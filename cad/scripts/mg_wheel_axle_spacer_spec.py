@@ -14,8 +14,10 @@ unchanged, and the wheel's spokes stand off its hub's back face
 The spacer is not clamped: with the back washer and the wheel it floats on
 the shank inside the endshake the nut sets (``mg_wheel_group``).  Nothing
 runs on it by design (the wheel's hub runs on the back washer), so neither
-face carries a roughness symbol.  Its length places the hub on the pin and so
-enters the pin's thread stack, hence its explicit band.
+face carries a roughness symbol.  MHA-MG-00 presses the pin with the spacer
+on its shank and gauges the pin's step from the spacer's outer face (owner
+ruling 2026-11-21, fit at assembly), so the length leaves the pin's thread
+stack and prints at the title block's .XXX.
 
 Local frame: lathe axis +Z, origin on the axis at the face that bears on the
 bar (Front Plane, z = 0, machine z ``BAR_FRONT_Z``); the washer face at
@@ -43,21 +45,17 @@ UNIT = drawing_unit("parts/mg-wheel-axle-spacer", _config.parts("mg-wheel-axle-s
 LENGTH = round(BAR_FRONT_Z - PEN_Z_MID - _back.MODEL_THICKNESS - HUB_BACK_Z, 6)
 if LENGTH <= 0.0:
     raise AssertionError(f"pen line {PEN_Z_MID} leaves no room for the spacer")
-# It moves the hub, and so the nut stack, along the pin: the thread length
-# that keeps the locknut on full thread (mg_wheel_group) spends this band. The
-# length closes the pen line, so it keeps its millimetre value and prints
-# rounded at .XXX; the stack reads the printed limits.
-LENGTH_BAND = 0.0254  # +/-.001
+# Owner ruling 2026-11-21 (tight-tolerance audit, row 3): "fit at assembly".
+# MHA-MG-00 sets the pin's press depth from this spacer's outer face, so its
+# length moves only the wheel's mid-plane off the pen line (by the band) and
+# no longer the nut stack; it prints .732 at the title block's .XXX (was
+# .731-.733). The length closes the pen line, so it keeps its millimetre
+# value and prints rounded at .XXX; the stack reads the printed limits.
 LENGTH_PLACES = 3
 LENGTH_LIMITS = tuple(
     LENGTH + deviation
-    for deviation in printed_deviations(
-        LENGTH, LENGTH_PLACES, (-LENGTH_BAND, LENGTH_BAND), unit=UNIT
-    )
+    for deviation in printed_deviations(LENGTH, LENGTH_PLACES, unit=UNIT)
 )
-# Two lines narrower than the 3:1 extension-line span (18.6 x 3 = 55.8 mm): the
-# one-line "MG-WHEEL-AXLE THREAD" ran into both extension lines.
-LENGTH_CALLOUT = f"SETS WHEEL STACK\nON AXLE {_config.parts('mg-wheel-axle')['number']}"
 
 # 7/16 bar as supplied (.4375) meets the .44 O.D.: the washer's own O.D.
 OD = 11.176  # .44

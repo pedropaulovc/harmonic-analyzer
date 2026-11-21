@@ -72,13 +72,10 @@ def test_stack_detail_station_increases_right(detail) -> None:
 
 
 def test_the_stack_settings_are_the_group_stations_with_their_bands() -> None:
-    # The rev-10 19.5 plus the spacer that lands the wheel on the pen line,
-    # snapped to the gauge's .001-in grid.
-    assert (
-        stack.PRESS_GAUGE
-        == mg_wheel_axle_spec.PRESS_GAUGE
-        == pytest.approx(19.5 + mg_wheel_axle_spacer_spec.LENGTH, abs=0.0127)
-    )
+    # Owner ruling 2026-11-21: the gauge runs from the spacer's outer face,
+    # .768 +/-.002, the rev-10 19.5 snapped to the .001-in grid.
+    assert stack.PRESS_GAUGE == mg_wheel_axle_spec.PRESS_GAUGE == 0.768 * 25.4
+    assert stack.PRESS_GAUGE_TOL == 0.002 * 25.4
     assert stack.PRESS_GAUGE_TOL == mg_wheel_axle_spec.PRESS_GAUGE_TOL
     # The printed endshake band is exactly the group's set window.
     assert stack.ENDSHAKE - stack.ENDSHAKE_TOL == pytest.approx(
@@ -87,13 +84,16 @@ def test_the_stack_settings_are_the_group_stations_with_their_bands() -> None:
     assert stack.ENDSHAKE + stack.ENDSHAKE_TOL == pytest.approx(
         mg_wheel_group.ENDSHAKE_MAX
     )
-    # Chain stations: bar far face, axle plain end, bar front face, shank
-    # step, drum face, spigot face, front washer, locknut face, thread end.
-    far, plain, face, step, drum, hub, washer, locknut, thread = stack.CHAIN_D
+    # Chain stations: bar far face, axle plain end, bar front face, spacer
+    # outer face, shank step, drum face, spigot face, front washer, locknut
+    # face, thread end.
+    far, plain, face, spacer, step, drum, hub, washer, locknut, thread = stack.CHAIN_D
     assert stack.CHAIN_D[stack.CHAIN_ORIGIN_INDEX] == face == 0.0
     assert far == -mg_wheel_axle_spec.BAR_DEPTH
     assert plain == mg_wheel_axle_spec.BACK_Y
-    assert step == mg_wheel_axle_spec.STEP_Y
+    assert spacer == mg_wheel_axle_spacer_spec.LENGTH
+    assert step - spacer == pytest.approx(stack.PRESS_GAUGE)
+    assert step == pytest.approx(mg_wheel_axle_spec.STEP_Y)
     assert hub - drum == pytest.approx(
         mg_magnifying_wheel_geom.SPIGOT_LEN - mg_magnifying_wheel_geom.DRUM_LEN
     )
@@ -101,7 +101,7 @@ def test_the_stack_settings_are_the_group_stations_with_their_bands() -> None:
     assert washer == mg_wheel_group.FRONT_WASHER_D
     assert locknut == mg_wheel_group.LOCKNUT_FACE_D
     assert thread == mg_wheel_axle_spec.THREAD_END_Y
-    assert far < plain < face < step < drum < hub < washer < locknut < thread
+    assert far < plain < face < spacer < step < drum < hub < washer < locknut < thread
 
 
 def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
@@ -113,18 +113,22 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
     names = {stack.PRESS_GAUGE_DIMENSION, stack.ENDSHAKE_DIMENSION} | limits
     assert notes.DRAWING_DIMENSIONS == {stack.FEATURE: names}
     assert set(stack.DRAWING_PRECISION[stack.FEATURE]) == names
-    assert set(stack.DIMENSION_TOLERANCES) == {stack.ENDSHAKE_DIMENSION}
+    assert set(stack.DIMENSION_TOLERANCES) == {
+        stack.PRESS_GAUGE_DIMENSION,
+        stack.ENDSHAKE_DIMENSION,
+    }
     assert set(stack.LIMIT_DIMENSIONS) == limits
-    assert stack.REFERENCE_DIMENSIONS == {stack.PRESS_GAUGE_DIMENSION}
     assert stack.DIMENSION_TOLERANCES[stack.ENDSHAKE_DIMENSION] == stack.ENDSHAKE_TOL
-    # The sheet is inch; the endshake and its band print exactly at their
-    # places (render_number refuses a value off the printed grid), so the
-    # printed band is the stack's band; so do the limit pairs.
+    assert stack.DIMENSION_TOLERANCES[stack.PRESS_GAUGE_DIMENSION] == stack.PRESS_GAUGE_TOL
+    # The sheet is inch; the gauge, the endshake and their bands print
+    # exactly at their places (render_number refuses a value off the printed
+    # grid), so each printed band is the stack's band; so do the limit pairs.
     assert stack.UNIT == "in"
     places = stack.DRAWING_PRECISION[stack.FEATURE]
     render_number(stack.ENDSHAKE / 25.4, "in", places[stack.ENDSHAKE_DIMENSION])
     render_number(stack.ENDSHAKE_TOL / 25.4, "in", stack.TOLERANCE_PRECISION)
     render_number(stack.PRESS_GAUGE / 25.4, "in", places[stack.PRESS_GAUGE_DIMENSION])
+    render_number(stack.PRESS_GAUGE_TOL / 25.4, "in", stack.TOLERANCE_PRECISION)
     for name, pair in stack.LIMIT_DIMENSIONS.items():
         assert places[name] == stack.LIMIT_PRECISION
         for limit in pair:
@@ -153,19 +157,20 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
     }
 
 
-def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
-    # Machinist reviews of e04fd60ab and 179705ff2: a band on a hand
-    # press is unneeded precision; the gauge prints as a bare reference. Its
-    # acceptance, read at the second nut, prints as DETAIL B's thread-end
-    # limits (#2286 option A: farm rounds 1-3 gated it as a DETAIL A callout,
-    # a view with no nut). A press to nominal within the stack's allocation
-    # passes it at every corner.
+def test_the_press_gauge_is_a_setting_accepted_at_the_nuts() -> None:
+    # Owner ruling 2026-11-21: the gauge, .768 +/-.002 from the spacer's
+    # outer face, is the press's setting. Its acceptance, read at the second
+    # nut, prints as DETAIL B's thread-end limits (#2286 option A: farm
+    # rounds 1-3 gated it as a DETAIL A callout, a view with no nut). A press
+    # inside the band passes it at every corner.
     low = stack.PRESS_GAUGE - stack.PRESS_GAUGE_TOL
     high = stack.PRESS_GAUGE + stack.PRESS_GAUGE_TOL
-    assert stack.PRESS_GAUGE_LOW_LIMIT / 25.4 == pytest.approx(1.497, abs=1e-6)
-    assert stack.PRESS_GAUGE_HIGH_LIMIT / 25.4 == pytest.approx(1.502, abs=1e-6)
+    assert stack.PRESS_GAUGE_LOW_LIMIT / 25.4 == pytest.approx(0.764, abs=1e-6)
+    assert stack.PRESS_GAUGE_HIGH_LIMIT / 25.4 == pytest.approx(0.771, abs=1e-6)
     assert stack.PRESS_GAUGE_LOW_LIMIT <= low < high <= stack.PRESS_GAUGE_HIGH_LIMIT
-    assert stack.PRESS_GAUGE_DIMENSION not in stack.SETTING_CALLOUTS[stack.FEATURE]
+    assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.PRESS_GAUGE_DIMENSION][
+        1
+    ].startswith("PRESS SETTING:")
     # The printed limits, in inches: the high side is the axle's own limit
     # and passes the worst stack; the low side keeps the locknut on full
     # thread, the dome's incomplete pitch past it, which the stack's low
@@ -178,9 +183,9 @@ def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
     assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.THREAD_PAST_LOCKNUT_DIMENSION][
         1
     ].startswith("ACCEPTANCE:")
-    assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.BACK_END_SUNK_DIMENSION][
-        1
-    ].startswith("FIRST SETTING:")
+    assert "SETTING" not in stack.SETTING_CALLOUTS[stack.FEATURE][
+        stack.BACK_END_SUNK_DIMENSION
+    ][1]
     # The acceptance is checked on the trial stack, then again once both
     # nuts are set, where DETAIL B dimensions it, with a named instrument;
     # the step names the view, never the value.
@@ -280,19 +285,26 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
         assert rule in notes.BOND_NOTE
 
 
-def test_the_axle_press_goes_to_the_plain_end_window_as_a_first_setting() -> None:
-    """The bar sheet no longer prints the pressed axle's end window (fanout/mg
-    #2260). The press step goes to it as a first setting, which DETAIL A
-    dimensions from the bar's far face as the axle spec's limits; the
-    thread-end check is the only acceptance (#2286 option A)."""
+def test_the_axle_press_goes_to_the_gauge_past_the_spacer() -> None:
+    """Owner ruling 2026-11-21 (fit at assembly): the press step sets the
+    shoulder past the outer face of the spacer, slid on the shank against
+    the bar, as DETAIL A dimensions it; the plain end's window below the
+    bar's far face (the axle spec's limits) is where that press leaves it,
+    and the thread-end check is the only acceptance (#2286 option A)."""
     low, high = stack.LIMIT_DIMENSIONS[stack.BACK_END_SUNK_DIMENSION]
     assert 0.0 < low < stack.BACK_END_D - stack.BAR_FAR_D < high
     pressed = notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
     assert (
-        "TO A FIRST SETTING: ITS PLAIN END BELOW THE FAR FACE OF ITEM "
-        f"{notes.ITEM_NUMBERS['mg-wheel-bar']} AS {notes.PRESS_DETAIL_TITLE} SETS IT"
-        in pressed
+        "UNTIL THE SHOULDER STANDS PAST THE OUTER FACE OF ITEM "
+        f"{notes.ITEM_NUMBERS['mg-wheel-axle-spacer']}, SLID ON THE SHANK AGAINST "
+        f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']}, AS {notes.PRESS_DETAIL_TITLE} "
+        "SETS IT" in pressed
     )
+    # The spacer stays on from the press: the trial and final stacks start at
+    # the back washer.
+    for key in (steps.AXLE_TRIAL_KEY, "wheel-stacked", "axle-stack-removed"):
+        assert f"{notes.ITEM_NUMBERS['mg-wheel-axle-spacer']}," not in notes.STEP_TEXT[key]
+        assert f"AND {notes.ITEM_NUMBERS['mg-wheel-axle-spacer']}." not in notes.STEP_TEXT[key]
     assert "CALIPER DEPTH ROD" in pressed
     assert not re.search(r"\.\d{3}", pressed)
     assert "GOVERN" not in notes.STEP_TEXT[steps.AXLE_CHECKED_KEY]
@@ -676,8 +688,8 @@ def test_only_detail_a_is_broken_out_after_its_chain_and_import(monkeypatch, det
     assert order == ["place", "chain", "import", *cut, "crop", "label"]
 
 
-def test_the_gauge_detail_shows_only_the_bar_and_the_axle() -> None:
-    assert drawing.PRESSED.stems == {"mg-wheel-bar", "mg-wheel-axle"}
+def test_the_gauge_detail_shows_only_the_bar_the_axle_and_the_spacer() -> None:
+    assert drawing.PRESSED.stems == {"mg-wheel-bar", "mg-wheel-axle", "mg-wheel-axle-spacer"}
     assert {
         "mg-vn-wheel-axle-front-washer",
         "mg-vn-wheel-axle-nut",
@@ -826,9 +838,10 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
         f"StackAxisY@{feature}": '"AxleAxisY"',
         f"{stack.BACK_END_SUNK_DIMENSION}@{feature}": '"AxleBackEndSunk"',
         f"PlainEndToFrontFace@{feature}": '"AxleBarDepth" - "AxleBackEndSunk"',
+        f"FrontFaceToSpacerFace@{feature}": '"AxleSpacerLength"',
         f"{stack.PRESS_GAUGE_DIMENSION}@{feature}": '"AxlePressGauge"',
         f"StepToDrumFace@{feature}": (
-            '"HubFrontStation" - "AxlePressGauge" - "WheelDrumRecess"'
+            '"HubFrontStation" - "AxleSpacerLength" - "AxlePressGauge" - "WheelDrumRecess"'
         ),
         f"{stack.DRUM_RECESS_DIMENSION}@{feature}": '"WheelDrumRecess"',
         f"{stack.ENDSHAKE_DIMENSION}@{feature}": '"WheelEndshake"',
@@ -842,6 +855,7 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
         "AxleAxisY": f"{stack.AXLE_Y}mm",
         "AxleBarDepth": f"{-stack.BAR_FAR_D}mm",
         "AxleBackEndSunk": f"{stack.BACK_END_D - stack.BAR_FAR_D}mm",
+        "AxleSpacerLength": f"{stack.SPACER_FACE_D}mm",
         "AxlePressGauge": f"{stack.PRESS_GAUGE}mm",
         "WheelDrumRecess": f"{stack.DRUM_RECESS}mm",
         "HubFrontStation": f"{stack.HUB_FRONT_D}mm",
@@ -865,16 +879,9 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
         for name, limits in stack.LIMIT_DIMENSIONS.items()
     ]
     assert blanked == [feature]
-    # The press gauge is a bare reference, (value) with no band; the banded
-    # endshake gets no affixes.
-    for (_feature, name), (display, dimension, parts) in references.items():
-        if name in stack.REFERENCE_DIMENSIONS:
-            assert dimension.Tolerance.Type == 0
-            assert display.ShowParenthesis is False
-            assert parts == {1: "(", 2: ")"}
-        else:
-            assert parts == {}
-    assert stack.REFERENCE_DIMENSIONS <= {name for _f, name in references}
+    # Every setting is banded or printed as limits (the press gauge took its
+    # band, owner ruling 2026-11-21): none is rewritten as a reference.
+    assert references == {}
 
 
 def test_the_package_has_five_landscape_sheets_with_view_d_on_sheet_5() -> None:
@@ -1849,16 +1856,12 @@ def test_mg_settings_only_read_inherited_native_callouts(
     def forbidden(*_args):
         pytest.fail("drawing settings must not write native callout text")
 
-    # Every imported setting, including the bare press-gauge reference,
-    # which inherits no callout (#2286 option A).
+    # Every imported setting, each with its inherited callout.
     for name in precision:
         part, text = callouts.get(name, (None, ""))
         text_parts[name] = {part: text.replace("\n", "\r\n")} if part else {}
         band_m = stack.DIMENSION_TOLERANCES.get(name, 0.0) / 1000.0
-        reference = group == "stack" and name in stack.REFERENCE_DIMENSIONS
         limits = stack.LIMIT_DIMENSIONS.get(name) if group == "stack" else None
-        if reference:
-            text_parts[name].update({1: "(", 2: ")"})
         legs = dict(zip(stack.CHAIN_LEG_DIMENSIONS, zip(stack.CHAIN_D, stack.CHAIN_D[1:])))
         nominal_m = (legs[name][1] - legs[name][0]) / 1000.0 if limits else 0.0
         if limits:
@@ -1869,7 +1872,7 @@ def test_mg_settings_only_read_inherited_native_callouts(
             )
         else:
             tolerance = SimpleNamespace(
-                Type=0 if reference else 4,
+                Type=4,
                 GetMaxValue=lambda band=band_m: band,
                 GetMinValue=lambda band=band_m: -band,
             )

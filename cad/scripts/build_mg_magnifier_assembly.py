@@ -419,8 +419,11 @@ def _author_setting_callouts(adapter, feature: str) -> None:
 _AXLE_STACK_DRIVES = {
     stack_spec.BACK_END_SUNK_DIMENSION: '"AxleBackEndSunk"',
     "PlainEndToFrontFace": '"AxleBarDepth" - "AxleBackEndSunk"',
+    "FrontFaceToSpacerFace": '"AxleSpacerLength"',
     stack_spec.PRESS_GAUGE_DIMENSION: '"AxlePressGauge"',
-    "StepToDrumFace": '"HubFrontStation" - "AxlePressGauge" - "WheelDrumRecess"',
+    "StepToDrumFace": (
+        '"HubFrontStation" - "AxleSpacerLength" - "AxlePressGauge" - "WheelDrumRecess"'
+    ),
     stack_spec.DRUM_RECESS_DIMENSION: '"WheelDrumRecess"',
     stack_spec.ENDSHAKE_DIMENSION: '"WheelEndshake"',
     "WasherToLocknutFace": '"LocknutFaceStation" - "HubFrontStation" - "WheelEndshake"',
@@ -434,9 +437,8 @@ def _author_axle_stack_reference(adapter) -> None:
     """The axle-stack settings as model dimensions: no solid or pose edits,
     one construction chain on the axle centreline through the stations of
     mg_magnifier_assembly_spec.CHAIN_D (the bar's far face to the axle's
-    thread end), dimensioned from globals, banded, printed as limits or shown
-    as a reference, marked for the drawing and blanked (the ms ClampedSetting
-    pattern).
+    thread end), dimensioned from globals, banded or printed as limits,
+    marked for the drawing and blanked (the ms ClampedSetting pattern).
     On the Right plane, sketch x is machine -z and sketch y is machine y."""
     spec = stack_spec
     for name, value in (
@@ -444,6 +446,7 @@ def _author_axle_stack_reference(adapter) -> None:
         ("AxleAxisY", spec.AXLE_Y),
         ("AxleBarDepth", -spec.BAR_FAR_D),
         ("AxleBackEndSunk", spec.BACK_END_D - spec.BAR_FAR_D),
+        ("AxleSpacerLength", spec.SPACER_FACE_D),
         ("AxlePressGauge", spec.PRESS_GAUGE),
         ("WheelDrumRecess", spec.DRUM_RECESS),
         ("HubFrontStation", spec.HUB_FRONT_D),
@@ -517,23 +520,6 @@ def _author_axle_stack_reference(adapter) -> None:
             places=spec.LIMIT_PRECISION,
             display_unit=spec.UNIT,
         )
-    for name in sorted(spec.REFERENCE_DIMENSIONS):
-        # A reference nominal, (1.500), through the native prefix/suffix
-        # channel around the live value (ShowParenthesis can read True and
-        # print bare); no band: the callout states its acceptance.
-        display, dimension = _named_dimension(adapter, spec.FEATURE, name)
-        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-        tolerance.Type = 0  # swTolNONE; property put, no success retval
-        display.ShowParenthesis = False
-        display.SetText(1, "(")  # swDimensionTextPrefix
-        display.SetText(2, ")")  # swDimensionTextSuffix
-        if (
-            int(tolerance.Type) != 0
-            or bool(display.ShowParenthesis)
-            or str(display.GetText(1) or "") != "("
-            or str(display.GetText(2) or "") != ")"
-        ):
-            raise RuntimeError(f"{name}@{spec.FEATURE}: reference form did not persist")
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     _author_setting_callouts(adapter, spec.FEATURE)
     mark_dimensions_for_drawing(

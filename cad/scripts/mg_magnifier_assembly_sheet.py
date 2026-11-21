@@ -224,9 +224,12 @@ _AXLE, _BAR, _WHEEL, _DRUM = _item(AXLE), _item(WHEEL_BAR), _item(WHEEL), _item(
 _NUT, _WASHER, _LEVER, _BRACKET = _item(NUT), _item(FRONT_WASHER), _item(LEVER), _item(BRACKET)
 _CLAMP, _THUMB, _ROD, _FIXTURE = _item(CLAMP), _item(THUMB_SCREW), _item(ROD), _item(FIXTURE)
 _WIRE = _item(WIRE)
-# The wheel stack on the axle, bar side first (sheet 2 shows the order).
+_SPACER = _item(SPACER)
+# The wheel stack on the axle past the spacer, bar side first (sheet 2 shows
+# the order). The spacer goes on at the press, which is gauged from its outer
+# face (owner ruling 2026-11-21), and stays on.
 _STACK = (
-    f"ITEMS {ITEM_NUMBERS[SPACER]}, {ITEM_NUMBERS[BACK_WASHER]}, "
+    f"ITEMS {ITEM_NUMBERS[BACK_WASHER]}, "
     f"{ITEM_NUMBERS[WHEEL]} ({_DRUM} AWAY FROM {_BAR}) AND {ITEM_NUMBERS[FRONT_WASHER]}"
 )
 
@@ -335,10 +338,10 @@ STEP_TEXT = {
         f"IF IT WAS BONDED, RETURN TO {_step(_steps.DRUM_HELD_KEY)} ONCE IT HAS "
         "CURED 24 H."
     ),
-    # The press goes to a first setting: the plain end's window below the
-    # bar's far face (the bar's depth stack, which MHA-MG-08 names; the spec
-    # proves the window), read with a depth rod where DETAIL A dimensions it.
-    # The only acceptance of the axle's position is the thread end past the
+    # The press goes to its setting: the shoulder past the outer face of the
+    # spacer slid on the shank against the bar (owner ruling 2026-11-21, fit
+    # at assembly: the spacer's length leaves the nut stack), read with a
+    # depth rod where DETAIL A dimensions it. The only acceptance of the axle's position is the thread end past the
     # second nut: the limits a depth rod reads there (owner ruling 2026-11-06
     # Q1), dimensioned on DETAIL B, which draws the nuts. Farm rounds 1-3
     # gated it as a callout on DETAIL A, which draws no nut, and r3 read two
@@ -349,9 +352,9 @@ STEP_TEXT = {
     "axle-plain-end-oiled": f"WIPE LIGHT MACHINE OIL ON THE PLAIN END OF {_AXLE}.",
     _steps.AXLE_PRESSED_KEY: (
         f"PRESS {_AXLE} INTO {_BAR}, THREADED END OUT, ON ITS SHOULDER ONLY "
-        f"THROUGH THE {_step(_steps.PRESS_SLEEVE_MADE_KEY)} SLEEVE, TO A FIRST "
-        f"SETTING: ITS PLAIN END BELOW THE FAR FACE OF {_BAR} AS "
-        f"{PRESS_DETAIL_TITLE} SETS IT (CALIPER DEPTH ROD)."
+        f"THROUGH THE {_step(_steps.PRESS_SLEEVE_MADE_KEY)} SLEEVE, UNTIL THE "
+        f"SHOULDER STANDS PAST THE OUTER FACE OF {_SPACER}, SLID ON THE SHANK "
+        f"AGAINST {_BAR}, AS {PRESS_DETAIL_TITLE} SETS IT (CALIPER DEPTH ROD)."
     ),
     _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
     # Owner ruling 2026-11-11 (#2541, #2523; amends 2026-11-07): a slip axle
@@ -362,7 +365,7 @@ STEP_TEXT = {
     # (3D/3E) has its depth read at once, before it comes back through the
     # hold check, and one that no longer holds is rebonded to that reading,
     # so the correction is not lost (#2578); before any re-press the axle
-    # stands at the DETAIL A first setting.
+    # stands at the DETAIL A press setting.
     "axle-pressed-out": (
         f"IF IT DOES, OR AN UNBONDED {_AXLE} SLID IN BY HAND, PRESS {_AXLE} OUT."
     ),
@@ -460,8 +463,8 @@ STEP_TEXT = {
     # and take the trial-fit loop again (machinist review, stab-split s2).
     "axle-stack-removed": (
         f"IF IT FAILS, REMOVE ITEMS {ITEM_NUMBERS[NUT]}, "
-        f"{ITEM_NUMBERS[FRONT_WASHER]}, {ITEM_NUMBERS[WHEEL]}, "
-        f"{ITEM_NUMBERS[BACK_WASHER]} AND {ITEM_NUMBERS[SPACER]}."
+        f"{ITEM_NUMBERS[FRONT_WASHER]}, {ITEM_NUMBERS[WHEEL]} AND "
+        f"{ITEM_NUMBERS[BACK_WASHER]}."
     ),
     "axle-reset": (
         f"IF THEY WERE REMOVED, RETURN TO {_step(_steps.AXLE_TRIAL_KEY)}."
