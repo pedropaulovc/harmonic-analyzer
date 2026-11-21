@@ -303,7 +303,8 @@ def test_stored_spare_with_the_active_configuration_remains_a_clash(
         _check(adapter)
     assert observations.spans["gate.interference"].attributes["chain_mesh_contacts"] == 1
     assert observations.spans["gate.interference"].attributes["hits"] == 1
-    assert observations.events[0][1]["configurations"] == ["InnerLink", equal_config]
+    # A result's members are read in name order (#2759), not as reported.
+    assert observations.events[0][1]["configurations"] == [equal_config, "InnerLink"]
     assert adapter.currentModel.manager.releases == 1
 
 

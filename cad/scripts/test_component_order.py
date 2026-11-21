@@ -222,3 +222,107 @@ def test_an_unnamed_member_never_binds_the_top_level_selector():
         component_reference_names(
             model, {"@LeverWire:1": ("sh-vn-music-wire", "LeverWire")}
         )
+
+
+class _ReportedComponent:
+    """A component as an interference result hands it back: logs each read."""
+
+    def __init__(self, log: list, name: str) -> None:
+        self._log = log
+        self._name = name
+
+    @property
+    def Name2(self) -> str:
+        self._log.append((self._name, "Name2"))
+        return self._name
+
+    @property
+    def ReferencedConfiguration(self) -> str:
+        self._log.append((self._name, "ReferencedConfiguration"))
+        return "Default"
+
+
+class _Interference:
+    def __init__(self, log: list, components: list, volume_mm3: float) -> None:
+        self._log = log
+        self._components = components
+        self._volume = volume_mm3 / 1e9
+        self._label = "&".join(sorted(component._name for component in components))
+
+    @property
+    def Components(self) -> list:
+        self._log.append((self._label, "Components"))
+        return self._components
+
+    @property
+    def Volume(self) -> float:
+        self._log.append((self._label, "Volume"))
+        return self._volume
+
+
+def _interference_adapter(log: list, results: list) -> SimpleNamespace:
+    manager = SimpleNamespace(
+        GetInterferences=lambda: results, Done=lambda: log.append(("manager", "Done"))
+    )
+    model = SimpleNamespace(
+        InterferenceDetectionManager=manager,
+        ToolsCheckInterference=lambda: None,
+        GetComponents=lambda _top_level_only: [],
+    )
+    return SimpleNamespace(
+        currentModel=model, _attempt=lambda action, default=None: action()
+    )
+
+
+def _interference_pass(reversed_report: bool) -> tuple[list, str]:
+    """Run the interference gate over four clashes (two sharing one pair) the
+    seat reports in one order, or in the reverse order with each pair's
+    members swapped."""
+    log: list = []
+    pairs = [
+        ("plate-1", "gear-1", 2.0),
+        ("gear-10", "gear-2", 3.0),
+        ("shaft-1", "gear-1", 4.0),
+        ("gear-1", "plate-1", 1.0),
+    ]
+    results = [
+        _Interference(
+            log,
+            [
+                _ReportedComponent(log, name)
+                for name in (pair[::-1] if reversed_report else pair)
+            ],
+            volume,
+        )
+        for *pair, volume in pairs
+    ]
+    if reversed_report:
+        results.reverse()
+    with pytest.raises(RuntimeError, match="4 interference") as raised:
+        _assembly.check_no_interference(_interference_adapter(log, results))
+    return log, str(raised.value)
+
+
+def test_interference_results_are_read_in_name_pair_order():
+    # Issue #2759: only the name reads follow the report's order; every later
+    # read, and the failure text, follow the sorted name pairs. Results that
+    # share a pair are reported by volume.
+    (first, first_error), (second, second_error) = map(
+        _interference_pass, (False, True)
+    )
+    names = sum(1 for entry in first if entry[1] in ("Components", "Name2"))
+    assert first[names:] == second[names:]
+    assert first_error == second_error
+    assert first_error.endswith(
+        "gear-1 & plate-1: 1 mm^3; gear-1 & plate-1: 2 mm^3; "
+        "gear-1 & shaft-1: 4 mm^3; gear-2 & gear-10: 3 mm^3"
+    )
+
+
+def test_an_unnamed_interference_member_fails_closed_and_releases_the_manager():
+    log: list = []
+    unnamed = SimpleNamespace(Name2=None)
+    result = SimpleNamespace(Components=[_ReportedComponent(log, "gear-1"), unnamed])
+    with pytest.raises(RuntimeError):
+        _assembly.check_no_interference(_interference_adapter(log, [result]))
+    assert log[-1] == ("manager", "Done")
