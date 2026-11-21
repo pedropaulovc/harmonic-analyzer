@@ -192,16 +192,18 @@ ACCEPTANCES = (
     # its bond is wet (1S) and accepted after cure (1X) on its tooth runout
     # about MHA-DT-04, read in every space with the part sheets' over-pins
     # pin; cone_set_stack books the limit, floored onto the printed places.
-    # MHA-DT-04 stands on its journal end against a V-block, so it turns on
-    # the journal's axis (Codjiflo review of #3324); the pin names the
-    # pin-gauge row of the tool list as MHA-PD-00's tooth-space rows do.
+    # MHA-DT-04 stands on its journal end in a V-block, so it turns on the
+    # journal's axis and 1T clips the comb in that same setup (Codjiflo
+    # review of #3324); the pin names the pin-gauge row of the tool list as
+    # MHA-PD-00's tooth-space rows do.  The cells hold the table's widest
+    # SETTING and ACCEPT widths (reference-view keep-out).
     (
         "t024-runout",
         f"{_step_ref('cone-gears-stacked', 'S')}, {_step_ref('cone-gears-stacked', 'X')}",
-        f"T{_LAND_2_TEETH:03d} RUNOUT, "
+        f"T{_LAND_2_TEETH:03d}, "
         f"\u00d8{inch_text(cone_gear.over_pins_pin_dia_mm(_LAND_2_TEETH), 3)} GAUGE PIN, "
-        "JOURNAL ON A V-BLOCK",
-        f"{inch_text(inch_floor_mm(LAND_2_ASSEMBLED_RUNOUT_TIR_MM, 4), 4)} TIR MAX",
+        "MHA-DT-04 ON END ON A V-BLOCK",
+        f"{inch_text(inch_floor_mm(LAND_2_ASSEMBLED_RUNOUT_TIR_MM, 4), 4)} TIR MAX EACH SPACE",
         "TEST INDICATOR",
     ),
 )

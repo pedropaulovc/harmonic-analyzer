@@ -53,9 +53,9 @@ def test_cone_drum_mesh_keeps_contact_at_the_loosest_feel_set(teeth: int) -> Non
 
 @pytest.mark.parametrize("teeth", cone.ROUND_BORE_TEETH)
 def test_bonded_gears_book_their_bond_float(teeth: int) -> None:
-    # #3219 option D and #3292: T012/T018's eccentricity about MHA-DT-04 is
-    # their printed tooth-space runout / 2 plus the bond float; T024's is half
-    # its after-cure tooth runout about MHA-DT-04, which reads the float.
+    # #3219 option D and #3292: T012/T018's eccentricity about the running
+    # axis is their printed tooth-space runout / 2 plus the bond float; T024's
+    # is half its after-cure tooth runout about MHA-DT-04, which reads the float.
     centre = cone_set_stack.cone_centre(teeth)
     if teeth in cone.SPIGOT_TEETH:
         eccentricity = (

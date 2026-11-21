@@ -141,8 +141,9 @@ def gear_data(teeth: int) -> str:
         # (MHA-DT-00 check 4), which measures no backlash, so the range is
         # reference only, from no binding to the loosest running centre
         # (#2586). "FEEL SET" read as a private phrase (machinist review of
-        # #3324 r1, 2 of 3 runs).
-        ("BACKLASH WITH MATE (REF), SET AT ASSEMBLY",
+        # #3324 r1, 2 of 3 runs) and "SET AT ASSEMBLY" as a backlash to set
+        # (Codjiflo review of #3324); note 2 names the assembly acceptance.
+        ("BACKLASH WITH MATE (REF)",
          f"{inch(minimum, 3)} TO {inch(maximum, 3)}"),
         # The bore's worst ligament (RV-03 on T012, RV-07 on T030).
         ("WEB MIN (REF)", inch(web, 4)),

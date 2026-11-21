@@ -1528,11 +1528,12 @@ def test_cone_station_rows_run_front_to_back() -> None:
     # and defines the BLADE the steps cite (machinist review of bd81283964).
     assert table[-1] == "MHA-DT-03-TL-02 = PHASING COMB, A BLADE IN A TOOTH SPACE OF EACH GEAR."
     # Owner, 2026-11-14 (#2734): the comb is a U clipped over the tip of the
-    # cone standing on its journal, both arms on T036.
+    # cone standing on its journal, both arms on T036; the journal stands in
+    # sheet 16 row 21's V-block from 1S (Codjiflo review of #3324).
     steps = " ".join(drawing.CONE_CRANK_STEPS.split())
     assert steps[steps.index("1T. ") :].startswith(
-        "1T. CLIP MHA-DT-03-TL-02 OVER THE TIP, MHA-DT-04 STANDING ON ITS"
-        " JOURNAL, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY."
+        "1T. CLIP MHA-DT-03-TL-02 OVER THE TIP, MHA-DT-04 STILL STANDING IN THE"
+        " V-BLOCK, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY."
     )
     # Round 2 waxes the blades again: its wet joints sit beside them.
     assert steps[steps.index("2B. ") :].startswith(

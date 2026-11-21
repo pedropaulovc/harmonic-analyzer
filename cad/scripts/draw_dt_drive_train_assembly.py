@@ -1476,9 +1476,9 @@ CONE_CRANK_STEPS = _note_text(
         # cures wherever it sits in its clearance, so T024 is centred while
         # the 638 is wet and accepted after cure on its tooth runout about
         # MHA-DT-04 (1X), the value cone_set_stack books.  Both read in the
-        # sheet 16 row's setup: MHA-DT-04 stands on its journal end, the
-        # journal turning against a V-block, so it turns on its own axis and
-        # 1T clips the comb without moving it (Codjiflo review of #3324).
+        # sheet 16 row's setup: MHA-DT-04 on end, its journal in a V-block,
+        # so it turns on its own axis, and 1T clips the comb in that same
+        # setup without moving it (Codjiflo review of #3324).
         f"1S. TAP T024 TRUE ON AN INDICATOR BEFORE IT GRABS ({acceptance_ref('t024-runout')}).",
         # Owner ruling 2026-11-10: one comb blade drops in one tooth space of
         # each gear.  T030's keyway centreline runs through its phase-0 tooth
@@ -1495,7 +1495,7 @@ CONE_CRANK_STEPS = _note_text(
         # inside the fixture time: T024 alone first (the comb's other blades
         # stand over air), then the spigot's three joints once T024 has cured,
         # since pushing T018 onto T024 loads it.
-        f"1T. CLIP {PHASING_COMB} OVER THE TIP, MHA-DT-04 STANDING ON ITS JOURNAL, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY.",
+        f"1T. CLIP {PHASING_COMB} OVER THE TIP, MHA-DT-04 STILL STANDING IN THE V-BLOCK, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY.",
         f"1U. REMOVE {PHASING_COMB} AND THE FEELER ONCE THE BOND GRABS.",
         "1V. AFTER T024'S 24 H CURE, WIPE THE WAX OFF T030 AND THE KEY END.",
         # #2470: T024 cures alone so it is accepted alone, before three wet
@@ -1513,9 +1513,9 @@ CONE_CRANK_STEPS = _note_text(
         "2. BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT PER THE SHEET 1 NOTE.",
         "2A. BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024, PER THE SHEET 1 NOTE.",
         # Round 2's wet joints sit beside the deeper blades, and 1Q's film has
-        # been through 1T and 1U, so the blades are coated again (Codjiflo
+        # been through 1U and 1V, so the blades are coated again (Codjiflo
         # review of PR #2735); step 2 has no letter left for a step of its own.
-        # MHA-DT-04 still stands on its journal from 1S.
+        # MHA-DT-04 still stands on end in the V-block from 1S and 1T.
         f"2B. CLIP {PHASING_COMB}, BLADES WAXED AGAIN, OVER THE TIP, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY.",
         # #2470: the coated spigot seals the blind socket's air in as it
         # enters; held home, the compressed air cannot back T018 off T024

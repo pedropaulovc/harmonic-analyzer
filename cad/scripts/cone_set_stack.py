@@ -123,9 +123,11 @@ LAND_2_ASSEMBLED_RUNOUT_TIR_MM = 0.0045 * 25.4
 
 
 def bond_float_mm(teeth: int) -> float:
-    """How far a bonded cone gear's bore can cure off its seat: half the
-    bond clearance (as dt_cone_gear_tl_phasing_comb_spec books it per gear);
-    zero for the keyed gears, which take their float up under mesh load."""
+    """How far a bonded cone gear's bore can cure off its seat: half its own
+    bond clearance; zero for the keyed gears, which take their float up under
+    mesh load.  dt_cone_gear_tl_phasing_comb_spec.BOND_FLOAT_MM is a different
+    quantity: one common float, the largest of these and the spigot's half
+    clearance in MHA-DT-04's socket, about T030's key rather than the axis."""
     if teeth in cone.ROUND_BORE_TEETH:
         return cone.bond_clearance_mm(teeth)[1] / 2.0
     return 0.0
