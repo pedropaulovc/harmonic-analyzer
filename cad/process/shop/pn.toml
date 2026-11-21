@@ -4,6 +4,26 @@
 # names are in common.toml, with the conventions every file follows; prechips
 # merges the directory's files by section and refuses a key defined twice.
 
+# --- MHA-PN-07 pen adjust screw (cad/process/pn_pen_adjust_screw/plan.toml) ---
+# The eye on the PM-30MV (program PS01_eye), in the C360 blank. Speeds:
+# LittleMachineShop "Cutting Speeds", Drilling & Reaming, row Brass (C35600,
+# C37700, C36000, ...): 160-175 ft/min (read 2026-11-17, as shop/mg.toml's
+# clamp holes): over 11,000 rpm on the #54 and on the #1 centre drill's 3/64
+# pilot, so the spindle's 2800. Feeds per rev: AutoDrill "Suggested drilling
+# feed rates" (as shop/mg.toml), row Brass, 1/16 in column .001 in/rev for
+# the .055 drill and the 3/64 pilot (under 1/16 takes that column's feed):
+# 2.8 in/min.
+[settings.pn-centre-drill-c360]
+tool = "centre-drills-carbide-60"
+material = "lathe-c360"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.pn-drill-54-c360]
+tool = "drill-54"
+material = "lathe-c360"
+rpm = 2800
+feed = "2.8 in/min"
+
 # --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
 # The tools the placeholder plans name (cad/process/<stem>/plan.toml with
 # revision = "placeholder", not in _process_plans.TRAVELER_STEMS), from the
