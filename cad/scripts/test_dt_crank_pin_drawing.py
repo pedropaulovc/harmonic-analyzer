@@ -74,7 +74,9 @@ def test_pin_is_the_bought_no_3_taper_pin_cross_drilled_only() -> None:
     assert spec.BIG_END_DIA == pytest.approx(0.219 * 25.4)
     assert spec.PIN_LENGTH == pytest.approx(1.75 * 25.4)
     # The standard 1:48 on diameter gives the catalogue's .183 small end.
-    assert spec.BIG_END_DIA - spec.SMALL_END_DIA == pytest.approx(spec.PIN_LENGTH / 48.0)
+    assert spec.BIG_END_DIA - spec.SMALL_END_DIA == pytest.approx(
+        spec.PIN_LENGTH / 48.0
+    )
     assert round(spec.SMALL_END_DIA / 25.4, 3) == 0.183
     assert set(spec.DRAWING_DIMENSIONS) == {"RingHoleProfile"}
     assert _config.parts("dt-crank-pin")["supplier_skus"] == [spec.SKU]
@@ -94,21 +96,29 @@ def test_ring_hole_station_runs_from_the_crowned_end_rim() -> None:
     callout = notes.RING_HOLE_STATION_CALLOUT_ABOVE
     assert " ".join(callout.split()) == "FROM END RIM"
     assert not any(ch.isdigit() for ch in callout)
-    assert len(callout.splitlines()) <= 2
+    # An above-callout with a line break does not print.
+    assert "\n" not in callout
 
 
 def test_matched_taper_fit_names_both_mates() -> None:
     """Rule 4: the hub and shaft are taper-reamed together to suit the pin,
-    so the fit names both mates by name and number and states the
-    acceptance, in the numbered note the taper callout links (rule 7)."""
+    so the fit names both mates by name and number in the numbered note the
+    taper callout links (rule 7).  The bought pin is not cut, so the
+    acceptance that ends the ream sits on the reamed parts' notes only
+    (machinist review of 3d3ad23a09)."""
     import _config
+    import dt_crank_hub_notes
+    import dt_crankshaft_notes
 
     assert notes.TAPER_CALLOUT.splitlines()[-1] == f"SEE NOTE {notes.TAPER_NOTE_NUMBER}"
     note = " ".join(notes.TAPER_NOTE.split())
     assert note.startswith(f"{notes.TAPER_NOTE_NUMBER}. ")
     for stem, name in (("dt-crank-hub", "CRANK HUB"), ("dt-crankshaft", "CRANKSHAFT")):
         assert f"{name} {_config.parts(stem)['number']}" in note
-    assert f"KEEPER RING {_config.parts('dt-crank-pin-ring')['number']}" in note
+    ring = f"KEEPER RING {_config.parts('dt-crank-pin-ring')['number']}"
+    assert ring not in note
+    for reamed in (dt_crank_hub_notes, dt_crankshaft_notes):
+        assert ring in " ".join(reamed.CROSS_HOLE_NOTE.split())
     assert len(notes.TAPER_NOTE.splitlines()) <= 4
 
 

@@ -25,7 +25,9 @@ STOCK_NOTE = "\n".join(
 # (dt_crank_pin_spec: the bought pin's ends are crowned about .03 high;
 # Codjiflo on #3158).  Words over the station's value: below it the rows would
 # run into the pin outline, which the value's text clears by only ~10 mm.
-RING_HOLE_STATION_CALLOUT_ABOVE = "FROM\nEND RIM"
+# One row: an above-callout with a line break does not print (r2 of #3158's
+# layout audit, text-unmatched; dt_cone_tip_gear_notes.CALLOUTS_ABOVE).
+RING_HOLE_STATION_CALLOUT_ABOVE = "FROM END RIM"
 
 # The taper's leader callout links the fit note (drawing-guidelines.md rule 7:
 # a flagged note, at most two lines of words).
@@ -33,14 +35,16 @@ TAPER_NOTE_NUMBER = 2
 TAPER_CALLOUT = f"DRIVE FIT\nSEE NOTE {TAPER_NOTE_NUMBER}"
 
 # The matched fit (rule 4): both mates by name and number, the fit by its
-# standard name (rule 26: DRIVE, not LIGHT DRIVE), the ream at assembly that
-# makes it, and the acceptance that ends the ream: the driven pin's keeper
-# ring MHA-DT-27 still clears the hub (#2231; the crank hub's note 1 for this
-# same joint; dt_crank_pin_ring_spec.PIN_PROUD books that clearance).
+# standard name (rule 26: DRIVE, not LIGHT DRIVE) and the ream at assembly
+# that makes it.  The acceptance that ends the ream (#2231: the driven pin's
+# keeper ring MHA-DT-27 still clears the hub; dt_crank_pin_ring_spec.PIN_PROUD
+# books that clearance) sits on the reamed parts, the crank hub's and the
+# crankshaft's note 1: the bought pin is not cut, so on its sheet the clause
+# was an assembly requirement (machinist review of 3d3ad23a09).
 TAPER_NOTE = "\n".join(
     (
         f"{TAPER_NOTE_NUMBER}. DRIVE FIT IN CRANK HUB MHA-DT-31 AND CRANKSHAFT MHA-DT-11, REAMED",
-        "   1:48 TOGETHER AT ASSEMBLY; KEEPER RING MHA-DT-27 MUST CLEAR THE HUB.",
+        "   1:48 TOGETHER AT ASSEMBLY.",
     )
 )
 

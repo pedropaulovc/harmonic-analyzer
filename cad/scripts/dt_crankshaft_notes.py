@@ -128,13 +128,15 @@ FIT_NOTE = "\n".join(
 # recommendations unless noted otherwise"; the recommendation: "Add the
 # sacrificial-stub permission; it costs one note and protects the crank mesh
 # runout"): the shaft may be turned between centres, the dome end's centre in
-# a sacrificial stub that goes when the dome is formed last.  A permission,
-# not a method; the plain end's leadered note links it.
+# extra stock past the dome.  The note states the finished part (no centre
+# in the dome) and the stock allowance (rule 7's `n STOCK OK`); the machinist
+# review of 3d3ad23a09 gated the earlier wording's cut-off and forming order
+# as a method.  The plain end's leadered note links it.
 CENTRE_STUB_NOTE_NUMBER = 4
 CENTRE_STUB_NOTE = "\n".join(
     (
-        f"{CENTRE_STUB_NOTE_NUMBER}. DOME END: A LATHE CENTRE IS OK ONLY IN A SACRIFICIAL STUB,",
-        "   CUT OFF WHEN THE DOME IS FORMED LAST.",
+        f"{CENTRE_STUB_NOTE_NUMBER}. NO CENTRE HOLE IN THE FINISHED DOME; A CENTRE IN EXTRA STOCK",
+        "   PAST THE DOME OK.",
     )
 )
 
@@ -229,8 +231,8 @@ PINION_PIN_CALLOUT = "\n".join(
 
 # Where the shop may drill a lathe centre hole (drawing-guidelines.md rule
 # 11): the plain far end, flagged here, and the dome end only as numbered
-# note 4 allows (owner ruling 2026-11-20, #2369: a sacrificial stub, the dome
-# formed last).  Note 4 names the dome itself, so it stands as a general
+# note 4 allows (owner ruling 2026-11-20, #2369: in extra stock past the
+# dome, none in the finished dome).  Note 4 names the dome itself, so it stands as a general
 # numbered note; this leadered row names only its own end (rule 7: flag it
 # where it applies; Codjiflo on #3158: a "SEE NOTE 4" here pointed from the
 # plain end at the dome).  The leader to the plain end's rim is what names

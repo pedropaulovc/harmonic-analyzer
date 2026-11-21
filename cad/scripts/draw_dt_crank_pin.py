@@ -102,8 +102,8 @@ AXIS_FACE_PICK = (FRONT_CENTER[0] + 0.020, FRONT_CENTER[1] + 0.002)
 # The .15 station's text cannot fit between its extension lines, 7.62 mm
 # apart at 2:1 (its test still budgets the 9.05 mm the template's "3.70"
 # measured). Put the text outboard right, clear of the outside arrow's
-# 6.35-mm tail and left of the taper-note leader; its FROM / END RIM rows
-# stand over it.
+# 6.35-mm tail and left of the taper-note leader; its FROM END RIM row
+# stands over it.
 # Below the hole: its Ø callout.  The bought pin's length and ends are
 # reference (note 1), so nothing else is dimensioned.
 FRONT_KEEP = {
