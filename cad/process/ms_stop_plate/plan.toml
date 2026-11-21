@@ -28,12 +28,12 @@
 # pair arrives drilled, opened and tapped. That sheet's wording is not
 # changed here (no drawing ink); flagged in the PR for the owner.
 #
-# Not on record, flagged: the .040 brass sheet (no stock record in
+# Flagged: the .040 brass sheet is not on record (no stock record in
 # cad/config/shop-equipment/stock-*.toml: to buy, any brass sheet or strip
-# .036-.044 thick as rolled, at least .62 x .90); Birchwood Casey Brass Black,
+# .036-.044 thick as rolled, at least .62 x .90). Birchwood Casey Brass Black,
 # its Cleaner-Degreaser and Barricade oil and the chemical gloves and glasses
-# (consumables, to_order; the traveler ends bare, tagged, until they arrive,
-# as MHA-MG-02's does).
+# are recorded consumables, to_order: the traveler ends bare, tagged, until
+# they arrive, as MHA-MG-02's does.
 #
 # Zeroing: X/Y by the .200 in edge finder at 900 rpm (the touch probe has no
 # holder); Z by the tool's point on a .002 feeler leaf. Every program loads
@@ -386,7 +386,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Start only with Birchwood Casey Brass Black, Birchwood Casey Cleaner-Degreaser and Barricade oil, chemical-resistant gloves and safety glasses in hand: all to buy, none on record. Until then the plate stays bare, tagged AWAITING BRASS BLACK with its pair mark."
+instruction = "Start only with Birchwood Casey Brass Black, Birchwood Casey Cleaner-Degreaser and Barricade oil, chemical-resistant gloves and safety glasses in hand: all on the order list, to buy. Until then the plate stays bare, tagged AWAITING BRASS BLACK with its pair mark."
 feed = "hand"
 
 [[setups.operations]]
