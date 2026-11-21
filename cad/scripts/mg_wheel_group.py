@@ -167,7 +167,9 @@ PEN_WIRE_WRAP_LEFT_DEG = PEN_WIRE_WRAP_DEG - CW_MAX_DEG  # 270.2
 # the tangent from the hook lands latest, and the wire leaves the drum
 # tangentially to reach TIE 1 standing outboard of it, at the hole's
 # farthest axis offset (the wire may lie anywhere in the smallest drilled
-# hole's slack), its clock angle shifted by that offset too.
+# hole's slack), its clock angle shifted by that offset too.  The drum-side
+# mouth is TIE 1's #50 counter-drill (#2406); the #60's smaller slack keeps
+# the wire farther out, so it bounds the departure from above.
 _HOOK_V = (_lever.HOOK_X - _lever.WHEEL_X, _lever.HOOK_Y - _lever.WHEEL_BAR_Y)
 _WIRE_R_MIN = _wheel.DRUM_WIRE_R_RANGE[0]
 _TANGENT_CLOCK_MIN = 180.0 - math.degrees(

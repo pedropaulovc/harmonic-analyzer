@@ -5,8 +5,9 @@ turned Ø30 hub boss. The boss carries an integral Ø.499 spigot on its front
 (pen) side, on which the MHA-MG-10 brass drum is pressed. The lever wire wraps
 the drum, the pen wire runs in the rim's U-groove: the wire-centre radii
 49.2 / 9.85 give the wheel's 5x magnification. TIE 1 (lever wire) is an axial
-hole through the boss just outboard of the drum's O.D.; TIE 2 (pen wire) is a
-radial hole from the groove bottom to the rim bore.
+#60 through the boss just outboard of the drum's O.D., counter-drilled #50
+from the drum side; TIE 2 (pen wire) is a radial hole from the groove bottom
+to the rim bore.
 
 Layout: wheel axis = local Z through the origin, the origin on the spokes' and
 rim's mid-plane (``mg_magnifying_wheel_geom``). The hub profile and the groove
@@ -76,6 +77,7 @@ from mg_magnifying_wheel_geom import (
     BORE_DIA,
     CAST_ROUND_R,
     CAST_TOL,
+    DRILL_POINT_DEG,
     HUB_BACK_Z,
     HUB_DIA,
     HUB_FILLET_R,
@@ -93,6 +95,8 @@ from mg_magnifying_wheel_geom import (
     SPOKE_TIP_WIDTH,
     SPOKE_X0,
     SPOKE_X1,
+    TIE1_CDRILL_DEPTH,
+    TIE1_CDRILL_DIA,
     TIE1_X,
     TIE1_Y,
     TIE2_CLOCK_DEG,
@@ -233,6 +237,22 @@ V_GROOVE = (
     )
 )
 V_TIE1 = math.pi * _TIE_R**2 * _BOSS_LEN
+# TIE 1's #50 counter-drill beyond the #60 already through: the annulus
+# between the two Ø down to the shoulder, then its 118 deg point's frustum
+# from the #50 down to the #60's Ø (the point's tip lies in the #60's air).
+_TIE1_CDRILL_R = TIE1_CDRILL_DIA / 2.0
+_POINT_PER_R = 1.0 / math.tan(math.radians(DRILL_POINT_DEG / 2.0))
+_POINT_LEN = (_TIE1_CDRILL_R - _TIE_R) * _POINT_PER_R
+V_TIE1_POINT = (
+    math.pi
+    * _POINT_LEN
+    / 3.0
+    * (_TIE1_CDRILL_R**2 + _TIE1_CDRILL_R * _TIE_R + _TIE_R**2)
+    - math.pi * _TIE_R**2 * _POINT_LEN
+)
+V_TIE1_CDRILL = (
+    math.pi * (_TIE1_CDRILL_R**2 - _TIE_R**2) * TIE1_CDRILL_DEPTH + V_TIE1_POINT
+)
 V_TIE2 = _tie2_volume()
 
 # --- TIE 2 profile: a half rectangle beside its radial axis, revolve-cut -------
@@ -611,6 +631,123 @@ def _spoke_reference(adapter) -> list[tuple[str, str]]:
     return dims.apply(adapter, feature)
 
 
+# TIE 1's counter-drill is drawn on a plane through TIE 1's axis parallel to
+# the Top plane (A-A's), the plane section B-B cuts, so its Ø and depth
+# print there.
+_TIE1_PLANE = "Tie1Plane"
+
+
+def _tie1_counter_drill(adapter) -> list[tuple[str, str]]:
+    """TIE 1's #50 counter-drill from the boss front (drum) face (owner ruling
+    2026-11-20 on #2406: "A"), revolve-cut on _TIE1_PLANE: a half profile
+    beside TIE 1's axis -- the mouth on the front face, the #50's wall to
+    its shoulder, the 118 deg point back to the axis.  The plane stands off
+    the Top plane by "Tie1Y"; the mouth runs from the origin by "Tie1X" and
+    by the front face's station ("HubFrontZ" - "SpigotLength"), so the
+    counter-drill moves with the #60 and the boss.  Its Ø and depth are
+    named and driven for B-B (drawing-guidelines.md rule 12); the point's
+    length is the #50's 118 deg point, as drawn.  The key pin's chord hole
+    on a station plane is the recipe (build_pd_transgear_disc_hub
+    ._key_pin_hole).  Returns the deferred drive jobs."""
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    check(
+        f"create_plane {_TIE1_PLANE}",
+        adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=TIE1_Y)
+        ),
+    )
+    name_last_feature(adapter, _TIE1_PLANE)
+    jobs = [(name_dimensions(adapter, _TIE1_PLANE, ["Tie1PlaneY"])[0], '"Tie1Y"')]
+    blank_reference_geometry(adapter, ((_TIE1_PLANE, "PLANE"),))
+
+    sd = SketchDims()
+    check("create_sketch tie 1 counter-drill", adapter.create_sketch(_TIE1_PLANE))
+    to_sketch = _sketch_mapper(adapter, u_axis=0, v_axis=2, label="tie 1 counter-drill")
+    origin = to_sketch((0.0, TIE1_Y, 0.0))
+    if origin != (0.0, 0.0):
+        raise RuntimeError(f"tie 1 counter-drill: sketch origin maps to {origin}")
+    shoulder_z = HUB_STEP_Z + TIE1_CDRILL_DEPTH
+    point_len = _TIE1_CDRILL_R * _POINT_PER_R
+    wall_x = TIE1_X + _TIE1_CDRILL_R
+    mouth, rim, shoulder, tip = (
+        to_sketch((x, TIE1_Y, z))
+        for x, z in (
+            (TIE1_X, HUB_STEP_Z),
+            (wall_x, HUB_STEP_Z),
+            (wall_x, shoulder_z),
+            (TIE1_X, shoulder_z + point_len),
+        )
+    )
+    set_sketch_direct_db(adapter, True)
+    axis = check("tie 1 counter-drill axis", adapter.add_centerline(*mouth, *tip))
+    set_sketch_direct_db(adapter, False)
+    mouth_line, wall, cone, on_axis = add_line_chain(
+        adapter, [mouth, rim, shoulder, tip]
+    )
+    _relate(
+        adapter,
+        (
+            ("tie 1 counter-drill axis along TIE 1", axis, None, _AXIAL),
+            (
+                "tie 1 counter-drill profile on the axis, mouth",
+                f"{axis}.start",
+                f"{on_axis}.end",
+                "coincident",
+            ),
+            (
+                "tie 1 counter-drill profile on the axis, tip",
+                f"{axis}.end",
+                f"{on_axis}.start",
+                "coincident",
+            ),
+            ("tie 1 counter-drill mouth on the face", mouth_line, None, _RADIAL),
+            ("tie 1 counter-drill wall along the axis", wall, None, _AXIAL),
+        ),
+    )
+    anchor_point_to_origin(
+        adapter, f"{axis}.start", *mouth, "tie 1 counter-drill mouth"
+    )
+    _record_origin_anchor(
+        sd,
+        *mouth,
+        "Tie1CdrillX",
+        "Tie1CdrillZ",
+        '"Tie1X"',
+        '"HubFrontZ" - "SpigotLength"',
+    )
+    dimension_between(
+        adapter,
+        f"{wall}.start",
+        f"{wall}.end",
+        _AXIAL_DISTANCE,
+        TIE1_CDRILL_DEPTH,
+        "Tie1CdrillDepth",
+    )
+    sd.record("Tie1CdrillDepth", '"Tie1CdrillDepth"')
+    dimension_between(
+        adapter,
+        f"{cone}.start",
+        f"{cone}.end",
+        _AXIAL_DISTANCE,
+        point_len,
+        "tie 1 counter-drill point",
+    )
+    sd.record("Tie1CdrillPoint")
+    add_diametric_linear_dimension(
+        adapter,
+        axis,
+        wall,
+        to_sketch((wall_x + 3.0, TIE1_Y, HUB_STEP_Z - 3.0)),
+        "Tie1CdrillDia",
+    )
+    sd.record("Tie1CdrillDia", '"Tie1CdrillDia"')
+    ensure_fully_defined(adapter, "tie 1 counter-drill sketch")
+    check("exit_sketch tie 1 counter-drill", adapter.exit_sketch())
+    name_last_feature(adapter, "Tie1CdrillProfile")
+    return jobs + sd.apply(adapter, "Tie1CdrillProfile")
+
+
 def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
@@ -646,6 +783,8 @@ def build(adapter) -> dict[str, str]:
     set_global(adapter, "TieHoleDia", f"{TIE_HOLE_DIA}mm")
     set_global(adapter, "Tie1X", f"{TIE1_X}mm")
     set_global(adapter, "Tie1Y", f"{-TIE1_Y}mm")
+    set_global(adapter, "Tie1CdrillDia", f"{TIE1_CDRILL_DIA}mm")
+    set_global(adapter, "Tie1CdrillDepth", f"{TIE1_CDRILL_DEPTH}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -1072,6 +1211,20 @@ def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Tie1")
     volume = volume_check(adapter, "tie 1", volume - V_TIE1, 0.02 * V_TIE1)
+    drive_jobs += _tie1_counter_drill(adapter)
+    check(
+        "revolve-cut tie 1 counter-drill",
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "Tie1Cdrill")
+    # Planes, cylinders and a cone: the measured removal should match
+    # V_TIE1_CDRILL to well under the band (expected residual ~1e-3 mm^3 or
+    # less on analytic faces), and the band is half what the 118 deg point
+    # adds over a flat-bottomed #50 (0.087 of 0.174 mm^3), so a flat bottom
+    # fails the gate.
+    volume = volume_check(
+        adapter, "tie 1 counter-drill", volume - V_TIE1_CDRILL, V_TIE1_POINT / 2.0
+    )
 
     # TIE 2: the pen-wire tie hole, radial from the groove bottom to the rim
     # bore at TIE2_CLOCK_DEG -- a half rectangle beside its radial axis,
