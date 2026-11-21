@@ -144,12 +144,12 @@ speed_kind = "spindle"
 tool = "drill-25"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.tap_drill_dia_band_mm}}" }
-instruction = "Touch the drill's point on the faced end and zero the tailstock quill scale there. Drill #25 until the scale reads .60–.61: the drill's full diameter is then {{cad.tap_drill_depth_min_in:.2dot}}–{{cad.tap_drill_depth_max_in:.2dot}} deep (its 118° point adds about .045). Back out to clear chips every .15 in."
+instruction = "Feed the drill in until its lips just touch the spot's rim and zero the tailstock quill scale there (its point is then about .035 below the faced end). Drill #25 until the scale reads .56–.57: the drill's full diameter is then {{cad.tap_drill_depth_min_in:.2dot}}–{{cad.tap_drill_depth_max_in:.2dot}} deep. Back out to clear chips every .15 in."
 settings = "lathe-drill-25-1018"
 cut_diameter_mm = "{{cad.tap_drill_dia_mm}}"
 hole_depth_mm = "{{cad.tap_drill_depth_mm}}"
 peck = { step_mm = "{{cad.tap_drill_dia_mm}}", retract = "full" }
-inspection = "Drill depth {{cad.tap_drill_depth_min_in:.2dot}}–{{cad.tap_drill_depth_max_in:.2dot}} to full diameter: quill scale .60–.61 from the point touching."
+inspection = "Drill depth {{cad.tap_drill_depth_min_in:.2dot}}–{{cad.tap_drill_depth_max_in:.2dot}} to full diameter: quill scale .56–.57 from the lips touching the spot's rim."
 gauge_checks = "other"
 
 [[setups.operations]]
