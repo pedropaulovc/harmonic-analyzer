@@ -553,6 +553,11 @@ description = "Round adjustable split dies, HSS, 13/16 in OD: #0-80 UNF and #4-4
 [tools.chamfer-mill-carbide-1-4-90]  # inventory tools.chamfer-mill-carbide-1-4-90; MHA-MS-02 and dt parts
 description = "1/4 in 2-flute uncoated carbide chamfering end mill, 90° included (McMaster 3073A46)"
 diameter_mm = 6.35
+# The AR holder is the A R Warner LMS 4132 set's (TCMT insert, R0.4 nose;
+# owned, by photo in the 45952b66bc inventory); it faces the MHA-CH-06 kit
+# nut and turns MHA-DT-23's O.D.
+[tools.lathe-ar]
+description = "A R Warner AR carbide turning holder, TCMT insert, R0.4 nose (LMS 4132)"
 [tools.endmill-carbide-3-32]  # MHA-PD-27 flat floor for the Ø.110 counterbore; MHA-CH-03 .106 ±.002 fork slot
 description = "3/32 in square carbide end mill, .47 in or more of reach"
 diameter_mm = 2.38125

@@ -179,6 +179,13 @@ description = "C67500 manganese bronze, round bar, 5/8 in"
 [stock.gray-iron-casting-cone-pivot-post]
 description = "gray iron, class not ruled, casting for MHA-DT-05 cone pivot post"
 
+# --- MHA-DT-23 pinion eccentric cam (cad/process/dt_pinion_cam/plan.toml) ---
+# The owned McMaster 3212A119 blade-style holder with its cutoff inserts
+# (cad/config/shop-equipment/ tools.cutoff-blade-holder and
+# tools.cutoff-inserts, owned); the cam is parted off the bar to length.
+[tools.cutoff-blade-holder]
+description = "Blade-style cutoff holder, 4-5/16 x 1/8 in (McMaster 3212A119), neutral carbide cutoff insert"
+
 # --- .2510-.2515 reamed bores (MHA-DT-18, and any dt part with that band) ---
 # Go/no-go pair for the Ø.2500 +.0010/+.0015 REAM THRU bores, as the MHA-CH-13
 # hub pair (common.toml gauges.plug-gauges-4000-4005): Vermont Gage standard
