@@ -9,7 +9,8 @@
   <rect class="hidden" x="80.0" y="60.0" width="207.0" height="15.9"/>
   <rect class="hidden" x="80.0" y="244.8" width="207.0" height="15.9"/>
   <line class="datum" x1="120.0" y1="56.0" x2="120.0" y2="76.0"/>
-  <text class="datum-label" x="114.0" y="74.0" text-anchor="end">X0 Y0</text>
+  <line class="leader" x1="74.0" y1="82.0" x2="120.0" y2="60.0"/>
+  <text class="datum-label" x="72.0" y="90.0" text-anchor="end">X0 Y0</text>
   <rect class="part-removed" x="136.5" y="90.5" width="94.0" height="139.7" rx="5.0"/>
   <rect class="part-waste" x="153.1" y="107.1" width="60.7" height="106.4"/>
   <text class="label-halo" x="183.5" y="160.3" text-anchor="middle">slug</text>
