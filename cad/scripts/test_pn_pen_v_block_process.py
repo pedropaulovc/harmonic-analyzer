@@ -143,6 +143,34 @@ def test_the_v_passes_put_the_cone_on_both_flanks(ctx) -> None:
     assert math.isclose(v["centre_y"], -10.922, abs_tol=1e-6)
 
 
+def _v_plunge_xs(ctx: dict) -> list[float]:
+    """X of the chamfer mill at each of the V section's Z feeds."""
+    lines = next(
+        op[2] for job in ctx["jobs"] for op in job["ops"] if op[0] == "v_groove"
+    )
+    x, xs = None, []
+    for line in lines:
+        words = dict((w[0], w[1:]) for w in line.split()[1:] if w[0] in "XYZ")
+        if "X" in words:
+            x = float(words["X"])
+        if line.startswith("G1") and "Z" in words:
+            xs.append(x)
+    return xs
+
+
+@pytest.mark.parametrize("stepover", [1.0, 1.1])
+def test_every_v_level_plunges_beside_p(stepover) -> None:
+    """Each V level plunges in the air beside P, also when a level has an odd
+    count of passes (stepover 1.1 gives one) and so ends at the V's far end,
+    where a plunge would put the cone past the flank."""
+    plan = copy.deepcopy(PLAN)
+    plan["parameters"]["v_stepover_max_mm"] = stepover
+    ctx = _context(plan)
+    counts = [len(offsets) for _t, offsets in ctx["v"]["passes"]]
+    assert any(n % 2 for n in counts) == (stepover == 1.1)
+    assert set(_v_plunge_xs(ctx)) == {round(ctx["v"]["x"][0], 3)}
+
+
 @pytest.mark.parametrize(
     ("changes", "detail"),
     [
@@ -153,7 +181,9 @@ def test_the_v_passes_put_the_cone_on_both_flanks(ctx) -> None:
         ({"bore_tip_height_mm": 5.5}, "bore_tip_height_mm"),
         ({"ream_tip_height_mm": 6.0}, "ream_tip_height_mm"),
         ({"tap_tip_height_mm": 11.0}, "tap_tip_height_mm"),
-        ({"tap_reach_min_mm": 10.5}, "plug tap's chamfer"),
+        ({"tap_reach_min_mm": 10.5}, "bottoming tap's chamfer"),
+        ({"bore_drill_depth_mm": 12.0}, "bore_drill_depth_mm"),
+        ({"tap_drill_depth_mm": 10.0}, "tap_drill_depth_mm"),
         ({"tap_reach_max_mm": 12.6}, "far wall"),
         ({"drill_32_feed_per_min_mm": 100.0}, "not its setting"),
         ({"lying_grip_mm": 17.0}, "lying_grip_mm"),
@@ -173,6 +203,29 @@ def test_the_v_passes_put_the_cone_on_both_flanks(ctx) -> None:
 def test_a_plan_number_off_the_model_or_shop_is_refused(changes, detail) -> None:
     plan = copy.deepcopy(PLAN)
     plan["parameters"].update(changes)
+    with pytest.raises(ValueError, match=detail):
+        _context(plan)
+
+
+@pytest.mark.parametrize(
+    ("cut", "field", "value", "detail"),
+    [
+        ("bore drill", "hole_depth_mm", 12.396, "hole_depth_mm is not"),
+        ("bore drill", "peck", {"step_mm": 2.54, "retract": "full"}, "peck is not"),
+        (
+            "tap drill",
+            "peck",
+            {"step_mm": "{{process.peck_43_mm}}", "retract": "partial"},
+            "peck is not",
+        ),
+    ],
+)
+def test_a_printed_hole_depth_or_peck_not_bound_is_refused(
+    cut, field, value, detail
+) -> None:
+    plan = copy.deepcopy(PLAN)
+    op = RECIPE._op_with_cut(plan, cut)[0]
+    op[field] = value
     with pytest.raises(ValueError, match=detail):
         _context(plan)
 

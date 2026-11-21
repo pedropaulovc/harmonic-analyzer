@@ -98,10 +98,14 @@ CENTRE_DRILL = {
 }
 # Jobber drills' point (the shop records give the diameter only).
 DRILL_POINT_DEG = 118.0
-# A plug hand tap's chamfer: three to five threads (ASME B94.9); the tap
-# reach window keeps at least three full threads' worth past the bore wall
-# and stops its point short of the far wall.
-PLUG_CHAMFER_PITCHES = 3
+# Hand taps' chamfers (ASME B94.9): a plug tap's three to five threads, a
+# bottoming tap's one to two. The owned plug tap's chamfer is not on record,
+# so its worst five would leave tapered thread where the set screw must run
+# full to the bore: the plug tap starts the thread and the bottoming tap (to
+# buy) finishes it to the same reach, which keeps the bottoming tap's worst
+# two threads past the bore's farther near-wall (its smallest size) and
+# stops either tap's point short of the far wall.
+BOTTOMING_CHAMFER_PITCHES = 2
 TAP_FAR_WALL_CLEAR_MM = 0.25
 # A tap file's first motion: G53 G0 to machine Z0, the homed top. FluidNC
 # sets an axis's machine position to its homing mpos_mm (default 0) after
@@ -805,20 +809,41 @@ def context(
     axis = z1 - bz  # VB07 frame: the bore axis above the stacks (back face)
     tap_tip = axis - _point(d43)
     _agree(plan, "tap_tip_height_mm", tap_tip)
-    bore_r_min, bore_r_max = g["bore_dia"][0] / 2, g["bore_dia"][1] / 2
+    bore_r_min = g["bore_dia"][0] / 2
     if _point(d43) >= bore_r_min:
         raise ValueError("the #43's point reaches the bore's far wall")
-    near_wall = bz - bore_r_max - z0
+    # The thread must be full to the bore's near wall where it lies farthest
+    # from the front face (the bore at its smallest).
+    near_wall = bz - bore_r_min - z0
     far_wall = bz + bore_r_min - z0
     reach = (p["tap_reach_min_mm"], p["tap_reach_max_mm"])
-    if reach[0] < near_wall + PLUG_CHAMFER_PITCHES * g["tap_pitch"] - 1e-6:
+    if reach[0] < near_wall + BOTTOMING_CHAMFER_PITCHES * g["tap_pitch"] - 1e-6:
         raise ValueError(
-            f"tap_reach_min_mm {reach[0]:g} leaves the plug tap's chamfer in the wall (near wall {near_wall:.3f})"
+            f"tap_reach_min_mm {reach[0]:g} leaves the bottoming tap's chamfer in the wall (near wall {near_wall:.3f})"
         )
     if reach[1] > far_wall - TAP_FAR_WALL_CLEAR_MM + 1e-6:
         raise ValueError(
             f"tap_reach_max_mm {reach[1]:g} runs the tap into the bore's far wall"
         )
+    # The printed hole depths and pecks are the ones the files drill.
+    _agree(plan, "bore_drill_depth_mm", height - (roof - p["drill_past_mm"]))
+    _agree(plan, "tap_drill_depth_mm", depth - axis)
+    for cut, depth_key, peck_key in (
+        ("bore drill", "bore_drill_depth_mm", "peck_32_mm"),
+        ("tap drill", "tap_drill_depth_mm", "peck_43_mm"),
+    ):
+        op = _op_with_cut(plan, cut)[0]
+        if op.get("hole_depth_mm") != f"{{{{process.{depth_key}}}}}":
+            raise ValueError(
+                f"'{cut}' hole_depth_mm is not {{{{process.{depth_key}}}}}"
+            )
+        if op.get("peck") != {
+            "step_mm": f"{{{{process.{peck_key}}}}}",
+            "retract": "full",
+        }:
+            raise ValueError(
+                f"'{cut}' peck is not process.{peck_key} with full retract"
+            )
 
     # Vise.
     upright_grip = p["vise_jaw_height_mm"] - p["parallel_height_mm"]
@@ -932,6 +957,9 @@ def context(
         f"G0 X{_r(v_x[0]):.3f} Y{_r(yc + first_offsets[0]):.3f}",
         f"G0 Z{_r(bottom_level + SAFE_MM):.3f}",
     ]
+    # Every level's plunge is beside P, in the air: a level that ends at the
+    # V's far end (an odd count of passes) runs back along its last pass
+    # first, since a plunge there would put the cone past the flank.
     at_start = True
     reverse = False
     for t_level, offsets in v_passes:
@@ -942,6 +970,9 @@ def context(
                 v_lines.append(f"G1 Y{_r(yc + e):.3f} F{{feed}}")
             v_lines.append(f"G1 X{_r(v_x[1] if at_start else v_x[0]):.3f} F{{feed}}")
             at_start = not at_start
+        if not at_start:
+            v_lines.append(f"G1 X{_r(v_x[0]):.3f} F{{feed}}")
+            at_start = True
         reverse = not reverse
     v_lines.append(f"G0 Z{clear_b:.3f}")
     corner_lines = [
@@ -1056,11 +1087,11 @@ def context(
         "tap": {
             "tool": numbers["dead-centre"],
             "label": names["dead-centre"],
-            "setting": "SPINDLE STAYS OFF. NEXT: 4-40 TAP IN THE SET-SCREW HOLE",
+            "setting": "SPINDLE STAYS OFF. NEXT: 4-40 PLUG THEN BOTTOMING TAP IN THE SET-SCREW HOLE",
             "gcode": [
                 f"G53 G0 Z{MACHINE_Z_TOP_MM:.3f}",
                 f"G0 X{tap_xy[0]:.3f} Y{tap_xy[1]:.3f}",
-                "(4-40 TAP IN THE SET-SCREW HOLE, FRONT FACE. JOG Z DOWN ONTO THE WRENCH, LIGHT PRESSURE."
+                "(4-40 PLUG TAP, THEN BOTTOMING TAP, IN THE SET-SCREW HOLE, FRONT FACE. JOG Z DOWN ONTO THE WRENCH, LIGHT PRESSURE."
                 " TAP BY HAND TO THE NOTED DRO Z, JOGGING Z TO KEEP THE POINT SEATED. JOG Z UP CLEAR)",
                 "M30",
             ],

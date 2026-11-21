@@ -15,7 +15,7 @@
   <line class="datum" x1="256.2" y1="73.3" x2="272.2" y2="73.3"/>
   <text class="datum-label" x="252.2" y="77.3" text-anchor="end">Z0</text>
   <text class="label" x="470.0" y="250.0">Blank upright on two 1 in parallels,</text>
-  <text class="label" x="470.0" y="268.0">gripped on its two 3/8 faces;</text>
+  <text class="label" x="470.0" y="268.0">gripped on its two wide faces;</text>
   <text class="label" x="470.0" y="286.0">the 1-1/4 width runs along the jaws.</text>
   <text class="label" x="470.0" y="304.0">Skim {{process.end_skim_mm:in.3dot}} off the sawn top: it becomes T.</text>
 </svg>

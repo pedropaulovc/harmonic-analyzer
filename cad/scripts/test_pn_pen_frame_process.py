@@ -54,10 +54,10 @@ def _post(ctx: dict, out: Path) -> None:
             "G21",
             "G54",
         ]
-        keys = [group[0] if isinstance(group, tuple) else group for group in groups]
-        for key in keys:
-            if key in ctx["manual"]:
-                manual = ctx["manual"][key]
+        for group in groups:
+            keys = group if isinstance(group, tuple) else (group,)
+            if keys[0] in ctx["manual"]:
+                manual = ctx["manual"][keys[0]]
                 text += [
                     "M5",
                     f"%msg TOOL CHANGE: T{manual['tool']} {manual['label']}, {manual['setting']}",
@@ -65,7 +65,7 @@ def _post(ctx: dict, out: Path) -> None:
                     *manual["gcode"],
                 ]
                 continue
-            job = sections[key]
+            job = sections[keys[0]]
             number = ctx["numbers"][job["tool"]]
             text += [
                 "M5",
@@ -76,10 +76,12 @@ def _post(ctx: dict, out: Path) -> None:
                     line.format(
                         feed=f"{job['feed']:.3f}", plunge=f"{job['plunge']:.3f}"
                     )
+                    for key in keys
                     for line in lines_of[key]
                 ),
             ]
-        if not any(key in ctx["manual"] for key in keys):
+        manual_keys = [g if isinstance(g, str) else g[0] for g in groups]
+        if not any(key in ctx["manual"] for key in manual_keys):
             text += ["M5", "G17 G90", "M2"]
         (out / f"{name}.nc").write_text("\n".join(text) + "\n", encoding="utf-8")
 
@@ -99,9 +101,9 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     stop = ctx["manual"]["tap"]
-    # The tap from the bottom end at the drawing's .50 from L, mid-depth
-    # (.155 from the back face against the fixed jaw).
-    assert stop["tool"] == 6 and stop["at"] == [12.7, -3.937]
+    # The tap from the bottom end at the drawing's .50 from L, .155 from the
+    # front face against the fixed jaw; L on the right, the frame to -X.
+    assert stop["tool"] == 6 and stop["at"] == [-12.7, -3.937]
     assert stop["gcode"][0] == "G53 G0 Z0.000" and stop["gcode"][-1] == "M30"
 
 
@@ -132,6 +134,10 @@ def test_the_recipes_programs_pass_every_check_it_declares(ctx, tmp_path) -> Non
         ("window_right_mm", 22.5, "window_right_mm"),
         ("parallel_thickness_mm", 6.35, "parallel stack"),
         ("lying_grip_mm", 7.5, "lying_grip_mm"),
+        ("bar_width_min_mm", 31.5, "bar_width_min_mm"),
+        ("bar_thick_max_mm", 10.0, "bar_thick_max_mm"),
+        ("window_corner_step_mm", 0.12, "window_corner_step_mm"),
+        ("window_corner_laps", 2, "window_corner_laps"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> None:
@@ -148,6 +154,44 @@ def test_a_finish_cutter_over_the_corner_radius_is_refused() -> None:
     plan["parameters"]["finish_cutter_dia_mm"] = 2.38125
     with pytest.raises(ValueError, match="corners over"):
         RECIPE.context(FEATURES, plan, shop, "frame.step")
+
+
+def test_the_corner_steps_keep_each_corner_cut_under_the_radial_limit(ctx) -> None:
+    """At each finish level the corners op steps every window corner in on
+    its diagonal from where the 1/8 in slot left it to one step short of
+    where the finish leaves it, no step over .05 × the 5/64's diameter."""
+    p = PLAN["parameters"]
+    e5, e8 = p["finish_cutter_dia_mm"], p["rough_cutter_dia_mm"]
+    limit = 0.05 * e5
+    d_rough = e8 / 2 + p["window_finish_stock_mm"]
+    left_rough = 2**0.5 * d_rough - e8 / 2
+    left_finish = (2**0.5 - 1) * e5 / 2
+    g = RECIPE._geometry(FEATURES)
+    height = g["height"]
+    (x0, x1), (y0, y1) = g["window_x"], g["window_y"]
+    corners = [(x, y - height) for x in (x0, x1) for y in (y0, y1)]
+    lines = next(
+        op[2] for job in ctx["jobs"] for op in job["ops"] if op[0] == "window_corners"
+    )
+    z = None
+    reached: dict[tuple, list[float]] = {}
+    for line in lines:
+        words = dict((w[0], w[1:]) for w in line.split()[1:] if w[0] in "XYZ")
+        if "Z" in words:
+            z = float(words["Z"])
+        if line.startswith("G1") and "X" in words:
+            px, py = float(words["X"]), float(words["Y"])
+            for kx, ky in corners:
+                ox, oy = abs(px - kx), abs(py - ky)
+                if abs(ox - oy) < 0.01 and ox < 2:
+                    reach = ((ox**2 + oy**2) ** 0.5) - e5 / 2
+                    reached.setdefault((z, kx, ky), []).append(reach)
+    levels = {key[0] for key in reached}
+    assert len(levels) == 2 and len(reached) == 8
+    for steps in reached.values():
+        chain = [left_rough, *steps, left_finish]
+        cuts = [a - b for a, b in zip(chain, chain[1:])]
+        assert all(0 < cut <= limit + 0.002 for cut in cuts), cuts
 
 
 def _seed(ctx: dict, key: str, old: str, new: str) -> dict:
@@ -185,8 +229,23 @@ def _line(ctx: dict, key: str, prefix: str, index: int = 0) -> str:
         ("window_finish", "G1 Y-7.", 0, lambda line: "G1 Y-6.834 F{feed}", "outline"),
         # The rough slot run anticlockwise on its first side: climb.
         ("window_rough", "G1 Y-7.", 0, lambda line: "G1 Y-32.372 F{feed}", "outline"),
-        # The finish's last level stopped short of the front face.
-        ("window_finish", "G1 Z-0.508", 0, lambda line: "G1 Z0.000 F{plunge}", "depth"),
+        # The finish's last level stopped short of the front face: the walls
+        # below it uncut (the corner steps still reach the depth).
+        (
+            "window_finish",
+            "G1 Z-0.508",
+            0,
+            lambda line: "G1 Z0.000 F{plunge}",
+            "outline",
+        ),
+        # A corner step moved past the finish path into the wall: a gouge.
+        (
+            "window_corners",
+            "G1 X4.480",
+            0,
+            lambda line: "G1 X4.000 Y-7.000 F{feed}",
+            "outline",
+        ),
         # The tap drill stopped in the rail.
         ("tap_drill", "G1 Z-7.775", 0, lambda line: "G1 Z-5.000 F{feed}", "holes"),
         # A peck re-entry rapided past the depth already drilled.

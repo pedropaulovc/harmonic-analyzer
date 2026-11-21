@@ -19,16 +19,16 @@ and clearance heights, the face overhang and the vise jaws' depth (keep-out
 shapes only).
 
 Route (plan text in ``plan.toml``): one 3/8 x 1-1/4 in C36000 blank about
-1.70 long. Upright on a 1 in parallel pair, gripped on the bar's 3/8 faces:
+1.70 long. Upright on a 1 in parallel pair, gripped on the bar's wide faces:
 PF01 faces the top end, PF02 (turned over) the bottom end to the height. On
 edge on the same pair: PF03 skims the left face, PF04 (turned over) faces
 the right face to the width. Lying on the 1 in + 1/2 in parallel stacks
 under the end rails, gripped on the ends: PF05 skims the front face, PF06
 (turned over) faces the back face to the depth, roughs the window with a
-1/8 in slot round its edge and finishes its walls with the 5/64 in end
-mill. Upright, the bottom end up: PF07 spots and drills the #43 through the
-bottom rail into the window, PF08 brings the dead centre over it for
-tapping by hand.
+1/8 in slot round its edge, steps the slot's corners in with the 5/64 in
+end mill and finishes the walls with it. Upright, the bottom end up: PF07
+spots and drills the #43 through the bottom rail into the window, PF08
+brings the dead centre over it for tapping by hand.
 
 Work frames (G54), each set in its setup:
 - PF01/PF02: X0 Y0 the bar's axis, Z0 the faced top end (PF01) or the
@@ -38,8 +38,8 @@ Work frames (G54), each set in its setup:
 - PF05: X0 the left face, Y0 the fixed jaw (bottom end), Z0 the stacks.
 - PF06: X0 the left face, Y0 the fixed jaw (top end), Z0 the stacks (the
   front face).
-- PF07/PF08: X0 the left face, Y0 the fixed jaw (back face), Z0 the bottom
-  end.
+- PF07/PF08: X0 the left face (the part to -X), Y0 the fixed jaw (front
+  face), Z0 the bottom end.
 
 Toolpath rules (owner rulings 2026-11-16): faces zigzag (ball screws),
 plunges beside the stock at the cutting feed, plunges into metal (each
@@ -69,7 +69,10 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("PF03_left_face", ("left_face",)),
     ("PF04_width", ("right_face",)),
     ("PF05_front_face", ("front_face",)),
-    ("PF06_window", (("back_face",), ("window_rough",), ("window_finish",))),
+    (
+        "PF06_window",
+        (("back_face",), ("window_rough",), ("window_corners", "window_finish")),
+    ),
     ("PF07_tap_drill", (("tap_spot",), ("tap_drill",))),
     ("PF08_tap", ("tap",)),
 )
@@ -101,7 +104,17 @@ PLUG_CHAMFER_THREADS = 5
 # finishing).
 SLOT_AXIAL_MAX = 0.35
 FINISH_AXIAL_MAX = 3.0
+# The finish's radial limit holds at the corners too: the 1/8 in slot
+# leaves each corner round at its own radius, and the 5/64 in end mill steps
+# in on the corner's diagonal by at most this × its diameter at a time.
 FINISH_RADIAL_MAX = 0.05
+# Each corner step runs in and out this far along the walls from the rough
+# slot path's corner.
+CORNER_LEAD_MM = 1.0
+# Each corner step's point sits this much nearer the wall it arrives along
+# (over the G-code's .001 mm rounding), so the outline check reads its
+# arrival along that wall's way.
+CORNER_BIAS_MM = 0.002
 # Each window plunge runs at half the cutter's chip load (the rocker strap
 # plan's plunge rule).
 PLUNGE_CHIP_FRACTION = 0.5
@@ -365,6 +378,54 @@ def _loop(
     return lines + [f"G0 Z{clear:.3f}"]
 
 
+def _corner_laps(
+    x: tuple[float, float],
+    y: tuple[float, float],
+    path: float,
+    dips: list[float],
+    top: float,
+    levels: list[float],
+) -> list[str]:
+    """Laps round the rough slot's path, ``path`` inside the window's walls
+    ``x`` × ``y``, clockwise, each stepping into every corner on its
+    diagonal: at each of ``levels`` (a straight plunge at the plunge feed at
+    the middle of the left side, in the slot) one lap per offset in
+    ``dips``, the cutter centre that far from both walls at the corner
+    (``CORNER_BIAS_MM`` nearer the arriving wall, so the rounded point is
+    nearer it). Each dip runs in from the arriving side and out to the
+    departing side, ``CORNER_LEAD_MM`` along the wall from the path's
+    corner, so every move runs the outline's way."""
+    (x0, x1), (y0, y1) = x, y
+    clear = _r(top + CLEAR_MM)
+    xa, ym = x0 + path, (y0 + y1) / 2
+    far = path + CORNER_LEAD_MM
+    # (wall corner, inward signs, True when the arriving wall is an X wall)
+    corners = (
+        ((x0, y1), (1, -1), True),
+        ((x1, y1), (-1, -1), False),
+        ((x1, y0), (-1, 1), True),
+        ((x0, y0), (1, 1), False),
+    )
+    lines = [
+        f"G0 Z{clear:.3f}",
+        f"G0 X{_r(xa):.3f} Y{_r(ym):.3f}",
+        f"G0 Z{_r(top + SAFE_MM):.3f}",
+    ]
+    for z in levels:
+        lines.append(f"G1 Z{_r(z):.3f} F{{plunge}}")
+        for dip in dips:
+            for (kx, ky), (sx, sy), x_wall in corners:
+                arrive = (path, far) if x_wall else (far, path)
+                bias = (CORNER_BIAS_MM, 0.0) if x_wall else (0.0, CORNER_BIAS_MM)
+                dip_at = (dip - bias[0], dip - bias[1])
+                for ox, oy in (arrive, dip_at, arrive[::-1]):
+                    lines.append(
+                        f"G1 X{_r(kx + sx * ox):.3f} Y{_r(ky + sy * oy):.3f} F{{feed}}"
+                    )
+            lines.append(f"G1 X{_r(xa):.3f} Y{_r(ym):.3f} F{{feed}}")
+    return lines + [f"G0 Z{clear:.3f}"]
+
+
 def _outline(
     x: tuple[float, float], y: tuple[float, float], corner: float
 ) -> list[dict[str, Any]]:
@@ -496,8 +557,21 @@ def context(
             f"the shortest blank less the top-end skim, {blank_min - end_skim:.3f}, is under the height {H:.3f}"
         )
     edge_level, face_level = bw - edge_skim, bt - face_skim
+    _agree(plan, "edge_level_mm", edge_level)
+    _agree(plan, "face_level_mm", face_level)
     if edge_level <= W or face_level <= D:
         raise ValueError("the bar leaves nothing to face to the width or the depth")
+    # PF03 and PF05 skim at a fixed height above the parallels: the bar's
+    # width and thickness, miked before Setup 2, must give each skim at
+    # least bar_skim_min_mm and at most one face level.
+    skim_min, skim_max = p["bar_skim_min_mm"], p["face_step_max_mm"]
+    for key, level in (("bar_width", edge_level), ("bar_thick", face_level)):
+        _agree(plan, f"{key}_min_mm", level + skim_min)
+        _agree(plan, f"{key}_max_mm", level + skim_max)
+    if not p["bar_width_min_mm"] <= bw <= p["bar_width_max_mm"] or not (
+        p["bar_thick_min_mm"] <= bt <= p["bar_thick_max_mm"]
+    ):
+        raise ValueError("the nominal bar is outside its own size window")
     for key, size in (
         ("blank_x_in", bw),
         ("blank_y_in", blank_min),
@@ -608,6 +682,34 @@ def context(
         raise ValueError(
             "the rough slot leaves no slug: it would mill the whole window"
         )
+    # The slot leaves each corner round at the 1/8's radius about its path's
+    # corner; the finish leaves it at the 5/64's. Between them the 5/64 steps
+    # in on the diagonal, each step (and the finish's last) at most the
+    # finish's radial limit, as on the walls.
+    left_rough = math.sqrt(2) * d_rough - r8
+    left_finish = (math.sqrt(2) - 1) * r5
+    steps = math.ceil((left_rough - left_finish) / (FINISH_RADIAL_MAX * e5) - 1e-9)
+    corner_step = (left_rough - left_finish) / steps
+    if corner_step > FINISH_RADIAL_MAX * e5 or stock > FINISH_RADIAL_MAX * e5:
+        raise ValueError("a corner step is over the finish's radial limit")
+    _agree(plan, "window_corner_step_mm", corner_step)
+    if p["window_corner_laps"] != steps - 1:
+        raise ValueError(f"process.window_corner_laps is not {steps - 1}")
+    dips = [(left_rough - k * corner_step + r5) / math.sqrt(2) for k in range(1, steps)]
+    if not math.isclose(
+        _cut(plan, "window corners", "radial_woc_mm"),
+        p["window_corner_step_mm"],
+        abs_tol=1e-6,
+    ) or not math.isclose(
+        _cut(plan, "window corners", "axial_doc_mm"),
+        p["window_finish_step_mm"],
+        abs_tol=1e-6,
+    ):
+        raise ValueError(
+            "'window corners' is not process.window_corner_step_mm at the finish's levels"
+        )
+    if _setting(plan, shop, "window corners") != (finish_rpm, finish_feed):
+        raise ValueError("'window corners' runs at another setting than the finish")
 
     # The thumb-screw tap, from the bottom end: spot under the #43, the #43
     # pecked with full retracts until its full diameter is past the bottom
@@ -705,8 +807,9 @@ def context(
         # the top end; X0 the left face.
         "front": _frame([0.0, 0.0, raw_back], [0, -1, 0], [0, 0, -1]),
         "back": _frame([0.0, H, 0.0], [0, 1, 0], [0, 0, 1]),
-        # Upright, the bottom end up, the back face to the fixed jaw.
-        "tap": _frame([0.0, 0.0, D], [0, 0, 1], [0, -1, 0]),
+        # Upright, the bottom end up, the front face to the fixed jaw (the
+        # hole's drawing station is from it): X0 the left face, on the right.
+        "tap": _frame([0.0, 0.0, 0.0], [0, 0, -1], [0, -1, 0]),
     }
     hw, ht = bw / 2, bt / 2
     stocks = {
@@ -716,7 +819,7 @@ def context(
         "right": ((0.0, H), (-bt, 0.0), (0.0, edge_level)),
         "front": ((0.0, W), (-H, 0.0), (0.0, bt)),
         "back": ((0.0, W), (-H, 0.0), (0.0, face_level)),
-        "tap": ((0.0, W), (-D, 0.0), (-H, 0.0)),
+        "tap": ((-W, 0.0), (-D, 0.0), (-H, 0.0)),
     }
     # Every frame puts the finished part where its stock box says.
     for key, frame in frames.items():
@@ -871,10 +974,15 @@ def context(
             "stock": stock_back,
             "ops": [
                 [
+                    "window_corners",
+                    "step the window's corners in",
+                    _corner_laps(wx, wy, d_rough, dips, D, finish_levels),
+                ],
+                [
                     "window_finish",
                     "finish the window",
                     _loop(finish_x, finish_y, D, finish_levels),
-                ]
+                ],
             ],
         },
         {
@@ -956,7 +1064,7 @@ def context(
         "back_face": jaws(lying_grip, lying_x, lying_y),
     }
     window_keep = keep["back_face"] + stacks
-    tap_keep = jaws(upright_grip - H, lying_x, (-D, 0.0))
+    tap_keep = jaws(upright_grip - H, (-W, 0.0), (-D, 0.0))
 
     tn = numbers
     expect: list[list[Any]] = []
@@ -985,7 +1093,11 @@ def context(
         ]
 
     def window_checks(
-        offset: float, corner: float, levels: list[float], radius: float
+        offset: float,
+        corner: float,
+        levels: list[float],
+        radius: float,
+        clearing: list[dict[str, Any]],
     ) -> list[list[Any]]:
         return [
             ["depth", {"z_min": _r(bottom)}],
@@ -997,10 +1109,15 @@ def context(
                     "elements": _outline(wx, wy, corner),
                     "passes": [{"offset": offset, "levels": [_r(z) for z in levels]}],
                     "z_top": D,
+                    "clearing": clearing,
                 },
             ],
             ["keep_out", {"radius": radius, "boxes": window_keep}],
         ]
+
+    if dips[-1] <= r5 + OUTLINE_TOL_MM:
+        raise ValueError("the last corner step reaches the finish's own path")
+    corner_clearing = [{"x": list(wx), "levels": [_r(z) for z in finish_levels]}]
 
     def hole_checks(z_bottom: float, radius: float) -> list[list[Any]]:
         return [
@@ -1048,8 +1165,8 @@ def context(
     for k, checks in enumerate(
         (
             face_checks("back_face"),
-            window_checks(d_rough, d_rough, rough_levels, r8),
-            window_checks(r5, r5, finish_levels, r5),
+            window_checks(d_rough, d_rough, rough_levels, r8, []),
+            window_checks(r5, r5, finish_levels, r5, corner_clearing),
         )
     ):
         expect += [[f"{name}@{k}", check, kwargs] for check, kwargs in checks]
