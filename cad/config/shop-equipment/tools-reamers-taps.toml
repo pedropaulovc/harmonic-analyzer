@@ -415,6 +415,11 @@ kind = "reamer"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-03-TL-01 132X .1570 +.0005/.0000 REAM THRU; MHA-DT-14 .1570 +.0005/.0000 FLAT-BOTTOM REAM."
 
+[tools.reamer-1570-bottoming]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. MHA-DT-14 follower seat .1570 +.0005/.0000 FLAT-BOTTOM REAM .16 deep, floor corners R.008 max: a bottoming (square-end, end-cutting) chucking reamer, corner break .002 in max (cad/process/shop/dt.toml tools.reamer-1570-bottoming)."
+
 [tools.reamer-1610]
 kind = "reamer"
 status = "to_order"

@@ -105,7 +105,17 @@ resolution_mm = 0.001016
 
 # The dt reamed-bore go/no-go pairs, Vermont Gage Class X as the hub pair
 # (cad/config/shop-equipment/ gauges, same keys, to buy; tools rows in
-# shop/dt.toml): .3760/.3765 (MHA-DT-02).
+# shop/dt.toml): .2510/.2515 (MHA-DT-18, MHA-DT-14, MHA-DT-23), .3135/.3140
+# and .1570/.1575 (MHA-DT-14), .3760/.3765 (MHA-DT-02).
+[gauges.plug-gauges-2510-2515]
+range_mm = [6.3754, 6.3881]
+resolution_mm = 0.001016
+[gauges.plug-gauges-3135-3140]
+range_mm = [7.9629, 7.9756]
+resolution_mm = 0.001016
+[gauges.plug-gauges-1570-1575]
+range_mm = [3.9878, 4.0005]
+resolution_mm = 0.001016
 [gauges.plug-gauges-3760-3765]
 range_mm = [9.5504, 9.5631]
 resolution_mm = 0.001016
@@ -386,6 +396,24 @@ chip_load_mm_per_tooth = 0.07112  # .0028 in; 2650 × 3 × .0028 = 22.3 in/min
 flutes = 3
 feed_unit = "in/min"
 
+# --- MHA-CH-13 rocker strap (cad/process/ch_rocker_strap/plan.toml), also
+# MHA-DT-14's outline (cad/process/dt_pinion_bracket/plan.toml) ---
+# The 1/8 in carbide end mill at Tru-Edge's chip load (owner ruling
+# 2026-11-17, relayed by Main): Tru-Edge "Solid Carbide Endmills Feeds and
+# Speeds" (PDF read 2026-11-17), row Low Carbon Steel - 1018, 1/8 in: .001
+# in/tooth, 200-400 SFM. The 6G table's .0006 in/tooth
+# (settings.endmill-carbide-3fl-1-8-1018-cf) is below the .001 in/tooth floor
+# of prechips' milling feed-factor table (Machinery's Handbook Table 4), which
+# is not extended without a source, so the strap's outline runs at this
+# setting; HA #3050 measures it. 2800 rpm as the 6G setting (92 ft/min).
+[settings.endmill-carbide-3fl-1-8-1018-cf-tru-edge]
+tool = "endmill-carbide-3fl-1-8"
+material = "rocker-1018-cold-finished"
+rpm = 2800
+chip_load_mm_per_tooth = 0.0254  # .001 in; 2800 × 3 × .001 = 8.4 in/min
+flutes = 3
+feed_unit = "in/min"
+
 # --- MHA-MG-02 magnifying clamp (cad/process/mg_magnifying_clamp/plan.toml) ---
 
 # The bore's Ø.257 +.004/0 has no gauge of its class on record (pin gauges
@@ -539,6 +567,9 @@ description = "Carbide 60° centre drills, trade sizes 1, 3 and 6"
 description = "Die stock for 13/16 in round dies (Drillco 3000DS1)"
 [tools.dies-zoro-wb7365521946]  # inventory tools.dies-zoro-wb7365521946
 description = "Round adjustable split dies, HSS, 13/16 in OD: #0-80 UNF and #4-40 UNC (Drill America DWTH1316-080, -440)"
+[tools.chamfer-mill-carbide-1-4-90]  # inventory tools.chamfer-mill-carbide-1-4-90; MHA-MS-02 and dt parts
+description = "1/4 in 2-flute uncoated carbide chamfering end mill, 90° included (McMaster 3073A46)"
+diameter_mm = 6.35
 [tools.endmill-carbide-3-32]  # MHA-PD-27 flat floor for the Ø.110 counterbore; MHA-CH-03 .106 ±.002 fork slot
 description = "3/32 in square carbide end mill, .47 in or more of reach"
 diameter_mm = 2.38125

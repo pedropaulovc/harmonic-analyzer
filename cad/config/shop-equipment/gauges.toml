@@ -239,6 +239,48 @@ purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .4000 in GO 
 note = "Not owned: to buy. MHA-CH-13 Setup 4 (RS03, after the ream): the first hole gauged before the lot, then every hole; GO enters, NO-GO does not."
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
 
+# --- .2510-.2515 reamed bores (MHA-DT-18 pinion pivot block, cad/process/dt_pinion_pivot_block) ---
+
+# Acceptance of the Ø.2500 +.0010/+.0015 REAM THRU bores (.2510-.2515 in): a
+# fixed-limit pair as the hub pair above, .2510 GO (plus tolerance) and .2515
+# NO-GO (minus tolerance), Vermont Gage standard Class X, each .000040 in. The
+# pair gives up .00008 in (16 %) of the .0005 in band, as the hub pair does.
+# Range and tolerance: cad/process/shop/ gauges.plug-gauges-2510-2515.
+[gauges.plug-gauges-2510-2515]
+name = "Plug gauge pair, .2510 GO and .2515 NO-GO, Class X"
+kind = "plug_gauge_pair"
+make = "Vermont Gage"
+status = "to_order"
+purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .2510 in GO (plus tolerance) and .2515 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
+note = "Not owned: to buy. MHA-DT-18 Setup 6 (after the ream): the first bore gauged before the lot, then every bore; GO enters, NO-GO does not. Any dt part with the same .2510-.2515 band uses this pair."
+cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
+
+# --- MHA-DT-14 pinion bracket strap (cad/process/dt_pinion_bracket) ---
+
+# Acceptance of its arbor bore, Ø.3125 +.0010/+.0015 REAM THRU (.3135-.3140
+# in), and its follower seat, Ø.1570 +.0005/.0000 FLAT-BOTTOM REAM
+# (.1570-.1575 in): fixed-limit pairs as the hub pair above, GO plus and
+# NO-GO minus, Vermont Gage standard Class X, each .000040 in. Each pair gives
+# up .00008 in (16 %) of its .0005 in band. Range and tolerance:
+# cad/process/shop/ gauges.plug-gauges-3135-3140 and plug-gauges-1570-1575.
+[gauges.plug-gauges-3135-3140]
+name = "Plug gauge pair, .3135 GO and .3140 NO-GO, Class X"
+kind = "plug_gauge_pair"
+make = "Vermont Gage"
+status = "to_order"
+purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .3135 in GO (plus tolerance) and .3140 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
+note = "Not owned: to buy. MHA-DT-14 Setup 2 (PB02, after the ream): the first arbor bore gauged before the lot, then every bore; GO enters, NO-GO does not."
+cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
+
+[gauges.plug-gauges-1570-1575]
+name = "Plug gauge pair, .1570 GO and .1575 NO-GO, Class X"
+kind = "plug_gauge_pair"
+make = "Vermont Gage"
+status = "to_order"
+purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .1570 in GO (plus tolerance) and .1575 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
+note = "Not owned: to buy. MHA-DT-14 Setup 4 (PB04, after the ream): every follower seat; GO enters, NO-GO does not."
+cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
+
 # --- MHA-DT-02 arbor pedestal (cad/process/dt_arbor_pedestal) ---
 
 # Acceptance of the arbor bore, Ø.3750 +.0015/+.0010 REAM THRU (.3760-.3765

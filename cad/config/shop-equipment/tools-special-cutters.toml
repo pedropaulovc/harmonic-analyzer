@@ -37,6 +37,15 @@ kind = "end_mill"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PN-01 window corners R.040 max."
 
+[tools.endmill-carbide-3fl-1-16-reach-1-2]
+kind = "end_mill"
+make = "Harvey Tool"
+sku = "34662"
+source = "https://www.harveytool.com/products/tool-details-34662"
+purchase = "Harvey Tool 34662, $60.30 each (listing read live 2026-11-21)"
+status = "to_order"
+note = "Not owned: to buy. Miniature End Mill, Square, Long Reach, Stub Flute: .0620 × .093 length of cut × .500 reach (8x), 3 flutes, 1/8 shank, uncoated, optimized for plunging. MHA-MS-02 rebate corner relief .05 ±.01 deep × .06 ±.01 high beside the roof, .38 below the mating face inside the .134 rebate, plunge-milled: no owned cutter is .07 or under and reaches it."
+
 [tools.chamfer-mill-1-2-90]
 kind = "chamfer_mill"
 status = "to_order"

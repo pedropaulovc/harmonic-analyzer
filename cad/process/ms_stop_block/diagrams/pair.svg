@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="16" y="22">Setup 11: pair pilot at MHA-MS-03 (its traveler, Setups 3-5)</text>
+  <rect class="part-arriving" x="30.0" y="40.0" width="328.7" height="229.1"/>
+  <polygon class="part-kept" points="74.2,70.0 344.5,70.0 358.7,84.2 358.7,269.1 60.0,269.1 60.0,84.2"/>
+  <rect class="holes" x="60.0" y="102.0" width="298.7" height="48.4"/>
+  <circle class="holes" cx="305.4" cy="212.2" r="13.0"/>
+  <circle class="holes" cx="113.3" cy="212.2" r="13.0"/>
+  <line class="hidden" x1="209.4" y1="150.4" x2="209.4" y2="269.1"/>
+  <text class="label" x="440.0" y="80.0">MHA-MS-03 on this mating face (dashed)</text>
+  <line class="leader" x1="436.0" y1="76.0" x2="239.2" y2="40.0"/>
+  <circle class="leader-dot" cx="239.2" cy="40.0" r="2.5"/>
+  <text class="label" x="440.0" y="140.0">#49 pilots, drilled through the plate</text>
+  <line class="leader" x1="436.0" y1="136.0" x2="305.4" y2="212.2"/>
+  <circle class="leader-dot" cx="305.4" cy="212.2" r="2.5"/>
+  <text class="label" x="440.0" y="200.0">locating ends and edges flush</text>
+  <line class="leader" x1="436.0" y1="196.0" x2="358.7" y2="269.1"/>
+  <circle class="leader-dot" cx="358.7" cy="269.1" r="2.5"/>
+  <text class="label" x="16.0" y="406.0">MHA-MS-03's traveler holds the pair and drills it; this block comes back piloted, with its plate.</text>
+</svg>
