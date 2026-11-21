@@ -256,7 +256,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }, {
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Long overall (Op 120): back through Op 90 (a new L0; the shoulder untouched), Op 110 (the spigot end's edge broken again) and Op 120. Short overall or head length out (Op 120), or spigot under the recorded bore less {{cad.step_clearance_max_in:.3dot}} (Op 100): scrap; make another from a bar end (Setup 1)."
+instruction = "Long overall (Op 120): mike a new L0 as in Op 80 (the bore record stands), then Op 90 with it (the shoulder untouched), Op 110 (the spigot end's edge broken again) and Op 120. Short overall or head length out (Op 120), or spigot under the recorded bore less {{cad.step_clearance_max_in:.3dot}} (Op 100): scrap; make another from a bar end (Setup 1)."
 feed = "hand"
 
 [[setups.operations]]

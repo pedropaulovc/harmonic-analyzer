@@ -7,10 +7,11 @@
 # line, part off .02 long. Setup 2: the spacer turned round, the faced end
 # .40 in the 3-jaw over a shim wrap, the parted end out. Nothing seats it
 # axially (the jaw tips may stand proud of the chuck face), so the length is
-# set from the micrometer, not from a stop: mike the length, touch the AR on
-# the parted end and preset the DRO to the excess over .732, face to Z0;
-# out, mike, and the same again until it reads .731-.733 (the .002 band is
-# too tight to part to). Bench: deburr, check the hole.
+# set from the micrometer, not from a stop: mike the length at the outer rim,
+# touch the AR lightly at that rim and preset the DRO to the miked length less
+# .7325 (see the datum comment), face to Z0; out, mike, and the same again
+# until it reads .731-.733 (the .002 band is too tight to part to). Bench:
+# deburr, check the hole.
 #
 # Stock: 7/16 in C36000 round is to order (cad/config/shop-equipment/
 # stock-to-order.toml c360-round-7-16, a 2 in piece); none is on hand.
