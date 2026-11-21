@@ -252,7 +252,7 @@ gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.blank_length_mi
 
 [[setups.operations]]
 instruction = "Mic each blank across both pairs of faces at both ends and the middle. Number each blank 1–{{process.quantity:d}} at one end in marker; that end becomes the foot. Lay the blank flat, the foot end toward you: mark the left side face L and the upward face F (front) along their length with marking fluid and a scribe; the right side face is R and the face on the bench is B (back)."
-inspection = "Every reading {{cad.front_face_section_min_in:.3dot}}–{{cad.front_face_section_max_in:.3dot}}: this traveler's incoming-stock gate (the drawing gives the section as 1/4 SQ STOCK, reference). Outside: set the blank aside and tell the owner. Write the L-to-R reading on the blank: Setups 2 and 4 zero on it."
+inspection = "Every reading {{cad.front_face_section_min_in:.3dot}}–{{cad.front_face_section_max_in:.3dot}}: this traveler's incoming-stock gate (the drawing gives the section as 1/4 SQ STOCK, reference). Outside: set the blank aside and tell the owner. Write each end's L-to-R reading on the blank at that end: Setup 2 zeros on the foot end's, Setup 4 on the top end's (the touch-offs are made near the end being cut)."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.front_face_section_band_mm}}" }]
 
 [[setups.operations]]
