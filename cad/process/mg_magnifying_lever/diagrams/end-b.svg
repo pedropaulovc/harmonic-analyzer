@@ -1,27 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300">
   <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="24">End B out, the steady rest an inch behind it: faced, threaded, chamfered (not to scale)</text>
-  <rect class="fixture-vise" x="30" y="70" width="70" height="160"/>
-  <rect class="clamp" x="100" y="110" width="60" height="30"/>
-  <rect class="clamp" x="100" y="160" width="60" height="30"/>
-  <rect class="part-kept" x="60" y="140" width="250" height="20"/>
-  <line class="dims" x1="310" y1="134" x2="322" y2="166"/>
-  <line class="dims" x1="322" y1="134" x2="334" y2="166"/>
-  <rect class="part-kept" x="334" y="140" width="270" height="20"/>
-  <rect class="part-threads" x="604" y="140" width="96" height="20"/>
-  <rect class="part-removed" x="700" y="140" width="6" height="20"/>
-  <rect class="fixture-support" x="545" y="88" width="14" height="52"/>
-  <rect class="fixture-support" x="545" y="160" width="14" height="52"/>
-  <rect class="cutter" x="640" y="164" width="14" height="40"/>
-  <line class="centre-line" x1="20" y1="150" x2="740" y2="150"/>
-  <line class="datum" x1="700" y1="100" x2="700" y2="230"/>
-  <text class="datum-label" x="708" y="112">Z0</text>
-  <line class="dims" x1="604" y1="236" x2="700" y2="236"/>
-  <line class="dims" x1="604" y1="228" x2="604" y2="244"/>
-  <line class="dims" x1="700" y1="228" x2="700" y2="244"/>
-  <text class="label" x="590" y="262">thread .70–.72</text>
-  <text class="label" x="470" y="80">steady rest, jaws on the rod</text>
-  <text class="label" x="612" y="222">threading bit</text>
-  <text class="label" x="40" y="250">3-jaw over a shim wrap on end A</text>
-  <text class="label" x="330" y="130">the 6.6 in rod (break)</text>
+  <text class="title" x="20" y="24">End B .74 out (lengths 400 px/in, diameters not to scale): faced back to the thread's length, then chamfered</text>
+  <rect class="fixture-vise" x="200" y="60" width="90" height="180"/>
+  <rect class="clamp" x="290" y="92" width="40" height="45"/>
+  <rect class="clamp" x="290" y="163" width="40" height="45"/>
+  <rect class="part-kept" x="20" y="137" width="320" height="26"/>
+  <rect class="part-threads" x="340" y="137" width="284" height="26"/>
+  <rect class="part-removed" x="624" y="137" width="12" height="26"/>
+  <rect class="cutter" x="636" y="168" width="14" height="50"/>
+  <line class="centre-line" x1="10" y1="150" x2="700" y2="150"/>
+  <line class="datum" x1="624" y1="100" x2="624" y2="200"/>
+  <text class="datum-label" x="560" y="92">end B, faced back</text>
+  <line class="dims" x1="340" y1="230" x2="624" y2="230"/>
+  <line class="dims" x1="340" y1="222" x2="340" y2="238"/>
+  <line class="dims" x1="624" y1="222" x2="624" y2="238"/>
+  <text class="label" x="380" y="254">thread .70–.72 from end B, read at the bench (Op 210)</text>
+  <line class="dims" x1="330" y1="272" x2="636" y2="272"/>
+  <line class="dims" x1="330" y1="264" x2="330" y2="280"/>
+  <line class="dims" x1="636" y1="264" x2="636" y2="280"/>
+  <text class="label" x="300" y="294">.74 out from the sawn end; jaws may cover the non-mating thread</text>
+  <text class="label" x="650" y="240">AR tool</text>
+  <text class="label" x="20" y="52">the rest of the rod back in the spindle bore</text>
+  <line class="dims" x1="60" y1="56" x2="60" y2="137"/>
+  <text class="label" x="120" y="270">3-jaw over a shim wrap</text>
+  <line class="dims" x1="200" y1="258" x2="300" y2="208"/>
 </svg>
