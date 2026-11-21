@@ -15,16 +15,20 @@ def test_the_stick_as_drawn_reads_a_common_offset_from_the_pivot() -> None:
     is (d + ~2.7 mm)/14.2 across the whole travel, the figure the 2026-11-15
     owner pack derived (2.74 over seven stations; issue-2434-registration.py
     on dfm-evidence/2434)."""
-    assert registration.MEAN_OFFSET_MM == pytest.approx(2.72, abs=0.02)
-    assert registration.OFFSET_SPREAD_MM < 0.1
+    assert registration.MEAN_OFFSET_MM == pytest.approx(2.73, abs=0.02)
+    # The .125 stick (#2441) rides the arm's curved top edge 0.101 off its
+    # mean offset (the .118 one 0.096); READOUT's stick-reading column holds
+    # each station's exact reading, so the spread only qualifies the "about".
+    assert registration.OFFSET_SPREAD_MM < 0.11
     for station in (0.0, 22.0, 44.0, registration.MAX_STATION_MM):
         reading = registration.stick_reading(station)
         assert stick.DIVISION_SPACING * reading - station == pytest.approx(
             registration.MEAN_OFFSET_MM, abs=registration.OFFSET_SPREAD_MM + 1e-9
         )
-    # The pack's per-station figures, reproduced from the specs.
-    assert registration.stick_reading(0.0) == pytest.approx(0.1983, abs=5e-4)
-    assert registration.stick_reading(88.0) == pytest.approx(6.3935, abs=5e-4)
+    # The pack's per-station figures, reproduced from the specs (the .118
+    # stick read 0.1983 and 6.3935; the .125 one, #2441, these).
+    assert registration.stick_reading(0.0) == pytest.approx(0.1994, abs=5e-4)
+    assert registration.stick_reading(88.0) == pytest.approx(6.3940, abs=5e-4)
 
 
 def test_zero_is_the_stop_on_the_two_tenths_tick() -> None:

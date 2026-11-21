@@ -9,7 +9,7 @@ extension lines. ENGRAVING separates numeral dimensions (detail F at the 0,
 detail H at the 10) from the open-edge Top detail for the V graduations'
 groove depth. Each detail's parent on sheets 2-4 is a reduced copy of a
 sheet 1 view, labelled with that view's name and scale. Section G-G cuts the
-whole .315 x .118 bar across both strokes of the zero numeral, so the true V
+whole .315 x .125 bar across both strokes of the zero numeral, so the true V
 grooves read in profile, and imports NumeralDepth there; its callout names
 the V angle. Native probes import TickDepth in Top but not in a removed
 cut-only section, so G-G is a full section (with hidden lines removed only

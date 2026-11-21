@@ -5,8 +5,9 @@ The unchanged 0-10 scale spans 142 mm at the configured 14.2 mm pitch.
 The longer half-division tick follows the book. The stop is a separate brass
 block, cover and stock hardware in the ms-measuring-stick assembly.
 
-The bar is 7.95 x .315 x .118 in (201.93 x 8.001 x 2.9972 mm; issue #290's
-decimal-inch sheet, ``ms_stick_spec`` gives the grid and its exemptions).
+The bar is 7.95 x .315 x .125 in (201.93 x 8.001 x 3.175 mm; issue #290's
+decimal-inch sheet, ``ms_stick_spec`` gives the grid and its exemptions; the
+.125 is the 1/8 flat's supplied thickness, owner ruling 2026-11-20, #2441).
 
 Layout: bar along +X with the bottom-left corner on the origin; graduations
 engraved .020 deep into the back face (z=0) as 30-degree included V grooves

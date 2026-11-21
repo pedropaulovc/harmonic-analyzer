@@ -9,7 +9,7 @@ the 10 end bears on the arm's outer tip land (the end away from the
 connecting rod), and the MHA-CH-01 bar is slid out until its outboard face
 touches the stick's end face nearest the 10. The reading at the stop's end
 face then sets the bar's station: the stick's 0 tick is not at the pivot, so
-the reading for station d is about (d + 2.72 mm) / 14.2 and zero is the 0.2
+the reading for station d is about (d + 2.73 mm) / 14.2 and zero is the 0.2
 tick. The arm land's and the stop face's own deviations are booked in
 error_budget.yaml (rocker_tip_land, stop_face_square).
 

@@ -68,7 +68,9 @@ def inch_text(value_mm: float, places: int) -> str:
 
 BODY_LENGTH = 201.93  # 7.95
 BODY_WIDTH = 8.001  # .315
-BODY_THICKNESS = 2.9972  # .118
+# Owner ruling 2026-11-20 (#2441, option B): "B". The bar keeps the 1/8 C360
+# flat's supplied thickness; only its two edges are milled to the 8 mm width.
+BODY_THICKNESS = 3.175  # .125
 # The bar beyond the last full tick: the model derives scale zero from the
 # length, the configured span and this land, which the 7.95 length sets to
 # 3.43 so scale zero stays put. Every station-table row adds it: the table
