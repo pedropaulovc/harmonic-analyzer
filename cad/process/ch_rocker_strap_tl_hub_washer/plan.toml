@@ -1,23 +1,159 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Rocker strap hub washer MHA-CH-13-TL-03, one off, turned on the manual
+# PM-1127VF-LB (owner ruling 2026-11-21: turned parts get lathe travelers, no
+# NC). Route chosen for speed: one chucking on the 5/8 in 1018 bar on hand
+# (cad/config/shop-equipment/stock-bought.toml 1018-round-5-8; the drawing
+# asks for low-carbon round 9/16 in or over): face the bar end (Z0), turn the
+# outside to its .52-.54 band back past the parting line, spot, drill H (the
+# drawing's .266-.270 hole) past the parting line, part off .06 from the
+# faced end; the parted face is the washer's other face, held to the .05-.07
+# band by the DRO. Bench: deburr, check thickness, outside and hole.
 title = "Rocker Strap Hub Washer"
-part = "MHA-CH-13-TL-03 Rocker Strap Hub Washer"
-revision = "placeholder"
-material = "low-carbon steel round, 9/16 in or over"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "1018 cold-finished steel round, 5/8 in (drawing: low-carbon steel round, 9/16 in or over)"
+stock = "Ø{{process.stock_dia_in:.3dot}} bar, on hand; the washer takes {{cad.pitch_in:.2dot}} in of it."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
+material_key = "lathe-1018-cold-finished"
+turning_material = "steel_1018"
+
+[cad]
+file = "../../out/features/ch_rocker_strap_tl_hub_washer/features.toml"
+adapter = "turned_bush"
+part = "ch-rocker-strap-tl-hub-washer"
+
+[parameters]
+quantity = 1
+stock_dia_in = 0.625
+# Facing allowance: squares a sawn or parted bar end.
+face_allowance_in = 0.02
+# Parting kerf: 1/8 in blade plus the insert's side clearance (authored).
+part_kerf_in = 0.13
+parts_per_pull = 1
+# The parting blade's clearance to the jaw fronts.
+jaw_clearance_in = 0.1
+# Outside passes (authored): the .02 in wide band takes rough passes only, at
+# the AR setting's .004 in/rev feed.
+rough_radial_doc_mm = 0.5
+turn_feed_mm_rev = 0.1016
+# The tool starts its pass this far off the faced end.
+turn_start_z_mm = 0.5
+
+[[tools]]
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "centre"
+name = "No. 3 centre drill"
+ref = "centre-drills-carbide-60"
 
 [[tools]]
 id = "drill-h"
 name = "H drill"
-ref = "drill-h"  # Drills H
+ref = "drill-h"
+
+[[tools]]
+id = "cutoff"
+name = "Cutoff blade"
+ref = "lathe-cutoff"
+
+[[tools]]
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Bar: face, turn the outside, drill H, part off"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
+datum = "Z0 (carriage DRO) the bar end faced in Op 10."
+diagram = { file = "diagrams/bar.svg", alt = "The 5/8 in bar in the 3-jaw: the end faced, the outside turned back past the parting line, the H hole drilled, the washer parted off .06 from the faced end." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
+turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off; set DRO Z0 on it."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Outside", phase = "rough", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.run_end_z_mm}}", kept_start_z_mm = "{{cad.outer_datum_out_near_z_mm}}", kept_end_z_mm = "{{cad.kept_end_z_mm}}", start_diameter_mm = "{{cad.stock_dia_mm}}", end_diameter_mm = "{{cad.outer_turn_min_mm}}", max_radial_doc_mm = "{{process.rough_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the outside to Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}} from Z0 back to Z{{cad.run_end_z_mm:in.2dot}}, past the parting line."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Outside Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}}; over: another pass."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock, about Ø.20 across the countersink: under the H drill, so the drill removes it."
+settings = "lathe-centre-1018"
+cut_diameter_mm = 2.778
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-h"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Drill H {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale: through the washer and past the parting line."
+settings = "lathe-drill-h-1018"
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
+hole_depth_mm = "{{cad.run_mm}}"
+peck = "none"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Part off with the blade's face toward Z0 at Z-{{cad.part_off_in:.3dot}} on the DRO. Catch the washer."
+settings = "lathe-part-1018"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Bench: deburr and inspect"
+machine = "Bench"
+envelope = "other"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished washer: its .06 thickness, the outside and the H hole." }
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr: file the parting burr off the parted face flat on the smooth file, break the outside edges and both ends of the hole, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Thickness {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} across the faces, calipers; the hole takes a .266 pin gauge and not a .271 (Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}). Thick: face the parted side back in the 3-jaw; thin or the .271 pin enters: scrap and make another."
+inspection = "Thickness {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}}; hole Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }, { gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
+feed = "hand"

@@ -1,23 +1,200 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Rocker hub MHA-CH-12, 20 off, turned on the manual PM-1127VF-LB (owner
+# ruling 2026-11-21: turned parts get lathe travelers, no NC). Route B, chosen
+# for speed and approved by Main 2026-11-21 (sketch
+# C:/farm-runs/triage-2026-11-19/sketches/bush-rocker-hub-bar-fed.png, brief
+# cnc/questions/bush-rocker-hub-route.json): bar-fed from the 24 in 1/2 in
+# 1018 bar, two hubs per pull, about 128 min for the lot against 191 min one
+# at a time from 20 sawn slugs. Each pull: face the bar end (Z0), rough and
+# finish the land over both hubs to its press band, spot, drill D through
+# both and past the second parting line, part off the first hub, face the new
+# end to Z0 again, part off the second. The land is turned before the drill
+# (the turning-deflection screen models solid round). The land's band
+# .4009-.4013 presses .0004-.0013 into any strap hole that gauges .4000-.4005
+# (MHA-CH-13, plug-gauges-4000-4005), so no hole is measured here. The hubs
+# part .02 long over the .32 MIN supply length: the drawing's note 1 finishes
+# bore and length after joining, on MHA-CH-06. Bench: deburr, check land and
+# length.
 title = "Rocker Hub"
-part = "MHA-CH-12 Rocker Hub"
-revision = "placeholder"
-material = "AISI 1018 cold-finish round"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "AISI 1018 cold-finished round, 1/2 in"
+stock = "Ø{{process.stock_dia_in:.2dot}} × {{process.bar_length_in:g}} in bar, on hand; {{process.quantity:d}} hubs at {{cad.pitch_in:.2dot}} in each ({{cad.parts_per_bar:d}} fit the bar)."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Setup 1 runs ten times, two hubs per pull. Bore and length are finished after joining to MHA-CH-13 (drawing note 1, MHA-CH-06)."
 shop = "../shop"
 stock_refs = ["1018-round-1-2"]
+material_key = "lathe-1018-cold-finished"
+turning_material = "steel_1018"
+
+[cad]
+file = "../../out/features/ch_rocker_hub/features.toml"
+adapter = "turned_bush"
+part = "ch-rocker-hub"
+
+[parameters]
+quantity = 20
+stock_dia_in = 0.5
+bar_length_in = 24.0
+chuck_grip_in = 1.0
+# Facing allowance: squares a parted bar end.
+face_allowance_in = 0.02
+# Parted .02 over the supply length: finished on MHA-CH-06 after joining.
+regrip_allowance_in = 0.02
+# Parting kerf: 1/8 in blade plus the insert's side clearance (authored).
+part_kerf_in = 0.13
+parts_per_pull = 2
+# The parting blade's clearance to the jaw fronts.
+jaw_clearance_in = 0.1
+# Land passes: roughing to within a finish pass, then finish passes of
+# .002 in a side (authored), at the AR setting's .004 in/rev feed.
+rough_radial_doc_mm = 0.5
+finish_radial_doc_mm = 0.05
+# Left a side over the land's low limit for the finish passes.
+finish_allowance_in = 0.002
+turn_feed_mm_rev = 0.1016
+# The tool starts its pass this far off the faced end.
+turn_start_z_mm = 0.5
+
+[[tools]]
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "centre"
+name = "No. 3 centre drill"
+ref = "centre-drills-carbide-60"
 
 [[tools]]
 id = "drill-d"
 name = "D drill"
-ref = "drill-d"  # Drills D
+ref = "drill-d"
+
+[[tools]]
+id = "cutoff"
+name = "Cutoff blade"
+ref = "lathe-cutoff"
+
+[[tools]]
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Bar: two hubs per pull, ten pulls"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the Ø{{process.stock_dia_in:.2dot}} bar through the spindle; pull {{cad.stickout_in:.2dot}} in out of the jaw fronts each time."
+datum = "Z0 (carriage DRO) the bar end faced in Op 10, set again on the parted end in Op 70."
+diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw with two hubs out: the end faced, the land turned over both, the D hole drilled through both past the second parting line, each hub parted off .34 from its faced end." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
+turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off; set DRO Z0 on it."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Land rough", phase = "rough", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.run_end_z_mm}}", kept_start_z_mm = "{{cad.outer_datum_out_near_z_mm}}", kept_end_z_mm = "{{cad.kept_end_z_mm}}", start_diameter_mm = "{{cad.stock_dia_mm}}", end_diameter_mm = "{{cad.outer_rough_dia_mm}}", max_radial_doc_mm = "{{process.rough_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.outer_rough_dia_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Rough the land from Z0 back to Z{{cad.run_end_z_mm:in.2dot}} (past the second parting line) to Ø{{cad.outer_rough_dia_mm:in.4dot}}."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Land finish", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.run_end_z_mm}}", kept_start_z_mm = "{{cad.outer_datum_out_near_z_mm}}", kept_end_z_mm = "{{cad.kept_end_z_mm}}", start_diameter_mm = "{{cad.outer_rough_dia_mm}}", end_diameter_mm = "{{cad.outer_turn_min_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Finish the land over the same length to Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} in light passes, miking between passes. Mike each hub's length of land; over the band: another pass."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Land Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} on both hubs; under the band: part them off and scrap them."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock, about Ø.18 across the countersink: under the D drill, so the drill removes it."
+settings = "lathe-centre-1018"
+cut_diameter_mm = 2.778
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-d"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Drill D {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale, clearing chips at half depth: through both hubs and past the second parting line."
+settings = "lathe-drill-d-1018"
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
+hole_depth_mm = "{{cad.run_mm}}"
+peck = { step_mm = "{{cad.bore_dia_mm}}", retract = "full" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Part off the first hub with the blade's face toward Z0 at Z-{{cad.part_off_in:.2dot}} on the DRO: .02 over the {{cad.length_min_in:.2dot}} MIN supply length, which the DRO station holds (not gauged). Catch it."
+settings = "lathe-part-1018"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the parted end {{process.face_allowance_in:.2dot}} in; set DRO Z0 on it again."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Part off the second hub at Z-{{cad.part_off_in:.2dot}}. Catch it. Pull the bar for the next two and repeat from Op 10 until {{process.quantity:d}} hubs are made."
+settings = "lathe-part-1018"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Bench: deburr the hubs"
+machine = "Bench"
+envelope = "other"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished hub: the land along its length, the D hole through, the supply length from the faced end." }
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr each hub: file the parting burr off the parted face, break both outside edges and both ends of the hole, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max; no burr may stand on the land."
+feed = "hand"
