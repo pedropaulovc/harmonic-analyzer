@@ -61,26 +61,38 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _drawing_registry import DRAWINGS_BY_NAME
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm, drill_process
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
+from _surface_finish import MACHINED_UM, surface_finish_by_key
 import _telemetry
-from ch_channel_lever_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
+from ch_channel_lever_notes import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    DRAWING_PRECISION_BY_NAME,
+)
 from ch_channel_lever_spec import (
     BAR_PIN_HOLE_SPEC,
     BAR_PIN_X,
     BAR_TALL,
     HUB_DIA,
     HUB_LENGTH,
+    HUB_LENGTH_BAND,
     LEVER_SPRING_X,
     LEVER_THICKNESS,
+    LEVER_THICKNESS_TOLERANCE,
     PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
+    PLATE_OFFSET,
+    PLATE_OFFSET_TOLERANCE,
     SPRING_EYE_HOLE_SPEC,
     SURFACE_FINISHES,
     TAPER_START_X,
@@ -88,6 +100,7 @@ from ch_channel_lever_spec import (
     TIP_END_X,
     TIP_RADIUS,
     TIP_WALL_TEXT,
+    UNIT,
     taper_tangent_point,
 )
 from ch_fulcrum_shaft_spec import SHAFT_DIA, SHAFT_DIA_BAND
@@ -262,6 +275,9 @@ HOLE_PRECISION = {"bar-pin hole": {"hw-diam": 4}, "spring-eye hole": {"hw-diam":
 # dfm-2340 r12: 2/3 runs).
 PLATE_OFFSET_NOTE_NUMBER = 1
 PLATE_OFFSET_NOTE = f"{PLATE_OFFSET_NOTE_NUMBER}. SPACES {BAR_NUMBER} BARS IN STACK."
+# The sheet's one numbered note, as the feature export reads it: kept here,
+# not in ch_channel_lever_notes, which the part build imports.
+DRAWING_NOTES = PLATE_OFFSET_NOTE
 TOP_CALLOUTS = {
     "LeverThick": f"SLIDING FIT IN NOTCH\nOF {BAR_NUMBER}",
     "PlateOffset": f"SEE NOTE {PLATE_OFFSET_NOTE_NUMBER}",
@@ -309,6 +325,277 @@ BORE_FINISH_SYMBOL = (0.080, 0.140)
 # Lower left, below the overall length and clear of the title block.
 PLATE_OFFSET_NOTE_XY = (0.020, 0.055)
 FINISH_CHAR_HEIGHT = 0.0025
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame (the build
+# docstring's layout: the fulcrum bore's axis on Z at the origin, the lever
+# along +X, the bar height in Y, the plate mid-plane in Z; the plate offset's
+# reference line runs from the hub face at -Z). A band is the dimension's own
+# native band, else the title block's row for its printed places. The
+# declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_ch_channel_lever"
+_SPEC = "ch_channel_lever_spec"
+_NOTES = "ch_channel_lever_notes"
+_FRAME = ((_SPEC, "__frame__"), (_SPEC, "taper_tangent_point"))
+_Z = (0.0, 0.0, 1.0)
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    fields={
+        "material.thickness": (HUB_LENGTH, ((_SPEC, "HUB_LENGTH"),)),
+    },
+    model_sources=(
+        (_SPEC, "__frame__"),
+        (_SPEC, "HUB_LENGTH"),
+        (_SPEC, "LEVER_THICKNESS"),
+        (_SPEC, "TIP_END_X"),
+    ),
+    precision_sources=(
+        (_NOTES, "DRAWING_PRECISION"),
+        (_NOTES, "DRAWING_PRECISION_BY_NAME"),
+        (_SELF, "HOLE_PRECISION"),
+    ),
+)
+# The hub's two faces, the stack's pitch between them (TOP_KEEP "HubLength",
+# +.001/.000); the plate's near face .091 +/-.002 from the hub face at -Z
+# (TOP_KEEP "PlateOffset", note 1) and its far face .118 +/-.002 from it
+# (TOP_KEEP "LeverThick"). The plate is centred in the hub.
+requirement(
+    "hub_near_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), HUB_LENGTH / 2.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", -HUB_LENGTH / 2.0), (*_FRAME, (_SPEC, "HUB_LENGTH")))},
+)
+requirement(
+    "hub_far_face",
+    kind="face",
+    faces=(PlanarFace(_Z, HUB_LENGTH / 2.0),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("z", HUB_LENGTH / 2.0), (*_FRAME, (_SPEC, "HUB_LENGTH"))),
+        "length": (
+            limits(HUB_LENGTH, _P["HubLength"], HUB_LENGTH_BAND),
+            ((_SPEC, "HUB_LENGTH"), (_SPEC, "HUB_LENGTH_BAND"), (_SELF, "TOP_KEEP")),
+        ),
+        "length_nominal": (HUB_LENGTH, ((_SPEC, "HUB_LENGTH"),)),
+        "length_from": ("hub_near_face", ((_SELF, "TOP_KEEP"),)),
+        "callout": (TOP_CALLOUTS["HubLength"], ((_SELF, "TOP_CALLOUTS"),)),
+    },
+    precision={"length": _P["HubLength"]},
+)
+requirement(
+    "plate_near_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), LEVER_THICKNESS / 2.0),),
+    requirements=("offset",),
+    fields={
+        "plane": (
+            _plane("z", -LEVER_THICKNESS / 2.0),
+            (*_FRAME, (_SPEC, "LEVER_THICKNESS")),
+        ),
+        "offset": (
+            limits(
+                PLATE_OFFSET,
+                _P["PlateOffset"],
+                (PLATE_OFFSET_TOLERANCE, -PLATE_OFFSET_TOLERANCE),
+            ),
+            (
+                (_SPEC, "PLATE_OFFSET"),
+                (_SPEC, "PLATE_OFFSET_TOLERANCE"),
+                (_SELF, "TOP_KEEP"),
+            ),
+        ),
+        "offset_nominal": (PLATE_OFFSET, ((_SPEC, "PLATE_OFFSET"),)),
+        "offset_from": ("hub_near_face", ((_SELF, "TOP_KEEP"),)),
+        "callout": (TOP_CALLOUTS["PlateOffset"], ((_SELF, "TOP_CALLOUTS"),)),
+        "note": (PLATE_OFFSET_NOTE, ((_SELF, "PLATE_OFFSET_NOTE"),)),
+    },
+    precision={"offset": _P["PlateOffset"]},
+)
+requirement(
+    "plate_far_face",
+    kind="face",
+    faces=(PlanarFace(_Z, LEVER_THICKNESS / 2.0),),
+    requirements=("thickness",),
+    fields={
+        "plane": (
+            _plane("z", LEVER_THICKNESS / 2.0),
+            (*_FRAME, (_SPEC, "LEVER_THICKNESS")),
+        ),
+        "thickness": (
+            limits(
+                LEVER_THICKNESS,
+                _P["LeverThick"],
+                (LEVER_THICKNESS_TOLERANCE, -LEVER_THICKNESS_TOLERANCE),
+            ),
+            (
+                (_SPEC, "LEVER_THICKNESS"),
+                (_SPEC, "LEVER_THICKNESS_TOLERANCE"),
+                (_SELF, "TOP_KEEP"),
+            ),
+        ),
+        "thickness_nominal": (LEVER_THICKNESS, ((_SPEC, "LEVER_THICKNESS"),)),
+        "thickness_from": ("plate_near_face", ((_SELF, "TOP_KEEP"),)),
+        "callout": (TOP_CALLOUTS["LeverThick"], ((_SELF, "TOP_CALLOUTS"),)),
+    },
+    precision={"thickness": _P["LeverThick"]},
+)
+# The hub's turned-looking round, .47 at the title block's .XX (FRONT_KEEP
+# "HubDia"), concentric with the fulcrum bore; the plate splits it.
+requirement(
+    "hub",
+    kind="boss",
+    faces=(CylinderFace(HUB_DIA),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (*_FRAME,)),
+        "axis": (_Z, (*_FRAME,)),
+        "dia": (
+            limits(HUB_DIA, _P["HubDia"], unit=UNIT),
+            ((_SPEC, "HUB_DIA"), (_SPEC, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "dia_nominal": (HUB_DIA, ((_SPEC, "HUB_DIA"),)),
+        # Covered material, for the stock check: no face bounds X or Y.
+        "extent_x": ([-HUB_DIA / 2.0, HUB_DIA / 2.0], ((_SPEC, "HUB_DIA"),)),
+        "extent_y": ([-HUB_DIA / 2.0, HUB_DIA / 2.0], ((_SPEC, "HUB_DIA"),)),
+    },
+    precision={"dia": _P["HubDia"]},
+)
+# The outline beyond the hub: the bar's two straight edges, .37 apart (at the
+# taper start, FRONT_KEEP "BarHeight"), the taper start 5.50 from the bore
+# (FRONT_KEEP "TaperStartX"), the two taper edges tangent to the full-round
+# tip, and the tip R.167 about the #21 hole (FRONT_KEEP "TipRadius"). The
+# overall length over the hub and the tip is a reference (OVERALL_TEXT_XY).
+_TANGENT_X, _TANGENT_Y = taper_tangent_point()
+_TAPER_NX = (_TANGENT_X - TIP_ARC_CX) / TIP_RADIUS
+_TAPER_NY = _TANGENT_Y / TIP_RADIUS
+_TAPER_OFFSET = _TAPER_NX * _TANGENT_X + _TAPER_NY * _TANGENT_Y
+_OUTLINE_SOURCES = ((_SPEC, "taper_tangent_point"), (_SPEC, "TIP_RADIUS"))
+requirement(
+    "outline",
+    kind="profile",
+    faces=(
+        PlanarFace((0.0, 1.0, 0.0), BAR_TALL / 2.0),
+        PlanarFace((0.0, -1.0, 0.0), BAR_TALL / 2.0),
+        PlanarFace((_TAPER_NX, _TAPER_NY, 0.0), _TAPER_OFFSET),
+        PlanarFace((_TAPER_NX, -_TAPER_NY, 0.0), _TAPER_OFFSET),
+        CylinderFace(2.0 * TIP_RADIUS),
+    ),
+    requirements=("bar_height", "taper_start", "tip_radius"),
+    fields={
+        "bar_height": (
+            limits(BAR_TALL, _P["BarHeight"], unit=UNIT),
+            ((_SPEC, "BAR_TALL"), (_SPEC, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "bar_height_nominal": (BAR_TALL, ((_SPEC, "BAR_TALL"),)),
+        "taper_start": (
+            limits(TAPER_START_X, _P["TaperStartX"], unit=UNIT),
+            ((_SPEC, "TAPER_START_X"), (_SPEC, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "taper_start_nominal": (TAPER_START_X, ((_SPEC, "TAPER_START_X"),)),
+        "taper_start_from": ("fulcrum_bore", ((_SELF, "FRONT_KEEP"),)),
+        "taper_tangent_at": (
+            [_TANGENT_X, _TANGENT_Y, 0.0],
+            _OUTLINE_SOURCES,
+        ),
+        "tip_radius": (
+            limits(TIP_RADIUS, _P["TipRadius"], unit=UNIT),
+            ((_SPEC, "TIP_RADIUS"), (_SPEC, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "tip_radius_nominal": (TIP_RADIUS, ((_SPEC, "TIP_RADIUS"),)),
+        "tip_at": ([TIP_ARC_CX, 0.0, 0.0], ((_SPEC, "TIP_ARC_CX"),)),
+        "tip_callout": (FRONT_CALLOUTS["TipRadius"], ((_SELF, "FRONT_CALLOUTS"),)),
+        "overall_length_ref": (
+            TIP_END_X + HUB_DIA / 2.0,
+            ((_SPEC, "TIP_END_X"), (_SPEC, "HUB_DIA"), (_SELF, "OVERALL_TEXT_XY")),
+        ),
+        # Covered material: the bar from the fulcrum axis to the tip's end.
+        "extent_x": ([0.0, TIP_END_X], ((_SPEC, "TIP_END_X"),)),
+        "extent_y": ([-BAR_TALL / 2.0, BAR_TALL / 2.0], ((_SPEC, "BAR_TALL"),)),
+    },
+    precision={
+        "bar_height": _P["BarHeight"],
+        "taper_start": _P["TaperStartX"],
+        "tip_radius": _P["TipRadius"],
+    },
+)
+# The reamed fulcrum bore (FRONT_KEEP "FulcrumDia", +.0010/.0000, Ra) and the
+# two drilled holes on the bar's axis, each located from the bore at .XXX with
+# its native Hole Wizard callout and the mate under it (HOLE_MATES).
+requirement(
+    "fulcrum_bore",
+    kind="hole",
+    faces=(surface_finish_by_key(SURFACE_FINISHES, "fulcrum_bore").face,),
+    requirements=("dia", "thru", "finish_ra", "process"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (*_FRAME,)),
+        "axis": (_Z, (*_FRAME,)),
+        "dia": (
+            limits(PIVOT_HOLE_DIA, _P["FulcrumDia"], PIVOT_HOLE_BAND),
+            ((_SPEC, "PIVOT_HOLE_DIA"), (_SPEC, "PIVOT_HOLE_BAND"), (_SELF, "FRONT_KEEP")),
+        ),
+        "nominal_dia": (PIVOT_HOLE_DIA, ((_SPEC, "PIVOT_HOLE_DIA"),)),
+        "thru": (True, ((_SELF, "FRONT_CALLOUTS"),)),
+        "process": ("ream", ((_SELF, "FRONT_CALLOUTS"),)),
+        "finish_ra": (MACHINED_UM, ((_SPEC, "SURFACE_FINISHES"),)),
+        "callout": (FRONT_CALLOUTS["FulcrumDia"], ((_SELF, "FRONT_CALLOUTS"),)),
+    },
+    precision={"dia": _P["FulcrumDia"], "finish_ra": 1},
+)
+for _name, _label, _spec, _x, _location, _callout_xy, _sources in (
+    (
+        "bar_pin_hole",
+        "bar-pin hole",
+        BAR_PIN_HOLE_SPEC,
+        BAR_PIN_X,
+        "BarPinCx",
+        "BAR_PIN_CALLOUT_XY",
+        ((_SPEC, "BAR_PIN_HOLE_SPEC"), (_SPEC, "BAR_PIN_X")),
+    ),
+    (
+        "spring_hole",
+        "spring-eye hole",
+        SPRING_EYE_HOLE_SPEC,
+        LEVER_SPRING_X,
+        "SpringCx",
+        "SPRING_CALLOUT_XY",
+        ((_SPEC, "SPRING_EYE_HOLE_SPEC"), (_SPEC, "LEVER_SPRING_X")),
+    ),
+):
+    _dia = blind_cut_dia_mm(_spec)
+    _places = HOLE_PRECISION[_label]["hw-diam"]
+    requirement(
+        _name,
+        kind="hole",
+        faces=(CylinderFace(_dia),),
+        requirements=("dia", "thru", "location", "process"),
+        fields={
+            "at": ([_x, 0.0, 0.0], _sources),
+            "axis": (_Z, (*_FRAME,)),
+            "dia": (
+                drilled_limits(_dia, _places, unit=UNIT),
+                (*_sources, (_SPEC, "UNIT"), (_SELF, "HOLE_PRECISION")),
+            ),
+            "nominal_dia": (_dia, _sources),
+            "drill": (_spec.size, _sources),
+            "thru": (True, ((_SELF, _callout_xy),)),
+            "process": (drill_process(_spec), _sources),
+            "location": (
+                limits(_x, _P[_location], unit=UNIT),
+                (*_sources, (_SPEC, "UNIT"), (_SELF, "FRONT_KEEP")),
+            ),
+            "location_nominal": (_x, _sources),
+            "location_from": ("fulcrum_bore", ((_SELF, "FRONT_KEEP"),)),
+            "mate": (HOLE_MATES[_label], ((_SELF, "HOLE_MATES"),)),
+        },
+        precision={"dia": _places, "location": _P[_location]},
+    )
 
 
 def build(adapter: Any) -> dict[str, str]:

@@ -73,10 +73,16 @@ def _spec_module(stem: str) -> ModuleType:
 
 
 def _notes_module(stem: str) -> ModuleType:
+    """The first of the notes module, the spec and the drawing that declares
+    the sheet's ``DRAWING_NOTES``; a sheet whose notes module the part build
+    imports keeps its notes in the drawing, so adding them re-keys no part."""
     name = f"{stem}_notes"
-    if importlib.util.find_spec(name) is not None:
-        return importlib.import_module(name)
-    return _spec_module(stem)
+    modules = [importlib.import_module(name)] if importlib.util.find_spec(name) is not None else []
+    modules += [_spec_module(stem), _drawing_module(stem)]
+    for module in modules:
+        if "DRAWING_NOTES" in _declarations(module):
+            return module
+    return modules[0]
 
 
 def _declarations(module: ModuleType) -> dict[str, str]:
