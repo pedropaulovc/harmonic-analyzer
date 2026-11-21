@@ -72,7 +72,8 @@ ISO_NOTE_XY = (0.345, 0.112)
 # dimension line stands above that line's own text, so no line strikes it:
 # the thread's designation beyond the arbor's end (toward the tail), low, so
 # the relief's dimension line beside it strikes no text; the relief's toward
-# the tail above it; the seat's and the pilot's toward the head in a
+# the tail above it, high enough that its UNDER THREAD ROOT row clears the
+# thread's designation; the seat's and the pilot's toward the head in a
 # staircase, the pilot's highest; the standoff's at its step's middle.
 TOWARD_HEAD = 1.0
 TOWARD_TAIL = -1.0
@@ -80,7 +81,7 @@ TEXT_GAP = 0.003
 DIA_TEXT: dict[str, tuple[float, float, float]] = {
     # name: (model station z mm, side, rise over the grip's top, m)
     "ThreadDia": (spec.ARBOR_END_Z, TOWARD_TAIL, 0.011),
-    "ReliefDia": (spec.RELIEF_END_Z, TOWARD_TAIL, 0.021),
+    "ReliefDia": (spec.RELIEF_END_Z, TOWARD_TAIL, 0.030),
     "PilotDia": (spec.PILOT_END_Z, TOWARD_HEAD, 0.036),
     "SeatDia": (spec.SEAT_END_Z, TOWARD_HEAD, 0.023),
     "StandoffDia": ((spec.GRIP_LENGTH + spec.SHOULDER_Z) / 2.0, TOWARD_HEAD, 0.014),

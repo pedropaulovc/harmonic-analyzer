@@ -212,6 +212,9 @@ def test_the_relief_is_a_pitch_wide_and_under_the_b1_1_root() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["ReliefDia"] == 3
     assert spec.RELIEF_DIA + XXX < root
     assert (spec.RELIEF_END - XX) - (spec.PILOT_END + XX) >= pitch
+    # Its third place is its function: Ø.11 at .XX reaches .12, over the root.
+    assert 0.12 * INCH > root
+    assert spec.CALLOUTS_BELOW["ReliefDia"] == "UNDER THREAD ROOT"
 
 
 def test_the_relief_keeps_the_keyed_arbors_share_of_the_stress_area() -> None:

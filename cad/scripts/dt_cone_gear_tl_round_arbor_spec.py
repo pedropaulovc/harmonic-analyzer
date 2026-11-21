@@ -521,10 +521,18 @@ THREAD_CALLOUT = f"{THREAD} {THREAD_SERIES}"
 # The thread's schematic major cylinder reads as its designation
 # (_drawing_dimensions.set_dimension_text).
 DIMENSION_TEXT: dict[str, str] = {"ThreadDia": THREAD_CALLOUT}
+# The relief's third place is its function: at .XX its largest limit would
+# stand over the thread's root, so it says so at the callout (guidelines
+# rule 3's stated-function form; machinist review of b3a18541e7 asked for
+# the function or .XX). The crank-handle pivot screw's relief words.
+RELIEF_CALLOUT = "UNDER THREAD ROOT"
+if inch_grid_mm(RELIEF_DIA, 2) + _XX < THREAD_ROOT_MIN:
+    raise AssertionError("the relief no longer needs its third place")
 CALLOUTS_BELOW: dict[str, str] = {
     "SeatDia": SEAT_NOTE_FLAG,
     "ShoulderR": SEAT_NOTE_FLAG,
     "GripDia": "STOCK OK",
     "PilotDia": f"CLEARS {_COLLAR_SHORT}",
+    "ReliefDia": RELIEF_CALLOUT,
 }
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
