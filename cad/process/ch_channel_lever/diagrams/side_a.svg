@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 3: turned over, A up; pocket A, outline on seven tabs, roots. Styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 380" width="640" height="380" font-family="sans-serif" font-size="12">
+<rect class="paper" width="640" height="380"/>
+<text class="label" x="20" y="20">Side A up: pocket, outline on tabs (top view)</text>
+<rect class="fixture-vise" x="89" y="34" width="413" height="26"/>
+<text class="label" x="240" y="50">fixed jaw</text>
+<rect class="fixture-plate" x="40" y="62" width="396" height="260" fill-opacity="0.4"/>
+<rect class="part-rest" x="40" y="60.0" width="511.8" height="66.0"/>
+<path class="part-kept" d="M80.3 80.8 L433.9 80.8 L526.0 82.0 A11.0 11.0 0 0 1 526.0 104.0 L433.9 105.2 L80.3 105.2 A15.5 15.5 0 1 1 80.3 80.8 Z"/>
+<circle class="holes" cx="70.7" cy="93.0" r="8.5"/>
+<circle class="holes" cx="400.9" cy="93.0" r="2.6"/>
+<circle class="holes" cx="525.8" cy="93.0" r="5.2"/>
+<rect class="part-rest" x="40" y="126.0" width="511.8" height="66.0"/>
+<path class="part-kept" d="M80.3 146.8 L433.9 146.8 L526.0 148.0 A11.0 11.0 0 0 1 526.0 170.1 L433.9 171.3 L80.3 171.3 A15.5 15.5 0 1 1 80.3 146.8 Z"/>
+<circle class="holes" cx="70.7" cy="159.1" r="8.5"/>
+<circle class="holes" cx="400.9" cy="159.1" r="2.6"/>
+<circle class="holes" cx="525.8" cy="159.1" r="5.2"/>
+<rect class="part-rest" x="40" y="192.1" width="511.8" height="66.0"/>
+<path class="part-kept" d="M80.3 212.9 L433.9 212.9 L526.0 214.1 A11.0 11.0 0 0 1 526.0 236.1 L433.9 237.3 L80.3 237.3 A15.5 15.5 0 1 1 80.3 212.9 Z"/>
+<circle class="holes" cx="70.7" cy="225.1" r="8.5"/>
+<circle class="holes" cx="400.9" cy="225.1" r="2.6"/>
+<circle class="holes" cx="525.8" cy="225.1" r="5.2"/>
+<rect class="part-rest" x="40" y="258.1" width="511.8" height="66.0"/>
+<path class="part-kept" d="M80.3 278.9 L433.9 278.9 L526.0 280.1 A11.0 11.0 0 0 1 526.0 302.2 L433.9 303.4 L80.3 303.4 A15.5 15.5 0 1 1 80.3 278.9 Z"/>
+<circle class="holes" cx="70.7" cy="291.1" r="8.5"/>
+<circle class="holes" cx="400.9" cy="291.1" r="2.6"/>
+<circle class="holes" cx="525.8" cy="291.1" r="5.2"/>
+<rect class="fixture-vise" x="89" y="324" width="413" height="26"/>
+<text class="label" x="240" y="341">moving jaw</text>
+<line class="datum" x1="40" y1="30" x2="40" y2="354"/>
+<text class="label" x="10" y="368">X0 left ends</text>
+<text class="label" x="460" y="368">turned over, A up: outline on 7 tabs</text>
+<rect class="clamp" x="51.2" y="89.0" width="5" height="8"/>
+<rect class="clamp" x="119.4" y="73.6" width="6.6" height="6"/>
+<rect class="clamp" x="197.4" y="106.4" width="6.6" height="6"/>
+<rect class="clamp" x="275.4" y="73.6" width="6.6" height="6"/>
+<rect class="clamp" x="353.4" y="106.4" width="6.6" height="6"/>
+<rect class="clamp" x="421.0" y="73.6" width="6.6" height="6"/>
+<rect class="clamp" x="506.8" y="106.4" width="6.6" height="6"/>
+<rect class="clamp" x="51.2" y="155.1" width="5" height="8"/>
+<rect class="clamp" x="119.4" y="139.7" width="6.6" height="6"/>
+<rect class="clamp" x="197.4" y="172.4" width="6.6" height="6"/>
+<rect class="clamp" x="275.4" y="139.7" width="6.6" height="6"/>
+<rect class="clamp" x="353.4" y="172.4" width="6.6" height="6"/>
+<rect class="clamp" x="421.0" y="139.7" width="6.6" height="6"/>
+<rect class="clamp" x="506.8" y="172.4" width="6.6" height="6"/>
+<rect class="clamp" x="51.2" y="221.1" width="5" height="8"/>
+<rect class="clamp" x="119.4" y="205.7" width="6.6" height="6"/>
+<rect class="clamp" x="197.4" y="238.5" width="6.6" height="6"/>
+<rect class="clamp" x="275.4" y="205.7" width="6.6" height="6"/>
+<rect class="clamp" x="353.4" y="238.5" width="6.6" height="6"/>
+<rect class="clamp" x="421.0" y="205.7" width="6.6" height="6"/>
+<rect class="clamp" x="506.8" y="238.5" width="6.6" height="6"/>
+<rect class="clamp" x="51.2" y="287.1" width="5" height="8"/>
+<rect class="clamp" x="119.4" y="271.8" width="6.6" height="6"/>
+<rect class="clamp" x="197.4" y="304.5" width="6.6" height="6"/>
+<rect class="clamp" x="275.4" y="271.8" width="6.6" height="6"/>
+<rect class="clamp" x="353.4" y="304.5" width="6.6" height="6"/>
+<rect class="clamp" x="421.0" y="271.8" width="6.6" height="6"/>
+<rect class="clamp" x="506.8" y="304.5" width="6.6" height="6"/>
+</svg>

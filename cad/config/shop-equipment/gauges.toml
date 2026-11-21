@@ -100,6 +100,10 @@ note = "The installed PM-30MV DRO's Y scale (dro.pm-30mv: installed DRO confirme
 status = "on_hand"
 note = "The F and G drill shanks of the owned 115-piece index (tools.jig-drill-f, owner 2026-11-19; G per cad/process/shop/ tools.clamp-drill-g, owner 2026-11-17)."
 
+[gauges.lever-bore-f-shank]
+status = "on_hand"
+note = "The F drill shank of the owned 115-piece index (tools.jig-drill-f), the MHA-CH-02 fulcrum bore's NO-GO (cad/process/ch_channel_lever)."
+
 # Owner inventory 2026-11-17 (Pedro, PR #2874): "2 0.001'' dial indicators,
 # one 1um lever indicator and one digital 0.000'' indicator". The lever
 # indicator is gauges.dti. Resolutions are cad/process/shop/, same keys;

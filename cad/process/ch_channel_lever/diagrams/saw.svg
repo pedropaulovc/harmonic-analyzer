@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 1: blanks sawn from the 72 in flat; the spoil plate sawn off the 6061 flat. Styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180" width="640" height="180" font-family="sans-serif" font-size="12">
+<rect class="paper" width="640" height="180"/>
+<text class="label" x="20" y="22">72 in length of 5/16 x 1 flat: nine 7.75–7.81 in blanks</text>
+<rect class="part-kept" x="20" y="34" width="62" height="18"/>
+<text class="label" x="42" y="47">1</text>
+<rect class="part-kept" x="86" y="34" width="62" height="18"/>
+<text class="label" x="108" y="47">2</text>
+<rect class="part-kept" x="152" y="34" width="62" height="18"/>
+<text class="label" x="174" y="47">3</text>
+<rect class="part-kept" x="218" y="34" width="62" height="18"/>
+<text class="label" x="240" y="47">4</text>
+<rect class="part-kept" x="284" y="34" width="62" height="18"/>
+<text class="label" x="306" y="47">5</text>
+<rect class="part-kept" x="350" y="34" width="62" height="18"/>
+<text class="label" x="372" y="47">6</text>
+<rect class="part-kept" x="416" y="34" width="62" height="18"/>
+<text class="label" x="438" y="47">7</text>
+<rect class="part-kept" x="482" y="34" width="62" height="18"/>
+<text class="label" x="504" y="47">8</text>
+<rect class="part-kept" x="548" y="34" width="62" height="18"/>
+<text class="label" x="570" y="47">9</text>
+<text class="label" x="20" y="90">1/2 x 6 in 6061 flat: the spoil plate, 3.9 in off its end</text>
+<rect class="part-rest" x="20" y="100" width="420" height="60"/>
+<rect class="part-kept" x="20" y="100" width="40" height="60"/>
+<text class="label" x="66" y="134">spoil plate 3.9 x 6</text>
+</svg>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 2: four blanks B up on the spoil plate across the jaws; face B, pocket B, bore, holes. Styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 380" width="640" height="380" font-family="sans-serif" font-size="12">
+<rect class="paper" width="640" height="380"/>
+<text class="label" x="20" y="20">Side B up: face, pocket, bore and holes (top view)</text>
+<rect class="fixture-vise" x="89" y="34" width="413" height="26"/>
+<text class="label" x="240" y="50">fixed jaw</text>
+<rect class="fixture-plate" x="40" y="62" width="396" height="260" fill-opacity="0.4"/>
+<rect class="part-rest" x="40" y="60.0" width="511.8" height="66.0"/>
+<path class="part-kept" d="M80.3 105.2 L433.9 105.2 L526.0 104.0 A11.0 11.0 0 0 0 526.0 82.0 L433.9 80.8 L80.3 80.8 A15.5 15.5 0 1 0 80.3 105.2 Z"/>
+<circle class="holes" cx="70.7" cy="93.0" r="8.5"/>
+<circle class="holes" cx="400.9" cy="93.0" r="2.6"/>
+<circle class="holes" cx="525.8" cy="93.0" r="5.2"/>
+<rect class="part-rest" x="40" y="126.0" width="511.8" height="66.0"/>
+<path class="part-kept" d="M80.3 171.3 L433.9 171.3 L526.0 170.1 A11.0 11.0 0 0 0 526.0 148.0 L433.9 146.8 L80.3 146.8 A15.5 15.5 0 1 0 80.3 171.3 Z"/>
+<circle class="holes" cx="70.7" cy="159.1" r="8.5"/>
+<circle class="holes" cx="400.9" cy="159.1" r="2.6"/>
+<circle class="holes" cx="525.8" cy="159.1" r="5.2"/>
+<rect class="part-rest" x="40" y="192.1" width="511.8" height="66.0"/>
+<path class="part-kept" d="M80.3 237.3 L433.9 237.3 L526.0 236.1 A11.0 11.0 0 0 0 526.0 214.1 L433.9 212.9 L80.3 212.9 A15.5 15.5 0 1 0 80.3 237.3 Z"/>
+<circle class="holes" cx="70.7" cy="225.1" r="8.5"/>
+<circle class="holes" cx="400.9" cy="225.1" r="2.6"/>
+<circle class="holes" cx="525.8" cy="225.1" r="5.2"/>
+<rect class="part-rest" x="40" y="258.1" width="511.8" height="66.0"/>
+<path class="part-kept" d="M80.3 303.4 L433.9 303.4 L526.0 302.2 A11.0 11.0 0 0 0 526.0 280.1 L433.9 278.9 L80.3 278.9 A15.5 15.5 0 1 0 80.3 303.4 Z"/>
+<circle class="holes" cx="70.7" cy="291.1" r="8.5"/>
+<circle class="holes" cx="400.9" cy="291.1" r="2.6"/>
+<circle class="holes" cx="525.8" cy="291.1" r="5.2"/>
+<rect class="fixture-vise" x="89" y="324" width="413" height="26"/>
+<text class="label" x="240" y="341">moving jaw</text>
+<line class="datum" x1="40" y1="30" x2="40" y2="354"/>
+<text class="label" x="10" y="368">X0 left ends</text>
+<text class="label" x="460" y="368">spoil plate (dashed) on 1 in parallels; B up</text>
+<path class="arrow" d="M600 93 H510"/>
+<text class="label" x="510" y="85">slot −X, arc round the hub</text>
+</svg>

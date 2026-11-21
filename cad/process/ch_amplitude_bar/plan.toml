@@ -197,7 +197,7 @@ name = "1/2 in carbide end mill"
 ref = "endmill-carbide-3fl-1-2"
 [[tools]]
 id = "saw"
-name = "2-3/4 x .064 HSS slitting saw on the R8 1 in arbor (arbor TO BUY)"
+name = "2-3/4 x .064 HSS slitting saw on the R8 1 in arbor, arbor TO BUY"
 ref = "slitting-saw-2-75-064"
 [[tools]]
 id = "spot"
@@ -209,7 +209,7 @@ name = "#49 drill"
 ref = "drill-49"
 [[tools]]
 id = "reamer-0775"
-name = ".0775 reamer (TO BUY)"
+name = ".0775 reamer, TO BUY"
 ref = "reamer-0775"
 [[tools]]
 id = "cutoff-saw"
@@ -217,7 +217,7 @@ name = "Evolution miter saw"
 ref = "saw-evolution-14"
 [[tools]]
 id = "rule"
-name = "48 in steel rule, 1/100 in (TO BUY)"
+name = "48 in steel rule, 1/100 in, TO BUY"
 ref = "steel-rule-48"
 [[tools]]
 id = "arbor-press"
