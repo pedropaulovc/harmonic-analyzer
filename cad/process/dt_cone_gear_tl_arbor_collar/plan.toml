@@ -12,8 +12,8 @@
 # Stock: 1018 cold-finished round (drawing: low-carbon steel, e.g. 12L14 CF).
 # 1 in and 1/2 in bar are on hand (cad/config/shop-equipment/stock-bought.toml
 # 1018-round-1, 1018-round-1-2); 1-3/4 in is to order (stock-to-order.toml
-# 1018-round-1-3-4, a 1.5 in piece). Kerf: the 1/8 in cutoff blade's insert
-# plus an authored allowance (cad/process/shop/lathe.toml tools.cutoff-blade-holder).
+# 1018-round-1-3-4, a 1.5 in piece). Kerf: the P1 HSS cutoff blade's width
+# plus an authored allowance (cad/process/shop/lathe.toml tools.cutoff-blade-p1).
 title = "Keyed Cutting Arbor Backing Collar"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -39,14 +39,13 @@ bar_length_in = 1.5
 chuck_grip_in = 0.75
 # Facing allowance: enough to square a sawn or parted bar end.
 face_allowance_in = 0.02
-# Parting kerf: 1/8 in blade plus the insert's side clearance (authored).
-part_kerf_in = 0.13
-# The cutoff blade's width: the holder's 1/8 in (cad/config/shop-equipment/
-# tools-cutting.toml tools.cutoff-blade-holder width_in). The inserts' cutting
-# width is not on record (the packing list's .252 is their thickness), so the
-# part-off ops caliper the insert and preset the DRO to what it reads; the
-# kerf above allows up to .13.
-blade_width_in = 0.125
+# Parting kerf: the P1 blade's width plus .0125 (authored), for wander or a
+# .010 step toward the chuck that widens a deep groove.
+part_kerf_in = 0.075
+# The P1 cutoff blade's width: its record (cad/config/shop-equipment/
+# tools-cutting.toml tools.cutoff-blade-p1 width_in, the makers' 1/16 in).
+# The part-off ops mike the blade's cutting edge and preset the DRO to that.
+blade_width_in = 0.0625
 parts_per_pull = 1
 # The parting blade's clearance to the jaw fronts.
 jaw_clearance_in = 0.1
@@ -68,8 +67,8 @@ ref = "drill-l"
 
 [[tools]]
 id = "cutoff"
-name = "Cutoff blade"
-ref = "cutoff-blade-holder"
+name = "P1 HSS cutoff blade"
+ref = "cutoff-blade-p1"
 
 [[tools]]
 id = "file"
@@ -125,7 +124,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width (about {{process.blade_width_in:.3dot}}, by caliper on the insert): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}. Catch the collar; mark it C175."
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}. On this Ø1.75, once the blade is about .10 in, back out and step it .010 toward the chuck, then cut in again, alternating, so it does not bind; that face stays at Z-{{cad.part_off_in:.3dot}}. Catch the collar; mark it C175."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 

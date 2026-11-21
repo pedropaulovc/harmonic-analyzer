@@ -9,13 +9,19 @@ the DRO was set to. The face the DRO then reads follows: the touched face, or
 the other one when the setting is the blade's width. Every cut positioned by
 the DRO must name that face. A part parted from the faced end at
 ``Z-{{cad.part_off_*}}`` lies on the tailstock side of the blade, so its
-tailstock-side face cuts it. A blade-width setting prints the plan's
-``blade_width_in``, the holder's recorded width, and the parting kerf the plan
-spaces its parts by covers it. A part-off placed without the DRO measures to
-the blade's near side, the side toward the part.
+tailstock-side face cuts it.
 
-Every ``cad/process/*/plan.toml`` that names the cutoff holder is checked, so
-a plan added later is held to the same rule.
+Every plan that names a cutoff tool states that tool's width as
+``blade_width_in``, equal to the tool's ``width_in`` in the shop inventory, and
+only a ``cutoff_blade`` record carries a cutting width (a holder's width is
+its body's, not its kerf: #3312's .125 was the 3212A119 holder's). The
+parting kerf the plan spaces its parts by follows that width, within an
+authored allowance. A blade-width DRO setting prints ``blade_width_in``. A
+part-off placed without the DRO measures to the blade's near side, the side
+toward the part.
+
+Every ``cad/process/*/plan.toml`` that names a cutoff tool is checked, so a
+plan added later is held to the same rule.
 """
 
 from __future__ import annotations
@@ -28,8 +34,13 @@ import pytest
 import _process_plans
 import _shop_equipment
 
-HOLDER = "cutoff-blade-holder"
-HOLDER_WIDTH_IN = _shop_equipment.load()["tools"][HOLDER]["width_in"]
+_TOOLS = _shop_equipment.load()["tools"]
+# Inventory kinds a plan may part or groove with.
+CUTOFF_KINDS = ("cutoff_blade", "cutoff_holder", "cutoff_insert_set")
+CUTOFF = {key: tool for key, tool in _TOOLS.items() if tool.get("kind") in CUTOFF_KINDS}
+# The kerf a plan spaces its parts by: the blade's width plus at most this
+# (wander, or a step over that widens a deep groove).
+KERF_OVER_MAX_IN = 0.015
 
 # "{{cad.part_off_in:.3dot}}" -> "<cad.part_off_in>": no colon of a format
 # spec is left to end a phrase early.
@@ -60,10 +71,16 @@ def _text(instruction: str) -> str:
     return _BINDING.sub(r"<\1>", instruction)
 
 
-def faults(plan: dict, holder_width_in: float = HOLDER_WIDTH_IN) -> list[str]:
+def faults(plan: dict, tools: dict = CUTOFF) -> list[str]:
     """Each place ``plan`` parts or grooves with a face the DRO does not
-    read, or with a blade width that disagrees with the holder's record."""
-    cutoff = {tool["id"] for tool in plan.get("tools", ()) if tool.get("ref") == HOLDER}
+    read, or with a blade width or kerf that disagrees with the blade's
+    record in ``tools`` (inventory key -> record)."""
+    refs = {
+        tool["id"]: tool["ref"]
+        for tool in plan.get("tools", ())
+        if tool.get("ref") in tools
+    }
+    cutoff = set(refs)
     if not cutoff:
         return []
     found: list[str] = []
@@ -129,23 +146,35 @@ def faults(plan: dict, holder_width_in: float = HOLDER_WIDTH_IN) -> list[str]:
                 found.append(
                     f"{where}: part-off placed neither by the DRO nor to the near side"
                 )
-    if width_settings:
-        parameters = plan.get("parameters", {})
-        width = parameters.get("blade_width_in")
-        if width != holder_width_in:
+    parameters = plan.get("parameters", {})
+    width = parameters.get("blade_width_in")
+    for ref in sorted(set(refs.values())):
+        record = tools[ref]
+        if record.get("kind") != "cutoff_blade":
             found.append(
-                f"process.blade_width_in {width!r} is not the holder's recorded "
-                f"width {holder_width_in}"
+                f"{ref} is a {record.get('kind')}, not a blade: no cutting width on record"
             )
-        if not any(
-            "<process.blade_width_in>" in _text(op.get("instruction", ""))
-            for setup in plan.get("setups", ())
-            for op in setup.get("operations", ())
-        ):
-            found.append("no part-off prints process.blade_width_in")
-        kerf = parameters.get("part_kerf_in")
-        if kerf is not None and width is not None and kerf < width:
-            found.append(f"process.part_kerf_in {kerf} is under the blade's {width}")
+        elif width != record["width_in"]:
+            found.append(
+                f"process.blade_width_in {width!r} is not {ref}'s recorded width "
+                f"{record['width_in']}"
+            )
+    kerf = parameters.get("part_kerf_in")
+    if (
+        kerf is not None
+        and width is not None
+        and not width <= kerf <= width + KERF_OVER_MAX_IN
+    ):
+        found.append(
+            f"process.part_kerf_in {kerf} does not follow the blade's {width} "
+            f"(+0 to +{KERF_OVER_MAX_IN})"
+        )
+    if width_settings and not any(
+        "<process.blade_width_in>" in _text(op.get("instruction", ""))
+        for setup in plan.get("setups", ())
+        for op in setup.get("operations", ())
+    ):
+        found.append("no part-off prints process.blade_width_in")
     return found
 
 
@@ -153,7 +182,7 @@ def _plans() -> dict[str, dict]:
     plans = {}
     for path in sorted(_process_plans.PROCESS_ROOT.glob("*/plan.toml")):
         plan = tomllib.loads(path.read_text(encoding="utf-8"))
-        if any(tool.get("ref") == HOLDER for tool in plan.get("tools", ())):
+        if any(tool.get("ref") in CUTOFF for tool in plan.get("tools", ())):
             plans[path.parent.name] = plan
     return plans
 
@@ -180,24 +209,38 @@ def test_the_blade_parts_with_the_face_the_dro_reads(stem: str) -> None:
     assert faults(PLANS[stem]) == []
 
 
-def _synthetic(*instructions: str, width: float | None = 0.125) -> dict:
-    parameters = {"part_kerf_in": 0.13}
+# Synthetic records, so the controls do not move with the inventory.
+_SYN_TOOLS = {
+    "blade": {"kind": "cutoff_blade", "width_in": 0.0625},
+    "holder": {"kind": "cutoff_holder", "width_in": 0.125},
+}
+
+
+def _synthetic(
+    *instructions: str, width: float | None = 0.0625, ref: str = "blade"
+) -> dict:
+    parameters = {"part_kerf_in": 0.075}
     if width is not None:
         parameters["blade_width_in"] = width
     return {
         "parameters": parameters,
-        "tools": [{"id": "cutoff", "ref": HOLDER}],
+        "tools": [{"id": "cutoff", "ref": ref}],
         "setups": [
             {"operations": [{"tool": "cutoff", "instruction": i} for i in instructions]}
         ],
     }
 
 
+def _faults(plan: dict) -> list[str]:
+    return faults(plan, _SYN_TOOLS)
+
+
 _RIGHT = (
     "Bring the blade's chuck-side face onto the faced end and set DRO Z there to "
-    "the blade's width (about {{process.blade_width_in:.3dot}}, by caliper on the "
-    "insert): the DRO then reads the blade's tailstock-side face. Part off with "
-    "that face at Z-{{cad.part_off_in:.3dot}}. Catch the part."
+    "the blade's width, miked across its cutting edge "
+    "({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's "
+    "tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}. "
+    "Catch the part."
 )
 
 
@@ -206,23 +249,27 @@ def test_the_check_refuses_the_datum_3312_found() -> None:
         "Touch the blade's Z0-side face on the faced end and zero DRO Z for the "
         "blade there. Part off at Z-{{cad.part_off_in:.3dot}}. Catch the part."
     )
-    assert len(faults(wrong)) >= 2
+    assert len(_faults(wrong)) >= 2
     # Touched with the chuck-side face and zeroed there: the DRO reads that
     # face, so a part-off at Z-part_off with it leaves the part short.
     zeroed = _synthetic(
         "Bring the blade's chuck-side face onto the faced end and set DRO Z there "
         "to 0. Part off with that face at Z-{{cad.part_off_in:.3dot}}."
     )
-    assert any("not the tailstock-side face" in f for f in faults(zeroed))
-    assert faults(_synthetic(_RIGHT)) == []
+    assert any("not the tailstock-side face" in f for f in _faults(zeroed))
+    assert _faults(_synthetic(_RIGHT)) == []
 
 
-def test_the_check_holds_the_width_to_the_record() -> None:
-    assert any("holder's recorded" in f for f in faults(_synthetic(_RIGHT, width=0.12)))
-    assert any("holder's recorded" in f for f in faults(_synthetic(_RIGHT, width=None)))
-    narrow = _synthetic(_RIGHT)
-    narrow["parameters"]["part_kerf_in"] = 0.1
-    assert any("under the blade" in f for f in faults(narrow))
+def test_the_check_holds_the_width_and_kerf_to_the_blade_record() -> None:
+    assert any("recorded width" in f for f in _faults(_synthetic(_RIGHT, width=0.125)))
+    assert any("recorded width" in f for f in _faults(_synthetic(_RIGHT, width=None)))
+    # #3312's .125 was the holder's body width, not a blade's kerf.
+    holder = _synthetic(_RIGHT, width=0.125, ref="holder")
+    assert any("not a blade" in f for f in _faults(holder))
+    for kerf in (0.05, 0.13):
+        plan = _synthetic(_RIGHT)
+        plan["parameters"]["part_kerf_in"] = kerf
+        assert any("does not follow the blade" in f for f in _faults(plan)), kerf
 
 
 def test_a_groove_cut_toward_the_chuck_reads_the_touched_face() -> None:
@@ -231,13 +278,11 @@ def test_a_groove_cut_toward_the_chuck_reads_the_touched_face() -> None:
     groove = _synthetic(
         "Touch its chuck-side face on the pilot's shoulder over a paper shim and "
         "set DRO Z+.300. Plunge at DRO Z+.100, then at DRO Z0 (its chuck-side "
-        "face on end B's plane) to the neck.",
-        width=None,
+        "face on end B's plane) to the neck."
     )
-    assert faults(groove) == []
+    assert _faults(groove) == []
     swapped = _synthetic(
         "Touch its chuck-side face on the pilot's shoulder and set DRO Z+.300. "
-        "Plunge at DRO Z0 (its tailstock-side face on end B's plane).",
-        width=None,
+        "Plunge at DRO Z0 (its tailstock-side face on end B's plane)."
     )
-    assert faults(swapped)
+    assert _faults(swapped)

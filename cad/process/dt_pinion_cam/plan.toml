@@ -51,8 +51,11 @@ bar_dia_in = 0.625
 # Both cams from one chucking: two lengths, two parting cuts, a .010 face
 # and the 3-jaw's grip, rounded up.
 bar_length_min_in = 2.0
-# Stick-out for both cams: 2 × .354 + two 1/8 in blade widths + the first
-# face's .010, plus room for the blade to clear the jaws: 1.25 in.
+# The P1 cutoff blade's width: its record (cad/config/shop-equipment/
+# tools-cutting.toml tools.cutoff-blade-p1 width_in, the makers' 1/16 in).
+blade_width_in = 0.0625
+# Stick-out for both cams: 2 × .354 + two P1 blade widths + the first face's
+# .010 (.843), plus room for the blade to clear the jaws: 1.25 in.
 stickout_mm = 31.75
 turn_length_in = 1.0
 # The blank a cam is cut from (stock_fit: envelope X, Y, Z).
@@ -145,8 +148,8 @@ name = "AR carbide turning tool"
 ref = "lathe-ar"
 [[tools]]
 id = "cutoff"
-name = "Cutoff blade"
-ref = "cutoff-blade-holder"
+name = "P1 HSS cutoff blade"
+ref = "cutoff-blade-p1"
 [[tools]]
 id = "spot"
 name = "#2 centre drill"
