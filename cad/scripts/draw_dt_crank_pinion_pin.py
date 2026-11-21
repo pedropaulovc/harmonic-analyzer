@@ -41,9 +41,13 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import limits
 from _session import run_build
 from _supplier_dimensions import supplier_reference_dimension
 import _telemetry
@@ -90,6 +94,66 @@ RIGHT_KEEP = {
     "PinDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + HALF_DIA + 0.022),
     "PinLen": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_DIA - 0.016),
 }
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_dt_crank_pinion_pin: axis +Z through the origin, one faced end at
+# z = 0, the datum end the length runs from; the other at z = PIN_LEN). The
+# diameter is the 1/8 rod as supplied (a REF fraction, STOCK, AS SUPPLIED);
+# the length takes the title block's .XX row. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_crank_pinion_pin"
+_PINION = "dt_crank_pinion_spec"
+UNIT = part_drawing_unit(PART_STEM)
+part_metadata(
+    model_sources=("PIN_LEN", (_PINION, "PIN_DIA")),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("PIN_LEN",)),
+        "outward": ([0.0, 0.0, -1.0], ("PIN_LEN",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), PIN_LEN),),
+    requirements=("length",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": PIN_LEN}, ("PIN_LEN",)),
+        "outward": ([0.0, 0.0, 1.0], ("PIN_LEN",)),
+        "length": (
+            limits(PIN_LEN, _P["PinLen"], unit=UNIT),
+            ("PIN_LEN", (_SELF, "UNIT"), (_SELF, "RIGHT_KEEP")),
+        ),
+        "length_nominal": (PIN_LEN, ("PIN_LEN",)),
+        "length_from": ("datum_end", ((_SELF, "RIGHT_KEEP"),)),
+    },
+    precision={"length": _P["PinLen"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(PIN_DIA),),
+    requirements=("stock",),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ((_PINION, "PIN_DIA"),)),
+        "at": ([0.0, 0.0, 0.0], ((_PINION, "PIN_DIA"),)),
+        "span": ([0.0, PIN_LEN], ("PIN_LEN",)),
+        "dia_ref": (
+            PIN_DIA,
+            ((_PINION, "PIN_DIA"), "PIN_DIA_FRACTION_DENOMINATOR"),
+        ),
+        "stock": (PIN_DIA_CALLOUT, ("PIN_DIA_CALLOUT",)),
+        "callout": (PIN_DIA_CALLOUT, ("PIN_DIA_CALLOUT",)),
+    },
+    precision={"dia_ref": _P["PinDia"]},
+)
 
 
 def build(adapter: Any) -> dict[str, str]:

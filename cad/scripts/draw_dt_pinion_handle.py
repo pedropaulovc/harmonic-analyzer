@@ -30,7 +30,11 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _part_properties import part_drawing_unit
+from _printed_limits import limits
 from _supplier_dimensions import supplier_reference_dimension
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -40,7 +44,11 @@ import _telemetry
 from dt_pinion_handle_spec import (
     DRAWING_PRECISION_BY_NAME,
     ROD_DIA,
+    ROD_DOWN,
     ROD_FRACTION_DENOMINATOR,
+    ROD_SPAN,
+    ROD_UP,
+    UNIT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -69,6 +77,72 @@ DONOR_KEEP = {"RodDia": (0.035, 0.205)}
 PRINCIPAL_KEEP = {"RodSpan": (PRINCIPAL_CENTER[0], 0.1335)}
 ROD_DIAMETER_XY = (0.235, 0.1915)
 DIMENSION_CALLOUTS = {"RodSpan": "OAL"}
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_dt_pinion_handle: the rod's axis is model +Y through the origin; the
+# end at y = -ROD_DOWN is the datum end the OAL runs from, the other end at
+# y = ROD_UP). The diameter is the 1/4 cold-finished bar as received (a REF
+# fraction); the OAL takes the title block's .XX row. The declarations print
+# nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_pinion_handle"
+_GEOM = "dt_pinion_handle_geometry"
+part_metadata(
+    model_sources=((_GEOM, "ROD_DIA"), (_GEOM, "ROD_DOWN"), (_GEOM, "ROD_SPAN")),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), ROD_DOWN),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": -ROD_DOWN},
+            ((_GEOM, "ROD_DOWN"),),
+        ),
+        "outward": ([0.0, -1.0, 0.0], ((_GEOM, "ROD_DOWN"),)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), ROD_UP),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": ROD_UP},
+            ((_GEOM, "ROD_UP"),),
+        ),
+        "outward": ([0.0, 1.0, 0.0], ((_GEOM, "ROD_UP"),)),
+        "length": (
+            limits(ROD_SPAN, _P["RodSpan"], unit=UNIT),
+            ((_GEOM, "ROD_SPAN"), "UNIT", (_SELF, "PRINCIPAL_KEEP")),
+        ),
+        "length_nominal": (ROD_SPAN, ((_GEOM, "ROD_SPAN"),)),
+        "length_from": ("datum_end", ((_SELF, "PRINCIPAL_KEEP"),)),
+        "callout": (DIMENSION_CALLOUTS["RodSpan"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+    },
+    precision={"length": _P["RodSpan"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(ROD_DIA),),
+    requirements=("stock",),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ((_GEOM, "ROD_DIA"),)),
+        "at": ([0.0, 0.0, 0.0], ((_GEOM, "ROD_DIA"),)),
+        "span": ([-ROD_DOWN, ROD_UP], ((_GEOM, "ROD_DOWN"), (_GEOM, "ROD_UP"))),
+        "dia_ref": (
+            ROD_DIA,
+            ((_GEOM, "ROD_DIA"), "ROD_FRACTION_DENOMINATOR"),
+        ),
+        "stock": ("COLD-FINISHED BAR AS RECEIVED", ("DRAWING_NOTES",)),
+    },
+    precision={"dia_ref": _P["RodDia"]},
+)
 
 
 def _move_dimension(
