@@ -474,50 +474,80 @@ def test_shared_numbers_print_the_item_the_native_bom_gives(monkeypatch) -> None
 def test_released_cup_pins_are_renewed_once_at_ninety_degrees() -> None:
     """Owner ruling 2026-11-20 (Pedro), #2497: a released or slipping cup pin
     is re-pinned once at 90 degrees, and a cup and shaft re-pinned before
-    (at 22F, 28P or 33R) are renewed; the arm's slipping dowel is bonded and
-    read again once cured."""
-    repin = "WITH A NEW PIN AT 90\u00b0 (RE-PINNED BEFORE: NEW CUP AND SHAFT)"
+    are renewed; the arm's slipping dowel is bonded and read again once
+    cured. Step 22 carries both, one action per sub-step (machinist review
+    of 592b20079f), so 28 and 33 repeat it whole."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    fitted = texts["knob-stack-fitted"]
+    assert fitted[2] == (
+        f"IF THE CUP HAS 2 HOLES, GO TO {drawing.sub_step('knob-stack-fitted', 0)} "
+        "WITH A NEW CUP AND SHAFT."
+    )
+    assert fitted[3].startswith(f"FIT THE {_number('pd-transgear-knob-cup')} CUP")
+    assert "AT 90\u00b0 TO ANY HOLE IN THE CUP" in fitted[4]
+    assert fitted[6] == (
+        "IF IT SLIDES IN BY HAND, PUSH IT OUT; GO TO "
+        f"{drawing.sub_step('knob-stack-fitted', 2)} WITH A NEW PIN."
+    )
+    repeat = (
+        f"REPEAT STEP {steps.step_number('knob-stack-fitted')}, THEN FROM STEP "
+        f"{steps.step_number('fitup-pose-set')}."
+    )
     for key in ("fitup-mesh-remedied", "fitup-accepted"):
-        assert repin in " ".join(_step_body(key).split()), key
-    fitted = drawing._step_text(operating_domain=_unit_operating_domain())[
-        "knob-stack-fitted"
-    ][5]
-    assert (
-        "AT 90\u00b0; IF RE-PINNED BEFORE, DRAW THE SHAFT OUT AND REPEAT FROM "
-        f"{drawing.sub_step('knob-stack-fitted', 0)} WITH A NEW CUP AND SHAFT."
-    ) in fitted
-    # The bond, its check and the check's remedy are separate sub-steps.
-    bond, check, remedy = drawing._step_text(operating_domain=_unit_operating_domain())[
-        "arm-plate-fitted"
-    ][6:9]
-    assert "BOND IT WITH LOCTITE 638 AT THE SAME PROUD AND CURE 24 H." in bond
+        assert any(row.endswith(repeat) for row in texts[key]), key
+        assert not any("RE-PINNED" in row for row in texts[key]), key
+    # The bond, its check and the check's remedy are separate sub-steps; the
+    # bond names its prep and where the compound goes.
+    bond, check, remedy = texts["arm-plate-fitted"][6:9]
+    assert bond.startswith("IF A DOWEL SLIDES IN BY HAND, PULL IT,")
+    for words in (
+        "DEGREASE IT AND ITS HOLE",
+        "COAT THE DOWEL, NOT THE HOLE, WITH LOCTITE 638",
+        "AT ONCE AT THE SAME PROUD",
+        "CURE 24 H.",
+    ):
+        assert words in bond, words
     assert check == (
         "CHECK: PUSHED, A BONDED DOWEL DOES NOT MOVE; IT READS AS "
         f"{drawing.sub_step('arm-plate-fitted', 5)}."
     )
     assert remedy.endswith(f"RENEW AS {drawing.sub_step('arm-plate-fitted', 22)}.")
-    assert drawing._step_text(operating_domain=_unit_operating_domain())[
-        "arm-plate-fitted"
-    ][22].startswith("IF A CHECK STILL FAILS, THE DOWELS HAVE NOT HELD")
+    assert texts["arm-plate-fitted"][22].startswith(
+        "IF A CHECK STILL FAILS, THE DOWELS HAVE NOT HELD"
+    )
 
 
 def test_a_feed_sleeve_found_outside_after_hanging_has_a_renewal_route() -> None:
-    """#3106: 24 and 26 renew a faulty MHA-PD-10 from the stripped cluster."""
-    meshed = " ".join(_step_body("hanger-meshed").split())
-    assert (
-        f"FOR A {_number('pd-transgear-feed-pinion')} FOUND OUTSIDE, SLIDE THE COLLAR OFF, "
-        f"STRIP {drawing.sub_step('disc-cluster-hung', 4)}-"
-        f"{drawing.sub_step('disc-cluster-hung', 1)}"
-    ) in meshed
-    assert (
-        f"THEN {steps.step_number('oil-hole-drilled')}-"
-        f"{steps.step_number('disc-cluster-shimmed')}"
-    ) in meshed
+    """#3106: 24 and 26 renew a faulty MHA-PD-10 from the stripped cluster,
+    one action per sub-step (machinist review of 592b20079f)."""
     texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    meshed = texts["hanger-meshed"]
+    sleeve = _number("pd-transgear-feed-pinion")
     route = next(
         index
-        for index, text in enumerate(texts["hanger-meshed"])
-        if text.startswith(f"FOR A {_number('pd-transgear-feed-pinion')} FOUND OUTSIDE")
+        for index, text in enumerate(meshed)
+        if text.startswith(f"FOR A {sleeve} FOUND OUTSIDE")
+    )
+    assert meshed[route : route + 3] == (
+        f"FOR A {sleeve} FOUND OUTSIDE, STRIP THE COLLAR AND "
+        f"{drawing.sub_step('disc-cluster-hung', 4)}-"
+        f"{drawing.sub_step('disc-cluster-hung', 1)}.",
+        f"FOR IT, DO {drawing.sub_step('arm-plate-located', 20)} AND THE REPEATS IN "
+        f"{drawing.sub_step('arm-plate-located', 21)} ON A NEW ONE.",
+        f"FOR IT, REPEAT STEPS {steps.step_number('oil-hole-drilled')}-"
+        f"{steps.step_number('disc-cluster-shimmed')} AND "
+        f"{drawing.sub_step('knob-stack-fitted', 7)}, THEN FROM "
+        f"{drawing.sub_step('hanger-meshed', 0)}.",
+    )
+    # The sub-steps it names are the ones that slide the sleeve off and on.
+    assert texts["arm-plate-located"][20].startswith(
+        "SLIDE THE HUB AND DISC AS ONE OFF"
+    )
+    assert texts["arm-plate-located"][21].startswith(
+        "WITH THEM OFF AND THE DISC SCREWS"
+    )
+    assert texts["knob-stack-fitted"][7].startswith(
+        f"SLIDE THE {_number('pd-transgear-drive-collar')} COLLAR ON"
     )
     assert (
         f"OR {drawing.sub_step('hanger-meshed', route)}."
@@ -2595,13 +2625,15 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     assert not any("STAKE" in line for line in pivot)
     accepted = texts["fitup-accepted"]
     # From 33 the reseat runs; a repeat failure takes the knob stack off
-    # (28G) and rebuilds the arm as 28Q-28U, whose step 15 carries the
+    # (28G) and rebuilds the arm as 28R-28V, whose step 15 carries the
     # renewal and the inspection (Codjiflo P2 on e8b4e199aa).
     assert "IF 33F FAILS, ARM UNLATCHED, DO 15L-15Q." in accepted
-    assert "IF A 15G-15J CHECK THEN FAILS, DO 28G AND 28Q-28U." in accepted
+    assert "IF A 15G-15J CHECK THEN FAILS, DO 28G AND 28R-28V." in accepted
     assert texts["fitup-mesh-remedied"][6].startswith("REMOVE THE ")
-    assert texts["fitup-mesh-remedied"][14].startswith("FOR A FAULT ALL ROUND (ARM SETTING)")
-    assert texts["fitup-mesh-remedied"][18].startswith("SKIP STEPS ")
+    assert texts["fitup-mesh-remedied"][15].startswith(
+        "FOR A FAULT ALL ROUND (ARM SETTING)"
+    )
+    assert texts["fitup-mesh-remedied"][19].startswith("SKIP STEPS ")
     hook = texts["hook-pin-hole-match-drilled"]
     assert hook[4] == "TIGHTEN THE HOOK SCREWS."
     assert hook[5] == "CHECK: PUSHED FIRMLY BY HAND, THE HOOK DOES NOT MOVE ON THE BAR."
@@ -2700,9 +2732,17 @@ def test_the_chain_is_closed_and_run_after_the_collar_is_accepted() -> None:
         "chain-run-accepted",
     )
     closed = _step_body("chain-closed")
-    # The loose links loop one pitch short; the connecting link closes it.
-    assert f"LOOP {chain.LINK_COUNT - 1} PITCHES" in closed
-    assert f"MAKES IT {chain.LINK_COUNT} PITCHES" in closed
+    # The loose links are cut one pitch short; the connecting link closes it.
+    # Cut, loop and join are one sub-step each (machinist review of
+    # 592b20079f).
+    cut, loop, join = drawing._step_text(operating_domain=_unit_operating_domain())[
+        "chain-closed"
+    ]
+    assert cut.startswith(f"CUT {chain.LINK_COUNT - 1} PITCHES")
+    assert cut.endswith("WITH A #25 CHAIN BREAKER.")
+    assert loop.startswith("LOOP THEM OVER")
+    assert join.startswith("JOIN THE ENDS")
+    assert f"MAKES THE LOOP {chain.LINK_COUNT} PITCHES" in join
     assert "ANSI #25" in closed
     knob = drawing.sprocket_name(sprocket.KNOB_CONFIG, numbered=False)
     crank = drawing.sprocket_name(sprocket.CRANK_CONFIG, numbered=False)
@@ -3079,7 +3119,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"REPLACE A PLATE FOUND OUTSIDE AND REPEAT FROM {drawing.sub_step('arm-plate-located', 0)}.",
         "REPLACE A DISC FOUND OUTSIDE THROUGH "
         f"{drawing.sub_step('disc-cluster-assembled', 2)}-"
-        f"{drawing.sub_step('disc-taps-transferred', 16)} ON THE SAME HUB, ITS "
+        f"{drawing.sub_step('disc-taps-transferred', 17)} ON THE SAME HUB, ITS "
         f"{_number('pd-vn-transgear-hub-key-pin')} PIN RIDING THE FLAT, "
         f"AND REPEAT FROM {trial}.",
         "SLIDE THE HUB AND DISC AS ONE OFF A "
@@ -3091,7 +3131,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"{drawing.sub_step('disc-taps-transferred', 2)}, "
         f"{drawing.sub_step('disc-taps-transferred', 9)} AND "
         f"{drawing.sub_step('disc-taps-transferred', 12)}-"
-        f"{drawing.sub_step('disc-taps-transferred', 16)} ON A NEW "
+        f"{drawing.sub_step('disc-taps-transferred', 17)} ON A NEW "
         f"{_number('pd-transgear-feed-pinion')}, THEN FROM {trial}.",
         f"REPLACE A {_number('pd-transgear-knob-shaft')} FOUND OUTSIDE AND REPEAT FROM {trial}.",
     ):
@@ -3104,9 +3144,9 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     assert "AS 12M AND 12N" in fitted
     # Owner ruling 2026-11-20 (Pedro), #2497: the arm already carries the
     # DETAIL K jig-boring, so a dowel that slides in is bonded, not scrapped.
-    assert (
-        "IF A DOWEL SLIDES IN BY HAND, BOND IT WITH LOCTITE 638 AT THE SAME PROUD"
-    ) in " ".join(fitted.split())
+    assert "WITH LOCTITE 638, SET IT AT ONCE AT THE SAME PROUD" in " ".join(
+        fitted.split()
+    )
     assert "ARM CLAMPED FRONT UP ON THE SAME PARALLELS" in fitted
     # A failed doweled re-read is cleaned and read again before the set is
     # scrapped, each its own sub-step.
@@ -3170,13 +3210,16 @@ def test_the_hub_key_pin_and_collar_flat_pin_are_fitted_and_kept() -> None:
     assert "FROM THE NOSE, THE PIN OVER THE FLAT" in assembled[fit]
     assert assembled[-1].startswith("CHECK:")
     assert "HUB DRIVES THE SLEEVE" in assembled[-1]
-    every_row = [row for rows in texts.values() for row in rows]
     # The cup pin's re-pin at 90 degrees is the only new pin (owner ruling
-    # 2026-11-20 (Pedro), #2497); the hub key pin is never renewed in place.
+    # 2026-11-20 (Pedro), #2497), in step 22, whose match-drill sets the
+    # 90 degrees; the hub key pin is never renewed in place.
     assert not any(
-        "DRIVEN INWARD" in row or ("NEW PIN" in row and "AT 90\u00b0" not in row)
-        for row in every_row
+        "DRIVEN INWARD" in row or "NEW PIN" in row
+        for key, rows in texts.items()
+        if key != "knob-stack-fitted"
+        for row in rows
     )
+    assert "AT 90\u00b0" in texts["knob-stack-fitted"][4]
     assert len(texts["oil-hole-drilled"]) == 1
     for key in ("fitup-mesh-remedied", "collar-disc-air-inspected"):
         rows = texts[key]
