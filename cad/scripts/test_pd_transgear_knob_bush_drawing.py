@@ -134,6 +134,24 @@ def test_every_marked_dimension_prints_on_the_section_with_model_places() -> Non
         assert set(callouts) <= spec.DRAWING_DIMENSIONS[feature], feature
 
 
+def test_every_printed_dimension_is_a_revolve_profile_dimension() -> None:
+    """Farm r3: a fillet feature's radius does not import into the axial
+    section, so the shoulder root is a tangent arc in the turned profile and
+    its radius is a profile dimension like the rest; the solid gate counts
+    the arc's fill (Pappus)."""
+    assert set(spec.DRAWING_DIMENSIONS) == {"BushProfile"}
+    built = Path(part.__file__).read_text(encoding="utf-8")
+    assert "add_fillet" not in built
+    assert "adapter.add_arc(" in built
+    r, press_r = BUSH.SHOULDER_ROOT_R_MAX_MM, BUSH.PRESS_DIA / 2.0
+    assert part.V_ROOT == pytest.approx(
+        2.0
+        * math.pi
+        * (press_r * r * r * (1.0 - math.pi / 4.0) + r**3 * (5.0 / 6.0 - math.pi / 4.0))
+    )
+    assert 0.0 < part.V_ROOT < 0.005 * part.V_BUSH
+
+
 def test_the_drawing_reads_the_callouts_back_and_never_writes_them() -> None:
     """Text set from the drawing writes through to the built part (#1942)."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")

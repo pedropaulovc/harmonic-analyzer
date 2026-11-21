@@ -50,6 +50,8 @@ def test_every_marked_dimension_prints_once_with_model_places() -> None:
     """Rule 11: the turner reads every turned size and both floor corners on
     A-A; the web's drill prints on the face view, where it shows round."""
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    # The floor corners are sketch arcs in the profile: a fillet feature's
+    # radius did not import into the section (farm r3).
     assert set(spec.DRAWING_DIMENSIONS["CupProfile"]) == {
         "CupDia",
         "CupLength",
@@ -57,10 +59,11 @@ def test_every_marked_dimension_prints_once_with_model_places() -> None:
         "PilotDepth",
         "CboreDia",
         "CboreDepth",
+        "PilotFloorR",
+        "PocketFloorR",
     }
-    assert spec.DRAWING_DIMENSIONS[spec.PILOT_FLOOR_FILLET] == {"PilotFloorR"}
-    assert spec.DRAWING_DIMENSIONS[spec.POCKET_FLOOR_FILLET] == {"PocketFloorR"}
-    assert set(drawing.SECTION_KEEP) == marked - {"HoleDia"}
+    assert set(spec.DRAWING_DIMENSIONS) == {"CupProfile", "WebHole"}
+    assert set(drawing.SECTION_KEEP) == set(spec.DRAWING_DIMENSIONS["CupProfile"])
     assert (
         set(drawing.FACE_KEEP) == set(spec.DRAWING_DIMENSIONS["WebHole"]) == {"HoleDia"}
     )
@@ -399,7 +402,7 @@ def test_the_part_volume_is_the_turned_cup_less_the_web_drill() -> None:
         - (spec.CBORE_DIA / 2.0) ** 2 * spec.CBORE_DEPTH
     )
     assert part.V_TURNED == pytest.approx(turned)
-    # Each floor fillet's spandrel, by Pappus at its centroid.
+    # Each floor arc's spandrel, by Pappus at its centroid.
     corners = 0.0
     for radius, wall_r in (
         (spec.PILOT_FLOOR_R_MAX, spec.BORE_DIA / 2.0),

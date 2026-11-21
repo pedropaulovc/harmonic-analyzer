@@ -416,9 +416,13 @@ def test_complete_nominal_native_volume_uses_full_face_gaps_and_true_d() -> None
     c, r_journal = spec.REAR_CHAMFER, spec.JOURNAL_DIA / 2.0
     rear_chamfer = math.pi * c * c * (r_journal - c / 3.0)
     assert spec.REAR_CHAMFER_VOLUME == pytest.approx(rear_chamfer)
+    # The chamfer is sketched in the journal profile, so V_JOURNAL carries it.
+    assert part.V_JOURNAL == pytest.approx(
+        math.pi * r_journal**2 * spec.JOURNAL_LENGTH - rear_chamfer
+    )
     turned = (
         math.pi * spec.STOCK_PROFILE.blank_radius_mm**2 * spec.FACE_WIDTH
-        + part.V_STUD + part.V_JOURNAL - flat_removed - rear_tap - rear_chamfer
+        + part.V_STUD + part.V_JOURNAL - flat_removed - rear_tap
     )
     straight = spec.TEETH * spec.STOCK_PROFILE.gap_area_mm2 * spec.FACE_WIDTH
     assert lower <= turned - straight <= upper
@@ -485,7 +489,10 @@ def test_journal_rear_chamfer_seats_the_end_flat_on_the_cup_web() -> None:
     )
     assert spec.REAR_FACE_LAND_MIN == pytest.approx(land)
     assert land > 0.0
-    assert spec.DRAWING_DIMENSIONS["RearChamfer"] == {"RearChamferSize"}
+    # A sketch dimension in the journal profile: the RearChamfer feature's
+    # did not import into the side view (farm r3).
+    assert "RearChamferSize" in spec.DRAWING_DIMENSIONS["JournalProfile"]
+    assert "RearChamfer" not in spec.DRAWING_DIMENSIONS
     assert drawing.DIMENSION_CALLOUTS_BELOW["RearChamferSize"] == "X 45\u00b0"
     x, y = drawing.SIDE_KEEP["RearChamferSize"]
     assert drawing.REAR_X < x < drawing.SIDE_KEEP["JournalDia"][0] - 0.020

@@ -12,8 +12,9 @@ the pilot, the O.D. and the rear pocket closed along the axis, so the O.D.,
 the length, the pilot's Ø and depth and the pocket's Ø and depth are its
 driving dimensions and all print on the drawing's axial section.  The web's
 #33 hole is a separate Top-plane cut through everything, sized where it
-shows round.  The pilot's and the pocket's floor corners are native fillets
-at their R.xxx MAX limits.  The front face is the Top Plane (y = 0), the rear face
+shows round.  The pilot's and the pocket's floor corners are tangent arcs
+in the profile sketch at their R.xxx MAX limits, so their radii import into
+the section with the other profile dimensions.  The front face is the Top Plane (y = 0), the rear face
 y = LENGTH.  ``Axis1`` is the cup axis (Front Plane ∩ Right Plane).  The
 paper-drive assembly mates ``Axis1`` to the knob shaft's axis and the Top
 Plane to the shaft's cup-face station.
@@ -32,7 +33,7 @@ from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
-from _dimensions import drive_dimension, name_dimensions, set_global
+from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -42,6 +43,7 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
@@ -71,9 +73,7 @@ from pd_transgear_knob_cup_spec import (
     LENGTH,
     OD,
     PILOT_DEPTH,
-    PILOT_FLOOR_FILLET,
     PILOT_FLOOR_R_MAX,
-    POCKET_FLOOR_FILLET,
     POCKET_FLOOR_R_MAX,
     SURFACE_FINISHES,
     UNIT,
@@ -95,9 +95,9 @@ V_HOLE = math.pi * HOLE_R**2 * WEB
 
 
 def _floor_corner_volume(radius: float, wall_r: float) -> float:
-    """Metal a floor fillet of ``radius`` adds inside a bore wall at ``wall_r``:
-    the (1 - pi/4) r^2 spandrel, revolved at its centroid, which stands
-    r (10 - 3 pi) / (3 (4 - pi)) in from the wall."""
+    """Metal a floor corner arc of ``radius`` adds inside a bore wall at
+    ``wall_r``: the (1 - pi/4) r^2 spandrel, revolved at its centroid, which
+    stands r (10 - 3 pi) / (3 (4 - pi)) in from the wall."""
     centroid_in = radius * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi))
     return (1.0 - math.pi / 4.0) * radius**2 * 2.0 * math.pi * (wall_r - centroid_in)
 
@@ -112,11 +112,12 @@ def _corner_max_limits(adapter) -> None:
     """Each floor corner as the single limit "R.xxx MAX": no native
     tolerance, " MAX" its suffix (build_pd_transgear_knob_bush's shoulder
     root), since swTolMAX prints a lowercase "max."."""
-    for feature, name in (
-        (PILOT_FLOOR_FILLET, "PilotFloorR"),
-        (POCKET_FLOOR_FILLET, "PocketFloorR"),
-    ):
-        display, dimension = _named_dimension(adapter, feature, name)
+    for name in ("PilotFloorR", "PocketFloorR"):
+        display, dimension = _named_dimension(adapter, "CupProfile", name)
+        # Equation-owned dimensions can read DrivenState 1; IsReference is the
+        # native controlling/reference distinction (build_dt_crank_handle_butt_cup).
+        if bool(dimension.IsReference()):
+            raise RuntimeError(f"{name}@CupProfile: radius is a reference dimension")
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         tolerance.Type = CORNER_TOL_TYPE
         display = _early_bound(display, "IDisplayDimension")
@@ -145,38 +146,68 @@ def build(adapter) -> dict[str, str]:
         ("PilotDepth", PILOT_DEPTH),
         ("CboreDia", CBORE_DIA),
         ("CboreDepth", CBORE_DEPTH),
+        ("PilotFloorR", PILOT_FLOOR_R_MAX),
+        ("PocketFloorR", POCKET_FLOOR_R_MAX),
         ("HoleDia", CLEAR_HOLE_DIA),
     ):
         set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Turned half-section about local +Y: in along the pilot's floor, out the
-    # pilot's wall to the front face, the O.D., the rear face, down the
-    # pocket's wall and in along its floor, closed on the axis.  Every turned
-    # size is a profile dimension that prints on the axial section (rule 11).
+    # Turned half-section about local +Y: in along the pilot's floor, round
+    # its floor corner, out the pilot's wall to the front face, the O.D., the
+    # rear face, down the pocket's wall, round its floor corner and in along
+    # its floor, closed on the axis.  Every turned size and both corner radii
+    # are profile dimensions that print on the axial section (rule 11).
+    rp, rq = PILOT_FLOOR_R_MAX, POCKET_FLOOR_R_MAX
+    pocket_floor_y = LENGTH - CBORE_DEPTH
+    pilot_floor_end = (BORE_R - rp, PILOT_DEPTH)
+    pilot_wall_start = (BORE_R, PILOT_DEPTH - rp)
+    pocket_wall_end = (CBORE_R, pocket_floor_y + rq)
+    pocket_floor_start = (CBORE_R - rq, pocket_floor_y)
     profile = SketchDims()
     check("create_sketch cup profile", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     axis = check("cup axis", adapter.add_centerline(0.0, 0.0, 0.0, LENGTH))
-    points = [
-        (0.0, PILOT_DEPTH),
-        (BORE_R, PILOT_DEPTH),
+    (pilot_floor,) = add_line_chain(
+        adapter, [(0.0, PILOT_DEPTH), pilot_floor_end], close=False
+    )
+    # add_arc is CCW: wall (0 deg) -> floor (90 deg) is the quarter arc.
+    pilot_round = check(
+        "pilot floor round",
+        adapter.add_arc(
+            BORE_R - rp, PILOT_DEPTH - rp, *pilot_wall_start, *pilot_floor_end
+        ),
+    )
+    outer_points = [
+        pilot_wall_start,
         (BORE_R, 0.0),
         (CUP_R, 0.0),
         (CUP_R, LENGTH),
         (CBORE_R, LENGTH),
-        (CBORE_R, LENGTH - CBORE_DEPTH),
-        (0.0, LENGTH - CBORE_DEPTH),
+        pocket_wall_end,
     ]
-    lines = add_line_chain(adapter, points)
+    outer = add_line_chain(adapter, outer_points, close=False)
+    # Floor (270 deg) -> wall (360 deg), CCW.
+    pocket_round = check(
+        "pocket floor round",
+        adapter.add_arc(
+            CBORE_R - rq, pocket_floor_y + rq, *pocket_floor_start, *pocket_wall_end
+        ),
+    )
+    inner_points = [pocket_floor_start, (0.0, pocket_floor_y), (0.0, PILOT_DEPTH)]
+    cbore_floor, web_axis = add_line_chain(adapter, inner_points, close=False)
     set_sketch_direct_db(adapter, False)
-    (
-        _pilot_floor, pilot_wall, front_face, od_line,
-        _rear_face, cbore_wall, _cbore_floor, web_axis,
-    ) = lines
-    for index, line in enumerate(lines[:-1]):
-        relation = "horizontal" if points[index][1] == points[index + 1][1] else "vertical"
+    pilot_wall, front_face, od_line, rear_face, cbore_wall = outer
+    for line, relation in (
+        (pilot_floor, "horizontal"),
+        (pilot_wall, "vertical"),
+        (front_face, "horizontal"),
+        (od_line, "vertical"),
+        (rear_face, "horizontal"),
+        (cbore_wall, "vertical"),
+        (cbore_floor, "horizontal"),
+    ):
         check(
             f"cup profile {relation} {line}",
             adapter.add_sketch_constraint(line, None, relation),
@@ -215,9 +246,14 @@ def build(adapter) -> dict[str, str]:
         adapter, axis, pilot_wall, (BORE_R - 1.5, PILOT_DEPTH / 2.0), "BoreDia"
     )
     profile.record("BoreDia", '"BoreDia"')
-    check(
-        "cup pilot depth",
-        adapter.add_sketch_dimension(pilot_wall, None, "linear", PILOT_DEPTH),
+    # Front face to the FLAT floor, not the wall segment the round shortens.
+    dimension_between(
+        adapter,
+        f"{front_face}.start",
+        f"{pilot_floor}.start",
+        "vertical_distance",
+        PILOT_DEPTH,
+        "cup pilot depth to the floor",
     )
     profile.record("PilotDepth", '"PilotDepth"')
     add_diametric_linear_dimension(
@@ -228,18 +264,40 @@ def build(adapter) -> dict[str, str]:
         "CboreDia",
     )
     profile.record("CboreDia", '"CboreDia"')
-    check(
-        "cup pocket depth",
-        adapter.add_sketch_dimension(cbore_wall, None, "linear", CBORE_DEPTH),
+    dimension_between(
+        adapter,
+        f"{rear_face}.start",
+        f"{cbore_floor}.start",
+        "vertical_distance",
+        CBORE_DEPTH,
+        "cup pocket depth to the floor",
     )
     profile.record("CboreDepth", '"CboreDepth"')
+    for name, arc, radius in (
+        ("PilotFloorR", pilot_round, rp),
+        ("PocketFloorR", pocket_round, rq),
+    ):
+        check(
+            f"cup {name}", adapter.add_sketch_dimension(arc, None, "radial", radius)
+        )
+        profile.record(name, f'"{name}"')
+    for first, second, label in (
+        (pilot_floor, pilot_round, "pilot floor"),
+        (pilot_round, pilot_wall, "pilot wall"),
+        (cbore_wall, pocket_round, "pocket wall"),
+        (pocket_round, cbore_floor, "pocket floor"),
+    ):
+        check(
+            f"floor round tangent to {label}",
+            adapter.add_sketch_constraint(first, second, "tangent"),
+        )
     ensure_fully_defined(adapter, "cup profile")
     check("exit_sketch cup profile", adapter.exit_sketch())
     name_last_feature(adapter, "CupProfile")
     drive_jobs += profile.apply(adapter, "CupProfile")
     check("revolve cup", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "CupBody")
-    volume_check(adapter, "turned blind cup", V_TURNED, 0.01 * V_PILOT)
+    volume_check(adapter, "turned blind cup", V_TURNED + V_CORNERS, 0.01 * V_PILOT)
     bbox_extent_check(adapter, "cup length", "y", LENGTH)
     bbox_extent_check(adapter, "cup O.D.", "x", OD)
 
@@ -268,25 +326,7 @@ def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "WebHoleCut")
-    volume_check(adapter, "drilled cup", V_CUP - V_CORNERS, 0.01 * V_HOLE)
-
-    # Rule 16: the pilot's and the pocket's floor corners at their largest
-    # acceptable radii, each full circle picked at -X, off the revolve's seam
-    # in the +X sketch plane.
-    for feature, name, radius, wall_r, floor_y in (
-        (PILOT_FLOOR_FILLET, "PilotFloorR", PILOT_FLOOR_R_MAX, BORE_R, PILOT_DEPTH),
-        (
-            POCKET_FLOOR_FILLET, "PocketFloorR", POCKET_FLOOR_R_MAX, CBORE_R,
-            LENGTH - CBORE_DEPTH,
-        ),
-    ):
-        check(
-            f"fillet {name}",
-            adapter.add_fillet(radius, [[-wall_r, floor_y, 0.0]], propagate=False),
-        )
-        name_last_feature(adapter, feature)
-        name_dimensions(adapter, feature, [name])
-    volume_check(adapter, "floor corners", V_CUP, 0.1 * V_CORNERS)
+    volume_check(adapter, "drilled cup", V_CUP, 0.01 * V_HOLE)
 
     # The mate axis: the first reference axis, so it is Axis1.
     cup_axis = name_bore_axis(

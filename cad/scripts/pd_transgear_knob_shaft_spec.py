@@ -876,8 +876,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "OutsideDia",
         "OverallLength",
     },
-    "JournalProfile": {"JournalDia", "JournalLength"},
-    "RearChamfer": {"RearChamferSize"},
+    "JournalProfile": {"JournalDia", "JournalLength", "RearChamferSize"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
@@ -904,8 +903,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "JournalProfile": {
         "JournalDia": JOURNAL_DIA_PLACES,
         "JournalLength": JOURNAL_LENGTH_PLACES,
+        "RearChamferSize": REAR_CHAMFER_PLACES,
     },
-    "RearChamfer": {"RearChamferSize": REAR_CHAMFER_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

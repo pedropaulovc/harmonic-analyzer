@@ -164,20 +164,27 @@ DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
         "BushLength": LENGTH_CALLOUT,
     },
 }
-# The shoulder root prints as the single limit R.005 MAX: no native band,
-# " MAX" its suffix (build_dt_cone_gear_tl_keyed_arbor's shoulder root).
-SHOULDER_FILLET = "ShoulderFillet"
+# The shoulder root, a sketch arc in the turned profile so its radius imports
+# into the axial section (a fillet feature's does not: farm r3), prints as
+# the single limit R.005 MAX: no native band, " MAX" its suffix
+# (build_dt_cone_gear_tl_keyed_arbor's shoulder root).
 SHOULDER_ROOT_TOL_TYPE = 0  # swTolType_e.swTolNONE
 SHOULDER_ROOT_SUFFIX = " MAX"
 
 # --- Marked dimensions and places ---------------------------------------------
-# The turned profile carries both diameters, the bore and both lengths from
-# the hub face, so all print on the axial section (rule 11); the root fillet
-# its own radius.  The stub (shoulder to rear face) follows from the two
+# The turned profile carries both diameters, the bore, both lengths from
+# the hub face and the shoulder root's radius, so all print on the axial
+# section (rule 11).  The stub (shoulder to rear face) follows from the two
 # lengths and is not printed.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "BushProfile": {"HubDia", "PressDia", "BoreDia", "HubLength", "BushLength"},
-    SHOULDER_FILLET: {"ShoulderR"},
+    "BushProfile": {
+        "HubDia",
+        "PressDia",
+        "BoreDia",
+        "HubLength",
+        "BushLength",
+        "ShoulderR",
+    },
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BushProfile": {
@@ -186,8 +193,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BoreDia": BUSH.BORE_PLACES,
         "HubLength": BUSH.HUB_LENGTH_PLACES,
         "BushLength": BUSH.LENGTH_PLACES,
+        "ShoulderR": BUSH.SHOULDER_ROOT_R_PLACES,
     },
-    SHOULDER_FILLET: {"ShoulderR": BUSH.SHOULDER_ROOT_R_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

@@ -8,11 +8,12 @@ reamed through after pressing for the MHA-PD-08 knob shaft's journal
 (``pd_transgear_knob_bush_geometry``).
 
 Layout: one turned half-section on the Front plane, revolved about local +Y:
-hub face, hub Ø, shoulder, press Ø, rear face, then back along the bore, so
-both diameters, the bore and both lengths are its driving dimensions and all
-print on the drawing's axial section.  The hub face is the Top Plane
-(y = 0), the shoulder y = HUB_LENGTH, the rear face y = LENGTH; a native
-fillet rounds the shoulder root.  ``Axis1`` is the bush axis (Front Plane ∩
+rear face, bore, hub face, hub Ø, shoulder, the shoulder root's tangent
+arc and the press Ø, so both diameters, the bore, both lengths and the
+root's radius are its driving dimensions and all print on the drawing's
+axial section (a fillet feature's radius does not import there: farm r3).
+The hub face is the Top Plane (y = 0), the shoulder y = HUB_LENGTH, the
+rear face y = LENGTH.  ``Axis1`` is the bush axis (Front Plane ∩
 Right Plane).  The paper-drive assembly mates ``Axis1`` to the knob axis K
 and the shoulder to the plate's face A.
 
@@ -31,7 +32,7 @@ from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
-from _dimensions import drive_dimension, name_dimensions, set_global
+from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -78,7 +79,6 @@ from pd_transgear_knob_bush_spec import (
     DRAWING_PRECISION,
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
-    SHOULDER_FILLET,
     SHOULDER_ROOT_SUFFIX,
     SHOULDER_ROOT_TOL_TYPE,
     SURFACE_FINISHES,
@@ -94,9 +94,17 @@ BORE_R = BORE_DIA / 2.0
 V_BUSH = math.pi * (
     HUB_R**2 * HUB_LENGTH + PRESS_R**2 * (LENGTH - HUB_LENGTH) - BORE_R**2 * LENGTH
 )
-# The root fillet adds (1 - pi/4) r^2 of section round the press: well inside
-# the volume gate, so the gate still proves the profile.
-V_ROOT = (1.0 - math.pi / 4.0) * SHOULDER_ROOT_R_MAX_MM**2 * 2.0 * math.pi * PRESS_R
+# The root arc fills the square outside a quarter disk beside the press:
+# section r^2(1 - pi/4), its first moment about the press line r^3(5/6 - pi/4)
+# (Pappus, as build_dt_crank_handle_butt_cup's pocket corner).
+V_ROOT = (
+    2.0
+    * math.pi
+    * (
+        PRESS_R * SHOULDER_ROOT_R_MAX_MM**2 * (1.0 - math.pi / 4.0)
+        + SHOULDER_ROOT_R_MAX_MM**3 * (5.0 / 6.0 - math.pi / 4.0)
+    )
+)
 
 
 @_telemetry.traced("dim.pd_transgear_knob_bush_callouts")
@@ -120,7 +128,7 @@ def _shoulder_root_max_limit(adapter) -> None:
     """ShoulderR as the single limit "R.005 MAX": no native tolerance, " MAX"
     its suffix (build_dt_cone_gear_tl_keyed_arbor._shoulder_root_max_limit),
     since swTolMAX prints a lowercase "max."."""
-    display, dimension = _named_dimension(adapter, SHOULDER_FILLET, "ShoulderR")
+    display, dimension = _named_dimension(adapter, "BushProfile", "ShoulderR")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = SHOULDER_ROOT_TOL_TYPE
     display = _early_bound(display, "IDisplayDimension")
@@ -148,32 +156,49 @@ def build(adapter) -> dict[str, str]:
         ("PressDia", PRESS_DIA),
         ("BushLength", LENGTH),
         ("BoreDia", BORE_DIA),
+        ("ShoulderR", SHOULDER_ROOT_R_MAX_MM),
     ):
         set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Turned half-section about local +Y: hub face, hub Ø, shoulder, press Ø,
-    # rear face, then back along the bore, so every diameter is a profile
-    # dimension that prints on the axial section (rule 11).
+    # Turned half-section about local +Y: rear face, bore, hub face, hub Ø,
+    # shoulder, then the root's tangent arc (concave, centred off the part,
+    # beyond the shoulder and the press) and the press Ø back to the rear
+    # face, so every diameter and the root radius are profile dimensions that
+    # print on the axial section (rule 11).
+    root_r = SHOULDER_ROOT_R_MAX_MM
+    root_center = (PRESS_R + root_r, HUB_LENGTH + root_r)
+    root_on_press = (PRESS_R, HUB_LENGTH + root_r)
+    root_on_shoulder = (PRESS_R + root_r, HUB_LENGTH)
     profile = SketchDims()
     check("create_sketch bush profile", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     axis = check("bush axis", adapter.add_centerline(0.0, 0.0, 0.0, LENGTH))
     points = [
+        (PRESS_R, LENGTH),
+        (BORE_R, LENGTH),
         (BORE_R, 0.0),
         (HUB_R, 0.0),
         (HUB_R, HUB_LENGTH),
-        (PRESS_R, HUB_LENGTH),
-        (PRESS_R, LENGTH),
-        (BORE_R, LENGTH),
+        root_on_shoulder,
     ]
-    lines = add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points, close=False)
+    # add_arc is CCW: from the press tangent (180 deg about the centre) to
+    # the shoulder tangent (270 deg) is the 90-degree arc, opposite the
+    # chain's traversal (build_dt_crank_handle_butt_cup's floor round).
+    root_arc = check(
+        "shoulder root arc",
+        adapter.add_arc(*root_center, *root_on_press, *root_on_shoulder),
+    )
+    (press,) = add_line_chain(adapter, [root_on_press, points[0]], close=False)
     set_sketch_direct_db(adapter, False)
-    for index, line in enumerate(lines):
-        p0 = points[index]
-        p1 = points[(index + 1) % len(points)]
-        relation = "horizontal" if p0[1] == p1[1] else "vertical"
+    rear_face, bore, hub_face, hub_od, shoulder = lines
+    for line, (u0, v0), (u1, v1) in (
+        *zip(lines, points, points[1:], strict=False),
+        (press, root_on_press, points[0]),
+    ):
+        relation = "horizontal" if v0 == v1 else "vertical"
         check(
             f"bush profile {relation} {line}",
             adapter.add_sketch_constraint(line, None, relation),
@@ -183,22 +208,22 @@ def build(adapter) -> dict[str, str]:
     check(
         "bush hub face on the Top plane",
         adapter.add_sketch_constraint(
-            f"{lines[0]}.start", "origin", "horizontal_points"
+            f"{hub_face}.start", "origin", "horizontal_points"
         ),
     )
     add_diametric_linear_dimension(
-        adapter, axis, lines[1], (HUB_R + 4.0, HUB_LENGTH / 2.0), "HubDia"
+        adapter, axis, hub_od, (HUB_R + 4.0, HUB_LENGTH / 2.0), "HubDia"
     )
     profile.record("HubDia", '"HubDia"')
     check(
         "bush hub length",
-        adapter.add_sketch_dimension(lines[1], None, "linear", HUB_LENGTH),
+        adapter.add_sketch_dimension(hub_od, None, "linear", HUB_LENGTH),
     )
     profile.record("HubLength", '"HubLength"')
     add_diametric_linear_dimension(
         adapter,
         axis,
-        lines[3],
+        press,
         (PRESS_R + 4.0, (HUB_LENGTH + LENGTH) / 2.0),
         "PressDia",
     )
@@ -207,8 +232,8 @@ def build(adapter) -> dict[str, str]:
     # lines rise from the part's outline, not across the cut bore.
     dimension_between(
         adapter,
-        f"{lines[0]}.end",
-        f"{lines[4]}.start",
+        f"{hub_face}.end",
+        f"{rear_face}.start",
         "vertical_distance",
         LENGTH,
         "bush length",
@@ -220,32 +245,31 @@ def build(adapter) -> dict[str, str]:
     )
     profile.record("AxisLength", '"BushLength"')
     add_diametric_linear_dimension(
-        adapter, axis, lines[5], (BORE_R - 1.5, LENGTH / 2.0), "BoreDia"
+        adapter, axis, bore, (BORE_R - 1.5, LENGTH / 2.0), "BoreDia"
     )
     profile.record("BoreDia", '"BoreDia"')
+    check(
+        "shoulder root radius",
+        adapter.add_sketch_dimension(root_arc, None, "radial", root_r),
+    )
+    profile.record("ShoulderR", '"ShoulderR"')
+    for first, second, label in (
+        (shoulder, root_arc, "shoulder"),
+        (root_arc, press, "press"),
+    ):
+        check(
+            f"shoulder root tangent to the {label}",
+            adapter.add_sketch_constraint(first, second, "tangent"),
+        )
     ensure_fully_defined(adapter, "bush profile")
     check("exit_sketch bush profile", adapter.exit_sketch())
     name_last_feature(adapter, "BushProfile")
     drive_jobs += profile.apply(adapter, "BushProfile")
     check("revolve bush", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "BushBody")
-    volume_check(adapter, "turned bush", V_BUSH, 0.005 * V_BUSH)
+    volume_check(adapter, "turned bush", V_BUSH + V_ROOT, 0.005 * V_BUSH)
     bbox_extent_check(adapter, "bush length", "y", LENGTH)
     bbox_extent_check(adapter, "bush hub O.D.", "x", HUB_DIA)
-
-    # The shoulder root: the full circle where the press meets the shoulder,
-    # picked at -X, off the revolve's seam in the +X sketch plane.
-    check(
-        "fillet shoulder root",
-        adapter.add_fillet(
-            SHOULDER_ROOT_R_MAX_MM,
-            [[-PRESS_R, HUB_LENGTH, 0.0]],
-            propagate=False,
-        ),
-    )
-    name_last_feature(adapter, SHOULDER_FILLET)
-    name_dimensions(adapter, SHOULDER_FILLET, ["ShoulderR"])
-    volume_check(adapter, "shoulder root", V_BUSH + V_ROOT, 0.005 * V_BUSH)
 
     # The mate axis: the first reference axis, so it is Axis1.
     bush_axis = name_bore_axis(

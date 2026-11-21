@@ -228,8 +228,10 @@ if SCREW_TIP_SHORT_OF_FULL_THREAD_MIN <= 0.0:
 
 # --- Inside corners that matter (drawing-guidelines.md rule 16) ------------------
 # The title block lets an inside corner run to R.040; two here must not.
-# Each is a native fillet at its largest acceptable radius, printed as the
-# single limit "R.xxx MAX" (MHA-PD-28's shoulder root pattern).
+# Each is a tangent arc in the turned profile sketch at its largest
+# acceptable radius (a sketch dimension imports into the section; a fillet
+# feature's does not), printed as the single limit "R.xxx MAX" (MHA-PD-28's
+# shoulder root pattern).
 # The pilot's floor corner: the journal's rear face must bear on the web, so
 # its .015 X 45° rear chamfer, at its least leg, clears every point of the
 # corner (a 45° chamfer of leg c clears a root fillet of radius r once c >= r).
@@ -240,8 +242,6 @@ POCKET_FLOOR_R_MAX = 0.254  # .010 MAX
 CORNER_R_PLACES = 3
 CORNER_TOL_TYPE = 0  # swTolType_e.swTolNONE: the " MAX" suffix carries the limit
 CORNER_SUFFIX = " MAX"
-PILOT_FLOOR_FILLET = "PilotFloorFillet"
-POCKET_FLOOR_FILLET = "PocketFloorFillet"
 if SHAFT_REAR_CHAMFER_MIN < PILOT_FLOOR_R_MAX - 1e-9:
     raise AssertionError(
         "MHA-PD-08's least rear chamfer rides MHA-PD-16's pilot floor corner"
@@ -263,16 +263,15 @@ SURFACE_FINISHES = (
 # Marked model dimensions and the places the model authors on them
 # (drawing-simplicity-policy.md `How the repository implements the
 # guidelines`).  The turned profile carries the O.D., the length, the pilot
-# and the pocket, and the two floor fillets their radii, so they print on
-# the axial section (rule 11); the web's drill is its own cut, sized on the
-# face view where it shows round.
+# and the pocket, and its two floor arcs their radii, so they print on the
+# axial section (rule 11); the web's drill is its own cut, sized on the face
+# view where it shows round.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CupProfile": {
         "CupDia", "CupLength", "BoreDia", "PilotDepth", "CboreDia", "CboreDepth",
+        "PilotFloorR", "PocketFloorR",
     },
     "WebHole": {"HoleDia"},
-    PILOT_FLOOR_FILLET: {"PilotFloorR"},
-    POCKET_FLOOR_FILLET: {"PocketFloorR"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CupProfile": {
@@ -282,10 +281,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PilotDepth": PILOT_DEPTH_PLACES,
         "CboreDia": CBORE_PLACES,
         "CboreDepth": CBORE_PLACES,
+        "PilotFloorR": CORNER_R_PLACES,
+        "PocketFloorR": CORNER_R_PLACES,
     },
     "WebHole": {"HoleDia": HOLE_PLACES},
-    PILOT_FLOOR_FILLET: {"PilotFloorR": CORNER_R_PLACES},
-    POCKET_FLOOR_FILLET: {"PocketFloorR": CORNER_R_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
