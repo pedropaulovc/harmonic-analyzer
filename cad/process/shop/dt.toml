@@ -201,5 +201,3 @@ description = "C67500 manganese bronze, round bar, 5/8 in"
 description = "gray iron, class not ruled, casting for MHA-DT-05 cone pivot post"
 [stock.drill-rod-1-8]
 description = "Drill rod (O1 or W1 tool steel, annealed, ground), round bar, 1/8 in"
-[stock.o1-drill-rod-5-32]
-description = "AISI O1 drill rod, precision ground, round bar, 5/32 in"

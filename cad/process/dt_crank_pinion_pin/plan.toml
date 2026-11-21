@@ -65,9 +65,9 @@ title = "Lathe: face the rod end"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} rod, {{cad.outer_stickout_datum_mm:in.2dot}} in out of the jaw fronts; the rest of the 3 in piece runs back through the jaws into the spindle bore."
+holding = "3-jaw over a brass shim wrap on the Ø{{process.stock_dia_in:.3dot}} rod (the jaws close on the pin's as-supplied O.D.), {{cad.outer_stickout_datum_mm:in.2dot}} in out of the jaw fronts; the rest of the 3 in piece runs back through the jaws into the spindle bore."
 datum = "Z0 (carriage DRO) the rod end faced in Op 10."
-diagram = { file = "diagrams/bar.svg", alt = "The 1/8 in drill rod in the 3-jaw with little out: its end faced square." }
+diagram = { file = "diagrams/bar.svg", alt = "The 1/8 in drill rod in the 3-jaw over a shim wrap with little out: its end faced square." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_datum_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -96,7 +96,7 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Scribe the rod {{process.saw_length_in:.2dot}} in from the faced end and saw on the far side of the line, the long end clamped in the saw's vise; catch the piece. File the burr off the sawn end."
+instruction = "Scribe the rod {{process.saw_length_in:.2dot}} in from the faced end and saw on the far side of the line, the long end clamped in the saw's vise; let the piece drop clear onto the saw base and pick it up only after the blade has stopped. File the burr off the sawn end."
 feed = "hand"
 
 [[setups]]

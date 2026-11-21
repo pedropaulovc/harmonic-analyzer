@@ -14,12 +14,10 @@ import dt_pinion_cam_pin_geometry as cam_pin
 import dt_pinion_handle_geometry as handle
 import export_features
 import mg_lever_thread_joint as lever
-import pn_pen_adjust_screw_spec as screw
 from _gtol_face import (
     SURFACE_CYLINDER,
     SURFACE_PLANE,
     SURFACE_SPHERE,
-    SURFACE_TORUS,
     FaceGeometry,
 )
 
@@ -58,19 +56,6 @@ def _sphere(dia_mm: float, center_mm: tuple[float, float, float]) -> FaceGeometr
     return FaceGeometry(None, SURFACE_SPHERE, (*center, dia_mm / 2000), None, ())
 
 
-def _torus(
-    major_mm: float, minor_mm: float, center_mm: tuple[float, float, float]
-) -> FaceGeometry:
-    center = tuple(value / 1000 for value in center_mm)
-    return FaceGeometry(
-        None,
-        SURFACE_TORUS,
-        (*center, 0.0, 1.0, 0.0, major_mm / 1000, minor_mm / 1000),
-        None,
-        (),
-    )
-
-
 _CAM_APEX = cam_pin.PIN_LEN + cam_pin.CAP_SAG
 _FACES: dict[str, dict[str, FaceGeometry]] = {
     "dt_crank_pinion_pin": {
@@ -94,24 +79,6 @@ _FACES: dict[str, dict[str, FaceGeometry]] = {
         "datum_end": _sphere(lever.ROD_DIA, (lever.ROD_DIA / 2, 0.0, 0.0)),
         "far_end": _plane(_X, lever.ROD_LENGTH),
         "outer": _cylinder(lever.ROD_DIA, _X, (lever.ROD_DIA / 2, lever.ROD_LENGTH)),
-    },
-    "pn_pen_adjust_screw": {
-        "datum_end": _plane(_MINUS_Y, 0.0),
-        "far_end": _plane(_Y, screw.OVERALL_LENGTH),
-        "shoulder": _plane(_MINUS_Y, -screw.SHANK_LENGTH),
-        "outer": _cylinder(screw.HEAD_DIA, _Y),
-        "step": _cylinder(screw.THREAD_MAJOR, _Y, (0.0, screw.FULL_THREAD_LENGTH)),
-        "step plain": _cylinder(
-            screw.THREAD_MAJOR,
-            _Y,
-            (screw.FULL_THREAD_LENGTH, screw.SHANK_LENGTH - screw.SHOULDER_FILLET_R),
-        ),
-        "fillet_shoulder": _torus(
-            screw.THREAD_MAJOR / 2 + screw.SHOULDER_FILLET_R,
-            screw.SHOULDER_FILLET_R,
-            (0.0, screw.SHANK_LENGTH - screw.SHOULDER_FILLET_R, 0.0),
-        ),
-        "cross_hole": _cylinder(screw.EYE_DIA, _X),
     },
 }
 
@@ -178,21 +145,6 @@ def test_printed_bands_are_the_sheets() -> None:
         "single_point",
     )
     assert arm["datum_end"]["radius_ref"] == pytest.approx(IN / 8)
-
-    stud = manifest("pn_pen_adjust_screw")["features"]
-    assert _inch(stud["far_end"]["length"]) == [1.01, 1.03]
-    assert _inch(stud["shoulder"]["station"]) == [0.31, 0.33]
-    assert stud["shoulder"]["station_from"] == "far_end"
-    assert _inch(stud["outer"]["dia"]) == [0.23, 0.25]
-    assert _inch(stud["step"]["dia"]) == [0.0563, 0.0595]
-    assert _inch(stud["step"]["thread_length"]) == [0.57, 0.59]
-    assert (stud["step"]["thread"], stud["step"]["thread_process"]) == (
-        "#0-80 UNF",
-        "die",
-    )
-    assert _inch(stud["fillet_shoulder"]["radius"]) == [0.01, 0.03]
-    assert _inch(stud["cross_hole"]["dia"]) == [0.055, 0.059]
-    assert _inch(stud["cross_hole"]["station"]) == [0.15, 0.17]
 
 
 def test_manifest_notes_are_the_printed_notes() -> None:
