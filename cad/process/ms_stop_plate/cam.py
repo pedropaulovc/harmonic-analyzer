@@ -268,7 +268,7 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         holes.append({"name": name, "at": hole["at"], "dia": hole["dia"]})
     if len(pilots) != 1:
         raise ValueError(f"the holes' pair pilots differ: {sorted(pilots)}")
-    pilot_dia, pilot_band, pilot_depth = pilots.pop()
+    pilot_dia, _pilot_band, pilot_depth = pilots.pop()
     return {
         "length": length,
         "height": height,
@@ -276,7 +276,6 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         "thickness_max": f["outer_face"]["thickness"][1],
         "holes": holes,
         "pilot_dia": pilot_dia,
-        "pilot_band": pilot_band,
         "pilot_depth": pilot_depth,
     }
 
@@ -330,8 +329,10 @@ def context(
     if spot_dia >= d49:
         raise ValueError("the spot is not under the #49: it would chamfer the block")
     spot_depth = _spot_depth(spot_dia)
-    if spot_depth - thickness > p["block_window_depth_mm"]:
-        raise ValueError("the spot's pilot reaches too deep")
+    if spot_depth - thickness >= g["pilot_depth"]:
+        raise ValueError(
+            "the spot reaches past the #49's full-diameter depth in the block"
+        )
     peck = p["pilot_peck_mm"]
     op = _op_with_cut(plan, "pair pilot")[0]
     if op["peck"] != {"step_mm": peck, "retract": "full"}:

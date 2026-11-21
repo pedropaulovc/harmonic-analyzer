@@ -24,10 +24,6 @@ rpm = 2800
 feed = "2.8 in/min"
 
 # --- MHA-MS-03 stop plate (cad/process/ms_stop_plate/plan.toml) ---
-# The owned 7-piece deburring scraper set (cad/config/shop-equipment/
-# tools.deburring-set, McMaster 4289A78): the plate's edges and hole mouths.
-[tools.deburring-set]
-description = "7-piece deburring scraper and countersink set (McMaster 4289A78)"
 # The plate's Ø.094 +.004/0 holes: no pin gauges are owned (gauges.pin-gauges
 # is to_order). As MHA-MG-02's bore (gauges.clamp-bore-drill-shanks), a drill
 # shank of the owned 115-piece index, miked first, is the NO-GO: the #40
