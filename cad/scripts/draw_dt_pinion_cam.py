@@ -16,6 +16,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -41,24 +42,45 @@ from _drawing_leader_notes import add_leader_note
 from _drawing_view_arrow import square_view_arrow
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _machinist_review_mode import MachinistReviewMode
 from _named_views import octant_view_name
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from dt_pinion_cam_geometry import SET_SCREW_HOLE_SPEC
 from dt_pinion_cam_spec import (
+    BORE,
+    BORE_BAND,
     BORE_CALLOUT,
+    CAM_LEN,
     CAM_OD,
+    COLLAR_AXIS_TOLERANCE_MM,
+    COLLAR_OD_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION_BY_NAME,
     ECC,
+    FOLLOWER_PIN_NUMBER,
     LIFT_NOTE_CALLOUT,
+    LIFT_NOTE_NUMBER,
+    LIFT_ROD_NUMBER,
+    SCREW_NOTE_NUMBER,
+    SET_SCREW_Z,
+    SLIP_CLEARANCE_MAX,
+    SLIP_CLEARANCE_MIN,
     SURFACE_FINISHES,
     TAP_DRILL_CALLOUT,
+    TAP_DRILL_DIA,
     THIN_WALL_CALLOUT,
+    THIN_WALL_MIN_MM,
+    UNIT,
 )
 
 
@@ -164,6 +186,211 @@ SET_SCREW_VIEW_ARROW = (
 )
 # Decimal places are the part's (dt_pinion_cam_spec.DRAWING_PRECISION, applied
 # by build_dt_pinion_cam).  The sheet only reads them back.
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (build_dt_pinion_cam: the bore axis is
+# model Z through the origin and the collar runs Z 0..CAM_LEN from the front
+# face, the Front plane the tap station runs from; the OD's axis sits ECC below
+# the bore, at -Y, so the thin wall is +Y and the heavy side -Y; the radial
+# #2-56 tap enters at the OD's lowest line on the X = 0 Right plane and runs +Y
+# into the bore). The OD and eccentricity bands are the part's native +/-.002
+# on the exact model nominal (it prints rounded, .575 and .079); the length
+# and station take the title block's .XX row on their printed nominal; the tap
+# drill the DRILLED HOLES row. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_pinion_cam"
+_GEOM = "dt_pinion_cam_geometry"
+_BUILD = "build_dt_pinion_cam"
+_FRAME = (_BUILD, "__frame__")
+_NOTES = DRAWING_NOTES.splitlines()
+_CAM_OD_FINISH = surface_finish_by_key(SURFACE_FINISHES, "cam_od")
+
+
+def _plane(value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": "z", "value": value}
+
+
+part_metadata(
+    model_sources=(_FRAME, (_GEOM, "CAM_OD"), (_GEOM, "CAM_LEN"), (_GEOM, "ECC")),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+# Both end faces, square to the bore: the front (Z = 0) is the face the tap
+# station runs from; the length between them is the OD's.
+requirement(
+    "front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane(0.0), (_FRAME,))},
+)
+requirement(
+    "rear_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), CAM_LEN),),
+    requirements=("plane",),
+    fields={"plane": (_plane(CAM_LEN), (_FRAME, (_GEOM, "CAM_LEN")))},
+)
+# The turned OD the MHA-DT-25 follower pin rides: Ø.575 +/-.002 flagged to
+# note 1 (SIDE_KEEP "CollarOd"), its length .35 (SIDE_KEEP "Depth") and the
+# sheet's one roughness symbol (SURFACE_FINISHES "cam_od").
+requirement(
+    "cam_od",
+    kind="outside_cylinder",
+    faces=(_CAM_OD_FINISH.face,),
+    requirements=("dia", "length", "finish_ra"),
+    fields={
+        "at": ([0.0, -ECC, 0.0], (_FRAME, (_GEOM, "ECC"))),
+        "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
+        "dia": (
+            limits(
+                CAM_OD,
+                _P["CollarOd"],
+                (COLLAR_OD_TOLERANCE_MM, -COLLAR_OD_TOLERANCE_MM),
+                unit=UNIT,
+            ),
+            (
+                (_GEOM, "CAM_OD"),
+                "COLLAR_OD_TOLERANCE_MM",
+                "UNIT",
+                (_SELF, "SIDE_KEEP"),
+            ),
+        ),
+        "nominal_dia": (CAM_OD, ((_GEOM, "CAM_OD"),)),
+        "length": (
+            limits(CAM_LEN, _P["Depth"], unit=UNIT),
+            ((_GEOM, "CAM_LEN"), "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "length_nominal": (CAM_LEN, ((_GEOM, "CAM_LEN"),)),
+        "finish_ra": (_CAM_OD_FINISH.roughness_um, ("SURFACE_FINISHES",)),
+        "callout": (
+            LIFT_NOTE_CALLOUT,
+            ("LIFT_NOTE_CALLOUT", (_SELF, "DIMENSION_CALLOUTS")),
+        ),
+        "mates": (FOLLOWER_PIN_NUMBER, ("FOLLOWER_PIN_NUMBER",)),
+        "note": (
+            _NOTES[LIFT_NOTE_NUMBER - 1],
+            ("DRAWING_NOTES", "LIFT_NOTE_NUMBER"),
+        ),
+    },
+    precision={"dia": _P["CollarOd"], "length": _P["Depth"], "finish_ra": 1},
+)
+# The eccentric bore on the origin, reamed through from the front face
+# (FRONT_KEEP "BoreDia" with BORE_CALLOUT: its sliding fit on the MHA-DT-17
+# lift rod and the diametral clearance its limits give). The eccentricity
+# .079 +/-.002 (FRONT_KEEP "CollarCy", flagged to note 1) locates it from the
+# OD's axis along Y; the thin-side wall over it prints as the single limit
+# .0797 MIN (FRONT_KEEP "ThinWallMin", owner minor RV-01): the least wall
+# the OD, bore and eccentricity bands leave, not a band of its own.
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(BORE),),
+    requirements=("dia", "thru", "eccentricity", "thin_wall_min"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
+        "dia": (
+            limits(BORE, _P["BoreDia"], BORE_BAND, unit=UNIT),
+            ((_GEOM, "BORE"), "BORE_BAND", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "nominal_dia": (BORE, ((_GEOM, "BORE"),)),
+        "thru": (True, ("BORE_CALLOUT",)),
+        "process": ("ream", ("BORE_CALLOUT",)),
+        "callout": (BORE_CALLOUT, ("BORE_CALLOUT", (_SELF, "DIMENSION_CALLOUTS"))),
+        "mates": (LIFT_ROD_NUMBER, ("LIFT_ROD_NUMBER",)),
+        "diametral_clearance": (
+            [SLIP_CLEARANCE_MIN, SLIP_CLEARANCE_MAX],
+            ("SLIP_CLEARANCE_MIN", "SLIP_CLEARANCE_MAX", "BORE_CALLOUT"),
+        ),
+        "eccentricity": (
+            limits(
+                ECC,
+                _P["CollarCy"],
+                (COLLAR_AXIS_TOLERANCE_MM, -COLLAR_AXIS_TOLERANCE_MM),
+                unit=UNIT,
+            ),
+            (
+                (_GEOM, "ECC"),
+                "COLLAR_AXIS_TOLERANCE_MM",
+                "UNIT",
+                (_SELF, "FRONT_KEEP"),
+            ),
+        ),
+        "eccentricity_nominal": (ECC, ((_GEOM, "ECC"),)),
+        "eccentricity_from": ("cam_od", ((_SELF, "FRONT_KEEP"),)),
+        "eccentricity_axis": ("y", (_FRAME,)),
+        "eccentricity_callout": (
+            LIFT_NOTE_CALLOUT,
+            ("LIFT_NOTE_CALLOUT", (_SELF, "DIMENSION_CALLOUTS")),
+        ),
+        "thin_wall_min": (
+            THIN_WALL_MIN_MM,
+            ("THIN_WALL_MIN_MM", "THIN_WALL_MIN_TOL_TYPE", (_SELF, "FRONT_KEEP")),
+        ),
+        "thin_wall_callout": (
+            THIN_WALL_CALLOUT,
+            ("THIN_WALL_CALLOUT", (_SELF, "DIMENSION_CALLOUTS")),
+        ),
+        "thin_side": ((0.0, 1.0, 0.0), (_FRAME, (_GEOM, "ECC"))),
+    },
+    precision={
+        "dia": _P["BoreDia"],
+        "eccentricity": _P["CollarCy"],
+        "thin_wall_min": _P["ThinWallMin"],
+    },
+)
+# The radial #2-56 set-screw tap (BOTTOM_KEEP "TapDrillDia" with
+# TAP_DRILL_CALLOUT: its #50 drill at .XXX, DRILLED HOLES row, through the
+# heavy wall to the bore) at .16 from the front face (BOTTOM_KEEP "TapCz", on
+# VIEW A). It enters at the OD's lowest line, on the centreline through the
+# bore and OD axes opposite the thin side: the front view draws it there
+# hidden and VIEW A's arrow looks up it. That 180 deg is drawn, not
+# dimensioned. Note 2 supplies its loose set screw.
+_TAP_ENTRY = [0.0, -(ECC + CAM_OD / 2.0), SET_SCREW_Z]
+_TAP_FROM_THIN_SIDE_DEG = math.degrees(math.atan2(_TAP_ENTRY[0], _TAP_ENTRY[1]))
+_TAP_ENTRY_SOURCES = (_FRAME, (_BUILD, "_TAP_PLANE_Y"), (_BUILD, "build"))
+requirement(
+    "set_screw_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(TAP_DRILL_DIA),),
+    requirements=("thread", "dia", "station", "angle_from_thin_side_deg"),
+    fields={
+        "at": (_TAP_ENTRY, (*_TAP_ENTRY_SOURCES, (_GEOM, "SET_SCREW_Z"))),
+        "axis": ((0.0, 1.0, 0.0), _TAP_ENTRY_SOURCES),
+        "thread": (
+            f"{TAP_DRILL_CALLOUT.splitlines()[-1]}-{SET_SCREW_HOLE_SPEC.thread_class}",
+            ("TAP_DRILL_CALLOUT", (_GEOM, "SET_SCREW_HOLE_SPEC")),
+        ),
+        "dia": (
+            drilled_limits(TAP_DRILL_DIA, _P["TapDrillDia"], unit=UNIT),
+            ((_GEOM, "TAP_DRILL_DIA"), "UNIT", (_SELF, "BOTTOM_KEEP")),
+        ),
+        "nominal_dia": (TAP_DRILL_DIA, ((_GEOM, "TAP_DRILL_DIA"),)),
+        "process": ("drill", ("TAP_DRILL_CALLOUT",)),
+        "into": ("bore", ("TAP_DRILL_CALLOUT", (_GEOM, "SET_SCREW_HOLE_SPEC"))),
+        "callout": (
+            TAP_DRILL_CALLOUT,
+            ("TAP_DRILL_CALLOUT", (_SELF, "DIMENSION_CALLOUTS")),
+        ),
+        "station": (
+            limits(SET_SCREW_Z, _P["TapCz"], unit=UNIT),
+            ((_GEOM, "SET_SCREW_Z"), "UNIT", (_SELF, "BOTTOM_KEEP")),
+        ),
+        "station_nominal": (SET_SCREW_Z, ((_GEOM, "SET_SCREW_Z"),)),
+        "station_from": ("front_face", ((_SELF, "BOTTOM_KEEP"),)),
+        "angle_from_thin_side_deg": (
+            _TAP_FROM_THIN_SIDE_DEG,
+            (*_TAP_ENTRY_SOURCES, (_SELF, "SET_SCREW_VIEW_ARROW")),
+        ),
+        "view": (SET_SCREW_VIEW_LABEL, ((_SELF, "SET_SCREW_VIEW_LABEL"),)),
+        "hardware_note": (
+            _NOTES[SCREW_NOTE_NUMBER - 1],
+            ("DRAWING_NOTES", "SCREW_NOTE_NUMBER"),
+        ),
+    },
+    precision={"dia": _P["TapDrillDia"], "station": _P["TapCz"]},
+)
 
 
 def _limit_witness_lines(
