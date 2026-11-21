@@ -7,7 +7,8 @@ gives the decimal drill size, never merely a screw designation.
 The shared millimetre hole-mouth coordinates convert to COM metres before
 projection into the cover-side *Back view.
 The native clearance callout carries the match-drill line; the pilot and
-opening sequence lives in the assembly sheet's step 1, not on this part.
+opening sequence lives in the plate's traveler (cad/process/ms_stop_plate,
+Setups 3-4), not on this sheet.
 Separate native chamfer size and angle retain their model-owned precision.
 """
 

@@ -34,7 +34,6 @@ import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
 import sh_vn_thumb_screw_spec as thumb
 from _assembly_contract import assembly_contract
-from _title_block_units import LENGTH_UNITS, render_number
 
 DRAWING_NUMBER = "MHA-MS-00"
 PLATE_DRAWING_NUMBER = str(_config.parts("ms-stop-plate")["number"])
@@ -82,13 +81,6 @@ def _inch_fraction(length_mm: float) -> str:
     return str(inches)
 
 
-def _hole(length_mm: float) -> str:
-    """A stop hole length as the stop sheets' hole callouts print it."""
-    return render_number(
-        length_mm / LENGTH_UNITS[UNIT], UNIT, stop.HOLE_CALLOUT_PRECISION
-    )
-
-
 # BOM DESCRIPTION cells (the parts carry no Description property).
 BOM_DESCRIPTIONS = {
     spec.STICK: "GRADUATED STICK",
@@ -108,29 +100,28 @@ DRAWING_DIMENSIONS = {spec.SETTING_FEATURE: {spec.SETTING_DIMENSION}}
 # Components own material and finish; no assembly coating operation is required.
 # The fitter's order, one action a step; the explode
 # (ms_measuring_stick_explode_spec) runs steps 7-10 backwards. The block and
-# its cover are a match-drilled pair (steps 1-6): neither is interchangeable.
-# The block's own tapped-hole callout states the drill and full-thread depths;
-# steps 3 and 5 point to it instead of restating them.
+# its cover arrive a match-drilled pair from their part travelers (the
+# MHA-MS-03 plate is pilot-drilled on its finished MHA-MS-02 block, ends and
+# edges flush, then opened; the block is tapped on its return): neither is
+# interchangeable. Steps 1-6 receive the pair and prove it is one.
 _BLOCK, _PLATE, _STICK = _item(spec.BLOCK), _item(spec.PLATE), _item(spec.STICK)
 _THUMB, _SCREWS = _item(spec.THUMB_SCREW), _item(spec.PLATE_SCREW)
 STOP_FACE_FEELER = ".002"
 ASSEMBLY_STEPS = (
-    f"1. LAY OUT THE TWO HOLES OF {_PLATE} PER {PLATE_DRAWING_NUMBER}; "
-    "DO NOT DRILL THEM YET.",
-    f"2. CLAMP {_PLATE} TO {_BLOCK}, LEFT ENDS AND TOP EDGES FLUSH AS IN THE "
-    f"SHEET 1 FRONT VIEW (TOP OF {_ref(spec.BLOCK)}: ITS {thumb.THREAD} "
-    f"TAPPED FACE). THESE ARE THE {stop.LOCATING_END_NOTE} AND "
-    f"{stop.LOCATING_EDGE_NOTE} ON {BLOCK_DRAWING_NUMBER} AND "
-    f"{PLATE_DRAWING_NUMBER}.",
-    f"3. AT EACH LAID-OUT HOLE, DRILL Ø{_hole(stop.PLATE_TAP_DRILL_DIA)} "
-    f"THROUGH {_PLATE} AND INTO {_BLOCK} TO THE {BLOCK_DRAWING_NUMBER} TAP "
-    f"DRILL DEPTH, MEASURED FROM THE {_ref(spec.BLOCK)} FACE UNDER "
-    f"{_ref(spec.PLATE)}.",
-    f"4. WITH {_PLATE} OFF {_ref(spec.BLOCK)}, OPEN ITS TWO HOLES TO "
-    f"Ø{_hole(stop.PLATE_CLEARANCE_DIA)} THRU.",
-    f"5. TAP BOTH HOLES IN {_BLOCK} {plate_screw.THREAD} WITH A BOTTOMING TAP "
-    f"TO THE {BLOCK_DRAWING_NUMBER} FULL THREAD DEPTH.",
-    f"6. MARK {_BLOCK} AND {_PLATE} AS A MATCHED PAIR.",
+    f"1. {_BLOCK} AND {_PLATE} ARRIVE AS A MATCHED PAIR, MATCH-DRILLED "
+    f"PER {BLOCK_DRAWING_NUMBER} AND {PLATE_DRAWING_NUMBER}, A PAIR MARK "
+    "ACROSS THEIR LOCATING ENDS.",
+    f"2. LAY {_PLATE} ON {_BLOCK}, PAIR MARKS TOGETHER, LEFT ENDS AND TOP "
+    "EDGES FLUSH AS IN THE SHEET 1 FRONT VIEW (TOP OF "
+    f"{_ref(spec.BLOCK)}: ITS {thumb.THREAD} TAPPED FACE). THESE ARE THE "
+    f"{stop.LOCATING_END_NOTE} AND {stop.LOCATING_EDGE_NOTE} ON "
+    f"{BLOCK_DRAWING_NUMBER} AND {PLATE_DRAWING_NUMBER}.",
+    f"3. CHECK: EACH {plate_screw.THREAD} TAPPED HOLE IN {_ref(spec.BLOCK)} "
+    f"SHOWS CENTRED IN ITS HOLE IN {_ref(spec.PLATE)}.",
+    f"4. IF ONE DOES NOT, {_ref(spec.PLATE)} IS NOT THIS {_ref(spec.BLOCK)}'S: "
+    "FIND ITS OWN BY THE PAIR MARKS, THEN REPEAT 2.",
+    f"5. LIFT {_PLATE} OFF {_ref(spec.BLOCK)}.",
+    f"6. BLOW THE CHIPS OUT OF BOTH TAPPED HOLES IN {_ref(spec.BLOCK)}.",
     f"7. START THE {_THUMB} INTO THE TAPPED HOLE IN THE TOP OF {_BLOCK}; "
     "KEEP ITS TIP CLEAR OF THE WINDOW.",
     f"8. WITH {_ref(spec.THUMB_SCREW)} ON TOP, LAY {_STICK} IN THE OPEN "
