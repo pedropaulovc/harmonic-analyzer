@@ -1,23 +1,266 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Rocker strap hub plug MHA-CH-13-TL-02, one off, turned on the manual
+# PM-1127VF-LB (owner ruling 2026-11-21: turned parts get lathe travelers, no
+# NC). Route chosen for speed, the registry's own (turn the body and pilot,
+# face the shoulder in one chucking, drill through, part off, face to
+# length) from 9/16 in 6061 round: the drawing calls for round 9/16 or over.
+# Setup 1, the bar pilot end out: measure the MHA-CH-13-TL-01 counterbore
+# (the body is turned to it), face the end (Z0), turn the body to the
+# measured counterbore less its clearance back past the parting line, turn
+# the pilot to the shoulder, chamfer the pilot end, spot, drill H through,
+# part off .02 long. Setup 2, the plug turned round on its pilot over a shim
+# wrap, the shoulder seated on the jaw fronts: face the body end to length
+# with the shoulder in its band. Bench: deburr and check.
+#
+# Stock: 9/16 in 6061 round is to order (cad/config/shop-equipment/
+# stock-to-order.toml 6061-round-9-16); none is on hand. The placeholder
+# plan's 1 x 3 in flat (on hand) would need a squared blank in the 6 in
+# 4-jaw, whose ownership is not recorded.
 title = "Rocker Strap Hub Plug"
-part = "MHA-CH-13-TL-02 Rocker Strap Hub Plug"
-revision = "placeholder"
-material = "6061 aluminum round, 9/16 in or over"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "6061-T6511 extruded aluminium round, 9/16 in"
+stock = "Ø{{process.stock_dia_in:.4dot}} 6061-T6511 extruded round, a {{process.bar_length_in:g}} in piece (to order, not on hand); lot: one plug, which takes {{cad.pitch_in:.2dot}} in of it."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on aluminium."
 shop = "../shop"
-stock_refs = ["6061-flat-1x3"]
+stock_refs = ["6061-round-9-16"]
+material_key = "lathe-6061"
+turning_material = "aluminum_6061"
+
+[cad]
+file = "../../out/features/ch_rocker_strap_tl_hub_plug/features.toml"
+adapter = "turned_bush"
+part = "ch-rocker-strap-tl-hub-plug"
+
+[parameters]
+quantity = 1
+stock_dia_in = 0.5625
+# The 3 in piece to order and the length the 3-jaw grips of it.
+bar_length_in = 3.0
+chuck_grip_in = 0.75
+# Facing allowance: squares a sawn bar end.
+face_allowance_in = 0.02
+# Left on the body end for Setup 2 to face to length.
+regrip_allowance_in = 0.02
+# Parting kerf: 1/8 in blade plus the insert's side clearance (authored).
+part_kerf_in = 0.13
+parts_per_pull = 1
+# The parting blade's clearance to the jaw fronts.
+jaw_clearance_in = 0.1
+# Left a side on the body and the pilot for their finish passes.
+finish_allowance_in = 0.003
+rough_radial_doc_mm = 0.5
+finish_radial_doc_mm = 0.025
+turn_feed_mm_rev = 0.1016
+turn_start_z_mm = 0.5
+
+[[tools]]
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "centre"
+name = "No. 3 centre drill"
+ref = "centre-drills-carbide-60"
 
 [[tools]]
 id = "drill-h"
 name = "H drill"
-ref = "drill-h"  # Drills H
+ref = "drill-h"
+
+[[tools]]
+id = "cutoff"
+name = "Cutoff blade"
+ref = "cutoff-blade-holder"
+
+[[tools]]
+id = "telescoping-gauges-starrett-s579gz"
+name = "Telescoping gauges"
+ref = "telescoping-gauges-starrett-s579gz"
+
+[[tools]]
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Bar, pilot end out: turn the body and pilot, drill H, part off long"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the Ø{{process.stock_dia_in:.4dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
+datum = "Z0 (carriage DRO) the bar end, faced in this setup: the pilot end. The body end is faced in Setup 2."
+diagram = { file = "diagrams/bar.svg", alt = "The 9/16 in bar in the 3-jaw, pilot end out: the end faced, the body and pilot turned, the pilot end chamfered, drilled H through, the plug parted off .02 long." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}", support = "none" }
+turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+tool = "telescoping-gauges-starrett-s579gz"
+instruction = "Measure the MHA-CH-13-TL-01 counterbore with a telescoping gauge and the micrometer and write it on this sheet. That reading (about .0005 repeatable) only sets the body's starting size: the body is sized to the counterbore itself in the next turning op."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off; set DRO Z0 on it."
+settings = "lathe-ar-6061"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Body rough", phase = "rough", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.run_end_z_mm}}", kept_start_z_mm = "{{cad.outer_far_out_near_z_mm}}", kept_end_z_mm = "{{cad.kept_end_z_mm}}", start_diameter_mm = "{{cad.stock_dia_mm}}", end_diameter_mm = "{{cad.outer_rough_dia_mm}}", max_radial_doc_mm = "{{process.rough_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.outer_rough_dia_mm}}" },
+  { name = "Body finish", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.run_end_z_mm}}", kept_start_z_mm = "{{cad.outer_far_out_near_z_mm}}", kept_end_z_mm = "{{cad.kept_end_z_mm}}", start_diameter_mm = "{{cad.outer_rough_dia_mm}}", end_diameter_mm = "{{cad.outer_turn_min_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the body from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}: rough to {{process.finish_allowance_in:.3dot}} a side over the recorded counterbore, then finish to the recorded counterbore + .001, miking between passes."
+settings = "lathe-ar-6061"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Body Ø the recorded counterbore +.0005 to +.0015, by micrometer; over: another light pass; under: go on to the try-fit, and if the counterbore slides on loose there, scrap."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle stopped, offer the MHA-CH-13-TL-01 counterbore onto the body end. Skim .0002 off the diameter at a time, trying it between skims, until the counterbore just slides on. Mike that size and write it on this sheet as D0 (within .0002 of the bore)."
+settings = "lathe-ar-6061"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Finish the body to D0 less .0007–.0013, miking between skims: the drawing's {{cad.outer_clearance_min_in:.4dot}}–{{cad.outer_clearance_max_in:.4dot}} diametral clearance in that counterbore."
+settings = "lathe-ar-6061"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Body Ø D0 less .0007–.0013, by micrometer; over: skim again; under: scrap."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Pilot rough", phase = "rough", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.step_far_out_far_z_mm}}", kept_start_z_mm = "{{cad.step_far_out_near_z_mm}}", kept_end_z_mm = "{{cad.step_far_out_far_z_mm}}", start_diameter_mm = "{{cad.outer_turn_min_mm}}", end_diameter_mm = "{{cad.step_rough_dia_mm}}", max_radial_doc_mm = "{{process.rough_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.step_rough_dia_mm}}" },
+  { name = "Pilot finish", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.step_far_out_far_z_mm}}", kept_start_z_mm = "{{cad.step_far_out_near_z_mm}}", kept_end_z_mm = "{{cad.step_far_out_far_z_mm}}", start_diameter_mm = "{{cad.step_rough_dia_mm}}", end_diameter_mm = "{{cad.step_turn_min_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the pilot from Z0 to the shoulder at Z{{cad.step_far_out_far_z_mm:in.3dot}} by the DRO, facing the shoulder square: rough to Ø{{cad.step_rough_dia_mm:in.4dot}}, then finish in light passes, miking between them, to Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}."
+settings = "lathe-ar-6061"
+cut_diameter_mm = "{{cad.step_dia_mm}}"
+inspection = "Pilot Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}, by micrometer; over: another light pass; under: scrap."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.step_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Compound at 45°: chamfer the pilot end's outside edge {{cad.chamfer_far_leg_min_in:.2dot}}–{{cad.chamfer_far_leg_max_in:.2dot}} × 45° with the AR's nose."
+settings = "lathe-ar-6061"
+cut_diameter_mm = "{{cad.step_dia_mm}}"
+inspection = "Chamfer {{cad.chamfer_far_leg_min_in:.2dot}}–{{cad.chamfer_far_leg_max_in:.2dot}} × 45°: lay the calipers' jaws flat on the end face and close them onto the chamfer; the flat reads the pilot Ø less twice the leg. Small: another touch with the compound; large: scrap."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock, about Ø.20 across the countersink: under the H drill, so the drill removes it."
+settings = "lathe-centre-6061"
+cut_diameter_mm = 2.778
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-h"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Drill H {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale, in one steady feed with cutting oil: through the plug and past the parting line."
+settings = "lathe-drill-h-6061"
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
+hole_depth_mm = "{{cad.run_mm}}"
+peck = "none"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Fit the C2 (3212A75) insert, the non-ferrous grade, for this aluminium. Touch the blade's Z0-side face on the faced end and set the DRO Z0 there, then part off with that face at Z-{{cad.part_off_in:.3dot}}: .02 over length, for Setup 2. Catch the plug."
+settings = "lathe-part-6061"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Turned round on the pilot: face the body end to length"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the pilot over one wrap of printer paper trimmed .08 wide, so it stays below the jaw fronts; the shoulder seated on the jaw fronts; the body end {{cad.step_stickout_datum_mm:in.2dot}} in out."
+datum = "Z0 (carriage DRO) the body end once faced. Before facing, check the shoulder sits on all three jaw fronts with no gap (reseat if light shows); then touch the AR on a jaw front and set Z-{{cad.shoulder_in:.3dot}} there, and face the body end to Z0."
+diagram = { file = "diagrams/regrip.svg", alt = "The plug turned round, its pilot in the jaws over a paper wrap with the shoulder on the jaw fronts: the body end faced to length." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.step_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.step_stickout_datum_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the body end in light skims to Z0 by the DRO: the shoulder then stands {{cad.shoulder_min_in:.3dot}}–{{cad.shoulder_max_in:.3dot}} from it (calipers between them) with the length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} (micrometer)."
+settings = "lathe-ar-6061"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Shoulder {{cad.shoulder_min_in:.3dot}}–{{cad.shoulder_max_in:.3dot}} from the body end; length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}. Short: scrap and make another."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.shoulder_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Bench: deburr and check"
+machine = "Bench"
+envelope = "other"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished plug: the body to the measured counterbore, the pilot, the shoulder and the H hole through." }
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr: break the body end's outside edge, the shoulder's outer edge and both ends of the hole, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max; leave the body and pilot diameters untouched."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Check the hole: a Ø{{cad.bore_dia_min_in:.3dot}} pin gauge enters and a Ø{{cad.bore_dia_max_in:.3dot}} does not."
+inspection = "Hole Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Try-fit the body in its MHA-CH-13-TL-01 counterbore, clean and dry: it enters full depth by hand without force. Tag the plug with D0 and its body size: it goes to that MHA-CH-13-TL-01."
+inspection = "Body enters the tagged counterbore full depth by hand."
+gauge_checks = "other"
+feed = "hand"
