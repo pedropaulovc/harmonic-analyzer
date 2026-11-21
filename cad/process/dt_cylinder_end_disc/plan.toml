@@ -135,6 +135,7 @@ diagram = { file = "diagrams/block.svg", alt = "The sawn blank in the 4-jaw, its
 lathe_hold = "other"
 
 [[setups.operations]]
+cut_kind = "other"
 instruction = "Spindle off: set the AR tool's tip on the out face at Ø2.25 and turn the chuck a full turn by hand. No jaw may touch the tool or its holder (the jaws' step depth is not on record). A jaw in the way: face only out to where all four clear; the ring outside is turned off in Setup 3."
 feed = "hand"
 
