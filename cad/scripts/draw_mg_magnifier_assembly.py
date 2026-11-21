@@ -796,8 +796,9 @@ PRESSED = StackDetail(
     frozenset({"mg-wheel-bar", "mg-wheel-axle", "mg-wheel-axle-spacer"}),
     BORE_ROW_HEIGHT,
     # The BOM items it shows (machinist review r1); the rest are left out.
+    # One clause a line: on one line the spacer clause ran over the border.
     f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']} PRESSED INTO "
-    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']}, "
+    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']},\n"
     f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle-spacer']} ON IT,\n"
     "OTHER PARTS NOT SHOWN",
     letter_corner=(-1, 1),
