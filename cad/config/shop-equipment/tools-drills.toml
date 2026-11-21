@@ -2,7 +2,7 @@
 # the ownership of the drills the placeholder process plans name, from the
 # owner's quote workbook quotes-2026-11-17-rev3.xlsx (owner 2026-11-19): its
 # Drills sheet for the 115-piece index members, its Items rows for the drills
-# to buy. Description and diameter_mm are cad/process/shop.toml under the same
+# to buy. Description and diameter_mm are cad/process/shop/ under the same
 # key; no field here repeats one there. TOML, deliberately not YAML; no COM
 # build closure reads it: it is in no leaf's cache key.
 

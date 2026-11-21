@@ -1,0 +1,567 @@
+# Harmonic-analyzer shop directory for prechips travelers (cad/process/shop/),
+# in the prechips shop schema: tooling, cutting settings, machines,
+# workholding, gauges and limits. prechips (0.11.10 and later) merges every
+# *.toml here by section and refuses a key defined in two files; HA's readers
+# merge it the same way (cad/scripts/_process_plans.py load_shop). This
+# common.toml holds the machines, workholding, limits and gauges, and every
+# tool, cutting setting and stock record that plans of more than one
+# subsystem family name; <prefix>.toml (ch, dt, fr, mg, ms, pd, pn, sm) holds
+# the records only that family's plans (cad/process/<prefix>_*/plan.toml) or
+# specs/tests read. A family without a file adds <prefix>.toml for its first
+# record of its own; a record a second family needs moves here; a new set
+# several families need may start its own topic file (cad/process/README.md,
+# "Shop records"). The directory holds only records an HA plan
+# (cad/process/<stem>/plan.toml) or an HA spec/test reads.
+# Checks use these values as written, with no measured/placeholder provenance
+# (owner ruling 2026-11-10, cad/process/README.md). Part-specific tool keys do
+# not assert tool equivalence. Material identities preserve each source's
+# stated stock condition; they are not inferred from the printed material text
+# or treated as interchangeable. Facts the prechips schema cannot hold that CAD
+# specs read live in cad/config/shop-equipment/*.toml, read through
+# cad/scripts/_shop_equipment.py; no field is in both.
+
+# Source: prechips v0.9.0 examples/shop.toml (archive/pre-v0.10-2026-11-08
+# examples/inventory/pedro-shop.toml and examples/shop-policy.toml, converted to
+# millimetres), plus the HA records marked below. Where HA's own records
+# (45952b66bc:cad/process/shop/{inventory,shop-policy}.toml) gave a different
+# value, HA's value is used and marked "HA:".
+# The PM-30MV is CNC-converted (GRBL, ballscrews on X/Y; owner 2026-11-16):
+# prechips has no control or repeatability field, so those facts are
+# cad/config/shop-equipment/ cnc.pm-30mv.
+[machines.pm-30mv]
+kind = "mill"
+# Owner (Pedro, 2026-11-16): spindle 100 rpm minimum, 2800 rpm maximum.
+# Owner (Pedro, 2026-11-16), "2800 max with low belty": the low belt alone
+# covers 100–2800 rpm, so no job on this mill needs a belt change.
+rpm_ranges = [[100, 2800]]
+travel_mm = { x = 584.2, y = 222.25, z = 355.6 }
+# HA: envelope spindle_to_table_min_in 2.46 (62.484 mm), max 17 in (431.8 mm).
+spindle_to_table_mm = [62.484, 431.8]
+
+# HA: the shop's installed lathe (Pedro 2026-10-15), from the deleted inventory
+# (45952b66bc:cad/process/shop/inventory.toml machines.PM-1127VF-LB), its two
+# spindle ranges as archived. MHA-PD-00 turns a stub mandrel in place in its
+# chuck (cad/scripts/ha_assembly_package.py, #2392).
+[machines.pm-1127vf-lb]
+kind = "lathe"
+rpm_ranges = [[70, 380], [380, 2000]]
+# HA: envelope swing_over_bed_in 11, swing_over_cross_slide_in 6.66 and
+# between_centres_in 27.55 (45952b66bc inventory machines.PM-1127VF-LB), × 25.4;
+# read by the TL-VN-84 lathe setup's machine_capacity screen.
+swing_over_bed_mm = 279.4
+swing_over_cross_slide_mm = 169.164
+between_centres_mm = 699.77
+
+# HA: fixtures.vise-pm-6 (Precision Matthews VISE-6in-HIGHPREC; make, SKU and
+# source stay in cad/config/shop-equipment/), from the deleted inventory
+# (45952b66bc:cad/process/shop/inventory.toml), × 25.4. Measured by Pedro on
+# 2026-10-05: jaw width 6.247 in (jaw length along the clamp face), jaw height
+# 1.7695 in (bed slideway to jaw top), bed height 2.886 in (mill table to vise
+# bed, swivel base off). Opening: the largest workpiece the stock hard jaws
+# clamp, 5 3/4 in (owner-reported fit, 2026-10-30); the vendor page says 6 in,
+# the vendor drawing L1 150 mm and the bare jaw-to-jaw caliper reading was
+# 6.135 in (2026-10-05), but only 5 3/4 in pieces fit.
+[workholding.vise-pm-6]
+kind = "vise"
+jaw_width_mm = 158.6738
+opening_mm = 146.05
+jaw_height_mm = 44.9453
+bed_height_mm = 73.3044
+
+[gauges.calipers]
+range_mm = [0.0, 152.4]
+resolution_mm = 0.0127
+
+# The owned 0-1, 1-2 and 2-3 in outside micrometer set
+# (cad/config/shop-equipment/ gauges.micrometers): 0-3 in = 76.2 mm.
+# Resolution: the set reads .0001 in = .00254 mm (owner ruling 2026-11-16,
+# Pedro, asked directly for the owned set's graduation).
+[gauges.micrometers]
+range_mm = [0.0, 76.2]
+resolution_mm = 0.00254
+
+# Pin-gauge set range, 0.011-0.500 in by 0.001 in; its grade note is
+# cad/config/shop-equipment/ gauges.pin-gauges. 0.011 in = 0.2794 mm exactly.
+[gauges.pin-gauges]
+range_mm = [0.2794, 12.7]
+resolution_mm = 0.0254
+
+# The owned Starrett S579GZ telescoping gauge set (cad/config/shop-equipment/
+# gauges.telescoping-gauges-starrett-s579gz; tools record below): 5/16 to
+# 2-1/8 in over its four pieces (Starrett, MSC and McMaster listings for
+# S579GZ) = 7.9375-53.975 mm. It transfers a bore to the micrometers, so it
+# reads at their .0001 in = .00254 mm.
+[gauges.telescoping-gauges-starrett-s579gz]
+range_mm = [7.9375, 53.975]
+resolution_mm = 0.00254
+
+# The MHA-CH-13 hub-hole go/no-go pair (cad/config/shop-equipment/
+# gauges.plug-gauges-4000-4005, to buy): GO .4000 and NO-GO .4005 in =
+# 10.16 and 10.1727 mm. A fixed-limit pair reads no scale; its resolution is
+# each member's Class X tolerance, .000040 in = 0.001016 mm.
+[gauges.plug-gauges-4000-4005]
+range_mm = [10.16, 10.1727]
+resolution_mm = 0.001016
+
+[gauges.height-gauge]
+range_mm = [0.0, 304.8]
+resolution_mm = 0.0254
+
+# HA: the shop's lever (dial test) indicator: graduation 0.001 mm, range
+# 0.14 mm (owner, Pedro, 2026-11-17, answering #2888); its kind is
+# cad/config/shop-equipment/ gauges.dti.
+[gauges.dti]
+range_mm = [0.0, 0.14]
+resolution_mm = 0.001
+
+# The owner's other indicators (owner inventory 2026-11-17, Pedro, PR #2874;
+# ownership is cad/config/shop-equipment/, same keys): two .001 in dial
+# indicators and "one digital 0.000'' indicator", recorded as written: a
+# three-place inch display, .001 in. No travel was stated, so none is
+# declared. The release's tool list reads them (ha_assembly_package).
+[gauges.dial-indicators]
+resolution_mm = 0.0254
+
+[gauges.digital-indicator]
+resolution_mm = 0.0254
+
+# PM-30MV X DRO scale read as a length gauge (feed-lever length, TL-26 plan,
+# "Grip end to length" setup). Range: machines.pm-30mv X travel; resolution: archive
+# installed MagXact MX-100M DRO, 5 um scales (owner-confirmed 2026-10-27).
+[gauges.mill-x-dro]
+range_mm = [0.0, 584.2]
+resolution_mm = 0.005
+
+[limits]
+# HA: shop-policy numbers.stickout_ld_max 3.0.
+stickout_ld_max = 3.0
+tool_change_clearance_mm = 25.0
+# Pedro's house choice (2026-11-10): grip at least 6 mm (~1/4 in) of the part's
+# height in the jaws. No published minimum exists for smooth jaws; Mitee-Bite
+# says only that they need "much more than .060"" clamped.
+vise_grip_min_mm = 6.0
+# Common rule of thumb, not a standard: Engineer Underground, "Workholding and
+# Fixturing": "Hold at least one-third of the part's height in the jaws (more
+# for tall, thin parts), and cut only the part that sticks out."
+# https://engineerunderground.com/resources/makers-fabrication/cnc-machining/workholding-fixturing/
+# Training texts are stricter (Introduction to Machining §9.5: no more than
+# 1/8 in above the jaw plates beyond the cut); raise the fraction to follow them.
+vise_grip_fraction_min = 0.3333
+# House rule (Pedro, 2026-11-10), no published number: a "centred" hold keeps
+# the midpoint of the gripped span within the middle third of the jaw width
+# (this fraction of the half width either side of centre). TC 9-524 p. 8-16
+# says only that work held at the end of the vise needs a spacing block.
+vise_centre_fraction_max = 0.3333
+
+# Source: base-bar.toml; Pedro's route dated 2026-11-05 and
+# table-clamped squaring sequence dated 2026-11-07 (see plan provenance).
+# diameter_mm: standard nominal size stated in each description, × 25.4 (HA's
+# per-tool diameter readings are not used; cad/process/README.md).
+# The 8-32 tap records the plan's authored #29 (.136 in) tap drill. The v48
+# drawing calls the #12 bracket drill (notes.process).
+# Logbook (logbook/entries): 2026-11-04 end brackets and 2026-11-05 base bar
+# blanks "sawn ... on a 14 in Evolution metal-cutting miter saw" (lines 17 and
+# 19). No entry states the blade (HA #2084).
+[tools.saw-evolution-14]
+description = "14 in Evolution metal-cutting miter saw"
+# Owner's MT3 dead centre with a straight end, gripped in the 3/4 in R8
+# collet and used as a tap guide on the PM-30MV; ownership and setting are
+# cad/config/shop-equipment/, same key.
+[tools.mill-dead-centre-mt3]
+description = "MT3 dead centre, straight end held in the 3/4 in R8 collet, used as a spindle tap guide"
+
+# Source: end-bracket.toml and feed-lever.toml; the 2026-11-02 interim
+# routes (MHA-CH-06-TL-28/TL-26 v47), the v48 manifest notes (#29 tap
+# drill, plug-start then bottoming-finish taps) and the archived
+# taps-unc-hand 8-32 plug/bottoming records.
+[tools.jig-spot]
+description = "#2 centre drill"
+[tools.jig-drill-29]
+description = "#29 (.136 in) drill"
+diameter_mm = 3.4544
+[tools.jig-tap-8-32-plug]
+description = "8-32 UNC plug tap; T-handle wrench"
+tap_drill_mm = 3.4544
+[tools.jig-files]
+description = "10 in mill second-cut and 8 in smooth files; bench vise with soft jaws"
+
+# Source: ch_rocker_arm_tl_oblique_carrier/plan.toml (MHA-CH-06-TL-21 v49).
+# Number and letter drills are the 115-piece index's (jig-drill-11-32);
+# diameter_mm and tap_drill_mm are the standard nominal sizes × 25.4: #43
+# .089 (4-40 tap drill), 23/64 .3594 (reamer pilot); the F drill and 5/16-18
+# plug tap are the blocks' records (tools.jig-drill-f, jig-tap-5-16-18-plug).
+# The .3760 reamer is the owned over reamer named in
+# cad/scripts/_fit_ream_slide.py (REAM_SLIDE); its cutting size is its nominal.
+[tools.jig-drill-43]
+description = "#43 (.089 in) drill, 115-piece index"
+diameter_mm = 2.2606
+# Turned by hand on the dead centre in the spindle (MHA-MG-02): the wrench
+# needs a centre hole in its top for the centre's point.
+[tools.jig-tap-4-40-plug]
+description = "4-40 UNC plug tap; T-handle tap wrench with a centre hole in its top"
+tap_drill_mm = 2.2606
+
+# PM-30MV Y DRO scale read as a length gauge (carrier A2/B2 rows from the
+# A1-B1 line, read over a pin with the DTI). Range: machines.pm-30mv Y travel;
+# resolution: the installed MagXact MX-100M DRO's 5 um scales, as
+# gauges.mill-x-dro.
+[gauges.mill-y-dro]
+range_mm = [0.0, 222.25]
+resolution_mm = 0.005
+
+# Riser (MHA-CH-06-TL-24) plan: the v49 notes.process names the #30 screw and
+# stop holes, the #9 CL/CR clearances and the 12 mm HUB relief; the 1/4 in
+# drill pilots the 12 mm and the 82° countersink cuts the Ø.25 × 82° seats.
+# Nominal sizes × 25.4 (#30 .1285 in, #9 .1960 in). The riser's 12 mm drill
+# left the buy list with the oblique jig (owner 2026-11-17; #3083 row 20).
+# The countersink is not owned (cad/config/shop-equipment/, same key); the
+# index-plate and arm-plate plans also name it.
+[tools.riser-drill-30]
+description = "#30 (.1285 in) drill, 115-piece index"
+diameter_mm = 3.2639
+[tools.riser-drill-9]
+description = "#9 (.1960 in) drill, 115-piece index"
+diameter_mm = 4.9784
+[tools.riser-countersink]
+description = "3/8 in 82° countersink"
+
+# Source: ch_rocker_arm_tl_oblique_{pivot,feed}_block/plan.toml (MHA-CH-06-TL-22
+# and TL-32, v50). The blocks also use saw-evolution-14, jig-em-half (the LMS
+# 6784 set's 1/2 in: every facing cut), jig-spot and basebar-counterbore (the
+# set's 5/16 in end mill: the counterbores). The drills are the 115-piece index
+# sizes the sheets print (#15 .180, F .257 tap drill); the 5/16 drill pilots
+# the Ø.375 leadscrew clearance. jig-drill-f and jig-tap-5-16-18-plug are the
+# carrier's (TL-21) records, byte-identical: keep one copy when both land.
+# block-em-3-8 is the LMS 6784 set's 3/8 in cutter (shop-equipment
+# endmills-lms-6784): plunged, it cuts the seat (squaring its floor) and
+# TL-32's leadscrew clearance to the title block's DRILLED HOLES band (owner
+# ruling 2026-11-13), the clearance from both ends so only its flutes enter
+# the hole (its flute_length_mm below).
+# block-em-half-long is the owner's 1/2 in end mill with at least 1.00 in of
+# flute (owner 2026-11-13), which reaches the .87 depth of TL-32's lug notch.
+[tools.block-drill-15]
+description = "#15 (.180 in) drill, 115-piece index"
+diameter_mm = 4.572
+[tools.jig-drill-f]
+description = "F (.257 in) drill, 115-piece index"
+diameter_mm = 6.5278
+[tools.block-drill-5-16]
+description = "5/16 in drill, 115-piece index"
+diameter_mm = 7.9375
+
+# --- MHA-CH-06-TL-VN-84 leadscrew kit rework ---
+# Plan: cad/process/ch_rocker_arm_tl_vn_oblique_leadscrew_kit/plan.toml.
+
+# HA: machines.BS-0 (45952b66bc inventory; installed and commissioned on the
+# PM-30MV, #465): 40:1 worm, 24-position direct index, plates A, B and C.
+[machines.bs-0]
+kind = "dividing_head"
+worm_ratio = 40
+direct_index_positions = 24
+plate_holes = { A = [15, 16, 17, 18, 19, 20], B = [21, 23, 27, 29, 31, 33], C = [37, 39, 41, 43, 47, 49] }
+
+# HA: the BS-0's own 5 in 3-jaw (45952b66bc inventory machines.BS-0.included,
+# chuck_3jaw_5in_inside_outside_jaws), which the kit's flats setups grip in.
+# No source gives its grip range or body size, so none is declared.
+[workholding.chuck-3jaw-5-bs0]
+kind = "chuck"
+
+# HA: fixtures.chuck-3jaw-6-d1-4, the PM-1127's standard 6 in 3-jaw (45952b66bc
+# inventory: body Ø158 x 72, #1413 placeholders). Grip range: prechips v0.10
+# examples/shop.toml workholding.chuck-3jaw-6.
+[workholding.chuck-3jaw-6]
+kind = "chuck"
+grip_range_mm = [3.0, 140.0]
+body_diameter_mm = 158.0
+body_length_mm = 72.0
+
+# --- 3-flute uncoated carbide square end mills (McMaster 88815) ---
+# Owned (McMaster-Carr packing list, PO 0803PCAMPOS, 1616317-01, 08/04/2025;
+# owner, Pedro, 2026-11-17: "add to inventory ... already owned"); ownership,
+# SKU and overall length are cad/config/shop-equipment/, same keys.
+# diameter_mm: the nominal size the packing list states, × 25.4.
+# helix_deg and flute_length_mm: each SKU's McMaster product page, read live
+# 2026-11-17 in a browser (https://www.mcmaster.com/<SKU>/): "Helix Angle 30°"
+# on all four; "Length of Cut" 1/2, 1 1/8, 1 3/4 and 1 in. The pages also give
+# the mill diameter tolerance -0.0020 to 0.0000 in. With the helix declared,
+# prechips takes the axial force from it instead of axial_ratio 1.0.
+[tools.endmill-carbide-3fl-1-8]
+description = "1/8 in 3-flute uncoated carbide square end mill, 1-1/2 in OAL (McMaster 88815A18)"
+diameter_mm = 3.175
+flute_length_mm = 12.7
+helix_deg = 30
+[tools.endmill-carbide-3fl-1-4]
+description = "1/4 in 3-flute uncoated carbide square end mill, 3 in OAL (McMaster 88815A43)"
+diameter_mm = 6.35
+flute_length_mm = 28.575
+helix_deg = 30
+[tools.endmill-carbide-3fl-3-8]
+description = "3/8 in 3-flute uncoated carbide square end mill, 4 in OAL (McMaster 88815A56)"
+diameter_mm = 9.525
+flute_length_mm = 44.45
+helix_deg = 30
+[tools.endmill-carbide-3fl-1-2]
+description = "1/2 in 3-flute uncoated carbide square end mill, 3 in OAL (McMaster 88815A45)"
+diameter_mm = 12.7
+flute_length_mm = 25.4
+helix_deg = 30
+
+# Their cutting settings on 1018 cold-finished steel at the PM-30MV. Material
+# key: settings.rocker-profile-hss-low-carbon-steel's, unchanged.
+# Speed: the spindle tops out at 2800 rpm (machines.pm-30mv, owner
+# 2026-11-16), which is 92, 183, 275 and 367 ft/min on the 1/8, 1/4, 3/8 and
+# 1/2 in cutters. Ceiling: The Carbide End Mill Store "Carbide End Mill Speeds
+# and Feeds, General Purpose, Uncoated" (6gtools.com, PDF read 2026-11-17),
+# row Steels P, Mild - 1018 (.2-.3 Carbon): 350 SFM. The 1/2 in cutter is
+# held under it: 350 × 3.82 / .5 = 2674 rpm, taken down to 2650 (347 ft/min);
+# the other three run at 2800. Tru-Edge "Solid Carbide Endmills Feeds and
+# Speeds" (PDF read 2026-11-17), row Low Carbon Steel - 1018: 200-400 SFM,
+# would admit 2800 on all four; the lower ceiling is kept for this mill.
+# Chip load: the same 6G table's Mild - 1018 feeds, .0006, .0017, .0025 and
+# .0028 in/tooth for 1/8, 1/4, 3/8 and 1/2 in, × 25.4. These are its low end:
+# the table multiplies them by a chip-load factor of 1.0 at 50 % radial
+# engagement (and more) up to 5.0 at 1 %, and the factor is left at 1.0. For
+# comparison Tru-Edge's 1018 row gives .001 (1/8), .0015 (1/4), .003 (1/2).
+# Carbide on this mill (Blondihacks, "Common Beginner Mistakes In Hobby
+# Machining", https://www.youtube.com/watch?v=PwSE3BeWuiM, mistake 1: carbide
+# pays only up to the machine's rigidity and power, and a sharp carbide edge
+# mimics HSS on a small machine). At 2800 rpm the 1/8 in cutter's 92 ft/min
+# is inside the HSS milling range for 1018 (LittleMachineShop "Cutting
+# Speeds", Milling, Plain carbon steels 1006-1026: 65-110 ft/min, read
+# 2026-11-17) and under the carbide ranges above, so there carbide buys
+# stiffness, about three times HSS's (FM Carbide "Solid Carbide vs. HSS End
+# Mills", read 2026-11-17: Young's modulus ~600 GPa against 200-210 GPa), not
+# speed. The 1/4 in cutter's 183 ft/min is already past the HSS range, and the
+# speed gain grows with diameter to 3.2× the HSS top at 1/2 in.
+[settings.endmill-carbide-3fl-1-8-1018-cf]
+tool = "endmill-carbide-3fl-1-8"
+material = "rocker-1018-cold-finished"
+rpm = 2800
+chip_load_mm_per_tooth = 0.01524  # .0006 in; 2800 × 3 × .0006 = 5.0 in/min
+flutes = 3
+feed_unit = "in/min"
+[settings.endmill-carbide-3fl-1-4-1018-cf]
+tool = "endmill-carbide-3fl-1-4"
+material = "rocker-1018-cold-finished"
+rpm = 2800
+chip_load_mm_per_tooth = 0.04318  # .0017 in; 2800 × 3 × .0017 = 14.3 in/min
+flutes = 3
+feed_unit = "in/min"
+[settings.endmill-carbide-3fl-3-8-1018-cf]
+tool = "endmill-carbide-3fl-3-8"
+material = "rocker-1018-cold-finished"
+rpm = 2800
+chip_load_mm_per_tooth = 0.0635  # .0025 in; 2800 × 3 × .0025 = 21.0 in/min
+flutes = 3
+feed_unit = "in/min"
+[settings.endmill-carbide-3fl-1-2-1018-cf]
+tool = "endmill-carbide-3fl-1-2"
+material = "rocker-1018-cold-finished"
+rpm = 2650
+chip_load_mm_per_tooth = 0.07112  # .0028 in; 2650 × 3 × .0028 = 22.3 in/min
+flutes = 3
+feed_unit = "in/min"
+
+# --- MHA-MG-02 magnifying clamp (cad/process/mg_magnifying_clamp/plan.toml) ---
+
+# The bore's Ø.257 +.004/0 has no gauge of its class on record (pin gauges
+# and reamers of the size are not owned, owner 2026-11-17). Owner decision
+# 2026-11-17 (relayed by Main): the F drill's shank is the GO and the G
+# drill's shank the NO-GO, each miked first. G (.261 in) is a member of the
+# owned 115-piece index (letter drills A-Z among its 115, as jig-drill-f);
+# diameter_mm is its nominal × 25.4. The pair reads no scale: its
+# resolution is the micrometers' (gauges.micrometers) reading of each shank;
+# its range is the drawing band: the traveler accepts an F shank of
+# .2570-.2575 as the GO and a G shank of .2600-.2610 as the NO-GO.
+# A shank is not ground to a gauge class; an F shank under .2570 cannot be
+# the GO, and the lower limit then rests on the F drill alone.
+[gauges.clamp-bore-drill-shanks]
+range_mm = [6.5278, 6.6294]
+resolution_mm = 0.00254
+
+# --- MHA-CH-13-TL-01 rocker-strap sub-plate (cad/process/ch_rocker_strap_tl_sub_plate/plan.toml) ---
+
+# The 1/4-20 hub tap's drill: #7 (.201 in) is a member of the owned 115-piece
+# index (number drills #1-#60 among its 115, as jig-drill-11-32); nominal ×
+# 25.4. The 1/4-20 tap is owned (cad/config/shop-equipment/
+# tools.jig-tap-1-4-20-plug).
+[tools.jig-drill-7]
+description = "#7 (.201 in) drill, 115-piece index"
+diameter_mm = 5.1054
+[tools.jig-tap-1-4-20-plug]
+description = "1/4-20 UNC hand tap; T-handle wrench"
+tap_drill_mm = 5.1054
+
+# --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
+# The tools the placeholder plans name (cad/process/<stem>/plan.toml with
+# revision = "placeholder", not in _process_plans.TRAVELER_STEMS), from the
+# owner's quote workbook quotes-2026-11-17-rev3.xlsx (owner 2026-11-19). The
+# comment on each header cites its workbook row: an Items item_id, a Drills
+# size or a Tap coverage thread. diameter_mm is the drill or reamer's nominal
+# size. Ownership is the inventory's status under the same key
+# (cad/config/shop-equipment/).
+[tools.drill-3-64]  # Drills 3/64
+description = "3/64 (.0469 in) drill, 115-piece index"
+diameter_mm = 1.190625
+[tools.drill-54]  # Drills #54
+description = "#54 (.0550 in) drill, 115-piece index"
+diameter_mm = 1.397
+[tools.drill-53]  # Drills #53
+description = "#53 (.0595 in) drill, 115-piece index"
+diameter_mm = 1.5113
+[tools.drill-1-16]  # Drills 1/16
+description = "1/16 (.0625 in) drill, 115-piece index"
+diameter_mm = 1.5875
+[tools.drill-51]  # Drills #51
+description = "#51 (.0670 in) drill, 115-piece index"
+diameter_mm = 1.7018
+[tools.drill-50]  # Drills #50
+description = "#50 (.0700 in) drill, 115-piece index"
+diameter_mm = 1.778
+[tools.drill-49]  # Drills #49
+description = "#49 (.0730 in) drill, 115-piece index"
+diameter_mm = 1.8542
+[tools.drill-41]  # Drills #41
+description = "#41 (.0960 in) drill, 115-piece index"
+diameter_mm = 2.4384
+[tools.drill-32]  # Drills #32
+description = "#32 (.1160 in) drill, 115-piece index"
+diameter_mm = 2.9464
+[tools.drill-31]  # Drills #31
+description = "#31 (.1200 in) drill, 115-piece index"
+diameter_mm = 3.048
+[tools.drill-25]  # Drills #25
+description = "#25 (.1495 in) drill, 115-piece index"
+diameter_mm = 3.7973
+[tools.drill-21]  # Drills #21
+description = "#21 (.1590 in) drill, 115-piece index"
+diameter_mm = 4.0386
+[tools.drill-14]  # Drills #14
+description = "#14 (.1820 in) drill, 115-piece index"
+diameter_mm = 4.6228
+[tools.drill-1]  # Drills #1; MHA-DT-03-TL-08 Ø.228 DRILL THRU (drawing callout 2026-11-20, #2356)
+description = "#1 (.2280 in) drill, 115-piece index"
+diameter_mm = 5.7912
+[tools.drill-b]  # Drills B
+description = "B (.2380 in) drill, 115-piece index"
+diameter_mm = 6.0452
+[tools.drill-c]  # Drills C
+description = "C (.2420 in) drill, 115-piece index"
+diameter_mm = 6.1468
+[tools.drill-n]  # Drills N
+description = "N (.3020 in) drill, 115-piece index"
+diameter_mm = 7.6708
+[tools.drill-31-64]  # Drills 31/64
+description = "31/64 (.4844 in) drill, 115-piece index"
+diameter_mm = 12.303125
+[tools.reamer-1240]  # B-reamer-.1240
+description = ".1240 in HSS chucking reamer"
+diameter_mm = 3.1496
+[tools.reamer-1260]  # B-reamer-.1260
+description = ".1260 in HSS chucking reamer"
+diameter_mm = 3.2004
+[tools.reamer-3135]  # B-reamer-.3135
+description = ".3135 in HSS chucking reamer"
+diameter_mm = 7.9629
+[tools.tap-0-80-bottoming]  # F-tap-bottoming-0-80; Tap coverage #0-80 UNF
+description = "Bottoming hand tap #0-80 UNF, HSS"
+[tools.tap-0-80-plug]  # Tap coverage #0-80 UNF
+description = "#0-80 UNF plug hand tap (OSG 1000100)"
+[tools.tap-10-24-plug]  # Tap coverage #10-24 UNC
+description = "#10-24 UNC plug hand tap (OSG 1024901)"
+[tools.tap-2-56-bottoming]  # Tap coverage #2-56 UNC
+description = "#2-56 UNC bottoming hand tap (OSG 1011108)"
+[tools.tap-2-56-plug]  # Tap coverage #2-56 UNC
+description = "#2-56 UNC plug hand tap (OSG 1011008)"
+[tools.tap-4-40-bottoming]  # F-tap-bottoming-4-40; Tap coverage #4-40 UNC
+description = "Bottoming hand tap #4-40 UNC, HSS"
+[tools.gear-cutter-arbor-1]  # F-arbor-1in-R8
+description = "1 in R8 stub arbor"
+[tools.gear-cutter-arbor-7-8]  # F-arbor-7-8
+description = "7/8 stub arbor, 3/4 straight shank"
+[tools.gear-cutters-48dp-20pa]  # F-gear-cutter-10-289-481 to -488
+description = "48DP 20PA involute gear cutters #1 to #8"
+[tools.depth-micrometer]  # F-depth-micrometer
+description = "Depth micrometer, inch"
+[tools.pin-gauges]  # A1-pin-set-011-060, A1-pin-set-061-500-combined; ownership: inventory gauges.pin-gauges
+description = "Pin gauge sets .011-.500 in, class ZZ minus (.011-.060 by .001 and .061-.500 combined)"
+[tools.protractor]  # F-protractor
+description = "Protractor"
+[tools.arbor-press]  # F-arbor-press
+description = "Arbor press, 1 ton"
+[tools.centre-punch-starrett-18a]  # F-centre-punch-starrett-18A
+description = "Starrett 18A automatic centre punch"
+[tools.file-nicholson-10-second-cut]  # F-file-nicholson-10-mill-second-cut
+description = "Nicholson 10 in mill second-cut file"
+[tools.india-stone-ib8]  # F-stone-norton-IB8
+description = "Norton IB8 India combination stone"
+[tools.pliers]  # F-pliers
+description = "Pliers"
+[tools.steel-rule-48]  # F-steel-rule-48
+description = "Steel rule, 48 in"
+[tools.transfer-punches]  # F-transfer-punches-fractional, F-transfer-punches-number
+description = "Transfer punch sets, fractional 3/32-1/2 by 64ths and number sizes #1-#60"
+[tools.v-blocks]  # F-v-blocks
+description = "Matched V-block pair with clamps"
+
+# --- Drawing cross-check additions (2026-11-19) -------------------------------
+# Tools the v50 drawings call for that the quote workbook left out, from the
+# drawing cross-check of the placeholder plans (2026-11-19) and the owner's
+# rulings of that day. The comment cites the drawing callout or the inventory
+# record that holds the tool's ownership.
+[tools.centre-drills-carbide-60]  # inventory tools.centre-drills-carbide-60
+description = "Carbide 60° centre drills, trade sizes 1, 3 and 6"
+[tools.die-stock-13-16]  # inventory holders.die-stock-13-16
+description = "Die stock for 13/16 in round dies (Drillco 3000DS1)"
+[tools.dies-zoro-wb7365521946]  # inventory tools.dies-zoro-wb7365521946
+description = "Round adjustable split dies, HSS, 13/16 in OD: #0-80 UNF and #4-40 UNC (Drill America DWTH1316-080, -440)"
+[tools.endmill-carbide-3-32]  # MHA-PD-27 flat floor for the Ø.110 counterbore; MHA-CH-03 .106 ±.002 fork slot
+description = "3/32 in square carbide end mill, .47 in or more of reach"
+diameter_mm = 2.38125
+[tools.feeler-gauges]  # inventory gauges.feeler-gauges
+description = "Pittsburgh SAE/metric feeler gauge set, 32 pieces"
+[tools.form-tool-r070]  # MHA-PD-23 R.07 shank-end dome; MHA-MG-07 R.07 tip
+description = "R.070 convex dome form tool"
+[tools.form-tool-r125]  # MHA-CH-04 2X (SR.125) ends; MHA-MG-03 SR.13 tip; MHA-MG-04 R.13 TANGENT HEMISPHERE
+description = "R.125 convex full-radius form tool (hemisphere on 1/4 rod)"
+[tools.gauge-blocks-mitutoyo]  # inventory gauges.gauge-blocks-mitutoyo
+description = "Mitutoyo 81-piece inch gauge block set, shop grade"
+[tools.grooving-tool-020]  # MHA-PD-23 .020 +.002/.000 ring groove; MHA-MG-04 thread relief, corners R.008 max.; MHA-MG-07 thread relief, corners R.008 max.
+description = "HSS lathe grooving bit, .020 in wide or less, corners R.008 max."
+[tools.lathe-tool-sharp-nose]  # MHA-PD-08 R.004 max. corners, .016 neck; MHA-PD-17 SPIGOT ROOT R.004 MAX; MHA-PD-23 R.005 MAX land-to-head corner; MHA-PN-04 R.008 max. shoulder
+description = "Lathe turning tool, nose radius .004 in or less, tip under .016 wide"
+[tools.reamer-0930]  # MHA-DT-11 2X .0930 +.0005/.0000 REAM .1555; MHA-PD-18 Ø.0930 +.0005/.0000 2X REAM THRU; MHA-PD-22 Ø.0930 +.0005/.0000 2X REAM THRU
+description = ".0930 in HSS chucking reamer"
+diameter_mm = 2.3622
+[tools.telescoping-gauges-starrett-s579gz]  # inventory gauges.telescoping-gauges-starrett-s579gz
+description = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
+[tools.threading-bits-lms-6685]  # MHA-DT-03-TL-03 1/4-28 UNF single-pointed (owner 2026-11-19); MHA-PD-08 #8-32 UNC single-pointed (owner 2026-11-19); MHA-MG-03 1/4-20 UNC single-pointed (owner 2026-11-19); MHA-DT-03-TL-07 #8-32 UNC single-pointed (drawing callout 2026-11-20, #2356)
+description = "5/16 in HSS threading tool bit, set of two (LMS 6685)"
+
+# --- Stock the process plans name (stock_refs) ---------------------------------
+# One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
+# prechips can check each plan's stock_refs. Description only: the ownership
+# status stays in the inventory under the same key (stock assignment audit,
+# owner 2026-11-19).
+[stock.1018-flat-1-2x2-1-4]
+description = "1018 cold-finish carbon steel, flat bar, 1/2 x 2-1/4 in"
+[stock.1018-flat-3-8x1-1-4]
+description = "1018 cold-finish carbon steel, flat bar, 3/8 x 1-1/4 in"
+[stock.1018-ground-round-1-4]
+description = "AISI 1018 steel, precision ground, round bar, 1/4 in"
+[stock.1018-round-1-2]
+description = "1018 cold-finish carbon steel, round bar, 1/2 in"
+[stock.1018-round-1-4]
+description = "1018 cold-finish carbon steel, round bar, 1/4 in"
+[stock.1018-round-3-8]
+description = "1018 cold-finish carbon steel, round bar, 3/8 in"
+[stock.1018-round-5-8]
+description = "1018 cold-finish carbon steel, round bar, 5/8 in"
+[stock.1018-square-3-4]
+description = "1018 cold-finish carbon steel, square bar, 3/4 x 3/4 in"
+[stock.c360-flat-3-4x1-1-4]
+description = "C36000 free-machining brass (360-H02, extruded), flat bar, 3/4 x 1-1/4 in"
+[stock.c360-round-1-4]
+description = "C36000 free-machining brass (360-H02, extruded), round bar, 1/4 in"
+[stock.c360-round-7-8]
+description = "C36000 free-machining brass (360-H02, extruded), round bar, 7/8 in"

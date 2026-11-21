@@ -710,15 +710,13 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
 
 
 def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> None:
-    import tomllib
-
+    import _process_plans
     import _shop_equipment
     import paper_drive_arm_registration as registration
-    from _paths import CAD_ROOT
 
     low, high = disc.CENTRE_DISTANCE_WINDOW
     ux, uy = registration.S_TO_K_UNIT
-    shop = tomllib.loads((CAD_ROOT / "process" / "shop.toml").read_text(encoding="utf-8"))
+    shop = _process_plans.load_shop()
     equipment = _shop_equipment.load()
     dro_record = equipment["dro"]["pm-30mv"]
     # The installed DRO's vendor-stated accuracy, per axis (its cite).

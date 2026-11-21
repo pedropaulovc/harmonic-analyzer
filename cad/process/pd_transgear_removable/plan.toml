@@ -6,7 +6,7 @@ part = "MHA-PD-09 Removable Chain Sprocket"
 revision = "placeholder"
 material = "bought steel ANSI #25 sprocket: McMaster 6793K4 (T12), 6793K11 (T18), 6793K17 (T24); supplier states no steel grade"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "drill-40"

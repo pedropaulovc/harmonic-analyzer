@@ -1,33 +1,52 @@
-"""Locate prechips process plans and their generated travelers.
+"""Locate prechips process plans, the shop directory and the generated travelers.
 
 Each enrolled part has an authored ``cad/process/<stem>/plan.toml`` that the
 latest prechips release renders (``prechips_traveler.py``), with the shared
-``cad/process/shop.toml``, into two standalone HTML travelers under
+shop directory ``cad/process/shop/``, into two standalone HTML travelers under
 ``cad/out/travelers/<stem>/``: the concise ``pro`` sheet and the ``hobby``
 sheet with its setup pictures. The hobby sheet is also printed to
 ``<slug>-traveler.pdf`` beside them. ``build`` and ``release`` render every
 enrolled part (``build_bare`` none); ``release`` ships those PDFs under the
 bundle's ``travelers/``.
+
+Enrolment is the plan file itself: a part is enrolled when its plan is not a
+placeholder (``revision = "placeholder"``, the plans that only list a part's
+tools until its traveler is written). No list names the enrolled parts.
 """
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
-from export_features import OUT as CAD_OUT
+import _shop_equipment
+from _paths import CAD_ROOT
 
-# The parts with a traveler, enrolled by the CNC migration: the rocker strap
-# first (2026-11-17), then the magnifying clamp, the strap's sub-plate and
-# the two column clamp halves (2026-11-20).
-TRAVELER_STEMS: tuple[str, ...] = (
-    "ch_rocker_strap",
-    "mg_magnifying_clamp",
-    "ch_rocker_strap_tl_sub_plate",
-    "sh_column_clamp_front",
-    "sh_column_clamp_back",
-)
-PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
-SHOP_PATH = PROCESS_ROOT / "shop.toml"
+CAD_OUT = CAD_ROOT / "out"
+PROCESS_ROOT = CAD_ROOT / "process"
+# The prechips shop: every ``*.toml`` directly in it (``shop_files``), merged
+# by section; each plan names it as ``shop = "../shop"``.
+SHOP_DIR = PROCESS_ROOT / "shop"
+# A placeholder plan's ``revision``: the part is not enrolled.
+PLACEHOLDER_REVISION = "placeholder"
+
+
+def enrolled_stems(root: Path = PROCESS_ROOT) -> tuple[str, ...]:
+    """The parts with a traveler: each ``<stem>/plan.toml`` under ``root`` whose
+    ``revision`` is not ``PLACEHOLDER_REVISION``, sorted. A plan TOML cannot
+    read fails here, naming it, so no plan is silently left out."""
+    stems = []
+    for plan in root.glob("*/plan.toml"):
+        try:
+            revision = tomllib.loads(plan.read_text(encoding="utf-8")).get("revision")
+        except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
+            raise ValueError(f"unreadable process plan {plan}: {exc}") from exc
+        if revision != PLACEHOLDER_REVISION:
+            stems.append(plan.parent.name)
+    return tuple(sorted(stems))
+
+
+TRAVELER_STEMS: tuple[str, ...] = enrolled_stems()
 # Each traveler file and the built-in prechips profile it is rendered with,
 # from the same plan; ``pro`` first.
 TRAVELER_PROFILES: dict[str, str] = {
@@ -40,6 +59,31 @@ PDF_PROFILE = "hobby"
 
 def plan_path(stem: str) -> Path:
     return PROCESS_ROOT / stem / "plan.toml"
+
+
+def shop_files(directory: Path | None = None) -> tuple[Path, ...]:
+    """The shop's files as prechips reads them: every ``*.toml`` directly in
+    ``directory`` (default ``SHOP_DIR``) whose name does not start with ``.``,
+    in name order."""
+    directory = SHOP_DIR if directory is None else directory
+    return tuple(
+        sorted(
+            path
+            for path in directory.glob("*.toml")
+            if path.is_file() and not path.name.startswith(".")
+        )
+    )
+
+
+def load_shop(directory: Path | None = None) -> dict:
+    """Section -> key -> record over every ``shop_files`` file, as prechips
+    (0.11.10 and later) merges a shop directory: a key in two files is refused,
+    naming both. Every HA reader of the shop goes through here."""
+    directory = SHOP_DIR if directory is None else directory
+    files = shop_files(directory)
+    if not files:
+        raise FileNotFoundError(f"no shop .toml files in {directory}")
+    return _shop_equipment.merge(files)
 
 
 def traveler_dir(stem: str, out: Path = CAD_OUT) -> Path:

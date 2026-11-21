@@ -24,7 +24,7 @@ import cam_nc
 import export_features
 
 STEMS = ("sh_column_clamp_front", "sh_column_clamp_back")
-SHOP = tomllib.loads(_process_plans.SHOP_PATH.read_text(encoding="utf-8"))
+SHOP = _process_plans.load_shop()
 
 
 def _plan(stem: str) -> dict:

@@ -6,7 +6,7 @@ part = "MHA-DT-03-TL-01 Cone Gear Dividing Head Index Plate"
 revision = "placeholder"
 material = "6061-T651 aluminum, owned 1/4 in plate"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["6061-flat-1-4x5"]
 
 [[tools]]

@@ -6,7 +6,7 @@ part = "MHA-PD-13 Transgear Thumbnut"
 revision = "placeholder"
 material = "C36000 free-machining brass"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["c360-round-7-8"]
 
 [[tools]]

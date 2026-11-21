@@ -6,7 +6,7 @@ part = "MHA-DT-27 Crank Pin Ring"
 revision = "placeholder"
 material = "C26000 brass wire, .040 in"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "pliers"

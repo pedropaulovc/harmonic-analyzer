@@ -1,0 +1,183 @@
+# Drive train (dt_*) records of the HA prechips shop directory: the tools,
+# cutting settings and stock only dt_* plans name (or dt specs/tests read).
+# Machines, workholding, limits, gauges and every record more than one family
+# names are in common.toml, with the conventions every file follows; prechips
+# merges the directory's files by section and refuses a key defined twice.
+
+# Source: ch_rocker_arm_tl_oblique_carrier/plan.toml (MHA-CH-06-TL-21 v49).
+# Number and letter drills are the 115-piece index's (jig-drill-11-32);
+# diameter_mm and tap_drill_mm are the standard nominal sizes × 25.4: #43
+# .089 (4-40 tap drill), 23/64 .3594 (reamer pilot); the F drill and 5/16-18
+# plug tap are the blocks' records (tools.jig-drill-f, jig-tap-5-16-18-plug).
+# The .3760 reamer is the owned over reamer named in
+# cad/scripts/_fit_ream_slide.py (REAM_SLIDE); its cutting size is its nominal.
+[tools.jig-drill-23-64]
+description = "23/64 (.3594 in) drill, 115-piece index"
+diameter_mm = 9.128125
+[tools.reamer-0376]
+description = ".001 over 3/8 (.3760) HSS straight-flute chucking reamer"
+diameter_mm = 9.5504
+
+# --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
+# The tools the placeholder plans name (cad/process/<stem>/plan.toml with
+# revision = "placeholder", not in _process_plans.TRAVELER_STEMS), from the
+# owner's quote workbook quotes-2026-11-17-rev3.xlsx (owner 2026-11-19). The
+# comment on each header cites its workbook row: an Items item_id, a Drills
+# size or a Tap coverage thread. diameter_mm is the drill or reamer's nominal
+# size. Ownership is the inventory's status under the same key
+# (cad/config/shop-equipment/).
+[tools.drill-65]  # Codjiflo round 1: pre-drill for the dt-cylinder-gear-tl-cam-fixture .0365 clock-pin ream
+description = "#65 (.0350 in) drill"
+diameter_mm = 0.889
+[tools.drill-45]  # Drills #45
+description = "#45 (.0820 in) drill, 115-piece index"
+diameter_mm = 2.0828
+[tools.drill-26]  # Drills #26
+description = "#26 (.1470 in) drill, 115-piece index"
+diameter_mm = 3.7338
+[tools.drill-20]  # Drills #20
+description = "#20 (.1610 in) drill, 115-piece index"
+diameter_mm = 4.0894
+[tools.drill-3]  # Drills #3
+description = "#3 (.2130 in) drill, 115-piece index"
+diameter_mm = 5.4102
+[tools.drill-l]  # Drills L
+description = "L (.2900 in) drill, 115-piece index"
+diameter_mm = 7.366
+[tools.drill-m]  # Drills M
+description = "M (.2950 in) drill, 115-piece index"
+diameter_mm = 7.493
+[tools.drill-v]  # Drills V
+description = "V (.3770 in) drill, 115-piece index"
+diameter_mm = 9.5758
+[tools.drill-7-16]  # Drills 7/16
+description = "7/16 (.4375 in) drill, 115-piece index"
+diameter_mm = 11.1125
+[tools.drill-15-32]  # Drills 15/32
+description = "15/32 (.4688 in) drill, 115-piece index"
+diameter_mm = 11.90625
+[tools.taper-pin-reamer]  # B-reamer-taper-pin
+description = "Taper-pin reamer 1:48 (No. 4) for MHA-DT-09"
+[tools.reamer-0620]  # B-reamer-.0620
+description = ".0620 in HSS chucking reamer"
+diameter_mm = 1.5748
+[tools.reamer-0630]  # B-reamer-.0630
+description = ".0630 in HSS chucking reamer"
+diameter_mm = 1.6002
+[tools.reamer-2510]  # B-reamer-.2510
+description = ".2510 in HSS chucking reamer"
+diameter_mm = 6.3754
+[tools.reamer-4500]  # B-reamer-.4500
+description = ".4500 in HSS chucking reamer"
+diameter_mm = 11.43
+[tools.reamer-4835]  # B-reamer-.4835
+description = ".4835 in HSS chucking reamer"
+diameter_mm = 12.2809
+[tools.tap-1-4-28-plug]  # Tap coverage 1/4-28 UNF
+description = "1/4-28 UNF plug hand tap (OSG 1120408)"
+[tools.broach-bushing-3-8-a]  # F-broach-bushing
+description = "Broach bushing 3/8 style A collared"
+[tools.cylinder-notch-saw]  # F-notch-saw
+description = "Screw-slotting saw 2-3/4 x .014 x 1"
+[tools.endmill-7-32]  # C-endmill-7-32
+description = "7/32 in (.2188) square end mill, centre cutting"
+[tools.gear-cutters-24dp-20pa]  # F-gear-cutter-10-289-242, F-gear-cutter-10-289-247
+description = "24DP 20PA involute gear cutters #2 and #7"
+[tools.keyseat-endmill-1-16]  # F-keyseat-endmill
+description = "1/16 HSS 2-flute DE end mill, 0/+.002"
+[tools.keyway-broach-1-16-a]  # F-keyway-broach
+description = "1/16 keyway broach, style A"
+[tools.setting-mandrel-375]  # F-setting-mandrel-375
+description = "3/8 in ground setting mandrel"
+
+# --- Drawing cross-check additions (2026-11-19) -------------------------------
+# Tools the v50 drawings call for that the quote workbook left out, from the
+# drawing cross-check of the placeholder plans (2026-11-19) and the owner's
+# rulings of that day. The comment cites the drawing callout or the inventory
+# record that holds the tool's ownership.
+[tools.boring-bars-meda-6045000]  # inventory tools.boring-bars-meda-6045000
+description = "MEDA 6045000 double-ended lathe boring bars for tool bits, 3/8 to 1 in"
+[tools.chamfer-mill-carbide-1-4-90]  # inventory tools.chamfer-mill-carbide-1-4-90
+description = "Carbide 1/4 in 90° chamfering end mill, 2-flute (McMaster 3073A46)"
+diameter_mm = 6.35
+[tools.drill-30-cobalt]  # MHA-DT-24 #30 DRILL .129 THRU in 17-7 PH Cond C
+description = "#30 (.1285 in) cobalt jobber drill, for 17-7 PH spring steel"
+diameter_mm = 3.2639
+[tools.dt-cone-gear-cutting-arbor]  # MHA-DT-03 TOOTH CUTTING SETUP .002 TIR TO FINISHED BORE
+description = "Shop-made keyed cutting arbor kit for the cone gears: MHA-DT-03-TL-03 arbor, TL-04 backing collars, TL-06 key and arbor nut"
+[tools.dt-cone-gear-round-arbor]  # MHA-DT-03 T024 TOOTH CUTTING SETUP; owner ruling 2026-11-20 (#2356, Option 2)
+description = "Shop-made round cutting arbor kit for T024: MHA-DT-03-TL-07 arbor, TL-08 backing collar and a McMaster 90480A009 #8-32 hex nut"
+[tools.dt-cone-gear-index-plate]  # MHA-DT-03 tooth indexing
+description = "Shop-made dividing-head index plate MHA-DT-03-TL-01 for the cone gears"
+[tools.dt-cone-tip-cutter-bar]  # MHA-DT-37 holder for the form cutter
+description = "Shop-made fly cutter bar MHA-DT-37-TL-02 for the cone tip gear form cutter"
+[tools.dt-cone-tip-form-cutter]  # MHA-DT-37 GEAR DATA CUTTER: MHA-DT-37-TL-01
+description = "Shop-made form cutter MHA-DT-37-TL-01 for the MHA-DT-37 tooth space"
+[tools.dt-cylinder-gear-cam-fixture]  # MHA-DT-12 cam throw .3402 ±.0020
+description = "Shop-made cam turning fixture MHA-DT-12-TL-01 (stub, clamp, clock pin) for the MHA-DT-12 cams"
+[tools.endmill-hss-2fl-1-4]  # inventory tools.endmill-hss-2fl-1-4
+description = "1/4 in HSS 2-flute square end mill, 5/8 in LOC (McMaster 3051A51)"
+diameter_mm = 6.35
+[tools.follow-rest-pm-1127]  # inventory fixtures.follow-rest-pm-1127
+description = "PM-1127VF-LB follow rest"
+[tools.needle-files-swiss]  # MHA-DT-37-TL-01 file the tooth-space form (.0114-.0323)
+description = "Swiss-pattern needle file set"
+[tools.reamer-0365]  # inventory tools.reamer-0365
+description = ".0365 in HSS straight-flute chucking reamer (KBC 5-018-0365)"
+diameter_mm = 0.9271
+[tools.reamer-0625]  # MHA-DT-03 .0625 +.0005/.0000 REAM THRU (T012, T018); MHA-DT-04 .0625 +.0005/.0000 REAM .20; MHA-DT-38 .0625 +.0005/.0000 REAM THRU (#2469)
+description = ".0625 in HSS chucking reamer"
+diameter_mm = 1.5875
+[tools.reamer-1562]  # MHA-DT-31 (Ø.156) REAM .17 at assembly with MHA-DT-06; MHA-DT-06 (Ø.156) REAM .17 for dowel MHA-DT-VN-59
+description = "5/32 (.1562 in) HSS chucking reamer"
+diameter_mm = 3.96875
+[tools.reamer-1570]  # MHA-DT-03-TL-01 132X .1570 +.0005/.0000 REAM THRU; MHA-DT-14 .1570 +.0005/.0000 FLAT-BOTTOM REAM
+description = ".1570 in HSS chucking reamer"
+diameter_mm = 3.9878
+[tools.reamer-1610]  # MHA-DT-08 (Ø.161) REAM THRU, running fit on MHA-DT-32
+description = ".1610 in HSS chucking reamer"
+diameter_mm = 4.0894
+[tools.reamer-3740]  # inventory tools.reamer-3740
+description = ".3740 in HSS straight-flute chucking reamer (McMaster 3087A55)"
+diameter_mm = 9.4996
+[tools.reamers-adjustable-lms-5948]  # inventory tools.reamers-adjustable-lms-5948
+description = "Adjustable reamer set, .250-.375 in, 4 pieces (LMS 5948)"
+[tools.slitting-saw-1-032]  # inventory tools.slitting-saw-1-032
+description = "Smooth-finish slitting saw, 1 in diameter, .032 in thick, 3/8 in arbor hole (McMaster 3044A23)"
+diameter_mm = 25.4
+[tools.steady-rest-pm-1127]  # inventory fixtures.steady-rest-pm-1127
+description = "PM-1127VF-LB steady rest"
+
+# --- Stock the process plans name (stock_refs) ---------------------------------
+# One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
+# prechips can check each plan's stock_refs. Description only: the ownership
+# status stays in the inventory under the same key (stock assignment audit,
+# owner 2026-11-19).
+[stock.1018-flat-1-4x2-1-2]
+description = "1018 cold-finish carbon steel, flat bar, 1/4 x 2-1/2 in"
+[stock.1018-flat-1x1-1-4]
+description = "1018 cold-finish carbon steel, flat bar, 1 x 1-1/4 in"
+[stock.1018-flat-5-16x1-12in]
+description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 12 in length"
+[stock.1018-or-1045-ground-round-3-8]
+description = "SAE 1018 or 1045 steel, precision ground, round bar, 3/8 in"
+[stock.1018-round-1]
+description = "1018 cold-finish carbon steel, round bar, 1 in"
+[stock.1018-round-1-3-4]
+description = "1018 cold-finish carbon steel, round bar, 1-3/4 in"
+[stock.1018-round-3-and-7-8]
+description = "1018 cold-finish carbon steel, round bar, 3 in / 7/8 in"
+[stock.1018-round-4]
+description = "1018 cold-finish carbon steel, round bar, 4 in"
+[stock.6061-flat-1-4x5]
+description = "6061-T6511 aluminium, flat bar, 1/4 x 5 in"
+[stock.c360-flat-1-8x2-1-2]
+description = "C36000 free-machining brass (360-H02, extruded), flat bar, 1/8 x 2-1/2 in"
+[stock.c360-round-9-16]
+description = "C36000 free-machining brass, round bar, 9/16 in"
+[stock.c360-round-gear-blanks]
+description = "C36000 free-cutting brass, H02, round bar, 2-5/8 in / 2-1/4 in / 1-3/4 in / 1-1/2 in / 1-1/8 in / 3/4 in"
+[stock.c675-round-5-8]
+description = "C67500 manganese bronze, round bar, 5/8 in"
+[stock.gray-iron-casting-cone-pivot-post]
+description = "gray iron, class not ruled, casting for MHA-DT-05 cone pivot post"

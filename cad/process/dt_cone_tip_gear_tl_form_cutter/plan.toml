@@ -6,7 +6,7 @@ part = "MHA-DT-37-TL-01 Cone Tip Gear Fly Cutter Bit"
 revision = "placeholder"
 material = "AISI O1 oil-hardening tool steel drill rod, 1/8 in, ASTM A681"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "pin-gauges"

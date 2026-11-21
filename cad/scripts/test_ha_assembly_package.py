@@ -25,7 +25,7 @@ def test_every_row_resolves_to_its_shop_records():
 
 def test_the_label_is_the_inventory_status_alone(monkeypatch):
     records = {
-        "shop.toml": {"gauges": {"g": {}}},
+        "shop": {"gauges": {"g": {}}},
         "shop-equipment": {
             "tools": {
                 "owned": {"status": "on_hand", "supply": "shop_made"},
@@ -48,8 +48,8 @@ def test_the_label_is_the_inventory_status_alone(monkeypatch):
     assert label("shop-equipment:tools.make") == "TO MAKE"
     # No status, or only a prechips record: unrecorded, never OWNED.
     assert label("shop-equipment:tools.bare") == package.UNRECORDED
-    assert label("shop.toml:gauges.g") == package.UNRECORDED
-    assert label("shop.toml:gauges.g", "shop-equipment:tools.owned") == "OWNED"
+    assert label("shop:gauges.g") == package.UNRECORDED
+    assert label("shop:gauges.g", "shop-equipment:tools.owned") == "OWNED"
     # Records that disagree print the worst.
     assert label("shop-equipment:tools.owned", "shop-equipment:tools.buy") == "TO BUY"
     assert label() == "TO MAKE"

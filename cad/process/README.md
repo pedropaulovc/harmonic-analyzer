@@ -5,7 +5,8 @@ This directory holds the inputs to the `prechips:<stem>` travelers and the
 
 ```text
 cad/process/
-  shop.toml                 prechips shop file, shared by every plan
+  shop/common.toml          prechips shop directory: records several families share
+  shop/<prefix>.toml        records only one subsystem family's plans name
   <stem>/plan.toml          one prechips plan per part (enrolled or placeholder)
   placeholder-profile.toml  no-check prechips profile for the placeholder plans
   <stem>/diagrams/*.svg     optional setup diagrams the plan names
@@ -22,7 +23,7 @@ work runs on the manual PM-1127VF-LB lathe.
 package. It is not an HA dependency while it stabilises (owner ruling
 2026-11-11, [#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)):
 it stays out of `uv.lock`, and every traveler run uses the latest PyPI release
-through uv's tool runner. It reads the plan, the shop file and the part's
+through uv's tool runner. It reads the plan, the shop directory and the part's
 exported `features.toml`, and writes standalone HTML travelers; the traveler
 task prints the hobby sheet to `<slug>-traveler.pdf`, which releases ship. It needs no
 FreeCAD or geometry kernel and checks no hashes. HA does not rewrite, bind or
@@ -32,10 +33,10 @@ stamp the plan; prechips reads the tracked file directly.
 
 `<stem>/plan.toml` follows the restarted prechips plan format documented in the
 prechips README. It points at the part's scoped feature manifest and the shop
-file with paths relative to the plan:
+directory with paths relative to the plan:
 
 ```toml
-shop = "../shop.toml"
+shop = "../shop"
 
 [cad]
 file = "../../out/features/<stem>/features.toml"
@@ -48,7 +49,11 @@ dimensions, limits and the drawing revision from `{{cad.…}}` rather than typin
 them, so a CAD change reaches the traveler through the exported manifest. Every
 file in the plan directory is an input to the traveler task.
 
-Parts are enrolled by the CNC migration. The rocker strap (`ch_rocker_strap`,
+Parts are enrolled by the CNC migration. Each enrolled plan opens with a header
+comment that summarises the part's route (blank, setups, holding, zeros, NC
+files); from 2026-11-21 that comment is the route summary and this README gets
+no paragraph per part. The paragraph below records the parts enrolled before
+then. The rocker strap (`ch_rocker_strap`,
 MHA-CH-13) is the first: faced and bored in edge clamps on a shop-made
 sub-plate, then bonded to it on tape and screwed down at the hub for the
 outline. The magnifying clamp (`mg_magnifying_clamp`, MHA-MG-02) stands
@@ -69,7 +74,7 @@ contents, so a drawing change that alters the manifest's requirements needs a
 prechips adapter release before the traveler passes again.
 
 Plan parameters that size envelopes and pictures (vise jaw width, jaw height
-and bed height) repeat `shop.toml` `workholding.vise-pm-6`, because prechips
+and bed height) repeat the shop's `workholding.vise-pm-6` (`shop/common.toml`), because prechips
 plan bindings cannot read shop records; each such parameter names the shop
 field it repeats, and the two must be changed together.
 
@@ -82,13 +87,13 @@ registry number, title and material, `stock = "To be written"`, one
 come"). Its tools come from the owner's quote workbook
 `quotes-2026-11-17-rev3.xlsx` (its Items, Where used detail, Drills and Tap
 coverage sheets), from a cross-check of the plans against the drawings
-(2026-11-19) and from owner rulings, each `ref` a `shop.toml` `tools` record
+(2026-11-19) and from owner rulings, each `ref` a shop `tools` record
 whose header comment cites the workbook row, the drawing callout, the inventory
 record or the ruling, with the
 tool's ownership in the inventory under the same key. Its `stock_refs` names
 the inventory `[stock.<key>]` rows it is cut from (the stock assignment audit,
-owner 2026-11-19). A placeholder is not in
-`TRAVELER_STEMS`: it has no `prechips:<stem>`
+owner 2026-11-19). A placeholder is not enrolled (`revision = "placeholder"`
+keeps it out of `TRAVELER_STEMS`): it has no `prechips:<stem>`
 task, is not rendered by `build` or `release` and ships nothing; it lists a
 part's tools for the stock BOM. It has no `[cad]` binding, so the built-in
 `pro` and `hobby` profiles refuse it (`stock_fit` needs one);
@@ -100,13 +105,28 @@ uv tool run --from prechips==<version> prechips traveler cad/process/<stem>/plan
 
 prechips refuses a plan with no `[[tools]]`, so a made part neither source names
 a tool for has no placeholder. Enrolling a part means writing its real plan
-over the placeholder (the `[cad]` binding, stock and setups) and adding its
-stem to `_process_plans.TRAVELER_STEMS`.
+over the placeholder (the `[cad]` binding, stock and setups, and a `revision`
+bound from `{{cad.revision}}`), and, for a milled part, adding its `cam.py`.
+The files are the enrolment: `_process_plans.TRAVELER_STEMS` is every plan
+whose `revision` is not `"placeholder"` and `_cam_programs.CAM_STEMS` every
+part with a `cam.py` (each needs an enrolled plan); no list is edited.
 
 ## Shop records
 
-`shop.toml` is the prechips shop file: machines, workholding, gauges, limits,
-tools and cutting settings, in prechips' schema and units. It holds only records
+`shop/` is the prechips shop directory: machines, workholding, gauges, limits,
+tools and cutting settings, in prechips' schema and units. prechips (0.11.10 and
+later) merges every `*.toml` directly in it by section and refuses a key
+defined in two files; HA reads it the same way through
+`_process_plans.load_shop()`. `common.toml` holds the machines, workholding,
+limits and gauges, and every tool, setting and stock record that plans of more
+than one subsystem family name; `<prefix>.toml` (`ch`, `dt`, `fr`, `mg`, `ms`,
+`pd`, `pn`, `sm`; a family without one adds it) holds the records only that
+family's plans or specs/tests read, each with its citation comments. A family's
+change adds its records to its own file. A record a second family needs moves
+to `common.toml` in that change (deleted from the family file: a key in two
+files is refused). A set of new records several families need, added by one
+change, may start its own topic file (for example `lathe.toml`) instead of
+growing `common.toml`. The directory holds only records
 an HA plan or an HA spec/test reads (no example tooling from other projects); a
 fact that schema can express lives here. Its records include the shop's
 indicators' ranges and resolutions (`gauges.dti`, `gauges.dial-indicators`,
@@ -140,7 +160,7 @@ split by topic and read only through `cad/scripts/_shop_equipment.py`, whose
 `load()` merges them by section and refuses a record key found in two files.
 Ownership is one `status`: `on_hand`, `not_received` (bought, not in the
 shop), `to_order` or `to_make`; a record without one reads `unrecorded` in
-every reader, and a shop.toml record holds no ownership. A record the shop
+every reader, and a shop directory record holds no ownership. A record the shop
 makes carries `supply = "shop_made"` (provenance only). A record with
 `location = "makerspace"` is the makerspace's equipment, used there (owner
 ruling 2026-11-20, #2288); readers label it by its `status` alone, so no plan
@@ -148,7 +168,7 @@ names one until a reader labels makerspace equipment as such. No record names
 the parts it serves as data (that is prose in its `note`): parts point at what
 they need from their process plans. They hold:
 
-- ownership-only records, under the shop.toml key, for the PM-30MV mill, the
+- ownership-only records, under the shop key, for the PM-30MV mill, the
   PM-1127VF-LB lathe, the calipers, the DRO scales and the clamp bore's drill
   shanks read as gauges (`machines.*`, `gauges.calipers`, `gauges.mill-x-dro`,
   `gauges.mill-y-dro`, `gauges.clamp-bore-drill-shanks`);
@@ -162,7 +182,7 @@ they need from their process plans. They hold:
   .016 MAX (#2364);
 - the measuring stick's engraving bit (2L P-125x2.0-30-.005-S, 30° V, .005 in
   tip), not owned, which cuts every MHA-MS-01 graduation and numeral; its
-  brass cutting setting is `shop.toml` `settings.ms-stick-engrave-brass`, and
+  brass cutting setting is `shop/ms.toml` `settings.ms-stick-engrave-brass`, and
   `test_ms_stick_drawing.py` reads both against the printed groove limits
   (#2433);
 - the PM 6-in vise's make, SKU and source;
@@ -183,7 +203,7 @@ they need from their process plans. They hold:
   row for a part without a plan) or `gauge` (each gauge its setups' and
   operations' `gauge_checks` name, once), then the stock rows no plan names
   with the part columns empty. A tool's or gauge's ownership is the `status`
-  of the inventory record under its shop.toml key in whichever of `tools`,
+  of the inventory record under its shop key in whichever of `tools`,
   `fixtures`, `consumables`, `gauges` and `holders` holds it, or `unrecorded` with no
   record, no status or (a tool) no `ref`. The md summary line counts the parts
   `ready`, `missing` and `no_traveler`. `--format xlsx --out PATH` adds a
@@ -195,7 +215,7 @@ they need from their process plans. They hold:
   this inventory. It exits 2 when a stock row or inventory record carries an
   unknown status, a key sits in two of those sections, a plan names an unknown
   or vendor (`-vn-`) stem or unknown stock, or a plan's tool `ref` or gauge is not
-  in `shop.toml`, and `test_stock_bom.py` (`check:recipe`) runs that check on
+  in the shop directory, and `test_stock_bom.py` (`check:recipe`) runs that check on
   every change;
 - the MHA-FR-02 top-frame casting to buy (owner ruling 2026-11-10 (Pedro),
   #2333): a gray-iron ASTM A48 class 25B `[stock.<key>]` row of form `casting`,
@@ -215,9 +235,9 @@ they need from their process plans. They hold:
   McMaster-Carr PO 0803PCAMPOS (packing list 1616317-01, 08/04/2025; owner
   2026-11-17), each with its SKU, quantity and packing-list line;
 
-One fact lives in one file. The same object may appear in both files with
+One fact lives in one file. The same object may appear in both directories with
 disjoint fields (the DTI, for example), but no field is duplicated. Together
-the two files are the source of truth for installed shop equipment.
+the two directories are the source of truth for installed shop equipment.
 
 The former `cad/process/shop/inventory.toml` and `cutting-data.toml` are
 deleted; records not carried into either file were dropped. Their last version
@@ -236,9 +256,9 @@ Owner rulings (Pedro), recorded for the cutover:
   stamp; no traveler or release gate distinguishes measured from placeholder
   values.
 - For prechips shop data: "no pedantism of not measured value inferred; if it
-  is in the inputs they will be considered" (2026-11-10). `shop.toml` and plan
+  is in the inputs they will be considered" (2026-11-10). Shop and plan
   values are used as written, with no measured/placeholder provenance.
-- `shop.toml` and the plans carry HA's own recorded values, not the prechips
+- The shop directory and the plans carry HA's own recorded values, not the prechips
   example ones: where the deleted inventory or shop policy (`45952b66bc`) held a
   different value for the same machine, holder or limit, HA's value is used
   and marked `HA:` in a comment beside it.
@@ -246,13 +266,14 @@ Owner rulings (Pedro), recorded for the cutover:
   named tool size with the drawing band; HA's per-tool readings in the deleted
   inventory (for example #29 3.451 mm, #12 4.798 mm, the 3/4 in end mill
   19.039 mm) were #1413 "realistic placeholder" values, not shop measurements,
-  and under the ruling above values are used as written in `shop.toml`, which
+  and under the ruling above values are used as written in the shop, which
   states the nominal size.
 
 ## Travelers
 
-`cad/scripts/_process_plans.py:TRAVELER_STEMS` lists the parts with a
-`prechips:<stem>` task, enrolled by the CNC migration. `build` runs
+`cad/scripts/_process_plans.py:TRAVELER_STEMS`, derived from the plan files,
+lists the parts with a `prechips:<stem>` task: every `<stem>/plan.toml` that is
+not a placeholder (a plan TOML cannot read fails task loading, naming it). `build` runs
 every one beside the drawing PDFs (`build_bare` runs none); `release` runs
 every one and ships each hobby sheet as
 `travelers/<slug>-traveler.pdf` (owner ruling 2026-11-14). Each run renders two
@@ -295,7 +316,7 @@ a refusal, either bad input or a failed enforced check (`stock_fit`,
 `turning_deflection`, `milling_deflection`, `cutting_speeds`, `tool_sizing`,
 `indexing`, `gauge_capability`, `lathe_holding`, `vise_holding`,
 `machine_capacity`, `drill_pecking`, or
-`hobby`'s missing setup picture). A missing plan fails only that part's task.
+`hobby`'s missing setup picture).
 A refusal is a finding about the plan or shop data; correct the source, not
 the check.
 
@@ -305,8 +326,8 @@ physical setup verification and machining approval are still required. See the
 
 ## NC programs (FreeCAD CAM)
 
-A part listed in `cad/scripts/_cam_programs.py:CAM_STEMS`, enrolled by the CNC
-migration, also has `<stem>/cam.py`, a CAM recipe that turns the plan's
+A part with `<stem>/cam.py` (`cad/scripts/_cam_programs.py:CAM_STEMS`, derived
+from the recipe files; each needs an enrolled plan) has a CAM recipe that turns the plan's
 machining setups into G-code with FreeCAD's CAM workbench, run headless.
 `build` and `release` run every enrolled part's `cam:<stem>` task
 (`build_bare` runs none); `uv run --frozen python -m doit cam:<stem>` runs
@@ -323,7 +344,7 @@ Its only task dependency is its own `package:features:<stem>` leaf. A release
 ships the programs, `cycle_times.json` and `manifest.json` (not the log) under
 the bundle's `nc/<stem>/`; a missing output, a program or `cycle_times.json`
 that differs from the manifest, or a manifest recording any input other than
-the current one (the feature bundle, `plan.toml`, `shop.toml`, the recipe or
+the current one (the feature bundle, `plan.toml`, each shop file, the recipe or
 the runtime: `_cam_programs.cam_inputs`) fails the cut.
 
 A recipe has five parts:
@@ -357,7 +378,7 @@ A recipe has five parts:
   dimension from the part's `features.toml`. Blank size, cutter tip depths,
   radial steps and jack positions come from the part's `plan.toml`
   (`[parameters]`, `milling_cuts`), and cutter diameters, speeds and feeds from
-  `shop.toml`. It also places the part in each setup's work frame and lays out
+  the shop directory. It also places the part in each setup's work frame and lays out
   the pass stations and depth levels. Values neither record carries are
   recipe constants with a stated source: the centre drill's geometry, the S2
   strap clearance, the approach clearance, the saw allowance past the blank

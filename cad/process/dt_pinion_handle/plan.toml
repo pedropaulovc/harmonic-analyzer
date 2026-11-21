@@ -7,7 +7,7 @@ part = "MHA-DT-15 Pinion Grip Cross Rod"
 revision = "placeholder"
 material = "low-carbon cold-finished steel rod, 1/4 in, ASTM A108 (1018, 1020 or 12L14)"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["1018-round-1-4"]
 
 [[tools]]

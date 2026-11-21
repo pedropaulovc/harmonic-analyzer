@@ -6,7 +6,7 @@ part = "MHA-MG-05 Magnifying Wheel"
 revision = "placeholder"
 material = "LOW-CARBON STEEL OR GRAY IRON"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "drill-60"

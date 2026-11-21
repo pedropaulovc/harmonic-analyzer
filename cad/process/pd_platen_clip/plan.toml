@@ -6,7 +6,7 @@ part = "MHA-PD-03 Platen Clip"
 revision = "placeholder"
 material = "C26000 half-hard brass sheet, 0.032 in"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "drill-32"

@@ -6,7 +6,7 @@
 > will it fight back.* Generic DFM checklists ("radius internal corners", "minimize setups") are
 > useless as bare bullets; every row below is attached to a **named feature with a real number** from
 > the build script. Audience + toolchain per §1/§11: period **brass + steel**. The shop's machines
-> are in `cad/process/shop.toml` (`machines.*`) and `cad/config/shop-equipment/`: the **PM-30MV
+> are in `cad/process/shop/` (`machines.*`) and `cad/config/shop-equipment/`: the **PM-30MV
 > mill**, CNC-converted (`cnc.pm-30mv`, `cnc.pm-30mv-controller`: FluidNC, sent from CNCjs), the
 > **PM-1127VF-LB lathe** (manual, with a DRO) and the **BS-0 dividing head**. Milled work is authored
 > for CNC (owner ruling 2026-11-17): each enrolled part's G-code is posted headless with FreeCAD CAM
@@ -976,7 +976,7 @@ tolerances. Useful-tail coverage beyond maximum reach is
 See [live vendor evidence](../references/mcmaster/README.md).
 
 This route is shop documentation, not a generated traveler. The part has no
-`cad/process/` plan and is not in `_process_plans.TRAVELER_STEMS`. No COM or
+`cad/process/` plan and is not enrolled (`_process_plans.TRAVELER_STEMS`). No COM or
 farm validation of the route is claimed here.
 
 ### Cylinder gear + cam, connecting rod (T1 — the 20 function generators)

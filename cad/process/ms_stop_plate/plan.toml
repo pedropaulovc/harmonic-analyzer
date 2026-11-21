@@ -6,7 +6,7 @@ part = "MHA-MS-03 Stop Plate"
 revision = "placeholder"
 material = "Brass"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "drill-49"

@@ -24,7 +24,7 @@ import export_features
 
 STEM = "mg_magnifying_clamp"
 PLAN = tomllib.loads(_process_plans.plan_path(STEM).read_text(encoding="utf-8"))
-SHOP = tomllib.loads(_process_plans.SHOP_PATH.read_text(encoding="utf-8"))
+SHOP = _process_plans.load_shop()
 RECIPE = _cam_programs.load_recipe(STEM)
 FEATURES = export_features.requirement_manifest(STEM)
 

@@ -2,7 +2,7 @@
 # and workholding a process plan names, that the prechips shop schema cannot
 # express. Each fact lives in exactly one
 # file: anything prechips can hold (machines, chucks, measuring ranges and
-# resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
+# resolutions, tools' sizing data, cutting settings) is in cad/process/shop/,
 # and no field here repeats one there. An object may appear in both files with
 # disjoint fields (gauges.dti, gauges.pin-gauges).
 #
@@ -54,7 +54,7 @@ note = "To buy: the #4-40 bottoming tap, tools.tap-4-40-bottoming. The archived 
 status = "on_hand"
 note = "Explicit on_hand preserves the pre-split record, which had no present key and so read as owned."
 
-# Thread length only; the tap's description and tap drill are cad/process/shop.toml
+# Thread length only; the tap's description and tap drill are cad/process/shop/
 # tools.basebar-tap. Tap America T/A54278 (drillsandcutters.com).
 [tools.taps-unc-hand.members.8-32-plug]
 flute_len_in = { value = 0.75, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, cutting length from point to flute or countersink boundary" } }
@@ -66,7 +66,7 @@ flute_len_in = { value = 0.75, measured = { status = "measured", by = "placehold
 # not measured: the 7.5 in first relayed was a guess (owner, 2026-11-17: "7.5
 # is a guess dead center had plenty of space with wrench"), so no length is
 # recorded; the tool setter measures it at M6. Its prechips description is
-# cad/process/shop.toml, same key.
+# cad/process/shop/, same key.
 [tools.mill-dead-centre-mt3]
 name = "MT3 dead centre with a straight end, held in the 3/4 in R8 collet"
 kind = "dead_centre"
@@ -149,7 +149,7 @@ dia_in = [0.0365, 0.0367]
 
 # The .3760 over reamer cad/scripts/_fit_ream_slide.py records as owned
 # (REAM_SLIDE: "cut by the owned over reamer (.2510, .3135, .3760)"); its
-# sizing data is cad/process/shop.toml tools.reamer-0376. The archived
+# sizing data is cad/process/shop/ tools.reamer-0376. The archived
 # inventory named the LMS 3066 over/under set only as a #1413 trial identity,
 # so no make or SKU is asserted here.
 [tools.reamer-0376]
@@ -176,7 +176,7 @@ note = "MHA-CH-06-TL-21 carrier L1, L2; TL-22/TL-32 5/16-18 hole under the pivot
 # The MHA-CH-13-TL-01 sub-plate's 1/4-20 hub hole (owner ruling 2026-11-17:
 # the hub screw is 1/4-20). Owned (owner, Pedro, 2026-11-17, relayed by
 # Main: "a 1/4-20 tap"); plug or taper unrecorded. Its tap drill (#7) is in
-# the owned 115-piece index; sizing data is cad/process/shop.toml
+# the owned 115-piece index; sizing data is cad/process/shop/
 # tools.jig-drill-7 and tools.jig-tap-1-4-20-plug.
 [tools.jig-tap-1-4-20-plug]
 name = "1/4-20 UNC hand tap"
@@ -191,7 +191,7 @@ note = "MHA-CH-13-TL-01 sub-plate: the hub screw's 1/4-20 hole through the count
 # MHA-CH-12. To purchase: not owned; no make, price or stock read. Cutting
 # band as tools.reamer-2550: the stated 0/+.0002, so it cuts .4000-.4002,
 # inside the bore's .4000-.4005 band (#3083 row 3); gauge the first hole
-# before the lot. Its sizing data is cad/process/shop.toml tools.reamer-4000.
+# before the lot. Its sizing data is cad/process/shop/ tools.reamer-4000.
 [tools.reamer-4000]
 name = ".4000 in HSS straight-flute chucking reamer"
 kind = "reamer"
@@ -304,7 +304,7 @@ cite = ["LittleMachineShop listing read 2026-11-17: SKU 5948, \"Reamers in this 
 # --- Placeholder process plans' reamers (quotes-2026-11-17-rev3.xlsx) -------
 # The chucking reamers the placeholder plans name, from the owner's quote
 # workbook (owner 2026-11-19), each to buy; description and diameter_mm are
-# cad/process/shop.toml under the same key.
+# cad/process/shop/ under the same key.
 [tools.reamer-0620]
 kind = "reamer"
 status = "to_order"

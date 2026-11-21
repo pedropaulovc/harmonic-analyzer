@@ -6,7 +6,7 @@ part = "MHA-CH-12 Rocker Hub"
 revision = "placeholder"
 material = "AISI 1018 cold-finish round"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["1018-round-1-2"]
 
 [[tools]]

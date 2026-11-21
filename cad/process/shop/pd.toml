@@ -1,0 +1,114 @@
+# Paper drive (pd_*) records of the HA prechips shop directory: the tools,
+# cutting settings and stock only pd_* plans name (or pd specs/tests read).
+# Machines, workholding, limits, gauges and every record more than one family
+# names are in common.toml, with the conventions every file follows; prechips
+# merges the directory's files by section and refuses a key defined twice.
+
+# --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
+# The tools the placeholder plans name (cad/process/<stem>/plan.toml with
+# revision = "placeholder", not in _process_plans.TRAVELER_STEMS), from the
+# owner's quote workbook quotes-2026-11-17-rev3.xlsx (owner 2026-11-19). The
+# comment on each header cites its workbook row: an Items item_id, a Drills
+# size or a Tap coverage thread. diameter_mm is the drill or reamer's nominal
+# size. Ownership is the inventory's status under the same key
+# (cad/config/shop-equipment/).
+[tools.drill-57]  # Drills #57
+description = "#57 (.0430 in) drill, 115-piece index"
+diameter_mm = 1.0922
+[tools.drill-56]  # Drills #56
+description = "#56 (.0465 in) drill, 115-piece index"
+diameter_mm = 1.1811
+[tools.drill-44]  # Drills #44
+description = "#44 (.0860 in) drill, 115-piece index"
+diameter_mm = 2.1844
+[tools.drill-40]  # Drills #40
+description = "#40 (.0980 in) drill, 115-piece index"
+diameter_mm = 2.4892
+[tools.drill-33]  # Drills #33
+description = "#33 (.1130 in) drill, 115-piece index"
+diameter_mm = 2.8702
+[tools.drill-1-8]  # Drills 1/8
+description = "1/8 (.1250 in) drill, 115-piece index"
+diameter_mm = 3.175
+[tools.drill-27]  # Drills #27
+description = "#27 (.1440 in) drill, 115-piece index"
+diameter_mm = 3.6576
+[tools.drill-13-32]  # Drills 13/32
+description = "13/32 (.4062 in) drill, 115-piece index"
+diameter_mm = 10.31875
+[tools.reamer-2490]  # B-reamer-.2490
+description = ".2490 in HSS chucking reamer"
+diameter_mm = 6.3246
+[tools.reamer-5010]  # B-reamer-.5010
+description = ".5010 in HSS chucking reamer"
+diameter_mm = 12.7254
+[tools.tap-4-40-spiral-point]  # Owner ruling 2026-11-20, #2427: MHA-PD-11 and MHA-PD-27 #4-40 THRU taps
+description = "Spiral-point (gun) hand tap #4-40 UNC, HSS"
+[tools.gear-cutters-32dp-20pa]  # F-gear-cutter-10-289-328
+description = "32DP 20PA involute gear cutter #8"
+[tools.straightedge]  # F-straightedge
+description = "Straightedge"
+
+# --- Drawing cross-check additions (2026-11-19) -------------------------------
+# Tools the v50 drawings call for that the quote workbook left out, from the
+# drawing cross-check of the placeholder plans (2026-11-19) and the owner's
+# rulings of that day. The comment cites the drawing callout or the inventory
+# record that holds the tool's ownership.
+[tools.chamfer-mill-330ch-1-4-90]  # inventory tools.chamfer-mill-330ch-1-4-90
+description = "330CH 1/4 in 90° included 2-flute chamfer mill"
+diameter_mm = 6.35
+[tools.drill-35]  # MHA-PD-27 4X ⌴ Ø.110 ↧ .469 counterbore
+description = "#35 (.1100 in) drill, 115-piece index"
+diameter_mm = 2.794
+[tools.endmill-carbide-3-64]  # MHA-PD-03 2X .04 SLIT, FULL R END
+description = "3/64 in square carbide end mill, 2- or 3-flute"
+diameter_mm = 1.190625
+[tools.form-tool-r180]  # MHA-PD-23 R.18 head dome
+description = "R.180 convex dome form tool"
+[tools.gauge-pin-0625]  # MHA-PD-10 .002 TIR TO A Ø.0625 PIN
+description = "Gauge pin .0625 in, class ZZ"
+[tools.knurl-straight-25tpi]  # MHA-PD-13 STRAIGHT KNURL 25 TPI
+description = "Lathe knurling holder with straight 25 TPI wheel"
+[tools.pd-latch-hook-former]  # MHA-PD-14 R3.13 ±.02, R.38 ±.02
+description = "Shop-made latch-hook former: R3.13 roll and R.38 tab form"
+[tools.pd-platen-clip-bow-former]  # MHA-PD-03 FORMED, 6X (R1.36), .06 BOW RISE
+description = "Shop-made platen-clip bow former: R1.36 crown, .06 rise"
+[tools.pd-rack-pinion-cutting-arbor]  # inventory fixtures.pd-rack-pinion-cutting-arbor
+description = "Shop-made work arbor with two backing discs for cutting the MHA-PD-06 teeth"
+[tools.reamer-0615]  # MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 +.0005/.0000 REAM (.163)
+description = ".0615 in HSS chucking reamer"
+diameter_mm = 1.5621
+[tools.reamer-0945]  # MHA-PD-19 2X Ø.0945 +.0005/.0000 REAM THRU
+description = ".0945 in HSS chucking reamer"
+diameter_mm = 2.4003
+[tools.reamer-1855]  # MHA-PD-20 Ø.1850 +.0010/+.0005 REAM THRU
+description = ".1855 in HSS chucking reamer"
+diameter_mm = 4.7117
+[tools.reamer-1920]  # MHA-PD-22 Ø.1920 +.0005/.0000 REAM THRU
+description = ".1920 in HSS chucking reamer"
+diameter_mm = 4.8768
+[tools.reamer-1940]  # MHA-PD-18 Ø.1940 +.001/.000 REAM THRU
+description = ".1940 in HSS chucking reamer"
+diameter_mm = 4.9276
+
+# --- Stock the process plans name (stock_refs) ---------------------------------
+# One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
+# prechips can check each plan's stock_refs. Description only: the ownership
+# status stays in the inventory under the same key (stock assignment audit,
+# owner 2026-11-19).
+[stock.1018-flat-3-8x1-2]
+description = "1018 cold-finish carbon steel, flat bar, 3/8 x 1/2 in"
+[stock.1018-ground-flat-5-16x1]
+description = "AISI 1018 cold-finished steel, precision ground, flat bar, 5/16 x 1 in"
+[stock.c260-h02-strip-032x2]
+description = "C26000 cartridge brass, H02 half hard, strip, .032 x 2 x 12 in"
+[stock.c360-flat-1-4x6]
+description = "C360 brass, flat bar, 1/4 x 6 in"
+[stock.c360-flat-1-8x4]
+description = "C36000 free-machining brass (360-H02, extruded), flat bar, 1/8 x 4 in"
+[stock.c360-round-1-1-8]
+description = "C36000 free-machining brass (360-H02, extruded), round bar, 1-1/8 in"
+[stock.c360-round-1-2]
+description = "C36000 free-machining brass (360-H02, extruded), round bar, 1/2 in"
+[stock.c360-round-5-8]
+description = "C36000 free-machining brass (360-H02, extruded), round bar, 5/8 in"

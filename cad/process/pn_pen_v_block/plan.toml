@@ -6,7 +6,7 @@ part = "MHA-PN-05 Pen V Block"
 revision = "placeholder"
 material = "C360 free-machining brass"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["c360-flat-3-4x1-1-4"]
 
 [[tools]]

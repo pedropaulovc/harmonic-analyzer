@@ -6,7 +6,7 @@ part = "MHA-PN-07 Pen Adjust Screw"
 revision = "placeholder"
 material = "C36000 free-machining brass rod"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["c360-round-1-4"]
 
 [[tools]]

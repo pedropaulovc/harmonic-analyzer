@@ -14,6 +14,7 @@ test_shop_file_readers_stay_outside_every_com_leaf).
 from __future__ import annotations
 
 import tomllib
+from collections.abc import Iterable
 from pathlib import Path
 
 from _paths import CAD_ROOT
@@ -31,14 +32,21 @@ def files(directory: Path = DIRECTORY) -> tuple[Path, ...]:
 
 
 def load(directory: Path = DIRECTORY) -> dict:
-    """Section -> record key -> record, merged over every file.
+    """Section -> record key -> record, merged over every file (``merge``)."""
+    return merge(files(directory))
+
+
+def merge(paths: Iterable[Path]) -> dict:
+    """Section -> record key -> record, merged over ``paths``; a record key in
+    two files is refused. The prechips shop directory merges the same way
+    (``_process_plans.load_shop``).
 
     A top-level value that is not a table of records (an array of tables such
     as ``[[stock]]``, or a scalar) is refused, naming its file and section.
     """
     merged: dict[str, dict] = {}
     found_in: dict[tuple[str, str], Path] = {}
-    for path in files(directory):
+    for path in paths:
         document = tomllib.loads(path.read_text(encoding="utf-8"))
         for section, records in document.items():
             if not isinstance(records, dict):

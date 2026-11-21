@@ -6,7 +6,7 @@ part = "MHA-DT-35 Crank Handle Butt Cup"
 revision = "placeholder"
 material = "AISI 12L14 or 1018 cold-finished steel rod, 1/2 in"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["1018-round-1-2"]
 
 [[tools]]

@@ -6,7 +6,7 @@ part = "MHA-DT-37 Cone Tip Gear"
 revision = "placeholder"
 material = "C67500 manganese bronze"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["c675-round-5-8"]
 
 [[tools]]

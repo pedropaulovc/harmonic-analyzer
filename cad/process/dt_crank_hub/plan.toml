@@ -6,7 +6,7 @@ part = "MHA-DT-31 Crank Hub"
 revision = "placeholder"
 material = "LOW-CARBON STEEL, E.G. 1018 CF"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["1018-round-1"]
 
 [[tools]]

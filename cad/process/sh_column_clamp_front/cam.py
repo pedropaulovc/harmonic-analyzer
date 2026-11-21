@@ -7,7 +7,7 @@ checks the posted G-code against :func:`expectations`. The half's sizes come
 from the feature export (its width, height and depth, both ear holes and the
 bore they straddle); the blank, the skims, face levels, spots, pecks and the
 riser from ``plan.toml`` ``[parameters]`` and ``milling_cuts``; cutter
-diameters, speeds and feeds from ``shop.toml`` and the plan's authored drill
+diameters, speeds and feeds from the shop (``shop/``) and the plan's authored drill
 settings. Every path is written here (``rt.custom``): straight lines a recipe
 can state exactly. Typed here, because neither record carries them: the #2
 centre drill's catalogue geometry (it sets the spot depth), the twist drills'

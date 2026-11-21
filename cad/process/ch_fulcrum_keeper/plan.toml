@@ -6,7 +6,7 @@ part = "MHA-CH-07 Fulcrum Keeper"
 revision = "placeholder"
 material = "AISI 1018 cold-finished steel bar"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["1018-square-3-4"]
 
 [[tools]]
