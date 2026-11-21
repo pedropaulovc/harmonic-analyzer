@@ -801,7 +801,7 @@ diameter_mm = 5.2197
 [tools.drill-3]  # Drills #3
 description = "#3 (.2130 in) drill, 115-piece index"
 diameter_mm = 5.4102
-[tools.drill-1]  # Drills #1
+[tools.drill-1]  # Drills #1; MHA-DT-03-TL-08 Ø.228 DRILL THRU (drawing callout 2026-11-20, #2356)
 description = "#1 (.2280 in) drill, 115-piece index"
 diameter_mm = 5.7912
 [tools.drill-b]  # Drills B
@@ -1020,6 +1020,8 @@ description = "#51 (.0670 in) taper-length HSS drill, 2 in flute, 3-3/4 in overa
 diameter_mm = 1.7018
 [tools.dt-cone-gear-cutting-arbor]  # MHA-DT-03 TOOTH CUTTING SETUP .002 TIR TO FINISHED BORE
 description = "Shop-made keyed cutting arbor kit for the cone gears: MHA-DT-03-TL-03 arbor, TL-04 backing collars, TL-06 key and arbor nut"
+[tools.dt-cone-gear-round-arbor]  # MHA-DT-03 T024 TOOTH CUTTING SETUP; owner ruling 2026-11-20 (#2356, Option 2)
+description = "Shop-made round cutting arbor kit for T024: MHA-DT-03-TL-07 arbor, TL-08 backing collar and a McMaster 90480A009 #8-32 hex nut"
 [tools.dt-cone-gear-index-plate]  # MHA-DT-03 tooth indexing
 description = "Shop-made dividing-head index plate MHA-DT-03-TL-01 for the cone gears"
 [tools.dt-cone-tip-cutter-bar]  # MHA-DT-37 holder for the form cutter
@@ -1128,7 +1130,7 @@ description = "PM-1127VF-LB steady rest"
 description = "#10-32 UNF bottoming pulley tap, 6 in overall, 4 flutes (Regal 015326AS)"
 [tools.telescoping-gauges-starrett-s579gz]  # inventory gauges.telescoping-gauges-starrett-s579gz
 description = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
-[tools.threading-bits-lms-6685]  # MHA-DT-03-TL-03 1/4-28 UNF single-pointed (owner 2026-11-19); MHA-PD-08 #8-32 UNC single-pointed (owner 2026-11-19); MHA-MG-03 1/4-20 UNC single-pointed (owner 2026-11-19)
+[tools.threading-bits-lms-6685]  # MHA-DT-03-TL-03 1/4-28 UNF single-pointed (owner 2026-11-19); MHA-PD-08 #8-32 UNC single-pointed (owner 2026-11-19); MHA-MG-03 1/4-20 UNC single-pointed (owner 2026-11-19); MHA-DT-03-TL-07 #8-32 UNC single-pointed (drawing callout 2026-11-20, #2356)
 description = "5/16 in HSS threading tool bit, set of two (LMS 6685)"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------

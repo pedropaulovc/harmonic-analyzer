@@ -597,6 +597,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="dt_cone_gear_tl_round_arbor",
+        part="dt_cone_gear_tl_round_arbor",
+        artifact_stem="dt-cone-gear-tl-round-arbor",
+        script_name="draw_dt_cone_gear_tl_round_arbor.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="dt_cone_gear_tl_round_arbor_collar",
+        part="dt_cone_gear_tl_round_arbor_collar",
+        artifact_stem="dt-cone-gear-tl-round-arbor-collar",
+        script_name="draw_dt_cone_gear_tl_round_arbor_collar.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="dt_cylinder_gear_tl_cam_fixture",
         part="dt_cylinder_gear_tl_cam_fixture",
         artifact_stem="dt-cylinder-gear-tl-cam-fixture",

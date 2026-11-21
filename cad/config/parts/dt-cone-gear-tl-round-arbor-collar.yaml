@@ -1,0 +1,14 @@
+dt-cone-gear-tl-round-arbor-collar:
+  title: Round Cutting Arbor Collar
+  # Shop tooling: the parent MHA-DT-03 Number plus -TL-nn (subsystem-identities.md).
+  # Issue #2356 (owner ruling 2026-11-20, Option 2): the one backing collar
+  # between T024 and the #8-32 nut on the round arbor MHA-DT-03-TL-07's pilot,
+  # under T024's root (dt_cone_gear_tl_round_arbor_spec).
+  number: MHA-DT-03-TL-08
+  material: LOW-CARBON STEEL, E.G. 12L14 CF
+  material_specification: low-carbon cold-finished steel round, 3/8 in, ASTM A108 (12L14 or 1018)
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: "face to length from 3/8 in round bar left at stock diameter; drill the bore through with a #1 (.228) drill; break edges"

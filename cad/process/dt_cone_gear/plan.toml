@@ -80,6 +80,11 @@ name = "Keyed cutting arbor kit (TL-03/04/06)"
 ref = "dt-cone-gear-cutting-arbor"  # drawing cross-check 2026-11-19: TOOTH CUTTING SETUP .002 TIR TO FINISHED BORE
 
 [[tools]]
+id = "dt-cone-gear-round-arbor"
+name = "Round cutting arbor kit (TL-07/08, #8-32 nut)"
+ref = "dt-cone-gear-round-arbor"  # owner ruling 2026-11-20 (#2356, Option 2): T024 TOOTH CUTTING SETUP on its round bore
+
+[[tools]]
 id = "dt-cone-gear-index-plate"
 name = "Index plate MHA-DT-03-TL-01"
 ref = "dt-cone-gear-index-plate"  # drawing cross-check 2026-11-19: tooth indexing

@@ -88,7 +88,7 @@ its first-root position; no second general note restates that location.
   | family | qty | repeat risk and route |
   |---|---|---|
   | `dt-cylinder-gear` (+ integral cam) | 20 | 120 teeth + eccentric cam + 0.4 mm index notch, all co-phased +Y — hand-repeating 20× scatters the phase. Bore and OD first, then teeth and notch together on an arbor with the stock #2 cutter on the BS-0, then the cam on the lathe fixture MHA-DT-12-TL-01 (fitting sheet MHA-DT-12-TL-00): the throw is set on its stub by indicator and its clock pin, in the notched tooth space, clocks the phase, once for all 20 (see [Cylinder-gear cam](#cylinder-gear-cam)). The notch needs a .014 in screw-slotting saw that is not yet owned (`cad/config/shop-equipment/tools-cutting.toml` `tools.cylinder-notch-saw`, [#2364](https://github.com/pedropaulovc/harmonic-analyzer/issues/2364)) |
-  | `dt-cone-gear` | 19 | involute teeth cut with stock 48DP PA20 range cutters indexed on the BS-0 dividing head; T006 (`dt-cone-tip-gear`) alone needs a special cutter (see [Cutter plan](#cutter-plan)); wire-EDM = outsource alt. T030–T120 are bored and broached first, then cut on the keyed arbor MHA-DT-03-TL-03 (fitting sheet MHA-DT-03-TL-05), which clocks each blank by its keyway. The cutters, cutter arbors and broach are recorded to buy, not owned (`cad/config/shop-equipment/tools-gear-cutting.toml`, "gear cutting kit"; owner ruling 2026-11-14 on [#2356](https://github.com/pedropaulovc/harmonic-analyzer/issues/2356): route A, make every gear as designed, so the kit is to buy) |
+  | `dt-cone-gear` | 19 | involute teeth cut with stock 48DP PA20 range cutters indexed on the BS-0 dividing head; T006 (`dt-cone-tip-gear`) alone needs a special cutter (see [Cutter plan](#cutter-plan)); wire-EDM = outsource alt. T030–T120 are bored and broached first, then cut on the keyed arbor MHA-DT-03-TL-03 (fitting sheet MHA-DT-03-TL-05), which clocks each blank by its keyway; T024 is reamed round first, then cut on the round arbor MHA-DT-03-TL-07 (see [T024 on the round arbor](#t024-on-the-round-arbor)). The cutters, cutter arbors and broach are recorded to buy, not owned (`cad/config/shop-equipment/tools-gear-cutting.toml`, "gear cutting kit"; owner ruling 2026-11-14 on [#2356](https://github.com/pedropaulovc/harmonic-analyzer/issues/2356): route A, make every gear as designed, so the kit is to buy) |
   | `ch-rocker-arm` / `ch-channel-lever` hubs | 20 each | the `ch-channel-lever` hubs stack face to face and set the 7.62 (.300) channel pitch; the `ch-rocker-arm` hubs are .278 ±.002, shorter than the pitch, so each arm floats on the pivot shaft and is located along the bank by its own connecting rod (owner ruling 2026-11-18, [#3114](https://github.com/pedropaulovc/harmonic-analyzer/issues/3114)); the 19 `pivot-bushing` and 19 `lever-bushing` spacers are retired. Hub width consistency across each set is the point ([#2344](https://github.com/pedropaulovc/harmonic-analyzer/issues/2344)) |
   | `ch-rocker-arm` | 20 | strap with a pressed hub; the R800/R816 arcs are the strap's outline, cut by the strap's CNC programs (`cad/process/ch_rocker_strap/`), the first part routed for the CNC mill; the oblique jig MHA-CH-06-TL-00 and its manual route were deleted (2026-11-17) |
   | `ch-connecting-rod` | 20 | flat outline from the bought 1/4 x 2 1018 CF flat, slotted fork; the ring and shank come off both faces equally inside the blank's uncut edges, released and reseated before the finish passes and set straight by hand to their bands (registry `process:`, [#2340](https://github.com/pedropaulovc/harmonic-analyzer/issues/2340)); the ring outline's route is **not selected** (no CNC program yet) |
@@ -1262,6 +1262,18 @@ its step, from the key's clock through the blank's mount, which leaves the blank
 clear of the jaws for the cutter to run out; indicate the seat within the sheet's setup allowance
 before cutting. The cone gears add the tailstock centre in the arbor's threaded end once the nut is
 tight; for the 64T the head is tilted and there is no tail centre.
+
+### T024 on the round arbor
+
+T024 is reamed round Ø.250 for MHA-DT-04's land 2, so the keyed arbor cannot carry it: its 1/4-28
+nut and smallest collar stand over T024's root. It is cut on the round arbor MHA-DT-03-TL-07 with
+its one Ø.38 collar MHA-DT-03-TL-08 and a purchased #8-32 hex nut (McMaster 90480A009), each under
+T024's root (owner ruling 2026-11-20 on
+[#2356](https://github.com/pedropaulovc/harmonic-analyzer/issues/2356#issuecomment-7051703304),
+Option 2). The round bore takes no clock: index from wherever the first tooth lands. Grip the
+arbor's Ø.62 end in the head's chuck against its step, indicate the seat within the sheet's setup
+allowance and feed toward the collar. There is no tail centre: the overhang is the owner-accepted
+compliance.
 
 ### Cylinder-gear cam
 
