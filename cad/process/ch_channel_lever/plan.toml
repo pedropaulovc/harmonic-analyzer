@@ -455,7 +455,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "First load only, still clamped: try the bores with the .256 plus pin and the .257 minus pin of the Class ZZ pin-gauge sets (to buy)."
+instruction = "Every load, still clamped: try each of the four bores with the .256 plus pin and the .257 minus pin of the Class ZZ pin-gauge sets (to buy)."
 inspection = "Bore Ø{{cad.fulcrum_bore_dia_min_in:.4dot}}–{{cad.fulcrum_bore_dia_max_in:.4dot}}: the .256 pin enters (GO); the .257 pin does not (NO-GO). A smooth reamed wall (Ra {{cad.fulcrum_bore_finish_ra_uin:d}} µin), no chatter rings. GO fails, NO-GO enters, or rings: stop and tell the owner."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.fulcrum_bore_dia_band_mm}}" }]
 
