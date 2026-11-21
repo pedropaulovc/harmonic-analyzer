@@ -12,9 +12,11 @@ import _drawing_leaders
 import ch_connecting_rod_notes
 import ch_connecting_rod_spec
 import draw_ch_connecting_rod as drawing
+import export_features
 import build_ch_connecting_rod as rod
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gtol_face import FaceGeometry
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 
 
@@ -788,3 +790,120 @@ def test_the_ring_and_shank_stay_flat_by_their_route_not_by_a_frame() -> None:
     assert (near / 25.4, far / 25.4) == pytest.approx((0.055, 0.065))
     for per_face in (near, far):
         assert f"{per_face / 25.4:.3f}".lstrip("0") in process
+
+
+_FEATURE_KINDS = {
+    "datum_face": "face",
+    "fork_far_face": "face",
+    "ring_near_face": "face",
+    "ring_far_face": "face",
+    "shank_near_face": "face",
+    "shank_far_face": "face",
+    "shank_left_flank": "face",
+    "shank_right_flank": "face",
+    "ring": "boss",
+    "fork": "profile",
+    "fork_slot": "slot",
+    "strap_bore": "hole",
+    "pin_hole": "hole",
+}
+
+
+def _in(value_in: float) -> float:
+    return value_in * 25.4
+
+
+def _plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+    point = tuple(value * offset_mm / 1000 for value in normal)
+    return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+
+def _cylinder(dia_mm: float, y_mm: float) -> FaceGeometry:
+    r = dia_mm / 2
+    box = tuple(v / 1000 for v in (-r, y_mm - r, -3.0, r, y_mm + r, 3.0))
+    return FaceGeometry(None, 4002, (0.0, y_mm / 1000, 0.0, 0.0, 0.0, 1.0, r / 1000), None, box)
+
+
+def test_the_rod_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    spec = ch_connecting_rod_spec
+    assert "ch_connecting_rod" in export_features.SUPPORTED_PARTS
+    manifest = export_features.requirement_manifest("ch_connecting_rod")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == _FEATURE_KINDS
+    assert manifest["construction"] == "one_piece"
+    selectors = export_features.feature_selectors("ch_connecting_rod")
+    datum = -spec.FORK_THICKNESS / 2
+    ring_near = datum + spec.RING_FACE_NEAR
+    shank_near = datum + spec.SHANK_FACE_NEAR
+    slot = spec.FORK_SLOT_WIDTH / 2
+    expected = {
+        "datum_face": [_plane((0.0, 0.0, -1.0), -datum)],
+        "fork_far_face": [_plane((0.0, 0.0, 1.0), -datum)],
+        "ring_near_face": [_plane((0.0, 0.0, -1.0), -ring_near)],
+        "ring_far_face": [_plane((0.0, 0.0, 1.0), ring_near + spec.RING_THICKNESS)],
+        "shank_near_face": [_plane((0.0, 0.0, -1.0), -shank_near)],
+        "shank_far_face": [
+            _plane((0.0, 0.0, 1.0), shank_near + spec.SHANK_THICKNESS)
+        ],
+        "shank_left_flank": [_plane((-1.0, 0.0, 0.0), spec.SHANK_WIDTH / 2)],
+        "shank_right_flank": [_plane((1.0, 0.0, 0.0), spec.SHANK_WIDTH / 2)],
+        "ring": [_cylinder(spec.RING_OUTER_DIA, 0.0)],
+        "fork": [
+            _plane((1.0, 0.0, 0.0), spec.FORK_WIDTH / 2),
+            _plane((-1.0, 0.0, 0.0), spec.FORK_WIDTH / 2),
+            _cylinder(spec.FORK_WIDTH, spec.CENTER_DISTANCE),
+            _plane((0.0, -1.0, 0.0), -spec.FORK_BASE_Y),
+        ],
+        "fork_slot": [
+            _plane((0.0, 0.0, 1.0), -slot),
+            _plane((0.0, 0.0, -1.0), -slot),
+            _plane((0.0, 1.0, 0.0), spec.FORK_CROTCH_Y),
+        ],
+        "strap_bore": [_cylinder(spec.RING_BORE_DIA, 0.0)],
+        "pin_hole": [_cylinder(spec.PIN_HOLE_DIA, spec.CENTER_DISTANCE)],
+    }
+    for name, faces in expected.items():
+        for face in faces:
+            owners = [
+                owner
+                for owner, specs in selectors.items()
+                if any(selector.matches(face) for selector in specs)
+            ]
+            assert owners == [name], name
+    # The model's R0.5 inside-corner fillets belong to no feature.
+    fillet = _cylinder(2 * spec.INSIDE_CORNER_R, spec.FORK_CROTCH_Y)
+    assert not any(
+        selector.matches(fillet) for specs in selectors.values() for selector in specs
+    )
+
+
+def test_rod_feature_bands_are_the_printed_ones() -> None:
+    features = export_features.requirement_manifest("ch_connecting_rod")["features"]
+    assert features["ring_near_face"]["offset"] == pytest.approx(
+        [_in(0.033), _in(0.037)]
+    )
+    assert features["ring_far_face"]["thickness"] == pytest.approx(
+        [_in(0.168), _in(0.172)]
+    )
+    assert features["shank_near_face"]["offset"] == pytest.approx([_in(0.04), _in(0.06)])
+    assert features["shank_far_face"]["thickness"] == pytest.approx(
+        [_in(0.12), _in(0.14)]
+    )
+    assert features["fork_far_face"]["dimension_type"] == "reference"
+    assert features["shank_right_flank"]["width"] == pytest.approx([_in(0.31), _in(0.33)])
+    assert features["shank_left_flank"]["datum"] == "B"
+    assert features["ring"]["dia"] == pytest.approx([_in(1.60), _in(1.62)])
+    fork, slot = features["fork"], features["fork_slot"]
+    assert fork["width"] == pytest.approx([_in(0.38), _in(0.40)])
+    assert fork["boss_length"] == pytest.approx([_in(0.70), _in(0.72)])
+    assert slot["width"] == pytest.approx([_in(0.104), _in(0.108)])
+    for side in ("near_tine", "far_tine"):
+        assert slot[side] == pytest.approx([_in(0.065), _in(0.069)])
+    assert slot["depth"] == pytest.approx([_in(0.57), _in(0.59)])
+    assert slot["corner_radius_max"] == pytest.approx(_in(0.040))
+    bore, pin = features["strap_bore"], features["pin_hole"]
+    assert bore["dia"] == pytest.approx([_in(1.213), _in(1.216)])
+    assert bore["datum"] == "A" and bore["finish_ra"] == pytest.approx(1.6)
+    assert pin["dia"] == pytest.approx([_in(0.0775), _in(0.0779)])
+    assert pin["position_dia"] == pytest.approx(_in(0.008))
+    assert pin["callout"] == drawing.FRONT_CALLOUTS["PinHoleDia"]

@@ -132,6 +132,23 @@ resolution_mm = 0.0254
 range_mm = [0.0, 584.2]
 resolution_mm = 0.005
 
+# The owned Mitutoyo 81-piece inch gauge block set (cad/config/shop-equipment/
+# gauges.gauge-blocks-mitutoyo), read as go/no-go blocks across a slot. Range:
+# the 81-piece inch set's smallest and largest blocks, .050 and 4.000 in
+# (1.27-101.6 mm); resolution: its .1001-.1009 series, .0001 in = .00254 mm.
+[gauges.gauge-blocks-mitutoyo]
+range_mm = [1.27, 101.6]
+resolution_mm = 0.00254
+
+# The 48 in steel rule (cad/config/shop-equipment/ tools.steel-rule-48),
+# to buy: the only length gauge on record past the 6 in calipers. A plan
+# that reads it needs its 1/100 in graduation (MHA-CH-01's 31.82 ± .01
+# length), a requirement of the purchase: 48 in = 1219.2 mm, .01 in =
+# .254 mm.
+[gauges.steel-rule-48]
+range_mm = [0.0, 1219.2]
+resolution_mm = 0.254
+
 [limits]
 # HA: shop-policy numbers.stickout_ld_max 3.0.
 stickout_ld_max = 3.0

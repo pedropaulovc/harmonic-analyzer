@@ -301,6 +301,16 @@ description = "#1-72 UNF plug hand tap (OSG 1010700)"
 [tools.form-tool-r160]  # D-form-tool-R160
 description = "R.160 convex-dome form tool"
 
+# --- MHA-CH-01/-03 notches and slot (cad/process/ch_amplitude_bar, ch_connecting_rod) ---
+# The owned HSS slitting saw (cad/config/shop-equipment/
+# tools.slitting-saw-2-75-064, McMaster 3062A21): ROOTS R.015 MAX and the
+# fork slot's inside corners need its sharp corners, run horizontally on
+# the R8 1 in arbor (tools.gear-cutter-arbor-1, to buy). diameter_mm: its
+# 2-3/4 in × 25.4.
+[tools.slitting-saw-2-75-064]
+description = "HSS slitting saw, 2-3/4 in diameter, .064 in thick, 72 teeth (McMaster 3062A21)"
+diameter_mm = 69.85
+
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
 # prechips can check each plan's stock_refs. Description only: the ownership

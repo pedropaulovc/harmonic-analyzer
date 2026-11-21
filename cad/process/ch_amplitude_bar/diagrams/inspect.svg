@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 5: the finished bar's two ends, both seen square to the F face (the L and R faces edge-on, top and bottom). The notches show as open slots; the pin hole, its axis L to R, shows hidden (dashed) through both cheeks. Styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 260" width="640" height="260" font-family="sans-serif" font-size="12">
+<rect class="paper" width="640" height="260"/>
+<text class="label" x="20" y="20">Foot end, seen on the B face (L face down)</text>
+<rect class="part-kept" x="20" y="40" width="240" height="60"/>
+<rect class="paper" x="20" y="58" width="22" height="26"/>
+<text class="label" x="20" y="116">L face</text>
+<path class="leader" d="M70 140 L36 80"/>
+<text class="label" x="74" y="144">foot notch: depth {{cad.foot_notch_depth_min_in:.3dot}}–{{cad.foot_notch_depth_max_in:.3dot}},</text>
+<text class="label" x="74" y="160">width {{cad.foot_notch_width_min_in:.3dot}}–{{cad.foot_notch_width_max_in:.3dot}},</text>
+<text class="label" x="74" y="176">ledge {{cad.foot_notch_ledge_min_in:.3dot}}–{{cad.foot_notch_ledge_max_in:.3dot}} from L</text>
+<text class="label" x="340" y="20">Top end, seen on the F face (R face down)</text>
+<rect class="part-kept" x="340" y="40" width="280" height="60"/>
+<rect class="paper" x="478" y="54" width="142" height="30"/>
+<line class="leader" stroke-dasharray="4 3" x1="555" y1="40" x2="555" y2="54"/>
+<line class="leader" stroke-dasharray="4 3" x1="565" y1="40" x2="565" y2="54"/>
+<line class="leader" stroke-dasharray="4 3" x1="555" y1="84" x2="565" y2="84"/>
+<line class="leader" stroke-dasharray="4 3" x1="555" y1="84" x2="555" y2="100"/>
+<line class="leader" stroke-dasharray="4 3" x1="565" y1="84" x2="565" y2="100"/>
+<line class="centre-line" x1="560" y1="30" x2="560" y2="110"/>
+<text class="label" x="340" y="116">R face</text>
+<path class="leader" d="M430 128 L500 70"/>
+<text class="label" x="340" y="144">top notch: depth {{cad.top_notch_depth_min_in:.2f}}–{{cad.top_notch_depth_max_in:.2f}},</text>
+<text class="label" x="340" y="160">width {{cad.top_notch_width_min_in:.3dot}}–{{cad.top_notch_width_max_in:.3dot}}, ledge {{cad.top_notch_ledge_min_in:.3dot}}–{{cad.top_notch_ledge_max_in:.3dot}} from R</text>
+<path class="leader" d="M600 186 L566 96"/>
+<text class="label" x="340" y="200">pin hole, hidden, L to R through both cheeks:</text>
+<text class="label" x="340" y="216">{{cad.top_pin_hole_drop_min_in:.2f}}–{{cad.top_pin_hole_drop_max_in:.2f}} from the top end</text>
+<text class="label" x="20" y="248">Length {{cad.top_end_length_min_in:.2f}}–{{cad.top_end_length_max_in:.2f}}, foot end to top end</text>
+</svg>
