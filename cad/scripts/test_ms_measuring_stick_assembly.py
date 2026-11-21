@@ -997,8 +997,6 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     monkeypatch.setattr(stick, "SCALE_START_X", zero)
     monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DEPTH", float(drill_depth) * 25.4)
     monkeypatch.setattr(stop, "PLATE_TAP_THREAD_DEPTH", float(thread_depth) * 25.4)
-    monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DIA", 0.070 * 25.4)
-    monkeypatch.setattr(stop, "PLATE_CLEARANCE_DIA", 0.096 * 25.4)
     tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
     namespace = {"__name__": "mutated_ms_assembly_spec"}
     exec(compile(ast.fix_missing_locations(tree), spec.__file__, "exec"), namespace)
@@ -1023,13 +1021,16 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     # Option C: whatever mark the saved pose uses, no step or note prints it.
     for text in (*changed.ASSEMBLY_STEPS, changed.EXAMPLE_POSE_NOTE):
         assert f"{mark:.1f}" not in text and "±" not in text
-    # The pair arrives match-drilled, opened and tapped by its part travelers:
-    # no step drills, opens or taps it, and none restates a depth or size.
+    # The pair arrives match-drilled to its part sheets: no step drills, opens
+    # or taps it, or restates a depth; a pair that fails its screw check stops
+    # for rework (rule 22: the check and its remedy are separate steps).
     for text in changed.ASSEMBLY_STEPS:
         assert drill_depth not in text and thread_depth not in text
-        assert "Ø.070" not in text and "Ø.096" not in text
-        assert "DRILL Ø" not in text and "BOTTOMING TAP" not in text
-    assert changed.ASSEMBLY_STEPS[0].startswith("1. ITEM 1 BLOCK AND ITEM 2 PLATE ARRIVE")
+        assert "DRILL" not in text.replace("MATCH-DRILLED", "")
+        assert "BOTTOMING TAP" not in text
+    check, remedy = changed.ASSEMBLY_STEPS[2:4]
+    assert check.startswith("3. CHECK: ") and "ENTERS FREELY" in check
+    assert remedy.startswith("4. IF ONE DOES NOT, STOP") and "REWORK" in remedy
     assert changed.PLATE_SCREW_TAP_RESERVE == pytest.approx(
         float(thread_depth) * 25.4 - changed.PLATE_SCREW_ENGAGED
     )
