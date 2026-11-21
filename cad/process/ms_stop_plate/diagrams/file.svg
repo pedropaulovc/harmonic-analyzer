@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 2: the plate filed to its outline, seating face up: locating edge and end first, then far end, roof edge and the two roof chamfers. Hand-drawn at 300 px/in; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 330" width="560" height="330" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <text class="title" x="12" y="20">Setup 2: file to size (outer face up, as the drawing)</text>
+  <!-- Blank outline arriving, .90 x .62. -->
+  <rect class="part-arriving" x="132" y="74" width="270" height="186"/>
+  <!-- Finished outline: .84 x .56 with .04 x 45 roof chamfers, locating end at the right, locating edge at the bottom (the sheet's back view). -->
+  <path class="part-kept" d="M144 260 L396 260 L396 104 L384 92 L156 92 L144 104 Z"/>
+  <line class="active-face" x1="396" y1="260" x2="396" y2="104"/>
+  <line class="active-face" x1="144" y1="260" x2="396" y2="260"/>
+  <line class="datum" x1="402" y1="260" x2="402" y2="104"/>
+  <line class="datum" x1="144" y1="266" x2="396" y2="266"/>
+  <text class="datum-label" x="410" y="190">LOCATING END</text>
+  <text class="datum-label" x="196" y="284">LOCATING EDGE</text>
+  <text class="label" x="196" y="230" font-size="12" font-style="italic">L on the seating face (underside)</text>
+  <!-- Dimensions. -->
+  <path class="dims" d="M144 60 L396 60"/>
+  <line class="leader" x1="144" y1="54" x2="144" y2="88"/>
+  <line class="leader" x1="396" y1="54" x2="396" y2="88"/>
+  <text class="label" x="240" y="52">{{cad.far_end_length_in:.2f}} ±.01</text>
+  <path class="dims" d="M110 104 L110 260"/>
+  <line class="leader" x1="104" y1="92" x2="140" y2="92"/>
+  <line class="leader" x1="104" y1="260" x2="140" y2="260"/>
+  <text class="label" x="30" y="186">{{cad.roof_edge_height_in:.2f}} ±.01</text>
+  <path class="leader" d="M384 96 L460 70"/>
+  <text class="label" x="464" y="70">2X {{cad.roof_chamfers_size_in:.2f}} × 45°</text>
+  <text class="label" x="40" y="304">1 locating edge straight · 2 locating end square to it</text><text class="label" x="40" y="320">3 far end and roof edge to size · 4 roof chamfers</text>
+</svg>

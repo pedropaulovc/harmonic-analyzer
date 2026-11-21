@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 6: the finished plate held by its edges; both faces, every edge, the chamfers and both holes take the brass black. Hand-drawn at 300 px/in; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 300" width="560" height="300" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <text class="title" x="12" y="20">Setup 6: blacken (once the Brass Black is bought)</text>
+  <path class="part-kept" d="M144 240 L396 240 L396 84 L384 72 L156 72 L144 84 Z"/>
+  <path class="active-face" d="M144 240 L396 240 L396 84 L384 72 L156 72 L144 84 Z"/>
+  <circle class="holes" cx="351" cy="192" r="14.4"/>
+  <circle class="holes" cx="189" cy="192" r="14.4"/>
+  <circle class="active-face" cx="351" cy="192" r="14.4"/>
+  <circle class="active-face" cx="189" cy="192" r="14.4"/>
+  <text class="label" x="200" y="140">both faces, every edge,</text><text class="label" x="200" y="158">the chamfers and both holes</text>
+  <text class="label" x="150" y="284">hold it by its edges after the degrease; gloves and glasses on</text>
+</svg>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 3: looking along the jaws (+X into the page): the MHA-MS-02 block mating face up on two 1 in parallels, this plate on it, both gripped across their .84 length, locating ends on the fixed jaw; the #49 pilot drilled through the plate into the block. Hand-drawn at 200 px/in; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 380" width="600" height="380" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <text class="title" x="12" y="20">Setup 3: pair pilot, MS01_pair_pilot (looking along the jaws)</text>
+  <!-- Vise bed. -->
+  <rect class="fixture-vise" x="60" y="320" width="480" height="30"/>
+  <!-- Jaws: moving at the left, fixed at the right, tops 6.3 mm (.25) above the plate. -->
+  <rect class="clamp" x="60" y="140" width="110" height="180"/>
+  <rect class="clamp" x="428" y="140" width="112" height="180"/>
+  <text class="label-on-clamp" x="74" y="300">moving jaw</text>
+  <text class="label-on-clamp" x="446" y="300">fixed jaw</text>
+  <!-- Parallels (1 in, 1/8 thick) against each jaw. -->
+  <rect class="fixture-support" x="170" y="220" width="25" height="100"/>
+  <rect class="fixture-support" x="403" y="220" width="25" height="100"/>
+  <!-- Block: .84 across the jaws (168 px), .48 deep (96 px). -->
+  <rect class="part-rest" x="170" y="132" width="258" height="88"/>
+  <text class="label-halo" x="306" y="186">MHA-MS-02</text>
+  <!-- Plate on it, .040 (8 px). -->
+  <rect class="part-kept" x="170" y="124" width="258" height="8"/>
+  <!-- Feeler leaves between the moving jaw and the shorter part, as needed. -->
+  <path class="leader" d="M172 128 L120 100"/>
+  <text class="label" x="20" y="96">feeler leaves if the lengths differ</text>
+  <!-- Pilots: .150 and .690 from the locating end (fixed jaw), into the block .300. -->
+  <rect class="part-removed" x="395" y="124" width="14" height="74"/>
+  <rect class="part-removed" x="287" y="124" width="14" height="74"/>
+  <path class="part-removed" d="M395 198 L402 206 L409 198 Z"/>
+  <path class="part-removed" d="M287 198 L294 206 L301 198 Z"/>
+  <!-- The #49 over the near-end hole. -->
+  <rect class="cutter" x="395" y="40" width="14" height="80"/>
+  <line class="arrow" x1="380" y1="60" x2="380" y2="112"/>
+  <text class="label" x="300" y="56">#49, set 2800</text>
+  <!-- Datums. -->
+  <line class="datum" x1="428" y1="110" x2="428" y2="136"/>
+  <text class="datum-label" x="434" y="122">Y0 fixed jaw = locating ends</text>
+  <line class="datum" x1="160" y1="124" x2="178" y2="124"/>
+  <text class="datum-label" x="40" y="128">Z0 plate top</text>
+  <path class="dims" d="M281 132 L281 198"/>
+  <text class="label" x="200" y="152">pilots .300</text><text class="label" x="200" y="168">below the</text><text class="label" x="200" y="184">block face</text>
+  <text class="label" x="200" y="370">locating edges flushed against a 1-2-3 block (X0, the near side)</text>
+</svg>

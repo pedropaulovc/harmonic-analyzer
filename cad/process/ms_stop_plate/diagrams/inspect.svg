@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 5: the finished plate, outer face up (the sheet's back view): both holes from the locating end and edge, the pair mark at the locating corner. Hand-drawn at 300 px/in; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 330" width="560" height="330" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <text class="title" x="12" y="20">Setup 5: inspect (outer face up)</text>
+  <path class="part-kept" d="M144 240 L396 240 L396 84 L384 72 L156 72 L144 84 Z"/>
+  <!-- Holes: .150 and .690 from the locating end (right), .160 from the locating edge (bottom); Ø.096 = 29 px. -->
+  <circle class="holes" cx="351" cy="192" r="14.4"/>
+  <circle class="holes" cx="189" cy="192" r="14.4"/>
+  <line class="centre-line" x1="170" y1="192" x2="370" y2="192"/>
+  <line class="datum" x1="396" y1="84" x2="396" y2="240"/>
+  <line class="datum" x1="144" y1="240" x2="396" y2="240"/>
+  <text class="datum-label" x="404" y="110">LOCATING END</text>
+  <text class="datum-label" x="200" y="258">LOCATING EDGE</text>
+  <!-- Stations from the locating end. -->
+  <line class="leader" x1="396" y1="244" x2="396" y2="310"/>
+  <line class="leader" x1="351" y1="208" x2="351" y2="288"/>
+  <line class="leader" x1="189" y1="208" x2="189" y2="310"/>
+  <path class="dims" d="M351 284 L396 284"/>
+  <text class="label" x="355" y="278">{{cad.clearance_hole_1_station_in:.3dot}}</text>
+  <path class="dims" d="M189 306 L396 306"/>
+  <text class="label" x="276" y="300">{{cad.clearance_hole_2_station_in:.3dot}}</text>
+  <!-- Height from the locating edge. -->
+  <line class="leader" x1="367" y1="192" x2="452" y2="192"/>
+  <line class="leader" x1="400" y1="240" x2="452" y2="240"/>
+  <path class="dims" d="M446 192 L446 240"/>
+  <text class="label" x="454" y="220">{{cad.clearance_hole_1_height_in:.3dot}}</text>
+  <!-- Hole size. -->
+  <path class="leader" d="M180 182 L90 62"/>
+  <text class="label" x="20" y="40">2X Ø{{cad.clearance_hole_1_dia_min_in:.3dot}}–{{cad.clearance_hole_1_dia_max_in:.3dot}}</text>
+  <text class="label" x="20" y="56">#40 shank must not enter</text>
+  <!-- Pair mark across the locating corner. -->
+  <line class="datum" x1="388" y1="150" x2="406" y2="150"/>
+  <path class="leader" d="M406 150 L470 170"/>
+  <text class="datum-label" x="430" y="186">pair mark</text>
+</svg>
