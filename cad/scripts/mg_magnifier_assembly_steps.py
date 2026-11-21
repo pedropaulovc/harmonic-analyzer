@@ -23,6 +23,7 @@ DRAWING_NUMBER = "MHA-MG-00"
 
 DRUM_PRESSED_KEY = "drum-pressed"
 DRUM_HELD_KEY = "drum-held"
+PRESS_SLEEVE_MADE_KEY = "press-sleeve-made"
 AXLE_PRESSED_KEY = "axle-pressed"
 AXLE_HELD_KEY = "axle-held"
 AXLE_TRIAL_KEY = "axle-trial-fitted"
@@ -46,7 +47,16 @@ STEPS: tuple[tuple[str, ...], ...] = (
     # Wheel group. Each press is accepted at the bench before anything else
     # goes on it (rule 23): it does not turn or slide by hand, and a slip fit
     # has its own single-action remedies.
-    (DRUM_PRESSED_KEY, DRUM_HELD_KEY, "drum-pulled-off", "drum-bonded"),
+    (
+        DRUM_PRESSED_KEY,
+        DRUM_HELD_KEY,
+        "drum-pulled-off",
+        "drum-bonded",
+        "drum-bond-cured",
+    ),
+    # The press's sleeve and oil are their own steps (rule 22).
+    (PRESS_SLEEVE_MADE_KEY,),
+    ("axle-plain-end-oiled",),
     (
         AXLE_PRESSED_KEY,
         AXLE_HELD_KEY,
@@ -63,6 +73,7 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "trial-parts-removed-to-press",
         "axle-pressed-further",
         "axle-pressed-back",
+        "axle-depth-recorded",
         "axle-rechecked",
     ),
     ("trial-parts-removed",),
@@ -89,7 +100,12 @@ STEPS: tuple[tuple[str, ...], ...] = (
     ("rod-seated",),
     (FIXTURE_SET_KEY, "fixture-thumb-screw-tightened", FIXTURE_HELD_KEY, "fixture-reset"),
     # Lever wire, on the machine.
-    (WIRE_HOOKED_KEY, "lever-wire-led-down", "lever-wire-hook-knotted"),
+    (
+        WIRE_HOOKED_KEY,
+        "lever-wire-led-down",
+        "lever-wire-hook-knotted",
+        "lever-wire-hook-closed",
+    ),
     ("machine-at-rest",),
     (WHEEL_TURNED_KEY,),
     (
@@ -97,6 +113,8 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "lever-wire-through-tie",
         "lever-wire-tie-knotted",
         "lever-wire-knots-held",
+        "lever-wire-cut-off",
+        "lever-wire-renewed",
         WIRE_TIED_KEY,
     ),
 )

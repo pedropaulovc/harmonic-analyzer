@@ -204,10 +204,12 @@ def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
     assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.ENDSHAKE_DIMENSION] == (
         4, "WHEEL FREE, NO RATTLE"
     )
-    # Each side has its own remedy; a re-press goes back through the
-    # press-hold check.
+    # Each side has its own remedy; a re-press is read at once and goes back
+    # through the press-hold check.
     for key, side in (("axle-pressed-further", "OVER THE MAX"), ("axle-pressed-back", "UNDER THE MIN")):
         assert side in notes.STEP_TEXT[key]
+    (trial_step,) = (step for step in steps.STEPS if step[0] == steps.AXLE_TRIAL_KEY)
+    assert trial_step[-3:] == ("axle-pressed-back", "axle-depth-recorded", "axle-rechecked")
     assert notes.STEP_TEXT["axle-rechecked"].endswith(
         f"RETURN TO STEP {steps.step_number(steps.AXLE_HELD_KEY)}."
     )
@@ -235,22 +237,36 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
         return f"STEP {steps.step_number(key)}"
 
     assert not any("REMAKE" in text for text in notes.STEP_TEXT.values())
-    # The slip-axle remedies run in order inside step 2: clean, bond, set,
-    # then back to the hold check once cured.
+    # The slip-axle remedies run in order inside step 2: press it out,
+    # clean, bond, set, then back to the hold check once cured.
     (axle_step,) = (step for step in steps.STEPS if step[0] == steps.AXLE_PRESSED_KEY)
-    assert axle_step[3:] == ("axle-cleaned", "axle-bonded", "axle-bond-set", "axle-bond-cured")
-    # Only an unbonded slip goes back out at 2B; a bonded axle that holds
-    # passes 2A-2B.
+    assert axle_step[2:] == (
+        "axle-pressed-out",
+        "axle-cleaned",
+        "axle-bonded",
+        "axle-bond-set",
+        "axle-bond-cured",
+    )
+    # Only an unbonded slip goes back out; a bonded part that holds passes the
+    # hold check, and a bonded drum, like the axle, comes back to it once
+    # cured (#2579).
     assert "UNBONDED" in notes.STEP_TEXT["axle-pressed-out"]
+    assert "UNBONDED" in notes.STEP_TEXT["drum-pulled-off"]
     for key in ("axle-bonded", "drum-bonded"):
         assert notes.STEP_TEXT[key].endswith(f"{notes.BOND_GRADE}, {notes.BOND_NOTE_REF}.")
-    # The bond is set inside its fixture time at the press step's setting,
-    # carrying any step 3 correction, so a rebond keeps the position step 3
-    # accepted.
+    (drum_step,) = (step for step in steps.STEPS if step[0] == steps.DRUM_PRESSED_KEY)
+    assert drum_step[-1] == "drum-bond-cured"
+    assert notes.STEP_TEXT["drum-bond-cured"].startswith(
+        f"IF IT WAS BONDED, RETURN TO {ref(steps.DRUM_HELD_KEY)}"
+    )
+    # #2578: the bond is set inside its fixture time to the depth read right
+    # after step 3's last re-press, else to the DETAIL A first setting, so a
+    # rebond keeps any position step 3 corrected.
     bond_set = notes.STEP_TEXT["axle-bond-set"]
     assert "AT ONCE" in bond_set
-    for key in (steps.AXLE_PRESSED_KEY, "axle-pressed-further", "axle-pressed-back"):
-        assert steps.step_number(key) in bond_set
+    assert ref("axle-depth-recorded") in bond_set
+    assert notes.PRESS_DETAIL_TITLE in bond_set
+    assert "CALIPER DEPTH ROD" in notes.STEP_TEXT["axle-depth-recorded"]
     assert notes.STEP_TEXT["axle-bond-cured"].startswith(
         f"IF IT WAS BONDED, RETURN TO {ref(steps.AXLE_HELD_KEY)}"
     )
@@ -313,11 +329,14 @@ def test_the_axle_presses_push_on_the_step_through_a_sleeve() -> None:
     )
     neck = math.pi / 4.0 * (spec.RELIEF_DIA_LIMITS[1] / inch) ** 2
     assert notes.PRESS_FORCE_MAX_KIP / neck > 3.0 * notes.AXLE_YIELD_KSI
-    # Both presses that drive the axle in name the sleeve; the re-press
-    # points back to the first press's step.
-    assert notes.PRESS_SLEEVE in notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
-    further = notes.STEP_TEXT["axle-pressed-further"]
-    assert f"STEP {steps.step_number(steps.AXLE_PRESSED_KEY)} SLEEVE" in further
+    # Both presses that drive the axle in name the sleeve, which its own step
+    # makes (rule 22: one action per step), as does the oil.
+    assert notes.PRESS_SLEEVE in notes.STEP_TEXT[steps.PRESS_SLEEVE_MADE_KEY]
+    sleeve = f"STEP {steps.step_number(steps.PRESS_SLEEVE_MADE_KEY)} SLEEVE"
+    assert sleeve in notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
+    assert sleeve in notes.STEP_TEXT["axle-pressed-further"]
+    assert "OIL" not in notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
+    assert "OIL" in notes.STEP_TEXT["axle-plain-end-oiled"]
 
 
 def test_the_drum_press_accepts_the_recess_window_the_wheel_lengths_prove() -> None:
