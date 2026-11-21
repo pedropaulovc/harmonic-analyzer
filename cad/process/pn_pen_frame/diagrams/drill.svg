@@ -21,6 +21,6 @@
   <text class="datum-label" x="252.3" y="146.3" text-anchor="end">Z0 (B)</text>
   <text class="label" x="470.0" y="300.0">Upright on the 1 in parallels, B up,</text>
   <text class="label" x="470.0" y="316.0">gripped on the front and back faces,</text>
-  <text class="label" x="470.0" y="332.0">F at the fixed jaw, L on the RIGHT.</text>
-  <text class="label" x="470.0" y="348.0">Hole {{cad.thumb_screw_tap_station_in:.3dot}} from L, {{cad.thumb_screw_tap_z_from_min_in:.3dot}} from F.</text>
+  <text class="label" x="470.0" y="332.0">BK at the fixed jaw, L on the RIGHT.</text>
+  <text class="label" x="470.0" y="348.0">Hole {{cad.thumb_screw_tap_station_in:.3dot}} from L, {{cad.thumb_screw_tap_z_from_min_in:.3dot}} from BK.</text>
 </svg>
