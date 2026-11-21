@@ -406,7 +406,7 @@ def test_back_journal_diameter_hangs_above_clear_of_the_crown_witnesses() -> Non
     witnesses on its crown side ran through its text at 30620a85, and the
     land's station witness and Ra leader sit on its head side.  Its diameter
     hangs above, text right of the line; its end station goes below."""
-    width, height = drawing._diameter_block_size(spec.JOURNAL_CALLOUT)
+    width, height = drawing._diameter_block_size(drawing.JOURNAL_CALLOUT)
     x, y = drawing.PRINCIPAL_KEEP["BackJournalDia"]
     shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
     # 12 -> 15 mm: the back Ra symbol now sits between block and shaft.
@@ -450,7 +450,7 @@ def test_back_ra_symbol_hangs_above_the_shaft_clear_of_every_witness() -> None:
     assert dia_line_x + 0.010 < arrow_x < symbol_x
     assert symbol_x + left - dia_line_x >= 0.010
     # Under the back JOURNAL block, with a gap.
-    _width, height = drawing._diameter_block_size(spec.JOURNAL_CALLOUT)
+    _width, height = drawing._diameter_block_size(drawing.JOURNAL_CALLOUT)
     dia_bottom = drawing.PRINCIPAL_KEEP["BackJournalDia"][1] - height / 2.0
     assert dia_bottom - (symbol_y + top) >= 0.002
     # Clear of the DETAIL A label to its right.

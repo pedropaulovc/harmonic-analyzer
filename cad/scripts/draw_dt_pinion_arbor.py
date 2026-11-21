@@ -371,10 +371,12 @@ BACK_JOURNAL_DIA_POINT_X = _sheet_x(
 # text right of the line over the land and clear of the back-crown sag
 # witnesses, and its crown-side end prints below as the 9.04 station.  The block rides high enough
 # that the back Ra symbol fits under it, over the land; at 0.1945 (r1 of
-# #1685) the one-line callout cleared the Ra text by 2.35 mm, so the
-# two-line one rises to keep its shoulder 2.8 mm over it.
+# #1685) the one-line callout cleared the Ra text by 2.35 mm, and the
+# two-line one rose to 0.1981 to keep its shoulder 2.8 mm over it.  Back to
+# one line (SEE NOTE 1, r1 machinist review of #3175), the block drops the
+# same 2.8 mm so its shoulder keeps that gap.
 BACK_JOURNAL_TEXT_X = BACK_JOURNAL_DIA_POINT_X + JOURNAL_DIA_LINE_OFFSET
-BACK_JOURNAL_DIA_Y = 0.1981
+BACK_JOURNAL_DIA_Y = 0.1953
 # Callout blocks, measured on the r1 sheet of #1685: lines 5.6 mm apart, a
 # capital ~2.75 mm wide (<MOD-DIAM> two of them), and a multi-line block
 # centred ~0.5 mm under its text position with its shoulder under the last
