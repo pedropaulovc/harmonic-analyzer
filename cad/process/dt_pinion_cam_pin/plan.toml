@@ -172,12 +172,17 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.faced_length_band_mm}}
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Under {{cad.faced_length_min_in:.3dot}}: the form ran past its Z: scrap the pin and make another from Setup 1. Repeat Setup 3 on the second blank."
+instruction = "Under {{cad.faced_length_min_in:.3dot}}: the form ran past its Z: scrap the pin and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Repeat Ops 50–130 on the second blank."
 
 [[setups]]
 machine_kind = "other"
 title = "Bench: break the edge, check, oil"
 machine = "Bench"
+holding = "Bench vise with soft jaws, the pin gripped lightly over the brass shim wrap on its O.D., the end being filed just clear of the jaws."
 indexing = "none"
 envelope = "other"
 vise_hold = "other"
