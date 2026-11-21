@@ -31,7 +31,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass rod, 1/4 in (drawing: brass)"
 stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} C360 rod, the 48 in bar on hand; one blank {{process.blank_length_in:.2dot}} in long."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. The O.D. is left as bought: grip it over a brass shim wrap."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. The O.D. is left as bought: the drawn rod's own surface is the drawing's Ra 125 MHA-MG-02 screw seat, so grip it over a brass shim wrap and never cut, file or stone it."
 shop = "../shop"
 stock_refs = ["c360-round-1-4"]
 material_key = "lathe-c360"
@@ -76,6 +76,7 @@ ref = "threading-bits-lms-6685"
 id = "form"
 name = "R.125 form tool"
 ref = "form-tool-r125"
+description = "R.125 concave full-radius form tool: its arc cuts the lever's convex SR.125 tip"
 status = "to_order"
 
 [[tools]]
@@ -129,9 +130,13 @@ cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Mike the thread's length where it was turned (skip if Op 30 turned nothing)."
+instruction = "Mike the turned diameter along the thread's length (skip if Op 30 turned nothing)."
 inspection = "Thread major Ø{{process.thread_major_min_in:.4dot}}–{{process.thread_major_max_in:.4dot}}."
 gauge_checks = [{ gauge = "micrometers", band_mm = [6.11632, 6.32206] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Over {{process.thread_major_max_in:.4dot}}: take another light skim from Z0 to Z-{{cad.thread_length_in:.3dot}} and mike it again. Under {{process.thread_major_min_in:.4dot}}: scrap the lever and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -139,7 +144,7 @@ speed_kind = "spindle"
 tool = "thread"
 drilling = "none"
 sizing = "other"
-instruction = "Single-point {{cad.thread_designation}}. Each pass: start off end B and cut toward the chuck; at Z-{{cad.thread_length_in:.3dot}} back the cross slide out and stop the spindle, half-nuts still closed (the thread then ends {{cad.thread_length_in:.2dot}} from end B, run-out {{cad.thread_incomplete_max_in:.3dot}} max). Reverse to run the carriage back past end B, return the cross slide to its mark, feed the compound, go forward again. Stop when Ops 60 and 70 pass."
+instruction = "Single-point {{cad.thread_designation}}. Each pass: start off end B and cut toward the chuck; at Z-{{cad.thread_length_in:.3dot}} back the cross slide out and stop the spindle, half-nuts still closed (the thread then ends {{cad.thread_length_in:.2dot}} from end B, run-out {{cad.thread_incomplete_max_in:.3dot}} max). Reverse to run the carriage back past end B, return the cross slide to its mark, feed the compound, go forward again. Stop when Ops 70 and 80 pass."
 settings = "lathe-thread-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -155,7 +160,7 @@ instruction = "Screw the magnifying bracket MHA-MG-01 (make it first; its 1/4-20
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Tight: take another .001–.002 compound pass and try again (Op 70). Shake, or the thread length or run-out out of Op 60's limits: scrap the lever and make another from Setup 1."
+instruction = "Tight: take another .001–.002 compound pass and try again (Op 80). Shake, or the thread length or run-out out of Op 70's limits: scrap the lever and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -174,7 +179,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Turned round: 3-jaw over the shim wrap on plain rod, end A {{process.end_stickout_in:.2dot}} in out; the threaded end back through the jaws into the spindle bore."
-datum = "End A's length is read with the height gauge (Op 110). For the tip (Op 130) the DRO Z is zeroed where the form tool's arc touches end A's corner."
+datum = "End A's length is read with the height gauge (Op 120). For the tip (Op 140) the DRO Z is zeroed where the form tool's arc touches end A's corner."
 diagram = { file = "diagrams/end-a.svg", alt = "The rod turned round, end A out: faced to length, then formed to the SR.125 tip." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
@@ -184,7 +189,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face end A square in light skims toward {{cad.faced_length_in:.2dot}}, reading the length between them (Op 110); stop inside {{cad.faced_length_min_in:.2dot}}–{{cad.faced_length_max_in:.2dot}}."
+instruction = "Face end A square in light skims toward {{cad.faced_length_in:.2dot}}, reading the length between them (Op 120); stop inside {{cad.faced_length_min_in:.2dot}}–{{cad.faced_length_max_in:.2dot}}."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -218,11 +223,11 @@ instruction = "Stop the spindle and look at the tip under a loupe: no pip or fla
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A pip (tool off centre height) or a step at the rod (arc off centre): correct the tool's height or the cross slide, spindle stopped. Then bring the arc up along Z until it just touches the formed tip, zero the DRO Z at that touch, and take one light pass to Z−.002 only; Op 170 then reads the length."
+instruction = "A pip (tool off centre height) or a step at the rod (arc off centre): correct the tool's height or the cross slide, spindle stopped. Then bring the arc up along Z until it just touches the formed tip, zero the DRO Z at that touch, and take one light pass to Z−.002 only; Op 180 then reads the length."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Read the length over the tip as Op 110."
+instruction = "Read the length over the tip as Op 120."
 inspection = "Length over the tip {{cad.faced_length_min_in:.2dot}}–{{cad.faced_length_max_in:.2dot}}."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.faced_length_band_mm}}" }]
 
@@ -254,6 +259,12 @@ instruction = "After deburring, screw end B by hand into the magnifying bracket 
 
 [[setups.operations]]
 instruction = "Tight: a burr is left; file it off the thread's start and try again. Shake or a torn thread: scrap the lever and make another from Setup 1."
+
+[[setups.operations]]
+instruction = "Look along the O.D. under a light, the MHA-MG-02 screw seat included: no jaw, shim or steady-rest mark and no scratch on the Ra 125 surface (its size is the rod's; nothing here cuts it)."
+
+[[setups.operations]]
+instruction = "A jaw, shim or steady-rest mark or a scratch on the O.D.: scrap the lever (the drawn surface is not reworked) and make another from Setup 1."
 
 [[setups.operations]]
 instruction = "Wipe the lever clean and dry (FINISH: machined) and bag it with its number."
