@@ -3962,7 +3962,7 @@ def test_export_runtime_inputs_invalidate_outer_key_and_internal_ledger(
     assert after[1] != before[1], source
 
 
-@pytest.mark.parametrize("member", ["features.toml", "ch-rocker-arm.STEP"])
+@pytest.mark.parametrize("member", ["ch-rocker-arm.faces.json", "ch-rocker-arm.STEP"])
 def test_produced_bundle_edits_rekey_full_export_without_invalidating_native_ledger(
     isolated_export_keys, member,
 ):
@@ -4052,7 +4052,7 @@ def test_prechips_task_shape_and_complete_dependency_closure(synthetic_prechips_
     unrelated.write_text('features = "other"\n')
     task = next(dodo.task_prechips())
     assert task["name"] == stem
-    assert task["task_dep"] == [f"package:features:{stem}"]
+    assert task["task_dep"] == [f"package:manifest:{stem}"]
     deps = set(task["file_dep"])
     manifest, step = exporter.bundle_paths(stem, dodo.CAD_OUT)
     expected = {
@@ -4193,7 +4193,7 @@ def test_recipe_enrolls_strict_traveler_tests():
 
 @pytest.fixture
 def isolated_feature_keys(isolated_assembly_helper_keys, monkeypatch):
-    """Use real leaf/native recipes and keys, mutating only isolated source bytes."""
+    """Use real leaf/manifest/native recipes and keys, mutating only isolated source bytes."""
     import export_features
 
     dodo, root, native_snapshot = isolated_assembly_helper_keys
@@ -4201,8 +4201,12 @@ def isolated_feature_keys(isolated_assembly_helper_keys, monkeypatch):
         stem: dodo._feature_requirement_deps(stem)
         for stem in export_features.SUPPORTED_PARTS
     }
+    exporters = {
+        stem: dodo._feature_exporter_deps(stem)
+        for stem in export_features.SUPPORTED_PARTS
+    }
     copied_sources = {}
-    for source in {path for paths in sources.values() for path in paths}:
+    for source in {path for paths in (*sources.values(), *exporters.values()) for path in paths}:
         original = Path(source).resolve()
         copied = root / original.relative_to(REPO_ROOT)
         assert copied.resolve().is_relative_to(root.resolve())
@@ -4214,12 +4218,24 @@ def isolated_feature_keys(isolated_assembly_helper_keys, monkeypatch):
         lambda stem: [copied_sources[path] for path in sources[stem]],
     )
     monkeypatch.setattr(
+        dodo, "_feature_exporter_deps",
+        lambda stem: [copied_sources[path] for path in exporters[stem]],
+    )
+    monkeypatch.setattr(
         dodo, "RELEASE_VERSION_FILE",
         root / dodo.RELEASE_VERSION_FILE.relative_to(REPO_ROOT),
     )
+    # The labelled STEPs and inventories a manifest binds (CAD_OUT is already
+    # isolated under root): produced bytes.
+    for stem in export_features.SUPPORTED_PARTS:
+        for path in dodo._feature_export_outputs(stem):
+            assert path.is_relative_to(root.resolve()), path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"produced labelled STEP or inventory\n")
 
     def snapshot(*, native=True):
-        """Every key group, or with ``native=False`` only ``features``.
+        """Every key group, or with ``native=False`` only ``features`` (the COM
+        leaves) and ``manifests`` (the seat-free binders).
 
         Feature-only callers skip regenerating every part and assembly key, but
         still start from an empty artefact-digest memo exactly as a full
@@ -4230,26 +4246,27 @@ def isolated_feature_keys(isolated_assembly_helper_keys, monkeypatch):
         else:
             dodo._ARTEFACT_DIGEST_MEMO.clear()
             result = {}
-        tasks = {
-            task["name"].removeprefix("features:"): task
-            for task in dodo.task_package()
-            if task["name"].startswith("features:")
-        }
-        for stem, task in tasks.items():
-            assert all(
-                Path(path).resolve().is_relative_to(root.resolve())
-                for path in task["file_dep"]
-            ), stem
-        result["features"] = {
-            stem: dodo._cache_key(task["file_dep"], f"package:features:{stem}")
-            for stem, task in tasks.items()
-        }
+        for group, prefix in (("features", "features:"), ("manifests", "manifest:")):
+            tasks = {
+                task["name"].removeprefix(prefix): task
+                for task in dodo.task_package()
+                if task["name"].startswith(prefix)
+            }
+            for stem, task in tasks.items():
+                assert all(
+                    Path(path).resolve().is_relative_to(root.resolve())
+                    for path in task["file_dep"]
+                ), stem
+            result[group] = {
+                stem: dodo._cache_key(task["file_dep"], f"package:{prefix}{stem}")
+                for stem, task in tasks.items()
+            }
         return result
 
     return dodo, root, snapshot
 
 
-def test_one_draw_edit_rekeys_only_its_features_leaf_not_native_closures(
+def test_one_draw_edit_rekeys_only_its_manifest_not_any_com_leaf(
     isolated_feature_keys,
 ):
     dodo, root, snapshot = isolated_feature_keys
@@ -4259,11 +4276,12 @@ def test_one_draw_edit_rekeys_only_its_features_leaf_not_native_closures(
     source.write_bytes(source.read_bytes() + b"\nFEATURE_RECIPE_REVISION = 2\n")
     after = snapshot()
     changed = {
-        stem for stem in before["features"]
-        if before["features"][stem] != after["features"][stem]
+        stem for stem in before["manifests"]
+        if before["manifests"][stem] != after["manifests"][stem]
     }
     assert changed == {"ch_rocker_arm"}
-    for group in ("recipes", "assemblies", "part_recipes", "parts"):
+    # A new or changed declaration binds offline: no labelled-STEP leaf re-keys.
+    for group in ("features", "recipes", "assemblies", "part_recipes", "parts"):
         assert after[group] == before[group], group
     assert all(
         str(source) not in dodo._part_file_deps(script, script.stem.removeprefix("build_"))
@@ -4284,7 +4302,7 @@ def test_one_draw_edit_rekeys_only_its_features_leaf_not_native_closures(
 )
 def test_features_keys_fold_each_real_shared_or_own_input(isolated_feature_keys, member):
     dodo, root, snapshot = isolated_feature_keys
-    before = snapshot(native=False)["features"]
+    before = snapshot(native=False)
     source = root / member
     assert source.is_file(), member
     if source.suffix == ".yaml":
@@ -4293,12 +4311,24 @@ def test_features_keys_fold_each_real_shared_or_own_input(isolated_feature_keys,
         source.write_bytes(source.read_bytes() + b"\nFEATURE_RECIPE_REVISION = 2\n")
     else:
         source.write_bytes(b"b" * 64 + b"\n")
-    after = snapshot(native=False)["features"]
-    expected = {
-        stem for stem in before if str(source.resolve()) in dodo._feature_export_file_deps(stem)
-    }
-    assert expected, member
-    assert {stem for stem in before if before[stem] != after[stem]} == expected
+    after = snapshot(native=False)
+    scripts = {script.stem.removeprefix("build_"): script for script in dodo.part_scripts()}
+
+    def native(stem):
+        # A COM leaf's native identity is its part's recipe key, so an input
+        # of that part's build re-keys the leaf through its .SLDPRT.
+        return dodo._part_file_deps(scripts[stem], stem)
+
+    for group, deps in (
+        ("features", lambda stem: [*dodo._feature_export_file_deps(stem), *native(stem)]),
+        ("manifests", dodo._feature_manifest_file_deps),
+    ):
+        expected = {stem for stem in before[group] if str(source.resolve()) in deps(stem)}
+        assert {stem for stem in before[group] if before[group][stem] != after[group][stem]} == expected, group
+    assert "ch_rocker_arm" in {
+        stem for group in ("features", "manifests") for stem in before[group]
+        if before[group][stem] != after[group][stem]
+    }, member
 
 
 @pytest.mark.parametrize(
@@ -4310,9 +4340,12 @@ def test_unrelated_config_edit_preserves_rocker_feature_key(isolated_feature_key
     source = root / member
     assert source.is_file(), member
     assert str(source.resolve()) not in dodo._feature_export_file_deps("ch_rocker_arm")
-    before = snapshot(native=False)["features"]["ch_rocker_arm"]
+    assert str(source.resolve()) not in dodo._feature_manifest_file_deps("ch_rocker_arm")
+    before = snapshot(native=False)
     source.write_bytes(source.read_bytes() + b"\nfeature_recipe_revision: 2\n")
-    assert snapshot(native=False)["features"]["ch_rocker_arm"] == before
+    after = snapshot(native=False)
+    for group in ("features", "manifests"):
+        assert after[group]["ch_rocker_arm"] == before[group]["ch_rocker_arm"], group
 
 
 def test_prechips_rejects_unexported_enrollment(monkeypatch):
@@ -4339,7 +4372,7 @@ def test_comment_edit_moves_no_leaf_key(isolated_feature_keys, monkeypatch):
     source.write_bytes(source.read_bytes() + b"\nRECIPE_REVISION = 2\n")
     after = snapshot()
     assert after["parts"] != before["parts"]
-    assert after["features"] != before["features"]
+    assert after["manifests"] != before["manifests"]
 
 
 def test_prechips_empty_enrollment_has_no_tasks(monkeypatch):

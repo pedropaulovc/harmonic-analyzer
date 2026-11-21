@@ -26,7 +26,8 @@ import ch_rocker_arm_spec as rocker
 import _rocker_interface as rocker_interface
 import dt_cone_pivot_post_spec as cone
 import rocker_bank_layout as bank
-from _export_feature_faces import FeatureFaceError, face_name
+from _export_feature_faces import FeatureFaceError
+from _test_feature_bundles import IdSelector, bind_manifest, rewrite_step, write_bundle
 from _feature_requirements import discover_parts, metadata_for, requirements_for, source_tree
 from _gtol_face import FaceGeometry
 from _printed_tolerance import drilled_oversize_mm, edge_break_radius_mm, printed_band_mm
@@ -54,29 +55,11 @@ def _fresh_draw(monkeypatch, stem: str):
     return module
 
 
-def _step_labels(stem: str) -> list[str]:
-    """One face per feature; an undeclared part's STEP has only unnamed faces."""
-    labels = [face_name(feature, 1) for feature in exporter.feature_selectors(stem)]
-    if stem == "ch_rocker_arm":
-        labels.insert(0, face_name("pivot_bore", 1))
-    return labels or ["NONE"]
-
-
-def _write_step(path: Path, labels: list[str]) -> None:
-    rows = ["ISO-10303-21;", "HEADER;", "ENDSEC;", "DATA;"]
-    rows += [f"#{index} = ADVANCED_FACE('{label}',(#1),#2,.T.);" for index, label in enumerate(labels, start=10)]
-    rows += ["ENDSEC;", "END-ISO-10303-21;"]
-    path.write_bytes("\r\n".join(rows).encode("utf-8"))
-
-
-def _step(tmp_path: Path, stem: str) -> Path:
-    """The bundle STEP, plus each declared member's STEP beside it."""
+def _step(tmp_path: Path, stem: str, **shape) -> tuple[Path, dict]:
+    """The bundle STEP, each member's STEP beside it, their inventories, and
+    the selectors that claim the real declarations' features in them."""
     path = tmp_path / stem / f"{stem.replace('_', '-')}.STEP"
-    path.parent.mkdir(parents=True)
-    _write_step(path, _step_labels(stem))
-    for cfg, member in exporter.member_step_paths(stem).items():
-        _write_step(path.with_name(member.name), [face_name(feature, 1) for feature in exporter.feature_selectors(stem, cfg)])
-    return path
+    return path, write_bundle(stem, path, **shape)
 
 
 def _load(path: Path) -> dict:
@@ -752,35 +735,28 @@ def test_bundle_paths_reject_unsupported_parts(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
 def test_raw_step_face_sets_and_values_are_bound_into_the_manifest(tmp_path: Path, stem: str) -> None:
-    step = _step(tmp_path, stem)
+    step, selectors = _step(tmp_path, stem)
     content = step.read_bytes()
-    path = exporter.write_manifest(stem.replace("_", "-"), step, revision="v40")
+    path = bind_manifest(stem.replace("_", "-"), step, selectors, revision="v40")
     assert path == step.with_name("features.toml")
     manifest = _load(path)
+    assert set(manifest["features"]) == set(exporter.feature_selectors(stem))
+    for name, feature in manifest["features"].items():
+        labels = {face.rsplit("/", 1)[1] for face in feature["faces"]}
+        assert len(labels) == 1, name
+        assert len(feature["faces"]) == exporter.STEP_FACE_COUNTS.get(stem, {}).get(name, 1), name
     if stem == "ch_rocker_arm":
-        labels = _step_labels(stem)
-
-        def expected_faces(label: str) -> list[str]:
-            return [
-                f"#{ordinal + 9}/ADVANCED_FACE[{ordinal}]/{label}"
-                for ordinal, emitted_label in enumerate(labels, start=1)
-                if emitted_label == label
-            ]
-
-        pivot_faces = expected_faces("HAF_PIVOT_BORE__P01")
-        assert len(pivot_faces) == 2
-        assert manifest["features"]["pivot_bore"]["faces"] == pivot_faces
-        for datum, label in (("B", "HAF_STRAP_DATUM_B__P01"), ("C", "HAF_ROD_HOLE__P01")):
-            datum_faces = expected_faces(label)
-            assert len(datum_faces) == 1
-            feature = manifest["datums"][datum]["feature"]
-            assert manifest["features"][feature]["faces"] == datum_faces
+        for datum in ("B", "C"):
+            assert len(manifest["features"][manifest["datums"][datum]["feature"]]["faces"]) == 1
     assert manifest["step"] == step.name
     assert manifest["step_sha256"] == hashlib.sha256(content).hexdigest()
     assert manifest["drawing"]["revision"] == "v40"
     assert manifest["cite"]["step_sha256"] == [f"harmonic-analyzer/cad/out/features/{stem}/{step.name}"]
     members = {name: path.with_name(member.name) for name, member in exporter.member_step_paths(stem).items()}
-    assert {file.name for file in path.parent.iterdir()} == {step.name, "features.toml", *(member.name for member in members.values())}
+    steps = [step, *members.values()]
+    assert {file.name for file in path.parent.iterdir()} == {
+        "features.toml", *(s.name for s in steps), *(f"{s.stem}.faces.json" for s in steps),
+    }
     for name, member in members.items():
         assert manifest["member_steps"][name]["step"] == member.name
         assert manifest["member_steps"][name]["step_sha256"] == hashlib.sha256(member.read_bytes()).hexdigest()
@@ -803,7 +779,8 @@ def test_an_undeclared_part_binds_its_step_with_an_empty_features_table_and_no_d
         return original(name, *args, **kwargs)
 
     monkeypatch.setattr(importlib, "import_module", no_drawing)
-    step = _step(tmp_path, stem)
+    step, _selectors = _step(tmp_path, stem)
+    # The real (empty) selectors: no stub stands between the undeclared part and its drawing.
     manifest = _load(exporter.write_manifest(stem, step, revision="v40"))
     assert manifest["features"] == {} and manifest["datums"] == {}
     assert manifest["part"] == stem.replace("_", "-")
@@ -831,54 +808,50 @@ def test_a_notes_file_without_drawing_notes_falls_through_to_the_spec(stem: str)
     assert manifest["construction"] != "unknown"
 
 
-def test_an_undeclared_step_must_carry_no_feature_label(tmp_path: Path) -> None:
-    step = tmp_path / "ch-amplitude-bar.STEP"
-    _write_step(step, ["NONE", face_name("stray", 1)])
-    with pytest.raises(FeatureFaceError, match="unknown feature 'stray'"):
-        exporter.write_manifest("ch_amplitude_bar", step, revision="v40")
-
-
 def test_rocker_hub_root_carries_both_native_fillets_each_split_in_two(tmp_path: Path) -> None:
-    # One native face per strap side (P01, P02); STEP splits each periodic
-    # torus into two ADVANCED_FACEs, so the manifest lists each label twice.
-    step = _step(tmp_path, "ch_rocker_arm")
-    one = face_name("hub_root", 1)
-    rows = step.read_bytes().decode("utf-8").split("\r\n")
-    at = next(index for index, row in enumerate(rows) if f"'{one}'" in row)
-    split = [one, one, face_name("hub_root", 2), face_name("hub_root", 2)]
-    rows[at : at + 1] = [f"#{900 + index} = ADVANCED_FACE('{label}',(#1),#2,.T.);" for index, label in enumerate(split)]
-    step.write_bytes("\r\n".join(rows).encode("utf-8"))
-    faces = _load(exporter.write_manifest("ch_rocker_arm", step, revision="v40"))["features"]["hub_root"]["faces"]
-    assert Counter(face.rsplit("/", 1)[1] for face in faces) == {one: 2, face_name("hub_root", 2): 2}
+    # One native face per strap side; STEP splits each periodic torus into two
+    # ADVANCED_FACEs, so the manifest lists both labels twice.
+    step, selectors = _step(tmp_path, "ch_rocker_arm", patches={"hub_root": 2}, split={"hub_root": 2})
+    faces = _load(bind_manifest("ch_rocker_arm", step, selectors, revision="v40"))["features"]["hub_root"]["faces"]
+    counts = Counter(face.rsplit("/", 1)[1] for face in faces)
+    assert len(counts) == 2 and set(counts.values()) == {2}
 
 
 def test_raw_step_ansi_metadata_and_line_endings_are_never_rewritten(tmp_path: Path) -> None:
-    step = _step(tmp_path, "ch_rocker_arm")
-    content = step.read_bytes().replace(b"HEADER;\r\n", b"HEADER;\r\nFILE_DESCRIPTION(('M\xe9tal \x80 metadata'),'2;1');\r\n")
-    step.write_bytes(content)
-    path = exporter.write_manifest("ch_rocker_arm", step, revision="v40")
+    step, selectors = _step(tmp_path, "ch_rocker_arm")
+    content = step.read_bytes().replace(b"HEADER;\n", b"HEADER;\nFILE_DESCRIPTION(('M\xe9tal \x80 metadata'),'2;1');\n").replace(b"\n", b"\r\n")
+    rewrite_step(step, content)
+    path = bind_manifest("ch_rocker_arm", step, selectors, revision="v40")
     assert _load(path)["step_sha256"] == hashlib.sha256(content).hexdigest()
     assert step.read_bytes() == content
 
 
 def test_writer_uses_supplied_revision_and_replaces_adjacent_manifest(tmp_path: Path, monkeypatch) -> None:
-    step = _step(tmp_path, "ch_rocker_arm")
+    step, selectors = _step(tmp_path, "ch_rocker_arm")
     monkeypatch.setattr(exporter._config, "release_revision", lambda: "v999")
-    path = exporter.write_manifest("ch_rocker_arm", step, revision="v40")
+    path = bind_manifest("ch_rocker_arm", step, selectors, revision="v40")
     old_digest = _load(path)["step_sha256"]
-    step.write_bytes(step.read_bytes() + b"\r\n/* raw export header changed */\r\n")
-    assert exporter.write_manifest("ch_rocker_arm", step, revision="v41") == path
+    rewrite_step(step, step.read_bytes() + b"\r\n/* raw export header changed */\r\n")
+    assert bind_manifest("ch_rocker_arm", step, selectors, revision="v41") == path
     manifest = _load(path)
     assert manifest["drawing"]["revision"] == "v41"
     assert manifest["step_sha256"] == hashlib.sha256(step.read_bytes()).hexdigest() != old_digest
     assert "harmonic-analyzer/cad/config/release.yaml:next_revision" in manifest["drawing"]["cite"]
 
 
-def test_missing_label_fails_before_installing_requirements(tmp_path: Path) -> None:
-    step = _step(tmp_path, "ch_pivot_shaft")
-    step.write_bytes(step.read_bytes().replace(face_name("north_dome", 1).encode(), b"NONE"))
-    with pytest.raises(FeatureFaceError, match="north_dome"):
-        exporter.write_manifest("ch_pivot_shaft", step, revision="v40")
+def test_a_declaration_matching_no_face_fails_before_writing_the_manifest(tmp_path: Path) -> None:
+    step, selectors = _step(tmp_path, "ch_pivot_shaft")
+    selectors[None]["north_dome"] = (IdSelector(999),)
+    with pytest.raises(FeatureFaceError, match="north_dome: selector IdSelector.999. matched no face"):
+        bind_manifest("ch_pivot_shaft", step, selectors, revision="v40")
+    assert not step.with_name("features.toml").exists()
+
+
+def test_a_step_its_inventory_does_not_bind_fails_before_writing_the_manifest(tmp_path: Path) -> None:
+    step, selectors = _step(tmp_path, "ch_pivot_shaft")
+    step.write_bytes(step.read_bytes() + b"\n")
+    with pytest.raises(FeatureFaceError, match="its STEP is"):
+        bind_manifest("ch_pivot_shaft", step, selectors, revision="v40")
     assert not step.with_name("features.toml").exists()
 
 

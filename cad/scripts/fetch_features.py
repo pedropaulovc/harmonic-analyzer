@@ -3,8 +3,9 @@
 ``uv run --frozen python cad/scripts/fetch_features.py <stem> [<stem> ...]``
 ``uv run --frozen python cad/scripts/fetch_features.py --all [--release v51]``
 
-Every part with its own drawing ships its feature bundle (the STEP and the
-``features.toml`` bound to it) in the release ZIP under ``features/<stem>/``,
+Every part with its own drawing ships its feature bundle (the labelled STEPs,
+their ``.faces.json`` face inventories once releases carry them, and the
+``features.toml`` bound to them) in the release ZIP under ``features/<stem>/``,
 from the first release cut with all-part bundles (the one after v50); earlier
 releases carry only the parts whose drawing declared requirements, and asking
 one for another part fails with "the release carries no ... bundle". This reads
@@ -16,18 +17,22 @@ names a tag.
 
 Each fetched bundle must identify its part and bind its STEP's exact bytes
 (``step``, ``step_sha256``); a bundle that does not is refused and nothing is
-written. It is then checked against this checkout:
+written. Its recipe is then diffed between the release's tagged commit and
+the working tree:
 
-- ``features_bound.validate_bundle``: the bundle matches the part's current
-  requirement declarations (feature set, member STEPs, face sets);
-- the files of the part's ``package:features:<stem>`` and ``part:<stem>``
-  recipes (dodo's cache-key inputs, without the release revision) are diffed
-  between the release's tagged commit and the working tree.
+- ``geometry`` inputs (``part:<stem>`` and the labelled-STEP export code,
+  ``package:features:<stem>``) changed: the STEP itself may differ, so the
+  bundle is STALE and needs a farm build of ``package:features:<stem>``;
+- otherwise ``features.toml`` is rebound here from this checkout's
+  declarations (``export_features.write_manifest`` over the fetched STEPs and
+  inventories, exactly what ``package:manifest:<stem>`` runs), so new or
+  changed ``requirement(...)`` declarations need no farm. A release made
+  before face inventories shipped cannot be rebound; a declaration change
+  against it is STALE.
 
-Either finding marks the bundle STALE for this checkout; it is reported with the
-changed files and the command exits 2 without writing it unless
-``--accept-stale`` is given. A stale bundle needs a farm build
-(``package:features:<stem>``) to be current.
+A STALE bundle is reported with its findings and the command exits 2 without
+writing it unless ``--accept-stale`` is given; declarations that do not bind
+(a selector matching no face) exit 1.
 
 With the bundle in place, the part's traveler and NC programs run seat-free
 without doit (whose ``prechips:<stem>``/``cam:<stem>`` tasks would first try to
@@ -53,8 +58,10 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+import _config
 import _telemetry
 import export_features
+from _export_feature_faces import FeatureFaceError, inventory_path
 from _release_drawing_diff import release_zip_reader, safe_member_parts
 from features_bound import FeaturesBoundError, validate_bundle
 
@@ -152,17 +159,23 @@ def check_binding(stem: str, out: Path) -> None:
 
 
 def recipe_files(stem: str) -> dict[str, str]:
-    """Repo-relative tracked inputs of the part's cache keys, each labelled with
-    the recipe it keys: ``geometry`` (``part:<stem>``, the native part) or
-    ``manifest`` (only ``package:features:<stem>``: exporter, notes, declarations)."""
+    """Repo-relative tracked inputs of the part's keys, each labelled with what
+    it can change: ``geometry`` (``part:<stem>`` and the labelled-STEP export
+    code) or ``manifest`` (only ``package:manifest:<stem>``: notes, citations,
+    declarations). Other parts' registry rows in the generic exporter's config
+    closure cannot change this part's STEP and are left out."""
     sys.path.insert(0, str(REPO))
     import dodo  # noqa: PLC0415 - the graph's own key inputs, loaded only here
 
     out = (REPO / "cad" / "out").resolve()
+    part = dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem)
+    exporter = [
+        dep for dep in dodo._feature_export_file_deps(stem) if dep.endswith(".py")
+    ]
     labelled: dict[str, str] = {}
     for label, deps in (
-        ("manifest", dodo._feature_export_file_deps(stem)),
-        ("geometry", dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem)),
+        ("manifest", dodo._feature_manifest_file_deps(stem)),
+        ("geometry", [*part, *exporter]),
     ):
         for dep in deps:
             path = Path(dep).resolve()
@@ -171,6 +184,20 @@ def recipe_files(stem: str) -> dict[str, str]:
             if path.is_relative_to(REPO.resolve()):
                 labelled[path.relative_to(REPO.resolve()).as_posix()] = label
     return dict(sorted(labelled.items()))
+
+
+def rebind(stem: str, out: Path) -> None:
+    """Rewrite ``stem``'s fetched ``features.toml`` from this checkout's
+    declarations over the fetched STEPs and face inventories."""
+    _manifest, step = export_features.bundle_paths(stem, out)
+    missing = [
+        path.name
+        for path in export_features.exported_steps(stem, out)
+        if not inventory_path(path).is_file()
+    ]
+    if missing:
+        raise FetchError(f"{stem}: the release carries no face inventory for {missing}")
+    export_features.write_manifest(stem, step, revision=_config.release_revision())
 
 
 def changed_since(commit: str, files: list[str]) -> list[str]:
@@ -241,13 +268,27 @@ def main(argv: list[str] | None = None) -> int:
             except ValueError as exc:
                 raise FetchError(f"release {tag}: {exc}") from exc
             stale: dict[str, list[str]] = {}
+            rebound: list[str] = []
             for stem in stems:
                 check_binding(stem, staging)
                 recipe = recipe_files(stem)
+                changed = changed_since(commit, list(recipe))
                 findings = [
-                    f"{recipe[name]} input changed since {tag}: {name}"
-                    for name in changed_since(commit, list(recipe))
+                    f"geometry input changed since {tag}: {name}"
+                    for name in changed
+                    if recipe[name] == "geometry"
                 ]
+                if not findings:
+                    try:
+                        rebind(stem, staging)
+                        rebound.append(stem)
+                    except FetchError as exc:
+                        if changed:
+                            findings += [
+                                f"manifest input changed since {tag}: {name}"
+                                for name in changed
+                            ]
+                            findings.append(f"cannot rebind offline: {exc}")
                 try:
                     validate_bundle(stem, staging)
                 except FeaturesBoundError as exc:
@@ -275,11 +316,19 @@ def main(argv: list[str] | None = None) -> int:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copytree(source, target)
                 state = "STALE" if stem in stale else "current"
+                how = (
+                    ", features.toml rebound from this checkout"
+                    if stem in rebound
+                    else ""
+                )
                 _telemetry.info(
-                    f"fetch-features: {stem}: {target} ({state} for this checkout)",
+                    f"fetch-features: {stem}: {target} ({state} for this checkout{how})",
                     stem=stem,
                     release=tag,
                 )
+    except FeatureFaceError as exc:
+        _telemetry.error(f"fetch-features: declarations do not bind: {exc}")
+        return 1
     except (FetchError, OSError) as exc:
         _telemetry.error(f"fetch-features: {exc}")
         return 1

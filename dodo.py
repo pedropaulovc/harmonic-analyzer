@@ -17,8 +17,10 @@ Task groups (the prefix says whether SolidWorks is required):
   part:<stem>        build one part            (COM -- needs SolidWorks)
   assembly:<stem>    build/refresh one assembly (COM)
   drawing:<stem>     build one manufacturing drawing (COM)
-  package:features:<stem> isolated STEP/requirements bundle (COM)
-  package:features   aggregate every feature bundle (NO SolidWorks)
+  package:features:<stem> isolated labelled STEP + face inventory (COM)
+  package:features   aggregate every feature STEP (NO SolidWorks)
+  package:manifest:<stem> bind declarations into features.toml (NO SolidWorks)
+  package:manifest   aggregate every features.toml (NO SolidWorks)
   verify:<suite>     soundness/subsystems/kinematics gates (COM)
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
   check:machinist_review:<stem> cached blind reviews + judge (NO SolidWorks)
@@ -659,7 +661,7 @@ def _stage_name(label: str) -> str:
         return "release"
     if label == "gallery":
         return "gallery"
-    if label.startswith(("export", "package:features:")):
+    if label.startswith(("export", "package:features:", "package:manifest:")):
         return "export"
     return "harmonic-analyzer"
 
@@ -1837,7 +1839,7 @@ def _kinematics_file_deps() -> list[str]:
 
 
 def _export_file_deps() -> list[str]:
-    """Exporter runtime, complete produced feature bundles, and native identities."""
+    """Exporter runtime, every labelled feature STEP and inventory, and native identities."""
     return sorted({
         *_export_requirement_deps(),
         *(str(path) for path in _feature_bundle_outputs()),
@@ -1847,19 +1849,12 @@ def _export_file_deps() -> list[str]:
     })
 
 
-def _feature_requirement_deps(stem: str) -> list[str]:
-    """One part's declaration/citation closure and generic exporter inputs.
-
-    Discovery identifies supported stems but never contributes another part's
-    draw/spec files to this leaf. Config reads include dynamically loaded
-    citation sources, not just imports the generic driver can see.
-    """
-    from export_features import source_paths
-
+def _feature_exporter_deps(stem: str) -> list[str]:
+    """The generic feature exporter and the config it reads for ``stem`` only:
+    another part's registry row never re-keys this part's leaf."""
     sources = {
         EXPORT_PY.resolve(),
         *(Path(path).resolve() for path in module_deps_of(EXPORT_PY)),
-        *(path.resolve() for path in source_paths(stem)),
     }
     return sorted({
         *(str(path) for path in sources),
@@ -1868,43 +1863,83 @@ def _feature_requirement_deps(stem: str) -> list[str]:
     })
 
 
+def _feature_requirement_deps(stem: str) -> list[str]:
+    """One part's declaration/citation closure and generic exporter inputs.
+
+    Discovery identifies supported stems but never contributes another part's
+    draw/spec files to this manifest. Config reads include dynamically loaded
+    citation sources, not just imports the generic driver can see.
+    """
+    from export_features import source_paths
+
+    sources = {path.resolve() for path in source_paths(stem)}
+    return sorted({
+        *_feature_exporter_deps(stem),
+        *(str(path) for path in sources),
+        *(dep for path in sources if path.suffix == ".py"
+          for dep in _config_deps(path, stem, "part")),
+    })
+
+
 def _export_requirement_deps() -> list[str]:
-    """Generic export runtime/config only; declarations belong to feature leaves."""
+    """Generic export runtime/config only; declarations belong to manifests."""
     return sorted({
         *_executed_closure([str(EXPORT_PY)]),
     })
 
 
 def _feature_export_file_deps(stem: str) -> list[str]:
-    """One bundle's recipe plus release revision and exact native identity."""
+    """One labelled-STEP COM leaf's key: the generic exporter (and the config
+    its closure reads for this part) and the exact native identity. No drawing
+    declaration: a declaration edit never re-exports a STEP."""
     return sorted({
-        *_feature_requirement_deps(stem),
-        str(RELEASE_VERSION_FILE),
+        *_feature_exporter_deps(stem),
         _sldprt(stem),
         _part_execution_token(stem),
     })
 
 
+def _feature_manifest_file_deps(stem: str) -> list[str]:
+    """One ``features.toml``: the declaration closure, the release revision,
+    and the labelled STEPs and inventories it binds."""
+    return sorted({
+        *_feature_requirement_deps(stem),
+        str(RELEASE_VERSION_FILE),
+        *(str(path) for path in _feature_export_outputs(stem)),
+    })
+
+
 def _feature_export_outputs(stem: str) -> list[Path]:
-    from export_features import bundle_paths, configuration_step_paths, member_step_paths
+    """One COM leaf's labelled STEPs, each followed by its face inventory."""
+    from _export_feature_faces import inventory_path
+    from export_features import exported_steps
 
     return [
         path.resolve()
-        for path in (
-            *bundle_paths(stem, CAD_OUT),
-            *configuration_step_paths(stem, CAD_OUT).values(),
-            *member_step_paths(stem, CAD_OUT).values(),
-        )
+        for step in exported_steps(stem, CAD_OUT)
+        for path in (step, inventory_path(step))
     ]
 
 
+def _feature_manifest_output(stem: str) -> Path:
+    from export_features import bundle_paths
+
+    return bundle_paths(stem, CAD_OUT)[0].resolve()
+
+
 def _feature_bundle_outputs() -> list[Path]:
-    """The complete bundle inventory for seat-free aggregate consumers."""
+    """Every labelled STEP and inventory, for seat-free aggregate consumers."""
     from export_features import SUPPORTED_PARTS
 
     return [
         path for stem in SUPPORTED_PARTS for path in _feature_export_outputs(stem)
     ]
+
+
+def _feature_manifest_outputs() -> list[Path]:
+    from export_features import SUPPORTED_PARTS
+
+    return [_feature_manifest_output(stem) for stem in SUPPORTED_PARTS]
 
 
 def _export_cache_outputs() -> list[Path]:
@@ -4330,10 +4365,11 @@ def _check_features_bound_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         "file_dep": [
             str((SCRIPTS_DIR / "features_bound.py").resolve()),
             *(str(path) for path in _feature_bundle_outputs()),
+            *(str(path) for path in _feature_manifest_outputs()),
             *(str((CAD_OUT / "step" / path.name).resolve())
               for path in _feature_bundle_outputs() if path.suffix == ".STEP"),
         ],
-        "task_dep": ["package:features", "export"],
+        "task_dep": ["package:manifest", "export"],
         "cmd": [sys.executable, str(SCRIPTS_DIR / "features_bound.py"),
                 "--out", str(CAD_OUT)],
     }
@@ -4450,7 +4486,7 @@ def _prechips_task(stem: str) -> dict[str, Any]:
             str(manifest.resolve()),
             *_executed_closure(cmd),
         }),
-        "task_dep": [f"package:features:{stem}"],
+        "task_dep": [f"package:manifest:{stem}"],
         "targets": targets,
         # The wrapper runs the latest prechips release from PyPI (not a locked
         # dependency, #2502), so no local input pins the generator: always run.
@@ -4500,7 +4536,7 @@ def _cam_task(stem: str) -> dict[str, Any]:
         # as is the runtime's own hash, so the runtime's text is an input too
         # (the recipe, outside cad/scripts, is already keyed by bytes).
         "file_dep": sorted({*deps, _source_text_dep(label, [runtime])}),
-        "task_dep": [f"package:features:{stem}"],
+        "task_dep": [f"package:manifest:{stem}"],
         "targets": targets,
         # A failed post or check must not leave a previous success's stamp; the
         # driver removes every program and the manifest itself.
@@ -4653,6 +4689,43 @@ def _package_features_task() -> dict[str, Any]:
     }
 
 
+def _write_feature_manifest(stem: str) -> None:
+    """``package:manifest:<stem>``'s action (``_run`` cannot be the action
+    itself: doit refuses a callable declaring ``task`` with a default)."""
+    label = f"package:manifest:{stem}"
+    _run(
+        [sys.executable, str(SCRIPTS_DIR / "export_features.py"), stem, "--out", str(CAD_OUT)],
+        label,
+        f"manifest-{stem.replace('_', '-')}",
+        task=label,
+    )
+
+
+def _package_manifest_task(stem: str) -> dict[str, Any]:
+    """Bind ``stem``'s declarations to its labelled STEP(s), seat-free."""
+    return {
+        "name": f"manifest:{stem}",
+        "file_dep": _feature_manifest_file_deps(stem),
+        "task_dep": [f"package:features:{stem}"],
+        "targets": [str(_feature_manifest_output(stem))],
+        "actions": [(_write_feature_manifest, [stem])],
+        "clean": True,
+        "verbosity": 2,
+    }
+
+
+def _package_manifests_task() -> dict[str, Any]:
+    from export_features import SUPPORTED_PARTS
+
+    return {
+        "name": "manifest",
+        "task_dep": [f"package:manifest:{stem}" for stem in SUPPORTED_PARTS],
+        "file_dep": [str(path) for path in _feature_manifest_outputs()],
+        "actions": [],
+        "verbosity": 2,
+    }
+
+
 def _package_release_task() -> dict[str, Any]:
     deps = _package_file_deps()
     native = _package_cache_outputs()[0]
@@ -4684,8 +4757,10 @@ def task_package():
     """Feature aggregation and cache-keyed native release packaging.
 
     ``package:features`` is action-free and seat-free. Its explicit task edges
-    include every ``package:features:<stem>`` leaf in the packaged farm graph; file edges
-    require each leaf's complete adjacent STEP/manifest bundle.
+    include every ``package:features:<stem>`` COM leaf in the packaged farm graph;
+    file edges require each leaf's labelled STEPs and face inventories.
+    ``package:manifest:<stem>`` binds the drawing's declarations to them
+    without SolidWorks; ``package:manifest`` aggregates every manifest.
 
     ``package:release`` is the COM half of a release: SolidWorks Pack-and-Go of
     the top assembly and of every native drawing, merged and de-duplicated into
@@ -4700,7 +4775,9 @@ def task_package():
 
     for stem in SUPPORTED_PARTS:
         yield _package_feature_task(stem)
+        yield _package_manifest_task(stem)
     yield _package_features_task()
+    yield _package_manifests_task()
     yield _package_release_task()
 
 
@@ -4909,9 +4986,11 @@ def _canonical_targets(name: str) -> list[str]:
             # The feature factory already computes these outputs for its action;
             # both paths use this same cheap output-only helper.
             return [str(path) for path in _feature_export_outputs(subname.removeprefix("features:"))]
+        if subname.startswith("manifest:"):
+            return [str(_feature_manifest_output(subname.removeprefix("manifest:")))]
         if subname == "release":
             return [str(_package_cache_outputs()[0] / "native-package.json")]
-        if subname == "features":
+        if subname in ("features", "manifest"):
             return []
     if name == "export":
         return [
@@ -5124,12 +5203,13 @@ def canonical_target_owners(paths: Iterable[str] | None = None) -> dict[str, str
 
     feature_root = CAD_OUT / "features"
     if queried_namespace(feature_root) or _ownership_namespace_has_aliases(
-        feature_root, filenames=frozenset({"features.toml"}), suffixes=frozenset({".step"}),
+        feature_root, filenames=frozenset({"features.toml"}), suffixes=frozenset({".step", ".json"}),
     ):
         from export_features import SUPPORTED_PARTS
 
         for stem in SUPPORTED_PARTS:
             include(f"package:features:{stem}")
+            include(f"package:manifest:{stem}")
 
     traveler_root = CAD_OUT / "travelers"
     stamp_prefix = normalized(REPORTS) + "/prechips-"

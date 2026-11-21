@@ -407,8 +407,9 @@ uv run python farm_build.py cancel <run-id | tag> --why "superseded by <sha>"
 | `part:<stem>`, `assembly:<stem>`, `drawing:<stem>` | yes | yes | yes |
 | `verify_soundness:<stem>`, `verify:kinematics` | yes | yes | yes |
 | `export`, `package:release` | yes | yes | yes |
-| `package:features:<stem>` (one isolated STEP/requirements bundle) | yes | yes | yes |
+| `package:features:<stem>` (one isolated labelled STEP + face inventory) | yes | yes | yes |
 | `package:features` | no (aggregator) | no | — (its leaves are) |
+| `package:manifest:<stem>` (binds declarations into `features.toml`), `package:manifest` | **no** | no | no (submitter-side) |
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
 | `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget` | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
@@ -430,43 +431,53 @@ interactive pytest retains its cache and unrelated CAD recipes do not re-key.
 `package:features:<stem>` exports a bundle for every part with its own drawing
 (`export_features.SUPPORTED_PARTS`: `draw_<stem>.py` beside `build_<stem>.py`,
 131 parts; `test_part_coverage` holds it equal to the registry's part drawings).
+The COM leaf reads no drawing: it labels every native face (`HAF_F####`),
+writes `cad/out/features/<stem>/<dashed-stem>.STEP` and its
+`<dashed-stem>.faces.json` inventory (each label's native geometry, bound to the
+STEP's sha256), plus one STEP and inventory per non-default registry member, and
+uses `uptodate: [False]` to reach the cache probe even with existing local
+targets. Its key is the generic exporter closure, the config it reads for that
+part and the native part identity. The seat-free `package:manifest:<stem>`
+(`export_features.py <stem>`) then runs the drawing's face selectors over the
+inventory and writes `features.toml`; it is a plain doit task, not cached.
 Parts whose `draw_<stem>.py` has module-level
 `_feature_requirements.requirement(...)` declarations beside its printed drawing
 requirements (`DECLARED_PARTS`, derived by import-free AST discovery, not a
-maintained part list) name their faces and list features; every other part's
+maintained part list) list features; every other part's
 manifest has an empty `[features]` table and reads no drawing. Source-path
 construction is also static: neither operation imports draw modules during graph
-loading. Each declared leaf includes its own **entire draw-module
-closure**, cited-module/config inputs and native part identity. A draw-only edit
-does not re-key other feature leaves or native part/assembly builds; shared
-`_drawing_common`, layout-audit, `_pdf_ink` or drawing-helper edits re-key every
-declared feature leaf and no undeclared one. `Requirement` returns are registry descriptors for inspection
+loading. Each declared manifest depends on its own **entire draw-module
+closure** and cited-module/config inputs. A draw-only edit re-runs only that
+part's manifest task, never a COM leaf; shared `_drawing_common`, layout-audit,
+`_pdf_ink` or drawing-helper edits re-run every declared manifest task.
+`Requirement` returns are registry descriptors for inspection
 or explicit consumption, not automatic print-path wiring: the rocker consumes
 datum/rod-FCF fields and checks four imported native precisions against them.
 Feature precision requires explicit `part_metadata.precision_sources`; printed
 literals cite their actual notes or drawing function authority, not unrelated
 numeric symbols. Retained non-printed process values cite their route or native
 authority without claiming new sheet text.
-`package:features` is a seat-free aggregator over all those COM leaves. Each
-leaf writes `cad/out/features/<stem>/{<dashed-stem>.STEP,features.toml}` and uses
-`uptodate: [False]` to reach the cache probe even with existing local targets.
+`package:features` and `package:manifest` are seat-free aggregators.
 Python citations are `file.py#symbol` (no line numbers); YAML citations
 resolve scalar key paths. Missing cited symbols fail loudly. The manifest's
 `step_sha256` binds the raw adjacent STEP; this self-contained bundle is the
-consumer artefact. Full `export` waits for the bundles and copies their exact
-STEP bytes into its separate neutral inventory; it consumes bundle outputs,
-not draw closures directly. The release-only `check:features_bound` validates
-scoped recorded face refs, requires two rocker pivot-bore patches and identical
-scoped/full STEP bytes, and reports both digests. Release staging copies the
-verified scoped bundles under `features/`. `check:features_bound` is HA-owned:
-it checks part identity, the adjacent STEP name and sha256, the release
-revision (an older one is a stale bundle), a non-empty features table for a
-declared part (an empty one for any other) and each feature's face set against
-that STEP; neither it nor `export_features` validates against a prechips schema.
+consumer artefact. Full `export` waits for the labelled STEPs, checks each
+against its inventory and copies their exact bytes into its separate neutral
+inventory; it reads no manifest or draw closure. The release-only
+`check:features_bound` validates scoped recorded face refs, requires two rocker
+pivot-bore patches and identical scoped/full STEP bytes, and reports both
+digests. Release staging copies the verified scoped bundles under `features/`.
+`check:features_bound` is HA-owned: it checks each inventory against its STEP,
+part identity, the adjacent STEP name and sha256, the release revision (an
+older one is a stale bundle), a non-empty features table for a declared part
+(an empty one for any other) and that each feature's faces exist in that STEP
+and cover every face their labels carry; neither it nor `export_features`
+validates against a prechips schema.
 Without SolidWorks or a farm run, `cad/scripts/fetch_features.py <stem>` fills
 `cad/out/features/<stem>/` from the latest release (range-reads only that
-bundle; releases after v50 carry every drawn part's) and reports it STALE, writing nothing, when the part's recipe moved
-since that release.
+bundle; releases after v50 carry every drawn part's), rebinds `features.toml`
+to this checkout's declarations, and reports it STALE, writing nothing, when
+the part's geometry moved since that release.
 
 Each part whose `cad/process/<stem>/plan.toml` is not a placeholder (no
 `revision = "placeholder"`; `_process_plans.TRAVELER_STEMS` is derived from the
@@ -504,7 +515,7 @@ every output.
 prechips itself is stdlib-only: no FreeCAD, no geometry kernel, no report or
 hash certificate. The plan reads its CAD values from the part's
 `features.toml`, which must exist under `cad/out/features/<stem>/` (from a
-build's `package:features:<stem>` leaf, the task's only dependency, or fetched
+build's `package:manifest:<stem>` task, the task's only dependency, or fetched
 seat-free from a release by `cad/scripts/fetch_features.py <stem>`), and its machines, tools, settings
 and gauges from the shop directory `cad/process/shop/` (prechips merges its
 `*.toml` by section and refuses a key defined in two files; HA reads it through

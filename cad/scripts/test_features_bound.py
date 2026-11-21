@@ -14,34 +14,8 @@ import pytest
 import _config
 import export_features
 import features_bound
-from _export_feature_faces import face_name
-
-
-def _labels(stem: str, *, pivot_bore_faces: int = 2) -> list[str]:
-    """One face per feature; the split rocker pivot bore labels both halves."""
-    labels = [face_name(feature, 1) for feature in export_features.feature_selectors(stem)]
-    if stem == "ch_rocker_arm":
-        labels.extend([face_name("pivot_bore", 1)] * (pivot_bore_faces - 1))
-    return labels
-
-
-def _step(name: str, labels: list[str], *, stamp: str, first: int, stride: int) -> bytes:
-    """A STEP the way two separate SolidWorks writes differ: own header time,
-    own entity numbering, own face order. Unnamed faces carry ``'NONE'``."""
-    rows = [
-        "ISO-10303-21;",
-        "HEADER;",
-        "FILE_DESCRIPTION (( 'STEP AP214' ), '1' );",
-        f"FILE_NAME ('{name}', '{stamp}', ( '' ), ( '' ), 'SwSTEP 2.0', 'SolidWorks 2026', '' );",
-        "FILE_SCHEMA (( 'AUTOMOTIVE_DESIGN' ));",
-        "ENDSEC;",
-        "DATA;",
-    ]
-    for index, label in enumerate(["NONE", *labels, "NONE"]):
-        entity = first + stride * index
-        rows.append(f"#{entity} = ADVANCED_FACE ( '{label}', ( #{entity + 1} ), #{entity + 2}, .T. ) ;")
-    rows.extend(("ENDSEC;", "END-ISO-10303-21;"))
-    return "\n".join(rows).encode("ascii")
+from _export_feature_faces import FeatureFaceError, face_label, inventory_path
+from _test_feature_bundles import bind_manifest, write_bundle
 
 
 def _add_full_face(out: Path, stem: str, label: str) -> Path:
@@ -57,26 +31,24 @@ def _add_full_face(out: Path, stem: str, label: str) -> Path:
 def bound_output(tmp_path: Path, *, pivot_bore_faces: int = 2) -> Path:
     """Authoritative scoped bundles and their byte-identical neutral copies.
 
-    Manifests come from the real generator reading the scoped STEP it binds.
+    Manifests come from the real generator binding the real declarations'
+    feature names through the inventory; only the face selectors are doubles.
     """
     out = tmp_path / "cad" / "out"
+    (out / "step").mkdir(parents=True)
     for stem in export_features.SUPPORTED_PARTS:
-        labels = _labels(stem, pivot_bore_faces=pivot_bore_faces)
         _manifest, step = export_features.bundle_paths(stem, out)
-        name = step.name
-        step.parent.mkdir(parents=True)
-        step.write_bytes(_step(name, labels, stamp="2026-10-01T22:03:24", first=10, stride=1))
-        full = out / "step" / name
-        full.parent.mkdir(parents=True, exist_ok=True)
-        full.write_bytes(step.read_bytes())
+        selectors = write_bundle(stem, step, split={"pivot_bore": pivot_bore_faces})
+        (out / "step" / step.name).write_bytes(step.read_bytes())
         for cfg_step in export_features.configuration_step_paths(stem, out).values():
             cfg_step.write_bytes(step.read_bytes())
+            inventory_path(cfg_step).write_text(
+                inventory_path(step).read_text(encoding="utf-8").replace(step.name, cfg_step.name), encoding="utf-8",
+            )
             (out / "step" / cfg_step.name).write_bytes(step.read_bytes())
-        for cfg, member in export_features.member_step_paths(stem, out).items():
-            member_labels = [face_name(feature, 1) for feature in export_features.feature_selectors(stem, cfg)]
-            member.write_bytes(_step(member.name, member_labels, stamp="2026-10-01T22:03:25", first=10, stride=1))
+        for member in export_features.member_step_paths(stem, out).values():
             (out / "step" / member.name).write_bytes(member.read_bytes())
-        export_features.write_manifest(stem, step, revision=_config.release_revision())
+        bind_manifest(stem, step, selectors, revision=_config.release_revision())
     return out
 
 
@@ -141,13 +113,14 @@ def test_copied_exports_bind_and_stage_exact_scoped_bytes(
         for stem in export_features.SUPPORTED_PARTS
     }
     assert export_features.configuration_step_paths(configured_feature_part, out)
-    files = 2 * len(export_features.SUPPORTED_PARTS) + sum(map(len, configured.values()))
+    # Each part: its STEP, inventory and manifest; each extra STEP: itself and its inventory.
+    files = 3 * len(export_features.SUPPORTED_PARTS) + 2 * sum(map(len, configured.values()))
     assert len(checked) == len(staged) == len(expected) == files
     assert _tree(stage) == expected
     for stem in export_features.SUPPORTED_PARTS:
+        steps = [f"{stem.replace('_', '-')}.STEP", *(path.name for path in configured[stem].values())]
         assert {path.name for path in (stage / "features" / stem).iterdir()} == {
-            f"{stem.replace('_', '-')}.STEP", "features.toml",
-            *(path.name for path in configured[stem].values()),
+            "features.toml", *steps, *(inventory_path(Path(name)).name for name in steps),
         }
 
 
@@ -164,11 +137,12 @@ def test_missing_configuration_step_never_stages(
     assert not (tmp_path / "stage").exists()
 
 
-@pytest.mark.parametrize("member", [0, 1], ids=["manifest", "step"])
-def test_unproduced_feature_leaf_never_stages_a_partial_package(tmp_path: Path, member: int) -> None:
+@pytest.mark.parametrize("member", ["manifest", "step", "inventory"])
+def test_unproduced_feature_leaf_never_stages_a_partial_package(tmp_path: Path, member: str) -> None:
     out = bound_output(tmp_path)
     stem = export_features.SUPPORTED_PARTS[-1]
-    missing = export_features.bundle_paths(stem, out)[member]
+    manifest, step = export_features.bundle_paths(stem, out)
+    missing = {"manifest": manifest, "step": step, "inventory": inventory_path(step)}[member]
     missing.unlink()
     before = _tree(out)
     stage = tmp_path / "stage"
@@ -181,7 +155,7 @@ def test_unproduced_feature_leaf_never_stages_a_partial_package(tmp_path: Path, 
 @pytest.mark.parametrize(("mismatch", "diagnostic"), [
     ("label-set", "not the exact scoped copy"),
     ("patch-count", "not the exact scoped copy"),
-    ("adjacent-digest", "does not bind the adjacent STEP"),
+    ("adjacent-digest", "its STEP is"),
 ])
 def test_unbound_bundle_never_stages_or_repairs(
     tmp_path: Path, mismatch: str, diagnostic: str,
@@ -189,11 +163,10 @@ def test_unbound_bundle_never_stages_or_repairs(
     out = bound_output(tmp_path)
     # A declared part diverges; validation of every bundle precedes any staging.
     stem = export_features.DECLARED_PARTS[-1]
-    feature = next(iter(export_features.feature_selectors(stem)))
     if mismatch == "label-set":
-        _add_full_face(out, stem, face_name(feature, 2))
+        _add_full_face(out, stem, "HAF_F9999")
     elif mismatch == "patch-count":
-        _add_full_face(out, stem, face_name(feature, 1))
+        _add_full_face(out, stem, face_label(2))
     else:
         step = out / "features" / stem / f"{stem.replace('_', '-')}.STEP"
         step.write_bytes(step.read_bytes().replace(b"2026-10-01T22:03:24", b"2026-10-01T22:03:25"))
@@ -229,7 +202,7 @@ def test_swapped_manifest_face_never_passes_or_stages(tmp_path: Path) -> None:
         lambda: features_bound.check_bound_features(out),
         lambda: features_bound.stage_bound_features(out, stage),
     ):
-        with pytest.raises(features_bound.FeaturesBoundError, match=rf"{feature}.*faces"):
+        with pytest.raises(features_bound.FeaturesBoundError, match=r"claimed by features"):
             gate()
     assert not stage.exists()
     assert _tree(out) == before
@@ -270,12 +243,9 @@ def test_invalid_manifest_schema_never_stages(
     assert not stage.exists()
 
 
-def test_half_labelled_rocker_pivot_bore_fails_even_when_both_exports_agree(
-    tmp_path: Path,
-) -> None:
-    out = bound_output(tmp_path, pivot_bore_faces=1)
-    with pytest.raises(features_bound.FeaturesBoundError, match="pivot_bore must be exactly 2 STEP faces, found 1"):
-        features_bound.check_bound_features(out)
+def test_half_labelled_rocker_pivot_bore_never_binds(tmp_path: Path) -> None:
+    with pytest.raises(FeatureFaceError, match="pivot_bore: expected exactly 2 STEP patches, found 1"):
+        bound_output(tmp_path, pivot_bore_faces=1)
 
 
 @pytest.mark.parametrize("mismatch", ["part", "step", "duplicate-face"])
@@ -293,7 +263,7 @@ def test_bundle_identity_and_face_inventory_must_be_exact(tmp_path: Path, mismat
     else:
         feature = next(iter(manifest["features"].values()))
         feature["faces"].append(feature["faces"][0])
-        diagnostic = "differ from adjacent STEP"
+        diagnostic = "name no or repeated STEP faces"
     path.write_text(export_features._toml(manifest), encoding="utf-8")
     stage = tmp_path / "stage"
     with pytest.raises(features_bound.FeaturesBoundError, match=diagnostic):

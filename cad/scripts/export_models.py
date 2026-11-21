@@ -49,17 +49,19 @@ export above can run on a SolidWorks farm worker that has no renderer:
 ``--features <stem> ...`` is the separate feature-bundle producer
 (the doit ``package:features:<stem>`` leaves, aggregated by ``package:features``).
 For each supported part it writes ONLY ``cad/out/features/<stem>/<dashed>.STEP``
-(the named, default-configuration ``SaveAs3`` export full export consumes), one
-``<dashed>-<configuration>.STEP`` per configuration a multi-configuration part
-declares in its spec's ``FEATURE_STEP_CONFIGURATIONS``, and an adjacent
-``features.toml`` bound to the default STEP's raw bytes by ``export_features.write_manifest``.
-It never touches the global STEP/STL/PNG, colour, source-digest or release-neutral files:
+(every face labelled; the default-configuration ``SaveAs3`` export full export
+consumes), one ``<dashed>-<configuration>.STEP`` per configuration its spec lists
+in ``FEATURE_STEP_CONFIGURATIONS``, one ``<dashed>--<member>.STEP`` per
+non-default registry member, and beside each STEP its ``.faces.json`` face
+inventory. ``features.toml`` is bound to them later without SolidWorks
+(``export_features.py``, the ``package:manifest:<stem>`` task). It never touches
+the global STEP/STL/PNG, colour, source-digest or release-neutral files:
 
     uv run python cad\\scripts\\export_models.py --features ch_rocker_arm ch_pivot_shaft
 
-Full export requires every enrolled bundle to exist and validate before copying
-any STEP. Missing or unbound bundles fail loudly; run the corresponding
-``package:features:<stem>`` tasks first. Full export never regenerates their manifests.
+Full export requires every enrolled STEP and inventory to exist and agree before
+copying any STEP. Missing or unbound ones fail loudly; run the corresponding
+``package:features:<stem>`` tasks first. Full export reads no manifest.
 
 Heterogeneous purchased parts declare ``configuration_quantities`` and
 ``default_configuration`` in their registry row. Their changed ``part:<stem>``
@@ -117,8 +119,7 @@ from _part_configuration_exports import (  # noqa: E402
 from _session import _resident_output_documents, discard_open_documents, run_build  # noqa: E402
 from _stock_recipe import StockRecipeDeclaration  # noqa: E402
 from _buildgraph import ASSEMBLY_ORDER, part_stems  # noqa: E402
-import _config  # noqa: E402
-from _export_feature_faces import FeatureFaceError, name_feature_faces, step_face_sets  # noqa: E402
+from _export_feature_faces import label_all_faces, write_inventory  # noqa: E402
 
 import _telemetry  # noqa: E402
 
@@ -961,39 +962,25 @@ def _save_as(doc: Any, out: Path) -> int:
 
 
 def _feature_stems() -> tuple[str, ...]:
-    """Underscore stems whose STEP carries named requirement-feature faces."""
+    """Underscore stems whose feature bundle owns their labelled STEP."""
     from export_features import SUPPORTED_PARTS  # noqa: PLC0415 - static discovery
 
     return tuple(SUPPORTED_PARTS)
 
 
-def _save_feature_step(
-    doc: Any, stem: str, out: Path, *, reuse_names: bool = False, configuration: str | None = None,
-) -> None:
-    """The named STEP producer used only by ``--features``.
+def _save_feature_step(doc: Any, stem: str, out: Path) -> None:
+    """The labelled STEP producer used only by ``--features``.
 
-    Name ``stem``'s feature faces on the open part, ``SaveAs3`` under
-    :data:`EXPORT_PREFERENCES`, and read the labels back. Names are transient:
-    the caller closes the part unsaved and checks the native's SHA-256.
-    ``reuse_names`` exports a later configuration of the already-named part;
-    ``configuration`` names the shown member whose own requirements it names.
-    A part whose drawing declares no requirement names nothing: its STEP is the
-    same unlabelled ``SaveAs3`` full export writes, and must carry no feature label.
+    Label every face of the shown configuration (``label_all_faces``),
+    ``SaveAs3`` under :data:`EXPORT_PREFERENCES`, and write the face inventory
+    beside the STEP, which refuses a label missing from the STEP or a STEP face
+    without an inventory label. Labels are transient: the caller closes the
+    part unsaved and checks the native's SHA-256. No drawing is read: features
+    bind to the inventory later, without SolidWorks.
     """
-    from export_features import DECLARED_PARTS  # noqa: PLC0415 - static discovery
-
-    if stem not in DECLARED_PARTS:
-        _save_as(doc, out)
-        step_face_sets(out.read_text(encoding="latin-1"), ())
-        return
-    names = name_feature_faces(doc, stem, reuse=reuse_names, configuration=configuration)
+    records = label_all_faces(doc, stem)
     _save_as(doc, out)
-    faces = step_face_sets(out.read_text(encoding="latin-1"), names)
-    if stem == "ch_rocker_arm" and len(faces["pivot_bore"]) != 2:
-        raise FeatureFaceError(
-            f"{stem}.pivot_bore: expected exactly 2 STEP patches, "
-            f"found {len(faces['pivot_bore'])}"
-        )
+    write_inventory(out, records)
 
 
 def _active_configuration(doc: Any) -> str:
@@ -1710,21 +1697,19 @@ def refresh_comparison_gallery() -> None:
 
 
 def export_feature_bundles(stems: list[str]) -> int:
-    """Write one isolated named STEP and adjacent manifest per supported part.
+    """Write each supported part's labelled STEP(s) and face inventories.
 
-    Each part opens once, exports its authoritative named STEP, closes unsaved,
-    and must leave its native byte-identical before the manifest reads and
-    binds the just-written STEP. A part that declares
-    ``FEATURE_STEP_CONFIGURATIONS`` also exports each listed configuration,
-    shown in turn, as its own named STEP in the bundle; a drawing that
-    declares a member's own requirements exports that member, shown, named
-    and saved as its neutral member STEP. No global export output is touched.
+    Each part opens once, exports its authoritative labelled STEP, then each
+    configuration its spec lists in ``FEATURE_STEP_CONFIGURATIONS`` and each
+    non-default registry member, shown in turn, as its own labelled STEP, and
+    closes unsaved; its native must stay byte-identical. ``features.toml`` is
+    written afterwards without SolidWorks (``export_features.py``, the
+    ``package:manifest:<stem>`` task). No global export output is touched.
     """
     from export_features import (  # noqa: PLC0415
         bundle_paths,
         configuration_step_paths,
         member_step_paths,
-        write_manifest,
     )
 
     natives = {stem: OUT_SLDPRT / f"{stem.replace('_', '-')}.SLDPRT" for stem in stems}
@@ -1746,17 +1731,16 @@ def export_feature_bundles(stems: list[str]) -> int:
                 doc = adapter.currentModel
                 _save_feature_step(doc, stem, step)
                 log(f"saved {step.name} ({step.stat().st_size / 1e6:.1f} MB)")
-                for cfg, cfg_step in configuration_step_paths(stem, OUT_FEATURES.parent).items():
+                shown = {
+                    **configuration_step_paths(stem, OUT_FEATURES.parent),
+                    **member_step_paths(stem, OUT_FEATURES.parent),
+                }
+                for cfg, cfg_step in shown.items():
                     _switch_configuration(adapter, doc, stem, cfg)
-                    _save_feature_step(doc, stem, cfg_step, reuse_names=True)
+                    _save_feature_step(doc, stem, cfg_step)
                     log(f"saved {cfg_step.name} ({cfg_step.stat().st_size / 1e6:.1f} MB)")
-                for cfg, member_step in member_step_paths(stem, OUT_FEATURES.parent).items():
-                    _switch_configuration(adapter, doc, stem, cfg)
-                    _save_feature_step(doc, stem, member_step, configuration=cfg)
-                    log(f"saved {member_step.name} ({member_step.stat().st_size / 1e6:.1f} MB)")
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
                 _require_native_unchanged(native, native_sha)
-                write_manifest(stem, step, revision=_config.release_revision())
             done[stem] = "exported"
         return done
 

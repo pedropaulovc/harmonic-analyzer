@@ -16,24 +16,45 @@ list. `package:features` is a seat-free
 aggregator depending on every `package:features:<stem>` leaf, not a COM export action.
 This namespace is interim until `solidworks-pool` admits top-level `features` targets; no pool change is included.
 Each leaf's native dependency is its own part, not assemblies or drawing
-artefacts. Parts with an enrolled (non-placeholder) plan feed their manifest to a
-prechips traveler, and parts with a CAM recipe feed it and its STEP
-to their NC programs (below). Fixture bundles expose drawing requirements too.
-Each leaf writes only its own self-contained bundle:
+artefacts, and it reads no drawing: it labels and exports geometry only.
+`package:manifest:<stem>` (seat-free, `export_features.py <stem>`) then binds
+the drawing's declarations to that geometry and writes `features.toml`;
+`package:manifest` aggregates them. Parts with an enrolled (non-placeholder)
+plan feed their manifest to a prechips traveler, and parts with a CAM recipe
+feed it and its STEP to their NC programs (below). Fixture bundles expose
+drawing requirements too. Each part's bundle is self-contained:
 
 ```text
 cad/out/features/<underscore-stem>/
-  <dashed-stem>.STEP
-  features.toml
+  <dashed-stem>.STEP          (COM leaf: every face labelled)
+  <dashed-stem>.faces.json    (COM leaf: face inventory bound to that STEP)
+  features.toml               (package:manifest:<stem>, no SolidWorks)
 ```
 
-The manifest's `step` is the adjacent STEP basename and `step_sha256` binds its
-raw bytes, verified when the manifest is generated directly from that STEP.
-The STEP plus `features.toml` is the consumer artefact; there are no feature
-receipts or preservation certificates. `export_features.py` is SolidWorks-free.
+The COM leaf gives every native face a deterministic ASCII label with
+`IPartDoc::SetEntityName` (`HAF_F0001`..., numbered by rounded box, then walk
+position; a face SolidWorks already named, e.g. for a mate, keeps its name),
+reads each back, exports the STEP with face/edge properties on so the labels
+reach its `ADVANCED_FACE` entities (a split periodic face carries its label on
+both halves), and closes the part unsaved. Beside each STEP,
+`<stem>.faces.json` (`harmonic-analyzer/face-inventory@1`) records the STEP's
+`step_sha256` and, per label, the native surface identity, parameters, outward
+normal and box: exactly what the drawing's face selectors read. Its labels must
+be exactly the STEP's face labels.
 
-An undeclared part's leaf names no face: its STEP is the same unlabelled
-`SaveAs3` the full export writes, and must carry no feature label. Its manifest
+The manifest step runs each declared feature's selectors (`FaceSpec.matches`,
+the matcher the native walk used to run) over the inventory's recorded
+geometry, then lists every STEP face the claimed labels carry as
+`#<entity>/ADVANCED_FACE[<ordinal>]/<label>`. A new or changed `requirement(...)`
+declaration therefore binds to an already-exported (or fetched) STEP without
+SolidWorks; only a geometry or exporter change needs the COM leaf. A selector
+that matches no recorded face, or a face two features claim, fails the
+manifest. The manifest's `step` is the adjacent STEP basename and `step_sha256`
+binds its raw bytes. The STEP, inventory and `features.toml` are the consumer
+artefact; there are no feature receipts or preservation certificates.
+`export_features.py` is SolidWorks-free.
+
+An undeclared part's manifest binds no feature. It
 reads no drawing module and holds what needs no declaration: `part`, `units`,
 the release `drawing.revision` and `number`, `material`, `step` and
 `step_sha256`, `general_tolerances`, `notes.process` and `edge_break`, the model
@@ -45,10 +66,11 @@ declares no requirement, whereas a missing or unparseable manifest is an error.
 
 The ordinary full `export` owns `cad/out/step/`, the other existing neutral
 outputs and `release-neutral.json`. For enrolled feature parts it validates and
-consumes the scoped feature bundles, copying their exact STEP bytes into the
-full neutral inventory instead of loading draw declarations or re-deriving
-manifests. It waits for `package:features`; the scoped leaves never overwrite
-full-export paths, STL/PNG outputs, colors or source-digest ledgers.
+consumes the labelled STEPs (each must agree with its inventory), copying their
+exact bytes into the full neutral inventory instead of loading draw
+declarations; it reads no manifest, so a declaration edit never re-keys it. It
+waits for `package:features`; the scoped leaves never overwrite full-export
+paths, STL/PNG outputs, colors or source-digest ledgers.
 
 Run COM leaves through
 [`farm_build.py`](../../../DEVELOPING.md#farm-builds-farm_buildpy),
@@ -85,18 +107,18 @@ Shared-helper sources name their defining module, such as
 `_drawing_common` module is not the authority for helpers extracted from it.
 
 When a configured producer's rework spans members, a requirement for a
-non-default member names it with a literal `configuration="<Member>"` keyword
-(no current part declares one; the oblique jig's leadscrew kit `FeedNut` did until
-2026-11-17). `export_models --features` shows that
-member after the default export, names only its requirements' faces and saves
-`<part>--<mesh key>.STEP` beside the bundle STEP (the member's
+non-default member names it with `configuration="<Member>"` (no current part
+declares one; the oblique jig's leadscrew kit `FeedNut` did until 2026-11-17).
+`export_models --features` shows every non-default registry member after the
+default export, labels its faces and saves `<part>--<mesh key>.STEP` and its
+inventory beside the bundle STEP (the member's
 `_part_configuration_exports.mesh_key`, lowercased: a `FeedNut` member saves
-`<part>--feednut.STEP`), the same name as the full
-export's neutral member STEP, which `features_bound` then requires to be that
-exact copy. The manifest marks each such feature with `configuration` and
-records the member STEP and its digest under `member_steps.<Member>`; the
-feature's `faces` bind that STEP. Members are read statically from the
-keywords and must be registry members other than the default.
+`<part>--feednut.STEP`), the same name as the full export's neutral member
+STEP, which `features_bound` then requires to be that exact copy. Every member
+is exported whether or not a declaration names it, so a later member
+declaration binds offline too. The manifest records every member STEP and its
+digest under `member_steps.<Member>`, marks each member feature with
+`configuration`, and binds that feature's `faces` to its member's STEP.
 
 Part-level fields, geometry frames and drawing datums use colocated
 `part_metadata` declarations with the same `(value, sources)` pairs; explicit
@@ -196,67 +218,74 @@ current top-level declarations or registered requirement/metadata calls.
 ## Face identity and native hygiene
 
 Scoped feature exports and full exports of other parts use the same AP214
-preference/default-configuration/naming path. `swStepExportFaceEdgeProps`
-exposes deterministic transient native entity names.
-Existing `_part_pmi` geometry matchers resolve each feature to every
-matching native patch. Zero matches, cross-feature claims, failed name/read-back
-or missing/unknown exported labels fail loudly. A periodic native face can yield
-multiple `ADVANCED_FACE` patches with the same label; all belong to its feature
-set. References include STEP entity id, file-order ordinal and raw label, valid
-only with that exact STEP digest. The STEP is never rewritten.
+preference/default-configuration path. `swStepExportFaceEdgeProps` exposes the
+transient native entity names, so every exported face carries its label.
+The manifest step resolves each feature to every matching recorded face with
+the drawing's existing geometry selectors. Zero matches, cross-feature claims,
+failed label read-back, an inventory label that labels no STEP face, or a STEP
+face whose label the inventory lacks, fail loudly. A periodic native face can
+yield multiple `ADVANCED_FACE` patches with the same label; all belong to its
+feature set. References include STEP entity id, file-order ordinal and raw
+label, valid only with that exact STEP digest. The STEP is never rewritten.
 
-Names are never saved into the native part. A before/after native SHA guard runs
-after closing the export document. Offline parser tests cover split patches and
-ambiguous/lost labels. The rocker pivot bore must carry two labelled STEP patches;
-one surviving half is a failure even if the full inventory copies that mistake.
+Labels are never saved into the native part. A before/after native SHA guard
+runs after closing the export document. Offline tests cover split patches and
+ambiguous/lost labels. The rocker pivot bore must bind two STEP patches
+(`export_features.STEP_FACE_COUNTS`); one surviving half fails the manifest and
+the release gate.
 
 ## Release binding gate
 
 `check:features_bound` is SolidWorks-free and required by `release`, not `build`.
-It waits for scoped bundles and the full neutral inventory. Its checks are
-HA-owned; no prechips schema is involved. It requires the manifest's `part` to
-identify the bundle's part, its `step` to name the adjacent STEP and its
-`step_sha256` to match that STEP's raw bytes, its `drawing.revision` to be the
-revision being released (an older one is a stale bundle), a non-empty
-`features` table of tables for a declared part and an empty one for any other,
-and every feature's recorded face set to equal the references parsed
-from that STEP. A mismatch fails with the feature name
-before any bundle is staged. The gate requires byte-identical scoped and full
-STEPs, reports both raw digests, and retains the split rocker pivot-bore patch
-check. Full export now copies the scoped STEP bytes: this checks authoritative
-bundle binding and copied neutral inventory, not an independent-session COM
-re-export.
+It waits for scoped bundles, their manifests and the full neutral inventory.
+Its checks are HA-owned; no prechips schema is involved. Every STEP's inventory
+must bind that STEP's bytes and name exactly its face labels. It requires the
+manifest's `part` to identify the bundle's part, its `step` to name the
+adjacent STEP and its `step_sha256` to match that STEP's raw bytes, its
+`drawing.revision` to be the revision being released (an older one is a stale
+bundle), a non-empty `features` table of tables for a declared part and an
+empty one for any other, `member_steps` to bind every member STEP, and every
+feature's recorded faces to be existing STEP faces (entity id, ordinal and
+label) that cover every face their labels carry, with no label claimed by two
+features. It does not reload declarations. A mismatch fails before any bundle
+is staged. The gate requires byte-identical scoped and full STEPs, reports both
+raw digests, and retains the split rocker pivot-bore patch check. Full export
+copies the scoped STEP bytes: this checks authoritative bundle binding and
+copied neutral inventory, not an independent-session COM re-export.
 
-Release staging copies the verified scoped STEP and manifest under `features/`,
-separately from the existing full neutral inventory. Each face reference remains
-bound only to the adjacent STEP whose digest the manifest records.
+Release staging copies the verified scoped STEPs, inventories and manifest
+under `features/`, separately from the existing full neutral inventory. Each
+face reference remains bound only to the adjacent STEP whose digest the
+manifest records.
 
-Each declared part's `package:features:<stem>` cache key includes the **entire** closure of its own
-draw module, symbol-citation module closures, registry/config dependencies,
-release revision and native part artefact identity/execution token, plus shared
-exporter/helper sources. Declaration discovery and source-path construction
-parse Python statically without importing draw modules; declaration values are
-validated when exporting.
-A draw-only edit re-keys that part's features leaf, not the other features
-leaves or its native part/assembly builds. This is file-granular coupling, not
-declaration-only coupling: edits to shared drawing helpers, `_drawing_common`,
-layout-audit helpers or `_pdf_ink` re-key every declared feature leaf.
-An undeclared part's key holds no draw module: the exporter, the closure of its
+Each part's `package:features:<stem>` cache key is the generic exporter's
+source closure, the config that closure reads for that part (its registry row,
+`title_block.yaml`, `release.yaml`; never another part's row) and the native
+part artefact identity/execution token. It holds no drawing module, so no
+declaration or drawing edit re-keys a COM leaf.
+
+`package:manifest:<stem>` is not cached: it is a seat-free doit task whose file
+dependencies are the **entire** closure of the part's draw module (declared
+parts), symbol-citation module closures, registry/config dependencies, the
+release revision and the labelled STEPs and inventories it binds. Declaration
+discovery and source-path construction parse Python statically without
+importing draw modules; declaration values are validated when the manifest is
+written. A draw-only edit re-runs that part's manifest task, not any COM leaf
+or native part/assembly build; edits to shared drawing helpers,
+`_drawing_common`, layout-audit helpers or `_pdf_ink` re-run every declared
+part's manifest task, each a fraction of a second. An undeclared part's
+manifest holds no draw module: the exporter, the closure of its
 `DRAWING_NOTES` owner, the notes/spec files read to find it, its builder file
-(the frame citation), registry/config, the release revision and the native part
-identity, so no drawing edit re-keys it.
-Because every key holds the release revision, each release-revision bump
-re-runs all 131 `package:features:<stem>` SolidWorks leaves (123 more than the
-eight declared parts): each opens the native part, saves the STEP and closes, about
-10 s of seat time plus the per-leaf farm overhead (roughly 2-2.5 worker-hours,
-15-20 min wall at farm parallelism 8 on an idle queue). The full export still
-opens each part again for STL/PNG, so the STEP work moves rather than
-disappears; the added cost is the per-leaf dispatch and the second open.
-Full `export` consumes bundle outputs rather than the draw closures directly;
-changed bundle bytes can therefore re-key it downstream. Feature leaves use
-`uptodate: [False]`, like full export, so each invocation reaches the cache probe
-even when local targets exist; target existence alone does not certify a bundle.
-The seat-free `package:features` aggregator has no all-parts COM source key.
+(the frame citation), registry/config and the release revision.
+The release revision keys only the manifest tasks: no COM leaf reads it, so a
+release-revision bump re-runs the 131 seat-free `package:manifest:<stem>` tasks
+and no `package:features:<stem>` SolidWorks leaf.
+Full `export` consumes the labelled STEPs and inventories rather than any
+manifest or draw closure; changed STEP bytes can therefore re-key it
+downstream. Feature leaves use `uptodate: [False]`, like full export, so each
+invocation reaches the cache probe even when local targets exist; target
+existence alone does not certify a bundle. The seat-free `package:features`
+and `package:manifest` aggregators have no all-parts COM source key.
 YAML comment-only edits do not change parsed dependencies; key-path citations
 remain valid without forcing a rebuild for shifted lines. There is no raw-YAML
 feature-task override; conservative dependency fallbacks may over-rebuild,
@@ -322,7 +351,7 @@ uvx --from prechips@latest prechips traveler cad/process/<stem>/plan.toml --prof
 ```
 
 Both need the part's feature manifest at `cad/out/features/<stem>/features.toml`:
-from a build (the task's `package:features:<stem>` dependency produces it), or
+from a build (the task's `package:manifest:<stem>` dependency produces it), or
 fetched from a release with no SolidWorks and no farm run:
 
 ```text
@@ -332,14 +361,20 @@ uv run --frozen python cad/scripts/fetch_features.py <stem> [--release vNN]
 Releases cut after v50 ship every drawn part's bundle under `features/<stem>/`
 (v50 and earlier only the declared parts', so an older `--release` fails for
 any other part with "the release carries no ... bundle"); the script
-range-reads just those ZIP members, refuses a bundle that does not bind its
-STEP, and reports it STALE (exit 2, nothing written unless `--accept-stale`)
-when the part's `part:<stem>` (geometry) or `package:features:<stem>` (manifest)
-recipe files differ between the release's tag and the working tree, or the
-bundle disagrees with this checkout's declarations. With the bundle in place
-run the wrapper or `uvx` form (and `cad/scripts/cam_nc.py <stem>` for NC); the
-doit tasks would first run the feature leaf. Both always use the latest
-prechips release from PyPI, so they need `uv` and network access to PyPI.
+range-reads just those ZIP members and refuses a bundle that does not bind its
+STEP. When the part's `geometry` inputs (`part:<stem>` and the labelled-STEP
+export code) differ between the release's tag and the working tree it reports
+the bundle STALE (exit 2, nothing written unless `--accept-stale`): only a farm
+build of `package:features:<stem>` makes it current. Otherwise it rebinds
+`features.toml` from this checkout's declarations over the fetched STEPs and
+inventories, exactly as `package:manifest:<stem>` would, so a new or changed
+`requirement(...)` needs no farm run. A release cut before face inventories
+shipped cannot be rebound: a declaration change against it is STALE. With the
+bundle in place run the wrapper or `uvx` form (and `cad/scripts/cam_nc.py
+<stem>` for NC); the doit tasks would first run the feature leaf. Both always
+use the latest prechips release from PyPI, so they need `uv` and network access
+to PyPI. After editing declarations on top of a local bundle, rerun
+`uv run --frozen python cad/scripts/export_features.py <stem>` to rebind it.
 
 The task runs `cad/scripts/prechips_traveler.py <stem>`, which removes any
 previous `traveler.html`, `traveler-hobby.html` and `<slug>-traveler.pdf` under
@@ -379,7 +414,8 @@ and removes every output. The task is
 SolidWorks-free, submitter-only (including under the farm executor) and not
 remote-cache-keyed. Because its generator version floats, it always runs when
 requested (`uptodate: [False]`). Its only task dependency is its own
-`package:features:<stem>` leaf. Its file dependencies are every file in the
+`package:manifest:<stem>` task (which needs the `package:features:<stem>`
+leaf). Its file dependencies are every file in the
 plan directory (including the `diagrams/*.svg` setup pictures the hobby sheet
 embeds), every shop directory file, the scoped `features.toml` and the wrapper's
 script closure. Its targets are the stamp
@@ -426,7 +462,7 @@ later). `build` and `release` run every enrolled one and `build_bare` runs
 none (owner ruling 2026-11-17). Like a traveler, the task is SolidWorks-free,
 submitter-only (including under the farm executor: no farm worker has
 FreeCAD) and not remote-cache-keyed, and its only task dependency is its own
-`package:features:<stem>` leaf. Its file dependencies are the recipe, its
+`package:manifest:<stem>` task. Its file dependencies are the recipe, its
 plan, every shop directory file, the scoped `features.toml` and STEP, the
 FreeCAD runtime script and the driver's script closure, so a CAD change
 re-posts the programs. Its targets are the stamp
