@@ -1,23 +1,162 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# the drawing cross-check of 2026-11-19, until its traveler is written. Not
-# enrolled in _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Crank handle ferrule MHA-DT-34, one off, turned on the manual PM-1127VF-LB
+# (owner ruling 2026-11-21: turned parts get lathe travelers, no NC). Route
+# chosen for speed: one chucking on 9/16 in C36000 rod, its outside left as
+# supplied (drawing: ROD AS SUPPLIED, skimmed with MHA-DT-08 after cure):
+# mike the rod, face the end (Z0), spot, drill N (.302, inside the drawing's
+# .298-.308 BORE THRU) past the parting line, part off .28 from the faced
+# end; the parted face is the ferrule's other face, held to the .27-.29 band
+# by the DRO. A drill, not a boring bar: no boring bar under 3/8 in is on
+# record (cad/process/shop), and N lands inside the band. Bench: deburr,
+# check length and hole, and tag the hole's pin size for MHA-DT-08, whose
+# tenon is turned to it.
+#
+# Stock: 9/16 in C36000 rod is to order (cad/config/shop-equipment/
+# stock-to-order.toml c360-round-9-16, 1.5 in); none is on hand.
 title = "Crank Handle Ferrule"
-part = "MHA-DT-34 Crank Handle Ferrule"
-revision = "placeholder"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
 material = "C36000 free-machining brass rod, 9/16 in"
-stock = "To be written"
+stock = "Lot: {{process.quantity:d}} ferrule. Ø{{process.stock_dia_in:.4dot}} rod, at least {{process.bar_length_in:g}} in (to order, not on hand); the ferrule takes {{cad.pitch_in:.2dot}} in of it."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry."
 shop = "../shop"
 stock_refs = ["c360-round-9-16"]
+material_key = "lathe-c360"
+
+[cad]
+file = "../../out/features/dt_crank_handle_ferrule/features.toml"
+adapter = "turned_bush"
+part = "dt-crank-handle-ferrule"
+
+[parameters]
+quantity = 1
+stock_dia_in = 0.5625
+# The 1.5 in piece to order and the length the 3-jaw grips of it.
+bar_length_in = 1.5
+chuck_grip_in = 0.75
+# Facing allowance: squares a sawn rod end.
+face_allowance_in = 0.02
+# Parting kerf: 1/8 in blade plus the insert's side clearance (authored).
+part_kerf_in = 0.13
+parts_per_pull = 1
+# The parting blade's clearance to the jaw fronts.
+jaw_clearance_in = 0.1
+
+[[tools]]
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "centre"
+name = "No. 3 centre drill"
+ref = "centre-drills-carbide-60"
 
 [[tools]]
 id = "drill-n"
 name = "N drill"
-ref = "drill-n"  # drawing cross-check 2026-11-19: .303 BORE THRU (N drill .302 inside .XXX)
+ref = "drill-n"
+
+[[tools]]
+id = "cutoff"
+name = "Cutoff blade"
+ref = "cutoff-blade-holder"
+
+[[tools]]
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Rod: face, drill N, part off"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the Ø{{process.stock_dia_in:.4dot}} rod, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
+datum = "Z0 (carriage DRO) the rod end faced in Op 20."
+diagram = { file = "diagrams/bar.svg", alt = "The 9/16 in rod in the 3-jaw: the end faced, centre-spotted and drilled N past the parting line; the ferrule parted off {{cad.part_off_in:.2dot}} from the faced end." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Mike the rod where the ferrule will come from: every reading at least {{cad.outer_stock_dia_min_in:.4dot}}, else stop (the outside is left as supplied)."
+inspection = "Rod Ø{{cad.outer_stock_dia_min_in:.4dot}} min."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{cad.outer_stock_dia_min_mm}}", "{{cad.outer_dia_mm}}"] }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the rod end square, {{process.face_allowance_in:.2dot}} in off; set DRO Z0 on it."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock, about Ø.20 across the countersink: under the N drill, so the drill removes it."
+settings = "lathe-centre-c360"
+cut_diameter_mm = 2.778
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-n"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Drill N (.302) {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale, through the ferrule and past the parting line (a BORE callout: the .XXX ±.005 row, Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}})."
+settings = "lathe-drill-n-c360"
+cut_diameter_mm = 7.6708
+hole_depth_mm = "{{cad.run_mm}}"
+peck = "none"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off at Z-{{cad.part_off_in:.3dot}}. Catch the ferrule."
+settings = "lathe-part-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Bench: deburr, inspect and tag the bore"
+machine = "Bench"
+envelope = "other"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished ferrule: its {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} length, the rod outside as supplied and the N hole through." }
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr: file the parting burr off the parted face flat on the smooth file, break the outside edges and both ends of the hole, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Length {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} across the faces, calipers; the hole takes the {{cad.bore_dia_min_in:.3dot}} pin gauge and not the {{cad.bore_dia_max_in:.3dot}}."
+inspection = "Length {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}}; hole Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }, { gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A ferrule that fails a check in Op 70 is scrapped, not reworked: make another by repeating Setup 1 and Ops 60–70."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Tag the ferrule with the largest pin that enters its hole: {{cad.bore_mate}} is turned to that size less {{cad.bore_clearance_ref_min_in:.3dot}}–{{cad.bore_clearance_ref_max_in:.3dot}}."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The ferrule leaves this traveler bare. Its outside skim to the installed diameter with {{cad.bore_mate}} after the bond cures (drawing note 1) and the drawing's clear-lacquer finish are both done there, after bonding, not here."
+feed = "hand"

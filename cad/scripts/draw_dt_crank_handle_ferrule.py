@@ -49,14 +49,19 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _printed_limits import limits
 from _supplier_dimensions import supplier_reference_dimension
 from _section_axis import create_section_axis_centerline, position_section_caption
 from _session import run_build
 import _telemetry
 from dt_crank_handle_ferrule_notes import (
     BORE_FIT_CALLOUT,
+    HANDLE_NUMBER,
     OUTER_DIA_CALLOUT,
     SHEET_NOTES,
 )
@@ -66,8 +71,11 @@ from dt_crank_handle_ferrule_spec import (
     DRAWING_PRECISION_BY_NAME,
     LENGTH,
     OUTER_DIA,
+    STOCK_DIA_MIN,
     STOCK_FRACTION_DENOMINATOR,
+    TENON_GLUE_LINE,
     UNIT,
+    WALL_WORST,
 )
 
 
@@ -128,6 +136,98 @@ SECTION_KEEP = {
 }
 CUT_START = (END_CENTER[0], END_CENTER[1] - OUTER_R - 0.006)
 CUT_END = (END_CENTER[0], END_CENTER[1] + OUTER_R + 0.006)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_dt_crank_handle_ferrule: one revolve about model +X; the arm-bearing
+# face at x = 0, the datum end the length runs from; the seat face at x =
+# LENGTH). The O.D. is the 9/16 rod as supplied (a REF, skimmed at
+# MHA-DT-08, note 1); the bore takes the title block's .XXX row (BORE names
+# the process, not DRILLED HOLES) and names its bonded tenon; the length the
+# .XX row. Each ``span`` is a diameter's model-X extent. The declarations
+# print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_NOTES = "dt_crank_handle_ferrule_notes"
+_SELF = "draw_dt_crank_handle_ferrule"
+part_metadata(
+    model_sources=("LENGTH", "OUTER_DIA", "BORE_DIA"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "x", "value": 0.0}, ("LENGTH",)),
+        "outward": ([-1.0, 0.0, 0.0], ("LENGTH",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": ({"frame": "model", "axis": "x", "value": LENGTH}, ("LENGTH",)),
+        "outward": ([1.0, 0.0, 0.0], ("LENGTH",)),
+        "length": (
+            limits(LENGTH, _P["Length"], unit=UNIT),
+            ("LENGTH", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "length_nominal": (LENGTH, ("LENGTH",)),
+        "length_from": ("datum_end", ((_SELF, "SECTION_KEEP"),)),
+    },
+    precision={"length": _P["Length"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(OUTER_DIA),),
+    requirements=("stock",),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], ("OUTER_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("OUTER_DIA",)),
+        "span": ([0.0, LENGTH], ("LENGTH",)),
+        "dia_ref": (
+            OUTER_DIA,
+            ("OUTER_DIA", "REFERENCE_DIMENSIONS", "STOCK_FRACTION_DENOMINATOR"),
+        ),
+        "stock_dia_min": (STOCK_DIA_MIN, ("STOCK_DIA_MIN",)),
+        "stock": (OUTER_DIA_CALLOUT, ((_NOTES, "OUTER_DIA_CALLOUT"),)),
+        "callout": (OUTER_DIA_CALLOUT, ((_NOTES, "OUTER_DIA_CALLOUT"),)),
+    },
+    precision={"dia_ref": _P["OuterDia"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(BORE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], ("BORE_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("BORE_DIA",)),
+        "span": ([0.0, LENGTH], ("LENGTH",)),
+        "dia": (
+            limits(BORE_DIA, _P["BoreDia"], unit=UNIT),
+            ("BORE_DIA", "BORE_DIA_TOL", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
+        "thru": (True, ((_NOTES, "BORE_FIT_CALLOUT"),)),
+        "process": ("bore", ((_NOTES, "BORE_FIT_CALLOUT"),)),
+        "diametral_clearance_ref": (
+            list(TENON_GLUE_LINE),
+            ("TENON_GLUE_LINE", (_NOTES, "BORE_FIT_CALLOUT")),
+        ),
+        "mate": (
+            f"{HANDLE_NUMBER} TENON",
+            ((_NOTES, "HANDLE_NUMBER"), (_NOTES, "BORE_FIT_CALLOUT")),
+        ),
+        "wall_min": (WALL_WORST, ("WALL_WORST",)),
+        "callout": (BORE_FIT_CALLOUT, ((_NOTES, "BORE_FIT_CALLOUT"),)),
+    },
+    precision={"dia": _P["BoreDia"]},
+)
 
 
 def build(adapter: Any) -> dict[str, str]:

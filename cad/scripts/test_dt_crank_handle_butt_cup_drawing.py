@@ -81,13 +81,13 @@ def test_pocket_names_its_mate_once_on_one_flag_note() -> None:
     # The body's bond is a matched fit on flag note 2: the .XXX grade alone
     # cannot give the glue line, so the route prints (round 2 review).
     assert drawing.DIMENSION_CALLOUTS["BodyDia"] not in flags
-    body = drawing.BODY_NOTE_TEXT
+    body = notes.BODY_NOTE_TEXT
     assert body.startswith("2. ") and len(body.splitlines()) <= 2
     assert _config.parts("dt-crank-handle")["number"] in body
     assert "CLEARANCE" in body
     assert drawing.NOTES_TEXT.splitlines() == [
         *notes.POCKET_NOTE_TEXT.splitlines(),
-        *drawing.BODY_NOTE_TEXT.splitlines(),
+        *notes.BODY_NOTE_TEXT.splitlines(),
     ]
 
 

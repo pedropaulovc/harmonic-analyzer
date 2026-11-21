@@ -59,31 +59,44 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
 from _section_axis import create_section_axis_centerline, position_section_caption
 from _session import run_build
 import _telemetry
 from dt_crank_handle_butt_cup_notes import (
     BODY_CHAMFER_CALLOUT,
+    BODY_FLAG,
+    DRAWING_NOTES as NOTES_TEXT,
     FLOOR_HOLE_CALLOUT,
     FLOOR_HOLE_CHAMFER_CALLOUT,
     HANDLE_NUMBER,
     POCKET_FIT_CALLOUT,
     POCKET_FLAG,
-    POCKET_NOTE,
-    POCKET_NOTE_TEXT,
+    SCREW_NAME,
+    SCREW_NUMBER,
 )
 from dt_crank_handle_butt_cup_spec import (
+    BODY_CHAMFER,
     BODY_DIA,
     FLOOR_HOLE_DIA,
     OVERALL_LENGTH,
+    POCKET_CLEARANCE,
     POCKET_DEPTH,
+    POCKET_DIA,
+    POCKET_DIA_MAX,
     POCKET_FLOOR_CORNER_R_BAND,
     POCKET_FLOOR_CORNER_R_MAX,
     POCKET_FLOOR_CORNER_R_TOL_TYPE,
+    POCKET_WALL_MIN,
     REFERENCE_DIMENSIONS,
+    UNIT,
 )
 from dt_crank_handle_butt_cup_seat_spec import (
     CUP_DRAWING_DIMENSIONS as DRAWING_DIMENSIONS,
@@ -178,27 +191,6 @@ SECTION_KEEP = {
         SECTION_CENTER[1] + BODY_R + 0.041,
     ),
 }
-# The body is bonded in the MHA-DT-08 counterbore: a matched bonded fit,
-# turned to the measured counterbore, whose diametral clearance is the
-# handle's glue line, REF (rules 4 and 26; rule 23: epoxy, wood to metal).
-# The fit lives on flag note 2: printed on the dimension (round 2) its two
-# lines ran into the floor-hole dimension line, and the .XXX grade alone
-# cannot give a .004-wide clearance, so the matched route must be printed.
-_MM_PER_IN = 25.4
-BODY_NOTE = POCKET_NOTE + 1
-BODY_FLAG = f"SEE NOTE {BODY_NOTE}"
-BODY_NOTE_TEXT = "\n".join(
-    (
-        f"{BODY_NOTE}. BODY: BONDED FIT IN {HANDLE_NUMBER} CRANK HANDLE, EPOXY:",
-        "   TURN TO THE MEASURED COUNTERBORE (CLEARANCE "
-        + "-".join(
-            f"{value / _MM_PER_IN:.3f}".removeprefix("0")
-            for value in COUNTERBORE_GLUE_LINE
-        )
-        + ").",
-    )
-)
-NOTES_TEXT = f"{POCKET_NOTE_TEXT}\n{BODY_NOTE_TEXT}"
 DIMENSION_CALLOUTS = {
     "BodyChamfer": BODY_CHAMFER_CALLOUT,
     "BodyDia": BODY_FLAG,
@@ -238,6 +230,197 @@ DETAIL_LABEL_XY = (DETAIL_CENTER[0], DETAIL_CENTER[1] - DETAIL_CROP_RADIUS - 0.0
 # The circle's letter on section A-A stands in the open pocket, up-right of
 # the mouth corner and under the pocket-floor radius's leader.
 DETAIL_LETTER_XY = (FACE_X - POCKET_DEPTH * _S + 0.007, SECTION_CENTER[1] + 0.011)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_dt_crank_handle_butt_cup: one revolve about model +X; the outer face
+# at x = 0, where the pocket opens, is the datum end the overall length and
+# the pocket depth run from; the body and floor run toward -X). The body is a
+# .XXX size turned to the measured MHA-DT-08 counterbore (note 2); the pocket
+# a REF nominal bored to the measured MHA-DT-32 head (note 1) under its
+# largest-bore cap; the floor hole the DRILLED HOLES row. Each ``span`` is a
+# diameter's model-X extent. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_NOTES = "dt_crank_handle_butt_cup_notes"
+_SEAT = "dt_crank_handle_butt_cup_seat_spec"
+_SELF = "draw_dt_crank_handle_butt_cup"
+part_metadata(
+    model_sources=(
+        "OVERALL_LENGTH",
+        "BODY_DIA",
+        "POCKET_DIA",
+        "POCKET_DEPTH",
+        "FLOOR_HOLE_DIA",
+    ),
+    precision_sources=("DRAWING_PRECISION", (_SEAT, "CUP_DRAWING_PRECISION_BY_NAME")),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "x", "value": 0.0}, ("OVERALL_LENGTH",)),
+        "outward": ([1.0, 0.0, 0.0], ("OVERALL_LENGTH",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), OVERALL_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": -OVERALL_LENGTH},
+            ("OVERALL_LENGTH",),
+        ),
+        "outward": ([-1.0, 0.0, 0.0], ("OVERALL_LENGTH",)),
+        "length": (
+            limits(OVERALL_LENGTH, _P["OverallLength"], unit=UNIT),
+            ("OVERALL_LENGTH", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "length_nominal": (OVERALL_LENGTH, ("OVERALL_LENGTH",)),
+        "length_from": ("datum_end", ((_SELF, "SECTION_KEEP"),)),
+    },
+    precision={"length": _P["OverallLength"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(BODY_DIA),),
+    requirements=("dia", "diametral_clearance"),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], ("BODY_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("BODY_DIA",)),
+        "span": ([-OVERALL_LENGTH, 0.0], ("OVERALL_LENGTH",)),
+        "dia": (
+            limits(BODY_DIA, _P["BodyDia"], unit=UNIT),
+            ("BODY_DIA", "BODY_DIA_TOL", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "dia_nominal": (BODY_DIA, ("BODY_DIA",)),
+        "diametral_clearance": (
+            list(COUNTERBORE_GLUE_LINE),
+            (
+                ("dt_crank_handle_spec", "COUNTERBORE_GLUE_LINE"),
+                (_NOTES, "BODY_NOTE_TEXT"),
+            ),
+        ),
+        "mate": (
+            f"{HANDLE_NUMBER} COUNTERBORE",
+            ((_NOTES, "HANDLE_NUMBER"), (_NOTES, "BODY_NOTE_TEXT")),
+        ),
+        "callout": (BODY_FLAG, ((_NOTES, "BODY_FLAG"),)),
+    },
+    precision={"dia": _P["BodyDia"]},
+)
+requirement(
+    "pocket",
+    kind="counterbore",
+    faces=(CylinderFace(POCKET_DIA), PlanarFace((1.0, 0.0, 0.0), -POCKET_DEPTH)),
+    requirements=("diametral_clearance", "dia_max", "depth", "corner_radius_max"),
+    fields={
+        "axis": ([-1.0, 0.0, 0.0], ("POCKET_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("POCKET_DIA",)),
+        "span": ([-POCKET_DEPTH, 0.0], ("POCKET_DEPTH",)),
+        "dia_ref": (
+            POCKET_DIA,
+            ("POCKET_DIA", "REFERENCE_DIMENSIONS", (_SELF, "SECTION_KEEP")),
+        ),
+        "dia_max": (POCKET_DIA_MAX, ("POCKET_DIA_MAX",)),
+        "diametral_clearance": (
+            list(POCKET_CLEARANCE),
+            ("POCKET_CLEARANCE", (_NOTES, "POCKET_NOTE_TEXT")),
+        ),
+        "mate": (
+            f"{SCREW_NUMBER} {SCREW_NAME} HEAD",
+            (
+                (_NOTES, "SCREW_NUMBER"),
+                (_NOTES, "SCREW_NAME"),
+                (_NOTES, "POCKET_NOTE_TEXT"),
+            ),
+        ),
+        "depth": (
+            limits(POCKET_DEPTH, _P["PocketDepth"], unit=UNIT),
+            ("POCKET_DEPTH", "POCKET_DEPTH_TOL", "UNIT"),
+        ),
+        "depth_nominal": (POCKET_DEPTH, ("POCKET_DEPTH",)),
+        "depth_from": ("datum_end", ((_SELF, "SECTION_KEEP"),)),
+        "corner_radius_max": (
+            POCKET_FLOOR_CORNER_R_MAX,
+            ("POCKET_FLOOR_CORNER_R_MAX", "POCKET_FLOOR_CORNER_R_TOL_TYPE"),
+        ),
+        "wall_min": (
+            POCKET_WALL_MIN,
+            ("POCKET_WALL_MIN", (_NOTES, "POCKET_FIT_CALLOUT")),
+        ),
+        "callout": (POCKET_FIT_CALLOUT, ((_NOTES, "POCKET_FIT_CALLOUT"),)),
+    },
+    precision={
+        "dia_ref": _P["PocketDia"],
+        "depth": _P["PocketDepth"],
+        "corner_radius_max": _P["PocketFloorRadius"],
+    },
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(FLOOR_HOLE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([-1.0, 0.0, 0.0], ("FLOOR_HOLE_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("FLOOR_HOLE_DIA",)),
+        "span": ([-OVERALL_LENGTH, -POCKET_DEPTH], ("OVERALL_LENGTH", "POCKET_DEPTH")),
+        "dia": (
+            drilled_limits(FLOOR_HOLE_DIA, _P["FloorHoleDia"], unit=UNIT),
+            ("FLOOR_HOLE_DIA", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "nominal_dia": (FLOOR_HOLE_DIA, ("FLOOR_HOLE_DIA",)),
+        "thru": (True, ((_NOTES, "FLOOR_HOLE_CALLOUT"),)),
+        "process": ("drill", ((_NOTES, "FLOOR_HOLE_CALLOUT"),)),
+        "callout": (FLOOR_HOLE_CALLOUT, ((_NOTES, "FLOOR_HOLE_CALLOUT"),)),
+    },
+    precision={"dia": _P["FloorHoleDia"]},
+)
+requirement(
+    "chamfer_far",
+    kind="chamfer",
+    faces=(ConeFace(45.0, contains_x_mm=-(OVERALL_LENGTH - BODY_CHAMFER / 2.0)),),
+    requirements=("leg",),
+    fields={
+        "leg": (
+            limits(BODY_CHAMFER, _P["BodyChamfer"], unit=UNIT),
+            ("BODY_CHAMFER", "BODY_CHAMFER_TOL", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "leg_nominal": (BODY_CHAMFER, ("BODY_CHAMFER",)),
+        "angle_deg": (45.0, ((_NOTES, "BODY_CHAMFER_CALLOUT"),)),
+        "edge_of": ("outer", ("BODY_CHAMFER",)),
+        "at_end": ("far_end", ("BODY_CHAMFER",)),
+        "callout": (BODY_CHAMFER_CALLOUT, ((_NOTES, "BODY_CHAMFER_CALLOUT"),)),
+    },
+    precision={"leg": _P["BodyChamfer"]},
+)
+requirement(
+    "chamfer_bore",
+    kind="chamfer",
+    faces=(ConeFace(45.0, contains_x_mm=-(POCKET_DEPTH + FLOOR_HOLE_CHAMFER / 2.0)),),
+    requirements=("leg",),
+    fields={
+        "leg": (
+            list(FLOOR_HOLE_CHAMFER_LIMITS),
+            ((_SEAT, "FLOOR_HOLE_CHAMFER_LIMITS"), (_SEAT, "LIMIT_TOL_TYPE")),
+        ),
+        "leg_nominal": (FLOOR_HOLE_CHAMFER, ((_SEAT, "FLOOR_HOLE_CHAMFER"),)),
+        "angle_deg": (45.0, ((_NOTES, "FLOOR_HOLE_CHAMFER_CALLOUT"),)),
+        "edge_of": ("bore", ((_SEAT, "FLOOR_HOLE_CHAMFER"),)),
+        "at_end": ("pocket", ((_SEAT, "FLOOR_HOLE_CHAMFER"),)),
+        "detail": (DETAIL_LETTER, ((_SELF, "DETAIL_LETTER"),)),
+        "callout": (
+            FLOOR_HOLE_CHAMFER_CALLOUT,
+            ((_NOTES, "FLOOR_HOLE_CHAMFER_CALLOUT"),),
+        ),
+    },
+    precision={"leg": _P["FloorHoleChamfer"]},
+)
 
 
 def _detail_xy(model_x_mm: float, model_y_mm: float) -> tuple[float, float]:

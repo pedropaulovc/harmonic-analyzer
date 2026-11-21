@@ -27,7 +27,11 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
+from _printed_limits import drilled_limits
 import _telemetry
 from _check import check
 from _drawing_centerline import add_view_centerline
@@ -57,7 +61,15 @@ from ch_rocker_hub_notes import (
     SUPPLY_BORE_CALLOUT,
     SUPPLY_LENGTH_CALLOUT,
 )
-from ch_rocker_hub_spec import LAND_DIA, SUPPLY_LENGTH_MIN
+from ch_rocker_hub_fit import HUB_LAND_BAND, PRESS_INTERFERENCE
+from ch_rocker_hub_spec import (
+    LAND_DIA,
+    STRAP_NUMBER,
+    SUPPLY_BORE_DIA,
+    SUPPLY_LENGTH_MIN,
+    SUPPLY_WALL_MIN,
+    UNIT,
+)
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -120,6 +132,119 @@ DIMENSION_CALLOUTS = {
     "SupplyBore": SUPPLY_BORE_CALLOUT,
     "SupplyLength": SUPPLY_LENGTH_CALLOUT,
 }
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_ch_rocker_hub: the hub axis is model Z through the origin, the
+# annulus extruded mid-plane, so the two end faces sit at z = -/+ half the
+# supply length). The end at -Z is the datum end the turned-part stations run
+# from; each ``span`` is a diameter's model-Z extent. The land prints its
+# explicit press band; the supply bore the title block's DRILLED HOLES row;
+# the supply length a single MIN limit. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_HALF = SUPPLY_LENGTH_MIN / 2.0
+_NOTES = "ch_rocker_hub_notes"
+_SELF = "draw_ch_rocker_hub"
+part_metadata(
+    model_sources=("LAND_DIA", "SUPPLY_BORE_DIA", "SUPPLY_LENGTH_MIN"),
+    precision_sources=(
+        (_NOTES, "DRAWING_PRECISION"),
+        (_NOTES, "DRAWING_PRECISION_BY_NAME"),
+    ),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), _HALF),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": -_HALF},
+            ("SUPPLY_LENGTH_MIN",),
+        ),
+        "outward": ([0.0, 0.0, -1.0], ("SUPPLY_LENGTH_MIN",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), _HALF),),
+    requirements=("length_min",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": _HALF},
+            ("SUPPLY_LENGTH_MIN",),
+        ),
+        "outward": ([0.0, 0.0, 1.0], ("SUPPLY_LENGTH_MIN",)),
+        "length_min": (
+            SUPPLY_LENGTH_MIN,
+            ("SUPPLY_LENGTH_MIN", "SUPPLY_LENGTH_TOL_TYPE"),
+        ),
+        "length_nominal": (SUPPLY_LENGTH_MIN, ("SUPPLY_LENGTH_MIN",)),
+        "length_from": ("datum_end", ((_SELF, "RIGHT_KEEP"),)),
+        "supply": (True, ((_NOTES, "SUPPLY_LENGTH_PREFIX"), (_NOTES, "DRAWING_NOTES"))),
+        "callout": (SUPPLY_LENGTH_CALLOUT, ((_NOTES, "SUPPLY_LENGTH_CALLOUT"),)),
+    },
+    precision={"length_min": _P["SupplyLength"]},
+)
+# The land: the finished O.D. pressed into the strap's reamed hole, its press
+# band printed on the .4000 nominal (LAND_CALLOUT names the route: turned to
+# the measured hole, a matched press fit).
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(LAND_DIA),),
+    requirements=("dia", "diametral_interference"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("LAND_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("LAND_DIA",)),
+        "span": ([-_HALF, _HALF], ("SUPPLY_LENGTH_MIN",)),
+        "dia": (
+            [
+                round(LAND_DIA + HUB_LAND_BAND[1], 12),
+                round(LAND_DIA + HUB_LAND_BAND[0], 12),
+            ],
+            ("LAND_DIA", ("ch_rocker_hub_fit", "HUB_LAND_BAND")),
+        ),
+        "dia_nominal": (LAND_DIA, ("LAND_DIA",)),
+        "diametral_interference": (
+            list(PRESS_INTERFERENCE),
+            (("ch_rocker_hub_fit", "PRESS_INTERFERENCE"), (_NOTES, "LAND_CALLOUT")),
+        ),
+        "mate": (
+            f"{STRAP_NUMBER} STRAP HOLE",
+            ("STRAP_NUMBER", (_NOTES, "LAND_CALLOUT")),
+        ),
+        "callout": (LAND_CALLOUT, ((_NOTES, "LAND_CALLOUT"),)),
+    },
+    precision={"dia": _P["LandDia"]},
+)
+# The supply bore: a D drill through, under the finished ream (note 1).
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(SUPPLY_BORE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("SUPPLY_BORE_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("SUPPLY_BORE_DIA",)),
+        "span": ([-_HALF, _HALF], ("SUPPLY_LENGTH_MIN",)),
+        "dia": (
+            drilled_limits(SUPPLY_BORE_DIA, _P["SupplyBore"], unit=UNIT),
+            ("SUPPLY_BORE_DIA", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "nominal_dia": (SUPPLY_BORE_DIA, ("SUPPLY_BORE_DIA",)),
+        "thru": (True, ((_NOTES, "SUPPLY_BORE_CALLOUT"),)),
+        "process": ("drill", ((_NOTES, "SUPPLY_BORE_CALLOUT"),)),
+        "supply": (True, ((_NOTES, "SUPPLY_BORE_CALLOUT"), (_NOTES, "DRAWING_NOTES"))),
+        "wall_min": (
+            SUPPLY_WALL_MIN,
+            ("SUPPLY_WALL_MIN", (_NOTES, "SUPPLY_WALL_TEXT")),
+        ),
+        "callout": (SUPPLY_BORE_CALLOUT, ((_NOTES, "SUPPLY_BORE_CALLOUT"),)),
+    },
+    precision={"dia": _P["SupplyBore"]},
+)
 
 
 def build(adapter: Any) -> dict[str, str]:

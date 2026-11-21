@@ -3903,11 +3903,12 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             *(str(path.resolve()) for path in _process_plans.shop_files()),
             *(str(path.resolve()) for path in _shop_equipment.files()),
             # test_cam_nc loads each CAM recipe by path (importlib, outside
-            # cad/scripts) and reads its plan's milling cuts at runtime.
+            # cad/scripts); process tests read every plan at runtime, and a
+            # plan's presence enrols it (_process_plans.enrolled_stems).
+            *(str(_cam_programs.recipe_path(stem).resolve()) for stem in _cam_programs.CAM_STEMS),
             *(
                 str(path.resolve())
-                for stem in _cam_programs.CAM_STEMS
-                for path in (_cam_programs.recipe_path(stem), _cam_programs.PROCESS_ROOT / stem / "plan.toml")
+                for path in sorted(_process_plans.PROCESS_ROOT.glob("*/plan.toml"))
             ),
             # module_deps_of only walks cad/scripts; comparison tests import
             # sibling tools (and load render_diff via importlib) outside it.

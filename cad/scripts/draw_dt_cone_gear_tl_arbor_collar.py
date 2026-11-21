@@ -40,9 +40,13 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
 from _purchased_variant_drawing import configure_reference_views
 from _session import run_build
 
@@ -87,6 +91,135 @@ LENGTH_DROP = 0.014
 OD_ON_SIDE = (
     SIDE_CENTER[0] + spec.LENGTH * VIEW_SCALE[0] / 2000.0 + OD_SIDE_RUN,
     SIDE_CENTER[1],
+)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what the member sheets print, in the part frame
+# (build_dt_cone_gear_tl_arbor_collar: axis +Z through the origin; the face
+# on the blank at z = 0, the datum end the length runs from; the face under
+# the nut at z = LENGTH). Every member shares the bore and the length; each
+# outside diameter is round bar left at stock (STOCK_CALLOUT), so it carries
+# no band. The saved default member (C175) owns the shared faces; the other
+# members name only their own outside diameter (their member STEPs). Each
+# ``span`` is a diameter's model-Z extent. The declarations print nothing.
+_P = spec.DRAWING_PRECISION_BY_NAME
+_DEFAULT = spec.CONFIGURATIONS[0]
+part_metadata(
+    model_sources=("LENGTH", "BORE", "OD_BY_CONFIGURATION"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("LENGTH",)),
+        "outward": ([0.0, 0.0, -1.0], ("LENGTH",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), spec.LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": spec.LENGTH}, ("LENGTH",)),
+        "outward": ([0.0, 0.0, 1.0], ("LENGTH",)),
+        "length": (
+            limits(spec.LENGTH, _P[spec.length_name(_DEFAULT)], unit=spec.UNIT),
+            ("LENGTH", "UNIT", "DRAWING_PRECISION_BY_NAME"),
+        ),
+        "length_nominal": (spec.LENGTH, ("LENGTH",)),
+        "length_from": ("datum_end", ("LENGTH",)),
+    },
+    precision={"length": _P[spec.length_name(_DEFAULT)]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(spec.BORE),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("BORE",)),
+        "at": ([0.0, 0.0, 0.0], ("BORE",)),
+        "span": ([0.0, spec.LENGTH], ("LENGTH",)),
+        "dia": (
+            drilled_limits(spec.BORE, _P[spec.bore_name(_DEFAULT)], unit=spec.UNIT),
+            ("BORE", "UNIT", "DRAWING_PRECISION_BY_NAME"),
+        ),
+        "nominal_dia": (spec.BORE, ("BORE",)),
+        "thru": (True, ("BORE_CALLOUT",)),
+        "process": ("drill", ("BORE_CALLOUT",)),
+        "callout": (spec.BORE_CALLOUT, ("BORE_CALLOUT",)),
+    },
+    precision={"dia": _P[spec.bore_name(_DEFAULT)]},
+)
+_OD_FIELDS = {
+    "axis": ([0.0, 0.0, 1.0], ("OD_BY_CONFIGURATION",)),
+    "at": ([0.0, 0.0, 0.0], ("OD_BY_CONFIGURATION",)),
+    "span": ([0.0, spec.LENGTH], ("LENGTH",)),
+    "stock": (spec.STOCK_CALLOUT, ("STOCK_CALLOUT",)),
+    "callout": (spec.STOCK_CALLOUT, ("STOCK_CALLOUT",)),
+}
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(spec.OD_BY_CONFIGURATION["C175"]),),
+    requirements=("stock",),
+    fields={
+        **_OD_FIELDS,
+        "dia_ref": (
+            spec.OD_BY_CONFIGURATION["C175"],
+            ("OD_BY_CONFIGURATION", "DRAWING_PRECISION_BY_NAME"),
+        ),
+        "member": ("C175", ("CONFIGURATIONS",)),
+        "quantity": (
+            spec.QUANTITY_BY_CONFIGURATION["C175"],
+            ("QUANTITY_BY_CONFIGURATION",),
+        ),
+    },
+    precision={"dia_ref": _P[spec.od_name("C175")]},
+)
+requirement(
+    "outer_c100",
+    kind="diameter",
+    faces=(CylinderFace(spec.OD_BY_CONFIGURATION["C100"]),),
+    requirements=("stock",),
+    configuration="C100",
+    fields={
+        **_OD_FIELDS,
+        "dia_ref": (
+            spec.OD_BY_CONFIGURATION["C100"],
+            ("OD_BY_CONFIGURATION", "DRAWING_PRECISION_BY_NAME"),
+        ),
+        "member": ("C100", ("CONFIGURATIONS",)),
+        "quantity": (
+            spec.QUANTITY_BY_CONFIGURATION["C100"],
+            ("QUANTITY_BY_CONFIGURATION",),
+        ),
+    },
+    precision={"dia_ref": _P[spec.od_name("C100")]},
+)
+requirement(
+    "outer_c050",
+    kind="diameter",
+    faces=(CylinderFace(spec.OD_BY_CONFIGURATION["C050"]),),
+    requirements=("stock",),
+    configuration="C050",
+    fields={
+        **_OD_FIELDS,
+        "dia_ref": (
+            spec.OD_BY_CONFIGURATION["C050"],
+            ("OD_BY_CONFIGURATION", "DRAWING_PRECISION_BY_NAME"),
+        ),
+        "member": ("C050", ("CONFIGURATIONS",)),
+        "quantity": (
+            spec.QUANTITY_BY_CONFIGURATION["C050"],
+            ("QUANTITY_BY_CONFIGURATION",),
+        ),
+    },
+    precision={"dia_ref": _P[spec.od_name("C050")]},
 )
 
 

@@ -1,23 +1,258 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Keyed cutting arbor backing collar MHA-DT-03-TL-04, three configurations
+# (C175, C100, C050: one each), turned on the manual PM-1127VF-LB (owner
+# ruling 2026-11-21: turned parts get lathe travelers, no NC). Route chosen
+# for speed: each collar comes off its own bar left at stock diameter
+# (drawing: Ø1.75 / Ø1.00 / Ø.50 STOCK OK) in one chucking: face the bar end
+# square (Z0), spot it with the centre drill, drill L (.290, the drawing's
+# Ø.290 DRILL THRU +.004/0) through the part and past the parting line, part
+# off .33 from the faced end. No second chucking: the parted face is the
+# collar's other face, held to the .32-.34 band by the carriage DRO. Bench:
+# deburr both faces' edges and both ends of the hole, check length and hole.
+#
+# Stock: 1018 cold-finished round (drawing: low-carbon steel, e.g. 12L14 CF).
+# 1 in and 1/2 in bar are on hand (cad/config/shop-equipment/stock-bought.toml
+# 1018-round-1, 1018-round-1-2); 1-3/4 in is to order (stock-to-order.toml
+# 1018-round-1-3-4, a 1.5 in piece). Kerf: the 1/8 in cutoff blade's insert
+# plus an authored allowance (cad/process/shop/lathe.toml tools.cutoff-blade-holder).
 title = "Keyed Cutting Arbor Backing Collar"
-part = "MHA-DT-03-TL-04 Keyed Cutting Arbor Backing Collar"
-revision = "placeholder"
-material = "low-carbon cold-finished steel round, 1/2, 1 and 1-3/4 in, ASTM A108 (12L14 or 1018)"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "1018 cold-finished steel round (drawing: low-carbon steel, e.g. 12L14 CF)"
+stock = "One each: Ø{{process.stock_dia_in:.2dot}} × {{process.bar_length_in:g}} in piece (to order, not on hand), Ø{{process.stock_dia_c100_in:.2dot}} and Ø{{process.stock_dia_c050_in:.2dot}} bar (on hand); each collar takes {{cad.pitch_in:.2dot}} in of bar."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Three collars, one from each bar: C175 Ø1.75, C100 Ø1.00, C050 Ø.50; mark each with its size after parting."
 shop = "../shop"
 stock_refs = ["1018-round-1-3-4", "1018-round-1", "1018-round-1-2"]
+material_key = "lathe-1018-cold-finished"
+
+[cad]
+file = "../../out/features/dt_cone_gear_tl_arbor_collar/features.toml"
+adapter = "turned_bush"
+part = "dt-cone-gear-tl-arbor-collar"
+
+[parameters]
+quantity = 1
+stock_dia_in = 1.75
+stock_dia_c100_in = 1.0
+stock_dia_c050_in = 0.5
+# The 1-3/4 in piece to order and the length the 3-jaw grips of it.
+bar_length_in = 1.5
+chuck_grip_in = 0.75
+# Facing allowance: enough to square a sawn or parted bar end.
+face_allowance_in = 0.02
+# Parting kerf: 1/8 in blade plus the insert's side clearance (authored).
+part_kerf_in = 0.13
+parts_per_pull = 1
+# The parting blade's clearance to the jaw fronts.
+jaw_clearance_in = 0.1
+
+[[tools]]
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "centre"
+name = "No. 3 centre drill"
+ref = "centre-drills-carbide-60"
 
 [[tools]]
 id = "drill-l"
 name = "L drill"
-ref = "drill-l"  # Drills L
+ref = "drill-l"
+
+[[tools]]
+id = "cutoff"
+name = "Cutoff blade"
+ref = "cutoff-blade-holder"
+
+[[tools]]
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
+
+[[setups]]
+machine_kind = "lathe"
+title = "C175: face, drill L and part off the 1-3/4 in piece"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the Ø{{process.stock_dia_in:.2dot}} piece, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
+datum = "Z0 (carriage DRO) the end faced in Op 10."
+diagram = { file = "diagrams/bar.svg", alt = "The 1-3/4 in piece in the 3-jaw: the end faced, centre-spotted and drilled L past the parting line; the cutoff blade parts the collar {{cad.part_off_in:.2dot}} from the faced end." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the end square, {{process.face_allowance_in:.2dot}} in off; set DRO Z0 on it."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock, about Ø.20 across the countersink: under the L drill, so the drill removes it."
+settings = "lathe-centre-1018"
+cut_diameter_mm = 2.778
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-l"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Drill L {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale: through the collar and past the parting line."
+settings = "lathe-drill-l-1018"
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
+hole_depth_mm = "{{cad.run_mm}}"
+peck = "none"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off at Z-{{cad.part_off_in:.3dot}}. Catch the collar; mark it C175."
+settings = "lathe-part-1018"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups]]
+machine_kind = "lathe"
+title = "C100: face, drill L and part off the 1 in bar"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the Ø{{process.stock_dia_c100_in:.2dot}} bar; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
+datum = "Z0 (carriage DRO) the end faced in Op 50."
+diagram = { file = "diagrams/bar-c100.svg", alt = "The 1 in bar in the 3-jaw: the end faced, centre-spotted and drilled L past the parting line; the cutoff blade parts the collar {{cad.part_off_in:.2dot}} from the faced end." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_c100_dia_mm}}", stock_diameter_mm = "{{cad.outer_c100_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_c100_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the end square, {{process.face_allowance_in:.2dot}} in off; set DRO Z0 on it."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.outer_c100_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre, about Ø.20 across the countersink."
+settings = "lathe-centre-1018"
+cut_diameter_mm = 2.778
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-l"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Drill L {{cad.run_in:.2dot}} deep from Z0: through the collar and past the parting line."
+settings = "lathe-drill-l-1018"
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
+hole_depth_mm = "{{cad.run_mm}}"
+peck = "none"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Part off at Z-{{cad.part_off_in:.3dot}} as in Setup 1. Catch the collar; mark it C100."
+settings = "lathe-part-1018"
+cut_diameter_mm = "{{cad.outer_c100_dia_mm}}"
+
+[[setups]]
+machine_kind = "lathe"
+title = "C050: face, drill L and part off the 1/2 in bar"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the Ø{{process.stock_dia_c050_in:.2dot}} bar; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
+datum = "Z0 (carriage DRO) the end faced in Op 90."
+diagram = { file = "diagrams/bar-c050.svg", alt = "The 1/2 in bar in the 3-jaw: the end faced, centre-spotted and drilled L past the parting line; the cutoff blade parts the collar {{cad.part_off_in:.2dot}} from the faced end." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_c050_dia_mm}}", stock_diameter_mm = "{{cad.outer_c050_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_c050_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the end square, {{process.face_allowance_in:.2dot}} in off; set DRO Z0 on it."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.outer_c050_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre, about Ø.20 across the countersink."
+settings = "lathe-centre-1018"
+cut_diameter_mm = 2.778
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-l"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Drill L {{cad.run_in:.2dot}} deep from Z0: through the collar and past the parting line."
+settings = "lathe-drill-l-1018"
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
+hole_depth_mm = "{{cad.run_mm}}"
+peck = "none"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Part off at Z-{{cad.part_off_in:.3dot}} as in Setup 1. Catch the collar; mark it C050."
+settings = "lathe-part-1018"
+cut_diameter_mm = "{{cad.outer_c050_dia_mm}}"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Bench: deburr and inspect the three collars"
+machine = "Bench"
+envelope = "other"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished collar, C175 drawn: its {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} length between the faced and the parted face, and the L hole through." }
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr each collar: file the parting burr off the parted face flat on the smooth file, break the outside edges and both ends of the hole, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Each collar: length {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} across the two faces, calipers; the hole takes the {{cad.bore_dia_min_in:.3dot}} pin gauge and not the {{cad.bore_dia_max_in:.3dot}}."
+inspection = "Length {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}}; hole Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }, { gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A collar that fails a check in Op 140 is scrapped, not reworked: make it again by repeating its lathe setup, then Ops 130–140. C100 and C050 come again from the same bar; the C175 piece is too short to hold a second time, so a C175 remake needs a fresh Ø1.75 × 1.5 in piece (to order)."
+feed = "hand"

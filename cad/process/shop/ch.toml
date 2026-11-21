@@ -197,11 +197,6 @@ feed = "7 in/min"
 # --- MHA-CH-06-TL-VN-84 leadscrew kit rework ---
 # Plan: cad/process/ch_rocker_arm_tl_vn_oblique_leadscrew_kit/plan.toml.
 
-# The AR holder is the A R Warner LMS 4132 set's (TCMT insert, R0.4 nose;
-# owned, by photo in the 45952b66bc inventory); it faces the kit nut.
-[tools.lathe-ar]
-description = "A R Warner AR carbide turning holder, TCMT insert, R0.4 nose (LMS 4132)"
-
 # SUS304 screw, LittleMachineShop "Cutting Speeds" table (read live
 # 2026-11-13), row Stainless steel 304: milling 70 ft/min (low end). Hand feed.
 [settings.kit-em-half-sus304]
@@ -327,3 +322,5 @@ description = "1018 cold-finish carbon steel, square bar, 1/4 x 1/4 in"
 description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 54 in length"
 [stock.6061-flat-1x3]
 description = "6061-T6511 aluminium, flat bar, 1 x 3 in"
+[stock.6061-round-9-16]
+description = "6061-T6511 aluminium, round bar, 9/16 in"
