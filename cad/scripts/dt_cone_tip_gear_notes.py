@@ -42,8 +42,8 @@ CUTTER_DETAIL_LINE_CHARS = 108
 # The teeth's do-not-cut (rule 7): flagged to the teeth in note 2.
 TOOTH_EDGE_NOTE = "NO EDGE BREAK ON TEETH."
 
-# Numbered notes (rule 7): note 1 the pivot's matched press fit, linked from
-# the pivot diameter; note 2 the teeth's mesh and fit route, linked from the
+# Numbered notes (rule 7): note 1 the pivot's two fits, linked from the
+# pivot diameter; note 2 the teeth's mesh and fit route, linked from the
 # tip, thickness and root; note 3 the turner's centres.
 PIVOT_NOTE_NUMBER = 1
 TEETH_NOTE_NUMBER = 2
@@ -63,25 +63,19 @@ FACE_STACK_CALLOUT = f"CONE SEAT PITCH\nON {SHAFT_MATE_NUMBER}"
 def sheet_notes() -> str:
     """The sheet's numbered notes.
 
-    Note 1 is the pivot's two fits (rule 4): the bushing presses over its root
-    and the end screw's reamed hole runs on its end, one diameter for both.
-    The window that gives both ranges on the mates' printed limits is .0003
-    wide, under any plain inch step, so the diameter prints REF and the pivot
-    is turned to its measured mates: the two ranges are the requirement
-    (matched pair). Note 2 names the mesh and the fit route of the tip,
-    thickness and root bands, with the teeth's do-not-cut. Note 3: the stems
-    are turned between centres, and a centre hole in either end harms nothing
-    (rule 11).
+    Note 1 is the pivot's two fits (rule 4): the bushing is bonded over its
+    root and the end screw's reamed hole runs on its end, one diameter for
+    both, each fit set by the printed limits (owner ruling 2026-11-20, #2469:
+    a LOCTITE 638 bonded slip fit on the shared .0625 reamer). Note 2 names
+    the mesh and the fit route of the tip, thickness and root bands, with the
+    teeth's do-not-cut. Note 3: the stems are turned between centres, and a
+    centre hole in either end harms nothing (rule 11).
     """
-    interference = spec.inch_range(spec.PIVOT_PRESS_INTERFERENCE_MM)
-    clearance = spec.inch_range(spec.PIVOT_RUNNING_CLEARANCE_MM)
     return "\n".join(
         (
-            f"{PIVOT_NOTE_NUMBER}. PIVOT: TURN TO ITS MEASURED MATES. PRESS FIT IN "
-            f"{BUSHING_MATE_NUMBER} {BUSHING_MATE_TITLE}",
-            f"   (INTERFERENCE {interference} ON ITS BORE); ITS END RUNNING FIT IN "
-            f"{END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE}",
-            f"   (DIAMETRAL CLEARANCE {clearance} IN ITS HOLE).",
+            f"{PIVOT_NOTE_NUMBER}. PIVOT: BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, IN "
+            f"{BUSHING_MATE_NUMBER} {BUSHING_MATE_TITLE};",
+            f"   ITS END RUNNING FIT IN {END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE}.",
             f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE_NUMBER}: ACCEPT OVER PINS, "
             "THEN BY FEEL AT ASSEMBLY,",
             f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
@@ -101,8 +95,8 @@ DIMENSION_CALLOUTS = {
         f"BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, IN {SHAFT_MATE_NUMBER} SOCKET\n"
         f"AND {STEM_BORE_MATES[0]}, {STEM_BORE_MATES[1]}"
     ),
-    # One REF diameter carries both of note 1's fits.
-    "PivotDia": f"PRESS AND RUNNING FIT\n{PIVOT_NOTE_FLAG}",
+    # One banded diameter carries both of note 1's fits.
+    "PivotDia": f"BONDED AND RUNNING FIT\n{PIVOT_NOTE_FLAG}",
     "ToothThickness": TEETH_NOTE_FLAG,
     # The origin circle is an inspection witness, not the off-centre root arc.
     "FloorDia": f"ROOT ENVELOPE\n{TEETH_NOTE_FLAG}",
@@ -168,7 +162,9 @@ def gear_data() -> str:
         ),
         ("PITCH DIAMETER (REF)", inch(teeth * family.MODULE_MM, 4)),
         ("CUTTER", cutter_description()),
-        ("CUTTER PLUNGE FROM BLANK OD (REF)", inch(profile.plunge_mm, 4)),
+        # No cutter plunge row: the infeed is method, and WHOLE DEPTH MAX,
+        # the root envelope and over-pins already define the finished tooth
+        # (machinist review of #3183 r4, 2 of 3 runs, judge-confirmed).
         (
             "WHOLE DEPTH MAX / CUTTER ROOT ARC R (REF)",
             f"{inch(whole_depth_max, 4)} / {inch(profile.template.root_radius_mm, 4)}",
@@ -182,11 +178,14 @@ def gear_data() -> str:
             f"{inch(minimum, 3)} TO {inch(maximum, 3)}",
         ),
         # cone_set_stack books each gear's tooth runout about its seat; this
-        # gear's seat is its own stems, between whose centres it is cut.
+        # gear's seat is its own stems.  A finished-part acceptance, not a
+        # setup (machinist review of #3183 r4, 2 of 3 runs: ACCEPT AT SETUP
+        # is method), worded as the 64T's and 16T's TOOTH RUNOUT rows; the
+        # MATE row above names the mesh, and a reason clause would run the
+        # block into the isometric.
         (
-            "TOOTH CUTTING SETUP, ACCEPT AT SETUP",
-            f"{inch(cone_set_stack.TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX TO BOTH "
-            f"\u00d8{inch(spec.STEM_DIA_MM, 4)} ENDS",
+            f"TOOTH RUNOUT TO BOTH \u00d8{inch(spec.STEM_DIA_MM, 4)} ENDS",
+            f"{inch(cone_set_stack.TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX",
         ),
         (
             f"OVER 2 PINS \u00d8{inch(pin, 3)}, OPPOSITE GAPS",

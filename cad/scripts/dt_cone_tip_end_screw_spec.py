@@ -1,7 +1,7 @@
 r"""Pure-data contract for MHA-DT-39, the cone tip end screw.
 
 Owner decision C1 keyed, 2026-11-09 (PR #1992; ``cone_tip_cluster``): a stock
-McMaster 91794A558 (18-8 stainless, 1/4-28 x 5/8 slotted fillister, ASME
+McMaster 91794A559 (18-8 stainless, 1/4-28 x 3/4 slotted fillister, ASME
 B18.6.3) with ONE added operation: drill and ream Ø.0630 x .12 concentric in
 its threaded end for T006's pivot (MHA-DT-37).  It threads through MHA-DT-21,
 locked by the block's pinch slit; its end face bears on the MHA-DT-38 bushing
@@ -31,7 +31,7 @@ import cone_stack_end_play as end_play
 import cone_tip_cluster as tip
 import dt_cone_tip_gear_spec as tip_gear
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
-from _mcmaster_91794a558 import (
+from _mcmaster_91794a559 import (
     HEAD_DIA,
     HEAD_H,
     PITCH,
@@ -83,7 +83,7 @@ if END_HOLE_DIA_MAX / 2.0 >= SHANK_DIA / 2.0 - TIP_CHAMFER:
 END_HOLE_POSITION_MM = 0.0005 * MM_PER_IN
 
 # --- Rule 17: wall from the hole to the thread root -------------------------
-# The smallest root the 2A thread allows (``_mcmaster_91794a558``'s derived
+# The smallest root the 2A thread allows (``_mcmaster_91794a559``'s derived
 # minimum minor) over the largest reamed hole, offset by its position error.
 END_HOLE_WALL_WORST = (
     THREAD_MINOR_MIN_MM - END_HOLE_DIA_MAX
@@ -175,7 +175,7 @@ END_HOLE_CALLOUT = "\n".join(
 # The stock, named once (rule 7: a flagged note, no method).
 STOCK_NOTE = "\n".join(
     (
-        f"1. MAKE FROM McMASTER-CARR {SKU}, {THREAD} X 5/8 SLOTTED FILLISTER",
+        f"1. MAKE FROM McMASTER-CARR {SKU}, {THREAD} X 3/4 SLOTTED FILLISTER",
         "   HEAD SCREW; ADD THE REAMED HOLE ONLY.",
         "2. UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE.",
     )

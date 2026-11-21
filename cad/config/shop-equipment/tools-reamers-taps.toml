@@ -383,12 +383,12 @@ note = "quotes-2026-11-17-rev3.xlsx B-reamer-.5010: recommended Shars 404-7572."
 [tools.reamer-0615]
 kind = "reamer"
 status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-38 .0615 +.0005/.0000 REAM THRU; MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 +.0005/.0000 REAM (.163)."
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 +.0005/.0000 REAM (.163). MHA-DT-38 moved to the .0625 reamer (owner ruling 2026-11-20, #2469)."
 
 [tools.reamer-0625]
 kind = "reamer"
 status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-03 .0625 +.0005/.0000 REAM THRU (T012, T018); MHA-DT-04 .0625 +.0005/.0000 REAM .20."
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-03 .0625 +.0005/.0000 REAM THRU (T012, T018); MHA-DT-04 .0625 +.0005/.0000 REAM .20. MHA-DT-38 .0625 +.0005/.0000 REAM THRU (owner ruling 2026-11-20, #2469)."
 
 [tools.reamer-0930]
 kind = "reamer"

@@ -1025,7 +1025,7 @@ from dt_cone_tip_end_screw_spec import (  # noqa: E402
 from _mcmaster_91794a112 import (  # noqa: E402
     THREAD as PINCH_THREAD,
 )
-from _mcmaster_91794a558 import (  # noqa: E402
+from _mcmaster_91794a559 import (  # noqa: E402
     SHANK_LEN as END_SCREW_SHANK_LEN,
     THREAD as END_SCREW_THREAD,
 )
@@ -1255,7 +1255,7 @@ CONE_KEY_SOUTH_LOCAL_Z = SHAFT_COLLAR_END + cone_key.END_SET_MM
 # Along the axis, south to north (cone_tip_cluster): T024 bonded (LOCTITE 638)
 # on land 2 one STACK_FEELER off T030 | T018 and T012 bonded on MHA-DT-37's
 # spigot, which is bonded in MHA-DT-04's socket | T006's leaves (MHA-DT-37) |
-# MHA-DT-38 pressed on its pivot | the set end play | MHA-DT-39's reamed end,
+# MHA-DT-38 bonded on its pivot | the set end play | MHA-DT-39's reamed end,
 # its 1/4-28 thread through MHA-DT-21 | the 91794A112 pinch screw locking it
 # across the top slit.  T024..T006, the bushing and the end screw sit
 # TIP_SET_SHIFT_MM north of their cone_line layout stations (the stack is
@@ -2046,12 +2046,11 @@ PIVOT_HEAD_WORST_GAP = tip_pivot_head_worst_gap_mm(TIP_NORTH_FACE_BAND_MM)
 # the end off the model's END_SCREW_MODEL_END_PLAY_MM by up to either limit of
 # SHAFT_END_PLAY.  Reach is functional: at the deepest embed the head must
 # still stand off MHA-DT-21's north face, or the screw cannot be set.  Thread
-# engagement is rule 18: the block's 1.5D window cannot hold the whole stack
-# at the printed limits (the shallow end falls short), so the worst full
-# thread in D is held to END_SCREW_ENGAGEMENT_FLOOR_D, the 1.39D the owner's
-# rule-18 exception accepts (ruling 2026-11-09 via PR #1992: keep 91794A558
-# at this block station; dt-drive-train.yaml DT-07).  Any stack change that
-# cuts deeper fails here and needs a new ruling.
+# engagement is rule 18: the worst full thread in D is held to
+# END_SCREW_ENGAGEMENT_FLOOR_D, 1.5D (owner ruling 2026-11-20, #2726: the 3/4
+# 91794A559 screw and the .44 block re-centre the stack in the window and
+# retire the 1.39D exception DT-07).  Any stack change that cuts the window
+# fails here.
 #
 # The post's screw clearance is one-sided (#2697): MHA-DT-00 holds MHA-DT-05
 # pushed toward MHA-DT-21 along the shaft while it is turned and tightened
@@ -2068,7 +2067,7 @@ END_SCREW_EMBED_BAND_MM = (
     + TIP_NORTH_FACE_BAND_MM
 )
 END_SCREW_POST_PUSH_MM = POST_SCREW_FLOAT_MM
-END_SCREW_ENGAGEMENT_FLOOR_D = 1.39
+END_SCREW_ENGAGEMENT_FLOOR_D = 1.5
 _END_SCREW_MAJOR_MM = THREAD_MAJOR_MM[tip_cluster.ADJUSTER_THREAD]
 
 
@@ -4401,7 +4400,7 @@ def build(adapter) -> dict[str, str]:
     # free-DOF attractor), and each copy is re-pointed at its own
     # T-configuration post-copy.  T006 is its own part, MHA-DT-37 (owner
     # decision C1 keyed, 2026-11-09, PR #1992), inserted on its model station
-    # with MHA-DT-38 pressed on its pivot.
+    # with MHA-DT-38 bonded on its pivot.
     seed_teeth = _config.cone_teeth(0)
     seed_cg = _place_on_shaft(
         adapter,
@@ -4427,7 +4426,7 @@ def build(adapter) -> dict[str, str]:
         BUSHING_NORTH_EULER,
         ROT_BUSHING_NORTH,
         ground=False,
-        label="cone-tip-bushing (MHA-DT-38 pressed on the T006 pivot)",
+        label="cone-tip-bushing (MHA-DT-38 bonded on the T006 pivot)",
     )
 
     # =================== cylinder drum (driven, free on the arbor) =============
@@ -5432,8 +5431,8 @@ def build(adapter) -> dict[str, str]:
     )
     apply_component_color(adapter, tip_gear, MUNTZ_YELLOW)
     cone_gears.append((6, tip_gear))
-    # MHA-DT-38 pressed on the pivot against T006's leaves: coaxial, its south
-    # face (Right Plane) on LeavesNorthPlane, and no spin on the press.
+    # MHA-DT-38 bonded on the pivot against T006's leaves: coaxial, its south
+    # face (Right Plane) on LeavesNorthPlane, and no spin in the cured bond.
     bush_o = _org(adapter, tip_bushing)
     coincident_mate(
         adapter,
@@ -5446,14 +5445,14 @@ def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Right Plane@{tip_bushing}", "PLANE"),
         named_ref(f"LeavesNorthPlane@{tip_gear}", "PLANE"),
-        label="tip bushing pressed against the T006 leaves",
+        label="tip bushing bonded against the T006 leaves",
         verify=(tip_bushing, bush_o),
     )
     parallel_mate(
         adapter,
         named_ref(f"Top Plane@{tip_bushing}", "PLANE"),
         named_ref(f"Top Plane@{tip_gear}", "PLANE"),
-        label="tip bushing anti-spin (pressed)",
+        label="tip bushing anti-spin (bonded)",
         verify=(tip_bushing, bush_o),
     )
     # MHA-DT-39 threads into the block's tap: coaxial on the block's end-screw

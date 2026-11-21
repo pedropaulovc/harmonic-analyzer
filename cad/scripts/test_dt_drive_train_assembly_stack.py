@@ -16,7 +16,7 @@ import build_dt_drive_train_assembly
 import _cone_axis_constants
 import _config
 import _mcmaster_91794a112
-import _mcmaster_91794a558
+import _mcmaster_91794a559
 import _sprocket_seat_geometry as seat_geometry
 import build_dt_arbor_pedestal
 import build_dt_cone_pivot_post
@@ -45,7 +45,6 @@ import dt_crank_pin_spec
 import dt_crank_pinion_spec
 import dt_crankshaft_spec
 import dt_cylinder_end_disc_spec
-import dt_drive_train_assembly_spec
 import dt_drum_station_setting_spec as drum_station_setting
 import dt_pinion_arbor_geometry
 import dt_pinion_bracket_geometry
@@ -637,7 +636,7 @@ def _tip_end_play(drive) -> None:
         <= drive.SHAFT_END_PLAY[1]
     ), "modelled end play is outside SHAFT_END_PLAY"
     assert (
-        _mcmaster_91794a558.SKU == tip_cluster.END_SCREW_SKU
+        _mcmaster_91794a559.SKU == tip_cluster.END_SCREW_SKU
         and dt_cone_tip_block_spec.END_SCREW_SKU == tip_cluster.END_SCREW_SKU
         and drive.END_SCREW_THREAD == tip_cluster.ADJUSTER_THREAD
     ), "MHA-DT-39 is not the end screw the tip block was sized for"
@@ -890,18 +889,12 @@ def _cone_pivot_screw(drive) -> None:
 
 
 def _tip_print_worst(drive) -> None:
-    # MHA-DT-00 step 3A prints dt_drive_train_assembly_spec's floored values (rule
-    # 20, DT-07); a MIN never rounds up.
-    assert (
-        math.floor(drive.END_SCREW_ENGAGEMENT_WORST_MM / 25.4 * 1000.0 + 1e-9),
-        math.floor(drive.END_SCREW_ENGAGEMENT_WORST_D * 100.0 + 1e-9),
-    ) == (
-        round(dt_drive_train_assembly_spec.END_SCREW_ENGAGEMENT_MIN_IN * 1000.0),
-        round(dt_drive_train_assembly_spec.END_SCREW_ENGAGEMENT_MIN_D * 100.0),
-    ), (
-        f"end screw print-worst full thread {drive.END_SCREW_ENGAGEMENT_WORST_MM / 25.4:.4f} in "
-        f"({drive.END_SCREW_ENGAGEMENT_WORST_D:.4f}D) no longer floors to the printed "
-        f"{dt_drive_train_assembly_spec.END_SCREW_ENGAGEMENT_MIN_IN} MIN ({dt_drive_train_assembly_spec.END_SCREW_ENGAGEMENT_MIN_D}D)"
+    # Owner ruling 2026-11-20 (#2726): the 3/4 end screw keeps rule 18's 1.5 D
+    # at the print-worst embed, so MHA-DT-00 step 3A prints no shortfall.
+    assert drive.END_SCREW_ENGAGEMENT_FLOOR_D == 1.5
+    assert drive.END_SCREW_ENGAGEMENT_WORST_D >= 1.5, (
+        f"end screw print-worst full thread {drive.END_SCREW_ENGAGEMENT_WORST_D:.4f}D "
+        "is under rule 18's 1.5 D"
     )
 
 

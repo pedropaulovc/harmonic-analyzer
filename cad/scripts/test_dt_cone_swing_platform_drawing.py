@@ -1082,9 +1082,10 @@ def test_holddown_section_arrows_clear_the_profile_plan() -> None:
 
 def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> None:
     """One #4 socket-head counterbore, close clearance, drilled from under,
-    .738 south of the pivot (C1 keyed, owner decision 2026-11-09, PR #1992)
-    and .04 to -x of the cone axis, the block's foot tap offset the same way,
-    so the block itself stays centred."""
+    .654 south of the pivot (C1 keyed, owner decision 2026-11-09, PR #1992;
+    re-stationed by owner ruling 2026-11-20, #2726) and .04 to -x of the cone
+    axis, the block's foot tap offset the same way, so the block itself stays
+    centred."""
     import dt_cone_tip_block_spec as block
 
     hole = spec.HOLDDOWN_HOLE_SPEC
@@ -1097,7 +1098,7 @@ def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> Non
     assert spec.HOLDDOWN_CLEARANCE_DIA == pytest.approx(3.048)
     assert spec.HOLDDOWN_LOCAL_X == -1.016
     assert spec.HOLDDOWN_LOCAL_Z == -block.TIP_BLOCK_PIVOT_OFFSET
-    assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-0.731 * 25.4)
+    assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-0.654 * 25.4)
     assert block.FOOT_TAP_OFFSET_X == spec.HOLDDOWN_LOCAL_X
 
 

@@ -250,10 +250,12 @@ def test_each_depth_states_its_function_and_each_gear_is_named_once() -> None:
         and high * INCH >= spec.SPREAD_MAX_MM > (high - 0.001) * INCH
     )
     assert spec.CALLOUTS_BELOW["GripSpan"].splitlines() == [
-        f"(INTERFERENCE {low:.3f}-{high:.3f})".replace("0.", "."),
+        "LOCATIONAL INTERFERENCE FIT",
         f"ON {spec.gear_number(spec.REFERENCE_TEETH)} ROOTS",
+        f"(INTERFERENCE {low:.3f}-{high:.3f})".replace("0.", "."),
     ]
-    words = (*spec.DEPTH_SUFFIX.values(), spec.GRIP_TEXT)
+    # The REF range is rule 4's reference, not reason words.
+    words = (*spec.DEPTH_SUFFIX.values(), spec.GRIP_FIT_TEXT)
     for text in words:
         assert len([w for w in text.split() if not w.startswith("MHA-")]) <= 6, text
     named = "\n".join((*spec.CALLOUTS_BELOW.values(), *spec.DEPTH_SUFFIX.values()))

@@ -417,11 +417,16 @@ _TIP_DOWEL_PIVOT_X_TEXT_X = (
 # detail centre leaves the relief's crown 10 mm under this line, so it drops
 # a further 1.9 mm.
 HOLDDOWN_X_LINE_Y = TIP_DOWEL_PIVOT_X_LINE_Y - HOLDDOWN_X_TEXT_SIZE[1] - 0.0030
+# The frame's left corner nearer the circle's centre in y stands 1 mm off it:
+# with the hold-down .654 off the pivot (owner ruling 2026-11-20, #2726) the
+# whole frame drops under the centre, so its upper corner is the near one.
+_HOLDDOWN_X_NEAR_DY = min(
+    abs(y - DETAIL_CENTER[1])
+    for y in (HOLDDOWN_X_LINE_Y, HOLDDOWN_X_LINE_Y + HOLDDOWN_X_TEXT_SIZE[1])
+)
 _HOLDDOWN_X_TEXT_X = (
     DETAIL_CENTER[0]
-    + math.sqrt(
-        (DETAIL_SHEET_RADIUS + 0.001) ** 2 - (HOLDDOWN_X_LINE_Y - DETAIL_CENTER[1]) ** 2
-    )
+    + math.sqrt((DETAIL_SHEET_RADIUS + 0.001) ** 2 - _HOLDDOWN_X_NEAR_DY**2)
     + HOLDDOWN_X_TEXT_SIZE[0] / 2.0
 )
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR

@@ -21,10 +21,12 @@ Research: ``research/3-detailed-design/drive-train-cone-tip-options.md``
   T012 and T018 (each reamed Ø.0625 and bonded on it) into the socket, where
   it is bonded too, and an integral Ø.0625 pivot running north.  Spigot and
   pivot sit .0108 under T006's root, so the DT6-FORM1 fly cutter runs off.
-* The brass bushing is pressed on the pivot against T006's north face; its
-  north face bears on the end of the end screw (McMaster 91794A558, 1/4-28 x
-  5/8 slotted fillister, with a reamed hole for the pivot in its threaded
-  end), which threads through MHA-DT-21 and is locked by its pinch slit.
+* The brass bushing is bonded (LOCTITE 638) on the pivot against T006's
+  north face (owner ruling 2026-11-20, #2469: a bonded slip fit on the shared
+  .0625 reamer, not a press); its north face bears on the end of the end
+  screw (McMaster 91794A559, 1/4-28 x 3/4 slotted fillister, owner ruling
+  2026-11-20, #2726, with a reamed hole for the pivot in its threaded end),
+  which threads through MHA-DT-21 and is locked by its pinch slit.
   The end screw sets the shaft's end play (cone_stack_end_play.SHAFT_END_PLAY).
 
 The tip cluster's model stations: T024, T018, T012, T006, the bushing and
@@ -59,11 +61,14 @@ TIP_SET_SHIFT_MM = STACK_FEELER
 
 # Ø.0625 stem stock: T006's spigot and pivot, T018/T012 bores, the socket.
 STEM_DIA_MM = 1.5875  # .0625
-# The spigot is turned between centres (L/D 12) and bonded: +.0000/-.0010.
-SPIGOT_DIA_BAND = (0.0, -0.0254)
-# The pivot carries the bushing's press and runs in the end screw's hole:
-# +.0000/-.0003.
-PIVOT_DIA_BAND = (0.0, -0.00762)
+# The spigot is turned between centres (L/D 12) and bonded: -.0003/-.0013,
+# the turned-diameter row's .0010 width held .0003 under the reamed bores'
+# low limit so the bond is never line to line, where the compound is wiped
+# off and T012/T018 may not slide on by hand (#2530).
+SPIGOT_DIA_BAND = (-0.00762, -0.03302)
+# The pivot is bonded in the bushing and runs in the end screw's hole: the
+# spigot's band (one stem stock, one turned-diameter row; #2469).
+PIVOT_DIA_BAND = SPIGOT_DIA_BAND
 # Reamed on size with an owned chucking reamer: T018 and T012 bores, the
 # DT-04 socket.
 STEM_BORE_DIA_MM = STEM_DIA_MM
@@ -92,24 +97,29 @@ TIP_END_RECESS_MM = 0.762  # .030
 # and into the end screw's hole, never bottoming there.
 PIVOT_LENGTH_MM = 6.35  # .25
 
-# Brass bushing (C36000), pressed on the pivot against T006's north face.
+# Brass bushing (C36000), bonded on the pivot against T006's north face.
 # Research: Ø.225; at the title block's .XXX that leaves a .079 wall over the
-# reamed bore, under rule 17's .080 target, so the OD is .228.
+# reamed bore, under rule 17's .080 target, so the OD is .228.  Its bore is
+# reamed with the stems' .0625 reamer (#2469: a LOCTITE 638 bonded slip fit
+# on the pivot, so no press force on the Ø1/16 stem and no .0615 reamer).
 BUSHING_OD_MM = 5.7912  # .228, .XXX
 BUSHING_LENGTH_MM = 4.064  # .160, .XXX
-BUSHING_BORE_DIA_MM = 1.5621  # .0615 reamer
-BUSHING_BORE_BAND = REAM_H7
+BUSHING_BORE_DIA_MM = STEM_BORE_DIA_MM  # .0625 reamer
+BUSHING_BORE_BAND = STEM_BORE_BAND
 BUSHING_PLACES = 3
 
 # The end screw's added operation: drill and ream Ø.0630 x .12 for the pivot.
-END_SCREW_SKU = "91794A558"
+# Owner ruling 2026-11-20 (#2726): the 3/4 screw, so the thread keeps 1.5 D
+# over the whole embed stack with the block's stations at .XX.
+END_SCREW_SKU = "91794A559"
 END_HOLE_DIA_MM = 1.6002  # .0630 reamer
 END_HOLE_BAND = REAM_H7
 END_HOLE_DEPTH_MM = 3.048  # .12, .XX
 
 # MHA-DT-21: BLOCK_DEPTH_MM deep for the end screw's thread; its stations
-# belong to dt_cone_tip_block_spec.
-BLOCK_DEPTH_MM = 10.922  # .430
+# belong to dt_cone_tip_block_spec.  .44 (#2726): its half, the foot tap's
+# station, stands on the .01 grid.
+BLOCK_DEPTH_MM = 11.176  # .440
 ADJUSTER_THREAD = "1/4-28"
 
 
@@ -134,23 +144,19 @@ STEM_BORE = (STEM_BORE_DIA_MM, STEM_BORE_BAND)
 BUSHING_BORE = (BUSHING_BORE_DIA_MM, BUSHING_BORE_BAND)
 END_HOLE = (END_HOLE_DIA_MM, END_HOLE_BAND)
 
-# Bonded slip fits: never interference, never past 638's largest gap.
+
+def _require_bond(name: str, clearance_mm: tuple[float, float]) -> None:
+    """A bonded slip fit: clearance at every limit (a line-to-line pair wipes
+    the compound, #2530), never past 638's largest gap."""
+    if not 0.0 < clearance_mm[0] <= clearance_mm[1] <= RETAINING_COMPOUND_MAX_GAP_MM:
+        raise AssertionError(f"{name} bond clearance {clearance_mm} mm")
+
+
 SPIGOT_BOND_CLEARANCE_MM = diametral_clearance_mm(STEM_BORE, SPIGOT)
-if (
-    not 0.0
-    <= SPIGOT_BOND_CLEARANCE_MM[0]
-    <= SPIGOT_BOND_CLEARANCE_MM[1]
-    <= (RETAINING_COMPOUND_MAX_GAP_MM)
-):
-    raise AssertionError(f"spigot bond clearance {SPIGOT_BOND_CLEARANCE_MM} mm")
-# The bushing's press on the pivot: interference at every limit.
-BUSHING_PRESS_INTERFERENCE_MM = tuple(
-    -c for c in reversed(diametral_clearance_mm(BUSHING_BORE, PIVOT))
-)
-if BUSHING_PRESS_INTERFERENCE_MM[0] <= 0.0:
-    raise AssertionError(
-        f"bushing press interference {BUSHING_PRESS_INTERFERENCE_MM} mm"
-    )
+_require_bond("spigot", SPIGOT_BOND_CLEARANCE_MM)
+# The bushing's bond on the pivot (#2469).
+BUSHING_BOND_CLEARANCE_MM = diametral_clearance_mm(BUSHING_BORE, PIVOT)
+_require_bond("bushing", BUSHING_BOND_CLEARANCE_MM)
 # The pivot runs in the end screw's reamed hole.
 PIVOT_RUNNING_CLEARANCE_MM = diametral_clearance_mm(END_HOLE, PIVOT)
 if PIVOT_RUNNING_CLEARANCE_MM[0] <= 0.0:

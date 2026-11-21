@@ -21,7 +21,7 @@ PURE_SPECS = (
     "dt_vn_cone_pivot_screw_spec",
     "dt_vn_cone_lock_knob_spec",
     "dt_swing_stop_screw_spec",
-    "_mcmaster_91794a558",
+    "_mcmaster_91794a559",
     "sh_vn_fillister_screw_90280a108_spec",
     "sh_vn_brass_fillister_screw_spec",
     "sh_vn_clamp_screw_spec",
@@ -81,7 +81,7 @@ def test_pose_vendor_specs_load_no_native_module(module_name: str) -> None:
 @pytest.mark.parametrize(
     "module_name",
     (
-        "diagnostics.diag_build_91794A558",
+        "diagnostics.diag_build_91794A559",
         "diagnostics.diag_build_90114A511",
         "diagnostics.diag_mcmaster_fillister",
         "diagnostics.diag_mcmaster_dowel",

@@ -634,46 +634,21 @@ PINCH_THREAD_CALLOUT_XY = (
     + ROUND_OUT
     + PINCH_THREAD_CALLOUT_EXTENT[1],
 )
-# The hold-down tap's lines (the tap drill and its depth, the thread and its
-# full-thread depth, then the stack its stations set) plus the shoulder,
-# measured on the c4c0e848a render: SolidWorks centres the block on the
-# point, 7.8 mm over it to the shoulder 8.35 under it, and the last line's
-# twenty glyphs print 57.6 mm wide.  The tap's .215 from the north face sets
-# where that face, and so the end screw's head, stands over MHA-DT-20's
-# hold-down hole: at .XX the 5/8 end screw's shallow engagement
-# (build_dt_drive_train_assembly END_SCREW_EMBED_WORST_MM) drops under the
-# owner's 1.39 D, so the station stays .XXX with its reason (rule 4; machinist
-# review of PR 2's farm proof, round 2, found no function on it).  #2697: its
-# station across the block prints .30 at .XX and needs no reason, so the one
-# reason is the .XXX station's alone (the v49 release review, 3 of 3 runs,
-# read it as the across station's when both were .XXX).  Rule 7 puts the mate
-# on the hole's size callout, not on the location (machinist review of
-# ecc864e1f refused it under the .215); reviews of 017b38ec2 and 0613bba70
-# refused it here as not at the dimension, so declaration dt-cone-tip-block
-# RV-02 (delegated ruling 2026-11-13) accepts the .215 as printed until the
-# 3/4 end screw of #2726 lets the station print .XX.
-FOOT_TAP_QUALIFIER = "SETS MHA-DT-39 REACH"
-_FOOT_TAP_GLYPH = 0.0576 / 20.0
-_FOOT_TAP_GROWTH = (len(FOOT_TAP_QUALIFIER) - 20) * _FOOT_TAP_GLYPH
-FOOT_TAP_CALLOUT_EXTENT = (
-    0.0293 + _FOOT_TAP_GROWTH / 2.0,
-    0.0086,
-    0.0293 + _FOOT_TAP_GROWTH / 2.0,
-    0.0080,
-)
+# The hold-down tap's two lines: the tap drill and its depth, the thread and
+# its full-thread depth.  Owner ruling 2026-11-20 (#2726): with the 3/4 end
+# screw and the .44 block the tap's station along the block prints .22 at
+# .XX, so it needs no reason; the former mate line under the thread
+# ("SETS MHA-DT-39 REACH", which the .215's third place carried, and the
+# delegated RV-02 accepting it) is gone, and the two-line block's measured
+# extent from 80240ed427 returns.
+FOOT_TAP_CALLOUT_EXTENT = (0.0280, 0.0060, 0.0280, 0.0055)
 # The hold-down tap's callout stands above the bottom view, right of the
 # FootTapX value and under the front view's foot finish, so its leader drops
-# steeply (53 degrees) through the view's north edge.  With the tap 1.00
-# toward -X (2026-09-29) a callout right of the view ran 5.4 mm longer over
-# the part than the tap's shortest approach.  SolidWorks centres the block
-# on the point, so the mate line (machinist review of c4c0e848a) dropped the
-# shoulder 2.8 mm onto the north edge and the 4.875's witness; 10.0 mm over
-# the edge the shoulder clears it by 1.65, as the two-line block's did, and
-# the block's left end stands 8.5 mm right of the tap.
-FOOT_TAP_CALLOUT_XY = (
-    FOOT_TAP_CENTER[0] + 0.0373 + _FOOT_TAP_GROWTH / 2.0,
-    _bottom_y(Z_NORTH) + 0.0100,
-)
+# steeply through the view's north edge.  With the tap 1.00 toward -X
+# (2026-09-29) a callout right of the view ran 5.4 mm longer over the part
+# than the tap's shortest approach.  SolidWorks centres the block on the
+# point; the two-line block 6.6 mm over the north edge clears it (80240ed427).
+FOOT_TAP_CALLOUT_XY = (FOOT_TAP_CENTER[0] + 0.035, _bottom_y(Z_NORTH) + 0.0066)
 # The locating foot's finish symbol, on the front view's foot edge (round-1
 # farm review, dt-fab-4: the seat that stands on MHA-DT-20).  The width
 # dimension that once ran under that foot reads in the bottom view, so the
@@ -1775,7 +1750,7 @@ def _states_depth(text: str, depth_mm: float) -> bool:
 def _foot_tap_callout_resolved(resolved_parts: dict[int, str]) -> bool:
     """Whether the hold-down tap's callout reads as a blind UNC-2B tap: the
     thread's line carries its full-thread depth, the tap drill's line its
-    depth, nothing says THRU, and the thread's part ends on the mate."""
+    depth, and nothing says THRU."""
     thread_desc = f"{HOLDDOWN_THREAD.lstrip('#')} UNC"
     lines = [text for text in resolved_parts.values() if text.strip()]
     thread = [text for text in lines if thread_desc in text]
@@ -1785,44 +1760,15 @@ def _foot_tap_callout_resolved(resolved_parts: dict[int, str]) -> bool:
         and len(thread) == 1
         and "2B" in thread[0]
         and _states_depth(thread[0], FOOT_THREAD_DEPTH)
-        and thread[0].rstrip().endswith(f"\n{FOOT_TAP_QUALIFIER}")
         and any(_states_depth(text, FOOT_DEPTH) for text in drill)
     )
-
-
-def _foot_tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Append the mate the tap's .XXX stations locate on (rule 4) to the one
-    compartment holding the thread, under its native thread line."""
-    if set(definitions) != {5, 6, 7, 8}:
-        raise RuntimeError(f"unexpected foot tap callout parts: {definitions!r}")
-    thread_parts = [part for part, text in definitions.items() if "<hw-threadclass>" in text]
-    if len(thread_parts) != 1:
-        raise RuntimeError(f"foot tap thread line is not in one callout part: {definitions!r}")
-    updated = dict(definitions)
-    part = thread_parts[0]
-    updated[part] = f"{updated[part].rstrip()}\n{FOOT_TAP_QUALIFIER}"
-    return updated
-
-
-def _set_foot_tap_callout_text(display: Any) -> None:
-    """Name the mate under the native thread line, keeping every variable."""
-    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
-    updated = _foot_tap_callout_definitions(definitions)
-    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
-        if updated[definition_part] != definitions[definition_part]:
-            display.SetText(writable_part, updated[definition_part])
-    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
-    if persisted != updated:
-        raise RuntimeError(
-            f"foot tap mate line did not persist: definitions={persisted!r}"
-        )
 
 
 def _check_foot_tap_callout(display: Any) -> None:
     resolved = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
     if not _foot_tap_callout_resolved(resolved):
         raise RuntimeError(
-            f"hold-down foot tap callout does not state its depths and mate: {resolved!r}"
+            f"hold-down foot tap callout does not state its depths: {resolved!r}"
         )
 
 
@@ -2164,7 +2110,6 @@ def build(adapter: Any) -> dict[str, str]:
         callout_xy=FOOT_TAP_CALLOUT_XY,
         label="hold-down foot tap",
     )
-    _set_foot_tap_callout_text(foot_tap_callout)
     set_hole_callout_precision(
         foot_tap_callout, FOOT_TAP_DEPTH_PRECISION, label="hold-down foot tap sizes"
     )

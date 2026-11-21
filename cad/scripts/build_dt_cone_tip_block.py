@@ -395,12 +395,18 @@ def build(adapter) -> dict[str, str]:
     # through the head-side jaw and pulls against threads in the far jaw.
     # Both features run along local X at (y = PINCH_BORE_Y, z = PINCH_Z, .22
     # from the north face) from the +X block face; the placement's z
-    # dimension holds PINCH_Z's magnitude, driven from PinchDepthCenter.  The
-    # slit splits the cylinder into two solid halves, so the through cut
-    # removes tap-drill area over (BLOCK_X - SLIT_W) of material.
-    pinch_placement = [
-        (("PinchCz", '"PinchDepthCenter" - "BlockZ" / 2'), ("PinchZ", '"PinchBoreY"'))
-    ]
+    # dimension holds PINCH_Z's magnitude, driven from PinchDepthCenter.  On
+    # the .44 block (#2726) .22 is the half depth, PINCH_Z is zero and the
+    # point takes a vertical relation to the origin instead (_holes cannot
+    # dimension a zero distance).  The slit splits the cylinder into two
+    # solid halves, so the through cut removes tap-drill area over
+    # (BLOCK_X - SLIT_W) of material.
+    pinch_cz = (
+        (None, None)
+        if abs(PINCH_Z) < 1e-12
+        else ("PinchCz", '"PinchDepthCenter" - "BlockZ" / 2')
+    )
+    pinch_placement = [(pinch_cz, ("PinchZ", '"PinchBoreY"'))]
     pinch_cut = wizard_holes(
         adapter, PINCH_BORE_SPEC,
         [[BLOCK_X / 2.0, PINCH_BORE_Y, PINCH_Z]],

@@ -20,14 +20,9 @@ name = "Pin gauges .011-.500"
 ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 
 [[tools]]
-id = "arbor-press"
-name = "Arbor press"
-ref = "arbor-press"  # F-arbor-press
-
-[[tools]]
-id = "reamer-0615"
-name = ".0615 reamer"
-ref = "reamer-0615"  # drawing cross-check 2026-11-19: .0615 +.0005/.0000 REAM THRU
+id = "reamer-0625"
+name = ".0625 reamer"
+ref = "reamer-0625"  # owner ruling 2026-11-20 (#2469): .0625 +.0005/.0000 REAM THRU, LOCTITE 638 bonded slip fit
 
 [[setups]]
 machine_kind = "other"

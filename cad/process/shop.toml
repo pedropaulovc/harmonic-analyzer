@@ -1079,10 +1079,10 @@ description = "Shop-made work arbor with two backing discs for cutting the MHA-P
 [tools.reamer-0365]  # inventory tools.reamer-0365
 description = ".0365 in HSS straight-flute chucking reamer (KBC 5-018-0365)"
 diameter_mm = 0.9271
-[tools.reamer-0615]  # MHA-DT-38 .0615 +.0005/.0000 REAM THRU; MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 +.0005/.0000 REAM (.163)
+[tools.reamer-0615]  # MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 +.0005/.0000 REAM (.163)
 description = ".0615 in HSS chucking reamer"
 diameter_mm = 1.5621
-[tools.reamer-0625]  # MHA-DT-03 .0625 +.0005/.0000 REAM THRU (T012, T018); MHA-DT-04 .0625 +.0005/.0000 REAM .20
+[tools.reamer-0625]  # MHA-DT-03 .0625 +.0005/.0000 REAM THRU (T012, T018); MHA-DT-04 .0625 +.0005/.0000 REAM .20; MHA-DT-38 .0625 +.0005/.0000 REAM THRU (#2469)
 description = ".0625 in HSS chucking reamer"
 diameter_mm = 1.5875
 [tools.reamer-0930]  # MHA-DT-11 2X .0930 +.0005/.0000 REAM .1555; MHA-PD-18 Ø.0930 +.0005/.0000 2X REAM THRU; MHA-PD-22 Ø.0930 +.0005/.0000 2X REAM THRU

@@ -68,7 +68,7 @@ allowed_free_stems:
   # MHA-DT-VN-71 sits in the MHA-DT-04 keyseat and rides the shaft's spin
   # and swing (owner decision C1 keyed, 2026-11-09, PR #1992).
   - dt-vn-cone-shaft-key
-  # MHA-DT-37 is bonded in MHA-DT-04's socket and MHA-DT-38 is pressed on its
+  # MHA-DT-37 is bonded in MHA-DT-04's socket and MHA-DT-38 is bonded on its
   # pivot: both ride the shaft's spin and swing.  MHA-DT-39 threads through
   # MHA-DT-21 and rides the swing (owner decision C1 keyed, 2026-11-09, PR
   # #1992).
@@ -141,8 +141,8 @@ machinist_exceptions:
     reason: "Owner ruling 2026-11-01: MHA-DT-VN-61 post-mount thread engagement 0.87D MIN (0.88D after #2107) accepted as a minor exception; #1019's 0.90D target not met. The same joint is MHA-DT-VN-61's RV-01"
   # DT-03 (MHA-DT-VN-55 #10-32 cup adjuster, 1.0D) retired with the adjuster:
   # owner decision C1 keyed, 2026-11-09, PR #1992
-  # (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992); its
-  # successor joint is DT-07 below.  Ids are not reused.
+  # (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992).  Ids are not
+  # reused.
   - id: "DT-04"
     kind: "minor"
     where: "sheet 13 checks 4W-4X: VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT (SHEET 16 ROW 19: .190 MIN); SHOULDER STAYS SEATED."
@@ -158,11 +158,9 @@ machinist_exceptions:
     where: "sheet 10 steps 10-10J: the back MHA-CH-08 set at DRO Y on the MHA-FR-05 rail and held by one MHA-CH-VN-57 #8-32 through its foot"
     finding: "one-screw part whose turning would change a setting, with no dowel, tongue, step or second screw (rule 23 static clamp)"
     reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 6.1; the dowel option is #2277. 10D clamps the ear at Y, 10F screws it down, 10G rechecks Y and 10H checks by hand that it does not turn. The wave-spring preload acts along the shaft axis in the screw's plane, so it puts no torque about the screw, and once MHA-CH-00 sets the pivot shaft in both ears the two brackets turn only together"
-  - id: "DT-07"
-    kind: "minor"
-    where: "sheet 7 steps 3-3A: MHA-DT-39 1/4-28 end screw in the .43 MHA-DT-21 tap, run in until MHA-DT-04 stops shuttling, BACK MHA-DT-39 OFF 1/8 TURN: ENGAGEMENT .347 MIN (1.39D)."
-    finding: "thread engagement below 1.5D (rule 18)"
-    reason: "Owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): MHA-DT-39 (McMaster 91794A558, 1/4-28 x 5/8) stays at the current MHA-DT-21 station with 1.39D of full thread at the print-worst shallow end, against rule 18's 1.5D. The end screw is set against MHA-DT-38, so its embed follows the tip's axial stack (post boss, MHA-DT-04 collar web, the cone gear stack and its feeler, MHA-DT-38's length, the MHA-DT-21 hold-down) plus the set end play; MHA-DT-21 is placed so the head never bottoms at the deep end (build_dt_drive_train_assembly.END_SCREW_ENGAGEMENT_WORST_D, asserted >= 1.39D). MHA-DT-VN-56 pinches the screw in the slit block once the end play is set"
+  # DT-07 (MHA-DT-39 1/4-28 end screw, 1.39D) retired: owner ruling 2026-11-20
+  # on #2726, "B": the 3/4 McMaster 91794A559 screw in the .44 MHA-DT-21 keeps
+  # 1.5D at the print-worst embed.
   - id: "DT-08"
     kind: "minor"
     where: "sheet 13 check 4R: TURN THE CRANK 80 TURNS: THE GEARS MUST NEVER BIND (A GEAR OUTSIDE THE TWO 4E BINDS MAY SHAKE)."

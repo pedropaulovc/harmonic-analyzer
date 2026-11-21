@@ -1,12 +1,13 @@
 r"""Create the machinist drawing for MHA-DT-38, the cone tip bushing.
 
 A turned brass ring (owner decision C1 keyed, 2026-11-09): OD and length at
-the title block's .XXX, the bore reamed for the press on the MHA-DT-37 pivot.
-The MHA-DT-34 ferrule's layout: the end view carries only its centre mark and
-the cutting plane; the longitudinal section A-A is the ring's length view
+the title block's .XXX, the bore reamed .0625 for its LOCTITE 638 bonded fit
+on the MHA-DT-37 pivot (owner ruling 2026-11-20, #2469).  The MHA-DT-34
+ferrule's layout: the end view carries only its centre mark and the cutting
+plane; the longitudinal section A-A is the ring's length view
 (drawing-guidelines.md rule 9) and takes every dimension, so the bore reads on
-cut edges.  The bore's callout names the fit, the mate and the interference
-REF (rule 4).
+cut edges.  The bore's callout names the fit, its compound and the mate
+(rule 4).
 
 Run with SolidWorks open::
 
@@ -94,9 +95,10 @@ NORTH_FACE_X = SECTION_CENTER[0] + HALF_LENGTH
 # Measured on the farm sheet (layout audit, run 20261110T001845485Z): a block
 # placed inside its extension lines centres on the keep point; one placed
 # outside them hangs on a shelf that starts at the keep x, and its rows run
-# about 30 mm down from the value (three callout rows, 3.5 mm text).
+# down from the value, one 3.5 mm text row each (the bore's callout rows).
 _ROW = 0.0056
-_BORE_BLOCK_BELOW_KEEP = 0.0038 - 3.0 * _ROW  # last row's baseline
+# The last row's baseline.
+_BORE_BLOCK_BELOW_KEEP = 0.0038 - len(BORE_CALLOUT.splitlines()) * _ROW
 # The OD's two-row block (value, wall) sits between its extension lines left
 # of the section.  The bore's block stands above and right of the north face,
 # wholly above its upper extension line (the bore edge at 5:1 leaves 7.8 mm

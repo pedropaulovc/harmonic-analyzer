@@ -1,6 +1,6 @@
 r"""Create the machinist drawing for MHA-DT-39, the cone tip end screw.
 
-A stock McMaster 91794A558 slotted fillister screw with one shop operation:
+A stock McMaster 91794A559 slotted fillister screw with one shop operation:
 the pivot hole reamed concentric in its threaded end (owner decision C1
 keyed, 2026-11-09).  The MHA-DT-34 ferrule's layout: the end view, looking at
 the threaded end, carries the hole's centre mark, the cutting plane and the
@@ -155,7 +155,7 @@ def build(adapter: Any) -> dict[str, str]:
             0: "Cone Tip End Screw Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "cone tip end screw; McMaster 91794A558 with a reamed pivot hole",
+            3: "cone tip end screw; McMaster 91794A559 with a reamed pivot hole",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

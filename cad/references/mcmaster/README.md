@@ -82,7 +82,8 @@ recipes:
 | 91794A055 | `sh-vn-fillister-screw-91794a055` (MHA-SH-VN-59: `DiscScrew`, `RackScrew`) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A078 | `mg-vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A080 | `ch-vn-frame-side-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
-| 91794A558 | `dt-cone-tip-end-screw` (MHA-DT-39, fabricated from stock: one added drill-and-ream pivot hole in its threaded end; owner decision C1 keyed, 2026-11-09, PR #1992) | 18-8 Stainless Steel Fillister Head Slotted Screw, 1/4"-28 x 5/8" |
+| 91794A558 | — (`dt-cone-tip-end-screw` stock until 2026-11-20: owner ruling on #2726 takes the 3/4 91794A559; `_mcmaster_91794a558` and its diagnostic recipe removed) | 18-8 Stainless Steel Fillister Head Slotted Screw, 1/4"-28 x 5/8" |
+| 91794A559 | `dt-cone-tip-end-screw` (MHA-DT-39, fabricated from stock: one added drill-and-ream pivot hole in its threaded end; owner ruling 2026-11-20, #2726; read live 2026-11-20 at https://www.mcmaster.com/91794A559/: 1/4"-28 UNF class 2A, fully threaded, flat tip, fillister head .237 high × Ø.414, 3/4" under the head, ASME B18.6.3, $11.39 per pack of 25, in stock; catalogue-built on the fillister family law, no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw, 1/4"-28 x 3/4" |
 | 92240A540 | `fr-vn-lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A560 | `dt-vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 91829A566 | `sm-vn-gooseneck-shoulder-screw` (MHA-SM-VN-56; catalogue-only, datasheet-built with the 91829A560 family's slot) | Slotted 18-8 Stainless Steel Precision Shoulder Screw, 1/4" Shoulder × 3/8", 10-24 Thread |

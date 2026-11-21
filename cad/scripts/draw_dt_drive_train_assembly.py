@@ -141,7 +141,6 @@ from dt_drive_train_assembly_spec import (
     CLUSTERS,
     COMPONENT_IDENTITIES,
     EXPLODED_VIEW_NAME,
-    END_SCREW_ENGAGEMENT_ASSEMBLY_FACT,
     FOOT_SCREW_SELECTOR,
     PENDING_STEMS,
     SOURCE_CONFIGURATION,
@@ -580,7 +579,7 @@ CLUSTER_BALLOON_CLEARANCE = {
 # ballooned instead on an enlarged copy of the same exploded view, isolated
 # to them, in the sheet's empty right half; its boundary circle and letter
 # sit on the 1:3 view (draw_ch_channel_assembly's exploded detail C).  The
-# explode keeps MHA-DT-38 pressed on the MHA-DT-37 pivot (the built pair), so
+# explode keeps MHA-DT-38 bonded on the MHA-DT-37 pivot (the built pair), so
 # the scale, not the explode, tells them apart: 6T tips 4.31 mm, bushing
 # 5.79 mm (dt_cone_tip_gear_spec, dt_cone_tip_bushing_spec).  Letters A, C,
 # D and E are taken here and B is MHA-FR-05's VIEW B, cited in step 10E.
@@ -829,7 +828,7 @@ BOM_DESCRIPTIONS = {
     "dt-cone-tip-block": "CONE TIP BLOCK",
     "dt-cone-tip-gear": "CONE TIP GEAR, 6T WITH SPIGOT AND PIVOT",
     "dt-cone-tip-bushing": "CONE TIP BUSHING",
-    "dt-cone-tip-end-screw": "END SCREW, MODIFIED MCMASTER 91794A558",
+    "dt-cone-tip-end-screw": "END SCREW, MODIFIED MCMASTER 91794A559",
     "dt-vn-cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 91794A112",
     "dt-vn-cone-tip-block-screw": "#4-40 X 3/8 SHCS, MCMASTER 91251A108",
     "dt-vn-locating-pin": "1/16 X 3/8 DOWEL PIN, MCMASTER 98381A417",
@@ -1431,8 +1430,9 @@ CONE_CRANK_STEPS = _note_text(
         # tool, never in this BOM) engaged inside the compound's fixture time
         # (cone_tip_cluster, cone_stack_end_play;
         # error_budget cone_tip_bond_clock).  The stack is first closed dry,
-        # T024 against T030 with no feeler, and measured; MHA-DT-38 is pressed
-        # on the loose MHA-DT-37 so the press never loads a bond.  Machinist
+        # T024 against T030 with no feeler, and measured; MHA-DT-38 is bonded
+        # on the loose MHA-DT-37 (owner ruling 2026-11-20, #2469: a LOCTITE
+        # 638 slip fit, no press) and cures while T024 bonds.  Machinist
         # review round 4 of PR 2 (rule 22): every slide and bond names its
         # mate and makes one joint, and 1B names its range and count.  A
         # keyway goes on its key only one way and 1F measures the stack its
@@ -1451,10 +1451,16 @@ CONE_CRANK_STEPS = _note_text(
         "1H. IF IT IS SHORT, REMAKE ITS THINNEST GEAR.",
         "1J. REPEAT 1F UNTIL THE STACK READS IN ITS WINDOW.",
         "1K. TAKE MHA-DT-37, T018, T012 AND T024 OFF.",
-        # Rule 23: the press fit's bench acceptance and its slip-fit remedy.
-        "1L. PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT, AGAINST ITS TEETH.",
-        "1M. CHECK THAT MHA-DT-38 DOES NOT TURN OR SLIDE BY HAND.",
-        "1N. IF IT DOES, BOND IT ON WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        # #2469: the bushing's bond keeps its squeeze-out off the face the end
+        # screw bears on, off the pivot's running end and out of T006's tooth
+        # spaces, which the bushing's face covers and MHA-DT-12 meshes in.  A
+        # slip fit does not hold itself home, so MHA-DT-37 cures spigot down:
+        # the bushing's weight keeps its south face on the leaves, the station
+        # the end-screw embed, the pivot's engagement and the tip air assume
+        # (codjiflo review round 2 of #3183).
+        "1L. BOND MHA-DT-38 ON THE MHA-DT-37 PIVOT, AGAINST ITS TEETH, PER THE SHEET 1 NOTE.",
+        "1M. WIPE THE SQUEEZE-OUT OFF MHA-DT-38'S BACK FACE, MHA-DT-37'S TOOTH SPACES AND THE PIVOT END.",
+        "1N. STAND MHA-DT-37 SPIGOT DOWN, MHA-DT-38 ON ITS TEETH, TO CURE WHILE T024 BONDS.",
         # #2470: T024 slides back along its coated land onto the feeler, so
         # its squeeze-out reaches T030's back face, the leaf and the key's
         # back end, the faces that must stay free for the stack float: they
@@ -1512,7 +1518,7 @@ CONE_CRANK_STEPS = _note_text(
         # The cured tip is accepted on the comb; the remedy parts every tip
         # bond, cleans the film off the coated spigot and the pivot too, and
         # redoes the tip from 1L: cleaning the pivot takes MHA-DT-38 off, so
-        # it is pressed back on before 1M (Codjiflo reviews of PR #2531;
+        # it is bonded back on at 1L (Codjiflo reviews of PR #2531;
         # machinist review of PR #2557 named the parts and the restart).
         f"2E. ONCE CURED, CHECK THAT {PHASING_COMB} CLIPS OVER ALL FIVE GEARS, BOTH ARMS ON T036.",
         "2F. IF IT DOES NOT, AT 250 DEG C TAKE MHA-DT-37, T018, T012, T024 AND MHA-DT-38 OFF.",
@@ -1579,7 +1585,9 @@ CONE_CRANK_STEPS = _note_text(
         # locks it; 4N's full turn checks the shaft runs free after.  U32
         # (user, 2026-09-23): option 1A turn-set.
         "3. THREAD MHA-DT-39 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING.",
-        f"3A. BACK MHA-DT-39 OFF 1/8 TURN: {END_SCREW_ENGAGEMENT_ASSEMBLY_FACT}",
+        # #2726: the 3/4 end screw keeps 1.5 D over the whole embed stack, so
+        # the step states no engagement shortfall (DT-07 retired).
+        "3A. BACK MHA-DT-39 OFF 1/8 TURN.",
         "3B. TIGHTEN MHA-DT-VN-56 ACROSS THE SLIT.",
         "3C. INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END "
         f"({acceptance_ref('shaft-end-play')}).",

@@ -10,7 +10,7 @@ import math
 from typing import Literal
 
 import _config
-import _mcmaster_91794a558 as end_screw_stock
+import _mcmaster_91794a559 as end_screw_stock
 import _printed_tolerance
 import cone_tip_cluster
 import dt_vn_locating_pin_spec as locating_pin
@@ -51,14 +51,15 @@ UNIT = drawing_unit("parts/dt-cone-tip-block", _config.parts("dt-cone-tip-block"
 BLOCK_X = 17.272  # .68 plan width across the shaft
 # Plan depth along the shaft: cone_tip_cluster's BLOCK_DEPTH_MM, deep enough
 # for the 1/4-28 end screw's full thread past both mouth countersinks at the
-# printed limits: 1.5 D, or 1.48 D (END_SCREW_ENGAGEMENT_MIN_MM) at the .XX
-# depth's shallow limit (END_SCREW_EMBED_WINDOW below; owner decision C1
-# keyed, 2026-11-09, PR #1992).  It prints .XX: the window holds at the title
-# block's +/-.01 (machinist review of PR 2's farm proof, rule 3: engagement
-# is no clearance, wall or floor, and rule 19: no band tightened to rescue a
-# thread).  Its half, .215, is the foot tap's station (FootTapZ, .XXX for the
-# end screw's reach below); the pinch hole stands .22 off the north face.
-BLOCK_Z = cone_tip_cluster.BLOCK_DEPTH_MM  # .430
+# printed limits: 1.52 D (END_SCREW_ENGAGEMENT_MIN_MM) at the .XX depth's
+# shallow limit, over the 1.5 D floor (END_SCREW_EMBED_WINDOW below).  It
+# prints .XX: the window holds at the title block's +/-.01 (machinist review
+# of PR 2's farm proof, rule 3: engagement is no clearance, wall or floor,
+# and rule 19: no band tightened to rescue a thread).  Owner ruling
+# 2026-11-20 (#2726): .44, so its half, .22, the foot tap's station
+# (FootTapZ), prints .XX on the .01 grid; the pinch hole stands .22 off the
+# north face, on the half depth.
+BLOCK_Z = cone_tip_cluster.BLOCK_DEPTH_MM  # .440
 
 # Owner decision C1 keyed (2026-11-09, PR #1992): MHA-DT-04 now ends inside
 # T024, so the block moved south to keep the end screw on T006's pivot (the
@@ -67,24 +68,21 @@ BLOCK_Z = cone_tip_cluster.BLOCK_DEPTH_MM  # .430
 # centre (user ruling 2026-09-29), so the platform's HoldDownZ prints the
 # centre's offset from the pivot, on the .001 in grid so it prints exactly.
 # Owner ruling 2026-11-09 (relayed by ImplementC1KeyedOpus): .738, .033 south
-# of the research's station, so the end screw reaches the bushing with its
-# head clear at every limit of the tip's axial stack
-# (build_dt_drive_train_assembly's END_SCREW_EMBED_WORST_MM); the shallow
-# side's 1.39D engagement there is an owner exception (ruling 2026-11-09,
-# dt-drive-train DT-07).  #2697: .731, .007 north of that ruling's station,
-# by the same two criteria.  The post's letter M mounting holes give its turn
-# room to line the tip up, and the same clearance lets the pushed post carry
-# the shaft further north (build_dt_drive_train_assembly books it one-sided);
-# the block follows so the shallow side keeps the ruling's 1.39D and the deep
-# side gains reach (0.30 mm to the head, 0.03 before).  The realized
-# south face stands TIP_BLOCK_GAP_MM (.27547) north of the layout T006 north
-# face.  Every consumer reads the block's stations from here.
-TIP_BLOCK_PIVOT_OFFSET = 18.5674  # .731
+# of the research's station; #2697: .731.  Owner ruling 2026-11-20 (#2726):
+# with the 3/4 end screw (91794A559) and the .44 block, .654, .077 north of
+# #2697's station, centres the end screw's worst embed stack
+# (build_dt_drive_train_assembly's END_SCREW_EMBED_WORST_MM, the pushed
+# post's one-sided clearance included) in its 1.5 D engagement window: about
+# 1.26 mm a side, at the shallow end to the 1.5 D floor and at the deep end
+# to the head's air off the north face.  The realized south face stands
+# TIP_BLOCK_GAP_MM (.34647) north of the layout T006 north face.  Every
+# consumer reads the block's stations from here.
+TIP_BLOCK_PIVOT_OFFSET = 16.6116  # .654
 TIP_BLOCK_STATION = PIVOT_STATION - TIP_BLOCK_PIVOT_OFFSET
 TIP_BLOCK_NORTH_FACE = TIP_BLOCK_STATION + BLOCK_Z / 2.0
 TIP_BLOCK_SOUTH_FACE = TIP_BLOCK_STATION - BLOCK_Z / 2.0
-TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = PIVOT_STATION - TIP_BLOCK_NORTH_FACE  # .515
-TIP_BLOCK_GAP_MM = TIP_BLOCK_SOUTH_FACE - T006_NORTH_FACE  # .27547
+TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = PIVOT_STATION - TIP_BLOCK_NORTH_FACE  # .434
+TIP_BLOCK_GAP_MM = TIP_BLOCK_SOUTH_FACE - T006_NORTH_FACE  # .34647
 
 # The adjuster and cone journal share one height above the platform top.
 # Free material above the slit floor and the pinch screw's rise stay fixed.
@@ -128,9 +126,9 @@ PINCH_HEIGHT_PLACES = 2
 # TIP_LATERAL_CAPACITY_MM).
 PASSAGE_CENTER_PLACES = 2
 # The pinch hole stands .22 from the north face, on the .01 grid at .XX
-# (machinist review of PR 2's farm proof, rule 3: no function needs the
-# .XXX its old half-depth station .215 printed), .005 south of the block's
-# half depth; PINCH_Z is its centre off the half depth (model +Z north).
+# (machinist review of PR 2's farm proof, rule 3: no function needs a .XXX
+# station), on the .44 block's half depth (#2726); PINCH_Z is its centre off
+# the half depth (model +Z north).
 PINCH_DEPTH_CENTER = 5.588  # .22
 PINCH_DEPTH_PLACES = 2
 PINCH_Z = BLOCK_Z / 2.0 - PINCH_DEPTH_CENTER
@@ -143,9 +141,10 @@ SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - 0.65
 SLIT_W = 1.27  # .05
 SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
 # Owner decision C1 keyed (2026-11-09, PR #1992): the end screw, McMaster
-# 91794A558 (1/4-28 x 5/8 slotted fillister, 18-8; MHA-DT-39 with its reamed
-# pivot hole), threads through the block from the north face; its end bears
-# on the brass bushing pressed on T006's pivot and sets the shaft's end play
+# 91794A559 (1/4-28 x 3/4 slotted fillister, 18-8, owner ruling 2026-11-20,
+# #2726; MHA-DT-39 with its reamed pivot hole), threads through the block
+# from the north face; its end bears on the brass bushing bonded on T006's
+# pivot and sets the shaft's end play
 # (cone_stack_end_play.SHAFT_END_PLAY); the pinch slit locks it.  The thread
 # is tapped THROUGH with a 90-degree countersink at both mouths (rule 18 E11/W1,
 # Main 2026-09-24: no floor to break out, no tap lead to deduct).
@@ -426,7 +425,7 @@ if WORST_PINCH_TIP_RECESS_MM < PINCH_SCREW_RECESS_MM - 1e-9:
 # the tip set's shift (cone_tip_cluster.TIP_SET_SHIFT_MM, the shaft pushed onto
 # the MHA-DT-05 boss), the bushing's length and that play.
 END_SCREW_SKU = cone_tip_cluster.END_SCREW_SKU
-END_SCREW_LENGTH = end_screw_stock.SHANK_LEN  # 5/8 under the head
+END_SCREW_LENGTH = end_screw_stock.SHANK_LEN  # 3/4 under the head
 # ASME B18.6.3 (cited, the build_pd_platen_clip precedent): length +0/-0.03 in
 # through 1 in; a point chamfer of at most 2P; on lengths of three diameters
 # and shorter, full form thread to within 1P of the head's bearing surface
@@ -453,10 +452,10 @@ END_SCREW_EMBED = TIP_BLOCK_NORTH_FACE - END_SCREW_END_STATION
 # full thread is its depth less both; the screw's runs from 1P under its
 # head to 2P short of its end.  The depth prints .XX (rule 19: no band is
 # tightened to rescue a thread), so at its shallowest the block holds
-# END_SCREW_ENGAGEMENT_MIN_MM, 1.48 D: the engagement floor is that or 1.5 D,
+# END_SCREW_ENGAGEMENT_MIN_MM, 1.52 D: the engagement floor is that or 1.5 D,
 # whichever is less.  The tip's engagement at the printed limits is
-# build_dt_drive_train_assembly's END_SCREW_ENGAGEMENT_WORST_D (1.39 D at the
-# stack's shallow end, owner ruling 2026-11-09 via PR #1992), stated there.
+# build_dt_drive_train_assembly's END_SCREW_ENGAGEMENT_WORST_D (1.5 D or
+# more over the whole stack, #2726), stated there.
 # In embed (from the north face, south positive) the window is: shallow, the
 # screw's full thread ends the floor past the north countersink; deep, the
 # shortest screw's head runout leaves the floor above the south countersink
@@ -611,10 +610,10 @@ FOOT_BORE_SPEC = HoleSpec(
 FOOT_BORE_DIA = blind_cut_dia_mm(FOOT_BORE_SPEC)
 # The tap's two stations: across the block from the -X face (the
 # PassageCenter datum), .XX, and along the axis from the NORTH face, the
-# face the pivot screw's head gap is measured to, .XXX
-# (build_dt_drive_train_assembly's embed stack reads the along band: at .XX
-# it passes the 5/8 end screw's reach and drops its engagement under the
-# owner's 1.39 D; the across band rides the post's lateral take-up, which has
+# face the pivot screw's head gap is measured to, .XX
+# (build_dt_drive_train_assembly's embed stack reads the along band: the 3/4
+# end screw keeps 1.5 D and its head air at .XX, owner ruling 2026-11-20,
+# #2726; the across band rides the post's lateral take-up, which has
 # room at .XX, #2697).  The tap sits
 # FOOT_TAP_OFFSET_X off the adjuster axis, the
 # same offset as the platform's hold-down hole off the cone line
@@ -625,7 +624,7 @@ FOOT_TAP_OFFSET_X = -1.016  # -.04
 FOOT_TAP_X = BLOCK_X / 2.0 + FOOT_TAP_OFFSET_X
 FOOT_TAP_Z = BLOCK_Z / 2.0
 FOOT_TAP_X_PLACES = 2
-FOOT_TAP_Z_PLACES = 3
+FOOT_TAP_Z_PLACES = 2
 FOOT_TAP_X_TOL_MM = printed_band_mm(FOOT_TAP_X_PLACES)
 FOOT_TAP_Z_TOL_MM = printed_band_mm(FOOT_TAP_Z_PLACES)
 _tap_r = _HOLDDOWN_MAJOR_MM / 2.0
@@ -806,12 +805,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # tap drill at .X), the pinch-hole height (the top ligament closes at 1.92 at
 # .X if 46.95 prints 47.0) and the pinch hole's .22 station from the north
 # face, the passage centre .34 and the tap's .30 across the block (#2697:
-# the post's turn on its screws takes up the tip's lateral error with room).
-# .XXX, with its function at its callout: the tap's .215 along the axis
-# (SETS MHA-DT-39 REACH), where .XX passes the 5/8 end screw's reach and
-# drops its engagement under the owner's 1.39 D
-# (build_dt_drive_train_assembly proves the looser grade fails).  The
-# dowel's station is a reference.
+# the post's turn on its screws takes up the tip's lateral error with room)
+# and .22 along it (#2726: the 3/4 end screw's embed stack closes at .XX).
+# The dowel's station is a reference.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"Width": BLOCK_WIDTH_PLACES, "Depth": BLOCK_DEPTH_PLACES},
     "Block": {"BlockHt": BLOCK_HEIGHT_PLACES},

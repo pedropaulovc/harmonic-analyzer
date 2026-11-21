@@ -8,9 +8,10 @@ leaves' inspection sizes the cone family prints on its T006 sheet: the
 circular tooth thickness on the +X tooth, its text on its own shelf, and the
 root envelope's limits off the near rim; its DETAIL B boundary rings the
 12 o'clock tooth space that sheet 2 plots. A shaded isometric gives the
-picture. Numbered notes name each mate once: note 1 the pivot's matched press
-fit in MHA-DT-38, note 2 the teeth's mesh with MHA-DT-12, and note 3 the
-centres. The pivot runs in MHA-DT-39, so it alone carries a roughness symbol.
+picture. Numbered notes name each mate once: note 1 the pivot's bonded fit
+in MHA-DT-38 and running fit in MHA-DT-39, note 2 the teeth's mesh with
+MHA-DT-12, and note 3 the centres. The pivot runs in MHA-DT-39, so it alone
+carries a roughness symbol.
 
 Sheet 2 defines the T006 tooth space point by point beside its outline (the
 custom DT6-FORM1 tool is ground to it); the exact equations stay in the
@@ -96,9 +97,11 @@ from dt_cone_tip_gear_spec import (
     OUTSIDE_DIA,
     OVERALL_LENGTH_MM,
     PART_NUMBER,
+    PIVOT_DIA_BAND,
     PIVOT_END_Z_MM,
     PIVOT_LENGTH_MM,
     PROFILE,
+    SPIGOT_DIA_BAND,
     SPIGOT_END_Z_MM,
     STEM_DIA_MM,
     SURFACE_FINISHES,
@@ -210,7 +213,6 @@ AXIS_OVERRUN = 0.003
 # family's layout).
 CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
-_TOL_NONE = 0  # swTolType_e.swTolNONE
 
 
 def floor_dia_y() -> float:
@@ -616,8 +618,9 @@ def _center_mark_pivot(adapter: Any, front: Any) -> None:
 
 
 def _assert_sheet_bands(adapter: Any, annotations: list[Any]) -> None:
-    """Prove the imported root-envelope LIMIT pair and the leaves' own blank
-    and tooth-thickness bands read back off the saved part."""
+    """Prove the imported root-envelope LIMIT pair, the leaves' own blank
+    and tooth-thickness bands and the stems' bands read back off the saved
+    part (#2469: the pivot prints the spigot's band)."""
     by_name = {}
     for annotation in annotations:
         by_name.setdefault(dimension_name(adapter, annotation), []).append(annotation)
@@ -625,6 +628,8 @@ def _assert_sheet_bands(adapter: Any, annotations: list[Any]) -> None:
         ("FloorDia", _TOL_LIMIT, FLOOR_DEVIATIONS_MM),
         ("BlankDia", None, deviations(BLANK_DIA_BAND)),
         ("ToothThickness", None, deviations(TOOTH_THICKNESS_BAND)),
+        ("SpigotDia", None, deviations(SPIGOT_DIA_BAND)),
+        ("PivotDia", None, deviations(PIVOT_DIA_BAND)),
     ):
         found = by_name.get(name, [])
         if len(found) != 1:
@@ -650,27 +655,8 @@ def _assert_sheet_bands(adapter: Any, annotations: list[Any]) -> None:
                 f"sheet {name} reads {observed} mm, expected {expected} mm"
             )
     _telemetry.success(
-        f"sheet root-envelope limits {FLOOR_LIMITS_MM} mm and tooth bands"
+        f"sheet root-envelope limits {FLOOR_LIMITS_MM} mm, tooth and stem bands"
     )
-
-
-def _pivot_reference(adapter: Any, side_annotations: list[Any]) -> None:
-    """Parenthesize the pivot's diameter as REF: the part leaves it unbanded,
-    and note 1's two ranges, on the measured mates, are its requirement."""
-    found = [a for a in side_annotations if dimension_name(adapter, a) == "PivotDia"]
-    if len(found) != 1:
-        raise RuntimeError(f"expected one PivotDia on the sheet, found {len(found)}")
-    display = _early_bound(
-        set_reference_dimension(adapter, found[0], label="pivot", diameter=True),
-        "IDisplayDimension",
-    )
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    if int(tolerance.Type) != _TOL_NONE:
-        raise RuntimeError(f"REF pivot reads tolerance type {int(tolerance.Type)}")
-    measured = abs(float(dimension.SystemValue)) * 1000.0
-    if abs(measured - STEM_DIA_MM) > 1e-4:
-        raise RuntimeError(f"REF pivot reads {measured:.4f} mm, expected {STEM_DIA_MM}")
 
 
 # The thickness callout's printed rows other than the value, top down.
@@ -1036,7 +1022,6 @@ def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    _pivot_reference(adapter, side_annotations)
     printed = {dimension_name(adapter, annotation) for annotation in annotations}
     if printed != sheet_dimension_names():
         raise RuntimeError(
