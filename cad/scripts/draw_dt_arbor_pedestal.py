@@ -44,19 +44,25 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_projection import model_point_in_view
 from _part_properties import part_drawing_unit
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
+from _printed_limits import drilled_limits, limits
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_arbor_pedestal_spec import (
     BORE_DIA,
+    BORE_DIA_BAND,
     BORE_HEIGHT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
+    FOOT_DEPTH,
     FOOT_HEIGHT,
     FOOT_MID_Z,
     FOOT_NEAR_Z,
@@ -68,10 +74,12 @@ from dt_arbor_pedestal_spec import (
     SET_SCREW_Z,
     STRAP_INNER_Z,
     STRAP_ROOT_Z,
+    STRAP_T,
     SURFACE_FINISHES,
     TAPER_TANGENT_X,
     TAPER_TANGENT_Y,
     TOP_RADIUS,
+    UNIT,
 )
 
 
@@ -299,6 +307,380 @@ PLAN_HOLE_CENTRELINE_MM = (
         + _PLAN_CENTRELINE_OVERRUN_MM,
     ),
 )
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (build_dt_arbor_pedestal: origin on
+# the foot seat, X centred on the foot's .94 width, +Y up the strap to the
+# crown, Z along the arbor; the strap inner face -- the foot's far face, flush
+# with it -- at Z = STRAP_INNER_Z and the hold-down ledge running -Z to
+# FOOT_NEAR_Z). The arbor bore and the crown run along Z at BORE_HEIGHT; the
+# hold-down hole and the apex tap run along Y on the X = 0 centreline. A band
+# is the title block's row for the places the sheet prints
+# (DRAWING_PRECISION_BY_NAME) on the printed nominal, or the bore's own
+# REAM_SLIDE band on its exact nominal; the hold-down drill and the tap drill
+# take the DRILLED HOLES row (HOLE_CALLOUT_PRECISION). Every Z location runs
+# off the far face and every X location off the west side face, as the plan
+# and elevation print them. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_arbor_pedestal"
+_HALF_WIDTH = FOOT_WIDTH / 2.0
+_HOLD_DOWN_STATION = STRAP_INNER_Z - SCREW_Z
+_SET_SCREW_STATION = STRAP_INNER_Z - SET_SCREW_Z
+_TAP_DRILL_DIA = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC)
+_TOP_KEEP = ((_SELF, "TOP_KEEP"),)
+_FRONT_KEEP = ((_SELF, "FRONT_KEEP"),)
+_BORE_FINISH = surface_finish_by_key(SURFACE_FINISHES, "arbor_bore")
+_SEAT_FINISH = surface_finish_by_key(SURFACE_FINISHES, "foot_seat")
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(
+        "FOOT_WIDTH",
+        "FOOT_HEIGHT",
+        "STRAP_INNER_Z",
+        "FOOT_NEAR_Z",
+        "BORE_HEIGHT",
+    ),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "DRAWING_PRECISION_BY_NAME",
+        "DRAWING_REFERENCE_PRECISION",
+        "HOLE_CALLOUT_PRECISION",
+        (_SELF, "HOLD_DOWN_PRECISION"),
+        (_SELF, "SET_SCREW_PRECISION"),
+    ),
+)
+# The foot seat on harmonic-base: the datum the height chain runs from, the
+# one face the Ra 125 flag says must be cut.
+requirement(
+    "foot_seat",
+    kind="face",
+    faces=(_SEAT_FINISH.face,),
+    requirements=("plane", "finish_ra"),
+    fields={
+        "plane": (_plane("y", 0.0), ("__frame__", "SURFACE_FINISHES")),
+        "finish_ra": (_SEAT_FINISH.roughness_um, ("SURFACE_FINISHES",)),
+    },
+    precision={"finish_ra": 1},
+)
+# The hold-down ledge's top: the foot height .20 off the seat (FRONT_KEEP
+# "FootHt").
+requirement(
+    "foot_top",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), FOOT_HEIGHT),),
+    requirements=("height",),
+    fields={
+        "plane": (_plane("y", FOOT_HEIGHT), ("FOOT_HEIGHT",)),
+        "height": (
+            limits(FOOT_HEIGHT, _P["FootHt"], unit=UNIT),
+            ("FOOT_HEIGHT", "UNIT", *_FRONT_KEEP),
+        ),
+        "height_nominal": (FOOT_HEIGHT, ("FOOT_HEIGHT",)),
+        "height_from": ("foot_seat", _FRONT_KEEP),
+    },
+    precision={"height": _P["FootHt"]},
+)
+# The far face: the foot's +Z end and the strap's inner face, one plane. The
+# plan's Z chain (foot depth, strap depth, hold-down and tap stations) runs
+# from it.
+requirement(
+    "far_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), STRAP_INNER_Z),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", STRAP_INNER_Z), ("STRAP_INNER_Z",))},
+)
+# The ledge's outboard end: the foot depth 1.10 (TOP_KEEP "Depth").
+requirement(
+    "near_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -FOOT_NEAR_Z),),
+    requirements=("depth",),
+    fields={
+        "plane": (_plane("z", FOOT_NEAR_Z), ("FOOT_NEAR_Z",)),
+        "depth": (
+            limits(FOOT_DEPTH, _P["Depth"], unit=UNIT),
+            ("FOOT_DEPTH", "UNIT", *_TOP_KEEP),
+        ),
+        "depth_nominal": (FOOT_DEPTH, ("FOOT_DEPTH",)),
+        "depth_from": ("far_face", _TOP_KEEP),
+    },
+    precision={"depth": _P["Depth"]},
+)
+# The strap's outer face, where the ledge starts: the strap depth .40
+# (TOP_KEEP "StrapDepth", its hidden reference sketch).
+requirement(
+    "strap_outer_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -STRAP_ROOT_Z),),
+    requirements=("depth",),
+    fields={
+        "plane": (_plane("z", STRAP_ROOT_Z), ("STRAP_ROOT_Z",)),
+        "depth": (
+            limits(STRAP_T, _P["StrapDepth"], unit=UNIT),
+            ("STRAP_T", "UNIT", "REFERENCE_SKETCHES", *_TOP_KEEP),
+        ),
+        "depth_nominal": (STRAP_T, ("STRAP_T",)),
+        "depth_from": ("far_face", _TOP_KEEP),
+    },
+    precision={"depth": _P["StrapDepth"]},
+)
+# The foot's side faces: the west one is the X origin both laterals run from
+# (rule 10); the east one closes the width .94 (TOP_KEEP "Width").
+requirement(
+    "west_side",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), _HALF_WIDTH),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", -_HALF_WIDTH), ("__frame__", "FOOT_WIDTH"))},
+)
+requirement(
+    "east_side",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), _HALF_WIDTH),),
+    requirements=("width",),
+    fields={
+        "plane": (_plane("x", _HALF_WIDTH), ("__frame__", "FOOT_WIDTH")),
+        "width": (
+            limits(FOOT_WIDTH, _P["Width"], unit=UNIT),
+            ("FOOT_WIDTH", "UNIT", *_TOP_KEEP),
+        ),
+        "width_nominal": (FOOT_WIDTH, ("FOOT_WIDTH",)),
+        "width_from": ("west_side", _TOP_KEEP),
+    },
+    precision={"width": _P["Width"]},
+)
+# The two tapered flanks: straight from the foot top at the foot's full width
+# up to tangency with the crown (CROWN_CALLOUT), the east one's lean off the
+# seat printed as the (91.47 deg) reference with the owner's PARALLEL SIDES OK
+# beneath it (_add_flank_angle, FLANK_ANGLE_CALLOUT): sides parallel and
+# tangent to the crown are as good, standing TOP_RADIUS off the X = 0 centre.
+# No band prints on either; the .94, .20, 1.75 and R.43 fix them.
+_FLANK_NORMAL_SCALE = 1.0 / sqrt(1.0 + _FLANK_RUN_PER_RISE**2)
+_FLANK_NORMALS = tuple(
+    (_sign * _FLANK_NORMAL_SCALE, _FLANK_RUN_PER_RISE * _FLANK_NORMAL_SCALE, 0.0)
+    for _sign in (1.0, -1.0)
+)
+_FLANK_OFFSET = (_HALF_WIDTH + _FLANK_RUN_PER_RISE * FOOT_HEIGHT) * _FLANK_NORMAL_SCALE
+_FLANK_GEOMETRY = (
+    "FOOT_WIDTH",
+    "FOOT_HEIGHT",
+    "TAPER_TANGENT_X",
+    "TAPER_TANGENT_Y",
+    (_SELF, "_FLANK_RUN_PER_RISE"),
+)
+requirement(
+    "flanks",
+    kind="tapered_side",
+    faces=tuple(PlanarFace(normal, _FLANK_OFFSET) for normal in _FLANK_NORMALS),
+    requirements=("angle_ref_deg", "parallel_sides_ok"),
+    fields={
+        "normals": ([list(normal) for normal in _FLANK_NORMALS], _FLANK_GEOMETRY),
+        "angle_ref_deg": (
+            FLANK_ANGLE_DEG,
+            ((_SELF, "FLANK_ANGLE_DEG"), (_SELF, "_add_flank_angle")),
+        ),
+        "dimension_type": ("reference", ((_SELF, "_add_flank_angle"),)),
+        "angle_from": ("foot_seat", ((_SELF, "_add_flank_angle"),)),
+        "root_half_width_nominal": (_HALF_WIDTH, ("FOOT_WIDTH",)),
+        "root_height_nominal": (FOOT_HEIGHT, ("FOOT_HEIGHT",)),
+        "tangent_half_width_nominal": (TAPER_TANGENT_X, ("TAPER_TANGENT_X",)),
+        "tangent_height_nominal": (TAPER_TANGENT_Y, ("TAPER_TANGENT_Y",)),
+        "tangent_to": ("crown", ((_SELF, "CROWN_CALLOUT"),)),
+        "parallel_sides_ok": (True, ((_SELF, "FLANK_ANGLE_CALLOUT"),)),
+        "parallel_half_width_nominal": (
+            TOP_RADIUS,
+            ("TOP_RADIUS", (_SELF, "FLANK_ANGLE_CALLOUT"), (_SELF, "CROWN_CALLOUT")),
+        ),
+        "callout": (FLANK_ANGLE_CALLOUT, ((_SELF, "FLANK_ANGLE_CALLOUT"),)),
+    },
+)
+# The arched top: R.43 (FRONT_KEEP "DomeRadius", SIDES TANGENT) on the bore's
+# centre, across the strap depth from the far face; the (2.18) overall height
+# to its apex is a reference (_set_reference_precision).
+requirement(
+    "crown",
+    kind="arc",
+    faces=(CylinderFace(2.0 * TOP_RADIUS),),
+    requirements=("radius",),
+    fields={
+        "center": ([0.0, BORE_HEIGHT, STRAP_INNER_Z], ("BORE_HEIGHT", "STRAP_INNER_Z")),
+        "axis": ((0.0, 0.0, -1.0), ("__frame__", "STRAP_T")),
+        "apex": ((0.0, 1.0, 0.0), ("__frame__",)),
+        "radius": (
+            limits(TOP_RADIUS, _P["DomeRadius"], unit=UNIT),
+            ("TOP_RADIUS", "UNIT", *_FRONT_KEEP),
+        ),
+        "radius_nominal": (TOP_RADIUS, ("TOP_RADIUS",)),
+        "concentric_with": ("arbor_bore", ((_SELF, "_show_crown_radius"),)),
+        "callout": (CROWN_CALLOUT, ((_SELF, "CROWN_CALLOUT"),)),
+        "overall_height_ref": (
+            BORE_HEIGHT + TOP_RADIUS,
+            (
+                "BORE_HEIGHT",
+                "TOP_RADIUS",
+                (_SELF, "OVERALL_HEIGHT_XY"),
+                (_SELF, "_set_reference_precision"),
+            ),
+        ),
+    },
+    precision={
+        "radius": _P["DomeRadius"],
+        "overall_height_ref": DRAWING_REFERENCE_PRECISION["overall height"],
+    },
+)
+# The reamed arbor bore through the strap: Ø.3750 +.0015/+.0010 REAM THRU,
+# SLIDING FIT ON ARBOR MHA-DT-13 (FRONT_KEEP "BoreDia", DIMENSION_CALLOUTS),
+# Ra 63; its axis 1.75 off the seat (FRONT_KEEP "BoreHeight") and .47 off the
+# west side (BoreLateral, under the elevation).
+requirement(
+    "arbor_bore",
+    kind="hole",
+    faces=(_BORE_FINISH.face,),
+    requirements=("dia", "thru", "finish_ra", "height", "lateral"),
+    fields={
+        "at": ([0.0, BORE_HEIGHT, STRAP_INNER_Z], ("BORE_HEIGHT", "STRAP_INNER_Z")),
+        "axis": ((0.0, 0.0, -1.0), ("__frame__", "STRAP_T")),
+        "dia": (
+            limits(BORE_DIA, _P["BoreDia"], BORE_DIA_BAND, unit=UNIT),
+            (
+                "BORE_DIA",
+                "BORE_DIA_BAND",
+                ("_fit_ream_slide", "REAM_SLIDE"),
+                "UNIT",
+                *_FRONT_KEEP,
+            ),
+        ),
+        "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
+        "thru": (True, ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "process": ("ream", ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "callout": (DIMENSION_CALLOUTS["BoreDia"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "mates": (ARBOR_NUMBER, ((_SELF, "ARBOR_NUMBER"),)),
+        "finish_ra": (_BORE_FINISH.roughness_um, ("SURFACE_FINISHES",)),
+        "height": (
+            limits(BORE_HEIGHT, _P["BoreHeight"], unit=UNIT),
+            ("BORE_HEIGHT", "UNIT", *_FRONT_KEEP),
+        ),
+        "height_nominal": (BORE_HEIGHT, ("BORE_HEIGHT",)),
+        "height_from": ("foot_seat", _FRONT_KEEP),
+        "lateral": (
+            limits(_HALF_WIDTH, _P["BoreLateral"], unit=UNIT),
+            ("FOOT_WIDTH", "UNIT", "REFERENCE_SKETCHES", *_FRONT_KEEP),
+        ),
+        "lateral_nominal": (_HALF_WIDTH, ("FOOT_WIDTH",)),
+        "lateral_from": ("west_side", _FRONT_KEEP),
+    },
+    precision={
+        "dia": _P["BoreDia"],
+        "finish_ra": 1,
+        "height": _P["BoreHeight"],
+        "lateral": _P["BoreLateral"],
+    },
+)
+# The #8 close-clearance hold-down hole through the ledge, drilled from the
+# seat in the model: its native callout (Ø.180 DRILL THRU ALL), .75 off the
+# far face (TOP_KEEP "HoldDownLocation") and .47 off the west side
+# (HoleLateral).
+_HOLE_LATERAL = (
+    limits(_HALF_WIDTH, _P["HoleLateral"], unit=UNIT),
+    ("FOOT_WIDTH", "UNIT", "REFERENCE_SKETCHES", *_TOP_KEEP),
+)
+_HOLD_DOWN_CALLOUT = ("SCREW_HOLE_SPEC", (_SELF, "hold_down_callout_definitions"))
+requirement(
+    "hold_down_hole",
+    kind="hole",
+    faces=(CylinderFace(SCREW_HOLE_DIA),),
+    requirements=("dia", "thru", "station", "lateral"),
+    fields={
+        "at": ([0.0, 0.0, SCREW_Z], ("SCREW_Z",)),
+        "axis": ((0.0, 1.0, 0.0), ("SCREW_HOLE_SPEC",)),
+        "dia": (
+            drilled_limits(SCREW_HOLE_DIA, HOLD_DOWN_PRECISION["hw-diam"], unit=UNIT),
+            ("SCREW_HOLE_DIA", "UNIT", (_SELF, "HOLD_DOWN_PRECISION")),
+        ),
+        "nominal_dia": (SCREW_HOLE_DIA, ("SCREW_HOLE_DIA", "SCREW_HOLE_SPEC")),
+        "thru": (True, _HOLD_DOWN_CALLOUT),
+        "process": ("drill", ((_SELF, "HOLD_DOWN_PROCESS"),)),
+        "station": (
+            limits(_HOLD_DOWN_STATION, _P["HoldDownLocation"], unit=UNIT),
+            ("SCREW_Z", "STRAP_INNER_Z", "UNIT", "REFERENCE_SKETCHES", *_TOP_KEEP),
+        ),
+        "station_nominal": (_HOLD_DOWN_STATION, ("SCREW_Z", "STRAP_INNER_Z")),
+        "station_from": ("far_face", _TOP_KEEP),
+        "lateral": _HOLE_LATERAL,
+        "lateral_nominal": (_HALF_WIDTH, ("FOOT_WIDTH",)),
+        "lateral_from": ("west_side", _TOP_KEEP),
+    },
+    precision={
+        "dia": HOLD_DOWN_PRECISION["hw-diam"],
+        "station": _P["HoldDownLocation"],
+        "lateral": _P["HoleLateral"],
+    },
+)
+# The #4-40 apex tap, down through the crown at the strap's mid-depth and
+# stopped at the arbor bore: its native callout (Ø.089 TO BORE / TAP 4-40 UNC
+# TO BORE), .20 off the far face (TOP_KEEP "SetScrewLocation"), and on the
+# hold-down's .47 by the one plan centreline the two holes share
+# (PLAN_HOLE_CENTRELINE_MM).
+_TAP_CALLOUT = ("SET_SCREW_HOLE_SPEC", (_SELF, "set_screw_callout_definitions"))
+requirement(
+    "apex_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(_TAP_DRILL_DIA),),
+    requirements=("thread", "dia", "into", "station", "lateral"),
+    fields={
+        "at": (
+            [0.0, BORE_HEIGHT + TOP_RADIUS, SET_SCREW_Z],
+            ("BORE_HEIGHT", "TOP_RADIUS", "SET_SCREW_Z"),
+        ),
+        "axis": ((0.0, -1.0, 0.0), ("SET_SCREW_HOLE_SPEC",)),
+        "thread": (
+            f"{SET_SCREW_HOLE_SPEC.size} UNC-{SET_SCREW_HOLE_SPEC.thread_class}",
+            _TAP_CALLOUT,
+        ),
+        "dia": (
+            drilled_limits(
+                _TAP_DRILL_DIA, SET_SCREW_PRECISION["hw-tapdrldia"], unit=UNIT
+            ),
+            (
+                "SET_SCREW_HOLE_SPEC",
+                ("_hole_spec", "TAP_DRILL_MM"),
+                "UNIT",
+                (_SELF, "SET_SCREW_PRECISION"),
+            ),
+        ),
+        "nominal_dia": (
+            _TAP_DRILL_DIA,
+            ("SET_SCREW_HOLE_SPEC", ("_hole_spec", "TAP_DRILL_MM")),
+        ),
+        "into": ("arbor_bore", (*_TAP_CALLOUT, (_SELF, "SET_SCREW_EXTENT"))),
+        "callout_extent": (SET_SCREW_EXTENT, ((_SELF, "SET_SCREW_EXTENT"),)),
+        "station": (
+            limits(_SET_SCREW_STATION, _P["SetScrewLocation"], unit=UNIT),
+            ("SET_SCREW_Z", "STRAP_INNER_Z", "UNIT", "REFERENCE_SKETCHES", *_TOP_KEEP),
+        ),
+        "station_nominal": (_SET_SCREW_STATION, ("SET_SCREW_Z", "STRAP_INNER_Z")),
+        "station_from": ("far_face", _TOP_KEEP),
+        "lateral": (
+            _HOLE_LATERAL[0],
+            (*_HOLE_LATERAL[1], (_SELF, "PLAN_HOLE_CENTRELINE_MM")),
+        ),
+        "lateral_nominal": (_HALF_WIDTH, ("FOOT_WIDTH",)),
+        "lateral_from": ("west_side", ((_SELF, "PLAN_HOLE_CENTRELINE_MM"),)),
+    },
+    precision={
+        "dia": SET_SCREW_PRECISION["hw-tapdrldia"],
+        "station": _P["SetScrewLocation"],
+        "lateral": _P["HoleLateral"],
+    },
+)
+
 # Half the ink of a drawn line: the 0.25 mm line weight.
 _LINE_HALF_M = 0.000125
 

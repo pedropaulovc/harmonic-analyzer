@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 9: the finished bracket, every surface blackened. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 9: blacken every surface (once the solution is bought)</text>
+  <path class="part-kept" d="M113.1 340 V151.53 A56.9 56.9 0 0 1 226.9 151.53 V340 Z"/>
+  <path class="active-face" fill="none" d="M113.1 340 V151.53 A56.9 56.9 0 0 1 226.9 151.53 V340 Z"/>
+  <circle class="holes" cx="170" cy="163.6" r="22.76"/>
+  <rect class="part-threads" x="162.09" y="94.64" width="15.82" height="47.96"/>
+  <text class="label" x="20" y="50">Front:</text>
+  <line class="leader" x1="170" y1="163.6" x2="266.9" y2="163.6"/>
+  <circle class="leader-dot" cx="170" cy="163.6" r="2"/>
+  <text class="label" x="266.9" y="167.6">the bore: brushed too</text>
+  <line class="leader" x1="170" y1="106.64" x2="266.9" y2="94.64"/>
+  <circle class="leader-dot" cx="170" cy="106.64" r="2"/>
+  <text class="label" x="266.9" y="98.64">the 4-40 hole's mouth</text>
+  <polygon class="part-kept" points="480,340 604.46,340 604.46,297.33 536.9,297.33 536.9,94.64 480,94.64"/>
+  <polygon class="active-face" fill="none" points="480,340 604.46,340 604.46,297.33 536.9,297.33 536.9,94.64 480,94.64"/>
+  <rect class="holes" x="551.12" y="297.33" width="32" height="42.67"/>
+  <text class="label" x="480" y="50">Side:</text>
+  <line class="leader" x1="567.12" y1="318.66" x2="624.46" y2="273.33"/>
+  <circle class="leader-dot" cx="567.12" cy="318.66" r="2"/>
+  <text class="label" x="624.46" y="277.33">the hold-down hole</text>
+  <text class="label" x="20" y="385">Every face, edge and hole: washed, scuffed (not the bore or the holes), brushed, rinsed, dried, oiled.</text>
+</svg>

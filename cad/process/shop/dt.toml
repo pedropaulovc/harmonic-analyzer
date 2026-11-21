@@ -201,3 +201,14 @@ description = "C67500 manganese bronze, round bar, 5/8 in"
 description = "gray iron, class not ruled, casting for MHA-DT-05 cone pivot post"
 [stock.drill-rod-1-8]
 description = "Drill rod (O1 or W1 tool steel, annealed, ground), round bar, 1/8 in"
+
+# --- MHA-DT-02 arbor pedestal (cad/process/dt_arbor_pedestal/plan.toml) -----
+# Go/no-go pair for its reamed arbor bore Ø.3750 +.0015/+.0010 (.3760-.3765),
+# as the MHA-CH-13 hub pair (common.toml gauges.plug-gauges-4000-4005):
+# Vermont Gage standard Class X steel pin/plug gages, GO at the low limit
+# (plus tolerance) and NO-GO at the high limit (minus tolerance), each
+# ± .000040 in (= 0.001016 mm, the resolution; the [gauges] table is in common.toml). Not owned: to buy
+# (cad/config/shop-equipment/ gauges, same key). The tools record lets the
+# plan list the pair in its tooling.
+[tools.plug-gauges-3760-3765]
+description = "Plug gauge pair, .3760 GO (plus) and .3765 NO-GO (minus), Vermont Gage Class X"
