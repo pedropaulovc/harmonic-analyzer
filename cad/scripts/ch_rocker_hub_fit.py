@@ -3,53 +3,48 @@ r"""The press fit that joins the built-up rocker arm's hub to its strap.
 PURE DATA, no SolidWorks/COM imports. MHA-CH-06 may be built up (its
 ``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): the turned hub MHA-CH-12
 is pressed into the Ø.400 hole of the flat strap MHA-CH-13. Both detail
-builds and their drawing tests import this one module, so the hole's band, the
-land's band and the interference they make are stated once.
+builds and their drawing tests import this one module, so the hole's band and
+the interference the land is turned to are stated once.
 
 User ruling (route v3, 2026-10-16): a press fit. #290 states it in inch on
 the .400 nominal (``ch_rocker_arm_spec.HUB_DIA``): the strap hole is reamed
-+.0005/.0000 with a .4000 reamer and the hub land is turned +.0013/+.0009, so
-the diametral interference runs .0004-.0013. A land band whose least
-interference is .0000 (+.0010/+.0005 in this hole) goes together
-line-to-line and is refused.
++.0005/.0000 with a .4000 reamer, and the diametral interference runs
+.0004-.0013.
+
+Owner ruling 2026-11-21 (tight-tolerance audit, row 1): "matched fit only".
+The land prints as the Ø.400 reference with the interference, turned to the
+measured strap hole: the land's own .4009-.4013 band (the interference held
+against every hole in the reamed band, .0004 wide) is gone, so each land
+takes the .0009 the interference leaves over its own hole. A fit whose least
+interference is .0000 goes together line-to-line and is refused.
 """
 
 from __future__ import annotations
 
 STRAP_HOLE_BAND = (0.0127, 0.0)  # (upper, lower): +.0005/.0000
-HUB_LAND_BAND = (0.03302, 0.02286)  # (upper, lower): +.0013/+.0009
+PRESS_INTERFERENCE = (0.01016, 0.03302)  # diametral (least, greatest): .0004-.0013
 
 
-def press_interference(
-    land_band: tuple[float, float], hole_band: tuple[float, float]
+def land_range(
+    interference: tuple[float, float], hole_band: tuple[float, float]
 ) -> tuple[float, float]:
-    """Diametral interference (least, greatest) of a land band in a hole band.
+    """The land's (least, greatest) deviation over the hole's nominal across
+    every hole in ``hole_band``, each land turned to its own measured hole.
 
-    The least is the smallest land in the largest hole, the greatest the
-    largest land in the smallest hole. A press fit must interfere at both
-    ends: a least of .0000 is a line-to-line pair that need not hold.
+    The least is the smallest hole plus the least interference, the greatest
+    the largest hole plus the greatest. A press fit must interfere at both
+    ends: a least interference of .0000 is a line-to-line pair that need not
+    hold.
     """
-    least = round(land_band[1] - hole_band[0], 6)
-    greatest = round(land_band[0] - hole_band[1], 6)
-    if not least > 0.0:
+    least, greatest = interference
+    if not 0.0 < least < greatest:
         raise AssertionError(
             f"the hub land can go in the strap hole line-to-line or loose: "
-            f"{(least, greatest)}"
+            f"{interference}"
         )
-    return least, greatest
+    return round(hole_band[1] + least, 6), round(hole_band[0] + greatest, 6)
 
 
-PRESS_INTERFERENCE = press_interference(HUB_LAND_BAND, STRAP_HOLE_BAND)
-
-
-def _inch_text(value_mm: float) -> str:
-    """``value_mm`` as four-place decimal-inch print text: ``.0004``."""
-    return f"{value_mm / 25.4:.4f}".removeprefix("0")
-
-
-# The callout row both prints carry under their Ø (drawing-guidelines.md rule 4:
-# a tight band names its mate and why).
-INTERFERENCE_TEXT = (
-    f"{_inch_text(PRESS_INTERFERENCE[0])}-{_inch_text(PRESS_INTERFERENCE[1])}"
-    " DIAMETRAL INTERFERENCE"
-)
+# .4004-.4018 over every hole the reamed band admits (the hub's supply wall
+# and its bar take the extremes).
+LAND_RANGE = land_range(PRESS_INTERFERENCE, STRAP_HOLE_BAND)

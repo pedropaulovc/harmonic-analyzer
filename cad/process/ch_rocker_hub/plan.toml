@@ -4,19 +4,23 @@
 # sketch on PR #3262, branch evidence/cnc-bush-hub-sketch): bar-fed from the 24 in 1/2 in
 # 1018 bar, two hubs per pull, about 128 min for the lot against 191 min one
 # at a time from 20 sawn slugs. Each pull: face the bar end (Z0), rough and
-# finish the land over both hubs to its press band, spot, drill D through
-# both and past the second parting line, part off the first hub, face the new
-# end to Z0 again, part off the second. The land is turned before the drill
-# (the turning-deflection screen models solid round). The drawing's fit
-# route governs the land: PRESS FIT IN MHA-CH-13 STRAP HOLE / TURN TO
-# MEASURED HOLE (INTERFERENCE .0004-.0013). Op 10 measures every MHA-CH-13
-# hub hole with the .4000 GO / .4005 NO-GO pair (MHA-CH-13's own acceptance,
-# plug-gauges-4000-4005, to buy). Every hole that gauges .4000-.4005 takes
-# the drawing's whole .4009-.4013 land at .0004-.0013 interference (hole +
-# .0004-.0013 always holds that band), so the measured hole sets one land
-# size for the lot and the hubs need no pairing. The hubs part .02 long over
-# the .32 MIN supply length: the drawing's note 1 finishes bore and length
-# after joining, on MHA-CH-06. Bench: deburr, check land and length.
+# finish the land over both hubs to the lot's land window, spot, drill D
+# through both and past the second parting line, part off the first hub, face
+# the new end to Z0 again, part off the second. The land is turned before the
+# drill (the turning-deflection screen models solid round). The drawing's
+# matched fit governs the land (owner ruling 2026-11-21, "matched fit only"):
+# (Ø.400) REF, TURN TO MEASURED STRAP HOLE / .0004-.0013 DIAMETRAL
+# INTERFERENCE ON MHA-CH-13. Op 10 reads every MHA-CH-13 hub hole with the
+# six Class X plug gauges .4000-.4005 by .0001 (the .4000/.4005 pair,
+# plug-gauges-4000-4005, plus the steps plug-gauges-4001-4004; all to buy):
+# the largest that enters is the hole's reading R, the hole lies in R to
+# R + .0001. One land fits the whole lot at .0004-.0013 in every hole: from
+# the largest R + .0005 to the smallest R + .0013, a window .0008 less the
+# lot's spread of readings (never under .0004, since every R lies in
+# .4000-.4004), so the hubs need no pairing. Acceptance is that interference:
+# land miked against the plug-gauged holes. The hubs part .02 long over the
+# .32 MIN supply length: the drawing's note 1 finishes bore and length after
+# joining, on MHA-CH-06. Bench: deburr, check land and length.
 title = "Rocker Hub"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -101,13 +105,13 @@ turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Before the first pull, measure the holes the land is turned to (drawing: TURN TO MEASURED HOLE). Gauge every MHA-CH-13 strap's hub hole with the .4000 GO and .4005 NO-GO plug pair. A hole of .4000–.4005 takes the land's Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} at the drawing's {{cad.outer_interference_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}} interference."
-inspection = "Every strap hole .4000–.4005: GO enters, NO-GO does not."
-gauge_checks = [{ gauge = "plug-gauges-4000-4005", band_mm = [10.16, 10.1727] }]
+instruction = "Before the first pull, read the holes the land is turned to (drawing: TURN TO MEASURED STRAP HOLE). Try the six plug gauges .4000–.4005 in every MHA-CH-13 strap's hub hole, smallest first, and write beside each strap the largest that enters: its reading R. The lot's land is Ø(largest R + .0005) to Ø(smallest R + {{cad.outer_interference_max_in:.4dot}}): the hole may be up to .0001 over its R, so every hole then takes the drawing's {{cad.outer_interference_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}} diametral interference. Write the land window on this sheet."
+inspection = "Every strap hole .4000–.4005: .4000 enters, .4005 does not; each R written; land window written."
+gauge_checks = [{ gauge = "plug-gauges-4000-4005", band_mm = [10.16, 10.1727] }, { gauge = "plug-gauges-4001-4004", band_mm = [10.16, 10.1727] }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A strap hole the NO-GO enters or the GO does not is outside MHA-CH-13's own .4000–.4005 hole band, the strap traveler's hub-hole check: that strap is nonconforming, so make no hub for it. Set it aside and tell the owner: the strap is remade, not fitted with a hub turned to it."
+instruction = "A strap hole the .4005 enters or the .4000 does not is outside MHA-CH-13's own .4000–.4005 hole band, the strap traveler's hub-hole check: that strap is nonconforming, so leave it out of the readings and make no hub for it. Set it aside and tell the owner: the strap is remade, not fitted with a hub turned to it."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -141,15 +145,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the land over the same length to Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} (the measured holes' land, Op 10) in light passes, miking each hub's length of land between passes; over the band, take another pass."
+instruction = "Finish the land over the same length to the lot's land window (Op 10) in light passes, miking each hub's length of land between passes; over the window, take another pass."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Land Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} on both hubs, micrometer."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+inspection = "Land inside the Op 10 window on both hubs, micrometer: the measured land less each hole's R lies within .0005–{{cad.outer_interference_max_in:.4dot}}."
+gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A land under Ø{{cad.outer_dia_min_in:.4dot}}: part both hubs off and scrap them; pull the bar and start the pair again from Op 30."
+instruction = "A land under the Op 10 window: part both hubs off and scrap them; pull the bar and start the pair again from Op 30."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -222,11 +226,11 @@ instruction = "Deburr each hub: file the parting burr off the parted face, break
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Each hub: length across the faces at least {{cad.length_min_in:.2dot}}, calipers; land Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} again after deburring, micrometer."
-inspection = "Length {{cad.length_min_in:.2dot}} min; land Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "calipers", band_mm = ["{{cad.length_min_mm}}", "{{cad.part_off_mm}}"] }, { gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+instruction = "Each hub: length across the faces at least {{cad.length_min_in:.2dot}}, calipers; land inside the Op 10 window again after deburring, micrometer."
+inspection = "Length {{cad.length_min_in:.2dot}} min; land inside the Op 10 window (largest R + .0005 to smallest R + {{cad.outer_interference_max_in:.4dot}})."
+gauge_checks = [{ gauge = "calipers", band_mm = ["{{cad.length_min_mm}}", "{{cad.part_off_mm}}"] }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A hub under the length or off the land band in Op 130 is scrapped, not reworked: the next pull makes another."
+instruction = "A hub under the length or outside the land window in Op 130 is scrapped, not reworked: the next pull makes another."
 feed = "hand"

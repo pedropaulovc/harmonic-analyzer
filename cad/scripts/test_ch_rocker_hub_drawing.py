@@ -26,24 +26,30 @@ def test_required_drawing_paths() -> None:
     assert "draw_ch_rocker_hub.py" in PRECISION_MIGRATED_DRAWINGS
 
 
-def test_press_fit_bands_hold_interference_at_both_ends() -> None:
-    # .400 strap hole +.0005/.0000, hub land +.0013/+.0009: .0004-.0013 in.
+def test_the_matched_press_holds_interference_over_every_reamed_hole() -> None:
+    # .400 strap hole +.0005/.0000; each land turned to its own measured hole
+    # for .0004-.0013 (owner ruling 2026-11-21, matched fit only), so across
+    # the reamed band the lands run .4004-.4018.
     assert rocker.HUB_DIA == pytest.approx(0.400 * 25.4)
     assert fit.STRAP_HOLE_BAND == (0.0127, 0.0)
-    assert fit.HUB_LAND_BAND == (0.03302, 0.02286)
     assert fit.PRESS_INTERFERENCE == pytest.approx((0.01016, 0.03302))
+    assert fit.LAND_RANGE == pytest.approx((0.01016, 0.04572))
+    # Each land's own window is the whole .0009 interference, against the
+    # .0004 the old .4009-.4013 band left (every hole at once).
+    each = fit.PRESS_INTERFERENCE[1] - fit.PRESS_INTERFERENCE[0]
+    every_hole = each - (fit.STRAP_HOLE_BAND[0] - fit.STRAP_HOLE_BAND[1])
+    assert each / 25.4 == pytest.approx(0.0009)
+    assert every_hole / 25.4 == pytest.approx(0.0004)
 
 
 @pytest.mark.parametrize(
-    "land_band",
-    [(0.0254, 0.0127), (0.0127, 0.0)],
-    ids=["line-to-line", "loose"],
+    "interference",
+    [(0.0, 0.0127), (-0.0127, 0.0127), (0.0254, 0.0127)],
+    ids=["line-to-line", "loose", "inverted"],
 )
-def test_a_press_that_can_go_line_to_line_is_refused(land_band) -> None:
-    # +.0010/+.0005 in the +.0005/.0000 hole: the smallest land meets the
-    # largest hole at .0000.
+def test_a_press_that_can_go_line_to_line_is_refused(interference) -> None:
     with pytest.raises(AssertionError, match="line-to-line or loose"):
-        fit.press_interference(land_band, fit.STRAP_HOLE_BAND)
+        fit.land_range(interference, fit.STRAP_HOLE_BAND)
 
 
 def test_supply_sizes_derive_from_the_finished_rocker() -> None:
@@ -94,9 +100,12 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_every_band_is_native_and_named() -> None:
-    assert model_toleranced_dimensions(part) == {
-        ("HubProfile", "LandDia"): "*deviations(HUB_LAND_BAND)",
-    }
+    # The land carries no band of its own (owner ruling 2026-11-21, matched
+    # fit only): a reference, bracketed on the part.
+    assert model_toleranced_dimensions(part) == {}
+    assert notes.REFERENCE_DIMENSIONS == {"HubProfile": frozenset({"LandDia"})}
+    assert notes.DRAWING_PRECISION_BY_NAME["LandDia"] == 3
+    assert (notes.REFERENCE_PREFIX, notes.REFERENCE_SUFFIX) == ("(<MOD-DIAM>", ")")
     # Fan-out screen 2026-11-07 (rule 7): the bore's and the length's
     # supply-matched sizes link the note that states them.
     assert notes.SUPPLY_BORE_CALLOUT.splitlines() == [
@@ -107,12 +116,11 @@ def test_every_band_is_native_and_named() -> None:
     assert notes.SUPPLY_LENGTH_CALLOUT == "SEE NOTE 1"
     assert drawing.DIMENSION_CALLOUTS["SupplyLength"] == notes.SUPPLY_LENGTH_CALLOUT
     assert notes.DRAWING_NOTES.startswith("1. ")
-    # The land's band is narrower than the turned-diameter row: the callout
-    # routes it to the measured strap hole (pending owner confirmation,
-    # fan-out Q2) with its interference as reference.
+    # Rule 4, matched pairs: the reference Ø names its measured mate and the
+    # interference that governs.
     assert notes.LAND_CALLOUT.splitlines() == [
-        "PRESS FIT IN MHA-CH-13 STRAP HOLE",
-        "TURN TO MEASURED HOLE (INTERFERENCE .0004-.0013)",
+        "TURN TO MEASURED STRAP HOLE",
+        ".0004-.0013 DIAMETRAL INTERFERENCE ON MHA-CH-13",
     ]
     # The stated wall is the spec's worst case, rounded down (rule 20).
     assert 0.075 <= spec.SUPPLY_WALL_MIN / 25.4 < 0.076

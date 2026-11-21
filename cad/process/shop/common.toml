@@ -103,6 +103,16 @@ resolution_mm = 0.00254
 range_mm = [10.16, 10.1727]
 resolution_mm = 0.001016
 
+# The MHA-CH-13 hub hole read to .0001 for the MHA-CH-12 matched press (owner
+# ruling 2026-11-21: the land is turned to the measured strap hole): the hub
+# pair above plus four Class X steps .4001-.4004 between them
+# (cad/config/shop-equipment/ gauges.plug-gauges-4001-4004, to buy). The
+# largest pin that enters reads the hole over .4000-.4005 = 10.16-10.1727 mm
+# in .0001 in = 0.00254 mm steps.
+[gauges.plug-gauges-4001-4004]
+range_mm = [10.16, 10.1727]
+resolution_mm = 0.00254
+
 # The dt reamed-bore go/no-go pairs, Vermont Gage Class X as the hub pair
 # (cad/config/shop-equipment/ gauges, same keys, to buy; tools rows in
 # shop/dt.toml): .2510/.2515 (MHA-DT-18, MHA-DT-14, MHA-DT-23), .3135/.3140

@@ -3,8 +3,9 @@ r"""Create the manufacturing drawing for the rocker hub (MHA-CH-12).
 Under ``cad/docs/drawing-guidelines.md``, in decimal inch (the part's
 ``drawing_unit: in``): the turned hub of the built-up rocker arm MHA-CH-06 as
 SUPPLIED to the joint (``ch_rocker_hub_spec``), on three native model
-dimensions: the Ø.4000 land with its press band and the press fit it makes in
-the MHA-CH-13 strap hole below it (rule 4), the supply bore with
+dimensions: the Ø.400 land as a reference, turned to the measured MHA-CH-13
+strap hole for the diametral interference stated below it (rule 4, matched
+pairs; owner ruling 2026-11-21), the supply bore with
 the title block's DRILLED HOLES row, and the supply length as a single MIN
 limit (rule 19). The face view carries the bore; the side view, where a
 turned part's diameter sits beside its length (rule 11), carries the land and
@@ -61,7 +62,7 @@ from ch_rocker_hub_notes import (
     SUPPLY_BORE_CALLOUT,
     SUPPLY_LENGTH_CALLOUT,
 )
-from ch_rocker_hub_fit import HUB_LAND_BAND, PRESS_INTERFERENCE
+from ch_rocker_hub_fit import PRESS_INTERFERENCE
 from ch_rocker_hub_spec import (
     LAND_DIA,
     STRAP_NUMBER,
@@ -138,9 +139,10 @@ DIMENSION_CALLOUTS = {
 # (build_ch_rocker_hub: the hub axis is model Z through the origin, the
 # annulus extruded mid-plane, so the two end faces sit at z = -/+ half the
 # supply length). The end at -Z is the datum end the turned-part stations run
-# from; each ``span`` is a diameter's model-Z extent. The land prints its
-# explicit press band; the supply bore the title block's DRILLED HOLES row;
-# the supply length a single MIN limit. The declarations print nothing.
+# from; each ``span`` is a diameter's model-Z extent. The land prints its Ø
+# as a reference and the matched interference that governs; the supply bore
+# the title block's DRILLED HOLES row; the supply length a single MIN limit.
+# The declarations print nothing.
 _P = DRAWING_PRECISION_BY_NAME
 _HALF = SUPPLY_LENGTH_MIN / 2.0
 _NOTES = "ch_rocker_hub_notes"
@@ -187,26 +189,22 @@ requirement(
     },
     precision={"length_min": _P["SupplyLength"]},
 )
-# The land: the finished O.D. pressed into the strap's reamed hole, its press
-# band printed on the .4000 nominal (LAND_CALLOUT names the route: turned to
-# the measured hole, a matched press fit).
+# The land: the finished O.D. pressed into the strap's reamed hole, a
+# reference turned to the measured hole for the stated interference (owner
+# ruling 2026-11-21, matched fit only; LAND_CALLOUT).
 requirement(
     "outer",
     kind="diameter",
     faces=(CylinderFace(LAND_DIA),),
-    requirements=("dia", "diametral_interference"),
+    requirements=("diametral_interference",),
     fields={
         "axis": ([0.0, 0.0, 1.0], ("LAND_DIA",)),
         "at": ([0.0, 0.0, 0.0], ("LAND_DIA",)),
         "span": ([-_HALF, _HALF], ("SUPPLY_LENGTH_MIN",)),
-        "dia": (
-            [
-                round(LAND_DIA + HUB_LAND_BAND[1], 12),
-                round(LAND_DIA + HUB_LAND_BAND[0], 12),
-            ],
-            ("LAND_DIA", ("ch_rocker_hub_fit", "HUB_LAND_BAND")),
+        "dia_ref": (
+            LAND_DIA,
+            ("LAND_DIA", (_NOTES, "REFERENCE_DIMENSIONS"), (_SELF, "LAND_ON_SIDE")),
         ),
-        "dia_nominal": (LAND_DIA, ("LAND_DIA",)),
         "diametral_interference": (
             list(PRESS_INTERFERENCE),
             (("ch_rocker_hub_fit", "PRESS_INTERFERENCE"), (_NOTES, "LAND_CALLOUT")),
@@ -215,9 +213,10 @@ requirement(
             f"{STRAP_NUMBER} STRAP HOLE",
             ("STRAP_NUMBER", (_NOTES, "LAND_CALLOUT")),
         ),
+        "mate_nominal_dia": (LAND_DIA, ("LAND_DIA",)),
         "callout": (LAND_CALLOUT, ((_NOTES, "LAND_CALLOUT"),)),
     },
-    precision={"dia": _P["LandDia"]},
+    precision={"dia_ref": _P["LandDia"]},
 )
 # The supply bore: a D drill through, under the finished ream (note 1).
 requirement(
