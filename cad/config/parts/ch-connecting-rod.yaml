@@ -4,7 +4,10 @@ ch-connecting-rod:
   material_specification: AISI 1018 CF flat, 1/4 x 2 REF
   # Owner ruling 2026-11-20 (#2348): "Black oxide and oil", like the channel
   # lever; the enamel masked both broad faces and was filed at the pins.
-  finish: matte black oxide per MIL-DTL-13924 Class 1, oil sealed
+  # Delegated ruling 2026-11-21 (Main), owner review #2144: no MIL spec on the
+  # finish; the owner ruled cold blackening (Presto Black PC9) acceptable as the
+  # drawing's black oxide.
+  finish: matte black oxide, oil sealed
   quantity: 20
   tolerance_class: machined_block
   fit_class: cam_follower_contact

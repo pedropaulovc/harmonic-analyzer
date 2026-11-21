@@ -189,7 +189,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert "5/16 x 1 in 1018" in part["process"]
     # A conversion coat, not paint: the hub faces, plate faces and bores
     # keep their bands with nothing masked (as the rocker arms, MHA-CH-06).
-    assert part["finish"] == "matte black oxide per MIL-DTL-13924 Class 1, oil sealed"
+    assert part["finish"] == "matte black oxide, oil sealed"
     assert int(part["quantity"]) == 20
 
 

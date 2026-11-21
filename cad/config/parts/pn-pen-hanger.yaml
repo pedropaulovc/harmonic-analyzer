@@ -5,7 +5,10 @@ pn-pen-hanger:
   # Stock: OnlineMetals 4804, 1/8 x 3/4 in 1018 cold-finish flat, 24 in,
   # bought for this part in the 2026-11-03 machine stock order (#2436); the
   # strap and both guide plates come from it.
-  finish: "black oxide per MIL-DTL-13924 Class 1, oil sealed"
+  # Delegated ruling 2026-11-21 (Main), owner review #2144: no MIL spec on the
+  # finish; the owner ruled cold blackening (Presto Black PC9) acceptable as the
+  # drawing's black oxide.
+  finish: "matte black oxide, oil sealed"
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
