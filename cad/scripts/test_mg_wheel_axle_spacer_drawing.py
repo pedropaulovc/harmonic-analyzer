@@ -109,9 +109,12 @@ def test_spacer_passes_the_pin_and_clears_the_tie_tail() -> None:
 
 def test_each_callout_states_its_need() -> None:
     assert not hasattr(spec, "DRAWING_NOTES")
-    # The length sets no stack since MHA-MG-00 gauges the press from the
-    # spacer's outer face (owner ruling 2026-11-21): no callout.
-    assert drawing.DIMENSION_CALLOUTS == {"SpacerBore": "DRILL THRU"}
+    # The length left the nut stack (owner ruling 2026-11-21); its three
+    # places name the function they carry (rule 3).
+    assert drawing.DIMENSION_CALLOUTS == {
+        "SpacerBore": "DRILL THRU",
+        "SpacerLength": "SETS WHEEL MHA-MG-05\nON THE PEN LINE",
+    }
 
 
 def test_registry_row() -> None:

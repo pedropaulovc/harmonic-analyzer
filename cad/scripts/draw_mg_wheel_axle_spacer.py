@@ -43,6 +43,7 @@ from mg_wheel_axle_spacer_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     LENGTH,
+    LENGTH_CALLOUT,
     LENGTH_LIMITS,
     OD,
     UNIT,
@@ -88,8 +89,9 @@ DRAWING_PRECISION_BY_NAME = {
 # through the centre: two would cross there.  The bore keeps the face view,
 # its one-line callout up and right of it; the O.D. is a donor there and
 # moves onto the side view, right of the sleeve (drawing-guidelines.md rule
-# 11 (turned parts read like the lathe)).  The length hangs under the side
-# view, centred between its extension lines.
+# 11 (turned parts read like the lathe)).  The length and its two-line
+# callout hang under the side view, centred between its extension lines;
+# each callout line stays narrower than that span (spec LENGTH_CALLOUT).
 FRONT_KEEP = {
     "SpacerOd": (0.050, 0.100),
     "SpacerBore": (0.130, 0.205),
@@ -100,10 +102,12 @@ RIGHT_KEEP = {
 OD_ON_SIDE = (RIGHT_CENTER[0] + LENGTH / 2.0 * _S + 0.030, RIGHT_CENTER[1])
 # The bore is a drilled clearance (rule 12 (hole and slot callouts say what to
 # do)). The length takes the title block's .XXX: MHA-MG-00 gauges the pin's
-# press from the spacer's outer face (owner ruling 2026-11-21), so it sets
-# no stack a callout must name.
+# press from the spacer's outer face (owner ruling 2026-11-21), so it leaves
+# the nut stack; its callout names the function the three places carry, the
+# wheel on the pen line (rule 3; machinist review of 09dd163236).
 DIMENSION_CALLOUTS = {
     "SpacerBore": BORE_CALLOUT,
+    "SpacerLength": LENGTH_CALLOUT,
 }
 
 
@@ -144,6 +148,7 @@ requirement(
         ),
         "length_nominal": (LENGTH, ("LENGTH",)),
         "length_from": ("datum_end", ((_SELF, "RIGHT_KEEP"),)),
+        "callout": (LENGTH_CALLOUT, ("LENGTH_CALLOUT",)),
     },
     precision={"length": _P["SpacerLength"]},
 )

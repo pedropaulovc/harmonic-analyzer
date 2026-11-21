@@ -56,6 +56,11 @@ LENGTH_LIMITS = tuple(
     LENGTH + deviation
     for deviation in printed_deviations(LENGTH, LENGTH_PLACES, unit=UNIT)
 )
+# Rule 3: a three-place size at the title block names its function. Two lines
+# narrower than the 3:1 extension-line span (18.6 x 3 = 55.8 mm).
+LENGTH_CALLOUT = (
+    f"SETS WHEEL {_config.parts('mg-magnifying-wheel')['number']}\nON THE PEN LINE"
+)
 
 # 7/16 bar as supplied (.4375) meets the .44 O.D.: the washer's own O.D.
 OD = 11.176  # .44
