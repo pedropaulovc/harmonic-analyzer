@@ -192,8 +192,8 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # The wall pass dropped: the foot top keeps its scallops.
         (
             "step",
-            lambda line: line.startswith("G1 Y8.89"),
-            lambda line: "G1 Y-27.051 F{feed}",
+            lambda line: line.startswith("G1 Y-25.146"),
+            lambda line: "G1 Y10.795 F{feed}",
             "passes",
         ),
         # The reamer rapided out of the bore.
@@ -232,3 +232,34 @@ def test_a_seeded_fault_in_a_program_is_caught(
     seeded = _seed(ctx, key, pick, change)
     _post(seeded, tmp_path)
     assert check in {finding.check for finding in _findings(seeded, tmp_path)}
+
+
+def _step_with(ctx: dict, change) -> dict:
+    seeded = copy.deepcopy(ctx)
+    lines = _lines(seeded, "step")
+    lines[:] = [change(line) for line in lines]
+    return seeded
+
+
+@pytest.mark.parametrize(
+    ("change", "detail"),
+    [
+        # #3269's program: the last station back at the facing's Y-10.406, so
+        # no stepover sweeps the wall's E end and the wall pass meets ~3.9 there.
+        (lambda line: line.replace("Y-16.256", "Y-10.406"), "radial > 0.355"),
+        # The wall pass run +Y, the wall on the cutter's left: conventional.
+        (
+            lambda line: {"G0 X12.446 Y8.890": "G0 X12.446 Y-25.146"}.get(
+                line, "G1 Y8.890 F{feed}" if line.startswith("G1 Y-25.146") else line
+            ),
+            "cuts conventional, expected climb",
+        ),
+    ],
+)
+def test_the_wall_pass_meets_only_its_declared_scallops_climb(
+    ctx, tmp_path, change, detail
+) -> None:
+    seeded = _step_with(ctx, change)
+    _post(seeded, tmp_path)
+    found = [f for f in _findings(seeded, tmp_path) if f.check == "engagement"]
+    assert any(detail in f.detail for f in found), found

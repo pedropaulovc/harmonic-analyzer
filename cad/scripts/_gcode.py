@@ -1113,3 +1113,180 @@ def _move_distance(m: Move, point: Point) -> float:
             return abs(math.hypot(dx, dy) - radius)
         return min(math.dist(m.start[:2], point[:2]), math.dist(m.end[:2], point[:2]))
     return _element_distance({"start": m.start[:2], "end": m.end[:2]}, point)[0]
+
+
+# The engagement simulation's height-field cell (mm): engagements are
+# measured to within one cell.
+ENGAGEMENT_CELL_MM = 0.05
+# A feed move is cut in straight pieces no longer than this (arcs, ramps).
+_PIECE_MM = 0.25
+# A move's radial engagement is the stock it removes per unit of travel,
+# averaged over each stretch of this length.
+_RATE_MM = 0.5
+
+
+@dataclass(frozen=True)
+class Engagement:
+    """What one feed move cut of the simulated stock: its index in
+    ``program.moves``; its radial engagement (``radial``, mm): the stock
+    area it removes per mm of the face it cuts (a line's travel; an arc's
+    turn at the removed band's mean radius), the most over any ``_RATE_MM`` of
+    it, which is the width of a steady side or face cut and the diameter of
+    a slot (a plunge: the span of what it removed); the
+    deepest stock it met below the stock's surface (``axial``, mm); and on
+    which side of its travel that stock lay with a right-hand (M3) cutter,
+    by its centroid: ``"climb"`` (the right), ``"conventional"`` (the
+    left), ``"both"`` (on the centre line: a slot, a plunge) or ``""`` (it
+    met none)."""
+
+    index: int
+    move: Move
+    radial: float
+    axial: float
+    side: str
+
+
+def engagements(
+    program: Program,
+    stock: Sequence[Sequence[float]],
+    radius: float,
+    cell: float = ENGAGEMENT_CELL_MM,
+) -> list[Engagement]:
+    """Cut the box ``stock`` ((x0, x1), (y0, y1), (z0, z1), its top z1) with a
+    flat end mill of ``radius``, every move in order (rapids too, so the
+    stock stays true), on a height field of ``cell`` squares, and return one
+    :class:`Engagement` per feed move. Each removed cell is placed along the
+    move where its leading edge reached it (a line's offset from its path,
+    an arc's from its circle, G17 only)."""
+    import numpy as np
+
+    (x0, x1), (y0, y1), (_z0, top) = stock
+    nx, ny = max(1, round((x1 - x0) / cell)), max(1, round((y1 - y0) / cell))
+    xs = x0 + (np.arange(nx) + 0.5) * (x1 - x0) / nx
+    ys = y0 + (np.arange(ny) + 0.5) * (y1 - y0) / ny
+    height = np.full((nx, ny), float(top))
+    area = (x1 - x0) / nx * (y1 - y0) / ny
+    result: list[Engagement] = []
+    for index, m in enumerate(program.moves):
+        if m.start == m.end and m.centre is None:
+            continue
+        arc = m.centre is not None and m.plane == 17 and m.motion is not Motion.RAPID
+        points = [m.start, *(_xy_points(m, _PIECE_MM) if arc else _pieces(m))]
+        removed_x: list = []
+        removed_y: list = []
+        axial = 0.0
+        for a, b in zip(points, points[1:]):
+            z = min(a[2], b[2])
+            if z >= top - _TOL_MM:
+                continue
+            i = np.nonzero((xs >= min(a[0], b[0]) - radius) & (xs <= max(a[0], b[0]) + radius))[0]
+            j = np.nonzero((ys >= min(a[1], b[1]) - radius) & (ys <= max(a[1], b[1]) + radius))[0]
+            if not len(i) or not len(j):
+                continue
+            gx, gy = np.meshgrid(xs[i], ys[j], indexing="ij")
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            span = dx * dx + dy * dy
+            t = np.clip(((gx - a[0]) * dx + (gy - a[1]) * dy) / span, 0.0, 1.0) if span > 0 else 0.0
+            inside = (gx - a[0] - t * dx) ** 2 + (gy - a[1] - t * dy) ** 2 < radius * radius
+            window = height[i[0]:i[-1] + 1, j[0]:j[-1] + 1]
+            cut = inside & (window > z + _TOL_MM)
+            if cut.any():
+                axial = max(axial, float((window[cut] - z).max()))
+                removed_x.append(gx[cut])
+                removed_y.append(gy[cut])
+                window[cut] = z
+        if m.motion is Motion.RAPID:
+            continue
+        if not removed_x:
+            result.append(Engagement(index, m, 0.0, 0.0, ""))
+            continue
+        rx, ry = np.concatenate(removed_x), np.concatenate(removed_y)
+        if arc:
+            a_, b_, r_arc, begin, sweep = m._arc()
+            cx, cy = m.centre[a_], m.centre[b_]
+            rho = np.hypot(rx - cx, ry - cy)
+            outward = rho - r_arc
+            sense = -1.0 if m.motion is Motion.ARC_CW else 1.0
+            turned = (sense * (np.arctan2(ry - cy, rx - cx) - begin)) % (2 * math.pi)
+            # Cells behind the start come out just under a full turn.
+            turned = np.where(turned > (sweep + 2 * math.pi) / 2, turned - 2 * math.pi, turned)
+            # The cutter centre first comes within the radius of a cell this
+            # far (radians) before the cell's own angle.
+            lead = np.arccos(np.clip((rho**2 + r_arc**2 - radius**2) / (2 * np.maximum(rho, 1e-9) * r_arc), -1.0, 1.0))
+            reached = np.clip(turned - lead, 0.0, sweep) / sweep
+            # Per mm along the removed band's mean radius: an annular band w
+            # wide (a side cut, a slot) then reads w.
+            contact = max(r_arc + float(outward.mean()), cell)
+            n = max(1, math.ceil(r_arc * sweep / _RATE_MM - 1e-9))
+            per_bin = contact * sweep / n
+            # Moving clockwise, the left of travel is outward of the circle.
+            offset = outward if m.motion is Motion.ARC_CW else -outward
+        else:
+            dx, dy = m.end[0] - m.start[0], m.end[1] - m.start[1]
+            length = math.hypot(dx, dy)
+            if length < _TOL_MM:  # a plunge: what it removed, its span along X
+                span = float(rx.max() - rx.min()) + cell
+                result.append(Engagement(index, m, span, axial, "both"))
+                continue
+            along = ((rx - m.start[0]) * dx + (ry - m.start[1]) * dy) / length
+            offset = ((rx - m.start[0]) * -dy + (ry - m.start[1]) * dx) / length
+            reached = np.clip(along - np.sqrt(np.clip(radius**2 - offset**2, 0.0, None)), 0.0, length) / length
+            n = max(1, math.ceil(length / _RATE_MM - 1e-9))
+            per_bin = length / n
+        counts = np.bincount(np.minimum((reached * n).astype(int), n - 1), minlength=n)
+        radial = float(counts.max() * area / per_bin)
+        centroid = float(offset.mean())
+        side = "climb" if centroid < -cell else ("conventional" if centroid > cell else "both")
+        result.append(Engagement(index, m, radial, axial, side))
+    return result
+
+
+def _pieces(m: Move) -> list[tuple[float, ...]]:
+    """A line's end, or for a ramp (XY and Z both changing) its points every
+    ``_PIECE_MM``: each piece then cuts at its lower end's Z."""
+    if _close(m.start[2], m.end[2]) or math.dist(m.start[:2], m.end[:2]) < _TOL_MM:
+        return [m.end]
+    n = max(1, math.ceil(m.length / _PIECE_MM))
+    return [tuple(s + (e - s) * k / n for s, e in zip(m.start, m.end)) for k in range(1, n + 1)]
+
+
+def check_engagement(
+    program: Program,
+    stock: Sequence[Sequence[float]],
+    radius: float,
+    max_radial: float,
+    z: float | None = None,
+    window: Sequence[Sequence[float]] | None = None,
+    min_length: float = 0.0,
+    side: str | None = None,
+    cell: float = ENGAGEMENT_CELL_MM,
+) -> list[Finding]:
+    """The passes a plan declares a radial width for meet no more stock than
+    that: the program cuts the box ``stock`` (:func:`engagements`), and every
+    feed move selected (both ends at ``z`` when given, both ends' XY inside
+    ``window`` ((x0, x1), (y0, y1)) when given, at least ``min_length`` long)
+    meets at most ``max_radial`` across its travel, to within one ``cell``;
+    with ``side`` (``"climb"``/``"conventional"``) every one that meets stock
+    meets it on that side. Stations alone cannot show this: what a pass meets
+    depends on what every earlier move left, at the part's edges too."""
+    (wx0, wx1), (wy0, wy1) = window if window is not None else ((-math.inf, math.inf),) * 2
+
+    def selected(m: Move) -> bool:
+        return (
+            (z is None or (_close(m.start[2], z) and _close(m.end[2], z)))
+            and all(wx0 - _TOL_MM <= p[0] <= wx1 + _TOL_MM and wy0 - _TOL_MM <= p[1] <= wy1 + _TOL_MM for p in (m.start, m.end))
+            and m.length >= min_length
+        )
+
+    chosen = [e for e in engagements(program, stock, radius, cell) if selected(e.move)]
+    if not chosen:
+        return [Finding(program.name, "engagement", f"no feed move at Z {z} in {window} at least {min_length} long")]
+    findings = []
+    for e in chosen:
+        m = e.move
+        where = f"X{m.start[0]:.3f} Y{m.start[1]:.3f} -> X{m.end[0]:.3f} Y{m.end[1]:.3f} Z{m.end[2]:.3f}"
+        if e.radial > max_radial + cell:
+            findings.append(Finding(program.name, "engagement", f"{where} meets {e.radial:.3f} radial > {max_radial:.3f}"))
+        if side is not None and e.side and e.side != side:
+            findings.append(Finding(program.name, "engagement", f"{where} cuts {e.side}, expected {side}"))
+    return findings

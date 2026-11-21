@@ -718,14 +718,21 @@ def context(
     width_ys = _stations((-width, 0.0), r, step_max)
     blank_x = run((0.0, blank_max))
     # The step: X passes from beside the far end to the foot top's station
-    # (the cutter's edge on it) and back; their stepovers at the wall leave
-    # scallops between alternate pairs, which one full-depth wall pass along
-    # +Y takes off.
+    # (the cutter's edge on it) and back; their stepovers at the wall sweep
+    # it between pairs of stations. The facing stations, the last moved onto
+    # E's line: the first pair's stepover starts beyond W and the last
+    # pair's ends on E, so the stepovers sweep the wall to both edges and
+    # leave only scallops between the pairs, which one full-depth wall pass
+    # along -Y (climb) takes off.
     wall_x = foot_top + r
     far_x = top_max + r + APPROACH_MM
-    scallop = r - math.sqrt(r**2 - ((width_ys[0] - width_ys[1]) / 2) ** 2)
-    if len(width_ys) % 2:
+    step_ys = [*width_ys[:-1], _r(-width)]
+    if len(step_ys) % 2:
         raise ValueError("an odd number of step passes ends a level at the wall")
+    if step_ys[0] < 0 or step_ys[-2] - r + width > step_max + 1e-9:
+        raise ValueError("the step's stations leave W unswept or overload the E pass")
+    gap = max(step_ys[k] - step_ys[k + 1] for k in range(1, len(step_ys) - 1, 2))
+    scallop = r - math.sqrt(r**2 - (gap / 2) ** 2)
     _agree(plan, "wall_finish_woc_mm", scallop)
     for name, axial, woc in (("step wall", length - ear, p["wall_finish_woc_mm"]),):
         if not (
@@ -733,9 +740,9 @@ def context(
             and math.isclose(_cut(plan, name, "radial_woc_mm"), woc, abs_tol=1e-6)
         ):
             raise ValueError(f"'{name}' depth or width is not the recipe's")
-    wall_y = (_r(-width - r - APPROACH_MM), _r(r + APPROACH_MM))
+    wall_y = (_r(r + APPROACH_MM), _r(-width - r - APPROACH_MM))
     step_lines = _step_lines(
-        length, section, ear, step_levels, width_ys, r, far_x, wall_x, wall_y
+        length, section, ear, step_levels, width_ys, step_ys, r, far_x, wall_x, wall_y
     )
 
     # Arch outline (machine XY of the arch frame, climb: round the outside
@@ -1152,9 +1159,24 @@ def context(
                 "final": _r(wall_x),
                 "raw": _r(wall_x + p["wall_finish_woc_mm"]),
                 "max_step": p["wall_finish_woc_mm"],
-                "direction": 1.0,
+                "direction": -1.0,
                 "span": width,
                 "below_z": length,
+            },
+        ],
+        # What the wall pass really meets: the scallops only, climb, E's and
+        # W's edges included (stations alone cannot show the edges).
+        [
+            name,
+            "engagement",
+            {
+                "stock": stocks["step"],
+                "radius": r,
+                "max_radial": p["wall_finish_woc_mm"],
+                "z": _r(ear),
+                "window": [[_r(wall_x), _r(wall_x)], [wall_y[1], wall_y[0]]],
+                "min_length": width,
+                "side": "climb",
             },
         ],
     ]
@@ -1217,19 +1239,21 @@ def _step_lines(
     ear: float,
     levels: list[float],
     ys: list[float],
+    step_ys: list[float],
     radius: float,
     far_x: float,
     wall_x: float,
     wall_y: tuple[float, float],
 ) -> list[str]:
     """PB05: the foot end faced at ``length`` across the whole part (X passes
-    from beside the seat), then the step's ``levels``, each in X passes from
-    beside the far end to the wall station and back, then one full-depth wall
-    pass along +Y beside the wall. Every plunge and level change is beside
-    the part; the moves between them are G0 above the raw stock top
-    ``section``."""
+    from beside the seat at the facing stations ``ys``), then the step's
+    ``levels``, each in X passes at ``step_ys`` from beside the far end to the
+    wall station and back, then one full-depth wall pass from beside W along
+    -Y (climb: the wall on the cutter's right) to beside E. Every plunge and
+    level change is beside the part; the moves between them are G0 above the
+    raw stock top ``section``."""
     foot = _face([length], section, (-radius - APPROACH_MM, far_x), ys)
-    step = _face(levels, section, (far_x, wall_x), ys)
+    step = _face(levels, section, (far_x, wall_x), step_ys)
     clear = _r(section + CLEAR_MM)
     return [
         *foot,
