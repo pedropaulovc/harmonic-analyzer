@@ -76,8 +76,8 @@ jaw_top_over_od_mm = 13.1953
 # Centred: the rod past the left jaw side by (length − jaw width)/2 (the vise
 # hold's left overhang), as far past the right; the right jaw side from the
 # left end. cam.py checks them.
-vise_jaw_from_x0_mm = 24.764
-vise_jaw_to_x0_mm = 183.438
+vise_jaw_from_x0_mm = 24.809
+vise_jaw_to_x0_mm = 183.483
 # The 1/8 in end mill's flats (shop endmill-carbide-3fl-1-8): its centre
 # crosses each flat's width at X stations no more than half the cutter apart.
 em_eighth_dia_mm = 3.175
@@ -92,11 +92,12 @@ em_eighth_projection_min_mm = 19.05
 # Each flat's depth below the O.D. top: the O.D. less the across, nominal
 # (.2500 − .2380 = .0120 in); cam.py checks it against the export.
 flat_depth_mm = 0.3048
-# Each flat's ends from the crown's apex (X0); cam.py checks them.
-flat_back_from_mm = 16.178
-flat_back_to_mm = 20.496
-flat_front_from_mm = 178.23
-flat_front_to_mm = 183.818
+# Each flat's ends from the crown's apex (X0) as the R.180 form cuts it,
+# .091 mm past the model's SR.19 apex; cam.py checks them.
+flat_back_from_mm = 16.268
+flat_back_to_mm = 20.586
+flat_front_from_mm = 178.32
+flat_front_to_mm = 183.908
 
 [[tools]]
 id = "saw"

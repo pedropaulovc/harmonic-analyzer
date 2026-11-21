@@ -171,10 +171,22 @@ def context(
         raise ValueError("outer: expected the model Z axis")
     dia = outer["dia_nominal"]
     radius = dia / 2
+
+    def apex(name: str) -> float:
+        """The end's plane; for a form-cut dome, the apex the shop's form
+        radius (not the model's) leaves, the dome being cut full on the O.D."""
+        item = f[name]
+        value = item["plane"]["value"]
+        if item["kind"] == "dome" and "dome_form_radius_in" in p:
+            form = p["dome_form_radius_in"] * IN
+            cut = form - math.sqrt(form**2 - radius**2)
+            value += item["outward"][2] * (cut - item["height_ref"])
+        return value
+
     end = f[X0_END]
-    plane = end["plane"]["value"]
+    plane = apex(X0_END)
     inward = -end["outward"][2]
-    length = abs(f["far_end"]["plane"]["value"] - f["datum_end"]["plane"]["value"])
+    length = abs(apex("far_end") - apex("datum_end"))
     if not math.isclose(p["stock_dia_in"] * IN, dia, abs_tol=1e-6):
         raise ValueError(f"process.stock_dia_in is not the O.D. Ø{dia:.4f}")
 
