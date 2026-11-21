@@ -48,6 +48,21 @@ def _plan(stem: str) -> dict:
     return tomllib.loads(_process_plans.plan_path(stem).read_text(encoding="utf-8"))
 
 
+def _drills(plan: dict) -> list[str]:
+    tools = {tool["id"]: tool for tool in plan["tools"]}
+    return [
+        tools[op["tool"]]["ref"]
+        for setup in plan["setups"]
+        for op in setup.get("operations", ())
+        if op.get("drilling") == "twist_drill"
+    ]
+
+
+# A plan that drills must land its drill in the drawing's bore band; the
+# sawn-and-faced pins drill nothing.
+DRILLED = tuple(stem for stem in STEMS if _drills(_plan(stem)))
+
+
 def test_the_turned_parts_are_enrolled() -> None:
     assert set(STEMS) >= {
         "ch_rocker_hub",
@@ -82,7 +97,7 @@ SIZED = {
 }
 
 
-@pytest.mark.parametrize("stem", STEMS)
+@pytest.mark.parametrize("stem", DRILLED)
 def test_the_drill_lands_in_the_drawings_hole_band(stem: str) -> None:
     plan = _plan(stem)
     features = export_features.requirement_manifest(stem)["features"]
