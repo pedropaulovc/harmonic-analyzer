@@ -25,11 +25,13 @@ right jaw side: CA03 faces them to the length, CA04 saws the top notch,
 CA05 spots, drills and reams the pin holes through both cheeks. The riser
 lifts the bars so each holder's nose, its tool set out by its stated
 projection, stays above the jaw tops at the deepest cut. CA00, once for a
-new riser, faces its two blocks side by side across the jaws on 1 in
-parallels, their tops over the jaw tops, past both blocks' sides wherever
-the moving jaw closes on them. Every P2-P4 bar's ledge is cut from the P1
-bar's saw Z0: the plan's ledge budget (touch-off, the seat sweep's
-acceptance and its reading error) is checked against each ledge band.
+new riser, faces its two blocks side by side along the jaws, each standing
+across them on both 1 in parallels, their tops over the jaw tops: passes
+past both jaw sides, from over the fixed jaw to past the moving jaw. Every
+P2-P4 bar's ledge is cut from the P1 bar's saw Z0: the plan's ledge budget
+(touch-off, the seat sweep's acceptance and its reading error, the two
+measuring terms no finer than the shop's gauges) is checked against each
+ledge band.
 
 Work frames (G54), each set in its setup:
 - CA00: X0 the vise's left jaw side, Y0 the fixed jaw, Z0 the higher riser
@@ -117,12 +119,17 @@ PLAN_TOL_MM = 0.01
 # Each holder's nose stands at least this far above the jaw tops at its
 # tool's deepest cut.
 HOLDER_CLEAR_MM = 1.0
-# CA00 faces this far past both of the riser pair's sides, wherever the
-# moving jaw closes on it.
+# CA00 faces this far past both of the riser blocks' ends, wherever the
+# moving jaw closes on them.
 FACE_OVERHANG_MM = 1.0
 # The jaws grip the riser blocks at least this high above their parallels
 # while CA00 faces them.
 RISER_GRIP_MIN_MM = 12.7
+# CA00's pass, touched off on the higher top, takes at least this (.001) off
+# the lowest corner Setup 1 accepts.
+RISER_FACE_CUT_MIN_MM = 0.0254
+# The plan's saw touch-off lowers the saw in steps of this (0.01 mm).
+SAW_TOUCH_STEP_MM = 0.01
 
 
 def _plan_operations(plan: dict[str, Any]):
@@ -438,7 +445,7 @@ def context(
             "process.riser_width_min_mm less its chamfer seats the last bar under "
             "half its width"
         )
-    if 2 * p["riser_length_mm"] > p["vise_jaw_width_mm"]:
+    if 2 * p["riser_length_max_mm"] > p["vise_jaw_width_mm"]:
         raise ValueError("the riser's two blocks end to end are longer than the jaws")
     protrusion = p["end_protrusion_mm"]
     jaw_w = p["vise_jaw_width_mm"]
@@ -461,6 +468,11 @@ def context(
     _agree(plan, "riser_height_min_mm", p["riser_blank_height_min_mm"] - face)
     _agree(plan, "riser_height_max_mm", p["riser_blank_height_max_mm"] - face)
     _agree(plan, "riser_reface_floor_mm", p["riser_height_min_mm"] + face)
+    if p["riser_blank_spread_max_mm"] + RISER_FACE_CUT_MIN_MM > face + 1e-9:
+        raise ValueError(
+            "process.riser_blank_spread_max_mm leaves CA00's one riser_face_mm pass "
+            f"under {RISER_FACE_CUT_MIN_MM} mm to take off the lowest corner"
+        )
     under = p["riser_parallel_height_mm"]
 
     def projection(tool: str, tip_z: float, key: str, oal_key: str) -> None:
@@ -493,6 +505,20 @@ def context(
     ledge_budget = (
         p["saw_touch_error_mm"] + p["seat_offset_max_mm"] + p["seat_measure_mm"]
     )
+    # The two measuring terms are no finer than the shop's gauges: the
+    # touch-off its steps plus the leaf's and P1's miked readings, the sweep
+    # two miked sections plus the DTI's reading.
+    mic = shop["gauges"]["micrometers"]["resolution_mm"]
+    dti = shop["gauges"]["dti"]["resolution_mm"]
+    if p["saw_touch_error_mm"] < SAW_TOUCH_STEP_MM + 2 * mic - 1e-9:
+        raise ValueError(
+            "process.saw_touch_error_mm is finer than its touch-off steps and two "
+            "micrometer readings"
+        )
+    if p["seat_measure_mm"] < 2 * mic + dti - 1e-9:
+        raise ValueError(
+            "process.seat_measure_mm is finer than two micrometer readings and the DTI"
+        )
     for name, notch in (("foot", foot), ("top", top)):
         lo, hi = notch["ledge"]
         if not math.isclose(notch["ledge_nominal"], (lo + hi) / 2, abs_tol=1e-6):
@@ -756,12 +782,13 @@ def context(
 
     # CA00_riser_face, once for a new riser (its own G54: X0 the vise's left
     # jaw side, Y0 the fixed jaw's face, Z0 the higher riser top; the job
-    # carries the bar's model only as FreeCAD's Job model). The
-    # two blocks side by side across the jaws on the 1 in parallels, their
-    # tops above the jaw tops: X passes past both jaw sides, stepping from
-    # over the fixed jaw's top to past the widest pair, face both blocks edge
-    # to edge wherever the moving jaw closes on them (the cutter passes over
-    # the jaw tops, never down beside them).
+    # carries the bar's model only as FreeCAD's Job model). The two blocks
+    # side by side along the jaws, centred, each standing across them on
+    # both 1 in parallels (its 3 in length gripped), their tops above the jaw
+    # tops: X passes past both jaw sides, stepping from over the fixed jaw's
+    # top to past the longest block's far end, face both blocks edge to edge
+    # wherever they stand along the jaws (the cutter passes over the jaw
+    # tops, never down beside them).
     if p["vise_jaw_height_mm"] - under < RISER_GRIP_MIN_MM:
         raise ValueError(
             "process.riser_parallel_height_mm leaves the jaws under "
@@ -773,7 +800,10 @@ def context(
             "CA00: the end mill's tip does not pass over the jaw tops: the riser's "
             "least blank height on its parallels is under them"
         )
-    pair_max = 2 * riser_w_max
+    length_min, length_max = p["riser_length_min_mm"], p["riser_length_max_mm"]
+    _agree(plan, "riser_pair_width_max_mm", 2 * riser_w_max)
+    pair_max = p["riser_pair_width_max_mm"]
+    _agree(plan, "riser_face_overhang_mm", -(jaw_w - pair_max) / 2)
     face_woc = _cut(plan, "riser face", "radial_woc_mm")
     if not 0 < face_woc <= r:
         raise ValueError("'riser face' radial_woc_mm is not within the cutter's radius")
@@ -782,7 +812,7 @@ def context(
     if _setting(plan, shop, "riser face") != (em_rpm, em_feed):
         raise ValueError("'riser face' runs at another setting than 'foot end'")
     riser_ys = [r - face_woc]
-    while riser_ys[-1] - r > -pair_max - FACE_OVERHANG_MM + 1e-9:
+    while riser_ys[-1] - r > -length_max - FACE_OVERHANG_MM + 1e-9:
         riser_ys.append(riser_ys[-1] - face_woc)
     riser_ys = [_r(y) for y in riser_ys]
     riser_x = (-(r + APPROACH_MM), jaw_w + r + APPROACH_MM)
@@ -800,7 +830,7 @@ def context(
             "label": "riser face",
             "stock": (
                 (0.0, jaw_w),
-                (-pair_max, 0.0),
+                (-length_max, 0.0),
                 (-p["riser_blank_height_max_mm"], 0.0),
             ),
             "ops": [
@@ -812,7 +842,7 @@ def context(
         _box(
             "moving jaw",
             (0.0, jaw_w),
-            (-2 * riser_w_min - JAW_DEPTH_MM, -2 * riser_w_min),
+            (-length_min - JAW_DEPTH_MM, -length_min),
             riser_jaw_top,
         ),
         _box("fixed jaw", (0.0, jaw_w), (0.0, JAW_DEPTH_MM), riser_jaw_top),
@@ -834,10 +864,10 @@ def context(
             "face_passes",
             {
                 "z": _r(-face),
-                "y": [-pair_max, 0.0],
+                "y": [-length_max, 0.0],
                 "max_engagement": face_woc,
                 "radius": r,
-                "span": p["riser_length_mm"],
+                "span": 2 * riser_w_max,
                 "overhang": FACE_OVERHANG_MM,
             },
         ],

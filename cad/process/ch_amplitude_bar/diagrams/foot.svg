@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 2: four bars side by side on the riser (two blocks end to end on the vise bed against the fixed jaw), foot ends .75 past the left jaw side; CA01 faces them, CA02 saws the foot notch. Top view and an end view of the load. Styles: prechips.palette. -->
+<!-- Setup 3: four bars side by side on the riser (two blocks end to end on the vise bed against the fixed jaw), foot ends .75 past the left jaw side; CA01 faces them, CA02 saws the foot notch. Top view and an end view of the load. Styles: prechips.palette. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" font-family="sans-serif" font-size="12">
 <rect class="paper" width="640" height="400"/>
 <text class="label" x="470" y="20">Top view</text>

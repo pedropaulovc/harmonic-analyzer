@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 2 (a new riser only): the two riser blocks side by side along the jaws, centred, each standing across the jaws on the 1 in pair of parallels (one against each jaw), its 3 in as-bought length gripped; their tops about .2 above the jaw tops. CA00 faces both tops at one Z in passes along X past both jaw sides. Top view and an end view. Styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" font-family="sans-serif" font-size="12">
+<rect class="paper" width="640" height="400"/>
+<text class="label" x="470" y="20">Top view</text>
+<rect class="clamp" x="170" y="36" width="250" height="28"/>
+<text class="label" x="190" y="30">fixed jaw, 6.247 long</text>
+<rect class="clamp" x="170" y="184" width="250" height="28"/>
+<text class="label" x="250" y="226">moving jaw</text>
+<rect class="fixture-support" x="170" y="64" width="250" height="5"/>
+<rect class="fixture-support" x="170" y="179" width="250" height="5"/>
+<rect class="part-kept" x="257" y="64" width="38" height="120"/>
+<rect class="part-kept" x="295" y="64" width="38" height="120"/>
+<text class="label" x="440" y="100">two blocks, each</text>
+<text class="label" x="440" y="114">{{process.riser_width_min_mm:in.2dot}}–{{process.riser_width_max_mm:in.2dot}} along the jaws,</text>
+<text class="label" x="440" y="128">3 in across them (TOP up)</text>
+<path class="leader" d="M436 110 L335 110"/>
+<text class="label" x="440" y="160">1 in parallels under</text>
+<text class="label" x="440" y="174">both ends of each block</text>
+<path class="leader" d="M436 170 L422 181"/>
+<circle class="cutter" cx="150" cy="64" r="10"/>
+<text class="label" x="40" y="96">end mill: passes</text>
+<text class="label" x="40" y="110">along X past both</text>
+<text class="label" x="40" y="124">jaw sides, stepping −Y</text>
+<path class="arrow" d="M150 80 H210"/>
+<line class="datum" x1="170" y1="22" x2="170" y2="236"/>
+<text class="label" x="150" y="248">X0</text>
+<line class="datum" x1="140" y1="64" x2="180" y2="64"/>
+<text class="label" x="116" y="60">Y0</text>
+<path class="axis" d="M520 250 H570"/><text class="label" x="574" y="254">+X</text>
+<path class="axis" d="M520 250 V200"/><text class="label" x="512" y="196">+Y</text>
+<text class="label" x="20" y="272">End view, from the left: one block across the jaws</text>
+<rect class="clamp" x="40" y="314" width="30" height="71"/>
+<text class="label" x="22" y="397">fixed jaw</text>
+<rect class="clamp" x="190" y="314" width="30" height="71"/>
+<text class="label" x="176" y="397">moving jaw</text>
+<rect class="fixture-support" x="70" y="345" width="6" height="40"/>
+<rect class="fixture-support" x="184" y="345" width="6" height="40"/>
+<rect class="part-kept" x="70" y="308" width="120" height="37"/>
+<rect class="part-removed" x="70" y="304" width="120" height="4"/>
+<line class="active-face" x1="70" y1="308" x2="190" y2="308"/>
+<text class="label" x="240" y="300">CA00 faces {{process.riser_face_mm:in.3dot}} off both tops at one Z</text>
+<text class="label" x="240" y="314">(Z0 the higher top); the cutter passes over the jaws</text>
+<path class="leader" d="M236 304 L192 306"/>
+<text class="label" x="240" y="340">the jaws grip the lower .77 in, on the bar's</text>
+<text class="label" x="240" y="354">as-bought edges, never a sawn face</text>
+<text class="label" x="240" y="378">1 in parallels, one against each jaw</text>
+<path class="leader" d="M236 374 L192 372"/>
+</svg>
