@@ -42,26 +42,40 @@ from _drawing_edges import visible_view_entities
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 import _telemetry
 from pd_platen_bottom_guide_spec import (
+    BAND,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    GUIDE_DEPTH,
+    GUIDE_DEPTH_BAND,
     GUIDE_DEPTH_CALLOUT,
+    GUIDE_HEIGHT,
     GUIDE_LENGTH,
     LOCK_TAP_SPEC,
     LOCK_TAP_X,
+    LOCK_TAP_Y,
     PLATEN_TAP_SPEC,
     PLATEN_TAP_X,
+    PLATEN_TAP_Y,
+    SCREW_CBORE_DEPTH,
     SCREW_CBORE_DIA,
     SCREW_CBORE_FRONT_WALL_TEXT,
+    SCREW_HOLE_DIA,
     SCREW_HOLE_X,
+    SCREW_HOLE_Z,
+    UNIT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -138,6 +152,223 @@ SCREW_CALLOUT_BELOW = (
 )
 TAPPED_HOLE_NOTE = "Tapped Hole"
 _TAP_DRILL = blind_cut_dia_mm(LOCK_TAP_SPEC)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (pd_platen_bottom_guide_spec: length
+# +X from the left end, height +Y from the underside, depth -Z from the
+# platen-mating front face). Bands are the title block's rows at the places
+# the sheet prints (DRAWING_PRECISION_BY_NAME), the depth its native one-sided
+# LIMITs, the tap drills the DRILLED HOLES row at the callout's three places.
+# The five platen-screw taps and the four rack-screw holes print no location:
+# they are struck at MHA-PD-00 (made_at = "assembly"), so a traveler that
+# makes the rail leaves them. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_platen_bottom_guide"
+_FRAME = "__frame__"
+_CALLOUT = ((_SELF, "build"),)
+# The callout prints the tap drill at the sheet's three places (decimals=3).
+_HOLE_PLACES = 3
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=("GUIDE_LENGTH", "GUIDE_HEIGHT", "GUIDE_DEPTH"),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "DRAWING_PRECISION_BY_NAME",
+        (_SELF, "build"),
+    ),
+)
+requirement(
+    "left_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", 0.0), (_FRAME,))},
+)
+# The length 10.62 (FRONT_KEEP "Length"), from the left end.
+requirement(
+    "right_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), GUIDE_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("x", GUIDE_LENGTH), ("GUIDE_LENGTH",)),
+        "length": (
+            limits(GUIDE_LENGTH, _P["Length"], unit=UNIT),
+            ("GUIDE_LENGTH", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "length_nominal": (GUIDE_LENGTH, ("GUIDE_LENGTH",)),
+        "length_from": ("left_end", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"length": _P["Length"]},
+)
+requirement(
+    "underside",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("y", 0.0), (_FRAME,))},
+)
+# The height .624 from the underside (FRONT_KEEP "Height") with its callout.
+requirement(
+    "top_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), GUIDE_HEIGHT),),
+    requirements=("height",),
+    fields={
+        "plane": (_plane("y", GUIDE_HEIGHT), ("GUIDE_HEIGHT",)),
+        "height": (
+            limits(GUIDE_HEIGHT, _P["Height"], unit=UNIT),
+            ("GUIDE_HEIGHT", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "height_nominal": (GUIDE_HEIGHT, ("GUIDE_HEIGHT",)),
+        "height_from": ("underside", ((_SELF, "FRONT_KEEP"),)),
+        "callout": (HEIGHT_CALLOUT, ((_SELF, "HEIGHT_CALLOUT"),)),
+    },
+    precision={"height": _P["Height"]},
+)
+requirement(
+    "front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", 0.0), (_FRAME,))},
+)
+# The depth .40/.39 from the front face: native LIMITs (RIGHT_KEEP "Depth").
+requirement(
+    "rear_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), GUIDE_DEPTH),),
+    requirements=("depth",),
+    fields={
+        "plane": (_plane("z", -GUIDE_DEPTH), ("GUIDE_DEPTH",)),
+        "depth": (
+            limits(GUIDE_DEPTH, _P["Depth"], GUIDE_DEPTH_BAND, unit=UNIT),
+            ("GUIDE_DEPTH", "GUIDE_DEPTH_BAND", (_SELF, "RIGHT_KEEP")),
+        ),
+        "depth_nominal": (GUIDE_DEPTH, ("GUIDE_DEPTH",)),
+        "depth_from": ("front_face", ((_SELF, "RIGHT_KEEP"),)),
+        "callout": (GUIDE_DEPTH_CALLOUT, ("GUIDE_DEPTH_CALLOUT",)),
+    },
+    precision={"depth": _P["Depth"]},
+)
+_THREAD = (f"{LOCK_TAP_SPEC.size} UNC-2B", ("LOCK_TAP_SPEC", *_CALLOUT))
+_TAP_DRILL_BAND = (
+    drilled_limits(_TAP_DRILL, _HOLE_PLACES, unit=UNIT),
+    ((_SELF, "_TAP_DRILL"), "UNIT", *_CALLOUT),
+)
+# The four lock taps, THRU from the rear face: one native callout (4X Ø.089
+# THRU ALL, 4-40 UNC THRU ALL, FOR MHA-PD-12 LOCKS), each station from the
+# left end and the shared row from the underside (FRONT_KEEP LockTap*).
+for _index, _x in enumerate(LOCK_TAP_X, 1):
+    requirement(
+        f"lock_tap_{_index}",
+        kind="threaded_hole",
+        faces=(CylinderFace(_TAP_DRILL, contains_x_mm=_x),),
+        requirements=("thread", "dia", "thru", "station", "height"),
+        fields={
+            "at": (
+                [_x, LOCK_TAP_Y, -GUIDE_DEPTH],
+                ("LOCK_TAP_X", "LOCK_TAP_Y", "GUIDE_DEPTH"),
+            ),
+            "axis": ((0.0, 0.0, 1.0), ("LOCK_TAP_SPEC", _FRAME)),
+            "thread": _THREAD,
+            "dia": _TAP_DRILL_BAND,
+            "nominal_dia": (_TAP_DRILL, ((_SELF, "_TAP_DRILL"),)),
+            "thru": (True, ("LOCK_TAP_SPEC", *_CALLOUT)),
+            "station": (
+                limits(_x, _P[f"LockTap{_index}X"], unit=UNIT),
+                ("LOCK_TAP_X", "UNIT", (_SELF, "FRONT_KEEP")),
+            ),
+            "station_nominal": (_x, ("LOCK_TAP_X",)),
+            "station_from": ("left_end", ((_SELF, "FRONT_KEEP"),)),
+            "height": (
+                limits(LOCK_TAP_Y, _P["LockTapY"], (BAND, -BAND), unit=UNIT),
+                ("LOCK_TAP_Y", "BAND", (_SELF, "FRONT_KEEP")),
+            ),
+            "height_nominal": (LOCK_TAP_Y, ("LOCK_TAP_Y",)),
+            "height_from": ("underside", ((_SELF, "FRONT_KEEP"),)),
+            "mates": (LOCK_CALLOUT_BELOW, ((_SELF, "LOCK_CALLOUT_BELOW"),)),
+        },
+        precision={
+            "dia": _HOLE_PLACES,
+            "station": _P[f"LockTap{_index}X"],
+            "height": _P["LockTapY"],
+        },
+    )
+# The five platen-screw taps, THRU from the front face, transferred from
+# MHA-PD-02 at assembly: their callout prints size only, no location.
+for _index, _x in enumerate(PLATEN_TAP_X, 1):
+    requirement(
+        f"platen_tap_{_index}",
+        kind="threaded_hole",
+        faces=(CylinderFace(blind_cut_dia_mm(PLATEN_TAP_SPEC), contains_x_mm=_x),),
+        requirements=("thread", "dia", "thru"),
+        fields={
+            "at": ([_x, PLATEN_TAP_Y, 0.0], ("PLATEN_TAP_X", "PLATEN_TAP_Y")),
+            "axis": ((0.0, 0.0, -1.0), ("PLATEN_TAP_SPEC", _FRAME)),
+            "thread": (
+                f"{PLATEN_TAP_SPEC.size} UNC-2B",
+                ("PLATEN_TAP_SPEC", *_CALLOUT),
+            ),
+            "dia": (
+                drilled_limits(
+                    blind_cut_dia_mm(PLATEN_TAP_SPEC), _HOLE_PLACES, unit=UNIT
+                ),
+                ("PLATEN_TAP_SPEC", "UNIT", *_CALLOUT),
+            ),
+            "nominal_dia": (blind_cut_dia_mm(PLATEN_TAP_SPEC), ("PLATEN_TAP_SPEC",)),
+            "thru": (True, ("PLATEN_TAP_SPEC", *_CALLOUT)),
+            "made_at": ("assembly", ((_SELF, "PLATEN_CALLOUT_BELOW"),)),
+            "transfer": (PLATEN_CALLOUT_BELOW, ((_SELF, "PLATEN_CALLOUT_BELOW"),)),
+        },
+        precision={"dia": _HOLE_PLACES},
+    )
+# The four rack-screw holes down from the top face, #51 THRU with a Ø.110
+# counterbore, struck from MHA-PD-26 at assembly; size, depth and wall only.
+for _index, _x in enumerate(SCREW_HOLE_X, 1):
+    requirement(
+        f"rack_screw_hole_{_index}",
+        kind="hole",
+        faces=(
+            CylinderFace(SCREW_HOLE_DIA, contains_x_mm=_x),
+            CylinderFace(SCREW_CBORE_DIA, contains_x_mm=_x),
+        ),
+        requirements=("dia", "thru", "cbore_dia", "cbore_depth"),
+        fields={
+            "at": (
+                [_x, GUIDE_HEIGHT, -SCREW_HOLE_Z],
+                ("SCREW_HOLE_X", "GUIDE_HEIGHT", "SCREW_HOLE_Z"),
+            ),
+            "axis": ((0.0, -1.0, 0.0), ("SCREW_HOLE_SPEC", _FRAME)),
+            "dia": (
+                drilled_limits(SCREW_HOLE_DIA, _HOLE_PLACES, unit=UNIT),
+                ("SCREW_HOLE_DIA", "UNIT", *_CALLOUT),
+            ),
+            "nominal_dia": (SCREW_HOLE_DIA, ("SCREW_HOLE_DIA",)),
+            "thru": (True, ("SCREW_HOLE_SPEC", *_CALLOUT)),
+            "cbore_dia": (
+                drilled_limits(SCREW_CBORE_DIA, _HOLE_PLACES, unit=UNIT),
+                ("SCREW_CBORE_DIA", "UNIT", *_CALLOUT),
+            ),
+            "cbore_depth": (
+                limits(SCREW_CBORE_DEPTH, _HOLE_PLACES, unit=UNIT),
+                ("SCREW_CBORE_DEPTH", "UNIT", *_CALLOUT),
+            ),
+            "made_at": ("assembly", ((_SELF, "SCREW_CALLOUT_BELOW"),)),
+            "transfer": (SCREW_CALLOUT_BELOW, ((_SELF, "SCREW_CALLOUT_BELOW"),)),
+        },
+        precision={
+            "dia": _HOLE_PLACES,
+            "cbore_dia": _HOLE_PLACES,
+            "cbore_depth": _HOLE_PLACES,
+        },
+    )
 
 
 def _rim(view: Any, station: float, diameter: float, *, label: str) -> Any:

@@ -10,10 +10,12 @@ import _config
 import build_pd_platen_bottom_guide as builder
 import build_pd_platen_guide as top_builder
 import draw_pd_platen_bottom_guide as drawing
+import export_features
 import pd_feed_rack_spec as rack
 import pd_platen_bottom_guide_spec as spec
 import pd_platen_guide_spec as top_spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
+from _gtol_face import FaceGeometry
 from _hole_spec import THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM
 from _mcmaster_91794a055 import HEAD_DIA, SHANK_DIA
@@ -179,3 +181,127 @@ def test_right_view_dimensions_stand_clear_of_the_front_view() -> None:
 
 def test_the_height_band_names_its_screw_by_number() -> None:
     assert drawing.HEIGHT_CALLOUT.splitlines() == ["SETS ENGAGEMENT", "OF MHA-SH-VN-59"]
+
+
+def _in(value_in: float) -> float:
+    return value_in * 25.4
+
+
+_FEATURE_KINDS = {
+    "left_end": "face",
+    "right_end": "face",
+    "underside": "face",
+    "top_face": "face",
+    "front_face": "face",
+    "rear_face": "face",
+    **{f"lock_tap_{index}": "threaded_hole" for index in range(1, 5)},
+    **{f"platen_tap_{index}": "threaded_hole" for index in range(1, 6)},
+    **{f"rack_screw_hole_{index}": "hole" for index in range(1, 5)},
+}
+
+
+def _plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+    point = tuple(value * offset_mm / 1000 for value in normal)
+    return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+
+def _cylinder(
+    dia_mm: float, axis: tuple[float, float, float], box_mm: tuple[float, ...]
+) -> FaceGeometry:
+    box = tuple(value / 1000 for value in box_mm)
+    return FaceGeometry(None, 4002, (0.0, 0.0, 0.0, *axis, dia_mm / 2000), None, box)
+
+
+def test_the_rail_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    assert "pd_platen_bottom_guide" in export_features.SUPPORTED_PARTS
+    manifest = export_features.requirement_manifest("pd_platen_bottom_guide")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == _FEATURE_KINDS
+    assert manifest["construction"] == "one_piece"
+    assert manifest["notes"]["manufacturing"] == []
+    selectors = export_features.feature_selectors("pd_platen_bottom_guide")
+    length, height, depth = spec.GUIDE_LENGTH, spec.GUIDE_HEIGHT, spec.GUIDE_DEPTH
+    expected = {
+        "left_end": [_plane((-1.0, 0.0, 0.0), 0.0)],
+        "right_end": [_plane((1.0, 0.0, 0.0), length)],
+        "underside": [_plane((0.0, -1.0, 0.0), 0.0)],
+        "top_face": [_plane((0.0, 1.0, 0.0), height)],
+        "front_face": [_plane((0.0, 0.0, 1.0), 0.0)],
+        "rear_face": [_plane((0.0, 0.0, -1.0), depth)],
+    }
+    tap_r = drawing._TAP_DRILL / 2
+    for index, x in enumerate(spec.LOCK_TAP_X, 1):
+        box = (
+            x - tap_r,
+            spec.LOCK_TAP_Y - tap_r,
+            -depth,
+            x + tap_r,
+            spec.LOCK_TAP_Y + tap_r,
+            0.0,
+        )
+        expected[f"lock_tap_{index}"] = [
+            _cylinder(drawing._TAP_DRILL, (0.0, 0.0, 1.0), box)
+        ]
+    for index, x in enumerate(spec.PLATEN_TAP_X, 1):
+        box = (
+            x - tap_r,
+            spec.PLATEN_TAP_Y - tap_r,
+            -depth,
+            x + tap_r,
+            spec.PLATEN_TAP_Y + tap_r,
+            0.0,
+        )
+        expected[f"platen_tap_{index}"] = [
+            _cylinder(drawing._TAP_DRILL, (0.0, 0.0, 1.0), box)
+        ]
+    for index, x in enumerate(spec.SCREW_HOLE_X, 1):
+        z = -spec.SCREW_HOLE_Z
+        floor = height - spec.SCREW_CBORE_DEPTH
+        hole_r, cbore_r = spec.SCREW_HOLE_DIA / 2, spec.SCREW_CBORE_DIA / 2
+        expected[f"rack_screw_hole_{index}"] = [
+            _cylinder(
+                spec.SCREW_HOLE_DIA,
+                (0.0, 1.0, 0.0),
+                (x - hole_r, 0.0, z - hole_r, x + hole_r, floor, z + hole_r),
+            ),
+            _cylinder(
+                spec.SCREW_CBORE_DIA,
+                (0.0, 1.0, 0.0),
+                (x - cbore_r, floor, z - cbore_r, x + cbore_r, height, z + cbore_r),
+            ),
+        ]
+    for name, faces in expected.items():
+        for face in faces:
+            owners = [
+                owner
+                for owner, specs in selectors.items()
+                if any(selector.matches(face) for selector in specs)
+            ]
+            assert owners == [name], name
+
+
+def test_rail_feature_bands_are_the_printed_ones() -> None:
+    features = export_features.requirement_manifest("pd_platen_bottom_guide")[
+        "features"
+    ]
+    assert features["right_end"]["length"] == pytest.approx([_in(10.61), _in(10.63)])
+    assert features["top_face"]["height"] == pytest.approx([_in(0.619), _in(0.629)])
+    assert features["rear_face"]["depth"] == pytest.approx([_in(0.39), _in(0.40)])
+    stations = (2.909, 3.461, 7.155, 7.707)
+    for index, station in enumerate(stations, 1):
+        tap = features[f"lock_tap_{index}"]
+        assert tap["thread"] == "#4-40 UNC-2B" and tap["thru"] is True
+        # The #43 tap drill at the title block's DRILLED HOLES +.004/0.
+        assert tap["dia"] == pytest.approx([_in(0.089), _in(0.093)], abs=1e-3)
+        assert tap["station"] == pytest.approx(
+            [_in(station - 0.005), _in(station + 0.005)], abs=1e-3
+        )
+        assert tap["height"] == pytest.approx([_in(0.461), _in(0.471)], abs=1e-3)
+        assert tap["axis"] == [0.0, 0.0, 1.0] and tap["at"][2] == -spec.GUIDE_DEPTH
+    for name, feature in features.items():
+        if name.startswith(("platen_tap_", "rack_screw_hole_")):
+            assert feature["made_at"] == "assembly"
+            assert "station" not in feature and "height" not in feature
+    assert features["rack_screw_hole_1"]["cbore_depth"] == pytest.approx(
+        [_in(0.464), _in(0.474)], abs=1e-3
+    )
