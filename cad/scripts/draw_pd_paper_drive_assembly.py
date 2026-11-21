@@ -2063,13 +2063,11 @@ DISC_TIR_TEXT = steps.inch_text(
 )
 # The disc is centred on its O.D., cut on the same arbor as its teeth, and
 # its tooth-space runout is read in 12 spaces about evenly round it: any
-# evenly spaced sample catches a once-a-turn runout (owner ruling
-# 2026-11-20 (Pedro), #2665; MHA-PD-06 RV-02).
-DISC_TIR_SAMPLE_SPACES = 12
-DISC_TIR_SAMPLE_STRIDES = (
-    disc.TEETH // DISC_TIR_SAMPLE_SPACES,
-    -(-disc.TEETH // DISC_TIR_SAMPLE_SPACES),
-)
+# evenly spaced sample catches a once-a-turn runout (owner rulings
+# 2026-11-20 and 2026-11-21 (Pedro), #2665). The sample is MHA-PD-06's own
+# control's, so the two sheets read the same spaces.
+DISC_TIR_SAMPLE_SPACES = disc.TOOTH_SPACE_SAMPLE_SPACES
+DISC_TIR_SAMPLE_STRIDES = disc.TOOTH_SPACE_SAMPLE_STRIDES
 # The setting table's rows, in step order; each step cites its row by number.
 SETTING_ROW_KEYS = (
     "bar-top",

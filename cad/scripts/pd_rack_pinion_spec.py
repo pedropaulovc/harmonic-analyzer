@@ -456,16 +456,26 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if {f: set(n) for f, n in DRAWING_PRECISION.items()} != DRAWING_DIMENSIONS:
     raise AssertionError("every marked MHA-PD-06 dimension needs its printed places")
 
-# Spacing is held by the dividing head and is not inspected; one pin in
-# every space on a radial indicator catches eccentricity and gross slips.
-# The part's control is to its bore, datum A, at the shop row
-# (PART_TOOTH_SPACE_RUNOUT_TIR_MM); the assembled limit is MHA-PD-00's,
-# set there by centring the disc in its spigot clearance.
+# Spacing is held by the dividing head and is not inspected.  One pin read
+# on a radial indicator in 12 spaces about evenly round the disc catches
+# eccentricity: any evenly spaced sample catches a once-a-turn runout (owner
+# rulings 2026-11-20 and 2026-11-21 (Pedro), #2665: the part sheet agrees
+# with MHA-PD-00's 12-space check).  The part's control is to its bore,
+# datum A, at the shop row (PART_TOOTH_SPACE_RUNOUT_TIR_MM); the assembled
+# limit is MHA-PD-00's, set there by centring the disc in its spigot
+# clearance.
+TOOTH_SPACE_SAMPLE_SPACES = 12
+TOOTH_SPACE_SAMPLE_STRIDES = (
+    TEETH // TOOTH_SPACE_SAMPLE_SPACES,
+    -(-TEETH // TOOTH_SPACE_SAMPLE_SPACES),
+)
 TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
 TOOTH_SPACE_CALLOUT = "\n".join(
     (
         f"TOOTH SPACE RUNOUT {PART_TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR TO A",
-        f"\u00d8{inch_text(TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} PIN, ALL {TEETH} SPACES",
+        f"\u00d8{inch_text(TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} PIN IN "
+        f"{TOOTH_SPACE_SAMPLE_SPACES} SPACES, EVERY {TOOTH_SPACE_SAMPLE_STRIDES[0]}TH "
+        f"OR {TOOTH_SPACE_SAMPLE_STRIDES[1]}TH",
     )
 )
 
