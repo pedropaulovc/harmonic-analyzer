@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the platen support bar (MHA-PD-07).
 
-A 17.8 x 1.010 x .374 steel bar clamped across the frame columns, printed in
+A 17.8 x 1.00 x .374 steel bar clamped across the frame columns, printed in
 decimal inch (#290). Its BACK face
 carries the transgear pivot's #8-32 through tap and the latch hook's two
 #4-40 through taps on one row; its FRONT face, which the platen slides on,
@@ -8,17 +8,20 @@ carries the four clamp screws: two counterbored holes on the east column and
 two counterbored slots on the west one (owner ruling 2026-10-15, option A).
 
 * The principal view looks on the back face (model +Z, ``*Front``), with no
-  label: the length, the hanger row's banded stations from the left end and
+  label: the length, the hanger row's stations from the left end and
   its height from the top face (the part-hidden HangerRowReference sketch),
   both countersinks' MAX Ø (CountersinkReference) each under its tap and
-  over the mate its banded row locates, and the top face's slide roughness.
+  over the mate its row locates, and the top face's slide roughness.
 * VIEW D, below it, looks on the front face (``*Back``, a rear view, so the
   left end is on the sheet's right), its viewing arrow on section A-A: the
-  height, the clamp row's banded stations from the same end and its banded
+  height, the clamp row's stations from the same end and its
   height (ClampRowReference), the round counterbores' native callout (size,
-  drill, counterbore; depth at .XX, sizes at .XXX) naming the back-arc taps
-  the row locates to, and the front face's slide roughness. Each roughness
-  symbol names the part that slides there; the sheet has no general note.
+  drill, counterbore; the counterbore's Ø the 5/16 plunge's .3125 +.010/0,
+  depth at .XX, the drill at .XXX) naming the back-arc taps
+  the row locates to and pointing to note 1, and the front face's slide
+  roughness (any process: the thickness is as supplied). Each roughness
+  symbol names the part that slides there; sheet note 1 states the clamp
+  holes' screw-line offset over the #8 screw clearance.
 * Detail C looks face-on at the outer slot: the slot's and its
   counterbore's widths and travels, the slot's width naming the head its
   upper limit seats and the counterbore's the MHA-SH-VN-53 head it clears.
@@ -102,6 +105,8 @@ from build_pd_support_bar import (
     BAR_LENGTH,
     CLAMP_CBORE_DEPTH,
     CLAMP_CBORE_DIA,
+    CLAMP_SCREW_LINE_SHORTFALL,
+    CLAMP_SLOT_CBORE_WIDTH,
     CLAMP_ROUND_X,
     CLAMP_ROW,
     CLAMP_SLOT_WIDTH,
@@ -109,6 +114,7 @@ from build_pd_support_bar import (
     HANGER_ROW,
     MAX_SUFFIX,
 )
+from sh_column_clamp_fit import note_text, stated_max
 from _column_clamp_interface import BAR_DEPTH
 from pd_support_bar_spec import (
     BACK_FACE_Z,
@@ -122,6 +128,8 @@ from pd_support_bar_spec import (
 from pd_support_bar_drawing_spec import (
     BACK_VIEW_CAPTION,
     CLAMP_CALLOUT_PRECISION,
+    CLAMP_CBORE_DIA_LIMIT_PLACES,
+    CLAMP_CBORE_DIA_LIMITS,
     CLAMP_EAST_HEIGHT_NAME,
     CLAMP_CBORE_CALLOUT,
     CLAMP_HOLE_PROCESS,
@@ -170,6 +178,18 @@ BACK_CENTER = (0.170, 0.122)
 SECTION_CENTER = (0.385, 0.200)
 ISO_CENTER = (0.368, 0.097)
 ISO_NOTE_XY = (0.300, 0.076)
+# The clamp screw line's drill-wander shortfall
+# (build_pd_support_bar.CLAMP_SCREW_LINE_SHORTFALL), stated rounded up as a
+# plain fact (rule 20): pd-support-bar RV-03. Numbered, the round holes'
+# callout pointing to it (CLAMP_CBORE_CALLOUT). Over END A's top-left corner,
+# left of the top edge's finish symbol and above the face view.
+SCREW_LINE_NOTE = (
+    "1. EACH .196 HOLE TO ITS\n"
+    "   MHA-SH-02 TAP: OFFSET UP\n"
+    f"   TO {note_text(stated_max(CLAMP_SCREW_LINE_SHORTFALL))} OVER #8 SCREW\n"
+    "   CLEARANCE."
+)
+SCREW_LINE_NOTE_XY = (0.016, 0.262)
 
 LEFT_END = FACE_CENTER[0] - BAR_LENGTH * _S / 2.0
 RIGHT_END = FACE_CENTER[0] + BAR_LENGTH * _S / 2.0
@@ -210,7 +230,7 @@ def _back_x(model_x: float) -> float:
 # off its end over END A's half of the bar, its text right of the top slide
 # symbol's leader and under its shelf (round 7 review blocker: that run had
 # no height; VIEW D's END A side carries the round holes' callout and leader,
-# END A, the 1.010 and the stations).
+# END A, the 1.00 and the stations).
 # The section line runs up through the pivot, its arrows and letters left of
 # it. Every location carries its value and band alone (rule 7; the hook
 # taps' stations REF, their callout's spotting route sets them): the mate
@@ -864,9 +884,11 @@ def _slot_section_material_boxes(
         point(CLAMP_TAP_Y + y)[1]
         for y in (-CLAMP_SLOT_WIDTH / 2.0, CLAMP_SLOT_WIDTH / 2.0)
     )
+    # B-B cuts through a slot, so the step is the slot counterbore's width,
+    # not the round counterbores' Ø (#2422 split them).
     cbore_bottom, cbore_top = sorted(
         point(CLAMP_TAP_Y + y)[1]
-        for y in (-CLAMP_CBORE_DIA / 2.0, CLAMP_CBORE_DIA / 2.0)
+        for y in (-CLAMP_SLOT_CBORE_WIDTH / 2.0, CLAMP_SLOT_CBORE_WIDTH / 2.0)
     )
     return {
         "upper bar": (xmin, cbore_top, xmax, top),
@@ -1388,8 +1410,9 @@ def clamp_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
 def _name_clamp_screws(display: Any) -> None:
     """Write the drill into the counterbores' native through row and hang the
     back-arc taps the holes locate to and the screws' part number under it
-    (clamp_callout_definitions); its sizes print .XXX, its depth the .XX its
-    head clearance takes. Only changed parts are written, each through its
+    (clamp_callout_definitions); its through hole prints .XXX, its depth the
+    .XX its head clearance takes and the counterbore's Ø the four places of
+    its 5/16 plunge and band. Only changed parts are written, each through its
     writable twin (definition 5..8 -> writable 1..4)."""
     label = "clamp-screw counterbores"
     native = _early_bound(display, "IDisplayDimension")
@@ -1412,7 +1435,58 @@ def _name_clamp_screws(display: Any) -> None:
             f"expected={updated!r}, resolved={read((1, 2, 3, 4))!r}"
         )
     set_hole_callout_precision(display, CLAMP_CALLOUT_PRECISION, label=label)
+    _band_counterbore_diameter(display)
     _telemetry.info(f"{label} callout: definitions={persisted!r}")
+
+
+_TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
+
+
+def _band_counterbore_diameter(display: Any) -> None:
+    """Print the round counterbores' Ø as the 5/16 plunge's .3125 +.0100/.0000
+    (owner ruling 2026-11-20, #2422; CLAMP_CBORE_DIA_LIMITS). The band lives
+    on the part's Hole Wizard feature (build_pd_support_bar
+    ._band_round_counterbores) and the callout's ``<hw-cbdia>`` displays it;
+    this sets only its tolerance places, the nominal's four, as
+    draw_dt_cone_swing_platform._print_pivot_band_exactly does, and reads the
+    displayed band back so a band that did not reach the callout fails here."""
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch
+
+    lower, upper = CLAMP_CBORE_DIA_LIMITS
+    matches = []
+    for raw in display.GetHoleCalloutVariables() or ():
+        # Concrete callout interfaces alias the generic metadata DISPIDs.
+        variable = dynamic_dispatch(raw._oleobj_)
+        if str(variable.VariableName) == "hw-cbdia":
+            matches.append((raw, variable))
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"clamp counterbore callout carries {len(matches)} hw-cbdia variables, not 1"
+        )
+    raw, variable = matches[0]
+    length = _early_bound(raw, "ICalloutLengthVariable")
+    actual = float(length.Length) * 1000.0
+    if abs(actual - CLAMP_CBORE_DIA) > 1e-5:
+        raise RuntimeError(
+            f"clamp counterbore callout Ø reads {actual:g}, expected {CLAMP_CBORE_DIA:g} mm"
+        )
+    length.TolerancePrecision = CLAMP_CBORE_DIA_LIMIT_PLACES
+    if (
+        int(variable.ToleranceType) != _TOL_BILATERAL
+        or abs(float(variable.ToleranceMin) * 1000.0 - lower) > 1e-5
+        or abs(float(variable.ToleranceMax) * 1000.0 - upper) > 1e-5
+        or int(length.TolerancePrecision) != CLAMP_CBORE_DIA_LIMIT_PLACES
+    ):
+        raise RuntimeError(
+            "clamp counterbore callout does not display the part's band: wanted "
+            f"swTolBILAT, deviations {(lower, upper)} mm at "
+            f"{CLAMP_CBORE_DIA_LIMIT_PLACES} places; read "
+            f"{int(variable.ToleranceType)}, {float(variable.ToleranceMin)!r}, "
+            f"{float(variable.ToleranceMax)!r}, {int(length.TolerancePrecision)}"
+        )
+    _telemetry.info(
+        f"clamp counterbore callout Ø {CLAMP_CBORE_DIA:g} mm, band {(lower, upper)} mm"
+    )
 
 
 def _set_countersink_suffixes(adapter: Any, annotations: list[Any]) -> None:
@@ -1475,9 +1549,31 @@ def _place_caption(adapter: Any, text: str, top_centre: tuple[float, float]) -> 
     _telemetry.info(f"caption {text!r}: extent {extent}")
 
 
+# swSFSymType_e.swSFBasic: the any-process symbol (open vee, no bar).
+SF_ANY_PROCESS = 0
+
+
+def _set_any_process_finish(adapter: Any, symbol: Any, *, label: str) -> None:
+    """Turn the front face's finish into the any-process form.
+
+    The bar's thickness prints as supplied (.374 +.001/-.003, owner ruling
+    2026-11-20, #1563 option C), so the cold-finished front face is met by any
+    process: the material-removal-required form asked the shop to face a
+    surface whose band leaves no stock for it (Codjiflo review of #3163, P1;
+    as draw_dt_cone_swing_platform._set_any_process_finish)."""
+    native = _early_bound(symbol, "ISFSymbol")
+    if not native.SetSymbol(SF_ANY_PROCESS, 0, False):
+        raise RuntimeError(f"failed to set the any-process finish symbol ({label})")
+    rebuild_drawing(adapter, label=f"{label} any-process symbol")
+    if int(native.GetSymbol()) != SF_ANY_PROCESS:
+        raise RuntimeError(f"any-process finish symbol did not persist ({label})")
+
+
 def _add_slide_finishes(adapter: Any, face: Any, back: Any) -> None:
     """The platen's two slide faces: the top face on its edge in the back-face
-    view, the front face seen face-on, a leader to a point on it."""
+    view, the front face seen face-on, a leader to a point on it.  The top
+    edge is skimmed (machining required); the front face stays as supplied
+    (any process)."""
     top = _sheet(
         adapter, face, (TOP_FINISH_MODEL_X, BAR_HEIGHT / 2.0, BACK_FACE_Z), "top finish"
     )
@@ -1491,24 +1587,26 @@ def _add_slide_finishes(adapter: Any, face: Any, back: Any) -> None:
         label="top slide finish",
         char_height=FINISH_CHAR_HEIGHT,
     )
-    control = surface_finish_by_key(SURFACE_FINISHES, "front_slide")
-    front_face = resolve_faces(
-        _early_bound(_early_bound(back, "IView").ReferencedDocument, "IModelDoc2"),
-        {control.key: control.face},
-    )[control.key]
-    add_surface_finish(
-        adapter,
-        back,
-        entity=front_face,
-        entity_type="FACE",
-        leader_attach_xy=_sheet(
-            adapter, back, (*FRONT_FINISH_MODEL_XY, -BAR_DEPTH / 2.0), "front finish"
-        ),
-        symbol_xy=FRONT_FINISH_SYMBOL_XY,
-        control=control,
-        label="front slide finish",
-        char_height=FINISH_CHAR_HEIGHT,
-    )
+    with _telemetry.span("drawing.support_bar_front_finish"):
+        control = surface_finish_by_key(SURFACE_FINISHES, "front_slide")
+        front_face = resolve_faces(
+            _early_bound(_early_bound(back, "IView").ReferencedDocument, "IModelDoc2"),
+            {control.key: control.face},
+        )[control.key]
+        front_symbol = add_surface_finish(
+            adapter,
+            back,
+            entity=front_face,
+            entity_type="FACE",
+            leader_attach_xy=_sheet(
+                adapter, back, (*FRONT_FINISH_MODEL_XY, -BAR_DEPTH / 2.0), "front finish"
+            ),
+            symbol_xy=FRONT_FINISH_SYMBOL_XY,
+            control=control,
+            label="front slide finish",
+            char_height=FINISH_CHAR_HEIGHT,
+        )
+        _set_any_process_finish(adapter, front_symbol, label="front slide finish")
 
 
 def build(adapter: Any) -> dict[str, str]:
@@ -1677,6 +1775,13 @@ def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    drawing.ActivateView("")
+    if drawing.ActiveDrawingView is not None:
+        raise RuntimeError("cannot leave view context for the screw-line note")
+    # pd-support-bar RV-03 (SCREW_LINE_NOTE).
+    if add_note(adapter, SCREW_LINE_NOTE, *SCREW_LINE_NOTE_XY) is None:
+        raise RuntimeError("screw-line note: InsertNote failed")
 
     # The countersinks' stacked callouts restate the taps, so the Hole
     # Wizard's own "Tapped Hole" note is the one redundant automatic note.

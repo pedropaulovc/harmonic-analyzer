@@ -47,6 +47,10 @@ import pd_vn_transgear_latch_pin_spec as LATCH_PIN
 import transgear_cluster_fit as CLUSTER
 import transgear_hanger_joints as HANGER
 
+# A running clearance under the support bar, with no contact at the printed
+# worst case: the platen's bottom rail must not drag on the bar's bottom edge.
+_BOTTOM_RAIL_RUNNING_FLOOR = 0.10
+
 
 def _platen(paper) -> None:
     assert (
@@ -62,16 +66,25 @@ def _platen(paper) -> None:
         "sh-vn-fillister-screw-91794a055",
         "RackScrew",
     ), "the rack-screw placement names another member"
-    assert (
-        abs(
-            paper.BAR_TOP_Y
-            - paper.BAR_HEIGHT
-            - paper.GUIDE_Y[0]
-            - paper.GUIDE_HEIGHTS[0]
-            - paper.BOTTOM_RAIL_CLEARANCE
+    # BOTTOM_RAIL_CLEARANCE is derived (the bar hangs from the top rail's
+    # underside, MHA-PD-27 sits at its own y), so hold the gap it leaves
+    # against a running floor stated here, rebuilt from the parts' own
+    # printed bands at the worst case: the bar at its tallest, the rail at its
+    # tallest and highest on the platen (#3163 review).
+    worst_gap = (
+        paper.GUIDE_Y[1]
+        - BAR.BAR_HEIGHT
+        - BAR.BAR_HEIGHT_BAND
+        - (
+            paper.GUIDE_Y[0]
+            + BOTTOM_GUIDE.GUIDE_HEIGHT
+            + max(paper._RAIL_HEIGHT_DEVS[0][1], 0.0)
+            + paper.BOTTOM_GUIDE_Y_BAND
         )
-        <= 1e-5
-    ), "the support bar's bottom edge is off the bottom rail's clearance"
+    )
+    assert worst_gap >= _BOTTOM_RAIL_RUNNING_FLOOR, (
+        f"the platen's bottom rail would rub the support bar ({worst_gap:.3f} mm)"
+    )
     assert abs(BOTTOM_GUIDE.GUIDE_DEPTH - paper.GUIDE_DEPTH) <= 1e-9, (
         "the two rails' depths differ, so their lock plates do"
     )
@@ -273,7 +286,7 @@ def _platen_rack_and_chain_air(paper) -> None:
     BUSHING_RACK_AIR_WORST = (
         BUSHING_RACK_AIR_NOMINAL
         - SPACER.LENGTH_BAND
-        - BAR.BAR_DEPTH_BAND
+        - BAR.BAR_DEPTH_REACH
         - paper._RACK_BACK_REARWARD_BAND
         - (
             CLUSTER.SLEEVE_REAR_FORWARD_FROM_ARM[1]

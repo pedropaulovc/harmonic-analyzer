@@ -125,7 +125,7 @@ def _loaded_hanger_bounds() -> tuple[float, float, float]:
     # position's .XX band, plus the as-built stack bands kept conservatively.
     z_offset = (
         abs(hook.PIN_HOLE_Z - arm.PIN_MACHINE_Z) + hook_spec.POSITION_TOL
-        + bar.BAR_DEPTH_BAND + spacer.LENGTH_BAND + arm.THICKNESS_BAND
+        + bar.BAR_DEPTH_REACH + spacer.LENGTH_BAND + arm.THICKNESS_BAND
     )
     hole_radius = hook.PIN_HOLE_DIA / 2.0
     if z_offset >= hole_radius:

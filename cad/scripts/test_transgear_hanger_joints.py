@@ -35,22 +35,37 @@ def _reload_joints():
 
 
 def test_pivot_screw_refuses_a_bar_too_thin_for_one_and_a_half_d(monkeypatch) -> None:
-    # Thinnest bar, deepest recess, one pitch charged at the faced tip and the
-    # vendor neck: (9.373 - 0.508) - 0.794 - 1.7653 = 6.306 = 1.514 D.
+    # Thinnest bar (.371, its 3/8 CF as-supplied limit; owner ruling
+    # 2026-11-21, #1563 option C), deepest recess, one pitch charged at the
+    # faced tip and the vendor neck: (9.4234 - 0.508) - 0.794 - 1.7653 =
+    # 6.356 = 1.526 D.
     assert joints.PIVOT_ENGAGEMENT_WORST == pytest.approx(
-        BAR_DEPTH
-        - bar.BAR_DEPTH_BAND
+        bar.BAR_DEPTH_MIN
         - pivot.TIP_RECESS[1]
         - pivot.INCOMPLETE_TIP_LEN_MAX
         - pivot.FULL_THREAD_START
     )
-    assert joints.PIVOT_ENGAGEMENT_WORST_D == pytest.approx(1.514, abs=1e-3)
-    assert joints.PIVOT_STOCK_SHORTFALL_AT_THICKEST_BAR == pytest.approx(
-        0.102, abs=1e-3
-    )
-    # A .X depth band (+/-0.25) on the bar leaves 6.19 = 1.49 D: refused.
-    monkeypatch.setattr(bar, "BAR_DEPTH_BAND", 0.25)
+    assert bar.BAR_DEPTH_MIN == pytest.approx(0.371 * 25.4)
+    assert joints.PIVOT_ENGAGEMENT_WORST_D == pytest.approx(1.526, abs=1e-3)
+    # A .X depth band (-0.25) on the bar leaves 6.19 = 1.49 D: refused.
+    monkeypatch.setattr(bar, "BAR_DEPTH_MIN", BAR_DEPTH - 0.25)
     with pytest.raises(AssertionError, match="worst engagement"):
+        _reload_joints()
+
+
+def test_the_shortest_stock_reaches_the_thickest_bars_recess_window(
+    monkeypatch,
+) -> None:
+    # .375 - .020 = .355, the ASME-short 90325A174 thread: no fitter
+    # selection (owner ruling 2026-11-21, #1563 option C). At the title
+    # block's +.005 (.379) the shortest stock stopped .004 short: refused.
+    assert bar.BAR_DEPTH_MAX == pytest.approx(0.375 * 25.4)
+    assert pivot.STOCK_THREAD_LEN_MIN == pytest.approx(0.355 * 25.4)
+    assert pivot.STOCK_THREAD_LEN_MIN >= (
+        bar.BAR_DEPTH_MAX - pivot.TIP_RECESS[1] - 1e-9
+    )
+    monkeypatch.setattr(bar, "BAR_DEPTH_MAX", BAR_DEPTH + 0.127)
+    with pytest.raises(AssertionError, match="thickest bar's recess window"):
         _reload_joints()
 
 
@@ -315,8 +330,10 @@ def test_the_far_face_gate_refuses_the_three_quarter_pin(monkeypatch) -> None:
     grade; the gate refuses it and accepts the 7/8 pin set .516-.565 proud.
     With the hook's screw holes at the title block's ±.005 (delegated ruling
     2026-11-07, pending owner confirmation) the 3/4 dowel falls short even
-    in the 6.20 hole that once barely cleared."""
-    assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST > 0.6
+    in the 6.20 hole that once barely cleared. The bar's pivot tap at the
+    title block's ±.005 (owner ruling 2026-11-20, #2422; it was ±.002) and
+    the 3/8 arm (#2019, #3184) leave the 7/8 pin 0.283 past the face."""
+    assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST == pytest.approx(0.283, abs=1e-3)
     # The retired 3/4 pin bottomed in a 6.20 hole printed .24: its proud
     # window, length grade and depth reach included.
     reach = 6.20 - (0.24 - 0.01) * 25.4

@@ -369,14 +369,14 @@ BOTTOM_GUIDE_Y_BAND = (
 # strip's printed screw floor above its flat top.
 RACK_SCREW_FLOOR_Y = GUIDE_Y[0] + BOTTOM_GUIDE.GUIDE_HEIGHT - BOTTOM_GUIDE.SCREW_CBORE_DEPTH
 BAR_TOP_Y = GUIDE_Y[1]
-BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0  # 304.907
+BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0  # 305.034
 # The SH column clamps' screw line, below the bar's centre (pd_support_bar_spec).
 CLAMP_Y = BAR_CY + BAR.CLAMP_TAP_Y  # 303.734
 # The bar fills the channel between the rails down to this running clearance
-# over the bottom rail's top edge (pd_support_bar_spec.BAR_HEIGHT). MHA-PD-27's
-# top stands BOTTOM_GUIDE.TOP_RISE above the former .29 bottom rail's, paid
-# from the former 0.98.
-BOTTOM_RAIL_CLEARANCE = 0.98 - BOTTOM_GUIDE.TOP_RISE
+# over the bottom rail's top edge (pd_support_bar_spec.BAR_HEIGHT; 1.022 with
+# the 1.00 bar, owner ruling 2026-11-20, #2421): the bar hangs from the top
+# rail's underside and MHA-PD-27 sits at its own y, so the gap is what is left.
+BOTTOM_RAIL_CLEARANCE = BAR_TOP_Y - BAR_HEIGHT - (GUIDE_Y[0] + GUIDE_HEIGHTS[0])
 LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.7: lock plates on the guide backs,
 # 0.7 behind the bar's back face -- they bridge the bar so the platen cannot
 # fall off it.
@@ -694,7 +694,7 @@ PLATEN_AIR = CLUSTER_AIR.AirStack(
         "sleeve cocking on the pin": CLUSTER_TILT_AT_DISC_RIM,
         "hub rock on the sleeve boss": DISC_HUB_ROCK_AT_RIM,
         "MHA-PD-20 spacer length": SPACER.LENGTH_BAND,
-        "MHA-PD-07 support bar depth": BAR.BAR_DEPTH_BAND,
+        "MHA-PD-07 support bar depth": BAR.BAR_DEPTH_REACH,
         "MHA-PD-02 platen thickness": _PLATEN_THICKNESS_BAND,
         "MHA-PD-06 disc thickness": DISC_SPEC.FACE_WIDTH_MAX - DISC_SPEC.FACE_WIDTH,
         **dict(CLUSTER.SHIMMED_STEP_TERMS),
@@ -1347,7 +1347,7 @@ def _latch_hook_sections() -> list[tuple[str, tuple[float, float, float, float]]
 # MHA-PD-27 follows the strip and the crest set (BOTTOM_GUIDE_Y_BAND), which
 # the sweep carries.
 LOCK_SWEEP_FLOOR = 0.10
-_BAR_DEPTH_DEV = (-BAR.BAR_DEPTH_BAND, BAR.BAR_DEPTH_BAND)
+_BAR_DEPTH_DEV = BAR.BAR_DEPTH_LIMITS
 _GUIDE_DEPTH_DEV = printed_deviations(
     GUIDE_DEPTH, GUIDE_DEPTH_PLACES, deviations(GUIDE_DEPTH_BAND), unit=GUIDE_UNIT
 )

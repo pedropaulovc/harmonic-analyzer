@@ -41,32 +41,53 @@ def test_printed_mating_numbers_resolve_to_the_registered_parts() -> None:
 
 
 def test_printed_bands_match_the_bar_and_drilled_slot_limits() -> None:
+    from _drawing_contract import model_toleranced_dimensions
     from _printed_tolerance import drilled_oversize_mm, printed_deviations
 
-    # .XXX at the inch print: each band is the printed limit's furthest
-    # reach from the mm nominal (both now on the .001 grid, #290).
-    for value, band in (
-        (spec.BAR_HEIGHT, spec.BAR_HEIGHT_BAND),
-        (BAR_DEPTH, spec.BAR_DEPTH_BAND),
-    ):
-        lower, upper = printed_deviations(value, spec.BAR_BAND_PLACES, unit="in")
-        assert band == max(-lower, upper)
-    assert (spec.BAR_HEIGHT_BAND, spec.BAR_DEPTH_BAND) == pytest.approx(
-        (0.127, 0.127)
+    # The height's band is the printed .XX limit's furthest reach from the mm
+    # nominal (both on their grid, #290; owner ruling 2026-11-20, #2421). The
+    # thickness is the 3/8 CF flat as supplied, .374 +.001/-.003 at .XXX
+    # (owner ruling 2026-11-21, #1563 option C), authored on the model.
+    assert (spec.BAR_HEIGHT_PLACES, spec.BAR_DEPTH_PLACES) == (2, 3)
+    lower, upper = printed_deviations(
+        spec.BAR_HEIGHT, spec.BAR_HEIGHT_PLACES, unit="in"
     )
+    assert spec.BAR_HEIGHT_BAND == max(-lower, upper)
+    assert spec.BAR_HEIGHT == pytest.approx(1.00 * 25.4)
+    assert spec.BAR_HEIGHT_BAND == pytest.approx(0.254)
+    assert spec.BAR_DEPTH_LIMITS == pytest.approx((-0.003 * 25.4, 0.001 * 25.4))
+    assert (spec.BAR_DEPTH_MIN, spec.BAR_DEPTH_MAX) == pytest.approx(
+        (0.371 * 25.4, 0.375 * 25.4)
+    )
+    assert spec.BAR_DEPTH_REACH == pytest.approx(0.003 * 25.4)
+    toleranced = model_toleranced_dimensions(part)
+    assert toleranced[("Bar", "Depth")] == "*BAR_DEPTH_LIMITS"
     assert part.CLAMP_SLOT_WIDTH_LIMITS == (0.0, drilled_oversize_mm(unit="in"))
 
 
-def test_hook_tap_stations_are_reference_and_only_the_pivot_row_is_banded() -> None:
+def test_hook_tap_stations_are_reference_and_the_pivot_row_is_unbanded() -> None:
     """Round 3 machinist review (over-specification): SPOT THRU MHA-PD-14 AT
-    ASSEMBLY sets the hook taps' stations, so they print REF with no band;
-    the row height and the pivot's station keep ±.002 (RV-01)."""
+    ASSEMBLY sets the hook taps' stations, so they print REF with no band.
+    The row height and the pivot's station print .XXX under the title block's
+    ±.005 (owner ruling 2026-11-20, #2422; it was ±.002, RV-01)."""
+    from _printed_tolerance import printed_band_mm
 
-    banded = set(sheet_spec.BANDED_HANGER_NAMES)
     reference = set(sheet_spec.HOOK_TAP_REFERENCE_NAMES)
-    assert banded == {"HangerRowHeight", "PivotTapStation"}
     assert reference == {"BracketTapStation1", "BracketTapStation2"}
-    assert banded | reference == {"HangerRowHeight", *sheet_spec.HANGER_STATION_NAMES}
+    assert not hasattr(sheet_spec, "BANDED_HANGER_NAMES")
+    assert not hasattr(spec, "HOLE_POSITION_TOL")
+    assert sheet_spec.SHEET_PRECISION["HangerRowReference"] == dict.fromkeys(
+        ("HangerRowHeight", *sheet_spec.HANGER_STATION_NAMES), 3
+    )
+    # The stacks read the printed reach: the title block's band plus half a
+    # .001 step, the stations being off the grid.
+    assert spec.HOLE_POSITION_BAND == pytest.approx(
+        printed_band_mm(3, unit="in") + 0.0005 * 25.4
+    )
+    ids = {
+        entry["id"] for entry in _config.parts("pd-support-bar")["machinist_exceptions"]
+    }
+    assert "RV-01" not in ids
     assert "SPOT THRU MHA-PD-14" in sheet_spec.DIMENSION_CALLOUTS["BracketCskDia"]
 
 
@@ -144,8 +165,8 @@ def test_each_row_draws_its_own_centreline() -> None:
         on_runs = [name for run in row.runs for name, _ in part._run_holes(row, run)]
         assert sorted(on_runs) == sorted(name for name, _ in row.holes)
     # The other row's rings: the slot counterbores reach 5.75 off their
-    # centres, the round ones 4.25, the countersinks 2.15.
-    slot_reach = part.CLAMP_SLOT_RUN / 2.0 + part.CLAMP_CBORE_DIA / 2.0
+    # centres, the round ones 3.97, the countersinks 2.15.
+    slot_reach = part.CLAMP_SLOT_RUN / 2.0 + part.CLAMP_SLOT_CBORE_WIDTH / 2.0
     csk_reach = spec.PIVOT_TAP_CSK_DIA / 2.0
     for start, end in taps.runs:
         for x in part.CLAMP_ROW_X:
@@ -338,7 +359,7 @@ def test_clamp_heads_stay_under_the_front_face_at_the_printed_worst_case() -> No
     # even at the depth's printed minimum.
     assert part.CLAMP_HEAD_H < shallowest
     # Rule 17: the floor under the deepest counterbore in the thinnest bar.
-    assert (BAR_DEPTH - spec.BAR_DEPTH_BAND) - deepest >= WALL_TARGET_MM
+    assert spec.BAR_DEPTH_MIN - deepest >= WALL_TARGET_MM
 
 
 def test_clamp_screws_engage_the_back_arc_and_stop_inside_it() -> None:
@@ -353,8 +374,8 @@ def test_clamp_screws_engage_the_back_arc_and_stop_inside_it() -> None:
     from sh_vn_clamp_screw_spec import SHANK_DIA, SHANK_LEN
 
     shallowest, deepest = _printed_cbore_depth_limits()
-    thick = BAR_DEPTH + spec.BAR_DEPTH_BAND
-    thin = BAR_DEPTH - spec.BAR_DEPTH_BAND
+    thick = spec.BAR_DEPTH_MAX
+    thin = spec.BAR_DEPTH_MIN
     least = SHANK_LEN - (thick - shallowest + front_arc + grip_gap)
     most = SHANK_LEN - (thin - deepest + front_arc + grip_gap)
     # Rule 18: 1.5D of thread at the least engagement.
@@ -440,9 +461,74 @@ def test_slot_heads_bear_and_stay_inside_their_counterbores() -> None:
     # is relaxed on a clearance feature.
     assert lower == -band
     assert upper >= printed_band_mm(2, unit="in")
-    # The slot counterbore is the round one's width, cut as deep.
-    assert part.CLAMP_SLOT_CBORE_WIDTH == part.CLAMP_CBORE_DIA == 8.509
+    # The slot counterbore stays .335, cut as deep as the round ones, which
+    # are the 5/16 plunge (owner ruling 2026-11-20, #2422).
+    assert part.CLAMP_SLOT_CBORE_WIDTH == 8.509
+    assert part.CLAMP_CBORE_DIA == 5.0 / 16.0 * 25.4
     assert part.CLAMP_SLOT_CBORE_RUN == part.CLAMP_SLOT_RUN
+
+
+def test_round_counterbores_are_the_5_16_plunge_and_clear_the_head() -> None:
+    """Owner ruling 2026-11-20 (#2422): the round counterbores print Ø.3125
+    +.010/0, a 5/16 end mill's plunge, in four places so the low limit is the
+    cutter. The MHA-SH-VN-53 head, its shank floated across the widest Ø.196
+    hole, still clears the narrowest counterbore; at the .XX row's -.01 it
+    would not."""
+    from _printed_tolerance import drilled_oversize_mm, printed_deviations
+    from sh_vn_clamp_screw_spec import HEAD_DIA, SHANK_DIA
+
+    assert sheet_spec.CLAMP_CBORE_DIA_LIMITS == pytest.approx((0.0, 0.010 * 25.4))
+    assert sheet_spec.CLAMP_CBORE_DIA_PLACES == 4
+    assert sheet_spec.CLAMP_CALLOUT_PRECISION["hw-cbdia"] == 4
+    assert sheet_spec.CLAMP_CBORE_DIA_LIMIT_PLACES == 4
+    assert (
+        part.CLAMP_HOLE_SPEC.overrides_mm["CounterBoreDiameter"] == part.CLAMP_CBORE_DIA
+    )
+    widest = 0.196 * 25.4 + drilled_oversize_mm(unit="in")
+    shift = (widest - SHANK_DIA) / 2.0
+    clearance = 0.3125 * 25.4 / 2.0 - (HEAD_DIA / 2.0 + shift)
+    assert clearance == pytest.approx(0.0826, abs=1e-4)
+    assert part.clamp_round_head_clearance() == pytest.approx(clearance)
+    lower, _ = printed_deviations(part.CLAMP_CBORE_DIA, 2, unit="in")
+    assert (part.CLAMP_CBORE_DIA + lower) / 2.0 - (HEAD_DIA / 2.0 + shift) < 0.0
+
+
+def test_clamp_screw_line_wander_shortfall_stays_the_owner_ruled_value() -> None:
+    """Owner ruling 2026-11-20 (#1988): with drill wander charged (the
+    MHA-SH-02 back-arc tap's and this bar's through hole's, 0.3 deg), the
+    clamp screw stands up to 0.051 past its hole's radial float at the worst
+    corner, as on the MHA-MG-08 wheel bar; the shortfall may not grow."""
+    from sh_column_clamp_fit import BACK_EAR_WANDER
+
+    wander = spec.BAR_DEPTH_MAX * math.tan(math.radians(0.3))
+    assert part.CLAMP_BAR_HOLE_WANDER == pytest.approx(wander)
+    demand = (
+        part.clamp_position_zone(part.CLAMP_POSITION_BAND) / 2.0
+        + part.BACK_ARC_TAP_ZONE / 2.0
+        + BACK_EAR_WANDER
+        + wander
+    )
+    assert part.CLAMP_SCREW_LINE_DEMAND == pytest.approx(demand)
+    assert part.CLAMP_SCREW_LINE_SHORTFALL == pytest.approx(
+        demand - part.CLAMP_HOLE_FLOAT / 2.0
+    )
+    assert part.CLAMP_SCREW_LINE_SHORTFALL == pytest.approx(0.0500, abs=1e-4)
+    assert part.CLAMP_SCREW_LINE_SHORTFALL_RULED == 0.051
+    # Rule 20: the sheet states it, rounded up, and RV-03 declares that note.
+    from sh_column_clamp_fit import note_text, stated_max
+
+    stated = note_text(stated_max(part.CLAMP_SCREW_LINE_SHORTFALL))
+    assert stated == ".002"
+    note = " ".join(drawing.SCREW_LINE_NOTE.split())
+    assert note.startswith("1. ")
+    assert f"OFFSET UP TO {stated} OVER #8" in note
+    assert sheet_spec.CLAMP_CBORE_CALLOUT.endswith("SEE NOTE 1")
+    entries = {
+        entry["id"]: entry
+        for entry in _config.parts("pd-support-bar")["machinist_exceptions"]
+    }
+    assert entries["RV-03"]["kind"] == "minor"
+    assert note in entries["RV-03"]["where"]
 
 
 def test_slot_counterbores_leave_rule_17_walls() -> None:
@@ -470,7 +556,7 @@ def test_slot_counterbores_leave_rule_17_walls() -> None:
         - station
         - cbore_max / 2.0
     )
-    assert side == pytest.approx(7.019, abs=5e-3)
+    assert side == pytest.approx(6.638, abs=5e-3)
     for wall in (end_wall, web, side):
         assert wall >= WALL_TARGET_MM
     # Nominally 5.806 to the end, 23.495 between.
@@ -603,7 +689,7 @@ def test_section_a_a_thickness_text_clears_both_extension_lines() -> None:
     top = drawing.SECTION_CENTER[1] + spec.BAR_HEIGHT * scale / 2000.0
     x = left_face - drawing.SECTION_DEPTH_SIDE
     y = top + drawing.SECTION_DEPTH_RISE
-    rows = [".374", *drawing.DIMENSION_CALLOUTS["Depth"].splitlines()]
+    rows = [".374 +.001", *drawing.DIMENSION_CALLOUTS["Depth"].splitlines()]
     assert len(rows) - 1 <= 2
     half_width = max(map(len, rows)) * 0.00278 / 2.0
     half_height = len(rows) * 0.0056 / 2.0 + 0.0003
@@ -643,8 +729,9 @@ def test_locations_and_overall_sizes_carry_no_words() -> None:
         *sheet_spec.HANGER_STATION_NAMES,
         *sheet_spec.CLAMP_STATION_NAMES,
     }
-    assert not words & (locations | {"Length"})
-    assert _config.parts("pd-guide-lock")["number"] in drawing.DIMENSION_CALLOUTS["Height"]
+    # The 1.00 height prints .XX alone (owner ruling 2026-11-20, #2421), so it
+    # carries no reason; the .XXX thickness names the stack it sets.
+    assert not words & (locations | {"Length", "Height"})
     assert (
         _config.parts("pd-vn-transgear-pivot-screw")["number"]
         in drawing.DIMENSION_CALLOUTS["Depth"]

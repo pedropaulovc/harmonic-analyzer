@@ -39,9 +39,11 @@ BAR_DEPTH_CALLOUT = "SETS MHA-MG-07\nAXLE END STACK"
 # Under the drawing's own native hole callouts (drawing annotations, not
 # imported model dimensions, so the sheet writes them): the hanger hole's
 # least wall; the clamp pair, drilled to the printed stations and row, names
-# the taps it clears, and its least wall.
+# the taps it clears, points to note 1's stated screw-line shortfall
+# (mg-wheel-bar RV-08; r2 machinist review: an unlinked note named no
+# feature), and its least wall.
 HANGER_HOLE_CALLOUT = _wall_row("hanger hole")
-CLAMP_HOLE_CALLOUT = "CLEARS MHA-SH-02 TAPPED HOLES\n" + _wall_row("clamp holes")
+CLAMP_HOLE_CALLOUT = "CLEARS MHA-SH-02 TAPS, SEE NOTE 1\n" + _wall_row("clamp holes")
 
 # lane -> (feature, dimension) -> text.
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
