@@ -142,11 +142,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinStationReference": {"PinStationFromHeadRear"},
     "BackRimReference": {"BackRimFromHeadRear"},
     "OverallReference": {"OverallLen"},
-    # Repitch1038 ruling (#1038): each land's crown-side end prints as its own
+    # #1038 delegated ruling (a) (dt_pinion_arbor_geometry records who made
+    # it and under what): each land's crown-side end prints as its own
     # station from the head rear face, not as a length chained off its
-    # head-side station.  One 2X diameter on the back land sizes both lands
-    # (the front land's block had no open space between the 2.61 and 1.82
-    # witnesses under the shaft, nor above it under the collar pin's leader).
+    # head-side station.  A sheet decision, not a ruling: one 2X diameter on
+    # the back land sizes both lands (the front land's block had no open
+    # space between the 2.61 and 1.82 witnesses under the shaft, nor above it
+    # under the collar pin's leader).
     "FrontJournalReference": {
         "FrontJournalFromHeadRear",
         "FrontJournalEndFromHeadRear",
@@ -157,7 +159,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "BackJournalDia",
     },
     # #2360: the relief between the two MHA-DT-01 bond lands: both shoulders
-    # from the head rear face (#1038 ruling) and its diameter.
+    # from the head rear face (#1038 delegated ruling (b)) and its diameter.
     "BondReliefProfile": {
         "BondReliefFromHeadRear",
         "BondReliefBackFromHeadRear",

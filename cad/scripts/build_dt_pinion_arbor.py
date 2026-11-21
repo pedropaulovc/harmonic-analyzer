@@ -125,6 +125,11 @@ V_BACK_CAP = math.pi * BACK_CAP_SAG**2 * (3.0 * BACK_CAP_R - BACK_CAP_SAG) / 3.0
 # #2360: the turned relief between the MHA-DT-01 bond lands.
 BOND_RELIEF_R = BOND_RELIEF_DIA / 2.0
 V_BOND_RELIEF = math.pi * (SHAFT_R**2 - BOND_RELIEF_R**2) * BOND_RELIEF_LEN
+# The relief's diameter is measured, as each journal's, at a 1 mm
+# construction witness on its floor, this far aft of the front shoulder, so
+# the sheet's line (1 mm further aft, where the drawing has always stood it)
+# has a ~1 mm extension, not a 15 mm run along the floor (#2613).
+RELIEF_DIA_POINT_FROM_FRONT = 14.5
 # Split lines reach this far past the shaft flank so the projection crosses
 # the whole Ø5/16 face on both sides of the Top plane.
 SPLIT_OVERHANG = 2.0
@@ -309,7 +314,7 @@ def _add_journal_land(
     (projected both ways they cut the cylinder into its own face), a
     construction witness on the flank between them, and the native
     dimensions the sheet prints -- both ends as stations from the head
-    shoulder (#1038 ruling: baseline axial lengths from one faced end) and,
+    shoulder (#1038 delegated ruling (a): baseline axial lengths from one faced end) and,
     with ``diameter``, the diameter that carries the journal band
     (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     One 2X diameter sizes both lands, so only one land carries it.
@@ -574,8 +579,11 @@ def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     rectangle from the relief's diameter out past the shaft flank, on the
     sketch's -x side (the sheet's upper flank).  The axis starts at the head
     rear face, the sheet's station datum, so both relief shoulders are
-    printed from it like every other station (#1038 ruling), on the
-    construction witness below the shaft, and the diameter follows.
+    printed from it like every other station (#1038 delegated ruling (b)),
+    on the construction witness below the shaft.  The diameter is measured
+    to a short construction witness on that floor RELIEF_DIA_POINT_FROM_FRONT
+    aft of the front shoulder, as each journal's is (#2613), so its
+    extension is ~1 mm, not a run along the floor.
     """
     from solidworks_mcp.adapters.base import RevolveParameters
 
@@ -604,17 +612,26 @@ def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     # The station's witness: a construction mirror of the relief floor on the
     # +x side (the sheet's lower flank), so the 4.20 reads to the shoulder
     # from the stations' rows below the shaft without its extension line
-    # crossing the part, as each journal's station does.
+    # crossing the part, as each journal's station does.  The diameter's own
+    # short witness lies on it (#2613).
+    dia_v = front_v - RELIEF_DIA_POINT_FROM_FRONT
     set_sketch_direct_db(adapter, True)
     witness = check(
         f"{feature_name} station witness",
         adapter.add_line(BOND_RELIEF_R, front_v, BOND_RELIEF_R, back_v),
     )
+    dia_witness = check(
+        f"{feature_name} diameter witness",
+        adapter.add_line(
+            BOND_RELIEF_R, dia_v, BOND_RELIEF_R, dia_v + JOURNAL_DIA_POINT_LEN
+        ),
+    )
     set_sketch_direct_db(adapter, False)
-    segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{witness}: failed to become construction geometry")
+    for construction in (witness, dia_witness):
+        segment = _early_bound(adapter._sketch_entities[construction], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"{construction}: failed to become construction geometry")
     for line, relation in (
         (axis, "vertical"),
         (inner, "vertical"),
@@ -674,15 +691,39 @@ def _add_bond_relief(adapter) -> list[tuple[str, str]]:
         ),
     )
     dims.record("BondReliefFloorR", '"BondReliefDia" / 2')
-    # The printed diameter runs from the axis to the station witness's
-    # shoulder point on the lower floor, so its extension comes from the
-    # shoulder side and the sheet hangs its text away from it (as the
+    check(
+        f"{feature_name} diameter witness on the floor",
+        adapter.add_sketch_constraint(dia_witness, witness, "collinear"),
+    )
+    check(
+        f"{feature_name} diameter witness station",
+        adapter.add_sketch_dimension(
+            f"{witness}.start",
+            f"{dia_witness}.start",
+            "vertical_distance",
+            RELIEF_DIA_POINT_FROM_FRONT,
+        ),
+    )
+    dims.record(None, None)
+    check(
+        f"{feature_name} diameter witness length",
+        adapter.add_sketch_dimension(
+            f"{dia_witness}.start",
+            f"{dia_witness}.end",
+            "vertical_distance",
+            JOURNAL_DIA_POINT_LEN,
+        ),
+    )
+    dims.record(None, None)
+    # The printed diameter runs from the axis to the diameter witness's aft
+    # point on the lower floor, so its extension comes from the front
+    # shoulder's side and the sheet hangs its text away from it (as the
     # journals' diameters do), clear of the station's shoulder witness.
     add_diametric_linear_dimension(
         adapter,
         axis,
-        f"{witness}.start",
-        (SHAFT_R + 5.0, front_v - 6.0),
+        f"{dia_witness}.start",
+        (SHAFT_R + 5.0, dia_v - 6.0),
         "BondReliefDia",
     )
     dims.record("BondReliefDia", '"BondReliefDia"')

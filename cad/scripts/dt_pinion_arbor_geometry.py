@@ -194,7 +194,8 @@ def worst_land_margins(
     margin is linear in each input, so the corners bound it.  ``stop`` limits
     the float to one end of its range (the drum hard forward or hard aft).
     Every land end prints as its own station from the head rear face (#1038
-    ruling: no length chained off a station), so each reads one band.
+    delegated ruling (a): no length chained off a station), so each reads one
+    band.
     """
     front, back = land_stations(journal_len)
     x = LINEAR_XX_BAND
@@ -239,10 +240,17 @@ def land_margin_slack(journal_len: float) -> float:
 
 JOURNAL_LEN = 20.066  # .79
 FRONT_JOURNAL_FROM_HEAD_REAR, BACK_JOURNAL_FROM_HEAD_REAR = land_stations(JOURNAL_LEN)
-# Repitch1038 ruling (#1038, machinist review of 057ffb6: the back land's .79
-# chained off its 8.25; review of 703211d, the front land's .79 chained off
-# its 1.82): each land's crown-side end prints as its own station from the
-# head rear face, 2.61 and 9.04.  Each land's length is then the difference
+# #1038 delegated ruling (a), on the machinist reviews of 057ffb6 (the back
+# land's .79 chained off its 8.25) and 703211d (the front land's .79 chained
+# off its 1.82): each land's crown-side end prints as its own station from
+# the head rear face, 2.61 and 9.04.  Delegated rulings (a) and (b) (the
+# relief's back shoulder, below): delegated ruling 2026-11-11, no
+# precedent, made by Repitch1038 as integration owner under the owner's
+# 2026-11-11 re-pitch rulings (commits 4a51a72647 and 7c268934d2), applying
+# drawing-guidelines rules 10/11 (baseline every axial station from one
+# faced end); the owner reviews them on #2144
+# (https://github.com/pedropaulovc/harmonic-analyzer/issues/2144).
+# Each land's length is then the difference
 # of two .XX stations, .79 -.02/+.02; every end it bears on reads one band.
 FRONT_JOURNAL_END_FROM_HEAD_REAR = FRONT_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN
 BACK_JOURNAL_END_FROM_HEAD_REAR = BACK_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN
@@ -374,15 +382,17 @@ if (
 # between two bond lands.  The drum then bears and bonds only on those lands,
 # and the long shaft no longer has to follow the bore's straightness over its
 # whole length.  The arbor's back end still slides through the meeting point
-# on assembly, so the halves must meet within the back journal's .0014 in
-# worst-case diametral clearance; the drum sheet's SLIDES ON BY HAND is that
-# check, made before bonding.  So a step under a land is harmless: it is at
-# most that .0014, under the land's .0014-.0053 bond clearance.
+# on assembly, so the halves must meet within what the drum sheet's SLIDES ON
+# BY HAND check passes, made before bonding on the actual pair: a high-limit
+# .3140 bore slides over a low-limit .3113 back journal, so a step under a
+# land can reach about .0027 in, not the .0014 worst-case journal clearance.
+# With the land's loosest .0053 bond clearance the gap is then about .0080
+# in (0.20 mm), still inside LOCTITE 638's 0.25 mm (#2612).
 #
 # Both relief shoulders are located from the head rear face, the sheet's
 # datum for every station (drawing-guidelines rules 10/11; machinist review
 # of 7454ba6d gated a chain off the front land, and the review of 057ffb6 the
-# 2.60 length chained off the 4.20; Repitch1038 ruling, #1038).  Both at .XX,
+# 2.60 length chained off the 4.20; #1038 delegated ruling (b)).  Both at .XX,
 # so the relief's length is the difference, 2.60 -.02/+.02.  The front land
 # is the longer: the operator's torque enters at the head and reaches the
 # drum through it; it also carries the bond-zone diameter's witness
@@ -392,8 +402,9 @@ BOND_RELIEF_BACK_FROM_HEAD_REAR = 172.72  # 6.80
 BOND_RELIEF_LEN = BOND_RELIEF_BACK_FROM_HEAD_REAR - BOND_RELIEF_FROM_HEAD_REAR
 BOND_RELIEF_Z = HEAD_REAR_Z + BOND_RELIEF_FROM_HEAD_REAR
 # Ø.28 at the title block's .XX: from the drum's .3135 minimum bore to the
-# relief's .29 maximum the radial air is .0118 in (0.30 mm), ten times the
-# step the reamed halves may leave, so nothing in the middle touches.
+# relief's .29 maximum the radial air is .0118 in (0.30 mm), about four times
+# the .0027 step the reamed halves may leave (#2612), so nothing in the middle
+# touches.
 BOND_RELIEF_DIA = 7.112  # .28
 BOND_RELIEF_MIN_RADIAL_AIR = 0.25
 DRUM_BORE_MIN = SHAFT_DIA + REAM_SLIDE[1]  # MHA-DT-01's REAM_SLIDE bore, .3135
@@ -428,11 +439,12 @@ if not (
     raise AssertionError("the bond relief must span the drum's mid-length")
 # Torque: either land alone holds twice a hard hand twist on the MHA-DT-15
 # T-bar (30 N at each end, about 32.5 mm out: 2.0 N m).  LOCTITE 638's ISO
-# 10123 shear is 25 N/mm^2 minimum (TDS), derated with the Henkel Retaining
-# Compound Design Guide's factors taken low: 0.4 for the brass drum
-# [unverified: no brass row was read; the guide's cast iron is 0.8,
-# aluminium 0.6], 0.3 for the clearance at the loosest pair (.0053 in;
-# sm_gooseneck_spring_joint books 0.3 at 0.25 mm) and 0.5 for a long land.
+# 10123 shear is 25 N/mm^2 minimum (TDS), derated with the Henkel LOCTITE
+# Retaining Compound Design Guide's factors taken low: 0.4 for the brass drum
+# (Factor 2, Materials, p. 10: "Copper and Alloys 0.4", the lower of the
+# dissimilar pair against mild steel's 1.0; read 2026-11-20, #2608), 0.3 for
+# the clearance at the loosest pair (.0053 in; sm_gooseneck_spring_joint
+# books 0.3 at 0.25 mm) and 0.5 for a long land.
 LOCTITE_638_SHEAR_MPA = 25.0
 BOND_FACTOR = 0.4 * 0.3 * 0.5
 HAND_TORQUE_NM = 2.0 * 30.0 * ROD_SPAN / 2.0 / 1000.0
@@ -473,8 +485,9 @@ if (
 # 492a7be5).  The witness station lies on a bond land, clear of the relief
 # and the journal, so the diameter reads as the bond lands'.  Machinist
 # review r1 of #1685 hung the callout below the shaft over the back bond
-# land.  #1038 ruling (machinist review of 057ffb6 and 7c26893): the relief's
-# back shoulder prints as a station from the head rear face, which can stand
+# land.  #1038 delegated ruling (b) (machinist reviews of 057ffb6 and
+# 7c26893): the relief's back shoulder prints as a station from the head
+# rear face, which can stand
 # neither above the shaft (the collar pin hole's leader would cross it) nor
 # below with the callout there (its extension would drop through the block).
 # So the witness moves to the front bond land and the callout hangs above

@@ -41,9 +41,9 @@ if not (
     < spec.BACK_JOURNAL_FROM_HEAD_REAR
 ):
     raise AssertionError("the back bond land's witness must lie on that land")
-# One size for both journal lands, on the back land (#1038 ruling: under the
-# shaft the front land's block had no open space between its 2.61 and 1.82
-# station witnesses).  Note 1 names them.
+# One size for both journal lands, on the back land (#1038 sheet decision,
+# not a ruling: under the shaft the front land's block had no open space
+# between its 2.61 and 1.82 station witnesses).  Note 1 names them.
 JOURNAL_DIA_PREFIX = "2X <MOD-DIAM>"
 _NEW_SPANS = (
     (
