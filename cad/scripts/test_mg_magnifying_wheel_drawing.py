@@ -34,9 +34,17 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         set(drawing.FRONT_KEEP)
         | set(drawing.SECTION_KEEP)
         | set(drawing.SECTION_DIAMETER_KEEP)
+        | set(drawing.TIE1_SECTION_TEXT_MM)
     )
     assert kept == marked
     assert not set(drawing.FRONT_KEEP) & set(drawing.SECTION_KEEP)
+    # TIE 1's counter-drill prints on B-B alone, from its own profile.
+    assert set(drawing.TIE1_SECTION_TEXT_MM) == set(
+        mg_magnifying_wheel_spec.DRAWING_DIMENSIONS["Tie1CdrillProfile"]
+    )
+    assert not set(drawing.TIE1_SECTION_TEXT_MM) & (
+        set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
+    )
     # The rim's Ø and the spokes' back face print on A-A from the hidden
     # reference sketch alone.
     assert set(drawing.SECTION_DIAMETER_KEEP) == set(
@@ -89,7 +97,8 @@ def test_tight_bands_sit_on_the_model_dimensions() -> None:
     assert geom.CAST_TOL == pytest.approx(0.03 * 25.4)
     precision = mg_magnifying_wheel_spec.DRAWING_PRECISION
     assert precision["HubProfile"]["HubDia"] == 2
-    assert precision["Tie1"]["Tie1X"] == precision["Tie1"]["Tie1Y"] == 2
+    tie1 = precision["Tie1Profile"]
+    assert tie1["Tie1X"] == tie1["Tie1Y"] == 2
 
 
 def test_walls_and_groove_hold_at_the_printed_bands() -> None:
@@ -202,18 +211,13 @@ def test_tie1_counter_drill_leaves_a_short_60_at_the_back_face() -> None:
     )
 
 
-def test_tie1_volume_unites_the_60_and_the_counter_drill() -> None:
-    # The #60 through the boss plus the #50 with its point, less the #60's
-    # core inside it: between the two straight holes, and above the same pair
-    # with a flat-bottomed #50 by more than the build's gate band.
+def test_tie1_volume_gates_prove_the_counter_drill_and_its_point() -> None:
+    # The #60 through the boss, then the #50 with its 118 deg point beyond
+    # the #60's air: together the union integrated along TIE 1's axis.
     r60, r50 = geom.TIE_HOLE_DIA / 2.0, geom.TIE1_CDRILL_DIA / 2.0
     boss = geom.HUB_BACK_Z - geom.HUB_STEP_Z
     depth = geom.TIE1_CDRILL_DEPTH
-    flat = math.pi * (r60**2 * boss + (r50**2 - r60**2) * depth)
-    assert part.V_TIE1 - flat > 0.004 * part.V_TIE1
-    full = math.pi * (r60**2 * boss + (r50**2 - r60**2) * (depth + r50))
-    assert flat < part.V_TIE1 < full
-    # The same union integrated along the axis.
+    assert part.V_TIE1 == pytest.approx(math.pi * r60**2 * boss)
     k = 1.0 / math.tan(math.radians(59.0))
     steps = 200000
     dz = (depth + r50 * k) / steps
@@ -222,48 +226,36 @@ def test_tie1_volume_unites_the_60_and_the_counter_drill() -> None:
         z = (i + 0.5) * dz
         r = r50 if z <= depth else r50 - (z - depth) / k
         removed += math.pi * max(r, r60) ** 2 * dz
-    assert part.V_TIE1 == pytest.approx(removed, rel=1e-6)
+    assert part.V_TIE1 + part.V_TIE1_CDRILL == pytest.approx(removed, rel=1e-6)
+    # The counter-drill's gate band is half its point: a flat-bottomed #50
+    # misses the gate.
+    flat = math.pi * (r50**2 - r60**2) * depth
+    assert part.V_TIE1_CDRILL - flat == pytest.approx(part.V_TIE1_POINT)
+    assert part.V_TIE1_POINT > 0.0
 
 
-def test_tie1_callout_rewrites_the_default_round_its_native_variables() -> None:
-    # A default Advanced Hole callout: each element's Ø, the #60's own depth
-    # and side words, the #50's depth and its far-side message.
-    definitions = {
-        5: (
-            "<MOD-DIAM> <v-dia-1> <HOLE-DEPTH> <v-dep-1> <v-near>\r\n"
-            "<MOD-DIAM> <v-dia-2> <HOLE-DEPTH> <v-dep-2> <v-far>"
-        ),
-        6: "",
-        7: "",
-        8: "",
-    }
-    index, text, places = drawing.tie1_definition(definitions)
-    assert index == 5
-    near, far, name = text.split("\n")
-    # Size, process, depth, side (rule 12); the name under the rows.
-    assert near == "<MOD-DIAM><v-dia-1> DRILL THRU"
-    assert far == "<MOD-DIAM><v-dia-2> DRILL <HOLE-DEPTH><v-dep-2> FAR SIDE"
-    assert name == drawing.TIE1_NAME
-    # Each drill's Ø at three places, the depth at two, by native variable.
-    assert places == {
-        "v-dia-1": drawing.TIE1_DIA_PLACES,
-        "v-dia-2": drawing.TIE1_DIA_PLACES,
-        "v-dep-2": drawing.TIE1_DEPTH_PLACES,
-    }
-    assert drawing.TIE1_DIA_PLACES == 3 and drawing.TIE1_DEPTH_PLACES == 2
-    dia60, dia50, depth = drawing.tie1_printed_values()
-    assert (dia60, dia50) == (".040", ".070")
-    assert len(depth.split(".")[1]) == 2
-    # Anything but two Ø rows, the second with one depth, refuses.
-    for bad in (
-        "<MOD-DIAM><a> THRU",
-        "<MOD-DIAM><a> <HOLE-DEPTH><b>\n<MOD-DIAM><c>",
-        "<MOD-DIAM><a> <MOD-DIAM><b> <HOLE-DEPTH><c>",
-    ):
-        with pytest.raises(RuntimeError):
-            drawing.tie1_definition({**definitions, 5: bad})
-    with pytest.raises(RuntimeError):
-        drawing.tie1_definition({**definitions, 6: "<MOD-DIAM><x>"})
+def test_tie1_section_b_b_cuts_through_tie1_off_the_y_extension_line() -> None:
+    # B-B runs along TIE 1's row (the counter-drill profile's plane, y =
+    # TIE1_Y), from just past the #50's rim on the bore side out past the
+    # boss's O.D. into the spoke window, so it crosses the hole whole.
+    (x0, y0), (x1, y1) = drawing.TIE1_SECTION_LINE_MM
+    r50 = geom.TIE1_CDRILL_DIA / 2.0
+    assert y0 == y1 == geom.TIE1_Y
+    assert x0 < geom.TIE1_X - r50 < geom.TIE1_X + r50 < x1
+    assert x1 > mg_magnifying_wheel_spec.HUB_DIA / 2.0
+    # Its far end stands in air between the 0 and 300 deg spokes' fillets.
+    bearing = math.degrees(math.atan2(y1, x1))
+    assert -mg_magnifying_wheel_spec.SPOKE_PITCH_DEG < bearing < 0.0
+    # Drawn right to left on the sheet, whichever order the ends come in.
+    assert drawing.tie1_section_line_ends(((0.1, 0.2), (0.3, 0.2))) == (
+        (0.3, 0.2),
+        (0.1, 0.2),
+    )
+    # The counter-drill's Ø says its process; its depth runs from the face.
+    assert drawing.TIE1_SECTION_CALLOUT == "#50 DRILL"
+    precision = mg_magnifying_wheel_spec.DRAWING_PRECISION["Tie1CdrillProfile"]
+    assert precision == {"Tie1CdrillDia": 3, "Tie1CdrillDepth": 2}
+    assert drawing.TIE1_SECTION_SCALE == (2, 1)
 
 
 def test_tie2_profile_runs_radially_and_ends_in_air() -> None:
@@ -385,8 +377,7 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     # Each tie hole is named plainly at its own callout (rule 26: WIRE TIE
     # HOLE, no coined label), size before process, at most two lines of
     # words (rule 7): no project label, so no key.
-    assert drawing.TIE1_NAME == "WIRE TIE HOLE"
-    assert "Tie1HoleDia" not in drawing.DIMENSION_CALLOUTS
+    assert drawing.DIMENSION_CALLOUTS["Tie1HoleDia"] == "#60 DRILL THRU\nWIRE TIE HOLE"
     # TIE 2 states where it runs: radial, from the groove's bottom.
     assert drawing.DIMENSION_CALLOUTS["Tie2HoleDia"] == (
         "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"

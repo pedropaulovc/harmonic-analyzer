@@ -57,7 +57,6 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     TIE1_CDRILL_DEPTH_PLACES,
     TIE1_CDRILL_DIA,
     TIE1_CDRILL_PLACES,
-    TIE1_CDRILL_SIZE,
     TIE1_CLOCK_DEG,
     TIE1_OFFSET_MAX,
     TIE1_PLACES,
@@ -130,10 +129,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HubFillets": {"HubFilletR"},
     "RimFillets": {"RimFilletR"},
     "GrooveProfile": {"GrooveR", "GrooveBottomDia"},
-    # TIE 1 is one Advanced Hole (#60 through, #50 counter-drilled from the
-    # drum face): its sizes and depth print in its native hole callout, and
-    # its placement sketch carries the two coordinates.
-    "Tie1": {"Tie1X", "Tie1Y"},
+    "Tie1Profile": {"Tie1X", "Tie1Y", "Tie1HoleDia"},
+    # TIE 1's #50 counter-drill: its Ø and depth from the drum face print on
+    # section B-B, the plane its profile is drawn on.
+    "Tie1CdrillProfile": {"Tie1CdrillDia", "Tie1CdrillDepth"},
     "Tie2Profile": {"Tie2HoleDia"},
 }
 # Each fillet feature's R imports onto its FIRST picked edge
@@ -177,7 +176,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HubFillets": {"HubFilletR": 2},
     "RimFillets": {"RimFilletR": 2},
     "GrooveProfile": {"GrooveR": 3, "GrooveBottomDia": 3},
-    "Tie1": {"Tie1X": TIE1_PLACES, "Tie1Y": TIE1_PLACES},
+    "Tie1Profile": {"Tie1X": TIE1_PLACES, "Tie1Y": TIE1_PLACES, "Tie1HoleDia": 3},
+    "Tie1CdrillProfile": {
+        "Tie1CdrillDia": TIE1_CDRILL_PLACES,
+        "Tie1CdrillDepth": TIE1_CDRILL_DEPTH_PLACES,
+    },
     "Tie2Profile": {"Tie2HoleDia": 3},
 }
 # Matched fits (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the spigot is turned to the stated

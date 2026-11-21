@@ -14,7 +14,9 @@ rim-bore round's R (on its cut arc) are added on the sheet.  The rim's Ø and
 the spokes' back-face offset come from a hidden reference sketch in A-A's plane,
 shown in the part while A-A is cut (_drawing_hidden_sketches).  TIE 2,
 radial inside the rim, shows in a broken-out window on the face
-(TIE2_WINDOW).  The bore's and the spigot's matched fits are numbered notes
+(TIE2_WINDOW).  TIE 1's #50 counter-drill, on the drum side out of the face's
+sight, prints on removed partial section B-B through TIE 1 at 2:1
+(TIE1_SECTION_*).  The bore's and the spigot's matched fits are numbered notes
 their own callouts link by "SEE NOTE n" (drawing-guidelines.md rule 7
 (notes: few, flagged, never a method)), and the running bore carries the
 part-owned roughness its fit needs (drawing-guidelines.md rule 6 (roughness
@@ -31,7 +33,6 @@ from __future__ import annotations
 
 import argparse
 import math
-import re
 import sys
 from typing import Any
 
@@ -57,7 +58,6 @@ from _drawing_dimensions import (
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_finish import add_surface_finish
-from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import (
     assert_leaders_clear,
     dimension_segments,
@@ -91,9 +91,14 @@ from _mg_wheel_rim_geometry import RIM_AXIAL, RIM_INNER_DIA, RIM_OUTER_DIA
 from mg_magnifying_wheel_geom import (
     HUB_BACK_Z,
     HUB_FRONT_Z,
+    HUB_STEP_Z,
     SPOKE_ROOT_WIDTH,
     SPOKE_TIP_WIDTH,
     SPOKE_X0,
+    TIE1_CDRILL_DEPTH,
+    TIE1_CDRILL_DIA,
+    TIE1_X,
+    TIE1_Y,
 )
 from mg_magnifying_wheel_spec import (
     BORE_DIA,
@@ -117,10 +122,6 @@ from mg_magnifying_wheel_spec import (
     SPOKE_AXIAL,
     SPOKE_PITCH_DEG,
     SURFACE_FINISHES,
-    TIE1_CDRILL_DEPTH,
-    TIE1_CDRILL_DEPTH_PLACES,
-    TIE1_CDRILL_DIA,
-    TIE1_CDRILL_PLACES,
     TIE1_CLOCK_DEG,
     TIE1_R,
     TIE2_CLOCK_DEG,
@@ -190,6 +191,59 @@ ROTATION_NOTE_TOP = SECTION_CAPTION_XY[1] - 0.009
 ROTATION_NOTE_CHAR = 0.0026
 _SECTION_PLACEMENT_TOL = 1e-5
 
+# TIE 1's #50 counter-drill from the drum face (owner ruling on #2406) is
+# out of sight from the face view, so its Ø and depth print on removed
+# partial section B-B through TIE 1's axis, parallel to A-A (its profile's
+# plane, build_mg_magnifying_wheel._tie1_counter_drill): the key pin's
+# chord hole on draw_pd_transgear_disc_hub's section is the precedent for a
+# drilled hole's Ø imported in a section under its "#nn DRILL" process.
+# The cutting line runs from just past the #50's rim on the bore's side out
+# past the boss into the 300-360 spoke window's air (one end, its arrow and
+# letter off the part), so its other end stops short of TIE 1's Y
+# extension line, which runs on along the same row toward the bore.  Drawn
+# right to left, its arrows point down, away from A-A.  The section stands
+# at 2:1, unturned (TIE 1's axis upright), in the field right of the
+# section's drum row and under the isometric; the slab's centre is placed
+# at TIE1_SECTION_CENTER.
+TIE1_SECTION_SCALE = (2, 1)
+TIE1_SECTION_CENTER = (0.380, 0.122)
+_TIE1_CDRILL_R = TIE1_CDRILL_DIA / 2.0
+_BOSS_EDGE_X = math.sqrt((HUB_DIA / 2.0) ** 2 - TIE1_Y**2)
+TIE1_SECTION_LINE_MM = (
+    (TIE1_X - _TIE1_CDRILL_R - 1.0, TIE1_Y),
+    (22.0, TIE1_Y),
+)
+# The slab B-B shows: the line's bore-side end to the boss's O.D., the boss's
+# back face to its front (drum) face (model mm, x and z at y = TIE1_Y).
+_TIE1_SLAB_MM = tuple(
+    (x, TIE1_Y, z)
+    for x in (TIE1_SECTION_LINE_MM[0][0], _BOSS_EDGE_X)
+    for z in (HUB_STEP_Z, HUB_BACK_Z)
+)
+# Text points in model mm: the Ø on TIE 1's axis 3 mm out from the drum face
+# (6 on the sheet), its process on the side away from the slab; the depth 3
+# mm beyond the boss's O.D., midway down the counter-drill.
+TIE1_SECTION_TEXT_MM = {
+    "Tie1CdrillDia": (TIE1_X, TIE1_Y, HUB_STEP_Z - 3.0),
+    "Tie1CdrillDepth": (
+        _BOSS_EDGE_X + 3.0,
+        TIE1_Y,
+        HUB_STEP_Z + TIE1_CDRILL_DEPTH / 2.0,
+    ),
+}
+TIE1_SECTION_CALLOUT = "#50 DRILL"
+TIE1_SECTION_CENTRELINE = {
+    "tie 1 axis": (
+        (TIE1_X, TIE1_Y, HUB_STEP_Z - 1.0),
+        (TIE1_X, TIE1_Y, HUB_BACK_Z + 1.0),
+    )
+}
+# The caption's top stands this far under the lowest of the slab and the Ø's
+# process line (a value line and the process under it, 2.8 mm each side of
+# the text point's line).
+_TIE1_CAPTION_GAP = 0.004
+_TIE1_DIA_BLOCK_BELOW = 0.0028 + 0.0056
+
 DRAWING_PRECISION_BY_NAME = {
     name: digits
     for names in DRAWING_PRECISION.values()
@@ -214,6 +268,10 @@ DRAWING_PRECISION_BY_NAME = {
 # a two-line one 5.6 mm; a multi-line callout stands on one shoulder under
 # its last line), and its text runs away from the feature it measures.
 _TEXT_LINE = 0.0056
+# A leadered Ø callout's shoulder starts this far (mm) left of its point, and
+# its stacked tolerance tops out this far over it.
+_CALLOUT_SHOULDER_LEFT = 15.3
+_CALLOUT_ABOVE = 6.3
 
 
 def _face(x_mm: float, y_mm: float) -> tuple[float, float]:
@@ -368,21 +426,17 @@ WIRE_NUMBER = str(_config.parts("sh-vn-music-wire")["number"])
 # radial, from the groove's bottom (the groove sits on A-A's drawn
 # centreline) through to the rim bore, clocked by its 43° from the
 # horizontal.  Each takes at most two lines of words under its process
-# (rule 7).  TIE 1 is one Advanced Hole: its native callout on the #60 seen
-# at the back face prints the #60 THRU over the #50 counter-drill's Ø, depth
-# and FAR SIDE (the drum face, away from this view): the sheet rewrites the
-# part's default Advanced Hole callout round its native variables
-# (tie1_definition) and adds the name under the rows.
-TIE1_NAME = "WIRE TIE HOLE"
+# (rule 7).  TIE 1's #60 names its drill (rule 12; dt_crank_pin's "#45 DRILL
+# THRU"), its #50 counter-drill prints on B-B.
+TIE1_CALLOUT = "#60 DRILL THRU\nWIRE TIE HOLE"
 TIE2_CALLOUT = "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"
-# TIE 1's block: the #60 row, the counter-drill row and the name; its widest,
-# the counter-drill's ("Ø.nnn DRILL ↧ .nn FAR SIDE"), sets its width at 2.45
-# mm a character.  Each drill's Ø prints to the title block's drilled-hole
-# three places, the counter-drill's depth to its .XX.
-TIE1_CALLOUT_ROWS = 3
-_TIE1_BLOCK_HALF = 26 * 2.45 / 2.0
-TIE1_DIA_PLACES = TIE1_CDRILL_PLACES
-TIE1_DEPTH_PLACES = TIE1_CDRILL_DEPTH_PLACES
+# Each side of a centred tie block past the DRILL THRU line's half-width
+# (capitals about 2.6 mm a character), mm.
+_TIE_BLOCK_WIDEN = (
+    (max(len(line) for line in TIE1_CALLOUT.splitlines()) - len("DRILL THRU"))
+    * 2.6
+    / 2.0
+)
 
 
 # The bore's matched fit is note BORE_FIT_NOTE (mg_magnifying_wheel_spec):
@@ -433,6 +487,22 @@ FRONT_KEEP = {
     # text left of the bore's under the wheel and right of TIE 2's block.
     "Tie1Y": _face(-(RIM_OUTER_DIA / 2.0 + 26.0), _TIE1[1] - 5.4),
     "Tie1X": _face(-9.0, -RIM_OUTER_DIA / 2.0 - 16.0),
+    # The two tie Ø callouts hang off the face, the block's leader from its
+    # shoulder's near end (the shoulder runs 7.3 mm under the point).  Each
+    # reads size, then process, then its plain name (rule 26), centred on
+    # the point.  TIE 1's block stands below the wheel, its top 3.2 mm under
+    # the OD, its shoulder's near end 20 mm right of the bore's centre (the
+    # name line widens the block _TIE_BLOCK_WIDEN each side past the DRILL
+    # THRU width the 15.3 mm shoulder offset was set for), so the leader runs
+    # down-right from the hole, away from the X's extension line, and the
+    # block stays left of the section's overall row.
+    "Tie1HoleDia": _face(
+        20.0 + _CALLOUT_SHOULDER_LEFT + _TIE_BLOCK_WIDEN,
+        -RIM_OUTER_DIA / 2.0
+        - 3.2
+        - _CALLOUT_ABOVE
+        - _TEXT_LINE * 1000.0 * len(TIE1_CALLOUT.splitlines()) / 2.0,
+    ),
     "Tie2Clock": _face(
         *_polar((0.0, 0.0), sum(_TIE2_CLOCK_SECTOR) / 2.0, _TIE2_CLOCK_TEXT_R)
     ),
@@ -447,19 +517,6 @@ FRONT_KEEP = {
         *_polar(_polar((0.0, 0.0), _TIE2_OUTWARD, 81.5), _TIE2_OUTWARD + 90.0, 23.6)
     ),
 }
-# TIE 1's native hole callout hangs off the face below the wheel, centred on
-# its point (the text's centre), its top one text line further under the OD
-# than the old two-row block (its wide counter-drill row then falls below
-# the section's .772 overall row, which ends level with the block's top) and
-# its left end 15 mm right of the bore's centre: its leader runs down-right
-# from the #60's rim, right of the X's extension line.  The rim pick lies on
-# the hole's back-face circle down-right of the centre, off the centre
-# mark's arms.
-TIE1_CALLOUT_XY = _face(
-    15.0 + _TIE1_BLOCK_HALF,
-    -RIM_OUTER_DIA / 2.0 - 3.2 - _TEXT_LINE * 1000.0 * (1.0 + TIE1_CALLOUT_ROWS / 2.0),
-)
-TIE1_PICK_BEARING = -45.0
 # The spoke root's text hangs off its dimension line on an OffsetText leader
 # (as the retired gooseneck spring-screw sheet did): the leader runs down-right across the
 # 300-360 window and the rim to the LEFT end of the callout line, one text
@@ -477,15 +534,15 @@ SPOKE_ROOT_TEXT_XY = _face(
 NEAR_SIDE_DIAMETERS = {
     "BoreDiaDim": BORE_DIA,
 }
-# TIE 1's callout leader lands on the #60's rim.  Every face leader near
-# A-A's line is proven off it, each landing on its own feature's radius from
-# the axis.
-TIE1_CALLOUT = "Tie1Callout"
+# TIE 1's Ø takes one arrow on the rim nearest its block, down-right of the
+# hole, and no line through the centre.  Every face leader near A-A's line
+# is proven off it, each landing on its own feature's radius from the axis.
+TIE1_NEAR_SIDE = "Tie1HoleDia"
 _BORE_LANDING = (0.8 * BORE_DIA / 2000.0, 1.2 * BORE_DIA / 2000.0)
 FACE_LEADER_LANDINGS = {
     "BoreDiaDim": _BORE_LANDING,
     "BoreFinish": _BORE_LANDING,
-    TIE1_CALLOUT: (
+    TIE1_NEAR_SIDE: (
         (TIE1_R - TIE_HOLE_DIA) / 1000.0,
         (TIE1_R + TIE_HOLE_DIA) / 1000.0,
     ),
@@ -732,8 +789,8 @@ ROUND_CALLOUT = "2X RIM BORE EDGES"
 # pair makes as REF (mg_magnifying_wheel_spec.DRAWING_NOTES): the bore is
 # reamed to run on the finished axle, and the spigot turned to press into
 # the drum's finished reamed bore.  The groove's two three-place sizes link their one
-# note; TIE 2 reads size, then process, then its plain name
-# (drawing-guidelines.md rule 26; TIE 1's native callout, TIE1_NAME).
+# note; the tie holes read size, then process, then their plain name
+# (drawing-guidelines.md rule 26).
 DIMENSION_CALLOUTS = {
     "BoreDiaDim": BORE_CALLOUT,
     "SpigotDia": f"SEE NOTE {SPIGOT_FIT_NOTE}",
@@ -743,6 +800,7 @@ DIMENSION_CALLOUTS = {
     "SpokeTipWidth": "6X TIP",
     "HubFilletR": "12X",
     "RimFilletR": "12X",
+    "Tie1HoleDia": TIE1_CALLOUT,
     "Tie2HoleDia": TIE2_CALLOUT,
 }
 # Each axial length's need stands over its value.
@@ -814,7 +872,7 @@ def _near_side_diameters(
     named = {
         dimension_name(adapter, annotation): annotation for annotation in annotations
     }
-    for name in NEAR_SIDE_DIAMETERS:
+    for name in (*NEAR_SIDE_DIAMETERS, TIE1_NEAR_SIDE):
         set_near_side_diameter(named[name], f"wheel {name}")
     rebuild_drawing(adapter, label="wheel near-side diameters")
     radii = {
@@ -830,109 +888,6 @@ def _near_side_diameters(
         },
         label="wheel near-side diameters",
     )
-
-
-# A hole callout's format parts (prefix, suffix, callout above, callout below)
-# read back at their definitions 5-8 and are written at 1-4.
-_DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
-
-
-_DIA_VARIABLE = re.compile(r"<MOD-DIAM>\s*(<[^<>]+>)")
-_DEPTH_VARIABLE = re.compile(r"<HOLE-DEPTH>\s*(<[^<>]+>)")
-
-
-def tie1_definition(definitions: dict[int, str]) -> tuple[int, str, dict[str, int]]:
-    """TIE 1's callout rewritten from the native variables of its default
-    Advanced Hole callout: the part holding both elements' Ø, its new text
-    and the places per variable.  The #60 (near side, listed first) reads
-    its Ø and DRILL THRU; the #50 its Ø, DRILL, the depth and FAR SIDE (rule
-    12: size, process, depth, side); the hole's name stands under them.  The
-    default's other words (its side messages) give way to these."""
-    if set(definitions) != set(_DEFINITION_TO_WRITABLE):
-        raise RuntimeError(f"unexpected hole callout parts: {definitions!r}")
-    holders = [part for part, text in definitions.items() if "<MOD-DIAM>" in text]
-    if len(holders) != 1:
-        raise RuntimeError(f"TIE 1 callout Ø not in one part: {definitions!r}")
-    part = holders[0]
-    text = definitions[part].replace("\r", "")
-    rows = [row for row in text.split("\n") if _DIA_VARIABLE.search(row)]
-    diameters = _DIA_VARIABLE.findall(text)
-    depths = _DEPTH_VARIABLE.findall(rows[-1]) if rows else []
-    if len(rows) != 2 or len(diameters) != 2 or len(depths) != 1:
-        raise RuntimeError(f"TIE 1 callout is not #60 then #50: {definitions!r}")
-    near, far = diameters
-    (depth,) = depths
-    rewritten = "\n".join(
-        (
-            f"<MOD-DIAM>{near} DRILL THRU",
-            f"<MOD-DIAM>{far} DRILL <HOLE-DEPTH>{depth} FAR SIDE",
-            TIE1_NAME,
-        )
-    )
-    places = {
-        near.strip("<>"): TIE1_DIA_PLACES,
-        far.strip("<>"): TIE1_DIA_PLACES,
-        depth.strip("<>"): TIE1_DEPTH_PLACES,
-    }
-    return part, rewritten, places
-
-
-def tie1_printed_values() -> tuple[str, ...]:
-    """The callout's three values as they print: each drill's Ø, then the
-    counter-drill's depth."""
-    return tuple(
-        f"{mm / 25.4:.{places}f}".lstrip("0")
-        for mm, places in (
-            (TIE_HOLE_DIA, TIE1_DIA_PLACES),
-            (TIE1_CDRILL_DIA, TIE1_DIA_PLACES),
-            (TIE1_CDRILL_DEPTH, TIE1_DEPTH_PLACES),
-        )
-    )
-
-
-def _add_tie1_callout(adapter: Any, view: Any, centre: tuple[float, float]) -> Any:
-    """TIE 1's native Advanced Hole callout on the #60's back-face rim: each
-    drill's Ø to three places and the depth to two, set per named variable
-    (the hole-callout precision exception, drawing-simplicity-policy.md), the
-    hole's name under the rows.  Returns its annotation."""
-    label = "wheel TIE 1"
-    rim = TIE_HOLE_DIA * SHEET_SCALE[0] / 2000.0
-    bearing = math.radians(TIE1_PICK_BEARING)
-    display = _early_bound(
-        add_native_hole_callout(
-            adapter,
-            view,
-            edge_xy=(
-                centre[0] + rim * math.cos(bearing),
-                centre[1] + rim * math.sin(bearing),
-            ),
-            callout_xy=TIE1_CALLOUT_XY,
-            label=label,
-        ),
-        "IDisplayDimension",
-    )
-    definitions = {
-        part: str(display.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
-    }
-    _telemetry.info(f"TIE 1 callout definitions {definitions!r}")
-    part, rewritten, places = tie1_definition(definitions)
-    display.SetText(_DEFINITION_TO_WRITABLE[part], rewritten)
-    applied = str(display.GetText(part) or "").replace("\r", "")
-    if applied != rewritten:
-        raise RuntimeError(f"TIE 1 callout text did not persist: {applied!r}")
-    set_hole_callout_precision(display, places, label=label)
-    rebuild_drawing(adapter, label="wheel TIE 1 callout")
-    resolved = "\n".join(str(display.GetText(part) or "") for part in (1, 2, 3, 4))
-    _telemetry.info(f"TIE 1 callout reads {resolved!r}")
-    values = tie1_printed_values()
-    depth_at_three = f"{TIE1_CDRILL_DEPTH / 25.4:.3f}".lstrip("0")
-    if (
-        any(value not in resolved for value in values)
-        or resolved.index(values[0]) > resolved.index(values[1])
-        or depth_at_three in resolved
-    ):
-        raise RuntimeError(f"TIE 1 callout did not print its values: {resolved!r}")
-    return display.GetAnnotation()
 
 
 def _trim_centre_marks(
@@ -1128,6 +1083,161 @@ def _orient_section(adapter: Any, section: Any) -> str:
         f"back={back}, spigot end={front}, rim top={top}"
     )
     return label
+
+
+def _metres(point_mm: tuple[float, ...]) -> tuple[float, ...]:
+    return tuple(value / 1000.0 for value in point_mm)
+
+
+def tie1_section_line_ends(
+    ends: tuple[tuple[float, float], tuple[float, float]],
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """B-B's cutting-line ends on the sheet, the right one first: drawn right
+    to left, its arrows point down, away from A-A's line above it."""
+    right, left = sorted(ends, key=lambda point: -point[0])
+    return right, left
+
+
+def _place_tie1_section(
+    adapter: Any, view: Any
+) -> tuple[bool, tuple[float, float, float, float]]:
+    """Move B-B by its projection until its slab's centre stands at
+    TIE1_SECTION_CENTER; return whether the drum face stands above the slab
+    and the slab's sheet box (left, bottom, right, top).  Fails unless TIE 1's
+    axis stands upright, as SECTION B-B is drawn unturned."""
+    native = _early_bound(view, "IView")
+    points = (
+        (TIE1_X, TIE1_Y, HUB_STEP_Z),
+        (TIE1_X, TIE1_Y, HUB_BACK_Z),
+        *_TIE1_SLAB_MM,
+    )
+    names = ("mouth", "back face", *(f"slab {i}" for i in range(len(_TIE1_SLAB_MM))))
+
+    def read() -> tuple[Any, Any, list[float], list[float]]:
+        mouth, back, *corners = model_points_in_view(
+            adapter,
+            native,
+            tuple(_metres(point) for point in points),
+            label="wheel section B-B placement",
+            names=names,
+        )
+        return mouth, back, [p[0] for p in corners], [p[1] for p in corners]
+
+    mouth, back, xs, ys = read()
+    if abs(mouth[0] - back[0]) > _SECTION_PLACEMENT_TOL:
+        raise RuntimeError(
+            f"wheel section B-B: TIE 1's axis is not upright (mouth {mouth}, "
+            f"back face {back})"
+        )
+    for attempt in range(4):
+        centre = ((min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0)
+        if math.dist(centre, TIE1_SECTION_CENTER) <= _SECTION_PLACEMENT_TOL:
+            break
+        position = tuple(float(value) for value in native.Position)
+        moved = [
+            position[axis] + TIE1_SECTION_CENTER[axis] - centre[axis] for axis in (0, 1)
+        ]
+        if not native.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to move wheel section B-B")
+        rebuild_drawing(adapter, label=f"wheel section B-B placed, pass {attempt}")
+        mouth, back, xs, ys = read()
+    else:
+        raise RuntimeError(
+            f"wheel section B-B slab centre stayed at {centre}, requested "
+            f"{TIE1_SECTION_CENTER}"
+        )
+    _telemetry.info(
+        f"wheel section B-B: mouth={mouth}, back face={back}, slab x "
+        f"{min(xs):.4f}..{max(xs):.4f}, y {min(ys):.4f}..{max(ys):.4f}"
+    )
+    return mouth[1] > back[1], (min(xs), min(ys), max(xs), max(ys))
+
+
+def _add_tie1_section(adapter: Any, front: Any) -> list[Any]:
+    """Removed partial section B-B through TIE 1 (TIE1_SECTION_*): the cut
+    face alone at 2:1, the #50 counter-drill's Ø and depth from the drum face
+    imported from Tie1CdrillProfile, the Ø's process on its side away from
+    the slab, TIE 1's axis as a centreline and the native caption under it
+    all.  Returns its dimension annotations."""
+    ends = model_points_in_view(
+        adapter,
+        front,
+        tuple((x / 1000.0, y / 1000.0, 0.0) for x, y in TIE1_SECTION_LINE_MM),
+        label="wheel section B-B line",
+        names=("bore side", "window side"),
+    )
+    start, end = tie1_section_line_ends((ends[0], ends[1]))
+    section = create_section_view(
+        adapter,
+        front,
+        line_start=start,
+        line_end=end,
+        view_xy=TIE1_SECTION_CENTER,
+        section_label="B",
+        scale=TIE1_SECTION_SCALE,
+        partial=True,
+        label="wheel section B-B",
+    )
+    native = _early_bound(section, "IView")
+    cut = _early_bound(native.GetSection(), "IDrSection")
+    # R2026x declares SetDisplayOnlySurfaceCut as a void setter; only its
+    # dedicated bool getter may be truth-tested (draw_dt_cone_gear_shaft).
+    cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="wheel section B-B cut face")
+    ratio = tuple(float(value) for value in native.ScaleRatio)
+    if (
+        not bool(cut.GetDisplayOnlySurfaceCut())
+        or not bool(cut.GetPartialSection())
+        or not math.isclose(
+            ratio[0] / ratio[1], TIE1_SECTION_SCALE[0] / TIE1_SECTION_SCALE[1]
+        )
+    ):
+        raise RuntimeError(
+            f"wheel section B-B is not a partial cut face at 2:1: {ratio}"
+        )
+    set_hidden_lines_removed(adapter, section)
+    face_up, (left, bottom, right, _top) = _place_tie1_section(adapter, native)
+    keep = dict(
+        zip(
+            TIE1_SECTION_TEXT_MM,
+            model_points_in_view(
+                adapter,
+                native,
+                tuple(_metres(point) for point in TIE1_SECTION_TEXT_MM.values()),
+                label="wheel section B-B text",
+                names=tuple(TIE1_SECTION_TEXT_MM),
+            ),
+            strict=True,
+        )
+    )
+    annotations = _drawing_hidden_sketches.curate_view_dimensions(
+        adapter,
+        section,
+        keep=keep,
+        view_label="section B-B",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    set_dimension_callouts(
+        adapter,
+        annotations,
+        {"Tie1CdrillDia": TIE1_SECTION_CALLOUT},
+        location="above" if face_up else "below",
+    )
+    _add_centrelines(
+        adapter, section, TIE1_SECTION_CENTRELINE, label="wheel section B-B centreline"
+    )
+    lowest = (
+        bottom
+        if face_up
+        else min(bottom, keep["Tie1CdrillDia"][1] - _TIE1_DIA_BLOCK_BELOW)
+    )
+    position_section_caption(
+        adapter,
+        section,
+        ((left + right) / 2.0, lowest - _TIE1_CAPTION_GAP),
+        label="wheel B-B",
+    )
+    return annotations
 
 
 def _set_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
@@ -1429,7 +1539,6 @@ def _assert_fillet_radii(
     front: Any,
     annotations: list[Any],
     bore_finish: Any,
-    tie1_callout: Any,
     *,
     axis: tuple[float, float],
 ) -> None:
@@ -1474,9 +1583,8 @@ def _assert_fillet_radii(
         named["SpokeTipWidth"], axis[1], (SPOKE_TIP_WIDTH / 2.0, -SPOKE_TIP_WIDTH / 2.0)
     )
     groups["Tie1Y"] = _width_dimension_lines(named["Tie1Y"], axis[1], (0.0, _TIE1[1]))
-    for name in NEAR_SIDE_DIAMETERS:
+    for name in (*NEAR_SIDE_DIAMETERS, TIE1_NEAR_SIDE):
         groups[name] = dimension_segments(named[name])
-    groups[TIE1_CALLOUT] = dimension_segments(tie1_callout)
     groups["BoreFinish"] = leader_segments(bore_finish.GetAnnotation())
     groups["SectionLine"] = section_line_segments(adapter, front)
     crossed = [
@@ -1491,7 +1599,6 @@ def _assert_face_leaders_clear(
     front: Any,
     annotations: list[Any],
     bore_finish: Any,
-    tie1_callout: Any,
     *,
     axis: tuple[float, float],
 ) -> None:
@@ -1501,8 +1608,10 @@ def _assert_face_leaders_clear(
     named = {
         dimension_name(adapter, annotation): annotation for annotation in annotations
     }
-    groups = {name: dimension_segments(named[name]) for name in NEAR_SIDE_DIAMETERS}
-    groups[TIE1_CALLOUT] = dimension_segments(tie1_callout)
+    groups = {
+        name: dimension_segments(named[name])
+        for name in (*NEAR_SIDE_DIAMETERS, TIE1_NEAR_SIDE)
+    }
     groups["BoreFinish"] = leader_segments(bore_finish.GetAnnotation())
     groups["SectionLine"] = section_line_segments(adapter, front)
     assert_leaders_clear(
@@ -1720,6 +1829,7 @@ def build(adapter: Any) -> dict[str, str]:
     # The face view needs no hidden lines once the section carries the hub.
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
+    tie1_section_annotations = _add_tie1_section(adapter, front)
 
     annotations = [
         *_drawing_hidden_sketches.curate_view_dimensions(
@@ -1733,7 +1843,11 @@ def build(adapter: Any) -> dict[str, str]:
     ]
     # Decimal places (and so the general-tolerance row each dimension claims)
     # are authored on the part; the sheet only proves the import kept them.
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(
+        adapter,
+        [*annotations, *tie1_section_annotations],
+        DRAWING_PRECISION_BY_NAME,
+    )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # The matched fits' Ø are reference nominals: "(Ø.499)", "(Ø.1885)".
     set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
@@ -1759,7 +1873,6 @@ def build(adapter: Any) -> dict[str, str]:
     )
     _near_side_diameters(adapter, annotations, axis=axis)
     _trim_centre_marks(adapter, front, {"bore": axis, "tie 1": tie1})
-    tie1_callout = _add_tie1_callout(adapter, front, tie1)
 
     # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore is a running fit (the general machined grade),
     # authored on the part and read back here.  The spigot is pressed into
@@ -1775,12 +1888,8 @@ def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=bore_landing,
         char_height=FINISH_CHAR_HEIGHT,
     )
-    _assert_face_leaders_clear(
-        adapter, front, annotations, bore_finish, tie1_callout, axis=axis
-    )
-    _assert_fillet_radii(
-        adapter, front, annotations, bore_finish, tie1_callout, axis=axis
-    )
+    _assert_face_leaders_clear(adapter, front, annotations, bore_finish, axis=axis)
+    _assert_fillet_radii(adapter, front, annotations, bore_finish, axis=axis)
     _break_out_tie2(adapter, front)
 
     # The rim's axial width across the section between its side faces' cut
@@ -1831,7 +1940,7 @@ def build(adapter: Any) -> dict[str, str]:
             *annotations,
             _early_bound(rim_width, "IDisplayDimension").GetAnnotation(),
             round_radius,
-            tie1_callout,
+            *tie1_section_annotations,
         ],
         iso,
     )

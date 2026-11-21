@@ -136,7 +136,6 @@ CAST_ROUND_R = 0.762  # .03
 # --- wire ties ---------------------------------------------------------------------
 # Both ties are drilled: the title block's DRILLED HOLES row governs their
 # size (mg_magnifying_wheel_spec takes its plus in every wall).
-TIE_HOLE_SIZE = "#60"
 TIE_HOLE_DIA = 1.016  # .040, a #60 drill
 DRILL_POINT_DEG = 118.0  # a twist drill's point
 # drawing-guidelines.md rule 17 (walls and webs): a drilled axis may wander
@@ -163,7 +162,6 @@ DRILL_WANDER_DEG = 0.3
 # title block's .XX, since its deepest .33 still leaves full #60
 # (TIE1_LAND_MIN) and its shallowest .31 still clears the spokes' plane
 # (mg_magnifying_wheel_spec._TIE1_R_MAX); .32 leaves the ruled .10 (.097).
-TIE1_CDRILL_SIZE = "#50"
 TIE1_CDRILL_DIA = 1.778  # .070, a #50 drill
 TIE1_CDRILL_PLACES = 3  # the drill's Ø, as the title block's drilled row
 TIE1_CDRILL_DEPTH = 8.128  # .32 from the boss front face
