@@ -47,7 +47,7 @@ EXTERNAL_NUMBERS = frozenset(
         drawing.ROCKER_ARM,
         # Check 5's feed sense, named on sheet 15's interface lines.
         drawing.PLATEN_NUMBER,
-        # Steps 1S and 2B's phasing comb: a shop tool in the cone-gear indexing kit,
+        # Steps 1T and 2B's phasing comb: a shop tool in the cone-gear indexing kit,
         # never a drive-train BOM row (owner ruling 2026-11-09, PR #1992).
         _config.parts("dt-cone-gear-tl-phasing-comb")["number"],
     }
@@ -1523,14 +1523,14 @@ def test_cone_station_rows_run_front_to_back() -> None:
     assert table[1] == "TNNN = MHA-DT-03 WITH NNN TEETH, BY STATION, FRONT TO BACK:"
     assert table[2].startswith("STN  1  T120")
     assert table[-2] == "GEAR 0-2 = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
-    # Steps 1S and 2B's comb is a shop tool with no BOM row: the key names it
+    # Steps 1T and 2B's comb is a shop tool with no BOM row: the key names it
     # and defines the BLADE the steps cite (machinist review of bd81283964).
     assert table[-1] == "MHA-DT-03-TL-02 = PHASING COMB, A BLADE IN A TOOTH SPACE OF EACH GEAR."
     # Owner, 2026-11-14 (#2734): the comb is a U clipped over the tip of the
     # cone standing on its journal, both arms on T036.
     steps = " ".join(drawing.CONE_CRANK_STEPS.split())
-    assert steps[steps.index("1S. ") :].startswith(
-        "1S. CLIP MHA-DT-03-TL-02 OVER THE TIP, MHA-DT-04 STANDING ON ITS"
+    assert steps[steps.index("1T. ") :].startswith(
+        "1T. CLIP MHA-DT-03-TL-02 OVER THE TIP, MHA-DT-04 STANDING ON ITS"
         " JOURNAL, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY."
     )
     # Round 2 waxes the blades again: its wet joints sit beside them.
@@ -1538,7 +1538,7 @@ def test_cone_station_rows_run_front_to_back() -> None:
         "2B. CLIP MHA-DT-03-TL-02, BLADES WAXED AGAIN, OVER THE TIP, BOTH ARMS"
         " ON T036, T030'S BLADE BESIDE THE KEY."
     )
-    for head in ("1V", "2E"):
+    for head in ("1W", "2E"):
         step = steps[steps.index(f"{head}. ") :]
         assert step.split(".", 2)[1].endswith("BOTH ARMS ON T036"), step[:120]
     assert "MHA-DT-03-TL-02 BLADES WITH" in steps

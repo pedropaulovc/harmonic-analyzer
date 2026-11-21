@@ -617,13 +617,31 @@ def test_actual_web_prints_as_a_fact(teeth: int) -> None:
 def test_each_sheet_prints_the_tooth_runout_the_mesh_stack_books(teeth: int) -> None:
     import cone_set_stack
 
-    # Owner ruling 2026-11-20 (#2356 option A): T012/T018 are cut on the bar
-    # before boring, so their setup is accepted to the turned OD.
-    datum = "TURNED OD" if teeth in spec.SPIGOT_TEETH else "FINISHED BORE"
-    assert (
-        f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {spec.inch_text(cone_set_stack.TOOTH_RUNOUT_TIR_MM, 3)} "
-        f"TIR MAX TO {datum}"
-    ) in notes.gear_data(teeth)
+    data = notes.gear_data(teeth)
+    booked = cone_set_stack.cone_tooth_runout_tir_mm(teeth)
+    if teeth in spec.SPIGOT_TEETH:
+        # Owner ruling 2026-11-21 (#3219 option D): T012/T018 are accepted on
+        # tooth-space runout to the bore, a pin in every space.
+        assert "ACCEPT AT SETUP" not in data
+        match = re.search(
+            r"^TOOTH SPACE RUNOUT TO BORE:  (\.\d{4}) TIR MAX, \u00d8(\.\d{3}) PIN, "
+            rf"ALL {teeth} SPACES$",
+            data,
+            re.MULTILINE,
+        )
+        assert match, data
+        printed_tir = float(match.group(1)) * spec.MM_PER_IN
+        assert booked - 0.0001 * spec.MM_PER_IN < printed_tir <= booked + 1e-9
+        assert float(match.group(2)) * spec.MM_PER_IN == pytest.approx(
+            spec.over_pins_pin_dia_mm(teeth)
+        )
+        assert f"\u00d8{match.group(2)}, OPPOSITE GAPS" in data
+    else:
+        assert booked == cone_set_stack.TOOTH_RUNOUT_TIR_MM
+        assert (
+            f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {spec.inch_text(booked, 3)} "
+            "TIR MAX TO FINISHED BORE"
+        ) in data
 
 
 _REVIEW_RECORD_TEXT = re.compile(

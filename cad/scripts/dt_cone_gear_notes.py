@@ -12,6 +12,7 @@ import math
 import cone_set_stack
 import dt_cone_gear_spec as spec
 import dt_mesh_checks
+from paper_drive_stock_inspection import toothspace_gauge_contact_mm
 
 CYLINDER_MATE_NUMBER = "MHA-DT-12"
 # The teeth's do-not-cut (rule 7): flagged to the teeth in sheet note 2, not
@@ -69,6 +70,36 @@ def cutter_description(teeth: int) -> str:
 # nothing a handbook defines.
 TOOTH_FORM = "INVOLUTE, AS CUT BY THE CUTTER"
 
+# T012/T018's Ø.0625 bore cannot carry a cutting load on an arbor, so their
+# teeth are cut on the bar (owner ruling 2026-11-20, Pedro, #2356 option A)
+# and the part is accepted on the quantity cone_set_stack books for them:
+# tooth-space runout to the bore, one pin read in every space, worded as
+# MHA-PD-06's row (owner ruling 2026-11-21, Pedro, #3219 option D). The pin is
+# the sheet's over-pins pin for the 48 DP space; seated alone in one space it
+# must bear on both flanks, clear of root and tip (MHA-PD-06's check), and
+# stand proud of the tips for the indicator. Every other gear is cut on an
+# arbor through its bore and accepted at that setup.
+for _teeth in spec.SPIGOT_TEETH:
+    _pin = spec.over_pins_pin_dia_mm(_teeth)
+    for _profile in spec.manufacturing_corner_profiles(_teeth):
+        _contact = toothspace_gauge_contact_mm(_profile, _pin)
+        if _contact.center_radius_mm + _pin / 2.0 <= _profile.blank_radius_mm:
+            raise AssertionError(f"T{_teeth:03d}'s tooth-space pin sits below its tips")
+
+
+def _tooth_runout_row(teeth: int, pin_dia_mm: float) -> tuple[str, str]:
+    tir = cone_set_stack.cone_tooth_runout_tir_mm(teeth)
+    if teeth in spec.SPIGOT_TEETH:
+        tir_text = spec.inch_text(spec.inch_grid_mm(tir, 4, math.floor), 4)
+        return (
+            "TOOTH SPACE RUNOUT TO BORE",
+            f"{tir_text} TIR MAX, \u00d8{spec.inch_text(pin_dia_mm, 3)} PIN, ALL {teeth} SPACES",
+        )
+    return (
+        "TOOTH CUTTING SETUP, ACCEPT AT SETUP",
+        f"{spec.inch_text(tir, 3)} TIR MAX TO FINISHED BORE",
+    )
+
 
 def gear_data(teeth: int) -> str:
     """One physical recipe with its reference sizes, in decimal inch."""
@@ -115,14 +146,7 @@ def gear_data(teeth: int) -> str:
          f"{inch(minimum, 3)} TO {inch(maximum, 3)}"),
         # The bore's worst ligament (RV-03 on T012, RV-07 on T030).
         ("WEB MIN (REF)", inch(web, 4)),
-        # cone_set_stack books each gear's tooth runout about its bore.
-        # T012/T018's Ø.0625 bore cannot carry a cutting load on an arbor,
-        # so their teeth are cut on the bar before boring and the setup is
-        # accepted to the turned OD (owner ruling 2026-11-20, Pedro, #2356
-        # option A); every other gear is cut on an arbor through its bore.
-        ("TOOTH CUTTING SETUP, ACCEPT AT SETUP",
-         f"{inch(cone_set_stack.TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX TO "
-         + ("TURNED OD" if teeth in spec.SPIGOT_TEETH else "FINISHED BORE")),
+        _tooth_runout_row(teeth, pin),
         # The measurable acceptance of the circular tooth thickness band
         # (spec.over_pins_limits_mm): every sheet (ENFORCE round 1 of #971).
         (
