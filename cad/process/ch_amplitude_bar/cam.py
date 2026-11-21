@@ -5,7 +5,8 @@ part's exported ``features.toml`` and the plan/shop TOML, then runs
 :func:`build` inside headless FreeCAD (``freecadcmd``) with that context and
 checks the posted G-code against :func:`expectations`. The bar's sizes come
 from the feature export (its section, length, both notches and the pin
-hole); the blank, the skims, the steps, the four-bar load and the holding
+hole); the blank, the skims, the steps, the load (``bars_per_load`` bars)
+and the holding
 from ``plan.toml`` ``[parameters]`` and ``milling_cuts``; cutter diameters,
 speeds and feeds from the shop (``shop/``) and the plan's authored drill and
 saw settings. Every path is written here (``rt.custom``): straight lines a
@@ -14,8 +15,9 @@ the #1 centre drill's catalogue geometry (it sets the spot depth), the twist
 drill's 118° point, the approach, safe and clearance heights and the vise
 jaws' depth (keep-out shapes only).
 
-Route (plan text in ``plan.toml``): four 1/4 in square bars per load, lying
-on 1 in parallels across the jaws. Foot ends past the left jaw side: CA01
+Route (plan text in ``plan.toml``): ``bars_per_load`` 1/4 in square bars
+per load across the jaws, each on its own 1 in parallel against a jaw (so
+at most two). Foot ends past the left jaw side: CA01
 faces them, CA02 saws the foot notch. Rolled over, top ends past the right
 jaw side: CA03 faces them to the length, CA04 saws the top notch, CA05
 spots, drills and reams the pin holes through both cheeks. The parallels
@@ -45,7 +47,7 @@ import re
 from typing import Any
 
 STEM = "ch_amplitude_bar"
-COMMENT = "MHA-CH-01 amplitude bar, four per load"
+COMMENT = "MHA-CH-01 amplitude bar, one load"
 # Programs in order, each listing its operation keys. A program whose keys
 # are grouped in tuples is one section per group (a FreeCAD Job), joined at
 # M6 tool changes.
@@ -371,6 +373,12 @@ def context(
     _agree(plan, "bar_pitch_mm", _mid(g["section_band"]))
     _agree(plan, "bar_section_min_mm", g["section_band"][0])
     load = n_bars * pitch
+    _agree(plan, "load_width_mm", load)
+    if not 1 <= n_bars <= 2:
+        raise ValueError(
+            "bars_per_load: each bar sits on its own parallel against a jaw, so a load "
+            "is one or two bars"
+        )
     protrusion = p["end_protrusion_mm"]
     jaw_w = p["vise_jaw_width_mm"]
     if protrusion <= g["top"]["depth"][1] + COLLAR_CLEAR_MM:

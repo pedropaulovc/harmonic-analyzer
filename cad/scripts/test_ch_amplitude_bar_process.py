@@ -108,13 +108,13 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
         "foot_notch": ["G1 Z1.854 F{feed}", "G1 Z2.946 F{feed}"],
         "top_notch": ["G1 Z1.600 F{feed}", "G1 Z3.213 F{feed}"],
     }
-    # Four pin holes .25 in from the top end, one per bar, a pitch apart.
+    # Two pin holes .25 in from the top end, one per bar, a pitch apart.
     holes = next(
         kwargs["centres"]
         for program, check, kwargs in ctx["expect"]
         if program.startswith("CA05") and check == "holes"
     )
-    assert holes == [[-6.35, -3.175], [-6.35, -9.5], [-6.35, -15.824], [-6.35, -22.149]]
+    assert holes == [[-6.35, -3.175], [-6.35, -9.5]]
 
 
 def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> None:
@@ -133,6 +133,8 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
             "under the length",
         ),
         ({"bar_pitch_mm": 6.35}, "bar_pitch_mm"),
+        ({"load_width_mm": 25.2984}, "load_width_mm"),
+        ({"bars_per_load": 4, "load_width_mm": 25.2984}, "one or two bars"),
         ({"foot_notch_width_mm": 2.6416}, "foot_notch_width_mm"),
         ({"top_notch_depth_mm": 14.224}, "top_notch_depth_mm"),
         ({"top_notch_step_mm": 3.4925}, "top_notch_step_mm"),
