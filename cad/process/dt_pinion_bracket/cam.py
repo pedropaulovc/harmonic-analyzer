@@ -559,7 +559,10 @@ def context(
     # pivot bore (before anything is cut there), Z set to the
     # micrometer's reading there (Op 20); no stack is exposed beside the
     # blank. Its thickness check after facing puts the micrometer's anvil
-    # under the blank's overhang beyond the parallels.
+    # under the blank's overhang beyond the parallels at each end: the
+    # holding text centres the stacks along the jaws and the blank over
+    # them, ends checked equal with the rule, so each overhang is half the
+    # shortest blank less the parallels' length.
     _agree(plan, "z_touch_y_mm", -bar_w / 2)
     if not r <= p["z_touch_x_mm"] <= first:
         raise ValueError("the Z touch-off is not wholly on the blank's left end")

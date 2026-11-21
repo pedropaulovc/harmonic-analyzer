@@ -74,6 +74,8 @@ riser_height_mm = 38.1
 parallel_thickness_mm = 3.175
 vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
 vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 bore_grip_mm = 6.8453
 # Gap between the two stacks under the cam (O.D. less two parallels): the
 # drill and reamer run out into it.
@@ -133,7 +135,8 @@ drill_50_feed_per_min_mm = 71.12
 # reach out of its collet plus the tap's reach in the wrench must be at most
 # the spindle-to-table maximum (431.8) less 25.0 to bring the point down, the
 # vise bed (73.304), the 1 in parallels, the cam's top above them (13.323)
-# and the collet gauge (6.3): 288.47, rounded down to .01 in.
+# and the collet gauge (6.3): 288.47, rounded down to .01 in. cam.py
+# recomputes it.
 tap_stack_max_mm = 288.29
 
 [[tools]]
@@ -191,7 +194,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "The 5/8 bar in the 3-jaw, {{process.stickout_mm:in.2f}} out. Both cams come from this one chucking."
 datum = "The faced end is each cam's FRONT face (the set-screw station is measured from it)."
-diagram = { file = "diagrams/lathe.svg", alt = "The bar in the 3-jaw: the O.D. turned to Ø.575 over both cams, the first cam parted off .354 from the faced end, the second behind it." }
+diagram = { file = "diagrams/lathe.svg", alt = "The bar in the 3-jaw: the O.D. turned to Ø.575 over both cams, the first cam parted off {{cad.cam_od_length_in:.3dot}} from the faced end, the second behind it." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = 15.875, stock_diameter_mm = 15.875, stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{cad.cam_od_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -445,7 +448,7 @@ instruction = "Tap #2-56 by hand on the dead centre, spindle off, Tapmatic Gold,
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Jog Z up clear, back the tap out, blow out the hole and the bore. Swap the two cams' positions: load the second cam at the jaws' RIGHT ends per Setup 3 Holding (face F LEFT, rear face .25 from the jaw ends, bore below centre, the 1/4 shank back in the bore), the drilled cam at the LEFT ends as the balance; then repeat from op 170: orient it, then its own Y0, X0 and Z0."
+instruction = "Jog Z up clear, back the tap out, blow out the hole and the bore. Swap the two cams' positions: load the second cam at the jaws' RIGHT ends per Setup 3 Holding (face F LEFT, rear face .25 from the jaw ends, bore below centre, the 1/4 shank back in the bore), the drilled cam at the LEFT ends as the balance; then repeat from op 170 in order: its own Y0 from its O.D., orient it, then its X0 and Z0."
 feed = "hand"
 
 [[setups]]

@@ -131,6 +131,8 @@ def test_the_recipes_programs_pass_every_check_it_declares(ctx, tmp_path) -> Non
         ("peck_50_mm", 2.0, "peck_50_mm"),
         ("parallel_thickness_mm", 6.35, "bore_parallel_gap_mm"),
         ("tap_tip_below_jaw_top_mm", 15.5, "tap_tip_below_jaw_top_mm"),
+        ("tap_stack_max_mm", 290.0, "tap_stack_max_mm"),
+        ("r8_collet_gauge_mm", 10.0, "tap_stack_max_mm"),
         # 2.0 mm × tan 1°, not the ±0.10 mm (2.9° of turn) Codjiflo caught.
         ("orient_band_mm", 0.1, "orient_band_mm"),
     ],
