@@ -127,6 +127,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -
         ("edge_spot_dia_mm", 1.7, "over the cross hole's band"),
         ("face_b_skim_mm", 0.5, "face_b_skim_mm"),
         ("grip_mm", 7.5, "grip_mm"),
+        ("overhang_min_mm", 6.35, "overhang_min_mm"),
         ("seat_floor_dia_mm", 3.74, "outside the R"),
         ("seat_ream_floor_gap_mm", 0.1, "outside the R"),
         ("seat_floor_z_mm", -4.3, "seat_floor_z_mm"),

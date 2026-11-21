@@ -566,6 +566,7 @@ def context(
     _agree(plan, "z_touch_y_mm", -bar_w / 2)
     if not r <= p["z_touch_x_mm"] <= first:
         raise ValueError("the Z touch-off is not wholly on the blank's left end")
+    _agree(plan, "overhang_min_mm", (blank_min - PARALLEL_LENGTH_MM) / 2)
     if (blank_min - PARALLEL_LENGTH_MM) / 2 < MIC_ANVIL_MM - 1e-9:
         raise ValueError(
             "the blank overhangs the parallels less than the micrometer's anvil"
