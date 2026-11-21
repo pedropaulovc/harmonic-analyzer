@@ -7,7 +7,7 @@
 # the outline.
 #
 # Route: saw 20 blanks (nine from each of two 72 in bars, two from the 36 in)
-# and mic them; saw a 3.9 x 6 in spoil plate off the 1/2 in 6061 flat once per batch.
+# and mic them; saw a new 3.9 x 6 in spoil plate off the 1/2 in 6061 flat every lot.
 # Setup 2, side B up, four blanks per load across the jaws on the spoil plate
 # on the 1 in parallels: face B to the hub's thickness (CL01); pocket B down
 # to the plate's near face (CL02); spot, drill D and ream the fulcrum bores
@@ -61,7 +61,7 @@ title = "Channel lever"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 5/16 x 1 in flat (drawing: {{cad.material_spec}})"
-stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:.0f}} in flat bar: two 72 in lengths and one 36 in; {{process.quantity:d}} × {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blanks. Spoil plate: one 3.9 x 6 in piece of the 1/2 x 6 in 6061 flat."
+stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:.0f}} in flat bar: two 72 in lengths and one 36 in; {{process.quantity:d}} × {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blanks. Spoil plate: a new 3.9 x 6 in piece of the 1/2 x 6 in 6061 flat every lot."
 note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Faces: B, the hub's near face, is faced in Setup 2; A, the far face, stays as bought. Mark A on each blank in Setup 1 and keep it readable. Words: the spoil plate is the aluminium plate the blanks lie on (Z0); the web is the lever's thin section along its bar (the drawing's plate, .116–.120 thick). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup. Order: Setup 2 for all the loads; then Setups 3 and 4 back to back on each load (the same clamping) before the next load. The spoil plate, the parallels, G54 Z0 and the noted Setup 2 G54 Y stay for every load and both sides, while the vise, parallels and spoil plate have not moved (moved: stop and tell the owner); X0 is picked up on every load. After a reset, E-stop or stall: home ($H), console M6 for the tool in the spindle (the tool setter measures it again), pick up X0 again with the edge finder, then restart the program from its start. Tools to buy before Setup 2: the .2560 reamer, the 5/64 in end mill, and the .256 plus and .257 minus Class ZZ pin gauges."
 shop = "../shop"
 stock_refs = ["1018-flat-5-16x1-72in", "1018-flat-5-16x1-36in", "6061-flat-1-2x6-54in"]
@@ -112,17 +112,25 @@ face_removal_max_mm = 0.3048
 # Holding (shop workholding.vise-pm-6): the spoil plate (1/2 in 6061, 3.9 x
 # 6 in, its top faced) on two 1 in parallels (fixtures.parallels-lms-6745),
 # one against each jaw; the blanks on the plate, gripped by their edges.
-# The jaws' top stands this far above the plate (Z0): the grip, under the
-# faced blanks' top.
+# The jaws' top stands above the plate's top (Z0): the grip, under the
+# faced blanks' top. The plate is bought 1/2 in and faced once, .005, in
+# Setup 2; the traveler gauges the jaws' top above it against the band
+# jaw_top_min_mm-jaw_top_max_mm (.237-.280): at least the shop's 6.0 mm
+# grip, and .5 mm under the faced hub. cam.py proves the band's ends (the
+# guards, the jaws' keep-outs at the high end, the drills over the
+# thinnest plate it accepts) and that the 1/2 in plate, before and after
+# its facing, lands in it.
 parallel_height_mm = 25.4
 spoil_plate_thickness_mm = 12.7
+spoil_plate_face_mm = 0.127
 spoil_plate_width_mm = 99.06
 spoil_plate_length_mm = 152.4
 support_height_mm = 38.1
 vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
 vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
 vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
-jaw_top_mm = 6.8453
+jaw_top_min_mm = 6.0198
+jaw_top_max_mm = 7.112
 # The jaws centred on the shortest blank: their left side from X0.
 jaw_start_mm = 19.0881
 jaw_end_mm = 177.7619
@@ -302,7 +310,7 @@ speed_kind = "other"
 tool = "cutoff-saw"
 drilling = "none"
 sizing = "other"
-instruction = "Once per lot (the 20 blanks): saw a 3.9 in piece off the end of the 1/2 x 6 in 6061 flat (the spoil plate, 3.9 x 6 in), or reuse the last lot's spoil plate; file its burrs, and mark one 3.9 in edge LEFT: the spoil plate runs 6 in along X and 3.9 in across the jaws. It is faced at the start of Setup 2, every lot, and never mid-lot."
+instruction = "Every lot (the 20 blanks): saw a new 3.9 in piece off the end of the 1/2 x 6 in 6061 flat (the spoil plate, 3.9 x 6 in); the last lot's plate is drilled and ringed and is not reused. File its burrs and mark one 3.9 in edge LEFT: the spoil plate runs 6 in along X and 3.9 in across the jaws. It is faced once, .005, at the start of Setup 2, and never again."
 feed = "hand"
 
 [[setups]]
@@ -311,7 +319,7 @@ title = "Side B: face, pocket, bore and holes"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw; the spoil plate on them, 6 in along X, its LEFT edge to the left, as left by the first op (it stays there for every load; brush it clean of chips and burrs before each load). The jaws' top then stands about .270 above the spoil plate's top (checked below): it grips most of each .3085–.3125 blank and stays under the faced B face (.3005), so the T1 1/2 in end mill passes over the jaws when it faces B. Four blanks of one load side by side across the jaws on the spoil plate, each on its A face (B up), numbers to the left, the lowest number against the fixed jaw. Flush the left ends with a 1-2-3 block's 3 in edge set twice, overlapping (across blanks 1–3 and the spoil plate's left edge, then across blanks 2–4), and feel that all four ends are flush; then close the vise on the blanks (the spoil plate, 3.9 in across under the 4 in load, is not gripped), tapping them down onto the spoil plate."
+holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw; the spoil plate on them, 6 in along X, its LEFT edge to the left, as left by the first op (it stays there for every load; brush it clean of chips and burrs before each load). The jaws' top then stands .237–.280 above the spoil plate's top (checked below): it grips most of each .3085–.3125 blank and stays at least .020 under the faced B face (.3005), so the T1 1/2 in end mill passes over the jaws when it faces B. Four blanks of one load side by side across the jaws on the spoil plate, each on its A face (B up), numbers to the left, the lowest number against the fixed jaw. Flush the left ends with a 1-2-3 block's 3 in edge set twice, overlapping (across blanks 1–3 and the spoil plate's left edge, then across blanks 2–4), and feel that all four ends are flush; then close the vise on the blanks (the spoil plate, 3.9 in across under the 4 in load, is not gripped), tapping them down onto the spoil plate."
 datum = "Programs CL01_face_b (T1), CL02_pocket_b (T1, T2), CL03_bore (T3, T6, T7), CL04_holes (T3, T4, T5). G54: X0 the left end of the blank against the fixed jaw (picked up on every load), Y0 the fixed jaw's face, Z0 the spoil plate's top. +X toward the blanks' right ends, +Y toward the fixed jaw: the blanks lie at −Y."
 diagram = { file = "diagrams/side_b.svg", alt = "Four blanks across the vise jaws on the spoil plate on two parallels, B up, still whole rectangles (the outline comes in Setup 4); what this setup cuts is hatched: B faced all over, each blank's 1/2 in slot along its centre line from past the right end to the hub with its arc round the hub at ±26°, the two 1/8 in rings round the hub at ±55°, then the bore at the hub and the pin and spring holes on the centre line. A 2.5 x detail shows one hub." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.drill_d_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
@@ -319,14 +327,14 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = 101.6, along_jaws_mm = "{{pro
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.blank_length_min_mm}}"], supports_mm = ["{{process.jaw_start_mm}}", "{{process.jaw_end_mm}}"], section_mm = { y = "{{process.blank_pitch_mm}}", z = "{{process.blank_thickness_min_mm}}" } }
 
 [[setups.operations]]
-instruction = "Every lot, before the first load: Home ($H); console M6 T1. Clamp the spoil plate alone on the parallels and face its top .010 (a new spoil plate or a used one)."
-instruction_detailed = "Home the mill ($H). Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Clamp the spoil plate alone across the jaws on the parallels, its LEFT edge to the left. Set 2650 and face its top .010 by hand jog in overlapping passes."
+instruction = "Every lot, before the first load: Home ($H); console M6 T1. Clamp the new spoil plate alone on the parallels and face its top .005, once."
+instruction_detailed = "Home the mill ($H). Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Clamp the new spoil plate alone across the jaws on the parallels, its LEFT edge to the left. Set 2650 and face its top .005 by hand jog in overlapping passes, once: a second facing could lift the jaws' top over the band below."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "Every lot, the spoil plate still clamped: the jaws' top above the spoil plate's top."
-inspection = "Jaws' top .200–.290 above the spoil plate's top (the calipers' depth rod, at both ends of each jaw): .290 keeps the jaws .010 under the faced B face (.3005); .200 still grips two thirds of the thinnest blank. Outside: stop and tell the owner."
-gauge_checks = [{ gauge = "calipers", band_mm = [5.08, 7.366] }]
+inspection = "Jaws' top .237–.280 above the spoil plate's top (the calipers' depth rod, at both ends of each jaw): .237 grips the blanks the shop's 6 mm minimum; .280 keeps the jaws .020 under the faced B face (.3005). A 1/2 in plate faced .005 reads about .275. Over .280 (the plate is thinner than .4895): saw a new plate, face it .005 and check again. Under .237, or a new plate over .280 too: stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.jaw_top_min_mm}}", "{{process.jaw_top_max_mm}}"] }]
 
 [[setups.operations]]
 instruction = "Open the vise and lift the spoil plate out. The cutter could not reach the jaw faces: file a .03 × 45° chamfer along both 6 in top edges, below the faced level. Put the spoil plate back on the parallels, LEFT edge to the left; leave the vise open."
