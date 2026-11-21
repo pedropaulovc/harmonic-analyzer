@@ -662,7 +662,11 @@ inspection = "Each spacer and collar under {{process.saw_collar_dia_max_mm:in.2d
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Spindle stopped, the head where CR05_bore left it, T1 in line with the fork against the fixed jaw, past its crown and clear above it: do not jog X or Y. Take out the collet and T1; mount the arbor in the spindle (drawbar tight), the slitting saw on it between the spacers just checked, at least .25 in of them above the saw and at least {{process.saw_spacer_below_min_mm:in.3dot}} in below it, then the nut; its teeth cutting with the spindle turning clockwise (M3) seen from above. Do not move the blanks."
+instruction = "Spindle stopped, the head where CR05_bore left it (T1 in line with the fork against the fixed jaw, past its crown, clear above it): do not jog X or Y. Take out the collet and T1. Do not move the blanks."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mount the arbor in the spindle (drawbar tight), the slitting saw on it between the spacers just checked, at least .25 in of them above the saw and at least {{process.saw_spacer_below_min_mm:in.3dot}} in below it, then the nut; the teeth cutting with the spindle turning clockwise (M3) seen from above."
 inspection = "The arbor's lowest point (the nut's lower face, or the arbor's end if it stands past the nut) no more than {{process.saw_below_max_mm:in.2dot}} in below the saw's lower face (the calipers' depth rod): CR06 rises that much higher between its passes to carry it over the stock. Over: take spacers from below the saw (keep at least {{process.saw_spacer_below_min_mm:in.3dot}} in), or stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.saw_below_max_mm}}"] }]
 
