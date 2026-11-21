@@ -7,8 +7,9 @@ an HA dependency; the adapter's own tests hold its bindings). Here each plan
 is held to what prechips cannot see, read from the drawing's requirement
 manifest (no SolidWorks seat): a form tool's radius is the drawing's dome
 radius and, fed to the centre on the bar, cuts a dome of the drawn height; a
-die cuts the drawn thread; every bar it is cut from is a stock record of that
-diameter, or the plan says it has none.
+die cuts a die-cut drawn thread and a threading tool bit single-points the
+rest; every bar it is cut from is a stock record of that diameter, or the
+plan says it has none.
 """
 
 from __future__ import annotations
@@ -40,12 +41,16 @@ STEMS = tuple(
 def _records(*names: str) -> dict:
     records: dict = {}
     for name in names:
-        records |= tomllib.loads((EQUIPMENT / name).read_text(encoding="utf-8"))
+        for section, body in tomllib.loads(
+            (EQUIPMENT / name).read_text(encoding="utf-8")
+        ).items():
+            records.setdefault(section, {}).update(body)
     return records
 
 
 STOCK = _records("stock-bought.toml", "stock-to-order.toml")["stock"]
 DIES = _records("tools-reamers-taps.toml")["tools"]
+BITS = _records("tools-special-cutters.toml")["tools"]
 
 
 def _plan(stem: str) -> dict:
@@ -171,12 +176,26 @@ def test_each_form_tool_cuts_the_drawn_dome(stem: str) -> None:
 
 @pytest.mark.parametrize("stem", STEMS)
 def test_the_die_cuts_the_drawn_thread(stem: str) -> None:
-    threads = {item["thread"] for item in _features(stem).values() if "thread" in item}
+    features = _features(stem).values()
+    threads = {item["thread"] for item in features if "thread" in item}
+    pointed = {
+        item["thread"]
+        for item in features
+        if item.get("thread_process") == "single_point"
+    }
+    tools = _tools(_plan(stem)).values()
     dies = [
         tool["ref"]
-        for tool in _tools(_plan(stem)).values()
+        for tool in tools
         if tool["ref"] in DIES and DIES[tool["ref"]].get("kind") == "die_set"
     ]
+    bits = [
+        tool["ref"]
+        for tool in tools
+        if BITS.get(tool["ref"], {}).get("kind") == "threading_tool_bit"
+    ]
+    assert bool(bits) == bool(pointed)
+    threads -= pointed
     if not threads:
         assert not dies
         return
