@@ -15,7 +15,11 @@ sm-summing-lever:
   # The Finish cell holds two lines (~44 capitals each); the knife condition
   # rides the masking clause so the statement fits (machinist review of farm
   # run 20261118T064843854Z-76ae9b13e9cf: three lines overran the cell).
-  finish: GREEN ENAMEL; MASK TAPPED HOLES, KNIFE EDGES (AS MACHINED, NOT HARDENED); OIL BARE FACES
+  # RAL 6005, the frame sheets' green (#2394, PR #3170): owner ruling
+  # 2026-11-21 (Pedro), #3179: "Summing base MHA-SM-03 green enamel: RAL 6005,
+  # same as the frame (#3179)." "MASK THREADS" for "MASK TAPPED HOLES" keeps
+  # the statement on the cell's two lines with the RAL number.
+  finish: RAL 6005 ENAMEL; MASK THREADS, KNIFE EDGES (AS MACHINED, NOT HARDENED); OIL BARE FACES
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in

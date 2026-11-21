@@ -83,7 +83,6 @@ from dt_pinion_bracket_spec import (
     ARBOR_BORE_BAND,
     C2C,
     CROSS_HOLE_BAND,
-    CROSS_HOLE_CALLOUT,
     CROSS_HOLE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -348,6 +347,18 @@ ARBOR_FINISH_XY = (0.155, 0.205)
 # ruling (a) for the seat's webs to the broad faces) are accepted in the
 # part's machinist_exceptions (RV-01, RV-02), since neither has a mate to
 # name and the .XX row would thin a web under its floor (fan-out round 4).
+# The set-pin cross hole is match-drilled at assembly through the strap and
+# MHA-DT-19 together (owner ruling 2026-11-21, Pedro: "Pinion bracket cross
+# hole: match-drill at assembly; fix the traveler and the sheet."); MHA-DT-00
+# SHAFT DRILL SET names the drill.  The pin is its own BOM line
+# (MHA-DT-VN-63), so the callout names it instead of supplying one loose with
+# each strap; test_dt_pinion_bracket_drawing keeps both numbers in step with
+# the parts registry.  The band is tighter than DRILLED HOLES, so the callout
+# also names the fit (rule 4; r2 review): a slotted spring pin grips its hole
+# by compression.  No line is wider than the former DRILL THRU callout's.
+CROSS_HOLE_CALLOUT = (
+    "MATCH-DRILL THRU WITH\nMHA-DT-19 AT ASSEMBLY\nFOR MHA-DT-VN-63\nSPRING PIN, PRESS FIT"
+)
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU\nSLIDING FIT ON\nSHAFT MHA-DT-19",
     "ArborBoreDia": "REAM THRU\nRUNNING FIT ON\nARBOR MHA-DT-22",
@@ -616,12 +627,14 @@ requirement(
     },
 )
 # The option E-a set-pin cross hole (LEFT_KEEP "CrossHoleDia" with
-# CROSS_HOLE_CALLOUT: drilled through for the MHA-DT-VN-63 spring pin, its
-# own press-fit band), through both walls and across the pivot bore's axis.
+# CROSS_HOLE_CALLOUT: match-drilled through strap and MHA-DT-19 at assembly
+# for the MHA-DT-VN-63 spring pin, its own press-fit band), through both
+# walls and across the pivot bore's axis.  Made at assembly, it names no
+# process: the part's traveler does not drill it.
 # It prints no station of its own: it shares the follower seat's centreline,
 # whose .180 from face A (LEFT_KEEP "PinSeatCz") locates it, and its centre
 # sits on the pivot-axis line the flank view draws (dt_pinion_bracket_spec).
-_CROSS_CALLOUT = ("CROSS_HOLE_CALLOUT", (_SELF, "DIMENSION_CALLOUTS"))
+_CROSS_CALLOUT = ((_SELF, "CROSS_HOLE_CALLOUT"), (_SELF, "DIMENSION_CALLOUTS"))
 requirement(
     "cross_hole",
     kind="hole",
@@ -644,7 +657,7 @@ requirement(
         ),
         "nominal_dia": (CROSS_HOLE_DIA, ("CROSS_HOLE_DIA",)),
         "thru": (True, _CROSS_CALLOUT),
-        "process": ("drill", _CROSS_CALLOUT),
+        "made_at": ("assembly", _CROSS_CALLOUT),
         "crosses": (
             "pivot_bore",
             (_FRAME, ("build_dt_pinion_bracket", "build"), (_SELF, "LEFT_KEEP")),

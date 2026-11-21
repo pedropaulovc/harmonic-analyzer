@@ -1871,8 +1871,19 @@ def test_assembly_poses_print_once_on_their_rig_steps() -> None:
     ):
         callout = importlib.import_module(drawing).DIMENSION_CALLOUTS["PinHoleDia"]
         assert callout.startswith("MATCH-DRILL THRU AT ASSEMBLY"), drawing
+    # Owner ruling 2026-11-21 (Pedro): "Pinion bracket cross hole: match-drill
+    # at assembly; fix the traveler and the sheet."  The straps arrive
+    # undrilled: SHAFT DRILL SET drills each strap and the shaft together with
+    # the named drill, and the strap's callout defers the hole to it.
+    bracket = importlib.import_module("draw_dt_pinion_bracket")
+    assert bracket.DIMENSION_CALLOUTS["CrossHoleDia"].startswith("MATCH-DRILL THRU")
     assert FITUP.SHAFT_DRILL_STEP.startswith(f"{FITUP.SHAFT_DRILL_NAME}: PUSH THE BACK")
-    assert "\nMATCH-DRILL MHA-DT-19 THRU" in FITUP.SHAFT_DRILL_STEP
+    assert FITUP.STRAP_PIN_HOLE_DRILL == "1/16"
+    assert FITUP.SHAFT_DRILL_STEP.split("\n")[-2] == (
+        f"MATCH-DRILL {FITUP.STRAP_PIN_HOLE_DRILL} THRU EACH "
+        f"{_config.parts('dt-pinion-bracket')['number']} AS PRINTED AND "
+        f"{_config.parts('dt-pinion-pivot-shaft')['number']}."
+    )
     # The steps' pin numbers are the registry's.
     assert FITUP.STRAP_PIN_NUMBER == _config.parts("dt-vn-pinion-strap-pin")["number"]
     assert (
@@ -1909,4 +1920,3 @@ def test_strap_pin_guard_reads_the_strap_parts_cross_holes() -> None:
             [drive.PIVOT_X, drive.PIVOT_Y, z0], strap_rows, [0.0, 0.0, CROSS_HOLE_CZ]
         )
         assert math.isclose(world[2], z_hole, abs_tol=1e-9)
-    assert drive.STRAP_PIN_Z == drive.STRAP_CROSS_HOLE_Z

@@ -54,7 +54,7 @@ from pinion_rig_layout import (
     RIG_SET_LEAVES,
     SPRING_PAD_LEAF,
 )
-from dt_vn_pinion_strap_pin_spec import PIN_SUB_FLUSH_MAX
+from dt_vn_pinion_strap_pin_spec import HOLE_DIA, HOLE_MAX, PIN_SUB_FLUSH_MAX
 from dt_drive_train_assembly_sheet import FEELER_PLACES, inch_max_text, inch_text
 
 # One purchased set, pinned like any other bought part: Starrett 66MA metric
@@ -180,6 +180,19 @@ COLLAR_SET_STEP = "\n".join(
 # front block (proud) -- so the step names those clearances, not a size.
 SHAFT_DRILL_NAME = "SHAFT DRILL SET"
 STRAP_PIN_NUMBER = "MHA-DT-VN-63"
+# Owner ruling 2026-11-21 (Pedro): "Pinion bracket cross hole: match-drill at
+# assembly; fix the traveler and the sheet."  The straps arrive undrilled, so
+# this step drills each strap at the station its sheet prints and the shaft
+# together.  The 1/16 jobber drill (the rig's one drill for every 1/16 pin,
+# dt_vn_pinion_strap_pin_spec.DRILL_THRU_CALLOUT) must cut inside both
+# prints' .0625-.0650 spring-pin band.
+STRAP_PIN_HOLE_DRILL = "1/16"
+_STRAP_PIN_DRILL_MM = 25.4 / 16.0
+if not (HOLE_DIA <= _STRAP_PIN_DRILL_MM <= HOLE_MAX):
+    raise AssertionError(
+        f"{SHAFT_DRILL_NAME}'s {STRAP_PIN_HOLE_DRILL} drill cuts outside the strap "
+        "and shaft pin-hole band"
+    )
 # The back stop is the back MHA-DT-18's inner face (pinion_rig_layout
 # BACK_STOP_Z); the drum's shimmed end play is the feeler between its front
 # end and the front strap (STRAP_Z_INNER).  Each line does one thing
@@ -194,7 +207,7 @@ SHAFT_DRILL_STEP = "\n".join(
         "SET THE MHA-DT-19 REAR END FLUSH WITH THE MHA-DT-18 REAR FACE "
         f"±{inch_max_text(FLUSH_SET_ERROR, 3)}, SO IT BEARS IN BOTH MHA-DT-18 AND CLEARS "
         "MHA-DT-16.",
-        "MATCH-DRILL MHA-DT-19 THRU THE MHA-DT-14 CROSS HOLES, 2 PL.",
+        f"MATCH-DRILL {STRAP_PIN_HOLE_DRILL} THRU EACH MHA-DT-14 AS PRINTED AND MHA-DT-19.",
         f"DRIVE {STRAP_PIN_NUMBER} PINS, BOTH ENDS 0 TO "
         f"{inch_max_text(PIN_SUB_FLUSH_MAX, 3)} BELOW THE MHA-DT-14 EDGES.",
     )
