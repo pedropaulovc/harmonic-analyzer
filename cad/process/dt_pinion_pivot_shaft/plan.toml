@@ -59,7 +59,7 @@ ref = "lathe-ar"
 
 [[tools]]
 id = "form"
-name = "R.180 dome form tool (cuts an SR.18 crown): HSS, a concave R.180 arc ground across an edge at least .30 wide (both tips past the Ø.250 O.D.), cutting edge at centre height, shank to suit the toolpost"
+name = "R.180 dome form tool (cuts an SR.18 crown): a concave R.180 arc .250 across ground into the edge, its two ends the tips, on the end of a 3/8 in square HSS tool blank, cutting edge at centre height"
 ref = "form-tool-r180"
 status = "to_order"
 
@@ -219,7 +219,7 @@ instruction = "Look at crown A under a light: no pip or flat at the apex, no ste
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A fault: as Ops 100–120, never past Z−{{cad.dome_datum_form_height_in:.4dot}}. Crown A is the same form fed the same depth from the same faced plane as crown B (checked in Ops 130–140), and a touch-off can only err shallow (the tips stop on the corner), which leaves a flat at the apex this op's look finds; so the body holds."
+instruction = "A fault: as Ops 100–110, never past Z−{{cad.dome_datum_form_height_in:.4dot}}. A flat at the apex here, after crown B passed Ops 130–140 with the same tool: the touch-off stopped short; touch both tips on the crown's rim, set the DRO Z to −{{cad.dome_datum_form_height_in:.4dot}} there and take one more light pass to Z−{{cad.dome_datum_form_height_in:.4dot}}."
 
 [[setups]]
 machine_kind = "other"
