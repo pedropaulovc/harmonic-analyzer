@@ -259,9 +259,12 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
 # landed past the drawn end and the view read as the whole part).
 # It stands 8 mm higher than the uncropped view did, so the full depth's
 # extra row and the run-out's second callout row (#2423) stay above the
-# title block, and 15 mm farther right than round 2, so the full depth's
-# text, naming the rack, clears the overall's.
-LEFT_CENTER = (0.388, 0.120)
+# title block, and 21 mm farther right than round 2, so the full depth's
+# text, naming the rack, clears the overall's: raised, the rack row stands
+# level with the foot of the overall's nose extension line (B-B, x 271.0
+# mm), so it starts right of it (run 20261120T234009484Z, text-on-line,
+# 6 mm left of here).
+LEFT_CENTER = (0.394, 0.120)
 LEFT_CAPTION = f"VIEW {OUTSIDE_VIEW_LETTER}"
 # The caption's estimated width (the drawing test's 3.5 mm text box).
 _LEFT_CAPTION_WIDTH = 0.016
@@ -328,9 +331,9 @@ LEFT_KEEP: dict[str, tuple[float, float]] = {
 # within 0.05 mm of the anchor.  Under the view the rear face's, the full
 # depth's and the run-out's extension lines run from the view down to the
 # run-out's dimension line at the title block (the final-head PNG: x 347.0,
-# 377.4, 388.3 mm), so a centred caption would cross them: it starts 4 mm
-# right of the run-out's line, 3 mm under the native box, and ends over
-# 10 mm inside the border.
+# 377.4, 388.3 mm, 6 mm farther right since), so a centred caption would
+# cross them: it starts 4 mm right of the run-out's line, 3 mm under the
+# native box, and ends over 4 mm inside the border.
 VIEW_C_NATIVE_MARGINS = (0.0058, 0.0051, 0.0098, 0.0051)
 VIEW_C_NATIVE_BOX = (
     OUTSIDE_CROP_FENCE[0] - VIEW_C_NATIVE_MARGINS[0],

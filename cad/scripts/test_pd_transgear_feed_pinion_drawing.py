@@ -1241,13 +1241,16 @@ def test_the_cropped_view_c_has_a_break_on_the_boss() -> None:
 # the anchor it was placed at (sheet m).
 _R3_FENCE = (0.3429663, 0.09474832, 0.3889429, 0.13725168)
 _R3_VIEW_BOX = (0.33718068, 0.08970559, 0.39872856, 0.14228562)
-# VIEW C's centre height when round 3 logged them.
-_R3_LEFT_CENTER_Y = 0.116
+# VIEW C's centre when round 3 logged them.
+_R3_LEFT_CENTER = (0.388, 0.116)
 _R3_CAPTION_EXTENT = (0.39699605, 0.11348873, 0.41319938, 0.11777785)
 _R3_CAPTION_ANCHOR = (0.3970429, 0.11775)
 # The final-head PNG (run 20261108T014931710Z, 431.8 mm over 5100 px): the
 # extension lines under VIEW C (rear face, full depth, run-out).
 _FINAL_WITNESS_X = (0.3470, 0.3774, 0.3883)
+# B-B's overall's nose extension line ends 1 mm under its dimension line
+# (run 20261120T234009484Z: x 271.0 mm, foot 88.2 mm).
+_OVERALL_WITNESS_OVERRUN = 0.001
 
 
 def test_view_c_caption_stands_under_its_view_clear_of_everything() -> None:
@@ -1258,7 +1261,7 @@ def test_view_c_caption_stands_under_its_view_clear_of_everything() -> None:
     (run 20261108T014931710Z): right of the view it ended ~1 mm from the
     border.  It stands under the view: its native extent, from round 3's
     measured margins and caption, starts 4 mm right of the rightmost
-    extension line, its top 3 mm under the native box, its right end 10 mm
+    extension line, its top 3 mm under the native box, its right end 4 mm
     inside the border, above the title block and clear of the cutter rows."""
     margins = drawing.VIEW_C_NATIVE_MARGINS
     measured = (
@@ -1269,11 +1272,18 @@ def test_view_c_caption_stands_under_its_view_clear_of_everything() -> None:
     )
     for margin, seen in zip(margins, measured, strict=True):
         assert seen <= margin < seen + 0.0002, (margin, seen)
-    # The fence the drawing crops at is the one round 3 logged, raised with
-    # the view since (#2423: 4 mm, for the run-out's second callout row).
-    raise_y = drawing.LEFT_CENTER[1] - _R3_LEFT_CENTER_Y
-    assert raise_y == pytest.approx(0.004, abs=1e-9)
-    fence = (_R3_FENCE[0], _R3_FENCE[1] + raise_y, _R3_FENCE[2], _R3_FENCE[3] + raise_y)
+    # The fence the drawing crops at is the one round 3 logged, moved with
+    # the view since (#2423: 4 mm up, for the run-out's second callout row,
+    # and 6 mm right, so the rack row clears the overall's extension line).
+    shift_x = drawing.LEFT_CENTER[0] - _R3_LEFT_CENTER[0]
+    raise_y = drawing.LEFT_CENTER[1] - _R3_LEFT_CENTER[1]
+    assert (shift_x, raise_y) == pytest.approx((0.006, 0.004), abs=1e-9)
+    fence = (
+        _R3_FENCE[0] + shift_x,
+        _R3_FENCE[1] + raise_y,
+        _R3_FENCE[2] + shift_x,
+        _R3_FENCE[3] + raise_y,
+    )
     assert drawing.OUTSIDE_CROP_FENCE == pytest.approx(fence, abs=1e-6)
     width, height = drawing.LEFT_CAPTION_EXTENT
     assert _R3_CAPTION_EXTENT[2] - _R3_CAPTION_EXTENT[0] <= width
@@ -1291,16 +1301,33 @@ def test_view_c_caption_stands_under_its_view_clear_of_everything() -> None:
         drawing._LEFT_REAR_X + z * scale
         for z in (0.0, spec.FULL_DEPTH_MIN, spec.CUTTER_RUNOUT_MAX)
     ]
-    assert witnesses == pytest.approx(_FINAL_WITNESS_X, abs=0.0003)
+    assert witnesses == pytest.approx(
+        [x + shift_x for x in _FINAL_WITNESS_X], abs=0.0003
+    )
     assert drawing.VIEW_C_LAST_WITNESS_X == pytest.approx(max(witnesses))
     assert caption.xmin - max(witnesses) >= 0.004 - 1e-9
     assert view[1] - caption.ymax >= 0.003 - 1e-9
     # Under the view, not beside it.
     assert view[0] < caption.xmin < view[2]
-    assert caption.xmax <= drawing.SHEET_INNER_BORDER[2] - 0.010
+    assert caption.xmax <= drawing.SHEET_INNER_BORDER[2] - 0.004
     assert caption.ymin > _TITLE_BLOCK_TOP + 0.010
     for name, xy in drawing.LEFT_KEEP.items():
         assert caption.gap(_printed_box(name, xy)) >= TEXT_CLEARANCE_HEIGHTS * _CAP_M, name
+
+
+def test_view_c_rows_clear_the_overalls_nose_extension_line() -> None:
+    """Run 20261120T234009484Z (text-on-line, gating): raised 4 mm for the
+    run-out's second callout row, the full depth's rack row stood level with
+    the foot of B-B's overall nose extension line, which it crossed.  A row
+    of VIEW C's texts above that foot starts right of the line by the
+    audit's text air."""
+    nose_x = drawing._side_x(spec.OVERALL_LENGTH)
+    overall = _printed_box("OverallLength", drawing.RIGHT_KEEP["OverallLength"])
+    foot = overall.ymin - _OVERALL_WITNESS_OVERRUN
+    air = TEXT_CLEARANCE_HEIGHTS * _CAP_M
+    for name, xy in drawing.LEFT_KEEP.items():
+        box = _printed_box(name, xy)
+        assert box.ymax < foot - air or box.xmin > nose_x + air, name
 
 
 def test_tooth_edge_exception_is_flagged_at_the_teeth() -> None:
