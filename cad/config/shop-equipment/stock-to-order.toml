@@ -235,3 +235,12 @@ dia_in = [1.75]
 length_in = [1.5]
 status = "to_order"
 cite = ["cad/config/parts/dt-cone-gear-tl-arbor-collar.yaml material_specification, default_configuration, configuration_quantities", "cad/scripts/dt_cone_gear_tl_arbor_collar_spec.py OD_BY_CONFIGURATION", "cad/scripts/dt_cone_gear_tl_keyed_arbor_spec.py COLLAR_LENGTH"]
+
+[stock.6061-round-9-16]
+form = "round_bar"
+material = "6061-T6511 aluminium"
+note = "To order: 9/16 in round 6061, at least 3 in (one .272 in hub plug plus parting, facing and a .75 in chucking end; four plugs per 3 in). Source: the ch-rocker-strap-tl-hub-plug (MHA-CH-13-TL-02) registry row, \"6061 aluminum round, 9/16 in or over\", turned from round bar on the manual lathe (registry process). No 6061 round is owned; the owned 1 x 3 in flat (stock.6061-flat-1x3) would need a squared blank in the 4-jaw. Supplier and price not read. Not owned."
+dia_in = [0.5625]
+length_in = [3.0]
+status = "to_order"
+cite = ["cad/config/parts/ch-rocker-strap-tl-hub-plug.yaml material_specification, process"]

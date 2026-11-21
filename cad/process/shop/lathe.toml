@@ -15,6 +15,7 @@
 #   drilling 60-100 ft/min.
 # - Brass (C36000): turning HSS 300-350, carbide 1170 ft/min; drilling
 #   160-175 ft/min.
+# - Aluminium (6061-T6): turning carbide 2820 ft/min; drilling 350-400 ft/min.
 # - 1018 milling 65-110 ft/min (a chamfer mill plunged from the tailstock
 #   takes the milling row).
 # On these small diameters most speeds exceed the lathe's 2000 rpm top speed
@@ -144,3 +145,29 @@ tool = "chamfer-mill-3-16-90"
 material = "lathe-1018-cold-finished"
 sfm = 65
 feed = "tailstock quill by hand, a light plunge, cutting oil"
+
+# MHA-CH-13-TL-02 hub plug (6061-T6511 round, to order); its H hole is
+# shallow, drilled without pecking.
+[settings.lathe-ar-6061]
+tool = "lathe-ar"
+material = "lathe-6061"
+sfm = 2820
+feed_mm_rev = 0.1016
+
+[settings.lathe-centre-6061]
+tool = "centre-drills-carbide-60"
+material = "lathe-6061"
+sfm = 350
+feed = "tailstock quill by hand"
+
+[settings.lathe-drill-h-6061]
+tool = "drill-h"
+material = "lathe-6061"
+sfm = 350
+feed = "tailstock quill by hand, steady, cutting oil"
+
+[settings.lathe-part-6061]
+tool = "cutoff-blade-holder"
+material = "lathe-6061"
+rpm = 300
+feed = "by hand, steady, cutting oil; back out to clear chips"
