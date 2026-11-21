@@ -57,22 +57,32 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
 from _gear_drawing_entities import visible_circle_edge
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _holes import DIAMETER_TOLERANCE_MM, _verify_tap_metadata
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 from sm_gooseneck_end_plug_spec import (
+    BOND_WINDOW,
     DIMENSION_CALLOUTS_BY_NAME,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    SCREW_NUMBER,
     TAP_CALLOUT_BELOW,
     TAP_CALLOUT_PRECISION,
+    TUBE_NUMBER,
+    UNIT,
 )
 from sm_gooseneck_geom import PLUG_DIA, PLUG_HEAD_LENGTH, PLUG_LENGTH
 from sm_gooseneck_spring_joint import (
+    ENGAGEMENT_MIN,
+    PLUG_SHANK_DIA,
     TAP_DRILL_DEPTH,
     TAP_DRILL_DIA,
     TAP_SPEC,
@@ -146,6 +156,184 @@ TAP_CALLOUT_XY = (0.072, 0.240)
 NOTES_XY = (0.016, 0.110)
 ISO_NOTE_XY = (0.320, 0.140)
 TAPPED_HOLE_NOTE = "Tapped Hole"
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_sm_gooseneck_end_plug: one revolve about model +X; the end face at
+# x = 0, facing -X, is the datum end the head length, the overall length and
+# both tap depths run from; the shoulder at the head length, the spigot's end
+# at the overall length). The head and both lengths take the title block's
+# .XX row; the spigot is a REF nominal turned to the measured MHA-SM-01 bore
+# (note 1, BOND_WINDOW governs); the tap's drill the DRILLED HOLES row. Each
+# ``span`` is a diameter's model-X extent. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_JOINT = "sm_gooseneck_spring_joint"
+_GEOM = "sm_gooseneck_geom"
+_SELF = "draw_sm_gooseneck_end_plug"
+# The printed window, inches rounded inward (BOND_WINDOW), as millimetres.
+_BOND_WINDOW_MM = [
+    round(float(f"0{inches}") * 25.4, 6) for inches in BOND_WINDOW.split("-")
+]
+part_metadata(
+    model_sources=(
+        (_GEOM, "PLUG_LENGTH"),
+        (_GEOM, "PLUG_HEAD_LENGTH"),
+        (_GEOM, "PLUG_DIA"),
+        (_JOINT, "PLUG_SHANK_DIA"),
+    ),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "DRAWING_PRECISION_BY_NAME",
+        "TAP_CALLOUT_PRECISION",
+    ),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": 0.0},
+            ((_GEOM, "PLUG_LENGTH"),),
+        ),
+        "outward": ([-1.0, 0.0, 0.0], ((_GEOM, "PLUG_LENGTH"),)),
+    },
+)
+requirement(
+    "shoulder",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), PLUG_HEAD_LENGTH),),
+    requirements=("station",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": PLUG_HEAD_LENGTH},
+            ((_GEOM, "PLUG_HEAD_LENGTH"),),
+        ),
+        "outward": ([1.0, 0.0, 0.0], ((_GEOM, "PLUG_HEAD_LENGTH"),)),
+        "station": (
+            limits(PLUG_HEAD_LENGTH, _P["PlugHeadLength"], unit=UNIT),
+            ((_GEOM, "PLUG_HEAD_LENGTH"), "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "station_nominal": (PLUG_HEAD_LENGTH, ((_GEOM, "PLUG_HEAD_LENGTH"),)),
+        "station_from": ("datum_end", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"station": _P["PlugHeadLength"]},
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), PLUG_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": PLUG_LENGTH},
+            ((_GEOM, "PLUG_LENGTH"),),
+        ),
+        "outward": ([1.0, 0.0, 0.0], ((_GEOM, "PLUG_LENGTH"),)),
+        "length": (
+            limits(PLUG_LENGTH, _P["PlugLength"], unit=UNIT),
+            ((_GEOM, "PLUG_LENGTH"), "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "length_nominal": (PLUG_LENGTH, ((_GEOM, "PLUG_LENGTH"),)),
+        "length_from": ("datum_end", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"length": _P["PlugLength"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(PLUG_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], ((_GEOM, "PLUG_DIA"),)),
+        "at": ([0.0, 0.0, 0.0], ((_GEOM, "PLUG_DIA"),)),
+        "span": ([0.0, PLUG_HEAD_LENGTH], ((_GEOM, "PLUG_HEAD_LENGTH"),)),
+        "dia": (
+            limits(PLUG_DIA, _P["PlugDia"], unit=UNIT),
+            ((_GEOM, "PLUG_DIA"), "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "dia_nominal": (PLUG_DIA, ((_GEOM, "PLUG_DIA"),)),
+    },
+    precision={"dia": _P["PlugDia"]},
+)
+requirement(
+    "step",
+    kind="diameter",
+    faces=(CylinderFace(PLUG_SHANK_DIA),),
+    requirements=("diametral_clearance",),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], ((_JOINT, "PLUG_SHANK_DIA"),)),
+        "at": ([0.0, 0.0, 0.0], ((_JOINT, "PLUG_SHANK_DIA"),)),
+        "span": (
+            [PLUG_HEAD_LENGTH, PLUG_LENGTH],
+            ((_GEOM, "PLUG_HEAD_LENGTH"), (_GEOM, "PLUG_LENGTH")),
+        ),
+        "dia_ref": (
+            PLUG_SHANK_DIA,
+            ((_JOINT, "PLUG_SHANK_DIA"), "REFERENCE_DIMENSIONS", (_SELF, "FRONT_KEEP")),
+        ),
+        "diametral_clearance": (_BOND_WINDOW_MM, ("BOND_WINDOW", "DRAWING_NOTES")),
+        "mate": (f"{TUBE_NUMBER} BORE", ("TUBE_NUMBER", "DRAWING_NOTES")),
+        "callout": (
+            DIMENSION_CALLOUTS_BY_NAME["PlugShankDia"],
+            ("DIMENSION_CALLOUTS",),
+        ),
+    },
+    precision={"dia_ref": _P["PlugShankDia"]},
+)
+_TAP_SOURCES = ((_JOINT, "TAP_SPEC"), (_SELF, "TAP_CALLOUT_XY"))
+requirement(
+    "tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(TAP_DRILL_DIA),),
+    requirements=("thread", "dia", "thread_depth", "drill_depth"),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], _TAP_SOURCES),
+        "at": ([0.0, 0.0, 0.0], _TAP_SOURCES),
+        "thread": (f"{TAP_SPEC.size} UNC-{TAP_SPEC.thread_class}", _TAP_SOURCES),
+        "dia": (
+            drilled_limits(
+                TAP_DRILL_DIA, TAP_CALLOUT_PRECISION["hw-tapdrldia"], unit=UNIT
+            ),
+            ((_JOINT, "TAP_DRILL_DIA"), "UNIT", "TAP_CALLOUT_PRECISION"),
+        ),
+        "nominal_dia": (TAP_DRILL_DIA, ((_JOINT, "TAP_DRILL_DIA"),)),
+        "thread_depth": (
+            limits(
+                TAP_THREAD_DEPTH, TAP_CALLOUT_PRECISION["hw-threaddepth"], unit=UNIT
+            ),
+            (
+                (_JOINT, "TAP_THREAD_DEPTH"),
+                (_JOINT, "TAP_DEPTH_BAND"),
+                "TAP_CALLOUT_PRECISION",
+            ),
+        ),
+        "thread_depth_nominal": (TAP_THREAD_DEPTH, ((_JOINT, "TAP_THREAD_DEPTH"),)),
+        "drill_depth": (
+            limits(TAP_DRILL_DEPTH, TAP_CALLOUT_PRECISION["hw-tapdrldepth"], unit=UNIT),
+            (
+                (_JOINT, "TAP_DRILL_DEPTH"),
+                (_JOINT, "TAP_DEPTH_BAND"),
+                "TAP_CALLOUT_PRECISION",
+            ),
+        ),
+        "drill_depth_nominal": (TAP_DRILL_DEPTH, ((_JOINT, "TAP_DRILL_DEPTH"),)),
+        "depth_from": ("datum_end", _TAP_SOURCES),
+        "tap": ("bottoming", ((_JOINT, "TAP_SPEC"),)),
+        "engagement_min": (
+            ENGAGEMENT_MIN,
+            ((_JOINT, "ENGAGEMENT_MIN"), "ENGAGEMENT_STATEMENT"),
+        ),
+        "mates": (SCREW_NUMBER, ("SCREW_NUMBER", "TAP_CALLOUT_BELOW")),
+        "callout": (TAP_CALLOUT_BELOW, ("TAP_CALLOUT_BELOW",)),
+    },
+    precision={
+        "dia": TAP_CALLOUT_PRECISION["hw-tapdrldia"],
+        "thread_depth": TAP_CALLOUT_PRECISION["hw-threaddepth"],
+        "drill_depth": TAP_CALLOUT_PRECISION["hw-tapdrldepth"],
+    },
+)
 
 
 def _require_saved_tap(model: Any) -> None:

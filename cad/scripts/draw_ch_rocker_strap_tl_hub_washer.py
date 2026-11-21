@@ -43,9 +43,13 @@ from _drawing_dimensions import assert_imported_precision, move_model_dimension
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 
 MACHINIST_REVIEW = MachinistReviewMode.LEARN
@@ -84,6 +88,90 @@ SIDE_KEEP = {
 OD_ON_SIDE = (SIDE_CENTER[0] + HALF_THICKNESS + 0.018, SIDE_CENTER[1])
 if set(END_KEEP) | set(SIDE_KEEP) != set().union(*spec.DRAWING_DIMENSIONS.values()):
     raise AssertionError("the hub washer sheet does not place every marked dimension")
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_ch_rocker_strap_tl_hub_washer: axis +Z through the origin, z = 0 the
+# face on the strap, the datum end the thickness runs from). The O.D. and
+# thickness take the title block's .XX row, the bore the DRILLED HOLES row.
+# Each ``span`` is a diameter's model-Z extent. The declarations print
+# nothing.
+_P = spec.DRAWING_PRECISION_BY_NAME
+_SELF = "draw_ch_rocker_strap_tl_hub_washer"
+part_metadata(
+    model_sources=("OUTER_DIA", "THICKNESS", "BORE_DIA"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("THICKNESS",)),
+        "outward": ([0.0, 0.0, -1.0], ("THICKNESS",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), spec.THICKNESS),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": spec.THICKNESS},
+            ("THICKNESS",),
+        ),
+        "outward": ([0.0, 0.0, 1.0], ("THICKNESS",)),
+        "length": (
+            limits(spec.THICKNESS, _P["Thickness"], unit=spec.UNIT),
+            ("THICKNESS", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "length_nominal": (spec.THICKNESS, ("THICKNESS",)),
+        "length_from": ("datum_end", ((_SELF, "SIDE_KEEP"),)),
+    },
+    precision={"length": _P["Thickness"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(spec.OUTER_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("OUTER_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("OUTER_DIA",)),
+        "span": ([0.0, spec.THICKNESS], ("THICKNESS",)),
+        "dia": (
+            limits(spec.OUTER_DIA, _P["OuterDia"], unit=spec.UNIT),
+            ("OUTER_DIA", "UNIT", (_SELF, "OD_ON_SIDE")),
+        ),
+        "dia_nominal": (spec.OUTER_DIA, ("OUTER_DIA",)),
+    },
+    precision={"dia": _P["OuterDia"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(spec.BORE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("BORE_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("BORE_DIA",)),
+        "span": ([0.0, spec.THICKNESS], ("THICKNESS",)),
+        "dia": (
+            drilled_limits(spec.BORE_DIA, _P["BoreDia"], unit=spec.UNIT),
+            ("BORE_DIA", "UNIT", (_SELF, "END_KEEP")),
+        ),
+        "nominal_dia": (spec.BORE_DIA, ("BORE_DIA",)),
+        "thru": (True, ("DIMENSION_CALLOUTS",)),
+        "process": ("drill", ("DIMENSION_CALLOUTS",)),
+        "callout": (
+            spec.DIMENSION_CALLOUTS_BY_NAME["BoreDia"],
+            ("DIMENSION_CALLOUTS",),
+        ),
+    },
+    precision={"dia": _P["BoreDia"]},
+)
 
 
 def _assert_part_callouts(adapter: Any, annotations: list[Any]) -> None:
