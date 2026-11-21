@@ -6,8 +6,8 @@ turned Ø30 hub boss. The boss carries an integral Ø.499 spigot on its front
 the drum, the pen wire runs in the rim's U-groove: the wire-centre radii
 49.2 / 9.85 give the wheel's 5x magnification. TIE 1 (lever wire) is an axial
 #60 through the boss just outboard of the drum's O.D., counter-drilled #50
-from the drum side (one native Advanced Hole); TIE 2 (pen wire) is a radial
-hole from the groove bottom to the rim bore.
+from the drum side; TIE 2 (pen wire) is a radial hole from the groove bottom
+to the rim bore.
 
 Layout: wheel axis = local Z through the origin, the origin on the spokes' and
 rim's mid-plane (``mg_magnifying_wheel_geom``). The hub profile and the groove
@@ -64,7 +64,7 @@ from _drawing_precision import apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_pmi import author_part_pmi
-from _visibility import blank_reference_geometry, blank_sketch_feature
+from _visibility import blank_reference_geometry
 from _mg_wheel_rim_geometry import (
     GROOVE_BOTTOM_DIA,
     GROOVE_R,
@@ -97,12 +97,10 @@ from mg_magnifying_wheel_geom import (
     SPOKE_X1,
     TIE1_CDRILL_DEPTH,
     TIE1_CDRILL_DIA,
-    TIE1_CDRILL_SIZE,
     TIE1_X,
     TIE1_Y,
     TIE2_CLOCK_DEG,
     TIE_HOLE_DIA,
-    TIE_HOLE_SIZE,
     clock_to_local_deg,
     fillet_area,
     fillets_volume,
@@ -238,28 +236,22 @@ V_GROOVE = (
         + _GROOVE_HALF_DISC * (_GROOVE_CENTRE_R - 4.0 * GROOVE_R / (3.0 * math.pi))
     )
 )
-# TIE 1: the #60 through the boss united with the #50 counter-drill (its
-# cylinder to the shoulder and its 118 deg point), less their overlap: the
-# #60's core along the #50's cylinder and the point's frustum down to the
-# #60's Ø, then the point's tip inside the #60.
+V_TIE1 = math.pi * _TIE_R**2 * _BOSS_LEN
+# TIE 1's #50 counter-drill beyond the #60 already through: the annulus
+# between the two Ø down to the shoulder, then its 118 deg point's frustum
+# from the #50 down to the #60's Ø (the point's tip lies in the #60's air).
 _TIE1_CDRILL_R = TIE1_CDRILL_DIA / 2.0
-# The point's length per unit radius.
 _POINT_PER_R = 1.0 / math.tan(math.radians(DRILL_POINT_DEG / 2.0))
-V_TIE1_CDRILL = (
+_POINT_LEN = (_TIE1_CDRILL_R - _TIE_R) * _POINT_PER_R
+V_TIE1_POINT = (
     math.pi
-    * _TIE1_CDRILL_R**2
-    * (TIE1_CDRILL_DEPTH + _TIE1_CDRILL_R * _POINT_PER_R / 3.0)
+    * _POINT_LEN
+    / 3.0
+    * (_TIE1_CDRILL_R**2 + _TIE1_CDRILL_R * _TIE_R + _TIE_R**2)
+    - math.pi * _TIE_R**2 * _POINT_LEN
 )
-V_TIE1 = (
-    math.pi * _TIE_R**2 * _BOSS_LEN
-    + V_TIE1_CDRILL
-    - math.pi
-    * _TIE_R**2
-    * (
-        TIE1_CDRILL_DEPTH
-        + (_TIE1_CDRILL_R - _TIE_R) * _POINT_PER_R
-        + _TIE_R * _POINT_PER_R / 3.0
-    )
+V_TIE1_CDRILL = (
+    math.pi * (_TIE1_CDRILL_R**2 - _TIE_R**2) * TIE1_CDRILL_DEPTH + V_TIE1_POINT
 )
 V_TIE2 = _tie2_volume()
 
@@ -639,198 +631,121 @@ def _spoke_reference(adapter) -> list[tuple[str, str]]:
     return dims.apply(adapter, feature)
 
 
-# TIE 1's Advanced Hole.  swAdvWzdGeneralHoleTypes_e, swHoleElementOrientation_e,
-# swEndConditions_e, swEndShape_e, swWzdHoleStandards_e,
-# swWzdHoleStandardFastenerTypes_e and swSelectType_e values from the
-# developing-solidworks reference.  The near side is the boss's back face (the
-# face view's side), the far side its front (drum) face.
-_AH_STRAIGHT = 2
-_AH_NEAR_SIDE = 0
-_AH_FAR_SIDE = 1
-_END_BLIND = 0
-_END_UP_TO_NEXT = 11
-_END_SHAPE_DRILL_POINT = 0
-_ANSI_INCH = 0
-_ANSI_INCH_NUMBER_DRILLS = 24
-_SEL_FACES = 2
-_MARK_NEAR_FACE = 256
-_MARK_FAR_FACE = 512
-# Each face is picked by a ray down TIE 1's axis from this far outside it.
-_TIE1_RAY_START = 5.0
-_TIE1_RAY_RADIUS = 0.5
+# TIE 1's counter-drill is drawn on a plane through TIE 1's axis parallel to
+# the Top plane (A-A's), the plane section B-B cuts, so its Ø and depth
+# print there.
+_TIE1_PLANE = "Tie1Plane"
 
 
-@_telemetry.traced("feature.advanced_hole", label_param="label")
-def _tie1_advanced_hole(adapter, label: str = "tie 1") -> list[tuple[str, str]]:
-    """TIE 1 as ONE native Advanced Hole: the #60 from the boss's back face up
-    to the #50 counter-drilled from its front (drum) face to the shoulder, the
-    #50's 118 deg point narrowing on to the #60 (owner ruling 2026-11-20 on
-    #2406).  Its default native callout lists each element's Ø, the #50's
-    depth and its side; the drawing adds the process words (an element's
-    CalloutString put is refused over COM, 'Member not found', r6).  The
-    placement point is dimensioned Tie1X/Tie1Y from the origin, driven by the
-    globals; returns those deferred drive jobs."""
-    import pythoncom
-    from win32com.client import VARIANT
+def _tie1_counter_drill(adapter) -> list[tuple[str, str]]:
+    """TIE 1's #50 counter-drill from the boss front (drum) face (owner ruling
+    2026-11-20 on #2406: "A"), revolve-cut on _TIE1_PLANE: a half profile
+    beside TIE 1's axis -- the mouth on the front face, the #50's wall to
+    its shoulder, the 118 deg point back to the axis.  The plane stands off
+    the Top plane by "Tie1Y"; the mouth runs from the origin by "Tie1X" and
+    by the front face's station ("HubFrontZ" - "SpigotLength"), so the
+    counter-drill moves with the #60 and the boss.  Its Ø and depth are
+    named and driven for B-B (drawing-guidelines.md rule 12); the point's
+    length is the #50's 118 deg point, as drawn.  The key pin's chord hole
+    on a station plane is the recipe (build_pd_transgear_disc_hub
+    ._key_pin_hole).  Returns the deferred drive jobs."""
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
 
-    from solidworks_mcp.adapters.pywin32_adapter import null_callout
-    from solidworks_mcp.adapters.solidworks.sketch import _add_sketch_dimension_impl
-
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    extension = _early_bound(model.Extension, "IModelDocExtension")
-    features = _early_bound(model.FeatureManager, "IFeatureManager")
-
-    # The near and far faces are picked by location (IFeatureManager::
-    # AdvancedHole: never IEntity::Select4), each by a ray down TIE 1's axis.
-    model.ClearSelection2(True)
-    for face, z, ray_z, mark in (
-        ("boss back face", HUB_BACK_Z + _TIE1_RAY_START, -1.0, _MARK_NEAR_FACE),
-        ("boss front face", HUB_STEP_Z - _TIE1_RAY_START, 1.0, _MARK_FAR_FACE),
-    ):
-        if not extension.SelectByRay(
-            TIE1_X / 1000.0,
-            TIE1_Y / 1000.0,
-            z / 1000.0,
-            0.0,
-            0.0,
-            ray_z,
-            _TIE1_RAY_RADIUS / 1000.0,
-            _SEL_FACES,
-            mark == _MARK_FAR_FACE,
-            mark,
-            0,
-        ):
-            raise RuntimeError(f"{label}: no {face} on TIE 1's axis")
-    selection = _early_bound(model.SelectionManager, "ISelectionMgr")
-    selected = int(selection.GetSelectedObjectCount2(-1))
-    if selected != 2:
-        raise RuntimeError(f"{label}: {selected} faces selected, expected 2")
-
-    def straight(orientation: int, size: str, end: int) -> object:
-        element = _early_bound(
-            extension.CreateAdvancedHoleElementData(_AH_STRAIGHT),
-            "IAdvancedHoleElementData",
-        )
-        element.Orientation = orientation
-        element.Standard = _ANSI_INCH
-        element.FastenerType = _ANSI_INCH_NUMBER_DRILLS
-        element.Size = size
-        element.EndCondition = end
-        return element
-
-    tie = straight(_AH_NEAR_SIDE, TIE_HOLE_SIZE, _END_UP_TO_NEXT)
-    cdrill = straight(_AH_FAR_SIDE, TIE1_CDRILL_SIZE, _END_BLIND)
-    cdrill.BlindDepth = TIE1_CDRILL_DEPTH / 1000.0
-    point = _early_bound(cdrill, "IStraightElementData")
-    point.EndShape = _END_SHAPE_DRILL_POINT
-    point.DrillPointAngleOverride = True
-    point.DrillPointAngle = math.radians(DRILL_POINT_DEG)
-
-    def stack(element: object) -> VARIANT:
-        return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, [element._oleobj_])
-
-    # Depth to the shoulder (IsDepthUptoTip False), the default callout.
-    created = features.AdvancedHole2(stack(tie), stack(cdrill), False, False, False)
-    feature, results = created if isinstance(created, tuple) else (created, None)
-    codes = [int(code) for code in (results or ())]
-    if feature is None or any(codes):
-        raise RuntimeError(
-            f"{label}: AdvancedHole2 refused (result codes {codes}; "
-            f"near {TIE_HOLE_SIZE} up to next, far {TIE1_CDRILL_SIZE} blind "
-            f"{TIE1_CDRILL_DEPTH} mm)"
-        )
-    name_last_feature(adapter, "Tie1")
-    feature = _early_bound(feature, "IFeature")
-
-    # The placement sketch: the one sketch under the feature, holding the
-    # hole's single point.
-    sketches = []
-    sub = feature.GetFirstSubFeature()
-    while sub is not None:
-        sub = _early_bound(sub, "IFeature")
-        if str(sub.GetTypeName2()) == "ProfileFeature":
-            sketch = _early_bound(sub.GetSpecificFeature2(), "ISketch")
-            sketches.append((sub, sketch, list(sketch.GetSketchPoints2() or ())))
-        sub = sub.GetNextSubFeature()
-    if len(sketches) != 1 or len(sketches[0][2]) != 1:
-        raise RuntimeError(
-            f"{label}: expected one placement sketch with one point, got "
-            f"{[(str(s.Name), len(points)) for s, _k, points in sketches]}"
-        )
-    place, sketch, (raw_point,) = sketches[0]
-    place_name = str(place.Name)
-
-    # TIE 1's axis in the placement sketch's own frame; its two coordinates
-    # take Tie1X/Tie1Y by which model axis each sketch axis runs along.
-    math_util = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    to_sketch = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    model_point = _early_bound(
-        math_util.CreatePoint(
-            VARIANT(
-                pythoncom.VT_ARRAY | pythoncom.VT_R8,
-                [TIE1_X / 1000.0, TIE1_Y / 1000.0, HUB_BACK_Z / 1000.0],
-            )
+    check(
+        f"create_plane {_TIE1_PLANE}",
+        adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=TIE1_Y)
         ),
-        "IMathPoint",
     )
-    sx, sy = list(
-        _early_bound(model_point.MultiplyTransform(to_sketch), "IMathPoint").ArrayData
-    )[:2]
-    x_m, y_m = TIE1_X / 1000.0, abs(TIE1_Y) / 1000.0
-    sx_abs, sy_abs = abs(sx), abs(sy)
+    name_last_feature(adapter, _TIE1_PLANE)
+    jobs = [(name_dimensions(adapter, _TIE1_PLANE, ["Tie1PlaneY"])[0], '"Tie1Y"')]
+    blank_reference_geometry(adapter, ((_TIE1_PLANE, "PLANE"),))
 
-    def on(value: float, coordinate: float) -> bool:
-        return math.isclose(value, coordinate, abs_tol=1e-7)
-
-    if on(sx_abs, x_m) and on(sy_abs, y_m):
-        names = ("Tie1X", "Tie1Y")
-    elif on(sx_abs, y_m) and on(sy_abs, x_m):
-        names = ("Tie1Y", "Tie1X")
-    else:
-        raise RuntimeError(f"{label}: placement sketch maps TIE 1 to ({sx}, {sy})")
-
-    model.ClearSelection2(True)
-    if not model.Extension.SelectByID2(
-        place_name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError(f"{label}: cannot edit {place_name}")
-    model.EditSketch()
-    sketch_manager = _early_bound(model.SketchManager, "ISketchManager")
-    # Straight to the sketch DB: an authored point near a reference snaps to it.
-    previous_add_to_db = bool(sketch_manager.AddToDB)
-    sketch_manager.AddToDB = True
-    try:
-        point = _early_bound(raw_point, "ISketchPoint")
-        point.SetCoords(sx, sy, 0.0)
-    finally:
-        sketch_manager.AddToDB = previous_add_to_db
-    dims = SketchDims()
-    # Direct EditSketch bypasses create_sketch's registry reset: resolve the
-    # reserved "origin" in THIS sketch (_holes.wizard_holes does the same).
-    adapter._sketch_origin_point = None
-    previous_sketch_manager = adapter.currentSketchManager
-    adapter.currentSketchManager = sketch_manager
-    try:
-        point_id = adapter._register_sketch_entity("Point", point)
-        for name, dimension_type, coordinate in (
-            (names[0], "horizontal_distance", sx),
-            (names[1], "vertical_distance", sy),
-        ):
-            check(
-                f"dimension {label} placement {name}",
-                _add_sketch_dimension_impl(
-                    adapter, point_id, "origin", dimension_type, abs(coordinate) * 1e3
-                ),
-            )
-            dims.record(name, f'"{name}"')
-    finally:
-        adapter.currentSketchManager = previous_sketch_manager
-    model.EditSketch()
-    model.EditRebuild3()
-    drive_jobs = dims.apply_feature(adapter, place, place_name)
-    # Hidden: a shown placement sketch prints its point in every render.
-    blank_sketch_feature(model, place, label)
-    return drive_jobs
+    sd = SketchDims()
+    check("create_sketch tie 1 counter-drill", adapter.create_sketch(_TIE1_PLANE))
+    to_sketch = _sketch_mapper(adapter, u_axis=0, v_axis=2, label="tie 1 counter-drill")
+    origin = to_sketch((0.0, TIE1_Y, 0.0))
+    if origin != (0.0, 0.0):
+        raise RuntimeError(f"tie 1 counter-drill: sketch origin maps to {origin}")
+    shoulder_z = HUB_STEP_Z + TIE1_CDRILL_DEPTH
+    point_len = _TIE1_CDRILL_R * _POINT_PER_R
+    wall_x = TIE1_X + _TIE1_CDRILL_R
+    mouth, rim, shoulder, tip = (
+        to_sketch((x, TIE1_Y, z))
+        for x, z in (
+            (TIE1_X, HUB_STEP_Z),
+            (wall_x, HUB_STEP_Z),
+            (wall_x, shoulder_z),
+            (TIE1_X, shoulder_z + point_len),
+        )
+    )
+    set_sketch_direct_db(adapter, True)
+    axis = check("tie 1 counter-drill axis", adapter.add_centerline(*mouth, *tip))
+    set_sketch_direct_db(adapter, False)
+    mouth_line, wall, cone, on_axis = add_line_chain(
+        adapter, [mouth, rim, shoulder, tip]
+    )
+    _relate(
+        adapter,
+        (
+            ("tie 1 counter-drill axis along TIE 1", axis, None, _AXIAL),
+            (
+                "tie 1 counter-drill profile on the axis, mouth",
+                f"{axis}.start",
+                f"{on_axis}.end",
+                "coincident",
+            ),
+            (
+                "tie 1 counter-drill profile on the axis, tip",
+                f"{axis}.end",
+                f"{on_axis}.start",
+                "coincident",
+            ),
+            ("tie 1 counter-drill mouth on the face", mouth_line, None, _RADIAL),
+            ("tie 1 counter-drill wall along the axis", wall, None, _AXIAL),
+        ),
+    )
+    anchor_point_to_origin(
+        adapter, f"{axis}.start", *mouth, "tie 1 counter-drill mouth"
+    )
+    _record_origin_anchor(
+        sd,
+        *mouth,
+        "Tie1CdrillX",
+        "Tie1CdrillZ",
+        '"Tie1X"',
+        '"HubFrontZ" - "SpigotLength"',
+    )
+    dimension_between(
+        adapter,
+        f"{wall}.start",
+        f"{wall}.end",
+        _AXIAL_DISTANCE,
+        TIE1_CDRILL_DEPTH,
+        "Tie1CdrillDepth",
+    )
+    sd.record("Tie1CdrillDepth", '"Tie1CdrillDepth"')
+    dimension_between(
+        adapter,
+        f"{cone}.start",
+        f"{cone}.end",
+        _AXIAL_DISTANCE,
+        point_len,
+        "tie 1 counter-drill point",
+    )
+    sd.record("Tie1CdrillPoint")
+    add_diametric_linear_dimension(
+        adapter,
+        axis,
+        wall,
+        to_sketch((wall_x + 3.0, TIE1_Y, HUB_STEP_Z - 3.0)),
+        "Tie1CdrillDia",
+    )
+    sd.record("Tie1CdrillDia", '"Tie1CdrillDia"')
+    ensure_fully_defined(adapter, "tie 1 counter-drill sketch")
+    check("exit_sketch tie 1 counter-drill", adapter.exit_sketch())
+    name_last_feature(adapter, "Tie1CdrillProfile")
+    return jobs + sd.apply(adapter, "Tie1CdrillProfile")
 
 
 def build(adapter) -> dict[str, str]:
@@ -868,6 +783,8 @@ def build(adapter) -> dict[str, str]:
     set_global(adapter, "TieHoleDia", f"{TIE_HOLE_DIA}mm")
     set_global(adapter, "Tie1X", f"{TIE1_X}mm")
     set_global(adapter, "Tie1Y", f"{-TIE1_Y}mm")
+    set_global(adapter, "Tie1CdrillDia", f"{TIE1_CDRILL_DIA}mm")
+    set_global(adapter, "Tie1CdrillDepth", f"{TIE1_CDRILL_DEPTH}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -1264,12 +1181,50 @@ def build(adapter) -> dict[str, str]:
     volume = volume_check(adapter, "groove", volume - V_GROOVE, 0.02 * V_GROOVE)
 
     # TIE 1: the lever-wire tie hole, axial through the boss just outboard of
-    # the drum's O.D., located from the bore centre by two coordinates: the
-    # #60 through, counter-drilled #50 from the drum face (_tie1_advanced_hole).
-    # The gate's band is under what a flat-bottomed counter-drill would add,
-    # so it proves the 118 deg point.
-    drive_jobs += _tie1_advanced_hole(adapter)
-    volume = volume_check(adapter, "tie 1", volume - V_TIE1, 0.004 * V_TIE1)
+    # the drum's O.D., located from the bore centre by two coordinates.
+    tie1_sd = SketchDims()
+    check("create_sketch tie 1", adapter.create_sketch("Front"))
+    define_circle(
+        adapter,
+        TIE1_X,
+        TIE1_Y,
+        _TIE_R,
+        "tie 1",
+        dims=tie1_sd,
+        names=("Tie1X", "Tie1Y", "Tie1HoleDia"),
+        drives=('"Tie1X"', '"Tie1Y"', '"TieHoleDia"'),
+    )
+    ensure_fully_defined(adapter, "tie 1 sketch")
+    check("exit_sketch tie 1", adapter.exit_sketch())
+    name_last_feature(adapter, "Tie1Profile")
+    drive_jobs += tie1_sd.apply(adapter, "Tie1Profile")
+    # Mid-plane cut on the spokes' plane: it must reach past both boss faces
+    # (back HUB_BACK_Z, front HUB_STEP_Z), which sit off-centre on it.
+    check(
+        "cut tie 1",
+        adapter.create_cut_extrude(
+            ExtrusionParameters(
+                depth=2.0 * (max(HUB_BACK_Z, -HUB_STEP_Z) + 1.0),
+                both_directions=True,
+            )
+        ),
+    )
+    name_last_feature(adapter, "Tie1")
+    volume = volume_check(adapter, "tie 1", volume - V_TIE1, 0.02 * V_TIE1)
+    drive_jobs += _tie1_counter_drill(adapter)
+    check(
+        "revolve-cut tie 1 counter-drill",
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "Tie1Cdrill")
+    # Planes, cylinders and a cone: the measured removal should match
+    # V_TIE1_CDRILL to well under the band (expected residual ~1e-3 mm^3 or
+    # less on analytic faces), and the band is half what the 118 deg point
+    # adds over a flat-bottomed #50 (0.087 of 0.174 mm^3), so a flat bottom
+    # fails the gate.
+    volume = volume_check(
+        adapter, "tie 1 counter-drill", volume - V_TIE1_CDRILL, V_TIE1_POINT / 2.0
+    )
 
     # TIE 2: the pen-wire tie hole, radial from the groove bottom to the rim
     # bore at TIE2_CLOCK_DEG -- a half rectangle beside its radial axis,
