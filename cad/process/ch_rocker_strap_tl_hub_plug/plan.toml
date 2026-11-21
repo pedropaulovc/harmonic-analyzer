@@ -165,6 +165,11 @@ sizing = "other"
 instruction = "Turn the pilot from Z0 to the shoulder at Z{{cad.step_far_out_far_z_mm:in.3dot}} by the DRO, facing the shoulder square: rough to Ø{{cad.step_rough_dia_mm:in.4dot}}, then finish in light passes, miking between them, to Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}."
 settings = "lathe-ar-6061"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
+# Pilot window, typed (the adapter binds no pilot-length band): Op 110 can
+# bring both bands in only for a pilot from length_min - shoulder_max
+# (.267 - .175 = .092) to length_max - shoulder_min (.277 - .165 = .112);
+# the .097-.107 aim is that window less .005 each side. Re-derive all three
+# whenever the drawing's shoulder or length band moves.
 inspection = "Pilot Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}, by micrometer; over: another light pass; under: scrap. Pilot length (Z0 to the shoulder) by the calipers' depth rod, aiming .097–.107 so Op 110 keeps room on both its shoulder and length bands; under .097: face the shoulder back; .107–.112: carry on, Op 110 decides; over .112 (no facing in Op 110 brings both into band): scrap."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.step_dia_band_mm}}" }]
 

@@ -288,7 +288,7 @@ gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A cup long in Op 140 goes back to Op 110 (a new L0, chucked, touched, preset and faced to Z0), then Op 120 (the far chamfer cut and checked again), then Op 140. One short in Op 140 or failing the hole check in Op 150 is scrapped, not reworked: make another from a bar end (Setup 1)."
+instruction = "A cup long in Op 140 goes back to Op 110 (a new L0, chucked, touched, preset and faced to Z0), then Op 120 (the far chamfer cut and checked again), Op 130 (the far end deburred again), then Op 140. One short in Op 140 or failing the hole check in Op 150 is scrapped, not reworked: make another from a bar end (Setup 1)."
 feed = "hand"
 
 [[setups.operations]]
