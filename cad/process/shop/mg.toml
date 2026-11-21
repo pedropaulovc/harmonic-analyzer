@@ -67,6 +67,23 @@ feed = "9.6 in/min"
 description = "G (.261 in) drill, 115-piece index; its shank the bore's NO-GO"
 diameter_mm = 6.6294
 
+# --- MHA-MG-03 magnifying lever (cad/process/mg_magnifying_lever/plan.toml) ---
+# Its facing takes shop/lathe.toml lathe-ar-c360. Authored, no source on
+# record, both in the lathe's low range (70-380 rpm): the R.125 form tool
+# cuts its whole width at once, so it runs at the 300 rpm the shop's parting
+# and O1 form settings start at; single-pointing runs at the 70 rpm bottom
+# speed so the half-nuts can be opened at the thread's end by hand.
+[settings.lathe-form-r125-c360]
+tool = "form-tool-r125"
+material = "lathe-c360"
+rpm = 300
+feed = "cross slide by hand, a slow steady plunge, dry"
+[settings.lathe-thread-c360]
+tool = "threading-bits-lms-6685"
+material = "lathe-c360"
+rpm = 70
+feed = "half-nuts on the 20 TPI gearbox setting; compound .003-.005 a pass, dry"
+
 # --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
 # The tools the placeholder plans name (cad/process/<stem>/plan.toml with
 # revision = "placeholder", not in _process_plans.TRAVELER_STEMS), from the
