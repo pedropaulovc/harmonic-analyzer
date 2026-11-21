@@ -123,7 +123,7 @@ speed_kind = "spindle"
 tool = "drill-h"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Drill H {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale: through the washer and past the parting line."
+instruction = "Feed the H drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{cad.run_in:.2dot}}: the drill's full diameter then runs through the washer and past the parting line."
 settings = "lathe-drill-h-1018"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 hole_depth_mm = "{{cad.run_mm}}"

@@ -114,7 +114,7 @@ speed_kind = "spindle"
 tool = "drill-n"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Drill N (.302) {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale, through the ferrule and past the parting line (a BORE callout: the .XXX ±.005 row, Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}})."
+instruction = "Feed the N (.302) drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{cad.run_in:.2dot}}: the drill's full diameter then runs through the ferrule and past the parting line (a BORE callout: the .XXX ±.005 row, Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}})."
 settings = "lathe-drill-n-c360"
 cut_diameter_mm = 7.6708
 hole_depth_mm = "{{cad.run_mm}}"

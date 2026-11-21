@@ -167,7 +167,7 @@ speed_kind = "spindle"
 tool = "drill-d"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Drill D {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale, backing fully out to clear chips every {{cad.bore_dia_mm:in.2dot}} in: through both hubs and past the second parting line."
+instruction = "Feed the D drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{cad.run_in:.2dot}}, backing fully out to clear chips every {{cad.bore_dia_mm:in.2dot}} in: the drill's full diameter then runs through both hubs and past the second parting line."
 settings = "lathe-drill-d-1018"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 hole_depth_mm = "{{cad.run_mm}}"

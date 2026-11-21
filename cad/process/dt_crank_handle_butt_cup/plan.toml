@@ -184,6 +184,7 @@ settings = "lathe-drill-20-1018"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 hole_depth_mm = "{{cad.run_mm}}"
 peck = { step_mm = "{{cad.bore_dia_mm}}", retract = "full" }
+peck_reason = "1018 drilled from a hand-fed tailstock quill, L/D about 2.7: backing out every diameter keeps the #20's chips from packing in its flutes"
 
 [[setups.operations]]
 cut_kind = "other"
