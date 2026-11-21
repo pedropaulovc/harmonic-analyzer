@@ -100,3 +100,9 @@ tool = "drill-n"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, pecking, dry"
+
+[settings.lathe-drill-10-c360]
+tool = "drill-10"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, pecking, dry"
