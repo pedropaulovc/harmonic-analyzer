@@ -97,9 +97,6 @@ description = "3/8 in ground setting mandrel"
 # record that holds the tool's ownership.
 [tools.boring-bars-meda-6045000]  # inventory tools.boring-bars-meda-6045000
 description = "MEDA 6045000 double-ended lathe boring bars for tool bits, 3/8 to 1 in"
-[tools.chamfer-mill-carbide-1-4-90]  # inventory tools.chamfer-mill-carbide-1-4-90
-description = "Carbide 1/4 in 90° chamfering end mill, 2-flute (McMaster 3073A46)"
-diameter_mm = 6.35
 [tools.drill-30-cobalt]  # MHA-DT-24 #30 DRILL .129 THRU in 17-7 PH Cond C
 description = "#30 (.1285 in) cobalt jobber drill, for 17-7 PH spring steel"
 diameter_mm = 3.2639
@@ -131,7 +128,7 @@ diameter_mm = 1.5875
 [tools.reamer-1562]  # MHA-DT-31 (Ø.156) REAM .17 at assembly with MHA-DT-06; MHA-DT-06 (Ø.156) REAM .17 for dowel MHA-DT-VN-59
 description = "5/32 (.1562 in) HSS chucking reamer"
 diameter_mm = 3.96875
-[tools.reamer-1570]  # MHA-DT-03-TL-01 132X .1570 +.0005/.0000 REAM THRU; MHA-DT-14 .1570 +.0005/.0000 FLAT-BOTTOM REAM
+[tools.reamer-1570]  # MHA-DT-03-TL-01 132X .1570 +.0005/.0000 REAM THRU (MHA-DT-14 FLAT-BOTTOM REAM: tools.reamer-1570-bottoming)
 description = ".1570 in HSS chucking reamer"
 diameter_mm = 3.9878
 [tools.reamer-1610]  # MHA-DT-08 (Ø.161) REAM THRU, running fit on MHA-DT-32
@@ -181,6 +178,38 @@ description = "C36000 free-cutting brass, H02, round bar, 2-5/8 in / 2-1/4 in / 
 description = "C67500 manganese bronze, round bar, 5/8 in"
 [stock.gray-iron-casting-cone-pivot-post]
 description = "gray iron, class not ruled, casting for MHA-DT-05 cone pivot post"
+
+# --- .2510-.2515 reamed bores (MHA-DT-18, and any dt part with that band) ---
+# Go/no-go pair for the Ø.2500 +.0010/+.0015 REAM THRU bores, as the MHA-CH-13
+# hub pair (common.toml gauges.plug-gauges-4000-4005): Vermont Gage standard
+# Class X steel pin/plug gages, .2510 GO (plus tolerance) and .2515 NO-GO
+# (minus tolerance), each ± .000040 in (= 0.001016 mm, the resolution here).
+# Not owned: to buy (cad/config/shop-equipment/ gauges, same key). The tools
+# record lets a plan list the pair in its tooling.
+[tools.plug-gauges-2510-2515]
+description = "Plug gauge pair, .2510 GO (plus) and .2515 NO-GO (minus), Vermont Gage Class X"
+
+# --- MHA-DT-14 pinion bracket strap (cad/process/dt_pinion_bracket/plan.toml) ---
+# Go/no-go pairs for its other two reamed sizes, as the .2510-.2515 pair
+# above: Vermont Gage standard Class X steel pin/plug gages, GO at the low
+# limit (plus tolerance) and NO-GO at the high limit (minus tolerance), each
+# ± .000040 in (= 0.001016 mm, the resolution here). The arbor bore Ø.3125
+# +.0010/+.0015 (.3135-.3140) and the follower seat Ø.1570 +.0005/.0000
+# (.1570-.1575). Not owned: to buy (cad/config/shop-equipment/ gauges, same
+# keys). The tools records let the plan list each pair in its tooling.
+[tools.plug-gauges-3135-3140]
+description = "Plug gauge pair, .3135 GO (plus) and .3140 NO-GO (minus), Vermont Gage Class X"
+[tools.plug-gauges-1570-1575]
+description = "Plug gauge pair, .1570 GO (plus) and .1575 NO-GO (minus), Vermont Gage Class X"
+# The follower seat's FLAT-BOTTOM REAM (.1570 +.0005/.0000, .16 deep, floor
+# corners R.008 max): a chucking reamer's 45° lead cannot reach the floor
+# corner, so the seat takes a bottoming (square-end, end-cutting) reamer,
+# bought with its corner break .002 in max to stay inside R.008. Not owned:
+# to buy (cad/config/shop-equipment/ tools-reamers-taps, same key).
+# diameter_mm is its nominal size.
+[tools.reamer-1570-bottoming]
+description = ".1570 in HSS bottoming (square-end) chucking reamer, corner break .002 max"
+diameter_mm = 3.9878
 
 # --- MHA-DT-02 arbor pedestal (cad/process/dt_arbor_pedestal/plan.toml) -----
 # Go/no-go pair for its reamed arbor bore Ø.3750 +.0015/+.0010 (.3760-.3765),

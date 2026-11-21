@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 520" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="520"/>
+  <text class="title" x="20" y="20">PB04, front view: pivot end at the left, seat flank up, face A against the fixed jaw (behind)</text>
+  <rect class="fixture-support" x="106" y="220" width="336" height="60"/>
+  <line class="hidden" x1="10" y1="178.9" x2="425" y2="178.9"/>
+  <path class="part-kept" d="M190,130 L358,130 A45,45 0 0 1 358,220 L190,220 A45,45 0 0 1 190,130 Z"/>
+  <circle class="holes" cx="190" cy="175" r="19.1"/>
+  <circle class="holes" cx="358" cy="175" r="23.9"/>
+  <rect class="holes" x="220" y="130" width="24" height="24.4"/>
+  <rect class="holes" x="185.2" y="130" width="9.6" height="90"/>
+  <line class="active-face" x1="190" y1="130" x2="358" y2="130"/>
+  <rect class="cutter" x="220" y="64" width="24" height="58"/>
+  <line class="arrow" x1="268" y1="70" x2="268" y2="120"/>
+  <text class="label-halo" x="278" y="86">follower seat: spot, #26, 1/8 in end mill floor, .1570 reamer</text>
+  <text class="label-halo" x="278" y="104">cross hole at X0: spot, 1/16 drill through the pivot bore</text>
+  <line class="datum" x1="190" y1="284" x2="190" y2="296"/>
+  <text class="datum-label" x="200" y="300">X0: pivot bore axis</text>
+  <line class="datum" x1="85" y1="130" x2="105" y2="130"/>
+  <text class="datum-label" x="20" y="124">Z0: seat flank</text>
+  <circle class="cutter" cx="129.8" cy="175" r="15.2"/>
+  <line class="leader" x1="129.8" y1="190.2" x2="40" y2="306"/>
+  <text class="label-halo" x="20" y="320">edge finder on the pivot end's apex</text>
+  <text class="label" x="470" y="182.9">jaw tops (dashed, behind)</text>
+  <line class="leader" x1="465" y1="246" x2="436" y2="246"/>
+  <text class="label" x="470" y="250">1 in + 1/2 in parallels stacked</text>
+  <text class="title" x="20" y="344">Section through the cross hole, across the jaws (fixed jaw at the right)</text>
+  <rect class="clamp" x="243.4" y="425.2" width="50" height="84.8"/>
+  <rect class="clamp" x="366.6" y="425.2" width="50" height="84.8"/>
+  <rect class="fixture-support" x="293.4" y="480" width="25.4" height="30"/>
+  <rect class="fixture-support" x="341.2" y="480" width="25.4" height="30"/>
+  <rect class="section" x="293.4" y="360" width="73.2" height="120"/>
+  <rect class="holes" x="293.4" y="394.5" width="73.2" height="51"/>
+  <rect class="holes" x="323.6" y="360" width="12.8" height="120"/>
+  <text class="label" x="426.6" y="441.2">face A at the fixed jaw: Y0</text>
+  <text class="label" x="83.4" y="441.2">face B at the moving jaw</text>
+  <line class="leader" x1="422" y1="420" x2="362" y2="410"/>
+  <text class="label" x="426.6" y="424">pivot bore (crossed)</text>
+  <text class="label" x="426.6" y="502">1/8 in parallel each side: the drill exits between them</text>
+</svg>

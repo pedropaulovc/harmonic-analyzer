@@ -221,23 +221,6 @@ sfm = 50  # Below LMS 70 for hand feed in 304: ~600 rpm (machinist review 2026-1
 chip_load_mm_per_tooth = 0.0254
 flutes = 2
 
-# --- MHA-CH-13 rocker strap (cad/process/ch_rocker_strap/plan.toml) ---
-# The 1/8 in carbide end mill at Tru-Edge's chip load (owner ruling
-# 2026-11-17, relayed by Main): Tru-Edge "Solid Carbide Endmills Feeds and
-# Speeds" (PDF read 2026-11-17), row Low Carbon Steel - 1018, 1/8 in: .001
-# in/tooth, 200-400 SFM. The 6G table's .0006 in/tooth
-# (settings.endmill-carbide-3fl-1-8-1018-cf) is below the .001 in/tooth floor
-# of prechips' milling feed-factor table (Machinery's Handbook Table 4), which
-# is not extended without a source, so the strap's outline runs at this
-# setting; HA #3050 measures it. 2800 rpm as the 6G setting (92 ft/min).
-[settings.endmill-carbide-3fl-1-8-1018-cf-tru-edge]
-tool = "endmill-carbide-3fl-1-8"
-material = "rocker-1018-cold-finished"
-rpm = 2800
-chip_load_mm_per_tooth = 0.0254  # .001 in; 2800 × 3 × .001 = 8.4 in/min
-flutes = 3
-feed_unit = "in/min"
-
 # Hub hole Ø.4000 +.0005/0 REAM THRU. The 25/64 (.3906 in) drill is the
 # 115-piece index's (as tools.jig-drill-11-32), nominal × 25.4; it leaves
 # .0094 in on the diameter for the reamer. The .4000 reamer is not owned

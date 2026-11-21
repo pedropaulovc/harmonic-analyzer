@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="16" y="22">Setup 14: brass black on every surface</text>
+  <polygon class="part-kept" points="74.2,70.0 344.5,70.0 358.7,84.2 358.7,269.1 60.0,269.1 60.0,84.2"/>
+  <rect class="holes" x="60.0" y="102.0" width="298.7" height="48.4"/>
+  <circle class="part-threads" cx="305.4" cy="212.2" r="15.3"/>
+  <circle class="holes" cx="305.4" cy="212.2" r="11.2"/>
+  <circle class="part-threads" cx="113.3" cy="212.2" r="15.3"/>
+  <circle class="holes" cx="113.3" cy="212.2" r="11.2"/>
+  <line class="hidden" x1="209.4" y1="150.4" x2="209.4" y2="269.1"/>
+  <line class="active-face" x1="74.2" y1="70.0" x2="344.5" y2="70.0"/>
+  <line class="active-face" x1="60.0" y1="269.1" x2="358.7" y2="269.1"/>
+  <line class="active-face" x1="60.0" y1="84.2" x2="60.0" y2="269.1"/>
+  <line class="active-face" x1="358.7" y1="84.2" x2="358.7" y2="269.1"/>
+  <text class="label" x="440.0" y="100.0">every face, the rebate and relief,</text>
+  <line class="leader" x1="436.0" y1="96.0" x2="358.7" y2="130.0"/>
+  <circle class="leader-dot" cx="358.7" cy="130.0" r="2.5"/>
+  <text class="label" x="440.0" y="130.0">the chamfers and the tapped holes</text>
+  <line class="leader" x1="436.0" y1="126.0" x2="305.4" y2="212.2"/>
+  <circle class="leader-dot" cx="305.4" cy="212.2" r="2.5"/>
+  <text class="label" x="16.0" y="406.0">Gated: the Brass Black, the degreaser, the oil and the PPE are to buy.</text>
+</svg>
