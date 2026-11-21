@@ -520,8 +520,9 @@ cite = ["Owner (Pedro) 2026-11-21: \"p1 hss and 0.252\\\"\"", "Somma Tool, T-Typ
 # To buy (owner 2026-11-21, via Main: add a better parting blade to the shop
 # records): the premium P1 for the AXA No. 7 holder (Aloris AXA-7 and its
 # clones take 1/2 in high T-type blades). Same 1/16 in kerf as the on-hand
-# P1, so no plan changes when it arrives; the travelers mike whichever blade
-# is mounted. T15 HSS over the on-hand M2 for edge life in 1018 and O1;
+# P1, so no plan's numbers change when it arrives, only the tool refs (#3326);
+# the travelers mike whichever blade is mounted. T15 HSS over the on-hand M2
+# for edge life in 1018 and O1;
 # chosen over the P1 carbide-tipped (LMS 3415, $139.95: brittle under a hand
 # feed) and the P2 indexable (LMS 5020, $47.95: GTN-2 inserts, not included,
 # and a wider kerf). The deepest part-off is the 1-3/4 in 1018 arbor collar:

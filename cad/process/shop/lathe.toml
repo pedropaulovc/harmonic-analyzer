@@ -78,6 +78,15 @@ material = "lathe-1018-cold-finished"
 rpm = 300
 feed = "by hand, steady, cutting oil; back out to clear chips"
 
+# The P1 HSS blade at the Ø1.75 collar: 60 % of the LMS HSS turning speed for
+# 1018 (125-215 ft/min, so about 75 ft/min) is 164 rpm there; 300 rpm would
+# be 137 ft/min, about 1.8x the rule, on the deepest part-off in the shop.
+[settings.lathe-part-1018-large]
+tool = "cutoff-blade-p1"
+material = "lathe-1018-cold-finished"
+rpm = 160
+feed = "by hand, steady, cutting oil; back out to clear chips"
+
 [settings.lathe-part-c360]
 tool = "cutoff-blade-p1"
 material = "lathe-c360"

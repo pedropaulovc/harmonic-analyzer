@@ -107,7 +107,7 @@ gauge_checks = [{ gauge = "plug-gauges-4000-4005", band_mm = [10.16, 10.1727] }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A strap hole the NO-GO enters or the GO does not is outside MHA-CH-13's own .4000–.4005 hole band, the strap traveler's hub-hole check: that strap is nonconforming, so make no hub for it. Set it aside for the strap traveler's own disposition (remade, not fitted with a hub turned to it)."
+instruction = "A strap hole the NO-GO enters or the GO does not is outside MHA-CH-13's own .4000–.4005 hole band, the strap traveler's hub-hole check: that strap is nonconforming, so make no hub for it. Set it aside and tell the owner: the strap is remade, not fitted with a hub turned to it."
 
 [[setups.operations]]
 cut_kind = "other"
