@@ -577,7 +577,7 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "Every load, still clamped: the faces below D on both blanks (the shank's on the first load only: CR03 cuts it from the ring face's Z0)."
-inspection = "Ring's face {{cad.ring_near_face_offset_min_in:.4dot}}–{{cad.ring_near_face_offset_max_in:.4dot}} below D, and, first load, the shank's {{cad.shank_near_face_offset_min_in:.3dot}}–{{cad.shank_near_face_offset_max_in:.3dot}}, each from the uncut frame's top at D beside the shank, right of the ring zone cut this setup (not the frame beside the ring, cut below D): the calipers' depth rod, read to .0005. Outside: stop and tell the owner."
+inspection = "Ring's face {{cad.ring_near_face_offset_min_in:.4dot}}–{{cad.ring_near_face_offset_max_in:.4dot}} below D, and, first load, the shank's {{cad.shank_near_face_offset_min_in:.3dot}}–{{cad.shank_near_face_offset_max_in:.3dot}}, each from the frame's top beside it, still at D (the strips along each blank's edges are left uncut): the calipers' depth rod, read to .0005. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.ring_near_face_offset_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.shank_near_face_offset_band_mm}}" },
