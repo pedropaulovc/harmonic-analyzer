@@ -195,6 +195,8 @@ def test_a_nut_too_close_under_the_saw_is_caught_over_the_top_ends(tmp_path) -> 
         ({"saw_touch_error_mm": 0.0254}, "ledge's budget"),
         ({"saw_touch_error_mm": 0.0127}, "saw_touch_error_mm is finer"),
         ({"seat_measure_mm": 0.00254}, "seat_measure_mm is finer"),
+        ({"saw_touch_step_mm": 0.0254}, "saw_touch_error_mm is finer"),
+        ({"sweep_zero_return_mm": 0.005}, "seat_measure_mm is finer"),
         ({"riser_blank_spread_max_mm": 0.127}, "riser_blank_spread_max_mm"),
         ({"riser_face_overhang_mm": -50.0}, "riser_face_overhang_mm"),
         ({"riser_parallel_height_mm": 38.1}, "to grip"),

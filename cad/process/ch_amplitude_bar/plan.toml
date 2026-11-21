@@ -53,9 +53,10 @@
 # 1 x 3 in 6061-T6511 bar (stock.6061-flat-1x3, 12 in on hand, freed by the
 # oblique jig's deletion): 3 in long (the bar's width, as bought), 1 in tall
 # (the bar's thickness), .92-.96 wide (the saw cut). A new pair is faced by
-# CA00_riser_face, clamped side by side across the jaws on the 1 in
-# parallels with their tops over the jaw tops: one Z, one clamping, edge to
-# edge wherever the moving jaw closes, so their tops are one plane at one
+# CA00_riser_face in Setup 2: each block standing across the jaws on both
+# 1 in parallels, the two side by side along the jaws, their tops over the
+# jaw tops: one Z, one clamping, edge to
+# edge wherever they stand along the jaws, so their tops are one plane at one
 # height (miked: all eight corners within .0005); every faced top edge is
 # then broken with a .03 x 45° chamfer. In use they stand end to end
 # on the vise bed (3 + 3 in under the 6.247 in jaws, neither past a jaw
@@ -180,19 +181,24 @@ riser_face_woc_mm = 6.35
 # The P2-P4 ledge budget (cam.py checks it against each ledge band's
 # ±.002, ledge_margin_min_mm to spare). Each P2-P4 ledge is cut from the
 # P1 bar's saw Z0 and is off by:
-# - saw_touch_error_mm (.0006): the saw lowered in 0.01 mm (.0004) steps to
-#   the first drag of the .002 leaf, the leaf's ±.0001 and P1's miked
-#   section's ±.0001;
+# - saw_touch_error_mm (.0006): the saw lowered in saw_touch_step_mm
+#   (0.01 mm, .0004) steps to the first drag of the .002 leaf, the leaf's
+#   ±.0001 and P1's miked section's ±.0001;
 # - seat_offset_max_mm (.0005): the seat sweep's acceptance of the bar's
 #   down face against P1's where the notch is cut (the DTI on each bar's top
 #   less its miked section), covering the riser's spread, the bar's seat
 #   and any tilt together;
 # - seat_measure_mm (.0003): the sweep's error, two micrometer readings'
-#   ±.0001 and the DTI's .001 mm.
-# Total .0014 of the ±.002: .0006 to spare, over ledge_margin_min_mm.
+#   ±.0001, the DTI's .001 mm and the zero's drift the sweep's return to
+#   P1 accepts (sweep_zero_return_mm, .002 mm).
+# Total .0014 of the ±.002: .0006 to spare, over ledge_margin_min_mm. cam.py
+# also floors the two measuring terms at those steps and the shop's gauge
+# resolutions.
+saw_touch_step_mm = 0.01
+sweep_zero_return_mm = 0.002
 saw_touch_error_mm = 0.01524
 seat_offset_max_mm = 0.0127
-seat_measure_mm = 0.00762
+seat_measure_mm = 0.00808
 ledge_margin_min_mm = 0.0127
 # Each load's ends stand this far past the jaw side (.75 in): past the top
 # notch's depth, so the saw never reaches the jaws.
@@ -462,7 +468,7 @@ machine_ref = "pm-30mv"
 holding = "Skip this setup if the riser is on hand. The two new blocks in the PM 6 in vise on the 1 in pair from the parallel set, one parallel against each jaw. Each block stands across the jaws, TOP up, its 3 in length between them: the bar's as-bought edges against the jaws, never a sawn face, and it rests on both parallels. The two side by side along the jaws, centred. Their tops stand about .2 above the jaw tops; the jaws grip their lower .77 in."
 datum = "Program CA00_riser_face (end mill). G54: X0 the vise's left jaw side, Y0 the fixed jaw's face, Z0 the higher riser top. +X along the jaws to the right, +Y toward the fixed jaw."
 diagram = { file = "diagrams/riser.svg", alt = "Two riser blocks side by side along the jaws, each standing across the jaws on the two 1 in parallels, their tops above the jaw tops; the end mill faces both tops in passes along the jaws." }
-envelope = { x_span_mm = ["{{process.vise_jaw_width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.riser_length_max_mm}}", "{{process.riser_face_woc_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_parallel_height_mm}}", "{{process.riser_blank_height_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_parallel_height_mm}}", "{{process.riser_height_min_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.vise_jaw_width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.riser_length_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_parallel_height_mm}}", "{{process.riser_blank_height_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_parallel_height_mm}}", "{{process.riser_height_min_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.riser_length_max_mm}}", along_jaws_mm = "{{process.riser_pair_width_max_mm}}", part_height_mm = "{{process.riser_blank_height_max_mm}}", parallel_height_mm = "{{process.riser_parallel_height_mm}}", overhang_mm = ["{{process.riser_face_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "y", hold = "cantilever", extent_mm = [0, "{{process.riser_length_max_mm}}"], clamp_mm = [0, "{{process.riser_length_max_mm}}"], section_mm = { x = "{{process.riser_width_min_mm}}", z = "{{process.riser_height_min_mm}}" }, vise_left = "other" }
 
@@ -534,7 +540,7 @@ instruction = "Every load, clamped as above, the seat sweep: spindle stopped, th
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Jog Y only (X and Z stay) to the middle of the P2, P3 and P4 bars and write each reading in mm, + up, then back to P1: it must read 0 ±0.002 mm, or the zero slipped: zero it there again and repeat the sweep. For each bar: d = its reading ÷ 25.4 − (its foot-end L-to-R reading − P1's)."
+instruction = "Jog Y only (X and Z stay) to the middle of the P2, P3 and P4 bars and write each reading in mm, + up, then back to P1: it must read 0 ±{{process.sweep_zero_return_mm:.3f}} mm, or the zero slipped: zero it there again and repeat the sweep. For each bar: d = its reading ÷ 25.4 − (its foot-end L-to-R reading − P1's)."
 inspection = "Every d within ±{{process.seat_offset_max_mm:in.4dot}}: that bar's down face, where its notch is cut, stands within that of P1's, which the saw's Z0 is touched on, so its ledge stays inside {{cad.foot_notch_ledge_min_in:.3dot}}–{{cad.foot_notch_ledge_max_in:.3dot}} with the touch-off's own error. Over: open the vise, brush the riser and the bars, reseat, tap down while closing and sweep again. Over after a second reseat: stop and tell the owner."
 gauge_checks = "other"
 
@@ -585,7 +591,7 @@ instruction = "Only after a reset or homing ($H) since CA01_foot_end parked T1: 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0 again, from the saw's lower face, its rim 3 mm in over the end of the P1 bar: spindle stopped, jog Z only, down in CNCjs (0.01 mm steps near the leaf), until a .002 leaf just drags under the saw on that bar's top; G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051). CA02 loads no tool."
+instruction = "G54 Z0 again, from the saw's lower face, its rim 3 mm in over the end of the P1 bar: spindle stopped, jog Z only, down in CNCjs ({{process.saw_touch_step_mm:.2f}} mm steps near the leaf), until a .002 leaf just drags under the saw on that bar's top; G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051). CA02 loads no tool."
 feed = "hand"
 
 [[setups.operations]]
@@ -664,7 +670,7 @@ instruction = "Every load, clamped as above, the seat sweep: spindle stopped, th
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Jog Y only (X and Z stay) to the middle of the P2, P3 and P4 bars and write each reading in mm, + up, then back to P1: it must read 0 ±0.002 mm, or the zero slipped: zero it there again and repeat the sweep. For each bar: d = its reading ÷ 25.4 − (its top-end L-to-R reading − P1's)."
+instruction = "Jog Y only (X and Z stay) to the middle of the P2, P3 and P4 bars and write each reading in mm, + up, then back to P1: it must read 0 ±{{process.sweep_zero_return_mm:.3f}} mm, or the zero slipped: zero it there again and repeat the sweep. For each bar: d = its reading ÷ 25.4 − (its top-end L-to-R reading − P1's)."
 inspection = "Every d within ±{{process.seat_offset_max_mm:in.4dot}}: that bar's down face, where its notch is cut, stands within that of P1's, which the saw's Z0 is touched on, so its ledge stays inside {{cad.top_notch_ledge_min_in:.3dot}}–{{cad.top_notch_ledge_max_in:.3dot}} with the touch-off's own error. Over: open the vise, brush the riser and the bars, reseat, tap down while closing and sweep again. Over after a second reseat: stop and tell the owner."
 gauge_checks = "other"
 
@@ -724,7 +730,7 @@ instruction = "Only after a reset or homing ($H) since CA03_top_end parked T1: f
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0 again, from the saw's lower face, its rim 3 mm in over the end of the P1 bar: spindle stopped, jog Z only, down in CNCjs (0.01 mm steps near the leaf), until a .002 leaf just drags under the saw on that bar's top; G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
+instruction = "G54 Z0 again, from the saw's lower face, its rim 3 mm in over the end of the P1 bar: spindle stopped, jog Z only, down in CNCjs ({{process.saw_touch_step_mm:.2f}} mm steps near the leaf), until a .002 leaf just drags under the saw on that bar's top; G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
 feed = "hand"
 
 [[setups.operations]]

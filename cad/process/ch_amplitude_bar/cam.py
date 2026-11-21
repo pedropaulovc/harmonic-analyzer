@@ -128,8 +128,6 @@ RISER_GRIP_MIN_MM = 12.7
 # CA00's pass, touched off on the higher top, takes at least this (.001) off
 # the lowest corner Setup 1 accepts.
 RISER_FACE_CUT_MIN_MM = 0.0254
-# The plan's saw touch-off lowers the saw in steps of this (0.01 mm).
-SAW_TOUCH_STEP_MM = 0.01
 
 
 def _plan_operations(plan: dict[str, Any]):
@@ -505,19 +503,21 @@ def context(
     ledge_budget = (
         p["saw_touch_error_mm"] + p["seat_offset_max_mm"] + p["seat_measure_mm"]
     )
-    # The two measuring terms are no finer than the shop's gauges: the
-    # touch-off its steps plus the leaf's and P1's miked readings, the sweep
-    # two miked sections plus the DTI's reading.
+    # The two measuring terms are no finer than the plan's own steps and the
+    # shop's gauges: the touch-off its saw_touch_step_mm steps plus the
+    # leaf's and P1's miked readings; the sweep two miked sections, the DTI's
+    # reading and the zero drift its return to P1 accepts.
     mic = shop["gauges"]["micrometers"]["resolution_mm"]
     dti = shop["gauges"]["dti"]["resolution_mm"]
-    if p["saw_touch_error_mm"] < SAW_TOUCH_STEP_MM + 2 * mic - 1e-9:
+    if p["saw_touch_error_mm"] < p["saw_touch_step_mm"] + 2 * mic - 1e-9:
         raise ValueError(
             "process.saw_touch_error_mm is finer than its touch-off steps and two "
             "micrometer readings"
         )
-    if p["seat_measure_mm"] < 2 * mic + dti - 1e-9:
+    if p["seat_measure_mm"] < 2 * mic + dti + p["sweep_zero_return_mm"] - 1e-9:
         raise ValueError(
-            "process.seat_measure_mm is finer than two micrometer readings and the DTI"
+            "process.seat_measure_mm is finer than two micrometer readings, the DTI "
+            "and the sweep's zero return"
         )
     for name, notch in (("foot", foot), ("top", top)):
         lo, hi = notch["ledge"]
