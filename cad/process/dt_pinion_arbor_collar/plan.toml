@@ -6,7 +6,7 @@ part = "MHA-DT-33 Pinion Arbor Retention Collar"
 revision = "placeholder"
 material = "low-carbon cold-finished steel bar, ASTM A108 (1018, 1020 or 12L14)"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["1018-round-5-8"]
 
 [[tools]]

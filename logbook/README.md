@@ -81,7 +81,7 @@ establish that it applies.
 ## Machines
 
 The shop's machines, workholding, gauges and traveler tooling are in
-[`cad/process/shop.toml`](../cad/process/shop.toml); the few equipment and stock
+[`cad/process/shop/`](../cad/process/shop/); the few equipment and stock
 facts CAD reads beyond that are in
 [`cad/config/shop-equipment/`](../cad/config/shop-equipment/). The former
 full inventory (bench tools, stock rack) is history, last at

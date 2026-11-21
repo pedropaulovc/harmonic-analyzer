@@ -2,7 +2,7 @@
 # and workholding a process plan names, that the prechips shop schema cannot
 # express. Each fact lives in exactly one
 # file: anything prechips can hold (machines, chucks, measuring ranges and
-# resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
+# resolutions, tools' sizing data, cutting settings) is in cad/process/shop/,
 # and no field here repeats one there. An object may appear in both files with
 # disjoint fields (gauges.dti, gauges.pin-gauges).
 #
@@ -16,8 +16,8 @@
 
 # --- measuring equipment on the mill -------------------------------------
 
-# The PM-30MV's installed DRO; the mill's own capacity is cad/process/shop.toml
-# machines.pm-30mv, and its scale resolution is shop.toml gauges.mill-x-dro.
+# The PM-30MV's installed DRO; the mill's own capacity is cad/process/shop/
+# machines.pm-30mv, and its scale resolution is shop/ gauges.mill-x-dro.
 [dro.pm-30mv]
 make = "MagXact MX-100M"
 status = "on_hand"

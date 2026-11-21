@@ -447,7 +447,8 @@ def test_release_stages_every_cam_output_under_nc_and_refuses_missing_or_stale_o
     recipe.parent.mkdir(parents=True)
     recipe.write_bytes(f'STEM = "{stem}"\nPROGRAMS = [("OP1", ()), ("OP2", ())]\n'.encode())
     (process / stem / "plan.toml").write_bytes(b"[parameters]\nhub_x_mm = 1.0\n")
-    (process / "shop.toml").write_bytes(b"[tools]\n")
+    (process / "shop").mkdir()
+    (process / "shop" / "common.toml").write_bytes(b"[tools]\n")
     runtime = tmp_path / "_freecad_cam_runtime.py"
     runtime.write_bytes(b"# runtime\n")
     out = tmp_path / "cad" / "out"
@@ -455,7 +456,7 @@ def test_release_stages_every_cam_output_under_nc_and_refuses_missing_or_stale_o
     monkeypatch.setattr(_cam_programs, "PROCESS_ROOT", process)
     monkeypatch.setattr(_cam_programs, "RUNTIME_PATH", runtime)
     monkeypatch.setattr(_process_plans, "PROCESS_ROOT", process)
-    monkeypatch.setattr(_process_plans, "SHOP_PATH", process / "shop.toml")
+    monkeypatch.setattr(_process_plans, "SHOP_DIR", process / "shop")
     monkeypatch.setattr(cut_release, "CAD_ROOT", out.parent)
     features, step = export_features.bundle_paths(stem, out)
     features.parent.mkdir(parents=True)
@@ -472,7 +473,7 @@ def test_release_stages_every_cam_output_under_nc_and_refuses_missing_or_stale_o
     manifest = directory / _cam_programs.MANIFEST_NAME
     inputs = {
         "features": features, "step": step, "plan": process / stem / "plan.toml",
-        "shop": process / "shop.toml", "recipe": recipe, "runtime": runtime,
+        "shop/common.toml": process / "shop" / "common.toml", "recipe": recipe, "runtime": runtime,
     }
 
     def sha(path: Path) -> str:

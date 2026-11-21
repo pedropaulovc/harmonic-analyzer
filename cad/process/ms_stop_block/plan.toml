@@ -6,7 +6,7 @@ part = "MHA-MS-02 Stop Block"
 revision = "placeholder"
 material = "Brass"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["c360-flat-3-4x1-1-4"]
 
 [[tools]]

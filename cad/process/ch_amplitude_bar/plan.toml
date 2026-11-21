@@ -6,7 +6,7 @@ part = "MHA-CH-01 Amplitude Bar"
 revision = "placeholder"
 material = "low-carbon cold-finished steel, 1/4 in sq"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["1018-square-1-4"]
 
 [[tools]]

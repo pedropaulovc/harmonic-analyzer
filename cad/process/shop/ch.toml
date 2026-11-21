@@ -1,0 +1,329 @@
+# Channel (ch_*) records of the HA prechips shop directory: the tools,
+# cutting settings and stock only ch_* plans name (or ch specs/tests read).
+# Machines, workholding, limits, gauges and every record more than one family
+# names are in common.toml, with the conventions every file follows; prechips
+# merges the directory's files by section and refuses a key defined twice.
+
+# Source: base-bar.toml; Pedro's route dated 2026-11-05 and
+# table-clamped squaring sequence dated 2026-11-07 (see plan provenance).
+# diameter_mm: standard nominal size stated in each description, × 25.4 (HA's
+# per-tool diameter readings are not used; cad/process/README.md).
+# The 8-32 tap records the plan's authored #29 (.136 in) tap drill. The v48
+# drawing calls the #12 bracket drill (notes.process).
+# No helix_deg or axial_ratio on the 1/2 in end mills (this one, jig-em-half,
+# block-em-half-long): no catalogue or measurement states a helix, so their
+# cuts keep prechips' configured axial_ratio 1.0 (owner ruling 2026-11-16,
+# #2873).
+[tools.basebar-em-half]
+description = "1/2 in centre-cutting 2-flute end mill; flutes ≥5/8 in"
+diameter_mm = 12.7
+[tools.basebar-em-face]
+description = "3/4 in 4-flute end mill"
+diameter_mm = 19.05
+[tools.basebar-spot]
+description = "#2 centre drill"
+[tools.basebar-rail-drill]
+description = "#29 (.136 in) drill"
+diameter_mm = 3.4544
+[tools.basebar-bracket-drill]
+description = "#12 (.189 in) drill"
+diameter_mm = 4.8006
+[tools.basebar-tap]
+description = "8-32 plug tap"
+tap_drill_mm = 3.4544
+[tools.basebar-counterbore]
+description = "5/16 in centre-cutting 2-flute end mill"
+diameter_mm = 7.9375
+# Shrum Solutions Tri Fly fly cutter (owner, 2026-11-16, relayed by Main):
+# 2 in cutting Ø, three TCGT 32.52 carbide inserts, 3/4 in shank held in the
+# 3/4 in R8 collet. https://www.shrumsolutions.com/product-page/tri-fly and
+# https://www.shrumsolutions.com/general-5 (inserts).
+# No axial_ratio: no source states one, nor the inserts' lead or rake, so its
+# cuts keep prechips' configured 1.0 and the base bar's side 1 keeps five face
+# passes (owner ruling 2026-11-16, #2873; plan Setup 3).
+[tools.basebar-trifly]
+description = "Shrum Tri Fly, 2 in, 3 TCGT 32.52 inserts, 3/4 in shank"
+diameter_mm = 50.8
+# The base bar's Setup 3 X0 probe; inventory, wiring and holder:
+# cad/config/shop-equipment/ gauges.touch-probe-diy0-tp05.
+[tools.basebar-probe]
+description = "DIY0 TP05 3D touch probe, 6 mm shank"
+
+[settings.basebar-edge-6061-t6511]
+tool = "basebar-em-half"
+material = "6061-t6511"
+rpm = 1250
+feed = "6 in/min"
+# Measured: dechatter 0.3.0 report v11, 2026-11-12, on the PM-30MV with a 1/2 in
+# 2-flute HSS end mill (48.8 mm stickout, R8) side-milling 6061, conventional,
+# 7.62 mm deep: cad/process/dechatter/2026-11-12-pm30mv-em-half-hss-6061-v11.html.
+# Raw data: https://1drv.ms/u/c/302eadd0a0193b06/IQBA9O2JVkqiTq0-oYk6oitRAWDgJWY83FRwBQnn81tMpAg?e=sZ0jBr
+# Every pass held .089 mm (.0035 in)/tooth. Valid only for that tool assembly
+# and within 7.62 mm deep: deeper cuts take equal depth levels (the plan's
+# side_max_stepdown_mm). The chart record above stays for plans that cut
+# full depth in one level.
+# Wide: 2250 rpm was stable to 4.7 mm wide (chatter at 5.0); 1830 rpm
+# chattered at 2.2 mm, so keep off that band. 2250 * 2 * .0035 = 15.75 in/min
+# (the report's 400 mm/min).
+[settings.em-half-hss-6061-v11-wide]
+tool = "basebar-em-half"
+material = "6061-t6511"
+rpm = 2250
+feed = "15.75 in/min"
+# Narrow (≤ 0.6 mm wide): 0.6 mm was stable at every speed tested, 570 to
+# 2250 rpm. The ends ran at 1250 only to share the slots' belt range; the low
+# belt covers 100–2800 rpm, so they take the measured 2250 (owner ruling
+# 2026-11-16). 2250 * 2 * .0035 = 15.75 in/min.
+[settings.em-half-hss-6061-v11-narrow]
+tool = "basebar-em-half"
+material = "6061-t6511"
+rpm = 2250
+feed = "15.75 in/min"
+[settings.basebar-slot-rough-6061-t6511]
+tool = "basebar-em-half"
+material = "6061-t6511"
+rpm = 1250
+feed = "5 in/min"
+# Owner ruling 2026-11-11: the source guide's 165 ft/min HSS milling speed and
+# .002 in/tooth: 12*165/(pi*3/4)=840 rpm, rounded to 850;
+# 850 rpm * 4 flutes * .002 in/tooth = 6.8 in/min, rough and finish.
+[settings.basebar-face-6061-t6511]
+tool = "basebar-em-face"
+material = "6061-t6511"
+rpm = 850
+feed = "6.8 in/min"
+
+# Base-bar facing on the Tri Fly (owner, 2026-11-16, relayed by Main): 2500 rpm
+# on the low belt, .004 in/tooth: 2500 * 3 * .004 = 30 in/min (762 mm/min).
+# prechips 0.11.3 passes the plan's face cuts at .004; .005 and .006 are refused
+# on axial_ratio = 1 (prechips#429). #2850 keeps the dechatter sweep
+# (.004–.006 in/tooth at ≤ 2500 rpm) open.
+[settings.basebar-trifly-6061-t6511]
+tool = "basebar-trifly"
+material = "6061-t6511"
+rpm = 2500
+feed = "30 in/min"
+
+# Source: end-bracket.toml and feed-lever.toml; the 2026-11-02 interim
+# routes (MHA-CH-06-TL-28/TL-26 v47), the v48 manifest notes (#29 tap
+# drill, plug-start then bottoming-finish taps) and the archived
+# taps-unc-hand 8-32 plug/bottoming records.
+[tools.jig-saw]
+description = "Miter saw or bandsaw"
+[tools.jig-em-half]
+description = "1/2 in centre-cutting 2-flute end mill"
+diameter_mm = 12.7
+[tools.jig-drill-11-32]
+description = "11/32 (.3438 in) drill, 115-piece index"
+diameter_mm = 8.73125
+
+# The 1/2 in end mill on TL-26/TL-28, the riser's (TL-24) Setups 3-4 and the
+# blocks' faces (TL-22/TL-32) (owner ruling 2026-11-16, prechips #436): the speed and
+# feed the owner ran a 1/2 in 2-flute HSS end mill at on the PM-30MV, facing
+# the base bar's long edge (harmonic-analyzer
+# logbook/entries/2026-11-05-base-bar-on-the-table.md, op 3: 1800 rpm,
+# 7 in/min), on the low belt. 1800 rpm = 236 ft/min; 7 / (1800 x 2) =
+# .0019 in/tooth.
+[settings.jig-em-half-6061-t6511]
+tool = "jig-em-half"
+material = "6061-t6511"
+rpm = 1800
+feed = "7 in/min"
+
+# HA: the rocker arm's strap profile cutter on its low-carbon steel. Source:
+# HA cutting-data row low_carbon_steel / HSS / profile, 3-12.7 mm cutters:
+# LMS Milling table, row Plain carbon steels (1018): 65-110 ft/min, low end used;
+# UF endmill feed table, row Mild steel (.2-.3 C): 0.002-0.008 in/tooth, stated
+# for 1/2 to 1-1/2 in cutters; AUTHOR'S CHOICE below 1/2 in, half the UF low
+# end, 0.001 in = 0.0254 mm/tooth.
+[tools.rocker-profile-cutter]
+description = "HSS 4-flute end mill from the LMS 6784 set"
+
+[settings.rocker-profile-hss-low-carbon-steel]
+tool = "rocker-profile-cutter"
+material = "rocker-1018-cold-finished"
+sfm = 65
+chip_load_mm_per_tooth = 0.0254
+flutes = 4
+
+# Riser (MHA-CH-06-TL-24) plan: the v49 notes.process names the #30 screw and
+# stop holes, the #9 CL/CR clearances and the 12 mm HUB relief; the 1/4 in
+# drill pilots the 12 mm and the 82° countersink cuts the Ø.25 × 82° seats.
+# Nominal sizes × 25.4 (#30 .1285 in, #9 .1960 in). The riser's 12 mm drill
+# left the buy list with the oblique jig (owner 2026-11-17; #3083 row 20).
+# The countersink is not owned (cad/config/shop-equipment/, same key); the
+# index-plate and arm-plate plans also name it.
+[tools.riser-drill-quarter]
+description = "1/4 in drill, 115-piece index"
+diameter_mm = 6.35
+
+# Source: ch_rocker_arm_tl_oblique_{pivot,feed}_block/plan.toml (MHA-CH-06-TL-22
+# and TL-32, v50). The blocks also use saw-evolution-14, jig-em-half (the LMS
+# 6784 set's 1/2 in: every facing cut), jig-spot and basebar-counterbore (the
+# set's 5/16 in end mill: the counterbores). The drills are the 115-piece index
+# sizes the sheets print (#15 .180, F .257 tap drill); the 5/16 drill pilots
+# the Ø.375 leadscrew clearance. jig-drill-f and jig-tap-5-16-18-plug are the
+# carrier's (TL-21) records, byte-identical: keep one copy when both land.
+# block-em-3-8 is the LMS 6784 set's 3/8 in cutter (shop-equipment
+# endmills-lms-6784): plunged, it cuts the seat (squaring its floor) and
+# TL-32's leadscrew clearance to the title block's DRILLED HOLES band (owner
+# ruling 2026-11-13), the clearance from both ends so only its flutes enter
+# the hole (its flute_length_mm below).
+# block-em-half-long is the owner's 1/2 in end mill with at least 1.00 in of
+# flute (owner 2026-11-13), which reaches the .87 depth of TL-32's lug notch.
+[tools.jig-tap-5-16-18-plug]
+description = "5/16-18 UNC plug tap; T-handle wrench"
+tap_drill_mm = 6.5278
+[tools.block-em-3-8]
+description = "3/8 in centre-cutting 2-flute end mill (LMS 6784 set)"
+diameter_mm = 9.525
+# LOC .50 in: stub-length floor (typical catalogue: stub 1/2, regular 3/4);
+# LMS 6784 page states no LOC; owner ruling 2026-11-16.
+flute_length_mm = 12.7
+[tools.block-em-half-long]
+description = "1/2 in centre-cutting end mill, flutes ≥1.00 in"
+diameter_mm = 12.7
+
+# The long 1/2 in end mill: 1800 rpm = 236 ft/min (blind review 2026-11-14);
+# 7 in/min (owner ruling 2026-11-16, Pedro: both block end-mill settings at
+# 7 in/min), 7 / (1800 × 2) = .0019 in/tooth. The blocks' standard 1/2 in end
+# mill runs at jig-em-half-6061-t6511, the same 1800 rpm and 7 in/min.
+[settings.block-em-half-long-6061-t6511]
+tool = "block-em-half-long"
+material = "6061-t6511"
+rpm = 1800
+feed = "7 in/min"
+
+# --- MHA-CH-06-TL-VN-84 leadscrew kit rework ---
+# Plan: cad/process/ch_rocker_arm_tl_vn_oblique_leadscrew_kit/plan.toml.
+
+# The AR holder is the A R Warner LMS 4132 set's (TCMT insert, R0.4 nose;
+# owned, by photo in the 45952b66bc inventory); it faces the kit nut.
+[tools.lathe-ar]
+description = "A R Warner AR carbide turning holder, TCMT insert, R0.4 nose (LMS 4132)"
+
+# SUS304 screw, LittleMachineShop "Cutting Speeds" table (read live
+# 2026-11-13), row Stainless steel 304: milling 70 ft/min (low end). Hand feed.
+[settings.kit-em-half-sus304]
+tool = "jig-em-half"
+material = "sus304"
+sfm = 50  # Below LMS 70 for hand feed in 304: ~400 rpm (machinist review 2026-11-14).
+# Chip load authored (no sourced feed for 304): .001 in/tooth, the load
+# the plan's milling_cuts declare; the feed prints from the calculated rpm.
+chip_load_mm_per_tooth = 0.0254
+flutes = 2
+[settings.kit-flat-sus304]
+tool = "basebar-counterbore"
+material = "sus304"
+sfm = 50  # Below LMS 70 for hand feed in 304: ~600 rpm (machinist review 2026-11-14).
+# Chip load authored (no sourced feed for 304): .001 in/tooth, the load
+# the plan's milling_cuts declare; the feed prints from the calculated rpm.
+chip_load_mm_per_tooth = 0.0254
+flutes = 2
+
+# --- MHA-CH-13 rocker strap (cad/process/ch_rocker_strap/plan.toml) ---
+# The 1/8 in carbide end mill at Tru-Edge's chip load (owner ruling
+# 2026-11-17, relayed by Main): Tru-Edge "Solid Carbide Endmills Feeds and
+# Speeds" (PDF read 2026-11-17), row Low Carbon Steel - 1018, 1/8 in: .001
+# in/tooth, 200-400 SFM. The 6G table's .0006 in/tooth
+# (settings.endmill-carbide-3fl-1-8-1018-cf) is below the .001 in/tooth floor
+# of prechips' milling feed-factor table (Machinery's Handbook Table 4), which
+# is not extended without a source, so the strap's outline runs at this
+# setting; HA #3050 measures it. 2800 rpm as the 6G setting (92 ft/min).
+[settings.endmill-carbide-3fl-1-8-1018-cf-tru-edge]
+tool = "endmill-carbide-3fl-1-8"
+material = "rocker-1018-cold-finished"
+rpm = 2800
+chip_load_mm_per_tooth = 0.0254  # .001 in; 2800 × 3 × .001 = 8.4 in/min
+flutes = 3
+feed_unit = "in/min"
+
+# Hub hole Ø.4000 +.0005/0 REAM THRU. The 25/64 (.3906 in) drill is the
+# 115-piece index's (as tools.jig-drill-11-32), nominal × 25.4; it leaves
+# .0094 in on the diameter for the reamer. The .4000 reamer is not owned
+# (cad/config/shop-equipment/ tools.reamer-4000, to buy); diameter_mm is
+# its nominal size.
+[tools.drill-25-64]
+description = "25/64 (.3906 in) drill, 115-piece index"
+diameter_mm = 9.921875
+[tools.reamer-4000]
+description = ".4000 in HSS straight-flute chucking reamer"
+diameter_mm = 10.16
+
+# The strap traveler's fixture and tape, so its plan's refs resolve: the plan
+# prints its own name and description for each. Ownership is
+# cad/config/shop-equipment/ fixtures.strap-sub-plate and
+# consumables.tape-3m-vhb-5906.
+[tools.strap-sub-plate]
+description = "Fixture MHA-CH-13-TL-00: sub-plate TL-01 with its hub plug, washer, edge clamps and hub screw"
+[tools.tape-3m-vhb-5906]
+description = "3M VHB 5906 double-sided tape, .006 in"
+
+# --- MHA-CH-13-TL-01 rocker-strap sub-plate (cad/process/ch_rocker_strap_tl_sub_plate/plan.toml) ---
+# The 1/8 in carbide end mill on 6061 (fence notches, clamp pockets): The
+# Carbide End Mill Store "Carbide End Mill Speeds and Feeds, General Purpose,
+# Uncoated" (6gtools.com, the PDF the 1018 settings above cite, read
+# 2026-11-17), row Non-Ferrous N, Al/Al Alloys: 500 SFM, 1/8 in .0011 in/tooth
+# (.028 mm). 500 SFM on 1/8 in is 15,280 rpm; the spindle tops out at 2800
+# (machines.pm-30mv), 92 ft/min. Chip load at the table's chip-load factor
+# 1.0 (50 % radial engagement and more): 2800 × 3 × .0011 = 9.2 in/min.
+[settings.endmill-carbide-3fl-1-8-6061]
+tool = "endmill-carbide-3fl-1-8"
+material = "6061-t6511"
+rpm = 2800
+chip_load_mm_per_tooth = 0.02794  # .0011 in
+flutes = 3
+feed_unit = "in/min"
+
+# --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
+# The tools the placeholder plans name (cad/process/<stem>/plan.toml with
+# revision = "placeholder", not in _process_plans.TRAVELER_STEMS), from the
+# owner's quote workbook quotes-2026-11-17-rev3.xlsx (owner 2026-11-19). The
+# comment on each header cites its workbook row: an Items item_id, a Drills
+# size or a Tap coverage thread. diameter_mm is the drill or reamer's nominal
+# size. Ownership is the inventory's status under the same key
+# (cad/config/shop-equipment/).
+[tools.drill-47]  # Drills #47
+description = "#47 (.0785 in) drill, 115-piece index"
+diameter_mm = 1.9939
+[tools.drill-d]  # Drills D
+description = "D (.2460 in) drill, 115-piece index"
+diameter_mm = 6.2484
+[tools.drill-h]  # Drills H
+description = "H (.2660 in) drill, 115-piece index"
+diameter_mm = 6.7564
+[tools.reamer-0775]  # B-reamer-.0775
+description = ".0775 in HSS chucking reamer"
+diameter_mm = 1.9685
+[tools.reamer-2550]  # B-reamer-.2550
+description = ".2550 in HSS chucking reamer"
+diameter_mm = 6.477
+[tools.reamer-2560]  # B-reamer-.2560 (not the 6.5 mm B-reamer-.2559: #3083 row 4)
+description = ".2560 in HSS chucking reamer"
+diameter_mm = 6.5024
+[tools.tap-1-72-plug]  # Tap coverage #1-72 UNF
+description = "#1-72 UNF plug hand tap (OSG 1010700)"
+[tools.form-tool-r160]  # D-form-tool-R160
+description = "R.160 convex-dome form tool"
+
+# --- Stock the process plans name (stock_refs) ---------------------------------
+# One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
+# prechips can check each plan's stock_refs. Description only: the ownership
+# status stays in the inventory under the same key (stock assignment audit,
+# owner 2026-11-19).
+[stock.1018-flat-1-4x2-36in]
+description = "1018 cold-finish carbon steel, flat bar, 1/4 x 2 in, 36 in length"
+[stock.1018-flat-1-4x2-72in]
+description = "1018 cold-finish carbon steel, flat bar, 1/4 x 2 in, 72 in length"
+[stock.1018-flat-1-8x1-1-2]
+description = "1018 cold-finish carbon steel, flat bar, 1/8 x 1-1/2 in"
+[stock.1018-flat-5-16x1-36in]
+description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 36 in length"
+[stock.1018-flat-5-16x1-72in]
+description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 72 in length"
+[stock.1018-square-1-4]
+description = "1018 cold-finish carbon steel, square bar, 1/4 x 1/4 in"
+[stock.6061-flat-1-2x6-54in]
+description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 54 in length"
+[stock.6061-flat-1x3]
+description = "6061-T6511 aluminium, flat bar, 1 x 3 in"

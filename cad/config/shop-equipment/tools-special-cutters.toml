@@ -3,7 +3,7 @@
 # placeholder process plans name: from the owner's quote workbook
 # quotes-2026-11-17-rev3.xlsx and from the drawing cross-check of the plans
 # (owner 2026-11-19), whose notes cite the drawing callout.
-# Descriptions are cad/process/shop.toml under the same key; no field here
+# Descriptions are cad/process/shop/ under the same key; no field here
 # repeats one there. TOML, deliberately not YAML; no COM build closure reads
 # it: it is in no leaf's cache key.
 

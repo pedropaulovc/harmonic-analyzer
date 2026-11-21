@@ -6,7 +6,7 @@ part = "MHA-MG-07 Wheel Axle"
 revision = "placeholder"
 material = "AISI O1 or W1 drill rod, 3/16 in, ground, as supplied (annealed)"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "arbor-press"

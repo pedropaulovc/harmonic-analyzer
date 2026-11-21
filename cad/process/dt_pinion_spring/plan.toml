@@ -6,7 +6,7 @@ part = "MHA-DT-24 Pinion Return Leaf Spring"
 revision = "placeholder"
 material = "17-7 PH stainless (UNS S17700) strip, Condition C, ASTM A693; 0.015 in +/-0.00075 in, sheared 1/4 in wide from McMaster-Carr 2325K19"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "feeler-gauges"

@@ -6,7 +6,7 @@ part = "MHA-DT-08 Crank Handle"
 revision = "placeholder"
 material = "FAS white oak, clear, straight grain along axis; 6-8% MC"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "drill-25"

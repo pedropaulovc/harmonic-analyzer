@@ -180,13 +180,13 @@ Drawing-bound requirement manifests are exported with named STEP face sets.
 `prechips:<stem>` tasks render two standalone HTML
 [prechips](https://github.com/pedropaulovc/prechips) travelers (a concise `pro`
 sheet and a `hobby` sheet with setup pictures, which is the part's CNC setup
-sheet) for each part
-in `_process_plans.TRAVELER_STEMS` (the rocker strap is the first part
-enrolled for CNC) from its `cad/process/<stem>/plan.toml`, which reads that part's
-exported manifest, and print the hobby sheet to `<slug>-traveler.pdf`. They
+sheet) for each part whose `cad/process/<stem>/plan.toml` is not a placeholder
+(the rocker strap is the first part enrolled for CNC), from that plan, which
+reads the part's exported manifest and the shop directory `cad/process/shop/`,
+and print the hobby sheet to `<slug>-traveler.pdf`. They
 always use the latest prechips release from PyPI, run with `uv tool run`
-outside the project environment. `cam:<stem>` tasks post each part in
-`_cam_programs.CAM_STEMS` to G-code for the PM-30MV with headless FreeCAD CAM
+outside the project environment. `cam:<stem>` tasks post each part with a
+`cad/process/<stem>/cam.py` recipe to G-code for the PM-30MV with headless FreeCAD CAM
 (FreeCAD 1.1 or later on the machine that runs the build), with estimated
 cycle times. `build` renders the travelers and posts the programs alongside the
 drawing PDFs (`build_bare` does neither); every release ships the hobby PDFs

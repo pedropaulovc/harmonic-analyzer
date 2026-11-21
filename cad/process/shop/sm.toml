@@ -1,0 +1,52 @@
+# Summing (sm_*) records of the HA prechips shop directory: the tools,
+# cutting settings and stock only sm_* plans name (or sm specs/tests read).
+# Machines, workholding, limits, gauges and every record more than one family
+# names are in common.toml, with the conventions every file follows; prechips
+# merges the directory's files by section and refuses a key defined twice.
+
+# --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
+# The tools the placeholder plans name (cad/process/<stem>/plan.toml with
+# revision = "placeholder", not in _process_plans.TRAVELER_STEMS), from the
+# owner's quote workbook quotes-2026-11-17-rev3.xlsx (owner 2026-11-19). The
+# comment on each header cites its workbook row: an Items item_id, a Drills
+# size or a Tap coverage thread. diameter_mm is the drill or reamer's nominal
+# size. Ownership is the inventory's status under the same key
+# (cad/config/shop-equipment/).
+[tools.drill-36]  # Drills #36
+description = "#36 (.1065 in) drill, 115-piece index"
+diameter_mm = 2.7051
+[tools.drill-11-8mm]  # G-drill-11.8mm; Drills 11.8 mm
+description = "11.8 mm (or 11.75 mm) pre-drill for 12 mm H7 reamer"
+diameter_mm = 11.8
+[tools.reamer-12mm-h7]  # B-reamer-12mm-h7
+description = "12 mm HSS chucking reamer, .4724-.4726 in"
+diameter_mm = 12.0
+[tools.tap-10-24-bottoming]  # Tap coverage #10-24 UNC
+description = "#10-24 UNC bottoming hand tap (OSG 1025000)"
+[tools.tap-6-32-plug]  # Tap coverage #6-32 UNC
+description = "#6-32 UNC plug hand tap (OSG 1023700)"
+[tools.digital-angle-gauge]  # F-digital-angle-gauge
+description = "Digital angle gauge"
+
+# --- Drawing cross-check additions (2026-11-19) -------------------------------
+# Tools the v50 drawings call for that the quote workbook left out, from the
+# drawing cross-check of the placeholder plans (2026-11-19) and the owner's
+# rulings of that day. The comment cites the drawing callout or the inventory
+# record that holds the tool's ownership.
+[tools.reamer-1280]  # MHA-SM-02 Ø.1280 ±.0007 REAM (.37), drill point
+description = ".1280 in HSS chucking reamer"
+diameter_mm = 3.2512
+[tools.sine-bar-5]  # MHA-SM-03 122.4° ±.5° knife-edge stubs
+description = "Sine bar, 5 in centres"
+[tools.sm-gooseneck-bend-form]  # inventory fixtures.sm-gooseneck-bend-form
+description = "Shop-made grooved bend form with a tail for the MHA-SM-01 gooseneck tube"
+
+# --- Stock the process plans name (stock_refs) ---------------------------------
+# One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
+# prechips can check each plan's stock_refs. Description only: the ownership
+# status stays in the inventory under the same key (stock assignment audit,
+# owner 2026-11-19).
+[stock.4130n-tube-1-2x0065]
+description = "4130-N seamless alloy steel tube, round tube, 1/2 in OD x .065 in wall"
+[stock.4140-ht-flat-5-8x1-1-4]
+description = "4140/4142 HT alloy steel, pre-hardened 28-32 HRC as supplied, flat bar, 5/8 x 1-1/4 in"

@@ -6,7 +6,7 @@ part = "MHA-DT-05 Cone Pivot Post"
 revision = "placeholder"
 material = "LOW-CARBON STEEL OR GRAY IRON"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["gray-iron-casting-cone-pivot-post"]
 
 [[tools]]

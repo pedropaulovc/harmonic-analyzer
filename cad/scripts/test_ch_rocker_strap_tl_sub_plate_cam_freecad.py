@@ -82,7 +82,7 @@ def test_plate_programs_post_and_pass_their_checks(tmp_path) -> None:
     assert step.is_file()
     recipe = _cam_programs.load_recipe(STEM)
     plan = tomllib.loads(_process_plans.plan_path(STEM).read_text(encoding="utf-8"))
-    shop = tomllib.loads(_process_plans.SHOP_PATH.read_text(encoding="utf-8"))
+    shop = _process_plans.load_shop()
     ctx = recipe.context(
         export_features.requirement_manifest(STEM), plan, shop, str(step)
     )

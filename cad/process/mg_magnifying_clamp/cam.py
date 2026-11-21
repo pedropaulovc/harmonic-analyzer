@@ -8,7 +8,7 @@ come from the feature export (its height, the hex, the cross bore and both
 tapped holes); the blank, the bottom skim, face levels, spots, pecks, the
 parallels and the drill's run past the corner from ``plan.toml``
 ``[parameters]`` and ``milling_cuts``; cutter diameters, speeds and feeds
-from ``shop.toml``. Every path is written here (``rt.custom``): straight
+from the shop (``shop/``). Every path is written here (``rt.custom``): straight
 lines a recipe can state exactly. Typed here, because neither record carries
 them: the #2 centre drill's catalogue geometry (it sets the spot depth), the
 twist drills' 118° point, the machine's Z top for the tap files' retract,

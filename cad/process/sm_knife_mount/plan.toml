@@ -6,7 +6,7 @@ part = "MHA-SM-02 Knife Mount"
 revision = "placeholder"
 material = "AISI 4140/4142 HT, pre-hardened, as supplied"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["4140-ht-flat-5-8x1-1-4"]
 
 [[tools]]

@@ -544,11 +544,12 @@ def _case_enrolled_traveler_keeps_normal_loader_conversion(dodo, monkeypatch, tm
     diagram = source.parent / "diagrams" / "setup.svg"
     diagram.parent.mkdir()
     diagram.write_text("<svg/>", encoding="utf-8")
-    shop = tmp_path / "shop.toml"
-    shop.write_text("version = 1\n", encoding="utf-8")
+    shop = tmp_path / "shop"
+    shop.mkdir()
+    (shop / "common.toml").write_text("version = 1\n", encoding="utf-8")
     monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", (stem,))
     monkeypatch.setattr(_process_plans, "PROCESS_ROOT", tmp_path)
-    monkeypatch.setattr(_process_plans, "SHOP_PATH", shop)
+    monkeypatch.setattr(_process_plans, "SHOP_DIR", shop)
 
     normal = {task.name: task for task in generate_tasks("prechips", dodo.task_prechips(), dodo.task_prechips.__doc__)}
     selected = {task.name: task for task in dodo.canonical_tasks(["prechips", f"prechips:{stem}"])}

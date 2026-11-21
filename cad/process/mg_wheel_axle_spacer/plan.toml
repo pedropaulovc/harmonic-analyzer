@@ -6,7 +6,7 @@ part = "MHA-MG-11 Wheel Axle Spacer"
 revision = "placeholder"
 material = "C36000 free-machining brass round bar, 7/16 in"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["c360-round-7-16"]
 
 [[tools]]

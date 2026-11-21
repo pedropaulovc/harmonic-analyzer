@@ -6,7 +6,7 @@ part = "MHA-PD-15 Transgear Knob Thrust Ring"
 revision = "placeholder"
 material = "C36000 free-machining brass"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["c360-round-5-8"]
 
 [[tools]]

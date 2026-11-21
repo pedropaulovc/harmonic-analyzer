@@ -370,7 +370,7 @@ Plan authoring and the shop files are described in
 
 Milled parts are made on the CNC-converted PM-30MV (owner ruling
 2026-11-17; the lathe stays manual). `build` and `release` run every enrolled
-`cam:<stem>` task (`_cam_programs.CAM_STEMS`; the rocker strap is the first),
+`cam:<stem>` task (each part with a `cad/process/<stem>/cam.py`; the rocker strap is the first),
 and `build_bare` runs none. Each one runs the part's
 `cad/process/<stem>/cam.py` recipe in headless FreeCAD and writes one G-code
 file per program, `cycle_times.json` and `manifest.json` to

@@ -6,7 +6,7 @@ part = "MHA-PD-18 Transgear Arm"
 revision = "placeholder"
 material = "AISI 1018 cold-finished steel bar, ASTM A108"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["1018-ground-flat-5-16x1"]
 
 [[tools]]

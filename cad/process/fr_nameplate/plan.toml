@@ -6,7 +6,7 @@ part = "MHA-FR-04 Nameplate"
 revision = "placeholder"
 material = "Brass sheet, .063 in C260 (C26000 cartridge brass; OnlineMetals 23624)"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "drill-31"

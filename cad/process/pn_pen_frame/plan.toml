@@ -6,7 +6,7 @@ part = "MHA-PN-01 Pen Frame"
 revision = "placeholder"
 material = "C36000 free-machining brass"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["c360-flat-3-8x1-1-4"]
 
 [[tools]]

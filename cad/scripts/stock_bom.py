@@ -12,9 +12,10 @@ every plan under cad/process (``<stem>/plan.toml``: the enrolled plans of
 part's tools until its traveler is written; the directory names the part,
 ``<stem>`` with ``_`` for ``-``) names its stock in ``stock_refs`` (keys of the
 cad/config/shop-equipment/ ``[stock.<key>]`` rows) and its tools in
-``[[tools]]``, whose ``ref`` is a cad/process/shop.toml ``tools``
-key, and its gauges in the setups' and operations' ``gauge_checks``, whose
-``gauge`` is a shop.toml ``gauges`` key. A stock row's ``status`` says whether
+``[[tools]]``, whose ``ref`` is a ``tools`` key of the shop directory
+cad/process/shop/ (``_process_plans.load_shop``), and its gauges in the
+setups' and operations' ``gauge_checks``, whose ``gauge`` is a shop
+``gauges`` key. A stock row's ``status`` says whether
 it is on hand, bought but not received, or still to order. A tool's or gauge's
 ownership reads the same key in the inventory (``_shop_equipment.load``),
 in whichever of its ``tools``, ``fixtures``, ``consumables``, ``gauges`` and
@@ -27,7 +28,7 @@ reworked in the shop) and its plan names no stock, ``no_stock_record`` for any
 other part with a plan but no stock, ``no_traveler`` for a part without a plan.
 
 The output is normalized: one row per part and requirement, ``type`` ``stock``
-(``ref`` the stock key), ``tool`` or ``gauge`` (``ref`` the shop.toml key),
+(``ref`` the stock key), ``tool`` or ``gauge`` (``ref`` the shop key),
 with that requirement's own ``status``. A part without stock reads one stock
 row with its placeholder status, a part without a plan one ``no_traveler``
 tool row, and stock no plan names closes the table with its part columns
@@ -43,7 +44,7 @@ Usage:
 Exits 2 when a stock row or an inventory record carries an unknown status, an
 inventory key sits in two ownership sections, or a plan names an unknown or
 vendor (``-vn-``) part, an unknown stock key, or a tool ``ref`` or gauge missing from
-shop.toml: the plans must not point at a retired or bought identity.
+the shop: the plans must not point at a retired or bought identity.
 """
 
 from __future__ import annotations
@@ -250,7 +251,7 @@ def plan_stems() -> tuple[str, ...]:
 
 def load_plans(
     stems: tuple[str, ...] | None = None,
-    shop_path: Path = _process_plans.SHOP_PATH,
+    shop_dir: Path = _process_plans.SHOP_DIR,
     equipment_dir: Path = _shop_equipment.DIRECTORY,
 ) -> dict[str, PlanRefs]:
     """Registry stem -> the stock keys, tools and gauges its process plan names.
@@ -259,14 +260,14 @@ def load_plans(
     tool's or gauge's ownership is the inventory record under its shop key in
     any of ``OWNERSHIP_SECTIONS``; a tool without a ``ref`` has none.
     """
-    shop = tomllib.loads(shop_path.read_text(encoding="utf-8"))
+    shop = _process_plans.load_shop(shop_dir)
     inventory = _shop_equipment.load(equipment_dir)
     errors = []
     by_part = {}
 
     def line(plan_name: str, kind: str, ref: str, name: str) -> ToolLine | None:
         if ref and ref not in shop.get(kind, {}):
-            errors.append(f"{plan_name}: {kind[:-1]} ref {ref!r} not in shop.toml")
+            errors.append(f"{plan_name}: {kind[:-1]} ref {ref!r} not in the shop")
             return None
         try:
             status = _tool_status(_owned_record(inventory, ref) if ref else None)

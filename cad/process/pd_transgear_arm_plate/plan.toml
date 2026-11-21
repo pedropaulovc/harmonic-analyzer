@@ -6,7 +6,7 @@ part = "MHA-PD-19 Transgear Arm Plate"
 revision = "placeholder"
 material = "AISI 1018 cold-finished steel bar, ASTM A108, 1-1/2 in"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "drill-44"
