@@ -97,6 +97,9 @@ rough_dia_mm = 1.6002
 rough_radial_doc_mm = 0.6096
 rough_feed_per_rev_mm = 0.0508
 finish_radial_doc_mm = 0.0635
+# The finish aim: the rough Ø less one finish cut per side (.063 - 2 x .0025),
+# inside the #0-80 class 2A major band .0563-.0595 (the test checks both).
+spigot_aim_in = 0.058
 finish_feed_per_rev_mm = 0.0254
 # Mill (shop workholding.vise-pm-6, fixtures.parallels-lms-6745, 1/8 in
 # thick): one 1 in parallel of the set standing on edge, centred between the
@@ -342,7 +345,7 @@ turning_support = { kind = "chuck_only", chuck_z_mm = -18.669 }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Set the AR tool square to the axis, its point the leftmost part of tool and holder. Touch the thread end, DRO Z0; spindle stopped, bring the tool's left edge to the jaw fronts: the DRO reads from Z−(the Op 80 length − .295) to Z−{{process.spigot_stickout_mm:in.3dot}}, else re-chuck. The shoulder's Z: −(the Op 80 length − {{process.shoulder_aim_in:.3dot}}); for 1.020, Z−.700. Never feed the carriage past it."
+instruction = "Set the AR tool square to the axis, its point the leftmost part of tool and holder. Touch the thread end, DRO Z0; spindle stopped, bring the tool's left edge to the jaw fronts: the DRO reads from Z−(the Op 80 length − .295) to Z−{{process.spigot_stickout_mm:in.3dot}}, else re-chuck (Op 80 length over 1.025: face the thread end to 1.025 first, touch Z0 again). The shoulder's Z: −(that length − {{process.shoulder_aim_in:.3dot}}); for 1.020, Z−.700. Never feed past it."
 
 [[setups.operations]]
 cut_kind = "longitudinal_turning"
@@ -355,7 +358,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Step-turn the spigot from Z0 toward the shoulder in steps {{process.step_mm:in.3dot}} long, never longer: in each step rough from Ø.25 to Ø{{process.rough_dia_mm:in.3dot}} in {{process.rough_radial_doc_mm:in.3dot}} cuts per side, then finish into Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}, aiming Ø{{cad.step_dia_in:.4dot}}, in one {{process.finish_radial_doc_mm:in.4dot}} cut per side, before moving on. Never pass back over a finished step."
+instruction = "Step-turn the spigot from Z0 toward the shoulder in steps {{process.step_mm:in.3dot}} long, never longer: in each step rough from Ø.25 to Ø{{process.rough_dia_mm:in.3dot}} in {{process.rough_radial_doc_mm:in.3dot}} cuts per side, then finish into Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}, aiming Ø{{process.spigot_aim_in:.4dot}}, in one {{process.finish_radial_doc_mm:in.4dot}} cut per side, before moving on. Never pass back over a finished step."
 settings = "lathe-ar-c360"
 feed = "Rough {{process.rough_feed_per_rev_mm:in.3dot}}, finish {{process.finish_feed_per_rev_mm:in.3dot}} in/rev"
 cut_diameter_mm = "{{cad.step_dia_mm}}"

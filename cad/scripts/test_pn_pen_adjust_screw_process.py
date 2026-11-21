@@ -69,3 +69,13 @@ def test_the_eye_program_drills_the_station_in_the_overhang():
     tip = min(k["z_bottom"] for k in holes)
     assert tip < -plan["parameters"]["stock_dia_in"] * IN
     assert hole["station"][1] < plan["parameters"]["head_overhang_mm"]
+
+
+def test_the_spigot_aim_is_one_finish_cut_inside_the_2a_band():
+    p = _plan()["parameters"]
+    step = export_features.requirement_manifest(STEM)["features"]["step"]
+    aim = p["spigot_aim_in"] * IN
+    assert aim == pytest.approx(
+        p["rough_dia_mm"] - 2 * p["finish_radial_doc_mm"], abs=0.003
+    )
+    assert step["dia"][0] <= aim <= step["dia"][1]
