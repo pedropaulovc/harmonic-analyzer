@@ -106,9 +106,10 @@ JAW_DEPTH_MM = IN
 OUTLINE_TOL_MM = 0.05
 # The 5/64 in root passes run this far along the shank's flank and this far
 # round the ring (degrees) or along the fork's side from each corner, inside
-# the 1/8 in cutter's cut. Any run clears the 1/8 in corner's round (its
-# tangent lies r8 from the corner, inside the 5/64 in cutter's own sweep);
-# a short one keeps the cutter off the shank's tabs near the corners.
+# the 1/8 in cutter's cut. The flank run must reach past where the 1/8 in
+# cutter's round leaves the flank (context() checks it against both
+# corners: a shorter run leaves a sliver of its R.0625 above R.040 MAX); a
+# short one keeps the cutter off the shank's tabs near the corners.
 ROOT_RUN_MM = 1.0
 ROOT_ARC_DEG = 15.0
 ROOT_SIDE_MM = 1.0
@@ -117,6 +118,9 @@ ROOT_SIDE_MM = 1.0
 FORK_OVERLAP_MM = 1.0
 # The arbor spacer by the saw clears the fork's crown by this much.
 COLLAR_CLEAR_MM = 1.0
+# The saw is touched off over the fork against the fixed jaw, its rim this
+# far in over the crown.
+TOUCH_IN_MM = 3.0
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
 
@@ -295,13 +299,18 @@ def _reamed(xy: tuple[float, float], top: float, tip: float, clear: float) -> li
 
 
 def _side(
-    xs: list[float], zs: list[float], y: tuple[float, float], top: float
+    xs: list[float],
+    zs: list[float],
+    y: tuple[float, float],
+    top: float,
+    clear: float | None = None,
 ) -> list[str]:
     """Side passes at each Z in ``zs`` and, at each, each cutter-centre X in
     ``xs`` in order, every pass from ``y[0]`` to ``y[1]`` (one direction):
     down to the level at feed beside the load, along Y at feed, up and back
-    above the stock in rapids."""
-    clear, safe = _r(top + CLEAR_MM), _r(top + SAFE_MM)
+    in rapids at ``clear`` (default the stock top plus ``CLEAR_MM``)."""
+    clear = _r(top + CLEAR_MM if clear is None else clear)
+    safe = _r(top + SAFE_MM)
     y0, y1 = _r(y[0]), _r(y[1])
     lines = [f"G0 Z{clear:.3f}"]
     for z in zs:
@@ -457,7 +466,10 @@ def context(
     load = n_blanks * pitch
 
     # The blank and the load: the ring at the left end, the crown short of
-    # the shortest blank's right end (CR04 trims the end to it).
+    # the shortest blank's right end by its margin (the tape's reading and
+    # the saw cut's squareness: a short blank would leave a flat on the
+    # crown, and the slot's depth and the boss's length are taken from it;
+    # CR04 trims the end to the crown).
     _agree(plan, "blank_length_min_mm", p["blank_length_in"] * IN)
     _agree(plan, "blank_length_max_mm", p["blank_length_max_in"] * IN)
     _agree(plan, "blank_pitch_mm", p["blank_width_in"] * IN)
@@ -470,8 +482,10 @@ def context(
         raise ValueError("the ring does not clear the blank's left end by its margin")
     crown_x = rx + g["crown"] + g["w"]
     _agree(plan, "crown_x_mm", crown_x)
-    if not crown_x < p["blank_length_min_mm"]:
-        raise ValueError("the crown is past the shortest blank's right end")
+    if p["blank_length_min_mm"] - crown_x < p["crown_margin_min_mm"]:
+        raise ValueError(
+            "the crown is not short of the shortest blank's right end by its margin"
+        )
     _agree(plan, "end_trim_max_mm", p["blank_length_max_mm"] - crown_x)
     l_max = p["blank_length_max_mm"]
     centres = [-(k + 0.5) * pitch for k in range(n_blanks)]
@@ -607,6 +621,41 @@ def context(
         raise ValueError("'fork slot' radial_woc_mm is not process.slot_step_mm")
     saw_xs = [crown_x + saw_r - d for d in slot_steps]
 
+    # The arbor round the saw (tools.gear-cutter-arbor-1, to buy: its sizes
+    # are the plan's assumed limits, checked when it is mounted): above the
+    # saw, spacers no wider than the collar limit; below it, spacers at least
+    # saw_spacer_below_min_mm deep, then the nut, all within saw_below_max_mm
+    # of the saw's lower face and the nut no wider than saw_nut_dia_max_mm.
+    collar_r = p["saw_collar_dia_max_mm"] / 2
+    nut_r = p["saw_nut_dia_max_mm"] / 2
+    below = p["saw_below_max_mm"]
+    spacer_below = p["saw_spacer_below_min_mm"]
+    if not 0 < spacer_below < below:
+        raise ValueError("the spacers under the saw are not inside its stack's depth")
+    # CR06 moves between passes with the stack's lowest point CLEAR_MM over
+    # the stock top.
+    saw_clear = t_max + CLEAR_MM + below
+    _agree(plan, "saw_clear_z_mm", saw_clear)
+    # The touch-off station: over the fork against the fixed jaw, the saw's
+    # rim TOUCH_IN_MM in over its crown; the spacers and the nut, hanging
+    # below the saw as it comes down onto the fork, stay past the crown.
+    touch = (crown_x + saw_r - TOUCH_IN_MM, centres[0])
+    _agree(plan, "saw_touch_x_mm", touch[0])
+    if touch[0] - max(nut_r, collar_r) < crown_x + COLLAR_CLEAR_MM:
+        raise ValueError("the arbor's nut reaches the crown at the saw's touch-off")
+    # CR05 leaves T1 parked over that station, high enough that the arbor
+    # mounted in its place (its lowest point no more than saw_arbor_length_mm
+    # from the nose; T1's tip at least its collet and projection out) hangs
+    # CLEAR_MM over the stock top: the saw never moves in X or Y on a
+    # height the controller does not know.
+    park_z = (
+        t_max
+        + CLEAR_MM
+        + p["saw_arbor_length_mm"]
+        - (p["r8_collet_gauge_mm"] + p["half_mill_projection_min_mm"])
+    )
+    _agree(plan, "saw_park_z_mm", park_z)
+
     # The ring's bore: interpolated by the 1/2 in end mill, a centre plunge
     # and a circle at each level, then the finish circle and a spring pass.
     bore_d = _mid(g["bore"])
@@ -643,6 +692,7 @@ def context(
         raise ValueError("the spot is not under the #49: it would chamfer the hole")
     spot_depth = _spot_depth(spot_dia)
     drill_tip = -(p["drill_past_mm"] + _point(tools["drill-49"]))
+    _agree(plan, "drill_tip_mm", drill_tip)
     ream_tip = -p["ream_past_mm"]
     spot_rpm, spot_feed = _setting(plan, shop, "pin spot")
     drill_rpm, drill_feed = _setting(plan, shop, "pin drill")
@@ -715,6 +765,12 @@ def context(
         )
     root_rpm, root_feed = _setting(plan, shop, "roots")
     root_levels = _levels(shank_far, shank_near - through, p["root_level_max_mm"])
+    # The roots' cut as the plan declares it to the bending screen: the
+    # cutter, its station (the fork's step) and its radial engagement at a
+    # corner (the 1/8 in cutter's radius less its own).
+    _agree(plan, "root_cutter_dia_mm", e5)
+    _agree(plan, "root_station_mm", fb)
+    _agree(plan, "root_woc_mm", r8 - r5)
     # The levels the outline and the roots cut (their cuts' declared depths)
     # and the bending screen's stations and webs.
     _agree(plan, "outline_level_mm", (out_levels[0] - out_levels[1]))
@@ -931,6 +987,9 @@ def context(
 
     # The bores: every blank's rough levels, then every blank's finish
     # circle and its spring pass (the check orders clearing before passes).
+    # Each rough comes down at the cutting feed to the ring's face, through
+    # the air the finish of side 2 left over it, then plunges into metal at
+    # the slow feed.
     bore: list[str] = []
     for yc in centres:
         c = (rx, yc)
@@ -938,7 +997,8 @@ def context(
         bore += [
             f"G0 Z{clear2:.3f}",
             f"G0 {_xy(*c)}",
-            f"G0 Z{_r(ring_far + SAFE_MM):.3f}",
+            f"G0 Z{safe2:.3f}",
+            f"G1 Z{_r(ring_far):.3f} F{{feed}}",
         ]
         for z in bore_levels:
             bore += [
@@ -949,27 +1009,47 @@ def context(
                 f"G1 {_xy(*c)} F{{feed}}",
             ]
         bore.append(f"G0 Z{clear2:.3f}")
-    # Each finish circle starts with a plunge at its start, at the slow feed
-    # (its side takes the .010 the rough left there): a move in from the
-    # bore's centre would clear after the first bore's finish.
+    # Each finish circle: down the roughed centre to the full depth, onto the
+    # circle on a half-circle lead-in tangent to it (no plunge on the wall),
+    # the finish lap and the spring lap, then off it on the other half of
+    # that circle back to the centre before the retract (no rapid up the
+    # finished wall).
     for yc in centres:
         c = (rx, yc)
         a, b = (rx + finish_rr, yc), (rx - finish_rr, yc)
+        lead = (rx + finish_rr / 2, yc)
         bore += [
-            f"G0 {_xy(*a)}",
-            f"G0 Z{_r(ring_far + SAFE_MM):.3f}",
-            f"G1 Z{_r(bore_levels[-1]):.3f} F{{plunge}}",
-            _arc("G2", a, b, c) + " F{feed}",
+            f"G0 {_xy(*c)}",
+            f"G0 Z{safe2:.3f}",
+            f"G1 Z{_r(bore_levels[-1]):.3f} F{{feed}}",
+            _arc("G2", c, a, lead),
+            _arc("G2", a, b, c),
             _arc("G2", b, a, c),
             _arc("G2", a, b, c),
             _arc("G2", b, a, c),
+            _arc("G2", a, c, lead),
             f"G0 Z{clear2:.3f}",
         ]
+    # T1 parked for the saw's mounting and touch-off (Setup 5): up to the
+    # park height, then along X past the crowns, then along Y over the fork
+    # against the fixed jaw.
+    bore += [
+        f"G0 Z{_r(park_z):.3f}",
+        f"G0 X{_r(touch[0]):.3f}",
+        f"G0 Y{_r(touch[1]):.3f}",
+    ]
 
-    # The slot: the saw's passes along -Y (conventional for an M3 saw right
-    # of the forks), each Z level in steps into the crown.
+    # The slot: the saw's passes along +Y, each Z level in steps into the
+    # crown: with an M3 saw right of the forks a pass along +Y is
+    # conventional (along -Y it would climb, and a slitting saw climbing
+    # grabs and feeds itself in). Between passes the saw rises to
+    # saw_clear, its stack's lowest point clear over the stock.
     slot = _side(
-        saw_xs, saw_zs, (saw_r + APPROACH_MM, -load - saw_r - APPROACH_MM), t_max
+        saw_xs,
+        saw_zs,
+        (-load - saw_r - APPROACH_MM, saw_r + APPROACH_MM),
+        t_max,
+        saw_clear,
     )
 
     # The pin holes.
@@ -1104,6 +1184,12 @@ def context(
     j5 = math.sqrt(big5**2 - (half + r5) ** 2)
     c5 = math.degrees(math.atan2(half + r5, j5))
     d5 = math.sqrt(r5**2 - (r5 - (w - half)) ** 2)
+    # Each flank run reaches past where the 1/8 in cutter's round leaves the
+    # flank (ring side jx8, step side fb - k8) from where the 5/64 in
+    # cutter's own round meets it (j5, fb - d5): shorter, it leaves a sliver
+    # of the R.0625 on the flank, over R.040 MAX.
+    if ROOT_RUN_MM < max(jx8 - j5, k8 - d5) + OUTLINE_TOL_MM:
+        raise ValueError("a root pass stops short of the 1/8 in cutter's round")
     # The root passes stay off every bar tab: the tab's material spans its
     # width along the flank, out from the flank by the kerf.
     tab_w = p["tab_width_mm"]
@@ -1736,7 +1822,7 @@ def context(
                 }
             )
     expect += [
-        [name, "rapids_clear", {"z_top": ring_far}],
+        [name, "rapids_clear", {"z_top": t_max}],
         [name, "air_feed", {"z_top": t_max}],
         [
             name,
@@ -1751,10 +1837,52 @@ def context(
                         "levels": [_r(z) for z in bore_levels],
                     }
                 ],
+                # Each finish lap's half-circle lead-in and lead-out, inside
+                # the roughed bore at its full depth.
+                "leads": [
+                    {
+                        "centre": [_r(rx), _r(yc)],
+                        "radius": finish_rr,
+                        "levels": [_r(bore_levels[-1])],
+                    }
+                    for yc in centres
+                ],
             },
         ],
         [name, "keep_out", {"radius": r, "boxes": jaws2}],
     ]
+
+    # The arbor round the saw, part by part: its reach from the saw's lower
+    # face (the programmed Z) down (lo) and up (hi), and its radius. No move,
+    # rapid or feed, brings a part into the stock, the plate or the vise:
+    # the blanks over the support plate and the jaws stand on the vise; the
+    # blanks' ends past the plate overhang air from Z0 to their top, which
+    # the nut may pass under while the saw cuts.
+    plate_end = p["support_plate_length_mm"]
+    solids = jaws2 + [
+        _box("the blanks over the plate", (0.0, plate_end), (-load, 0.0), t_max),
+        {
+            **_box(
+                "the blanks past the plate", (plate_end, crown_x), (-load, 0.0), t_max
+            ),
+            "z_bottom": 0.0,
+        },
+        _box("the vise past the plate", (plate_end, jaw_x0 + jaw_w), (-load, 0.0), 0.0),
+    ]
+
+    def reach(part: str, lo: float, hi: float | None) -> list[dict[str, Any]]:
+        """``solids`` as bands of the programmed Z in which a part reaching
+        ``lo`` to ``hi`` from it (``hi`` None: on up) would meet them."""
+        out = []
+        for solid in solids:
+            moved = {**solid, "name": f"{solid['name']} ({part})"}
+            moved["z_top"] = _r(solid["z_top"] - lo)
+            if "z_bottom" in solid and hi is not None:
+                moved["z_bottom"] = _r(solid["z_bottom"] - hi)
+            else:
+                moved.pop("z_bottom", None)
+            out.append(moved)
+        return out
 
     name = "CR06_slot"
     expect += [
@@ -1772,12 +1900,27 @@ def context(
                 "final": _r(saw_xs[-1]),
                 "raw": _r(crown_x + saw_r),
                 "max_step": slot_steps[0],
-                "direction": -1,
+                "direction": 1,
                 "span": load,
                 "below_z": t_max,
             },
         ],
         [name, "keep_out", {"radius": saw_r, "boxes": jaws2}],
+        [
+            name,
+            "keep_out",
+            {"radius": collar_r, "boxes": reach("spacers above the saw", saw_t, None)},
+        ],
+        [
+            name,
+            "keep_out",
+            {"radius": collar_r, "boxes": reach("spacers below the saw", -below, 0.0)},
+        ],
+        [
+            name,
+            "keep_out",
+            {"radius": nut_r, "boxes": reach("the arbor's nut", -below, -spacer_below)},
+        ],
     ]
 
     name = "CR07_pin"
@@ -1800,7 +1943,7 @@ def context(
             [f"{name}@{k}", check, kwargs]
             for check, kwargs in (
                 ("holes", {"centres": pin_xy, "z_bottom": _r(bottom)}),
-                ("rapids_clear", {"z_top": fork_t, "open_holes": pin_xy}),
+                ("rapids_clear", {"z_top": t_max, "open_holes": pin_xy}),
                 ("vertical_below_top", {"z_top": fork_t}),
                 ("air_feed", {"z_top": fork_t}),
                 ("keep_out", {"radius": radius, "boxes": jaws2}),
