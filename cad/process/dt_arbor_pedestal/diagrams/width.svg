@@ -24,6 +24,6 @@
   <text class="label" x="307.5" y="161.15" text-anchor="end">F</text>
   <circle class="datum" cx="313.5" cy="226.65" r="3.5"/>
   <text class="datum-label" x="373.5" y="244.65">Y0 the fixed jaw (F); Z0 the stacks' top (W)</text>
-  <text class="label" x="470" y="290">Looking along the jaws from the left end:</text>
-  <text class="label" x="470" y="308">X0 the blank's left end, facing you.</text>
+  <text class="label" x="470" y="290">Looking along the jaws from the right end:</text>
+  <text class="label" x="470" y="308">X0, the blank's left end, away from you.</text>
 </svg>

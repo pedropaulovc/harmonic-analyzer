@@ -35,5 +35,5 @@
   <text class="datum-label" x="618.39" y="254">Y0: W</text>
   <circle class="holes" cx="546.67" cy="285.81" r="6.86"/>
   <text class="label" x="470" y="345.63">hole X {{cad.hold_down_hole_z_from_min_mm:.3f}}, Y −{{cad.hold_down_hole_lateral_mm:.3f}} mm</text>
-  <text class="label" x="400" y="380">Looking along the jaws from the left: N faces you.</text>
+  <text class="label" x="370" y="380">Looking along the jaws from the right end: F faces you.</text>
 </svg>

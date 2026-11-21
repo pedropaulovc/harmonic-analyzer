@@ -131,6 +131,12 @@ RELIEF_ENTRY_MM = 0.1
 JAW_DEPTH_MM = IN
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
+# Class ZZ minus pin gauges (the shop's sets): a pin is up to this under its
+# marked size, never over.
+PIN_MINUS_MM = 0.0002 * IN
+# The least wall a cutter test hole keeps to the slice's faces, the final
+# end, the rebate and the other test hole.
+TEST_WALL_MM = 0.75
 
 
 def _plan_operations(plan: dict[str, Any]):
@@ -565,20 +571,92 @@ def context(
     # the rebate's back at stations no more than half its diameter apart, its
     # load along its axis. Between two plunges a ridge stands on each side:
     # its height (the scallop) is the cutter radius less the half-chord, and
-    # the relief's clear height between the ridges must stay in its band.
+    # the relief's clear height between the ridges, √(D² − s²) for a cutter D
+    # at the step s, must stay in its band. The least cutter the traveler
+    # accepts is then hypot(band minimum, s), and the step is held to half
+    # of it too (s ≤ band minimum / √3), so any cutter it accepts plunges no
+    # more than half itself apart.
     relief_bottom = -(slot_depth + relief_depth)
     relief_span = abs(slot_ys[1] - slot_ys[0])
-    intervals = math.ceil(relief_span / (e16 / 2) - 1e-9)
+    step_cap = min(e16 / 2, relief_height[0] / math.sqrt(3))
+    intervals = math.ceil(relief_span / step_cap - 1e-9)
     plunge_step = relief_span / intervals
     _agree(plan, "relief_plunge_step_mm", plunge_step)
     scallop = e16_r - math.sqrt(e16_r**2 - (plunge_step / 2) ** 2)
     _agree(plan, "relief_scallop_mm", scallop)
     # The cutter band whose plunges leave the relief's clear height (between
     # the ridges) in its band; the traveler mics the cutter against it.
-    _agree(plan, "relief_cutter_min_mm", relief_height[0] + 2 * scallop)
+    cutter_min = math.hypot(relief_height[0], plunge_step)
+    _agree(plan, "relief_cutter_min_mm", cutter_min)
     _agree(plan, "relief_cutter_max_mm", relief_height[1])
-    if e16 < relief_height[0] + 2 * scallop:
+    if e16 < cutter_min or plunge_step > cutter_min / 2 + 1e-9:
         raise ValueError("the relief's plunge ridges leave it under its height band")
+    # Setup 6 gauges each 3-flute cutter by a test plunge in the waste end,
+    # read with the pins: the GO pin, at its least, is not under the least
+    # good cut and the NO-GO pin, at its most, not over the largest. The
+    # 1/8 in cut's band is the rebate band less the two wall passes (the
+    # walls run at the nominal cutter's offsets); the 1/16 in cut's is the
+    # relief cutter band above. Each plunge feeds as its program plunges.
+    rebate_band = f["rebate_floor"]["rebate_height"]
+    slot_cut = (
+        rebate_band[0] - (slot_height - e8),
+        rebate_band[1] - (slot_height - e8),
+    )
+    _agree(plan, "slot_cut_min_mm", slot_cut[0])
+    _agree(plan, "slot_cut_max_mm", slot_cut[1])
+    for name, (lo, hi) in (
+        ("slot", slot_cut),
+        ("relief", (cutter_min, relief_height[1])),
+    ):
+        go = math.ceil(round((lo + PIN_MINUS_MM) / IN * 1000, 6)) / 1000
+        nogo = math.floor(round(hi / IN * 1000, 6)) / 1000
+        for key, value in (("go", go), ("nogo", nogo)):
+            stated = p[f"{name}_{key}_pin_in"]
+            if not math.isclose(stated, value, abs_tol=1e-6):
+                raise ValueError(
+                    f"process.{name}_{key}_pin_in {stated:g}, the recipe picks {value:.3f}"
+                )
+        if go >= nogo:
+            raise ValueError(f"no pin pair reads the {name} test cut's band")
+    _close(
+        _cut(plan, "slot test plunge", "cutter_dia_mm"),
+        e8,
+        "'slot test plunge' cutter_dia_mm",
+    )
+    _close(
+        _cut(plan, "relief test plunge", "cutter_dia_mm"),
+        e16,
+        "'relief test plunge' cutter_dia_mm",
+    )
+    if _setting(plan, shop, "slot test plunge") != (rebate_rpm, rebate_feed):
+        raise ValueError("'slot test plunge' runs at another setting than 'rebate'")
+    if _setting(plan, shop, "relief test plunge") != (relief_rpm, relief_feed):
+        raise ValueError("'relief test plunge' runs at another setting than 'relief'")
+    _agree(plan, "slot_test_feed_mm_min", rebate_feed / 2)
+    _agree(plan, "relief_test_feed_mm_min", relief_feed)
+    # The test holes, at the largest cut the pins pass, all in the waste
+    # end the end facing removes (at test_y_mm from the fixed jaw's face, the
+    # retests as far from the moving jaw's), clear of the rebate and of each
+    # other by TEST_WALL_MM, so a pin cannot push a thin web aside.
+    _agree(plan, "test_far_y_mm", bar_x - p["test_y_mm"])
+    holes = (
+        (p["slot_test_x_mm"], slot_cut[1] / 2),
+        (p["relief_test_x_mm"], relief_height[1] / 2),
+    )
+    y, wall = p["test_y_mm"], TEST_WALL_MM - 1e-9
+    for x, r in holes:
+        if not (
+            y - r >= wall
+            and trim - (y + r) >= wall
+            and x - r - x_floor >= wall
+            and height - (x + r) >= wall
+        ):
+            raise ValueError(
+                f"the test hole at X{x:g} is not {TEST_WALL_MM} mm inside the waste end"
+            )
+    (x1, r1), (x2, r2) = holes
+    if abs(x2 - x1) - r1 - r2 < wall:
+        raise ValueError(f"the test holes are not {TEST_WALL_MM} mm apart")
     relief_ys = [
         slot_ys[0] + k * (slot_ys[1] - slot_ys[0]) / intervals
         for k in range(intervals + 1)

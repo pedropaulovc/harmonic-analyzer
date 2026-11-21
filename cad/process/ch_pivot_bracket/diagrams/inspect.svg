@@ -21,7 +21,7 @@
   <line class="datum" x1="470" y1="370" x2="470" y2="104.64"/>
   <text class="datum-label" x="466" y="100.64" text-anchor="end">I</text>
   <text class="label" x="470" y="50">Side (I on the left):</text>
-  <text class="label" x="536.9" y="134.64">ear {{cad.outboard_face_thickness_in:.3dot}} ±.004</text>
+  <text class="label" x="536.9" y="134.64">ear {{cad.outboard_face_thickness_min_in:.4dot}}–{{cad.outboard_face_thickness_max_in:.4dot}}</text>
   <text class="label" x="602.46" y="338.66">length {{cad.foot_end_length_in:.2dot}}</text>
   <text class="label" x="537.12" y="382">hold-down {{cad.hold_down_station_in:.2dot}} from I</text>
   <text class="label" x="530.9" y="311.33">inside corner R{{cad.inside_corner_radius_max_in:.2dot}} max</text>

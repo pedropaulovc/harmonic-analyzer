@@ -113,27 +113,29 @@ def test_context_accepts_the_plan_and_numbers_the_tools(context) -> None:
 
 
 def test_the_relief_plunges_keep_it_inside_its_height_band(context) -> None:
-    """Plunges no more than half the cutter apart; the ridge between two
-    leaves the relief's clear height (the cutter less two ridges) at least
-    the plan's least cutter less two ridges: the printed band's minimum."""
+    """Every cutter the traveler accepts (the plan's least to its most)
+    plunges no more than half itself apart and leaves the relief's clear
+    height between the ridges, √(D² − s²), inside the printed band; the
+    nominal cutter's ridge is the plan's scallop."""
     centres = next(
         kwargs["centres"]
         for program, check, kwargs in context["expect"]
         if program == "MS05_relief" and check == "holes"
     )
-    cutter = SHOP["tools"]["endmill-carbide-3fl-1-16-reach-1-2"]["diameter_mm"]
     steps = {
         round(abs(b[1] - a[1]), 3) for a, b in zip(centres, centres[1:], strict=False)
     }
-    assert max(steps) <= cutter / 2
-    radius = cutter / 2
-    ridge = radius - math.sqrt(radius**2 - (max(steps) / 2) ** 2)
+    step = max(steps)
     p = PLAN["parameters"]
+    band = FEATURES["features"]["relief_floor"]["relief_height"]
+    nominal = SHOP["tools"]["endmill-carbide-3fl-1-16-reach-1-2"]["diameter_mm"]
+    for cutter in (p["relief_cutter_min_mm"], nominal, p["relief_cutter_max_mm"]):
+        assert step <= cutter / 2 + 1e-3
+        clear = math.sqrt(cutter**2 - step**2)
+        assert band[0] - 1e-3 <= clear <= band[1] + 1e-3, cutter
+    radius = nominal / 2
+    ridge = radius - math.sqrt(radius**2 - (step / 2) ** 2)
     assert ridge <= p["relief_scallop_mm"] + 1e-3
-    assert (
-        cutter - 2 * ridge
-        >= p["relief_cutter_min_mm"] - 2 * p["relief_scallop_mm"] - 1e-3
-    )
 
 
 def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -> None:
@@ -152,6 +154,13 @@ def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -
         ("relief_plunge_step_mm", 1.0, "relief_plunge_step_mm"),
         ("relief_scallop_mm", 0.2, "relief_scallop_mm"),
         ("relief_cutter_min_mm", 1.6, "relief_cutter_min_mm"),
+        ("slot_cut_max_mm", 3.175, "slot_cut_max_mm"),
+        ("slot_go_pin_in", 0.123, "slot_go_pin_in"),
+        ("relief_nogo_pin_in", 0.071, "relief_nogo_pin_in"),
+        ("slot_test_feed_mm_min", 213.36, "slot_test_feed_mm_min"),
+        ("relief_test_x_mm", 10.5, "apart"),
+        ("slot_test_x_mm", 13.0, "inside the waste end"),
+        ("test_far_y_mm", 29.0, "test_far_y_mm"),
         ("chamfer_tip_depth_mm", 1.9, "chamfer_tip_depth_mm"),
         ("thumb_tip_height_mm", 5.5, "thumb_tip_height_mm"),
         ("thumb_tap_reach_mm", 13.0, "lowest roof"),
