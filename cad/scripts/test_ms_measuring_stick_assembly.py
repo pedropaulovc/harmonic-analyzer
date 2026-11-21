@@ -1023,15 +1023,13 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     # Option C: whatever mark the saved pose uses, no step or note prints it.
     for text in (*changed.ASSEMBLY_STEPS, changed.EXAMPLE_POSE_NOTE):
         assert f"{mark:.1f}" not in text and "±" not in text
-    pilot = changed.ASSEMBLY_STEPS[2]
-    assert "DRILL Ø.070 THROUGH ITEM 2 PLATE AND INTO ITEM 1 BLOCK" in pilot
-    assert "OPEN ITS TWO HOLES TO Ø.096 THRU" in changed.ASSEMBLY_STEPS[3]
-    # The block's tapped-hole callout carries the depths; the steps name it.
-    tap = changed.ASSEMBLY_STEPS[4]
-    for text in (pilot, tap):
+    # The pair arrives match-drilled, opened and tapped by its part travelers:
+    # no step drills, opens or taps it, and none restates a depth or size.
+    for text in changed.ASSEMBLY_STEPS:
         assert drill_depth not in text and thread_depth not in text
-    assert "MEASURED FROM THE ITEM 1 FACE UNDER ITEM 2" in pilot
-    assert "BOTTOMING TAP" in tap
+        assert "Ø.070" not in text and "Ø.096" not in text
+        assert "DRILL Ø" not in text and "BOTTOMING TAP" not in text
+    assert changed.ASSEMBLY_STEPS[0].startswith("1. ITEM 1 BLOCK AND ITEM 2 PLATE ARRIVE")
     assert changed.PLATE_SCREW_TAP_RESERVE == pytest.approx(
         float(thread_depth) * 25.4 - changed.PLATE_SCREW_ENGAGED
     )
