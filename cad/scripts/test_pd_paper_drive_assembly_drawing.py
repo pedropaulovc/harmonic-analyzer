@@ -496,17 +496,33 @@ def test_released_cup_pins_are_renewed_once_at_ninety_degrees() -> None:
     for key in ("fitup-mesh-remedied", "fitup-accepted"):
         assert any(row.endswith(repeat) for row in texts[key]), key
         assert not any("RE-PINNED" in row for row in texts[key]), key
-    # The bond, its check and the check's remedy are separate sub-steps; the
-    # bond names its prep and where the compound goes.
+    # The bond, its check and the check's remedy are separate sub-steps. The
+    # bond's prep and where the compound goes are DETAIL H's bond note, so
+    # 13G stays one action in step 13's 24 letters (machinist reviews of
+    # 592b20079f and 70917f0316).
     bond, check, remedy = texts["arm-plate-fitted"][6:9]
-    assert bond.startswith("IF A DOWEL SLIDES IN BY HAND, PULL IT,")
+    detail_sheet = drawing.SHEET_NAMES.index(drawing.SETTING_DETAIL_SHEET) + 1
+    assert bond == (
+        "IF A DOWEL SLIDES IN BY HAND, BOND IT PER THE BOND NOTE AT DETAIL H, "
+        f"SHEET {detail_sheet}."
+    )
+    assert (
+        drawing.detail_cite("arm-plate-fitted") == f"(DETAIL H, SHEET {detail_sheet})"
+    )
+    note = " ".join(drawing.SETTING_DETAIL_CAPTIONS["H"].split())
+    assert f"BOND NOTE ({drawing.sub_step('arm-plate-fitted', 6)}):" in note
     for words in (
-        "DEGREASE IT AND ITS HOLE",
-        "COAT THE DOWEL, NOT THE HOLE, WITH LOCTITE 638",
-        "AT ONCE AT THE SAME PROUD",
+        "PULL THE DOWEL.",
+        "DEGREASE IT AND ITS HOLE.",
+        "COAT THE DOWEL, NOT THE HOLE, WITH LOCTITE 638.",
+        f"PRESS IT BACK AT ONCE TO {drawing.sub_step('arm-plate-fitted', 5)}'S PROUD.",
         "CURE 24 H.",
     ):
-        assert words in bond, words
+        assert words in note, words
+    assert all(
+        len(row) <= drawing.SETTING_CAPTION_WIDTH
+        for row in drawing.SETTING_DETAIL_CAPTIONS["H"].split("\n")
+    )
     assert check == (
         "CHECK: PUSHED, A BONDED DOWEL DOES NOT MOVE; IT READS AS "
         f"{drawing.sub_step('arm-plate-fitted', 5)}."
@@ -528,10 +544,10 @@ def test_a_feed_sleeve_found_outside_after_hanging_has_a_renewal_route() -> None
         for index, text in enumerate(meshed)
         if text.startswith(f"FOR A {sleeve} FOUND OUTSIDE")
     )
-    assert meshed[route : route + 3] == (
-        f"FOR A {sleeve} FOUND OUTSIDE, STRIP THE COLLAR AND "
-        f"{drawing.sub_step('disc-cluster-hung', 4)}-"
-        f"{drawing.sub_step('disc-cluster-hung', 1)}.",
+    assert meshed[route : route + 4] == (
+        f"FOR A {sleeve} FOUND OUTSIDE, SLIDE THE COLLAR OFF.",
+        f"FOR IT, STRIP THE CLUSTER ({drawing.sub_step('disc-cluster-hung', 4)} BACK TO "
+        f"{drawing.sub_step('disc-cluster-hung', 1)}), KEEPING ITS SHIMS.",
         f"FOR IT, DO {drawing.sub_step('arm-plate-located', 20)} AND THE REPEATS IN "
         f"{drawing.sub_step('arm-plate-located', 21)} ON A NEW ONE.",
         f"FOR IT, REPEAT STEPS {steps.step_number('oil-hole-drilled')}-"
@@ -2676,10 +2692,15 @@ def test_every_failure_branch_has_a_pass_exit() -> None:
     remedies = accepted[accepted.index(exit_row) + 1:]
     assert remedies and all(row.startswith(("IF ", "FOR ")) for row in remedies)
     run = texts["chain-run-accepted"]
+    # The remedy opens the link and lifts the chain off as two sub-steps
+    # (machinist review of 70917f0316).
     assert run[3] == (
         f"IF BOTH CHECKS PASS, SKIP {s('chain-run-accepted', 4)}-"
-        f"{s('chain-run-accepted', 6)}."
+        f"{s('chain-run-accepted', 7)}."
     )
+    assert run[4].startswith("OPEN THE ") and run[4].endswith(" LINK.")
+    assert run[5] == "LIFT THE CHAIN OFF."
+    assert run[7].startswith("REPEAT STEPS ")
     located = texts["arm-plate-located"]
     assert located[16] == (
         f"IF {s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)} PASSED, GO TO STEP "
@@ -3144,9 +3165,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     assert "AS 12M AND 12N" in fitted
     # Owner ruling 2026-11-20 (Pedro), #2497: the arm already carries the
     # DETAIL K jig-boring, so a dowel that slides in is bonded, not scrapped.
-    assert "WITH LOCTITE 638, SET IT AT ONCE AT THE SAME PROUD" in " ".join(
-        fitted.split()
-    )
+    assert "BOND IT PER THE BOND NOTE AT DETAIL H" in " ".join(fitted.split())
     assert "ARM CLAMPED FRONT UP ON THE SAME PARALLELS" in fitted
     # A failed doweled re-read is cleaned and read again before the set is
     # scrapped, each its own sub-step.

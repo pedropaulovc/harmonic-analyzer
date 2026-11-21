@@ -2210,8 +2210,9 @@ def _step_text(
     # pointed to from 26 (the step-line budget), one action per sub-step
     # (machinist review of 592b20079f).
     sleeve_renewed = (
-        f"FOR A {n['pd-transgear-feed-pinion']} FOUND OUTSIDE, STRIP THE COLLAR AND "
-        f"{s('disc-cluster-hung', 4)}-{s('disc-cluster-hung', 1)}.",
+        f"FOR A {n['pd-transgear-feed-pinion']} FOUND OUTSIDE, SLIDE THE COLLAR OFF.",
+        f"FOR IT, STRIP THE CLUSTER ({s('disc-cluster-hung', 4)} BACK TO "
+        f"{s('disc-cluster-hung', 1)}), KEEPING ITS SHIMS.",
         f"FOR IT, DO {s('arm-plate-located', 20)} AND THE REPEATS IN "
         f"{s('arm-plate-located', 21)} ON A NEW ONE.",
         f"FOR IT, REPEAT STEPS {steps.step_number('oil-hole-drilled')}-"
@@ -2309,9 +2310,12 @@ def _step_text(
             f"IF THE TOP GUIDE MOVES, MAKE A NEW {n['pd-platen-guide']} GUIDE AND "
             f"REPEAT {s('guides-screwed', 0)} AND {s('guides-screwed', 7)}-"
             f"{s('guides-screwed', 12)} FOR IT.",
-            f"IF THE BOTTOM GUIDE MOVES, MAKE A NEW {n['pd-platen-bottom-guide']} "
-            f"GUIDE, MOVE THE RACK TO IT PER STEP {steps.step_number('rack-screwed')} "
-            f"AND REPEAT {s('guides-screwed', 1)}-{s('guides-screwed', 12)} FOR IT.",
+            # One action and its repeat, as the top guide's (machinist review
+            # of 70917f0316: making the guide and moving the rack read as two).
+            "IF THE BOTTOM GUIDE MOVES, MOVE THE RACK TO A NEW "
+            f"{n['pd-platen-bottom-guide']} GUIDE PER STEP "
+            f"{steps.step_number('rack-screwed')} AND REPEAT "
+            f"{s('guides-screwed', 1)}-{s('guides-screwed', 12)} FOR IT.",
         ),
         "clips-fitted": (
             f"SCREW THE {n['pd-platen-clip']} CLIPS TO THE PLATEN FRONT WITH "
@@ -2530,12 +2534,11 @@ def _step_text(
             # press. The cured dowel is read again before the plate goes on;
             # a bond that fails renews the arm's set as 13Y does. The plate
             # refit and its match mark share a sub-step (24-letter budget).
-            # The bond's prep and application are its own words, the proud
-            # 13F's (machinist review of 592b20079f: no step said to degrease
-            # or where the compound goes).
-            "IF A DOWEL SLIDES IN BY HAND, PULL IT, DEGREASE IT AND ITS HOLE, "
-            "COAT THE DOWEL, NOT THE HOLE, WITH LOCTITE 638, SET IT AT ONCE AT "
-            "THE SAME PROUD AND CURE 24 H.",
+            # The bond's prep and application (machinist review of
+            # 592b20079f) are DETAIL H's bond note, so 13G stays one action
+            # within the step's 24 letters (review of 70917f0316).
+            "IF A DOWEL SLIDES IN BY HAND, BOND IT PER THE BOND NOTE AT "
+            f"{detail_cite('arm-plate-fitted')[1:-1]}.",
             "CHECK: PUSHED, A BONDED DOWEL DOES NOT MOVE; IT READS AS "
             f"{s('arm-plate-fitted', 5)}.",
             f"IF IT MOVES OR READS OUTSIDE, RENEW AS {s('arm-plate-fitted', 22)}.",
@@ -2727,8 +2730,8 @@ def _step_text(
             f"IN {DISC_TIR_SAMPLE_SPACES} SPACES, EVERY {DISC_TIR_SAMPLE_STRIDES[0]}TH "
             f"OR {DISC_TIR_SAMPLE_STRIDES[1]}TH, READS {tir} TIR MAX.",
             # The O.D. already read true, so the disc is set on the pins.
-            "IF NOT, SLACKEN THE SCREWS AND TAP THE DISC CENTRAL ON THE PINS.",
-            f"THEN REPEAT {s('disc-taps-transferred', 9)} AND "
+            "IF NOT, SLACKEN THE SCREWS.",
+            f"TAP THE DISC CENTRAL ON THE PINS AND REPEAT {s('disc-taps-transferred', 9)} AND "
             f"{s('disc-taps-transferred', 12)}.",
             # Rule 23 bench acceptance for the disc screws: they carry the
             # drive torque as shear on the flange's bolt circle
@@ -3259,9 +3262,9 @@ def _step_text(
             "CHECK: THE SLACK RUN TOUCHES NOTHING.",
             # #2629 (machinist rule 22): a pass exit past the remedy.
             f"IF BOTH CHECKS PASS, SKIP {s('chain-run-accepted', 4)}-"
-            f"{s('chain-run-accepted', 6)}.",
-            f"OPEN THE {n['pd-vn-chain-connecting-link']} LINK AND LIFT THE CHAIN "
-            "OFF.",
+            f"{s('chain-run-accepted', 7)}.",
+            f"OPEN THE {n['pd-vn-chain-connecting-link']} LINK.",
+            "LIFT THE CHAIN OFF.",
             knob_stack_off,
             f"REPEAT STEPS {steps.step_number('collar-rear-faced-to-fit')}-"
             f"{steps.step_number('chain-run-accepted')}.",
@@ -3758,6 +3761,18 @@ def _steps_label(keys: tuple[str, ...]) -> str:
 # 20261117T144118108Z-771678f99db440ccbcec03874c9b1aca found one-line titles
 # printing over the next caption and through the border.
 SETTING_CAPTION_WIDTH = 26
+# DETAIL H carries the bond 13G points to (owner ruling 2026-11-20 (Pedro),
+# #2497: retaining compound only on the arm, which already carries DETAIL K's
+# jig-boring). Its prep and where the compound goes are the machinist
+# review's (592b20079f); as a note, 13G stays one action (review of
+# 70917f0316). The column under H's caption is empty down to the title
+# block, clear of DETAIL L left and DETAIL J right.
+BOND_NOTE = (
+    f"BOND NOTE ({sub_step('arm-plate-fitted', 6)}): PULL THE DOWEL. DEGREASE IT "
+    "AND ITS HOLE. COAT THE DOWEL, NOT THE HOLE, WITH LOCTITE 638. PRESS IT "
+    f"BACK AT ONCE TO {sub_step('arm-plate-fitted', 5)}'S PROUD. CURE 24 H."
+)
+SETTING_DETAIL_NOTES = {"H": BOND_NOTE}
 SETTING_DETAIL_CAPTIONS = {
     detail.letter: "\n".join(
         (
@@ -3765,6 +3780,16 @@ SETTING_DETAIL_CAPTIONS = {
             f"{_scale_suffix(detail.scale, SHEET_SCALES[SETTING_DETAIL_SHEET])} "
             f"({_steps_label(detail.step_keys)})",
             *textwrap.wrap(detail.title, SETTING_CAPTION_WIDTH),
+            *(
+                (
+                    "",
+                    *textwrap.wrap(
+                        SETTING_DETAIL_NOTES[detail.letter], SETTING_CAPTION_WIDTH
+                    ),
+                )
+                if detail.letter in SETTING_DETAIL_NOTES
+                else ()
+            ),
         )
     )
     for detail in setting_details.DETAILS
