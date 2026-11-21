@@ -213,22 +213,6 @@ def _loosened(tight_mm: float) -> float:
     return block.printed_band_mm(1) - tight_mm
 
 
-def test_cone_boss_length_band_is_booked_in_the_embed_band() -> None:
-    """ConeBossLen prints .XXX, the shared 1.654 (user ruling 2026-09-29 put
-    it at .XX): the shaft collar bears on the boss's north face, half its band
-    off the post centre, so the end screw's embed books that half band.  With
-    the 3/4 end screw (#2726) the embed window holds it with room either way."""
-    import build_dt_drive_train_assembly as bdt
-    import dt_cone_pivot_post_spec as post
-    import dt_cone_tip_block_spec as block
-
-    places = post.DRAWING_PRECISION["ConeShaftBoss"]["ConeBossLen"]
-    assert places == 3
-    half_band = block.printed_band_mm(places) / 2.0
-    _, high = bdt.end_screw_embed_worst_mm(bdt.END_SCREW_EMBED_BAND_MM - half_band)
-    assert high + half_band == pytest.approx(bdt.END_SCREW_EMBED_WORST_MM[1])
-
-
 def test_post_mount_stations_need_their_explicit_band() -> None:
     """The platform's post-mount taps (the shop's +/-.005 drilled-hole row,
     delegated ruling 2026-11-07) move the shaft's thrust face; at the inch

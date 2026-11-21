@@ -1255,7 +1255,7 @@ CONE_KEY_SOUTH_LOCAL_Z = SHAFT_COLLAR_END + cone_key.END_SET_MM
 # Along the axis, south to north (cone_tip_cluster): T024 bonded (LOCTITE 638)
 # on land 2 one STACK_FEELER off T030 | T018 and T012 bonded on MHA-DT-37's
 # spigot, which is bonded in MHA-DT-04's socket | T006's leaves (MHA-DT-37) |
-# MHA-DT-38 pressed on its pivot | the set end play | MHA-DT-39's reamed end,
+# MHA-DT-38 bonded on its pivot | the set end play | MHA-DT-39's reamed end,
 # its 1/4-28 thread through MHA-DT-21 | the 91794A112 pinch screw locking it
 # across the top slit.  T024..T006, the bushing and the end screw sit
 # TIP_SET_SHIFT_MM north of their cone_line layout stations (the stack is
@@ -4400,7 +4400,7 @@ def build(adapter) -> dict[str, str]:
     # free-DOF attractor), and each copy is re-pointed at its own
     # T-configuration post-copy.  T006 is its own part, MHA-DT-37 (owner
     # decision C1 keyed, 2026-11-09, PR #1992), inserted on its model station
-    # with MHA-DT-38 pressed on its pivot.
+    # with MHA-DT-38 bonded on its pivot.
     seed_teeth = _config.cone_teeth(0)
     seed_cg = _place_on_shaft(
         adapter,
@@ -4426,7 +4426,7 @@ def build(adapter) -> dict[str, str]:
         BUSHING_NORTH_EULER,
         ROT_BUSHING_NORTH,
         ground=False,
-        label="cone-tip-bushing (MHA-DT-38 pressed on the T006 pivot)",
+        label="cone-tip-bushing (MHA-DT-38 bonded on the T006 pivot)",
     )
 
     # =================== cylinder drum (driven, free on the arbor) =============
@@ -5431,8 +5431,8 @@ def build(adapter) -> dict[str, str]:
     )
     apply_component_color(adapter, tip_gear, MUNTZ_YELLOW)
     cone_gears.append((6, tip_gear))
-    # MHA-DT-38 pressed on the pivot against T006's leaves: coaxial, its south
-    # face (Right Plane) on LeavesNorthPlane, and no spin on the press.
+    # MHA-DT-38 bonded on the pivot against T006's leaves: coaxial, its south
+    # face (Right Plane) on LeavesNorthPlane, and no spin in the cured bond.
     bush_o = _org(adapter, tip_bushing)
     coincident_mate(
         adapter,
@@ -5445,14 +5445,14 @@ def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Right Plane@{tip_bushing}", "PLANE"),
         named_ref(f"LeavesNorthPlane@{tip_gear}", "PLANE"),
-        label="tip bushing pressed against the T006 leaves",
+        label="tip bushing bonded against the T006 leaves",
         verify=(tip_bushing, bush_o),
     )
     parallel_mate(
         adapter,
         named_ref(f"Top Plane@{tip_bushing}", "PLANE"),
         named_ref(f"Top Plane@{tip_gear}", "PLANE"),
-        label="tip bushing anti-spin (pressed)",
+        label="tip bushing anti-spin (bonded)",
         verify=(tip_bushing, bush_o),
     )
     # MHA-DT-39 threads into the block's tap: coaxial on the block's end-screw

@@ -68,8 +68,8 @@ its first-root position; no second general note restates that location.
      off 1/8 turn for 0.05–0.25 mm end play, then tighten the pinch screw. Ream the end-screw hole held on
      its thread so it runs true. MHA-DT-21's axis height is made to the measured MHA-DT-05 journal-axis
      height above MHA-DT-20 (matched fit, ±.003 in) so the pivot enters the end screw; tighten the block's
-     hold-down with the pivot running free in MHA-DT-39. At the print-worst stack the end screw keeps 1.39D
-     of full thread in the block, under rule 18's 1.5D (accepted by owner ruling 2026-11-09, dt-drive-train DT-07).
+     hold-down with the pivot running free in MHA-DT-39. At the print-worst stack the 3/4 end screw keeps
+     1.524D of full thread in the .44 block, over rule 18's 1.5D (owner ruling 2026-11-20, #2726; DT-07 retired).
      `dt_cone_tip_air.py` owns the cone-tip air to G19 over the whole swing: the bushing, the end
      screw's proud end and MHA-DT-21's south face where it stands over G19. Use worst-case arithmetic
      over every source if it clears everywhere; otherwise use the statistical method everywhere: nominal

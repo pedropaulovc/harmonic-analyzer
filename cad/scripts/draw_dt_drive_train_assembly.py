@@ -579,7 +579,7 @@ CLUSTER_BALLOON_CLEARANCE = {
 # ballooned instead on an enlarged copy of the same exploded view, isolated
 # to them, in the sheet's empty right half; its boundary circle and letter
 # sit on the 1:3 view (draw_ch_channel_assembly's exploded detail C).  The
-# explode keeps MHA-DT-38 pressed on the MHA-DT-37 pivot (the built pair), so
+# explode keeps MHA-DT-38 bonded on the MHA-DT-37 pivot (the built pair), so
 # the scale, not the explode, tells them apart: 6T tips 4.31 mm, bushing
 # 5.79 mm (dt_cone_tip_gear_spec, dt_cone_tip_bushing_spec).  Letters A, C,
 # D and E are taken here and B is MHA-FR-05's VIEW B, cited in step 10E.
@@ -1452,9 +1452,10 @@ CONE_CRANK_STEPS = _note_text(
         "1J. REPEAT 1F UNTIL THE STACK READS IN ITS WINDOW.",
         "1K. TAKE MHA-DT-37, T018, T012 AND T024 OFF.",
         # #2469: the bushing's bond keeps its squeeze-out off the face the end
-        # screw bears on and off the pivot's running end.
+        # screw bears on, off the pivot's running end and out of T006's tooth
+        # spaces, which the bushing's face covers and MHA-DT-12 meshes in.
         "1L. BOND MHA-DT-38 ON THE MHA-DT-37 PIVOT, AGAINST ITS TEETH, PER THE SHEET 1 NOTE.",
-        "1M. WIPE THE SQUEEZE-OUT OFF MHA-DT-38'S BACK FACE AND THE PIVOT END.",
+        "1M. WIPE THE SQUEEZE-OUT OFF MHA-DT-38'S BACK FACE, MHA-DT-37'S TOOTH SPACES AND THE PIVOT END.",
         "1N. LET MHA-DT-38 CURE ON THE LOOSE MHA-DT-37 WHILE T024 BONDS.",
         # #2470: T024 slides back along its coated land onto the feeler, so
         # its squeeze-out reaches T030's back face, the leaf and the key's

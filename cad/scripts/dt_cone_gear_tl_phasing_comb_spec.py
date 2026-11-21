@@ -262,9 +262,15 @@ BOND_FLOAT_MM = max(
     cluster.SPIGOT_BOND_CLEARANCE_MM[1] / 2.0,
 )
 # The tip over T030's south face: MHA-DT-37's pivot at its .XX length's top
-# over T006's north face; MHA-DT-38 (.XXX OD) on it, off a floating axis.
+# over T006's north face; MHA-DT-38 (.XXX OD) on it, off a floating axis and
+# cured off the pivot's by up to half its own bond clearance (#2469: bonded,
+# step 1N cures it on the loose pivot before the comb goes on).
 PIVOT_END_MAX_MM = _T006_NORTH_MAX_MM + cluster.PIVOT_LENGTH_MM + _XX
-BUSHING_REACH_MM = (cluster.BUSHING_OD_MM + _XXX) / 2.0 + BOND_FLOAT_MM
+BUSHING_REACH_MM = (
+    (cluster.BUSHING_OD_MM + _XXX) / 2.0
+    + BOND_FLOAT_MM
+    + cluster.BUSHING_BOND_CLEARANCE_MM[1] / 2.0
+)
 
 
 # --- The tooth space against a blade -----------------------------------------

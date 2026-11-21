@@ -1,15 +1,16 @@
 """Axial air between the cone tip and the drum bank's G19.
 
 Owner decision C1 keyed (2026-11-09, PR #1992): the cone shaft's tip carries
-the brass bushing pressed on T006's pivot (MHA-DT-38), whose north face bears
-on the end of the end screw (MHA-DT-39) threaded through the moved tip block
-(MHA-DT-21).  G19's tooth face is the bank's north end.  Over the whole P1
-swing none of the three may reach the bank:
+the brass bushing bonded on T006's pivot (MHA-DT-38; LOCTITE 638 slip fit,
+owner ruling 2026-11-20, #2469), whose north face bears on the end of the end
+screw (MHA-DT-39) threaded through the moved tip block (MHA-DT-21).  G19's
+tooth face is the bank's north end.  Over the whole P1 swing none of the
+three may reach the bank:
 
 * the bushing rides the shaft at its model station (cone_tip_cluster: the
   layout T006 north face plus TIP_SET_SHIFT_MM), its corner toward T006
   broken by its chamfer at the smallest printed leg (dt_cone_tip_bushing_spec,
-  #2697);
+  #2697), cured off the pivot's axis and cocked on it by its bond clearance;
 * the end screw's end stands proud of the block's south face toward the
   cone, set against the bushing at assembly (dt_cone_tip_block_spec);
 * the block's south face, only where it stands over G19 (inside its tip
@@ -122,6 +123,15 @@ class DrumTier:
 BUSHING_SOUTH_STATION_MM = cone_line.T006_NORTH_FACE + cluster.TIP_SET_SHIFT_MM
 _BUSHING_OD_BAND = printed_band_mm(cluster.BUSHING_PLACES, unit="in")
 _BUSHING_LENGTH_BAND = printed_band_mm(cluster.BUSHING_PLACES, unit="in")
+# The bond cures with the bushing anywhere its clearance on the pivot lets it
+# sit (#2469): off the pivot's axis by half the largest clearance, and cocked
+# by the whole clearance over its length, which carries its south corner
+# (at its O.D.) toward G19 by that slope times its radius.
+_BUSHING_BOND_CLEARANCE_MAX = cluster.BUSHING_BOND_CLEARANCE_MM[1]
+_BUSHING_BOND_RADIAL = _BUSHING_BOND_CLEARANCE_MAX / 2.0
+_BUSHING_BOND_COCK_AXIAL = (
+    _BUSHING_BOND_CLEARANCE_MAX / cluster.BUSHING_LENGTH_MM
+) * (cluster.BUSHING_OD_MM / 2.0)
 # The screw stands set against the bushing at the model's end play; the
 # least the assembly step sets brings it this much further south.
 _SET_END_PLAY_LOSS = tip.END_SCREW_MODEL_END_PLAY_MM - SHAFT_END_PLAY[0]
@@ -135,10 +145,16 @@ TIERS = (
         BUSHING_SOUTH_STATION_MM,
         BUSHING_SOUTH_STATION_MM + cluster.BUSHING_LENGTH_MM,
         cluster.BUSHING_OD_MM / 2.0,
-        0.0,
+        -_BUSHING_BOND_COCK_AXIAL,
         _BUSHING_LENGTH_BAND,
-        _BUSHING_OD_BAND / 2.0,
-        {"bushing outside diameter": (0.0, _BUSHING_OD_BAND / 2.0)},
+        _BUSHING_OD_BAND / 2.0 + _BUSHING_BOND_RADIAL,
+        {
+            "bushing outside diameter": (0.0, _BUSHING_OD_BAND / 2.0),
+            "bushing bond on the pivot": (
+                _BUSHING_BOND_COCK_AXIAL,
+                _BUSHING_BOND_RADIAL,
+            ),
+        },
         bushing.END_CHAMFER_MIN,
     ),
     # The thread's major at its 2A maximum stands in for the proud end.
@@ -331,6 +347,7 @@ INDEPENDENT_TOLERANCES = frozenset(
         "base pivot seat transferred through the platform bore",
         "swing feel set",
         "bushing outside diameter",
+        "bushing bond on the pivot",
         "bushing length",
         "end screw set end play",
         *(f"bank {name}" for name in bank.DATUM_CHAIN_STACK),

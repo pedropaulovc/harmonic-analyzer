@@ -68,7 +68,7 @@ allowed_free_stems:
   # MHA-DT-VN-71 sits in the MHA-DT-04 keyseat and rides the shaft's spin
   # and swing (owner decision C1 keyed, 2026-11-09, PR #1992).
   - dt-vn-cone-shaft-key
-  # MHA-DT-37 is bonded in MHA-DT-04's socket and MHA-DT-38 is pressed on its
+  # MHA-DT-37 is bonded in MHA-DT-04's socket and MHA-DT-38 is bonded on its
   # pivot: both ride the shaft's spin and swing.  MHA-DT-39 threads through
   # MHA-DT-21 and rides the swing (owner decision C1 keyed, 2026-11-09, PR
   # #1992).
