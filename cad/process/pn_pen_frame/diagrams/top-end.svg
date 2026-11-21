@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="16" y="20">PF01, across the jaws (F at the fixed jaw): the top end T skimmed</text>
+  <text class="title" x="16" y="20">PF01, across the jaws (BK at the fixed jaw): the top end T skimmed</text>
   <line class="fixture-table" x1="126.2" y1="420.0" x2="473.8" y2="420.0"/>
   <rect class="clamp" x="166.2" y="195.3" width="110.0" height="224.7"/>
   <rect class="clamp" x="323.8" y="195.3" width="110.0" height="224.7"/>

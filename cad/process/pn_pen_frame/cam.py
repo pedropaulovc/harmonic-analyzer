@@ -23,8 +23,8 @@ Route (plan text in ``plan.toml``): one 3/8 x 1-1/4 in C36000 blank about
 PF01 faces the top end, PF02 (turned over) the bottom end to the height. On
 edge on the same pair: PF03 skims the left face, PF04 (turned over) faces
 the right face to the width. Lying on the 1 in + 1/2 in parallel stacks
-under the end rails, gripped on the ends: PF05 skims the front face, PF06
-(turned over) faces the back face to the depth, roughs the window with a
+under the end rails, gripped on the ends: PF05 skims the back face, PF06
+(turned over) faces the front face to the depth, roughs the window with a
 1/8 in slot round its edge, steps the slot's corners in with the 5/64 in
 end mill and finishes the walls with it. Upright, the bottom end up: PF07
 spots and drills the #43 through the bottom rail into the window, PF08
@@ -32,14 +32,18 @@ brings the dead centre over it for tapping by hand.
 
 Work frames (G54), each set in its setup:
 - PF01/PF02: X0 Y0 the bar's axis, Z0 the faced top end (PF01) or the
-  parallels' top (PF02); +Y toward the fixed jaw (the front face).
-- PF03: X0 the bottom end, Y0 the fixed jaw (front face), Z0 the parallels.
-- PF04: X0 the top end, Y0 the fixed jaw (front face), Z0 the parallels.
+  parallels' top (PF02); +Y toward the fixed jaw (the back face).
+- PF03: X0 the bottom end, Y0 the fixed jaw (back face), Z0 the parallels.
+- PF04: X0 the top end, Y0 the fixed jaw (back face), Z0 the parallels.
 - PF05: X0 the left face, Y0 the fixed jaw (bottom end), Z0 the stacks.
 - PF06: X0 the left face, Y0 the fixed jaw (top end), Z0 the stacks (the
-  front face).
-- PF07/PF08: X0 the left face (the part to -X), Y0 the fixed jaw (front
+  back face).
+- PF07/PF08: X0 the left face (the part to -X), Y0 the fixed jaw (back
   face), Z0 the bottom end.
+
+Faces are the drawing's: its front view looks at the model's +Z face, so
+the model's front_face feature (Z0) is the drawing's back face, the face
+the hole's .16 is measured from.
 
 Toolpath rules (owner rulings 2026-11-16): faces zigzag (ball screws),
 plunges beside the stock at the cutting feed, plunges into metal (each
@@ -68,10 +72,10 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("PF02_height", ("bottom_end",)),
     ("PF03_left_face", ("left_face",)),
     ("PF04_width", ("right_face",)),
-    ("PF05_front_face", ("front_face",)),
+    ("PF05_back_face", ("back_face",)),
     (
         "PF06_window",
-        (("back_face",), ("window_rough",), ("window_corners", "window_finish")),
+        (("front_face",), ("window_rough",), ("window_corners", "window_finish")),
     ),
     ("PF07_tap_drill", (("tap_spot",), ("tap_drill",))),
     ("PF08_tap", ("tap",)),
@@ -474,8 +478,8 @@ def _outline(
 def _geometry(features: dict[str, Any]) -> dict[str, Any]:
     """The frame's sizes, window and tap from the export, each checked
     against the frame the recipe assumes: the left face X0, the bottom end
-    Y0, the front face Z0, the window through Z, the tap into the bottom end
-    along +Y."""
+    Y0, the model's front_face (the drawing's back face) Z0, the window
+    through Z, the tap into the bottom end along +Y."""
     f = features["features"]
     for name, axis in (("left_face", "x"), ("bottom_face", "y"), ("front_face", "z")):
         plane = f[name]["plane"]
@@ -589,7 +593,7 @@ def context(
     if not lo - 1e-3 <= d43 <= hi:
         raise ValueError(f"#43 Ø{d43} is not the tap drill band {g['tap_dia']}")
     step_max = p["face_stepover_max_mm"]
-    face_cuts = ("top end", "height", "left face", "width", "front face", "depth")
+    face_cuts = ("top end", "height", "left face", "width", "back face", "depth")
     face_rpm, face_feed = _setting(plan, shop, "top end")
     for name in face_cuts:
         if not math.isclose(_cut(plan, name, "cutter_dia_mm"), em, abs_tol=1e-6):
@@ -605,7 +609,7 @@ def context(
     for name, doc in (
         ("top end", end_skim),
         ("left face", edge_skim),
-        ("front face", face_skim),
+        ("back face", face_skim),
     ):
         if not math.isclose(_cut(plan, name, "axial_doc_mm"), doc, abs_tol=1e-6):
             raise ValueError(f"'{name}' axial_doc_mm is not its skim")
@@ -618,8 +622,8 @@ def context(
             raise ValueError(f"'{name}' axial_doc_mm is not process.face_step_max_mm")
 
     # The window: a 1/8 in slot finish_stock inside the walls, then the 5/64
-    # in finish a cutter radius inside them; both from the back face to
-    # run_past below the front face, between the parallel stacks.
+    # in finish a cutter radius inside them; both from the front face to
+    # run_past below the back face, between the parallel stacks.
     for name, dia, key in (
         ("window rough", e8, "rough_cutter_dia_mm"),
         ("window plunge", e8, "rough_cutter_dia_mm"),
@@ -756,7 +760,7 @@ def context(
     _agree(plan, "lying_grip_mm", lying_grip)
     if lying_grip >= D:
         raise ValueError(
-            "lying, the jaws reach the back face: the faces would cut the jaws"
+            "lying, the jaws reach the front face: the faces would cut the jaws"
         )
     t = p["parallel_thickness_mm"]
     # The window and its run past lie between the stacks under the ends: no
@@ -788,26 +792,26 @@ def context(
 
     # Frames (model point p -> axes · (p - origin)). Raw faces: the left
     # face's skim beyond X0, the right the rest of the bar's width beyond
-    # it; the front face's skim beyond Z0, the back the rest of its
-    # thickness; the top end's skim beyond the height.
+    # it; the back face's (model Z0) skim beyond Z0, the front face the rest
+    # of its thickness; the top end's skim beyond the height.
     raw_left = -edge_skim
     raw_right = raw_left + bw
     raw_front = -face_skim
     raw_back = raw_front + bt
     cx, cz = (raw_left + raw_right) / 2, (raw_front + raw_back) / 2
     frames = {
-        # Upright, the front face to the fixed jaw (+Y).
+        # Upright, the back face (model Z0) to the fixed jaw (+Y).
         "top": _frame([cx, H, cz], [0, 0, -1], [0, 1, 0]),
         "bottom": _frame([cx, H, cz], [0, 0, -1], [0, -1, 0]),
-        # On edge, the front face to the fixed jaw: X0 the bottom end, then
+        # On edge, the back face to the fixed jaw: X0 the bottom end, then
         # turned over, the top end.
         "left": _frame([raw_right, 0.0, raw_front], [0, 0, -1], [-1, 0, 0]),
         "right": _frame([0.0, H, raw_front], [0, 0, -1], [1, 0, 0]),
         # Lying: the bottom end to the fixed jaw, then turned end for end,
         # the top end; X0 the left face.
-        "front": _frame([0.0, 0.0, raw_back], [0, -1, 0], [0, 0, -1]),
-        "back": _frame([0.0, H, 0.0], [0, 1, 0], [0, 0, 1]),
-        # Upright, the bottom end up, the front face to the fixed jaw (the
+        "lying": _frame([0.0, 0.0, raw_back], [0, -1, 0], [0, 0, -1]),
+        "flipped": _frame([0.0, H, 0.0], [0, 1, 0], [0, 0, 1]),
+        # Upright, the bottom end up, the back face to the fixed jaw (the
         # hole's drawing station is from it): X0 the left face, on the right.
         "tap": _frame([0.0, 0.0, 0.0], [0, 0, -1], [0, -1, 0]),
     }
@@ -817,8 +821,8 @@ def context(
         "bottom": ((-hw, hw), (-ht, ht), (0.0, upright_top)),
         "left": ((0.0, H), (-bt, 0.0), (0.0, bw)),
         "right": ((0.0, H), (-bt, 0.0), (0.0, edge_level)),
-        "front": ((0.0, W), (-H, 0.0), (0.0, bt)),
-        "back": ((0.0, W), (-H, 0.0), (0.0, face_level)),
+        "lying": ((0.0, W), (-H, 0.0), (0.0, bt)),
+        "flipped": ((0.0, W), (-H, 0.0), (0.0, face_level)),
         "tap": ((-W, 0.0), (-D, 0.0), (-H, 0.0)),
     }
     # Every frame puts the finished part where its stock box says.
@@ -915,9 +919,9 @@ def context(
             edge_y,
             H,
         ),
-        "front_face": ("front", [face_level], bt, run(lying_x), lying_ys, lying_y, W),
-        "back_face": (
-            "back",
+        "back_face": ("lying", [face_level], bt, run(lying_x), lying_ys, lying_y, W),
+        "front_face": (
+            "flipped",
             depth_levels,
             face_level,
             run(lying_x),
@@ -956,7 +960,7 @@ def context(
     jobs += [
         {
             **rough_tool,
-            "frame": "back",
+            "frame": "flipped",
             "label": "window rough",
             "stock": stock_back,
             "ops": [
@@ -969,7 +973,7 @@ def context(
         },
         {
             **finish_tool,
-            "frame": "back",
+            "frame": "flipped",
             "label": "window finish",
             "stock": stock_back,
             "ops": [
@@ -1060,10 +1064,10 @@ def context(
         "bottom_end": jaws(upright_grip, upright_x, upright_y),
         "left_face": jaws(upright_grip, edge_x, edge_y),
         "right_face": jaws(upright_grip, edge_x, edge_y),
-        "front_face": jaws(lying_grip, lying_x, lying_y),
         "back_face": jaws(lying_grip, lying_x, lying_y),
+        "front_face": jaws(lying_grip, lying_x, lying_y),
     }
-    window_keep = keep["back_face"] + stacks
+    window_keep = keep["front_face"] + stacks
     tap_keep = jaws(upright_grip - H, (-W, 0.0), (-D, 0.0))
 
     tn = numbers
@@ -1133,7 +1137,7 @@ def context(
         "PF02_height": "bottom_end",
         "PF03_left_face": "left_face",
         "PF04_width": "right_face",
-        "PF05_front_face": "front_face",
+        "PF05_back_face": "back_face",
     }
     for name, key in single.items():
         top = faces[key][2]
@@ -1164,7 +1168,7 @@ def context(
     ]
     for k, checks in enumerate(
         (
-            face_checks("back_face"),
+            face_checks("front_face"),
             window_checks(d_rough, d_rough, rough_levels, r8, []),
             window_checks(r5, r5, finish_levels, r5, corner_clearing),
         )

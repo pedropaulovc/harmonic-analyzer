@@ -19,11 +19,13 @@
   <rect class="cutter" x="292.9" y="92.3" width="14.2" height="100.8"/>
   <polygon class="cutter" points="286.0,38.3 314.0,38.3 300.0,80.3"/>
   <text class="label-halo" x="370.0" y="76.3">T-handle wrench on the dead centre</text>
-  <text class="label-halo" x="370.0" y="182.3">tap point {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below B</text>
+  <line class="leader" x1="256.3" y1="193.1" x2="292.9" y2="193.1"/>
+  <text class="label-halo" x="252.3" y="189.1" text-anchor="end">tap point {{process.tap_reach_min_mm:in.3dot}}–</text>
+  <text class="label-halo" x="252.3" y="205.1" text-anchor="end">{{process.tap_reach_max_mm:in.3dot}} below B</text>
   <line class="datum" x1="256.3" y1="142.3" x2="276.3" y2="142.3"/>
   <text class="datum-label" x="252.3" y="146.3" text-anchor="end">Z0 (B)</text>
   <text class="label" x="470.0" y="300.0">Upright on the 1 in parallels, B up,</text>
   <text class="label" x="470.0" y="316.0">gripped on the front and back faces,</text>
-  <text class="label" x="470.0" y="332.0">F at the fixed jaw, L on the RIGHT.</text>
-  <text class="label" x="470.0" y="348.0">Hole {{cad.thumb_screw_tap_station_in:.3dot}} from L, {{cad.thumb_screw_tap_z_from_min_in:.3dot}} from F.</text>
+  <text class="label" x="470.0" y="332.0">BK at the fixed jaw, L on the RIGHT.</text>
+  <text class="label" x="470.0" y="348.0">Hole {{cad.thumb_screw_tap_station_in:.3dot}} from L, {{cad.thumb_screw_tap_z_from_min_in:.3dot}} from BK.</text>
 </svg>

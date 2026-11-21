@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="16" y="20">Finished frame, front face toward you: deburr and inspect</text>
+  <text class="title" x="16" y="20">Finished frame, its front face toward you (BK away), as the drawing's front view: deburr and inspect</text>
   <rect class="part-kept" x="200.0" y="40.0" width="203.2" height="321.1"/>
   <rect class="paper" x="226.4" y="88.8" width="150.4" height="223.5" rx="7.9"/>
   <rect class="holes" x="226.4" y="88.8" width="150.4" height="223.5" rx="7.9"/>
@@ -8,8 +8,8 @@
   <text class="label" x="423.2" y="80.0">T (top end)</text>
   <text class="label" x="423.2" y="361.1">B (bottom end): 4-40 through</text>
   <text class="label" x="423.2" y="377.1">the .24 rail into the window</text>
-  <line class="leader" x1="419.2" y1="216.5" x2="403.2" y2="216.5"/>
-  <text class="label" x="423.2" y="220.5">L, the left face: on your RIGHT with F toward you</text>
+  <line class="leader" x1="184.0" y1="216.5" x2="200.0" y2="216.5"/>
+  <text class="label" x="180.0" y="220.5" text-anchor="end">L, the left face</text>
   <text class="label" x="301.6" y="200.5" text-anchor="middle">window</text>
   <text class="label" x="423.2" y="160.0">Corners R.040 MAX: the 5/64 cutter's radius</text>
   <text class="label" x="423.2" y="180.0">Break every edge R{{cad.edge_break_in:.3dot}} or .010 chamfer max</text>

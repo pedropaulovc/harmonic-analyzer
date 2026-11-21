@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="16" y="20">PF05, plan (fixed jaw at the top): the front face F skimmed</text>
+  <text class="title" x="16" y="20">PF05, plan (fixed jaw at the top): the back face BK skimmed</text>
   <rect class="clamp" x="60.0" y="30.0" width="247.0" height="30.0"/>
   <rect class="clamp" x="60.0" y="260.7" width="247.0" height="30.0"/>
   <text class="label-on-clamp" x="183.5" y="50.0" text-anchor="middle">fixed jaw</text>
@@ -26,5 +26,5 @@
   <rect class="part-removed" x="470.0" y="324.8" width="80.3" height="3.3"/>
   <text class="label" x="470.0" y="436.0">1 in + 1/2 in parallels stacked, under each end</text>
   <text class="label" x="317.0" y="208.0">Gripped on the ends, B to the fixed jaw.</text>
-  <text class="label" x="317.0" y="224.0">Skim the face up down to {{process.face_level_mm:in.3dot}} above the stacks: F.</text>
+  <text class="label" x="317.0" y="224.0">Skim the face up down to {{process.face_level_mm:in.3dot}} above the stacks: BK.</text>
 </svg>
