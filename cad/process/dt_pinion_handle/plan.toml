@@ -73,7 +73,7 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Scribe the bar {{process.saw_length_in:.2dot}} in from its end and saw on the far side of the line, the bar clamped in the saw's vise; file the burrs off both sawn ends."
+instruction = "Scribe the bar {{process.saw_length_in:.2dot}} in from its end and saw on the far side of the line, the bar clamped in the saw's vise; let the piece drop clear onto the saw base and pick it up only after the blade has stopped. File the burrs off both sawn ends."
 feed = "hand"
 
 [[setups]]
@@ -82,9 +82,9 @@ title = "Lathe: face the first end"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} piece, {{cad.outer_stickout_datum_mm:in.2dot}} in out of the jaw fronts; the rest of the piece runs back through the jaws into the spindle bore."
+holding = "3-jaw over a brass shim wrap on the Ø{{process.stock_dia_in:.3dot}} piece (the jaws close on the rod's as-received O.D.), {{cad.outer_stickout_datum_mm:in.2dot}} in out of the jaw fronts; the rest of the piece runs back through the jaws into the spindle bore."
 datum = "Z0 (carriage DRO) the end faced in Op 20."
-diagram = { file = "diagrams/bar.svg", alt = "The 1/4 in piece in the 3-jaw with little out: one sawn end faced square." }
+diagram = { file = "diagrams/bar.svg", alt = "The 1/4 in piece in the 3-jaw over a shim wrap with little out: one sawn end faced square." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_datum_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
 [[setups.operations]]

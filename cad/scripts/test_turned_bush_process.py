@@ -42,15 +42,25 @@ def _stock() -> dict:
 
 
 STOCK = _stock()
-DRILLED = tuple(
-    stem
-    for stem in STEMS
-    if "bore" in export_features.requirement_manifest(stem)["features"]
-)
 
 
 def _plan(stem: str) -> dict:
     return tomllib.loads(_process_plans.plan_path(stem).read_text(encoding="utf-8"))
+
+
+def _drills(plan: dict) -> list[str]:
+    tools = {tool["id"]: tool for tool in plan["tools"]}
+    return [
+        tools[op["tool"]]["ref"]
+        for setup in plan["setups"]
+        for op in setup.get("operations", ())
+        if op.get("drilling") == "twist_drill"
+    ]
+
+
+# A plan that drills must land its drill in the drawing's bore band; the
+# sawn-and-faced pins drill nothing.
+DRILLED = tuple(stem for stem in STEMS if _drills(_plan(stem)))
 
 
 def test_the_turned_parts_are_enrolled() -> None:
@@ -78,17 +88,8 @@ def test_plan_binds_the_part_from_its_feature_export(stem: str) -> None:
 
 @pytest.mark.parametrize("stem", DRILLED)
 def test_the_drill_lands_in_the_drawings_hole_band(stem: str) -> None:
-    plan = _plan(stem)
     band = export_features.requirement_manifest(stem)["features"]["bore"]["dia"]
-    tools = {tool["id"]: tool for tool in plan["tools"]}
-    drills = [
-        tools[op["tool"]]["ref"]
-        for setup in plan["setups"]
-        for op in setup.get("operations", ())
-        if op.get("drilling") == "twist_drill"
-    ]
-    assert drills
-    for ref in drills:
+    for ref in _drills(_plan(stem)):
         assert band[0] <= SHOP["tools"][ref]["diameter_mm"] <= band[1], ref
 
 
