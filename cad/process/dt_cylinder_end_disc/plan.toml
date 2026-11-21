@@ -72,6 +72,7 @@ ref = "lathe-ar"
 id = "dead-centre"
 name = "MT3 dead centre"
 ref = "mill-dead-centre-mt3"
+description = "MT3 dead centre, in the lathe tailstock: centres the blank on its punch mark (Setup 2)"
 
 [[tools]]
 id = "centre"
@@ -103,7 +104,19 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Saw a {{process.blank_side_in:g}} in length off the flat: a {{process.blank_side_in:g}} in square. Scribe both diagonals and centre-punch where they cross. Saw each corner off at 45°, .8 in back from the corner along each edge. Deburr the sawn edges. Mike the thickness: {{cad.length_min_in:.3dot}} or over everywhere, else stop."
+instruction = "Saw a {{process.blank_side_in:g}} in length off the flat, the flat lying on the saw bed against the fence, clamped in the saw's vise: a {{process.blank_side_in:g}} in square. Scribe both diagonals and centre-punch where they cross. Mark each corner .8 in back along both edges."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Saw each corner off: the square flat on the bed, an edge on the fence, the head at 45°, the square clamped in the saw's vise, the blade on the marks. Deburr the sawn edges."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mike the thickness at four places: {{cad.length_min_in:.3dot}} or over everywhere, else stop."
 inspection = "Thickness at least {{cad.length_min_in:.3dot}} (micrometer, four places)."
 gauge_checks = "other"
 feed = "hand"
@@ -116,7 +129,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "6 in 4-jaw on the blank's four sawn edges, seated flat on the jaw steps, jaws snug only. The MT3 dead centre in the tailstock: run its point into the centre-punch mark, then tighten the jaws in turn, a pair at a time, keeping the point seated in the mark; withdraw the tailstock."
 datum = "The face against the jaw steps; the out face is faced to the thickness from it."
-diagram = { file = "diagrams/block.svg", alt = "The sawn blank in the 4-jaw on its edges: the out face faced to thickness, spotted and drilled V through from the tailstock." }
+diagram = { file = "diagrams/block.svg", alt = "The sawn blank in the 4-jaw, its sawn edges in the jaws and its back face on the jaw steps; the dead centre's point in the punch mark; the AR tool faces the out face to thickness." }
 lathe_hold = "other"
 
 [[setups.operations]]

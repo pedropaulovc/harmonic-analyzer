@@ -731,11 +731,27 @@ instruction = "If the enamel cannot follow now: oil the back lightly, bag it and
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The enamel is the owner's Rust-Oleum Stops Rust Flat Black 376855, over Rust-Oleum Stops Rust Clean Metal Primer 7780830 (the paint maker recommends its primer on bare metal). The primer is not owned: buy it. The enamel: check the shelf, buy if none. Spray outdoors or in a well-ventilated space, at 50–90 °F and humidity under 70 %."
+instruction = "Paint: the owner's Rust-Oleum Stops Rust Flat Black 376855 over Rust-Oleum Stops Rust Clean Metal Primer 7780830, the paint maker's primer for bare metal. The primer is not owned: buy it. The enamel: check the shelf, buy if none."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Wash in detergent, rinse in clean water and dry thoroughly. Mask the half bore and both tapped holes (a #8-32 screw in each). Primer: shake the can a full minute after the ball rattles, hold it 10–16 in off and spray 2 light coats a few minutes apart. The enamel can follow the primer at once: every other face black, 2 or more light coats a few minutes apart, the can moving and at one distance, no runs; any further coat within 1 hour or after 48 hours. Tack-free in 2–4 hours, handle after 5–9 hours, fully dry in 24 hours."
+instruction = "Wash the back in detergent, rinse it in clean water and dry it thoroughly."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mask the half bore and both tapped holes (a #8-32 screw in each)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Spray outdoors or in a well-ventilated space, at 50–90 °F and humidity under 70 %. Primer: shake the can a full minute after the ball rattles; 2 light coats a few minutes apart, the can 10–16 in off."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Enamel straight after the primer: every unmasked face black, 2 or more light coats a few minutes apart, the can moving and at one distance, no runs. Any further coat within 1 hour or after 48 hours."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Let it dry: tack-free in 2–4 hours, handle after 5–9 hours, fully dry in 24 hours."
 feed = "hand"
 
 [[setups.operations]]

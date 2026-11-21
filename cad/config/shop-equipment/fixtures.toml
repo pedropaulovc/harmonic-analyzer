@@ -95,16 +95,6 @@ kind = "follow_rest"
 status = "on_hand"
 cite = ["Owner (Pedro) 2026-11-17: \"already have follow and steady rests for the lathe\""]
 
-# The lathe's quick-change toolpost. Owner (Pedro), answered in person
-# 2026-11-21 (cnc rulings record, second ask): "axa quick change 1/4 to 5/8".
-# Owner-stated: its make and how many holders of which kind are unrecorded.
-[fixtures.toolpost-axa-pm-1127]
-name = "AXA quick-change toolpost for the PM-1127VF-LB lathe, holders for 1/4 to 5/8 in tool shanks"
-kind = "toolpost"
-status = "on_hand"
-note = "Make, holder count and holder kinds not recorded."
-cite = ["Owner (Pedro) 2026-11-21, answered in person: \"axa quick change 1/4 to 5/8\""]
-
 # The lathe's 6 in 4-jaw independent chuck. Owner (Pedro), answered in person
 # 2026-11-21 (cnc rulings record): "Lathe 6 in 4-jaw independent chuck: on
 # hand." Its prechips record is cad/process/shop/common.toml
