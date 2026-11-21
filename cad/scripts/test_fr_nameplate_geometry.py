@@ -1,11 +1,14 @@
 """SolidWorks-free integrity guards for the photo-traced nameplate contours.
 
 The 2026-10-09 ruling makes the original outer ribbon's OUTER edge the plate
-outline, scaled to 3.938 x 1.785 in. That edge is imported for the slab;
-the ribbon itself is omitted from the engraving so it cannot nick the plate.
-The recessed field follows the notched pinstripe INNER edge, copied into its
-own single-loop DXF. Screw holes sit just inside the traced head marks and
-the whole head must bear on the raised border, not the sunken field.
+outline, scaled to 3.95 x 1.79 in. That edge is imported for the slab. Owner
+ruling 2026-11-20 (Pedro), #2313 ("A") etches the field and leaves the border
+and the filled letters proud: the field DXF is the pinstripe's notched INNER
+edge (cut), the letters DXF every letter and counter (bossed back, even-odd),
+and the resist DXF is the outline plus the etched field eroded by the etch
+depth (the resist widened by the depth per edge). Screw holes sit at the
+traced corners and the whole head must bear on the raised border, not the
+etched field.
 
 Reuse the repo's ASCII DXF/polygon helpers: no ezdxf or CAD kernel is needed.
 These tests run in check:nameplate and guard units, closed contours, exact
@@ -24,10 +27,19 @@ import pytest
 
 import _dxf_text as dxf
 import build_fr_nameplate as part
+import fr_nameplate_drawing_spec as print_spec
 import fr_nameplate_spec as spec
 from _inch_wall_limits import WALL_TARGET_MM
+from _paths import REFERENCES_DIR
 from fr_harmonic_base_spec import DECK_LENGTH
 from sh_vn_brass_fillister_screw_spec import HEAD_DIA
+
+RESIST_DXF = REFERENCES_DIR / print_spec.RESIST_DXF_NAME
+
+
+def _etched_field() -> list[dxf.Ring]:
+    """The finished etched field, even-odd: its edge, the letters, counters."""
+    return _rings(part.FIELD_DXF) + _rings(part.LETTERS_DXF)
 
 
 def _read(path: Path) -> str:
@@ -45,10 +57,35 @@ def _rings(path: Path) -> list[dxf.Ring]:
     return [ring for ring, _ in dxf.read_lwpolylines(_entities_section(_read(path)))]
 
 
+def _segments(rings: list[dxf.Ring]) -> tuple[np.ndarray, np.ndarray]:
+    starts = np.concatenate([np.asarray(ring) for ring in rings])
+    ends = np.concatenate([np.roll(np.asarray(ring), -1, axis=0) for ring in rings])
+    return starts, ends
+
+
+def _distances(points: np.ndarray, rings: list[dxf.Ring]) -> np.ndarray:
+    """Least distance from each point to the rings' edges."""
+    a, b = _segments(rings)
+    ab = b - a
+    length2 = np.maximum((ab**2).sum(axis=1), 1e-30)
+    best = np.full(len(points), np.inf)
+    for chunk in range(0, len(points), 256):
+        p = points[chunk : chunk + 256, None, :]
+        t = np.clip(((p - a) * ab).sum(axis=2) / length2, 0.0, 1.0)
+        gap = np.hypot(*np.moveaxis(p - a - t[..., None] * ab, 2, 0))
+        best[chunk : chunk + 256] = gap.min(axis=1)
+    return best
+
+
 @pytest.mark.parametrize(
     ("path", "count"),
-    [(part.ENGRAVING_DXF, 110), (part.OUTLINE_DXF, 1), (part.FIELD_DXF, 1)],
-    ids=["engraving", "outline", "field"],
+    [
+        (part.FIELD_DXF, 1),
+        (part.LETTERS_DXF, 43),
+        (part.OUTLINE_DXF, 1),
+        (RESIST_DXF, 43),
+    ],
+    ids=["field", "letters", "outline", "resist"],
 )
 def test_vendored_dxf_has_only_closed_millimetre_contours(path: Path, count: int):
     assert path.is_file(), path
@@ -64,25 +101,6 @@ def test_vendored_dxf_has_only_closed_millimetre_contours(path: Path, count: int
     assert all(closed and len(ring) >= 3 for ring, closed in entities)
     # Every contour is a planar line loop, not an unparsed arc/width/extrusion.
     assert not re.search(r"\n (?:38|39|40|41|42)\n(?!0(?:\.0)?\n)", section)
-
-
-def test_engraving_extent_matches_the_baked_import_constants():
-    bounds = dxf.bbox(_rings(part.ENGRAVING_DXF))
-    assert bounds == pytest.approx(part.ENGRAVING_RAW_BBOX, abs=1e-9)
-    width = bounds[2] - bounds[0]
-    centre = ((bounds[0] + bounds[2]) / 2.0, (bounds[1] + bounds[3]) / 2.0)
-    assert width == pytest.approx(part.ENGRAVING_TARGET_WIDTH, abs=1e-9)
-    assert centre == pytest.approx(part.ENGRAVING_CENTER, abs=1e-9)
-    assert part.ENGRAVING_SCALE == pytest.approx(1.0, abs=1e-12)
-    assert part.ENGRAVING_POSITION == (0.0, 0.0)
-    # The dropped edge ribbon is not imported as a cut: all remaining vertices
-    # are strictly inside the plate's outer contour.
-    outline = _rings(part.OUTLINE_DXF)[0]
-    assert all(
-        dxf.point_in_ring(outline, point)
-        for ring in _rings(part.ENGRAVING_DXF)
-        for point in ring
-    )
 
 
 def test_plate_outline_is_the_scaled_dxf_outer_edge():
@@ -116,42 +134,43 @@ def test_corner_radius_matches_the_traced_outer_corner():
     assert np.max(abs(np.hypot(corner[:, 0] - cx, corner[:, 1] - cy) - radius)) < 0.001
 
 
-def test_field_is_exactly_the_pinstripe_inner_edge_and_has_pinned_area():
+def test_etched_field_is_the_pinstripe_inner_edge_less_the_letters():
     field = _rings(part.FIELD_DXF)[0]
-    assert field in _rings(part.ENGRAVING_DXF), (
-        "field must be the actual frame inner loop"
-    )
-    assert len(field) == 173  # preserve the traced notches, not a BorderW rectangle
-    assert abs(dxf.signed_area(field)) == pytest.approx(part.FIELD_AREA_MM2, abs=1e-8)
-    x0, y0, x1, y1 = dxf.bbox([field])
-    assert abs(dxf.signed_area(field)) < (x1 - x0) * (y1 - y0)
+    # The traced notches, not a BorderW rectangle: the pinstripe's inner edge.
+    assert len(field) == 173
+    assert abs(dxf.signed_area(field)) == pytest.approx(part.FIELD_AREA_MM2, abs=1e-6)
+    letters = _rings(part.LETTERS_DXF)
+    depths = [dxf.nesting_depth(letters, i) for i in range(len(letters))]
+    # 34 letters and ornament standing proud (0), and the nine counters etched
+    # inside them (1).
+    assert Counter(depths) == {0: 34, 1: 9}
+    assert dxf.net_area(letters) == pytest.approx(part.LETTERS_AREA_MM2, abs=1e-6)
     outline = _rings(part.OUTLINE_DXF)[0]
     assert all(dxf.point_in_ring(outline, point) for point in field)
+    assert all(dxf.point_in_ring(field, point) for ring in letters for point in ring)
 
 
-def test_screw_stations_sit_on_the_dxf_head_marks():
-    # Each hole sits on its traced head mark at the .16 station from both
-    # edges (within .0001 in), concentric with the outline's rounded corner,
-    # and the head covers the engraved mark.
-    rings = _rings(part.ENGRAVING_DXF)
-    assert len(spec.SCREW_XY) == len(spec.HEAD_MARK_XY) == 4
-    for (sx, sy), mark_xy in zip(spec.SCREW_XY, spec.HEAD_MARK_XY, strict=True):
-        # Each slotted head is two ribbon halves, each with an inner counter.
-        # Identify by geometry, not DXF ordering/handles, to tolerate a re-export.
-        mark = []
-        for ring in rings:
-            x0, y0, x1, y1 = dxf.bbox([ring])
-            centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
-            if x1 - x0 < 5.0 and y1 - y0 < 5.0 and math.dist(centre, mark_xy) < 1.0:
-                mark.append(ring)
-        assert len(mark) == 4, (mark_xy, len(mark))
-        x0, y0, x1, y1 = dxf.bbox(mark)
-        centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
-        assert math.dist(centre, mark_xy) < 0.01, (mark_xy, centre)
-        assert sx == pytest.approx(centre[0], abs=0.003)
-        assert sy == pytest.approx(centre[1], abs=0.003)
-        reach = max(math.dist((sx, sy), point) for ring in mark for point in ring)
-        assert reach < HEAD_DIA / 2.0, (sx, sy, reach)
+def test_resist_is_the_outline_plus_the_field_set_back_by_the_etch_depth():
+    resist = _rings(RESIST_DXF)
+    field = _etched_field()
+    # The shop's one artwork file carries the plate outline as its outer loop.
+    assert resist[0] == _rings(part.OUTLINE_DXF)[0]
+    assert [dxf.nesting_depth(resist, i) for i in range(len(resist))][0] == 0
+    # Every resist edge inside the outline stands the etch depth off the
+    # finished field's edges (the field eroded by FIELD_DEPTH, simplified to
+    # .002 mm), so the 1:1 undercut brings each edge back to its finished line.
+    inner = np.concatenate([np.asarray(ring) for ring in resist[1:]])
+    gaps = _distances(inner, field)
+    assert gaps.min() == pytest.approx(print_spec.FIELD_DEPTH, abs=0.005)
+    assert np.median(gaps) == pytest.approx(print_spec.FIELD_DEPTH, abs=0.002)
+    # And every one lies in the etched field (an odd number of field loops
+    # holds it): the resist only grows.
+    for x, y in inner[:: max(1, len(inner) // 400)]:
+        held = sum(dxf.point_in_ring(ring, (x, y)) for ring in field)
+        assert held % 2 == 1, (x, y)
+    # The widened resist covers more than the finished border and letters.
+    finished = dxf.net_area(_rings(part.OUTLINE_DXF)) - dxf.net_area(field)
+    assert dxf.net_area(resist) > finished
 
 
 def test_screw_holes_and_heads_stay_on_the_raised_plate_border():
@@ -206,5 +225,5 @@ def test_all_nameplate_dxf_assets_are_part_recipe_dependencies():
     from _buildgraph import data_deps_of
 
     dependencies = data_deps_of(Path(part.__file__))
-    for asset in (part.ENGRAVING_DXF, part.OUTLINE_DXF, part.FIELD_DXF):
+    for asset in (part.OUTLINE_DXF, part.FIELD_DXF, part.LETTERS_DXF, RESIST_DXF):
         assert str(asset.resolve()) in dependencies, dependencies

@@ -3,7 +3,7 @@ r"""Text -> closed polygons -> minimal DXF, for engraving numerals at build time
 SolidWorks-free. The COM adapter has no sketch-text API, so engraved lettering
 follows the nameplate precedent: a vendored DXF of CLOSED loops that
 ``adapter.import_dxf_dwg`` inserts as one sketch and a cut-extrude engraves as
-one feature (``build_nameplate`` / ``cad/references/fr-nameplate-engraving.dxf``).
+one feature (``build_fr_nameplate`` / ``cad/references/fr-nameplate-field.dxf``).
 The nameplate's DXF was traced off a photo; a ruled scale's numerals are plain
 type, so this module renders them from a font instead:
 
@@ -22,9 +22,10 @@ type, so this module renders them from a font instead:
   ``.6f`` coordinates: the same rings render the same bytes, so the generated
   file can be tracked and its regeneration byte-compared in a test.
 
-Nested rings cut as islands: a cut-extrude of a sketch region whose outer loop
-contains an inner loop removes the ring between them, which is exactly how the
-nameplate's closed-ribbon letters with counters engrave.
+Nested rings extrude as islands: a sketch region whose outer loop contains an
+inner loop takes only the ring between them, which is exactly how the
+nameplate's letters stand proud with their counters etched
+(``cad/references/fr-nameplate-letters.dxf``).
 """
 
 from __future__ import annotations

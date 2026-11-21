@@ -1923,10 +1923,10 @@ def test_specialized_helper_blast_radius_is_narrow():
     assert 0 < len(feat_users) <= 8, feat_users
 
 
-def test_data_deps_of_nameplate_lists_engraving_dxf():
+def test_data_deps_of_nameplate_lists_field_dxf():
     """The nameplate build's imported DXF is a data dependency of the part."""
     deps = data_deps_of(SCRIPTS_DIR / "build_fr_nameplate.py")
-    assert any(d.endswith("fr-nameplate-engraving.dxf") for d in deps), deps
+    assert any(d.endswith("fr-nameplate-field.dxf") for d in deps), deps
     # A build that imports no DXF/DWG has no data deps.
     assert data_deps_of(SCRIPTS_DIR / "build_pd_platen.py") == []
 

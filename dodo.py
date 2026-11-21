@@ -4136,16 +4136,17 @@ def _check_graph_spec(pytest_cmd: list[str]) -> dict[str, Any]:
 
 def _check_nameplate_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     return {
-        # The plate outline, notched field and engraving are all vendored
+        # The plate outline, the etched field and the resist are all vendored
         # geometry; any contour or its pinned area/bbox must invalidate this
         # SolidWorks-free integrity gate.
         "file_dep": [
             str((SCRIPTS_DIR / "test_fr_nameplate_geometry.py").resolve()),
             str((SCRIPTS_DIR / "fr_nameplate_spec.py").resolve()),
             str((SCRIPTS_DIR / "build_fr_nameplate.py").resolve()),
+            str((SCRIPTS_DIR / "fr_nameplate_drawing_spec.py").resolve()),
             str(
                 (
-                    REPO_ROOT / "cad" / "references" / "fr-nameplate-engraving.dxf"
+                    REPO_ROOT / "cad" / "references" / "fr-nameplate-resist.dxf"
                 ).resolve()
             ),
             str(
@@ -4156,6 +4157,11 @@ def _check_nameplate_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str(
                 (
                     REPO_ROOT / "cad" / "references" / "fr-nameplate-field.dxf"
+                ).resolve()
+            ),
+            str(
+                (
+                    REPO_ROOT / "cad" / "references" / "fr-nameplate-letters.dxf"
                 ).resolve()
             ),
         ],

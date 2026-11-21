@@ -502,7 +502,7 @@ class SolidWorksIOMixin:
             # the (X, Y) is the absolute location the imported geometry's ORIGIN
             # lands at (NOT a bbox-centred offset -- swDwgEntitiesCentered is 1);
             # callers that want the artwork centred pass an origin offset computed
-            # from the file's bbox (see build_nameplate.ENGRAVING_POSITION).
+            # from the file's bbox.
             px, py = (params.position or [0.0, 0.0])[:2]
             adapter._attempt(
                 lambda: import_data.SetPosition(
