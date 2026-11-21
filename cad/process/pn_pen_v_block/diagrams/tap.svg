@@ -11,9 +11,9 @@
   <rect class="part-threads" x="207.7" y="110" width="9" height="137"/>
   <rect class="clamp" x="140" y="100" width="145" height="10"/>
   <polygon class="cutter" points="204.2,40 220.2,40 212.2,100"/>
-  <line class="leader" x1="300" y1="246.9" x2="217" y2="246.9"/>
-  <text class="label" x="304" y="251">tap point {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the front face</text>
-  <text class="label" x="304" y="267">(aim .465): in the bore, short of its far wall</text>
+  <line class="leader" x1="426" y1="246.9" x2="217" y2="246.9"/>
+  <text class="label" x="430" y="251">tap point {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the front face</text>
+  <text class="label" x="430" y="267">(aim {{process.tap_reach_mm:in.3dot}}): in the bore, short of its far wall</text>
   <line class="leader" x1="300" y1="105" x2="286" y2="105"/>
   <text class="label" x="304" y="109">T-handle tap wrench, centre hole on top</text>
   <line class="leader" x1="300" y1="60" x2="220" y2="60"/>

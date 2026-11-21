@@ -20,7 +20,9 @@
   <line class="arrow" x1="93" y1="189.2" x2="240" y2="189.2"/>
   <line class="datum" x1="150" y1="64" x2="150" y2="92"/>
   <line class="datum" x1="138" y1="80" x2="164" y2="80"/>
-  <text class="datum-label" x="30" y="98">X0 (P) Y0 (jaw)</text>
+  <text class="datum-label" x="20" y="112">X0 (P), Y0 {{cad.body_back_depth_in:.3dot}}</text>
+  <text class="datum-label" x="20" y="127">from FRONT</text>
+  <line class="leader" x1="100" y1="100" x2="146" y2="83"/>
   <text class="label-halo" x="470" y="70">fixed jaw: BACK face</text>
   <text class="label-halo" x="470" y="320">moving jaw: FRONT face</text>
   <line class="leader" x1="466" y1="150" x2="412" y2="150"/>

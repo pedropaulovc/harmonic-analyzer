@@ -78,6 +78,20 @@ end_skim_mm = 0.508
 back_skim_mm = 0.508
 bottom_skim_mm = 0.508
 face_step_max_mm = 2.032
+# VB03 and VB05 skim the back face and B at a fixed height above the stacks
+# (the nominal bar less the .020 skim): the bar is miked before Setup 2 and
+# must give each skim at least bar_skim_min_mm (.005 in, the least that
+# cleans the extruded skin) and at most bar_skim_max_mm (.030 in, one light
+# pass). cam.py checks the windows.
+bar_skim_min_mm = 0.127
+bar_skim_max_mm = 0.762
+bar_thick_min_mm = 18.669
+bar_thick_max_mm = 19.304
+bar_width_min_mm = 31.369
+bar_width_max_mm = 32.004
+# The back neck step's depth below the back face (VB03); cam.py checks it
+# against the model.
+back_step_depth_mm = 2.032
 # Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2), equal
 # passes no wider than half the cutter (6G's chip-load factor 1.0 holds to
 # 50 % engagement, shop settings.pn-em-half-c360).
@@ -122,6 +136,7 @@ drill_43_feed_per_min_mm = 71.12
 # its smallest. cam.py checks both.
 tap_reach_min_mm = 11.43
 tap_reach_max_mm = 12.192
+tap_reach_mm = 11.811
 # Holding (shop workholding.vise-pm-6 and fixtures.parallels-lms-6745, 1/8
 # in thick, 1/2 to 1 in by 1/16): upright, a 1 in parallel against each jaw;
 # lying, the set's 1/2 in and 5/8 in parallels stacked against each jaw
@@ -254,11 +269,11 @@ instruction = "Blank shorter than {{process.blank_x_in:.2f}}: saw another. Longe
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mic the blank's thickness (across the wide faces) and width (across the narrow faces), each at both ends. Setups 4 and 6 skim the back face and B at a fixed height above the stacks: these windows give each skim .005–.030."
-inspection = "Thickness .735–.760 and width 1.235–1.260, micrometers."
+instruction = "Mic the blank's thickness (across the wide faces) and width (across the narrow faces), each at both ends. Setups 4 and 6 skim the back face and B at a fixed height above the stacks: these windows give each skim {{process.bar_skim_min_mm:in.3dot}}–{{process.bar_skim_max_mm:in.3dot}}."
+inspection = "Thickness {{process.bar_thick_min_mm:in.3dot}}–{{process.bar_thick_max_mm:in.3dot}} and width {{process.bar_width_min_mm:in.3dot}}–{{process.bar_width_max_mm:in.3dot}}, micrometers."
 gauge_checks = [
-  { gauge = "micrometers", band_mm = [18.669, 19.304] },
-  { gauge = "micrometers", band_mm = [31.369, 32.004] },
+  { gauge = "micrometers", band_mm = ["{{process.bar_thick_min_mm}}", "{{process.bar_thick_max_mm}}"] },
+  { gauge = "micrometers", band_mm = ["{{process.bar_width_min_mm}}", "{{process.bar_width_max_mm}}"] },
 ]
 
 [[setups.operations]]
@@ -391,7 +406,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run VB03_back (M6 T1; set 2800): skim the back face {{process.back_skim_mm:in.3dot}} at Z {{process.blank_z_in:.3dot}} less the skim, then cut the back neck step {{cad.neck_front_station_in:.3dot}} deep from P to {{cad.neck_steps_station_in:.3dot}}, one pass across the jaws, the cutter's side on the step face. Still clamped, look at the back face."
+instruction = "Run VB03_back (M6 T1; set 2800): skim the back face {{process.back_skim_mm:in.3dot}} at Z {{process.blank_z_in:.3dot}} less the skim, then cut the back neck step {{process.back_step_depth_mm:in.3dot}} deep from P to {{cad.neck_steps_station_in:.3dot}}, one pass across the jaws, the cutter's side on the step face. Still clamped, look at the back face."
 inspection = "No extruded patch left on the back face."
 gauge_checks = "other"
 settings = "pn-em-half-c360"
@@ -437,7 +452,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Run VB04_front (M6 T1; set 2800): face the front down to Z {{cad.body_back_depth_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}, then cut the front neck step {{cad.neck_front_station_in:.3dot}} deep from P to {{cad.neck_steps_station_in:.3dot}}, one pass across the jaws (its floor .13 above the jaw tops). Then, still clamped, check the depth and the step."
 settings = "pn-em-half-c360"
-inspection = "Depth {{cad.body_back_depth_min_in:.3dot}}–{{cad.body_back_depth_max_in:.3dot}}: the calipers' depth rod from the front face past P's end to the fixed-jaw stack's top, at both ends of the body. Front step {{cad.neck_front_station_min_in:.3dot}}–{{cad.neck_front_station_max_in:.3dot}}: the depth rod from the front face down to the step's floor. Step face from P {{cad.neck_steps_station_min_in:.3dot}}–{{cad.neck_steps_station_max_in:.3dot}}: the depth rod from P along the floor to the step face."
+inspection = "Depth {{cad.body_back_depth_min_in:.3dot}}–{{cad.body_back_depth_max_in:.3dot}}: the calipers' beam end on the front face, the depth rod down past the far end to the fixed-jaw stack's top, at the far end's two corners. Front step {{cad.neck_front_station_min_in:.3dot}}–{{cad.neck_front_station_max_in:.3dot}}: the depth rod from the front face down to the step's floor. Step face from P {{cad.neck_steps_station_min_in:.3dot}}–{{cad.neck_steps_station_max_in:.3dot}}: the depth rod from P along the floor to the step face."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.body_back_depth_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.neck_front_station_band_mm}}" },
@@ -473,15 +488,20 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same stacks. The block lying along the jaws, the BOTTOM wide face up (TOP down on both stacks), P to the LEFT, gripped on the FRONT and BACK faces (BACK to the fixed jaw): the jaws bear on the body from the steps to the far end; the neck stands .08 clear of each. Centred; tap it down onto both stacks while closing the vise. The bottom stands .085 above the jaw tops."
-datum = "Program VB05_bottom. G54: X0 P, Y0 the fixed jaw's face (the BACK face), Z0 the stacks' top (TOP). The slot and the V centre at Y −{{cad.pivot_bore_z_from_min_in:.3f}} in."
+datum = "Program VB05_bottom. G54: X0 P; Y0 {{cad.body_back_depth_in:.3dot}} from the FRONT face (where the back face is at the nominal depth), set through the fixed jaw from the block's miked depth, so the slot and the V sit from the front face as drawn; Z0 the stacks' top (TOP). The slot and the V centre at Y −{{cad.pivot_bore_z_from_min_in:.3f}} in, {{cad.pivot_bore_z_from_min_in:.3f}} from the front face."
 diagram = { file = "diagrams/bottom.svg", alt = "The block lying on stacked parallels, bottom face up, back face at the fixed jaw; the 1/2 in end mill skims B and mills the relief slot from the far end, the chamfer mill cuts the V from P, the 5/64 end mill takes the slot's step corners and the V's flat." }
 envelope = { x_span_mm = ["{{cad.far_end_length_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.body_back_depth_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.stack_height_mm}}", 19.05], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.stack_height_mm}}", 11.938], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.body_back_depth_mm}}", along_jaws_mm = "{{cad.far_end_length_mm}}", part_height_mm = 19.05, parallel_height_mm = "{{process.stack_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.far_end_length_mm}}"], clamp_mm = [0, "{{cad.far_end_length_mm}}"], section_mm = { y = "{{cad.body_back_depth_mm}}", z = 19.05 }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 P, Y0 the fixed jaw's face (BACK): edge finder (900 rpm), then M6 T1 and the feeler Z0 on the fixed-jaw stack, as Setup 4."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on P from the left, G10 L20 P1 X-2.540. Console M6 T1; MDI G0 X-12.700 Y-6.850; the tip dragging a .002 leaf on the fixed-jaw stack: G10 L20 P1 Z0.051."
+instruction = "Home the mill first ($H). Mic the block's depth, FRONT to BACK, and note it. G54 X0 P; Y0 {{cad.body_back_depth_in:.3dot}} from the FRONT face: the edge finder (900 rpm) on the fixed jaw, offset by the miked depth less {{cad.body_back_depth_in:.3dot}}."
+instruction_detailed = "Home the mill first ($H). Mic the block's depth across the body near the far end, FRONT to BACK; note it (in). Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y(−2.540 + (the miked depth − {{cad.body_back_depth_in:.3dot}}) × 25.4); for {{cad.body_back_depth_in:.3dot}}, Y-2.540: the front face is then at Y −{{cad.body_back_depth_in:.3dot}} in. On P from the left, G10 L20 P1 X-2.540."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Console M6 T1, then the feeler Z0 on the fixed-jaw stack, as Setup 4."
+instruction_detailed = "Console M6 T1; MDI G0 X-12.700 Y-6.850; the tip dragging a .002 leaf on the fixed-jaw stack: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -493,7 +513,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run VB05_bottom (M6 T1; set 2800): skim the bottom face {{process.bottom_skim_mm:in.3dot}} (it becomes B), then mill the relief slot from the far end to one cutter radius off the step, {{cad.relief_height_in:.3dot}} deep below B in levels of {{process.relief_step_max_mm:in.3dot}}, its walls at Y −{{cad.relief_far_wall_mm:in.3dot}} and −{{cad.relief_near_wall_mm:in.3dot}} from the back face (the drawing's {{cad.relief_near_wall_in:.3dot}} and {{cad.relief_far_wall_in:.3dot}} from the front). Plenty of cutting fluid or air: brass chips pack the slot."
+instruction = "Run VB05_bottom (M6 T1; set 2800): skim the bottom face {{process.bottom_skim_mm:in.3dot}} (it becomes B), then mill the relief slot from the far end to one cutter radius off the step, {{cad.relief_height_in:.3dot}} deep below B in levels of {{process.relief_step_max_mm:in.3dot}}, its walls {{cad.relief_near_wall_in:.3dot}} and {{cad.relief_far_wall_in:.3dot}} from the front face (Y −{{cad.relief_far_wall_mm:in.3dot}} and −{{cad.relief_near_wall_mm:in.3dot}}). Plenty of cutting fluid or air: brass chips pack the slot."
 settings = "pn-em-half-c360"
 milling_cuts = [
   { name = "bottom face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.bottom_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{cad.far_end_length_mm}}"] },
@@ -542,7 +562,7 @@ inspection = "Each flank 45° ±1° to B: the protractor's blade on B, its arm a
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Any check of the two ops above out of its band: stop and tell the owner. VB05 sets the slot, the V and their edges from B and the back face; running it again moves none of them."
+instruction = "Any check of the two ops above out of its band: stop and tell the owner. VB05 sets the slot, the V and their edges from B and the front face; running it again moves none of them."
 feed = "hand"
 
 [[setups]]
@@ -723,8 +743,8 @@ speed_kind = "other"
 tool = "tap-4-40"
 drilling = "none"
 sizing = "other"
-instruction = "Plug tap by hand on the dead centre, spindle off, Tapmatic Gold, jogging Z down to keep it seated, until the DRO Z (G20, inches) reads its noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim .465): its point is in the bore, short of the far wall."
-instruction_detailed = "The plug tap's point in the hole, a drop of Tapmatic Gold; jog Z down until the centre is seated: it guides, it does not push. Turn the wrench, a half turn back each turn to break the chip, jogging Z down to keep it seated. Stop when the DRO Z (G20, inches) reads its noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim .465); past {{process.tap_reach_max_mm:in.3dot}} the point reaches the bore's far wall."
+instruction = "Plug tap by hand on the dead centre, spindle off, Tapmatic Gold, jogging Z down to keep it seated, until the DRO Z (G20, inches) reads its noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim {{process.tap_reach_mm:in.3dot}}): its point is in the bore, short of the far wall."
+instruction_detailed = "The plug tap's point in the hole, a drop of Tapmatic Gold; jog Z down until the centre is seated: it guides, it does not push. Turn the wrench, a half turn back each turn to break the chip, jogging Z down to keep it seated. Stop when the DRO Z (G20, inches) reads its noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim {{process.tap_reach_mm:in.3dot}}); past {{process.tap_reach_max_mm:in.3dot}} the point reaches the bore's far wall."
 feed = "hand"
 
 [[setups.operations]]
@@ -741,8 +761,8 @@ speed_kind = "other"
 tool = "tap-4-40-bottoming"
 drilling = "none"
 sizing = "other"
-instruction = "Bottoming tap (to buy) in the plug tap's thread, the same way, until the DRO Z (G20) reads its noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim .465): the thread is now full to the bore, where the set screw's cup must reach."
-instruction_detailed = "The bottoming tap started by hand in the plug tap's thread, a drop of Tapmatic Gold; jog Z down until the centre is seated. Turn the wrench, a half turn back each turn, jogging Z down to keep it seated. Stop when the DRO Z (G20, inches) reads its noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim .465); past {{process.tap_reach_max_mm:in.3dot}} the point reaches the bore's far wall."
+instruction = "Bottoming tap (to buy) in the plug tap's thread, the same way, until the DRO Z (G20) reads its noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim {{process.tap_reach_mm:in.3dot}}): the thread is now full to the bore, where the set screw's cup must reach."
+instruction_detailed = "The bottoming tap started by hand in the plug tap's thread, a drop of Tapmatic Gold; jog Z down until the centre is seated. Turn the wrench, a half turn back each turn, jogging Z down to keep it seated. Stop when the DRO Z (G20, inches) reads its noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim {{process.tap_reach_mm:in.3dot}}); past {{process.tap_reach_max_mm:in.3dot}} the point reaches the bore's far wall."
 feed = "hand"
 
 [[setups.operations]]

@@ -586,6 +586,19 @@ def context(
     raw_front = raw_back - wide
     front_top = wide - back_skim  # VB04: the raw front above the back face
     bottom_level = thick - bottom_skim  # VB05: the bottom face above the stacks
+    # VB03 and VB05 skim the back face and B at a fixed height above the
+    # stacks: the bar, miked before Setup 2, must give each skim at least
+    # bar_skim_min_mm and at most bar_skim_max_mm, itself within one face level.
+    skim_min, skim_max = p["bar_skim_min_mm"], p["bar_skim_max_mm"]
+    if not 0 < skim_min < skim_max <= p["face_step_max_mm"]:
+        raise ValueError("the bar's skim window is not inside one face level")
+    for key, level in (("bar_width", front_top), ("bar_thick", bottom_level)):
+        _agree(plan, f"{key}_min_mm", level + skim_min)
+        _agree(plan, f"{key}_max_mm", level + skim_max)
+    if not p["bar_width_min_mm"] <= wide <= p["bar_width_max_mm"] or not (
+        p["bar_thick_min_mm"] <= thick <= p["bar_thick_max_mm"]
+    ):
+        raise ValueError("the nominal bar is outside its own size window")
 
     # Cutters.
     em = _shop_tool(plan, shop, "em-half")["diameter_mm"]
@@ -691,6 +704,8 @@ def context(
     back_step_levels = _levels(back_level, g["neck1"] - raw_front, level_max)
     depth_levels = _levels(front_top, depth, level_max)
     front_step_levels = _levels(depth, z1 - g["neck0"], level_max)
+    # The back step's depth below the back face, as printed (VB03).
+    _agree(plan, "back_step_depth_mm", z1 - g["neck1"])
     height_levels = _levels(raw_top, height, level_max)
     # A neck step is cut by the end mill's side on the step face: its centre
     # one radius short of the step, its far side past the paper end.
@@ -817,6 +832,8 @@ def context(
     near_wall = bz - bore_r_min - z0
     far_wall = bz + bore_r_min - z0
     reach = (p["tap_reach_min_mm"], p["tap_reach_max_mm"])
+    if not reach[0] <= p["tap_reach_mm"] <= reach[1]:
+        raise ValueError("process.tap_reach_mm is not between its min and max")
     if reach[0] < near_wall + BOTTOMING_CHAMFER_PITCHES * g["tap_pitch"] - 1e-6:
         raise ValueError(
             f"tap_reach_min_mm {reach[0]:g} leaves the bottoming tap's chamfer in the wall (near wall {near_wall:.3f})"

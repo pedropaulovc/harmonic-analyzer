@@ -20,7 +20,7 @@
   <line class="leader" x1="420" y1="86" x2="308" y2="80"/>
   <text class="label" x="424" y="90">back face: {{process.back_skim_mm:in.3dot}} skim</text>
   <line class="leader" x1="420" y1="120" x2="200" y2="90"/>
-  <text class="label" x="424" y="124">back neck step: {{cad.neck_front_station_in:.3dot}} deep,</text>
+  <text class="label" x="424" y="124">back neck step: {{process.back_step_depth_mm:in.3dot}} deep,</text>
   <text class="label" x="424" y="140">P to {{cad.neck_steps_station_in:.3dot}}, one pass across the jaws</text>
   <line class="leader" x1="420" y1="196" x2="400" y2="196"/>
   <text class="label" x="424" y="200">fixed jaw behind (dashed): TOP face,</text>
