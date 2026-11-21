@@ -29,7 +29,8 @@
 # as it is drilled.
 
 # Moved from ch.toml: the rocker hub (ch), washer (ch), collar (dt), ferrule
-# (dt) and spacer (mg) plans read it. The AR holder is the A R Warner LMS
+# (dt), pinion cam (dt) and spacer (mg) plans read it, and it faces the
+# MHA-CH-06 kit nut. The AR holder is the A R Warner LMS
 # 4132 set's (TCMT insert, R0.4 nose); ownership: cad/config/shop-equipment/
 # tools-cutting.toml tools.lathe-ar, same key.
 [tools.lathe-ar]
