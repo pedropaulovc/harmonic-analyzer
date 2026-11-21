@@ -16,6 +16,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import inspect
 import sys
 from typing import Any
 
@@ -44,20 +45,32 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
 from _session import run_build
-from _surface_finish import surface_finish_by_key
-import _config
+from _surface_finish import MACHINED_UM, surface_finish_by_key
 import _telemetry
+from dt_pinion_pivot_block_notes import (
+    LIFT_BORE_NOTE,
+    LIFT_BORE_NOTE_NUMBER,
+    LIFT_BORE_NOTE_TEXT,
+)
 from dt_pinion_pivot_block_spec import (
     BLOCK_DEPTH,
+    BLOCK_EAST,
     BLOCK_HEIGHT,
+    BLOCK_TOP_Y,
     BLOCK_WEST,
     BLOCK_WIDTH as BLOCK_WIDTH,
     BORE_DIA,
+    BORE_DIA_BAND,
     BORE_UP,
+    DRAWING_PRECISION,
     FRONT_BBOX_CX,
     FRONT_BBOX_CY,
     LIFT_BORE_RISE,
@@ -68,6 +81,7 @@ from dt_pinion_pivot_block_spec import (
     SCREW_HOLE_CALLOUT_PRECISION,
     SCREW_HOLE_DIA,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 
@@ -174,19 +188,9 @@ RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], FRONT_TOP_Y + 0.00925)}
 TOP_KEEP = {}
 # Each reamed bore: size, then process, then at most two rows of words
 # (rule 7; rule 26 size-process-depth order).  The lift bore's .728/.085
-# locations from the pivot bore carry value and band only; their one reason
-# and its mates go in numbered note 1, flagged from the lift-bore callout
-# (rule 4: mates by drawing number; rule 26: standard words, not a coined
-# "park gap"): the lift rod's eccentric cam MHA-DT-23 parks just clear of
-# the follower pin MHA-DT-25 (dt_pinion_pivot_block_geometry;
-# build_dt_drive_train_assembly's park-gap band).
-CAM_NUMBER = _config.parts("dt-pinion-cam")["number"]
-FOLLOWER_PIN_NUMBER = _config.parts("dt-pinion-cam-pin")["number"]
-LIFT_BORE_NOTE_NUMBER = 1
-LIFT_BORE_NOTE = (
-    f"{LIFT_BORE_NOTE_NUMBER}. .728 AND .085 SET {CAM_NUMBER} TO "
-    f"{FOLLOWER_PIN_NUMBER} CLEARANCE."
-)
+# locations carry value and band only; their reason is numbered note 1
+# (dt_pinion_pivot_block_notes, which the feature export reads), flagged from
+# the lift-bore callout.
 # Upper-left, in the open band under the front view's 1.57 row (y ~0.074)
 # and left of the title block (x 0.216): ~140 mm at the note font.
 LIFT_BORE_NOTE_XY = (0.020, 0.058)
@@ -207,6 +211,303 @@ DIMENSION_CALLOUTS = {
 PIVOT_ORIGIN_DIMENSIONS = {"AnchorX": 0, "LiftBoreX": 0, "AnchorZ": 1, "LiftBoreCz": 1}
 _ORIGIN_ARROWHEAD = 4  # swArrowStyle_e.swORIGIN_ARROWHEAD (no-fill circle)
 _CLOSED_ARROWHEAD = 1  # swArrowStyle_e.swCLOSED_ARROWHEAD
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (build_dt_pinion_pivot_block; the
+# layout note at dt_pinion_pivot_block_geometry.BLOCK_EAST): the origin is the
+# pivot bore's axis on the back face (the Front sketch plane, z = 0), +X runs
+# from the west end (x = -BLOCK_WEST) to the east end (x = +BLOCK_EAST), +Y up
+# from the bottom (base seat, y = -BORE_UP) to the top (y = BLOCK_TOP_Y), and
+# the block is extruded +Z to the front face (z = BLOCK_DEPTH), the face the
+# front view looks at.  Both reamed bores run along Z (entered here from the
+# front face); the two #8 hold-down holes run along Y (entered from the top
+# face the top view shows), at mid-depth.  A band is the title block's row for
+# the places the sheet prints (DRAWING_PRECISION) on the printed nominal, or
+# the part-authored REAM_SLIDE band on the exact bore diameter; the hold-down
+# drill takes the DRILLED HOLES row at its callout's .XXX.  The declarations
+# print nothing.
+#
+# The top view's hold-down stations (.69, 1.35 from the west end) and their
+# depth location (.22 from the front face) are sheet edge dimensions
+# (add_edge_dimension), which carry no per-dimension precision: they print at
+# the drawing's document places, the ``decimals`` that build leaves
+# new_project_drawing at its default.
+EDGE_DIMENSION_PLACES = (
+    inspect.signature(new_project_drawing).parameters["decimals"].default
+)
+_P = DRAWING_PRECISION["BlockProfile"]
+_DEPTH_P = DRAWING_PRECISION["Block"]["Depth"]
+_SELF = "draw_dt_pinion_pivot_block"
+_GEOM = "dt_pinion_pivot_block_geometry"
+_BUILD = "build_dt_pinion_pivot_block"
+_NOTES = "dt_pinion_pivot_block_notes"
+_FRAME = ("__frame__", (_BUILD, "build"), (_GEOM, "BLOCK_EAST"))
+_UNIT = (_GEOM, "UNIT")
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(
+        (_BUILD, "build"),
+        (_GEOM, "BLOCK_EAST"),
+        (_GEOM, "BLOCK_WEST"),
+        (_GEOM, "BORE_UP"),
+        (_GEOM, "BLOCK_HEIGHT"),
+        (_GEOM, "BLOCK_DEPTH"),
+    ),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "SCREW_HOLE_CALLOUT_PRECISION",
+        (_GEOM, "BLOCK_DEPTH_PLACES"),
+        (_SELF, "EDGE_DIMENSION_PLACES"),
+        ("_drawing_edge_dimensions", "add_edge_dimension"),
+        ("_drawing_common", "new_project_drawing"),
+    ),
+)
+# The four ends and sides of the front view: the width 1.57 from the west end
+# (FRONT_KEEP "BlockWidth"), the height .99 from the bottom ("BlockHeight").
+requirement(
+    "west_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), BLOCK_WEST),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", -BLOCK_WEST), (*_FRAME, (_GEOM, "BLOCK_WEST")))},
+)
+requirement(
+    "east_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), BLOCK_EAST),),
+    requirements=("width",),
+    fields={
+        "plane": (_plane("x", BLOCK_EAST), _FRAME),
+        "width": (
+            limits(BLOCK_WIDTH, _P["BlockWidth"], unit=UNIT),
+            ((_GEOM, "BLOCK_WIDTH"), _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "width_nominal": (BLOCK_WIDTH, ((_GEOM, "BLOCK_WIDTH"),)),
+        "width_from": ("west_end", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"width": _P["BlockWidth"]},
+)
+requirement(
+    "bottom_face",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), BORE_UP),),
+    requirements=("plane",),
+    fields={"plane": (_plane("y", -BORE_UP), (*_FRAME, (_GEOM, "BORE_UP")))},
+)
+requirement(
+    "top_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), BLOCK_TOP_Y),),
+    requirements=("height",),
+    fields={
+        "plane": (_plane("y", BLOCK_TOP_Y), (*_FRAME, (_GEOM, "BLOCK_TOP_Y"))),
+        "height": (
+            limits(BLOCK_HEIGHT, _P["BlockHeight"], unit=UNIT),
+            ((_GEOM, "BLOCK_HEIGHT"), _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "height_nominal": (BLOCK_HEIGHT, ((_GEOM, "BLOCK_HEIGHT"),)),
+        "height_from": ("bottom_face", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"height": _P["BlockHeight"]},
+)
+# The broad faces: the depth .44 between them (RIGHT_KEEP "Depth").  The front
+# face is the one the top view locates the hold-down holes from.
+requirement(
+    "back_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", 0.0), _FRAME)},
+)
+requirement(
+    "front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), BLOCK_DEPTH),),
+    requirements=("depth",),
+    fields={
+        "plane": (_plane("z", BLOCK_DEPTH), (*_FRAME, (_GEOM, "BLOCK_DEPTH"))),
+        "depth": (
+            limits(BLOCK_DEPTH, _DEPTH_P, unit=UNIT),
+            (
+                (_GEOM, "BLOCK_DEPTH"),
+                (_GEOM, "BLOCK_DEPTH_PLACES"),
+                _UNIT,
+                (_SELF, "RIGHT_KEEP"),
+            ),
+        ),
+        "depth_nominal": (BLOCK_DEPTH, ((_GEOM, "BLOCK_DEPTH"),)),
+        "depth_from": ("back_face", ((_SELF, "RIGHT_KEEP"),)),
+    },
+    precision={"depth": _DEPTH_P},
+)
+# Both reamed bores: Ø.2500 +.0015/+.0010 (the part-authored REAM_SLIDE band
+# on the exact diameter, .XXXX), REAM THRU and the mate each runs (or the note
+# it cites) under the size (DIMENSION_CALLOUTS), and Ra 63 (SURFACE_FINISHES:
+# each turns its shaft).  The pivot bore is the front view's one datum: 1.02
+# from the west end ("AnchorX") and .66 up from the bottom ("AnchorZ"); the
+# lift bore stands .728 west of it ("LiftBoreX") and .085 above it
+# ("LiftBoreCz"), at .XXX.
+_BORE_DIA = (
+    limits(BORE_DIA, _P["PivotBoreDia"], BORE_DIA_BAND, unit=UNIT),
+    ((_GEOM, "BORE_DIA"), "BORE_DIA_BAND", _UNIT, (_SELF, "FRONT_KEEP")),
+)
+_REAM = ((_SELF, "DIMENSION_CALLOUTS"),)
+_FINISH = ("SURFACE_FINISHES", ("_surface_finish", "MACHINED_UM"))
+requirement(
+    "pivot_bore",
+    kind="hole",
+    faces=(surface_finish_by_key(SURFACE_FINISHES, "pivot_bore").face,),
+    requirements=("dia", "thru", "finish_ra", "x_from_west", "height"),
+    fields={
+        "at": ([0.0, 0.0, BLOCK_DEPTH], (*_FRAME, (_GEOM, "BLOCK_DEPTH"))),
+        "axis": ((0.0, 0.0, -1.0), _FRAME),
+        "dia": _BORE_DIA,
+        "nominal_dia": (BORE_DIA, ((_GEOM, "BORE_DIA"),)),
+        "process": ("ream", _REAM),
+        "thru": (True, _REAM),
+        "callout": (DIMENSION_CALLOUTS["PivotBoreDia"], _REAM),
+        "mates": (" ".join(PIVOT_SHAFT_MATE), ("PIVOT_SHAFT_MATE",)),
+        "finish_ra": (MACHINED_UM, _FINISH),
+        "x_from_west": (
+            limits(BLOCK_WEST, _P["AnchorX"], unit=UNIT),
+            ((_GEOM, "BLOCK_WEST"), _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "x_from_west_nominal": (BLOCK_WEST, ((_GEOM, "BLOCK_WEST"),)),
+        "x_from_west_from": ("west_end", ((_SELF, "FRONT_KEEP"),)),
+        "height": (
+            limits(BORE_UP, _P["AnchorZ"], unit=UNIT),
+            ((_GEOM, "BORE_UP"), _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "height_nominal": (BORE_UP, ((_GEOM, "BORE_UP"),)),
+        "height_from": ("bottom_face", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={
+        "dia": _P["PivotBoreDia"],
+        "x_from_west": _P["AnchorX"],
+        "height": _P["AnchorZ"],
+    },
+)
+requirement(
+    "lift_bore",
+    kind="hole",
+    faces=(surface_finish_by_key(SURFACE_FINISHES, "lift_bore").face,),
+    requirements=("dia", "thru", "finish_ra", "spacing", "rise"),
+    fields={
+        "at": (
+            [-LIFT_BORE_SPACING, LIFT_BORE_RISE, BLOCK_DEPTH],
+            (
+                (_GEOM, "LIFT_BORE_SPACING"),
+                (_GEOM, "LIFT_BORE_RISE"),
+                (_GEOM, "BLOCK_DEPTH"),
+            ),
+        ),
+        "axis": ((0.0, 0.0, -1.0), _FRAME),
+        "dia": (
+            limits(BORE_DIA, _P["LiftBoreDia"], BORE_DIA_BAND, unit=UNIT),
+            ((_GEOM, "BORE_DIA"), "BORE_DIA_BAND", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "nominal_dia": (BORE_DIA, ((_GEOM, "BORE_DIA"),)),
+        "process": ("ream", _REAM),
+        "thru": (True, _REAM),
+        "callout": (DIMENSION_CALLOUTS["LiftBoreDia"], _REAM),
+        "mates": (" ".join(LIFT_ROD_MATE), ("LIFT_ROD_MATE",)),
+        "note": (
+            LIFT_BORE_NOTE_TEXT,
+            ((_NOTES, "LIFT_BORE_NOTE_TEXT"), (_NOTES, "DRAWING_NOTES")),
+        ),
+        "finish_ra": (MACHINED_UM, _FINISH),
+        "spacing": (
+            limits(LIFT_BORE_SPACING, _P["LiftBoreX"], unit=UNIT),
+            ((_GEOM, "LIFT_BORE_SPACING"), _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "spacing_nominal": (LIFT_BORE_SPACING, ((_GEOM, "LIFT_BORE_SPACING"),)),
+        "spacing_from": ("pivot_bore", ((_SELF, "PIVOT_ORIGIN_DIMENSIONS"),)),
+        "spacing_axis": ("x", ((_SELF, "PIVOT_ORIGIN_DIMENSIONS"),)),
+        "rise": (
+            limits(LIFT_BORE_RISE, _P["LiftBoreCz"], unit=UNIT),
+            ((_GEOM, "LIFT_BORE_RISE"), _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "rise_nominal": (LIFT_BORE_RISE, ((_GEOM, "LIFT_BORE_RISE"),)),
+        "rise_from": ("pivot_bore", ((_SELF, "PIVOT_ORIGIN_DIMENSIONS"),)),
+        "rise_axis": ("y", ((_SELF, "PIVOT_ORIGIN_DIMENSIONS"),)),
+    },
+    precision={
+        "dia": _P["LiftBoreDia"],
+        "spacing": _P["LiftBoreX"],
+        "rise": _P["LiftBoreCz"],
+    },
+)
+# The two #8 normal-clearance hold-down holes: one native callout (2X Ø.196
+# THRU ALL, its drill at SCREW_HOLE_CALLOUT_PRECISION's .XXX), each located
+# along X from the west end (.69, 1.35) and both by the one .22 from the front
+# face (build's top-view edge dimensions).  Through-all from the top face to
+# the base seat; the base's #8-32 seats are transferred through them at
+# assembly (that base's own sheet), not by this part.
+_SCREW_DIA = (
+    drilled_limits(SCREW_HOLE_DIA, SCREW_HOLE_CALLOUT_PRECISION, unit=UNIT),
+    (
+        (_GEOM, "SCREW_HOLE_DIA"),
+        _UNIT,
+        "SCREW_HOLE_CALLOUT_PRECISION",
+        (_SELF, "build"),
+    ),
+)
+_SCREW_THRU = ((_GEOM, "SCREW_HOLE_SPEC"), (_BUILD, "build"), (_SELF, "build"))
+_EDGE_DIMENSIONS = ((_SELF, "build"), (_SELF, "EDGE_DIMENSION_PLACES"))
+for _name, _sign in (("west_hold_down", -1.0), ("east_hold_down", 1.0)):
+    _station = BLOCK_WEST + _sign * SCREW_HALF_SPACING
+    requirement(
+        _name,
+        kind="hole",
+        faces=(CylinderFace(SCREW_HOLE_DIA, contains_x_mm=_sign * SCREW_HALF_SPACING),),
+        requirements=("dia", "thru", "x_from_west", "z_from_front"),
+        fields={
+            "at": (
+                [_sign * SCREW_HALF_SPACING, BLOCK_TOP_Y, BLOCK_DEPTH / 2.0],
+                (
+                    (_GEOM, "SCREW_HALF_SPACING"),
+                    (_GEOM, "BLOCK_TOP_Y"),
+                    (_GEOM, "BLOCK_DEPTH"),
+                ),
+            ),
+            "axis": ((0.0, -1.0, 0.0), _SCREW_THRU),
+            "dia": _SCREW_DIA,
+            "nominal_dia": (SCREW_HOLE_DIA, ((_GEOM, "SCREW_HOLE_DIA"),)),
+            "process": ("drill", _SCREW_THRU),
+            "thru": (True, _SCREW_THRU),
+            "x_from_west": (
+                limits(_station, EDGE_DIMENSION_PLACES, unit=UNIT),
+                (
+                    (_GEOM, "BLOCK_WEST"),
+                    (_GEOM, "SCREW_HALF_SPACING"),
+                    _UNIT,
+                    *_EDGE_DIMENSIONS,
+                ),
+            ),
+            "x_from_west_nominal": (
+                _station,
+                ((_GEOM, "BLOCK_WEST"), (_GEOM, "SCREW_HALF_SPACING")),
+            ),
+            "x_from_west_from": ("west_end", _EDGE_DIMENSIONS),
+            "z_from_front": (
+                limits(BLOCK_DEPTH / 2.0, EDGE_DIMENSION_PLACES, unit=UNIT),
+                ((_GEOM, "BLOCK_DEPTH"), _UNIT, *_EDGE_DIMENSIONS),
+            ),
+            "z_from_front_nominal": (BLOCK_DEPTH / 2.0, ((_GEOM, "BLOCK_DEPTH"),)),
+            "z_from_front_from": ("front_face", _EDGE_DIMENSIONS),
+        },
+        precision={
+            "dia": SCREW_HOLE_CALLOUT_PRECISION,
+            "x_from_west": EDGE_DIMENSION_PLACES,
+            "z_from_front": EDGE_DIMENSION_PLACES,
+        },
+    )
 
 
 def _arrowheads(annotation: Any, label: str) -> list[tuple[tuple[float, float], int]]:
