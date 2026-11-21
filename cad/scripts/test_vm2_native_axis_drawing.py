@@ -905,9 +905,14 @@ def test_datum_landing_reads_native_display_ink_even_without_registered_leaders(
         else expected
     )
 
+    # Documented row shapes (#1419): arrowhead [tip3, dir3, width, height,
+    # style, normal3]; triangle [v1, v2, v3, isFilled, lineType].
     rows = {
-        "arrow": (*tip, 0.0, 1.0, 0.0, 0.0, 0.002, 0.001, 0.0),
-        "triangle": (*tip, 0.0, tip[0] + 0.002, tip[1], 0.0, tip[0] + 0.002, tip[1] + 0.001, 0.0),
+        "arrow": (*tip, 0.0, 1.0, 0.0, 0.0, 0.002, 0.001, 0.0, 0.0, 0.0, 1.0),
+        "triangle": (
+            *tip, 0.0, tip[0] + 0.002, tip[1], 0.0, tip[0] + 0.002, tip[1] + 0.001, 0.0,
+            1.0, 0.0,
+        ),
         "line": (0.0, 0.0, 0.0, 0.0, *tip, 0.0, tip[0] + 0.002, tip[1], 0.0),
     }
     count_name = {

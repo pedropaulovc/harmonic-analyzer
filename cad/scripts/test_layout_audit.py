@@ -2765,6 +2765,136 @@ def test_a_primitive_count_answering_none_is_a_read_error(monkeypatch):
     assert reader.take_errors() == {"GetLineCount": 1}
 
 
+_LINE = (0.0, 1.0, 0.0, 1.0, 0.1, 0.1, 0.0, 0.2, 0.1, 0.0)
+_POLYLINE = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.1, 0.1, 0.0, 0.2, 0.1, 0.0)
+
+
+@pytest.mark.parametrize(
+    ("count_name", "getters", "good", "bad", "error"),
+    [
+        ("GetLineCount", ("GetLineAtIndex3", "GetLineAtIndex2"), _LINE, (), "GetLineAtIndex3/GetLineAtIndex2 malformed (0 values)"),
+        ("GetLineCount", ("GetLineAtIndex3", "GetLineAtIndex2"), _LINE, _LINE[:8], "GetLineAtIndex3/GetLineAtIndex2 malformed (8 values)"),
+        ("GetPolyLineCount", ("GetPolylineAtIndex2",), _POLYLINE, _POLYLINE[:10], "GetPolylineAtIndex2 malformed (10 values)"),
+        ("GetArrowHeadCount", ("GetArrowHeadAtIndex2",), (0.1,) * 12, (0.1,) * 8, "GetArrowHeadAtIndex2 malformed (8 values)"),
+    ],
+    ids=["empty-line", "truncated-line", "truncated-polyline", "truncated-arrow"],
+)
+def test_a_row_not_in_its_documented_shape_is_a_malformed_read(
+    monkeypatch, count_name, getters, good, bad, error
+):
+    """Issue #1419: a positive count with an empty or truncated row dropped
+    that row's ink with com-read-errors clean. The row is now counted as a
+    malformed read, with its shape; a documented row still dumps clean."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+
+    class Data:
+        def __getattr__(self, name):
+            if name == count_name:
+                return lambda: 2
+            if name.endswith("Count"):
+                return lambda: 0
+            if name in getters:
+                return lambda index: good if index == 0 else bad
+            raise AttributeError(name)
+
+    reader = collector._Reader(adapter=None)
+    display = collector._dump_display(reader, Data())
+    assert [tuple(row) for rows in display.values() for row in rows] == [good]
+    assert reader.take_errors() == {error: 1}
+
+
+@pytest.mark.parametrize(
+    ("points", "style", "error"),
+    [
+        ((), 2, "(0 values)"),
+        ((), None, "(0 values)"),
+        ((), 0x100, None),
+        ((0.1, 0.1, 0.0, 0.2), 1, "(4 values)"),
+        (0.5, 1, "(float)"),
+    ],
+    ids=["empty-bent", "empty-style-refused", "empty-no-leader", "truncated", "scalar"],
+)
+def test_a_leader_not_in_its_documented_shape_is_a_malformed_read(
+    monkeypatch, points, style, error
+):
+    """Issue #1419: empty leader points were dropped with com-read-errors
+    clean. A straight (two-point) or bent (three-point) leader dumps, and so
+    does nothing for the documented empty answer of an swNO_LEADER style
+    (attachment flags above the low byte); a refused style read leaves the
+    empty row malformed."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+    leaders = [(0.1, 0.1, 0.0, 0.2, 0.1, 0.0), (0.1, 0.1, 0.0, 0.2, 0.1, 0.0, 0.2, 0.2, 0.0), points]
+
+    class Data:
+        def __getattr__(self, name):
+            if name.endswith("Count"):
+                return lambda: 0
+            raise AttributeError(name)
+
+    class Annotation:
+        Visible = 1
+        OwnerType = 0
+        Layer = ""
+
+        def GetType(self):
+            return 6  # swNote
+
+        def GetName(self):
+            return "Note1"
+
+        def GetPosition(self):
+            return (0.1, 0.1, 0.0)
+
+        def GetLeaderCount(self):
+            return len(leaders)
+
+        def GetLeaderPointsAtIndex(self, index):
+            return leaders[index]
+
+        def GetLeaderStyle(self):
+            if style is None:
+                raise RuntimeError("refused")
+            return style
+
+        def GetDisplayData(self):
+            return Data()
+
+        def GetSpecificAnnotation(self):
+            return None
+
+    reader = collector._Reader(adapter=None)
+    record = collector._dump_annotation(reader, Annotation())
+    assert [tuple(leader) for leader in record["leaders"]] == leaders[:2]
+    expected = {"GetSpecificAnnotation": 1}
+    if error is not None:
+        expected[f"GetLeaderPointsAtIndex malformed {error}"] = 1
+    assert reader.take_errors() == expected
+
+
+@pytest.mark.parametrize(
+    ("row", "ok"),
+    [
+        ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.1, 0.1, 0.0), True),
+        ((1.0, 3.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.1, 0.1, 0.0), True),
+        ((1.0, 3.0, 0.0, 0.0, 0.0, 0.0, 1.0, 9.0, 9.0, 9.0, 0.1, 0.1, 0.0), False),
+        ((0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.1, 0.1, 0.0), False),
+        ((2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.1, 0.1, 0.0), False),
+        ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.5, 0.1, 0.1, 0.0), False),
+    ],
+    ids=["type0", "type1", "type1-geomdata-slot", "type0-datasize", "type2", "fractional-n"],
+)
+def test_a_polyline_row_has_the_documented_header_and_length(row, ok):
+    # GetPolylineAtIndex2: seven header values, then N XYZs; DataSize puts no
+    # payload in the array (codjiflo P2 on #3146).
+    import _drawing_layout_audit as collector
+
+    assert collector._row_shape_ok("polylines", list(row)) is ok
+
+
 @pytest.mark.parametrize("getter", ["GetTextHeightAtIndex", "GetTextRefPositionAtIndex", "GetTextAngleAtIndex"])
 def test_a_text_run_read_answering_none_is_a_read_error(monkeypatch, getter):
     """Codex P2 on de9d742ab: a None height read as 0.0, so text_items dropped
