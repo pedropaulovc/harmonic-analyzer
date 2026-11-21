@@ -41,6 +41,11 @@ from _drawing_common import (
 from _drawing_dimensions import set_dimension_callouts
 from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _printed_limits import drilled_limits, limits
+from _printed_tolerance import angular_band_deg
 from _surface_finish import surface_finish_by_key
 from _drawing_leader_notes import add_attached_note, add_property_linked_callout
 from _part_properties import part_drawing_unit
@@ -53,6 +58,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
+from ms_stop_block_notes import REBATE_NOTE, REBATE_NOTE_NUMBER
 from solidworks_mcp.adapters.solidworks.drawing import add_note, auto_center_marks, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -92,10 +98,8 @@ RIGHT_KEEP = {
 BOTTOM_KEEP = {
     "ThumbFromEnd": (0.175, 0.031), "ThumbFromPlate": (0.090, 0.073),
 }
-# Rule 4: the rebate is one feature with two tight bands, so both carry only
-# SEE NOTE 1 and the one numbered note names the stick that slides in it.
-REBATE_NOTE_NUMBER = 1
-REBATE_NOTE = f"{REBATE_NOTE_NUMBER}. SLIDING FIT ON {_config.parts('ms-stick')['number']} MEASURING STICK"
+# Rule 4: the rebate's two tight bands carry only SEE NOTE 1; the one numbered
+# note (ms_stop_block_notes.REBATE_NOTE) names the stick that slides in it.
 REBATE_NOTE_LINK = f"SEE NOTE {REBATE_NOTE_NUMBER}"
 # Upper-left corner of the note text: the empty field left of the .84 and
 # above the .56, clear of the cover-face view.
@@ -135,6 +139,539 @@ THUMB_TAP_PRECISION = {"hw-tapdrldia": part.HOLE_CALLOUT_PRECISION}
 # Ra 63 uin symbol left of the right view's open rebate mouth, below the mating
 # face label; its leader enters the mouth to the ceiling's mouth-side quarter.
 SLIDE_FINISH_OFFSET = (-0.030, -0.012)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (ms_stop_block_spec: X = 0 is the
+# LOCATING END, Y = 0 the LOCATING EDGE underside, Z = 0 the MHA-MS-03 mating
+# face; the rebate runs through X and opens into Z = 0; the thumb tap runs +Y,
+# the plate taps +Z). A band is the title block's row for the places the sheet
+# prints (BLOCK_DRAWING_PRECISION_BY_NAME) on the printed nominal, the
+# rebate's own +.004/0 (WINDOW_SIZE_TOLERANCE_MM) on the exact model nominal,
+# or the DRILLED HOLES row on the native tap drills (HOLE_CALLOUT_PRECISION).
+# The plate-tap stations print as references: the plate (MHA-MS-03) masters
+# the match-drill, so they carry no band here. The declarations print nothing.
+_P = part.BLOCK_DRAWING_PRECISION_BY_NAME
+_SPEC = "ms_stop_spec"
+_SELF = "draw_ms_stop_block"
+_NOTES = "ms_stop_block_notes"
+_FRAME = (_SPEC, "__frame__")
+_BUILD = ("build_ms_stop_block", "build")
+_PRECISION = (_SPEC, "BLOCK_DRAWING_PRECISION_BY_NAME")
+_REBATE_BAND = (part.WINDOW_SIZE_TOLERANCE_MM[1], part.WINDOW_SIZE_TOLERANCE_MM[0])
+_PLATE_NUMBER = _config.parts("ms-stop-plate")["number"]
+_SLIDE_FINISH = surface_finish_by_key(part.BLOCK_SURFACE_FINISHES, "rebate_slide")
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+def _printed(
+    name: str, value: float, *sources: Any
+) -> tuple[list[float], tuple[Any, ...]]:
+    """The title block's band for the printed places of dimension ``name``."""
+    return (
+        limits(value, _P[name], unit=part.UNIT),
+        (*sources, (_SPEC, "UNIT"), _PRECISION),
+    )
+
+
+def _rebate(
+    name: str, value: float, *sources: Any
+) -> tuple[list[float], tuple[Any, ...]]:
+    """The rebate's own +.004/0 on the exact model nominal (SEE NOTE 1)."""
+    return (
+        limits(value, _P[name], _REBATE_BAND, unit=part.UNIT),
+        (*sources, (_SPEC, "WINDOW_SIZE_TOLERANCE_MM"), (_SELF, "DIMENSION_CALLOUTS")),
+    )
+
+
+part_metadata(
+    model_sources=(
+        _FRAME,
+        _BUILD,
+        (_SPEC, "BLOCK_LENGTH"),
+        (_SPEC, "BLOCK_HEIGHT"),
+        (_SPEC, "BLOCK_DEPTH"),
+    ),
+    precision_sources=(
+        _PRECISION,
+        (_SPEC, "HOLE_CALLOUT_PRECISION"),
+        (_SELF, "COVER_TAP_PRECISION"),
+        (_SELF, "THUMB_TAP_PRECISION"),
+    ),
+)
+# The X = 0 end, labelled LOCATING END: the match-drill clamp sets it flush
+# with the plate's, and the .84, the thumb tap's .42 and the plate taps'
+# (.150)/(.690) run from it. The rebate and the relief split it.
+requirement(
+    "locating_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": (_plane("x", 0.0), (_FRAME, _BUILD)),
+        "note": (
+            part.LOCATING_END_NOTE,
+            ((_SPEC, "LOCATING_END_NOTE"), (_SELF, "_label_locating_edges")),
+        ),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), part.BLOCK_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("x", part.BLOCK_LENGTH), ((_SPEC, "BLOCK_LENGTH"),)),
+        "length": _printed(
+            "BlockLength",
+            part.BLOCK_LENGTH,
+            (_SPEC, "BLOCK_LENGTH"),
+            (_SELF, "FRONT_KEEP"),
+        ),
+        "length_nominal": (part.BLOCK_LENGTH, ((_SPEC, "BLOCK_LENGTH"),)),
+        "length_from": ("locating_end", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"length": _P["BlockLength"]},
+)
+# The Y = 0 underside, labelled LOCATING EDGE (its edge on the mating face):
+# the match-drill clamp sets it flush with the plate's; the .56 and the plate
+# taps' (.160) run from it, and the thumb tap enters it.
+requirement(
+    "locating_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": (_plane("y", 0.0), (_FRAME, _BUILD)),
+        "note": (
+            part.LOCATING_EDGE_NOTE,
+            ((_SPEC, "LOCATING_EDGE_NOTE"), (_SELF, "_label_locating_edges")),
+        ),
+    },
+)
+requirement(
+    "top_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), part.BLOCK_HEIGHT),),
+    requirements=("height",),
+    fields={
+        "plane": (_plane("y", part.BLOCK_HEIGHT), ((_SPEC, "BLOCK_HEIGHT"),)),
+        "height": _printed(
+            "BlockHeight",
+            part.BLOCK_HEIGHT,
+            (_SPEC, "BLOCK_HEIGHT"),
+            (_SELF, "FRONT_KEEP"),
+        ),
+        "height_nominal": (part.BLOCK_HEIGHT, ((_SPEC, "BLOCK_HEIGHT"),)),
+        "height_from": ("locating_edge", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"height": _P["BlockHeight"]},
+)
+# The Z = 0 face the stop plate covers (MHA-MS-03 MATING FACE): the rebate
+# opens into it, splitting it into the roof lip and the floor; the plate taps
+# and the thumb tap's .17 run from it.
+requirement(
+    "mating_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), part.PLATE_Z_MAX),),
+    requirements=("plane",),
+    fields={
+        "plane": (_plane("z", part.PLATE_Z_MAX), ((_SPEC, "PLATE_Z_MAX"), _FRAME)),
+        "note": (
+            part.BLOCK_MATING_FACE_NOTE,
+            ((_SPEC, "BLOCK_MATING_FACE_NOTE"), (_SELF, "build")),
+        ),
+        "mates": (
+            _PLATE_NUMBER,
+            ((_SPEC, "BLOCK_MATING_FACE_NOTE"), ("_config", "parts")),
+        ),
+    },
+)
+# The back face: the .15 back wall from the rebate's back face (RIGHT_KEEP
+# "BackWall") controls it; the (.48) overall depth prints as a reference.
+requirement(
+    "back_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part.BLOCK_DEPTH),),
+    requirements=("back_wall",),
+    fields={
+        "plane": (_plane("z", part.BLOCK_DEPTH), ((_SPEC, "BLOCK_DEPTH"),)),
+        "back_wall": _printed(
+            "BackWall",
+            part.BACK_WALL_THICKNESS,
+            (_SPEC, "BACK_WALL_THICKNESS"),
+            (_SELF, "RIGHT_KEEP"),
+        ),
+        "back_wall_nominal": (
+            part.BACK_WALL_THICKNESS,
+            ((_SPEC, "BACK_WALL_THICKNESS"),),
+        ),
+        "back_wall_from": ("rebate_back", ((_SELF, "RIGHT_KEEP"),)),
+        "depth_ref": (
+            part.BLOCK_DEPTH,
+            ((_SPEC, "BLOCK_DEPTH"), (_SPEC, "BLOCK_REFERENCE_DIMENSIONS")),
+        ),
+        "dimension_type": (
+            "reference",
+            (
+                (_SPEC, "BLOCK_REFERENCE_DIMENSIONS"),
+                ("build_ms_stop_block", "_author_reference_dimensions"),
+            ),
+        ),
+    },
+    precision={"back_wall": _P["BackWall"], "depth_ref": _P["BlockDepth"]},
+)
+# The rebate, through X and open into the mating face: its ceiling (the roof
+# underside, .09 from the top: RoofThickness) is the one graded surface, Ra 63,
+# where the stick's graduated face slides (BLOCK_SURFACE_FINISHES); the relief
+# notch's top is coplanar with it.
+requirement(
+    "rebate_ceiling",
+    kind="face",
+    faces=(_SLIDE_FINISH.face,),
+    requirements=("roof_thickness", "finish_ra"),
+    fields={
+        "plane": (_plane("y", part.WINDOW_Y_MAX), ((_SPEC, "WINDOW_Y_MAX"),)),
+        "roof_thickness": _printed(
+            "RoofThickness",
+            part.ROOF_THICKNESS,
+            (_SPEC, "ROOF_THICKNESS"),
+            (_SELF, "RIGHT_KEEP"),
+        ),
+        "roof_thickness_nominal": (part.ROOF_THICKNESS, ((_SPEC, "ROOF_THICKNESS"),)),
+        "roof_thickness_from": ("top_face", ((_SELF, "RIGHT_KEEP"),)),
+        "finish_ra": (_SLIDE_FINISH.roughness_um, ((_SPEC, "BLOCK_SURFACE_FINISHES"),)),
+        "open_to": ("mating_face", (("ms_stop_geom", "rebate_profile"),)),
+    },
+    precision={"roof_thickness": _P["RoofThickness"], "finish_ra": 1},
+)
+# The rebate's two sliding-fit sizes (.134 and .330 +.004/0, SEE NOTE 1): the
+# height on its floor from the ceiling, the width on its back face from the
+# mating face (RIGHT_KEEP "WindowHeight", "WindowWidth"; DIMENSION_CALLOUTS).
+_FIT = (
+    REBATE_NOTE,
+    ((_NOTES, "REBATE_NOTE"), (_NOTES, "DRAWING_NOTES")),
+)
+_FIT_LINK = (
+    REBATE_NOTE_LINK,
+    ((_SELF, "REBATE_NOTE_LINK"), (_SELF, "DIMENSION_CALLOUTS")),
+)
+requirement(
+    "rebate_floor",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), part.WINDOW_Y_MIN),),
+    requirements=("rebate_height",),
+    fields={
+        "plane": (_plane("y", part.WINDOW_Y_MIN), ((_SPEC, "WINDOW_Y_MIN"),)),
+        "rebate_height": _rebate(
+            "WindowHeight",
+            part.WINDOW_HEIGHT,
+            (_SPEC, "WINDOW_HEIGHT"),
+            (_SELF, "RIGHT_KEEP"),
+        ),
+        "rebate_height_nominal": (part.WINDOW_HEIGHT, ((_SPEC, "WINDOW_HEIGHT"),)),
+        "rebate_height_from": ("rebate_ceiling", ((_SELF, "RIGHT_KEEP"),)),
+        "callout": _FIT_LINK,
+        "note": _FIT,
+    },
+    precision={"rebate_height": _P["WindowHeight"]},
+)
+requirement(
+    "rebate_back",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -part.WINDOW_Z_MAX),),
+    requirements=("rebate_width",),
+    fields={
+        "plane": (_plane("z", part.WINDOW_Z_MAX), ((_SPEC, "WINDOW_Z_MAX"),)),
+        "rebate_width": _rebate(
+            "WindowWidth",
+            part.WINDOW_WIDTH,
+            (_SPEC, "WINDOW_WIDTH"),
+            (_SELF, "RIGHT_KEEP"),
+        ),
+        "rebate_width_nominal": (part.WINDOW_WIDTH, ((_SPEC, "WINDOW_WIDTH"),)),
+        "rebate_width_from": ("mating_face", ((_SELF, "RIGHT_KEEP"),)),
+        "callout": _FIT_LINK,
+        "note": _FIT,
+    },
+    precision={"rebate_width": _P["WindowWidth"]},
+)
+# The corner relief: a notch into the back wall under the roof, .05 deep from
+# the rebate's back face and .06 down from the ceiling (RIGHT_KEEP
+# "ReliefDepth", "ReliefHeight"), so the stick seats on the roof past the
+# cutter's corner radius.
+_RELIEF_BACK_Z = part.WINDOW_Z_MAX + part.RELIEF_DEPTH
+_RELIEF_FLOOR_Y = part.WINDOW_Y_MAX - part.RELIEF_HEIGHT
+requirement(
+    "relief_back",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -_RELIEF_BACK_Z),),
+    requirements=("relief_depth",),
+    fields={
+        "plane": (
+            _plane("z", _RELIEF_BACK_Z),
+            ((_SPEC, "WINDOW_Z_MAX"), (_SPEC, "RELIEF_DEPTH")),
+        ),
+        "relief_depth": _printed(
+            "ReliefDepth",
+            part.RELIEF_DEPTH,
+            (_SPEC, "RELIEF_DEPTH"),
+            (_SELF, "RIGHT_KEEP"),
+        ),
+        "relief_depth_nominal": (part.RELIEF_DEPTH, ((_SPEC, "RELIEF_DEPTH"),)),
+        "relief_depth_from": ("rebate_back", ((_SELF, "RIGHT_KEEP"),)),
+    },
+    precision={"relief_depth": _P["ReliefDepth"]},
+)
+requirement(
+    "relief_floor",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), _RELIEF_FLOOR_Y),),
+    requirements=("relief_height",),
+    fields={
+        "plane": (
+            _plane("y", _RELIEF_FLOOR_Y),
+            ((_SPEC, "WINDOW_Y_MAX"), (_SPEC, "RELIEF_HEIGHT")),
+        ),
+        "relief_height": _printed(
+            "ReliefHeight",
+            part.RELIEF_HEIGHT,
+            (_SPEC, "RELIEF_HEIGHT"),
+            (_SELF, "RIGHT_KEEP"),
+        ),
+        "relief_height_nominal": (part.RELIEF_HEIGHT, ((_SPEC, "RELIEF_HEIGHT"),)),
+        "relief_height_from": ("rebate_ceiling", ((_SELF, "RIGHT_KEEP"),)),
+    },
+    precision={"relief_height": _P["ReliefHeight"]},
+)
+# The two roof end chamfers, .04 x 45 deg, 2 CORNERS (FRONT_KEEP
+# "RoofChamferSize", "RoofChamferAngle"): each breaks the roof's end edge,
+# which runs +Z from ``at`` (chamfer 1 at the locating end, 2 at the far end).
+_ANGULAR_BAND = angular_band_deg(unit=part.UNIT)
+for _index, _x, _sign in ((1, 0.0, -1.0), (2, part.BLOCK_LENGTH, 1.0)):
+    requirement(
+        f"roof_chamfer_{_index}",
+        kind="chamfer",
+        faces=(
+            PlanarFace(
+                (_sign, 1.0, 0.0),
+                (_sign * _x + part.BLOCK_HEIGHT - part.ROOF_END_CHAMFER)
+                / math.sqrt(2.0),
+            ),
+        ),
+        requirements=("size", "angle_deg"),
+        fields={
+            "at": (
+                [_x, part.BLOCK_HEIGHT, 0.0],
+                ((_SPEC, "BLOCK_LENGTH"), (_SPEC, "BLOCK_HEIGHT"), _BUILD),
+            ),
+            "axis": ((0.0, 0.0, 1.0), (_BUILD,)),
+            "size": _printed(
+                "RoofChamferSize",
+                part.ROOF_END_CHAMFER,
+                (_SPEC, "ROOF_END_CHAMFER"),
+                (_SELF, "FRONT_KEEP"),
+            ),
+            "size_nominal": (part.ROOF_END_CHAMFER, ((_SPEC, "ROOF_END_CHAMFER"),)),
+            "angle_deg": (
+                [
+                    round(part.ROOF_CHAMFER_ANGLE - _ANGULAR_BAND, 12),
+                    round(part.ROOF_CHAMFER_ANGLE + _ANGULAR_BAND, 12),
+                ],
+                (
+                    (_SPEC, "ROOF_CHAMFER_ANGLE"),
+                    ("_printed_tolerance", "angular_band_deg"),
+                    (_SELF, "FRONT_KEEP"),
+                ),
+            ),
+            "angle_nominal_deg": (
+                part.ROOF_CHAMFER_ANGLE,
+                ((_SPEC, "ROOF_CHAMFER_ANGLE"),),
+            ),
+            "callout": (
+                DIMENSION_CALLOUTS["RoofChamferSize"],
+                ((_SELF, "DIMENSION_CALLOUTS"),),
+            ),
+        },
+        precision={"size": _P["RoofChamferSize"], "angle_deg": _P["RoofChamferAngle"]},
+    )
+# The #4-40 thumbscrew tap, up from the underside through the floor and into
+# the rebate, the roof not drilled (THUMB_HOLE_END): its tap drill prints .XXX
+# on the DRILLED HOLES row (THUMB_TAP_PRECISION); .42 from the locating end
+# and .17 from the mating face (BOTTOM_KEEP). THRU means through the floor
+# only: the drill breaks out into the rebate floor and must stop short of the
+# roof (``thru_length_ref``, the floor's thickness, is not printed).
+_TAP_CALLOUT = ((_SELF, "build"), (_SELF, "_remove_general_thread_class"))
+requirement(
+    "thumb_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(part.THUMB_TAP_DRILL),),
+    requirements=(
+        "thread",
+        "dia",
+        "thru",
+        "location_from_end",
+        "location_from_mating_face",
+    ),
+    fields={
+        "at": (list(part.THUMB_HOLE_POINTS[0]), ((_SPEC, "THUMB_HOLE_POINTS"),)),
+        "axis": ((0.0, 1.0, 0.0), ((_SPEC, "THUMB_HOLE_NORMAL"),)),
+        "thread": (
+            f"{part.THUMB_TAP_SPEC.size} UNC-{part.THUMB_TAP_SPEC.thread_class}",
+            ((_SPEC, "THUMB_TAP_SPEC"), *_TAP_CALLOUT),
+        ),
+        "dia": (
+            drilled_limits(
+                part.THUMB_TAP_DRILL,
+                THUMB_TAP_PRECISION["hw-tapdrldia"],
+                unit=part.UNIT,
+            ),
+            (
+                (_SPEC, "THUMB_TAP_DRILL"),
+                (_SPEC, "UNIT"),
+                (_SELF, "THUMB_TAP_PRECISION"),
+            ),
+        ),
+        "nominal_dia": (part.THUMB_TAP_DRILL, ((_SPEC, "THUMB_TAP_DRILL"),)),
+        "thru": (True, ((_SPEC, "THUMB_TAP_SPEC"), *_TAP_CALLOUT)),
+        "process": ("drill", ((_SPEC, "THUMB_TAP_SPEC"),)),
+        "exit_face": ("rebate_floor", ((_SELF, "THUMB_HOLE_END"),)),
+        "thru_length_ref": (part.FLOOR_THICKNESS, ((_SPEC, "FLOOR_THICKNESS"),)),
+        "end_note": (THUMB_HOLE_END, ((_SELF, "THUMB_HOLE_END"),)),
+        "location_from_end": _printed(
+            "ThumbFromEnd",
+            part.THUMB_AXIS_X,
+            (_SPEC, "THUMB_AXIS_X"),
+            (_SELF, "BOTTOM_KEEP"),
+        ),
+        "location_from_end_nominal": (part.THUMB_AXIS_X, ((_SPEC, "THUMB_AXIS_X"),)),
+        "location_from_end_from": ("locating_end", ((_SELF, "BOTTOM_KEEP"),)),
+        "location_from_mating_face": _printed(
+            "ThumbFromPlate",
+            part.THUMB_AXIS_Z,
+            (_SPEC, "THUMB_AXIS_Z"),
+            (_SELF, "BOTTOM_KEEP"),
+        ),
+        "location_from_mating_face_nominal": (
+            part.THUMB_AXIS_Z,
+            ((_SPEC, "THUMB_AXIS_Z"),),
+        ),
+        "location_from_mating_face_from": ("mating_face", ((_SELF, "BOTTOM_KEEP"),)),
+    },
+    precision={
+        "dia": THUMB_TAP_PRECISION["hw-tapdrldia"],
+        "location_from_end": _P["ThumbFromEnd"],
+        "location_from_mating_face": _P["ThumbFromPlate"],
+    },
+)
+# The two #2-56 blind plate taps (2X Ø.073 ↧.300, 2-56 UNC ↧.250 and
+# COVER_HOLE_MATCH_DRILL): the tap drill is match-drilled through the stop
+# plate MHA-MS-03, its master, clamped with the locating ends and edges flush,
+# in that plate's traveler (``made_at = "pair_drill"``); this part's traveler
+# taps them (bottoming tap, PLATE_TAP_SPEC). Depths run from the mating face
+# and print .XXX (COVER_TAP_PRECISION). Their stations print as references
+# (.150)/(.690) from the locating end and (.160) from the locating edge: the
+# plate's bands locate them.
+_COVER_SOURCES = (
+    (_SPEC, "PLATE_TAP_SPEC"),
+    *_TAP_CALLOUT,
+    (_SELF, "COVER_TAP_PRECISION"),
+)
+_PAIR = ((_SELF, "COVER_HOLE_MATCH_DRILL"), (_SPEC, "MATCH_DRILL_DATUM_ALIGNMENT"))
+_REFERENCE = (
+    (_SPEC, "PLATE_LOCATION_DIMENSIONS"),
+    ("build_ms_stop_block", "_author_reference_dimensions"),
+    (_SELF, "FRONT_KEEP"),
+)
+for _index, (_point, _end_dimension) in enumerate(
+    zip(
+        part.BLOCK_PLATE_HOLE_POINTS,
+        ("PlateLeftFromEnd", "PlateRightFromEnd"),
+        strict=True,
+    ),
+    1,
+):
+    requirement(
+        f"plate_tap_{_index}",
+        kind="threaded_hole",
+        faces=(CylinderFace(part.PLATE_TAP_DRILL_DIA, contains_x_mm=_point[0]),),
+        requirements=("thread", "dia", "thread_depth", "drill_depth"),
+        fields={
+            "at": (list(_point), ((_SPEC, "BLOCK_PLATE_HOLE_POINTS"),)),
+            "axis": ((0.0, 0.0, 1.0), ((_SPEC, "PLATE_HOLE_NORMAL"),)),
+            "thread": (
+                f"{part.PLATE_TAP_SPEC.size} UNC-{part.PLATE_TAP_SPEC.thread_class}",
+                _COVER_SOURCES,
+            ),
+            "dia": (
+                drilled_limits(
+                    part.PLATE_TAP_DRILL_DIA,
+                    COVER_TAP_PRECISION["hw-tapdrldia"],
+                    unit=part.UNIT,
+                ),
+                ((_SPEC, "PLATE_TAP_DRILL_DIA"), (_SPEC, "UNIT"), *_COVER_SOURCES),
+            ),
+            "nominal_dia": (
+                part.PLATE_TAP_DRILL_DIA,
+                ((_SPEC, "PLATE_TAP_DRILL_DIA"),),
+            ),
+            "process": ("drill", ((_SPEC, "PLATE_TAP_SPEC"),)),
+            "thread_depth": (
+                limits(
+                    part.PLATE_TAP_THREAD_DEPTH,
+                    COVER_TAP_PRECISION["hw-threaddepth"],
+                    unit=part.UNIT,
+                ),
+                ((_SPEC, "PLATE_TAP_THREAD_DEPTH"), (_SPEC, "UNIT"), *_COVER_SOURCES),
+            ),
+            "thread_depth_nominal": (
+                part.PLATE_TAP_THREAD_DEPTH,
+                ((_SPEC, "PLATE_TAP_THREAD_DEPTH"),),
+            ),
+            "drill_depth": (
+                limits(
+                    part.PLATE_TAP_DRILL_DEPTH,
+                    COVER_TAP_PRECISION["hw-tapdrldepth"],
+                    unit=part.UNIT,
+                ),
+                ((_SPEC, "PLATE_TAP_DRILL_DEPTH"), (_SPEC, "UNIT"), *_COVER_SOURCES),
+            ),
+            "drill_depth_nominal": (
+                part.PLATE_TAP_DRILL_DEPTH,
+                ((_SPEC, "PLATE_TAP_DRILL_DEPTH"),),
+            ),
+            "tap_style": ("bottoming", ((_SPEC, "PLATE_TAP_SPEC"),)),
+            "made_at": ("pair_drill", _PAIR),
+            "pair_drill_master": (_PLATE_NUMBER, (*_PAIR, ("_config", "parts"))),
+            "pair_drill_alignment": (part.MATCH_DRILL_DATUM_ALIGNMENT, _PAIR),
+            "tapped_in": (
+                _config.parts("ms-stop-block")["number"],
+                (("_config", "parts"), _BUILD),
+            ),
+            "callout": (COVER_HOLE_MATCH_DRILL, ((_SELF, "COVER_HOLE_MATCH_DRILL"),)),
+            "location_from_end_ref": (
+                _point[0],
+                ((_SPEC, "PLATE_HOLE_XS"), *_REFERENCE),
+            ),
+            "location_from_edge_ref": (
+                _point[1],
+                ((_SPEC, "PLATE_HOLE_Y"), *_REFERENCE),
+            ),
+            "location_from_end_ref_from": ("locating_end", _REFERENCE),
+            "location_from_edge_ref_from": ("locating_edge", _REFERENCE),
+            "dimension_type": ("reference", _REFERENCE),
+        },
+        precision={
+            "dia": COVER_TAP_PRECISION["hw-tapdrldia"],
+            "thread_depth": COVER_TAP_PRECISION["hw-threaddepth"],
+            "drill_depth": COVER_TAP_PRECISION["hw-tapdrldepth"],
+            "location_from_end_ref": _P[_end_dimension],
+            "location_from_edge_ref": _P["PlateFromHeadFace"],
+        },
+    )
 
 
 def _add_rebate_slide_finish(adapter: Any, right: Any) -> None:
