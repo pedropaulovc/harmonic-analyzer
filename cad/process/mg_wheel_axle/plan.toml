@@ -71,9 +71,13 @@ rough_radial_doc_mm = 0.15
 finish_radial_doc_mm = 0.03
 turn_feed_mm_rev = 0.1016
 # The R.070 form tool's radius: the dome is cut full (to the centre) on the
-# Ø.1112 #4-40 basic major, .070 − √(.070² − .0556²) = .0275 high
-# (cad.dome_far_form_height).
+# blank's own Ø, anywhere in the thread blank's .1061–.1112 band, so its
+# height goes by the blank: .070 − √(.070² − (Ø/2)²), .0243 at Ø.1061 to
+# .0275 at Ø.1112 (cad.dome_far_form_height_min/_max; the pictures print
+# that range and Op 110 the per-blank feed).
 dome_form_radius_in = 0.07
+dome_form_dia_min_in = 0.1061
+dome_form_dia_max_in = 0.1112
 # The thread length read from the shoulder face to the dome's apex (the dome
 # root is an edge on the thread; the calipers' beam end seats on the apex):
 # the .314–.334 thread plus the dome's height for the blank's miked Ø, .0243
@@ -236,7 +240,7 @@ speed_kind = "spindle"
 tool = "form"
 drilling = "none"
 sizing = "other"
-instruction = "Form the R.07 dome: tool on centre height, square to the axis; set the cross-slide so the arc touches the O.D. corner on both sides at once, and zero the DRO Z there. Feed along Z by the blank's dome height for its Op 80 reading: .0243 at Ø.1061, .0258 at Ø.1086, .0275 at Ø.1112."
+instruction = "Form the R.07 dome: tool on centre height, square to the axis; set the cross-slide so the arc touches the O.D. corner on both sides at once, and zero the DRO Z there. Feed along Z by the blank's dome height for its Op 80 reading: {{cad.dome_far_form_height_min_in:.4dot}} at Ø{{process.dome_form_dia_min_in:.4dot}}, .0258 at Ø.1086, {{cad.dome_far_form_height_max_in:.4dot}} at Ø{{process.dome_form_dia_max_in:.4dot}}."
 settings = "lathe-form-r070-o1"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
 
@@ -329,7 +333,7 @@ instruction = "Break the back end's edge and the shoulder's outer edge R{{cad.ed
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Read the thread from the shoulder face to the dome's apex with the calipers' depth rod: the beam's end on the apex, the rod down beside the thread onto the shoulder face. Add the dome's height for the blank's Op 80 reading to the {{cad.thread_length_min_in:.3dot}}–{{cad.thread_length_max_in:.3dot}} thread: .0243 at Ø.1061, .0258 at Ø.1086, .0275 at Ø.1112. Look over the shank where the jaws held it."
+instruction = "Read the thread from the shoulder face to the dome's apex with the calipers' depth rod: the beam's end on the apex, the rod down beside the thread onto the shoulder face. Add the dome's height for the blank's Op 80 reading to the {{cad.thread_length_min_in:.3dot}}–{{cad.thread_length_max_in:.3dot}} thread: {{cad.dome_far_form_height_min_in:.4dot}} at Ø{{process.dome_form_dia_min_in:.4dot}}, .0258 at Ø.1086, {{cad.dome_far_form_height_max_in:.4dot}} at Ø{{process.dome_form_dia_max_in:.4dot}}. Look over the shank where the jaws held it."
 inspection = "Shoulder to apex {{cad.thread_length_min_in:.3dot}} + the dome's height to {{cad.thread_length_max_in:.3dot}} + the dome's height, for this blank's Ø (gauge range {{process.thread_apex_min_in:.4dot}}–{{process.thread_apex_max_in:.4dot}}); shank: no mark you can feel."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.thread_apex_min_mm}}", "{{process.thread_apex_max_mm}}"] }]
 

@@ -136,6 +136,11 @@ def test_each_form_tool_cuts_the_drawn_dome(stem: str) -> None:
     # The adapter derives the dome heights and the faced length from the
     # form's radius: it must be the form tool's.
     assert math.isclose(parameters["dome_form_radius_in"] * IN, radius, abs_tol=1e-6)
+    if "dome_form_dia_min_in" in parameters:
+        # Formed on each blank's own Ø: the band is the domed diameter's.
+        assert [
+            parameters[f"dome_form_dia_{side}_in"] * IN for side in ("min", "max")
+        ] == pytest.approx(root["dia"], abs=1e-6)
     # Apex readings: a drawn band read from a dome's apex instead of its
     # root (an edge) is that band plus the form's height. The thread's is
     # widened over the blank's diameter band (the op prints the per-blank
