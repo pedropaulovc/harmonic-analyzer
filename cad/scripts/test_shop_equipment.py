@@ -1,11 +1,15 @@
 """_shop_equipment: the inventory files merge into one document, a record key
-lives in one file, and ownership is the one ``status`` enum."""
+lives in one file, ownership is the one ``status`` enum, and every plan's
+hand-tap stack leaves room for the recorded tap guide."""
 
 from __future__ import annotations
+
+import tomllib
 
 import pytest
 
 import _shop_equipment
+from _paths import CAD_ROOT
 
 STATUSES = {"on_hand", "not_received", "to_order", "to_make"}
 STOCK_STATUSES = {"on_hand", "not_received", "to_order"}
@@ -59,3 +63,21 @@ def test_ownership_is_the_status_enum() -> None:
                 assert record.get("supply") == "shop_made", (section, key)
             for member in record.get("members", {}).values():
                 assert "use" not in member, (section, key)
+
+
+def test_every_hand_tap_stop_leaves_room_for_the_tap_guide() -> None:
+    # Owner ruling 2026-11-21: the mill's hand-tap stops use the Fisher spring
+    # tap guide. A plan holding it measures only the tap in its wrench against
+    # tap_wrench_reach_max_mm: its guide-and-tap stack less the guide's
+    # overall length, rounded down to .01 in.
+    guide_mm = _shop_equipment.load()["tools"]["tap-guide-fisher"]["overall_length_in"] * 25.4
+    holders = []
+    for path in sorted((CAD_ROOT / "process").glob("*/plan.toml")):
+        plan = tomllib.loads(path.read_text(encoding="utf-8"))
+        if not any(tool.get("ref") == "tap-guide-fisher" for tool in plan.get("tools", [])):
+            continue
+        holders.append(path.parent.name)
+        parameters = plan["parameters"]
+        room = parameters["tap_stack_max_mm"] - guide_mm
+        assert 0 <= room - parameters["tap_wrench_reach_max_mm"] < 0.254, path.parent.name
+    assert len(holders) >= 10, holders

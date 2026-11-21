@@ -58,8 +58,8 @@ MHA-CH-13) is the first: faced and bored in edge clamps on a shop-made
 sub-plate, then bonded to it on tape and screwed down at the hub for the
 outline. The magnifying clamp (`mg_magnifying_clamp`, MHA-MG-02) stands
 upright on parallels in the vise for both ends and lies corner up between them
-for its cross bore; its holes are tapped by hand on a dead centre in the
-spindle, one Idle-ending NC file per hole. The column clamp halves
+for its cross bore; its holes are tapped by hand under the spring tap guide
+in the spindle, one Idle-ending NC file per hole. The column clamp halves
 (`sh_column_clamp_front`, MHA-SH-01, and `sh_column_clamp_back`, MHA-SH-02)
 are each squared from a 3/4 in bar blank on parallels in the vise and drilled
 from one zero at the near side; the back's traveler then bolts each back to
@@ -361,9 +361,12 @@ A recipe has five parts:
   or a manual section: G-code the recipe writes itself, such as an operator
   stop or a probing cycle). Sections join into one file. A file may be one
   manual section alone, a hand-tap stop: it must load its tool first (`M6`,
-  so the guide's length is set), retract with `G53 G0 Z` to the machine top,
-  rapid over the hole and end `M30`, so the controller is Idle where FluidNC
-  allows jogging; `_gcode.check_tap_stop` proves it. A new tool starts at
+  so the guide's length is set: the Fisher spring tap guide in the 1/2 in R8
+  collet, shop `tools.tap-guide-fisher`, owner ruling 2026-11-21), retract
+  with `G53 G0 Z` to the machine top (machine Z0, the top of travel after
+  homing, owner 2026-11-21; `cnc.pm-30mv-controller`), rapid over the hole
+  and end `M30`, so the controller is Idle where FluidNC allows jogging;
+  `_gcode.check_tap_stop` proves it. A new tool starts at
   `M5`, a `%msg` naming it and the speed to set, and `M6 T<n>`, which CNCjs
   (Manual Tool Change, Custom Probing) expands into its tool change and
   tool-setter probe; FluidNC 3.7.8 has no tool change of its own. The

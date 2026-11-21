@@ -19,8 +19,8 @@
 # finish the walls and corners with the 5/64 in end mill (PF06); Setup 8
 # upright, the bottom end up, the back face to the fixed jaw: spot and
 # drill the #43 through the bottom rail into the window (PF07), then tap
-# 4-40 through by hand on the dead centre (PF08); bench deburr and inspect.
-# Finish as machined.
+# 4-40 through by hand under the spring tap guide (PF08); bench deburr and
+# inspect. Finish as machined.
 #
 # To buy before Setup 7: the 5/64 in end mill (shop-equipment
 # tools.endmill-5-64-long, to_order). It is the only cutter on record small
@@ -32,11 +32,19 @@
 # Zeroing: every X/Y zero is the owned .200 in edge finder at 900 rpm
 # (tools.edge-finder; the touch probe has no holder) and every Z zero a
 # cutter on a .002 feeler leaf, as the column clamp and magnifying clamp
-# plans do. Tapping (owner, Pedro, 2026-11-17): FluidNC cannot rigid-tap and
-# no tapping head is owned; the T-handle wrench's centre hole rides on the
-# MT3 dead centre in the spindle, spindle off, and the tap stop is its own
-# file ending M30 over the hole (FluidNC refuses jogs in the Hold an M0
-# leaves).
+# plans do.
+#
+# Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
+# guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner, Pedro,
+# answered in person 2026-11-21: "use
+# https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
+# on r8 0.5 collet"; cad/config/shop-equipment/ tools.tap-guide-fisher, its
+# ownership to confirm): its spring-loaded point seats in the T-handle
+# wrench's centre hole and follows the tap down 1/2 in, spindle off; the
+# operator jogs Z only to push the point home again and to read the depth.
+# FluidNC refuses jogs in the Hold an M0 leaves
+# (wiki.fluidnc.com/en/features/single_block_mode), so the tap stop is its
+# own file ending M30 over its hole (PF08).
 #
 # NC (cam:pn_pen_frame, cad/process/pn_pen_frame/cam.py): PF01_top_end,
 # PF02_height, PF03_left_face, PF04_width, PF05_back_face, PF06_window,
@@ -44,7 +52,7 @@
 # milling_cuts names are a contract with that recipe. Tool numbers are the
 # places in the tools list among the mill's tools: T1 1/2 in end mill, T2
 # 1/8 in end mill, T3 5/64 in end mill, T4 centre drill, T5 #43, T6 the
-# dead centre (the tap is turned by hand).
+# tap guide (the tap is turned by hand).
 title = "Pen frame"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -209,15 +217,20 @@ centre_drill_oal_mm = 47.625
 # Setup 8: the drill's point above the parallels, the height less
 # drill_tip_depth_mm (40.132 − 7.775); cam.py checks it.
 drill_tip_height_mm = 32.357
-# Tapping on the dead centre: neither the centre's reach out of its collet
-# nor the tap's reach in its wrench is on record, so the traveler stops
-# before the tap file unless the two together are at most tap_stack_max_mm:
-# the spindle-to-table maximum (shop machines.pm-30mv, 431.8) less 25.0 to
-# bring the point down onto the wrench (the shop's tool-change clearance),
-# the vise bed, the parallels, the frame's height and the collet gauge:
-# 261.664, rounded down to .01 in. It is also the dead centre's declared
-# reach in Setup 8's capacity check.
+# Tapping under the spring tap guide (tools.tap-guide-fisher): the guide and
+# the tap in its wrench together reach at most tap_stack_max_mm below the
+# collet face, the spindle-to-table maximum (shop machines.pm-30mv, 431.8)
+# less 25.0 to bring the point down onto the wrench (the shop's tool-change
+# clearance), the vise bed, the parallels, the frame's height and the collet
+# gauge: 261.664, rounded down to .01 in; it is also the guide-and-tap
+# stack's declared reach in Setup 8's capacity check. The guide is 3 1/8 in
+# (79.375) overall, its sellers' size and the most it can stand below the
+# collet face; the tap's reach in its wrench is not on record, so the
+# traveler stops before the tap file unless the tap, point to the wrench's
+# centre hole, is at most tap_wrench_reach_max_mm: 261.62 less 79.375,
+# 182.245, rounded down to .01 in.
 tap_stack_max_mm = 261.62
+tap_wrench_reach_max_mm = 182.11
 
 [[tools]]
 id = "em-half"
@@ -240,9 +253,9 @@ id = "drill-43"
 name = "#43 drill"
 ref = "jig-drill-43"
 [[tools]]
-id = "dead-centre"
-name = "MT3 dead centre"
-ref = "mill-dead-centre-mt3"
+id = "tap-guide"
+name = "Fisher spring tap guide"
+ref = "tap-guide-fisher"
 [[tools]]
 id = "tap-4-40"
 name = "4-40 plug tap"
@@ -640,24 +653,24 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "The 4-40 tap goes in the T-handle tap wrench with the centre hole in its top: the dead centre's point seats in that hole."
+instruction = "The 4-40 tap goes in the T-handle tap wrench with the centre hole in its top: the tap guide's point seats in that hole."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Stop check before the tap file: measure the dead centre from its tip to the collet's face and the 4-40 tap in the T-handle wrench from its point to the wrench's centre hole (calipers, or the combination square's 12 in blade). The two together must be at most {{process.tap_stack_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the parallels, this frame, the collet and 1 in to bring the point down onto the wrench). Over: stop; do not tap on this setup."
+instruction = "Stop check before the tap file: measure the 4-40 tap in the T-handle wrench from its point to the wrench's centre hole (calipers, or the combination square's 12 in blade). It must be at most {{process.tap_wrench_reach_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the parallels, this frame, the collet, the tap guide's 3 1/8 in and 1 in to bring the point down onto the wrench). Over: stop; do not tap on this setup."
 feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
-tool = "dead-centre"
+tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run PF08_tap: M6 T6, the dead centre in its 3/4 in collet (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
-diagram = { file = "diagrams/tap.svg", alt = "The frame upright in the vise, B up, BK at the fixed jaw; the 4-40 tap in the T-handle wrench in the hole, the dead centre in the spindle seated in the wrench's centre hole; the tap's point to go {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below B, into the window." }
+instruction = "Run PF08_tap: M6 T6, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
+diagram = { file = "diagrams/tap.svg", alt = "The frame upright in the vise, B up, BK at the fixed jaw; the 4-40 tap in the T-handle wrench in the hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to go {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below B, into the window." }
 
 [[setups.operations]]
-instruction = "Tap depth reference: the DRO's work Z, in inches, with the tap's point standing on B beside the hole and the dead centre seated in the wrench."
-instruction_detailed = "MDI G0 X-5.000 (over B beside the hole), then send G20: the DRO reads inches. Stand the 4-40 plug tap, in its T-handle wrench, on its point on B; jog Z down until the dead centre's point sits in the wrench's centre hole, light pressure only. Note the DRO Z. Jog Z up clear, MDI G0 X-0.500 (over the hole, in inches)."
+instruction = "Tap depth reference: the DRO's work Z, in inches, with the tap's point standing on B beside the hole and the tap guide's point pushed fully home in the wrench."
+instruction_detailed = "MDI G0 X-5.000 (over B beside the hole), then send G20: the DRO reads inches. Stand the 4-40 plug tap, in its T-handle wrench, on its point on B; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home. Note the DRO Z. Jog Z up clear, MDI G0 X-0.500 (over the hole, in inches)."
 feed = "hand"
 
 [[setups.operations]]
@@ -665,8 +678,8 @@ speed_kind = "other"
 tool = "tap-4-40"
 drilling = "none"
 sizing = "other"
-instruction = "Tap by hand on the dead centre, spindle off, Tapmatic Gold, jogging Z down to keep it seated, until the DRO Z reads the noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim {{process.tap_reach_mm:in.3dot}}): the tap's chamfer is then through the rail into the window and every thread in the rail is full. Not gauged on the part."
-instruction_detailed = "The tap's point in the hole, a drop of Tapmatic Gold; jog Z down until the centre is seated: it guides, it does not push. Turn the wrench, a half turn back each turn to break the chip, jogging Z down to keep it seated. Stop when the DRO Z reads the noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim {{process.tap_reach_mm:in.3dot}}): the tap's point shows in the window."
+instruction = "Tap by hand under the tap guide, spindle off, Tapmatic Gold: the spring keeps the point in the wrench as the tap feeds. Read the depth with the point pushed fully home, as the reference: stop when the DRO Z reads the noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim {{process.tap_reach_mm:in.3dot}}): the tap's chamfer is then through the rail into the window and every thread in the rail is full. Not gauged on the part."
+instruction_detailed = "Tap's point in the hole, a drop of Tapmatic Gold; jog Z down until the guide's point is pushed fully home: the spring then holds the tap square and follows it down. Turn the wrench, a half turn back each turn. To read, push the point fully home again: stop at the noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim {{process.tap_reach_mm:in.3dot}}), the tap's point showing in the window."
 feed = "hand"
 
 [[setups.operations]]

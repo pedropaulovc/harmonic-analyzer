@@ -40,6 +40,9 @@ cite = [
 firmware = "FluidNC v3.7.8"
 board = "generic ESP32 (config board: None), CP210x USB"
 homing = "switches on all three axes"
+# The hand-tap files' G53 G0 Z0 retract (cad/process/*/cam.py
+# MACHINE_Z_TOP_MM) rests on this; the owner confirmed it 2026-11-21.
+z_machine_zero = "top of Z travel after homing"
 probe_pin = "gpio.5:high:pd, nothing wired (2026-11-16); gpio.5:low:pu once the touch probe is wired"
 toolsetter_pin = "gpio.21:low:pu, the tool setter"
 sender = "CNCjs 1.11.5, Manual Tool Change (Custom Probing)"
@@ -48,4 +51,5 @@ note = "FluidNC 3.7.8 has no manual tool change of its own (atc_manual arrives i
 cite = [
   "Owner (Pedro) 2026-11-16, relayed by Main: FluidNC config (board, homing, probe and toolsetter pins), CNCjs 1.11.5.",
   "FluidNC v3.7.8 source: Probe.cpp tripped() ORs the probe and toolsetter pins; MotionControl.cpp mc_probe_cycle alarms ProbeFailInitial on a tripped start; GCode.cpp G10 L20 = MPos - G92 - TLO - value, saved to NVS (Settings.cpp Coordinates::set).",
+  "Owner (Pedro) 2026-11-21, answered in person (cnc rulings record), asked whether machine Z = 0 is the top of travel after homing: \"yes\".",
 ]

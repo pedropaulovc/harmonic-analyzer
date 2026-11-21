@@ -105,8 +105,8 @@ def test_a_program_that_loads_its_first_tool_does_so_before_any_move(tmp_path):
 
 
 _TAP_STOP = (
-    "(SP03_tap_clamp_1)\n(T6 MT3 dead centre)\n(Begin preamble)\nG17 G90\nG21\nG54\n"
-    "M5\n%msg TOOL CHANGE: T6 MT3 dead centre, SPINDLE STAYS OFF. NEXT: 4-40 TAP IN CLAMP HOLE 1\n"
+    "(SP03_tap_clamp_1)\n(T6 Fisher spring tap guide)\n(Begin preamble)\nG17 G90\nG21\nG54\n"
+    "M5\n%msg TOOL CHANGE: T6 Fisher spring tap guide, SPINDLE STAYS OFF. NEXT: 4-40 TAP IN CLAMP HOLE 1\n"
     "M6 T6\nG53 G0 Z0.000\nG0 X25.400 Y-41.910\n(4-40 TAP IN CLAMP HOLE 1)\nM30\n"
 )
 

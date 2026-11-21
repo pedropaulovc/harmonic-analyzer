@@ -89,7 +89,7 @@ def _findings(ctx: dict, out: Path) -> list:
 
 
 def test_context_numbers_the_tools_and_drills_every_lock_tap_from_one_zero(ctx) -> None:
-    assert ctx["numbers"] == {"em-half": 1, "spot": 2, "drill-43": 3, "dead-centre": 4}
+    assert ctx["numbers"] == {"em-half": 1, "spot": 2, "drill-43": 3, "tap-guide": 4}
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     lock = sorted(
         (
@@ -136,6 +136,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("lying_grip_mm", 7.5, "lying_grip_mm"),
         ("vise_overhang_mm", 55.48, "vise_overhang_mm"),
         ("tap_stack_max_mm", 279.4, "tap_stack_max_mm"),
+        ("tap_wrench_reach_max_mm", 199.517, "tap_wrench_reach_max_mm"),
         ("parallel_thickness_mm", 5.5, "reaches the stacks"),
     ],
 )

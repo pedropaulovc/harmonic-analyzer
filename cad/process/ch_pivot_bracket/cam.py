@@ -40,8 +40,12 @@ Work frames (G54), each set in its setup:
 Toolpath rules (owner rulings 2026-11-16): faces zigzag (ball screws),
 plunges beside the stock at the cutting feed, real G0 above the stock; the
 arch is profiled climb (G2 round the outside). The reamer is fed out. The
-apex hole is tapped by hand on the dead centre, spindle off (as the
-magnifying clamp): FluidNC refuses jogs while an M0 holds the program
+apex hole is tapped by hand (FluidNC cannot rigid-tap; owner, Pedro,
+2026-11-17), the T-handle wrench's centre hole on the spring point of the
+Fisher tap guide in the 1/2 in R8 collet (owner, Pedro, 2026-11-21: "use
+https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
+on r8 0.5 collet"), spindle off, the operator jogging Z down to push the
+point home. FluidNC refuses jogs while an M0 holds the program
 (http://wiki.fluidnc.com/en/features/single_block_mode), so the tap stop is
 a file of its own that ends with M30 over its hole.
 """
@@ -71,7 +75,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
 )
 # Every program loads its own first tool (M6, the tool setter): each setup
 # starts on whatever the mill last held, and the tap file before its retract
-# (the dead centre).
+# (the tap guide).
 LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these (the tap, the pins, the saw and the files are not).
@@ -82,7 +86,7 @@ CAM_TOOLS = (
     "drill-d",
     "reamer",
     "drill-43",
-    "dead-centre",
+    "tap-guide",
 )
 IN = 25.4
 # ANSI #2 combined drill and countersink, 60° included: the shop record names
@@ -100,8 +104,9 @@ DRILL_POINT_DEG = 118.0
 UNC_4_40_MAJOR_MM = 0.112 * IN
 # The tap file's first motion: G53 G0 to machine Z0, the homed top (as the
 # magnifying clamp's recipe: FluidNC sets an axis's machine position to its
-# homing mpos_mm, default 0, and Z homes up) [INFERENCE: the owner's
-# config's Z mpos_mm is not on record].
+# homing mpos_mm, default 0, and Z homes up); the owner (Pedro) confirmed
+# it, answered in person 2026-11-21 (cnc rulings record): machine Z = 0 is
+# the top of travel after homing.
 MACHINE_Z_TOP_MM = 0.0
 # Face passes start and finish with the cutter this far clear of the part's
 # ends, so every plunge and stepover link is in the air beside it.
@@ -950,14 +955,14 @@ def context(
     ]
     manual = {
         "apex_tap": {
-            "tool": numbers["dead-centre"],
-            "label": names["dead-centre"],
+            "tool": numbers["tap-guide"],
+            "label": names["tap-guide"],
             "setting": "SPINDLE STAYS OFF. NEXT: 4-40 TAP IN THE APEX HOLE",
             "gcode": [
                 f"G53 G0 Z{MACHINE_Z_TOP_MM:.3f}",
                 f"G0 X{tap_xy[0]:.3f} Y{tap_xy[1]:.3f}",
-                "(4-40 TAP IN THE APEX HOLE. JOG Z DOWN ONTO THE WRENCH, LIGHT PRESSURE."
-                " TAP BY HAND TO THE NOTED DRO Z, JOGGING Z TO KEEP THE POINT SEATED. JOG Z UP CLEAR)",
+                "(4-40 TAP IN THE APEX HOLE. JOG Z DOWN TO PUSH THE GUIDE POINT HOME IN THE WRENCH."
+                " TAP BY HAND TO THE NOTED DRO Z, READ WITH THE POINT PUSHED HOME. JOG Z UP CLEAR)",
                 "M30",
             ],
             "at": tap_xy,
@@ -1215,7 +1220,7 @@ def context(
         [
             name,
             "tap_stop",
-            {"tool": tn["dead-centre"], "at": tap_xy, "machine_top": MACHINE_Z_TOP_MM},
+            {"tool": tn["tap-guide"], "at": tap_xy, "machine_top": MACHINE_Z_TOP_MM},
         ],
         [name, "air_feed", {"z_top": height}],
     ]

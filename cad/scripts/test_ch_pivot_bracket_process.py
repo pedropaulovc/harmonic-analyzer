@@ -96,7 +96,7 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
         "drill-d": 4,
         "reamer": 5,
         "drill-43": 6,
-        "dead-centre": 7,
+        "tap-guide": 7,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     # Every hole on the width's centre line, W at Y0: the hold-down from I,

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 490" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="490"/>
-  <text class="title" x="16" y="20">PF08: tap 4-40 by hand on the dead centre, through the rail into the window</text>
+  <text class="title" x="16" y="20">PF08: tap 4-40 by hand under the tap guide, through the rail into the window</text>
   <line class="fixture-table" x1="130.3" y1="470.0" x2="469.7" y2="470.0"/>
   <rect class="clamp" x="170.3" y="245.3" width="110.0" height="224.7"/>
   <rect class="clamp" x="319.7" y="245.3" width="110.0" height="224.7"/>
@@ -18,7 +18,7 @@
   <rect class="clamp" x="240.0" y="82.3" width="120.0" height="10.0"/>
   <rect class="cutter" x="292.9" y="92.3" width="14.2" height="100.8"/>
   <polygon class="cutter" points="286.0,38.3 314.0,38.3 300.0,80.3"/>
-  <text class="label-halo" x="370.0" y="76.3">T-handle wrench on the dead centre</text>
+  <text class="label-halo" x="370.0" y="76.3">tap guide's point in the wrench</text>
   <line class="leader" x1="256.3" y1="193.1" x2="292.9" y2="193.1"/>
   <text class="label-halo" x="252.3" y="189.1" text-anchor="end">tap point {{process.tap_reach_min_mm:in.3dot}}–</text>
   <text class="label-halo" x="252.3" y="205.1" text-anchor="end">{{process.tap_reach_max_mm:in.3dot}} below B</text>

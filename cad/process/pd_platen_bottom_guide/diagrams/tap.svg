@@ -11,7 +11,7 @@
   <!-- The tap through the rail, its point .550 below R. -->
   <rect class="cutter" x="224" y="140" width="8.8" height="125.5"/>
   <polygon class="cutter" points="224,265.5 232.8,265.5 228.4,276"/>
-  <!-- T-handle wrench and the dead centre seated in its centre hole. -->
+  <!-- T-handle wrench and the tap guide's point in its centre hole. -->
   <rect class="part-rest" x="168" y="122" width="121" height="12"/>
   <rect class="part-rest" x="220" y="110" width="17" height="30"/>
   <polygon class="clamp" points="221,60 236,60 236,95 228.4,108 221,95"/>
@@ -19,7 +19,7 @@
   <line class="datum" x1="80" y1="250" x2="150" y2="250"/>
   <text class="datum-label" x="30" y="246">Z0 (F)</text>
   <line class="leader" x1="240" y1="78" x2="320" y2="70"/>
-  <text class="label" x="325" y="74">MT3 dead centre in the spindle, spindle off</text>
+  <text class="label" x="325" y="74">tap guide in the spindle, spindle OFF</text>
   <line class="leader" x1="290" y1="128" x2="320" y2="110"/>
   <text class="label" x="325" y="110">T-handle wrench, centre hole on the point</text>
   <line class="leader" x1="234" y1="230" x2="345" y2="200"/>
