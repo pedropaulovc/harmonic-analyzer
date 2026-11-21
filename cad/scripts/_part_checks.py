@@ -5,6 +5,7 @@ Separate module so edits affect only recipes that use this scope.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import _telemetry
@@ -13,12 +14,19 @@ from _com import _early_bound
 
 @_telemetry.traced("check.volume", label_param="label")
 def volume_check(adapter: Any, label: str, expected: float, tol: float) -> float:
-    """Assert the part volume (mm^3) and return it."""
+    """Assert the part volume (mm^3) and return it.
+
+    A NaN or infinite volume, expectation or tolerance fails:
+    ``abs(nan - x) > tol`` is False, so the band alone would pass it and hand
+    NaN to the next chained expectation (issue #2013)."""
     mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"{label}: get_mass_properties failed: {mass.error}")
     volume = float(mass.data.volume)
-    if abs(volume - expected) > tol:
+    if (
+        not all(math.isfinite(value) for value in (volume, expected, tol))
+        or abs(volume - expected) > tol
+    ):
         raise RuntimeError(
             f"{label}: volume {volume:.1f} mm^3, expected {expected:.1f} "
             f"(+/- {tol:.1f})"
