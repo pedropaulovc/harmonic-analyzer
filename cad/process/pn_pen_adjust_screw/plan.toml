@@ -81,10 +81,12 @@ spigot_stickout_mm = 18.669
 # The head's length from the head end the shoulder is turned to (the
 # drawing's .31-.33, aimed at its middle).
 shoulder_aim_in = 0.32
-# Setup 6: the die's chamfered face runs to the full thread's .58 plus the
-# die's chamfer, about 3 threads at 80 TPI (.04, authored: no die record
-# gives it); never within .04 of the shoulder's fillet at .70.
-die_stop_in = 0.62
+# Setup 6: the die's chamfered face first stops at .60, aimed short because
+# no die record gives the start chamfer (authored): a 1.5-thread chamfer at
+# 80 TPI (.019) leaves about .58 of full thread, a 3-thread one (.0375)
+# about .56, and Op 260 runs the die on a quarter turn at a time into the
+# drawing's .57-.59; never within .04 of the shoulder's fillet at .70.
+die_stop_in = 0.6
 die_stop_max_in = 0.66
 # Setup 6: the eye's .15-.17 station read to a .055 pin's far side (plus
 # half the pin, .0275).
@@ -408,7 +410,7 @@ speed_kind = "other"
 tool = "die"
 drilling = "none"
 sizing = "other"
-instruction = "Cut down, half a turn on and a quarter back, dry, until the calipers' depth rod from the spigot's end to the die's top face reads {{process.die_stop_in:.2dot}} − T: the chamfered face is then {{process.die_stop_in:.2dot}} from the end ({{cad.thread_length_in:.2dot}} of full thread plus the die's chamfer). Never past {{process.die_stop_max_in:.2dot}} (the shoulder is about .70 from the end). Back the die off."
+instruction = "Cut down, half a turn on and a quarter back, dry, until the calipers' depth rod from the spigot's end to the die's top face reads {{process.die_stop_in:.2dot}} − T: the chamfered face is then {{process.die_stop_in:.2dot}} from the end, aimed short of {{cad.thread_length_in:.2dot}} of full thread (the die's chamfer is not on record; Op 260 runs it on). Never past {{process.die_stop_max_in:.2dot}} (the shoulder is about .70 from the end). Back the die off."
 feed = "hand"
 
 [[setups.operations]]
