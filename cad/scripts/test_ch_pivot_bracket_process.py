@@ -106,7 +106,7 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
         for program, check, kwargs in ctx["expect"]
         if check == "holes"
     }
-    assert centres["PB03_seat@2"] == [[12.446, -8.128]]
+    assert centres["PB03_seat@2"] == [[12.7, -8.128]]
     assert centres["PB04_arch_bore@3"] == [[-25.2, -8.128]]
     assert centres["PB06_apex@1"] == [[-4.064, -8.128]]
     stop = ctx["manual"]["apex_tap"]
@@ -213,8 +213,8 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # The hold-down drilled off its station.
         (
             "hold_drill",
-            lambda line: line.startswith("G0 X12.446"),
-            lambda line: "G0 X12.954 Y-8.128",
+            lambda line: line.startswith("G0 X12.700"),
+            lambda line: "G0 X13.208 Y-8.128",
             "holes",
         ),
         # The tap stop holds (M0) instead of ending Idle.
