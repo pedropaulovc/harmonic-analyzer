@@ -49,23 +49,31 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import limits
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_pinion_cam_pin_spec import (
+    CAP_RADIUS,
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     PIN_DIA as PIN_DIA,
+    PIN_DIA_BAND,
     PIN_LEN,
     RETAINING_COMPOUND,
     SEAT_NUMBER,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 
@@ -144,6 +152,86 @@ DIMENSION_CALLOUTS = {
 # surface (test_the_cam_rides_the_shank_short_of_the_crown).
 CAM_CONTACT_FROM_SEATED_END_MM = 15.0
 SHANK_FINISH_SYMBOL_XY = (0.168, RIGHT_CENTER[1] + HALF_DIA + 0.006)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_dt_pinion_cam_pin: axis +Z through the origin, the seated flat end at
+# z = 0, the datum end the depth runs from; the crown's apex at z = OVERALL).
+# The shank is the drill rod as supplied at its printed +/-.0005; the crown
+# root's station (Depth) and the crown radius take the title block's .XX
+# row; the overall is the parenthesised reference. The domed end is the far
+# end itself (its apex plane), its sphere the end's one face. The
+# declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_pinion_cam_pin"
+_GEOM = "dt_pinion_cam_pin_geometry"
+part_metadata(
+    model_sources=(
+        (_GEOM, "PIN_DIA"),
+        (_GEOM, "PIN_LEN"),
+        (_GEOM, "CAP_RADIUS"),
+        (_GEOM, "CAP_SAG"),
+    ),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ((_GEOM, "PIN_LEN"),)),
+        "outward": ([0.0, 0.0, -1.0], ((_GEOM, "PIN_LEN"),)),
+    },
+)
+requirement(
+    "far_end",
+    kind="dome",
+    faces=(SphereFace(2.0 * CAP_RADIUS, (0.0, 0.0, OVERALL - CAP_RADIUS)),),
+    requirements=("length_ref", "radius", "root_station"),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": OVERALL},
+            ((_SELF, "OVERALL"),),
+        ),
+        "outward": ([0.0, 0.0, 1.0], ((_SELF, "OVERALL"),)),
+        "length_ref": (OVERALL, ((_SELF, "OVERALL"), "DRAWING_REFERENCE_PRECISION")),
+        "length_from": ("datum_end", ((_SELF, "OVERALL_TEXT_XY"),)),
+        "radius": (
+            limits(CAP_RADIUS, _P["CapR"], unit=UNIT),
+            ((_GEOM, "CAP_RADIUS"), "UNIT", (_SELF, "RIGHT_KEEP")),
+        ),
+        "radius_nominal": (CAP_RADIUS, ((_GEOM, "CAP_RADIUS"),)),
+        "root_station": (
+            limits(PIN_LEN, _P["Depth"], unit=UNIT),
+            ((_GEOM, "PIN_LEN"), "UNIT", (_SELF, "RIGHT_KEEP")),
+        ),
+        "root_station_nominal": (PIN_LEN, ((_GEOM, "PIN_LEN"),)),
+    },
+    precision={
+        "length_ref": DRAWING_REFERENCE_PRECISION,
+        "radius": _P["CapR"],
+        "root_station": _P["Depth"],
+    },
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(PIN_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ((_GEOM, "PIN_DIA"),)),
+        "at": ([0.0, 0.0, 0.0], ((_GEOM, "PIN_DIA"),)),
+        "span": ([0.0, PIN_LEN], ((_GEOM, "PIN_LEN"),)),
+        "dia": (
+            limits(PIN_DIA, _P["PinDia"], PIN_DIA_BAND, unit=UNIT),
+            ((_GEOM, "PIN_DIA"), "PIN_DIA_BAND", (_SELF, "RIGHT_KEEP")),
+        ),
+        "dia_nominal": (PIN_DIA, ((_GEOM, "PIN_DIA"),)),
+        "callout": (PIN_DIA_CALLOUT, ((_SELF, "PIN_DIA_CALLOUT"),)),
+    },
+    precision={"dia": _P["PinDia"]},
+)
 
 
 def _shank_point() -> tuple[float, float, float]:
