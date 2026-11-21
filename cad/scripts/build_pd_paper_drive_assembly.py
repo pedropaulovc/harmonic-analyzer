@@ -43,9 +43,10 @@ real receiving and loaded-inspection data remain separately required.
   arm carries the feed sleeve (12T 32DP PA20), the 150T disc and its brass hub,
   whose plain bore slides on the sleeve's boss and whose pressed MHA-PD-VN-69
   chord key pin lies over the sleeve's flat, closed by the hub cap. The arm plate, screwed to
-  the arm, bores the knob shaft, whose integral 15T meshes the disc; the thrust
-  ring and the knob cup (set on a feeler, cross-pinned to the journal) set its
-  end float. On the shaft's front D-core the drive collar (pressed drive pins; a
+  the arm, carries the pressed MHA-PD-28 bush that bores the knob shaft, whose integral 15T
+  meshes the disc; the thrust ring and the knob cup (its front faced at fit-up to the
+  float, bonded on the journal and held by the MHA-PD-VN-71 screw into the journal's tap)
+  set its end float. On the shaft's front D-core the drive collar (pressed drive pins; a
   plain bore whose pressed MHA-PD-VN-70 pin bears on the D-flat) carries
   selected knob removable CHAIN-WRAPPED at the z -155.7 chain plane, and the
   knurled thumbnut on the shaft's front thread, seated on the collar's pilot,
@@ -393,7 +394,6 @@ from pd_transgear_feed_pinion_spec import (  # noqa: E402
 )
 import pd_rack_pinion_spec as DISC_SPEC  # noqa: E402
 import pd_transgear_arm_plate_geometry as ARM_PLATE  # noqa: E402
-import pd_transgear_arm_plate_spec as ARM_PLATE_SPEC  # noqa: E402
 import _transgear_arm_plate_locating_interface as LOCATING_INTERFACE  # noqa: E402
 import pd_vn_transgear_arm_plate_screw_spec as PLATE_SCREW  # noqa: E402
 import transgear_cluster_fit as CLUSTER  # noqa: E402
@@ -405,7 +405,9 @@ import pd_transgear_drive_collar_spec as COLLAR  # noqa: E402
 import pd_transgear_feed_pinion_spec as FEED  # noqa: E402
 import pd_transgear_front_bushing_spec as FRONT_BUSHING  # noqa: E402
 import transgear_hanger_joints as HANGER  # noqa: E402
+import pd_transgear_knob_bush_geometry as BUSH  # noqa: E402
 import pd_transgear_knob_cup_spec as CUP  # noqa: E402
+import pd_vn_transgear_knob_cup_screw_spec as CUP_SCREW  # noqa: E402
 import pd_vn_transgear_latch_pin_spec as LATCH_PIN  # noqa: E402
 import pd_transgear_pin_spec as PIN  # noqa: E402
 import pd_vn_transgear_pivot_screw_spec as PIVOT_SCREW  # noqa: E402
@@ -459,8 +461,8 @@ ARM_Z0 = ARM.FRONT_FACE_MACHINE_Z  # -124.4: arm front face on the spacer
 # on the spacer.
 PIVOT_SCREW_Z0 = BAR_BACK_Z + PIVOT_SCREW.SHOULDER_LEN  # under the head
 PIVOT_SPRING_Z0 = ARM_Z0 + ARM.SPOT_FACE_FLOOR_FROM_FRONT  # the spot-face floor
-# Arm plate (rows Rz(theta): local X along U): its mounting plane on
-# the arm's rear face; hub forward to the thrust ring, boss rearward.
+# Arm plate (rows Rz(theta): local X along U): its face A on the arm's rear
+# face; the pressed bush's hub forward to the thrust ring, its stub rearward.
 PLATE_Z0 = ARM_Z0 + ARM.THICKNESS  # -114.888
 PLATE_SCREW_XY = tuple(_on_arm(station) for station in ARM.PLATE_TAP_STATIONS)
 PLATE_SCREW_Z0 = PLATE_Z0 + ARM_PLATE.REAR_FACE_Z  # -109.884: oval heads flush
@@ -573,7 +575,8 @@ CHAIN_PULLEY_DIA = {
 }
 
 # Knob stack on K (front -> back): thumbnut | knob wheel | drive collar | the
-# shaft's 15T | thrust ring | arm-plate hub | plate | boss | knob cup.
+# shaft's 15T | thrust ring | bush hub | plate (bush press) | bush stub | knob
+# cup | cup screw.
 # The front collar seat is the wheel's rear; the knob train stands on the
 # arm chain's F (transgear_cluster_fit.F_Z), and the collar's rear is faced
 # at fit-up to meet it (step collar-rear-faced-to-fit). The model collar is
@@ -593,14 +596,23 @@ KNOB_COLLAR_FRONT_GAP = KNOB_COLLAR_Z0 - KNOB_COLLAR_SEAT_Z
 # -Z), rounded ends DRIVE_PIN_PROUD in front of it, in the wheel's pin holes.
 KNOB_DRIVE_PIN_TIP_Z = KNOB_COLLAR_Z0 - COLLAR.DRIVE_PIN_PROUD
 KNOB_DRIVE_PIN_Z0 = KNOB_DRIVE_PIN_TIP_Z + KNOB_PIN.LENGTH  # -151.9206
-# Behind the 15T: the thrust ring to the plate hub's face, the knob cup on the
-# journal's rear end END_FLOAT behind the plate's boss (all Rx+90), and the
-# MHA-PD-VN-62 spring pin through cup and journal (identity: along machine X,
-# R9-70 K-1).
-KNOB_RING_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.FACE_WIDTH  # -142.2
+# Behind the 15T (all Rx+90, local +Y rearward): the thrust ring to the
+# MHA-PD-28 bush's hub face, the bush pressed in the plate with its shoulder
+# on face A (owner ruling 2026-11-20, #2425), and the knob cup on the
+# journal's rear end END_FLOAT behind the bush's rear face (the cup's front is
+# faced to it at fit-up), held by the MHA-PD-VN-71 #2-56 fillister on the axis:
+# its under-head plane on the cup web's rear face (the counterbore floor), its
+# shank forward through the web's #33 hole into the journal's rear tap.
+KNOB_RING_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.FACE_WIDTH  # -142.2184
+KNOB_BUSH_Z0 = PLATE_Z0 - BUSH.HUB_LENGTH  # -135.4366, the hub face
+KNOB_BUSH_REAR_Z = PLATE_Z0 + BUSH.STUB_LENGTH  # -106.4044, the cup's thrust face
 KNOB_CUP_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.CUP_FACE_Z  # -106.2012
-KNOB_SHAFT_REAR_Z = KNOB_SHAFT_Z0 + KNOB_SPEC.REAR_END_Z  # -99.4956
-KNOB_CUP_PIN_Z0 = KNOB_CUP_Z0 + CUP.PIN_HOLE_FROM_FRONT  # -103.1532
+KNOB_END_FLOAT = KNOB_CUP_Z0 - KNOB_BUSH_REAR_Z
+KNOB_SHAFT_REAR_Z = KNOB_SHAFT_Z0 + KNOB_SPEC.REAR_END_Z
+KNOB_CUP_SCREW_Z0 = KNOB_CUP_Z0 + CUP.LENGTH - CUP.CBORE_DEPTH
+KNOB_CUP_SCREW_TIP_Z = KNOB_CUP_SCREW_Z0 - CUP_SCREW.LENGTH
+# The fully threaded shank's length inside the journal's tap.
+KNOB_CUP_SCREW_ENGAGED = KNOB_SHAFT_REAR_Z - KNOB_CUP_SCREW_TIP_Z
 
 # The 150T disc's rear face (the MHA-SH-VN-59 DiscScrew tips sit inside it) to the platen's
 # front face, cluster rearward on the rear bushing: an air stack in the
@@ -1204,7 +1216,7 @@ def _assert_fastener_stacks() -> None:
     )
 
     # Knob stack: the thumbnut on the shaft's front thread, seated on the
-    # collar's pilot (R9-70); the cup is pinned, not screwed.
+    # collar's pilot (R9-70).
     raw_thumbnut = (
         KNOB_SPEC.TIP_STATION - COLLAR.LENGTH - COLLAR.PILOT_LENGTH
     )
@@ -1217,6 +1229,28 @@ def _assert_fastener_stacks() -> None:
     nonnegative(
         "thumbnut seat to the stud's full-thread end",
         KNOB_SHAFT_Z0 - KNOB_SPEC.PLAIN_CORE - THUMBNUT_Z0,
+    )
+    # 91794A079 (MHA-PD-VN-71) holds the cup on the journal (#2425): head in
+    # the cup's rear counterbore, shank through the web's #33 hole, fully
+    # threaded into the journal's blind tap: rule 18's 1.5D of full thread,
+    # its tip short of the tap's full-thread depth.
+    nonnegative("cup screw head recess", CUP.CBORE_DEPTH - CUP_SCREW.HEAD_H)
+    nonnegative(
+        "cup screw head radial clearance", (CUP.CBORE_DIA - CUP_SCREW.HEAD_DIA) / 2.0
+    )
+    nonnegative(
+        "cup screw shank radial clearance",
+        (CUP.CLEAR_HOLE_DIA - CUP_SCREW.MAJOR_DIA) / 2.0,
+    )
+    screw_floor = KNOB_SPEC.ENGAGEMENT_FLOOR_D * CUP_SCREW.MAJOR_DIA
+    if KNOB_CUP_SCREW_ENGAGED + 1e-9 < screw_floor:
+        raise AssertionError(
+            f"cup screw #2-56 engagement {KNOB_CUP_SCREW_ENGAGED:.4f} mm is under "
+            f"{KNOB_SPEC.ENGAGEMENT_FLOOR_D} screw diameters ({screw_floor:.4f} mm)"
+        )
+    nonnegative(
+        "cup screw tip to the tap's full-thread end",
+        KNOB_SPEC.REAR_TAP_FULL_THREAD_MIN - KNOB_CUP_SCREW_ENGAGED,
     )
 
 
@@ -1337,9 +1371,11 @@ def _latch_hook_sections() -> list[tuple[str, tuple[float, float, float, float]]
 # the platen rides its front face, so the thinnest bar carries the whole lock
 # stack rearward toward the hanger, and the deepest rail and thickest sheet
 # stand the pan heads further back again. The arm sits on the shortest
-# spacer, its plate's lower section on the thinnest arm stock and the deepest
-# notch. Deviations are (lower, upper) from the model, read from the specs the
-# parts author on their model dimensions, so the sheets and the sweep agree.
+# spacer, its flat plate's face A on the thinnest arm stock, and the pressed
+# bush's hub face that far forward again by its longest hub and the press's
+# shoulder seat gap. Deviations are (lower, upper) from the model, read from
+# the specs the parts author on their model dimensions, so the sheets and the
+# sweep agree.
 # Unmodelled contributor (R9-61): the platen's y against the top rail (which
 # hangs on the bar's top edge), set by the platen's upper guide-screw row and
 # the #4 screws' float in its Ø3.0 holes. The platen has no sheet and so no
@@ -1362,12 +1398,9 @@ _RAIL_Y_SHIFTS = (BOTTOM_GUIDE_Y_BAND, 0.0)  # either way, per rail
 _LOCK_THICK_DEV = (-LOCK_THICK_BAND, LOCK_THICK_BAND)  # the sheet's mill band
 _LOCK_HEIGHT_DEV = printed_deviations(LOCK_HEIGHT, LOCK_PRECISION["Height"], unit=LOCK_UNIT)
 _SPACER_LENGTH_DEV = (-SPACER.LENGTH_BAND, SPACER.LENGTH_BAND)
-_NOTCH_DEPTH_DEV = printed_deviations(
-    ARM_PLATE.NOTCH_DEPTH, ARM_PLATE_SPEC.NOTCH_DEPTH_PLACES, unit=ARM_PLATE.UNIT
-)
 _PLATE_OUTLINE_BAND = ARM_PLATE.OUTLINE_BAND
-_HUB_DIA_DEV = printed_deviations(
-    ARM_PLATE.HUB_DIA, ARM_PLATE_SPEC.HUB_DIA_PLACES, unit=ARM_PLATE.UNIT
+_BUSH_HUB_DIA_DEV = printed_deviations(
+    BUSH.HUB_DIA, BUSH.HUB_DIA_PLACES, unit=BUSH.UNIT
 )
 
 
@@ -1488,10 +1521,14 @@ def _assert_lock_station_sweep() -> None:
     # offset its printed runout to A allows (SPACER.BORE_ECCENTRICITY).
     pivot_tap = BAR.HOLE_POSITION_BAND
     spacer_r = (SPACER.OD + SPACER.OD_BAND) / 2.0 + SPACER.BORE_ECCENTRICITY
-    # The arm's front face on the shortest spacer; its plate's lower section
-    # stands proud of it by the deepest notch on the thinnest arm stock.
+    # The arm's front face on the shortest spacer; the flat plate's face A on
+    # the thinnest arm stock. The bush's hub face stands its longest hub, and
+    # the shoulder's largest seat gap, forward of face A.
     arm_forward = -_SPACER_LENGTH_DEV[0]
-    plate_forward = arm_forward + ARM.THICKNESS_BAND + _NOTCH_DEPTH_DEV[1]
+    plate_forward = arm_forward + ARM.THICKNESS_BAND
+    bush_hub_forward = plate_forward + BUSH.HUB_LENGTH_BAND + BUSH.SHOULDER_SEAT_GAP_MAX
+    bush_hub_r = (BUSH.HUB_DIA + _BUSH_HUB_DIA_DEV[1]) / 2.0
+    bush_stub_r = (BUSH.PRESS_DIA + max(BUSH.PRESS_DIA_BAND)) / 2.0
     fixed: list[tuple[str, tuple[float, float, float, float]]] = [
         (
             "arm",
@@ -1508,8 +1545,8 @@ def _assert_lock_station_sweep() -> None:
                 (
                     ky - ARM_PLATE.END_R,
                     plate_corner_y,
-                    PLATE_Z0 + ARM_PLATE.FRONT_FACE_Z,
-                    PLATE_Z0 + ARM_PLATE.BOSS_FACE_Z,
+                    PLATE_Z0,
+                    PLATE_Z0 + ARM_PLATE.REAR_FACE_Z,
                 ),
                 _PLATE_OUTLINE_BAND + pivot_tap,
                 plate_forward,
@@ -1517,16 +1554,20 @@ def _assert_lock_station_sweep() -> None:
             ),
         ),
         (
-            "arm plate hub",
+            "knob bush hub",
             _grown(
-                (
-                    ky - ARM_PLATE.HUB_DIA / 2.0,
-                    ky + ARM_PLATE.HUB_DIA / 2.0,
-                    PLATE_Z0 + ARM_PLATE.HUB_FACE_Z,
-                    ARM_Z0,
-                ),
-                _HUB_DIA_DEV[1] / 2.0 + pivot_tap,
-                arm_forward,
+                (ky - bush_hub_r, ky + bush_hub_r, KNOB_BUSH_Z0, PLATE_Z0),
+                pivot_tap,
+                bush_hub_forward,
+                0.0,
+            ),
+        ),
+        (
+            "knob bush stub",
+            _grown(
+                (ky - bush_stub_r, ky + bush_stub_r, PLATE_Z0, KNOB_BUSH_REAR_Z),
+                pivot_tap,
+                plate_forward,
                 0.0,
             ),
         ),
@@ -1859,12 +1900,12 @@ def _assert_knob_shaft_clearance() -> None:
             f"knob shaft sits {reach:.4f} from the stud, the mesh centre"
             f" distance is {DISC_SPEC.CENTRE_DISTANCE}"
         )
-    # The arm plate's hub (z -137..-124.4) shares the rack's z band: it must
-    # stay under the rack crests at every platen position.
-    hub_top = KNOB_SHAFT_XY[1] + ARM_PLATE.HUB_DIA / 2.0
+    # The knob bush's hub (from the hub face to face A) shares the rack's z
+    # band: it must stay under the rack crests at every platen position.
+    hub_top = KNOB_SHAFT_XY[1] + BUSH.HUB_DIA / 2.0
     if hub_top >= RACK_TIP_Y - 0.5:
         raise RuntimeError(
-            f"arm plate hub top {hub_top:.2f} too close to the rack crests"
+            f"knob bush hub top {hub_top:.2f} too close to the rack crests"
             f" {RACK_TIP_Y:.3f}"
         )
     # The mounted knob wheel shares the disc hub's z band: radial gap to the hub.
@@ -1897,12 +1938,20 @@ def _assert_knob_shaft_clearance() -> None:
     z_gap = DISC_Z0 - seat_geometry.SEAT_FACE_Z  # 6.9
     if z_gap < 2.0:
         raise RuntimeError(f"knob wheel/disc z gap {z_gap:.2f} < 2.0")
-    # End float: the knob cup's front face behind the arm plate's boss.
-    end_float = KNOB_CUP_Z0 - (PLATE_Z0 + ARM_PLATE.BOSS_FACE_Z)
-    if abs(end_float - KNOB_SPEC.END_FLOAT) > 1e-9:
+    # End float: the knob cup's front face behind the bush's rear face.
+    if abs(KNOB_END_FLOAT - KNOB_SPEC.END_FLOAT) > 1e-9:
         raise RuntimeError(
-            f"knob end float {end_float:.4f} is not {KNOB_SPEC.END_FLOAT}"
+            f"knob end float {KNOB_END_FLOAT:.4f} is not {KNOB_SPEC.END_FLOAT}"
         )
+    # The journal's end stands behind the bush's rear face by its stand-out
+    # and inside the cup's pilot, short of (or on) the web the screw clamps.
+    standout = KNOB_SHAFT_REAR_Z - KNOB_BUSH_REAR_Z
+    if abs(standout - KNOB_SPEC.JOURNAL_STANDOUT) > 1e-9:
+        raise RuntimeError(
+            f"knob journal stand-out {standout:.4f} is not {KNOB_SPEC.JOURNAL_STANDOUT}"
+        )
+    if not KNOB_CUP_Z0 < KNOB_SHAFT_REAR_Z <= KNOB_CUP_Z0 + CUP.PILOT_DEPTH + 1e-9:
+        raise RuntimeError("the knob journal's end is not inside the cup's pilot")
     # Sleeve float: the ring's rear face in front of the front bushing (the
     # disc's end float less the hub's recess).
     cluster_float = (FRONT_BUSHING_Z0 - FRONT_BUSHING.LENGTH) - CLUSTER.RING_REAR_Z
@@ -1911,13 +1960,14 @@ def _assert_knob_shaft_clearance() -> None:
             f"sleeve float {cluster_float:.4f} is not {CLUSTER.SLEEVE_FLOAT_MODEL}"
         )
     log(
-        f"knob shaft at ({KNOB_SHAFT_XY[0]:.3f}, {KNOB_SHAFT_XY[1]:.3f}); plate"
+        f"knob shaft at ({KNOB_SHAFT_XY[0]:.3f}, {KNOB_SHAFT_XY[1]:.3f}); bush"
         f" hub {RACK_TIP_Y - hub_top:.2f} under the rack crests; gaps:"
         f" knob wheel/hub {knob_wheel_hub_gap:.1f},"
         f" front bushing/knob stack {bushing_air:.1f},"
         f" knob wheel/disc z {z_gap:.1f}, collar/disc air"
-        f" {air:.3f} ({CLUSTER_AIRS['method']}); floats: knob {end_float:.2f},"
-        f" cluster {cluster_float:.2f}"
+        f" {air:.3f} ({CLUSTER_AIRS['method']}); floats: knob {KNOB_END_FLOAT:.2f},"
+        f" cluster {cluster_float:.2f}; journal stand-out {standout:.3f}, cup"
+        f" screw {KNOB_CUP_SCREW_ENGAGED:.3f} in its tap"
     )
 
 
@@ -3304,6 +3354,17 @@ def build(adapter) -> dict[str, str]:
         [0.0, 0.0, ARM_ANGLE_DEG], arm_rows,
     )
     _assert_arm_plate_registered(adapter, arm, arm_plate)
+    # MHA-PD-28 pressed in the plate's ream at K and reamed with it before the
+    # plate goes on the arm, so it is static with the plate (Rx+90: local +Y
+    # rearward, its hub face forward on the thrust ring, its shoulder on face A).
+    place_component(
+        adapter,
+        "pd-transgear-knob-bush",
+        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], KNOB_BUSH_Z0],
+        [90.0, 0.0, 0.0],
+        ROT_X_POS90,
+        label="MHA-PD-28 knob bush (shoulder on the plate's face A)",
+    )
     for x, y in LOCATING_PIN_XY:
         place_component(
             adapter, "pd-vn-transgear-arm-plate-locating-pin", [x, y, LOCATING_PIN_Z0],
@@ -3658,8 +3719,9 @@ def build(adapter) -> dict[str, str]:
         f" {CHAIN_MID_Z - CHAIN_PIN_HALF_LEN:.2f} (radial gap to the head"
         f" {_chain_inner_wrap_r - THUMBNUT_HEAD_DIA / 2.0:.1f})"
     )
-    # Behind the 15T (Rx+90): the thrust ring to the plate hub, the knob cup on
-    # the journal's rear end, and the MHA-PD-VN-62 spring pin through both (R9-70).
+    # Behind the 15T (Rx+90): the thrust ring to the bush's hub face, the knob
+    # cup on the journal's rear end, and the MHA-PD-VN-71 screw through the
+    # cup's web into the journal's rear tap (head +Y rearward, shank forward).
     ring = place_component(
         adapter,
         "pd-transgear-knob-thrust-ring",
@@ -3678,20 +3740,16 @@ def build(adapter) -> dict[str, str]:
         ground=False,
     )
     _lock_to_shaft(cup, "knob cup")
-    cup_pin = place_component(
+    cup_screw = place_component(
         adapter,
-        "pd-vn-transgear-knob-cup-pin",
-        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], KNOB_CUP_PIN_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+        "pd-vn-transgear-knob-cup-screw",
+        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], KNOB_CUP_SCREW_Z0],
+        [90.0, 0.0, 0.0],
+        ROT_X_POS90,
         ground=False,
+        label=f"MHA-PD-VN-71 cup screw ({KNOB_CUP_SCREW_ENGAGED:.3f} in the tap)",
     )
-    lock_mate(
-        adapter,
-        named_ref(f"Front Plane@{cup_pin}", "PLANE"),
-        named_ref(f"Front Plane@{cup}", "PLANE"),
-        label="knob stack: cup pin locked to the knob cup",
-    )
+    _lock_to_shaft(cup_screw, "cup screw")
     # Crank-end removable = the crank-shaft chain wheel, brought over from
     # drive-train so the chain seats on BOTH sprockets locally. Placed at the
     # MACHINE crank centre = -CHAIN_CRANK_CENTRE (the pre-mirror _chain anchor,

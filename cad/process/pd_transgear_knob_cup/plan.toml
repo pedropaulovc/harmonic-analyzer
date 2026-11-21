@@ -10,14 +10,14 @@ shop = "../shop.toml"
 stock_refs = ["c360-round-7-8"]
 
 [[tools]]
-id = "drill-1-16"
-name = "1/16 drill"
-ref = "drill-1-16"  # Drills 1/16
+id = "drill-33"
+name = "#33 drill"
+ref = "drill-33"  # #2425: the web's clearance hole for the MHA-PD-VN-71 #2-56 screw
 
 [[tools]]
-id = "reamer-2490"
-name = ".2490 reamer"
-ref = "reamer-2490"  # B-reamer-.2490
+id = "endmill-hss-2fl-1-4"
+name = "1/4 two-flute end mill"
+ref = "endmill-hss-2fl-1-4"  # #2425: the Ø.250 +.001/0 pilot's flat floor, plunged from the tailstock after the B drill
 
 [[tools]]
 id = "pin-gauges"
@@ -25,14 +25,14 @@ name = "Pin gauges .011-.500"
 ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 
 [[tools]]
-id = "arbor-press"
-name = "Arbor press"
-ref = "arbor-press"  # F-arbor-press
+id = "endmill-hss-tin-2fl-3-16"
+name = "3/16 two-flute end mill"
+ref = "endmill-hss-tin-2fl-3-16"  # #2425: the Ø.188 head pocket's flat floor, plunged from the tailstock
 
 [[tools]]
 id = "drill-b"
 name = "B drill"
-ref = "drill-b"  # drawing cross-check 2026-11-19: pre-drill for the .2490 ream
+ref = "drill-b"  # #2425: pilot drill ahead of the 1/4 end mill's plunge
 
 [[setups]]
 machine_kind = "other"

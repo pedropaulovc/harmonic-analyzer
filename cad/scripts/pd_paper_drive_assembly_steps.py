@@ -107,8 +107,8 @@ SEQUENCE: tuple[str, ...] = (
     # Knob stack, front to rear (contract §1). R9-70 (N-A): the collar's pilot
     # faced on the bench to stand proud of every removable wheel, the
     # thumbnut's seat (pd_transgear_drive_collar_spec.PILOT_PROUD_RANGE); R9-70
-    # (K-1): the cup set on a feeler at the plate's rear boss and cross-pinned
-    # to the journal.
+    # (K-1), #2425: the cup's front faced at assembly to the measured stand-out
+    # behind the MHA-PD-28 bush, bonded (LOCTITE 641) and screwed to the journal.
     "collar-pins-pressed",
     "pilot-faced-to-fit",
     "knob-stack-fitted",

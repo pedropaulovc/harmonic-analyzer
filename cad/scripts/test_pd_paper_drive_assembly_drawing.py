@@ -19,7 +19,6 @@ import _component_references
 import _drawing_balloons
 import _drawing_tables
 from _layout_geometry import LeaderSegment, find_leader_leader_crossings
-from _printed_tolerance import printed_band_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
 import build_pd_paper_drive_assembly as assembly
@@ -38,7 +37,7 @@ import pd_feed_rack_spec as feed_rack
 import pd_rack_pinion_spec as disc
 import pd_transgear_drive_collar_spec as collar
 import pd_transgear_feed_pinion_spec as feed_pinion
-import pd_transgear_knob_cup_spec as cup
+import pd_transgear_knob_bush_geometry as knob_bush
 import pd_transgear_knob_shaft_spec as knob_shaft
 import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
 import _transgear_arm_plate_locating_interface as plate_locating_interface
@@ -47,7 +46,6 @@ import pd_transgear_removable_spec as sprocket
 import _sprocket_seat_geometry as seat_geometry
 import transgear_cluster_fit as cluster_fit
 import transgear_hanger_joints as joints
-import pd_vn_transgear_knob_cup_pin_spec as cup_pin
 import pd_vn_transgear_pivot_screw_spec as pivot_screw
 
 STEP_HEAD = re.compile(r"^(\d+)([A-Z]?)\. ", re.MULTILINE)
@@ -126,8 +124,9 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-transgear-removable": 3,
     "pd-transgear-thumbnut": 1,
     "pd-transgear-knob-thrust-ring": 1,
+    "pd-transgear-knob-bush": 1,
     "pd-transgear-knob-cup": 1,
-    "pd-vn-transgear-knob-cup-pin": 1,
+    "pd-vn-transgear-knob-cup-screw": 1,
 }
 # The shared #0-80 fillister's native names: the builder places the four
 # RackScrews first, then the three DiscScrews (it proves each name).
@@ -690,7 +689,7 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
     # The legend names each lettered circle by its part number.
     for letter, stem in (
         ("S", "pd-transgear-arm"),
-        (drawing.KNOB_BORE_LETTER, "pd-transgear-arm-plate"),
+        (drawing.KNOB_BORE_LETTER, "pd-transgear-knob-bush"),
         ("T", "pd-vn-transgear-arm-plate-screw"),
     ):
         assert f"{letter}: {_number(stem)} " in drawing.KNOB_SETTING_CAPTION
@@ -800,7 +799,7 @@ def test_the_plate_recheck_names_its_bore_and_acceptance() -> None:
     defined = drawing.sub_step("arm-plate-located", 2)
     assert drawing.KNOB_SETTING_TRUE in _step_body("arm-plate-located")
     assert (
-        f"CHECK: RE-INDICATED, {_number('pd-transgear-arm-plate')} KNOB BORE "
+        f"CHECK: RE-INDICATED, {_number('pd-transgear-knob-bush')} KNOB BORE "
         f"{drawing.KNOB_BORE_LETTER} IS STILL TRUE PER {defined} (SHEET {sheet})."
         in _step_body("arm-plate-located")
     )
@@ -1108,13 +1107,15 @@ def test_the_isometric_ring_pair_from_run_082822_swaps() -> None:
 
 # The isometric never balloons these: farm run 20261001T051043622Z found no
 # reachable isometric ink for the sleeve; the pin, front bushing and retaining
-# ring meet on the pin nose. Sheet 3's explode balloons them.
+# ring meet on the pin nose; the knob bush stands under the ring and in the
+# arm, the cup screw in the cup (#2425). Sheet 3's explode balloons them.
 HIDDEN_BY_THE_ISOMETRIC = {
     "pd-transgear-feed-pinion",
     "pd-transgear-knob-shaft",
     "pd-transgear-drive-collar",
     "pd-vn-transgear-knob-drive-pin",
-    "pd-vn-transgear-knob-cup-pin",
+    "pd-transgear-knob-bush",
+    "pd-vn-transgear-knob-cup-screw",
     "pd-vn-transgear-arm-plate-screw",
     "pd-vn-transgear-arm-plate-locating-pin",
     "pd-vn-transgear-latch-pin",
@@ -1311,15 +1312,15 @@ def test_no_retired_part_is_named_on_the_sheet() -> None:
 
 
 def test_the_knob_stack_goes_on_front_to_rear() -> None:
-    """Contract §1: shaft through ring and plate, then the cup and its pin,
-    then the collar."""
+    """Contract §1: shaft through ring and bush, then the cup and its screw,
+    then the collar (#2425)."""
     body = _step_body("knob-stack-fitted")
     order = [
         "pd-transgear-knob-shaft",
         "pd-transgear-knob-thrust-ring",
-        "pd-transgear-arm-plate",
+        "pd-transgear-knob-bush",
         "pd-transgear-knob-cup",
-        "pd-vn-transgear-knob-cup-pin",
+        "pd-vn-transgear-knob-cup-screw",
         "pd-transgear-drive-collar",
     ]
     positions = [body.index(_number(stem)) for stem in order]
@@ -1575,31 +1576,106 @@ def test_one_disc_cycle_reference_travel_is_one_feed_revolution() -> None:
     ) == pytest.approx(math.pi * feed_pinion.PITCH_DIA)
 
 
-def test_the_rear_cup_is_pinned_and_the_nut_seats_on_the_faced_pilot() -> None:
-    """R9-70's rear cup and wheel-float fit remain; the front drive is a true D."""
+def test_the_knob_bush_is_pressed_and_reamed_before_the_plate_is_set() -> None:
+    """#2425 (owner ruling 2026-11-20): the MHA-PD-28 bush is pressed into
+    MHA-PD-19 from face A to its shoulder, accepted on its own feeler, and
+    reamed through after the press, before the plate goes on the arm; its
+    bore is DETAIL K's knob bore N."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())["pin-pressed"]
+    bush = _number("pd-transgear-knob-bush")
+    plate = _number("pd-transgear-arm-plate")
+    assert texts[2] == (
+        f"PRESS THE {bush} BUSH, STUB FIRST, INTO THE {plate} PLATE FROM FACE A UNTIL ITS "
+        "SHOULDER SEATS."
+    )
+    # Turned to the measured hole, a bush that slips is undersize (#2425).
+    assert texts[3] == (
+        f"IF IT SLIDES IN BY HAND, TAKE IT OUT, TURN A NEW {bush} BUSH TO THE PLATE'S "
+        f"MEASURED HOLE AND REPEAT {drawing.sub_step('pin-pressed', 2)}."
+    )
+    feeler = disc.inch_text(knob_bush.SHOULDER_SEAT_GAP_MAX, 4)
+    assert feeler == ".0005"
+    assert texts[4] == f"CHECK: A {feeler} FEELER DOES NOT ENTER UNDER THE SHOULDER."
+    # A check and its remedy are separate sub-steps (rule 22).
+    assert texts[5].startswith("IF IT ENTERS, PRESS AGAIN; IF IT STILL ENTERS, MAKE A NEW")
+    ream = steps.inch_window(
+        tuple(knob_bush.BORE_DIA + limit for limit in knob_bush.BORE_DIA_LIMITS), 4
+    )
+    assert ream == ".2490-.2495"
+    assert texts[6] == f"REAM THE BUSH'S BORE \u00d8{ream} THRU."
+    assert len(texts) == 7
+    assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
+    located = _step_body("arm-plate-located")
+    assert f"{bush} KNOB BORE {drawing.KNOB_BORE_LETTER} IS STILL TRUE" in located
+    assert f"INTO THE {bush} BUSH'S BORE FROM THE FRONT" in located
+    assert drawing.KNOB_SETTING_LEGEND[drawing.KNOB_BORE_LETTER] == f"{bush} KNOB BORE"
+    assert "pd-transgear-knob-bush-1" in drawing.KNOB_SETTING_INSTANCES
+    # Every later renewal of the plate renews its pressed bush.
+    for key in ("arm-plate-fitted", "hanger-pivoted", "fitup-mesh-remedied"):
+        body = _step_body(key)
+        assert body.count(f"{plate} PLATE,") == body.count(f"{plate} PLATE, {bush} BUSH,"), key
+
+
+def test_the_rear_cup_is_faced_bonded_and_screwed_and_the_nut_seats_on_the_faced_pilot() -> None:
+    """#2425 (owner ruling 2026-11-20): the cup's front is faced to the
+    journal's stand-out less the end float, its pilot bonded on the journal
+    end with LOCTITE 641 and the MHA-PD-VN-71 screw seated on the axis; the
+    float is accepted on feelers at the bush's rear face. No pin, no
+    match-drill. R9-70's wheel-float fit remains; the front drive is a true D."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())["knob-stack-fitted"]
     knob = _step_body("knob-stack-fitted")
-    for text in (
-        f"{disc.inch_text(knob_shaft.END_FLOAT, 3)} FEELER",
-        cup_pin.HOLE_TEXT,
-        f"{disc.inch_text(cup.PIN_HOLE_FROM_FRONT, 3)} FROM THE CUP FRONT",
-    ):
-        assert text in knob, text
-    # #2169: the step prints the pin station at three places, so the sheet's
-    # title-block band (wider than the cup's .004 marking-out) holds it; the
-    # shortest 1.61 journal, less its .010 rear-end break, still leaves the
-    # end wall over its .080 target.  The match-drilled crosshole's mouths
-    # stay buried in the cup's bore, unbroken, and charge nothing.
-    station_band = printed_band_mm(
-        3, unit=assembly_contract("pd-paper-drive").drawing_unit
+    s = drawing.sub_step
+    float_text = disc.inch_text(knob_shaft.END_FLOAT, 3)
+    assert texts[1] == (
+        f"PUSH THE SHAFT REARWARD, THE {drawing.KNOB_PINION} ON THE RING, THE RING ON "
+        "THE BUSH'S HUB FACE."
     )
-    end_wall = (
-        knob_shaft.JOURNAL_REAR_EXTENSION_MIN
-        - (cup.PIN_HOLE_FROM_FRONT + station_band)
-        - cup_pin.HOLE_MAX / 2.0
-        - knob_shaft.EDGE_BREAK_MAX
+    assert texts[2].startswith("READ THE JOURNAL'S STAND-OUT BEHIND THE BUSH'S REAR FACE")
+    assert (
+        f"PILOT DEPTH READS {float_text} LESS THAN {s('knob-stack-fitted', 2)}'S STAND-OUT"
+        in texts[3]
     )
-    assert end_wall == pytest.approx(0.0805 * 25.4, abs=1e-9)
-    assert end_wall >= cup.WALL_FLOOR
+    assert texts[4].startswith("IF THE PILOT ENDS SHALLOWER THAN THAT, MAKE A NEW")
+    # Rule 23's bond bullet: grade by number, degrease, the compound on the
+    # journal (the pin), not the blind pilot, kept off the running land, set
+    # at once, the cure before load, and a bench acceptance.
+    assert texts[5].startswith("DEGREASE ")
+    bond = texts[drawing.KNOB_CUP_BOND_SUB_STEP]
+    assert "LOCTITE 641" in bond and "NOT THE CUP'S BLIND PILOT" in bond
+    assert "OFF THE JOURNAL IN THE BUSH" in bond
+    assert texts[7].startswith("AT ONCE, ")
+    assert texts[8].startswith(f"SEAT THE {_number('pd-vn-transgear-knob-cup-screw')} SCREW")
+    assert f"CURE {drawing.KNOB_CUP_BOND_CURE_H} H BEFORE" in texts[10]
+    assert texts[11].startswith(f"CHECK: SHAFT REARWARD AS {s('knob-stack-fitted', 1)}")
+    assert (
+        f"THE CUP'S FRONT AND THE BUSH'S REAR FACE READS {drawing.KNOB_END_FLOAT_WINDOW} "
+        "ON FEELERS"
+    ) in texts[11]
+    assert drawing.KNOB_END_FLOAT_WINDOW == ".006 TO .010"
+    assert texts[12] == "CHECK: SHAFT HELD, THE CUP DOES NOT TURN OR SLIDE ON THE JOURNAL BY HAND."
+    assert texts[13] == (
+        f"IF BOTH CHECKS PASS, SKIP {s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 16)}."
+    )
+    # The cured bond lets go only hot (rule 23); the heat is kept off the
+    # bush's oil (codjiflo review, #2425).
+    assert texts[14] == (
+        f"UNSCREW THE {_number('pd-vn-transgear-knob-cup-screw')} SCREW, THEN HEAT THE "
+        f"{_number('pd-transgear-knob-cup')} CUP TO ABOUT 250\u00b0C, THE HEAT KEPT OFF THE "
+        f"{_number('pd-transgear-knob-bush')} BUSH'S OIL, AND PULL IT OFF THE JOURNAL."
+    )
+    for word in ("MATCH-DRILL", "PIN (PRESS FIT)", "FEELER AT THE PLATE"):
+        assert word not in knob, word
+    assert "pd-vn-transgear-knob-cup-pin" not in drawing.BOM_PART_NUMBERS
+    assert "cup-pin-hole" not in drawing.SETTING_ROW_KEYS
+    note = drawing.BOM_EXPENDABLES_NOTE.replace("\n", " ")
+    assert (
+        f"{s('knob-stack-fitted', drawing.KNOB_CUP_BOND_SUB_STEP)} USES LOCTITE 641 RETAINING "
+        f"COMPOUND; CURE {drawing.KNOB_CUP_BOND_CURE_H} H BEFORE LOAD."
+    ) in note
+    # Each sub-step prints in at most six lines (rule 22).
+    assert all(
+        len(lines) <= 6 for lines in drawing._wrapped_sub_steps("knob-stack-fitted", texts)
+    )
     seq = steps.SEQUENCE
     assert seq.index("pilot-faced-to-fit") < seq.index("knob-stack-fitted")
     assert seq.index("pilot-faced-to-fit") < seq.index("collar-shoulder-seated")
@@ -2678,6 +2754,48 @@ def test_a_balloon_ring_is_centred_in_its_room_or_refused() -> None:
         drawing.ring_fit_shift((0.0, 0.0, 0.19, 0.1), limits, name="t")
 
 
+def test_the_knob_stack_ring_runs_below_its_field_only_clear_of_the_title_block() -> None:
+    """Run 20261121T015111001Z (#2425) read the knob stack and hanger's ring
+    199.3 mm tall in its 197.0 mm field: the cup screw thrown behind the cup
+    lengthened the view along the isometric's Z. The ring hangs from the
+    field's top and runs into the empty field left of the title block; its
+    balloons, on an ellipse round the outline, stay off the block."""
+    knob, cluster = drawing.TRANSGEAR_EXPLODED_GROUPS
+    assert cluster.ring_floor is None
+    assert drawing.SHEET_INNER_BORDER_BOTTOM < knob.ring_floor < knob.ring_limits[1]
+    reach = drawing.BALLOON_RING_REACH
+    # The run's height; its width passed (at most the field's 244 mm).
+    for width in (0.150, knob.ring_limits[2] - knob.ring_limits[0] - 2 * reach):
+        outline = (0.05, 0.05, 0.05 + width, 0.05 + 0.1993 - 2 * reach)
+        with pytest.raises(ValueError, match=r"height 199\.3 mm > room 197\.0 mm"):
+            drawing.ring_fit_shift(outline, knob.ring_limits, name=knob.label)
+        dx, dy = drawing.exploded_ring_shift(outline, knob)
+        ring = drawing._grown(
+            (outline[0] + dx, outline[1] + dy, outline[2] + dx, outline[3] + dy), reach
+        )
+        assert ring[3] == pytest.approx(knob.ring_limits[3])
+        assert ring[0] - knob.ring_limits[0] == pytest.approx(knob.ring_limits[2] - ring[2])
+        assert ring[1] >= knob.ring_floor
+        # Every balloon circle on the ellipse clears the title block.
+        keep_x, keep_y = drawing.TITLE_BLOCK_KEEP_OUT
+        circle = reach - drawing.BALLOON_MARGIN
+        centre = ((ring[0] + ring[2]) / 2.0, (ring[1] + ring[3]) / 2.0)
+        semi = ((ring[2] - ring[0]) / 2.0 - circle, (ring[3] - ring[1]) / 2.0 - circle)
+        for k in range(720):
+            angle = math.radians(k / 2.0)
+            x = centre[0] + semi[0] * math.cos(angle)
+            y = centre[1] + semi[1] * math.sin(angle)
+            assert x + circle < keep_x or y - circle >= keep_y, (width, x, y)
+    # A ring whose balloons would come down on the block is refused, and so
+    # is one past the floor; a field without a floor refuses any overflow.
+    with pytest.raises(ValueError, match="over the title block"):
+        drawing.exploded_ring_shift((0.0, 0.0, 0.200, 0.200), knob)
+    with pytest.raises(ValueError, match="height"):
+        drawing.exploded_ring_shift((0.0, 0.0, 0.100, 0.230), knob)
+    with pytest.raises(ValueError, match="height"):
+        drawing.exploded_ring_shift((0.0, 0.0, 0.100, 0.150), cluster)
+
+
 # Farm run 20261001T142942518Z (8689c2a0d) read sheet 1's isometric at 1:3:
 # its outline 187.7 mm tall; its width passed, so at most 149 mm.
 ISO_OUTLINE_AT_1_3 = (0.250, 0.075, 0.250 + 0.149, 0.075 + 0.1877)
@@ -2830,8 +2948,8 @@ def test_the_reducer_dial_window_is_what_a_build_inside_its_drawings_reads() -> 
     running clearances; the window takes every reading that leaves, rounded
     outward one division at most, and its floor is a readable positive shake."""
     journal = (
-        min(drawing.plate_geometry.BORE_DIA_LIMITS) - max(knob_shaft.JOURNAL_DIA_BAND),
-        max(drawing.plate_geometry.BORE_DIA_LIMITS) - min(knob_shaft.JOURNAL_DIA_BAND),
+        min(knob_bush.BORE_DIA_LIMITS) - max(knob_shaft.JOURNAL_DIA_BAND),
+        max(knob_bush.BORE_DIA_LIMITS) - min(knob_shaft.JOURNAL_DIA_BAND),
     )
     sleeve = cluster_fit.BORE_DIAMETRAL_CLEARANCE
     assert 0.0 < journal[0] < journal[1] and 0.0 < sleeve[0] < sleeve[1]
@@ -2909,7 +3027,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # charges before it blames the arm.
     assert (
         f"{_number('pd-transgear-knob-shaft')} JOURNAL AND "
-        f"{_number('pd-transgear-arm-plate')} AND "
+        f"{_number('pd-transgear-knob-bush')} AND "
         f"{_number('pd-transgear-feed-pinion')} BORES TO THEIR SHEETS."
         in located
     )
@@ -2924,7 +3042,10 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # is repeated, a new shaft only re-meshes.
     trial = drawing.sub_step("arm-plate-located", 9)
     for remedy in (
-        f"REPLACE A PLATE FOUND OUTSIDE AND REPEAT FROM {drawing.sub_step('arm-plate-located', 0)}.",
+        f"REPLACE A {_number('pd-transgear-knob-bush')} BUSH FOUND OUTSIDE WITH A NEW BUSH AND "
+        f"{_number('pd-transgear-arm-plate')} PLATE PER {drawing.sub_step('pin-pressed', 2)}-"
+        f"{drawing.sub_step('pin-pressed', 6)} AND REPEAT FROM "
+        f"{drawing.sub_step('arm-plate-located', 0)}.",
         "REPLACE A DISC FOUND OUTSIDE THROUGH STEPS "
         f"{steps.step_number('disc-cluster-assembled')}-"
         f"{steps.step_number('disc-taps-transferred')} ON THE SAME HUB, ITS "
@@ -3072,8 +3193,8 @@ def test_the_trial_stack_goes_together_at_the_located_step() -> None:
     sleeve_rear = arm_front + cluster_fit.REAR_BUSHING_LENGTH
     disc_front = sleeve_rear + feed_pinion.DISC_FRONT_STATION
     disc_rear = disc_front - disc.FACE_WIDTH
-    # The knob shaft's 15T on the loose ring on the plate's hub face.
-    pinion_rear = plate.HUB_FACE_TO_MOUNTING + cluster_fit.KNOB_RING.LENGTH
+    # The knob shaft's 15T on the loose ring on the bush's hub face (#2425).
+    pinion_rear = knob_bush.HUB_LENGTH + cluster_fit.KNOB_RING.LENGTH
     pinion_front = pinion_rear + knob_shaft.FACE_WIDTH
     slack = cluster_fit.F_BAND + cluster_fit.UNSHIMMED_FLOAT_BAND
     assert pinion_rear + slack < disc_rear and disc_front + slack < pinion_front
@@ -3097,8 +3218,8 @@ def test_the_trial_stack_goes_together_at_the_located_step() -> None:
         steps_arm.KNOB_BORE_STATION + plate.EDGE_PLUS_X,
     )
     assert max(plate_edges) + cluster_fit.PIN.HEAD_DIA / 2.0 < steps_arm.PIN_STATION
-    shaft_drop = knob_shaft.JOURNAL_LENGTH - cluster_fit.KNOB_RING.LENGTH - plate.HUB_FACE_TO_MOUNTING
-    assert plate.BOSS_FACE_Z < shaft_drop < 25.4
+    shaft_drop = knob_shaft.JOURNAL_LENGTH - cluster_fit.KNOB_RING.LENGTH - knob_bush.HUB_LENGTH
+    assert knob_bush.STUB_LENGTH < shaft_drop < 25.4
     # The clamps: the plate's edge nearest the pivot bore lies over the arm
     # a clamp jaw's width (3/8 in) outside the disc's tips; the pilots lie
     # inside them, so the stack comes off before they are drilled.
@@ -3107,7 +3228,7 @@ def test_the_trial_stack_goes_together_at_the_located_step() -> None:
         assert math.dist(site, (steps_arm.PIN_STATION, 0.0)) < tip_radius
     # The knob bore stands off the arm, so its indicator and the shaft reach
     # it from the front.
-    assert abs(steps_arm.KNOB_BORE_OFFSET) - plate.HUB_DIA / 2.0 > steps_arm.edge_half_width(
+    assert abs(steps_arm.KNOB_BORE_OFFSET) - knob_bush.HUB_DIA / 2.0 > steps_arm.edge_half_width(
         steps_arm.KNOB_BORE_STATION
     )
 

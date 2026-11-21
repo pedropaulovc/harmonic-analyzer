@@ -1,0 +1,44 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# its registry process and drawing (MHA-PD-28, #2425, 2026-11-20), until its
+# traveler is written. Not enrolled in _process_plans.TRAVELER_STEMS; see
+# cad/process/README.md, "Placeholder plans".
+title = "Transgear Knob Bush"
+part = "MHA-PD-28 Transgear Knob Bush"
+revision = "placeholder"
+material = "AISI 1018 cold-finished steel round bar, ASTM A108, 5/8 in"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-round-5-8"]
+
+[[tools]]
+id = "drill-b"
+name = "B drill"
+ref = "drill-b"  # Drills B
+
+[[tools]]
+id = "reamer-2490"
+name = ".2490 reamer"
+ref = "reamer-2490"  # B-reamer-.2490
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+
+[[tools]]
+id = "arbor-press"
+name = "Arbor press"
+ref = "arbor-press"  # F-arbor-press
+
+[[tools]]
+id = "feeler-gauges"
+name = "Feeler gauges"
+ref = "feeler-gauges"  # inventory gauges.feeler-gauges
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

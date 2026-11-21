@@ -199,6 +199,19 @@ status = "to_order"
 purchase = "One .4000 in (decimal size) HSS straight-flute straight-shank chucking reamer; stated cutting band 0/+.0002 (.4000-.4002)."
 note = "Cuts the MHA-CH-13 hub hole in 1018 after a 25/64 drill, 400 rpm, cutting oil, fed in and out. Checked with the go/no-go pair gauges.plug-gauges-4000-4005 (first hole before the lot, then every part): the shop owns no pin gauges (owner 2026-11-17), and the owned Starrett telescoping gauges read on the micrometer repeat to about the whole .0005 in band. Not owned: to buy."
 
+# Press-hole reamer for MHA-PD-19: Ø.4375 +.0007/0 REAM THRU, the ANSI B4.1
+# FN2 hole for the MHA-PD-28 bush (#2425, owner ruling 2026-11-20 (Pedro)).
+# To purchase: not owned; no make, price or stock read. Cutting band: ANSI
+# B94.2 chucking-reamer diameter tolerance +.0001/+.0005 (as
+# tools.reamer-2550), so it cuts .4376-.4380, inside the hole's .4375-.4382
+# band. Its sizing data is cad/process/shop.toml tools.reamer-4375.
+[tools.reamer-4375]
+name = ".4375 in (7/16) HSS straight-flute chucking reamer"
+kind = "reamer"
+status = "to_order"
+purchase = "One .4375 in (7/16) HSS straight-flute straight-shank chucking reamer; ANSI B94.2 cutting band .4376-.4380."
+note = "Cuts the MHA-PD-19 press hole in 1018 CF after a 27/64 drill (cad/process/pd_transgear_arm_plate/plan.toml). Not owned: to buy."
+
 # --- Owner inventory 2026-11-17: Zoro order, shop photos, reamers ----------
 
 # Owner (Pedro) 2026-11-17, answering what is physically in the shop:

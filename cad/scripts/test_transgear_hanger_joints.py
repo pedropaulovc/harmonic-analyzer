@@ -119,9 +119,10 @@ def test_arm_and_plate_weight_inputs_are_actual_cut_geometry() -> None:
 
 
 def test_plate_weight_input_is_the_native_recipe_volume() -> None:
-    """The analytic plate volume is the native recipe's: each section's own
-    outline (an independent shoelace over its vertices plus the end round's
-    sector) times its depth, less the recipe's cuts."""
+    """The analytic plate volume is the native recipe's: the flat outline (an
+    independent shoelace over its vertices plus the end round's sector)
+    times its thickness, less the recipe's cuts and the press hole's
+    face-A chamfer."""
     import build_pd_transgear_arm_plate as recipe
 
     def outline_area(left, right):
@@ -137,13 +138,10 @@ def test_plate_weight_input_is_the_native_recipe_volume() -> None:
         )
         return abs(shoelace) / 2.0 + plate.END_R**2 * (end - start) / 2.0
 
-    sections = (
-        outline_area(plate.TOP_LEFT, plate.TOP_RIGHT) * plate.THICKNESS_OVER_ARM
-        + outline_area(plate.NOTCH_LEFT, plate.NOTCH_RIGHT) * plate.NOTCH_DEPTH
-    )
-    assert recipe.V_PLATE + recipe.V_LOWER == pytest.approx(sections, rel=1e-12)
+    section = outline_area(plate.TOP_LEFT, plate.TOP_RIGHT) * plate.THICKNESS_OVER_ARM
+    assert recipe.V_PLATE == pytest.approx(section, rel=1e-12)
     native = (
-        sections + recipe.V_HUB + recipe.V_BOSS - recipe.V_BORE - recipe.V_HOLES
+        section - recipe.V_PRESS_HOLE - plate.PRESS_HOLE_CHAMFER_VOLUME_MM3 - recipe.V_HOLES
         - len(plate.SCREW_HOLES) * recipe.V_CSK
         - len(plate.LOCATOR_SITES_MM) * math.pi * (plate.LOCATOR_HOLE_DIA_MM / 2.0)**2
         * plate.THICKNESS_OVER_ARM
@@ -244,25 +242,6 @@ def test_cut_plate_screws_hold_one_and_a_half_d_in_the_thinnest_arm(
     # arm, #2019, leaves about 1.9 mm of margin).
     monkeypatch.setattr(screw, "CUT_END_BREAK_MAX", 3.5)
     with pytest.raises(AssertionError, match="MHA-PD-VN-56 worst engagement"):
-        _reload_joints()
-
-
-def test_plate_notch_face_clears_the_arm_edge_at_every_limit(monkeypatch) -> None:
-    """Reference-pose graded clearance; the notch does not locate."""
-    # The corners print .XX with nominals that follow the arm's mm edges:
-    # judged at their printed limits' reach, never less than the .XX row.
-    import pd_transgear_arm_plate_spec as plate_spec
-
-    assert plate.NOTCH_BAND >= plate_spec.BAND_BY_PLACES[plate_spec.NOTCH_PLACES]
-    worst = (plate.NOTCH_RELIEF - plate.NOTCH_BAND) * math.cos(arm.EDGE_LEAN) - arm.OUTLINE_BAND
-    assert worst > 0.0
-    assert joints.NOTCH_REFERENCE_AIR_WORST_MM == pytest.approx(worst)
-    # Each corner still sits on the relieved line parallel to the arm edge.
-    for xc, yc in (plate.NOTCH_LEFT, plate.NOTCH_RIGHT):
-        assert plate.arm_lower_edge_y(xc) - yc == pytest.approx(plate.NOTCH_RELIEF)
-    # The face modelled on the edge (no relief) closes at the limits: refused.
-    monkeypatch.setattr(plate, "NOTCH_RELIEF", 0.0)
-    with pytest.raises(AssertionError, match="notch face meets the arm"):
         _reload_joints()
 
 

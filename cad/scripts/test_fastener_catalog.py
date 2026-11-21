@@ -49,7 +49,7 @@ _STOCK_REQUIREMENTS = {
     "pd-vn-transgear-knob-drive-pin": (("98381A433",), "MHA-PD-VN-54", 2),
     "pd-vn-transgear-collar-flat-pin": (("90145A414",), "MHA-PD-VN-70", 1),
     "pd-vn-transgear-hub-key-pin": (("98381A416",), "MHA-PD-VN-69", 1),
-    "pd-vn-transgear-knob-cup-pin": (("98296A031",), "MHA-PD-VN-62", 1),
+    "pd-vn-transgear-knob-cup-screw": (("91794A079",), "MHA-PD-VN-71", 1),
     "sh-vn-fillister-screw-91794a055": (("91794A055",), "MHA-SH-VN-59", 7),
     "pd-vn-transgear-latch-pin": (("98381A474",), "MHA-PD-VN-58", 1),
     "pd-vn-transgear-pivot-screw": (("90325A174",), "MHA-PD-VN-57", 1),
