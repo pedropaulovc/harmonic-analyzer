@@ -4481,8 +4481,15 @@ def _prechips_task(stem: str) -> dict[str, Any]:
         "name": stem,
         "file_dep": sorted({
             # The plan directory also holds the diagrams/*.svg setup pictures
-            # the hobby traveler embeds.
-            *(str(path.resolve()) for path in plan.parent.rglob("*") if path.is_file()),
+            # the hobby traveler embeds. Not its __pycache__: importing the
+            # part's cam.py (cam_nc, test_cam_nc) writes one there at any
+            # moment, and a compiled file is no traveler input.
+            *(
+                str(path.resolve())
+                for path in plan.parent.rglob("*")
+                if path.is_file()
+                and "__pycache__" not in path.relative_to(plan.parent).parts
+            ),
             *(str(path.resolve()) for path in _process_plans.shop_files()),
             str(manifest.resolve()),
             *_executed_closure(cmd),

@@ -44,6 +44,12 @@ face_allowance_in = 0.02
 regrip_allowance_in = 0.02
 # Parting kerf: 1/8 in blade plus the insert's side clearance (authored).
 part_kerf_in = 0.13
+# The cutoff blade's width: the holder's 1/8 in (cad/config/shop-equipment/
+# tools-cutting.toml tools.cutoff-blade-holder width_in). The inserts' cutting
+# width is not on record (the packing list's .252 is their thickness), so the
+# part-off op calipers the insert and presets the DRO to what it reads; the
+# kerf above allows up to .13.
+blade_width_in = 0.125
 parts_per_pull = 2
 # The parting blade's clearance to the jaw fronts.
 jaw_clearance_in = 0.1
@@ -174,7 +180,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off the first hub at Z-{{cad.part_off_in:.2dot}}: {{process.regrip_allowance_in:.2dot}} over the {{cad.length_min_in:.2dot}} MIN supply length. Catch it."
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width (about {{process.blade_width_in:.3dot}}, by caliper on the insert): the DRO then reads the blade's tailstock-side face. Part off the first hub with that face at Z-{{cad.part_off_in:.2dot}}: {{process.regrip_allowance_in:.2dot}} over the {{cad.length_min_in:.2dot}} MIN supply length. Catch it."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -184,7 +190,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the parted end {{process.face_allowance_in:.2dot}} in with the AR tool; set DRO Z0 on it again, and touch the blade on it and zero DRO Z for the blade as in Op 90."
+instruction = "Face the parted end {{process.face_allowance_in:.2dot}} in with the AR tool; set DRO Z0 on it again. Bring the blade's chuck-side face onto the new faced end and set DRO Z there to the blade's width, as in Op 90: the DRO again reads the blade's tailstock-side face."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -194,7 +200,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Part off the second hub at Z-{{cad.part_off_in:.2dot}}. Catch it. Pull the bar for the next two and repeat from Op 30 until there is a hub for every strap that passed Op 10."
+instruction = "Part off the second hub with the blade's tailstock-side face at Z-{{cad.part_off_in:.2dot}}. Catch it. Pull the bar for the next two and repeat from Op 30 until there is a hub for every strap that passed Op 10."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 

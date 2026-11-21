@@ -4050,6 +4050,11 @@ def test_prechips_task_shape_and_complete_dependency_closure(synthetic_prechips_
     unrelated = plans.plan_path("synthetic_other_part")
     unrelated.parent.mkdir(parents=True)
     unrelated.write_text('features = "other"\n')
+    # A compiled cam.py, as importing the recipe leaves it mid-run, is no
+    # input: it appearing between two loads changed the task (#3313's gates).
+    compiled = source.parent / "__pycache__" / "cam.cpython-314.pyc"
+    compiled.parent.mkdir()
+    compiled.write_bytes(b"\0")
     task = next(dodo.task_prechips())
     assert task["name"] == stem
     assert task["task_dep"] == [f"package:manifest:{stem}"]
@@ -4066,6 +4071,7 @@ def test_prechips_task_shape_and_complete_dependency_closure(synthetic_prechips_
     # prechips is not locked (#2502): the lock is no traveler input.
     assert str((dodo.REPO_ROOT / "uv.lock").resolve()) not in deps
     assert str(unrelated.resolve()) not in deps
+    assert str(compiled.resolve()) not in deps
     assert str(step.resolve()) not in deps
     stamp = str(dodo.REPORTS / f"prechips-{stem}.ok")
     assert task["targets"] == [

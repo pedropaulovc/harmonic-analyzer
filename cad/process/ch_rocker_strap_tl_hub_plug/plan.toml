@@ -43,6 +43,12 @@ face_allowance_in = 0.02
 regrip_allowance_in = 0.02
 # Parting kerf: 1/8 in blade plus the insert's side clearance (authored).
 part_kerf_in = 0.13
+# The cutoff blade's width: the holder's 1/8 in (cad/config/shop-equipment/
+# tools-cutting.toml tools.cutoff-blade-holder width_in). The inserts' cutting
+# width is not on record (the packing list's .252 is their thickness), so the
+# part-off op calipers the insert and presets the DRO to what it reads; the
+# kerf above allows up to .13.
+blade_width_in = 0.125
 parts_per_pull = 1
 # The parting blade's clearance to the jaw fronts.
 jaw_clearance_in = 0.1
@@ -213,7 +219,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Fit the C2 (3212A75) insert, the non-ferrous grade, for this aluminium. Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width (about .125, by caliper on the insert): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Catch the plug."
+instruction = "Fit the C2 (3212A75) insert, the non-ferrous grade, for this aluminium. Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width (about {{process.blade_width_in:.3dot}}, by caliper on the insert): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Catch the plug."
 settings = "lathe-part-6061"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
