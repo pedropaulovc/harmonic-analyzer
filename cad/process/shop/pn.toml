@@ -20,12 +20,126 @@ description = "Open-end wrench, 5/32 in (ignition size)"
 # drawing cross-check of the placeholder plans (2026-11-19) and the owner's
 # rulings of that day. The comment cites the drawing callout or the inventory
 # record that holds the tool's ownership.
-[tools.chamfer-mill-1-2-90]  # MHA-PN-05 2X 45° V, (.20) deep
-description = "1/2 in 90° included chamfer mill"
-diameter_mm = 12.7
+# MHA-PN-01 needs .34 in of reach (the .31 window through and .020 past) and
+# its axial levels of .165 in within the flutes; carbide, for the Tru-Edge
+# brass setting below (settings.pn-em-5-64-c360). Not owned: to buy
+# (shop-equipment tools-special-cutters.toml holds its status).
 [tools.endmill-5-64-long]  # MHA-PN-01 window corners R.040 max
-description = "5/64 in 2-flute end mill, 5/16 in or more of reach"
+description = "5/64 in 2-flute carbide end mill, .34 in or more of reach, 3/16 in or more of flute"
 diameter_mm = 1.984375
+
+# --- PN family C36000 flat brass settings (MHA-PN-01, MHA-PN-05) ---------------
+# Plans: cad/process/pn_pen_frame/plan.toml, cad/process/pn_pen_v_block/plan.toml.
+# Material key pn-c360-flat: C36000 free-machining brass, 360-H02 extruded
+# flat bar (shop-equipment stock c360-flat-*, as bought); the sources' rows
+# below are their brass rows, read for that bar. On the PM-30MV, whose low
+# belt tops out at 2800 rpm (machines.pm-30mv, owner 2026-11-16).
+#
+# Carbide end mills: The Carbide End Mill Store "Carbide End Mill Speeds and
+# Feeds, General Purpose, Uncoated" (6gtools.com,
+# uploaded/files/feedsandspeeds/Carbide_End_Mill_Feeds_And_Speeds_General_Purpose_Uncoated.pdf,
+# read 2026-11-21; the PDF mg.toml settings.clamp-em-half-brass cites), row
+# Non-Ferrous N, Brass/Bronze: 400 SFM; 1/8 in .0011 and 1/2 in .0042
+# in/tooth at chip-load factor 1.0 (50 % radial engagement and more, so the
+# table's lowest load: every cut here engages 50 % or less, or slots).
+# 400 SFM is 3056 rpm on the 1/2 in and 12,224 on the 1/8 in: both run at
+# the spindle's 2800 (367 and 92 ft/min).
+[settings.pn-em-half-c360]
+tool = "endmill-carbide-3fl-1-2"
+material = "pn-c360-flat"
+rpm = 2800
+chip_load_mm_per_tooth = 0.10668  # .0042 in; 2800 × 3 × .0042 = 35.3 in/min
+flutes = 3
+feed_unit = "in/min"
+[settings.pn-em-eighth-c360]
+tool = "endmill-carbide-3fl-1-8"
+material = "pn-c360-flat"
+rpm = 2800
+chip_load_mm_per_tooth = 0.02794  # .0011 in; 2800 × 3 × .0011 = 9.2 in/min
+flutes = 3
+feed_unit = "in/min"
+# The 5/64 in 2-flute end mill (tools.endmill-5-64-long, to buy): Tru-Edge
+# "Solid Carbide Endmills Feeds and Speeds" (tru-edge.com,
+# wp-content/uploads/2019/09/Feeds-and-Speeds-Endmills.pdf, read
+# 2026-11-21), row Brass and Bronze: 250-350 SFM; 1/16 in .001 and 1/8 in
+# .002 in/tooth. 5/64 lies between the two columns and takes the lower one's
+# .001 (as the drill feeds above take the lower column). 250 SFM is 12,224
+# rpm on 5/64 in: it runs at the spindle's 2800 (57 ft/min). For comparison,
+# Harvey Tool's miniature long-reach table (series 762xx, Brass row,
+# ecomm.productivity.com HAT2_Speeds_Feeds_76210.pdf, read 2026-11-21)
+# starts a .078 in cutter at .00078 in/tooth finishing, below the .001 floor
+# of prechips' milling feed-factor table (Machinery's Handbook Table 4).
+[settings.pn-em-5-64-c360]
+tool = "endmill-5-64-long"
+material = "pn-c360-flat"
+rpm = 2800
+chip_load_mm_per_tooth = 0.0254  # .001 in; 2800 × 2 × .001 = 5.6 in/min
+flutes = 2
+feed_unit = "in/min"
+# Holes (HSS): the sources mg.toml's settings.clamp-*-brass cite.
+# LittleMachineShop "Cutting Speeds", Drilling & Reaming, row Brass
+# (C35600, C37700, C36000, ...): 160-175 ft/min; AutoDrill "Suggested
+# drilling feed rates", row Brass: 1/16 in .001, 1/8 in .003 in/rev, a size
+# between two columns taking the lower column's feed.
+# - #2 centre drill (5/64 pilot, 3/16 body): 160 ft/min is over 3200 rpm on
+#   the body, so 2800; its pilot under 1/8 in, .001 in/rev: 2.8 in/min.
+# - #43 (.089 in): 160 ft/min is 6870 rpm, so 2800 (65 ft/min); .089 lies
+#   between the 1/16 and 1/8 in columns, .001 in/rev: 2.8 in/min.
+[settings.pn-spot-c360]
+tool = "jig-spot"
+material = "pn-c360-flat"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.pn-drill-43-c360]
+tool = "jig-drill-43"
+material = "pn-c360-flat"
+rpm = 2800
+feed = "2.8 in/min"
+
+# --- MHA-PN-05 pen V block (cad/process/pn_pen_v_block/plan.toml) -------------
+# Its other settings are the PN family's above (material pn-c360-flat).
+# The owned 1/4 in 90° chamfer mill (common.toml
+# tools.chamfer-mill-carbide-1-4-90, McMaster 3073A46: 1/8 in length of cut
+# on a 1/4 in mill, so its 45° cone runs to a point) cuts the V's flanks and
+# the pivot bore's top chamfer. Each V level steps 1.0 mm down with passes
+# 1.0 mm apart, so the cone engages at most 3.0 mm across (the step plus
+# the half-pass ridge left above it, both sides), under 1/8 in: the 6G
+# table's brass row (the PDF the family block above cites) at 1/8 in,
+# .0011 in/tooth; 400 SFM is 6112 rpm on 1/4 in, so the spindle's 2800
+# (183 ft/min).
+[settings.pn-chamfer-1-4-c360]
+tool = "chamfer-mill-carbide-1-4-90"
+material = "pn-c360-flat"
+rpm = 2800
+chip_load_mm_per_tooth = 0.02794  # .0011 in; 2800 × 2 × .0011 = 6.2 in/min
+flutes = 2
+feed_unit = "in/min"
+# Pivot bore (HSS): the family block's LittleMachineShop and AutoDrill rows.
+# - #32 (.116 in, common.toml tools.drill-32), the reamer's pilot (.010 in
+#   on the diameter for the reamer): 160 ft/min is 5270 rpm, so 2800
+#   (85 ft/min); .116 lies between the 1/16 and 1/8 in columns, .001 in/rev:
+#   2.8 in/min.
+# - .1260 chucking reamer (common.toml tools.reamer-1260, to buy): the same
+#   row's 160 ft/min is the ceiling (4850 rpm); the author reams at half
+#   the spindle's 2800, 1400 rpm (46 ft/min), at the 1/8 in column's
+#   .003 in/rev: 4.2 in/min, fed in and fed out.
+[settings.pn-drill-32-c360]
+tool = "drill-32"
+material = "pn-c360-flat"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.pn-ream-1260-c360]
+tool = "reamer-1260"
+material = "pn-c360-flat"
+rpm = 1400
+feed = "4.2 in/min"
+# The pivot bore's go/no-go pair (cad/config/shop-equipment/
+# gauges.plug-gauges-1260-1265, to buy): GO .1260 and NO-GO .1265 in =
+# 3.2004 and 3.2131 mm. A fixed-limit pair reads no scale; its resolution is
+# each member's Class X tolerance, .000040 in = 0.001016 mm.
+[gauges.plug-gauges-1260-1265]
+range_mm = [3.2004, 3.2131]
+resolution_mm = 0.001016
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so

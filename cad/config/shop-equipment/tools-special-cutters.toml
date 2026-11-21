@@ -46,11 +46,6 @@ purchase = "Harvey Tool 34662, $60.30 each (listing read live 2026-11-21)"
 status = "to_order"
 note = "Not owned: to buy. Miniature End Mill, Square, Long Reach, Stub Flute: .0620 × .093 length of cut × .500 reach (8x), 3 flutes, 1/8 shank, uncoated, optimized for plunging. MHA-MS-02 rebate corner relief .05 ±.01 deep × .06 ±.01 high beside the roof, .38 below the mating face inside the .134 rebate, plunge-milled: no owned cutter is .07 or under and reaches it."
 
-[tools.chamfer-mill-1-2-90]
-kind = "chamfer_mill"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PN-05 2X 45° V, (.20) deep."
-
 [tools.knurl-straight-25tpi]
 kind = "knurling_tool"
 status = "to_order"

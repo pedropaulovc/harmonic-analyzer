@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="16" y="20">PF05, plan (fixed jaw at the top): the back face BK skimmed</text>
+  <rect class="clamp" x="60.0" y="30.0" width="247.0" height="30.0"/>
+  <rect class="clamp" x="60.0" y="260.7" width="247.0" height="30.0"/>
+  <text class="label-on-clamp" x="183.5" y="50.0" text-anchor="middle">fixed jaw</text>
+  <text class="label-on-clamp" x="183.5" y="280.7" text-anchor="middle">moving jaw</text>
+  <rect class="part-kept" x="120.0" y="60.0" width="127.0" height="200.7"/>
+  <rect class="hidden" x="80.0" y="60.0" width="207.0" height="15.9"/>
+  <rect class="hidden" x="80.0" y="244.8" width="207.0" height="15.9"/>
+  <line class="datum" x1="120.0" y1="56.0" x2="120.0" y2="76.0"/>
+  <line class="leader" x1="74.0" y1="82.0" x2="120.0" y2="60.0"/>
+  <text class="datum-label" x="72.0" y="90.0" text-anchor="end">X0 Y0</text>
+  <line class="arrow" x1="90.0" y1="80.0" x2="277.0" y2="80.0"/>
+  <text class="label" x="317.0" y="120.0">1/2 in end mill passes along X,</text>
+  <text class="label" x="317.0" y="136.0">stepping across the jaws</text>
+  <text class="label" x="183.5" y="310.7" text-anchor="middle">B at the fixed jaw, T at the moving jaw</text>
+  <text class="label" x="317.0" y="185.0">dashed: the parallel stacks under the ends</text>
+  <text class="title" x="470.0" y="262.0">Section across the jaws, 2/5 of the plan's scale</text>
+  <line class="fixture-table" x1="420.0" y1="420.0" x2="600.3" y2="420.0"/>
+  <rect class="clamp" x="430.0" y="330.1" width="40.0" height="89.9"/>
+  <rect class="clamp" x="550.3" y="330.1" width="40.0" height="89.9"/>
+  <rect class="fixture-support" x="470.0" y="343.8" width="6.3" height="76.2"/>
+  <rect class="fixture-support" x="543.9" y="343.8" width="6.3" height="76.2"/>
+  <rect class="part-kept" x="470.0" y="328.1" width="80.3" height="15.7"/>
+  <rect class="part-removed" x="470.0" y="324.8" width="80.3" height="3.3"/>
+  <text class="label" x="470.0" y="436.0">1 in + 1/2 in parallels stacked, under each end</text>
+  <text class="label" x="317.0" y="208.0">Gripped on the ends, B to the fixed jaw.</text>
+  <text class="label" x="317.0" y="224.0">Skim the face up down to {{process.face_level_mm:in.3dot}} above the stacks: BK.</text>
+</svg>
