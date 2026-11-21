@@ -159,15 +159,17 @@ def test_strap_feature_bands_are_the_printed_ones() -> None:
     assert seat["station"] == pytest.approx([_in(0.175), _in(0.185)])
     assert seat["axis"] == [1.0, 0.0, 0.0]
     assert seat["callout"] == drawing.DIMENSION_CALLOUTS["PinSeatDia"]
-    # Ø.0625 +.0025/.0000 DRILL THRU for the MHA-DT-VN-63 spring pin, on the
-    # seat's .180 centreline and across the pivot bore.
+    # Ø.0625 +.0025/.0000 match-drilled THRU at assembly with MHA-DT-19 for the
+    # MHA-DT-VN-63 spring pin (owner ruling 2026-11-21), on the seat's .180
+    # centreline and across the pivot bore: no process, the traveler skips it.
     cross = features["cross_hole"]
     assert cross["dia"] == pytest.approx([_in(0.0625), _in(0.0650)])
-    assert (cross["process"], cross["thru"], cross["crosses"]) == (
-        "drill",
+    assert (cross["made_at"], cross["thru"], cross["crosses"]) == (
+        "assembly",
         True,
         "pivot_bore",
     )
+    assert "process" not in cross
     assert cross["station"] == seat["station"]
     assert cross["callout"] == drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
 

@@ -305,19 +305,22 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
     # Main overrode the loose-SUPPLY wording once MHA-DT-VN-63 became a
     # modelled BOM line (2 used): supplying one per strap would double the
     # order, so the callout names the part, and its number is the parts
-    # registry's.
+    # registry's.  Owner ruling 2026-11-21 (Pedro): the hole is match-drilled
+    # at assembly with the MHA-DT-19 shaft, so the callout says so and names
+    # the shaft by the registry's number.
 
     import _config
 
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
-    assert callout is dt_pinion_bracket_spec.CROSS_HOLE_CALLOUT
+    assert callout is drawing.CROSS_HOLE_CALLOUT
     assert "AXIS" not in callout and "CENTRED" not in callout
     assert "SUPPLY" not in callout and "LOOSE" not in callout
     number = _config.parts("dt-vn-pinion-strap-pin")["number"]
+    shaft = _config.parts("dt-pinion-pivot-shaft")["number"]
     assert callout.splitlines() == [
-        "DRILL THRU",
-        f"FOR {number}",
-        "SPRING PIN, PRESS FIT",
+        "MATCH-DRILL THRU",
+        f"WITH {shaft} AT ASSEMBLY",
+        f"PRESS FIT ON {number}",
     ]
     dims = dt_pinion_bracket_spec.DRAWING_DIMENSIONS
     # Through the thickness the hole shares the seat's centreline, which

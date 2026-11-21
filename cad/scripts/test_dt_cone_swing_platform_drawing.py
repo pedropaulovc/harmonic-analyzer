@@ -112,8 +112,9 @@ def test_only_sliding_and_locating_surfaces_carry_roughness() -> None:
 def test_plate_and_nonfit_features_remain_at_general_grade() -> None:
     registry = _config.parts("dt-cone-swing-platform")
     assert registry["tolerance_class"] == "machined_block"
-    assert "mil-dtl-13924 class 1" in str(registry["finish"]).lower()
-    assert "oil seal" in str(registry["finish"]).lower()
+    # Delegated ruling 2026-11-21 (Main), owner review #2144: no MIL spec.
+    assert "matte black oxide, oil sealed" in str(registry["finish"]).lower()
+    assert "mil-dtl" not in str(registry["finish"]).lower()
     assert int(registry["quantity"]) == 1
     assert drawing_spec.DRAWING_PRECISION["Plate"]["PlateThk"] == 2
     assert drawing_spec.DRAWING_PRECISION["PivotBearingRelief"]["PivotBearingReliefDepth"] == 3

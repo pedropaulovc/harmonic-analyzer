@@ -63,11 +63,13 @@ ARBOR_BORE_BAND = REAM_SLIDE  # pinion arbor turns in it
 PIN_SEAT_DIA_BAND = REAM_H7
 
 # Option E-a set-pin cross hole (dt_vn_pinion_strap_pin_spec).  Its location is a
-# functional requirement, not habit: the hole is match-drilled on into the
-# MHA-DT-19 shaft, and every bit it runs off the bore axis comes straight off
-# the shaft wall beside it (SHAFT_LIGAMENT_WORST).  Codex #858 P2, user
-# ruling (a): no location lives in prose.  Through the thickness the hole
-# shares the follower seat's centreline, which the seat's own PinSeatCz
+# functional requirement, not habit: the hole is match-drilled at assembly
+# through the strap and the MHA-DT-19 shaft together (owner ruling 2026-11-21,
+# Pedro: "Pinion bracket cross hole: match-drill at assembly; fix the
+# traveler and the sheet."), and every bit it runs off the bore axis comes
+# straight off the shaft wall beside it (SHAFT_LIGAMENT_WORST).  Codex #858
+# P2, user ruling (a): no location lives in prose.  Through the thickness the
+# hole shares the follower seat's centreline, which the seat's own PinSeatCz
 # (.180 from broad face A) locates; a second .18 station on that same line
 # printed one location twice (machinist review, fan-out round 1).  Its
 # far-face web is STRAP_FACE_WEB_WORST, still charged the looser .XX row.
@@ -76,15 +78,11 @@ PIN_SEAT_DIA_BAND = REAM_H7
 # needs no offset: the former 3.18 from the pivot-bore wall (a hidden
 # reference sketch) ran to a hidden line, which rule 9 forbids (r1 machinist
 # review, #1007).  The diameter carries the spring pin's own functional band
-# (dt_vn_pinion_strap_pin_spec), and the hole is drilled (rule 12).
+# (dt_vn_pinion_strap_pin_spec), and the hole is drilled (rule 12).  Its
+# callout is sheet text (draw_dt_pinion_bracket.CROSS_HOLE_CALLOUT), so
+# wording edits never re-key the part.
 CROSS_HOLE_DIA = _strap_pin.HOLE_DIA
 CROSS_HOLE_BAND = _strap_pin.HOLE_BAND
-# The pin is its own BOM line (MHA-DT-VN-63), so the callout names it
-# instead of supplying one loose with each strap; test_dt_pinion_bracket_drawing
-# keeps the number in step with the parts registry.  The band is tighter than
-# DRILLED HOLES, so the callout also names the fit (rule 4; r2 review): a
-# slotted spring pin grips its hole by compression.
-CROSS_HOLE_CALLOUT = "DRILL THRU\nFOR MHA-DT-VN-63\nSPRING PIN, PRESS FIT"
 
 # drawing-guidelines.md rule 17 (walls and webs) (#842, U27; audit W23) worst-case web from the blind seat to a broad
 # face.  Codex #858 P2, user ruling (a) (2026-09-25): the seat's station is

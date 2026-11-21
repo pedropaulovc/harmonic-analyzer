@@ -63,7 +63,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 }
 
 # Option E-a set pins (dt_vn_pinion_strap_pin_spec): one cross hole under each
-# MHA-DT-14 strap, match-drilled through the strap's own cross hole with the
+# MHA-DT-14 strap, match-drilled together with the strap's cross hole (owner
+# ruling 2026-11-21: the strap arrives undrilled) with the
 # shaft back-flush and the cluster at the back stop -- the fit-up stack the
 # assembly shows (pinion_rig_layout) -- so they sit at its strap mid-planes,
 # from the front end (local z 0).  The print
