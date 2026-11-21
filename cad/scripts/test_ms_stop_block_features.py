@@ -175,7 +175,8 @@ def test_the_rebate_bands_are_the_printed_ones(manifest: dict) -> None:
         ("rebate_back", "rebate_width", 0.330),
     ):
         rebate = features[name]
-        assert rebate[key] == pytest.approx([_in(low), _in(low + 0.004)], abs=1e-6)
+        # +.010/0 (owner ruling 2026-11-21).
+        assert rebate[key] == pytest.approx([_in(low), _in(low + 0.010)], abs=1e-6)
         assert rebate["callout"] == "SEE NOTE 1"
         assert rebate["note"] == drawing.REBATE_NOTE
     assert features["rebate_floor"]["rebate_height_from"] == "rebate_ceiling"

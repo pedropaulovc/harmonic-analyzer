@@ -105,7 +105,10 @@ def test_print_worst_joint_stack_preserves_bottoming_tap_and_ligaments() -> None
     assert spec.PLATE_TAP_BACK_WALL_MIN == pytest.approx(3.60342, abs=1e-5)
     assert spec.ROOF_THICKNESS_MIN == pytest.approx(2.032)
     # The plate stations ride the title block's .XXX (L2): each web loses .001.
-    assert spec.PLATE_TAP_WINDOW_WEB_MIN == pytest.approx(2.60731)
+    # The rebate's +.010/0 (owner ruling 2026-11-21) leaves the window web
+    # .0967 against the .080 target (.1027 at +.004/0).
+    assert spec.PLATE_TAP_WINDOW_WEB_MIN == pytest.approx(2.45491)
+    assert spec.PLATE_TAP_WINDOW_WEB_MIN >= WALL_TARGET_MM
     assert spec.PLATE_TAP_END_WEB_MIN == pytest.approx(2.30251)
     assert spec.PLATE_TAP_MAJOR_DIA_MAX == pytest.approx(0.0887 * 25.4)
     assert spec.PLATE_TAP_MAJOR_DIA_MAX > screw.MAJOR_DIA
@@ -135,9 +138,10 @@ def test_every_worst_case_wall_meets_the_inch_rule_17_target() -> None:
         assert not hasattr(spec, name)
 
 
-def test_drilled_holes_and_rebate_bands_are_plus_four_thou() -> None:
+def test_drilled_holes_are_plus_four_thou_and_the_rebate_plus_ten() -> None:
     assert spec.DRILL_OVERSIZE_MM == pytest.approx(_inch(0.004))
-    assert spec.WINDOW_SIZE_TOLERANCE_MM == pytest.approx((0.0, _inch(0.004)))
+    # Owner ruling 2026-11-21: "MS-02 rebate opens to +.010/0 now".
+    assert spec.WINDOW_SIZE_TOLERANCE_MM == pytest.approx((0.0, _inch(0.010)))
 
 
 def test_hole_wizard_callouts_print_three_places_by_native_variable() -> None:
@@ -163,14 +167,17 @@ def test_matched_pair_uses_functional_positions_and_a_real_shop_sequence() -> No
 
 
 def test_window_keeps_functional_clearance_at_printed_size_limits() -> None:
-    # The window's own +.004/0 band and the stick's .XXX leave .010 of side
+    # The window's own +.010/0 band and the stick's .XXX leave .010 of side
     # and .004 of face clearance at the tightest limits. Owner ruling
     # 2026-11-20 (#2441): "B", the stick keeps the 1/8 flat's .125 and the
-    # .330 x .134 rebate stays, so the face clearance drops to .004-.018
-    # (still slides).
-    window_lower, _window_upper = spec.WINDOW_SIZE_TOLERANCE_MM
+    # .330 x .134 rebate stays. Owner ruling 2026-11-21 opened the band from
+    # +.004/0 to +.010/0: the least clearances stay, the largest grow to
+    # .030 side and .024 face; the thumb screw seats the stick on the roof.
+    window_lower, window_upper = spec.WINDOW_SIZE_TOLERANCE_MM
     assert spec.WINDOW_WIDTH + window_lower - (stick.BODY_WIDTH + stick.BODY_FIT_TOLERANCE_MM) == pytest.approx(0.254)
     assert spec.WINDOW_HEIGHT + window_lower - (stick.BODY_THICKNESS + stick.BODY_FIT_TOLERANCE_MM) == pytest.approx(0.1016)
+    assert spec.WINDOW_WIDTH + window_upper - (stick.BODY_WIDTH - stick.BODY_FIT_TOLERANCE_MM) == pytest.approx(_inch(0.030))
+    assert spec.WINDOW_HEIGHT + window_upper - (stick.BODY_THICKNESS - stick.BODY_FIT_TOLERANCE_MM) == pytest.approx(_inch(0.024))
     assert spec.PLATE_CLEARANCE_DIA > screw.MAJOR_DIA
 
 

@@ -158,7 +158,7 @@ PLATE_LOCATION_DIMENSIONS = frozenset({
 # from the rebate and the wall and prints as a reference "(.48)".
 BLOCK_REFERENCE_DIMENSIONS = frozenset({"BlockDepth"})
 # Sizes print the title block's .XX unless they need .XXX: the rebate (its
-# +.004/0 for the stick), the cover thickness and the match-drill stations
+# +.010/0 for the stick), the cover thickness and the match-drill stations
 # the cover masters; the block repeats those stations at the cover's places
 # as references. Angles print whole degrees against the title block's +/-1 deg.
 _THREE_PLACE = frozenset({
@@ -185,7 +185,13 @@ PLATE_DRAWING_PRECISION_BY_NAME = {name: places for dims in PLATE_DRAWING_PRECIS
 BLOCK_MATING_FACE_NOTE = f"{_config.parts('ms-stop-plate')['number']} MATING FACE"
 # Every native Hole Wizard length (drill diameters and depths) prints .XXX.
 HOLE_CALLOUT_PRECISION = 3
-WINDOW_SIZE_TOLERANCE_MM = (0.0, 0.1016)  # +.004/0
+# The rebate's sliding fit on the MS-01 stick: the low limit keeps the least
+# clearances (.010 across the width, .004 on the face) and the top limit only
+# opens the slide, since the thumb screw seats the stick on the roof. Owner
+# ruling 2026-11-21 (tight-tolerance audit, row 12): "MS-02 rebate opens to
+# +.010/0 now" (was +.004/0); the plate-tap-to-window web
+# (PLATE_TAP_WINDOW_WEB_MIN) drops from .1027 to .0967 against the .080 target.
+WINDOW_SIZE_TOLERANCE_MM = (0.0, 0.254)  # +.010/0
 
 assert 0.0 < WINDOW_Y_MIN < WINDOW_Y_MAX < BLOCK_HEIGHT
 assert WINDOW_Z_MIN == 0.0 < WINDOW_Z_MAX < BLOCK_DEPTH

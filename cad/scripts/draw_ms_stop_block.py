@@ -147,7 +147,7 @@ SLIDE_FINISH_OFFSET = (-0.030, -0.012)
 # face; the rebate runs through X and opens into Z = 0; the thumb tap runs +Y,
 # the plate taps +Z). A band is the title block's row for the places the sheet
 # prints (BLOCK_DRAWING_PRECISION_BY_NAME) on the printed nominal, the
-# rebate's own +.004/0 (WINDOW_SIZE_TOLERANCE_MM) on the exact model nominal,
+# rebate's own +.010/0 (WINDOW_SIZE_TOLERANCE_MM) on the exact model nominal,
 # or the DRILLED HOLES row on the native tap drills (HOLE_CALLOUT_PRECISION).
 # The plate-tap stations print as references: the plate (MHA-MS-03) masters
 # the match-drill, so they carry no band here. The declarations print nothing.
@@ -180,7 +180,7 @@ def _printed(
 def _rebate(
     name: str, value: float, *sources: Any
 ) -> tuple[list[float], tuple[Any, ...]]:
-    """The rebate's own +.004/0 on the exact model nominal (SEE NOTE 1)."""
+    """The rebate's own +.010/0 on the exact model nominal (SEE NOTE 1)."""
     return (
         limits(value, _P[name], _REBATE_BAND, unit=part.UNIT),
         (*sources, (_SPEC, "WINDOW_SIZE_TOLERANCE_MM"), (_SELF, "DIMENSION_CALLOUTS")),
@@ -348,7 +348,7 @@ requirement(
     },
     precision={"roof_thickness": _P["RoofThickness"], "finish_ra": 1},
 )
-# The rebate's two sliding-fit sizes (.134 and .330 +.004/0, SEE NOTE 1): the
+# The rebate's two sliding-fit sizes (.134 and .330 +.010/0, SEE NOTE 1): the
 # height on its floor from the ceiling, the width on its back face from the
 # mating face (RIGHT_KEEP "WindowHeight", "WindowWidth"; DIMENSION_CALLOUTS).
 _FIT = (

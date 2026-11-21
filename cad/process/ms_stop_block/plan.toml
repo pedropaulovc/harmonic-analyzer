@@ -103,7 +103,7 @@ height_top_mm = 18.542
 # The depth is (.48) REF: the rebate width plus the back wall. The block is
 # faced to .480 and accepted between the widest rebate plus the thinnest
 # wall and the narrowest rebate plus the thickest wall (cam.py recomputes it).
-thickness_min_mm = 12.0396
+thickness_min_mm = 12.192
 thickness_max_mm = 12.446
 # Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2), passes
 # across the face no wider than half the cutter (6G chip-load factor 1.0 to
@@ -111,7 +111,7 @@ thickness_max_mm = 12.446
 face_cutter_dia_mm = 12.7
 face_stepover_max_mm = 6.35
 # The rebate (MS05), aimed at each printed band's middle: the roof .090
-# under the top face, the rebate .136 high and .332 deep from the mating
+# under the top face, the rebate .139 high and .335 deep from the mating
 # face, the relief .050 past the rebate's back. The 1/8 in end mill slots
 # down the middle in levels of .020 (.16 × D, under Harvey's .18 × D for
 # slotting), then finishes each wall full depth, each taking rebate_wall_mm.
@@ -130,11 +130,11 @@ face_stepover_max_mm = 6.35
 # flat bottoms. cam.py recomputes all three and checks a plunge at every
 # station.
 roof_aim_mm = 2.286
-rebate_height_aim_mm = 3.4544
-rebate_depth_aim_mm = 8.4328
-relief_bottom_mm = 9.7028
-rebate_centre_x_mm = 4.0132
-rebate_wall_mm = 0.1397
+rebate_height_aim_mm = 3.5306
+rebate_depth_aim_mm = 8.509
+relief_bottom_mm = 9.779
+rebate_centre_x_mm = 4.0513
+rebate_wall_mm = 0.1778
 rebate_step_mm = 0.508
 relief_plunge_step_mm = 0.7293
 relief_scallop_mm = 0.0895
@@ -152,10 +152,10 @@ relief_cutter_dia_mm = 1.5748
 # class ZZ minus pins: GO the least pin whose least size is not under the
 # band, NO-GO the largest not over it. Each plunge feeds as its program
 # plunges. cam.py recomputes them all.
-slot_cut_min_mm = 3.1242
-slot_cut_max_mm = 3.2258
-slot_go_pin_in = 0.124
-slot_nogo_pin_in = 0.127
+slot_cut_min_mm = 3.048
+slot_cut_max_mm = 3.302
+slot_go_pin_in = 0.121
+slot_nogo_pin_in = 0.130
 relief_go_pin_in = 0.058
 relief_nogo_pin_in = 0.070
 slot_test_feed_mm_min = 106.68
