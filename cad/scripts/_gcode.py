@@ -1197,18 +1197,29 @@ def check_keep_out(
     """No move, rapid or feed, brings the cutter (``radius``) into a fixture
     shape below its top: each of ``boxes`` an ``x`` × ``y`` rectangle, each of
     ``circles`` a ``centre`` and ``radius``, each with a ``name`` and a
-    ``z_top`` below which the cutter must miss it."""
+    ``z_top`` below which the cutter must miss it. A shape with a
+    ``z_bottom`` (stock overhanging its support, air under it) spans only the
+    band between the two: there the cutter's path from one sampled point to
+    the next must not cross the band. A recipe whose tool reaches above or
+    below its programmed point (an arbor's spacers and nut round a slitting
+    saw) checks each such part with every shape's band shifted by the part's
+    reach."""
     shapes = [(b, lambda p, b=b: _box_distance(b, p)) for b in boxes]
     shapes += [
         (c, lambda p, c=c: math.dist(c["centre"], p[:2]) - c["radius"]) for c in circles
     ]
     hits: dict[str, list[str]] = {}
     for m in program.moves:
+        previous = m.start
         for point in (m.start, *_xy_points(m)):
             for shape, distance in shapes:
-                if point[2] < shape["z_top"] - _TOL_MM:
+                low, high = point[2], point[2]
+                if "z_bottom" in shape:
+                    low, high = sorted((previous[2], point[2]))
+                if low < shape["z_top"] - _TOL_MM and high > shape.get("z_bottom", -math.inf) + _TOL_MM:
                     if distance(point) < radius - _TOL_MM:
                         hits.setdefault(shape["name"], []).append(_where(point))
+            previous = point
     findings: list[Finding] = []
     for shape, items in hits.items():
         what = f"cutter points into {shape}"
