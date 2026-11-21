@@ -36,14 +36,29 @@
 [tools.lathe-ar]
 description = "A R Warner AR carbide turning holder, TCMT insert, R0.4 nose (LMS 4132)"
 
-# Ownership: cad/config/shop-equipment/tools-cutting.toml, same key
-# (McMaster 3212A119, 1/8 in wide), and tools.cutoff-inserts (C2 3212A75, C5
-# 3212A76), both on hand. The packing list gives the inserts' .252 in
-# thickness, not their cutting width, so the plans' parting kerf is an
-# authored allowance over the 1/8 in blade, set by caliper on the insert
-# before the first part.
-[tools.cutoff-blade-holder]
-description = "1/8 in blade-style cutoff holder (McMaster 3212A119), neutral uncoated carbide insert: C5 (3212A76) for steel, C2 (3212A75) for brass and aluminium (non-ferrous)"
+# Every turned plan parts off with the P1 HSS T-type blade, on every material
+# (owner 2026-11-21: "p1 hss and 0.252\""). Ownership: cad/config/
+# shop-equipment/tools-cutting.toml, same key (1/16 in nominal width, the
+# makers' P1 size). The plans' blade_width_in is that record; the travelers
+# mike the edge and preset the DRO to the reading. The .252 in carbide
+# inserts (tools.cutoff-inserts) are not used: no on-hand holder takes them
+# (tools.cutoff-blade-holder is for .161 in inserts), and their kerf is four
+# P1 widths.
+[tools.cutoff-blade-p1]
+description = "P1 HSS T-type cutoff blade, 1/16 in wide x 1/2 in high, in the AXA No. 7 parting blade holder"
+
+# To order (owner 2026-11-21: a better parting blade): the premium P1, same
+# 1/16 in kerf, for the same No. 7 holder. Ownership and the choice's reasons:
+# cad/config/shop-equipment/tools-cutting.toml, same key (status to_order).
+# The plans keep cutoff-blade-p1 until it is on hand.
+[tools.cutoff-blade-p1-t15]
+description = "P1 T15 HSS T-type cutoff blade, 1/16 in wide x 1/2 in high (A R Warner, LittleMachineShop 1728), in the AXA No. 7 parting blade holder"
+
+# The lathe's tool post (owner 2026-11-21: LittleMachineShop 2280). Ownership:
+# cad/config/shop-equipment/tools-cutting.toml, same key, with its five
+# holders as members.
+[tools.qctp-axa-lms-2280]
+description = "AXA (series 100) wedge-type quick-change tool post set, LMS 2280: holders No. 1 turning and facing, No. 2 boring, turning and facing, No. 4 heavy-duty boring (5/8 or 3/4 in round shanks), No. 7 parting blade, No. 10 knurling, facing and turning"
 
 [settings.lathe-ar-1018]
 tool = "lathe-ar"
@@ -58,13 +73,22 @@ sfm = 1170
 feed_mm_rev = 0.1016
 
 [settings.lathe-part-1018]
-tool = "cutoff-blade-holder"
+tool = "cutoff-blade-p1"
 material = "lathe-1018-cold-finished"
 rpm = 300
 feed = "by hand, steady, cutting oil; back out to clear chips"
 
+# The P1 HSS blade at the Ø1.75 collar: 60 % of the LMS HSS turning speed for
+# 1018 (125-215 ft/min, so about 75 ft/min) is 164 rpm there; 300 rpm would
+# be 137 ft/min, about 1.8x the rule, on the deepest part-off in the shop.
+[settings.lathe-part-1018-large]
+tool = "cutoff-blade-p1"
+material = "lathe-1018-cold-finished"
+rpm = 160
+feed = "by hand, steady, cutting oil; back out to clear chips"
+
 [settings.lathe-part-c360]
-tool = "cutoff-blade-holder"
+tool = "cutoff-blade-p1"
 material = "lathe-c360"
 rpm = 300
 feed = "by hand, steady, dry; back out to clear chips"
@@ -176,7 +200,7 @@ sfm = 350
 feed = "tailstock quill by hand, steady, cutting oil"
 
 [settings.lathe-part-6061]
-tool = "cutoff-blade-holder"
+tool = "cutoff-blade-p1"
 material = "lathe-6061"
 rpm = 300
 feed = "by hand, steady, cutting oil; back out to clear chips"

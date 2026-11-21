@@ -42,8 +42,13 @@ chuck_grip_in = 1.0
 face_allowance_in = 0.02
 # Parted .02 over the supply length: finished on MHA-CH-06 after joining.
 regrip_allowance_in = 0.02
-# Parting kerf: 1/8 in blade plus the insert's side clearance (authored).
-part_kerf_in = 0.13
+# Parting kerf: the P1 blade's width plus .0125 (authored), for wander or a
+# .010 step toward the chuck that widens a deep groove.
+part_kerf_in = 0.075
+# The P1 cutoff blade's width: its record (cad/config/shop-equipment/
+# tools-cutting.toml tools.cutoff-blade-p1 width_in, the makers' 1/16 in).
+# The part-off op mikes the blade's cutting edge and presets the DRO to that.
+blade_width_in = 0.0625
 parts_per_pull = 2
 # The parting blade's clearance to the jaw fronts.
 jaw_clearance_in = 0.1
@@ -74,8 +79,8 @@ ref = "drill-d"
 
 [[tools]]
 id = "cutoff"
-name = "Cutoff blade"
-ref = "cutoff-blade-holder"
+name = "P1 HSS cutoff blade"
+ref = "cutoff-blade-p1"
 
 [[tools]]
 id = "file"
@@ -102,7 +107,7 @@ gauge_checks = [{ gauge = "plug-gauges-4000-4005", band_mm = [10.16, 10.1727] }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A strap hole the NO-GO enters or the GO does not: no land in the band fits it. Set that strap aside, make no hub for it, and report it."
+instruction = "A strap hole the NO-GO enters or the GO does not is outside MHA-CH-13's own .4000–.4005 hole band, the strap traveler's hub-hole check: that strap is nonconforming, so make no hub for it. Set it aside and tell the owner: the strap is remade, not fitted with a hub turned to it."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -162,7 +167,7 @@ speed_kind = "spindle"
 tool = "drill-d"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Drill D {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale, backing fully out to clear chips every {{cad.bore_dia_mm:in.2dot}} in: through both hubs and past the second parting line."
+instruction = "Feed the D drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{cad.run_in:.2dot}}, backing fully out to clear chips every {{cad.bore_dia_mm:in.2dot}} in: the drill's full diameter then runs through both hubs and past the second parting line."
 settings = "lathe-drill-d-1018"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 hole_depth_mm = "{{cad.run_mm}}"
@@ -174,7 +179,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off the first hub at Z-{{cad.part_off_in:.2dot}}: {{process.regrip_allowance_in:.2dot}} over the {{cad.length_min_in:.2dot}} MIN supply length. Catch it."
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off the first hub with that face at Z-{{cad.part_off_in:.2dot}}: {{process.regrip_allowance_in:.2dot}} over the {{cad.length_min_in:.2dot}} MIN supply length. Catch it."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -184,7 +189,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the parted end {{process.face_allowance_in:.2dot}} in with the AR tool; set DRO Z0 on it again, and touch the blade on it and zero DRO Z for the blade as in Op 90."
+instruction = "Face the parted end {{process.face_allowance_in:.2dot}} in with the AR tool; set DRO Z0 on it again. Bring the blade's chuck-side face onto the new faced end and set DRO Z there to the blade's width, as in Op 90: the DRO again reads the blade's tailstock-side face."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -194,7 +199,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Part off the second hub at Z-{{cad.part_off_in:.2dot}}. Catch it. Pull the bar for the next two and repeat from Op 30 until there is a hub for every strap that passed Op 10."
+instruction = "Part off the second hub with the blade's tailstock-side face at Z-{{cad.part_off_in:.2dot}}. Catch it. Pull the bar for the next two and repeat from Op 30 until there is a hub for every strap that passed Op 10."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
