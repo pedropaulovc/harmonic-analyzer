@@ -62,31 +62,45 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension
+from _feature_requirements import part_metadata, requirement
 from _drawing_finish import add_surface_finish
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import limits
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from dt_pinion_bracket_geometry import CROSS_HOLE_CZ
 from dt_pinion_bracket_spec import (
     ARBOR_BORE,
+    ARBOR_BORE_BAND,
     C2C,
+    CROSS_HOLE_BAND,
     CROSS_HOLE_CALLOUT,
     CROSS_HOLE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     OVERALL_LENGTH,
+    PIN_BORE,
     PIN_DROP,
+    PIN_SEAT,
     PIN_SEAT_CALLOUT,
+    PIN_SEAT_DIA_BAND,
+    PIN_SEAT_FLOOR_CORNER_R_MAX,
+    PIVOT_BORE,
+    PIVOT_BORE_BAND,
     R_END,
     SURFACE_FINISHES,
     THICKNESS,
+    UNIT,
 )
 
 
@@ -340,6 +354,311 @@ DIMENSION_CALLOUTS = {
     "PinSeatDia": PIN_SEAT_CALLOUT,
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
 }
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (build_dt_pinion_bracket: the pivot
+# bore's axis is model Z through the origin, the arbor bore's at (0, C2C); the
+# strap runs up +Y between the two R.30 ends centred on those bores, its
+# straight flanks at X = +/-R_END, broad face A on Z = 0 and the far broad
+# face at Z = THICKNESS; the blind follower seat and the set-pin cross hole run
+# along X, entering the -X flank).  A band is the title block's row for the
+# places the sheet prints (DRAWING_PRECISION_BY_NAME) on the printed nominal,
+# or the fit band the part authors on its exact model nominal.  The
+# declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_pinion_bracket"
+_GEOM = "dt_pinion_bracket_geometry"
+_FRAME = ("build_dt_pinion_bracket", "__frame__")
+_UNIT = (_GEOM, "UNIT")
+# The seat's centre through the thickness: build_dt_pinion_bracket drives
+# PinSeatCz as "StrapThickness" / 2.
+_SEAT_Z = THICKNESS / 2.0
+_SEAT_Z_SOURCES = ((_GEOM, "THICKNESS"), ("build_dt_pinion_bracket", "build"))
+_ARBOR_FINISH = surface_finish_by_key(SURFACE_FINISHES, "arbor_bore")
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(
+        _FRAME,
+        (_GEOM, "WIDTH"),
+        (_GEOM, "C2C"),
+        (_GEOM, "THICKNESS"),
+        (_GEOM, "CROSS_HOLE_CZ"),
+    ),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "DRAWING_PRECISION_BY_NAME",
+        "DRAWING_REFERENCE_PRECISION",
+        (_GEOM, "END_RADIUS_PLACES"),
+        (_GEOM, "THICKNESS_PLACES"),
+    ),
+)
+# Broad face A, the extrusion's sketch face: the face the thickness, the
+# seat's .180 station and the bores' entry run from.
+requirement(
+    "broad_face_a",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", 0.0), (_FRAME,))},
+)
+# The far broad face: the thickness .36 from face A (LEFT_KEEP "Depth").
+requirement(
+    "broad_face_b",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), THICKNESS),),
+    requirements=("thickness",),
+    fields={
+        "plane": (_plane("z", THICKNESS), ((_GEOM, "THICKNESS"),)),
+        "thickness": (
+            limits(THICKNESS, _P["Depth"], unit=UNIT),
+            ((_GEOM, "THICKNESS"), _UNIT, (_SELF, "LEFT_KEEP")),
+        ),
+        "thickness_nominal": (THICKNESS, ((_GEOM, "THICKNESS"),)),
+        "thickness_from": ("broad_face_a", ((_SELF, "LEFT_KEEP"),)),
+    },
+    precision={"thickness": _P["Depth"]},
+)
+# The straight flanks, tangent to both R.30 ends (the width prints only as
+# the two radii): the -X one carries the follower-seat and cross-hole mouths.
+for _name, _sign in (("seat_flank", -1.0), ("far_flank", 1.0)):
+    requirement(
+        _name,
+        kind="face",
+        faces=(PlanarFace((_sign, 0.0, 0.0), R_END),),
+        requirements=("plane",),
+        fields={"plane": (_plane("x", _sign * R_END), (_FRAME, (_GEOM, "R_END")))},
+    )
+# The two R.30 round ends (FRONT_KEEP "BottomCapRadius", "TopCapRadius"),
+# each concentric with its bore; each cylinder is named by its far extreme.
+# The (1.7) overall the flank view prints as a reference (_overall_reference)
+# runs over both ends, C2C plus the two radii; it rides the arbor end.
+_OVERALL_REF = {
+    "overall_length_ref": (
+        OVERALL_LENGTH,
+        (
+            (_GEOM, "OVERALL_LENGTH"),
+            "DRAWING_REFERENCE_PRECISION",
+            (_SELF, "_overall_reference"),
+        ),
+    )
+}
+for _name, _y, _extreme_y, _radius, _extra, _extra_precision in (
+    ("pivot_end", 0.0, -R_END, "BottomCapRadius", {}, {}),
+    (
+        "arbor_end",
+        C2C,
+        C2C + R_END,
+        "TopCapRadius",
+        _OVERALL_REF,
+        {"overall_length_ref": DRAWING_REFERENCE_PRECISION},
+    ),
+):
+    requirement(
+        _name,
+        kind="arc",
+        faces=(CylinderFace(2.0 * R_END, contains_y_mm=_extreme_y),),
+        requirements=("radius",),
+        fields={
+            "center": ([0.0, _y, 0.0], (_FRAME, (_GEOM, "C2C"))),
+            "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
+            # The end it rounds: away from the other bore.
+            "apex": ((0.0, 1.0 if _extreme_y > _y else -1.0, 0.0), (_FRAME,)),
+            "radius": (
+                limits(R_END, _P[_radius], unit=UNIT),
+                ((_GEOM, "R_END"), _UNIT, (_SELF, "FRONT_KEEP")),
+            ),
+            "radius_nominal": (R_END, ((_GEOM, "R_END"),)),
+            **_extra,
+        },
+        precision={"radius": _P[_radius], **_extra_precision},
+    )
+# The two reamed through bores, entered from face A, each with its fit and
+# mate callout (DIMENSION_CALLOUTS): the pivot bore's sliding fit on the
+# MHA-DT-19 shaft and the arbor bore's running fit on the MHA-DT-22 arbor, its
+# Ra (SURFACE_FINISHES "arbor_bore") and the 1.10 centre distance from the
+# pivot bore (FRONT_KEEP "ArborBoreCz").
+_REAMED_THRU = ((_SELF, "DIMENSION_CALLOUTS"),)
+requirement(
+    "pivot_bore",
+    kind="hole",
+    faces=(CylinderFace(PIVOT_BORE),),
+    requirements=("dia", "thru"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
+        "dia": (
+            limits(PIVOT_BORE, _P["PivotBoreDia"], PIVOT_BORE_BAND, unit=UNIT),
+            (
+                (_GEOM, "PIVOT_BORE"),
+                "PIVOT_BORE_BAND",
+                ("_fit_ream_slide", "REAM_SLIDE"),
+                (_SELF, "FRONT_KEEP"),
+            ),
+        ),
+        "nominal_dia": (PIVOT_BORE, ((_GEOM, "PIVOT_BORE"),)),
+        "thru": (True, _REAMED_THRU),
+        "process": ("ream", _REAMED_THRU),
+        "callout": (DIMENSION_CALLOUTS["PivotBoreDia"], _REAMED_THRU),
+    },
+    precision={"dia": _P["PivotBoreDia"]},
+)
+requirement(
+    "arbor_bore",
+    kind="hole",
+    faces=(CylinderFace(ARBOR_BORE),),
+    requirements=("dia", "thru", "center_distance", "finish_ra"),
+    fields={
+        "at": ([0.0, C2C, 0.0], (_FRAME, (_GEOM, "C2C"))),
+        "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
+        "dia": (
+            limits(ARBOR_BORE, _P["ArborBoreDia"], ARBOR_BORE_BAND, unit=UNIT),
+            (
+                (_GEOM, "ARBOR_BORE"),
+                "ARBOR_BORE_BAND",
+                ("_fit_ream_slide", "REAM_SLIDE"),
+                (_SELF, "FRONT_KEEP"),
+            ),
+        ),
+        "nominal_dia": (ARBOR_BORE, ((_GEOM, "ARBOR_BORE"),)),
+        "thru": (True, _REAMED_THRU),
+        "process": ("ream", _REAMED_THRU),
+        "callout": (DIMENSION_CALLOUTS["ArborBoreDia"], _REAMED_THRU),
+        "center_distance": (
+            limits(C2C, _P["ArborBoreCz"], unit=UNIT),
+            ((_GEOM, "C2C"), _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "center_distance_nominal": (C2C, ((_GEOM, "C2C"),)),
+        "center_distance_from": ("pivot_bore", ((_SELF, "FRONT_KEEP"),)),
+        "center_distance_axis": ("y", (_FRAME,)),
+        "finish_ra": (
+            _ARBOR_FINISH.roughness_um,
+            ("SURFACE_FINISHES", (_SELF, "build")),
+        ),
+        "finish_ra_printed": (
+            _ARBOR_FINISH.roughness_ra,
+            ("SURFACE_FINISHES", ("_surface_finish", "ra")),
+        ),
+    },
+    precision={
+        "dia": _P["ArborBoreDia"],
+        "center_distance": _P["ArborBoreCz"],
+        "finish_ra": 1,
+    },
+)
+# The blind follower seat, flat-bottom reamed into the -X flank
+# (DIMENSION_CALLOUTS "PinSeatDia": PIN_SEAT_CALLOUT, its bonded fit on the
+# MHA-DT-25 stud and the floor-corner allowance), its .16 depth controlled by
+# Section B-B (SECTION_KEEP "PinSeatDepth"), located .276 above the pivot
+# axis (LEFT_KEEP "PinSeatCy") and .180 from face A (LEFT_KEEP "PinSeatCz").
+# The flat floor faces the mouth.
+_SEAT_CALLOUT = ("PIN_SEAT_CALLOUT", (_SELF, "DIMENSION_CALLOUTS"))
+requirement(
+    "follower_seat",
+    kind="hole",
+    faces=(
+        CylinderFace(PIN_BORE),
+        PlanarFace((-1.0, 0.0, 0.0), R_END - PIN_SEAT),
+    ),
+    requirements=("dia", "depth", "height", "station", "floor_corner_r_max"),
+    fields={
+        "at": (
+            [-R_END, -PIN_DROP, _SEAT_Z],
+            (_FRAME, (_GEOM, "R_END"), (_GEOM, "PIN_DROP"), *_SEAT_Z_SOURCES),
+        ),
+        "axis": ((1.0, 0.0, 0.0), (_FRAME,)),
+        "dia": (
+            limits(PIN_BORE, _P["PinSeatDia"], PIN_SEAT_DIA_BAND, unit=UNIT),
+            (
+                (_GEOM, "PIN_BORE"),
+                "PIN_SEAT_DIA_BAND",
+                ("_fit_ream_h7", "REAM_H7"),
+                (_SELF, "LEFT_KEEP"),
+            ),
+        ),
+        "nominal_dia": (PIN_BORE, ((_GEOM, "PIN_BORE"),)),
+        "process": ("ream", _SEAT_CALLOUT),
+        "flat_bottom": (True, _SEAT_CALLOUT),
+        "depth": (
+            limits(PIN_SEAT, _P["PinSeatDepth"], unit=UNIT),
+            ((_GEOM, "PIN_SEAT"), _UNIT, (_SELF, "SECTION_KEEP"), "PIN_SEAT_CALLOUT"),
+        ),
+        "depth_nominal": (PIN_SEAT, ((_GEOM, "PIN_SEAT"),)),
+        "floor_corner_r_max": (
+            PIN_SEAT_FLOOR_CORNER_R_MAX,
+            ("PIN_SEAT_FLOOR_CORNER_R_MAX", "PIN_SEAT_CALLOUT"),
+        ),
+        "height": (
+            limits(-PIN_DROP, _P["PinSeatCy"], unit=UNIT),
+            ((_GEOM, "PIN_DROP"), _UNIT, (_SELF, "LEFT_KEEP")),
+        ),
+        "height_nominal": (-PIN_DROP, ((_GEOM, "PIN_DROP"),)),
+        "height_from": ("pivot_bore", ((_SELF, "LEFT_KEEP"),)),
+        "height_axis": ("y", (_FRAME,)),
+        "station": (
+            limits(_SEAT_Z, _P["PinSeatCz"], unit=UNIT),
+            (*_SEAT_Z_SOURCES, _UNIT, (_SELF, "LEFT_KEEP")),
+        ),
+        "station_nominal": (_SEAT_Z, _SEAT_Z_SOURCES),
+        "station_from": ("broad_face_a", ((_SELF, "LEFT_KEEP"),)),
+        "callout": (PIN_SEAT_CALLOUT, _SEAT_CALLOUT),
+    },
+    precision={
+        "dia": _P["PinSeatDia"],
+        "depth": _P["PinSeatDepth"],
+        "height": _P["PinSeatCy"],
+        "station": _P["PinSeatCz"],
+    },
+)
+# The option E-a set-pin cross hole (LEFT_KEEP "CrossHoleDia" with
+# CROSS_HOLE_CALLOUT: drilled through for the MHA-DT-VN-63 spring pin, its
+# own press-fit band), through both walls and across the pivot bore's axis.
+# It prints no station of its own: it shares the follower seat's centreline,
+# whose .180 from face A (LEFT_KEEP "PinSeatCz") locates it, and its centre
+# sits on the pivot-axis line the flank view draws (dt_pinion_bracket_spec).
+_CROSS_CALLOUT = ("CROSS_HOLE_CALLOUT", (_SELF, "DIMENSION_CALLOUTS"))
+requirement(
+    "cross_hole",
+    kind="hole",
+    faces=(CylinderFace(CROSS_HOLE_DIA),),
+    requirements=("dia", "thru", "station"),
+    fields={
+        "at": (
+            [-R_END, 0.0, CROSS_HOLE_CZ],
+            (_FRAME, (_GEOM, "R_END"), (_GEOM, "CROSS_HOLE_CZ")),
+        ),
+        "axis": ((1.0, 0.0, 0.0), (_FRAME,)),
+        "dia": (
+            limits(CROSS_HOLE_DIA, _P["CrossHoleDia"], CROSS_HOLE_BAND, unit=UNIT),
+            (
+                "CROSS_HOLE_DIA",
+                "CROSS_HOLE_BAND",
+                ("dt_vn_pinion_strap_pin_spec", "HOLE_BAND"),
+                (_SELF, "LEFT_KEEP"),
+            ),
+        ),
+        "nominal_dia": (CROSS_HOLE_DIA, ("CROSS_HOLE_DIA",)),
+        "thru": (True, _CROSS_CALLOUT),
+        "process": ("drill", _CROSS_CALLOUT),
+        "crosses": (
+            "pivot_bore",
+            (_FRAME, ("build_dt_pinion_bracket", "build"), (_SELF, "LEFT_KEEP")),
+        ),
+        "station": (
+            limits(CROSS_HOLE_CZ, _P["PinSeatCz"], unit=UNIT),
+            ((_GEOM, "CROSS_HOLE_CZ"), _UNIT, (_SELF, "LEFT_KEEP")),
+        ),
+        "station_nominal": (CROSS_HOLE_CZ, ((_GEOM, "CROSS_HOLE_CZ"),)),
+        "station_from": ("broad_face_a", ((_SELF, "LEFT_KEEP"),)),
+        "callout": (CROSS_HOLE_CALLOUT, _CROSS_CALLOUT),
+    },
+    precision={"dia": _P["CrossHoleDia"], "station": _P["PinSeatCz"]},
+)
 
 
 def _overall_reference(adapter: Any, left: Any) -> None:
