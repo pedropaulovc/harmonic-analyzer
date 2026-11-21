@@ -157,12 +157,12 @@ description = "PM-1127VF-LB steady rest"
 
 # The cam pin's R.125 form tool cuts its whole width at once: University of
 # Florida EML2322L "Parting Facts" (lathe.toml header), the 300 rpm start for
-# a full-width plunge, fed by hand with cutting oil.
+# a full-width form cut, fed along Z by hand with cutting oil.
 [settings.lathe-form-r125-o1]
 tool = "form-tool-r125"
 material = "lathe-o1-drill-rod"
 rpm = 300
-feed = "cross slide by hand, a slow steady plunge, cutting oil"
+feed = "carriage handwheel along Z, a slow steady feed, cutting oil"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
