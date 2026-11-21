@@ -10,8 +10,10 @@ import pytest
 
 import build_pn_pen_v_block as part
 import draw_pn_pen_v_block as drawing
+import export_features
 import pn_pen_v_block_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gtol_face import FaceGeometry
 from _hole_spec import TAP_DRILL_MM
 from _printed_tolerance import printed_deviations
 
@@ -947,3 +949,144 @@ def test_tap_wall_stands_under_the_front_view_clear_of_every_line() -> None:
     assert y - 0.0045 > station_y + 0.0017 + 0.005
     # The station row clears the bottom view's top (body front face) edge.
     assert station_y - 0.0033 - 0.004 > drawing._bz(spec.BODY_Z0)
+
+
+def _in(value_in: float) -> float:
+    return value_in * 25.4
+
+
+_FEATURE_KINDS = {
+    "paper_end": "face",
+    "bottom_face": "face",
+    "body_front": "face",
+    "far_end": "face",
+    "top_face": "face",
+    "neck_front": "face",
+    "neck_back": "face",
+    "body_back": "face",
+    "neck_steps": "face",
+    "v_groove": "vee",
+    "relief": "slot",
+    "pivot_bore": "hole",
+    "set_screw_tap": "threaded_hole",
+}
+
+
+def _plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+    point = tuple(value * offset_mm / 1000 for value in normal)
+    return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+
+def _cylinder(
+    dia_mm: float, axis: tuple[float, float, float], box_mm: tuple[float, ...]
+) -> FaceGeometry:
+    box = tuple(value / 1000 for value in box_mm)
+    return FaceGeometry(None, 4002, (0.0, 0.0, 0.0, *axis, dia_mm / 2000), None, box)
+
+
+def test_the_block_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    assert "pn_pen_v_block" in export_features.SUPPORTED_PARTS
+    manifest = export_features.requirement_manifest("pn_pen_v_block")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == _FEATURE_KINDS
+    assert manifest["construction"] == "one_piece"
+    assert manifest["notes"]["manufacturing"] == []
+    selectors = export_features.feature_selectors("pn_pen_v_block")
+    s = math.sqrt(0.5)
+    r = spec.RELIEF_CORNER_R
+    x0, z0, z1 = spec.RELIEF_X0, spec.RELIEF_Z0, spec.RELIEF_Z1
+    bore_r = spec.PIVOT_BORE_DIA / 2
+    tap = TAP_DRILL_MM[spec.SET_SCREW_TAP_SPEC.size]
+    tr = tap / 2
+    x, y, mid = spec.PIVOT_BORE_X, spec.SET_SCREW_Y, spec.DEPTH_MID_Z
+    expected = {
+        "paper_end": [_plane((-1.0, 0.0, 0.0), 0.0)],
+        "bottom_face": [_plane((0.0, -1.0, 0.0), 0.0)],
+        "body_front": [_plane((0.0, 0.0, -1.0), -spec.BODY_Z0)],
+        "far_end": [_plane((1.0, 0.0, 0.0), spec.BLOCK_LENGTH)],
+        "top_face": [_plane((0.0, 1.0, 0.0), spec.BLOCK_HEIGHT)],
+        "neck_front": [_plane((0.0, 0.0, -1.0), 0.0)],
+        "neck_back": [_plane((0.0, 0.0, 1.0), spec.NECK_DEPTH)],
+        "body_back": [_plane((0.0, 0.0, 1.0), spec.BODY_Z1)],
+        "neck_steps": [_plane((-1.0, 0.0, 0.0), -x0)],
+        "v_groove": [
+            _plane((0.0, -s, s), s * spec.V_MOUTH_Z0),
+            _plane((0.0, -s, -s), -s * spec.V_MOUTH_Z1),
+            _plane((0.0, -1.0, 0.0), -spec.V_FLAT_Y),
+        ],
+        "relief": [
+            _plane((0.0, -1.0, 0.0), -spec.RELIEF_HEIGHT),
+            _plane((0.0, 0.0, 1.0), z0),
+            _plane((0.0, 0.0, -1.0), -z1),
+            _plane((1.0, 0.0, 0.0), x0),
+            _cylinder(
+                2 * r,
+                (0.0, 1.0, 0.0),
+                (x0, 0.0, z0, x0 + r, spec.RELIEF_HEIGHT, z0 + r),
+            ),
+            _cylinder(
+                2 * r,
+                (0.0, 1.0, 0.0),
+                (x0, 0.0, z1 - r, x0 + r, spec.RELIEF_HEIGHT, z1),
+            ),
+        ],
+        "pivot_bore": [
+            _cylinder(
+                spec.PIVOT_BORE_DIA,
+                (0.0, 1.0, 0.0),
+                (
+                    x - bore_r,
+                    spec.RELIEF_HEIGHT,
+                    mid - bore_r,
+                    x + bore_r,
+                    spec.BLOCK_HEIGHT,
+                    mid + bore_r,
+                ),
+            )
+        ],
+        "set_screw_tap": [
+            _cylinder(
+                tap,
+                (0.0, 0.0, 1.0),
+                (x - tr, y - tr, spec.BODY_Z0, x + tr, y + tr, mid - bore_r),
+            )
+        ],
+    }
+    for name, faces in expected.items():
+        for face in faces:
+            owners = [
+                owner
+                for owner, specs in selectors.items()
+                if any(selector.matches(face) for selector in specs)
+            ]
+            assert owners == [name], name
+
+
+def test_block_feature_bands_are_the_printed_ones() -> None:
+    features = export_features.requirement_manifest("pn_pen_v_block")["features"]
+    assert features["far_end"]["length"] == pytest.approx([_in(1.02), _in(1.04)])
+    assert features["top_face"]["height"] == pytest.approx([_in(0.70), _in(0.72)])
+    assert features["neck_front"]["station"] == pytest.approx([_in(0.07), _in(0.09)])
+    assert features["neck_back"]["station"] == pytest.approx([_in(0.77), _in(0.79)])
+    assert features["body_back"]["depth"] == pytest.approx([_in(0.85), _in(0.87)])
+    assert features["neck_steps"]["station"] == pytest.approx([_in(0.34), _in(0.36)])
+    vee = features["v_groove"]
+    assert vee["flank_angle_deg"] == pytest.approx([44.0, 46.0])
+    assert vee["flat_width"] == pytest.approx([_in(0.07), _in(0.09)])
+    assert vee["mouth_near"] == pytest.approx([_in(0.18), _in(0.20)])
+    assert vee["mouth_far"] == pytest.approx([_in(0.66), _in(0.68)])
+    relief = features["relief"]
+    assert relief["near_wall"] == pytest.approx([_in(0.11), _in(0.13)])
+    assert relief["far_wall"] == pytest.approx([_in(0.73), _in(0.75)])
+    assert relief["height"] == pytest.approx([_in(0.25), _in(0.27)])
+    bore = features["pivot_bore"]
+    assert bore["process"] == "ream" and bore["thru"] is True
+    assert bore["dia"] == pytest.approx([_in(0.1260), _in(0.1265)], abs=1e-4)
+    assert bore["station"] == pytest.approx([_in(0.48), _in(0.50)])
+    assert bore["depth_station"] == pytest.approx([_in(0.42), _in(0.44)])
+    assert bore["top_chamfer"] == pytest.approx([_in(0.012), _in(0.016)])
+    tap = features["set_screw_tap"]
+    assert tap["thread"] == "#4-40 UNC-2B" and tap["into"] == "pivot_bore"
+    assert tap["dia"] == pytest.approx([_in(0.089), _in(0.093)], abs=1e-3)
+    assert tap["height"] == pytest.approx([_in(0.46), _in(0.48)])
+    assert tap["wall_min"][0] == pytest.approx(_in(0.064), abs=1e-3)

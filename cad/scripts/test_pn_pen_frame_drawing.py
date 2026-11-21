@@ -9,10 +9,12 @@ import pytest
 
 import build_pn_pen_frame as part
 import draw_pn_pen_frame as drawing
+import export_features
 import pn_pen_carriage_geom as carriage
 import pn_pen_frame_spec as spec
 import pn_pen_v_block_spec as v_block
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gtol_face import FaceGeometry
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, blind_cut_dia_mm
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm, printed_deviations
@@ -331,3 +333,114 @@ def test_tap_precision_goes_to_the_drill_variable_the_callout_carries() -> None:
     )
     with pytest.raises(RuntimeError):
         drawing._tap_drill_variable({5: "TAP <hw-threaddesc> <hw-thru>"})
+
+
+def _in(value_in: float) -> float:
+    return value_in * 25.4
+
+
+_FEATURE_KINDS = {
+    "left_face": "face",
+    "bottom_face": "face",
+    "front_face": "face",
+    "right_face": "face",
+    "top_face": "face",
+    "back_face": "face",
+    "window": "pocket",
+    "thumb_screw_tap": "threaded_hole",
+}
+
+
+def _plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+    point = tuple(value * offset_mm / 1000 for value in normal)
+    return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+
+def _cylinder(
+    dia_mm: float, axis: tuple[float, float, float], box_mm: tuple[float, ...]
+) -> FaceGeometry:
+    box = tuple(value / 1000 for value in box_mm)
+    return FaceGeometry(None, 4002, (0.0, 0.0, 0.0, *axis, dia_mm / 2000), None, box)
+
+
+def test_the_ring_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    assert "pn_pen_frame" in export_features.SUPPORTED_PARTS
+    manifest = export_features.requirement_manifest("pn_pen_frame")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == _FEATURE_KINDS
+    assert manifest["construction"] == "one_piece"
+    assert manifest["notes"]["manufacturing"] == []
+    selectors = export_features.feature_selectors("pn_pen_frame")
+    w, h, d = spec.OUTER_WIDTH, spec.OUTER_HEIGHT, spec.FRAME_DEPTH
+    x0, x1 = spec.RAIL_SIDE, spec.RAIL_SIDE + spec.WINDOW_WIDTH
+    y0, y1 = spec.RAIL_END, spec.RAIL_END + spec.WINDOW_HEIGHT
+    r = spec.WINDOW_CORNER_R
+    corners = [
+        _cylinder(
+            2 * r,
+            (0.0, 0.0, 1.0),
+            (
+                min(x, x + sx * r),
+                min(y, y + sy * r),
+                0.0,
+                max(x, x + sx * r),
+                max(y, y + sy * r),
+                d,
+            ),
+        )
+        for x, sx in ((x0, 1.0), (x1, -1.0))
+        for y, sy in ((y0, 1.0), (y1, -1.0))
+    ]
+    tap = blind_cut_dia_mm(spec.SET_SCREW_TAP_SPEC)
+    tr = tap / 2
+    expected = {
+        "left_face": [_plane((-1.0, 0.0, 0.0), 0.0)],
+        "bottom_face": [_plane((0.0, -1.0, 0.0), 0.0)],
+        "front_face": [_plane((0.0, 0.0, -1.0), 0.0)],
+        "right_face": [_plane((1.0, 0.0, 0.0), w)],
+        "top_face": [_plane((0.0, 1.0, 0.0), h)],
+        "back_face": [_plane((0.0, 0.0, 1.0), d)],
+        "window": [
+            _plane((1.0, 0.0, 0.0), x0),
+            _plane((-1.0, 0.0, 0.0), -x1),
+            _plane((0.0, 1.0, 0.0), y0),
+            _plane((0.0, -1.0, 0.0), -y1),
+            *corners,
+        ],
+        "thumb_screw_tap": [
+            _cylinder(
+                tap,
+                (0.0, 1.0, 0.0),
+                (w / 2 - tr, 0.0, d / 2 - tr, w / 2 + tr, y0, d / 2 + tr),
+            )
+        ],
+    }
+    for name, faces in expected.items():
+        for face in faces:
+            owners = [
+                owner
+                for owner, specs in selectors.items()
+                if any(selector.matches(face) for selector in specs)
+            ]
+            assert owners == [name], name
+
+
+def test_ring_feature_bands_are_the_printed_ones() -> None:
+    features = export_features.requirement_manifest("pn_pen_frame")["features"]
+    assert features["right_face"]["width"] == pytest.approx([_in(0.99), _in(1.01)])
+    assert features["top_face"]["height"] == pytest.approx([_in(1.57), _in(1.59)])
+    assert features["back_face"]["depth"] == pytest.approx([_in(0.30), _in(0.32)])
+    window = features["window"]
+    assert window["width"] == pytest.approx([_in(0.73), _in(0.75)])
+    assert window["height"] == pytest.approx([_in(1.09), _in(1.11)])
+    assert window["left_wall"] == pytest.approx([_in(0.12), _in(0.14)])
+    assert window["bottom_wall"] == pytest.approx([_in(0.23), _in(0.25)])
+    assert window["corner_r_max"] == pytest.approx(_in(0.040))
+    tap = features["thumb_screw_tap"]
+    assert tap["thread"] == "#4-40 UNC-2B" and tap["thru"] is True
+    assert tap["breaks_into"] == "window"
+    assert tap["dia"] == pytest.approx([_in(0.089), _in(0.093)], abs=1e-3)
+    assert tap["station"] == pytest.approx([_in(0.49), _in(0.51)])
+    # The .16 prints rounded from the .155 mid-plane; its band is the printed one.
+    assert tap["depth_station"] == pytest.approx([_in(0.15), _in(0.17)])
+    assert tap["wall_note"] == spec.TAP_WALL_CALLOUT

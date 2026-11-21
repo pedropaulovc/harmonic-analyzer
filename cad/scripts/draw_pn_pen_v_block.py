@@ -93,12 +93,17 @@ from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import TAP_DRILL_MM
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
+from _printed_tolerance import angular_band_deg
 from _paths import CAD_ROOT
 from _section_axis import position_section_caption
 from _session import run_build
@@ -106,6 +111,7 @@ import _telemetry
 from pn_pen_v_block_spec import (
     BLOCK_HEIGHT,
     BLOCK_LENGTH,
+    BODY_DEPTH,
     BODY_Z0,
     BODY_Z1,
     DEPTH_MID_Z,
@@ -113,23 +119,33 @@ from pn_pen_v_block_spec import (
     DIMENSION_CALLOUTS_ABOVE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    INSIDE_CORNER_R_MAX,
     ISOMETRIC_VIEW_SCALE,
     NECK_DEPTH,
+    PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
     PIVOT_BORE_TOP_CHAMFER,
     PIVOT_BORE_X,
+    PIVOT_CHAMFER_BAND,
+    RELIEF_CORNER_R,
     RELIEF_HEIGHT,
     RELIEF_X0,
     RELIEF_Z0,
+    RELIEF_Z1,
     SECTION_REFERENCE_SKETCHES,
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
+    TAP_WALL_MIN_BAND,
     TAP_WALL_MIN_MM,
     TAP_WALL_START_X,
+    UNIT,
     V_ANGLE_DEG,
+    V_FLANK_ANGLE_DEG,
+    V_FLAT_WIDTH,
     V_FLAT_Y,
     V_MOUTH_Z0,
     V_MOUTH_Z1,
+    depth_station,
 )
 
 
@@ -747,6 +763,370 @@ _THRU_TOKEN = "<hw-thru>"
 _DRILL_WORD = "DRILL"
 # swDimensionTextParts_e: each definition part and the part SetText writes.
 _DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (pn_pen_v_block_spec: length +X from
+# the paper end, height +Y from the bottom face, depth Z with z 0 the neck's
+# front face; every depth station prints from the body's front face, z
+# BODY_Z0, the print's one depth datum). Bands are the title block's rows at
+# the places the sheet prints (DRAWING_PRECISION_BY_NAME), the reamed bore
+# and the two single-limit dimensions their native bands, the tap drill the
+# DRILLED HOLES row at TAP_DRILL_PLACES. Inside corners print nothing (the
+# title block's R.040 MAX). The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pn_pen_v_block"
+_FRAME = "__frame__"
+_PRECISION = ("DRAWING_PRECISION_BY_NAME", "UNIT")
+_FLANK = math.radians(V_FLANK_ANGLE_DEG)
+_SET_SCREW_DRILL = TAP_DRILL_MM[SET_SCREW_TAP_SPEC.size]
+_ANGULAR_BAND_DEG = angular_band_deg(unit=UNIT)
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+def _printed(name: str, model: float, *sources: Any) -> tuple[list[float], tuple]:
+    return limits(model, _P[name], unit=UNIT), (*sources, *_PRECISION)
+
+
+part_metadata(
+    model_sources=("BLOCK_LENGTH", "BLOCK_HEIGHT", "BODY_Z0", "BODY_Z1", "NECK_DEPTH"),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "DRAWING_PRECISION_BY_NAME",
+        "DRAWING_BANDS",
+        (_SELF, "TAP_DRILL_PLACES"),
+    ),
+)
+# The faces the print locates from: the paper end (every X station), the
+# bottom face (the height, the relief roof, the set-screw row) and the
+# body's front face (every depth station).
+for _name, _normal, _axis, _value, _source in (
+    ("paper_end", (-1.0, 0.0, 0.0), "x", 0.0, _FRAME),
+    ("bottom_face", (0.0, -1.0, 0.0), "y", 0.0, _FRAME),
+    ("body_front", (0.0, 0.0, -1.0), "z", BODY_Z0, "BODY_Z0"),
+):
+    requirement(
+        _name,
+        kind="face",
+        faces=(PlanarFace(_normal, -_value if _axis == "z" else _value),),
+        requirements=("plane",),
+        fields={"plane": (_plane(_axis, _value), (_source,))},
+    )
+# The length 1.03 and height .71, and across the depth the neck's two faces
+# (.08, .78) and the body's back (.86), each a baseline from its datum face.
+for _name, _normal, _axis, _value, _key, _dim, _nominal, _source, _from, _keep in (
+    (
+        "far_end",
+        (1.0, 0.0, 0.0),
+        "x",
+        BLOCK_LENGTH,
+        "length",
+        "Length",
+        BLOCK_LENGTH,
+        "BLOCK_LENGTH",
+        "paper_end",
+        "BOTTOM_KEEP",
+    ),
+    (
+        "top_face",
+        (0.0, 1.0, 0.0),
+        "y",
+        BLOCK_HEIGHT,
+        "height",
+        "Height",
+        BLOCK_HEIGHT,
+        "BLOCK_HEIGHT",
+        "bottom_face",
+        "FRONT_KEEP",
+    ),
+    (
+        "neck_front",
+        (0.0, 0.0, -1.0),
+        "z",
+        0.0,
+        "station",
+        "NeckZ0",
+        depth_station(0.0),
+        "BODY_Z0",
+        "body_front",
+        "BOTTOM_KEEP",
+    ),
+    (
+        "neck_back",
+        (0.0, 0.0, 1.0),
+        "z",
+        NECK_DEPTH,
+        "station",
+        "NeckZ1",
+        depth_station(NECK_DEPTH),
+        "NECK_DEPTH",
+        "body_front",
+        "BOTTOM_KEEP",
+    ),
+    (
+        "body_back",
+        (0.0, 0.0, 1.0),
+        "z",
+        BODY_Z1,
+        "depth",
+        "Depth",
+        BODY_DEPTH,
+        "BODY_DEPTH",
+        "body_front",
+        "BOTTOM_KEEP",
+    ),
+):
+    requirement(
+        _name,
+        kind="face",
+        faces=(PlanarFace(_normal, -_value if _normal[2] < 0 else _value),),
+        requirements=(_key,),
+        fields={
+            "plane": (_plane(_axis, _value), (_source,)),
+            _key: _printed(_dim, _nominal, _source, (_SELF, _keep)),
+            f"{_key}_nominal": (_nominal, (_source,)),
+            f"{_key}_from": (_from, ((_SELF, _keep),)),
+        },
+        precision={_key: _P[_dim]},
+    )
+# The body's two side steps, where the neck ends: in line with the relief
+# slot's end wall, so the .35 (BOTTOM_KEEP ReliefX0) locates both.
+requirement(
+    "neck_steps",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), -RELIEF_X0),),
+    requirements=("station",),
+    fields={
+        "plane": (_plane("x", RELIEF_X0), ("RELIEF_X0",)),
+        "station": _printed("ReliefX0", RELIEF_X0, "RELIEF_X0", (_SELF, "BOTTOM_KEEP")),
+        "station_nominal": (RELIEF_X0, ("RELIEF_X0",)),
+        "station_from": ("paper_end", ((_SELF, "BOTTOM_KEEP"),)),
+    },
+    precision={"station": _P["ReliefX0"]},
+)
+# The grip's V along the neck's bottom, open at the paper end and run to the
+# step: each flank 2X 45° to the bottom face, its mouth edges .19 and .67
+# from the body's front face, the apex flat .08 wide at (.20) (RIGHT_KEEP).
+requirement(
+    "v_groove",
+    kind="vee",
+    faces=(
+        PlanarFace(
+            (0.0, -math.cos(_FLANK), math.sin(_FLANK)), math.sin(_FLANK) * V_MOUTH_Z0
+        ),
+        PlanarFace(
+            (0.0, -math.cos(_FLANK), -math.sin(_FLANK)), -math.sin(_FLANK) * V_MOUTH_Z1
+        ),
+        PlanarFace((0.0, -1.0, 0.0), -V_FLAT_Y),
+    ),
+    requirements=(
+        "flank_angle_deg",
+        "flat_width",
+        "mouth_near",
+        "mouth_far",
+        "flat_height_ref",
+    ),
+    fields={
+        "axis": ((1.0, 0.0, 0.0), (_FRAME,)),
+        "flank_angle_deg": (
+            [
+                V_FLANK_ANGLE_DEG - _ANGULAR_BAND_DEG,
+                V_FLANK_ANGLE_DEG + _ANGULAR_BAND_DEG,
+            ],
+            ("V_FLANK_ANGLE_DEG", "UNIT", (_SELF, "RIGHT_KEEP"), "DIMENSION_PREFIXES"),
+        ),
+        "flank_angle_deg_nominal": (V_FLANK_ANGLE_DEG, ("V_FLANK_ANGLE_DEG",)),
+        "included_angle_deg": (V_ANGLE_DEG, ("V_ANGLE_DEG",)),
+        "flat_width": _printed(
+            "VFlatWidth", V_FLAT_WIDTH, "V_FLAT_WIDTH", (_SELF, "RIGHT_KEEP")
+        ),
+        "flat_width_nominal": (V_FLAT_WIDTH, ("V_FLAT_WIDTH",)),
+        "mouth_near": _printed(
+            "VMouthZ0", depth_station(V_MOUTH_Z0), "V_MOUTH_Z0", (_SELF, "RIGHT_KEEP")
+        ),
+        "mouth_near_nominal": (depth_station(V_MOUTH_Z0), ("V_MOUTH_Z0",)),
+        "mouth_far": _printed(
+            "VMouthZ1", depth_station(V_MOUTH_Z1), "V_MOUTH_Z1", (_SELF, "RIGHT_KEEP")
+        ),
+        "mouth_far_nominal": (depth_station(V_MOUTH_Z1), ("V_MOUTH_Z1",)),
+        "mouth_near_from": ("body_front", ((_SELF, "RIGHT_KEEP"),)),
+        "mouth_far_from": ("body_front", ((_SELF, "RIGHT_KEEP"),)),
+        "flat_height_ref": (V_FLAT_Y, ("V_FLAT_Y", "REFERENCE_DIMENSIONS")),
+        "length_to": ("neck_steps", ("V_CUT_LENGTH",)),
+        "corner_r_max": (INSIDE_CORNER_R_MAX, ("INSIDE_CORNER_R_MAX",)),
+    },
+    precision={
+        "flank_angle_deg": _P["VFlankAngle"],
+        "flat_width": _P["VFlatWidth"],
+        "mouth_near": _P["VMouthZ0"],
+        "mouth_far": _P["VMouthZ1"],
+        "flat_height_ref": _P["VFlatY"],
+    },
+)
+# The relief slot under the body, open at the far end and the bottom: its
+# walls .12 and .74 from the body's front face and roof .26 from the bottom
+# (SECTION_KEEP), its end wall at the step .35 from the paper end; the two
+# corners at the step take the title block's R.040 MAX.
+_RELIEF_ARC = 0.3 * RELIEF_CORNER_R
+requirement(
+    "relief",
+    kind="slot",
+    faces=(
+        PlanarFace((0.0, -1.0, 0.0), -RELIEF_HEIGHT),
+        PlanarFace((0.0, 0.0, 1.0), RELIEF_Z0),
+        PlanarFace((0.0, 0.0, -1.0), -RELIEF_Z1),
+        PlanarFace((1.0, 0.0, 0.0), RELIEF_X0),
+        CylinderFace(
+            2.0 * RELIEF_CORNER_R,
+            contains_x_mm=RELIEF_X0 + _RELIEF_ARC,
+            contains_z_mm=RELIEF_Z0 + _RELIEF_ARC,
+        ),
+        CylinderFace(
+            2.0 * RELIEF_CORNER_R,
+            contains_x_mm=RELIEF_X0 + _RELIEF_ARC,
+            contains_z_mm=RELIEF_Z1 - _RELIEF_ARC,
+        ),
+    ),
+    requirements=("near_wall", "far_wall", "height", "station", "corner_r_max"),
+    fields={
+        "axis": ((1.0, 0.0, 0.0), (_FRAME,)),
+        "near_wall": _printed(
+            "ReliefZ0", depth_station(RELIEF_Z0), "RELIEF_Z0", (_SELF, "SECTION_KEEP")
+        ),
+        "near_wall_nominal": (depth_station(RELIEF_Z0), ("RELIEF_Z0",)),
+        "far_wall": _printed(
+            "ReliefZ1", depth_station(RELIEF_Z1), "RELIEF_Z1", (_SELF, "SECTION_KEEP")
+        ),
+        "far_wall_nominal": (depth_station(RELIEF_Z1), ("RELIEF_Z1",)),
+        "near_wall_from": ("body_front", ((_SELF, "SECTION_KEEP"),)),
+        "far_wall_from": ("body_front", ((_SELF, "SECTION_KEEP"),)),
+        "height": _printed(
+            "ReliefHeight", RELIEF_HEIGHT, "RELIEF_HEIGHT", (_SELF, "SECTION_KEEP")
+        ),
+        "height_nominal": (RELIEF_HEIGHT, ("RELIEF_HEIGHT",)),
+        "height_from": ("bottom_face", ((_SELF, "SECTION_KEEP"),)),
+        "station": _printed("ReliefX0", RELIEF_X0, "RELIEF_X0", (_SELF, "BOTTOM_KEEP")),
+        "station_nominal": (RELIEF_X0, ("RELIEF_X0",)),
+        "station_from": ("paper_end", ((_SELF, "BOTTOM_KEEP"),)),
+        "corner_r_max": (INSIDE_CORNER_R_MAX, ("INSIDE_CORNER_R_MAX",)),
+        "corner_r_model": (RELIEF_CORNER_R, ("RELIEF_CORNER_R",)),
+    },
+    precision={
+        "near_wall": _P["ReliefZ0"],
+        "far_wall": _P["ReliefZ1"],
+        "height": _P["ReliefHeight"],
+        "station": _P["ReliefX0"],
+    },
+)
+# The pivot bore, reamed down from the top face through into the relief:
+# Ø.1260 +.0005/0 REAM THRU, SLIDING FIT ON MHA-PN-04 PIVOT, .49 from the
+# paper end and .43 from the body's front face, its top edge chamfered .012
+# MIN X 45° (CLEARS ROD MHA-PN-04 FILLET).
+requirement(
+    "pivot_bore",
+    kind="hole",
+    faces=(CylinderFace(PIVOT_BORE_DIA),),
+    requirements=("dia", "thru", "station", "depth_station", "top_chamfer"),
+    fields={
+        "at": (
+            [PIVOT_BORE_X, BLOCK_HEIGHT, DEPTH_MID_Z],
+            ("PIVOT_BORE_X", "BLOCK_HEIGHT", "DEPTH_MID_Z"),
+        ),
+        "axis": ((0.0, -1.0, 0.0), (_FRAME,)),
+        "process": ("ream", ("PIVOT_BORE_DIA", "DIMENSION_CALLOUTS")),
+        "dia": (
+            limits(PIVOT_BORE_DIA, _P["PivotDia"], PIVOT_BORE_BAND, unit=UNIT),
+            ("PIVOT_BORE_DIA", "PIVOT_BORE_BAND", "DRAWING_BANDS"),
+        ),
+        "nominal_dia": (PIVOT_BORE_DIA, ("PIVOT_BORE_DIA",)),
+        "thru": (True, ("DIMENSION_CALLOUTS",)),
+        "breaks_into": ("relief", ("PIVOT_BORE_DIA", "RELIEF_HEIGHT")),
+        "callout": (DIMENSION_CALLOUTS["PivotDia"], ("DIMENSION_CALLOUTS",)),
+        "station": _printed(
+            "PivotX", PIVOT_BORE_X, "PIVOT_BORE_X", (_SELF, "BOTTOM_KEEP")
+        ),
+        "station_nominal": (PIVOT_BORE_X, ("PIVOT_BORE_X",)),
+        "station_from": ("paper_end", ((_SELF, "BOTTOM_KEEP"),)),
+        "depth_station": _printed(
+            "PivotZ", depth_station(DEPTH_MID_Z), "DEPTH_MID_Z", (_SELF, "SECTION_KEEP")
+        ),
+        "depth_station_nominal": (depth_station(DEPTH_MID_Z), ("DEPTH_MID_Z",)),
+        "depth_station_from": ("body_front", ((_SELF, "SECTION_KEEP"),)),
+        "top_chamfer": (
+            limits(
+                PIVOT_BORE_TOP_CHAMFER,
+                _P["PivotChamferSize"],
+                PIVOT_CHAMFER_BAND,
+                unit=UNIT,
+            ),
+            ("PIVOT_BORE_TOP_CHAMFER", "PIVOT_CHAMFER_BAND", "PIVOT_CHAMFER_TOL_TYPE"),
+        ),
+        "top_chamfer_nominal": (PIVOT_BORE_TOP_CHAMFER, ("PIVOT_BORE_TOP_CHAMFER",)),
+        "top_chamfer_angle_deg": (45.0, ("DIMENSION_CALLOUTS",)),
+        "top_chamfer_note": (
+            DIMENSION_CALLOUTS_ABOVE["PivotChamferSize"],
+            ("DIMENSION_CALLOUTS_ABOVE",),
+        ),
+    },
+    precision={
+        "dia": _P["PivotDia"],
+        "station": _P["PivotX"],
+        "depth_station": _P["PivotZ"],
+        "top_chamfer": _P["PivotChamferSize"],
+    },
+)
+# The rod set screw's #4-40 tap from the body's front face into the pivot
+# bore: one native callout (Ø.089 DRILL INTO PIVOT BORE, 4-40 UNC INTO PIVOT
+# BORE), .49 from the paper end and .47 from the bottom (FRONT_KEEP), its
+# wall to the step .064 MIN (TAP WALL).
+requirement(
+    "set_screw_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(_SET_SCREW_DRILL, contains_z_mm=BODY_Z0 + RELIEF_Z0),),
+    requirements=("thread", "dia", "into", "station", "height", "wall_min"),
+    fields={
+        "at": (
+            [PIVOT_BORE_X, SET_SCREW_Y, BODY_Z0],
+            ("PIVOT_BORE_X", "SET_SCREW_Y", "BODY_Z0"),
+        ),
+        "axis": ((0.0, 0.0, 1.0), ("SET_SCREW_TAP_SPEC", _FRAME)),
+        "thread": (
+            f"{SET_SCREW_TAP_SPEC.size} UNC-2B",
+            ("SET_SCREW_TAP_SPEC", (_SELF, "_TAP_END")),
+        ),
+        "dia": (
+            drilled_limits(_SET_SCREW_DRILL, TAP_DRILL_PLACES, unit=UNIT),
+            ("SET_SCREW_TAP_SPEC", "UNIT", (_SELF, "TAP_DRILL_PLACES")),
+        ),
+        "nominal_dia": (_SET_SCREW_DRILL, ("SET_SCREW_TAP_SPEC",)),
+        "into": ("pivot_bore", ((_SELF, "_TAP_END"),)),
+        "station": _printed(
+            "SetScrewX", PIVOT_BORE_X, "PIVOT_BORE_X", (_SELF, "FRONT_KEEP")
+        ),
+        "station_nominal": (PIVOT_BORE_X, ("PIVOT_BORE_X",)),
+        "station_from": ("paper_end", ((_SELF, "FRONT_KEEP"),)),
+        "height": _printed(
+            "SetScrewY", SET_SCREW_Y, "SET_SCREW_Y", (_SELF, "FRONT_KEEP")
+        ),
+        "height_nominal": (SET_SCREW_Y, ("SET_SCREW_Y",)),
+        "height_from": ("bottom_face", ((_SELF, "FRONT_KEEP"),)),
+        "wall_min": (
+            limits(TAP_WALL_MIN_MM, _P["TapWallMin"], TAP_WALL_MIN_BAND, unit=UNIT),
+            ("TAP_WALL_MIN_MM", "TAP_WALL_MIN_BAND", "TAP_WALL_MIN_TOL_TYPE"),
+        ),
+        "wall_to": ("neck_steps", ("TAP_WALL_START_X",)),
+        "wall_note": (DIMENSION_CALLOUTS["TapWallMin"], ("DIMENSION_CALLOUTS",)),
+    },
+    precision={
+        "dia": TAP_DRILL_PLACES,
+        "station": _P["SetScrewX"],
+        "height": _P["SetScrewY"],
+        "wall_min": _P["TapWallMin"],
+    },
+)
 
 
 def _tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:

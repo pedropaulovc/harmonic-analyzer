@@ -55,7 +55,11 @@ from _drawing_edges import scan_view_edges
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import blind_cut_dia_mm
@@ -68,11 +72,19 @@ from pn_pen_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FRAME_DEPTH,
+    INSIDE_CORNER_R_MAX,
     ISOMETRIC_VIEW_NOTE,
     OUTER_HEIGHT,
     OUTER_WIDTH,
     RAIL_END,
+    RAIL_SIDE,
     SET_SCREW_TAP_SPEC,
+    TAP_WALL_CALLOUT,
+    TAP_WALL_MIN_MM,
+    UNIT,
+    WINDOW_CORNER_R,
+    WINDOW_HEIGHT,
+    WINDOW_WIDTH,
 )
 
 
@@ -187,6 +199,203 @@ HOLE_CALLOUT_XY = (0.165, 0.128)
 TAP_DRILL_PLACES = 3
 _TAP_DRILL_VARIABLES = ("hw-tapdrldia", "hw-thrutapdrldia")
 _CALLOUT_DEFINITION_PARTS = (5, 6, 7, 8)  # swDimensionTextParts_e definitions
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (pn_pen_frame_spec: the ring in XY,
+# origin the bottom-left outer corner of the sketch face, width +X, height +Y,
+# depth +Z; the window centred in X). Every size and station prints .XX
+# (DRAWING_PRECISION_BY_NAME), the tap drill the DRILLED HOLES row at
+# TAP_DRILL_PLACES; the window's corners print no radius, so the title
+# block's INSIDE CORNERS R.040 MAX governs them. The declarations print
+# nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pn_pen_frame"
+_FRAME = "__frame__"
+_TAP_DRILL = blind_cut_dia_mm(SET_SCREW_TAP_SPEC)
+_SCREW_AT = (OUTER_WIDTH / 2.0, 0.0, FRAME_DEPTH / 2.0)
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+def _band(name: str, model: float, sources: tuple) -> tuple[list[float], tuple]:
+    return limits(model, _P[name], unit=UNIT), (
+        *sources,
+        "UNIT",
+        "DRAWING_PRECISION_BY_NAME",
+    )
+
+
+part_metadata(
+    model_sources=("OUTER_WIDTH", "OUTER_HEIGHT", "FRAME_DEPTH"),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "DRAWING_PRECISION_BY_NAME",
+        (_SELF, "TAP_DRILL_PLACES"),
+    ),
+)
+# The three faces the print locates from: the left (LeftWall, ScrewX), the
+# bottom (BottomWall, the tap's entry) and the sketch face (ScrewZ, Depth).
+for _name, _normal, _axis in (
+    ("left_face", (-1.0, 0.0, 0.0), "x"),
+    ("bottom_face", (0.0, -1.0, 0.0), "y"),
+    ("front_face", (0.0, 0.0, -1.0), "z"),
+):
+    requirement(
+        _name,
+        kind="face",
+        faces=(PlanarFace(_normal, 0.0),),
+        requirements=("plane",),
+        fields={"plane": (_plane(_axis, 0.0), (_FRAME,))},
+    )
+# The outer width 1.00 (FRONT_KEEP OuterSpanX), height 1.58 (OuterHeightDim)
+# and depth .31 (BOTTOM_KEEP Depth), each from its opposite face.
+for _name, _normal, _axis, _value, _key, _dim, _source, _from, _keep in (
+    (
+        "right_face",
+        (1.0, 0.0, 0.0),
+        "x",
+        OUTER_WIDTH,
+        "width",
+        "OuterSpanX",
+        "OUTER_WIDTH",
+        "left_face",
+        "FRONT_KEEP",
+    ),
+    (
+        "top_face",
+        (0.0, 1.0, 0.0),
+        "y",
+        OUTER_HEIGHT,
+        "height",
+        "OuterHeightDim",
+        "OUTER_HEIGHT",
+        "bottom_face",
+        "FRONT_KEEP",
+    ),
+    (
+        "back_face",
+        (0.0, 0.0, 1.0),
+        "z",
+        FRAME_DEPTH,
+        "depth",
+        "Depth",
+        "FRAME_DEPTH",
+        "front_face",
+        "BOTTOM_KEEP",
+    ),
+):
+    requirement(
+        _name,
+        kind="face",
+        faces=(PlanarFace(_normal, _value),),
+        requirements=(_key,),
+        fields={
+            "plane": (_plane(_axis, _value), (_source,)),
+            _key: _band(_dim, _value, (_source, (_SELF, _keep))),
+            f"{_key}_nominal": (_value, (_source,)),
+            f"{_key}_from": (_from, ((_SELF, _keep),)),
+        },
+        precision={_key: _P[_dim]},
+    )
+# The window, through the depth: its width .74 and height 1.10, and its
+# lower-left corner .13 from the left face and .24 from the bottom face
+# (FRONT_KEEP). Its four walls and four corner rounds; the rounds take the
+# title block's R.040 MAX.
+_WINDOW_X = (RAIL_SIDE, RAIL_SIDE + WINDOW_WIDTH)
+_WINDOW_Y = (RAIL_END, RAIL_END + WINDOW_HEIGHT)
+requirement(
+    "window",
+    kind="pocket",
+    faces=(
+        PlanarFace((1.0, 0.0, 0.0), _WINDOW_X[0]),
+        PlanarFace((-1.0, 0.0, 0.0), -_WINDOW_X[1]),
+        PlanarFace((0.0, 1.0, 0.0), _WINDOW_Y[0]),
+        PlanarFace((0.0, -1.0, 0.0), -_WINDOW_Y[1]),
+        *(
+            CylinderFace(
+                2.0 * WINDOW_CORNER_R,
+                contains_x_mm=_x + _sx * 0.3 * WINDOW_CORNER_R,
+                contains_y_mm=_y + _sy * 0.3 * WINDOW_CORNER_R,
+            )
+            for _x, _sx in ((_WINDOW_X[0], 1.0), (_WINDOW_X[1], -1.0))
+            for _y, _sy in ((_WINDOW_Y[0], 1.0), (_WINDOW_Y[1], -1.0))
+        ),
+    ),
+    requirements=("width", "height", "left_wall", "bottom_wall", "corner_r_max"),
+    fields={
+        "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
+        "thru": (True, ("FRAME_DEPTH", _FRAME)),
+        "width": _band(
+            "WindowWidth", WINDOW_WIDTH, ("WINDOW_WIDTH", (_SELF, "FRONT_KEEP"))
+        ),
+        "width_nominal": (WINDOW_WIDTH, ("WINDOW_WIDTH",)),
+        "height": _band(
+            "WindowHeight", WINDOW_HEIGHT, ("WINDOW_HEIGHT", (_SELF, "FRONT_KEEP"))
+        ),
+        "height_nominal": (WINDOW_HEIGHT, ("WINDOW_HEIGHT",)),
+        "left_wall": _band("LeftWall", RAIL_SIDE, ("RAIL_SIDE", (_SELF, "FRONT_KEEP"))),
+        "left_wall_nominal": (RAIL_SIDE, ("RAIL_SIDE",)),
+        "left_wall_from": ("left_face", ((_SELF, "FRONT_KEEP"),)),
+        "bottom_wall": _band(
+            "BottomWall", RAIL_END, ("RAIL_END", (_SELF, "FRONT_KEEP"))
+        ),
+        "bottom_wall_nominal": (RAIL_END, ("RAIL_END",)),
+        "bottom_wall_from": ("bottom_face", ((_SELF, "FRONT_KEEP"),)),
+        "corner_r_max": (INSIDE_CORNER_R_MAX, ("INSIDE_CORNER_R_MAX",)),
+        "corner_r_model": (WINDOW_CORNER_R, ("WINDOW_CORNER_R",)),
+    },
+    precision={
+        "width": _P["WindowWidth"],
+        "height": _P["WindowHeight"],
+        "left_wall": _P["LeftWall"],
+        "bottom_wall": _P["BottomWall"],
+    },
+)
+# The thumb-screw tap up through the bottom rail into the window: one native
+# callout (Ø.089 THRU, 4-40 UNC THRU), its station .50 from the left face and
+# .16 from the sketch face, which states the far wall (WALL .074 MIN).
+requirement(
+    "thumb_screw_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(_TAP_DRILL, contains_y_mm=RAIL_END / 2.0),),
+    requirements=("thread", "dia", "thru", "station", "depth_station"),
+    fields={
+        "at": (list(_SCREW_AT), ("OUTER_WIDTH", "FRAME_DEPTH", _FRAME)),
+        "axis": ((0.0, 1.0, 0.0), ("SET_SCREW_TAP_SPEC", _FRAME)),
+        "thread": (
+            f"{SET_SCREW_TAP_SPEC.size} UNC-2B",
+            ("SET_SCREW_TAP_SPEC", (_SELF, "build")),
+        ),
+        "dia": (
+            drilled_limits(_TAP_DRILL, TAP_DRILL_PLACES, unit=UNIT),
+            ("SET_SCREW_TAP_SPEC", "UNIT", (_SELF, "TAP_DRILL_PLACES")),
+        ),
+        "nominal_dia": (_TAP_DRILL, ("SET_SCREW_TAP_SPEC",)),
+        # THROUGH_NEXT: through the bottom rail, out into the window.
+        "thru": (True, ("SET_SCREW_TAP_SPEC", (_SELF, "build"))),
+        "breaks_into": ("window", ("SET_SCREW_TAP_SPEC",)),
+        "station": _band(
+            "ScrewX", _SCREW_AT[0], ("OUTER_WIDTH", (_SELF, "BOTTOM_KEEP"))
+        ),
+        "station_nominal": (_SCREW_AT[0], ("OUTER_WIDTH",)),
+        "station_from": ("left_face", ((_SELF, "BOTTOM_KEEP"),)),
+        "depth_station": _band(
+            "ScrewZ", _SCREW_AT[2], ("FRAME_DEPTH", (_SELF, "BOTTOM_KEEP"))
+        ),
+        "depth_station_nominal": (_SCREW_AT[2], ("FRAME_DEPTH",)),
+        "depth_station_from": ("front_face", ((_SELF, "BOTTOM_KEEP"),)),
+        "wall_min": (TAP_WALL_MIN_MM, ("TAP_WALL_MIN_MM",)),
+        "wall_note": (TAP_WALL_CALLOUT, ("TAP_WALL_CALLOUT", "DIMENSION_CALLOUTS")),
+    },
+    precision={
+        "dia": TAP_DRILL_PLACES,
+        "station": _P["ScrewX"],
+        "depth_station": _P["ScrewZ"],
+    },
+)
 
 
 def _tap_drill_variable(definitions: dict[int, str]) -> str:
