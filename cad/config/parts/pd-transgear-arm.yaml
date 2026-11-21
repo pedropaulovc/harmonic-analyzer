@@ -24,3 +24,8 @@ pd-transgear-arm:
       where: "the MHA-PD-VN-58 latch pin's blind press hole"
       finding: "pressed pin has no way out (rule 16)"
       reason: "owner ruling 2026-10-27 (#1379): \"MHA-PD-18 latch pin should never come out.\" A permanent press; it is not removed in service, so rule 16's removal path does not apply (owner-accepted)"
+    - id: "RV-04"
+      kind: "accept"
+      where: "section A-A's spot-face floor nominal .2717 ±.002 (SEE NOTE 4)"
+      finding: "fabricated nominal off the .001 grid (rule 3)"
+      reason: "Delegated ruling 2026-11-20 (Main), following owner precedent 2026-10-31 (#290, spot-face floor 6.9 mm = MHA-PD-VN-63 installed height) and rule 3's calibrated-spring exemption; owner review #2144"

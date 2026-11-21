@@ -232,18 +232,22 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     assert rows == sorted(rows, reverse=True)
     assert drawing.F_X < drawing.CORE_END_X < drawing.THREAD_END_X < drawing.TIP_X
     # Round 2: each .XXX tip station names what it serves, by its link on the
-    # value's line to the stations note, which quotes the printed values and
-    # names the mates whose stacks need .XXX.  Round 6: the overall keeps
-    # .XXX (the knob cup's pin wall fails at .XX) and states that function
-    # once at the dimension, never in a note (r3).
-    note = dict(drawing.NOTE_TEXTS)[drawing.STATIONS_NOTE]
-    for name, value in (
-        ("TipStation", spec.TIP_STATION),
-        ("CoreFromTip", spec.CORE_FRONT_FROM_TIP),
-        ("ThreadEndFromTip", spec.THREAD_END_FROM_TIP),
+    # value's line to a note naming the mate whose stack needs .XXX.  Machinist
+    # review r1 of #2019 (rule 7): one reason a note, no values in its text.
+    # Round 6: the overall keeps .XXX (the knob cup's pin wall fails at .XX)
+    # and states that function once at the dimension, never in a note (r3).
+    notes = dict(drawing.NOTE_TEXTS)
+    note = notes[drawing.STATIONS_NOTE] + notes[drawing.THREAD_NOTE]
+    for name, link in (
+        ("TipStation", drawing.STATIONS_LINK),
+        ("CoreFromTip", drawing.STATIONS_LINK),
+        ("ThreadEndFromTip", drawing.THREAD_LINK),
     ):
-        assert drawing.DIMENSION_SUFFIXES[name] == f" {drawing.STATIONS_LINK}", name
-        assert spec.inch_text(value, 3) in note, name
+        assert drawing.DIMENSION_SUFFIXES[name] == f" {link}", name
+    for value in (spec.TIP_STATION, spec.CORE_FRONT_FROM_TIP, spec.THREAD_END_FROM_TIP):
+        assert spec.inch_text(value, 3) not in drawing.NOTES
+    assert "D-FLAT SEAT" in notes[drawing.STATIONS_NOTE]
+    assert "FULL THREAD" in notes[drawing.THREAD_NOTE]
     cup = _config.parts("pd-transgear-knob-cup")["number"]
     assert drawing.DIMENSION_SUFFIXES["OverallLength"] == f" SETS PIN WALL IN {cup}"
     assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_BELOW
@@ -753,8 +757,10 @@ def test_tight_bands_name_their_mates_once_by_name_and_number() -> None:
     assert callouts["OutsideDia"] == drawing.GEAR_DATA_LINK
     assert callouts["ToothSpan"] == "MATCHED FIT,\nSEE GEAR DATA"
     disc_part = _config.parts("pd-rack-pinion")
-    assert f"MATES WITH:  {disc_part['title'].upper()} {disc_part['number']}" in (
-        drawing.GEAR_DATA_NOTE.splitlines()
+    # The mate's number wraps onto its own continuation line (#2019).
+    assert (
+        f"MATES WITH:  {disc_part['title'].upper()}\n   {disc_part['number']}"
+        in drawing.GEAR_DATA_NOTE
     )
     assert drawing.DIMENSION_SUFFIXES["FrontReliefDia"] == f" {drawing.NECK_LINK}"
     # Vertical Ø callouts go above their text (a below one would sit on the

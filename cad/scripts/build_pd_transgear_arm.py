@@ -158,10 +158,10 @@ SPOT_FACE_OVERRUN = SPOT_FACE_DEPTH
 # The rear mouth's profile runs this far past the rear face, and its axis
 # this far again, so the revolved cut clears the face (not printed).
 PIN_MOUTH_OVERRUN = 1.0
-# The flank angle's text in the model sketch: inside the wedge between the
-# P-T centreline and the upper edge, toward the square end (the sheet moves
-# it to its own place).
-FLANK_ANGLE_TEXT_XY = (105.0, 4.0)
+# The flank angle's text in the model sketch: in the wedge over the upper
+# edge, between it and the horizontal through its tangent point, short of
+# the pin bore (the sheet moves it to its own place).
+FLANK_ANGLE_TEXT_XY = (45.0, PIVOT_TANGENT_Y - 1.0)
 
 _R_BORE = PIVOT_BORE_DIA / 2.0
 _R_SPOT = SPOT_FACE_DIA / 2.0
@@ -433,22 +433,29 @@ def build(adapter: Any) -> dict[str, str]:
     outline.record("EndWidth", '"EndWidth"')
     # The flank's lean to the P-T centreline, a driven reference the sheet
     # prints for the vise set-up (owner ruling 2026-11-20 (Pedro), #2424
-    # option B: "B, C and D together in the #2019 stock-change").  The
-    # centreline runs from P to the square end's midpoint, so the outline
-    # gains no driving constraint.
+    # option B: "B, C and D together in the #2019 stock-change").  It is
+    # taken from a short horizontal (parallel to P-T) at the upper edge's
+    # tangent point, so its vertex is on the part and its wedge stands
+    # outside the outline (machinist review r1: from the centreline the
+    # vertex fell 160 mm past the square end and the text inside the arm).
+    # The line ends over P, so the outline gains no driving constraint.
     set_sketch_direct_db(adapter, True)
-    centreline = check(
-        "P-T centreline", adapter.add_centerline(0.0, 0.0, TIP_STATION, 0.0)
+    flank_reference = check(
+        "flank reference", adapter.add_centerline(tx, ty, 0.0, ty)
     )
     set_sketch_direct_db(adapter, False)
     for label, e1, e2, relation in (
-        ("P-T centreline on P", f"{centreline}.start", f"{pivot_round}.center", "coincident"),
-        ("P-T centreline at the square end's middle", f"{centreline}.end", end_face, "midpoint"),
+        ("flank reference on the tangent point", f"{flank_reference}.start", f"{upper}.end", "coincident"),
+        ("flank reference ends over P", f"{flank_reference}.end", f"{pivot_round}.center", "vertical_points"),
     ):
         check(label, adapter.add_sketch_constraint(e1, e2, relation))
+    check(
+        "flank reference horizontal",
+        adapter.add_sketch_constraint(flank_reference, None, "horizontal"),
+    )
     add_angular_reference_dimension(
         adapter,
-        centreline,
+        flank_reference,
         upper,
         FLANK_ANGLE_TEXT_XY,
         "flank angle to the P-T centreline",
