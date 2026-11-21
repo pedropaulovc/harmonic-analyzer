@@ -38,7 +38,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
-import _config
 from _check import check
 from _column_clamp_drawing import (
     add_bore_axis_centerline,
@@ -63,25 +62,46 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from fr_tube_frame_spec import OUTER_DIA as COLUMN_DIA
+from sh_column_clamp_back_notes import (
+    BORE_NOTE,
+    BORE_NOTE_TEXT,
+    DRAWING_NOTES,
+    GRIP_NOTE,
+    GRIP_NOTE_TEXT,
+)
 from sh_column_clamp_back_spec import (
+    ANCHOR_Z_BAND,
     ARC_HEIGHT,
-    BORE_CLEARANCE_TEXT,
+    ARC_WIDTH,
+    BLOCK_DEPTH,
+    BORE_DIAMETRAL_CLEARANCE,
     COLUMN_BORE,
+    COLUMN_MATE,
     DEPTH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    EAR_HEIGHT_BAND,
     EAR_HOLE_CALLOUT_PLACES,
+    EAR_HOLE_HEIGHT,
     EAR_HOLE_Z,
+    EAR_STATION_BAND,
     FRONT_ARC_MATE,
     GRIP_OFFSET,
+    HOLE_SPEC,
     REFERENCE_DIMENSIONS,
     TAP_DRILL_DIA,
+    UNIT,
 )
 
 
@@ -174,21 +194,14 @@ DIMENSION_PREFIXES = {"EarHole1Z": "2X ", "EarHoleHeight": "2X "}
 # through the bore centre runs diagonally (farm round 2, 20261107T123928892Z:
 # a 31-character row ran it down the split face).  All under the value:
 # SOLIDWORKS prints nothing of an above-callout holding a line break
-# (draw_dt_cone_gear_shaft._printable_above_callouts).
-GRIP_NOTE = 1
-BORE_NOTE = 2
-COLUMN_NUMBER = _config.parts("fr-tube-frame")["number"]
+# (draw_dt_cone_gear_shaft._printable_above_callouts).  The notes and their
+# numbers live in sh_column_clamp_back_notes, which the feature export reads.
 DIMENSION_CALLOUTS = {
     "BoreDia": f"SEE NOTE {BORE_NOTE}",
     "GripOffset": f"SEE NOTE {GRIP_NOTE}",
 }
-# The notes stand in the open lower-left field, left of the title block (x
-# 0.216, up to y 0.070), where the front arc's notes stand.
-DRAWING_NOTES = (
-    f"{GRIP_NOTE}. KEEPS A GAP TO {FRONT_ARC_MATE} WHEN CLAMPED.\n"
-    f"{BORE_NOTE}. SLIDING FIT ON {COLUMN_NUMBER} COLUMN, "
-    f"DIAMETRAL CLEARANCE {BORE_CLEARANCE_TEXT}."
-)
+# The notes (DRAWING_NOTES) stand in the open lower-left field, left of the
+# title block (x 0.216, up to y 0.070), where the front arc's notes stand.
 NOTES_XY = (0.020, 0.070)
 HOLE_CALLOUT_BELOW = f"MATCHES {FRONT_ARC_MATE} EAR HOLES"
 
@@ -211,6 +224,260 @@ HOLE_CALLOUT_PRECISION = {"hw-thrutapdrldia": EAR_HOLE_CALLOUT_PLACES}
 _PROJECTION_TOL = 0.0005
 # The top view's frame: the bbox centre in X (model mm), for the same proof.
 _X_MID = -(DEPTH + GRIP_OFFSET) / 2.0
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (_clamp_arc: the bore axis is model Y
+# through the origin and Y is the column axis, centred on the block's height;
+# the block runs from the back face at X = -DEPTH to the split face at
+# X = -GRIP_OFFSET; the ears' screw line runs along X at Z = +/-EAR_HOLE_Z on
+# the Y = 0 centre plane, ear 1 at +Z; the near side face, AnchorZ's, is +Z).
+# A band is the title block's row for the places the sheet prints
+# (DRAWING_PRECISION_BY_NAME) on the printed nominal, or the explicit band the
+# part authors (AnchorZ, the ear stations and height, on the exact model
+# nominal); the tap drills take the DRILLED HOLES row (HOLE_CALLOUT_PRECISION).
+# Ear stations are signed model Z. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_sh_column_clamp_back"
+_NOTES = "sh_column_clamp_back_notes"
+_GEOM = "sh_column_clamp_back_geom"
+_ARC = "sh_column_clamp_front_geom"
+_FIT = "sh_column_clamp_fit"
+_FRAME = ("_clamp_arc", "__frame__")
+_HALF_HEIGHT = ARC_HEIGHT / 2.0
+_HALF_WIDTH = ARC_WIDTH / 2.0
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(
+        _FRAME,
+        (_GEOM, "DEPTH"),
+        (_GEOM, "GRIP_OFFSET"),
+        (_ARC, "ARC_WIDTH"),
+        (_ARC, "ARC_HEIGHT"),
+    ),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "DRAWING_PRECISION_BY_NAME",
+        (_FIT, "EAR_HOLE_CALLOUT_PLACES"),
+        (_SELF, "HOLE_CALLOUT_PRECISION"),
+    ),
+)
+# The split face, GripOffset .020 short of the bore axis (TOP_KEEP, title
+# block .XXX) so the faces stay apart when clamped (note 1). The relief splits
+# it into two patches, one each side of the bore.
+requirement(
+    "mating_face",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), -GRIP_OFFSET),),
+    requirements=("grip_offset",),
+    fields={
+        "plane": (_plane("x", -GRIP_OFFSET), (_FRAME, (_GEOM, "GRIP_OFFSET"))),
+        "grip_offset": (
+            limits(GRIP_OFFSET, _P["GripOffset"], unit=UNIT),
+            ((_GEOM, "GRIP_OFFSET"), "UNIT", (_SELF, "TOP_KEEP")),
+        ),
+        "grip_offset_nominal": (GRIP_OFFSET, ((_GEOM, "GRIP_OFFSET"),)),
+        "grip_offset_from": ("bore", ((_SELF, "TOP_KEEP"),)),
+        "callout": (
+            DIMENSION_CALLOUTS["GripOffset"],
+            ((_SELF, "DIMENSION_CALLOUTS"), (_NOTES, "GRIP_NOTE")),
+        ),
+        "note": (
+            GRIP_NOTE_TEXT,
+            ((_NOTES, "GRIP_NOTE_TEXT"), (_NOTES, "DRAWING_NOTES")),
+        ),
+    },
+    precision={"grip_offset": _P["GripOffset"]},
+)
+# The back face: the depth .59 from the split face (TOP_KEEP "Depth").
+requirement(
+    "back_face",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), DEPTH),),
+    requirements=("depth",),
+    fields={
+        "plane": (_plane("x", -DEPTH), (_FRAME, (_GEOM, "DEPTH"))),
+        "depth": (
+            limits(BLOCK_DEPTH, _P["Depth"], unit=UNIT),
+            ((_GEOM, "BLOCK_DEPTH"), "UNIT", (_SELF, "TOP_KEEP")),
+        ),
+        "depth_nominal": (BLOCK_DEPTH, ((_GEOM, "BLOCK_DEPTH"),)),
+        "depth_from": ("mating_face", ((_SELF, "TOP_KEEP"),)),
+    },
+    precision={"depth": _P["Depth"]},
+)
+# Both ends of the column's run: the height .63 between them (FACE_KEEP
+# "Height"); the bottom is the face the taps' height runs from.
+_HEIGHT = (
+    limits(ARC_HEIGHT, _P["Height"], unit=UNIT),
+    ((_ARC, "ARC_HEIGHT"), "UNIT", (_SELF, "FACE_KEEP")),
+)
+for _name, _sign in (("bottom_face", -1.0), ("top_face", 1.0)):
+    requirement(
+        _name,
+        kind="face",
+        faces=(PlanarFace((0.0, _sign, 0.0), _HALF_HEIGHT),),
+        requirements=("height",),
+        fields={
+            "plane": (_plane("y", _sign * _HALF_HEIGHT), ((_ARC, "ARC_HEIGHT"),)),
+            "height": _HEIGHT,
+            "height_nominal": (ARC_HEIGHT, ((_ARC, "ARC_HEIGHT"),)),
+        },
+        precision={"height": _P["Height"]},
+    )
+# The side faces: the near one (+Z) locates the bore (AnchorZ, on the bore
+# below); the far one closes the width 1.89 (TOP_KEEP "Width").
+requirement(
+    "near_side",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), _HALF_WIDTH),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", _HALF_WIDTH), (_FRAME, (_ARC, "ARC_WIDTH")))},
+)
+requirement(
+    "far_side",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), _HALF_WIDTH),),
+    requirements=("width",),
+    fields={
+        "plane": (_plane("z", -_HALF_WIDTH), (_FRAME, (_ARC, "ARC_WIDTH"))),
+        "width": (
+            limits(ARC_WIDTH, _P["Width"], unit=UNIT),
+            ((_ARC, "ARC_WIDTH"), "UNIT", (_SELF, "TOP_KEEP")),
+        ),
+        "width_nominal": (ARC_WIDTH, ((_ARC, "ARC_WIDTH"),)),
+        "width_from": ("near_side", ((_SELF, "TOP_KEEP"),)),
+    },
+    precision={"width": _P["Width"]},
+)
+# The relief, through the height and open to the split face (the bore's
+# segment past the split face's chord): its (Ø1.008) prints as a REFERENCE
+# citing note 2, the matched diametral clearance on the column
+# (sh_column_clamp_fit), so it carries that acceptance, not a size band;
+# AnchorZ .945 +/-.010 locates its axis from the near side face.
+requirement(
+    "bore",
+    kind="half_bore",
+    faces=(CylinderFace(COLUMN_BORE),),
+    requirements=("diametral_clearance", "location_from_near_side"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ((0.0, 1.0, 0.0), (_FRAME,)),
+        "thru": (True, (("_clamp_arc", "build_arc"),)),
+        "open_to": ("mating_face", (_FRAME,)),
+        "dia_ref": (
+            COLUMN_BORE,
+            ((_ARC, "COLUMN_BORE"), "REFERENCE_DIMENSIONS", (_SELF, "TOP_KEEP")),
+        ),
+        "dimension_type": (
+            "reference",
+            (
+                "REFERENCE_DIMENSIONS",
+                ("_drawing_dimensions", "set_reference_dimensions"),
+            ),
+        ),
+        "diametral_clearance": (
+            list(BORE_DIAMETRAL_CLEARANCE),
+            (
+                (_FIT, "BORE_DIAMETRAL_CLEARANCE"),
+                (_FIT, "BORE_CLEARANCE_TEXT"),
+                (_NOTES, "BORE_NOTE_TEXT"),
+            ),
+        ),
+        "mate": (COLUMN_MATE, ((_FIT, "COLUMN_MATE"), (_NOTES, "COLUMN_NUMBER"))),
+        "mate_od_nominal": (COLUMN_DIA, (("fr_tube_frame_spec", "OUTER_DIA"),)),
+        "callout": (
+            DIMENSION_CALLOUTS["BoreDia"],
+            ((_SELF, "DIMENSION_CALLOUTS"), (_NOTES, "BORE_NOTE")),
+        ),
+        "note": (
+            BORE_NOTE_TEXT,
+            ((_NOTES, "BORE_NOTE_TEXT"), (_NOTES, "DRAWING_NOTES")),
+        ),
+        "location_from_near_side": (
+            limits(
+                _HALF_WIDTH,
+                _P["AnchorZ"],
+                (ANCHOR_Z_BAND, -ANCHOR_Z_BAND),
+                unit=UNIT,
+            ),
+            ((_ARC, "ARC_WIDTH"), "ANCHOR_Z_BAND", (_SELF, "TOP_KEEP")),
+        ),
+        "location_nominal": (_HALF_WIDTH, ((_ARC, "ARC_WIDTH"),)),
+        "location_from": ("near_side", ((_SELF, "TOP_KEEP"),)),
+    },
+    precision={"dia_ref": _P["BoreDia"], "location_from_near_side": _P["AnchorZ"]},
+)
+# The two #8-32 ears, tapped through from the back face: one native callout
+# (its tap drill at .XXX, the thread, THRU, MATCHES MHA-SH-01 EAR HOLES), the
+# 2X station from the bore axis and the 2X height off the bottom face
+# (FACE_KEEP, DIMENSION_PREFIXES). The tapped length is the block's
+# (sh_column_clamp_back_geom.HOLE_SPEC). #8-32 is the UNC series (ASME B1.1)
+# the Hole Wizard's ANSI Inch tap prints.
+_TAP_DRILL = (
+    drilled_limits(TAP_DRILL_DIA, EAR_HOLE_CALLOUT_PLACES, unit=UNIT),
+    ((_GEOM, "TAP_DRILL_DIA"), "UNIT", (_SELF, "HOLE_CALLOUT_PRECISION")),
+)
+_TAP_CALLOUT = ((_GEOM, "HOLE_SPEC"), (_SELF, "build"))
+_EAR_PREFIXED = ((_SELF, "FACE_KEEP"), (_SELF, "DIMENSION_PREFIXES"))
+for _index, _sign in ((1, 1.0), (2, -1.0)):
+    requirement(
+        f"ear_tap_{_index}",
+        kind="threaded_hole",
+        faces=(CylinderFace(TAP_DRILL_DIA, contains_z_mm=_sign * EAR_HOLE_Z),),
+        requirements=("thread", "dia", "thru", "station", "height"),
+        fields={
+            "at": (
+                [-DEPTH, 0.0, _sign * EAR_HOLE_Z],
+                ((_GEOM, "DEPTH"), (_ARC, "EAR_HOLE_Z")),
+            ),
+            "axis": ((1.0, 0.0, 0.0), (_FRAME,)),
+            "thread": (
+                f"{HOLE_SPEC.size} UNC-{HOLE_SPEC.thread_class}",
+                _TAP_CALLOUT,
+            ),
+            "dia": _TAP_DRILL,
+            "tap_drill_nominal": (TAP_DRILL_DIA, ((_GEOM, "TAP_DRILL_DIA"),)),
+            "thru": (True, _TAP_CALLOUT),
+            "thread_length_nominal": (
+                BLOCK_DEPTH,
+                ((_GEOM, "BLOCK_DEPTH"), (_GEOM, "HOLE_SPEC")),
+            ),
+            "station": (
+                limits(
+                    _sign * EAR_HOLE_Z,
+                    _P["EarHole1Z"],
+                    (EAR_STATION_BAND, -EAR_STATION_BAND),
+                    unit=UNIT,
+                ),
+                ((_ARC, "EAR_HOLE_Z"), (_FIT, "EAR_STATION_BAND"), *_EAR_PREFIXED),
+            ),
+            "station_nominal": (_sign * EAR_HOLE_Z, ((_ARC, "EAR_HOLE_Z"),)),
+            "station_from": ("bore", ((_SELF, "FACE_KEEP"),)),
+            "height": (
+                limits(
+                    EAR_HOLE_HEIGHT,
+                    _P["EarHoleHeight"],
+                    (EAR_HEIGHT_BAND, -EAR_HEIGHT_BAND),
+                    unit=UNIT,
+                ),
+                ("EAR_HOLE_HEIGHT", (_FIT, "EAR_HEIGHT_BAND"), *_EAR_PREFIXED),
+            ),
+            "height_nominal": (EAR_HOLE_HEIGHT, ("EAR_HOLE_HEIGHT",)),
+            "height_from": ("bottom_face", ((_SELF, "FACE_KEEP"),)),
+            "mates": (HOLE_CALLOUT_BELOW, ((_SELF, "HOLE_CALLOUT_BELOW"),)),
+        },
+        precision={
+            "dia": EAR_HOLE_CALLOUT_PLACES,
+            "station": _P["EarHole1Z"],
+            "height": _P["EarHoleHeight"],
+        },
+    )
 
 
 def _mm_to_m(point: tuple[float, float, float]) -> tuple[float, float, float]:

@@ -11,6 +11,7 @@ from _column_clamp_interface import ARC_DEPTH
 import sh_column_clamp_front_spec as spec
 import sh_column_clamp_fit as fit
 import draw_sh_column_clamp_front as drawing
+import export_features
 import build_sh_column_clamp_front as part
 import _clamp_arc
 import _column_clamp_drawing
@@ -20,6 +21,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _paths import CAD_ROOT
 from machinist_exceptions import load_exceptions
 from _hole_spec import blind_cut_dia_mm
+from _gtol_face import FaceGeometry
 
 
 def _in(value_in: float) -> float:
@@ -271,3 +273,90 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     # One clamp pair per front column: two on the paper-drive platen bar plus
     # one at the magnifier wheel bar.
     assert int(row["quantity"]) == 3
+
+
+_FEATURE_KINDS = {
+    "mating_face": "face",
+    "bar_face": "face",
+    "bottom_face": "face",
+    "top_face": "face",
+    "near_side": "face",
+    "far_side": "face",
+    "bore": "half_bore",
+    "ear_hole_1": "hole",
+    "ear_hole_2": "hole",
+}
+
+
+def _plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+    point = tuple(value * offset_mm / 1000 for value in normal)
+    return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+
+def _cylinder(
+    dia_mm: float, axis: tuple[float, float, float], box_mm: tuple[float, ...]
+) -> FaceGeometry:
+    box = tuple(value / 1000 for value in box_mm)
+    return FaceGeometry(None, 4002, (0.0, 0.0, 0.0, *axis, dia_mm / 2000), None, box)
+
+
+def test_the_arc_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    assert "sh_column_clamp_front" in export_features.SUPPORTED_PARTS
+    manifest = export_features.requirement_manifest("sh_column_clamp_front")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == _FEATURE_KINDS
+    assert manifest["construction"] == "one_piece"
+    assert manifest["notes"]["manufacturing"] == spec.DRAWING_NOTES.split("\n")
+    selectors = export_features.feature_selectors("sh_column_clamp_front")
+    h, w, r = spec.ARC_HEIGHT / 2, spec.ARC_WIDTH / 2, spec.COLUMN_BORE / 2
+    ear_r = spec.EAR_HOLE_DIA / 2
+    expected = {
+        "mating_face": [_plane((-1.0, 0.0, 0.0), 0.0)],
+        "bar_face": [_plane((1.0, 0.0, 0.0), ARC_DEPTH)],
+        "bottom_face": [_plane((0.0, -1.0, 0.0), h)],
+        "top_face": [_plane((0.0, 1.0, 0.0), h)],
+        "near_side": [_plane((0.0, 0.0, 1.0), w)],
+        "far_side": [_plane((0.0, 0.0, -1.0), w)],
+        "bore": [_cylinder(spec.COLUMN_BORE, (0.0, 1.0, 0.0), (0, -h, -r, r, h, r))],
+    }
+    for index, sign in ((1, 1.0), (2, -1.0)):
+        z = sign * spec.EAR_HOLE_Z
+        box = (0.0, -ear_r, z - ear_r, ARC_DEPTH, ear_r, z + ear_r)
+        expected[f"ear_hole_{index}"] = [
+            _cylinder(spec.EAR_HOLE_DIA, (1.0, 0.0, 0.0), box)
+        ]
+    for name, faces in expected.items():
+        for face in faces:
+            owners = [
+                owner
+                for owner, specs in selectors.items()
+                if any(selector.matches(face) for selector in specs)
+            ]
+            assert owners == [name], name
+
+
+def test_arc_feature_bands_are_the_printed_ones() -> None:
+    features = export_features.requirement_manifest("sh_column_clamp_front")["features"]
+    assert features["bar_face"]["depth"] == pytest.approx([_in(0.680), _in(0.690)])
+    for name in ("bottom_face", "top_face"):
+        assert features[name]["height"] == pytest.approx([_in(0.62), _in(0.64)])
+    assert features["far_side"]["width"] == pytest.approx([_in(1.88), _in(1.90)])
+    bore = features["bore"]
+    assert bore["dia_ref"] == spec.COLUMN_BORE and bore["dimension_type"] == "reference"
+    assert bore["diametral_clearance"] == pytest.approx([_in(0.004), _in(0.012)])
+    assert bore["location_from_near_side"] == pytest.approx(
+        [_in(0.935), _in(0.955)], abs=1e-3
+    )
+    assert bore["callout"] == drawing.DIMENSION_CALLOUTS["BoreDia"]
+    for index, sign in ((1, 1.0), (2, -1.0)):
+        ear = features[f"ear_hole_{index}"]
+        # The #8 clearance drill at the title block's DRILLED HOLES +.004/0.
+        assert ear["dia"] == pytest.approx([_in(0.196), _in(0.200)], abs=1e-3)
+        assert ear["thru"] is True and ear["axis"] == [-1.0, 0.0, 0.0]
+        assert ear["station"] == pytest.approx(
+            sorted([sign * _in(0.685), sign * _in(0.693)]), abs=1e-3
+        )
+        assert ear["height"] == pytest.approx([_in(0.311), _in(0.319)], abs=1e-3)
+        assert ear["web_to_bore_min"] == pytest.approx(_in(spec.EAR_WALL_MIN))
+        assert ear["web_note"] == spec.EAR_WALL_NOTE
+        assert ear["mates"] == drawing.HOLE_CALLOUT_BELOW
