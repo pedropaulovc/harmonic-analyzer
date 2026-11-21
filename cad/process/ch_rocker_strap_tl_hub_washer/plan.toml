@@ -96,10 +96,10 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Turn the outside to Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}} from Z0 back to Z{{cad.run_end_z_mm:in.2dot}}, past the parting line."
+instruction = "Turn the outside to Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}} from Z0 back to Z{{cad.run_end_z_mm:in.2dot}}, past the parting line; calipers between passes, and over the band take another pass."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Outside Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}}; over: another pass."
+inspection = "Outside Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}}, calipers."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.outer_dia_band_mm}}" }]
 
 [[setups.operations]]
@@ -130,7 +130,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Part off with the blade's face toward Z0 at Z-{{cad.part_off_in:.3dot}} on the DRO. Catch the washer."
+instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off at Z-{{cad.part_off_in:.3dot}}. Catch the washer."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -153,7 +153,11 @@ instruction = "Deburr: file the parting burr off the parted face flat on the smo
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Thickness {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} across the faces, calipers; the hole takes a .266 pin gauge and not a .271 (Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}). Thick: face the parted side back in the 3-jaw; thin or the .271 pin enters: scrap and make another."
+instruction = "Thickness {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} across the faces, calipers; the hole takes the {{cad.bore_dia_min_in:.3dot}} pin gauge and not the {{cad.bore_dia_max_in:.3dot}}."
 inspection = "Thickness {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}}; hole Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }, { gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A washer under the outside band in Op 20 or failing a check in Op 70 is scrapped, not reworked: make another by repeating Setup 1 and Ops 60–70."
 feed = "hand"

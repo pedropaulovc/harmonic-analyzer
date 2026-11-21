@@ -121,7 +121,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Part off with the blade's face toward Z0 at Z-{{cad.part_off_in:.3dot}} on the DRO. Catch the ferrule."
+instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off at Z-{{cad.part_off_in:.3dot}}. Catch the ferrule."
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -144,11 +144,19 @@ instruction = "Deburr: file the parting burr off the parted face flat on the smo
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Length {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} across the faces, calipers; the hole takes a .298 pin gauge and not a .309 (Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}). Long: face the parted side back in the 3-jaw; short or the .309 pin enters: scrap and make another."
+instruction = "Length {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} across the faces, calipers; the hole takes the {{cad.bore_dia_min_in:.3dot}} pin gauge and not the {{cad.bore_dia_max_in:.3dot}}."
 inspection = "Length {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}}; hole Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }, { gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
+instruction = "A ferrule that fails a check in Op 70 is scrapped, not reworked: make another by repeating Setup 1 and Ops 60–70."
+feed = "hand"
+
+[[setups.operations]]
 instruction = "Tag the ferrule with the largest pin that enters its hole: {{cad.bore_mate}} is turned to that size less {{cad.bore_clearance_ref_min_in:.3dot}}–{{cad.bore_clearance_ref_max_in:.3dot}}."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The ferrule leaves this traveler bare. Its outside skim to Ø.49 with {{cad.bore_mate}} after the bond cures (drawing note 1) and the drawing's clear-lacquer finish are both done there, after bonding, not here."
 feed = "hand"

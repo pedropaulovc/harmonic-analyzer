@@ -29,6 +29,8 @@ part = "mg-wheel-axle-spacer"
 [parameters]
 quantity = 1
 stock_dia_in = 0.4375
+# The outside is the bar as supplied, inside its band: not turned.
+as_supplied_outer = 1
 # The 2 in piece to order and the length the 3-jaw grips of it.
 bar_length_in = 2.0
 chuck_grip_in = 0.75
@@ -124,7 +126,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Part off with the blade's face toward Z0 at Z-{{cad.part_off_in:.3dot}} on the DRO: .02 over length, for Setup 2. Catch the spacer."
+instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off at Z-{{cad.part_off_in:.3dot}}: .02 over length, for Setup 2. Catch the spacer."
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -148,7 +150,7 @@ sizing = "other"
 instruction = "Face the parted end in light skims, miking the length between them, to {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
-inspection = "Length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} across the faces; short: scrap and make another."
+inspection = "Length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} across the faces, micrometer."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
 
 [[setups]]
@@ -170,7 +172,11 @@ instruction = "Deburr: break the outside edges and both ends of the hole, R{{cad
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The hole takes a .193 pin gauge and not a .198 (Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}); the .198 pin enters: scrap."
+instruction = "The hole takes the {{cad.bore_dia_min_in:.3dot}} pin gauge and not the {{cad.bore_dia_max_in:.3dot}}."
 inspection = "Hole Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A spacer faced under {{cad.length_min_in:.3dot}} in Op 60 or failing the hole check in Op 80 is scrapped, not reworked: make another from Setup 1."
 feed = "hand"
