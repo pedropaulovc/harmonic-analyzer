@@ -43,7 +43,7 @@ description = "A R Warner AR carbide turning holder, TCMT insert, R0.4 nose (LMS
 # authored allowance over the 1/8 in blade, set by caliper on the insert
 # before the first part.
 [tools.cutoff-blade-holder]
-description = "1/8 in blade-style cutoff holder (McMaster 3212A119), neutral uncoated carbide insert: C5 (3212A76) for steel, C2 (3212A75) for brass"
+description = "1/8 in blade-style cutoff holder (McMaster 3212A119), neutral uncoated carbide insert: C5 (3212A76) for steel, C2 (3212A75) for brass and aluminium (non-ferrous)"
 
 [settings.lathe-ar-1018]
 tool = "lathe-ar"
