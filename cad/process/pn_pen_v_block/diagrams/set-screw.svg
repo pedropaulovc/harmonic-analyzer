@@ -21,7 +21,7 @@
   <text class="label" x="434" y="90">pecked to the bore's axis ({{cad.set_screw_tap_into_axis_in:.3dot}} deep)</text>
   <line class="leader" x1="430" y1="124" x2="233" y2="124"/>
   <text class="label" x="434" y="128">pivot bore (VB06), crosswise</text>
-  <line class="leader" x1="430" y1="176" x2="200" y2="100"/>
+  <line class="leader" x1="430" y1="176" x2="200" y2="45"/>
   <text class="label" x="434" y="180">tap wall to the step face {{cad.set_screw_tap_wall_min_min_in:.3dot}} min</text>
   <text class="label" x="434" y="300">fixed jaw (behind): B</text>
   <text class="label-halo" x="124" y="48">front step</text>
