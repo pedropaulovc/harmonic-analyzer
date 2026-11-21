@@ -87,9 +87,12 @@ thread_start_z_in = 0.4
 end_stickout_in = 0.4
 # Setup 3: end A's .60 in the jaws, the rest out to the dead centre.
 centre_stickout_mm = 167.0
-# Op 190: the cutoff blade cuts end B's face at Z0, down to a Ø.06 neck that
-# still carries the stub on the dead centre; Setup 4 saws through the neck.
+# Op 190: the 1/16 P1 cutoff blade cuts end B's face at Z0, down to a Ø.06
+# neck that still carries the stub on the dead centre; plunges at Z0, Z+.050
+# and Z+.100 (each under one blade width apart, no web) leave a groove about
+# .16 wide, room for the saw's kerf mid-groove; Setup 4 saws through the neck.
 neck_dia_in = 0.06
+blade_width_in = 0.0625
 # ASME B1.1-2019, 1/4-20 UNC-2A major diameter limits.
 thread_major_min_in = 0.2408
 thread_major_max_in = 0.2489
@@ -295,7 +298,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "The cutoff blade on centre height, square: touch its chuck-side face on the pilot's shoulder, just gripping a cigarette paper, and set DRO Z+.301 (the paper). Plunge at DRO Z0 (its chuck-side face on end B's plane) to a Ø{{process.neck_dia_in:.2dot}} neck, then at Z+.100 to the same neck: a groove about .22 wide, room for the saw. Back out for chips; the dead centre stays in."
+instruction = "The cutoff blade on centre height, square: touch its chuck-side face on the pilot's shoulder, just gripping a cigarette paper, and set DRO Z+.301 (the paper). Plunge at DRO Z0 (its chuck-side face on end B's plane) to a Ø{{process.neck_dia_in:.2dot}} neck, then at Z+.050 and Z+.100 to the same neck: a groove about .16 wide with the {{process.blade_width_in:.4dot}} blade, room for the saw. Back out for chips; the dead centre stays in."
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
