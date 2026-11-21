@@ -312,7 +312,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Before mounting the saw: mic every spacer, collar and the nut of the TTC 67-600-016 R8 1 in spacer-type arbor (Travers; TO BUY) that will sit within 1/4 in above or below the saw."
+instruction = "First load only (the spacers stay on the arbor after): before mounting the saw, mic every spacer, collar and the nut of the TTC 67-600-016 R8 1 in spacer-type arbor (Travers; TO BUY) that will sit within 1/4 in above or below the saw."
 inspection = "Each under {{process.saw_collar_dia_max_mm:in.2dot}} in diameter, or the top notch's end meets it in Setup 4. Over: stop and tell the owner."
 gauge_checks = "other"
 
@@ -345,7 +345,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "First load (and after any re-touch), still clamped: check the foot notch of the bar against the fixed jaw."
+instruction = "Every load (each has its own saw Z0 touch-off), still clamped: check the foot notch of the bar against the fixed jaw."
 inspection = "Width {{cad.foot_notch_width_min_in:.3dot}}–{{cad.foot_notch_width_max_in:.3dot}}: the {{cad.foot_notch_width_min_in:.3dot}} gauge block enters across the notch, the {{cad.foot_notch_width_max_in:.3dot}} does not. Depth {{cad.foot_notch_depth_min_in:.3dot}}–{{cad.foot_notch_depth_max_in:.3dot}} from the foot end: the calipers' depth rod. Ledge (the L-side cheek) {{cad.foot_notch_ledge_min_in:.3dot}}–{{cad.foot_notch_ledge_max_in:.3dot}}: the calipers' outside jaw tips across it. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "gauge-blocks-mitutoyo", band_mm = "{{cad.foot_notch_width_band_mm}}" },
@@ -354,7 +354,7 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "Unclamp the load; back to the collet (edge finder, then T1), clamp the next four and repeat this setup from its first operation. The X0 each load's foot notch is cut from is the end CA01 faced in that same clamping."
+instruction = "Unclamp the load; back to the collet (edge finder, then T1), clamp the next four and repeat this setup from its first operation, skipping the first-load-only ops. The X0 each load's foot notch is cut from is the end CA01 faced in that same clamping."
 feed = "hand"
 
 [[setups]]
@@ -455,7 +455,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "First load (and after any re-touch), still clamped: check the top notch of the bar against the fixed jaw."
+instruction = "Every load (each has its own saw Z0 touch-off), still clamped: check the top notch of the bar against the fixed jaw."
 inspection = "Width {{cad.top_notch_width_min_in:.3dot}}–{{cad.top_notch_width_max_in:.3dot}}: the {{cad.top_notch_width_min_in:.3dot}} gauge block enters across the notch, the {{cad.top_notch_width_max_in:.3dot}} does not. Depth {{cad.top_notch_depth_min_in:.2f}}–{{cad.top_notch_depth_max_in:.2f}} from the top end: the calipers' depth rod. Ledge (the R-side cheek) {{cad.top_notch_ledge_min_in:.3dot}}–{{cad.top_notch_ledge_max_in:.3dot}}: the calipers' outside jaw tips across it. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "gauge-blocks-mitutoyo", band_mm = "{{cad.top_notch_width_band_mm}}" },
@@ -515,15 +515,21 @@ inspection = "Size Ø{{cad.top_pin_hole_dia_min_in:.4dot}}–{{cad.top_pin_hole_
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Every load, still clamped: each hole's place, the #49 drill's shank in it. CA05 places the holes on a {{process.bar_pitch_mm:in.4dot}} bar pitch from the fixed jaw (each bar taken at .249 F to B)."
-inspection = "Drop {{cad.top_pin_hole_drop_min_in:.2f}}–{{cad.top_pin_hole_drop_max_in:.2f}} from the top end: the calipers from the end over the shank, less half the shank's miked Ø. From B {{cad.top_pin_hole_location_from_back_min_in:.3dot}}–{{cad.top_pin_hole_location_from_back_max_in:.3dot}}: after unclamping, measure the same way from the B face of the bar that lay farthest from the fixed jaw (it carries the other three bars' width error), and on the first load from every bar's B face. Outside: stop and tell the owner."
+instruction = "Still clamped, first load only and after any X0 remedy or change to CA05: each hole's drop, the #49 drill's shank in it. Every load: write on the traveler the number of the bar farthest from the fixed jaw."
+inspection = "Drop {{cad.top_pin_hole_drop_min_in:.2f}}–{{cad.top_pin_hole_drop_max_in:.2f}} from the top end: the calipers from the end over the shank, less half the shank's miked Ø. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.top_pin_hole_drop_band_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Unclamp the load. Every load: the hole's place from B in the bar written down above (farthest from the fixed jaw: it carries the other three bars' width error; CA05 places the holes on a {{process.bar_pitch_mm:in.4dot}} bar pitch); first load: every bar. The #49 shank in the hole."
+inspection = "From B {{cad.top_pin_hole_location_from_back_min_in:.3dot}}–{{cad.top_pin_hole_location_from_back_max_in:.3dot}}: the calipers from the B face over the shank, less half the shank's miked Ø. Outside: stop and tell the owner."
+gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.top_pin_hole_location_from_back_band_mm}}" },
 ]
 
 [[setups.operations]]
-instruction = "Unclamp the load; back to the collet (edge finder, then T1), clamp the next four and repeat this setup from its first operation (that load's own longest bar and its written length)."
+instruction = "Back to the collet (edge finder, then T1), clamp the next four and repeat this setup from its first operation, skipping the first-load-only ops (that load's own longest bar and its written length)."
 feed = "hand"
 
 [[setups]]
