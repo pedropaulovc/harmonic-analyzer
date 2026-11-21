@@ -239,8 +239,9 @@ def test_section_reference_carries_the_etched_depth_on_the_cut_plane(
 
 def _etched(x: float, y: float) -> bool:
     """A point of the decorated face lies in the etched field: an odd number
-    of the field DXF's loops (the field, a letter, a counter) holds it."""
-    rings = _rings(part.FIELD_DXF)
+    of the field and letters DXFs' loops (the field, a letter, a counter)
+    holds it."""
+    rings = _rings(part.FIELD_DXF) + _rings(part.LETTERS_DXF)
     return sum(dxf.point_in_ring(ring, (x, y)) for ring in rings) % 2 == 1
 
 
@@ -321,7 +322,9 @@ def test_section_a_crosses_the_plate_between_the_lettering_rows() -> None:
     # The only field loop the line meets is the field's edge, which spans
     # the plate; every letter and the ornament stand at least a millimetre
     # clear of it.
-    field, *letters = _rings(part.FIELD_DXF)
+    (field,) = _rings(part.FIELD_DXF)
+    letters = _rings(part.LETTERS_DXF)
+    assert letters
     xs = [x for x, _ in field]
     assert min(xs) < drawing.SECTION_FIELD_X
     assert max(xs) > spec.PLATE_WIDTH - drawing.SECTION_FIELD_X

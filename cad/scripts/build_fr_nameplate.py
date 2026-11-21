@@ -157,10 +157,11 @@ CORNER_R = 4.032846449419005  # mm; measured circular fit, not an outline driver
 OUTLINE_DXF = REFERENCES_DIR / OUTLINE_DXF_NAME
 OUTLINE_AREA_MM2 = 4547.480744565876
 
-# The etched field at its finished size: the notched inner edge of the traced
-# pinstripe (keeping the screw heads on the raised border instead of sinking
-# their bearing lands) less the proud letters and ornament, their counters
-# etched (the net even-odd area of the field DXF's loops).
+# The etched field's edge: the notched inner edge of the traced pinstripe
+# (keeping the screw heads on the raised border instead of sinking their
+# bearing lands); FIELD_AREA_MM2 is that one loop's gross area. The letters
+# and ornament bossed back from it, less their etched counters, net
+# LETTERS_AREA_MM2 (the even-odd area of the letters DXF's loops).
 FIELD_DXF = REFERENCES_DIR / FIELD_DXF_NAME
 FIELD_AREA_MM2 = 3665.6669540813814
 LETTERS_DXF = REFERENCES_DIR / LETTERS_DXF_NAME
