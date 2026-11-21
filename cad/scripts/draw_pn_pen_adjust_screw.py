@@ -51,11 +51,16 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _gtol_torus import TorusFace
 from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import drill_process
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 import _telemetry
 from pn_pen_adjust_screw_spec import (
@@ -64,10 +69,12 @@ from pn_pen_adjust_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     EYE_DIA,
+    EYE_FROM_HEAD_END,
     EYE_SPEC,
     EYE_Y,
     FULL_THREAD_LENGTH,
     HEAD_DIA,
+    HEAD_HEIGHT,
     OVERALL_LENGTH,
     PLAIN_SHANK,
     REFERENCE_DIMENSIONS,
@@ -75,6 +82,7 @@ from pn_pen_adjust_screw_spec import (
     SHOULDER_FILLET_R,
     THREAD_CALLOUT,
     THREAD_MAJOR,
+    UNIT,
 )
 
 
@@ -213,6 +221,181 @@ _TOL_NONE = 0  # swTolType_e.swTolNONE
 _ARROWS_INSIDE = 0  # swDimArrowsSide_e.swDimArrowsInside
 # The native Hole Wizard Ø variable of the #54 eye's drill callout.
 EYE_CALLOUT_PRECISION = {"hw-diam": 3}
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_pn_pen_adjust_screw: axis +Y through the origin, the faced threaded
+# end at y = 0, the datum end the overall and full thread run from; the head's
+# faced end at y = OVERALL_LENGTH, the end its height and the eye's station run
+# from). The thread blank is one diameter in two faces, ringed by the
+# thread-limit split; it carries the #0-80 UNF thread (die-cut, registry
+# process) and its acceptance is the title block's class 2A major
+# (THREAD_MAJOR_2A). The head, lengths and shoulder radius take the .XX row;
+# the eye the DRILLED HOLES row. The declarations print nothing.
+# ASME B1.1-2019 table 2A, #0-80 UNF-2A: major .0563-.0595 in.
+THREAD_MAJOR_2A = (0.0563 * 25.4, 0.0595 * 25.4)
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pn_pen_adjust_screw"
+part_metadata(
+    model_sources=(
+        "OVERALL_LENGTH",
+        "HEAD_HEIGHT",
+        "HEAD_DIA",
+        "FULL_THREAD_LENGTH",
+        "THREAD_MAJOR",
+        "EYE_FROM_HEAD_END",
+    ),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("OVERALL_LENGTH",)),
+        "outward": ([0.0, -1.0, 0.0], ("OVERALL_LENGTH",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), OVERALL_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": OVERALL_LENGTH},
+            ("OVERALL_LENGTH",),
+        ),
+        "outward": ([0.0, 1.0, 0.0], ("OVERALL_LENGTH",)),
+        "length": (
+            limits(OVERALL_LENGTH, _P["OverallLength"], unit=UNIT),
+            ("OVERALL_LENGTH", "OVERALL_DEVIATIONS", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "length_nominal": (OVERALL_LENGTH, ("OVERALL_LENGTH",)),
+        "length_from": ("datum_end", ((_SELF, "SIDE_KEEP"),)),
+    },
+    precision={"length": _P["OverallLength"]},
+)
+requirement(
+    "shoulder",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), -SHANK_LENGTH),),
+    requirements=("station",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": SHANK_LENGTH},
+            ("SHANK_LENGTH",),
+        ),
+        "outward": ([0.0, -1.0, 0.0], ("SHANK_LENGTH",)),
+        "station": (
+            limits(HEAD_HEIGHT, _P["HeadHeight"], unit=UNIT),
+            ("HEAD_HEIGHT", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "station_nominal": (HEAD_HEIGHT, ("HEAD_HEIGHT",)),
+        "station_from": ("far_end", ((_SELF, "SIDE_KEEP"),)),
+    },
+    precision={"station": _P["HeadHeight"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(HEAD_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("HEAD_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("HEAD_DIA",)),
+        "span": ([SHANK_LENGTH, OVERALL_LENGTH], ("SHANK_LENGTH", "OVERALL_LENGTH")),
+        "dia": (
+            limits(HEAD_DIA, _P["HeadDia"], unit=UNIT),
+            ("HEAD_DIA", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "dia_nominal": (HEAD_DIA, ("HEAD_DIA",)),
+    },
+    precision={"dia": _P["HeadDia"]},
+)
+requirement(
+    "step",
+    kind="diameter",
+    faces=(
+        CylinderFace(THREAD_MAJOR, contains_y_mm=FULL_THREAD_LENGTH / 2.0),
+        CylinderFace(
+            THREAD_MAJOR, contains_y_mm=FULL_THREAD_LENGTH + PLAIN_SHANK / 2.0
+        ),
+    ),
+    requirements=("dia", "thread", "thread_length"),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("THREAD_MAJOR",)),
+        "at": ([0.0, 0.0, 0.0], ("THREAD_MAJOR",)),
+        "span": ([0.0, SHANK_LENGTH], ("SHANK_LENGTH",)),
+        "dia": (list(THREAD_MAJOR_2A), ((_SELF, "THREAD_MAJOR_2A"), "THREAD")),
+        "dia_nominal": (THREAD_MAJOR, ("THREAD_MAJOR", "REFERENCE_DIMENSIONS")),
+        "thread": (THREAD_CALLOUT, ("THREAD_CALLOUT", "DIMENSION_TEXT")),
+        "thread_length": (
+            limits(FULL_THREAD_LENGTH, _P["FullThreadLength"], unit=UNIT),
+            ("FULL_THREAD_LENGTH", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "thread_length_nominal": (FULL_THREAD_LENGTH, ("FULL_THREAD_LENGTH",)),
+        "thread_end": ("datum_end", ("DIMENSION_CALLOUTS",)),
+        "thread_process": ("die", ("PLAIN_SHANK",)),
+        "callout": (DIMENSION_CALLOUTS["FullThreadLength"], ("DIMENSION_CALLOUTS",)),
+    },
+    precision={"dia": 4, "thread_length": _P["FullThreadLength"]},
+)
+requirement(
+    "fillet_shoulder",
+    kind="fillet",
+    faces=(
+        TorusFace(
+            THREAD_MAJOR / 2.0 + SHOULDER_FILLET_R,
+            SHOULDER_FILLET_R,
+            (0.0, SHANK_LENGTH - SHOULDER_FILLET_R, 0.0),
+        ),
+    ),
+    requirements=("radius",),
+    fields={
+        "radius": (
+            limits(SHOULDER_FILLET_R, _P["ShoulderRadius"], unit=UNIT),
+            ("SHOULDER_FILLET_R", "SHOULDER_FILLET_PLACES", "UNIT"),
+        ),
+        "radius_nominal": (SHOULDER_FILLET_R, ("SHOULDER_FILLET_R",)),
+        "at": ([0.0, SHANK_LENGTH, 0.0], ("SHANK_LENGTH",)),
+    },
+    precision={"radius": _P["ShoulderRadius"]},
+)
+requirement(
+    "cross_hole",
+    kind="hole",
+    faces=(CylinderFace(EYE_DIA),),
+    requirements=("dia", "station", "thru"),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], ("EYE_SPEC",)),
+        "at": ([0.0, EYE_Y, 0.0], ("EYE_Y",)),
+        "dia": (
+            drilled_limits(EYE_DIA, EYE_CALLOUT_PRECISION["hw-diam"], unit=UNIT),
+            ("EYE_DIA", "UNIT", (_SELF, "EYE_CALLOUT_PRECISION")),
+        ),
+        "nominal_dia": (EYE_DIA, ("EYE_DIA",)),
+        "station": (
+            limits(EYE_FROM_HEAD_END, _P["EyeFromHeadEnd"], unit=UNIT),
+            ("EYE_FROM_HEAD_END", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "station_nominal": (EYE_FROM_HEAD_END, ("EYE_FROM_HEAD_END",)),
+        "station_from": ("far_end", ((_SELF, "SIDE_KEEP"),)),
+        "thru": (True, ("EYE_SPEC",)),
+        "process": ("drill", ("EYE_SPEC",)),
+        "callout": (
+            f"{drill_process(EYE_SPEC)} Ø{EYE_DIA / 25.4:.3f} THRU ALL".replace(
+                "Ø0.", "Ø."
+            ),
+            ("EYE_SPEC", (_SELF, "EYE_CALLOUT_PRECISION")),
+        ),
+    },
+    precision={
+        "dia": EYE_CALLOUT_PRECISION["hw-diam"],
+        "station": _P["EyeFromHeadEnd"],
+    },
+)
 # The eye callout stands up and LEFT of the eye, above the bare thread (the
 # old up-and-right place dropped its leader through the station dimension's
 # line, rule 14). SolidWorks hangs the leader off the text end nearer the

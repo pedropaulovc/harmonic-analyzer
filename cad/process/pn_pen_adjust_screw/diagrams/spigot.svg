@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" width="760" height="340">
+  <rect class="paper" x="0" y="0" width="760" height="340"/>
+  <text class="title" x="20" y="22">To scale (500 px/in, the shim excepted): the head in the 3-jaw, the spigot step-turned toward the chuck</text>
+  <rect class="fixture-vise" x="60" y="50" width="115" height="250"/>
+  <rect class="clamp" x="175" y="60" width="125" height="44.5"/>
+  <rect class="clamp" x="175" y="235.5" width="125" height="44.5"/>
+  <rect class="clamp" x="175" y="104.5" width="125" height="3"/>
+  <rect class="clamp" x="175" y="232.5" width="125" height="3"/>
+  <rect class="part-kept" x="157.5" y="107.5" width="160" height="125"/>
+  <rect class="part-removed" x="317.5" y="107.5" width="350" height="48"/>
+  <rect class="part-removed" x="317.5" y="184.5" width="350" height="48"/>
+  <rect class="part-kept" x="317.5" y="155.5" width="350" height="29"/>
+  <line class="dims" x1="627.5" y1="107.5" x2="627.5" y2="155.5"/>
+  <line class="dims" x1="587.5" y1="107.5" x2="587.5" y2="155.5"/>
+  <line class="dims" x1="547.5" y1="107.5" x2="547.5" y2="155.5"/>
+  <line class="dims" x1="507.5" y1="107.5" x2="507.5" y2="155.5"/>
+  <line class="dims" x1="467.5" y1="107.5" x2="467.5" y2="155.5"/>
+  <line class="dims" x1="427.5" y1="107.5" x2="427.5" y2="155.5"/>
+  <line class="dims" x1="387.5" y1="107.5" x2="387.5" y2="155.5"/>
+  <line class="dims" x1="347.5" y1="107.5" x2="347.5" y2="155.5"/>
+  <path class="cutter" d="M317.5 185L317.5 262L372 262L372 215L345 185Z"/>
+  <line class="centre-line" x1="40" y1="170" x2="720" y2="170"/>
+  <line class="datum" x1="667.5" y1="120" x2="667.5" y2="245"/>
+  <text class="datum-label" x="675" y="132">Z0</text>
+  <line class="dims" x1="300" y1="88" x2="300" y2="104"/>
+  <line class="dims" x1="317.5" y1="88" x2="317.5" y2="104"/>
+  <line class="dims" x1="300" y1="96" x2="317.5" y2="96"/>
+  <line class="dims" x1="317.5" y1="96" x2="335" y2="78"/>
+  <text class="label" x="338" y="76">jaw fronts to shoulder .025–.045</text>
+  <line class="dims" x1="300" y1="288" x2="300" y2="312"/>
+  <line class="dims" x1="667.5" y1="250" x2="667.5" y2="312"/>
+  <line class="dims" x1="300" y1="304" x2="667.5" y2="304"/>
+  <text class="label" x="440" y="326">.735 out (3 × Ø.245)</text>
+  <text class="label" x="70" y="44">3-jaw over a shim wrap on the head</text>
+  <text class="label" x="560" y="100">steps .080 max</text>
+  <line class="dims" x1="587.5" y1="125" x2="627.5" y2="125"/>
+  <line class="dims" x1="600" y1="104" x2="607" y2="125"/>
+  <text class="label" x="380" y="258">AR tool: left edge square,</text>
+  <text class="label" x="380" y="274">point leftmost (0° side cutting angle)</text>
+  <text class="label" x="380" y="100">spigot Ø.0563–.0595</text>
+  <line class="dims" x1="440" y1="104" x2="452" y2="158"/>
+</svg>
