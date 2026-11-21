@@ -489,10 +489,14 @@ feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
-tool = "tap-4-40"
+tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Load and run SP03_tap_clamp_1, then _2, _3, _4, one file per hole: each loads T6 (M6; the tap guide in the 1/2 in collet, pointed end out, spindle stays off; the tool setter measures it), goes to Z top over its hole and ends. 4-40 tap in the T-handle wrench in the hole, tap fluid; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home."
+instruction = "Load and run SP03_tap_clamp_1, then _2, _3, _4, one file per hole, the steps below on each: each file loads T6 (M6; the tap guide in the 1/2 in collet, pointed end out, spindle stays off; the tool setter measures it), goes to Z top over its hole and ends Idle."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "4-40 tap in the T-handle wrench in the hole, tap fluid; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home."
 feed = "hand"
 
 [[setups.operations]]
