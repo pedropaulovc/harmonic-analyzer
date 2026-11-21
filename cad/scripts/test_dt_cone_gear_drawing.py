@@ -637,11 +637,10 @@ def test_each_sheet_prints_the_tooth_runout_the_mesh_stack_books(teeth: int) -> 
         )
         assert f"\u00d8{match.group(2)}, OPPOSITE GAPS" in data
     else:
+        # Machinist review of #3324 r1: a finished-part row, not a setup.
         assert booked == cone_set_stack.TOOTH_RUNOUT_TIR_MM
-        assert (
-            f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {spec.inch_text(booked, 3)} "
-            "TIR MAX TO FINISHED BORE"
-        ) in data
+        assert "ACCEPT AT SETUP" not in data
+        assert f"TOOTH RUNOUT TO BORE:  {spec.inch_text(booked, 3)} TIR MAX" in data
 
 
 _REVIEW_RECORD_TEXT = re.compile(

@@ -1158,7 +1158,8 @@ def test_every_sheet_16_row_is_cited_by_its_step_and_fits_its_sheet(
     )
     for key, number in drawing.ACCEPTANCE_ROW_NUMBERS.items():
         cite = f"({drawing.acceptance_ref(key)}"
-        assert printed.count(cite) == (2 if key == "tip-gap" else 1), key
+        # T024's row is the setup 1S centres in and 1X accepts in (#3292).
+        assert printed.count(cite) == (2 if key in ("tip-gap", "t024-runout") else 1), key
         (row,) = (row for row in drawing.ACCEPTANCE_TABLE_ROWS if row[0] == str(number))
         # The STEP cell names the sub-step (or check) whose text carries the cite.
         first = row[1].split(",")[0]

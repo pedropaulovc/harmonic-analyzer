@@ -1475,8 +1475,11 @@ CONE_CRANK_STEPS = _note_text(
         # #3292 (owner ruling 2026-11-21, options 2 + 4): a bonded slip fit
         # cures wherever it sits in its clearance, so T024 is centred while
         # the 638 is wet and accepted after cure on its tooth runout about
-        # MHA-DT-04 (1X), the value cone_set_stack books.
-        "1S. TAP T024 CENTRAL TO AN INDICATOR ON ITS TEETH BEFORE IT GRABS.",
+        # MHA-DT-04 (1X), the value cone_set_stack books.  Both read in the
+        # sheet 16 row's setup: MHA-DT-04 stands on its journal end, the
+        # journal turning against a V-block, so it turns on its own axis and
+        # 1T clips the comb without moving it (Codjiflo review of #3324).
+        f"1S. TAP T024 TRUE ON AN INDICATOR BEFORE IT GRABS ({acceptance_ref('t024-runout')}).",
         # Owner ruling 2026-11-10: one comb blade drops in one tooth space of
         # each gear.  T030's keyway centreline runs through its phase-0 tooth
         # (dt_cone_gear_spec), and its blade takes the space beside that tooth,

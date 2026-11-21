@@ -36,14 +36,18 @@ function (gears that do not come loose) was ruled on #2584 (owner ruling
 assemblies/dt-drive-train.yaml); no allowance is booked for it here. A pair
 then runs looser than that at the far phase of its running runout: the drum
 ``TOOTH_RUNOUT_TIR_MM`` about its bore and each cone gear its eccentricity
-about MHA-DT-04 (``cone_eccentricity_mm``). The keyed gears' seat floats, the
+about the set's running axis (``cone_eccentricity_mm``), which runs from
+MHA-DT-04's journal to MHA-DT-37's pivot. The keyed gears' seat floats, the
 pivot's translation and the arbor's float are taken up the same way under
 the mesh load at the set as in running, so they do not move a pair off its
 set. A bonded gear's float is not: the gear cures off its seat by up to half
 its bond clearance and keeps that offset (#3292). T012/T018 book it on top of
-their printed tooth runout to the bore; T024 is centred while its bond is
-wet and accepted after cure on its tooth runout about MHA-DT-04, which reads
-the float and the tooth runout together.
+their printed tooth runout to the bore; their seat is MHA-DT-37's spigot,
+one part with the pivot, so the spigot's own float in MHA-DT-04's socket
+moves the axis with them. T024 is centred while its bond is wet and accepted
+after cure on its tooth runout about MHA-DT-04's journal, which reads the
+float and the tooth runout together. How the spigot's float, tilt and the
+socket's runout move the axis off MHA-DT-04 near the tip is #2473.
 
 The CAD places the cone line ``SET_ABOVE_STANDARD_MM`` above standard at
 every cone; the feel set runs T120 tighter than that, by
@@ -120,7 +124,7 @@ LAND_2_ASSEMBLED_RUNOUT_TIR_MM = 0.0045 * 25.4
 
 def bond_float_mm(teeth: int) -> float:
     """How far a bonded cone gear's bore can cure off its seat: half the
-    bond clearance (as dt_cone_gear_tl_phasing_comb_spec.BOND_FLOAT_MM);
+    bond clearance (as dt_cone_gear_tl_phasing_comb_spec books it per gear);
     zero for the keyed gears, which take their float up under mesh load."""
     if teeth in cone.ROUND_BORE_TEETH:
         return cone.bond_clearance_mm(teeth)[1] / 2.0
@@ -128,7 +132,7 @@ def bond_float_mm(teeth: int) -> float:
 
 
 def cone_eccentricity_mm(teeth: int) -> float:
-    """The largest eccentricity of cone ``teeth``'s teeth about MHA-DT-04."""
+    """The largest eccentricity of cone ``teeth``'s teeth about the running axis."""
     if teeth in cone.LAND_2_TEETH:
         return LAND_2_ASSEMBLED_RUNOUT_TIR_MM / 2.0
     return cone_tooth_runout_tir_mm(teeth) / 2.0 + bond_float_mm(teeth)

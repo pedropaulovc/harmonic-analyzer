@@ -78,7 +78,9 @@ TOOTH_FORM = "INVOLUTE, AS CUT BY THE CUTTER"
 # the sheet's over-pins pin for the 48 DP space; seated alone in one space it
 # must bear on both flanks, clear of root and tip (MHA-PD-06's check), and
 # stand proud of the tips for the indicator. Every other gear is cut on an
-# arbor through its bore and accepted at that setup.
+# arbor through its bore; its row is the finished-part tooth runout to the
+# bore, worded as the 64T's, 16T's, 120T's and MHA-DT-37's rows (machinist
+# review of #3324 r1, 2 of 3 runs: ACCEPT AT SETUP is an in-process check).
 for _teeth in spec.SPIGOT_TEETH:
     _pin = spec.over_pins_pin_dia_mm(_teeth)
     for _profile in spec.manufacturing_corner_profiles(_teeth):
@@ -95,10 +97,7 @@ def _tooth_runout_row(teeth: int, pin_dia_mm: float) -> tuple[str, str]:
             "TOOTH SPACE RUNOUT TO BORE",
             f"{tir_text} TIR MAX, \u00d8{spec.inch_text(pin_dia_mm, 3)} PIN, ALL {teeth} SPACES",
         )
-    return (
-        "TOOTH CUTTING SETUP, ACCEPT AT SETUP",
-        f"{spec.inch_text(tir, 3)} TIR MAX TO FINISHED BORE",
-    )
+    return ("TOOTH RUNOUT TO BORE", f"{spec.inch_text(tir, 3)} TIR MAX")
 
 
 def gear_data(teeth: int) -> str:
@@ -138,11 +137,12 @@ def gear_data(teeth: int) -> str:
         ("TOOTH FORM", TOOTH_FORM),
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T"),
         # The fit route of the tip, thickness and root bands (drawing-
-        # guidelines "What the shop holds"): the cone mesh is set by feel at
-        # assembly (MHA-DT-00 check 4), which measures no backlash, so the
-        # range is reference only, from no binding to the loosest running
-        # centre (#2586).
-        ("BACKLASH WITH MATE (REF), FEEL SET AT ASSEMBLY",
+        # guidelines "What the shop holds"): the cone mesh is set at assembly
+        # (MHA-DT-00 check 4), which measures no backlash, so the range is
+        # reference only, from no binding to the loosest running centre
+        # (#2586). "FEEL SET" read as a private phrase (machinist review of
+        # #3324 r1, 2 of 3 runs).
+        ("BACKLASH WITH MATE (REF), SET AT ASSEMBLY",
          f"{inch(minimum, 3)} TO {inch(maximum, 3)}"),
         # The bore's worst ligament (RV-03 on T012, RV-07 on T030).
         ("WEB MIN (REF)", inch(web, 4)),

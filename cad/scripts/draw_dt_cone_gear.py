@@ -375,11 +375,13 @@ def sheet_notes(teeth: int) -> str:
         )
     else:
         fit = (bonded_fit_note(teeth),)
+    # "BY FEEL" read as a private phrase (machinist review of #3324 r1, 2 of
+    # 3 runs): the assembly acceptance is the function itself, turning with
+    # no bind (owner direction 2026-11-11, #2416).
     return "\n".join((
         *fit,
-        f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE}: ACCEPT OVER PINS, "
-        "THEN BY FEEL AT ASSEMBLY,",
-        f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
+        f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE}: ACCEPT OVER PINS PER GEAR DATA,",
+        f"   THEN AT ASSEMBLY BY TURNING WITH NO BIND. {TOOTH_EDGE_NOTE}",
     ))
 
 

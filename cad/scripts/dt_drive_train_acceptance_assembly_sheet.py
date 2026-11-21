@@ -189,14 +189,18 @@ ACCEPTANCES = (
         f"{_step_ref('other-base-mounting', 'N')}",
     ),
     # #3292 (owner ruling 2026-11-21, options 2 + 4): T024 is centred while
-    # its bond is wet and accepted after cure on its tooth runout about
-    # MHA-DT-04, read in every space with the part sheets' over-pins pin;
-    # cone_set_stack books the limit, floored onto the printed places.
+    # its bond is wet (1S) and accepted after cure (1X) on its tooth runout
+    # about MHA-DT-04, read in every space with the part sheets' over-pins
+    # pin; cone_set_stack books the limit, floored onto the printed places.
+    # MHA-DT-04 stands on its journal end against a V-block, so it turns on
+    # the journal's axis (Codjiflo review of #3324); the pin names the
+    # pin-gauge row of the tool list as MHA-PD-00's tooth-space rows do.
     (
         "t024-runout",
-        _step_ref("cone-gears-stacked", "X"),
-        f"T{_LAND_2_TEETH:03d} RUNOUT ABOUT MHA-DT-04, "
-        f"\u00d8{inch_text(cone_gear.over_pins_pin_dia_mm(_LAND_2_TEETH), 3)} PIN, EACH SPACE",
+        f"{_step_ref('cone-gears-stacked', 'S')}, {_step_ref('cone-gears-stacked', 'X')}",
+        f"T{_LAND_2_TEETH:03d} RUNOUT, "
+        f"\u00d8{inch_text(cone_gear.over_pins_pin_dia_mm(_LAND_2_TEETH), 3)} GAUGE PIN, "
+        "JOURNAL ON A V-BLOCK",
         f"{inch_text(inch_floor_mm(LAND_2_ASSEMBLED_RUNOUT_TIR_MM, 4), 4)} TIR MAX",
         "TEST INDICATOR",
     ),
