@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 7: the 4-40 tap in the T-handle wrench on the dead centre, spindle off. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 7 (PB07_apex_tap): tap 4-40 by hand on the dead centre</text>
+  <rect class="fixture-support" x="175.54" y="380" width="184.46" height="6"/>
+  <polygon class="part-kept" points="330,380 205.54,380 205.54,337.33 273.1,337.33 273.1,134.64 330,134.64"/>
+  <rect class="holes" x="273.1" y="180.85" width="56.9" height="45.5"/>
+  <text class="label" x="301.55" y="207.6" text-anchor="middle">bore</text>
+  <rect class="part-threads" x="293.64" y="134.64" width="15.82" height="51.11"/>
+  <line class="centre-line" x1="301.55" y1="104.64" x2="301.55" y2="240"/>
+  <line class="hidden" x1="175.54" y1="243.18" x2="390" y2="243.18"/>
+  <text class="label" x="396" y="247.18">jaw tops</text>
+  <circle class="datum" cx="330" cy="134.64" r="3.5"/>
+  <text class="datum-label" x="336" y="128.64">X0: I</text>
+  <circle class="datum" cx="332" cy="380" r="3.5"/>
+  <text class="datum-label" x="338" y="374">Z0 the parallels' top (the seat)</text>
+  <rect class="part-rest" x="261.55" y="94.64" width="80" height="10"/>
+  <text class="label" x="347.55" y="104.64">T-handle wrench</text>
+  <rect class="part-rest" x="298.55" y="104.64" width="6" height="30"/>
+  <polygon class="cutter" points="289.55,24.64 313.55,24.64 301.55,90.64"/>
+  <text class="label" x="321.55" y="54.64">dead centre in the spindle, spindle OFF</text>
+  <text class="label" x="396" y="158.64">tap point {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the apex: into the bore</text>
+  <text class="label" x="20" y="40">Looking at the moving jaw; W at the fixed jaw behind.</text>
+</svg>

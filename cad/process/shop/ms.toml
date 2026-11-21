@@ -23,6 +23,105 @@ material = "ms-stick-brass"
 rpm = 2800
 feed = "2.8 in/min"
 
+# --- MHA-MS-02 stop block (cad/process/ms_stop_block/plan.toml) ----------------
+# The blank: C36000 free-machining brass, stock.c360-flat-3-4x1-1-4 (common).
+# The material key names this bar; the sources below read their brass rows.
+#
+# Facing, the owned 1/2 in 3-flute carbide end mill: The Carbide End Mill
+# Store "Carbide End Mill Speeds and Feeds, General Purpose, Uncoated"
+# (6gtools.com, PDF read 2026-11-17, as mg.toml settings.clamp-em-half-brass),
+# row Non-Ferrous N, Brass/Bronze: 400 SFM, 1/2 in .0042 in/tooth at
+# chip-load factor 1.0 (50 % radial engagement: the faces' passes take at
+# most half the cutter). 400 × 3.82 / .5 = 3056 rpm, over the spindle's 2800
+# (machines.pm-30mv), so 2800 (367 ft/min).
+[settings.stop-em-half-c360]
+tool = "endmill-carbide-3fl-1-2"
+material = "stop-c360"
+rpm = 2800
+chip_load_mm_per_tooth = 0.10668  # .0042 in; 2800 × 3 × .0042 = 35.28 in/min
+flutes = 3
+feed_unit = "in/min"
+
+# The rebate, the owned 1/8 in 3-flute carbide end mill: Harvey Tool
+# "General Machining Guidelines", Carbide End Mills, Non-Ferrous table
+# (harveytool.com/resources/general-machining-guidelines, read 2026-11-20),
+# row Copper, Yellow Brass, High Lead Brass, Red Brass (C36000 is the
+# free-cutting leaded brass): 800-1500 SFM, 1/8 in .001 in/tooth. 800 SFM on
+# 1/8 in is 24,450 rpm, so the spindle's 2800 (92 ft/min, carbide running
+# slow and cool); 2800 × 3 × .001 = 8.4 in/min. Plunges at half that.
+[settings.stop-em-eighth-c360]
+tool = "endmill-carbide-3fl-1-8"
+material = "stop-c360"
+rpm = 2800
+chip_load_mm_per_tooth = 0.0254  # .001 in; 8.4 in/min
+flutes = 3
+feed_unit = "in/min"
+
+# The rebate's corner relief (.05 deep × .06 high, beside the roof, at the
+# bottom of the .134 rebate): no owned cutter is under .07 wide and reaches
+# .38 down inside the rebate. It is plunge-milled (owner ruling 2026-11-21,
+# relayed by CncBlockA) with Harvey Tool 34662, Miniature End Mill, Square,
+# Long Reach, Stub Flute: 3 flutes, centre cutting, .0620 cutter × .0930
+# length of cut × .5000 reach (8×), 1/8 shank, 2-1/2 overall, uncoated,
+# "optimized for plunging", $60.30 (harveytool.com/products/tool-details-
+# 34662, read 2026-11-21). Not owned: to buy. diameter_mm and
+# flute_length_mm: its .0620 and .0930 × 25.4.
+[tools.endmill-carbide-3fl-1-16-reach-1-2]
+description = "1/16 in (.0620) 3-flute carbide square end mill, stub flute .093 length of cut, .500 reach, 1/8 shank (Harvey Tool 34662)"
+diameter_mm = 1.5748
+flute_length_mm = 2.3622
+# Its setting: Harvey Tool Speeds & Feeds, Miniature End Mills - Square -
+# Long Reach, Stub Flute, 9x Reach Multiple (W.C. Chapman's copy of Harvey's
+# table, shop.wcchapman.com/speeds-feeds/harvey-tool-miniature-end-mills-
+# square-long-reach-stub-flute-9x-reach-multiple/, read 2026-11-21; the 9x
+# table, the next longer than 34662's 8x, is the lower of the two), row
+# Brass (C2xxxx-C4xxxx): 500 SFM, .062 in Slotting .00035 in/tooth; run at
+# .0003, under it. 500 SFM is 30,800 rpm, so the spindle's 2800; 2800 × 3 ×
+# .0003 = 2.52 in/min. Plunged: .0003 × 3 = .0009 in/rev of thrust, inside
+# prechips' drilling feed table (Machinery's Handbook, from .0005 in/rev);
+# as a side cut its .0003 in/tooth would lie below the milling feed-factor
+# table's .001 floor, which is not extended without a source.
+[settings.stop-em-sixteenth-c360]
+tool = "endmill-carbide-3fl-1-16-reach-1-2"
+material = "stop-c360"
+rpm = 2800
+chip_load_mm_per_tooth = 0.00762  # .0003 in; 2.52 in/min
+flutes = 3
+feed_unit = "in/min"
+
+# The .04 × 45° roof chamfers: the owned 1/4 in 2-flute 90° carbide
+# chamfering end mill (common.toml tools.chamfer-mill-carbide-1-4-90; McMaster
+# 3073A46, "90 Degree Cut": 45° each side of its axis). Setting: the Harvey
+# general Non-Ferrous table above, Yellow/High Lead Brass, 1/4 in .002
+# in/tooth; 2800 rpm (183 ft/min on the body); 2800 × 2 × .002 = 11.2 in/min.
+[settings.stop-chamfer-c360]
+tool = "chamfer-mill-carbide-1-4-90"
+material = "stop-c360"
+rpm = 2800
+chip_load_mm_per_tooth = 0.0508  # .002 in; 11.2 in/min
+flutes = 2
+feed_unit = "in/min"
+
+# Holes (HSS), as mg.toml's clamp settings and from the same sources:
+# LittleMachineShop "Cutting Speeds", Drilling & Reaming, row Brass (C35600,
+# C37700, C36000, ...): 160-175 ft/min (read 2026-11-17); AutoDrill
+# "Suggested drilling feed rates" (read 2026-11-17), row Brass: 1/16 in .001
+# in/rev, 1/8 in .003, a size between two columns taking the lower one's.
+# - #2 centre drill (5/64 pilot, 3/16 body): 160 ft/min is over 3200 rpm on
+#   the body, so 2800; the pilot under 1/8 in, .001 in/rev: 2.8 in/min.
+# - #43 (.089 in): 160 ft/min is 6870 rpm, so 2800 (65 ft/min); between the
+#   1/16 and 1/8 in columns, .001 in/rev: 2.8 in/min.
+[settings.stop-spot-c360]
+tool = "jig-spot"
+material = "stop-c360"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.stop-drill-43-c360]
+tool = "jig-drill-43"
+material = "stop-c360"
+rpm = 2800
+feed = "2.8 in/min"
+
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
 # prechips can check each plan's stock_refs. Description only: the ownership

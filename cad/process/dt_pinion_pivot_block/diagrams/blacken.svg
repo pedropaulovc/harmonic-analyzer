@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">Setup 8: blacken every surface, both bores and both hold-down holes too</text>
+  <text class="title" x="60" y="60">Front face (8 px/mm)</text>
+  <rect class="part-kept" x="80" y="80" width="319" height="201"/>
+  <rect class="active-face" x="80" y="80" width="319" height="201"/>
+  <circle class="holes" cx="287.3" cy="147.1" r="25.5"/>
+  <circle class="holes" cx="139.3" cy="129.9" r="25.5"/>
+  <text class="label-halo" x="287.3" y="200" text-anchor="middle">pivot bore</text>
+  <text class="label-halo" x="139.3" y="183" text-anchor="middle">lift bore</text>
+  <text class="title" x="480" y="60">Top face (6 px/mm)</text>
+  <rect class="part-kept" x="480" y="80" width="239" height="67"/>
+  <rect class="active-face" x="480" y="80" width="239" height="67"/>
+  <circle class="holes" cx="585.2" cy="113.5" r="14.9"/>
+  <circle class="holes" cx="685.7" cy="113.5" r="14.9"/>
+  <text class="label" x="480" y="180">Hold-down holes: brushed inside.</text>
+  <text class="label" x="480" y="216">All six faces, every edge (outlined),</text>
+  <text class="label" x="480" y="232">both bores and both holes blackened;</text>
+  <text class="label" x="480" y="248">rinsed, dried, oiled after.</text>
+</svg>

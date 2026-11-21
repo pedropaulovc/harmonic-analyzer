@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 6: the 4-40 tap in the T-handle wrench on the dead centre, spindle off. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 6 (PA06_apex_tap): tap 4-40 by hand on the dead centre</text>
+  <rect class="fixture-support" x="223.61" y="345" width="124.39" height="6"/>
+  <polygon class="part-kept" points="330,345 241.61,345 241.61,178.88 276.66,178.88 276.66,329.76 330,329.76"/>
+  <rect class="holes" x="241.61" y="197.32" width="35.05" height="28.65"/>
+  <text class="label" x="259.2" y="215.65" text-anchor="middle">bore</text>
+  <rect class="part-threads" x="257.16" y="178.88" width="8.54" height="18.97"/>
+  <line class="centre-line" x1="261.42" y1="138.88" x2="261.42" y2="231"/>
+  <line class="hidden" x1="223.61" y1="276.84" x2="348" y2="276.84"/>
+  <text class="label" x="354" y="280.84">jaw tops</text>
+  <circle class="datum" cx="330" cy="329.76" r="3.5"/>
+  <text class="datum-label" x="338" y="323.76">X0: N</text>
+  <rect class="part-rest" x="221.42" y="138.88" width="80" height="10"/>
+  <text class="label" x="307.42" y="148.88">T-handle wrench</text>
+  <rect class="part-rest" x="258.42" y="148.88" width="6" height="30"/>
+  <polygon class="cutter" points="249.42,34 273.42,34 261.42,132.88"/>
+  <text class="label" x="281.42" y="64">dead centre in the spindle, spindle OFF</text>
+  <line class="dims" x1="280.66" y1="178.88" x2="324.66" y2="178.88"/>
+  <line class="dims" x1="267.42" y1="214.88" x2="324.66" y2="214.88"/>
+  <line class="arrow" x1="316.66" y1="192.88" x2="316.66" y2="214.88"/>
+  <text class="label" x="330.66" y="200.88">tap point {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the top: into the bore</text>
+  <text class="label" x="20" y="392">Looking at the moving jaw; W at the fixed jaw behind.</text>
+</svg>

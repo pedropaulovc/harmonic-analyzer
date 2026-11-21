@@ -47,21 +47,28 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_projection import model_points_in_view
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from ch_pivot_bracket_drawing_spec import (
+    BORE_DIA_BAND,
+    CORNER_R_BAND,
     CORNER_R_MAX,
+    CORNER_R_PLACES,
     CORNER_R_TOL_TYPE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     SURFACE_FINISHES,
 )
-from ch_pivot_bracket_sides import FOOT_Z1, HOLE_STATION, HOLE_Z
+from ch_pivot_bracket_sides import FOOT_LEN, FOOT_Z1, HOLE_STATION, HOLE_Z
 from ch_pivot_bracket_spec import (
     APEX_ABOVE_BORE,
     ARCH_LIFT,
@@ -69,11 +76,16 @@ from ch_pivot_bracket_spec import (
     BORE_H,
     EAR_ARCH_R,
     EAR_T,
+    EAR_T_BAND,
     EAR_TOP_Y,
     FOOT_H,
     FOOT_W,
     FOOT_Z0,
+    HOLD_DOWN_HOLE_SPEC,
+    HOLE_DIA,
     SET_SCREW_HOLE_SPEC,
+    SET_SCREW_THREAD,
+    UNIT,
 )
 
 
@@ -277,6 +289,346 @@ SET_SCREW_CALLOUT_XY = (FRONT_CENTER[0] - 0.018, _top_y(FOOT_Z0) + 0.026)
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 _LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (ch_pivot_bracket_spec: the seat at
+# y = 0, the origin on it under the bore; X across the foot and the ear, its
+# sides at +/-FOOT_W/2, the west side -X; the ear's inboard face at z =
+# FOOT_Z0, its outboard face at +EAR_T/2 and the foot on to FOOT_Z1 along +Z;
+# the cross-bore runs along Z at y = BORE_H, the hold-down hole and the apex
+# tap along Y on x = 0). A band is the title block's row for the places the
+# part authors (DRAWING_PRECISION_BY_NAME) on the printed nominal, or the
+# explicit band it authors (the ear thickness, the cross-bore, the corner's
+# MAX) on the exact model nominal; the drilled hole and the tap drill take
+# the DRILLED HOLES row. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_ch_pivot_bracket"
+_DS = "ch_pivot_bracket_drawing_spec"
+_SIDES = "ch_pivot_bracket_sides"
+_HALF_W = FOOT_W / 2.0
+_ARCH_CENTER_Y = BORE_H + ARCH_LIFT
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(
+        "FOOT_W",
+        "FOOT_H",
+        "FOOT_Z0",
+        "EAR_T",
+        "EAR_TOP_Y",
+        (_SIDES, "FOOT_Z1"),
+    ),
+    precision_sources=(
+        (_DS, "DRAWING_PRECISION"),
+        (_DS, "DRAWING_PRECISION_BY_NAME"),
+        (_DS, "CORNER_R_PLACES"),
+        (_SELF, "SET_SCREW_CALLOUT_PRECISION"),
+        (_SELF, "APEX_REFERENCE_PLACES"),
+    ),
+)
+# The seat: every height runs from it (FRONT_KEEP), and it carries the Ra 125
+# seat grade (SURFACE_FINISHES "foot_seat", an inch sheet's microinches).
+_SEAT_FINISH = surface_finish_by_key(SURFACE_FINISHES, "foot_seat")
+_FINISH_SOURCES = ((_DS, "SURFACE_FINISHES"), (_SELF, "build"))
+requirement(
+    "seat",
+    kind="face",
+    faces=(_SEAT_FINISH.face,),
+    requirements=("plane", "finish_ra"),
+    fields={
+        "plane": (_plane("y", 0.0), ("__frame__",)),
+        "finish_ra": (_SEAT_FINISH.roughness_um, _FINISH_SOURCES),
+        "finish_callout": (_SEAT_FINISH.roughness_ra, _FINISH_SOURCES),
+    },
+    # export_features restamps the Ra's places from _surface_finish.ra.
+    precision={"finish_ra": 1},
+)
+# The foot top: the foot height .24 off the seat (FRONT_KEEP "FootHt").
+requirement(
+    "foot_top",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), FOOT_H),),
+    requirements=("height",),
+    fields={
+        "plane": (_plane("y", FOOT_H), ("FOOT_H",)),
+        "height": (
+            limits(FOOT_H, _P["FootHt"], unit=UNIT),
+            ("FOOT_H", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "height_nominal": (FOOT_H, ("FOOT_H",)),
+        "height_from": ("seat", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"height": _P["FootHt"]},
+)
+# The two side faces, each one flat down the ear and the foot: the west one
+# locates the bore and the hold-down hole (BoreLateral, HoleLateral); the east
+# one closes the width .64 (TOP_KEEP "FootW").
+requirement(
+    "west_side",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), _HALF_W),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", -_HALF_W), ("__frame__", "FOOT_W"))},
+)
+requirement(
+    "east_side",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), _HALF_W),),
+    requirements=("width",),
+    fields={
+        "plane": (_plane("x", _HALF_W), ("__frame__", "FOOT_W")),
+        "width": (
+            limits(FOOT_W, _P["FootW"], unit=UNIT),
+            ("FOOT_W", "UNIT", (_SELF, "TOP_KEEP")),
+        ),
+        "width_nominal": (FOOT_W, ("FOOT_W",)),
+        "width_from": ("west_side", ((_SELF, "TOP_KEEP"),)),
+    },
+    precision={"width": _P["FootW"]},
+)
+# The ear's inboard face, one flat with the foot's inboard end: every plan
+# length along Z runs from it (TOP_KEEP).
+requirement(
+    "inboard_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -FOOT_Z0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", FOOT_Z0), ("__frame__", "FOOT_Z0"))},
+)
+# The ear's outboard face: the thickness .320 +/-.004 from the inboard face
+# (RIGHT_KEEP_NAMES "EarThick"), the part's own band, with its callout.
+requirement(
+    "outboard_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), EAR_T / 2.0),),
+    requirements=("thickness",),
+    fields={
+        "plane": (_plane("z", EAR_T / 2.0), ("__frame__", "EAR_T")),
+        "thickness": (
+            limits(EAR_T, _P["EarThick"], (EAR_T_BAND, -EAR_T_BAND), unit=UNIT),
+            ("EAR_T", "EAR_T_BAND", (_SELF, "RIGHT_KEEP_NAMES")),
+        ),
+        "thickness_nominal": (EAR_T, ("EAR_T",)),
+        "thickness_from": ("inboard_face", ((_SELF, "RIGHT_KEEP_NAMES"),)),
+        "callout": (DIMENSION_CALLOUTS["EarThick"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+    },
+    precision={"thickness": _P["EarThick"]},
+)
+# The foot's free end: the foot length .70 from the inboard face (TOP_KEEP
+# "FootLen").
+requirement(
+    "foot_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), FOOT_Z1),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("z", FOOT_Z1), ((_SIDES, "FOOT_Z1"),)),
+        "length": (
+            limits(FOOT_LEN, _P["FootLen"], unit=UNIT),
+            ((_SIDES, "FOOT_LEN"), "UNIT", (_SELF, "TOP_KEEP")),
+        ),
+        "length_nominal": (FOOT_LEN, ((_SIDES, "FOOT_LEN"),)),
+        "length_from": ("inboard_face", ((_SELF, "TOP_KEEP"),)),
+    },
+    precision={"length": _P["FootLen"]},
+)
+# The arched top: the ear's half-round R.32 (FRONT_KEEP "ArchRadius"), its
+# centre ARCH_LIFT over the bore axis; its apex is the overall height 1.38
+# off the seat (FRONT_KEEP "OverallHeight", the HeightReference line up the
+# tap's axis), the arc's centre plus its radius, so it carries no `_from`
+# (an arc's coordinate is its centre). The bore axis to the apex prints
+# (.39) as a REFERENCE (_add_apex_reference) at the heights' places.
+requirement(
+    "arch",
+    kind="arc",
+    faces=(CylinderFace(2.0 * EAR_ARCH_R),),
+    requirements=("radius", "overall_height"),
+    fields={
+        "center": ([0.0, _ARCH_CENTER_Y, 0.0], ("BORE_H", "ARCH_LIFT")),
+        "axis": ((0.0, 0.0, 1.0), ("__frame__",)),
+        "apex": ((0.0, 1.0, 0.0), ("__frame__",)),
+        "radius": (
+            limits(EAR_ARCH_R, _P["ArchRadius"], unit=UNIT),
+            ("EAR_ARCH_R", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "radius_nominal": (EAR_ARCH_R, ("EAR_ARCH_R",)),
+        "overall_height": (
+            limits(EAR_TOP_Y, _P["OverallHeight"], unit=UNIT),
+            ("EAR_TOP_Y", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "overall_height_nominal": (EAR_TOP_Y, ("EAR_TOP_Y",)),
+        "apex_above_bore_ref": (
+            APEX_ABOVE_BORE,
+            ("APEX_ABOVE_BORE", (_SELF, "_add_apex_reference")),
+        ),
+    },
+    precision={
+        "radius": _P["ArchRadius"],
+        "overall_height": _P["OverallHeight"],
+        "apex_above_bore_ref": APEX_REFERENCE_PLACES,
+    },
+)
+# The cross-bore, reamed through the ear from its outboard face: O.256
+# +.004/.000 (FRONT_KEEP "ShaftBoreDia", BORE_DIA_BAND) with its REAM THRU
+# callout; the bore height .99 off the seat and its lateral .32 off the west
+# side (FRONT_KEEP "BoreCz", "BoreLateral").
+_REAM = ((_SELF, "DIMENSION_CALLOUTS"),)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(BORE_DIA),),
+    requirements=("dia", "thru", "height", "lateral"),
+    fields={
+        "at": ([0.0, BORE_H, EAR_T / 2.0], ("BORE_H", "EAR_T")),
+        "axis": ((0.0, 0.0, -1.0), ("__frame__",)),
+        "dia": (
+            limits(BORE_DIA, _P["ShaftBoreDia"], BORE_DIA_BAND, unit=UNIT),
+            ("BORE_DIA", (_DS, "BORE_DIA_BAND"), (_SELF, "FRONT_KEEP")),
+        ),
+        "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
+        "process": ("ream", _REAM),
+        "thru": (True, _REAM),
+        "callout": (DIMENSION_CALLOUTS["ShaftBoreDia"], _REAM),
+        "mates": (PIVOT_SHAFT_NUMBER, ((_SELF, "PIVOT_SHAFT_NUMBER"),)),
+        "height": (
+            limits(BORE_H, _P["BoreCz"], unit=UNIT),
+            ("BORE_H", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "height_nominal": (BORE_H, ("BORE_H",)),
+        "height_from": ("seat", ((_SELF, "FRONT_KEEP"),)),
+        "lateral": (
+            limits(_HALF_W, _P["BoreLateral"], unit=UNIT),
+            ("FOOT_W", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "lateral_nominal": (_HALF_W, ("FOOT_W",)),
+        "lateral_from": ("west_side", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={
+        "dia": _P["ShaftBoreDia"],
+        "height": _P["BoreCz"],
+        "lateral": _P["BoreLateral"],
+    },
+)
+# The #8 close-clearance hold-down hole, drilled through the foot from its
+# top: O.180 DRILL THRU (TOP_KEEP "HoleDia"), its station .49 from the
+# inboard face and its lateral .32 off the west side (TOP_KEEP "HoleStation",
+# "HoleLateral").
+_DRILL = ((_SELF, "DIMENSION_CALLOUTS"),)
+requirement(
+    "hold_down",
+    kind="hole",
+    faces=(CylinderFace(HOLE_DIA),),
+    requirements=("dia", "thru", "station", "lateral"),
+    fields={
+        "at": ([0.0, FOOT_H, HOLE_Z], ("FOOT_H", (_SIDES, "HOLE_Z"))),
+        "axis": ((0.0, -1.0, 0.0), ("__frame__",)),
+        "dia": (
+            drilled_limits(HOLE_DIA, _P["HoleDia"], unit=UNIT),
+            ("HOLE_DIA", "UNIT", (_SELF, "TOP_KEEP")),
+        ),
+        "nominal_dia": (HOLE_DIA, ("HOLE_DIA",)),
+        "clearance_for": (HOLD_DOWN_HOLE_SPEC.size, ("HOLD_DOWN_HOLE_SPEC",)),
+        "process": ("drill", _DRILL),
+        "thru": (True, _DRILL),
+        "callout": (DIMENSION_CALLOUTS["HoleDia"], _DRILL),
+        "station": (
+            limits(HOLE_STATION, _P["HoleStation"], unit=UNIT),
+            ((_SIDES, "HOLE_STATION"), "UNIT", (_SELF, "TOP_KEEP")),
+        ),
+        "station_nominal": (HOLE_STATION, ((_SIDES, "HOLE_STATION"),)),
+        "station_from": ("inboard_face", ((_SELF, "TOP_KEEP"),)),
+        "lateral": (
+            limits(_HALF_W, _P["HoleLateral"], unit=UNIT),
+            ("FOOT_W", "UNIT", (_SELF, "TOP_KEEP")),
+        ),
+        "lateral_nominal": (_HALF_W, ("FOOT_W",)),
+        "lateral_from": ("west_side", ((_SELF, "TOP_KEEP"),)),
+    },
+    precision={
+        "dia": _P["HoleDia"],
+        "station": _P["HoleStation"],
+        "lateral": _P["HoleLateral"],
+    },
+)
+# The apex set-screw tap, #4-40 down through the arch apex on x = 0 into the
+# bore (the native callout: O.089 TO BORE, 4-40 UNC TO BORE, SET_SCREW_MATE;
+# the class is the title block's 2B), its station .16 from the inboard face
+# (TOP_KEEP "SetScrewLocation"). Its x = 0 rides the bore's lateral: the
+# elevation's centreline, the HeightReference line up its axis.
+_TAP_CALLOUT = (
+    "SET_SCREW_HOLE_SPEC",
+    (_SELF, "set_screw_callout_definitions"),
+    (_SELF, "SET_SCREW_CALLOUT_PRECISION"),
+)
+_TAP_DRILL_DIA = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC)
+_TAP_DRILL_SOURCES = ("SET_SCREW_HOLE_SPEC", ("_hole_spec", "blind_cut_dia_mm"))
+requirement(
+    "apex_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(_TAP_DRILL_DIA),),
+    requirements=("thread", "dia", "into", "station"),
+    fields={
+        "at": ([0.0, EAR_TOP_Y, 0.0], ("EAR_TOP_Y", "SET_SCREW_HOLE_SPEC")),
+        "axis": ((0.0, -1.0, 0.0), ("__frame__", "SET_SCREW_HOLE_SPEC")),
+        "thread": (
+            f"{SET_SCREW_THREAD} UNC-{SET_SCREW_HOLE_SPEC.thread_class}",
+            ("SET_SCREW_THREAD", *_TAP_CALLOUT),
+        ),
+        "dia": (
+            drilled_limits(
+                _TAP_DRILL_DIA, SET_SCREW_CALLOUT_PRECISION["hw-tapdrldia"], unit=UNIT
+            ),
+            (*_TAP_DRILL_SOURCES, "UNIT", *_TAP_CALLOUT),
+        ),
+        "nominal_dia": (_TAP_DRILL_DIA, _TAP_DRILL_SOURCES),
+        "into": ("bore", ("SET_SCREW_HOLE_SPEC", (_SELF, "SET_SCREW_EXTENT"))),
+        "extent": (SET_SCREW_EXTENT, ((_SELF, "SET_SCREW_EXTENT"),)),
+        "mates": (SET_SCREW_MATE, ((_SELF, "SET_SCREW_MATE"),)),
+        "station": (
+            limits(-FOOT_Z0, _P["SetScrewLocation"], unit=UNIT),
+            ("FOOT_Z0", "UNIT", (_SELF, "TOP_KEEP")),
+        ),
+        "station_nominal": (-FOOT_Z0, ("FOOT_Z0",)),
+        "station_from": ("inboard_face", ((_SELF, "TOP_KEEP"),)),
+    },
+    precision={
+        "dia": SET_SCREW_CALLOUT_PRECISION["hw-tapdrldia"],
+        "station": _P["SetScrewLocation"],
+    },
+)
+# The foot-to-ear inside corner (the foot top meets the outboard face, along
+# X): the single limit R.02 MAX (RIGHT_KEEP_NAMES "CornerRadius"), sharp up to
+# CORNER_R_MAX, with its callout; the part models it at the limit.
+requirement(
+    "inside_corner",
+    kind="fillet",
+    faces=(CylinderFace(2.0 * CORNER_R_MAX),),
+    requirements=("radius",),
+    fields={
+        "at": (list(CORNER_MODEL_MM), ("FOOT_H", "EAR_T", (_SELF, "CORNER_MODEL_MM"))),
+        "axis": ((1.0, 0.0, 0.0), ("__frame__",)),
+        "radius": (
+            limits(CORNER_R_MAX, CORNER_R_PLACES, CORNER_R_BAND, unit=UNIT),
+            (
+                (_DS, "CORNER_R_MAX"),
+                (_DS, "CORNER_R_BAND"),
+                (_DS, "CORNER_R_TOL_TYPE"),
+                (_SELF, "RIGHT_KEEP_NAMES"),
+            ),
+        ),
+        "radius_nominal": (CORNER_R_MAX, ((_DS, "CORNER_R_MAX"),)),
+        "callout": (
+            DIMENSION_CALLOUTS["CornerRadius"],
+            ((_SELF, "DIMENSION_CALLOUTS"),),
+        ),
+    },
+    precision={"radius": CORNER_R_PLACES},
+)
 
 
 def set_screw_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:

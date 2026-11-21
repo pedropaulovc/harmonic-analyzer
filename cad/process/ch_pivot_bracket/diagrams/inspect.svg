@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 8: the finished bracket; what each check reads from. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 8: inspect each bracket</text>
+  <path class="part-kept" d="M93.1 360 V171.53 A56.9 56.9 0 0 1 206.9 171.53 V360 Z"/>
+  <circle class="holes" cx="150" cy="183.6" r="22.76"/>
+  <rect class="part-threads" x="142.09" y="114.64" width="15.82" height="47.96"/>
+  <line class="hidden" x1="93.1" y1="317.33" x2="206.9" y2="317.33"/>
+  <line class="centre-line" x1="150" y1="102.64" x2="150" y2="370"/>
+  <line class="datum" x1="83.1" y1="360" x2="216.9" y2="360"/>
+  <text class="datum-label" x="79.1" y="364" text-anchor="end">seat</text>
+  <line class="datum" x1="93.1" y1="364" x2="93.1" y2="340"/>
+  <text class="datum-label" x="89.1" y="380" text-anchor="end">W</text>
+  <text class="label" x="20" y="50">Front (W on the left):</text>
+  <text class="label" x="218.9" y="187.6">bore {{cad.bore_height_in:.2dot}} up, {{cad.bore_lateral_in:.2dot}} from W</text>
+  <text class="label" x="218.9" y="118.64">apex {{cad.arch_overall_height_in:.2dot}} up; 4-40 into the bore</text>
+  <text class="label" x="218.9" y="321.33">foot top {{cad.foot_top_height_in:.2dot}} (hidden)</text>
+  <polygon class="part-kept" points="470,360 594.46,360 594.46,317.33 526.9,317.33 526.9,114.64 470,114.64"/>
+  <rect class="holes" x="470" y="160.85" width="56.9" height="45.5"/>
+  <rect class="holes" x="541.12" y="317.33" width="32" height="42.67"/>
+  <line class="datum" x1="470" y1="370" x2="470" y2="104.64"/>
+  <text class="datum-label" x="466" y="100.64" text-anchor="end">I</text>
+  <text class="label" x="470" y="50">Side (I on the left):</text>
+  <text class="label" x="536.9" y="134.64">ear {{cad.outboard_face_thickness_min_in:.4dot}}–{{cad.outboard_face_thickness_max_in:.4dot}}</text>
+  <text class="label" x="602.46" y="338.66">length {{cad.foot_end_length_in:.2dot}}</text>
+  <text class="label" x="537.12" y="382">hold-down {{cad.hold_down_station_in:.2dot}} from I</text>
+  <text class="label" x="530.9" y="311.33">inside corner R{{cad.inside_corner_radius_max_in:.2dot}} max</text>
+</svg>

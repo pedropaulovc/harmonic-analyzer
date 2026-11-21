@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="16" y="22">Setup 10: deburr the rebate and the mating face for the pair</text>
+  <polygon class="part-kept" points="74.2,70.0 344.5,70.0 358.7,84.2 358.7,269.1 60.0,269.1 60.0,84.2"/>
+  <rect class="holes" x="60.0" y="102.0" width="298.7" height="48.4"/>
+  <line class="hidden" x1="209.4" y1="150.4" x2="209.4" y2="269.1"/>
+  <line class="active-face" x1="60.0" y1="102.0" x2="358.7" y2="102.0"/>
+  <line class="active-face" x1="60.0" y1="150.4" x2="358.7" y2="150.4"/>
+  <text class="label" x="440.0" y="80.0">roof (chamfered corners)</text>
+  <line class="leader" x1="436.0" y1="76.0" x2="209.4" y2="86.0"/>
+  <circle class="leader-dot" cx="209.4" cy="86.0" r="2.5"/>
+  <text class="label" x="440.0" y="120.0">rebate: deburr its edges and ends</text>
+  <line class="leader" x1="436.0" y1="116.0" x2="269.1" y2="126.2"/>
+  <circle class="leader-dot" cx="269.1" cy="126.2" r="2.5"/>
+  <text class="label" x="440.0" y="160.0">MATING face: stone it flat</text>
+  <line class="leader" x1="436.0" y1="156.0" x2="299.0" y2="196.0"/>
+  <circle class="leader-dot" cx="299.0" cy="196.0" r="2.5"/>
+  <text class="label" x="440.0" y="200.0">thumb hole (hidden): deburr its exit</text>
+  <line class="leader" x1="436.0" y1="196.0" x2="209.4" y2="210.0"/>
+  <circle class="leader-dot" cx="209.4" cy="210.0" r="2.5"/>
+  <text class="label" x="440.0" y="240.0">LOCATING EDGE</text>
+  <line class="leader" x1="436.0" y1="236.0" x2="239.2" y2="269.1"/>
+  <circle class="leader-dot" cx="239.2" cy="269.1" r="2.5"/>
+  <text class="label" x="440.0" y="280.0">LOCATING END (right)</text>
+  <line class="leader" x1="436.0" y1="276.0" x2="358.7" y2="209.4"/>
+  <circle class="leader-dot" cx="358.7" cy="209.4" r="2.5"/>
+  <text class="label" x="16.0" y="406.0">The block seen on its mating face. Then to MHA-MS-03's traveler, Setups 3-5, and back to Setup 12.</text>
+</svg>

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="16" y="22">Setup 9 (MS08): spot and drill the thumb hole into the rebate</text>
+  <rect class="fixture-vise" x="101.6" y="330.0" width="156.8" height="22.0"/>
+  <rect class="clamp" x="125.6" y="150.2" width="30.0" height="179.8"/>
+  <rect class="clamp" x="204.4" y="150.2" width="30.0" height="179.8"/>
+  <text class="label" x="140.6" y="368.0" text-anchor="middle">moving jaw</text>
+  <text class="label" x="219.4" y="368.0" text-anchor="middle">fixed jaw</text>
+  <rect class="fixture-support" x="155.6" y="177.6" width="12.7" height="152.4"/>
+  <rect class="fixture-support" x="191.7" y="177.6" width="12.7" height="152.4"/>
+  <rect class="part-kept" x="155.6" y="120.7" width="48.8" height="56.9"/>
+  <rect class="hidden" x="170.7" y="154.6" width="33.7" height="13.8"/>
+  <rect class="holes" x="182.6" y="120.7" width="9.0" height="44.3"/>
+  <rect class="cutter" x="182.6" y="70.7" width="9.0" height="94.3"/>
+  <text class="label" x="320.0" y="60.0">#43 drill, after the centre drill's spot</text>
+  <line class="leader" x1="316.0" y1="56.0" x2="189.1" y2="90.7"/>
+  <circle class="leader-dot" cx="189.1" cy="90.7" r="2.5"/>
+  <text class="label" x="320.0" y="120.0">its point stops in the rebate</text>
+  <line class="leader" x1="316.0" y1="116.0" x2="187.1" y2="165.0"/>
+  <circle class="leader-dot" cx="187.1" cy="165.0" r="2.5"/>
+  <text class="label" x="320.0" y="150.0">LOCATING EDGE up</text>
+  <line class="leader" x1="316.0" y1="146.0" x2="161.6" y2="120.7"/>
+  <circle class="leader-dot" cx="161.6" cy="120.7" r="2.5"/>
+  <text class="label" x="320.0" y="180.0">rebate (hidden), open to the MATING face</text>
+  <line class="leader" x1="316.0" y1="176.0" x2="190.9" y2="161.5"/>
+  <circle class="leader-dot" cx="190.9" cy="161.5" r="2.5"/>
+  <text class="label" x="320.0" y="210.0">MATING face (fixed jaw)</text>
+  <line class="leader" x1="316.0" y1="206.0" x2="202.4" y2="140.7"/>
+  <circle class="leader-dot" cx="202.4" cy="140.7" r="2.5"/>
+  <text class="label" x="320.0" y="240.0">roof: not drilled, not tapped</text>
+  <line class="leader" x1="316.0" y1="236.0" x2="184.1" y2="173.0"/>
+  <circle class="leader-dot" cx="184.1" cy="173.0" r="2.5"/>
+  <text class="label" x="320.0" y="270.0">TOP face down on the stacks</text>
+  <line class="leader" x1="316.0" y1="266.0" x2="163.6" y2="177.6"/>
+  <circle class="leader-dot" cx="163.6" cy="177.6" r="2.5"/>
+  <text class="label" x="16.0" y="406.0">Section across the jaws through the thumb hole; the locating end faces you (X0 at the right end).</text>
+</svg>
