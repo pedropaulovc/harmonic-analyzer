@@ -43,7 +43,10 @@ diameter_mm = 6.3246
 description = ".5010 in HSS chucking reamer"
 diameter_mm = 12.7254
 [tools.tap-4-40-spiral-point]  # Owner ruling 2026-11-20, #2427: MHA-PD-11 and MHA-PD-27 #4-40 THRU taps
-description = "Spiral-point (gun) hand tap #4-40 UNC, HSS"
+description = "Spiral-point (gun) hand tap #4-40 UNC, HSS; T-handle tap wrench with a centre hole in its top"
+# MHA-PD-27's traveler (cad/process/pd_platen_bottom_guide/plan.toml) drills
+# its holes with the #43 (.089 in, tools.jig-drill-43), the 4-40 tap drill.
+tap_drill_mm = 2.2606
 [tools.gear-cutters-32dp-20pa]  # F-gear-cutter-10-289-328
 description = "32DP 20PA involute gear cutter #8"
 [tools.straightedge]  # F-straightedge
@@ -57,9 +60,6 @@ description = "Straightedge"
 [tools.chamfer-mill-330ch-1-4-90]  # inventory tools.chamfer-mill-330ch-1-4-90
 description = "330CH 1/4 in 90° included 2-flute chamfer mill"
 diameter_mm = 6.35
-[tools.drill-35]  # MHA-PD-27 4X ⌴ Ø.110 ↧ .469 counterbore
-description = "#35 (.1100 in) drill, 115-piece index"
-diameter_mm = 2.794
 [tools.endmill-carbide-3-64]  # MHA-PD-03 2X .04 SLIT, FULL R END
 description = "3/64 in square carbide end mill, 2- or 3-flute"
 diameter_mm = 1.190625

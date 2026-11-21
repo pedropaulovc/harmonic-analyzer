@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 220" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="220"/>
+  <text class="title" x="20" y="20">Black oxide + oil: Presto Black BST4 swabbed on, sealed with Dri-Touch Amber IRP2 (all to buy)</text>
+  <rect class="clamp" x="40" y="90" width="700.9" height="41.2"/>
+  <circle class="hole" cx="232" cy="110.6" r="4"/>
+  <circle class="hole" cx="269" cy="110.6" r="4"/>
+  <circle class="hole" cx="512" cy="110.6" r="4"/>
+  <circle class="hole" cx="549" cy="110.6" r="4"/>
+  <line class="leader" x1="269" y1="106" x2="300" y2="60"/>
+  <text class="label" x="305" y="56">the four lock taps: swabbed and sealed too</text>
+  <line class="leader" x1="600" y1="128" x2="620" y2="160"/>
+  <text class="label" x="560" y="176">every face and both ends</text>
+  <text class="label" x="40" y="206">Until the supplies are bought: tag the rail AWAITING BLACK OXIDE; keep it bare and dry.</text>
+</svg>
