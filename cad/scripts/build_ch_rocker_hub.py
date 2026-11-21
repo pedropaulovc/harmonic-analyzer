@@ -2,10 +2,10 @@ r"""Reproduction script: rocker hub (MHA-CH-12; 20 used, one per rocker arm).
 
 The turned 1018 hub of the built-up rocker arm MHA-CH-06
 (``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``), as SUPPLIED to the joint
-(``ch_rocker_hub_spec``): the Ø.400 land at its finished size with its press
-band on the MHA-CH-13 strap's reamed hole (``ch_rocker_hub_fit``), the bore
-drilled under the finished ream and the length left long, both finished on the
-joined part to the MHA-CH-06 print.
+(``ch_rocker_hub_spec``): the Ø.400 land at its finished size, a reference
+turned to the MHA-CH-13 strap's measured hole for the press
+(``ch_rocker_hub_fit``), the bore drilled under the finished ream and the
+length left long, both finished on the joined part to the MHA-CH-06 print.
 
 Layout: Front-plane annulus at the origin (land, bore) extruded mid-plane, so
 the hub's own mid-plane is the Front plane, as the rocker's integral hub is.
@@ -21,6 +21,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
@@ -34,9 +35,7 @@ from _drawing_marks import (
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import name_last_feature
-from _fit_deviations import deviations
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
@@ -45,11 +44,13 @@ from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
 from _sketch import SketchDims, ensure_fully_defined
 from _sketch_circle import define_circle
-from ch_rocker_hub_fit import HUB_LAND_BAND
 from ch_rocker_hub_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    REFERENCE_DIMENSIONS,
+    REFERENCE_PREFIX,
+    REFERENCE_SUFFIX,
     SUPPLY_LENGTH_PREFIX,
 )
 from ch_rocker_hub_spec import (
@@ -57,7 +58,6 @@ from ch_rocker_hub_spec import (
     SUPPLY_BORE_DIA,
     SUPPLY_LENGTH_MIN,
     SUPPLY_LENGTH_TOL_TYPE,
-    UNIT,
 )
 
 PART_NAME = "ch-rocker-hub"
@@ -95,6 +95,27 @@ def _supply_length_min_limit(adapter) -> None:
         or int(tolerance.Type) != SUPPLY_LENGTH_TOL_TYPE
     ):
         raise RuntimeError(f"{label}: cannot retain the MIN limit")
+
+
+@_telemetry.traced("part.reference_dimensions")
+def _author_reference_dimensions(adapter) -> None:
+    """Bracket the land Ø's value only, so its callout (the interference that
+    governs) does not read as reference too: a "(" prefix carrying
+    SolidWorks' "<MOD-DIAM>" token and a ")" suffix
+    (build_ch_rocker_strap_tl_hub_plug)."""
+    for feature, names in REFERENCE_DIMENSIONS.items():
+        for name in names:
+            display, _dimension = _named_dimension(adapter, feature, name)
+            display = _early_bound(display, "IDisplayDimension")
+            display.SetText(1, REFERENCE_PREFIX)  # swDimensionTextPrefix
+            display.SetText(2, REFERENCE_SUFFIX)  # swDimensionTextSuffix
+            if (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != (
+                REFERENCE_PREFIX,
+                REFERENCE_SUFFIX,
+            ):
+                raise RuntimeError(
+                    f"{name}@{feature}: reference brackets did not persist"
+                )
 
 
 def build(adapter) -> dict[str, str]:
@@ -163,18 +184,18 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The land carries its press band natively; the supply bore takes the
-    # title block's DRILLED HOLES row; the supply length is a single MIN limit
-    # (it only has to leave facing stock, ch_rocker_hub_spec.FACE_STOCK).
-    set_dimension_bilateral_tolerance(
-        adapter, "HubProfile", "LandDia", *deviations(HUB_LAND_BAND), display_unit=UNIT
-    )
+    # The land is a reference turned to the measured strap hole (owner ruling
+    # 2026-11-21, matched fit only): no band of its own, its interference
+    # rides below it. The supply bore takes the title block's DRILLED HOLES
+    # row; the supply length is a single MIN limit (it only has to leave
+    # facing stock, ch_rocker_hub_spec.FACE_STOCK).
     _supply_length_min_limit(adapter)
     set_dimension_prefix(adapter, "Hub", "SupplyLength", SUPPLY_LENGTH_PREFIX)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    _author_reference_dimensions(adapter)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)

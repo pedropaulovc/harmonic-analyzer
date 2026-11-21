@@ -413,7 +413,18 @@ def context(
     rebate_width = f["rebate_back"]["rebate_width"]
     _agree(plan, "thickness_min_mm", rebate_width[1] + back_wall[0])
     _agree(plan, "thickness_max_mm", rebate_width[0] + back_wall[1])
-    if not p["thickness_min_mm"] <= depth <= p["thickness_max_mm"]:
+    # MS02 faces to the window's middle: at +.010/0 on the rebate (owner
+    # ruling 2026-11-21) the window's floor is the model's (.48) REF depth,
+    # so facing to the model would aim at the reject edge.
+    _agree(
+        plan, "thickness_aim_mm", (p["thickness_min_mm"] + p["thickness_max_mm"]) / 2
+    )
+    aim = p["thickness_aim_mm"]
+    # The relief cutter's point above the stacks, on the thinnest block.
+    _agree(
+        plan, "relief_floor_height_mm", p["thickness_min_mm"] - p["relief_bottom_mm"]
+    )
+    if not p["thickness_min_mm"] - 1e-6 <= depth <= p["thickness_max_mm"] + 1e-6:
         raise ValueError(f"the model's depth {depth:.3f} is outside the thickness band")
 
     # The bar: its 1-1/4 width along X, its 3/4 thickness along Y, the sawn
@@ -426,7 +437,7 @@ def context(
     back_skim, edge_skim = p["back_skim_mm"], p["edge_skim_mm"]
     trim = (bar_x - length) / 2
     _agree(plan, "end_trim_mm", trim)
-    if slice_min - back_skim < depth + 0.5:
+    if slice_min - back_skim < aim + 0.5:
         raise ValueError(
             f"the shortest slice less the skim, {slice_min - back_skim:.3f}, leaves under .5 mm to face to the depth"
         )
@@ -486,12 +497,12 @@ def context(
         if _setting(plan, shop, name) != (face_rpm, face_feed):
             raise ValueError(f"'{name}' runs at another setting than 'back face'")
     step = p["face_step_max_mm"]
-    mating_levels = _levels(mating_top, depth, step)
+    mating_levels = _levels(mating_top, aim, step)
     height_levels = _levels(height_top, height, step)
     locating_levels = _levels(bar_x, far_top, step)
     far_levels = _levels(far_top, length, step)
     for name, levels, top, bottom in (
-        ("mating face", mating_levels, mating_top, depth),
+        ("mating face", mating_levels, mating_top, aim),
         ("top face", height_levels, height_top, height),
         ("locating end", locating_levels, bar_x, far_top),
         ("far end", far_levels, far_top, length),
@@ -1147,7 +1158,7 @@ def context(
         "MS02_mating": (
             mating_top,
             [t["em-half"]],
-            depth,
+            aim,
             [face_checks(mating_levels, mating_top, bar_x, -bar_y, jaws_mating)],
         ),
         "MS03_edge": (

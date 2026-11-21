@@ -3,8 +3,9 @@ r"""Create the manufacturing drawing for the rocker hub (MHA-CH-12).
 Under ``cad/docs/drawing-guidelines.md``, in decimal inch (the part's
 ``drawing_unit: in``): the turned hub of the built-up rocker arm MHA-CH-06 as
 SUPPLIED to the joint (``ch_rocker_hub_spec``), on three native model
-dimensions: the Ø.4000 land with its press band and the press fit it makes in
-the MHA-CH-13 strap hole below it (rule 4), the supply bore with
+dimensions: the Ø.400 land as a reference, turned to the measured MHA-CH-13
+strap hole for the diametral interference stated below it (rule 4, matched
+pairs; owner ruling 2026-11-21), the supply bore with
 the title block's DRILLED HOLES row, and the supply length as a single MIN
 limit (rule 19). The face view carries the bore; the side view, where a
 turned part's diameter sits beside its length (rule 11), carries the land and
@@ -34,6 +35,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _printed_limits import drilled_limits
 import _telemetry
 from _check import check
+from _com import _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -58,10 +60,13 @@ from ch_rocker_hub_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     LAND_CALLOUT,
+    REFERENCE_DIMENSIONS,
+    REFERENCE_PREFIX,
+    REFERENCE_SUFFIX,
     SUPPLY_BORE_CALLOUT,
     SUPPLY_LENGTH_CALLOUT,
 )
-from ch_rocker_hub_fit import HUB_LAND_BAND, PRESS_INTERFERENCE
+from ch_rocker_hub_fit import PRESS_INTERFERENCE
 from ch_rocker_hub_spec import (
     LAND_DIA,
     STRAP_NUMBER,
@@ -138,9 +143,10 @@ DIMENSION_CALLOUTS = {
 # (build_ch_rocker_hub: the hub axis is model Z through the origin, the
 # annulus extruded mid-plane, so the two end faces sit at z = -/+ half the
 # supply length). The end at -Z is the datum end the turned-part stations run
-# from; each ``span`` is a diameter's model-Z extent. The land prints its
-# explicit press band; the supply bore the title block's DRILLED HOLES row;
-# the supply length a single MIN limit. The declarations print nothing.
+# from; each ``span`` is a diameter's model-Z extent. The land prints its Ø
+# as a reference and the matched interference that governs; the supply bore
+# the title block's DRILLED HOLES row; the supply length a single MIN limit.
+# The declarations print nothing.
 _P = DRAWING_PRECISION_BY_NAME
 _HALF = SUPPLY_LENGTH_MIN / 2.0
 _NOTES = "ch_rocker_hub_notes"
@@ -187,26 +193,22 @@ requirement(
     },
     precision={"length_min": _P["SupplyLength"]},
 )
-# The land: the finished O.D. pressed into the strap's reamed hole, its press
-# band printed on the .4000 nominal (LAND_CALLOUT names the route: turned to
-# the measured hole, a matched press fit).
+# The land: the finished O.D. pressed into the strap's reamed hole, a
+# reference turned to the measured hole for the stated interference (owner
+# ruling 2026-11-21, matched fit only; LAND_CALLOUT).
 requirement(
     "outer",
     kind="diameter",
     faces=(CylinderFace(LAND_DIA),),
-    requirements=("dia", "diametral_interference"),
+    requirements=("diametral_interference",),
     fields={
         "axis": ([0.0, 0.0, 1.0], ("LAND_DIA",)),
         "at": ([0.0, 0.0, 0.0], ("LAND_DIA",)),
         "span": ([-_HALF, _HALF], ("SUPPLY_LENGTH_MIN",)),
-        "dia": (
-            [
-                round(LAND_DIA + HUB_LAND_BAND[1], 12),
-                round(LAND_DIA + HUB_LAND_BAND[0], 12),
-            ],
-            ("LAND_DIA", ("ch_rocker_hub_fit", "HUB_LAND_BAND")),
+        "dia_ref": (
+            LAND_DIA,
+            ("LAND_DIA", (_NOTES, "REFERENCE_DIMENSIONS"), (_SELF, "LAND_ON_SIDE")),
         ),
-        "dia_nominal": (LAND_DIA, ("LAND_DIA",)),
         "diametral_interference": (
             list(PRESS_INTERFERENCE),
             (("ch_rocker_hub_fit", "PRESS_INTERFERENCE"), (_NOTES, "LAND_CALLOUT")),
@@ -215,9 +217,10 @@ requirement(
             f"{STRAP_NUMBER} STRAP HOLE",
             ("STRAP_NUMBER", (_NOTES, "LAND_CALLOUT")),
         ),
+        "mate_nominal_dia": (LAND_DIA, ("LAND_DIA",)),
         "callout": (LAND_CALLOUT, ((_NOTES, "LAND_CALLOUT"),)),
     },
-    precision={"dia": _P["LandDia"]},
+    precision={"dia_ref": _P["LandDia"]},
 )
 # The supply bore: a D drill through, under the finished ream (note 1).
 requirement(
@@ -245,6 +248,32 @@ requirement(
     },
     precision={"dia": _P["SupplyBore"]},
 )
+
+
+def _assert_reference_brackets(adapter: Any, annotations: list[Any]) -> None:
+    """The part brackets the land Ø as a reference (build_ch_rocker_hub); the
+    import and the move must carry the brackets unchanged, or the sheet
+    would print a bare Ø.400 under the title block's .XXX row
+    (draw_ch_rocker_strap_tl_hub_plug._assert_part_text)."""
+    names = set().union(*REFERENCE_DIMENSIONS.values())
+    expected = {
+        (slot, name): text
+        for name in names
+        for slot, text in ((1, REFERENCE_PREFIX), (2, REFERENCE_SUFFIX))
+    }
+    found: dict[tuple[int, str], str] = {}
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in names:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        for slot in (1, 2):  # swDimensionTextPrefix, swDimensionTextSuffix
+            found[(slot, name)] = str(display.GetText(slot) or "")
+    if found != expected:
+        raise RuntimeError(
+            f"hub land reference brackets did not import: {found!r} != {expected!r}"
+        )
 
 
 def build(adapter: Any) -> dict[str, str]:
@@ -328,6 +357,7 @@ def build(adapter: Any) -> dict[str, str]:
     # Decimal places (and so the general-tolerance row each dimension claims)
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _assert_reference_brackets(adapter, annotations)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # The template centre-marks the face view's circles as the view is placed
     # (draw_mg_wheel_drum: a second AutoInsertCenterMarks2 printed a duplicate).

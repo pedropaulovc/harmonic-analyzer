@@ -179,7 +179,10 @@ def _inch(values: list[float]) -> list[float]:
 def test_printed_bands_are_the_sheets() -> None:
     manifest = export_features.requirement_manifest
     hub_features = manifest("ch_rocker_hub")["features"]
-    assert _inch(hub_features["outer"]["dia"]) == [0.4009, 0.4013]
+    # Owner ruling 2026-11-21, matched fit only: the land is a reference
+    # turned to the measured strap hole, no band of its own.
+    assert "dia" not in hub_features["outer"]
+    assert _inch([hub_features["outer"]["dia_ref"]]) == [0.4]
     assert _inch(hub_features["outer"]["diametral_interference"]) == [0.0004, 0.0013]
     assert hub_features["far_end"]["length_min"] == pytest.approx(0.32 * IN)
     assert _inch(hub_features["bore"]["dia"]) == [0.246, 0.25]

@@ -4,10 +4,10 @@ PURE DATA, no SolidWorks/COM imports. MHA-CH-06 may be built up
 (``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): this hub is pressed into
 the strap MHA-CH-13 (``ch_rocker_hub_fit``), then the joined part's bore is
 reamed and its hub length faced to the MHA-CH-06 print. So this detail is
-the hub as SUPPLIED to the joint: the land at its finished Ø with its
-press band, the bore and the length left with stock (drawing-guidelines.md
-rule 19: a supply size, finished later). The finished bore and length print on
-MHA-CH-06 only; this sheet never repeats them.
+the hub as SUPPLIED to the joint: the land at its finished Ø, turned to the
+measured strap hole for the press, the bore and the length left with stock
+(drawing-guidelines.md rule 19: a supply size, finished later). The finished
+bore and length print on MHA-CH-06 only; this sheet never repeats them.
 
 Every size derives from ``ch_rocker_arm_spec``; the two stock allowances below
 are the only new numbers.
@@ -28,7 +28,7 @@ from ch_rocker_arm_spec import (
     PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
 )
-from ch_rocker_hub_fit import HUB_LAND_BAND
+from ch_rocker_hub_fit import LAND_RANGE
 
 NUMBER = "MHA-CH-12"
 STRAP_NUMBER = "MHA-CH-13"
@@ -63,8 +63,9 @@ SUPPLY_LENGTH_MIN = round(
 )  # 8.128, .32
 SUPPLY_LENGTH_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints ".32 MIN"
 
-# Wall between the smallest land and the largest supply bore: .0754 against
-# the .060 floor (under the .080 target; the joined part reams it thinner).
-SUPPLY_WALL_MIN = (LAND_DIA + HUB_LAND_BAND[1] - (SUPPLY_BORE_DIA + DRILLED_PLUS)) / 2.0
+# Wall between the smallest land (the smallest hole plus the least
+# interference) and the largest supply bore: .0752 against the .060 floor
+# (under the .080 target; the joined part reams it thinner).
+SUPPLY_WALL_MIN = (LAND_DIA + LAND_RANGE[0] - (SUPPLY_BORE_DIA + DRILLED_PLUS)) / 2.0
 if SUPPLY_WALL_MIN < WALL_FLOOR_MM:
     raise AssertionError(f"supply wall {SUPPLY_WALL_MIN:.3f} under the rule-17 floor")

@@ -220,7 +220,7 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # A relief plunge stopped short of the relief's back.
         (
             "relief",
-            lambda line: line == "G1 Z-9.703 F{feed}",
+            lambda line: line == "G1 Z-9.779 F{feed}",
             lambda line: "G1 Z-9.000 F{feed}",
             "holes",
         ),

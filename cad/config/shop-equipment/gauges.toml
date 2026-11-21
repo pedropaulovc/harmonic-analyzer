@@ -248,6 +248,22 @@ purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .4000 in GO 
 note = "Not owned: to buy. MHA-CH-13 Setup 4 (RS03, after the ream): the first hole gauged before the lot, then every hole; GO enters, NO-GO does not."
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
 
+# MHA-CH-12's land is turned to the measured MHA-CH-13 hole (owner ruling
+# 2026-11-21, "matched fit only"; the owner buys pin gauges, 2026-11-21): four
+# Class X steps between the hub pair above read each hole to .0001 in, so the
+# lot's land window is .0008 less the spread of the lot's readings (.0008 for
+# holes that read alike), against the .0004 a GO/NO-GO reading leaves. Range
+# and tolerance: cad/process/shop/
+# gauges.plug-gauges-4001-4004.
+[gauges.plug-gauges-4001-4004]
+name = "Plug gauges .4001, .4002, .4003, .4004, Class X"
+kind = "plug_gauge_set"
+make = "Vermont Gage"
+status = "to_order"
+purchase = "Four Vermont Gage standard Class X steel pin/plug gages, .4001, .4002, .4003 and .4004 in, each +/- .000040 in, used with the .4000/.4005 pair (gauges.plug-gauges-4000-4005); no part number, price or stock read."
+note = "Not owned: to buy. MHA-CH-12 Setup 1 Op 10: the largest of the six pins .4000-.4005 that enters each MHA-CH-13 hub hole is that hole's reading; the lot's land is turned from the readings."
+cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Owner (Pedro) 2026-11-21: \"ill buy pin gauges\""]
+
 # --- .2510-.2515 reamed bores (MHA-DT-18 pinion pivot block, cad/process/dt_pinion_pivot_block) ---
 
 # Acceptance of the Ø.2500 +.0010/+.0015 REAM THRU bores (.2510-.2515 in): a
