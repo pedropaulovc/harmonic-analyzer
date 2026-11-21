@@ -54,7 +54,12 @@ sub-plate, then bonded to it on tape and screwed down at the hub for the
 outline. The magnifying clamp (`mg_magnifying_clamp`, MHA-MG-02) stands
 upright on parallels in the vise for both ends and lies corner up between them
 for its cross bore; its holes are tapped by hand on a dead centre in the
-spindle, one Idle-ending NC file per hole. The oblique trammel jig's eight parts,
+spindle, one Idle-ending NC file per hole. The column clamp halves
+(`sh_column_clamp_front`, MHA-SH-01, and `sh_column_clamp_back`, MHA-SH-02)
+are each squared from a 3/4 in bar blank on parallels in the vise and drilled
+from one zero at the near side; the back's traveler then bolts each back to
+its front, interpolates the shared bore on the split line, and faces the
+back's grip offset off after unbolting. The oblique trammel jig's eight parts,
 enrolled before it was deleted (owner ruling 2026-11-17, #2885), left their
 plans, diagrams and the base bar's CAM recipe at
 `ebd3bf3b44:cad/process/ch_rocker_arm_tl_oblique_*/` and
