@@ -134,6 +134,9 @@ PLAN_TOL_MM = 0.01
 # Class ZZ minus pin gauges (the shop's sets): a pin is up to this under its
 # marked size, never over.
 PIN_MINUS_MM = 0.0002 * IN
+# The least wall a cutter test hole keeps to the slice's faces, the final
+# end, the rebate and the other test hole.
+TEST_WALL_MM = 0.75
 
 
 def _plan_operations(plan: dict[str, Any]):
@@ -631,6 +634,29 @@ def context(
         raise ValueError("'relief test plunge' runs at another setting than 'relief'")
     _agree(plan, "slot_test_feed_mm_min", rebate_feed / 2)
     _agree(plan, "relief_test_feed_mm_min", relief_feed)
+    # The test holes, at the largest cut the pins pass, all in the waste
+    # end the end facing removes (at test_y_mm from the fixed jaw's face, the
+    # retests as far from the moving jaw's), clear of the rebate and of each
+    # other by TEST_WALL_MM, so a pin cannot push a thin web aside.
+    _agree(plan, "test_far_y_mm", bar_x - p["test_y_mm"])
+    holes = (
+        (p["slot_test_x_mm"], slot_cut[1] / 2),
+        (p["relief_test_x_mm"], relief_height[1] / 2),
+    )
+    y, wall = p["test_y_mm"], TEST_WALL_MM - 1e-9
+    for x, r in holes:
+        if not (
+            y - r >= wall
+            and trim - (y + r) >= wall
+            and x - r - x_floor >= wall
+            and height - (x + r) >= wall
+        ):
+            raise ValueError(
+                f"the test hole at X{x:g} is not {TEST_WALL_MM} mm inside the waste end"
+            )
+    (x1, r1), (x2, r2) = holes
+    if abs(x2 - x1) - r1 - r2 < wall:
+        raise ValueError(f"the test holes are not {TEST_WALL_MM} mm apart")
     relief_ys = [
         slot_ys[0] + k * (slot_ys[1] - slot_ys[0]) / intervals
         for k in range(intervals + 1)

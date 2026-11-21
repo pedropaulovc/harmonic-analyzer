@@ -148,6 +148,14 @@ relief_go_pin_in = 0.058
 relief_nogo_pin_in = 0.070
 slot_test_feed_mm_min = 106.68
 relief_test_feed_mm_min = 64.008
+# The test holes: at test_y_mm from the fixed jaw's face in the waste end
+# MS06/MS07 face off, a retest as far from the moving jaw's (test_far_y_mm,
+# recomputed); cam.py holds each, at the largest cut the pins pass, .75 mm
+# clear of the faces, the final end, the rebate and the other hole.
+slot_test_x_mm = 8.25
+relief_test_x_mm = 12.0
+test_y_mm = 2.5
+test_far_y_mm = 29.25
 # The relief cutter's point above the stacks at the relief's floor (the
 # block's .480 less relief_bottom_mm).
 relief_floor_height_mm = 2.4892
@@ -483,12 +491,12 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Gauge the 1/8 in end mill by what it cuts (three flutes cannot be miked across): spindle stopped, set 2800; plunge it .050 into the waste end by the fixed jaw, which MS06 or MS07 faces off. MDI: M3 S2800, G0 X10.000 Y-2.500 Z1.000, G1 Z-1.270 F{{process.slot_test_feed_mm_min:.1f}}, G0 Z5.000, M5."
+instruction = "Gauge the 1/8 in end mill by what it cuts (three flutes cannot be miked across): spindle stopped, set 2800; plunge it .050 into the waste end by the fixed jaw, which MS06 or MS07 faces off. MDI: M3 S2800, G0 X{{process.slot_test_x_mm:.3f}} Y-{{process.test_y_mm:.3f}} Z1.000, G1 Z-1.270 F{{process.slot_test_feed_mm_min:.1f}}, G0 Z5.000, M5."
 settings = "stop-em-eighth-c360"
 milling_cuts = [
-  { name = "slot test plunge", kind = "plunge", phase = "finish", cutter_dia_mm = "{{process.slot_cutter_dia_mm}}", stations_mm = 10.0 },
+  { name = "slot test plunge", kind = "plunge", phase = "finish", cutter_dia_mm = "{{process.slot_cutter_dia_mm}}", stations_mm = "{{process.slot_test_x_mm}}" },
 ]
-inspection = "By pins: the {{process.slot_go_pin_in:.3dot}} (GO) enters the test hole, the {{process.slot_nogo_pin_in:.3dot}} (NO-GO) does not: a cut inside the {{process.slot_cut_min_mm:in.3dot}}–{{process.slot_cut_max_mm:in.3dot}} that puts the rebate's height (the cut plus two wall passes) in its band. Either fails: use another 1/8 in end mill and repeat at X10.000 Y-29.250 (the waste end by the moving jaw). That fails too: stop and tell the owner."
+inspection = "By pins: the {{process.slot_go_pin_in:.3dot}} (GO) enters the test hole, the {{process.slot_nogo_pin_in:.3dot}} (NO-GO) does not: a cut inside the {{process.slot_cut_min_mm:in.3dot}}–{{process.slot_cut_max_mm:in.3dot}} that puts the rebate's height (the cut plus two wall passes) in its band. Either fails: set another 1/8 in end mill at least .60 out, Console M6 T2 (the tool setter measures it), and repeat at X{{process.slot_test_x_mm:.3f}} Y-{{process.test_far_y_mm:.3f}} (the waste end by the moving jaw). That fails too: stop and tell the owner."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = ["{{process.slot_cut_min_mm}}", "{{process.slot_cut_max_mm}}"] }]
 
 [[setups.operations]]
@@ -532,12 +540,12 @@ speed_kind = "spindle"
 tool = "em-sixteenth"
 drilling = "none"
 sizing = "other"
-instruction = "Gauge it by what it cuts (three flutes cannot be miked across): spindle stopped, set 2800; plunge it .050 into the waste end beside the 1/8 in test hole. MDI: M3 S2800, G0 X12.500 Y-2.500 Z1.000, G1 Z-1.270 F{{process.relief_test_feed_mm_min:.1f}}, G0 Z5.000, M5. The relief's clear height is that cut less its two plunge ridges."
+instruction = "Gauge it by what it cuts (three flutes cannot be miked across): spindle stopped, set 2800; plunge it .050 into the waste end, clear of the 1/8 in test hole. MDI: M3 S2800, G0 X{{process.relief_test_x_mm:.3f}} Y-{{process.test_y_mm:.3f}} Z1.000, G1 Z-1.270 F{{process.relief_test_feed_mm_min:.1f}}, G0 Z5.000, M5. The relief's clear height is that cut less its two plunge ridges."
 settings = "stop-em-sixteenth-c360"
 milling_cuts = [
-  { name = "relief test plunge", kind = "plunge", phase = "finish", cutter_dia_mm = "{{process.relief_cutter_dia_mm}}", stations_mm = 12.5 },
+  { name = "relief test plunge", kind = "plunge", phase = "finish", cutter_dia_mm = "{{process.relief_cutter_dia_mm}}", stations_mm = "{{process.relief_test_x_mm}}" },
 ]
-inspection = "By pins: the {{process.relief_go_pin_in:.3dot}} (GO) enters the test hole, the {{process.relief_nogo_pin_in:.3dot}} (NO-GO) does not: a cut inside the {{process.relief_cutter_min_mm:in.4dot}}–{{process.relief_cutter_max_mm:in.4dot}} that leaves the relief's clear height in its band. The GO does not enter: the relief would be under its {{cad.relief_floor_relief_height_min_in:.3dot}}; stop and tell the owner. The NO-GO enters: use another 1/16 in end mill and repeat at X12.500 Y-29.250; that fails too: stop and tell the owner."
+inspection = "By pins: the {{process.relief_go_pin_in:.3dot}} (GO) enters the test hole, the {{process.relief_nogo_pin_in:.3dot}} (NO-GO) does not: a cut inside the {{process.relief_cutter_min_mm:in.4dot}}–{{process.relief_cutter_max_mm:in.4dot}} that leaves the relief's clear height in its band. The GO does not enter: the relief would be under its {{cad.relief_floor_relief_height_min_in:.3dot}}; stop and tell the owner. The NO-GO enters: set another 1/16 in end mill at least .60 out, Console M6 T3 (the tool setter measures it), and repeat at X{{process.relief_test_x_mm:.3f}} Y-{{process.test_far_y_mm:.3f}}; that fails too: stop and tell the owner."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = ["{{process.relief_cutter_min_mm}}", "{{process.relief_cutter_max_mm}}"] }]
 
 [[setups.operations]]
