@@ -234,6 +234,7 @@ instruction = "Under {{cad.faced_length_min_in:.2dot}}: the form ran past its Z:
 machine_kind = "other"
 title = "Bench: deburr, try the thread, bag"
 machine = "Bench"
+holding = "Bench vise with soft jaws, the lever gripped lightly over the brass shim wrap on plain rod near end B, the thread clear of the jaws."
 indexing = "none"
 envelope = "other"
 vise_hold = "other"
