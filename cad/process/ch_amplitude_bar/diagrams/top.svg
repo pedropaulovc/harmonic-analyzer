@@ -13,9 +13,9 @@
 <rect class="part-kept" x="0" y="112" width="440" height="14"/>
 <rect class="hidden" x="194" y="70" width="96" height="53"/>
 <rect class="hidden" x="290" y="70" width="96" height="53"/>
-<text class="label" x="100" y="60">bar 1</text>
+<text class="label" x="100" y="60">P1</text>
 <path class="leader" d="M114 64 L114 76"/>
-<text class="label" x="100" y="146">bar 4</text>
+<text class="label" x="100" y="146">P4</text>
 <path class="leader" d="M114 134 L114 120"/>
 <circle class="cutter" cx="500" cy="98" r="80" fill-opacity="0.75"/>
 <circle class="holes" cx="425" cy="77" r="3"/>
@@ -61,6 +61,6 @@
 <text class="label" x="254" y="320">R faces on the riser (Z0)</text>
 <text class="label" x="254" y="340">riser {{process.riser_width_min_mm:in.2dot}}–{{process.riser_width_max_mm:in.2dot}} wide, against</text>
 <text class="label" x="254" y="354">the fixed jaw, not clamped: the</text>
-<text class="label" x="254" y="368">moving jaw grips bar 4</text>
+<text class="label" x="254" y="368">moving jaw grips the P4 bar</text>
 <path class="leader" d="M250 344 L210 344"/>
 </svg>
