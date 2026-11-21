@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+import _config
 import export_features
 import features_bound
 from _export_feature_faces import face_name
@@ -75,7 +76,7 @@ def bound_output(tmp_path: Path, *, pivot_bore_faces: int = 2) -> Path:
             member_labels = [face_name(feature, 1) for feature in export_features.feature_selectors(stem, cfg)]
             member.write_bytes(_step(member.name, member_labels, stamp="2026-10-01T22:03:25", first=10, stride=1))
             (out / "step" / member.name).write_bytes(member.read_bytes())
-        export_features.write_manifest(stem, step, revision="v38")
+        export_features.write_manifest(stem, step, revision=_config.release_revision())
     return out
 
 
@@ -186,8 +187,8 @@ def test_unbound_bundle_never_stages_or_repairs(
     tmp_path: Path, mismatch: str, diagnostic: str,
 ) -> None:
     out = bound_output(tmp_path)
-    # The final stem diverges so earlier valid bundles cannot leak into staging.
-    stem = export_features.SUPPORTED_PARTS[-1]
+    # A declared part diverges; validation of every bundle precedes any staging.
+    stem = export_features.DECLARED_PARTS[-1]
     feature = next(iter(export_features.feature_selectors(stem)))
     if mismatch == "label-set":
         _add_full_face(out, stem, face_name(feature, 2))
@@ -215,7 +216,7 @@ def test_unbound_bundle_never_stages_or_repairs(
 
 def test_swapped_manifest_face_never_passes_or_stages(tmp_path: Path) -> None:
     out = bound_output(tmp_path)
-    stem = export_features.SUPPORTED_PARTS[-1]
+    stem = export_features.DECLARED_PARTS[-1]
     path = out / "features" / stem / "features.toml"
     manifest = tomllib.loads(path.read_text(encoding="utf-8"))
     feature, other = list(manifest["features"])[:2]
@@ -239,19 +240,29 @@ def test_swapped_manifest_face_never_passes_or_stages(tmp_path: Path) -> None:
     [
         ("empty", "feature manifest has no features"),
         ("scalar", "every feature must be a table"),
+        ("undeclared-listing", "declares no requirement, but the manifest lists features"),
+        ("stale-revision", "stale bundle: drawing revision 'v1'"),
     ],
 )
 def test_invalid_manifest_schema_never_stages(
     tmp_path: Path, corrupt: str, message: str
 ) -> None:
     out = bound_output(tmp_path)
-    stem = export_features.SUPPORTED_PARTS[-1]
+    stem = export_features.DECLARED_PARTS[-1]
+    undeclared = next(stem for stem in export_features.SUPPORTED_PARTS if stem not in export_features.DECLARED_PARTS)
+    if corrupt == "undeclared-listing":
+        stem = undeclared
     path = out / "features" / stem / "features.toml"
     manifest = tomllib.loads(path.read_text(encoding="utf-8"))
     if corrupt == "empty":
         manifest["features"] = {}
-    else:
+    elif corrupt == "scalar":
         manifest["features"][next(iter(manifest["features"]))] = "not a table"
+    elif corrupt == "undeclared-listing":
+        assert manifest["features"] == {}
+        manifest["features"] = {"invented": {"kind": "hole"}}
+    else:
+        manifest["drawing"]["revision"] = "v1"
     path.write_text(export_features._toml(manifest), encoding="utf-8")
     stage = tmp_path / "stage"
     with pytest.raises(features_bound.FeaturesBoundError, match=message):
@@ -270,7 +281,7 @@ def test_half_labelled_rocker_pivot_bore_fails_even_when_both_exports_agree(
 @pytest.mark.parametrize("mismatch", ["part", "step", "duplicate-face"])
 def test_bundle_identity_and_face_inventory_must_be_exact(tmp_path: Path, mismatch: str) -> None:
     out = bound_output(tmp_path)
-    stem = export_features.SUPPORTED_PARTS[-1]
+    stem = export_features.DECLARED_PARTS[-1]
     path, _step_path = export_features.bundle_paths(stem, out)
     manifest = tomllib.loads(path.read_text(encoding="utf-8"))
     if mismatch == "part":

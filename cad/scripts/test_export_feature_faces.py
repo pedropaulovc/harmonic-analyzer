@@ -283,7 +283,7 @@ def selectors(monkeypatch) -> dict[str, tuple]:
 
     monkeypatch.setitem(
         sys.modules, "export_features",
-        SimpleNamespace(feature_selectors=feature_selectors, SUPPORTED_PARTS=("ch_rocker_arm",)),
+        SimpleNamespace(feature_selectors=feature_selectors, SUPPORTED_PARTS=("ch_rocker_arm",), DECLARED_PARTS=("ch_rocker_arm",)),
     )
     return {"calls": calls}
 
@@ -415,6 +415,7 @@ def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
     # Patch the shared module, not sys.modules: features_bound must see exactly
     # the inventory the producer supplies, rather than the complete recipe.
     monkeypatch.setattr(export_features, "SUPPORTED_PARTS", ("ch_rocker_arm",))
+    monkeypatch.setattr(export_features, "DECLARED_PARTS", ("ch_rocker_arm",))
     monkeypatch.setattr(export_features, "feature_selectors", lambda _stem, _configuration=None: _SELECTORS)
     monkeypatch.setattr(export_features, "requirement_manifest", requirement_manifest)
 
@@ -474,6 +475,25 @@ def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
         return seen
 
     return run, seen
+
+
+def test_an_undeclared_part_exports_its_plain_step_without_naming_a_face(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    run, seen = _exporter(tmp_path, monkeypatch)
+    declared_manifest = export_features.requirement_manifest
+    monkeypatch.setattr(export_features, "DECLARED_PARTS", ())
+    monkeypatch.setattr(
+        export_features, "requirement_manifest",
+        lambda stem: {**declared_manifest(stem), "features": {}},
+    )
+    run("--features", "ch_rocker_arm")
+    assert seen["rc"] == 0
+    assert [face.name for face in seen["documents"][0].faces] == ["", "", ""]
+    manifest_path, step = export_features.bundle_paths("ch_rocker_arm", tmp_path)
+    manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["features"] == {}
+    assert manifest["step_sha256"] == hashlib.sha256(step.read_bytes()).hexdigest()
 
 
 def _tree(root: Path) -> dict[str, bytes]:
@@ -614,6 +634,7 @@ def test_full_export_rejects_a_missing_bundle_before_any_native_or_neutral_write
     run, seen = _exporter(tmp_path, monkeypatch)
     # A valid earlier bundle must not leak into staging when the last is missing.
     monkeypatch.setattr(export_features, "SUPPORTED_PARTS", _STEMS)
+    monkeypatch.setattr(export_features, "DECLARED_PARTS", _STEMS)
     run("--features", *_STEMS)
     assert seen["rc"] == 0
     missing = export_features.bundle_paths("ch_rocker_arm", tmp_path)[member]
@@ -647,6 +668,7 @@ def test_full_export_rejects_malformed_bundles_without_regeneration_or_partial_s
 ) -> None:
     run, seen = _exporter(tmp_path, monkeypatch)
     monkeypatch.setattr(export_features, "SUPPORTED_PARTS", _STEMS)
+    monkeypatch.setattr(export_features, "DECLARED_PARTS", _STEMS)
     run("--features", *_STEMS)
     assert seen["rc"] == 0
     manifest_path, step = export_features.bundle_paths("ch_rocker_arm", tmp_path)

@@ -294,8 +294,11 @@ uvx --from prechips@latest prechips traveler cad/process/<stem>/plan.toml --prof
 Each form needs the part's feature manifest at
 `cad/out/features/<stem>/features.toml`. The doit task first runs its
 `package:features:<stem>` leaf (SolidWorks, via the supervised farm); the
-wrapper and the by-hand `uvx` command need an existing bundle, from a build or
-copied from a release asset's `features/<stem>/`. All three use the latest
+wrapper and the by-hand `uvx` command need an existing bundle, from a build or,
+with no SolidWorks and no farm run, from a release:
+`uv run --frozen python cad/scripts/fetch_features.py <stem>` (it reports a
+bundle the part's recipe has moved past as STALE and writes nothing; see
+[features and travelers](../docs/pipeline/features-travelers.md)). All three use the latest
 prechips release from PyPI (`@latest` makes uv revalidate its index and skip
 any `uv tool install`-ed copy), so they need `uv` and network access. The doit
 task always runs when requested.

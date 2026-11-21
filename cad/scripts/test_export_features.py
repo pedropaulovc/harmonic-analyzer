@@ -10,6 +10,7 @@ import hashlib
 import importlib
 import importlib.util
 import math
+import re
 import sys
 import tomllib
 from pathlib import Path
@@ -54,10 +55,11 @@ def _fresh_draw(monkeypatch, stem: str):
 
 
 def _step_labels(stem: str) -> list[str]:
+    """One face per feature; an undeclared part's STEP has only unnamed faces."""
     labels = [face_name(feature, 1) for feature in exporter.feature_selectors(stem)]
     if stem == "ch_rocker_arm":
         labels.insert(0, face_name("pivot_bore", 1))
-    return labels
+    return labels or ["NONE"]
 
 
 def _write_step(path: Path, labels: list[str]) -> None:
@@ -162,7 +164,13 @@ def test_source_paths_never_import_draw_spec_or_citation_modules(monkeypatch) ->
     for stem in exporter.SUPPORTED_PARTS:
         paths = exporter.source_paths(stem)
         assert paths and all(path.is_file() for path in paths), stem
-        assert any(path.name == f"draw_{stem}.py" for path in paths), stem
+        drawings = {path.name for path in paths if path.name.startswith(("draw_", "_drawing"))}
+        if stem in exporter.DECLARED_PARTS:
+            assert f"draw_{stem}.py" in drawings, stem
+        else:
+            # An undeclared bundle reads no drawing, so no drawing edit re-keys it.
+            assert not drawings, (stem, drawings)
+            assert any(path.name == f"build_{stem}.py" for path in paths), stem
 
 
 def test_source_paths_cover_unimported_runtime_tuple_sources_and_their_closure(tmp_path: Path, monkeypatch) -> None:
@@ -193,6 +201,7 @@ def test_source_paths_cover_unimported_runtime_tuple_sources_and_their_closure(t
     monkeypatch.setattr(exporter, "__file__", str(scripts / "export_features.py"))
     monkeypatch.setattr(exporter, "CONFIG_DIR", tmp_path / "cad" / "config")
     monkeypatch.setattr(exporter, "SUPPORTED_PARTS", ("synthetic",))
+    monkeypatch.setattr(exporter, "DECLARED_PARTS", ("synthetic",))
     with monkeypatch.context() as graph:
         graph.setattr(_buildgraph, "SCRIPTS_DIR", scripts)
         _buildgraph.clear_import_caches()
@@ -237,7 +246,7 @@ def test_assignment_subscript_and_attribute_targets_cannot_hijack_symbol_citatio
     assert exporter._cite(module, "KEY") == ["harmonic-analyzer/authority.py#KEY"]
 
 
-@pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
+@pytest.mark.parametrize("stem", exporter.DECLARED_PARTS)
 def test_draw_declarations_cite_current_calls_and_declared_sources(stem: str) -> None:
     draw = importlib.import_module(f"draw_{stem}")
     declarations = requirements_for(draw)
@@ -362,7 +371,7 @@ def test_changed_process_is_detected_instead_of_accepting_stale_native_text(monk
         _assert_rocker_print_authority()
 
 
-@pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
+@pytest.mark.parametrize("stem", exporter.DECLARED_PARTS)
 def test_draw_import_registers_declarations_without_starting_solidworks(monkeypatch, stem: str) -> None:
     module = _fresh_draw(monkeypatch, stem)
     assert requirements_for(module), f"{module.__name__}: import did not register declarations"
@@ -779,6 +788,54 @@ def test_raw_step_face_sets_and_values_are_bound_into_the_manifest(tmp_path: Pat
             exporter.feature_selectors(stem, name)
         )
     assert step.read_bytes() == content
+
+
+@pytest.mark.parametrize("stem", ["ch_amplitude_bar", "ch_pivot_bracket"])
+def test_an_undeclared_part_binds_its_step_with_an_empty_features_table_and_no_drawing(
+    tmp_path: Path, monkeypatch, stem: str,
+) -> None:
+    assert stem in exporter.SUPPORTED_PARTS and stem not in exporter.DECLARED_PARTS
+    original = importlib.import_module
+
+    def no_drawing(name, *args, **kwargs):
+        if name.startswith("draw_"):
+            pytest.fail(f"an undeclared manifest imported {name}")
+        return original(name, *args, **kwargs)
+
+    monkeypatch.setattr(importlib, "import_module", no_drawing)
+    step = _step(tmp_path, stem)
+    manifest = _load(exporter.write_manifest(stem, step, revision="v40"))
+    assert manifest["features"] == {} and manifest["datums"] == {}
+    assert manifest["part"] == stem.replace("_", "-")
+    assert manifest["step"] == step.name
+    assert manifest["step_sha256"] == hashlib.sha256(step.read_bytes()).hexdigest()
+    assert manifest["drawing"] == {**manifest["drawing"], "revision": "v40"}
+    assert manifest["frames"]["model"]["cite"] == [f"harmonic-analyzer/cad/scripts/build_{stem}.py#__doc__"]
+    notes = exporter._undeclared_notes_module(stem)
+    if notes is None:
+        assert manifest["construction"] == manifest["notes"]["manufacturing"] == "unknown"
+    else:
+        assert manifest["construction"] in {"one_piece", "built_up_permitted"}
+        assert manifest["notes"]["manufacturing"] == notes.DRAWING_NOTES.splitlines()
+
+
+@pytest.mark.parametrize("stem", ["dt_crank_arm", "dt_crank_pin", "dt_crankshaft", "dt_pinion_arbor"])
+def test_a_notes_file_without_drawing_notes_falls_through_to_the_spec(stem: str) -> None:
+    # Oracle independent of _undeclared_notes_path: the source text itself.
+    scripts = exporter.REPO / "cad" / "scripts"
+    assert stem not in exporter.DECLARED_PARTS
+    assert not re.search(r"^DRAWING_NOTES\b", (scripts / f"{stem}_notes.py").read_text(encoding="utf-8"), re.M)
+    assert re.search(r"^DRAWING_NOTES\b", (scripts / f"{stem}_spec.py").read_text(encoding="utf-8"), re.M)
+    manifest = exporter.requirement_manifest(stem)
+    assert manifest["notes"]["manufacturing"] == importlib.import_module(f"{stem}_spec").DRAWING_NOTES.splitlines()
+    assert manifest["construction"] != "unknown"
+
+
+def test_an_undeclared_step_must_carry_no_feature_label(tmp_path: Path) -> None:
+    step = tmp_path / "ch-amplitude-bar.STEP"
+    _write_step(step, ["NONE", face_name("stray", 1)])
+    with pytest.raises(FeatureFaceError, match="unknown feature 'stray'"):
+        exporter.write_manifest("ch_amplitude_bar", step, revision="v40")
 
 
 def test_rocker_hub_root_carries_both_native_fillets_each_split_in_two(tmp_path: Path) -> None:

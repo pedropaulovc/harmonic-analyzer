@@ -2911,19 +2911,23 @@ def test_features_source_closures_preserve_draw_and_spec_config_reads():
     import export_features
 
     globs = {"machine/*", "tolerances/*", "parts/*", "**", bg.ASSEMBLY_CONTRACTS_TOKEN}
-    # Every features part cites its own <stem>_spec.
+    # Every declared features part cites its own <stem>_spec; an undeclared
+    # part's manifest reads no drawing at all.
     for stem in export_features.SUPPORTED_PARTS:
         sources = {path.resolve() for path in export_features.source_paths(stem)}
         drawing = (SCRIPTS_DIR / f"draw_{stem}.py").resolve()
-        spec_module = f"{stem}_spec"
-        spec = (SCRIPTS_DIR / f"{spec_module}.py").resolve()
-        assert spec.is_file(), stem
-        assert {drawing, spec} <= sources, stem
-        for root in (drawing, spec):
-            assert {Path(path).resolve() for path in module_deps_of(root)} <= sources, (stem, root)
-        assert {
-            path.name for path in sources if path.name.startswith("draw_")
-        } == {drawing.name}, stem
+        if stem not in export_features.DECLARED_PARTS:
+            assert not any(path.name.startswith("draw_") for path in sources), stem
+        else:
+            spec_module = f"{stem}_spec"
+            spec = (SCRIPTS_DIR / f"{spec_module}.py").resolve()
+            assert spec.is_file(), stem
+            assert {drawing, spec} <= sources, stem
+            for root in (drawing, spec):
+                assert {Path(path).resolve() for path in module_deps_of(root)} <= sources, (stem, root)
+            assert {
+                path.name for path in sources if path.name.startswith("draw_")
+            } == {drawing.name}, stem
         for source in sources:
             if source.suffix == ".py":
                 for token in config_files_of(source):

@@ -775,7 +775,8 @@ def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path)
                 digest = hashlib.sha256(adjacent).hexdigest()
                 assert digest == manifest["step_sha256"] == sums[f"step/{manifest['step']}"]
                 assert digest == sums[f"{directory}/{manifest['step']}"]
-                assert manifest["drawing"]["revision"] == "v38"
+                # check:features_bound refuses any other revision as stale.
+                assert manifest["drawing"]["revision"] == export_features._config.release_revision()
         certificate = json.loads(before_certificate)
         for members in certificate["part_configurations"].values():
             for paths in members.values():

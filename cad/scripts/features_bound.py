@@ -18,6 +18,7 @@ import tomllib
 from pathlib import Path
 from typing import NoReturn
 
+import _config
 import _telemetry
 import export_features
 from _export_feature_faces import FeatureFaceError, step_face_sets
@@ -52,10 +53,10 @@ def _face_sets(path: Path, content: bytes, features: list[str], digests: str) ->
         _fail(str(path), f"{exc} ({digests})")
 
 
-def _validated_bundles(out: Path) -> tuple[tuple[Path, bytes], ...]:
+def _validated_bundles(out: Path, stems: tuple[str, ...] | None = None) -> tuple[tuple[Path, bytes], ...]:
     """Read and validate the complete producer inventory before any copy."""
     pending: list[tuple[Path, bytes]] = []
-    for stem in export_features.SUPPORTED_PARTS:
+    for stem in export_features.SUPPORTED_PARTS if stems is None else stems:
         manifest_path, step_path = export_features.bundle_paths(stem, out)
         step_bytes = _read(step_path)
         manifest_bytes = _read(manifest_path)
@@ -73,8 +74,13 @@ def _validated_bundles(out: Path) -> tuple[tuple[Path, bytes], ...]:
         if manifest.get("step_sha256") != scoped_digest:
             _fail(str(manifest_path), f"step_sha256 {manifest.get('step_sha256')!r} does not bind the adjacent STEP ({digests})")
         table = manifest.get("features")
-        if not isinstance(table, dict) or not table:
+        declared = stem in export_features.DECLARED_PARTS
+        if not isinstance(table, dict):
+            _fail(str(manifest_path), "feature manifest has no features table")
+        if declared and not table:
             _fail(str(manifest_path), "feature manifest has no features")
+        if not declared and table:
+            _fail(str(manifest_path), f"draw_{stem} declares no requirement, but the manifest lists features {sorted(table)}")
         if not all(isinstance(entry, dict) for entry in table.values()):
             _fail(str(manifest_path), "every feature must be a table")
         members = export_features.member_step_paths(stem, out)
@@ -148,8 +154,23 @@ def stage_feature_steps(out: Path, step_directory: Path) -> dict[Path, str]:
         return staged
 
 
+def validate_bundle(stem: str, out: Path) -> tuple[tuple[Path, bytes], ...]:
+    """Validate one part's bundle on its own (identity, STEP binding, face sets)."""
+    stem = stem.replace("-", "_")
+    if stem not in export_features.SUPPORTED_PARTS:
+        _fail(stem, "not a part with a feature bundle")
+    return _validated_bundles(Path(out), (stem,))
+
+
 def _validated_files(out: Path) -> tuple[tuple[Path, bytes], ...]:
     pending = _validated_bundles(out)
+    revision = _config.release_revision()
+    for path, content in pending:
+        if path.name != "features.toml":
+            continue
+        recorded = tomllib.loads(content.decode("utf-8")).get("drawing", {}).get("revision")
+        if recorded != revision:
+            _fail(str(path), f"stale bundle: drawing revision {recorded!r}, releasing {revision!r}")
     for step_path, step_bytes in pending:
         if step_path.suffix != ".STEP":
             continue
