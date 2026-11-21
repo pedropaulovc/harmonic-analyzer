@@ -100,10 +100,11 @@ drill_tip_height_mm = -2.038
 # #29 (.136): 1700 rpm (61 ft/min) × .003 = 5.1 in/min. cam.py posts these.
 spot_feed_per_min_mm = 45.72
 drill_feed_per_min_mm = 129.54
-# Tapping 8-32 through: the plug tap's point this far past the mating face
-# (its 3-5 chamfered threads, at most 5/32, and a margin), into the gap
-# between the stacks, so the full thread runs the whole depth.
-tap_past_mm = 6.35
+# Tapping 8-32 through: the plug tap's point this far past the mating face,
+# so its 5/32 chamfer leaves partial threads only in the last .016 at the
+# mating face, which the .020 face-off removes, and its .750 thread (a
+# standard #8 hand tap) still spans the outside face: the shank stays out.
+tap_past_mm = 3.556
 # Holding (shop workholding.vise-pm-6 and fixtures.parallels-lms-6745, 1/8
 # in thick): upright, a 1 in parallel against each jaw; lying, the set's 1 in
 # and 1/2 in parallels stacked against each jaw (1.5 in), as the sub-plate
@@ -245,7 +246,7 @@ beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_ma
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 Y0 the bar's axis: edge finder (900 rpm) on the left and right faces and on the fixed jaw."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm), its tip .10 below the sawn top: on the fixed jaw's face beside the blank, G10 L20 P1 Y(half the miked section in mm − 2.540); for .750, Y6.985. On the blank's LEFT face from the left: G10 L20 P1 X0. On its RIGHT face from the right: G10 L20 P1 X(half the DRO X reading)."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm). Y: its tip .10 below the jaw top, on the fixed jaw's face beside the blank, G10 L20 P1 Y(half the miked section in mm − 2.540); for .750, Y6.985. X: its tip .10 below the sawn top, on the blank's LEFT face from the left, G10 L20 P1 X0; on its RIGHT face from the right, G10 L20 P1 X(half the DRO X reading)."
 feed = "hand"
 
 [[setups.operations]]
@@ -288,7 +289,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the parallels' top, touched with the end mill on the fixed-jaw parallel beside the blank."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel's top, left of the blank. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051."
+instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X-17.000 Y2.675: the cutter left of the blank, its edge .02 off the fixed jaw, over that jaw's parallel. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -333,7 +334,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack left of the blank."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X-12.700, then jog Y over the fixed-jaw stack's top. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051."
+instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X-12.700 Y-6.850: the cutter left of the blank, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -409,7 +410,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack left of the blank."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X-12.700, then jog Y over the fixed-jaw stack's top. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051."
+instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X-12.700 Y-6.850: the cutter left of the blank, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -447,7 +448,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack right of the part."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). Jog it right of the part's far end, over the fixed-jaw stack's top. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051."
+instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X55.400 Y-6.850: the cutter right of the part's far end, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -499,8 +500,11 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "Every blank, still clamped, before tapping: each hole's X from N, the calipers from the left end over the largest pin gauge that slips in, less half its Ø. Write both readings on this traveler with the blank's number: Setup 11 checks them against the bore."
-inspection = "Each hole's X from N within {{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}} of the bore's station {{cad.bore_location_in:.3dot}}. Outside: stop and tell the owner (the front's ear holes are drilled to the same stations)."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.ear_station_band_mm}}" }]
+inspection = "Near hole {{cad.ear_near_x_min_in:.3dot}}–{{cad.ear_near_x_max_in:.3dot}} and far hole {{cad.ear_far_x_min_in:.3dot}}–{{cad.ear_far_x_max_in:.3dot}} from N: the drawing's {{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}} about the bore, which the pair bore puts {{cad.bore_location_in:.3dot}} from N. Outside: stop and tell the owner."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.ear_near_x_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.ear_far_x_band_mm}}" },
+]
 
 [[setups.operations]]
 instruction = "First blank only, then: unclamp, check each hole's height on the surface plate, reclamp as before and repeat the edge-finder X0 and Y0 (Z0 stands: the same stacks)."
@@ -508,7 +512,7 @@ inspection = "Each hole from B (Y) {{cad.ear_height_min_in:.3dot}}–{{cad.ear_h
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.ear_height_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "The 8-32 plug tap goes in the small T-handle tap wrench with the centre hole in its top: the dead centre's point seats in that hole. If that wrench does not take the 8-32 tap: stop; do not tap on this setup."
+instruction = "The 8-32 plug tap, its thread at least .750 long (a standard hand tap), goes in the small T-handle tap wrench with the centre hole in its top: the dead centre's point seats in that hole. If that wrench does not take the 8-32 tap: stop; do not tap on this setup."
 feed = "hand"
 
 [[setups.operations]]
@@ -598,7 +602,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the parallels' top, touched with the end mill on the front's parallel right of the pair."
-instruction_detailed = "Console M6 T1, the 1/2 in end mill at least {{process.bore_mill_projection_min_mm:in.2dot}} out of the collet (the collet's face must clear the block and the fixed jaw at the bore's bottom; the tool setter measures it). Jog it right of the pair, over the front's parallel. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051."
+instruction_detailed = "Console M6 T1, the 1/2 in end mill at least {{process.bore_mill_projection_min_mm:in.2dot}} out of the collet (the collet's face must clear the block and the fixed jaw at the bore's bottom; the tool setter measures it). MDI G0 X55.400 Y-12.000: the cutter right of the pair, over the front's parallel and clear of the block. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -610,7 +614,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB09_pair_bore (M6 T1; set 2650): the end mill helixes down the bore's place, climbing, {{process.helix_pitch_mm:in.3dot}} a turn, to {{process.bore_past_mm:in.3dot}} below the pair, then a finish turn and a spring turn at full depth. Cutting oil on the pair before Cycle Start; hands clear until the program ends, then blow the chips out of the bore. Then, still clamped, gauge the bore."
+instruction = "Run CB09_pair_bore (M6 T1; set 2650): the end mill helixes down the bore's place, climbing, {{process.helix_pitch_mm:in.3dot}} a turn, to {{process.bore_past_mm:in.3dot}} below the pair, then a finish turn and a spring turn at full depth. Cutting oil on the pair before Cycle Start; hands clear until the program ends, then blow the chips out of the bore. It puts the bore {{cad.bore_location_in:.3dot}} from the flush N ends, where both halves' holes were drilled from. Then, still clamped, gauge the bore."
 rpm = 2650
 feed = "{{process.bore_feed_per_min_mm:in.1f}} in/min"
 inspection = "Bore Ø (Ø{{cad.bore_dia_in:.3dot}} REF) still clamped: the column Ø plus {{cad.bore_clearance_min_in:.3dot}}–{{cad.bore_clearance_max_in:.3dot}}, each reading on the 3/4–1-1/4 in telescoping gauge at mid-height, across the split line and along it, read on the 0–1 in or 1–2 in micrometer."
@@ -675,7 +679,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Run CB11_face_off (M6 T1; set 2650): face the mating face down {{cad.grip_offset_mm:in.3dot}} at Z −{{cad.grip_offset_mm:in.3dot}} in one level, across the half bore. Unclamp; mic the depth, mating face to outside face, at both ends."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
-inspection = "Depth {{cad.depth_min_in:.3dot}}–{{cad.depth_max_in:.3dot}}, miked at both end pads; and the grip offset, the recorded pre-face depth less this reading, {{cad.grip_offset_min_in:.3dot}}–{{cad.grip_offset_max_in:.3dot}}. Over either band's top: reclamp as before (Z0 stands); send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the depth reading − {{cad.depth_mm:in.3dot}}) × 25.4); run CB11_face_off again. Under: stop and tell the owner."
+inspection = "Depth {{cad.depth_min_in:.3dot}}–{{cad.depth_max_in:.3dot}}, miked at both end pads; and the grip offset, the recorded pre-face depth less this reading, {{cad.grip_offset_min_in:.3dot}}–{{cad.grip_offset_max_in:.3dot}}."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.depth_band_mm}}" },
   { gauge = "micrometers", band_mm = "{{cad.grip_offset_band_mm}}" },
@@ -683,6 +687,10 @@ gauge_checks = [
 milling_cuts = [
   { name = "face off", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{cad.grip_offset_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{cad.width_mm}}"] },
 ]
+
+[[setups.operations]]
+instruction = "Too little off (depth over {{cad.depth_max_in:.3dot}} or offset under {{cad.grip_offset_min_in:.3dot}}): reclamp as before (Z0 stands); send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the larger of the depth reading − {{cad.depth_mm:in.3dot}} and {{cad.grip_offset_mm:in.3dot}} − the offset) × 25.4); run CB11_face_off again and re-check. Too much off (depth under {{cad.depth_min_in:.3dot}} or offset over {{cad.grip_offset_max_in:.3dot}}), or one band short and the other full: stop and tell the owner."
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
@@ -713,7 +721,7 @@ feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Black enamel (once the enamel is chosen)"
+title = "Black enamel"
 machine = "Bench, ventilated"
 indexing = "none"
 diagram = { file = "diagrams/inspect.svg", alt = "The finished back: every face enamelled black but the half bore and both tapped holes, which stay bare and oiled." }
@@ -722,7 +730,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Finish ({{cad.finish}}): no enamel, primer or masking material is on record. Start only once the owner names them; until then the back stays bare, oiled and tagged."
+instruction = "Finish ({{cad.finish}}): any black enamel for steel, with the primer its directions call for, applied by its directions. If the owner names a product, use it."
 feed = "hand"
 
 [[setups.operations]]
