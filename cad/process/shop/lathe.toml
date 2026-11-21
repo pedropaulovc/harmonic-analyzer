@@ -15,8 +15,8 @@
 #   drilling 60-100 ft/min.
 # - Brass (C36000): turning HSS 300-350, carbide 1170 ft/min; drilling
 #   160-175 ft/min.
-# - 1018 reaming 40-65 ft/min; 1018 milling 65-110 ft/min (a chamfer mill
-#   plunged from the tailstock takes the milling row).
+# - 1018 milling 65-110 ft/min (a chamfer mill plunged from the tailstock
+#   takes the milling row).
 # On these small diameters most speeds exceed the lathe's 2000 rpm top speed
 # and clamp to it (prechips fits every calculated rpm to the machine's
 # ranges).
@@ -117,28 +117,30 @@ material = "lathe-1018-cold-finished"
 sfm = 60
 feed = "tailstock quill by hand, pecking, cutting oil"
 
-# MHA-DT-35 butt cup (1018): #20 through, D under the pocket (shallow, no
-# peck), the pocket reamed flat-bottomed and its mouth chamfered.
+# MHA-DT-35 butt cup (1018): #20 through, #1 under the pocket (shallow, no
+# peck), the pocket bored to the measured head with the small carbide bar
+# (the turning row; it clamps to 2000 rpm) and the #20 hole's floor-side edge
+# chamfered.
 [settings.lathe-drill-20-1018]
 tool = "drill-20"
 material = "lathe-1018-cold-finished"
 sfm = 60
 feed = "tailstock quill by hand, pecking, cutting oil"
 
-[settings.lathe-drill-d-steady-1018]
-tool = "drill-d"
+[settings.lathe-drill-1-steady-1018]
+tool = "drill-1"
 material = "lathe-1018-cold-finished"
 sfm = 60
 feed = "tailstock quill by hand, steady, cutting oil"
 
-[settings.lathe-ream-2560-end-1018]
-tool = "reamer-2560-end-cutting"
+[settings.lathe-bore-1018]
+tool = "boring-bar-micro100-bb-180500s"
 material = "lathe-1018-cold-finished"
-sfm = 40
-feed = "tailstock quill by hand, steady, cutting oil; dwell a moment on the floor, then back out"
+sfm = 800
+feed = "carriage and cross slide by hand, light passes of .001-.002 a side, cutting oil"
 
-[settings.lathe-chamfer-1-4-1018]
-tool = "chamfer-mill-carbide-1-4-90"
+[settings.lathe-chamfer-3-16-1018]
+tool = "chamfer-mill-3-16-90"
 material = "lathe-1018-cold-finished"
 sfm = 65
 feed = "tailstock quill by hand, a light plunge, cutting oil"
