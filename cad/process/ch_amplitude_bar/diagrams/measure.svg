@@ -9,5 +9,6 @@
 <text class="label" x="20" y="62">square block on the foot end</text>
 <rect class="fixture-plate" x="60" y="70" width="560" height="10"/>
 <text class="label" x="300" y="62">48 in rule (to buy), 1/100 in</text>
-<text class="label" x="420" y="160">written on the bar: its length</text>
+<text class="label" x="360" y="160">its length written on the bar here</text>
+<path class="leader" d="M560 150 L580 96"/>
 </svg>
