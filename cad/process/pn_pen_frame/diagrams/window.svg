@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="16" y="20">PF06, plan (fixed jaw at the top): back face to the depth, then the window</text>
+  <text class="title" x="16" y="20">PF06, plan (fixed jaw at the top): front face to the depth, then the window</text>
   <rect class="clamp" x="60.0" y="30.0" width="247.0" height="30.0"/>
   <rect class="clamp" x="60.0" y="260.7" width="247.0" height="30.0"/>
   <text class="label-on-clamp" x="183.5" y="50.0" text-anchor="middle">fixed jaw</text>
@@ -30,7 +30,7 @@
   <rect class="part-removed" x="470.0" y="324.8" width="80.3" height="3.3"/>
   <text class="label" x="470.0" y="436.0">1 in + 1/2 in parallels stacked, under each end</text>
   <rect class="part-removed" x="482.2" y="328.1" width="55.9" height="19.7"/>
-  <text class="label" x="317.0" y="208.0">F down, T to the fixed jaw; vise snug.</text>
+  <text class="label" x="317.0" y="208.0">BK down, T to the fixed jaw; vise snug.</text>
   <text class="label" x="317.0" y="224.0">Depth {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}}; window through</text>
-  <text class="label" x="317.0" y="240.0">{{process.window_run_past_mm:in.3dot}} below F, between the stacks.</text>
+  <text class="label" x="317.0" y="240.0">{{process.window_run_past_mm:in.3dot}} below BK, between the stacks.</text>
 </svg>

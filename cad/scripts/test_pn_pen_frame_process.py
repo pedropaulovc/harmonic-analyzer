@@ -219,7 +219,7 @@ def _line(ctx: dict, key: str, prefix: str, index: int = 0) -> str:
     [
         # The first face pass moved onto the part's middle: a full-width cut.
         (
-            "back_face",
+            "front_face",
             "G0 X",
             0,
             lambda line: line.split(" Y")[0] + " Y-20.000",
