@@ -121,6 +121,10 @@ COLLAR_CLEAR_MM = 1.0
 # The saw is touched off over the fork against the fixed jaw, its rim this
 # far in over the crown.
 TOUCH_IN_MM = 3.0
+# The feeler leaf under a tool touched off on a face (.002 in).
+LEAF_MM = 0.0508
+# The plan's air proofs raise Z0 1.000 in.
+AIR_PROOF_RAISE_MM = 25.4
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
 
@@ -641,6 +645,9 @@ def context(
     # below the saw as it comes down onto the fork, stay past the crown.
     touch = (crown_x + saw_r - TOUCH_IN_MM, centres[0])
     _agree(plan, "saw_touch_x_mm", touch[0])
+    _agree(plan, "saw_touch_y_mm", touch[1])
+    # The saw's and T3's Z0 on the fork's F face, over the .002 leaf.
+    _agree(plan, "fork_touch_z_mm", fork_t + LEAF_MM)
     if touch[0] - max(nut_r, collar_r) < crown_x + COLLAR_CLEAR_MM:
         raise ValueError("the arbor's nut reaches the crown at the saw's touch-off")
     # CR05 leaves T1 parked over that station, high enough that the arbor
@@ -1906,22 +1913,28 @@ def context(
             },
         ],
         [name, "keep_out", {"radius": saw_r, "boxes": jaws2}],
-        [
-            name,
-            "keep_out",
-            {"radius": collar_r, "boxes": reach("spacers above the saw", saw_t, None)},
-        ],
-        [
-            name,
-            "keep_out",
-            {"radius": collar_r, "boxes": reach("spacers below the saw", -below, 0.0)},
-        ],
-        [
-            name,
-            "keep_out",
-            {"radius": nut_r, "boxes": reach("the arbor's nut", -below, -spacer_below)},
-        ],
     ]
+    # Each arbor part as cut, and as proved in air (Z0 raised
+    # AIR_PROOF_RAISE_MM: every part that much higher over the same shapes,
+    # where the nut that passes under the crowns must not rise into them).
+    for lift, when in ((0.0, ""), (AIR_PROOF_RAISE_MM, ", proved in air")):
+        for part, radius_of, lo, hi in (
+            ("spacers above the saw", collar_r, saw_t, None),
+            ("spacers below the saw", collar_r, -below, 0.0),
+            ("the arbor's nut", nut_r, -below, -spacer_below),
+        ):
+            expect.append(
+                [
+                    name,
+                    "keep_out",
+                    {
+                        "radius": radius_of,
+                        "boxes": reach(
+                            part + when, lo + lift, None if hi is None else hi + lift
+                        ),
+                    },
+                ]
+            )
 
     name = "CR07_pin"
     expect += common(

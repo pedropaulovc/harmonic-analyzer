@@ -151,6 +151,8 @@ def test_a_root_run_short_of_the_eighth_cutters_round_is_refused(monkeypatch) ->
         ({"crown_x_mm": 186.0}, "crown_x_mm"),
         ({"slot_floor_x_mm": 171.0}, "slot_floor_x_mm"),
         ({"saw_collar_dia_max_mm": 40.0}, "saw_collar_dia_max_mm"),
+        ({"saw_touch_y_mm": -25.0}, "saw_touch_y_mm"),
+        ({"fork_touch_z_mm": 6.096}, "fork_touch_z_mm"),
         ({"tab_top_mm": 2.54}, "tab_top_mm"),
         ({"tab_station_7_mm": 162.5}, "tab_station_7_mm"),
         ({"outline_level_mm": 0.889}, "outline_level_mm"),
