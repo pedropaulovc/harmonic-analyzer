@@ -7,7 +7,7 @@
 <rect class="part-kept" x="60" y="84" width="540" height="16"/>
 <rect class="fixture-support" x="40" y="70" width="20" height="30"/>
 <text class="label" x="20" y="62">square block on the foot end</text>
-<rect class="fixture-plate" x="60" y="70" width="560" height="10"/>
+<rect class="part-rest" x="60" y="70" width="560" height="10"/>
 <text class="label" x="300" y="62">48 in rule (to buy), 1/100 in</text>
 <text class="label" x="360" y="160">its length written on the bar here</text>
 <path class="leader" d="M560 150 L580 96"/>

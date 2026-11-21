@@ -4,7 +4,7 @@
 <rect class="paper" width="640" height="400"/>
 <text class="label" x="20" y="20">Top view</text>
 <rect class="clamp" x="190" y="30" width="200" height="40"/>
-<text class="label" x="240" y="24">fixed jaw</text>
+<text class="label" x="216" y="24">fixed jaw, 6.247 long</text>
 <rect class="clamp" x="190" y="126" width="200" height="40"/>
 <text class="label" x="200" y="182">moving jaw</text>
 <rect class="part-kept" x="0" y="70" width="440" height="14"/>
@@ -31,7 +31,7 @@
 <path class="dims" d="M390 196 H440"/>
 <text class="label" x="392" y="192">{{process.end_protrusion_mm:in.2dot}}</text>
 <text class="label" x="20" y="212">foot ends flush, past the table</text>
-<text class="label" x="300" y="214">riser (hidden)</text>
+<text class="label" x="236" y="214">riser: two 3 in blocks (hidden)</text>
 <path class="leader" d="M340 202 L340 120"/>
 <path class="axis" d="M560 370 H610"/><text class="label" x="614" y="374">+X</text>
 <path class="axis" d="M560 370 V320"/><text class="label" x="552" y="316">+Y</text>

@@ -4,7 +4,7 @@
 <rect class="paper" width="640" height="400"/>
 <text class="label" x="470" y="20">Top view</text>
 <rect class="clamp" x="250" y="30" width="200" height="40"/>
-<text class="label" x="300" y="24">fixed jaw</text>
+<text class="label" x="262" y="24">fixed jaw, 6.247 long</text>
 <rect class="clamp" x="250" y="126" width="200" height="40"/>
 <text class="label" x="290" y="182">moving jaw</text>
 <rect class="part-kept" x="200" y="70" width="440" height="14"/>
@@ -19,7 +19,7 @@
 <path class="leader" d="M574 134 L574 120"/>
 <text class="label" x="490" y="196">about 25 in of each</text>
 <text class="label" x="490" y="210">bar hangs right</text>
-<text class="label" x="372" y="214">riser (hidden)</text>
+<text class="label" x="300" y="214">riser: two 3 in blocks (hidden)</text>
 <path class="leader" d="M410 202 L410 120"/>
 <circle class="cutter" cx="120" cy="98" r="80" fill-opacity="0.75"/>
 <text class="label" x="60" y="102">slitting saw</text>
