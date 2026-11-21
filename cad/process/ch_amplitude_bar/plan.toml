@@ -312,7 +312,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Swap to the saw: R8 1 in arbor in the spindle (drawbar tight), the slitting saw on it between spacers under {{process.saw_collar_dia_max_mm:in.2dot}} in diameter, its teeth cutting with the spindle turning clockwise (M3) seen from above. Do not move the bars."
+instruction = "Swap to the saw: R8 1 in arbor in the spindle (drawbar tight), the slitting saw on it between spacers under {{process.saw_collar_dia_max_mm:in.2dot}} in diameter, its teeth cutting with the spindle turning clockwise (M3) seen from above. The arbor's nut, screw head or flange below the saw must also be under {{process.saw_collar_dia_max_mm:in.2dot}} in diameter (the arbor is TO BUY, no make chosen: check this on its listing before ordering, and mic it before mounting). Do not move the bars."
 feed = "hand"
 
 [[setups.operations]]
@@ -366,12 +366,12 @@ drilling = "none"
 sizing = "other"
 feed = "hand"
 instruction = "Rule each bar from its faced foot end to its sawn top end, reading to .01 in with a 1-2-3 block square against the foot end. Write the reading on the bar near the top end, and sort the bars into loads of four of near equal length."
-inspection = "Each reading {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} less the {{process.foot_skim_mm:in.2dot}} skim. Under {{cad.top_end_length_min_in:.2f}}: scrap it."
+inspection = "Accept {{process.measured_length_min_mm:in.2f}}–{{process.measured_length_max_mm:in.2f}} (the longest blank less the {{process.foot_skim_mm:in.2dot}} skim is the most CA03 is written to face off). Over {{process.measured_length_max_mm:in.2f}}: saw or file the top end back and rule it again. Under {{process.measured_length_min_mm:in.2f}}: scrap it."
 gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.measured_length_min_mm}}", "{{process.measured_length_max_mm}}"] }]
 
 [[setups.operations]]
 instruction = "Mic one MHA-SH-VN-58 pin from the lot the bars will be assembled with (sheet note 1 fits the hole to it)."
-inspection = "The pin {{process.pin_dia_min_mm:in.4dot}}–{{process.pin_dia_max_mm:in.4dot}} (McMaster 90145A299, 5/64 in 0/+.0002): the .0775 reamer is then .0004–.0008 under it, as the note asks. Outside: stop and tell the owner before reaming any bar."
+inspection = "The pin {{process.pin_dia_min_mm:in.4dot}}–{{process.pin_dia_max_mm:in.4dot}} (McMaster 90145A299, 5/64 in 0/+.0002): the reamed hole ({{cad.top_pin_hole_dia_min_in:.4dot}}–{{cad.top_pin_hole_dia_max_in:.4dot}}) is then .0002–.0008 under it, as the note asks. Outside: stop and tell the owner before reaming any bar."
 gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.pin_dia_min_mm}}", "{{process.pin_dia_max_mm}}"] }]
 
 [[setups]]
@@ -413,7 +413,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Unclamp one bar at a time only if a check below calls for it; otherwise check the length in place: the 48 in rule from the flush foot ends to each top end."
+instruction = "Still clamped, check the length in place: the 48 in rule from the flush foot ends to each top end."
 inspection = "Each bar {{cad.top_end_length_min_in:.2f}}–{{cad.top_end_length_max_in:.2f}} long. Over: send $#, note the G54 line's X, G10 L2 P1 X(that X − (the reading − {{cad.top_end_length_in:.2f}}) × 25.4) and run CA03_top_end again. Under: that bar is scrap."
 gauge_checks = [{ gauge = "steel-rule-48", band_mm = "{{cad.top_end_length_band_mm}}" }]
 
