@@ -566,9 +566,9 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "Deburr the drill and tap exits on the mating face flush (scraper from the deburring set; no countersink), then break every edge, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max. The mating face must lie flat on the front's: stone it lightly on a flat stone and wipe it. Keep N and B readable. Wash off the oil. Mic the pre-face depth, mating face to outside face, at both ends; write the larger reading on the part and on this traveler (Setups 9 and 10 use it)."
+instruction = "Deburr the drill and tap exits on the mating face flush (scraper from the deburring set; no countersink), then break every edge, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max. The mating face must lie flat on the front's: stone it lightly on a flat stone and wipe it. Keep N and B readable. Wash off the oil. Mic the pre-face depth, mating face to outside face, at the N end and at the far end; write both readings, labelled N and far, on this traveler (Setups 9 and 10 use them)."
 feed = "hand"
-inspection = "Mating face down on the surface plate: it does not rock and no burr stands proud (rocks: stone it again). Pre-face depth {{cad.pre_face_depth_min_in:.3dot}}–{{cad.pre_face_depth_max_in:.3dot}}, miked at both ends; the larger reading recorded."
+inspection = "Mating face down on the surface plate: it does not rock and no burr stands proud (rocks: stone it again). Pre-face depth {{cad.pre_face_depth_min_in:.3dot}}–{{cad.pre_face_depth_max_in:.3dot}}, miked at both ends; both readings recorded."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.pre_face_depth_band_mm}}" }]
 
 [[setups]]
@@ -592,12 +592,12 @@ gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mic the column this clamp goes on (MHA-FR-03, the 1.000 DOM tube, stock 1020-dom-tube-1x0120) where the clamp will sit, two readings 90° apart; record the smaller as the column Ø for this pair. The bore is accepted on it."
+instruction = "Mic the column this clamp goes on (MHA-FR-03, the 1.000 DOM tube, stock 1020-dom-tube-1x0120) where the clamp will sit, two readings 90° apart; record both for this pair. The bore is accepted on them."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 the N ends, Y0 the split line: edge finder (900 rpm) on the N ends and on the fixed jaw, less this back's recorded pre-face depth."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm), its tip .10 below the pair's top: on the N ends from the left, G10 L20 P1 X-2.540. On the fixed jaw's face beside the pair (right of it), G10 L20 P1 Y(this back's recorded pre-face depth in mm − 2.540). The split line is that depth from the jaw."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm), its tip .10 below the pair's top: on the N ends from the left, G10 L20 P1 X-2.540. On the fixed jaw's face beside the pair (right of it), G10 L20 P1 Y(the mean of this back's two recorded pre-face depths, in mm, − 2.540). The split line is that depth from the jaw."
 feed = "hand"
 
 [[setups.operations]]
@@ -617,7 +617,7 @@ sizing = "other"
 instruction = "Run CB09_pair_bore (M6 T1; set 2650): the end mill helixes down the bore's place, climbing, {{process.helix_pitch_mm:in.3dot}} a turn, to {{process.bore_past_mm:in.3dot}} below the pair, then a finish turn and a spring turn at full depth. Cutting oil on the pair before Cycle Start; hands clear until the program ends, then blow the chips out of the bore. It puts the bore {{cad.bore_location_in:.3dot}} from the flush N ends, where both halves' holes were drilled from. Then, still clamped, gauge the bore."
 rpm = 2650
 feed = "{{process.bore_feed_per_min_mm:in.1f}} in/min"
-inspection = "Bore Ø (Ø{{cad.bore_dia_in:.3dot}} REF) still clamped: the column Ø plus {{cad.bore_clearance_min_in:.3dot}}–{{cad.bore_clearance_max_in:.3dot}}, each reading on the 3/4–1-1/4 in telescoping gauge at mid-height, across the split line and along it, read on the 0–1 in or 1–2 in micrometer."
+inspection = "Bore Ø (Ø{{cad.bore_dia_in:.3dot}} REF) still clamped: at least {{cad.bore_clearance_min_in:.3dot}} over the larger column reading and at most {{cad.bore_clearance_max_in:.3dot}} over the smaller, each reading on the 3/4–1-1/4 in telescoping gauge at mid-height, across the split line and along it, read on the 0–1 in or 1–2 in micrometer."
 gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = "{{cad.bore_dia_band_mm}}" }]
 milling_cuts = [
   { name = "bore rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.helix_pitch_mm}}", radial_woc_mm = "{{process.face_cutter_dia_mm}}", rpm = 2650, feed_mm_min = "{{process.bore_feed_per_min_mm}}", stations_mm = "{{cad.bore_location_mm}}" },
@@ -629,7 +629,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Bore under the column Ø plus {{cad.bore_clearance_min_in:.3dot}} either way: run CB10_bore_open (M6 T1; set 2650): down the bore's centre, out, a turn {{process.bore_open_mm:in.3dot}} larger on the diameter and a spring turn; gauge again. Over the column Ø plus {{cad.bore_clearance_max_in:.3dot}} either way, or still under after CB10: stop and tell the owner."
+instruction = "Bore under the larger column reading plus {{cad.bore_clearance_min_in:.3dot}} either way: run CB10_bore_open (M6 T1; set 2650): down the bore's centre, out, a turn {{process.bore_open_mm:in.3dot}} larger on the diameter and a spring turn; gauge again. Over the smaller column reading plus {{cad.bore_clearance_max_in:.3dot}} either way, or still under after CB10: stop and tell the owner."
 rpm = 2650
 feed = "{{process.bore_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -638,7 +638,7 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "Unclamp (the pair still bolted) and gauge the bore again the same two ways: the vise's squeeze may have held it round or oval."
-inspection = "Bore Ø unclamped, across the split line and along it: the column Ø plus {{cad.bore_clearance_min_in:.3dot}}–{{cad.bore_clearance_max_in:.3dot}}. Outside it only now: stop and tell the owner (the vise sprang the pair; do not re-clamp to open it). In band: scribe the pair number on both halves' N ends and record both readings and the column Ø for the pair."
+inspection = "Bore Ø unclamped, across the split line and along it: at least {{cad.bore_clearance_min_in:.3dot}} over the larger column reading and at most {{cad.bore_clearance_max_in:.3dot}} over the smaller. Outside it only now: stop and tell the owner (the vise sprang the pair; do not re-clamp to open it). In band: scribe the pair number on both halves' N ends and record both bore readings and both column readings for the pair."
 gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = "{{cad.bore_dia_band_mm}}" }]
 
 [[setups.operations]]
@@ -679,7 +679,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Run CB11_face_off (M6 T1; set 2650): face the mating face down {{cad.grip_offset_mm:in.3dot}} at Z −{{cad.grip_offset_mm:in.3dot}} in one level, across the half bore. Unclamp; mic the depth, mating face to outside face, at both ends."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
-inspection = "Depth {{cad.depth_min_in:.3dot}}–{{cad.depth_max_in:.3dot}}, miked at both end pads; and the grip offset, the recorded pre-face depth less this reading, {{cad.grip_offset_min_in:.3dot}}–{{cad.grip_offset_max_in:.3dot}}."
+inspection = "Depth {{cad.depth_min_in:.3dot}}–{{cad.depth_max_in:.3dot}}, miked at the N end and the far end; and at each end the grip offset, that end's recorded pre-face depth less its reading here, {{cad.grip_offset_min_in:.3dot}}–{{cad.grip_offset_max_in:.3dot}}."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.depth_band_mm}}" },
   { gauge = "micrometers", band_mm = "{{cad.grip_offset_band_mm}}" },
@@ -689,7 +689,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Too little off (depth over {{cad.depth_max_in:.3dot}} or offset under {{cad.grip_offset_min_in:.3dot}}): reclamp as before (Z0 stands); send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the larger of the depth reading − {{cad.depth_mm:in.3dot}} and {{cad.grip_offset_mm:in.3dot}} − the offset) × 25.4); run CB11_face_off again and re-check. Too much off (depth under {{cad.depth_min_in:.3dot}} or offset over {{cad.grip_offset_max_in:.3dot}}), or one band short and the other full: stop and tell the owner."
+instruction = "Too little off (at either end, depth over {{cad.depth_max_in:.3dot}} or offset under {{cad.grip_offset_min_in:.3dot}}): reclamp as before (Z0 stands); send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the largest, over both ends, of the depth reading − {{cad.depth_mm:in.3dot}} and {{cad.grip_offset_mm:in.3dot}} − that end's offset) × 25.4); run CB11_face_off again and re-check. Too much off (at either end, depth under {{cad.depth_min_in:.3dot}} or offset over {{cad.grip_offset_max_in:.3dot}}), or one band short and the other full: stop and tell the owner."
 feed = "hand"
 
 [[setups]]
