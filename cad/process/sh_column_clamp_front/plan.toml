@@ -170,9 +170,9 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Saw {{process.quantity:d}} blanks {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in long off the 3/4 in square 1018 bar, the bar flat in the saw's vise (MHA-SH-02's traveler saws its three the same way). File the burr off both ends and the four long edges so each blank seats flat on the parallels. Mark each blank F1, F2, F3 on a sawn end."
+instruction = "Saw {{process.quantity:d}} blanks {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in long off the 3/4 in square 1018 bar, the bar flat in the saw's vise (MHA-SH-02's traveler saws its three the same way). File the burr off both ends and the four long edges so each blank seats flat on the parallels. Mark each blank F1, F2, F3 on a cold-finished long face with marking fluid (the sawn ends are faced off)."
 feed = "hand"
-inspection = "Each blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} long. Outside: shorter, scrap it; longer, saw it again. Every program assumes this blank."
+inspection = "Each blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} long, calipers. Outside: shorter, scrap it; longer, saw it again. Every program assumes this blank."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{cad.blank_length_min_mm}}", "{{cad.blank_length_max_mm}}"] }]
 
 [[setups]]
@@ -466,6 +466,8 @@ drilling = "none"
 sizing = "other"
 instruction = "Deburr the drill exits on the mating face flush (scraper from the deburring set; no countersink), then break every edge, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max. The mating face must lie flat on the back's: stone it lightly on a flat stone and wipe it. Keep N and B readable. Wash off the oil."
 feed = "hand"
+inspection = "Mating face down on the surface plate: it does not rock and no burr stands proud. Rocks: stone it again."
+gauge_checks = "other"
 
 [[setups]]
 machine_kind = "other"
