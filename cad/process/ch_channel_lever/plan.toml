@@ -264,8 +264,9 @@ name = "Files"
 ref = "jig-files"
 [[tools]]
 id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+name = "Pin gauges .256 plus, .257 minus"
+ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500, and its plus set
+description = "Class ZZ pin gauges: .256 plus pin (GO, .2560-.2562) and .257 minus pin (NO-GO, .2568-.2570)"
 status = "to_order"
 
 [[setups]]
