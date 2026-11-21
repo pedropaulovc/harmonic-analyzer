@@ -7,13 +7,16 @@
 # finish the land over both hubs to its press band, spot, drill D through
 # both and past the second parting line, part off the first hub, face the new
 # end to Z0 again, part off the second. The land is turned before the drill
-# (the turning-deflection screen models solid round). The land's band
-# .4009-.4013 presses .0004-.0013 into any strap hole that gauges .4000-.4005
-# (MHA-CH-13, plug-gauges-4000-4005, to buy), so Op 10 gauges every strap
-# hole once before the first pull and the hubs are not paired. The hubs
-# part .02 long over the .32 MIN supply length: the drawing's note 1 finishes
-# bore and length after joining, on MHA-CH-06. Bench: deburr, check land and
-# length.
+# (the turning-deflection screen models solid round). The drawing's fit
+# route governs the land: PRESS FIT IN MHA-CH-13 STRAP HOLE / TURN TO
+# MEASURED HOLE (INTERFERENCE .0004-.0013). Op 10 measures every MHA-CH-13
+# hub hole with the .4000 GO / .4005 NO-GO pair (MHA-CH-13's own acceptance,
+# plug-gauges-4000-4005, to buy). Every hole that gauges .4000-.4005 takes
+# the drawing's whole .4009-.4013 land at .0004-.0013 interference (hole +
+# .0004-.0013 always holds that band), so the measured hole sets one land
+# size for the lot and the hubs need no pairing. The hubs part .02 long over
+# the .32 MIN supply length: the drawing's note 1 finishes bore and length
+# after joining, on MHA-CH-06. Bench: deburr, check land and length.
 title = "Rocker Hub"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -86,16 +89,20 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.2dot}} bar through the spindle; pull {{cad.stickout_in:.2dot}} in out of the jaw fronts each time."
-datum = "Z0 (carriage DRO) the bar end faced in Op 20, set again on the parted end in Op 80."
+datum = "Z0 (carriage DRO) the bar end faced in Op 30, set again on the parted end in Op 100."
 diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw with two hubs out: the end faced, the land turned over both, the D hole drilled through both past the second parting line, each hub parted off {{cad.part_off_in:.2dot}} from its faced end." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Before the first pull, the land's fit: the drawing turns it to the measured MHA-CH-13 strap hole. Check every strap's hub hole with the .4000 GO and .4005 NO-GO plug pair: GO enters, NO-GO does not. The land's band then presses {{cad.outer_interference_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}} into every hole, so the hubs fit any strap and are not paired. A hole the NO-GO enters or the GO does not: set that strap aside and report it; it is not to its drawing."
-inspection = "Every strap hole .4000–.4005 (GO enters, NO-GO does not)."
+instruction = "Before the first pull, measure the holes the land is turned to (drawing: TURN TO MEASURED HOLE). Gauge every MHA-CH-13 strap's hub hole with the .4000 GO and .4005 NO-GO plug pair. A hole of .4000–.4005 takes the land's Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} at the drawing's {{cad.outer_interference_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}} interference."
+inspection = "Every strap hole .4000–.4005: GO enters, NO-GO does not."
 gauge_checks = [{ gauge = "plug-gauges-4000-4005", band_mm = [10.16, 10.1727] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A strap hole the NO-GO enters or the GO does not: no land in the band fits it. Set that strap aside, make no hub for it, and report it."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -129,11 +136,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the land over the same length to Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} in light passes, miking each hub's length of land between passes; over the band, take another pass. Under the band: part both hubs off and scrap them."
+instruction = "Finish the land over the same length to Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} (the measured holes' land, Op 10) in light passes, miking each hub's length of land between passes; over the band, take another pass."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 inspection = "Land Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} on both hubs, micrometer."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A land under Ø{{cad.outer_dia_min_in:.4dot}}: part both hubs off and scrap them; pull the bar and start the pair again from Op 30."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -173,7 +184,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the parted end {{process.face_allowance_in:.2dot}} in with the AR tool; set DRO Z0 on it again, and touch the blade on it and zero DRO Z for the blade as in Op 70."
+instruction = "Face the parted end {{process.face_allowance_in:.2dot}} in with the AR tool; set DRO Z0 on it again, and touch the blade on it and zero DRO Z for the blade as in Op 90."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -183,7 +194,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Part off the second hub at Z-{{cad.part_off_in:.2dot}}. Catch it. Pull the bar for the next two and repeat from Op 20 until {{process.quantity:d}} hubs are made."
+instruction = "Part off the second hub at Z-{{cad.part_off_in:.2dot}}. Catch it. Pull the bar for the next two and repeat from Op 30 until there is a hub for every strap that passed Op 10."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -212,5 +223,5 @@ gauge_checks = [{ gauge = "calipers", band_mm = ["{{cad.length_min_mm}}", "{{cad
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A hub under the length or off the land band in Op 110 is scrapped, not reworked: the next pull makes another."
+instruction = "A hub under the length or off the land band in Op 130 is scrapped, not reworked: the next pull makes another."
 feed = "hand"
