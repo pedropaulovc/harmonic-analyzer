@@ -82,7 +82,7 @@ feed = "carriage handwheel along Z, a slow steady feed, dry"
 tool = "threading-bits-lms-6685"
 material = "lathe-c360"
 rpm = 70
-feed = "half-nuts on the 20 TPI gearbox setting; compound .003-.005 a pass, dry"
+feed = "compound at 29°, the bit on centre height and square to the axis; half-nuts on the 20 TPI gearbox setting; compound .003-.005 a pass, less near depth, dry"
 
 # --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
 # The tools the placeholder plans name (cad/process/<stem>/plan.toml with
