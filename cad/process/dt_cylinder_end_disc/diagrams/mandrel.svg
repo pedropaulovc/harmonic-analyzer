@@ -21,7 +21,7 @@
   <line class="leader" x1="205" y1="200" x2="300" y2="165"/>
   <text class="label-halo" x="304" y="162">bolt head outboard, on the outer washer</text>
   <line class="leader" x1="193" y1="140" x2="300" y2="135"/>
-  <text class="label-halo" x="304" y="138">sawn blank; dark: the finished Ø2.16–2.18</text>
+  <text class="label-halo" x="304" y="138">dashed: the sawn blank; heavy outline: the finished Ø2.16–2.18</text>
   <line class="leader" x1="206" y1="300" x2="300" y2="310"/>
   <text class="label-halo" x="304" y="314">AR tool turns the outside to Ø2.16–2.18</text>
   <text class="label" x="40" y="388">6 in 3-jaw (two jaws shown in section)</text>
