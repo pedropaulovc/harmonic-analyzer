@@ -1604,13 +1604,16 @@ def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_pa
     tip = (tip_r * math.cos(angle), tip_r * math.sin(angle))
     assert tooth["entity_xy"] == pytest.approx(tip)
     assert tooth["note_xy"] == drawing.TOOTH_EDGE_NOTE_XY
-    # The journal's finish lands on the journal's own side-view silhouette,
-    # not on the end view's circle among the teeth.
+    # The journal's finish attaches to the journal's controlled model FACE
+    # (resolved on the part, not a hit-tested silhouette: farm r5 re-solved
+    # one onto another face), its leader landing on the side view's lower
+    # outline, not on the end view's circle among the teeth.
     [(finish_args, finish)] = seat.made["add_surface_finish"]
     assert finish["label"] == "journal finish"
     assert finish_args[1].name == "*Right"
-    assert finish["entity_type"] == "SILHOUETTE"
-    assert finish["edge_xy"] == drawing.JOURNAL_FINISH_PICK
+    assert finish["entity_type"] == "FACE"
+    assert finish["entity"] == "journal"
+    assert "edge_xy" not in finish
     assert finish["leader_attach_xy"] == drawing.JOURNAL_FINISH_PICK
     # The rear tap's native callout goes on the rear view (*Front), after the
     # saved source proves its RearTap; its automatic label is swept.

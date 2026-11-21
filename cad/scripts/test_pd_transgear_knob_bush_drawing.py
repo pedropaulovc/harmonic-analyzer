@@ -380,6 +380,40 @@ def test_the_section_cuts_the_bush_axis_hub_face_left() -> None:
     )
 
 
+def _bore_landing(toward: tuple[float, float]) -> tuple[float, float]:
+    """The face view's bore circle point facing ``toward`` (the drawing's
+    ``_bore_landing``, with the view centred on FACE_CENTER)."""
+    cx, cy = drawing.FACE_CENTER
+    dx, dy = toward[0] - cx, toward[1] - cy
+    scale = drawing.HALF_BORE / math.hypot(dx, dy)
+    return cx + dx * scale, cy + dy * scale
+
+
+def test_the_face_view_leaders_stay_left_of_the_cutting_line() -> None:
+    """Farm r5 layout audit: the bore finish's leader ran through the lower
+    letter A and the frame's crossed the cutting line.  The line runs
+    vertically through the bore's centre with its arrows and letters on the
+    right, so both annotations and both leader landings stand left of it,
+    the frame's right end too, with room for the arrowheads."""
+    line_x = drawing.SECTION_LINE[0][0]
+    clearance = 0.003
+    frame_left, frame_top = drawing.FRAME_XY
+    assert frame_left >= 0.016  # the sheet's left note column
+    assert frame_left + drawing.FRAME_WIDTH_M < line_x - clearance
+    assert frame_top > drawing.SECTION_LINE[1][1] + 0.010  # above the line's top
+    frame_landing = _bore_landing(drawing.FRAME_LANDING_TOWARD)
+    assert frame_landing[0] < line_x - clearance
+    assert frame_landing[1] > drawing.FACE_CENTER[1]
+    finish_landing = _bore_landing(drawing.BORE_FINISH_XY)
+    assert drawing.BORE_FINISH_XY[0] < drawing.FACE_CENTER[0] - drawing.HALF_HUB
+    assert finish_landing[0] < line_x - clearance
+    # Every landing is on the bore, not the hub outline round it.
+    for landing in (frame_landing, finish_landing):
+        assert math.dist(landing, drawing.FACE_CENTER) == pytest.approx(
+            drawing.HALF_BORE
+        )
+
+
 def test_the_diameters_stand_off_the_part_without_crossing() -> None:
     """Left of the hub face the bore's dimension line stands nearer the part
     than the hub's, so the hub's extension lines pass outside it; the press

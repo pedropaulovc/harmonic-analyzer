@@ -170,7 +170,7 @@ def test_web_hole_prints_its_drill_on_the_face_view() -> None:
     assert x < drawing.FACE_CENTER[0]
 
 
-def test_depth_rows_stand_above_the_section_over_their_own_spans() -> None:
+def test_depth_rows_stand_above_the_section_clear_of_each_other() -> None:
     top = drawing.SECTION_TOP
     rear, front = drawing.REAR_FACE_X, drawing.FRONT_FACE_X
     cbore_x, cbore_y = drawing.SECTION_KEEP["CboreDepth"]
@@ -178,9 +178,13 @@ def test_depth_rows_stand_above_the_section_over_their_own_spans() -> None:
     length_x, length_y = drawing.SECTION_KEEP["CupLength"]
     assert cbore_y == pilot_y > top + 0.005
     assert rear < cbore_x < rear + drawing.CBORE_DEPTH_ON_SHEET
-    assert front - drawing.PILOT_DEPTH_ON_SHEET < pilot_x < front
-    # ".108" and ".152" side by side: 10 mm texts 23 mm apart.
-    assert pilot_x - cbore_x > 0.015
+    # r5 render: ".152 / SEE NOTE 1" (24 mm) over its 15 mm span was struck
+    # by the length's extension line from the front face and by the pocket
+    # depth's arrow.  Its text now stands wholly right of the front face.
+    half = drawing.DEPTH_TEXT_HALF_WIDTH
+    assert drawing.SECTION_CALLOUTS["PilotDepth"] == "SEE NOTE 1"
+    assert pilot_x - half > front + 0.002
+    assert drawing.PILOT_DEPTH_ON_SHEET < 2.0 * half  # why it cannot sit inside
     # The length a row higher, its NOTE 1 reference clear of the depths.
     assert length_y - pilot_y > 0.012
     assert length_x == drawing.SECTION_CENTER[0]
@@ -194,12 +198,20 @@ def test_front_finish_caption_names_the_bush_rear_face() -> None:
     assert f"{bush_number} REAR FACE" in caption
     assert drawing.FRONT_FINISH_CAPTION_XY[1] > drawing.FRONT_FINISH[1][1]
     # The pick is on the front face's cut edge, above the pilot's upper
-    # extension line; the symbol stands outboard of the length's.
-    (pick_x, pick_y), (symbol_x, _) = drawing.FRONT_FINISH
+    # extension line; the symbol stands level with it, so the leader runs
+    # straight in under the pilot depth's text.
+    (pick_x, pick_y), (symbol_x, symbol_y) = drawing.FRONT_FINISH
     assert pick_x == drawing.FRONT_FACE_X
     rise = pick_y - drawing.SECTION_CENTER[1]
     assert drawing.HALF_BORE + 0.003 < rise < drawing.HALF_OD - 0.003
-    assert symbol_x > drawing.FRONT_FACE_X + 0.010
+    assert symbol_y == pick_y
+    # The leader and symbol stay under the pilot depth's row (its text
+    # bottom ~2.8 mm under its keep), the caption right of that text.
+    pilot_right = drawing.SECTION_KEEP["PilotDepth"][0] + drawing.DEPTH_TEXT_HALF_WIDTH
+    assert symbol_x - 0.0015 > pilot_right + 0.003
+    assert drawing.FRONT_FINISH_CAPTION_XY[0] > pilot_right + 0.002
+    # The Ra text (~14 mm right of the V) ends short of the bore Ø's line.
+    assert symbol_x + 0.014 < drawing.SECTION_KEEP["BoreDia"][0] - 0.005
 
 
 def test_cup_diameters_stand_between_the_face_view_and_the_section() -> None:

@@ -162,19 +162,25 @@ BORE_BLOCK_HALF_HEIGHT = 0.0153
 # section; the pocket's Ø inside it, its text dropped below the pocket so the
 # two stand apart.  The pilot right of the front face: its block (taller than
 # the 25 mm between the pilot's extension lines) stands below the lower one,
-# clear of the finish above, the corner radii and the caption to its left.
-# Above the section, the two depths on one row over their own spans, the
-# length a row higher with its note reference under it.  Below it, the two
-# floor corners' R.xxx MAX on one row, each under its own corner, the
-# caption beneath.
+# clear of the finish above, the corner radii and the caption to its left,
+# its dimension line right of the finish symbol's Ra text.
+# Above the section, the two depths on one row, the length a row higher
+# with its note reference under it.  The pocket depth's text stands over its
+# span; the pilot depth's ".152 / SEE NOTE 1" (24 mm wide over a 15 mm span)
+# stands outside right of the front face, where the length's extension line
+# rising from that face no longer strikes its NOTE row and the pocket
+# depth's arrow no longer runs into its "S" (r5 render).  Below the section,
+# the two floor corners' R.xxx MAX on one row, each under its own corner,
+# the caption beneath.
+DEPTH_TEXT_HALF_WIDTH = 0.012  # "SEE NOTE 1", 23.9 mm on the r5 render
 SECTION_KEEP = {
     "CupDia": (REAR_FACE_X - 0.030, SECTION_CENTER[1]),
     "CboreDia": (REAR_FACE_X - 0.012, SECTION_CENTER[1] - HALF_CBORE - 0.007),
     "CboreDepth": (REAR_FACE_X + CBORE_DEPTH_ON_SHEET / 2.0, SECTION_TOP + 0.010),
-    "PilotDepth": (FRONT_FACE_X - PILOT_DEPTH_ON_SHEET / 2.0, SECTION_TOP + 0.010),
+    "PilotDepth": (FRONT_FACE_X + 0.003 + DEPTH_TEXT_HALF_WIDTH, SECTION_TOP + 0.010),
     "CupLength": (SECTION_CENTER[0], SECTION_TOP + 0.026),
     "BoreDia": (
-        FRONT_FACE_X + 0.050,
+        FRONT_FACE_X + 0.060,
         SECTION_CENTER[1] - HALF_BORE - BORE_BLOCK_HALF_HEIGHT - 0.004,
     ),
     "PocketFloorR": (REAR_FACE_X - 0.002, SECTION_BOTTOM - 0.010),
@@ -184,13 +190,15 @@ SECTION_KEEP = {
 FACE_KEEP = {"HoleDia": (FACE_CENTER[0] - 0.040, FACE_CENTER[1] + 0.037)}
 
 # The front face's pick lies on its cut edge, midway between the bore and
-# the O.D. on the upper half; the symbol stands above and outboard, clear of
-# the length dimension's extension line rising from the same face.
+# the O.D. on the upper half.  The symbol stands level with it, outboard
+# past the pilot depth's text, so its leader runs straight in under that
+# text and over the pilot's upper extension line (a leader rising to a
+# symbol over the face crossed the text's place).
 _FRONT_PICK = (
     FRONT_FACE_X,
     SECTION_CENTER[1] + (BORE_DIA + OD) / 4.0 * _S / 1000.0,
 )
-FRONT_FINISH = (_FRONT_PICK, (_FRONT_PICK[0] + 0.020, _FRONT_PICK[1] + 0.022))
+FRONT_FINISH = (_FRONT_PICK, (_FRONT_PICK[0] + 0.037, _FRONT_PICK[1]))
 
 # Rule 19: the supply sizes and the fitted size, with the step that sets it;
 # the float it sets and how are the assembly step's.  Below the face view.
@@ -203,10 +211,10 @@ NOTES_XY = (0.020, 0.112)
 # The front face's finish caption names the face's function and its mate
 # (rule 6: a finish only on a face that runs, slides or locates; machinist
 # review: the face's function was stated nowhere).  Just above the symbol (a
-# run-1 reviewer read the 6 mm gap as a caption floating free of it), left of
-# the isometric.
+# run-1 reviewer read the 6 mm gap as a caption floating free of it), right
+# of the pilot depth's text and left of the isometric.
 FRONT_FINISH_CAPTION = f"THRUST FACE ON\n{BUSH_NUMBER} REAR FACE"
-FRONT_FINISH_CAPTION_XY = (FRONT_FINISH[1][0] - 0.009, FRONT_FINISH[1][1] + 0.0185)
+FRONT_FINISH_CAPTION_XY = (FRONT_FINISH[1][0] - 0.007, FRONT_FINISH[1][1] + 0.0185)
 # A note's read-back position may differ from the one asked by this much.
 NOTE_POSITION_TOL_M = 5e-4
 # How far A-A's axis may sit from SECTION_CENTER / level before it is moved.

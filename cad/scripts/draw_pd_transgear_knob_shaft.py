@@ -490,6 +490,11 @@ CHAMFER_NOTE_XY = (TIP_X + 0.004, SIDE_CENTER[1] - HALF_OD - 0.002)
 # view symbol).  Under the journal's left half the symbol stands 3 mm
 # below the outline, right of the rear witness line (76.9 mm) and left of
 # the journal Ø's lower arrow (134.4 mm) and the 40.938 text (from 129.8).
+# The symbol attaches to the journal's controlled cylindrical model FACE,
+# resolved on the referenced part, its leader landing here on the lower
+# outline: a hit-tested SILHOUETTE re-solved onto another face after
+# insertion (farm r5 of #2425, same_entity=False), as on MHA-PD-23's shank
+# and MHA-DT-27's (draw_pd_transgear_pin, draw_dt_pinion_cam_pin).
 JOURNAL_FINISH_PICK = (REAR_X + 0.018, _sheet_y(-JOURNAL_DIA / 2.0))
 JOURNAL_FINISH_SYMBOL = (REAR_X + 0.023, JOURNAL_FINISH_PICK[1] - 0.0135)
 # A point on the journal's face for the turning axis.
@@ -1317,14 +1322,20 @@ def build(adapter: Any) -> dict[str, str]:
     )
 
     # The one running surface, authored on the part and read back (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
+    part_model = _early_bound(
+        _early_bound(side, "IView").ReferencedDocument, "IModelDoc2"
+    )
+    journal_finish = surface_finish_by_key(SURFACE_FINISHES, "journal")
     add_surface_finish(
         adapter,
         side,
-        edge_xy=JOURNAL_FINISH_PICK,
+        entity=resolve_faces(part_model, {journal_finish.key: journal_finish.face})[
+            journal_finish.key
+        ],
         symbol_xy=JOURNAL_FINISH_SYMBOL,
-        control=surface_finish_by_key(SURFACE_FINISHES, "journal"),
+        control=journal_finish,
         label="journal finish",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
         leader_attach_xy=JOURNAL_FINISH_PICK,
         char_height=0.0025,
     )
@@ -1343,9 +1354,6 @@ def build(adapter: Any) -> dict[str, str]:
     controls = {control.key: control for control in GEOMETRIC_CONTROLS}
     if set(controls) != set(GEOMETRIC_TOLERANCES_MM):
         raise RuntimeError("knob shaft frames do not cover the spec's geometric controls")
-    part_model = _early_bound(
-        _early_bound(side, "IView").ReferencedDocument, "IModelDoc2"
-    )
     control_faces = resolve_faces(
         part_model,
         {key: control.face for key, control in controls.items()},

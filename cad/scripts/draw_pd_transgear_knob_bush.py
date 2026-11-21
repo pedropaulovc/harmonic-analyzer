@@ -166,10 +166,20 @@ FACE_FINISHES = {
 DATUM_A_PICK = (SHOULDER_X, SECTION_CENTER[1] - (HALF_PRESS + HALF_HUB) / 2.0)
 DATUM_A_XY = (SHOULDER_X - 0.012, SECTION_CENTER[1] - HALF_HUB - 0.022)
 
-# The face view's bore: the perpendicularity frame above the view (its
-# top-left corner), the running finish below right.
-FRAME_XY = (FACE_CENTER[0] - 0.030, FACE_CENTER[1] + HALF_HUB + 0.026)
-BORE_FINISH_XY = (FACE_CENTER[0] + HALF_HUB + 0.010, FACE_CENTER[1] - HALF_HUB - 0.008)
+# The face view's bore: the cutting line A runs vertically through its
+# centre, with its arrows and letters on the right (toward A-A), so the
+# perpendicularity frame and the running finish both stand LEFT of the view
+# and land on the bore's left half: neither leader crosses the line or a
+# letter (farm r5 layout audit: the finish's leader ran through the lower
+# letter, the frame's crossed the line).  The frame (its top-left corner)
+# is FRAME_WIDTH_M wide, measured on r5 (its leader left the right end
+# 37.2 mm from the corner); it stands above the view, its right end short
+# of the line, its leader landing up-left on the bore.  The finish symbol
+# stands lower left, its leader landing on the bore facing it.
+FRAME_WIDTH_M = 0.0375
+FRAME_XY = (0.018, FACE_CENTER[1] + HALF_HUB + 0.026)
+FRAME_LANDING_TOWARD = (FACE_CENTER[0] - 0.010, FACE_CENTER[1] + 0.010)
+BORE_FINISH_XY = (FACE_CENTER[0] - HALF_HUB - 0.008, FACE_CENTER[1] - 0.016)
 FINISH_CHAR_HEIGHT = 0.0025
 # A note's read-back position may differ from the one asked by this much.
 NOTE_POSITION_TOL_M = 5e-4
@@ -392,6 +402,7 @@ def build(adapter: Any) -> dict[str, str]:
             face,
             FRAME_XY,
             edge_entity=bore_edge,
+            leader_attachment_xy=_bore_landing(adapter, face, FRAME_LANDING_TOWARD),
         ),
     }
     project_part_pmi(
