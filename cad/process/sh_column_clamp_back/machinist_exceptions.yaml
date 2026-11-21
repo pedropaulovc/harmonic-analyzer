@@ -1,0 +1,6 @@
+machinist_exceptions:
+  - id: TV-001
+    where: "Tools table and Setup 7 tapping ops, the T4 tap-guide dead centre"
+    finding: "an MT3 dead centre has no straight end a 3/4 in collet can grip (tool cannot be bought or held as described)"
+    reason: "Owner-attested tool, not a catalogue part: Owner (Pedro) 2026-11-17, cad/config/shop-equipment/tools-reamers-taps.toml tools.mill-dead-centre-mt3: \"it was a mt3 dead center that had a straight part at the end i gripped with a 3/4 collet\". The traveler names the owner's own centre."
+    kind: minor

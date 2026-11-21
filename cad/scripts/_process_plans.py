@@ -17,11 +17,14 @@ from pathlib import Path
 from export_features import OUT as CAD_OUT
 
 # The parts with a traveler, enrolled by the CNC migration: the rocker strap
-# first (2026-11-17), then the magnifying clamp and the strap's sub-plate.
+# first (2026-11-17), then the magnifying clamp, the strap's sub-plate and
+# the two column clamp halves (2026-11-20).
 TRAVELER_STEMS: tuple[str, ...] = (
     "ch_rocker_strap",
     "mg_magnifying_clamp",
     "ch_rocker_strap_tl_sub_plate",
+    "sh_column_clamp_front",
+    "sh_column_clamp_back",
 )
 PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
 SHOP_PATH = PROCESS_ROOT / "shop.toml"

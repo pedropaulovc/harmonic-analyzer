@@ -230,11 +230,13 @@ def _owned_record(inventory: dict, key: str) -> dict | None:
 
 def _gauge_refs(plan: dict) -> list[str]:
     """The gauges a plan's setups and operations check with, in plan order,
-    once each."""
+    once each. A ``gauge_checks = "other"`` (prechips: checked by sight or
+    feel, no gauge) names none."""
     refs = [
         check["gauge"]
         for setup in plan.get("setups", ())
         for checker in (setup, *setup.get("operations", ()))
+        if checker.get("gauge_checks") != "other"
         for check in checker.get("gauge_checks", ())
     ]
     return list(dict.fromkeys(refs))

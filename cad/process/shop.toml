@@ -76,6 +76,15 @@ resolution_mm = 0.00254
 range_mm = [0.2794, 12.7]
 resolution_mm = 0.0254
 
+# The owned Starrett S579GZ telescoping gauge set (cad/config/shop-equipment/
+# gauges.telescoping-gauges-starrett-s579gz; tools record below): 5/16 to
+# 2-1/8 in over its four pieces (Starrett, MSC and McMaster listings for
+# S579GZ) = 7.9375-53.975 mm. It transfers a bore to the micrometers, so it
+# reads at their .0001 in = .00254 mm.
+[gauges.telescoping-gauges-starrett-s579gz]
+range_mm = [7.9375, 53.975]
+resolution_mm = 0.00254
+
 # The MHA-CH-13 hub-hole go/no-go pair (cad/config/shop-equipment/
 # gauges.plug-gauges-4000-4005, to buy): GO .4000 and NO-GO .4005 in =
 # 10.16 and 10.1727 mm. A fixed-limit pair reads no scale; its resolution is

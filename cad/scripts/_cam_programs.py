@@ -26,6 +26,8 @@ CAM_STEMS: tuple[str, ...] = (
     "ch_rocker_strap",
     "mg_magnifying_clamp",
     "ch_rocker_strap_tl_sub_plate",
+    "sh_column_clamp_front",
+    "sh_column_clamp_back",
 )
 PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
 SCRIPTS_DIR = Path(__file__).resolve().parent
