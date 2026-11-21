@@ -2754,6 +2754,48 @@ def test_a_balloon_ring_is_centred_in_its_room_or_refused() -> None:
         drawing.ring_fit_shift((0.0, 0.0, 0.19, 0.1), limits, name="t")
 
 
+def test_the_knob_stack_ring_runs_below_its_field_only_clear_of_the_title_block() -> None:
+    """Run 20261121T015111001Z (#2425) read the knob stack and hanger's ring
+    199.3 mm tall in its 197.0 mm field: the cup screw thrown behind the cup
+    lengthened the view along the isometric's Z. The ring hangs from the
+    field's top and runs into the empty field left of the title block; its
+    balloons, on an ellipse round the outline, stay off the block."""
+    knob, cluster = drawing.TRANSGEAR_EXPLODED_GROUPS
+    assert cluster.ring_floor is None
+    assert drawing.SHEET_INNER_BORDER_BOTTOM < knob.ring_floor < knob.ring_limits[1]
+    reach = drawing.BALLOON_RING_REACH
+    # The run's height; its width passed (at most the field's 244 mm).
+    for width in (0.150, knob.ring_limits[2] - knob.ring_limits[0] - 2 * reach):
+        outline = (0.05, 0.05, 0.05 + width, 0.05 + 0.1993 - 2 * reach)
+        with pytest.raises(ValueError, match=r"height 199\.3 mm > room 197\.0 mm"):
+            drawing.ring_fit_shift(outline, knob.ring_limits, name=knob.label)
+        dx, dy = drawing.exploded_ring_shift(outline, knob)
+        ring = drawing._grown(
+            (outline[0] + dx, outline[1] + dy, outline[2] + dx, outline[3] + dy), reach
+        )
+        assert ring[3] == pytest.approx(knob.ring_limits[3])
+        assert ring[0] - knob.ring_limits[0] == pytest.approx(knob.ring_limits[2] - ring[2])
+        assert ring[1] >= knob.ring_floor
+        # Every balloon circle on the ellipse clears the title block.
+        keep_x, keep_y = drawing.TITLE_BLOCK_KEEP_OUT
+        circle = reach - drawing.BALLOON_MARGIN
+        centre = ((ring[0] + ring[2]) / 2.0, (ring[1] + ring[3]) / 2.0)
+        semi = ((ring[2] - ring[0]) / 2.0 - circle, (ring[3] - ring[1]) / 2.0 - circle)
+        for k in range(720):
+            angle = math.radians(k / 2.0)
+            x = centre[0] + semi[0] * math.cos(angle)
+            y = centre[1] + semi[1] * math.sin(angle)
+            assert x + circle < keep_x or y - circle >= keep_y, (width, x, y)
+    # A ring whose balloons would come down on the block is refused, and so
+    # is one past the floor; a field without a floor refuses any overflow.
+    with pytest.raises(ValueError, match="over the title block"):
+        drawing.exploded_ring_shift((0.0, 0.0, 0.200, 0.200), knob)
+    with pytest.raises(ValueError, match="height"):
+        drawing.exploded_ring_shift((0.0, 0.0, 0.100, 0.230), knob)
+    with pytest.raises(ValueError, match="height"):
+        drawing.exploded_ring_shift((0.0, 0.0, 0.100, 0.150), cluster)
+
+
 # Farm run 20261001T142942518Z (8689c2a0d) read sheet 1's isometric at 1:3:
 # its outline 187.7 mm tall; its width passed, so at most 149 mm.
 ISO_OUTLINE_AT_1_3 = (0.250, 0.075, 0.250 + 0.149, 0.075 + 0.1877)

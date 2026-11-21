@@ -466,24 +466,38 @@ if not CLUSTER_STEMS < explode.TRANSGEAR_SHOWN_STEMS:
 
 @dataclass(frozen=True)
 class ExplodedGroup:
-    """One sheet-3 view: its families, where it is placed and its ring field."""
+    """One sheet-3 view: its families, where it is placed and its ring field.
+    A ``ring_floor`` lets a ring too tall for the field run down to it where
+    its balloons clear the title block (exploded_ring_shift)."""
 
     label: str
     stems: frozenset[str]
     center: tuple[float, float]
     ring_limits: Box
+    ring_floor: float | None = None
 
 
+# The title block's top-left corner, kept 3 mm clear as sheet 1's isometric
+# field keeps its top (ISO_RING_LIMITS).
+TITLE_BLOCK_KEEP_OUT = (
+    DRAWING_TEMPLATES[SPEC.layout].title_block_left_m - 0.003,
+    DRAWING_TEMPLATES[SPEC.layout].title_block_top_m + 0.003,
+)
 # The knob stack and hanger's ring at 2:3 is about 199 x 185 mm (run
 # 20261024T025815061Z's outline scaled), the cluster's about 135 x 130 mm
 # (its projected box from the builder's stations). The title block spans x
-# 218 to 420, y 13 to 66 mm, so the left field stops above it.
+# 218 to 420, y 13 to 66 mm, so the left field stops above it. #2425's cup
+# screw, thrown 18 mm behind the cup, made the knob stack's ring 199.3 mm
+# tall in that 197.0 mm field (run 20261121T015111001Z), so it may run down
+# into the empty field left of the title block, as far below as the left
+# field's margin from the border.
 TRANSGEAR_EXPLODED_GROUPS = (
     ExplodedGroup(
         "knob stack and hanger exploded",
         explode.TRANSGEAR_SHOWN_STEMS - CLUSTER_STEMS,
         (0.140, 0.168),
         (0.018, 0.070, 0.262, 0.267),
+        ring_floor=0.018,
     ),
     ExplodedGroup(
         "disc cluster exploded",
@@ -1648,6 +1662,50 @@ def ring_fit_shift(outline: Box, limits: Box, *, name: str) -> tuple[float, floa
         (limits[0] + limits[2] - ring[0] - ring[2]) / 2.0,
         (limits[1] + limits[3] - ring[1] - ring[3]) / 2.0,
     )
+
+
+def exploded_ring_shift(outline: Box, group: ExplodedGroup) -> tuple[float, float]:
+    """Shift that fits a sheet-3 view's balloon ring in its field.
+
+    A ring that fits ``ring_limits`` is centred there (ring_fit_shift). One
+    too tall for it, in a group with a ``ring_floor``, is centred across and
+    hung from the field's top, running down at most to the floor. Its corners
+    may then stand over the title block, but no balloon does:
+    _spread_balloons sets each balloon's circle on an ellipse BALLOON_MARGIN
+    outside the outline, so that ellipse, its circles and the outline itself
+    must clear TITLE_BLOCK_KEEP_OUT. Raises naming the overflow.
+    """
+    try:
+        return ring_fit_shift(outline, group.ring_limits, name=group.label)
+    except ValueError:
+        if group.ring_floor is None:
+            raise
+    left, _bottom, right, top = group.ring_limits
+    ring_fit_shift(outline, (left, group.ring_floor, right, top), name=group.label)
+    ring = _grown(outline, BALLOON_RING_REACH)
+    shift = ((left + right - ring[0] - ring[2]) / 2.0, top - ring[3])
+    centre_x = (outline[0] + outline[2]) / 2.0 + shift[0]
+    centre_y = (outline[1] + outline[3]) / 2.0 + shift[1]
+    semi_x = (outline[2] - outline[0]) / 2.0 + BALLOON_MARGIN
+    semi_y = (outline[3] - outline[1]) / 2.0 + BALLOON_MARGIN
+    circle = BALLOON_RING_REACH - BALLOON_MARGIN
+    keep_x, keep_y = TITLE_BLOCK_KEEP_OUT
+    # A circle reaches over the block from centres at keep_x - circle on; the
+    # ellipse's lower edge rises away from its centre, so it is lowest there,
+    # or at its foot when the centre itself stands over the block.
+    across = max(keep_x - circle - centre_x, 0.0) / semi_x
+    lowest = centre_y - semi_y * math.sqrt(1.0 - across**2) if across < 1.0 else math.inf
+    findings = []
+    if lowest - circle < keep_y:
+        findings.append(
+            f"{group.label} balloons down to {(lowest - circle) * 1000:.1f} mm over the "
+            f"title block (keep above {keep_y * 1000:.1f} mm)"
+        )
+    if outline[2] + shift[0] > keep_x and outline[1] + shift[1] < keep_y:
+        findings.append(f"{group.label} outline stands on the title block")
+    if findings:
+        raise ValueError(f"balloon ring does not fit: {'; '.join(findings)}")
+    return shift
 
 
 def step_down_to_fit(
@@ -5078,13 +5136,8 @@ def _place_transgear_exploded_sheet(
             adapter, view, True, configuration=configuration, label=label
         )
         view = set_drawing_view_instance_visibility(adapter, view, exploded_group_instances(group), mode="show", label=label)
-        _scale, outline = step_down_to_fit(
-            _native_outline_at(adapter, view, TRANSGEAR_EXPLODED_SCALE, label=label),
-            (TRANSGEAR_EXPLODED_SCALE,),
-            group.ring_limits,
-            name=label,
-        )
-        shift = ring_fit_shift(outline, group.ring_limits, name=label)
+        # One scale, never stepped down (rule 15): read the placed outline.
+        shift = exploded_ring_shift(_view_outline(view), group)
         _shift_view(adapter, view, shift, label=f"{label} ring fit")
         _link_view_to_bom(view, table, label=label)
         views.append((group, view))
