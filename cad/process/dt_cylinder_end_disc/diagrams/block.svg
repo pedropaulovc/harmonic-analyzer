@@ -4,13 +4,13 @@
   <text class="title" x="20" y="22">Setup 2: the sawn blank in the 4-jaw on its sawn edges, faced, then spotted and drilled V</text>
   <line class="centre-line" x1="20" y1="200" x2="560" y2="200"/>
   <rect class="fixture-vise" x="40" y="48" width="100" height="304"/>
-  <path class="fixture-vise" d="M140,96 H176 V136.5 H170 V150 H140 Z"/>
-  <path class="fixture-vise" d="M140,304 H176 V263.5 H170 V250 H140 Z"/>
+  <path class="fixture-vise" d="M140,96 H173.2 V136.5 H170 V150 H140 Z"/>
+  <path class="fixture-vise" d="M140,304 H173.2 V263.5 H170 V250 H140 Z"/>
   <rect class="part-kept" x="170" y="136.5" width="6.35" height="127"/>
   <line class="datum" x1="170" y1="80" x2="170" y2="94"/>
   <line class="datum" x1="170" y1="306" x2="170" y2="320"/>
   <path class="part-rest" d="M176.35,200 L196,190 H300 V210 H196 Z"/>
-  <path class="cutter" d="M178,268 L186,262 L196,262 L196,336 L184,336 L184,276 Z"/>
+  <path class="cutter" d="M178,257 L186,251 L196,251 L196,336 L184,336 L184,265 Z"/>
   <line class="leader" x1="90" y1="340" x2="90" y2="372"/>
   <text class="label-halo" x="40" y="388">6 in 4-jaw (two jaws shown in section)</text>
   <line class="leader" x1="176" y1="160" x2="250" y2="90"/>
@@ -22,8 +22,8 @@
   <text class="label-halo" x="334" y="160">withdrawn, then the centre drill and the V drill</text>
   <text class="label-halo" x="334" y="176">go in the tailstock for the hole</text>
   <line class="leader" x1="190" y1="300" x2="300" y2="320"/>
-  <text class="label-halo" x="304" y="318">AR tool faces the out face to .100–.120</text>
-  <text class="label-halo" x="304" y="334">(about .015 off, light skims)</text>
+  <text class="label-halo" x="304" y="318">AR tool faces the out face to .100–.120,</text>
+  <text class="label-halo" x="304" y="334">centre out to Ø2.25 only, clear of the jaws</text>
   <line class="leader" x1="170" y1="80" x2="170" y2="52"/>
   <text class="datum-label" x="20" y="46">datum end: the back face, on the jaw steps</text>
 </svg>
