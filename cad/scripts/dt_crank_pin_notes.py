@@ -7,7 +7,7 @@ the part or the many modules that read ``dt_crank_pin_spec``.
 
 from __future__ import annotations
 
-from dt_crank_pin_spec import DESIGNATION, SKU, STANDARD
+from dt_crank_pin_spec import DESIGNATION, DIMENSION_CALLOUTS, SKU, STANDARD
 
 # Note 1: the stock, named once (rule 7: no method), in the MHA-DT-39
 # bought-and-reworked form (owner ruling 2026-11-20, #2368: a bought No. 3
@@ -21,13 +21,16 @@ STOCK_NOTE = "\n".join(
     )
 )
 
-# The ring hole's station runs from the big end's RIM, not the crown's apex
-# (dt_crank_pin_spec: the bought pin's ends are crowned about .03 high;
-# Codjiflo on #3158).  Words over the station's value: below it the rows would
-# run into the pin outline, which the value's text clears by only ~10 mm.
-# One row: an above-callout with a line break does not print (r2 of #3158's
-# layout audit, text-unmatched; dt_cone_tip_gear_notes.CALLOUTS_ABOVE).
-RING_HOLE_STATION_CALLOUT_ABOVE = "FROM END RIM"
+# The ring hole names the ring it carries by number (rule 4: the mate is named
+# by drawing number), once, on the hole's own Ø callout between the spec's
+# drill and web rows (rule 7: the mate a location serves sits on the hole's
+# size callout; rule 20: the web shortfall stays where it applies).  The .15
+# station carries its value and band only (rule 7); its extension line runs to
+# the model's flat big end, the as-bought pin's end rim (dt_crank_pin_spec).
+# Machinist review of f79663bf15 on #3158, both findings.
+_DRILL_ROW, _WEB_ROW = DIMENSION_CALLOUTS["RingHoleDia"].splitlines()
+RING_HOLE_CALLOUT = "\n".join((_DRILL_ROW, "FOR KEEPER RING MHA-DT-27", _WEB_ROW))
+RING_HOLE_CALLOUTS: dict[str, str] = {"RingHoleDia": RING_HOLE_CALLOUT}
 
 # The taper's leader callout links the fit note (drawing-guidelines.md rule 7:
 # a flagged note, at most two lines of words).

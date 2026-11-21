@@ -32,13 +32,12 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from dt_crank_pin_notes import (
-    RING_HOLE_STATION_CALLOUT_ABOVE,
+    RING_HOLE_CALLOUTS,
     SHEET_NOTES,
     TAPER_CALLOUT,
 )
 from dt_crank_pin_spec import (
     BIG_END_DIA,
-    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PIN_LENGTH,
@@ -102,8 +101,7 @@ AXIS_FACE_PICK = (FRONT_CENTER[0] + 0.020, FRONT_CENTER[1] + 0.002)
 # The .15 station's text cannot fit between its extension lines, 7.62 mm
 # apart at 2:1 (its test still budgets the 9.05 mm the template's "3.70"
 # measured). Put the text outboard right, clear of the outside arrow's
-# 6.35-mm tail and left of the taper-note leader; its FROM END RIM row
-# stands over it.
+# 6.35-mm tail and left of the taper-note leader.
 # Below the hole: its Ø callout.  The bought pin's length and ends are
 # reference (note 1), so nothing else is dimensioned.
 FRONT_KEEP = {
@@ -176,15 +174,8 @@ def build(adapter: Any) -> dict[str, str]:
     )
     assert_imported_precision(adapter, front_annotations, DRAWING_PRECISION_BY_NAME)
     # Descriptive text only; the hole's size and station are the model's.
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    set_dimension_callouts(
-        adapter,
-        front_annotations,
-        {"RingHoleX": RING_HOLE_STATION_CALLOUT_ABOVE},
-        location="above",
-    )
-    # The axis shows the cross-hole goes through the centre; its station runs
-    # from the big end's rim.
+    set_dimension_callouts(adapter, front_annotations, RING_HOLE_CALLOUTS)
+    # The axis shows the cross-hole goes through the centre.
     add_view_centerline(
         adapter, front, face_xy=AXIS_FACE_PICK, label="crank pin axis centerline"
     )

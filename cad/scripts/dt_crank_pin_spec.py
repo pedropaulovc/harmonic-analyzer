@@ -47,7 +47,7 @@ BIG_END_DIA_BAND = (0.0013 * MM_PER_IN, -0.0007 * MM_PER_IN)
 # the .219 end.  The model's flat big end is that rim plane: the crown lies
 # outboard of it, so it adds metal beyond the hole-to-end ligament and never
 # takes any; measured from the crown's apex instead, the hole would sit .03
-# nearer the end, so the station names the rim (dt_crank_pin_notes).
+# nearer the end, so the station's extension line runs to that drawn rim.
 RING_HOLE_DIA = 2.0828  # .082
 RING_HOLE_X = 3.81  # .15 from the big end: a ligament over the .080 target
 

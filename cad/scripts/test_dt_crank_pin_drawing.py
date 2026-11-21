@@ -25,7 +25,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     marked = set().union(*dt_crank_pin_spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.FRONT_KEEP) == marked
     assert set(drawing.DRAWING_PRECISION_BY_NAME) == marked
-    assert set(dt_crank_pin_spec.DIMENSION_CALLOUTS) <= marked
+    assert set(notes.RING_HOLE_CALLOUTS) <= marked
     assert drawing.PIN_LENGTH == dt_crank_pin_spec.PIN_LENGTH
 
 
@@ -89,15 +89,19 @@ def test_pin_is_the_bought_no_3_taper_pin_cross_drilled_only() -> None:
     assert all(len(row) <= 73 for row in notes.SHEET_NOTES.splitlines())
 
 
-def test_ring_hole_station_runs_from_the_crowned_end_rim() -> None:
-    """Codjiflo on #3158: ASME B18.8.2 ends are crowned about .03 high, more
-    than the station's .XX band, so the station names the rim (the model's
-    flat big end), words only, flagged on the station itself."""
-    callout = notes.RING_HOLE_STATION_CALLOUT_ABOVE
-    assert " ".join(callout.split()) == "FROM END RIM"
-    assert not any(ch.isdigit() for ch in callout)
-    # An above-callout with a line break does not print.
-    assert "\n" not in callout
+def test_ring_hole_station_carries_its_value_only() -> None:
+    """Rule 7: a location dimension carries its value and band and nothing
+    else; the ring the hole serves is named once, on its Ø callout, by drawing
+    number (rule 4; machinist review of f79663bf15)."""
+    import _config
+
+    assert set(notes.RING_HOLE_CALLOUTS) == {"RingHoleDia"}
+    ring = f"KEEPER RING {_config.parts('dt-crank-pin-ring')['number']}"
+    assert notes.RING_HOLE_CALLOUT.splitlines() == [
+        "#45 DRILL THRU",
+        f"FOR {ring}",
+        dt_crank_pin_spec.CROSS_HOLE_WEB_CALLOUT,
+    ]
 
 
 def test_matched_taper_fit_names_both_mates() -> None:
@@ -124,7 +128,7 @@ def test_matched_taper_fit_names_both_mates() -> None:
 
 def test_web_shortfall_is_stated_on_the_hole_callout() -> None:
     """Rule 20: the pending web shortfall prints where it applies."""
-    callout = dt_crank_pin_spec.DIMENSION_CALLOUTS["RingHoleDia"]
+    callout = notes.RING_HOLE_CALLOUTS["RingHoleDia"]
     assert callout.splitlines()[-1] == dt_crank_pin_spec.CROSS_HOLE_WEB_CALLOUT
 
 
