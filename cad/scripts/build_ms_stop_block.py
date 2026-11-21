@@ -167,8 +167,11 @@ def build(adapter) -> dict[str, str]:
     volume_check(adapter, "finished brass stop block", spec.BLOCK_FINISHED_VOLUME,
                        0.005 * spec.BLOCK_FINISHED_VOLUME)
     lower, upper = spec.WINDOW_SIZE_TOLERANCE_MM
+    # The band prints at the nominal's three places, +.010/.000: the fewest
+    # places that keep it (.01) would print short of the .330 it qualifies.
     for name in ("WindowHeight", "WindowWidth"):
         set_dimension_bilateral_tolerance(adapter, "WindowProfile", name, lower, upper,
+                                          places=DRAWING_PRECISION["WindowProfile"][name],
                                           display_unit=spec.UNIT)
     _author_reference_dimensions(adapter)
     clear_dimensions_for_drawing(adapter)
