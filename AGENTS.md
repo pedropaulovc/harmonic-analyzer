@@ -477,7 +477,9 @@ Without SolidWorks or a farm run, `cad/scripts/fetch_features.py <stem>` fills
 `cad/out/features/<stem>/` from the latest release (range-reads only that
 bundle; releases after v50 carry every drawn part's), rebinds `features.toml`
 to this checkout's declarations, and reports it STALE, writing nothing, when
-the part's geometry moved since that release.
+the part's geometry moved since that release or the release predates face
+inventories (every release cut before #3232; it can be neither rebound nor
+validated offline).
 
 Each part whose `cad/process/<stem>/plan.toml` is not a placeholder (no
 `revision = "placeholder"`; `_process_plans.TRAVELER_STEMS` is derived from the

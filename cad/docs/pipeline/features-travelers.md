@@ -280,7 +280,7 @@ manifest holds no draw module: the exporter, the closure of its
 Every native part carries the release revision (`_part_properties`
 `Revision`), so a release-revision bump rebuilds every `part:<stem>` and,
 through its artefact identity, re-runs all 131 `package:features:<stem>`
-SolidWorks leaves (125 more than the six declared parts): each opens the part,
+SolidWorks leaves (123 more than the eight declared parts): each opens the part,
 labels its faces, saves the STEP and closes, about 10 s of seat time plus the
 per-leaf farm overhead (roughly 2-2.5 worker-hours, 15-20 min wall at farm
 parallelism 8 on an idle queue). The full export still opens each part again
