@@ -15,8 +15,8 @@ from _printed_tolerance import printed_band_mm
 
 
 def test_rod_is_the_threaded_bar_of_the_joint_contract() -> None:
-    # As-bought 7/32 brass rod; the shoulder station keeps its 7.50 mm model.
-    assert spec.ROD_DIA == pytest.approx(7.0 / 32.0 * 25.4)
+    # As-bought 1/4 brass bar (#2404); the shoulder station keeps its 7.50 mm model.
+    assert spec.ROD_DIA == pytest.approx(1.0 / 4.0 * 25.4)
     # The REF is untoleranced: the supplier's band governs the fits.
     assert spec.ROD_DIA_CALLOUT == "ROD STOCK"
     assert spec.ROD_LENGTH == pytest.approx(spec.SHOULDER_X + spec.BODY_LENGTH)
@@ -176,7 +176,7 @@ def _fixture_screw_reach() -> tuple[float, float]:
 def test_fixture_thumb_screw_bears_on_the_as_bought_body() -> None:
     """MHA-MG-06's axial thumb screw (MHA-SH-VN-55) locks the fixture wherever
     the operator sets it along the rod (ch. 20 p. 46). Its reach lies on the
-    body's one 7/32 cylinder and covers nearly all of it. No MHA-MG-02 screw
+    body's one 1/4 cylinder and covers nearly all of it. No MHA-MG-02 screw
     bears on the rod."""
     import build_mg_magnifier_assembly as assembly
     import mg_magnifying_clamp_geom as clamp

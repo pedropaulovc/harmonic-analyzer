@@ -72,15 +72,10 @@ kind = "form_tool"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-23 R.07 shank-end dome; MHA-MG-07 R.07 tip."
 
-[tools.form-tool-r110]
-kind = "form_tool"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-MG-04 R.11 TANGENT HEMISPHERE."
-
 [tools.form-tool-r125]
 kind = "form_tool"
 status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-CH-04 2X (SR.125) ends; MHA-MG-03 SR.13 tip."
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-CH-04 2X (SR.125) ends; MHA-MG-03 SR.13 tip; MHA-MG-04 R.13 TANGENT HEMISPHERE (1/4 bar, #2404)."
 
 [tools.form-tool-r180]
 kind = "form_tool"

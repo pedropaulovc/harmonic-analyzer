@@ -1,8 +1,8 @@
 """Drawing-free vertical-rod sizes shared by its part, the magnifier assembly
 and the fixture installation.
 
-#1559: the rod's top end is a #4-40 thread turned down from the 7/32 in brass
-rod, with a relief at the shoulder; it screws into the clamp's bottom-face tap
+#1559: the rod's top end is a #4-40 thread turned down from the 1/4 in brass
+bar, with a relief at the shoulder; it screws into the clamp's bottom-face tap
 until the shoulder seats (``mg_rod_clamp_joint`` owns the thread and its
 checks). The bottom end keeps its full hemisphere.
 
@@ -22,12 +22,14 @@ from mg_rod_clamp_joint import (
 )
 
 MM_PER_IN = 25.4
-# As-bought 7/32 in C36000 brass rod (owner ruling, #290): the body is never
+# As-bought 1/4 in C36000 brass bar, the bar the shop bought for it (owner
+# ruling 2026-11-20 on #2404, "B": make MG-04 from the bought 1/4 bar and
+# keep the #4-40 tenon, reversing #290's 7/32 rod): the body is never
 # turned, so the sheet prints it as a REF fraction and the supplier's
 # tolerance governs. +/-.005 in bounds 360 brass rounds (ASTM B16; Speedy
 # Metals lists +/-.002-.005) for every worst case below and in the fixture.
-ROD_DIA = 7.0 / 32.0 * MM_PER_IN
-ROD_DIA_FRACTION_DENOMINATOR = 32
+ROD_DIA = 1.0 / 4.0 * MM_PER_IN
+ROD_DIA_FRACTION_DENOMINATOR = 4
 ROD_DIA_BAND = (0.127, -0.127)  # (upper, lower) supplier deviations
 # Shoulder (the seating face) to the bottom dome's tip: the hanging length
 # the output fixture slides along.

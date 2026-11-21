@@ -231,7 +231,7 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "its seat on the washer and strap faces"
     ),
     ("mg_magnifying_vertical_rod_geom", "ROD_DIA_BAND"): (
-        "as-bought 7/32 brass rod's supplier tolerance (upper, lower): indexed "
+        "as-bought 1/4 brass rod's supplier tolerance (upper, lower): indexed "
         "for the fixture cross-bore clearance and the turned relief"
     ),
 }

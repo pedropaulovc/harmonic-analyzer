@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the magnifying vertical rod.
 
-A 7/32 in brass rod (MHA-MG-04, #1559): a #4-40 threaded top end with a
+A 1/4 in brass rod (MHA-MG-04, #1559): a #4-40 threaded top end with a
 relief at the shoulder that seats on MHA-MG-02, a full hemisphere at the
 bottom. The rod axis is local +X, so the *Front view is the long side
 elevation, thread tip left. The sheet prints decimal inch (#290).
@@ -134,7 +134,7 @@ SIDE_KEEP = {
     # rod, clear of detail A's rows and of the body length's text; the
     # as-bought rod's supplier REF fraction, its stock band below it.
     "RodDia": (_sheet_x(0.75 * ROD_LENGTH), SIDE_CENTER[1] + 0.020),
-    # Right of the dome's end, the whole "R.11 / TANGENT HEMISPHERE" block
+    # Right of the dome's end, the whole "R.13 / TANGENT HEMISPHERE" block
     # right of the tip: the leader from its near end runs down-left onto the
     # hemisphere's own upper-right quarter. Centred 12 mm right of the tip,
     # the block's left end stood left of the dome centre and the arrow fell
@@ -688,7 +688,7 @@ def build(adapter: Any) -> dict[str, str]:
             0: "Magnifying Vertical Rod Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: f"magnifying vertical rod; 7/32 brass rod; {THREAD_CALLOUT} end",
+            3: f"magnifying vertical rod; 1/4 brass rod; {THREAD_CALLOUT} end",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -719,7 +719,7 @@ def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*side_annotations, *detail_annotations]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    # The as-bought rod's Ø: a supplier REF fraction, "(Ø7/32 in)".
+    # The as-bought rod's Ø: a supplier REF fraction, "(Ø1/4")".
     stock = _early_bound(
         _early_bound(
             _named(adapter, annotations, STOCK_REFERENCE_DIMENSION), "IAnnotation"

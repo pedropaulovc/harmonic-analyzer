@@ -1050,9 +1050,7 @@ description = "HSS lathe grooving bit ground to a full R.024 (.048 wide) nose"
 description = "HSS lathe full-radius grooving bit, nose R.020-.047 (e.g. R.047, .094 wide)"
 [tools.form-tool-r070]  # MHA-PD-23 R.07 shank-end dome; MHA-MG-07 R.07 tip
 description = "R.070 convex dome form tool"
-[tools.form-tool-r110]  # MHA-MG-04 R.11 TANGENT HEMISPHERE
-description = "R.110 convex dome form tool"
-[tools.form-tool-r125]  # MHA-CH-04 2X (SR.125) ends; MHA-MG-03 SR.13 tip
+[tools.form-tool-r125]  # MHA-CH-04 2X (SR.125) ends; MHA-MG-03 SR.13 tip; MHA-MG-04 R.13 TANGENT HEMISPHERE
 description = "R.125 convex full-radius form tool (hemisphere on 1/4 rod)"
 [tools.form-tool-r180]  # MHA-PD-23 R.18 head dome
 description = "R.180 convex dome form tool"
@@ -1228,8 +1226,6 @@ description = "C36000 free-machining brass (360-H02, extruded), round bar, 1/4 i
 description = "C36000 free-machining brass (360-H02, extruded), round bar, 5/8 in"
 [stock.c360-round-7-16]
 description = "C36000 free-machining brass, round bar, 7/16 in"
-[stock.c360-round-7-32]
-description = "C36000 brass, round bar, 7/32 in"
 [stock.c360-round-7-8]
 description = "C36000 free-machining brass (360-H02, extruded), round bar, 7/8 in"
 [stock.c360-round-9-16]

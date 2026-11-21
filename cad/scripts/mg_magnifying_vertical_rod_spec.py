@@ -118,7 +118,7 @@ SINGLE_LIMITS: dict[tuple[str, str], tuple[float, int]] = {
     ("ReliefRoots", "ReliefRootR"): (RELIEF_ROOT_R, RELIEF_ROOT_R_TOL_TYPE),
 }
 REFERENCE_DIMENSIONS: tuple[tuple[str, str], ...] = (("RodProfile", "OverallLength"),)
-# The as-bought 7/32 rod's Ø prints as an untoleranced supplier REF fraction;
+# The as-bought 1/4 rod's Ø prints as an untoleranced supplier REF fraction;
 # its tolerance is the supplier's (mg_magnifying_vertical_rod_geom.ROD_DIA_BAND),
 # which the fixture bore and wall checks charge.
 STOCK_REFERENCE_DIMENSION = "RodDia"

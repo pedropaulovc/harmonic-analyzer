@@ -19,7 +19,7 @@ body length both from the shoulder, so the drawing inserts them as model
 items (mg_magnifying_vertical_rod_spec.DRAWING_DIMENSIONS). The overall is a
 driven reference dimension shown in parentheses. The part is an IPS document
 (the sheet prints decimal inch, #290). The #4-40 end carries a cosmetic
-thread so the pictorial matches the callout. The body is as-bought 7/32 in
+thread so the pictorial matches the callout. The body is as-bought 1/4 in
 brass rod: the sheet prints its Ø as a supplier REF fraction.
 
 Run (SolidWorks already open)::

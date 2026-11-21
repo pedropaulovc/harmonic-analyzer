@@ -1,7 +1,9 @@
 mg-magnifying-vertical-rod:
   number: MHA-MG-04
   material: Brass
-  material_specification: "C36000 brass rod, 7/32 in; MSC Direct 32001166"
+  # Owner ruling 2026-11-20 on #2404, "B": made from the bought 1/4 bar
+  # (stock-bought.toml c360-round-1-4), reversing #290's 7/32 rod.
+  material_specification: "C36000 brass rod, 1/4 in; Online Metals part 1257"
   finish: machined
   quantity: 1
   tolerance_class: machined_block
