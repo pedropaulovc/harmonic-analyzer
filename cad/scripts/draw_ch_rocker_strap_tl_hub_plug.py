@@ -47,9 +47,14 @@ from _drawing_dimensions import assert_imported_precision, move_model_dimension
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 
 MACHINIST_REVIEW = MachinistReviewMode.LEARN
@@ -146,6 +151,165 @@ if set(END_KEEP) | set(SIDE_KEEP) != set().union(*spec.DRAWING_DIMENSIONS.values
     raise AssertionError("the hub plug sheet does not place every marked dimension")
 if set(MOVED) | set(SIDE_KEEP) | {"BoreDia"} != set(spec.DRAWING_PRECISION_BY_NAME):
     raise AssertionError("every hub plug dimension ends on exactly one view")
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_ch_rocker_strap_tl_hub_plug: axis +Z through the origin, z = 0 the
+# body's bottom face, the shoulder at the body length, the pilot's top at the
+# overall length). The bottom face is the datum end both lengths run from;
+# each ``span`` is a diameter's model-Z extent. The body is a REF nominal
+# whose matched clearance governs; the pilot prints its own band; the bore
+# the DRILLED HOLES row. The declarations print nothing.
+_P = spec.DRAWING_PRECISION_BY_NAME
+_C = spec.DIMENSION_CALLOUTS_BY_NAME
+_SELF = "draw_ch_rocker_strap_tl_hub_plug"
+part_metadata(
+    model_sources=("BODY_LENGTH", "OVERALL_LENGTH", "BODY_DIA", "PILOT_DIA"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("BODY_LENGTH",)),
+        "outward": ([0.0, 0.0, -1.0], ("BODY_LENGTH",)),
+    },
+)
+requirement(
+    "shoulder",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), spec.BODY_LENGTH),),
+    requirements=("station",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": spec.BODY_LENGTH},
+            ("BODY_LENGTH",),
+        ),
+        "outward": ([0.0, 0.0, 1.0], ("BODY_LENGTH",)),
+        "station": (
+            limits(spec.BODY_LENGTH, _P["BodyLength"], unit=spec.UNIT),
+            ("BODY_LENGTH", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "station_nominal": (spec.BODY_LENGTH, ("BODY_LENGTH",)),
+        "station_from": ("datum_end", ((_SELF, "SIDE_KEEP"),)),
+        "callout": (_C["BodyLength"], ("DIMENSION_CALLOUTS",)),
+    },
+    precision={"station": _P["BodyLength"]},
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), spec.OVERALL_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": spec.OVERALL_LENGTH},
+            ("OVERALL_LENGTH",),
+        ),
+        "outward": ([0.0, 0.0, 1.0], ("OVERALL_LENGTH",)),
+        "length": (
+            limits(spec.OVERALL_LENGTH, _P["OverallLength"], unit=spec.UNIT),
+            ("OVERALL_LENGTH", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "length_nominal": (spec.OVERALL_LENGTH, ("OVERALL_LENGTH",)),
+        "length_from": ("datum_end", ((_SELF, "SIDE_KEEP"),)),
+        "callout": (_C["OverallLength"], ("DIMENSION_CALLOUTS",)),
+    },
+    precision={"length": _P["OverallLength"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(spec.BODY_DIA),),
+    requirements=("diametral_clearance",),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("BODY_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("BODY_DIA",)),
+        "span": ([0.0, spec.BODY_LENGTH], ("BODY_LENGTH",)),
+        "dia_ref": (
+            spec.BODY_DIA,
+            ("BODY_DIA", "REFERENCE_DIMENSIONS", (_SELF, "BODY_ON_SIDE")),
+        ),
+        "diametral_clearance": (
+            list(spec.BODY_CLEARANCE),
+            ("BODY_CLEARANCE", "BODY_CLEARANCE_TEXT"),
+        ),
+        "mate": (
+            f"{spec.PLATE_NUMBER} COUNTERBORE",
+            ("PLATE_NUMBER", "DIMENSION_CALLOUTS"),
+        ),
+        "mate_nominal_dia": (spec.COUNTERBORE_DIA, ("COUNTERBORE_DIA",)),
+        "callout": (_C["BodyDia"], ("DIMENSION_CALLOUTS",)),
+    },
+    precision={"dia_ref": _P["BodyDia"]},
+)
+requirement(
+    "step",
+    kind="diameter",
+    faces=(CylinderFace(spec.PILOT_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("PILOT_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("PILOT_DIA",)),
+        "span": (
+            [spec.BODY_LENGTH, spec.OVERALL_LENGTH],
+            ("BODY_LENGTH", "OVERALL_LENGTH"),
+        ),
+        "dia": (list(spec.PILOT_LIMITS), ("PILOT_LIMITS", (_SELF, "PILOT_ON_SIDE"))),
+        "dia_nominal": (spec.PILOT_DIA, ("PILOT_DIA",)),
+        "diametral_clearance_ref": (
+            list(spec.PILOT_CLEARANCE),
+            ("PILOT_CLEARANCE", "PILOT_CLEARANCE_TEXT"),
+        ),
+        "mate": (
+            f"{spec.STRAP_NUMBER} HUB HOLE",
+            ("STRAP_NUMBER", "DIMENSION_CALLOUTS"),
+        ),
+        "callout": (_C["PilotDia"], ("DIMENSION_CALLOUTS",)),
+    },
+    precision={"dia": _P["PilotDia"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(spec.BORE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("BORE_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("BORE_DIA",)),
+        "span": ([0.0, spec.OVERALL_LENGTH], ("OVERALL_LENGTH",)),
+        "dia": (
+            drilled_limits(spec.BORE_DIA, _P["BoreDia"], unit=spec.UNIT),
+            ("BORE_DIA", "UNIT", (_SELF, "END_KEEP")),
+        ),
+        "nominal_dia": (spec.BORE_DIA, ("BORE_DIA",)),
+        "thru": (True, ("DIMENSION_CALLOUTS",)),
+        "process": ("drill", ("DIMENSION_CALLOUTS",)),
+        "wall_min": (spec.WALL_MIN, ("WALL_MIN", "WALL_TEXT")),
+        "callout": (_C["BoreDia"], ("DIMENSION_CALLOUTS",)),
+    },
+    precision={"dia": _P["BoreDia"]},
+)
+requirement(
+    "chamfer_far",
+    kind="chamfer",
+    faces=(ConeFace(45.0),),
+    requirements=("leg",),
+    fields={
+        "leg": (
+            limits(spec.CHAMFER, _P["ChamferSize"], unit=spec.UNIT),
+            ("CHAMFER", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "leg_nominal": (spec.CHAMFER, ("CHAMFER",)),
+        "angle_deg": (45.0, ("DIMENSION_CALLOUTS",)),
+        "edge_of": ("step", ("PILOT_CHAMFER",)),
+        "at_end": ("far_end", ("PILOT_CHAMFER",)),
+        "callout": (_C["ChamferSize"], ("DIMENSION_CALLOUTS",)),
+    },
+    precision={"leg": _P["ChamferSize"]},
+)
 
 
 def _assert_part_text(adapter: Any, annotations: list[Any]) -> None:

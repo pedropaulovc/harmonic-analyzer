@@ -76,3 +76,6 @@ SHEET_NOTES = "\n".join(
         f" {inch_text(ARM_FACE_WALL_MIN, 3)} MIN AT ARM FACE.",
     )
 )
+# The feature export's copy of the printed notes (export_features), with
+# SolidWorks' diameter token as the Ø it prints.
+DRAWING_NOTES = SHEET_NOTES.replace("<MOD-DIAM>", "Ø")

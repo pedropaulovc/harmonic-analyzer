@@ -1,23 +1,186 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Wheel axle spacer MHA-MG-11, one off, turned on the manual PM-1127VF-LB
+# (owner ruling 2026-11-21: turned parts get lathe travelers, no NC). Route
+# chosen for speed: the outside is the 7/16 in C36000 bar as supplied (.4375,
+# inside the drawing's .43-.45 band; registry: O.D. as supplied), so nothing
+# is turned. Setup 1 on the bar: mike the bar, face the end (Z0), spot, drill
+# #10 (.1935, inside the .193-.197 DRILL THRU) through and past the parting
+# line, part off .02 long. Setup 2: the spacer turned round, the faced end
+# .40 in the 3-jaw over a shim wrap, the parted end out: face it to the
+# .731-.733 length, a micrometer between skims (the .002 band is too tight to
+# part to). Bench: deburr, check the hole.
+#
+# Stock: 7/16 in C36000 round is to order (cad/config/shop-equipment/
+# stock-to-order.toml c360-round-7-16, a 2 in piece); none is on hand.
 title = "Wheel Axle Spacer"
-part = "MHA-MG-11 Wheel Axle Spacer"
-revision = "placeholder"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 7/16 in"
-stock = "To be written"
+stock = "Lot: {{process.quantity:d}} spacer. Ø{{process.stock_dia_in:.4dot}} bar, a {{process.bar_length_in:g}} in piece (to order, not on hand); the spacer takes {{cad.pitch_in:.2dot}} in of it."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry."
 shop = "../shop"
 stock_refs = ["c360-round-7-16"]
+material_key = "lathe-c360"
+
+[cad]
+file = "../../out/features/mg_wheel_axle_spacer/features.toml"
+adapter = "turned_bush"
+part = "mg-wheel-axle-spacer"
+
+[parameters]
+quantity = 1
+stock_dia_in = 0.4375
+# The outside is the bar as supplied, inside its band: not turned.
+as_supplied_outer = 1
+# The 2 in piece to order and the length the 3-jaw grips of it.
+bar_length_in = 2.0
+chuck_grip_in = 0.75
+# Facing allowance: squares a sawn bar end.
+face_allowance_in = 0.02
+# Left on the parted end for Setup 2 to face to length.
+regrip_allowance_in = 0.02
+# Parting kerf: 1/8 in blade plus the insert's side clearance (authored).
+part_kerf_in = 0.13
+parts_per_pull = 1
+# The parting blade's clearance to the jaw fronts.
+jaw_clearance_in = 0.1
+# Setup 2: how much of the spacer the jaws take, from its faced end.
+regrip_grip_in = 0.4
+
+[[tools]]
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "centre"
+name = "No. 3 centre drill"
+ref = "centre-drills-carbide-60"
 
 [[tools]]
 id = "drill-10"
 name = "#10 drill"
-ref = "drill-10"  # Drills #10
+ref = "drill-10"
+
+[[tools]]
+id = "cutoff"
+name = "Cutoff blade"
+ref = "cutoff-blade-holder"
+
+[[tools]]
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Bar: face, drill #10, part off long"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the Ø{{process.stock_dia_in:.4dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
+datum = "Z0 (carriage DRO) the bar end faced in Op 20."
+diagram = { file = "diagrams/bar.svg", alt = "The 7/16 in bar in the 3-jaw: the end faced, centre-spotted and drilled #10 past the parting line; the spacer parted off {{process.regrip_allowance_in:.2dot}} long." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Mike the bar where the spacer will come from: every reading {{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}}, else stop (the outside is left as supplied)."
+inspection = "Bar Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}}."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off; set DRO Z0 on it."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock, about Ø.15 across the countersink: under the #10 drill, so the drill removes it."
+settings = "lathe-centre-c360"
+cut_diameter_mm = 2.778
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-10"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Drill #10 {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale, backing fully out to clear chips every {{cad.bore_dia_mm:in.2dot}} in: through the spacer and past the parting line."
+settings = "lathe-drill-10-c360"
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
+hole_depth_mm = "{{cad.run_mm}}"
+peck = { step_mm = "{{cad.bore_dia_mm}}", retract = "full" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Catch the spacer."
+settings = "lathe-part-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Turned round: face the parted end to length"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw over a shim wrap of brass shim, {{process.regrip_grip_in:.2dot}} in in the jaws, the Setup 1 faced end seated flat against the chuck face; the parted end {{cad.outer_stickout_far_mm:in.2dot}} in out."
+datum = "The Setup 1 faced end, seated on the chuck face: the length is miked across both faces off the lathe."
+diagram = { file = "diagrams/regrip.svg", alt = "The spacer turned round, its faced end in the jaws over a shim wrap; the parted end faced to length." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the parted end in light skims to {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}. To check between skims: stop the spindle, take the spacer out, mike the length across both faces, then reseat it flat against the chuck face before the next skim."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+inspection = "Length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} across the faces, micrometer."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Bench: deburr and check the hole"
+machine = "Bench"
+envelope = "other"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished spacer: its {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} length, the outside as supplied and the #10 hole through." }
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr: break the outside edges and both ends of the hole, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, without touching the faced ends' flats."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The hole takes the {{cad.bore_dia_min_in:.3dot}} pin gauge and not the {{cad.bore_dia_max_in:.3dot}}."
+inspection = "Hole Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A spacer faced under {{cad.length_min_in:.3dot}} in Op 60 or failing the hole check in Op 80 is scrapped, not reworked: make another from Setup 1."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Finish (drawing: bright machined, oiled): wipe the spacer clean and give it a light coat of light machine oil."
+feed = "hand"

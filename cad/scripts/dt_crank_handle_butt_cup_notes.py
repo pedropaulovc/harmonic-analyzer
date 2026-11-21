@@ -18,6 +18,7 @@ from dt_crank_handle_butt_cup_spec import (
     POCKET_CLEARANCE,
     POCKET_WALL_MIN,
 )
+from dt_crank_handle_spec import COUNTERBORE_GLUE_LINE
 from _title_block_units import MM_PER_INCH, render_number
 
 
@@ -62,5 +63,28 @@ BODY_CHAMFER_CALLOUT = "\n".join(
 FLOOR_HOLE_CHAMFER_CALLOUT = "\n".join(
     ("X 45°", f"CLEARS {SCREW_NUMBER}", "UNDER-HEAD RADIUS")
 )
+# The body is bonded in the MHA-DT-08 counterbore: a matched bonded fit,
+# turned to the measured counterbore, whose diametral clearance is the
+# handle's glue line, REF (rules 4 and 26; rule 23: epoxy, wood to metal).
+# The fit lives on flag note 2: printed on the dimension (round 2) its two
+# lines ran into the floor-hole dimension line, and the .XXX grade alone
+# cannot give a .004-wide clearance, so the matched route must be printed.
+_MM_PER_IN = 25.4
+BODY_NOTE = POCKET_NOTE + 1
+BODY_FLAG = f"SEE NOTE {BODY_NOTE}"
+BODY_NOTE_TEXT = "\n".join(
+    (
+        f"{BODY_NOTE}. BODY: BONDED FIT IN {HANDLE_NUMBER} CRANK HANDLE, EPOXY:",
+        "   TURN TO THE MEASURED COUNTERBORE (CLEARANCE "
+        + "-".join(
+            f"{value / _MM_PER_IN:.3f}".removeprefix("0")
+            for value in COUNTERBORE_GLUE_LINE
+        )
+        + ").",
+    )
+)
+# The sheet's numbered notes, printed by draw_dt_crank_handle_butt_cup and
+# read by the feature export (export_features).
+DRAWING_NOTES = f"{POCKET_NOTE_TEXT}\n{BODY_NOTE_TEXT}"
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

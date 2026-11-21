@@ -32,14 +32,22 @@ from _drawing_dimensions import (
 from _drawing_view_display import set_hidden_lines_removed
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
 from mg_wheel_axle_spacer_spec import (
     BORE_CALLOUT,
+    BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     LENGTH,
     LENGTH_CALLOUT,
+    LENGTH_LIMITS,
     OD,
+    UNIT,
+    WALL_WORST,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -99,6 +107,87 @@ DIMENSION_CALLOUTS = {
     "SpacerBore": BORE_CALLOUT,
     "SpacerLength": LENGTH_CALLOUT,
 }
+
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_mg_wheel_axle_spacer: axis +Z through the origin, the bar-side face
+# at z = 0, the datum end the length runs from; the washer face at z =
+# LENGTH). The length carries its model band (LENGTH_LIMITS); the O.D. the
+# title block's .XX row; the bore the DRILLED HOLES row. Each ``span`` is a
+# diameter's model-Z extent. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_mg_wheel_axle_spacer"
+part_metadata(
+    model_sources=("LENGTH", "OD", "BORE_DIA"),
+    precision_sources=("DRAWING_PRECISION", (_SELF, "DRAWING_PRECISION_BY_NAME")),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("LENGTH",)),
+        "outward": ([0.0, 0.0, -1.0], ("LENGTH",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": LENGTH}, ("LENGTH",)),
+        "outward": ([0.0, 0.0, 1.0], ("LENGTH",)),
+        "length": (
+            list(LENGTH_LIMITS),
+            ("LENGTH_LIMITS", "LENGTH_BAND", (_SELF, "RIGHT_KEEP")),
+        ),
+        "length_nominal": (LENGTH, ("LENGTH",)),
+        "length_from": ("datum_end", ((_SELF, "RIGHT_KEEP"),)),
+        "callout": (LENGTH_CALLOUT, ("LENGTH_CALLOUT",)),
+    },
+    precision={"length": _P["SpacerLength"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(OD),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("OD",)),
+        "at": ([0.0, 0.0, 0.0], ("OD",)),
+        "span": ([0.0, LENGTH], ("LENGTH",)),
+        "dia": (
+            limits(OD, _P["SpacerOd"], unit=UNIT),
+            ("OD", "UNIT", (_SELF, "OD_ON_SIDE")),
+        ),
+        "dia_nominal": (OD, ("OD",)),
+    },
+    precision={"dia": _P["SpacerOd"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(BORE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("BORE_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("BORE_DIA",)),
+        "span": ([0.0, LENGTH], ("LENGTH",)),
+        "dia": (
+            drilled_limits(BORE_DIA, _P["SpacerBore"], unit=UNIT),
+            ("BORE_DIA", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
+        "thru": (True, ("BORE_CALLOUT",)),
+        "process": ("drill", ("BORE_CALLOUT",)),
+        "wall_min": (WALL_WORST, ("WALL_WORST",)),
+        "callout": (BORE_CALLOUT, ("BORE_CALLOUT",)),
+    },
+    precision={"dia": _P["SpacerBore"]},
+)
 
 
 def build(adapter: Any) -> dict[str, str]:

@@ -1,0 +1,109 @@
+# Lathe records for the turned bushes, spacers, rings, washers, collars, cups
+# and plugs that several families' plans (ch, dt, mg, sm) turn on the
+# PM-1127VF-LB: the turning and parting tools and their cutting settings by
+# material. A set several families need, so its own topic file (common.toml
+# header; cad/process/README.md, "Shop records"). Drills, centre drills and
+# taps stay where their other readers keep them (common.toml or the family
+# file); only their lathe settings are here.
+#
+# Cutting speeds: LittleMachineShop, "Cutting Speeds"
+# (https://littlemachineshop.com/pages/cutting-speeds, read live 2026-11-21).
+# Turning rows are "adjusted to the feed rate of the mini lathe (0.004/rev.),
+# a depth of cut of 0.040"; the settings take that .004 in/rev (0.1016 mm/rev)
+# and the low end of each range:
+# - Plain carbon steels (1018): turning HSS 125-215, carbide 800-885 ft/min;
+#   drilling 60-100 ft/min.
+# - Brass (C36000): turning HSS 300-350, carbide 1170 ft/min; drilling
+#   160-175 ft/min.
+# On these small diameters most speeds exceed the lathe's 2000 rpm top speed
+# and clamp to it (prechips fits every calculated rpm to the machine's
+# ranges).
+# Parting: University of Florida EML2322L, "Parting Facts"
+# (https://web.mae.ufl.edu/designlab/Advanced%20Manufacturing/Lathe%20Parting/Parting%20Facts.pdf):
+# part at about 60 % of the turning speed and under 600 rpm, starting at
+# 300 rpm, fed by hand with cutting oil, backing out to clear chips. The
+# settings take the 300 rpm start for every material; brass is parted dry,
+# as it is drilled.
+
+# Moved from ch.toml: the rocker hub (ch), washer (ch), collar (dt), ferrule
+# (dt) and spacer (mg) plans read it. The AR holder is the A R Warner LMS
+# 4132 set's (TCMT insert, R0.4 nose); ownership: cad/config/shop-equipment/
+# tools-cutting.toml tools.lathe-ar, same key.
+[tools.lathe-ar]
+description = "A R Warner AR carbide turning holder, TCMT insert, R0.4 nose (LMS 4132)"
+
+# Ownership: cad/config/shop-equipment/tools-cutting.toml, same key
+# (McMaster 3212A119, 1/8 in wide), and tools.cutoff-inserts (C2 3212A75, C5
+# 3212A76), both on hand. The packing list gives the inserts' .252 in
+# thickness, not their cutting width, so the plans' parting kerf is an
+# authored allowance over the 1/8 in blade, set by caliper on the insert
+# before the first part.
+[tools.cutoff-blade-holder]
+description = "1/8 in blade-style cutoff holder (McMaster 3212A119), neutral uncoated carbide insert: C5 (3212A76) for steel, C2 (3212A75) for brass"
+
+[settings.lathe-ar-1018]
+tool = "lathe-ar"
+material = "lathe-1018-cold-finished"
+sfm = 800
+feed_mm_rev = 0.1016
+
+[settings.lathe-ar-c360]
+tool = "lathe-ar"
+material = "lathe-c360"
+sfm = 1170
+feed_mm_rev = 0.1016
+
+[settings.lathe-part-1018]
+tool = "cutoff-blade-holder"
+material = "lathe-1018-cold-finished"
+rpm = 300
+feed = "by hand, steady, cutting oil; back out to clear chips"
+
+[settings.lathe-part-c360]
+tool = "cutoff-blade-holder"
+material = "lathe-c360"
+rpm = 300
+feed = "by hand, steady, dry; back out to clear chips"
+
+# Centre drills at the drilling row, taken at the pilot; fed by hand.
+[settings.lathe-centre-1018]
+tool = "centre-drills-carbide-60"
+material = "lathe-1018-cold-finished"
+sfm = 60
+feed = "tailstock quill by hand"
+
+[settings.lathe-centre-c360]
+tool = "centre-drills-carbide-60"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand"
+
+[settings.lathe-drill-d-1018]
+tool = "drill-d"
+material = "lathe-1018-cold-finished"
+sfm = 60
+feed = "tailstock quill by hand, pecking, cutting oil"
+
+[settings.lathe-drill-h-1018]
+tool = "drill-h"
+material = "lathe-1018-cold-finished"
+sfm = 60
+feed = "tailstock quill by hand, steady, cutting oil"
+
+[settings.lathe-drill-l-1018]
+tool = "drill-l"
+material = "lathe-1018-cold-finished"
+sfm = 60
+feed = "tailstock quill by hand, steady, cutting oil"
+
+[settings.lathe-drill-n-c360]
+tool = "drill-n"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, steady, dry"
+
+[settings.lathe-drill-10-c360]
+tool = "drill-10"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, pecking, dry"

@@ -429,6 +429,19 @@ cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), li
 3244A574 = { note = "carbide, steel, semi-interrupted cutting, medium" }
 6110N147 = { note = "carbide, steel, semi-interrupted cutting, roughing" }
 
+# The A R Warner turning-tool set, LittleMachineShop 4132 (AR, E and AL
+# holders, TCMT-21.51 inserts), recorded owned by photo and LMS package in
+# the 45952b66bc inventory (cad/process/shop/inventory.toml
+# tools.turning-tools-warner-lms-4132). Keyed by the AR holder the lathe
+# travelers name (cad/process/shop/lathe.toml tools.lathe-ar).
+[tools.lathe-ar]
+name = "A R Warner carbide turning-tool set (AR, E, AL holders), TCMT-21.51 inserts, R0.4 nose"
+kind = "insert_holders"
+sku = "4132"
+status = "on_hand"
+pieces = 3
+cite = ["Inventory at 45952b66bc, cad/process/shop/inventory.toml tools.turning-tools-warner-lms-4132: make A R Warner, styles AR/E/AL, insert TCMT-21.51, source LittleMachineShop SKU 4132, by photo + LMS package"]
+
 [tools.cutoff-blade-holder]
 name = "Blade-style holder for cutoff and grooving carbide inserts, 4-5/16 in long x 1/8 in wide"
 kind = "cutoff_holder"

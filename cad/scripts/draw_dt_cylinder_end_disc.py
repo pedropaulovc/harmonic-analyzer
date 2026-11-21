@@ -27,15 +27,21 @@ from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 import _telemetry
 from dt_cylinder_end_disc_spec import (
     BORE_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    UNIT,
+    WASHER_BORE,
     WASHER_OD,
     WASHER_THICK,
 )
@@ -82,6 +88,87 @@ SECTION_KEEP = {
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
 }
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_dt_cylinder_end_disc: axis +Z through the origin, the annulus
+# extruded +Z by the thickness; z = 0 is the datum end the thickness runs
+# from). The O.D. and thickness take the title block's .XX row, the bore the
+# DRILLED HOLES row. Each ``span`` is a diameter's model-Z extent. The
+# declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_cylinder_end_disc"
+part_metadata(
+    model_sources=("WASHER_OD", "WASHER_BORE", "WASHER_THICK"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("WASHER_THICK",)),
+        "outward": ([0.0, 0.0, -1.0], ("WASHER_THICK",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), WASHER_THICK),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": WASHER_THICK},
+            ("WASHER_THICK",),
+        ),
+        "outward": ([0.0, 0.0, 1.0], ("WASHER_THICK",)),
+        "length": (
+            limits(WASHER_THICK, _P["DiscThick"], unit=UNIT),
+            ("WASHER_THICK", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "length_nominal": (WASHER_THICK, ("WASHER_THICK",)),
+        "length_from": ("datum_end", ((_SELF, "SECTION_KEEP"),)),
+    },
+    precision={"length": _P["DiscThick"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(WASHER_OD),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("WASHER_OD",)),
+        "at": ([0.0, 0.0, 0.0], ("WASHER_OD",)),
+        "span": ([0.0, WASHER_THICK], ("WASHER_THICK",)),
+        "dia": (
+            limits(WASHER_OD, _P["DiscDia"], unit=UNIT),
+            ("WASHER_OD", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "dia_nominal": (WASHER_OD, ("WASHER_OD",)),
+    },
+    precision={"dia": _P["DiscDia"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(WASHER_BORE),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("WASHER_BORE",)),
+        "at": ([0.0, 0.0, 0.0], ("WASHER_BORE",)),
+        "span": ([0.0, WASHER_THICK], ("WASHER_THICK",)),
+        "dia": (
+            drilled_limits(WASHER_BORE, _P["BoreDia"], unit=UNIT),
+            ("WASHER_BORE", "WASHER_BORE_BAND", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "nominal_dia": (WASHER_BORE, ("WASHER_BORE",)),
+        "thru": (True, ("BORE_CALLOUT",)),
+        "process": ("drill", ("BORE_CALLOUT",)),
+        "callout": (BORE_CALLOUT, ("BORE_CALLOUT",)),
+    },
+    precision={"dia": _P["BoreDia"]},
+)
 
 # swDimensionTextParts_e.swDimensionTextCalloutBelow. These are ordinary
 # model display dimensions, not Hole Wizard callouts (GetText excludes those).
