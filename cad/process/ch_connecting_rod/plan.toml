@@ -685,8 +685,8 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Mount the arbor in the spindle (drawbar tight), the slitting saw on it between the spacers just checked, at least .25 in of them above the saw and at least {{process.saw_spacer_below_min_mm:in.3dot}} in below it, then the nut; the teeth cutting with the spindle turning clockwise (M3) seen from above."
-inspection = "The arbor's lowest point (the nut's lower face, or the arbor's end if it stands past the nut) no more than {{process.saw_below_max_mm:in.2dot}} in below the saw's lower face (the calipers' depth rod): CR06 rises that much higher between its passes to carry it over the stock. Over: take spacers from below the saw (keep at least {{process.saw_spacer_below_min_mm:in.3dot}} in), or stop and tell the owner."
-gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.saw_below_max_mm}}"] }]
+inspection = "The nut's upper face at least {{process.saw_spacer_below_min_mm:in.3dot}} and the arbor's lowest point (the nut's lower face, or the arbor's end if it stands past the nut) at most {{process.saw_below_max_mm:in.2dot}} below the saw's lower face (the calipers' depth rod): the nut passes under the blanks' ends, and CR06 rises that much higher between its passes to carry it over the stock. Outside: change the spacers under the saw, or stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.saw_spacer_below_min_mm}}", "{{process.saw_below_max_mm}}"] }]
 
 [[setups.operations]]
 instruction = "Only after a reset or homing ($H) since CR05_bore parked T1: from the homed Z, MDI G0 X{{process.saw_touch_x_mm:.3f}} Y{{process.saw_touch_y_mm:.3f}} (the station, X and Y only), then the touch-off below, Z only."
