@@ -216,7 +216,7 @@ title = "End B: thread between the chuck and the dead centre"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "Turned round: 3-jaw over the shim wrap on the other end's .60 in (end A); the rod out toward the tailstock, the MT3 dead centre in the tailstock, its point oiled, in the stub's centre hole, the quill just snug and locked. The centre must seat and lock in the quill's taper; if it does not, stop: a lathe dead centre is to order. Re-oil the point every few passes."
+holding = "Not turned round: draw the rod out of the spindle bore toward the tailstock until only the other end's .60 in (end A) is in the jaws; 3-jaw over the shim wrap there; the MT3 dead centre in the tailstock, its point oiled, in the stub's centre hole, the quill just snug and locked (the centre seated and locked in the quill's MT3 taper). Re-oil the point every few passes."
 datum = "Z0 (carriage DRO) end B's plane, {{process.stub_in:.3dot}} in from the stub's faced end: the AR tool (Op 60) and the threading bit (Op 90) are touched on the stub's end and set to Z+{{process.stub_in:.3dot}}; the cutoff blade as Op 190 sets it on the pilot's shoulder."
 diagram = { file = "diagrams/centres.svg", alt = "The rod between the 3-jaw and the dead centre in the stub: end B's thread cut toward the chuck from over the pilot." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{process.centre_stickout_mm}}", minimum_diameter_mm = "{{process.pilot_dia_mm}}", support = "tailstock" }
@@ -285,7 +285,7 @@ instruction = "The leaf does not seat (Op 140): the gearbox is off 20 TPI; set i
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Tight on the bracket (Op 150): spindle stopped, half-nuts closed, run the bit into the groove at X0: its point sits in the groove with no gap on either flank (the rod has not slipped or bent). Off the groove: scrap the lever and make another from Setup 1."
+instruction = "Tight on the bracket (Op 150): spindle stopped, half-nuts closed, turn the chuck forward by hand until the DRO reads about Z-.300 (over full thread), then bring the cross slide to X0: the bit's point sits in the groove with no gap on either flank (the rod has not slipped or bent). Off the groove: scrap the lever and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
