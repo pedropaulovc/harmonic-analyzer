@@ -407,7 +407,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Depth over {{cad.depth_max_in:.3dot}}: abort; send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.depth_mm:in.4dot}}) × 25.4); run CF06_bar_drill again from its start (the face, then the holes) and re-check. Under {{cad.depth_min_in:.3dot}}: the half is scrap."
+instruction = "Depth over {{cad.depth_max_in:.3dot}}: stop the file; home ($H) and repeat this setup's X0, Y0 and Z0 touch-offs (a stop resets the controller); then send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.depth_mm:in.4dot}}) × 25.4); run CF06_bar_drill again from its start (the face, then the holes) and re-check. Under {{cad.depth_min_in:.3dot}}: the half is scrap."
 feed = "hand"
 
 [[setups.operations]]
