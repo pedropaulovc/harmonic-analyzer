@@ -20,5 +20,6 @@
   <polygon class="cutter" points="289.55,24.64 313.55,24.64 301.55,90.64"/>
   <text class="label" x="321.55" y="54.64">dead centre in the spindle, spindle OFF</text>
   <text class="label" x="396" y="158.64">tap point {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the apex: into the bore</text>
-  <text class="label" x="20" y="40">Looking at the moving jaw; W at the fixed jaw behind.</text>
+  <text class="label" x="20" y="80">Looking at the moving jaw;</text>
+  <text class="label" x="20" y="96">W at the fixed jaw behind.</text>
 </svg>
