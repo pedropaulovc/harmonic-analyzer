@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Setup 2: four blanks B up on the spoil plate across the jaws; face B, pocket B, bore, holes. Styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 380" width="640" height="380" font-family="sans-serif" font-size="12">
-<rect class="paper" width="640" height="380"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 410" width="640" height="410" font-family="sans-serif" font-size="12">
+<rect class="paper" width="640" height="410"/>
 <text class="label" x="20" y="20">Side B up: face, pocket, bore and holes (top view)</text>
 <rect class="fixture-vise" x="89" y="34" width="413" height="26"/>
 <text class="label" x="240" y="50">fixed jaw</text>
@@ -29,8 +29,8 @@
 <rect class="fixture-vise" x="89" y="324" width="413" height="26"/>
 <text class="label" x="240" y="341">moving jaw</text>
 <line class="datum" x1="40" y1="30" x2="40" y2="354"/>
-<text class="label" x="10" y="368">X0 left ends</text>
-<text class="label" x="460" y="368">spoil plate (dashed) on 1 in parallels; B up</text>
-<path class="arrow" d="M600 93 H510"/>
-<text class="label" x="510" y="85">slot −X, arc round the hub</text>
+<rect x="40" y="62" width="396" height="260" fill="none" stroke="#333" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text class="label" x="10" y="370">X0 left ends</text>
+<text class="label" x="130" y="370">spoil plate (dashed outline, 6 x 3.9 in) on 1 in parallels; B up</text>
+<text class="label" x="10" y="390">each pocket: slot along the centre line to the hub, then the arc round the hub</text>
 </svg>
