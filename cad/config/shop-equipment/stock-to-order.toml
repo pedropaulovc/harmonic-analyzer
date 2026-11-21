@@ -239,8 +239,8 @@ cite = ["cad/config/parts/dt-cone-gear-tl-arbor-collar.yaml material_specificati
 [stock.6061-round-9-16]
 form = "round_bar"
 material = "6061-T6511 aluminium"
-note = "To order: 9/16 in round 6061, at least 3 in (one .272 in hub plug plus parting, facing and a .75 in chucking end; four plugs per 3 in). Source: the ch-rocker-strap-tl-hub-plug (MHA-CH-13-TL-02) registry row, \"6061 aluminum round, 9/16 in or over\", turned from round bar on the manual lathe (registry process). No 6061 round is owned; the owned 1 x 3 in flat (stock.6061-flat-1x3) would need a squared blank in the 4-jaw. Supplier and price not read. Not owned."
+note = "To order: 9/16 in round 6061, at least 3 in (one .272 in hub plug plus parting, facing and a .75 in chucking end; four plugs per 3 in). Source: the ch-rocker-strap-tl-hub-plug (MHA-CH-13-TL-02) registry material_specification, \"6061 aluminum round, 9/16 in or over\". The registry process and fixtures.strap-hub-plug say \"round bar on hand\", but no 6061 round bar is recorded in this inventory (the owned 1 x 3 in flat, stock.6061-flat-1x3, would need a squared blank in the 4-jaw), so it is recorded to order until the owner names a bar. Supplier and price not read. Not owned."
 dia_in = [0.5625]
 length_in = [3.0]
 status = "to_order"
-cite = ["cad/config/parts/ch-rocker-strap-tl-hub-plug.yaml material_specification, process"]
+cite = ["cad/config/parts/ch-rocker-strap-tl-hub-plug.yaml material_specification"]
