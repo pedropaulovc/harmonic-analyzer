@@ -966,6 +966,7 @@ def check_outline(
     z_top: float,
     clearing: Sequence[dict] = (),
     tabs: Sequence[dict] = (),
+    leads: Sequence[dict] = (),
 ) -> list[Finding]:
     """Profile passes round a closed part outline. ``elements`` are its lines
     and minor arcs (``start``, ``end``, optional ``centre``) in the order and
@@ -985,6 +986,13 @@ def check_outline(
     clearing, not a stray; :func:`check_cleared` checks what it clears and
     :func:`check_keep_out` what it must miss.
 
+    Each of ``leads`` is a ``centre`` and ``radius`` inside waste the
+    clearing has already cut, with its ``levels``, where a pass is entered
+    and left on arcs (a bore's finish circle, from and back to its centre):
+    a waste point inside one at one of its levels is neither clearing nor a
+    stray and is in no order, so each pass's lead-out and the next one's
+    lead-in may follow it. The direction rule still holds there.
+
     Each of ``tabs`` is a bridge the passes leave standing to hold the part:
     a ``name``, an ``x`` × ``y`` box spanning the outline and every pass's
     cutter-centre path across the tab (its ends square to the path; the tab
@@ -1001,6 +1009,7 @@ def check_outline(
     findings: list[Finding] = []
     levels = {round(z, 3) for p in passes for z in p["levels"]}
     levels |= {round(z, 3) for c in clearing for z in c["levels"]}
+    levels |= {round(z, 3) for c in leads for z in c["levels"]}
 
     def inside(tab: dict, p: Point, margin: float = 0.0) -> bool:
         (x0, x1), (y0, y1) = tab["x"], tab["y"]
@@ -1085,6 +1094,12 @@ def check_outline(
                         stray.append(f"{where} from {element['name']}")
                     continue
             waste = distance > farthest + element["tol"]
+            if waste and any(
+                math.dist(c["centre"], point[:2]) <= c["radius"] + _TOL_MM
+                and at(point[2], c["levels"])
+                for c in leads
+            ):
+                continue
             if waste and any(
                 c["x"][0] <= point[0] <= c["x"][1] and at(point[2], c["levels"])
                 for c in clearing
