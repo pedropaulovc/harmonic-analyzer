@@ -14,8 +14,8 @@
 # - The eye is drilled while the blank is Ø.25 along its whole length: it
 #   lies along the vise jaws on one parallel on edge, the head end .25 in out
 #   past the jaws' left side, so the eye (.16 from the head end) is drilled
-#   in the overhang into air; an offcut of the same bar at the jaws' right
-#   end balances the jaw.
+#   in the overhang into air; an offcut of the same bar on the 4 in
+#   parallel's right end balances the jaw.
 # - The Ø.058 x .70 spigot is step-turned toward the chuck with the head in
 #   the jaws (prechips turning_step, #515): each step .080 in long at most is
 #   roughed and finished before the tool moves on, so every cut loads the

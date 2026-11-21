@@ -206,10 +206,10 @@ def test_manifest_notes_are_the_printed_notes() -> None:
 
 
 def test_thread_processes_are_the_registry_rows() -> None:
-    parts = _config._doc("parts")["parts"]
+    row = _config.parts("pn-pen-adjust-screw")
     stud = export_features.requirement_manifest("pn_pen_adjust_screw")["features"]
     assert stud["step"]["thread_process"] == "die"
-    assert "die-cut" in parts["pn-pen-adjust-screw"]["process"]
+    assert "die-cut" in row["process"]
 
 
 def test_the_screw_blank_is_accepted_at_the_2a_major() -> None:

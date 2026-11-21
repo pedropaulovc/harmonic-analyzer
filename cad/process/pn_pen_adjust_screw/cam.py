@@ -19,7 +19,7 @@ centre drill's catalogue geometry (it sets the spot depth), the twist drill's
 Route (``plan.toml``): both ends are faced on the lathe first, so the blank
 is the screw's length at the bar's Ø.25. On the mill it lies along the vise
 jaws on one 1 in parallel standing on edge, the head end .25 in out past the
-jaws' left side, an offcut of the bar balancing the jaws' right end. PS01
+jaws' left side, an offcut of the bar on the parallel's right end. PS01
 spots the eye with the #1 centre drill and pecks the #54 through, in the
 overhang, into air.
 
@@ -64,7 +64,7 @@ CLEAR_MM = 5.0
 # Rapid re-entry into a pecked hole stops this far above the last peck.
 PECK_REENTRY_MM = 0.5
 # Keep-outs: each vise jaw's depth outward from the gripped O.D.; the spacer
-# (an offcut of the bar) at the jaws' right end.
+# (an offcut of the bar) on the 4 in parallel's right end.
 JAW_DEPTH_MM = IN
 SPACER_MM = IN
 # A plan number the recipe recomputes must agree to this (its rounding).
