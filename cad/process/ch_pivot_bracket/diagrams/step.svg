@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 6: lying, I down, seat to the left (X0); PB05 faces the foot end and mills the step to the ear. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 6 (PB05_step): the foot end to the length, then the L step to the ear</text>
+  <rect class="fixture-support" x="30" y="330" width="473.51" height="6"/>
+  <rect class="part-kept" x="60" y="134.42" width="67.06" height="195.58"/>
+  <rect class="part-kept" x="127.06" y="240.59" width="318.52" height="89.41"/>
+  <rect class="part-removed" x="60" y="120.45" width="413.51" height="13.97"/>
+  <rect class="part-removed" x="127.06" y="134.42" width="318.52" height="106.17"/>
+  <rect class="part-removed" x="445.57" y="134.42" width="27.94" height="95.17"/>
+  <line class="active-face" x1="127.06" y1="240.59" x2="473.51" y2="240.59"/>
+  <line class="active-face" x1="127.06" y1="134.42" x2="127.06" y2="240.59"/>
+  <line class="active-face" x1="60" y1="134.42" x2="127.06" y2="134.42"/>
+  <line class="hidden" x1="30" y1="254.7" x2="503.51" y2="254.7"/>
+  <rect class="holes" x="301.45" y="240.59" width="71.5" height="89.41"/>
+  <rect class="holes" x="60" y="167.95" width="67.06" height="50.29"/>
+  <text class="label" x="523.51" y="144.42">foot end Z {{cad.foot_end_length_mm:in.4dot}}</text>
+  <text class="label" x="523.51" y="246.59">outboard face Z {{cad.outboard_face_thickness_mm:in.4dot}}</text>
+  <text class="label" x="523.51" y="270.7">jaw tops</text>
+  <circle class="datum" cx="60" cy="330" r="3.5"/>
+  <text class="datum-label" x="66" y="324"></text>
+  <text class="datum-label" x="60" y="356">X0 the seat; Z0 the stacks' top (I)</text>
+  <text class="label" x="20" y="390">Looking at the moving jaw. Levels of {{process.step_level_mm:in.3dot}}.</text>
+  <line class="leader" x1="337.2" y1="285.3" x2="523.51" y2="316"/>
+  <circle class="leader-dot" cx="337.2" cy="285.3" r="2"/>
+  <text class="label" x="523.51" y="320">bore (opened)</text>
+  <line class="leader" x1="93.53" y1="193.09" x2="30" y2="92"/>
+  <circle class="leader-dot" cx="93.53" cy="193.09" r="2"/>
+  <text class="label" x="30" y="96">hold-down hole (opened)</text>
+  <line class="leader" x1="127.06" y1="187.51" x2="250" y2="92"/>
+  <circle class="leader-dot" cx="127.06" cy="187.51" r="2"/>
+  <text class="label" x="250" y="96">foot top X {{cad.foot_top_height_mm:in.3dot}}: the last pass's edge</text>
+</svg>

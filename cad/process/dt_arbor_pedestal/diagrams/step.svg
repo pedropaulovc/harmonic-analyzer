@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 5: lying on the 7/8 + 1/2 in stacks, N up, the seat to the right (X0); PA04 mills the step to the strap and makes the bore. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 5 (PA04_step_bore): the step down to the strap, then the bore</text>
+  <rect class="fixture-support" x="64.98" y="300" width="351.52" height="6"/>
+  <polygon class="part-kept" points="400,300 81.48,300 81.48,235.74 372.06,235.74 372.06,137.95 400,137.95"/>
+  <rect class="part-removed" x="81.48" y="137.95" width="290.58" height="97.79"/>
+  <line class="active-face" x1="81.48" y1="235.74" x2="372.06" y2="235.74"/>
+  <line class="active-face" x1="372.06" y1="235.74" x2="372.06" y2="137.95"/>
+  <rect class="holes" x="129.26" y="235.74" width="52.53" height="64.26"/>
+  <line class="centre-line" x1="155.52" y1="221.74" x2="155.52" y2="322"/>
+  <rect class="holes" x="359" y="174.27" width="41" height="25.15"/>
+  <line class="hidden" x1="64.98" y1="244.89" x2="416.5" y2="244.89"/>
+  <text class="label" x="422.5" y="248.89">jaw tops</text>
+  <circle class="datum" cx="400" cy="300" r="3.5"/>
+  <text class="datum-label" x="408" y="320">X0 the seat; Z0 the stacks' top (F)</text>
+  <line class="leader" x1="235" y1="235.74" x2="474" y2="217.74"/>
+  <circle class="leader-dot" cx="235" cy="235.74" r="2"/>
+  <text class="label" x="478" y="221.74">floor Z {{process.step_floor_mm:in.4dot}}: the strap and F's stock</text>
+  <line class="leader" x1="372.06" y1="162.5" x2="474" y2="142.5"/>
+  <circle class="leader-dot" cx="372.06" cy="162.5" r="2"/>
+  <text class="label" x="478" y="146.5">foot top X −{{cad.foot_top_height_mm:in.3dot}}: the last pass's edge</text>
+  <line class="leader" x1="383.5" y1="186.84" x2="474" y2="190.84"/>
+  <circle class="leader-dot" cx="383.5" cy="186.84" r="2"/>
+  <text class="label" x="478" y="194.84">hold-down hole (opened)</text>
+  <line class="leader" x1="155.52" y1="278" x2="40" y2="350"/>
+  <circle class="leader-dot" cx="155.52" cy="278" r="2"/>
+  <text class="label" x="44" y="354">bore X −{{cad.arbor_bore_height_mm:in.3dot}}: spot, 23/64, ream .3760, through between the stacks</text>
+  <text class="label" x="20" y="50">Levels of {{process.step_level_mm:in.3dot}}; passes across the width, from the left end to the foot.</text>
+  <text class="label" x="20" y="390">Looking at the moving jaw; W at the fixed jaw behind.</text>
+</svg>
