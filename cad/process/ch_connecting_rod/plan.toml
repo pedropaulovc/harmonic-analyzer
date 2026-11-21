@@ -759,7 +759,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 instruction = "The pin hole's place from the bore: not gauged."
-inspection = "The drawing's Ø{{cad.pin_hole_position_dia_in:.3dot}} position, {{cad.pin_hole_basic_from_a_in:.3f}} basic from the bore: process-held. The bore (CR05) and the pin hole (CR07) are cut in this one clamping from the same G54, {{cad.pin_hole_basic_from_a_in:.3f}} apart on the program; no gauge on hand reads it (no pin gauges, owner 2026-11-19)."
+inspection = "The drawing's Ø{{cad.pin_hole_position_dia_in:.3dot}} position, {{cad.pin_hole_basic_from_a_in:.3f}} basic from the bore: process-held. The bore (CR05) and the pin hole (CR07) are cut in this one clamping from the same G54, {{cad.pin_hole_basic_from_a_in:.3f}} apart on the program. It is not gauged: measured over pins it spans more than the 6 in calipers reach."
 gauge_checks = "other"
 
 [[setups]]
