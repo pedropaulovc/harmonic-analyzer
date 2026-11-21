@@ -5,9 +5,13 @@
 # is turned. Setup 1 on the bar: mike the bar, face the end (Z0), spot, drill
 # #10 (.1935, inside the .193-.197 DRILL THRU) through and past the parting
 # line, part off .02 long. Setup 2: the spacer turned round, the faced end
-# .40 in the 3-jaw over a shim wrap, the parted end out: face it to the
-# .731-.733 length, a micrometer between skims (the .002 band is too tight to
-# part to). Bench: deburr, check the hole.
+# .40 in the 3-jaw over a shim wrap, the parted end out. Nothing seats it
+# axially (the jaw tips may stand proud of the chuck face), so the length is
+# set from the micrometer, not from a stop: mike the length at the outer rim,
+# touch the AR lightly at that rim and preset the DRO to the miked length less
+# .7325 (see the datum comment), face to Z0; out, mike, and the same again
+# until it reads .731-.733 (the .002 band is too tight to part to). Bench:
+# deburr, check the hole.
 #
 # Stock: 7/16 in C36000 round is to order (cad/config/shop-equipment/
 # stock-to-order.toml c360-round-7-16, a 2 in piece); none is on hand.
@@ -126,7 +130,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Catch the spacer."
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width (about .125, by caliper on the insert): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Catch the spacer."
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -136,9 +140,13 @@ title = "Turned round: face the parted end to length"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw over a shim wrap of brass shim, {{process.regrip_grip_in:.2dot}} in in the jaws, the Setup 1 faced end seated flat against the chuck face; the parted end {{cad.outer_stickout_far_mm:in.2dot}} in out."
-datum = "The Setup 1 faced end, seated on the chuck face: the length is miked across both faces off the lathe."
-diagram = { file = "diagrams/regrip.svg", alt = "The spacer turned round, its faced end in the jaws over a shim wrap; the parted end faced to length." }
+holding = "3-jaw over a shim wrap of brass shim, {{process.regrip_grip_in:.2dot}} in in the jaws from the Setup 1 faced end (a pencil line that far from it at the jaw fronts); the parted end {{cad.outer_stickout_far_mm:in.2dot}} in out. Nothing seats the spacer axially: the jaw tips may stand proud of the chuck face."
+# The .7325 preset aim is typed (the adapter binds no mid-upper-band value):
+# the midpoint of length_in (.7320) and length_max_in (.7330), leaving .0015
+# above length_min_in (.7310) for a touch mark of at most .001 plus a setting
+# error of about .0005. Re-derive it whenever the drawing's length band moves.
+datum = "Z0: the parted face, .7325 from the Setup 1 faced end (the upper half of the {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} band), preset from the length miked in Op 60; the setting error, about .0005 either way, plus a touch mark of at most .001, which only shortens it, stays inside the band."
+diagram = { file = "diagrams/regrip.svg", alt = "The spacer turned round, its faced end in the jaws over a shim wrap with nothing behind it; the parted end faced to length from the miked length." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -147,11 +155,16 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the parted end in light skims to {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}. To check between skims: stop the spindle, take the spacer out, mike the length across both faces, then reseat it flat against the chuck face before the next skim."
+instruction = "Mike the length at the outer rim; write it down (about {{cad.part_off_in:.3dot}} the first time). Chuck it; spindle running, touch the AR lightly on the parted end's outer rim, a mark no deeper than .001, and set DRO Z to that length less .7325 (the upper half of the band). Face in light skims to Z0; unchuck and mike at the rim."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 inspection = "Length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} across the faces, micrometer."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Over {{cad.length_max_in:.3dot}} in Op 60: chuck it again and repeat Op 60 from that reading (re-touch, preset, face to Z0). Under {{cad.length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1."
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
@@ -178,7 +191,7 @@ gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A spacer faced under {{cad.length_min_in:.3dot}} in Op 60 or failing the hole check in Op 80 is scrapped, not reworked: make another from Setup 1."
+instruction = "A spacer failing the hole check in Op 90 is scrapped, not reworked: make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
