@@ -15,16 +15,18 @@ drill's 118° point, the approach, safe and clearance heights and the vise
 jaws' depth (keep-out shapes only).
 
 Route (plan text in ``plan.toml``): four 1/4 in square bars per load, lying
-on the vise bed across the jaws. Foot ends past the left jaw side: CA01
+on 1 in parallels across the jaws. Foot ends past the left jaw side: CA01
 faces them, CA02 saws the foot notch. Rolled over, top ends past the right
 jaw side: CA03 faces them to the length, CA04 saws the top notch, CA05
-spots, drills and reams the pin holes through both cheeks.
+spots, drills and reams the pin holes through both cheeks. The parallels
+lift the bars so each holder's nose, its tool set out by its stated
+projection, stays above the jaw tops at the deepest cut.
 
 Work frames (G54), each set in its setup:
 - CA01, CA02: X0 the faced foot end (the bar along +X), Y0 the fixed jaw
-  (the bars' F faces toward it), Z0 the bars' L faces on the bed.
+  (the bars' F faces toward it), Z0 the bars' L faces on the parallels.
 - CA03-CA05: X0 the top end at the length (the bar along -X), Y0 the fixed
-  jaw (the B faces toward it), Z0 the bars' R faces on the bed.
+  jaw (the B faces toward it), Z0 the bars' R faces on the parallels.
 
 The slitting saw runs horizontally on its arbor: its lower face is the
 programmed Z, touched off by hand (it has no tool-setter length, so CA02 and
@@ -91,6 +93,9 @@ SAW_STEP_MAX_MM = 3.0
 COLLAR_CLEAR_MM = 1.0
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
+# Each holder's nose stands at least this far above the jaw tops at its
+# tool's deepest cut.
+HOLDER_CLEAR_MM = 1.0
 
 
 def _plan_operations(plan: dict[str, Any]):
@@ -377,6 +382,26 @@ def context(
     _agree(plan, "top_extent_start_mm", -length)
     _agree(plan, "top_clamp_start_mm", -(protrusion + jaw_w))
     _agree(plan, "top_clamp_end_mm", -protrusion)
+    # The bars stand on parallels: the jaw tops in the setup frame (Z0 the
+    # bars' down face).
+    parallel = p["parallel_height_mm"]
+    jaw_top = p["vise_jaw_height_mm"] - parallel
+
+    def projection(tool: str, tip_z: float, key: str, oal_key: str) -> None:
+        """The tool's stated projection out of its holder puts the holder's
+        nose HOLDER_CLEAR_MM above the jaw tops at its deepest tip, and the
+        tool is long enough to give it with holder_grip_min_mm gripped."""
+        out = p[key]
+        if tip_z + out < jaw_top + HOLDER_CLEAR_MM - 1e-6:
+            raise ValueError(
+                f"{tool}: process.{key} {out:g} leaves its holder's nose under the "
+                f"jaw tops at its deepest cut (needs {jaw_top + HOLDER_CLEAR_MM - tip_z:.2f})"
+            )
+        if out > p[oal_key] - p["holder_grip_min_mm"] + 1e-6:
+            raise ValueError(
+                f"{tool}: process.{key} {out:g} is more than process.{oal_key} "
+                "less process.holder_grip_min_mm"
+            )
 
     # Notches: each band's middle, and the saw's reach.
     foot, top = g["foot"], g["top"]
@@ -397,6 +422,12 @@ def context(
         "saw_collar_dia_max_mm",
         2 * (radius - top["depth"][1] - COLLAR_CLEAR_MM),
     )
+    # The saw's arbor and spacers stay past the jaw side, never over the
+    # jaws: the saw's centre is beyond the ends by its radius less the notch.
+    collar_r = p["saw_collar_dia_max_mm"] / 2
+    for name, depth in (("foot", foot["depth"][1]), ("top", top["depth"][1])):
+        if protrusion + radius - depth - collar_r <= 0:
+            raise ValueError(f"the saw arbor's spacers reach over the jaws at the {name} notch")
     top_depth = p["top_notch_depth_mm"]
     # Equal steps into the end, the deepest last.
     n_steps = math.ceil(top_depth / SAW_STEP_MAX_MM - 1e-9)
@@ -434,6 +465,7 @@ def context(
             raise ValueError(
                 f"'{name}' axial_doc_mm is under the bar's height and the tip's overrun"
             )
+    projection("the end mill", end_z, "half_mill_projection_min_mm", "half_mill_oal_mm")
     top_excess = p["top_excess_max_mm"]
     top_xs = [r + e for e in _levels(top_excess, 0.0, step)]
 
@@ -469,6 +501,9 @@ def context(
     ream_tip = -p["ream_past_mm"]
     if ream_tip > -0.5:
         raise ValueError("the reamer's tip does not pass the down face")
+    projection("the centre drill", section - spot_depth, "spot_projection_mm", "centre_drill_oal_mm")
+    projection("the #49", drill_tip, "drill_projection_mm", "drill_49_oal_mm")
+    projection("the reamer", ream_tip, "ream_projection_mm", "reamer_oal_mm")
 
     names = {tool["id"]: tool["name"] for tool in plan["tools"]}
     numbers = {
@@ -602,9 +637,7 @@ def context(
         )
 
     # Keep-outs: the jaws beside the load, inward of the protrusion, from the
-    # bed (Z0) to the jaw top.
-    jaw_top = p["vise_jaw_height_mm"]
-
+    # parallels' top (Z0) to the jaw top.
     def jaws(x: tuple[float, float]) -> list[dict[str, Any]]:
         return [
             _box("moving jaw", x, (-load - JAW_DEPTH_MM, -load), jaw_top),

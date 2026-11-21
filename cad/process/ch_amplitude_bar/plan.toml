@@ -7,7 +7,7 @@
 # selected to the MHA-CH-00 bow check before it is machined.
 #
 # Route: saw 20 blanks, two from each 72 in bar; mic, bow-check and
-# straighten them; Setup 2, four bars at a time lying on the vise bed with
+# straighten them; Setup 2, four bars at a time lying on 1 in parallels with
 # their foot ends .75 in past the left jaw side: face the foot ends (CA01),
 # then the slitting saw cuts the foot notches (CA02); the bench: each bar's
 # length; Setup 4, four bars rolled over (L face up) with their top ends .75 in past
@@ -46,9 +46,16 @@
 # Zeroing: every X/Y zero is the owned .200 in edge finder at 900 rpm
 # (logbook 2026-11-04, tools.edge-finder), as the column clamp plan does.
 # Every Z zero is a bar's top face, touched with the tool on a .002 feeler
-# leaf less that bar's miked section: the four bars lie on the vise bed, so
+# leaf less that bar's miked section: the four bars lie on the parallels, so
 # their down faces, the faces the notch ledges are measured from, share one
-# plane, and no bed is left bare to touch.
+# plane, and no parallel is left bare to touch.
+#
+# Holders: the bars stand on the owned 1 in parallels (fixtures.parallels-
+# lms-6745) so that every holder's nose (collet, drill chuck) stays above the
+# jaw tops at its deepest cut, each tool set out of its holder by at least
+# its stated projection (cam.py checks each against the jaw tops and the
+# tool's length less a 1/2 in grip). The saw arbor never stands over the
+# jaws: its spacers stay past the jaw side (cam.py checks it).
 #
 # NC (cam:ch_amplitude_bar, cad/process/ch_amplitude_bar/cam.py):
 # CA01_foot_end, CA02_foot_notch, CA03_top_end, CA04_top_notch, CA05_pin_hole.
@@ -97,6 +104,8 @@ bar_pitch_mm = 6.3246
 # Each load's ends stand this far past the jaw side (.75 in): past the top
 # notch's depth, so the saw never reaches the jaws.
 end_protrusion_mm = 19.05
+# The ends stand .75 in past the jaw side for every cut: the top notch's
+# deflection grows with the overhang cubed.
 # Ends: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2) on its
 # side, full bar height in one level, its tip .1 mm under the bars' down
 # face (past the jaw side, in air), passes no deeper than .020 into the end.
@@ -143,8 +152,9 @@ drill_past_mm = 0.5
 drill_tip_height_mm = -1.057
 ream_past_mm = 1.0
 # The pin MHA-SH-VN-58, McMaster 90145A299: 5/64 in, 0/+.0002 (.0781-.0783,
-# cad/config/parts/sh-vn-pivot-pin.yaml): the .0775 reamer is .0004-.0008
-# under it, inside the drawing's .0002-.0008 (sheet note 1).
+# cad/config/parts/sh-vn-pivot-pin.yaml): the .0775 reamer is .0006-.0008
+# under it; the reamed band .0775-.0779 is .0002-.0008 under it, the
+# drawing's .0002-.0008 (sheet note 1).
 pin_dia_min_mm = 1.98374
 pin_dia_max_mm = 1.98882
 # Speeds, authored in the operations: LittleMachineShop "Cutting Speeds",
@@ -158,9 +168,10 @@ pin_dia_max_mm = 1.98882
 spot_feed_per_min_mm = 35.56
 drill_feed_per_min_mm = 71.12
 ream_feed_per_min_mm = 101.6
-# Holding (shop workholding.vise-pm-6): the bars on the vise bed, no
-# parallels; the jaws grip their full height.
-parallel_height_mm = 0
+# Holding (shop workholding.vise-pm-6): the bars on the owned 1 in
+# parallels (fixtures.parallels-lms-6745), inside the jaws, neither past a
+# jaw side; the jaws grip the bars' full height above them.
+parallel_height_mm = 25.4
 vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
 vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
 vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
@@ -184,8 +195,19 @@ measured_length_max_mm = 810.768
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set at least 1 in out of the collet.
-half_mill_projection_min_mm = 25.4
+# Each tool's least projection out of its holder: at its deepest tip (the
+# parallels' height plus its Z) the holder's nose stands at least 1 mm above
+# the jaw tops; none more than the tool's length less a holder_grip_min_mm
+# grip (cam.py checks both). The 1/2 in end mill, 3 in overall, 2 in out.
+holder_grip_min_mm = 12.7
+half_mill_oal_mm = 76.2
+half_mill_projection_min_mm = 50.8
+# ANSI #1 centre drill, 1-1/4 in overall: .70 in out.
+centre_drill_oal_mm = 31.75
+spot_projection_mm = 17.78
+# The #49 and the reamer: 1.00 in out.
+drill_projection_mm = 25.4
+ream_projection_mm = 25.4
 # The saw arbor (tools.gear-cutter-arbor-1): 2 in shoulder to nut; the saw
 # is on it within that, so the whole arbor is under 2.5 in from the nose.
 saw_arbor_length_mm = 63.5
@@ -199,7 +221,7 @@ name = "1/2 in carbide end mill"
 ref = "endmill-carbide-3fl-1-2"
 [[tools]]
 id = "saw"
-name = "2-3/4 x .064 HSS slitting saw on the TTC 67-600-016 R8 1 in spacer-type arbor (its own spacers and nut), arbor TO BUY"
+name = "2-3/4 x .064 HSS slitting saw on the TTC 67-600-016 R8 1 in spacer-type arbor, its own spacers and nut, arbor TO BUY"
 ref = "slitting-saw-2-75-064"
 [[tools]]
 id = "spot"
@@ -229,6 +251,12 @@ ref = "arbor-press"
 id = "files"
 name = "Files"
 ref = "jig-files"
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .0775 plus, .0779 minus"
+ref = "pin-gauges"
+description = "Special Class ZZ pin gauges: .0775 plus pin (GO, .0775-.0777) and .0779 minus pin (NO-GO, .0777-.0779); not in the .001-step sets on order"
+status = "to_order"
 
 [[setups]]
 machine_kind = "other"
@@ -280,10 +308,10 @@ title = "Foot ends and foot notches"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Four blanks side by side across the jaws, lying on the vise bed with no parallels: each on its L face, its F face toward the fixed jaw, foot ends to the LEFT. Before closing the vise, hold a 1-2-3 block's 2 in face across the four foot ends and its 1 in face along the front blank, and push the ends against it so they are flush; then slide the four together until the foot ends stand {{process.end_protrusion_mm:in.2dot}} past the left jaw side (the calipers' depth rod). Tap the blanks down onto the bed while closing the vise. The rest of each blank, about 25 in, hangs past the right jaw side."
-datum = "Programs CA01_foot_end (end mill) and CA02_foot_notch (saw). G54: X0 the faced foot end, Y0 the fixed jaw's face, Z0 the bars' down face (the vise bed). +X toward the jaws, +Y toward the fixed jaw."
-diagram = { file = "diagrams/foot.svg", alt = "Four bars lying on the vise bed across the jaws, foot ends past the left jaw side; the end mill faces the ends, then the slitting saw, horizontal, cuts the notch across all four." }
-envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.foot_notch_depth_mm}}", 5.0], y_span_mm = ["{{process.saw_dia_mm}}", 25.2984, 4.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{cad.envelope_width_mm}}"], deepest_cut_mm = "{{process.vise_bed_height_mm}}", longest_tool_mm = "{{process.saw_arbor_length_mm}}", shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+holding = "Four blanks side by side across the jaws, lying on the two 1 in parallels (inside the jaws, neither past a jaw side): each on its L face, its F face toward the fixed jaw, foot ends to the LEFT. Before closing the vise, hold a 1-2-3 block's 2 in face across the four foot ends and its 1 in face along the front blank, and push the ends against it so they are flush; then slide the four together until the foot ends stand {{process.end_protrusion_mm:in.2dot}} past the left jaw side (the calipers' depth rod). Tap the blanks down onto the parallels while closing the vise. The rest of each blank, about 25 in, hangs past the right jaw side."
+datum = "Programs CA01_foot_end (end mill) and CA02_foot_notch (saw). G54: X0 the faced foot end, Y0 the fixed jaw's face, Z0 the bars' down face (on the parallels). +X toward the jaws, +Y toward the fixed jaw."
+diagram = { file = "diagrams/foot.svg", alt = "Four bars lying on 1 in parallels across the jaws, foot ends past the left jaw side; the end mill faces the ends, then the slitting saw, horizontal, cuts the notch across all four." }
+envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.foot_notch_depth_mm}}", 5.0], y_span_mm = ["{{process.saw_dia_mm}}", 25.2984, 4.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.envelope_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}"], longest_tool_mm = "{{process.saw_arbor_length_mm}}", shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = 25.2984, along_jaws_mm = "{{cad.envelope_length_mm}}", part_height_mm = "{{cad.envelope_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.end_protrusion_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_length_mm}}"], clamp_mm = ["{{process.end_protrusion_mm}}", "{{process.foot_clamp_end_mm}}"], section_mm = { y = "{{process.bar_section_min_mm}}", z = "{{process.bar_section_min_mm}}" }, vise_left = "start" }
 
@@ -293,8 +321,8 @@ instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm). Y: its 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the bars' down face, from the top face of the bar against the fixed jaw and its miked section."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the top of the bar against the fixed jaw, inside the jaws: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051); for .2490, Z6.376."
+instruction = "G54 Z0: the bars' down face, from the top face of the bar against the fixed jaw and its miked section. The end mill 2.00 in out of the collet, so the collet clears the jaw tops at the cut."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 2.00 in out of the collet, so the collet nose is above the jaw tops at the cut; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the top of the bar against the fixed jaw, inside the jaws: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051); for .2490, Z6.376."
 feed = "hand"
 
 [[setups.operations]]
@@ -392,10 +420,10 @@ title = "Top ends to length, top notches, pin holes"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Four bars of one load side by side across the jaws on the vise bed, each on its R face, its B face toward the fixed jaw, top ends to the RIGHT: each bar as in Setup 2, rolled over about its length (L face up) and slid left along the jaws. At the far (foot) ends, beyond the table, hold the 1-2-3 block's 2 in face across the four foot ends and its 1 in face along the bar nearest you, and push the ends flush against it; slide the four together until the top ends stand {{process.end_protrusion_mm:in.2dot}} past the right jaw side. Tap them down while closing the vise."
-datum = "Programs CA03_top_end (end mill), CA04_top_notch (saw), CA05_pin_hole (centre drill, drill, reamer). G54: X0 the top end at the length, Y0 the fixed jaw's face, Z0 the bars' down face (R, on the bed). +X toward the top ends, +Y toward the fixed jaw."
-diagram = { file = "diagrams/top.svg", alt = "Four bars lying on the vise bed across the jaws, top ends past the right jaw side; the end mill faces them to length, the slitting saw cuts the top notch across all four, and the pin hole is drilled down through both cheeks of each bar." }
-envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.top_notch_depth_mm}}", 5.0], y_span_mm = ["{{process.saw_dia_mm}}", 25.2984, 4.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{cad.envelope_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.drill_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+holding = "Four bars of one load side by side across the jaws on the two 1 in parallels as in Setup 2, each on its R face, its B face toward the fixed jaw, top ends to the RIGHT: each bar as in Setup 2, rolled over about its length (L face up) and slid left along the jaws. At the far (foot) ends, beyond the table, hold the 1-2-3 block's 2 in face across the four foot ends and its 1 in face along the bar nearest you, and push the ends flush against it; slide the four together until the top ends stand {{process.end_protrusion_mm:in.2dot}} past the right jaw side. Tap them down onto the parallels while closing the vise."
+datum = "Programs CA03_top_end (end mill), CA04_top_notch (saw), CA05_pin_hole (centre drill, drill, reamer). G54: X0 the top end at the length, Y0 the fixed jaw's face, Z0 the bars' down face (R, on the parallels). +X toward the top ends, +Y toward the fixed jaw."
+diagram = { file = "diagrams/top.svg", alt = "Four bars lying on 1 in parallels across the jaws, top ends past the right jaw side; the end mill faces them to length, the slitting saw cuts the top notch across all four, and the pin hole is drilled down through both cheeks of each bar." }
+envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.top_notch_depth_mm}}", 5.0], y_span_mm = ["{{process.saw_dia_mm}}", 25.2984, 4.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.envelope_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = 25.2984, along_jaws_mm = "{{cad.envelope_length_mm}}", part_height_mm = "{{cad.envelope_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["rest", "{{process.end_protrusion_mm}}"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = ["{{process.top_extent_start_mm}}", 0], clamp_mm = ["{{process.top_clamp_start_mm}}", "{{process.top_clamp_end_mm}}"], section_mm = { y = "{{process.bar_section_min_mm}}", z = "{{process.bar_section_min_mm}}" }, vise_left = "start" }
 
@@ -405,8 +433,8 @@ instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm). Y: its 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the bars' down face, from the top face of the bar against the fixed jaw and its miked section, with T1 as in Setup 2."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the top of the bar against the fixed jaw, inside the jaws: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
+instruction = "G54 Z0: the bars' down face, from the top face of the bar against the fixed jaw and its miked section, with T1 as in Setup 2 (2.00 in out of the collet)."
+instruction_detailed = "Console M6 T1 (at least 2.00 in out of the collet, so the collet nose is above the jaw tops at the cut; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the top of the bar against the fixed jaw, inside the jaws: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
 feed = "hand"
 
 [[setups.operations]]
@@ -468,7 +496,7 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "Swap to the drill chuck. G54 Z0 again with T3, the #1 centre drill, as above with T1: console M6 T3, spindle stopped, its tip on a .002 leaf on the top of the bar against the fixed jaw, G10 L20 P1 Z(that bar's reading × 25.4 + 0.051)."
+instruction = "Swap to the drill chuck. Set each CA05 tool out of the chuck by at least: #1 centre drill {{process.spot_projection_mm:in.2dot}}, #49 {{process.drill_projection_mm:in.2f}}, reamer {{process.ream_projection_mm:in.2f}} (the calipers' depth rod), so the chuck's nose stays above the jaw tops at its deepest cut. G54 Z0 again with T3, as above with T1: console M6 T3, spindle stopped, its tip on a .002 leaf on the top of the bar against the fixed jaw, G10 L20 P1 Z(that bar's reading × 25.4 + 0.051)."
 feed = "hand"
 
 [[setups.operations]]
@@ -480,7 +508,7 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Run CA05_pin_hole (M6 T3, #1 centre drill; set 2800): spot the four pin holes Ø{{process.spot_dia_mm:in.3dot}}, {{cad.top_pin_hole_drop_in:.2f}} in from the top ends, each {{cad.top_pin_hole_location_from_back_in:.3dot}} from its bar's B face."
+instruction = "Run CA05_pin_hole (M6 T3, #1 centre drill {{process.spot_projection_mm:in.2dot}} out of the chuck; set 2800): spot the four pin holes Ø{{process.spot_dia_mm:in.3dot}}, {{cad.top_pin_hole_drop_in:.2f}} in from the top ends, each {{cad.top_pin_hole_location_from_back_in:.3dot}} from its bar's B face."
 rpm = 2800
 feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -492,7 +520,7 @@ speed_kind = "spindle"
 tool = "drill-49"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T4: #49 drill through both cheeks of each bar, pecks of {{process.peck_mm:in.3dot}} with full retract, its full diameter {{process.drill_past_mm:in.3dot}} past the R face; set 2800. Cutting oil."
+instruction = "Same file, M6 T4 (#49, {{process.drill_projection_mm:in.2f}} out of the chuck): drill through both cheeks of each bar, pecks of {{process.peck_mm:in.3dot}} with full retract, its full diameter {{process.drill_past_mm:in.3dot}} past the R face; set 2800. Cutting oil."
 rpm = 2800
 feed = "{{process.drill_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.envelope_thickness_mm}}"
@@ -506,7 +534,7 @@ speed_kind = "spindle"
 tool = "reamer-0775"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.top_pin_hole_dia_band_mm}}" }
-instruction = "Same file, M6 T5: ream each hole through with the .0775 reamer (to buy), in and out at feed, its full diameter {{process.ream_past_mm:in.3dot}} past the R face into the air under the overhang; set 2000. Cutting oil."
+instruction = "Same file, M6 T5 (the .0775 reamer, to buy, {{process.ream_projection_mm:in.2f}} out of the chuck): ream each hole through, in and out at feed, its full diameter {{process.ream_past_mm:in.3dot}} past the R face into the air under the overhang; set 2000. Cutting oil."
 rpm = 2000
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [

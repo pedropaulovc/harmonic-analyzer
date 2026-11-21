@@ -32,7 +32,7 @@
 <rect class="part-removed" x="320" y="281" width="48" height="25"/>
 <line class="centre-line" x1="344" y1="264" x2="344" y2="324"/>
 <line class="active-face" x1="310" y1="318" x2="378" y2="318"/>
-<text class="label" x="380" y="322">R face on the bed (Z0)</text>
+<text class="label" x="380" y="322">R face on the parallels (Z0)</text>
 <text class="label" x="380" y="298">notch {{process.top_notch_width_mm:in.4dot}} wide, ledge {{cad.top_notch_ledge_in:.3dot}} above R</text>
 <text class="label" x="380" y="280">pin hole down through both cheeks</text>
 </svg>

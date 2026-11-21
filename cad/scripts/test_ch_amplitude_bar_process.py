@@ -141,6 +141,10 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ({"drill_tip_height_mm": -0.5}, "drill_tip_height_mm"),
         ({"spot_dia_mm": 1.9}, "under the #49"),
         ({"top_clamp_end_mm": 19.05}, "top_clamp_end_mm"),
+        ({"half_mill_projection_min_mm": 19.0}, "jaw tops"),
+        ({"drill_projection_mm": 20.0}, "jaw tops"),
+        ({"spot_projection_mm": 20.0}, "holder_grip_min_mm"),
+        ({"parallel_height_mm": 0}, "jaw tops"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(changes, detail) -> None:
