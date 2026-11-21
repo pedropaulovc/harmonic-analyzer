@@ -330,6 +330,21 @@ def test_label_all_faces_skips_a_number_an_existing_name_already_uses() -> None:
     assert [face.name for face in doc.faces] == [_F1, _F3, _F2]
 
 
+def test_label_all_faces_never_reuses_a_label_an_earlier_configuration_gave() -> None:
+    used: set[str] = set()
+    label_all_faces(_PartDoc(), "ch_rocker_arm", used)
+    assert used == {_F1, _F2, _F3}
+    # Another configuration of the same open part suppresses the face named
+    # _F2 and shows a new, unnamed face where it was.
+    other = _PartDoc()
+    other.faces[0].name, other.faces[2].name = _F3, _F1
+
+    label_all_faces(other, "ch_rocker_arm", used)
+
+    assert [face.name for face in other.faces] == [_F3, _F4, _F1]
+    assert used == {_F1, _F2, _F3, _F4}
+
+
 def test_label_all_faces_fails_when_set_entity_name_is_refused() -> None:
     doc = _PartDoc()
     doc.SetEntityName = lambda _face, _name: False
@@ -554,6 +569,8 @@ def test_an_undeclared_part_binds_an_empty_feature_table(tmp_path: Path, monkeyp
     run, _seen = _exporter(tmp_path, monkeypatch)
     declared_manifest = export_features.requirement_manifest
     monkeypatch.setattr(export_features, "DECLARED_PARTS", ())
+    # Undeclared, the rocker counts no pivot-bore patches either.
+    monkeypatch.setattr(export_features, "STEP_FACE_COUNTS", {})
     monkeypatch.setattr(export_features, "feature_selectors", lambda _stem, _configuration=None: {})
     monkeypatch.setattr(
         export_features, "requirement_manifest",

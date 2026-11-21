@@ -253,7 +253,7 @@ def main(argv: list[str] | None = None) -> int:
             manifest_path = directory / _cam_programs.MANIFEST_NAME
             missing = [str(p) for p in inputs.values() if not Path(p).is_file()]
             if missing:
-                raise FileNotFoundError(f"missing inputs {missing}; run package:features:{stem} first")
+                raise FileNotFoundError(f"missing inputs {missing}; run package:manifest:{stem} (or fetch_features.py {stem}) first")
             features = _load_toml(features_path)
             if features["step_sha256"] != sha256(step_path):
                 raise ValueError(f"{step_path.name} does not match features.toml step_sha256")

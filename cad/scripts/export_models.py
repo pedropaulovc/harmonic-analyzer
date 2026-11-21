@@ -968,17 +968,18 @@ def _feature_stems() -> tuple[str, ...]:
     return tuple(SUPPORTED_PARTS)
 
 
-def _save_feature_step(doc: Any, stem: str, out: Path) -> None:
+def _save_feature_step(doc: Any, stem: str, out: Path, used: set[str]) -> None:
     """The labelled STEP producer used only by ``--features``.
 
-    Label every face of the shown configuration (``label_all_faces``),
-    ``SaveAs3`` under :data:`EXPORT_PREFERENCES`, and write the face inventory
-    beside the STEP, which refuses a label missing from the STEP or a STEP face
-    without an inventory label. Labels are transient: the caller closes the
-    part unsaved and checks the native's SHA-256. No drawing is read: features
-    bind to the inventory later, without SolidWorks.
+    Label every face of the shown configuration (``label_all_faces``; ``used``
+    holds the labels earlier configurations of this open part gave), ``SaveAs3``
+    under :data:`EXPORT_PREFERENCES`, and write the face inventory beside the
+    STEP, which refuses a label missing from the STEP or a STEP face without an
+    inventory label. Labels are transient: the caller closes the part unsaved
+    and checks the native's SHA-256. No drawing is read: features bind to the
+    inventory later, without SolidWorks.
     """
-    records = label_all_faces(doc, stem)
+    records = label_all_faces(doc, stem, used)
     _save_as(doc, out)
     write_inventory(out, records)
 
@@ -1706,11 +1707,7 @@ def export_feature_bundles(stems: list[str]) -> int:
     written afterwards without SolidWorks (``export_features.py``, the
     ``package:manifest:<stem>`` task). No global export output is touched.
     """
-    from export_features import (  # noqa: PLC0415
-        bundle_paths,
-        configuration_step_paths,
-        member_step_paths,
-    )
+    from export_features import bundle_paths, shown_step_paths  # noqa: PLC0415
 
     natives = {stem: OUT_SLDPRT / f"{stem.replace('_', '-')}.SLDPRT" for stem in stems}
     missing = sorted(path.name for path in natives.values() if not path.is_file())
@@ -1723,21 +1720,19 @@ def export_feature_bundles(stems: list[str]) -> int:
         for stem in stems:
             native = natives[stem]
             manifest, step = bundle_paths(stem, OUT_FEATURES.parent)
+            shown = shown_step_paths(stem, OUT_FEATURES.parent)
             with _telemetry.span("export.feature_bundle", part=stem):
                 step.parent.mkdir(parents=True, exist_ok=True)
                 manifest.unlink(missing_ok=True)
                 native_sha = _file_sha256(native)
                 check(f"open {native.name}", adapter.open_model(str(native)))
                 doc = adapter.currentModel
-                _save_feature_step(doc, stem, step)
+                used: set[str] = set()
+                _save_feature_step(doc, stem, step, used)
                 log(f"saved {step.name} ({step.stat().st_size / 1e6:.1f} MB)")
-                shown = {
-                    **configuration_step_paths(stem, OUT_FEATURES.parent),
-                    **member_step_paths(stem, OUT_FEATURES.parent),
-                }
                 for cfg, cfg_step in shown.items():
                     _switch_configuration(adapter, doc, stem, cfg)
-                    _save_feature_step(doc, stem, cfg_step)
+                    _save_feature_step(doc, stem, cfg_step, used)
                     log(f"saved {cfg_step.name} ({cfg_step.stat().st_size / 1e6:.1f} MB)")
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
                 _require_native_unchanged(native, native_sha)

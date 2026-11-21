@@ -156,21 +156,17 @@ def test_a_new_declaration_binds_to_the_released_step_without_a_farm(
     assert set(features) == set(export_features.feature_selectors(DECLARED))
 
 
-def test_a_release_without_inventories_cannot_rebind_a_declaration_change(
-    tmp_path: Path, monkeypatch, capsys
+@pytest.mark.parametrize("changed", [(), (f"cad/scripts/draw_{DECLARED}.py",)])
+def test_a_release_without_inventories_is_always_stale(
+    tmp_path: Path, monkeypatch, capsys, changed: tuple[str, ...]
 ) -> None:
-    _release(
-        monkeypatch,
-        tmp_path,
-        DECLARED,
-        inventories=False,
-        changed=(f"cad/scripts/draw_{DECLARED}.py",),
-    )
+    _release(monkeypatch, tmp_path, DECLARED, inventories=False, changed=changed)
     out = tmp_path / "out"
     assert fetch_features.main([DECLARED, "--out", str(out)]) == 2
     err = capsys.readouterr().err
-    assert f"manifest input changed since v99: cad/scripts/draw_{DECLARED}.py" in err
-    assert "cannot rebind offline" in err
+    for name in changed:
+        assert f"manifest input changed since v99: {name}" in err
+    assert "release v99 predates face inventories" in err
     assert not (out / "features").exists()
 
 

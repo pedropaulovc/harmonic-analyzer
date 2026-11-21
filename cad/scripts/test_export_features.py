@@ -817,6 +817,20 @@ def test_rocker_hub_root_carries_both_native_fillets_each_split_in_two(tmp_path:
     assert len(counts) == 2 and set(counts.values()) == {2}
 
 
+def test_a_counted_feature_the_drawing_no_longer_declares_fails(tmp_path: Path, monkeypatch) -> None:
+    step, selectors = _step(tmp_path, "ch_rocker_arm")
+    monkeypatch.setitem(exporter.STEP_FACE_COUNTS, "ch_rocker_arm", {"retired_bore": 2})
+    with pytest.raises(FeatureFaceError, match="'retired_bore', which the drawing no longer declares"):
+        bind_manifest("ch_rocker_arm", step, selectors, revision="v40")
+
+
+def test_a_configuration_that_is_also_a_registry_member_is_refused(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(exporter, "configuration_step_paths", lambda _stem, _out=None: {"Installed": tmp_path / "a.STEP"})
+    monkeypatch.setattr(exporter, "member_step_paths", lambda _stem, _out=None: {"Installed": tmp_path / "b.STEP"})
+    with pytest.raises(ValueError, match=r"\['Installed'\] are both FEATURE_STEP_CONFIGURATIONS and registry members"):
+        exporter.exported_steps("ch_pivot_shaft", tmp_path)
+
+
 def test_raw_step_ansi_metadata_and_line_endings_are_never_rewritten(tmp_path: Path) -> None:
     step, selectors = _step(tmp_path, "ch_rocker_arm")
     content = step.read_bytes().replace(b"HEADER;\n", b"HEADER;\nFILE_DESCRIPTION(('M\xe9tal \x80 metadata'),'2;1');\n").replace(b"\n", b"\r\n")

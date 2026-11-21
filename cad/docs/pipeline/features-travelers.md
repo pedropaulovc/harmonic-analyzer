@@ -375,7 +375,8 @@ build of `package:features:<stem>` makes it current. Otherwise it rebinds
 `features.toml` from this checkout's declarations over the fetched STEPs and
 inventories, exactly as `package:manifest:<stem>` would, so a new or changed
 `requirement(...)` needs no farm run. A release cut before face inventories
-shipped cannot be rebound: a declaration change against it is STALE. With the
+shipped can be neither rebound nor validated, so it is always STALE (use a
+newer release or `--accept-stale`). With the
 bundle in place run the wrapper or `uvx` form (and `cad/scripts/cam_nc.py
 <stem>` for NC); the doit tasks would first run the feature leaf. Both always
 use the latest prechips release from PyPI, so they need `uv` and network access

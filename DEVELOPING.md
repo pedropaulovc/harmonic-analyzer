@@ -376,8 +376,9 @@ STEP. It rebinds `features.toml` to this checkout's requirement declarations
 over the fetched STEP, so a new or changed `requirement(...)` needs no farm,
 and reports the bundle STALE (exit 2, nothing written, unless `--accept-stale`)
 when the part's geometry inputs (`part:<stem>` or the labelled-STEP exporter)
-differ between the release's tag and the working tree, or when a declaration
-changed and the release predates face inventories (it cannot be rebound). A
+differ between the release's tag and the working tree. A release that predates
+face inventories can be neither rebound nor validated, so it is always STALE
+(use a newer release or `--accept-stale`). A
 stale part needs a farm build of `package:features:<stem>`. After editing
 declarations on top of a local bundle,
 `uv run --frozen python cad/scripts/export_features.py <stem>` rebinds it. Only exit 0

@@ -175,13 +175,15 @@ def face_record(label: str, geometry: FaceGeometry | None) -> dict[str, Any]:
     }
 
 
-def label_all_faces(doc: Any, stem: str) -> list[dict[str, Any]]:
+def label_all_faces(doc: Any, stem: str, used: set[str] | None = None) -> list[dict[str, Any]]:
     """Label every face of the open part and return its inventory rows.
 
     Unnamed faces get :func:`face_label` numbers in rounded-box, then walk,
     order; a face that already carries a name keeps it.  Every label is read
-    back, and two faces may not share one.  Run once per shown configuration:
-    a face named in an earlier configuration keeps that name.
+    back, and two faces may not share one.  Run once per shown configuration
+    with one ``used`` set: a face named in an earlier configuration keeps that
+    name, and a face new to this one never takes a number given to a face
+    this configuration suppresses (``used`` grows by this call's labels).
     """
     import _telemetry  # noqa: PLC0415
     from _com import _bind, _com_invoke, _early_bound  # noqa: PLC0415
@@ -202,7 +204,7 @@ def label_all_faces(doc: Any, stem: str) -> list[dict[str, Any]]:
                 face = _com_invoke(face, "IFace2", "GetNextFace")
         bound = [_bind(face, "IFace2") for face, _geometry in walked]
         existing = [str(part.GetEntityName(face) or "") for face in bound]
-        taken = {name for name in existing if name}
+        taken = {name for name in existing if name} | (used if used is not None else set())
         records: list[dict[str, Any]] = []
         number = 0
         for index in sorted(range(len(walked)), key=lambda index: (_box_key(walked[index][1]), index)):
@@ -222,6 +224,8 @@ def label_all_faces(doc: Any, stem: str) -> list[dict[str, Any]]:
         repeated = sorted(label for label, count in Counter(row["label"] for row in records).items() if count > 1)
         if repeated:
             raise FeatureFaceError(f"{stem}: faces share labels {repeated}")
+        if used is not None:
+            used |= taken
         sp.set_attribute("faces.walked", len(walked))
         sp.set_attribute("faces.labelled", number)
         sp.set_attribute("faces.kept_names", sum(1 for name in existing if name))

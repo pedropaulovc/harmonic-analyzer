@@ -17,8 +17,10 @@ names a tag.
 
 Each fetched bundle must identify its part and bind its STEP's exact bytes
 (``step``, ``step_sha256``); a bundle that does not is refused and nothing is
-written. Its recipe is then diffed between the release's tagged commit and
-the working tree:
+written. A release cut before face inventories shipped can be neither
+rebound nor validated here, so its bundles are always STALE (and any older
+than this exporter have changed geometry inputs anyway). Otherwise the recipe
+is diffed between the release's tagged commit and the working tree:
 
 - ``geometry`` inputs (``part:<stem>`` and the labelled-STEP export code,
   ``package:features:<stem>``) changed: the STEP itself may differ, so the
@@ -26,9 +28,7 @@ the working tree:
 - otherwise ``features.toml`` is rebound here from this checkout's
   declarations (``export_features.write_manifest`` over the fetched STEPs and
   inventories, exactly what ``package:manifest:<stem>`` runs), so new or
-  changed ``requirement(...)`` declarations need no farm. A release made
-  before face inventories shipped cannot be rebound; a declaration change
-  against it is STALE.
+  changed ``requirement(...)`` declarations need no farm.
 
 A STALE bundle is reported with its findings and the command exits 2 without
 writing it unless ``--accept-stale`` is given; declarations that do not bind
@@ -270,23 +270,32 @@ def main(argv: list[str] | None = None) -> int:
                     for name in changed
                     if recipe[name] == "geometry"
                 ]
-                if not findings:
-                    try:
+                legacy = [
+                    path.name
+                    for path in export_features.exported_steps(stem, staging)
+                    if not inventory_path(path).is_file()
+                ]
+                if legacy:
+                    # Nothing here can rebind or validate it: always STALE.
+                    findings += [
+                        f"manifest input changed since {tag}: {name}"
+                        for name in changed
+                        if recipe[name] == "manifest"
+                    ]
+                    findings.append(
+                        f"release {tag} predates face inventories (none for {', '.join(legacy)}): "
+                        "cannot rebind or validate it offline; use a newer release"
+                    )
+                else:
+                    if not findings:
                         rebind(stem, staging)
                         rebound.append(stem)
-                    except FetchError as exc:
-                        if changed:
-                            findings += [
-                                f"manifest input changed since {tag}: {name}"
-                                for name in changed
-                            ]
-                            findings.append(f"cannot rebind offline: {exc}")
-                try:
-                    validate_bundle(stem, staging)
-                except FeaturesBoundError as exc:
-                    findings.append(
-                        f"does not match this checkout's declarations: {exc}"
-                    )
+                    try:
+                        validate_bundle(stem, staging)
+                    except FeaturesBoundError as exc:
+                        findings.append(
+                            f"does not match this checkout's declarations: {exc}"
+                        )
                 if findings:
                     stale[stem] = findings
             for stem, findings in stale.items():

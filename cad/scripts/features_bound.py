@@ -121,7 +121,7 @@ def _validated_bundles(out: Path, stems: tuple[str, ...] | None = None) -> tuple
             if problems:
                 _fail(str(manifest_path), f"{'; '.join(problems)} (scoped sha256 {hashlib.sha256(steps[scoped]).hexdigest()})")
         for feature, expected in export_features.STEP_FACE_COUNTS.get(stem, {}).items():
-            actual = len(table[feature]["faces"]) if feature in table else expected
+            actual = len(table[feature]["faces"]) if feature in table else 0
             if actual != expected:
                 _fail(stem, f"{feature} must be exactly {expected} STEP faces, found {actual} ({digests})")
         pending.extend(steps.items())

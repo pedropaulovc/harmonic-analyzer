@@ -580,9 +580,21 @@ def member_step_paths(stem: str, out: Path = OUT) -> dict[str, Path]:
     }
 
 
+def shown_step_paths(stem: str, out: Path = OUT) -> dict[str, Path]:
+    """Each non-default configuration the COM leaf shows, with its STEP: the
+    declared ``FEATURE_STEP_CONFIGURATIONS`` then the registry members. A name
+    in both would be shown twice and its configuration STEP never written."""
+    configurations = configuration_step_paths(stem, out)
+    members = member_step_paths(stem, out)
+    overlap = sorted(set(configurations) & set(members))
+    if overlap:
+        raise ValueError(f"{stem}: {overlap} are both FEATURE_STEP_CONFIGURATIONS and registry members")
+    return {**configurations, **members}
+
+
 def exported_steps(stem: str, out: Path = OUT) -> tuple[Path, ...]:
     """Every STEP the part's COM leaf writes, each with its face inventory."""
-    return (bundle_paths(stem, out)[1], *configuration_step_paths(stem, out).values(), *member_step_paths(stem, out).values())
+    return (bundle_paths(stem, out)[1], *shown_step_paths(stem, out).values())
 
 
 def _member_steps(stem: str) -> dict[str, Any]:
@@ -624,8 +636,10 @@ def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
             feature["faces"] = refs
             feature["cite"]["faces"] = [scoped_cite]
     for name, expected in STEP_FACE_COUNTS.get(stem, {}).items():
-        found = len(manifest["features"].get(name, {}).get("faces", ()))
-        if name in manifest["features"] and found != expected:
+        if name not in manifest["features"]:
+            raise FeatureFaceError(f"{stem}: STEP_FACE_COUNTS names {name!r}, which the drawing no longer declares")
+        found = len(manifest["features"][name].get("faces", ()))
+        if found != expected:
             raise FeatureFaceError(f"{stem}.{name}: expected exactly {expected} STEP patches, found {found}")
     manifest["step"] = step.name
     manifest["step_sha256"] = hashlib.sha256(content).hexdigest()
@@ -645,13 +659,17 @@ def main(argv: list[str] | None = None) -> int:
     changed requirement declarations to an already-exported (or fetched) STEP."""
     import argparse
 
+    import _telemetry
+
     parser = argparse.ArgumentParser(description=main.__doc__)
     parser.add_argument("stems", nargs="+", help="parts with a feature bundle")
     parser.add_argument("--out", type=Path, default=OUT, help="output root (default: cad/out)")
     args = parser.parse_args(argv)
+    _telemetry.set_service("export-features")
+    _telemetry.configure()
     for stem in args.stems:
         path = write_manifest(stem, bundle_paths(stem, args.out)[1], revision=_config.release_revision())
-        print(f"export-features: wrote {path}")
+        _telemetry.info(f"export-features: wrote {path}", part=stem)
     return 0
 
 

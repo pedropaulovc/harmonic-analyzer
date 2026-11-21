@@ -1399,7 +1399,7 @@ def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
         def _attempt(self, call, default=None):
             return call()
 
-    def save_step(_doc, selected, step):
+    def save_step(_doc, selected, step, _used):
         assert selected == stem
         write_labelled_step(step, list(export_features.feature_selectors(selected)))
 
@@ -1476,7 +1476,7 @@ def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
         def _attempt(self, call, default=None):
             return call()
 
-    def save_step(doc, selected, step):
+    def save_step(doc, selected, step, _used):
         assert selected == stem
         saves.append((step.name, doc.active))
         write_labelled_step(step, list(export_features.feature_selectors(selected)), stamp=doc.active)
