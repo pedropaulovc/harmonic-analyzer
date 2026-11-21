@@ -103,7 +103,8 @@ def test_context_accepts_the_plan_and_numbers_the_tools(context) -> None:
     assert holes["PB02_flat@2"] == [[17.0, -15.875], [70.0, -15.875]]
     assert holes["PB02_flat@3"] == [[45.0, -15.875], [98.0, -15.875]]
     assert holes["PB04_edge@0"] == [[7.0, -4.572]]
-    assert all("cross" not in key for _name, ops in RECIPE.PROGRAMS for key in ops)
+    names = [name for _p, ops in RECIPE.PROGRAMS for group in ops for name in group]
+    assert names and all("cross" not in name for name in names)
 
 
 def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -> None:

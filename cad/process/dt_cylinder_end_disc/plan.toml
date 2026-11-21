@@ -18,15 +18,17 @@
 # opts out of the lathe-holding screen (lathe_hold = "other"); its grip, the
 # 2-1/2 in blank in a 6 in chuck, is well inside any 6 in 4-jaw's span.
 #
-# FLAGGED, not on record: the mandrel hardware, one 3/8-16 x 1-1/2 in hex
-# bolt (its threads gripped), one 3/8-16 hex nut and two 3/8 flat
-# washers smaller than the disc's Ø2.17; shop hardware, to find or buy.
+# FLAGGED, not on record: the mandrel hardware, one 3/8-16 x 1-1/2 in
+# FULLY threaded hex bolt (a standard bolt's 1/2 in plain shank would stop
+# the nut short of the .24 in stack), one 3/8-16 hex nut and two 3/8 x
+# 1-1/2 in OD fender washers (they back the .11 disc to Ø1.5 and clear the
+# Ø2.16 turned edge by .33); shop hardware, to find or buy.
 title = "Cylinder Bank South End Disc"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass, 1/8 x 2-1/2 in flat"
 stock = "1/8 × 2-1/2 in flat, on hand; one disc from a {{process.blank_side_in:g}} in square sawn off it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Not on record, to find or buy before the job: the mandrel's 3/8-16 x 1-1/2 in hex bolt, its nut and two 3/8 flat washers. The .377 and .381 pin gauges are on the owner's order (owner 2026-11-21: \"ill buy pin gauges\")."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Not on record, to find or buy before the job: the mandrel's 3/8-16 x 1-1/2 in fully threaded hex bolt, its nut and two 3/8 x 1-1/2 in OD fender washers. The .377 and .381 pin gauges are on the owner's order (owner 2026-11-21: \"ill buy pin gauges\")."
 shop = "../shop"
 stock_refs = ["c360-flat-1-8x2-1-2"]
 material_key = "lathe-c360"
@@ -172,9 +174,9 @@ title = "Bolt mandrel: turn the outside"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "On the 3/8-16 x 1-1/2 in bolt, head outboard: head, flat washer, the blank (its V hole on the bolt), flat washer, nut, the nut tight. The bolt's threaded end in the 3-jaw up to the nut, the jaws on the threads."
+holding = "On the 3/8-16 x 1-1/2 in fully threaded bolt, head outboard: head, fender washer, the blank (its V hole on the bolt), fender washer, nut, the nut tight. The bolt's threaded end in the 3-jaw up to the nut, the jaws on the threads."
 datum = "The disc's faces between the washers; only the outside is cut."
-diagram = { file = "diagrams/mandrel.svg", alt = "The blank on the bolt, head outboard, a flat washer each side and the nut toward the chuck, the bolt's threads in the 3-jaw: the outside turned to Ø2.16–2.18." }
+diagram = { file = "diagrams/mandrel.svg", alt = "The blank on the bolt, head outboard, a fender washer each side and the nut toward the chuck, the bolt's threads in the 3-jaw: the outside turned to Ø2.16–2.18." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bolt_dia_mm}}", stock_diameter_mm = "{{process.blank_swing_mm}}", stickout_mm = "{{process.mandrel_stickout_mm}}", minimum_diameter_mm = "{{process.bolt_root_mm}}", support = "none" }
 
 [[setups.operations]]

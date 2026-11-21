@@ -38,8 +38,10 @@
 # (GO) and a .257 minus pin (NO-GO) from the Class ZZ pin-gauge sets, which
 # are TO BUY (gauges.pin-gauges status to_order; owner ruling 2026-11-20,
 # #3075: plus and minus sets, the GO end a plus pin); the
-# drilled holes as drilled. The drawing's finish, matte black oxide per
-# MIL-DTL-13924 Class 1 (all over, no masking), is done in the shop. Owner
+# drilled holes as drilled. The drawing's finish, matte black oxide, oil
+# sealed (all over, no masking), is done in the shop: delegated ruling
+# 2026-11-21 (Main, owner review #2144, cnc rulings record) drops
+# MIL-DTL-13924 from the sheet (the sheet change is #3318). Owner
 # (Pedro), answered in person 2026-11-21: "Black oxide: cold blackening in
 # the shop with Presto Black PC9 is acceptable as the drawing's black
 # oxide." Setup 6 blackens the levers with Birchwood Presto Black Steel PC9
