@@ -366,15 +366,16 @@ _ONE_PASS = {
 }
 
 
-def _loop(z: float) -> str:
-    """One anticlockwise lap at cutter-centre offset 1 round ``_OUTLINE``, from
-    and back to (5, -1), at depth ``z``; its corners are radius-1 arcs."""
+def _loop(z: float, r: float = 1.0) -> str:
+    """One anticlockwise lap at cutter-centre offset ``r`` round ``_OUTLINE``,
+    from and back to (5, -r), at depth ``z``; its corners are radius-r arcs."""
     nx, ny = _N
     return (
-        f"G1 X5 Y-1 Z{z} F100\nG1 X10 Y-1\nG3 X11 Y0 I0 J1\nG1 X11 Y10\n"
-        f"G3 X{10 + nx:.4f} Y{10 + ny:.4f} I-1 J0\n"
-        f"G3 X{-nx:.4f} Y{10 + ny:.4f} I{-5 - nx:.4f} J{-30 - ny:.4f}\n"
-        f"G3 X-1 Y10 I{nx:.4f} J{-ny:.4f}\nG1 X-1 Y0\nG3 X0 Y-1 I1 J0\nG1 X5 Y-1\n"
+        f"G1 X5 Y{-r:g} Z{z} F100\nG1 X10 Y{-r:g}\nG3 X{10 + r:g} Y0 I0 J{r:g}\n"
+        f"G1 X{10 + r:g} Y10\nG3 X{10 + r * nx:.4f} Y{10 + r * ny:.4f} I{-r:g} J0\n"
+        f"G3 X{-r * nx:.4f} Y{10 + r * ny:.4f} I{-5 - r * nx:.4f} J{-30 - r * ny:.4f}\n"
+        f"G3 X{-r:g} Y10 I{r * nx:.4f} J{-r * ny:.4f}\nG1 X{-r:g} Y0\n"
+        f"G3 X0 Y{-r:g} I{r:g} J0\nG1 X5 Y{-r:g}\n"
     )
 
 
@@ -433,6 +434,165 @@ def test_outline_passes_run_in_order_after_the_clearing(tmp_path):
     assert len(late) == 1 and "cut after a later pass" in late[0]
     swapped = check("G0 X5 Y-1 Z5\n" + _loop(-2.0) + _loop(-1.0))
     assert len(swapped) == 1 and "cut after a later pass" in swapped[0]
+
+
+# One tab on the bottom edge, X4-6: its box spans the edge and the cutter
+# centres at offset 1; the part's floor is the deepest level, Z-2.
+_TAB = {
+    "name": "bottom",
+    "x": (4.0, 6.0),
+    "y": (-2.0, 0.5),
+    "top": -1.5,
+    "floor": -2.0,
+    "thickness": 0.5,
+}
+
+
+def _tabbed_loop(
+    z: float,
+    hops: tuple[tuple[float, float, float], ...] = ((4.0, 6.0, -1.5),),
+    r: float = 1.0,
+) -> str:
+    """``_loop`` at depth ``z`` entered at (10, -r) after ``_loop``'s lap,
+    lifting to each hop's Z over its X range on the bottom run."""
+    nx, ny = _N
+    bottom = "".join(f"G1 X{x0}\nG1 Z{hz}\nG1 X{x1}\nG1 Z{z}\n" for x0, x1, hz in hops)
+    return (
+        f"G1 X10 Y{-r:g} F100\nG1 Z{z}\nG3 X{10 + r:g} Y0 I0 J{r:g}\n"
+        f"G1 X{10 + r:g} Y10\nG3 X{10 + r * nx:.4f} Y{10 + r * ny:.4f} I{-r:g} J0\n"
+        f"G3 X{-r * nx:.4f} Y{10 + r * ny:.4f} I{-5 - r * nx:.4f} J{-30 - r * ny:.4f}\n"
+        f"G3 X{-r:g} Y10 I{r * nx:.4f} J{-r * ny:.4f}\nG1 X{-r:g} Y0\n"
+        f"G3 X0 Y{-r:g} I{r:g} J0\n{bottom}G1 X10 Y{-r:g}\n"
+    )
+
+
+def _tabs(tmp_path: Path, deep: str, tabs=(_TAB,)) -> list[str]:
+    text = "G0 X5 Y-1 Z5\n" + _loop(-1.0) + deep + "G0 Z5\n"
+    return _outline(tmp_path, text, tabs=list(tabs))
+
+
+def test_a_tab_is_left_standing_at_its_top_over_its_floor(tmp_path):
+    assert _tabs(tmp_path, _tabbed_loop(-2.0)) == []
+    # The same file with no tab declared: the hop is off the levels and the
+    # gap leaves the bottom edge uncut.
+    undeclared = _tabs(tmp_path, _tabbed_loop(-2.0), ())
+    assert any("off the levels" in d for d in undeclared)
+    assert any("uncut at Z-2.000: bottom at X5.000" in d for d in undeclared)
+
+
+@pytest.mark.parametrize(
+    ("fault", "deep", "tab", "found"),
+    [
+        # Cut straight through: nothing hops, the cutter bites the tab.
+        (
+            "cut through",
+            _loop(-2.0),
+            _TAB,
+            ["no pass hops it", "cutter centres below tab bottom's top"],
+        ),
+        # Hops above the top: the hop is off the levels and never at the top.
+        (
+            "hop high",
+            _tabbed_loop(-2.0, ((4.0, 6.0, -1.2),)),
+            _TAB,
+            ["off the levels", "no pass hops it"],
+        ),
+        # Hops below the top: a thinner tab than declared.
+        (
+            "hop low",
+            _tabbed_loop(-2.0, ((4.0, 6.0, -1.8),)),
+            _TAB,
+            ["off the levels", "cutter centres below"],
+        ),
+        # A second hop where no tab is declared, at the tab's top.
+        (
+            "stray hop",
+            _tabbed_loop(-2.0, ((4.0, 6.0, -1.5), (7.5, 9.5, -1.5))),
+            _TAB,
+            ["off the levels", "uncut at Z-2.000: bottom at X8.000"],
+        ),
+        # The recipe's thickness differs from top less floor.
+        (
+            "thickness",
+            _tabbed_loop(-2.0),
+            {**_TAB, "thickness": 0.4},
+            ["is 0.500 thick, the recipe's 0.400"],
+        ),
+        # No level reaches the floor: the part never breaks free elsewhere.
+        (
+            "floor",
+            _tabbed_loop(-2.0),
+            {**_TAB, "floor": -2.5, "thickness": 1.0},
+            ["no level reaches its floor Z-2.500"],
+        ),
+        # The box beside the path holds no outline and is never hopped.
+        (
+            "off the outline",
+            _tabbed_loop(-2.0),
+            {**_TAB, "y": (-5.0, -3.0)},
+            ["its box holds no outline", "no pass hops it", "off the levels"],
+        ),
+        # The box at X2-3.5, the hop at X4-6: the cut runs through the box.
+        (
+            "moved",
+            _tabbed_loop(-2.0),
+            {**_TAB, "x": (2.0, 3.5)},
+            ["no pass hops it", "cutter centres below", "off the levels"],
+        ),
+        # A plunge to depth inside the box between two hops.
+        (
+            "plunge",
+            _tabbed_loop(-2.0, ((4.0, 5.0, -1.5), (5.0, 6.0, -1.5))),
+            _TAB,
+            ["cutter centres below tab bottom's top"],
+        ),
+        # The drop to depth comes 0.1 mm inside the box's exit edge.
+        (
+            "early drop",
+            _tabbed_loop(-2.0, ((4.0, 5.9, -1.5),)),
+            _TAB,
+            ["cutter centres below tab bottom's top"],
+        ),
+    ],
+)
+def test_a_tab_fault_is_caught(tmp_path, fault, deep, tab, found):
+    details = _tabs(tmp_path, deep, (tab,))
+    for text in found:
+        assert any(text in d for d in details), (fault, text, details)
+
+
+def test_every_declared_tab_must_stand(tmp_path):
+    second = {**_TAB, "name": "right", "x": (10.5, 11.5), "y": (3.0, 5.0)}
+    details = _tabs(tmp_path, _tabbed_loop(-2.0), (_TAB, second))
+    assert any("tab right: no pass hops it" in d for d in details)
+    assert any("cutter centres below tab right's top" in d for d in details)
+    assert not any("tab bottom" in d for d in details)
+
+
+@pytest.mark.parametrize(
+    ("box_y", "found"),
+    [
+        # The box spans both passes' paths and both hop it.
+        ((-2.5, 0.5), []),
+        # The box spans only the finishing path: the roughing pass, offset 2,
+        # cuts across the tab outside the box and never hops it.
+        ((-1.5, 0.5), ["tab bottom: the offset-2.000 pass, cut below its top"]),
+    ],
+)
+def test_every_pass_must_hop_the_tab(tmp_path, box_y, found):
+    passes = [{"offset": 2.0, "levels": [-2.0]}, {"offset": 1.0, "levels": [-2.0]}]
+    if box_y[0] < -2.0:
+        rough = "G0 X10 Y-2 Z5\n" + _tabbed_loop(-2.0, r=2.0)
+    else:
+        rough = "G0 X5 Y-2 Z5\n" + _loop(-2.0, r=2.0)
+    finish = "G0 Z5\nG0 X10 Y-1\n" + _tabbed_loop(-2.0) + "G0 Z5\n"
+    program = _program(tmp_path, rough + finish)
+    tab = {**_TAB, "y": box_y}
+    checked = _gcode.check_outline(program, _OUTLINE, passes, 0.0, tabs=[tab])
+    details = [f.detail for f in checked]
+    assert len(details) == len(found), details
+    for text in found:
+        assert any(text in d for d in details), (text, details)
 
 
 def test_cleared_waste_is_swept_at_depth(tmp_path):

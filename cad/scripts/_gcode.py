@@ -875,6 +875,29 @@ def _xy_points(m: Move, step: float = _SAMPLE_MM) -> list[tuple[float, ...]]:
     return [tuple(s + (e - s) * k / n for s, e in pairs) for k in range(1, n + 1)]
 
 
+def _first_inside(m: Move, lo: Point, hi: Point) -> Point | None:
+    """The first point of ``m`` (start included) inside the closed box from
+    ``lo`` to ``hi``: exact for a line, the start and :func:`_xy_points`
+    samples for an arc."""
+    if m.centre is not None:
+        points = (m.start, *_xy_points(m))
+        return next(
+            (p for p in points if all(a <= v <= b for v, a, b in zip(p, lo, hi))),
+            None,
+        )
+    t0, t1 = 0.0, 1.0
+    for s, e, a, b in zip(m.start, m.end, lo, hi):
+        if s == e:
+            if not a <= s <= b:
+                return None
+            continue
+        ta, tb = sorted(((a - s) / (e - s), (b - s) / (e - s)))
+        t0, t1 = max(t0, ta), min(t1, tb)
+        if t0 > t1:
+            return None
+    return tuple(s + (e - s) * t0 for s, e in zip(m.start, m.end))
+
+
 def _cross(o: Point, a: Point, b: Point) -> float:
     return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
 
@@ -942,6 +965,7 @@ def check_outline(
     passes: Sequence[dict],
     z_top: float,
     clearing: Sequence[dict] = (),
+    tabs: Sequence[dict] = (),
 ) -> list[Finding]:
     """Profile passes round a closed part outline. ``elements`` are its lines
     and minor arcs (``start``, ``end``, optional ``centre``) in the order and
@@ -959,11 +983,43 @@ def check_outline(
     and its ``levels``: there a point farther from the outline than every
     pass offset (plus the element's ``tol``) at one of those levels is
     clearing, not a stray; :func:`check_cleared` checks what it clears and
-    :func:`check_keep_out` what it must miss."""
+    :func:`check_keep_out` what it must miss.
+
+    Each of ``tabs`` is a bridge the passes leave standing to hold the part:
+    a ``name``, an ``x`` × ``y`` box spanning the outline and every pass's
+    cutter-centre path across the tab (its ends square to the path; the tab
+    is the box's length along the path less the cutter's diameter), the
+    tab's ``top`` and ``floor`` Z and the recipe's ``thickness``. Below its
+    top no cutter centre enters the box on any feed move, plunges and ramps
+    included; every pass cut below its top hops over it level at exactly its
+    top and at the pass's offset, and that hop is the only XY feed allowed
+    off the levels. Only there, and only at levels under its top, is the
+    outline excused coverage. Each tab must stand: its top less its floor is
+    the recipe's thickness, a level reaches its floor, its box holds outline
+    and every pass cut below its top hops it."""
     name = program.name
     findings: list[Finding] = []
     levels = {round(z, 3) for p in passes for z in p["levels"]}
     levels |= {round(z, 3) for c in clearing for z in c["levels"]}
+
+    def inside(tab: dict, p: Point, margin: float = 0.0) -> bool:
+        (x0, x1), (y0, y1) = tab["x"], tab["y"]
+        return x0 - margin <= p[0] <= x1 + margin and y0 - margin <= p[1] <= y1 + margin
+
+    def hop_of(p: Point) -> dict | None:
+        """The tab whose top ``p`` rides, inside its box."""
+        return next(
+            (t for t in tabs if _close(p[2], t["top"]) and inside(t, p, _TOL_MM)),
+            None,
+        )
+
+    def hop(m: Move) -> bool:
+        return (
+            bool(tabs)
+            and _close(m.start[2], m.end[2])
+            and all(hop_of(q) is not None for q in (m.start, *_xy_points(m)))
+        )
+
     moves = [
         m
         for m in program.cutting
@@ -975,8 +1031,11 @@ def check_outline(
     off_level = [
         f"{_where(m.end)} from Z{m.start[2]:.3f}"
         for m in moves
-        if not _close(m.start[2], m.end[2])
-        or not any(_close(m.end[2], z) for z in levels)
+        if not hop(m)
+        and (
+            not _close(m.start[2], m.end[2])
+            or not any(_close(m.end[2], z) for z in levels)
+        )
     ]
     _report(findings, name, f"XY feed moves off the levels {sorted(levels)}", off_level)
 
@@ -989,6 +1048,16 @@ def check_outline(
     backward: list[str] = []
     late: list[str] = []
     stage = 0  # 0 clearing, k + 1 pass k: the latest cut so far
+    hops: dict[str, set[int]] = {t["name"]: set() for t in tabs}
+    bites: dict[str, list[str]] = {t["name"]: [] for t in tabs}
+    for t in tabs:
+        (x0, x1), (y0, y1) = t["x"], t["y"]
+        lo = (x0 + _TOL_MM, y0 + _TOL_MM, -math.inf)
+        hi = (x1 - _TOL_MM, y1 - _TOL_MM, t["top"] - _TOL_MM)
+        for m in program.cutting:
+            point = _first_inside(m, lo, hi)
+            if point is not None:
+                bites[t["name"]].append(_where(point))
     farthest = max(p["offset"] for p in passes)
     cell = farthest + max(e["tol"] for e in elements) + _SAMPLE_MM
     for m in moves:
@@ -1002,6 +1071,19 @@ def check_outline(
                     backward.append(_where(point))
             previous = point
             level = next((z for z in levels if _close(point[2], z)), None)
+            tab = hop_of(point)
+            if tab is not None:
+                riding = {
+                    k
+                    for k, p in enumerate(passes)
+                    if abs(distance - p["offset"]) <= element["tol"]
+                }
+                hops[tab["name"]] |= riding
+                if level is None:  # the hop: at a pass's offset, never stage
+                    if not riding:
+                        where = f"{_where(point)} is {distance:.3f}"
+                        stray.append(f"{where} from {element['name']}")
+                    continue
             waste = distance > farthest + element["tol"]
             if waste and any(
                 c["x"][0] <= point[0] <= c["x"][1] and at(point[2], c["levels"])
@@ -1037,8 +1119,11 @@ def check_outline(
         reach = p["offset"]
         for z in p["levels"]:
             grid = grids.get((k, round(z, 3)), {})
+            excused = [t for t in tabs if z < t["top"] - _TOL_MM]
             uncovered = []
             for element, s in samples:
+                if any(inside(t, s) for t in excused):
+                    continue
                 limit = reach + element["tol"]
                 cx, cy = int(s[0] // cell), int(s[1] // cell)
                 cells = [(cx + i, cy + j) for i in (-1, 0, 1) for j in (-1, 0, 1)]
@@ -1047,6 +1132,34 @@ def check_outline(
                     uncovered.append(f"{element['name']} at X{s[0]:.3f} Y{s[1]:.3f}")
             what = f"outline points the offset-{reach:.3f} pass leaves uncut at"
             _report(findings, name, f"{what} Z{z:.3f}", uncovered)
+    pass_levels = [z for p in passes for z in p["levels"]]
+    for t in tabs:
+        tab = f"tab {t['name']}"
+        thick = t["top"] - t["floor"]
+        if not _close(thick, t["thickness"]):
+            detail = f"{tab} is {thick:.3f} thick, the recipe's {t['thickness']:.3f}"
+            findings.append(Finding(name, "outline", detail))
+        if not any(z <= t["floor"] + _TOL_MM for z in pass_levels):
+            detail = f"{tab}: no level reaches its floor Z{t['floor']:.3f}"
+            findings.append(Finding(name, "outline", detail))
+        if not any(inside(t, s) for _e, s in samples):
+            findings.append(
+                Finding(name, "outline", f"{tab}: its box holds no outline")
+            )
+        if not hops[t["name"]]:
+            detail = f"{tab}: no pass hops it at Z{t['top']:.3f}"
+            findings.append(Finding(name, "outline", detail))
+        else:
+            for k, p in enumerate(passes):
+                below = any(z < t["top"] - _TOL_MM for z in p["levels"])
+                if below and k not in hops[t["name"]]:
+                    detail = (
+                        f"{tab}: the offset-{p['offset']:.3f} pass, cut below its "
+                        f"top, never hops it at Z{t['top']:.3f}"
+                    )
+                    findings.append(Finding(name, "outline", detail))
+        what = f"cutter centres below {tab}'s top Z{t['top']:.3f} in its box"
+        _report(findings, name, what, bites[t["name"]])
     return findings
 
 
