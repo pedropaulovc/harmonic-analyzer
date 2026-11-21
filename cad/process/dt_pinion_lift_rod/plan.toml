@@ -111,7 +111,7 @@ ref = "lathe-ar"
 
 [[tools]]
 id = "form"
-name = "R.180 dome form tool (cuts the SR.19 far dome to R.18)"
+name = "R.180 dome form tool (cuts the SR.19 far dome to R.18): HSS, a concave R.180 arc ground across an edge at least .30 wide (both tips past the Ø.250 O.D.), cutting edge at centre height, shank to suit the toolpost"
 ref = "form-tool-r180"
 status = "to_order"
 
@@ -219,11 +219,11 @@ instruction = "Look at the crown under a light: no pip or flat at the apex, no s
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A pip at the apex: the tool is off centre height; reset it and take one more light pass to the same Z−{{cad.dome_far_form_height_in:.4dot}}, never deeper (it would shorten the body)."
+instruction = "A pip at the apex: the tool is off centre height. Reset its height; if that moved the tool along Z, touch both tips on the crown's rim (it now sits at Z−{{cad.dome_far_form_height_in:.4dot}}) and set the DRO Z to −{{cad.dome_far_form_height_in:.4dot}} there, not zero. Take one more light pass to Z−{{cad.dome_far_form_height_in:.4dot}}, never deeper (it would shorten the body)."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A step at the O.D.: the arc is not centred across the rod; centre it as Op 70 and take one more light pass to the same Z."
+instruction = "A step at the O.D.: the arc is not centred across the rod. Centre it, both tips touching the crown's rim together, and set the DRO Z to −{{cad.dome_far_form_height_in:.4dot}} there, not zero (the rim sits at Z−{{cad.dome_far_form_height_in:.4dot}}). Take one more light pass to Z−{{cad.dome_far_form_height_in:.4dot}}."
 
 [[setups.operations]]
 cut_kind = "other"
