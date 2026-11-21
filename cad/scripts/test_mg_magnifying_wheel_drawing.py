@@ -225,49 +225,45 @@ def test_tie1_volume_unites_the_60_and_the_counter_drill() -> None:
     assert part.V_TIE1 == pytest.approx(removed, rel=1e-6)
 
 
-def test_tie1_name_rides_under_the_counter_drill_row() -> None:
+def test_tie1_callout_rewrites_the_default_round_its_native_variables() -> None:
+    # A default Advanced Hole callout: each element's Ø, the #60's own depth
+    # and side words, the #50's depth and its far-side message.
     definitions = {
-        5: "<MOD-DIAM><a> DRILL THRU\n<MOD-DIAM><b> DRILL <HOLE-DEPTH><c> <far>",
+        5: (
+            "<MOD-DIAM> <v-dia-1> <HOLE-DEPTH> <v-dep-1> <v-near>\r\n"
+            "<MOD-DIAM> <v-dia-2> <HOLE-DEPTH> <v-dep-2> <v-far>"
+        ),
         6: "",
         7: "",
         8: "",
     }
-    part_index, named = drawing.tie1_named_definition(definitions)
-    assert part_index == 5
-    assert named.splitlines()[-1] == drawing.TIE1_NAME
-    assert named.splitlines()[:-1] == definitions[5].splitlines()
-    # A depth that is not the last row, or a name already printed, refuses.
-    with pytest.raises(RuntimeError):
-        drawing.tie1_named_definition({**definitions, 5: "x <HOLE-DEPTH>c\ny"})
-    with pytest.raises(RuntimeError):
-        drawing.tie1_named_definition({**definitions, 8: drawing.TIE1_NAME})
-
-
-def test_tie1_callout_prints_drill_places_and_a_two_place_depth() -> None:
-    definitions = {
-        5: "<MOD-DIAM><a> DRILL THRU\n<MOD-DIAM><b> DRILL <HOLE-DEPTH><c> <far>",
-        6: "",
-        7: "",
-        8: "",
-    }
-    places = drawing.tie1_callout_precision(definitions)
+    index, text, places = drawing.tie1_definition(definitions)
+    assert index == 5
+    near, far, name = text.split("\n")
+    # Size, process, depth, side (rule 12); the name under the rows.
+    assert near == "<MOD-DIAM><v-dia-1> DRILL THRU"
+    assert far == "<MOD-DIAM><v-dia-2> DRILL <HOLE-DEPTH><v-dep-2> FAR SIDE"
+    assert name == drawing.TIE1_NAME
+    # Each drill's Ø at three places, the depth at two, by native variable.
     assert places == {
-        "a": drawing.TIE1_DIA_PLACES,
-        "b": drawing.TIE1_DIA_PLACES,
-        "c": drawing.TIE1_DEPTH_PLACES,
+        "v-dia-1": drawing.TIE1_DIA_PLACES,
+        "v-dia-2": drawing.TIE1_DIA_PLACES,
+        "v-dep-2": drawing.TIE1_DEPTH_PLACES,
     }
     assert drawing.TIE1_DIA_PLACES == 3 and drawing.TIE1_DEPTH_PLACES == 2
-    # Each element's row states its process (rule 12) before any depth.
-    near, far = part.tie1_callout_strings("<d>", "<h>", "<f>")
-    for row in (near, far):
-        assert row.startswith("<MOD-DIAM><d> DRILL ")
-    assert far.index("<HOLE-DEPTH><h>") > far.index("DRILL")
-    # A missing depth or Ø refuses rather than printing default places.
-    with pytest.raises(RuntimeError):
-        drawing.tie1_callout_precision({**definitions, 5: "<MOD-DIAM><a> DRILL THRU"})
     dia60, dia50, depth = drawing.tie1_printed_values()
     assert (dia60, dia50) == (".040", ".070")
     assert len(depth.split(".")[1]) == 2
+    # Anything but two Ø rows, the second with one depth, refuses.
+    for bad in (
+        "<MOD-DIAM><a> THRU",
+        "<MOD-DIAM><a> <HOLE-DEPTH><b>\n<MOD-DIAM><c>",
+        "<MOD-DIAM><a> <MOD-DIAM><b> <HOLE-DEPTH><c>",
+    ):
+        with pytest.raises(RuntimeError):
+            drawing.tie1_definition({**definitions, 5: bad})
+    with pytest.raises(RuntimeError):
+        drawing.tie1_definition({**definitions, 6: "<MOD-DIAM><x>"})
 
 
 def test_tie2_profile_runs_radially_and_ends_in_air() -> None:

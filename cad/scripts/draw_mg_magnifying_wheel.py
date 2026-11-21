@@ -370,9 +370,9 @@ WIRE_NUMBER = str(_config.parts("sh-vn-music-wire")["number"])
 # horizontal.  Each takes at most two lines of words under its process
 # (rule 7).  TIE 1 is one Advanced Hole: its native callout on the #60 seen
 # at the back face prints the #60 THRU over the #50 counter-drill's Ø, depth
-# and FAR SIDE (the drum face, away from this view), its rows authored on
-# the part (build_mg_magnifying_wheel._tie1_advanced_hole); the sheet adds
-# the name under them.
+# and FAR SIDE (the drum face, away from this view): the sheet rewrites the
+# part's default Advanced Hole callout round its native variables
+# (tie1_definition) and adds the name under the rows.
 TIE1_NAME = "WIRE TIE HOLE"
 TIE2_CALLOUT = "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"
 # TIE 1's block: the #60 row, the counter-drill row and the name; its widest,
@@ -837,37 +837,44 @@ def _near_side_diameters(
 _DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
 
 
-def tie1_named_definition(definitions: dict[int, str]) -> tuple[int, str]:
-    """The one format part whose last row is the counter-drill's (the
-    callout's only depth), with the hole's name on a row under it."""
+_DIA_VARIABLE = re.compile(r"<MOD-DIAM>\s*(<[^<>]+>)")
+_DEPTH_VARIABLE = re.compile(r"<HOLE-DEPTH>\s*(<[^<>]+>)")
+
+
+def tie1_definition(definitions: dict[int, str]) -> tuple[int, str, dict[str, int]]:
+    """TIE 1's callout rewritten from the native variables of its default
+    Advanced Hole callout: the part holding both elements' Ø, its new text
+    and the places per variable.  The #60 (near side, listed first) reads
+    its Ø and DRILL THRU; the #50 its Ø, DRILL, the depth and FAR SIDE (rule
+    12: size, process, depth, side); the hole's name stands under them.  The
+    default's other words (its side messages) give way to these."""
     if set(definitions) != set(_DEFINITION_TO_WRITABLE):
         raise RuntimeError(f"unexpected hole callout parts: {definitions!r}")
-    holders = [part for part, text in definitions.items() if "<HOLE-DEPTH>" in text]
-    if len(holders) != 1 or TIE1_NAME in "\n".join(definitions.values()):
-        raise RuntimeError(f"TIE 1 callout has no single depth: {definitions!r}")
+    holders = [part for part, text in definitions.items() if "<MOD-DIAM>" in text]
+    if len(holders) != 1:
+        raise RuntimeError(f"TIE 1 callout Ø not in one part: {definitions!r}")
     part = holders[0]
-    rows = definitions[part].replace("\r", "").rstrip().split("\n")
-    if "<HOLE-DEPTH>" not in rows[-1]:
-        raise RuntimeError(
-            f"TIE 1 callout's depth row is not its last: {definitions!r}"
+    text = definitions[part].replace("\r", "")
+    rows = [row for row in text.split("\n") if _DIA_VARIABLE.search(row)]
+    diameters = _DIA_VARIABLE.findall(text)
+    depths = _DEPTH_VARIABLE.findall(rows[-1]) if rows else []
+    if len(rows) != 2 or len(diameters) != 2 or len(depths) != 1:
+        raise RuntimeError(f"TIE 1 callout is not #60 then #50: {definitions!r}")
+    near, far = diameters
+    (depth,) = depths
+    rewritten = "\n".join(
+        (
+            f"<MOD-DIAM>{near} DRILL THRU",
+            f"<MOD-DIAM>{far} DRILL <HOLE-DEPTH>{depth} FAR SIDE",
+            TIE1_NAME,
         )
-    return part, "\n".join((*rows, TIE1_NAME))
-
-
-_DRILL_VARIABLE = re.compile(r"<(MOD-DIAM|HOLE-DEPTH)><([^<>]+)>")
-
-
-def tie1_callout_precision(definitions: dict[int, str]) -> dict[str, int]:
-    """Places per native length variable: each drill's Ø (the variable after
-    a Ø) and the counter-drill's depth (after the depth symbol)."""
-    pairs = _DRILL_VARIABLE.findall("\n".join(definitions.values()))
-    kinds = [kind for kind, _name in pairs]
-    if sorted(kinds) != ["HOLE-DEPTH", "MOD-DIAM", "MOD-DIAM"]:
-        raise RuntimeError(f"TIE 1 callout variables: {definitions!r}")
-    return {
-        name: TIE1_DEPTH_PLACES if kind == "HOLE-DEPTH" else TIE1_DIA_PLACES
-        for kind, name in pairs
+    )
+    places = {
+        near.strip("<>"): TIE1_DIA_PLACES,
+        far.strip("<>"): TIE1_DIA_PLACES,
+        depth.strip("<>"): TIE1_DEPTH_PLACES,
     }
+    return part, rewritten, places
 
 
 def tie1_printed_values() -> tuple[str, ...]:
@@ -908,23 +915,23 @@ def _add_tie1_callout(adapter: Any, view: Any, centre: tuple[float, float]) -> A
         part: str(display.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
     }
     _telemetry.info(f"TIE 1 callout definitions {definitions!r}")
-    set_hole_callout_precision(
-        display, tie1_callout_precision(definitions), label=label
-    )
-    part, named = tie1_named_definition(definitions)
-    display.SetText(_DEFINITION_TO_WRITABLE[part], named)
+    part, rewritten, places = tie1_definition(definitions)
+    display.SetText(_DEFINITION_TO_WRITABLE[part], rewritten)
     applied = str(display.GetText(part) or "").replace("\r", "")
-    if applied != named:
-        raise RuntimeError(f"TIE 1 callout name did not persist: {applied!r}")
+    if applied != rewritten:
+        raise RuntimeError(f"TIE 1 callout text did not persist: {applied!r}")
+    set_hole_callout_precision(display, places, label=label)
     rebuild_drawing(adapter, label="wheel TIE 1 callout")
     resolved = "\n".join(str(display.GetText(part) or "") for part in (1, 2, 3, 4))
     _telemetry.info(f"TIE 1 callout reads {resolved!r}")
+    values = tie1_printed_values()
     depth_at_three = f"{TIE1_CDRILL_DEPTH / 25.4:.3f}".lstrip("0")
     if (
-        any(value not in resolved for value in tie1_printed_values())
+        any(value not in resolved for value in values)
+        or resolved.index(values[0]) > resolved.index(values[1])
         or depth_at_three in resolved
     ):
-        raise RuntimeError(f"TIE 1 callout did not print its places: {resolved!r}")
+        raise RuntimeError(f"TIE 1 callout did not print its values: {resolved!r}")
     return display.GetAnnotation()
 
 
