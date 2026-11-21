@@ -311,7 +311,7 @@ title = "Side B: face, pocket, bore and holes"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw; the spoil plate on them, 6 in along X, its LEFT edge to the left, as left by the first op (it stays there for every load; brush it clean of chips and burrs before each load). The jaws' top then stands about .270 above the spoil plate's top (checked below): it grips most of each .3085–.3125 blank and stays under the faced B face (.3005), so the face mill passes over the jaws. Four blanks of one load side by side across the jaws on the spoil plate, each on its A face (B up), numbers to the left, the lowest number against the fixed jaw. Flush the left ends with a 1-2-3 block's 3 in edge set twice, overlapping (across blanks 1–3 and the spoil plate's left edge, then across blanks 2–4), and feel that all four ends are flush; then close the vise on the blanks (the spoil plate, 3.9 in across under the 4 in load, is not gripped), tapping them down onto the spoil plate."
+holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw; the spoil plate on them, 6 in along X, its LEFT edge to the left, as left by the first op (it stays there for every load; brush it clean of chips and burrs before each load). The jaws' top then stands about .270 above the spoil plate's top (checked below): it grips most of each .3085–.3125 blank and stays under the faced B face (.3005), so the T1 1/2 in end mill passes over the jaws when it faces B. Four blanks of one load side by side across the jaws on the spoil plate, each on its A face (B up), numbers to the left, the lowest number against the fixed jaw. Flush the left ends with a 1-2-3 block's 3 in edge set twice, overlapping (across blanks 1–3 and the spoil plate's left edge, then across blanks 2–4), and feel that all four ends are flush; then close the vise on the blanks (the spoil plate, 3.9 in across under the 4 in load, is not gripped), tapping them down onto the spoil plate."
 datum = "Programs CL01_face_b (T1), CL02_pocket_b (T1, T2), CL03_bore (T3, T6, T7), CL04_holes (T3, T4, T5). G54: X0 the left end of the blank against the fixed jaw (picked up on every load), Y0 the fixed jaw's face, Z0 the spoil plate's top. +X toward the blanks' right ends, +Y toward the fixed jaw: the blanks lie at −Y."
 diagram = { file = "diagrams/side_b.svg", alt = "Four blanks across the vise jaws on the spoil plate on two parallels, B up; the end mill faces them, pockets each along its centre line round the hub, and the bore and holes are drilled on the centre line." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.drill_d_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
@@ -631,8 +631,12 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Before each later load: the spoil plate's top after stoning."
-inspection = "A 6 in rule laid across the spoil plate at both ends and the middle: no rock, no burr or edge standing proud. Fail: stone it again and recheck. Then take the next load's four (side B done), turn them over, clamp them as in Setup 3 and repeat Setup 3 and this setup from its first op."
+inspection = "A 6 in rule laid across the spoil plate at both ends and the middle: no rock, no burr or edge standing proud. Fail: stone it again and recheck."
 gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Next load: take the next load's four (side B done), turn them over, clamp them as in Setup 3 and repeat Setup 3 and this setup from its first op."
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
