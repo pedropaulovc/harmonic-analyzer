@@ -1,38 +1,258 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Gooseneck end plug MHA-SM-05, one off, turned on the manual PM-1127VF-LB
+# (owner ruling 2026-11-21: turned parts get lathe travelers, no NC). Route
+# chosen for speed, two chuckings of the 5/8 in 1018 bar on hand. Setup 1,
+# the bar head end out: face the end (Z0), turn the head Ø back through the
+# parting line, spot, drill #25, tap #10-24 with the plug then the bottoming
+# tap from the tailstock, part off .02 long. Setup 2, the plug turned round
+# on its head over a shim wrap: measure the MHA-SM-01 bore (note 1 turns the
+# spigot to it), face the spigot end to length, rough and finish the spigot
+# to the measured bore less the clearance. The slender spigot is turned last,
+# on the short regrip stickout, not at the end of the bar pull. Bench: deburr
+# and check.
 title = "Gooseneck End Plug"
-part = "MHA-SM-05 Gooseneck End Plug"
-revision = "placeholder"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
 material = "AISI 1018 cold-drawn round, 5/8 in"
-stock = "To be written"
+stock = "Ø{{process.stock_dia_in:.3dot}} bar, on hand; one plug, which takes {{cad.pitch_in:.2dot}} in of it (any bar end {{process.chuck_grip_in:.2dot}} in longer than {{cad.stickout_in:.2dot}} will do)."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on steel."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
+material_key = "lathe-1018-cold-finished"
+turning_material = "steel_1018"
+
+[cad]
+file = "../../out/features/sm_gooseneck_end_plug/features.toml"
+adapter = "turned_bush"
+part = "sm-gooseneck-end-plug"
+
+[parameters]
+quantity = 1
+stock_dia_in = 0.625
+# The bar on hand and the length the 3-jaw grips of it.
+bar_length_in = 48.0
+chuck_grip_in = 0.75
+# Facing allowance: squares a sawn or parted bar end.
+face_allowance_in = 0.02
+# Left on the spigot end for Setup 2 to face to length.
+regrip_allowance_in = 0.02
+# Parting kerf: 1/8 in blade plus the insert's side clearance (authored).
+part_kerf_in = 0.13
+parts_per_pull = 1
+# The parting blade's clearance to the jaw fronts.
+jaw_clearance_in = 0.1
+# Setup 2: how much of the head the jaws take, from the head end.
+regrip_grip_in = 0.3
+# The bottoming tap's lead: about 1.5 threads at 24 per inch.
+tap_lead_in = 0.0625
+# Left a side on the spigot for its finish passes.
+finish_allowance_in = 0.005
+rough_radial_doc_mm = 0.5
+finish_radial_doc_mm = 0.05
+turn_feed_mm_rev = 0.1016
+turn_start_z_mm = 0.5
+
+[[tools]]
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "centre"
+name = "No. 3 centre drill"
+ref = "centre-drills-carbide-60"
 
 [[tools]]
 id = "drill-25"
 name = "#25 drill"
-ref = "drill-25"  # Drills #25
-
-[[tools]]
-id = "tap-10-24-bottoming"
-name = "#10-24 bottoming tap"
-ref = "tap-10-24-bottoming"  # Tap coverage #10-24 UNC
+ref = "drill-25"
 
 [[tools]]
 id = "tap-10-24-plug"
 name = "#10-24 plug tap"
-ref = "tap-10-24-plug"  # Tap coverage #10-24 UNC
+ref = "tap-10-24-plug"
+
+[[tools]]
+id = "tap-10-24-bottoming"
+name = "#10-24 bottoming tap"
+ref = "tap-10-24-bottoming"
+
+[[tools]]
+id = "cutoff"
+name = "Cutoff blade"
+ref = "cutoff-blade-holder"
 
 [[tools]]
 id = "telescoping-gauges-starrett-s579gz"
 name = "Telescoping gauges"
-ref = "telescoping-gauges-starrett-s579gz"  # drawing cross-check 2026-11-19: measures the MHA-SM-01 bore for the spigot
+ref = "telescoping-gauges-starrett-s579gz"
+
+[[tools]]
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Bar, head end out: turn the head, drill and tap, part off long"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
+datum = "Z0 (carriage DRO) the bar end, faced first in this setup: the head end."
+diagram = { file = "diagrams/bar.svg", alt = "The 5/8 in bar in the 3-jaw, head end out: the end faced, the head turned, spotted, drilled #25 and tapped #10-24, the plug parted off .02 long." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}", support = "none" }
+turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off; set DRO Z0 on it."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Head", phase = "rough", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.run_end_z_mm}}", kept_start_z_mm = "{{cad.outer_datum_out_near_z_mm}}", kept_end_z_mm = "{{cad.kept_end_z_mm}}", start_diameter_mm = "{{cad.stock_dia_mm}}", end_diameter_mm = "{{cad.outer_turn_min_mm}}", max_radial_doc_mm = "{{process.rough_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Turn Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}} (the head) from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Head Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}}, by micrometer."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock, about Ø.12 across the countersink: under the #25 drill, so the drill removes it."
+settings = "lathe-centre-1018"
+cut_diameter_mm = 2.778
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-25"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.tap_drill_dia_band_mm}}" }
+instruction = "Touch the drill's point on the faced end and zero the tailstock quill scale there. Drill #25 until the scale reads .60–.61: the drill's full diameter is then {{cad.tap_drill_depth_min_in:.2dot}}–{{cad.tap_drill_depth_max_in:.2dot}} deep (its 118° point adds about .045). Back out to clear chips every .15 in."
+settings = "lathe-drill-25-1018"
+cut_diameter_mm = "{{cad.tap_drill_dia_mm}}"
+hole_depth_mm = "{{cad.tap_drill_depth_mm}}"
+peck = { step_mm = "{{cad.tap_drill_dia_mm}}", retract = "full" }
+inspection = "Drill depth {{cad.tap_drill_depth_min_in:.2dot}}–{{cad.tap_drill_depth_max_in:.2dot}} to full diameter: quill scale .60–.61 from the point touching."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "tap-10-24-plug"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle off, in neutral. Start {{cad.tap_thread}} with the plug tap in a tap wrench, its shank centre on the tailstock centre to keep it on axis; turn the wrench, backing off every half turn, cutting oil, to the drill's depth."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "tap-10-24-bottoming"
+drilling = "none"
+sizing = "other"
+instruction = "Finish with the bottoming tap the same way until its point is {{cad.tap_reach_min_in:.3dot}}–{{cad.tap_reach_max_in:.3dot}} deep (a pencil mark on the tap): full thread {{cad.tap_thread_depth_min_in:.2dot}}–{{cad.tap_thread_depth_max_in:.2dot}}."
+feed = "hand"
+inspection = "Full thread at least {{cad.tap_thread_depth_min_in:.2dot}} deep: mark a #10-24 screw {{cad.tap_thread_depth_min_in:.2dot}} from its end (calipers' depth rod against the screw, marker); it runs in by hand until the mark reaches the head-end face. The {{cad.tap_thread_depth_max_in:.2dot}} maximum is held by stopping the bottoming tap at its pencil mark."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Part off with the blade's face toward Z0 at Z-{{cad.part_off_in:.3dot}} on the DRO: .02 over length, for Setup 2. Catch the plug."
+settings = "lathe-part-1018"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Turned round on the head: face to length, turn the spigot"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw over a shim wrap on the head, {{process.regrip_grip_in:.2dot}} in of it in the jaws from the head end; the parted end {{cad.outer_stickout_far_mm:in.2dot}} in out."
+datum = "Z0 (carriage DRO) the spigot end, faced to length in this setup."
+diagram = { file = "diagrams/regrip.svg", alt = "The plug turned round, its head in the jaws over a shim wrap: the parted end faced to length and the spigot turned to the measured MHA-SM-01 bore." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}", support = "none" }
+turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.outer_regrip_jaw_z_far_mm}}" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+tool = "telescoping-gauges-starrett-s579gz"
+instruction = "Measure the MHA-SM-01 tube's bore at its end with a telescoping gauge and the micrometer and write it on this sheet: the spigot is that bore less {{cad.step_clearance_min_in:.3dot}}–{{cad.step_clearance_max_in:.3dot}} (drawing note 1)."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the parted end in light skims, miking the length between them, to {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}; set DRO Z0 on it."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}. Short: scrap and make another."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Spigot rough", phase = "rough", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.step_far_out_far_z_mm}}", kept_start_z_mm = "{{cad.step_far_out_near_z_mm}}", kept_end_z_mm = "{{cad.step_far_out_far_z_mm}}", start_diameter_mm = "{{cad.outer_turn_min_mm}}", end_diameter_mm = "{{cad.step_rough_dia_mm}}", max_radial_doc_mm = "{{process.rough_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.step_rough_dia_mm}}" },
+  { name = "Spigot finish", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.step_far_out_far_z_mm}}", kept_start_z_mm = "{{cad.step_far_out_near_z_mm}}", kept_end_z_mm = "{{cad.step_far_out_far_z_mm}}", start_diameter_mm = "{{cad.step_rough_dia_mm}}", end_diameter_mm = "{{cad.step_turn_min_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the spigot from Z0 to the shoulder at Z{{cad.step_far_out_far_z_mm:in.3dot}} by the DRO, so the shoulder stands {{cad.shoulder_min_in:.3dot}}–{{cad.shoulder_max_in:.3dot}} from the head end: rough to {{process.finish_allowance_in:.3dot}} a side over the target (the recorded bore less {{cad.step_clearance_min_in:.3dot}}), then finish in light passes, miking between them, to the recorded bore less {{cad.step_clearance_min_in:.3dot}}–{{cad.step_clearance_max_in:.3dot}}."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.step_dia_mm}}"
+inspection = "Spigot Ø the recorded MHA-SM-01 bore less {{cad.step_clearance_min_in:.3dot}}–{{cad.step_clearance_max_in:.3dot}}, by micrometer (over: skim again; under: scrap); shoulder {{cad.shoulder_min_in:.3dot}}–{{cad.shoulder_max_in:.3dot}} from the head-end face, by the calipers' depth rod."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.shoulder_band_mm}}" }]
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Bench: deburr and tag"
+machine = "Bench"
+envelope = "other"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished plug: the head, the shoulder, the spigot to the measured bore and the tapped hole in the head end." }
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr: break the outside edges R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, and the thread's mouth; leave the spigot's diameter and the shoulder face otherwise untouched (they bond into MHA-SM-01)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Wipe the plug clean and oil the head and the tapped hole lightly with light machine oil (finish: bare, oiled); leave the spigot and the shoulder dry and clean for the Loctite 638 bond."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Tag the plug with the recorded MHA-SM-01 bore: it goes to that tube (Loctite 638, at MHA-SM-00)."
+feed = "hand"
