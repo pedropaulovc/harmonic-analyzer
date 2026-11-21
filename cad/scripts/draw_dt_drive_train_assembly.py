@@ -843,7 +843,7 @@ BOM_DESCRIPTIONS = {
     "dt-crank-pinion": f"CRANK PINION, {pinion.TEETH}T",
     "dt-crank-pinion-pin": "CRANK PINION RETENTION PIN",
     "dt-crank-arm": "CRANK ARM",
-    "dt-crank-pin": "CRANK TAPER PIN, 1:48",
+    "dt-crank-pin": "CRANK PIN, MODIFIED MCMASTER 98390A254",
     "dt-crank-pin-ring": "TAPER PIN KEEPER RING",
     "dt-vn-keeper-chain": "#18 BRASS JACK CHAIN, MCMASTER 3603T354",
     # With "BRASS" the row runs 44 characters, past the column's one-line

@@ -133,6 +133,10 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("build_dt_drive_train_assembly", "ARBOR_PED_NORTH_Z_BAND"): (
         "plan z extent of the north pedestal foot (clearance geometry)"
     ),
+    ("dt_crank_pin_spec", "BIG_END_DIA_BAND"): (
+        "ASME B18.8.2 catalogue tolerance of the bought No. 3 pin's big end (#2368); it bounds the "
+        "cross-hole web and the keeper ring's air, while the taper fit is reamed to suit the pin"
+    ),
     ("dt_crank_pin_ring_spec", "BUTT_GAP_BAND"): (
         "pliers-closed butt gap between the keeper ring's own wire ends (note: GAP 0-.010); "
         "no mating part"

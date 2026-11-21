@@ -123,6 +123,7 @@ recipes:
 | 98381A435 | `pd-vn-transgear-arm-plate-locating-pin` (MHA-PD-VN-64; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A473 | `sm-vn-knife-mount-dowel` | Alloy Steel Dowel Pin |
 | 98381A474 | `pd-vn-transgear-latch-pin` (catalogue-only; no vendor model; SKU not yet read live) | Alloy Steel Dowel Pin |
+| 98390A254 | `dt-crank-pin` (MHA-DT-09, shop-reworked blank: one cross-drilled #45 ring hole; owner ruling 2026-11-20, #2368; catalogue-only, modelled from ASME B18.8.2 No. 3; read live 2026-11-20: 12L14, pack of 25) | Taper Pin, No. 3, 1-3/4" Long, 0.183" Small End Diameter |
 | 98830A511 | `dt-vn-cone-shaft-key` (MHA-DT-VN-71; catalogue-only; no vendor model) | 1008-1045 Carbon Steel Machine Key Stock |
 | 99607A213 | `pn-vn-pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
 

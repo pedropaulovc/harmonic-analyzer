@@ -945,9 +945,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # the MHA-DT-09 pilot spans: a longer hub chord, and the shaft crossing
     # further down the taper. #1140 stood the pin further proud, and #290's
     # inch keeper ring (PIN_PROUD 4.572, keeper-ring hole at .15 in) a little
-    # more, so a thinner stretch of the taper sits in both receivers.
-    assert 111.5 < crank_allowed[hub_pair] < 112.3
-    assert 54.8 < crank_allowed[shaft_pair] < 55.3
+    # more, so a thinner stretch of the taper sits in both receivers.  #2368
+    # made MHA-DT-09 the bought No. 3 pin (Ø.219 big end, against the turned
+    # pin's Ø.234), so still less taper stands over the #14 and #9 pilots.
+    assert 66.6 < crank_allowed[hub_pair] < 67.4
+    assert 21.3 < crank_allowed[shaft_pair] < 21.9
     # MHA-SH-VN-58: each 5/64 BarPin pressed into its bar's Ø1.97358 ream
     # through both top-notch cheeks (6.35 bar less the .124 notch), and each
     # RodPin into its rod's Ø1.97358 fork ream through both tines (.240 fork

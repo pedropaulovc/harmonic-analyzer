@@ -29,9 +29,9 @@ import math
 
 import _config
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm, printed_deviations
-from dt_crank_pin_spec import BIG_END_DIA, PIN_LENGTH, RING_HOLE_DIA, RING_HOLE_X, SMALL_END_DIA
-from dt_crank_pin_spec import UNIT as PIN_UNIT
+from _printed_tolerance import printed_deviations
+from dt_crank_pin_spec import BIG_END_DIA, BIG_END_DIA_BAND, PIN_LENGTH, RING_HOLE_DIA
+from dt_crank_pin_spec import RING_HOLE_X, RING_HOLE_X_BAND, SMALL_END_DIA
 
 UNIT = drawing_unit("parts/dt-crank-pin-ring", _config.parts("dt-crank-pin-ring"))
 
@@ -78,21 +78,24 @@ if HOLE_AIR < RING_HOLE_AIR - 1e-9:
         f"Ø{RING_HOLE_DIA} cross-hole, under {RING_HOLE_AIR}"
     )
 
-# The ring's inside diameter prints at the title block's two places; the pin's
-# end diameters and the hole's station print at two (dt_crank_pin_spec), and
-# the drilled hole only cuts oversize. The governing case is the smallest
-# ring (tightest arc) through the fattest pin section at the hole, the hole
-# at its station's big-end limit and drilled to its nominal size.
+# The ring's inside diameter prints at the title block's two places; the
+# bought pin's big end holds its catalogue band and the hole's station prints
+# at two places (dt_crank_pin_spec), and the drilled hole only cuts oversize.
+# The governing case is the smallest ring (tightest arc) through the fattest
+# pin section at the hole, the hole at its station's big-end limit and
+# drilled to its nominal size.
 RING_ID = 2.0 * MEAN_R - WIRE_DIA
 RING_ID_PLACES = 2
 RING_ID_MIN, RING_ID_MAX = (
     round(RING_ID + d, 12)
     for d in printed_deviations(RING_ID, RING_ID_PLACES, unit=UNIT)
 )
-# The pin's end diameters and the hole's station print at two places.
-PIN_BAND = printed_band_mm(2, unit=PIN_UNIT)
+# The hole's printed station band (the keeper chain reads it too).
+PIN_BAND = RING_HOLE_X_BAND
 _TAPER_PER_MM = (BIG_END_DIA - SMALL_END_DIA) / PIN_LENGTH
-PIN_DIA_AT_HOLE_MAX = BIG_END_DIA + PIN_BAND - _TAPER_PER_MM * (RING_HOLE_X - PIN_BAND)
+PIN_DIA_AT_HOLE_MAX = (
+    BIG_END_DIA + BIG_END_DIA_BAND[0] - _TAPER_PER_MM * (RING_HOLE_X - PIN_BAND)
+)
 _MEAN_R_MIN = (RING_ID_MIN + WIRE_DIA) / 2.0
 _HALF_CHORD = PIN_DIA_AT_HOLE_MAX / 2.0
 ARC_SAGITTA_WORST = _MEAN_R_MIN - math.sqrt(_MEAN_R_MIN**2 - _HALF_CHORD**2)

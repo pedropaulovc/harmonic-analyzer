@@ -167,7 +167,7 @@ flowchart LR
     e6["spring rate ±1.25 %<br/><b>matched, 1 %/%</b>"]:::part -.-> spring
     e7["hole position (2.667 %/mm)<br/>knife term at each input's actual setup"]:::part -.-> summing
     e8["common-mode gain: calibrated out<br/>component range 83.920 / 165 / 193.115 mm<br/>setup capped at built 165 mm<br/><b>capacity from READOUT.md</b>"]:::free -.-> mag
-    e9["reading ±0.075 mm<br/>crank index ±8°<br/>terms from current report"]:::setup -.-> op
+    e9["reading ±0.075 mm<br/>crank arm down ±8°<br/>terms from current report"]:::setup -.-> op
 
     classDef part fill:#fde2e2,stroke:#c0392b
     classDef setup fill:#fff3cd,stroke:#b7791f
@@ -534,9 +534,11 @@ operator forms from step 1; the table is the only data the procedure needs beyon
    alternating readings). Use the **read** ordinate, not the set one: an idle bar still moves
    (its $c_1$ is the null lift), so its second harmonic is $\kappa\,x^\text{read} \neq 0$ — on
    `pair_1_20` the 18 idle channels' $c_2$ is what the correction removes.
-6. **Crank in one direction**, and read coefficient $k$ with the crank stopped on its index at
-   $2k$ turns (the 80-turn period makes $\theta_k = k\pi/20$ exactly two turns apart) rather
-   than at a ruled abscissa on a moving paper.
+6. **Crank in one direction**, and read coefficient $k$ after $2k$ turns (the 80-turn period
+   makes $\theta_k = k\pi/20$ exactly two turns apart) with the crank stopped and its arm
+   pointing straight down, the saved pose, judged by eye or, if needed, with a digital angle
+   gauge on the arm (owner ruling 2026-11-20, #2385), rather than at a ruled abscissa on a
+   moving paper.
 7. Report errors as $e_k = (O_k - C_k)/\max_j|C_j|$ with $C_k$ computed by the **same
    20-sample rule** the machine realises, so quadrature error is never charged to the hardware.
 

@@ -1,16 +1,22 @@
 dt-crank-pin:
   number: MHA-DT-09
+  # Owner ruling 2026-11-20 (#2368, option B, in his words: "B"): a bought
+  # ASME B18.8.2 No. 3 x 1-3/4 taper pin, cross-drilled only; it replaces the
+  # shop-turned custom 1:48 pin.
+  stock_name: No. 3 x 1-3/4 Steel Taper Pin
+  supplier: McMaster-Carr
+  supplier_skus: [98390A254]
   material: Plain Carbon Steel
-  material_specification: AISI 1018 cold-finished steel rod
-  finish: smooth turned, deburred, oiled
+  material_specification: 12L14 carbon steel, McMaster-Carr 98390A254 (No. 3 x 1-3/4 taper pin, ASME B18.8.2)
+  finish: as supplied; oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "machined (steel)"
+  process: "purchased McMaster-Carr 98390A254 No. 3 x 1-3/4 taper pin (ASME B18.8.2); one added operation: drill the #45 keeper-ring hole through the big end"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "#45 ring-hole callout: WEB .065 MIN"
-      finding: "cross-hole web .065 at the smallest printed taper section, above the .060 floor and under the .080 target (rule 17)"
-      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions (extends to MHA-DT-09 and closes #989 as accepted; the hole carries the .040 MHA-DT-27 keeper ring with air, and nearer the big end it runs into the hub)"
+      where: "#45 ring-hole callout: WEB .064 MIN"
+      finding: "cross-hole web .064 at the smallest catalogue taper section at the hole, above the .060 floor and under the .080 target (rule 17)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions (extends to MHA-DT-09 and closes #989 as accepted; the hole carries the .040 MHA-DT-27 keeper ring with air, and nearer the big end it runs into the hub). Owner ruling 2026-11-20 (#2368, \"B\") made the pin a stock No. 3, whose web the triage sheet put at ~.064 MIN, still in RV-01's class."

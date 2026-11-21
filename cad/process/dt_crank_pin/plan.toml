@@ -4,10 +4,12 @@
 title = "Crank Pin"
 part = "MHA-DT-09 Crank Pin"
 revision = "placeholder"
-material = "AISI 1018 cold-finished steel rod"
+material = "12L14 carbon steel, McMaster-Carr 98390A254 (No. 3 x 1-3/4 taper pin, ASME B18.8.2)"
 stock = "To be written"
 shop = "../shop"
-stock_refs = ["1018-round-1-4"]
+# A bought taper pin, cross-drilled only (owner ruling 2026-11-20, #2368):
+# no stock row; the stock BOM reads the registry SKU.
+stock_refs = []
 
 [[tools]]
 id = "drill-45"

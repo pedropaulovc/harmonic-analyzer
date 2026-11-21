@@ -1,8 +1,9 @@
 r"""Build removable crank taper pin MHA-DT-09.
 
-The custom 1:48 pin secures separate hub MHA-DT-31 to crankshaft MHA-DT-11 and is
-removed to release the matched arm/hub assembly for gear service.  Its brass
-keeper ring passes through the small cross-hole near the big end.
+The bought No. 3 x 1-3/4 taper pin (ASME B18.8.2, McMaster-Carr 98390A254; owner
+ruling 2026-11-20, #2368) secures separate hub MHA-DT-31 to crankshaft MHA-DT-11
+and is removed to release the matched arm/hub assembly for gear service.  Its
+brass keeper ring passes through the one shop-drilled cross-hole near the big end.
 
 Layout: pin axis along +X from the origin (big end at x=0), profile revolved
 360 degrees about a centreline on the axis.

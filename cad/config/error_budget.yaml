@@ -117,9 +117,10 @@ reserved:
                                    # setup; one reading converts through s = r_0/(S + C_2), so
                                    # idle bars' lift and the second harmonic at k=0 inflate it.
                                    # Report the worst SINGLE coefficient beside it, not gated.
-  timebase:                        # reading coefficient k with the crank stopped on its index,
-                                   # scored on the worst reference input
-    crank_index_deg: 8.0           # +/- stop repeatability on the crank index (uniform)
+  timebase:                        # reading coefficient k with the crank stopped, its arm
+                                   # pointing straight down (#2385), scored on the worst
+                                   # reference input
+    crank_index_deg: 8.0           # +/- stop repeatability of that arm-down pose (uniform)
     allowance_pct: 0.30
   knife:                           # fixed reversal displacement, evaluated at each input's
                                    # actual ordinate scale and available magnifier range

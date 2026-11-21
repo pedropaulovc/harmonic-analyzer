@@ -1,10 +1,12 @@
 r"""Pure-data dimensional contract shared by the crank pin and drawing.
 
-Issue #290: the sheet prints decimal inch (``drawing_unit: in``).  The taper's
-end diameters and length keep their millimetre nominals: the big end sizes the
-inherited crank hub's cross-hole (dt_crank_hub_geometry), so they print rounded
-at .XX, the model inside each band.  The cross-hole is a #45 drill on the
-printed grid.
+Owner ruling 2026-11-20 (#2368, option B, in his words: "B"): MHA-DT-09 is a
+bought ASME B18.8.2 No. 3 x 1-3/4 taper pin that the shop only cross-drills
+for the keeper ring.  The pin's ends and length are the supplier's, so the
+sheet dimensions none of them (undimensioned purchased geometry is
+reference, the MHA-DT-39 form); it prints the cross-hole, a #45 drill on the
+printed grid, from the as-bought big-end face.  Issue #290: decimal inch
+(``drawing_unit: in``).
 """
 
 from __future__ import annotations
@@ -18,54 +20,62 @@ from _title_block_units import render_number
 
 UNIT = drawing_unit("parts/dt-crank-pin", _config.parts("dt-crank-pin"))
 
-PIN_LENGTH = 45.0
-# CUSTOM 1:48 self-holding taper (0.9375 mm on diameter over the length),
-# dimensioned by its two end diameters on the drawing -- NOT a standard No. 2
-# taper pin (whose 0.193 in large end would not match these ends). The small
-# end sits at the crank-hub cross-hole nominal; the big end is the small end
-# plus the 1:48 on-diameter rise, so the drive-fit taper contacts along its
-# whole length. The hub's cross-hole is taper-reamed with the shaft to the same
-# 1:48 to suit this removable service pin at assembly.
-SMALL_END_DIA = 5.0
-BIG_END_DIA = SMALL_END_DIA + PIN_LENGTH / 48.0  # 5.9375
+MM_PER_IN = 25.4
+# McMaster-Carr 98390A254 (read live 2026-11-20): No. 3 taper pin, 0.219 in
+# large end, 1-3/4 in long, 0.183 in small end, 1:48 taper, 12L14 carbon
+# steel, ASME B18.8.2, pack of 25.
+SKU = "98390A254"
+DESIGNATION = "No. 3 X 1-3/4 TAPER PIN"
+STANDARD = "ASME B18.8.2"
+PIN_LENGTH = 1.75 * MM_PER_IN  # 44.45
+BIG_END_DIA = 0.219 * MM_PER_IN  # 5.5626
+# The standard 1:48 taper on diameter (1/4 in per foot) over the length: the
+# .1825 small end the catalogue rounds to .183.
+SMALL_END_DIA = BIG_END_DIA - PIN_LENGTH / 48.0
+# ASME B18.8.2 commercial taper pins hold the large end +.0013/-.0007 in (as
+# published by Stanho, "Standard Steel Taper Pins", and on Grainger's ASME
+# B18.8.2 No. 3 listing 2PZR2, both read 2026-11-20).  The cross-hole web
+# and the keeper ring's air read this band, not a printed one.
+BIG_END_DIA_BAND = (0.0013 * MM_PER_IN, -0.0007 * MM_PER_IN)
 # Keeper-ring cross-hole through the big end (ch11 p.14 page002_img01: the
 # brass ring hangs from a hole in the pin's head), perpendicular to the axis.
 # A #45 drill, sized for the round ring's wire arc (dt_crank_pin_ring_spec
-# asserts the air).
+# asserts the air).  Its station prints at .XX from the as-bought big end's
+# RIM.  ASME B18.8.2 taper pins have crowned ends; No. 3's end crown radius is
+# .209-.229 in (RC Fastener "Commercial & Precision Classes Taper Pins",
+# ASME B18.8.2-2000 table, read 2026-11-20), a crown about .03 in high over
+# the .219 end.  The model's flat big end is that rim plane: the crown lies
+# outboard of it, so it adds metal beyond the hole-to-end ligament and never
+# takes any; measured from the crown's apex instead, the hole would sit .03
+# nearer the end, so the station's extension line runs to that drawn rim.
 RING_HOLE_DIA = 2.0828  # .082
 RING_HOLE_X = 3.81  # .15 from the big end: a ligament over the .080 target
 
 # No roughness symbol: the taper is a pinned light drive fit that neither runs
 # nor slides (drawing-guidelines.md rule 6 (roughness symbols only where a
-# surface runs, slides or locates)); the Finish field covers the turned face.
+# surface runs, slides or locates)); the pin's surface is as supplied.
 SURFACE_FINISHES = ()
 
 # The cross-hole prints natively: its Ø (a drilled hole: three places under
 # the DRILLED HOLES row) and its station from the big-end face (two places),
-# so no note restates either (drawing-guidelines.md rule 7).
+# so no note restates either (drawing-guidelines.md rule 7).  The bought
+# pin's length and end diameters are not dimensioned.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PinProfile": {"Length"},
     "RingHoleProfile": {"RingHoleX", "RingHoleDia"},
 }
-# Two places on the length: the hand-fitted part's overall size, held to the
-# general .XX band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PinProfile": {"Length": 2},
     "RingHoleProfile": {"RingHoleX": 2, "RingHoleDia": 3},
 }
 
-# The cross-hole's thinnest wall to the pin surface at the printed worst
-# case: the taper at the hole's .XX station, both at their adverse .XX limits,
-# and the drilled hole at its DRILLED HOLES oversize. The big end's lower limit
-# is the PRINTED .XX value's, not the mm model's (#290 review of 29af6f44d:
-# from Ø.23 -.01 the web is .065, not the .067 the model's .2338 gave).
-# Rounded DOWN: the sheet never states more web than the limits give.
-_XX_BAND = printed_band_mm(2, unit=UNIT)
+# The cross-hole's thinnest wall to the pin surface at the worst case: the
+# smallest catalogue big end, the hole at its .XX station's small-end limit
+# and drilled at its DRILLED HOLES oversize.  Rounded DOWN: the sheet never
+# states more web than the limits give.
+RING_HOLE_X_BAND = printed_band_mm(2, unit=UNIT)
 _DRILL_OVERSIZE = drilled_oversize_mm(unit=UNIT)
 _TAPER_PER_MM = (BIG_END_DIA - SMALL_END_DIA) / PIN_LENGTH
-BIG_END_DIA_PRINTED = round(BIG_END_DIA / 25.4, 2) * 25.4
 PIN_DIA_AT_RING_HOLE_MIN = (
-    BIG_END_DIA_PRINTED - _XX_BAND - _TAPER_PER_MM * (RING_HOLE_X + _XX_BAND)
+    BIG_END_DIA + BIG_END_DIA_BAND[1] - _TAPER_PER_MM * (RING_HOLE_X + RING_HOLE_X_BAND)
 )
 CROSS_HOLE_WEB_MIN = round(
     math.floor(
@@ -85,17 +95,15 @@ CROSS_HOLE_WEB_CALLOUT = (
 DIMENSION_CALLOUTS: dict[str, str] = {
     "RingHoleDia": f"#45 DRILL THRU\n{CROSS_HOLE_WEB_CALLOUT}",
 }
+END_VIEW_NOTE = "END VIEW SCALE 4:1"
 
-# The one note, flagged on the taper by a leader (rule 7): the taper ratio the
-# end diameters' .XX bands do not control, and the matched fit with both
-# mates by name and number (rule 4). Four lines, short enough to stand
-# between the end diameters' callouts above the side view.
+# The part's Manufacturing Notes property: the bought pin, the one added
+# operation and the matched fit with both mates by name and number (rule 4).
 DRAWING_NOTES = "\n".join(
     (
-        "1:48 TAPER ON DIAMETER, LIGHT DRIVE",
-        "FIT IN THE CROSS-HOLE OF CRANK HUB",
-        "MHA-DT-31 AND CRANKSHAFT MHA-DT-11,",
+        f"McMASTER-CARR {SKU} {DESIGNATION}, {STANDARD};",
+        "DRILL THE #45 RING HOLE ONLY. DRIVE FIT IN THE CROSS-HOLE",
+        "OF CRANK HUB MHA-DT-31 AND CRANKSHAFT MHA-DT-11,",
         "TAPER-REAMED TOGETHER AT ASSEMBLY",
     )
 )
-END_VIEW_NOTE = "END VIEW SCALE 4:1"

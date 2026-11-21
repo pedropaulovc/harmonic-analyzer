@@ -57,7 +57,7 @@ diameter_mm = 11.1125
 description = "15/32 (.4688 in) drill, 115-piece index"
 diameter_mm = 11.90625
 [tools.taper-pin-reamer]  # B-reamer-taper-pin
-description = "Taper-pin reamer 1:48 (No. 4) for MHA-DT-09"
+description = "Taper-pin reamer 1:48 (No. 3) for MHA-DT-09"
 [tools.reamer-0620]  # B-reamer-.0620
 description = ".0620 in HSS chucking reamer"
 diameter_mm = 1.5748

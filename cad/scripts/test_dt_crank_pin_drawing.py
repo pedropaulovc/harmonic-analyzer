@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import build_dt_crank_pin as part
 import dt_crank_pin_notes as notes
 import dt_crank_pin_spec
@@ -23,7 +25,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     marked = set().union(*dt_crank_pin_spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.FRONT_KEEP) == marked
     assert set(drawing.DRAWING_PRECISION_BY_NAME) == marked
-    assert set(dt_crank_pin_spec.DIMENSION_CALLOUTS) <= marked
+    assert set(notes.RING_HOLE_CALLOUTS) <= marked
     assert drawing.PIN_LENGTH == dt_crank_pin_spec.PIN_LENGTH
 
 
@@ -40,12 +42,13 @@ def test_cross_hole_prints_natively_not_in_a_note() -> None:
     for value in (spec.RING_HOLE_DIA, spec.RING_HOLE_X, spec.PIN_LENGTH):
         inch = value / 25.4
         for places in (2, 3):
-            for text in (notes.TAPER_CALLOUT, notes.TAPER_NOTE):
+            for text in (notes.TAPER_CALLOUT, notes.SHEET_NOTES):
                 assert f"{inch:.{places}f}".lstrip("0") not in text
 
 
 def test_cross_hole_station_text_clears_its_extension_lines() -> None:
-    """Rule 14: the 3.70 text must not straddle its 7.4-mm paper span."""
+    """Rule 14: the .15 station text must not straddle its 7.62-mm paper span
+    (budgeted at the template's wider "3.70")."""
     text_x, text_y = drawing.FRONT_KEEP["RingHoleX"]
     # The unchanged template's copied PDF measures 9.051 mm across "3.70".
     text_half_width = 0.0046
@@ -62,33 +65,85 @@ def test_cross_hole_station_text_clears_its_extension_lines() -> None:
     assert text_y > pin_top + clearance
 
 
-def test_end_diameters_are_drawing_native_true_diameter_callouts() -> None:
-    """The model's end dims are half-profile radii, so the print measures the
-    projected big-end circle; the length and the 1:48 ratio give the small end."""
-    # Custom 1:48 taper over 45 mm -> 0.9375 on diameter.
-    taper_on_dia = dt_crank_pin_spec.BIG_END_DIA - dt_crank_pin_spec.SMALL_END_DIA
-    assert round(taper_on_dia, 4) == round(dt_crank_pin_spec.PIN_LENGTH / 48.0, 4)
-    assert "1:48" in notes.TAPER_CALLOUT
+def test_ring_hole_callout_stands_right_of_the_hole() -> None:
+    """Rule 14: the Ø callout's leader leaves its shoulder's left end and
+    climbs to the hole, so the widest row must start right of the hole or the
+    leader strikes its first letter (machinist review of b8fab08f4e)."""
+    text_x, _ = drawing.FRONT_KEEP["RingHoleDia"]
+    # r5's sheet measured 64.3 mm across the 25-character keeper-ring row.
+    advance = 0.0643 / 25
+    widest = max(len(row) for row in notes.RING_HOLE_CALLOUT.splitlines())
+    hole_right = (
+        drawing.RING_HOLE_CENTER[0]
+        + dt_crank_pin_spec.RING_HOLE_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    )
+    assert text_x - advance * widest / 2.0 >= hole_right + 0.004
+
+
+def test_pin_is_the_bought_no_3_taper_pin_cross_drilled_only() -> None:
+    """Owner ruling 2026-11-20 (#2368, "B"): a stock ASME B18.8.2 No. 3 x
+    1-3/4 pin; the sheet names it once and dimensions only the cross-hole."""
+    import _config
+
+    spec = dt_crank_pin_spec
+    assert spec.BIG_END_DIA == pytest.approx(0.219 * 25.4)
+    assert spec.PIN_LENGTH == pytest.approx(1.75 * 25.4)
+    # The standard 1:48 on diameter gives the catalogue's .183 small end.
+    assert spec.BIG_END_DIA - spec.SMALL_END_DIA == pytest.approx(
+        spec.PIN_LENGTH / 48.0
+    )
+    assert round(spec.SMALL_END_DIA / 25.4, 3) == 0.183
+    assert set(spec.DRAWING_DIMENSIONS) == {"RingHoleProfile"}
+    assert _config.parts("dt-crank-pin")["supplier_skus"] == [spec.SKU]
+    stock = " ".join(notes.STOCK_NOTE.split())
+    assert f"McMASTER-CARR {spec.SKU}, {spec.DESIGNATION} ({spec.STANDARD})" in stock
+    assert "ADD THE RING HOLE ONLY" in stock
+    assert "UNDIMENSIONED GEOMETRY IS REFERENCE" in stock
+    # Rule 7: at most four short lines of part-specific notes.
+    assert len(notes.SHEET_NOTES.splitlines()) <= 4
+    assert all(len(row) <= 73 for row in notes.SHEET_NOTES.splitlines())
+
+
+def test_ring_hole_station_carries_its_value_only() -> None:
+    """Rule 7: a location dimension carries its value and band and nothing
+    else; the ring the hole serves is named once, on its Ø callout, by drawing
+    number (rule 4; machinist review of f79663bf15)."""
+    import _config
+
+    assert set(notes.RING_HOLE_CALLOUTS) == {"RingHoleDia"}
+    ring = f"KEEPER RING {_config.parts('dt-crank-pin-ring')['number']}"
+    assert notes.RING_HOLE_CALLOUT.splitlines() == [
+        "#45 DRILL THRU",
+        f"FOR {ring}",
+        dt_crank_pin_spec.CROSS_HOLE_WEB_CALLOUT,
+    ]
 
 
 def test_matched_taper_fit_names_both_mates() -> None:
     """Rule 4: the hub and shaft are taper-reamed together to suit the pin,
-    so the fit names both mates by name and number and states the
-    acceptance, in the numbered note the taper callout links (rule 7)."""
+    so the fit names both mates by name and number in the numbered note the
+    taper callout links (rule 7).  The bought pin is not cut, so the
+    acceptance that ends the ream sits on the reamed parts' notes only
+    (machinist review of 3d3ad23a09)."""
     import _config
+    import dt_crank_hub_notes
+    import dt_crankshaft_notes
 
     assert notes.TAPER_CALLOUT.splitlines()[-1] == f"SEE NOTE {notes.TAPER_NOTE_NUMBER}"
     note = " ".join(notes.TAPER_NOTE.split())
     assert note.startswith(f"{notes.TAPER_NOTE_NUMBER}. ")
     for stem, name in (("dt-crank-hub", "CRANK HUB"), ("dt-crankshaft", "CRANKSHAFT")):
         assert f"{name} {_config.parts(stem)['number']}" in note
-    assert f"KEEPER RING {_config.parts('dt-crank-pin-ring')['number']}" in note
+    ring = f"KEEPER RING {_config.parts('dt-crank-pin-ring')['number']}"
+    assert ring not in note
+    for reamed in (dt_crank_hub_notes, dt_crankshaft_notes):
+        assert ring in " ".join(reamed.CROSS_HOLE_NOTE.split())
     assert len(notes.TAPER_NOTE.splitlines()) <= 4
 
 
 def test_web_shortfall_is_stated_on_the_hole_callout() -> None:
     """Rule 20: the pending web shortfall prints where it applies."""
-    callout = dt_crank_pin_spec.DIMENSION_CALLOUTS["RingHoleDia"]
+    callout = notes.RING_HOLE_CALLOUTS["RingHoleDia"]
     assert callout.splitlines()[-1] == dt_crank_pin_spec.CROSS_HOLE_WEB_CALLOUT
 
 
@@ -115,7 +170,8 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("dt-crank-pin")
     assert config["number"] == "MHA-DT-09"
-    assert "1018" in str(config["material_specification"])
+    assert dt_crank_pin_spec.SKU in str(config["material_specification"])
+    assert "12L14" in str(config["material_specification"])
     assert config["finish"]
     assert int(config["quantity"]) == 1
 
@@ -145,8 +201,9 @@ def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
     ) / 2.0
     assert worst_web >= WALL_FLOOR_MM
     assert worst_web - 0.0254 < dt_crank_pin_spec.CROSS_HOLE_WEB_MIN <= worst_web
-    # The ligament to the big-end face meets the .080 target at the worst case
-    # of the printed bands (.XX station off the .XX length, DRILLED HOLES).
+    # The ligament to the big-end face meets the .080 target with margin for
+    # twice the .XX station band (the station runs from the as-bought big
+    # end) and the DRILLED HOLES oversize.
     ligament = (
         dt_crank_pin_spec.RING_HOLE_X
         - 2.0 * printed_band_mm(2, unit=unit)

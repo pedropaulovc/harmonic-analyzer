@@ -60,15 +60,16 @@ def _band(places: int) -> float:
 def test_smallest_printed_ring_threads_the_fattest_printed_pin_section() -> None:
     # The ring closes through the taper pin's straight cross-hole, its wire
     # bowing along its own arc. The governing case is the ring at its printed
-    # lower limit (tightest arc) through the pin at its .XX upper limits (the
-    # big end oversize, the hole's station toward the big end), the drilled
-    # hole at nominal (it only cuts oversize).
+    # lower limit (tightest arc) through the bought pin at its fattest (the
+    # big end at its catalogue upper limit, the hole's .XX station toward the
+    # big end), the drilled hole at nominal (it only cuts oversize).
     places = notes.DRAWING_PRECISION_BY_NAME["RingID"]
     ring_min = round(notes.RING_ID / 25.4, places) * 25.4 - _band(places)
     assert spec.RING_ID_MIN == pytest.approx(ring_min)
     taper = (pin.BIG_END_DIA - pin.SMALL_END_DIA) / pin.PIN_LENGTH
-    xx = _band(2)
-    pin_max = pin.BIG_END_DIA + xx - taper * (pin.RING_HOLE_X - xx)
+    xx = printed_band_mm(2, unit=pin.UNIT)
+    big_end_max = pin.BIG_END_DIA + 0.0013 * 25.4  # ASME B18.8.2 +.0013
+    pin_max = big_end_max - taper * (pin.RING_HOLE_X - xx)
     assert spec.PIN_DIA_AT_HOLE_MAX == pytest.approx(pin_max)
     radius = (ring_min + spec.WIRE_DIA) / 2.0
     sagitta = radius - math.sqrt(radius**2 - (pin_max / 2.0) ** 2)

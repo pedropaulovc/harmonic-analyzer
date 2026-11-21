@@ -29,11 +29,12 @@
 # recorded the shop owning it, so it is to buy (or to record, if the shop has
 # one). No vendor or SKU is asserted for a tool to buy.
 
-# Size from the pin (#3083 row 6, owner ruling 2026-11-20): MHA-DT-09's ends
-# are Ø5.0 and Ø5.9375 mm (.197-.234 in) on a 1:48 taper (dt_crank_pin_spec
-# SMALL_END_DIA, BIG_END_DIA), inside a No. 4 taper-pin reamer's span.
+# Size from the pin (#3083 row 6, owner ruling 2026-11-20; #2368, the same
+# day, made MHA-DT-09 a bought No. 3 taper pin): its ends are .183-.219 in on
+# a 1:48 taper (dt_crank_pin_spec SMALL_END_DIA, BIG_END_DIA), a No. 3
+# taper-pin reamer's size.
 [tools.taper-pin-reamer]
-name = "Taper-pin reamer No. 4, 1:48, for the MHA-DT-09 pin"
+name = "Taper-pin reamer No. 3, 1:48, for the MHA-DT-09 pin"
 kind = "reamer"
 status = "to_order"
 

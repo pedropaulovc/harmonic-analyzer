@@ -209,7 +209,7 @@ sections:
         - scaled
         - med
       - - Taper pin + keeper ring (MHA-DT-09)
-        - '45-long 1:48 pin through separate hub MHA-DT-31 + crankshaft only at local station 13.6 (world z −169.4); big end 4.45 proud of the hub barrel; round Ø12 brass wire ring (Ø1.0 wire, Ø11.0 inside, `dt-crank-pin-ring` MHA-DT-27; owner ruling 2026-10-15, option A: the smallest printed ring still threads the fattest printed pin section) through a Ø2.1 cross-hole 3.7 from the big end, sized for the ring''s wire arc; owner ruling 2026-10-15 A1: the ring is posed flat in the pin''s axial plane, reaching outboard past the big end clear of the arm (hung down along the arm it dipped 0.9 into the arm''s inboard face); owner ruling 2026-11-08 (#2144 item 9.2): one open strand of 9 links of #18 jack chain (MHA-DT-VN-65), its end link screwed flat to the arm''s outboard face by the MHA-DT-VN-70 #2-56 binding head through its eye, the ring threaded through the far link''s eye and closed with pliers (butt gap 0–.010); the strand reaches the fully withdrawn pin with 2 links spare (`dt_vn_keeper_chain_spec.py`)'
+        - 'Stock No. 3 x 1-3/4 ASME B18.8.2 taper pin (McMaster-Carr 98390A254, 44.45 long, 1:48; owner ruling 2026-11-20, #2368: bought and cross-drilled only, replacing the shop-turned 45-long custom pin) through separate hub MHA-DT-31 + crankshaft only at local station 13.6 (world z −169.4); big end 4.57 proud of the hub barrel; round Ø12 brass wire ring (Ø1.0 wire, Ø11.0 inside, `dt-crank-pin-ring` MHA-DT-27; owner ruling 2026-10-15, option A: the smallest printed ring still threads the fattest printed pin section) through a Ø2.1 cross-hole 3.8 from the big end, sized for the ring''s wire arc; owner ruling 2026-10-15 A1: the ring is posed flat in the pin''s axial plane, reaching outboard past the big end clear of the arm (hung down along the arm it dipped 0.9 into the arm''s inboard face); owner ruling 2026-11-08 (#2144 item 9.2): one open strand of 9 links of #18 jack chain (MHA-DT-VN-65), its end link screwed flat to the arm''s outboard face by the MHA-DT-VN-70 #2-56 binding head through its eye, the ring threaded through the far link''s eye and closed with pliers (butt gap 0–.010); the strand reaches the fully withdrawn pin with 2 links spare (`dt_vn_keeper_chain_spec.py`)'
         - —
         - 'ch11 p.14 page002_img01 (removable pin head and brass ring) + primary crank construction photo; the hub #14 and shaft #9 pilots are match-reamed together. The arm is outboard of this station and is not drilled by MHA-DT-09. The anchor screw remains on the arm; the chain is lost, and is reconstructed with McMaster 3603T354 #18 solid brass single jack chain (.047 wire, .39 inside length; eye ID unpublished, .110–.1535 across sources: gauge a sample before purchase).'
         - scaled + construction
@@ -289,7 +289,7 @@ sections:
       - - Tapered-pin cross-hole
         - '~Ø5 mm through MHA-DT-31 rear barrel + shaft at local station 13.6'
         - ~0.20
-        - p.14 photo and removable MHA-DT-09 small end; hub and shaft pilots are match-reamed to the custom 1:48 pin
+        - p.14 photo and removable MHA-DT-09 small end; hub and shaft pilots are taper-reamed together to the stock No. 3 pin (owner ruling 2026-11-20, #2368)
         - scaled
         - med
       - - Crankshaft length

@@ -23,10 +23,10 @@ Threadlocker alone, a seated thread, shoulder or shim is not a lock.
 ## Open items
 
 Exposed joints with no mechanical lock and no owner ruling (the audit
-reported four at removal; `post-mount-screws`, #1177, has since been ruled):
+reported four at removal; `post-mount-screws` (#1177),
+`arbor-apex-set-screw` (#1173) and `keeper-chain-anchor-screw` (#1175) have
+since been ruled):
 
-- `dt-drive-train/arbor-apex-set-screw` (#1173, #2216): MHA-SH-VN-54 `sh-vn-arbor-set-screw` in MHA-DT-02 `dt-arbor-pedestal`, #4-40 UNC, rotating drag, lock: none.
-- `dt-drive-train/keeper-chain-anchor-screw` (#1175): MHA-DT-VN-70 `dt-vn-keeper-chain-screw` in MHA-DT-06 `dt-crank-arm`, #2-56 UNC, oscillating, lock: none.
 - `ha-harmonic-analyzer/cone-pivot-screw-in-base` (#1179, #2312): MHA-DT-VN-52 `dt-vn-cone-pivot-screw` in MHA-FR-01 `fr-harmonic-base`, #10-24 UNC, oscillating, lock: none.
 
 ## Owner rulings (accepted without a lock)
@@ -42,6 +42,8 @@ reported four at removal; `post-mount-screws`, #1177, has since been ruled):
 - `U-MHA-SH-VN-54-in-CH-08-no-lock` (`ch-channel/pivot-bracket-apex-set-screw`): owner (Pedro), 2026-11-20, #2397 (triage of 2026-11-19), in his words "Follow recommendations unless noted otherwise", accepting option 2 for "the CH pivot/fulcrum stakes guarding shafts pulled to change a channel part": drop the stakes on joints that must open for channel, wire or spring service and rely on the set screw on a flat. The MHA-CH-05 pivot shaft comes out to change one channel part, so each MHA-SH-VN-54 cup point is tightened onto its flat under the MHA-CH-08 ear's apex tap and left unstaked; the former tap-mouth stake step and its view D pointer are retired. Joint-specific: the MHA-SH-VN-54 in MHA-DT-02 (`dt-drive-train/arbor-apex-set-screw`) is not covered.
 - `U-MHA-CH-VN-55-no-lock` (`ch-channel/fulcrum-shaft-set-screw-in-keeper`): owner (Pedro), 2026-11-20, #2397, the same ruling as `U-MHA-SH-VN-54-in-CH-08-no-lock`: the MHA-CH-04 fulcrum shaft comes out to change one channel part, so each MHA-CH-VN-55 cup point is tightened onto its flat under the MHA-CH-07 keeper's crown tap and left unstaked; the former tap-mouth stake step and its view E pointer are retired. The MHA-DT-00 crank-handle stake (`dt-drive-train/handle-pivot-screw`) stays (same ruling: "Keep the DT handle stake").
 - `U-MHA-DT-VN-61-no-lock` (`dt-drive-train/post-mount-screws`): owner (Pedro), 2026-11-20, #1177 (triage of 2026-11-19): 'B only if plate hole can be a blind hole otherwise it could rub on the deck when swinging the plate. Otherwise A'. The plate hole cannot be blind, so A stands: no lock and no dowel; MHA-DT-05 is held on MHA-DT-20 by the two screws' head and face friction. Why B fails its condition: MHA-DT-20 is 1/4 plate as supplied, .245 at its mill band's least (`dt_cone_swing_platform_spec.PLATE_THICKNESS`, `PLATE_STOCK_BAND`). A blind ream for option B's 1/8 x 1/2 dowel, gripping it 1.5D (.1875; the 1.5D grip rule `dt_cone_tip_block_spec` asserts in each member for its own Ø1/16 dowel, MHA-DT-VN-69), with its .XX depth band and the 118° drill point (.0376), leaves .015 under the point at nominal and none at the printed worst, against the rule-17 .060 floor; the deepest blind ream that keeps .060 grips 1.02D. Whatever the dowel size (a Ø1/16 would leave about .11 under the point), a blind plate hole opens only on the plate top under MHA-DT-05, so the match-drilling after fit-up that option B rests on could reach it only by drilling 3.73 down through the post, on the cross axis through both running bores. After any loosening of MHA-DT-VN-61, MHA-DT-00 check 4V sends the fitter to step 3G, which re-sets the post (2M, 2S-2U) and indicates the shaft end play again (3C-3F), and then redoes checks 4-7 (#3085); the assembly package declares this acceptance as U-MHA-DT-VN-61-no-lock. This accepts no lock for this joint, not a demonstrated immunity: journal drag and the crank load still pass a cyclic moment about vertical (see the row's reason below).
+- `U-MHA-SH-VN-54-DT-no-lock` (`dt-drive-train/arbor-apex-set-screw`): owner (Pedro), 2026-11-20, #1173 (triage of 2026-11-19, option A, in his words: "A"): accept the bare cup point, like `U-MHA-PD-VN-57-no-lock`. The two #4-40 cup-point MHA-SH-VN-54 set screws hold the stationary MHA-DT-13 arbor in the MHA-DT-02 pedestal crowns by their own thread and the cup in the arbor's spot; no stake, no jam screw. The rejected options were staking the crown tap mouth (as on MHA-CH-08) and raising the crown for a jam screw. #2216 (the same finding from a machinist review) is closed as its duplicate.
+- `U-MHA-DT-VN-70-no-lock` (`dt-drive-train/keeper-chain-anchor-screw`): owner (Pedro), 2026-11-20, #1175 (triage of 2026-11-19, option A, in his words: "A"): accept unlocked. The #2-56 brass binding head MHA-DT-VN-70 clamps the MHA-DT-VN-65 keeper chain's end link to the turning MHA-DT-06 arm with no lock; its load is a few grams of chain, it is in plain sight on the crank and is re-tightened when seen, and losing it frees only the keeper chain, not the crank. The rejected options were a 3/8 screw with its tip filed flush and the inboard tap mouth staked (as MHA-DT-32) and a jammed #2-56 hex nut.
 
 ## fr-frame
 
@@ -68,9 +70,9 @@ Why each row is classified so, and how it is held axially:
 | `tip-end-screw` | MHA-DT-39 `dt-cone-tip-end-screw` → MHA-DT-21 `dt-cone-tip-block` | 1/4-28 | 1 | adjuster | pinch clamp (`dt-vn-cone-tip-pinch-screw`) | post-and-tip-block / end-play-set |
 | `tip-pinch-screw` | MHA-DT-VN-56 `dt-vn-cone-tip-pinch-screw` → MHA-DT-21 `dt-cone-tip-block` | #4-40 | 1 | static clamp | none | end-play-set |
 | `handle-pivot-screw` | MHA-DT-32 `dt-crank-handle-pivot-screw` → MHA-DT-06 `dt-crank-arm` | #4-40 | 1 | rotating drag | staked (`dt-crank-arm:staked tap mouth`) | crank-handle-fitted |
-| `arbor-apex-set-screw` | MHA-SH-VN-54 `sh-vn-arbor-set-screw` → MHA-DT-02 `dt-arbor-pedestal` | #4-40 UNC | 2 | rotating drag | none; **open** #1173, #2216 | cylinder-bank-located |
+| `arbor-apex-set-screw` | MHA-SH-VN-54 `sh-vn-arbor-set-screw` → MHA-DT-02 `dt-arbor-pedestal` | #4-40 UNC | 2 | rotating drag | none; ruling `U-MHA-SH-VN-54-DT-no-lock` | cylinder-bank-located |
 | `pinion-cam-set-screw` | MHA-DT-23 `dt-pinion-cam` → MHA-DT-17 `dt-pinion-lift-rod` | #2-56 UNC (ASME B18.3 #2-56 X 3/16 flat-point socket set screw supplied with MHA-DT-23, 2B tap in the cam) | 2 | oscillating | staked (`dt-pinion-cam:staked tap mouth`) | cams-and-lever-fitted / cam-collars-set |
-| `keeper-chain-anchor-screw` | MHA-DT-VN-70 `dt-vn-keeper-chain-screw` → MHA-DT-06 `dt-crank-arm` | #2-56 UNC | 1 | oscillating | none; **open** #1175 | crank-hub-fitted |
+| `keeper-chain-anchor-screw` | MHA-DT-VN-70 `dt-vn-keeper-chain-screw` → MHA-DT-06 `dt-crank-arm` | #2-56 UNC | 1 | oscillating | none; ruling `U-MHA-DT-VN-70-no-lock` | crank-hub-fitted |
 
 Why each row is classified so, and how it is held axially:
 
