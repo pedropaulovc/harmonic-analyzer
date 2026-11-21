@@ -164,9 +164,9 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Blue the corner of the sheet. On the surface plate, scribe a {{process.blank_x_in:.2f}} × {{process.blank_y_in:.2f}} in rectangle off two straight sheet edges with the height gauge. Saw it out just outside the lines, the sheet clamped flat between two scrap boards in the saw's vise so it cannot buckle. File the saw burr off; keep the blank flat (do not bend it)."
+instruction = "Blue the corner of the sheet. On the surface plate, scribe a {{process.blank_x_in:.2f}} × {{process.blank_y_in:.2f}} in rectangle off two straight sheet edges with the height gauge, the sheet stood on each edge in turn against a 1-2-3 block on the plate. Saw it out just outside the lines, the sheet clamped flat between two scrap boards in the saw's vise so it cannot buckle. File the saw burr off; keep the blank flat (do not bend it)."
 feed = "hand"
-inspection = "Blank at least {{cad.far_end_length_max_in:.2f}} × {{cad.roof_edge_height_max_in:.2f}}, calipers; flat: it does not rock on the surface plate."
+inspection = "Blank at least {{cad.far_end_length_max_in:.2f}} × {{cad.roof_edge_height_max_in:.2f}}, calipers; flat: it does not rock on the surface plate. Short or bent: saw another blank."
 gauge_checks = [
   { gauge = "calipers", band_mm = [21.59, 22.86] },
   { gauge = "calipers", band_mm = [14.478, 15.748] },
@@ -189,7 +189,7 @@ drilling = "none"
 sizing = "other"
 instruction = "In the bench vise's soft jaws, the blank no more than 1/8 in above them: file one long edge straight, the LOCATING EDGE, then one short end square to it, the LOCATING END, checked with the combination square's blade (no light under it). Scribe an L on the seating face at that corner: every later step counts from these two."
 feed = "hand"
-inspection = "Locating end square to the locating edge: no light under the square's blade along either."
+inspection = "Locating end square to the locating edge: no light under the square's blade along either. Light: file again and recheck."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -197,9 +197,9 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "Blue the blank. Scribe the far end {{cad.far_end_length_in:.3dot}} from the locating end and the roof edge {{cad.roof_edge_height_in:.3dot}} from the locating edge (height gauge on the surface plate). File each down to its line, square to the locating edge and end."
+instruction = "Blue the blank. Scribe the far end {{cad.far_end_length_in:.3dot}} from the locating end and the roof edge {{cad.roof_edge_height_in:.3dot}} from the locating edge with the height gauge, the blank stood on that edge (then on the locating end) against a 1-2-3 block on the surface plate. File each down to its line, square to the locating edge and end."
 feed = "hand"
-inspection = "Length {{cad.far_end_length_min_in:.2f}}–{{cad.far_end_length_max_in:.2f}} (locating end to far end) and height {{cad.roof_edge_height_min_in:.2f}}–{{cad.roof_edge_height_max_in:.2f}} (locating edge to roof edge), calipers at both ends of each."
+inspection = "Length {{cad.far_end_length_min_in:.2f}}–{{cad.far_end_length_max_in:.2f}} (locating end to far end) and height {{cad.roof_edge_height_min_in:.2f}}–{{cad.roof_edge_height_max_in:.2f}} (locating edge to roof edge), calipers at both ends of each. Over: file to the line again and recheck; under: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.far_end_length_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.roof_edge_height_band_mm}}" },
@@ -212,7 +212,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Scribe {{cad.roof_chamfers_size_in:.3dot}} from each roof corner along the roof edge and down each end. File each of the two roof corners off at 45° to its two marks (the locating-edge corners stay sharp, edge break only)."
 feed = "hand"
-inspection = "Each roof chamfer {{cad.roof_chamfers_size_min_in:.2f}}–{{cad.roof_chamfers_size_max_in:.2f}} along the roof and down the end, calipers; 45° ±1°: no light under the combination square's 45° face."
+inspection = "Each roof chamfer {{cad.roof_chamfers_size_min_in:.2f}}–{{cad.roof_chamfers_size_max_in:.2f}} along the roof and down the end, calipers; 45° ±1°: no light under the combination square's 45° face. Small or off angle: file again and recheck; over {{cad.roof_chamfers_size_max_in:.2f}}: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.roof_chamfers_size_band_mm}}" }]
 
 [[setups.operations]]
@@ -222,7 +222,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Break every edge R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max with the scraper; no burr may stand proud of either face, because the seating face lies on the block in the pair. Lay it on the surface plate."
 feed = "hand"
-inspection = "Flat: it does not rock on the surface plate, either face down."
+inspection = "Flat: it does not rock on the surface plate, either face down. Rocks: stone the high face on the plate and recheck."
 gauge_checks = "other"
 
 [[setups]]
@@ -302,7 +302,7 @@ title = "Open the plate's holes"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "As Setup 3, but the plate turned over about its long axis: its seating face UP, its locating end still on the fixed jaw, its locating edge now on the LEFT, flush with the block's roof side. Its two pilots now stand over the block's open window (.336–.470 above the block's locating edge), so the #41 breaks into air. Look down each pilot before clamping: you see the window, not the block face."
+holding = "As Setup 3, but the plate turned over about its long axis: its seating face UP, its locating end still on the fixed jaw, its locating edge now on the LEFT, flush with the block's roof side: a 1-2-3 block held against both on the left, the plate tapped until both touch it. Its two pilots now stand over the block's open window (.336–.470 above the block's locating edge), so the #41 breaks into air. Look down each pilot before clamping: you see the window, not the block face."
 datum = "Program MS02_open. G54: X0 the plate's locating edge (LEFT side), the plate to +X; Y0 the fixed jaw's face; Z0 the plate's top (its seating face). Holes at Y −{{cad.clearance_hole_1_station_in:.3f}} and −{{cad.clearance_hole_2_station_in:.3f}}, X +{{cad.clearance_hole_1_height_in:.3f}}."
 diagram = { file = "diagrams/open.svg", alt = "The plate turned over on the same block, gripped as before; its two pilots over the block's window; the #41 opens both through into the window." }
 envelope = { x_span_mm = ["{{cad.envelope_y_mm}}", 5.08], y_span_mm = ["{{cad.envelope_x_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.stack_height_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.stack_height_mm}}", "{{process.open_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_41_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_41_oal_mm}}"] }
@@ -316,7 +316,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Mike the #41 across its margins first: .094–.098 (else use another). G54 Z0: the plate's top, touched with the #41's point on a .002 feeler leaf."
-instruction_detailed = "Console M6 T3 (#41; the tool setter measures it). Spindle stopped, its point just dragging a .002 feeler leaf on the plate between the holes: G10 L20 P1 Z0.051."
+instruction_detailed = "Mike the #41 across its margins: .094–.098, else use another #41; note the reading for Ops 210–220. Console M6 T3 (#41; the tool setter measures it). Spindle stopped, its point just dragging a .002 feeler leaf on the plate between the holes: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -354,7 +354,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Deburr both holes on both faces with the scraper, edge break only (no countersink: the screw heads seat on the outer face). Stone the seating face lightly flat on the surface plate's edge if a burr stands."
 feed = "hand"
-inspection = "Seating face down on the surface plate: it does not rock and no burr stands proud."
+inspection = "Seating face down on the surface plate: it does not rock and no burr stands proud. Rocks: stone the burr off and recheck."
 gauge_checks = "other"
 
 [[setups.operations]]
