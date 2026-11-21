@@ -197,6 +197,11 @@ HALF_OD = OUTSIDE_DIA * _S / 2000.0
 _ABOVE_Y = SIDE_CENTER[1] + HALF_OD + 0.016
 _ROW_PITCH = 0.010
 _ROW_Y = tuple(SIDE_CENTER[1] - HALF_OD - 0.016 - i * _ROW_PITCH for i in range(6))
+# The overall's text stands 1.5 mm over its row: on it, VIEW C's span text
+# (top 76.3 mm) stood 2.39 mm under it and read as one callout (the audit
+# wants 3.57; r4 and r6).  The face width's block above it ends right of the
+# pinion's witness line, so the lift meets nothing.
+_OVERALL_LIFT = 0.0015
 # Mates named once at their tight bands (drawing-guidelines rule 4), by the
 # config's part name (less the family's "TRANSGEAR") and number.
 THUMBNUT_NUMBER = _config.parts("pd-transgear-thumbnut")["number"]
@@ -376,11 +381,7 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     # and the pinion's rear witness line (round 3: "2.792 SEE NOTE 3" left
     # of F ran into the face width's left witness line and arrow, which drop
     # to the overall text's height); OVERALL_TEXT_* below check both ends.
-    "OverallLength": ((REAR_X + PINION_REAR_X) / 2.0, _ROW_Y[5]),
-    # #2425: the journal's explicit rear chamfer, over the rear end's top
-    # corner on the journal Ø's row, left of that Ø's text and right of the
-    # rear view's tap callout.
-    "RearChamferSize": (REAR_X + 0.010, _DIA_ROW_Y[0]),
+    "OverallLength": ((REAR_X + PINION_REAR_X) / 2.0, _ROW_Y[5] + _OVERALL_LIFT),
 }
 END_KEEP: dict[str, tuple[float, float]] = {
     # The flat's distance from the axis, where the flat shows true (machinist
@@ -392,7 +393,8 @@ END_KEEP: dict[str, tuple[float, float]] = {
     "FlatToAxis": (FRONT_CENTER[0] + HALF_OD + 0.005, FRONT_CENTER[1] - 0.022),
 }
 # Callouts over the vertical Ø texts (a below-callout there would sit on
-# the Ø's own line), each one line.  Every kept tight band prints its
+# the Ø's own line unless it starts a space off it, as the journal's rear
+# chamfer row does), each one line.  Every kept tight band prints its
 # matched-fit route at its callout (delegated ruling 2026-11-07 (Main) F5):
 # the tooth tips link the gear data block, which names the mesh mate and its
 # backlash acceptance; the thread relief's is a plain clearance.
@@ -412,12 +414,21 @@ if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
 # GEAR DATA block's backlash acceptance, worded as MHA-PD-06's span callout
 # (two lines of words under "SPAN 2 TEETH" and its limits).  Lengths and
 # locations print their values alone.
+# #2425: the journal's .015 X 45° rear chamfer prints as a row of the
+# journal Ø's own callout (as MHA-PD-19's press hole carries its mouth
+# chamfer in its REAM THRU callout): a native dimension over the rear corner
+# sat on detail B's ".016 SEE NOTE 4" and ".007" (farm r6), and a note may
+# not carry a size.  The Ø's text hangs right of its line over the journal,
+# so the row (one leading space off that line, ~55 mm) runs x 134.8-190 mm
+# under the Ø's value and over the shaft's top (169.5 mm), left of the
+# pinion (from 195.4 mm).
+JOURNAL_DIA_BELOW = f" REAR END {REAR_CHAMFER_CALLOUT}"
 SPAN_CALLOUT = f"MATCHED FIT,\n{GEAR_DATA_LINK}"
 DIMENSION_CALLOUTS_BELOW = {
     "FaceWidth": FACE_WIDTH_CALLOUT,
     "FlatToAxis": D_SECTION_FIT_LINK,
     "ToothSpan": SPAN_CALLOUT,
-    "RearChamferSize": REAR_CHAMFER_CALLOUT,
+    "JournalDia": JOURNAL_DIA_BELOW,
 }
 # The two D-flat stations link the seat note and the thread's end the thread
 # note, each on its value's line; detail
@@ -522,11 +533,17 @@ NOTES_XY = (0.300, 0.100)
 TITLE_BLOCK_TOP = 0.0663
 NOTES_CHAR_HEIGHT = GEAR_DATA_CHAR_HEIGHT
 DATUM_A_SYMBOL = (END_CENTER[0] - 0.017, END_CENTER[1] - 0.018)
-# The rear #2-56 tap's native callout on the rear view, up and left of the
-# journal (datum A's symbol hangs lower left), over the side view's rear end:
-# the drill and the full thread at their places (rule 12: the full thread
-# and the deeper drill each print), the screw it takes under the rows.
-REAR_TAP_CALLOUT_XY = (0.020, 0.200)
+# The rear #2-56 tap's native callout on the rear view, centred under it
+# (r6 of #2425: centred up and left at x 20 mm, its 47 mm rows ran 16 mm
+# past the left border): its rows (~47 mm wide, ~14.5 mm tall, centred on
+# the point) run x 24.5-71.5 mm, inside the border and left of the rear
+# witness line (77.3), and y 120.7-135.3 mm, under datum A's symbol and
+# over the GEAR DATA block (top 118).  The drill and
+# the full thread at their places (rule 12: the full thread and the deeper
+# drill each print), the screw it takes under the rows.
+REAR_TAP_CALLOUT_XY = (END_CENTER[0] + 0.003, 0.128)
+REAR_TAP_CALLOUT_HALF_WIDTH = 0.0235
+REAR_TAP_CALLOUT_HALF_HEIGHT = 0.0073
 REAR_TAP_CALLOUT_PRECISION = {
     "hw-tapdrldia": REAR_TAP_DRILL_DIA_PLACES,
     "hw-threaddepth": REAR_TAP_DEPTH_PLACES,

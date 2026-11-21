@@ -165,18 +165,23 @@ BORE_BLOCK_HALF_HEIGHT = 0.0153
 # clear of the finish above, the corner radii and the caption to its left,
 # its dimension line right of the finish symbol's Ra text.
 # Above the section, the two depths on one row, the length a row higher
-# with its note reference under it.  The pocket depth's text stands over its
-# span; the pilot depth's ".152 / SEE NOTE 1" (24 mm wide over a 15 mm span)
-# stands outside right of the front face, where the length's extension line
-# rising from that face no longer strikes its NOTE row and the pocket
-# depth's arrow no longer runs into its "S" (r5 render).  Below the section,
-# the two floor corners' R.xxx MAX on one row, each under its own corner,
-# the caption beneath.
+# with its note reference under it.  Neither depth's text fits its span
+# with air to both extension lines, so each stands outside: the pocket
+# depth's ".108" (8.5 mm over an 11 mm span) left of the rear face, where
+# the length's extension line rising from that face stood 1.39 mm from it
+# (r6 audit; 2.0 wanted), and the pilot depth's ".152 / SEE NOTE 1" (24 mm
+# over 15 mm) right of the front face, where the length's extension line
+# no longer strikes its NOTE row and the pocket depth's arrow no longer
+# runs into its "S" (r5 render).  Below the section, the two floor corners'
+# R.xxx MAX on one row, each under its own corner, the caption beneath.
 DEPTH_TEXT_HALF_WIDTH = 0.012  # "SEE NOTE 1", 23.9 mm on the r5 render
+CBORE_DEPTH_TEXT_HALF_WIDTH = 0.00425  # ".108", 8.5 mm on the r6 render
 SECTION_KEEP = {
     "CupDia": (REAR_FACE_X - 0.030, SECTION_CENTER[1]),
     "CboreDia": (REAR_FACE_X - 0.012, SECTION_CENTER[1] - HALF_CBORE - 0.007),
-    "CboreDepth": (REAR_FACE_X + CBORE_DEPTH_ON_SHEET / 2.0, SECTION_TOP + 0.010),
+    "CboreDepth": (
+        REAR_FACE_X - 0.0025 - CBORE_DEPTH_TEXT_HALF_WIDTH, SECTION_TOP + 0.010
+    ),
     "PilotDepth": (FRONT_FACE_X + 0.003 + DEPTH_TEXT_HALF_WIDTH, SECTION_TOP + 0.010),
     "CupLength": (SECTION_CENTER[0], SECTION_TOP + 0.026),
     "BoreDia": (

@@ -3,14 +3,14 @@ r"""Create the manufacturing drawing for the transgear knob bush (MHA-PD-28).
 Section A-A is the lathe view (drawing-guidelines.md rule 11): it cuts the
 bush on its axis through the Front plane, the plane of the turned profile,
 and lies axis-horizontal with the hub face on the left, so the hub and press
-diameters, the reamed bore, the hub station and the overall length (both
-from the hub face) and the shoulder root print together on solid cut edges.
-Datum A tags the shoulder face there, and both thrust faces carry their
-finish under a caption naming the part they bear on.  The face view, the
-``*Top`` orientation turned a quarter, carries the cutting plane, the bore's
-perpendicularity frame to A and the bore's running
-finish.  Every callout row is authored on the part; the sheet reads them
-back.
+diameters, the hub station and the overall length (both from the hub face)
+and the shoulder root print together on solid cut edges.  Datum A tags the
+shoulder face there, and both thrust faces carry their finish under a
+caption naming the part they bear on.  The face view, the ``*Top``
+orientation turned a quarter, carries the cutting plane and the reamed bore,
+a circle there: its Ø callout (rule 12, the MHA-PD-25 bushing's end view),
+its perpendicularity frame to A and its running finish.  Every callout row
+is authored on the part; the sheet reads them back.
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision
+from _drawing_edges import scan_view_edges
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
 from _drawing_projection import model_point_in_view, model_points_in_view
@@ -91,11 +92,14 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-# The face view upper left (its frame above it), A-A in the middle, the
-# isometric lower right, above the title block's top edge.
+# The face view upper left, A-A in the middle, the isometric lower left
+# under the hub Ø, clear of the title block (farm r6: lower right it
+# intruded 8 mm into it).
 FACE_CENTER = (0.060, 0.200)
 SECTION_CENTER = (0.200, 0.170)
-ISO_CENTER = (0.340, 0.105)
+ISO_CENTER = (0.110, 0.064)
+# The isometric's extent, read off r6: 39.6 x 92.2 mm about its centre.
+ISO_SIZE_M = (0.0396, 0.0922)
 # Half the bush's hub, press and bore Ø and its length on the sheet, and the
 # cutting line's overrun past the hub.
 HALF_HUB = HUB_DIA * _S / 2000.0
@@ -118,68 +122,102 @@ HUB_FACE_X = SECTION_CENTER[0] - HALF_LENGTH
 SHOULDER_X = HUB_FACE_X + HUB_LENGTH * _S / 1000.0
 REAR_FACE_X = SECTION_CENTER[0] + HALF_LENGTH
 # The native SECTION caption, top-centre anchored, under the section and
-# below datum A's tag and the root radius, right of the bore's block.
+# below datum A's tag and the root radius.
 CAPTION_XY = (SECTION_CENTER[0], SECTION_CENTER[1] - HALF_HUB - 0.045)
 
-# Section A-A's dimension texts.  Left of the hub face: the bore's line
-# nearer the part and the hub's beyond it, so the hub's extension lines (at
-# the hub radius) pass outside the bore's dimension line and neither crosses
-# the other; the bore's three-row block hangs below the part.  Above: the
-# hub station, then the overall length over it.  Right of the rear face: the
-# press Ø, its block between its own extension lines.  The root radius below
-# the shoulder.
+# Section A-A's dimension texts.  Each diameter's text sits between its own
+# extension lines, so no dimension line runs out across another's extension
+# line (farm r6: the bore's, nested inside the hub's, crossed it; the bore
+# now prints on the face view).  Left of the hub face the hub Ø, far enough
+# out that the hub face's finish and caption stand between it and the part;
+# right of the rear face the press Ø, its block beyond the rear face's
+# finish and caption.  Above: the hub station, then the overall length over
+# it.  The root radius below and right of the shoulder, its text off the
+# shoulder's line so its leader slants away from datum A's.
 SECTION_KEEP = {
-    "HubDia": (HUB_FACE_X - 0.038, SECTION_CENTER[1]),
-    "BoreDia": (HUB_FACE_X - 0.014, SECTION_CENTER[1] - HALF_HUB - 0.020),
+    "HubDia": (HUB_FACE_X - 0.060, SECTION_CENTER[1]),
     "HubLength": (
         (HUB_FACE_X + SHOULDER_X) / 2.0,
         SECTION_CENTER[1] + HALF_HUB + 0.022,
     ),
     "BushLength": (SECTION_CENTER[0], SECTION_CENTER[1] + HALF_HUB + 0.050),
-    "PressDia": (REAR_FACE_X + 0.066, SECTION_CENTER[1]),
-    "ShoulderR": (SHOULDER_X + 0.014, SECTION_CENTER[1] - HALF_HUB - 0.012),
+    "PressDia": (REAR_FACE_X + 0.108, SECTION_CENTER[1]),
+    "ShoulderR": (SHOULDER_X + 0.034, SECTION_CENTER[1] - HALF_HUB - 0.012),
 }
+# The face view's bore Ø: its block centred above the view and right of the
+# bore's centre, so SolidWorks runs the leader from the shelf's LEFT end
+# (the end on the circle's side, as MHA-PD-25's end view lands its right
+# end) down onto the bore's upper-left quarter, left of the cutting line,
+# the block's shelf clear above the line's top letter.
+FACE_KEEP = {
+    "BoreDia": (FACE_CENTER[0] + 0.015, FACE_CENTER[1] + HALF_HUB + 0.0265),
+}
+# The bore's block, read off r6's A-A: 96 mm wide, 25 mm from shelf to top.
+BORE_BLOCK_SIZE_M = (0.096, 0.025)
 
-# Each thrust face's pick lies on its cut edge on the upper half, midway
-# between the bore and its outer Ø; the symbol stands above and outboard of
-# the diameter's extension line, its caption over it (the plate's former
-# hub- and boss-face layout).
-_HUB_PICK = (HUB_FACE_X, SECTION_CENTER[1] + (BORE_DIA + HUB_DIA) / 4.0 * _S / 1000.0)
+# A surface finish's ink, read off r6 relative to its symbol point: the
+# leader leaves 6.3 mm right of it, the symbol stands up to 7.2 mm above it,
+# its text 5.3-13.7 mm right and 4.3-6.8 mm up; a caption's two rows hang
+# 8.1 mm under its point and run 37.5 mm right.  So a leader that leaves
+# level or downward clears its own text (r6's face-view leader rose through
+# it), and each symbol sits ABOVE its landing.
+FINISH_LEADER_DX_M = 0.0063
+FINISH_SYMBOL_HEIGHT_M = 0.0072
+FINISH_TEXT_BOX_M = (0.0053, 0.0043, 0.0137, 0.0068)
+CAPTION_SIZE_M = (0.0375, 0.0081)
+# Each thrust face's pick lies on its cut edge on the lower half, midway
+# between the bore and its outer Ø.  Its symbol stands just above the pick's
+# height outboard of the face, inside that end's diameter's extension lines,
+# the leader falling to the face under the symbol; the caption over the
+# symbol.  Nothing crosses the hub Ø's or press Ø's extension lines (r6: the
+# symbols above the part had their leaders and captions on them and on the
+# lengths' extension lines).
+_HUB_PICK = (HUB_FACE_X, SECTION_CENTER[1] - (BORE_DIA + HUB_DIA) / 4.0 * _S / 1000.0)
 _REAR_PICK = (
     REAR_FACE_X,
-    SECTION_CENTER[1] + (BORE_DIA + PRESS_DIA) / 4.0 * _S / 1000.0,
+    SECTION_CENTER[1] - (BORE_DIA + PRESS_DIA) / 4.0 * _S / 1000.0,
 )
+_HUB_SYMBOL = (_HUB_PICK[0] - 0.0205, _HUB_PICK[1] + 0.0037)
+_REAR_SYMBOL = (_REAR_PICK[0] + 0.005, _REAR_PICK[1] + 0.0036)
 FACE_FINISHES = {
     "hub_face": (
         _HUB_PICK,
-        (_HUB_PICK[0] - 0.009, SECTION_CENTER[1] + HALF_HUB + 0.010),
-        (_HUB_PICK[0] - 0.034, SECTION_CENTER[1] + HALF_HUB + 0.024),
+        _HUB_SYMBOL,
+        (HUB_FACE_X - 0.0465, _HUB_SYMBOL[1] + 0.0195),
     ),
     "rear_face": (
         _REAR_PICK,
-        (_REAR_PICK[0] + 0.012, SECTION_CENTER[1] + HALF_HUB + 0.010),
-        (_REAR_PICK[0] + 0.008, SECTION_CENTER[1] + HALF_HUB + 0.024),
+        _REAR_SYMBOL,
+        (REAR_FACE_X + 0.004, _REAR_SYMBOL[1] + 0.019),
     ),
 }
-# Datum A's tag hangs below the shoulder's lower cut edge, left of the root
-# radius; its pick lies on that edge midway between the press and the hub.
-DATUM_A_PICK = (SHOULDER_X, SECTION_CENTER[1] - (HALF_PRESS + HALF_HUB) / 2.0)
-DATUM_A_XY = (SHOULDER_X - 0.012, SECTION_CENTER[1] - HALF_HUB - 0.022)
+# Datum A rides the shoulder face's line, extended below the part, attached
+# to the shoulder's own outer rim (the hub Ø's circle at the shoulder,
+# edge-on in A-A, drawn the full height there).  An edge-attached tag
+# re-solves to the foot of its leader on the edge's line, the leader square
+# to it (r6: the tag at (206.2, 128.2) landed at (206.1, 153.3), straight
+# above), so the tag stands left of the line at a height below the hub: the
+# triangle sits on the shoulder's extension, clear under the hub Ø's lower
+# extension line, its leader level and away from the root radius on the
+# right.  r6 picked the 3 mm shoulder line by sheet point and caught a
+# neighbour instead, its leader crossing the hub Ø's extension line.
+DATUM_A_XY = (SHOULDER_X - 0.012, SECTION_CENTER[1] - HALF_HUB - 0.010)
 
 # The face view's bore: the cutting line A runs vertically through its
 # centre, with its arrows and letters on the right (toward A-A), so the
-# perpendicularity frame and the running finish both stand LEFT of the view
-# and land on the bore's left half: neither leader crosses the line or a
-# letter (farm r5 layout audit: the finish's leader ran through the lower
-# letter, the frame's crossed the line).  The frame (its top-left corner)
-# is FRAME_WIDTH_M wide, measured on r5 (its leader left the right end
-# 37.2 mm from the corner); it stands above the view, its right end short
-# of the line, its leader landing up-left on the bore.  The finish symbol
-# stands lower left, its leader landing on the bore facing it.
+# frame, the finish and the Ø's leader all land on the bore's left half
+# (farm r5: the finish's leader ran through the lower letter, the frame's
+# crossed the line).  The frame (its top-left corner) is FRAME_WIDTH_M wide,
+# measured on r5 (its leader left the right end 37.2 mm from the corner): it
+# stands below the view at the sheet's left note column, its right end short
+# of the line, its leader rising to the bore's lower-left.  The finish
+# symbol stands left of the view above the horizontal centre line, its
+# leader falling onto the bore facing it.
 FRAME_WIDTH_M = 0.0375
-FRAME_XY = (0.018, FACE_CENTER[1] + HALF_HUB + 0.026)
-FRAME_LANDING_TOWARD = (FACE_CENTER[0] - 0.010, FACE_CENTER[1] + 0.010)
-BORE_FINISH_XY = (FACE_CENTER[0] - HALF_HUB - 0.008, FACE_CENTER[1] - 0.016)
+FRAME_HEIGHT_M = 0.007
+FRAME_XY = (0.016, FACE_CENTER[1] - HALF_HUB - 0.012)
+FRAME_LANDING_TOWARD = (FACE_CENTER[0] - 0.004, FACE_CENTER[1] - 0.010)
+BORE_FINISH_XY = (0.024, FACE_CENTER[1] + 0.008)
 FINISH_CHAR_HEIGHT = 0.0025
 # A note's read-back position may differ from the one asked by this much.
 NOTE_POSITION_TOL_M = 5e-4
@@ -381,11 +419,19 @@ def build(adapter: Any) -> dict[str, str]:
         view_label="axial section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    face_annotations = curate_view_dimensions(
+        adapter,
+        face,
+        keep=FACE_KEEP,
+        view_label="face",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     # Decimal places (and so the general-tolerance row each dimension claims),
     # the bands, the root's MAX and every callout row are authored on the
     # part; the sheet only proves the import kept them.
-    assert_imported_precision(adapter, section_annotations, DRAWING_PRECISION_BY_NAME)
-    _assert_dimension_callouts(adapter, section_annotations)
+    annotations = [*section_annotations, *face_annotations]
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _assert_dimension_callouts(adapter, annotations)
     create_section_axis_centerline(
         adapter, section, length_mm=LENGTH, label="knob bush axis"
     )
@@ -393,11 +439,21 @@ def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to the bush face view")
 
     # The same native datum and frame authored on the part: A on the
-    # shoulder's cut edge, the bore's frame on the face view's bore.  The
+    # shoulder's outer rim, the bore's frame on the face view's bore.  The
     # bore carries no datum: no frame references one (rule 5).
+    shoulder_rim = (
+        scan_view_edges(section, label="knob bush A-A")
+        .circle_at(
+            (0.0, HUB_LENGTH, 0.0),
+            HUB_DIA / 2.0,
+            axis=(0.0, 1.0, 0.0),
+            label="knob bush shoulder rim (datum A)",
+        )
+        .edge
+    )
     bore_edge = visible_circle_edge(adapter, face, BORE_DIA)
     placements = {
-        "datum:A": PmiDrawingPlacement(section, DATUM_A_XY, attachment_xy=DATUM_A_PICK),
+        "datum:A": PmiDrawingPlacement(section, DATUM_A_XY, edge_entity=shoulder_rim),
         "bore_perpendicularity": PmiDrawingPlacement(
             face,
             FRAME_XY,

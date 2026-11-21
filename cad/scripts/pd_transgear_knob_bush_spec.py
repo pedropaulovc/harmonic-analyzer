@@ -157,8 +157,8 @@ LENGTH_CALLOUT = f"SETS FACING RANGE\nOF CUP {KNOB_CUP_NUMBER}"
 # imports and reads it back (text set from the drawing writes through to the
 # built part, fleet issue #1942).
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
+    "BoreSketch": {"BoreDia": BORE_CALLOUT},
     "BushProfile": {
-        "BoreDia": BORE_CALLOUT,
         "PressDia": PRESS_CALLOUT,
         "HubLength": HUB_LENGTH_CALLOUT,
         "BushLength": LENGTH_CALLOUT,
@@ -172,25 +172,28 @@ SHOULDER_ROOT_TOL_TYPE = 0  # swTolType_e.swTolNONE
 SHOULDER_ROOT_SUFFIX = " MAX"
 
 # --- Marked dimensions and places ---------------------------------------------
-# The turned profile carries both diameters, the bore, both lengths from
-# the hub face and the shoulder root's radius, so all print on the axial
-# section (rule 11).  The stub (shoulder to rear face) follows from the two
-# lengths and is not printed.
+# The turned profile carries both diameters, both lengths from the hub face
+# and the shoulder root's radius, so all print on the axial section (rule
+# 11).  The stub (shoulder to rear face) follows from the two lengths and is
+# not printed.  The reamed bore is its own Top-plane circle, so its Ø and
+# callout print on the face view, where the bore is a circle (rule 12; the
+# MHA-PD-25 bushing's end view): in A-A its dimension line, nested inside
+# the hub Ø's extension lines, had to cross one to reach its block (farm r6).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "BoreSketch": {"BoreDia"},
     "BushProfile": {
         "HubDia",
         "PressDia",
-        "BoreDia",
         "HubLength",
         "BushLength",
         "ShoulderR",
     },
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "BoreSketch": {"BoreDia": BUSH.BORE_PLACES},
     "BushProfile": {
         "HubDia": BUSH.HUB_DIA_PLACES,
         "PressDia": BUSH.PRESS_DIA_PLACES,
-        "BoreDia": BUSH.BORE_PLACES,
         "HubLength": BUSH.HUB_LENGTH_PLACES,
         "BushLength": BUSH.LENGTH_PLACES,
         "ShoulderR": BUSH.SHOULDER_ROOT_R_PLACES,

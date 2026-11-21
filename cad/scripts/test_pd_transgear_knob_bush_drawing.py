@@ -96,7 +96,7 @@ def test_the_plate_hole_is_the_bush_press_band() -> None:
 
 def test_the_bands_live_on_the_model_from_named_constants() -> None:
     assert model_toleranced_dimensions(part) == {
-        ("BushProfile", "BoreDia"): "*deviations(BORE_BAND)",
+        ("BoreSketch", "BoreDia"): "*deviations(BORE_BAND)",
         ("BushProfile", "PressDia"): "*deviations(PRESS_DIA_BAND)",
         ("BushProfile", "HubLength"): "HUB_LENGTH_BAND",
         ("BushProfile", "BushLength"): "LENGTH_BAND",
@@ -110,22 +110,26 @@ def test_the_bands_live_on_the_model_from_named_constants() -> None:
         assert band < _printed_tolerance.printed_band_mm(places, unit=BUSH.UNIT)
 
 
-def test_every_marked_dimension_prints_on_the_section_with_model_places() -> None:
-    """Rule 11: the turner reads both diameters, the bore, both lengths from
-    the hub face and the shoulder root on A-A."""
+def test_every_marked_dimension_prints_with_model_places() -> None:
+    """Rule 11: the turner reads both diameters, both lengths from the hub
+    face and the shoulder root on A-A; rule 12: the reamed bore's Ø and
+    callout on the face view, where it is a circle."""
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert (
         set(drawing.SECTION_KEEP)
-        == marked
+        == spec.DRAWING_DIMENSIONS["BushProfile"]
         == {
             "HubDia",
             "PressDia",
-            "BoreDia",
             "HubLength",
             "BushLength",
             "ShoulderR",
         }
     )
+    assert (
+        set(drawing.FACE_KEEP) == spec.DRAWING_DIMENSIONS["BoreSketch"] == {"BoreDia"}
+    )
+    assert set(drawing.SECTION_KEEP) | set(drawing.FACE_KEEP) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert (
         spec.DRAWING_PRECISION_BY_NAME["ShoulderR"] == BUSH.SHOULDER_ROOT_R_PLACES == 3
@@ -134,15 +138,19 @@ def test_every_marked_dimension_prints_on_the_section_with_model_places() -> Non
         assert set(callouts) <= spec.DRAWING_DIMENSIONS[feature], feature
 
 
-def test_every_printed_dimension_is_a_revolve_profile_dimension() -> None:
+def test_the_profile_is_solid_to_the_axis_and_the_bore_a_circle_cut() -> None:
     """Farm r3: a fillet feature's radius does not import into the axial
     section, so the shoulder root is a tangent arc in the turned profile and
-    its radius is a profile dimension like the rest; the solid gate counts
-    the arc's fill (Pappus)."""
-    assert set(spec.DRAWING_DIMENSIONS) == {"BushProfile"}
+    its radius a profile dimension like the rest; the solid gate counts the
+    arc's fill (Pappus).  Farm r6: the bore is a Top-plane circle cut both
+    ways through, its Ø a circle's, so it prints on the face view."""
+    assert set(spec.DRAWING_DIMENSIONS) == {"BushProfile", "BoreSketch"}
     built = Path(part.__file__).read_text(encoding="utf-8")
     assert "add_fillet" not in built
     assert "adapter.add_arc(" in built
+    assert 'adapter.create_sketch("Top")' in built
+    assert "both_directions=True" in built
+    assert part.BORE_CUT_DEPTH / 2.0 > BUSH.LENGTH
     r, press_r = BUSH.SHOULDER_ROOT_R_MAX_MM, BUSH.PRESS_DIA / 2.0
     assert part.V_ROOT == pytest.approx(
         2.0
@@ -150,6 +158,9 @@ def test_every_printed_dimension_is_a_revolve_profile_dimension() -> None:
         * (press_r * r * r * (1.0 - math.pi / 4.0) + r**3 * (5.0 / 6.0 - math.pi / 4.0))
     )
     assert 0.0 < part.V_ROOT < 0.005 * part.V_BUSH
+    assert part.V_TURNED - part.V_BUSH == pytest.approx(
+        math.pi * (BUSH.BORE_DIA / 2.0) ** 2 * BUSH.LENGTH
+    )
 
 
 def test_the_drawing_reads_the_callouts_back_and_never_writes_them() -> None:
@@ -184,15 +195,16 @@ def test_each_tight_callout_names_its_mate_by_drawing_number() -> None:
         f"SETS FACING RANGE\nOF CUP {_number('pd-transgear-knob-cup')}"
     )
     assert spec.DIMENSION_CALLOUTS == {
+        "BoreSketch": {"BoreDia": spec.BORE_CALLOUT},
         "BushProfile": {
-            "BoreDia": spec.BORE_CALLOUT,
             "PressDia": spec.PRESS_CALLOUT,
             "HubLength": spec.HUB_LENGTH_CALLOUT,
             "BushLength": spec.LENGTH_CALLOUT,
         },
     }
     # The B pre-drill is the process's, not the sheet's.
-    assert ".238" not in "".join(spec.DIMENSION_CALLOUTS["BushProfile"].values())
+    for callouts in spec.DIMENSION_CALLOUTS.values():
+        assert ".238" not in "".join(callouts.values())
 
 
 def _worst_walls_in() -> dict[str, float]:
@@ -389,41 +401,156 @@ def _bore_landing(toward: tuple[float, float]) -> tuple[float, float]:
     return cx + dx * scale, cy + dy * scale
 
 
+def _finish_ink(symbol: tuple[float, float]) -> dict[str, tuple[float, ...]]:
+    """A surface finish's leader start, symbol box and text box (sheet m),
+    from the drawing's r6-measured offsets."""
+    left, bottom, right, top = drawing.FINISH_TEXT_BOX_M
+    x, y = symbol
+    return {
+        "leader_start": (x + drawing.FINISH_LEADER_DX_M, y),
+        "symbol": (x - 0.002, y, x + right, y + drawing.FINISH_SYMBOL_HEIGHT_M),
+        "text": (x + left, y + bottom, x + right, y + top),
+    }
+
+
+def _caption_box(xy: tuple[float, float]) -> tuple[float, float, float, float]:
+    width, height = drawing.CAPTION_SIZE_M
+    return (xy[0], xy[1] - height, xy[0] + width, xy[1])
+
+
+def _segment_y_at(start, end, x: float) -> float:
+    return start[1] + (end[1] - start[1]) * (x - start[0]) / (end[0] - start[0])
+
+
 def test_the_face_view_leaders_stay_left_of_the_cutting_line() -> None:
-    """Farm r5 layout audit: the bore finish's leader ran through the lower
-    letter A and the frame's crossed the cutting line.  The line runs
+    """Farm r5: the bore finish's leader ran through the lower letter A and
+    the frame's crossed the cutting line; r6: the finish's leader rose
+    through its own text and its text sat on the press circle.  The line runs
     vertically through the bore's centre with its arrows and letters on the
-    right, so both annotations and both leader landings stand left of it,
-    the frame's right end too, with room for the arrowheads."""
+    right, so the frame, the finish and the Ø's leader all land left of it."""
     line_x = drawing.SECTION_LINE[0][0]
+    line_bottom, line_top = drawing.SECTION_LINE[0][1], drawing.SECTION_LINE[1][1]
+    cx, cy = drawing.FACE_CENTER
     clearance = 0.003
+    # The frame below the view at the note column, its right end short of
+    # the line, clear under the line's foot; its leader rises to the bore.
     frame_left, frame_top = drawing.FRAME_XY
-    assert frame_left >= 0.016  # the sheet's left note column
+    assert frame_left >= 0.016
     assert frame_left + drawing.FRAME_WIDTH_M < line_x - clearance
-    assert frame_top > drawing.SECTION_LINE[1][1] + 0.010  # above the line's top
+    assert frame_top < line_bottom - 0.005
     frame_landing = _bore_landing(drawing.FRAME_LANDING_TOWARD)
     assert frame_landing[0] < line_x - clearance
-    assert frame_landing[1] > drawing.FACE_CENTER[1]
+    assert frame_top < frame_landing[1] < cy
+    # The finish left of the hub circle, its text clear of it; its leader
+    # falls onto the bore and passes under its own text.
+    ink = _finish_ink(drawing.BORE_FINISH_XY)
+    text_left, text_bottom, text_right, _top = ink["text"]
+    hub_r = drawing.HALF_HUB
+    assert text_right < cx - math.sqrt(hub_r**2 - min(hub_r, text_bottom - cy) ** 2)
+    assert ink["symbol"][1] > cy + 0.005  # above the horizontal centre line
     finish_landing = _bore_landing(drawing.BORE_FINISH_XY)
-    assert drawing.BORE_FINISH_XY[0] < drawing.FACE_CENTER[0] - drawing.HALF_HUB
     assert finish_landing[0] < line_x - clearance
+    start = ink["leader_start"]
+    assert finish_landing[1] <= start[1]
+    assert _segment_y_at(start, finish_landing, text_right) < text_bottom
+    # The bore Ø's block centred right of the bore's centre, so its leader
+    # leaves the shelf's left end, radially onto the bore's upper left; the
+    # shelf clears the line's top letter and the leader the finish symbol.
+    keep_x, keep_y = drawing.FACE_KEEP["BoreDia"]
+    width, height = drawing.BORE_BLOCK_SIZE_M
+    shelf = (keep_x - width / 2.0, keep_y - height / 2.0)
+    assert keep_x > cx + 0.010
+    assert shelf[0] >= 0.016
+    assert shelf[1] > line_top + 0.008
+    dia_landing = _bore_landing(shelf)
+    assert dia_landing[0] < line_x - clearance
+    symbol_right, symbol_top = ink["symbol"][2], ink["symbol"][3]
+    assert _segment_y_at(shelf, dia_landing, symbol_right) > symbol_top + 0.003
     # Every landing is on the bore, not the hub outline round it.
-    for landing in (frame_landing, finish_landing):
+    for landing in (frame_landing, finish_landing, dia_landing):
         assert math.dist(landing, drawing.FACE_CENTER) == pytest.approx(
             drawing.HALF_BORE
         )
 
 
-def test_the_diameters_stand_off_the_part_without_crossing() -> None:
-    """Left of the hub face the bore's dimension line stands nearer the part
-    than the hub's, so the hub's extension lines pass outside it; the press
-    Ø stands right of the rear face; both lengths above the part."""
+def test_the_section_texts_stay_inside_their_own_extension_lines() -> None:
+    """Farm r6: the bore's dimension line ran out across the hub Ø's
+    extension line.  Each diameter's text now sits between its own lines,
+    the hub's left of the hub face and the press's right of the rear face
+    beyond the rear face's finish; both lengths above the part."""
     keep = drawing.SECTION_KEEP
-    assert keep["HubDia"][0] < keep["BoreDia"][0] < drawing.HUB_FACE_X
+    assert "BoreDia" not in keep
+    assert keep["HubDia"][0] < drawing.HUB_FACE_X
+    assert keep["HubDia"][1] == keep["PressDia"][1] == drawing.SECTION_CENTER[1]
     assert keep["PressDia"][0] > drawing.REAR_FACE_X
     top = drawing.SECTION_CENTER[1] + drawing.HALF_HUB
     assert top < keep["HubLength"][1] < keep["BushLength"][1]
-    assert keep["BoreDia"][1] < drawing.SECTION_CENTER[1] - drawing.HALF_HUB
+
+
+def test_the_thrust_face_finishes_stay_clear_of_lines_and_captions() -> None:
+    """Farm r6: both captions overlapped their symbols, the leaders crossed
+    the captions and the hub Ø's extension line, the lengths' extension
+    lines struck both.  Each symbol now stands inside its end's diameter's
+    extension lines, above its pick so the leader falls to the face away from
+    its own ink, its caption over it with 1.27 mm of air; nothing reaches
+    the hub face's line (the lengths' extension lines), the hub Ø's text or
+    the press Ø's block."""
+    centre_y = drawing.SECTION_CENTER[1]
+    keep = drawing.SECTION_KEEP
+    press_block_left = keep["PressDia"][0] - 0.0605  # r6: 120.5 mm wide, centred
+    hub_text_right = keep["HubDia"][0] + 0.006
+    for key, half, outboard in (
+        ("hub_face", drawing.HALF_HUB, -1.0),
+        ("rear_face", drawing.HALF_PRESS, 1.0),
+    ):
+        pick, symbol, caption = drawing.FACE_FINISHES[key]
+        ink = _finish_ink(symbol)
+        start = ink["leader_start"]
+        assert pick[1] < symbol[1], key  # the leader falls to the face
+        assert outboard * (start[0] - pick[0]) > 0.002, key
+        assert outboard * (ink["symbol"][0 if outboard > 0 else 2] - pick[0]) > 0, key
+        box = _caption_box(caption)
+        for low, high in ((ink["symbol"][1], ink["symbol"][3]), (box[1], box[3])):
+            assert centre_y - half + 0.002 < low < high < centre_y + half - 0.002, key
+        assert box[1] - ink["symbol"][3] >= 0.00127, key
+        if outboard < 0:
+            assert hub_text_right + 0.003 < box[0] < box[2] < pick[0] - 0.005
+            assert ink["symbol"][2] < pick[0] - 0.003
+        else:
+            assert pick[0] + 0.003 < box[0] < box[2] < press_block_left - 0.003
+            assert ink["symbol"][2] < press_block_left - 0.003
+            # The leftward leader passes under the symbol's own baseline.
+            assert _segment_y_at(start, pick, symbol[0]) < symbol[1] - 0.001
+
+
+def test_datum_a_rides_the_shoulder_line_below_the_hub() -> None:
+    """Farm r6: datum A landed on a neighbour of the 3 mm shoulder line and
+    its leader crossed the hub Ø's extension line.  The tag stands left of
+    the shoulder's line below the hub, so its square leader meets the line's
+    extension under the lower extension line, clear of the root radius'
+    text on the right and the section caption under it."""
+    x, y = drawing.DATUM_A_XY
+    hub_bottom = drawing.SECTION_CENTER[1] - drawing.HALF_HUB
+    assert x < drawing.SHOULDER_X - 0.006
+    assert drawing.CAPTION_XY[1] + 0.010 < y < hub_bottom - 0.006
+    assert drawing.SECTION_KEEP["ShoulderR"][0] > drawing.SHOULDER_X + 0.020
+
+
+def test_the_isometric_clears_the_title_block_and_the_section() -> None:
+    """Farm r6: lower right the isometric ran 8 mm into the title block
+    ([216.0, 0.0]..[431.8, 66.0] mm, the audit's keep-out)."""
+    (cx, cy), (width, height) = drawing.ISO_CENTER, drawing.ISO_SIZE_M
+    left, bottom, right, top = (
+        cx - width / 2.0,
+        cy - height / 2.0,
+        cx + width / 2.0,
+        cy + height / 2.0,
+    )
+    assert right < 0.216 or top < 0.066
+    assert left > 0.0127 + 0.003 and bottom > 0.0127 + 0.003  # the border
+    assert top < drawing.SECTION_CENTER[1] - drawing.HALF_HUB - 0.010
+    assert top < drawing.FRAME_XY[1] - drawing.FRAME_HEIGHT_M - 0.010
+    assert right < drawing.CAPTION_XY[0] - 0.030  # the SECTION caption
 
 
 def test_registry_row_is_the_turned_steel_mha_pd_28() -> None:

@@ -177,7 +177,13 @@ def test_depth_rows_stand_above_the_section_clear_of_each_other() -> None:
     pilot_x, pilot_y = drawing.SECTION_KEEP["PilotDepth"]
     length_x, length_y = drawing.SECTION_KEEP["CupLength"]
     assert cbore_y == pilot_y > top + 0.005
-    assert rear < cbore_x < rear + drawing.CBORE_DEPTH_ON_SHEET
+    # r6 audit: ".108" (8.5 mm) inside its 11 mm span stood 1.39 mm from the
+    # length's extension line (2.0 wanted); it stands outside left of the
+    # rear face, 2 mm or more clear of that shared line.
+    cbore_half = drawing.CBORE_DEPTH_TEXT_HALF_WIDTH
+    assert cbore_x + cbore_half < rear - 0.002
+    assert drawing.CBORE_DEPTH_ON_SHEET < 2.0 * (cbore_half + 0.002)
+    assert cbore_x - cbore_half > drawing.SECTION_KEEP["CupDia"][0] + 0.005
     # r5 render: ".152 / SEE NOTE 1" (24 mm) over its 15 mm span was struck
     # by the length's extension line from the front face and by the pocket
     # depth's arrow.  Its text now stands wholly right of the front face.
