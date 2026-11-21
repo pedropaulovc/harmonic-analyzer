@@ -16,18 +16,21 @@
 # the V's flat with the 5/64 in end mill (VB05); B down, face the top to the
 # height, spot, drill #32, ream .1260 and chamfer the pivot bore down into
 # the slot (VB06); front up, spot and drill #43 into the bore (VB07) and tap
-# 4-40 by hand on the dead centre (VB08). Bench: clean the bore with the
-# reamer by hand, deburr, inspect. Bright brass: machined, washed, no
-# coating.
+# 4-40 by hand on the dead centre (VB08), the plug tap first, then the
+# bottoming tap to the same reach. Bench: clean the bore with the reamer by
+# hand, deburr, inspect. Bright brass: machined, washed, no coating.
 #
 # Not owned, to buy before this traveler runs (flagged; the traveler marks
 # each): the 5/64 in long-reach end mill (shop endmill-5-64-long: the slot's
 # step corners are R.040 max, under every owned cutter's radius), the .1260
-# chucking reamer (reamer-1260) and the .1260/.1265 plug gauge pair
-# (plug-gauges-1260-1265: the pin-gauge sets step by .001 and hold no .1265).
+# chucking reamer (reamer-1260), the .1260/.1265 plug gauge pair
+# (plug-gauges-1260-1265: the pin-gauge sets step by .001 and hold no .1265)
+# and the 4-40 bottoming tap (tap-4-40-bottoming: the owned plug tap's
+# chamfer is not on record, and at B94.9's worst five threads it would leave
+# the set screw's thread tapered short of the bore).
 # The placeholder's 1/2 in 90° chamfer mill is not needed: the owned 1/4 in
-# one cuts each flank in stepped levels; its pin gauges and protractor are
-# replaced by the plug gauge pair and the cutter's own 90°.
+# one cuts each flank in stepped levels; its pin gauges are replaced by the
+# plug gauge pair. The owned protractor checks the flanks.
 #
 # Zeroing: the touch probe has no holder, so every X/Y zero is the owned
 # .200 in edge finder at 900 rpm and every Z zero the end mill on a .002
@@ -112,9 +115,11 @@ spot_feed_per_min_mm = 71.12
 drill_32_feed_per_min_mm = 71.12
 ream_feed_per_min_mm = 106.68
 drill_43_feed_per_min_mm = 71.12
-# Tapping: the 4-40 plug tap's point below the front face, from the bore's
-# near wall at its largest plus three threads (a plug tap's chamfer is three
-# to five) to .010 short of its far wall at its smallest. cam.py checks both.
+# Tapping: the taps' point below the front face, both the plug tap and the
+# bottoming tap that finishes after it: from the bore's near wall at its
+# smallest (the wall farthest from the front face) plus the bottoming tap's
+# worst chamfer (two threads, ASME B94.9) to .010 short of the far wall at
+# its smallest. cam.py checks both.
 tap_reach_min_mm = 11.43
 tap_reach_max_mm = 12.192
 # Holding (shop workholding.vise-pm-6 and fixtures.parallels-lms-6745, 1/8
@@ -144,6 +149,11 @@ upright_top_max_mm = 28.702
 bore_tip_height_mm = 4.719
 ream_tip_height_mm = 5.104
 tap_tip_height_mm = 10.243
+# Full-diameter hole depths the traveler prints, the ones the files drill:
+# the #32 the slot roof's depth below the top plus drill_past_mm; the #43 to
+# the bore's axis below the front face. cam.py checks both.
+bore_drill_depth_mm = 12.396
+tap_drill_depth_mm = 10.922
 # Machine-capacity inputs (mm): heights from the table, tool lengths from
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
@@ -202,6 +212,14 @@ ref = "mill-dead-centre-mt3"
 id = "tap-4-40"
 name = "4-40 plug tap"
 ref = "jig-tap-4-40-plug"
+[[tools]]
+id = "tap-4-40-bottoming"
+name = "4-40 bottoming tap"
+ref = "tap-4-40-bottoming"
+[[tools]]
+id = "protractor"
+name = "Protractor"
+ref = "protractor"
 [[tools]]
 id = "saw"
 name = "Evolution miter saw"
@@ -514,7 +532,12 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
+speed_kind = "other"
+tool = "protractor"
+drilling = "none"
+sizing = "other"
 instruction = "Look along the V from P: both flanks straight and meeting the flat; the flank angle is the chamfer mill's 90° included ({{cad.v_groove_flank_angle_deg_mm:.0f}}° each to B). The flat {{cad.v_groove_flat_width_min_in:.3dot}}–{{cad.v_groove_flat_width_max_in:.3dot}} wide is the 5/64 end mill's pass between the chamfer mill's last level: not gauged."
+feed = "hand"
 inspection = "Each flank 45° ±1° to B: the protractor's blade on B, its arm along the flank, no light under it."
 gauge_checks = "other"
 
@@ -579,8 +602,8 @@ drilling = "twist_drill"
 sizing = "other"
 instruction = "Same file, M6 T5: #32 drill (the reamer's pilot) down into the slot, its full diameter {{process.drill_past_mm:in.3dot}} past the slot's roof, pecks of {{process.peck_32_mm:in.3dot}} with full retract; set 2800. A drop of cutting oil."
 settings = "pn-drill-32-c360"
-hole_depth_mm = 12.396
-peck = { step_mm = 2.54, retract = "full" }
+hole_depth_mm = "{{process.bore_drill_depth_mm}}"
+peck = { step_mm = "{{process.peck_32_mm}}", retract = "full" }
 milling_cuts = [
   { name = "bore drill", kind = "drill", phase = "rough", cutter_dia_mm = 2.9464, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_32_feed_per_min_mm}}", stations_mm = "{{cad.pivot_bore_x_mm}}" },
 ]
@@ -664,18 +687,18 @@ drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-4-40" }
 instruction = "Same file, M6 T7: #43 drill down into the pivot bore, its full diameter to the bore's axis ({{cad.set_screw_tap_into_axis_in:.3dot}} below the front face), pecks of {{process.peck_43_mm:in.3dot}} with full retract; set 2800. A drop of Tapmatic Gold."
 settings = "pn-drill-43-c360"
-hole_depth_mm = "{{cad.set_screw_tap_into_axis_mm}}"
-peck = { step_mm = 2.032, retract = "full" }
+hole_depth_mm = "{{process.tap_drill_depth_mm}}"
+peck = { step_mm = "{{process.peck_43_mm}}", retract = "full" }
 milling_cuts = [
   { name = "tap drill", kind = "drill", phase = "rough", cutter_dia_mm = 2.2606, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_43_feed_per_min_mm}}", stations_mm = "{{cad.set_screw_tap_x_mm}}" },
 ]
 
 [[setups.operations]]
-instruction = "The 4-40 tap goes in the T-handle tap wrench with the centre hole in its top: the dead centre's point seats in that hole."
+instruction = "Each 4-40 tap goes in the T-handle tap wrench with the centre hole in its top: the dead centre's point seats in that hole."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Stop check before the tap file: measure the dead centre from its tip to the collet's face and the 4-40 tap in the T-handle wrench from its point to the wrench's centre hole (calipers, or the combination square's 12 in blade). The two together must be at most {{process.tap_stack_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the stacks, this block, the collet and 1 in to bring the point down onto the wrench)."
+instruction = "Stop check before the tap file: measure the dead centre from its tip to the collet's face, and the longer of the two 4-40 taps in the T-handle wrench from its point to the wrench's centre hole (calipers, or the combination square's 12 in blade). The two together must be at most {{process.tap_stack_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the stacks, this block, the collet and 1 in to bring the point down onto the wrench)."
 feed = "hand"
 
 [[setups.operations]]
@@ -688,10 +711,10 @@ tool = "dead-centre"
 drilling = "none"
 sizing = "other"
 instruction = "Run VB08_set_screw_tap: M6 T8, the dead centre in its 3/4 in collet (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
-diagram = { file = "diagrams/tap.svg", alt = "The block lying front face up; the 4-40 tap in the T-handle wrench in the set-screw hole, the dead centre in the spindle seated in the wrench's centre hole; the tap's point to go {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the front face, into the bore." }
+diagram = { file = "diagrams/tap.svg", alt = "The block lying front face up; a 4-40 tap in the T-handle wrench in the set-screw hole, the dead centre in the spindle seated in the wrench's centre hole; the tap's point to go {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the front face, into the bore." }
 
 [[setups.operations]]
-instruction = "Tap depth reference, in inches: send G20, then note the DRO Z with the tap's point standing on the front face beside the hole and the dead centre seated in the wrench. Stay in G20 until the tap is out."
+instruction = "Plug tap depth reference, in inches: send G20, then note the DRO Z with the plug tap's point standing on the front face beside the hole and the dead centre seated in the wrench. Stay in G20 until both taps are out."
 instruction_detailed = "Send G20: the DRO reads inches. MDI G0 X.709 (over the front face beside the hole). Stand the 4-40 plug tap, in its T-handle wrench, on its point on the front face; jog Z down until the dead centre's point sits in the wrench's centre hole, light pressure only. Note the DRO Z. Jog Z up clear and MDI G0 X.490 (over the hole), still in G20."
 feed = "hand"
 
@@ -700,12 +723,30 @@ speed_kind = "other"
 tool = "tap-4-40"
 drilling = "none"
 sizing = "other"
-instruction = "Tap by hand on the dead centre, spindle off, Tapmatic Gold, jogging Z down to keep it seated, until the DRO Z (G20, inches) reads the noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim .465): the tap's point is in the bore, short of its far wall, and the thread is full to the bore."
-instruction_detailed = "The tap's point in the hole, a drop of Tapmatic Gold; jog Z down until the centre is seated: it guides, it does not push. Turn the wrench, a half turn back each turn to break the chip, jogging Z down to keep it seated. Stop when the DRO Z (G20, inches) reads the noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim .465); past {{process.tap_reach_max_mm:in.3dot}} the point reaches the bore's far wall."
+instruction = "Plug tap by hand on the dead centre, spindle off, Tapmatic Gold, jogging Z down to keep it seated, until the DRO Z (G20, inches) reads its noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim .465): its point is in the bore, short of the far wall."
+instruction_detailed = "The plug tap's point in the hole, a drop of Tapmatic Gold; jog Z down until the centre is seated: it guides, it does not push. Turn the wrench, a half turn back each turn to break the chip, jogging Z down to keep it seated. Stop when the DRO Z (G20, inches) reads its noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim .465); past {{process.tap_reach_max_mm:in.3dot}} the point reaches the bore's far wall."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Jog Z up clear, back the tap out by hand, then send G21 (the controller back in mm); blow the hole and the bore out."
+instruction = "Jog Z up clear and back the plug tap out by hand, still in G20."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Bottoming tap depth reference: note the DRO Z (G20) with the bottoming tap's point standing on the front face beside the hole and the dead centre seated in the wrench."
+instruction_detailed = "MDI G0 X.709 (over the front face beside the hole). Stand the 4-40 bottoming tap, in its T-handle wrench, on its point on the front face; jog Z down until the dead centre's point sits in the wrench's centre hole, light pressure only. Note the DRO Z. Jog Z up clear and MDI G0 X.490 (over the hole)."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-4-40-bottoming"
+drilling = "none"
+sizing = "other"
+instruction = "Bottoming tap (to buy) in the plug tap's thread, the same way, until the DRO Z (G20) reads its noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim .465): the thread is now full to the bore, where the set screw's cup must reach."
+instruction_detailed = "The bottoming tap started by hand in the plug tap's thread, a drop of Tapmatic Gold; jog Z down until the centre is seated. Turn the wrench, a half turn back each turn, jogging Z down to keep it seated. Stop when the DRO Z (G20, inches) reads its noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} (aim .465); past {{process.tap_reach_max_mm:in.3dot}} the point reaches the bore's far wall."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Jog Z up clear, back the bottoming tap out by hand, then send G21 (the controller back in mm); blow the hole and the bore out."
 feed = "hand"
 
 [[setups]]
@@ -742,7 +783,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Inspect, the block on the surface plate."
-inspection = "Bore from P {{cad.pivot_bore_station_min_in:.3dot}}–{{cad.pivot_bore_station_max_in:.3dot}} and from the front face {{cad.pivot_bore_depth_station_min_in:.3dot}}–{{cad.pivot_bore_depth_station_max_in:.3dot}}: the GO plug standing in the bore, the height gauge over it less half its .1260 (the block on P, then on its front face). Set-screw hole from P {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_screw_tap_station_max_in:.3dot}} and from B {{cad.set_screw_tap_height_min_in:.3dot}}–{{cad.set_screw_tap_height_max_in:.3dot}}: the #43 drill's shank in it, the height gauge over it less half its .089 (the block on P, then on B). Tap wall to the step face at least {{cad.set_screw_tap_wall_min_min_in:.3dot}} (owner exception RV-01): the bore and tap stations above put it there."
+inspection = "Bore from P {{cad.pivot_bore_station_min_in:.3dot}}–{{cad.pivot_bore_station_max_in:.3dot}} and from the front face {{cad.pivot_bore_depth_station_min_in:.3dot}}–{{cad.pivot_bore_depth_station_max_in:.3dot}}: the GO plug standing in the bore, the height gauge over it less half its .1260 (the block on P, then on its front face). Set-screw hole from P {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_screw_tap_station_max_in:.3dot}} and from B {{cad.set_screw_tap_height_min_in:.3dot}}–{{cad.set_screw_tap_height_max_in:.3dot}}: the #43 drill's shank in it, the height gauge over it less half its .089 (the block on P, then on B). Tap wall to the step face at least {{cad.set_screw_tap_wall_min_min_in:.3dot}}: the bore and tap stations above put it there."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = "{{cad.pivot_bore_station_band_mm}}" },
   { gauge = "height-gauge", band_mm = "{{cad.pivot_bore_depth_station_band_mm}}" },
