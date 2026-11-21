@@ -199,7 +199,7 @@ name = "1/2 in carbide end mill"
 ref = "endmill-carbide-3fl-1-2"
 [[tools]]
 id = "saw"
-name = "2-3/4 x .064 HSS slitting saw on the R8 1 in arbor, arbor TO BUY"
+name = "2-3/4 x .064 HSS slitting saw on the TTC 67-600-016 R8 1 in spacer-type arbor (its own spacers and nut), arbor TO BUY"
 ref = "slitting-saw-2-75-064"
 [[tools]]
 id = "spot"
@@ -312,7 +312,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Swap to the saw: R8 1 in arbor in the spindle (drawbar tight), the slitting saw on it between spacers under {{process.saw_collar_dia_max_mm:in.2dot}} in diameter, its teeth cutting with the spindle turning clockwise (M3) seen from above. The arbor's nut, screw head or flange below the saw must also be under {{process.saw_collar_dia_max_mm:in.2dot}} in diameter (the arbor is TO BUY, no make chosen: check this on its listing before ordering, and mic it before mounting). Do not move the bars."
+instruction = "Swap to the saw: the TTC 67-600-016 R8 1 in spacer-type arbor (Travers; TO BUY) in the spindle (drawbar tight), the slitting saw on it between that arbor's own spacers, its teeth cutting with the spindle turning clockwise (M3) seen from above. Before mounting, mic every spacer and the arbor nut that sit below the saw: each must be under {{process.saw_collar_dia_max_mm:in.2dot}} in diameter, or the top notch's end meets it. Over it: stop and tell the owner. Do not move the bars."
 feed = "hand"
 
 [[setups.operations]]

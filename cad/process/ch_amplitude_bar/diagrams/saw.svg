@@ -15,7 +15,7 @@
 <rect class="fixture-table" x="20" y="190" width="600" height="22"/>
 <text class="label" x="26" y="230">surface plate</text>
 <path class="part-kept" d="M40 186 Q330 176 620 186 L620 176 Q330 166 40 176 Z"/>
-<rect class="clamp" x="300" y="182" width="60" height="4"/>
+<rect class="leader" fill="none" x="300" y="181" width="60" height="4"/>
 <path class="leader" d="M330 182 L360 150"/>
 <text class="label" x="364" y="148">.005 leaf: must not enter</text>
 </svg>

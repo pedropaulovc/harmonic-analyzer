@@ -20,7 +20,7 @@
 <line class="leader" stroke-dasharray="4 3" x1="565" y1="84" x2="565" y2="100"/>
 <line class="centre-line" x1="560" y1="30" x2="560" y2="110"/>
 <text class="label" x="340" y="116">R face</text>
-<path class="leader" d="M336 140 L500 70"/>
+<path class="leader" d="M430 128 L500 70"/>
 <text class="label" x="340" y="144">top notch: depth {{cad.top_notch_depth_min_in:.2f}}–{{cad.top_notch_depth_max_in:.2f}},</text>
 <text class="label" x="340" y="160">width {{cad.top_notch_width_min_in:.3dot}}–{{cad.top_notch_width_max_in:.3dot}}, ledge {{cad.top_notch_ledge_min_in:.3dot}}–{{cad.top_notch_ledge_max_in:.3dot}} from R</text>
 <path class="leader" d="M600 186 L566 96"/>
