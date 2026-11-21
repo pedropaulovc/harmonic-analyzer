@@ -770,11 +770,15 @@ def test_raw_step_face_sets_and_values_are_bound_into_the_manifest(tmp_path: Pat
     assert step.read_bytes() == content
 
 
-@pytest.mark.parametrize("stem", ["ch_amplitude_bar", "ch_pivot_bracket"])
+UNDECLARED_PARTS = tuple(
+    stem for stem in exporter.SUPPORTED_PARTS if stem not in exporter.DECLARED_PARTS
+)
+
+
+@pytest.mark.parametrize("stem", UNDECLARED_PARTS)
 def test_an_undeclared_part_binds_its_step_with_an_empty_features_table_and_no_drawing(
     tmp_path: Path, monkeypatch, stem: str,
 ) -> None:
-    assert stem in exporter.SUPPORTED_PARTS and stem not in exporter.DECLARED_PARTS
     original = importlib.import_module
 
     def no_drawing(name, *args, **kwargs):
