@@ -102,6 +102,12 @@ HOLE_X_BAND = _LINEAR_2PL  # the hole's centring across the foot
 DRILL_GROWTH = drilled_oversize_mm(unit=UNIT)  # title-block drilled hole, +.004/0 on the diameter
 LIGAMENT_FLOOR = WALL_FLOOR_MM
 LIGAMENT_TARGET = WALL_TARGET_MM
+# The support's seat (MHA-FR-05) is transferred through the hold-down hole
+# with an 11/64 punch (rocker_bracket_seat_layout), so the screw's axis may
+# stand off the hole's centre by the punch's float in the hole at its drilled
+# maximum, toward the ear as readily as away from it (#2563).
+TRANSFER_PUNCH_DIA = 11.0 / 64.0 * 25.4
+PUNCH_FLOAT = (HOLE_DIA + DRILL_GROWTH - TRANSFER_PUNCH_DIA) / 2.0
 
 
 def hole_ligaments_min(hole_z: float, foot_z1: float) -> dict[str, float]:
@@ -127,9 +133,16 @@ def head_to_ear_face_min(hole_z: float, head_dia: float) -> float:
     """Worst-case gap from the hold-down screw's head to the ear's outboard face.
 
     The station and the ear thickness both run from the ear's inboard face,
-    so the outboard face closes on the head by those two bands.
+    so the outboard face closes on the head by those two bands; the screw's
+    axis may stand the transfer punch's float off the hole's centre toward
+    the ear (#2563).
     """
-    return hole_z - head_dia / 2.0 - EAR_T / 2.0 - (EAR_T_BAND + STATION_BAND)
+    return (
+        hole_z
+        - head_dia / 2.0
+        - EAR_T / 2.0
+        - (EAR_T_BAND + STATION_BAND + PUNCH_FLOAT)
+    )
 
 
 if BORE_LIGAMENT < LIGAMENT_TARGET:

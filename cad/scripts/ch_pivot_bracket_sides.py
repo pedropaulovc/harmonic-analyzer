@@ -68,16 +68,18 @@ def _support_end_z(length: float) -> dict[str, float]:
 
 
 # The hole's window (part z). Low limit: the screw head touches the ear's
-# outboard face at the worst case of the ear-thickness and station bands
-# (``head_to_ear_face_min`` = 0). High limit: the seat's thread keeps the
+# outboard face at the worst case of the ear-thickness and station bands and
+# the seat's transfer-punch float (``head_to_ear_face_min`` = 0). High limit:
+# the seat's thread keeps the
 # support's end wall when the support's end face moves by half its length's
-# .X band and the hole by its station band, on whichever side that end face
-# is nearer.
+# .X band and the hole by its station band and the seat by the punch float,
+# on whichever side that end face is nearer.
 HOLE_Z_MIN = (
     _bracket.EAR_T / 2.0
     + SCREW_HEAD_DIA / 2.0
     + _bracket.EAR_T_BAND
     + _bracket.STATION_BAND
+    + _bracket.PUNCH_FLOAT
 )
 
 
@@ -87,15 +89,18 @@ def _hole_z_max(support_end_z: float) -> float:
         - SUPPORT_WALL_TARGET
         - THREAD_MAJOR_MM[SCREW_THREAD] / 2.0
         - _bracket.STATION_BAND
+        - _bracket.PUNCH_FLOAT
         - SUPPORT_LENGTH_BAND / 2.0
     )
 
 
-# The printed hold-down station from the ear's inboard face, .49: a plain
+# The printed hold-down station from the ear's inboard face, .50: a plain
 # .XX nominal for a clearance hole (#1371 review), held fixed so a support
 # length change moves neither this hole, its sheet nor the frame's seat
-# holes. The window checks below guard it.
-HOLE_STATION = 49 * _GRID_MM
+# holes. The window checks below guard it. Owner ruling 2026-11-20 (#2563,
+# option B): "B", the station moved .49 -> .50 so the head clears the R.02
+# MAX foot-to-ear corner with the seat's transfer-punch float charged.
+HOLE_STATION = 50 * _GRID_MM
 
 
 def _foot_z1(support_end_z: float) -> float:
