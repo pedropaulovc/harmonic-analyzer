@@ -3,9 +3,9 @@
   <text class="title" x="20" y="24">Side view along the jaws: the head end out past the jaws, the eye drilled in the overhang (not to scale)</text>
   <rect class="fixture-vise" x="258" y="260" width="462" height="30"/>
   <rect class="clamp" x="258" y="100" width="462" height="90"/>
-  <rect class="fixture-support" x="258" y="190" width="462" height="70"/>
-  <rect class="part-kept" x="160" y="160" width="400" height="30"/>
-  <rect class="fixture-support" x="655" y="160" width="60" height="30"/>
+  <rect class="fixture-support" x="258" y="190" width="296" height="70"/>
+  <rect class="part-kept" x="160" y="160" width="260" height="30"/>
+  <rect class="fixture-support" x="480" y="160" width="74" height="30"/>
   <rect class="part-removed" x="195" y="160" width="10" height="30"/>
   <rect class="cutter" x="195" y="60" width="10" height="94"/>
   <line class="centre-line" x1="200" y1="50" x2="200" y2="200"/>
@@ -28,10 +28,11 @@
   <line class="dims" x1="185" y1="50" x2="196" y2="62"/>
   <text class="label" x="420" y="72">jaw (behind) grips the O.D.</text>
   <line class="dims" x1="470" y1="78" x2="470" y2="104"/>
-  <text class="label" x="400" y="310">1 in parallel on edge, centred</text>
-  <line class="dims" x1="450" y1="296" x2="450" y2="256"/>
-  <text class="label" x="600" y="310">offcut spacer</text>
-  <line class="dims" x1="680" y1="296" x2="685" y2="186"/>
+  <text class="label" x="330" y="310">4 in parallel on edge, centred</text>
+  <line class="dims" x1="400" y1="296" x2="400" y2="256"/>
+  <text class="label" x="560" y="310">offcut spacer on</text>
+  <text class="label" x="560" y="326">the parallel's right end</text>
+  <line class="dims" x1="600" y1="296" x2="520" y2="186"/>
   <text class="label" x="20" y="120">blank, thread end right</text>
   <line class="dims" x1="100" y1="124" x2="170" y2="165"/>
 </svg>

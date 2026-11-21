@@ -9,11 +9,11 @@ end's overhang, clear of the jaws.
 
 from __future__ import annotations
 
-import importlib.util
 import tomllib
 
 import pytest
 
+import _cam_programs
 import _process_plans
 import export_features
 
@@ -26,11 +26,7 @@ def _plan() -> dict:
 
 
 def _recipe():
-    path = _process_plans.plan_path(STEM).with_name("cam.py")
-    spec = importlib.util.spec_from_file_location(f"{STEM}_cam", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return _cam_programs.load_recipe(STEM)
 
 
 def test_the_step_turned_hold_is_inside_the_shops_stickout_rule():

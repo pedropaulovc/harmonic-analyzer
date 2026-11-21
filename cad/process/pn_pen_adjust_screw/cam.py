@@ -4,8 +4,11 @@
 part's exported ``features.toml`` and the plan/shop TOML, then runs
 :func:`build` inside headless FreeCAD (``freecadcmd``) with that context and
 checks the posted G-code against :func:`expectations`. The blank's diameter
-and length, the eye's diameter band and its station from the head end come
-from the feature export; the parallel, the overhang, the spot, the pecks and
+comes from ``plan.toml`` ``parameters.stock_dia_in`` (the export's ``outer``
+is the head, not the blank), and with it the setup frame's origin and every
+Z depth; the blank's length, the eye's diameter band and its station from
+the head end come from the feature export; the parallel, the overhang, the
+spot, the pecks and
 the drill's run past the rod from ``plan.toml`` ``[parameters]`` and
 ``milling_cuts``; the #54's diameter from ``shop/``. Every path is written
 here (``rt.custom``). Typed here, because neither record carries them: the #1
@@ -353,16 +356,20 @@ def context(
         },
     ]
 
-    # Keep-outs: the jaws from the overhang on (to their tops), the parallel
-    # under the blank (to its top, the blank's underside), the spacer at the
-    # jaws' right end (to the O.D. top).
+    # Keep-outs: the jaws from the overhang on (to their tops), the 4 in
+    # parallel under the blank from the jaws' left face (to its top, the
+    # blank's underside), the spacer on the parallel's right end (to the O.D.
+    # top).
     jaw_x = (overhang, overhang + p["vise_jaw_width_mm"])
+    parallel_x = (overhang, overhang + p["parallel_length_mm"])
     half = p["parallel_thickness_mm"] / 2
     boxes = [
         _box("moving jaw", jaw_x, (-radius - JAW_DEPTH_MM, -radius), jaw_top),
         _box("fixed jaw", jaw_x, (radius, radius + JAW_DEPTH_MM), jaw_top),
-        _box("parallel", jaw_x, (-half, half), -dia),
-        _box("spacer", (jaw_x[1] - SPACER_MM, jaw_x[1]), (-radius, radius), 0.0),
+        _box("parallel", parallel_x, (-half, half), -dia),
+        _box(
+            "spacer", (parallel_x[1] - SPACER_MM, parallel_x[1]), (-radius, radius), 0.0
+        ),
     ]
     name = PROGRAMS[0][0]
     tn = numbers
