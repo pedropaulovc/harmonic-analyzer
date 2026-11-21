@@ -12,8 +12,8 @@ Typed here, because neither record carries them: the ramp's drop per leg, the
 safe and clearance heights and the vise jaws' depth (keep-out shapes only).
 
 Route (plan text in ``plan.toml``): the front end is faced and the far end
-crowned first; the rod then lies along the vise jaws on the 1 in and 1/2 in
-parallels stacked against each jaw, centred on the jaws, gripped on its
+crowned first; the rod then lies along the vise jaws on one 1 in parallel
+on edge, centred between the jaws, centred along them, gripped on its
 O.D.: LR01 mills both flats in one clamping, so they face the same way. The
 Ø.064 cross hole is match-drilled at assembly (MHA-DT-00), not here.
 
