@@ -221,7 +221,7 @@ lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Mike the rod at both ends and the middle. Over {{process.thread_major_max_in:.4dot}} where the thread goes: Op 60 turns the thread's length down first."
+instruction = "Mike the rod at three places along the thread's length (Z+.300 to Z-.720). Over {{process.thread_major_max_in:.4dot}} at any: Op 60 turns the thread's length down first."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -434,10 +434,18 @@ instruction = "After deburring, screw end B by hand into the magnifying bracket 
 instruction = "Tight: a burr is left; file it off the thread's start and try again. Shake or a torn thread: scrap the lever and make another from Setup 1."
 
 [[setups.operations]]
-instruction = "Look along the O.D. under a light, then slide the MHA-MG-02 clamp along the rod: it slides without catching (the drawing's sliding fit), and the MHA-MG-02 screw seat (main view, the plain rod near the SR.125 tip) has no raised burr, dent or scratch that breaks its Ra 125."
+instruction = "Look along the O.D. under a light, then slide the MHA-MG-02 clamp along the rod: it slides without catching, and the MHA-MG-02 screw seat (main view, the plain rod near the SR.125 tip) has no raised burr, dent or scratch that breaks its Ra 125."
 
 [[setups.operations]]
 instruction = "The clamp catches, or the screw seat is marked: scrap the lever (the drawn surface is not reworked) and make another from Setup 1."
+
+[[setups.operations]]
+instruction = "The sliding fit: mike the rod where the clamp slides (about .248–.250, the bar as bought); read the MHA-MG-02 bore with the pin gauges, the largest pin that enters (about .255–.263); subtract."
+inspection = "Clearance, MHA-MG-02 bore less the rod, .007–.013 (drawing: SLIDING FIT IN MHA-MG-02 CLAMP)."
+gauge_checks = [{ gauge = "micrometers", band_mm = [6.2992, 6.35] }, { gauge = "pin-gauges", band_mm = [6.477, 6.6802] }]
+
+[[setups.operations]]
+instruction = "Outside .007–.013: the rod is the bar as bought, so the clamp's bore is off; set the lever aside and rework or remake MHA-MG-02 to its own traveler, then repeat Op 380."
 
 [[setups.operations]]
 instruction = "Wipe the lever clean and dry (FINISH: machined) and bag it with its number."
