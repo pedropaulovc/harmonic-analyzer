@@ -32,7 +32,8 @@ gauge reads it small. Unbolted, the back alone: CB11 faces the grip offset
 Work frames (G54), each set in its setup:
 - CB01: X0 Y0 the bar's axis, Z0 the faced first end.
 - CB02: X0 Y0 the bar's axis, Z0 the parallels' top (the first end).
-- CB03-CB05: X0 the left end, Y0 the fixed jaw (B from CB05), Z0 the
+- CB03-CB04: X0 the left end, Y0 the fixed jaw, Z0 the stacks' top.
+- CB05: X0 the right end (the near side), Y0 the fixed jaw (B), Z0 the
   stacks' top.
 - CB06-CB08: X0 the LEFT end (the near side, marked N), Y0 the fixed jaw
   (the bottom face B against it), Z0 the stacks' top (the mating face).
@@ -558,9 +559,9 @@ def context(
         # Bottom up, the raw mating face against the fixed jaw.
         "bottom": _frame([raw_mating, raw_top, near], [1, 0, 0], [0, -1, 0]),
         "top": _frame([raw_outside, g["bottom"], near], [-1, 0, 0], [0, 1, 0]),
-        # Mating face up, B against the fixed jaw: X0 the LEFT end, the far
-        # side (N is not marked until CB06).
-        "mating": _frame([raw_outside, g["bottom"], far], [0, -1, 0], [1, 0, 0]),
+        # Mating face up, B against the fixed jaw: the near side is the
+        # RIGHT end, the part to -X.
+        "mating": _frame([raw_outside, g["bottom"], near], [0, -1, 0], [1, 0, 0]),
         # Outside face up, B against the fixed jaw: the near side N is the LEFT end.
         "outside": _frame([0.0, g["bottom"], near], [0, -1, 0], [-1, 0, 0]),
         # The bolted pair: the back toward the fixed jaw, the N ends at X0.
