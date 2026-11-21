@@ -140,7 +140,11 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a shim wrap of brass shim, {{process.regrip_grip_in:.2dot}} in in the jaws from the Setup 1 faced end (a pencil line that far from it at the jaw fronts); the parted end {{cad.outer_stickout_far_mm:in.2dot}} in out. Nothing seats the spacer axially: the jaw tips may stand proud of the chuck face."
-datum = "Z0: the parted face, .7325 from the Setup 1 faced end (the upper half of the {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} band), preset from the length miked in Op 60; setting error about .0005, mostly long."
+# The .7325 preset aim is typed (the adapter binds no mid-upper-band value):
+# the midpoint of length_in (.7320) and length_max_in (.7330), leaving .0015
+# of touch-mark depth and setting error above length_min_in (.7310). Re-derive
+# it whenever the drawing's length band moves.
+datum = "Z0: the parted face, .7325 from the Setup 1 faced end (the upper half of the {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} band), preset from the length miked in Op 60; the setting error, about .0005 either way, and the touch mark, which only shortens it, stay inside the band."
 diagram = { file = "diagrams/regrip.svg", alt = "The spacer turned round, its faced end in the jaws over a shim wrap with nothing behind it; the parted end faced to length from the miked length." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
@@ -150,7 +154,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Mike the length at the outer rim; write it down (about {{cad.part_off_in:.3dot}} the first time). Chuck it; spindle running, touch the AR on the parted end's outer rim and set DRO Z to that length less .7325 (a deep touch mark then leaves it long, not short). Face in light skims to Z0; unchuck and mike at the rim."
+instruction = "Mike the length at the outer rim; write it down (about {{cad.part_off_in:.3dot}} the first time). Chuck it; spindle running, touch the AR lightly on the parted end's outer rim and set DRO Z to that length less .7325 (the upper half of the band: a touch mark up to .0015 deep still leaves it in band). Face in light skims to Z0; unchuck and mike at the rim."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 inspection = "Length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} across the faces, micrometer."
