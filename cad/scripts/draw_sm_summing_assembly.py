@@ -63,7 +63,7 @@ from _drawing_dimensions import (
 )
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_point_in_view
-from _general_table import insert_general_table
+from _general_table import TABLE_TITLE_DROP, insert_general_table
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
@@ -205,7 +205,13 @@ DETAIL_LETTER_GAP = 0.002
 DETAIL_LETTER_HALF_WIDTH = 0.0013
 # The setting table (rule 22: settings and acceptances no visible model
 # dimension carries) runs along the top border, above every view on the sheet.
+# Its TABLE's top sits SETTING_TABLE_TOP_INSET under the inner border and its
+# title rides _general_table.TABLE_TITLE_DROP over it: the rows' bottom read
+# 228.55 mm, 0.55 mm over the 4 mm guard on DETAIL A (run
+# 20261117T155408788Z), so a grown title drop raises the title instead (its
+# top 3.2 mm under the border at the 7.79 mm drop; title extent 4.8 mm tall).
 SETTING_TABLE_INSET = 0.004
+SETTING_TABLE_TOP_INSET = 0.010525
 SETTING_TABLE_VIEW_GAP = 0.004
 
 # --- Sheet 2 ------------------------------------------------------------------
@@ -866,6 +872,12 @@ def _knife_detail(adapter: Any) -> tuple[Callable[[], None], Callable[[], None]]
     return proud_settled, finish
 
 
+def setting_table_title_top() -> float:
+    """The setting table title's requested top: its table's top
+    (SETTING_TABLE_TOP_INSET under the inner border) plus the title drop."""
+    return SHEET_INNER_BORDER[3] - SETTING_TABLE_TOP_INSET + TABLE_TITLE_DROP
+
+
 def _place_setting_table(adapter: Any, views: dict[str, Any]) -> None:
     """The sheet 1 setting table along the top border, above every view.
 
@@ -880,13 +892,13 @@ def _place_setting_table(adapter: Any, views: dict[str, Any]) -> None:
     }
     occupied_tops[notes.DETAIL_TITLE] = DETAIL_CENTRE[1] + DETAIL_CROP_RADIUS
     _activate_sheet(adapter, SHEET_NAMES[0])
-    left, _bottom, _right, top = SHEET_INNER_BORDER
+    left = SHEET_INNER_BORDER[0]
     box = insert_general_table(
         adapter,
         title=notes.SETTING_TABLE_TITLE,
         header=notes.SETTING_TABLE_HEADER,
         rows=notes.SETTING_TABLE_ROWS,
-        top_left=(left + SETTING_TABLE_INSET, top - SETTING_TABLE_INSET),
+        top_left=(left + SETTING_TABLE_INSET, setting_table_title_top()),
         label=label,
     )
     _assert_box_on_sheet(box, label=label)
