@@ -54,9 +54,13 @@
 # CR06 and its touch-off are laid out on those limits (cam.py checks every
 # move of the saw, its spacers and its nut against the stock and the vise).
 # Also to buy: the .0775 reamer (tools.reamer-0775) and the 5/64 in end mill
-# (tools.endmill-5-64-long). No pin gauges (owner decision 2026-11-19, #3124
-# item 5): the pin hole is accepted on the reamer and a hand try of the
-# miked pin. The black enamel has no paint on record: Setup 8 is gated on
+# (tools.endmill-5-64-long). FLAGGED: the pin hole's size is gauged by a
+# special Class ZZ pin-gauge pair, GO .0775 plus and NO-GO .0779 minus, TO
+# BUY (as CH-01's): a reamed hole is the reamer's size +.0005/0, wider than
+# the drawing's .0004 band, so the reamer alone does not hold it. This
+# departs from the owner's 2026-11-19 decision (#3124 item 5: the hole
+# accepted on the reamer and a hand try of the miked pin), his to overrule;
+# the pin-gauge sets on order (gauges.pin-gauges) step .001. The black enamel has no paint on record: Setup 8 is gated on
 # the owner's product.
 #
 # Zeroing: X0 the blanks' left ends, flushed with a 1-2-3 block, edge finder
@@ -372,6 +376,12 @@ ref = "saw-evolution-14"
 id = "files"
 name = "Files"
 ref = "jig-files"
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .0775 plus, .0779 minus"
+ref = "pin-gauges"
+description = "Special Class ZZ pin gauges: .0775 plus pin (GO, .0775-.0777) and .0779 minus pin (NO-GO, .0777-.0779); not in the .001-step sets on order"
+status = "to_order"
 
 [[setups]]
 machine_kind = "other"
@@ -408,7 +418,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Mic one MHA-SH-VN-58 pin from the lot the rods will be assembled with (sheet note 1 fits the hole to it), and mic the .0775 reamer across its flutes."
-inspection = "The pin {{process.pin_dia_min_mm:in.4dot}}–{{process.pin_dia_max_mm:in.4dot}} (McMaster 90145A299, 5/64 in 0/+.0002) and the reamer .0775–.0777: the reamed hole is then held inside the drawing's Ø.0775–.0779 and .0004–.0008 under the pin, inside note 1's .0002–.0008 (the hole's size is held by this reamer; Setup 5 only tries the pin in it). Outside: stop and tell the owner before reaming any rod."
+inspection = "The pin {{process.pin_dia_min_mm:in.4dot}}–{{process.pin_dia_max_mm:in.4dot}} (McMaster 90145A299, 5/64 in 0/+.0002) and the reamer .0775–.0777. A hole the Setup 5 gauges pass (.0775–.0779) is then .0002–.0008 under the pin, note 1's fit. Outside: stop and tell the owner before reaming any rod."
 gauge_checks = [
   { gauge = "micrometers", band_mm = ["{{process.pin_dia_min_mm}}", "{{process.pin_dia_max_mm}}"] },
   { gauge = "micrometers", band_mm = [1.9685, 1.97358] },
@@ -554,8 +564,8 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Every load, still clamped: the faces below D on both blanks."
-inspection = "Ring's face {{cad.ring_near_face_offset_min_in:.4dot}}–{{cad.ring_near_face_offset_max_in:.4dot}} below D, and the shank's {{cad.shank_near_face_offset_min_in:.3dot}}–{{cad.shank_near_face_offset_max_in:.3dot}}, each from the frame's top beside it: the calipers' depth rod, read to .0005. Outside: stop and tell the owner."
+instruction = "Every load, still clamped: the faces below D on both blanks (the shank's on the first load only: CR03 cuts it from the ring face's Z0)."
+inspection = "Ring's face {{cad.ring_near_face_offset_min_in:.4dot}}–{{cad.ring_near_face_offset_max_in:.4dot}} below D, and, first load, the shank's {{cad.shank_near_face_offset_min_in:.3dot}}–{{cad.shank_near_face_offset_max_in:.3dot}}, each from the frame's top beside it: the calipers' depth rod, read to .0005. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.ring_near_face_offset_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.shank_near_face_offset_band_mm}}" },
@@ -691,8 +701,8 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Every load, after CR06_slot ends, spindle stopped, still clamped: the fork slot of the blank against the fixed jaw."
-inspection = "Width {{cad.fork_slot_width_min_in:.4dot}}–{{cad.fork_slot_width_max_in:.4dot}}: the .1040 gauge block enters the slot, the .1080 does not. Depth {{cad.fork_slot_depth_min_in:.3dot}}–{{cad.fork_slot_depth_max_in:.3dot}} from the crown: the calipers' depth rod. Near tine {{cad.fork_slot_near_tine_min_in:.4dot}}–{{cad.fork_slot_near_tine_max_in:.4dot}} and far tine {{cad.fork_slot_far_tine_min_in:.4dot}}–{{cad.fork_slot_far_tine_max_in:.4dot}}: the calipers' outside jaw tips across each tine at the crown. Outside: stop and tell the owner."
+instruction = "Every load, after CR06_slot ends, spindle stopped, still clamped: the fork slot of the blank against the fixed jaw (its depth on the first load only: X is not moved after CR04 trims the crown)."
+inspection = "Width {{cad.fork_slot_width_min_in:.4dot}}–{{cad.fork_slot_width_max_in:.4dot}}: the .1040 gauge block enters the slot, the .1080 does not. First load: depth {{cad.fork_slot_depth_min_in:.3dot}}–{{cad.fork_slot_depth_max_in:.3dot}} from the crown: the calipers' depth rod. Near tine {{cad.fork_slot_near_tine_min_in:.4dot}}–{{cad.fork_slot_near_tine_max_in:.4dot}} and far tine {{cad.fork_slot_far_tine_min_in:.4dot}}–{{cad.fork_slot_far_tine_max_in:.4dot}}: the calipers' outside jaw tips across each tine at the crown. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "gauge-blocks-mitutoyo", band_mm = "{{cad.fork_slot_width_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.fork_slot_depth_band_mm}}" },
@@ -743,8 +753,8 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "First load only, before the next load: try the miked MHA-SH-VN-58 pin by hand in each hole, chamfered end first."
-inspection = "The pin does not enter past its chamfer by hand: the hole is under it (the press fit). It enters: the hole is oversize; stop and tell the owner. The pin is pressed in only at assembly."
+instruction = "First load and the first load after any reamer change, before the next load: gauge each hole with the Class ZZ pin-gauge pair (GO .0775 plus, NO-GO .0779 minus; TO BUY), then try the miked MHA-SH-VN-58 pin by hand in each hole, chamfered end first."
+inspection = "Size Ø.0775–.0779: the GO enters through by hand, the NO-GO does not enter. Then the pin does not enter past its chamfer (note 1's press fit). Either fails: stop and tell the owner. The pin is pressed in only at assembly."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -811,7 +821,7 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "Break each rod out of its frame: bend the frame at each tab until it snaps, or cut the tab with a hacksaw. File each tab's stub flush with the edge. Deburr the edges, the bore's, the slot's and the pin hole's mouths: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, smooth file and a scraper; clear the slot's burrs inside the pin hole with the reamer by hand. Wash off the oil."
+instruction = "Break each rod out of its frame: bend the frame at each tab until it snaps, or cut the tab with a hacksaw. File each tab's stub flush with the edge. Deburr the edges, the bore's, the slot's and the pin hole's mouths: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, smooth file and a scraper; clear the slot's burrs inside the pin hole with the reamer by hand; the NO-GO .0779 still does not enter. Wash off the oil."
 feed = "hand"
 
 [[setups.operations]]
