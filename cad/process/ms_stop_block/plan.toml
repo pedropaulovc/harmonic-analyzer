@@ -465,10 +465,17 @@ instruction_detailed = "Console M6 T2 (1/8 in end mill, at least .60 out of its 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Gauge the 1/8 in end mill by what it cuts (three flutes cannot be miked across): plunge it .050 into the waste end by the fixed jaw, which MS06 or MS07 faces off. MDI: M3 S2800, G0 X10.000 Y-2.500 Z1.000, G1 Z-1.270 F106.7, G0 Z5.000, M5."
-inspection = "The test hole Ø.123–.125: the .123 pin enters, the .126 does not. The .123 does not enter, or the .126 does: use another 1/8 in end mill and repeat at X10.000 Y-29.250 (the waste end by the moving jaw); the rebate's height is that cut plus two wall passes."
+speed_kind = "spindle"
+tool = "em-eighth"
+drilling = "none"
+sizing = "other"
+instruction = "Gauge the 1/8 in end mill by what it cuts (three flutes cannot be miked across): spindle stopped, set 2800; plunge it .050 into the waste end by the fixed jaw, which MS06 or MS07 faces off. MDI: M3 S2800, G0 X10.000 Y-2.500 Z1.000, G1 Z-1.270 F106.7, G0 Z5.000, M5."
+settings = "stop-em-eighth-c360"
+milling_cuts = [
+  { name = "test plunge", kind = "plunge", phase = "finish", cutter_dia_mm = 3.175, stations_mm = 10.0 },
+]
+inspection = "The test hole Ø.123–.125 by pins: the .123 pin enters, the .125 does not. Either fails: use another 1/8 in end mill and repeat at X10.000 Y-29.250 (the waste end by the moving jaw); the rebate's height is that cut plus two wall passes."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = [3.1242, 3.175] }]
-feed = "hand"
 
 [[setups.operations]]
 instruction = "Prove MS05_rebate in air, Z0 raised 1.000 in; every move stays between the jaws. Then Z0 back."
@@ -503,9 +510,21 @@ instruction = "The relief is file MS05_relief, cut by the 1/16 in long-reach stu
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Gauge the 1/16 in end mill by what it cuts (three flutes cannot be miked across). Set it at least .60 out of its collet: its shank starts .50 above its tip, and it reaches {{process.relief_bottom_mm:in.3dot}} below the mating face. Console M6 T3 (the tool setter measures it), then plunge it .050 into the waste end beside the 1/8 in test hole. MDI: M3 S2800, G0 X12.500 Y-2.500 Z1.000, G1 Z-1.270 F64.0, G0 Z5.000, M5. Its plunges in the relief leave a ridge {{process.relief_scallop_mm:in.4dot}} high each side, so the relief's clear height is the cut less two ridges."
-inspection = "The test hole Ø {{process.relief_cutter_min_mm:in.4dot}}–{{process.relief_cutter_max_mm:in.4dot}}: the .058 pin enters, the .071 does not. The .058 does not enter: the relief would be under its {{cad.relief_floor_relief_height_min_in:.3dot}}; stop and tell the owner."
-gauge_checks = [{ gauge = "pin-gauges", band_mm = ["{{process.relief_cutter_min_mm}}", "{{process.relief_cutter_max_mm}}"] }]
+instruction = "Set the 1/16 in end mill at least .60 out of its collet: its shank starts .50 above its tip, and it reaches {{process.relief_bottom_mm:in.3dot}} below the mating face. Console M6 T3: the tool setter measures it."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-sixteenth"
+drilling = "none"
+sizing = "other"
+instruction = "Gauge it by what it cuts (three flutes cannot be miked across): spindle stopped, set 2800; plunge it .050 into the waste end beside the 1/8 in test hole. MDI: M3 S2800, G0 X12.500 Y-2.500 Z1.000, G1 Z-1.270 F64.0, G0 Z5.000, M5. The relief's clear height is that cut less two {{process.relief_scallop_mm:in.4dot}} ridges."
+settings = "stop-em-sixteenth-c360"
+milling_cuts = [
+  { name = "test plunge", kind = "plunge", phase = "finish", cutter_dia_mm = "{{process.relief_cutter_dia_mm}}", stations_mm = 12.5 },
+]
+inspection = "The test hole Ø.058–.070 by pins (the least cutter is {{process.relief_cutter_min_mm:in.4dot}}): the .058 pin enters, the .070 does not. The .058 does not enter: the relief would be under its {{cad.relief_floor_relief_height_min_in:.3dot}}; stop and tell the owner. The .070 enters: use another 1/16 in end mill and repeat at X12.500 Y-29.250."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = [1.4732, 1.778] }]
 
 [[setups.operations]]
 instruction = "Prove MS05_relief in air as MS05_rebate was, Z0 raised 1.000 in. Then Z0 back."
