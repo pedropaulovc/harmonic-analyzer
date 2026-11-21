@@ -13,6 +13,14 @@ A requirement declared for a non-default member (``configuration="<Member>"``)
 is named in that member's own STEP, ``member_step_paths``, the neutral member
 name the full export already uses; the manifest records its ``configuration``
 and each member STEP's digest under ``member_steps``.
+
+Every part with its own drawing has a bundle (``SUPPORTED_PARTS``); only the
+parts whose drawing declares requirements (``DECLARED_PARTS``) name faces and
+list features. An undeclared part's manifest carries what needs no drawing
+declaration (identity, units, revision, material, STEP name and digest,
+construction from its notes module, general tolerances, the model frame) and an
+empty ``[features]`` table. It never imports, cites or depends on the drawing
+module, so drawing edits do not re-key its bundle.
 """
 
 from __future__ import annotations
@@ -50,7 +58,29 @@ from _printed_tolerance import (
 )
 from _title_block_units import ANGLE_UNITS, LENGTH_UNITS, edge_break_chamfer_display, edge_break_radius_display, quantity
 
-SUPPORTED_PARTS = discover_parts(Path(__file__).resolve().parent)
+DECLARED_PARTS = discover_parts(Path(__file__).resolve().parent)
+
+
+def drawn_parts(scripts: Path) -> tuple[str, ...]:
+    """Every part with its own drawing: ``draw_<stem>.py`` beside the part builder
+    ``build_<stem>.py`` (assembly drawings pair with ``build_<x>_assembly.py``).
+
+    Static, like :func:`discover_parts`: no drawing or registry is imported, so
+    enrolment never enters a bundle's cache key. ``test_part_coverage`` holds this
+    equal to the drawing registry's part drawings.
+    """
+    scripts = Path(scripts)
+    return tuple(
+        stem
+        for path in sorted(scripts.glob("draw_*.py"))
+        if not (stem := path.stem.removeprefix("draw_")).endswith("_assembly")
+        and (scripts / f"build_{stem}.py").is_file()
+    )
+
+
+SUPPORTED_PARTS = drawn_parts(Path(__file__).resolve().parent)
+if _undrawn := sorted(set(DECLARED_PARTS) - set(SUPPORTED_PARTS)):
+    raise RuntimeError(f"requirement declarations outside a part drawing: {_undrawn}")
 REPO = Path(__file__).resolve().parents[2]
 CONFIG_DIR = REPO / "cad" / "config"
 OUT = REPO / "cad" / "out"
@@ -77,6 +107,34 @@ def _notes_module(stem: str) -> ModuleType:
     if importlib.util.find_spec(name) is not None:
         return importlib.import_module(name)
     return _spec_module(stem)
+
+
+def _undeclared_notes_path(stem: str) -> Path | None:
+    """An undeclared part's ``DRAWING_NOTES`` owner (notes, else spec), read
+    statically so a spec that owns no notes is neither imported nor keyed."""
+    scripts = Path(__file__).resolve().parent
+    for path in (scripts / f"{stem}_notes.py", scripts / f"{stem}_spec.py"):
+        if path.is_file():
+            return path.resolve() if "DRAWING_NOTES" in _source_declarations(path.resolve(), source_tree(path.resolve())) else None
+    return None
+
+
+def _undeclared_notes_module(stem: str) -> ModuleType | None:
+    path = _undeclared_notes_path(stem)
+    return None if path is None else importlib.import_module(path.stem)
+
+
+def _builder_path(stem: str) -> Path:
+    return Path(__file__).resolve().parent / f"build_{stem}.py"
+
+
+def _builder_frame_cite(stem: str) -> list[str]:
+    """An undeclared part's model frame is its builder's, cited by its docstring."""
+    path = _builder_path(stem)
+    declarations = _source_declarations(path, source_tree(path))
+    if "__frame__" not in declarations:
+        raise ValueError(f"build_{stem}: missing module docstring for the model-frame citation")
+    return [declarations["__frame__"]]
 
 
 def _declarations(module: ModuleType) -> dict[str, str]:
@@ -200,19 +258,32 @@ def _source_modules(tree: ast.Module) -> set[str]:
 
 
 def source_paths(stem: str) -> tuple[Path, ...]:
-    """Statically cover this draw and its source closures; never import them."""
+    """Statically cover this draw and its source closures; never import them.
+
+    An undeclared part's manifest reads no drawing: its sources are the
+    exporter, the closure of its ``DRAWING_NOTES`` owner, the notes/spec files
+    read to find that owner and its builder file (the frame citation), never a
+    draw module or drawing helper.
+    """
     from _buildgraph import module_deps_of
 
     stem = _stem(stem)
     scripts = Path(__file__).resolve().parent
-    drawing = _source_module_path(f"draw_{stem}", scripts)
-    spec = _source_module_path(f"{stem}_spec", scripts)
     notes = scripts / f"{stem}_notes.py"
-    roots = {Path(__file__).resolve(), drawing, spec}
-    if notes.is_file():
-        roots.add(notes.resolve())
-    roots.update(_source_module_path(name, scripts) for name in _source_modules(source_tree(drawing)))
-    paths = set(roots)
+    roots = {Path(__file__).resolve()}
+    read: set[Path] = set()
+    if stem in DECLARED_PARTS:
+        if notes.is_file():
+            roots.add(notes.resolve())
+        drawing = _source_module_path(f"draw_{stem}", scripts)
+        roots |= {drawing, _source_module_path(f"{stem}_spec", scripts)}
+        roots.update(_source_module_path(name, scripts) for name in _source_modules(source_tree(drawing)))
+    else:
+        if (owner := _undeclared_notes_path(stem)) is not None:
+            roots.add(owner)
+        read = {path.resolve() for path in (notes, scripts / f"{stem}_spec.py") if path.is_file()}
+        read.add(_builder_path(stem))
+    paths = roots | read
     for path in roots:
         paths.update(Path(dependency).resolve() for dependency in module_deps_of(path))
     paths.add(CONFIG_DIR / "parts" / f"{stem.replace('_', '-')}.yaml")
@@ -223,8 +294,11 @@ def feature_selectors(stem: str, configuration: str | None = None) -> dict[str, 
     """Resolve all STEP patches using each drawing's geometric feature domains.
 
     ``configuration`` selects one non-default member's requirements; ``None``
-    the saved default member's."""
-    drawing = _drawing_module(_stem(stem))
+    the saved default member's. An undeclared part has none."""
+    stem = _stem(stem)
+    if stem not in DECLARED_PARTS:
+        return {}
+    drawing = _drawing_module(stem)
     return {
         name: declared.faces for name, declared in requirements_for(drawing).items()
         if declared.configuration == configuration
@@ -278,22 +352,30 @@ def _construction(module: ModuleType) -> tuple[str, list[str]]:
 
 
 def requirement_manifest(stem: str) -> dict[str, Any]:
-    """Pure drawing requirement data, before binding it to STEP face names."""
+    """Pure drawing requirement data, before binding it to STEP face names.
+
+    An undeclared part reads no drawing: no metadata, an empty features table,
+    its builder's model frame and, when its notes/spec module has
+    ``DRAWING_NOTES``, those notes and construction (otherwise ``unknown``)."""
     stem = _stem(stem)
     dashed = stem.replace("_", "-")
-    module = _spec_module(stem)
-    drawing = _drawing_module(stem)
-    declarations = requirements_for(drawing)
-    relative = Path(drawing.__file__).resolve().relative_to(REPO).as_posix()
-    calls = {name: [f"harmonic-analyzer/{relative}#requirement:{name}"] for name in declarations}
-    metadata = [
-        (declared, [f"harmonic-analyzer/{relative}#part_metadata:{ordinal}"])
-        for ordinal, declared in enumerate(metadata_for(drawing), 1)
-    ]
     facts = {}
     fact_citations = {}
     precision_cite = []
-    frame_cite = [*_cite(module, "__frame__"), *_cite(drawing, "build")]
+    if stem in DECLARED_PARTS:
+        module = _spec_module(stem)
+        drawing = _drawing_module(stem)
+        declarations = requirements_for(drawing)
+        relative = Path(drawing.__file__).resolve().relative_to(REPO).as_posix()
+        calls = {name: [f"harmonic-analyzer/{relative}#requirement:{name}"] for name in declarations}
+        metadata = [
+            (declared, [f"harmonic-analyzer/{relative}#part_metadata:{ordinal}"])
+            for ordinal, declared in enumerate(metadata_for(drawing), 1)
+        ]
+        frame_cite = [*_cite(module, "__frame__"), *_cite(drawing, "build")]
+    else:
+        calls, metadata = {}, []
+        frame_cite = _builder_frame_cite(stem)
     for declared, call in metadata:
         for key, (value, sources) in declared.fields.items():
             facts[key] = value
@@ -304,9 +386,17 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
             if any((source[1] if isinstance(source, tuple) else source) == "__frame__" for source in declared.precision_sources):
                 raise ValueError(f"draw_{stem}: precision_sources must cite printed precision, not a module docstring")
             precision_cite += [*call, *_spec_cite(module, declared.precision_sources)]
-    features = _drawing_features(stem, declarations, calls, precision_cite)
-    notes_module = _notes_module(stem)
-    construction, construction_cite = _construction(notes_module)
+    if stem in DECLARED_PARTS:
+        features = _drawing_features(stem, declarations, calls, precision_cite)
+        notes_module = _notes_module(stem)
+    else:
+        features = {}
+        notes_module = _undeclared_notes_module(stem)
+    if notes_module is None:
+        construction, construction_cite, notes, notes_cite = UNKNOWN, [], UNKNOWN, []
+    else:
+        construction, construction_cite = _construction(notes_module)
+        notes, notes_cite = notes_module.DRAWING_NOTES.splitlines(), _cite(notes_module, "DRAWING_NOTES")
     row = _config.parts(dashed)
     registry = _config._doc("parts")
     registry_row = registry["parts"][dashed]
@@ -359,7 +449,6 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
                 feature["precision"]["finish_ra"] = _finish_precision()
                 feature["cite"]["precision.finish_ra"] = [*call, *_cite(_surface_finish, "ra")]
         feature["faces"] = UNKNOWN
-    notes = notes_module.DRAWING_NOTES
     for feature in features.values():
         for key in ("axis", "at", "normal", "plane"):
             if key in feature:
@@ -381,7 +470,7 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
         "cite": {"construction": construction_cite, "units": frame_cite, "precision": fact_citations.get("precision", frame_cite), "frames": frame_cite},
         "drawing": {"number": row["number"], "revision": UNKNOWN, "cite": [*registry_cite("number"), "harmonic-analyzer/cad/config/release.yaml:next_revision", *_cite(_part_properties, "part_properties")]},
         "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": facts.get("material.finish", row.get("finish", UNKNOWN)), "thickness": facts.get("material.thickness", UNKNOWN), "cite": [*registry_cite("material_specification", "material"), *fact_citations.get("material.finish", registry_cite("finish")), *fact_citations.get("material.thickness", [])]},
-        "notes": {"manufacturing": notes.splitlines(), "process": facts.get("notes.process", row.get("process", UNKNOWN)), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {edge_break_radius_display(unit=unit)} OR CHAMFER {edge_break_chamfer_display(unit=unit)} MAX", "cite": [*fact_citations.get("notes.process", registry_cite("process")), *_title_cite("edge_break.radius", "edge_break.chamfer_max", "edge_break.digits", unit=unit), *unit_cite, *_cite(notes_module, "DRAWING_NOTES")]},
+        "notes": {"manufacturing": notes, "process": facts.get("notes.process", row.get("process", UNKNOWN)), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {edge_break_radius_display(unit=unit)} OR CHAMFER {edge_break_chamfer_display(unit=unit)} MAX", "cite": [*fact_citations.get("notes.process", registry_cite("process")), *_title_cite("edge_break.radius", "edge_break.chamfer_max", "edge_break.digits", unit=unit), *unit_cite, *notes_cite]},
         "general_tolerances": general, "frames": frames, "datums": datums, "features": features,
     }
 

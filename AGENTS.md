@@ -427,15 +427,20 @@ another gate's Windows collection `lstat`, even with an explicit test-file path.
 Keep this policy on the gate commands, not global pytest configuration, so local
 interactive pytest retains its cache and unrelated CAD recipes do not re-key.
 
-`package:features:<stem>` exports each part whose `draw_<stem>.py` has module-level
+`package:features:<stem>` exports a bundle for every part with its own drawing
+(`export_features.SUPPORTED_PARTS`: `draw_<stem>.py` beside `build_<stem>.py`,
+131 parts; `test_part_coverage` holds it equal to the registry's part drawings).
+Parts whose `draw_<stem>.py` has module-level
 `_feature_requirements.requirement(...)` declarations beside its printed drawing
-requirements. `export_features.SUPPORTED_PARTS` is derived by import-free AST
-discovery, not a maintained part list. Source-path construction is also static:
-neither operation imports draw modules during graph loading. Each leaf includes its own **entire draw-module
+requirements (`DECLARED_PARTS`, derived by import-free AST discovery, not a
+maintained part list) name their faces and list features; every other part's
+manifest has an empty `[features]` table and reads no drawing. Source-path
+construction is also static: neither operation imports draw modules during graph
+loading. Each declared leaf includes its own **entire draw-module
 closure**, cited-module/config inputs and native part identity. A draw-only edit
 does not re-key other feature leaves or native part/assembly builds; shared
-`_drawing_common`, layout-audit, `_pdf_ink` or drawing-helper edits re-key all 18
-feature leaves. `Requirement` returns are registry descriptors for inspection
+`_drawing_common`, layout-audit, `_pdf_ink` or drawing-helper edits re-key every
+declared feature leaf and no undeclared one. `Requirement` returns are registry descriptors for inspection
 or explicit consumption, not automatic print-path wiring: the rocker consumes
 datum/rod-FCF fields and checks four imported native precisions against them.
 Feature precision requires explicit `part_metadata.precision_sources`; printed
@@ -454,9 +459,14 @@ not draw closures directly. The release-only `check:features_bound` validates
 scoped recorded face refs, requires two rocker pivot-bore patches and identical
 scoped/full STEP bytes, and reports both digests. Release staging copies the
 verified scoped bundles under `features/`. `check:features_bound` is HA-owned:
-it checks part identity, the adjacent STEP name and sha256, a non-empty features
-table and each feature's face set against that STEP; neither it nor
-`export_features` validates against a prechips schema.
+it checks part identity, the adjacent STEP name and sha256, the release
+revision (an older one is a stale bundle), a non-empty features table for a
+declared part (an empty one for any other) and each feature's face set against
+that STEP; neither it nor `export_features` validates against a prechips schema.
+Without SolidWorks or a farm run, `cad/scripts/fetch_features.py <stem>` fills
+`cad/out/features/<stem>/` from the latest release (range-reads only that
+bundle) and reports it STALE, writing nothing, when the part's recipe moved
+since that release.
 
 Each part whose `cad/process/<stem>/plan.toml` is not a placeholder (no
 `revision = "placeholder"`; `_process_plans.TRAVELER_STEMS` is derived from the
@@ -494,8 +504,8 @@ every output.
 prechips itself is stdlib-only: no FreeCAD, no geometry kernel, no report or
 hash certificate. The plan reads its CAD values from the part's
 `features.toml`, which must exist under `cad/out/features/<stem>/` (from a
-build's `package:features:<stem>` leaf, the task's only dependency, or copied
-from a release asset's `features/<stem>/`), and its machines, tools, settings
+build's `package:features:<stem>` leaf, the task's only dependency, or fetched
+seat-free from a release by `cad/scripts/fetch_features.py <stem>`), and its machines, tools, settings
 and gauges from the shop directory `cad/process/shop/` (prechips merges its
 `*.toml` by section and refuses a key defined in two files; HA reads it through
 `_process_plans.load_shop()`). Run `uv run --frozen python -m doit prechips:<stem>` for

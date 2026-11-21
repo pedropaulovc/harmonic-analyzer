@@ -103,3 +103,15 @@ def test_part_and_assembly_coverage():
         if stems
     ]
     assert not failures, "Part coverage violations:\n" + "\n".join(failures)
+
+
+def test_every_part_drawing_has_a_feature_bundle():
+    """The static bundle enrolment (``draw_<stem>.py`` beside ``build_<stem>.py``)
+    is exactly the registry's part drawings, and declared parts are among them."""
+    part_drawings = {
+        row.part
+        for row in registry.DRAWINGS_BY_NAME.values()
+        if row.source_kind == "part"
+    }
+    assert set(export_features.SUPPORTED_PARTS) == part_drawings
+    assert set(export_features.DECLARED_PARTS) <= part_drawings

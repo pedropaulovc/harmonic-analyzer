@@ -977,7 +977,15 @@ def _save_feature_step(
     the caller closes the part unsaved and checks the native's SHA-256.
     ``reuse_names`` exports a later configuration of the already-named part;
     ``configuration`` names the shown member whose own requirements it names.
+    A part whose drawing declares no requirement names nothing: its STEP is the
+    same unlabelled ``SaveAs3`` full export writes, and must carry no feature label.
     """
+    from export_features import DECLARED_PARTS  # noqa: PLC0415 - static discovery
+
+    if stem not in DECLARED_PARTS:
+        _save_as(doc, out)
+        step_face_sets(out.read_text(encoding="latin-1"), ())
+        return
     names = name_feature_faces(doc, stem, reuse=reuse_names, configuration=configuration)
     _save_as(doc, out)
     faces = step_face_sets(out.read_text(encoding="latin-1"), names)

@@ -1,0 +1,310 @@
+"""Fill ``cad/out/features/<stem>/`` from a published release; no SolidWorks, no farm.
+
+``uv run --frozen python cad/scripts/fetch_features.py <stem> [<stem> ...]``
+``uv run --frozen python cad/scripts/fetch_features.py --all [--release v51]``
+
+Every part with its own drawing ships its feature bundle (the STEP and the
+``features.toml`` bound to it) in the release ZIP under ``features/<stem>/``.
+This reads only those members from the GitHub release asset with HTTP range
+requests (the ZIP's central directory, then each member), so one part costs a
+few MB rather than the whole multi-GB bundle. The latest release is used unless
+``--release`` names a tag.
+
+Each fetched bundle must identify its part and bind its STEP's exact bytes
+(``step``, ``step_sha256``); a bundle that does not is refused and nothing is
+written. It is then checked against this checkout:
+
+- ``features_bound.validate_bundle``: the bundle matches the part's current
+  requirement declarations (feature set, member STEPs, face sets);
+- the files of the part's ``package:features:<stem>`` and ``part:<stem>``
+  recipes (dodo's cache-key inputs, without the release revision) are diffed
+  between the release's tagged commit and the working tree.
+
+Either finding marks the bundle STALE for this checkout; it is printed with the
+changed files and the command exits 2 without writing it unless
+``--accept-stale`` is given. A stale bundle needs a farm build
+(``package:features:<stem>``) to be current.
+
+With the bundle in place, the part's traveler and NC programs run seat-free
+without doit (whose ``prechips:<stem>``/``cam:<stem>`` tasks would first try to
+rebuild the bundle):
+
+    uv run --frozen python cad/scripts/prechips_traveler.py <stem>
+    uv run --frozen python cad/scripts/cam_nc.py <stem>
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import io
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import tomllib
+import urllib.request
+import zipfile
+from pathlib import Path
+
+import export_features
+from features_bound import FeaturesBoundError, validate_bundle
+
+REPO = export_features.REPO
+PROJECT_SLUG = "harmonic-analyzer"
+_API = "https://api.github.com/repos/{repo}/releases/{which}"
+
+
+class FetchError(RuntimeError):
+    """The release, its asset or a bundle in it cannot be used."""
+
+
+def _git(*args: str) -> str:
+    done = subprocess.run(
+        ["git", *args], cwd=REPO, capture_output=True, text=True, check=False
+    )
+    if done.returncode:
+        raise FetchError(f"git {' '.join(args)}: {done.stderr.strip()}")
+    return done.stdout.strip()
+
+
+def _repo_slug() -> str:
+    url = _git("config", "--get", "remote.origin.url")
+    match = re.search(r"github\.com[:/](.+?)(?:\.git)?$", url)
+    if match is None:
+        raise FetchError(f"origin {url!r} is not a GitHub remote")
+    return match.group(1)
+
+
+def _request(url: str, **headers: str) -> urllib.request.Request:
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token and url.startswith("https://api.github.com/"):
+        headers["Authorization"] = f"Bearer {token}"
+    return urllib.request.Request(url, headers={"User-Agent": PROJECT_SLUG, **headers})
+
+
+def release_asset(tag: str | None) -> tuple[str, str]:
+    """The release's tag and the download URL of its ``<project>-<tag>.zip``."""
+    which = "latest" if tag is None else f"tags/{tag}"
+    with urllib.request.urlopen(
+        _request(_API.format(repo=_repo_slug(), which=which))
+    ) as response:
+        release = json.load(response)
+    name = f"{PROJECT_SLUG}-{release['tag_name']}.zip"
+    for asset in release.get("assets", ()):
+        if asset["name"] == name:
+            return release["tag_name"], asset["browser_download_url"]
+    raise FetchError(f"release {release['tag_name']} has no {name} asset")
+
+
+class RangeFile(io.RawIOBase):
+    """A read-only, seekable view of a remote file through HTTP range requests,
+    enough for :class:`zipfile.ZipFile` to read a member without the rest."""
+
+    def __init__(self, url: str) -> None:
+        self._url = url
+        self._position = 0
+        with urllib.request.urlopen(_request(url, Range="bytes=0-0")) as response:
+            total = response.headers.get("Content-Range", "").rpartition("/")[2]
+        if not total.isdigit():
+            raise FetchError(f"{url}: the server does not serve byte ranges")
+        self._size = int(total)
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return True
+
+    def tell(self) -> int:
+        return self._position
+
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        base = {io.SEEK_SET: 0, io.SEEK_CUR: self._position, io.SEEK_END: self._size}[
+            whence
+        ]
+        self._position = max(0, base + offset)
+        return self._position
+
+    def readinto(self, buffer) -> int:
+        end = min(self._size, self._position + len(buffer))
+        if end <= self._position:
+            return 0
+        request = _request(self._url, Range=f"bytes={self._position}-{end - 1}")
+        with urllib.request.urlopen(request) as response:
+            data = response.read()
+        if len(data) != end - self._position:
+            raise FetchError(f"{self._url}: short range read at {self._position}")
+        buffer[: len(data)] = data
+        self._position = end
+        return len(data)
+
+
+def extract_bundles(
+    archive: zipfile.ZipFile, stems: list[str], destination: Path
+) -> None:
+    """Copy each part's ``features/<stem>/`` members into ``destination/features/<stem>/``."""
+    for stem in stems:
+        prefix = f"features/{stem}/"
+        members = [
+            name
+            for name in archive.namelist()
+            if name.startswith(prefix) and not name.endswith("/")
+        ]
+        if not members:
+            raise FetchError(f"{stem}: the release carries no {prefix} bundle")
+        for name in members:
+            relative = name.removeprefix(prefix)
+            if "/" in relative or relative in {"", ".", ".."}:
+                raise FetchError(f"{name}: unexpected nested bundle member")
+            target = destination / "features" / stem / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(archive.read(name))
+
+
+def check_binding(stem: str, out: Path) -> None:
+    """Refuse a bundle that does not identify its part or bind its STEP bytes."""
+    manifest_path, step_path = export_features.bundle_paths(stem, out)
+    try:
+        manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+        digest = hashlib.sha256(step_path.read_bytes()).hexdigest()
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
+        raise FetchError(f"{stem}: unreadable bundle ({exc})") from exc
+    expected = (stem.replace("_", "-"), step_path.name, digest)
+    recorded = (manifest.get("part"), manifest.get("step"), manifest.get("step_sha256"))
+    if recorded != expected:
+        raise FetchError(f"{stem}: bundle records {recorded}, its files are {expected}")
+
+
+def recipe_files(stem: str) -> dict[str, str]:
+    """Repo-relative tracked inputs of the part's cache keys, each labelled with
+    the recipe it keys: ``geometry`` (``part:<stem>``, the native part) or
+    ``manifest`` (only ``package:features:<stem>``: exporter, notes, declarations)."""
+    sys.path.insert(0, str(REPO))
+    import dodo  # noqa: PLC0415 - the graph's own key inputs, loaded only here
+
+    out = (REPO / "cad" / "out").resolve()
+    labelled: dict[str, str] = {}
+    for label, deps in (
+        ("manifest", dodo._feature_export_file_deps(stem)),
+        ("geometry", dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem)),
+    ):
+        for dep in deps:
+            path = Path(dep).resolve()
+            if path == Path(dodo.RELEASE_VERSION_FILE).resolve() or out in path.parents:
+                continue
+            if path.is_relative_to(REPO.resolve()):
+                labelled[path.relative_to(REPO.resolve()).as_posix()] = label
+    return dict(sorted(labelled.items()))
+
+
+def changed_since(commit: str, files: list[str]) -> list[str]:
+    """The ``files`` that differ between ``commit`` and the working tree."""
+    changed: list[str] = []
+    for start in range(0, len(files), 200):
+        output = _git("diff", "--name-only", commit, "--", *files[start : start + 200])
+        changed += [line for line in output.splitlines() if line]
+    return sorted(set(changed))
+
+
+def tag_commit(tag: str) -> str:
+    try:
+        return _git("rev-parse", f"{tag}^{{commit}}")
+    except FetchError:
+        _git("fetch", "--quiet", "origin", "tag", tag)
+        return _git("rev-parse", f"{tag}^{{commit}}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("stems", nargs="*", help="parts (underscore or dashed stems)")
+    parser.add_argument(
+        "--all", action="store_true", help="every part with a feature bundle"
+    )
+    parser.add_argument("--release", help="release tag (default: the latest release)")
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=export_features.OUT,
+        help="output root (default: cad/out)",
+    )
+    parser.add_argument(
+        "--accept-stale",
+        action="store_true",
+        help="write bundles this checkout's recipe has moved past",
+    )
+    args = parser.parse_args(argv)
+    stems = (
+        list(export_features.SUPPORTED_PARTS)
+        if args.all
+        else [stem.replace("-", "_") for stem in args.stems]
+    )
+    unknown = sorted(set(stems) - set(export_features.SUPPORTED_PARTS))
+    if not stems or unknown:
+        parser.error(
+            f"name parts with a feature bundle (unknown: {', '.join(unknown) or 'none given'})"
+        )
+
+    try:
+        tag, url = release_asset(args.release)
+        commit = tag_commit(tag)
+        head = _git("rev-parse", "HEAD")
+        print(
+            f"fetch-features: release {tag} (commit {commit[:12]}), checkout HEAD {head[:12]}"
+        )
+        with tempfile.TemporaryDirectory(prefix="fetch-features-") as scratch:
+            staging = Path(scratch)
+            with zipfile.ZipFile(
+                io.BufferedReader(RangeFile(url), buffer_size=1 << 20)
+            ) as archive:
+                extract_bundles(archive, stems, staging)
+            stale: dict[str, list[str]] = {}
+            for stem in stems:
+                check_binding(stem, staging)
+                recipe = recipe_files(stem)
+                findings = [
+                    f"{recipe[name]} input changed since {tag}: {name}"
+                    for name in changed_since(commit, list(recipe))
+                ]
+                try:
+                    validate_bundle(stem, staging)
+                except FeaturesBoundError as exc:
+                    findings.append(
+                        f"does not match this checkout's declarations: {exc}"
+                    )
+                if findings:
+                    stale[stem] = findings
+            for stem, findings in stale.items():
+                print(
+                    f"fetch-features: STALE {stem} ({tag} bundle; needs a farm build of package:features:{stem} to be current)",
+                    file=sys.stderr,
+                )
+                for finding in findings:
+                    print(f"  {finding}", file=sys.stderr)
+            if stale and not args.accept_stale:
+                print(
+                    "fetch-features: nothing written; rerun with --accept-stale to use these bundles anyway",
+                    file=sys.stderr,
+                )
+                return 2
+            for stem in stems:
+                source = staging / "features" / stem
+                target = Path(args.out) / "features" / stem
+                shutil.rmtree(target, ignore_errors=True)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(source, target)
+                state = "STALE" if stem in stale else "current"
+                print(f"fetch-features: {stem}: {target} ({state} for this checkout)")
+    except (FetchError, OSError) as exc:
+        print(f"fetch-features: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

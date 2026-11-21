@@ -349,8 +349,7 @@ on the submitter, including when SolidWorks leaves run on the farm, and always
 run when requested. To render a part's travelers (`traveler.html` under
 `--profile pro`, `traveler-hobby.html` under `--profile hobby` with setup
 pictures, and that hobby sheet printed to `<slug>-traveler.pdf`) after its
-scoped feature bundle exists under `cad/out/features/<stem>/` (from a build or
-a release asset):
+scoped feature bundle exists under `cad/out/features/<stem>/`:
 
 ```text
 uv run --frozen python -m doit prechips:<stem>
@@ -358,7 +357,21 @@ uv run --frozen python cad/scripts/prechips_traveler.py <stem>
 uvx --from prechips@latest prechips traveler cad/process/<stem>/plan.toml --profile hobby --out <file>
 ```
 
-The doit task also runs its `package:features:<stem>` leaf first. Only exit 0
+The doit task also runs its `package:features:<stem>` leaf first (a cache
+restore, or a SolidWorks leaf on a miss). Without SolidWorks or a farm run,
+fetch the bundle from a release first, then use the wrapper or `uvx` form:
+
+```text
+uv run --frozen python cad/scripts/fetch_features.py <stem> [--release vNN]
+```
+
+Every release carries the bundle of every part with its own drawing under
+`features/<stem>/`; the script range-reads only those members of the release
+ZIP, refuses a bundle that does not bind its STEP, and reports it STALE (exit 2,
+nothing written, unless `--accept-stale`) when the part's geometry or manifest
+recipe files differ between the release's tag and the working tree, or the
+bundle does not match this checkout's requirement declarations. A stale part
+needs a farm build of `package:features:<stem>`. Only exit 0
 from both profiles and a printed PDF is success. Exit 2 from either profile is
 a prechips refusal (bad input or a failed enforced check) and leaves no
 traveler file; exit 1 means uv itself failed (no `uv`, no PyPI, or a `uv tool
@@ -379,10 +392,12 @@ fails if any is missing or stale. The tasks run on the submitter (no farm
 worker has FreeCAD), so the submitter needs FreeCAD 1.1 or later:
 `$HARMONIC_FREECAD` names `freecadcmd`, otherwise the newest `FreeCAD
 <version>` install is used, and the task fails when there is none. To post one
-part's programs after its scoped feature bundle exists:
+part's programs after its scoped feature bundle exists (from a build, or
+`fetch_features.py` as above; `cam_nc.py` skips doit's feature leaf):
 
 ```text
 uv run --frozen python -m doit cam:<stem>
+uv run --frozen python cad/scripts/cam_nc.py <stem>
 ```
 
 Recipes and their checks are described in
@@ -1517,12 +1532,19 @@ Switching to these per-drawing dependencies changes existing drawing cache keys
 once. It does not reuse legacy keys; subsequent unrelated row changes stay
 isolated. A scoped drawing build need not regenerate the rest of the fleet.
 
-Feature declarations remain colocated in `draw_<stem>.py`. Static AST discovery
+Every part with its own drawing has a `package:features:<stem>` leaf
+(`export_features.SUPPORTED_PARTS`, 131 parts); only parts whose drawing
+declares requirements (`DECLARED_PARTS`) name faces and list features. Feature
+declarations remain colocated in `draw_<stem>.py`. Static AST discovery
 and source-path construction do not import those modules while loading the task
-graph, but each `package:features:<stem>` source key includes its **entire own draw-module
-closure**, not just declaration expressions. An own-draw edit re-keys only that
-feature leaf; shared `_drawing_common`, layout-audit, `_pdf_ink` and drawing-helper
-edits re-key all 18 enrolled feature leaves, not native part/assembly recipes.
+graph, but each declared part's `package:features:<stem>` source key includes its
+**entire own draw-module closure**, not just declaration expressions. An own-draw
+edit re-keys only that feature leaf; shared `_drawing_common`, layout-audit,
+`_pdf_ink` and drawing-helper edits re-key every declared feature leaf, not
+native part/assembly recipes. An undeclared part's leaf reads no drawing: its key
+is the exporter, its `DRAWING_NOTES` owner closure, the notes/spec files read to
+find it, its builder file, registry/config and the native part identity, so no
+drawing edit re-keys it.
 Full `export` waits for scoped bundles, validates them and copies their exact
 STEP bytes; its recipe consumes bundle outputs rather than draw closures
 directly. A `prechips:<stem>` traveler depends only on its own feature leaf.
