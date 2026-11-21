@@ -448,7 +448,7 @@ def _lap(
             f"G1 Z{_r(box['top']):.3f} F{{feed}}",
             _arc("G3", a0, a1, h),
             f"G1 Z{_r(z):.3f} F{{plunge}}",
-            _arc("G3", a1, mirror(path["j"]), h),
+            _arc("G3", a1, mirror(path["j"]), h) + " F{feed}",
         ]
     else:
         lines.append(_arc("G3", path["j"], path["w"], h))
