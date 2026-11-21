@@ -337,13 +337,3 @@ description = "1018 cold-finish carbon steel, square bar, 1/4 x 1/4 in"
 description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 54 in length"
 [stock.6061-flat-1x3]
 description = "6061-T6511 aluminium, flat bar, 1 x 3 in"
-
-# The MHA-CH-02 fulcrum bore's NO-GO (cad/config/shop-equipment/
-# gauges.lever-bore-f-shank): the F (.257 in) drill's shank from the owned
-# 115-piece index (as tools.jig-drill-f), miked .2570-.2575 before use: it
-# must not enter the .2560-.2570 bore. No GO is on hand (no pin gauges:
-# owner decision 2026-11-19, #3124); the lower limit rests on the .2560
-# reamer. Its range is the drawing band; its resolution the micrometers'.
-[gauges.lever-bore-f-shank]
-range_mm = [6.5024, 6.5278]
-resolution_mm = 0.00254
