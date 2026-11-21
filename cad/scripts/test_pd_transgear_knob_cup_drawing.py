@@ -15,6 +15,7 @@ import pd_transgear_knob_cup_spec as spec
 import pd_vn_transgear_knob_cup_pin_spec as pin
 import pd_transgear_knob_shaft_spec as knob_shaft
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
+from _inch_wall_limits import WALL_FLOOR_MM
 from _drawing_registry import DRAWINGS_BY_NAME
 from _printed_tolerance import printed_band_mm
 
@@ -115,6 +116,11 @@ def test_pin_hole_note_stands_apart_and_cites_the_assembly_step() -> None:
     assert "NO CROSS HOLE ON THIS PART" in note
     assert _config.parts("pd-vn-transgear-knob-cup-pin")["number"] in note
     assert steps.step_ref("knob-stack-fitted") in note
+    # #2192: the hole's thin front wall is stated as a plain fact, matching
+    # the package's declared minor.
+    assert "HOLE WALL TO THRUST FACE .072 MIN" in note
+    (rv01,) = _config.parts(part.PART_NAME)["machinist_exceptions"]
+    assert rv01["kind"] == "minor" and spec.FRONT_PIN_WALL_TEXT in rv01["where"]
     # Below the face view (and its section labels), inside the left border.
     assert (
         drawing.PIN_HOLE_NOTE_XY[1] < drawing.FACE_CENTER[1] - drawing.HALF_OD - 0.010
@@ -165,15 +171,20 @@ def test_only_the_bore_carries_a_model_band() -> None:
 
 def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
     """Every wall round the assembly-drilled pin hole, recomputed from the
-    printed bands, stays at or above the 2.0 mm floor."""
+    printed bands, stays at or above its floor: the .080 target, except the
+    front wall's owner-ruled .060 floor (#2192)."""
     hole_r = (pin.HOLE_DIA + max(pin.HOLE_BAND)) / 2.0  # .0325
-    station = spec.PIN_HOLE_FROM_FRONT + spec.PIN_HOLE_STATION_TOL
+    # The assembly step prints the .120 station at three places: +/-.005.
+    station_band = 0.127
+    station = spec.PIN_HOLE_FROM_FRONT + station_band
     od_min = spec.OD - _band(spec.OD_PLACES)
     length_min = spec.LENGTH - _band(spec.LENGTH_PLACES)
     bore_max = spec.BORE_DIA + max(spec.BORE_BAND)
+    # The title block's .010 break on the front face's edges.
+    front_break = 0.254
     walls = {
         "journal": (knob_shaft.JOURNAL_DIA_MIN - 2.0 * hole_r) / 2.0,
-        "front": spec.PIN_HOLE_FROM_FRONT - spec.PIN_HOLE_STATION_TOL - hole_r,
+        "front": spec.PIN_HOLE_FROM_FRONT - station_band - hole_r - front_break,
         # The journal's rear-end rim takes MHA-PD-08's title-block break; the
         # match-drilled crosshole's mouths stay buried in the cup, unbroken.
         "end": (
@@ -185,24 +196,30 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         "ring": (od_min - bore_max) / 2.0,
         "rear": length_min - station - hole_r,
     }
+    assert spec.PIN_HOLE_STATION_TOL == pytest.approx(station_band, abs=1e-9)
+    assert spec.FRONT_FACE_EDGE_BREAK_MAX == pytest.approx(front_break, abs=1e-9)
     assert walls["journal"] == pytest.approx((6.3119 - 1.651) / 2.0, abs=1e-9)
-    assert walls["front"] == pytest.approx(3.048 - 0.1016 - 0.8255, abs=1e-9)
+    assert walls["front"] == pytest.approx(0.0725 * 25.4, abs=1e-9)
     assert walls["ring"] == pytest.approx((18.796 - 6.3373) / 2.0, abs=1e-9)
     # #2169: the journal (.264 behind the cup's face, its ±.005 station
     # band) at ±.011 since MHA-PD-08 prints its overall and face width with
-    # the journal REF (fan-out 2026-11-07), less the .010 rear-end break,
-    # leaves the end wall at .0815.
+    # the journal REF (fan-out 2026-11-07), less the .010 rear-end break and
+    # the pin station's .005 band, leaves the end wall at .0805.
     assert knob_shaft.EDGE_BREAK_MAX == pytest.approx(0.254, abs=1e-9)
     assert walls["end"] == pytest.approx(
-        (6.7056 - 0.2794 - 0.127) - 3.048 - 0.1016 - 0.8255 - 0.254, abs=1e-9
+        (6.7056 - 0.2794 - 0.127) - 3.048 - 0.127 - 0.8255 - 0.254, abs=1e-9
     )
-    assert walls["end"] == pytest.approx(0.0815 * 25.4, abs=1e-9)
-    assert {k: w for k, w in walls.items() if w < spec.WALL_FLOOR} == {}
+    assert walls["end"] == pytest.approx(0.0805 * 25.4, abs=1e-9)
+    floors = {name: spec.WALL_FLOOR for name in walls}
+    floors["front"] = WALL_FLOOR_MM
+    assert {k: w for k, w in walls.items() if w < floors[k] - 1e-9} == {}
+    assert walls["front"] < spec.WALL_FLOOR
     assert spec.JOURNAL_PIN_WALL_WORST == pytest.approx(walls["journal"])
     assert spec.FRONT_PIN_WALL_WORST == pytest.approx(walls["front"])
     assert spec.END_PIN_WALL_WORST == pytest.approx(walls["end"])
     assert spec.RADIAL_WALL_WORST == pytest.approx(walls["ring"])
     assert spec.REAR_PIN_WALL_WORST == pytest.approx(walls["rear"])
+    assert spec.FRONT_PIN_WALL_TEXT == "HOLE WALL TO THRUST FACE .072 MIN"
 
 
 def test_the_longest_pin_stays_inside_the_smallest_od() -> None:

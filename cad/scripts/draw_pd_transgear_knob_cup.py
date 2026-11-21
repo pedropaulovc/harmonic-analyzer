@@ -59,6 +59,7 @@ from pd_transgear_knob_cup_spec import (
     BORE_CLEARANCE_TEXT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    FRONT_PIN_WALL_TEXT,
     LENGTH,
     OD,
     SURFACE_FINISHES,
@@ -161,11 +162,15 @@ FRONT_FINISH = (_FRONT_PICK, (_FRONT_PICK[0] + 0.020, _FRONT_PICK[1] + 0.022))
 # The cross pin hole is no feature of the supplied cup: a sheet note, apart
 # from the bore's callout, says so and points at the assembly step that sizes
 # and locates it (machinist review: on the bore's leader the line read as the
-# bore, and it gave the hole no definition).  Below the face view.
+# bore, and it gave the hole no definition).  Below the face view.  Its last
+# row states the hole's front wall at the worst case as a plain fact (rule
+# 20): under the .080 target, the package's declared RV-01 minor (owner
+# ruling 2026-11-20, #2192).
 PIN_HOLE_NOTE = (
     f"NO CROSS HOLE ON THIS PART: THE {PIN_NUMBER}\n"
     f"PIN HOLE IS MADE THROUGH CUP AND {SHAFT_NUMBER}\n"
-    f"AT ASSEMBLY PER {step_ref('knob-stack-fitted')}."
+    f"AT ASSEMBLY PER {step_ref('knob-stack-fitted')}.\n"
+    f"{FRONT_PIN_WALL_TEXT}."
 )
 PIN_HOLE_NOTE_XY = (0.020, 0.112)
 # The front face's finish caption names the face's function and its mate
