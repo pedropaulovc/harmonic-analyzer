@@ -563,6 +563,8 @@ description = "Matched V-block pair with clamps"
 # record that holds the tool's ownership.
 [tools.centre-drills-carbide-60]  # inventory tools.centre-drills-carbide-60
 description = "Carbide 60° centre drills, trade sizes 1, 3 and 6"
+[tools.deburring-set]  # inventory tools.deburring-set (McMaster 4289A78); MHA-MS-03 and MHA-PD-27 edges and hole mouths
+description = "7-piece deburring scraper and countersink set (McMaster 4289A78)"
 [tools.die-stock-13-16]  # inventory holders.die-stock-13-16
 description = "Die stock for 13/16 in round dies (Drillco 3000DS1)"
 [tools.dies-zoro-wb7365521946]  # inventory tools.dies-zoro-wb7365521946

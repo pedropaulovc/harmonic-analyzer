@@ -215,6 +215,10 @@ ref = "saw-evolution-14"
 id = "files"
 name = "Files"
 ref = "jig-files"
+[[tools]]
+id = "deburring-set"
+name = "Deburring scraper set"
+ref = "deburring-set"
 
 [[setups]]
 machine_kind = "other"
@@ -480,7 +484,7 @@ gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.right_end_length_band_m
 
 [[setups.operations]]
 instruction = "Still clamped: hole 1's station from the left end."
-instruction_detailed = "The largest pin gauge that slips into hole 1; the calipers from the left end over the pin, less half the pin's size."
+instruction_detailed = "The #43 drill that cut the hole, out of its collet: mic its shank. Its shank in hole 1; the calipers from the left end over the shank, less half its miked Ø."
 inspection = "Hole 1 {{cad.lock_tap_1_station_min_in:.3dot}}–{{cad.lock_tap_1_station_max_in:.3dot}} from the left end. The other holes: the program's stations from the same X0, not gauged. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.lock_tap_1_station_band_mm}}" }]
 
@@ -540,12 +544,22 @@ beam = "other"
 
 [[setups.operations]]
 speed_kind = "other"
+tool = "deburring-set"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr the tap exits on F and the tap entries on R flush with a scraper from the deburring set (no countersink)."
+feed = "hand"
+inspection = "No burr stands proud of F or R at a tap; a #4-40 screw still runs through each tap by hand."
+gauge_checks = "other"
+
+[[setups.operations]]
+speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "Deburr the tap exits on F and the tap entries on R flush (scraper from the deburring set; no countersink), then break every edge, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, smooth file. Wash off the oil."
+instruction = "Break every edge, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, smooth file. Wash off the oil."
 feed = "hand"
-inspection = "No burr stands proud of any face; a #4-40 screw still runs through each tap by hand."
+inspection = "No burr stands proud of any face or end."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -568,7 +582,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Start only with Presto Black BST4, acetone, baking soda, Dri-Touch Amber IRP2, chemical-resistant gloves and safety glasses in hand: all to buy, none on record. Until then the rail stays bare and dry, tagged AWAITING BLACK OXIDE."
+instruction = "Start only with Presto Black BST4, acetone, baking soda, Dri-Touch Amber IRP2, chemical-resistant gloves and safety glasses in hand: all on the order list, to buy. Until then the rail stays bare and dry, tagged AWAITING BLACK OXIDE."
 feed = "hand"
 
 [[setups.operations]]
