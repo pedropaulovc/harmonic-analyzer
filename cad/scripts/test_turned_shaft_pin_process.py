@@ -1,11 +1,13 @@
-"""The sawn-and-faced pins' lathe travelers agree with their models.
+"""The sawn pins' and domed parts' lathe travelers agree with their models.
 
 ``dt_crank_pinion_pin`` and ``dt_pinion_handle`` are cut from rod used as
 supplied on the diameter: a piece is sawn and each end faced in the 3-jaw.
 ``test_turned_bush_process`` holds their adapter binding and stock records;
 these tests hold what it cannot see: the sawn piece leaves the facing
 allowances over the drawing's length, and the rod is the drawing's reference
-diameter.
+diameter. The domed parts (``turned_shaft``) are blanks sawn from rod used as
+supplied: each blank leaves a skim on both ends, and the rod lies in the
+drawing's diameter band.
 """
 
 from __future__ import annotations
@@ -45,3 +47,35 @@ def test_the_rod_is_the_drawings_reference_diameter(stem: str) -> None:
     stock_dia_in = _plan(stem)["parameters"]["stock_dia_in"]
     outer = export_features.requirement_manifest(stem)["features"]["outer"]
     assert stock_dia_in * IN == pytest.approx(outer["dia_ref"])
+
+
+# The domed parts: a blank sawn from rod used as supplied on the diameter,
+# each end faced (turned_shaft's sawn-blank route).
+BLANKS = ("dt_pinion_cam_pin", "mg_magnifying_lever")
+
+
+@pytest.mark.parametrize("stem", BLANKS)
+def test_the_domed_parts_are_sawn_blanks_on_turned_shaft(stem: str) -> None:
+    plan = _plan(stem)
+    assert stem in _process_plans.TRAVELER_STEMS
+    assert plan["cad"]["adapter"] == "turned_shaft"
+    assert {"blank_length_in", "end_stickout_in"} <= set(plan["parameters"])
+
+
+@pytest.mark.parametrize("stem", BLANKS)
+def test_the_blank_leaves_a_skim_on_each_end_of_the_longest_part(stem: str) -> None:
+    parameters = _plan(stem)["parameters"]
+    far = export_features.requirement_manifest(stem)["features"]["far_end"]
+    longest = far["length"][1] if "length" in far else far["length_ref"]
+    face_per_end = (parameters["blank_length_in"] * IN - longest) / 2
+    assert 0.005 * IN <= face_per_end <= 0.05 * IN
+
+
+@pytest.mark.parametrize("stem", BLANKS)
+def test_the_blank_rod_is_the_drawings_diameter_as_supplied(stem: str) -> None:
+    stock = _plan(stem)["parameters"]["stock_dia_in"]
+    outer = export_features.requirement_manifest(stem)["features"]["outer"]
+    if "dia" in outer:
+        assert outer["dia"][0] <= stock * IN <= outer["dia"][1]
+    else:
+        assert stock * IN == pytest.approx(outer["dia_ref"])
