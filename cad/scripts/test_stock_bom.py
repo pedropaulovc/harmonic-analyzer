@@ -3,6 +3,7 @@ parts and inventory keys."""
 
 from __future__ import annotations
 
+import tomllib
 import zipfile
 
 import pytest
@@ -19,6 +20,22 @@ def test_every_plan_names_a_live_made_part_and_known_stock() -> None:
     # A retired or vendor (-vn-) stem, an unknown stock key, or a tool ref missing
     # from the shop raises InventoryError.
     stock_bom.build_bom(_config.parts(), stock_bom.load_stock(), stock_bom.load_plans())
+
+
+def test_every_plan_stock_ref_is_a_shop_stock_record() -> None:
+    # prechips resolves stock_refs against the shop directory, not the
+    # equipment inventory: a record dropped from cad/process/shop/ while a plan
+    # still names it fails the traveler ("unknown shared stock reference").
+    stock = stock_bom._process_plans.load_shop().get("stock", {})
+    missing = [
+        f"{stem}: {ref}"
+        for stem in stock_bom.plan_stems()
+        for ref in tomllib.loads(
+            stock_bom._process_plans.plan_path(stem).read_text(encoding="utf-8")
+        ).get("stock_refs", ())
+        if ref not in stock
+    ]
+    assert missing == []
 
 
 def test_a_shop_key_in_two_files_is_refused(tmp_path) -> None:
