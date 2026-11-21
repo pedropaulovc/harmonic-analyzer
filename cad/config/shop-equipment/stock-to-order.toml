@@ -244,3 +244,12 @@ dia_in = [0.5625]
 length_in = [3.0]
 status = "to_order"
 cite = ["cad/config/parts/ch-rocker-strap-tl-hub-plug.yaml material_specification"]
+
+[stock.drill-rod-1-8]
+form = "round_bar"
+material = "drill rod (O1 or W1 tool steel, annealed, ground)"
+note = "To order: 1/8 in drill rod, at least 3 in (one .56 in pin, dt_crank_pinion_pin_spec.PIN_LEN 14.224 mm, plus facing, parting and a chucking end). Source: the dt-crank-pinion-pin (MHA-DT-29) registry row, AISI 1018 CF rod or stock 1/8 in drill rod, diameter as supplied; no 1/8 in round of either is owned. Supplier, length and price not read. Not owned."
+dia_in = [0.125]
+length_in = [3.0]
+status = "to_order"
+cite = ["cad/config/parts/dt-crank-pinion-pin.yaml material_specification, process", "cad/scripts/dt_crank_pinion_pin_spec.py PIN_LEN"]

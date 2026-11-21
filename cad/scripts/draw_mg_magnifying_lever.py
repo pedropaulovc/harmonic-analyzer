@@ -29,7 +29,12 @@ from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dim
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
 from _part_properties import part_drawing_unit
+from _printed_limits import limits
 from _supplier_dimensions import supplier_reference_dimension
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -38,7 +43,7 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from _transgear_zone_line import require_placed, sketch_lines
-from mg_lever_thread_joint import PITCH, ROD_DIA, ROD_LENGTH, THREAD_ROOT_X
+from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, LEVER_UNIT, PITCH, ROD_DIA, ROD_LENGTH, THREAD_LENGTH, THREAD_ROOT_X
 from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, LEAD_CALLOUT, PRINT_THREAD_CALLOUT, ROD_BORE_CLEARANCE, ROD_DIA_FRACTION_DENOMINATOR, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -95,6 +100,98 @@ ROD_DIA_CALLOUT = (
     "ROD STOCK\n"
     f"SLIDING FIT IN MHA-MG-02 CLAMP (CLEARANCE {_inch(ROD_BORE_CLEARANCE[0])}"
     f"-{_inch(ROD_BORE_CLEARANCE[1])})"
+)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_mg_magnifying_lever: axis +X through the origin; the free
+# hemisphere's apex at x = 0, the datum end the 6.59 runs from; the flat
+# threaded end at x = ROD_LENGTH). The rod is the 1/4 brass stock as bought
+# (a REF fraction) and carries the 1/4-20 UNC thread on its last .71, cut
+# single-point from the flat end (registry process); the dome is the
+# reference (SR.125), a hemisphere on the stock. The declarations print
+# nothing.
+_P = DRAWING_PRECISION
+_SELF = "draw_mg_magnifying_lever"
+_JOINT = "mg_lever_thread_joint"
+_DOME_R = ROD_DIA / 2.0
+part_metadata(
+    model_sources=(
+        (_JOINT, "ROD_DIA"),
+        (_JOINT, "ROD_LENGTH"),
+        (_JOINT, "THREAD_LENGTH"),
+    ),
+    precision_sources=("DRAWING_PRECISION",),
+)
+requirement(
+    "datum_end",
+    kind="dome",
+    faces=(SphereFace(ROD_DIA, (_DOME_R, 0.0, 0.0)),),
+    requirements=("plane", "radius_ref", "height_ref"),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": 0.0},
+            ((_JOINT, "ROD_LENGTH"),),
+        ),
+        "outward": ([-1.0, 0.0, 0.0], ((_JOINT, "ROD_LENGTH"),)),
+        "radius_ref": (_DOME_R, ((_JOINT, "ROD_DIA"), (_SELF, "FRONT_KEEP"))),
+        "height_ref": (_DOME_R, ((_JOINT, "ROD_DIA"),)),
+    },
+    precision={"radius_ref": _P["RodProfile"]["DomeR"]},
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), ROD_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": ROD_LENGTH},
+            ((_JOINT, "ROD_LENGTH"),),
+        ),
+        "outward": ([1.0, 0.0, 0.0], ((_JOINT, "ROD_LENGTH"),)),
+        "length": (
+            limits(ROD_LENGTH, _P["RodProfile"]["OverallLength"], unit=LEVER_UNIT),
+            ((_JOINT, "ROD_LENGTH"), (_JOINT, "LEVER_UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "length_nominal": (ROD_LENGTH, ((_JOINT, "ROD_LENGTH"),)),
+        "length_from": ("datum_end", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"length": _P["RodProfile"]["OverallLength"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(ROD_DIA, contains_x_mm=50.0),),
+    requirements=("stock", "thread", "thread_length", "thread_incomplete_max"),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], ((_JOINT, "ROD_DIA"),)),
+        "at": ([0.0, 0.0, 0.0], ((_JOINT, "ROD_DIA"),)),
+        "span": ([_DOME_R, ROD_LENGTH], ((_JOINT, "ROD_DIA"), (_JOINT, "ROD_LENGTH"))),
+        "dia_ref": (ROD_DIA, ((_JOINT, "ROD_DIA"), "ROD_DIA_FRACTION_DENOMINATOR")),
+        "stock": ("ROD STOCK", ((_SELF, "ROD_DIA_CALLOUT"),)),
+        "callout": (
+            ROD_DIA_CALLOUT,
+            ((_SELF, "ROD_DIA_CALLOUT"), "ROD_BORE_CLEARANCE"),
+        ),
+        "thread": (THREAD_CALLOUT.split("\n")[0], ("THREAD_CALLOUT",)),
+        "thread_length": (
+            limits(THREAD_LENGTH, _P["ThreadExtent"]["ThreadLength"], unit=LEVER_UNIT),
+            ((_JOINT, "THREAD_LENGTH"), (_JOINT, "LEVER_UNIT"), (_SELF, "DETAIL_KEEP")),
+        ),
+        "thread_length_nominal": (THREAD_LENGTH, ((_JOINT, "THREAD_LENGTH"),)),
+        "thread_end": ("far_end", ((_SELF, "DETAIL_KEEP"),)),
+        "thread_process": ("single_point", ((_JOINT, "INCOMPLETE_THREAD_MAX"),)),
+        "thread_incomplete_max": (
+            INCOMPLETE_THREAD_MAX,
+            ((_JOINT, "INCOMPLETE_THREAD_MAX"), "SINGLE_LIMITS", "LEAD_CALLOUT"),
+        ),
+    },
+    precision={
+        "dia_ref": _P["RodProfile"]["RodDia"],
+        "thread_length": _P["ThreadExtent"]["ThreadLength"],
+        "thread_incomplete_max": _P["ThreadExtent"]["IncompleteLength"],
+    },
 )
 
 
