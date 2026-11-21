@@ -641,9 +641,9 @@ def _spoke_reference(adapter) -> list[tuple[str, str]]:
 
 # TIE 1's Advanced Hole.  swAdvWzdGeneralHoleTypes_e, swHoleElementOrientation_e,
 # swEndConditions_e, swEndShape_e, swWzdHoleStandards_e,
-# swWzdHoleStandardFastenerTypes_e, swCalloutVariable_e and swSelectType_e
-# values from the developing-solidworks reference.  The near side is the
-# boss's back face (the face view's side), the far side its front (drum) face.
+# swWzdHoleStandardFastenerTypes_e and swSelectType_e values from the
+# developing-solidworks reference.  The near side is the boss's back face (the
+# face view's side), the far side its front (drum) face.
 _AH_STRAIGHT = 2
 _AH_NEAR_SIDE = 0
 _AH_FAR_SIDE = 1
@@ -652,9 +652,6 @@ _END_UP_TO_NEXT = 11
 _END_SHAPE_DRILL_POINT = 0
 _ANSI_INCH = 0
 _ANSI_INCH_NUMBER_DRILLS = 24
-_CALLOUT_STRAIGHT_DIA = 76
-_CALLOUT_STRAIGHT_DEPTH = 77
-_CALLOUT_STRAIGHT_FAR_SIDE = 81
 _SEL_FACES = 2
 _MARK_NEAR_FACE = 256
 _MARK_FAR_FACE = 512
@@ -663,23 +660,14 @@ _TIE1_RAY_START = 5.0
 _TIE1_RAY_RADIUS = 0.5
 
 
-def tie1_callout_strings(diameter: str, depth: str, far_side: str) -> tuple[str, str]:
-    """TIE 1's two element rows from the native callout variables: each drill's
-    Ø then its process (rule 12), the counter-drill's depth and FAR SIDE after."""
-    return (
-        f"<MOD-DIAM>{diameter} DRILL THRU",
-        f"<MOD-DIAM>{diameter} DRILL <HOLE-DEPTH>{depth} {far_side}",
-    )
-
-
 @_telemetry.traced("feature.advanced_hole", label_param="label")
 def _tie1_advanced_hole(adapter, label: str = "tie 1") -> list[tuple[str, str]]:
     """TIE 1 as ONE native Advanced Hole: the #60 from the boss's back face up
     to the #50 counter-drilled from its front (drum) face to the shoulder, the
     #50's 118 deg point narrowing on to the #60 (owner ruling 2026-11-20 on
-    #2406).  Each element prints its own callout row, size then process then
-    depth (rule 12), the counter-drill's with its native FAR SIDE message, so
-    the face view's callout on the visible #60 reads the whole hole.  The
+    #2406).  Its default native callout lists each element's Ø, the #50's
+    depth and its side; the drawing adds the process words (an element's
+    CalloutString put is refused over COM, 'Member not found', r6).  The
     placement point is dimensioned Tie1X/Tie1Y from the origin, driven by the
     globals; returns those deferred drive jobs."""
     import pythoncom
@@ -718,11 +706,7 @@ def _tie1_advanced_hole(adapter, label: str = "tie 1") -> list[tuple[str, str]]:
     if selected != 2:
         raise RuntimeError(f"{label}: {selected} faces selected, expected 2")
 
-    diameter = str(extension.GetCalloutVariableString(_CALLOUT_STRAIGHT_DIA))
-    depth = str(extension.GetCalloutVariableString(_CALLOUT_STRAIGHT_DEPTH))
-    far_side = str(extension.GetCalloutVariableString(_CALLOUT_STRAIGHT_FAR_SIDE))
-
-    def straight(orientation: int, size: str, end: int, callout: str) -> object:
+    def straight(orientation: int, size: str, end: int) -> object:
         element = _early_bound(
             extension.CreateAdvancedHoleElementData(_AH_STRAIGHT),
             "IAdvancedHoleElementData",
@@ -732,12 +716,10 @@ def _tie1_advanced_hole(adapter, label: str = "tie 1") -> list[tuple[str, str]]:
         element.FastenerType = _ANSI_INCH_NUMBER_DRILLS
         element.Size = size
         element.EndCondition = end
-        element.CalloutString = callout
         return element
 
-    near_callout, far_callout = tie1_callout_strings(diameter, depth, far_side)
-    tie = straight(_AH_NEAR_SIDE, TIE_HOLE_SIZE, _END_UP_TO_NEXT, near_callout)
-    cdrill = straight(_AH_FAR_SIDE, TIE1_CDRILL_SIZE, _END_BLIND, far_callout)
+    tie = straight(_AH_NEAR_SIDE, TIE_HOLE_SIZE, _END_UP_TO_NEXT)
+    cdrill = straight(_AH_FAR_SIDE, TIE1_CDRILL_SIZE, _END_BLIND)
     cdrill.BlindDepth = TIE1_CDRILL_DEPTH / 1000.0
     point = _early_bound(cdrill, "IStraightElementData")
     point.EndShape = _END_SHAPE_DRILL_POINT
@@ -747,8 +729,8 @@ def _tie1_advanced_hole(adapter, label: str = "tie 1") -> list[tuple[str, str]]:
     def stack(element: object) -> VARIANT:
         return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, [element._oleobj_])
 
-    # Depth to the shoulder (IsDepthUptoTip False), custom callouts.
-    created = features.AdvancedHole2(stack(tie), stack(cdrill), False, True, False)
+    # Depth to the shoulder (IsDepthUptoTip False), the default callout.
+    created = features.AdvancedHole2(stack(tie), stack(cdrill), False, False, False)
     feature, results = created if isinstance(created, tuple) else (created, None)
     codes = [int(code) for code in (results or ())]
     if feature is None or any(codes):
