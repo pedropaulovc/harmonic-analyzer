@@ -436,6 +436,25 @@ def test_outline_passes_run_in_order_after_the_clearing(tmp_path):
     assert len(swapped) == 1 and "cut after a later pass" in swapped[0]
 
 
+def test_a_lead_out_through_cleared_waste_is_not_clearing_after_a_pass(tmp_path):
+    passes = [{"offset": 1.0, "levels": [-1.0]}, {"offset": 1.0, "levels": [-2.0]}]
+    clear = "G0 X2 Y-4 Z5\nG1 Z-2 F100\nG1 X8\nG0 Z5\n"
+    zone = [{"x": (1.0, 9.0), "levels": [-2.0]}]
+    # After the last lap, back out from its offset into the cleared waste.
+    text = clear + "G0 X5 Y-1 Z5\n" + _loop(-1.0) + _loop(-2.0) + "G1 Y-4\nG0 Z5\n"
+    lead = [{"centre": (5.0, -4.0), "radius": 3.0, "levels": [-2.0]}]
+
+    def check(leads=()):
+        found = _gcode.check_outline(
+            _program(tmp_path, text), _OUTLINE, passes, 0.0, clearing=zone, leads=leads
+        )
+        return [f.detail for f in found]
+
+    late = check()
+    assert len(late) == 1 and "cut after a later pass" in late[0]
+    assert check(lead) == []
+
+
 # One tab on the bottom edge, X4-6: its box spans the edge and the cutter
 # centres at offset 1; the part's floor is the deepest level, Z-2.
 _TAB = {
@@ -624,6 +643,23 @@ def test_keep_out_catches_the_cutter_entering_a_fixture_below_its_top(tmp_path):
     assert hits(clear) == []
     assert hits("G0 X5 Y-0.5 Z5\nG0 Z1\nG1 X6 F100\n") == ["fence"]
     assert hits("G0 X20 Y-1.5 Z7\nG0 Z5\n") == ["flange"]
+
+
+def test_keep_out_band_catches_a_tool_part_crossing_an_overhang(tmp_path):
+    # A plate overhanging its support from Z0 to Z6: a part of the tool
+    # under it misses it, one through its band does not.
+    ledge = {"name": "ledge", "x": (0.0, 10.0), "y": (0.0, 5.0), "z_top": 6.0, "z_bottom": 0.0}
+
+    def hits(text):
+        found = _gcode.check_keep_out(_program(tmp_path, text), 1.0, boxes=[ledge])
+        return [f.detail.split(" into ")[1].split(":")[0] for f in found]
+
+    assert hits("G0 X5 Y-5 Z-3\nG1 Y2 F100\nG0 Z-3\nG1 Y-5\nG0 Z8\nG0 Y2\n") == []
+    assert hits("G0 X5 Y-5 Z3\nG1 Y2 F100\n") == ["ledge"]
+    # Straight down through the band, no sampled point inside it.
+    assert hits("G0 X5 Y2 Z8\nG0 Z-3\n") == ["ledge"]
+    # A steep diagonal through the band, in reach at its start, out at its end.
+    assert hits("G0 X5 Y5.8 Z8\nG0 Y6.05 Z-3\n") == ["ledge"]
 
 
 def test_a_reamer_rapided_out_of_its_bore_is_caught(tmp_path):

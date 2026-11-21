@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 5: same load; the slitting saw slots both forks in one sweep; spot, drill and ream the pin holes. Styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" width="900" height="520" font-family="sans-serif" font-size="12">
+<rect class="paper" width="900" height="520"/>
+<text class="title" x="20" y="22">Face F up: fork slot and pin hole (top view)</text>
+<rect class="clamp" x="85" y="46" width="460" height="24"/>
+<text class="label" x="270" y="62">fixed jaw</text>
+<rect class="fixture-plate" x="50" y="76" width="442" height="283" fill-opacity="0.35"/>
+<rect class="part-rest" x="50" y="70.0" width="541.8" height="147.3"/>
+<path class="part-kept" d="M50.0 75.2 L204.1 75.2 L204.1 115.1 L539.5 115.1 L539.5 92.5 L577.4 92.5 L577.4 194.9 L539.5 194.9 L539.5 172.2 L204.1 172.2 L204.1 212.2 L50.0 212.2 Z"/>
+<circle class="holes" cx="118.1" cy="143.7" r="44.7"/>
+<circle class="holes" cx="577.4" cy="143.7" r="2.9"/>
+<text class="label" x="54" y="84.0">1</text>
+<rect class="part-rest" x="50" y="217.3" width="541.8" height="147.3"/>
+<path class="part-kept" d="M50.0 222.5 L204.1 222.5 L204.1 262.4 L539.5 262.4 L539.5 239.8 L577.4 239.8 L577.4 342.2 L539.5 342.2 L539.5 319.5 L204.1 319.5 L204.1 359.5 L50.0 359.5 Z"/>
+<circle class="holes" cx="118.1" cy="291.0" r="44.7"/>
+<circle class="holes" cx="577.4" cy="291.0" r="2.9"/>
+<text class="label" x="54" y="231.3">2</text>
+<rect class="clamp" x="85" y="365" width="460" height="24"/>
+<text class="label" x="270" y="381">moving jaw</text>
+<line class="datum" x1="50" y1="36" x2="50" y2="399"/>
+<text class="datum-label" x="10" y="415">X0 left ends</text>
+<text class="label" x="170" y="415">F up; support plate (6061) on two 1 in parallels</text>
+<line class="hidden" x1="549.1" y1="129.3" x2="549.1" y2="158.0"/>
+<line class="hidden" x1="549.1" y1="276.6" x2="549.1" y2="305.3"/>
+<circle class="cutter" cx="650" cy="359" r="101" style="fill-opacity:0.55"/>
+<path class="arrow" d="M830 345 V60"/>
+<text class="label" x="840" y="66">+Y</text>
+<circle class="cutter" cx="684" cy="144" r="101" style="fill-opacity:0.25"/>
+<text class="label" x="170" y="495">touch off over fork 1 (pale, where CR05 parks); saw along +Y at two heights (slot floor hidden); spot, #49, ream</text>
+</svg>
