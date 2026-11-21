@@ -203,9 +203,10 @@ def test_printed_bands_are_the_sheets() -> None:
         for name in ("outer", "outer_c100", "outer_c050")
     ] == pytest.approx([value * IN for value in (1.75, 1.0, 0.5)])
     assert _inch(collar_features["far_end"]["length"]) == [0.32, 0.34]
+    # Owner ruling 2026-11-21: the spacer prints .732 at the title block.
     assert _inch(manifest("mg_wheel_axle_spacer")["features"]["far_end"]["length"]) == [
-        0.731,
-        0.733,
+        0.727,
+        0.737,
     ]
     disc_features = manifest("dt_cylinder_end_disc")["features"]
     assert _inch(disc_features["outer"]["dia"]) == [2.16, 2.18]

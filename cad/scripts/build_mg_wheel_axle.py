@@ -1,14 +1,15 @@
 r"""Reproduction script: magnifying-wheel axle (book ch. 21, pp. 50-51).
 
 A plain pin from 3/16 drill rod (mg_wheel_axle_spec): pressed into the
-mg-wheel-bar's reamed bore until the shank stands the press gauge off the
-bar's front face, the back end then about flush with its back face; the
+mg-wheel-bar's reamed bore, the spacer (MHA-MG-11) on its shank against the
+bar's front face, until the step stands the press gauge past the spacer's
+outer face, the back end then about flush with the bar's back face; the
 magnifying wheel runs on the shank; the front end is a #4-40 thread for the
 nut and locknut, with a thread relief at the step, finished with a domed tip.
 ``mg_wheel_group`` sizes the lengths against the whole stack.
 
 Layout: pin axis local +Y, origin on the bar's FRONT face (the assembly's
-d = 0); back end y = BACK_Y (-9), shank to STEP_Y (the gauge), relief to
+d = 0); back end y = BACK_Y (-9), shank to STEP_Y (the step station), relief to
 STEP_Y + RELIEF_WIDTH, thread to THREAD_END_Y, dome to TIP_Y. The assembly
 mates Axis1 and the Front Plane.
 
@@ -75,8 +76,8 @@ from mg_wheel_axle_spec import (
     DRAWING_PRECISION,
     PIN_DIA,
     PIN_LEN,
-    PRESS_GAUGE,
     SHANK_LEN,
+    STEP_STATION,
     STEP_Y,
     LIMIT_PAIRS,
     SINGLE_LIMITS,
@@ -215,7 +216,7 @@ def build(adapter) -> dict[str, str]:
         ("ThreadDia", THREAD_MAJOR),
         ("ThreadLength", THREAD_LEN),
         ("DomeHeight", DOME_H),
-        ("PressGauge", PRESS_GAUGE),
+        ("StepStation", STEP_STATION),
         ("ReliefWidth", RELIEF_WIDTH),
         ("ReliefDia", RELIEF_DIA),
         ("ReliefRootR", RELIEF_ROOT_R),
@@ -271,7 +272,7 @@ def build(adapter) -> dict[str, str]:
     anchor_point_to_origin(
         adapter, f"{back_end}.start", 0.0, BACK_Y, "pin back end"
     )
-    profile.record("BackEnd", '"ShankLength" - "PressGauge"')
+    profile.record("BackEnd", '"ShankLength" - "StepStation"')
     add_diametric_linear_dimension(
         adapter, axis, shank, (PIN_R + 4.0, (BACK_Y + STEP_Y) / 2.0), "PinDia"
     )

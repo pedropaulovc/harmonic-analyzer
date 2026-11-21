@@ -1,7 +1,8 @@
 r"""Pure-data dimensional contract shared by the wheel axle and its drawing.
 
 A plain pin from 3/16 drill rod, pressed into the mg-wheel-bar's reamed bore
-until its shank-to-thread step stands a gauge length off the bar's FRONT face;
+with the spacer (MHA-MG-11) on its shank against the bar's FRONT face, until
+its shank-to-thread step stands a gauge length past the spacer's outer face;
 the back end then lands near the back face (eight-views-6 shows only a point
 there). The magnifying wheel runs on the shank; the front end is
 a #4-40 thread for the nut and locknut, finished with a domed tip.
@@ -39,7 +40,7 @@ PIN_DIA_FRACTION_DENOMINATOR = 16
 # dimension origin) to the back end, and only places that end: nothing stands
 # behind the bar's back face within 10 mm of the axle (the nearest part, the
 # pen-hanger screw head, sits 56 mm along the bar). It grows with the spacer
-# (MHA-MG-11) exactly as the gauge does, so the back end stays put; like the
+# (MHA-MG-11) exactly as the step's station does, so the back end stays put; like the
 # spacer it follows the pen line, so it keeps its millimetre nominal and
 # prints rounded at .XX (the back end's window below reads its printed
 # limits).
@@ -107,7 +108,7 @@ if 2.0 * RELIEF_ROOT_R >= RELIEF_WIDTH_MIN:
 # shank's band stays out of the thread's stack. The band is the user's option
 # (c) of 2026-10-12 restated in inches: +/-.010 on .324, the shortest length
 # whose FULL thread still clears the locknut's outer face at the worst corner
-# (the spacer's, gauge's and hub's printed bands in the stack), and whose long
+# (the gauge's, washers', hub's and nuts' printed bands in the stack), and whose long
 # corner leaves at most .114 of thread past the locknut (the ruled 2.9,
 # floored to the inch grid; mg_wheel_group), measured from the thread end
 # (the dome's tangent), not the dome's tip.
@@ -121,35 +122,43 @@ DOME_R = 1.778  # .07
 DOME_H = DOME_R - math.sqrt(DOME_R**2 - (THREAD_MAJOR / 2.0) ** 2)  # .028
 PIN_LEN = SHANK_LEN + THREAD_LEN + DOME_H  # a reference: the dome sets it
 
-# The press gauge: the step stands this far off the bar's front face, so the
-# bar's depth leaves the stack on the pin (mg_wheel_group). The spacer
-# (MHA-MG-11) stands between the bar and the back washer, so the gauge is its
-# length plus the rev-10 19.5 the washer, hub and nut stack need, snapped to
-# the .XXX MHA-MG-00 prints it at (+/-.002): 1.500.
+# The press gauge. Owner ruling 2026-11-21 (tight-tolerance audit, row 3):
+# "fit at assembly". MHA-MG-00 presses the pin with the spacer (MHA-MG-11)
+# on its shank, seated on the bar's front face, and gauges the step from the
+# spacer's OUTER face: .768 +/-.002 past it. The spacer's length then leaves
+# the nut stack (mg_wheel_group) and prints at the title block; it only
+# places the back end in the bar. The gauge is the rev-10 19.5 the washer,
+# hub and nut stack need, snapped to the .001-in grid it prints on with its
+# band; the step stands the spacer's model length further out (38.1038, the
+# rev-10 1.500 station plus .00015).
 PRESS_GAUGE_PLACES = 3
-PRESS_GAUGE = round(
-    round((19.5 + _spacer.LENGTH) / MM_PER_IN, PRESS_GAUGE_PLACES) * MM_PER_IN, 6
-)
+PRESS_GAUGE = round(round(19.5 / MM_PER_IN, PRESS_GAUGE_PLACES) * MM_PER_IN, 6)
 PRESS_GAUGE_TOL = 0.0508  # .002
 PRESS_GAUGE_LIMITS = (PRESS_GAUGE - PRESS_GAUGE_TOL, PRESS_GAUGE + PRESS_GAUGE_TOL)
+STEP_STATION = round(_spacer.LENGTH + PRESS_GAUGE, 6)
 
-# Where the back end lands on the bar's back face: the shank and the gauge
-# from the step, the bar's printed depth from the front face. At every corner
-# it stands sunk in the bore, never proud.
+# Where the back end lands on the bar's back face: the step stands the
+# spacer plus the gauge off the bar's front face, the shank runs back from
+# it, and the bar's printed depth is from the front face. At every corner it
+# stands sunk in the bore, never proud.
 _SHANK = printed_deviations(SHANK_LEN, SHANK_LEN_PLACES, unit=UNIT)
 _DEPTH = printed_deviations(
     BAR_DEPTH, _bar.BAR_DEPTH_PLACES, deviations(_bar.BAR_DEPTH_BAND), unit=_bar.UNIT
 )
+_STEP_STATION = (
+    _spacer.LENGTH_LIMITS[0] + PRESS_GAUGE_LIMITS[0],
+    _spacer.LENGTH_LIMITS[1] + PRESS_GAUGE_LIMITS[1],
+)
 BACK_END_SUNK_MIN = (BAR_DEPTH + _DEPTH[0]) - (
-    (SHANK_LEN + _SHANK[1]) - PRESS_GAUGE_LIMITS[0]
-)  # .008
+    (SHANK_LEN + _SHANK[1]) - _STEP_STATION[0]
+)  # .002
 BACK_END_SUNK_MAX = (BAR_DEPTH + _DEPTH[1]) - (
-    (SHANK_LEN + _SHANK[0]) - PRESS_GAUGE_LIMITS[1]
-)  # .040
+    (SHANK_LEN + _SHANK[0]) - _STEP_STATION[1]
+)  # .046
 if BACK_END_SUNK_MIN < 0.0:
     raise AssertionError("wheel-axle back end stands proud of the bar")
 
-STEP_Y = PRESS_GAUGE
+STEP_Y = STEP_STATION
 BACK_Y = STEP_Y - SHANK_LEN  # -8.91: 0.59 inside the 9.5 bar's back face
 THREAD_END_Y = STEP_Y + THREAD_LEN
 TIP_Y = THREAD_END_Y + DOME_H

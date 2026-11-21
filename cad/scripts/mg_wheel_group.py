@@ -9,8 +9,8 @@ Axial stations ``d`` run from the wheel bar's FRONT face toward the pen
 (machine z = BAR_FRONT_Z - d): bar -9..0, spacer, back washer, wheel hub
 (spokes' mid-plane on the pen-rod line ``_recording_geometry.PEN_Z_MID``),
 endshake, front washer, nut, locknut, then the pin's thread end and domed tip.
-The pin is pressed to a gauge from the bar's front face, its back end about
-flush with the back face. The spacer's length is derived from the pen line
+The pin is pressed to a gauge from the spacer's outer face, its back end
+inside the bar's bore. The spacer's length is derived from the pen line
 (``mg_wheel_axle_spacer_spec``), so the wheel mid-plane is the pen line by
 construction; the closure is asserted below.
 """
@@ -56,13 +56,14 @@ if not math.isclose(_SPOKE_MID_Z, WHEEL_MID_Z, abs_tol=1e-9):
     )
 
 # --- stack corners (the printed and catalogue bands) -----------------------------------
-# The pin is pressed to a gauge from the bar's FRONT face, so the bar's depth
-# is not in the stack; it sets only where the back end lands
-# (mg_wheel_axle_spec.BACK_END_SUNK_MIN / BACK_END_SUNK_MAX). The spacer
-# stands between the bar and the hub, so its band is. The spacer, the gauge
-# and the hub keep millimetre nominals and print rounded: each term is its
-# printed limits.
-_SPACER = _spacer.LENGTH_LIMITS
+# Owner ruling 2026-11-21 (tight-tolerance audit, row 3): "fit at assembly".
+# MHA-MG-00 presses the pin with the spacer on its shank against the bar's
+# front face and gauges the step from the spacer's OUTER face, so neither
+# the bar's depth nor the spacer's length is in the stack: they set only
+# where the back end lands (mg_wheel_axle_spec.BACK_END_SUNK_MIN /
+# BACK_END_SUNK_MAX). Each corner runs from the spacer's outer face, where
+# the back washer seats. The gauge and the hub keep millimetre nominals and
+# print rounded: each term is its printed limits.
 _GAUGE = _pin.PRESS_GAUGE_LIMITS
 _BACK = (_back.THICKNESS_MIN, _back.THICKNESS_MAX)
 _HUB = _wheel.HUB_LEN_LIMITS
@@ -77,29 +78,28 @@ _NUTS = (2.0 * _nut.THICKNESS_MIN, 2.0 * _nut.THICKNESS_MAX)
 
 # (a) The pin's shank-to-thread step stays inside the hub's front face, so the
 # wheel runs on the full shank and the front washer sits on the thread.
-STEP_INSIDE_HUB = (_SPACER[0] + _BACK[0] + _HUB[0]) - _GAUGE[1]  # .026
+STEP_INSIDE_HUB = (_BACK[0] + _HUB[0]) - _GAUGE[1]  # .027
 # (b) The locknut sits on FULL thread (drawing-guidelines.md rule 18 (thread engagement) counts full threads only): the
 # thread less the incomplete pitch the dome cuts runs past its outer face,
 # and the first nut's inner face sits past the step's thread relief (or the
 # die's run-out, were the relief cut narrower than the die's lead).
 LOCKNUT_THREAD_MARGIN = (_GAUGE[0] + _THREAD[0] - _pin.TIP_INCOMPLETE) - (
-    _SPACER[1] + _BACK[1] + _HUB[1] + ENDSHAKE_MAX + _FRONT[1] + _NUTS[1]
-)  # .001
-NUT_RUNOUT_MARGIN = (_SPACER[0] + _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0]) - (
+    _BACK[1] + _HUB[1] + ENDSHAKE_MAX + _FRONT[1] + _NUTS[1]
+)  # .002
+NUT_RUNOUT_MARGIN = (_BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0]) - (
     _GAUGE[1] + _pin.FULL_THREAD_FROM_STEP_MAX
-)  # .003
+)  # .004
 # (c) At most .114 of thread, incomplete pitch included, stands past the
 # locknut: the user's option (c) of 2026-10-12 (2.9 mm, floored to the inch
 # grid), superseding the rev-10 "dome + 1.3 at every corner" (the washers'
 # and nuts' catalogue bands alone set a floor near it with the thread length
 # exact).
-# Rounded to the micron like the spacer's length: the corner can sit on the
-# limit (.114 since #290's column snap printed the spacer .732).
+# Rounded to the micron: the corner can sit on the limit.
 THREAD_PAST_LOCKNUT_MAX = round(
     (_GAUGE[1] + _THREAD[1])
-    - (_SPACER[0] + _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0] + _NUTS[0]),
+    - (_BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0] + _NUTS[0]),
     6,
-)  # .114
+)  # .113
 THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # .067
 if STEP_INSIDE_HUB <= 0.0:
     raise AssertionError(f"pin step clears the hub front face: {STEP_INSIDE_HUB:.4f}")

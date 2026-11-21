@@ -46,9 +46,7 @@ def test_spec_values_are_the_drill_rod_pin() -> None:
     assert spec.THREAD_PITCH == pytest.approx(0.635)
     assert spec.DIE_RUNOUT == pytest.approx(1.5 * 0.635)
     assert spec.RELIEF_WIDTH >= spec.DIE_RUNOUT >= spec.THREAD_PITCH
-    assert spec.FULL_THREAD_START_Y == pytest.approx(
-        spec.PRESS_GAUGE + spec.RELIEF_WIDTH
-    )
+    assert spec.FULL_THREAD_START_Y == pytest.approx(spec.STEP_Y + spec.RELIEF_WIDTH)
     assert spec.FULL_THREAD_END_Y == pytest.approx(spec.THREAD_END_Y - 0.635)
     # The dome's R prints .07 exactly; its height follows through the thread
     # major's edge.
@@ -56,13 +54,14 @@ def test_spec_values_are_the_drill_rod_pin() -> None:
     assert (spec.DOME_R - spec.DOME_H) ** 2 + (spec.THREAD_MAJOR / 2.0) ** 2 == (
         pytest.approx(spec.DOME_R**2)
     )
-    # Pressed to the gauge from the bar's front face (the origin), the gauge
+    # Pressed to the gauge past the spacer's outer face (owner ruling
+    # 2026-11-21), the spacer on the bar's front face (the origin), the gauge
     # on the .001 in grid MHA-MG-00 prints; the back end then sits inside the
     # bar, short of its back face.
-    assert spec.PRESS_GAUGE == spec.STEP_Y
-    assert spec.PRESS_GAUGE == pytest.approx(19.5 + spacer, abs=0.0005 * 25.4)
+    assert spec.STEP_Y == spec.STEP_STATION == pytest.approx(spacer + spec.PRESS_GAUGE)
+    assert spec.PRESS_GAUGE == pytest.approx(19.5, abs=0.0005 * 25.4)
     assert spec.PRESS_GAUGE / 25.4 == pytest.approx(round(spec.PRESS_GAUGE / 25.4, 3))
-    assert spec.BACK_Y == pytest.approx(spec.PRESS_GAUGE - spec.SHANK_LEN)
+    assert spec.BACK_Y == pytest.approx(spec.STEP_Y - spec.SHANK_LEN)
     assert -BAR_DEPTH < spec.BACK_Y < 0.0
     assert (spec.THREAD_END_Y, spec.TIP_Y) == pytest.approx(
         (spec.STEP_Y + spec.THREAD_LEN, spec.STEP_Y + spec.THREAD_LEN + spec.DOME_H)
@@ -245,21 +244,24 @@ def test_part_stamps_make_critical_properties() -> None:
 
 def test_wheel_group_stack_fits_the_pin() -> None:
     # Every corner at the printed limits (inch): the step inside the hub...
-    assert group.STEP_INSIDE_HUB == pytest.approx(0.026 * 25.4, abs=1e-6)
+    # Owner ruling 2026-11-21: gauged from the spacer's outer face, the
+    # spacer's length leaves every corner below.
+    assert group.STEP_INSIDE_HUB == pytest.approx(0.027 * 25.4, abs=1e-6)
     # (b) on FULL thread: the dome's incomplete pitch is not counted, and the
     # first nut stays clear of the step's relief.
-    assert group.LOCKNUT_THREAD_MARGIN >= 0.0
-    assert group.NUT_RUNOUT_MARGIN == pytest.approx(0.003 * 25.4, abs=1e-6)
+    assert group.LOCKNUT_THREAD_MARGIN == pytest.approx(0.002 * 25.4, abs=1e-6)
+    assert group.NUT_RUNOUT_MARGIN == pytest.approx(0.004 * 25.4, abs=1e-6)
     # (c) the ruled 2.9 floored to .114, and the long corner under it.
     assert spec.THREAD_PAST_LOCKNUT_LIMIT == pytest.approx(0.114 * 25.4)
     assert spec.THREAD_PAST_LOCKNUT_LIMIT <= 2.9
-    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(0.114 * 25.4, abs=1e-6)
+    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(0.113 * 25.4, abs=1e-6)
     assert group.THREAD_PAST_LOCKNUT_MAX <= spec.THREAD_PAST_LOCKNUT_LIMIT
     assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(1.719, abs=0.005)
-    # Pressed to the gauge, the shank lands the back end sunk in the bore at
-    # every corner; nothing stands behind it there.
-    assert spec.BACK_END_SUNK_MIN == pytest.approx(0.007 * 25.4, abs=1e-6)
-    assert spec.BACK_END_SUNK_MAX == pytest.approx(0.041 * 25.4, abs=1e-6)
+    # Pressed to the gauge past the spacer (its .XXX band now places the
+    # back end), the shank lands the back end sunk in the bore at every
+    # corner; nothing stands behind it there.
+    assert spec.BACK_END_SUNK_MIN == pytest.approx(0.002 * 25.4, abs=1e-6)
+    assert spec.BACK_END_SUNK_MAX == pytest.approx(0.046 * 25.4, abs=1e-6)
     # The spacer lands the spokes' mid-plane on the pen-rod line.
     assert group.SPOKE_MID_D == pytest.approx(
         mg_wheel_axle_spacer_spec.LENGTH

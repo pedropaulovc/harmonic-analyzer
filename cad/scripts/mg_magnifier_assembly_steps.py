@@ -24,6 +24,7 @@ DRAWING_NUMBER = "MHA-MG-00"
 DRUM_PRESSED_KEY = "drum-pressed"
 DRUM_HELD_KEY = "drum-held"
 PRESS_SLEEVE_MADE_KEY = "press-sleeve-made"
+SPACER_FITTED_KEY = "spacer-fitted"
 AXLE_PRESSED_KEY = "axle-pressed"
 AXLE_HELD_KEY = "axle-held"
 AXLE_TRIAL_KEY = "axle-trial-fitted"
@@ -54,8 +55,10 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "drum-bonded",
         "drum-bond-cured",
     ),
-    # The press's sleeve and oil are their own steps (rule 22).
+    # The press's sleeve, the spacer it gauges from and the oil are their own
+    # steps (rule 22).
     (PRESS_SLEEVE_MADE_KEY,),
+    (SPACER_FITTED_KEY,),
     ("axle-plain-end-oiled",),
     (
         AXLE_PRESSED_KEY,
@@ -63,18 +66,27 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "axle-pressed-out",
         "axle-cleaned",
         "axle-bonded",
+        "axle-spacer-refitted",
         "axle-bond-set",
         "axle-bond-cured",
     ),
+    # The press setting is the axle's one position (owner ruling 2026-11-21):
+    # with it and every part in its drawing band the stack lands the thread
+    # end inside its acceptance (mg_wheel_group), so a failed trial reads the
+    # setting again, then replaces the stack part outside its limits, and
+    # with none the axle itself, whose thread length is the stack's last term.
     (
         AXLE_TRIAL_KEY,
         "trial-nuts-jammed",
         AXLE_CHECKED_KEY,
         "trial-parts-removed-to-press",
-        "axle-pressed-further",
-        "axle-pressed-back",
-        "axle-depth-recorded",
+        "axle-press-rechecked",
+        "axle-repressed",
         "axle-rechecked",
+        "stack-part-replaced",
+        "trial-refitted",
+        "axle-pressed-out-to-replace",
+        "axle-replaced",
     ),
     ("trial-parts-removed",),
     ("column-clamps-fitted",),

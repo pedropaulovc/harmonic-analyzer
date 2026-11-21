@@ -138,7 +138,7 @@ def test_release_prints_the_steps_moved_off_their_sheets():
     assert f"{mg.ENDSHAKE_GO_TEXT} ENTERS, {mg.ENDSHAKE_NO_GO_TEXT} DOES NOT." in text
     # A setting the sheets dimension is cited by its view, never valued.
     assert (
-        f"BELOW THE FAR FACE OF ITEM {mg.ITEM_NUMBERS['mg-wheel-bar']} AS "
+        f"AGAINST ITEM {mg.ITEM_NUMBERS['mg-wheel-bar']}, AS "
         f"{mg.PRESS_DETAIL_TITLE} SETS IT" in text
     )
 

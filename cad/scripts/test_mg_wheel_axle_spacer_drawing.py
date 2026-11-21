@@ -62,12 +62,11 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     }
 
 
-def test_only_the_length_carries_an_explicit_band() -> None:
-    # The O.D. and the drilled bore take the title block's rows.
-    assert model_toleranced_dimensions(part) == {
-        ("Spacer", "SpacerLength"): "LENGTH_BAND",
-    }
-    assert spec.LENGTH_BAND == pytest.approx(0.001 * 25.4)
+def test_every_size_takes_the_title_block() -> None:
+    # Owner ruling 2026-11-21 (fit at assembly): the length prints .732 at the
+    # title block's .XXX; the O.D. and the drilled bore take their rows too.
+    assert model_toleranced_dimensions(part) == {}
+    assert [round(limit / 25.4, 4) for limit in spec.LENGTH_LIMITS] == [0.727, 0.737]
     # The wall at the .44 O.D.'s least and the #10-drilled bore's largest.
     assert spec.WALL_WORST == pytest.approx((0.43 - 0.197) / 2.0 * 25.4)
     assert spec.WALL_WORST >= 0.080 * 25.4
@@ -84,7 +83,7 @@ def test_length_lands_the_wheel_on_the_pen_line() -> None:
     # The stack reads the limits its rounded .XXX value prints.
     low, high = spec.LENGTH_LIMITS
     assert low < spec.LENGTH < high
-    assert high - low == pytest.approx(2.0 * spec.LENGTH_BAND)
+    assert high - low == pytest.approx(2.0 * 0.005 * 25.4)
     assert group.SPACER_D == 0.0
     assert group.BACK_WASHER_D == pytest.approx(spec.LENGTH)
     assert BAR_FRONT_Z - group.SPOKE_MID_D == pytest.approx(PEN_Z_MID)
@@ -110,9 +109,11 @@ def test_spacer_passes_the_pin_and_clears_the_tie_tail() -> None:
 
 def test_each_callout_states_its_need() -> None:
     assert not hasattr(spec, "DRAWING_NOTES")
+    # The length left the nut stack (owner ruling 2026-11-21); its three
+    # places name the function they carry (rule 3).
     assert drawing.DIMENSION_CALLOUTS == {
         "SpacerBore": "DRILL THRU",
-        "SpacerLength": "SETS WHEEL STACK\nON AXLE MHA-MG-07",
+        "SpacerLength": "SETS WHEEL MHA-MG-05\nON THE PEN LINE",
     }
 
 

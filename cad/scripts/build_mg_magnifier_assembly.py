@@ -419,8 +419,11 @@ def _author_setting_callouts(adapter, feature: str) -> None:
 _AXLE_STACK_DRIVES = {
     stack_spec.BACK_END_SUNK_DIMENSION: '"AxleBackEndSunk"',
     "PlainEndToFrontFace": '"AxleBarDepth" - "AxleBackEndSunk"',
+    "FrontFaceToSpacerFace": '"AxleSpacerLength"',
     stack_spec.PRESS_GAUGE_DIMENSION: '"AxlePressGauge"',
-    "StepToDrumFace": '"HubFrontStation" - "AxlePressGauge" - "WheelDrumRecess"',
+    "StepToDrumFace": (
+        '"HubFrontStation" - "AxleSpacerLength" - "AxlePressGauge" - "WheelDrumRecess"'
+    ),
     stack_spec.DRUM_RECESS_DIMENSION: '"WheelDrumRecess"',
     stack_spec.ENDSHAKE_DIMENSION: '"WheelEndshake"',
     "WasherToLocknutFace": '"LocknutFaceStation" - "HubFrontStation" - "WheelEndshake"',
@@ -444,6 +447,7 @@ def _author_axle_stack_reference(adapter) -> None:
         ("AxleAxisY", spec.AXLE_Y),
         ("AxleBarDepth", -spec.BAR_FAR_D),
         ("AxleBackEndSunk", spec.BACK_END_D - spec.BAR_FAR_D),
+        ("AxleSpacerLength", spec.SPACER_FACE_D),
         ("AxlePressGauge", spec.PRESS_GAUGE),
         ("WheelDrumRecess", spec.DRUM_RECESS),
         ("HubFrontStation", spec.HUB_FRONT_D),
@@ -518,9 +522,9 @@ def _author_axle_stack_reference(adapter) -> None:
             display_unit=spec.UNIT,
         )
     for name in sorted(spec.REFERENCE_DIMENSIONS):
-        # A reference nominal, (1.500), through the native prefix/suffix
+        # A reference nominal, (.024), through the native prefix/suffix
         # channel around the live value (ShowParenthesis can read True and
-        # print bare); no band: the callout states its acceptance.
+        # print bare); no band: no step sets or reads it.
         display, dimension = _named_dimension(adapter, spec.FEATURE, name)
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         tolerance.Type = 0  # swTolNONE; property put, no success retval

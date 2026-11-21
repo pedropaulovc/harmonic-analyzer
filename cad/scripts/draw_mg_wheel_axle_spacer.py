@@ -101,8 +101,10 @@ RIGHT_KEEP = {
 }
 OD_ON_SIDE = (RIGHT_CENTER[0] + LENGTH / 2.0 * _S + 0.030, RIGHT_CENTER[1])
 # The bore is a drilled clearance (rule 12 (hole and slot callouts say what to
-# do)); the length's band names the stack it sets (rule 4 (tighten only for
-# function, and name the mate)).
+# do)). The length takes the title block's .XXX: MHA-MG-00 gauges the pin's
+# press from the spacer's outer face (owner ruling 2026-11-21), so it leaves
+# the nut stack; its callout names the function the three places carry, the
+# wheel on the pen line (rule 3; machinist review of 09dd163236).
 DIMENSION_CALLOUTS = {
     "SpacerBore": BORE_CALLOUT,
     "SpacerLength": LENGTH_CALLOUT,
@@ -113,8 +115,8 @@ DIMENSION_CALLOUTS = {
 # features-travelers.md): what this sheet prints, in the part frame
 # (build_mg_wheel_axle_spacer: axis +Z through the origin, the bar-side face
 # at z = 0, the datum end the length runs from; the washer face at z =
-# LENGTH). The length carries its model band (LENGTH_LIMITS); the O.D. the
-# title block's .XX row; the bore the DRILLED HOLES row. Each ``span`` is a
+# LENGTH). The length takes the title block's .XXX row (LENGTH_LIMITS); the
+# O.D. the title block's .XX row; the bore the DRILLED HOLES row. Each ``span`` is a
 # diameter's model-Z extent. The declarations print nothing.
 _P = DRAWING_PRECISION_BY_NAME
 _SELF = "draw_mg_wheel_axle_spacer"
@@ -142,7 +144,7 @@ requirement(
         "outward": ([0.0, 0.0, 1.0], ("LENGTH",)),
         "length": (
             list(LENGTH_LIMITS),
-            ("LENGTH_LIMITS", "LENGTH_BAND", (_SELF, "RIGHT_KEEP")),
+            ("LENGTH_LIMITS", (_SELF, "RIGHT_KEEP")),
         ),
         "length_nominal": (LENGTH, ("LENGTH",)),
         "length_from": ("datum_end", ((_SELF, "RIGHT_KEEP"),)),

@@ -7,12 +7,13 @@ model dimension (mg_magnifier_assembly_spec). The front view prints the lever
 group's two operator settings, the clamp station and the fixture drop. Every
 other view carries a letter (drawing-guidelines.md rules 9 and 26), its
 boundary circle or viewing arrow drawn on the right side view:
-- DETAIL A (2:1) shows only the bar and the axle. It prints the press gauge
-  from the bar's front face to the shank step (the wheel hub hides the step
-  once it is fitted) and, as limits, the axle's plain end below the bar's far
-  face, the press's first setting. A broken-out window to the axle's
-  mid-plane shows the plain end, sunk in the bar's bore, as the visible edge
-  that setting ends on.
+- DETAIL A (2:1) shows only the bar, the axle and the spacer on its shank.
+  It prints the press gauge, the press's setting, from the spacer's outer
+  face to the shank step (owner ruling 2026-11-21; the wheel hub hides the
+  step once it is fitted) and, as a reference, the axle's plain end below
+  the bar's far face, where that press leaves it. A broken-out window to the
+  axle's mid-plane shows the plain end, sunk in the bar's bore, as the
+  visible edge that reference ends on.
 - DETAIL B (4:1) shows the stack. It prints, as limits, the drum's face below
   the wheel's spigot end and the axle's thread end past the second nut (the
   press's acceptance), and the endshake between the spigot face and the
@@ -787,16 +788,19 @@ _PRESSED_MARGIN = 6.25
 PRESSED = StackDetail(
     notes.PRESS_DETAIL_TITLE,
     (2, 1),
-    (stack.BAR_FAR_D + stack.PRESS_GAUGE) / 2.0,
-    (stack.PRESS_GAUGE - stack.BAR_FAR_D) / 2.0 + _PRESSED_MARGIN,
-    # 12 mm right of the old 0.330, so the plain end's limits, left of the
+    (stack.BAR_FAR_D + stack.STEP_D) / 2.0,
+    (stack.STEP_D - stack.BAR_FAR_D) / 2.0 + _PRESSED_MARGIN,
+    # 12 mm right of the old 0.330, so the plain end's reference, left of the
     # bar's far face, clear the isometric (its ink ends at x 0.255).
     (0.342, 0.200),
-    frozenset({"mg-wheel-bar", "mg-wheel-axle"}),
+    frozenset({"mg-wheel-bar", "mg-wheel-axle", "mg-wheel-axle-spacer"}),
     BORE_ROW_HEIGHT,
     # The BOM items it shows (machinist review r1); the rest are left out.
+    # One clause a line: on one line the spacer clause ran over the border.
     f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']} PRESSED INTO "
-    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']},\nOTHER PARTS NOT SHOWN",
+    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']},\n"
+    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle-spacer']} ON IT,\n"
+    "OTHER PARTS NOT SHOWN",
     letter_corner=(-1, 1),
     break_out=True,
 )
@@ -925,9 +929,10 @@ def boundary_letter_xy(
     )
 
 
-# The gauge's dimension line runs above the bar, inside the circle, a bare
-# reference; the plain end's limits stand left of the bar's far face, their
-# line level with the gauge's, clear of the bar's top face. The endshake's
+# The gauge's dimension line runs above the spacer and the shank, inside the
+# circle, its value and callout over it; the plain end's reference stands left of
+# the bar's far face, their line level with the gauge's, clear of the bar's
+# top face. The endshake's
 # text stands right of the stack, above the nuts and past the crop, with its
 # callout below; the drum recess's and the thread end's lines run below the
 # axle, under the nuts' corners and over DETAIL B's label, their texts left of
@@ -957,11 +962,16 @@ def text_over_line(name: str, line_y: float) -> float:
     return line_y + lines * DIM_TEXT_HALF_LINE
 
 
-_GAUGE_XY = PRESSED.sheet_xy(stack.PRESS_GAUGE / 2.0, GAUGE_RISE)
-GAUGE_LINE_Y = _GAUGE_XY[1] - DIM_TEXT_HALF_LINE
+_GAUGE_LINE_XY = PRESSED.sheet_xy(
+    (stack.SPACER_FACE_D + stack.STEP_D) / 2.0, GAUGE_RISE
+)
+GAUGE_LINE_Y = _GAUGE_LINE_XY[1] - DIM_TEXT_HALF_LINE
 STACK_LINE_Y = ENDSHAKE.sheet_xy(stack.HUB_FRONT_D, -STACK_LINE_DROP)[1]
 PRESSED_KEEP = {
-    stack.PRESS_GAUGE_DIMENSION: _GAUGE_XY,
+    stack.PRESS_GAUGE_DIMENSION: (
+        _GAUGE_LINE_XY[0],
+        text_over_line(stack.PRESS_GAUGE_DIMENSION, GAUGE_LINE_Y),
+    ),
     stack.BACK_END_SUNK_DIMENSION: (
         PRESSED.sheet_xy(stack.BAR_FAR_D)[0] - BACK_END_SUNK_RUN,
         text_over_line(stack.BACK_END_SUNK_DIMENSION, GAUGE_LINE_Y),
@@ -991,7 +1001,7 @@ def _assert_callouts(
     displays: list[tuple[str, Any]], callouts: dict[str, tuple[int, str]]
 ) -> None:
     """Read inherited native setting text without writing the released model.
-    A dimension with no callout (the bare press-gauge reference) must carry
+    A dimension with no callout must carry
     none above or below."""
     for name, display in displays:
         checks = (callouts[name],) if name in callouts else ((3, ""), (4, ""))

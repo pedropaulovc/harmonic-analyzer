@@ -3,9 +3,9 @@ r"""Reproduction script: wheel-axle spacer (MHA-MG-11; ch. 21; 1 used).
 The turned brass sleeve on the mg-wheel-axle between the mg-wheel-bar's front
 face and the MHA-MG-VN-54 back washer (``mg_wheel_axle_spacer_spec``).  Its
 length carries the magnifying wheel off the bar onto the pen-rod line, so it
-is derived from ``_recording_geometry.PEN_Z_MID``; it sets the wheel's station on
-the pin's thread stack, so it carries an explicit band.  The bore is a drilled
-clearance on the pin.
+is derived from ``_recording_geometry.PEN_Z_MID``; MHA-MG-00 gauges the pin's
+press from its outer face (owner ruling 2026-11-21), so every size takes the
+title block's rows.  The bore is a drilled clearance on the pin.
 
 Layout: Front-plane annulus at the origin (O.D., bore) extruded +Z by the
 length, so the bar-side face is the Front Plane (z = 0) and the washer face is
@@ -42,17 +42,14 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_pmi import author_part_pmi
 from mg_wheel_axle_spacer_spec import (
     BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     LENGTH,
-    LENGTH_BAND,
     OD,
     SURFACE_FINISHES,
-    UNIT,
 )
 
 PART_NAME = "mg-wheel-axle-spacer"
@@ -134,16 +131,9 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The length sets the wheel's station on the pin: its explicit band.  The
-    # O.D. and the drilled bore take the title block's rows.
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "Spacer",
-        "SpacerLength",
-        LENGTH_BAND,
-        places=DRAWING_PRECISION["Spacer"]["SpacerLength"],
-        display_unit=UNIT,
-    )
+    # Every size takes the title block's rows: the length's .XXX (the press
+    # is gauged from the spacer's outer face, MHA-MG-00), the O.D.'s .XX and
+    # the drilled bore's DRILLED HOLES row.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
