@@ -313,7 +313,5 @@ description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 72 in lengt
 description = "1018 cold-finish carbon steel, square bar, 1/4 x 1/4 in"
 [stock.6061-flat-1-2x6-54in]
 description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 54 in length"
-[stock.6061-flat-1x3]
-description = "6061-T6511 aluminium, flat bar, 1 x 3 in"
 [stock.6061-round-9-16]
 description = "6061-T6511 aluminium, round bar, 9/16 in"
