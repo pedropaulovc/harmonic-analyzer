@@ -34,9 +34,10 @@
 # Setup 4 (CL06) and its holding.
 #
 # FLAGGED: to buy: the .2560 reamer (tools.reamer-2560) and the 5/64 in end
-# mill (tools.endmill-5-64-long). The bore is gauged with the .256 (GO) and
-# .257 (NO-GO) pins of the owned pin gauge sets (tools.pin-gauges; #3124
-# item 5 rules out a Class X pair for the CH-01/CH-03 pivot reams only); the
+# mill (tools.endmill-5-64-long). The bore is gauged with a .256 plus pin
+# (GO) and a .257 minus pin (NO-GO) from the Class ZZ pin-gauge sets, which
+# are TO BUY (gauges.pin-gauges status to_order; owner ruling 2026-11-20,
+# #3075: plus and minus sets, the GO end a plus pin); the
 # drilled holes as drilled. The drawing's finish, matte black oxide per
 # MIL-DTL-13924 Class 1 (a hot process, all over, no masking), has no line on
 # record: Setup 6 sends the levers out.
@@ -265,6 +266,7 @@ ref = "jig-files"
 id = "pin-gauges"
 name = "Pin gauges .011-.500"
 ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+status = "to_order"
 
 [[setups]]
 machine_kind = "other"
@@ -452,7 +454,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "First load only, still clamped: try the bores with the .256 and .257 pins of the owned pin gauge set."
+instruction = "First load only, still clamped: try the bores with the .256 plus pin and the .257 minus pin of the Class ZZ pin-gauge sets (to buy)."
 inspection = "Bore Ø{{cad.fulcrum_bore_dia_min_in:.4dot}}–{{cad.fulcrum_bore_dia_max_in:.4dot}}: the .256 pin enters (GO); the .257 pin does not (NO-GO). A smooth reamed wall (Ra {{cad.fulcrum_bore_finish_ra_uin:d}} µin), no chatter rings. GO fails, NO-GO enters, or rings: stop and tell the owner."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.fulcrum_bore_dia_band_mm}}" }]
 
