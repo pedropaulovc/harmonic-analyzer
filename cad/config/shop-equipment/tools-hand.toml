@@ -236,3 +236,9 @@ name = "Steel figure stamp set, 1/8 in characters, 0-9"
 kind = "figure_stamp_set"
 status = "to_order"
 note = "Stamps the MHA-FR-01 serial (STAMP \"2\" / 1/8 FIGURE STAMP). Owner decision 2026-11-19 (#3124, item 1): the serial's glyph is a 1/8 figure stamp's (3.175 mm) and the shop buys a 1/8 set; it owned no figure stamps."
+
+[tools.chain-breaker-25]
+name = "Roller chain breaker for ANSI #25 chain"
+kind = "chain_breaker"
+status = "to_order"
+note = "Pushes one outer link's pin out to cut the MHA-PD-00 chain loops (step 34). Owner ruling 2026-11-20 (Pedro), #2429, option A."
