@@ -89,6 +89,7 @@ from pd_transgear_arm_geometry import (
     PIN_MOUTH_CHAMFER,
     PIN_STATION,
     PIVOT_END_R,
+    PIVOT_TANGENT_Y,
     PLATE_TAP_SPEC,
     PLATE_TAP_STATIONS,
     THICKNESS,
@@ -241,10 +242,6 @@ FRONT_KEEP = {
     # line frees about 1.4 mm at each end; 0.5 mm lower splits it, about
     # 1.9 mm under the border and 0.9 mm over the edge.
     "LocatorDia1": (0.262, _front_y(PIVOT_END_R) + 0.0144),
-    # #2424 B: the flank's lean to the P-T centreline (section line A-A
-    # draws it), in the open upper half of the arm between the pin bore S
-    # and the square end: the 2.4 degree wedge is over 7 mm deep there.
-    "FlankAngle": (_front_x(105.0), _front_y(4.0)),
 }
 # The true overall (review of 19e33c6c2: the 128.90 from the bore axis read
 # as one), a reference under the stations: picked on the pivot round's upper
@@ -326,16 +323,25 @@ _PIN_MOUTH_Y = PIN_SECTION_CENTER[1] + (
     PIN_BORE_DIA / 2.0 + PIN_MOUTH_CHAMFER / 2.0
 ) * _S / 1000.0
 PIN_SECTION_KEEP = {"PinMouthChamfer": (PIN_SECTION_REAR_X - 0.006, _PIN_MOUTH_Y)}
+# #2424 B: the flank's lean to the P-T centreline, on sheet 2's plan, where
+# the field over the arm is open (machinist review r1: on sheet 1's plan the
+# text sat inside the arm and its vertex fell past the square end).  It is
+# taken from the horizontal through the upper edge's tangent point, so its
+# extension line runs over the arm from the pivot round to the text, in the
+# wedge 45 mm out and short of cutting line D-D's label (x 54).
+PIN_PLAN_KEEP = {"FlankAngle": (_front_x(45.0), _front_y(PIVOT_TANGENT_Y - 1.0))}
 # Each import phase proves the precision of exactly the dimensions its views
 # import: sheet 1's front, A-A and end views every marked dimension but the
 # rear mouth's leg, which only section D-D on sheet 2 imports (run
 # 20261105T023327427Z: the whole-package map failed sheet 1 on
-# PinMouthChamfer before D-D existed).  Together they cover the package.
+# PinMouthChamfer before D-D existed), and the flank angle, which only
+# sheet 2's plan imports.  Together they cover the package.
 PIN_SECTION_PRECISION = {name: DRAWING_PRECISION_BY_NAME[name] for name in PIN_SECTION_KEEP}
+PIN_PLAN_PRECISION = {name: DRAWING_PRECISION_BY_NAME[name] for name in PIN_PLAN_KEEP}
 ARM_SHEET_PRECISION = {
     name: places
     for name, places in DRAWING_PRECISION_BY_NAME.items()
-    if name not in PIN_SECTION_KEEP
+    if name not in PIN_SECTION_KEEP and name not in PIN_PLAN_KEEP
 }
 # The value and its two callout lines (~14 mm tall, ~84 mm wide), the
 # block's right end 10 mm short of the dimension line's stand-off.
@@ -408,8 +414,9 @@ TAP_STATION_REFERENCES = ("PlateTapStation1", "PlateTapStation2")
 # The latch-pin hole's depth rides its callout as REF (round 2: a depth is
 # never deferred to a view) while section A-A's native MIN controls it.
 LINEAR_REFERENCES = TAP_STATION_REFERENCES
-# The flank angle is a driven reference (#2424 B): parenthesized as well.
-REFERENCE_DIMENSIONS = (*LINEAR_REFERENCES, "FlankAngle")
+# The flank angle is a driven reference (#2424 B): parenthesized as well, on
+# sheet 2's plan.
+REFERENCE_DIMENSIONS = (*LINEAR_REFERENCES, *PIN_PLAN_KEEP)
 TAP_CALLOUTS = (
     (
         "plate taps",
@@ -576,7 +583,9 @@ def _set_tap_callout_text(display: Any, qualifier: str, *, label: str) -> None:
         )
 
 
-def _reference_dimensions(adapter: Any, annotations: list[Any]) -> None:
+def _reference_dimensions(
+    adapter: Any, annotations: list[Any], names: tuple[str, ...]
+) -> None:
     """Print the plate-tap stations and the flank angle in parentheses, as
     references: the taps are transferred from MHA-PD-19's holes, so the
     stations control nothing, and the outline's rows govern the flank.  No
@@ -584,10 +593,10 @@ def _reference_dimensions(adapter: Any, annotations: list[Any]) -> None:
     found = set()
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
-        if name in REFERENCE_DIMENSIONS:
+        if name in names:
             set_reference_dimension(adapter, annotation, label=name)
             found.add(name)
-    missing = set(REFERENCE_DIMENSIONS) - found
+    missing = set(names) - found
     if missing:
         raise RuntimeError(f"references never reached the sheet: {sorted(missing)}")
 
@@ -925,7 +934,7 @@ def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, ARM_SHEET_PRECISION)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    _reference_dimensions(adapter, annotations)
+    _reference_dimensions(adapter, annotations, LINEAR_REFERENCES)
     _set_stock_text(adapter, annotations)
     _end_radius_to_arc(adapter, annotations)
     offset_dimension_text(adapter, annotations, {"FloorDepth": FLOOR_TEXT_XY})
@@ -1040,6 +1049,15 @@ def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, mouth, PIN_SECTION_PRECISION)
     set_dimension_callouts(adapter, mouth, {"PinMouthChamfer": PIN_MOUTH_CALLOUT})
     offset_dimension_text(adapter, mouth, {"PinMouthChamfer": PIN_MOUTH_TEXT_XY})
+    flank = hidden_sketches.curate_view_dimensions(
+        adapter,
+        pin_plan,
+        keep=PIN_PLAN_KEEP,
+        view_label="pin-bore section plan",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    assert_imported_precision(adapter, flank, PIN_PLAN_PRECISION)
+    _reference_dimensions(adapter, flank, tuple(PIN_PLAN_KEEP))
     _section_captions_without_scale(
         adapter, {"A-A": section, "B-B": locator_section, "D-D": pin_section}
     )

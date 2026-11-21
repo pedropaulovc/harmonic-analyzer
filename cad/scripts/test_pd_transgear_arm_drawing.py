@@ -51,6 +51,7 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
         drawing.SECTION_KEEP,
         drawing.END_KEEP,
         drawing.PIN_SECTION_KEEP,
+        drawing.PIN_PLAN_KEEP,
     )
     assert set().union(*views) == marked
     assert sum(len(view) for view in views) == len(marked)
@@ -472,7 +473,7 @@ def test_the_rear_mouth_prints_its_modelled_band_on_its_native_leg_in_d_d() -> N
     assert box[3] < drawing._front_y(-geometry.PIVOT_END_R) - 0.010
 
 
-@pytest.mark.parametrize("dropped", (None, "arm sheet", "section D-D"))
+@pytest.mark.parametrize("dropped", (None, "arm sheet", "section D-D", "sheet-2 plan"))
 def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, dropped: str | None
 ) -> None:
@@ -486,6 +487,7 @@ def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
         None: None,
         "arm sheet": sheet_one_names[0],
         "section D-D": "PinMouthChamfer",
+        "sheet-2 plan": "FlankAngle",
     }[dropped]
 
     def annotation(name: str) -> SimpleNamespace:
@@ -559,10 +561,26 @@ def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
     assert [set(precision) for _names, precision in guarded] == [
         set(sheet_one_names),
         set(drawing.PIN_SECTION_KEEP),
+        set(drawing.PIN_PLAN_KEEP),
     ]
     assert all(names == set(precision) for names, precision in guarded)
-    assert guarded[0][1].keys().isdisjoint(guarded[1][1])
-    assert guarded[0][1] | guarded[1][1] == spec.DRAWING_PRECISION_BY_NAME
+    for first, second in itertools.combinations([p for _n, p in guarded], 2):
+        assert first.keys().isdisjoint(second)
+    assert {k: v for _n, p in guarded for k, v in p.items()} == spec.DRAWING_PRECISION_BY_NAME
+
+
+def test_the_flank_angle_stands_in_its_wedge_over_the_arm() -> None:
+    """#2424 B (machinist review r1): the (2.4°) stands outside the outline,
+    between the upper edge and the horizontal through its tangent point, on
+    sheet 2's plan, short of cutting line D-D, and prints as a reference."""
+    assert "FlankAngle" not in drawing.FRONT_KEEP
+    assert "FlankAngle" in drawing.REFERENCE_DIMENSIONS
+    x, y = drawing.PIN_PLAN_KEEP["FlankAngle"]
+    station = (x - drawing.FRONT_CENTER[0]) * 1000.0 / drawing._S + drawing._BBOX_CENTER_X
+    height = (y - drawing.FRONT_CENTER[1]) * 1000.0 / drawing._S
+    assert geometry.edge_half_width(station) < height < geometry.PIVOT_TANGENT_Y
+    assert station < geometry.PIN_STATION - 10.0
+    assert part.FLANK_ANGLE_TEXT_XY == pytest.approx((station, height))
 
 
 def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
