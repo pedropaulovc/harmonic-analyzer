@@ -244,3 +244,21 @@ dia_in = [0.5625]
 length_in = [3.0]
 status = "to_order"
 cite = ["cad/config/parts/ch-rocker-strap-tl-hub-plug.yaml material_specification"]
+
+[stock.drill-rod-1-8]
+form = "round_bar"
+material = "drill rod (O1 or W1 tool steel, annealed, ground)"
+note = "To order: 1/8 in drill rod, at least 3 in (one .56 in pin, dt_crank_pinion_pin_spec.PIN_LEN 14.224 mm, plus facing, parting and a chucking end). Source: the dt-crank-pinion-pin (MHA-DT-29) registry row, AISI 1018 CF rod or stock 1/8 in drill rod, diameter as supplied; no 1/8 in round of either is owned. Supplier, length and price not read. Not owned."
+dia_in = [0.125]
+length_in = [3.0]
+status = "to_order"
+cite = ["cad/config/parts/dt-crank-pinion-pin.yaml material_specification, process", "cad/scripts/dt_crank_pinion_pin_spec.py PIN_LEN"]
+
+[stock.o1-drill-rod-5-32]
+form = "round_bar"
+material = "AISI O1 drill rod, precision ground"
+note = "To order: McMaster-Carr 8893K162, 5/32 in O1 drill rod, .1563 +/-.0005 in, at least 3 in (two .79 in cam-follower pins with their crowns, dt_pinion_cam_pin_geometry.PIN_LEN 20.066 mm, plus facing, parting and a chucking end). Source: the dt-pinion-cam-pin (MHA-DT-25) registry row (owner ruling #290, 2026-10-30), diameter as supplied. Catalogue length and price not read. Not owned."
+dia_in = [0.15625]
+length_in = [3.0]
+status = "to_order"
+cite = ["cad/config/parts/dt-pinion-cam-pin.yaml material_specification", "cad/scripts/dt_pinion_cam_pin_geometry.py PIN_DIA, PIN_LEN"]

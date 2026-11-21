@@ -42,6 +42,11 @@ def _stock() -> dict:
 
 
 STOCK = _stock()
+DRILLED = tuple(
+    stem
+    for stem in STEMS
+    if {"bore", "tap"} & set(export_features.requirement_manifest(stem)["features"])
+)
 
 
 def _plan(stem: str) -> dict:
@@ -82,7 +87,7 @@ SIZED = {
 }
 
 
-@pytest.mark.parametrize("stem", STEMS)
+@pytest.mark.parametrize("stem", DRILLED)
 def test_the_drill_lands_in_the_drawings_hole_band(stem: str) -> None:
     plan = _plan(stem)
     features = export_features.requirement_manifest(stem)["features"]
