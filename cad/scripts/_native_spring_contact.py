@@ -340,11 +340,7 @@ _STATION_LOOKUP_TOLERANCE_MM = 1e-3
 
 
 def _spring_contact_family(source_stem: str) -> str | None:
-    if source_stem == _CHANNEL_SPRING_FAMILY or source_stem.startswith(
-        f"{_CHANNEL_SPRING_FAMILY}-stretch"
-    ):
-        return _CHANNEL_SPRING_FAMILY
-    families = (*_CHANNEL_CONTACT_FAMILIES[1:], *_SUMMING_CONTACT_FAMILIES)
+    families = (*_CHANNEL_CONTACT_FAMILIES, *_SUMMING_CONTACT_FAMILIES)
     return source_stem if source_stem in families else None
 
 

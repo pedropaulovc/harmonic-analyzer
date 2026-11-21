@@ -6,7 +6,8 @@ r"""Create the MHA-CH-00 channel assembly fitter package (six sheets).
 2. EXPLODED VIEW + BOM: the builder-owned CHANNEL_EXPLODED isometric
    (ch_channel_explode_spec), the native BOM with the registry's part
    numbers, vendor SKUs and ch_channel_assembly_sheet's descriptions, and one
-   balloon per BOM row.
+   balloon per BOM row. The spring's installed-length configurations group
+   by their stamped part number into one MHA-CH-VN-50 row of 20 (#1610).
 3. ROCKER BANK FIT-UP: view D, the bank isolated at 1:1 with the ears'
    inner-face span and the shaft's tip set, and the first rocker-bank steps.
    The arms float on the plain pivot shaft between the ears, each located by
@@ -303,43 +304,12 @@ BOM_ROW_HEIGHT = 0.006
 EXPLODED_CAPTION_OFFSET = 0.006
 EXPLODED_CAPTION_MIN_GAP = 0.004
 
-# Spring variants: one per distinct amplitude among the built channels, named
-# as build_ch_channel_assembly names them (first-occurrence order).
+# One spring part whose installed-length configurations
+# (build_ch_vn_channel_spring_installed) group into one BOM row.
 CHANNELS = _config.active_count()
 if CHANNELS != COUNT:
     raise AssertionError("the channel package is drawn for the full bank")
-SPRING_VARIANT_ISSUE = "https://github.com/pedropaulovc/harmonic-analyzer/issues/1610"
-
-
-def spring_stems(amplitudes: list[float], channels: int) -> tuple[str, ...]:
-    """Installed-spring file stems the channel builder makes for these amplitudes."""
-    variants = {
-        amplitude: index for index, amplitude in enumerate(dict.fromkeys(amplitudes))
-    }
-    return tuple(
-        dict.fromkeys(
-            f"ch-vn-channel-spring-installed-stretch{variants[amplitude]:02d}"
-            for amplitude in amplitudes[:channels]
-        )
-    )
-
-
-def require_single_spring_variant(stems: tuple[str, ...], preset: str) -> None:
-    """Refuse a BOM the drawing cannot print: one MHA-CH-VN-50 row of qty 20.
-
-    Each spring variant is its own SLDPRT, so a preset with several installed
-    lengths would print several rows under one part number.
-    """
-    if len(stems) != 1:
-        raise RuntimeError(
-            f"MHA-CH-00 is drawn for one installed-spring length, but the "
-            f"{preset!r} amplitude preset builds {len(stems)} spring variants "
-            f"that share MHA-CH-VN-50; see {SPRING_VARIANT_ISSUE}"
-        )
-
-
-SPRING_STEMS = spring_stems(_config.amplitudes(), CHANNELS)
-SPRING_STEM = SPRING_STEMS[0]
+SPRING_STEM = explode.CHANNEL_SPRING
 
 BOM_QUANTITIES = {
     "ch-pivot-shaft": 1,
@@ -395,12 +365,7 @@ BOM_SKUS = {
     or MADE_PART_SKU
     for stem, row in PART_ROWS.items()
 }
-BOM_DESCRIPTIONS = {
-    stem: notes.BOM_DESCRIPTIONS[
-        "ch-vn-channel-spring-installed" if stem == SPRING_STEM else stem
-    ]
-    for stem in BOM_COMPONENTS
-}
+BOM_DESCRIPTIONS = {stem: notes.BOM_DESCRIPTIONS[stem] for stem in BOM_COMPONENTS}
 # The BOM's item numbers: the native table numbers the families in component
 # order, which is BOM_COMPONENTS (_validate_bom proves the table prints
 # exactly these). Steps name parts by item (drawing-guidelines.md rule 22).
@@ -767,7 +732,7 @@ def exploded_offset(stem: str, side: explode.Side) -> tuple[float, float, float]
     sides = {None, side} | ({"north"} if side == "north-most" else set())
     offset = [0.0, 0.0, 0.0]
     for step in explode.EXPLODE_STEPS:
-        if explode.family(stem) in step.stems and step.side in sides:
+        if stem in step.stems and step.side in sides:
             offset["xyz".index(step.axis)] += step.distance_mm
     return offset[0], offset[1], offset[2]
 
@@ -2422,9 +2387,6 @@ def _create_sheets(adapter: Any) -> None:
 
 @_telemetry.traced("drawing.channel_assembly")
 def build(adapter: Any) -> dict[str, str]:
-    require_single_spring_variant(
-        SPRING_STEMS, str(_config.machine("amplitude", "preset"))
-    )
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
 

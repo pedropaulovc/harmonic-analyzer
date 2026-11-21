@@ -65,12 +65,14 @@ For unrelated configurations the entire suffix from the first `--` remains
 intact. Thus `transgear-removable--t12` pairs with
 `pd-transgear-removable--t12`, `crank-handle-ferrule--installed` with
 `dt-crank-handle-ferrule--installed`, and `cone-gear--t006` with
-`dt-cone-gear--t006`. Generated `-stretchN` qualifiers are also retained, for
-example `channel-spring-installed-stretch07` becomes
-`ch-vn-channel-spring-installed-stretch07`; an exporter `--configuration` takes
-precedence over that generated suffix rule. Geometry verdicts and highlights
-remain per exact qualified mesh. The changed-part summary groups only trailing
-`--t<digits>` and `-stretch<digits>` variants by base stem.
+`dt-cone-gear--t006`. Historical generated `-stretchN` spring files (before
+#1610 made the installed lengths configurations, `--installedNN`, of one
+part) are also retained, for example `channel-spring-installed-stretch07`
+becomes `ch-vn-channel-spring-installed-stretch07`; an exporter
+`--configuration` takes precedence over that generated suffix rule. Geometry
+verdicts and highlights remain per exact qualified mesh. The changed-part
+summary groups only trailing `--t<digits>`, `--installed<digits>` and
+`-stretch<digits>` variants by base stem.
 
 Many-to-one comparisons retain **all** historical candidates, including old
 parent-specific clones and archive spellings. Release geometry output compares

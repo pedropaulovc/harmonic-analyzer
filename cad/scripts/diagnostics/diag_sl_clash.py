@@ -87,8 +87,8 @@ def build(adapter) -> dict[str, str]:
             log(f"    OVERLAP AABB: x[{ox[0]:.2f},{ox[1]:.2f}] y[{oy[0]:.2f},{oy[1]:.2f}] z[{oz[0]:.2f},{oz[1]:.2f}]")
     adapter._attempt(lambda: mgr.Done(), default=None)
 
-    # --- isolate summing-lever + the stretch00 springs, render the clash -----
-    keep = ("sm-summing-lever", "ch-vn-channel-spring-installed-stretch00")
+    # --- isolate summing-lever + the channel springs, render the clash -------
+    keep = ("sm-summing-lever", "ch-vn-channel-spring-installed")
     model = adapter.currentModel
 
     def _leaves(comp):

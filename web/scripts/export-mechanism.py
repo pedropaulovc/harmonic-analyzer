@@ -309,7 +309,7 @@ def build() -> tuple[dict, list]:
                 ],
             ),
             (
-                f"{ch}ch-vn-channel-spring-installed-*-{n}",
+                f"{ch}ch-vn-channel-spring-installed-{n}",
                 [0, 0, 0],
                 [*spring.centre_xy, mid],
             ),

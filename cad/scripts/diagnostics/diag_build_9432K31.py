@@ -327,7 +327,9 @@ def _com_out(result, label: str):
 # --------------------------------------------------------------------------
 # feature steps
 # --------------------------------------------------------------------------
-def _coil_helix(adapter, length_mm: float | None, feature_name: str) -> None:
+def _coil_helix(
+    adapter, length_mm: float | None, feature_name: str, plane: str
+) -> None:
     """Vendor Sketch3 + Helix/Spiral1: seed circle on a plane at the coil start.
 
     The start angle and the two direction flags are computed from the plane
@@ -339,7 +341,6 @@ def _coil_helix(adapter, length_mm: float | None, feature_name: str) -> None:
     """
     a = COIL_MEAN_RADIUS_MM
     x_start, _ = coil_ends_mm(length_mm)
-    plane = "CoilStartPlane"
     offset_plane(adapter, plane, x_start, base="Right Plane")
     check(f"create_sketch {plane}", adapter.create_sketch(plane))
     with no_sketch_inference(adapter):
@@ -750,39 +751,79 @@ def _hook_pattern(adapter, sketch_name: str, feature_name: str) -> None:
 # --------------------------------------------------------------------------
 # builder
 # --------------------------------------------------------------------------
-def build_9432K31(adapter, truth=None, *, length_mm: float | None = None):
-    """Build 9432K31 into the current (empty) part.  Never opens or saves."""
+# The recipe's named features in creation order (parents before dependents).
+# ``suffix`` keeps several lengths' recipes distinct in one part; the empty
+# suffix is the vendor's own single-length tree.
+FEATURES = (
+    "CoilStartPlane",
+    "CoilHelix",
+    "HookProfile",
+    "HookTransition",
+    "HookPath",
+    "HookWire",
+    "HookMirror",
+    "CoilWire",
+)
+
+
+def feature_names(suffix: str = "") -> tuple[str, ...]:
+    """The recipe's named features for ``suffix``, parents first."""
+    return tuple(f"{name}{suffix}" for name in FEATURES)
+
+
+def build_9432K31(
+    adapter, truth=None, *, length_mm: float | None = None, suffix: str = ""
+):
+    """Build 9432K31 into the current part.  Never opens or saves.
+
+    The active configuration must hold no live solid: the sweeps merge with
+    every body in their scope.  ``suffix`` names this length's features
+    (:func:`feature_names`)."""
     length = check_length_mm(length_mm)
     bez = transition_bezier_mm(length)
+    (plane, helix, profile, transition, path, hook_wire, hook_mirror, coil_wire) = (
+        feature_names(suffix)
+    )
     _telemetry.info(
         f"9432K31: length {length:.4f} mm, helix {helix_height_mm(length):.4f} mm "
         f"x {COIL_TURNS} at pitch {helix_pitch_mm(length):.6f} mm, "
         f"eye centres +-{end_centers_mm(length)[1][0]:.4f} mm"
     )
+    if bodies(adapter):
+        raise RuntimeError(
+            f"9432K31{suffix}: the active configuration already holds "
+            f"{len(bodies(adapter))} solid bodies; the wire sweeps would merge them"
+        )
 
     with no_sketch_inference(adapter):
         # --- coil (vendor Sketch3 + Helix/Spiral1) -------------------------
-        _coil_helix(adapter, length, "CoilHelix")
+        _coil_helix(adapter, length, helix, plane)
 
         # --- hook path (vendor Sketch2 + 3DSketch1 + CompCurve4) -----------
         check("create_sketch hook", adapter.create_sketch("Front"))
-        _hook_sketch(adapter, length, "HookProfile")
+        _hook_sketch(adapter, length, profile)
         check("exit_sketch hook", adapter.exit_sketch())
-        name_last_feature(adapter, "HookProfile")
-        _transition_sketch(adapter, bez, "HookTransition")
-        _composite_curve(adapter, ["HookProfile", "HookTransition"], "HookPath")
+        name_last_feature(adapter, profile)
+        _transition_sketch(adapter, bez, transition)
+        _composite_curve(adapter, [profile, transition], path)
 
     # --- wire (vendor Sweep2 -> CirPattern1 -> Sweep3) ---------------------
-    _sweep_wire(adapter, "HookPath", "HookWire")
+    _sweep_wire(adapter, path, hook_wire)
     # (the hook sweep's single body is the pattern seed; _hook_pattern checks it)
-    _hook_pattern(adapter, "HookProfile", "HookMirror")
+    _hook_pattern(adapter, profile, hook_mirror)
     if len(bodies(adapter)) != 2:
         raise RuntimeError(
             f"hook pattern left {len(bodies(adapter))} bodies, expected 2"
         )
-    _sweep_wire(adapter, "CoilHelix", "CoilWire")
+    _sweep_wire(adapter, helix, coil_wire)
+    check_spring_body(adapter, length)
 
-    # --- shape checks (the vendor gate runs separately, on the free part) --
+    # The replica is authored in the vendor's own frame: no COM remap.
+    adapter._mcm_com_map = None
+
+
+def check_spring_body(adapter, length_mm: float) -> None:
+    """The active configuration holds exactly this length's merged spring."""
     body_list = bodies(adapter)
     if len(body_list) != 1:
         raise RuntimeError(
@@ -798,11 +839,8 @@ def build_9432K31(adapter, truth=None, *, length_mm: float | None = None):
     # pi*r^2*L exactly.  SolidWorks' integrator reads ~0.055 % under that on
     # this helical body (vendor part: 349.6031 mm^3 against 349.7950 analytic),
     # so this is a shape sanity check, not the vendor gate.
-    expected = math.pi * (WIRE_DIA_MM / 2.0) ** 2 * wire_length_mm(length)
+    expected = math.pi * (WIRE_DIA_MM / 2.0) ** 2 * wire_length_mm(length_mm)
     volume_check(adapter, "spring wire", expected, 0.003 * expected)
-
-    # The replica is authored in the vendor's own frame: no COM remap.
-    adapter._mcm_com_map = None
 
 
 if __name__ == "__main__":
