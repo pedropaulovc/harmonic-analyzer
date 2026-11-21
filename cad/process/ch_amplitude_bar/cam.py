@@ -24,9 +24,16 @@ CA01 faces them, CA02 saws the foot notch. Rolled over, top ends past the
 right jaw side: CA03 faces them to the length, CA04 saws the top notch,
 CA05 spots, drills and reams the pin holes through both cheeks. The riser
 lifts the bars so each holder's nose, its tool set out by its stated
-projection, stays above the jaw tops at the deepest cut.
+projection, stays above the jaw tops at the deepest cut. CA00, once for a
+new riser, faces its two blocks side by side across the jaws on 1 in
+parallels, their tops over the jaw tops, past both blocks' sides wherever
+the moving jaw closes on them. Every P2-P4 bar's ledge is cut from the P1
+bar's saw Z0: the plan's ledge budget (touch-off, the seat sweep's
+acceptance and its reading error) is checked against each ledge band.
 
 Work frames (G54), each set in its setup:
+- CA00: X0 the vise's left jaw side, Y0 the fixed jaw, Z0 the higher riser
+  top on its parallels.
 - CA01, CA02: X0 the faced foot end (the bar along +X), Y0 the fixed jaw
   (the bars' F faces toward it), Z0 the bars' L faces on the riser.
 - CA03-CA05: X0 the top end at the length (the bar along -X), Y0 the fixed
@@ -61,6 +68,7 @@ COMMENT = "MHA-CH-01 amplitude bar, one load"
 # are grouped in tuples is one section per group (a FreeCAD Job), joined at
 # M6 tool changes.
 PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
+    ("CA00_riser_face", ("riser_face",)),
     ("CA01_foot_end", ("foot_end",)),
     ("CA02_foot_notch", ("foot_notch",)),
     ("CA03_top_end", ("top_end",)),
@@ -70,7 +78,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
 # The end mill and drill-chuck programs load their own first tool (M6, the
 # tool setter); the saw programs run on the saw already on its arbor and
 # touched off, which the tool setter cannot measure.
-LOAD_FIRST_TOOL = ("CA01_foot_end", "CA03_top_end", "CA05_pin_hole")
+LOAD_FIRST_TOOL = ("CA00_riser_face", "CA01_foot_end", "CA03_top_end", "CA05_pin_hole")
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these (the cutoff saw, the press and the files are not).
 CAM_TOOLS = ("em-half", "saw", "spot", "drill-49", "reamer-0775")
@@ -109,6 +117,12 @@ PLAN_TOL_MM = 0.01
 # Each holder's nose stands at least this far above the jaw tops at its
 # tool's deepest cut.
 HOLDER_CLEAR_MM = 1.0
+# CA00 faces this far past both of the riser pair's sides, wherever the
+# moving jaw closes on it.
+FACE_OVERHANG_MM = 1.0
+# The jaws grip the riser blocks at least this high above their parallels
+# while CA00 faces them.
+RISER_GRIP_MIN_MM = 12.7
 
 
 def _plan_operations(plan: dict[str, Any]):
@@ -260,6 +274,24 @@ def _side(
                 f"G0 Z{clear:.3f}",
             ]
     return lines
+
+
+def _face(x: tuple[float, float], ys: list[float], z: float, top: float) -> list[str]:
+    """A zigzag face at ``z``: one X pass per Y in ``ys`` in order,
+    alternating direction from ``x[0]``; the plunge and every stepover beside
+    the stock, past ``x``'s ends."""
+    clear = _r(top + CLEAR_MM)
+    lines = [
+        f"G0 Z{clear:.3f}",
+        f"G0 X{_r(x[0]):.3f} Y{ys[0]:.3f}",
+        f"G0 Z{_r(top + SAFE_MM):.3f}",
+        f"G1 Z{_r(z):.3f} F{{feed}}",
+    ]
+    for k, y in enumerate(ys):
+        if k:
+            lines.append(f"G1 Y{y:.3f} F{{feed}}")
+        lines.append(f"G1 X{_r(x[1] if k % 2 == 0 else x[0]):.3f} F{{feed}}")
+    return lines + [f"G0 Z{clear:.3f}"]
 
 
 def _spot(xy: tuple[float, float], top: float, z: float, clear: float) -> list[str]:
@@ -422,6 +454,14 @@ def context(
     # The bars stand on the riser: the jaw tops in the setup frame (Z0 the
     # bars' down face), at the riser's least faced height.
     jaw_top = p["vise_jaw_height_mm"] - p["riser_height_min_mm"]
+    # The riser's heights: its blank (1 in bar, miked in Setup 1) less one
+    # riser_face_mm CA00 pass; a reface (one more pass) only above
+    # riser_reface_floor_mm.
+    face = p["riser_face_mm"]
+    _agree(plan, "riser_height_min_mm", p["riser_blank_height_min_mm"] - face)
+    _agree(plan, "riser_height_max_mm", p["riser_blank_height_max_mm"] - face)
+    _agree(plan, "riser_reface_floor_mm", p["riser_height_min_mm"] + face)
+    under = p["riser_parallel_height_mm"]
 
     def projection(tool: str, tip_z: float, key: str, oal_key: str) -> None:
         """The tool's stated projection out of its holder puts the holder's
@@ -445,6 +485,23 @@ def context(
     _agree(plan, "foot_notch_depth_mm", _mid(foot["depth"]))
     _agree(plan, "top_notch_width_mm", _mid(top["width"]))
     _agree(plan, "top_notch_depth_mm", _mid(top["depth"]))
+    # The P2-P4 bars' ledges are cut from the P1 bar's saw Z0: each is off by
+    # the touch-off's error, by its down face's height against P1's where the
+    # notch is cut (the seat sweep accepts up to seat_offset_max_mm) and by
+    # the sweep's own reading error. Their sum, with ledge_margin_min_mm to
+    # spare, stays inside each ledge's half band.
+    ledge_budget = (
+        p["saw_touch_error_mm"] + p["seat_offset_max_mm"] + p["seat_measure_mm"]
+    )
+    for name, notch in (("foot", foot), ("top", top)):
+        lo, hi = notch["ledge"]
+        if not math.isclose(notch["ledge_nominal"], (lo + hi) / 2, abs_tol=1e-6):
+            raise ValueError(f"the {name} ledge is not cut at its band's middle")
+        if ledge_budget + p["ledge_margin_min_mm"] > (hi - lo) / 2 + 1e-9:
+            raise ValueError(
+                f"the {name} ledge's budget (touch-off, seat, sweep) {ledge_budget:.4f} "
+                f"leaves under ledge_margin_min_mm of its ±{(hi - lo) / 2:.4f} band"
+            )
     saw = _shop_tool(plan, shop, "saw")["diameter_mm"]
     _agree(plan, "saw_dia_mm", saw)
     radius = saw / 2
@@ -696,6 +753,91 @@ def context(
                 ],
             }
         )
+
+    # CA00_riser_face, once for a new riser (frame "riser": X0 the vise's
+    # left jaw side, Y0 the fixed jaw's face, Z0 the higher riser top). The
+    # two blocks side by side across the jaws on the 1 in parallels, their
+    # tops above the jaw tops: X passes past both jaw sides, stepping from
+    # over the fixed jaw's top to past the widest pair, face both blocks edge
+    # to edge wherever the moving jaw closes on them (the cutter passes over
+    # the jaw tops, never down beside them).
+    if p["vise_jaw_height_mm"] - under < RISER_GRIP_MIN_MM:
+        raise ValueError(
+            "process.riser_parallel_height_mm leaves the jaws under "
+            f"{RISER_GRIP_MIN_MM} mm of the riser to grip"
+        )
+    riser_jaw_top = p["vise_jaw_height_mm"] - under - p["riser_blank_height_min_mm"]
+    if -face < riser_jaw_top + HOLDER_CLEAR_MM - 1e-6:
+        raise ValueError(
+            "CA00: the end mill's tip does not pass over the jaw tops: the riser's "
+            "least blank height on its parallels is under them"
+        )
+    pair_max = 2 * riser_w_max
+    face_woc = _cut(plan, "riser face", "radial_woc_mm")
+    if not 0 < face_woc <= r:
+        raise ValueError("'riser face' radial_woc_mm is not within the cutter's radius")
+    if not math.isclose(_cut(plan, "riser face", "axial_doc_mm"), face, abs_tol=1e-6):
+        raise ValueError("'riser face' axial_doc_mm is not process.riser_face_mm")
+    if _setting(plan, shop, "riser face") != (em_rpm, em_feed):
+        raise ValueError("'riser face' runs at another setting than 'foot end'")
+    riser_ys = [r - face_woc]
+    while riser_ys[-1] - r > -pair_max - FACE_OVERHANG_MM + 1e-9:
+        riser_ys.append(riser_ys[-1] - face_woc)
+    riser_ys = [_r(y) for y in riser_ys]
+    riser_x = (-(r + APPROACH_MM), jaw_w + r + APPROACH_MM)
+    jobs.insert(
+        0,
+        {
+            "tool": "em-half",
+            "dia": em,
+            "shape": "endmill",
+            "flutes": 3,
+            "rpm": em_rpm,
+            "feed": em_feed,
+            "plunge": em_feed,
+            "frame": "foot",
+            "label": "riser face",
+            "stock": ((0.0, jaw_w), (-pair_max, 0.0), (-under, 0.0)),
+            "ops": [
+                ["riser_face", "face the riser", _face(riser_x, riser_ys, -face, 0.0)]
+            ],
+        },
+    )
+    riser_keep = [
+        _box(
+            "moving jaw",
+            (0.0, jaw_w),
+            (-2 * riser_w_min - JAW_DEPTH_MM, -2 * riser_w_min),
+            riser_jaw_top,
+        ),
+        _box("fixed jaw", (0.0, jaw_w), (0.0, JAW_DEPTH_MM), riser_jaw_top),
+    ]
+    name = "CA00_riser_face"
+    riser_expect = [
+        [
+            name,
+            "tool_changes",
+            {"z_top": 0.0, "tools": [numbers["em-half"]], "loads_first": True},
+        ],
+        [name, "spindle", {"rpm": [[em_rpm]]}],
+        [name, "pauses", {"z_top": 0.0, "count": 0}],
+        [name, "depth", {"z_min": _r(-face)}],
+        [name, "rapids_clear", {"z_top": 0.0}],
+        [name, "air_feed", {"z_top": 0.0}],
+        [
+            name,
+            "face_passes",
+            {
+                "z": _r(-face),
+                "y": [-pair_max, 0.0],
+                "max_engagement": face_woc,
+                "radius": r,
+                "span": p["riser_length_mm"],
+                "overhang": FACE_OVERHANG_MM,
+            },
+        ],
+        [name, "keep_out", {"radius": r, "boxes": riser_keep}],
+    ]
     clear = section + CLEAR_MM
     for key, label, tool, dia, shape, rpm, feed, lines in (
         (
@@ -805,7 +947,7 @@ def context(
         return out
 
     tn = numbers
-    expect: list[list[Any]] = []
+    expect: list[list[Any]] = list(riser_expect)
     for name, key, final, raw, max_step, direction, rpm, tool, loads in (
         ("CA01_foot_end", "foot_end", -r, -r - skim, skim, 1, em_rpm, "em-half", True),
         (

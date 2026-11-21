@@ -94,6 +94,7 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
         "reamer-0775": 5,
     }
     assert set(RECIPE.LOAD_FIRST_TOOL) == {
+        "CA00_riser_face",
         "CA01_foot_end",
         "CA03_top_end",
         "CA05_pin_hole",
@@ -189,7 +190,11 @@ def test_a_nut_too_close_under_the_saw_is_caught_over_the_top_ends(tmp_path) -> 
         ({"half_mill_projection_min_mm": 19.0}, "jaw tops"),
         ({"drill_projection_mm": 20.0}, "jaw tops"),
         ({"spot_projection_mm": 20.0}, "holder_grip_min_mm"),
-        ({"riser_height_min_mm": 0}, "jaw tops"),
+        ({"riser_height_min_mm": 0}, "riser_height_min_mm"),
+        ({"seat_offset_max_mm": 0.0254}, "ledge's budget"),
+        ({"saw_touch_error_mm": 0.0254}, "ledge's budget"),
+        ({"riser_parallel_height_mm": 38.1}, "to grip"),
+        ({"riser_parallel_height_mm": 12.7}, "over the jaw tops"),
         ({"saw_spacer_below_min_mm": 25.4}, "inside its stack's depth"),
         ({"saw_clear_z_mm": 11.35}, "saw_clear_z_mm"),
         ({"saw_proof_raise_mm": 25.4}, "air proof"),
@@ -253,6 +258,13 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             "pin_drill",
             lambda line: line.startswith("G0 X-6.350 Y"),
             lambda line: line.replace("X-6.350", "X-25.000"),
+            "keep_out",
+        ),
+        # The riser faced down beside the jaws instead of over them.
+        (
+            "riser_face",
+            lambda line: line == "G1 Z-0.127 F{feed}",
+            lambda line: "G1 Z-8.000 F{feed}",
             "keep_out",
         ),
         # A pin hole drilled short of the down face.
