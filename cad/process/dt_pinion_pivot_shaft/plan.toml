@@ -1,28 +1,261 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Pinion pivot shaft MHA-DT-19, one off, on the manual PM-1127VF-LB (owner
+# ruling 2026-11-21: turned parts get lathe travelers, no NC). Route chosen
+# for speed: the O.D. is 1/4 ground stock as supplied (owner ruling
+# 2026-11-20, #2346: a ground-stock shaft is cut to length, faced and has its
+# features added, never turned on its fitted diameter). Saw a blank a little
+# long; in the 3-jaw over a shim wrap, a short stick-out, the rest of the bar
+# back in the spindle bore: face end A; turn it round, face end B to the
+# faced length (the body plus both crown heights; the crowns keep their
+# apexes on the faced planes) and form its crown with the R.180 form tool;
+# turn it round again and form crown A. The two spring-pin holes are
+# match-drilled at assembly (MHA-DT-00 SHAFT DRILL SET), so the shaft leaves
+# without them.
+#
+# Flagged: the R.180 form tool (cad/config/shop-equipment/
+# tools-special-cutters.toml form-tool-r180, its drawing SR.18 REF) is to
+# order; 1/4 in 1018 ground round (stock-to-order.toml
+# 1018-ground-round-1-4) is to order. Lengths over 6 in are read with the
+# owned 0-12 in height gauge on the surface plate (the owned calipers stop at
+# 6 in).
 title = "Pinion Pivot Shaft"
-part = "MHA-DT-19 Pinion Pivot Shaft"
-revision = "placeholder"
-material = "AISI 1018 cold-finished steel shafting"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "AISI 1018 cold-finished steel, precision-ground round, 1/4 in"
+stock = "Ø{{process.stock_dia_in:.4dot}} ground bar (to order, not on hand); one blank {{process.blank_length_in:.2dot}} in long."
+note = "Inches, unless marked mm (the settings' feeds). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil. The O.D. is left as supplied: grip it over a brass shim wrap and never cut it."
 shop = "../shop"
-stock_refs = ["1018-ground-round-1-4"]  # 1018 shafting, ground (owner ruling 2026-11-20, #2346)
+stock_refs = ["1018-ground-round-1-4"]
+material_key = "lathe-1018-cold-finished"
+
+[cad]
+file = "../../out/features/dt_pinion_pivot_shaft/features.toml"
+adapter = "turned_shaft"
+part = "dt-pinion-pivot-shaft"
+
+[parameters]
+quantity = 1
+stock_dia_in = 0.25
+# Sawn a little over the faced length: about .03 in to face off each end.
+blank_length_in = 7.88
+as_supplied_outer = 1
+# Out of the jaw fronts while an end is faced and crowned: under 4 × Ø.
+end_stickout_in = 0.5
+# The R.180 form tool's radius: each crown is cut full (to the centre, no
+# flat at the apex) on the Ø.250, .180 − √(.180² − .125²) = .0505 high
+# (cad.dome_*_form_height), inside the drawing's .05 (.XX) band; the faced
+# length is the body's 7.70–7.72 plus both (cad.faced_length_*), so holding
+# it holds the body.
+dome_form_radius_in = 0.18
 
 [[tools]]
-id = "drill-1-16"
-name = "1/16 drill"
-ref = "drill-1-16"  # Drills 1/16
+id = "saw"
+name = "Metal-cutting saw"
+ref = "saw-evolution-14"
 
 [[tools]]
-id = "depth-micrometer"
-name = "Depth micrometer"
-ref = "depth-micrometer"  # F-depth-micrometer
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "form"
+name = "R.180 dome form tool (cuts an SR.18 crown): a concave R.180 arc .250 across ground into the edge, its two ends the tips, on the end of a 3/8 in square HSS tool blank, cutting edge at centre height"
+ref = "form-tool-r180"
+status = "to_order"
+
+[[tools]]
+id = "file"
+name = "Files (10 in mill second-cut, 8 in smooth)"
+ref = "jig-files"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Saw the blank"
+machine = "Saw / bench"
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/saw.svg", alt = "The 1/4 in ground bar on the saw: one blank sawn a little over the faced length." }
 
 [[setups.operations]]
-instruction = "Process not written yet."
+instruction = "Mike the bar over the length you will cut, at both ends and the middle: every reading {{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} (the O.D. is left as supplied)."
+inspection = "Bar Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}}."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "A reading outside the band: mark that length scrap and mike the next length of the bar."
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Scribe {{process.blank_length_in:.2dot}} in from the bar end and saw on the waste side of the scribe. Deburr both sawn ends with the file."
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
+title = "End A (the datum end): face"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw over a brass shim wrap on the ground O.D., {{process.end_stickout_in:.2dot}} in out of the jaw fronts; the rest of the blank back in the spindle bore."
+datum = "Z0 (carriage DRO) end A, faced in Op 40."
+diagram = { file = "diagrams/end-a.svg", alt = "The blank in the 3-jaw, end A out a half inch: faced square." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face end A (the datum end in the pictures) square, about {{cad.face_stock_per_end_in:.3dot}} in off, to the centre with no pip; set DRO Z0 on it."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups]]
+machine_kind = "lathe"
+title = "End B (the far end): face to length, form crown B"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "Turned round: 3-jaw over the shim wrap, {{process.end_stickout_in:.2dot}} in out, end A back in the spindle bore."
+datum = "DRO Z touched on end B with the facing tool before each skim (Op 50), and with the form tool's two tips in Op 70."
+diagram = { file = "diagrams/end-b.svg", alt = "The shaft turned round, end B out: faced to length, then crowned with the R.180 form tool." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face end B square in light skims, reading the length between them (Op 60), to {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}}, aiming {{cad.faced_length_in:.3dot}}: the body {{cad.body_length_min_in:.2dot}}–{{cad.body_length_max_in:.2dot}} plus two {{cad.dome_far_form_height_in:.4dot}} crowns."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Between skims, take the shaft out, stand it on end A on the surface plate, held upright by hand against the side of a 1-2-3 block, and read end B with the height gauge (the 0–6 in calipers do not reach). Chuck it again {{process.end_stickout_in:.2dot}} out and touch the facing tool on end B before the next skim."
+inspection = "Faced length {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}}."
+gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.faced_length_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Set the R.180 form tool on centre height, square to the axis, its arc spanning the whole end. Bring its tips up to end B and set the cross-slide until both tips just touch the O.D. corner together (no light at either tip): the arc is then centred. Zero the DRO Z there."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "form"
+drilling = "none"
+sizing = "other"
+instruction = "Form crown B: feed along Z to Z−{{cad.dome_far_form_height_in:.4dot}} (the crown's height). The form then reaches the centre, the apex on the faced plane."
+settings = "lathe-form-r180-1018"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Look at crown B under a light: no pip or flat at the apex, no step where it meets the O.D."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A pip at the apex: the tool is off centre height. Reset its height; if that moved the tool along Z, touch both tips on the crown's rim (it now sits at Z−{{cad.dome_far_form_height_in:.4dot}}) and set the DRO Z to −{{cad.dome_far_form_height_in:.4dot}} there, not zero. Take one more light pass to Z−{{cad.dome_far_form_height_in:.4dot}}, never deeper (it would shorten the body)."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A step at the O.D.: the arc is not centred across the shaft. Centre it, both tips touching the crown's rim together, and set the DRO Z to −{{cad.dome_far_form_height_in:.4dot}} there, not zero (the rim sits at Z−{{cad.dome_far_form_height_in:.4dot}}). Take one more light pass to Z−{{cad.dome_far_form_height_in:.4dot}}."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A flat at the apex with the DRO at Z−{{cad.dome_far_form_height_in:.4dot}}: either the touch-off stopped short of the corner or the form is under R.180. Feed on past Z−{{cad.dome_far_form_height_in:.4dot}} in .001 passes until the flat just disappears, and no further; Ops 130–140 then tell the two apart (a crown out of its band: the tool)."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Take the shaft out, stand it on end A against the 1-2-3 block as Op 60 and read crown B's apex with the height gauge: the apex is on the faced plane, so it still reads the faced length."
+inspection = "Apex {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}} over end A."
+gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.faced_length_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Still standing, the height gauge's go/no-go on the crown's rim: zero the scriber on crown B's apex; set it {{cad.dome_far_height_min_in:.3dot}} below and slide its tip in across the top: it must ride on the crown, clear of the O.D.'s edge; set it {{cad.dome_far_height_max_in:.3dot}} below and slide it in again: it must stop on the O.D., below the edge."
+inspection = "Crown B height {{cad.dome_far_height_min_in:.3dot}}–{{cad.dome_far_height_max_in:.3dot}}."
+gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.dome_far_height_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Apex under {{cad.faced_length_min_in:.3dot}}, or crown B outside its band: the shaft is scrap; make another from Setup 1 (a crown out of band means the form is not cut to R.180: the tool goes back to be reground first)."
+
+[[setups]]
+machine_kind = "lathe"
+title = "End A: form crown A"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "Turned round again: 3-jaw over the shim wrap, {{process.end_stickout_in:.2dot}} in out, crown B back in the spindle bore."
+datum = "DRO Z zeroed with the form tool's two tips on end A (faced in Op 40) in Op 160."
+diagram = { file = "diagrams/end-a-crown.svg", alt = "The shaft turned round again, end A out: crowned with the R.180 form tool." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Set and centre the form tool on end A as Op 70, and zero the DRO Z there."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "form"
+drilling = "none"
+sizing = "other"
+instruction = "Form crown A as Op 80: feed along Z to Z−{{cad.dome_datum_form_height_in:.4dot}}."
+settings = "lathe-form-r180-1018"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Look at crown A under a light: no pip or flat at the apex, no step where it meets the O.D."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A pip or a step: as Ops 100–110, never past Z−{{cad.dome_datum_form_height_in:.4dot}}. A flat at the apex, after crown B passed Ops 130–140 with the same tool: the touch-off stopped short of the corner, so the form fell short of the faced plane; feed on past Z−{{cad.dome_datum_form_height_in:.4dot}} in .001 passes until the flat just disappears, and no further."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Take the shaft out and stand it on crown B's apex on the surface plate, held upright against the 1-2-3 block's face. With the height gauge read crown A's apex; then lower the scriber until its tip, slid in across the top, just stops on the O.D.'s top edge (crown A's rim) and read it; then set it where its tip just stops under the O.D.'s bottom edge (crown B's rim) and read it. Body = crown A's rim − crown B's rim; crown A = its apex − its rim."
+inspection = "Body {{cad.body_length_min_in:.3dot}}–{{cad.body_length_max_in:.3dot}} rim to rim; crown A {{cad.dome_datum_height_min_in:.3dot}}–{{cad.dome_datum_height_max_in:.3dot}} high."
+gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.body_length_band_mm}}" }, { gauge = "height-gauge", band_mm = "{{cad.dome_datum_height_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Body outside {{cad.body_length_min_in:.3dot}}–{{cad.body_length_max_in:.3dot}}, or crown A outside its band: the shaft is scrap; make another from Setup 1."
+
+[[setups]]
+machine_kind = "other"
+title = "Bench: deburr, check, oil"
+machine = "Bench"
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished shaft: the 7.71 body between the crown rims, both .05 crowns, the O.D. as supplied; the two pin holes come at assembly." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Break both crown rims R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max; leave the O.D. and the crowns' faces untouched."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mike the O.D. at both ends and the middle: the jaws must not have marked it."
+inspection = "O.D. Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}}."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "A jaw-marked O.D. under {{cad.outer_dia_min_in:.4dot}}: scrap the shaft and make another from Setup 1."
+
+[[setups.operations]]
+instruction = "Wipe the shaft with machine oil. It leaves without its two Ø{{cad.cross_hole_front_dia_min_in:.4dot}}–{{cad.cross_hole_front_dia_max_in:.4dot}} spring-pin holes: MHA-DT-00 match-drills them through the MHA-DT-14 straps at assembly."

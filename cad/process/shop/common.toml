@@ -589,9 +589,9 @@ diameter_mm = 2.38125
 [tools.feeler-gauges]  # inventory gauges.feeler-gauges
 description = "Pittsburgh SAE/metric feeler gauge set, 32 pieces"
 [tools.form-tool-r070]  # MHA-PD-23 R.07 shank-end dome; MHA-MG-07 R.07 tip
-description = "R.070 convex dome form tool"
+description = "R.070 dome form tool: concave R.070 edge, cuts a convex R.070 dome"
 [tools.form-tool-r125]  # MHA-CH-04 2X (SR.125) ends; MHA-MG-03 SR.13 tip; MHA-MG-04 R.13 TANGENT HEMISPHERE
-description = "R.125 convex full-radius form tool (hemisphere on 1/4 rod)"
+description = "R.125 full-radius dome form tool: concave R.125 edge, cuts a convex SR.125 dome (hemisphere on 1/4 rod)"
 [tools.gauge-blocks-mitutoyo]  # inventory gauges.gauge-blocks-mitutoyo
 description = "Mitutoyo 81-piece inch gauge block set, shop grade"
 [tools.grooving-tool-020]  # MHA-PD-23 .020 +.002/.000 ring groove; MHA-MG-04 thread relief, corners R.008 max.; MHA-MG-07 thread relief, corners R.008 max.

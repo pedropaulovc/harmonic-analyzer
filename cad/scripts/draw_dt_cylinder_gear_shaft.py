@@ -39,6 +39,10 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_sphere import SphereFace
+from _printed_limits import limits
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -52,13 +56,118 @@ from dt_cylinder_gear_shaft_spec import (
     LENGTH_CALLOUT,
     SHAFT_DIA,
     SHAFT_RADIUS,
+    SHAFT_DIA_BAND,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 # The model's spherical radius (build_dt_cylinder_gear_shaft.DOME_SPHERE_RADIUS):
 # a cap of the dome height on the bar's radius.
 DOME_SPHERE_RADIUS = (SHAFT_RADIUS**2 + ARBOR_DOME_HEIGHT**2) / (
     2.0 * ARBOR_DOME_HEIGHT
+)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_dt_cylinder_gear_shaft: axis +Y, the cylinder y 0..ARBOR_LENGTH, a
+# dome ARBOR_DOME_HEIGHT past each end). The datum end is the y = 0 dome, its
+# apex plane the end's plane. The bar is supplied uncut (DRAWING_NOTES: SUPPLY
+# 7-1/2 LONG, its .X title-block band), and the length is cut to fit and both
+# domes turned at assembly, so both ends carry made_at = "assembly" and the
+# cylinder's length is the printed (6.9) reference. The set-screw spots are
+# drilled at assembly and are not modelled. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_cylinder_gear_shaft"
+_LAYOUT = "cylinder_bank_layout"
+_NOTES = "dt_cylinder_gear_shaft_notes"
+SUPPLY_LENGTH = 7.5 * 25.4  # DRAWING_NOTES "SUPPLY 7-1/2 LONG"
+_TIP_Z = (-ARBOR_DOME_HEIGHT, ARBOR_LENGTH + ARBOR_DOME_HEIGHT)
+part_metadata(
+    model_sources=("SHAFT_DIA", (_LAYOUT, "ARBOR_LENGTH")),
+    precision_sources=("DRAWING_PRECISION_BY_NAME",),
+)
+_DOME_FIELDS = {
+    "radius_ref": (DOME_SPHERE_RADIUS, ((_SELF, "DOME_SPHERE_RADIUS"),)),
+    "height": (
+        limits(ARBOR_DOME_HEIGHT, _P["DomeHeight"], unit=UNIT),
+        ((_LAYOUT, "ARBOR_DOME_HEIGHT"), "UNIT"),
+    ),
+    "height_nominal": (ARBOR_DOME_HEIGHT, ((_LAYOUT, "ARBOR_DOME_HEIGHT"),)),
+    "made_at": ("assembly", ((_NOTES, "DRAWING_NOTES"),)),
+    "callout": (DOME_CALLOUT, ("DOME_CALLOUT",)),
+}
+requirement(
+    "datum_end",
+    kind="dome",
+    faces=(
+        SphereFace(
+            2.0 * DOME_SPHERE_RADIUS,
+            (0.0, _TIP_Z[0] + DOME_SPHERE_RADIUS, 0.0),
+        ),
+    ),
+    requirements=("height",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": _TIP_Z[0]},
+            ((_LAYOUT, "ARBOR_DOME_HEIGHT"),),
+        ),
+        "outward": ([0.0, -1.0, 0.0], ((_LAYOUT, "ARBOR_DOME_HEIGHT"),)),
+        **_DOME_FIELDS,
+    },
+    precision={"height": _P["DomeHeight"]},
+)
+requirement(
+    "far_end",
+    kind="dome",
+    faces=(
+        SphereFace(
+            2.0 * DOME_SPHERE_RADIUS,
+            (0.0, _TIP_Z[1] - DOME_SPHERE_RADIUS, 0.0),
+        ),
+    ),
+    requirements=("height", "supply_length"),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": _TIP_Z[1]},
+            ((_LAYOUT, "ARBOR_LENGTH"), (_LAYOUT, "ARBOR_DOME_HEIGHT")),
+        ),
+        "outward": ([0.0, 1.0, 0.0], ((_LAYOUT, "ARBOR_LENGTH"),)),
+        "length_ref": (
+            _TIP_Z[1] - _TIP_Z[0],
+            ((_LAYOUT, "ARBOR_LENGTH"), (_LAYOUT, "ARBOR_DOME_HEIGHT")),
+        ),
+        "length_from": ("datum_end", ((_LAYOUT, "ARBOR_LENGTH"),)),
+        "body_length_ref": (ARBOR_LENGTH, ((_LAYOUT, "ARBOR_LENGTH"),)),
+        "supply_length": (
+            limits(SUPPLY_LENGTH, 1, unit=UNIT),
+            ((_SELF, "SUPPLY_LENGTH"), (_NOTES, "DRAWING_NOTES"), "UNIT"),
+        ),
+        "supply_length_nominal": (
+            SUPPLY_LENGTH,
+            ((_SELF, "SUPPLY_LENGTH"), (_NOTES, "DRAWING_NOTES")),
+        ),
+        "length_callout": (LENGTH_CALLOUT, ("LENGTH_CALLOUT",)),
+        **_DOME_FIELDS,
+    },
+    precision={"height": _P["DomeHeight"], "supply_length": 1},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(SHAFT_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("SHAFT_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("SHAFT_DIA",)),
+        "span": ([0.0, ARBOR_LENGTH], ((_LAYOUT, "ARBOR_LENGTH"),)),
+        "dia": (
+            limits(SHAFT_DIA, _P["ShaftDia"], SHAFT_DIA_BAND, unit=UNIT),
+            ("SHAFT_DIA", "SHAFT_DIA_BAND", "UNIT"),
+        ),
+        "dia_nominal": (SHAFT_DIA, ("SHAFT_DIA",)),
+        "callout": (SHAFT_DIA_CALLOUT, ((_NOTES, "SHAFT_DIA_CALLOUT"),)),
+    },
+    precision={"dia": _P["ShaftDia"]},
 )
 
 
