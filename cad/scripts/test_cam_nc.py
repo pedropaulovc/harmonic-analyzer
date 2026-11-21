@@ -658,6 +658,8 @@ def test_keep_out_band_catches_a_tool_part_crossing_an_overhang(tmp_path):
     assert hits("G0 X5 Y-5 Z3\nG1 Y2 F100\n") == ["ledge"]
     # Straight down through the band, no sampled point inside it.
     assert hits("G0 X5 Y2 Z8\nG0 Z-3\n") == ["ledge"]
+    # A steep diagonal through the band, in reach at its start, out at its end.
+    assert hits("G0 X5 Y5.8 Z8\nG0 Y6.05 Z-3\n") == ["ledge"]
 
 
 def test_a_reamer_rapided_out_of_its_bore_is_caught(tmp_path):
