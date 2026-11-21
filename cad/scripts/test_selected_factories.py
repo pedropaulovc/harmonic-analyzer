@@ -556,7 +556,7 @@ def _case_enrolled_traveler_keeps_normal_loader_conversion(dodo, monkeypatch, tm
     assert set(selected) == set(normal)
     for name in selected:
         assert _record(selected[name]) == _record(normal[name])
-    assert selected[f"prechips:{stem}"].task_dep == [f"package:features:{stem}"]
+    assert selected[f"prechips:{stem}"].task_dep == [f"package:manifest:{stem}"]
     assert str(source.resolve()) in selected[f"prechips:{stem}"].file_dep
     assert str(diagram.resolve()) in selected[f"prechips:{stem}"].file_dep
     assert [Path(target).name for target in selected[f"prechips:{stem}"].targets] == [
@@ -585,7 +585,7 @@ def _case_enrolled_cam_keeps_normal_loader_conversion(dodo, monkeypatch, tmp_pat
     for name in selected:
         assert _record(selected[name]) == _record(normal[name])
     task = selected[f"cam:{stem}"]
-    assert task.task_dep == [f"package:features:{stem}"]
+    assert task.task_dep == [f"package:manifest:{stem}"]
     # freecadcmd executes the runtime as a script, so no import closure can find it.
     assert str(_cam_programs.RUNTIME_PATH.resolve()) in task.file_dep
     assert str(_cam_programs.recipe_path(stem).resolve()) in task.file_dep
@@ -815,7 +815,11 @@ def _case_nested_feature_junction_cannot_hide_an_omitted_producer(dodo, monkeypa
     monkeypatch.setattr(dodo.os, "scandir", scandir)
     monkeypatch.setattr(
         dodo, "_canonical_targets",
-        lambda name: [str(target)] if name == "package:features:ownership_probe" else original_targets(name),
+        lambda name: (
+            [str(target)] if name == "package:features:ownership_probe"
+            else [] if name == "package:manifest:ownership_probe"
+            else original_targets(name)
+        ),
     )
     key = _path_identity(_workspace_path(REPO_ROOT, str(relocated)))
     assert dodo.canonical_target_owners([str(relocated)]) == {
@@ -826,11 +830,15 @@ def _case_nested_feature_junction_cannot_hide_an_omitted_producer(dodo, monkeypa
 
 def _case_alias_scan_covers_exact_declared_target_depth(dodo, ordinary, monkeypatch):
     for name, task in ordinary.tasks.items():
-        if name.startswith("package:features:"):
+        if name.startswith(("package:features:", "package:manifest:")):
             for target in task.targets:
                 relative = Path(target).relative_to(dodo.CAD_OUT / "features")
                 assert len(relative.parts) == 2
-                assert relative.name == "features.toml" or relative.suffix.lower() == ".step"
+                assert (
+                    relative.name == "features.toml"
+                    or relative.name.endswith(".faces.json")
+                    or relative.suffix.lower() == ".step"
+                )
 
     root = dodo.CAD_OUT / "features"
     stem = root / "ownership_probe"

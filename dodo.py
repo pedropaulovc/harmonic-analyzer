@@ -4928,7 +4928,12 @@ def _canonical_subtask_names(family: str) -> list[str]:
     if family == "package":
         from export_features import SUPPORTED_PARTS
 
-        return [*(f"features:{stem}" for stem in SUPPORTED_PARTS), "features", "release"]
+        return [
+            *(name for stem in SUPPORTED_PARTS for name in (f"features:{stem}", f"manifest:{stem}")),
+            "features",
+            "manifest",
+            "release",
+        ]
     if family == "review_sweep":
         return [stem for stem, _mode in _reviewed_drawings()]
     raise ValueError(f"unknown canonical task family: {family}")
@@ -5033,8 +5038,12 @@ def _canonical_subtask_definition(family: str, subname: str) -> dict[str, Any]:
     if family == "package":
         if subname.startswith("features:"):
             return _package_feature_task(subname.removeprefix("features:"))
+        if subname.startswith("manifest:"):
+            return _package_manifest_task(subname.removeprefix("manifest:"))
         if subname == "features":
             return _package_features_task()
+        if subname == "manifest":
+            return _package_manifests_task()
         if subname == "release":
             return _package_release_task()
     if family == "review_sweep" and subname in dict(_reviewed_drawings()):
