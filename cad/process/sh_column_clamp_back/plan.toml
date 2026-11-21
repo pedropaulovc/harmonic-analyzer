@@ -196,7 +196,7 @@ name = "#29 drill"
 ref = "jig-drill-29"
 [[tools]]
 id = "dead-centre"
-name = "MT3 dead centre"
+name = "The owner's MT3 dead centre with a straight end, the 3/4 in collet on that end, not on the taper"
 ref = "mill-dead-centre-mt3"
 [[tools]]
 id = "tap-8-32"
@@ -397,7 +397,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same stacks. The blank lying along the jaws, gripped on B and the top: B against the FIXED jaw, the two cold-finished faces left horizontal; the face up becomes the mating face. That puts N at the RIGHT end. Centred on the jaws; tap it down onto both stacks while closing the vise."
-datum = "Program CB05_mating. G54: X0 the blank's RIGHT end (the near side, which CB06 marks N), the part to −X; Y0 the fixed jaw's face (B), Z0 the stacks' top."
+datum = "Program CB05_mating. G54: X0 the blank's RIGHT end N (scribed in Setup 4), the part to −X; Y0 the fixed jaw's face (B), Z0 the stacks' top."
 diagram = { file = "diagrams/mating.svg", alt = "The blank lying on stacked parallels, gripped on its bottom and top faces, B at the fixed jaw; the 1/2 in end mill skims the face up, the mating face." }
 envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.pre_face_depth_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.width_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
@@ -729,11 +729,11 @@ instruction = "Tag the back AWAITING BLACK ENAMEL with its pair number unless th
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Finish ({{cad.finish}}): any black enamel for steel, with the primer its directions call for, applied by its directions. If the owner names a product, use it."
+instruction = "Choose the enamel: any black enamel for steel and the primer its directions call for, or the owner's product if one is named."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Degrease. Mask the half bore and both tapped holes (a #8-32 screw in each). Enamel every other face black by the maker's directions; let it cure."
+instruction = "Degrease. Mask the half bore and both tapped holes (a #8-32 screw in each). Prime if its directions call for it, then enamel every other face black by its directions; let it cure."
 feed = "hand"
 
 [[setups.operations]]

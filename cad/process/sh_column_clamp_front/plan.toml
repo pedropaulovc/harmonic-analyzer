@@ -515,11 +515,11 @@ instruction = "Tag the front AWAITING BLACK ENAMEL with its pair number unless t
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Finish ({{cad.finish}}): any black enamel for steel, with the primer its directions call for, applied by its directions. If the owner names a product, use it."
+instruction = "Choose the enamel: any black enamel for steel and the primer its directions call for, or the owner's product if one is named."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Degrease. Mask the bore, both ear holes (a plug or a #8 screw in each) and the outside face (the bar seats on it), the face opposite the bore. Enamel every other face black by the maker's directions; let it cure."
+instruction = "Degrease. Mask the bore, both ear holes (a plug or a #8 screw in each) and the outside face (the bar seats on it), the face opposite the bore. Prime if its directions call for it, then enamel every other face black by its directions; let it cure."
 feed = "hand"
 
 [[setups.operations]]
