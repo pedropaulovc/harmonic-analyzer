@@ -104,10 +104,11 @@ _TIP_HOLDDOWN_GATE_LIMIT_MM3 = _TIP_HOLDDOWN_OBSERVED_MM3 * 1.10
 # MHA-DT-39, the 1/4-28 end screw (owner decision C1 keyed, 2026-11-09, PR
 # #1992), runs through MHA-DT-21's whole tapped depth with its threaded end
 # proud of the south face, so its axial setting does not change the overlap:
-# 34.1729 mm3, read by the PR 2 drive-train leaf (6fda5a47590f, farm run
-# 20261110T001845485Z, assembly:dt_drive_train log line 601; the smooth
-# annulus bound was 104.31, 3.1x the reading).
-_END_SCREW_OBSERVED_MM3 = 34.1729
+# 34.9463 mm3 through the .44 block (owner ruling 2026-11-20, #2726), read by
+# the #3183 drive-train leaf (5b360c8fee, farm run
+# 20261120T223603596Z-06cb8deecd914fe0b02ae12cf03e772f, assembly:dt_drive_train
+# log line 605; 34.1729 through the .43 block in 20261110T001845485Z).
+_END_SCREW_OBSERVED_MM3 = 34.9463
 _END_SCREW_GATE_LIMIT_MM3 = _END_SCREW_OBSERVED_MM3 * 1.10
 
 ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
