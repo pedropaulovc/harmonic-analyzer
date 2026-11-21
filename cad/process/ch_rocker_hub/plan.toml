@@ -123,7 +123,6 @@ instruction = "A strap hole the .4005 enters or the .4000 does not is outside MH
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Work out the lot's land window from the readings kept, Ø(largest R + {{process.land_over_reading_min_in:.4dot}}) to Ø(smallest R + {{cad.outer_interference_max_in:.4dot}}), and write it on this sheet: a hole may be up to .0001 over its R, so every hole then takes the drawing's {{cad.outer_interference_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}} diametral interference."
-inspection = "Land window written."
 
 [[setups.operations]]
 cut_kind = "other"
