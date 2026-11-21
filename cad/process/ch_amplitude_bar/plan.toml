@@ -400,10 +400,6 @@ instruction = "First load only: prove CA02_foot_notch in air, Z0 raised 1.000 in
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First load only: prove CA02_foot_notch in air, Z0 raised 1.000 in; the saw clears the jaws and both bars' ends. Then Z0 back."
-feed = "hand"
-
-[[setups.operations]]
 speed_kind = "spindle"
 tool = "saw"
 drilling = "none"
@@ -593,7 +589,7 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "Unclamp the load. Every load: each bar's hole place from its B face (bar 2's carries bar 1's width error: CA05 places the holes on a {{process.bar_pitch_mm:in.4dot}} bar pitch). The GO .0775 pin gauge in the hole."
+instruction = "Unclamp the load. First load only, and after any change to CA05 or to the Y0 pick-up: each bar's hole place from its B face (CA05 places the holes on a {{process.bar_pitch_mm:in.4dot}} bar pitch from Y0; bar 2's carries bar 1's width, within .001 of it). The GO .0775 pin gauge in the hole."
 inspection = "From B {{cad.top_pin_hole_location_from_back_min_in:.3dot}}–{{cad.top_pin_hole_location_from_back_max_in:.3dot}}: the calipers from the B face over the gauge pin, less half its .0775. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.top_pin_hole_location_from_back_band_mm}}" },
