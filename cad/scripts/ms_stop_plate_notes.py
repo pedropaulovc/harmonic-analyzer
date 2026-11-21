@@ -14,7 +14,8 @@ from ms_stop_spec import MATCH_DRILL_DATUM_ALIGNMENT
 # Rule 4: the matched pair, its screws and the thickness that sets their reach
 # are named once, in note 1; the thickness and the hole callout link it, and
 # the three hole locations carry only their value (title block .XXX). The
-# pilot-and-open sequence is the assembly sheet's step 1.
+# pilot-and-open sequence is the plate's traveler (cad/process/ms_stop_plate,
+# Setups 3-4, on its finished MHA-MS-02 block).
 NOTE_NUMBER = 1
 MATCHED_PAIR_NOTE = (
     f"{NOTE_NUMBER}. MATCHED PAIR WITH {_config.parts('ms-stop-block')['number']} STOP BLOCK:"
