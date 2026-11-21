@@ -128,7 +128,16 @@ own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
   lie between the two holds; an end-side gear past a hold may run below it,
   accepted by owner ruling 2026-11-14 on #2584 and stated on MHA-DT-00 check
   4R), opened by both gears'
-  running runout. No number is booked for the ease out of the bind (check 4N;
+  running runout: the drum's 0.05 TIR about its bore and each cone gear's
+  eccentricity about the running axis (MHA-DT-04's journal to MHA-DT-37's
+  pivot). That is half its 0.05 TIR for a keyed gear;
+  for T012/T018 half their printed .0015 in tooth-space runout to the bore
+  plus their bond float, half their bond clearance (#3219 option D and #3292,
+  owner rulings 2026-11-21); for T024, centred while its bond is wet, half its
+  .0045 in TIR about MHA-DT-04's journal read after cure (MHA-DT-00 sheet 16,
+  #3292). How the spigot's float and tilt in MHA-DT-04's socket move the
+  running axis off MHA-DT-04 near the tip is not booked (#2473).
+  No number is booked for the ease out of the bind (check 4N;
   delegated ruling 2026-11-12, #2144, see gear-standard.md). Reported only (REF): the
   printed-corner contact ratio there. A gear that binds is cleared by easing
   the swing, not by stoning a tip.

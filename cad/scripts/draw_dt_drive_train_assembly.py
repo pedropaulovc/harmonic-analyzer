@@ -1351,7 +1351,7 @@ CHANNEL_RODS_SET_AT = _step_ref("cylinder-stack-accepted", "B")
 # key defines TNNN for MHA-DT-03 only (review of 5994f29c83, rule 4).
 CRANK_CHAIN_WHEEL = str(_config.parts("pd-transgear-removable")["number"])
 PLATEN_NUMBER = str(_config.parts("pd-platen")["number"])
-# Steps 1S and 2B's phasing comb is a shop tool in the cone-gear indexing kit, never
+# Steps 1T and 2B's phasing comb is a shop tool in the cone-gear indexing kit, never
 # a BOM row (owner rulings 2026-11-09 and 2026-11-10); the code key names it
 # and its blade (machinist review of bd81283964: an undefined tool and word).
 PHASING_COMB = str(_config.parts("dt-cone-gear-tl-phasing-comb")["number"])
@@ -1472,6 +1472,14 @@ CONE_CRANK_STEPS = _note_text(
         # T024 pressed onto the feeler on T030 closes the keyed stack onto the
         # collar, so the feeler sets the stack float (cone_stack_end_play).
         f"1R. BOND T024 ON THE LAND, {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER ON T030, PER THE SHEET 1 NOTE.",
+        # #3292 (owner ruling 2026-11-21, options 2 + 4): a bonded slip fit
+        # cures wherever it sits in its clearance, so T024 is centred while
+        # the 638 is wet and accepted after cure on its tooth runout about
+        # MHA-DT-04 (1X), the value cone_set_stack books.  Both read in the
+        # sheet 16 row's setup: MHA-DT-04 on end, its journal in a V-block,
+        # so it turns on its own axis, and 1T clips the comb in that same
+        # setup without moving it (Codjiflo review of #3324).
+        f"1S. TAP T024 TRUE ON AN INDICATOR BEFORE IT GRABS ({acceptance_ref('t024-runout')}).",
         # Owner ruling 2026-11-10: one comb blade drops in one tooth space of
         # each gear.  T030's keyway centreline runs through its phase-0 tooth
         # (dt_cone_gear_spec), and its blade takes the space beside that tooth,
@@ -1487,25 +1495,27 @@ CONE_CRANK_STEPS = _note_text(
         # inside the fixture time: T024 alone first (the comb's other blades
         # stand over air), then the spigot's three joints once T024 has cured,
         # since pushing T018 onto T024 loads it.
-        f"1S. CLIP {PHASING_COMB} OVER THE TIP, MHA-DT-04 STANDING ON ITS JOURNAL, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY.",
-        f"1T. REMOVE {PHASING_COMB} AND THE FEELER ONCE THE BOND GRABS.",
-        "1U. AFTER T024'S 24 H CURE, WIPE THE WAX OFF T030 AND THE KEY END.",
+        f"1T. CLIP {PHASING_COMB} OVER THE TIP, MHA-DT-04 STILL STANDING IN THE V-BLOCK, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY.",
+        f"1U. REMOVE {PHASING_COMB} AND THE FEELER ONCE THE BOND GRABS.",
+        "1V. AFTER T024'S 24 H CURE, WIPE THE WAX OFF T030 AND THE KEY END.",
         # #2470: T024 cures alone so it is accepted alone, before three wet
         # joints wait on the comb (Codjiflo review of PR #2531); a bonded slip
         # fit has nothing to adjust, so the remedy parts it (drawing-
         # guidelines: about 250 C releases 638) and cleans the cured film out.
-        f"1V. CHECK THAT {PHASING_COMB} CLIPS OVER T030 AND T024, BOTH ARMS ON T036.",
-        "1W. IF IT DOES NOT, TAKE T024 OFF AT 250 DEG C.",
-        "1X. CLEAN THE CURED 638 OUT OF ITS BORE AND OFF THE LAND.",
-        "1Y. REDO FROM 1P.",
+        # Both T024 checks share that remedy; step 1 has one letter left for
+        # the clean, which names the redo it prepares.
+        f"1W. CHECK THAT {PHASING_COMB} CLIPS OVER T030 AND T024, BOTH ARMS ON T036.",
+        f"1X. CHECK T024'S TOOTH RUNOUT ABOUT MHA-DT-04 ({acceptance_ref('t024-runout')}).",
+        "1Y. IF EITHER CHECK FAILS, TAKE T024 OFF AT 250 DEG C.",
+        "1Z. CLEAN THE CURED 638 OFF ITS BORE AND LAND FOR A REDO FROM 1P.",
         # Step 1 has no letter left for the spigot's round, so it opens step 2,
         # before the post goes on.
         "2. BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT PER THE SHEET 1 NOTE.",
         "2A. BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024, PER THE SHEET 1 NOTE.",
         # Round 2's wet joints sit beside the deeper blades, and 1Q's film has
-        # been through 1T and 1U, so the blades are coated again (Codjiflo
+        # been through 1U and 1V, so the blades are coated again (Codjiflo
         # review of PR #2735); step 2 has no letter left for a step of its own.
-        # MHA-DT-04 still stands on its journal from 1S.
+        # MHA-DT-04 still stands on end in the V-block from 1S and 1T.
         f"2B. CLIP {PHASING_COMB}, BLADES WAXED AGAIN, OVER THE TIP, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY.",
         # #2470: the coated spigot seals the blind socket's air in as it
         # enters; held home, the compressed air cannot back T018 off T024
@@ -3093,7 +3103,7 @@ def code_key_text(rows: Sequence[tuple[int, str]], cylinder_gears: int) -> str:
     """The package's labelled code key (owner ruling 2026-11-08, Pedro): the
     MHA-DT-03 codes as the model configures them, by station front to back
     (``rows``, from the placed cone gears), two columns, GEAR 0 to the last of
-    the ``cylinder_gears`` MHA-DT-12, counted from the front, and steps 1S
+    the ``cylinder_gears`` MHA-DT-12, counted from the front, and steps 1T
     and 2B's phasing comb and its blades (a shop tool on its own print, no
     BOM row)."""
     code = rows[0][1]

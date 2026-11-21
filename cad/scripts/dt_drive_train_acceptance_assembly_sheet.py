@@ -16,8 +16,10 @@ ha_assembly_package reads its instruments into the ASSEMBLY.md tool list.
 
 from __future__ import annotations
 
+from cone_set_stack import LAND_2_ASSEMBLED_RUNOUT_TIR_MM
 from cone_stack_end_play import SHAFT_END_PLAY
 import cylinder_bank_layout as bank
+import dt_cone_gear_spec as cone_gear
 from dt_cone_gear_stack import STACK_L20_ACCEPT
 import dt_crank_handle_pivot_screw_spec as handle_screw
 from dt_crank_pin_ring_spec import BUTT_GAP_BAND as RING_BUTT_GAP_BAND
@@ -65,7 +67,10 @@ STRAP_PIN_DEPTH_TEXT = f"0 TO {inch_max_text(STRAP_PIN_SUB_FLUSH_MAX, 3)}"
 POST_SCREW_SHORT_TEXT = inch_max_text(
     post_screw.POST_SCREW_CUT_TO_FIT_SHORT, post_screw.CUT_TO_FIT_SHORT_PLACES
 )
-# (key, step, setting, set to / accept, check with), in step order.
+(_LAND_2_TEETH,) = cone_gear.LAND_2_TEETH
+# (key, step, setting, set to / accept, check with), in step order, then rows
+# added later appended so no earlier row (which other records cite by number)
+# renumbers.
 ACCEPTANCES = (
     (
         "cone-stack",
@@ -182,5 +187,23 @@ ACCEPTANCES = (
         STOP_SCREW_ENGAGEMENT,
         f"LESSER OF {_step_ref('other-base-mounting', 'M')}, "
         f"{_step_ref('other-base-mounting', 'N')}",
+    ),
+    # #3292 (owner ruling 2026-11-21, options 2 + 4): T024 is centred while
+    # its bond is wet (1S) and accepted after cure (1X) on its tooth runout
+    # about MHA-DT-04, read in every space with the part sheets' over-pins
+    # pin; cone_set_stack books the limit, floored onto the printed places.
+    # MHA-DT-04 stands on its journal end in a V-block, so it turns on the
+    # journal's axis and 1T clips the comb in that same setup (Codjiflo
+    # review of #3324); the pin names the pin-gauge row of the tool list as
+    # MHA-PD-00's tooth-space rows do.  The cells hold the table's widest
+    # SETTING and ACCEPT widths (reference-view keep-out).
+    (
+        "t024-runout",
+        f"{_step_ref('cone-gears-stacked', 'S')}, {_step_ref('cone-gears-stacked', 'X')}",
+        f"T{_LAND_2_TEETH:03d}, "
+        f"\u00d8{inch_text(cone_gear.over_pins_pin_dia_mm(_LAND_2_TEETH), 3)} GAUGE PIN, "
+        "MHA-DT-04 ON END ON A V-BLOCK",
+        f"{inch_text(inch_floor_mm(LAND_2_ASSEMBLED_RUNOUT_TIR_MM, 4), 4)} TIR MAX EACH SPACE",
+        "TEST INDICATOR",
     ),
 )

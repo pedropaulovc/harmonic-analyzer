@@ -51,6 +51,24 @@ def test_cone_drum_mesh_keeps_contact_at_the_loosest_feel_set(teeth: int) -> Non
     assert check.contact_ratio_nominal >= CONE_NOMINAL_CONTACT_RATIO_MIN, check.text()
 
 
+@pytest.mark.parametrize("teeth", cone.ROUND_BORE_TEETH)
+def test_bonded_gears_book_their_bond_float(teeth: int) -> None:
+    # #3219 option D and #3292: T012/T018's eccentricity about the running
+    # axis is their printed tooth-space runout / 2 plus the bond float; T024's
+    # is half its after-cure tooth runout about MHA-DT-04, which reads the float.
+    centre = cone_set_stack.cone_centre(teeth)
+    if teeth in cone.SPIGOT_TEETH:
+        eccentricity = (
+            cone_set_stack.SPIGOT_TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
+            + cone.bond_clearance_mm(teeth)[1] / 2.0
+        )
+    else:
+        eccentricity = cone_set_stack.LAND_2_ASSEMBLED_RUNOUT_TIR_MM / 2.0
+    assert centre.ceiling_mm - centre.set_max_mm == pytest.approx(
+        2.0 * eccentricity + cone_set_stack.TOOTH_RUNOUT_TIR_MM
+    )
+
+
 def test_alignment_drum_fitup_mesh_cannot_bind() -> None:
     _require_no_bind(alignment_mesh_check.alignment_check())
 

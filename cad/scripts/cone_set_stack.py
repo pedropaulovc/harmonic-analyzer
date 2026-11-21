@@ -34,11 +34,20 @@ the line's extension, higher by the line's slope times its overhang. Its
 function (gears that do not come loose) was ruled on #2584 (owner ruling
 2026-11-14, option A: accepted and stated on the sheet, exception DT-08 in
 assemblies/dt-drive-train.yaml); no allowance is booked for it here. A pair
-then runs looser than that at the far phase of its running runout, the cone
-and the drum each ``TOOTH_RUNOUT_TIR_MM`` about their bores. The seat floats,
-the pivot's translation and the arbor's float are taken up the same way under
+then runs looser than that at the far phase of its running runout: the drum
+``TOOTH_RUNOUT_TIR_MM`` about its bore and each cone gear its eccentricity
+about the set's running axis (``cone_eccentricity_mm``), which runs from
+MHA-DT-04's journal to MHA-DT-37's pivot. The keyed gears' seat floats, the
+pivot's translation and the arbor's float are taken up the same way under
 the mesh load at the set as in running, so they do not move a pair off its
-set.
+set. A bonded gear's float is not: the gear cures off its seat by up to half
+its bond clearance and keeps that offset (#3292). T012/T018 book it on top of
+their printed tooth runout to the bore; their seat is MHA-DT-37's spigot,
+one part with the pivot, so the spigot's own float in MHA-DT-04's socket
+moves the axis with them. T024 is centred while its bond is wet and accepted
+after cure on its tooth runout about MHA-DT-04's journal, which reads the
+float and the tooth runout together. How the spigot's float, tilt and the
+socket's runout move the axis off MHA-DT-04 near the tip is #2473.
 
 The CAD places the cone line ``SET_ABOVE_STANDARD_MM`` above standard at
 every cone; the feel set runs T120 tighter than that, by
@@ -89,6 +98,48 @@ PIVOT_SEAT_TRANSFER_MM = PIVOT_TRANSFER_PUNCH_PLAY_MM + PUNCH_MARK_PICKUP_MM
 TOOTH_RUNOUT_TIR_MM = float(
     _config.fit("cone_drum_oblique_mesh", "tooth_cutting_runout_tir_mm")
 )
+# T012/T018 print their tooth-space runout to the bore, read with a pin in
+# every space, on the MHA-DT-03 sheet. Owner ruling 2026-11-21 (Pedro),
+# #3219: "option D. Print the tooth-space runout to the bore (.0015 TIR, pin
+# in the bore, as on MHA-PD-06) on T012 and T018, and the traveler turns the
+# OD and reams the bore in the same chucking before the teeth are cut."
+SPIGOT_TOOTH_SPACE_RUNOUT_TIR_MM = 0.0015 * 25.4
+
+
+def cone_tooth_runout_tir_mm(teeth: int) -> float:
+    """Cone ``teeth``'s tooth runout about its bore, as its sheet prints it."""
+    if teeth in cone.SPIGOT_TEETH:
+        return SPIGOT_TOOTH_SPACE_RUNOUT_TIR_MM
+    return TOOTH_RUNOUT_TIR_MM
+
+
+# T024 is centred on land 2 while its LOCTITE 638 is wet and accepted after
+# cure on its tooth runout about MHA-DT-04 (MHA-DT-00 sheet 16). Owner ruling
+# 2026-11-21 (Pedro), #3292: "options 2 + 4 together. At assembly, while the
+# LOCTITE 638 is wet, indicate T024 teeth on the shaft and tap it central,
+# then cure; the assembly sheet gets a check after cure: tooth runout about
+# the shaft .0045 TIR max. No part change."
+LAND_2_ASSEMBLED_RUNOUT_TIR_MM = 0.0045 * 25.4
+
+
+def bond_float_mm(teeth: int) -> float:
+    """How far a bonded cone gear's bore can cure off its seat: half its own
+    bond clearance; zero for the keyed gears, which take their float up under
+    mesh load.  dt_cone_gear_tl_phasing_comb_spec.BOND_FLOAT_MM is a different
+    quantity: one common float, the largest of these and the spigot's half
+    clearance in MHA-DT-04's socket, about T030's key rather than the axis."""
+    if teeth in cone.ROUND_BORE_TEETH:
+        return cone.bond_clearance_mm(teeth)[1] / 2.0
+    return 0.0
+
+
+def cone_eccentricity_mm(teeth: int) -> float:
+    """The largest eccentricity of cone ``teeth``'s teeth about the running axis."""
+    if teeth in cone.LAND_2_TEETH:
+        return LAND_2_ASSEMBLED_RUNOUT_TIR_MM / 2.0
+    return cone_tooth_runout_tir_mm(teeth) / 2.0 + bond_float_mm(teeth)
+
+
 ALPHA_RAD = math.radians(cone.PRESSURE_ANGLE_DEG)
 
 # The swing's own clearances, for the stacks of the parts it carries.
@@ -176,10 +227,13 @@ def first_bind_offsets_mm(teeth: int) -> tuple[float, ...]:
 # tightest phase; a gear past a hold is accepted by the owner's #2584 ruling
 # (option A, exception DT-08; see the module docstring).
 SET_OFFSET_MAX_MM = max(max(first_bind_offsets_mm(t)) for t in cone.CONE_TEETH)
-# The far phase of the running runout: the set is felt at the tightest phase
-# of a full turn, and the cone's and the drum's eccentricities (TIR/2 each)
-# open the centre by up to 2 x TIR at the opposite phase.
-RUNNING_RUNOUT_SPAN_MM = 2.0 * TOOTH_RUNOUT_TIR_MM
+
+
+def running_runout_span_mm(teeth: int) -> float:
+    """The far phase of the running runout: the set is felt at the tightest
+    phase of a full turn, and the cone's eccentricity and the drum's (TIR / 2)
+    each open the centre by twice their size at the opposite phase."""
+    return 2.0 * cone_eccentricity_mm(teeth) + TOOTH_RUNOUT_TIR_MM
 
 
 @dataclass(frozen=True)
@@ -203,7 +257,7 @@ def cone_centre(teeth: int) -> ConeCentre:
         teeth,
         std + min(first_bind_offsets_mm(teeth)),
         set_max,
-        set_max + RUNNING_RUNOUT_SPAN_MM,
+        set_max + running_runout_span_mm(teeth),
     )
 
 

@@ -385,7 +385,7 @@ FACE_WIDTH_BAND = (0.0508, -0.0508)  # (upper, lower), +/-.002 in
 # round 2: a ±.25° clock in DETAIL A named a tooth the detail does not draw,
 # and no mate).  The round bonded tip gears T012..T024 carry no clock on
 # their bores: the MHA-DT-03-TL-02 comb phases each to the keyed T030 while
-# its bond cures, in two rounds (#2470): MHA-DT-00 step 1S engages it for
+# its bond cures, in two rounds (#2470): MHA-DT-00 step 1T engages it for
 # T024 alone, step 2B again for T018, T012 and T006, and step 2E accepts the
 # cured tip on it (owner ruling 2026-11-10 via PR #1992;
 # dt_cone_gear_tl_phasing_comb_spec, error_budget.yaml cone_tip_bond_clock).
