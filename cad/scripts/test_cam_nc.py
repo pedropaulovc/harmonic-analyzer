@@ -645,3 +645,42 @@ def test_freecad_older_than_1_1_is_refused(tmp_path, monkeypatch):
     monkeypatch.setattr(cam_nc, "freecad_version", lambda _path: (1, 1))
     assert cam_nc.resolve_freecadcmd() == exe
 
+
+
+def test_engagement_sees_what_a_finish_pass_really_meets(tmp_path):
+    stock = ((0.0, 20.0), (0.0, 10.0), (0.0, 5.0))
+    # A wall at Y5 (the part beyond it): one rough pass leaves 0.5 on it, the
+    # finish pass along -X has the wall on its right (climb).
+    rough = "G0 X-5 Y1.5 Z5\nG1 Z2 F100\nG1 X25\nG0 Z8\n"
+    finish = "G0 X25 Y2 Z8\nG0 Z5\nG1 Z2 F100\nG1 X-5\nG0 Z8\n"
+    kwargs = {
+        "stock": stock, "radius": 3.0, "max_radial": 0.5, "z": 2.0,
+        "window": ((-10.0, 30.0), (2.0, 2.0)), "min_length": 25.0, "side": "climb",
+    }
+    good = _program(tmp_path, rough + finish)
+    assert _gcode.check_engagement(good, **kwargs) == []
+    last = _gcode.engagements(good, stock, 3.0)[-1]
+    assert last.radial == pytest.approx(0.5, abs=0.06) and last.axial == pytest.approx(3.0) and last.side == "climb"
+    # The rough pass stopped short of the far end: the finish meets the full 5 there.
+    short = _program(tmp_path, rough.replace("X25", "X12") + finish)
+    assert any("radial > 0.500" in f.detail for f in _gcode.check_engagement(short, **kwargs))
+    # The finish run +X: the wall on its left, conventional.
+    backward = _program(tmp_path, rough + finish.replace("X25", "XA").replace("X-5", "X25").replace("XA", "X-5"))
+    assert [f.detail for f in _gcode.check_engagement(backward, **kwargs)] == [
+        "X-5.000 Y2.000 -> X25.000 Y2.000 Z2.000 cuts conventional, expected climb"
+    ]
+    # Nothing selected is a finding, not a pass.
+    assert _gcode.check_engagement(good, **{**kwargs, "z": 1.0})[0].check == "engagement"
+
+
+def test_engagement_follows_an_arc_and_a_slot(tmp_path):
+    stock = ((-20.0, 20.0), (-20.0, 20.0), (0.0, 5.0))
+    # G2 rings round the origin: R11 cuts 10..12, then R10.5 meets 9.5..10,
+    # inside its circle: on the right of clockwise travel, climb.
+    rings = (
+        "G0 X11 Y0 Z5\nG1 Z2 F100\nG2 X11 Y0 I-11 J0\nG0 Z8\n"
+        "G0 X10.5 Y0\nG0 Z5\nG1 Z2 F100\nG2 X10.5 Y0 I-10.5 J0\nG0 Z8\n"
+    )
+    first, second = [e for e in _gcode.engagements(_program(tmp_path, rings), stock, 1.0) if e.move.centre]
+    assert first.side == "both" and first.radial == pytest.approx(2.0, abs=0.06)
+    assert second.side == "climb" and second.radial == pytest.approx(0.5, abs=0.06)
