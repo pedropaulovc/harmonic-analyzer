@@ -485,14 +485,17 @@ feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Deburr, inspect"
+title = "Deburr, inspect, black enamel"
 machine = "Bench"
 indexing = "none"
 diagram = { file = "diagrams/inspect.svg", alt = "The finished front, looking down the bore: the ear holes either side, the web between each and the bore, the bore's place from the N end." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-inspection = ["Bore Ø accepted in the pair (MHA-SH-02 Setup 9). Measure before the bore's edges are broken. Each ear's web to the bore, on the mating face: the calipers' outside jaw tips into the ear hole and the bore, closed on the web: at least {{cad.ear_wall_min_in:.3dot}} (MIN EAR WALL). Each ear's station: that web plus half the ear hole's pin plus half the bore's recorded Ø, {{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}}. The bore's place: the calipers from N to the bore's near edge on the mating face, plus half its Ø, {{cad.bore_location_min_in:.3dot}}–{{cad.bore_location_max_in:.3dot}}. Under the web or outside either band: stop and tell the owner."]
+
+[[setups.operations]]
+instruction = "Inspect first, the bore's edges still sharp (the deburr below breaks them)."
+inspection = "Bore Ø accepted in the pair (MHA-SH-02 Setup 9). Each ear's web to the bore, on the mating face: the calipers' outside jaw tips into the ear hole and the bore, closed on the web: at least {{cad.ear_wall_min_in:.3dot}} (MIN EAR WALL). Each ear's station: that web plus half the ear hole's pin plus half the bore's recorded Ø, {{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}}. The bore's place: the calipers from N to the bore's near edge on the mating face, plus half its Ø, {{cad.bore_location_min_in:.3dot}}–{{cad.bore_location_max_in:.3dot}}. Under the web or outside either band: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = ["{{cad.ear_wall_min_mm}}", "{{cad.ear_wall_best_mm}}"] },
   { gauge = "calipers", band_mm = "{{cad.ear_station_band_mm}}" },
@@ -508,18 +511,8 @@ instruction = "Deburr the bore's edges at the top and bottom faces and along the
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Tag the front AWAITING BLACK ENAMEL with its pair number unless Setup 11 follows now."
+instruction = "Tag the front AWAITING BLACK ENAMEL with its pair number unless the enamel ops below follow now."
 feed = "hand"
-
-[[setups]]
-machine_kind = "other"
-title = "Black enamel"
-machine = "Bench, ventilated"
-indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished front: every face enamelled black but the bore, both ear holes and the outside face, which stay bare and oiled." }
-envelope = "other"
-vise_hold = "other"
-beam = "other"
 
 [[setups.operations]]
 instruction = "Finish ({{cad.finish}}): any black enamel for steel, with the primer its directions call for, applied by its directions. If the owner names a product, use it."

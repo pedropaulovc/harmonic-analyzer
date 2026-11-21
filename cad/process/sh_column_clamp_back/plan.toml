@@ -321,7 +321,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in). The blank lying on them along the jaws, gripped across two opposite cold-finished faces, centred on the jaws; the face up becomes the bottom face B. Tap it down onto both stacks while closing the vise. Its top stands {{process.blank_section_in:.3dot}} above the stacks, the lower {{process.lying_grip_mm:in.3dot}} of it in the jaws."
-datum = "Program CB03_bottom. G54: X0 the blank's LEFT end, Y0 the fixed jaw's face, Z0 the stacks' top; +Y toward the fixed jaw."
+datum = "Program CB03_bottom. G54: X0 the blank's LEFT end, the near side N (scribed after this cut), Y0 the fixed jaw's face, Z0 the stacks' top; +Y toward the fixed jaw."
 diagram = { file = "diagrams/bottom.svg", alt = "The blank lying along the jaws on stacked parallels; the 1/2 in end mill skims the top face, which becomes the bottom face B." }
 envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_section_mm}}", along_jaws_mm = "{{cad.width_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -346,7 +346,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB03_bottom (M6 T1; set 2650): skim the top face {{process.bottom_skim_mm:in.3dot}} at Z {{process.blank_section_mm:in.3dot}} less the skim. A cold-finished patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; mark this face B (blue marking fluid and a scribed B) and the blank's number on it."
+instruction = "Run CB03_bottom (M6 T1; set 2650): skim the top face {{process.bottom_skim_mm:in.3dot}} at Z {{process.blank_section_mm:in.3dot}} less the skim. A cold-finished patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; mark this face B (blue marking fluid and a scribed B) and the blank's number on it, and scribe N on the left end: the near side the stations and the bore count from."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "bottom face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.bottom_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{cad.width_mm}}"] },
@@ -358,7 +358,7 @@ title = "Top face to the height"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "As Setup 4, the blank turned over: B down on both stacks, gripped across the same two cold-finished faces, centred."
+holding = "As Setup 4, the blank turned over, its ends unchanged: B down on both stacks, N still at the LEFT end, gripped across the same two cold-finished faces, centred."
 datum = "Program CB04_height. G54: X0 the blank's LEFT end, Y0 the fixed jaw's face, Z0 the stacks' top (B)."
 diagram = { file = "diagrams/height.svg", alt = "The blank lying on stacked parallels, B down; the 1/2 in end mill faces the top down to the height in levels." }
 envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
@@ -396,7 +396,7 @@ title = "Mating face skim"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The same stacks. The blank lying along the jaws, gripped on B and the top: B against the FIXED jaw, the two cold-finished faces left horizontal; the face up becomes the mating face. Centred on the jaws; tap it down onto both stacks while closing the vise."
+holding = "The same stacks. The blank lying along the jaws, gripped on B and the top: B against the FIXED jaw, the two cold-finished faces left horizontal; the face up becomes the mating face. That puts N at the RIGHT end. Centred on the jaws; tap it down onto both stacks while closing the vise."
 datum = "Program CB05_mating. G54: X0 the blank's RIGHT end (the near side, which CB06 marks N), the part to −X; Y0 the fixed jaw's face (B), Z0 the stacks' top."
 diagram = { file = "diagrams/mating.svg", alt = "The blank lying on stacked parallels, gripped on its bottom and top faces, B at the fixed jaw; the 1/2 in end mill skims the face up, the mating face." }
 envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.pre_face_depth_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
@@ -442,8 +442,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_ja
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], clamp_mm = [0, "{{cad.width_mm}}"], section_mm = { y = "{{cad.height_mm}}", z = "{{cad.pre_face_depth_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the LEFT end (N), Y0 the fixed jaw's face (B): edge finder (900 rpm). Mark the left end N on the part."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the part's LEFT end from the left, G10 L20 P1 X-2.540. Scribe N on the left end: it is the near side the stations and the bore count from, here and in the pair."
+instruction = "Home the mill first ($H). G54 X0 the LEFT end (N), Y0 the fixed jaw's face (B): edge finder (900 rpm)."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the part's LEFT end from the left, G10 L20 P1 X-2.540. N, scribed in Setup 4, is the left end here and in the pair."
 feed = "hand"
 
 [[setups.operations]]
@@ -700,14 +700,17 @@ feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Deburr, inspect"
+title = "Deburr, inspect, black enamel"
 machine = "Bench"
 indexing = "none"
 diagram = { file = "diagrams/inspect.svg", alt = "The finished back, looking down the half bore: the tapped ear holes either side, the bore's place from the N end." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-inspection = ["Bore Ø accepted in the pair (Setup 9). Before the bore's edges are broken (measure first): the bore's place, the calipers from N to the half bore's near edge on the mating face, plus half its recorded Ø, {{cad.bore_location_min_in:.3dot}}–{{cad.bore_location_max_in:.3dot}}. Each tap drill's station from the bore: that place less the hole's X recorded in Setup 7 (near hole), or the far hole's X less that place, {{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}}. Outside either: stop and tell the owner."]
+
+[[setups.operations]]
+instruction = "Inspect first, the bore's edges still sharp (the deburr below breaks them)."
+inspection = "Bore Ø accepted in the pair (Setup 9). The bore's place, the calipers from N to the half bore's near edge on the mating face, plus half its recorded Ø, {{cad.bore_location_min_in:.3dot}}–{{cad.bore_location_max_in:.3dot}}. Each tap drill's station from the bore: that place less the hole's X recorded in Setup 7 (near hole), or the far hole's X less that place, {{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}}. Outside either: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.bore_location_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.ear_station_band_mm}}" },
@@ -722,18 +725,8 @@ instruction = "Deburr the half bore's edges at the top and bottom faces and alon
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Tag the back AWAITING BLACK ENAMEL with its pair number unless Setup 12 follows now."
+instruction = "Tag the back AWAITING BLACK ENAMEL with its pair number unless the enamel ops below follow now."
 feed = "hand"
-
-[[setups]]
-machine_kind = "other"
-title = "Black enamel"
-machine = "Bench, ventilated"
-indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished back: every face enamelled black but the half bore and both tapped holes, which stay bare and oiled." }
-envelope = "other"
-vise_hold = "other"
-beam = "other"
 
 [[setups.operations]]
 instruction = "Finish ({{cad.finish}}): any black enamel for steel, with the primer its directions call for, applied by its directions. If the owner names a product, use it."
