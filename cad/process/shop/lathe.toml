@@ -15,9 +15,6 @@
 #   drilling 60-100 ft/min.
 # - Brass (C36000): turning HSS 300-350, carbide 1170 ft/min; drilling
 #   160-175 ft/min.
-# - Aluminium (6061-T6): turning carbide 2820 ft/min; drilling 350-400 ft/min.
-# - 1018 reaming 40-65 ft/min; 1018 milling 65-110 ft/min (an end mill or
-#   chamfer mill plunged from the tailstock takes the milling row).
 # On these small diameters most speeds exceed the lathe's 2000 rpm top speed
 # and clamp to it (prechips fits every calculated rpm to the machine's
 # ranges).
@@ -28,20 +25,20 @@
 # settings take the 300 rpm start for every material; brass is parted dry,
 # as it is drilled.
 
-# Moved from ch.toml: the rocker hub (ch), washer (ch), collar (dt) and
-# ferrule (dt) plans read it too.
-# The AR holder is the A R Warner LMS 4132 set's (TCMT insert, R0.4 nose;
-# owned, by photo in the 45952b66bc inventory); it faces the kit nut.
+# Moved from ch.toml: the rocker hub (ch), washer (ch), collar (dt), ferrule
+# (dt) and spacer (mg) plans read it. The AR holder is the A R Warner LMS
+# 4132 set's (TCMT insert, R0.4 nose); ownership: cad/config/shop-equipment/
+# tools-cutting.toml tools.lathe-ar, same key.
 [tools.lathe-ar]
 description = "A R Warner AR carbide turning holder, TCMT insert, R0.4 nose (LMS 4132)"
 
-# Ownership: cad/config/shop-equipment/tools-cutting.toml
-# tools.cutoff-blade-holder (McMaster 3212A119, 1/8 in wide) and
-# tools.cutoff-inserts (C2 3212A75, C5 3212A76), both on hand. The packing
-# list gives the inserts' .252 in thickness, not their cutting width, so the
-# plans' parting kerf is an authored allowance over the 1/8 in blade, set by
-# caliper on the insert before the first part.
-[tools.lathe-cutoff]
+# Ownership: cad/config/shop-equipment/tools-cutting.toml, same key
+# (McMaster 3212A119, 1/8 in wide), and tools.cutoff-inserts (C2 3212A75, C5
+# 3212A76), both on hand. The packing list gives the inserts' .252 in
+# thickness, not their cutting width, so the plans' parting kerf is an
+# authored allowance over the 1/8 in blade, set by caliper on the insert
+# before the first part.
+[tools.cutoff-blade-holder]
 description = "1/8 in blade-style cutoff holder (McMaster 3212A119), neutral uncoated carbide insert: C5 (3212A76) for steel, C2 (3212A75) for brass"
 
 [settings.lathe-ar-1018]
@@ -57,13 +54,13 @@ sfm = 1170
 feed_mm_rev = 0.1016
 
 [settings.lathe-part-1018]
-tool = "lathe-cutoff"
+tool = "cutoff-blade-holder"
 material = "lathe-1018-cold-finished"
 rpm = 300
 feed = "by hand, steady, cutting oil; back out to clear chips"
 
 [settings.lathe-part-c360]
-tool = "lathe-cutoff"
+tool = "cutoff-blade-holder"
 material = "lathe-c360"
 rpm = 300
 feed = "by hand, steady, dry; back out to clear chips"
@@ -91,94 +88,22 @@ feed = "tailstock quill by hand, pecking, cutting oil"
 tool = "drill-h"
 material = "lathe-1018-cold-finished"
 sfm = 60
-feed = "tailstock quill by hand, pecking, cutting oil"
+feed = "tailstock quill by hand, steady, cutting oil"
 
 [settings.lathe-drill-l-1018]
 tool = "drill-l"
 material = "lathe-1018-cold-finished"
 sfm = 60
-feed = "tailstock quill by hand, pecking, cutting oil"
+feed = "tailstock quill by hand, steady, cutting oil"
 
 [settings.lathe-drill-n-c360]
 tool = "drill-n"
 material = "lathe-c360"
 sfm = 160
-feed = "tailstock quill by hand, pecking, dry"
+feed = "tailstock quill by hand, steady, dry"
 
 [settings.lathe-drill-10-c360]
 tool = "drill-10"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, pecking, dry"
-
-# MHA-SM-05 end plug: #10-24 tap drill in 1018.
-[settings.lathe-drill-25-1018]
-tool = "drill-25"
-material = "lathe-1018-cold-finished"
-sfm = 60
-feed = "tailstock quill by hand, pecking, cutting oil"
-
-# MHA-DT-35 butt cup (1018): #20 through, the pocket reamed and its floor
-# flattened with an end mill from the tailstock.
-[settings.lathe-drill-20-1018]
-tool = "drill-20"
-material = "lathe-1018-cold-finished"
-sfm = 60
-feed = "tailstock quill by hand, pecking, cutting oil"
-
-[settings.lathe-ream-2560-1018]
-tool = "reamer-2560"
-material = "lathe-1018-cold-finished"
-sfm = 40
-feed = "tailstock quill by hand, steady, cutting oil; never stop or back out with the spindle reversed"
-
-[settings.lathe-endmill-1-4-1018]
-tool = "endmill-carbide-3fl-1-4"
-material = "lathe-1018-cold-finished"
-sfm = 65
-feed = "tailstock quill by hand, a light plunge, cutting oil"
-
-[settings.lathe-chamfer-1-4-1018]
-tool = "chamfer-mill-carbide-1-4-90"
-material = "lathe-1018-cold-finished"
-sfm = 65
-feed = "tailstock quill by hand, a light plunge, cutting oil"
-
-# MHA-CH-13-TL-02 hub plug (6061-T6511 round, to order).
-[settings.lathe-ar-6061]
-tool = "lathe-ar"
-material = "lathe-6061"
-sfm = 2820
-feed_mm_rev = 0.1016
-
-[settings.lathe-centre-6061]
-tool = "centre-drills-carbide-60"
-material = "lathe-6061"
-sfm = 350
-feed = "tailstock quill by hand"
-
-[settings.lathe-drill-h-6061]
-tool = "drill-h"
-material = "lathe-6061"
-sfm = 350
-feed = "tailstock quill by hand, pecking, cutting oil"
-
-[settings.lathe-part-6061]
-tool = "lathe-cutoff"
-material = "lathe-6061"
-rpm = 300
-feed = "by hand, steady, cutting oil; back out to clear chips"
-
-# MHA-DT-26 end disc (C360 flat): letter V drill.
-[settings.lathe-drill-v-c360]
-tool = "drill-v"
-material = "lathe-c360"
-sfm = 160
-feed = "tailstock quill by hand, pecking, dry"
-
-# The PM-1127's 6 in 4-jaw independent chuck, for a squared blank or flat
-# turned on centre. NOT recorded as owned: no inventory or packing list names
-# it, so it carries no ownership status; the owner was asked 2026-11-21
-# (open). Grip range and body size unknown, so none is declared.
-[workholding.chuck-4jaw-6]
-kind = "chuck"

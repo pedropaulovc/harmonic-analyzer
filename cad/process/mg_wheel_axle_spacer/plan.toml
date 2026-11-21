@@ -15,7 +15,7 @@ title = "Wheel Axle Spacer"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 7/16 in"
-stock = "Ø{{process.stock_dia_in:.4dot}} bar, a {{process.bar_length_in:g}} in piece (to order, not on hand); the spacer takes {{cad.pitch_in:.2dot}} in of it."
+stock = "Lot: {{process.quantity:d}} spacer. Ø{{process.stock_dia_in:.4dot}} bar, a {{process.bar_length_in:g}} in piece (to order, not on hand); the spacer takes {{cad.pitch_in:.2dot}} in of it."
 note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry."
 shop = "../shop"
 stock_refs = ["c360-round-7-16"]
@@ -64,7 +64,7 @@ ref = "drill-10"
 [[tools]]
 id = "cutoff"
 name = "Cutoff blade"
-ref = "lathe-cutoff"
+ref = "cutoff-blade-holder"
 
 [[tools]]
 id = "file"
@@ -79,7 +79,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.4dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
 datum = "Z0 (carriage DRO) the bar end faced in Op 20."
-diagram = { file = "diagrams/bar.svg", alt = "The 7/16 in bar in the 3-jaw: the end faced, centre-spotted and drilled #10 past the parting line; the spacer parted off .02 long." }
+diagram = { file = "diagrams/bar.svg", alt = "The 7/16 in bar in the 3-jaw: the end faced, centre-spotted and drilled #10 past the parting line; the spacer parted off {{process.regrip_allowance_in:.2dot}} long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -114,7 +114,7 @@ speed_kind = "spindle"
 tool = "drill-10"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Drill #10 {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale, backing out to clear chips every .2 in: through the spacer and past the parting line."
+instruction = "Drill #10 {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale, backing fully out to clear chips every {{cad.bore_dia_mm:in.2dot}} in: through the spacer and past the parting line."
 settings = "lathe-drill-10-c360"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 hole_depth_mm = "{{cad.run_mm}}"
@@ -126,7 +126,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off at Z-{{cad.part_off_in:.3dot}}: .02 over length, for Setup 2. Catch the spacer."
+instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Catch the spacer."
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -159,7 +159,7 @@ title = "Bench: deburr and check the hole"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished spacer: its .732 length, the outside as supplied and the #10 hole through." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished spacer: its {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} length, the outside as supplied and the #10 hole through." }
 vise_hold = "other"
 beam = "other"
 

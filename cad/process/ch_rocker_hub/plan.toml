@@ -1,8 +1,7 @@
 # Rocker hub MHA-CH-12, 20 off, turned on the manual PM-1127VF-LB (owner
 # ruling 2026-11-21: turned parts get lathe travelers, no NC). Route B, chosen
-# for speed and approved by Main 2026-11-21 (sketch
-# C:/farm-runs/triage-2026-11-19/sketches/bush-rocker-hub-bar-fed.png, brief
-# cnc/questions/bush-rocker-hub-route.json): bar-fed from the 24 in 1/2 in
+# for speed (owner ruling 2026-11-21: the agent chooses the route; comparison
+# sketch on PR #3262, branch evidence/cnc-bush-hub-sketch): bar-fed from the 24 in 1/2 in
 # 1018 bar, two hubs per pull, about 128 min for the lot against 191 min one
 # at a time from 20 sawn slugs. Each pull: face the bar end (Z0), rough and
 # finish the land over both hubs to its press band, spot, drill D through
@@ -73,7 +72,7 @@ ref = "drill-d"
 [[tools]]
 id = "cutoff"
 name = "Cutoff blade"
-ref = "lathe-cutoff"
+ref = "cutoff-blade-holder"
 
 [[tools]]
 id = "file"
@@ -88,7 +87,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.2dot}} bar through the spindle; pull {{cad.stickout_in:.2dot}} in out of the jaw fronts each time."
 datum = "Z0 (carriage DRO) the bar end faced in Op 20, set again on the parted end in Op 80."
-diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw with two hubs out: the end faced, the land turned over both, the D hole drilled through both past the second parting line, each hub parted off .34 from its faced end." }
+diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw with two hubs out: the end faced, the land turned over both, the D hole drilled through both past the second parting line, each hub parted off {{cad.part_off_in:.2dot}} from its faced end." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
 
@@ -152,7 +151,7 @@ speed_kind = "spindle"
 tool = "drill-d"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Drill D {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale, clearing chips at half depth: through both hubs and past the second parting line."
+instruction = "Drill D {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale, backing fully out to clear chips every {{cad.bore_dia_mm:in.2dot}} in: through both hubs and past the second parting line."
 settings = "lathe-drill-d-1018"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 hole_depth_mm = "{{cad.run_mm}}"
@@ -164,7 +163,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off the first hub at Z-{{cad.part_off_in:.2dot}}: .02 over the {{cad.length_min_in:.2dot}} MIN supply length, which the DRO station holds (not gauged). Catch it."
+instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off the first hub at Z-{{cad.part_off_in:.2dot}}: {{process.regrip_allowance_in:.2dot}} over the {{cad.length_min_in:.2dot}} MIN supply length. Catch it."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -190,7 +189,7 @@ cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups]]
 machine_kind = "other"
-title = "Bench: deburr the hubs"
+title = "Bench: deburr and check the hubs"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
@@ -204,4 +203,14 @@ tool = "file"
 drilling = "none"
 sizing = "other"
 instruction = "Deburr each hub: file the parting burr off the parted face, break both outside edges and both ends of the hole, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max; no burr may stand on the land."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Each hub: length across the faces at least {{cad.length_min_in:.2dot}}, calipers; land Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} again after deburring, micrometer."
+inspection = "Length {{cad.length_min_in:.2dot}} min; land Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = ["{{cad.length_min_mm}}", "{{cad.part_off_mm}}"] }, { gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A hub under the length or off the land band in Op 110 is scrapped, not reworked: the next pull makes another."
 feed = "hand"

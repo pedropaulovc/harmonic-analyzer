@@ -13,7 +13,7 @@
 # 1 in and 1/2 in bar are on hand (cad/config/shop-equipment/stock-bought.toml
 # 1018-round-1, 1018-round-1-2); 1-3/4 in is to order (stock-to-order.toml
 # 1018-round-1-3-4, a 1.5 in piece). Kerf: the 1/8 in cutoff blade's insert
-# plus an authored allowance (cad/process/shop/lathe.toml tools.lathe-cutoff).
+# plus an authored allowance (cad/process/shop/lathe.toml tools.cutoff-blade-holder).
 title = "Keyed Cutting Arbor Backing Collar"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -63,7 +63,7 @@ ref = "drill-l"
 [[tools]]
 id = "cutoff"
 name = "Cutoff blade"
-ref = "lathe-cutoff"
+ref = "cutoff-blade-holder"
 
 [[tools]]
 id = "file"
@@ -78,7 +78,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.2dot}} piece, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
 datum = "Z0 (carriage DRO) the end faced in Op 10."
-diagram = { file = "diagrams/bar.svg", alt = "The 1-3/4 in piece in the 3-jaw: the end faced, centre-spotted and drilled L past the parting line; the cutoff blade parts the collar .33 from the faced end." }
+diagram = { file = "diagrams/bar.svg", alt = "The 1-3/4 in piece in the 3-jaw: the end faced, centre-spotted and drilled L past the parting line; the cutoff blade parts the collar {{cad.part_off_in:.2dot}} from the faced end." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -119,7 +119,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off at Z-{{cad.part_off_in:.3dot}} (the collar's .33 length). Catch the collar; mark it C175."
+instruction = "Touch the blade's Z0-side face on the faced end and zero DRO Z for the blade there. Part off at Z-{{cad.part_off_in:.3dot}}. Catch the collar; mark it C175."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -131,7 +131,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_c100_in:.2dot}} bar; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
 datum = "Z0 (carriage DRO) the end faced in Op 50."
-diagram = { file = "diagrams/bar-c100.svg", alt = "The 1 in bar in the 3-jaw: the end faced, centre-spotted and drilled L past the parting line; the cutoff blade parts the collar .33 from the faced end." }
+diagram = { file = "diagrams/bar-c100.svg", alt = "The 1 in bar in the 3-jaw: the end faced, centre-spotted and drilled L past the parting line; the cutoff blade parts the collar {{cad.part_off_in:.2dot}} from the faced end." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_c100_dia_mm}}", stock_diameter_mm = "{{cad.outer_c100_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_c100_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -184,7 +184,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_c050_in:.2dot}} bar; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
 datum = "Z0 (carriage DRO) the end faced in Op 90."
-diagram = { file = "diagrams/bar-c050.svg", alt = "The 1/2 in bar in the 3-jaw: the end faced, centre-spotted and drilled L past the parting line; the cutoff blade parts the collar .33 from the faced end." }
+diagram = { file = "diagrams/bar-c050.svg", alt = "The 1/2 in bar in the 3-jaw: the end faced, centre-spotted and drilled L past the parting line; the cutoff blade parts the collar {{cad.part_off_in:.2dot}} from the faced end." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_c050_dia_mm}}", stock_diameter_mm = "{{cad.outer_c050_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_c050_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -235,7 +235,7 @@ title = "Bench: deburr and inspect the three collars"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished collar, C175 drawn: its .33 length between the faced and the parted face, and the L hole through." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished collar, C175 drawn: its {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} length between the faced and the parted face, and the L hole through." }
 vise_hold = "other"
 beam = "other"
 

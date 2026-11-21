@@ -11,7 +11,7 @@ title = "Rocker Strap Hub Washer"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel round, 5/8 in (drawing: low-carbon steel round, 9/16 in or over)"
-stock = "Ø{{process.stock_dia_in:.3dot}} bar, on hand; the washer takes {{cad.pitch_in:.2dot}} in of it."
+stock = "Lot: {{process.quantity:d}} washer. Ø{{process.stock_dia_in:.3dot}} bar, on hand; the washer takes {{cad.pitch_in:.2dot}} in of it."
 note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
@@ -58,7 +58,7 @@ ref = "drill-h"
 [[tools]]
 id = "cutoff"
 name = "Cutoff blade"
-ref = "lathe-cutoff"
+ref = "cutoff-blade-holder"
 
 [[tools]]
 id = "file"
@@ -73,7 +73,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
 datum = "Z0 (carriage DRO) the bar end faced in Op 10."
-diagram = { file = "diagrams/bar.svg", alt = "The 5/8 in bar in the 3-jaw: the end faced, the outside turned back past the parting line, the H hole drilled, the washer parted off .06 from the faced end." }
+diagram = { file = "diagrams/bar.svg", alt = "The 5/8 in bar in the 3-jaw: the end faced, the outside turned back past the parting line, the H hole drilled, the washer parted off {{cad.part_off_in:.2dot}} from the faced end." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
 
@@ -140,7 +140,7 @@ title = "Bench: deburr and inspect"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished washer: its .06 thickness, the outside and the H hole." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished washer: its {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} thickness, the outside and the H hole." }
 vise_hold = "other"
 beam = "other"
 

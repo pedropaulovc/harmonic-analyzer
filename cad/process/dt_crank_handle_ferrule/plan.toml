@@ -16,7 +16,7 @@ title = "Crank Handle Ferrule"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass rod, 9/16 in"
-stock = "Ø{{process.stock_dia_in:.4dot}} rod, at least {{process.bar_length_in:g}} in (to order, not on hand); the ferrule takes {{cad.pitch_in:.2dot}} in of it."
+stock = "Lot: {{process.quantity:d}} ferrule. Ø{{process.stock_dia_in:.4dot}} rod, at least {{process.bar_length_in:g}} in (to order, not on hand); the ferrule takes {{cad.pitch_in:.2dot}} in of it."
 note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry."
 shop = "../shop"
 stock_refs = ["c360-round-9-16"]
@@ -59,7 +59,7 @@ ref = "drill-n"
 [[tools]]
 id = "cutoff"
 name = "Cutoff blade"
-ref = "lathe-cutoff"
+ref = "cutoff-blade-holder"
 
 [[tools]]
 id = "file"
@@ -74,7 +74,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.4dot}} rod, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
 datum = "Z0 (carriage DRO) the rod end faced in Op 20."
-diagram = { file = "diagrams/bar.svg", alt = "The 9/16 in rod in the 3-jaw: the end faced, centre-spotted and drilled N past the parting line; the ferrule parted off .28 from the faced end." }
+diagram = { file = "diagrams/bar.svg", alt = "The 9/16 in rod in the 3-jaw: the end faced, centre-spotted and drilled N past the parting line; the ferrule parted off {{cad.part_off_in:.2dot}} from the faced end." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -109,7 +109,7 @@ speed_kind = "spindle"
 tool = "drill-n"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Drill N {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale: through the ferrule and past the parting line."
+instruction = "Drill N (.302) {{cad.run_in:.2dot}} deep from Z0 by the tailstock quill scale, through the ferrule and past the parting line (a BORE callout: the .XXX ±.005 row, Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}})."
 settings = "lathe-drill-n-c360"
 cut_diameter_mm = 7.6708
 hole_depth_mm = "{{cad.run_mm}}"
@@ -131,7 +131,7 @@ title = "Bench: deburr, inspect and tag the bore"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished ferrule: its .28 length, the rod outside as supplied and the N hole through." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished ferrule: its {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} length, the rod outside as supplied and the N hole through." }
 vise_hold = "other"
 beam = "other"
 
@@ -158,5 +158,5 @@ instruction = "Tag the ferrule with the largest pin that enters its hole: {{cad.
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The ferrule leaves this traveler bare. Its outside skim to Ø.49 with {{cad.bore_mate}} after the bond cures (drawing note 1) and the drawing's clear-lacquer finish are both done there, after bonding, not here."
+instruction = "The ferrule leaves this traveler bare. Its outside skim to the installed diameter with {{cad.bore_mate}} after the bond cures (drawing note 1) and the drawing's clear-lacquer finish are both done there, after bonding, not here."
 feed = "hand"
