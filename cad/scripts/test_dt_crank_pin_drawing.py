@@ -65,6 +65,21 @@ def test_cross_hole_station_text_clears_its_extension_lines() -> None:
     assert text_y > pin_top + clearance
 
 
+def test_ring_hole_callout_stands_right_of_the_hole() -> None:
+    """Rule 14: the Ø callout's leader leaves its shoulder's left end and
+    climbs to the hole, so the widest row must start right of the hole or the
+    leader strikes its first letter (machinist review of b8fab08f4e)."""
+    text_x, _ = drawing.FRONT_KEEP["RingHoleDia"]
+    # r5's sheet measured 64.3 mm across the 25-character keeper-ring row.
+    advance = 0.0643 / 25
+    widest = max(len(row) for row in notes.RING_HOLE_CALLOUT.splitlines())
+    hole_right = (
+        drawing.RING_HOLE_CENTER[0]
+        + dt_crank_pin_spec.RING_HOLE_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    )
+    assert text_x - advance * widest / 2.0 >= hole_right + 0.004
+
+
 def test_pin_is_the_bought_no_3_taper_pin_cross_drilled_only() -> None:
     """Owner ruling 2026-11-20 (#2368, "B"): a stock ASME B18.8.2 No. 3 x
     1-3/4 pin; the sheet names it once and dimensions only the cross-hole."""

@@ -102,14 +102,18 @@ AXIS_FACE_PICK = (FRONT_CENTER[0] + 0.020, FRONT_CENTER[1] + 0.002)
 # apart at 2:1 (its test still budgets the 9.05 mm the template's "3.70"
 # measured). Put the text outboard right, clear of the outside arrow's
 # 6.35-mm tail and left of the taper-note leader.
-# Below the hole: its Ø callout.  The bought pin's length and ends are
-# reference (note 1), so nothing else is dimensioned.
+# Below the hole: its Ø callout, its widest row (the keeper-ring row) wholly
+# right of the hole so the leader leaves the shoulder's left end and climbs to
+# the hole without striking a letter, and its top row clear of the pin's
+# lower outline (machinist review of b8fab08f4e: the leader crossed the
+# row's F).  The bought pin's length and ends are reference (note 1), so
+# nothing else is dimensioned.
 FRONT_KEEP = {
     "RingHoleX": (
         RING_HOLE_CENTER[0] + 0.014,
         FRONT_CENTER[1] + 0.016,
     ),
-    "RingHoleDia": (RING_HOLE_CENTER[0] + 0.020, FRONT_CENTER[1] - 0.016),
+    "RingHoleDia": (RING_HOLE_CENTER[0] + 0.039, FRONT_CENTER[1] - 0.019),
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
