@@ -198,11 +198,20 @@ vise_centre_fraction_max = 0.3333
 # 19). No entry states the blade (HA #2084).
 [tools.saw-evolution-14]
 description = "14 in Evolution metal-cutting miter saw"
-# Owner's MT3 dead centre with a straight end, gripped in the 3/4 in R8
-# collet and used as a tap guide on the PM-30MV; ownership and setting are
-# cad/config/shop-equipment/, same key.
-[tools.mill-dead-centre-mt3]
-description = "MT3 dead centre, straight end held in the 3/4 in R8 collet, used as a spindle tap guide"
+# Owner's MT3 dead centre, in the PM-1127VF-LB tailstock (MT3); ownership is
+# cad/config/shop-equipment/, same key. No longer the mill's tap guide (owner
+# ruling 2026-11-21: tools.tap-guide-fisher).
+[tools.dead-centre-mt3]
+description = "MT3 dead centre in the lathe tailstock"
+# The mill's tap guide (owner, Pedro, answered in person 2026-11-21: "remove
+# mention of dead centre ; use
+# https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
+# on r8 0.5 collet"): 1/2 in shank in the 1/2 in R8 collet, 3/16 in
+# spring-loaded point that retracts 1/2 in, 3 1/8 in overall (the sellers'
+# sizes); ownership (to confirm) and sources are cad/config/shop-equipment/,
+# same key.
+[tools.tap-guide-fisher]
+description = "Fisher spring tap guide (LittleMachineShop 1963), 1/2 in shank in the 1/2 in R8 collet; its point seats in the tap wrench's centre hole"
 
 # Source: end-bracket.toml and feed-lever.toml; the 2026-11-02 interim
 # routes (MHA-CH-06-TL-28/TL-26 v47), the v48 manifest notes (#29 tap
@@ -229,8 +238,8 @@ description = "10 in mill second-cut and 8 in smooth files; bench vise with soft
 [tools.jig-drill-43]
 description = "#43 (.089 in) drill, 115-piece index"
 diameter_mm = 2.2606
-# Turned by hand on the dead centre in the spindle (MHA-MG-02): the wrench
-# needs a centre hole in its top for the centre's point.
+# Turned by hand under the spring tap guide in the spindle (MHA-MG-02): the
+# wrench needs a centre hole in its top for the guide's point.
 [tools.jig-tap-4-40-plug]
 description = "4-40 UNC plug tap; T-handle tap wrench with a centre hole in its top"
 tap_drill_mm = 2.2606

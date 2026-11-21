@@ -24,8 +24,8 @@ one vise clamping: fence and stop tops faced, the plate top (Z0) milled round
 them, the stop and fence walls finished, the hub counterbore plunged (1/2 in
 end mill); the fence notches, clamp pockets and the hub tap's spot (1/8 in
 end mill); spot, #43 and #7 drills. Then one short file per hole to tap,
-SP03_tap_*: the dead centre loaded (M6), Z to the machine's top, over the
-hole, M30; the operator taps by hand with the wrench on the dead centre.
+SP03_tap_*: the tap guide loaded (M6), Z to the machine's top, over the
+hole, M30; the operator taps by hand with the wrench under the tap guide.
 
 The programs work in the plate's model frame, the strap programs' G54: X0
 the stop face, Y0 the fence face (plate at -Y), Z0 the plate top.
@@ -49,10 +49,12 @@ COMMENT = "MHA-CH-13-TL-01 rocker-strap sub-plate"
 # grouped in tuples is one section per group (a FreeCAD Job, or a manual
 # section), joined at M6 tool changes and M0 stops.
 #
-# The holes are tapped by hand (FluidNC cannot rigid-tap), the T-handle
-# wrench's centre hole on a dead centre in the spindle, spindle off, the
-# operator jogging Z down to keep the point seated as the tap turns (owner,
-# Pedro, 2026-11-17). FluidNC, like Grbl, refuses jog commands while an M0
+# The holes are tapped by hand (FluidNC cannot rigid-tap; owner, Pedro,
+# 2026-11-17), the T-handle wrench's centre hole on the spring point of the
+# Fisher tap guide in the 1/2 in R8 collet (owner, Pedro, 2026-11-21: "use
+# https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
+# on r8 0.5 collet"), spindle off, the operator jogging Z down to push the
+# point home. FluidNC, like Grbl, refuses jog commands while an M0
 # holds the program (FluidNC wiki, "Single Block Mode": a pause "is a
 # standard feed hold ... jogging disabled during pause";
 # http://wiki.fluidnc.com/en/features/single_block_mode), so each tap stop
@@ -86,7 +88,7 @@ if tuple(name for name, _ops in PROGRAMS[2:]) != tuple(
     raise ValueError("PROGRAMS must list one SP03_tap_* file per TAP_HOLES entry")
 # Every program loads its own first tool (M6, the tool setter): SP01 runs
 # once per plate on whatever the mill last held, SP02 after a vise setup,
-# each tap file before its retract (the dead centre).
+# each tap file before its retract (the tap guide).
 LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these (tools off the mill, the saw, the taps and the files, are
@@ -97,7 +99,7 @@ CAM_TOOLS = (
     "spot",
     "drill-43",
     "drill-7",
-    "dead-centre",
+    "tap-guide",
 )
 IN = 25.4
 # ANSI #2 combined drill and countersink, 60° included: the shop record names
@@ -113,8 +115,9 @@ DRILL_POINT_DEG = 118.0
 # A tap file's first motion: G53 G0 to machine Z0, the homed top. FluidNC
 # sets an axis's machine position to its homing mpos_mm (default 0) after
 # homing, and Z homes up (cad/config/shop-equipment/
-# cnc.pm-30mv-controller: switches on all three axes) [INFERENCE: the
-# owner's config's Z mpos_mm is not on record].
+# cnc.pm-30mv-controller: switches on all three axes); the owner (Pedro)
+# confirmed it, answered in person 2026-11-21 (cnc rulings record): machine
+# Z = 0 is the top of travel after homing.
 MACHINE_Z_TOP_MM = 0.0
 # Side and face passes start and finish with the cutter this far clear of
 # the stock's ends, so every plunge and stepover link there is in the air.
@@ -866,11 +869,11 @@ def context(
         f"G0 Z{clear_h:.3f}",
     ]
 
-    # One file per hole to tap (TAP_HOLES): the dead centre loaded by the
+    # One file per hole to tap (TAP_HOLES): the tap guide loaded by the
     # file's own M6 (its %msg names the hole and tap), Z to the machine's top
     # in machine coordinates before any XY (the operator left Z jogged down
     # on the last hole), over the hole, M30: the controller ends Idle, so the
-    # operator can jog the dead centre down onto the wrench.
+    # operator can jog the guide's point down into the wrench.
     tap_holes = {
         **{
             f"clamp_{k}": ("4-40", f"CLAMP HOLE {k}", xy)
@@ -883,14 +886,14 @@ def context(
     tap_files = {}
     for key, (thread, what, (x, y)) in tap_holes.items():
         tap_files[f"tap_{key}"] = {
-            "tool": numbers["dead-centre"],
-            "label": names["dead-centre"],
+            "tool": numbers["tap-guide"],
+            "label": names["tap-guide"],
             "setting": f"SPINDLE STAYS OFF. NEXT: {thread} TAP IN {what}",
             "gcode": [
                 f"G53 G0 Z{MACHINE_Z_TOP_MM:.3f}",
                 f"G0 X{x:.3f} Y{y:.3f}",
-                f"({thread} TAP IN {what}: JOG Z DOWN ONTO THE WRENCH, LIGHT PRESSURE;"
-                " TAP BY HAND, JOGGING Z TO KEEP THE POINT SEATED; JOG Z UP CLEAR)",
+                f"({thread} TAP IN {what}. JOG Z DOWN TO PUSH THE GUIDE POINT HOME IN THE WRENCH."
+                " TAP BY HAND THROUGH, THE POINT FOLLOWING THE TAP. JOG Z UP CLEAR)",
                 "M30",
             ],
             "at": [x, y],
@@ -1037,7 +1040,7 @@ def context(
         ((nr_start, x_right), (y0, notch_back)), ((xs, x_hi8), (yi, yb)), d8 / 2
     )
     sp2 = PROGRAMS[1][0]
-    tools2 = [numbers[t] for t in CAM_TOOLS if t != "dead-centre"]
+    tools2 = [numbers[t] for t in CAM_TOOLS if t != "tap-guide"]
 
     def hole_checks(centres, bottom, radius):
         return [
@@ -1120,7 +1123,7 @@ def context(
                 name,
                 "tap_stop",
                 {
-                    "tool": numbers["dead-centre"],
+                    "tool": numbers["tap-guide"],
                     "at": section["at"],
                     "machine_top": MACHINE_Z_TOP_MM,
                 },

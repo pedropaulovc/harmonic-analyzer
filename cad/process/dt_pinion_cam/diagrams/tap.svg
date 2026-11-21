@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 3: CM03 brings the dead centre over the hole; tap #2-56 by hand</text>
+  <text class="title" x="20" y="20">Setup 3: CM03 brings the tap guide over the hole; tap #2-56 by hand</text>
   <rect class="part-kept" x="240" y="200" width="160" height="160"/>
   <rect class="hidden" x="240" y="300" width="160" height="40"/>
   <rect class="part-threads" x="300" y="200" width="14" height="110"/>
@@ -8,6 +8,6 @@
   <rect class="cutter" x="220" y="108" width="174" height="14"/>
   <polygon class="cutter" points="300,70 314,70 307,100"/>
   <line class="arrow" x1="420" y1="60" x2="320" y2="90"/>
-  <text class="label" x="425" y="60">dead centre in the wrench's centre hole</text>
-  <text class="label" x="20" y="385">Spindle off; jog Z down to keep it seated. Point to the bore's axis (.366 below the top line).</text>
+  <text class="label" x="425" y="60">tap guide's point in the wrench</text>
+  <text class="label" x="20" y="385">Spindle off; the guide's spring follows the tap. Point to the bore's axis (.366 below the top line).</text>
 </svg>

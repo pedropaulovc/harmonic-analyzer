@@ -16,11 +16,22 @@
 # clamping: the fence and stop tops faced, the plate top (Z0) milled down
 # round them, its walls (the fence face Y0, the stop face X0), the hub
 # counterbore, the fence notches and clamp pockets (1/8 in end mill), and
-# the holes, then taps them by hand in the same clamping, the T-handle
-# wrench's centre hole on a dead centre in the spindle (owner, Pedro,
-# 2026-11-17): one short file per hole that ends Idle (M30) over it, because
-# FluidNC refuses jogs while an M0 holds the program
-# (wiki.fluidnc.com/en/features/single_block_mode).
+# the holes, then taps them by hand in the same clamping under the spring
+# tap guide in the spindle: one short file per hole that ends Idle (M30)
+# over it.
+#
+# Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
+# guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner, Pedro,
+# answered in person 2026-11-21, cnc rulings record: "use
+# https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
+# on r8 0.5 collet"; cad/config/shop-equipment/ tools.tap-guide-fisher, its
+# ownership to confirm): its spring-loaded point seats in the T-handle
+# wrench's centre hole and follows the tap down 1/2 in, spindle off; the
+# operator jogs Z only to push the point home again. Each hole's tap travel
+# (the hole through plus the plug tap's chamfer) is under 1/2 in, so the
+# point follows the whole thread. FluidNC refuses jogs in the Hold an M0
+# leaves (wiki.fluidnc.com/en/features/single_block_mode), so each tap stop
+# is its own file ending M30 over its hole (SP03_tap_*).
 #
 # Adapter plan: prechips' fence_plate adapter binds every printed size, band,
 # station, the drawing number and the revision from the plate's feature
@@ -34,7 +45,7 @@
 # underside. Program names, the [parameters] and the milling_cuts names are a
 # contract with that recipe. Tool numbers are the places in the tools list
 # among the mill's tools: T1 1/2 in end mill, T2 1/8 in end mill, T3 centre
-# drill, T4 #43, T5 #7, T6 the MT3 dead centre (the taps are turned by hand).
+# drill, T4 #43, T5 #7, T6 the tap guide (the taps are turned by hand).
 title = "Rocker-strap sub-plate"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -77,17 +88,21 @@ sp02_y_set_mm = 10.16
 sp02_z_set_mm = -10.5156
 # The fence top, faced, plus the .002 in leaf: SP02's Z check after a reset.
 sp02_z_check_mm = 1.9304
-# Tapping on the dead centre, on Setup 3's 1.5 in parallels: neither the
-# centre's reach out of its collet nor a tap's reach in its wrench is on
-# record (the owner's 7.5 in was a guess, 2026-11-17), so the traveler stops
-# at the first tap file unless the two together, dead-centre tip to collet
-# face plus tap point to the wrench's centre hole, are at most
-# tap_stack_max_mm: the spindle-to-table maximum (shop machines.pm-30mv,
-# 431.8) less 25.0 to bring the point down onto the wrench (the shop's
-# tool-change clearance), the vise bed, the parallels, the higher hole mouth
-# above the underside (the pocket floors, clamp_hole_depth_mm) and the
-# collet gauge: 282.085, rounded down to .01 in.
+# Tapping under the spring tap guide (tools.tap-guide-fisher), on Setup 3's
+# 1.5 in parallels: the guide and the tap in its wrench together reach at
+# most tap_stack_max_mm below the collet face, the spindle-to-table maximum
+# (shop machines.pm-30mv, 431.8) less 25.0 to bring the point down onto the
+# wrench (the shop's tool-change clearance), the vise bed, the parallels,
+# the higher hole mouth above the underside (the pocket floors,
+# clamp_hole_depth_mm) and the collet gauge: 282.085, rounded down to .01
+# in. The guide is 3 1/8 in (79.375) overall, its sellers' size and the
+# most it can stand below the collet face; a tap's reach in its wrench is
+# not on record, so the traveler stops before the first tap file unless
+# each tap, point to the wrench's centre hole, is at most
+# tap_wrench_reach_max_mm: 281.94 less 79.375, 202.565, rounded down to .01
+# in.
 tap_stack_max_mm = 281.94
+tap_wrench_reach_max_mm = 202.43
 # SP01, on the table. The front edge loses edge_stock_mm off the as-received
 # bar edge (an extruded edge; .040 in cleans its corner radius and width
 # spread, the author's allowance): a rough pass edge_rough_woc_mm and a
@@ -191,9 +206,9 @@ id = "drill-7"
 name = "#7 drill"
 ref = "jig-drill-7"
 [[tools]]
-id = "dead-centre"
-name = "MT3 dead centre"
-ref = "mill-dead-centre-mt3"
+id = "tap-guide"
+name = "Fisher spring tap guide"
+ref = "tap-guide-fisher"
 [[tools]]
 id = "tap-4-40"
 name = "4-40 tap"
@@ -311,7 +326,7 @@ diagram = { file = "diagrams/top.svg", alt = "Plan of the plate in the vise: fen
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.width_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.bar_top_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_tip_below_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.width_mm}}", along_jaws_mm = "{{cad.length_mm}}", part_height_mm = "{{process.bar_top_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{process.plate_overhang_mm}}", "{{process.jaw_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.plate_top_height_mm}}" }, vise_left = "start" }
-inspection = ["After the file, before unclamping (ops 230–250), DRO in inches (G20), X0 and Y0 picked up again on the cut stop and fence faces (op 230): the pockets' far walls at Y −{{cad.pocket_back_wall_min_in:.4dot}} to −{{cad.pocket_back_wall_max_in:.4dot}} in, the wall's position (the edge finder's DRO reading less its .100 radius); the counterbore's centre at X {{cad.hub_x_min_in:.4dot}}–{{cad.hub_x_max_in:.4dot}}, Y −{{cad.hub_y_min_in:.4dot}} to −{{cad.hub_y_max_in:.4dot}} in (DTI, DRO). Out of band: stop, the plate is scrap. Not gauged, the program's path: the pockets' length and depth, the notches, the fence's width."]
+inspection = ["After the file, before unclamping (ops 240–260), DRO in inches (G20), X0 and Y0 picked up again on the cut stop and fence faces (op 240): the pockets' far walls at Y −{{cad.pocket_back_wall_min_in:.4dot}} to −{{cad.pocket_back_wall_max_in:.4dot}} in, the wall's position (the edge finder's DRO reading less its .100 radius); the counterbore's centre at X {{cad.hub_x_min_in:.4dot}}–{{cad.hub_x_max_in:.4dot}}, Y −{{cad.hub_y_min_in:.4dot}} to −{{cad.hub_y_max_in:.4dot}} in (DTI, DRO). Out of band: stop, the plate is scrap. Not gauged, the program's path: the pockets' length and depth, the notches, the fence's width."]
 gauge_checks = [
   { gauge = "mill-y-dro", band_mm = "{{cad.pocket_back_wall_band_mm}}" },
   { gauge = "mill-x-dro", band_mm = "{{cad.hub_x_band_mm}}" },
@@ -461,15 +476,27 @@ milling_cuts = [
 ]
 
 # The holes are tapped in this clamping (their XY are the drills'), one file
-# per hole; the tool setter measures the dead centre at each file's M6, so no
+# per hole; the tool setter measures the tap guide at each file's M6, so no
 # program assumes its length.
 [[setups.operations]]
 speed_kind = "other"
-tool = "dead-centre"
+tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Stop check before SP03_tap_clamp_1: the dead centre's reach (tip to collet face) plus each tap's (point to the T-handle wrench's centre hole), calipers or rule, at most {{process.tap_stack_max_mm:in.2f}} in. Over: stop; do not tap on this setup."
-instruction_detailed = "Stop check before SP03_tap_clamp_1: the dead centre's reach (tip to collet face) plus each tap's (point to the T-handle wrench's centre hole), calipers or rule, at most {{process.tap_stack_max_mm:in.2f}} in: the mill's 17 in opening less the vise, the parallels, the plate up to the pocket floors, the collet, and 1 in to bring the point down onto the wrench. Over: stop; do not tap on this setup."
+instruction = "Stop check before SP03_tap_clamp_1: measure each tap in the T-handle wrench from its point to the wrench's centre hole (calipers or rule). Each must be at most {{process.tap_wrench_reach_max_mm:in.2f}} in. Over: stop; do not tap on this setup."
+instruction_detailed = "Stop check before SP03_tap_clamp_1: measure the 4-40 and the 1/4-20 tap, each in the T-handle wrench, from its point to the wrench's centre hole (calipers or rule). Each must be at most {{process.tap_wrench_reach_max_mm:in.2f}} in: the mill's 17 in opening less the vise, the parallels, the plate up to the pocket floors, the collet, the tap guide's 3 1/8 in, and 1 in to bring the point down onto the wrench. Over: stop; do not tap on this setup."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-guide"
+drilling = "none"
+sizing = "other"
+instruction = "Load and run SP03_tap_clamp_1, then _2, _3, _4, one file per hole, the steps below on each: each file loads T6 (M6; the tap guide in the 1/2 in collet, pointed end out, spindle stays off; the tool setter measures it), goes to Z top over its hole and ends Idle."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "4-40 tap in the T-handle wrench in the hole, tap fluid; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home."
 feed = "hand"
 
 [[setups.operations]]
@@ -477,15 +504,7 @@ speed_kind = "other"
 tool = "tap-4-40"
 drilling = "none"
 sizing = "other"
-instruction = "Load and run SP03_tap_clamp_1, then _2, _3, _4, one file per hole: each loads T6 (M6; the dead centre in its collet, spindle stays off), goes to Z top over its hole and ends. 4-40 tap in the T-handle wrench in the hole, tap fluid; jog Z down until the dead centre's point sits in the wrench's centre hole, light pressure only: the point guides, it does not push."
-feed = "hand"
-
-[[setups.operations]]
-speed_kind = "other"
-tool = "tap-4-40"
-drilling = "none"
-sizing = "other"
-instruction = "Turn the wrench, backing off to clear chips, jogging Z down to keep the point seated, until the tap is through. Back the tap out; jog Z up clear of the wrench before loading the next file."
+instruction = "Tap by hand under the tap guide, spindle off, backing off to clear chips, until the tap is through: the spring keeps the point in the wrench and the tap square as it feeds, up to 1/2 in; should the point run out, jog Z down to push it home again. Back the tap out; jog Z up clear of the wrench before loading the next file."
 feed = "hand"
 
 [[setups.operations]]
@@ -493,12 +512,12 @@ speed_kind = "other"
 tool = "tap-1-4-20"
 drilling = "none"
 sizing = "other"
-instruction = "Load and run SP03_tap_hub: the same, the 1/4-20 tap in the hub hole from the counterbore floor. Jog Z up clear of the wrench at the end."
+instruction = "Load and run SP03_tap_hub: the same, the 1/4-20 tap in the hub hole from the counterbore floor, under the tap guide, its point pushed fully home in the wrench. Jog Z up clear of the wrench at the end."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "Before unclamping: pick up X0 and Y0 again on the cut stop and fence faces (edge finder): the drawing dimensions the walls and hub from them."
-instruction_detailed = "Before unclamping. Spindle off: dead centre out, the edge finder in the collet; MDI M3, set 900 rpm by hand. Finder on the cut fence face from the front: G10 L20 P1 Y-2.540; on the cut stop face from the right: G10 L20 P1 X2.540 (its .100 radius). The drawing dimensions the walls and hub from these faces."
+instruction_detailed = "Before unclamping. Spindle off: tap guide out, the edge finder in the collet; MDI M3, set 900 rpm by hand. Finder on the cut fence face from the front: G10 L20 P1 Y-2.540; on the cut stop face from the right: G10 L20 P1 X2.540 (its .100 radius). The drawing dimensions the walls and hub from these faces."
 feed = "hand"
 
 [[setups.operations]]

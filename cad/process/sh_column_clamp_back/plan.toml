@@ -4,9 +4,10 @@
 # sized to the drawing (the 1.890 width, the .630 height) and to the .610
 # pre-face depth (the drawing's .590 plus the .020 grip offset, SEE NOTE 1),
 # both #29 tap drills drilled through from one zero and tapped 8-32 by hand
-# on the dead centre; stations from the near side N, heights from the bottom
-# face B. Then the pair: each back bolted to its front (MHA-SH-01, drilled by
-# its own traveler) with their own #8-32 screws, gripped on the two outside
+# under the spring tap guide; stations from the near side N, heights from
+# the bottom face B. Then the pair: each back bolted to its front
+# (MHA-SH-01, drilled by its own traveler) with their own #8-32 screws,
+# gripped on the two outside
 # faces with a 1-2-3 block between the screw heads, and the full Ø1.008 bore
 # interpolated on the split line with the 1/2 in carbide end mill, gauged
 # with the telescoping gauges; unbolted, .020 faced off the back's mating
@@ -18,12 +19,24 @@
 # and 1/2 in parallels stacked under each jaw (1.5 in): face B (CB03), B
 # down, the top to the height (CB04), jaws on B and the top, skim the mating
 # face (CB05), mating face down, face the outside face to the pre-face depth,
-# spot and drill both tap drills (CB06), tap both on the dead centre (CB07,
+# spot and drill both tap drills (CB06), tap both under the tap guide (CB07,
 # CB08); bench deburr; the pair bore (CB09, CB10 to open it if small); the
 # face-off (CB11); deburr and inspect; black enamel: the owner's Rust-Oleum
 # Flat Black 376855 (owner 2026-11-21, answered in person: "rust-oleum Flat
 # Black376855") over the maker's Clean Metal Primer, by Rust-Oleum's
 # technical data SRT-01 (consumables.black-alkyd-enamel cites it).
+#
+# Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
+# guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner, Pedro,
+# answered in person 2026-11-21, cnc rulings record: "use
+# https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
+# on r8 0.5 collet"; cad/config/shop-equipment/ tools.tap-guide-fisher, its
+# ownership to confirm): its spring-loaded point seats in the T-handle
+# wrench's centre hole and follows the tap down 1/2 in, spindle off; the
+# operator jogs Z only to push the point home again and to read the depth.
+# FluidNC refuses jogs in the Hold an M0 leaves
+# (wiki.fluidnc.com/en/features/single_block_mode), so each tap stop is its
+# own file ending M30 over its hole (CB07, CB08).
 #
 # Zeroing: the touch probe has no holder (its 6 mm R8 collet is off the buy
 # list, cad/config/shop-equipment/ gauges.touch-probe-diy0-tp05), so every
@@ -39,7 +52,7 @@
 # CB11_face_off. Program names, the [parameters] and the milling_cuts names
 # are a contract with that recipe. Tool numbers are the places in the tools
 # list among the mill's tools: T1 1/2 in end mill, T2 centre drill, T3 #29,
-# T4 dead centre.
+# T4 tap guide (the tap is turned by hand).
 title = "Column clamp back"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -173,16 +186,21 @@ half_mill_projection_min_mm = 25.4
 # ASME B94.11M jobber length, overall, of the #2 combined drill and
 # countersink, 1-7/8 in. Bounded by its whole length below the chuck.
 centre_drill_oal_mm = 47.625
-# Tapping on the dead centre: neither the centre's reach out of its collet
-# nor the tap's reach in its wrench is on record, so the traveler stops
-# before the first tap file unless the two together are at most
-# tap_stack_max_mm: the spindle-to-table maximum (shop machines.pm-30mv,
-# 431.8) less 25.0 to bring the point down onto the wrench (the shop's
-# tool-change clearance), the vise bed, the stacks, the setup's tallest
-# stock (the blank's section) and the collet gauge, rounded down to .01 in.
-# cam.py checks it. It is also the dead centre's declared reach in the
-# capacity check.
+# Tapping under the spring tap guide (tools.tap-guide-fisher): the guide and
+# the tap in its wrench together reach at most tap_stack_max_mm below the
+# collet face, the spindle-to-table maximum (shop machines.pm-30mv, 431.8)
+# less 25.0 to bring the point down onto the wrench (the shop's tool-change
+# clearance), the vise bed, the stacks, the setup's tallest stock (the
+# blank's section) and the collet gauge, rounded down to .01 in; cam.py
+# checks it. It is also the guide-and-tap stack's declared reach in the
+# capacity check. The guide is 3 1/8 in (79.375) overall, its sellers' size
+# and the most it can stand below the collet face; the tap's reach in its
+# wrench is not on record, so the traveler stops before the first tap file
+# unless the tap, point to the wrench's centre hole, is at most
+# tap_wrench_reach_max_mm: 270.002 less 79.375, 190.627, rounded down to
+# .01 in (cam.py checks it).
 tap_stack_max_mm = 270.002
+tap_wrench_reach_max_mm = 190.5
 
 [[tools]]
 id = "em-half"
@@ -197,9 +215,9 @@ id = "drill-29"
 name = "#29 drill"
 ref = "jig-drill-29"
 [[tools]]
-id = "dead-centre"
-name = "The owner's MT3 dead centre with a straight end, the 3/4 in collet on that end, not on the taper"
-ref = "mill-dead-centre-mt3"
+id = "tap-guide"
+name = "Fisher spring tap guide"
+ref = "tap-guide-fisher"
 [[tools]]
 id = "tap-8-32"
 name = "8-32 plug tap"
@@ -514,24 +532,24 @@ inspection = "Each hole from B (Y) {{cad.ear_height_min_in:.3dot}}–{{cad.ear_h
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.ear_height_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "The 8-32 plug tap, its thread at least .750 long (a standard hand tap), goes in the small T-handle tap wrench with the centre hole in its top: the dead centre's point seats in that hole. If that wrench does not take the 8-32 tap: stop; do not tap on this setup."
+instruction = "The 8-32 plug tap, its thread at least .750 long (a standard hand tap), goes in the small T-handle tap wrench with the centre hole in its top: the tap guide's point seats in that hole. If that wrench does not take the 8-32 tap: stop; do not tap on this setup."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Stop check before the first tap file: measure the dead centre from its tip to the collet's face and the 8-32 tap in the T-handle wrench from its point to the wrench's centre hole (calipers, or the combination square's 12 in blade). The two together must be at most {{process.tap_stack_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the stacks, this half, the collet and 1 in to bring the point down onto the wrench). Over: stop; do not tap on this setup."
+instruction = "Stop check before the first tap file: measure the 8-32 tap in the T-handle wrench from its point to the wrench's centre hole (calipers, or the combination square's 12 in blade). It must be at most {{process.tap_wrench_reach_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the stacks, this half, the collet, the tap guide's 3 1/8 in and 1 in to bring the point down onto the wrench). Over: stop; do not tap on this setup."
 feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
-tool = "dead-centre"
+tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB07_tap_1: M6 T4, the dead centre in its 3/4 in collet (the tool setter measures it), spindle off; the file ends Idle at the machine top over the near tap drill."
-diagram = { file = "diagrams/tap.svg", alt = "The half as before, outside face up; the 8-32 tap in the T-handle wrench in a tap drill, the dead centre in the spindle seated in the wrench's centre hole; the tap's point to go {{process.tap_point_depth_mm:in.3dot}} below the outside face, through the mating face." }
+instruction = "Run CB07_tap_1: M6 T4, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the near tap drill."
+diagram = { file = "diagrams/tap.svg", alt = "The half as before, outside face up; the 8-32 tap in the T-handle wrench in a tap drill, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to go {{process.tap_point_depth_mm:in.3dot}} below the outside face, through the mating face." }
 
 [[setups.operations]]
-instruction = "Tap depth reference: the DRO's work Z, in inches, with the tap's point standing on the outside face beside the hole and the dead centre seated in the wrench."
-instruction_detailed = "MDI G91 G0 X3.810 (beside the hole, on the outside face), G90, then send G20: the DRO reads inches. Stand the 8-32 plug tap, in its T-handle wrench, on its point on the outside face; jog Z down until the dead centre's point sits in the wrench's centre hole, light pressure only. Note the DRO Z. Jog Z up clear, send G21 and MDI G91 G0 X-3.810, G90: back over the hole."
+instruction = "Tap depth reference: the DRO's work Z, in inches, with the tap's point standing on the outside face beside the hole and the tap guide's point pushed fully home in the wrench."
+instruction_detailed = "MDI G91 G0 X3.810 (beside the hole, on the outside face), G90, then send G20: the DRO reads inches. Stand the 8-32 plug tap, in its T-handle wrench, on its point on the outside face; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home. Note the DRO Z. Jog Z up clear, send G21 and MDI G91 G0 X-3.810, G90: back over the hole."
 feed = "hand"
 
 [[setups.operations]]
@@ -539,18 +557,22 @@ speed_kind = "other"
 tool = "tap-8-32"
 drilling = "none"
 sizing = "other"
-instruction = "Send G20 (the DRO reads inches). Tap {{cad.ear_thread}} through by hand on the dead centre, spindle off, cutting oil, jogging Z down to keep it seated, until the DRO Z reads the noted Z − {{process.tap_point_depth_mm:in.3dot}}: the point through the mating face, the full thread the whole depth. Jog Z up clear, send G21, back the tap out and blow the hole out."
-instruction_detailed = "Send G20: the DRO reads inches, as when the depth was noted. The tap's point in the hole, a drop of cutting oil; jog Z down until the centre is seated: it guides, it does not push. Turn the wrench, a half turn back each turn to break the chip, jogging Z down to keep it seated. Stop when the DRO Z reads the noted Z − {{process.tap_point_depth_mm:in.3dot}}. Jog Z up clear, send G21, back the tap out by hand and blow the hole out."
-inspection = "One of the pair's MHA-SH-VN-53 screws runs through the thread by hand. Binds: run the tap through again on the centre; still binds: stop and tell the owner."
+instruction = "Send G20 (the DRO reads inches). Tap {{cad.ear_thread}} through by hand under the tap guide, spindle off, cutting oil: the spring keeps the point in the wrench as the tap feeds, up to 1/2 in. Read the depth with the point pushed fully home, as the reference: stop when the DRO Z reads the noted Z − {{process.tap_point_depth_mm:in.3dot}}: the point through the mating face, the full thread the whole depth."
+instruction_detailed = "Send G20, as when the depth was noted. Tap's point in the hole, a drop of cutting oil; jog Z down until the guide's point is pushed fully home: the spring then holds the tap square and follows it down. Turn the wrench, a half turn back each turn; push the point home again before the tap has gone 1/2 in. To read, push it fully home: stop at the noted Z − {{process.tap_point_depth_mm:in.3dot}}."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Jog Z up clear, send G21, back the tap out by hand and blow the hole out."
+inspection = "One of the pair's MHA-SH-VN-53 screws runs through the thread by hand. Binds: run the tap through again under the tap guide; still binds: stop and tell the owner."
 gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
-tool = "dead-centre"
+tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB08_tap_2 (the dead centre still in, spindle off; it ends Idle over the far tap drill). Tap it the same way: G20, depth reference beside it, tap through to the same depth, G21, back out, blow out, screw check."
+instruction = "Run CB08_tap_2 (the tap guide still in, spindle off; it ends Idle over the far tap drill). Tap it the same way: G20, depth reference beside it, tap through to the same depth under the tap guide, G21, back out, blow out, screw check."
 feed = "hand"
 
 [[setups]]

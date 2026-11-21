@@ -9,10 +9,10 @@
 # long-reach stub-flute end mill (Harvey Tool 34662, to buy; owner ruling 2026-11-21:
 # plunging keeps Harvey's chip load and loads the long tool along its axis),
 # the roof corners chamfered with the 90° chamfer mill, the
-# #4-40 thumb hole drilled #43 and hand-tapped on the dead centre. The two
+# #4-40 thumb hole drilled #43 and hand-tapped under the tap guide. The two
 # #2-56 plate holes are pair-piloted #49 from MHA-MS-03 by that part's
 # traveler (its Setups 3-5, the block finished but for them); this traveler
-# then taps them bottoming on the dead centre (Setup 12).
+# then taps them bottoming under the tap guide (Setup 12).
 #
 # Route: saw (Setup 1); lying on the 1 in and 1/2 in parallels stacked under
 # each jaw (1.5 in): skim the sawn back face (MS01), back face down, face the
@@ -25,9 +25,21 @@
 # and back faces, face the locating end and chamfer its roof corner (MS06),
 # then the far end to the length and its roof corner (MS07), the end facing
 # opening the rebate through; lying, locating edge up, spot and drill the
-# thumb hole into the rebate (MS08), tap it by hand on the dead centre
+# thumb hole into the rebate (MS08), tap it by hand under the spring tap guide
 # (MS09); bench deburr; MHA-MS-03's pair pilot; tap both plate holes (MS10,
 # MS11); deburr, inspect; brass black (gated: the solution is to buy).
+#
+# Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
+# guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner, Pedro,
+# answered in person 2026-11-21: "use
+# https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
+# on r8 0.5 collet"; cad/config/shop-equipment/ tools.tap-guide-fisher, its
+# ownership to confirm): its spring-loaded point seats in the T-handle
+# wrench's centre hole and follows the tap down 1/2 in, spindle off; the
+# operator jogs Z only to push the point home again and to read the depth.
+# FluidNC refuses jogs in the Hold an M0 leaves
+# (wiki.fluidnc.com/en/features/single_block_mode), so each tap stop is its
+# own file ending M30 over its hole (MS09, MS10, MS11).
 #
 # Zeroing: every X/Y zero is the owned .200 in edge finder at 900 rpm
 # (logbook 2026-11-04, tools.edge-finder) and every Z zero a cutter on a
@@ -40,7 +52,7 @@
 # are a contract with that recipe. Tool numbers are the places in the tools
 # list among the mill's tools: T1 1/2 in end mill, T2 1/8 in end mill, T3
 # 1/16 in long-reach end mill, T4 chamfer mill, T5 centre drill, T6 #43, T7
-# the dead centre (the taps are turned by hand).
+# the tap guide (the taps are turned by hand).
 title = "Stop block"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -220,14 +232,21 @@ chamfer_projection_min_mm = 12.7
 # and countersink 1-7/8 in.
 drill_43_oal_mm = 57.15
 centre_drill_oal_mm = 47.625
-# Tapping on the dead centre (the magnifying clamp's rule): the dead centre's
-# reach out of its collet plus the tap's point to its wrench's centre hole
-# must be at most tap_stack_max_mm: the spindle-to-table maximum (shop
-# machines.pm-30mv, 431.8) less 25.0 to bring the point down onto the wrench,
-# the vise bed, the stacks, the tallest tapping setup (Setup 9, the .56
-# height) and the collet gauge, rounded down to .01 in. cam.py recomputes it.
+# Tapping under the spring tap guide (tools.tap-guide-fisher): the guide and
+# the tap in its wrench together reach at most tap_stack_max_mm below the
+# collet face, the spindle-to-table maximum (shop machines.pm-30mv, 431.8)
+# less 25.0 to bring the point down onto the wrench, the vise bed, the
+# stacks, the tallest tapping setup (Setup 9, the .56 height) and the collet
+# gauge, rounded down to .01 in (cam.py recomputes it); it is also the
+# guide-and-tap stack's declared reach in the setups' capacity check. The
+# guide is 3 1/8 in (79.375) overall, its sellers' size and the most it can
+# stand below the collet face; the tap's reach in its wrench is not on
+# record, so the traveler stops before the first tap file unless the tap,
+# point to the wrench's centre hole, is at most tap_wrench_reach_max_mm:
+# 274.828 less 79.375, 195.453, rounded down to .01 in.
 spindle_to_table_mm = 431.8
 tap_stack_max_mm = 274.828
+tap_wrench_reach_max_mm = 195.32
 
 [[tools]]
 id = "em-half"
@@ -254,9 +273,9 @@ id = "drill-43"
 name = "#43 drill"
 ref = "jig-drill-43"
 [[tools]]
-id = "dead-centre"
-name = "MT3 dead centre"
-ref = "mill-dead-centre-mt3"
+id = "tap-guide"
+name = "Fisher spring tap guide"
+ref = "tap-guide-fisher"
 [[tools]]
 id = "tap-4-40"
 name = "4-40 plug tap"
@@ -564,7 +583,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Look along the rebate: the relief runs end to end beside the roof, its walls lightly ridged. Its depth ({{cad.relief_back_relief_depth_min_in:.3dot}}–{{cad.relief_back_relief_depth_max_in:.3dot}}) is the file's Z and its height the miked cutter's: neither is gauged here."
+instruction = "Look along the rebate: the relief runs end to end beside the roof, its walls lightly ridged. Its depth ({{cad.relief_back_relief_depth_min_in:.3dot}}–{{cad.relief_back_relief_depth_max_in:.3dot}}) is the file's Z and its height the cutter's, held by its pin-gauged test cut above: neither is gauged here."
 feed = "hand"
 
 [[setups]]
@@ -671,7 +690,7 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "Unclamp; mic the length."
-inspection = "Length {{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}}, locating end to far end, miked at the locating edge and at the top face."
+inspection = "Length {{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}}, locating end to far end, miked at the locating edge and at the top face. Outside: stop and tell the owner with the reading."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.far_end_length_band_mm}}" }]
 
 [[setups]]
@@ -682,7 +701,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and 1/2 in parallels stacked against each jaw again (1.5 in). The block lying on its TOP face, the LOCATING EDGE up, gripped on the mating face (to the FIXED jaw) and the back face; the locating end to the RIGHT; centred on the jaws. Tap it down onto both stacks while closing the vise."
 datum = "Programs MS08_thumb and MS09_thumb_tap. G54: X0 the locating end (RIGHT), the block to −X; Y0 the fixed jaw's face (the mating face); Z0 the stacks' top (the top face). The thumb hole at X −{{cad.thumb_tap_location_from_end_in:.3f}}, Y −{{cad.thumb_tap_location_from_mating_face_in:.3f}} in."
-diagram = { file = "diagrams/thumb.svg", alt = "The block lying locating edge up on stacked parallels, mating face to the fixed jaw; the centre drill spots and the #43 drill drills the thumb hole down through the floor into the rebate, short of the roof; then the 4-40 tap is turned by hand on the dead centre." }
+diagram = { file = "diagrams/thumb.svg", alt = "The block lying locating edge up on stacked parallels, mating face to the fixed jaw; the centre drill spots and the #43 drill drills the thumb hole down through the floor into the rebate, short of the roof; then the 4-40 tap is turned by hand under the tap guide." }
 envelope = { x_span_mm = ["{{cad.envelope_x_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.envelope_z_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.envelope_y_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.thumb_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_z_mm}}", along_jaws_mm = "{{cad.envelope_x_mm}}", part_height_mm = "{{cad.envelope_y_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_length_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_x_mm}}"], clamp_mm = [0, "{{cad.envelope_x_mm}}"], section_mm = { y = "{{cad.envelope_z_mm}}", z = "{{cad.envelope_y_mm}}" }, vise_left = "start" }
@@ -734,24 +753,24 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "The 4-40 tap goes in the T-handle tap wrench with the centre hole in its top: the dead centre's point seats in that hole."
+instruction = "The 4-40 tap goes in the T-handle tap wrench with the centre hole in its top: the tap guide's point seats in that hole."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Stop check before the tap file: measure the dead centre from its tip to the collet's face and the 4-40 tap in its wrench from its point to the wrench's centre hole. The two together must be at most {{process.tap_stack_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the stacks, this block, the collet and 1 in to bring the point down). Over: stop; do not tap on this setup."
+instruction = "Stop check before the tap file: measure the 4-40 tap in its wrench from its point to the wrench's centre hole. It must be at most {{process.tap_wrench_reach_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the stacks, this block, the collet, the tap guide's 3 1/8 in and 1 in to bring the point down). Over: stop; do not tap on this setup."
 feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
-tool = "dead-centre"
+tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run MS09_thumb_tap: M6 T7, the dead centre in its 3/4 in collet (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
-diagram = { file = "diagrams/thumb-tap.svg", alt = "The block lying locating edge up; the 4-40 tap in the T-handle wrench in the thumb hole, the dead centre in the spindle seated in the wrench's centre hole; the tap's point to stop {{process.thumb_tap_reach_mm:in.3dot}} below the locating edge, inside the rebate and short of the roof." }
+instruction = "Run MS09_thumb_tap: M6 T7, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
+diagram = { file = "diagrams/thumb-tap.svg", alt = "The block lying locating edge up; the 4-40 tap in the T-handle wrench in the thumb hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to stop {{process.thumb_tap_reach_mm:in.3dot}} below the locating edge, inside the rebate and short of the roof." }
 
 [[setups.operations]]
-instruction = "Tap depth reference: the DRO's work Z, in inches, with the tap's point standing on the locating edge beside the hole and the dead centre seated in the wrench."
-instruction_detailed = "MDI G0 X-6.000 (over the locating edge beside the hole), then send G20: the DRO reads inches. Stand the 4-40 plug tap, in its wrench, on its point on the locating edge; jog Z down until the dead centre's point sits in the wrench's centre hole, light pressure only. Note the DRO Z. Jog Z up clear; send G21 and MDI G0 X-{{cad.thumb_tap_x_mm:.3f}} Y-{{cad.thumb_tap_z_mm:.3f}} (back over the hole), then G20 again."
+instruction = "Tap depth reference: the DRO's work Z, in inches, with the tap's point standing on the locating edge beside the hole and the tap guide's point pushed fully home in the wrench."
+instruction_detailed = "MDI G0 X-6.000 (over the locating edge beside the hole), then G20. Stand the 4-40 plug tap, in its wrench, on its point on the locating edge; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home. Note the DRO Z. Jog Z up clear; G21, MDI G0 X-{{cad.thumb_tap_x_mm:.3f}} Y-{{cad.thumb_tap_z_mm:.3f}} (over the hole), G20."
 feed = "hand"
 
 [[setups.operations]]
@@ -759,13 +778,13 @@ speed_kind = "other"
 tool = "tap-4-40"
 drilling = "none"
 sizing = "other"
-instruction = "Tap by hand on the dead centre, spindle off, Tapmatic Gold, jogging Z down to keep it seated, until the DRO Z reads the noted Z less {{process.thumb_tap_reach_mm:in.3dot}}: the point is then in the rebate, .020 under the roof, and the thread full through the floor. Never past it: the roof is not to be touched."
-instruction_detailed = "The tap's point in the hole, a drop of Tapmatic Gold; jog Z down until the centre is seated: it guides, it does not push. Turn the wrench, a half turn back each turn to break the chip, jogging Z down to keep it seated. Stop when the DRO Z reads the noted Z less {{process.thumb_tap_reach_mm:in.3dot}}."
+instruction = "Tap by hand under the tap guide, spindle off, Tapmatic Gold: the spring keeps the point in the wrench as the tap feeds. Read the depth with the point pushed fully home, as the reference: stop when the DRO Z reads the noted Z less {{process.thumb_tap_reach_mm:in.3dot}}: the point is then in the rebate, .020 under the roof, and the thread full through the floor. Never past it: the roof is not to be touched."
+instruction_detailed = "Tap's point in the hole, a drop of Tapmatic Gold; jog Z down until the guide's point is pushed fully home: the spring then holds the tap square and follows it down. Turn the wrench, a half turn back each turn. To read, push the point fully home again: stop at the noted Z less {{process.thumb_tap_reach_mm:in.3dot}}."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "Jog Z up clear, send G21, back the tap out by hand; blow the hole and the rebate out."
-inspection = "A 4-40 screw runs in by hand from the locating edge through into the rebate; the roof unmarked."
+inspection = "A 4-40 screw runs in by hand from the locating edge through into the rebate; the roof unmarked. Binds: send G20 and run the tap again under the tap guide to the same DRO Z, never deeper; still binds, or the roof is marked: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups]]
@@ -818,7 +837,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and 1/2 in parallels stacked against each jaw (1.5 in). The block alone (its plate set aside), lying MATING face up, gripped across the .84 length: the LOCATING END against the FIXED jaw (as MHA-MS-03 held the pair), the locating edge to the RIGHT; centred on the jaws. Never across the .56: the roof would bend."
 datum = "Programs MS10_plate_tap_1 and MS11_plate_tap_2. G54: X0 the locating edge (RIGHT), the block to −X; Y0 the fixed jaw's face (the locating end). No Z0: these files move Z only to the machine top (G53); each tap's depth is the DRO Z you note by hand. Hole 1 at Y −{{cad.plate_tap_1_x_from_min_in:.3f}}, hole 2 at Y −{{cad.plate_tap_2_x_from_min_in:.3f}}, both at X −{{cad.plate_tap_1_y_from_min_in:.3f}} in: the pair pilot's places, from the same flush end and edge."
-diagram = { file = "diagrams/plate-tap.svg", alt = "The block lying mating face up, gripped across its length, locating end on the fixed jaw; the 2-56 tap in the T-handle wrench in a piloted hole, the dead centre seated in the wrench's centre hole; the tap's point to stop {{process.plate_tap_reach_mm:in.3dot}} below the mating face." }
+diagram = { file = "diagrams/plate-tap.svg", alt = "The block lying mating face up, gripped across its length, locating end on the fixed jaw; the 2-56 tap in the T-handle wrench in a piloted hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to stop {{process.plate_tap_reach_mm:in.3dot}} below the mating face." }
 envelope = { x_span_mm = ["{{cad.envelope_y_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.envelope_x_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.envelope_z_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.envelope_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_x_mm}}", along_jaws_mm = "{{cad.envelope_y_mm}}", part_height_mm = "{{cad.envelope_z_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_height_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = "other"
@@ -834,18 +853,18 @@ feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
-tool = "dead-centre"
+tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run MS10_plate_tap_1: M6 T7, the dead centre, spindle off; the file ends Idle at the machine top over hole 1 (near the locating end)."
+instruction = "Run MS10_plate_tap_1: M6 T7, the tap guide, spindle off; the file ends Idle at the machine top over hole 1 (near the locating end)."
 
 [[setups.operations]]
-instruction = "Seat the dead centre on the hole: send G20 (the DRO reads inches); stand the 2-56 plug tap, in its wrench, in the hole by hand; jog Z down until the dead centre's point nears the wrench's centre hole; jog X and Y in .001 in steps until the point drops into the centre hole without tilting the wrench (a square against the wrench's shank reads it upright)."
+instruction = "Centre the tap guide on the hole: send G20 (the DRO reads inches); stand the 2-56 plug tap, in its wrench, in the hole by hand; jog Z down until the guide's point nears the wrench's centre hole; jog X and Y in .001 in steps until the point drops into the centre hole without tilting the wrench (a square against the wrench's shank reads it upright)."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Tap depth reference: the DRO's work Z, in inches, with the tap's point standing on the mating face beside the hole and the dead centre seated in the wrench."
-instruction_detailed = "Still in G20: note the DRO X and Y. Lift the tap out; jog X by +.050 in (over the mating face beside the hole); stand the tap on its point there, jog Z down until the centre seats, light pressure; note the DRO Z. Jog Z up clear; jog X back to the noted X (inches, as noted)."
+instruction = "Tap depth reference: the DRO's work Z, in inches, with the tap's point standing on the mating face beside the hole and the tap guide's point pushed fully home in the wrench."
+instruction_detailed = "Still in G20: note the DRO X and Y. Lift the tap out; jog X by +.050 in (over the mating face beside the hole); stand the tap on its point there, jog Z down until the guide's point is in the wrench's centre hole and pushed fully home; note the DRO Z. Jog Z up clear; jog X back to the noted X (inches, as noted)."
 feed = "hand"
 
 [[setups.operations]]
@@ -853,7 +872,7 @@ speed_kind = "other"
 tool = "tap-2-56-plug"
 drilling = "none"
 sizing = "other"
-instruction = "Tap by hand on the dead centre, spindle off, Tapmatic Gold, jogging Z down to keep it seated, a half turn back each turn, until the DRO Z reads the noted Z less {{process.plate_tap_reach_mm:in.3dot}}. Jog Z up clear; back the tap out; blow the hole out."
+instruction = "Tap's point in the hole; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home. Tap by hand, spindle off, Tapmatic Gold, a half turn back each turn: the spring keeps the point in the wrench as the tap feeds. Read the depth with the point pushed fully home: stop when the DRO Z reads the noted Z less {{process.plate_tap_reach_mm:in.3dot}}. Jog Z up clear; back the tap out; blow the hole out."
 feed = "hand"
 
 [[setups.operations]]
@@ -861,15 +880,15 @@ speed_kind = "other"
 tool = "tap-2-56-bottoming"
 drilling = "none"
 sizing = "other"
-instruction = "Same hole, the 2-56 bottoming tap in the wrench: start it by hand in the plug tap's thread, seat the dead centre, and tap to the same DRO Z (the noted Z less {{process.plate_tap_reach_mm:in.3dot}}); never past it: the pilot is only {{cad.plate_tap_1_drill_depth_min_in:.3dot}} deep. Jog Z up clear, send G21, back the tap out, blow the hole out."
+instruction = "Same hole, the 2-56 bottoming tap in the wrench: start it by hand in the plug tap's thread, jog Z down to push the guide's point fully home in the wrench, and tap under the tap guide to the same DRO Z (the noted Z less {{process.plate_tap_reach_mm:in.3dot}}), read with the point pushed fully home; never past it: the pilot is only {{cad.plate_tap_1_drill_depth_min_in:.3dot}} deep. Jog Z up clear, send G21, back the tap out, blow the hole out."
 feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
-tool = "dead-centre"
+tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run MS11_plate_tap_2 (hole 2) and repeat the four steps above on it: seat the centre, the depth reference, the plug tap, the bottoming tap."
+instruction = "Run MS11_plate_tap_2 (hole 2) and repeat the four steps above on it: centre the tap guide, the depth reference, the plug tap, the bottoming tap."
 
 [[setups.operations]]
 instruction = "The thread depth ({{cad.plate_tap_1_thread_depth_min_in:.3dot}}–{{cad.plate_tap_1_thread_depth_max_in:.3dot}}) is held by the bottoming tap run to its DRO Z in the {{cad.plate_tap_1_drill_depth_min_in:.3dot}}–{{cad.plate_tap_1_drill_depth_max_in:.3dot}} pilot, not gauged. In each hole run a 2-56 screw (at least 3/8 under the head) in by hand to its stop; mark it at the mating face; out, read the mark to its end."

@@ -27,7 +27,7 @@ its corner relief with the 1/16 in long-reach end mill, both stopping short of t
 roof is never squeezed by the jaws. Upright, gripped on the mating and back
 faces: MS06 faces the locating end and chamfers its roof corner, MS07 the
 far end to the length and its roof corner. Lying, locating edge up: MS08
-spots and drills the thumb hole into the rebate; MS09 brings the dead centre
+spots and drills the thumb hole into the rebate; MS09 brings the tap guide
 over it. After MHA-MS-03's pair pilot: MS10 and MS11 bring it over each
 plate hole.
 
@@ -48,9 +48,12 @@ the mating face:
 
 Toolpath rules (owner rulings 2026-11-16): faces zigzag (ball screws),
 plunges beside the stock at the cutting feed, real G0 above the stock. The
-holes are tapped by hand (FluidNC cannot rigid-tap), the T-handle wrench's
-centre hole on the MT3 dead centre in the spindle, spindle off, the operator
-jogging Z down (owner, Pedro, 2026-11-17); each tap stop is a file of its
+holes are tapped by hand (FluidNC cannot rigid-tap; owner, Pedro,
+2026-11-17), the T-handle wrench's centre hole on the spring point of the
+Fisher tap guide in the 1/2 in R8 collet (owner, Pedro, 2026-11-21: "use
+https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
+on r8 0.5 collet"), spindle off, the operator jogging Z down to push the
+point home; each tap stop is a file of its
 own that ends with M30 over its hole (FluidNC refuses jogs in an M0 hold,
 http://wiki.fluidnc.com/en/features/single_block_mode).
 """
@@ -95,7 +98,7 @@ CAM_TOOLS = (
     "chamfer",
     "spot",
     "drill-43",
-    "dead-centre",
+    "tap-guide",
 )
 IN = 25.4
 # ANSI #2 combined drill and countersink, 60° included: the shop record names
@@ -113,7 +116,8 @@ DRILL_POINT_DEG = 118.0
 CHAMFER_DEG = 90.0
 # A tap file's first motion: G53 G0 to machine Z0, the homed top (FluidNC
 # sets an axis's machine position to its homing mpos_mm, default 0, and Z
-# homes up) [INFERENCE: the owner's config's Z mpos_mm is not on record].
+# homes up); the owner (Pedro) confirmed it, answered in person 2026-11-21
+# (cnc rulings record): machine Z = 0 is the top of travel after homing.
 MACHINE_Z_TOP_MM = 0.0
 # Face and chamfer passes start and finish this far clear of the stock.
 APPROACH_MM = 2.54
@@ -744,7 +748,7 @@ def context(
                 f"{name}: the tap reach is not between the thread and the drilled depth"
             )
 
-    # The dead centre's stack (mg_magnifying_clamp's rule): the spindle-to-
+    # The tap guide's stack (mg_magnifying_clamp's rule): the spindle-to-
     # table maximum (machines.pm-30mv) less 25.0 to bring the point down,
     # the vise bed, the stacks, the tallest tapping setup (the thumb hole's,
     # the height) and the collet gauge, rounded down to .01 in.
@@ -994,10 +998,10 @@ def context(
     for job in jobs:
         job["stock"] = stock[job["frame"]]
 
-    # One file per hole to tap: the dead centre loaded by the file's own M6
+    # One file per hole to tap: the tap guide loaded by the file's own M6
     # (its %msg names the hole), Z to the machine's top in machine
     # coordinates before any XY, over the hole, M30: the controller ends
-    # Idle, so the operator can jog the dead centre down onto the wrench.
+    # Idle, so the operator can jog the guide's point down into the wrench.
     manual = {}
     for key, at, what in (
         ("tap_thumb", thumb_xy, "4-40 PLUG TAP IN THE THUMB HOLE"),
@@ -1009,14 +1013,14 @@ def context(
         ("tap_plate_2", plate_xy[1], "2-56 PLUG THEN BOTTOMING TAP IN PLATE HOLE 2"),
     ):
         manual[key] = {
-            "tool": numbers["dead-centre"],
-            "label": names["dead-centre"],
+            "tool": numbers["tap-guide"],
+            "label": names["tap-guide"],
             "setting": f"SPINDLE STAYS OFF. NEXT: {what}",
             "gcode": [
                 f"G53 G0 Z{MACHINE_Z_TOP_MM:.3f}",
                 f"G0 X{at[0]:.3f} Y{at[1]:.3f}",
-                f"({what}. JOG Z DOWN ONTO THE WRENCH, LIGHT PRESSURE."
-                " TAP BY HAND TO THE NOTED DRO Z, JOGGING Z TO KEEP THE POINT SEATED. JOG Z UP CLEAR)",
+                f"({what}. JOG Z DOWN TO PUSH THE GUIDE POINT HOME IN THE WRENCH."
+                " TAP BY HAND TO THE NOTED DRO Z, READ WITH THE POINT PUSHED HOME. JOG Z UP CLEAR)",
                 "M30",
             ],
             "at": list(at),
@@ -1277,7 +1281,7 @@ def context(
                 name,
                 "tap_stop",
                 {
-                    "tool": t["dead-centre"],
+                    "tool": t["tap-guide"],
                     "at": manual[key]["at"],
                     "machine_top": MACHINE_Z_TOP_MM,
                 },

@@ -100,7 +100,7 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
         "drill-23-64": 4,
         "reamer": 5,
         "drill-43": 6,
-        "dead-centre": 7,
+        "tap-guide": 7,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     # The tap stop stands over the hole PA05 drilled, in the same frame.

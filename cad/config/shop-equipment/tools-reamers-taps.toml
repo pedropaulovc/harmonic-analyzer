@@ -60,22 +60,57 @@ note = "Explicit on_hand preserves the pre-split record, which had no present ke
 [tools.taps-unc-hand.members.8-32-plug]
 flute_len_in = { value = 0.75, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, cutting length from point to flute or countersink boundary" } }
 
-# Owner (Pedro) 2026-11-17, verbatim: "it was a mt3 dead center that had a
-# straight part at the end i gripped with a 3/4 collet". Used in the PM-30MV
-# as a tap guide, held by its straight end in the 3/4 in collet of
-# holders.r8-collets-south-bend-sb1280. Its stickout (tip to collet face) is
-# not measured: the 7.5 in first relayed was a guess (owner, 2026-11-17: "7.5
-# is a guess dead center had plenty of space with wrench"), so no length is
-# recorded; the tool setter measures it at M6. Its prechips description is
+# The owner's MT3 dead centre, a dead centre in the PM-1127VF-LB tailstock
+# (MT3). Owner (Pedro) 2026-11-17, verbatim: "it was a mt3 dead center that
+# had a straight part at the end i gripped with a 3/4 collet". It was the
+# mill's tap guide (tools.mill-dead-centre-mt3, gripped by its straight end
+# in the 3/4 in R8 collet) until the owner's ruling, answered in person
+# 2026-11-21 (cnc rulings record): "remove mention of dead centre ; use
+# https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
+# on r8 0.5 collet": the mill's hand-tap stops use tools.tap-guide-fisher
+# below, and that key is retired. Its prechips description is
 # cad/process/shop/, same key.
-[tools.mill-dead-centre-mt3]
-name = "MT3 dead centre with a straight end, held in the 3/4 in R8 collet"
+[tools.dead-centre-mt3]
+name = "MT3 dead centre (with a straight end)"
 kind = "dead_centre"
 status = "on_hand"
-note = "Tap guide in the PM-30MV spindle; its MT3 taper also fits the PM-1127VF-LB tailstock (machines.pm-1127vf-lb tailstock_taper), a dead centre there"
+note = "A dead centre in the PM-1127VF-LB tailstock (machines.pm-1127vf-lb tailstock_taper). No longer a tap guide on the mill (owner ruling 2026-11-21: tools.tap-guide-fisher)."
 cite = [
-  "Owner (Pedro) 2026-11-17: \"it was a mt3 dead center that had a straight part at the end i gripped with a 3/4 collet\"; stickout unmeasured (\"7.5 is a guess dead center had plenty of space with wrench\")",
+  "Owner (Pedro) 2026-11-17: \"it was a mt3 dead center that had a straight part at the end i gripped with a 3/4 collet\"",
   "Owner (Pedro) 2026-11-21, answered in person: \"Lathe tailstock taper: MT3; the mill tap-guide dead centre fits.\"",
+  "Owner (Pedro) 2026-11-21, answered in person, on tap guiding on the mill: \"remove mention of dead centre ; use https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805 on r8 0.5 collet\"",
+]
+
+# The mill's tap guide on every hand-tap stop. Owner (Pedro), answered in
+# person 2026-11-21 (cnc rulings record): "remove mention of dead centre ; use
+# https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
+# on r8 0.5 collet". Held by its 1/2 in shank in the 1/2 in collet of
+# holders.r8-collets-south-bend-sb1280 (on hand). Its pointed end seats in
+# the T-handle wrench's centre hole (holders.tap-wrench-t-small), as its
+# sellers describe; its concave end takes a small tap's own 60° shank
+# point, with no wrench in the way. The owner named the product, not
+# whether it is owned: no status (stock_bom reads it unrecorded), to
+# confirm. It is a spring tap guide in the spindle as the #2837 ruling on
+# tools.spring-tap-guide asked (that record's 0.05° squareness is not
+# stated for this one). Its prechips description is cad/process/shop/, same
+# key.
+[tools.tap-guide-fisher]
+name = "Fisher Machine Shop micro tap guide No. 20 MTG (LittleMachineShop 1963), held in the 1/2 in R8 collet"
+kind = "tap_guide"
+make = "Fisher Machine Shop"
+sku = "1963"
+source = "https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805"
+purchase = "$19.95 (LittleMachineShop, read live 2026-11-21)"
+shank_dia_in = 0.5
+overall_length_in = 3.125
+point_dia_in = 0.1875
+point_travel_in = 0.5
+note = "Ownership not stated by the owner: to confirm. Spring-loaded reversible 3/16 in point, pointed at one end, concave (a centre hole) at the other; the point retracts 1/2 in into the body; spring tension adjustable by the end screw. Overall 3 1/8 in. Sizes are the sellers', not measured here."
+cite = [
+  "Owner (Pedro) 2026-11-21, answered in person, on tap guiding on the mill: \"remove mention of dead centre ; use https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805 on r8 0.5 collet\"",
+  "LittleMachineShop, Tap Guide, Fisher, SKU 1963, read 2026-11-21: \"0.500\" diameter body\"; \"The reversible point is spring loaded to maintain pressure on the tap. One end of the point has a center hole for small taps, while the other end is pointed for larger taps.\"; \"The 0.500\" diameter straight shank body is ground and knurled cap for easy handling.\"; \"Remove the setscrew in the back end to reverse the point.\"",
+  "Primary Tactical, Fisher Machine Shop, Inc. Micro Tap Guide (https://www.primarytactical.com/product/fisher-machine-shop-inc-micro-tap-guide/), read 2026-11-21: \"31/8\" (7.9cm) OAL, 1/2\" (13mm) diameter shank, 3/16\" (4.8mm) diameter tip, retracts 1/2\" into body. Adjustable spring tension.\"",
+  "Carter Tools, Fisher Machine Shop #20MTG 1/2\" Shank Micro Tap Guide (https://www.cartertools.com/fmpdtg.html), read 2026-11-21: \"3/16\" diameter spring loaded point that can be reversed. The tip has a point on one end (l) and a concave taper (c) on the other.\"; \"The point will retract 1/2\" into the body.\"; \"The point is placed in the small hole at the end of the tap wrench ... and the tailstock advanced until the tap is against the hole and the point is fully retracted.\"; \"As you turn the tap wrench, the point springs forward, maintaining pressure againt the wrench\"",
 ]
 
 # Owner ruling 2026-11-16 (Pedro), #2837: "Require a spring tap guide in the

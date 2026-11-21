@@ -15,15 +15,29 @@
 # the strap, which opens the hold-down hole, then spot, drill 23/64 and ream
 # .3760 the arbor bore through the strap (PA04); Setup 6 upright on the seat:
 # face the top end, spot and drill #43 from the apex into the bore (PA05),
-# tap 4-40 by hand on the dead centre (PA06); Setup 7 the far face up, the
-# foot gripped by the seat and the foot top: face the far face to the depth
-# and profile the tapered flanks and the crown round the bore (PA07); bench
+# tap 4-40 by hand under the spring tap guide (PA06); Setup 7 the far face
+# up, the foot gripped by the seat and the foot top: face the far face to
+# the depth and profile the tapered flanks and the crown round the bore
+# (PA07); bench
 # deburr (the reamer by hand through the bore) and inspect; black enamel,
 # the bore and the foot seat masked, the bare machined faces oiled: the
 # owner's Rust-Oleum Flat Black 376855 (owner 2026-11-21, answered in
 # person: "rust-oleum Flat Black376855") over the maker's Clean Metal
 # Primer, by Rust-Oleum's technical data SRT-01 (consumables.black-alkyd-
 # enamel cites it).
+#
+# Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
+# guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner, Pedro,
+# answered in person 2026-11-21: "remove mention of dead centre ; use
+# https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
+# on r8 0.5 collet"; cad/config/shop-equipment/ tools.tap-guide-fisher, its
+# ownership to confirm): its spring-loaded point seats in the T-handle
+# wrench's centre hole and follows the tap down 1/2 in, spindle off; the
+# operator jogs Z only to push the point home again and to read the depth.
+# The apex tap goes up to .579 below the apex, more than the spring's 1/2 in,
+# so the point is pushed home again on the way down. FluidNC refuses jogs in
+# the Hold an M0 leaves (wiki.fluidnc.com/en/features/single_block_mode), so
+# the tap stop is its own file ending M30 over its hole (PA06).
 #
 # Zeroing: every X/Y zero the owned .200 in edge finder at 900 rpm
 # (logbook 2026-11-04, tools.edge-finder), every Z zero a tool on a .002
@@ -34,14 +48,14 @@
 # PA06_apex_tap, PA07_outline. Program names, the [parameters] and the
 # milling_cuts names are a contract with that recipe. Tool numbers are the
 # places in the tools list among the mill's tools: T1 1/2 in end mill, T2
-# centre drill, T3 #15, T4 23/64, T5 .3760 reamer, T6 #43, T7 the dead
-# centre (the tap is turned by hand).
+# centre drill, T3 #15, T4 23/64, T5 .3760 reamer, T6 #43, T7 the tap
+# guide (the tap is turned by hand).
 title = "Arbor pedestal"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel flat bar (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_x_in:fraction}} x {{process.blank_z_in:fraction}} in flat bar; {{process.quantity:d}} × {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in blanks."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.east_side_width_min_in:.3dot}}–{{cad.east_side_width_max_in:.3dot}} wide at the foot (W to E), {{cad.near_end_depth_min_in:.3dot}}–{{cad.near_end_depth_max_in:.3dot}} deep (the far face to the near end), the strap {{cad.strap_outer_face_depth_min_in:.3dot}}–{{cad.strap_outer_face_depth_max_in:.3dot}} thick; the bore {{cad.arbor_bore_height_min_in:.3dot}}–{{cad.arbor_bore_height_max_in:.3dot}} above the seat. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home (logbook 2026-11-06). After any controller reset, stall or E-stop, home again and re-touch the setup's zeros before re-running its file from the top."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.east_side_width_min_in:.3dot}}–{{cad.east_side_width_max_in:.3dot}} wide at the foot (W to E), {{cad.near_end_depth_min_in:.3dot}}–{{cad.near_end_depth_max_in:.3dot}} deep (the far face to the near end), the strap {{cad.strap_outer_face_depth_min_in:.3dot}}–{{cad.strap_outer_face_depth_max_in:.3dot}} thick; the bore {{cad.arbor_bore_height_min_in:.3dot}}–{{cad.arbor_bore_height_max_in:.3dot}} above the seat. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Both blanks go through each mill setup in turn before the next setup: after the first, unclamp it, clamp the second as the Holding says and pick up again every zero taken on the part itself (each setup's X0; Setup 4's Z0 on the sawn top; Setup 7's X0, Y0 and Z0); the fixed jaw's Y0 and a stack or parallel Z0 stand. Then run the file and its checks on it. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home (logbook 2026-11-06). After any controller reset, stall or E-stop, home again and re-touch the setup's zeros before re-running its file from the top."
 shop = "../shop"
 stock_refs = ["1018-flat-1x1-1-4"]
 material_key = "rocker-1018-cold-finished"
@@ -223,14 +237,20 @@ centre_drill_oal_mm = 47.625
 reamer_projection_mm = 107.95
 reamer_shank_min_mm = 7.874
 reamer_shank_max_mm = 7.9375
-# Tapping on the dead centre (as the magnifying clamp): neither the centre's
-# reach out of its collet nor the tap's in its wrench is on record, so the
-# traveler stops before the tap file unless the two together are at most
-# tap_stack_max_mm: the spindle-to-table maximum (shop machines.pm-30mv,
-# 431.8) less 25.0 to bring the point down (the shop's tool-change
+# Tapping under the spring tap guide (tools.tap-guide-fisher): the guide and
+# the tap in its wrench together reach at most tap_stack_max_mm below the
+# collet face, the spindle-to-table maximum (shop machines.pm-30mv, 431.8)
+# less 25.0 to bring the point down onto the wrench (the shop's tool-change
 # clearance), the vise bed, the 7/8 in parallels, the longest blank less the
-# seat skim and the collet gauge: 247.059, rounded down to .01 in.
+# seat skim and the collet gauge: 247.059, rounded down to .01 in; it is
+# also the guide-and-tap stack's declared reach in the setup's capacity
+# check. The guide is 3 1/8 in (79.375) overall, its sellers' size and the
+# most it can stand below the collet face; the tap's reach in its wrench is
+# not on record, so the traveler stops before the tap file unless the tap,
+# point to the wrench's centre hole, is at most tap_wrench_reach_max_mm:
+# 246.888 less 79.375, 167.513, rounded down to .01 in.
 tap_stack_max_mm = 246.888
+tap_wrench_reach_max_mm = 167.38
 
 [[tools]]
 id = "em-half"
@@ -257,9 +277,9 @@ id = "drill-43"
 name = "#43 drill"
 ref = "jig-drill-43"
 [[tools]]
-id = "dead-centre"
-name = "MT3 dead centre"
-ref = "mill-dead-centre-mt3"
+id = "tap-guide"
+name = "Fisher spring tap guide"
+ref = "tap-guide-fisher"
 [[tools]]
 id = "tap-4-40"
 name = "4-40 plug tap"
@@ -658,24 +678,24 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "The 4-40 tap goes in the T-handle tap wrench with the centre hole in its top: the dead centre's point seats in that hole."
+instruction = "The 4-40 tap goes in the T-handle tap wrench with the centre hole in its top: the tap guide's point seats in that hole."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Stop check before the tap file: measure the dead centre from its tip to the collet's face and the 4-40 tap in the T-handle wrench from its point to the wrench's centre hole (calipers, or the combination square's 12 in blade). The two together must be at most {{process.tap_stack_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the parallels, this part, the collet and 1 in to bring the point down onto the wrench). Over: stop; do not tap on this setup."
+instruction = "Stop check before the tap file: measure the 4-40 tap in the T-handle wrench from its point to the wrench's centre hole (calipers, or the combination square's 12 in blade). It must be at most {{process.tap_wrench_reach_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the parallels, this part, the collet, the tap guide's 3 1/8 in and 1 in to bring the point down onto the wrench). Over: stop; do not tap on this setup."
 feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
-tool = "dead-centre"
+tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run PA06_apex_tap: M6 T7, the dead centre in its 3/4 in collet (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
-diagram = { file = "diagrams/apex-tap.svg", alt = "The pedestal upright in the vise, the strap up; the 4-40 tap in the T-handle wrench in the apex hole, the dead centre in the spindle seated in the wrench's centre hole; the tap's point to go {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the apex, into the bore." }
+instruction = "Run PA06_apex_tap: M6 T7, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
+diagram = { file = "diagrams/apex-tap.svg", alt = "The pedestal upright in the vise, the strap up; the 4-40 tap in the T-handle wrench in the apex hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to go {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the apex, into the bore." }
 
 [[setups.operations]]
-instruction = "Tap depth reference: the DRO's work Z, in inches, with the tap's point standing on the faced top beside the hole and the dead centre seated in the wrench."
-instruction_detailed = "MDI G0 X-26.000 (over the top end between the hole and F), then send G20: the DRO reads inches. Stand the 4-40 plug tap, in its T-handle wrench, on its point on the top; jog Z down until the dead centre's point sits in the wrench's centre hole, light pressure only. Note the DRO Z. Jog Z up clear, send G21, MDI G0 X-22.860 (back over the hole), send G20."
+instruction = "Tap depth reference: the DRO's work Z, in inches, with the tap's point standing on the faced top beside the hole and the tap guide's point pushed fully home in the wrench."
+instruction_detailed = "MDI G0 X-26.000 (over the top end between the hole and F), then send G20: the DRO reads inches. Stand the 4-40 plug tap, in its wrench, on its point on the top; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home. Note the DRO Z. Jog Z up clear, send G21, MDI G0 X-22.860 (over the hole), send G20."
 feed = "hand"
 
 [[setups.operations]]
@@ -683,8 +703,8 @@ speed_kind = "other"
 tool = "tap-4-40"
 drilling = "none"
 sizing = "other"
-instruction = "Tap by hand on the dead centre, spindle off, Tapmatic Gold, jogging Z down to keep it seated, until the DRO Z reads the noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}}: the full thread runs through into the bore, the point stops short of the bore's far wall."
-instruction_detailed = "The tap's point in the hole, a drop of Tapmatic Gold; jog Z down until the centre is seated: it guides, it does not push. Turn the wrench, a half turn back each turn to break the chip, jogging Z down to keep it seated. Stop when the DRO Z reads the noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}}: its lead is through the bore's wall, its point short of the far wall."
+instruction = "Tap by hand under the tap guide, spindle off, Tapmatic Gold: the spring keeps the point in the wrench as the tap feeds, up to 1/2 in. Read the depth with the point pushed fully home, as the reference: stop when the DRO Z reads the noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}}: the full thread runs through into the bore, the point stops short of the bore's far wall."
+instruction_detailed = "Tap's point in the hole, a drop of Tapmatic Gold; jog Z down until the guide's point is pushed fully home: the spring then holds the tap square and follows it down. Turn the wrench, a half turn back each turn; push the point home again before the tap has gone 1/2 in. To read, push it fully home: stop at the noted Z less {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}}, the lead through the bore's wall, the point short of the far wall."
 feed = "hand"
 
 [[setups.operations]]

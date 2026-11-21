@@ -107,7 +107,7 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
         "drill-32": 5,
         "reamer": 6,
         "drill-43": 7,
-        "dead-centre": 8,
+        "tap-guide": 8,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     stop = ctx["manual"]["tap"]

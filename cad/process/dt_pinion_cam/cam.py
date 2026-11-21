@@ -20,7 +20,7 @@ the lathe (no NC). The disc then stands on its front face on the parallels
 in the vise, gripped on its O.D.: CM01 spots, drills C and reams the bore
 through, offset from the O.D. axis along the jaws. It then lies in the vise,
 its axis along the jaws, the thick side up: CM02 spots and drills #50 down
-into the bore; CM03 brings the dead centre over it for tapping by hand.
+into the bore; CM03 brings the tap guide over it for tapping by hand.
 
 Work frames (G54), each set in its setup:
 - CM01: X0 Y0 the O.D. axis, Z0 the rear face (up); the bore at +X.
@@ -28,12 +28,16 @@ Work frames (G54), each set in its setup:
   axis; Z0 the O.D.'s top line.
 
 Toolpath rules (owner rulings 2026-11-16): plunges at the cutting feed, real
-G0 above the stock. The hole is tapped by hand (FluidNC cannot rigid-tap),
-the T-handle wrench's centre hole on the MT3 dead centre in the spindle,
-spindle off, the operator jogging Z down (owner, Pedro, 2026-11-17). FluidNC
-refuses jogs while an M0 holds the program (FluidNC wiki, "Single Block
-Mode", http://wiki.fluidnc.com/en/features/single_block_mode), so the tap
-stop is a file of its own that ends with M30 over its hole.
+G0 above the stock. The hole is tapped by hand (FluidNC cannot rigid-tap;
+owner, Pedro, 2026-11-17), the T-handle wrench's centre hole on the spring
+point of the Fisher tap guide in the 1/2 in R8 collet (owner, Pedro,
+2026-11-21: "use
+https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
+on r8 0.5 collet"), spindle off, the operator jogging Z down to push the
+point home. FluidNC refuses jogs while an M0 holds the program (FluidNC
+wiki, "Single Block Mode",
+http://wiki.fluidnc.com/en/features/single_block_mode), so the tap stop is
+a file of its own that ends with M30 over its hole.
 """
 
 from __future__ import annotations
@@ -56,7 +60,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
 LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these (the lathe tools, the tap and the files are not).
-CAM_TOOLS = ("spot", "drill-c", "reamer", "drill-50", "dead-centre")
+CAM_TOOLS = ("spot", "drill-c", "reamer", "drill-50", "tap-guide")
 IN = 25.4
 # ANSI #2 combined drill and countersink, 60° included, its pilot ground
 # with a 118° point: the shop record names the tool, not its geometry.
@@ -70,8 +74,9 @@ CENTRE_DRILL = {
 # Jobber drills' point (the shop records give the diameter only).
 DRILL_POINT_DEG = 118.0
 # The tap file's first motion: G53 G0 to machine Z0, the homed top (as the
-# magnifying clamp's recipe) [INFERENCE: the owner's config's Z mpos_mm is
-# not on record].
+# magnifying clamp's recipe); the owner (Pedro) confirmed it, answered in
+# person 2026-11-21 (cnc rulings record): machine Z = 0 is the top of travel
+# after homing.
 MACHINE_Z_TOP_MM = 0.0
 # Plunges and drill R planes start this far above the stock top: real G0
 # brings the tool down to it.
@@ -514,20 +519,20 @@ def context(
         },
     ]
 
-    # The tap stop: the dead centre loaded by the file's own M6 (its %msg
+    # The tap stop: the tap guide loaded by the file's own M6 (its %msg
     # names the hole), Z to the machine's top in machine coordinates before
     # any XY, over the hole, M30: the controller ends Idle, so the operator
-    # can jog the dead centre down onto the wrench.
+    # can jog the guide's point down into the wrench.
     manual = {
         "tap_stop": {
-            "tool": numbers["dead-centre"],
-            "label": names["dead-centre"],
+            "tool": numbers["tap-guide"],
+            "label": names["tap-guide"],
             "setting": "SPINDLE STAYS OFF. NEXT: 2-56 TAP IN THE SET-SCREW HOLE",
             "gcode": [
                 f"G53 G0 Z{MACHINE_Z_TOP_MM:.3f}",
                 f"G0 X{tap_xy[0]:.3f} Y{tap_xy[1]:.3f}",
-                "(2-56 TAP IN THE SET-SCREW HOLE. JOG Z DOWN ONTO THE WRENCH, LIGHT PRESSURE."
-                " TAP BY HAND TO THE NOTED DRO Z, JOGGING Z TO KEEP THE POINT SEATED. JOG Z UP CLEAR)",
+                "(2-56 TAP IN THE SET-SCREW HOLE. JOG Z DOWN TO PUSH THE GUIDE POINT HOME IN THE WRENCH."
+                " TAP BY HAND TO THE NOTED DRO Z, READ WITH THE POINT PUSHED HOME. JOG Z UP CLEAR)",
                 "M30",
             ],
             "at": tap_xy,
@@ -617,7 +622,7 @@ def context(
         [
             "CM03_set_screw_tap",
             "tap_stop",
-            {"tool": t["dead-centre"], "at": tap_xy, "machine_top": MACHINE_Z_TOP_MM},
+            {"tool": t["tap-guide"], "at": tap_xy, "machine_top": MACHINE_Z_TOP_MM},
         ],
         ["CM03_set_screw_tap", "air_feed", {"z_top": 0.0}],
     ]

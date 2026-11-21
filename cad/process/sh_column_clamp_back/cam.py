@@ -21,7 +21,7 @@ CB01 faces the first end, CB02 the other end to the width. Lying on the 1 in
 + 1/2 in parallel stacks: CB03 faces the bottom face, CB04 the top to the
 height, CB05 skims the mating face, CB06 (mating face down) faces the back
 face to the pre-face depth (.610), spots and drills both #29 tap drills from
-one zero; CB07 and CB08 bring the dead centre over each for the 8-32 hand
+one zero; CB07 and CB08 bring the tap guide over each for the 8-32 hand
 tap. Each back is then bolted to its front (MHA-SH-01, drilled by its
 traveler) with their own #8-32 screws and gripped on the two outside faces:
 CB09 interpolates the full bore on the split line (helix down, then a finish
@@ -45,10 +45,14 @@ Work frames (G54), each set in its setup:
 Toolpath rules (owner rulings 2026-11-16): faces zigzag (ball screws),
 plunges beside the stock at the cutting feed, real G0 above the stock; the
 bore climbs (G3, a clockwise spindle) and enters on a helix, never a plunge.
-The holes are tapped by hand on the dead centre, spindle off (as the
-magnifying clamp): FluidNC refuses jogs while an M0 holds the program
-(http://wiki.fluidnc.com/en/features/single_block_mode), so each tap stop is
-a file of its own that ends with M30 over its hole.
+The holes are tapped by hand (FluidNC cannot rigid-tap; owner, Pedro,
+2026-11-17), the T-handle wrench's centre hole on the spring point of the
+Fisher tap guide in the 1/2 in R8 collet (owner, Pedro, 2026-11-21: "use
+https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
+on r8 0.5 collet"), spindle off, the operator jogging Z down to push the
+point home (as the magnifying clamp). FluidNC refuses jogs while an M0 holds
+the program (http://wiki.fluidnc.com/en/features/single_block_mode), so each
+tap stop is a file of its own that ends with M30 over its hole.
 """
 
 from __future__ import annotations
@@ -77,12 +81,16 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
 )
 # Every program loads its own first tool (M6, the tool setter): each setup
 # starts on whatever the mill last held, and each tap file before its
-# retract (the dead centre).
+# retract (the tap guide).
 LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these (the saw, the tap and the files are not).
-CAM_TOOLS = ("em-half", "spot", "drill-29", "dead-centre")
+CAM_TOOLS = ("em-half", "spot", "drill-29", "tap-guide")
 IN = 25.4
+# The Fisher tap guide's overall length, 3 1/8 in (its sellers' size,
+# cad/config/shop-equipment/ tools.tap-guide-fisher): the most it stands
+# below the collet face, taken off the tap stack for the tap's own reach.
+TAP_GUIDE_OAL_MM = 3.125 * IN
 # ANSI #2 combined drill and countersink, 60° included: the shop record names
 # the tool, not its geometry.
 CENTRE_DRILL = {
@@ -95,8 +103,9 @@ CENTRE_DRILL = {
 DRILL_POINT_DEG = 118.0
 # A tap file's first motion: G53 G0 to machine Z0, the homed top (as the
 # magnifying clamp's recipe: FluidNC sets an axis's machine position to its
-# homing mpos_mm, default 0, and Z homes up) [INFERENCE: the owner's
-# config's Z mpos_mm is not on record].
+# homing mpos_mm, default 0, and Z homes up); the owner (Pedro) confirmed
+# it, answered in person 2026-11-21 (cnc rulings record): machine Z = 0 is
+# the top of travel after homing.
 MACHINE_Z_TOP_MM = 0.0
 # Face passes start and finish with the cutter this far clear of the part's
 # ends, so every plunge and stepover link is in the air beside it.
@@ -516,7 +525,7 @@ def context(
     _agree(plan, "upright_grip_mm", upright_grip)
     _agree(plan, "lying_grip_mm", lying_grip)
     t = p["parallel_thickness_mm"]
-    # The tap stack's ceiling (the dead centre's reach out of its collet plus
+    # The tap stack's ceiling (the tap guide's reach out of its collet plus
     # the tap's in its wrench): spindle-to-table maximum less the tool-change
     # clearance, the vise bed, the stacks, the setup's tallest stock (the
     # section, as the capacity check takes it) and the collet's gauge,
@@ -530,7 +539,15 @@ def context(
         - section
         - p["r8_collet_gauge_mm"]
     )
-    _agree(plan, "tap_stack_max_mm", math.floor(stack / 0.254 + 1e-9) * 0.254)
+    stack_max = math.floor(stack / 0.254 + 1e-9) * 0.254
+    _agree(plan, "tap_stack_max_mm", stack_max)
+    # The tap's own reach in its wrench: the stack less the guide's length,
+    # rounded down to .01 in.
+    _agree(
+        plan,
+        "tap_wrench_reach_max_mm",
+        math.floor((stack_max - TAP_GUIDE_OAL_MM) / 0.254 + 1e-9) * 0.254,
+    )
 
     names = {tool["id"]: tool["name"] for tool in plan["tools"]}
     numbers = {
@@ -903,21 +920,22 @@ def context(
         }
     )
 
-    # One file per hole to tap (as the magnifying clamp's): the dead centre
+    # One file per hole to tap (as the magnifying clamp's): the tap guide
     # loaded by the file's own M6, Z to the machine's top before any XY, over
     # the hole, M30: the controller ends Idle for the operator's jog.
     manual = {}
     for k, xy in enumerate(holes, 1):
         what = f"TAP DRILL {k}, THE ONE {'NEAR' if k == 1 else 'FAR FROM'} N"
         manual[f"tap_{k}"] = {
-            "tool": numbers["dead-centre"],
-            "label": names["dead-centre"],
+            "tool": numbers["tap-guide"],
+            "label": names["tap-guide"],
             "setting": f"SPINDLE STAYS OFF. NEXT: 8-32 TAP IN {what}",
             "gcode": [
                 f"G53 G0 Z{MACHINE_Z_TOP_MM:.3f}",
                 f"G0 X{xy[0]:.3f} Y{xy[1]:.3f}",
-                f"(8-32 TAP IN {what}. JOG Z DOWN ONTO THE WRENCH, LIGHT PRESSURE."
-                " TAP BY HAND THROUGH TO THE NOTED DRO Z, JOGGING Z TO KEEP THE POINT SEATED. JOG Z UP CLEAR)",
+                f"(8-32 TAP IN {what}. JOG Z DOWN TO PUSH THE GUIDE POINT HOME IN THE WRENCH."
+                " TAP BY HAND THROUGH TO THE NOTED DRO Z, PUSHING THE POINT HOME EACH 1/2 IN,"
+                " READ WITH THE POINT PUSHED HOME. JOG Z UP CLEAR)",
                 "M30",
             ],
             "at": xy,
@@ -1074,7 +1092,7 @@ def context(
                 name,
                 "tap_stop",
                 {
-                    "tool": tn["dead-centre"],
+                    "tool": tn["tap-guide"],
                     "at": manual[key]["at"],
                     "machine_top": MACHINE_Z_TOP_MM,
                 },

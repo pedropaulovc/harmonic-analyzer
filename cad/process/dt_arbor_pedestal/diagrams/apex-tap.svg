@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 6: the 4-40 tap in the T-handle wrench on the dead centre, spindle off. -->
+  <!-- Setup 6: the 4-40 tap in the T-handle wrench under the spring tap guide, spindle off. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 6 (PA06_apex_tap): tap 4-40 by hand on the dead centre</text>
+  <text class="title" x="20" y="20">Setup 6 (PA06_apex_tap): tap 4-40 by hand under the tap guide</text>
   <rect class="fixture-support" x="223.61" y="345" width="124.39" height="6"/>
   <polygon class="part-kept" points="330,345 241.61,345 241.61,178.88 276.66,178.88 276.66,329.76 330,329.76"/>
   <rect class="holes" x="241.61" y="197.32" width="35.05" height="28.65"/>
@@ -16,7 +16,7 @@
   <text class="label" x="307.42" y="148.88">T-handle wrench</text>
   <rect class="part-rest" x="258.42" y="148.88" width="6" height="30"/>
   <polygon class="cutter" points="249.42,34 273.42,34 261.42,132.88"/>
-  <text class="label" x="281.42" y="64">dead centre in the spindle, spindle OFF</text>
+  <text class="label" x="281.42" y="64">tap guide in the spindle, spindle OFF</text>
   <line class="dims" x1="280.66" y1="178.88" x2="324.66" y2="178.88"/>
   <line class="dims" x1="267.42" y1="214.88" x2="324.66" y2="214.88"/>
   <line class="arrow" x1="316.66" y1="192.88" x2="316.66" y2="214.88"/>
