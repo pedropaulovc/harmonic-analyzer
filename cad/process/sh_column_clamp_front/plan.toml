@@ -492,7 +492,7 @@ diagram = { file = "diagrams/inspect.svg", alt = "The finished front, looking do
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-inspection = ["Bore Ø accepted in the pair (MHA-SH-02 Setup 9). Each ear's web to the bore, on the mating face: the calipers' outside jaw tips into the ear hole and the bore, closed on the web: at least {{cad.ear_wall_min_in:.3dot}} (MIN EAR WALL). Each ear's station: that web plus half the ear hole's pin plus half the bore's recorded Ø, {{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}}. The bore's place: the calipers from N to the bore's near edge on the mating face, plus half its Ø, {{cad.bore_location_min_in:.3dot}}–{{cad.bore_location_max_in:.3dot}}. Under the web or outside either band: stop and tell the owner."]
+inspection = ["Bore Ø accepted in the pair (MHA-SH-02 Setup 9). Measure before the bore's edges are broken. Each ear's web to the bore, on the mating face: the calipers' outside jaw tips into the ear hole and the bore, closed on the web: at least {{cad.ear_wall_min_in:.3dot}} (MIN EAR WALL). Each ear's station: that web plus half the ear hole's pin plus half the bore's recorded Ø, {{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}}. The bore's place: the calipers from N to the bore's near edge on the mating face, plus half its Ø, {{cad.bore_location_min_in:.3dot}}–{{cad.bore_location_max_in:.3dot}}. Under the web or outside either band: stop and tell the owner."]
 gauge_checks = [
   { gauge = "calipers", band_mm = ["{{cad.ear_wall_min_mm}}", "{{cad.ear_wall_best_mm}}"] },
   { gauge = "calipers", band_mm = "{{cad.ear_station_band_mm}}" },
