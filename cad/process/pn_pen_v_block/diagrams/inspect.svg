@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 520" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="520"/>
+  <text class="title" x="20" y="22">The finished block (8 px/mm): view on B (top) and front elevation (below)</text>
+  <!-- View on B: X along, depth across, the front face at the bottom. -->
+  <polygon class="part-kept" points="100,56.3 171.1,56.3 171.1,40 309.3,40 309.3,214.8 171.1,214.8 171.1,198.5 100,198.5"/>
+  <rect class="part-removed" x="171.1" y="64.4" width="138.2" height="126"/>
+  <rect class="part-removed" x="100" y="79.8" width="79.2" height="96"/>
+  <line class="hidden" x1="100" y1="119.7" x2="179.2" y2="119.7"/>
+  <line class="hidden" x1="100" y1="136" x2="179.2" y2="136"/>
+  <circle class="holes" cx="199.6" cy="127.4" r="12.8"/>
+  <line class="centre-line" x1="80" y1="127.4" x2="330" y2="127.4"/>
+  <text class="label" x="340" y="60">B (bottom face): V groove along the neck,</text>
+  <text class="label" x="340" y="76">relief slot from the steps to the far end,</text>
+  <text class="label" x="340" y="92">the pivot bore breaking into the slot</text>
+  <text class="label" x="340" y="124">P at the left; the front face at the bottom</text>
+  <line class="dims" x1="100" y1="232" x2="309.3" y2="232"/>
+  <text class="label-halo" x="204" y="250" text-anchor="middle">length {{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}}</text>
+  <line class="dims" x1="320" y1="40" x2="320" y2="214.8"/>
+  <text class="label-halo" x="326" y="200">depth {{cad.body_back_depth_min_in:.3dot}}–{{cad.body_back_depth_max_in:.3dot}}</text>
+  <!-- Front elevation: X along, height up, B at the bottom. -->
+  <polygon class="part-kept" points="100,300 309.3,300 309.3,444 100,444"/>
+  <line class="hidden" x1="100" y1="404.1" x2="179.2" y2="404.1"/>
+  <line class="hidden" x1="171.1" y1="391.2" x2="309.3" y2="391.2"/>
+  <line class="hidden" x1="171.1" y1="391.2" x2="171.1" y2="444"/>
+  <line class="hidden" x1="186.8" y1="300" x2="186.8" y2="391.2"/>
+  <line class="hidden" x1="212.4" y1="300" x2="212.4" y2="391.2"/>
+  <circle class="part-threads" cx="199.6" cy="348.5" r="9"/>
+  <line class="centre-line" x1="199.6" y1="290" x2="199.6" y2="454"/>
+  <line class="dims" x1="320" y1="300" x2="320" y2="444"/>
+  <text class="label-halo" x="326" y="380">height {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}}</text>
+  <line class="leader" x1="340" y1="320" x2="214" y2="320"/>
+  <text class="label" x="344" y="324">pivot bore Ø{{cad.pivot_bore_dia_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}: .1260 GO / .1265 NO-GO</text>
+  <line class="leader" x1="340" y1="350" x2="209" y2="350"/>
+  <text class="label" x="344" y="354">4-40 set-screw hole from the front, into the bore</text>
+  <text class="label" x="344" y="420">relief slot and V (hidden) below</text>
+  <text class="label" x="40" y="490">Deburr R{{cad.edge_break_in:.3dot}} / {{cad.chamfer_max_in:.3dot}} max; no file on the V's flanks or the bore's seat.</text>
+</svg>

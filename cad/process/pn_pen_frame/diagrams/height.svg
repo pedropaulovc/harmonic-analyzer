@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="16" y="20">PF02, across the jaws: T down, the bottom end B faced to the height</text>
+  <line class="fixture-table" x1="126.2" y1="420.0" x2="473.8" y2="420.0"/>
+  <rect class="clamp" x="166.2" y="195.3" width="110.0" height="224.7"/>
+  <rect class="clamp" x="323.8" y="195.3" width="110.0" height="224.7"/>
+  <text class="label-on-clamp" x="221.2" y="215.3" text-anchor="middle">moving jaw</text>
+  <text class="label-on-clamp" x="378.8" y="215.3" text-anchor="middle">fixed jaw</text>
+  <rect class="fixture-support" x="276.2" y="293.0" width="15.9" height="127.0"/>
+  <rect class="fixture-support" x="307.9" y="293.0" width="15.9" height="127.0"/>
+  <rect class="part-kept" x="276.2" y="92.3" width="47.6" height="200.7"/>
+  <rect class="part-removed" x="276.2" y="73.3" width="47.6" height="19.1"/>
+  <rect class="cutter" x="268.2" y="41.3" width="63.5" height="30.0"/>
+  <text class="label-halo" x="337.8" y="59.3">1/2 in end mill, two passes along the jaws</text>
+  <line class="datum" x1="256.2" y1="92.3" x2="272.2" y2="92.3"/>
+  <text class="datum-label" x="252.2" y="96.3" text-anchor="end">Z {{cad.top_face_height_mm:in.3dot}}</text>
+  <text class="label" x="470.0" y="250.0">T down on the 1 in parallels; Z0 their top.</text>
+  <text class="label" x="470.0" y="268.0">Levels of {{process.face_step_max_mm:in.3dot}} max down to</text>
+  <text class="label" x="470.0" y="286.0">the height {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}}.</text>
+  <text class="label" x="470.0" y="304.0">The faced end is B: the tap goes in it.</text>
+</svg>

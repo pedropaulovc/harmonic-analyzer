@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="16" y="20">PF01, across the jaws (F at the fixed jaw): the top end T skimmed</text>
+  <line class="fixture-table" x1="126.2" y1="420.0" x2="473.8" y2="420.0"/>
+  <rect class="clamp" x="166.2" y="195.3" width="110.0" height="224.7"/>
+  <rect class="clamp" x="323.8" y="195.3" width="110.0" height="224.7"/>
+  <text class="label-on-clamp" x="221.2" y="215.3" text-anchor="middle">moving jaw</text>
+  <text class="label-on-clamp" x="378.8" y="215.3" text-anchor="middle">fixed jaw</text>
+  <rect class="fixture-support" x="276.2" y="293.0" width="15.9" height="127.0"/>
+  <rect class="fixture-support" x="307.9" y="293.0" width="15.9" height="127.0"/>
+  <rect class="part-kept" x="276.2" y="73.3" width="47.6" height="219.7"/>
+  <rect class="part-removed" x="276.2" y="70.8" width="47.6" height="2.5"/>
+  <rect class="cutter" x="268.2" y="38.8" width="63.5" height="30.0"/>
+  <text class="label-halo" x="337.8" y="56.8">1/2 in end mill, two passes along the jaws</text>
+  <line class="datum" x1="256.2" y1="73.3" x2="272.2" y2="73.3"/>
+  <text class="datum-label" x="252.2" y="77.3" text-anchor="end">Z0</text>
+  <text class="label" x="470.0" y="250.0">Blank upright on two 1 in parallels,</text>
+  <text class="label" x="470.0" y="268.0">gripped on its two 3/8 faces;</text>
+  <text class="label" x="470.0" y="286.0">the 1-1/4 width runs along the jaws.</text>
+  <text class="label" x="470.0" y="304.0">Skim {{process.end_skim_mm:in.3dot}} off the sawn top: it becomes T.</text>
+</svg>
