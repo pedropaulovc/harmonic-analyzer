@@ -139,14 +139,14 @@ speed_kind = "spindle"
 tool = "thread"
 drilling = "none"
 sizing = "other"
-instruction = "Single-point {{cad.thread_designation}}: gearbox on 20 TPI, compound at 29°, the bit on centre height and square to the axis. Start each pass off end B, cut toward the chuck and open the half-nuts at Z-{{cad.thread_length_in:.3dot}}: the thread, its run-out included, then ends {{cad.thread_length_in:.2dot}} from end B, and the run-out (the last, shallower turn) is no longer than {{cad.thread_incomplete_max_in:.3dot}}. Feed the compound .003–.005 a pass, less near depth; stop when Ops 60 and 70 pass."
+instruction = "Single-point {{cad.thread_designation}}, compound at 29°, the bit on centre height and square to the axis. Each pass: start off end B and cut toward the chuck; at Z-{{cad.thread_length_in:.3dot}} back the cross slide out and stop the spindle, half-nuts still closed (the thread then ends {{cad.thread_length_in:.2dot}} from end B, run-out {{cad.thread_incomplete_max_in:.3dot}} max). Reverse the spindle to run the carriage back past end B, return the cross slide to its mark, feed the compound, go forward again. Less feed near depth; stop when Ops 60 and 70 pass."
 settings = "lathe-thread-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Spindle stopped, the rod still in the chuck and steady rest: seat the 20 TPI leaf of the 40-piece set's screw pitch gauge in the thread along its length. Calipers from end B to where the thread ends, run-out included; then the run-out alone, from the last full-depth turn to the thread's end."
-inspection = "Thread length {{cad.thread_length_min_in:.2dot}}–{{cad.thread_length_max_in:.2dot}} from end B, run-out included; run-out {{cad.thread_incomplete_max_in:.3dot}} max."
+inspection = "Pitch-gauge leaf seats along the whole thread, no light under it; thread length {{cad.thread_length_min_in:.2dot}}–{{cad.thread_length_max_in:.2dot}} from end B, run-out included; run-out {{cad.thread_incomplete_max_in:.3dot}} max."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.thread_length_band_mm}}" }]
 
 [[setups.operations]]
@@ -200,11 +200,15 @@ instruction = "Faced under {{cad.faced_length_min_in:.2dot}}: scrap the lever an
 
 [[setups.operations]]
 cut_kind = "other"
+instruction = "Spindle stopped: set the R.125 form tool (a concave R.125 arc) on centre height, the arc facing end A and spanning it. Bring the arc's tips up along Z, adjusting the cross slide, until both touch end A's O.D. corner at once, no light showing at either tip: the arc is then centred on the axis. Zero the DRO Z at that touch."
+
+[[setups.operations]]
+cut_kind = "other"
 speed_kind = "spindle"
 tool = "form"
 drilling = "none"
 sizing = "other"
-instruction = "Form the tip with the R.125 form tool (a concave R.125 arc), on centre height, the arc facing end A and spanning it. Spindle stopped: bring the arc's tips up to end A and set the cross slide so both touch the O.D. corner together (an even light gap either side): the arc is then centred on the axis. Zero the DRO Z there. Spindle on, feed the carriage along Z to Z−{{cad.dome_datum_form_height_in:.3dot}} (the rod's radius): a full SR{{cad.dome_datum_radius_ref_in:.3dot}} hemisphere, its apex on the faced plane and tangent to the rod. Never past Z−{{cad.dome_datum_form_height_in:.3dot}}."
+instruction = "Spindle on: feed the carriage along Z to Z−{{cad.dome_datum_form_height_in:.3dot}} (the rod's radius): a full SR{{cad.dome_datum_radius_ref_in:.3dot}} hemisphere, its apex on the faced plane and tangent to the rod. Never past Z−{{cad.dome_datum_form_height_in:.3dot}}."
 settings = "lathe-form-r125-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -214,7 +218,7 @@ instruction = "Stop the spindle and look at the tip under a loupe: no pip or fla
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A pip at the apex: the tool is off centre height; reset it and take one more light pass to the same Z−{{cad.dome_datum_form_height_in:.3dot}}, no deeper. A step at the rod: the arc is off centre across the rod; reset the cross slide as Op 130 and take one more pass to the same Z."
+instruction = "A pip (tool off centre height) or a step at the rod (arc off centre): correct the tool's height or the cross slide, spindle stopped. Then bring the arc up along Z until it just touches the formed tip, zero the DRO Z at that touch, and take one light pass to Z−.002 only; Op 170 then reads the length."
 
 [[setups.operations]]
 cut_kind = "other"
