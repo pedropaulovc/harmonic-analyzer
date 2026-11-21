@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="430"/>
+  <text class="title" x="20" y="20">Section across the jaws at a lock hole, from the LEFT end (1 in = 100 px)</text>
+  <line class="fixture-table" x1="60" y1="400" x2="400" y2="400"/>
+  <rect class="clamp" x="152.6" y="223" width="60" height="177"/>
+  <rect class="clamp" x="275" y="223" width="60" height="177"/>
+  <text class="label-on-clamp" x="158" y="390">moving</text>
+  <text class="label-on-clamp" x="285" y="390">fixed</text>
+  <!-- Both stacks side by side against the fixed jaw. -->
+  <rect class="fixture-support" x="250" y="250" width="12.5" height="150"/>
+  <rect class="fixture-support" x="262.5" y="250" width="12.5" height="150"/>
+  <rect class="part-kept" x="212.6" y="210.5" width="62.4" height="39.5"/>
+  <rect class="holes" x="223.95" y="210.5" width="8.9" height="39.5"/>
+  <rect class="cutter" x="222" y="110" width="11" height="70"/>
+  <line class="arrow" x1="228.4" y1="90" x2="228.4" y2="108"/>
+  <line class="centre-line" x1="228.4" y1="200" x2="228.4" y2="275"/>
+  <line class="datum" x1="80" y1="250" x2="150" y2="250"/>
+  <text class="datum-label" x="30" y="246">Z0 (F)</text>
+  <line class="datum" x1="275" y1="196" x2="275" y2="222"/>
+  <text class="datum-label" x="300" y="214">Y0 (U)</text>
+  <line class="dims" x1="228.4" y1="195" x2="275" y2="195"/>
+  <line class="dims" x1="228.4" y1="188" x2="228.4" y2="202"/>
+  <line class="dims" x1="275" y1="188" x2="275" y2="194"/>
+  <line class="leader" x1="252" y1="195" x2="298" y2="178"/>
+  <text class="label" x="300" y="182">hole {{cad.lock_tap_1_height_in:.3dot}} from U</text>
+  <line class="leader" x1="231" y1="262" x2="231" y2="410"/>
+  <text class="label" x="225" y="422" text-anchor="end">the #43 exits here, in the air</text>
+  <line class="leader" x1="262.5" y1="380" x2="262.5" y2="410"/>
+  <text class="label" x="258" y="422">both stacks at the fixed jaw</text>
+  <text class="label-halo" x="218" y="238">top</text>
+  <text class="label-halo" x="258" y="238">U</text>
+  <!-- Plan, fixed jaw at the top, 1 in = 25 px. -->
+  <text class="title" x="430" y="60">Plan (fixed jaw at the top, 1 in = 25 px)</text>
+  <rect class="clamp" x="514.6" y="110" width="156.2" height="30"/>
+  <rect class="clamp" x="514.6" y="155.6" width="156.2" height="30"/>
+  <rect class="part-removed" x="458.5" y="140" width="1.5" height="15.6"/>
+  <rect class="part-removed" x="725.5" y="140" width="4" height="15.6"/>
+  <rect class="part-kept" x="460" y="140" width="265.5" height="15.6"/>
+  <circle class="holes" cx="532.7" cy="151.65" r="1.6"/>
+  <circle class="holes" cx="546.5" cy="151.65" r="1.6"/>
+  <circle class="holes" cx="638.9" cy="151.65" r="1.6"/>
+  <circle class="holes" cx="652.7" cy="151.65" r="1.6"/>
+  <circle class="cutter" cx="451.75" cy="147.8" r="6.35"/>
+  <circle class="cutter" cx="733.75" cy="147.8" r="6.35"/>
+  <line class="arrow" x1="442" y1="185" x2="442" y2="115"/>
+  <line class="arrow" x1="744" y1="115" x2="744" y2="185"/>
+  <text class="label" x="430" y="205">left end: passes +Y</text>
+  <text class="label" x="640" y="205">right end: passes −Y</text>
+  <line class="datum" x1="460" y1="90" x2="460" y2="135"/>
+  <text class="datum-label" x="430" y="85">X0, the milled LEFT end</text>
+  <line class="dims" x1="460" y1="235" x2="532.7" y2="235"/>
+  <line class="dims" x1="532.7" y1="160" x2="532.7" y2="240"/>
+  <text class="label" x="462" y="252">{{cad.lock_tap_1_station_in:.3f}}</text>
+  <line class="dims" x1="460" y1="270" x2="725.5" y2="270"/>
+  <line class="dims" x1="460" y1="160" x2="460" y2="275"/>
+  <line class="dims" x1="725.5" y1="160" x2="725.5" y2="275"/>
+  <text class="label" x="560" y="288">length {{cad.right_end_length_in:.2f}}</text>
+  <text class="label" x="430" y="320">4X #43 thru, stations {{cad.lock_tap_1_station_in:.3f}}, {{cad.lock_tap_2_station_in:.3f}},</text>
+  <text class="label" x="430" y="338">{{cad.lock_tap_3_station_in:.3f}}, {{cad.lock_tap_4_station_in:.3f}} from the left end</text>
+</svg>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 4: the plate turned over about its long axis on the same block, gripped as in Setup 3; left, looking along the plate's length at the block's open window under the pilot; right, the #41 opening a pilot through into the window. Hand-drawn at 200 px/in; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="600" height="360" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <text class="title" x="12" y="20">Setup 4: open the holes, MS02_open (plate turned over on the block)</text>
+  <!-- Left: section across the block at a hole, seen from the front (operator); .56 wide (112 px), .48 deep (96 px), 200 px/in. -->
+  <text class="title" x="30" y="40">across the block at a hole, from the front</text>
+  <rect class="part-rest" x="60" y="132" width="112" height="96"/>
+  <!-- Window: .336-.470 from the block's locating edge (now on the right), open upward, .330 deep (66 px). -->
+  <rect class="paper" x="78" y="132" width="27" height="66"/>
+  <rect class="hidden" x="78" y="132" width="27" height="66"/>
+  <path class="leader" d="M92 190 L100 260"/>
+  <text class="label" x="30" y="278">MHA-MS-02 window</text>
+  <!-- Plate turned over: its locating edge now on the LEFT (X0). -->
+  <rect class="part-kept" x="60" y="124" width="112" height="8"/>
+  <!-- Pilot at .160 from the plate's locating edge: centre 32 px in, over the window. -->
+  <rect class="part-removed" x="87" y="124" width="10" height="8"/>
+  <rect class="cutter" x="87" y="64" width="10" height="56"/>
+  <path class="part-removed" d="M87 132 L92 140 L97 132 Z"/>
+  <line class="datum" x1="60" y1="64" x2="60" y2="136"/>
+  <text class="datum-label" x="20" y="58">X0 plate's locating edge</text>
+  <line class="datum" x1="172" y1="132" x2="172" y2="228"/>
+  <text class="datum-label" x="130" y="300">block's locating edge</text>
+  <path class="leader" d="M172 220 L190 288"/>
+  <!-- Right: along the jaws, as Setup 3. -->
+  <text class="title" x="320" y="40">along the jaws (as Setup 3)</text>
+  <rect class="fixture-vise" x="300" y="300" width="280" height="24"/>
+  <rect class="clamp" x="300" y="120" width="40" height="180"/>
+  <rect class="clamp" x="526" y="120" width="54" height="180"/>
+  <rect class="fixture-support" x="340" y="214" width="14" height="86"/>
+  <rect class="fixture-support" x="512" y="214" width="14" height="86"/>
+  <rect class="part-rest" x="340" y="126" width="186" height="88"/>
+  <rect class="part-kept" x="340" y="118" width="186" height="8"/>
+  <rect class="part-removed" x="384" y="118" width="12" height="8"/>
+  <rect class="part-removed" x="490" y="118" width="12" height="8"/>
+  <rect class="cutter" x="490" y="56" width="12" height="58"/>
+  <line class="arrow" x1="478" y1="70" x2="478" y2="110"/>
+  <text class="label" x="380" y="80">#41, set 2800</text>
+  <text class="datum-label" x="346" y="108">Z0 plate top</text>
+  <text class="label" x="300" y="344">the #41 breaks into the window, never into the block</text>
+</svg>

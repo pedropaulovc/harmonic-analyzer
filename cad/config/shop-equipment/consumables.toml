@@ -236,3 +236,53 @@ cite = [
   "Brownells instruction sheet 076-200-546 (https://feeds.brownells.com/userdocs/learn/Inst-546forWeb.pdf), read 2026-11-17: 'Oxpho-Blue is an easily applied, highly rust resistant, bright phosphatizing chemical for touching-up or bluing guns, tools and instruments.' Contains phosphoric acid, cupric sulfate and selenious acid. No metal other than the gun is named.",
   "Brownells Bluing Supplies booklet 076-200-040, read 2026-11-17: 'The chemical goes through the oil on the gun, removes thin rust and blues the steel underneath.' Oxpho-Blue Creme: 'use Oxpho Creme anywhere you need to give steel a quick, uniform, blue/black finish'.",
 ]
+
+# --- MHA-PD-27 platen bottom guide: black oxide + oil -----------------------
+
+# The drawing's finish is black oxide + oil and no black-oxide product is
+# owned (Oxpho-Blue above is a selenium cold blue). CncBlockB 2026-11-21: add
+# to_order records for a room-temperature black oxide for steel and what its
+# directions name; the traveler's finish setup
+# (cad/process/pd_platen_bottom_guide) is gated on them and the rail is tagged
+# AWAITING BLACK OXIDE until they are bought. Its PPE is
+# consumables.chemical-gloves-eye-protection.
+[consumables.presto-black-bst4]
+name = "Birchwood Technologies Presto Black BST4 brush-on blackener, 1 qt"
+kind = "blackening_solution"
+make = "Birchwood Laboratories"
+sku = "530040-S"
+status = "to_order"
+purchase = "Birchwood Technologies store, 1 qt, $50.80, read 2026-11-21 (https://www.birchwoodtechnologies.com/shop/all-products/presto-black-bst4-brush-on-liquid-1qt/). No stock read."
+note = "Not owned: to buy. MHA-PD-27 platen bottom guide: room-temperature black oxide for iron and non-stainless steel, swabbed on, its last setup."
+cite = [
+  "PRESTO BLACK BST4 Brush-On Blackener Operating Instructions, Birchwood Laboratories 07/2015, read 2026-11-21 (https://birchwoodtechnologies.com/wp-content/uploads/2019/02/5300_Presto_Black_BST4_Instructions.pdf): a liquid brush-on blackener for all iron and non-stainless steels, applied at room temperature, a non-dimensional black finish in 30-90 seconds. 1. clean with a solvent that leaves no residue: alcohol, acetone, lacquer thinner or equivalent (not mineral spirits or kerosene); 2. remove oxides if necessary (bead blast, Scotchbrite); 3. apply a thin film by brush, swab or spray and re-apply a few times during the reaction until a uniform gray/black; do not let it dry on the surface or flash rusting can occur; 4. stop the reaction by sponging with water; against flash rust, a second rinse of baking soda solution, 2 tablespoons per gallon of warm water; 5. force dry with compressed or warm air; 6. seal: tooling and machine parts with a water-displacer such as DRI TOUCH AMBER IRP2.",
+]
+
+[consumables.acetone]
+name = "Acetone"
+kind = "solvent"
+status = "to_order"
+purchase = "The residue-free solvent BST4's directions name (alcohol, acetone or lacquer thinner); any make. No size, price or stock read."
+note = "Not owned: to buy (none on record). MHA-PD-27 black oxide: clean the rail of all oil before the BST4."
+cite = ["Presto Black BST4 directions step 1 (see consumables.presto-black-bst4)"]
+
+[consumables.baking-soda]
+name = "Baking soda (sodium bicarbonate)"
+kind = "neutralizer"
+status = "to_order"
+purchase = "Any make; 2 tablespoons per gallon of warm water. No size, price or stock read."
+note = "Not owned: to buy (none on record). MHA-PD-27 black oxide: the second rinse that stops flash rust after the BST4."
+cite = ["Presto Black BST4 directions step 4 (see consumables.presto-black-bst4)"]
+
+[consumables.dri-touch-amber-irp2]
+name = "Birchwood Technologies Dri-Touch Amber IRP2 rust preventive (water displacer)"
+kind = "oil"
+make = "Birchwood Laboratories"
+sku = "8104"
+status = "to_order"
+purchase = "Birchwood Technologies store, $61.90-$226.00 by size, read 2026-11-21 (https://www.birchwoodtechnologies.com/shop/all-products/dri-touch-amber-irp2-rust-preventive/); the size to buy is not chosen. No stock read."
+note = "Not owned: to buy. MHA-PD-27 black oxide + oil: the seal BST4's directions name for machine parts."
+cite = [
+  "Presto Black BST4 directions step 6 (see consumables.presto-black-bst4)",
+  "DRI-TOUCH AMBER IRP2 Rust Preventive Operating Instructions, Birchwood Laboratories 07/2015, read 2026-11-21 (https://www.birchwoodtechnologies.com/wp-content/uploads/2019/02/8104_Dri-Touch_Amber_IRP2_Instructions.pdf): applied to wet or dry surfaces by dipping, brushing or low-pressure spray; dries in 10-30 minutes at ambient temperature; a corrosion preventive over black oxide that seals out corrosion and enhances the depth of colour; film about 0.10 mil.",
+]
