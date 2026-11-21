@@ -67,7 +67,10 @@ def test_the_blank_leaves_a_skim_on_each_end_of_the_longest_part(stem: str) -> N
     parameters = _plan(stem)["parameters"]
     far = export_features.requirement_manifest(stem)["features"]["far_end"]
     longest = far["length"][1] if "length" in far else far["length_ref"]
-    face_per_end = (parameters["blank_length_in"] * IN - longest) / 2
+    # A stub sawn off after it carried the threading centre is stock
+    # allowance beyond the part, not facing stock.
+    stub = parameters.get("stub_allowance_in", 0.0) * IN
+    face_per_end = (parameters["blank_length_in"] * IN - stub - longest) / 2
     assert 0.005 * IN <= face_per_end <= 0.05 * IN
 
 
