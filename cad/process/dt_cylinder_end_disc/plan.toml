@@ -129,10 +129,14 @@ title = "4-jaw: face to thickness, drill V"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "6 in 4-jaw on the blank's four sawn edges, seated flat on the jaw steps, the jaws on the back 1/16 of the edges only so the out face stands proud of the jaw fronts; jaws snug only. The MT3 dead centre in the tailstock: run its point into the centre-punch mark, then tighten the jaws in turn, a pair at a time, keeping the point seated in the mark; withdraw the tailstock."
+holding = "6 in 4-jaw on the blank's four sawn edges, seated flat on the jaw steps, jaws snug only. The MT3 dead centre in the tailstock: run its point into the centre-punch mark, then tighten the jaws in turn, a pair at a time, keeping the point seated in the mark; withdraw the tailstock."
 datum = "The face against the jaw steps; the out face is faced to the thickness from it."
 diagram = { file = "diagrams/block.svg", alt = "The sawn blank in the 4-jaw, its sawn edges in the jaws and its back face on the jaw steps; the dead centre's point in the punch mark; the AR tool faces the out face to thickness." }
 lathe_hold = "other"
+
+[[setups.operations]]
+instruction = "Spindle off: set the AR tool's tip on the out face at Ø2.25 and turn the chuck a full turn by hand. No jaw may touch the tool or its holder (the jaws' step depth is not on record). A jaw in the way: face only out to where all four clear; the ring outside is turned off in Setup 3."
+feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
