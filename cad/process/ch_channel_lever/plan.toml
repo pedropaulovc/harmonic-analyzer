@@ -135,12 +135,12 @@ frame_strips_width_mm = 12.7
 pocket_arc_deg = 25.74
 # The 1/8 in carbide end mill: two rings round the hub, at the hub's radius
 # plus its own and at 10 mm, ±55° from the centre line, in levels no deeper
-# than .020; its plunges into metal at 1 in/min.
+# than .048 (two per pocket); its plunges into metal at 1 in/min.
 eighth_cutter_dia_mm = 3.175
 eighth_plunge_feed_per_min_mm = 25.4
 ring_outer_radius_mm = 10.0
 ring_half_angle_deg = 55
-ring_level_max_mm = 0.5
+ring_level_max_mm = 1.2192
 # Holes: spot Ø.065 with the #1 carbide centre drill (under the #47), the
 # drills through in pecks with full retracts, each full diameter .5 mm into
 # the spoil plate; the reamer 1.0 mm into it.
@@ -167,15 +167,16 @@ drill_d_feed_per_min_mm = 60.96
 ream_feed_per_min_mm = 60.96
 root_feed_per_min_mm = 142.24
 # The outline: the 1/8 in end mill round each lever at its radius outside
-# the drawn edge, over the plate's thickness in levels no deeper than .030,
+# the drawn edge, over the plate's thickness in levels no deeper than .043,
 # from its far face to .010 past its near face; then round the hub alone above
 # and below the plate to .010 into the spoil plate. Seven tabs .100 wide and
 # .050 thick on the plate's near face (the tab's top .050 above it): one at
 # the hub's far side and six along the bar, alternately on its top and bottom
-# edges, 20 to 169 mm from the hub's centre, so no stretch between tabs, nor
+# edges, 20 to 172 mm from the hub's centre (the last at the end of the bar's
+# straight edge, before the tip's round), so no stretch between tabs, nor
 # the tip past the last, bends past prechips' finish limit under the cut.
 # Each lap starts at 95 mm on the bottom edge.
-outline_level_max_mm = 0.762
+outline_level_max_mm = 1.0922
 outline_through_mm = 0.254
 tab_thickness_mm = 1.27
 tab_top_mm = 3.5814
@@ -185,7 +186,7 @@ tab_bottom_1_x_mm = 50
 tab_top_2_x_mm = 80
 tab_bottom_2_x_mm = 110
 tab_top_3_x_mm = 136
-tab_bottom_3_x_mm = 169
+tab_bottom_3_x_mm = 172
 outline_start_x_mm = 95
 # The tabs' stations from X0: the hub's far side, then the hub's place plus
 # each bar tab's (cam.py checks them).
@@ -195,15 +196,15 @@ tab_station_3_mm = 61.811
 tab_station_4_mm = 91.811
 tab_station_5_mm = 121.811
 tab_station_6_mm = 147.811
-tab_station_7_mm = 180.811
+tab_station_7_mm = 183.811
 # The lever's extent from X0 with side A up: the hub's far side to the tip.
 lever_start_mm = 5.842
 lever_end_mm = 191.1028
 # The roots: the title block's INSIDE CORNERS R1.0 MAX (1.0 mm, printed
 # R.040 on this inch sheet); the 5/64 in end mill's radius .039 is under it.
-# Levels no deeper than .012 over the plate's thickness.
+# Levels no deeper than .022 over the plate's thickness.
 inside_corner_max_mm = 1.016
-root_level_max_mm = 0.3
+root_level_max_mm = 0.5588
 # Machine-capacity inputs (mm): heights from the table, tool lengths from
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
@@ -358,7 +359,7 @@ sizing = "other"
 instruction = "Same file, M6 T2 (1/8 in end mill, at least .75 in out; set 2800): two rings round each hub, ±{{process.ring_half_angle_deg:.0f}}°, in levels to the same floor: the roots between the bar's edges and the hub."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
-  { name = "rings b", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = 0.4623, radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", stations_mm = "{{process.hub_from_end_mm}}" },
+  { name = "rings b", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = 1.1557, radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", stations_mm = "{{process.hub_from_end_mm}}" },
 ]
 
 [[setups.operations]]
@@ -507,7 +508,7 @@ sizing = "other"
 instruction = "Same file, M6 T2 (set 2800): the two rings round each hub, as in Setup 2."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
-  { name = "rings a", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = 0.4648, radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", stations_mm = "{{process.hub_from_end_mm}}" },
+  { name = "rings a", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = 1.162, radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", stations_mm = "{{process.hub_from_end_mm}}" },
 ]
 
 [[setups.operations]]
@@ -540,7 +541,7 @@ sizing = "other"
 instruction = "Run CL06_outline (M6 T2; set 2800): each lever's outline anticlockwise round its drawn edge over the plate's thickness, in levels from the plate's far face to .010 past its near face; below {{process.tab_top_mm:in.3dot}} above Z0 the cutter lifts over seven tabs, {{process.tab_width_mm:in.3dot}} wide and {{process.tab_thickness_mm:in.3dot}} thick on the plate's near face: one at the hub's far side, six along the bar, alternately top and bottom. Plunges into metal at {{process.eighth_plunge_feed_per_min_mm:in.1f}} in/min."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
-  { name = "outline", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = 0.6502, radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = ["{{process.lever_start_mm}}", "{{process.lever_end_mm}}"] },
+  { name = "outline", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = 1.0837, radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = ["{{process.lever_start_mm}}", "{{process.lever_end_mm}}"] },
 ]
 
 [[setups.operations]]

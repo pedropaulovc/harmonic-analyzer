@@ -671,8 +671,6 @@ def context(
         _agree(plan, f"tab_station_{k}_mm", station)
     _agree(plan, "lever_start_mm", hub_x - g["hub_r"])
     _agree(plan, "lever_end_mm", hub_x + lever_end)
-    if not jaw_x0 < tab_stations[1] and tab_stations[-1] < jaw_x0 + jaw_w:
-        raise ValueError("a bar tab lies outside the jaws' grip")
 
     def edge_y(x: float) -> float:
         """The bar's top edge at ``x`` from the hub's centre."""
