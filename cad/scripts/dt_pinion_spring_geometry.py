@@ -183,12 +183,14 @@ PAD_HOLE_WEB_MIN = round(
 # scaling from tensile applies (ruling 1's rule was for tensile-only minima).
 # The optional CH 900 age (482 C, 1 h) raises it and is NOT counted.
 YIELD_MPA = 1205.0
-# Raised-pivot design: the longer blade needs more free-form preset. An
-# isolated source-law sizing over all 32 formed corners leaves 7.90..9.03
-# degrees feasible against the current cutter-blank annulus mass and old native
-# gravity plus pose-change bounds. 8.2 preserves both 1.5x gates; this is not
-# a replacement for the integrated native gravity recalibration.
-PRESET_DEG = 8.2
+# Raised-pivot design: the longer blade needs more free-form preset.  Owner
+# ruling 2026-11-20 (#1037): "B", the option "Re-form the blade ≈0.64° less
+# preset (8.2° → ≈7.56°): window centred at ±0.67 mm".  The pad's east-west
+# window is centred on the foot hole's station, so the gage-leaf stop fits it.
+# 7.52 is the preset that centres it (the drive train's own gates read 0.671
+# east before the soft corner's 1.5x preload floor and 0.670 west before the
+# stiff corner's 1.5 stress floor; 8.2 left 1.063 east and 0.280 west).
+PRESET_DEG = 7.52
 
 _LAM = math.radians(STRAP_LEAN_DEG)
 STRAP_U = (math.sin(_LAM), math.cos(_LAM))  # up the strap axis
@@ -292,7 +294,7 @@ KINK_ANGLE_PLACES = 0
 # flank normal: the free crest circle's centre shift less the parked air. The
 # parked contact point turned PRESET_DEG is no longer the face's nearest point
 # to the flank; it would understate this by (R_KINK + THICK)(1 - cos PRESET_DEG),
-# 0.038 mm at 8.2 degrees. formed_contact measures the same face.
+# 0.032 mm at 7.52 degrees. formed_contact measures the same face.
 PRESET = (
     (KINK_C[0] - FREE_KINK_C[0]) * STRAP_N[0]
     + (KINK_C[1] - FREE_KINK_C[1]) * STRAP_N[1]

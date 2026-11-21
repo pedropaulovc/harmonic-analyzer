@@ -145,8 +145,8 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
     assert len(leaf.FORMED_CORNERS) == 2 ** len(leaf.FORMED_CONTACT_BANDS)
     # The nominal formed profile IS the free shape (the installed one turned
     # PRESET_DEG about the bend centre): its crest face, arm and contact
-    # station are the free crest circle's, exactly.  At 8.2 degrees they sit
-    # ~0.5 up the blade and ~1.1 down the strap from the installed contact.
+    # station are the free crest circle's, exactly.  At 7.52 degrees they sit
+    # ~0.5 up the blade and ~1.0 down the strap from the installed contact.
     nominal = leaf.formed_contact()
     free_contact = (
         leaf.FREE_KINK_C[0] - leaf.STRAP_N[0] * (leaf.R_KINK + section.THICK),
@@ -1486,22 +1486,15 @@ def test_rig_anchors_are_named_not_literal() -> None:
     assert math.isclose(arbor.DRUM_STATION_AS_BUILT, 60.66, abs_tol=1e-12)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason=(
-        "#1037: MHA-DT-24's pad has no east-west locate that fits the preload "
-        "and stress window (user ruling 2026-09-27: ships in v37 as a known "
-        "issue, redesigned after the release)"
-    ),
-)
 def test_spring_pad_east_west_placement_fits_the_preload_and_stress_window() -> None:
     # Codex #859 (review body, P1): the base seat is spotted through the pad,
     # so the pad's east-west station is where the fitter holds it.  An east
     # shift s cuts the crest's penetration by s cos(lean), a west one adds it.
     # The window is what the worst formed corners leave: east until the soft
     # corner reaches the 1.5x preload floor, west until the stiff corner
-    # reaches the 1.5 stress floor.
+    # reaches the 1.5 stress floor.  Owner ruling 2026-11-20 (#1037, "B"):
+    # the blade is re-formed with less preset so the window is centred on the
+    # foot hole's station, about +/-0.67 mm, and the stop's stack fits it.
     from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
     from _printed_tolerance import printed_deviations
 
@@ -1525,8 +1518,10 @@ def test_spring_pad_east_west_placement_fits_the_preload_and_stress_window() -> 
             deflection[1], drive._SPR_T_HI, arm
         )
         west_room.append(deflection[1] * (sf / 1.5 - 1.0) / cos_lean)
+    # Centred: each side within 0.01 mm of the other, about 0.67 mm.
+    assert min(east_room) == pytest.approx(min(west_room), abs=0.01)
     window = min(min(east_room), min(west_room))
-    assert window == pytest.approx(0.092, abs=0.002)  # #1037's number
+    assert window == pytest.approx(0.67, abs=0.01)
     # The best named-datum stop #1037 found: a gage leaf on edge against the
     # back block's east end, the pad screwed through its clearance hole.
     placement = {
