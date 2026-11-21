@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import tomllib
 import zipfile
 from pathlib import Path
 
@@ -11,22 +12,39 @@ import pytest
 import _config
 import export_features
 import fetch_features
+from _export_feature_faces import inventory_path
+from _test_feature_bundles import bind_manifest, write_bundle
 
-STEM = "ch_amplitude_bar"
+UNDECLARED = "ch_amplitude_bar"
+DECLARED = "ch_pivot_shaft"
 
 
 def _release_zip(
-    tmp_path: Path, *, tamper: bool = False, extra: tuple[str, ...] = ()
+    tmp_path: Path,
+    stem: str,
+    monkeypatch,
+    *,
+    tamper: bool = False,
+    drop_feature: bool = False,
+    inventories: bool = True,
+    extra: tuple[str, ...] = (),
 ) -> bytes:
-    """A release ZIP: a large unrelated member, then one real undeclared bundle."""
-    _manifest, step = export_features.bundle_paths(STEM, tmp_path)
-    step.parent.mkdir(parents=True)
-    step.write_bytes(
-        b"ISO-10303-21;\r\nDATA;\r\n#10 = ADVANCED_FACE('NONE',(#1),#2,.T.);\r\nENDSEC;\r\n"
+    """A release ZIP: a large unrelated member, then one bundle built by the
+    real writer. The drawing's selectors are doubles that match the synthetic
+    inventory, here and in the fetcher's offline rebind."""
+    _manifest, step = export_features.bundle_paths(stem, tmp_path)
+    selectors = write_bundle(stem, step)
+    monkeypatch.setattr(
+        export_features, "feature_selectors", lambda _stem, cfg=None: selectors[cfg]
     )
-    manifest = export_features.write_manifest(
-        STEM, step, revision=_config.release_revision()
-    )
+    manifest = bind_manifest(stem, step, selectors, revision=_config.release_revision())
+    if drop_feature:
+        # A release cut before the drawing declared its last feature.
+        text = manifest.read_text(encoding="utf-8")
+        last = list(tomllib.loads(text)["features"])[-1]
+        table = tomllib.loads(text)
+        del table["features"][last]
+        manifest.write_text(export_features._toml(table), encoding="utf-8")
     if tamper:
         step.write_bytes(step.read_bytes() + b"/* drift */")
     buffer = io.BytesIO()
@@ -34,8 +52,8 @@ def _release_zip(
         archive.writestr(
             "solidworks/ha-harmonic-analyzer.SLDASM", bytes(range(256)) * 4096
         )
-        for path in (step, manifest):
-            archive.writestr(f"features/{STEM}/{path.name}", path.read_bytes())
+        for path in (step, manifest, *((inventory_path(step),) if inventories else ())):
+            archive.writestr(f"features/{stem}/{path.name}", path.read_bytes())
         for name in extra:
             # ZipInfo() turns os.sep into "/"; keep the name byte-for-byte.
             info = zipfile.ZipInfo(name)
@@ -71,13 +89,13 @@ def _serve(monkeypatch, content: bytes) -> list[tuple[int, int]]:
 def _release(
     monkeypatch,
     tmp_path: Path,
+    stem: str = UNDECLARED,
     *,
-    tamper: bool = False,
     changed: tuple[str, ...] = (),
-    extra: tuple[str, ...] = (),
+    **shape,
 ) -> list:
     ranges = _serve(
-        monkeypatch, _release_zip(tmp_path / "published", tamper=tamper, extra=extra)
+        monkeypatch, _release_zip(tmp_path / "published", stem, monkeypatch, **shape)
     )
     monkeypatch.setattr(
         fetch_features,
@@ -89,7 +107,10 @@ def _release(
     monkeypatch.setattr(
         fetch_features,
         "recipe_files",
-        lambda _stem: {"cad/scripts/build_ch_amplitude_bar.py": "geometry"},
+        lambda selected: {
+            f"cad/scripts/build_{selected}.py": "geometry",
+            f"cad/scripts/draw_{selected}.py": "manifest",
+        },
     )
     monkeypatch.setattr(
         fetch_features, "changed_since", lambda _commit, _files: list(changed)
@@ -102,29 +123,72 @@ def test_a_current_bundle_is_fetched_by_range_without_the_rest_of_the_zip(
 ) -> None:
     ranges = _release(monkeypatch, tmp_path)
     out = tmp_path / "out"
-    assert fetch_features.main([STEM, "--out", str(out)]) == 0
-    manifest, step = export_features.bundle_paths(STEM, out)
-    published = export_features.bundle_paths(STEM, tmp_path / "published")
+    assert fetch_features.main([UNDECLARED, "--out", str(out)]) == 0
+    manifest, step = export_features.bundle_paths(UNDECLARED, out)
+    published = export_features.bundle_paths(UNDECLARED, tmp_path / "published")
     assert manifest.read_bytes() == published[0].read_bytes()
     assert step.read_bytes() == published[1].read_bytes()
+    assert (
+        inventory_path(step).read_bytes() == inventory_path(published[1]).read_bytes()
+    )
     # The 1 MiB unrelated member is never read.
     assert sum(end - start for start, end in ranges) < 1 << 20
 
 
-def test_a_stale_bundle_is_reported_and_not_written_unless_accepted(
+def test_a_new_declaration_binds_to_the_released_step_without_a_farm(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _release(
+        monkeypatch,
+        tmp_path,
+        DECLARED,
+        drop_feature=True,
+        changed=(f"cad/scripts/draw_{DECLARED}.py",),
+    )
+    out = tmp_path / "out"
+    # Record the status line directly: whether an INFO record reaches caplog
+    # depends on handlers an earlier test's _telemetry.configure() installed.
+    said: list[str] = []
+    monkeypatch.setattr(
+        fetch_features._telemetry,
+        "info",
+        lambda message, **_fields: said.append(message),
+    )
+    assert fetch_features.main([DECLARED, "--out", str(out)]) == 0
+    assert any("features.toml rebound from this checkout" in line for line in said)
+    manifest, step = export_features.bundle_paths(DECLARED, out)
+    published = export_features.bundle_paths(DECLARED, tmp_path / "published")
+    assert step.read_bytes() == published[1].read_bytes()
+    features = tomllib.loads(manifest.read_text(encoding="utf-8"))["features"]
+    assert set(features) == set(export_features.feature_selectors(DECLARED))
+
+
+@pytest.mark.parametrize("changed", [(), (f"cad/scripts/draw_{DECLARED}.py",)])
+def test_a_release_without_inventories_is_always_stale(
+    tmp_path: Path, monkeypatch, capsys, changed: tuple[str, ...]
+) -> None:
+    _release(monkeypatch, tmp_path, DECLARED, inventories=False, changed=changed)
+    out = tmp_path / "out"
+    assert fetch_features.main([DECLARED, "--out", str(out)]) == 2
+    err = capsys.readouterr().err
+    for name in changed:
+        assert f"manifest input changed since v99: {name}" in err
+    assert "release v99 predates face inventories" in err
+    assert not (out / "features").exists()
+
+
+def test_a_geometry_change_is_reported_stale_and_not_written_unless_accepted(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:
-    _release(monkeypatch, tmp_path, changed=("cad/scripts/build_ch_amplitude_bar.py",))
+    _release(monkeypatch, tmp_path, changed=(f"cad/scripts/build_{UNDECLARED}.py",))
     out = tmp_path / "out"
-    assert fetch_features.main([STEM, "--out", str(out)]) == 2
+    assert fetch_features.main([UNDECLARED, "--out", str(out)]) == 2
     err = capsys.readouterr().err
-    assert "STALE ch_amplitude_bar" in err
-    assert (
-        "geometry input changed since v99: cad/scripts/build_ch_amplitude_bar.py" in err
-    )
+    assert f"STALE {UNDECLARED}" in err
+    assert f"geometry input changed since v99: cad/scripts/build_{UNDECLARED}.py" in err
     assert not (out / "features").exists()
-    assert fetch_features.main([STEM, "--out", str(out), "--accept-stale"]) == 0
-    assert export_features.bundle_paths(STEM, out)[0].is_file()
+    assert fetch_features.main([UNDECLARED, "--out", str(out), "--accept-stale"]) == 0
+    assert export_features.bundle_paths(UNDECLARED, out)[0].is_file()
 
 
 def test_a_bundle_that_does_not_bind_its_step_is_refused(
@@ -132,21 +196,25 @@ def test_a_bundle_that_does_not_bind_its_step_is_refused(
 ) -> None:
     _release(monkeypatch, tmp_path, tamper=True)
     out = tmp_path / "out"
-    assert fetch_features.main([STEM, "--out", str(out), "--accept-stale"]) == 1
+    assert fetch_features.main([UNDECLARED, "--out", str(out), "--accept-stale"]) == 1
     assert "bundle records" in capsys.readouterr().err
     assert not (out / "features").exists()
 
 
 @pytest.mark.parametrize(
     "member",
-    [f"features/{STEM}/..\\..\\x", f"features/{STEM}/C:x", f"features/{STEM}/sub/x"],
+    [
+        f"features/{UNDECLARED}/..\\..\\x",
+        f"features/{UNDECLARED}/C:x",
+        f"features/{UNDECLARED}/sub/x",
+    ],
 )
 def test_an_unsafe_or_nested_bundle_member_is_refused(
     tmp_path: Path, monkeypatch, capsys, member: str
 ) -> None:
     _release(monkeypatch, tmp_path, extra=(member,))
     out = tmp_path / "out"
-    assert fetch_features.main([STEM, "--out", str(out), "--accept-stale"]) == 1
+    assert fetch_features.main([UNDECLARED, "--out", str(out), "--accept-stale"]) == 1
     err = capsys.readouterr().err
     assert repr(member) in err or member in err
     assert not (out / "features").exists()

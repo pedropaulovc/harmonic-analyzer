@@ -10,7 +10,6 @@ import re
 import struct
 import os
 import sys
-import tomllib
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -1372,7 +1371,8 @@ def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
     tmp_path: Path, monkeypatch, stem: str,
 ) -> None:
     import export_features
-    from _export_feature_faces import face_name
+    from _export_feature_faces import inventory_path
+    from _test_feature_bundles import write_labelled_step
 
     native = tmp_path / "sldprt" / f"{stem.replace('_', '-')}.SLDPRT"
     native.parent.mkdir()
@@ -1399,26 +1399,14 @@ def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
         def _attempt(self, call, default=None):
             return call()
 
-    def save_step(_doc, selected, step):
+    def save_step(_doc, selected, step, _used):
         assert selected == stem
-        labels = [face_name(feature, 1) for feature in export_features.feature_selectors(selected)]
-        if selected == "ch_rocker_arm":
-            labels.append(face_name("pivot_bore", 1))  # Split cylindrical face in the raw STEP.
-        rows = [
-            f"#{index} = ADVANCED_FACE ( '{label}', ( #100 ), #101, .T. ) ;"
-            for index, label in enumerate(labels, 1)
-        ]
-        step.write_text(
-            "ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n"
-            + "\n".join(rows) + "\nENDSEC;\nEND-ISO-10303-21;\n",
-            encoding="ascii",
-        )
+        write_labelled_step(step, list(export_features.feature_selectors(selected)))
 
     monkeypatch.setattr(export_models, "OUT_SLDPRT", native.parent)
     monkeypatch.setattr(export_models, "OUT_FEATURES", tmp_path / "features")
     monkeypatch.setattr(export_models, "enforce_preferences", lambda *_args: None)
     monkeypatch.setattr(export_models, "_save_feature_step", save_step)
-    monkeypatch.setattr(export_models._config, "release_revision", lambda: "v38")
     monkeypatch.setattr(
         export_models, "run_build", lambda build: (build(Adapter()), 0)[1],
     )
@@ -1426,16 +1414,14 @@ def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
 
     assert export_models.main() == 0
     manifest, step = export_features.bundle_paths(stem, tmp_path)
-    content = tomllib.loads(manifest.read_text(encoding="utf-8"))
-    assert content["step"] == step.name
-    assert content["step_sha256"] == hashlib.sha256(step.read_bytes()).hexdigest()
-    assert content["drawing"]["revision"] == "v38"
-    assert set(content["features"]) == set(export_features.feature_selectors(stem))
     assert opened == [native]
     assert closed == [True]
     after = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
     assert {path: after[path] for path in before} == before
-    assert set(after) - set(before) == {manifest, step}
+    # The COM leaf writes the labelled STEP and its inventory; features.toml is
+    # bound later, without SolidWorks.
+    assert set(after) - set(before) == {step, inventory_path(step)}
+    assert not manifest.exists()
 
 
 def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
@@ -1444,7 +1430,7 @@ def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
     """A test-only multi-configuration bundle carries every declared configuration."""
     import export_features
     import features_bound
-    from _export_feature_faces import face_name
+    from _test_feature_bundles import write_labelled_step
 
     from dt_crank_handle_pivot_screw_spec import INSTALLED_CONFIG
 
@@ -1490,27 +1476,15 @@ def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
         def _attempt(self, call, default=None):
             return call()
 
-    def save_step(doc, selected, step, *, reuse_names=False):
+    def save_step(doc, selected, step, _used):
         assert selected == stem
-        saves.append((step.name, doc.active, reuse_names))
-        labels = [face_name(feature, 1) for feature in export_features.feature_selectors(selected)]
-        if selected == "ch_rocker_arm":
-            labels.append(face_name("pivot_bore", 1))  # Split cylindrical face in the raw STEP.
-        rows = [
-            f"#{index} = ADVANCED_FACE ( '{label}', ( #100 ), #101, .T. ) ;"
-            for index, label in enumerate(labels, 1)
-        ]
-        step.write_text(
-            f"ISO-10303-21;\nHEADER;\n/* {doc.active} */\nENDSEC;\nDATA;\n"
-            + "\n".join(rows) + "\nENDSEC;\nEND-ISO-10303-21;\n",
-            encoding="ascii",
-        )
+        saves.append((step.name, doc.active))
+        write_labelled_step(step, list(export_features.feature_selectors(selected)), stamp=doc.active)
 
     monkeypatch.setattr(export_models, "OUT_SLDPRT", native.parent)
     monkeypatch.setattr(export_models, "OUT_FEATURES", tmp_path / "features")
     monkeypatch.setattr(export_models, "enforce_preferences", lambda *_args: None)
     monkeypatch.setattr(export_models, "_save_feature_step", save_step)
-    monkeypatch.setattr(export_models._config, "release_revision", lambda: "v38")
     monkeypatch.setattr(
         export_models, "run_build", lambda build: (build(Adapter()), 0)[1],
     )
@@ -1518,14 +1492,15 @@ def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
 
     assert export_models.main() == 0
     assert saves == [
-        (f"{dashed}.STEP", "Default", False),
-        (f"{dashed}-Default.STEP", "Default", True),
-        (f"{dashed}-{INSTALLED_CONFIG}.STEP", INSTALLED_CONFIG, True),
+        (f"{dashed}.STEP", "Default"),
+        (f"{dashed}-Default.STEP", "Default"),
+        (f"{dashed}-{INSTALLED_CONFIG}.STEP", INSTALLED_CONFIG),
     ]
     manifest, step = export_features.bundle_paths(stem, tmp_path)
     configured = export_features.configuration_step_paths(stem, tmp_path)
     assert list(configured) == ["Default", INSTALLED_CONFIG]
-    assert {path for path in manifest.parent.iterdir()} == {manifest, step, *configured.values()}
+    steps = [step, *configured.values()]
+    assert set(manifest.parent.iterdir()) == {*steps, *(path.with_name(f"{path.stem}.faces.json") for path in steps)}
 
     monkeypatch.setattr(export_features, "SUPPORTED_PARTS", (stem,))
     staged = features_bound.stage_feature_steps(tmp_path, tmp_path / "step")
@@ -1536,7 +1511,7 @@ def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
         assert digest == hashlib.sha256(path.read_bytes()).hexdigest()
     for cfg, path in configured.items():
         assert (tmp_path / "step" / path.name).read_bytes() == path.read_bytes()
-        assert f"/* {cfg} */" in path.read_text(encoding="ascii")
+        assert f"'{cfg}'" in path.read_text(encoding="ascii")
 
 
 def test_single_configuration_parts_declare_no_configuration_steps() -> None:
@@ -1571,7 +1546,7 @@ def test_configuration_steps_require_explicit_spec_opt_in(monkeypatch) -> None:
 def produced_feature_bundles(tmp_path: Path, monkeypatch):
     """Real manifest/STEP bundles with already-current native STL/render outputs."""
     import export_features
-    from _export_feature_faces import face_name
+    from _test_feature_bundles import bind_manifest, write_bundle
 
     stems = ("ch_pivot_shaft", "ch_rocker_arm")
     monkeypatch.setattr(export_features, "SUPPORTED_PARTS", stems)
@@ -1579,19 +1554,7 @@ def produced_feature_bundles(tmp_path: Path, monkeypatch):
     digests = {}
     for stem in stems:
         manifest, step = export_features.bundle_paths(stem, tmp_path)
-        step.parent.mkdir(parents=True)
-        labels = [face_name(feature, 1) for feature in export_features.feature_selectors(stem)]
-        if stem == "ch_rocker_arm":
-            labels.append(face_name("pivot_bore", 1))  # Split cylindrical face in the raw STEP.
-        rows = [
-            f"#{index} = ADVANCED_FACE ( '{label}', ( #100 ), #101, .T. ) ;"
-            for index, label in enumerate(labels, 1)
-        ]
-        step.write_bytes(
-            ("ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n"
-             + "\n".join(rows) + "\nENDSEC;\nEND-ISO-10303-21;\n").encode("ascii")
-        )
-        export_features.write_manifest(stem, step, revision="v38")
+        bind_manifest(stem, step, write_bundle(stem, step), revision="v38")
         dashed = stem.replace("_", "-")
         for relative in (
             f"sldprt/{dashed}.SLDPRT", f"stl/{dashed}.STL",
@@ -1650,24 +1613,25 @@ def test_full_export_copies_raw_feature_steps_without_rederiving_or_opening_cad(
     assert {path: path.read_bytes() for path in originals} == originals
 
 
-@pytest.mark.parametrize("fault", ["missing-manifest", "missing-step", "unbound-step"])
+@pytest.mark.parametrize("fault", ["missing-inventory", "missing-step", "unbound-step"])
 def test_full_export_refuses_incomplete_bundles_before_copying_any_output(
     produced_feature_bundles, fault: str,
 ) -> None:
     import export_features
+    from _export_feature_faces import inventory_path
     from features_bound import FeaturesBoundError
 
     root, stems = produced_feature_bundles
-    manifest, step = export_features.bundle_paths(stems[-1], root)
-    if fault == "missing-manifest":
-        manifest.unlink()
+    _manifest, step = export_features.bundle_paths(stems[-1], root)
+    if fault == "missing-inventory":
+        inventory_path(step).unlink()
         diagnostic = "cannot read required file"
     elif fault == "missing-step":
         step.unlink()
         diagnostic = "cannot read required file"
     else:
         step.write_bytes(step.read_bytes() + b"unbound producer bytes")
-        diagnostic = "does not bind the adjacent STEP"
+        diagnostic = "its STEP is"
     before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
     with pytest.raises(FeaturesBoundError, match=diagnostic):
         export_models.main()

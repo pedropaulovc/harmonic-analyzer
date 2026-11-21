@@ -1,26 +1,29 @@
-"""Write adjacent drawing requirements bound to the just-exported raw STEP.
+"""Bind drawing requirements to an exported labelled STEP, without SolidWorks.
 
-No SolidWorks document is opened or saved. The exporter calls
-``write_manifest(stem, step, revision=release_revision())`` after naming and
-exporting the part's requirement faces. Face sets come from that STEP's labels;
-its unmodified bytes supply ``step_sha256``.
+No SolidWorks document is opened or saved. ``export_models --features`` (the
+``package:features:<stem>`` COM leaf) labels every face and writes the STEP and
+its face inventory; ``write_manifest(stem, step, revision=release_revision())``
+(``package:manifest:<stem>``, or ``export_features.py <stem>`` by hand) runs the
+drawing's face selectors over that inventory. Face sets come from the STEP's
+labels; its unmodified bytes supply ``step_sha256``.
 
 Construction is one_piece unless the actual drawing notes explicitly supply
 BUILT_UP_PERMISSION_NOTE, whose exact, nonempty text must occur in DRAWING_NOTES.
 A material/process alternative (casting or solid stock) is not built-up permission.
 
-A requirement declared for a non-default member (``configuration="<Member>"``)
-is named in that member's own STEP, ``member_step_paths``, the neutral member
-name the full export already uses; the manifest records its ``configuration``
-and each member STEP's digest under ``member_steps``.
+Every non-default registry member is exported as its own STEP,
+``member_step_paths``, under the neutral member name the full export already
+uses. A requirement declared for a member (``configuration="<Member>"``) binds
+to that STEP; the manifest records its ``configuration`` and each member STEP's
+digest under ``member_steps``.
 
 Every part with its own drawing has a bundle (``SUPPORTED_PARTS``); only the
-parts whose drawing declares requirements (``DECLARED_PARTS``) name faces and
-list features. An undeclared part's manifest carries what needs no drawing
-declaration (identity, units, revision, material, STEP name and digest,
-construction from its notes module, general tolerances, the model frame) and an
-empty ``[features]`` table. It never imports, cites or depends on the drawing
-module, so drawing edits do not re-key its bundle.
+parts whose drawing declares requirements (``DECLARED_PARTS``) list features.
+An undeclared part's manifest carries what needs no drawing declaration
+(identity, units, revision, material, STEP name and digest, construction from
+its notes module, general tolerances, the model frame) and an empty
+``[features]`` table. It never imports, cites or depends on the drawing module,
+so drawing edits do not re-run its manifest.
 """
 
 from __future__ import annotations
@@ -42,7 +45,6 @@ import _part_properties
 import _surface_finish
 from _feature_requirements import (
     discover_parts,
-    member_configurations,
     metadata_for,
     requirements_for,
     source_tree,
@@ -557,36 +559,42 @@ def configuration_step_paths(stem: str, out: Path = OUT) -> dict[str, Path]:
 
 @lru_cache(maxsize=256)
 def member_step_configurations(stem: str) -> tuple[str, ...]:
-    """The non-default members the drawing declares requirements for.
+    """The part's non-default registry members, each exported as its own STEP.
 
-    Read statically from the literal ``configuration=`` keywords, so dodo never
-    imports a drawing; each must be a registry member other than the saved
-    default, whose faces the bundle STEP already carries. A stem with no
-    drawing source (a test inventory) declares no member, as
-    ``step_configurations`` reads a missing spec.
+    Every member is exported whether or not the drawing declares requirements
+    for it, so a later ``configuration="<Member>"`` declaration binds offline
+    to an already-exported member STEP and the COM export never reads a drawing.
     """
-    stem = _stem(stem)
-    drawing = Path(__file__).resolve().parent / f"draw_{stem}.py"
-    if not drawing.is_file():
-        return ()
-    names = member_configurations(source_tree(drawing))
-    members = _part_configuration_exports.member_configurations(stem)[1:]
-    for name in names:
-        if name not in members:
-            raise ValueError(f"draw_{stem}: requirement configuration {name!r} is not a non-default member {members!r}")
-    return names
+    return tuple(_part_configuration_exports.member_configurations(_stem(stem))[1:])
 
 
 def member_step_paths(stem: str, out: Path = OUT) -> dict[str, Path]:
-    """Each declared member's STEP beside the bundle STEP, under the member's
-    neutral name (``<part>--<member>.STEP``), so the full export's member STEP
-    is these exact bytes."""
+    """Each member's STEP beside the bundle STEP, under the member's neutral
+    name (``<part>--<member>.STEP``), so the full export's member STEP is these
+    exact bytes."""
     _manifest, step = bundle_paths(stem, out)
     dashed = _stem(stem).replace("_", "-")
     return {
         name: step.with_name(f"{_part_configuration_exports.mesh_key(dashed, name)}{step.suffix}")
         for name in member_step_configurations(stem)
     }
+
+
+def shown_step_paths(stem: str, out: Path = OUT) -> dict[str, Path]:
+    """Each non-default configuration the COM leaf shows, with its STEP: the
+    declared ``FEATURE_STEP_CONFIGURATIONS`` then the registry members. A name
+    in both would be shown twice and its configuration STEP never written."""
+    configurations = configuration_step_paths(stem, out)
+    members = member_step_paths(stem, out)
+    overlap = sorted(set(configurations) & set(members))
+    if overlap:
+        raise ValueError(f"{stem}: {overlap} are both FEATURE_STEP_CONFIGURATIONS and registry members")
+    return {**configurations, **members}
+
+
+def exported_steps(stem: str, out: Path = OUT) -> tuple[Path, ...]:
+    """Every STEP the part's COM leaf writes, each with its face inventory."""
+    return (bundle_paths(stem, out)[1], *shown_step_paths(stem, out).values())
 
 
 def _member_steps(stem: str) -> dict[str, Any]:
@@ -597,29 +605,42 @@ def _member_steps(stem: str) -> dict[str, Any]:
     return {"member_steps": {name: {"step": path.name, "step_sha256": UNKNOWN} for name, path in paths.items()}}
 
 
+# A split periodic face labels each STEP half with its native name. The issue
+# #1204 spike found the v38 rocker-arm pivot bore as two Ø6.5 halves, so a
+# half-labelled split (one patch) must fail, not ship a partial datum A.
+STEP_FACE_COUNTS = {"ch_rocker_arm": {"pivot_bore": 2}}
+
+
 def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
-    """Bind all labelled STEP faces and write the adjacent requirements TOML."""
-    from _export_feature_faces import step_face_sets
+    """Bind the drawing's requirement features to the exported STEP(s) through
+    their face inventories and write the adjacent requirements TOML.
+
+    No SolidWorks: the STEPs and inventories already exist beside ``step``."""
+    from _export_feature_faces import FeatureFaceError, bind_features
 
     stem = _stem(stem)
     step = Path(step)
     content = step.read_bytes()
     manifest = requirement_manifest(stem)
     step_cite = f"harmonic-analyzer/cad/out/features/{stem}/{step.name}"
-    scopes = {None: (content, step_cite)}
+    scopes = {None: (step, step_cite)}
     for cfg, member_path in member_step_paths(stem).items():
         member_step = step.with_name(member_path.name)
-        member = member_step.read_bytes()
         member_cite = f"harmonic-analyzer/cad/out/features/{stem}/{member_step.name}"
-        scopes[cfg] = (member, member_cite)
-        manifest["member_steps"][cfg].update(step_sha256=hashlib.sha256(member).hexdigest(), cite=[member_cite])
+        scopes[cfg] = (member_step, member_cite)
+        manifest["member_steps"][cfg].update(step_sha256=hashlib.sha256(member_step.read_bytes()).hexdigest(), cite=[member_cite])
     for cfg, (scoped, scoped_cite) in scopes.items():
-        names = [name for name, feature in manifest["features"].items() if feature.get("configuration") == cfg]
-        faces = step_face_sets(scoped.decode("latin-1"), names)
-        for name in names:
+        faces = bind_features(scoped, feature_selectors(stem, cfg))
+        for name, refs in faces.items():
             feature = manifest["features"][name]
-            feature["faces"] = faces[name]
+            feature["faces"] = refs
             feature["cite"]["faces"] = [scoped_cite]
+    for name, expected in STEP_FACE_COUNTS.get(stem, {}).items():
+        if name not in manifest["features"]:
+            raise FeatureFaceError(f"{stem}: STEP_FACE_COUNTS names {name!r}, which the drawing no longer declares")
+        found = len(manifest["features"][name].get("faces", ()))
+        if found != expected:
+            raise FeatureFaceError(f"{stem}.{name}: expected exactly {expected} STEP patches, found {found}")
     manifest["step"] = step.name
     manifest["step_sha256"] = hashlib.sha256(content).hexdigest()
     manifest["cite"]["step_sha256"] = [step_cite]
@@ -629,3 +650,28 @@ def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
     partial.write_text(_toml(manifest), encoding="utf-8", newline="\n")
     partial.replace(path)
     return path
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Write ``features.toml`` for parts whose STEP and face inventory exist.
+
+    The ``package:manifest:<stem>`` task, and the seat-free way to bind new or
+    changed requirement declarations to an already-exported (or fetched) STEP."""
+    import argparse
+
+    import _telemetry
+
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("stems", nargs="+", help="parts with a feature bundle")
+    parser.add_argument("--out", type=Path, default=OUT, help="output root (default: cad/out)")
+    args = parser.parse_args(argv)
+    _telemetry.set_service("export-features")
+    _telemetry.configure()
+    for stem in args.stems:
+        path = write_manifest(stem, bundle_paths(stem, args.out)[1], revision=_config.release_revision())
+        _telemetry.info(f"export-features: wrote {path}", part=stem)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

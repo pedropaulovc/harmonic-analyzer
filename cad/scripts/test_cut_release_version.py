@@ -765,8 +765,11 @@ def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path)
                 members = {
                     f"{directory}/{entry['step']}" for entry in manifest.get("member_steps", {}).values()
                 }
+                steps = {f"{directory}/{manifest['step']}", *configurations, *members}
+                # Each STEP ships with its face inventory, so declarations bind offline.
+                inventories = {f"{Path(step).parent.as_posix()}/{Path(step).stem}.faces.json" for step in steps}
                 assert {name for name in expected if name.startswith(f"{directory}/")} == {
-                    f"{directory}/{manifest['step']}", relative, *configurations, *members,
+                    relative, *steps, *inventories,
                 }
                 adjacent = archive.read(f"{directory}/{manifest['step']}")
                 full = archive.read(f"step/{manifest['step']}")
@@ -801,12 +804,11 @@ def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path)
 def test_release_stages_baseline_but_never_seals_divergent_feature_producers(
     feature_release: Path,
 ) -> None:
-    from _export_feature_faces import face_name
     from features_bound import FeaturesBoundError
     from test_features_bound import _add_full_face
 
     out = feature_release
-    full_step = _add_full_face(out, "ch_rocker_arm", face_name("pivot_bore", 2))
+    full_step = _add_full_face(out, "ch_rocker_arm", "HAF_F9999")
     certificate_path = out / "reports" / "release-neutral.json"
     certificate = json.loads(certificate_path.read_bytes())
     certificate["files"]["step/ch-rocker-arm.STEP"] = _byte_record(full_step, out)

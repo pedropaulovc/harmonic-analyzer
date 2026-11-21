@@ -357,9 +357,10 @@ uv run --frozen python cad/scripts/prechips_traveler.py <stem>
 uvx --from prechips@latest prechips traveler cad/process/<stem>/plan.toml --profile hobby --out <file>
 ```
 
-The doit task also runs its `package:features:<stem>` leaf first (a cache
-restore, or a SolidWorks leaf on a miss). Without SolidWorks or a farm run,
-fetch the bundle from a release first, then use the wrapper or `uvx` form:
+The doit task also runs its `package:manifest:<stem>` task first, which needs
+the `package:features:<stem>` leaf (a cache restore, or a SolidWorks leaf on a
+miss). Without SolidWorks or a farm run, fetch the bundle from a release first,
+then use the wrapper or `uvx` form:
 
 ```text
 uv run --frozen python cad/scripts/fetch_features.py <stem> [--release vNN]
@@ -368,12 +369,19 @@ uv run --frozen python cad/scripts/fetch_features.py <stem> [--release vNN]
 Releases cut after v50 carry the bundle of every part with its own drawing
 under `features/<stem>/` (v50 and earlier carry only the parts whose drawing
 declared requirements; asking one for another part fails with "the release
-carries no ... bundle"); the script range-reads only those members of the release
-ZIP, refuses a bundle that does not bind its STEP, and reports it STALE (exit 2,
-nothing written, unless `--accept-stale`) when the part's geometry or manifest
-recipe files differ between the release's tag and the working tree, or the
-bundle does not match this checkout's requirement declarations. A stale part
-needs a farm build of `package:features:<stem>`. Only exit 0
+carries no ... bundle"). Releases cut with face inventories also carry, beside
+each labelled STEP, its `.faces.json` inventory. The script range-reads only
+those members of the release ZIP and refuses a bundle that does not bind its
+STEP. It rebinds `features.toml` to this checkout's requirement declarations
+over the fetched STEP, so a new or changed `requirement(...)` needs no farm,
+and reports the bundle STALE (exit 2, nothing written, unless `--accept-stale`)
+when the part's geometry inputs (`part:<stem>` or the labelled-STEP exporter)
+differ between the release's tag and the working tree. A release that predates
+face inventories can be neither rebound nor validated, so it is always STALE
+(use a newer release or `--accept-stale`). A
+stale part needs a farm build of `package:features:<stem>`. After editing
+declarations on top of a local bundle,
+`uv run --frozen python cad/scripts/export_features.py <stem>` rebinds it. Only exit 0
 from both profiles and a printed PDF is success. Exit 2 from either profile is
 a prechips refusal (bad input or a failed enforced check) and leaves no
 traveler file; exit 1 means uv itself failed (no `uv`, no PyPI, or a `uv tool
@@ -1534,24 +1542,27 @@ Switching to these per-drawing dependencies changes existing drawing cache keys
 once. It does not reuse legacy keys; subsequent unrelated row changes stay
 isolated. A scoped drawing build need not regenerate the rest of the fleet.
 
-Every part with its own drawing has a `package:features:<stem>` leaf
-(`export_features.SUPPORTED_PARTS`, 131 parts); only parts whose drawing
-declares requirements (`DECLARED_PARTS`) name faces and list features. Feature
-declarations remain colocated in `draw_<stem>.py`. Static AST discovery
-and source-path construction do not import those modules while loading the task
-graph, but each declared part's `package:features:<stem>` source key includes its
-**entire own draw-module closure**, not just declaration expressions. An own-draw
-edit re-keys only that feature leaf; shared `_drawing_common`, layout-audit,
-`_pdf_ink` and drawing-helper edits re-key every declared feature leaf, not
-native part/assembly recipes. An undeclared part's leaf reads no drawing: its key
-is the exporter, its `DRAWING_NOTES` owner closure, the notes/spec files read to
-find it, its builder file, registry/config and the native part identity, so no
-drawing edit re-keys it.
-Full `export` waits for scoped bundles, validates them and copies their exact
-STEP bytes; its recipe consumes bundle outputs rather than draw closures
-directly. A `prechips:<stem>` traveler depends only on its own feature leaf.
+Every part with its own drawing has a `package:features:<stem>` COM leaf
+(`export_features.SUPPORTED_PARTS`, 131 parts) that labels every face and writes
+its STEP and face inventory; it reads no drawing, so its key is the generic
+exporter closure, that part's config reads and the native part identity. The
+seat-free `package:manifest:<stem>` binds the drawing's declarations to that
+inventory; only parts whose drawing declares requirements (`DECLARED_PARTS`)
+list features. Feature declarations remain colocated in `draw_<stem>.py`.
+Static AST discovery and source-path construction do not import those modules
+while loading the task graph, but each declared part's manifest task depends on
+its **entire own draw-module closure**, not just declaration expressions. An
+own-draw edit re-runs only that manifest task; shared `_drawing_common`,
+layout-audit, `_pdf_ink` and drawing-helper edits re-run every declared
+manifest task, and none re-keys a COM leaf or a native part/assembly recipe. An
+undeclared part's manifest reads no drawing: it depends on the exporter, its
+`DRAWING_NOTES` owner closure, the notes/spec files read to find it, its builder
+file, registry/config and its STEP and inventory.
+Full `export` waits for the labelled STEPs, validates each against its
+inventory and copies their exact bytes; its recipe reads no manifest or draw
+closure. A `prechips:<stem>` traveler depends only on its own manifest task.
 Feature leaves retain `uptodate: [False]`, so every invocation reaches the cache
-probe even if local manifest and STEP targets exist. `cache_status` reports
+probe even if local STEP and inventory targets exist. `cache_status` reports
 individual `package:features:<stem>` keys, not an aggregate `package:features` COM key.
 See [drawing requirements and travelers](cad/docs/pipeline/features-travelers.md)
 for sourced precision, printed-literal authority and explicit descriptor consumption.

@@ -1,13 +1,16 @@
 """Check and stage isolated feature bundles against the full neutral export.
 
-The isolated producer owns the raw labelled STEP and its adjacent manifest.
-Full export copies that STEP without rewriting it; the release-only gate
-requires byte-identical scoped and neutral copies. ``features.toml`` must
-identify its part, bind its adjacent STEP's exact raw bytes, and record that
-STEP's exact face sets per feature. A member's own requirements bind that
-member's STEP (``member_steps``) the same way. Consumers derive feature
-names from the produced manifest, never reload drawing declarations. Every
-failure is loud; neither export nor the gate regenerates a missing bundle.
+The isolated producer owns each raw labelled STEP and its face inventory
+(``.faces.json``, bound to that STEP's sha256); the seat-free manifest step
+owns ``features.toml``. Full export copies the STEPs without rewriting them
+and reads no manifest; the release-only gate requires byte-identical scoped
+and neutral copies. ``features.toml`` must identify its part, bind its
+adjacent STEP's exact raw bytes, and record per feature STEP faces that exist
+with that entity id, ordinal and label, covering every face their labels carry.
+A member's own requirements bind that member's STEP (``member_steps``) the same
+way. Consumers derive feature names from the produced manifest, never reload
+drawing declarations. Every failure is loud; neither export nor the gate
+regenerates a missing bundle.
 """
 
 from __future__ import annotations
@@ -21,14 +24,10 @@ from typing import NoReturn
 import _config
 import _telemetry
 import export_features
-from _export_feature_faces import FeatureFaceError, step_face_sets
+from _export_feature_faces import FeatureFaceError, inventory_path, read_inventory, step_feature_refs_valid, step_label_refs
 
 OUT = export_features.OUT
 _REBUILD = "regenerate package:features and export before releasing"
-# A split periodic face labels each STEP half with its native name. The issue
-# #1204 spike found the v38 rocker-arm pivot bore as two Ø6.5 halves, so a
-# half-labelled split (one patch) must fail here, not ship a partial datum A.
-_STEP_FACE_COUNTS = {"ch_rocker_arm": {"pivot_bore": 2}}
 
 
 class FeaturesBoundError(RuntimeError):
@@ -46,21 +45,38 @@ def _read(path: Path) -> bytes:
         _fail(str(path), f"cannot read required file ({exc.strerror})")
 
 
-def _face_sets(path: Path, content: bytes, features: list[str], digests: str) -> dict[str, list[str]]:
+def _validated_step(path: Path) -> list[tuple[Path, bytes]]:
+    """One labelled STEP and its inventory: the inventory binds the STEP's bytes,
+    and its labels are exactly the STEP's face labels."""
+    content = _read(path)
+    inventory = _read(inventory_path(path))
+    digests = f"scoped sha256 {hashlib.sha256(content).hexdigest()}"
     try:
-        return step_face_sets(content.decode("latin-1"), features)
+        labels, _geometries = read_inventory(path)
+        step_label_refs(content.decode("latin-1"), labels)
     except FeatureFaceError as exc:
         _fail(str(path), f"{exc} ({digests})")
+    return [(path, content), (inventory_path(path), inventory)]
+
+
+def _validated_steps(out: Path, stems: tuple[str, ...] | None = None) -> tuple[tuple[Path, bytes], ...]:
+    """Every exported STEP and inventory, validated before any copy."""
+    return tuple(
+        item
+        for stem in (export_features.SUPPORTED_PARTS if stems is None else stems)
+        for path in export_features.exported_steps(stem, out)
+        for item in _validated_step(path)
+    )
 
 
 def _validated_bundles(out: Path, stems: tuple[str, ...] | None = None) -> tuple[tuple[Path, bytes], ...]:
-    """Read and validate the complete producer inventory before any copy."""
+    """Read and validate the complete producer inventory and manifests before any copy."""
     pending: list[tuple[Path, bytes]] = []
     for stem in export_features.SUPPORTED_PARTS if stems is None else stems:
+        steps = dict(_validated_steps(out, (stem,)))
         manifest_path, step_path = export_features.bundle_paths(stem, out)
-        step_bytes = _read(step_path)
         manifest_bytes = _read(manifest_path)
-        scoped_digest = hashlib.sha256(step_bytes).hexdigest()
+        scoped_digest = hashlib.sha256(steps[step_path]).hexdigest()
         digests = f"scoped sha256 {scoped_digest}"
         try:
             manifest = tomllib.loads(manifest_bytes.decode("utf-8"))
@@ -87,61 +103,42 @@ def _validated_bundles(out: Path, stems: tuple[str, ...] | None = None) -> tuple
         recorded_members = manifest.get("member_steps", {})
         if not isinstance(recorded_members, dict) or set(recorded_members) != set(members):
             _fail(str(manifest_path), f"member_steps {sorted(recorded_members) if isinstance(recorded_members, dict) else recorded_members!r} must be {sorted(members)}")
-        scopes = {
-            cfg: [name for name, entry in table.items() if entry.get("configuration") == cfg]
-            for cfg in (None, *members)
-        }
+        for cfg, member_path in members.items():
+            entry = recorded_members[cfg]
+            member_digest = hashlib.sha256(steps[member_path]).hexdigest()
+            if not isinstance(entry, dict) or entry.get("step") != member_path.name or entry.get("step_sha256") != member_digest:
+                _fail(str(manifest_path), f"member_steps.{cfg} {entry!r} does not bind {member_path.name} (scoped sha256 {member_digest})")
+        scopes = {None: step_path, **members}
         stray = sorted(name for name, entry in table.items() if entry.get("configuration", None) not in scopes)
         if stray:
             _fail(str(manifest_path), f"features {stray} name no exported member configuration")
-        features = scopes[None]
-        scoped_faces = _face_sets(step_path, step_bytes, features, digests)
-        for feature, refs in scoped_faces.items():
-            recorded = table[feature].get("faces")
-            if not isinstance(recorded, list) or len(recorded) != len(refs) or set(recorded) != set(refs):
-                _fail(str(manifest_path), f"{feature} faces {recorded!r} differ from adjacent STEP {refs!r} ({digests})")
-        for feature, expected in _STEP_FACE_COUNTS.get(stem, {}).items():
-            actual = len(scoped_faces.get(feature, ()))
+        for cfg, scoped in scopes.items():
+            recorded = {name: entry.get("faces") for name, entry in table.items() if entry.get("configuration", None) == cfg}
+            malformed = sorted(name for name, faces in recorded.items() if not isinstance(faces, list) or not faces)
+            if malformed:
+                _fail(str(manifest_path), f"{malformed} faces must be nonempty lists of STEP face refs")
+            problems = step_feature_refs_valid(steps[scoped].decode("latin-1"), recorded)
+            if problems:
+                _fail(str(manifest_path), f"{'; '.join(problems)} (scoped sha256 {hashlib.sha256(steps[scoped]).hexdigest()})")
+        for feature, expected in export_features.STEP_FACE_COUNTS.get(stem, {}).items():
+            actual = len(table[feature]["faces"]) if feature in table else 0
             if actual != expected:
                 _fail(stem, f"{feature} must be exactly {expected} STEP faces, found {actual} ({digests})")
-        pending.extend(((step_path, step_bytes), (manifest_path, manifest_bytes)))
-        # A member's own requirements bind that member's STEP, digest and faces.
-        for cfg, member_path in members.items():
-            member_bytes = _read(member_path)
-            member_digest = hashlib.sha256(member_bytes).hexdigest()
-            member_digests = f"scoped sha256 {member_digest}"
-            entry = recorded_members[cfg]
-            if not isinstance(entry, dict) or entry.get("step") != member_path.name or entry.get("step_sha256") != member_digest:
-                _fail(str(manifest_path), f"member_steps.{cfg} {entry!r} does not bind {member_path.name} ({member_digests})")
-            if not scopes[cfg]:
-                _fail(str(manifest_path), f"member {cfg} declares no feature")
-            member_faces = _face_sets(member_path, member_bytes, scopes[cfg], member_digests)
-            for feature, refs in member_faces.items():
-                recorded = table[feature].get("faces")
-                if not isinstance(recorded, list) or len(recorded) != len(refs) or set(recorded) != set(refs):
-                    _fail(str(manifest_path), f"{feature} faces {recorded!r} differ from member STEP {refs!r} ({member_digests})")
-            pending.append((member_path, member_bytes))
-        # A multi-configuration part's per-configuration STEPs label the same features.
-        for cfg_path in export_features.configuration_step_paths(stem, out).values():
-            cfg_bytes = _read(cfg_path)
-            cfg_digests = f"scoped sha256 {hashlib.sha256(cfg_bytes).hexdigest()}"
-            cfg_faces = _face_sets(cfg_path, cfg_bytes, features, cfg_digests)
-            unlabelled = sorted(feature for feature, refs in cfg_faces.items() if not refs)
-            if unlabelled:
-                _fail(str(cfg_path), f"labels no face for {unlabelled} ({cfg_digests})")
-            pending.append((cfg_path, cfg_bytes))
+        pending.extend(steps.items())
+        pending.append((manifest_path, manifest_bytes))
     return tuple(pending)
 
 
 def stage_feature_steps(out: Path, step_directory: Path) -> dict[Path, str]:
     """Copy every validated producer STEP to the neutral cache, byte-for-byte.
 
-    All bundles must be complete and valid before the first destination is
-    created. Copy the snapshots just validated, not a later read of the cache,
-    and return each destination with its validated snapshot's SHA-256.
+    Every STEP and face inventory must be complete and agree before the first
+    destination is created; manifests are not read, so a declaration edit never
+    touches the export. Copy the snapshots just validated, not a later read of
+    the cache, and return each destination with its validated snapshot's SHA-256.
     """
     with _telemetry.span("export.feature_steps", parts=len(export_features.SUPPORTED_PARTS)):
-        pending = _validated_bundles(Path(out))
+        pending = _validated_steps(Path(out))
         staged: dict[Path, str] = {}
         for source, content in pending:
             if source.suffix != ".STEP":
@@ -198,8 +195,9 @@ def check_bound_features(out: Path | None = None) -> tuple[Path, ...]:
 def stage_bound_features(out: Path, released: Path) -> list[Path]:
     """Validate all bundles, then stage the exact validated scoped bytes.
 
-    Each bundle stages its scoped STEP and ``features.toml``; the snapshots
-    read during validation are written, never a later read of the cache.
+    Each bundle stages its scoped STEPs, their face inventories and
+    ``features.toml``; the snapshots read during validation are written, never
+    a later read of the cache.
     """
     output, stage = Path(out), Path(released)
     with _telemetry.span("release.features_stage", parts=len(export_features.SUPPORTED_PARTS)):

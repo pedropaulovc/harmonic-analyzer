@@ -17,9 +17,9 @@ dict requires nonempty ``precision_sources`` naming its actual printed maps,
 callout helpers or formatter; a module docstring is not precision authority.
 
 A configured purchased part whose rework spans members declares each
-non-default member's requirements with a literal ``configuration="<Member>"``.
-Those faces are named and exported in that member's own STEP, beside the
-default member's; ``member_configurations`` reads the literals statically.
+non-default member's requirements with ``configuration="<Member>"``. Every
+member is exported as its own STEP with a face inventory, so those faces bind
+to that member's STEP without SolidWorks.
 
 Numeric ``limits`` and ``drilled_limits`` belong to ``_printed_limits`` and
 drawings import them directly. Both modules stay out of native part and assembly
@@ -281,24 +281,6 @@ def discover_parts(scripts: Path) -> tuple[str, ...]:
         for path in sorted(Path(scripts).glob("draw_*.py"))
         if _may_declare(path) and declaration_calls(source_tree(path), "requirement")
     )
-
-
-def member_configurations(tree: ast.Module) -> tuple[str, ...]:
-    """The literal ``configuration=`` members a draw module's requirements name.
-
-    Static, like discovery: the graph needs the member STEPs without importing
-    the drawing. A non-literal member name is refused rather than guessed.
-    """
-    names: list[str] = []
-    for call in declaration_calls(tree, "requirement"):
-        for keyword in call.keywords:
-            if keyword.arg != "configuration":
-                continue
-            if not isinstance(keyword.value, ast.Constant) or not isinstance(keyword.value.value, str):
-                raise ValueError(f"line {call.lineno}: requirement configuration must be a literal member name")
-            if keyword.value.value not in names:
-                names.append(keyword.value.value)
-    return tuple(names)
 
 
 def _call_site(frame: Any, api: str) -> Path:

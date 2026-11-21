@@ -293,11 +293,14 @@ uvx --from prechips@latest prechips traveler cad/process/<stem>/plan.toml --prof
 
 Each form needs the part's feature manifest at
 `cad/out/features/<stem>/features.toml`. The doit task first runs its
+`package:manifest:<stem>` task, which needs the part's labelled STEP from its
 `package:features:<stem>` leaf (SolidWorks, via the supervised farm); the
 wrapper and the by-hand `uvx` command need an existing bundle, from a build or,
 with no SolidWorks and no farm run, from a release:
-`uv run --frozen python cad/scripts/fetch_features.py <stem>` (it reports a
-bundle the part's recipe has moved past as STALE and writes nothing; see
+`uv run --frozen python cad/scripts/fetch_features.py <stem>` (it rebinds the
+manifest to this checkout's declarations, and reports a bundle whose geometry
+has moved past the release, or any bundle from a release cut before face
+inventories shipped (#3232), as STALE and writes nothing; see
 [features and travelers](../docs/pipeline/features-travelers.md)). All three use the latest
 prechips release from PyPI (`@latest` makes uv revalidate its index and skip
 any `uv tool install`-ed copy), so they need `uv` and network access. The doit
@@ -343,7 +346,7 @@ one `.nc` per recipe program, `cycle_times.json` and `manifest.json` (input,
 post and output SHA-256s, FreeCAD version, the post file FreeCAD loaded) to
 `cad/out/nc/<stem>/`, logs each program's cutting, air-at-feed and rapid
 minutes, and leaves freecadcmd's console output in `freecadcmd.log` there.
-Its only task dependency is its own `package:features:<stem>` leaf. A release
+Its only task dependency is its own `package:manifest:<stem>` task. A release
 ships the programs, `cycle_times.json` and `manifest.json` (not the log) under
 the bundle's `nc/<stem>/`; a missing output, a program or `cycle_times.json`
 that differs from the manifest, or a manifest recording any input other than
