@@ -1200,10 +1200,10 @@ def check_keep_out(
     ``z_top`` below which the cutter must miss it. A shape with a
     ``z_bottom`` (stock overhanging its support, air under it) spans only the
     band between the two: there the cutter's path from one sampled point to
-    the next must not cross the band. A recipe whose tool reaches above or
-    below its programmed point (an arbor's spacers and nut round a slitting
-    saw) checks each such part with every shape's band shifted by the part's
-    reach."""
+    the next must not cross the band within reach of either point. A recipe
+    whose tool reaches above or below its programmed point (an arbor's
+    spacers and nut round a slitting saw) checks each such part with every
+    shape's band shifted by the part's reach."""
     shapes = [(b, lambda p, b=b: _box_distance(b, p)) for b in boxes]
     shapes += [
         (c, lambda p, c=c: math.dist(c["centre"], p[:2]) - c["radius"]) for c in circles
@@ -1214,10 +1214,12 @@ def check_keep_out(
         for point in (m.start, *_xy_points(m)):
             for shape, distance in shapes:
                 low, high = point[2], point[2]
+                near = distance(point)
                 if "z_bottom" in shape:
                     low, high = sorted((previous[2], point[2]))
+                    near = min(near, distance(previous))
                 if low < shape["z_top"] - _TOL_MM and high > shape.get("z_bottom", -math.inf) + _TOL_MM:
-                    if distance(point) < radius - _TOL_MM:
+                    if near < radius - _TOL_MM:
                         hits.setdefault(shape["name"], []).append(_where(point))
             previous = point
     findings: list[Finding] = []
