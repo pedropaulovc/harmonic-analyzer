@@ -64,7 +64,7 @@ diameter_mm = 6.35
 description = "3/64 in square carbide end mill, 2- or 3-flute"
 diameter_mm = 1.190625
 [tools.form-tool-r180]  # MHA-PD-23 R.18 head dome
-description = "R.180 convex dome form tool"
+description = "R.180 dome form tool: concave R.180 edge, cuts a convex R.18 dome"
 [tools.gauge-pin-0625]  # MHA-PD-10 .002 TIR TO A Ø.0625 PIN
 description = "Gauge pin .0625 in, class ZZ"
 [tools.knurl-straight-25tpi]  # MHA-PD-13 STRAIGHT KNURL 25 TPI
