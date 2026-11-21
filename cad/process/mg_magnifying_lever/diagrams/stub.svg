@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300">
   <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="24">The stub end .40 out (lengths 400 px/in, diameters not to scale): faced, turned to the pilot, centre-drilled</text>
+  <text class="title" x="20" y="24">The stub end .40 out (not to scale): faced, turned to the pilot, centre-drilled</text>
   <rect class="fixture-vise" x="200" y="60" width="90" height="180"/>
   <rect class="clamp" x="290" y="92" width="40" height="45"/>
   <rect class="clamp" x="290" y="163" width="40" height="45"/>
