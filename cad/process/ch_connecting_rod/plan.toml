@@ -18,7 +18,7 @@
 # spot, drill and ream the pin hole (CR07). Setup 6, the same clamping: cut
 # the outline on seven tabs and recut the four inside corners to R.039
 # (CR08). Setup 7, bench: break the rods out, file the stubs, deburr,
-# inspect. Setup 8: black oxide, sent out.
+# inspect. Setup 8: black oxide in the shop, Presto Black Steel PC9.
 #
 # The route departs from the drawing's process (cad/config/parts/ch-
 # connecting-rod.yaml), by the owner's ruling of 2026-11-21 (the author
@@ -61,8 +61,13 @@
 # +.0005/0, wider than the drawing's .0004 band, so the reamer alone does
 # not hold it; the pin-gauge sets on order (gauges.pin-gauges) step .001.
 # The drawing's finish, matte black oxide per MIL-DTL-13924 Class 1 (owner
-# ruling 2026-11-20, #2348; a hot process, all over, no masking), has no
-# line on record: Setup 8 sends the rods out, as CH-02's.
+# ruling 2026-11-20, #2348; all over, no masking), is done in the shop.
+# Owner (Pedro), answered in person 2026-11-21: "Black oxide: cold
+# blackening in the shop with Presto Black PC9 is acceptable as the
+# drawing's black oxide." Setup 8 blackens the rods with Birchwood Presto
+# Black Steel PC9 by the maker's instructions (Presto Black Steel PC9
+# Instructions, steps 1 prepare, 2b brush-on, 3 stop, 4 dry, 6 seal), as
+# CH-02's; the PC9 and the gloves and glasses are to buy (to_order).
 #
 # Zeroing: X0 the blanks' left ends, flushed with a 1-2-3 block, edge finder
 # at 900 rpm; Y0 the fixed jaw, edge finder; Z0 with F up the plate's top,
@@ -850,14 +855,36 @@ gauge_checks = "other"
 
 [[setups]]
 machine_kind = "other"
-title = "Black oxide"
-machine = "Outside shop"
+title = "Black oxide: blacken with Presto Black Steel PC9"
+machine = "Bench, ventilated"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished rod, as inspected, before its finish." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished rod, as inspected, to be blackened all over: the ring, the shank, the fork, the bore, the slot and the pin hole." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Wash off the oil and the marker numbers (acetone). Finish: {{cad.finish}}, all over as the drawing states (no masking). Hot black oxide is not done in this shop (no line on record; the owned cold blue is not equivalent): send the rods out to a black-oxide shop with that callout."
+instruction = "The drawing's finish: {{cad.finish}}, all over as the drawing states (no masking), done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide), by its maker's instructions as below. To buy before this setup (none on record): the PC9, chemical-resistant gloves and safety glasses."
 feed = "hand"
+
+[[setups.operations]]
+instruction = "Gloves and safety glasses on (the maker: it contains acid). Wash the rods with soap and water to take off the oil and the marker numbers; rinse and dry them. Hold each by its edges from here on."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Scuff both faces of each rod lightly with the 220 sanding roll to fresh metal (the maker: Scotch-Brite or blasting), keeping them flat. Not in the bore, the slot or the pin hole. Wash again and dry."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mix the PC9 with water 1:1 in a plastic cup (the maker: 50–100% for brush-on). Brush it on every surface of each rod with even, light strokes, into the bore, the slot and the pin hole; re-wet the brush and go over the edges, the slot, the holes and any light spot until the rod is an even black (the maker: do not press hard, it lifts the coating)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Rinse each rod thoroughly with clean water to stop the reaction (left acid keeps working and rusts the part); dry with a lint-free cloth or compressed air, blowing out the slot and the pin hole. Light spots: brush again, rinse, dry. Collect the solution and rinse water for a hazardous-waste drop-off, not the drain (the maker)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Seal: wipe on the stone lubricant (a light oil; the maker: clear coat, wax or oil), leave it a few minutes, wipe off the excess."
+feed = "hand"
+inspection = "Even black all over each rod, no bare spot and no wiping-off coating. Fit after blackening: the GO .0775 pin still enters the pin hole. Tight: stop and tell the owner; do not re-ream."
+gauge_checks = "other"
