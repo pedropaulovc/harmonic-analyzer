@@ -308,7 +308,7 @@ title = "Side B: face, pocket, bore and holes"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw; the spoil plate on them, 6 in along X, its LEFT edge to the left, as left by the first op (it stays there for every load; brush it clean of chips and burrs before each load). The jaws' top then stands about .270 above the spoil plate's top (checked below): it grips most of each .3085–.3125 blank and stays under the faced B face (.3005), so the face mill passes over the jaws. Four blanks of one load side by side across the jaws on the spoil plate, each on its A face (B up), numbers to the left, the lowest number against the fixed jaw. Hold a 1-2-3 block's 2 in face across the four left ends and the spoil plate's left edge and push them flush; then close the vise on the blanks (the spoil plate, 3.9 in across under the 4 in load, is not gripped), tapping them down onto the spoil plate."
+holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw; the spoil plate on them, 6 in along X, its LEFT edge to the left, as left by the first op (it stays there for every load; brush it clean of chips and burrs before each load). The jaws' top then stands about .270 above the spoil plate's top (checked below): it grips most of each .3085–.3125 blank and stays under the faced B face (.3005), so the face mill passes over the jaws. Four blanks of one load side by side across the jaws on the spoil plate, each on its A face (B up), numbers to the left, the lowest number against the fixed jaw. Flush the left ends with a 1-2-3 block's 3 in edge set twice, overlapping (across blanks 1–3 and the spoil plate's left edge, then across blanks 2–4), and feel that all four ends are flush; then close the vise on the blanks (the spoil plate, 3.9 in across under the 4 in load, is not gripped), tapping them down onto the spoil plate."
 datum = "Programs CL01_face_b (T1), CL02_pocket_b (T1, T2), CL03_bore (T3, T6, T7), CL04_holes (T3, T4, T5). G54: X0 the left end of the blank against the fixed jaw (picked up on every load), Y0 the fixed jaw's face, Z0 the spoil plate's top. +X toward the blanks' right ends, +Y toward the fixed jaw: the blanks lie at −Y."
 diagram = { file = "diagrams/side_b.svg", alt = "Four blanks across the vise jaws on the spoil plate on two parallels, B up; the end mill faces them, pockets each along its centre line round the hub, and the bore and holes are drilled on the centre line." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.drill_d_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
@@ -371,9 +371,14 @@ inspection = "Hub thickness {{cad.hub_far_face_length_min_in:.4dot}}–{{cad.hub
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.hub_far_face_length_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "First load only, once, and only when the op before read over .3010: lower Z0 by the excess and run CL01_face_b again; then mic again against the same band."
+instruction = "First load only, once, and only when the op before read over .3010: lower Z0 by the excess and run CL01_face_b again."
 instruction_detailed = "Send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − (the reading − {{process.hub_thickness_mm:in.4dot}}) × 25.4): a reading of .3015 lowers Z0 .0254 mm. Run CL01_face_b again. The corrected Z0 stays for CL02_pocket_b onward, for every later load and for side A."
 feed = "hand"
+
+[[setups.operations]]
+instruction = "Only after the Z0 correction: unclamp, mic the same blank again near its left end, put it back flush and clamp again."
+inspection = "Hub thickness {{cad.hub_far_face_length_min_in:.4dot}}–{{cad.hub_far_face_length_max_in:.4dot}}: on to CL02_pocket_b. Still outside: stop and tell the owner."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.hub_far_face_length_band_mm}}" }]
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -506,7 +511,7 @@ gauge_checks = "other"
 
 
 [[setups.operations]]
-instruction = "Back to the collet (console M6 T1). Brush the spoil plate clean, clamp the next four flush on it, pick up X0 again as above and repeat this setup from CL01_face_b, skipping the first-load-only ops (the Z0 correction is never repeated; the corrected Z0 stays): Y and Z0 stay; the tool setter measures each M6."
+instruction = "Back to the collet (console M6 T1). Brush the spoil plate clean and stone its top flat round the drilled hub and hole stations with the India stone; check it as in the rule check above. Clamp the next four flush on it, pick up X0 again and repeat this setup from CL01_face_b, skipping the first-load-only ops (the Z0 correction is never repeated): Y and Z0 stay."
 feed = "hand"
 
 [[setups]]
@@ -515,7 +520,7 @@ title = "Side A: pocket"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Lift the load's four blanks out together and turn them over as one stack about its length (A up, B on the spoil plate): the blank that was against the fixed jaw now lies against the moving jaw; numbers still at the left ends. Back on the spoil plate, left ends flushed with the 1-2-3 block against the spoil plate's left edge. Tap the blanks down while closing the vise."
+holding = "Lift the load's four blanks out together and turn them over as one stack about its length (A up, B on the spoil plate): the blank that was against the fixed jaw now lies against the moving jaw; numbers still at the left ends. Back on the spoil plate, left ends flushed as in Setup 2 (the 1-2-3 block's 3 in edge set twice, overlapping, against the spoil plate's left edge; all four ends felt flush). Tap the blanks down while closing the vise."
 datum = "Program CL05_pocket_a (T1, T2). G54: X0 the left end of the blank against the fixed jaw (picked up again on every load), Y0 the noted Setup 2 Y shifted by this load's width (op below), Z0 unchanged."
 diagram = { file = "diagrams/side_a_pocket.svg", alt = "The blanks turned over, A up, on the spoil plate; the end mill pockets A to the web's far face and the 1/8 in end mill rings each hub." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.hub_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", -0.254], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}", 50.8], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
@@ -618,8 +623,13 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Unclamp the load and lift the blanks out, each lever hanging on its tabs in its frame. Brush the spoil plate clean, take the next load's four (side B done), turn them over and clamp them as in Setup 3, and repeat Setup 3 and this setup from its first op."
+instruction = "Unclamp the load and lift the blanks out, each lever hanging on its tabs in its frame. Brush the spoil plate clean and stone its top flat round the hub rings and hole stations with the India stone."
 feed = "hand"
+
+[[setups.operations]]
+instruction = "Before each later load: the spoil plate's top after stoning."
+inspection = "A 6 in rule laid across the spoil plate at both ends and the middle: no rock, no burr or edge standing proud. Fail: stone it again and recheck. Then take the next load's four (side B done), turn them over, clamp them as in Setup 3 and repeat Setup 3 and this setup from its first op."
+gauge_checks = "other"
 
 [[setups]]
 machine_kind = "other"
