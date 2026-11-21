@@ -5,7 +5,7 @@
 <text class="label" x="20" y="20">Foot end, seen on the B face (L face down)</text>
 <rect class="part-kept" x="20" y="40" width="240" height="60"/>
 <rect class="paper" x="20" y="58" width="22" height="26"/>
-<text class="label" x="20" y="116">L face</text>
+<text class="label" x="150" y="116">L face</text>
 <path class="leader" d="M70 140 L36 80"/>
 <text class="label" x="74" y="144">foot notch: depth {{cad.foot_notch_depth_min_in:.3dot}}–{{cad.foot_notch_depth_max_in:.3dot}},</text>
 <text class="label" x="74" y="160">width {{cad.foot_notch_width_min_in:.3dot}}–{{cad.foot_notch_width_max_in:.3dot}},</text>
