@@ -312,7 +312,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Before mounting the saw: mic every spacer and the nut of the TTC 67-600-016 R8 1 in spacer-type arbor (Travers; TO BUY) that will sit below the saw."
+instruction = "Before mounting the saw: mic every spacer, collar and the nut of the TTC 67-600-016 R8 1 in spacer-type arbor (Travers; TO BUY) that will sit within 1/4 in above or below the saw."
 inspection = "Each under {{process.saw_collar_dia_max_mm:in.2dot}} in diameter, or the top notch's end meets it in Setup 4. Over: stop and tell the owner."
 gauge_checks = "other"
 
@@ -321,8 +321,11 @@ instruction = "Spindle stopped (M5). Take out the collet and end mill; mount the
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0 again, from the saw's lower face: spindle stopped (M5), its rim over the top of the bar against the fixed jaw, lowered until a .002 leaf just drags under its lower face."
-instruction_detailed = "Spindle stopped (M5) before any hand comes near the saw. First raise Z on the handwheel until the saw's lower face is clearly above the jaw tops and the bar tops. Then MDI G0 X-31.900 Y-3.000 puts the saw's centre left of the ends with its rim 3 mm over the end of the bar against the fixed jaw. Lower on the handwheel until a .002 feeler leaf just drags under the saw's lower face on that bar's top: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051). The saw carries no tool-setter length: CA02 loads no tool."
+instruction = "Spindle stopped (M5). Raise Z on the handwheel until the saw's lower face is clearly above the jaw tops and the bar tops, then MDI G0 X-31.900 Y-3.000: the saw's centre left of the ends, its rim 3 mm over the end of the bar against the fixed jaw."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0 again, from the saw's lower face: spindle still stopped, lower on the handwheel until a .002 leaf just drags under it on the top of the bar against the fixed jaw; G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051). The saw has no tool-setter length: CA02 loads no tool."
 feed = "hand"
 
 [[setups.operations]]
@@ -427,8 +430,11 @@ instruction = "Spindle stopped (M5). Take out the collet and end mill; mount the
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0 again, from the saw's lower face on the top of the bar against the fixed jaw: spindle stopped (M5), a .002 leaf just dragging, G10 L20 P1 Z(that bar's reading × 25.4 + 0.051)."
-instruction_detailed = "Spindle stopped (M5) before any hand comes near the saw. First raise Z on the handwheel until the saw's lower face is clearly above the jaw tops and the bar tops. Then MDI G0 X31.900 Y-3.000 puts the saw's centre right of the ends with its rim 3 mm over the end of the bar against the fixed jaw. Lower on the handwheel until a .002 feeler leaf just drags under the saw's lower face: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
+instruction = "Spindle stopped (M5). Raise Z on the handwheel until the saw's lower face is clearly above the jaw tops and the bar tops, then MDI G0 X31.900 Y-3.000: the saw's centre right of the ends, its rim 3 mm over the end of the bar against the fixed jaw."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0 again, from the saw's lower face: spindle still stopped, lower on the handwheel until a .002 leaf just drags under it on the top of the bar against the fixed jaw; G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
 feed = "hand"
 
 [[setups.operations]]
@@ -509,8 +515,8 @@ inspection = "Size Ø{{cad.top_pin_hole_dia_min_in:.4dot}}–{{cad.top_pin_hole_
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "First load only, still clamped: each hole's place, the #49 drill's shank in it."
-inspection = "Drop {{cad.top_pin_hole_drop_min_in:.2f}}–{{cad.top_pin_hole_drop_max_in:.2f}} from the top end: the calipers from the end over the shank, less half the shank's miked Ø. From B {{cad.top_pin_hole_location_from_back_min_in:.3dot}}–{{cad.top_pin_hole_location_from_back_max_in:.3dot}}: unclamp after this load and measure the same way from each bar's B face. Outside: stop and tell the owner."
+instruction = "Every load, still clamped: each hole's place, the #49 drill's shank in it. CA05 places the holes on a {{process.bar_pitch_mm:in.4dot}} bar pitch from the fixed jaw (each bar taken at .249 F to B)."
+inspection = "Drop {{cad.top_pin_hole_drop_min_in:.2f}}–{{cad.top_pin_hole_drop_max_in:.2f}} from the top end: the calipers from the end over the shank, less half the shank's miked Ø. From B {{cad.top_pin_hole_location_from_back_min_in:.3dot}}–{{cad.top_pin_hole_location_from_back_max_in:.3dot}}: after unclamping, measure the same way from the B face of the bar that lay farthest from the fixed jaw (it carries the other three bars' width error), and on the first load from every bar's B face. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.top_pin_hole_drop_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.top_pin_hole_location_from_back_band_mm}}" },
