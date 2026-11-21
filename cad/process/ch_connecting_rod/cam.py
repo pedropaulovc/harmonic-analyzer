@@ -17,8 +17,9 @@ jaws' depth (keep-out shapes only).
 Route (plan text in ``plan.toml``): two 1/4 x 2 in blanks per load, side by
 side across the jaws on a 1/2 in aluminium support plate on 1 in parallels,
 each rod along its blank, the ring at the left end. Each face is pocketed
-inside the blank's uncut edges (its frame): the ring and the fork stand as
-islands, the shank and the waste round it go down to the shank's face.
+inside the blank's uncut edges (its frame): the ring's zone full width, the
+ring and the fork standing as islands; along the shank only a band the
+shank's width plus the outline's kerf, the waste beyond it staying whole.
 Side 2 (the fork's far face) up: CR01 skims the fork's far face and roughs
 side 2 to .020 over its floors. Side 1 (the datum face, as bought) up: CR02
 roughs side 1; the blanks are released and reseated; CR03 finishes side 1.
@@ -105,8 +106,10 @@ JAW_DEPTH_MM = IN
 OUTLINE_TOL_MM = 0.05
 # The 5/64 in root passes run this far along the shank's flank and this far
 # round the ring (degrees) or along the fork's side from each corner, inside
-# the 1/8 in cutter's cut.
-ROOT_RUN_MM = 3.0
+# the 1/8 in cutter's cut. Any run clears the 1/8 in corner's round (its
+# tangent lies r8 from the corner, inside the 5/64 in cutter's own sweep);
+# a short one keeps the cutter off the shank's tabs near the corners.
+ROOT_RUN_MM = 1.0
 ROOT_ARC_DEG = 15.0
 ROOT_SIDE_MM = 1.0
 # The 1/8 in outline and the 1/2 in fork contour overlap this far along the
@@ -683,6 +686,14 @@ def context(
     for deg in ring_tabs:
         if not c8 + tab_deg < deg < 360 - c8 - tab_deg:
             raise ValueError(f"the ring tab at {deg:g}° is off the ring's free arc")
+        # A tab holds only where frame stands outside the kerf there: the
+        # kerf's outside at its angle must leave the frame's minimum to the
+        # blank's left end and to its edge.
+        a = math.radians(deg)
+        out_x = rx + edge * math.cos(a)
+        out_y = abs(edge * math.sin(a))
+        if min(out_x, pitch / 2 - out_y) < p["frame_min_mm"]:
+            raise ValueError(f"the ring tab at {deg:g}° has no frame outside the kerf")
     stations = sorted(
         {rx + big_r * math.cos(math.radians(d)) for d in ring_tabs}
         | {rx + x for _side, x in bar_tabs}
@@ -815,18 +826,22 @@ def context(
         ]
 
     def ring_face(yc: float, z: float, top: float) -> list[str]:
-        """Rows across the ring's face alone, each from beside the ring to
-        beside it again (the waste round it is lower)."""
+        """Rows across the ring's face, on the rough rows' lines: each from
+        beside the ring's left to no further right than the rough rows went
+        (``x_zone``), so the cutter stays in the roughed zone (the waste past
+        it is whole). The first row plunges into the floor stock at the slow
+        feed."""
         clear, safe = _r(top + CLEAR_MM), _r(top + SAFE_MM)
         lines = [f"G0 Z{clear:.3f}"]
         for k, dy in enumerate(dys):
             span = math.sqrt(max(big_r**2 - dy**2, 0.0)) + r + APPROACH_MM
-            a, b = (rx - span, rx + span) if k % 2 == 0 else (rx + span, rx - span)
+            right = min(rx + span, x_zone)
+            a, b = (rx - span, right) if k % 2 == 0 else (right, rx - span)
             if k == 0:
                 lines += [
                     f"G0 {_xy(a, yc + dy)}",
                     f"G0 Z{safe:.3f}",
-                    f"G1 Z{_r(z):.3f} F{{feed}}",
+                    f"G1 Z{_r(z):.3f} F{{plunge}}",
                 ]
             else:
                 lines.append(f"G1 {_xy(a, yc + dy)} F{{feed}}")
@@ -1028,13 +1043,14 @@ def context(
                 }
             )
         for deg in ring_tabs:
-            inner = _polar(c, big_r - 1.0, deg)
-            outer = _polar(c, big8 + 1.0, deg)
-            across = (-math.sin(math.radians(deg)), math.cos(math.radians(deg)))
+            # The box round the tab's arcs alone: the ring's edge (less a
+            # margin inward) and the cutter's path, between the hop's ends
+            # and through its middle (an arc over an axis bulges past its
+            # ends). On a slanted tab the path past either end leaves it.
             corners = [
-                (q[0] + s * tab_half * across[0], q[1] + s * tab_half * across[1])
-                for q in (inner, outer)
-                for s in (-1.0, 1.0)
+                _polar(c, rr, a)
+                for rr in (big_r - 1.0, big8)
+                for a in (deg - tab_deg, deg, deg + tab_deg)
             ]
             xs = sorted(q[0] for q in corners)
             ys = sorted(q[1] for q in corners)
@@ -1088,6 +1104,15 @@ def context(
     j5 = math.sqrt(big5**2 - (half + r5) ** 2)
     c5 = math.degrees(math.atan2(half + r5, j5))
     d5 = math.sqrt(r5**2 - (r5 - (w - half)) ** 2)
+    # The root passes stay off every bar tab: the tab's material spans its
+    # width along the flank, out from the flank by the kerf.
+    tab_w = p["tab_width_mm"]
+    for _flank, x in bar_tabs:
+        if not (
+            j5 + ROOT_RUN_MM + r5 < x - tab_w / 2
+            and x + tab_w / 2 < fb_rel - d5 - ROOT_RUN_MM - r5
+        ):
+            raise ValueError(f"a root pass reaches the tab at x {x:g}")
     root_elements: list[dict[str, Any]] = []
     roots: list[str] = []
     for k, yc in enumerate(centres):
@@ -1478,7 +1503,7 @@ def context(
             ]
         return out
 
-    def islands(side: dict[str, float], ring: bool) -> tuple[list[dict], list[dict]]:
+    def islands(side: dict[str, float]) -> tuple[list[dict], list[dict]]:
         boxes, circles = [], []
         cc = rx + g["crown"]
         for k, yc in enumerate(centres):
@@ -1491,15 +1516,14 @@ def context(
                     "z_top": side["top"],
                 }
             )
-            if ring:
-                circles.append(
-                    {
-                        "name": f"ring {k + 1}",
-                        "centre": [rx, yc],
-                        "radius": big_r,
-                        "z_top": side["ring"],
-                    }
-                )
+            circles.append(
+                {
+                    "name": f"ring {k + 1}",
+                    "centre": [rx, yc],
+                    "radius": big_r,
+                    "z_top": side["ring"],
+                }
+            )
         return boxes, circles
 
     # Points each pocket tool must clear: the shank and the outline's kerf
@@ -1539,12 +1563,12 @@ def context(
     tn = numbers
     expect: list[list[Any]] = []
 
-    def common(name, z_top, tools_loaded, rpms, z_min, loads=True):
+    def common(name, z_top, tools_loaded, rpms, z_min):
         return [
             [
                 name,
                 "tool_changes",
-                {"z_top": z_top, "tools": tools_loaded, "loads_first": loads},
+                {"z_top": z_top, "tools": tools_loaded, "loads_first": True},
             ],
             [name, "spindle", {"rpm": [[x] for x in rpms]}],
             [name, "pauses", {"z_top": z_top, "count": 0}],
@@ -1560,7 +1584,7 @@ def context(
         expect += common(
             name, check_top, [tn["em-half"], tn["em-eighth"]], [em_rpm, e8_rpm], floor
         )
-        boxes, circles = islands(side, ring=True)
+        boxes, circles = islands(side)
         pts = [q for yc in centres for q in pocket_points(yc, l_max)]
         expect += [
             [f"{name}@0", "rapids_clear", {"z_top": check_top}],
@@ -1640,7 +1664,7 @@ def context(
     expect += common(
         name, t_max, [tn["em-half"], tn["em-eighth"]], [em_rpm, e8_rpm], -through
     )
-    boxes, circles = islands(side2, ring=True)
+    boxes, circles = islands(side2)
     pts = [q for yc in centres for q in pocket_points(yc, slot_floor_x - r)]
     end_pts = []
     for yc in centres:
@@ -1694,7 +1718,6 @@ def context(
     expect += common(name, t_max, [tn["em-half"]], [bore_rpm], bore_levels[-1])
     bore_elements = []
     for k, yc in enumerate(centres):
-        c = (rx, yc)
         rb = bore_d / 2
         # The centre as the post prints it (a radial move in or out is then
         # square to the bore, not a hair against its way); quarters from 45°
@@ -1818,7 +1841,26 @@ def context(
                 "passes": [{"offset": r5, "levels": [_r(z) for z in root_levels]}],
             },
         ],
-        [f"{name}@1", "keep_out", {"radius": r5, "boxes": jaws2}],
+        [
+            f"{name}@1",
+            "keep_out",
+            {
+                "radius": r5,
+                "boxes": jaws2
+                + [
+                    _box(
+                        f"rod {k + 1} {side} tab x{x:g}",
+                        (rx + x - tab_w / 2, rx + x + tab_w / 2),
+                        (yc + half, yc + half + e8)
+                        if side == "top"
+                        else (yc - half - e8, yc - half),
+                        tab_top,
+                    )
+                    for k, yc in enumerate(centres)
+                    for side, x in bar_tabs
+                ],
+            },
+        ],
     ]
 
     return {

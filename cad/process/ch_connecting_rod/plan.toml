@@ -20,10 +20,13 @@
 # (CR08). Setup 7, bench: break the rods out, file the stubs, deburr,
 # inspect. Setup 8: black enamel.
 #
-# The order follows the drawing's process (cad/config/parts/ch-connecting-
-# rod.yaml): both faces roughed in turns to .020 over, the blanks released
-# and reseated, then both finished, the bore, slot and pin hole after the
-# faces. It cuts them before the outline, the rod still in its frame.
+# The route departs from the drawing's process (cad/config/parts/ch-
+# connecting-rod.yaml), by the owner's ruling of 2026-11-21 (the author
+# chooses the route for speed; the owner corrects afterwards): D stays as
+# bought and F alone is skimmed .010 (not .005 off each fork face), and the
+# bore, slot and pin hole are cut before the outline, the rod still in its
+# frame (not after it). Both faces are still roughed in turns to .020 over,
+# the blanks released and reseated, then both finished.
 #
 # Speed (owner's priority): NC 57 min per load of two (about 29 min a rod),
 # from 100 in the first draft: only the ring's zone and the shank's band are
@@ -47,7 +50,7 @@
 # Also to buy: the .0775 reamer (tools.reamer-0775) and the 5/64 in end mill
 # (tools.endmill-5-64-long). No pin gauges (owner decision 2026-11-19, #3124
 # item 5): the pin hole is accepted on the reamer and a hand try of the
-# miked pin. The black enamel has no paint on record: Setup 7 is gated on
+# miked pin. The black enamel has no paint on record: Setup 8 is gated on
 # the owner's product.
 #
 # Zeroing: X0 the blanks' left ends, flushed with a 1-2-3 block, edge finder
@@ -177,7 +180,8 @@ through_mm = 0.254
 # (LittleMachineShop "Cutting Speeds", Milling, Plain carbon steels
 # 1006-1026, HSS: 80-110 ft/min; read 2026-11-20); .001 in/tooth × 72 × 100 =
 # 7.2 in/min, the lowest chip load prechips' force table holds (the author's
-# choice). Its lower face at the near tine's wall, then .1090 higher so its
+# choice). Its lower face at the near tine's wall, then .042 higher (.1090
+# above Z0) so its
 # upper face makes the far wall; each level in steps no deeper than
 # slot_step_max_mm into the crown. The largest arbor spacer by the saw: 2 ×
 # (the saw's radius − the slot's depth − 1.0 mm clear of the crown).
@@ -207,7 +211,7 @@ bore_finish_radius_mm = 9.0741
 # Pin hole: spot Ø.065 with the #1 carbide centre drill (under the #49, so no
 # chamfer at the mouth), the #49 through the fork in pecks of .050 with full
 # retracts, its full diameter .5 mm past face D (in the air past the plate's
-# end), then the .0775 reamer through, its full diameter 1.0 mm past it, in
+# end), then the .0775 reamer through, its tip 1.0 mm past it, in
 # and out at feed.
 spot_dia_mm = 1.651
 drill_past_mm = 0.5
@@ -251,11 +255,11 @@ tab_top_2_x_mm = 83
 tab_bottom_2_x_mm = 111
 tab_top_3_x_mm = 140.5
 tab_ring_1_deg = 90
-tab_ring_2_deg = 180
+tab_ring_2_deg = 225
 outline_start_x_mm = 83
 # The tabs' stations from X0 (cam.py checks them), and the outline's extent:
 # the ring's far side to just past the slot's floor.
-tab_station_1_mm = 3.053
+tab_station_1_mm = 9.042
 tab_station_2_mm = 23.5
 tab_station_3_mm = 50.5
 tab_station_4_mm = 78.5
@@ -622,7 +626,7 @@ speed_kind = "spindle"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Run CR06_slot (the saw; set 100): two passes along −Y across both forks {{cad.fork_slot_depth_in:.3dot}} into the crowns: the first with the saw's lower face {{process.saw_low_mm:in.4dot}} above Z0 (the near tine's wall), the second with its lower face {{process.saw_high_mm:in.4dot}} above Z0, its upper face making the far tine's wall. Cutting oil on the saw."
+instruction = "Run CR06_slot (the saw; set 100): two passes along −Y across the whole load, {{cad.fork_slot_depth_in:.3dot}} into both forks' crowns and the waste strips beside them: the first with the saw's lower face {{process.saw_low_mm:in.4dot}} above Z0 (the near tine's wall), the second with its lower face {{process.saw_high_mm:in.4dot}} above Z0, its upper face making the far tine's wall. Cutting oil on the saw."
 rpm = 100
 feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -674,7 +678,7 @@ speed_kind = "spindle"
 tool = "reamer-0775"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pin_hole_dia_band_mm}}" }
-instruction = "Same file, M6 T5: ream each hole through with the .0775 reamer (to buy), in and out at feed, its full diameter {{process.ream_past_mm:in.3dot}} past face D; set 2000. Cutting oil."
+instruction = "Same file, M6 T5: ream each hole through with the .0775 reamer (to buy), in and out at feed, its tip {{process.ream_past_mm:in.3dot}} past face D (its full diameter through); set 2000. Cutting oil."
 rpm = 2000
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [
@@ -755,7 +759,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Inspect each rod; the first rod of the batch in full."
-inspection = "Each rod: ring {{cad.ring_far_face_thickness_min_in:.4dot}}–{{cad.ring_far_face_thickness_max_in:.4dot}} thick (the micrometers; its near face and the bore were checked on the mill for every load); no tab stub standing proud. The first rod also: ring Ø{{cad.ring_dia_min_in:.2f}}–{{cad.ring_dia_max_in:.2f}}; shank {{cad.shank_far_face_thickness_min_in:.3dot}}–{{cad.shank_far_face_thickness_max_in:.3dot}} thick and {{cad.shank_right_flank_width_min_in:.2f}}–{{cad.shank_right_flank_width_max_in:.2f}} wide; the fork {{cad.fork_width_min_in:.2f}}–{{cad.fork_width_max_in:.2f}} wide and its boss {{cad.fork_boss_length_min_in:.2f}}–{{cad.fork_boss_length_max_in:.2f}} from the crown (the micrometers, the calipers); later rods hold these on the program's path. The inside corners: process-held by the 5/64 in cutter in Setup 6 (R.039, under R.040 MAX). Outside: set it aside and tell the owner."
+inspection = "Each rod: ring {{cad.ring_far_face_thickness_min_in:.4dot}}–{{cad.ring_far_face_thickness_max_in:.4dot}} thick (the micrometers; its near face and the bore were checked on the mill for every load); no tab stub standing proud. The first rod also: ring Ø{{cad.ring_dia_min_in:.2f}}–{{cad.ring_dia_max_in:.2f}}; shank {{cad.shank_far_face_thickness_min_in:.3dot}}–{{cad.shank_far_face_thickness_max_in:.3dot}} thick and {{cad.shank_right_flank_width_min_in:.2f}}–{{cad.shank_right_flank_width_max_in:.2f}} wide; the fork {{cad.fork_width_min_in:.2f}}–{{cad.fork_width_max_in:.2f}} wide and its boss {{cad.fork_boss_length_min_in:.2f}}–{{cad.fork_boss_length_max_in:.2f}} from the crown (the micrometers, the calipers); later rods hold these on the program's path. The inside corners: process-held by the 5/64 in cutter in Setup 6 (R.039, under R.040 MAX). A rod sprung out of its band once free: set it straight by hand on the surface plate and check again. Still outside: set it aside and tell the owner."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.ring_far_face_thickness_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.ring_dia_band_mm}}" },
