@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300">
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="24">End B in the bench vise (not to scale): the neck's pip filed flush, the edge broken</text>
+  <rect class="clamp" x="140" y="92" width="160" height="45"/>
+  <rect class="clamp" x="140" y="163" width="160" height="45"/>
+  <rect class="part-kept" x="20" y="137" width="320" height="26"/>
+  <rect class="part-threads" x="340" y="137" width="284" height="26"/>
+  <rect class="part-removed" x="624" y="146" width="10" height="8"/>
+  <rect class="cutter" x="634" y="70" width="12" height="160"/>
+  <line class="centre-line" x1="10" y1="150" x2="700" y2="150"/>
+  <line class="datum" x1="624" y1="100" x2="624" y2="200"/>
+  <text class="datum-label" x="540" y="92">end B's face</text>
+  <line class="dims" x1="340" y1="236" x2="624" y2="236"/>
+  <line class="dims" x1="340" y1="228" x2="340" y2="244"/>
+  <line class="dims" x1="624" y1="228" x2="624" y2="244"/>
+  <text class="label" x="360" y="262">thread .70–.72 from end B (Op 200)</text>
+  <text class="label" x="560" y="290">smooth file, flat on the face</text>
+  <line class="dims" x1="640" y1="278" x2="640" y2="230"/>
+  <text class="label" x="660" y="130">pip</text>
+  <line class="dims" x1="662" y1="134" x2="632" y2="148"/>
+  <text class="label" x="140" y="62">soft jaws over a shim wrap on plain rod</text>
+</svg>
