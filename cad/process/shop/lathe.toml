@@ -173,8 +173,9 @@ material = "lathe-6061"
 rpm = 300
 feed = "by hand, steady, cutting oil; back out to clear chips"
 
-# The turned shafts and pins (dt_pinion_pivot_shaft and mg_wheel_axle
-# plans). Speeds from the LittleMachineShop "Cutting Speeds"
+# The turned shafts and pins (dt_crank_pinion_pin, dt_pinion_pivot_shaft and
+# mg_wheel_axle plans; lathe-ar-o1 moved here from dt.toml, a second family
+# needing it). Speeds from the LittleMachineShop "Cutting Speeds"
 # page above (read live 2026-11-21), low end of each range: O1 ("Cold work,
 # oil hardening tool steel O1, O2, O6, O7") turning carbide 590 ft/min,
 # drilling 45 ft/min (the O1 drill rod is bought annealed). The form and
@@ -189,24 +190,24 @@ feed = "by hand along Z, light and steady, cutting oil"
 
 [settings.lathe-ar-o1]
 tool = "lathe-ar"
-material = "lathe-o1-annealed"
+material = "lathe-o1-drill-rod"
 sfm = 590
 feed_mm_rev = 0.1016
 
 [settings.lathe-groove-o1]
 tool = "grooving-tool-020"
-material = "lathe-o1-annealed"
+material = "lathe-o1-drill-rod"
 rpm = 300
 feed = "by hand, light and steady, cutting oil"
 
 [settings.lathe-form-r070-o1]
 tool = "form-tool-r070"
-material = "lathe-o1-annealed"
+material = "lathe-o1-drill-rod"
 rpm = 300
 feed = "by hand along Z, light and steady, cutting oil"
 
 [settings.lathe-centre-o1]
 tool = "centre-drills-carbide-60"
-material = "lathe-o1-annealed"
+material = "lathe-o1-drill-rod"
 sfm = 45
 feed = "tailstock quill by hand"

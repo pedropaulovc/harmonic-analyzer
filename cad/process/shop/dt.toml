@@ -151,17 +151,9 @@ diameter_mm = 25.4
 description = "PM-1127VF-LB steady rest"
 
 # --- Lathe settings for the drill-rod pins (MHA-DT-29) ----------------------------
-# O1 drill rod, annealed as supplied, on the lathe.toml tools. The 1/8 in rod
-# may be O1 or W1 (stock-to-order drill-rod-1-8); the slower O1 row serves both.
-# Cutting speeds: LittleMachineShop, "Cutting Speeds"
-# (https://littlemachineshop.com/pages/cutting-speeds, read live 2026-11-21),
-# "Cold work, oil hardening tool steel O1, O2, O6, O7": turning HSS 125,
-# carbide 590 ft/min, at the mini-lathe .004 in/rev feed (lathe.toml header).
-[settings.lathe-ar-o1]
-tool = "lathe-ar"
-material = "lathe-o1-drill-rod"
-sfm = 590
-feed_mm_rev = 0.1016
+# lathe-ar-o1 (O1 drill rod, annealed as supplied; the 1/8 in rod may be O1 or
+# W1, stock-to-order drill-rod-1-8, the slower O1 row serves both) is in
+# lathe.toml: MHA-MG-07 needs it too.
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
