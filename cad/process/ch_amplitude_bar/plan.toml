@@ -86,7 +86,8 @@
 # the riser and the jaws (cam.py checks it).
 #
 # NC (cam:ch_amplitude_bar, cad/process/ch_amplitude_bar/cam.py):
-# CA01_foot_end, CA02_foot_notch, CA03_top_end, CA04_top_notch, CA05_pin_hole.
+# CA00_riser_face (a new riser only), CA01_foot_end, CA02_foot_notch,
+# CA03_top_end, CA04_top_notch, CA05_pin_hole.
 # Program names, the [parameters] and the milling_cuts names are a contract
 # with that recipe. Tool numbers are the places in the tools list among the
 # mill's tools: T1 1/2 in end mill, T2 slitting saw, T3 #1 centre drill, T4
@@ -393,7 +394,7 @@ instruction = "Number each blank 1–{{process.quantity:d}} at one end in marker
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mic each blank across both pairs of faces at both ends and the middle. Write each end's L-to-R reading on the blank at that end: Setup 2 zeros on the foot end's, Setup 4 on the top end's."
+instruction = "Mic each blank across both pairs of faces at both ends and the middle. Write each end's L-to-R reading to .0001 on the blank at that end: Setup 2 zeros and sweeps on the foot end's, Setup 4 on the top end's."
 inspection = "Every reading {{cad.front_face_section_min_in:.3dot}}–{{cad.front_face_section_max_in:.3dot}}: this traveler's incoming-stock gate (the drawing gives the section as 1/4 SQ STOCK, reference). Outside: set the blank aside and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.front_face_section_band_mm}}" }]
 
@@ -428,7 +429,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Mic each new riser block's height (the bar's 1 in thickness) at its four corners."
-inspection = "Every reading {{process.riser_blank_height_min_mm:in.3dot}}–{{process.riser_blank_height_max_mm:in.3dot}}: CA00 faces {{process.riser_face_mm:in.3dot}} off, leaving {{process.riser_height_min_mm:in.3dot}}–{{process.riser_height_max_mm:in.3dot}}. Outside: stop and tell the owner."
+inspection = "Every reading {{process.riser_blank_height_min_mm:in.3dot}}–{{process.riser_blank_height_max_mm:in.3dot}} and all eight within .003 of each other, so CA00's one {{process.riser_face_mm:in.3dot}} pass faces both tops, leaving {{process.riser_height_min_mm:in.3dot}}–{{process.riser_height_max_mm:in.3dot}}. Outside: saw another pair, or stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.riser_blank_height_min_mm}}", "{{process.riser_blank_height_max_mm}}"] }]
 
 [[setups]]
@@ -498,7 +499,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Jog Y only (X and Z stay) to the middle of the P2, P3 and P4 bars and write each reading in mm, + up. For each bar: d = its reading ÷ 25.4 − (its foot-end L-to-R reading − P1's)."
-inspection = "Every d within ±{{process.seat_offset_max_mm:in.4dot}}: that bar's down face, where its notch is cut, stands within that of P1's, which the saw's Z0 is touched on (the plan's ledge budget). Over: open the vise, brush the riser and the bars, reseat, tap down while closing and sweep again. Over after a second reseat: stop and tell the owner."
+inspection = "Every d within ±{{process.seat_offset_max_mm:in.4dot}}: that bar's down face, where its notch is cut, stands within that of P1's, which the saw's Z0 is touched on, so its ledge stays inside {{cad.foot_notch_ledge_min_in:.3dot}}–{{cad.foot_notch_ledge_max_in:.3dot}} with the touch-off's own error. Over: open the vise, brush the riser and the bars, reseat, tap down while closing and sweep again. Over after a second reseat: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -628,7 +629,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Jog Y only (X and Z stay) to the middle of the P2, P3 and P4 bars and write each reading in mm, + up. For each bar: d = its reading ÷ 25.4 − (its top-end L-to-R reading − P1's)."
-inspection = "Every d within ±{{process.seat_offset_max_mm:in.4dot}}: that bar's down face, where its notch is cut, stands within that of P1's, which the saw's Z0 is touched on (the plan's ledge budget). Over: open the vise, brush the riser and the bars, reseat, tap down while closing and sweep again. Over after a second reseat: stop and tell the owner."
+inspection = "Every d within ±{{process.seat_offset_max_mm:in.4dot}}: that bar's down face, where its notch is cut, stands within that of P1's, which the saw's Z0 is touched on, so its ledge stays inside {{cad.top_notch_ledge_min_in:.3dot}}–{{cad.top_notch_ledge_max_in:.3dot}} with the touch-off's own error. Over: open the vise, brush the riser and the bars, reseat, tap down while closing and sweep again. Over after a second reseat: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -725,7 +726,7 @@ instruction = "Swap to the drill chuck. Set each CA05 tool out of the chuck by a
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0 again with T3: console M6 T3 (the tool setter measures it; T4 and T5 are measured against it at their M6), spindle stopped, its tip on a .002 leaf on the top of the bar against the fixed jaw, G10 L20 P1 Z(that bar's reading × 25.4 + 0.051)."
+instruction = "G54 Z0 again with T3: console M6 T3 (the tool setter measures it; T4 and T5 are measured against it at their M6), spindle stopped, its tip on a .002 leaf on the P1 bar's top inside the jaws, G10 L20 P1 Z(that bar's top-end L-to-R reading × 25.4 + 0.051)."
 feed = "hand"
 
 [[setups.operations]]

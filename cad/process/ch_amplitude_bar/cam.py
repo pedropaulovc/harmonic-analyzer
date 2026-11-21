@@ -754,8 +754,9 @@ def context(
             }
         )
 
-    # CA00_riser_face, once for a new riser (frame "riser": X0 the vise's
-    # left jaw side, Y0 the fixed jaw's face, Z0 the higher riser top). The
+    # CA00_riser_face, once for a new riser (its own G54: X0 the vise's left
+    # jaw side, Y0 the fixed jaw's face, Z0 the higher riser top; the job
+    # carries the bar's model only as FreeCAD's Job model). The
     # two blocks side by side across the jaws on the 1 in parallels, their
     # tops above the jaw tops: X passes past both jaw sides, stepping from
     # over the fixed jaw's top to past the widest pair, face both blocks edge
@@ -797,7 +798,11 @@ def context(
             "plunge": em_feed,
             "frame": "foot",
             "label": "riser face",
-            "stock": ((0.0, jaw_w), (-pair_max, 0.0), (-under, 0.0)),
+            "stock": (
+                (0.0, jaw_w),
+                (-pair_max, 0.0),
+                (-p["riser_blank_height_max_mm"], 0.0),
+            ),
             "ops": [
                 ["riser_face", "face the riser", _face(riser_x, riser_ys, -face, 0.0)]
             ],
