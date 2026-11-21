@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="22">Saw: one blank off the 3/4 x 1-1/4 in C360 bar (plan, 4 px/mm)</text>
+  <!-- The bar, lying on its wide face; the blank at its end. -->
+  <rect class="part-arriving" x="40" y="90" width="566" height="127"/>
+  <rect class="part-kept" x="606" y="90" width="114" height="127"/>
+  <line class="cutter" x1="606" y1="60" x2="606" y2="247"/>
+  <text class="label-halo" x="612" y="60">saw cut</text>
+  <line class="dims" x1="606" y1="235" x2="720" y2="235"/>
+  <text class="label-halo" x="663" y="255" text-anchor="middle">{{process.blank_x_in:.2f}}–{{process.blank_x_max_in:.2f}} in</text>
+  <line class="dims" x1="735" y1="90" x2="735" y2="217"/>
+  <text class="label-halo" x="740" y="158" text-anchor="end" transform="rotate(-90 740 158)">1-1/4</text>
+  <text class="label-halo" x="300" y="158" text-anchor="middle">bar stays in stock (shared with MHA-MS-02)</text>
+  <text class="label-halo" x="663" y="140" text-anchor="middle">blank</text>
+  <text class="label-halo" x="663" y="158" text-anchor="middle">3/4 thick</text>
+  <text class="label" x="40" y="285">File the burrs off both sawn ends and the long edges; mark one wide face TOP, one narrow face BACK.</text>
+</svg>

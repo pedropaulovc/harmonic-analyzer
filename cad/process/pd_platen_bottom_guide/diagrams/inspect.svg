@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 300" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="300"/>
+  <text class="title" x="20" y="20">The finished rail, looking at F (the front face), U down (1 in = 66 px)</text>
+  <rect class="part-kept" x="40" y="100" width="700.9" height="41.2"/>
+  <rect class="part-threads" x="227.1" y="106.2" width="7.4" height="7.4"/>
+  <rect class="part-threads" x="263.6" y="106.2" width="7.4" height="7.4"/>
+  <rect class="part-threads" x="507.3" y="106.2" width="7.4" height="7.4"/>
+  <rect class="part-threads" x="543.7" y="106.2" width="7.4" height="7.4"/>
+  <line class="centre-line" x1="232" y1="90" x2="232" y2="190"/>
+  <line class="dims" x1="40" y1="180" x2="232" y2="180"/>
+  <line class="dims" x1="40" y1="145" x2="40" y2="230"/>
+  <text class="label-halo" x="90" y="175">hole 1 {{cad.lock_tap_1_station_min_in:.3dot}}–{{cad.lock_tap_1_station_max_in:.3dot}}</text>
+  <line class="dims" x1="40" y1="220" x2="740.9" y2="220"/>
+  <line class="dims" x1="740.9" y1="145" x2="740.9" y2="230"/>
+  <text class="label-halo" x="330" y="238">length {{cad.right_end_length_min_in:.3dot}}–{{cad.right_end_length_max_in:.3dot}}</text>
+  <line class="dims" x1="222" y1="109.9" x2="222" y2="141.2"/>
+  <line class="dims" x1="216" y1="109.9" x2="232" y2="109.9"/>
+  <line class="dims" x1="216" y1="141.2" x2="228" y2="141.2"/>
+  <text class="label-halo" x="44" y="130">hole 1 from U {{cad.lock_tap_1_height_min_in:.3dot}}–{{cad.lock_tap_1_height_max_in:.3dot}}</text>
+  <line class="leader" x1="230" y1="84" x2="267" y2="104"/>
+  <text class="label" x="20" y="80">4X {{cad.lock_tap_1_thread}} THRU, a screw runs through each</text>
+  <line class="datum" x1="40" y1="150" x2="40" y2="165"/>
+  <text class="datum-label" x="44" y="163">LEFT</text>
+  <text class="label" x="370" y="125">F</text>
+  <text class="label" x="40" y="270">edges broken R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max; platen taps and rack-screw holes come at MHA-PD-00</text>
+</svg>

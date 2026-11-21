@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="430"/>
+  <text class="title" x="20" y="20">Section across the jaws at a lock hole, from the LEFT end (1 in = 100 px)</text>
+  <line class="fixture-table" x1="60" y1="400" x2="400" y2="400"/>
+  <rect class="clamp" x="152.6" y="223" width="60" height="177"/>
+  <rect class="clamp" x="275" y="223" width="60" height="177"/>
+  <rect class="fixture-support" x="250" y="250" width="12.5" height="150"/>
+  <rect class="fixture-support" x="262.5" y="250" width="12.5" height="150"/>
+  <rect class="part-kept" x="212.6" y="210.5" width="62.4" height="39.5"/>
+  <rect class="part-threads" x="222.8" y="210.5" width="11.2" height="39.5"/>
+  <!-- The tap through the rail, its point .550 below R. -->
+  <rect class="cutter" x="224" y="140" width="8.8" height="125.5"/>
+  <polygon class="cutter" points="224,265.5 232.8,265.5 228.4,276"/>
+  <!-- T-handle wrench and the dead centre seated in its centre hole. -->
+  <rect class="part-rest" x="168" y="122" width="121" height="12"/>
+  <rect class="part-rest" x="220" y="110" width="17" height="30"/>
+  <polygon class="clamp" points="221,60 236,60 236,95 228.4,108 221,95"/>
+  <line class="centre-line" x1="228.4" y1="40" x2="228.4" y2="290"/>
+  <line class="datum" x1="80" y1="250" x2="150" y2="250"/>
+  <text class="datum-label" x="30" y="246">Z0 (F)</text>
+  <line class="leader" x1="240" y1="78" x2="320" y2="70"/>
+  <text class="label" x="325" y="74">MT3 dead centre in the spindle, spindle off</text>
+  <line class="leader" x1="290" y1="128" x2="320" y2="110"/>
+  <text class="label" x="325" y="110">T-handle wrench, centre hole on the point</text>
+  <line class="leader" x1="234" y1="230" x2="345" y2="200"/>
+  <text class="label" x="350" y="200">{{cad.lock_tap_1_thread}} spiral-point tap, through</text>
+  <line class="dims" x1="380" y1="210.5" x2="380" y2="276"/>
+  <line class="dims" x1="370" y1="210.5" x2="390" y2="210.5"/>
+  <line class="dims" x1="370" y1="276" x2="390" y2="276"/>
+  <text class="label" x="395" y="248">point {{process.tap_point_depth_mm:in.3dot}} below R</text>
+  <line class="leader" x1="231" y1="280" x2="231" y2="410"/>
+  <text class="label" x="225" y="422" text-anchor="end">the point stands below F here, in the air</text>
+</svg>

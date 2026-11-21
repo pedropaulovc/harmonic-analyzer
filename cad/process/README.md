@@ -169,9 +169,10 @@ the parts it serves as data (that is prose in its `note`): parts point at what
 they need from their process plans. They hold:
 
 - ownership-only records, under the shop key, for the PM-30MV mill, the
-  PM-1127VF-LB lathe, the calipers, the DRO scales and the clamp bore's drill
-  shanks read as gauges (`machines.*`, `gauges.calipers`, `gauges.mill-x-dro`,
-  `gauges.mill-y-dro`, `gauges.clamp-bore-drill-shanks`);
+  PM-1127VF-LB lathe, the calipers, the DRO scales and the clamp bore's and
+  stop plate's drill shanks read as gauges (`machines.*`, `gauges.calipers`,
+  `gauges.mill-x-dro`, `gauges.mill-y-dro`, `gauges.clamp-bore-drill-shanks`,
+  `gauges.ms-plate-hole-drill-shanks`);
 - gauges: the DTI's kind, the pin-gauge note, the Mitutoyo gauge-block set
   and the indicators' ownership;
 - the PM-30MV DRO's make and cited accuracy (read by the paper-drive tests);

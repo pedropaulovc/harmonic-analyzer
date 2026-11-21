@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="16" y="20">PF04, along the jaws: L down, the right face faced to the width</text>
+  <line class="fixture-table" x1="60.0" y1="420.0" x2="520.0" y2="420.0"/>
+  <rect class="fixture-support" x="70.0" y="293.0" width="420.0" height="127.0"/>
+  <rect class="clamp" x="60.0" y="195.3" width="440.0" height="6.0"/>
+  <text class="label" x="330.7" y="189.3">jaw tops (fixed jaw behind;</text>
+  <text class="label" x="330.7" y="217.3">moving jaw cut away)</text>
+  <rect class="part-kept" x="120.0" y="166.0" width="200.7" height="127.0"/>
+  <rect class="part-removed" x="120.0" y="136.8" width="200.7" height="29.2"/>
+  <rect class="cutter" x="68.2" y="104.8" width="63.5" height="30.0"/>
+  <text class="label-halo" x="137.8" y="122.8"></text>
+  <line class="arrow" x1="100.0" y1="96.8" x2="360.7" y2="96.8"/>
+  <text class="label-halo" x="180.0" y="90.8">passes along X, two across the 3/8</text>
+  <line class="datum" x1="120.0" y1="301.0" x2="120.0" y2="285.0"/>
+  <text class="datum-label" x="116.0" y="317.0" text-anchor="middle">X0 (T)</text>
+  <text class="label" x="320.7" y="317.0" text-anchor="middle">B</text>
+  <text class="label" x="70.0" y="356.5">1 in parallel</text>
+  <text class="label" x="470.0" y="120.0">L down on the parallels; T now LEFT.</text>
+  <text class="label" x="470.0" y="138.0">Levels of {{process.face_step_max_mm:in.3dot}} max down to</text>
+  <text class="label" x="470.0" y="156.0">the width {{cad.right_face_width_min_in:.3dot}}–{{cad.right_face_width_max_in:.3dot}}.</text>
+</svg>

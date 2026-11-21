@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="460"/>
+  <text class="title" x="20" y="22">VB04: elevation along the jaws (6 px/mm), BACK down on the stacks, P left</text>
+  <rect class="fixture-support" x="70" y="268.5" width="320" height="171.5"/>
+  <line class="fixture-table" x1="40" y1="440" x2="420" y2="440"/>
+  <!-- The front faced from 31.24 down to the depth 21.84 in five levels, then the front step.
+       The back step (cut in VB03) stands clear of the stacks at the lower left. -->
+  <polygon class="part-kept" points="150,149.6 203.3,149.6 203.3,137.4 307,137.4 307,268.5 203.3,268.5 203.3,256.3 150,256.3"/>
+  <rect class="part-removed" x="150" y="81" width="157" height="56.4"/>
+  <rect class="part-removed" x="150" y="137.4" width="53.3" height="12.2"/>
+  <rect class="hidden" x="60" y="170.3" width="340" height="269.7" fill="none"/>
+  <rect class="cutter" x="127.1" y="40" width="76.2" height="80"/>
+  <line class="arrow" x1="165" y1="120" x2="165" y2="145"/>
+  <line class="datum" x1="150" y1="152" x2="150" y2="180"/>
+  <text class="datum-label" x="90" y="162">X0 = P</text>
+  <line class="datum" x1="307" y1="268.5" x2="420" y2="268.5"/>
+  <text class="datum-label" x="424" y="272">Z0 stacks' top (BACK)</text>
+  <line class="dims" x1="320" y1="137.4" x2="320" y2="268.5"/>
+  <text class="label-halo" x="326" y="240">depth {{cad.body_back_depth_min_in:.3dot}}–{{cad.body_back_depth_max_in:.3dot}}</text>
+  <line class="leader" x1="420" y1="100" x2="308" y2="100"/>
+  <text class="label" x="424" y="104">front faced in levels of {{process.face_step_max_mm:in.3dot}} max</text>
+  <line class="leader" x1="420" y1="146" x2="200" y2="146"/>
+  <text class="label" x="424" y="150">front neck step {{cad.neck_front_station_in:.3dot}} deep,</text>
+  <text class="label" x="424" y="166">its floor .13 above the jaw tops</text>
+  <line class="leader" x1="420" y1="196" x2="400" y2="196"/>
+  <text class="label" x="424" y="200">fixed jaw behind (dashed): the bottom face</text>
+  <line class="leader" x1="60" y1="250" x2="160" y2="262"/>
+  <text class="label-halo" x="20" y="246">back step, clear of the stacks</text>
+  <text class="label" x="424" y="364">the back face bears past the back step</text>
+</svg>

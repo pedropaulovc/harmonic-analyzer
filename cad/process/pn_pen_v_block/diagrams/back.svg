@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="460"/>
+  <text class="title" x="20" y="22">VB03: elevation along the jaws (6 px/mm), the blank lying on its narrow face, BACK up, P left</text>
+  <!-- 1/2 + 5/8 in parallels stacked (1-1/8 in), seen from the moving-jaw side. -->
+  <rect class="fixture-support" x="70" y="268.5" width="320" height="171.5"/>
+  <line class="fixture-table" x1="40" y1="440" x2="420" y2="440"/>
+  <!-- The blank 1.25 tall; the back skim and the back neck step removed. -->
+  <polygon class="part-kept" points="150,268.5 150,93.2 203.3,93.2 203.3,81 307,81 307,268.5"/>
+  <rect class="part-removed" x="150" y="78" width="157" height="3"/>
+  <rect class="part-removed" x="150" y="81" width="53.3" height="12.2"/>
+  <!-- The fixed jaw behind the blank (outline), its top 16.4 mm above the stacks. -->
+  <rect class="hidden" x="60" y="170.3" width="340" height="269.7" fill="none"/>
+  <!-- The 1/2 in end mill on the step, its side on the step face, passing across the jaws. -->
+  <rect class="cutter" x="127.1" y="34" width="76.2" height="36"/>
+  <line class="arrow" x1="165" y1="70" x2="165" y2="88"/>
+  <line class="datum" x1="150" y1="96" x2="150" y2="124"/>
+  <text class="datum-label" x="90" y="120">X0 = P</text>
+  <line class="datum" x1="307" y1="268.5" x2="420" y2="268.5"/>
+  <text class="datum-label" x="424" y="272">Z0 stacks' top</text>
+  <line class="leader" x1="420" y1="86" x2="308" y2="80"/>
+  <text class="label" x="424" y="90">back face: {{process.back_skim_mm:in.3dot}} skim</text>
+  <line class="leader" x1="420" y1="120" x2="200" y2="90"/>
+  <text class="label" x="424" y="124">back neck step: {{process.back_step_depth_mm:in.3dot}} deep,</text>
+  <text class="label" x="424" y="140">P to {{cad.neck_steps_station_in:.3dot}}, one pass across the jaws</text>
+  <line class="leader" x1="420" y1="196" x2="400" y2="196"/>
+  <text class="label" x="424" y="200">fixed jaw behind (dashed): TOP face,</text>
+  <text class="label" x="424" y="216">its top {{process.lying_grip_mm:in.3dot}} above the stacks</text>
+  <line class="leader" x1="420" y1="360" x2="390" y2="360"/>
+  <text class="label" x="424" y="364">1/2 + 5/8 in parallels,</text>
+  <text class="label" x="424" y="380">stacked against each jaw</text>
+  <text class="label-halo" x="10" y="60">1/2 in end mill</text>
+</svg>

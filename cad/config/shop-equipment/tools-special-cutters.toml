@@ -50,7 +50,6 @@ note = "Not owned: to buy. Miniature End Mill, Square, Long Reach, Stub Flute: .
 kind = "chamfer_mill"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PN-05 2X 45° V, (.20) deep."
-
 [tools.knurl-straight-25tpi]
 kind = "knurling_tool"
 status = "to_order"

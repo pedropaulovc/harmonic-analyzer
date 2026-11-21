@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="430"/>
+  <text class="title" x="20" y="20">Section across the jaws, from the LEFT end (1 in = 100 px)</text>
+  <line class="fixture-table" x1="60" y1="400" x2="420" y2="400"/>
+  <rect class="clamp" x="140" y="223" width="60" height="177"/>
+  <rect class="clamp" x="275" y="223" width="60" height="177"/>
+  <text class="label-on-clamp" x="146" y="390">moving</text>
+  <text class="label-on-clamp" x="285" y="390">fixed</text>
+  <rect class="fixture-support" x="200" y="250" width="12.5" height="150"/>
+  <rect class="fixture-support" x="262.5" y="250" width="12.5" height="150"/>
+  <rect class="part-kept" x="200" y="187.6" width="75" height="62.4"/>
+  <rect class="part-removed" x="200" y="180" width="75" height="7.6"/>
+  <rect class="cutter" x="225" y="125" width="50" height="55"/>
+  <line class="arrow" x1="240" y1="115" x2="210" y2="115"/>
+  <line class="datum" x1="80" y1="250" x2="150" y2="250"/>
+  <text class="datum-label" x="30" y="246">Z0 (U)</text>
+  <line class="datum" x1="275" y1="196" x2="275" y2="222"/>
+  <text class="datum-label" x="300" y="214">Y0</text>
+  <text class="label-halo" x="218" y="245">U</text>
+  <line class="leader" x1="280" y1="190" x2="340" y2="150"/>
+  <text class="label" x="300" y="145">top faced to Z {{process.height_target_mm:in.4dot}} in levels</text>
+  <line class="dims" x1="380" y1="187.6" x2="380" y2="250"/>
+  <line class="dims" x1="370" y1="187.6" x2="390" y2="187.6"/>
+  <line class="dims" x1="370" y1="250" x2="390" y2="250"/>
+  <text class="label" x="395" y="224">height {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}}, miked</text>
+  <text class="label" x="345" y="300">same stacks, the blank turned over</text>
+  <text class="label" x="345" y="318">about its length, LEFT end still left</text>
+</svg>

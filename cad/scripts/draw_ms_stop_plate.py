@@ -7,7 +7,8 @@ gives the decimal drill size, never merely a screw designation.
 The shared millimetre hole-mouth coordinates convert to COM metres before
 projection into the cover-side *Back view.
 The native clearance callout carries the match-drill line; the pilot and
-opening sequence lives in the assembly sheet's step 1, not on this part.
+opening sequence lives in the plate's traveler (cad/process/ms_stop_plate,
+Setups 3-4), not on this sheet.
 Separate native chamfer size and angle retain their model-owned precision.
 """
 
@@ -36,7 +37,12 @@ from _drawing_dimensions import set_dimension_callouts
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
+from _printed_tolerance import angular_band_deg
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
@@ -44,6 +50,7 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
+from ms_stop_plate_notes import MATCHED_PAIR_NOTE, NOTE_NUMBER
 from solidworks_mcp.adapters.solidworks.drawing import add_note, auto_center_marks, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -71,20 +78,12 @@ FRONT_KEEP = {
 }
 # Text left of the thin edge view, so neither witness line strikes it.
 RIGHT_KEEP = {"PlateThickness": (0.327, 0.225)}
-# Rule 4: the matched pair, its screws and the thickness that sets their reach
-# are named once, in note 1; the thickness and the hole callout link it, and
-# the three hole locations carry only their value (title block .XXX).
-NOTE_NUMBER = 1
+# Rule 4: the thickness and the hole callout link note 1
+# (ms_stop_plate_notes.MATCHED_PAIR_NOTE), which names the matched pair, its
+# screws and the thickness that sets their reach once; the three hole
+# locations carry only their value (title block .XXX).
 NOTE_LINK = f"SEE NOTE {NOTE_NUMBER}"
 DIMENSION_CALLOUTS = {"PlateThickness": NOTE_LINK}
-# The pilot-and-open sequence is the assembly sheet's step 1.
-MATCHED_PAIR_NOTE = (
-    f"{NOTE_NUMBER}. MATCHED PAIR WITH {_config.parts('ms-stop-block')['number']} STOP BLOCK:"
-    f" {part.MATCH_DRILL_DATUM_ALIGNMENT}.\n"
-    f"    2X {_config.parts('ms-vn-stop-plate-screw')['number']} SCREWS ENTER FREELY;"
-    f" THICKNESS SETS THEIR REACH IN\n"
-    f"    {_config.parts('ms-stop-block')['number']} TAPS."
-)
 # Upper-left corner of the note: the open top-left field, as on MHA-MS-02.
 MATCHED_PAIR_NOTE_XY = (0.020, 0.262)
 # The size rows are wider than the room between the .56 witnesses, so the
@@ -98,6 +97,277 @@ LOCATING_END_XY = (0.228, 0.128)
 # leader leaves the text's end, between the two hole witness lines.
 LOCATING_EDGE_XY = (0.150, 0.130)
 LOCATING_EDGE_X_MM = 7.0
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (ms_stop_plate_spec: X = 0 the
+# LOCATING END, Y = 0 the LOCATING EDGE, Z = 0 the face that seats on the
+# MHA-MS-02 mating face, the sheet's .040 thickness toward -Z). A band is the
+# title block's row for the places the sheet prints
+# (PLATE_DRAWING_PRECISION_BY_NAME) on the printed nominal, the thickness its
+# own +/-.004, the clearance holes the DRILLED HOLES row
+# (HOLE_CALLOUT_PRECISION). The plate is the match-drill master: its holes
+# are opened from the #49 pilot the pair drill puts through it and into the
+# block (MHA-MS-02's 2X Ø.073 to .300 from its mating face), carried here as
+# the pair's pilot. The declarations print nothing.
+_P = part.PLATE_DRAWING_PRECISION_BY_NAME
+_SPEC = "ms_stop_spec"
+_SELF = "draw_ms_stop_plate"
+_FRAME = "__frame__"
+_BUILD = ("build_ms_stop_plate", "build")
+_PRECISION = (_SPEC, "PLATE_DRAWING_PRECISION_BY_NAME")
+_ANGULAR_BAND_DEG = angular_band_deg(unit=part.UNIT)
+_CHAMFER_DIAGONAL = math.sqrt(0.5)
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+def _printed(
+    name: str, value: float, *sources: Any
+) -> tuple[list[float], tuple[Any, ...]]:
+    """The title block's band for the printed places of dimension ``name``."""
+    return (
+        limits(value, _P[name], unit=part.UNIT),
+        (*sources, (_SPEC, "UNIT"), _PRECISION),
+    )
+
+
+part_metadata(
+    fields={
+        "material.thickness": (
+            part.PLATE_THICKNESS,
+            ((_SPEC, "PLATE_THICKNESS"), (_SPEC, "PLATE_THICKNESS_TOLERANCE_MM")),
+        ),
+    },
+    model_sources=(
+        _BUILD,
+        (_SPEC, "BLOCK_LENGTH"),
+        (_SPEC, "BLOCK_HEIGHT"),
+        (_SPEC, "PLATE_THICKNESS"),
+    ),
+    precision_sources=(
+        _PRECISION,
+        (_SPEC, "HOLE_CALLOUT_PRECISION"),
+        (_SELF, "CLEARANCE_PRECISION"),
+    ),
+)
+# The X = 0 end and Y = 0 edge, labelled LOCATING END and LOCATING EDGE: the
+# pair clamp sets both flush with the block's, and every station runs from
+# them.
+for _name, _normal, _axis, _note in (
+    ("locating_end", (-1.0, 0.0, 0.0), "x", part.LOCATING_END_NOTE),
+    ("locating_edge", (0.0, -1.0, 0.0), "y", part.LOCATING_EDGE_NOTE),
+):
+    requirement(
+        _name,
+        kind="face",
+        faces=(PlanarFace(_normal, 0.0),),
+        requirements=("plane",),
+        fields={
+            "plane": (_plane(_axis, 0.0), (_FRAME, _BUILD)),
+            "note": (
+                _note,
+                (
+                    (_SPEC, "LOCATING_END_NOTE"),
+                    (_SPEC, "LOCATING_EDGE_NOTE"),
+                    (_SELF, "_label_locating_edges"),
+                ),
+            ),
+        },
+    )
+# The length .84 and height .56 (FRONT_KEEP), each from its locating face.
+for _name, _normal, _axis, _value, _key, _dim, _source, _from in (
+    (
+        "far_end",
+        (1.0, 0.0, 0.0),
+        "x",
+        part.BLOCK_LENGTH,
+        "length",
+        "PlateLength",
+        "BLOCK_LENGTH",
+        "locating_end",
+    ),
+    (
+        "roof_edge",
+        (0.0, 1.0, 0.0),
+        "y",
+        part.BLOCK_HEIGHT,
+        "height",
+        "PlateHeight",
+        "BLOCK_HEIGHT",
+        "locating_edge",
+    ),
+):
+    requirement(
+        _name,
+        kind="face",
+        faces=(PlanarFace(_normal, _value),),
+        requirements=(_key,),
+        fields={
+            "plane": (_plane(_axis, _value), ((_SPEC, _source),)),
+            _key: _printed(_dim, _value, (_SPEC, _source), (_SELF, "FRONT_KEEP")),
+            f"{_key}_nominal": (_value, ((_SPEC, _source),)),
+            f"{_key}_from": (_from, ((_SELF, "FRONT_KEEP"),)),
+        },
+        precision={_key: _P[_dim]},
+    )
+# The seating face (Z = 0) and the outer face: the sheet's .040 +/-.004
+# (RIGHT_KEEP PlateThickness, SEE NOTE 1), the stock's as bought.
+requirement(
+    "seating_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part.PLATE_Z_MAX),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", part.PLATE_Z_MAX), (_FRAME, (_SPEC, "PLATE_Z_MAX")))},
+)
+requirement(
+    "outer_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -part.PLATE_Z_MIN),),
+    requirements=("thickness",),
+    fields={
+        "plane": (_plane("z", part.PLATE_Z_MIN), ((_SPEC, "PLATE_Z_MIN"),)),
+        "thickness": (
+            limits(
+                part.PLATE_THICKNESS,
+                _P["PlateThickness"],
+                (part.PLATE_THICKNESS_TOLERANCE_MM, -part.PLATE_THICKNESS_TOLERANCE_MM),
+                unit=part.UNIT,
+            ),
+            (
+                (_SPEC, "PLATE_THICKNESS"),
+                (_SPEC, "PLATE_THICKNESS_TOLERANCE_MM"),
+                (_SELF, "RIGHT_KEEP"),
+            ),
+        ),
+        "thickness_nominal": (part.PLATE_THICKNESS, ((_SPEC, "PLATE_THICKNESS"),)),
+        "thickness_from": ("seating_face", ((_SELF, "RIGHT_KEEP"),)),
+        "callout": (NOTE_LINK, ((_SELF, "DIMENSION_CALLOUTS"),)),
+    },
+    precision={"thickness": _P["PlateThickness"]},
+)
+# The roof edge's two corners, 2X .04 X 45° (FRONT_KEEP RoofChamfer*), as the
+# block's roof chamfers.
+requirement(
+    "roof_chamfers",
+    kind="chamfer",
+    faces=(
+        PlanarFace(
+            (-_CHAMFER_DIAGONAL, _CHAMFER_DIAGONAL, 0.0),
+            (part.BLOCK_HEIGHT - part.ROOF_END_CHAMFER) * _CHAMFER_DIAGONAL,
+        ),
+        PlanarFace(
+            (_CHAMFER_DIAGONAL, _CHAMFER_DIAGONAL, 0.0),
+            (part.BLOCK_LENGTH + part.BLOCK_HEIGHT - part.ROOF_END_CHAMFER)
+            * _CHAMFER_DIAGONAL,
+        ),
+    ),
+    requirements=("size", "angle_deg"),
+    fields={
+        "count": (2, ((_SELF, "_style_plate_chamfer"),)),
+        "edge": ("roof_edge", ((_SPEC, "ROOF_END_CHAMFER"),)),
+        "size": _printed(
+            "RoofChamferSize",
+            part.ROOF_END_CHAMFER,
+            (_SPEC, "ROOF_END_CHAMFER"),
+            (_SELF, "FRONT_KEEP"),
+        ),
+        "size_nominal": (part.ROOF_END_CHAMFER, ((_SPEC, "ROOF_END_CHAMFER"),)),
+        "angle_deg": (
+            [
+                part.ROOF_CHAMFER_ANGLE - _ANGULAR_BAND_DEG,
+                part.ROOF_CHAMFER_ANGLE + _ANGULAR_BAND_DEG,
+            ],
+            ((_SPEC, "ROOF_CHAMFER_ANGLE"), (_SPEC, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "angle_deg_nominal": (
+            part.ROOF_CHAMFER_ANGLE,
+            ((_SPEC, "ROOF_CHAMFER_ANGLE"),),
+        ),
+    },
+    precision={"size": _P["RoofChamferSize"], "angle_deg": _P["RoofChamferAngle"]},
+)
+# The two clearance holes, THRU from the outer face: one native callout (2X
+# Ø.094 THRU ALL, SEE NOTE 1), stations .150 and .690 from the locating end
+# and .160 from the locating edge; each opened from the pair's #49 pilot.
+_CLEARANCE = (
+    drilled_limits(
+        part.PLATE_CLEARANCE_DIA, part.HOLE_CALLOUT_PRECISION, unit=part.UNIT
+    ),
+    ((_SPEC, "PLATE_CLEARANCE_DIA"), (_SPEC, "UNIT"), (_SELF, "CLEARANCE_PRECISION")),
+)
+for _index, (_x, _dim) in enumerate(
+    zip(part.PLATE_HOLE_XS, ("PlateLeftFromEnd", "PlateRightFromEnd"), strict=True), 1
+):
+    requirement(
+        f"clearance_hole_{_index}",
+        kind="hole",
+        faces=(CylinderFace(part.PLATE_CLEARANCE_DIA, contains_x_mm=_x),),
+        requirements=("dia", "thru", "station", "height"),
+        fields={
+            "at": (
+                [_x, part.PLATE_HOLE_Y, part.PLATE_Z_MIN],
+                ((_SPEC, "PLATE_HOLE_POINTS"),),
+            ),
+            "axis": ((0.0, 0.0, 1.0), ((_SPEC, "PLATE_HOLE_NORMAL"), _FRAME)),
+            "process": ("drill", ((_SPEC, "PLATE_CLEARANCE_SPEC"),)),
+            "dia": _CLEARANCE,
+            "nominal_dia": (
+                part.PLATE_CLEARANCE_DIA,
+                ((_SPEC, "PLATE_CLEARANCE_DIA"),),
+            ),
+            "clearance_for": (
+                part.PLATE_CLEARANCE_SPEC.size,
+                ((_SPEC, "PLATE_CLEARANCE_SPEC"),),
+            ),
+            "thru": (True, ((_SPEC, "PLATE_CLEARANCE_SPEC"), (_SELF, "build"))),
+            "station": _printed(
+                _dim, _x, (_SPEC, "PLATE_HOLE_XS"), (_SELF, "FRONT_KEEP")
+            ),
+            "station_nominal": (_x, ((_SPEC, "PLATE_HOLE_XS"),)),
+            "station_from": ("locating_end", ((_SELF, "FRONT_KEEP"),)),
+            "height": _printed(
+                "PlateFromHeadFace",
+                part.PLATE_HOLE_Y,
+                (_SPEC, "PLATE_HOLE_Y"),
+                (_SELF, "FRONT_KEEP"),
+            ),
+            "height_nominal": (part.PLATE_HOLE_Y, ((_SPEC, "PLATE_HOLE_Y"),)),
+            "height_from": ("locating_edge", ((_SELF, "FRONT_KEEP"),)),
+            "callout": (NOTE_LINK, ((_SELF, "NOTE_LINK"),)),
+            # The pair drill (MHA-MS-02's callout: 2X Ø.073 ↓.300 MATCH-DRILL
+            # FROM MHA-MS-03 STOP PLATE): the #49 pilot through this plate
+            # and into the block to .300 below the block's mating face.
+            "pair_pilot_dia": (
+                part.PLATE_TAP_DRILL_DIA,
+                ((_SPEC, "PLATE_TAP_DRILL_DIA"),),
+            ),
+            "pair_pilot_depth_in_mate": (
+                limits(
+                    part.PLATE_TAP_DRILL_DEPTH,
+                    part.HOLE_CALLOUT_PRECISION,
+                    unit=part.UNIT,
+                ),
+                ((_SPEC, "PLATE_TAP_DRILL_DEPTH"), (_SPEC, "HOLE_LINEAR_TOLERANCE_MM")),
+            ),
+            "pair_pilot_depth_in_mate_nominal": (
+                part.PLATE_TAP_DRILL_DEPTH,
+                ((_SPEC, "PLATE_TAP_DRILL_DEPTH"),),
+            ),
+            "mate": (
+                _config.parts("ms-stop-block")["number"],
+                ((_SPEC, "PLATE_TAP_SPEC"),),
+            ),
+        },
+        precision={
+            "dia": part.HOLE_CALLOUT_PRECISION,
+            "station": _P[_dim],
+            "height": _P["PlateFromHeadFace"],
+            "pair_pilot_depth_in_mate": part.HOLE_CALLOUT_PRECISION,
+        },
+    )
 
 
 def _append_callout_lines(display: Any, lines: str) -> None:

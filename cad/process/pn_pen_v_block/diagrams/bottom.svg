@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 640" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="640"/>
+  <text class="title" x="20" y="22">VB05: plan (10 px/mm, fixed jaw at the top), B up, P left</text>
+  <!-- Jaws: fixed (BACK face) at the top, moving (FRONT) at the bottom; they bear on the body only. -->
+  <rect class="clamp" x="100" y="50" width="360" height="30"/>
+  <rect class="clamp" x="100" y="298.4" width="360" height="30"/>
+  <!-- The block: the neck (X0 to the steps, 17.78 deep) and the body (to the far end, 21.84 deep). -->
+  <polygon class="part-kept" points="150,100.3 238.9,100.3 238.9,80 411.6,80 411.6,298.4 238.9,298.4 238.9,278.1 150,278.1"/>
+  <!-- Relief slot, steps to the far end. -->
+  <rect class="part-removed" x="238.9" y="110.5" width="172.7" height="157.5"/>
+  <!-- The V: mouth and flat. -->
+  <rect class="part-removed" x="150" y="129.2" width="99.1" height="120"/>
+  <line class="hidden" x1="150" y1="179.1" x2="249.1" y2="179.1"/>
+  <line class="hidden" x1="150" y1="199.4" x2="249.1" y2="199.4"/>
+  <line class="centre-line" x1="120" y1="189.2" x2="440" y2="189.2"/>
+  <!-- 1/2 in end mill in the slot at its in-most pass; the chamfer mill beside P. -->
+  <circle class="cutter" cx="302.4" cy="204.5" r="63.5"/>
+  <line class="arrow" x1="380" y1="236" x2="430" y2="236"/>
+  <circle class="cutter" cx="93" cy="189.2" r="31.75"/>
+  <line class="arrow" x1="93" y1="189.2" x2="240" y2="189.2"/>
+  <line class="datum" x1="150" y1="64" x2="150" y2="92"/>
+  <line class="datum" x1="138" y1="80" x2="164" y2="80"/>
+  <text class="datum-label" x="20" y="112">X0 (P), Y0 {{cad.body_back_depth_in:.3dot}}</text>
+  <text class="datum-label" x="20" y="127">from FRONT</text>
+  <line class="leader" x1="100" y1="100" x2="146" y2="83"/>
+  <text class="label-halo" x="470" y="70">fixed jaw: BACK face</text>
+  <text class="label-halo" x="470" y="320">moving jaw: FRONT face</text>
+  <line class="leader" x1="466" y1="150" x2="412" y2="150"/>
+  <text class="label-halo" x="470" y="146">relief slot {{cad.relief_height_in:.3dot}} deep below B,</text>
+  <text class="label-halo" x="470" y="162">1/2 in end mill from the far end; 5/64</text>
+  <text class="label-halo" x="470" y="178">end mill in its two corners at the step</text>
+  <line class="leader" x1="466" y1="196" x2="250" y2="196"/>
+  <text class="label-halo" x="470" y="200">V groove: 1/4 in chamfer mill in 5 levels,</text>
+  <text class="label-halo" x="470" y="216">flat by the 5/64 end mill (Y −.430 centre)</text>
+  <line class="leader" x1="40" y1="280" x2="75" y2="216"/>
+  <text class="label-halo" x="20" y="293">1/4 in chamfer mill, on the V's centre</text>
+  <!-- Section across the jaws through the neck, looking from P (5 px/mm, fixed jaw at the right). -->
+  <g transform="translate(0 80)">
+  <text class="title" x="20" y="285">Section through the neck (5 px/mm, fixed jaw at the right)</text>
+  <rect class="clamp" x="245.4" y="320.3" width="80" height="224.7"/>
+  <rect class="clamp" x="434.6" y="320.3" width="80" height="224.7"/>
+  <rect class="fixture-support" x="325.4" y="402" width="15.9" height="143"/>
+  <rect class="fixture-support" x="418.7" y="402" width="15.9" height="143"/>
+  <line class="fixture-table" x1="220" y1="545" x2="540" y2="545"/>
+  <rect class="hidden" x="325.4" y="309.3" width="109.2" height="92.7" fill="none"/>
+  <polygon class="part-kept" points="335.5,402 335.5,309.3 350,309.3 374.9,334.2 385.1,334.2 410,309.3 424.4,309.3 424.4,402"/>
+  <polygon class="part-removed" points="350,309.3 410,309.3 385.1,334.2 374.9,334.2"/>
+  <line class="datum" x1="200" y1="402" x2="325" y2="402"/>
+  <text class="datum-label" x="40" y="406">Z0 stacks' top (TOP face)</text>
+  <text class="label" x="540" y="330">jaw tops .085 below B</text>
+  <text class="label" x="540" y="430">body behind (dashed) is what</text>
+  <text class="label" x="540" y="446">the jaws grip; the neck stands</text>
+  <text class="label" x="540" y="462">.08 clear of each jaw</text>
+  </g>
+</svg>

@@ -121,6 +121,17 @@ tool = "jig-drill-43"
 material = "stop-c360"
 rpm = 2800
 feed = "2.8 in/min"
+# --- MHA-MS-03 stop plate (cad/process/ms_stop_plate/plan.toml) ---
+# The plate's Ø.094 +.004/0 holes: no pin gauges are owned (gauges.pin-gauges
+# is to_order). As MHA-MG-02's bore (gauges.clamp-bore-drill-shanks), a drill
+# shank of the owned 115-piece index, miked first, is the NO-GO: the #40
+# (.098 in, nominal × 25.4) does not enter. The lower limit rests on the
+# miked #41 (.096 in) that cuts the hole; no GO is owned at .094. The check
+# reads no scale: its resolution is the micrometers' reading of the shank;
+# its range is the drawing band it accepts (as clamp-bore-drill-shanks).
+[gauges.ms-plate-hole-drill-shanks]
+range_mm = [2.3876, 2.4892]
+resolution_mm = 0.00254
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
