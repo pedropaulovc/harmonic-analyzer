@@ -466,7 +466,7 @@ def context(
         raise ValueError("'pin drill' peck is not process.peck_mm with full retract")
     drill_tip = -(p["drill_past_mm"] + _point(d49))
     _agree(plan, "drill_tip_height_mm", drill_tip)
-    ream_tip = p["ream_tip_height_mm"]
+    ream_tip = -p["ream_past_mm"]
     if ream_tip > -0.5:
         raise ValueError("the reamer's tip does not pass the down face")
 

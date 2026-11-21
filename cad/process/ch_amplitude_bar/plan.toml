@@ -23,14 +23,23 @@
 # the notch walls, two passes per width. FLAGGED: it needs an R8 1 in saw
 # arbor; the one on record is to buy (cad/config/shop-equipment/
 # tools.gear-cutter-arbor-1, bought for the gear cutters), and the saw's
-# arbor hole is not on the packing list. The arbor's spacers by the saw must
-# be under the saw_collar_dia_max_mm below, or the collar meets the bar's end
-# in the top notch.
+# arbor hole is not on the packing list: 1 in is assumed for McMaster's
+# 2-3/4 in series, UNVERIFIED. The arbor's spacers by the saw must be under
+# the saw_collar_dia_max_mm below, or the collar meets the bar's end in the
+# top notch.
+#
+# FLAGGED: the .0775 reamer is to buy (tools.reamer-0775); no pin gauges
+# (owner decision 2026-11-19, #3124 item 5): the hole is accepted by a
+# first-article press of the pin.
 #
 # FLAGGED: the length (31.81-31.83) has no gauge on hand. Neither end of a
 # 31.8 in bar reaches the other within the mill's 23 in X travel, and the
 # calipers stop at 6 in. This traveler reads it with the 48 in steel rule on
 # record as to buy (tools.steel-rule-48), which must be graduated in 1/100 in.
+#
+# Workholding: the agent's recommendation (option A, the vise; owner's
+# per-part choice pending, 2026-11-21). A switch to a fixture replaces only
+# Setups 2 and 4 and their programs.
 #
 # Zeroing: every X/Y zero is the owned .200 in edge finder at 900 rpm
 # (logbook 2026-11-04, tools.edge-finder), as the column clamp plan does.
@@ -130,7 +139,12 @@ peck_mm = 1.27
 drill_past_mm = 0.5
 # The #49's point (118°) under that: cam.py checks it.
 drill_tip_height_mm = -1.057
-ream_tip_height_mm = -1.0
+ream_past_mm = 1.0
+# The pin MHA-SH-VN-58, McMaster 90145A299: 5/64 in, 0/+.0002 (.0781-.0783,
+# cad/config/parts/sh-vn-pivot-pin.yaml): the .0775 reamer is .0004-.0008
+# under it, inside the drawing's .0002-.0008 (sheet note 1).
+pin_dia_min_mm = 1.98374
+pin_dia_max_mm = 1.98882
 # Speeds, authored in the operations: LittleMachineShop "Cutting Speeds",
 # Drilling & Reaming, Plain carbon steels 1006-1026 (read 2026-11-20):
 # drilling 60-100 ft/min, reaming 40-65. The #49 (.073) at 2800 rpm, the
@@ -183,7 +197,7 @@ name = "1/2 in carbide end mill"
 ref = "endmill-carbide-3fl-1-2"
 [[tools]]
 id = "saw"
-name = "2-3/4 × .064 HSS slitting saw on the R8 1 in arbor"
+name = "2-3/4 x .064 HSS slitting saw on the R8 1 in arbor (arbor TO BUY)"
 ref = "slitting-saw-2-75-064"
 [[tools]]
 id = "spot"
@@ -195,12 +209,16 @@ name = "#49 drill"
 ref = "drill-49"
 [[tools]]
 id = "reamer-0775"
-name = ".0775 reamer"
+name = ".0775 reamer (TO BUY)"
 ref = "reamer-0775"
 [[tools]]
 id = "cutoff-saw"
 name = "Evolution miter saw"
 ref = "saw-evolution-14"
+[[tools]]
+id = "rule"
+name = "48 in steel rule, 1/100 in (TO BUY)"
+ref = "steel-rule-48"
 [[tools]]
 id = "arbor-press"
 name = "Arbor press"
@@ -225,14 +243,14 @@ speed_kind = "other"
 tool = "cutoff-saw"
 drilling = "none"
 sizing = "other"
-instruction = "Saw {{process.quantity:d}} blanks {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long, two from each 72 in length, the bar flat in the saw's vise, measured with the tape. File the burrs off both ends."
+instruction = "Saw {{process.quantity:d}} blanks {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long, two from each 72 in length, the bar flat in the saw's vise, each marked off with the 48 in rule. File the burrs off both ends."
 feed = "hand"
-inspection = "Each blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long (the 48 in rule, to buy: see the head note). Shorter: scrap it (another length); longer: saw it again."
+inspection = "Each blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long: the 48 in rule (to buy; it must read 1/100 in). Shorter: scrap it (another length); longer: saw it again."
 gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.blank_length_min_mm}}", "{{process.blank_length_max_mm}}"] }]
 
 [[setups.operations]]
-instruction = "Mic each blank across both pairs of faces at both ends and the middle. Number each blank 1–{{process.quantity:d}} at one end in marker; that end becomes the foot. With the foot end toward you, mark the face on your left L and the face away from you F (front) along their length with marking fluid and a scribe: the right face R and the back face B are opposite them."
-inspection = "Every reading {{cad.front_face_section_min_in:.3dot}}–{{cad.front_face_section_max_in:.3dot}}: the drawing's stock band. Outside: set the blank aside and tell the owner. Write the L-to-R reading on the blank: Setup 2 zeroes on it."
+instruction = "Mic each blank across both pairs of faces at both ends and the middle. Number each blank 1–{{process.quantity:d}} at one end in marker; that end becomes the foot. Lay the blank flat, the foot end toward you: mark the left side face L and the upward face F (front) along their length with marking fluid and a scribe; the right side face is R and the face on the bench is B (back)."
+inspection = "Every reading {{cad.front_face_section_min_in:.3dot}}–{{cad.front_face_section_max_in:.3dot}}: this traveler's incoming-stock gate (the drawing gives the section as 1/4 SQ STOCK, reference). Outside: set the blank aside and tell the owner. Write the L-to-R reading on the blank: Setups 2 and 4 zero on it."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.front_face_section_band_mm}}" }]
 
 [[setups.operations]]
@@ -340,9 +358,19 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Rule each bar from its faced foot end to its sawn top end, reading to .01 in with a square block against the foot end. Write the reading on the bar near the top end, and sort the bars into loads of four of near equal length."
+speed_kind = "other"
+tool = "rule"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Rule each bar from its faced foot end to its sawn top end, reading to .01 in with a 1-2-3 block square against the foot end. Write the reading on the bar near the top end, and sort the bars into loads of four of near equal length."
 inspection = "Each reading {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} less the {{process.foot_skim_mm:in.2dot}} skim. Under {{cad.top_end_length_min_in:.2f}}: scrap it."
 gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.measured_length_min_mm}}", "{{process.measured_length_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "Mic one MHA-SH-VN-58 pin from the lot the bars will be assembled with (sheet note 1 fits the hole to it)."
+inspection = "The pin {{process.pin_dia_min_mm:in.4dot}}–{{process.pin_dia_max_mm:in.4dot}} (McMaster 90145A299, 5/64 in 0/+.0002): the .0775 reamer is then .0004–.0008 under it, as the note asks. Outside: stop and tell the owner before reaming any bar."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.pin_dia_min_mm}}", "{{process.pin_dia_max_mm}}"] }]
 
 [[setups]]
 machine_kind = "other"
@@ -359,7 +387,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = ["{{process.top_extent_sta
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). G54 Y0 the fixed jaw's face; X0 the top end at the length: edge finder (900 rpm) on the longest bar's top end, less that bar's excess over {{cad.top_end_length_in:.2f}} (its written length − {{cad.top_end_length_in:.2f}})."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm). Y: on the fixed jaw's face, G10 L20 P1 Y2.540. X: its tip .10 below the bars' top, on the top end that stands farthest right, from the right: G10 L20 P1 X(2.540 + (that bar's written length − {{cad.top_end_length_in:.2f}}) × 25.4); for 31.88, X4.013. The four foot ends are flush, so every bar faces to the same length."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm). Y: on the fixed jaw's face, G10 L20 P1 Y2.540. X: its tip .10 below the bars' top, on the top end that stands farthest right, from the right: G10 L20 P1 X(2.540 + (that bar's written length − {{cad.top_end_length_in:.2f}}) × 25.4); for 31.88, X4.064. The four foot ends are flush, so every bar faces to the same length."
 feed = "hand"
 
 [[setups.operations]]
@@ -368,7 +396,7 @@ instruction_detailed = "Console M6 T1 (the tool setter measures it). Spindle sto
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First load only: prove CA03_top_end, then (after the swap below) CA04_top_notch and CA05_pin_hole, each in air with Z0 raised 1.000 in. Then Z0 back."
+instruction = "First load only: prove CA03_top_end in air, Z0 raised 1.000 in; every move clears the jaws. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -390,6 +418,10 @@ gauge_checks = [{ gauge = "steel-rule-48", band_mm = "{{cad.top_end_length_band_
 [[setups.operations]]
 instruction = "Swap to the saw as in Setup 2 (spacers under {{process.saw_collar_dia_max_mm:in.2dot}} in), and set G54 Z0 from its lower face on the back bar's top: the saw stopped, a .002 leaf just dragging, G10 L20 P1 Z(that bar's reading × 25.4 + 0.051)."
 instruction_detailed = "MDI G0 X31.900 Y-3.000 puts the saw's centre right of the ends with its rim 3 mm over the back bar's end. Lower on the handwheel until a .002 feeler leaf just drags under the saw's lower face: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First load only: prove CA04_top_notch in air, Z0 raised 1.000 in; the saw clears the jaws and the bars' ends. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -416,6 +448,10 @@ gauge_checks = [
 
 [[setups.operations]]
 instruction = "Swap to the drill chuck. G54 Z0 again with T3, the #1 centre drill, as above with T1: console M6 T3, its tip on a .002 leaf on the back bar's top, G10 L20 P1 Z(that bar's reading × 25.4 + 0.051)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First load only: prove CA05_pin_hole in air, Z0 raised 1.000 in, through each M6. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -449,12 +485,17 @@ speed_kind = "spindle"
 tool = "reamer-0775"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.top_pin_hole_dia_band_mm}}" }
-instruction = "Same file, M6 T5: ream each hole through with the .0775 reamer, in and out at feed, its full diameter {{process.ream_tip_height_mm:in.3dot}} below the R face; set 2000. Cutting oil."
+instruction = "Same file, M6 T5: ream each hole through with the .0775 reamer (to buy), in and out at feed, its full diameter {{process.ream_past_mm:in.3dot}} past the R face into the air under the overhang; set 2000. Cutting oil."
 rpm = 2000
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [
   { name = "pin ream", kind = "drill", phase = "finish", cutter_dia_mm = 1.9685, flutes = 4, rpm = 2000, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = -6.35 },
 ]
+
+[[setups.operations]]
+instruction = "First load only, before the next load: try a miked MHA-SH-VN-58 pin by hand in each hole, chamfered end first."
+inspection = "The pin does not enter past its chamfer by hand: the hole is under it (the press fit). It enters: the hole is oversize; stop and tell the owner. The pin is pressed in only at assembly (MHA-CH-00)."
+gauge_checks = "other"
 
 [[setups.operations]]
 instruction = "First load only, still clamped: each hole's place, the #49 drill's shank in it."
@@ -480,7 +521,7 @@ beam = "other"
 
 [[setups.operations]]
 instruction = "Inspect first, the edges still sharp."
-inspection = "Pin hole: MHA-SH-VN-58, the bar pivot pin, is miked; the hole is a press fit {{cad.top_pin_hole_dia_min_in:.4dot}}–{{cad.top_pin_hole_dia_max_in:.4dot}} reamed .0002–.0008 under it (sheet note 1). The first bar is tried with a pin in the arbor press: it presses in by hand pressure on the handle, not by a tap. Too loose or too tight: stop and tell the owner (no pin gauges: owner decision 2026-11-19, #3124). Foot notch's floor finish: Ra {{cad.foot_notch_finish_ra_uin:d}} µin, a smooth saw cut with no torn marks; torn: tell the owner. Bow rechecked as in Setup 1."
+inspection = "Pin hole: reamed with the .0775 reamer to the miked pin (Setup 4) and tried by hand on the first load. Foot notch's floor finish: Ra {{cad.foot_notch_finish_ra_uin:d}} µin, a smooth saw cut with no torn marks; torn: tell the owner. Bow rechecked as in Setup 1."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -492,5 +533,5 @@ instruction = "Deburr the notch edges, the pin holes' mouths and the ends: R{{ca
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Buff the four cold-finished faces bright along their length with the 220-grit roll (consumables.sanding-roll-220), wipe, then oil all over (consumables.oil-iso-vg32). No plating."
+instruction = "Buff the four cold-finished faces bright along their length with the 220-grit abrasive roll, wipe, then oil all over with ISO VG 32 light machine oil. No plating."
 feed = "hand"
