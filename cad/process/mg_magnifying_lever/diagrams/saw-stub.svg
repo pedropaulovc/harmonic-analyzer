@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300">
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="24">The lever on the saw, the stub beyond the blade (not to scale)</text>
+  <rect class="clamp" x="120" y="80" width="200" height="40"/>
+  <rect class="clamp" x="120" y="180" width="200" height="40"/>
+  <rect class="part-kept" x="40" y="137" width="300" height="26"/>
+  <rect class="part-threads" x="340" y="137" width="150" height="26"/>
+  <rect class="part-removed" x="490" y="146" width="56" height="8"/>
+  <rect class="part-removed" x="546" y="137" width="50" height="26"/>
+  <rect class="part-removed" x="596" y="143" width="40" height="14"/>
+  <rect class="cutter" x="513" y="50" width="10" height="200"/>
+  <line class="datum" x1="490" y1="100" x2="490" y2="200"/>
+  <text class="datum-label" x="420" y="92">end B's face</text>
+  <text class="label" x="300" y="270">kerf mid-way along the .22 wide Op 170 groove</text>
+  <line class="dims" x1="480" y1="258" x2="516" y2="200"/>
+  <text class="label" x="570" y="110">stub, dropped clear</text>
+  <line class="dims" x1="600" y1="114" x2="585" y2="137"/>
+  <text class="label" x="120" y="60">saw vise over a shim wrap on plain rod</text>
+  <text class="label" x="350" y="128">thread</text>
+  <text class="label" x="600" y="200">Ø.06 neck</text>
+  <line class="dims" x1="610" y1="188" x2="535" y2="155"/>
+</svg>

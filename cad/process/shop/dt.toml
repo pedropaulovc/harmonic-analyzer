@@ -153,7 +153,7 @@ diameter_mm = 25.4
 [tools.steady-rest-pm-1127]  # inventory fixtures.steady-rest-pm-1127
 description = "PM-1127VF-LB steady rest"
 
-# --- Lathe settings for the drill-rod pins (MHA-DT-29) ----------------------------
+# --- Lathe settings for the drill-rod pins (MHA-DT-25, MHA-DT-29) ----------------
 # O1 drill rod, annealed as supplied, on the lathe.toml tools. The 1/8 in rod
 # may be O1 or W1 (stock-to-order drill-rod-1-8); the slower O1 row serves both.
 # Cutting speeds: LittleMachineShop, "Cutting Speeds"
@@ -165,6 +165,15 @@ tool = "lathe-ar"
 material = "lathe-o1-drill-rod"
 sfm = 590
 feed_mm_rev = 0.1016
+
+# The cam pin's R.125 form tool cuts its whole width at once: University of
+# Florida EML2322L "Parting Facts" (lathe.toml header), the 300 rpm start for
+# a full-width form cut, fed along Z by hand with cutting oil.
+[settings.lathe-form-r125-o1]
+tool = "form-tool-r125"
+material = "lathe-o1-drill-rod"
+rpm = 300
+feed = "carriage handwheel along Z, a slow steady feed, cutting oil"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
@@ -201,3 +210,5 @@ description = "C67500 manganese bronze, round bar, 5/8 in"
 description = "gray iron, class not ruled, casting for MHA-DT-05 cone pivot post"
 [stock.drill-rod-1-8]
 description = "Drill rod (O1 or W1 tool steel, annealed, ground), round bar, 1/8 in"
+[stock.o1-drill-rod-5-32]
+description = "AISI O1 drill rod, precision ground, round bar, 5/32 in"
