@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="14">
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="24">The 2.60 piece in the 3-jaw, .28 out; the rest back through the jaws into the spindle bore (not to scale)</text>
+  <rect class="fixture-vise" x="40" y="60" width="90" height="180"/>
+  <rect class="clamp" x="300" y="90" width="200" height="44"/>
+  <rect class="clamp" x="300" y="166" width="200" height="44"/>
+  <rect class="part-kept" x="110" y="136" width="494" height="28"/>
+  <rect class="part-removed" x="604" y="136" width="8" height="28"/>
+  <line class="centre-line" x1="30" y1="150" x2="720" y2="150"/>
+  <line class="datum" x1="604" y1="114" x2="604" y2="186"/>
+  <text class="datum-label" x="590" y="106">Z0</text>
+  <rect class="cutter" x="616" y="168" width="20" height="44"/>
+  <text class="label" x="560" y="232">AR tool: face .02 off</text>
+  <line class="dims" x1="500" y1="250" x2="604" y2="250"/>
+  <line class="dims" x1="500" y1="242" x2="500" y2="258"/>
+  <line class="dims" x1="604" y1="242" x2="604" y2="258"/>
+  <text class="label" x="470" y="276">.28 out of the jaw fronts</text>
+  <text class="label" x="310" y="84">3-jaw on the Ø1/4 piece</text>
+  <text class="label" x="20" y="256">chuck body; the far end in the spindle bore</text>
+</svg>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="14">
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="24">Plan of the saw bed: a 2.60 piece off the end of the 72 in bar (not to scale)</text>
+  <rect class="fixture-table" x="10" y="50" width="740" height="200"/>
+  <rect class="clamp" x="420" y="98" width="300" height="36"/>
+  <rect class="clamp" x="420" y="166" width="300" height="36"/>
+  <rect class="part-kept" x="80" y="136" width="300" height="28"/>
+  <rect class="part-rest" x="390" y="136" width="350" height="28"/>
+  <rect class="cutter" x="382" y="70" width="8" height="160"/>
+  <line class="dims" x1="80" y1="200" x2="380" y2="200"/>
+  <line class="dims" x1="80" y1="192" x2="80" y2="208"/>
+  <line class="dims" x1="380" y1="192" x2="380" y2="208"/>
+  <text class="label" x="100" y="246">scribe line 2.60 from the bar end</text>
+  <text class="label" x="120" y="128">the rod's piece</text>
+  <text class="label" x="350" y="66">blade on the far side of the line</text>
+  <text class="label" x="450" y="90">saw vise: the rest of the 1/4 bar</text>
+  <text class="label" x="20" y="280">Ø1/4 cold-finished bar; file the burrs off both sawn ends</text>
+</svg>
