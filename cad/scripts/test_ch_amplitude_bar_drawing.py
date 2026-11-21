@@ -12,8 +12,10 @@ import sh_vn_pivot_pin_bar_spec as pin_spec
 import ch_amplitude_bar_notes
 import ch_amplitude_bar_spec
 import draw_ch_amplitude_bar as drawing
+import export_features
 import build_ch_amplitude_bar as bar
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gtol_face import FaceGeometry
 from _config import parts
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import printed_deviations
@@ -898,3 +900,103 @@ def test_every_band_is_inch_native() -> None:
         ),
     ):
         assert tuple(value / 25.4 for value in band) == pytest.approx(inch, abs=1e-12)
+
+
+_FEATURE_KINDS = {
+    "back_face": "face",
+    "front_face": "face",
+    "left_face": "face",
+    "right_face": "face",
+    "foot_end": "face",
+    "top_end": "face",
+    "top_notch": "notch",
+    "foot_notch": "notch",
+    "top_pin_hole": "hole",
+}
+
+
+def _in(value_in: float) -> float:
+    return value_in * 25.4
+
+
+def _plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+    point = tuple(value * offset_mm / 1000 for value in normal)
+    return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+
+def test_the_bar_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    spec = ch_amplitude_bar_spec
+    assert "ch_amplitude_bar" in export_features.SUPPORTED_PARTS
+    manifest = export_features.requirement_manifest("ch_amplitude_bar")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == _FEATURE_KINDS
+    assert manifest["construction"] == "one_piece"
+    selectors = export_features.feature_selectors("ch_amplitude_bar")
+    w, d, length = spec.BAR_WIDTH, spec.BAR_DEPTH, spec.BAR_LENGTH
+    top_left = w - spec.TOP_NOTCH_OFFSET - spec.TOP_NOTCH_WIDTH
+    foot_right = spec.BOTTOM_NOTCH_OFFSET + spec.BOTTOM_NOTCH_WIDTH
+    r = spec.TOP_PIN_HOLE_DIA / 2
+    pin_box = tuple(
+        value / 1000
+        for value in (0.0, spec.TOP_PIN_Y - r, d / 2 - r, w, spec.TOP_PIN_Y + r, d / 2 + r)
+    )
+    expected = {
+        "back_face": [_plane((0.0, 0.0, -1.0), 0.0)],
+        "front_face": [_plane((0.0, 0.0, 1.0), d)],
+        "left_face": [_plane((-1.0, 0.0, 0.0), 0.0)],
+        "right_face": [_plane((1.0, 0.0, 0.0), w)],
+        "foot_end": [_plane((0.0, -1.0, 0.0), 0.0)],
+        "top_end": [_plane((0.0, 1.0, 0.0), length)],
+        "top_notch": [
+            _plane((1.0, 0.0, 0.0), top_left),
+            _plane((-1.0, 0.0, 0.0), -(w - spec.TOP_NOTCH_OFFSET)),
+            _plane((0.0, 1.0, 0.0), length - spec.TOP_NOTCH_HEIGHT),
+        ],
+        "foot_notch": [
+            _plane((1.0, 0.0, 0.0), spec.BOTTOM_NOTCH_OFFSET),
+            _plane((-1.0, 0.0, 0.0), -foot_right),
+            _plane((0.0, -1.0, 0.0), -spec.BOTTOM_NOTCH_HEIGHT),
+        ],
+        "top_pin_hole": [
+            FaceGeometry(None, 4002, (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, r / 1000), None, pin_box)
+        ],
+    }
+    for name, faces in expected.items():
+        for face in faces:
+            owners = [
+                owner
+                for owner, specs in selectors.items()
+                if any(selector.matches(face) for selector in specs)
+            ]
+            assert owners == [name], name
+
+
+def test_bar_feature_bands_are_the_printed_ones() -> None:
+    features = export_features.requirement_manifest("ch_amplitude_bar")["features"]
+    assert features["top_end"]["length"] == pytest.approx([_in(31.81), _in(31.83)])
+    for name in ("front_face", "right_face"):
+        field = "section" if name == "front_face" else "width"
+        assert features[name][field] == pytest.approx([_in(0.248), _in(0.25)])
+        assert features[name]["callout"] == "1/4 SQ STOCK"
+    top, foot = features["top_notch"], features["foot_notch"]
+    assert top["width"] == pytest.approx([_in(0.124), _in(0.131)])
+    assert top["ledge"] == pytest.approx([_in(0.061), _in(0.065)])
+    assert top["ledge_from"] == "right_face"
+    assert top["depth"] == pytest.approx([_in(0.54), _in(0.56)])
+    assert foot["width"] == pytest.approx([_in(0.104), _in(0.110)])
+    assert foot["ledge"] == pytest.approx([_in(0.071), _in(0.075)])
+    assert foot["ledge_from"] == "left_face"
+    # A native band qualifies the exact model nominal, 3/32, printed .094.
+    assert foot["depth"] == pytest.approx([_in(0.09375 - 0.020), _in(0.09375)])
+    assert foot["finish_ra"] == pytest.approx(1.6)
+    for notch in (top, foot):
+        assert notch["thru"] is True
+        # ROOTS R.015 MAX, as printed.
+        assert notch["depth_callout"] == ch_amplitude_bar_notes.ROOT_CALLOUT
+        assert notch["root_radius_max"] == pytest.approx(_in(0.015))
+    hole = features["top_pin_hole"]
+    assert hole["dia"] == pytest.approx([_in(0.0775), _in(0.0779)])
+    assert hole["location_from_back"] == pytest.approx([_in(0.120), _in(0.130)])
+    assert hole["drop"] == pytest.approx([_in(0.24), _in(0.26)])
+    assert hole["axis"] == [1.0, 0.0, 0.0] and hole["process"] == "ream"
+    assert hole["callout"] == drawing.DIMENSION_CALLOUTS["TopPinDia"]

@@ -66,35 +66,58 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import limits
+from _printed_tolerance import inside_corner_radius_mm
 from _session import run_build
-from _surface_finish import surface_finish_by_key
+from _surface_finish import MACHINED_UM, surface_finish_by_key
 import _telemetry
 from ch_connecting_rod_notes import (
     CAM_SLOT_NOTE_NUMBER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PIN_FIT_NOTE_NUMBER,
+    PIN_NUMBER,
     SLOT_FIT_NOTE_NUMBER,
 )
 from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
     FORK_BASE_Y,
+    FORK_CROTCH_Y,
+    FORK_SLOT_BAND,
     FORK_SLOT_WIDTH,
     FORK_THICKNESS,
+    FORK_THICKNESS_BAND,
     FORK_TOP_Y,
     FORK_WIDTH,
     GEOMETRIC_TOLERANCES_IN,
+    GEOMETRIC_TOLERANCES_MM,
     PIN_HOLE_DIA,
+    PIN_HOLE_LIMITS,
     RING_BORE_DIA,
+    RING_BORE_DIA_BAND,
     RING_BOTTOM_Y,
+    RING_FACE_BAND,
+    RING_FACE_NEAR,
+    RING_OUTER_DIA,
     RING_OUTER_RADIUS,
+    RING_THICKNESS,
+    RING_THICKNESS_BAND,
+    SHANK_FACE_BAND,
+    SHANK_FACE_NEAR,
+    SHANK_THICKNESS,
+    SHANK_THICKNESS_BAND,
     SHANK_WIDTH,
     STRAP_DIAMETRAL_CLEARANCE,
     SURFACE_FINISHES,
+    TINE_BAND,
+    TINE_THICKNESS,
+    UNIT,
 )
 
 
@@ -359,6 +382,296 @@ PIN_OFFSET_TEXT_XY = (0.150, _sheet_xy(0.0, 111.0)[1])
 # A): its witness rises from the bore centre up the shank, its text out to
 # the left on the shank above the ring, clear over the ring OD's text.
 DATUM_B_FROM_A_TEXT_XY = (0.150, _sheet_xy(0.0, 55.0)[1])
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame (_sheet_xy
+# and _detail_xy: the strap bore's axis on Z at the origin, the rod up +Y to
+# the pin at CENTER_DISTANCE, X across, Z through the thickness with the
+# fork's datum face at -Z). Every Z face and the slot locate from that datum
+# face; a band is the dimension's own native band, else the title block's row
+# for its printed places. The declarations print nothing.
+_P = {name: places for by in DRAWING_PRECISION.values() for name, places in by.items()}
+_SELF = "draw_ch_connecting_rod"
+_SPEC = "ch_connecting_rod_spec"
+_NOTES = "ch_connecting_rod_notes"
+_FRAME = ((_SELF, "_sheet_xy"), (_SELF, "_detail_xy"))
+_Z = (0.0, 0.0, 1.0)
+_DATUM_Z = -FORK_THICKNESS / 2.0
+_SLOT_HALF = FORK_SLOT_WIDTH / 2.0
+_RING_NEAR_Z = _DATUM_Z + RING_FACE_NEAR
+_SHANK_NEAR_Z = _DATUM_Z + SHANK_FACE_NEAR
+# The rod's one geometric tolerance, the pin hole's position zone (its FCF
+# below subscripts the same row): unpacked, so a second row fails here.
+(_PIN_POSITION_MM,) = GEOMETRIC_TOLERANCES_MM.values()
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(
+        *_FRAME,
+        (_SPEC, "CENTER_DISTANCE"),
+        (_SPEC, "FORK_THICKNESS"),
+        (_SPEC, "RING_OUTER_DIA"),
+    ),
+    precision_sources=((_NOTES, "DRAWING_PRECISION"),),
+)
+# The fork's datum face (model -Z, the near tine's outer face): the near
+# tine, the slot, the ring's near face and the shank's near face all run from
+# it (DETAIL_KEEP, LEFT_KEEP).
+requirement(
+    "datum_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -_DATUM_Z),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", _DATUM_Z), (*_FRAME, (_SPEC, "FORK_THICKNESS")))},
+)
+# The other faces normal to Z, each one band from the face it runs from: the
+# fork over the tines, .240, as their reference sum with its worst-case
+# spread (DETAIL_KEEP "ForkThick"); the ring's near face .035 +/-.002 from the
+# datum face and its thickness .170 +/-.002 (LEFT_KEEP, note 3: its sliding
+# fit in the cam slot); the stepped shank's near face .05 from the datum face
+# and its thickness .13, both at the title block's .XX (DETAIL_KEEP).
+_Z_FACES = (
+    # (feature, z, field, printed dimension, nominal, source, from, keep)
+    ("fork_far_face", -_DATUM_Z, "thickness", "ForkThick", FORK_THICKNESS,
+     "FORK_THICKNESS", "datum_face", "DETAIL_KEEP"),
+    ("ring_near_face", _RING_NEAR_Z, "offset", "RingFaceNear", RING_FACE_NEAR,
+     "RING_FACE_NEAR", "datum_face", "LEFT_KEEP"),
+    ("ring_far_face", _RING_NEAR_Z + RING_THICKNESS, "thickness", "RingThick",
+     RING_THICKNESS, "RING_THICKNESS", "ring_near_face", "LEFT_KEEP"),
+    ("shank_near_face", _SHANK_NEAR_Z, "offset", "ShankFaceNear", SHANK_FACE_NEAR,
+     "SHANK_FACE_NEAR", "datum_face", "DETAIL_KEEP"),
+    ("shank_far_face", _SHANK_NEAR_Z + SHANK_THICKNESS, "thickness", "ShankThick",
+     SHANK_THICKNESS, "SHANK_THICKNESS", "shank_near_face", "DETAIL_KEEP"),
+)
+_Z_BANDS = {
+    "ForkThick": FORK_THICKNESS_BAND,
+    "RingFaceNear": RING_FACE_BAND,
+    "RingThick": RING_THICKNESS_BAND,
+    "ShankFaceNear": SHANK_FACE_BAND,
+    "ShankThick": SHANK_THICKNESS_BAND,
+}
+for _name, _z, _field, _dim, _nominal, _source, _from, _keep in _Z_FACES:
+    _fields: dict[str, Any] = {
+        "plane": (_plane("z", _z), (*_FRAME, (_SPEC, _source))),
+        _field: (
+            limits(_nominal, _P[_dim], _Z_BANDS[_dim]),
+            ((_SPEC, _source), (_SELF, "_Z_BANDS"), (_SELF, _keep)),
+        ),
+        f"{_field}_nominal": (_nominal, ((_SPEC, _source),)),
+        f"{_field}_from": (_from, ((_SELF, _keep),)),
+    }
+    if _dim in LEFT_CALLOUTS:
+        _fields["callout"] = (LEFT_CALLOUTS[_dim], ((_SELF, "LEFT_CALLOUTS"),))
+    if _dim == "ForkThick":
+        _fields["dimension_type"] = ("reference", ((_SELF, "DETAIL_KEEP"),))
+    requirement(
+        _name,
+        kind="face",
+        faces=(PlanarFace((0.0, 0.0, math.copysign(1.0, _z)), abs(_z)),),
+        requirements=(_field,),
+        fields=_fields,
+        precision={_field: _P[_dim]},
+    )
+# The shank's flanks, .32 apart (FRONT_KEEP "ShankWidthDim"): the left one is
+# datum B, .16 BASIC from datum A (DATUM_B_FROM_A_TEXT_XY).
+requirement(
+    "shank_left_flank",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), SHANK_WIDTH / 2.0),),
+    requirements=("plane", "basic_from_a"),
+    fields={
+        "plane": (_plane("x", -SHANK_WIDTH / 2.0), (*_FRAME, (_SPEC, "SHANK_WIDTH"))),
+        "datum": ("B", ((_SELF, "DATUM_B_EDGE"),)),
+        "basic_from_a": (
+            SHANK_WIDTH / 2.0,
+            ((_SPEC, "SHANK_WIDTH"), (_SELF, "DATUM_B_FROM_A_TEXT_XY")),
+        ),
+    },
+)
+requirement(
+    "shank_right_flank",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), SHANK_WIDTH / 2.0),),
+    requirements=("width",),
+    fields={
+        "plane": (_plane("x", SHANK_WIDTH / 2.0), (*_FRAME, (_SPEC, "SHANK_WIDTH"))),
+        "width": (
+            limits(SHANK_WIDTH, _P["ShankWidthDim"], unit=UNIT),
+            ((_SPEC, "SHANK_WIDTH"), (_SPEC, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "width_nominal": (SHANK_WIDTH, ((_SPEC, "SHANK_WIDTH"),)),
+        "width_from": ("shank_left_flank", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"width": _P["ShankWidthDim"]},
+)
+# The ring's outside, 1.61 (FRONT_KEEP "RingOuterDia"), concentric with the
+# strap bore.
+requirement(
+    "ring",
+    kind="boss",
+    faces=(CylinderFace(RING_OUTER_DIA),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, 0.0], _FRAME),
+        "axis": (_Z, _FRAME),
+        "dia": (
+            limits(RING_OUTER_DIA, _P["RingOuterDia"], unit=UNIT),
+            ((_SPEC, "RING_OUTER_DIA"), (_SPEC, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "dia_nominal": (RING_OUTER_DIA, ((_SPEC, "RING_OUTER_DIA"),)),
+    },
+    precision={"dia": _P["RingOuterDia"]},
+)
+# The fork's outside: its flanks .39 apart with the full-round crown on the
+# pin (FRONT_KEEP "ForkWidthDim", FULL R) and the boss's underside .71 below
+# the crown top (DETAIL_KEEP "ForkBossLength"). The overall length, ring
+# bottom to crown top, is a reference (OVERALL_TEXT_XY).
+requirement(
+    "fork",
+    kind="profile",
+    faces=(
+        PlanarFace((1.0, 0.0, 0.0), FORK_WIDTH / 2.0),
+        PlanarFace((-1.0, 0.0, 0.0), FORK_WIDTH / 2.0),
+        CylinderFace(FORK_WIDTH),
+        PlanarFace((0.0, -1.0, 0.0), -FORK_BASE_Y),
+    ),
+    requirements=("width", "boss_length"),
+    fields={
+        "width": (
+            limits(FORK_WIDTH, _P["ForkWidthDim"], unit=UNIT),
+            ((_SPEC, "FORK_WIDTH"), (_SPEC, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "width_nominal": (FORK_WIDTH, ((_SPEC, "FORK_WIDTH"),)),
+        "callout": (FRONT_CALLOUTS["ForkWidthDim"], ((_SELF, "FRONT_CALLOUTS"),)),
+        "crown_at": ([0.0, CENTER_DISTANCE, 0.0], ((_SPEC, "CENTER_DISTANCE"),)),
+        "boss_length": (
+            limits(FORK_TOP_Y - FORK_BASE_Y, _P["ForkBossLength"], unit=UNIT),
+            ((_SPEC, "FORK_BASE_BELOW_PIN"), (_SPEC, "UNIT"), (_SELF, "DETAIL_KEEP")),
+        ),
+        "boss_length_nominal": (
+            FORK_TOP_Y - FORK_BASE_Y,
+            ((_SPEC, "FORK_BASE_BELOW_PIN"),),
+        ),
+        "overall_length_ref": (
+            OVERALL_LENGTH,
+            ((_SPEC, "FORK_TOP_Y"), (_SPEC, "RING_BOTTOM_Y"), (_SELF, "OVERALL_LENGTH")),
+        ),
+    },
+    precision={"width": _P["ForkWidthDim"], "boss_length": _P["ForkBossLength"]},
+)
+# The slot between the tines: its two walls and its floor. The near tine
+# .067 +/-.002 from the datum face locates it; the slot .106 +/-.002; the far
+# tine the same size from the far face (2X TINE WALL); its depth .58 from the
+# crown top; its floor corners at the title block's INSIDE CORNERS R.040 MAX
+# (DETAIL_KEEP, DETAIL_CALLOUTS, note 2).
+_TINE = limits(TINE_THICKNESS, _P["TineNear"], TINE_BAND)
+_DETAIL = ((_SELF, "DETAIL_KEEP"), (_SELF, "DETAIL_CALLOUTS"))
+requirement(
+    "fork_slot",
+    kind="slot",
+    faces=(
+        PlanarFace(_Z, -_SLOT_HALF),
+        PlanarFace((0.0, 0.0, -1.0), -_SLOT_HALF),
+        PlanarFace((0.0, 1.0, 0.0), FORK_CROTCH_Y),
+    ),
+    requirements=("width", "near_tine", "far_tine", "depth", "corner_radius_max"),
+    fields={
+        "open_to": ("crown", _FRAME),
+        "thru": (True, _DETAIL),
+        "width": (
+            limits(FORK_SLOT_WIDTH, _P["SlotWidth"], FORK_SLOT_BAND),
+            ((_SPEC, "FORK_SLOT_WIDTH"), (_SPEC, "FORK_SLOT_BAND"), *_DETAIL),
+        ),
+        "width_nominal": (FORK_SLOT_WIDTH, ((_SPEC, "FORK_SLOT_WIDTH"),)),
+        "near_tine": (_TINE, ((_SPEC, "TINE_THICKNESS"), (_SPEC, "TINE_BAND"), *_DETAIL)),
+        "near_tine_nominal": (TINE_THICKNESS, ((_SPEC, "TINE_THICKNESS"),)),
+        "near_tine_from": ("datum_face", _DETAIL),
+        "far_tine": (_TINE, ((_SPEC, "TINE_THICKNESS"), (_SPEC, "TINE_BAND"), *_DETAIL)),
+        "far_tine_nominal": (TINE_THICKNESS, ((_SPEC, "TINE_THICKNESS"),)),
+        "far_tine_from": ("fork_far_face", _DETAIL),
+        "depth": (
+            limits(FORK_TOP_Y - FORK_CROTCH_Y, _P["SlotDepth"], unit=UNIT),
+            ((_SPEC, "FORK_CROTCH_BELOW_PIN"), (_SPEC, "UNIT"), *_DETAIL),
+        ),
+        "depth_nominal": (FORK_TOP_Y - FORK_CROTCH_Y, ((_SPEC, "FORK_CROTCH_BELOW_PIN"),)),
+        "depth_from": ("fork", _DETAIL),
+        "corner_radius_max": (
+            inside_corner_radius_mm(unit=UNIT),
+            (("_printed_tolerance", "inside_corner_radius_mm"), (_SPEC, "UNIT")),
+        ),
+        "tine_callout": (DETAIL_CALLOUTS["TineNear"], _DETAIL),
+        "width_callout": (DETAIL_CALLOUTS["SlotWidth"], _DETAIL),
+    },
+    precision={
+        "width": _P["SlotWidth"],
+        "near_tine": _P["TineNear"],
+        "far_tine": _P["TineNear"],
+        "depth": _P["SlotDepth"],
+    },
+)
+# The strap bore (datum A): 1.213 +.003/.000, Ra, running on the cam
+# (FRONT_KEEP "StrapBoreDia").
+requirement(
+    "strap_bore",
+    kind="hole",
+    faces=(surface_finish_by_key(SURFACE_FINISHES, "strap_bore").face,),
+    requirements=("dia", "thru", "finish_ra", "process"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], _FRAME),
+        "axis": (_Z, _FRAME),
+        "dia": (
+            limits(RING_BORE_DIA, _P["StrapBoreDia"], RING_BORE_DIA_BAND),
+            ((_SPEC, "RING_BORE_DIA"), (_SPEC, "RING_BORE_DIA_BAND"), (_SELF, "FRONT_KEEP")),
+        ),
+        "nominal_dia": (RING_BORE_DIA, ((_SPEC, "RING_BORE_DIA"),)),
+        "thru": (True, ((_SELF, "FRONT_CALLOUTS"),)),
+        "process": ("bore", ((_SELF, "FRONT_CALLOUTS"),)),
+        "finish_ra": (MACHINED_UM, ((_SPEC, "SURFACE_FINISHES"),)),
+        "datum": ("A", ((_SELF, "DATUM_A_EDGE"),)),
+        "callout": (FRONT_CALLOUTS["StrapBoreDia"], ((_SELF, "FRONT_CALLOUTS"),)),
+    },
+    precision={"dia": _P["StrapBoreDia"], "finish_ra": 1},
+)
+# The reamed press hole through both tines on the rod axis: its limits and
+# REAM THRU / SEE NOTE 1, at the BASIC centre distance from A and .16 BASIC
+# from B, inside a diameter-.008 position zone to A and B.
+requirement(
+    "pin_hole",
+    kind="hole",
+    faces=(CylinderFace(PIN_HOLE_DIA),),
+    requirements=("dia", "thru", "process", "position_dia"),
+    fields={
+        "at": ([0.0, CENTER_DISTANCE, 0.0], ((_SPEC, "CENTER_DISTANCE"),)),
+        "axis": (_Z, _FRAME),
+        "dia": (
+            list(PIN_HOLE_LIMITS),
+            ((_SPEC, "PIN_HOLE_LIMITS"), (_SELF, "FRONT_KEEP")),
+        ),
+        "nominal_dia": (PIN_HOLE_DIA, ((_SPEC, "PIN_HOLE_DIA"),)),
+        "thru": (True, ((_SELF, "FRONT_CALLOUTS"),)),
+        "process": ("ream", ((_SELF, "FRONT_CALLOUTS"),)),
+        "callout": (FRONT_CALLOUTS["PinHoleDia"], ((_SELF, "FRONT_CALLOUTS"),)),
+        "press_fit_on": (PIN_NUMBER, ((_NOTES, "PIN_NUMBER"),)),
+        "basic_from_a": (
+            CENTER_DISTANCE,
+            ((_SPEC, "CENTER_DISTANCE"), (_SELF, "CENTRE_DISTANCE_PLACES")),
+        ),
+        "basic_from_b": (
+            SHANK_WIDTH / 2.0,
+            ((_SPEC, "SHANK_WIDTH"), (_SELF, "PIN_OFFSET_TEXT_XY")),
+        ),
+        "position_dia": (
+            _PIN_POSITION_MM,
+            ((_SPEC, "GEOMETRIC_TOLERANCES_MM"), (_SPEC, "GEOMETRIC_TOLERANCES_IN")),
+        ),
+        "position_datums": (["A", "B"], ((_SELF, "build"),)),
+    },
+    precision={"dia": _P["PinHoleDia"]},
+)
 
 
 def _fork_detail(adapter: Any, left: Any) -> Any:

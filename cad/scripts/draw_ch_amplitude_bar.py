@@ -55,31 +55,51 @@ from _drawing_view_arrow import square_view_arrow
 from _drawing_notes import add_property_linked_note
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _part_properties import part_drawing_unit
+from _printed_limits import limits
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
+from _surface_finish import MACHINED_UM, surface_finish_by_key
 import _telemetry
 from ch_amplitude_bar_drawing_spec import SURFACE_FINISHES
 from ch_amplitude_bar_notes import (
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION_BY_NAME,
+    LEVER_NUMBER,
     REFERENCE_DIMENSIONS,
+    ROCKER_ARM_NUMBER,
+    ROOT_CALLOUT,
+    TOP_PIN_NUMBER,
 )
 from ch_amplitude_bar_spec import (
     BAR_DEPTH,
     BAR_LENGTH,
+    BAR_STOCK_UNDERSIZE,
     BAR_WIDTH,
+    BOTTOM_NOTCH_DEPTH_BAND,
     BOTTOM_NOTCH_HEIGHT,
     BOTTOM_NOTCH_OFFSET,
     BOTTOM_NOTCH_WIDTH,
+    BOTTOM_NOTCH_WIDTH_BAND,
+    NOTCH_OFFSET_TOLERANCE_MM,
     TOP_NOTCH_HEIGHT,
+    TOP_NOTCH_OFFSET,
+    TOP_NOTCH_WIDTH,
+    TOP_NOTCH_WIDTH_BAND,
     TOP_PIN_DROP,
+    TOP_PIN_HOLE_DIA,
+    TOP_PIN_HOLE_LIMITS,
+    TOP_PIN_Y,
+    UNIT,
 )
 
 
@@ -363,6 +383,299 @@ TOP_SIDE_KEEP = {
 # drops a multi-line callout above a value from the print (r1: the two-line
 # TopNotchWidth callout never reached the PDF), so these are one line each.
 CALLOUTS_ABOVE = frozenset({"BottomNotchHeight", "BarSection", "TopPinX"})
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (CroppedView: bar width along X from
+# the origin corner, length along Y from the foot end, depth along Z from the
+# back face; the top notch at +Y, its pin hole along X through both cheeks).
+# A band is the dimension's own native band, else the title block's row for
+# the places the sheet prints (DRAWING_PRECISION_BY_NAME); the 1/4 square's
+# two sides print once, as the reference stock section, and carry the
+# stock's +0/-.002 band. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_ch_amplitude_bar"
+_SPEC = "ch_amplitude_bar_spec"
+_NOTES = "ch_amplitude_bar_notes"
+_FRAME = (_SELF, "CroppedView")
+# ROOTS R.015 MAX (ROOT_CALLOUT): the largest corner radius either notch's
+# root may carry, in mm.
+_ROOT_RADIUS_MAX = 0.015 * 25.4
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(
+        _FRAME,
+        (_SPEC, "BAR_LENGTH"),
+        (_SPEC, "BAR_WIDTH"),
+        (_SPEC, "BAR_DEPTH"),
+    ),
+    precision_sources=(
+        (_NOTES, "DRAWING_PRECISION"),
+        (_NOTES, "DRAWING_PRECISION_BY_NAME"),
+    ),
+)
+# The stock section, 1/4 SQ (.25) REF on the top end's side view
+# (TOP_SIDE_KEEP "BarSection"): as bought, +0/-.002 on both sides.
+_SECTION_SOURCES = (
+    (_SPEC, "BAR_STOCK_UNDERSIZE"),
+    (_NOTES, "REFERENCE_DIMENSIONS"),
+    (_SELF, "TOP_SIDE_KEEP"),
+)
+_SECTION_CALLOUT = (
+    DIMENSION_CALLOUTS["BarSection"],
+    ((_NOTES, "DIMENSION_CALLOUTS"),),
+)
+# The back face: the pin hole's offset runs from it (TOP_SIDE_KEEP "TopPinX").
+requirement(
+    "back_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", 0.0), (_FRAME,))},
+)
+requirement(
+    "front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), BAR_DEPTH),),
+    requirements=("section",),
+    fields={
+        "plane": (_plane("z", BAR_DEPTH), (_FRAME, (_SPEC, "BAR_DEPTH"))),
+        "section": (
+            [BAR_DEPTH - BAR_STOCK_UNDERSIZE, BAR_DEPTH],
+            ((_SPEC, "BAR_DEPTH"), *_SECTION_SOURCES),
+        ),
+        "section_nominal": (BAR_DEPTH, ((_SPEC, "BAR_DEPTH"),)),
+        "section_from": ("back_face", ((_SELF, "TOP_SIDE_KEEP"),)),
+        "dimension_type": ("reference", ((_NOTES, "REFERENCE_DIMENSIONS"),)),
+        "callout": _SECTION_CALLOUT,
+    },
+    precision={"section": _P["BarSection"]},
+)
+# The left face: the foot notch's centring ledge runs from it (DETAIL_A_KEEP
+# "BottomLeftLedge"); the right face: the top notch's (DETAIL_B_KEEP
+# "TopRightLedge"), across the square's width.
+requirement(
+    "left_face",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", 0.0), (_FRAME,))},
+)
+requirement(
+    "right_face",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), BAR_WIDTH),),
+    requirements=("width",),
+    fields={
+        "plane": (_plane("x", BAR_WIDTH), (_FRAME, (_SPEC, "BAR_WIDTH"))),
+        "width": (
+            [BAR_WIDTH - BAR_STOCK_UNDERSIZE, BAR_WIDTH],
+            ((_SPEC, "BAR_WIDTH"), *_SECTION_SOURCES),
+        ),
+        "width_nominal": (BAR_WIDTH, ((_SPEC, "BAR_WIDTH"),)),
+        "width_from": ("left_face", ((_SELF, "TOP_SIDE_KEEP"),)),
+        "dimension_type": ("reference", ((_NOTES, "REFERENCE_DIMENSIONS"),)),
+        "callout": _SECTION_CALLOUT,
+    },
+    precision={"width": _P["BarSection"]},
+)
+# Both ends, each split in two by its notch: the length 31.82 between them
+# (FRONT_KEEP "BarLength"); every depth along the bar runs from its own end.
+requirement(
+    "foot_end",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("y", 0.0), (_FRAME,))},
+)
+requirement(
+    "top_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), BAR_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("y", BAR_LENGTH), (_FRAME, (_SPEC, "BAR_LENGTH"))),
+        "length": (
+            limits(BAR_LENGTH, _P["BarLength"], unit=UNIT),
+            ((_SPEC, "BAR_LENGTH"), (_SPEC, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "length_nominal": (BAR_LENGTH, ((_SPEC, "BAR_LENGTH"),)),
+        "length_from": ("foot_end", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"length": _P["BarLength"]},
+)
+# Each end's notch, centred on the width and through the whole depth: its
+# two walls and its root. Its width carries its one-sided native band and its
+# mate (RUNNING FIT, CHEEK WALL MIN), its centring ledge +/-.002 from one side
+# face, its depth from its own end, and the ROOTS R.015 MAX callout on that
+# depth. The foot notch's root is the bar's one sliding face (Ra on it).
+_TOP_NOTCH_LEFT = BAR_WIDTH - TOP_NOTCH_OFFSET - TOP_NOTCH_WIDTH
+_BOTTOM_NOTCH_RIGHT = BOTTOM_NOTCH_OFFSET + BOTTOM_NOTCH_WIDTH
+_LEDGE_BAND = (NOTCH_OFFSET_TOLERANCE_MM, -NOTCH_OFFSET_TOLERANCE_MM)
+_ROOT = (_ROOT_RADIUS_MAX, ((_NOTES, "ROOT_CALLOUT"),))
+requirement(
+    "top_notch",
+    kind="notch",
+    faces=(
+        PlanarFace((1.0, 0.0, 0.0), _TOP_NOTCH_LEFT),
+        PlanarFace((-1.0, 0.0, 0.0), -(BAR_WIDTH - TOP_NOTCH_OFFSET)),
+        PlanarFace((0.0, 1.0, 0.0), BAR_LENGTH - TOP_NOTCH_HEIGHT),
+    ),
+    requirements=("width", "ledge", "depth", "root_radius_max"),
+    fields={
+        "open_to": ("top_end", (_FRAME,)),
+        "thru": (True, ((_SELF, "DETAIL_B"), (_SELF, "TOP_ISO"))),
+        "width": (
+            limits(TOP_NOTCH_WIDTH, _P["TopNotchWidth"], TOP_NOTCH_WIDTH_BAND),
+            (
+                (_SPEC, "TOP_NOTCH_WIDTH"),
+                (_SPEC, "TOP_NOTCH_WIDTH_BAND"),
+                (_SELF, "DETAIL_B_KEEP"),
+            ),
+        ),
+        "width_nominal": (TOP_NOTCH_WIDTH, ((_SPEC, "TOP_NOTCH_WIDTH"),)),
+        "ledge": (
+            limits(TOP_NOTCH_OFFSET, _P["TopRightLedge"], _LEDGE_BAND),
+            (
+                (_SPEC, "TOP_NOTCH_OFFSET"),
+                (_SPEC, "NOTCH_OFFSET_TOLERANCE_MM"),
+                (_SELF, "DETAIL_B_KEEP"),
+            ),
+        ),
+        "ledge_nominal": (TOP_NOTCH_OFFSET, ((_SPEC, "TOP_NOTCH_OFFSET"),)),
+        "ledge_from": ("right_face", ((_SELF, "DETAIL_B_KEEP"),)),
+        "depth": (
+            limits(TOP_NOTCH_HEIGHT, _P["TopNotchHeight"], unit=UNIT),
+            ((_SPEC, "TOP_NOTCH_HEIGHT"), (_SPEC, "UNIT"), (_SELF, "DETAIL_B_KEEP")),
+        ),
+        "depth_nominal": (TOP_NOTCH_HEIGHT, ((_SPEC, "TOP_NOTCH_HEIGHT"),)),
+        "depth_from": ("top_end", ((_SELF, "DETAIL_B_KEEP"),)),
+        "root_radius_max": _ROOT,
+        "mate": (LEVER_NUMBER, ((_NOTES, "LEVER_NUMBER"),)),
+        "width_callout": (
+            DIMENSION_CALLOUTS["TopNotchWidth"],
+            ((_NOTES, "DIMENSION_CALLOUTS"),),
+        ),
+        "depth_callout": (ROOT_CALLOUT, ((_NOTES, "DIMENSION_CALLOUTS"),)),
+    },
+    precision={
+        "width": _P["TopNotchWidth"],
+        "ledge": _P["TopRightLedge"],
+        "depth": _P["TopNotchHeight"],
+    },
+)
+_FOOT_FINISH = surface_finish_by_key(SURFACE_FINISHES, "bottom_notch_floor")
+requirement(
+    "foot_notch",
+    kind="notch",
+    faces=(
+        PlanarFace((1.0, 0.0, 0.0), BOTTOM_NOTCH_OFFSET),
+        PlanarFace((-1.0, 0.0, 0.0), -_BOTTOM_NOTCH_RIGHT),
+        _FOOT_FINISH.face,
+    ),
+    requirements=("width", "ledge", "depth", "root_radius_max", "finish_ra"),
+    fields={
+        "open_to": ("foot_end", (_FRAME,)),
+        "thru": (True, ((_SELF, "DETAIL_A"), (_SELF, "FOOT_ISO"))),
+        "width": (
+            limits(BOTTOM_NOTCH_WIDTH, _P["BottomNotchWidth"], BOTTOM_NOTCH_WIDTH_BAND),
+            (
+                (_SPEC, "BOTTOM_NOTCH_WIDTH"),
+                (_SPEC, "BOTTOM_NOTCH_WIDTH_BAND"),
+                (_SELF, "DETAIL_A_KEEP"),
+            ),
+        ),
+        "width_nominal": (BOTTOM_NOTCH_WIDTH, ((_SPEC, "BOTTOM_NOTCH_WIDTH"),)),
+        "ledge": (
+            limits(BOTTOM_NOTCH_OFFSET, _P["BottomLeftLedge"], _LEDGE_BAND),
+            (
+                (_SPEC, "BOTTOM_NOTCH_OFFSET"),
+                (_SPEC, "NOTCH_OFFSET_TOLERANCE_MM"),
+                (_SELF, "DETAIL_A_KEEP"),
+            ),
+        ),
+        "ledge_nominal": (BOTTOM_NOTCH_OFFSET, ((_SPEC, "BOTTOM_NOTCH_OFFSET"),)),
+        "ledge_from": ("left_face", ((_SELF, "DETAIL_A_KEEP"),)),
+        "depth": (
+            limits(
+                BOTTOM_NOTCH_HEIGHT, _P["BottomNotchHeight"], BOTTOM_NOTCH_DEPTH_BAND
+            ),
+            (
+                (_SPEC, "BOTTOM_NOTCH_HEIGHT"),
+                (_SPEC, "BOTTOM_NOTCH_DEPTH_BAND"),
+                (_SELF, "DETAIL_A_KEEP"),
+            ),
+        ),
+        "depth_nominal": (BOTTOM_NOTCH_HEIGHT, ((_SPEC, "BOTTOM_NOTCH_HEIGHT"),)),
+        "depth_from": ("foot_end", ((_SELF, "DETAIL_A_KEEP"),)),
+        "root_radius_max": _ROOT,
+        "finish_ra": (
+            MACHINED_UM,
+            (("ch_amplitude_bar_drawing_spec", "SURFACE_FINISHES"),),
+        ),
+        "mate": (ROCKER_ARM_NUMBER, ((_NOTES, "ROCKER_ARM_NUMBER"),)),
+        "width_callout": (
+            DIMENSION_CALLOUTS["BottomNotchWidth"],
+            ((_NOTES, "DIMENSION_CALLOUTS"),),
+        ),
+        "depth_callout": (ROOT_CALLOUT, ((_NOTES, "DIMENSION_CALLOUTS"),)),
+    },
+    precision={
+        "width": _P["BottomNotchWidth"],
+        "ledge": _P["BottomLeftLedge"],
+        "depth": _P["BottomNotchHeight"],
+    },
+)
+# The reamed press hole across the top notch, through both cheeks
+# (TOP_SIDE_KEEP): its limits and REAM THRU / SEE NOTE 1 callout, its offset
+# from the back face (.XXX, HOLE WALL MIN) and its drop from the top end.
+_HOLE_SOURCES = ((_NOTES, "DIMENSION_CALLOUTS"), (_SELF, "TOP_SIDE_KEEP"))
+requirement(
+    "top_pin_hole",
+    kind="hole",
+    faces=(CylinderFace(TOP_PIN_HOLE_DIA),),
+    requirements=("dia", "thru", "location_from_back", "drop"),
+    fields={
+        "at": (
+            [0.0, TOP_PIN_Y, BAR_DEPTH / 2.0],
+            ((_SPEC, "TOP_PIN_Y"), (_SPEC, "BAR_DEPTH")),
+        ),
+        "axis": ((1.0, 0.0, 0.0), (_FRAME,)),
+        "dia": (
+            list(TOP_PIN_HOLE_LIMITS),
+            ((_SPEC, "TOP_PIN_HOLE_LIMITS"), (_SELF, "TOP_SIDE_KEEP")),
+        ),
+        "nominal_dia": (TOP_PIN_HOLE_DIA, ((_SPEC, "TOP_PIN_HOLE_DIA"),)),
+        "thru": (True, _HOLE_SOURCES),
+        "process": ("ream", _HOLE_SOURCES),
+        "location_from_back": (
+            limits(BAR_DEPTH / 2.0, _P["TopPinX"], unit=UNIT),
+            ((_SPEC, "BAR_DEPTH"), (_SPEC, "UNIT"), (_SELF, "TOP_SIDE_KEEP")),
+        ),
+        "location_from_back_nominal": (BAR_DEPTH / 2.0, ((_SPEC, "BAR_DEPTH"),)),
+        "location_from": ("back_face", ((_SELF, "TOP_SIDE_KEEP"),)),
+        "drop": (
+            limits(TOP_PIN_DROP, _P["TopPinDrop"], unit=UNIT),
+            ((_SPEC, "TOP_PIN_DROP"), (_SPEC, "UNIT"), (_SELF, "TOP_SIDE_KEEP")),
+        ),
+        "drop_nominal": (TOP_PIN_DROP, ((_SPEC, "TOP_PIN_DROP"),)),
+        "drop_from": ("top_end", ((_SELF, "TOP_SIDE_KEEP"),)),
+        "press_fit_on": (TOP_PIN_NUMBER, ((_NOTES, "TOP_PIN_NUMBER"),)),
+        "callout": (DIMENSION_CALLOUTS["TopPinDia"], _HOLE_SOURCES),
+        "location_callout": (DIMENSION_CALLOUTS["TopPinX"], _HOLE_SOURCES),
+        "fit_note": (DRAWING_NOTES, ((_NOTES, "DRAWING_NOTES"),)),
+    },
+    precision={
+        "dia": _P["TopPinDia"],
+        "location_from_back": _P["TopPinX"],
+        "drop": _P["TopPinDrop"],
+    },
+)
 
 # VIEW C's viewing arrow on DETAIL B: level, looking -X onto the bar's right
 # face (the *Right view's direction), its tip just off the face between the

@@ -13,8 +13,10 @@ import ch_amplitude_bar_spec
 import ch_channel_lever_notes as notes
 import ch_channel_lever_spec as spec
 import draw_ch_channel_lever as drawing
+import export_features
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gtol_face import FaceGeometry
 from _hole_spec import blind_cut_dia_mm
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import printed_deviations
@@ -203,3 +205,104 @@ def test_the_plate_stays_flat_by_its_route_not_by_a_frame() -> None:
     bar = 0.3125 * 25.4
     per_face = (bar - spec.LEVER_THICKNESS) / 2.0 / 25.4
     assert f"{per_face:.3f}".lstrip("0") in process
+
+
+_FEATURE_KINDS = {
+    "hub_near_face": "face",
+    "hub_far_face": "face",
+    "plate_near_face": "face",
+    "plate_far_face": "face",
+    "hub": "boss",
+    "outline": "profile",
+    "fulcrum_bore": "hole",
+    "bar_pin_hole": "hole",
+    "spring_hole": "hole",
+}
+
+
+def _in(value_in: float) -> float:
+    return value_in * 25.4
+
+
+def _plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+    point = tuple(value * offset_mm / 1000 for value in normal)
+    return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+
+def _cylinder(dia_mm: float, x_mm: float) -> FaceGeometry:
+    r = dia_mm / 2
+    box = tuple(v / 1000 for v in (x_mm - r, -r, -1.0, x_mm + r, r, 1.0))
+    return FaceGeometry(None, 4002, (x_mm / 1000, 0.0, 0.0, 0.0, 0.0, 1.0, r / 1000), None, box)
+
+
+def test_the_lever_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    assert "ch_channel_lever" in export_features.SUPPORTED_PARTS
+    manifest = export_features.requirement_manifest("ch_channel_lever")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == _FEATURE_KINDS
+    assert manifest["construction"] == "one_piece"
+    assert manifest["notes"]["manufacturing"] == [drawing.PLATE_OFFSET_NOTE]
+    selectors = export_features.feature_selectors("ch_channel_lever")
+    hub, plate = spec.HUB_LENGTH / 2, spec.LEVER_THICKNESS / 2
+    # Each taper edge's outward normal is radial at its tangent point.
+    tx, ty = spec.taper_tangent_point()
+    nx, ny = (tx - spec.TIP_ARC_CX) / spec.TIP_RADIUS, ty / spec.TIP_RADIUS
+    taper = nx * tx + ny * ty
+    expected = {
+        "hub_near_face": [_plane((0.0, 0.0, -1.0), hub)],
+        "hub_far_face": [_plane((0.0, 0.0, 1.0), hub)],
+        "plate_near_face": [_plane((0.0, 0.0, -1.0), plate)],
+        "plate_far_face": [_plane((0.0, 0.0, 1.0), plate)],
+        "hub": [_cylinder(spec.HUB_DIA, 0.0)],
+        "outline": [
+            _plane((0.0, 1.0, 0.0), spec.BAR_TALL / 2),
+            _plane((0.0, -1.0, 0.0), spec.BAR_TALL / 2),
+            _plane((nx, ny, 0.0), taper),
+            _plane((nx, -ny, 0.0), taper),
+            _cylinder(2 * spec.TIP_RADIUS, spec.TIP_ARC_CX),
+        ],
+        "fulcrum_bore": [_cylinder(spec.PIVOT_HOLE_DIA, 0.0)],
+        "bar_pin_hole": [
+            _cylinder(blind_cut_dia_mm(spec.BAR_PIN_HOLE_SPEC), spec.BAR_PIN_X)
+        ],
+        "spring_hole": [
+            _cylinder(blind_cut_dia_mm(spec.SPRING_EYE_HOLE_SPEC), spec.LEVER_SPRING_X)
+        ],
+    }
+    for name, faces in expected.items():
+        for face in faces:
+            owners = [
+                owner
+                for owner, specs in selectors.items()
+                if any(selector.matches(face) for selector in specs)
+            ]
+            assert owners == [name], name
+
+
+def test_lever_feature_bands_are_the_printed_ones() -> None:
+    features = export_features.requirement_manifest("ch_channel_lever")["features"]
+    assert features["hub_far_face"]["length"] == pytest.approx([_in(0.300), _in(0.301)])
+    assert features["plate_near_face"]["offset"] == pytest.approx(
+        [_in(0.089), _in(0.093)]
+    )
+    assert features["plate_near_face"]["offset_from"] == "hub_near_face"
+    assert features["plate_far_face"]["thickness"] == pytest.approx(
+        [_in(0.116), _in(0.120)]
+    )
+    assert features["hub"]["dia"] == pytest.approx([_in(0.46), _in(0.48)])
+    outline = features["outline"]
+    assert outline["bar_height"] == pytest.approx([_in(0.36), _in(0.38)])
+    assert outline["taper_start"] == pytest.approx([_in(5.49), _in(5.51)])
+    assert outline["tip_radius"] == pytest.approx([_in(0.162), _in(0.172)])
+    assert outline["tip_callout"] == drawing.FRONT_CALLOUTS["TipRadius"]
+    bore = features["fulcrum_bore"]
+    assert bore["dia"] == pytest.approx([_in(0.2560), _in(0.2570)])
+    assert bore["process"] == "ream" and bore["finish_ra"] == pytest.approx(1.6)
+    pin, spring = features["bar_pin_hole"], features["spring_hole"]
+    # The model drill diameter is the drill's mm size, .0785 to 1e-3 mm.
+    assert pin["dia"] == pytest.approx([_in(0.0785), _in(0.0825)], abs=1e-3)
+    assert pin["location"] == pytest.approx([_in(4.995), _in(5.005)])
+    assert spring["dia"] == pytest.approx([_in(0.159), _in(0.163)], abs=1e-3)
+    assert spring["location"] == pytest.approx([_in(6.887), _in(6.897)])
+    assert (pin["drill"], spring["drill"]) == ("#47", "#21")
+    assert spring["mate"] == drawing.HOLE_MATES["spring-eye hole"]
