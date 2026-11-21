@@ -5,7 +5,7 @@
 <rect class="fixture-table" x="20" y="100" width="600" height="20"/>
 <text class="label" x="26" y="140">bench</text>
 <rect class="part-kept" x="60" y="84" width="540" height="16"/>
-<rect class="clamp" x="40" y="70" width="20" height="30"/>
+<rect class="fixture-support" x="40" y="70" width="20" height="30"/>
 <text class="label" x="20" y="62">square block on the foot end</text>
 <rect class="fixture-plate" x="60" y="70" width="560" height="10"/>
 <text class="label" x="300" y="62">48 in rule (to buy), 1/100 in</text>

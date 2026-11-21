@@ -17,8 +17,8 @@
 <circle class="holes" cx="425" cy="78" r="3"/>
 <circle class="holes" cx="425" cy="94" r="3"/>
 <text class="label" x="474" y="20">slitting saw</text>
-<path class="arrow" d="M600 190 V220"/>
-<text class="label" x="530" y="212">feed −Y</text>
+<path class="arrow" d="M600 220 V190"/>
+<text class="label" x="530" y="212">feed +Y</text>
 <line class="datum" x1="440" y1="64" x2="440" y2="108"/>
 <text class="label" x="456" y="196">X0 = length</text>
 <path class="leader" d="M466 184 L442 110"/>

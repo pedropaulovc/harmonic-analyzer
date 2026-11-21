@@ -124,6 +124,40 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
     assert set(times) == {name for name, _ops in RECIPE.PROGRAMS}
 
 
+def test_the_saw_is_mounted_and_moved_only_where_its_arbor_clears(ctx) -> None:
+    p = PLAN["parameters"]
+    # CA01 and CA03 leave T1 parked over the touch-off station, past the
+    # ends on the saw's side: up, then X, then Y.
+    for key, side in (("foot_end", -1), ("top_end", 1)):
+        assert _lines(ctx, key)[-3:] == [
+            f"G0 Z{p['saw_park_z_mm']:.3f}",
+            f"G0 X{side * p['saw_touch_x_mm']:.3f}",
+            "G0 Y-3.162",
+        ]
+    # The saw rises straight up from the touch-off before any X or Y move,
+    # and moves between passes at that height (down to the pass only beside
+    # the load, 1 mm over the bars' top).
+    for key in ("foot_notch", "top_notch"):
+        lines = _lines(ctx, key)
+        assert lines[0] == f"G0 Z{p['saw_clear_z_mm']:.3f}"
+        assert {line for line in lines if line.startswith("G0 Z")} == {
+            lines[0],
+            "G0 Z7.350",
+        }
+
+
+def test_a_nut_too_close_under_the_saw_is_caught_over_the_top_ends(tmp_path) -> None:
+    # The rod's .125 in of spacers under the saw: at the top notch's second
+    # level the nut, wider than the spacers, reaches over the bars' ends.
+    plan = copy.deepcopy(PLAN)
+    plan["parameters"]["saw_spacer_below_min_mm"] = 3.175
+    ctx = _context(plan)
+    _post(ctx, tmp_path)
+    found = [f.detail for f in _findings(ctx, tmp_path) if f.check == "keep_out"]
+    assert found and all("the arbor's nut" in detail for detail in found)
+    assert any("the bars' ends" in detail for detail in found)
+
+
 @pytest.mark.parametrize(
     ("changes", "detail"),
     [
@@ -147,6 +181,12 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ({"drill_projection_mm": 20.0}, "jaw tops"),
         ({"spot_projection_mm": 20.0}, "holder_grip_min_mm"),
         ({"parallel_height_mm": 0}, "jaw tops"),
+        ({"saw_spacer_below_min_mm": 25.4}, "inside its stack's depth"),
+        ({"saw_clear_z_mm": 11.35}, "saw_clear_z_mm"),
+        ({"saw_touch_x_mm": 31.9}, "saw_touch_x_mm"),
+        ({"saw_touch_y_mm": -3.0}, "saw_touch_y_mm"),
+        ({"saw_park_z_mm": 11.35}, "saw_park_z_mm"),
+        ({"saw_nut_dia_max_mm": 64.0}, "bar ends at the saw's touch-off"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(changes, detail) -> None:
@@ -176,12 +216,20 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: line.replace("X6.350", "X6.604"),
             "passes",
         ),
-        # A saw pass run the climb way (+Y with the saw right of the ends).
+        # A saw pass run the climb way (-Y with the saw right of the ends).
         (
             "top_notch",
             lambda line: line.startswith("G1 Y"),
-            lambda line: "G1 Y100.000 F{feed}",
+            lambda line: "G1 Y-100.000 F{feed}",
             "passes",
+        ),
+        # The deepest pass started over the load instead of beside it: the
+        # nut, under the saw coming down there, meets the bars' ends.
+        (
+            "top_notch",
+            lambda line: line.startswith("G0 X20.955 Y"),
+            lambda line: "G0 X20.955 Y-6.000",
+            "keep_out",
         ),
         # The saw lowered to its level in a rapid.
         (
