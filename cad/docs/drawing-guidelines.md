@@ -128,10 +128,10 @@ metric grades until their package is converted.
   included. On an assembly they govern work done at assembly, such as
   match-drilling; they do not call for reinspecting supplied parts.
 - The name field is labelled `PART` on every sheet and prints the model's
-  registered identifier, its dashed stem, on part and assembly sheets alike
-  (`sm-summing` on MHA-SM-00); the drawing number beside it names the print.
-  A stem there, or the `PART` label on an assembly, is not a finding: do not
-  ask for a descriptive name or for `ASSEMBLY`.
+  registered identifier, its lower-case dashed stem, on part and assembly
+  sheets alike; the drawing number beside it names the print. A stem there,
+  or the `PART` label on an assembly, is not a finding: do not ask for a
+  descriptive name or for `ASSEMBLY`.
 
 ### Rule 3 — Decimal places carry the tolerance
 
