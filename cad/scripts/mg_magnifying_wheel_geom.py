@@ -173,13 +173,13 @@ TIE1_OFFSET_MAX = math.hypot(_TIE1_COORD, _TIE1_COORD) + TIE1_DEPTH_MAX * math.t
 DRUM_WIRE_R_RANGE = (
     (DRUM_OD + DRUM_OD_DEVIATIONS[0]) / 2.0 + LEVER_WIRE_DIA / 2.0,
     (DRUM_OD + DRUM_OD_DEVIATIONS[1]) / 2.0 + LEVER_WIRE_DIA / 2.0,
-)  # 9.671 .. 9.925
+)  # 9.754 .. 10.008
 TIE1_DRUM_OPENING = (
     TIE1_R
     - TIE1_OFFSET_MAX
     + TIE_HOLE_DIA / 2.0
     - (DRUM_WIRE_R_RANGE[1] - LEVER_WIRE_DIA / 2.0)
-)  # 1.531
+)  # 1.150
 if TIE1_DRUM_OPENING < LEVER_WIRE_DIA:
     raise AssertionError(
         f"the drum covers TIE 1: {TIE1_DRUM_OPENING:.3f} open < {LEVER_WIRE_DIA} wire"

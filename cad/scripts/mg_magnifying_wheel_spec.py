@@ -339,7 +339,7 @@ TIE2_SPOKE_WALL = (
 )
 # TIE 2 to the rim's side faces: it breaks into the bore at mid-width, where
 # the faces end at the rim-bore rounds' tangent line (R.03 MAX: 3.810 - 0.762
-# - 0.559 - 0.028 = 2.462).
+# - 0.559 - 0.029 = 2.460).
 TIE2_FACE_WALL = _RIM_AXIAL_MIN / 2.0 - _CAST_ROUND_MAX - _TIE_R_MAX - _TIE2_WANDER
 # Spigot to bore at the smallest finished spigot and the largest finished
 # bore, and the groove floor to the rim ID.
@@ -379,7 +379,7 @@ if LEVER_WIRE_WEB_GAP < _lever.CLEARANCE:
 # groove is wider than the wire, the shallowest buries it below the rim OD,
 # and the round bottom is never deeper than the groove.
 GROOVE_WIDTH_MIN = 2.0 * _GROOVE_R[0]  # 0.965 (.038)
-GROOVE_DEPTH_MIN = (_RIM_OD[0] - _GROOVE_BOTTOM[1]) / 2.0  # 1.041 (.041)
+GROOVE_DEPTH_MIN = (_RIM_OD[0] - _GROOVE_BOTTOM[1]) / 2.0  # 0.749 (.0295)
 if not GROOVE_WIDTH_MIN > PEN_WIRE_DIA:
     raise AssertionError(f"groove {GROOVE_WIDTH_MIN:.3f} wide pinches the wire")
 if not GROOVE_DEPTH_MIN >= PEN_WIRE_DIA:

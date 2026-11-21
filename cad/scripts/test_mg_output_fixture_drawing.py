@@ -132,7 +132,7 @@ def test_every_wall_holds_the_target_and_the_sheet_states_none() -> None:
             "rod bore to the free end": 2.1397,
             "rod bore to the shoulder": 2.1397,
             "groove lip to the spigot face": 2.1082,
-            "groove root over the thread major": 2.1089,
+            "groove root over the thread major": 2.4899,
         },
         abs=1e-4,
     )
@@ -153,13 +153,15 @@ def test_the_owner_ruling_numbers_hold() -> None:
     # #1559, 2026-10-16: semicircular groove on the spigot on 7/16 hex, the
     # hook in the plumb plane; #2403 (owner ruling 2026-11-20) moves the face
     # .010 nearer the bore, the groove held on the hook (3.496 from the
-    # face).  #290: R.047 MAX, the spigot Ø the root's plus 2R.
+    # face).  #290: R.047 MAX, the spigot Ø the root's plus 2R.  #2687 (owner
+    # ruling 2026-11-20): the root seats the Ø.008 wire at 4.25, the hook
+    # stands its 0.25 clearance outboard at 4.5.
     lip = spec.WALLS["groove lip to the spigot face"][1]
     root = spec.WALLS["groove root over the thread major"][1]
     assert lip == pytest.approx(2.1082, abs=0.005)
-    assert root == pytest.approx(2.1089, abs=0.005)
-    assert spec.GROOVE_DEPTH_MIN == pytest.approx(0.040 * 25.4, abs=0.005)
-    assert spec.SHOULDER_ANNULUS == pytest.approx(0.51, abs=0.005)
+    assert root == pytest.approx(2.4899, abs=0.005)
+    assert spec.GROOVE_DEPTH_MIN == pytest.approx(0.035 * 25.4, abs=0.005)
+    assert spec.SHOULDER_ANNULUS == pytest.approx(0.214, abs=0.005)
     assert geom.FIXTURE_YAW_DEG == pytest.approx(26.69, abs=0.005)
 
 
@@ -303,22 +305,20 @@ def test_the_groove_station_from_the_face_holds_the_face_lip() -> None:
     clearance = (0.25 - 0.01) * 25.4 - (station_max + 0.047 * 25.4)
     assert spec.GROOVE_SHOULDER_CLEARANCE == pytest.approx(clearance, abs=1e-9)
     assert clearance == pytest.approx(1.0922)
-    assert spec.GROOVE_FILLET_CLEARANCE == pytest.approx(clearance - 0.008 * 25.4, abs=1e-9)
-    # The wire stays in it at the smallest OD (.40) over the largest root (.30).
-    assert spec.GROOVE_DEPTH_MIN == pytest.approx(((0.40 - 0.01) - (0.30 + 0.01)) * 25.4 / 2.0)
+    assert spec.GROOVE_FILLET_CLEARANCE == pytest.approx(clearance - 0.005 * 25.4, abs=1e-9)
+    # The wire stays in it at the smallest OD (.42) over the largest root (.33).
+    assert spec.GROOVE_DEPTH_MIN == pytest.approx(((0.42 - 0.01) - (0.33 + 0.01)) * 25.4 / 2.0)
     assert spec.GROOVE_DEPTH_MIN > geom.WIRE_DIA / 2.0
 
 
 def test_the_groove_is_a_true_semicircle_centred_on_the_spigot_od() -> None:
     # OD = root Ø + 2R: the arc's centre on the OD, so the groove is as deep
-    # as its radius and opens its full Ø at the mouth.  The owner's Ø10.5
-    # would bury the centre under the OD: a re-entrant groove.
+    # as its radius and opens its full Ø at the mouth.
     assert geom.SPIGOT_DIA == pytest.approx(
         geom.GROOVE_ROOT_DIA + 2.0 * geom.GROOVE_RADIUS
     )
     assert geom.GROOVE_CENTRE_R == pytest.approx(geom.SPIGOT_DIA / 2.0, abs=1e-12)
     assert geom.GROOVE_HALF_OPENING == pytest.approx(geom.GROOVE_RADIUS, abs=1e-12)
-    assert (10.5 - geom.GROOVE_ROOT_DIA) / 2.0 > geom.GROOVE_RADIUS
     assert part.V_GROOVE == pytest.approx(
         2.0
         * math.pi
@@ -355,8 +355,8 @@ def test_the_groove_radius_is_a_limit_band_and_the_title_block_x_row_would_thin_
     assert (0.14 - 0.01) * 25.4 - half < spec.WALL_TARGET
 
 
-_PRINTED_ROOTS = ((0.30 - 0.01) * 25.4, (0.30 + 0.01) * 25.4)
-_PRINTED_ODS = ((0.40 - 0.01) * 25.4, (0.40 + 0.01) * 25.4)
+_PRINTED_ROOTS = ((0.33 - 0.01) * 25.4, (0.33 + 0.01) * 25.4)
+_PRINTED_ODS = ((0.42 - 0.01) * 25.4, (0.42 + 0.01) * 25.4)
 
 
 def _groove_at(radius: float) -> dict[str, float]:
@@ -384,7 +384,7 @@ def test_the_groove_holds_the_wire_and_every_wall_at_its_smallest_radius() -> No
     assert geom.HOOK_RADIAL_OFFSET == pytest.approx(
         geom.GROOVE_ROOT_DIA / 2.0 + geom.WIRE_DIA / 2.0 + geom.WIRE_CLEARANCE
     )
-    assert spec.GROOVE_DEPTH_MIN == pytest.approx(0.040 * 25.4) and spec.GROOVE_DEPTH_MIN > 0.4
+    assert spec.GROOVE_DEPTH_MIN == pytest.approx(0.035 * 25.4) and spec.GROOVE_DEPTH_MIN > 0.4
     r_min, r_max = 0.020 * 25.4, 0.047 * 25.4
     smallest, largest = _groove_at(r_min), _groove_at(r_max)
     # R MIN centres under the OD at every printed root and OD: walls .040 apart.
@@ -393,16 +393,16 @@ def test_the_groove_holds_the_wire_and_every_wall_at_its_smallest_radius() -> No
     assert smallest["narrowest mouth"] > geom.WIRE_DIA
     # Owner ruling on review r5: the radius's own row reads FULL R, the arc
     # tangent to both walls (2R wide), the depth the root Ø's.  An R.020 arc
-    # cannot reach the root from the OD, so its walls run straight: .020 long
-    # at the shallowest printed groove, .040 at the deepest.  At R.047 the
-    # shallowest groove (.040) is under R: the arc meets the OD first, a
+    # cannot reach the root from the OD, so its walls run straight: .015 long
+    # at the shallowest printed groove, .035 at the deepest.  At R.047 the
+    # shallowest groove (.035) is under R: the arc meets the OD first, a
     # narrower mouth than 2R.
     assert spec.GROOVE_RADIUS_CALLOUT == "FULL R"
-    assert spec.GROOVE_WALL_AT_RADIUS_MIN == pytest.approx(0.020 * 25.4)
-    assert (_PRINTED_ODS[1] - _PRINTED_ROOTS[0]) / 2.0 - r_min == pytest.approx(0.040 * 25.4)
+    assert spec.GROOVE_WALL_AT_RADIUS_MIN == pytest.approx(0.015 * 25.4)
+    assert (_PRINTED_ODS[1] - _PRINTED_ROOTS[0]) / 2.0 - r_min == pytest.approx(0.035 * 25.4)
     above = _PRINTED_ROOTS[1] / 2.0 + r_max - _PRINTED_ODS[0] / 2.0
     assert largest["narrowest mouth"] == pytest.approx(2.0 * math.sqrt(r_max**2 - above**2))
-    assert largest["narrowest mouth"] == pytest.approx(2.361, abs=5e-4)
+    assert largest["narrowest mouth"] == pytest.approx(2.3085, abs=5e-4)
     # Each wall the largest radius sets only thickens at the smallest.
     assert largest["face lip"] == pytest.approx(spec.WALLS["groove lip to the spigot face"][1])
     assert largest["root over thread"] == pytest.approx(
@@ -410,7 +410,7 @@ def test_the_groove_holds_the_wire_and_every_wall_at_its_smallest_radius() -> No
     )
     assert largest["shoulder clearance"] == pytest.approx(spec.GROOVE_SHOULDER_CLEARANCE)
     assert smallest["face lip"] == pytest.approx(2.794)
-    assert smallest["root over thread"] == pytest.approx(2.1125, abs=1e-4)
+    assert smallest["root over thread"] == pytest.approx(2.4935, abs=1e-4)
     assert smallest["shoulder clearance"] == pytest.approx(1.778)
     for name in ("face lip", "root over thread", "shoulder clearance"):
         assert smallest[name] > largest[name], name
@@ -440,10 +440,10 @@ def test_the_overall_reference_is_an_accepted_exception_with_its_real_stack() ->
 
 
 def test_the_spigot_cleans_up_inside_the_thinnest_flats() -> None:
-    # A route check, not a band: the shop turns the largest printed Ø (.41)
+    # A route check, not a band: the shop turns the largest printed Ø (.43)
     # inside the thinnest flats.
     assert geom.SPIGOT_DIA + spec._SPIGOT_HI < geom.HEX_AF - spec.HEX_STOCK_AF_BAND
-    assert geom.HEX_AF - spec.HEX_STOCK_AF_BAND - 0.41 * 25.4 == pytest.approx(0.5715)
+    assert geom.HEX_AF - spec.HEX_STOCK_AF_BAND - 0.43 * 25.4 == pytest.approx(0.0635)
 
 
 def test_the_spigot_prints_its_own_length_and_the_hex_is_the_stations_less_it() -> None:
@@ -462,12 +462,13 @@ def test_the_shoulder_corner_takes_the_title_block_inside_corner_row() -> None:
     # ENFORCE review 2026-10-24 (rule 4): a bare MAX radius named no mate and
     # nothing seats on the shoulder, so the title block's INSIDE CORNERS row
     # (R.040 MAX) governs the corner and the sheet prints no size.  The part
-    # keeps its modelled .008 tool nose inside that row.
+    # keeps a modelled .005 tool nose inside that row (.008 until #2687's
+    # .42 spigot left the thinnest bar a .0059 shoulder).
     from _printed_tolerance import inside_corner_radius_mm
 
     ceiling = inside_corner_radius_mm(unit=spec.UNIT)
     assert ceiling == pytest.approx(0.040 * 25.4)
-    assert geom.SHOULDER_FILLET_R == pytest.approx(0.008 * 25.4)
+    assert geom.SHOULDER_FILLET_R == pytest.approx(0.005 * 25.4)
     assert geom.SHOULDER_FILLET_R <= ceiling
     assert "ShoulderFillet" not in spec.DRAWING_DIMENSIONS
     assert "ShoulderRadius" not in spec.DRAWING_PRECISION_BY_NAME
@@ -482,14 +483,14 @@ def test_the_shoulder_corner_takes_the_title_block_inside_corner_row() -> None:
     # The modelled corner sits inside the shoulder's annulus on 7/16 flats,
     # even on the thinnest bar, and clear of the groove's shoulder-side mouth.
     annulus = (geom.HEX_AF - geom.SPIGOT_DIA) / 2.0
-    assert annulus == pytest.approx(0.51245)
+    assert annulus == pytest.approx(0.21405)
     assert spec.SHOULDER_ANNULUS == pytest.approx(annulus)
     thinnest = (geom.HEX_AF - spec.HEX_STOCK_AF_BAND - geom.SPIGOT_DIA) / 2.0
     assert spec.SHOULDER_ANNULUS_MIN == pytest.approx(thinnest)
-    assert thinnest == pytest.approx(0.44895)
+    assert thinnest == pytest.approx(0.15055)
     assert geom.SHOULDER_FILLET_R < thinnest
     nominal = geom.GROOVE_MOUTHS[0] - (geom.SHOULDER_X + geom.SHOULDER_FILLET_R)
-    assert nominal == pytest.approx(1.457, abs=1e-4)
+    assert nominal == pytest.approx(1.5332, abs=1e-4)
     # Even the row's R.040 clears the groove's mouth at the worst-case stack:
     # an inside-corner blend never reaches the groove.
     assert geom.GROOVE_MOUTHS[0] - (geom.SHOULDER_X + ceiling) == pytest.approx(0.6442, abs=1e-4)
@@ -504,7 +505,7 @@ def test_the_builder_fillets_the_shoulder_and_its_volume_is_the_swept_spandrel()
         for index in range(steps)
     )
     assert part.V_FILLET == pytest.approx(swept, rel=1e-4)
-    assert part.V_FILLET == pytest.approx(0.2833, abs=1e-3)
+    assert part.V_FILLET == pytest.approx(0.1168, abs=1e-3)
     assert part.V_TOTAL == pytest.approx(
         part.V_HEX + part.V_SPIGOT + part.V_FILLET - part.V_GROOVE - part.V_BORE - part.V_TAP
     )
@@ -1262,9 +1263,10 @@ def test_radius_text_reads_in_open_air_over_the_root_dia_text() -> None:
     assert drawing.RADIUS_GLYPHS == len(_RADIUS_ROWS[0])
     assert drawing.SIDE_KEEP["GrooveRadius"] == drawing.RADIUS_TEXT_XY
     # Right of the face, under the root Ø's upper extension, left of its
-    # dimension line: the upper limit's ink 1.9 mm under the extension.
+    # dimension line: the upper limit's ink 3.1 mm under the extension (1.9
+    # before #2687 moved the root out to Ø.33).
     assert box.xmin > face_x + 0.003
-    assert drawing.GROOVE_ROOT_SHEET_YS[1] - box.ymax == pytest.approx(0.0019, abs=5e-5)
+    assert drawing.GROOVE_ROOT_SHEET_YS[1] - box.ymax == pytest.approx(0.0031, abs=5e-5)
     assert box.xmax < drawing.SIDE_KEEP["GrooveRootDia"][0] - 0.009
     # The callout row stands over the root Ø's text, never level with it:
     # 2.0 mm over r12's printed ink, 2.2 mm over the layout's text box.

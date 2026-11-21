@@ -58,7 +58,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø18.9 x 9 ring at 3:1: the face view, the side view and the isometric
+# A Ø19.5 x 9 ring at 3:1: the face view, the side view and the isometric
 # sit on one row midway between the top border and the title block (top at
 # about 65 mm), with no general note left to anchor (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 SHEET_SCALE = (3.0, 1.0)

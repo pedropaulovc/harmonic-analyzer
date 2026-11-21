@@ -5,7 +5,7 @@ PURE DATA, no SolidWorks/COM imports. Its computed endpoints/yoke remain in
 solver directly so BOM prose stays out of their geometry recipe closures.
 
 The wire is purchased McMaster-Carr 9666K142 music wire (0.008 in, modelled
-at that size on the Ø0.8 lane's centreline). The package drawing
+at that size on the wire centres its seats are laid out for). The package drawing
 ``draw_sh_vn_music_wire`` prints only the supplier wire diameter; this member's
 straight rest run is installed geometry, not a purchase dimension.
 """

@@ -37,6 +37,7 @@ from __future__ import annotations
 import math
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _mcmaster_9666k142 import DIA as _WIRE_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 
 # --- Stock: 7/16 hex brass bar (independent of the larger MG-02 clamp) -------
@@ -48,7 +49,7 @@ HEX_CORNER_RADIUS = HEX_AF / math.sqrt(3.0)
 # --- Stations along the hex axis (local x; origin on the rod-bore axis) ----------
 # The free end's and the spigot face's stations, and the groove's station and
 # root Ø below, set the installed hook and the bracket arm's load: they keep
-# their millimetre nominals and print rounded (.49, .14, .30). The free end
+# their millimetre nominals and print rounded (.49, .14, .33). The free end
 # mates nothing: it stands on the .XX grid at .23, long enough that the wall
 # over the drilled bore meets the .080 target at the title-block band (rule
 # 17: geometry, not a tighter band).
@@ -96,18 +97,30 @@ ROD_BORE_DRILL, ROD_BORE_DIA = min(
 )
 
 # --- Spigot and its full-radius wire groove ------------------------------------
+# The lever wire the groove carries: the fitted 9666K142 wire itself
+# (sh_vn_music_wire_lever_geom asserts the drum carries the same), no wider
+# lane.
+WIRE_DIA = _WIRE_DIA
+# The wire centre's radius in the groove. The root seats the wire there
+# (owner ruling 2026-11-20 on #2687, "A": the seat surfaces move out so the
+# wire centres stay where they were); the hook stands WIRE_CLEARANCE (0.25)
+# outboard of it, as it always has, so the hook and the bracket arm's load
+# stay put.
+_GROOVE_WIRE_R = 4.25
 # The groove arc's centre sits exactly on the spigot OD (OD = root Ø + 2R), so
 # the groove is a true semicircle, as deep as its radius: a centre inside the
 # OD would cut a re-entrant (undercut) groove, not turnable.  The radius is
 # its LIMIT's upper value (.047), the root Ø the hook's (exempt above), so
-# the OD follows them and prints rounded (.40).
+# the OD follows them and prints rounded (.42).
 GROOVE_RADIUS = 1.1938  # .047
-GROOVE_ROOT_DIA = 7.7
+GROOVE_ROOT_DIA = round(2.0 * _GROOVE_WIRE_R - WIRE_DIA, 6)  # 8.2968, prints .33
 SPIGOT_DIA = GROOVE_ROOT_DIA + 2.0 * GROOVE_RADIUS
 # The internal corner where the spigot turns up to the hex shoulder: a
-# .008 tool-nose radius.  It stays on the shoulder face inside the flats and
-# short of the groove.
-SHOULDER_FILLET_R = 0.2032  # .008
+# .005 tool-nose radius (the title block's INSIDE CORNERS row governs it; the
+# sheet prints no size).  It stays on the shoulder face inside the flats and
+# short of the groove: the .42 spigot (#2687) leaves the thinnest 7/16 bar
+# a .0059 shoulder, too narrow for the .008 nose modelled before.
+SHOULDER_FILLET_R = 0.127  # .005
 # The groove's station from the spigot face: its face-side lip holds the wall
 # target at the worst case; the shoulder side takes the rest of the spigot.
 GROOVE_STATION = 3.496
@@ -144,7 +157,6 @@ TAP_SPEC = HoleSpec(
 TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 
 # --- Lever wire hook ------------------------------------------------------------
-WIRE_DIA = 0.8
 WIRE_CLEARANCE = 0.25
 HOOK_RADIAL_OFFSET = GROOVE_ROOT_DIA / 2.0 + WIRE_DIA / 2.0 + WIRE_CLEARANCE
 HOOK_LOCAL = (GROOVE_X, 0.0, HOOK_RADIAL_OFFSET)

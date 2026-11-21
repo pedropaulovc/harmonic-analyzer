@@ -161,7 +161,7 @@ _HUB_R = HUB_DIA / 2.0
 _SPIGOT_R = SPIGOT_DIA / 2.0
 _BORE_R = BORE_DIA / 2.0
 _TIE_R = TIE_HOLE_DIA / 2.0
-_GROOVE_CENTRE_R = GROOVE_BOTTOM_DIA / 2.0 + GROOVE_R  # 49.4
+_GROOVE_CENTRE_R = GROOVE_BOTTOM_DIA / 2.0 + GROOVE_R  # 49.708
 # The groove walls run past the rim OD so the cut opens cleanly.
 _GROOVE_TOP_R = _RIM_R + 0.5
 _BOSS_LEN = HUB_LEN - SPIGOT_LEN  # 10.6, back face to the step

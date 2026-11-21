@@ -22,7 +22,7 @@ wheel's rim (build_pn_pen_assembly: the pen rod slides in the hanger's U
 guides, the carriage hangs on it). The carriage mass is
 pn_pen_carriage_geom.plan_cg_local(); the pen rod is pn_pen_rod_spec's 5 mm
 square stock. The wheel balances that weight at RIM_WIRE_R against wire 1 at
-the drum, so wire 1 carries the built WIRE_RATIO (5.12) times the pen-side load.
+the drum, so wire 1 carries the wheel's WIRE_RATIO (4.995) times the pen-side load.
 
 Stiffness criterion: the arm's share of the output chain's SERIES
 compliance. error_budget.yaml has no structural allowance, and the static
@@ -78,7 +78,7 @@ from mg_magnifying_lever_geom import (
 )
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_LENGTH as VROD_LENGTH
-from sh_vn_music_wire_lever_geom import BUILT_WIRE_RATIO as WIRE_RATIO
+from mg_magnifying_wheel_geom import WIRE_RATIO
 from mg_output_fixture_geom import HEX_AF as FIXTURE_HEX_AF
 from mg_output_fixture_geom import OVERALL_LENGTH as FIXTURE_LENGTH
 
@@ -93,19 +93,19 @@ G_STEEL = 79_000.0  # N/mm^2, assumed for the compliance estimate
 
 # --- loads ---------------------------------------------------------------------
 _HEX_AREA = math.sqrt(3.0) / 2.0  # hex area per AF^2
-_CARRIAGE_G = pn_pen_carriage_geom.plan_cg_local()[0]  # 114.2 g
+_CARRIAGE_G = pn_pen_carriage_geom.plan_cg_local()[0]  # 105.6 g
 _PEN_ROD_G = (
     pn_pen_rod_spec.ROD_SECTION**2 * pn_pen_rod_spec.TOTAL_LENGTH * BRASS_G_PER_MM3
 )  # 26.1 g
 _PEN_HARDWARE_G = 5.0  # #0-80 adjust stud + jam nut, generous
-PEN_SIDE_G = _CARRIAGE_G + _PEN_ROD_G + _PEN_HARDWARE_G  # 145.3 g
+PEN_SIDE_G = _CARRIAGE_G + _PEN_ROD_G + _PEN_HARDWARE_G  # 136.7 g
 # U-guide friction reverses with the stroke: bounded at 50 % of the hanging
 # weight (a generous allowance for a brass block on a sliding square rod).
 GUIDE_FRICTION_FRACTION = 0.5
-PEN_LOAD_MAX_N = PEN_SIDE_G * G * (1.0 + GUIDE_FRICTION_FRACTION)  # 2.14 N
-PEN_LOAD_SWING_N = 2.0 * GUIDE_FRICTION_FRACTION * PEN_SIDE_G * G  # 1.43 N peak-to-peak
-WIRE1_TENSION_MAX_N = WIRE_RATIO * PEN_LOAD_MAX_N  # 10.7 N
-WIRE1_TENSION_SWING_N = WIRE_RATIO * PEN_LOAD_SWING_N  # 7.1 N
+PEN_LOAD_MAX_N = PEN_SIDE_G * G * (1.0 + GUIDE_FRICTION_FRACTION)  # 2.01 N
+PEN_LOAD_SWING_N = 2.0 * GUIDE_FRICTION_FRACTION * PEN_SIDE_G * G  # 1.34 N peak-to-peak
+WIRE1_TENSION_MAX_N = WIRE_RATIO * PEN_LOAD_MAX_N  # 10.0 N
+WIRE1_TENSION_SWING_N = WIRE_RATIO * PEN_LOAD_SWING_N  # 6.7 N
 
 _LEVER_G = (
     math.pi / 4.0 * LEVER_ROD_DIA**2 * LEVER_ROD_LENGTH * BRASS_G_PER_MM3

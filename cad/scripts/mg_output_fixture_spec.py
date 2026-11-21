@@ -207,8 +207,8 @@ if not GROOVE_DEPTH_MIN > _geom.WIRE_DIA / 2.0:
 # mouth stays wider than the wire.  FULL R (GROOVE_RADIUS_CALLOUT) holds the
 # width at 2R: an R MIN arc cannot reach the root from the OD (even the
 # shallowest printed groove is deeper than R MIN), so its two walls run
-# straight and parallel from the arc's tangent points up to the OD, .020
-# long at the shallowest groove (.027 at nominal, .040 at the deepest), and
+# straight and parallel from the arc's tangent points up to the OD, .015
+# long at the shallowest groove (.027 at nominal, .035 at the deepest), and
 # the mouth is 2 x R MIN = .040 at any printed root and OD.
 if not GROOVE_RADIUS_MIN > _geom.WIRE_DIA / 2.0:
     raise AssertionError("MHA-MG-06 groove floor tighter than the wire: it bridges")

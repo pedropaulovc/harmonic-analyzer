@@ -113,20 +113,20 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
         (1.18 - 0.01) * inch / 2.0 - (tie1_r + offset) - tie_r_max
     )
     # The cast spokes, fillets and rim bore at their +/-.03 casting band.
-    assert spec.WALLS["tie2_to_rim_fillet"] == pytest.approx(2.602, abs=1e-3)
+    assert spec.WALLS["tie2_to_rim_fillet"] == pytest.approx(2.6006, abs=1e-3)
     assert spec.WALLS["tie1_to_hub_fillet"] >= spec.MIN_WALL
     # TIE 1 stands outboard of the drum it sits behind: the smallest hole,
     # at its worst offset, still opens a wire diameter past the largest drum
-    # (.74 + .01).
+    # (.77 + .01).
     assert geom.TIE1_DRUM_OPENING == pytest.approx(
-        tie1_r - offset + 0.020 * inch - 0.75 * inch / 2.0
+        tie1_r - offset + 0.020 * inch - 0.78 * inch / 2.0
     )
     assert geom.TIE1_DRUM_OPENING >= geom.LEVER_WIRE_DIA
     # 8 o'clock seen from the front, midway between two spokes.
     assert geom.TIE1_CLOCK_DEG == pytest.approx(-150.0, abs=0.1)
     # TIE 2 breaks into the bore at mid-width: its ligament ends at the
     # rim-bore rounds, R.03 MAX (no model band), on a rim .31 wide at .XX.
-    assert spec.WALLS["tie2_to_rim_faces"] == pytest.approx(2.462, abs=1e-3)
+    assert spec.WALLS["tie2_to_rim_faces"] == pytest.approx(2.4599, abs=1e-3)
     assert geom.CAST_ROUND_R == pytest.approx(0.03 * inch)
     assert not hasattr(geom, "CAST_ROUND_BAND")
     assert spec.ROUND_TEXT_SUFFIX == " MAX"
@@ -135,11 +135,11 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     assert spec.WALLS["spigot_to_bore"] == pytest.approx((0.4992 - 0.1894) * inch / 2.0)
     assert "RimRounds" not in spec.DRAWING_DIMENSIONS
     assert geom.TIE2_CLOCK_DEG == -43.0
-    # The 0.8 pen wire seats at every printed groove corner: the narrowest
+    # The Ø.008 pen wire seats at every printed groove corner: the narrowest
     # groove (R at its .XXX min) is wider than the wire, and the shallowest
     # (the .XX rim at its min over the .XXX bottom at its max) still buries it.
     assert spec.GROOVE_WIDTH_MIN == pytest.approx(0.038 * inch)
-    assert spec.GROOVE_DEPTH_MIN == pytest.approx((3.93 - 3.848) * inch / 2.0)
+    assert spec.GROOVE_DEPTH_MIN == pytest.approx((3.93 - 3.871) * inch / 2.0)
     assert spec.GROOVE_WIDTH_MIN > rim.PEN_WIRE_DIA
     assert spec.GROOVE_DEPTH_MIN >= rim.PEN_WIRE_DIA
     # The drum is never proud of the spigot face: .000-.020 below it.
@@ -161,7 +161,7 @@ def test_feature_volumes_are_consistent() -> None:
     floor = rim.GROOVE_BOTTOM_DIA / 2.0 - rim.RIM_INNER_DIA / 2.0
     hole = 3.141592653589793 / 4.0 * geom.TIE_HOLE_DIA**2
     assert hole * floor < part.V_TIE2 < hole * (floor + 2.0 * rim.GROOVE_R)
-    assert part.V_GROOVE == pytest.approx(405.07, abs=0.05)
+    assert part.V_GROOVE == pytest.approx(292.88, abs=0.05)
     assert part.V_SPOKE_FREE > part.V_SPOKE_WEB > 0.0
 
 
