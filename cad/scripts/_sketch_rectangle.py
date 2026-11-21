@@ -5,12 +5,48 @@ Separate module so edits affect only recipes that use this scope.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import _telemetry
 from _check import check
 from _com import _early_bound, _read_member
 from _sketch import SketchDims, add_line_chain, dimension_between
+
+
+# How far a native centre-rectangle corner may sit from the requested one
+# (mm). Sketch inference snaps by whole features (1 mm onto a deck edge in
+# #1310); this only absorbs metre/millimetre round-off.
+_CORNER_TOL_MM = 1e-6
+
+
+def _assert_requested_corners(
+    ends: list[tuple[float, float]], half_x: float, half_z: float, label: str
+) -> None:
+    """Fail at the sketch when the native rectangle's edges do not end on the
+    four requested corners (issue #1323).
+
+    ``CreateCenterRectangle`` runs sketch inference: a corner near existing
+    geometry snaps onto it, the rectangle comes back another size, and the
+    width/depth dimensions placed on it later turn driven, which surfaced
+    only at the equation step two features on. This catches a snap that
+    moves a corner; a relation inferred onto geometry a corner already lies
+    on exactly moves nothing and is not seen here (#3174)."""
+    corners = [(sx * half_x, sz * half_z) for sx in (-1, 1) for sz in (-1, 1)]
+    for x, z in ends:
+        nearest = min(math.hypot(x - cx, z - cz) for cx, cz in corners)
+        if nearest > _CORNER_TOL_MM:
+            raise RuntimeError(
+                f"{label}: native center rectangle snapped: an edge ends at "
+                f"({x:.6f}, {z:.6f}) mm, {nearest:.6f} mm from the nearest requested "
+                f"corner of ±{half_x:g} x ±{half_z:g} mm (sketch inference)"
+            )
+    for cx, cz in corners:
+        if not any(math.hypot(x - cx, z - cz) <= _CORNER_TOL_MM for x, z in ends):
+            raise RuntimeError(
+                f"{label}: native center rectangle has no edge at the requested "
+                f"corner ({cx:g}, {cz:g}) mm"
+            )
 
 
 @_telemetry.traced("sketch.rectangle", label_param="label")
@@ -47,6 +83,7 @@ def define_centered_rectangle(
             sketch_mgr.AddToDB = previous_add_to_db
         segments = list(raw or [])
         edges: list[tuple[str, float, float]] = []
+        ends: list[tuple[float, float]] = []
         diagonal_id: str | None = None
         for segment in segments:
             if bool(_read_member(segment, "ConstructionGeometry")):
@@ -58,17 +95,22 @@ def define_centered_rectangle(
             entity_id = adapter._register_sketch_entity("Line", segment)
             start = _read_member(segment, "GetStartPoint2")
             end = _read_member(segment, "GetEndPoint2")
-            dx = (
-                float(_read_member(end, "X")) - float(_read_member(start, "X"))
-            ) * 1000.0
-            dz = (
-                float(_read_member(end, "Y")) - float(_read_member(start, "Y"))
-            ) * 1000.0
+            points = [
+                (
+                    float(_read_member(point, "X")) * 1000.0,
+                    float(_read_member(point, "Y")) * 1000.0,
+                )
+                for point in (start, end)
+            ]
+            ends.extend(points)
+            dx = points[1][0] - points[0][0]
+            dz = points[1][1] - points[0][1]
             edges.append((entity_id, dx, dz))
         if len(edges) != 4:
             raise RuntimeError(
                 f"{label}: center rectangle returned {len(edges)} profile edges, expected 4"
             )
+        _assert_requested_corners(ends, half_x, half_z, label)
         horizontal = next(
             (row for row in edges if abs(row[1]) > 1e-9 and abs(row[2]) < 1e-9),
             None,
