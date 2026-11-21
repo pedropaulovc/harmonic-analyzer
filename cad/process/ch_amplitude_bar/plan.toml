@@ -461,8 +461,12 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "Still clamped, check the length in place: the 48 in rule from the flush foot ends to each top end."
-inspection = "Each bar {{cad.top_end_length_min_in:.2f}}–{{cad.top_end_length_max_in:.2f}} long. The two share flush foot ends and one X0, so they read alike; differing by more than .01: re-flush the foot ends and rule again. Over: take the shorter reading, send $#, note the G54 line's X, G10 L2 P1 X(that X − (that shorter reading − {{cad.top_end_length_in:.2f}}) × 25.4) and run CA03_top_end again. Under: that bar is scrap."
+inspection = "Each bar {{cad.top_end_length_min_in:.2f}}–{{cad.top_end_length_max_in:.2f}} long. The two share flush foot ends and one X0, so they read alike; differing by more than .01: a foot end was not flush, do the next operation. Over (both alike): take the shorter reading, send $#, note the G54 line's X, G10 L2 P1 X(that X − (that shorter reading − {{cad.top_end_length_in:.2f}}) × 25.4) and run CA03_top_end again. Under: that bar is scrap."
 gauge_checks = [{ gauge = "steel-rule-48", band_mm = "{{cad.top_end_length_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Only if the two readings differed by more than .01 (otherwise skip): unclamp, re-flush both foot ends against the 1-2-3 block and re-clamp, tapping each bar down onto its parallel. Rule both bars again: a bar under {{cad.top_end_length_min_in:.2f}} is scrap. Then redo this setup's X pick-up (edge finder on the top end that stands farthest right, its new reading as its written length) and run CA03_top_end again before going on."
+feed = "hand"
 
 [[setups.operations]]
 instruction = "Spindle stopped (M5). Take out the collet and end mill; mount the arbor and slitting saw as in Setup 2 (the same spacers, checked there), drawbar tight, teeth cutting with M3. Do not move the bars."
