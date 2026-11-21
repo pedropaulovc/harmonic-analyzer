@@ -88,8 +88,9 @@ end_stickout_in = 0.4
 centre_stickout_mm = 167.0
 # Op 190: the 1/16 P1 cutoff blade plunges at Z+.100 and Z+.050 first, then
 # at Z0 (end B's face) last, each down to a Ø.06 neck (each under one blade
-# width apart, no web): every plunge but the last is driven through full rod,
-# and the stub hangs on the neck, on the dead centre, only for the last. The
+# width apart, no web): each plunge cuts on the chuck side of any neck already
+# cut, so its cutting torque never passes through the Ø.06 neck; the stub
+# rides on that neck (and the dead centre's friction) from the first plunge on. The
 # groove is about .16 wide, room for the saw's kerf mid-groove; Setup 4 saws
 # through the neck.
 neck_dia_in = 0.06
