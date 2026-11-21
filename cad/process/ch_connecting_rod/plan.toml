@@ -54,16 +54,15 @@
 # CR06 and its touch-off are laid out on those limits (cam.py checks every
 # move of the saw, its spacers and its nut against the stock and the vise).
 # Also to buy: the .0775 reamer (tools.reamer-0775) and the 5/64 in end mill
-# (tools.endmill-5-64-long). FLAGGED: the pin hole's size is gauged by a
-# special Class ZZ pin-gauge pair, GO .0775 plus and NO-GO .0779 minus, TO
-# BUY (as CH-01's): a reamed hole is the reamer's size +.0005/0, wider than
-# the drawing's .0004 band, so the reamer alone does not hold it. This
-# departs from the owner's 2026-11-19 decision (#3124 item 5: the hole
-# accepted on the reamer and a hand try of the miked pin), his to overrule;
-# the pin-gauge sets on order (gauges.pin-gauges) step .001. The drawing's
-# finish, matte black oxide per MIL-DTL-13924 Class 1 (owner ruling
-# 2026-11-20, #2348; a hot process, all over, no masking), has no line on
-# record: Setup 8 sends the rods out, as CH-02's.
+# (tools.endmill-5-64-long). The pin hole's size is gauged by a special
+# Class ZZ pin-gauge pair, GO .0775 plus and NO-GO .0779 minus, TO BUY (as
+# CH-01's; owner ruling 2026-11-21, "ill buy pin gauges", superseding the
+# 2026-11-19 decision of #3124 item 5): a reamed hole is the reamer's size
+# +.0005/0, wider than the drawing's .0004 band, so the reamer alone does
+# not hold it; the pin-gauge sets on order (gauges.pin-gauges) step .001.
+# The drawing's finish, matte black oxide per MIL-DTL-13924 Class 1 (owner
+# ruling 2026-11-20, #2348; a hot process, all over, no masking), has no
+# line on record: Setup 8 sends the rods out, as CH-02's.
 #
 # Zeroing: X0 the blanks' left ends, flushed with a 1-2-3 block, edge finder
 # at 900 rpm; Y0 the fixed jaw, edge finder; Z0 with F up the plate's top,
