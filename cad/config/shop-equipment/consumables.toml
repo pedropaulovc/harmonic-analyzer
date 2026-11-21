@@ -81,11 +81,28 @@ kind = "paint"
 status = "to_order"
 note = "Not owned: to buy. Under the alkyd enamels of MHA-FR-01 and MHA-FR-02 (their FINISH: ALKYD PRIME)."
 
+# Owner (Pedro), answered in person 2026-11-21 (cnc rulings record, second
+# ask), naming the black enamel: "rust-oleum Flat Black376855". Whether a can
+# is on hand was not stated, so the record carries no status (stock_bom reads
+# it as unrecorded): FLAGGED, check the shelf before buying.
 [consumables.black-alkyd-enamel]
-name = "Black alkyd enamel"
+name = "Rust-Oleum Stops Rust Custom Spray 5-in-1 Flat Black 376855, 12 oz aerosol (oil-modified alkyd enamel)"
+kind = "paint"
+note = "Ownership not stated by the owner: to check. MHA-FR-01 deck and underside (BLACK DECK/UNDERSIDE), the MHA-SH-01/MHA-SH-02 column clamps and the MHA-DT-02 arbor pedestal (black enamel)."
+cite = [
+  "Owner (Pedro) 2026-11-21, answered in person: \"rust-oleum Flat Black376855\".",
+  "The Home Depot, Rust-Oleum Stops Rust 12 oz. Custom Spray 5-in-1 Flat Black Spray Paint 376855 (https://www.homedepot.com/p/Rust-Oleum-Stops-Rust-12-oz-Custom-Spray-5-in-1-Flat-Black-Spray-Paint-376855/323255175), read 2026-11-21.",
+  "Rust-Oleum Technical Data SRT-01, Stops Rust Enamel Sprays (Form GDH-678 Rev. 121919, https://www.rustoleum.com/-/media/DigitalEncyclopedia/Documents/RustoleumUSA/TDS/English/CBG/Stops%20Rust/SRT-01_Stops_Rust_Enamel_Sprays_TDS.ashx), read 2026-11-21: surface preparation 'Remove all dirt, grease, oil ... by washing the surface with a commercial detergent ... Rinse with fresh water and allow to thoroughly dry'; priming 'Use of a Stops Rust Primer ... is especially recommended for bare wood and metal', 7780830 Clean Metal Primer; application 'Hold can upright 10-16\" from surface ... Apply 2 or more light coats a few minutes apart'; 'Dries tack free in 2-4 hours, to handle in 5-9 hours and fully dry in 24 hours. Primers may be top coated immediately. Apply a second coat or clear coat within 1 hour or after 48 hours'; use at 50-90 F, humidity below 70%, outdoors or well ventilated; resin oil-modified alkyd.",
+]
+
+# The primer the enamel's maker recommends on clean bare metal (Rust-Oleum
+# SRT-01, above). Not owned: to buy.
+[consumables.rust-oleum-clean-metal-primer]
+name = "Rust-Oleum Stops Rust Clean Metal Primer 7780830, 12 oz aerosol"
 kind = "paint"
 status = "to_order"
-note = "Not owned: to buy. MHA-FR-01 deck and underside (BLACK DECK/UNDERSIDE) and the MHA-SH-01/MHA-SH-02 column clamps (black enamel)."
+note = "Not owned: to buy. Under the black enamel (consumables.black-alkyd-enamel) on bare steel: MHA-SH-01/MHA-SH-02 column clamps and the MHA-DT-02 arbor pedestal."
+cite = ["Rust-Oleum Technical Data SRT-01, Stops Rust Enamel Sprays (Rev. 121919), read 2026-11-21: 'Use of a Stops Rust Primer provides added corrosion protection, superior adhesion and hiding and is especially recommended for bare wood and metal'; '7780830 Clean Metal Primer'."]
 
 # --- McMaster-Carr PO 0803PCAMPOS (owned) ------------------------------------
 

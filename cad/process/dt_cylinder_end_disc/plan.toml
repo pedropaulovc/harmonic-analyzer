@@ -1,23 +1,201 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Cylinder bank south end disc MHA-DT-26, one off, turned on the manual
+# PM-1127VF-LB (owner ruling 2026-11-21: turned parts get lathe travelers, no
+# NC). Route chosen for speed (agent's choice under the owner ruling of
+# 2026-11-21) from the 1/8 x 2-1/2 in C36000 flat on hand, bought for this
+# disc (stock.c360-flat-1-8x2-1-2): saw a 2-1/2 in square off it and saw its
+# corners off; Setup 2, the blank in the 6 in 4-jaw on its sawn edges, its
+# centre-punch mark trued to the MT3 dead centre in the tailstock: face the
+# out face to the thickness, spot and drill V through; Setup 3, the blank on
+# a 3/8-16 bolt through that hole, between two washers, the bolt's plain
+# shank in the 3-jaw: turn the outside to its diameter. Bench: deburr and
+# check.
+#
+# Owner rulings 2026-11-21 (answered in person): the 6 in 4-jaw independent
+# chuck is on hand (cad/config/shop-equipment/fixtures.chuck-4jaw-6), and the
+# tailstock is MT3, which the mill tap-guide dead centre fits
+# (tools.mill-dead-centre-mt3). The 4-jaw's grip range is not recorded
+# (workholding.chuck-4jaw-6 declares none: no source states it), so Setup 2
+# opts out of the lathe-holding screen (lathe_hold = "other"); its grip, the
+# 2-1/2 in blank in a 6 in chuck, is well inside any 6 in 4-jaw's span.
+#
+# FLAGGED, not on record: the mandrel hardware, one 3/8-16 x 1-1/2 in hex
+# bolt (its plain shank gripped), one 3/8-16 hex nut and two 3/8 flat
+# washers smaller than the disc's Ø2.17; shop hardware, to find or buy.
 title = "Cylinder Bank South End Disc"
-part = "MHA-DT-26 Cylinder Bank South End Disc"
-revision = "placeholder"
-material = "C36000 free-machining brass"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "C36000 free-machining brass, 1/8 x 2-1/2 in flat"
+stock = "1/8 × 2-1/2 in flat, on hand; one disc from a {{process.blank_side_in:g}} in square sawn off it."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Not on record, to find or buy before the job: the mandrel's 3/8-16 x 1-1/2 in hex bolt, its nut and two 3/8 flat washers. The .377 and .381 pin gauges are on the owner's order (owner 2026-11-21: \"ill buy pin gauges\")."
 shop = "../shop"
 stock_refs = ["c360-flat-1-8x2-1-2"]
+material_key = "lathe-c360"
+turning_material = "brass"
+
+[cad]
+file = "../../out/features/dt_cylinder_end_disc/features.toml"
+adapter = "turned_bush"
+part = "dt-cylinder-end-disc"
+
+[parameters]
+quantity = 1
+# The square sawn off the flat and the flat's thickness along the axis.
+blank_side_in = 2.5
+blank_axial_in = 0.125
+# What Setup 2 faces off the out face for the picture: the flat's .125 less
+# the disc's .11 nominal (the adapter binds the same as cad.face_stock_in).
+face_allowance_in = 0.015
+# The sawn blank's largest swung diameter: the square's corners sawn off
+# .80 back along each edge leave vertices at (1.25, .45) in from its centre,
+# Ø2.657 in (67.49 mm); the cut lines stand 1.202 in from the centre, so the
+# blank still holds a Ø2.40 circle, over the disc's Ø2.18.
+blank_swing_mm = 67.49
+# Setup 3: the 3/8-16 bolt (Ø.375) pushed into the 3-jaw until its end
+# stands flush with the nut, so all that stands out of the jaws is a
+# washer, the disc, a washer and the nut, about .63 in (16 mm); the thread's
+# root, about Ø.30, the least section there.
+bolt_shank_mm = 9.525
+mandrel_stickout_mm = 16.0
+bolt_root_mm = 7.5
+
+[[tools]]
+id = "saw"
+name = "Evolution miter saw"
+ref = "saw-evolution-14"
+
+[[tools]]
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "dead-centre"
+name = "MT3 dead centre"
+ref = "mill-dead-centre-mt3"
+
+[[tools]]
+id = "centre"
+name = "No. 3 centre drill"
+ref = "centre-drills-carbide-60"
 
 [[tools]]
 id = "drill-v"
 name = "V drill"
-ref = "drill-v"  # Drills V
+ref = "drill-v"
+
+[[tools]]
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Saw the blank"
+machine = "Saw / bench"
+indexing = "none"
+diagram = { file = "diagrams/saw.svg", alt = "The 1/8 x 2-1/2 in flat with a 2-1/2 in square marked off its end, both diagonals scribed and centre-punched where they cross, each corner sawn off .8 in back; the finished Ø2.17 disc fits inside." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Saw a {{process.blank_side_in:g}} in length off the flat: a {{process.blank_side_in:g}} in square. Scribe both diagonals and centre-punch where they cross. Saw each corner off at 45°, .8 in back from the corner along each edge. Deburr the sawn edges. Mike the thickness: {{cad.length_min_in:.3dot}} or over everywhere, else stop."
+inspection = "Thickness at least {{cad.length_min_in:.3dot}} (micrometer, four places)."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
+title = "4-jaw: face to thickness, drill V"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "6 in 4-jaw on the blank's four sawn edges, seated flat on the jaw steps, jaws snug only. The MT3 dead centre in the tailstock: run its point into the centre-punch mark, then tighten the jaws in turn, a pair at a time, keeping the point seated in the mark; withdraw the tailstock."
+datum = "The face against the jaw steps; the out face is faced to the thickness from it."
+diagram = { file = "diagrams/block.svg", alt = "The sawn blank in the 4-jaw on its edges: the out face faced to thickness, spotted and drilled V through from the tailstock." }
+lathe_hold = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the out face in light skims, miking the thickness between them, to {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} (about {{cad.face_stock_in:.3dot}} comes off)."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Thickness {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}, by micrometer, four places."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock, about Ø.25 across the countersink: under the V drill, so the drill removes it."
+settings = "lathe-centre-c360"
+cut_diameter_mm = 2.778
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-v"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Drill V through from the tailstock, dry, feeding gently as the point breaks through (brass grabs): the hole is the mandrel's in Setup 3."
+settings = "lathe-drill-v-c360"
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
+hole_depth_mm = 6.0
+peck = "none"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Bolt mandrel: turn the outside"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "The 3/8-16 x 1-1/2 in bolt through the V hole, a flat washer each side and the nut tight. Push the bolt into the 3-jaw until its end stands flush with the nut's outer face, the inner washer just clear of the jaw fronts, and tighten the jaws on the bolt."
+datum = "The disc's faces between the washers; only the outside is cut."
+diagram = { file = "diagrams/mandrel.svg", alt = "The blank on a bolt through its V hole, washer and nut each face, the bolt in the 3-jaw: the outside turned to Ø2.16–2.18." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bolt_shank_mm}}", stock_diameter_mm = "{{process.blank_swing_mm}}", stickout_mm = "{{process.mandrel_stickout_mm}}", minimum_diameter_mm = "{{process.bolt_root_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the outside across its thickness, light cuts at the sawn flats' interruptions, to Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}}."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Outside Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}}, by calipers."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Bench: deburr and check"
+machine = "Bench"
+envelope = "other"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished disc: Ø2.17 by .11 with the V hole through." }
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr: break both outside edges and both ends of the hole R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Check the hole: a Ø{{cad.bore_dia_min_in:.3dot}} pin gauge enters and a Ø{{cad.bore_dia_max_in:.3dot}} does not."
+inspection = "Hole Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
+feed = "hand"

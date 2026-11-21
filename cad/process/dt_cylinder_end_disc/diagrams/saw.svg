@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 240" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="240"/>
+  <text class="title" x="20" y="20">Setup 1: a 2-1/2 in square off the 1/8 x 2-1/2 in flat, its corners sawn off</text>
+  <rect class="part-rest" x="40" y="50" width="160" height="150"/>
+  <line class="datum" x1="205" y1="40" x2="205" y2="210"/>
+  <path class="part-arriving" d="M258,50 L312,50 L360,98 L360,152 L312,200 L258,200 L210,152 L210,98 Z"/>
+  <path class="part-waste" d="M210,50 L258,50 L210,98 Z M312,50 L360,50 L360,98 Z M360,152 L360,200 L312,200 Z M258,200 L210,200 L210,152 Z"/>
+  <line class="hidden" x1="210" y1="50" x2="360" y2="200"/>
+  <line class="hidden" x1="360" y1="50" x2="210" y2="200"/>
+  <circle class="hidden" cx="285" cy="125" r="65.1"/>
+  <circle class="holes" cx="285" cy="125" r="2.5"/>
+  <text class="label" x="40" y="227">flat (rest)</text>
+  <text class="label" x="160" y="36">saw kerf</text>
+  <line class="leader" x1="288" y1="122" x2="420" y2="70"/>
+  <text class="label-halo" x="424" y="66">centre punch where the diagonals cross</text>
+  <line class="leader" x1="336" y1="74" x2="420" y2="100"/>
+  <text class="label-halo" x="424" y="104">each corner sawn off at 45°, .8 in back along each edge</text>
+  <line class="leader" x1="340" y1="160" x2="420" y2="150"/>
+  <text class="label-halo" x="424" y="154">dashed: the finished Ø2.17 disc, inside the sawn blank</text>
+  <text class="label" x="424" y="196">2-1/2 in square, 1/8 in thick (drawn to scale, 60 px/in)</text>
+</svg>
