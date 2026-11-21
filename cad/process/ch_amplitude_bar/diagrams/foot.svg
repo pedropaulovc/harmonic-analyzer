@@ -1,49 +1,59 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 2: two bars, each on its own 1 in parallel against its jaw, foot ends .75 past the left jaw side; CA01 faces them, CA02 saws the foot notch. Top view and an end view of the load. Styles: prechips.palette. -->
+<!-- Setup 3: four bars side by side on the riser (two blocks end to end on the vise bed against the fixed jaw), foot ends .75 past the left jaw side; CA01 faces them, CA02 saws the foot notch. Top view and an end view of the load. Styles: prechips.palette. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" font-family="sans-serif" font-size="12">
 <rect class="paper" width="640" height="400"/>
 <text class="label" x="470" y="20">Top view</text>
 <rect class="clamp" x="250" y="30" width="200" height="40"/>
-<text class="label" x="300" y="24">fixed jaw</text>
-<rect class="clamp" x="250" y="102" width="200" height="40"/>
-<text class="label" x="290" y="158">moving jaw</text>
-<rect class="part-kept" x="200" y="70" width="440" height="16"/>
-<rect class="part-kept" x="200" y="86" width="440" height="16"/>
-<text class="label" x="560" y="60">bar 1</text>
+<text class="label" x="262" y="24">fixed jaw, 6.247 long</text>
+<rect class="clamp" x="250" y="126" width="200" height="40"/>
+<text class="label" x="290" y="182">moving jaw</text>
+<rect class="part-kept" x="200" y="70" width="440" height="14"/>
+<rect class="part-kept" x="200" y="84" width="440" height="14"/>
+<rect class="part-kept" x="200" y="98" width="440" height="14"/>
+<rect class="part-kept" x="200" y="112" width="440" height="14"/>
+<rect class="hidden" x="254" y="70" width="96" height="53"/>
+<rect class="hidden" x="350" y="70" width="96" height="53"/>
+<text class="label" x="560" y="60">P1</text>
 <path class="leader" d="M574 64 L574 76"/>
-<text class="label" x="560" y="122">bar 2</text>
-<path class="leader" d="M574 110 L574 96"/>
-<text class="label" x="470" y="150">about 25 in of each</text>
-<text class="label" x="470" y="164">bar hangs right</text>
-<circle class="cutter" cx="120" cy="86" r="80" fill-opacity="0.75"/>
-<text class="label" x="60" y="90">slitting saw</text>
+<text class="label" x="560" y="146">P4</text>
+<path class="leader" d="M574 134 L574 120"/>
+<text class="label" x="490" y="196">about 25 in of each</text>
+<text class="label" x="490" y="210">bar hangs right</text>
+<text class="label" x="300" y="214">riser: two 3 in blocks (hidden)</text>
+<path class="leader" d="M410 202 L410 120"/>
+<circle class="cutter" cx="120" cy="98" r="80" fill-opacity="0.75"/>
+<text class="label" x="60" y="102">slitting saw</text>
 <circle class="cutter" cx="188" cy="58" r="10"/>
 <text class="label" x="206" y="24">end mill</text>
 <path class="leader" d="M210 28 L194 50"/>
-<path class="arrow" d="M120 192 V222"/>
-<text class="label" x="128" y="214">feed −Y</text>
-<line class="datum" x1="200" y1="64" x2="200" y2="108"/>
-<text class="label" x="182" y="196">X0</text>
-<path class="dims" d="M200 182 H250"/>
-<text class="label" x="206" y="178">{{process.end_protrusion_mm:in.2dot}}</text>
+<path class="arrow" d="M40 192 V222"/>
+<text class="label" x="48" y="214">feed −Y</text>
+<line class="datum" x1="200" y1="64" x2="200" y2="132"/>
+<text class="label" x="182" y="238">X0</text>
+<path class="dims" d="M200 226 H250"/>
+<text class="label" x="206" y="222">{{process.end_protrusion_mm:in.2dot}}</text>
 <path class="axis" d="M560 370 H610"/><text class="label" x="614" y="374">+X</text>
 <path class="axis" d="M560 370 V320"/><text class="label" x="552" y="316">+Y</text>
-<text class="label" x="20" y="250">End view of the load, from the foot end (parallels drawn short)</text>
+<text class="label" x="20" y="256">End view of the load, from the foot end (riser drawn short)</text>
 <rect class="clamp" x="40" y="264" width="30" height="120"/>
 <text class="label" x="22" y="396">fixed jaw</text>
-<rect class="part-kept" x="70" y="270" width="48" height="48"/>
-<rect class="part-removed" x="70" y="284" width="48" height="20"/>
-<rect class="part-kept" x="118" y="270" width="48" height="48"/>
-<rect class="part-removed" x="118" y="284" width="48" height="20"/>
-<rect class="fixture-support" x="70" y="318" width="24" height="66"/>
-<rect class="fixture-support" x="142" y="318" width="24" height="66"/>
-<rect class="clamp" x="166" y="264" width="30" height="120"/>
-<text class="label" x="150" y="396">moving jaw</text>
-<line class="active-face" x1="70" y1="318" x2="166" y2="318"/>
-<text class="label" x="210" y="298">notch {{process.foot_notch_width_mm:in.3dot}} wide, ledge {{cad.foot_notch_ledge_in:.3dot}} above L</text>
-<path class="leader" d="M206 294 L168 294"/>
-<text class="label" x="210" y="322">L faces on the parallels (Z0)</text>
-<text class="label" x="210" y="354">1 in parallel under each bar,</text>
-<text class="label" x="210" y="368">against its jaw</text>
-<path class="leader" d="M206 358 L168 352"/>
+<rect class="part-kept" x="70" y="270" width="36" height="36"/>
+<rect class="part-removed" x="70" y="280.5" width="36" height="15"/>
+<rect class="part-kept" x="106" y="270" width="36" height="36"/>
+<rect class="part-removed" x="106" y="280.5" width="36" height="15"/>
+<rect class="part-kept" x="142" y="270" width="36" height="36"/>
+<rect class="part-removed" x="142" y="280.5" width="36" height="15"/>
+<rect class="part-kept" x="178" y="270" width="36" height="36"/>
+<rect class="part-removed" x="178" y="280.5" width="36" height="15"/>
+<rect class="fixture-support" x="70" y="306" width="136" height="78"/>
+<rect class="clamp" x="214" y="264" width="30" height="120"/>
+<text class="label" x="190" y="396">moving jaw</text>
+<line class="active-face" x1="70" y1="306" x2="214" y2="306"/>
+<text class="label" x="254" y="290">notch {{process.foot_notch_width_mm:in.3dot}} wide, ledge {{cad.foot_notch_ledge_in:.3dot}} above L</text>
+<path class="leader" d="M250 288 L216 288"/>
+<text class="label" x="254" y="312">L faces on the riser (Z0)</text>
+<text class="label" x="254" y="340">riser {{process.riser_width_min_mm:in.2dot}}–{{process.riser_width_max_mm:in.2dot}} wide, against</text>
+<text class="label" x="254" y="354">the fixed jaw, not clamped: the</text>
+<text class="label" x="254" y="368">moving jaw grips the P4 bar</text>
+<path class="leader" d="M250 344 L200 344"/>
 </svg>

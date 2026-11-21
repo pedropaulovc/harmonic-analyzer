@@ -94,6 +94,7 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
         "reamer-0775": 5,
     }
     assert set(RECIPE.LOAD_FIRST_TOOL) == {
+        "CA00_riser_face",
         "CA01_foot_end",
         "CA03_top_end",
         "CA05_pin_hole",
@@ -108,13 +109,18 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
         "foot_notch": ["G1 Z1.854 F{feed}", "G1 Z2.946 F{feed}"],
         "top_notch": ["G1 Z1.600 F{feed}", "G1 Z3.213 F{feed}"],
     }
-    # Two pin holes .25 in from the top end, one per bar, a pitch apart.
+    # Four pin holes .25 in from the top end, one per bar, a pitch apart.
     holes = next(
         kwargs["centres"]
         for program, check, kwargs in ctx["expect"]
         if program.startswith("CA05") and check == "holes"
     )
-    assert holes == [[-6.35, -3.175], [-6.35, -9.5]]
+    assert holes == [
+        [-6.35, -3.175],
+        [-6.35, -9.5],
+        [-6.35, -15.824],
+        [-6.35, -22.149],
+    ]
 
 
 def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> None:
@@ -167,8 +173,12 @@ def test_a_nut_too_close_under_the_saw_is_caught_over_the_top_ends(tmp_path) -> 
             "under the length",
         ),
         ({"bar_pitch_mm": 6.35}, "bar_pitch_mm"),
-        ({"load_width_mm": 25.2984}, "load_width_mm"),
-        ({"bars_per_load": 4, "load_width_mm": 25.2984}, "one or two bars"),
+        ({"load_width_mm": 12.6492}, "load_width_mm"),
+        ({"riser_width_max_mm": 25.2}, "narrowest load"),
+        ({"riser_width_min_mm": 22.8}, "half its width"),
+        ({"bars_per_load": 5, "load_width_mm": 31.623}, "half its width"),
+        ({"riser_chamfer_mm": 1.6}, "quarter of the first bar"),
+        ({"riser_length_max_mm": 80.0}, "longer than the jaws"),
         ({"foot_notch_width_mm": 2.6416}, "foot_notch_width_mm"),
         ({"top_notch_depth_mm": 14.224}, "top_notch_depth_mm"),
         ({"top_notch_step_mm": 3.4925}, "top_notch_step_mm"),
@@ -180,7 +190,17 @@ def test_a_nut_too_close_under_the_saw_is_caught_over_the_top_ends(tmp_path) -> 
         ({"half_mill_projection_min_mm": 19.0}, "jaw tops"),
         ({"drill_projection_mm": 20.0}, "jaw tops"),
         ({"spot_projection_mm": 20.0}, "holder_grip_min_mm"),
-        ({"parallel_height_mm": 0}, "jaw tops"),
+        ({"riser_height_min_mm": 0}, "riser_height_min_mm"),
+        ({"seat_offset_max_mm": 0.0254}, "ledge's budget"),
+        ({"saw_touch_error_mm": 0.0254}, "ledge's budget"),
+        ({"saw_touch_error_mm": 0.0127}, "saw_touch_error_mm is finer"),
+        ({"seat_measure_mm": 0.00254}, "seat_measure_mm is finer"),
+        ({"saw_touch_step_mm": 0.0254}, "saw_touch_error_mm is finer"),
+        ({"sweep_zero_return_mm": 0.005}, "seat_measure_mm is finer"),
+        ({"riser_blank_spread_max_mm": 0.127}, "riser_blank_spread_max_mm"),
+        ({"riser_face_overhang_mm": -50.0}, "riser_face_overhang_mm"),
+        ({"riser_parallel_height_mm": 38.1}, "to grip"),
+        ({"riser_parallel_height_mm": 12.7}, "over the jaw tops"),
         ({"saw_spacer_below_min_mm": 25.4}, "inside its stack's depth"),
         ({"saw_clear_z_mm": 11.35}, "saw_clear_z_mm"),
         ({"saw_proof_raise_mm": 25.4}, "air proof"),
@@ -238,6 +258,20 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: line.startswith("G1 Z1.854"),
             lambda line: "G0 Z1.854",
             "rapid",
+        ),
+        # A pin hole drilled between the jaws, down into the riser.
+        (
+            "pin_drill",
+            lambda line: line.startswith("G0 X-6.350 Y"),
+            lambda line: line.replace("X-6.350", "X-25.000"),
+            "keep_out",
+        ),
+        # The riser faced down beside the jaws instead of over them.
+        (
+            "riser_face",
+            lambda line: line == "G1 Z-0.127 F{feed}",
+            lambda line: "G1 Z-8.000 F{feed}",
+            "keep_out",
         ),
         # A pin hole drilled short of the down face.
         (
