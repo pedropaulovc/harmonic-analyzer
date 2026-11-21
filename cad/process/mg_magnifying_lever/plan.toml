@@ -1,33 +1,467 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# the drawing cross-check of 2026-11-19, until its traveler is written. Not
-# enrolled in _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Magnifying lever MHA-MG-03, one off, on the manual PM-1127VF-LB (owner
+# ruling 2026-11-21: turned parts get lathe travelers, no NC). Route chosen
+# for speed: the O.D. is the 1/4 in C360 brass rod as bought (drawing: ROD
+# STOCK, REF 1/4; registry: the stock's .000/-.002 governs), so nothing is
+# turned on it except, if the rod reads over the class 2A major, the thread's
+# length. A blank sawn long by a .535 stub, stock allowance that never
+# becomes part of the lever; the stub's end faced, turned to a Ø.18 pilot
+# and centre-drilled; end B single-pointed 1/4-20 UNC-2A for .70-.72 (owner
+# 2026-11-05: single-pointed, not die-cut) between the 3-jaw on end A and
+# the dead centre in the stub, and tried in the MHA-MG-01 bracket over the
+# pilot before the stub comes off; end B's face cut at Z0 by the cutoff
+# blade, leaving a Ø.06 neck to the stub; the stub sawn off through the neck
+# and the pip filed flush at the bench; turned round, end A a short stickout
+# out of the 3-jaw with the thread back in the spindle bore: faced to the
+# 6.58-6.60 length, then the SR.125 tip formed with the R.125 form tool, its
+# apex on the faced plane. Bench: deburr, check, bag (FINISH: machined).
+#
+# Why the stub: threading end B for .70-.72 needs it out of the jaws by the
+# thread plus the threading bit's half-width and clearance (about .95), over
+# the shop's 3 x D stickout limit on the 1/4 rod (.75). A centre in end B
+# itself would leave an undrawn hole in the flat tip, which stands .05 past
+# the bracket's far face (mg_lever_thread_joint); a die is ruled out by the
+# owner; the steady rest leaves 1 in free past it with no carriage clearance
+# on record. The stub carries the centre and is cut off: the lever leaves
+# with no feature the drawing does not show. End B's face is cut in the same
+# hold (Op 190), so no setup holds the threaded end out of the jaws. Route
+# chosen by the agent and approved by Main 2026-11-21 (the owner corrects
+# afterwards), over the steady rest, a follow rest, a chuck-only hold .95
+# out, a centre in end B and a die.
+#
+# The dead centre clears the bit: the stub's outer .20 is a Ø.18 pilot,
+# under the bit's point (the thread's minor, Ø.19), so each pass starts at
+# Z+.40 over the pilot in air; the bit's right side is then .025 past the
+# stub's end, where the dead centre's 60° point is still inside the #1
+# centre drill's Ø.09 countersink (its cone reaches Ø.12 there), while the
+# bit's flank stands over .26 off the axis: no half-centre is needed. The
+# dead centre's nose is not measured. The tailstock taper is MT3 and the
+# owner's MT3 dead centre fits it (owner 2026-11-21: machines.pm-1127vf-lb,
+# tools.dead-centre-mt3, no longer the mill's tap guide). Op 100's dry run proves the
+# clearance before the first pass.
+#
+# Flagged: the R.125 form tool (tools-special-cutters.toml form-tool-r125)
+# is to order; the 6.59 length is read with the owned height gauge on the
+# surface plate (no calipers on record reach it).
+# No 1/4-20 class 2A ring gauge is on record: the thread is accepted by its
+# major (micrometer), its pitch (the 40-piece set's screw pitch gauge) and a
+# hand trial in the magnifying bracket's tapped hole. The class 2A major
+# .2408-.2489 (ASME B1.1, 1/4-20 UNC-2A) is quoted in the plan; the threading
+# and form-tool settings in shop/mg.toml are authored (low range).
 title = "Magnifying Lever"
-part = "MHA-MG-03 Magnifying Lever"
-revision = "placeholder"
-material = "Brass"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "C36000 free-machining brass rod, 1/4 in (drawing: brass)"
+stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} C360 rod, 360-H02 extruded, the 48 in bar on hand (Online Metals part 1257); one blank {{process.blank_length_in:.2dot}} in long. Before sawing, mike the bar at three places along the blank: every reading .248–.250 (the lever's O.D. is the bar as bought; with the MHA-MG-02 bore accepted at .257–.261 on its own traveler, that is the drawing's .007–.013 sliding clearance); then slide the MHA-MG-02 clamp (made first) along it: it slides without catching. Either fails: do not cut that bar, order another."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. The O.D. is left as bought: the drawn rod's own surface is the drawing's Ra 125 MHA-MG-02 screw seat, so grip it over a brass shim wrap and never cut, file or stone it."
 shop = "../shop"
 stock_refs = ["c360-round-1-4"]
+material_key = "lathe-c360"
+
+[cad]
+file = "../../out/features/mg_magnifying_lever/features.toml"
+adapter = "turned_shaft"
+part = "mg-magnifying-lever"
+
+[parameters]
+quantity = 1
+stock_dia_in = 0.25
+# The SR.125 tip is cut by the R.125 form tool (form-tool-r125): a full
+# hemisphere on the 1/4 rod.
+dome_form_radius_in = 0.125
+# Sawn long: the 6.59 length and about .085 to face off at end A, plus the
+# .535 stub allowance (stub_allowance_in: .500 out past end B's plane and
+# .035 faced off its sawn end). End B's face is cut at Z0 in Setup 3, so end
+# B takes no facing allowance of its own.
+blank_length_in = 7.21
+stub_allowance_in = 0.535
+# The stub's faced end stands .500 out from end B's plane (Z0 of Setup 3);
+# its outer .20 is the Ø.18 pilot, under the bracket's 1/4-20 minor (.196
+# min), so MHA-MG-01 passes over it for the fit trial.
+stub_in = 0.5
+pilot_dia_in = 0.18
+pilot_dia_mm = 4.572
+pilot_length_in = 0.2
+thread_start_z_in = 0.4
+# Out of the jaw fronts while the stub's end and end A are faced: under 3 × Ø.
+end_stickout_in = 0.4
+# Setup 3: end A's .60 in the jaws, the rest out to the dead centre.
+centre_stickout_mm = 167.0
+# Op 190: the 1/16 P1 cutoff blade plunges at Z+.100 and Z+.050 first, then
+# at Z0 (end B's face) last, each down to a Ø.06 neck (each under one blade
+# width apart, no web): each plunge cuts on the chuck side of any neck already
+# cut, so its cutting torque never passes through the Ø.06 neck; the stub
+# rides on that neck (and the dead centre's friction) from the first plunge on. The
+# groove is about .16 wide, room for the saw's kerf mid-groove; Setup 4 saws
+# through the neck.
+neck_dia_in = 0.06
+blade_width_in = 0.0625
+# ASME B1.1-2019, 1/4-20 UNC-2A major diameter limits.
+thread_major_min_in = 0.2408
+thread_major_max_in = 0.2489
+# Single-pointing: the compound feeds at 29°, so at full depth (about .035 of
+# compound travel) the point sits about .017 nearer the chuck than the
+# carriage DRO reads (the bit was touched on the stub's end at compound
+# zero). The cross slide is backed out briskly from DRO Z-.673 and is clear
+# by DRO Z-.698 (at 70 rpm and 20 TPI the carriage runs .058 in/s, so about
+# .4 s): on the last, deepest pass the point backs out at about .690 and is
+# clear by about .715, so the run-out ends inside the drawing's .70-.72 and
+# under its .075 maximum.
+thread_retract_start_in = 0.673
+thread_retract_clear_in = 0.698
+# The form tool's feed: straight to Z-.105 (under the R.125 arc's cap height
+# over the smallest rod the stock allows, Ø.248: .109), then in .001 steps
+# until the faced flat at the apex just vanishes; never past the rod's
+# radius (.125, a full hemisphere on a Ø.250 rod).
+form_rough_feed_in = 0.105
 
 [[tools]]
-id = "threading-bits-lms-6685"
-name = "5/16 HSS threading bit"
-ref = "threading-bits-lms-6685"  # drawing cross-check 2026-11-19: 1/4-20 UNC single-pointed (owner 2026-11-19)
+id = "saw"
+name = "14 in metal-cutting saw"
+ref = "saw-evolution-14"
 
 [[tools]]
-id = "form-tool-r125"
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "thread"
+name = "60° HSS threading bit"
+ref = "threading-bits-lms-6685"
+
+[[tools]]
+id = "form"
 name = "R.125 form tool"
-ref = "form-tool-r125"  # drawing cross-check 2026-11-19: SR.13 tip
+ref = "form-tool-r125"
+description = "R.125 concave full-radius form tool: its arc cuts the lever's convex SR.125 tip"
+status = "to_order"
 
 [[tools]]
-id = "calipers-12"
-name = "12 in calipers"
-ref = "calipers-12"  # drawing cross-check 2026-11-19: 6.59 overall at ±.01
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
+
+[[tools]]
+id = "centre"
+name = "No. 1 centre drill"
+ref = "centre-drills-carbide-60"
+
+[[tools]]
+id = "dead-centre"
+name = "MT3 dead centre"
+ref = "dead-centre-mt3"
+description = "MT3 dead centre in the lathe tailstock: carries the stub's centre hole (Setup 3)"
+
+[[tools]]
+id = "part"
+name = "P1 HSS cutoff blade"
+ref = "cutoff-blade-p1"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Saw the blank"
+machine = "Evolution 14 in metal-cutting saw"
+holding = "The rod flat on the saw bed, its long end clamped in the saw's vise, the blank free beyond the blade."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/saw.svg", alt = "The 1/4 in brass rod on the saw: a blank sawn to the 6.59 length plus its stub allowance." }
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Scribe {{process.blank_length_in:.2dot}} in from the bar end and saw on the waste side of the line; let the blank drop clear onto the saw base and pick it up only after the blade has stopped. File the burrs off the sawn ends."
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Stub: face, pilot, centre-drill"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "The rod back through the spindle bore, 3-jaw over a brass shim wrap, one sawn end {{process.end_stickout_in:.2dot}} in out: that end is the stub, stock allowance sawn off in Setup 4."
+datum = "Z0 (carriage DRO) the stub's end, faced in Op 20."
+diagram = { file = "diagrams/stub.svg", alt = "The rod in the 3-jaw, the stub end out: faced, turned to a Ø.18 pilot .20 long and centre-drilled." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{process.pilot_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the stub's end square, about .035 in off, to the centre with no pip; set DRO Z0 on it."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Turn Z0 to Z-{{process.pilot_length_in:.3dot}} to Ø{{process.pilot_dia_in:.3dot}} (±.005, calipers): the pilot the bracket passes over in Op 150."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "The No. 1 centre drill in the tailstock drill chuck: drill the pilot's end until the countersink is about Ø.09 across, half the pilot."
+settings = "lathe-centre-c360"
+cut_diameter_mm = 1.191
+
+[[setups]]
+machine_kind = "lathe"
+title = "End B: thread between the chuck and the dead centre"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "Not turned round: draw the rod out of the spindle bore toward the tailstock until only the other end's .60 in (end A) is in the jaws; 3-jaw over the shim wrap there; the MT3 dead centre in the tailstock, its point oiled, in the stub's centre hole, the quill just snug and locked (the centre seated and locked in the quill's MT3 taper). Re-oil the point every few passes."
+datum = "Z0 (carriage DRO) end B's plane, {{process.stub_in:.3dot}} in from the stub's faced end: the AR tool (Op 60) and the threading bit (Op 90) are touched on the stub's end and set to Z+{{process.stub_in:.3dot}}; the cutoff blade as Op 190 sets it on the pilot's shoulder."
+diagram = { file = "diagrams/centres.svg", alt = "The rod between the 3-jaw and the dead centre in the stub: end B's thread cut toward the chuck from over the pilot." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{process.centre_stickout_mm}}", minimum_diameter_mm = "{{process.pilot_dia_mm}}", support = "tailstock" }
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Mike the rod at three places along where the thread goes: from the pilot's shoulder to {{cad.thread_length_max_in:.2dot}} beyond end B's plane (.50 in from the stub's faced end) toward the chuck. Over {{process.thread_major_max_in:.4dot}} at any: Op 60 turns the thread's length down first."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Touch the AR tool on the stub's faced end, spindle stopped, and set DRO Z+{{process.stub_in:.3dot}}. Only if the rod read over {{process.thread_major_max_in:.4dot}}: turn from the pilot's shoulder (Z+.300) to Z-{{cad.thread_length_max_in:.3dot}} (the thread's length only; the rod beyond stays as bought) to {{process.thread_major_min_in:.4dot}}–{{process.thread_major_max_in:.4dot}} (the class 2A major), aiming .2460."
+settings = "mg-lathe-ar-c360-centre"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Mike the turned diameter along the thread's length (skip if Op 60 turned nothing)."
+inspection = "Thread major Ø{{process.thread_major_min_in:.4dot}}–{{process.thread_major_max_in:.4dot}}."
+gauge_checks = [{ gauge = "micrometers", band_mm = [6.11632, 6.32206] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Over {{process.thread_major_max_in:.4dot}}: take another light skim to Z-{{cad.thread_length_max_in:.3dot}} and mike it again. Under {{process.thread_major_min_in:.4dot}}: scrap the lever and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: the threading bit on centre height and square to the axis; touch its point on the stub's faced end and set DRO Z+{{process.stub_in:.3dot}}; then touch it on the rod's O.D. over a cigarette-paper shim and zero DRO X there: X0 is the cross slide's mark for every pass."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Dry run, spindle stopped, half-nuts open: the bit's point at Z+{{process.thread_start_z_in:.3dot}} over the pilot must clear the dead centre with daylight between them; run the carriage by hand to Z-{{process.thread_retract_clear_in:.3dot}}: the bit stays clear of the jaws."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The bit touches the dead centre: start the passes at Z+.350 instead (still over the pilot, whose shoulder is Z+.300) and run Op 100 again; still touching there: draw the quill back until the centre just holds and run Op 100 again before cutting."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "thread"
+drilling = "none"
+sizing = "other"
+instruction = "Single-point {{cad.thread_designation}}, one pass: from Z+{{process.thread_start_z_in:.3dot}} over the pilot toward the chuck; at DRO Z-{{process.thread_retract_start_in:.3dot}} back the cross slide out briskly, clear by DRO Z-{{process.thread_retract_clear_in:.3dot}} (the 29° compound carries the point about .017 past the DRO at depth), and stop the spindle, half-nuts closed. Bit backed out, reverse at 70 rpm back to Z+{{process.thread_start_z_in:.3dot}}; stop."
+settings = "lathe-thread-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Return the cross slide to its mark, feed the compound, and repeat Op 120 until Ops 140 and 150 pass; the half-nuts stay closed until then."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: seat the 20 TPI leaf of the 40-piece set's screw pitch gauge in the thread along its length: it seats along the whole thread with no light under it."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Only once Op 140 passes: back the cross slide fully off and the tailstock away; steady the rod near end B with one hand and screw the magnifying bracket MHA-MG-01 (make it first) over the pilot to the thread's end with the fingers only, no wrench, and off again: it runs the whole thread without forcing and without shake. Bring the dead centre back, oiled and snug."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The leaf rocks on the crests or drifts out of step along the thread at any pass (the pitch is wrong, not the depth): the gearbox is off 20 TPI; set it right, scrap the lever and make another from Setup 1. A leaf that seats but shows light only because the thread is still shallow: keep cutting as Op 130. The bracket shakes at Op 150 (cut too deep): scrap the lever and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Tight on the bracket (Op 150): spindle stopped, half-nuts closed, turn the chuck forward by hand until the DRO reads about Z-.300 (over full thread), then bring the cross slide to X0: the bit's point sits in the groove with no gap on either flank (the rod has not slipped or bent). Off the groove: scrap the lever and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The point sits (Op 170): take a .001–.002 compound pass as Op 120 and try the bracket again as Op 150. Shake or a torn thread at Op 150: scrap the lever and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "part"
+drilling = "none"
+sizing = "other"
+instruction = "The cutoff blade on centre height, square: touch its chuck-side face on the pilot's shoulder, just gripping a cigarette paper, and set DRO Z+.301 (the paper). Plunge at Z+.100, then at Z+.050, each to a Ø{{process.neck_dia_in:.2dot}} neck; then at DRO Z0 (its chuck-side face on end B's plane) to the same neck, last: a groove about .16 wide with the {{process.blade_width_in:.4dot}} blade, room for the saw. Back out for chips; the dead centre stays in."
+settings = "lathe-part-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups]]
+machine_kind = "other"
+title = "Saw the stub off"
+machine = "Evolution 14 in metal-cutting saw"
+holding = "The rod flat on the saw bed, clamped in the saw's vise over a brass shim wrap on plain rod behind the thread, the stub free beyond the blade."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/saw-stub.svg", alt = "The rod on the saw, the stub beyond the blade: sawn through the Op 190 neck." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Saw through the Ø{{process.neck_dia_in:.2dot}} neck mid-way along the Op 190 groove, so the kerf clears end B's face on one side and the stub on the other; let the stub drop and pick up the lever only after the blade has stopped."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Bench: end B's pip, edge break, thread length"
+machine = "Bench"
+holding = "Bench vise with soft jaws, the lever gripped lightly over the brass shim wrap on plain rod behind the thread, end B out past the jaws and clear of them."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/end-b.svg", alt = "End B in the bench vise: the neck's pip filed flush with the face and the tip's edge broken." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "File the neck's pip flush with end B's face, not past it, keeping the file flat on the face; then break end B's edge 45° × {{cad.chamfer_max_in:.3dot}} max (the title block's edge break), so the thread starts clean."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Calipers from end B to where the thread ends, run-out included; then the run-out alone, from the last full-depth turn to the thread's end."
+inspection = "Thread length {{cad.thread_length_min_in:.2dot}}–{{cad.thread_length_max_in:.2dot}} from end B, run-out included; run-out {{cad.thread_incomplete_max_in:.3dot}} max."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.thread_length_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Over {{cad.thread_length_max_in:.2dot}} with end B flat: file end B back a few strokes at a time, square to the rod (the combination square's blade along the rod), reading Op 220 between; end A's allowance takes it up. Break end B's edge again as Op 210."
+
+[[setups.operations]]
+instruction = "Under {{cad.thread_length_min_in:.2dot}} at Op 220, or the run-out over {{cad.thread_incomplete_max_in:.3dot}}: scrap the lever and make another from Setup 1."
+
+[[setups]]
+machine_kind = "lathe"
+title = "End A: face to length, form the SR.125 tip"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "Turned round: 3-jaw over the shim wrap on plain rod, end A's faced plane {{process.end_stickout_in:.2dot}} in out of the jaws (the sawn end about .085 beyond it); the threaded end back through the jaws into the spindle bore."
+datum = "End A's length is read with the height gauge (Op 260). For the tip (Op 280) the DRO Z is zeroed where the form tool's arc touches end A's corner."
+diagram = { file = "diagrams/end-a.svg", alt = "The rod turned round, end A out: faced to length, then formed to the SR.125 tip." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face end A square in light skims toward {{cad.faced_length_in:.2dot}}, reading the length between them (Op 260); stop inside {{cad.faced_length_min_in:.2dot}}–{{cad.faced_length_max_in:.2dot}}."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Between skims, stop the spindle and take the rod out: stand it on end B on the surface plate against a V-block and read end A with the height gauge; chuck it again over the shim."
+inspection = "Length {{cad.faced_length_min_in:.2dot}}–{{cad.faced_length_max_in:.2dot}}."
+gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.faced_length_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Faced under {{cad.faced_length_min_in:.2dot}}: scrap the lever and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: set the R.125 form tool (a concave R.125 arc) on centre height, the arc facing end A and spanning it. Bring the arc up along Z, adjusting the cross slide, until end A's O.D. corner touches it on both sides at once, no light showing at either side: the arc is then centred on the axis. Zero the DRO Z at that touch."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "form"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle on: feed the carriage along Z straight to Z−{{process.form_rough_feed_in:.3dot}}, then on in .001 steps, stopping the spindle after each to look at the apex under the loupe: stop at the step where the faced flat at the apex just vanishes (a full SR{{cad.dome_datum_radius_ref_in:.3dot}} tip, its apex on the faced plane). Never past Z−{{cad.dome_datum_form_height_in:.3dot}} (the rod's radius)."
+settings = "lathe-form-r125-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Stop the spindle and look at the tip under a loupe: no pip or flat at the apex, no step where the tip meets the rod."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A pip (tool off centre height) or a step at the rod (arc off centre), found in Op 300: correct the tool's height or the cross slide, spindle stopped."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Only if Op 300 found a pip or step: bring the arc up along Z until it just touches the formed tip, zero the DRO Z at that touch, take one light pass to Z−.002 only, and look again as Op 300."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Still a pip or step: read the length as Op 260."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Op 330 read {{cad.faced_length_min_in:.2dot}} plus .002 or more: correct the cause as Op 310, take the Op 320 pass once more and look again as Op 300; still a pip or step after that one repeat, or Op 330 read less: scrap the lever and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Read the length over the tip as Op 260."
+inspection = "Length over the tip {{cad.faced_length_min_in:.2dot}}–{{cad.faced_length_max_in:.2dot}}."
+gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.faced_length_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Under {{cad.faced_length_min_in:.2dot}}: the form ran past its Z: scrap the lever and make another from Setup 1."
+
+[[setups]]
+machine_kind = "other"
+title = "Bench: deburr, try the thread, bag"
+machine = "Bench"
+holding = "Bench vise with soft jaws, the lever gripped lightly over the brass shim wrap on plain rod near end B, the thread clear of the jaws."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished lever: the SR.125 tip, the rod as bought and the 1/4-20 thread at end B." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Take the burr off the thread's start and end B's chamfer; leave the tip and the rod untouched."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "After deburring, screw end B by hand into the magnifying bracket MHA-MG-01's 1/4-20 hole once more, the whole thread length: it runs in without forcing and without shake."
+
+[[setups.operations]]
+instruction = "Tight: a burr is left; file it off the thread's start and try again. Shake or a torn thread: scrap the lever and make another from Setup 1."
+
+[[setups.operations]]
+instruction = "Look along the O.D. under a light, then slide the MHA-MG-02 clamp along the rod: it slides without catching, and the MHA-MG-02 screw seat (main view, the plain rod near the SR.125 tip) has no raised burr, dent or scratch that breaks its Ra 125."
+
+[[setups.operations]]
+instruction = "The clamp catches, or the screw seat is marked: scrap the lever (the drawn surface is not reworked) and make another from Setup 1."
+
+[[setups.operations]]
+instruction = "Wipe the lever clean and dry (FINISH: machined) and bag it with its number."

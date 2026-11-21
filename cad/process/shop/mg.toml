@@ -67,6 +67,32 @@ feed = "9.6 in/min"
 description = "G (.261 in) drill, 115-piece index; its shank the bore's NO-GO"
 diameter_mm = 6.6294
 
+# --- MHA-MG-03 magnifying lever (cad/process/mg_magnifying_lever/plan.toml) ---
+# Its facing takes shop/lathe.toml lathe-ar-c360. Authored, no source on
+# record, both in the lathe's low range (70-380 rpm): the R.125 form tool
+# cuts its whole width at once, so it runs at the 300 rpm the shop's parting
+# and O1 form settings start at; single-pointing runs at the 70 rpm bottom
+# speed so the cross slide can be backed out within .025 of carriage travel
+# at the thread's end (the half-nuts stay closed; the spindle is reversed).
+# Turning the thread's major between the 3-jaw and the dead centre (the
+# 6.6 in rod on a plain centre): authored, at the low range's 300 rpm so the
+# oiled dead centre does not gall and the slender rod does not whip.
+[settings.mg-lathe-ar-c360-centre]
+tool = "lathe-ar"
+material = "lathe-c360"
+rpm = 300
+feed_mm_rev = 0.0508
+[settings.lathe-form-r125-c360]
+tool = "form-tool-r125"
+material = "lathe-c360"
+rpm = 300
+feed = "carriage handwheel along Z, a slow steady feed, dry"
+[settings.lathe-thread-c360]
+tool = "threading-bits-lms-6685"
+material = "lathe-c360"
+rpm = 70
+feed = "compound at 29°, the bit on centre height and square to the axis; half-nuts on the 20 TPI gearbox setting; compound .003-.005 a pass, less near depth, dry"
+
 # --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
 # The tools the placeholder plans name (cad/process/<stem>/plan.toml with
 # revision = "placeholder", not in _process_plans.TRAVELER_STEMS), from the
@@ -105,8 +131,6 @@ diameter_mm = 12.6746
 # drawing cross-check of the placeholder plans (2026-11-19) and the owner's
 # rulings of that day. The comment cites the drawing callout or the inventory
 # record that holds the tool's ownership.
-[tools.calipers-12]  # MHA-MG-03 6.59 overall at ±.01
-description = "Calipers, 12 in (8 in or longer reads the 6.59 overall)"
 [tools.form-tool-r024]  # MHA-MG-05 R.024 rim wire groove
 description = "HSS lathe grooving bit ground to a full R.024 (.048 wide) nose"
 [tools.form-tool-r047]  # MHA-MG-06 R .047/.020 FULL R groove

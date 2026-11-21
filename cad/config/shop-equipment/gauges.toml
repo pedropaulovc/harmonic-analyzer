@@ -347,8 +347,3 @@ note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-10 .002 TIR TO
 kind = "sine_bar"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-SM-03 122.4° ±.5° knife-edge stubs."
-
-[gauges.calipers-12]
-kind = "caliper"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-MG-03 6.59 overall at ±.01."

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300">
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="24">Turned round, end A out (not to scale): faced to length, then the SR.125 tip formed</text>
+  <rect class="fixture-vise" x="200" y="60" width="90" height="180"/>
+  <rect class="clamp" x="290" y="92" width="80" height="45"/>
+  <rect class="clamp" x="290" y="163" width="80" height="45"/>
+  <rect class="part-threads" x="20" y="137" width="120" height="26"/>
+  <rect class="part-removed" x="597" y="137" width="64" height="26"/>
+  <rect class="part-kept" x="140" y="137" width="457" height="26"/>
+  <path class="part-kept" d="M597 137 A13 13 0 0 1 597 163 Z"/>
+  <line class="centre-line" x1="10" y1="150" x2="740" y2="150"/>
+  <line class="datum" x1="610" y1="100" x2="610" y2="200"/>
+  <text class="datum-label" x="540" y="92">end A's faced plane</text>
+  <line class="dims" x1="370" y1="236" x2="610" y2="236"/>
+  <line class="dims" x1="370" y1="228" x2="370" y2="244"/>
+  <line class="dims" x1="610" y1="228" x2="610" y2="244"/>
+  <text class="label" x="400" y="262">.40 out of the jaw fronts</text>
+  <text class="label" x="520" y="290">sawn end, about .085 faced off</text>
+  <line class="dims" x1="640" y1="278" x2="645" y2="165"/>
+  <path class="cutter" d="M680 118 L720 118 L720 182 L680 182 L680 163 A13 13 0 0 0 680 137 Z"/>
+  <text class="label" x="640" y="110">R.125 form tool</text>
+  <text class="label" x="20" y="214">end B's thread, back</text>
+  <text class="label" x="20" y="232">in the spindle bore</text>
+  <line class="dims" x1="70" y1="200" x2="70" y2="165"/>
+  <text class="label" x="160" y="290">3-jaw over a shim wrap on plain rod</text>
+  <line class="dims" x1="240" y1="278" x2="320" y2="208"/>
+</svg>
