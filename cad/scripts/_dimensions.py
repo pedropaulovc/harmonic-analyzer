@@ -5,10 +5,12 @@ Separate module so edits affect only recipes that use this scope.
 
 from __future__ import annotations
 
+import math
+import re
 from typing import Any
 
 import _telemetry
-from _com import _bind, _com_invoke
+from _com import _bind, _com_invoke, _read_member
 from _feature_tree import _feature_by_name
 
 
@@ -111,6 +113,38 @@ def _rename_dimensions(
     return out
 
 
+# A literal with a unit, as builders write them (``f"{value}mm"``).
+_UNIT_LITERAL = re.compile(
+    r"\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s*(mm|in|deg)\s*"
+)
+# How far SolidWorks' evaluation may sit from a literal, in the document unit
+# it answers in: eight decimal places round by at most 5e-9 (issue #889).
+_LITERAL_READBACK_TOL = 1e-8
+# swUserPreferenceIntegerValue_e.swUnitsLinear / swUnitsAngular, and the
+# millimetres (swLengthUnit_e) or degrees (swAngleUnit_e) in one document unit.
+_UNITS_LINEAR = 47
+_UNITS_ANGULAR = 51
+_MM_PER_LENGTH_UNIT = {0: 1.0, 1: 10.0, 2: 1000.0, 3: 25.4}  # mm, cm, m, in
+_DEG_PER_ANGLE_UNIT = {0: 1.0, 3: 180.0 / math.pi}  # degrees, radians
+
+
+def _literal_in_document_units(
+    adapter: Any, number: float, unit: str
+) -> tuple[float, str]:
+    """``number unit`` in the active document's unit for that quantity, which
+    is the unit ``IEquationMgr::Value`` answers in, and that unit's name."""
+    extension = _read_member(adapter.currentModel, "Extension")
+    if unit == "deg":
+        kind, preference, table = "angle", _UNITS_ANGULAR, _DEG_PER_ANGLE_UNIT
+    else:
+        kind, preference, table = "length", _UNITS_LINEAR, _MM_PER_LENGTH_UNIT
+        number *= 25.4 if unit == "in" else 1.0
+    code = int(extension.GetUserPreferenceInteger(preference, 0))
+    if code not in table:
+        raise RuntimeError(f"document {kind} unit {code} has no readback scale")
+    return number / table[code], f"{kind} unit {code}"
+
+
 @_telemetry.traced("param.global", label_param="name")
 def set_global(adapter: Any, name: str, expr: str | float) -> float:
     """Add or update an equation-manager global variable; returns its value.
@@ -118,7 +152,14 @@ def set_global(adapter: Any, name: str, expr: str | float) -> float:
     Centralises the pen-driver pattern. ``expr`` is the equation-manager
     expression (a literal like ``197`` or a formula like ``"ColumnX" +
     "RailWidth" / 2``); the dialect takes degrees for trig and ``sqr`` is the
-    square root (see SetGlobalVariableParameters)."""
+    square root (see SetGlobalVariableParameters).
+
+    A literal with a unit (``12.5182deg``, ``14.6mm``, ``0.25in``) is read
+    back against its intended value: the equation manager rounds a global to
+    the document's decimal places for its unit and answers the rounded value
+    as if exact (``ConeIncline = 12.5182deg`` evaluated 12.52 at two angular
+    places, issue #889). More than ``_LITERAL_READBACK_TOL`` off, in the
+    document unit the value comes back in, raises. Formulas are not gated."""
     from solidworks_mcp.adapters.base import SetGlobalVariableParameters
 
     res = adapter.set_global_variable(
@@ -128,7 +169,19 @@ def set_global(adapter: Any, name: str, expr: str | float) -> float:
         raise RuntimeError(f"set_global {name}={expr!r}: {res.error}")
     value = res.data.get("value") if res.data else None
     _telemetry.success(f"global {name} = {expr}  -> {value}")
-    return float(value) if value is not None else float("nan")
+    evaluated = float(value) if value is not None else float("nan")
+    literal = _UNIT_LITERAL.fullmatch(str(expr))
+    if literal is not None:
+        intended, unit = _literal_in_document_units(
+            adapter, float(literal.group(1)), literal.group(2)
+        )
+        if not abs(evaluated - intended) <= _LITERAL_READBACK_TOL:
+            raise RuntimeError(
+                f"set_global {name}={expr!r}: evaluated {evaluated!r}, intended "
+                f"{intended!r} in document {unit} (rounded to the document's "
+                "decimal places?)"
+            )
+    return evaluated
 
 
 @_telemetry.traced("param.dimension", label_param="dim_name")

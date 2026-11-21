@@ -16,6 +16,7 @@ import _telemetry
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _check import check
 from _custom_properties import apply_custom_properties
+from _document_units import keep_equation_places_exact
 from _com import _early_bound
 from _part_checks import report_mass_properties
 from _part_save import save_part_and_images
@@ -52,6 +53,7 @@ def build_spring(
     are applied before the single save/export operation.
     """
     check("create_part", adapter.create_part())
+    keep_equation_places_exact(adapter, label=part_name)
     try:
         build_9432K31(adapter, None, length_mm=length_mm)
     finally:
