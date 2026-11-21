@@ -740,7 +740,11 @@ def test_raw_step_face_sets_and_values_are_bound_into_the_manifest(tmp_path: Pat
     path = bind_manifest(stem.replace("_", "-"), step, selectors, revision="v40")
     assert path == step.with_name("features.toml")
     manifest = _load(path)
-    assert set(manifest["features"]) == set(exporter.feature_selectors(stem))
+    assert set(manifest["features"]) == {
+        name
+        for configuration in (None, *exporter.member_step_paths(stem))
+        for name in exporter.feature_selectors(stem, configuration)
+    }
     for name, feature in manifest["features"].items():
         labels = {face.rsplit("/", 1)[1] for face in feature["faces"]}
         assert len(labels) == 1, name

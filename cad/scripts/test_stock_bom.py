@@ -293,7 +293,6 @@ def test_a_placeholder_plans_tools_appear_unenrolled(tmp_path, monkeypatch) -> N
 PLANLESS_MADE_PARTS = {
     "dt-cone-gear-tl-arbor-key": "cut to length from key stock; no source names a tool",
     "dt-cone-gear-tl-phasing-comb": "U outline cut from .020 sheet; no source names a tool",
-    "dt-crank-pinion-pin": "cut from 1/8 drill rod, ends faced; no source names a tool",
     "dt-pinion-cam-pin": "cut from drill rod, crown turned; no source names a tool",
     "dt-pinion-lever-pin": "cut from drill rod, trimmed and peened at assembly; no source names a tool",
     "pd-platen-paper": "consumable recording paper; not manufactured (no drawing)",
