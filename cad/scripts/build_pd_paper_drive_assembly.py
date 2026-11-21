@@ -479,7 +479,7 @@ LATCH_PIN_PRESSED_STATION = ARM.TIP_STATION - LATCH_PIN.PRESS_DEPTH
 LATCH_PIN_POS = (
     *_on_arm(LATCH_PIN_PRESSED_STATION),
     ARM.PIN_MACHINE_Z,
-)  # (45.543, 237.121, -120.431)
+)  # (43.478, 238.439, -119.651)
 
 
 def _latch_pin_placed_proud() -> float:
@@ -587,7 +587,7 @@ KNOB_COLLAR_SEAT_Z = seat_geometry.SEAT_FACE_Z  # -154.3, the wheel's rear
 KNOB_COLLAR_FITTED_LENGTH = KNOB_SHAFT_Z0 - KNOB_COLLAR_SEAT_Z
 KNOB_COLLAR_Z0 = KNOB_SHAFT_Z0 - COLLAR.LENGTH  # the REF nominal's front
 KNOB_COLLAR_REAR_Z = KNOB_COLLAR_Z0 + COLLAR.LENGTH  # on F
-# 0.0039 since the #290 column snap moved F 0.013 forward (0.0169 before).
+# 0.0166 on the 3/8 arm (0.0039 on the 5/16 arm after the #290 column snap).
 KNOB_COLLAR_FRONT_GAP = KNOB_COLLAR_Z0 - KNOB_COLLAR_SEAT_Z
 # The two MHA-PD-VN-54 dowels pressed through the collar's holes (Rx-90: pin +Y ->
 # -Z), rounded ends DRIVE_PIN_PROUD in front of it, in the wheel's pin holes.
@@ -598,9 +598,9 @@ KNOB_DRIVE_PIN_Z0 = KNOB_DRIVE_PIN_TIP_Z + KNOB_PIN.LENGTH  # -151.9206
 # MHA-PD-VN-62 spring pin through cup and journal (identity: along machine X,
 # R9-70 K-1).
 KNOB_RING_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.FACE_WIDTH  # -142.2
-KNOB_CUP_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.CUP_FACE_Z  # -107.7887
-KNOB_SHAFT_REAR_Z = KNOB_SHAFT_Z0 + KNOB_SPEC.REAR_END_Z  # -101.0831
-KNOB_CUP_PIN_Z0 = KNOB_CUP_Z0 + CUP.PIN_HOLE_FROM_FRONT  # -104.7407
+KNOB_CUP_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.CUP_FACE_Z  # -106.2012
+KNOB_SHAFT_REAR_Z = KNOB_SHAFT_Z0 + KNOB_SPEC.REAR_END_Z  # -99.4956
+KNOB_CUP_PIN_Z0 = KNOB_CUP_Z0 + CUP.PIN_HOLE_FROM_FRONT  # -103.1532
 
 # The 150T disc's rear face (the MHA-SH-VN-59 DiscScrew tips sit inside it) to the platen's
 # front face, cluster rearward on the rear bushing: an air stack in the
