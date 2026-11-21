@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="16" y="22">Setup 12 (MS10, MS11): tap both plate holes by hand on the dead centre</text>
+  <rect class="fixture-vise" x="83.3" y="330.0" width="193.3" height="22.0"/>
+  <rect class="clamp" x="107.3" y="150.2" width="30.0" height="179.8"/>
+  <rect class="clamp" x="222.7" y="150.2" width="30.0" height="179.8"/>
+  <text class="label" x="122.3" y="368.0" text-anchor="middle">moving jaw</text>
+  <text class="label" x="237.7" y="368.0" text-anchor="middle">fixed jaw</text>
+  <rect class="fixture-support" x="137.3" y="177.6" width="12.7" height="152.4"/>
+  <rect class="fixture-support" x="210.0" y="177.6" width="12.7" height="152.4"/>
+  <rect class="part-kept" x="137.3" y="128.8" width="85.3" height="48.8"/>
+  <rect class="part-threads" x="203.1" y="128.8" width="8.7" height="25.4"/>
+  <rect class="holes" x="203.7" y="154.2" width="7.4" height="5.1"/>
+  <rect class="holes" x="148.8" y="128.8" width="7.4" height="30.5"/>
+  <rect class="cutter" x="203.4" y="98.8" width="8.0" height="58.4"/>
+  <rect class="clamp" x="161.4" y="88.8" width="92.0" height="10.0"/>
+  <polygon class="cutter" points="198.4,48.8 216.4,48.8 207.4,86.8"/>
+  <text class="label" x="320.0" y="60.0">dead centre, seated in the wrench</text>
+  <line class="leader" x1="316.0" y1="56.0" x2="211.4" y2="68.8"/>
+  <circle class="leader-dot" cx="211.4" cy="68.8" r="2.5"/>
+  <text class="label" x="320.0" y="90.0">T-handle wrench; 2-56 plug, then bottoming</text>
+  <line class="leader" x1="316.0" y1="86.0" x2="247.4" y2="93.8"/>
+  <circle class="leader-dot" cx="247.4" cy="93.8" r="2.5"/>
+  <text class="label" x="320.0" y="130.0">hole 1, by the locating end</text>
+  <line class="leader" x1="316.0" y1="126.0" x2="211.4" y2="148.8"/>
+  <circle class="leader-dot" cx="211.4" cy="148.8" r="2.5"/>
+  <text class="label" x="320.0" y="165.0">MATING face up</text>
+  <line class="leader" x1="316.0" y1="161.0" x2="180.0" y2="128.8"/>
+  <circle class="leader-dot" cx="180.0" cy="128.8" r="2.5"/>
+  <text class="label" x="320.0" y="270.0">hole 2: still the #49 pilot (tapped next)</text>
+  <line class="leader" x1="316.0" y1="266.0" x2="152.6" y2="158.8"/>
+  <circle class="leader-dot" cx="152.6" cy="158.8" r="2.5"/>
+  <text class="label" x="320.0" y="200.0">LOCATING END (fixed jaw)</text>
+  <line class="leader" x1="316.0" y1="196.0" x2="220.7" y2="158.8"/>
+  <circle class="leader-dot" cx="220.7" cy="158.8" r="2.5"/>
+  <text class="label" x="320.0" y="235.0">stacked parallels (1.5 in)</text>
+  <line class="leader" x1="316.0" y1="231.0" x2="216.7" y2="237.6"/>
+  <circle class="leader-dot" cx="216.7" cy="237.6" r="2.5"/>
+  <text class="label" x="16.0" y="388.0">Section across the jaws, along the block's length. Gripped across the length only:</text>
+  <text class="label" x="16.0" y="406.0">never across the height (the roof would bend).</text>
+</svg>

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="20" y="22">Setup 7: the finished block; positions read over pins in the holes</text>
+  <text class="title" x="60" y="52">Front face (8 px/mm)</text>
+  <text class="title" x="480" y="110">Top face (6 px/mm), front at the bottom</text>
+  <!-- Front view: W at the left, B at the bottom. -->
+  <rect class="part-kept" x="80" y="120" width="319" height="201"/>
+  <circle class="holes" cx="287.3" cy="187.1" r="25.5"/>
+  <circle class="holes" cx="139.3" cy="169.9" r="25.5"/>
+  <line class="centre-line" x1="250" y1="187.1" x2="325" y2="187.1"/>
+  <line class="centre-line" x1="287.3" y1="150" x2="287.3" y2="360"/>
+  <line class="centre-line" x1="40" y1="169.9" x2="177" y2="169.9"/>
+  <line class="centre-line" x1="139.3" y1="85" x2="139.3" y2="207"/>
+  <line class="centre-line" x1="287.3" y1="85" x2="287.3" y2="150"/>
+  <line class="centre-line" x1="40" y1="187.1" x2="250" y2="187.1"/>
+  <!-- Pivot bore from W and from B; lift bore spacing and rise. -->
+  <line class="dims" x1="80" y1="345" x2="287.3" y2="345"/>
+  <line class="dims" x1="80" y1="321" x2="80" y2="352"/>
+  <text class="label-halo" x="183" y="340" text-anchor="middle">pivot bore from W</text>
+  <line class="dims" x1="425" y1="187.1" x2="425" y2="321"/>
+  <line class="dims" x1="399" y1="321" x2="432" y2="321"/>
+  <line class="dims" x1="325" y1="187.1" x2="432" y2="187.1"/>
+  <text class="label-halo" x="430" y="262">from B</text>
+  <line class="dims" x1="139.3" y1="92" x2="287.3" y2="92"/>
+  <text class="label-halo" x="213" y="86" text-anchor="middle">spacing</text>
+  <line class="dims" x1="50" y1="169.9" x2="50" y2="187.1"/>
+  <text class="label-halo" x="46" y="216" text-anchor="end">rise</text>
+  <line class="leader" x1="40" y1="205" x2="50" y2="180"/>
+  <text class="label-halo" x="88" y="140">W</text>
+  <text class="label-halo" x="388" y="140" text-anchor="end">E</text>
+  <text class="label-halo" x="240" y="314" text-anchor="middle">B</text>
+  <text class="label-halo" x="139.3" y="232" text-anchor="middle">lift bore</text>
+  <line class="leader" x1="316" y1="219" x2="305" y2="205"/>
+  <text class="label-halo" x="318" y="230">pivot bore</text>
+  <!-- Top face: both hold-downs from W and from the front face. -->
+  <rect class="part-kept" x="480" y="140" width="239" height="67"/>
+  <circle class="holes" cx="585.2" cy="173.5" r="14.9"/>
+  <circle class="holes" cx="685.7" cy="173.5" r="14.9"/>
+  <line class="centre-line" x1="585.2" y1="150" x2="585.2" y2="247"/>
+  <line class="centre-line" x1="685.7" y1="150" x2="685.7" y2="282"/>
+  <line class="dims" x1="480" y1="243" x2="585.2" y2="243"/>
+  <line class="dims" x1="480" y1="278" x2="685.7" y2="278"/>
+  <line class="dims" x1="480" y1="207" x2="480" y2="285"/>
+  <text class="label-halo" x="532" y="236" text-anchor="middle">west from W</text>
+  <text class="label-halo" x="635" y="271" text-anchor="middle">east from W</text>
+  <line class="dims" x1="740" y1="173.5" x2="740" y2="207"/>
+  <line class="dims" x1="700" y1="173.5" x2="746" y2="173.5"/>
+  <line class="dims" x1="719" y1="207" x2="746" y2="207"/>
+  <line class="leader" x1="738" y1="290" x2="740" y2="210"/>
+  <text class="label-halo" x="752" y="304" text-anchor="end">from front</text>
+  <text class="label-halo" x="486" y="134">W</text>
+  <text class="label-halo" x="600" y="222">front face</text>
+  <text class="label" x="480" y="340">Bores: GO .2510 plug enters, NO-GO .2515</text>
+  <text class="label" x="480" y="356">does not; the GO plug is the pin for the</text>
+  <text class="label" x="480" y="372">bore positions, the #9 drill's shank</text>
+  <text class="label" x="480" y="388">for the hold-downs'.</text>
+</svg>
