@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Bench: the finished pedestal from the front and the side, and where each is measured from. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Inspect: the bore, the crown, the holes and the faces they are measured from</text>
+  <path class="part-kept" d="M239.86 345 L340.14 345 L340.14 323.66 L335.86 157.13 A45.87 45.87 0 0 0 244.14 157.13 L239.86 323.66 Z"/>
+  <circle class="holes" cx="290" cy="158.31" r="20.06"/>
+  <line class="hidden" x1="285.25" y1="112.44" x2="285.25" y2="139.2"/>
+  <line class="hidden" x1="294.75" y1="112.44" x2="294.75" y2="139.2"/>
+  <line class="hidden" x1="280.4" y1="345" x2="280.4" y2="323.66"/>
+  <line class="hidden" x1="299.6" y1="345" x2="299.6" y2="323.66"/>
+  <line class="hidden" x1="239.86" y1="323.66" x2="340.14" y2="323.66"/>
+  <line class="centre-line" x1="290" y1="357.6" x2="290" y2="97.2"/>
+  <text class="label" x="239.86" y="363">W</text>
+  <text class="label" x="340.14" y="363" text-anchor="end">E</text>
+  <line class="leader" x1="271.94" y1="149.7" x2="206" y2="130"/>
+  <circle class="leader-dot" cx="271.94" cy="149.7" r="2"/>
+  <text class="label" x="202" y="134" text-anchor="end">bore Ø{{cad.arbor_bore_dia_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}},</text>
+  <text class="label" x="202" y="148" text-anchor="end">{{cad.arbor_bore_height_in:.2dot}} above the seat</text>
+  <line class="leader" x1="254.3" y1="132.9" x2="206" y2="90"/>
+  <circle class="leader-dot" cx="254.3" cy="132.9" r="2"/>
+  <text class="label" x="202" y="94" text-anchor="end">crown R{{cad.crown_radius_in:.2dot}} about the bore</text>
+  <line class="leader" x1="290" y1="112.44" x2="206" y2="58"/>
+  <circle class="leader-dot" cx="290" cy="112.44" r="2"/>
+  <text class="label" x="202" y="62" text-anchor="end">apex hole 4-40, into the bore</text>
+  <line class="leader" x1="264.8" y1="345" x2="206" y2="330"/>
+  <circle class="leader-dot" cx="264.8" cy="345" r="2"/>
+  <text class="label" x="202" y="334" text-anchor="end">seat (masked)</text>
+  <line class="leader" x1="290" y1="334.5" x2="206" y2="300"/>
+  <circle class="leader-dot" cx="290" cy="334.5" r="2"/>
+  <text class="label" x="202" y="304" text-anchor="end">hold-down hole #15</text>
+  <text class="label" x="290" y="392" text-anchor="middle">Front</text>
+  <polygon class="part-kept" points="520,345 637.35,345 637.35,112.44 594.68,112.44 594.68,323.66 520,323.66"/>
+  <line class="hidden" x1="594.68" y1="178.36" x2="637.35" y2="178.36"/>
+  <line class="hidden" x1="594.68" y1="138.25" x2="637.35" y2="138.25"/>
+  <line class="hidden" x1="547.74" y1="345" x2="547.74" y2="323.66"/>
+  <line class="hidden" x1="566.94" y1="345" x2="566.94" y2="323.66"/>
+  <line class="hidden" x1="611.27" y1="112.44" x2="611.27" y2="139.2"/>
+  <line class="hidden" x1="620.76" y1="112.44" x2="620.76" y2="139.2"/>
+  <line class="leader" x1="637.35" y1="219" x2="657.35" y2="219"/>
+  <circle class="leader-dot" cx="637.35" cy="219" r="2"/>
+  <text class="label" x="661.35" y="223">F (far face)</text>
+  <text class="label" x="520" y="361">N</text>
+  <line class="leader" x1="557.34" y1="334.5" x2="508" y2="294.6"/>
+  <circle class="leader-dot" cx="557.34" cy="334.5" r="2"/>
+  <text class="label" x="504" y="298.6" text-anchor="end">hold-down {{cad.hold_down_hole_station_in:.2dot}} from F</text>
+  <line class="leader" x1="616.01" y1="122.4" x2="580.68" y2="44"/>
+  <circle class="leader-dot" cx="616.01" cy="122.4" r="2"/>
+  <text class="label" x="576.68" y="48" text-anchor="end">apex hole {{cad.apex_tap_station_in:.2dot}} from F</text>
+  <line class="leader" x1="616.35" y1="261" x2="657.35" y2="271"/>
+  <circle class="leader-dot" cx="616.35" cy="261" r="2"/>
+  <text class="label" x="661.35" y="275">strap {{cad.strap_outer_face_depth_in:.2dot}};</text>
+  <text class="label" x="661.35" y="291">depth {{cad.near_end_depth_in:.2dot}}</text>
+  <text class="label" x="578.55" y="392" text-anchor="middle">Side</text>
+</svg>

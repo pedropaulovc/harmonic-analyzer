@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 1: two blanks sawn off the 1 x 1-1/4 in flat bar. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 1: saw {{process.quantity:d}} blanks off the bar</text>
+  <rect class="part-rest" x="40" y="150" width="680" height="95.25"/>
+  <rect class="part-kept" x="40" y="150" width="175.26" height="95.25"/>
+  <text class="label" x="127.63" y="201.62" text-anchor="middle">blank 1</text>
+  <rect class="part-removed" x="215.26" y="150" width="9.52" height="95.25"/>
+  <rect class="part-kept" x="224.78" y="150" width="175.26" height="95.25"/>
+  <text class="label" x="312.41" y="201.62" text-anchor="middle">blank 2</text>
+  <rect class="part-removed" x="400.04" y="150" width="9.52" height="95.25"/>
+  <line class="leader" x1="215.26" y1="247.25" x2="120" y2="300"/>
+  <circle class="leader-dot" cx="215.26" cy="247.25" r="2"/>
+  <text class="label" x="124" y="304">each {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in long</text>
+  <line class="leader" x1="219.26" y1="148" x2="260" y2="110"/>
+  <circle class="leader-dot" cx="219.26" cy="148" r="2"/>
+  <text class="label" x="264" y="114">saw kerf, {{process.kerf_in:.3dot}}</text>
+  <text class="label" x="520" y="140">1 x 1-1/4 in 1018 flat bar</text>
+  <text class="label" x="40" y="360">Mark W (a broad face) and F (a narrow face) on each blank, and its number on W.</text>
+</svg>
