@@ -82,8 +82,8 @@ if WALL_WORST < WALL_TARGET_MM:
 
 # Marked model dimensions and the places the part authors on them
 # (drawing-simplicity-policy.md `How the repository implements the
-# guidelines`): the length carries LENGTH_BAND on its model dimension; the
-# O.D. and the drilled bore take the title block's rows.
+# guidelines`): the length, the O.D. and the
+# drilled bore take the title block's rows.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {"SpacerOd", "SpacerBore"},
     "Spacer": {"SpacerLength"},

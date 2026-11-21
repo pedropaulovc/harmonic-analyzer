@@ -106,11 +106,13 @@ def test_the_stack_settings_are_the_group_stations_with_their_bands() -> None:
 
 def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
     limits = {
-        stack.BACK_END_SUNK_DIMENSION,
         stack.DRUM_RECESS_DIMENSION,
         stack.THREAD_PAST_LOCKNUT_DIMENSION,
     }
-    names = {stack.PRESS_GAUGE_DIMENSION, stack.ENDSHAKE_DIMENSION} | limits
+    names = (
+        {stack.PRESS_GAUGE_DIMENSION, stack.ENDSHAKE_DIMENSION, stack.BACK_END_SUNK_DIMENSION}
+        | limits
+    )
     assert notes.DRAWING_DIMENSIONS == {stack.FEATURE: names}
     assert set(stack.DRAWING_PRECISION[stack.FEATURE]) == names
     assert set(stack.DIMENSION_TOLERANCES) == {
@@ -134,10 +136,13 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
         for limit in pair:
             render_number(limit / 25.4, "in", stack.LIMIT_PRECISION)
     # Each limit pair carries the window its owner spec proves.
-    assert stack.LIMIT_DIMENSIONS[stack.BACK_END_SUNK_DIMENSION] == (
+    assert stack.BACK_END_SUNK_LIMITS == (
         mg_wheel_axle_spec.BACK_END_SUNK_MIN,
         mg_wheel_axle_spec.BACK_END_SUNK_MAX,
     )
+    # The plain end is where the press setting leaves it: a reference, so
+    # DETAIL A sets the axle by the press gauge alone (Codjiflo r1, #3334).
+    assert stack.REFERENCE_DIMENSIONS == {stack.BACK_END_SUNK_DIMENSION}
     assert stack.LIMIT_DIMENSIONS[stack.DRUM_RECESS_DIMENSION] == pytest.approx(
         mg_magnifying_wheel_geom.DRUM_RECESS, abs=1e-9
     )
@@ -221,6 +226,8 @@ def test_the_press_gauge_is_a_setting_accepted_at_the_nuts() -> None:
         "axle-rechecked",
         "stack-part-replaced",
         "trial-refitted",
+        "axle-pressed-out-to-replace",
+        "axle-replaced",
     )
     assert notes.PRESS_DETAIL_TITLE in notes.STEP_TEXT["axle-press-rechecked"]
     assert "TO THAT SETTING" in notes.STEP_TEXT["axle-repressed"]
@@ -269,6 +276,7 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
         "axle-pressed-out",
         "axle-cleaned",
         "axle-bonded",
+        "axle-spacer-refitted",
         "axle-bond-set",
         "axle-bond-cured",
     )
@@ -309,7 +317,7 @@ def test_the_axle_press_goes_to_the_gauge_past_the_spacer() -> None:
     the bar, as DETAIL A dimensions it; the plain end's window below the
     bar's far face (the axle spec's limits) is where that press leaves it,
     and the thread-end check is the only acceptance (#2286 option A)."""
-    low, high = stack.LIMIT_DIMENSIONS[stack.BACK_END_SUNK_DIMENSION]
+    low, high = stack.BACK_END_SUNK_LIMITS
     assert 0.0 < low < stack.BACK_END_D - stack.BAR_FAR_D < high
     pressed = notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
     assert (
@@ -897,9 +905,16 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
         for name, limits in stack.LIMIT_DIMENSIONS.items()
     ]
     assert blanked == [feature]
-    # Every setting is banded or printed as limits (the press gauge took its
-    # band, owner ruling 2026-11-21): none is rewritten as a reference.
-    assert references == {}
+    # The plain end is a bare reference, (value) with no band (Codjiflo r1,
+    # #3334); the banded and limit settings get no affixes.
+    for (_feature, name), (display, dimension, parts) in references.items():
+        if name in stack.REFERENCE_DIMENSIONS:
+            assert dimension.Tolerance.Type == 0
+            assert display.ShowParenthesis is False
+            assert parts == {1: "(", 2: ")"}
+        else:
+            assert parts == {}
+    assert stack.REFERENCE_DIMENSIONS <= {name for _f, name in references}
 
 
 def test_the_package_has_five_landscape_sheets_with_view_d_on_sheet_5() -> None:
@@ -1879,7 +1894,10 @@ def test_mg_settings_only_read_inherited_native_callouts(
         part, text = callouts.get(name, (None, ""))
         text_parts[name] = {part: text.replace("\n", "\r\n")} if part else {}
         band_m = stack.DIMENSION_TOLERANCES.get(name, 0.0) / 1000.0
+        reference = group == "stack" and name in stack.REFERENCE_DIMENSIONS
         limits = stack.LIMIT_DIMENSIONS.get(name) if group == "stack" else None
+        if reference:
+            text_parts[name].update({1: "(", 2: ")"})
         legs = dict(zip(stack.CHAIN_LEG_DIMENSIONS, zip(stack.CHAIN_D, stack.CHAIN_D[1:])))
         nominal_m = (legs[name][1] - legs[name][0]) / 1000.0 if limits else 0.0
         if limits:
@@ -1890,7 +1908,7 @@ def test_mg_settings_only_read_inherited_native_callouts(
             )
         else:
             tolerance = SimpleNamespace(
-                Type=4,
+                Type=0 if reference else 4,
                 GetMaxValue=lambda band=band_m: band,
                 GetMinValue=lambda band=band_m: -band,
             )

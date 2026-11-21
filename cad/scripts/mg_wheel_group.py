@@ -9,8 +9,8 @@ Axial stations ``d`` run from the wheel bar's FRONT face toward the pen
 (machine z = BAR_FRONT_Z - d): bar -9..0, spacer, back washer, wheel hub
 (spokes' mid-plane on the pen-rod line ``_recording_geometry.PEN_Z_MID``),
 endshake, front washer, nut, locknut, then the pin's thread end and domed tip.
-The pin is pressed to a gauge from the bar's front face, its back end about
-flush with the back face. The spacer's length is derived from the pen line
+The pin is pressed to a gauge from the spacer's outer face, its back end
+inside the bar's bore. The spacer's length is derived from the pen line
 (``mg_wheel_axle_spacer_spec``), so the wheel mid-plane is the pen line by
 construction; the closure is asserted below.
 """

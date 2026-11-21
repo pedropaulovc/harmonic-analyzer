@@ -66,13 +66,15 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "axle-pressed-out",
         "axle-cleaned",
         "axle-bonded",
+        "axle-spacer-refitted",
         "axle-bond-set",
         "axle-bond-cured",
     ),
     # The press setting is the axle's one position (owner ruling 2026-11-21):
     # with it and every part in its drawing band the stack lands the thread
     # end inside its acceptance (mg_wheel_group), so a failed trial reads the
-    # setting again, then looks for the part outside its drawing.
+    # setting again, then replaces the stack part outside its limits, and
+    # with none the axle itself, whose thread length is the stack's last term.
     (
         AXLE_TRIAL_KEY,
         "trial-nuts-jammed",
@@ -83,6 +85,8 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "axle-rechecked",
         "stack-part-replaced",
         "trial-refitted",
+        "axle-pressed-out-to-replace",
+        "axle-replaced",
     ),
     ("trial-parts-removed",),
     ("column-clamps-fitted",),

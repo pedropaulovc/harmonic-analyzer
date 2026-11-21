@@ -113,11 +113,15 @@ if abs((_group.ENDSHAKE - _group.ENDSHAKE_MIN) - ENDSHAKE_TOL) > 1e-9:
 # depth rod, each a model length on the same chain (rule 22: a measurable
 # setting prints on a view even though the steps print in ASSEMBLY.md).
 # Each prints as its two limits; the model's own pose sits inside them.
-# The axle's plain end below the bar's far face: the window the axle spec
-# proves from the printed shank, spacer, gauge and bar depth.
+# The axle's plain end below the bar's far face: where the press setting
+# leaves it, a window the axle spec proves from the printed shank, spacer,
+# gauge and bar depth (its low limit keeps the end inside the bore). No step
+# sets or reads it, so it prints as a reference (REFERENCE_DIMENSIONS).
 BAR_FAR_D = -_pin.BAR_DEPTH
 BACK_END_D = _pin.BACK_Y
 BACK_END_SUNK_LIMITS = (_pin.BACK_END_SUNK_MIN, _pin.BACK_END_SUNK_MAX)
+if not BACK_END_SUNK_LIMITS[0] < BACK_END_D - BAR_FAR_D < BACK_END_SUNK_LIMITS[1]:
+    raise AssertionError("the model's plain end is outside its proven window")
 # The pressed drum's outer face below the spigot end (the wheel hub's front
 # face): the window the printed spigot and drum lengths prove. The geom
 # asserts the near limit >= -1e-9 mm; rounding (and + 0.0, for -0.0) drops
@@ -185,7 +189,6 @@ CHAIN_LEG_DIMENSIONS = (
 if len(CHAIN_LEG_DIMENSIONS) != len(CHAIN_D) - 1:
     raise AssertionError("every axle stack leg needs one dimension name")
 LIMIT_DIMENSIONS = {
-    BACK_END_SUNK_DIMENSION: BACK_END_SUNK_LIMITS,
     DRUM_RECESS_DIMENSION: DRUM_RECESS_LIMITS,
     THREAD_PAST_LOCKNUT_DIMENSION: THREAD_PAST_LOCKNUT_LIMITS,
 }
@@ -195,11 +198,13 @@ for _name, (_low, _high) in LIMIT_DIMENSIONS.items():
     if not _low < _length < _high:
         raise AssertionError(f"{_name}: the model's {_length:.4f} mm is outside {_low}-{_high}")
 LIMIT_PRECISION = 3
+# Printed as (value) through the native prefix/suffix channel, no band.
+REFERENCE_DIMENSIONS = frozenset({BACK_END_SUNK_DIMENSION})
 DRAWING_PRECISION = {
     FEATURE: {
         PRESS_GAUGE_DIMENSION: _pin.PRESS_GAUGE_PLACES,
         ENDSHAKE_DIMENSION: 3,
-        **{name: LIMIT_PRECISION for name in LIMIT_DIMENSIONS},
+        **{name: LIMIT_PRECISION for name in (*LIMIT_DIMENSIONS, *REFERENCE_DIMENSIONS)},
     }
 }
 TOLERANCE_PRECISION = 3
@@ -207,10 +212,11 @@ DIMENSION_TOLERANCES = {
     PRESS_GAUGE_DIMENSION: PRESS_GAUGE_TOL,
     ENDSHAKE_DIMENSION: ENDSHAKE_TOL,
 }
-if set(DIMENSION_TOLERANCES) & set(LIMIT_DIMENSIONS) or (
-    set(DIMENSION_TOLERANCES) | set(LIMIT_DIMENSIONS)
-) != set(DRAWING_PRECISION[FEATURE]):
-    raise AssertionError("each stack setting is exactly one of banded or limits")
+_forms = (REFERENCE_DIMENSIONS, set(DIMENSION_TOLERANCES), set(LIMIT_DIMENSIONS))
+if set().union(*_forms) != set(DRAWING_PRECISION[FEATURE]) or sum(map(len, _forms)) != len(
+    DRAWING_PRECISION[FEATURE]
+):
+    raise AssertionError("each stack setting is exactly one of banded, limits or a reference")
 
 # --- The lever group's settings (LEVER_FEATURE, Front plane: sketch x is
 # machine x, sketch y machine y) ---------------------------------------------
@@ -268,9 +274,10 @@ SETTING_CALLOUTS = {
         ENDSHAKE_DIMENSION: (4, "WHEEL FREE, NO RATTLE"),
         # Each limit pair names the two faces it reads between; the press's
         # setting and its one acceptance say which they are (r3 of #2286
-        # read two acceptances). The plain end's window is where a press to
-        # the gauge leaves it, read to record a re-press. The steps name the
-        # caliper depth rod.
+        # read two acceptances). The plain end below the far face prints as
+        # a reference, where the press setting leaves it, so DETAIL A sets
+        # the axle by the press gauge alone. The steps name the caliper
+        # depth rod.
         BACK_END_SUNK_DIMENSION: (4, "PLAIN END BELOW\nFAR FACE"),
         DRUM_RECESS_DIMENSION: (4, "DRUM FACE BELOW\nSPIGOT END"),
         THREAD_PAST_LOCKNUT_DIMENSION: (4, "ACCEPTANCE:\nTHREAD END PAST\nSECOND NUT"),

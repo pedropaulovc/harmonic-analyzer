@@ -232,6 +232,12 @@ _STACK = (
     f"ITEMS {ITEM_NUMBERS[BACK_WASHER]}, "
     f"{ITEM_NUMBERS[WHEEL]} ({_DRUM} AWAY FROM {_BAR}) AND {ITEM_NUMBERS[FRONT_WASHER]}"
 )
+# The parts on the axle whose printed or catalogue thickness is a term of the
+# thread end's stack (mg_wheel_group), for the failed-trial remedy.
+_STACK_PARTS = (
+    f"ITEMS {ITEM_NUMBERS[BACK_WASHER]}, {ITEM_NUMBERS[WHEEL]}, "
+    f"{ITEM_NUMBERS[FRONT_WASHER]} AND {ITEM_NUMBERS[NUT]}"
+)
 
 # Rule 23: a specified anaerobic bond equals a press fit. The package bonds
 # a press that went in slack: the drum on the wheel's spigot (owner ruling
@@ -281,9 +287,11 @@ if not (
 # .88 kip). The worst annulus (the sleeve's bore at the drilled limit, the
 # step's flat inside a full edge break) carries it at about 83 ksi, under the
 # 1.8 x yield static bearing on a finished face takes (AISC 360-16 J7), so at
-# worst the step's rim coins; the step locates nothing (the wheel hub
-# overhangs it, mg_wheel_group.STEP_INSIDE_HUB; the press is accepted at the
-# thread end past the nuts).
+# worst the step's rim coins. The step is the face the press setting reads,
+# over the sleeve that bears on it (owner ruling 2026-11-21), so a coined rim
+# reads the axle that much deeper and leaves the thread end that much farther
+# out; the press is still accepted at the thread end past the nuts, and the
+# step locates no part (the wheel hub overhangs it, STEP_INSIDE_HUB).
 PRESS_FRICTION_OILED = 0.10
 PRESS_HUB_PRESSURE_KSI = 40.0
 AXLE_YIELD_KSI = 55.0  # annealed O1/W1 drill rod
@@ -320,6 +328,16 @@ PRESS_SLEEVE = (
 # leader and in the steps; MHA-MG-05 keys it as TIE 1 on its own sheet.
 WIRE_TIE_HOLE = "WIRE TIE HOLE"
 _TIE_HOLE = f"THE {WIRE_TIE_HOLE}"
+# How the press setting is read (Codjiflo r1 of #3334): the shoulder stands
+# past the spacer face with the thread rising from it, so a depth rod cannot
+# rest on it. The press sleeve sits on the shoulder over the thread and
+# stands past the dome; its top is the face the beam rests on, the rod comes
+# down beside it (the sleeve's .25 OD inside the spacer's) onto the spacer
+# face, and the sleeve's own length comes off the reading.
+_PRESS_READ = (
+    f"(CALIPER DEPTH ROD FROM THE TOP OF THE {_step(_steps.PRESS_SLEEVE_MADE_KEY)} "
+    "SLEEVE ON THE SHOULDER, LESS ITS MEASURED LENGTH)"
+)
 STEP_TEXT = {
     _steps.DRUM_PRESSED_KEY: (
         f"PRESS {_DRUM} ONTO THE SPIGOT OF {_WHEEL} UNTIL IT IS HARD AGAINST THE "
@@ -356,22 +374,27 @@ STEP_TEXT = {
         f"PRESS {_AXLE} INTO {_BAR}, THREADED END OUT, ON ITS SHOULDER ONLY "
         f"THROUGH THE {_step(_steps.PRESS_SLEEVE_MADE_KEY)} SLEEVE, UNTIL THE "
         f"SHOULDER STANDS PAST THE OUTER FACE OF {_SPACER}, HELD AGAINST "
-        f"{_BAR}, AS {PRESS_DETAIL_TITLE} SETS IT (CALIPER DEPTH ROD)."
+        f"{_BAR}, AS {PRESS_DETAIL_TITLE} SETS IT {_PRESS_READ}."
     ),
     _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
     # Owner ruling 2026-11-11 (#2541, #2523; amends 2026-11-07): a slip axle
-    # is bonded, not remade, under NOTE 1 as the drum is: clean, bond, set
-    # before it grabs to the DETAIL A setting, its one position, then the
-    # hold check again once cured. The slip clause names an unbonded axle, so
-    # the bonded one passes back through the hold check.
+    # is bonded, not remade, under NOTE 1 as the drum is: clean, bond, put
+    # the spacer back on (the setting reads from its face; NOTE 1 has the
+    # squeeze-out wiped first), set before it grabs to the DETAIL A setting,
+    # its one position, then the hold check again once cured. The slip clause
+    # names an unbonded axle, so the bonded one passes back through the hold
+    # check.
     "axle-pressed-out": (
         f"IF IT DOES, OR AN UNBONDED {_AXLE} SLID IN BY HAND, PRESS {_AXLE} OUT."
     ),
     "axle-cleaned": f"IF {_AXLE} CAME OUT, CLEAN IT AND THE BORE IN {_BAR} TO BARE METAL.",
     "axle-bonded": f"IF IT WAS CLEANED, BOND IT IN WITH {BOND_GRADE}, {BOND_NOTE_REF}.",
+    "axle-spacer-refitted": (
+        f"IF IT WAS BONDED, SLIDE {_SPACER} ONTO ITS SHANK AGAINST {_BAR}."
+    ),
     "axle-bond-set": (
         f"IF IT WAS BONDED, SET IT AT ONCE AS {PRESS_DETAIL_TITLE} SETS IT "
-        "(CALIPER DEPTH ROD)."
+        f"{_PRESS_READ}."
     ),
     "axle-bond-cured": (
         f"IF IT WAS BONDED, RETURN TO {_step(_steps.AXLE_HELD_KEY)} ONCE IT HAS "
@@ -390,7 +413,7 @@ STEP_TEXT = {
     ),
     "axle-press-rechecked": (
         f"IF THEY WERE REMOVED, CHECK THE SHOULDER OF {_AXLE} STANDS PAST "
-        f"{_SPACER} AS {PRESS_DETAIL_TITLE} SETS IT (CALIPER DEPTH ROD)."
+        f"{_SPACER} AS {PRESS_DETAIL_TITLE} SETS IT {_PRESS_READ}."
     ),
     "axle-repressed": (
         f"IF IT FAILS, PRESS {_AXLE} TO THAT SETTING: IN ON ITS SHOULDER "
@@ -401,13 +424,23 @@ STEP_TEXT = {
     "axle-rechecked": (
         f"IF {_AXLE} WAS PRESSED AGAIN, RETURN TO {_step(_steps.AXLE_HELD_KEY)}."
     ),
+    # The setting in its band: a stack part outside its own limits, else the
+    # axle (its thread length, the stack's last term), is replaced, so the
+    # loop always ends on a new part.
     "stack-part-replaced": (
-        f"IF {_step('axle-press-rechecked')} PASSED, REPLACE WHICHEVER OF {_STACK} "
-        f"OR THE {_NUT} NUTS MEASURES "
-        "OUTSIDE ITS DRAWING OR CATALOGUE LIMITS."
+        f"IF {_step('axle-press-rechecked')} PASSED, REPLACE WHICHEVER OF "
+        f"{_STACK_PARTS} MEASURES OUTSIDE ITS DRAWING OR CATALOGUE LIMITS."
     ),
     "trial-refitted": (
         f"IF A PART WAS REPLACED, RETURN TO {_step(_steps.AXLE_TRIAL_KEY)}."
+    ),
+    "axle-pressed-out-to-replace": (
+        f"IF {_step('axle-press-rechecked')} PASSED AND NO PART WAS REPLACED, "
+        f"PRESS {_AXLE} OUT."
+    ),
+    "axle-replaced": (
+        f"IF IT WAS PRESSED OUT, RETURN TO {_step(_steps.SPACER_FITTED_KEY)} "
+        f"WITH A NEW {_AXLE}."
     ),
     "trial-parts-removed": f"REMOVE THE TRIAL NUTS AND PARTS FROM {_AXLE}.",
     "column-clamps-fitted": (
