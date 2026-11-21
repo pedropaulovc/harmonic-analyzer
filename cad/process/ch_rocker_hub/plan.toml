@@ -39,6 +39,11 @@ part = "ch-rocker-hub"
 
 [parameters]
 quantity = 20
+# The land's least excess over a hole's reading R: the drawing's least
+# interference (.0004) plus the plug gauges' .0001 step, since the hole may
+# lie up to one step over R (test_ch_rocker_hub_drawing binds it to
+# ch_rocker_hub_fit.PRESS_INTERFERENCE).
+land_over_reading_min_in = 0.0005
 stock_dia_in = 0.5
 bar_length_in = 24.0
 chuck_grip_in = 1.0
@@ -105,9 +110,11 @@ turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Before the first pull, read the holes the land is turned to (drawing: TURN TO MEASURED STRAP HOLE). Try the six plug gauges .4000–.4005 in every MHA-CH-13 strap's hub hole, smallest first, and write beside each strap the largest that enters: its reading R. The lot's land is Ø(largest R + .0005) to Ø(smallest R + {{cad.outer_interference_max_in:.4dot}}): the hole may be up to .0001 over its R, so every hole then takes the drawing's {{cad.outer_interference_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}} diametral interference. Write the land window on this sheet."
+instruction = "Before the first pull, read the holes the land is turned to (drawing: TURN TO MEASURED STRAP HOLE). Try the six plug gauges .4000–.4005 in every MHA-CH-13 strap's hub hole, smallest first, and write beside each strap the largest that enters: its reading R. The lot's land is Ø(largest R + {{process.land_over_reading_min_in:.4dot}}) to Ø(smallest R + {{cad.outer_interference_max_in:.4dot}}): the hole may be up to .0001 over its R, so every hole then takes the drawing's {{cad.outer_interference_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}} diametral interference. Write the land window on this sheet."
 inspection = "Every strap hole .4000–.4005: .4000 enters, .4005 does not; each R written; land window written."
-gauge_checks = [{ gauge = "plug-gauges-4000-4005", band_mm = [10.16, 10.1727] }, { gauge = "plug-gauges-4001-4004", band_mm = [10.16, 10.1727] }]
+# The pair gauges the hole's band; the four steps read it inside the pair,
+# .4001-.4004.
+gauge_checks = [{ gauge = "plug-gauges-4000-4005", band_mm = [10.16, 10.1727] }, { gauge = "plug-gauges-4001-4004", band_mm = [10.16254, 10.17016] }]
 
 [[setups.operations]]
 cut_kind = "other"
@@ -148,7 +155,7 @@ sizing = "other"
 instruction = "Finish the land over the same length to the lot's land window (Op 10) in light passes, miking each hub's length of land between passes; over the window, take another pass."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Land inside the Op 10 window on both hubs, micrometer: the measured land less each hole's R lies within .0005–{{cad.outer_interference_max_in:.4dot}}."
+inspection = "Land inside the Op 10 window on both hubs, micrometer: the measured land less each hole's R lies within {{process.land_over_reading_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}}."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -227,7 +234,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Each hub: length across the faces at least {{cad.length_min_in:.2dot}}, calipers; land inside the Op 10 window again after deburring, micrometer."
-inspection = "Length {{cad.length_min_in:.2dot}} min; land inside the Op 10 window (largest R + .0005 to smallest R + {{cad.outer_interference_max_in:.4dot}})."
+inspection = "Length {{cad.length_min_in:.2dot}} min; land inside the Op 10 window (largest R + {{process.land_over_reading_min_in:.4dot}} to smallest R + {{cad.outer_interference_max_in:.4dot}})."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{cad.length_min_mm}}", "{{cad.part_off_mm}}"] }]
 feed = "hand"
 

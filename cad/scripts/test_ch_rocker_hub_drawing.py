@@ -151,3 +151,17 @@ def test_land_callout_stands_above_the_hub_clear_of_the_isometric() -> None:
     assert drawing.ISO_CENTER[1] + iso_half < y - rows * line - 0.005
     assert drawing.ISO_CENTER[1] - iso_half > 0.065  # over the title block
     assert drawing.ISO_CENTER[0] - iso_half > x + 0.005
+
+
+def test_the_traveler_land_window_reads_the_drawing_interference() -> None:
+    import tomllib
+
+    from _paths import CAD_ROOT
+
+    plan = tomllib.loads(
+        (CAD_ROOT / "process/ch_rocker_hub/plan.toml").read_text("utf-8")
+    )
+    step_in = 0.0001  # the .4000-.4005 plug gauges' step: a hole lies in R..R+.0001
+    assert plan["parameters"]["land_over_reading_min_in"] == pytest.approx(
+        fit.PRESS_INTERFERENCE[0] / 25.4 + step_in
+    )

@@ -35,6 +35,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _printed_limits import drilled_limits
 import _telemetry
 from _check import check
+from _com import _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -59,6 +60,9 @@ from ch_rocker_hub_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     LAND_CALLOUT,
+    REFERENCE_DIMENSIONS,
+    REFERENCE_PREFIX,
+    REFERENCE_SUFFIX,
     SUPPLY_BORE_CALLOUT,
     SUPPLY_LENGTH_CALLOUT,
 )
@@ -246,6 +250,32 @@ requirement(
 )
 
 
+def _assert_reference_brackets(adapter: Any, annotations: list[Any]) -> None:
+    """The part brackets the land Ø as a reference (build_ch_rocker_hub); the
+    import and the move must carry the brackets unchanged, or the sheet
+    would print a bare Ø.400 under the title block's .XXX row
+    (draw_ch_rocker_strap_tl_hub_plug._assert_part_text)."""
+    names = set().union(*REFERENCE_DIMENSIONS.values())
+    expected = {
+        (slot, name): text
+        for name in names
+        for slot, text in ((1, REFERENCE_PREFIX), (2, REFERENCE_SUFFIX))
+    }
+    found: dict[tuple[int, str], str] = {}
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in names:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        for slot in (1, 2):  # swDimensionTextPrefix, swDimensionTextSuffix
+            found[(slot, name)] = str(display.GetText(slot) or "")
+    if found != expected:
+        raise RuntimeError(
+            f"hub land reference brackets did not import: {found!r} != {expected!r}"
+        )
+
+
 def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -327,6 +357,7 @@ def build(adapter: Any) -> dict[str, str]:
     # Decimal places (and so the general-tolerance row each dimension claims)
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _assert_reference_brackets(adapter, annotations)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # The template centre-marks the face view's circles as the view is placed
     # (draw_mg_wheel_drum: a second AutoInsertCenterMarks2 printed a duplicate).

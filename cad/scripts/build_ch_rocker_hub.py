@@ -21,6 +21,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
@@ -96,6 +97,7 @@ def _supply_length_min_limit(adapter) -> None:
         raise RuntimeError(f"{label}: cannot retain the MIN limit")
 
 
+@_telemetry.traced("part.reference_dimensions")
 def _author_reference_dimensions(adapter) -> None:
     """Bracket the land Ø's value only, so its callout (the interference that
     governs) does not read as reference too: a "(" prefix carrying

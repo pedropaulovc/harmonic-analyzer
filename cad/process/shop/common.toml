@@ -107,10 +107,11 @@ resolution_mm = 0.001016
 # ruling 2026-11-21: the land is turned to the measured strap hole): the hub
 # pair above plus four Class X steps .4001-.4004 between them
 # (cad/config/shop-equipment/ gauges.plug-gauges-4001-4004, to buy). The
-# largest pin that enters reads the hole over .4000-.4005 = 10.16-10.1727 mm
-# in .0001 in = 0.00254 mm steps.
+# set's own pins span .4001-.4004 = 10.16254-10.17016 mm in .0001 in =
+# 0.00254 mm steps; with the .4000/.4005 pair the largest pin that enters
+# reads the hole over .4000-.4005.
 [gauges.plug-gauges-4001-4004]
-range_mm = [10.16, 10.1727]
+range_mm = [10.16254, 10.17016]
 resolution_mm = 0.00254
 
 # The dt reamed-bore go/no-go pairs, Vermont Gage Class X as the hub pair
