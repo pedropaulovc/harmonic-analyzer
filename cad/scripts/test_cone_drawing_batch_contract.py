@@ -78,7 +78,10 @@ def test_every_cone_sheet_names_the_actual_finite_cutting_system() -> None:
             f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f}\u00b0"
         ) in data
         assert "CUTTER:" in data
-        assert "PLUNGE" in data
+        # MHA-DT-37's form cutter carries its tooth space (sheet 2), so its
+        # sheet states the finished WHOLE DEPTH only; an infeed row was
+        # method (machinist review of #3183 r4, 2 of 3 runs).
+        assert ("PLUNGE" in data) == (teeth_row != "TEETH:  6\n"), teeth_row
         assert "WHOLE DEPTH" in data
         assert "TOOTH FORM:" in data
         assert "CONTACT RATIO" not in data

@@ -145,8 +145,10 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     # The cutter row names the fly-cutter bit that carries the form (#2358).
     bit = _config.parts("dt-cone-tip-gear-tl-form-cutter")["number"]
     assert f"CUTTER:  {bit};" in gear_data and "NOT STOCK" not in gear_data
-    # The setup names the features the sheet draws, not private labels.
-    assert "TIR MAX TO BOTH \u00d8.0625 ENDS" in gear_data
+    # The runout row names the features the sheet draws, not private labels,
+    # and is a finished-part acceptance with no setup or cutter infeed.
+    assert "TOOTH RUNOUT TO BOTH \u00d8.0625 ENDS:  .002 TIR MAX" in gear_data
+    assert "SETUP" not in gear_data and "PLUNGE" not in gear_data
     assert "SPIGOT" not in gear_data and "PIVOT" not in gear_data
     minimum, maximum = family.over_pins_limits_mm(6)
     assert f"{spec.inch_text(minimum, 4)} TO {spec.inch_text(maximum, 4)}" in gear_data
