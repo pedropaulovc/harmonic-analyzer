@@ -12,6 +12,7 @@ drawing's diameter band.
 
 from __future__ import annotations
 
+import math
 import tomllib
 
 import pytest
@@ -63,15 +64,25 @@ def test_the_domed_parts_are_sawn_blanks_on_turned_shaft(stem: str) -> None:
 
 
 @pytest.mark.parametrize("stem", BLANKS)
-def test_the_blank_leaves_a_skim_on_each_end_of_the_longest_part(stem: str) -> None:
+def test_the_blank_leaves_a_skim_on_each_faced_end(stem: str) -> None:
     parameters = _plan(stem)["parameters"]
     far = export_features.requirement_manifest(stem)["features"]["far_end"]
-    longest = far["length"][1] if "length" in far else far["length_ref"]
-    # A stub sawn off after it carried the threading centre is stock
-    # allowance beyond the part, not facing stock.
-    stub = parameters.get("stub_allowance_in", 0.0) * IN
-    face_per_end = (parameters["blank_length_in"] * IN - stub - longest) / 2
-    assert 0.005 * IN <= face_per_end <= 0.05 * IN
+    if "length" in far:
+        longest = far["length"][1]
+    else:
+        # A domed far end: its root station's maximum plus the cap the form
+        # tool's arc leaves over the rod as supplied.
+        form_r = parameters["dome_form_radius_in"] * IN
+        half_dia = parameters["stock_dia_in"] * IN / 2
+        longest = far["root_station"][1] + form_r - math.sqrt(form_r**2 - half_dia**2)
+    spare = parameters["blank_length_in"] * IN - longest
+    if "stub_allowance_in" in parameters:
+        # The stub that carried the threading centre is stock allowance
+        # beyond end B, whose face is cut at its root: end A alone is faced.
+        end_a = spare - parameters["stub_allowance_in"] * IN
+        assert 0.005 * IN <= end_a <= 0.1 * IN
+    else:
+        assert 0.005 * IN <= spare / 2 <= 0.05 * IN
 
 
 @pytest.mark.parametrize("stem", BLANKS)
