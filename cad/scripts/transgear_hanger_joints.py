@@ -73,10 +73,10 @@ if _PIVOT_TAP_CSK_DEPTH > PIVOT.FULL_THREAD_START:
     )
 if _PIVOT_TAP_CSK_DEPTH > PIVOT.TIP_RECESS[0] + PIVOT.INCOMPLETE_TIP_LEN_MAX:
     raise AssertionError("the bar's front countersink reaches the screw's full thread")
-_BAR_THIN = BAR_DEPTH - BAR.BAR_DEPTH_BAND
-_BAR_THICK = BAR_DEPTH + BAR.BAR_DEPTH_BAND
-# Fitted thread lengths (shoulder end to faced tip) over the bar band and the
-# recess window.
+_BAR_THIN = BAR.BAR_DEPTH_MIN
+_BAR_THICK = BAR.BAR_DEPTH_MAX
+# Fitted thread lengths (shoulder end to faced tip) over the bar's
+# as-supplied limits and the recess window.
 PIVOT_FITTED_LEN_MIN = _BAR_THIN - PIVOT.TIP_RECESS[1]
 PIVOT_FITTED_LEN_MAX = _BAR_THICK - PIVOT.TIP_RECESS[0]
 PIVOT_ENGAGEMENT_NOMINAL = (
@@ -94,15 +94,15 @@ if PIVOT_ENGAGEMENT_WORST_D < ENGAGEMENT_TARGET_D:
 # The gauged full-form tail reaches the neck's full thread at the shortest fit.
 if PIVOT_FITTED_LEN_MIN - PIVOT.FULL_THREAD_START < PIVOT.THREAD_LENGTH_MIN:
     raise AssertionError("the shortest fit leaves the gauged tail inside the neck")
-# Every stock length reaches the thinnest bar's recess window, so facing
-# (never adding) fits it there. At the thickest bar the ASME-short stock
-# (-0.020 in) can stop this far deeper than the deepest recess: the fit-up
-# sets such a screw aside (assembly step "hanger-pivoted").
-if PIVOT.STOCK_THREAD_LEN_MIN < _BAR_THIN - PIVOT.TIP_RECESS[1]:
-    raise AssertionError("the shortest stock cannot reach the thinnest bar's recess")
-PIVOT_STOCK_SHORTFALL_AT_THICKEST_BAR = max(
-    0.0, _BAR_THICK - PIVOT.TIP_RECESS[1] - PIVOT.STOCK_THREAD_LEN_MIN
-)
+# Every stock length reaches the recess window in every bar, so facing
+# (never adding) fits it: the bar is printed at its 3/8 CF as-supplied
+# .374 +.001/-.003 (owner ruling 2026-11-21 (Pedro), #1563, option C), so
+# its thickest .375 less the deepest .020 recess is the ASME-short stock's
+# .355 thread exactly, with no fitter selection.
+if PIVOT.STOCK_THREAD_LEN_MIN + 1e-9 < _BAR_THICK - PIVOT.TIP_RECESS[1]:
+    raise AssertionError(
+        "the shortest stock pivot screw cannot reach the thickest bar's recess window"
+    )
 # The shoulder's end ring bears on the bar outside the tap's countersink.
 if not BAR.PIVOT_TAP_CSK_DIA < PIVOT.SHOULDER_DIA + PIVOT.SHOULDER_DIA_LIMITS[0]:
     raise AssertionError("the bar tap's countersink swallows the shoulder end")

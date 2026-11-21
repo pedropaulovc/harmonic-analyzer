@@ -170,7 +170,7 @@ def test_front_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
     assert guide.GUIDE_SCREW_THREAD_ENGAGEMENT == pytest.approx(reach)
     # The tip against the shallowest seat (the faced lock seats over A2/A4).
     seat_min = min(_GUIDE_DEPTH_MIN, _BAR_DEPTH_MIN + _LOCK_GAP_FIT_MIN)
-    assert seat_min - reach == pytest.approx(4.0024, abs=1e-3)
+    assert seat_min - reach == pytest.approx(4.0532, abs=1e-3)
     assert guide.GUIDE_SCREW_TIP_INSIDE_MIN == pytest.approx(seat_min - reach)
     # The assembly's blind-bottom check reads the same tip clearance.
     assert guide.GUIDE_SCREW_BOTTOM_CLEARANCE == guide.GUIDE_SCREW_TIP_INSIDE_MIN
@@ -186,7 +186,7 @@ _IN = 25.4
 _LOCK_SCREW_LEN_MAX = 0.375 * _IN  # 91792A108; B18.6.3 band +0/-0.03 in
 _LOCK_THICK_MIN = (1.0 / 16.0 - 0.005) * _IN  # 1/16 sheet as supplied, +/-0.005 in
 _GUIDE_DEPTH_MIN = 10.16 - 0.254  # .40 +0/-.01 on the guide sheet
-_BAR_DEPTH_MIN = (0.374 - 0.005) * _IN  # MHA-PD-07 .374 +/-.005
+_BAR_DEPTH_MIN = (0.374 - 0.003) * _IN  # MHA-PD-07 .374 +.001/-.003 (#1563)
 _LOCK_GAP_FIT_MIN = 0.002 * _IN  # the faced lock seats (R9-47)
 
 
@@ -196,7 +196,7 @@ def test_lock_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
     assert spec.depth_mm == 0.0 and not spec.overrides_mm
     seat_min = min(_GUIDE_DEPTH_MIN, _BAR_DEPTH_MIN + _LOCK_GAP_FIT_MIN)
     tip_reach_max = _LOCK_SCREW_LEN_MAX - _LOCK_THICK_MIN
-    assert seat_min - tip_reach_max == pytest.approx(1.3589, abs=1e-3)
+    assert seat_min - tip_reach_max == pytest.approx(1.4097, abs=1e-3)
     assert guide.LOCK_SCREW_TIP_INSIDE_MIN == pytest.approx(seat_min - tip_reach_max)
 
 

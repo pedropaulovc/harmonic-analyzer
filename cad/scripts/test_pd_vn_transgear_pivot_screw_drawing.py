@@ -85,25 +85,16 @@ def test_fitted_length_is_a_reference_set_by_the_bar() -> None:
     assert "TIP FACED AT ASSEMBLY .008-.020 BELOW" in note
     assert "FRONT FACE OF SUPPORT BAR MHA-PD-07." in note
     # Facing only shortens: the nominal fit is inside the catalogue length,
-    # and every stock length reaches the thinnest bar's deepest recess.
+    # and every stock length reaches the deepest recess of every bar, the
+    # thickest at its 3/8 CF as-supplied .375 (#1563 option C).
     assert screw.FITTED_THREAD_LEN < screw.THREAD_LEN
-    thin = BAR_DEPTH - bar.BAR_DEPTH_BAND
-    assert screw.STOCK_THREAD_LEN_MIN >= thin - screw.TIP_RECESS[1]
-    # The corner the fit-up sets aside: ASME-short stock in the thickest bar
-    # stops .004 deeper than the .020 max recess.
-    thick = BAR_DEPTH + bar.BAR_DEPTH_BAND
-    assert joints.PIVOT_STOCK_SHORTFALL_AT_THICKEST_BAR == pytest.approx(
-        thick - screw.TIP_RECESS[1] - screw.STOCK_THREAD_LEN_MIN
-    )
-    assert joints.PIVOT_STOCK_SHORTFALL_AT_THICKEST_BAR == pytest.approx(
-        0.1016, abs=1e-3
-    )
+    assert screw.STOCK_THREAD_LEN_MIN >= bar.BAR_DEPTH_MAX - screw.TIP_RECESS[1] - 1e-9
 
 
 def test_engagement_charges_one_pitch_and_the_neck() -> None:
     """Worst case: the thinnest bar, the deepest recess, one incomplete pitch
     at the faced tip and the neck before the full thread starts."""
-    thin = BAR_DEPTH - bar.BAR_DEPTH_BAND
+    thin = bar.BAR_DEPTH_MIN
     assert joints.PIVOT_FITTED_LEN_MIN == pytest.approx(thin - screw.TIP_RECESS[1])
     worst = joints.PIVOT_FITTED_LEN_MIN - screw.PITCH - screw.FULL_THREAD_START
     assert joints.PIVOT_ENGAGEMENT_WORST == pytest.approx(worst)

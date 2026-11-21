@@ -70,14 +70,26 @@ BAR_HEIGHT = 25.4  # 1.00
 # build_pd_support_bar authors it natively on Height@BarProfile.
 BAR_HEIGHT_BAND = _printed_reach(BAR_HEIGHT, BAR_HEIGHT_PLACES)
 # Deep (Z), BAR_DEPTH (_column_clamp_interface, shared with the wheel
-# bar): the back face on the clamp arcs, the front face carrying the platen's
-# back. 9.5 (prints .374), not the 9.0 stock read, so the MHA-PD-VN-57 pivot
-# screw's faced tip (0.20-0.50 below the front face) keeps rule 18's 1.5D at
-# the thinnest bar (user ruling 2026-10-15; transgear_hanger_joints).
-# The pivot screw's tip recess and the latch-hook-bracket-screw (MHA-SH-VN-52)
-# tips spend the bar's .XXX thickness band.
-# build_pd_support_bar authors it natively on Depth@Bar.
-BAR_DEPTH_BAND = _printed_reach(BAR_DEPTH, BAR_DEPTH_PLACES)
+# bar, whose own band is mg_wheel_bar_geom's): the back face on the clamp
+# arcs, the front face carrying the platen's back. 9.5 (prints .374), not the
+# 9.0 stock read, so the MHA-PD-VN-57 pivot screw's faced tip (0.20-0.50 below
+# the front face) keeps rule 18's 1.5D at the thinnest bar (user ruling
+# 2026-10-15; transgear_hanger_joints).
+# The thickness is the 3/8 CF flat's as supplied, .374 +.001/-.003 (.371-.375,
+# ASTM A108): owner ruling 2026-11-21 (Pedro), #1563, option C: "Print the
+# MHA-PD-07 bar thickness as supplied, .374 +.001/-.003 (model unchanged at
+# .374)". At the title block's +/-.005 the shortest stock pivot screw (.355
+# thread) stopped .004 short of the tip window in a .379 bar; at .375 it
+# reaches it exactly (transgear_hanger_joints). The pivot screw's tip recess and
+# engagement, the latch-hook-bracket-screw (MHA-SH-VN-52) tips, the
+# MHA-PD-12 lock gap and the clamp holes' wander spend these limits.
+# build_pd_support_bar authors them natively on Depth@Bar.
+BAR_DEPTH_LIMITS = (-0.0762, 0.0254)  # -.003/+.001
+BAR_DEPTH_MIN = BAR_DEPTH + BAR_DEPTH_LIMITS[0]  # .371
+BAR_DEPTH_MAX = BAR_DEPTH + BAR_DEPTH_LIMITS[1]  # .375
+# The farthest either limit stands off the model, for stacks that charge
+# the thickness's variation without a sign.
+BAR_DEPTH_REACH = max(abs(limit) for limit in BAR_DEPTH_LIMITS)
 BACK_FACE_Z = BAR_DEPTH / 2.0
 
 # The column clamps (SH column clamps, machine y 303.734) and the hanger row

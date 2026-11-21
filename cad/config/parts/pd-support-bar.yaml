@@ -1,7 +1,7 @@
 pd-support-bar:
   number: MHA-PD-07
   material: Plain Carbon Steel
-  material_specification: Plain Carbon Steel
+  material_specification: ASTM A108 1018 cold-finished flat bar, 3/8 x 1 in; thickness as supplied
   finish: machined
   quantity: 1
   tolerance_class: machined_block
@@ -10,11 +10,11 @@ pd-support-bar:
   machinist_exceptions:
     - id: "RV-02"
       kind: "accept"
-      where: "SECTION A-A thickness .374 (SETS MHA-PD-VN-57 ENGAGEMENT), at the title block's .XXX row with no explicit band"
-      finding: "a reason on an overall size with no band of its own (rule 7 narration), or a three-place size with no stated function (rule 3)"
-      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 4.3. The thickness is spent by a stack at the .XXX row: the MHA-PD-VN-57 pivot screw's thread engagement (under rule 18's 1.5D at .XX). Rule 3 makes such a size a rule 4 matter that names its stack; printed bare, the reviews read it as over-specification (round 4, 3/3), and with its stack named, as narration (round 5 local repeat, 3/3). The height this entry also covered (1.010, SETS MHA-PD-12 RETENTION) is now 1.00 at the .XX row with no reason: owner ruling 2026-11-20 (Pedro), #2421, in his words: \"B\" (1.00 tall at .XX from 3/8 x 1 CF, the top edge skimmed only, the MHA-PD-12 lock unchanged)."
+      where: "SECTION A-A thickness .374 +.001/-.003 (SETS MHA-PD-VN-57 ENGAGEMENT), the 3/8 CF flat's as-supplied band"
+      finding: "a reason on an overall size (rule 7 narration), or a three-place size with no stated function (rule 3)"
+      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 4.3. The thickness is spent by a stack: the MHA-PD-VN-57 pivot screw's thread engagement (under rule 18's 1.5D) and tip window. Rule 3 makes such a size a rule 4 matter that names its stack; printed bare, the reviews read it as over-specification (round 4, 3/3), and with its stack named, as narration (round 5 local repeat, 3/3). Its band is the 3/8 CF flat's as supplied (ASTM A108): owner ruling 2026-11-21 (Pedro), #1563, option C: \"Print the MHA-PD-07 bar thickness as supplied, .374 +.001/-.003 (model unchanged at .374)\"; at .375 the shortest stock pivot screw (.355 thread) reaches the .020 deepest recess with no fitter selection, and the worst engagement is 1.526D. The height this entry also covered (1.010, SETS MHA-PD-12 RETENTION) is now 1.00 at the .XX row with no reason: owner ruling 2026-11-20 (Pedro), #2421, in his words: \"B\" (1.00 tall at .XX from 3/8 x 1 CF, the top edge skimmed only, the MHA-PD-12 lock unchanged)."
     - id: "RV-03"
       kind: "minor"
       where: "sheet note 1, linked from the 2X round clamp counterbores' callout (INTO MHA-SH-02 TAPS, SEE NOTE 1): 1. EACH .196 HOLE TO ITS MHA-SH-02 TAP: OFFSET UP TO .002 OVER #8 SCREW CLEARANCE."
       finding: "the MHA-SH-VN-53 clamp screw line (bar hole to MHA-SH-02 back-arc tap) not held by the hole's radial float at the worst case once drill wander is charged, with no fit-up adjustment (rules 17, 19, 20)"
-      reason: "Owner ruling 2026-11-20 (Pedro), #1988, in his words: \"Follow recommendations unless noted otherwise\"; the recommendation accepted: \"Accept the ~0.046 shortfall as ruled, consistent with RV-02 (0.053) on the clamp front screw line; the worst case needs every wander term to stack against the band limits.\" Charged: the clamp row and stations at the title block's +/-.005 rounded to the printed .001 (clamp_position_zone), the back-arc tap's zone and 0.3 deg wander, and this bar's 0.3 deg through-hole wander over the .379 thickest bar, against the #8 screw in the .196 MIN hole: 0.0506 mm (.0020) over, stated rounded up as .002 (build_pd_support_bar.CLAMP_SCREW_LINE_SHORTFALL, held at or under 0.051). The ruling's ~0.046 left out the .001 rounding reach; the computed value stays inside the 0.053 of sh-column-clamp-front RV-02, the precedent the ruling names. No slot, oversize or match-drill is added"
+      reason: "Owner ruling 2026-11-20 (Pedro), #1988, in his words: \"Follow recommendations unless noted otherwise\"; the recommendation accepted: \"Accept the ~0.046 shortfall as ruled, consistent with RV-02 (0.053) on the clamp front screw line; the worst case needs every wander term to stack against the band limits.\" Charged: the clamp row and stations at the title block's +/-.005 rounded to the printed .001 (clamp_position_zone), the back-arc tap's zone and 0.3 deg wander, and this bar's 0.3 deg through-hole wander over the .375 thickest bar (#1563 option C), against the #8 screw in the .196 MIN hole: 0.0500 mm (.0020) over, stated rounded up as .002 (build_pd_support_bar.CLAMP_SCREW_LINE_SHORTFALL, held at or under 0.051). The ruling's ~0.046 left out the .001 rounding reach; the computed value stays inside the 0.053 of sh-column-clamp-front RV-02, the precedent the ruling names. No slot, oversize or match-drill is added"

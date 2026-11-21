@@ -41,20 +41,27 @@ def test_printed_mating_numbers_resolve_to_the_registered_parts() -> None:
 
 
 def test_printed_bands_match_the_bar_and_drilled_slot_limits() -> None:
+    from _drawing_contract import model_toleranced_dimensions
     from _printed_tolerance import drilled_oversize_mm, printed_deviations
 
-    # Each band is the printed limit's furthest reach from the mm nominal
-    # (both on their grid, #290): the height at .XX (owner ruling 2026-11-20,
-    # #2421), the thickness at .XXX.
+    # The height's band is the printed .XX limit's furthest reach from the mm
+    # nominal (both on their grid, #290; owner ruling 2026-11-20, #2421). The
+    # thickness is the 3/8 CF flat as supplied, .374 +.001/-.003 at .XXX
+    # (owner ruling 2026-11-21, #1563 option C), authored on the model.
     assert (spec.BAR_HEIGHT_PLACES, spec.BAR_DEPTH_PLACES) == (2, 3)
-    for value, places, band in (
-        (spec.BAR_HEIGHT, spec.BAR_HEIGHT_PLACES, spec.BAR_HEIGHT_BAND),
-        (BAR_DEPTH, spec.BAR_DEPTH_PLACES, spec.BAR_DEPTH_BAND),
-    ):
-        lower, upper = printed_deviations(value, places, unit="in")
-        assert band == max(-lower, upper)
+    lower, upper = printed_deviations(
+        spec.BAR_HEIGHT, spec.BAR_HEIGHT_PLACES, unit="in"
+    )
+    assert spec.BAR_HEIGHT_BAND == max(-lower, upper)
     assert spec.BAR_HEIGHT == pytest.approx(1.00 * 25.4)
-    assert (spec.BAR_HEIGHT_BAND, spec.BAR_DEPTH_BAND) == pytest.approx((0.254, 0.127))
+    assert spec.BAR_HEIGHT_BAND == pytest.approx(0.254)
+    assert spec.BAR_DEPTH_LIMITS == pytest.approx((-0.003 * 25.4, 0.001 * 25.4))
+    assert (spec.BAR_DEPTH_MIN, spec.BAR_DEPTH_MAX) == pytest.approx(
+        (0.371 * 25.4, 0.375 * 25.4)
+    )
+    assert spec.BAR_DEPTH_REACH == pytest.approx(0.003 * 25.4)
+    toleranced = model_toleranced_dimensions(part)
+    assert toleranced[("Bar", "Depth")] == "*BAR_DEPTH_LIMITS"
     assert part.CLAMP_SLOT_WIDTH_LIMITS == (0.0, drilled_oversize_mm(unit="in"))
 
 
@@ -352,7 +359,7 @@ def test_clamp_heads_stay_under_the_front_face_at_the_printed_worst_case() -> No
     # even at the depth's printed minimum.
     assert part.CLAMP_HEAD_H < shallowest
     # Rule 17: the floor under the deepest counterbore in the thinnest bar.
-    assert (BAR_DEPTH - spec.BAR_DEPTH_BAND) - deepest >= WALL_TARGET_MM
+    assert spec.BAR_DEPTH_MIN - deepest >= WALL_TARGET_MM
 
 
 def test_clamp_screws_engage_the_back_arc_and_stop_inside_it() -> None:
@@ -367,8 +374,8 @@ def test_clamp_screws_engage_the_back_arc_and_stop_inside_it() -> None:
     from sh_vn_clamp_screw_spec import SHANK_DIA, SHANK_LEN
 
     shallowest, deepest = _printed_cbore_depth_limits()
-    thick = BAR_DEPTH + spec.BAR_DEPTH_BAND
-    thin = BAR_DEPTH - spec.BAR_DEPTH_BAND
+    thick = spec.BAR_DEPTH_MAX
+    thin = spec.BAR_DEPTH_MIN
     least = SHANK_LEN - (thick - shallowest + front_arc + grip_gap)
     most = SHANK_LEN - (thin - deepest + front_arc + grip_gap)
     # Rule 18: 1.5D of thread at the least engagement.
@@ -493,7 +500,7 @@ def test_clamp_screw_line_wander_shortfall_stays_the_owner_ruled_value() -> None
     corner, as on the MHA-MG-08 wheel bar; the shortfall may not grow."""
     from sh_column_clamp_fit import BACK_EAR_WANDER
 
-    wander = (BAR_DEPTH + spec.BAR_DEPTH_BAND) * math.tan(math.radians(0.3))
+    wander = spec.BAR_DEPTH_MAX * math.tan(math.radians(0.3))
     assert part.CLAMP_BAR_HOLE_WANDER == pytest.approx(wander)
     demand = (
         part.clamp_position_zone(part.CLAMP_POSITION_BAND) / 2.0
@@ -505,7 +512,7 @@ def test_clamp_screw_line_wander_shortfall_stays_the_owner_ruled_value() -> None
     assert part.CLAMP_SCREW_LINE_SHORTFALL == pytest.approx(
         demand - part.CLAMP_HOLE_FLOAT / 2.0
     )
-    assert part.CLAMP_SCREW_LINE_SHORTFALL == pytest.approx(0.0506, abs=1e-4)
+    assert part.CLAMP_SCREW_LINE_SHORTFALL == pytest.approx(0.0500, abs=1e-4)
     assert part.CLAMP_SCREW_LINE_SHORTFALL_RULED == 0.051
     # Rule 20: the sheet states it, rounded up, and RV-03 declares that note.
     from sh_column_clamp_fit import note_text, stated_max
@@ -682,7 +689,7 @@ def test_section_a_a_thickness_text_clears_both_extension_lines() -> None:
     top = drawing.SECTION_CENTER[1] + spec.BAR_HEIGHT * scale / 2000.0
     x = left_face - drawing.SECTION_DEPTH_SIDE
     y = top + drawing.SECTION_DEPTH_RISE
-    rows = [".374", *drawing.DIMENSION_CALLOUTS["Depth"].splitlines()]
+    rows = [".374 +.001", *drawing.DIMENSION_CALLOUTS["Depth"].splitlines()]
     assert len(rows) - 1 <= 2
     half_width = max(map(len, rows)) * 0.00278 / 2.0
     half_height = len(rows) * 0.0056 / 2.0 + 0.0003

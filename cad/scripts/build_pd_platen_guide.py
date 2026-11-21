@@ -78,8 +78,7 @@ from pd_platen_guide_spec import (
     TAP_Y_BAND,
     UNIT,
 )
-from _column_clamp_interface import BAR_DEPTH
-from pd_support_bar_spec import BAR_DEPTH_BAND
+from pd_support_bar_spec import BAR_DEPTH_MAX, BAR_DEPTH_MIN
 
 PART_NAME = "pd-platen-guide"
 MATERIAL = "Plain Carbon Steel"
@@ -129,7 +128,7 @@ _GUIDE_DEPTH_DEV = printed_deviations(
 # to the fitted lock gap (R9-47) on the thinnest bar. The front taps at the
 # lock stations exit under the seats.
 LOCK_SEAT_DEPTH_MIN = min(
-    GUIDE_DEPTH + _GUIDE_DEPTH_DEV[0], BAR_DEPTH - BAR_DEPTH_BAND + LOCK_GAP_FIT[0]
+    GUIDE_DEPTH + _GUIDE_DEPTH_DEV[0], BAR_DEPTH_MIN + LOCK_GAP_FIT[0]
 )
 # R9-48: the longest lock screw under the thinnest plate stops this far inside
 # the rail's platen-mating face at the shallowest seat.
@@ -203,7 +202,7 @@ if LOCK_TAP_EXIT_WALL_MIN < RECEIVER_WALL_FLOOR:
     )
 # R9-47: the as-made lock gap (shallowest rail on the deepest bar) never
 # falls under the fitted window's max, so facing the seats always cuts.
-if GUIDE_DEPTH + _GUIDE_DEPTH_DEV[0] - (BAR_DEPTH + BAR_DEPTH_BAND) < LOCK_GAP_FIT[1]:
+if GUIDE_DEPTH + _GUIDE_DEPTH_DEV[0] - BAR_DEPTH_MAX < LOCK_GAP_FIT[1]:
     raise AssertionError(
         "MHA-PD-11 platen guide on the support bar: as-made lock gap under the "
         f"fitted max {LOCK_GAP_FIT[1]:.2f}"

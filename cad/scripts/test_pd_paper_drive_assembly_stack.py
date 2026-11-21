@@ -273,7 +273,7 @@ def _platen_rack_and_chain_air(paper) -> None:
     BUSHING_RACK_AIR_WORST = (
         BUSHING_RACK_AIR_NOMINAL
         - SPACER.LENGTH_BAND
-        - BAR.BAR_DEPTH_BAND
+        - BAR.BAR_DEPTH_REACH
         - paper._RACK_BACK_REARWARD_BAND
         - (
             CLUSTER.SLEEVE_REAR_FORWARD_FROM_ARM[1]

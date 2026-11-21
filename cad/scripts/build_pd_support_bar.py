@@ -94,7 +94,8 @@ from _column_clamp_interface import BAR_DEPTH
 from frame_column_stations import COLUMN_X  # frame column line (frame assembly)
 from pd_support_bar_spec import (
     BACK_FACE_Z,
-    BAR_DEPTH_BAND,
+    BAR_DEPTH_LIMITS,
+    BAR_DEPTH_MAX,
     BAR_DEPTH_PLACES,
     BAR_HEIGHT,
     BAR_HEIGHT_PLACES,
@@ -227,18 +228,16 @@ if clamp_position_zone(CLAMP_POSITION_BAND) + BACK_ARC_TAP_ZONE > CLAMP_HOLE_FLO
     )
 # Drill wander on the screw line (#1988): the MHA-SH-02 back-arc tap's own
 # (sh_column_clamp_fit.BACK_EAR_WANDER) and this bar's through hole's over its
-# thickest bar, at the same 0.3 deg, added to both position zones' worst
-# corner, run past the hole's radial float. Owner ruling 2026-11-20 (Pedro),
-# #1988, "Follow recommendations unless noted otherwise"; the recommendation
-# accepted: "Accept the ~0.046 shortfall as ruled, consistent with RV-02
-# (0.053) on the clamp front screw line; the worst case needs every wander
-# term to stack against the band limits." With the stations' rounding to the
-# printed .001 charged (clamp_position_zone) it is 0.0506; it may not grow.
-# The MHA-MG-08 wheel bar's identical screw line is held in
-# test_mg_wheel_bar_drawing.
-CLAMP_BAR_HOLE_WANDER = (BAR_DEPTH + BAR_DEPTH_BAND) * math.tan(
-    math.radians(EAR_DRILL_WANDER_DEG)
-)
+# thickest bar (.375 as supplied, #1563), at the same 0.3 deg, added to both
+# position zones' worst corner, run past the hole's radial float. Owner ruling
+# 2026-11-20 (Pedro), #1988, "Follow recommendations unless noted otherwise";
+# the recommendation accepted: "Accept the ~0.046 shortfall as ruled,
+# consistent with RV-02 (0.053) on the clamp front screw line; the worst case
+# needs every wander term to stack against the band limits." With the
+# stations' rounding to the printed .001 charged (clamp_position_zone) it is
+# 0.0500; it may not grow. The MHA-MG-08 wheel bar's identical screw line is
+# held in test_mg_wheel_bar_drawing.
+CLAMP_BAR_HOLE_WANDER = BAR_DEPTH_MAX * math.tan(math.radians(EAR_DRILL_WANDER_DEG))
 CLAMP_SCREW_LINE_DEMAND = (
     clamp_position_zone(CLAMP_POSITION_BAND) / 2.0
     + BACK_ARC_TAP_ZONE / 2.0
@@ -1244,20 +1243,29 @@ def build(adapter) -> dict[str, str]:
     volume_check(adapter, "driven bar (equations neutral)", expected, 0.005 * expected)
 
     # The bottom rail's running clearance under the bar and the MHA-PD-12
-    # locks' overlap spend the height's band, and the pivot screw's tip recess
-    # and the bracket-screw tips the thickness's
-    # (pd_support_bar_spec.BAR_HEIGHT_BAND, BAR_DEPTH_BAND). Both are title
-    # block rows, the height's .XX (owner ruling 2026-11-20, #2421) and the
-    # thickness's .XXX, so the model dimensions carry them as their places
-    # alone: an explicit band would restate the title block (drawing-guidelines
-    # rule 2; r4 machinist review); the thickness names the stack it sets on
-    # the sheet (rule 4).
+    # locks' overlap spend the height's band
+    # (pd_support_bar_spec.BAR_HEIGHT_BAND), the title block's .XX row (owner
+    # ruling 2026-11-20, #2421), so the height carries it as its places alone:
+    # an explicit band would restate the title block (drawing-guidelines rule
+    # 2; r4 machinist review). The thickness is the 3/8 CF flat's as supplied,
+    # .374 +.001/-.003 (owner ruling 2026-11-21 (Pedro), #1563, option C;
+    # pd_support_bar_spec.BAR_DEPTH_LIMITS), authored on the model dimension;
+    # the pivot screw's tip window and engagement spend it and the sheet
+    # names that stack (rule 4).
     apply_drawing_precision(
         adapter,
         {
             "BarProfile": {"Height": BAR_HEIGHT_PLACES},
             "Bar": {"Depth": BAR_DEPTH_PLACES},
         },
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "Bar",
+        "Depth",
+        *BAR_DEPTH_LIMITS,
+        places=BAR_DEPTH_PLACES,
+        display_unit=UNIT,
     )
 
     # The rest of the print's places, then its bands and limits: the hanger

@@ -694,7 +694,7 @@ PLATEN_AIR = CLUSTER_AIR.AirStack(
         "sleeve cocking on the pin": CLUSTER_TILT_AT_DISC_RIM,
         "hub rock on the sleeve boss": DISC_HUB_ROCK_AT_RIM,
         "MHA-PD-20 spacer length": SPACER.LENGTH_BAND,
-        "MHA-PD-07 support bar depth": BAR.BAR_DEPTH_BAND,
+        "MHA-PD-07 support bar depth": BAR.BAR_DEPTH_REACH,
         "MHA-PD-02 platen thickness": _PLATEN_THICKNESS_BAND,
         "MHA-PD-06 disc thickness": DISC_SPEC.FACE_WIDTH_MAX - DISC_SPEC.FACE_WIDTH,
         **dict(CLUSTER.SHIMMED_STEP_TERMS),
@@ -1347,7 +1347,7 @@ def _latch_hook_sections() -> list[tuple[str, tuple[float, float, float, float]]
 # MHA-PD-27 follows the strip and the crest set (BOTTOM_GUIDE_Y_BAND), which
 # the sweep carries.
 LOCK_SWEEP_FLOOR = 0.10
-_BAR_DEPTH_DEV = (-BAR.BAR_DEPTH_BAND, BAR.BAR_DEPTH_BAND)
+_BAR_DEPTH_DEV = BAR.BAR_DEPTH_LIMITS
 _GUIDE_DEPTH_DEV = printed_deviations(
     GUIDE_DEPTH, GUIDE_DEPTH_PLACES, deviations(GUIDE_DEPTH_BAND), unit=GUIDE_UNIT
 )
