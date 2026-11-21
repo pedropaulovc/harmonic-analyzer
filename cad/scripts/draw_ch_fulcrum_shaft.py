@@ -34,13 +34,143 @@ from _surface_finish import surface_finish_by_key
 import _telemetry
 from ch_fulcrum_shaft_notes import ACROSS_FLAT_CALLOUT, SHAFT_DIA_CALLOUT
 from ch_fulcrum_shaft_spec import (
+    ACROSS_FLAT,
+    CYLINDER_HALF,
+    DOME_R,
     DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    FLAT_BASELINE,
     FLAT_FROM_END,
+    FLAT_HEIGHT,
     FLAT_LENGTH,
+    FLAT_PITCH,
     SHAFT_DIA,
+    SHAFT_DIA_BAND,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
+    UNIT,
 )
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
+from _printed_limits import limits
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (ch_fulcrum_shaft_spec: axis Z centred on z = 0, the cylinder
+# +-CYLINDER_HALF, a full hemisphere of DOME_R past each end, both flats on
+# +Y). The datum end is the -Z dome, the sheet's left tip that the overall
+# length and both flat stations run from (each the flat's edge nearer it).
+# The dome radius is a printed reference; a full hemisphere's height is its
+# radius. The declarations print nothing.
+_SHAFT = DRAWING_PRECISION["ShaftProfile"]
+_FLAT = DRAWING_PRECISION["FlatProfile"]
+_NOTES = "ch_fulcrum_shaft_notes"
+_TIP_Z = (-SHAFT_LENGTH / 2.0, SHAFT_LENGTH / 2.0)
+part_metadata(
+    model_sources=("SHAFT_DIA", "SHAFT_LENGTH", "CYLINDER_HALF"),
+    precision_sources=("DRAWING_PRECISION",),
+)
+_DOME_FIELDS = {
+    "radius_ref": (DOME_R, ("DOME_R",)),
+    "height_ref": (DOME_R, ("DOME_R",)),
+}
+requirement(
+    "datum_end",
+    kind="dome",
+    faces=(SphereFace(2.0 * DOME_R, (0.0, 0.0, -CYLINDER_HALF)),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": _TIP_Z[0]},
+            ("SHAFT_LENGTH",),
+        ),
+        "outward": ([0.0, 0.0, -1.0], ("SHAFT_LENGTH",)),
+        **_DOME_FIELDS,
+    },
+)
+requirement(
+    "far_end",
+    kind="dome",
+    faces=(SphereFace(2.0 * DOME_R, (0.0, 0.0, CYLINDER_HALF)),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": _TIP_Z[1]},
+            ("SHAFT_LENGTH",),
+        ),
+        "outward": ([0.0, 0.0, 1.0], ("SHAFT_LENGTH",)),
+        "length": (
+            limits(SHAFT_LENGTH, _SHAFT["OverallLength"], unit=UNIT),
+            ("SHAFT_LENGTH", "UNIT"),
+        ),
+        "length_nominal": (SHAFT_LENGTH, ("SHAFT_LENGTH",)),
+        "length_from": ("datum_end", ("SHAFT_LENGTH",)),
+        **_DOME_FIELDS,
+    },
+    precision={"length": _SHAFT["OverallLength"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(SHAFT_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("SHAFT_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("SHAFT_DIA",)),
+        "span": ([-CYLINDER_HALF, CYLINDER_HALF], ("CYLINDER_HALF",)),
+        "dia": (
+            limits(SHAFT_DIA, _SHAFT["ShaftDia"], SHAFT_DIA_BAND, unit=UNIT),
+            ("SHAFT_DIA", "SHAFT_DIA_BAND", "UNIT"),
+        ),
+        "dia_nominal": (SHAFT_DIA, ("SHAFT_DIA",)),
+        "callout": (SHAFT_DIA_CALLOUT, ((_NOTES, "SHAFT_DIA_CALLOUT"),)),
+    },
+    precision={"dia": _SHAFT["ShaftDia"]},
+)
+# (feature, flat centre z, its station from the datum tip, the station's
+# printed dimension and spec name)
+_FLATS = (
+    ("flat_datum", -FLAT_PITCH / 2.0, FLAT_FROM_END, "FlatFromEnd", "FLAT_FROM_END"),
+    ("flat_far", FLAT_PITCH / 2.0, FLAT_BASELINE, "FlatBaseline", "FLAT_BASELINE"),
+)
+for _name, _centre, _station, _station_dim, _station_src in _FLATS:
+    requirement(
+        _name,
+        kind="flat",
+        faces=(PlanarFace((0.0, 1.0, 0.0), FLAT_HEIGHT, contains_z_mm=_centre),),
+        requirements=("across", "station", "length"),
+        fields={
+            "normal": ([0.0, 1.0, 0.0], ("FLAT_HEIGHT",)),
+            "span": (
+                [_centre - FLAT_LENGTH / 2.0, _centre + FLAT_LENGTH / 2.0],
+                ("FLAT_PITCH", "FLAT_LENGTH"),
+            ),
+            "across": (
+                limits(ACROSS_FLAT, _FLAT["AcrossFlat"], unit=UNIT),
+                ("ACROSS_FLAT", "UNIT"),
+            ),
+            "across_nominal": (ACROSS_FLAT, ("ACROSS_FLAT",)),
+            "station": (
+                limits(_station, _FLAT[_station_dim], unit=UNIT),
+                (_station_src, "UNIT"),
+            ),
+            "station_nominal": (_station, (_station_src,)),
+            "station_from": ("datum_end", (_station_src,)),
+            "length": (
+                limits(FLAT_LENGTH, _FLAT["FlatLength"], unit=UNIT),
+                ("FLAT_LENGTH", "UNIT"),
+            ),
+            "length_nominal": (FLAT_LENGTH, ("FLAT_LENGTH",)),
+            "callout": (ACROSS_FLAT_CALLOUT, ((_NOTES, "ACROSS_FLAT_CALLOUT"),)),
+        },
+        precision={
+            "across": _FLAT["AcrossFlat"],
+            "station": _FLAT[_station_dim],
+            "length": _FLAT["FlatLength"],
+        },
+    )
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.

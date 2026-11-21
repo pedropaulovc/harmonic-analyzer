@@ -66,22 +66,168 @@ import _telemetry
 import mg_wheel_axle_callouts as callouts
 from mg_wheel_axle_spec import (
     BACK_Y,
+    DOME_H,
+    DOME_R,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     LIMIT_PAIRS,
     PIN_DIA,
     PIN_DIA_FRACTION_DENOMINATOR,
+    PIN_LEN,
     RELIEF_DIA,
+    RELIEF_DIA_LIMITS,
     RELIEF_ROOT_R,
     RELIEF_WIDTH,
+    RELIEF_WIDTH_MIN,
+    SHANK_LEN,
     SINGLE_LIMITS,
     STEP_Y,
     SURFACE_FINISHES,
     THREAD_CALLOUT,
     THREAD_END_Y,
+    THREAD_LEN,
+    THREAD_LEN_BAND,
     THREAD_MAJOR,
     TIP_Y,
     TOL_TYPE_LIMIT,
+    UNIT,
+)
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
+from _printed_limits import limits
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_mg_wheel_axle: axis +Y, back end y = BACK_Y, the shank to the step
+# at STEP_Y, the relief, the #4-40 blank to THREAD_END_Y and the R.07 dome to
+# TIP_Y). The datum end is the back end, the shank length runs from it to the
+# step face. The shank is the drill rod as bought (its Ø3/16 REF, the
+# supplier's limits: callouts.PIN_LIMITS); the thread blank carries the
+# #4-40 UNC-2A major limits (THREAD_MAJOR_2A_IN) the title block's class
+# implies; the relief's root rounds print R.008 MAX. The declarations print
+# nothing.
+_P = DRAWING_PRECISION["PinProfile"]
+_SELF = "draw_mg_wheel_axle"
+_CALLOUTS = "mg_wheel_axle_callouts"
+# #4-40 UNC-2A major diameter limits, ASME B1.1 (pd_latch_hook_bracket_screw_spec
+# and mg_rod_clamp_joint state the same pair): the die-cut blank's band.
+THREAD_MAJOR_2A_IN = (0.1061, 0.1112)
+part_metadata(
+    model_sources=("PIN_DIA", "SHANK_LEN", "THREAD_LEN", "DOME_R"),
+    precision_sources=("DRAWING_PRECISION",),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), -BACK_Y),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "y", "value": BACK_Y}, ("BACK_Y",)),
+        "outward": ([0.0, -1.0, 0.0], ("BACK_Y",)),
+    },
+)
+requirement(
+    "shoulder",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), STEP_Y),),
+    requirements=("station",),
+    fields={
+        "plane": ({"frame": "model", "axis": "y", "value": STEP_Y}, ("STEP_Y",)),
+        "station": (
+            limits(SHANK_LEN, _P["ShankLength"], unit=UNIT),
+            ("SHANK_LEN", "UNIT"),
+        ),
+        "station_nominal": (SHANK_LEN, ("SHANK_LEN",)),
+        "station_from": ("datum_end", ("SHANK_LEN",)),
+    },
+    precision={"station": _P["ShankLength"]},
+)
+requirement(
+    "far_end",
+    kind="dome",
+    faces=(SphereFace(2.0 * DOME_R, (0.0, TIP_Y - DOME_R, 0.0)),),
+    requirements=("radius",),
+    fields={
+        "plane": ({"frame": "model", "axis": "y", "value": TIP_Y}, ("TIP_Y",)),
+        "outward": ([0.0, 1.0, 0.0], ("TIP_Y",)),
+        "length_ref": (PIN_LEN, ("PIN_LEN",)),
+        "length_from": ("datum_end", ("PIN_LEN",)),
+        "radius": (limits(DOME_R, _P["DomeR"], unit=UNIT), ("DOME_R", "UNIT")),
+        "radius_nominal": (DOME_R, ("DOME_R",)),
+        "height_ref": (DOME_H, ("DOME_H",)),
+    },
+    precision={"radius": _P["DomeR"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(PIN_DIA),),
+    requirements=("stock",),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("PIN_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("PIN_DIA",)),
+        "span": ([BACK_Y, STEP_Y], ("BACK_Y", "STEP_Y")),
+        "dia_ref": (PIN_DIA, ("PIN_DIA",)),
+        # The sheet's "(Ø3/16)" stock reference: the drill rod as bought.
+        "stock": (
+            f"Ø{round(PIN_DIA / 25.4 * PIN_DIA_FRACTION_DENOMINATOR)}"
+            f"/{PIN_DIA_FRACTION_DENOMINATOR} DRILL ROD",
+            ("PIN_DIA", "PIN_DIA_FRACTION_DENOMINATOR"),
+        ),
+        "stock_dia_min": (callouts.PIN_LIMITS[0], ((_CALLOUTS, "PIN_LIMITS"),)),
+        "callout": (callouts.PIN_DIA_CALLOUT, ((_CALLOUTS, "PIN_DIA_CALLOUT"),)),
+    },
+)
+requirement(
+    "step",
+    kind="diameter",
+    faces=(CylinderFace(THREAD_MAJOR),),
+    requirements=("dia", "thread_length"),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("THREAD_MAJOR",)),
+        "at": ([0.0, 0.0, 0.0], ("THREAD_MAJOR",)),
+        "span": ([STEP_Y, THREAD_END_Y], ("STEP_Y", "THREAD_END_Y")),
+        "dia": (
+            [round(value * 25.4, 12) for value in THREAD_MAJOR_2A_IN],
+            ((_SELF, "THREAD_MAJOR_2A_IN"),),
+        ),
+        "dia_nominal": (THREAD_MAJOR_2A_IN[1] * 25.4, ((_SELF, "THREAD_MAJOR_2A_IN"),)),
+        "thread": (THREAD_CALLOUT, ("THREAD_CALLOUT",)),
+        "thread_length": (
+            limits(THREAD_LEN, _P["ThreadLength"], THREAD_LEN_BAND, unit=UNIT),
+            ("THREAD_LEN", "THREAD_LEN_BAND", "UNIT"),
+        ),
+        "thread_length_nominal": (THREAD_LEN, ("THREAD_LEN",)),
+        "thread_end": ("far_end", ("THREAD_LEN",)),
+        "thread_process": ("die", ("THREAD_CALLOUT",)),
+    },
+    precision={"dia": 4, "thread_length": _P["ThreadLength"]},
+)
+requirement(
+    "groove",
+    kind="groove",
+    faces=(CylinderFace(RELIEF_DIA),),
+    requirements=("dia", "width", "corner_radius_max"),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("RELIEF_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("RELIEF_DIA",)),
+        "span": ([STEP_Y, STEP_Y + RELIEF_WIDTH], ("STEP_Y", "RELIEF_WIDTH")),
+        "dia": (
+            [round(value, 12) for value in RELIEF_DIA_LIMITS],
+            ("RELIEF_DIA_LIMITS",),
+        ),
+        "dia_nominal": (RELIEF_DIA, ("RELIEF_DIA",)),
+        "width": (
+            [RELIEF_WIDTH_MIN, RELIEF_WIDTH],
+            ("RELIEF_WIDTH_MIN", "RELIEF_WIDTH"),
+        ),
+        "width_nominal": (RELIEF_WIDTH, ("RELIEF_WIDTH",)),
+        "corner_radius_max": (RELIEF_ROOT_R, ("RELIEF_ROOT_R",)),
+        "callout": (callouts.RELIEF_DIA_CALLOUT, ((_CALLOUTS, "RELIEF_DIA_CALLOUT"),)),
+    },
+    precision={"dia": _P["ReliefDia"], "width": _P["ReliefWidth"]},
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.

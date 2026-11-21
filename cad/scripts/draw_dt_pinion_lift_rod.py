@@ -65,25 +65,35 @@ from _surface_finish import surface_finish_by_key
 import _telemetry
 import dt_pinion_cam_spec
 import dt_pinion_lift_rod_spec
-from dt_pinion_lever_geometry import ROD_PIN_HOLE_FROM_END
+from dt_pinion_lever_geometry import PIN_HOLE_DIA, ROD_PIN_HOLE_FROM_END
 from dt_pinion_lift_rod_spec import (
+    ACROSS_FLAT,
     ACROSS_FLAT_CALLOUT,
     BACK_FLAT_EDGE_FROM_RIM,
     BACK_FLAT_LEN,
+    CAP_R,
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_DIMENSIONS,
+    FLAT_HEIGHT,
     FLAT_NORMAL_LOCAL,
     FLATS_VIEW,
     FRONT_FLAT_EDGE_FROM_RIM,
     FRONT_FLAT_LEN,
     PIN_HOLE_CALLOUT,
     ROD_DIA,
+    ROD_DIA_BAND,
     ROD_DIA_CALLOUT,
     ROD_LEN,
     SURFACE_FINISHES,
+    UNIT,
 )
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
+from _printed_limits import drilled_limits, limits
 
 # The rod spec restates the cam's print grades and screw (the cam spec reads
 # the rod spec, so the rod spec cannot read it back); prove them here, where
@@ -120,6 +130,156 @@ if _CAM_DRIFT:
     raise AssertionError(
         f"dt_pinion_lift_rod_spec's restated MHA-DT-23 values drifted: {_CAM_DRIFT}"
     )
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_dt_pinion_lift_rod: axis Z, the body z 0..ROD_LEN from the flat
+# front end face, crowned SR CAP_R past z = ROD_LEN). The datum end is the
+# front face; the body length reads the .XX row to the crown's rim, the
+# overall is a reference. Both set-screw flats share one plane on
+# FLAT_NORMAL_LOCAL and print their rim-side edges from the crown rim. The pin
+# hole is match-drilled at assembly, stationed from the front face. The
+# declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_pinion_lift_rod"
+_LEVER = "dt_pinion_lever_geometry"
+part_metadata(
+    model_sources=("ROD_DIA", "ROD_LEN", "CAP_R"),
+    precision_sources=("DRAWING_PRECISION_BY_NAME",),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("ROD_LEN",)),
+        "outward": ([0.0, 0.0, -1.0], ("ROD_LEN",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="dome",
+    faces=(SphereFace(2.0 * CAP_R, (0.0, 0.0, ROD_LEN + CAP_SAG - CAP_R)),),
+    requirements=("radius", "body_length"),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": ROD_LEN + CAP_SAG},
+            ("ROD_LEN", "CAP_SAG"),
+        ),
+        "outward": ([0.0, 0.0, 1.0], ("ROD_LEN",)),
+        "length_ref": (ROD_LEN + CAP_SAG, ("ROD_LEN", "CAP_SAG")),
+        "length_from": ("datum_end", ("ROD_LEN",)),
+        "body_length": (
+            limits(ROD_LEN, _P["RodBody"], unit=UNIT),
+            ("ROD_LEN", "UNIT"),
+        ),
+        "body_length_nominal": (ROD_LEN, ("ROD_LEN",)),
+        "radius": (limits(CAP_R, _P["CapR"], unit=UNIT), ("CAP_R", "UNIT")),
+        "radius_nominal": (CAP_R, ("CAP_R",)),
+        "height_ref": (CAP_SAG, ("CAP_SAG",)),
+    },
+    precision={"radius": _P["CapR"], "body_length": _P["RodBody"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(ROD_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("ROD_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("ROD_DIA",)),
+        "span": ([0.0, ROD_LEN], ("ROD_LEN",)),
+        "dia": (
+            limits(ROD_DIA, _P["RodDia"], ROD_DIA_BAND, unit=UNIT),
+            ("ROD_DIA", "ROD_DIA_BAND", "UNIT"),
+        ),
+        "dia_nominal": (ROD_DIA, ("ROD_DIA",)),
+        "callout": (ROD_DIA_CALLOUT, ("ROD_DIA_CALLOUT",)),
+    },
+    precision={"dia": _P["RodDia"]},
+)
+# (feature, rim-side edge, length, their printed dimensions, their spec names)
+_FLATS = (
+    (
+        "flat_back",
+        (BACK_FLAT_EDGE_FROM_RIM, BACK_FLAT_LEN),
+        ("BackFlatFromRim", "BackFlatLen"),
+        ("BACK_FLAT_EDGE_FROM_RIM", "BACK_FLAT_LEN"),
+    ),
+    (
+        "flat_front",
+        (FRONT_FLAT_EDGE_FROM_RIM, FRONT_FLAT_LEN),
+        ("FrontFlatFromRim", "FrontFlatLen"),
+        ("FRONT_FLAT_EDGE_FROM_RIM", "FRONT_FLAT_LEN"),
+    ),
+)
+for _name, (_edge, _length), (_edge_dim, _length_dim), _sources in _FLATS:
+    _edge_src, _length_src = _sources
+    _centre = ROD_LEN - _edge - _length / 2
+    requirement(
+        _name,
+        kind="flat",
+        faces=(PlanarFace(FLAT_NORMAL_LOCAL, FLAT_HEIGHT, contains_z_mm=_centre),),
+        requirements=("across", "station", "length"),
+        fields={
+            "normal": (list(FLAT_NORMAL_LOCAL), ("FLAT_NORMAL_LOCAL",)),
+            "span": (
+                [ROD_LEN - _edge - _length, ROD_LEN - _edge],
+                ("ROD_LEN", _edge_src, _length_src),
+            ),
+            "across": (
+                limits(ACROSS_FLAT, _P["AcrossFlat"], unit=UNIT),
+                ("ACROSS_FLAT", "UNIT"),
+            ),
+            "across_nominal": (ACROSS_FLAT, ("ACROSS_FLAT",)),
+            "station": (limits(_edge, _P[_edge_dim], unit=UNIT), (_edge_src, "UNIT")),
+            "station_nominal": (_edge, (_edge_src,)),
+            "station_from": ("far_root", (_edge_src,)),
+            "length": (
+                limits(_length, _P[_length_dim], unit=UNIT),
+                (_length_src, "UNIT"),
+            ),
+            "length_nominal": (_length, (_length_src,)),
+            "callout": (ACROSS_FLAT_CALLOUT, ("ACROSS_FLAT_CALLOUT",)),
+        },
+        precision={
+            "across": _P["AcrossFlat"],
+            "station": _P[_edge_dim],
+            "length": _P[_length_dim],
+        },
+    )
+requirement(
+    "cross_hole",
+    kind="hole",
+    faces=(CylinderFace(PIN_HOLE_DIA),),
+    requirements=("dia", "station", "thru"),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], ((_LEVER, "PIN_HOLE_DIA"),)),
+        "at": (
+            [0.0, 0.0, ROD_PIN_HOLE_FROM_END],
+            ((_LEVER, "ROD_PIN_HOLE_FROM_END"),),
+        ),
+        "dia": (
+            drilled_limits(PIN_HOLE_DIA, _P["PinHoleDia"], unit=UNIT),
+            ((_LEVER, "PIN_HOLE_DIA"), "UNIT"),
+        ),
+        "nominal_dia": (PIN_HOLE_DIA, ((_LEVER, "PIN_HOLE_DIA"),)),
+        "station": (
+            limits(ROD_PIN_HOLE_FROM_END, _P["PinHoleZ"], unit=UNIT),
+            ((_LEVER, "ROD_PIN_HOLE_FROM_END"), "UNIT"),
+        ),
+        "station_nominal": (
+            ROD_PIN_HOLE_FROM_END,
+            ((_LEVER, "ROD_PIN_HOLE_FROM_END"),),
+        ),
+        "station_from": ("datum_end", ((_LEVER, "ROD_PIN_HOLE_FROM_END"),)),
+        "thru": (True, ("PIN_HOLE_CALLOUT",)),
+        "made_at": ("assembly", ("PIN_HOLE_CALLOUT",)),
+        "callout": (PIN_HOLE_CALLOUT, ("PIN_HOLE_CALLOUT",)),
+    },
+    precision={"dia": _P["PinHoleDia"], "station": _P["PinHoleZ"]},
+)
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.

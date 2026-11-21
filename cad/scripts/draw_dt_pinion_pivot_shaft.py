@@ -58,17 +58,25 @@ import _telemetry
 from dt_pinion_pivot_block_spec import BORE_DIA as BLOCK_BORE_DIA
 from dt_pinion_pivot_block_spec import BORE_DIA_BAND as BLOCK_BORE_BAND
 from dt_pinion_pivot_shaft_spec import (
+    CAP_RADIUS,
     CAP_SAG,
     CROWN_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     OVERALL_LEN,
+    PIN_HOLE_BAND,
+    PIN_HOLE_DIA,
     PIN_HOLE_Z,
     SHAFT_DIA as SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LEN,
     SURFACE_FINISHES,
+    UNIT,
 )
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_sphere import SphereFace
+from _printed_limits import limits
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -149,6 +157,104 @@ DIMENSION_CALLOUTS = {
     "ShaftLength": "CYLINDRICAL BODY",
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_dt_pinion_pivot_shaft: axis Z, the cylindrical body z 0..SHAFT_LEN,
+# a CAP_SAG crown past each end). The datum end is the z = 0 crown, its apex
+# plane the end's plane. The body length and the crown height read the .XX
+# row; the overall and the sphere radius are references. The two spring-pin
+# holes are match-drilled at assembly with no printed station (the straps set
+# it). The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_pinion_pivot_shaft"
+_TIP_Z = (-CAP_SAG, SHAFT_LEN + CAP_SAG)
+part_metadata(
+    model_sources=("SHAFT_DIA", "SHAFT_LEN", "CAP_SAG"),
+    precision_sources=("DRAWING_PRECISION_BY_NAME",),
+)
+_CROWN_FIELDS = {
+    "radius_ref": (CAP_RADIUS, ("CAP_RADIUS",)),
+    "height": (limits(CAP_SAG, _P["CapFrontSag"], unit=UNIT), ("CAP_SAG", "UNIT")),
+    "height_nominal": (CAP_SAG, ("CAP_SAG",)),
+    "callout": (CROWN_CALLOUT, ("CROWN_CALLOUT",)),
+}
+requirement(
+    "datum_end",
+    kind="dome",
+    faces=(SphereFace(2.0 * CAP_RADIUS, (0.0, 0.0, _TIP_Z[0] + CAP_RADIUS)),),
+    requirements=("height",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": _TIP_Z[0]}, ("CAP_SAG",)),
+        "outward": ([0.0, 0.0, -1.0], ("CAP_SAG",)),
+        **_CROWN_FIELDS,
+    },
+    precision={"height": _P["CapFrontSag"]},
+)
+requirement(
+    "far_end",
+    kind="dome",
+    faces=(SphereFace(2.0 * CAP_RADIUS, (0.0, 0.0, _TIP_Z[1] - CAP_RADIUS)),),
+    requirements=("height", "body_length"),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": _TIP_Z[1]},
+            ("SHAFT_LEN", "CAP_SAG"),
+        ),
+        "outward": ([0.0, 0.0, 1.0], ("SHAFT_LEN",)),
+        "length_ref": (OVERALL_LEN, ("OVERALL_LEN",)),
+        "length_from": ("datum_end", ("OVERALL_LEN",)),
+        "body_length": (
+            limits(SHAFT_LEN, _P["ShaftLength"], unit=UNIT),
+            ("SHAFT_LEN", "UNIT"),
+        ),
+        "body_length_nominal": (SHAFT_LEN, ("SHAFT_LEN",)),
+        "body_length_callout": (
+            DIMENSION_CALLOUTS["ShaftLength"],
+            ((_SELF, "DIMENSION_CALLOUTS"),),
+        ),
+        **_CROWN_FIELDS,
+    },
+    precision={"height": _P["CapFrontSag"], "body_length": _P["ShaftLength"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(SHAFT_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("SHAFT_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("SHAFT_DIA",)),
+        "span": ([0.0, SHAFT_LEN], ("SHAFT_LEN",)),
+        "dia": (
+            limits(SHAFT_DIA, _P["ShaftDia"], SHAFT_DIA_BAND, unit=UNIT),
+            ("SHAFT_DIA", "SHAFT_DIA_BAND", "UNIT"),
+        ),
+        "dia_nominal": (SHAFT_DIA, ("SHAFT_DIA",)),
+        "callout": (SHAFT_FIT_CALLOUT, ((_SELF, "SHAFT_FIT_CALLOUT"),)),
+    },
+    precision={"dia": _P["ShaftDia"]},
+)
+for _name, _z in zip(("cross_hole_front", "cross_hole_back"), PIN_HOLE_Z, strict=True):
+    requirement(
+        _name,
+        kind="hole",
+        faces=(CylinderFace(PIN_HOLE_DIA, contains_z_mm=_z),),
+        requirements=("dia", "thru"),
+        fields={
+            "axis": ([1.0, 0.0, 0.0], ("PIN_HOLE_Z",)),
+            "at": ([0.0, 0.0, _z], ("PIN_HOLE_Z",)),
+            "dia": (
+                limits(PIN_HOLE_DIA, _P["PinHoleDia"], PIN_HOLE_BAND, unit=UNIT),
+                ("PIN_HOLE_DIA", "PIN_HOLE_BAND", "UNIT"),
+            ),
+            "nominal_dia": (PIN_HOLE_DIA, ("PIN_HOLE_DIA",)),
+            "thru": (True, ((_SELF, "PIN_HOLE_CALLOUT"),)),
+            "made_at": ("assembly", ((_SELF, "PIN_HOLE_CALLOUT"),)),
+            "callout": (PIN_HOLE_CALLOUT, ((_SELF, "PIN_HOLE_CALLOUT"),)),
+        },
+        precision={"dia": _P["PinHoleDia"]},
+    )
 
 PROFILE_KEEP = {
     # Over the bar, stacked: the overall (reference) outermost, tip to tip,
