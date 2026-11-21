@@ -252,8 +252,8 @@ pd-vn-transgear-knob-cup-screw:
   designation: "#2-56 UNC-2A x 3/8 slotted fillister head machine screw, 18-8 stainless"
   standard: "ASME B18.6.3"
   envelope:
-    "head Ø": "_mcmaster_91794a079 SupplierHeadDiameter"
-    "head H": "_mcmaster_91794a079 SupplierHeadHeight"
+    "head Ø": "_mcmaster_91794a079 FILLISTER_SIZE[3]"
+    "head H": "_mcmaster_91794a079 FILLISTER_SIZE[2]"
 pd-vn-transgear-knob-drive-pin:
   tier: 1
   why: "ASME B18.8.2 hardened dowel pin, used as supplied"
