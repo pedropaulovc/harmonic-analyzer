@@ -251,7 +251,11 @@ inspection = "Each blank {{process.blank_length_in:.2f}}–{{process.blank_lengt
 gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.blank_length_min_mm}}", "{{process.blank_length_max_mm}}"] }]
 
 [[setups.operations]]
-instruction = "Mic each blank across both pairs of faces at both ends and the middle. Number each blank 1–{{process.quantity:d}} at one end in marker; that end becomes the foot. Lay the blank flat, the foot end toward you: mark the left side face L and the upward face F (front) along their length with marking fluid and a scribe; the right side face is R and the face on the bench is B (back). Write each end's L-to-R reading on the blank at that end: Setup 2 zeros on the foot end's, Setup 4 on the top end's."
+instruction = "Number each blank 1–{{process.quantity:d}} at one end in marker; that end becomes the foot. Lay the blank flat, the foot end toward you: mark the left side face L and the upward face F (front) along their length with marking fluid and a scribe; the right side face is R and the face on the bench is B (back)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mic each blank across both pairs of faces at both ends and the middle. Write each end's L-to-R reading on the blank at that end: Setup 2 zeros on the foot end's, Setup 4 on the top end's."
 inspection = "Every reading {{cad.front_face_section_min_in:.3dot}}–{{cad.front_face_section_max_in:.3dot}}: this traveler's incoming-stock gate (the drawing gives the section as 1/4 SQ STOCK, reference). Outside: set the blank aside and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.front_face_section_band_mm}}" }]
 
