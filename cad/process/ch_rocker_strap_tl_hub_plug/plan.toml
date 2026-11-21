@@ -14,7 +14,7 @@
 # Stock: 9/16 in 6061 round is to order (cad/config/shop-equipment/
 # stock-to-order.toml 6061-round-9-16); none is on hand. The placeholder
 # plan's 1 x 3 in flat (on hand) would need a squared blank in the 6 in
-# 4-jaw, whose ownership is not recorded.
+# 4-jaw (on hand, owner 2026-11-21); round bar skips the squaring.
 title = "Rocker Strap Hub Plug"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
