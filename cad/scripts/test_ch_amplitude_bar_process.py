@@ -183,6 +183,7 @@ def test_a_nut_too_close_under_the_saw_is_caught_over_the_top_ends(tmp_path) -> 
         ({"parallel_height_mm": 0}, "jaw tops"),
         ({"saw_spacer_below_min_mm": 25.4}, "inside its stack's depth"),
         ({"saw_clear_z_mm": 11.35}, "saw_clear_z_mm"),
+        ({"saw_proof_raise_mm": 25.4}, "air proof"),
         ({"saw_touch_x_mm": 31.9}, "saw_touch_x_mm"),
         ({"saw_touch_y_mm": -3.0}, "saw_touch_y_mm"),
         ({"saw_park_z_mm": 11.35}, "saw_park_z_mm"),

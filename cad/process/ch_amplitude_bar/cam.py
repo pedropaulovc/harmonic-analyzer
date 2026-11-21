@@ -39,7 +39,9 @@ a slitting saw climbing grabs and feeds itself in). CA01 and CA03 leave the
 end mill parked over the saw's touch-off station, high enough that the
 arbor mounted in its place hangs clear of the stock: the saw then comes down
 in Z only, and moves in X and Y only with its arbor's spacers and nut clear
-of the bars and the jaws (``keep_out`` checks every move of each part).
+of the bars and the jaws (``keep_out`` checks each part's every move after
+the first rise from the touch-off, which is straight up, both as cut and as
+proved in air with Z0 raised ``saw_proof_raise_mm``).
 
 Toolpath rules (owner rulings 2026-11-16): plunges beside the stock at the
 cutting feed, real G0 above the stock.
@@ -461,6 +463,17 @@ def context(
     # the bars' top.
     saw_clear = section + CLEAR_MM + below
     _agree(plan, "saw_clear_z_mm", saw_clear)
+    # The saw programs' air proof raises Z0 by saw_proof_raise_mm: enough to
+    # lift the whole stack CLEAR_MM over the bars' top at the lowest level
+    # (raised by less, the nut that passes under the top ends would rise
+    # into them).
+    proof_raise = p["saw_proof_raise_mm"]
+    lowest_level = min(foot["ledge_nominal"], top["ledge_nominal"])
+    if proof_raise < below + section - lowest_level + CLEAR_MM - 1e-6:
+        raise ValueError(
+            "process.saw_proof_raise_mm leaves the arbor's stack under the bars' top "
+            "in the saw programs' air proof"
+        )
     # The touch-off station: the saw's rim TOUCH_IN_MM in over the ends, over
     # the middle of the bar against the fixed jaw (X mirrored for the top
     # ends); the spacers and the nut, hanging below the saw as it comes down,
@@ -843,33 +856,30 @@ def context(
             [name, "keep_out", {"radius": cutter_r, "boxes": keep[frame_of[key]]}],
         ]
         if tool == "saw":
+            # Each part as cut, and as proved in air (Z0 raised proof_raise:
+            # every part that much higher over the same shapes).
             frame = frame_of[key]
-            expect += [
-                [
-                    name,
-                    "keep_out",
-                    {
-                        "radius": collar_r,
-                        "boxes": reach(frame, "spacers above the saw", thick, None),
-                    },
-                ],
-                [
-                    name,
-                    "keep_out",
-                    {
-                        "radius": collar_r,
-                        "boxes": reach(frame, "spacers below the saw", -below, 0.0),
-                    },
-                ],
-                [
-                    name,
-                    "keep_out",
-                    {
-                        "radius": nut_r,
-                        "boxes": reach(frame, "the arbor's nut", -below, -spacer_below),
-                    },
-                ],
-            ]
+            for lift, when in ((0.0, ""), (proof_raise, ", proved in air")):
+                for part, radius_of, lo, hi in (
+                    ("spacers above the saw", collar_r, thick, None),
+                    ("spacers below the saw", collar_r, -below, 0.0),
+                    ("the arbor's nut", nut_r, -below, -spacer_below),
+                ):
+                    expect.append(
+                        [
+                            name,
+                            "keep_out",
+                            {
+                                "radius": radius_of,
+                                "boxes": reach(
+                                    frame,
+                                    part + when,
+                                    lo + lift,
+                                    None if hi is None else hi + lift,
+                                ),
+                            },
+                        ]
+                    )
     name = "CA05_pin_hole"
     expect += [
         [

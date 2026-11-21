@@ -61,7 +61,7 @@
 # its stated projection (cam.py checks each against the jaw tops and the
 # tool's length less a 1/2 in grip). The saw arbor never stands over the
 # jaws: its spacers and nut stay past the jaw side, and every move of them
-# misses the bars and the jaws (cam.py checks it).
+# after the saw's first rise misses the bars and the jaws (cam.py checks it).
 #
 # NC (cam:ch_amplitude_bar, cad/process/ch_amplitude_bar/cam.py):
 # CA01_foot_end, CA02_foot_notch, CA03_top_end, CA04_top_notch, CA05_pin_hole.
@@ -151,11 +151,16 @@ saw_collar_dia_max_mm = 39.402
 # (their ends overhang air) while the saw cuts. The saw moves between passes
 # with its lower face at saw_clear_z_mm, the stack's lowest point .20 in (5
 # mm) over the bars' top (cam.py checks every move of the saw's spacers and
-# nut against the bars and the jaws).
+# nut, after its first rise from the touch-off, against the bars and the
+# jaws). The saw programs are proved in air with Z0 raised
+# saw_proof_raise_mm, not 1 in: raised, the nut that passes under the top
+# ends would rise into them; this raise lifts the whole stack over the bars'
+# top (cam.py checks it and the raised programs' moves too).
 saw_spacer_below_min_mm = 6.35
 saw_below_max_mm = 25.4
 saw_nut_dia_max_mm = 44.45
 saw_clear_z_mm = 36.75
+saw_proof_raise_mm = 38.1
 # The saw's touch-off station: over the middle of the bar against the fixed
 # jaw, the saw's rim 3 mm in over the ends (its centre the saw's radius less
 # 3 mm past them, X mirrored for the top ends), the spacers and the nut past
@@ -167,6 +172,9 @@ saw_clear_z_mm = 36.75
 saw_touch_x_mm = 31.925
 saw_touch_y_mm = -3.1623
 saw_park_z_mm = 17.75
+# After a reset or homing ($H) between the park and the touch-off, the saw
+# goes back over the station by MDI from the homed Z (its top), X and Y
+# only, then down in Z.
 # Notch targets: each band's middle, from the export (cam.py checks them).
 foot_notch_width_mm = 2.7178
 foot_notch_depth_mm = 2.1273
@@ -392,11 +400,15 @@ inspection = "The nut's upper face at least {{process.saw_spacer_below_min_mm:in
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.saw_spacer_below_min_mm}}", "{{process.saw_below_max_mm}}"] }]
 
 [[setups.operations]]
+instruction = "Only after a reset or homing ($H) since CA01_foot_end parked T1: from the homed Z, MDI G0 X-{{process.saw_touch_x_mm:.3f}} Y{{process.saw_touch_y_mm:.3f}} (the station, X and Y only), then the touch-off below, Z only."
+feed = "hand"
+
+[[setups.operations]]
 instruction = "G54 Z0 again, from the saw's lower face, its rim 3 mm in over the end of bar 1: spindle stopped, jog Z only, down in CNCjs (.001 in steps near the leaf), until a .002 leaf just drags under the saw on that bar's top; G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051). CA02 loads no tool."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First load only: prove CA02_foot_notch in air, Z0 raised 1.000 in; it rises straight to Z{{process.saw_clear_z_mm:.2f}} before any X or Y move, and the saw, spacers and nut clear the jaws and both bars' ends. Then Z0 back."
+instruction = "First load only: prove CA02_foot_notch in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})); it rises straight to its clear height before any X or Y move, and the saw, spacers and nut clear the jaws and both bars' ends. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -502,11 +514,15 @@ inspection = "The nut's upper face at least {{process.saw_spacer_below_min_mm:in
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.saw_spacer_below_min_mm}}", "{{process.saw_below_max_mm}}"] }]
 
 [[setups.operations]]
+instruction = "Only after a reset or homing ($H) since CA03_top_end parked T1: from the homed Z, MDI G0 X{{process.saw_touch_x_mm:.3f}} Y{{process.saw_touch_y_mm:.3f}} (the station, X and Y only), then the touch-off below, Z only."
+feed = "hand"
+
+[[setups.operations]]
 instruction = "G54 Z0 again, from the saw's lower face, its rim 3 mm in over the end of bar 1: spindle stopped, jog Z only, down in CNCjs (.001 in steps near the leaf), until a .002 leaf just drags under the saw on that bar's top; G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First load only: prove CA04_top_notch in air, Z0 raised 1.000 in; it rises straight to Z{{process.saw_clear_z_mm:.2f}} before any X or Y move, and the saw, spacers and nut clear the jaws and the bars' ends. Then Z0 back."
+instruction = "First load only: prove CA04_top_notch in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})), not 1 in: lower, the nut under the saw would meet the top ends. It rises straight to its clear height before any X or Y move. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -590,7 +606,7 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "Unclamp the load. First load only, and on any later load whose G54 Y (send $#) differs from the first load's by more than 0.05 mm (.002): each bar's hole place from its B face (CA05 places the holes on a {{process.bar_pitch_mm:in.4dot}} bar pitch from Y0; bar 2's carries bar 1's width, within .001 of it). The GO .0775 pin gauge in the hole."
+instruction = "Unclamp the load. First load (write its G54 Y, from $#, on this sheet), and any later load whose G54 Y differs from it by more than 0.05 mm (.002): each bar's hole place from its B face (CA05 places the holes on a {{process.bar_pitch_mm:in.4dot}} bar pitch from Y0; bar 2's carries bar 1's width, within .001 of it). The GO .0775 pin gauge in the hole."
 inspection = "From B {{cad.top_pin_hole_location_from_back_min_in:.3dot}}–{{cad.top_pin_hole_location_from_back_max_in:.3dot}}: the calipers from the B face over the gauge pin, less half its .0775. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.top_pin_hole_location_from_back_band_mm}}" },
