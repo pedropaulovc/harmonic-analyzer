@@ -70,14 +70,20 @@ def test_every_hand_tap_stop_leaves_room_for_the_tap_guide() -> None:
     # tap guide. A plan holding it measures only the tap in its wrench against
     # tap_wrench_reach_max_mm: its guide-and-tap stack less the guide's
     # overall length, rounded down to .01 in.
-    guide_mm = _shop_equipment.load()["tools"]["tap-guide-fisher"]["overall_length_in"] * 25.4
+    guide_mm = (
+        _shop_equipment.load()["tools"]["tap-guide-fisher"]["overall_length_in"] * 25.4
+    )
     holders = []
     for path in sorted((CAD_ROOT / "process").glob("*/plan.toml")):
         plan = tomllib.loads(path.read_text(encoding="utf-8"))
-        if not any(tool.get("ref") == "tap-guide-fisher" for tool in plan.get("tools", [])):
+        if not any(
+            tool.get("ref") == "tap-guide-fisher" for tool in plan.get("tools", [])
+        ):
             continue
         holders.append(path.parent.name)
         parameters = plan["parameters"]
         room = parameters["tap_stack_max_mm"] - guide_mm
-        assert 0 <= room - parameters["tap_wrench_reach_max_mm"] < 0.254, path.parent.name
+        assert 0 <= room - parameters["tap_wrench_reach_max_mm"] < 0.254, (
+            path.parent.name
+        )
     assert len(holders) >= 10, holders

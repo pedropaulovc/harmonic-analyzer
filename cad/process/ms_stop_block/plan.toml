@@ -690,7 +690,7 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "Unclamp; mic the length."
-inspection = "Length {{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}}, locating end to far end, miked at the locating edge and at the top face."
+inspection = "Length {{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}}, locating end to far end, miked at the locating edge and at the top face. Outside: stop and tell the owner with the reading."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.far_end_length_band_mm}}" }]
 
 [[setups]]
@@ -784,7 +784,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Jog Z up clear, send G21, back the tap out by hand; blow the hole and the rebate out."
-inspection = "A 4-40 screw runs in by hand from the locating edge through into the rebate; the roof unmarked."
+inspection = "A 4-40 screw runs in by hand from the locating edge through into the rebate; the roof unmarked. Binds: send G20 and run the tap again under the tap guide to the same DRO Z, never deeper; still binds, or the roof is marked: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups]]

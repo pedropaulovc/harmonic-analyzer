@@ -699,8 +699,8 @@ instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the stacks' top, touched with the centre drill on the fixed-jaw stack left of the block."
-instruction_detailed = "Console M6 T4 (#2 centre drill; the tool setter measures it). MDI G0 X-6.000 Y-1.600: over the fixed-jaw stack's top, left of P. Spindle stopped, its point just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
+instruction = "G54 Z0: the stacks' top, touched with the 1/2 in end mill on the fixed-jaw stack left of the block, as Setups 4–7 (the centre drill's body would meet the jaw there)."
+instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X-12.700 Y-6.850: the cutter left of P, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. VB07's M6 T4 then measures the centre drill against it."
 feed = "hand"
 
 [[setups.operations]]
