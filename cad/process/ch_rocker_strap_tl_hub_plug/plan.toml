@@ -136,7 +136,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle stopped, offer the MHA-CH-13-TL-01 counterbore onto the body end: at this first trial it must not go on (if it slides on, scrap the plug). Skim .0002 off the diameter at a time, trying it between skims, until the counterbore just slides on. Mike that size and write it on this sheet as D0 (within .0002 of the bore)."
+instruction = "Spindle stopped, offer the MHA-CH-13-TL-01 counterbore onto the faced bar end (Z0), still the body's diameter at this point: at this first trial it must not go on (if it slides on, scrap the plug). Skim .0002 off the diameter at a time, trying it between skims, until the counterbore just slides on. Mike that size and write it on this sheet as D0 (within .0002 of the bore)."
 settings = "lathe-ar-6061"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -165,7 +165,7 @@ sizing = "other"
 instruction = "Turn the pilot from Z0 to the shoulder at Z{{cad.step_far_out_far_z_mm:in.3dot}} by the DRO, facing the shoulder square: rough to Ø{{cad.step_rough_dia_mm:in.4dot}}, then finish in light passes, miking between them, to Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}."
 settings = "lathe-ar-6061"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
-inspection = "Pilot Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}, by micrometer; over: another light pass; under: scrap. Pilot length (Z0 to the shoulder) .097–.107 by the calipers' depth rod; short: face the shoulder back; long: scrap."
+inspection = "Pilot Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}, by micrometer; over: another light pass; under: scrap. Pilot length (Z0 to the shoulder) by the calipers' depth rod, aiming .097–.107 so Op 110 keeps room on both its shoulder and length bands; under .097: face the shoulder back; .107–.112: carry on, Op 110 decides; over .112 (no facing in Op 110 brings both into band): scrap."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.step_dia_band_mm}}" }]
 
 [[setups.operations]]
@@ -208,7 +208,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Fit the C2 (3212A75) insert, the non-ferrous grade, for this aluminium. Touch the blade's Z0-side face on the faced end and set the DRO Z0 there, then part off with that face at Z-{{cad.part_off_in:.3dot}}: .02 over length, for Setup 2. Catch the plug."
+instruction = "Fit the C2 (3212A75) insert, the non-ferrous grade, for this aluminium. Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width (about .125, by caliper on the insert): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Catch the plug."
 settings = "lathe-part-6061"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -232,7 +232,7 @@ sizing = "other"
 instruction = "Face the body end in light skims to Z0 by the DRO: the shoulder then stands {{cad.shoulder_min_in:.3dot}}–{{cad.shoulder_max_in:.3dot}} from it (calipers between them) with the length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} (micrometer)."
 settings = "lathe-ar-6061"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Shoulder {{cad.shoulder_min_in:.3dot}}–{{cad.shoulder_max_in:.3dot}} from the body end; length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}. Both long: another skim. Short, or the length long with the shoulder already in band: scrap and make another."
+inspection = "Shoulder {{cad.shoulder_min_in:.3dot}}–{{cad.shoulder_max_in:.3dot}} from the body end; length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}. Either long: another skim (it shortens both by the same amount), as long as neither goes under its minimum. Either short, or one still long when the next skim would take the other under its minimum: scrap and make another."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.shoulder_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
 
 [[setups]]
