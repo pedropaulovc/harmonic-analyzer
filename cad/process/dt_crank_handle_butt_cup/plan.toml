@@ -105,13 +105,13 @@ ref = "jig-files"
 
 [[setups]]
 machine_kind = "lathe"
-title = "Bar, pocket end out: turn the body, drill, bore the pocket, part off long"
+title = "Bar, pocket end out: turn the body, drill, cut the pocket with the boring bar, part off long"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
 datum = "Z0 (carriage DRO) the bar end, faced in this setup: the pocket end, left flat (it shows flush in the handle's butt)."
-diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw, pocket end out: the end faced, the body turned, drilled #20 through, the pocket bored to a flat floor, the cup parted off .02 long." }
+diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw, pocket end out: the end faced, the body turned, the #20 hole drilled through, the pocket cut to a flat floor, the cup parted off .02 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
 
@@ -122,7 +122,7 @@ drilling = "none"
 sizing = "other"
 feed = "hand"
 tool = "telescoping-gauges-starrett-s579gz"
-instruction = "Measure the MHA-DT-08 handle's butt counterbore with a telescoping gauge and the micrometer and write it on this sheet: the body is that bore less {{cad.outer_clearance_min_in:.3dot}}–{{cad.outer_clearance_max_in:.3dot}} (drawing note 2), inside Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}; a counterbore needing a body outside that band: stop and report."
+instruction = "Measure the MHA-DT-08 handle's butt counterbore with a telescoping gauge and the micrometer and write it on this sheet: the body is that counterbore less {{cad.outer_clearance_min_in:.3dot}}–{{cad.outer_clearance_max_in:.3dot}} (drawing note 2), inside Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}; a counterbore needing a body outside that band: stop and report."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -184,7 +184,7 @@ speed_kind = "spindle"
 tool = "drill-1"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Feed the #1 drill in until its lips just touch the #20 hole's edge and zero the quill scale there (its point is then about .05 below the faced end). Drill until it reads .20: the full diameter is then about .18 deep and the point stays above the pocket floor. It leaves the boring bar .005–.015 a side."
+instruction = "Feed the #1 drill in until its lips just touch the #20 hole's edge and zero the quill scale there (its point is then about .05 below the faced end). Drill until it reads .20: the full diameter is then about .18 deep and the drill's cone meets the #20 hole about .20 deep, above the .212 floor; the point itself runs in the #20 hole. It leaves the boring bar .005–.015 a side."
 settings = "lathe-drill-1-steady-1018"
 cut_diameter_mm = 5.7912
 hole_depth_mm = 4.572
@@ -263,7 +263,7 @@ title = "Bench: deburr and check"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished cup: the body to the measured counterbore, the reamed pocket in the flat end, the #20 hole through and the two chamfers." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished cup: the body to the measured counterbore, the pocket in the flat end, the #20 hole through and the two chamfers." }
 vise_hold = "other"
 beam = "other"
 
@@ -276,7 +276,7 @@ instruction = "Deburr: break the pocket mouth, the outside edge of the pocket en
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Check the hole: a Ø{{cad.bore_dia_min_in:.3dot}} pin gauge enters and a Ø{{cad.bore_dia_max_in:.3dot}} does not. Wipe the cup all over with light machine oil (drawing finish: bright turned, oiled). Tag it with the recorded counterbore and head: it goes to that handle and that screw."
+instruction = "Check the #20 hole: a Ø{{cad.bore_dia_min_in:.3dot}} pin gauge enters and a Ø{{cad.bore_dia_max_in:.3dot}} does not. Wipe the cup all over with light machine oil (drawing finish: bright turned, oiled). Tag it with the recorded counterbore and head: it goes to that handle and that screw."
 inspection = "Hole Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
