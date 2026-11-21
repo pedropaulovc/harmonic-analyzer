@@ -56,6 +56,7 @@ ref = "lathe-ar"
 id = "form"
 name = "R.125 form tool"
 ref = "form-tool-r125"
+description = "R.125 concave full-radius form tool: its arc cuts the pin's convex R.12 crown"
 status = "to_order"
 
 [[tools]]
