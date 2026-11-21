@@ -48,7 +48,6 @@ import argparse
 import hashlib
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -67,7 +66,10 @@ from features_bound import FeaturesBoundError, validate_bundle
 
 REPO = export_features.REPO
 PROJECT_SLUG = "harmonic-analyzer"
-_API = "https://api.github.com/repos/{repo}/releases/{which}"
+# Releases live upstream; a fork's origin has none (release_diff.asset_url
+# hardcodes the same repository).
+UPSTREAM = "pedropaulovc/harmonic-analyzer"
+_API = f"https://api.github.com/repos/{UPSTREAM}/releases/{{which}}"
 
 
 class FetchError(RuntimeError):
@@ -83,14 +85,6 @@ def _git(*args: str) -> str:
     return done.stdout.strip()
 
 
-def _repo_slug() -> str:
-    url = _git("config", "--get", "remote.origin.url")
-    match = re.search(r"github\.com[:/](.+?)(?:\.git)?$", url)
-    if match is None:
-        raise FetchError(f"origin {url!r} is not a GitHub remote")
-    return match.group(1)
-
-
 def release_asset(tag: str | None) -> tuple[str, str]:
     """The release's tag and the download URL of its ``<project>-<tag>.zip``."""
     which = "latest" if tag is None else f"tags/{tag}"
@@ -98,9 +92,7 @@ def release_asset(tag: str | None) -> tuple[str, str]:
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    request = urllib.request.Request(
-        _API.format(repo=_repo_slug(), which=which), headers=headers
-    )
+    request = urllib.request.Request(_API.format(which=which), headers=headers)
     with urllib.request.urlopen(request, timeout=60) as response:
         release = json.load(response)
     name = f"{PROJECT_SLUG}-{release['tag_name']}.zip"
@@ -213,7 +205,7 @@ def tag_commit(tag: str) -> str:
     try:
         return _git("rev-parse", f"{tag}^{{commit}}")
     except FetchError:
-        _git("fetch", "--quiet", "origin", "tag", tag)
+        _git("fetch", "--quiet", f"https://github.com/{UPSTREAM}.git", "tag", tag)
         return _git("rev-parse", f"{tag}^{{commit}}")
 
 

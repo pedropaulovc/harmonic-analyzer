@@ -277,9 +277,15 @@ part's manifest task, each a fraction of a second. An undeclared part's
 manifest holds no draw module: the exporter, the closure of its
 `DRAWING_NOTES` owner, the notes/spec files read to find it, its builder file
 (the frame citation), registry/config and the release revision.
-The release revision keys only the manifest tasks: no COM leaf reads it, so a
-release-revision bump re-runs the 131 seat-free `package:manifest:<stem>` tasks
-and no `package:features:<stem>` SolidWorks leaf.
+Every native part carries the release revision (`_part_properties`
+`Revision`), so a release-revision bump rebuilds every `part:<stem>` and,
+through its artefact identity, re-runs all 131 `package:features:<stem>`
+SolidWorks leaves (125 more than the six declared parts): each opens the part,
+labels its faces, saves the STEP and closes, about 10 s of seat time plus the
+per-leaf farm overhead (roughly 2-2.5 worker-hours, 15-20 min wall at farm
+parallelism 8 on an idle queue). The full export still opens each part again
+for STL/PNG, so the STEP work moves rather than disappears; the added cost is
+the per-leaf dispatch and the second open.
 Full `export` consumes the labelled STEPs and inventories rather than any
 manifest or draw closure; changed STEP bytes can therefore re-key it
 downstream. Feature leaves use `uptodate: [False]`, like full export, so each

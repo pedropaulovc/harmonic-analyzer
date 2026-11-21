@@ -136,7 +136,7 @@ def test_a_current_bundle_is_fetched_by_range_without_the_rest_of_the_zip(
 
 
 def test_a_new_declaration_binds_to_the_released_step_without_a_farm(
-    tmp_path: Path, monkeypatch, capsys
+    tmp_path: Path, monkeypatch, caplog
 ) -> None:
     _release(
         monkeypatch,
@@ -147,7 +147,8 @@ def test_a_new_declaration_binds_to_the_released_step_without_a_farm(
     )
     out = tmp_path / "out"
     assert fetch_features.main([DECLARED, "--out", str(out)]) == 0
-    assert "features.toml rebound from this checkout" in capsys.readouterr().err
+    # INFO is below the console level under xdist; the log record is not.
+    assert "features.toml rebound from this checkout" in caplog.text
     manifest, step = export_features.bundle_paths(DECLARED, out)
     published = export_features.bundle_paths(DECLARED, tmp_path / "published")
     assert step.read_bytes() == published[1].read_bytes()
