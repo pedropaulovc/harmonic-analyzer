@@ -139,7 +139,7 @@ def test_bracket_feature_bands_are_the_printed_ones() -> None:
     # The #8 close clearance drill at the title block's DRILLED HOLES +.004/0.
     assert hold_down["dia"] == pytest.approx([_in(0.180), _in(0.184)])
     assert hold_down["process"] == "drill" and hold_down["thru"] is True
-    assert hold_down["station"] == pytest.approx([_in(0.48), _in(0.50)])
+    assert hold_down["station"] == pytest.approx([_in(0.49), _in(0.51)])
     assert hold_down["lateral"] == pytest.approx([_in(0.31), _in(0.33)])
     tap = features["apex_tap"]
     assert tap["thread"] == "#4-40 UNC-2B"
