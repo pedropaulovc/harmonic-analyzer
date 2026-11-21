@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 2: four bars on the vise bed, foot ends .75 past the left jaw side; CA01 faces them, CA02 saws the foot notch. Top view and an end view. Styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 330" width="640" height="330" font-family="sans-serif" font-size="12">
+<rect class="paper" width="640" height="330"/>
+<text class="label" x="20" y="20">Top view</text>
+<rect class="fixture-vise" x="250" y="30" width="200" height="40"/>
+<text class="label" x="300" y="54">fixed jaw</text>
+<rect class="fixture-vise" x="250" y="134" width="200" height="40"/>
+<text class="label" x="290" y="158">moving jaw</text>
+<rect class="part-kept" x="200" y="70" width="440" height="16"/>
+<rect class="part-kept" x="200" y="86" width="440" height="16"/>
+<rect class="part-kept" x="200" y="102" width="440" height="16"/>
+<rect class="part-kept" x="200" y="118" width="440" height="16"/>
+<text class="label" x="500" y="150">about 25 in of each</text>
+<text class="label" x="500" y="164">bar hangs right</text>
+<circle class="cutter" cx="92" cy="102" r="108" fill-opacity="0.35"/>
+<text class="label" x="40" y="106">slitting saw</text>
+<circle class="cutter" cx="188" cy="60" r="10"/>
+<text class="label" x="120" y="44">end mill</text>
+<path class="arrow" d="M120 230 V200"/>
+<text class="label" x="128" y="222">feed +Y</text>
+<line class="datum" x1="200" y1="64" x2="200" y2="140"/>
+<text class="label" x="182" y="196">X0</text>
+<path class="dims" d="M200 186 H250"/>
+<text class="label" x="206" y="182">{{process.end_protrusion_mm:in.2dot}}</text>
+<path class="axis" d="M520 300 H570"/><text class="label" x="574" y="304">+X</text>
+<path class="axis" d="M520 300 V250"/><text class="label" x="512" y="246">+Y</text>
+<text class="label" x="20" y="262">End view of one foot end</text>
+<rect class="part-kept" x="40" y="270" width="48" height="48"/>
+<rect class="part-removed" x="40" y="284" width="48" height="20"/>
+<line class="active-face" x1="30" y1="318" x2="98" y2="318"/>
+<text class="label" x="100" y="322">L face on the bed (Z0)</text>
+<text class="label" x="100" y="298">notch {{process.foot_notch_width_mm:in.3dot}} wide, ledge {{cad.foot_notch_ledge_in:.3dot}} above L</text>
+</svg>
