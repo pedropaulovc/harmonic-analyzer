@@ -30,7 +30,8 @@ def test_every_noted_artwork_file_lands_at_its_printed_path(tmp_path: Path) -> N
     nameplate = {
         m.group(0) for m in NOTED_ARTWORK.finditer(nameplate_spec.MANUFACTURING_NOTES)
     }
-    assert len(nameplate) == 3 and nameplate <= noted
+    # The etched plate's one artwork file: the outline and the resist.
+    assert nameplate == {"pdf/fr-nameplate-resist.dxf"} and nameplate <= noted
 
     staged = cut_release.stage_noted_artwork(tmp_path, texts)
 
