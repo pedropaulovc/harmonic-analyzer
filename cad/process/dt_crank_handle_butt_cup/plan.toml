@@ -126,7 +126,7 @@ instruction = "Measure the MHA-DT-08 handle's butt counterbore with a telescopin
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Mike the MHA-DT-32 pivot screw's head (REF Ø{{cad.pocket_ref_in:.3dot}}) and write it on this sheet with the pocket's two pins: GO = the head + {{cad.pocket_clearance_min_in:.3dot}} rounded up to the next .001 pin, NO-GO = the head + {{cad.pocket_clearance_max_in:.3dot}} rounded up to the next .001 pin. The .2560 reamer gives the {{cad.pocket_clearance_min_in:.3dot}}–{{cad.pocket_clearance_max_in:.3dot}} clearance of drawing note 1 only if the head measures .240–.248; outside that, stop and report."
+instruction = "Mike the MHA-DT-32 pivot screw's head (REF Ø{{cad.pocket_ref_in:.3dot}}) and write it on this sheet with the pocket's two pins: GO = the head + {{cad.pocket_clearance_min_in:.3dot}} rounded up to the next .001 pin, NO-GO = the head + {{cad.pocket_clearance_max_in:.3dot}} rounded down to the next .001 pin. The .2560 reamer gives the {{cad.pocket_clearance_min_in:.3dot}}–{{cad.pocket_clearance_max_in:.3dot}} clearance of drawing note 1 only if the head measures .240–.248; outside that, stop and report."
 inspection = "Screw head Ø.240–.248."
 gauge_checks = "other"
 
@@ -184,7 +184,7 @@ speed_kind = "spindle"
 tool = "drill-d"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Zero the quill scale with the D drill's point on the faced end, then drill until it reads .25: the full diameter is then .18 deep and the 118° point stops above the pocket floor at the #20 hole's edge. It leaves the reamer .005 a side."
+instruction = "Feed the D drill in until its lips just touch the #20 hole's edge and zero the quill scale there (its point is then about .05 below the faced end). Drill until it reads .20: the full diameter is then .18 deep and the 118° point stops above the pocket floor at the #20 hole's edge. It leaves the reamer .005 a side."
 settings = "lathe-drill-d-steady-1018"
 cut_diameter_mm = 6.2484
 hole_depth_mm = 4.572
@@ -251,10 +251,10 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Compound at 45°: chamfer the outside edge of this end {{cad.chamfer_far_leg_min_in:.3dot}}–{{cad.chamfer_far_leg_max_in:.3dot}} × 45° with the AR's nose (it clears the counterbore's corner in MHA-DT-08)."
+instruction = "Compound at 45°: chamfer the outside edge of this end {{cad.chamfer_far_leg_min_in:.3dot}}–{{cad.chamfer_far_leg_max_in:.3dot}} × 45° with the AR's nose in light passes, checking between them (it clears the counterbore's corner in MHA-DT-08)."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Chamfer {{cad.chamfer_far_leg_min_in:.3dot}}–{{cad.chamfer_far_leg_max_in:.3dot}} × 45° (calipers across the face: the flat Ø the body less twice the leg)."
+inspection = "Chamfer {{cad.chamfer_far_leg_min_in:.3dot}}–{{cad.chamfer_far_leg_max_in:.3dot}} × 45°: lay the calipers' jaws flat on the end face and close them onto the chamfer; the flat reads the body Ø less twice the leg. Small: another pass; large: scrap."
 gauge_checks = "other"
 
 [[setups]]
@@ -276,7 +276,7 @@ instruction = "Deburr: break the pocket mouth, the outside edge of the pocket en
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Check the hole: a Ø{{cad.bore_dia_min_in:.3dot}} pin gauge enters and a Ø{{cad.bore_dia_max_in:.3dot}} does not. Tag the cup with the recorded counterbore and head: it goes to that handle and that screw."
+instruction = "Check the hole: a Ø{{cad.bore_dia_min_in:.3dot}} pin gauge enters and a Ø{{cad.bore_dia_max_in:.3dot}} does not. Wipe the cup all over with light machine oil (drawing finish: bright turned, oiled). Tag it with the recorded counterbore and head: it goes to that handle and that screw."
 inspection = "Hole Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
