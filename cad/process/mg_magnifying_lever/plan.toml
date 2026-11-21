@@ -287,7 +287,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "The cutoff blade on centre height, square: touch its chuck-side face on the pilot's shoulder over a paper shim and set DRO Z+.300. Plunge at DRO Z+.100 to a Ø{{process.neck_dia_in:.2dot}} neck, then at DRO Z0 (its chuck-side face on end B's plane) to the same neck: a groove about .22 wide, room for the saw. Back out for chips; the dead centre stays in."
+instruction = "The cutoff blade on centre height, square: touch its chuck-side face on the pilot's shoulder, just gripping a cigarette paper, and set DRO Z+.301 (the paper). Plunge at DRO Z0 (its chuck-side face on end B's plane) to a Ø{{process.neck_dia_in:.2dot}} neck, then at Z+.100 to the same neck: a groove about .22 wide, room for the saw. Back out for chips; the dead centre stays in."
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -335,7 +335,7 @@ inspection = "Thread length {{cad.thread_length_min_in:.2dot}}–{{cad.thread_le
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.thread_length_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Over {{cad.thread_length_max_in:.2dot}} with end B flat: file end B back a few strokes at a time, square to the rod (the combination square's blade along the rod), reading Op 200 between; end A's allowance takes it up. Under {{cad.thread_length_min_in:.2dot}}, or the run-out over {{cad.thread_incomplete_max_in:.3dot}}: scrap the lever and make another from Setup 1."
+instruction = "Over {{cad.thread_length_max_in:.2dot}} with end B flat: file end B back a few strokes at a time, square to the rod (the combination square's blade along the rod), reading Op 200 between; end A's allowance takes it up. Break end B's edge again as Op 190. Under {{cad.thread_length_min_in:.2dot}}, or the run-out over {{cad.thread_incomplete_max_in:.3dot}}: scrap the lever and make another from Setup 1."
 
 [[setups]]
 machine_kind = "lathe"
