@@ -146,6 +146,14 @@ note = "Owner ruling 2026-11-10 (#2333, option a): a one-off gray-iron sand cast
 status = "to_order"
 cite = ["https://github.com/pedropaulovc/harmonic-analyzer/issues/2333"]
 
+# MHA-DT-05 cone pivot post casting (owner ruling 2026-11-20 (Pedro), #2359).
+[stock.gray-iron-casting-cone-pivot-post]
+form = "casting"
+material = "gray iron (class not ruled)"
+note = "Owner ruling 2026-11-20 (Pedro, triage of 2026-11-19, #2359 option A): 'A likely cast'. MHA-DT-05 stays one integral part with its crank boss (no two-piece post); its blank is a gray-iron casting, as the registry process ('machined from solid stock or casting') and the sheet's LOW-CARBON STEEL OR GRAY IRON already allow. Allocation: dt-cone-pivot-post (MHA-DT-05), one. Finished envelope 1.68 x 2.84 x 3.73 in (head diameter; crank-boss end to the far head tangent; height: dt_cone_pivot_post_spec HEAD_DIA, CRANK_BOSS_START_Z to CRANK_BOSS_END_Z, BLOCK_HEIGHT), 0.84 kg finished (HARVESTED_MASS_KG, at 7.20 g/cc). Class, foundry, pattern and machining stock are not ruled: none chosen, contacted or quoted. The solid route the casting replaces (2 x 3 in 1018 flat about 3.9 long, milled round, the 1-3 mm root sectors under the boss filed; #2359) stays allowed by the registry process and is not stocked. Not owned."
+status = "to_order"
+cite = ["https://github.com/pedropaulovc/harmonic-analyzer/issues/2359", "cad/config/parts/dt-cone-pivot-post.yaml process", "cad/scripts/dt_cone_pivot_post_spec.py HEAD_DIA, CRANK_BOSS_END_Z, BLOCK_HEIGHT, HARVESTED_MASS_KG"]
+
 # --- MHA-PD-06 disc cutting arbor (#2412) -----------------------------------
 
 # MHA-PD-06 disc blank (#2412): the Ø3.1655 disc needs at least 3.25 in of

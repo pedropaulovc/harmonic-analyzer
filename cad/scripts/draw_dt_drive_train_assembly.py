@@ -1591,6 +1591,12 @@ CONE_CRANK_STEPS = _note_text(
         # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
         # acceptance, worded as 2Z's, once the end play is final.
         "3F. CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND.",
+        # Owner rulings 2026-11-20 (#1177 friction-only, #3085 option B): a
+        # post screw loosened later re-sets the post (2M eases both screws,
+        # 2S-2U set its yaw) and, as the post can shift along the shaft on the
+        # screws' float, indicates the end play again (3C-3F).  It lives here,
+        # among the steps it cites, so check 4V can name it by one STEP head.
+        "3G. IF A MHA-DT-VN-61 IS EVER LOOSENED, REDO 2M, 2S-2U, THEN 3C-3F.",
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         # Delegated ruling 2026-11-17 on #2481 (option B; precedent #2365 and
@@ -2235,8 +2241,19 @@ CHECKS = _note_text(
         # the redo are one step each.
         "4S. IF ONE BINDS, LOOSEN MHA-DT-VN-51 THERE.",
         "4T. REDO 4N-4R.",
-        "4U. LEAVE MHA-DT-02 AS THEY ARE FROM HERE ON.",
-        "4V. REDO CHECKS 4-7 AFTER ANY LATER LOOSENING OF MHA-DT-02.",
+        # Owner ruling 2026-11-20 (Pedro, #1177: no blind plate hole, so no
+        # post dowel; #3085 option B): only the two MHA-DT-VN-61 screws'
+        # friction holds MHA-DT-05's yaw, which steps 2S-2U set, so the hold
+        # names them beside the pedestals, and a loosened post screw re-sets
+        # the post by the remedy step 3G (2M, 2S-2U, then the end play again
+        # at 3C-3F) before the checks are redone.  A check cites steps only
+        # under a STEP head, so 4V names 3G.  The 4A-4Z letters are full and
+        # the sheet 13 left field has no line to spare: the hold and the redo
+        # stay one line each ("A SCREW" is the only screw 4U names).  Rule
+        # 22's lint: the hold is stated as a check (no imperative), so 4V's IF
+        # is a remedy that follows its check.
+        "4U. MHA-DT-02 AND MHA-DT-VN-61 STAY AS SET FROM HERE ON.",
+        f"4V. IF ONE LOOSENS, REDO CHECKS 4-7 (A SCREW: STEP {_step_ref('end-play-set', 'G')} FIRST).",
         "4W. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT, THE LESSER READING OF STEPS "
         f"{_step_ref('other-base-mounting', 'H')}-{_step_ref('other-base-mounting', 'J')} "
         f"({acceptance_ref('pivot-screw-engagement')}).",
@@ -2368,13 +2385,15 @@ def _split_sequence_chain(
 
 
 # The fields, in reading order (package_note_fields): sheet 7's left field
-# carries the direction key and step 1, its full-height right field 2-3 (the
-# spigot's bond round opens step 2); sheet 8 carries 4-6 (MHA-PD-00
+# carries the direction key, step 1 and step 2's head line, its full-height
+# right field 2A-3 (the spigot's bond round); sheet 8 carries 4-6 (MHA-PD-00
 # cites 4 and 5 on CRANK_SHEET), each step whole; sheets 9-11 carry 7-23, each
 # field cut at a sub-step by the constants below.  Sub-step splits keep every
 # field full once the one-thing lines grew the sequence (rubric sample rounds
 # 2 and 4); test_every_note_field_holds_its_stacked_blocks proves each fits.
-CONE_CONTINUED_FROM = str(steps.step_number("post-and-tip-block"))
+# Step 3G (#1177/#3085, 2026-11-20) took the right field's last spare line,
+# so step 2's head line moved to the left field.
+CONE_CONTINUED_FROM = f"{steps.step_number('post-and-tip-block')}A"
 CRANK_SHEET_FROM = str(steps.step_number("crank-mesh-checked"))
 CRANK_SHEET_RIGHT_FROM = f"{steps.step_number('crank-hub-fitted')}D"
 CRANK_CONTINUED_FROM = str(steps.step_number("crank-handle-fitted"))
