@@ -304,7 +304,7 @@ title = "Side B: face, pocket, bore and holes"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Two 1 in parallels on the vise bed, one against each jaw; the spoil plate on them, 6 in along X, its LEFT edge to the left, as left by the first op (it stays there for every load). Four blanks of one load side by side across the jaws on the plate, each on its A face (B up), numbers to the left, the lowest number against the fixed jaw. Hold a 1-2-3 block's 2 in face across the four left ends and the plate's left edge and push them flush; then close the vise on the blanks (the plate, 3.9 in across under the 4 in load, is not gripped), tapping them down onto the plate."
+holding = "Two 1 in parallels on the vise bed, one against each jaw; the spoil plate on them, 6 in along X, its LEFT edge to the left, as left by the first op (it stays there for every load). The jaws' top then stands .270 above the plate's top: it grips .270 of each .3085–.3125 blank and sits .031 under the faced B face (.3005), so the face mill passes over the jaws. Four blanks of one load side by side across the jaws on the plate, each on its A face (B up), numbers to the left, the lowest number against the fixed jaw. Hold a 1-2-3 block's 2 in face across the four left ends and the plate's left edge and push them flush; then close the vise on the blanks (the plate, 3.9 in across under the 4 in load, is not gripped), tapping them down onto the plate."
 datum = "Programs CL01_face_b (T1), CL02_pocket_b (T1, T2), CL03_bore (T3, T6, T7), CL04_holes (T3, T4, T5). G54: X0 the left end of the blank against the fixed jaw (picked up on every load), Y0 the fixed jaw's face, Z0 the spoil plate's top. +X toward the blanks' right ends, +Y toward the fixed jaw: the blanks lie at −Y."
 diagram = { file = "diagrams/side_b.svg", alt = "Four blanks across the vise jaws on the spoil plate on two parallels, B up; the end mill faces them, pockets each along its centre line round the hub, and the bore and holes are drilled on the centre line." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.drill_d_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
@@ -312,8 +312,13 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = 101.6, along_jaws_mm = "{{pro
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.blank_length_min_mm}}"], supports_mm = ["{{process.jaw_start_mm}}", "{{process.jaw_end_mm}}"], section_mm = { y = "{{process.blank_pitch_mm}}", z = "{{process.blank_thickness_min_mm}}" } }
 
 [[setups.operations]]
-instruction = "Every batch, before the first load: Home ($H). Clamp the spoil plate alone on the parallels; first batch (or when cut up): face its top .010 with T1. Then G54 Z0 on its bare top with T1; unclamp, leaving it in place."
-instruction_detailed = "Home the mill ($H). Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Clamp the plate alone across the jaws on the parallels, its LEFT edge to the left. First batch, or when its top is cut up: set 2650 and face its top .010 by hand jog in overlapping passes. Spindle stopped, the tip just dragging a .002 feeler leaf on the plate's top: G10 L20 P1 Z0.051. This Z0 stays for every load and both sides: the tool setter measures each M6, holder swaps included, so Z0 is never touched again. Open the vise and leave the plate on the parallels."
+instruction = "Every batch, before the first load: Home ($H); console M6 T1. Clamp the spoil plate alone on the parallels. First batch (or when its top is cut up): face its top .010."
+instruction_detailed = "Home the mill ($H). Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Clamp the plate alone across the jaws on the parallels, its LEFT edge to the left. First batch, or when its top is cut up: set 2650 and face its top .010 by hand jog in overlapping passes."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0 on the plate's bare top with T1; then open the vise and leave the plate on the parallels."
+instruction_detailed = "Spindle stopped, the T1 tip just dragging a .002 feeler leaf on the plate's top: G10 L20 P1 Z0.051. This Z0 stays for every load and both sides (the tool setter measures each M6, holder swaps included). Open the vise; leave the plate where it is."
 feed = "hand"
 
 [[setups.operations]]
@@ -465,7 +470,7 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "First load only, still clamped: each hole's place, a shank standing in it."
-inspection = "Pin hole {{cad.bar_pin_hole_location_min_in:.3f}}–{{cad.bar_pin_hole_location_max_in:.3f}} and spring hole {{cad.spring_hole_location_min_in:.3f}}–{{cad.spring_hole_location_max_in:.3f}} from the bore, on the blank against the fixed jaw: the #47 and #21 drills' shanks standing in the holes and the .2560 reamer's shank (out of the chuck) in the bore; the edge finder (900 rpm) picks up each shank's left and right sides; each centre is the mean of its two X readings, and the distances are the DRO's X differences. Outside: stop and tell the owner."
+inspection = "Pin hole {{cad.bar_pin_hole_location_min_in:.3f}}–{{cad.bar_pin_hole_location_max_in:.3f}} and spring hole {{cad.spring_hole_location_min_in:.3f}}–{{cad.spring_hole_location_max_in:.3f}} from the bore, on the blank against the fixed jaw: the #47 and #21 drills' shanks standing in the holes and the .2560 reamer's shank (out of the chuck; mike it first: .2550–.2560, so it floats at most ±.001 in the bore, inside the ±.005 bands) in the bore; the edge finder (900 rpm) picks up each shank's left and right sides; each centre is the mean of its two X readings, and the distances are the DRO's X differences. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "mill-x-dro", band_mm = "{{cad.bar_pin_hole_location_band_mm}}" },
   { gauge = "mill-x-dro", band_mm = "{{cad.spring_hole_location_band_mm}}" },
@@ -609,7 +614,7 @@ gauge_checks = [
 
 [[setups.operations]]
 instruction = "The lowest-numbered lever of each load only (the flip's registration and the proved outline): its hub, bar, tip and roots. The other levers are not gauged on these: the proved program's path holds them."
-inspection = "Hub Ø{{cad.hub_dia_min_in:.2f}}–{{cad.hub_dia_max_in:.2f}}, bar {{cad.outline_bar_height_min_in:.2f}}–{{cad.outline_bar_height_max_in:.2f}} high and the tip's wall round the spring hole at least .060 (the calipers); the roots no larger than R.040 (the 5/64 in cutter's own radius). Outside: set that load's four levers aside and tell the owner."
+inspection = "Hub Ø{{cad.hub_dia_min_in:.2f}}–{{cad.hub_dia_max_in:.2f}}, bar {{cad.outline_bar_height_min_in:.2f}}–{{cad.outline_bar_height_max_in:.2f}} high at 5.50 from the bore's centre (the drawing's station; the bar tapers past it) and the tip's wall round the spring hole at least .060 (the calipers); the roots no larger than R.040 (the 5/64 in cutter's own radius). Outside: set that load's four levers aside and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.hub_dia_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.outline_bar_height_band_mm}}" },

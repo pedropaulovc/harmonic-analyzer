@@ -3,8 +3,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 410" width="640" height="410" font-family="sans-serif" font-size="12">
 <rect class="paper" width="640" height="410"/>
 <text class="label" x="20" y="20">Side A up: pocket and rings (top view)</text>
-<rect class="fixture-vise" x="89" y="34" width="413" height="26"/>
-<text class="label" x="240" y="50">fixed jaw</text>
+<rect class="clamp" x="89" y="34" width="413" height="26"/>
+<text class="label" x="510" y="51">fixed jaw</text>
 <rect class="fixture-plate" x="40" y="62" width="396" height="260" fill-opacity="0.4"/>
 <rect class="part-rest" x="40" y="60.0" width="511.8" height="66.0"/>
 <path class="part-kept" d="M80.3 80.8 L433.9 80.8 L526.0 82.0 A11.0 11.0 0 0 1 526.0 104.0 L433.9 105.2 L80.3 105.2 A15.5 15.5 0 1 1 80.3 80.8 Z"/>
@@ -26,8 +26,8 @@
 <circle class="holes" cx="70.7" cy="291.1" r="8.5"/>
 <circle class="holes" cx="400.9" cy="291.1" r="2.6"/>
 <circle class="holes" cx="525.8" cy="291.1" r="5.2"/>
-<rect class="fixture-vise" x="89" y="324" width="413" height="26"/>
-<text class="label" x="240" y="341">moving jaw</text>
+<rect class="clamp" x="89" y="324" width="413" height="26"/>
+<text class="label" x="510" y="341">moving jaw</text>
 <line class="datum" x1="40" y1="30" x2="40" y2="354"/>
 <rect x="40" y="62" width="396" height="260" fill="none" stroke="#333" stroke-width="1.5" stroke-dasharray="6 4"/>
 <text class="label" x="10" y="370">X0 left ends</text>
