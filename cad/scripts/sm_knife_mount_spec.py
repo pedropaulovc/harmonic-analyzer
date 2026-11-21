@@ -33,7 +33,7 @@ and slips into this block's round hole (datum B).  Owner ruling 2026-11-08
 (Pedro), #2144 item 11.3 (scheme S1): one dowel and the screw hang the
 block; datum C, its slot open to the -X face and every slot control are
 deleted, and the block's yaw about the dowel is set at MHA-SM-00: the front
-mount's by a Ø.4720 gauge bar slid through both mounts' bores while its
+mount's by a gauge bar slid through both mounts' bores while its
 screw is tightened (step 5), the rear mount's by the rock gauge (6G) before
 its screw is tightened (6H).  Owner ruling 2026-11-10 (Pedro), #2334
 option B1 with S1 and S2, superseding the 2026-11-08 SM-02 harden-less
@@ -135,17 +135,24 @@ BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.01345
 # mounts, whose outer faces stand 7.67 apart, so the tool is an 8.0 in bar.
 # A bar that long has no gauge class, so it is made to the measured bores
 # (machinist review of farm build 20261110T204245.238203Z: a bare band
-# names no fit route): reference Ø.4720, the bore's smallest printed size,
-# at .0002-.0017 diametral clearance in each bore, so the rock budget keeps
-# the old class ZZ pin's .0017 maximum (shop-equipment gauges.gauge-bar-0472x8).
+# names no fit route) at a diametral clearance under each bore
+# (shop-equipment gauges.gauge-bar-0472x8).  Owner ruling 2026-11-20
+# (Pedro), #2499: "Follow recommendations unless noted otherwise" -- widen
+# the printed fit to cover the bores' pitch and height and charge its
+# maximum in the stack.  The class ZZ pin's .0002-.0017 it kept did not pass
+# two conforming bores: the minimum is the clearance their ∥.002|A pitch and
+# ⌖Ø.008 heights demand of a straight bar
+# (``build_sm_summing_assembly.KNIFE_BAR_FIT_NEED``, .00255, rounded up to
+# the .0001 step), the band keeps the bore band's .0015 width, so one bar
+# fits both bores of any conforming pair, and the rock budget and both
+# hanger-bolt stacks charge the .0041 maximum.  A bar so cut is Ø.4679-.4709.
 # The fit lives here, beside the bore it is cut to, so MHA-FR-02's hanger
 # mirror can charge the bar's play without importing the summing spec's
 # config closure (test_dodo_recipe's fine-grained config deps).
-KNIFE_GAUGE_BAR_DIA_IN = 0.4720
-KNIFE_GAUGE_BAR_CLEARANCE_IN = (0.0002, 0.0017)  # (min, max) diametral, each bore
-KNIFE_GAUGE_BAR_DIA = KNIFE_GAUGE_BAR_DIA_IN * 25.4  # 11.9888
-# The bar in the smallest conforming bores.
-KNIFE_GAUGE_BAR_DIA_MIN = (KNIFE_GAUGE_BAR_DIA_IN - KNIFE_GAUGE_BAR_CLEARANCE_IN[0]) * 25.4
+KNIFE_GAUGE_BAR_CLEARANCE_IN = (0.0026, 0.0041)  # (min, max) diametral, each bore
+# The bar at the fit's minimum in the smallest conforming bore: its
+# clearance in the largest bore is the fit's maximum.
+KNIFE_GAUGE_BAR_DIA_MIN = 2.0 * BORE_R_MIN - KNIFE_GAUGE_BAR_CLEARANCE_IN[0] * 25.4
 KNIFE_GAUGE_BAR_LENGTH_IN = 8.0
 
 # The block's overall sizes print two places (.XX): every stack below reads
@@ -175,7 +182,7 @@ GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
 # its vertical centre plane), for the webs and the tap's crown, and a
 # separate ∥.002|A holds its axis parallel to the top seat (its pitch).  A|B
 # leaves the bore's yaw about B free: the part no longer sets it.  At
-# MHA-SM-00 a Ø.4720 gauge bar slid through both mounts' bores with the
+# MHA-SM-00 a (Ø.47) gauge bar slid through both mounts' bores with the
 # screws finger-tight sets the front mount's yaw before its screw is
 # tightened, and must slide out after; the rear mount's yaw is set by the
 # rock gauge (6G) before its screw is tightened (6H)
@@ -199,8 +206,10 @@ KNIFE_BORE_PARALLELISM_TOL = GEOMETRIC_TOLERANCES_MM["knife-bore parallelism"]
 # ``build_sm_summing_assembly``'s HANGER_SCREW_MISMATCH charges the zone's
 # radius alone.  Owner ruling 2026-11-10 (Pedro), #2334 margin option 1a,
 # superseding that ruling's Ø.008: with the gauge bar's play charged, Ø.008
-# left 0.018 of bolt spare in MHA-FR-02's C-drill hole; Ø.005 leaves 0.072
-# and FR-02 unchanged (machinist exception RV-06: under the drilled-hole row).
+# left 0.018 of bolt spare in MHA-FR-02's C-drill hole; Ø.005 left 0.072
+# and FR-02 unchanged (machinist exception RV-06: under the drilled-hole row),
+# and 0.046 once the gauge bar's fit widened to .0026-.0041 (owner ruling
+# 2026-11-20 (Pedro), #2499).
 STUD_TAP_POSITION_TOL = GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"]
 # Datum B's round slip hole stands square to the datum-A top seat, so the
 # MHA-SM-VN-53 dowel, pressed square into the crossbar, enters it without

@@ -1050,8 +1050,9 @@ DRAWING_NOTES_B = f"WHOLE TOP EXCEPT 4 BOSSES:\nRa {ra(SEAT_UM, unit=UNIT)}."
 # bottoms, the junction lands and plan gussets, and the crossbar's full-depth
 # ends that seat both MHA-SM-02 knife mounts.  The 4X corner-boss bottoms
 # (.25 below the plane) and the hub boss and its V-gussets (.31 below) stay
-# off it.  No flatness zone (both knife seats lie on the one faced plane; no
-# stack spends a form budget on it) and no geometry change: the model's
+# off it.  No flatness zone (both knife seats lie on the one faced plane;
+# no stack spends a form budget on it, and the MHA-SM-00 gauge bar's fit
+# need takes the two seats as one plane: #3157) and no geometry change: the model's
 # underside is the finished plane.  Its own property, on the UNDERSIDE sheet
 # beside the enlarged detail of the hub boss and gussets it excludes.
 DRAWING_NOTES_C = (

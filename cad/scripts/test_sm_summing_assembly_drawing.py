@@ -445,6 +445,24 @@ def test_steps_five_and_six_do_one_thing_a_sub_step() -> None:
             assert line.count(". ") == 1, line
 
 
+def test_steps_name_the_front_and_rear_mounts_by_what_the_fitter_sees() -> None:
+    # Machinist review of the #2499 head (clarity, r1+r2): FRONT and REAR
+    # mounts and trunnions were never tied to anything on the sheets.  Step
+    # 5 names the mounts by the hanger hole nearer the gooseneck hub (the hub
+    # stands at the summing station) and 6B the rear trunnion by MHA-SM-03's
+    # printed datum B end; both cues must match the model's rear (+Z) side.
+    import fr_top_frame_spec as top_frame
+
+    (step5,) = [line for line in notes.ASSEMBLY_STEPS if line.startswith("5. ")]
+    assert "NEARER THE GOOSENECK HUB IS THE REAR MOUNT" in step5
+    assert top_frame.STUD_Z_REAR - SUMMING_Z < SUMMING_Z - top_frame.STUD_Z_FRONT
+    (step6b,) = [line for line in notes.ASSEMBLY_STEPS if line.startswith("6B. ")]
+    assert "DATUM B END OF MHA-SM-03 (THE REAR TRUNNION)" in step6b
+    # Datum B is the lever's +Z body end, the side of the rear hanger hole.
+    assert sm_summing_lever_spec.PLATE_Z_PLUS > 0
+    assert top_frame.STUD_Z_REAR > SUMMING_Z > top_frame.STUD_Z_FRONT
+
+
 def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() -> None:
     # Owner ruling 2026-10-27 (#2018 option C): accepted as is.  Each cut
     # bolt is run in by hand to its washer before it draws the mount's top
@@ -456,7 +474,11 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
     # with a fit route (rule 4): a matched fit to the bores it gauges, whose
     # maximum is the clearance the rock budget charges.  That fit is the
     # bar's own make record; the step states only the fitter's hand check
-    # (rule 22, PR #2717: no number that needs an instrument).
+    # (rule 22, PR #2717: no number that needs an instrument).  Owner ruling
+    # 2026-11-20 (Pedro), #2499: "Follow recommendations unless noted
+    # otherwise" -- the fit widens to .0026-.0041 so the bar passes two
+    # conforming bores; such a bar shakes, so the hand check is that it
+    # slides, and its reference size is the two places every such bar rounds to.
     step = " ".join(_step_group("5"))
     assert step.startswith("5. ")
     assert "MHA-SM-VN-52" in step
@@ -464,25 +486,32 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
     assert "WITHOUT THE LEVER" in step
     assert step.index("BY HAND") < step.index(notes.KNIFE_GAUGE_BAR) < step.index("TIGHTEN")
     assert step.index("TIGHTEN") < step.index("WITHDRAW THE BAR")
-    assert notes.KNIFE_GAUGE_BAR == "(Ø.4720) X 8.0 LONG GAUGE BAR"
+    assert notes.KNIFE_GAUGE_BAR == "(Ø.47) X 8.0 LONG GAUGE BAR"
     assert "PIN" not in notes.KNIFE_GAUGE_BAR and "ZZ" not in notes.KNIFE_GAUGE_BAR
     (bar_step,) = [
         line for line in notes.ASSEMBLY_STEPS if notes.KNIFE_GAUGE_BAR in line
     ]
     assert notes.KNIFE_GAUGE_BAR_FEEL in bar_step and "BY HAND" in bar_step
+    assert "SHAKE" not in bar_step
     # Rule 4: the matched fit names its mate by drawing number.
     assert "MADE TO THE MHA-SM-02 BORES" in bar_step
     # No four-place size is left in the step for an instrument to read.
     assert re.search(r"\.\d{4}\b", bar_step.replace(notes.KNIFE_GAUGE_BAR, "")) is None
     record = _shop_equipment.load()["gauges"]["gauge-bar-0472x8"]
+    assert "(Ø.47) x 8.0 in" in record["name"]
     low, high = builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN
     assert f"{low:.4f}".lstrip("0") in record["purchase"]
     assert f"{high:.4f}".lstrip("0") in record["purchase"]
-    assert builder.knife_mount.KNIFE_GAUGE_BAR_DIA == pytest.approx(2.0 * builder.knife_mount.BORE_R_MIN)
+    # Every bar so cut, Ø.4679-.4709, rounds to the printed (Ø.47).
+    assert notes.KNIFE_GAUGE_BAR_SIZES_IN == pytest.approx((0.4679, 0.4709))
+    assert "Ø.4679-.4709" in record["purchase"]
     assert max(builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) * 25.4 == pytest.approx(
         builder.KNIFE_BAR_CLEARANCE
     )
-    assert min(builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) > 0.0
+    # The minimum is what two conforming bores need, rounded up to .0001.
+    assert low == pytest.approx(builder.KNIFE_BAR_FIT_MIN_IN) == pytest.approx(0.0026)
+    assert low * 25.4 >= builder.KNIFE_BAR_FIT_NEED
+    assert (high - low) * 25.4 == pytest.approx(max(builder.knife_mount.BORE_DIA_BAND))
     assert builder.KNIFE_GAUGE_BAR_LENGTH > builder.KNIFE_MOUNT_OUTER_SPAN_MAX
     # The mounts' outer span grew .25 in with the front station (#1038).
     assert builder.KNIFE_MOUNT_OUTER_SPAN_MAX / 25.4 == pytest.approx(7.665, abs=1e-3)

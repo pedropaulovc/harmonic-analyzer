@@ -7,7 +7,7 @@ a bottoming tap in the block top, and located by the one MHA-SM-VN-53 dowel
 pressed into the crossbar, which slips into the block's top-seat round hole,
 datum B; owner ruling 2026-10-24, T+H3).  Owner ruling 2026-11-08 (Pedro),
 #2144 item 11.3 (scheme S1): one dowel and the screw hang the block; its yaw
-about the dowel is set at MHA-SM-00 by a Ø.4720 gauge bar through both
+about the dowel is set at MHA-SM-00 by a gauge bar through both
 mounts' bores, so the former -X slot (datum C) is gone.
 The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
 of its hexagonal pivot trunnions** (build_sm_summing_lever ``_hex_collar``); each
