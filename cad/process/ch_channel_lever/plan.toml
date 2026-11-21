@@ -324,11 +324,6 @@ instruction_detailed = "Home the mill ($H). Console M6 T1 (1/2 in end mill, at l
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0 on the spoil plate's bare top with T1, the spoil plate still clamped."
-instruction_detailed = "Spindle stopped, the T1 tip just dragging a .002 feeler leaf on the spoil plate's top: G10 L20 P1 Z0.051. This Z0 stays for every load and both sides (the tool setter measures each M6, holder swaps included)."
-feed = "hand"
-
-[[setups.operations]]
 instruction = "Every lot, the spoil plate still clamped: the jaws' top above the spoil plate's top."
 inspection = "Jaws' top .200–.290 above the spoil plate's top (the calipers' depth rod, at both ends of each jaw): .290 keeps the jaws .010 under the faced B face (.3005); .200 still grips two thirds of the thinnest blank. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = [5.08, 7.366] }]
@@ -341,6 +336,11 @@ feed = "hand"
 instruction = "Every lot: the spoil plate's top after filing."
 inspection = "A 6 in rule laid across the spoil plate at both ends and the middle: no rock, no edge standing proud. Fail: file the proud edge again and recheck."
 gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "G54 Z0 on the spoil plate's top with T1, the spoil plate now seated for good on the parallels (filed and checked; it is not lifted again this lot)."
+instruction_detailed = "Spindle stopped, the T1 tip just dragging a .002 feeler leaf on the spoil plate's top: G10 L20 P1 Z0.051. This Z0 stays for every load and both sides (the tool setter measures each M6, holder swaps included); from here on the spoil plate is only brushed and stoned in place."
+feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Y0 the fixed jaw's face: edge finder (900 rpm), from the blanks' side. Send $# and note the G54 line's Y for Setup 3."
