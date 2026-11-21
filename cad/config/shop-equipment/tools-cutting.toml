@@ -32,6 +32,35 @@ sku = "S10R-SCLCR3"
 status = "on_hand"
 note = "Owner inventory 2026-11-13; lathe boring bar."
 
+# To buy (route B for the MHA-DT-35 butt cup's pocket, 2026-11-21): the first
+# boring tool under 3/8 in. The pocket is bored to the measured MHA-DT-32 head
+# + .008-.016 (any head in the drawn .231-.241) with its floor corner inside
+# R.004 MAX, which no owned tool reaches. Micro 100 BB-180500S, listings read
+# 2026-11-21 (micro100.com tool details BB-180500; Kaufman Co. and Raptor
+# Supplies BB-180500S, about $48-53): solid carbide, sharp corner, right hand,
+# min bore .196 (5 mm), max bore depth .500, 1/4 in shank with a lockdown
+# flat, 2-1/2 in OAL, centreline offset .055. It needs a 1/4 in shank holder
+# (a Micro 100 Micro-Quik holder, or a 1/4 in ID sleeve in the tool post's
+# boring-bar holder): none is on record.
+[tools.boring-bar-micro100-bb-180500s]
+name = "Micro 100 BB-180500S solid carbide boring bar, sharp corner, .196 min bore x .500 deep, 1/4 in shank"
+kind = "boring_bar"
+sku = "BB-180500S"
+status = "to_order"
+note = "To buy, with a 1/4 in shank holder or sleeve (not on record). Supplier for the order not chosen; price about $48-53 (listings read 2026-11-21)."
+
+# To buy with it: the floor-side chamfer of the butt cup's #20 hole sits
+# inside the bored pocket (Ø.239-.257), where the owned 1/4 in chamfer mill
+# does not fit. Harvey Tool 902345-C3 (Turner Supply listing read
+# 2026-11-21): 3/16 in 90° pointed 2-flute solid carbide chamfer cutter,
+# 3/16 in shank, double ended.
+[tools.chamfer-mill-3-16-90]
+name = "Harvey Tool 902345-C3 3/16 in 90 deg pointed 2-flute carbide chamfer cutter, double ended"
+kind = "chamfer_mill"
+sku = "902345-C3"
+status = "to_order"
+note = "To buy. Supplier and price for the order not chosen."
+
 # Owner inventory, 2026-11-13: the shop's only 90 deg countersinking tool. No
 # 82 deg countersink is owned.
 [tools.chamfer-mill-330ch-1-4-90]

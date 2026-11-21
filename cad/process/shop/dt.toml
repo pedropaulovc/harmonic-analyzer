@@ -137,9 +137,11 @@ diameter_mm = 3.9878
 [tools.reamer-1610]  # MHA-DT-08 (Ø.161) REAM THRU, running fit on MHA-DT-32
 description = ".1610 in HSS chucking reamer"
 diameter_mm = 4.0894
-[tools.reamer-2560-end-cutting]  # MHA-DT-35 pocket, floor corner R.004 MAX (inventory: to order)
-description = ".2560 in end-cutting (flat-bottom) reamer"
-diameter_mm = 6.5024
+[tools.boring-bar-micro100-bb-180500s]  # MHA-DT-35 pocket bored to the measured head, floor corner R.004 MAX (inventory: to order)
+description = "Micro 100 BB-180500S carbide boring bar, sharp corner, .196 min bore, .500 deep, 1/4 in shank"
+[tools.chamfer-mill-3-16-90]  # MHA-DT-35 #20 hole's floor-side chamfer inside the pocket (inventory: to order)
+description = "3/16 in 90° pointed 2-flute carbide chamfer cutter (Harvey Tool 902345-C3)"
+diameter_mm = 4.7625
 [tools.reamer-3740]  # inventory tools.reamer-3740
 description = ".3740 in HSS straight-flute chucking reamer (McMaster 3087A55)"
 diameter_mm = 9.4996
