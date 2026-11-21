@@ -19,13 +19,16 @@
 # finished ends; Setup 6 lying on the 1-1/2 in parallel stacks, gripped on
 # the two ends, the west end against the fixed jaw: face the front face to
 # the depth, spot, drill C and ream .2510 both bores through from one zero
-# (PB05: X from the west end, Y from B); bench deburr and inspect, oil and
-# tag AWAITING BLACK OXIDE. Finish: the drawing's black oxide, by the
-# owner's 2026-11-17 brass-black precedent (MHA-MG-02: machined now,
-# blackened later): the last setup is gated on Birchwood Presto Black Steel
-# PC9, a room-temperature black oxide (cad/config/shop-equipment/
-# consumables.presto-black-steel-pc9, to buy), with gloves and eye
-# protection (consumables.chemical-gloves-eye-protection, to buy).
+# (PB05: X from the west end, Y from B); bench deburr and inspect. Finish:
+# black oxide, in the shop. Owner (Pedro), answered in person 2026-11-21:
+# "Black oxide: cold blackening in the shop with Presto Black PC9 is
+# acceptable as the drawing's black oxide." The last setup blackens the
+# block with Birchwood Presto Black Steel PC9 by the maker's instructions
+# (Presto Black Steel PC9 Instructions, steps 1 prepare, 2b brush-on, 3
+# stop, 4 dry, 6 seal; cad/config/shop-equipment/
+# consumables.presto-black-steel-pc9, which cites them); the PC9 and the
+# gloves and glasses (consumables.chemical-gloves-eye-protection) are to buy
+# (to_order).
 #
 # Why this order: a face can only be faced across the jaws when it is up, and
 # side-milled faces would leave sawn lips at the gripped ends. Each face is
@@ -637,12 +640,12 @@ instruction = "Fits, if the mating parts are at hand: the MHA-DT-19 pinion pivot
 feed = "hand"
 
 [[setups.operations]]
-instruction = "In band: oil each block lightly against rust with the stone lubricant (a light honing oil, on the shelf), tag it AWAITING BLACK OXIDE with its number, and bag it."
+instruction = "In band: go on to the blackening. If it must wait, oil each block lightly against rust with the stone lubricant (a light honing oil, on the shelf) and bag it with its number; the next setup washes the oil off."
 feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Blacken (once the cold black-oxide solution is bought)"
+title = "Blacken with Presto Black Steel PC9 (the drawing's black oxide)"
 machine = "Bench, ventilated"
 indexing = "none"
 diagram = { file = "diagrams/blacken.svg", alt = "The finished block, every surface to be blackened: the six faces, both bores and both hold-down holes." }
@@ -651,7 +654,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "The drawing's finish: {{cad.finish}}. Start only with Birchwood Presto Black Steel PC9 (a room-temperature black oxide for steel), chemical-resistant gloves and safety glasses in hand: all to buy, none on record. Until then each block stays bare and oiled, tagged AWAITING BLACK OXIDE."
+instruction = "The drawing's finish: {{cad.finish}}, done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide), by its maker's instructions as below. To buy before this setup (none on record): the PC9, chemical-resistant gloves and safety glasses."
 feed = "hand"
 
 [[setups.operations]]

@@ -72,8 +72,11 @@ flute_len_in = { value = 0.75, measured = { status = "measured", by = "placehold
 name = "MT3 dead centre with a straight end, held in the 3/4 in R8 collet"
 kind = "dead_centre"
 status = "on_hand"
-note = "Tap guide in the PM-30MV spindle"
-cite = ["Owner (Pedro) 2026-11-17: \"it was a mt3 dead center that had a straight part at the end i gripped with a 3/4 collet\"; stickout unmeasured (\"7.5 is a guess dead center had plenty of space with wrench\")"]
+note = "Tap guide in the PM-30MV spindle; its MT3 taper also fits the PM-1127VF-LB tailstock (machines.pm-1127vf-lb tailstock_taper), a dead centre there"
+cite = [
+  "Owner (Pedro) 2026-11-17: \"it was a mt3 dead center that had a straight part at the end i gripped with a 3/4 collet\"; stickout unmeasured (\"7.5 is a guess dead center had plenty of space with wrench\")",
+  "Owner (Pedro) 2026-11-21, answered in person: \"Lathe tailstock taper: MT3; the mill tap-guide dead centre fits.\"",
+]
 
 # Owner ruling 2026-11-16 (Pedro), #2837: "Require a spring tap guide in the
 # spindle (tap squared to the quill), and add a squareness term to the

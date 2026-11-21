@@ -112,6 +112,14 @@ material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, pecking, dry"
 
+# MHA-DT-26 end disc (C36000): the V hole through .11 of brass, in one
+# steady feed (no peck).
+[settings.lathe-drill-v-c360]
+tool = "drill-v"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, steady, dry; ease off as the point breaks through"
+
 # MHA-SM-05 end plug: #10-24 tap drill in 1018.
 [settings.lathe-drill-25-1018]
 tool = "drill-25"

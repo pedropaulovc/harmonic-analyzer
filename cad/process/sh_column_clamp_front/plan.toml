@@ -17,7 +17,10 @@
 # the height (CF04), jaws on B and the top, skim the mating face (CF05),
 # mating face down, face the outside face to the depth, spot and drill both ears
 # (CF06); bench deburr; the pair bore (MHA-SH-02 Setup 9); deburr and
-# inspect; black enamel (gated: no paint is on record).
+# inspect; black enamel: the owner's Rust-Oleum Flat Black 376855 (owner
+# 2026-11-21, answered in person: "rust-oleum Flat Black376855") over the
+# maker's Clean Metal Primer, by Rust-Oleum's technical data SRT-01
+# (consumables.black-alkyd-enamel cites it).
 #
 # Zeroing: the touch probe has no holder (its 6 mm R8 collet is off the buy
 # list, cad/config/shop-equipment/ gauges.touch-probe-diy0-tp05), so every
@@ -265,7 +268,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in). The blank lying on them along the jaws, gripped across two opposite cold-finished faces, centred on the jaws; the face up becomes the bottom face B. Tap it down onto both stacks while closing the vise. Its top stands {{process.blank_section_in:.3dot}} above the stacks, the lower {{process.lying_grip_mm:in.3dot}} of it in the jaws."
-datum = "Program CF03_bottom. G54: X0 the blank's LEFT end, Y0 the fixed jaw's face, Z0 the stacks' top; +Y toward the fixed jaw."
+datum = "Program CF03_bottom. G54: X0 the blank's LEFT end, its near side N (marked N after this setup and kept at the left through Setup 6), Y0 the fixed jaw's face, Z0 the stacks' top; +Y toward the fixed jaw."
 diagram = { file = "diagrams/bottom.svg", alt = "The blank lying along the jaws on stacked parallels; the 1/2 in end mill skims the top face, which becomes the bottom face B." }
 envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_section_mm}}", along_jaws_mm = "{{cad.width_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -296,14 +299,18 @@ milling_cuts = [
   { name = "bottom face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.bottom_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{cad.width_mm}}"] },
 ]
 
+[[setups.operations]]
+instruction = "Mark the LEFT end N (marking fluid): the near side. It stays at the left through Setup 6; Setup 7 turns the blank end for end and puts it at the right."
+feed = "hand"
+
 [[setups]]
 machine_kind = "other"
 title = "Top face to the height"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "As Setup 4, the blank turned over: B down on both stacks, gripped across the same two cold-finished faces, centred."
-datum = "Program CF04_height. G54: X0 the blank's LEFT end, Y0 the fixed jaw's face, Z0 the stacks' top (B)."
+holding = "As Setup 4, the blank turned over about its length, the N end still at the left: B down on both stacks, gripped across the same two cold-finished faces, centred."
+datum = "Program CF04_height. G54: X0 the N end (the left end), Y0 the fixed jaw's face, Z0 the stacks' top (B)."
 diagram = { file = "diagrams/height.svg", alt = "The blank lying on stacked parallels, B down; the 1/2 in end mill faces the top down to the height in levels." }
 envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_section_mm}}", along_jaws_mm = "{{cad.width_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -340,8 +347,8 @@ title = "Mating face skim"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The same stacks. The blank lying along the jaws, gripped on B and the top: B against the FIXED jaw, the two cold-finished faces left horizontal; the face up becomes the mating face. Centred on the jaws; tap it down onto both stacks while closing the vise."
-datum = "Program CF05_mating. G54: X0 the blank's LEFT end, Y0 the fixed jaw's face (B), Z0 the stacks' top."
+holding = "The same stacks. The blank lying along the jaws, the N end at the left, gripped on B and the top: B against the FIXED jaw, the two cold-finished faces left horizontal; the face up becomes the mating face. Centred on the jaws; tap it down onto both stacks while closing the vise."
+datum = "Program CF05_mating. G54: X0 the N end (the left end), Y0 the fixed jaw's face (B), Z0 the stacks' top."
 diagram = { file = "diagrams/mating.svg", alt = "The blank lying on stacked parallels, gripped on its bottom and top faces, B at the fixed jaw; the 1/2 in end mill skims the face up, the mating face." }
 envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.depth_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.width_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
@@ -380,8 +387,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_ja
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], clamp_mm = [0, "{{cad.width_mm}}"], section_mm = { y = "{{cad.height_mm}}", z = "{{cad.depth_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the RIGHT end (N), Y0 the fixed jaw's face (B): edge finder (900 rpm). Mark the right end N on the part."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the part's RIGHT end from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end). Scribe N on the right end: it is the near side the stations and the bore count from, here and in the pair."
+instruction = "Home the mill first ($H). G54 X0 the RIGHT end (N, marked in Setup 4), Y0 the fixed jaw's face (B): edge finder (900 rpm). Scribe the N in on that end."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the part's RIGHT end (N) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end). Scribe N into the marking on the right end: it is the near side the stations and the bore count from, here and in the pair."
 feed = "hand"
 
 [[setups.operations]]
@@ -494,11 +501,17 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Inspect first, the bore's edges still sharp (the deburr below breaks them)."
-inspection = "Bore Ø accepted in the pair (MHA-SH-02 Setup 9). Each ear's web to the bore, on the mating face: the calipers' outside jaw tips into the ear hole and the bore, closed on the web: at least {{cad.ear_wall_min_in:.3dot}} (MIN EAR WALL). Each ear's station: that web plus half the ear hole's pin plus half the bore's recorded Ø, {{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}}. The bore's place: the calipers from N to the bore's near edge on the mating face, plus half its Ø, {{cad.bore_location_min_in:.3dot}}–{{cad.bore_location_max_in:.3dot}}. Under the web or outside either band: stop and tell the owner."
+instruction = "Inspect first, the bore's edges still sharp (the deburr below breaks them): the bore was accepted in the pair (MHA-SH-02 Setup 9). The ears now; under the web or outside the band: stop and tell the owner."
+inspection = "Each ear's web to the bore, on the mating face: the calipers' outside jaw tips into the ear hole and the bore, closed on the web: at least {{cad.ear_wall_min_in:.3dot}} (MIN EAR WALL). Each ear's station: that web plus half the ear hole's pin plus half the bore's recorded Ø, {{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}}."
 gauge_checks = [
   { gauge = "calipers", band_mm = ["{{cad.ear_wall_min_mm}}", "{{cad.ear_wall_best_mm}}"] },
   { gauge = "calipers", band_mm = "{{cad.ear_station_band_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "The bore's place from N; outside the band: stop and tell the owner."
+inspection = "The calipers from N to the bore's near edge on the mating face, plus half its recorded Ø: {{cad.bore_location_min_in:.3dot}}–{{cad.bore_location_max_in:.3dot}}."
+gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.bore_location_band_mm}}" },
 ]
 
@@ -511,15 +524,31 @@ instruction = "Deburr the bore's edges at the top and bottom faces and along the
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Tag the front AWAITING BLACK ENAMEL with its pair number unless the enamel ops below follow now."
+instruction = "If the enamel cannot follow now: oil the front lightly, bag it and tag it with its pair number; wash the oil off before the enamel."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Choose the enamel: any black enamel for steel and the primer its directions call for, or the owner's product if one is named."
+instruction = "Paint: the owner's Rust-Oleum Stops Rust Flat Black 376855 over Rust-Oleum Stops Rust Clean Metal Primer 7780830, the paint maker's primer for bare metal. The primer is not owned: buy it. The enamel: check the shelf, buy if none."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Degrease. Mask the bore, both ear holes (a plug or a #8 screw in each) and the outside face (the bar seats on it), the face opposite the bore. Prime if its directions call for it, then enamel every other face black by its directions; let it cure."
+instruction = "Wash the front in detergent, rinse it in clean water and dry it thoroughly."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mask the bore, both ear holes (a plug or a #8 screw in each) and the outside face (the bar seats on it), the face opposite the bore."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Spray outdoors or in a well-ventilated space, at 50–90 °F and humidity under 70 %. Primer: shake the can a full minute after the ball rattles; 2 light coats a few minutes apart, the can 10–16 in off."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Enamel straight after the primer: every unmasked face black, 2 or more light coats a few minutes apart, the can moving and at one distance, no runs. Any further coat within 1 hour or after 48 hours."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Let it dry: tack-free in 2–4 hours, handle after 5–9 hours, fully dry in 24 hours."
 feed = "hand"
 
 [[setups.operations]]

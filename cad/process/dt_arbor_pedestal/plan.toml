@@ -19,8 +19,11 @@
 # foot gripped by the seat and the foot top: face the far face to the depth
 # and profile the tapered flanks and the crown round the bore (PA07); bench
 # deburr (the reamer by hand through the bore) and inspect; black enamel,
-# the bore and the foot seat masked, the bare machined faces oiled (gated:
-# no paint is on record).
+# the bore and the foot seat masked, the bare machined faces oiled: the
+# owner's Rust-Oleum Flat Black 376855 (owner 2026-11-21, answered in
+# person: "rust-oleum Flat Black376855") over the maker's Clean Metal
+# Primer, by Rust-Oleum's technical data SRT-01 (consumables.black-alkyd-
+# enamel cites it).
 #
 # Zeroing: every X/Y zero the owned .200 in edge finder at 900 rpm
 # (logbook 2026-11-04, tools.edge-finder), every Z zero a tool on a .002
@@ -752,7 +755,7 @@ feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Deburr, inspect, black enamel (gated)"
+title = "Deburr, inspect, black enamel"
 machine = "Bench"
 indexing = "none"
 diagram = { file = "diagrams/inspect.svg", alt = "The finished pedestal from the front and the side: the seat, the foot top, the tapered flanks and the crown about the bore, the apex hole into the bore, the hold-down hole through the foot, and where each is measured from." }
@@ -805,15 +808,31 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Tag the pedestal AWAITING BLACK ENAMEL with its number unless the enamel ops below follow now."
+instruction = "If the enamel cannot follow now: oil the pedestal lightly, bag it and tag it with its number; wash the oil off before the enamel."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Choose the enamel (the drawing: {{cad.finish}}). No paint is on record in the shop: buy any black enamel for steel and the primer its directions call for, or use the owner's product if one is named. None to hand: stop at the tag above."
+instruction = "Paint (the drawing: {{cad.finish}}): the owner's Rust-Oleum Stops Rust Flat Black 376855 over Rust-Oleum Stops Rust Clean Metal Primer 7780830, the paint maker's primer for bare metal. The primer is not owned: buy it. The enamel: check the shelf, buy if none."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Degrease. Mask the bore (a 3/8 dowel or a rolled paper plug), the apex hole (a 4-40 screw) and the foot seat. Prime if its directions call for it, then enamel every other face black by its directions; let it cure."
+instruction = "Wash the pedestal in detergent, rinse it in clean water and dry it thoroughly."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mask the bore (a 3/8 dowel or a rolled paper plug), the apex hole (a 4-40 screw) and the foot seat."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Spray outdoors or in a well-ventilated space, at 50–90 °F and humidity under 70 %. Primer: shake the can a full minute after the ball rattles; 2 light coats a few minutes apart, the can 10–16 in off."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Enamel straight after the primer: every unmasked face black, 2 or more light coats a few minutes apart, the can moving and at one distance, no runs. Any further coat within 1 hour or after 48 hours."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Let it dry: tack-free in 2–4 hours, handle after 5–9 hours, fully dry in 24 hours."
 feed = "hand"
 
 [[setups.operations]]

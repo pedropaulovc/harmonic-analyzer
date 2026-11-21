@@ -20,8 +20,10 @@
 # face (CB05), mating face down, face the outside face to the pre-face depth,
 # spot and drill both tap drills (CB06), tap both on the dead centre (CB07,
 # CB08); bench deburr; the pair bore (CB09, CB10 to open it if small); the
-# face-off (CB11); deburr and inspect; black enamel (gated: no paint is on
-# record).
+# face-off (CB11); deburr and inspect; black enamel: the owner's Rust-Oleum
+# Flat Black 376855 (owner 2026-11-21, answered in person: "rust-oleum Flat
+# Black376855") over the maker's Clean Metal Primer, by Rust-Oleum's
+# technical data SRT-01 (consumables.black-alkyd-enamel cites it).
 #
 # Zeroing: the touch probe has no holder (its 6 mm R8 collet is off the buy
 # list, cad/config/shop-equipment/ gauges.touch-probe-diy0-tp05), so every
@@ -725,15 +727,31 @@ instruction = "Deburr the half bore's edges at the top and bottom faces and alon
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Tag the back AWAITING BLACK ENAMEL with its pair number unless the enamel ops below follow now."
+instruction = "If the enamel cannot follow now: oil the back lightly, bag it and tag it with its pair number; wash the oil off before the enamel."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Choose the enamel: any black enamel for steel and the primer its directions call for, or the owner's product if one is named."
+instruction = "Paint: the owner's Rust-Oleum Stops Rust Flat Black 376855 over Rust-Oleum Stops Rust Clean Metal Primer 7780830, the paint maker's primer for bare metal. The primer is not owned: buy it. The enamel: check the shelf, buy if none."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Degrease. Mask the half bore and both tapped holes (a #8-32 screw in each). Prime if its directions call for it, then enamel every other face black by its directions; let it cure."
+instruction = "Wash the back in detergent, rinse it in clean water and dry it thoroughly."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mask the half bore and both tapped holes (a #8-32 screw in each)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Spray outdoors or in a well-ventilated space, at 50–90 °F and humidity under 70 %. Primer: shake the can a full minute after the ball rattles; 2 light coats a few minutes apart, the can 10–16 in off."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Enamel straight after the primer: every unmasked face black, 2 or more light coats a few minutes apart, the can moving and at one distance, no runs. Any further coat within 1 hour or after 48 hours."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Let it dry: tack-free in 2–4 hours, handle after 5–9 hours, fully dry in 24 hours."
 feed = "hand"
 
 [[setups.operations]]

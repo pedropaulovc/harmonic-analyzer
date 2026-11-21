@@ -72,6 +72,7 @@ def test_the_turned_parts_are_enrolled() -> None:
         "dt_crank_handle_ferrule",
         "dt_crank_handle_butt_cup",
         "sm_gooseneck_end_plug",
+        "dt_cylinder_end_disc",
     }
 
 
@@ -116,7 +117,12 @@ def test_the_drill_lands_in_the_drawings_hole_band(stem: str) -> None:
         assert band[0] <= SHOP["tools"][ref]["diameter_mm"] <= band[1], ref
 
 
-@pytest.mark.parametrize("stem", STEMS)
+# A plan turns its part from round bar (stock_dia_in) or from a squared blank
+# sawn off flat bar (blank_side_in, blank_axial_in; the 4-jaw route).
+BLOCK = tuple(stem for stem in STEMS if "blank_side_in" in _plan(stem)["parameters"])
+
+
+@pytest.mark.parametrize("stem", tuple(stem for stem in STEMS if stem not in BLOCK))
 def test_every_bar_is_a_stock_record_of_its_diameter(stem: str) -> None:
     plan = _plan(stem)
     bars = {
@@ -128,3 +134,17 @@ def test_every_bar_is_a_stock_record_of_its_diameter(stem: str) -> None:
     for ref in plan["stock_refs"]:
         assert STOCK[ref]["form"] == "round_bar", ref
     assert bars == recorded
+
+
+@pytest.mark.parametrize("stem", BLOCK)
+def test_every_squared_blank_is_sawn_from_a_flat_of_its_thickness(stem: str) -> None:
+    plan = _plan(stem)
+    side = plan["parameters"]["blank_side_in"] * 25.4
+    axial = plan["parameters"]["blank_axial_in"] * 25.4
+    assert plan["stock_refs"]
+    for ref in plan["stock_refs"]:
+        stock = STOCK[ref]
+        assert stock["form"] == "flat_bar", ref
+        width, thickness = stock["section_mm"]
+        assert abs(thickness - axial) < 1e-6, ref
+        assert width >= side - 1e-6, ref

@@ -81,11 +81,28 @@ kind = "paint"
 status = "to_order"
 note = "Not owned: to buy. Under the alkyd enamels of MHA-FR-01 and MHA-FR-02 (their FINISH: ALKYD PRIME)."
 
+# Owner (Pedro), answered in person 2026-11-21 (cnc rulings record, second
+# ask), naming the black enamel: "rust-oleum Flat Black376855". Whether a can
+# is on hand was not stated, so the record carries no status (stock_bom reads
+# it as unrecorded): FLAGGED, check the shelf before buying.
 [consumables.black-alkyd-enamel]
-name = "Black alkyd enamel"
+name = "Rust-Oleum Stops Rust Custom Spray 5-in-1 Flat Black 376855, 12 oz aerosol (oil-modified alkyd enamel)"
+kind = "paint"
+note = "Ownership not stated by the owner: to check. MHA-FR-01 deck and underside (BLACK DECK/UNDERSIDE), the MHA-SH-01/MHA-SH-02 column clamps and the MHA-DT-02 arbor pedestal (black enamel)."
+cite = [
+  "Owner (Pedro) 2026-11-21, answered in person: \"rust-oleum Flat Black376855\".",
+  "The Home Depot, Rust-Oleum Stops Rust 12 oz. Custom Spray 5-in-1 Flat Black Spray Paint 376855 (https://www.homedepot.com/p/Rust-Oleum-Stops-Rust-12-oz-Custom-Spray-5-in-1-Flat-Black-Spray-Paint-376855/323255175), read 2026-11-21.",
+  "Rust-Oleum Technical Data SRT-01, Stops Rust Enamel Sprays (Form GDH-678 Rev. 121919, https://www.rustoleum.com/-/media/DigitalEncyclopedia/Documents/RustoleumUSA/TDS/English/CBG/Stops%20Rust/SRT-01_Stops_Rust_Enamel_Sprays_TDS.ashx), read 2026-11-21: surface preparation 'Remove all dirt, grease, oil ... by washing the surface with a commercial detergent ... Rinse with fresh water and allow to thoroughly dry'; priming 'Use of a Stops Rust Primer ... is especially recommended for bare wood and metal', 7780830 Clean Metal Primer; application 'Hold can upright 10-16\" from surface ... Apply 2 or more light coats a few minutes apart'; 'Dries tack free in 2-4 hours, to handle in 5-9 hours and fully dry in 24 hours. Primers may be top coated immediately. Apply a second coat or clear coat within 1 hour or after 48 hours'; use at 50-90 F, humidity below 70%, outdoors or well ventilated; resin oil-modified alkyd.",
+]
+
+# The primer the enamel's maker recommends on clean bare metal (Rust-Oleum
+# SRT-01, above). Not owned: to buy.
+[consumables.rust-oleum-clean-metal-primer]
+name = "Rust-Oleum Stops Rust Clean Metal Primer 7780830, 12 oz aerosol"
 kind = "paint"
 status = "to_order"
-note = "Not owned: to buy. MHA-FR-01 deck and underside (BLACK DECK/UNDERSIDE) and the MHA-SH-01/MHA-SH-02 column clamps (black enamel)."
+note = "Not owned: to buy. Under the black enamel (consumables.black-alkyd-enamel) on bare steel: MHA-SH-01/MHA-SH-02 column clamps and the MHA-DT-02 arbor pedestal."
+cite = ["Rust-Oleum Technical Data SRT-01, Stops Rust Enamel Sprays (Rev. 121919), read 2026-11-21: 'Use of a Stops Rust Primer provides added corrosion protection, superior adhesion and hiding and is especially recommended for bare wood and metal'; '7780830 Clean Metal Primer'."]
 
 # --- McMaster-Carr PO 0803PCAMPOS (owned) ------------------------------------
 
@@ -217,8 +234,11 @@ cite = ["Birchwood Casey Deutschland, Brass Black directions step 8 (see consuma
 name = "Chemical-resistant gloves and safety glasses"
 kind = "ppe"
 status = "to_order"
-note = "Not owned: to buy (none on record). Handling Brass Black (H314: severe skin burns and eye damage)."
-cite = ["Birchwood Casey Deutschland, Brass Black hazard labelling: P280 wear protective gloves, protective clothing, eye protection, face protection"]
+note = "Not owned: to buy (none on record). Handling Brass Black (H314: severe skin burns and eye damage) and Presto Black Steel PC9 (an acid)."
+cite = [
+  "Birchwood Casey Deutschland, Brass Black hazard labelling: P280 wear protective gloves, protective clothing, eye protection, face protection",
+  "Presto Black Steel PC9 Instructions (see consumables.presto-black-steel-pc9): 'This product contains acid. Wear proper PPE including acid-resistant gloves and eye protection.'",
+]
 
 # Owner (Pedro) 2026-11-17: "i have oxpho blue". A cold blue for steel: the
 # maker's instructions and catalogue name guns, tools and steel, never brass,
@@ -239,11 +259,12 @@ cite = [
 
 # --- steel parts finished black oxide: room-temperature black oxide ---------
 
-# Owner ruling relayed by CncBlockA 2026-11-21, after the MHA-MG-02 brass-black
-# precedent (2026-11-17): a steel part whose finish is black oxide is machined
-# now and blackened later, its traveler's last setup gated on a to_order
-# room-temperature black oxide for steel, the part tagged awaiting black oxide
-# until then. One record for every such part (MHA-CH-08 pivot bracket first).
+# Owner (Pedro), answered in person 2026-11-21 (cnc rulings record): "Black
+# oxide: cold blackening in the shop with Presto Black PC9 is acceptable as
+# the drawing's black oxide." Every steel part whose drawing calls black oxide
+# is blackened in the shop by its traveler's last setup, by the maker's
+# instructions (cited below), with this solution and
+# consumables.chemical-gloves-eye-protection; both stay to_order until bought.
 # Oxpho-Blue (on hand) is a cold blue, not named black oxide by its maker.
 [consumables.presto-black-steel-pc9]
 name = "Birchwood Casey Presto Black Steel PC9 room-temperature black oxide concentrate, 8 fl oz"
@@ -253,58 +274,8 @@ sku = "5602"
 source = "birchwoodtechnologies.com, Presto Black Steel PC9, 8 oz size"
 status = "to_order"
 purchase = "Birchwood Technologies store, Presto Black Steel PC9, $26.49 for the smallest (8 oz) size, read 2026-11-21."
-note = "Not owned: to buy. Steel parts whose finish is black oxide (MHA-CH-08 pivot bracket): the blackening, their last setup. Not stainless; acid: gloves and eye protection (consumables.chemical-gloves-eye-protection)."
+note = "Not owned: to buy. The in-shop black oxide (owner ruling 2026-11-21) of every steel part whose drawing calls black oxide: the blackening, their last setup. Not stainless; acid: gloves and eye protection (consumables.chemical-gloves-eye-protection)."
 cite = [
   "Birchwood Technologies product page, Presto Black Steel PC9, SKU 5602, read 2026-11-21 (https://www.birchwoodtechnologies.com/shop/all-products/presto-black-steel-mkp-rpl-pc9/): 'Versatile Liquid Concentrate to create a black Steel patina', $26.49 to $575.50 by size (8 oz, 32 oz, 1 gal).",
   "Presto Black Steel PC9 Instructions (https://www.birchwoodtechnologies.com/wp-content/uploads/2025/11/Presto-Black-Steel-PC9-Inst.pdf), read 2026-11-21: 'works at room temperature to form a non-dimensional, medium-durability, black coating on all iron and steel surfaces'; 1. prepare metal: wash with soap and water or isopropanol, Scotchbrite or blast to fresh metal; 2b. brush or sponge-on: dilute 50-100% with water, apply with even strokes, re-wet and continue, attention to edges and holes, apply lightly; 3. stop the reaction: rinse thoroughly with clean water; 4. dry (compressed air, heat gun or lint-free cloth), repeat step 2 if necessary; 6. seal with a clear-coat, wax, or oil. Acid: acid-resistant gloves and eye protection. Waste and rinse water to a hazardous waste drop-off.",
-]
-
-# --- MHA-PD-27 platen bottom guide: black oxide + oil -----------------------
-
-# The drawing's finish is black oxide + oil and no black-oxide product is
-# owned (Oxpho-Blue above is a selenium cold blue). CncBlockB 2026-11-21: add
-# to_order records for a room-temperature black oxide for steel and what its
-# directions name; the traveler's finish setup
-# (cad/process/pd_platen_bottom_guide) is gated on them and the rail is tagged
-# AWAITING BLACK OXIDE until they are bought. Its PPE is
-# consumables.chemical-gloves-eye-protection.
-[consumables.presto-black-bst4]
-name = "Birchwood Technologies Presto Black BST4 brush-on blackener, 1 qt"
-kind = "blackening_solution"
-make = "Birchwood Laboratories"
-sku = "530040-S"
-status = "to_order"
-purchase = "Birchwood Technologies store, 1 qt, $50.80, read 2026-11-21 (https://www.birchwoodtechnologies.com/shop/all-products/presto-black-bst4-brush-on-liquid-1qt/). No stock read."
-note = "Not owned: to buy. MHA-PD-27 platen bottom guide: room-temperature black oxide for iron and non-stainless steel, swabbed on, its last setup."
-cite = [
-  "PRESTO BLACK BST4 Brush-On Blackener Operating Instructions, Birchwood Laboratories 07/2015, read 2026-11-21 (https://birchwoodtechnologies.com/wp-content/uploads/2019/02/5300_Presto_Black_BST4_Instructions.pdf): a liquid brush-on blackener for all iron and non-stainless steels, applied at room temperature, a non-dimensional black finish in 30-90 seconds. 1. clean with a solvent that leaves no residue: alcohol, acetone, lacquer thinner or equivalent (not mineral spirits or kerosene); 2. remove oxides if necessary (bead blast, Scotchbrite); 3. apply a thin film by brush, swab or spray and re-apply a few times during the reaction until a uniform gray/black; do not let it dry on the surface or flash rusting can occur; 4. stop the reaction by sponging with water; against flash rust, a second rinse of baking soda solution, 2 tablespoons per gallon of warm water; 5. force dry with compressed or warm air; 6. seal: tooling and machine parts with a water-displacer such as DRI TOUCH AMBER IRP2.",
-]
-
-[consumables.acetone]
-name = "Acetone"
-kind = "solvent"
-status = "to_order"
-purchase = "The residue-free solvent BST4's directions name (alcohol, acetone or lacquer thinner); any make. No size, price or stock read."
-note = "Not owned: to buy (none on record). MHA-PD-27 black oxide: clean the rail of all oil before the BST4."
-cite = ["Presto Black BST4 directions step 1 (see consumables.presto-black-bst4)"]
-
-[consumables.baking-soda]
-name = "Baking soda (sodium bicarbonate)"
-kind = "neutralizer"
-status = "to_order"
-purchase = "Any make; 2 tablespoons per gallon of warm water. No size, price or stock read."
-note = "Not owned: to buy (none on record). MHA-PD-27 black oxide: the second rinse that stops flash rust after the BST4."
-cite = ["Presto Black BST4 directions step 4 (see consumables.presto-black-bst4)"]
-
-[consumables.dri-touch-amber-irp2]
-name = "Birchwood Technologies Dri-Touch Amber IRP2 rust preventive (water displacer)"
-kind = "oil"
-make = "Birchwood Laboratories"
-sku = "8104"
-status = "to_order"
-purchase = "Birchwood Technologies store, $61.90-$226.00 by size, read 2026-11-21 (https://www.birchwoodtechnologies.com/shop/all-products/dri-touch-amber-irp2-rust-preventive/); the size to buy is not chosen. No stock read."
-note = "Not owned: to buy. MHA-PD-27 black oxide + oil: the seal BST4's directions name for machine parts."
-cite = [
-  "Presto Black BST4 directions step 6 (see consumables.presto-black-bst4)",
-  "DRI-TOUCH AMBER IRP2 Rust Preventive Operating Instructions, Birchwood Laboratories 07/2015, read 2026-11-21 (https://www.birchwoodtechnologies.com/wp-content/uploads/2019/02/8104_Dri-Touch_Amber_IRP2_Instructions.pdf): applied to wet or dry surfaces by dipping, brushing or low-pressure spray; dries in 10-30 minutes at ambient temperature; a corrosion preventive over black oxide that seals out corrosion and enhances the depth of colour; film about 0.10 mil.",
 ]

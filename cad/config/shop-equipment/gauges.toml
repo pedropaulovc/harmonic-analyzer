@@ -31,8 +31,13 @@ note = "owner confirmed on hand 2026-11-19"
 # set covering the reamed sizes; it keeps the guideline and every existing
 # review valid." A minus pin used as GO passes a hole up to .0002 under its
 # low limit (#3083 row 2), so the GO end of a reamed-hole check is a plus pin.
+# Owner ruling 2026-11-21 (Pedro, cnc rulings record): "ill buy pin gauges".
+# It supersedes the 2026-11-19 no-pin-gauge decision (#3124 item 5):
+# travelers may accept holes with go/no-go pin gauges, this record staying
+# to_order until they arrive; the sizes the enrolled plans name are listed in
+# PR #3319's body.
 [gauges.pin-gauges]
-note = "Class ZZ pin gauges, minus and plus, covering the reamed sizes (owner ruling 2026-11-20, #3075). Minus: the .011-.060 set (quotes-2026-11-17-rev3.xlsx A1-pin-set-011-060, recommended Shars 303-4501M0) and the combined .061-.500 set (A1-pin-set-061-500-combined, recommended Shars 303-4516M1+2, covering the A1-pin-set-061-250 and A1-pin-set-251-500 boxes). Plus: the matching plus sets over the same range, not yet quoted. The placeholder process plans name it as cad/process/shop/ tools.pin-gauges."
+note = "Class ZZ pin gauges, minus and plus, covering the reamed sizes (owner ruling 2026-11-20, #3075; owner ruling 2026-11-21: \"ill buy pin gauges\"). Minus: the .011-.060 set (quotes-2026-11-17-rev3.xlsx A1-pin-set-011-060, recommended Shars 303-4501M0) and the combined .061-.500 set (A1-pin-set-061-500-combined, recommended Shars 303-4516M1+2, covering the A1-pin-set-061-250 and A1-pin-set-251-500 boxes). Plus: the matching plus sets over the same range, not yet quoted. The placeholder process plans name it as cad/process/shop/ tools.pin-gauges."
 status = "to_order"
 
 # Owned by the shop (Pedro, 2026-11-08): a Mitutoyo shop-grade 81-piece inch gauge

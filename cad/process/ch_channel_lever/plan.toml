@@ -17,7 +17,7 @@
 # plate on seven tabs, take the two bar-to-hub roots to R.039, then round
 # each hub above and below the plate (CL06). Setup 5, bench: break the
 # levers off their tabs, file the tab stubs, deburr, inspect. Setup 6: black
-# oxide.
+# oxide in the shop, Presto Black Steel PC9.
 #
 # Pockets: the 1/2 in end mill's slot along each lever's centre line, from
 # past the blank's far end to the hub, and its arc round the hub; the 1/8 in
@@ -38,9 +38,20 @@
 # (GO) and a .257 minus pin (NO-GO) from the Class ZZ pin-gauge sets, which
 # are TO BUY (gauges.pin-gauges status to_order; owner ruling 2026-11-20,
 # #3075: plus and minus sets, the GO end a plus pin); the
-# drilled holes as drilled. The drawing's finish, matte black oxide per
-# MIL-DTL-13924 Class 1 (a hot process, all over, no masking), has no line on
-# record: Setup 6 sends the levers out.
+# drilled holes as drilled. The drawing's finish, matte black oxide, oil
+# sealed (all over, no masking), is done in the shop: delegated ruling
+# 2026-11-21 (Main, owner review #2144, cnc rulings record; precedent: the
+# owner's PC9 ruling below) drops MIL-DTL-13924 from the sheet, recorded
+# beside the finish line in cad/config/parts/ch-channel-lever.yaml by #3318.
+# Owner
+# (Pedro), answered in person 2026-11-21: "Black oxide: cold blackening in
+# the shop with Presto Black PC9 is acceptable as the drawing's black
+# oxide." Setup 6 blackens the levers with Birchwood Presto Black Steel PC9
+# by the maker's instructions (Presto Black Steel PC9 Instructions, steps 1
+# prepare, 2b brush-on, 3 stop, 4 dry, 6 seal; cad/config/shop-equipment/
+# consumables.presto-black-steel-pc9, which cites them); the PC9 and the
+# gloves and glasses (consumables.chemical-gloves-eye-protection) are to
+# buy (to_order).
 #
 # Zeroing: Z0 the spoil plate's bare top before the blanks go on, touched
 # with T1 on a .002 feeler leaf, kept for every load (the tool setter
@@ -700,14 +711,36 @@ gauge_checks = [
 
 [[setups]]
 machine_kind = "other"
-title = "Black oxide"
-machine = "Outside shop"
+title = "Black oxide: blacken with Presto Black Steel PC9"
+machine = "Bench, ventilated"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished lever, as inspected, before its finish." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished lever, as inspected, to be blackened all over: the hub, the bar, the bore and the holes." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Wash off the oil and the marker numbers (acetone). Finish: {{cad.finish}}, all over as the drawing states (no masking). Hot black oxide is not done in this shop (no line on record; the owned cold blue is not equivalent): send the levers out to a black-oxide shop with that callout."
+instruction = "The drawing's finish: {{cad.finish}}, all over (no masking). Done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide), by its maker's instructions as below. To buy before this setup (none on record): the PC9, chemical-resistant gloves and safety glasses."
 feed = "hand"
+
+[[setups.operations]]
+instruction = "Gloves and safety glasses on (the maker: it contains acid). Wash the levers with soap and water to take off the oil and the marker numbers; rinse and dry them. Hold each by its edges from here on."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "No sanding: the machined faces are fresh metal already (the maker's step 1), and the hub and web are at their final thickness. A rust spot or stain only: touch that spot lightly with the 220 roll, never on the hub faces. Wash again and dry."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mix the PC9 with water 1:1 in a plastic cup (the maker: 50–100% for brush-on). Brush it on every surface of each lever with even, light strokes, into the bore and the pin and spring holes; re-wet the brush and go over the edges, the holes and any light spot until the lever is an even black (the maker: do not press hard, it lifts the coating)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Rinse each lever thoroughly with clean water to stop the reaction (left acid keeps working and rusts the part); dry with a lint-free cloth or compressed air. Light spots: brush again, rinse, dry. Collect the solution and rinse water for a hazardous-waste drop-off, not the drain (the maker)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Seal: wipe on the stone lubricant (a light oil; the maker: clear coat, wax or oil), leave it a few minutes, wipe off the excess."
+feed = "hand"
+inspection = "Even black all over each lever, no bare spot and no wiping-off coating. Fit after blackening: the .256 pin (GO) still enters the bore. Tight: stop and tell the owner; do not re-ream."
+gauge_checks = "other"

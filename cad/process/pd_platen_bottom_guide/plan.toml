@@ -15,8 +15,8 @@
 # from the top face, over the moving jaw's side, clear of them): mill both
 # ends to the length with the cutter's side, spot and drill the four #43
 # holes through (PB05), tap each by hand (PB06-PB09); bench deburr and
-# inspect; black oxide + oil (gated: its Presto Black BST4 and supplies are
-# to buy; the rail is tagged AWAITING BLACK OXIDE until they come).
+# inspect; black oxide + oil, in the shop with Presto Black Steel PC9 (owner
+# ruling 2026-11-21; the PC9 and supplies are to buy).
 # The heavy depth removal (.355) is split .175 off the front and .180 off
 # the rear, and the height's .126 .050/.076, so the cold-finished bar's skin
 # comes off both sides of each pair and the rail stays straight.
@@ -36,11 +36,13 @@
 #
 # Flagged, not owned: the spiral-point #4-40 tap (owner ruling 2026-11-20,
 # #2427; shop-equipment tools.tap-4-40-spiral-point, to_order); the black
-# oxide + oil (none owned; CncBlockB 2026-11-21: records to buy, the part
-# tagged AWAITING BLACK OXIDE): shop-equipment consumables.presto-black-bst4,
-# acetone, baking-soda, dri-touch-amber-irp2 and
-# chemical-gloves-eye-protection, all to_order. Setup 8 follows the BST4
-# operating instructions (cited on that record) step by step.
+# oxide's Presto Black Steel PC9 and gloves and glasses (shop-equipment
+# consumables.presto-black-steel-pc9 and chemical-gloves-eye-protection,
+# to_order). Owner (Pedro), answered in person 2026-11-21: "Black oxide:
+# cold blackening in the shop with Presto Black PC9 is acceptable as the
+# drawing's black oxide." Setup 8 follows the PC9 instructions (cited on
+# that record: steps 1 prepare, 2b brush-on, 3 stop, 4 dry, 6 seal with
+# oil, the drawing's "+ oil").
 #
 # Zeroing: the touch probe has no holder (its 6 mm R8 collet is off the buy
 # list, cad/config/shop-equipment/ gauges.touch-probe-diy0-tp05), so every
@@ -573,32 +575,36 @@ feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Black oxide + oil (once its supplies are bought)"
+title = "Black oxide + oil: blacken with Presto Black Steel PC9"
 machine = "Bench, ventilated"
 indexing = "none"
-diagram = { file = "diagrams/finish.svg", alt = "The finished rail, every face, both ends and the four lock taps swabbed black with the Presto Black BST4, then sealed with Dri-Touch Amber IRP2." }
+diagram = { file = "diagrams/finish.svg", alt = "The finished rail, every face, both ends and the four lock taps brushed black with the Presto Black Steel PC9, then sealed with oil." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Start only with Presto Black BST4, acetone, baking soda, Dri-Touch Amber IRP2, chemical-resistant gloves and safety glasses in hand: all on the order list, to buy. Until then the rail stays bare and dry, tagged AWAITING BLACK OXIDE."
+instruction = "The drawing's finish: {{cad.finish}}, done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide), by its maker's instructions as below. To buy before this setup (none on record): the PC9, chemical-resistant gloves and safety glasses."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Gloves and safety glasses on (BST4 is an acid). Wipe the rail all over with acetone on clean rags, into the four taps, until a fresh rag stays clean (the maker: no mineral spirits or kerosene). Hold it by its ends from here on."
+instruction = "Gloves and safety glasses on (the maker: it contains acid). Wash the rail with soap and water, into the four taps, to take off the oil; rinse and dry it. Hold it by its ends from here on."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mix the second rinse first: 2 tablespoons of baking soda in a gallon of warm water. Swab BST4 on every face, both ends and into the taps in a thin film, wetting it again every few seconds until an even gray-black, 30–90 s (the maker's time). Never let it dry on: it flash-rusts."
+instruction = "Scuff every face lightly with the 220 sanding roll to fresh metal (the maker: Scotch-Brite or blasting), keeping the faces flat. Not in the taps. Wash again and dry."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Stop it: sponge the rail with clean water, then with the baking-soda rinse. Dry it at once with compressed or warm air, blowing out the taps."
+instruction = "Mix the PC9 with water 1:1 in a plastic cup (the maker: 50–100% for brush-on). Brush it on every face, both ends and into the taps with even, light strokes; re-wet the brush and go over the edges, the taps and any light spot until the rail is an even black (the maker: do not press hard, it lifts the coating)."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Seal (the oil): brush Dri-Touch Amber IRP2 over every face, both ends and into the taps; let it dry 10–30 min (the maker's time)."
+instruction = "Rinse thoroughly with clean water to stop the reaction (left acid keeps working and rusts the part); dry with compressed air, blowing out the taps, or a lint-free cloth. Light spots: brush again, rinse, dry. Collect the solution and rinse water for a hazardous-waste drop-off, not the drain (the maker)."
 feed = "hand"
-inspection = "An even black on every face and end, no bare or rusty patch (else wipe with acetone and repeat from the BST4); a #4-40 screw runs through each tap by hand."
+
+[[setups.operations]]
+instruction = "Seal (the oil): wipe the stone lubricant (a light oil) over every face, both ends and into the taps (the maker: clear coat, wax or oil), leave it a few minutes, wipe off the excess."
+feed = "hand"
+inspection = "An even black on every face and end, no bare or rusty patch (else wash, brush again, rinse, dry and seal); a #4-40 screw runs through each tap by hand."
 gauge_checks = "other"
