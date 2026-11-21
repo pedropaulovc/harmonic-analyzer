@@ -390,7 +390,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Saw {{process.quantity:d}} blanks {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long: nine from each of the two 72 in lengths and two from the 36 in, each marked off with the tape. File the burrs off both ends."
 feed = "hand"
-inspection = "Each blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long (the calipers to 6 in plus the tape). Under {{process.blank_length_in:.2f}}: the crown, {{process.crown_x_mm:in.3f}} from the left end, would have under {{process.crown_margin_min_mm:in.2dot}} to clean up past the tape's 1/32 and the saw's out-of-square. Over {{process.blank_length_max_in:.2f}}: CR04's end trim, one cut of at most {{process.end_trim_max_mm:in.3dot}} that plunges .10 past a {{process.blank_length_max_in:.2f}} end, would cut deeper or plunge onto it. Shorter: saw another; longer: saw it again."
+inspection = "Each blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long, from the filed left end: the calipers' jaws over the first 6 in, the tape for the rest. Shorter: it will not clean up at the crown, saw another; longer: CR04's end trim is laid out for {{process.blank_length_max_in:.2f}}, saw it again."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -632,7 +632,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "CR05_bore ends with T1 parked for the saw: up to Z{{process.saw_park_z_mm:.2f}}, along X past the crowns, along Y over the fork against the fixed jaw (X{{process.saw_touch_x_mm:.3f}} Y-25.400). Leave the head there."
+instruction = "CR05_bore ends with T1 parked for the saw: up to Z{{process.saw_park_z_mm:.2f}}, along X past the crowns, along Y in line with the fork against the fixed jaw (X{{process.saw_touch_x_mm:.3f}} Y-25.400; the saw's rim will sit 3 mm in over its crown). Leave the head there."
 feed = "hand"
 
 [[setups.operations]]
@@ -662,7 +662,7 @@ inspection = "Each spacer and collar under {{process.saw_collar_dia_max_mm:in.2d
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Spindle stopped, the head where CR05_bore left it, T1 over the fork against the fixed jaw, clear above it: do not jog X or Y. Take out the collet and T1; mount the arbor in the spindle (drawbar tight), the slitting saw on it between the spacers just checked, at least .25 in of them above the saw and at least {{process.saw_spacer_below_min_mm:in.3dot}} in below it, then the nut; its teeth cutting with the spindle turning clockwise (M3) seen from above. Do not move the blanks."
+instruction = "Spindle stopped, the head where CR05_bore left it, T1 in line with the fork against the fixed jaw, past its crown and clear above it: do not jog X or Y. Take out the collet and T1; mount the arbor in the spindle (drawbar tight), the slitting saw on it between the spacers just checked, at least .25 in of them above the saw and at least {{process.saw_spacer_below_min_mm:in.3dot}} in below it, then the nut; its teeth cutting with the spindle turning clockwise (M3) seen from above. Do not move the blanks."
 inspection = "The arbor's lowest point (the nut's lower face, or the arbor's end if it stands past the nut) no more than {{process.saw_below_max_mm:in.2dot}} in below the saw's lower face (the calipers' depth rod): CR06 rises that much higher between its passes to carry it over the stock. Over: take spacers from below the saw (keep at least {{process.saw_spacer_below_min_mm:in.3dot}} in), or stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.saw_below_max_mm}}"] }]
 
