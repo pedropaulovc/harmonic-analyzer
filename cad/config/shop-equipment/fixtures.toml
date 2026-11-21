@@ -329,6 +329,14 @@ status = "to_make"
 supply = "shop_made"
 note = "Not made: shop-made. Owner ruling 2026-11-20 (#2356, Option 2): T024 (MHA-DT-03-T024) TOOTH CUTTING SETUP on its round bore, which the keyed arbor cannot carry."
 
+[fixtures.dt-cone-gear-round-arbor-nut]
+name = "#8-32 UNC zinc-plated steel hex machine screw nut (round cutting arbor kit)"
+kind = "fastener"
+status = "to_order"
+sku = "McMaster 90480A009"
+purchase = "One (a pack is the usual unit). 11/32 across flats, 1/8 thick (ASME B18.6.3). Owner ruling 2026-11-20 (#2356, Option 2): \"purchased #8-32 nut under the root\"."
+note = "Not owned: to buy. Clamps TL-08 and T024 on the round arbor MHA-DT-03-TL-07 (fixtures.dt-cone-gear-round-arbor); no stem or Number (bought fixture hardware outside a kit assembly)."
+
 [fixtures.dt-cone-gear-index-plate]
 kind = "fixture"
 status = "to_make"
