@@ -626,6 +626,21 @@ def test_keep_out_catches_the_cutter_entering_a_fixture_below_its_top(tmp_path):
     assert hits("G0 X20 Y-1.5 Z7\nG0 Z5\n") == ["flange"]
 
 
+def test_keep_out_band_catches_a_tool_part_crossing_an_overhang(tmp_path):
+    # A plate overhanging its support from Z0 to Z6: a part of the tool
+    # under it misses it, one through its band does not.
+    ledge = {"name": "ledge", "x": (0.0, 10.0), "y": (0.0, 5.0), "z_top": 6.0, "z_bottom": 0.0}
+
+    def hits(text):
+        found = _gcode.check_keep_out(_program(tmp_path, text), 1.0, boxes=[ledge])
+        return [f.detail.split(" into ")[1].split(":")[0] for f in found]
+
+    assert hits("G0 X5 Y-5 Z-3\nG1 Y2 F100\nG0 Z-3\nG1 Y-5\nG0 Z8\nG0 Y2\n") == []
+    assert hits("G0 X5 Y-5 Z3\nG1 Y2 F100\n") == ["ledge"]
+    # Straight down through the band, no sampled point inside it.
+    assert hits("G0 X5 Y2 Z8\nG0 Z-3\n") == ["ledge"]
+
+
 def test_a_reamer_rapided_out_of_its_bore_is_caught(tmp_path):
     fed = _program(tmp_path, "G0 X10 Y5 Z5\nG0 Z1\nG1 Z-7 F80\nG1 Z1 F80\nG0 Z5\n")
     assert _gcode.check_feed_out(fed, 0.0) == []
