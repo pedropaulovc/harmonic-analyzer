@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="460"/>
+  <text class="title" x="20" y="22">VB02: section across the jaws (5 px/mm), P down on the parallels</text>
+  <rect class="clamp" x="252" y="215" width="80.5" height="225"/>
+  <rect class="clamp" x="427.5" y="215" width="80.5" height="225"/>
+  <rect class="fixture-support" x="332.5" y="313" width="16" height="127"/>
+  <rect class="fixture-support" x="411.5" y="313" width="16" height="127"/>
+  <line class="fixture-table" x1="220" y1="440" x2="540" y2="440"/>
+  <!-- The blank up to 28.70 above the parallels; faced to 26.16 (1.030) in two levels. -->
+  <rect class="part-kept" x="332.5" y="182.2" width="95" height="130.8"/>
+  <rect class="part-removed" x="332.5" y="169.5" width="95" height="12.7"/>
+  <line class="arrow" x1="380" y1="150" x2="380" y2="180"/>
+  <rect class="cutter" x="348.25" y="70" width="63.5" height="80"/>
+  <line class="datum" x1="332.5" y1="313" x2="560" y2="313"/>
+  <text class="datum-label" x="566" y="317">Z0: the parallels' top (P)</text>
+  <line class="dims" x1="530" y1="182.2" x2="530" y2="313"/>
+  <line class="leader" x1="428" y1="182.2" x2="530" y2="182.2"/>
+  <text class="label-halo" x="536" y="250">length {{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}}</text>
+  <text class="label-halo" x="446" y="166">far end, faced in levels of {{process.face_step_max_mm:in.3dot}} max</text>
+  <line class="leader" x1="560" y1="380" x2="428" y2="380"/>
+  <text class="label" x="566" y="384">1 in parallels</text>
+  <text class="label" x="516" y="210">fixed jaw: TOP face</text>
+  <text class="label" x="160" y="210">moving jaw</text>
+  <text class="label" x="40" y="80">Check the length still clamped: the calipers'</text>
+  <text class="label" x="40" y="96">depth rod, top to the parallel</text>
+</svg>
