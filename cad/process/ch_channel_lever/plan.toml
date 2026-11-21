@@ -720,7 +720,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "The drawing's finish: {{cad.finish}}, all over as the drawing states (no masking), done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide), by its maker's instructions as below. To buy before this setup (none on record): the PC9, chemical-resistant gloves and safety glasses."
+instruction = "The drawing's finish: {{cad.finish}}, all over (no masking). Done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide), by its maker's instructions as below. To buy before this setup (none on record): the PC9, chemical-resistant gloves and safety glasses."
 feed = "hand"
 
 [[setups.operations]]
@@ -728,7 +728,7 @@ instruction = "Gloves and safety glasses on (the maker: it contains acid). Wash 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Scuff both faces of each lever lightly with the 220 sanding roll to fresh metal (the maker: Scotch-Brite or blasting), keeping them flat. Not in the bore or the holes. Wash again and dry."
+instruction = "No sanding: the machined faces are fresh metal already (the maker's step 1), and the hub and web are at their final thickness. A rust spot or stain only: touch that spot lightly with the 220 roll, never on the hub faces. Wash again and dry."
 feed = "hand"
 
 [[setups.operations]]
