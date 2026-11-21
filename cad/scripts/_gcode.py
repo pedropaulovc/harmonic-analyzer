@@ -875,6 +875,29 @@ def _xy_points(m: Move, step: float = _SAMPLE_MM) -> list[tuple[float, ...]]:
     return [tuple(s + (e - s) * k / n for s, e in pairs) for k in range(1, n + 1)]
 
 
+def _first_inside(m: Move, lo: Point, hi: Point) -> Point | None:
+    """The first point of ``m`` (start included) inside the closed box from
+    ``lo`` to ``hi``: exact for a line, the start and :func:`_xy_points`
+    samples for an arc."""
+    if m.centre is not None:
+        points = (m.start, *_xy_points(m))
+        return next(
+            (p for p in points if all(a <= v <= b for v, a, b in zip(p, lo, hi))),
+            None,
+        )
+    t0, t1 = 0.0, 1.0
+    for s, e, a, b in zip(m.start, m.end, lo, hi):
+        if s == e:
+            if not a <= s <= b:
+                return None
+            continue
+        ta, tb = sorted(((a - s) / (e - s), (b - s) / (e - s)))
+        t0, t1 = max(t0, ta), min(t1, tb)
+        if t0 > t1:
+            return None
+    return tuple(s + (e - s) * t0 for s, e in zip(m.start, m.end))
+
+
 def _cross(o: Point, a: Point, b: Point) -> float:
     return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
 
@@ -967,12 +990,13 @@ def check_outline(
     cutter-centre path across the tab (its ends square to the path; the tab
     is the box's length along the path less the cutter's diameter), the
     tab's ``top`` and ``floor`` Z and the recipe's ``thickness``. Below its
-    top no cutter centre enters the box; a pass that meets it hops over level
-    at exactly its top and at the pass's offset, and that hop is the only XY
-    feed allowed off the levels. Only there, and only at levels under its
-    top, is the outline excused coverage. Each tab must stand: its top less
-    its floor is the recipe's thickness, a level reaches its floor, its box
-    holds outline and a pass hops it."""
+    top no cutter centre enters the box on any feed move, plunges and ramps
+    included; every pass cut below its top hops over it level at exactly its
+    top and at the pass's offset, and that hop is the only XY feed allowed
+    off the levels. Only there, and only at levels under its top, is the
+    outline excused coverage. Each tab must stand: its top less its floor is
+    the recipe's thickness, a level reaches its floor, its box holds outline
+    and every pass cut below its top hops it."""
     name = program.name
     findings: list[Finding] = []
     levels = {round(z, 3) for p in passes for z in p["levels"]}
@@ -990,8 +1014,10 @@ def check_outline(
         )
 
     def hop(m: Move) -> bool:
-        return _close(m.start[2], m.end[2]) and all(
-            hop_of(q) is not None for q in (m.start, *_xy_points(m))
+        return (
+            bool(tabs)
+            and _close(m.start[2], m.end[2])
+            and all(hop_of(q) is not None for q in (m.start, *_xy_points(m)))
         )
 
     moves = [
@@ -1022,8 +1048,16 @@ def check_outline(
     backward: list[str] = []
     late: list[str] = []
     stage = 0  # 0 clearing, k + 1 pass k: the latest cut so far
-    hops: dict[str, int] = {t["name"]: 0 for t in tabs}
+    hops: dict[str, set[int]] = {t["name"]: set() for t in tabs}
     bites: dict[str, list[str]] = {t["name"]: [] for t in tabs}
+    for t in tabs:
+        (x0, x1), (y0, y1) = t["x"], t["y"]
+        lo = (x0 + _TOL_MM, y0 + _TOL_MM, -math.inf)
+        hi = (x1 - _TOL_MM, y1 - _TOL_MM, t["top"] - _TOL_MM)
+        for m in program.cutting:
+            point = _first_inside(m, lo, hi)
+            if point is not None:
+                bites[t["name"]].append(_where(point))
     farthest = max(p["offset"] for p in passes)
     cell = farthest + max(e["tol"] for e in elements) + _SAMPLE_MM
     for m in moves:
@@ -1037,16 +1071,16 @@ def check_outline(
                     backward.append(_where(point))
             previous = point
             level = next((z for z in levels if _close(point[2], z)), None)
-            for t in tabs:
-                if point[2] < t["top"] - _TOL_MM and inside(t, point, -_TOL_MM):
-                    bites[t["name"]].append(_where(point))
             tab = hop_of(point)
             if tab is not None:
-                hops[tab["name"]] += 1
+                riding = {
+                    k
+                    for k, p in enumerate(passes)
+                    if abs(distance - p["offset"]) <= element["tol"]
+                }
+                hops[tab["name"]] |= riding
                 if level is None:  # the hop: at a pass's offset, never stage
-                    if not any(
-                        abs(distance - p["offset"]) <= element["tol"] for p in passes
-                    ):
+                    if not riding:
                         where = f"{_where(point)} is {distance:.3f}"
                         stray.append(f"{where} from {element['name']}")
                     continue
@@ -1115,6 +1149,15 @@ def check_outline(
         if not hops[t["name"]]:
             detail = f"{tab}: no pass hops it at Z{t['top']:.3f}"
             findings.append(Finding(name, "outline", detail))
+        else:
+            for k, p in enumerate(passes):
+                below = any(z < t["top"] - _TOL_MM for z in p["levels"])
+                if below and k not in hops[t["name"]]:
+                    detail = (
+                        f"{tab}: the offset-{p['offset']:.3f} pass, cut below its "
+                        f"top, never hops it at Z{t['top']:.3f}"
+                    )
+                    findings.append(Finding(name, "outline", detail))
         what = f"cutter centres below {tab}'s top Z{t['top']:.3f} in its box"
         _report(findings, name, what, bites[t["name"]])
     return findings

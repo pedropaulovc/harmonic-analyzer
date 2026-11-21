@@ -366,15 +366,16 @@ _ONE_PASS = {
 }
 
 
-def _loop(z: float) -> str:
-    """One anticlockwise lap at cutter-centre offset 1 round ``_OUTLINE``, from
-    and back to (5, -1), at depth ``z``; its corners are radius-1 arcs."""
+def _loop(z: float, r: float = 1.0) -> str:
+    """One anticlockwise lap at cutter-centre offset ``r`` round ``_OUTLINE``,
+    from and back to (5, -r), at depth ``z``; its corners are radius-r arcs."""
     nx, ny = _N
     return (
-        f"G1 X5 Y-1 Z{z} F100\nG1 X10 Y-1\nG3 X11 Y0 I0 J1\nG1 X11 Y10\n"
-        f"G3 X{10 + nx:.4f} Y{10 + ny:.4f} I-1 J0\n"
-        f"G3 X{-nx:.4f} Y{10 + ny:.4f} I{-5 - nx:.4f} J{-30 - ny:.4f}\n"
-        f"G3 X-1 Y10 I{nx:.4f} J{-ny:.4f}\nG1 X-1 Y0\nG3 X0 Y-1 I1 J0\nG1 X5 Y-1\n"
+        f"G1 X5 Y{-r:g} Z{z} F100\nG1 X10 Y{-r:g}\nG3 X{10 + r:g} Y0 I0 J{r:g}\n"
+        f"G1 X{10 + r:g} Y10\nG3 X{10 + r * nx:.4f} Y{10 + r * ny:.4f} I{-r:g} J0\n"
+        f"G3 X{-r * nx:.4f} Y{10 + r * ny:.4f} I{-5 - r * nx:.4f} J{-30 - r * ny:.4f}\n"
+        f"G3 X{-r:g} Y10 I{r * nx:.4f} J{-r * ny:.4f}\nG1 X{-r:g} Y0\n"
+        f"G3 X0 Y{-r:g} I{r:g} J0\nG1 X5 Y{-r:g}\n"
     )
 
 
@@ -448,18 +449,20 @@ _TAB = {
 
 
 def _tabbed_loop(
-    z: float, hops: tuple[tuple[float, float, float], ...] = ((4.0, 6.0, -1.5),)
+    z: float,
+    hops: tuple[tuple[float, float, float], ...] = ((4.0, 6.0, -1.5),),
+    r: float = 1.0,
 ) -> str:
-    """``_loop`` at depth ``z`` entered at (10, -1) after ``_loop``'s lap,
+    """``_loop`` at depth ``z`` entered at (10, -r) after ``_loop``'s lap,
     lifting to each hop's Z over its X range on the bottom run."""
     nx, ny = _N
     bottom = "".join(f"G1 X{x0}\nG1 Z{hz}\nG1 X{x1}\nG1 Z{z}\n" for x0, x1, hz in hops)
     return (
-        f"G1 X10 Y-1 F100\nG1 Z{z}\nG3 X11 Y0 I0 J1\nG1 X11 Y10\n"
-        f"G3 X{10 + nx:.4f} Y{10 + ny:.4f} I-1 J0\n"
-        f"G3 X{-nx:.4f} Y{10 + ny:.4f} I{-5 - nx:.4f} J{-30 - ny:.4f}\n"
-        f"G3 X-1 Y10 I{nx:.4f} J{-ny:.4f}\nG1 X-1 Y0\nG3 X0 Y-1 I1 J0\n"
-        f"{bottom}G1 X10 Y-1\n"
+        f"G1 X10 Y{-r:g} F100\nG1 Z{z}\nG3 X{10 + r:g} Y0 I0 J{r:g}\n"
+        f"G1 X{10 + r:g} Y10\nG3 X{10 + r * nx:.4f} Y{10 + r * ny:.4f} I{-r:g} J0\n"
+        f"G3 X{-r * nx:.4f} Y{10 + r * ny:.4f} I{-5 - r * nx:.4f} J{-30 - r * ny:.4f}\n"
+        f"G3 X{-r:g} Y10 I{r * nx:.4f} J{-r * ny:.4f}\nG1 X{-r:g} Y0\n"
+        f"G3 X0 Y{-r:g} I{r:g} J0\n{bottom}G1 X10 Y{-r:g}\n"
     )
 
 
@@ -536,6 +539,20 @@ def test_a_tab_is_left_standing_at_its_top_over_its_floor(tmp_path):
             {**_TAB, "x": (2.0, 3.5)},
             ["no pass hops it", "cutter centres below", "off the levels"],
         ),
+        # A plunge to depth inside the box between two hops.
+        (
+            "plunge",
+            _tabbed_loop(-2.0, ((4.0, 5.0, -1.5), (5.0, 6.0, -1.5))),
+            _TAB,
+            ["cutter centres below tab bottom's top"],
+        ),
+        # The drop to depth comes 0.1 mm inside the box's exit edge.
+        (
+            "early drop",
+            _tabbed_loop(-2.0, ((4.0, 5.9, -1.5),)),
+            _TAB,
+            ["cutter centres below tab bottom's top"],
+        ),
     ],
 )
 def test_a_tab_fault_is_caught(tmp_path, fault, deep, tab, found):
@@ -550,6 +567,32 @@ def test_every_declared_tab_must_stand(tmp_path):
     assert any("tab right: no pass hops it" in d for d in details)
     assert any("cutter centres below tab right's top" in d for d in details)
     assert not any("tab bottom" in d for d in details)
+
+
+@pytest.mark.parametrize(
+    ("box_y", "found"),
+    [
+        # The box spans both passes' paths and both hop it.
+        ((-2.5, 0.5), []),
+        # The box spans only the finishing path: the roughing pass, offset 2,
+        # cuts across the tab outside the box and never hops it.
+        ((-1.5, 0.5), ["tab bottom: the offset-2.000 pass, cut below its top"]),
+    ],
+)
+def test_every_pass_must_hop_the_tab(tmp_path, box_y, found):
+    passes = [{"offset": 2.0, "levels": [-2.0]}, {"offset": 1.0, "levels": [-2.0]}]
+    if box_y[0] < -2.0:
+        rough = "G0 X10 Y-2 Z5\n" + _tabbed_loop(-2.0, r=2.0)
+    else:
+        rough = "G0 X5 Y-2 Z5\n" + _loop(-2.0, r=2.0)
+    finish = "G0 Z5\nG0 X10 Y-1\n" + _tabbed_loop(-2.0) + "G0 Z5\n"
+    program = _program(tmp_path, rough + finish)
+    tab = {**_TAB, "y": box_y}
+    checked = _gcode.check_outline(program, _OUTLINE, passes, 0.0, tabs=[tab])
+    details = [f.detail for f in checked]
+    assert len(details) == len(found), details
+    for text in found:
+        assert any(text in d for d in details), (text, details)
 
 
 def test_cleared_waste_is_swept_at_depth(tmp_path):
