@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The finished rod: ring and bore, shank, fork with its slot and pin hole. Styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 260" width="640" height="260" font-family="sans-serif" font-size="12">
+<rect class="paper" width="640" height="260"/>
+<text class="title" x="20" y="22">Finished rod (top view and side view)</text>
+<path class="part-kept" d="M160.6 112.2 L536.4 112.2 L536.4 114.9 L575.6 114.9 A14.9 14.9 0 0 0 575.6 85.1 L536.4 85.1 L536.4 87.8 L160.6 87.8 A61.3 61.3 0 1 0 160.6 112.2 Z"/>
+<circle class="holes" cx="100.5" cy="100.0" r="46.3"/>
+<circle class="holes" cx="575.6" cy="100.0" r="3.0"/>
+<rect class="part-kept" x="39.2" y="183.1" width="122.7" height="38.9"/>
+<rect class="part-kept" x="161.8" y="188.9" width="374.5" height="29.7"/>
+<rect class="part-kept" x="536.4" y="175.1" width="54.1" height="54.9"/>
+<rect class="paper" x="546.3" y="190.5" width="45.2" height="24.2"/>
+<line class="datum" x1="20" y1="230" x2="600" y2="230"/>
+<text class="datum-label" x="24" y="246">D (side view, thickness ×3)</text>
+</svg>

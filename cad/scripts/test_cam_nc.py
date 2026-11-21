@@ -436,6 +436,25 @@ def test_outline_passes_run_in_order_after_the_clearing(tmp_path):
     assert len(swapped) == 1 and "cut after a later pass" in swapped[0]
 
 
+def test_a_lead_out_through_cleared_waste_is_not_clearing_after_a_pass(tmp_path):
+    passes = [{"offset": 1.0, "levels": [-1.0]}, {"offset": 1.0, "levels": [-2.0]}]
+    clear = "G0 X2 Y-4 Z5\nG1 Z-2 F100\nG1 X8\nG0 Z5\n"
+    zone = [{"x": (1.0, 9.0), "levels": [-2.0]}]
+    # After the last lap, back out from its offset into the cleared waste.
+    text = clear + "G0 X5 Y-1 Z5\n" + _loop(-1.0) + _loop(-2.0) + "G1 Y-4\nG0 Z5\n"
+    lead = [{"centre": (5.0, -4.0), "radius": 3.0, "levels": [-2.0]}]
+
+    def check(leads=()):
+        found = _gcode.check_outline(
+            _program(tmp_path, text), _OUTLINE, passes, 0.0, clearing=zone, leads=leads
+        )
+        return [f.detail for f in found]
+
+    late = check()
+    assert len(late) == 1 and "cut after a later pass" in late[0]
+    assert check(lead) == []
+
+
 # One tab on the bottom edge, X4-6: its box spans the edge and the cutter
 # centres at offset 1; the part's floor is the deepest level, Z-2.
 _TAB = {
