@@ -15,7 +15,9 @@ import fetch_features
 STEM = "ch_amplitude_bar"
 
 
-def _release_zip(tmp_path: Path, *, tamper: bool = False) -> bytes:
+def _release_zip(
+    tmp_path: Path, *, tamper: bool = False, extra: tuple[str, ...] = ()
+) -> bytes:
     """A release ZIP: a large unrelated member, then one real undeclared bundle."""
     _manifest, step = export_features.bundle_paths(STEM, tmp_path)
     step.parent.mkdir(parents=True)
@@ -34,6 +36,11 @@ def _release_zip(tmp_path: Path, *, tamper: bool = False) -> bytes:
         )
         for path in (step, manifest):
             archive.writestr(f"features/{STEM}/{path.name}", path.read_bytes())
+        for name in extra:
+            # ZipInfo() turns os.sep into "/"; keep the name byte-for-byte.
+            info = zipfile.ZipInfo(name)
+            info.filename = name
+            archive.writestr(info, b"x")
     return buffer.getvalue()
 
 
@@ -44,11 +51,12 @@ def _serve(monkeypatch, content: bytes) -> list[tuple[int, int]]:
     class _Response(io.BytesIO):
         def __init__(self, data: bytes, start: int) -> None:
             super().__init__(data)
+            self.status = 206
             self.headers = {
                 "Content-Range": f"bytes {start}-{start + len(data) - 1}/{len(content)}"
             }
 
-    def urlopen(request):
+    def urlopen(request, timeout=None):
         first, _, last = (
             request.get_header("Range").removeprefix("bytes=").partition("-")
         )
@@ -61,9 +69,16 @@ def _serve(monkeypatch, content: bytes) -> list[tuple[int, int]]:
 
 
 def _release(
-    monkeypatch, tmp_path: Path, *, tamper: bool = False, changed: tuple[str, ...] = ()
+    monkeypatch,
+    tmp_path: Path,
+    *,
+    tamper: bool = False,
+    changed: tuple[str, ...] = (),
+    extra: tuple[str, ...] = (),
 ) -> list:
-    ranges = _serve(monkeypatch, _release_zip(tmp_path / "published", tamper=tamper))
+    ranges = _serve(
+        monkeypatch, _release_zip(tmp_path / "published", tamper=tamper, extra=extra)
+    )
     monkeypatch.setattr(
         fetch_features,
         "release_asset",
@@ -119,6 +134,21 @@ def test_a_bundle_that_does_not_bind_its_step_is_refused(
     out = tmp_path / "out"
     assert fetch_features.main([STEM, "--out", str(out), "--accept-stale"]) == 1
     assert "bundle records" in capsys.readouterr().err
+    assert not (out / "features").exists()
+
+
+@pytest.mark.parametrize(
+    "member",
+    [f"features/{STEM}/..\\..\\x", f"features/{STEM}/C:x", f"features/{STEM}/sub/x"],
+)
+def test_an_unsafe_or_nested_bundle_member_is_refused(
+    tmp_path: Path, monkeypatch, capsys, member: str
+) -> None:
+    _release(monkeypatch, tmp_path, extra=(member,))
+    out = tmp_path / "out"
+    assert fetch_features.main([STEM, "--out", str(out), "--accept-stale"]) == 1
+    err = capsys.readouterr().err
+    assert repr(member) in err or member in err
     assert not (out / "features").exists()
 
 

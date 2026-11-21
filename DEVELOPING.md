@@ -365,8 +365,10 @@ fetch the bundle from a release first, then use the wrapper or `uvx` form:
 uv run --frozen python cad/scripts/fetch_features.py <stem> [--release vNN]
 ```
 
-Every release carries the bundle of every part with its own drawing under
-`features/<stem>/`; the script range-reads only those members of the release
+Releases cut after v50 carry the bundle of every part with its own drawing
+under `features/<stem>/` (v50 and earlier carry only the parts whose drawing
+declared requirements; asking one for another part fails with "the release
+carries no ... bundle"); the script range-reads only those members of the release
 ZIP, refuses a bundle that does not bind its STEP, and reports it STALE (exit 2,
 nothing written, unless `--accept-stale`) when the part's geometry or manifest
 recipe files differ between the release's tag and the working tree, or the

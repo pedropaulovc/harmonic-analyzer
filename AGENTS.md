@@ -465,7 +465,7 @@ declared part (an empty one for any other) and each feature's face set against
 that STEP; neither it nor `export_features` validates against a prechips schema.
 Without SolidWorks or a farm run, `cad/scripts/fetch_features.py <stem>` fills
 `cad/out/features/<stem>/` from the latest release (range-reads only that
-bundle) and reports it STALE, writing nothing, when the part's recipe moved
+bundle; releases after v50 carry every drawn part's) and reports it STALE, writing nothing, when the part's recipe moved
 since that release.
 
 Each part whose `cad/process/<stem>/plan.toml` is not a placeholder (no

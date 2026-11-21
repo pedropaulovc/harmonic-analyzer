@@ -245,6 +245,13 @@ An undeclared part's key holds no draw module: the exporter, the closure of its
 `DRAWING_NOTES` owner, the notes/spec files read to find it, its builder file
 (the frame citation), registry/config, the release revision and the native part
 identity, so no drawing edit re-keys it.
+Because every key holds the release revision, each release-revision bump
+re-runs all 131 `package:features:<stem>` SolidWorks leaves (113 more than the
+declared-only set): each opens the native part, saves the STEP and closes, about
+10 s of seat time plus the per-leaf farm overhead (roughly 2-2.5 worker-hours,
+15-20 min wall at farm parallelism 8 on an idle queue). The full export still
+opens each part again for STL/PNG, so the STEP work moves rather than
+disappears; the added cost is the per-leaf dispatch and the second open.
 Full `export` consumes bundle outputs rather than the draw closures directly;
 changed bundle bytes can therefore re-key it downstream. Feature leaves use
 `uptodate: [False]`, like full export, so each invocation reaches the cache probe
@@ -322,7 +329,9 @@ fetched from a release with no SolidWorks and no farm run:
 uv run --frozen python cad/scripts/fetch_features.py <stem> [--release vNN]
 ```
 
-Every release ships every part's bundle under `features/<stem>/`; the script
+Releases cut after v50 ship every drawn part's bundle under `features/<stem>/`
+(v50 and earlier only the declared parts', so an older `--release` fails for
+any other part with "the release carries no ... bundle"); the script
 range-reads just those ZIP members, refuses a bundle that does not bind its
 STEP, and reports it STALE (exit 2, nothing written unless `--accept-stale`)
 when the part's `part:<stem>` (geometry) or `package:features:<stem>` (manifest)

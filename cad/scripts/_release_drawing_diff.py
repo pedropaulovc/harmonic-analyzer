@@ -60,6 +60,34 @@ def previous_published_release(
     return candidates[max(candidates)] if candidates else None
 
 
+def release_zip_reader() -> Any:
+    """The comparison tool's ZIP/ZIP64 range reader (``central_dir``, ``extract``)."""
+    spec = importlib.util.spec_from_file_location("_drawing_release_zip", _TOOLS / "release_diff.py")
+    assert spec is not None and spec.loader is not None
+    reader = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(reader)
+    return reader
+
+
+def safe_member_parts(name: str) -> list[str]:
+    """``name``'s path components, refusing any that could escape or alias on
+    Windows: backslashes, empty/dot parts, control or drive/ADS characters,
+    trailing dots or spaces, and reserved device names."""
+    components = name.split("/")
+    if (
+        "\\" in name
+        or any(
+            part in ("", ".", "..")
+            or any(ord(char) < 32 or char in '<>:"|?*' for char in part)
+            or part.endswith((" ", "."))
+            or re.fullmatch(r"(?i:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?", part)
+            for part in components
+        )
+    ):
+        raise ValueError(f"unsafe release member: {name!r}")
+    return components
+
+
 def extract_release_pdfs(release: dict[str, Any], destination: Path) -> Path:
     """Extract actual ``pdf/**/*.pdf`` members without flattening identities.
 
@@ -81,27 +109,16 @@ def extract_release_pdfs(release: dict[str, Any], destination: Path) -> Path:
     if not isinstance(url, str) or not url.startswith("https://"):
         raise ValueError(f"published release {tag} has no HTTPS CAD asset URL")
 
-    spec = importlib.util.spec_from_file_location("_drawing_release_zip", _TOOLS / "release_diff.py")
-    assert spec is not None and spec.loader is not None
-    reader = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(reader)
+    reader = release_zip_reader()
     directory = reader.central_dir(url)
     selected: dict[str, tuple[PurePosixPath, dict[str, Any]]] = {}
     for name, entry in directory.items():
         if not name.lower().replace("\\", "/").startswith("pdf/") or not name.lower().endswith(".pdf"):
             continue
-        components = name.split("/")
-        if (
-            "\\" in name
-            or any(
-                part in ("", ".", "..")
-                or any(ord(char) < 32 or char in '<>:"|?*' for char in part)
-                or part.endswith((" ", "."))
-                or re.fullmatch(r"(?i:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?", part)
-                for part in components
-            )
-        ):
-            raise ValueError(f"unsafe release PDF member: {name!r}")
+        try:
+            components = safe_member_parts(name)
+        except ValueError:
+            raise ValueError(f"unsafe release PDF member: {name!r}") from None
         relative = PurePosixPath(*components[1:])
         identity = relative.as_posix().casefold()
         if identity in selected:

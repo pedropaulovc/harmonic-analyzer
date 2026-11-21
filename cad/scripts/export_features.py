@@ -110,12 +110,13 @@ def _notes_module(stem: str) -> ModuleType:
 
 
 def _undeclared_notes_path(stem: str) -> Path | None:
-    """An undeclared part's ``DRAWING_NOTES`` owner (notes, else spec), read
-    statically so a spec that owns no notes is neither imported nor keyed."""
+    """An undeclared part's ``DRAWING_NOTES`` owner: the notes module if it
+    defines them, else the spec if it does. Read statically, so a module that
+    owns no notes is neither imported nor keyed beyond the file read."""
     scripts = Path(__file__).resolve().parent
     for path in (scripts / f"{stem}_notes.py", scripts / f"{stem}_spec.py"):
-        if path.is_file():
-            return path.resolve() if "DRAWING_NOTES" in _source_declarations(path.resolve(), source_tree(path.resolve())) else None
+        if path.is_file() and "DRAWING_NOTES" in _source_declarations(path.resolve(), source_tree(path.resolve())):
+            return path.resolve()
     return None
 
 

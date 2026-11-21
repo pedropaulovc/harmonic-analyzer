@@ -4,11 +4,15 @@
 ``uv run --frozen python cad/scripts/fetch_features.py --all [--release v51]``
 
 Every part with its own drawing ships its feature bundle (the STEP and the
-``features.toml`` bound to it) in the release ZIP under ``features/<stem>/``.
-This reads only those members from the GitHub release asset with HTTP range
-requests (the ZIP's central directory, then each member), so one part costs a
-few MB rather than the whole multi-GB bundle. The latest release is used unless
-``--release`` names a tag.
+``features.toml`` bound to it) in the release ZIP under ``features/<stem>/``,
+from the first release cut with all-part bundles (the one after v50); earlier
+releases carry only the parts whose drawing declared requirements, and asking
+one for another part fails with "the release carries no ... bundle". This reads
+only those members from the GitHub release asset with HTTP range requests (the
+ZIP's central directory, then each member, through the comparison tool's
+reader that release drawing diffs use), so one part costs a few MB rather than
+the whole multi-GB bundle. The latest release is used unless ``--release``
+names a tag.
 
 Each fetched bundle must identify its part and bind its STEP's exact bytes
 (``step``, ``step_sha256``); a bundle that does not is refused and nothing is
@@ -20,7 +24,7 @@ written. It is then checked against this checkout:
   recipes (dodo's cache-key inputs, without the release revision) are diffed
   between the release's tagged commit and the working tree.
 
-Either finding marks the bundle STALE for this checkout; it is printed with the
+Either finding marks the bundle STALE for this checkout; it is reported with the
 changed files and the command exits 2 without writing it unless
 ``--accept-stale`` is given. A stale bundle needs a farm build
 (``package:features:<stem>``) to be current.
@@ -37,7 +41,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import io
 import json
 import os
 import re
@@ -47,10 +50,12 @@ import sys
 import tempfile
 import tomllib
 import urllib.request
-import zipfile
 from pathlib import Path
+from typing import Any
 
+import _telemetry
 import export_features
+from _release_drawing_diff import release_zip_reader, safe_member_parts
 from features_bound import FeaturesBoundError, validate_bundle
 
 REPO = export_features.REPO
@@ -79,19 +84,17 @@ def _repo_slug() -> str:
     return match.group(1)
 
 
-def _request(url: str, **headers: str) -> urllib.request.Request:
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    if token and url.startswith("https://api.github.com/"):
-        headers["Authorization"] = f"Bearer {token}"
-    return urllib.request.Request(url, headers={"User-Agent": PROJECT_SLUG, **headers})
-
-
 def release_asset(tag: str | None) -> tuple[str, str]:
     """The release's tag and the download URL of its ``<project>-<tag>.zip``."""
     which = "latest" if tag is None else f"tags/{tag}"
-    with urllib.request.urlopen(
-        _request(_API.format(repo=_repo_slug(), which=which))
-    ) as response:
+    headers = {"User-Agent": PROJECT_SLUG}
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(
+        _API.format(repo=_repo_slug(), which=which), headers=headers
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
         release = json.load(response)
     name = f"{PROJECT_SLUG}-{release['tag_name']}.zip"
     for asset in release.get("assets", ()):
@@ -100,69 +103,38 @@ def release_asset(tag: str | None) -> tuple[str, str]:
     raise FetchError(f"release {release['tag_name']} has no {name} asset")
 
 
-class RangeFile(io.RawIOBase):
-    """A read-only, seekable view of a remote file through HTTP range requests,
-    enough for :class:`zipfile.ZipFile` to read a member without the rest."""
-
-    def __init__(self, url: str) -> None:
-        self._url = url
-        self._position = 0
-        with urllib.request.urlopen(_request(url, Range="bytes=0-0")) as response:
-            total = response.headers.get("Content-Range", "").rpartition("/")[2]
-        if not total.isdigit():
-            raise FetchError(f"{url}: the server does not serve byte ranges")
-        self._size = int(total)
-
-    def readable(self) -> bool:
-        return True
-
-    def seekable(self) -> bool:
-        return True
-
-    def tell(self) -> int:
-        return self._position
-
-    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
-        base = {io.SEEK_SET: 0, io.SEEK_CUR: self._position, io.SEEK_END: self._size}[
-            whence
-        ]
-        self._position = max(0, base + offset)
-        return self._position
-
-    def readinto(self, buffer) -> int:
-        end = min(self._size, self._position + len(buffer))
-        if end <= self._position:
-            return 0
-        request = _request(self._url, Range=f"bytes={self._position}-{end - 1}")
-        with urllib.request.urlopen(request) as response:
-            data = response.read()
-        if len(data) != end - self._position:
-            raise FetchError(f"{self._url}: short range read at {self._position}")
-        buffer[: len(data)] = data
-        self._position = end
-        return len(data)
-
-
 def extract_bundles(
-    archive: zipfile.ZipFile, stems: list[str], destination: Path
+    reader: Any,
+    url: str,
+    directory: dict[str, dict],
+    stems: list[str],
+    destination: Path,
 ) -> None:
-    """Copy each part's ``features/<stem>/`` members into ``destination/features/<stem>/``."""
+    """Copy each part's ``features/<stem>/`` members into ``destination/features/<stem>/``.
+
+    Member names must be safe on Windows (``safe_member_parts``) and sit
+    directly in the bundle directory; every target must resolve under it."""
     for stem in stems:
         prefix = f"features/{stem}/"
         members = [
             name
-            for name in archive.namelist()
+            for name in directory
             if name.startswith(prefix) and not name.endswith("/")
         ]
         if not members:
             raise FetchError(f"{stem}: the release carries no {prefix} bundle")
+        root = (destination / "features" / stem).resolve()
         for name in members:
-            relative = name.removeprefix(prefix)
-            if "/" in relative or relative in {"", ".", ".."}:
+            try:
+                parts = safe_member_parts(name)
+            except ValueError as exc:
+                raise FetchError(str(exc)) from None
+            if len(parts) != 3:
                 raise FetchError(f"{name}: unexpected nested bundle member")
-            target = destination / "features" / stem / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(archive.read(name))
+            target = destination / "features" / stem / parts[2]
+            if not target.resolve().is_relative_to(root):
+                raise FetchError(f"{name}: escapes the bundle directory")
+            reader.extract(url, directory[name], target)
 
 
 def check_binding(stem: str, out: Path) -> None:
@@ -249,20 +221,25 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(
             f"name parts with a feature bundle (unknown: {', '.join(unknown) or 'none given'})"
         )
+    _telemetry.set_service("fetch-features")
+    _telemetry.configure()
 
     try:
         tag, url = release_asset(args.release)
         commit = tag_commit(tag)
         head = _git("rev-parse", "HEAD")
-        print(
-            f"fetch-features: release {tag} (commit {commit[:12]}), checkout HEAD {head[:12]}"
+        _telemetry.info(
+            f"fetch-features: release {tag} (commit {commit[:12]}), checkout HEAD {head[:12]}",
+            release=tag,
         )
         with tempfile.TemporaryDirectory(prefix="fetch-features-") as scratch:
             staging = Path(scratch)
-            with zipfile.ZipFile(
-                io.BufferedReader(RangeFile(url), buffer_size=1 << 20)
-            ) as archive:
-                extract_bundles(archive, stems, staging)
+            reader = release_zip_reader()
+            try:
+                directory = reader.central_dir(url)
+                extract_bundles(reader, url, directory, stems, staging)
+            except ValueError as exc:
+                raise FetchError(f"release {tag}: {exc}") from exc
             stale: dict[str, list[str]] = {}
             for stem in stems:
                 check_binding(stem, staging)
@@ -280,16 +257,15 @@ def main(argv: list[str] | None = None) -> int:
                 if findings:
                     stale[stem] = findings
             for stem, findings in stale.items():
-                print(
-                    f"fetch-features: STALE {stem} ({tag} bundle; needs a farm build of package:features:{stem} to be current)",
-                    file=sys.stderr,
+                _telemetry.warn(
+                    f"fetch-features: STALE {stem} ({tag} bundle; needs a farm build of package:features:{stem} to be current)\n"
+                    + "\n".join(f"  {finding}" for finding in findings),
+                    stem=stem,
+                    release=tag,
                 )
-                for finding in findings:
-                    print(f"  {finding}", file=sys.stderr)
             if stale and not args.accept_stale:
-                print(
-                    "fetch-features: nothing written; rerun with --accept-stale to use these bundles anyway",
-                    file=sys.stderr,
+                _telemetry.error(
+                    "fetch-features: nothing written; rerun with --accept-stale to use these bundles anyway"
                 )
                 return 2
             for stem in stems:
@@ -299,9 +275,13 @@ def main(argv: list[str] | None = None) -> int:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copytree(source, target)
                 state = "STALE" if stem in stale else "current"
-                print(f"fetch-features: {stem}: {target} ({state} for this checkout)")
+                _telemetry.info(
+                    f"fetch-features: {stem}: {target} ({state} for this checkout)",
+                    stem=stem,
+                    release=tag,
+                )
     except (FetchError, OSError) as exc:
-        print(f"fetch-features: {exc}", file=sys.stderr)
+        _telemetry.error(f"fetch-features: {exc}")
         return 1
     return 0
 
