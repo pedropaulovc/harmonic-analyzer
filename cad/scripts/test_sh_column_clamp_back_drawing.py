@@ -5,15 +5,20 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+import pytest
+
 import _clamp_arc
 import _column_clamp_drawing
 import _drawing_hidden_sketches
 import _config
 import build_sh_column_clamp_back as part
 import draw_sh_column_clamp_back as drawing
+import export_features
 import sh_column_clamp_back_geom as geom
+import sh_column_clamp_back_notes as notes
 import sh_column_clamp_back_spec as spec
 import sh_column_clamp_fit as fit
+from _gtol_face import FaceGeometry
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _paths import CAD_ROOT
 from machinist_exceptions import load_exceptions
@@ -251,3 +256,108 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     # One clamp pair per front column on the paper-drive bar, one at the
     # magnifier wheel bar.
     assert int(row["quantity"]) == 3
+
+
+_FEATURE_KINDS = {
+    "mating_face": "face",
+    "back_face": "face",
+    "bottom_face": "face",
+    "top_face": "face",
+    "near_side": "face",
+    "far_side": "face",
+    "bore": "half_bore",
+    "ear_tap_1": "threaded_hole",
+    "ear_tap_2": "threaded_hole",
+}
+
+
+def _plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+    point = tuple(value * offset_mm / 1000 for value in normal)
+    return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+
+def _cylinder(
+    dia_mm: float, axis: tuple[float, float, float], box_mm: tuple[float, ...]
+) -> FaceGeometry:
+    box = tuple(value / 1000 for value in box_mm)
+    return FaceGeometry(None, 4002, (0.0, 0.0, 0.0, *axis, dia_mm / 2000), None, box)
+
+
+def test_flag_notes_print_from_the_notes_module_the_export_reads() -> None:
+    assert drawing.DRAWING_NOTES is notes.DRAWING_NOTES
+    assert notes.DRAWING_NOTES.split("\n") == [
+        f"{notes.GRIP_NOTE}. {notes.GRIP_NOTE_TEXT}",
+        f"{notes.BORE_NOTE}. {notes.BORE_NOTE_TEXT}",
+    ]
+    assert notes.COLUMN_NUMBER == _config.parts("fr-tube-frame")["number"]
+
+
+def test_the_arc_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    assert "sh_column_clamp_back" in export_features.SUPPORTED_PARTS
+    manifest = export_features.requirement_manifest("sh_column_clamp_back")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == _FEATURE_KINDS
+    assert manifest["construction"] == "one_piece"
+    assert manifest["notes"]["manufacturing"] == drawing.DRAWING_NOTES.split("\n")
+    selectors = export_features.feature_selectors("sh_column_clamp_back")
+    h, w, r = spec.ARC_HEIGHT / 2, spec.ARC_WIDTH / 2, spec.COLUMN_BORE / 2
+    tap_r = geom.TAP_DRILL_DIA / 2
+    expected = {
+        "mating_face": [_plane((1.0, 0.0, 0.0), -geom.GRIP_OFFSET)],
+        "back_face": [_plane((-1.0, 0.0, 0.0), geom.DEPTH)],
+        "bottom_face": [_plane((0.0, -1.0, 0.0), h)],
+        "top_face": [_plane((0.0, 1.0, 0.0), h)],
+        "near_side": [_plane((0.0, 0.0, 1.0), w)],
+        "far_side": [_plane((0.0, 0.0, -1.0), w)],
+        "bore": [
+            _cylinder(
+                spec.COLUMN_BORE,
+                (0.0, 1.0, 0.0),
+                (-r, -h, -r, -geom.GRIP_OFFSET, h, r),
+            )
+        ],
+    }
+    for index, sign in ((1, 1.0), (2, -1.0)):
+        z = sign * spec.EAR_HOLE_Z
+        box = (-geom.DEPTH, -tap_r, z - tap_r, -geom.GRIP_OFFSET, tap_r, z + tap_r)
+        expected[f"ear_tap_{index}"] = [
+            _cylinder(geom.TAP_DRILL_DIA, (1.0, 0.0, 0.0), box)
+        ]
+    for name, faces in expected.items():
+        for face in faces:
+            owners = [
+                owner
+                for owner, specs in selectors.items()
+                if any(selector.matches(face) for selector in specs)
+            ]
+            assert owners == [name], name
+
+
+def test_arc_feature_bands_are_the_printed_ones() -> None:
+    features = export_features.requirement_manifest("sh_column_clamp_back")["features"]
+    mating = features["mating_face"]
+    assert mating["grip_offset"] == pytest.approx([_in(0.015), _in(0.025)])
+    assert mating["note"] == notes.GRIP_NOTE_TEXT
+    assert features["back_face"]["depth"] == pytest.approx([_in(0.58), _in(0.60)])
+    for name in ("bottom_face", "top_face"):
+        assert features[name]["height"] == pytest.approx([_in(0.62), _in(0.64)])
+    assert features["far_side"]["width"] == pytest.approx([_in(1.88), _in(1.90)])
+    bore = features["bore"]
+    assert bore["dia_ref"] == spec.COLUMN_BORE and bore["dimension_type"] == "reference"
+    assert bore["diametral_clearance"] == pytest.approx([_in(0.004), _in(0.012)])
+    assert bore["location_from_near_side"] == pytest.approx(
+        [_in(0.935), _in(0.955)], abs=1e-3
+    )
+    assert bore["note"] == notes.BORE_NOTE_TEXT
+    for index, sign in ((1, 1.0), (2, -1.0)):
+        tap = features[f"ear_tap_{index}"]
+        assert tap["thread"] == "#8-32 UNC-2B"
+        # The tap drill at the title block's DRILLED HOLES +.004/0.
+        assert tap["dia"] == pytest.approx([_in(0.136), _in(0.140)], abs=1e-3)
+        assert tap["thru"] is True and tap["axis"] == [1.0, 0.0, 0.0]
+        assert tap["thread_length_nominal"] == geom.BLOCK_DEPTH
+        assert tap["station"] == pytest.approx(
+            sorted([sign * _in(0.685), sign * _in(0.693)]), abs=1e-3
+        )
+        assert tap["height"] == pytest.approx([_in(0.311), _in(0.319)], abs=1e-3)
+        assert tap["mates"] == drawing.HOLE_CALLOUT_BELOW
