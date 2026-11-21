@@ -23,7 +23,7 @@
 # owner; the steady rest leaves 1 in free past it with no carriage clearance
 # on record. The stub carries the centre and is cut off: the lever leaves
 # with no feature the drawing does not show. End B's face is cut in the same
-# hold (Op 170), so no setup holds the threaded end out of the jaws. Route
+# hold (Op 190), so no setup holds the threaded end out of the jaws. Route
 # chosen by the agent and approved by Main 2026-11-21 (the owner corrects
 # afterwards), over the steady rest, a follow rest, a chuck-only hold .95
 # out, a centre in end B and a die.
@@ -52,7 +52,7 @@ title = "Magnifying Lever"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass rod, 1/4 in (drawing: brass)"
-stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} C360 rod, 360-H02 extruded, the 48 in bar on hand (Online Metals part 1257); one blank {{process.blank_length_in:.2dot}} in long. Before sawing, slide the MHA-MG-02 clamp (made first) along the bar where the blank comes from: it slides without catching; if it catches, the bar is no good for the lever's sliding fit: do not cut it, order another."
+stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} C360 rod, 360-H02 extruded, the 48 in bar on hand (Online Metals part 1257); one blank {{process.blank_length_in:.2dot}} in long. Before sawing, mike the bar at three places along the blank: every reading .248–.250 (the lever's O.D. is the bar as bought; with the MHA-MG-02 bore accepted at .257–.261 on its own traveler, that is the drawing's .007–.013 sliding clearance); then slide the MHA-MG-02 clamp (made first) along it: it slides without catching. Either fails: do not cut that bar, order another."
 note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. The O.D. is left as bought: the drawn rod's own surface is the drawing's Ra 125 MHA-MG-02 screw seat, so grip it over a brass shim wrap and never cut, file or stone it."
 shop = "../shop"
 stock_refs = ["c360-round-1-4"]
@@ -87,7 +87,7 @@ thread_start_z_in = 0.4
 end_stickout_in = 0.4
 # Setup 3: end A's .60 in the jaws, the rest out to the dead centre.
 centre_stickout_mm = 167.0
-# Op 170: the cutoff blade cuts end B's face at Z0, down to a Ø.06 neck that
+# Op 190: the cutoff blade cuts end B's face at Z0, down to a Ø.06 neck that
 # still carries the stub on the dead centre; Setup 4 saws through the neck.
 neck_dia_in = 0.06
 # ASME B1.1-2019, 1/4-20 UNC-2A major diameter limits.
@@ -215,13 +215,13 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Turned round: 3-jaw over the shim wrap on the other end's .60 in (end A); the rod out toward the tailstock, the MT3 dead centre in the tailstock, its point oiled, in the stub's centre hole, the quill just snug and locked. The centre must seat and lock in the quill's taper; if it does not, stop: a lathe dead centre is to order. Re-oil the point every few passes."
-datum = "Z0 (carriage DRO) end B's plane, {{process.stub_in:.3dot}} in from the stub's faced end: the AR tool (Op 60) and the threading bit (Op 90) are touched on the stub's end and set to Z+{{process.stub_in:.3dot}}; the cutoff blade (Op 170) on the pilot's shoulder, Z+.300."
+datum = "Z0 (carriage DRO) end B's plane, {{process.stub_in:.3dot}} in from the stub's faced end: the AR tool (Op 60) and the threading bit (Op 90) are touched on the stub's end and set to Z+{{process.stub_in:.3dot}}; the cutoff blade as Op 190 sets it on the pilot's shoulder."
 diagram = { file = "diagrams/centres.svg", alt = "The rod between the 3-jaw and the dead centre in the stub: end B's thread cut toward the chuck from over the pilot." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{process.centre_stickout_mm}}", minimum_diameter_mm = "{{process.pilot_dia_mm}}", support = "tailstock" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Mike the rod at three places along the thread's length (Z+.300 to Z-.720). Over {{process.thread_major_max_in:.4dot}} at any: Op 60 turns the thread's length down first."
+instruction = "Mike the rod at three places along where the thread goes: from the pilot's shoulder to {{cad.thread_length_max_in:.2dot}} beyond end B's plane (.50 in from the stub's faced end) toward the chuck. Over {{process.thread_major_max_in:.4dot}} at any: Op 60 turns the thread's length down first."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -279,7 +279,15 @@ instruction = "Only once Op 140 passes: back the cross slide fully off and the t
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Leaf does not seat: the gearbox is off 20 TPI; set it right, scrap the lever, start again at Setup 1. Tight on the bracket: spindle stopped, half-nuts closed, run the bit into the groove at X0: its point sits in the groove with no gap on either flank (the rod has not slipped or bent), then take a .001–.002 compound pass and try again. Point off the groove, shake or a torn thread: scrap the lever."
+instruction = "The leaf does not seat (Op 140): the gearbox is off 20 TPI; set it right, scrap the lever and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Tight on the bracket (Op 150): spindle stopped, half-nuts closed, run the bit into the groove at X0: its point sits in the groove with no gap on either flank (the rod has not slipped or bent). Off the groove: scrap the lever and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The point sits (Op 170): take a .001–.002 compound pass as Op 120 and try the bracket again as Op 150. Shake or a torn thread at Op 150: scrap the lever and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -300,14 +308,14 @@ indexing = "none"
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-diagram = { file = "diagrams/saw-stub.svg", alt = "The rod on the saw, the stub beyond the blade: sawn through the Op 170 neck." }
+diagram = { file = "diagrams/saw-stub.svg", alt = "The rod on the saw, the stub beyond the blade: sawn through the Op 190 neck." }
 
 [[setups.operations]]
 speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Saw through the Ø{{process.neck_dia_in:.2dot}} neck mid-way along the Op 170 groove, so the kerf clears end B's face on one side and the stub on the other; let the stub drop and pick up the lever only after the blade has stopped."
+instruction = "Saw through the Ø{{process.neck_dia_in:.2dot}} neck mid-way along the Op 190 groove, so the kerf clears end B's face on one side and the stub on the other; let the stub drop and pick up the lever only after the blade has stopped."
 feed = "hand"
 
 [[setups]]
@@ -335,7 +343,10 @@ inspection = "Thread length {{cad.thread_length_min_in:.2dot}}–{{cad.thread_le
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.thread_length_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Over {{cad.thread_length_max_in:.2dot}} with end B flat: file end B back a few strokes at a time, square to the rod (the combination square's blade along the rod), reading Op 200 between; end A's allowance takes it up. Break end B's edge again as Op 190. Under {{cad.thread_length_min_in:.2dot}}, or the run-out over {{cad.thread_incomplete_max_in:.3dot}}: scrap the lever and make another from Setup 1."
+instruction = "Over {{cad.thread_length_max_in:.2dot}} with end B flat: file end B back a few strokes at a time, square to the rod (the combination square's blade along the rod), reading Op 220 between; end A's allowance takes it up. Break end B's edge again as Op 210."
+
+[[setups.operations]]
+instruction = "Under {{cad.thread_length_min_in:.2dot}} at Op 220, or the run-out over {{cad.thread_incomplete_max_in:.3dot}}: scrap the lever and make another from Setup 1."
 
 [[setups]]
 machine_kind = "lathe"
@@ -344,7 +355,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Turned round: 3-jaw over the shim wrap on plain rod, end A's faced plane {{process.end_stickout_in:.2dot}} in out of the jaws (the sawn end about .085 beyond it); the threaded end back through the jaws into the spindle bore."
-datum = "End A's length is read with the height gauge (Op 230). For the tip (Op 250) the DRO Z is zeroed where the form tool's arc touches end A's corner."
+datum = "End A's length is read with the height gauge (Op 260). For the tip (Op 280) the DRO Z is zeroed where the form tool's arc touches end A's corner."
 diagram = { file = "diagrams/end-a.svg", alt = "The rod turned round, end A out: faced to length, then formed to the SR.125 tip." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
@@ -354,7 +365,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face end A square in light skims toward {{cad.faced_length_in:.2dot}}, reading the length between them (Op 230); stop inside {{cad.faced_length_min_in:.2dot}}–{{cad.faced_length_max_in:.2dot}}."
+instruction = "Face end A square in light skims toward {{cad.faced_length_in:.2dot}}, reading the length between them (Op 260); stop inside {{cad.faced_length_min_in:.2dot}}–{{cad.faced_length_max_in:.2dot}}."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -388,19 +399,23 @@ instruction = "Stop the spindle and look at the tip under a loupe: no pip or fla
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A pip (tool off centre height) or a step at the rod (arc off centre), found in Op 270: correct the tool's height or the cross slide, spindle stopped."
+instruction = "A pip (tool off centre height) or a step at the rod (arc off centre), found in Op 300: correct the tool's height or the cross slide, spindle stopped."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Only if Op 270 found a pip or step: bring the arc up along Z until it just touches the formed tip, zero the DRO Z at that touch, take one light pass to Z−.002 only, and look again as Op 270."
+instruction = "Only if Op 300 found a pip or step: bring the arc up along Z until it just touches the formed tip, zero the DRO Z at that touch, take one light pass to Z−.002 only, and look again as Op 300."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Still a pip or step: read the length as Op 230; 6.582 or more: repeat Op 290 once; otherwise scrap the lever and make another from Setup 1."
+instruction = "Still a pip or step: read the length as Op 260."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Read the length over the tip as Op 230."
+instruction = "Op 330 read {{cad.faced_length_min_in:.2dot}} plus .002 or more: correct the cause as Op 310, take the Op 320 pass once more and look again as Op 300; still a pip or step after that one repeat, or Op 330 read less: scrap the lever and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Read the length over the tip as Op 260."
 inspection = "Length over the tip {{cad.faced_length_min_in:.2dot}}–{{cad.faced_length_max_in:.2dot}}."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.faced_length_band_mm}}" }]
 
@@ -438,14 +453,6 @@ instruction = "Look along the O.D. under a light, then slide the MHA-MG-02 clamp
 
 [[setups.operations]]
 instruction = "The clamp catches, or the screw seat is marked: scrap the lever (the drawn surface is not reworked) and make another from Setup 1."
-
-[[setups.operations]]
-instruction = "The sliding fit: mike the rod where the clamp slides (about .248–.250, the bar as bought); read the MHA-MG-02 bore with the pin gauges, the largest pin that enters (about .255–.263); subtract."
-inspection = "Clearance, MHA-MG-02 bore less the rod, .007–.013 (drawing: SLIDING FIT IN MHA-MG-02 CLAMP)."
-gauge_checks = [{ gauge = "micrometers", band_mm = [6.2992, 6.35] }, { gauge = "pin-gauges", band_mm = [6.477, 6.6802] }]
-
-[[setups.operations]]
-instruction = "Outside .007–.013: the rod is the bar as bought, so the clamp's bore is off; set the lever aside and rework or remake MHA-MG-02 to its own traveler, then repeat Op 380."
 
 [[setups.operations]]
 instruction = "Wipe the lever clean and dry (FINISH: machined) and bag it with its number."

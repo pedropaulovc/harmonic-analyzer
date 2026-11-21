@@ -11,7 +11,7 @@
   <rect class="cutter" x="513" y="50" width="10" height="200"/>
   <line class="datum" x1="490" y1="100" x2="490" y2="200"/>
   <text class="datum-label" x="420" y="92">end B's face</text>
-  <text class="label" x="300" y="270">kerf mid-way along the .22 wide Op 170 groove</text>
+  <text class="label" x="300" y="270">kerf mid-way along the .22 wide Op 190 groove</text>
   <line class="dims" x1="480" y1="258" x2="516" y2="200"/>
   <text class="label" x="570" y="110">stub, dropped clear</text>
   <line class="dims" x1="600" y1="114" x2="585" y2="137"/>

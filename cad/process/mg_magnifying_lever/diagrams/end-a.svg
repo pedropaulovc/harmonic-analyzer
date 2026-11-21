@@ -17,7 +17,7 @@
   <text class="label" x="400" y="262">.40 out of the jaw fronts</text>
   <text class="label" x="520" y="290">sawn end, about .085 faced off</text>
   <line class="dims" x1="640" y1="278" x2="645" y2="165"/>
-  <path class="cutter" d="M680 118 L720 118 L720 182 L680 182 L680 163 A13 13 0 0 1 680 137 Z"/>
+  <path class="cutter" d="M680 118 L720 118 L720 182 L680 182 L680 163 A13 13 0 0 0 680 137 Z"/>
   <text class="label" x="640" y="110">R.125 form tool</text>
   <text class="label" x="20" y="120">end B's thread back in the spindle bore</text>
   <text class="label" x="160" y="290">3-jaw over a shim wrap on plain rod</text>

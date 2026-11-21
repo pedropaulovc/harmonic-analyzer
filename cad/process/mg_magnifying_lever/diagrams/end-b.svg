@@ -13,7 +13,7 @@
   <line class="dims" x1="340" y1="236" x2="624" y2="236"/>
   <line class="dims" x1="340" y1="228" x2="340" y2="244"/>
   <line class="dims" x1="624" y1="228" x2="624" y2="244"/>
-  <text class="label" x="360" y="262">thread .70–.72 from end B (Op 200)</text>
+  <text class="label" x="360" y="262">thread .70–.72 from end B (Op 220)</text>
   <text class="label" x="560" y="290">smooth file, flat on the face</text>
   <line class="dims" x1="640" y1="278" x2="640" y2="230"/>
   <text class="label" x="660" y="130">pip</text>
