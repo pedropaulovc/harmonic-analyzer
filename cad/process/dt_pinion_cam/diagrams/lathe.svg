@@ -11,7 +11,7 @@
   <line class="active-face" x1="570" y1="154" x2="570" y2="246"/>
   <rect class="cutter" x="380" y="270" width="40" height="70"/>
   <text class="label" x="580" y="140">face F (front), faced first</text>
-  <text class="label" x="430" y="290">part off .350 from F</text>
+  <text class="label" x="430" y="290">part off {{cad.cam_od_length_in:.3dot}} from F</text>
   <text class="label" x="230" y="140">second cam</text>
   <text class="label" x="40" y="380">O.D. turned Ø.575 ±.002 over both (1.00 long); edge broken; parted face is the rear face.</text>
 </svg>

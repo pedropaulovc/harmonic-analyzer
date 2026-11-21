@@ -337,6 +337,19 @@ def context(
     _agree(plan, "cross_axis_height_mm", drop)
     cross_jaw_top = p["vise_jaw_height_mm"] - p["parallel_height_mm"] - drop - radius
     _agree(plan, "cross_jaw_top_mm", cross_jaw_top)
+    # The tap stack's ceiling (CM03, the same hold): spindle-to-table maximum
+    # less the tool-change clearance, the vise bed, the parallels, the cam's
+    # top above them and the collet's gauge, rounded down to .01 in.
+    machine = shop["machines"]["pm-30mv"]
+    stack = (
+        machine["spindle_to_table_mm"][1]
+        - shop["limits"]["tool_change_clearance_mm"]
+        - p["vise_bed_height_mm"]
+        - p["parallel_height_mm"]
+        - (drop + radius)
+        - p["r8_collet_gauge_mm"]
+    )
+    _agree(plan, "tap_stack_max_mm", math.floor(stack / 0.254 + 1e-9) * 0.254)
     if p["tap_spot_dia_mm"] >= d50:
         raise ValueError("the tap spot is not under the #50 drill")
     tap_spot = _spot_depth(p["tap_spot_dia_mm"])

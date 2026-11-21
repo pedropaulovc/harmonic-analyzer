@@ -106,15 +106,17 @@ face_stepover_max_mm = 6.35
 # Both stop rebate_tab_mm short of the bar's ends, in the waste MS06 and MS07
 # face off.
 # The relief is plunge-milled: the 1/16 in long-reach end mill plunges
-# straight down from the rebate's back to relief_bottom_mm at 34 stations
-# relief_plunge_step_mm (.0305) apart, no more than half its diameter.
-# Between two plunges a ridge stands on each side of the relief, the cutter's
-# radius less the half-chord: relief_scallop_mm (.0040). The relief's clear
-# height between the ridges is the cutter less two ridges, .0620 − .0080 =
-# .0540, inside the printed .05–.07; any cutter of at least
-# relief_cutter_min_mm (the band's .050 plus two ridges, .058) keeps it
-# there. The relief's depth is the plunges' flat bottoms. cam.py recomputes
-# all three and checks a plunge at every station.
+# straight down from the rebate's back to relief_bottom_mm at 36 stations
+# relief_plunge_step_mm (.0287) apart. Between two plunges a ridge stands on
+# each side of the relief, the cutter's radius less the half-chord:
+# relief_scallop_mm (.0035) for the .0620 cutter. The relief's clear height
+# between the ridges is √(D² − s²) for a cutter D at the step s, .0550 for
+# the .0620 cutter, inside the printed .05–.07. The least cutter that keeps
+# it there is relief_cutter_min_mm = hypot(.050, s) = .0577, and the step is
+# held to half of that (s ≤ .050/√3), so any cutter the traveler accepts
+# plunges no more than half itself apart. The relief's depth is the plunges'
+# flat bottoms. cam.py recomputes all three and checks a plunge at every
+# station.
 roof_aim_mm = 2.286
 rebate_height_aim_mm = 3.4544
 rebate_depth_aim_mm = 8.4328
@@ -122,9 +124,9 @@ relief_bottom_mm = 9.7028
 rebate_centre_x_mm = 4.0132
 rebate_wall_mm = 0.1397
 rebate_step_mm = 0.508
-relief_plunge_step_mm = 0.7735
-relief_scallop_mm = 0.1015
-relief_cutter_min_mm = 1.4731
+relief_plunge_step_mm = 0.7293
+relief_scallop_mm = 0.0895
+relief_cutter_min_mm = 1.4645
 relief_cutter_max_mm = 1.778
 # The ceiling's Ra in microinches, the inch drawing's unit (cam.py checks it
 # against the export's 1.6 µm).
@@ -644,8 +646,8 @@ instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the stacks' top, touched with the centre drill on the fixed-jaw stack right of the block."
-instruction_detailed = "Console M6 T5 (#2 centre drill; the tool setter measures it). MDI G0 X6.000 Y-1.600: right of the block, over the fixed jaw's stack. Spindle stopped, its point just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
+instruction = "G54 Z0: the stacks' top, touched with the 1/8 in end mill on the fixed-jaw stack right of the block (the centre drill's body would meet the jaw there)."
+instruction_detailed = "Console M6 T2 (the 1/8 in end mill; the tool setter measures it). MDI G0 X6.000 Y-2.000: right of the block, its edge .016 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. MS08_thumb's M6 T5 then measures the centre drill against it."
 feed = "hand"
 
 [[setups.operations]]
