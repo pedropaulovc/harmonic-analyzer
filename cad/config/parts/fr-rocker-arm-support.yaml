@@ -1,8 +1,16 @@
 fr-rocker-arm-support:
   number: MHA-FR-05
-  material_family: ferrous_noncritical
-  finish: GREEN ENAMEL; MASK FOOT UNDERSIDE AND TOP FACE; OIL BARE FACES
+  # Owner ruling 2026-11-20 (Pedro), #635: from low-carbon bar now, so the
+  # sheet no longer offers gray iron.
+  material: LOW-CARBON STEEL, E.G. 1018 CF
+  material_specification: AISI 1018 cold-finished steel bar, 3 x 8 in
+  # One RAL on the three frame sheets, RAL 6005: owner ruling 2026-11-20
+  # (Pedro), #2394: "RAL 6005 on the base, top frame and rocker support;
+  # deck and column clamps plain black enamel."
+  finish: RAL 6005 ENAMEL; MASK FOOT UNDERSIDE AND TOP FACE; OIL BARE FACES
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "machined from solid stock or casting"
+  # Owner ruling 2026-11-20 (Pedro), #635: from low-carbon bar now
+  # (stock.1018-flat-3x8), not cast with the top frame.
+  process: "machined from low-carbon steel bar"

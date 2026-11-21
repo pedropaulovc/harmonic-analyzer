@@ -8,7 +8,10 @@ fr-top-frame:
   # section, the .51 webs; a class 30B heat also conforms.
   material: GRAY IRON, ASTM A48 CLASS 25B
   material_specification: GRAY IRON, ASTM A48 CLASS 25B
-  finish: ALKYD PRIME/GREEN ENAMEL;MASK SEATS/BORES/THREADS;LIGHT OIL BARE METAL
+  # One RAL on the three frame sheets, RAL 6005: owner ruling 2026-11-20
+  # (Pedro), #2394: "RAL 6005 on the base, top frame and rocker support;
+  # deck and column clamps plain black enamel."
+  finish: ALKYD PRIME/RAL 6005 ENAMEL;MASK SEATS/BORES/THREADS;LIGHT OIL BARE METAL
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
@@ -109,3 +112,8 @@ fr-top-frame:
       where: "the added draft's callout (2° +1°/0° DRAFT, WEBS, CROSSBAR, POCKETS, GUSSETS, PADS, SET-BOSS SIDES, HOLDS 2-56 TAP WALL .080 MIN, sheet 7)"
       finding: "draft band tighter than the title block's ±1° on added-draft faces that hold no 2-56 tap wall (rule 4)"
       reason: "owner ruling 2026-11-10 (#2333, D4): faces where draft is added print 2° +1°/-0 and faces where it is taken out print 2° ±1°; the one band covers every added-draft face of the pattern, and its 2° minimum is what leaves the keeper 2-56 tap drill its .0807 wall in the rail web (.0636 at 1°, target .080) (owner-accepted)"
+    - id: "RV-13"
+      kind: "minor"
+      where: "the two west corner-boss tops between the Ø1.083 cap recess's .02 mouth lead-in and the K5 keeper-relief step .67 from the socket axis (SECTION A-A and the plan's relief step)"
+      finding: "boss-top land .071 at the worst case, below the .080 in target (rule 17)"
+      reason: "Owner ruling 2026-11-20 (Pedro), #2626 option (a), in his words: \"A\". Accept .071 as a rule-17 advisory shortfall: the most-inboard printed step (.67 -.010) less the largest printed recess radius (Ø1.083 +.005), its drawn axis .005 off the socket's, the lead-in's largest printed leg (.02 +.010) and the step's own title-block .010 break leave .071 (1.803 mm) of flat boss top, above the .060 floor; over that 1 mm nothing bears (each MHA-FR-VN-54 cap seats on its tube end), so the geometry is unchanged and the recess keeps Ø1.083 (#2395 option A). Option (a) was put to the owner as \"Geometry and sheet unchanged\", so the sheet prints no rule-20 shortfall note for it"

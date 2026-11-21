@@ -79,7 +79,12 @@ import sm_vn_knife_hanger_stud_spec as HANGER_SCREW
 import sm_vn_knife_hanger_washer_spec as HANGER_WASHER
 import sm_vn_knife_mount_dowel_spec as KNIFE_DOWEL
 from _package_units import drawing_unit
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
+from _printed_tolerance import (
+    angular_band_deg,
+    drilled_oversize_mm,
+    printed_band_mm,
+    printed_deviations,
+)
 from _title_block_units import render_number
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -387,14 +392,28 @@ HANGER_PIN_HOLE_DIA_MAX = HANGER_PIN_HOLE_DIA + max(HANGER_PIN_HOLE_DIA_BAND)
 HANGER_PIN_HOLE_DEPTH = KNIFE_DOWEL.PRESS_DEPTH  # 12.7 MIN full diameter
 HANGER_PIN_HOLE_DEPTH_PLACES = KNIFE_DOWEL.PRESS_DEPTH_PLACES
 HANGER_PIN_HOLE_POINT_H = KNIFE_DOWEL.PRESS_POINT_H  # 0.946 on the ream size
+# The tallest cone the hole can end in (#3130, codjiflo round 2 on #3128).
+# The point is undimensioned, so the title block's angular ±1° governs it,
+# and the cover charges the sharpest accepted point, 117°, over the largest
+# diameter (sm_knife_mount_spec._PIN_POINT_H_MAX's terms).  The #31 (.120)
+# pilot under the ream (cad/process/fr_top_frame/plan.toml) may run past
+# the ream's full diameter: the depth band bounds the hole's deepest full
+# diameter whichever tool cut it, and the pilot's cone, on its smaller
+# diameter at the title block's DRILLED HOLES limit, is the shorter one.
+HANGER_PIN_PILOT_DIA = 0.120 * IN  # #31, 3.048
+_SHARPEST_POINT_HALF_ANGLE = radians((118.0 - angular_band_deg(unit=UNIT)) / 2.0)
+HANGER_PIN_HOLE_POINT_H_MAX = max(
+    dia / 2.0 / tan(_SHARPEST_POINT_HALF_ANGLE)
+    for dia in (HANGER_PIN_HOLE_DIA_MAX, HANGER_PIN_PILOT_DIA + DRILL_OVERSIZE)
+)  # 0.969, the ream's
 # A single MIN limit (owner decision 2026-11-19, #3124 item 3): the model
 # value is the printed minimum.  swTolMIN prints only that value and MIN, so
-# the native record's upper deviation is the deepest ream whose drill point
-# still stops the wall target (.080) below the faced top at the grip's near
-# limit: a THRU ream, which would exit under the MHA-SM-VN-54 washer's rim
-# (sm_vn_knife_mount_dowel_spec), is out of band.  The MHA-PD-18 latch-pin
-# precedent (#3127); build_fr_top_frame.PIN_HOLE_POINT_MARGIN proves it at
-# the band's maximum: (20.694, 0).
+# the native record's upper deviation is the deepest hole whose tallest
+# point still stops the wall target (.080) below the faced top at the grip's
+# near limit: a THRU ream, which would exit under the MHA-SM-VN-54 washer's
+# rim (sm_vn_knife_mount_dowel_spec), is out of band.  The MHA-PD-18
+# latch-pin precedent (#3127); build_fr_top_frame.PIN_HOLE_POINT_MARGIN
+# proves it at the band's maximum: (20.672, 0).
 HANGER_PIN_HOLE_POINT_COVER_MIN = WALL_TARGET_MM
 HANGER_PIN_HOLE_DEPTH_BAND = (
     int(
@@ -402,7 +421,7 @@ HANGER_PIN_HOLE_DEPTH_BAND = (
             HANGER_GRIP
             - HANGER_GRIP_TOL
             - HANGER_PIN_HOLE_POINT_COVER_MIN
-            - HANGER_PIN_HOLE_POINT_H
+            - HANGER_PIN_HOLE_POINT_H_MAX
             - HANGER_PIN_HOLE_DEPTH
         )
         * 1e6
@@ -431,8 +450,10 @@ HANGER_PIN_HOLE_DEPTH_MAX = HANGER_PIN_HOLE_DEPTH + max(HANGER_PIN_HOLE_DEPTH_BA
 # provenance scan reads them): the inch strings print, the millimetres
 # derive from them.
 # The keeper seats carry no frame: rule 5 names flatness on a clamp face
-# over-specification and no user ruling accepts one (codex review of
-# 06d0bbc59); the faced top (RV-03) carries them.
+# over-specification (codex review of 06d0bbc59); the faced top (RV-03)
+# carries them, and MHA-CH-00's fit-up check (the shaft slides freely
+# through both keeper bores) accepts the 0.04 seat zone the keeper stack
+# spends (owner ruling 2026-11-20 (Pedro), #1659 option B).
 # Owner rulings B6, D2, D3 and D6 (#2333): the four tube sockets (datum B, the 4X
 # pattern) are located BASIC from the casting's target frame E|F|G by a
 # two-tier position (two single-segment frames: drawing-guidelines.md allows
@@ -881,8 +902,8 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # The position frame holds the hanger axes BASIC zero on D (sheet 7
     # carries D's width and station); keeper coordinates are reference-only
     # guides to assembly-transferred taps.
-    "front hanger z from upper sockets": 3,
-    "rear hanger z from upper sockets": 3,
+    "front hanger z from lower sockets": 3,
+    "rear hanger z from lower sockets": 3,
     "keeper x from left sockets": 3,
     "front keeper z from upper sockets": 3,
     "rear keeper z from upper sockets": 3,
@@ -1019,9 +1040,10 @@ DRAWING_NOTES = (
 # puts them and both washers bear on the crossbar's faced top; no split-line
 # regions and no geometry change: the model's top is the finished plane.  Its
 # own property, placed beside the keeper callout on HOLES-SOCKETS.  The
-# keeper seats carry no flatness frame (rule 5; codex review of PR #1640,
-# owner ruling pending in #1659): MHA-CH-00 pair-reams the keepers and sets
-# them on this face with the shaft through both.
+# keeper seats carry no flatness frame (rule 5; codex review of PR #1640;
+# owner ruling 2026-11-20 (Pedro), #1659 option B): MHA-CH-00 pair-reams
+# the keepers, sets them on this face with the shaft through both and checks
+# the shaft slides freely through both bores.
 DRAWING_NOTES_B = f"WHOLE TOP EXCEPT 4 BOSSES:\nRa {ra(SEAT_UM, unit=UNIT)}."
 # User ruling 2026-10-12 (reading (i)): every face on the underside
 # plane between the bosses is faced at the seat finish -- the rail web

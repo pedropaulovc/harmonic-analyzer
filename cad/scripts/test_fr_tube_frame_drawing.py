@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+import _shop_equipment
 import fr_tube_frame_spec
 from fr_frame_attachment_spec import (
     BASE_SCREW_Y,
@@ -58,6 +59,17 @@ def test_length_is_flagged_cut_to_fit_from_a_longer_supply() -> None:
     # The supply is the next .01 in above the cut plus its allowance.
     assert supply - 0.254 < cut + fr_tube_frame_spec.SUPPLY_LENGTH_ALLOWANCE
     assert math.isclose(supply, 40.51 * 25.4, abs_tol=1e-9)
+
+
+def test_tube_supply_fits_the_41_in_stock_bought() -> None:
+    # Owner ruling 2026-11-20 (Pedro), #11 option B: "B but limit frame tube
+    # height max to 41 in ; thats the stock length bought".  The supply
+    # blank, and so the cut, comes out of one bought 41.000 in length.
+    limit = 41.0 * 25.4
+    assert TUBE_CUT_LENGTH < fr_tube_frame_spec.SUPPLY_LENGTH_MIN <= limit
+    tube = _shop_equipment.load()["stock"]["1020-dom-tube-1x0120"]
+    assert math.isclose(tube["length_mm"], limit, abs_tol=1e-9)
+    assert tube["pieces"] >= 4
 
 
 def test_callouts_link_numbered_notes_and_view_a_has_room() -> None:

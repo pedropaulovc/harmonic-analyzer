@@ -269,7 +269,23 @@ STEP_TEXT = {
         f"ABOVE THE UNDERSIDE OF {_BASE} (SHEET 1), {_BASE} ON A FLAT BENCH: READ "
         "WITH A STEEL RULE STOOD ON THE BENCH, AT THE CENTRE OF THE HOLE."
     ),
-    steps.TOP_FRAME_CLAMPED_KEY: f"CLAMP {_TOP} TO THE COLUMNS AT THAT HEIGHT.",
+    # #2324 (owner ruling 2026-11-20): a collar under each socket holds the
+    # height until the cross screws do. Two-piece, so it goes on and comes
+    # off a column held in both castings.
+    steps.TOP_FRAME_CLAMPED_KEY: (
+        f"TIGHTEN A 1 IN TWO-PIECE SHAFT COLLAR ON EACH COLUMN, SNUG UNDER ITS {_TOP} "
+        "SOCKET, WHILE THAT HEIGHT IS HELD."
+    ),
+    steps.TOP_AXIS_HELD_CHECKED_KEY: (
+        f"CHECK EACH {_TOP} SOCKET CROSS-HOLE AXIS STILL MEETS THE "
+        f"{_step(steps.TOP_AXIS_SET_KEY)} HEIGHT."
+    ),
+    "top-axis-held-reset": (
+        "IF ONE DOES NOT, LOOSEN ITS COLLAR AND REPEAT STEPS "
+        f"{steps.step_number(steps.TOP_AXIS_SET_KEY)} AND "
+        f"{steps.step_number(steps.TOP_FRAME_CLAMPED_KEY)} AT THAT SOCKET, UNTIL "
+        f"{_step(steps.TOP_AXIS_HELD_CHECKED_KEY)} PASSES."
+    ),
     "columns-marked": (
         f"MARK EACH {_COLUMN} FOR LENGTH, SO AN {_CAP} PUSHED ONTO ITS TOP END "
         f"REACHES ITS INSIDE SEAT WITH ITS SKIRT CLEAR OF THE RECESS FLOOR IN {_TOP}."
@@ -280,9 +296,11 @@ STEP_TEXT = {
     steps.FRAME_RESEATED_KEY: (
         f"RESEAT THE COLUMNS AND {_TOP} ON {_BASE}, ALL ON THEIR MATCH MARKS."
     ),
+    # The collars stay tight through the cut, so the reseated frame lands on
+    # them: the height is rechecked before the upper holes are spotted.
     "top-axis-reset": (
-        f"REPEAT STEPS {steps.step_number(steps.TOP_AXIS_SET_KEY)} AND "
-        f"{steps.step_number(steps.TOP_FRAME_CLAMPED_KEY)}."
+        f"REPEAT STEPS {steps.step_number(steps.TOP_AXIS_HELD_CHECKED_KEY)} AND "
+        f"{steps.step_number('top-axis-held-reset')}, THE COLLARS STILL TIGHT."
     ),
     "upper-holes-marked": (
         f"SPOT EACH COLUMN THROUGH THE CLEARANCE HOLE OF ITS {_TOP} SOCKET AS "
@@ -321,6 +339,7 @@ STEP_TEXT = {
         "IF ONE DOES NOT, CHASE ITS TAPPED HOLE WITH A #10-32 BOTTOMING TAP UNTIL "
         f"IT SEATS AS {_step(steps.CROSS_SCREWS_DRIVEN_KEY)}."
     ),
+    "collars-removed": "TAKE THE FOUR SHAFT COLLARS OFF THE COLUMNS.",
     "cap-recesses-checked": (
         f"CHECK EACH CAP RECESS IN {_TOP} CLEARS THE SKIRT OF ITS {_CAP}."
     ),

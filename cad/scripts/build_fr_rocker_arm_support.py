@@ -1,7 +1,7 @@
 r"""Reproduction script: rocker-arm support (manual feature-tree replay).
 
 Feature-tree replay of ``fr-rocker-arm-support.SLDPRT`` with stock-compatible
-hold-down clearance holes: a thin-walled cast bracket with a trapezoidal wedge
+hold-down clearance holes: a thin-walled bracket from 1018 bar with a trapezoidal wedge
 wall (wide foot, narrow top) stood **Y-up**, lightened by a window that
 opens on the two big front/back faces, with a mounting foot drilled for four
 top-down hex-head screws, the window rim broken by a fillet + chamfer, and a
@@ -156,11 +156,11 @@ from rocker_bracket_seat_layout import (
 )
 
 PART_NAME = "fr-rocker-arm-support"
-# The source repro was authored in steel, but this casting is now the machine's
-# green rocker-arm-support (it replaced rocker-arm-portal): match the other cast
-# structure (harmonic-base, top-frame) and the registry row (Gray Cast Iron,
-# materials.yaml casting_green_parts) so it renders green, not steel-grey.
-MATERIAL = "Gray Cast Iron"
+# Machined from 1018 bar (owner ruling 2026-11-20 (Pedro), #635), so the
+# model's material, and the mass it reports, is plain carbon steel like every
+# other 1018 part; it stays in materials.yaml casting_green_parts because it is
+# painted the frame's RAL 6005 green (#2394), so it renders green.
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 # Trapezoid (Sketch1) -- wide foot / narrow top: WIDE / NARROW / HALF_Y, the
 # window half BIG and the FOOT_THICKNESS they leave are
@@ -1321,7 +1321,7 @@ def build(adapter) -> dict[str, str]:
     apply_material(adapter, MATERIAL)
     apply_color(
         adapter, CASTING_GREEN
-    )  # green-painted casting, like the base/top-frame
+    )  # RAL 6005 green, like the base/top frame
     report_mass_properties(adapter)
     apply_drawing_properties(adapter, PART_NAME)
     return save_part_and_images(adapter, PART_NAME)

@@ -11,10 +11,10 @@ Each step does one thing (drawing-guidelines.md rule 22): a check and its
 remedy are their own steps, each check right after the action it checks.
 The nameplate is spotted through onto the base and its seats tapped on the
 mill before the columns go in. The columns are then fitted and match-marked
-in the base, the top frame set to the controlling height, the columns
-match-cut to the cap stack, the tube cross holes transfer-punched through
-each casting's clearance hole and drilled on the mill, and the frame screwed
-together before the support goes on.
+in the base, the top frame set to the controlling height and held there on
+shaft collars, the columns match-cut to the cap stack, the tube cross holes
+transfer-punched through each casting's clearance hole and drilled on the
+mill, and the frame screwed together before the support goes on.
 """
 
 from __future__ import annotations
@@ -30,7 +30,10 @@ COLUMNS_RESEATED_KEY = "columns-reseated"
 # height above the base underside, before the columns are cut and the upper
 # tube holes transfer-punched.
 TOP_AXIS_SET_KEY = "top-axis-set"
+# A shaft collar under each top socket holds that height (#2324) until the
+# cross screws do; the height is rechecked before anything is spotted from it.
 TOP_FRAME_CLAMPED_KEY = "top-frame-clamped"
+TOP_AXIS_HELD_CHECKED_KEY = "top-axis-held-checked"
 COLUMNS_CUT_KEY = "columns-cut"
 FRAME_RESEATED_KEY = "frame-reseated"
 UPPER_HOLES_CHECKED_KEY = "upper-holes-checked"
@@ -68,12 +71,15 @@ SEQUENCE: tuple[str, ...] = (
     LOWER_HOLES_CHECKED_KEY,
     "lower-holes-reworked",
     "lower-tap-chased",
-    # The top frame on the columns, at the controlling height.
+    # The top frame on the columns, at the controlling height, held there on
+    # a shaft collar under each socket (#2324) and the height rechecked.
     "top-frame-lowered",
     "top-sockets-fitted",
     "top-match-marked",
     TOP_AXIS_SET_KEY,
     TOP_FRAME_CLAMPED_KEY,
+    TOP_AXIS_HELD_CHECKED_KEY,
+    "top-axis-held-reset",
     # Columns match-cut to the cap stack at that height.
     "columns-marked",
     "frame-lifted-for-cut",
@@ -89,12 +95,13 @@ SEQUENCE: tuple[str, ...] = (
     "frame-reassembled",
     UPPER_HOLES_CHECKED_KEY,
     "upper-holes-reworked",
-    # The frame screwed together and capped.
+    # The frame screwed together, the collars off, and capped.
     "cross-screws-measured",
     "cross-screws-replaced",
     CROSS_SCREWS_DRIVEN_KEY,
     "cross-screw-heads-checked",
     "cross-screw-taps-chased",
+    "collars-removed",
     "cap-recesses-checked",
     "caps-pushed-on",
     "caps-checked",

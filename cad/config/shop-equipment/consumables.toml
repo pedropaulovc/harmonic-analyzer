@@ -60,6 +60,33 @@ kind = "oil"
 status = "to_order"
 note = "The archived inventory listed it only as an illustrative example item."
 
+# --- Frame paint (#2394) -----------------------------------------------------
+
+# Owner ruling 2026-11-20 (Pedro), #2394, "Follow recommendations unless
+# noted otherwise": one RAL on the three frame sheets (MHA-FR-01, -02, -05),
+# with primer and black enamel added to the consumables. Owner ruling
+# 2026-11-20 (Pedro), #2394: "RAL 6005 on the base, top frame and rocker
+# support; deck and column clamps plain black enamel." The archived
+# inventory listed the RAL 6005 enamel only as an illustrative example
+# item, so all three are to buy.
+[consumables.ral-6005-alkyd]
+name = "RAL 6005 moss-green alkyd enamel"
+kind = "paint"
+status = "to_order"
+note = "Not owned: to buy. Body colour of MHA-FR-01, MHA-FR-02 and MHA-FR-05 (each sheet's FINISH), and MHA-DT-05."
+
+[consumables.alkyd-primer]
+name = "Alkyd metal primer"
+kind = "paint"
+status = "to_order"
+note = "Not owned: to buy. Under the alkyd enamels of MHA-FR-01 and MHA-FR-02 (their FINISH: ALKYD PRIME)."
+
+[consumables.black-alkyd-enamel]
+name = "Black alkyd enamel"
+kind = "paint"
+status = "to_order"
+note = "Not owned: to buy. MHA-FR-01 deck and underside (BLACK DECK/UNDERSIDE) and the MHA-SH-01/MHA-SH-02 column clamps (black enamel)."
+
 # --- McMaster-Carr PO 0803PCAMPOS (owned) ------------------------------------
 
 # Every tool, gauge, cutter, insert, holder, saw and shop fluid on the owner's

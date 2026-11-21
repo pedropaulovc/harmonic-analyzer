@@ -333,18 +333,20 @@ GEOMETRY_FRONT_CENTER = (0.145, 0.090)
 # 1:2. The Ø25.5 sockets and Ø45 bosses are the setup features; the
 # smaller boss remains 22.5 mm across on paper, the socket 12.75 mm.
 # Its final centre below reserves room for the assembly-transfer callout.
-# The socket Ra symbol reads off the upper-left rim of the rear east socket
-# (135 deg on the sheet, y 104.5 + 4.5 = 109.0 mm), from the left margin
-# 22 mm over its axis, so its leader descends across the boss over the
-# hole table origin mark's Y arrow (x 77.2, y 95.0..111.0 with its "Y"):
-# level with the axis, it ran through that arrow (farm run
-# 20261107T084432155Z, leader-crosses-leader); here it passes 3 mm over the
-# letter.  Its "TUBE SOCKET BORES, 4X" row (about 38 mm from 5 mm right of
-# the symbol point, 9 mm above it) stands in the empty margin left of the
-# rail.  The band under the plan belongs to the hole table
-# (HOLE_TABLE_ANCHOR).
-SOCKET_FINISH_SYMBOL_XY = (0.020, 0.131)
-SOCKET_FINISH_LANDING_DEG = 135.0
+# The socket Ra symbol reads off the bottom rim of the rear east socket
+# (270 deg on the sheet, y 104.5 - 6.4 = 98.1 mm), from the left margin
+# 20.5 mm under its axis, so its leader rises across the boss under the
+# rear sockets' axis line, the hanger stations' extension from it
+# (HANGER_Z_TEXT_XY, #2628 (d)), and under A1's tag, which now stands
+# outboard left of that boss (hole_tag_position); at 135 deg from 22 mm
+# over the axis it crossed the rear station's extension line, and at 225
+# deg it met A1's tag leader at that rim (farm run 20261120T205313453Z).
+# Its "TUBE SOCKET BORES, 4X" row (about 38 mm from 5 mm right of the
+# symbol point, 9 mm above it) stands in the empty margin left of the
+# rail, 8 mm under that axis line's extension.  The band under the plan
+# belongs to the hole table (HOLE_TABLE_ANCHOR), 2.5 mm under the symbol.
+SOCKET_FINISH_SYMBOL_XY = (0.020, 0.084)
+SOCKET_FINISH_LANDING_DEG = 270.0
 FINISH_LEADER_TAIL = 0.042
 # Owner ruling B3 (#2333): the boss tops are machined seats.  Their one
 # symbol stands in sheet 4's empty band left of A-A, under the cap recess
@@ -418,7 +420,7 @@ def hanger_center_landing() -> tuple[float, float, float]:
 # needs no words (machinist review r1: no basic in note text); the
 # qualifier is the count alone, and a note never explains what a datum
 # letter is (rule 7; farm runs 20261106T214613300Z and T221139403Z).  The Z
-# stations stand from the front sockets' axis (HANGER_Z_TEXT_XY).
+# stations stand from the rear sockets' axis (HANGER_Z_TEXT_XY, #2628 (d)).
 HANGER_CENTER_QUALIFIER = "2X"
 # D is the crossbar's as-cast width at the underside, where the added draft
 # leaves it nominal (owner rulings B5 and D2, #2333): sheet 7 carries the
@@ -1355,14 +1357,16 @@ SIDE_WEB_POSITION_FRAME_XY = (0.2608, 0.0923)
 # derive from the socket pattern -- so sheet 3 dimensions every hole from
 # the socket bore axes instead (``HOLE_STATIONS``, drawing-guidelines.md rule 10 (dimension from a real feature)).
 DETAIL_TOP_KEEP = {
-    # The boss diameter, as cast on the faced top's plane, over the socket
+    # The boss diameter, as cast on the faced top's plane, under the socket
     # block; its near-side leader climbs to the upper-left boss's rim.
     "C0Dia": (0.035, 0.236),
     # Three rows (the value, the mating tube and the fit it holds, machinist
     # review r1), the widest 25 glyphs (2.58 mm each, farm run
-    # 20261106T212431241Z: 64.5 mm).  It stands left of the plan, under the
-    # boss's leader, so its radial leader climbs to A2's lower-left rim.
-    "B0Dia": (0.047, 0.193),
+    # 20261106T212431241Z: 64.5 mm).  It stands left of the plan over the
+    # boss's callout, so its radial leader drops to A2's upper-left rim and
+    # stays over every hanger station's line (#2628 (d): under the boss's
+    # callout it crossed the front station's line).
+    "B0Dia": (0.047, 0.2555),
 }
 # Sheet 3's tagged hole table: the four tube sockets, BASIC from the
 # casting's own datum frame (owner rulings B6 and D2, #2333).  Its origin is
@@ -1375,7 +1379,7 @@ DETAIL_TOP_KEEP = {
 # mark is reattached to a view point on that corner, its X arrow under the
 # corner and its Y arrow right of it (TABLE_ORIGIN_*_ARROW).  The hanger
 # holes are not in it: they stand on datum D by their own frame and take
-# their Z stations from the front sockets (HANGER_Z_*).  The keeper taps
+# their Z stations from the rear sockets (HANGER_Z_*).  The keeper taps
 # stay out too: MHA-CH-07 transfers them at assembly, so their callout
 # places them.  The table hangs in the band under the plan, over the
 # edge-break note, left of the title block.  The native SIZE column is
@@ -1390,11 +1394,20 @@ HOLE_TABLE_MATE_COLUMN = "MATE"
 HOLE_TABLE_MATE_WIDTH = 0.054
 _HOLE_TABLE_SIZE_COLUMN = 3
 EDGE_NOTE_XY = (0.030, 0.033)
-# Each socket's tag stands in the open window beside it on a leader to the
-# axis, 14 mm in from the axis on each sheet axis, past the boss and the
-# rail: the native default parked it up-right of the hole, in the keeper
-# callout's leader (farm run 20261106T204855971Z, leader-through-text).
+# Each right socket's tag stands in the open window beside it on a leader
+# to the axis, 14 mm in from the axis on each sheet axis, past the boss and
+# the rail: the native default parked it up-right of the hole, in the
+# keeper callout's leader (farm run 20261106T204855971Z, leader-through-
+# text).  SolidWorks lands every tag's leader on its bore's fixed lower-left
+# rim (farm run 20261120T205313453Z: A1 and A2 at 225 deg from both an
+# up-right and a down-right tag), so from the left windows the leaders
+# crossed the hanger stations' extension lines (#2628 (d)).  The left
+# sockets' tags stand outboard instead, their box's upper-right corner
+# HOLE_TAG_OUTBOARD (12.25 left, 5.25 down) off the axis: 2.1 mm off the
+# boss, under the rear axis line and over the front station's extension,
+# on a short leader up-right to that rim.
 HOLE_TAG_SOCKET_INSET = 0.014
+HOLE_TAG_OUTBOARD = (0.01225, 0.00525)
 # The tag's printed "A1" box about its centre (2 glyphs at 3.5 mm): the note
 # position SolidWorks takes is the box's upper-left corner.
 _HOLE_TAG_HALF = (0.0025, 0.00175)
@@ -1422,16 +1435,20 @@ TABLE_HOLES: tuple[tuple[float, float, float, str], ...] = tuple(
     for z in (FRONT_COLUMN_Z, REAR_COLUMN_Z)
     for x in (-COLUMN_X, COLUMN_X)
 )
-# Each hanger hole's Z station from the front-left socket's axis, in the
-# left window: the front one's line 30 mm left of the crossbar, the rear
-# one's 18 mm left of that.  The front station is 14 mm of paper with the
-# rail's inner edge through it (y 207.7), so its value stands outside the
-# run, in the window 2.3 mm under the hole's extension line (y 202.5), and
-# its 11 mm of text, left of its line, clears the rear station's line
-# (x 138) by 5.7.
+# Each hanger hole's Z station from the rear sockets' axis (#2628 (d)), in
+# the left margin off the part (rule 14), the axis at y 104.5 and the holes
+# at y 115.4 (rear) and 205.7 (front), the rear-left boss's tangent at x
+# 83.5.  The rear station, the shorter, is the inner: its line at x 79
+# runs up past the hole to its value, which stands left of the line at y
+# 120 (about 68..78 x 118..122), over the rear-left boss and clear of the
+# socket finish's leader, which now runs under the axis.  The front
+# station's line at x 65 stands 3 mm left of that value, its own value
+# centred on it at y 172, between the socket finish's row and the moved
+# socket callout (DETAIL_TOP_KEEP["B0Dia"]); its extension lines pass over
+# the finish row and under the bosses' frame.
 HANGER_Z_TEXT_XY = {
-    "front hanger z from upper sockets": (0.156, 0.1985),
-    "rear hanger z from upper sockets": (0.138, 0.166),
+    "front hanger z from lower sockets": (0.065, 0.172),
+    "rear hanger z from lower sockets": (0.079, 0.120),
 }
 # The sockets' two position frames (owner rulings D2 and D6): Ø.06 to
 # E|F|G over Ø.010 to A, on a leader to the front-right socket's rim from
@@ -1672,9 +1689,12 @@ def negative_locations(rows: tuple[tuple[str, ...], ...]) -> list[str]:
 
 def hole_tag_position(x: float, z: float) -> tuple[float, float]:
     """The sheet point (the tag box's upper-left corner) for one TABLE_HOLES
-    socket's tag: in the window diagonally inside it."""
+    socket's tag: a right socket's in the window diagonally inside it, a
+    left socket's outboard, down-left of it (HOLE_TAG_OUTBOARD)."""
     s = DETAIL_VIEW_SCALE / 1000.0
     cx, cy = DETAIL_TOP_CENTER[0] + x * s, DETAIL_TOP_CENTER[1] - z * s
+    if x < 0:
+        return (cx - HOLE_TAG_OUTBOARD[0] - 2.0 * _HOLE_TAG_HALF[0], cy - HOLE_TAG_OUTBOARD[1])
     dx = -math.copysign(HOLE_TAG_SOCKET_INSET, x)
     dy = math.copysign(HOLE_TAG_SOCKET_INSET, z)
     return (cx + dx - _HOLE_TAG_HALF[0], cy + dy + _HOLE_TAG_HALF[1])
@@ -5014,31 +5034,33 @@ def build(adapter: Any) -> dict[str, str]:
 
     crossbar_median()
     _draw_datum_traces(adapter, detail_top)
-    # Each hanger hole's Z station, .XXX from the front sockets' shared axis
-    # (owner ruling D2, #2333): drawn between the front bosses, it is the
-    # line both stations stand from.
-    (front_socket_axis,) = _add_view_centerlines(
+    # Each hanger hole's Z station, .XXX from the rear sockets' shared axis
+    # (owner ruling D2, #2333: from the socket axes; owner ruling 2026-11-20
+    # (Pedro), #2628 option (d): the rear pair's, so both values stand in
+    # the left margin, off the part): drawn between the rear bosses, it is
+    # the line both stations stand from.
+    (rear_socket_axis,) = _add_view_centerlines(
         adapter, detail_top,
-        (((-COLUMN_X + BOSS_DIA / 2.0 + SECTION_AXIS_OVERRUN_MM, HALF_H, FRONT_COLUMN_Z),
-          (COLUMN_X - BOSS_DIA / 2.0 - SECTION_AXIS_OVERRUN_MM, HALF_H, FRONT_COLUMN_Z)),),
+        (((-COLUMN_X + BOSS_DIA / 2.0 + SECTION_AXIS_OVERRUN_MM, HALF_H, REAR_COLUMN_Z),
+          (COLUMN_X - BOSS_DIA / 2.0 - SECTION_AXIS_OVERRUN_MM, HALF_H, REAR_COLUMN_Z)),),
     )
     for station_z, label in (
-        (STUD_Z_FRONT, "front hanger z from upper sockets"),
-        (STUD_Z_REAR, "rear hanger z from upper sockets"),
+        (STUD_Z_FRONT, "front hanger z from lower sockets"),
+        (STUD_Z_REAR, "rear hanger z from lower sockets"),
     ):
         _checked_dimension(
             adapter,
             detail_top,
-            p0=(HANGER_X, HALF_H, FRONT_COLUMN_Z),
+            p0=(HANGER_X, HALF_H, REAR_COLUMN_Z),
             p1=(HANGER_X, HALF_H, station_z),
             text_xy=HANGER_Z_TEXT_XY[label],
             label=label,
-            expected_mm=station_z - FRONT_COLUMN_Z,
+            expected_mm=REAR_COLUMN_Z - station_z,
             orientation="vertical",
             center=True,
             entity_types=("SKETCHSEGMENT", "EDGE"),
             entities=(
-                front_socket_axis,
+                rear_socket_axis,
                 detail_top_edges.circle_at(
                     (HANGER_X, HALF_H, station_z),
                     HANGER_CLEARANCE_DIA / 2.0,

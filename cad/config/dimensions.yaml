@@ -62,13 +62,13 @@ sections:
       - method
       - confidence
       rows:
-      - - Total height (incl. curved counter-spring rod arching over top)
+      - - Total height (incl. curved counter-spring rod arching over top); model departs, owner-accepted (see below)
         - 147 cm
         - '57.9'
         - photo callout p.3
         - annotated
         - high
-      - - Frame column height
+      - - Frame column height; model departs, owner-accepted (see below)
         - 107 cm
         - '42.1'
         - photo callout p.3
@@ -120,8 +120,18 @@ sections:
       historical reconstruction coordinates, not current drilling inputs.
       Pivot, lock and stop seats follow `cone_line.PIVOT_XZ` and
       `dt_cone_swing_platform_geometry.swing_hardware_geometry`.
-      Frame column 107 cm is the top-down anchor for tube-frame length; 147 − 107 =
-      40 cm of counter-spring rod arc above the frame.
+      DESIGN DEPARTURE (owner ruling 2026-11-20 (Pedro), #11 option B, in his
+      words: "B but limit frame tube height max to 41 in ; thats the stock
+      length bought"): the model keeps the photo-derived height, not the 107 /
+      147 cm callouts. The owner's 2026-09-02 ch30 p002 re-read ends the capped
+      columns just above the corner bosses, so the MHA-FR-VN-54 cap tops stand
+      at 1044.80 (`fr_frame_attachment_spec.CAP_TOP_Y`), 25.2 under 107 cm, and
+      the machine's highest modelled point, the MHA-SM-01 gooseneck arm top, at
+      about 1354.9, about 115 under 147 cm. The MHA-FR-03 tube is cut 1018.77
+      (40.11 in, `TUBE_CUT_LENGTH`) from a 40.51 in supply blank, and neither may
+      exceed the 41.000 in 1020 DOM lengths bought
+      (`cad/config/shop-equipment/stock-bought.toml`, `stock.1020-dom-tube-1x0120`;
+      `test_fr_tube_frame_drawing.test_tube_supply_fits_the_41_in_stock_bought`).
 - heading: Chapter 26/29/8/9 — System-level facts (gear law, scale references)
   elements:
   - prose: ''
@@ -1146,7 +1156,7 @@ sections:
         - derived
         - med
       - - Lever fulcrum
-        - 'Ø6.5 pivot hole at 0; common plain Ø6.35 × 178.05 shaft (`ch-fulcrum-shaft`, domed R3.175 ends 1.016 proud of each keeper lug, one 0.3-deep × 4.4 set-screw flat per end on +Y at ±80.772) along Z at (x, y, centre-z) = (+199.9, 1061.3932, −0.504 = the lever-hub bank mid-plane), with black end keepers (`ch-fulcrum-keeper`, MHA-CH-07) seated at 1036.1932 on the rail top face 1036.193 (the 0.0002 float Main accepted on #2127): 8.0-thick lugs (owner ruling Q11-B 2026-10-16), each reamed on its own (#2338), Ø.2550 +.0010/0 slip fit on the Ø.2500 shaft (0.010 clearance kept over the height bands of both bores and the 0.04 flatness zone of the MHA-FR-02 faced keeper-rail top), mid-planes z −0.504 ± 80.772 = −81.276/+80.268 (0.508 float to the integral lever-hub bank each side), a #1-72 × 5/32 cup-point set screw (MHA-CH-VN-55) down through each crown onto its flat; 8.5-long outboard feet (owner ruling Q11-B'' 2026-10-16) screwed by #2-56 × 7/16 frame-side screws (MHA-CH-VN-52, McMaster 91794A080: head Ø3.556 × 2.1082, length 11.1125) into #2-56 blind rail taps (drill 11.5, thread 7.6) at z −0.504 ± 88.646 = −89.150/+88.142'
+        - 'Ø6.5 pivot hole at 0; common plain Ø6.35 × 178.05 shaft (`ch-fulcrum-shaft`, domed R3.175 ends 1.016 proud of each keeper lug, one 0.3-deep × 4.4 set-screw flat per end on +Y at ±80.772) along Z at (x, y, centre-z) = (+199.9, 1061.3932, −0.504 = the lever-hub bank mid-plane), with black end keepers (`ch-fulcrum-keeper`, MHA-CH-07) seated at 1036.1932 on the rail top face 1036.193 (the 0.0002 float Main accepted on #2127): 8.0-thick lugs (owner ruling Q11-B 2026-10-16), each reamed on its own (#2338), Ø.2550 +.0010/0 slip fit on the Ø.2500 shaft (0.010 clearance kept over the height bands of both bores and a 0.04 seat zone on the MHA-FR-02 faced keeper-rail top; no flatness frame is printed, the MHA-CH-00 check that the shaft slides freely through both keeper bores accepts it, owner ruling 2026-11-20 (Pedro), #1659 option B), mid-planes z −0.504 ± 80.772 = −81.276/+80.268 (0.508 float to the integral lever-hub bank each side), a #1-72 × 5/32 cup-point set screw (MHA-CH-VN-55) down through each crown onto its flat; 8.5-long outboard feet (owner ruling Q11-B'' 2026-10-16) screwed by #2-56 × 7/16 frame-side screws (MHA-CH-VN-52, McMaster 91794A080: head Ø3.556 × 2.1082, length 11.1125) into #2-56 blind rail taps (drill 11.5, thread 7.6) at z −0.504 ± 88.646 = −89.150/+88.142'
         - —
         - 'p.40 bottom-left clevis = the shaft END mount; fulcrum = keeper seat 1036.1932 (top_frame_plane: MHA-FR-02 rail top 1036.193 + 0.0002) + 25.2 = 1061.3932 (#290 plane snap moves the whole chain −0.0068 with the underside; was 1061.4 over 1036.2); ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive); keeper/shaft/set-screw geometry from `cad/scripts/ch_fulcrum_keeper_spec.py` and `cad/scripts/ch_fulcrum_shaft_spec.py` (2026-10-10 outward-foot rederive); tap from ch_fulcrum_keeper_spec KEEPER_TAP_SPEC'
         - measured
@@ -2224,7 +2234,7 @@ sections:
         - SUPERSEDED — re-authored as rocker-arm with corrected dims (`build_rocker_arm.py`)
       - - tube-frame
         - 'ch.6: frame column height 107 cm — legacy file measured 1016 mm (40"), CONTRADICTS the book'
-        - 'RE-AUTHORED — `build_fr_tube_frame.py`; 2026-08-02 rederive: COLUMN_LENGTH 989.9 → 1014.0 (top y 1064.8 — the columns run +28.6 proud of the new rail top 1036.2 through the Ø25.5 boss bores, reconciling the book''s 107 cm with the ch30 stub reads), each stub closed by an integral spherical dome cap r 12.7 × h 3.3 from y 1061.5 — plain capped tops, NO nut, NO thread (user-corrected: the polished tops in top.png/ch30 p002 are pressed-in turned caps; supersedes the old "no stub above" read). Source: ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive), measured/med. OD REDERIVED Ø25.4 (1") from the ch30 8-views (M6.11): 4 quarter views isolate single columns, apparent width = OD × scale (scale fit from the ±197/±112 stations + azimuth, R² 0.94–0.99, cross-checked by the 460 mm base ~1500 px) → 7 reads = Ø23.8 ± 1.0, rounded to 1" stock; SUPERSEDES legacy Ø1.375" (~45% oversize). Wall kept legacy 0.12" → Ø19.3 bore. M4 fluting retired (M6.8: plain reflective columns)'
+        - 'RE-AUTHORED — `build_fr_tube_frame.py` (MHA-FR-03). Current stack: each tube stands in its MHA-FR-01 socket from y 25.40 (`COLUMN_BOTTOM_Y`) to y 1044.17 (`TUBE_TOP_Y`), cut 1018.77 (40.11 in, `fr_frame_attachment_spec.TUBE_CUT_LENGTH`) from a 40.51 in supply blank, through the MHA-FR-02 sockets (rail top 1036.19, corner-boss tops 1040.77), and closed by a pressed-on McMaster 9275K141 cap (MHA-FR-VN-54) whose top stands at 1044.80 (`CAP_TOP_Y`), about 4 above the bosses. History: the 2026-08-02 rederive took COLUMN_LENGTH 989.9 → 1014.0 (top y 1064.8, integral dome caps) to reconcile the book''s 107 cm with the ch30 stub reads; the owner''s 2026-09-02 ch30 p002 re-read cut the columns 1014 → 994 so they end just above the corner bosses (the 1064.8 stub stood 20 too tall), and the turned dome caps gave way to the socketed tube and the bought cap. The 107 cm callout is an owner-accepted departure, and the tube may not exceed the 41 in DOM lengths bought (owner ruling 2026-11-20 (Pedro), #11 option B; see the ch.6 prose). OD REDERIVED Ø25.4 (1") from the ch30 8-views (M6.11): 4 quarter views isolate single columns, apparent width = OD × scale (scale fit from the ±197/±112 stations + azimuth, R² 0.94–0.99, cross-checked by the 460 mm base ~1500 px) → 7 reads = Ø23.8 ± 1.0, rounded to 1" stock; SUPERSEDES legacy Ø1.375" (~45% oversize). Wall kept legacy 0.12" → Ø19.3 bore. M4 fluting retired (M6.8: plain reflective columns)'
   - prose: |2
 
       No legacy part contradicts a book annotation. Every part still gets re-authored
