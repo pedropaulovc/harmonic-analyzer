@@ -872,7 +872,7 @@ speed_kind = "other"
 tool = "tap-2-56-plug"
 drilling = "none"
 sizing = "other"
-instruction = "Tap by hand under the tap guide, spindle off, Tapmatic Gold, a half turn back each turn: the spring keeps the point in the wrench as the tap feeds. Read the depth with the point pushed fully home: stop when the DRO Z reads the noted Z less {{process.plate_tap_reach_mm:in.3dot}}. Jog Z up clear; back the tap out; blow the hole out."
+instruction = "Tap's point in the hole; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home. Tap by hand, spindle off, Tapmatic Gold, a half turn back each turn: the spring keeps the point in the wrench as the tap feeds. Read the depth with the point pushed fully home: stop when the DRO Z reads the noted Z less {{process.plate_tap_reach_mm:in.3dot}}. Jog Z up clear; back the tap out; blow the hole out."
 feed = "hand"
 
 [[setups.operations]]

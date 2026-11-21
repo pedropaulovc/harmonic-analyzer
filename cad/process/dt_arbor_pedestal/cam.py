@@ -1140,7 +1140,8 @@ def context(
                 f"G53 G0 Z{MACHINE_Z_TOP_MM:.3f}",
                 f"G0 X{apex_xy[0]:.3f} Y{apex_xy[1]:.3f}",
                 "(4-40 TAP IN THE APEX HOLE. JOG Z DOWN TO PUSH THE GUIDE POINT HOME IN THE WRENCH."
-                " TAP BY HAND INTO THE BORE TO THE NOTED DRO Z, READ WITH THE POINT PUSHED HOME. JOG Z UP CLEAR)",
+                " TAP BY HAND INTO THE BORE TO THE NOTED DRO Z, PUSHING THE POINT HOME EACH 1/2 IN,"
+                " READ WITH THE POINT PUSHED HOME. JOG Z UP CLEAR)",
                 "M30",
             ],
             "at": apex_xy,

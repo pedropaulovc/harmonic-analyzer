@@ -103,7 +103,7 @@ def test_context_accepts_each_plan_and_numbers_the_tools(contexts) -> None:
         "drill-9": 3,
     }
     back = contexts["sh_column_clamp_back"]
-    assert back["numbers"] == {"em-half": 1, "spot": 2, "drill-29": 3, "dead-centre": 4}
+    assert back["numbers"] == {"em-half": 1, "spot": 2, "drill-29": 3, "tap-guide": 4}
     for stem in STEMS:
         recipe = RECIPES[stem]
         assert recipe.LOAD_FIRST_TOOL == tuple(name for name, _ops in recipe.PROGRAMS)
