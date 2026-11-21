@@ -445,6 +445,24 @@ def test_steps_five_and_six_do_one_thing_a_sub_step() -> None:
             assert line.count(". ") == 1, line
 
 
+def test_steps_name_the_front_and_rear_mounts_by_what_the_fitter_sees() -> None:
+    # Machinist review of the #2499 head (clarity, r1+r2): FRONT and REAR
+    # mounts and trunnions were never tied to anything on the sheets.  Step
+    # 5 names the mounts by the hanger hole nearer the gooseneck hub (the hub
+    # stands at the summing station) and 6B the rear trunnion by MHA-SM-03's
+    # printed datum B end; both cues must match the model's rear (+Z) side.
+    import fr_top_frame_spec as top_frame
+
+    (step5,) = [line for line in notes.ASSEMBLY_STEPS if line.startswith("5. ")]
+    assert "NEARER THE GOOSENECK HUB IS THE REAR MOUNT" in step5
+    assert top_frame.STUD_Z_REAR - SUMMING_Z < SUMMING_Z - top_frame.STUD_Z_FRONT
+    (step6b,) = [line for line in notes.ASSEMBLY_STEPS if line.startswith("6B. ")]
+    assert "DATUM B END OF MHA-SM-03 (THE REAR TRUNNION)" in step6b
+    # Datum B is the lever's +Z body end, the side of the rear hanger hole.
+    assert sm_summing_lever_spec.PLATE_Z_PLUS > 0
+    assert top_frame.STUD_Z_REAR > SUMMING_Z > top_frame.STUD_Z_FRONT
+
+
 def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() -> None:
     # Owner ruling 2026-10-27 (#2018 option C): accepted as is.  Each cut
     # bolt is run in by hand to its washer before it draws the mount's top
