@@ -2,10 +2,10 @@
   <rect class="paper" x="0" y="0" width="760" height="340"/>
   <text class="title" x="20" y="24">Side view along the jaws: the head end out past the jaws, the eye drilled in the overhang (not to scale)</text>
   <rect class="fixture-vise" x="258" y="260" width="462" height="30"/>
+  <rect class="clamp" x="258" y="100" width="462" height="90"/>
   <rect class="fixture-support" x="258" y="190" width="462" height="70"/>
   <rect class="part-kept" x="160" y="160" width="400" height="30"/>
   <rect class="fixture-support" x="655" y="160" width="60" height="30"/>
-  <rect class="clamp" x="258" y="100" width="462" height="90" style="fill-opacity:0.35"/>
   <rect class="part-removed" x="195" y="160" width="10" height="30"/>
   <rect class="cutter" x="195" y="60" width="10" height="94"/>
   <line class="centre-line" x1="200" y1="50" x2="200" y2="200"/>
