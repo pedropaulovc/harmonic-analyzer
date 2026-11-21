@@ -22,6 +22,7 @@ import pytest
 
 import _process_plans
 import export_features
+import mg_wheel_axle_callouts
 
 ROOT = Path(__file__).resolve().parents[2]
 EQUIPMENT = ROOT / "cad" / "config" / "shop-equipment"
@@ -34,7 +35,6 @@ STEMS = tuple(
     ].get("adapter")
     == "turned_shaft"
 )
-SHOP = _process_plans.load_shop()
 
 
 def _records(*names: str) -> dict:
@@ -194,3 +194,11 @@ def test_every_bar_is_a_stock_record_of_its_diameter_or_flagged(stem: str) -> No
     for ref in plan["stock_refs"]:
         assert STOCK[ref]["form"] == "round_bar", ref
         assert STOCK[ref]["dia_in"][0] == bar, ref
+
+
+def test_the_axle_rod_band_is_the_printed_fits_limits() -> None:
+    parameters = _plan("mg_wheel_axle")["parameters"]
+    low, high = mg_wheel_axle_callouts.PIN_LIMITS
+    assert math.isclose(_features("mg_wheel_axle")["outer"]["stock_dia_min"], low)
+    assert math.isclose(parameters["stock_dia_max_mm"], high, abs_tol=1e-6)
+    assert math.isclose(parameters["stock_dia_max_in"] * IN, high, abs_tol=1e-6)

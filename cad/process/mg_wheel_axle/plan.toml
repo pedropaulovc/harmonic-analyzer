@@ -9,7 +9,10 @@
 # (the .35 in of Ø.11 is over 3 × Ø out of the jaws, so it is not turned
 # from the chuck alone); withdraw the centre, face the stub off to the tip,
 # form the R.07 dome, run the die on to the shoulder by hand, groove the
-# relief at the shoulder; turn it round, the shank in the jaws: face the back
+# relief at the shoulder (these run without the centre: the stub facing, the
+# form and the die load the end along its axis, and the relief sits at the
+# shoulder, the jaws' end of the Ø.11, so none bends the end as the turning
+# passes would); turn it round, the shank in the jaws: face the back
 # end to the 1.85 shank length. Pressed into MHA-MG-08 at assembly
 # (MHA-MG-00).
 #
@@ -39,6 +42,11 @@ part = "mg-wheel-axle"
 [parameters]
 quantity = 1
 stock_dia_in = 0.1875
+# The rod's upper limit behind the printed fits (mg_wheel_axle_callouts
+# PIN_LIMITS[1]; the feature export carries only the lower,
+# cad.outer_stock_dia_min); test_turned_shaft_process.py checks it.
+stock_dia_max_in = 0.1877
+stock_dia_max_mm = 4.76758
 # Sawn over the 2.20 REF: about .03 in to face off each end plus the
 # .10 in centre stub beyond the tip.
 blank_length_in = 2.36
@@ -93,7 +101,7 @@ ref = "centre-drills-carbide-60"
 
 [[tools]]
 id = "form"
-name = "R.070 form tool"
+name = "R.070 form tool: HSS, a concave R.070 arc ground across an edge at least .15 wide (both tips past the Ø.11 thread blank), cutting edge at centre height, shank to suit the toolpost"
 ref = "form-tool-r070"
 status = "to_order"
 
@@ -129,12 +137,12 @@ beam = "other"
 diagram = { file = "diagrams/saw.svg", alt = "The 3/16 in drill rod on the saw: one blank sawn a little over the axle's length." }
 
 [[setups.operations]]
-instruction = "Mike the rod over the length you will cut: every reading {{cad.outer_stock_dia_min_in:.4dot}} or over (the shank is left as supplied; its fits come off the rod's own limits)."
-inspection = "Rod Ø{{cad.outer_stock_dia_min_in:.4dot}} min."
-gauge_checks = [{ gauge = "micrometers", band_mm = ["{{cad.outer_stock_dia_min_mm}}", "{{cad.stock_dia_mm}}"] }]
+instruction = "Mike the rod over the length you will cut: every reading {{cad.outer_stock_dia_min_in:.4dot}}–{{process.stock_dia_max_in:.4dot}} (the shank is left as supplied; its fits come off the rod's own limits)."
+inspection = "Rod Ø{{cad.outer_stock_dia_min_in:.4dot}}–{{process.stock_dia_max_in:.4dot}}."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{cad.outer_stock_dia_min_mm}}", "{{process.stock_dia_max_mm}}"] }]
 
 [[setups.operations]]
-instruction = "A reading under {{cad.outer_stock_dia_min_in:.4dot}}: mark that length scrap and mike the next length of the rod."
+instruction = "A reading outside {{cad.outer_stock_dia_min_in:.4dot}}–{{process.stock_dia_max_in:.4dot}}: mark that length scrap and mike the next length of the rod."
 
 [[setups.operations]]
 speed_kind = "other"
@@ -322,11 +330,11 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Read the thread from the shoulder face to the dome's apex with the calipers' depth rod: the beam's end on the apex, the rod down beside the thread onto the shoulder face. Add the dome's height for the blank's Op 80 reading to the {{cad.thread_length_min_in:.3dot}}–{{cad.thread_length_max_in:.3dot}} thread: .0243 at Ø.1061, .0258 at Ø.1086, .0275 at Ø.1112. Mike the shank at both ends."
-inspection = "Shoulder to apex {{cad.thread_length_min_in:.3dot}} + the dome's height to {{cad.thread_length_max_in:.3dot}} + the dome's height, for this blank's Ø (gauge range {{process.thread_apex_min_in:.4dot}}–{{process.thread_apex_max_in:.4dot}}); shank Ø{{cad.outer_stock_dia_min_in:.4dot}} min, no mark you can feel."
-gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.thread_apex_min_mm}}", "{{process.thread_apex_max_mm}}"] }, { gauge = "micrometers", band_mm = ["{{cad.outer_stock_dia_min_mm}}", "{{cad.stock_dia_mm}}"] }]
+inspection = "Shoulder to apex {{cad.thread_length_min_in:.3dot}} + the dome's height to {{cad.thread_length_max_in:.3dot}} + the dome's height, for this blank's Ø (gauge range {{process.thread_apex_min_in:.4dot}}–{{process.thread_apex_max_in:.4dot}}); shank Ø{{cad.outer_stock_dia_min_in:.4dot}}–{{process.stock_dia_max_in:.4dot}}, no mark you can feel."
+gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.thread_apex_min_mm}}", "{{process.thread_apex_max_mm}}"] }, { gauge = "micrometers", band_mm = ["{{cad.outer_stock_dia_min_mm}}", "{{process.stock_dia_max_mm}}"] }]
 
 [[setups.operations]]
-instruction = "Shoulder to apex out of its band, or the shank marked under {{cad.outer_stock_dia_min_in:.4dot}}: scrap the axle and make another from Setup 1."
+instruction = "Shoulder to apex out of its band, or the shank marked or outside {{cad.outer_stock_dia_min_in:.4dot}}–{{process.stock_dia_max_in:.4dot}}: scrap the axle and make another from Setup 1."
 
 [[setups.operations]]
 instruction = "Wipe the axle with machine oil (FINISH: bright, oiled). MHA-MG-00 presses it into MHA-MG-08 to its gauge."

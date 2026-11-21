@@ -59,7 +59,7 @@ ref = "lathe-ar"
 
 [[tools]]
 id = "form"
-name = "R.180 dome form tool (cuts an SR.18 crown)"
+name = "R.180 dome form tool (cuts an SR.18 crown): HSS, a concave R.180 arc ground across an edge at least .30 wide (both tips past the Ø.250 O.D.), cutting edge at centre height, shank to suit the toolpost"
 ref = "form-tool-r180"
 status = "to_order"
 
@@ -162,11 +162,11 @@ instruction = "Look at crown B under a light: no pip or flat at the apex, no ste
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A pip at the apex: the tool is off centre height; reset it and take one more light pass to the same Z−{{cad.dome_far_form_height_in:.4dot}}, never deeper (it would shorten the body)."
+instruction = "A pip at the apex: the tool is off centre height. Reset its height; if that moved the tool along Z, touch both tips on the crown's rim (it now sits at Z−{{cad.dome_far_form_height_in:.4dot}}) and set the DRO Z to −{{cad.dome_far_form_height_in:.4dot}} there, not zero. Take one more light pass to Z−{{cad.dome_far_form_height_in:.4dot}}, never deeper (it would shorten the body)."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A step at the O.D.: the arc is not centred across the shaft; centre it as Op 70 and take one more light pass to the same Z."
+instruction = "A step at the O.D.: the arc is not centred across the shaft. Centre it, both tips touching the crown's rim together, and set the DRO Z to −{{cad.dome_far_form_height_in:.4dot}} there, not zero (the rim sits at Z−{{cad.dome_far_form_height_in:.4dot}}). Take one more light pass to Z−{{cad.dome_far_form_height_in:.4dot}}."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -219,7 +219,7 @@ instruction = "Look at crown A under a light: no pip or flat at the apex, no ste
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A fault: as Ops 100–120, never past Z−{{cad.dome_datum_form_height_in:.4dot}}. Crown A is the same form fed the same depth from the same faced plane as crown B (checked in Ops 130–140), so the body holds."
+instruction = "A fault: as Ops 100–120, never past Z−{{cad.dome_datum_form_height_in:.4dot}}. Crown A is the same form fed the same depth from the same faced plane as crown B (checked in Ops 130–140), and a touch-off can only err shallow (the tips stop on the corner), which leaves a flat at the apex this op's look finds; so the body holds."
 
 [[setups]]
 machine_kind = "other"
