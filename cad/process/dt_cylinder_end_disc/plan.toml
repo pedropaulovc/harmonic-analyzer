@@ -6,9 +6,9 @@
 # corners off; Setup 2, the blank in the 6 in 4-jaw on its sawn edges, its
 # centre-punch mark trued to the MT3 dead centre in the tailstock: face the
 # out face to the thickness, spot and drill V through; Setup 3, the blank on
-# a 3/8-16 bolt through that hole, between two washers, the bolt's plain
-# shank in the 3-jaw: turn the outside to its diameter. Bench: deburr and
-# check.
+# a 3/8-16 bolt through that hole, head outboard (head, washer, blank,
+# washer, nut), the threads in the 3-jaw: turn the outside to its
+# diameter. Bench: deburr and check.
 #
 # Owner rulings 2026-11-21 (answered in person): the 6 in 4-jaw independent
 # chuck is on hand (cad/config/shop-equipment/fixtures.chuck-4jaw-6), and the
@@ -19,7 +19,7 @@
 # 2-1/2 in blank in a 6 in chuck, is well inside any 6 in 4-jaw's span.
 #
 # FLAGGED, not on record: the mandrel hardware, one 3/8-16 x 1-1/2 in hex
-# bolt (its plain shank gripped), one 3/8-16 hex nut and two 3/8 flat
+# bolt (its threads gripped), one 3/8-16 hex nut and two 3/8 flat
 # washers smaller than the disc's Ø2.17; shop hardware, to find or buy.
 title = "Cylinder Bank South End Disc"
 part = "{{cad.drawing_number}}"
@@ -50,12 +50,12 @@ face_allowance_in = 0.015
 # Ø2.657 in (67.49 mm); the cut lines stand 1.202 in from the centre, so the
 # blank still holds a Ø2.40 circle, over the disc's Ø2.18.
 blank_swing_mm = 67.49
-# Setup 3: the 3/8-16 bolt (Ø.375) pushed into the 3-jaw until its end
-# stands flush with the nut, so all that stands out of the jaws is a
-# washer, the disc, a washer and the nut, about .63 in (16 mm); the thread's
-# root, about Ø.30, the least section there.
-bolt_shank_mm = 9.525
-mandrel_stickout_mm = 16.0
+# Setup 3: the 3/8-16 bolt (Ø.375) head outboard, its threads in the 3-jaw
+# up to the nut, so all that stands out of the jaws is the nut (about .33),
+# a washer, the blank, a washer and the head (about .23): about .81 in, set
+# at 21 mm; the thread's root, about Ø.30, the least section there.
+bolt_dia_mm = 9.525
+mandrel_stickout_mm = 21.0
 bolt_root_mm = 7.5
 
 [[tools]]
@@ -172,10 +172,10 @@ title = "Bolt mandrel: turn the outside"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "The 3/8-16 x 1-1/2 in bolt through the V hole, a flat washer each side and the nut tight. Push the bolt into the 3-jaw until its end stands flush with the nut's outer face, the inner washer just clear of the jaw fronts, and tighten the jaws on the bolt."
+holding = "On the 3/8-16 x 1-1/2 in bolt, head outboard: head, flat washer, the blank (its V hole on the bolt), flat washer, nut, the nut tight. The bolt's threaded end in the 3-jaw up to the nut, the jaws on the threads."
 datum = "The disc's faces between the washers; only the outside is cut."
-diagram = { file = "diagrams/mandrel.svg", alt = "The blank on a bolt through its V hole, washer and nut each face, the bolt in the 3-jaw: the outside turned to Ø2.16–2.18." }
-lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bolt_shank_mm}}", stock_diameter_mm = "{{process.blank_swing_mm}}", stickout_mm = "{{process.mandrel_stickout_mm}}", minimum_diameter_mm = "{{process.bolt_root_mm}}", support = "none" }
+diagram = { file = "diagrams/mandrel.svg", alt = "The blank on the bolt, head outboard, a flat washer each side and the nut toward the chuck, the bolt's threads in the 3-jaw: the outside turned to Ø2.16–2.18." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bolt_dia_mm}}", stock_diameter_mm = "{{process.blank_swing_mm}}", stickout_mm = "{{process.mandrel_stickout_mm}}", minimum_diameter_mm = "{{process.bolt_root_mm}}", support = "none" }
 
 [[setups.operations]]
 cut_kind = "other"
