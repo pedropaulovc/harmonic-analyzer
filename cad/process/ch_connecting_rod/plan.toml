@@ -60,10 +60,12 @@
 # 2026-11-19 decision of #3124 item 5): a reamed hole is the reamer's size
 # +.0005/0, wider than the drawing's .0004 band, so the reamer alone does
 # not hold it; the pin-gauge sets on order (gauges.pin-gauges) step .001.
-# The drawing's finish, matte black oxide, oil sealed (owner ruling
-# 2026-11-20, #2348; all over, no masking; the sheet's MIL-DTL-13924 Class
-# 1 dropped for that process-neutral callout by Main's delegated ruling of
-# 2026-11-21, owner review #2144, #3318), is done in the shop.
+# The drawing's finish, matte black oxide (owner ruling 2026-11-20, #2348;
+# all over, no masking), is done in the shop. The sheet prints it per
+# MIL-DTL-13924 Class 1 until #3318 lands: that PR makes the callout a
+# process-neutral "matte black oxide, oil sealed" (delegated ruling
+# 2026-11-21, owner review #2144, following the owner's PC9 ruling below),
+# and this plan merges after it. Setup 8 prints the sheet's callout as it is.
 # Owner (Pedro), answered in person 2026-11-21: "Black oxide: cold
 # blackening in the shop with Presto Black PC9 is acceptable as the
 # drawing's black oxide." Setup 8 blackens the rods with Birchwood Presto
@@ -866,7 +868,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "The drawing's finish: {{cad.finish}}, all over as the drawing states (no masking), done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide; the sheet's callout process-neutral per owner review #2144), by its maker's instructions as below. To buy before this setup (none on record): the PC9, chemical-resistant gloves and safety glasses."
+instruction = "The drawing's finish: {{cad.finish}}, all over as the drawing states (no masking), done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide), by its maker's instructions as below. To buy before this setup (none on record): the PC9, chemical-resistant gloves and safety glasses."
 feed = "hand"
 
 [[setups.operations]]
