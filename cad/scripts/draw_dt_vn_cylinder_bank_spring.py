@@ -1,11 +1,15 @@
 """Supplier nominal dimension diagrams beside the installed 9714K392 envelope.
 
-The sheet prints only replacement sizes: ID, OD and free height. The strip
+The sheet's views print only replacement sizes: ID, OD and free height. The strip
 thickness is not one: SKU 9714K392 defines it, and its 0.127 mm strip
 printed as a doubled hairline through the FRONT envelope (machinist review of
-4e46b502). The part keeps its strip and catalogue load-point gauge sketches
-(compressed height and deflection at 1.5 lb), which this sheet neither
-shows nor dimensions; the 0.95 mm set gap governs the installed preload.
+4e46b502). The part keeps its strip and catalogue load-point gauge sketches,
+which this sheet neither shows nor dimensions; the 0.95 mm set gap governs
+the installed preload. As a tier-2 specification-control sheet (#2886, owner
+rulings 2026-11-17 on #3044) the ID and OD print as receiving limits on their
+native dimensions (``vn_disc_spring_acceptance``: the catalogue's OD band and
+ID maximum, and an owner-directed ID minimum that slides on the MHA-DT-13
+arbor); the free height stays REF.
 
 The shared disc diagram shows and dimensions all four sizes, so this sheet
 shows only the envelope and plan sketches (``SHEET_FEATURES``) and imports
@@ -49,11 +53,13 @@ from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
+from _supplier_disc_spring_drawing import assert_disc_size_band
 from _supplier_spring_drawing import (
     assert_supplier_configuration_value,
     build_supplier_spring_drawing,
     reacquire_supplier_dimensions,
 )
+from vn_disc_spring_acceptance import LIMITS
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
 from _construction_line_font import _construction_curves_as_outline
 import dt_vn_cylinder_bank_spring_spec as supplier_spec
@@ -69,6 +75,9 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["dt_vn_cylinder_bank_spring"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "WAVE DISC SPRING"
+# The footer's general line: the views carry the ID/OD receiving limits, so
+# the default "VIEWS ARE REFERENCE ONLY" would contradict them.
+GENERAL_TEXT = "PURCHASED PART, USED AS SUPPLIED. ID AND OD ARE RECEIVING LIMITS."
 # The drawing's view of the spec: identical except for no application gauges.
 SHEET_SPEC = SimpleNamespace(
     **{**vars(supplier_spec), "SUPPLIER_APPLICATION_DIMENSIONS": ()}
@@ -380,6 +389,8 @@ def _import_sizes(
                 # A wave spring's .050 could be read as its strip; the
                 # catalogue's figure is the free height (machinist review).
                 "callout": "FREE" if field == "FREE_HEIGHT" else None,
+                # The ID and OD carry their receiving limits natively.
+                "reference": field not in LIMITS[supplier_spec.SKU],
             }
             supplier_reference_dimension(
                 adapter,
@@ -388,14 +399,6 @@ def _import_sizes(
             )
             references.append((key, name, arguments, field))
     return references
-
-
-def _assert_unbanded(display: Any, field: str) -> None:
-    """Supplier sizes print as untoleranced REF: the catalogue band stays in
-    the spec for the fit math and never reaches the native dimension."""
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    if int(_early_bound(dimension.Tolerance, "IDimensionTolerance").Type) != 0:
-        raise RuntimeError(f"{supplier_spec.SKU} {field}: supplier REF gained a band")
 
 
 def supplier_dimensions(
@@ -438,7 +441,7 @@ def supplier_dimensions(
                 arguments["expected_mm"],
                 label=name,
             )
-            _assert_unbanded(display, field)
+            assert_disc_size_band(display, supplier_spec, field)
         for name in TEXT_SIDES["free_top"]:
             display = _early_bound(displays[name], "IDisplayDimension")
             if int(display.LeaderVisibility) != LEADER_LINE_NONE:
@@ -463,8 +466,10 @@ def build(adapter: Any) -> dict[str, str]:
         prepare_views=prepare_diagrams,
         supplier_reference_features=SHEET_FEATURES,
         include_right=False,
-        # Rules 9 and 26: the projected principal views take no prose name;
-        # the footer note already says the views are reference only.
+        # Rules 9 and 26: the projected principal views take no prose name.
+        # The footer's general line says the ID and OD are receiving limits
+        # (owner ruling 2026-11-17, #3044); the free height stays REF in
+        # parentheses.
         stock_caption="",
         supplier_margins={
             "free_front": (0.035, 0.0, 0.035, 0.0),
@@ -473,6 +478,7 @@ def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=partial(supplier_dimensions, settled_checks=settled_checks),
         installed_caption="ISOMETRIC",
         settled_checks=settled_checks,
+        general_text=GENERAL_TEXT,
         unit=part_drawing_unit("dt-vn-cylinder-bank-spring"),
     )
 

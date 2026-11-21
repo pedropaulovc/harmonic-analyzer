@@ -88,10 +88,15 @@ def test_the_bank_spring_fits_its_arbor_and_faces() -> None:
     import dt_cylinder_gear_shaft_spec as arbor
     import dt_vn_cylinder_bank_spring_spec as spring
 
-    # Catalogue worst case: the tightest spring still passes the largest arbor
-    # (with no clearance to spare: the DT-000 step checks it slides free).
-    id_min = spring.ID + spring.ID_BAND[1]
-    assert id_min >= arbor.SHAFT_DIA + arbor.SHAFT_DIA_BAND[0] - 1e-9
+    # The printed receiving ID minimum (owner ruling 2026-11-17, #3044), not
+    # the catalogue's, passes the largest printed arbor with the slip fit's
+    # mean clearance to spare.
+    import vn_disc_spring_acceptance as acceptance
+
+    id_min = acceptance.LIMITS[spring.SKU]["ID"][0]
+    assert id_min - (arbor.SHAFT_DIA + max(arbor.SHAFT_DIA_BAND)) >= (
+        acceptance.SLIDING_ALLOWANCE_MM
+    )
     # Direct seating on gear 19's planar face and the north pedestal strap.
     od_min = spring.OD + spring.OD_BAND[1]
     od_max = spring.OD + spring.OD_BAND[0]

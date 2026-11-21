@@ -92,6 +92,7 @@ def _presentation(
     fraction_denominator: int | None,
     callout: str | None,
     expected_mm: float | None,
+    reference: bool = True,
 ) -> tuple[int, int, str, str]:
     if units not in ("in", "mm", "deg") or presentation not in (
         "length", "diameter", "angle"
@@ -118,16 +119,20 @@ def _presentation(
         raise ValueError(f"{label}: supplier below-callout must be nonempty text")
     unit = {"mm": 0, "in": 3, "deg": 0}[units]
     fraction = 2 if fraction_denominator is not None else 1
-    prefix = "(<MOD-DIAM>" if presentation == "diameter" else "("
+    mark = "<MOD-DIAM>" if presentation == "diameter" else ""
+    # A banded supplier size (a spec-control limit carried on the native
+    # dimension) prints bare; a REF size is parenthesized.
+    open_, close = ("(", ")") if reference else ("", "")
+    prefix = open_ + mark
     # SolidWorks already prints an inch mark after a fraction (1/4"), and an
     # inch sheet's title block already reads UNIT: IN, so neither takes an
     # " in" suffix. Other decimals still name their unit.
     if units == "deg" or fraction_denominator is not None or (
         units == "in" and sheet_units(adapter) == "in"
     ):
-        suffix = ")"
+        suffix = close
     else:
-        suffix = f" {units})"
+        suffix = f" {units}{close}"
     return unit, fraction, prefix, suffix
 
 
@@ -164,16 +169,20 @@ def supplier_reference_dimension(
     fraction_denominator: int | None = None,
     callout: str | None = None,
     configuration: str | None = None,
+    reference: bool = True,
 ) -> Any:
     """Dress a native measured value; retain its source tolerance, if any.
 
     Imported nominal model references are not claims of physical-edge or
     helical-thread attachment. Callers verify the appropriate source identity.
     A below-callout identifies the native size; it never replaces its value.
+    ``reference=False`` prints a size whose model dimension carries its own
+    spec-control band bare, without the REF parentheses.
     """
     unit, fraction, prefix, suffix = _presentation(
         adapter, label=label, units=units, precision=precision, presentation=presentation,
         fraction_denominator=fraction_denominator, callout=callout, expected_mm=expected_mm,
+        reference=reference,
     )
     display = _early_bound(dimension, "IDisplayDimension")
     _measured_supplier_value(
@@ -203,6 +212,7 @@ def supplier_reference_dimension(
         presentation=presentation, fraction_denominator=fraction_denominator,
         callout=callout,
         configuration=configuration,
+        reference=reference,
     )
     return display
 
@@ -221,11 +231,13 @@ def assert_supplier_reference_dimension(
     fraction_denominator: int | None = None,
     callout: str | None = None,
     configuration: str | None = None,
+    reference: bool = True,
 ) -> None:
     """Read persisted native state after the final rebuild; never repair it."""
     unit, fraction, prefix, suffix = _presentation(
         adapter, label=label, units=units, precision=precision, presentation=presentation,
         fraction_denominator=fraction_denominator, callout=callout, expected_mm=expected_mm,
+        reference=reference,
     )
     display = _early_bound(dimension, "IDisplayDimension")
     _measured_supplier_value(

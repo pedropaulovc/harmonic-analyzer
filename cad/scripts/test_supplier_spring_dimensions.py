@@ -15,6 +15,7 @@ import ch_vn_channel_spring_installed_spec as channel
 import dt_vn_cylinder_bank_spring_spec as cylinder
 import pd_vn_transgear_pivot_spring_spec as pivot
 import sm_vn_counter_spring_spec as counter
+import vn_disc_spring_acceptance as acceptance
 import vn_disc_spring_supplier_stock as stock
 
 
@@ -66,12 +67,20 @@ def _captured_reference_bounds(views):
     return reference_bounds
 
 
-def _native_annotation(name, owner, value, band=None):
-    tolerance = SimpleNamespace(
-        Type=0 if band is None else (4 if math.isclose(band[0], -band[1]) else 2),
-        GetMinValue=lambda: 0.0 if band is None else band[1] / 1000,
-        GetMaxValue=lambda: 0.0 if band is None else band[0] / 1000,
-    )
+def _native_annotation(name, owner, value, band=None, limits=None):
+    if limits is not None:
+        # A receiving LIMIT (swTolLIMIT = 3): deviations about the nominal.
+        tolerance = SimpleNamespace(
+            Type=3,
+            GetMinValue=lambda: (limits[0] - value) / 1000,
+            GetMaxValue=lambda: (limits[1] - value) / 1000,
+        )
+    else:
+        tolerance = SimpleNamespace(
+            Type=0 if band is None else (4 if math.isclose(band[0], -band[1]) else 2),
+            GetMinValue=lambda: 0.0 if band is None else band[1] / 1000,
+            GetMaxValue=lambda: 0.0 if band is None else band[0] / 1000,
+        )
     native = SimpleNamespace(
         FullName=f"{name}@{owner}@Source", value=value, Tolerance=tolerance
     )
@@ -152,7 +161,10 @@ def _disc_views(spec):
                 if name in names
             )
             views[key].annotations.append(
-                _native_annotation(name, owner, getattr(spec, semantic))
+                _native_annotation(
+                    name, owner, getattr(spec, semantic),
+                    limits=acceptance.LIMITS.get(spec.SKU, {}).get(semantic),
+                )
             )
     return views
 
@@ -511,47 +523,48 @@ def test_disc_preparation_defers_capture_then_reuses_it_for_fitted_annotations(
     )
 
 
-@pytest.mark.parametrize(
-    "spec,ends,expected",
-    [
-        (
-            counter,
-            "LOOPS",
-            (
-                "FREE LENGTH INSIDE LOOPS (10.00)",
-                "MAXIMUM EXTENDED LENGTH INSIDE LOOPS (16.60)",
-                "COIL OD (Ø.500), WIRE (Ø.063)",
-            ),
-        ),
-        (
-            channel,
-            "HOOKS",
-            (
-                "FREE LENGTH INSIDE HOOKS (1.948)",
-                "MAXIMUM EXTENDED LENGTH INSIDE HOOKS (5.448)",
-                "COIL OD (Ø.25), WIRE (Ø.026)",
-            ),
-        ),
-    ],
-    ids=["1330K524", "9432K31"],
-)
-def test_extension_supplier_sizes_print_as_ref_data_at_catalogue_places(
-    spec, ends, expected
-):
-    # No gauge view draws a dimension over no spring: the catalogue sizes are
-    # parenthesized inch REF data lines beside the ITEM row.
-    lines = layout.extension_spring_data(
-        free_length_mm=spec.FREE_LENGTH_MM,
-        max_length_mm=spec.MAX_LENGTH_MM,
-        coil_od_mm=spec.SUPPLIER_COIL_OD_MM,
-        wire_dia_mm=spec.SUPPLIER_WIRE_DIA_MM,
-        precision=spec.SUPPLIER_PRECISION,
-        ends=ends,
-    )
-    assert lines == expected
+@pytest.mark.parametrize("spec", [counter, channel], ids=["1330K524", "9432K31"])
+def test_extension_supplier_precision_keys_are_the_source_dimensions(spec):
     assert set(spec.SUPPLIER_PRECISION) == {
         extension.FREE_LENGTH,
         extension.MAX_LENGTH,
         extension.COIL_OD,
         extension.WIRE_DIA,
     }
+
+
+def test_channel_spring_prints_catalogue_tolerances_as_spec_control_limits():
+    # mcmaster.com/9432K31 (read 2026-11-17): rate 1 +/-0.1 lbf/in, minimum
+    # load 0.4 +/-0.06 lb, OD .25 +/-.008; no length or wire tolerance, so
+    # those stay parenthesized REF.
+    lines = layout.extension_spring_spec_control_data(
+        free_length_mm=channel.FREE_LENGTH_MM,
+        max_length_mm=channel.MAX_LENGTH_MM,
+        coil_od_mm=channel.SUPPLIER_COIL_OD_MM,
+        coil_od_tolerance_mm=channel.SUPPLIER_COIL_OD_TOLERANCE_MM,
+        wire_dia_mm=channel.SUPPLIER_WIRE_DIA_MM,
+        rate_n_per_mm=channel.SPRING_RATE_N_PER_MM,
+        rate_tolerance_fraction=channel.SPRING_RATE_TOLERANCE_FRACTION,
+        initial_tension_n=channel.INITIAL_TENSION_N,
+        initial_tension_tolerance_n=channel.INITIAL_TENSION_TOLERANCE_N,
+        precision=channel.SUPPLIER_PRECISION,
+        ends="HOOKS",
+    )
+    assert lines == (
+        "RATE 1.00 ±.10 LBF/IN, INITIAL TENSION .40 ±.06 LBF",
+        "COIL OD Ø.250 ±.008, WIRE (Ø.026)",
+        "FREE (1.948), MAX EXTENDED (5.448) INSIDE HOOKS",
+    )
+
+
+def test_wave_spring_receiving_limits():
+    spec, expected_in = cylinder, {"ID": (0.377, 0.395), "OD": (0.490, 0.510)}
+    # Owner ruling 2026-11-17 (#3044): catalogue OD band and ID maximum; the
+    # ID minimum is the largest printed shaft plus the slip fit's mean
+    # clearance, rounded up to .001 in.
+    limits = acceptance.LIMITS[spec.SKU]
+    for field, (low, high) in expected_in.items():
+        assert limits[field] == pytest.approx((low * 25.4, high * 25.4))
+        nominal = getattr(spec, field)
+        assert limits[field][0] < nominal < limits[field][1]
+    assert pivot.SKU not in acceptance.LIMITS

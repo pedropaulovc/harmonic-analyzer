@@ -127,10 +127,11 @@ their sheet re-keys for another reason.
   model, as the [rack source-save controls](pipeline/evidence/vm2-datum-placement/source-hash-cause.md)
   demonstrated. Source-clean guards remain fail-closed before drawing export.
   Purchased supplier-reference sheets retain the supplier's explicit units,
-  precision and exact fractions, and print every supplier size as untoleranced
-  REF (the catalogue tolerance governs) rather than project fabrication
-  controls. `_supplier_dimensions` formats a visible native value without
-  assigning `SystemValue` or replacing numeric text; sizes are parenthesized
+  precision and exact fractions, and print every native supplier size as
+  untoleranced REF (the catalogue tolerance governs) rather than project
+  fabrication controls, except a tier-2 specification-control limit below.
+  `_supplier_dimensions` formats a visible native value without
+  assigning `SystemValue` or replacing numeric text; REF sizes are parenthesized
   and unit-labelled. Model-owned hidden construction carriers are explicitly
   nominal supplier references, not claims of physical-edge or helical-thread
   attachment. Thread identification is below-text on the native nominal-major
@@ -138,7 +139,17 @@ their sheet re-keys for another reason.
   reads stays in the spec, and the native dimension that prints is refused if
   it gains a tolerance (`_supplier_unbanded`). Supplier application ranges,
   such as a spring pin's mating-hole range, are application data, not part
-  sizes, and may print. Reference sketches are authored in
+  sizes, and may print. Tier-2 specification-control sheets (#2886; owner
+  rulings 2026-11-17 on #3044) print receiving acceptance limits. A size
+  carries its limits on its native diagram dimension, authored in the model
+  (the MHA-DT-VN-68 wave disc spring's ID/OD, `vn_disc_spring_acceptance`,
+  printed bare with `reference=False`, its footer general line naming them
+  receiving limits). A force (a spring's rate and initial tension), and
+  a size the sheet draws no dimension for (an installed-only extension
+  spring's coil OD), prints once in the footer under
+  `SUPPLIER CATALOGUE TOLERANCES (ACCEPT):`, formatted from the spec by
+  `_supplier_spring_drawing.extension_spring_spec_control_data`. A value the
+  supplier states no tolerance on prints parenthesized as REF. Reference sketches are authored in
   the final transformed stock frame by `_supplier_screw_reference`; only
   threaded builders import the separate `_supplier_screw_save` saver.
   Connected linear witnesses reuse an existing anchor only after both native

@@ -196,3 +196,18 @@ def test_the_end_bars_never_reach_the_ears() -> None:
     assert rocker.BAR_TO_EAR == pytest.approx(
         rocker.NORTH_EAR_STANDOFF - bar.BAR_WIDTH / 2.0
     )
+
+
+def test_adjacent_channel_springs_clear_at_the_catalogue_maximum_od() -> None:
+    # Every channel spring's axis lies in its station plane (z_j + ARM_MID_DZ,
+    # build_ch_channel_assembly), so neighbours' coils stand one station pitch
+    # apart across Z whatever their in-plane angle. At the 9432K31 catalogue
+    # maximum coil OD (.250 +.008, owner ruling 2026-11-17, #3044) they keep
+    # about 1.07 mm.
+    import _config
+    import ch_vn_channel_spring_installed_spec as spring
+
+    pitch = _config.machine("channels", "station_pitch_mm")
+    od_max = spring.SUPPLIER_COIL_OD_MM + spring.SUPPLIER_COIL_OD_TOLERANCE_MM
+    assert pitch - od_max == pytest.approx(1.0668)
+    assert pitch - od_max > 1.0

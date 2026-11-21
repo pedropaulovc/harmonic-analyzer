@@ -45,6 +45,7 @@ from _drawing_layout_audit import annotation_display
 from _drawing_projection import model_point_in_view
 from _drawing_types import DRAWING_TEMPLATES, DrawingSpec
 from _drawing_sheet_region import sheet_drawable_region
+from _drawing_tolerances import _tolerance_places
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_audit import display_box
 from _purchased_fastener_drawing import (
@@ -59,12 +60,14 @@ from _purchased_fastener_drawing import (
     _open_supplier_source_read_only,
     _purchased_title_block,
     _rebuild,
+    _supplier_data_lines,
     _source_file_sha256,
     add_purchased_footer,
     assert_supplier_annotations_fit,
     assert_supplier_view_fits,
     check_item,
     supplier_fit_cells,
+    SUPPLIER_DATA_HEADING,
     view_band_bottom,
 )
 from _purchased_part_variants import _suppressed
@@ -178,33 +181,63 @@ def assert_supplier_configuration_value(
         raise RuntimeError(f"{label}: exact configured supplier dimension changed")
 
 
-def extension_spring_data(
+# A tier-2 specification-control sheet's footer heading (#2886; owner ruling
+# 2026-11-17: accept on the supplier catalogue's tolerances). Its toleranced
+# values are acceptance limits; a parenthesized value is ordinary REF, one
+# the supplier states no tolerance on (drawing-simplicity-policy.md).
+SPEC_CONTROL_HEADING = "SUPPLIER CATALOGUE TOLERANCES (ACCEPT):"
+_MM_PER_IN = 25.4
+_N_PER_LBF = 4.4482216152605
+
+
+def _inch_text(value: float, places: int) -> str:
+    """A decimal-inch figure with no leading zero (``.250``, ``1.948``)."""
+    text = f"{value:.{places}f}"
+    return text[1:] if text.startswith("0.") else text
+
+
+def extension_spring_spec_control_data(
     *,
     free_length_mm: float,
     max_length_mm: float,
     coil_od_mm: float,
+    coil_od_tolerance_mm: float,
     wire_dia_mm: float,
+    rate_n_per_mm: float,
+    rate_tolerance_fraction: float,
+    initial_tension_n: float,
+    initial_tension_tolerance_n: float,
     precision: Mapping[str, int],
     ends: str,
 ) -> tuple[str, ...]:
-    """An extension spring's catalogue sizes as footer reference data lines.
+    """An extension spring's catalogue acceptance and reference lines.
 
-    The free and maximum lengths are the supplier's inside-hook/inside-loop
-    measurements of states the sheet does not draw. Printed as gauge views
-    they were bare dimension lines over no spring, under prose titles (novice
-    rubric screen, rule 9); as REF data beside the ITEM row they need no view.
-    Inch values in parentheses, at the catalogue's own places (``precision``
-    is keyed by the source dimension names).
+    Rate, initial tension and coil OD carry the supplier's stated
+    tolerances; the lengths and wire, which it states none on, print as
+    parenthesized reference at the catalogue's own places (``precision`` is
+    keyed by the source dimension names). The coil OD prints at its own
+    places or the tolerance's, whichever is finer. The free and maximum
+    lengths are inside-hook/inside-loop measurements of states the sheet
+    does not draw.
     """
 
     def inch(value_mm: float, name: str) -> str:
-        text = f"{value_mm / 25.4:.{precision[name]}f}"
-        return text[1:] if text.startswith("0.") else text
+        return _inch_text(value_mm / _MM_PER_IN, precision[name])
 
+    od_places = max(
+        precision[COIL_OD], _tolerance_places(coil_od_tolerance_mm, display_unit="in")
+    )
+    rate = rate_n_per_mm * _MM_PER_IN / _N_PER_LBF
+    lbf = 1.0 / _N_PER_LBF
     return (
-        f"FREE LENGTH INSIDE {ends} ({inch(free_length_mm, FREE_LENGTH)})",
-        f"MAXIMUM EXTENDED LENGTH INSIDE {ends} ({inch(max_length_mm, MAX_LENGTH)})",
-        f"COIL OD (Ø{inch(coil_od_mm, COIL_OD)}), WIRE (Ø{inch(wire_dia_mm, WIRE_DIA)})",
+        f"RATE {_inch_text(rate, 2)} ±{_inch_text(rate * rate_tolerance_fraction, 2)}"
+        f" LBF/IN, INITIAL TENSION {_inch_text(initial_tension_n * lbf, 2)}"
+        f" ±{_inch_text(initial_tension_tolerance_n * lbf, 2)} LBF",
+        f"COIL OD Ø{_inch_text(coil_od_mm / _MM_PER_IN, od_places)}"
+        f" ±{_inch_text(coil_od_tolerance_mm / _MM_PER_IN, od_places)},"
+        f" WIRE (Ø{inch(wire_dia_mm, WIRE_DIA)})",
+        f"FREE ({inch(free_length_mm, FREE_LENGTH)}), MAX EXTENDED"
+        f" ({inch(max_length_mm, MAX_LENGTH)}) INSIDE {ends}",
     )
 
 
@@ -779,6 +812,7 @@ def build_supplier_spring_drawing(
     supplier_reference_features: Mapping[str, Sequence[str]] | None = None,
     installed_front: bool = False,
     supplier_data: Sequence[str] = (),
+    supplier_data_heading: str = SUPPLIER_DATA_HEADING,
     stock_configuration: str = SUPPLIER_FREE_CONFIGURATION,
     prepare_views: Callable[..., Sequence[Callable[[], None]] | None] | None = None,
     include_right: bool = True,
@@ -789,6 +823,7 @@ def build_supplier_spring_drawing(
     installed_caption: str = "INSTALLED REPRESENTATION",
     right_caption: str = "SUPPLIER NOMINAL SECTIONS",
     cut_to_suit: bool = False,
+    general_text: str | None = None,
     spring_metadata: bool = False,
     settled_checks: Sequence[Callable[[], None]] = (),
     unit: str = "mm",
@@ -798,8 +833,15 @@ def build_supplier_spring_drawing(
     ``installed_front`` (extension springs) draws the installed configuration
     only, as a Front over an Isometric, and takes no supplier diagram views,
     margins or dimension hooks: the catalogue sizes print as ``supplier_data``
-    footer lines (:func:`extension_spring_data`).
+    footer lines (:func:`extension_spring_spec_control_data`). A
+    specification-control sheet passes ``SPEC_CONTROL_HEADING``. ``general_text``
+    replaces the footer's general line (``add_purchased_footer``), for a sheet
+    whose views carry receiving limits.
     """
+    # Footer data and its heading fail here, before the seat opens anything.
+    _supplier_data_lines(
+        supplier_data, label=spec.artifact_stem, heading=supplier_data_heading
+    )
     supplier_margins = supplier_margins or {}
     supplier_reference_features = supplier_reference_features or {}
     if installed_front and (
@@ -942,7 +984,7 @@ def build_supplier_spring_drawing(
         draw,
         {
             0: title,
-            1: "Purchased identification only; supplier sizes are reference dimensions",
+            1: "Purchased identification only; untoleranced supplier sizes are reference dimensions",
             2: "Harmonic Analyzer Project",
             3: f"{spec.artifact_stem}; {properties['Supplier']}; {properties['Supplier SKUs']}",
             4: "installed front and pictorial; supplier data list"
@@ -1187,8 +1229,10 @@ def build_supplier_spring_drawing(
             item=item,
             notes=notes,
             cut_to_suit=cut_to_suit,
+            general_text=general_text,
             label=spec.artifact_stem,
             supplier_data=supplier_data,
+            supplier_data_heading=supplier_data_heading,
         )
     )
     _rebuild(draw, phase="supplier/installed annotations")

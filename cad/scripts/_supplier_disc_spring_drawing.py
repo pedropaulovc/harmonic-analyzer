@@ -27,7 +27,9 @@ from _supplier_spring_drawing import (
     assert_supplier_configuration_value,
     reacquire_supplier_dimensions,
 )
+from _limit_tolerance import SW_TOL_LIMIT
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
+from vn_disc_spring_acceptance import LIMITS, PLACES as ACCEPTANCE_PLACES
 from vn_disc_spring_supplier_stock import (
     SUPPLIER_DIMENSION_NAMES,
     SUPPLIER_DIMENSIONS_BY_FEATURE,
@@ -245,6 +247,43 @@ def assert_disc_size_text_clear(
         )
 
 
+_SW_TOL_NONE = 0  # swTolType_e.swTolNONE
+
+
+def assert_disc_size_band(display: Any, spec: Any, semantic: str) -> None:
+    """A wave spring's ID/OD carries its receiving limits as a native LIMIT
+    tolerance (``vn_disc_spring_acceptance``, owner ruling 2026-11-17, #3044);
+    every other supplier size stays untoleranced REF."""
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    limits = LIMITS.get(spec.SKU, {}).get(semantic)
+    if limits is None:
+        if int(tolerance.Type) != _SW_TOL_NONE:
+            raise RuntimeError(f"{spec.SKU} {semantic}: supplier REF gained a band")
+        return
+    nominal = float(getattr(spec, semantic))
+    if (
+        int(tolerance.Type) != SW_TOL_LIMIT
+        or not math.isclose(
+            float(tolerance.GetMinValue()) * 1000.0, limits[0] - nominal, abs_tol=1e-6
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()) * 1000.0, limits[1] - nominal, abs_tol=1e-6
+        )
+    ):
+        raise RuntimeError(
+            f"{spec.SKU} {semantic}: receiving limits {limits} did not reach the sheet"
+        )
+    # The limits print at the tolerance precision; the drawing-side unit
+    # rewrite must not have reset it to the template's places.
+    places = int(display.GetPrimaryTolPrecision2())
+    if places != ACCEPTANCE_PLACES:
+        raise RuntimeError(
+            f"{spec.SKU} {semantic}: receiving limits print at {places} places, "
+            f"not {ACCEPTANCE_PLACES}"
+        )
+
+
 def supplier_disc_spring_dimensions(
     adapter: Any,
     views: dict[str, Any],
@@ -325,6 +364,7 @@ def supplier_disc_spring_dimensions(
                 "presentation": (
                     "diameter" if semantic in ("ID", "OD", "SHAFT_DIA") else "length"
                 ),
+                "reference": semantic not in LIMITS.get(spec.SKU, {}),
             }
             if semantic in callouts:
                 arguments["callout"] = callouts[semantic]
@@ -381,11 +421,7 @@ def supplier_disc_spring_dimensions(
                 arguments["expected_mm"],
                 label=name,
             )
-            # Supplier sizes print as untoleranced REF; the catalogue governs.
-            dimension = _early_bound(display.GetDimension2(0), "IDimension")
-            tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-            if int(tolerance.Type) != 0:
-                raise RuntimeError(f"{spec.SKU} {semantic}: supplier REF gained a band")
+            assert_disc_size_band(display, spec, semantic)
 
     if settled_checks is not None:
         settled_checks.append(check_settled_references)
