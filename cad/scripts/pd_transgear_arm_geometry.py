@@ -328,7 +328,7 @@ PIN_HOLE_DEPTH_PLACES = 2
 PIN_HOLE_POINT_LENGTH = PIN_HOLE_DIA / 2.0 * DRILL_POINT_H  # 0.954
 PIN_HOLE_Z = THICKNESS / 2.0  # mid-thickness, on y = 0
 # The latch pin's axis in the machine frame; the hook's hole is drilled on it.
-PIN_MACHINE_Z = FRONT_FACE_MACHINE_Z + PIN_HOLE_Z  # -119.63775
+PIN_MACHINE_Z = FRONT_FACE_MACHINE_Z + PIN_HOLE_Z  # -119.6505
 
 # The end-face latch hole's height is an ordinary .XXX row: the title block
 # governs it, with no tightened band (coordinator ruling (a), #2019).  It
