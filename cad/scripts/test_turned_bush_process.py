@@ -54,6 +54,8 @@ def test_the_turned_parts_are_enrolled() -> None:
         "ch_rocker_strap_tl_hub_washer",
         "dt_cone_gear_tl_arbor_collar",
         "dt_crank_handle_ferrule",
+        "dt_crank_handle_butt_cup",
+        "sm_gooseneck_end_plug",
     }
 
 
@@ -71,19 +73,30 @@ def test_plan_binds_the_part_from_its_feature_export(stem: str) -> None:
     )
 
 
+# The adapter binding a twist drill's sizing band names, and the feature
+# whose hole band that is: the bore, or the tap's drill.
+SIZED = {
+    "{{cad.bore_dia_band_mm}}": "bore",
+    "{{cad.tap_drill_dia_band_mm}}": "tap",
+}
+
+
 @pytest.mark.parametrize("stem", STEMS)
 def test_the_drill_lands_in_the_drawings_hole_band(stem: str) -> None:
     plan = _plan(stem)
-    band = export_features.requirement_manifest(stem)["features"]["bore"]["dia"]
+    features = export_features.requirement_manifest(stem)["features"]
     tools = {tool["id"]: tool for tool in plan["tools"]}
+    # A drill sized to a hole band must land in that band; a pre-drill
+    # (sizing "other", e.g. under a reamer) is not the finished hole.
     drills = [
-        tools[op["tool"]]["ref"]
+        (tools[op["tool"]]["ref"], SIZED[op["sizing"]["band_mm"]])
         for setup in plan["setups"]
         for op in setup.get("operations", ())
-        if op.get("drilling") == "twist_drill"
+        if op.get("drilling") == "twist_drill" and op.get("sizing") != "other"
     ]
     assert drills
-    for ref in drills:
+    for ref, feature in drills:
+        band = features[feature]["dia"]
         assert band[0] <= SHOP["tools"][ref]["diameter_mm"] <= band[1], ref
 
 

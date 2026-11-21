@@ -137,6 +137,9 @@ diameter_mm = 3.9878
 [tools.reamer-1610]  # MHA-DT-08 (Ø.161) REAM THRU, running fit on MHA-DT-32
 description = ".1610 in HSS chucking reamer"
 diameter_mm = 4.0894
+[tools.reamer-2560-end-cutting]  # MHA-DT-35 pocket, floor corner R.004 MAX (inventory: to order)
+description = ".2560 in end-cutting (flat-bottom) reamer"
+diameter_mm = 6.5024
 [tools.reamer-3740]  # inventory tools.reamer-3740
 description = ".3740 in HSS straight-flute chucking reamer (McMaster 3087A55)"
 diameter_mm = 9.4996
