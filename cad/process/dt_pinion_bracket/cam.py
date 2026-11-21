@@ -5,7 +5,7 @@ part's exported ``features.toml`` and the plan/shop TOML, then runs
 :func:`build` inside headless FreeCAD (``freecadcmd``) with that context and
 checks the posted G-code against :func:`expectations`. The strap's sizes come
 from the feature export (its thickness, flanks, round ends, both reamed bores,
-the follower seat and the cross hole); the blank, the parts' places in it,
+the follower seat); the blank, the parts' places in it,
 the levels, spots, drill and reamer depths and the holding from ``plan.toml``
 ``[parameters]`` and ``milling_cuts``; cutter diameters and end-mill speeds
 from the shop (``shop/``), the drills' and reamers' speeds from the plan's
@@ -29,11 +29,12 @@ face) down.
   round to its other side: the bridge alone holds each strap in the blank
   until the saw cuts across it (Setup 3).
 - PB04 (one strap on edge on stacked parallels, A against the fixed jaw, the
-  far flank down, the seat flank up): spot the follower seat and the cross
-  hole, drill the seat #26 short of its floor and the cross hole 1/16 through
-  (pecked, full retract) into the gap between the parallels, flat-bottom the
-  seat's floor with the 1/8 in end mill, then ream the seat .1570 to just
-  above the floor (fed in and out).
+  far flank down, the seat flank up): spot the follower seat, drill it #26
+  short of its floor, flat-bottom the seat's floor with the 1/8 in end mill,
+  then ream the seat .1570 to just above the floor (fed in and out). The
+  cross hole is not drilled here: it is match-drilled 1/16 through the strap
+  and the MHA-DT-19 shaft together at assembly (owner ruling 2026-11-21,
+  MHA-DT-00 STEP 16, SHAFT DRILL SET).
 
 Work frames (G54), each set in its setup:
 - PB02: X0 the blank's LEFT end, Y0 the fixed jaw's face (the bar's edge,
@@ -80,7 +81,6 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
         (
             ("edge_spot",),
             ("seat_drill",),
-            ("cross_drill",),
             ("seat_floor",),
             ("seat_ream",),
         ),
@@ -100,7 +100,6 @@ CAM_TOOLS = (
     "reamer-3135",
     "em-eighth",
     "drill-26",
-    "drill-1-16",
     "reamer-1570",
 )
 IN = 25.4
@@ -430,8 +429,8 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
     frame the recipe assumes: face A at model Z0 and face B above it, the
     flanks square to X either side of the bores' line, the pivot bore through
     the origin and the arbor bore along +Y, both through along Z; the round
-    ends about the bores; the seat and the cross hole entering the seat flank
-    along +X at their stations from face A."""
+    ends about the bores; the seat entering the seat flank along +X at its
+    station from face A."""
     f = features["features"]
     if f["broad_face_a"]["plane"] != {"frame": "model", "axis": "z", "value": 0.0}:
         raise ValueError("broad_face_a: expected at model Z0")
@@ -471,20 +470,17 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         and math.isclose(far_x, radius, abs_tol=1e-3)
     ):
         raise ValueError("the flanks: expected tangent to the round ends")
-    seat, cross = f["follower_seat"], f["cross_hole"]
-    for name, hole in (("follower_seat", seat), ("cross_hole", cross)):
-        if hole["axis"] != [1.0, 0.0, 0.0] or not math.isclose(
-            hole["at"][0], seat_x, abs_tol=1e-3
-        ):
-            raise ValueError(f"{name}: expected into the seat flank along +X")
-        if not math.isclose(hole["at"][2], hole["station_nominal"], abs_tol=1e-3):
-            raise ValueError(f"{name}: its Z is not its station from face A")
+    seat = f["follower_seat"]
+    if seat["axis"] != [1.0, 0.0, 0.0] or not math.isclose(
+        seat["at"][0], seat_x, abs_tol=1e-3
+    ):
+        raise ValueError("follower_seat: expected into the seat flank along +X")
+    if not math.isclose(seat["at"][2], seat["station_nominal"], abs_tol=1e-3):
+        raise ValueError("follower_seat: its Z is not its station from face A")
     if not seat.get("flat_bottom") or "depth_nominal" not in seat:
         raise ValueError("follower_seat: expected a flat-bottomed blind seat")
     if not math.isclose(seat["at"][1], seat["height_nominal"], abs_tol=1e-3):
         raise ValueError("follower_seat: its Y is not its height from the pivot bore")
-    if not cross.get("thru") or cross["at"][1] != 0.0:
-        raise ValueError("cross_hole: expected through, on the pivot bore's axis")
     return {
         "thickness": thickness,
         "width": far_x - seat_x,
@@ -496,7 +492,6 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         "pivot_band": pivot["dia"],
         "arbor_band": arbor["dia"],
         "seat": seat,
-        "cross": cross,
     }
 
 
@@ -664,23 +659,15 @@ def context(
     _agree(
         plan, "pivot_apex_x_mm", -(sum(g["radius_band"]) / 2 + EDGE_FINDER_RADIUS_MM)
     )
-    seat, cross = g["seat"], g["cross"]
-    d26, d16, d1570 = (
-        tool_dia("drill-26"),
-        tool_dia("drill-1-16"),
-        tool_dia("reamer-1570"),
-    )
+    seat = g["seat"]
+    d26, d1570 = tool_dia("drill-26"), tool_dia("reamer-1570")
     if not seat["dia"][0] <= d1570 <= seat["dia"][1]:
         raise ValueError(
             f"reamer-1570 Ø{d1570} is outside the seat's band {seat['dia']}"
         )
-    if not cross["dia"][0] <= d16 <= cross["dia"][1]:
-        raise ValueError("the 1/16 drill is outside the cross hole's band")
-    # The spot's mouth no wider than the cross hole's upper limit (it starts
-    # the 1/16 drill and leaves no chamfer beyond the hole's band) and under
-    # the #26.
-    if not (edge_spot <= cross["dia"][1] + 1e-9 and edge_spot < d26):
-        raise ValueError("the edge spot is over the cross hole's band or the #26")
+    # The spot's mouth under the #26, so the drill takes it out.
+    if not edge_spot < d26:
+        raise ValueError("the edge spot is over the #26")
     if not 0 < d1570 - d26 <= p["ream_stock_max_mm"]:
         raise ValueError("the #26 leaves the .1570 reamer no stock or too much")
     floor = -seat["depth_nominal"]
@@ -714,13 +701,7 @@ def context(
             f"the corner the floor's turn and the reamer leave is outside the R{rmax} floor corner"
         )
     seat_ream_tip = floor + gap
-    cross_peck = p["cross_peck_mm"]
-    if cross_peck > d16 + 1e-9:
-        raise ValueError("the cross hole's peck is over one diameter")
-    cross_tip = -W - (p["cross_drill_past_mm"] + _point(d16))
-    _agree(plan, "cross_drill_tip_mm", cross_tip)
     seat_rpm, seat_feed = _setting(plan, shop, "seat drill")
-    cross_rpm, cross_feed = _setting(plan, shop, "cross drill")
     sream_rpm, sream_feed = _setting(plan, shop, "seat ream")
 
     names = {tool["id"]: tool["name"] for tool in plan["tools"]}
@@ -751,12 +732,6 @@ def context(
         arbors.append([_r(x), _r(y)])
     edge = frames["edge"]
     seat_xy = [_r(v) for v in _to(edge, seat["at"])[:2]]
-    cross_xy = [_r(v) for v in _to(edge, cross["at"])[:2]]
-    if not math.isclose(_to(edge, [g["far_x"], 0.0, 0.0])[2], -W, abs_tol=1e-6):
-        raise ValueError("edge: the far flank is not the strap's width below Z0")
-    # The cross hole leaves the far flank between the parallels.
-    if not (-T + t < cross_xy[1] - d16 / 2 and cross_xy[1] + d16 / 2 < -t):
-        raise ValueError("the cross hole's exit reaches a parallel")
 
     stocks = {
         "flat": ((0.0, blank_max), (-bar_w, 0.0), (0.0, bar_t)),
@@ -803,7 +778,7 @@ def context(
     bores = pivots + arbors
     bore_spot_depth = _spot_depth(bore_spot)
     edge_spot_depth = _spot_depth(edge_spot)
-    edge_holes = [seat_xy, cross_xy]
+    edge_holes = [seat_xy]
 
     jobs = [
         {
@@ -910,7 +885,7 @@ def context(
             "ops": [
                 [
                     "edge_spot",
-                    "spot the seat and the cross hole",
+                    "spot the seat",
                     [
                         line
                         for xy in edge_holes
@@ -929,19 +904,6 @@ def context(
                     "seat_drill",
                     "drill the seat #26 short of its floor",
                     _pecked(seat_xy, 0.0, seat_drill_tip, W, edge_clear),
-                ]
-            ],
-        },
-        {
-            **drill_tool("drill-1-16", d16, cross_rpm, cross_feed),
-            "frame": "edge",
-            "label": "cross drill",
-            "stock": stocks["edge"],
-            "ops": [
-                [
-                    "cross_drill",
-                    "drill the cross hole 1/16 through",
-                    _pecked(cross_xy, 0.0, cross_tip, cross_peck, edge_clear),
                 ]
             ],
         },
@@ -1178,7 +1140,6 @@ def context(
             ),
         ),
         ([seat_rpm], hole_checks([seat_xy], seat_drill_tip, 0.0, d26 / 2, edge_keep)),
-        ([cross_rpm], hole_checks([cross_xy], cross_tip, 0.0, d16 / 2, edge_keep)),
         (
             [floor_rpm],
             [
@@ -1207,7 +1168,6 @@ def context(
     edge_tools = [
         tn["spot"],
         tn["drill-26"],
-        tn["drill-1-16"],
         tn["em-eighth"],
         tn["reamer-1570"],
     ]
@@ -1219,7 +1179,8 @@ def context(
         ],
         [name, "spindle", {"rpm": [speeds for speeds, _c in edge_sections]}],
         [name, "pauses", {"z_top": 0.0, "count": 0}],
-        [name, "depth", {"z_min": _r(cross_tip)}],
+        # The deepest cut: the end mill on the seat's floor.
+        [name, "depth", {"z_min": _r(floor)}],
     ]
     for k, (_speeds, checks) in enumerate(edge_sections):
         expect += [[f"{name}@{k}", check, kwargs] for check, kwargs in checks]

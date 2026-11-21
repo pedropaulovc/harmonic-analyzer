@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <!-- Setup 9: the finished bracket, every surface blackened. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 9: blacken every surface (once the solution is bought)</text>
+  <text class="title" x="20" y="20">Setup 9: blacken every surface with the Presto Black Steel PC9</text>
   <path class="part-kept" d="M113.1 340 V151.53 A56.9 56.9 0 0 1 226.9 151.53 V340 Z"/>
   <path class="active-face" fill="none" d="M113.1 340 V151.53 A56.9 56.9 0 0 1 226.9 151.53 V340 Z"/>
   <circle class="holes" cx="170" cy="163.6" r="22.76"/>

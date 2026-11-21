@@ -88,13 +88,13 @@ def test_context_accepts_the_plan_and_numbers_the_tools(context) -> None:
         "reamer-3135": 6,
         "em-eighth": 7,
         "drill-26": 8,
-        "drill-1-16": 9,
-        "reamer-1570": 10,
+        "reamer-1570": 9,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     # Both straps' bores on the blank's centre line, the arbor bores the
     # centre distance past the pivot bores; the seat its height from the
-    # cross hole, both at the station from face A.
+    # pivot bore's axis at its station from face A (the cross hole is
+    # match-drilled at assembly, owner ruling 2026-11-21: no PB04 hole).
     holes = {
         program: kwargs["centres"]
         for program, check, kwargs in context["expect"]
@@ -102,7 +102,8 @@ def test_context_accepts_the_plan_and_numbers_the_tools(context) -> None:
     }
     assert holes["PB02_flat@2"] == [[17.0, -15.875], [70.0, -15.875]]
     assert holes["PB02_flat@3"] == [[45.0, -15.875], [98.0, -15.875]]
-    assert holes["PB04_edge@0"] == [[7.0, -4.572], [0.0, -4.572]]
+    assert holes["PB04_edge@0"] == [[7.0, -4.572]]
+    assert all("cross" not in key for _name, ops in RECIPE.PROGRAMS for key in ops)
 
 
 def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -> None:
@@ -124,15 +125,13 @@ def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -
         ("z_touch_x_mm", 3.0, "wholly on the blank"),
         ("pivot_drill_tip_mm", -2.0, "pivot_drill_tip_mm"),
         ("bore_spot_dia_mm", 3.3, "between the pilot"),
-        ("edge_spot_dia_mm", 1.7, "over the cross hole's band"),
+        ("edge_spot_dia_mm", 3.8, "over the #26"),
         ("face_b_skim_mm", 0.5, "face_b_skim_mm"),
         ("grip_mm", 7.5, "grip_mm"),
         ("overhang_min_mm", 6.35, "overhang_min_mm"),
         ("seat_floor_dia_mm", 3.74, "outside the R"),
         ("seat_ream_floor_gap_mm", 0.1, "outside the R"),
         ("seat_floor_z_mm", -4.3, "seat_floor_z_mm"),
-        ("cross_peck_mm", 2.0, "over one diameter"),
-        ("cross_drill_tip_mm", -15.5, "cross_drill_tip_mm"),
         ("pivot_apex_x_mm", -7.5, "pivot_apex_x_mm"),
         ("finder_tip_depth_mm", 2.54, "below the jaw tops"),
         ("parallel_thickness_mm", 6.35, "parallel's inner edge"),
@@ -193,12 +192,12 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: "G0 Z5.000",
             "rapid",
         ),
-        # A cross-hole peck re-entry rapided past the depth already drilled.
+        # The seat drilled short of its depth.
         (
-            "cross_drill",
-            lambda line: line == "G0 Z-0.770",
-            lambda line: "G0 Z-3.000",
-            "rapid",
+            "seat_drill",
+            lambda line: line == "G1 Z-4.014 F{feed}",
+            lambda line: "G1 Z-2.000 F{feed}",
+            "holes",
         ),
         # The seat's floor turned climb (G3).
         (

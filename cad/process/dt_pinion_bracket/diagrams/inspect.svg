@@ -9,10 +9,10 @@
   <text class="label-halo" x="306" y="222.5" text-anchor="middle">arbor bore .3135</text>
   <rect class="part-kept" x="420" y="120" width="301" height="64"/>
   <line class="centre-line" x1="472.5" y1="108" x2="472.5" y2="196"/>
-  <circle class="holes" cx="472.5" cy="152" r="5.6"/>
   <circle class="holes" cx="521.5" cy="152" r="14"/>
-  <line class="leader" x1="476" y1="147" x2="500" y2="96"/>
-  <text class="label-halo" x="504" y="94">cross hole, on the pivot bore's axis</text>
+  <line class="leader" x1="472.5" y1="112" x2="490" y2="96"/>
+  <text class="label-halo" x="494" y="94">pivot bore's axis: the seat's height from it</text>
+  <text class="label" x="420" y="272">no cross hole: it is match-drilled at assembly</text>
   <line class="leader" x1="528" y1="164" x2="560" y2="206"/>
   <text class="label-halo" x="564" y="212">follower seat</text>
   <text class="label" x="420" y="240">seat flank view, pivot end at the left;</text>

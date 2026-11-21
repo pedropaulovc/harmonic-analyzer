@@ -15,7 +15,13 @@ kind = "mill"
 status = "on_hand"
 note = "Ownership only; its facts are cad/process/shop/, same key. Explicit on_hand preserves the pre-split ASSEMBLY.md OWNED, which read a shop.toml record with no present key as owned."
 
+# Tailstock taper MT3: owner (Pedro), answered in person 2026-11-21 (cnc
+# rulings record), "Lathe tailstock taper: MT3; the mill tap-guide dead centre
+# fits" (tools.mill-dead-centre-mt3); the lathe's manual agrees ("Taper in
+# Tailstock Spindle .... MT3", PM-1127VF-LB Operator's Manual 2015,
+# specifications, read 2026-11-21). prechips has no field for it.
 [machines.pm-1127vf-lb]
 kind = "lathe"
 status = "on_hand"
-note = "Ownership only; its facts are cad/process/shop/, same key. Explicit on_hand preserves the pre-split ASSEMBLY.md OWNED, which read a shop.toml record with no present key as owned."
+tailstock_taper = "MT3"
+note = "Ownership and the tailstock taper only; its other facts are cad/process/shop/, same key. Explicit on_hand preserves the pre-split ASSEMBLY.md OWNED, which read a shop.toml record with no present key as owned."
