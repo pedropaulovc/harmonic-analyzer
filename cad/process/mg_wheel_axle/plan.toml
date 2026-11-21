@@ -236,7 +236,7 @@ speed_kind = "spindle"
 tool = "form"
 drilling = "none"
 sizing = "other"
-instruction = "Form the R.07 dome: the form tool on centre height, square to the axis, its arc spanning the whole end; bring the arc up to the faced tip and set the cross-slide so the arc touches the blank's O.D. corner on both sides at once (no light at either side; the tips just past the O.D.): the arc is then centred. Zero the DRO Z there; feed along Z to Z−{{cad.dome_far_form_height_in:.4dot}} (the dome's height): the form then reaches the centre, no flat left at the tip."
+instruction = "Form the R.07 dome: the form tool on centre height, square to the axis, its arc spanning the whole end; bring the arc up to the faced tip and set the cross-slide so the arc touches the blank's O.D. corner on both sides at once (no light at either side; the tips just past the O.D.): the arc is then centred. Zero the DRO Z there; feed along Z by this blank's dome height from its Op 80 reading: .0243 at Ø.1061, .0258 at Ø.1086, .0275 at Ø.1112 (the pictures draw the Ø.1112 blank, Z−{{cad.dome_far_form_height_in:.4dot}}). The form then reaches the centre, no flat left at the tip."
 settings = "lathe-form-r070-o1"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
 
