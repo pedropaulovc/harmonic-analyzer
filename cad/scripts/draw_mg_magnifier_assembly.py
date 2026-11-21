@@ -799,7 +799,8 @@ PRESSED = StackDetail(
     # One clause a line: on one line the spacer clause ran over the border.
     f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']} PRESSED INTO "
     f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']},\n"
-    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle-spacer']} ON IT,\n"
+    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle-spacer']} ON "
+    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']},\n"
     "OTHER PARTS NOT SHOWN",
     letter_corner=(-1, 1),
     break_out=True,

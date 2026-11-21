@@ -94,6 +94,9 @@ NUT_RUNOUT_MARGIN = (_BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0]) - (
 # grid), superseding the rev-10 "dome + 1.3 at every corner" (the washers'
 # and nuts' catalogue bands alone set a floor near it with the thread length
 # exact).
+# The long corner at ENDSHAKE_MIN is also the MHA-MG-00 trial fit's: its
+# nuts jam over the endshake's go feeler before the endshake is set
+# (#3344; mg_magnifier_assembly_sheet asserts the trial corners).
 # Rounded to the micron: the corner can sit on the limit.
 THREAD_PAST_LOCKNUT_MAX = round(
     (_GAUGE[1] + _THREAD[1])
