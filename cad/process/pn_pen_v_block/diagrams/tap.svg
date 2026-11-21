@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="460"/>
+  <text class="title" x="20" y="22">VB08: tapping 4-40 on the dead centre (5 px/mm), spindle off</text>
+  <rect class="hidden" x="40" y="215" width="380" height="225" fill="none"/>
+  <rect class="fixture-support" x="60" y="297.1" width="340" height="142.9"/>
+  <line class="fixture-table" x1="30" y1="440" x2="430" y2="440"/>
+  <polygon class="part-kept" points="150,197.9 194.5,197.9 194.5,187.9 280.8,187.9 280.8,297.1 194.5,297.1 194.5,287 150,287"/>
+  <circle class="holes" cx="212.2" cy="242.5" r="8"/>
+  <rect class="holes" x="206.6" y="187.9" width="11.2" height="47"/>
+  <!-- The tap, its point to go .450-.480 below the front face; the wrench; the dead centre seated in its top. -->
+  <rect class="part-threads" x="207.7" y="110" width="9" height="137"/>
+  <rect class="clamp" x="140" y="100" width="145" height="10"/>
+  <polygon class="cutter" points="204.2,40 220.2,40 212.2,100"/>
+  <line class="leader" x1="300" y1="246.9" x2="217" y2="246.9"/>
+  <text class="label" x="304" y="251">tap point {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the front face</text>
+  <text class="label" x="304" y="267">(aim .465): in the bore, short of its far wall</text>
+  <line class="leader" x1="300" y1="105" x2="286" y2="105"/>
+  <text class="label" x="304" y="109">T-handle tap wrench, centre hole on top</text>
+  <line class="leader" x1="300" y1="60" x2="220" y2="60"/>
+  <text class="label" x="304" y="64">MT3 dead centre in the spindle (T8): guides, does not push</text>
+  <text class="label" x="304" y="190">jog Z down to keep it seated; turn by hand,</text>
+  <text class="label" x="304" y="206">half a turn back each turn; Tapmatic Gold</text>
+  <line class="datum" x1="150" y1="187.9" x2="200" y2="187.9"/>
+  <text class="datum-label" x="145" y="184" text-anchor="end">front face (DRO ref.)</text>
+</svg>
