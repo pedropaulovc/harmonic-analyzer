@@ -136,7 +136,7 @@ lathe_hold = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle off: set the AR tool's tip on the out face at Ø2.25 and turn the chuck a full turn by hand. No jaw may touch the tool or its holder (the jaws' step depth is not on record). A jaw in the way: face only out to where all four clear; the ring outside is turned off in Setup 3."
+instruction = "Spindle off: set the AR tool's tip on the out face at Ø2.25 and turn the chuck a full turn by hand. No jaw may touch the tool or its holder (the jaws' step depth is not on record). A jaw in the way: try Ø2.20, just over the finished Ø2.18; a jaw in the way there too: stop and tell the owner."
 feed = "hand"
 
 [[setups.operations]]
@@ -145,7 +145,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the out face from the centre out to Ø2.25 only, never out to the jaws (the ring outside is turned off in Setup 3), in light skims, miking the thickness between them, to {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} (about {{cad.face_stock_in:.3dot}} comes off)."
+instruction = "Face the out face from the centre out to the Ø the check above cleared (Ø2.25, or Ø2.20), never out to the jaws; Setup 3 turns off the ring outside it. Light skims, miking the thickness between them, to {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} (about {{cad.face_stock_in:.3dot}} comes off)."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 inspection = "Thickness {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}, by micrometer, four places."
