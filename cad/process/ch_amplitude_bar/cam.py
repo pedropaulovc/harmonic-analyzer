@@ -435,7 +435,9 @@ def context(
     collar_r = p["saw_collar_dia_max_mm"] / 2
     for name, depth in (("foot", foot["depth"][1]), ("top", top["depth"][1])):
         if protrusion + radius - depth - collar_r <= 0:
-            raise ValueError(f"the saw arbor's spacers reach over the jaws at the {name} notch")
+            raise ValueError(
+                f"the saw arbor's spacers reach over the jaws at the {name} notch"
+            )
     top_depth = p["top_notch_depth_mm"]
     # Equal steps into the end, the deepest last.
     n_steps = math.ceil(top_depth / SAW_STEP_MAX_MM - 1e-9)
@@ -509,7 +511,12 @@ def context(
     ream_tip = -p["ream_past_mm"]
     if ream_tip > -0.5:
         raise ValueError("the reamer's tip does not pass the down face")
-    projection("the centre drill", section - spot_depth, "spot_projection_mm", "centre_drill_oal_mm")
+    projection(
+        "the centre drill",
+        section - spot_depth,
+        "spot_projection_mm",
+        "centre_drill_oal_mm",
+    )
     projection("the #49", drill_tip, "drill_projection_mm", "drill_49_oal_mm")
     projection("the reamer", ream_tip, "ream_projection_mm", "reamer_oal_mm")
 
