@@ -16,19 +16,21 @@ drill's 118° point, the approach, safe and clearance heights and the vise
 jaws' depth (keep-out shapes only).
 
 Route (plan text in ``plan.toml``): ``bars_per_load`` 1/4 in square bars
-per load across the jaws, each on its own 1 in parallel against a jaw (so
-at most two). Foot ends past the left jaw side: CA01
-faces them, CA02 saws the foot notch. Rolled over, top ends past the right
-jaw side: CA03 faces them to the length, CA04 saws the top notch, CA05
-spots, drills and reams the pin holes through both cheeks. The parallels
-lift the bars so each holder's nose, its tool set out by its stated
+per load side by side across the jaws on the riser: two plain 6061 blocks
+end to end on the vise bed against the fixed jaw, narrower than the load
+(the moving jaw grips the last bar, never the riser) and wide enough to
+seat every bar at least half its width. Foot ends past the left jaw side:
+CA01 faces them, CA02 saws the foot notch. Rolled over, top ends past the
+right jaw side: CA03 faces them to the length, CA04 saws the top notch,
+CA05 spots, drills and reams the pin holes through both cheeks. The riser
+lifts the bars so each holder's nose, its tool set out by its stated
 projection, stays above the jaw tops at the deepest cut.
 
 Work frames (G54), each set in its setup:
 - CA01, CA02: X0 the faced foot end (the bar along +X), Y0 the fixed jaw
-  (the bars' F faces toward it), Z0 the bars' L faces on the parallels.
+  (the bars' F faces toward it), Z0 the bars' L faces on the riser.
 - CA03-CA05: X0 the top end at the length (the bar along -X), Y0 the fixed
-  jaw (the B faces toward it), Z0 the bars' R faces on the parallels.
+  jaw (the B faces toward it), Z0 the bars' R faces on the riser.
 
 The slitting saw runs horizontally on its arbor: its lower face is the
 programmed Z, touched off by hand (it has no tool-setter length, so CA02 and
@@ -385,11 +387,27 @@ def context(
     _agree(plan, "bar_section_min_mm", g["section_band"][0])
     load = n_bars * pitch
     _agree(plan, "load_width_mm", load)
-    if not 1 <= n_bars <= 2:
+    # The riser: narrower than the narrowest load, so the moving jaw grips
+    # the last bar and never the riser; wide enough, less the chamfer filed
+    # along its far top edge, to seat the last bar at least half its width
+    # in the widest load; the blocks end to end within the jaw width.
+    section_min, section_max = g["section_band"]
+    riser_w_min, riser_w_max = p["riser_width_min_mm"], p["riser_width_max_mm"]
+    chamfer = p["riser_chamfer_mm"]
+    if chamfer > section_min / 4:
+        raise ValueError("process.riser_chamfer_mm unseats a quarter of the first bar")
+    if riser_w_max >= n_bars * section_min:
         raise ValueError(
-            "bars_per_load: each bar sits on its own parallel against a jaw, so a load "
-            "is one or two bars"
+            "process.riser_width_max_mm is not under the narrowest load: the moving "
+            "jaw would grip the riser"
         )
+    if riser_w_min - chamfer < (n_bars - 0.5) * section_max:
+        raise ValueError(
+            "process.riser_width_min_mm less its chamfer seats the last bar under "
+            "half its width"
+        )
+    if 2 * p["riser_length_mm"] > p["vise_jaw_width_mm"]:
+        raise ValueError("the riser's two blocks end to end are longer than the jaws")
     protrusion = p["end_protrusion_mm"]
     jaw_w = p["vise_jaw_width_mm"]
     if protrusion <= g["top"]["depth"][1] + COLLAR_CLEAR_MM:
@@ -401,10 +419,9 @@ def context(
     _agree(plan, "top_extent_start_mm", -length)
     _agree(plan, "top_clamp_start_mm", -(protrusion + jaw_w))
     _agree(plan, "top_clamp_end_mm", -protrusion)
-    # The bars stand on parallels: the jaw tops in the setup frame (Z0 the
-    # bars' down face).
-    parallel = p["parallel_height_mm"]
-    jaw_top = p["vise_jaw_height_mm"] - parallel
+    # The bars stand on the riser: the jaw tops in the setup frame (Z0 the
+    # bars' down face), at the riser's least faced height.
+    jaw_top = p["vise_jaw_height_mm"] - p["riser_height_min_mm"]
 
     def projection(tool: str, tip_z: float, key: str, oal_key: str) -> None:
         """The tool's stated projection out of its holder puts the holder's
@@ -735,21 +752,23 @@ def context(
         )
 
     # Keep-outs: the jaws beside the load, inward of the protrusion, from the
-    # parallels' top (Z0) to the jaw top.
-    def jaws(x: tuple[float, float]) -> list[dict[str, Any]]:
+    # riser's top (Z0) to the jaw top; the riser under the load, against the
+    # fixed jaw and inside both jaw sides, from Z0 down.
+    def vise(x: tuple[float, float]) -> list[dict[str, Any]]:
         return [
             _box("moving jaw", x, (-load - JAW_DEPTH_MM, -load), jaw_top),
             _box("fixed jaw", x, (0.0, JAW_DEPTH_MM), jaw_top),
+            _box("the riser", x, (-riser_w_max, 0.0), 0.0),
         ]
 
     keep = {
-        "foot": jaws((protrusion, protrusion + jaw_w)),
-        "top": jaws((-(protrusion + jaw_w), -protrusion)),
+        "foot": vise((protrusion, protrusion + jaw_w)),
+        "top": vise((-(protrusion + jaw_w), -protrusion)),
     }
     # The arbor round the saw, part by part: its reach from the saw's lower
     # face (the programmed Z) down (lo) and up (hi), and its radius. No move,
-    # rapid or feed, brings a part into the bars or the jaws: the bars
-    # between the jaws stand on the parallels and the vise; their ends past
+    # rapid or feed, brings a part into the bars, the riser or the jaws: the
+    # bars between the jaws stand on the riser and the vise; their ends past
     # the jaw side overhang air from Z0 to their top, which the nut may pass
     # under while the saw cuts.
     ends = {"foot": (0.0, protrusion), "top": (-protrusion, 0.0)}

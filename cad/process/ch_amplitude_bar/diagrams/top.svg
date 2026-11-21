@@ -1,52 +1,66 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 4: two bars rolled over, each on its own 1 in parallel against its jaw, top ends .75 past the right jaw side; CA03 faces them to length, CA04 saws the top notch, CA05 spots, drills and reams the pin holes. Top view and an end view of the load. Styles: prechips.palette. -->
+<!-- Setup 4: four bars rolled over, side by side on the riser (two blocks end to end on the vise bed against the fixed jaw), top ends .75 past the right jaw side; CA03 faces them to length, CA04 saws the top notch, CA05 spots, drills and reams the pin holes. Top view and an end view of the load. Styles: prechips.palette. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" font-family="sans-serif" font-size="12">
 <rect class="paper" width="640" height="400"/>
 <text class="label" x="20" y="20">Top view</text>
 <rect class="clamp" x="190" y="30" width="200" height="40"/>
 <text class="label" x="240" y="24">fixed jaw</text>
-<rect class="clamp" x="190" y="102" width="200" height="40"/>
-<text class="label" x="230" y="158">moving jaw</text>
-<rect class="part-kept" x="0" y="70" width="440" height="16"/>
-<rect class="part-kept" x="0" y="86" width="440" height="16"/>
+<rect class="clamp" x="190" y="126" width="200" height="40"/>
+<text class="label" x="200" y="182">moving jaw</text>
+<rect class="part-kept" x="0" y="70" width="440" height="14"/>
+<rect class="part-kept" x="0" y="84" width="440" height="14"/>
+<rect class="part-kept" x="0" y="98" width="440" height="14"/>
+<rect class="part-kept" x="0" y="112" width="440" height="14"/>
+<rect class="hidden" x="194" y="70" width="96" height="53"/>
+<rect class="hidden" x="290" y="70" width="96" height="53"/>
 <text class="label" x="100" y="60">bar 1</text>
 <path class="leader" d="M114 64 L114 76"/>
-<text class="label" x="100" y="122">bar 2</text>
-<path class="leader" d="M114 110 L114 96"/>
-<circle class="cutter" cx="500" cy="86" r="80" fill-opacity="0.75"/>
-<circle class="holes" cx="425" cy="78" r="3"/>
-<circle class="holes" cx="425" cy="94" r="3"/>
-<text class="label" x="474" y="20">slitting saw</text>
-<path class="arrow" d="M600 220 V190"/>
-<text class="label" x="530" y="212">feed +Y</text>
-<line class="datum" x1="440" y1="64" x2="440" y2="108"/>
-<text class="label" x="456" y="196">X0 = length</text>
-<path class="leader" d="M466 184 L442 110"/>
-<path class="dims" d="M390 180 H440"/>
-<text class="label" x="392" y="176">{{process.end_protrusion_mm:in.2dot}}</text>
-<text class="label" x="20" y="196">foot ends flush, past the table</text>
+<text class="label" x="100" y="146">bar 4</text>
+<path class="leader" d="M114 134 L114 120"/>
+<circle class="cutter" cx="500" cy="98" r="80" fill-opacity="0.75"/>
+<circle class="holes" cx="425" cy="77" r="3"/>
+<circle class="holes" cx="425" cy="91" r="3"/>
+<circle class="holes" cx="425" cy="105" r="3"/>
+<circle class="holes" cx="425" cy="119" r="3"/>
+<text class="label" x="474" y="12">slitting saw</text>
+<path class="arrow" d="M600 236 V206"/>
+<text class="label" x="530" y="228">feed +Y</text>
+<line class="datum" x1="440" y1="64" x2="440" y2="132"/>
+<text class="label" x="456" y="212">X0 = length</text>
+<path class="leader" d="M466 200 L442 134"/>
+<path class="dims" d="M390 196 H440"/>
+<text class="label" x="392" y="192">{{process.end_protrusion_mm:in.2dot}}</text>
+<text class="label" x="20" y="212">foot ends flush, past the table</text>
+<text class="label" x="300" y="214">riser (hidden)</text>
+<path class="leader" d="M340 202 L340 120"/>
 <path class="axis" d="M560 370 H610"/><text class="label" x="614" y="374">+X</text>
 <path class="axis" d="M560 370 V320"/><text class="label" x="552" y="316">+Y</text>
-<text class="label" x="20" y="250">End view from the top end, fixed jaw on the right (parallels drawn short)</text>
+<text class="label" x="20" y="256">End view from the top end, fixed jaw on the right (riser drawn short)</text>
 <rect class="clamp" x="40" y="264" width="30" height="120"/>
 <text class="label" x="22" y="396">moving jaw</text>
-<rect class="part-kept" x="70" y="270" width="48" height="48"/>
-<rect class="part-removed" x="70" y="281" width="48" height="25"/>
-<rect class="part-kept" x="118" y="270" width="48" height="48"/>
-<rect class="part-removed" x="118" y="281" width="48" height="25"/>
-<line class="centre-line" x1="94" y1="264" x2="94" y2="324"/>
-<line class="centre-line" x1="142" y1="264" x2="142" y2="324"/>
-<rect class="fixture-support" x="70" y="318" width="24" height="66"/>
-<rect class="fixture-support" x="142" y="318" width="24" height="66"/>
-<rect class="clamp" x="166" y="264" width="30" height="120"/>
-<text class="label" x="150" y="396">fixed jaw</text>
-<line class="active-face" x1="70" y1="318" x2="166" y2="318"/>
-<text class="label" x="210" y="276">pin hole down through both cheeks</text>
-<path class="leader" d="M206 272 L144 268"/>
-<text class="label" x="210" y="298">notch {{process.top_notch_width_mm:in.4dot}} wide, ledge {{cad.top_notch_ledge_in:.3dot}} above R</text>
-<path class="leader" d="M206 294 L168 294"/>
-<text class="label" x="210" y="322">R faces on the parallels (Z0)</text>
-<text class="label" x="210" y="354">1 in parallel under each bar,</text>
-<text class="label" x="210" y="368">against its jaw</text>
-<path class="leader" d="M206 358 L168 352"/>
+<rect class="part-kept" x="70" y="270" width="36" height="36"/>
+<rect class="part-removed" x="70" y="278.25" width="36" height="18.75"/>
+<rect class="part-kept" x="106" y="270" width="36" height="36"/>
+<rect class="part-removed" x="106" y="278.25" width="36" height="18.75"/>
+<rect class="part-kept" x="142" y="270" width="36" height="36"/>
+<rect class="part-removed" x="142" y="278.25" width="36" height="18.75"/>
+<rect class="part-kept" x="178" y="270" width="36" height="36"/>
+<rect class="part-removed" x="178" y="278.25" width="36" height="18.75"/>
+<line class="centre-line" x1="88" y1="264" x2="88" y2="312"/>
+<line class="centre-line" x1="124" y1="264" x2="124" y2="312"/>
+<line class="centre-line" x1="160" y1="264" x2="160" y2="312"/>
+<line class="centre-line" x1="196" y1="264" x2="196" y2="312"/>
+<rect class="fixture-support" x="78" y="306" width="136" height="78"/>
+<rect class="clamp" x="214" y="264" width="30" height="120"/>
+<text class="label" x="190" y="396">fixed jaw</text>
+<line class="active-face" x1="70" y1="306" x2="214" y2="306"/>
+<text class="label" x="254" y="276">pin hole down through both cheeks</text>
+<path class="leader" d="M250 272 L198 268"/>
+<text class="label" x="254" y="298">notch {{process.top_notch_width_mm:in.4dot}} wide, ledge {{cad.top_notch_ledge_in:.3dot}} above R</text>
+<path class="leader" d="M250 294 L216 294"/>
+<text class="label" x="254" y="320">R faces on the riser (Z0)</text>
+<text class="label" x="254" y="340">riser {{process.riser_width_min_mm:in.2dot}}–{{process.riser_width_max_mm:in.2dot}} wide, against</text>
+<text class="label" x="254" y="354">the fixed jaw, not clamped: the</text>
+<text class="label" x="254" y="368">moving jaw grips bar 4</text>
+<path class="leader" d="M250 344 L210 344"/>
 </svg>
