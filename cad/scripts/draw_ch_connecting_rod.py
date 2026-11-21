@@ -523,6 +523,16 @@ requirement(
             ((_SPEC, "RING_OUTER_DIA"), (_SPEC, "UNIT"), (_SELF, "FRONT_KEEP")),
         ),
         "dia_nominal": (RING_OUTER_DIA, ((_SPEC, "RING_OUTER_DIA"),)),
+        # Covered material, for the stock check: no face bounds Y, and the
+        # ring is the widest across X.
+        "extent_x": (
+            [-RING_OUTER_RADIUS, RING_OUTER_RADIUS],
+            ((_SPEC, "RING_OUTER_RADIUS"),),
+        ),
+        "extent_y": (
+            [-RING_OUTER_RADIUS, RING_OUTER_RADIUS],
+            ((_SPEC, "RING_OUTER_RADIUS"),),
+        ),
     },
     precision={"dia": _P["RingOuterDia"]},
 )
@@ -560,6 +570,9 @@ requirement(
             OVERALL_LENGTH,
             ((_SPEC, "FORK_TOP_Y"), (_SPEC, "RING_BOTTOM_Y"), (_SELF, "OVERALL_LENGTH")),
         ),
+        # Covered material: the fork from its boss's underside to the crown.
+        "extent_x": ([-FORK_WIDTH / 2.0, FORK_WIDTH / 2.0], ((_SPEC, "FORK_WIDTH"),)),
+        "extent_y": ([FORK_BASE_Y, FORK_TOP_Y], ((_SPEC, "FORK_BASE_Y"), (_SPEC, "FORK_TOP_Y"))),
     },
     precision={"width": _P["ForkWidthDim"], "boss_length": _P["ForkBossLength"]},
 )

@@ -461,6 +461,9 @@ requirement(
             ((_SPEC, "HUB_DIA"), (_SPEC, "UNIT"), (_SELF, "FRONT_KEEP")),
         ),
         "dia_nominal": (HUB_DIA, ((_SPEC, "HUB_DIA"),)),
+        # Covered material, for the stock check: no face bounds X or Y.
+        "extent_x": ([-HUB_DIA / 2.0, HUB_DIA / 2.0], ((_SPEC, "HUB_DIA"),)),
+        "extent_y": ([-HUB_DIA / 2.0, HUB_DIA / 2.0], ((_SPEC, "HUB_DIA"),)),
     },
     precision={"dia": _P["HubDia"]},
 )
@@ -512,6 +515,9 @@ requirement(
             TIP_END_X + HUB_DIA / 2.0,
             ((_SPEC, "TIP_END_X"), (_SPEC, "HUB_DIA"), (_SELF, "OVERALL_TEXT_XY")),
         ),
+        # Covered material: the bar from the fulcrum axis to the tip's end.
+        "extent_x": ([0.0, TIP_END_X], ((_SPEC, "TIP_END_X"),)),
+        "extent_y": ([-BAR_TALL / 2.0, BAR_TALL / 2.0], ((_SPEC, "BAR_TALL"),)),
     },
     precision={
         "bar_height": _P["BarHeight"],
