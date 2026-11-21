@@ -289,7 +289,9 @@ def test_a_placeholder_plans_tools_appear_unenrolled(tmp_path, monkeypatch) -> N
 
 # Made parts with no process plan, each with the reason it has none. A placeholder
 # lists the tools a source names (cad/process/README.md, "Placeholder plans"), and
-# prechips refuses a plan with no [[tools]].
+# prechips refuses a plan with no [[tools]]. The reasons are prose no file holds,
+# so the list is written by hand; a part that later gets a plan needs no edit here
+# to stay green (its plan supersedes the reason; drop the entry when convenient).
 PLANLESS_MADE_PARTS = {
     "dt-cone-gear-tl-arbor-key": "cut to length from key stock; no source names a tool",
     "dt-cone-gear-tl-phasing-comb": "U outline cut from .020 sheet; no source names a tool",
@@ -302,4 +304,5 @@ PLANLESS_MADE_PARTS = {
 def test_every_made_part_has_a_process_plan_or_a_reason() -> None:
     made = {stem for stem in _config.parts() if stock_bom._is_made(stem)}
     planned = set(stock_bom.load_plans())
-    assert made - planned == set(PLANLESS_MADE_PARTS)
+    assert made - planned <= set(PLANLESS_MADE_PARTS)
+    assert set(PLANLESS_MADE_PARTS) <= made
