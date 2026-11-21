@@ -61,7 +61,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 5/16 x 1 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:.0f}} in flat bar: two 72 in lengths and one 36 in; {{process.quantity:d}} × {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blanks. Spoil plate: one 3.9 x 6 in piece of the 1/2 x 6 in 6061 flat."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Faces: B, the hub's near face, is faced in Setup 2; A, the far face, stays as bought. Mark A on each blank in Setup 1 and keep it readable. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup. Order: Setup 2 for all the loads; then Setups 3 and 4 back to back on each load (the same clamping) before the next load. The spoil plate, the parallels, G54 Z0 and the noted Setup 2 G54 Y stay for every load and both sides, while the vise, parallels and plate have not moved (moved: stop and tell the owner); X0 is picked up on every load. After a reset, E-stop or stall: home ($H), console M6 for the tool in the spindle (the tool setter measures it again), pick up X0 again with the edge finder, then restart the program from its start. Tools to buy before Setup 2: the .2560 reamer and the 5/64 in end mill."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Faces: B, the hub's near face, is faced in Setup 2; A, the far face, stays as bought. Mark A on each blank in Setup 1 and keep it readable. Words: the spoil plate is the aluminium plate the blanks lie on (Z0); the web is the lever's thin section along its bar (the drawing's plate, .116–.120 thick). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup. Order: Setup 2 for all the loads; then Setups 3 and 4 back to back on each load (the same clamping) before the next load. The spoil plate, the parallels, G54 Z0 and the noted Setup 2 G54 Y stay for every load and both sides, while the vise, parallels and spoil plate have not moved (moved: stop and tell the owner); X0 is picked up on every load. After a reset, E-stop or stall: home ($H), console M6 for the tool in the spindle (the tool setter measures it again), pick up X0 again with the edge finder, then restart the program from its start. Tools to buy before Setup 2: the .2560 reamer and the 5/64 in end mill."
 shop = "../shop"
 stock_refs = ["1018-flat-5-16x1-72in", "1018-flat-5-16x1-36in", "6061-flat-1-2x6-54in"]
 material_key = "rocker-1018-cold-finished"
@@ -299,7 +299,7 @@ speed_kind = "other"
 tool = "cutoff-saw"
 drilling = "none"
 sizing = "other"
-instruction = "Once per lot (the 20 blanks): saw a 3.9 in piece off the end of the 1/2 x 6 in 6061 flat (the spoil plate, 3.9 x 6 in), or reuse the last lot's plate; file its burrs, and mark one 3.9 in edge LEFT: the plate runs 6 in along X and 3.9 in across the jaws. It is faced at the start of Setup 2, every lot, and never mid-lot."
+instruction = "Once per lot (the 20 blanks): saw a 3.9 in piece off the end of the 1/2 x 6 in 6061 flat (the spoil plate, 3.9 x 6 in), or reuse the last lot's spoil plate; file its burrs, and mark one 3.9 in edge LEFT: the spoil plate runs 6 in along X and 3.9 in across the jaws. It is faced at the start of Setup 2, every lot, and never mid-lot."
 feed = "hand"
 
 [[setups]]
@@ -308,7 +308,7 @@ title = "Side B: face, pocket, bore and holes"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw; the spoil plate on them, 6 in along X, its LEFT edge to the left, as left by the first op (it stays there for every load; brush it clean of chips and burrs before each load). The jaws' top then stands about .270 above the plate's top (checked below): it grips most of each .3085–.3125 blank and stays under the faced B face (.3005), so the face mill passes over the jaws. Four blanks of one load side by side across the jaws on the plate, each on its A face (B up), numbers to the left, the lowest number against the fixed jaw. Hold a 1-2-3 block's 2 in face across the four left ends and the plate's left edge and push them flush; then close the vise on the blanks (the plate, 3.9 in across under the 4 in load, is not gripped), tapping them down onto the plate."
+holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw; the spoil plate on them, 6 in along X, its LEFT edge to the left, as left by the first op (it stays there for every load; brush it clean of chips and burrs before each load). The jaws' top then stands about .270 above the spoil plate's top (checked below): it grips most of each .3085–.3125 blank and stays under the faced B face (.3005), so the face mill passes over the jaws. Four blanks of one load side by side across the jaws on the spoil plate, each on its A face (B up), numbers to the left, the lowest number against the fixed jaw. Hold a 1-2-3 block's 2 in face across the four left ends and the spoil plate's left edge and push them flush; then close the vise on the blanks (the spoil plate, 3.9 in across under the 4 in load, is not gripped), tapping them down onto the spoil plate."
 datum = "Programs CL01_face_b (T1), CL02_pocket_b (T1, T2), CL03_bore (T3, T6, T7), CL04_holes (T3, T4, T5). G54: X0 the left end of the blank against the fixed jaw (picked up on every load), Y0 the fixed jaw's face, Z0 the spoil plate's top. +X toward the blanks' right ends, +Y toward the fixed jaw: the blanks lie at −Y."
 diagram = { file = "diagrams/side_b.svg", alt = "Four blanks across the vise jaws on the spoil plate on two parallels, B up; the end mill faces them, pockets each along its centre line round the hub, and the bore and holes are drilled on the centre line." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.drill_d_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
@@ -316,27 +316,27 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = 101.6, along_jaws_mm = "{{pro
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.blank_length_min_mm}}"], supports_mm = ["{{process.jaw_start_mm}}", "{{process.jaw_end_mm}}"], section_mm = { y = "{{process.blank_pitch_mm}}", z = "{{process.blank_thickness_min_mm}}" } }
 
 [[setups.operations]]
-instruction = "Every lot, before the first load: Home ($H); console M6 T1. Clamp the spoil plate alone on the parallels and face its top .010 (a new plate or a used one)."
-instruction_detailed = "Home the mill ($H). Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Clamp the plate alone across the jaws on the parallels, its LEFT edge to the left. Set 2650 and face its top .010 by hand jog in overlapping passes."
+instruction = "Every lot, before the first load: Home ($H); console M6 T1. Clamp the spoil plate alone on the parallels and face its top .010 (a new spoil plate or a used one)."
+instruction_detailed = "Home the mill ($H). Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Clamp the spoil plate alone across the jaws on the parallels, its LEFT edge to the left. Set 2650 and face its top .010 by hand jog in overlapping passes."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0 on the plate's bare top with T1, the plate still clamped."
-instruction_detailed = "Spindle stopped, the T1 tip just dragging a .002 feeler leaf on the plate's top: G10 L20 P1 Z0.051. This Z0 stays for every load and both sides (the tool setter measures each M6, holder swaps included)."
+instruction = "G54 Z0 on the spoil plate's bare top with T1, the spoil plate still clamped."
+instruction_detailed = "Spindle stopped, the T1 tip just dragging a .002 feeler leaf on the spoil plate's top: G10 L20 P1 Z0.051. This Z0 stays for every load and both sides (the tool setter measures each M6, holder swaps included)."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Every lot, the plate still clamped: the jaws' top above the plate's top."
-inspection = "Jaws' top .200–.290 above the plate's top (the calipers' depth rod, at both ends of each jaw): .290 keeps the jaws .010 under the faced B face (.3005); .200 still grips two thirds of the thinnest blank. Outside: stop and tell the owner."
+instruction = "Every lot, the spoil plate still clamped: the jaws' top above the spoil plate's top."
+inspection = "Jaws' top .200–.290 above the spoil plate's top (the calipers' depth rod, at both ends of each jaw): .290 keeps the jaws .010 under the faced B face (.3005); .200 still grips two thirds of the thinnest blank. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = [5.08, 7.366] }]
 
 [[setups.operations]]
-instruction = "Open the vise and lift the plate out. The cutter could not reach the jaw faces: file a .03 × 45° chamfer along both 6 in top edges, below the faced level. Put the plate back on the parallels, LEFT edge to the left; leave the vise open."
+instruction = "Open the vise and lift the spoil plate out. The cutter could not reach the jaw faces: file a .03 × 45° chamfer along both 6 in top edges, below the faced level. Put the spoil plate back on the parallels, LEFT edge to the left; leave the vise open."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Every lot: the plate's top after filing."
-inspection = "A 6 in rule laid across the plate at both ends and the middle: no rock, no edge standing proud. Fail: file the proud edge again and recheck."
+instruction = "Every lot: the spoil plate's top after filing."
+inspection = "A 6 in rule laid across the spoil plate at both ends and the middle: no rock, no edge standing proud. Fail: file the proud edge again and recheck."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -359,7 +359,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CL01_face_b (M6 T1; set 2650): face B of all four blanks to {{process.hub_thickness_mm:in.4dot}} above the plate in one level, zigzag rows along X, at most {{process.face_removal_max_mm:in.3dot}} deep."
+instruction = "Run CL01_face_b (M6 T1; set 2650): face B of all four blanks to {{process.hub_thickness_mm:in.4dot}} above the spoil plate in one level, zigzag rows along X, at most {{process.face_removal_max_mm:in.3dot}} deep."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "face b", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_removal_max_mm}}", radial_woc_mm = 7.62, traverse_mm = [0, "{{process.blank_length_min_mm}}"] },
@@ -380,7 +380,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CL02_pocket_b (M6 T1; set 2650): each blank's pocket in three rough levels and a .008 finish level to the plate's near face, {{process.pocket_b_floor_mm:in.4dot}} above Z0: the slot along the centre line from past the right end to the hub, then the arc round the hub ±{{process.pocket_arc_deg:.0f}}°."
+instruction = "Run CL02_pocket_b (M6 T1; set 2650): each blank's pocket in three rough levels and a .008 finish level to the web's near face, {{process.pocket_b_floor_mm:in.4dot}} above Z0: the slot along the centre line from past the right end to the hub, then the arc round the hub ±{{process.pocket_arc_deg:.0f}}°."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "pocket b rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 0.7027, radial_woc_mm = "{{process.face_cutter_dia_mm}}", traverse_mm = [0, "{{process.blank_length_min_mm}}"] },
@@ -400,7 +400,7 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "First load only, still clamped: the pocket's floor."
-inspection = "Plate near face {{cad.plate_near_face_offset_min_in:.3dot}}–{{cad.plate_near_face_offset_max_in:.3dot}} below the hub's B face: the calipers' depth rod from the hub across to the floor beside it. Outside: stop and tell the owner."
+inspection = "Web near face {{cad.plate_near_face_offset_min_in:.3dot}}–{{cad.plate_near_face_offset_max_in:.3dot}} below the hub's B face: the calipers' depth rod from the hub across to the floor beside it. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.plate_near_face_offset_band_mm}}" }]
 
 [[setups.operations]]
@@ -425,7 +425,7 @@ speed_kind = "spindle"
 tool = "drill-d"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T6: D drill through each hub into the spoil plate in one feed, its full diameter {{process.drill_past_mm:in.3dot}} into the plate; set 1200. Cutting oil."
+instruction = "Same file, M6 T6: D drill through each hub into the spoil plate in one feed, its full diameter {{process.drill_past_mm:in.3dot}} into the spoil plate; set 1200. Cutting oil."
 rpm = 1200
 feed = "{{process.drill_d_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.hub_thickness_mm}}"
@@ -439,7 +439,7 @@ speed_kind = "spindle"
 tool = "reamer-2560"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.fulcrum_bore_dia_band_mm}}" }
-instruction = "Same file, M6 T7: ream each bore through with the .2560 reamer (to buy), in and out at feed, its full diameter {{process.ream_past_mm:in.3dot}} into the plate; set 600. Cutting oil."
+instruction = "Same file, M6 T7: ream each bore through with the .2560 reamer (to buy), in and out at feed, its full diameter {{process.ream_past_mm:in.3dot}} into the spoil plate; set 600. Cutting oil."
 rpm = 600
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [
@@ -456,7 +456,7 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Run CL04_holes (M6 T3; set 2800): spot the pin and spring holes on the plate's near face Ø{{process.spot_dia_mm:in.3dot}}, {{cad.bar_pin_hole_location_in:.3f}} and {{cad.spring_hole_location_in:.3f}} from each bore."
+instruction = "Run CL04_holes (M6 T3; set 2800): spot the pin and spring holes on the web's near face Ø{{process.spot_dia_mm:in.3dot}}, {{cad.bar_pin_hole_location_in:.3f}} and {{cad.spring_hole_location_in:.3f}} from each bore."
 rpm = 2800
 feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -473,7 +473,7 @@ rpm = 2800
 feed = "{{process.drill_47_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.pocket_b_floor_mm}}"
 peck = { step_mm = 1.27, retract = "full" }
-peck_reason = "the #47 runs on through the plate's A-side stock (pocketed later) into the spoil plate, about .25 deep in all, L/D over 3; full retracts clear its chips"
+peck_reason = "the #47 runs on through the web's A-side stock (pocketed later) into the spoil plate, about .25 deep in all, L/D over 3; full retracts clear its chips"
 milling_cuts = [
   { name = "pin hole drill", kind = "drill", phase = "rough", cutter_dia_mm = 1.9939, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_47_feed_per_min_mm}}", stations_mm = 138.811 },
 ]
@@ -499,9 +499,14 @@ gauge_checks = [
   { gauge = "mill-x-dro", band_mm = "{{cad.bar_pin_hole_location_band_mm}}" },
   { gauge = "mill-x-dro", band_mm = "{{cad.spring_hole_location_band_mm}}" },
 ]
+[[setups.operations]]
+instruction = "Every load, before the next: unclamp and lift the four out. Deburr face B with the India stone laid flat on it: both long edges and the pocket's and rings' edges, never rounding the faced hub. Keep the four together, in their order, for Setup 3."
+inspection = "Each blank lies B down on the surface plate without rocking. Rocks: stone the burr again and recheck."
+gauge_checks = "other"
+
 
 [[setups.operations]]
-instruction = "Unclamp the load; back to the collet (console M6 T1). Brush the plate clean, clamp the next four flush on it, pick up X0 again as above and repeat this setup from CL01_face_b, skipping the first-load-only ops (the Z0 correction is never repeated; the corrected Z0 stays): Y and Z0 stay; the tool setter measures each M6."
+instruction = "Back to the collet (console M6 T1). Brush the spoil plate clean, clamp the next four flush on it, pick up X0 again as above and repeat this setup from CL01_face_b, skipping the first-load-only ops (the Z0 correction is never repeated; the corrected Z0 stays): Y and Z0 stay; the tool setter measures each M6."
 feed = "hand"
 
 [[setups]]
@@ -510,9 +515,9 @@ title = "Side A: pocket"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Lift the load's four blanks out together and turn them over as one stack about its length (A up, B on the plate): the blank that was against the fixed jaw now lies against the moving jaw; numbers still at the left ends. Back on the plate, left ends flushed with the 1-2-3 block against the plate's left edge. Tap the blanks down while closing the vise."
+holding = "Lift the load's four blanks out together and turn them over as one stack about its length (A up, B on the spoil plate): the blank that was against the fixed jaw now lies against the moving jaw; numbers still at the left ends. Back on the spoil plate, left ends flushed with the 1-2-3 block against the spoil plate's left edge. Tap the blanks down while closing the vise."
 datum = "Program CL05_pocket_a (T1, T2). G54: X0 the left end of the blank against the fixed jaw (picked up again on every load), Y0 the noted Setup 2 Y shifted by this load's width (op below), Z0 unchanged."
-diagram = { file = "diagrams/side_a_pocket.svg", alt = "The blanks turned over, A up, on the spoil plate; the end mill pockets A to the plate's far face and the 1/8 in end mill rings each hub." }
+diagram = { file = "diagrams/side_a_pocket.svg", alt = "The blanks turned over, A up, on the spoil plate; the end mill pockets A to the web's far face and the 1/8 in end mill rings each hub." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.hub_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", -0.254], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}", 50.8], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = 101.6, along_jaws_mm = "{{process.blank_length_min_mm}}", part_height_mm = "{{process.hub_thickness_mm}}", parallel_height_mm = "{{process.support_height_mm}}", overhang_mm = ["{{process.jaw_start_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.blank_length_min_mm}}"], supports_mm = ["{{process.jaw_start_mm}}", "{{process.jaw_end_mm}}"], section_mm = { y = "{{process.frame_strips_width_mm}}", z = "{{process.hub_thickness_mm}}" } }
@@ -537,7 +542,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CL05_pocket_a (M6 T1; set 2650): each blank's pocket in three rough levels and a .008 finish level to the plate's far face, {{process.pocket_a_floor_mm:in.4dot}} above Z0, as in Setup 2."
+instruction = "Run CL05_pocket_a (M6 T1; set 2650): each blank's pocket in three rough levels and a .008 finish level to the web's far face, {{process.pocket_a_floor_mm:in.4dot}} above Z0, as in Setup 2."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "pocket a rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 0.707, radial_woc_mm = "{{process.face_cutter_dia_mm}}", traverse_mm = [0, "{{process.blank_length_min_mm}}"] },
@@ -557,7 +562,7 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "First load only, still clamped: the pocket's depth."
-inspection = "From the hub's A face down to the pocket's floor .087–.096: the drawing's worst-case limits (hub .300–.301 less the offset .089–.093 and the plate .116–.120); the calipers' depth rod. Outside: stop and tell the owner before CL06."
+inspection = "From the hub's A face down to the pocket's floor .087–.096: the drawing's worst-case limits (hub .300–.301 less the offset .089–.093 and the web .116–.120); the calipers' depth rod. Outside: stop and tell the owner before CL06."
 gauge_checks = [{ gauge = "calipers", band_mm = [2.2098, 2.4384] }]
 
 [[setups]]
@@ -583,7 +588,7 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Run CL06_outline (M6 T2; set 2800): each lever's outline anticlockwise round its drawn edge over the plate's thickness, in levels from the plate's far face to .010 past its near face; below {{process.tab_top_mm:in.3dot}} above Z0 the cutter lifts over seven tabs, {{process.tab_width_mm:in.3dot}} wide and {{process.tab_thickness_mm:in.3dot}} thick on the plate's near face: one at the hub's far side, six along the bar, alternately top and bottom. Plunges into metal at {{process.eighth_plunge_feed_per_min_mm:in.1f}} in/min."
+instruction = "Run CL06_outline (M6 T2; set 2800): each lever's outline anticlockwise round its drawn edge over the web's thickness, in levels from the web's far face to .010 past its near face; below {{process.tab_top_mm:in.3dot}} above Z0 the cutter lifts over seven tabs, {{process.tab_width_mm:in.3dot}} wide and {{process.tab_thickness_mm:in.3dot}} thick on the web's near face: one at the hub's far side, six along the bar, alternately top and bottom. Plunges into metal at {{process.eighth_plunge_feed_per_min_mm:in.1f}} in/min."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
   { name = "outline", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = 1.0837, radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = ["{{process.lever_start_mm}}", "{{process.lever_end_mm}}"] },
@@ -594,7 +599,7 @@ speed_kind = "spindle"
 tool = "em-5-64"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T8 (5/64 in end mill, to buy; set 2800): the two roots where each lever's bar edges meet its hub, recut over the plate's thickness from the 1/8 in cutter's R.0625 to R.039, under the drawing's INSIDE CORNERS R.040 MAX."
+instruction = "Same file, M6 T8 (5/64 in end mill, to buy; set 2800): the two roots where each lever's bar edges meet its hub, recut over the web's thickness from the 1/8 in cutter's R.0625 to R.039, under the drawing's INSIDE CORNERS R.040 MAX."
 rpm = 2800
 feed = "{{process.root_feed_per_min_mm:in.2f}} in/min"
 milling_cuts = [
@@ -606,14 +611,14 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T2: round each hub alone above the plate and below it, in levels to .010 into the spoil plate: the lever then hangs on its tabs only."
+instruction = "Same file, M6 T2: round each hub alone above the web and below it, in levels to .010 into the spoil plate: the lever then hangs on its tabs only."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
   { name = "outline hub", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_level_max_mm}}", radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", stations_mm = "{{process.hub_from_end_mm}}" },
 ]
 
 [[setups.operations]]
-instruction = "Unclamp the load and lift the blanks out, each lever hanging on its tabs in its frame. Brush the plate clean, take the next load's four (side B done), turn them over and clamp them as in Setup 3, and repeat Setup 3 and this setup from its first op."
+instruction = "Unclamp the load and lift the blanks out, each lever hanging on its tabs in its frame. Brush the spoil plate clean, take the next load's four (side B done), turn them over and clamp them as in Setup 3, and repeat Setup 3 and this setup from its first op."
 feed = "hand"
 
 [[setups]]
@@ -621,7 +626,7 @@ machine_kind = "other"
 title = "Break out, deburr and inspect"
 machine = "Bench"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "A finished lever: the hub with its reamed bore, the thin plate along the bar with the pin hole and the spring hole at the tip, the plate offset from the hub's near face." }
+diagram = { file = "diagrams/inspect.svg", alt = "A finished lever: the hub with its reamed bore, the thin web along the bar with the pin hole and the spring hole at the tip, the web offset from the hub's near face." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -643,8 +648,8 @@ instruction = "Deburr the edges, the bore's and holes' mouths and the pockets' e
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Inspect each lever: hub and plate thickness, the plate's offset, the tab stubs."
-inspection = "Hub {{cad.hub_far_face_length_min_in:.4dot}}–{{cad.hub_far_face_length_max_in:.4dot}} thick and plate {{cad.plate_far_face_thickness_min_in:.3dot}}–{{cad.plate_far_face_thickness_max_in:.3dot}} thick (the micrometers); the plate's near face {{cad.plate_near_face_offset_min_in:.3dot}}–{{cad.plate_near_face_offset_max_in:.3dot}} below the hub's near face (the calipers' depth rod from the hub's B face across to the plate beside it, as in Setup 2); no tab stub standing proud. Outside: set it aside and tell the owner."
+instruction = "Inspect each lever: hub and web thickness, the web's offset, the tab stubs."
+inspection = "Hub {{cad.hub_far_face_length_min_in:.4dot}}–{{cad.hub_far_face_length_max_in:.4dot}} thick and web {{cad.plate_far_face_thickness_min_in:.3dot}}–{{cad.plate_far_face_thickness_max_in:.3dot}} thick (the micrometers); the web's near face {{cad.plate_near_face_offset_min_in:.3dot}}–{{cad.plate_near_face_offset_max_in:.3dot}} below the hub's near face (the calipers' depth rod from the hub's B face across to the web beside it, as in Setup 2); no tab stub standing proud. Outside: set it aside and tell the owner."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.hub_far_face_length_band_mm}}" },
   { gauge = "micrometers", band_mm = "{{cad.plate_far_face_thickness_band_mm}}" },
