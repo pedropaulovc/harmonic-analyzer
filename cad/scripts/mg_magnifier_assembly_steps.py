@@ -23,6 +23,7 @@ DRAWING_NUMBER = "MHA-MG-00"
 
 DRUM_PRESSED_KEY = "drum-pressed"
 DRUM_HELD_KEY = "drum-held"
+PRESS_SLEEVE_MADE_KEY = "press-sleeve-made"
 AXLE_PRESSED_KEY = "axle-pressed"
 AXLE_HELD_KEY = "axle-held"
 AXLE_TRIAL_KEY = "axle-trial-fitted"
@@ -53,6 +54,9 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "drum-bonded",
         "drum-bond-cured",
     ),
+    # The press's sleeve and oil are their own steps (rule 22).
+    (PRESS_SLEEVE_MADE_KEY,),
+    ("axle-plain-end-oiled",),
     (
         AXLE_PRESSED_KEY,
         AXLE_HELD_KEY,

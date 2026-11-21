@@ -329,11 +329,14 @@ def test_the_axle_presses_push_on_the_step_through_a_sleeve() -> None:
     )
     neck = math.pi / 4.0 * (spec.RELIEF_DIA_LIMITS[1] / inch) ** 2
     assert notes.PRESS_FORCE_MAX_KIP / neck > 3.0 * notes.AXLE_YIELD_KSI
-    # Both presses that drive the axle in name the sleeve; the re-press
-    # points back to the first press's step.
-    assert notes.PRESS_SLEEVE in notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
-    further = notes.STEP_TEXT["axle-pressed-further"]
-    assert f"STEP {steps.step_number(steps.AXLE_PRESSED_KEY)} SLEEVE" in further
+    # Both presses that drive the axle in name the sleeve, which its own step
+    # makes (rule 22: one action per step), as does the oil.
+    assert notes.PRESS_SLEEVE in notes.STEP_TEXT[steps.PRESS_SLEEVE_MADE_KEY]
+    sleeve = f"STEP {steps.step_number(steps.PRESS_SLEEVE_MADE_KEY)} SLEEVE"
+    assert sleeve in notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
+    assert sleeve in notes.STEP_TEXT["axle-pressed-further"]
+    assert "OIL" not in notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
+    assert "OIL" in notes.STEP_TEXT["axle-plain-end-oiled"]
 
 
 def test_the_drum_press_accepts_the_recess_window_the_wheel_lengths_prove() -> None:

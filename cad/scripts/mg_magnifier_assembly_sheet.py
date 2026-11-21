@@ -303,7 +303,7 @@ if STEP_BEARING_MAX_KSI > BEARING_YIELD_FACTOR * AXLE_YIELD_KSI:
         f"the press sleeve bears {STEP_BEARING_MAX_KSI:.0f} ksi on the axle step"
     )
 PRESS_SLEEVE = (
-    f"A STEEL SLEEVE OVER THE THREAD ({PRESS_SLEEVE_DRILL} DRILLED BORE, "
+    f"A STEEL SLEEVE THAT FITS OVER THE THREAD ({PRESS_SLEEVE_DRILL} DRILLED BORE, "
     f"{render_number(PRESS_SLEEVE_OD / _INCH, UNIT, 2)} OD, "
     f"{render_number(PRESS_SLEEVE_LENGTH / _INCH, UNIT, 2)} LONG)"
 )
@@ -343,12 +343,15 @@ STEP_TEXT = {
     # Q1), dimensioned on DETAIL B, which draws the nuts. Farm rounds 1-3
     # gated it as a callout on DETAIL A, which draws no nut, and r3 read two
     # acceptances; Main chose option A on 2026-11-08. The press goes in oiled
-    # and pushes only on the shank step, through PRESS_SLEEVE (#2399).
+    # and pushes only on the shank step, through PRESS_SLEEVE (#2399); the
+    # sleeve and the oil are steps of their own (rule 22).
+    _steps.PRESS_SLEEVE_MADE_KEY: f"MAKE {PRESS_SLEEVE} FOR {_AXLE}.",
+    "axle-plain-end-oiled": f"WIPE LIGHT MACHINE OIL ON THE PLAIN END OF {_AXLE}.",
     _steps.AXLE_PRESSED_KEY: (
-        f"PRESS {_AXLE} INTO {_BAR} WITH LIGHT MACHINE OIL ON ITS PLAIN END, "
-        "THREADED END OUT, ON ITS SHOULDER ONLY, "
-        f"THROUGH {PRESS_SLEEVE}, TO A FIRST SETTING: ITS PLAIN END BELOW THE "
-        f"FAR FACE OF {_BAR} AS {PRESS_DETAIL_TITLE} SETS IT (CALIPER DEPTH ROD)."
+        f"PRESS {_AXLE} INTO {_BAR}, THREADED END OUT, ON ITS SHOULDER ONLY "
+        f"THROUGH THE {_step(_steps.PRESS_SLEEVE_MADE_KEY)} SLEEVE, TO A FIRST "
+        f"SETTING: ITS PLAIN END BELOW THE FAR FACE OF {_BAR} AS "
+        f"{PRESS_DETAIL_TITLE} SETS IT (CALIPER DEPTH ROD)."
     ),
     _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
     # Owner ruling 2026-11-11 (#2541, #2523; amends 2026-11-07): a slip axle
@@ -388,7 +391,7 @@ STEP_TEXT = {
     "axle-pressed-further": (
         f"IF {_step(_steps.AXLE_CHECKED_KEY)} READ OVER THE MAX, PRESS {_AXLE} IN "
         "BY THE EXCESS, ON ITS SHOULDER THROUGH THE "
-        f"{_step(_steps.AXLE_PRESSED_KEY)} SLEEVE."
+        f"{_step(_steps.PRESS_SLEEVE_MADE_KEY)} SLEEVE."
     ),
     "axle-pressed-back": (
         f"IF {_step(_steps.AXLE_CHECKED_KEY)} READ UNDER THE MIN, PRESS {_AXLE} "
