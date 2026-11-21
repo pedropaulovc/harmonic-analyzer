@@ -2,22 +2,17 @@ fr-nameplate:
   number: MHA-FR-04
   material: Brass
   material_specification: Brass sheet, .063 in C260 (C26000 cartridge brass; OnlineMetals 23624)
-  finish: polished; sunk field and engraving blackened
+  finish: polished; etched field blackened
   quantity: 1
   tolerance_class: visual_noncritical
   drawing_unit: in
-  process: "engraved brass plate"
+  process: "acid-etched brass plate"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the three DXF notes: OUTLINE AND CORNERS PER pdf/fr-nameplate-outline.dxf (the outline DXF), SUNK FIELD PER pdf/fr-nameplate-field.dxf (the field DXF) and ENGRAVING PER pdf/fr-nameplate-engraving.dxf (the engraving DXF)"
-      finding: "three surfaces are defined only by the release-bundle DXFs and not dimensioned on the sheet (rule 1): the plate outline and its corner radii (outline DXF), the sunk-field border (field DXF) and the engraved artwork (engraving DXF)"
-      reason: "the traced period artwork is the definition of all three: the outline DXF is the plate's traced outer edge and corners, the field DXF the engraving's own pinstripe inner edge, and the engraving DXF the lettering and ornament, each shipped in the release bundle beside the PDF; the acceptance covers the outline DXF as well as the field and engraving (owner ruling 2026-10-15); redrawing any of them as dimensions would restate the artwork (owner-accepted)"
-    - id: "RV-02"
-      kind: "minor"
-      where: "the sheet note FLOOR UNDER ENGRAVING .025 MIN"
-      finding: "floor under the engraving below the .060 wall floor (rules 17, 20)"
-      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions; the owner applied it to this decorative floor. .025 MIN at the worst printed thickness (.063 C260 sheet) and engraving depth (.035 floor nominal); a decorative engraving floor on a plate that carries no load (owner-ruled shortfall)"
+      where: "the DXF note: OUTLINE AND ETCH RESIST PER pdf/fr-nameplate-resist.dxf (the resist DXF)"
+      finding: "the plate outline and its corner radii, and the etched field's edge, letters and ornament, are defined only by the release-bundle resist DXF and not dimensioned on the sheet (rule 1)"
+      reason: "the traced period artwork is the definition of both: the resist DXF's outer loop is the plate's traced outer edge and corners, and its inner loops are the traced field edge, lettering and ornament, shipped in the release bundle beside the PDF; the acceptance covers the outline DXF as well as the artwork (owner ruling 2026-10-15); redrawing either as dimensions would restate the artwork. Owner ruling 2026-11-20 (Pedro), #2313: \"A\" (etch the field ~.010 (.008-.012); letters and border proud and polished): the resist is the border plus the filled letters, widened by the etch depth per edge for the etch's undercut (owner-accepted)"
     - id: "RV-03"
       kind: "minor"
       where: "the sheet note SCREWS ENGAGE .133 MIN FULL THREAD"
@@ -25,11 +20,11 @@ fr-nameplate:
       reason: "Owner ruling 2026-11-01: thread engagement below 1.5D with no geometry escape accepted as a minor exception. .133 MIN (1.19D) of installed full-thread overlap in the base's #4-40 receiver: the 1/4 in 90114A511 fillister at its shortest stock length through the thickest printed .063 plate, tip chamfer deducted, counted only past the receiver's .010 entrance break. The screw's bare projection is .143 (1.28D); both are below the 1.31D accepted earlier for the former 1.5 mm plate. It only holds an unloaded cosmetic plate, so the screw stays (owner-ruled shortfall)"
     - id: "RV-05"
       kind: "minor"
-      where: "SECTION A-A, the floor under the .016 SUNK FIELD DEPTH: the .063 plate less the .016 field, .037 at the worst printed .XXX bands"
-      finding: "floor under the sunk field below the .060 wall floor (rule 17)"
-      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 12.2: RV-02 (owner ruling 2026-11-01) accepts the .025 floor under the engraving, which is cut through this same field floor, so the field floor is thicker everywhere it lies; a decorative plate that carries no load. Run 20261107T234638358Z"
-    - id: "RV-06"
+      where: "the sheet note FLOOR UNDER ETCHED FIELD .046 MIN: the .063 plate at its .058 minimum less the .012 deepest etch (SECTION A-A)"
+      finding: "floor under the etched field below the .060 wall floor (rules 17, 20)"
+      reason: "Owner ruling 2026-11-20 (Pedro), #2313: \"A\" (etch the field ~.010 (.008-.012); letters and border proud and polished), which restates this exception at .046 MIN (.058 plate min - .012); it replaces owner ruling 2026-11-08 (Pedro), #2144 item 12.2 (the .037 floor under the former .016 sunk field) and the .025 floor under the former engraving. A decorative plate that carries no load (owner-ruled shortfall)"
+    - id: "RV-07"
       kind: "accept"
-      where: "SECTION A-A, '.016 SUNK FIELD DEPTH' at the title-block .XXX grade"
-      finding: "three-place field depth with no band of its own and no stated function on the sheet (rule 3)"
-      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 12.2: the third place keeps the field shallower than the .028 engraving -- at .XXX (+-.005) .002 of lettering stays below the field, at .XX (+-.01) the field could cut below it. Printed on the sheet, that reason read as a second datum (run 20261107T220230661Z) and as narration (run 20261107T234638358Z), so it is declared here"
+      where: "SECTION A-A, the .008-.012 ETCHED FIELD DEPTH limits"
+      finding: "an explicit band narrower than the .XXX row with no mate named (rules 3, 4)"
+      reason: "Owner ruling 2026-11-20 (Pedro), #2313: \"A\" (etch the field ~.010 (.008-.012); letters and border proud and polished): one time-set etch depth printed with its limits replaces the former .016 sunk field and .028 engraving; the deepest etch sets the stated floor (RV-05). A decorative depth with no mate (owner-accepted)"

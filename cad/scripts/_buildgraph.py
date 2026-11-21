@@ -42,7 +42,7 @@ ASSEMBLY_CONTRACTS_TOKEN = "assemblies/*"
 REFERENCES_DIR = SCRIPTS_DIR.parent / "references"
 
 # Vendored input artefacts (DXF/DWG) a build imports at run time. A build that
-# imports one (e.g. build_nameplate -> nameplate-engraving.dxf) must depend on the
+# imports one (e.g. build_fr_nameplate -> fr-nameplate-field.dxf) must depend on the
 # FILE so an edit rebuilds the part and busts its remote-cache key -- see
 # data_deps_of, honored by dodo._part_file_deps.
 _DATA_EXTENSIONS = (".dxf", ".dwg")
@@ -2008,7 +2008,7 @@ def data_deps_of(script: Path) -> list[str]:
     must treat as ``file_dep`` (and fold into the remote-cache key).
 
     ``module_deps_of`` only follows Python imports; a build that imports a data
-    file (``build_nameplate`` -> ``cad/references/fr-nameplate-engraving.dxf`` via
+    file (``build_fr_nameplate`` -> ``cad/references/fr-nameplate-field.dxf`` via
     ``adapter.import_dxf_dwg``) has no import edge to it, so an edit to the DXF
     would otherwise not rebuild the part. This scans the script's transitive
     module closure source for quoted ``*.dxf``/``*.dwg`` literals and resolves

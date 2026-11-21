@@ -185,7 +185,7 @@ STEP_TEXT = {
     # first so the bare base goes on the mill for the drilling and tapping
     # (#2390), not under the erected frame.
     steps.NAMEPLATE_SET_KEY: (
-        f"SET {_PLATE} ENGRAVED FACE UP ON THE TOP FACE OF {_BASE}, CENTRED ACROSS "
+        f"SET {_PLATE} ETCHED FACE UP ON THE TOP FACE OF {_BASE}, CENTRED ACROSS "
         "ITS WIDTH, PARALLEL TO THE NEAREST END OF THAT FACE AND INSET FROM IT BY "
         "THE SECTION B-B DIMENSION (SHEET 1)."
     ),

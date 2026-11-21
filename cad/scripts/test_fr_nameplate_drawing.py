@@ -1,4 +1,4 @@
-"""Offline contracts for the engraved nameplate's manufacturing drawing (#628)."""
+"""Offline contracts for the etched nameplate's manufacturing drawing (#628)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from typing import Any
 
 import pytest
 
-import _drawing_edge_dimensions
 import _dxf_text as dxf
 import build_fr_nameplate as part
 import draw_fr_nameplate as drawing
@@ -42,26 +41,24 @@ def test_registry_row_names_this_script_and_stem() -> None:
 
 def test_marked_set_is_exactly_what_the_sheet_keeps() -> None:
     # The build marks and gives places to DRAWING_DIMENSIONS; the sheet keeps
-    # exactly their union, and its one sheet-derived reference has spec places.
+    # exactly their union.
     assert part.DRAWING_DIMENSIONS is print_spec.DRAWING_DIMENSIONS
     assert part.DRAWING_PRECISION is print_spec.DRAWING_PRECISION
     marked = set().union(*print_spec.DRAWING_DIMENSIONS.values())
     kept = [*drawing.FRONT_KEEP, *drawing.RIGHT_KEEP, *drawing.SECTION_KEEP]
     assert len(kept) == len(set(kept)) and set(kept) == marked
     assert set(print_spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert print_spec.DRAWING_REFERENCE_PRECISION == {drawing.FLOOR_REFERENCE_LABEL: 3}
     assert set(print_spec.DIMENSION_PREFIXES) <= marked
-    assert set(print_spec.DIMENSION_CALLOUTS) <= marked
+    assert drawing.SECTION_CALLOUTS is print_spec.SECTION_CALLOUTS
     assert set(print_spec.SECTION_CALLOUTS) == set(drawing.SECTION_KEEP)
     # The reference sketches carry exactly the marked names they own.
     for sketch in print_spec.REFERENCE_SKETCHES:
         assert sketch in print_spec.DRAWING_DIMENSIONS
 
 
-def test_places_are_the_parts_and_the_sheet_sets_only_the_reference() -> None:
-    # Every manufacturing dimension's places are authored on the part and read
-    # back on the sheet; SetPrecision3 is reserved for the one reference, and
-    # takes its places from the spec's DRAWING_REFERENCE_PRECISION.
+def test_places_are_the_parts_and_the_sheet_sets_none() -> None:
+    # Every dimension's places are authored on the part and read back on the
+    # sheet; the sheet derives no dimension of its own.
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
@@ -220,39 +217,57 @@ def test_face_reference_carries_the_outline_and_far_stations(
     assert holes == 2
 
 
-def test_section_reference_carries_both_depths_on_the_cut_plane(
+def test_section_reference_carries_the_etched_depth_on_the_cut_plane(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     adapter, dims = _run_reference_sketch(monkeypatch, part._section_reference)
     assert adapter.sketch_planes == [print_spec.SECTION_PLANE]
     assert print_spec.DRAWING_DIMENSIONS[print_spec.SECTION_REFERENCE] <= set(dims)
-    assert dims["FieldDepth"] == print_spec.FIELD_DEPTH == part.RECESS_DEPTH
-    assert dims["EngravingDepth"] == print_spec.ENGRAVING_FLOOR_DEPTH
+    assert dims["FieldDepth"] == print_spec.FIELD_DEPTH
     # Points only: a construction chord on a cut-face line printed grey
     # dashes over A-A's outline, read as hidden lines in a section (ENFORCE
     # review). Each point lies on the cut-face line A-A draws at its height:
-    # the decorated face, the groove's floor, the field's floor (sketch v = -z).
+    # the decorated face on the border, the field's floor (sketch v = -z).
     assert not adapter.lines
-    assert len(adapter.points) == 3
-    field = _rings(part.FIELD_DXF)[0]
-    engraving = _rings(part.ENGRAVING_DXF)
+    assert len(adapter.points) == 2
     y = print_spec.SECTION_Y
-
-    def engraved(x: float) -> bool:
-        return sum(dxf.point_in_ring(ring, (x, y)) for ring in engraving) % 2 == 1
-
-    expected = {
-        0.0: (False, False),
-        print_spec.ENGRAVING_FLOOR_DEPTH: (False, True),
-        print_spec.FIELD_DEPTH: (True, False),
-    }
+    expected = {0.0: False, print_spec.FIELD_DEPTH: True}
     for x, v in adapter.points.values():
-        assert (dxf.point_in_ring(field, (x, y)), engraved(x)) == expected[v], x
+        assert _etched(x, y) == expected[v], x
         assert drawing.SECTION_CROP[0][0] < x < drawing.SECTION_CROP[1][0]
 
 
-def test_no_model_band_every_dimension_prints_the_title_block_grade() -> None:
+def _etched(x: float, y: float) -> bool:
+    """A point of the decorated face lies in the etched field: an odd number
+    of the field DXF's loops (the field, a letter, a counter) holds it."""
+    rings = _rings(part.FIELD_DXF)
+    return sum(dxf.point_in_ring(ring, (x, y)) for ring in rings) % 2 == 1
+
+
+def test_the_one_model_band_is_the_owner_ruled_etch_depth() -> None:
+    # No symmetric or bilateral band anywhere; the etched field's depth alone
+    # prints its limits, .008-.012 (owner ruling 2026-11-20, #2313: "A").
     assert model_toleranced_dimensions(part) == {}
+    low, high = print_spec.FIELD_DEPTH_LIMITS
+    assert (low / 25.4, print_spec.FIELD_DEPTH / 25.4, high / 25.4) == pytest.approx(
+        (0.008, 0.010, 0.012), abs=1e-12
+    )
+    import ast
+
+    calls = [
+        node
+        for node in ast.walk(ast.parse(Path(part.__file__).read_text(encoding="utf-8")))
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "set_limits"
+    ]
+    assert len(calls) == 1
+    (call,) = calls
+    assert [ast.unparse(arg) for arg in call.args[1:]] == [
+        "SECTION_REFERENCE",
+        "'FieldDepth'",
+    ]
+    assert {keyword.arg: ast.unparse(keyword.value) for keyword in call.keywords}[
+        "limits"
+    ] == "FIELD_DEPTH_LIMITS"
 
 
 def test_isometric_note_names_the_isometric_view_scale() -> None:
@@ -263,8 +278,8 @@ def test_isometric_note_names_the_isometric_view_scale() -> None:
 
 def test_print_contract_matches_the_built_geometry() -> None:
     assert print_spec.SCREW_HOLE_DIA == part.SCREW_HOLE_DIA
-    assert print_spec.FIELD_DEPTH == part.RECESS_DEPTH
-    assert print_spec.ENGRAVING_FLOOR_DEPTH == part.RECESS_DEPTH + part.ENGRAVE_DEPTH
+    assert part.FIELD_DXF.name == print_spec.FIELD_DXF_NAME
+    assert part.OUTLINE_DXF.name == print_spec.OUTLINE_DXF_NAME
 
 
 def test_each_hole_prints_one_station_value_per_edge_pair() -> None:
@@ -296,53 +311,40 @@ def _segment_distance(
 
 def test_section_a_crosses_the_plate_between_the_lettering_rows() -> None:
     # A short partial plane: it starts off the outline, so that arrow and
-    # letter print off the plate (r2 review C3), and stops on the sunk field
+    # letter print off the plate (r2 review C3), and stops on the etched field
     # just past what the cropped section shows (rule 9).
     outline = _rings(part.OUTLINE_DXF)[0]
     y = drawing.SECTION_Y
     assert drawing.SECTION_X_START < 0.0 < drawing.SECTION_CROP[1][0] < drawing.SECTION_X_END
     assert drawing.SECTION_X_END < 0.1 * spec.PLATE_WIDTH
     assert not dxf.point_in_ring(outline, (drawing.SECTION_X_START, y))
-    # The only engraved rings the line meets are the border's (pinstripe and
-    # field edges, which span the plate); every letter and the ornament
-    # stand at least a millimetre clear of it.
-    for ring in _rings(part.ENGRAVING_DXF):
-        xs = [x for x, _ in ring]
+    # The only field loop the line meets is the field's edge, which spans
+    # the plate; every letter and the ornament stand at least a millimetre
+    # clear of it.
+    field, *letters = _rings(part.FIELD_DXF)
+    xs = [x for x, _ in field]
+    assert min(xs) < drawing.SECTION_FIELD_X
+    assert max(xs) > spec.PLATE_WIDTH - drawing.SECTION_FIELD_X
+    for ring in letters:
         ys = [y_ for _, y_ in ring]
-        if min(ys) <= y <= max(ys):
-            assert min(xs) < drawing.SECTION_FIELD_X, ring[0]
-            assert max(xs) > spec.PLATE_WIDTH - drawing.SECTION_FIELD_X, ring[0]
-        else:
-            assert min(abs(min(ys) - y), abs(max(ys) - y)) >= 1.0, ring[0]
+        assert min(abs(min(ys) - y), abs(max(ys) - y)) >= 1.0, ring[0]
+        assert not min(ys) <= y <= max(ys), ring[0]
 
 
-def test_section_a_crop_holds_the_border_the_groove_and_the_field() -> None:
-    # The engraving DXF's closed rings nest: the pinstripe's outer edge, the
-    # field ring (its inner edge), each letter and each letter's counter. A
-    # point is cut to the engraving floor where an odd number of them holds it.
+def test_section_a_crop_holds_the_border_and_the_etched_field() -> None:
+    # The face point stands on the raised border, the field point and the
+    # crop's right end on the etched field.
     outline = _rings(part.OUTLINE_DXF)[0]
-    field = _rings(part.FIELD_DXF)[0]
-    engraving = _rings(part.ENGRAVING_DXF)
-    assert field in engraving
     y = drawing.SECTION_Y
-
-    def engraved(x: float) -> bool:
-        return sum(dxf.point_in_ring(ring, (x, y)) for ring in engraving) % 2 == 1
-
-    face = (print_spec.SECTION_FACE_X, y)
-    assert dxf.point_in_ring(outline, face) and not dxf.point_in_ring(field, face)
-    assert not engraved(print_spec.SECTION_FACE_X)
-    groove = (drawing.SECTION_GROOVE_X, y)
-    assert not dxf.point_in_ring(field, groove) and engraved(drawing.SECTION_GROOVE_X)
-    floor = (drawing.SECTION_FIELD_X, y)
-    assert dxf.point_in_ring(field, floor) and not engraved(drawing.SECTION_FIELD_X)
+    assert dxf.point_in_ring(outline, (print_spec.SECTION_FACE_X, y))
+    assert not _etched(print_spec.SECTION_FACE_X, y)
+    assert _etched(drawing.SECTION_FIELD_X, y)
     # The crop holds the plate's left edge and the whole thickness, and ends
-    # on the field floor, not mid-groove.
+    # on the field floor.
     (x0, z0), (x1, z1) = drawing.SECTION_CROP
     assert x0 < 0.0 and z0 > 0.0 and z1 < -spec.PLATE_THICKNESS
     assert x1 > drawing.SECTION_FIELD_X
-    end = (x1, y)
-    assert dxf.point_in_ring(field, end) and not engraved(x1)
+    assert _etched(x1, y)
 
 
 def test_section_a_break_line_closes_the_crops_open_end() -> None:
@@ -364,153 +366,48 @@ def test_section_a_break_line_closes_the_crops_open_end() -> None:
     )
 
 
-def test_section_a_dimensions_each_depth_on_its_own_line() -> None:
-    # r2 review C2: the two depths shared one face arrow; each now stands on
-    # its own station, both from the decorated face point (z = 0).
-    points = print_spec.SECTION_REFERENCE_POINTS
-    face, field, groove = points["face"], points["field"], points["groove"]
-    assert face[1] == 0.0 and field[0] != groove[0]
-    assert -field[1] == print_spec.FIELD_DEPTH
-    assert -groove[1] == print_spec.ENGRAVING_FLOOR_DEPTH
-    keep = drawing.SECTION_KEEP
-    assert keep["FieldDepth"][0] != keep["EngravingDepth"][0]
-    # B3: the floor under the engraving chains below the engraving depth as
-    # a reference, plate thickness less the engraving floor depth.
-    floor = drawing.FLOOR_REFERENCE
-    assert floor["from"] == groove
-    (_, z0), (_, z1) = floor["from"], floor["to"]
-    assert math.isclose(z0 - z1, floor["expected_mm"])
-    assert math.isclose(
-        floor["expected_mm"], spec.PLATE_THICKNESS - print_spec.ENGRAVING_FLOOR_DEPTH
-    )
-    assert floor["callout"] == "FLOOR UNDER ENGRAVING"
-
-
-def test_sunk_field_depth_holds_three_places_by_declared_exception() -> None:
-    # PR #1468 r4 review: the field depth printed .XXX with no stated
-    # function. The field must stay above the engraving's floor so the
-    # lettering stays cut; .028 and .016 at .XXX (+-.005) leave .002, and at
-    # .XX (+-.010) the field could cut below the engraving.
+def test_etched_field_depth_prints_its_declared_limits_above_the_face() -> None:
+    # One depth from the decorated face point (z = 0) to the field floor,
+    # its limits declared as fr-nameplate RV-07 (owner ruling 2026-11-20).
     from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
 
-    assert (0.028 - 0.005) - (0.016 + 0.005) == pytest.approx(0.002)
-    assert (0.028 - 0.005) - (0.016 + 0.010) < 0.0
-    assert print_spec.ENGRAVING_BELOW_FIELD_MIN == pytest.approx(0.002 * 25.4)
+    points = print_spec.SECTION_REFERENCE_POINTS
+    assert set(points) == {"face", "field"}
+    assert points["face"][1] == 0.0
+    assert -points["field"][1] == print_spec.FIELD_DEPTH
     assert print_spec.DRAWING_PRECISION[print_spec.SECTION_REFERENCE] == {
-        "FieldDepth": 3,
-        "EngravingDepth": 3,
+        "FieldDepth": 3
     }
-    # The reason lives in RV-06, not on the sheet: printed, it read as a
-    # second datum (run 20261107T220230661Z) and as narration (run
-    # 20261107T234638358Z).
     rows = drawing.SECTION_CALLOUTS["FieldDepth"].split("\n")
-    assert rows == ["SUNK FIELD DEPTH"]
+    assert rows == ["ETCHED FIELD DEPTH"]
     declared = {
         entry.id: entry
         for entry in load_exceptions(CAD_ROOT / "config", "fr_nameplate", "part")
     }
-    assert "SUNK FIELD DEPTH" in declared["RV-06"].where
-    assert ".002" in declared["RV-06"].reason
-    # The three-row block (value and two callout rows, 4.5 mm each) keeps its
-    # leader shelf above the field's outside arrow, ~5.7 mm long on the r4
-    # render, at the decorated face.
+    assert "ETCHED FIELD DEPTH" in declared["RV-07"].where
+    assert ".008-.012" in declared["RV-07"].where
+    # The block (two stacked limits and the callout row, 4.5 mm each) keeps
+    # its leader shelf above the field's outside arrow, ~5.7 mm long on the
+    # r4 render, at the decorated face.
     face_y = drawing._section_xy(print_spec.SECTION_FIELD_X, 0.0)[1]
-    block_bottom = drawing.SECTION_KEEP["FieldDepth"][1] - 0.00225 * (1 + len(rows))
+    block_bottom = drawing.SECTION_KEEP["FieldDepth"][1] - 0.00225 * (2 + len(rows))
     assert block_bottom > face_y + 0.006
-
-
-class _FakeDisplay:
-    def __init__(self) -> None:
-        self.precision: tuple[int, ...] | None = None
-
-    def SetPrecision3(self, *places: int) -> None:  # noqa: N802 -- COM name
-        self.precision = places
-
-    def GetPrimaryPrecision2(self) -> int:  # noqa: N802 -- COM name
-        assert self.precision is not None
-        return self.precision[0]
-
-    def GetAnnotation(self) -> _FakeDisplay:  # noqa: N802 -- COM name
-        return self
-
-
-def test_floor_reference_measures_through_the_shared_helper(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # The sheet measures its one derived dimension with the shared
-    # assert_dimension_measures (attachments checked, 1e-3 mm), not a copy,
-    # and gives it the spec's reference places.
-    assert (
-        drawing.assert_dimension_measures
-        is _drawing_edge_dimensions.assert_dimension_measures
-    )
-    display = _FakeDisplay()
-    calls: dict[str, Any] = {}
-
-    def cut_face_line(_edges: Any, *, x_mm: float, z_mm: float, label: str) -> Any:
-        return f"edge@{z_mm}", (x_mm, print_spec.SECTION_Y, z_mm)
-
-    def measures(_adapter: Any, dimension: Any, **kwargs: Any) -> float:
-        calls["measures"] = (dimension, kwargs)
-        return kwargs["expected_mm"]
-
-    def add_edge_dimension(_adapter: Any, _view: Any, **kwargs: Any) -> Any:
-        calls["add"] = kwargs
-        return display
-
-    monkeypatch.setattr(drawing, "scan_view_edges", lambda _view, label: label)
-    monkeypatch.setattr(drawing, "_cut_face_line", cut_face_line)
-    monkeypatch.setattr(
-        drawing, "model_points_in_view", lambda _a, _v, points, label: points
-    )
-    monkeypatch.setattr(drawing, "add_edge_dimension", add_edge_dimension)
-    monkeypatch.setattr(drawing, "assert_dimension_measures", measures)
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(
-        drawing,
-        "set_reference_dimension",
-        lambda _a, annotation, label: calls.setdefault("reference", label),
-    )
-    monkeypatch.setattr(
-        drawing,
-        "set_dimension_callouts",
-        lambda _a, _annotations, callouts: calls.setdefault("callouts", callouts),
-    )
-    monkeypatch.setattr(drawing, "dimension_name", lambda _a, _annotation: "RD1")
-    drawing._floor_reference(object(), object())
-
-    floor = drawing.FLOOR_REFERENCE
-    entities = (f"edge@{floor['from'][1]}", f"edge@{floor['to'][1]}")
-    assert calls["add"]["entities"] == entities
-    assert calls["measures"] == (
-        display,
-        {
-            "expected_mm": floor["expected_mm"],
-            "label": drawing.FLOOR_REFERENCE_LABEL,
-            "entities": entities,
-            "tolerance_mm": 1e-3,
-        },
-    )
-    places = print_spec.DRAWING_REFERENCE_PRECISION[drawing.FLOOR_REFERENCE_LABEL]
-    assert display.precision == (places, -1, -1, -1)
-    assert calls["reference"] == drawing.FLOOR_REFERENCE_LABEL
-    assert calls["callouts"] == {"RD1": print_spec.FLOOR_UNDER_ENGRAVING_CALLOUT}
 
 
 def test_section_a_texts_and_caption_clear_each_other() -> None:
     # Measured r2 text blocks (8:1): a two-row value and callout is about
     # 8 mm tall and its callout row about 2.85 mm a character wide; r4's
-    # measured ~9 mm, so each row here takes 4.5 mm and a block's width is
-    # its longest callout row's. Each block is boxed left-aligned on its
-    # dimension line (as r2 printed), right-aligned on it (as r4 printed the
-    # floor reference) and centred on it, so no SOLIDWORKS placement can
+    # measured ~9 mm, so each row here takes 4.5 mm (the limits print two
+    # stacked rows) and a block's width is its longest callout row's. Each
+    # block is boxed left-aligned on its dimension line (as r2 printed),
+    # right-aligned on it and centred on it, so no SOLIDWORKS placement can
     # collide.
     def boxes(pick: dict) -> list[tuple[float, float, float, float]]:
         x, y = pick["text_xy"]
         rows = pick["callout"].split("\n")
         width = 0.00285 * max(len(row) for row in rows)
-        half = 0.00225 * (1 + len(rows))
+        half = 0.00225 * (2 + len(rows))
         return [
             (x, y - half, x + width, y + half),
             (x - width, y - half, x, y + half),
@@ -526,11 +423,8 @@ def test_section_a_texts_and_caption_clear_each_other() -> None:
     crop_high = drawing._section_xy(*drawing.SECTION_CROP[0])
     crop = (crop_high[0], crop_low[1], crop_low[0], crop_high[1])
     texts = {
-        **{
-            name: {"text_xy": xy, "callout": print_spec.SECTION_CALLOUTS[name]}
-            for name, xy in drawing.SECTION_KEEP.items()
-        },
-        drawing.FLOOR_REFERENCE_LABEL: drawing.FLOOR_REFERENCE,
+        name: {"text_xy": xy, "callout": print_spec.SECTION_CALLOUTS[name]}
+        for name, xy in drawing.SECTION_KEEP.items()
     }
     placed = {name: boxes(pick) for name, pick in texts.items()}
     for name, candidates in placed.items():
@@ -623,15 +517,15 @@ def test_hole_ligament_holds_with_each_hole_driven_into_its_rounded_corner() -> 
     assert print_spec.HOLE_LIGAMENT_WORST >= print_spec.LIGAMENT_FLOOR
 
 
-def test_engraving_floor_at_the_printed_worst_case() -> None:
+def test_floor_under_the_etched_field_at_the_printed_worst_case() -> None:
     floor = (
         spec.PLATE_THICKNESS
         - printed_band_mm(3, unit=spec.UNIT)
-        - (print_spec.ENGRAVING_FLOOR_DEPTH + printed_band_mm(3, unit=spec.UNIT))
+        - print_spec.FIELD_DEPTH_LIMITS[1]
     )
-    assert math.isclose(print_spec.ENGRAVING_FLOOR_MIN, floor)
-    # .063 - .005 - (.028 + .005) = .025.
-    assert floor == pytest.approx(0.025 * 25.4)
+    assert math.isclose(print_spec.FIELD_FLOOR_MIN, floor)
+    # .063 - .005 - .012 = .046, owner ruling 2026-11-20 (#2313).
+    assert floor == pytest.approx(0.046 * 25.4)
 
 
 def test_screw_full_thread_is_the_accepted_rule_20_shortfall() -> None:
@@ -669,29 +563,27 @@ def test_declared_exceptions_name_the_printed_minimums() -> None:
     }
     assert {name: entry.kind for name, entry in declared.items()} == {
         "RV-01": "accept",
-        "RV-02": "minor",
         "RV-03": "minor",
         "RV-05": "minor",
-        "RV-06": "accept",
+        "RV-07": "accept",
     }
-    for name in ("RV-01", "RV-02", "RV-03"):
-        assert declared[name].reason.endswith(("(owner-accepted)", "(owner-ruled shortfall)"))
-    for name in ("RV-05", "RV-06"):
-        assert "Owner ruling 2026-11-08 (Pedro), #2144 item 12.2" in declared[name].reason
+    for entry in declared.values():
+        assert entry.reason.endswith(("(owner-accepted)", "(owner-ruled shortfall)"))
+    for name in ("RV-01", "RV-05", "RV-07"):
+        assert 'Owner ruling 2026-11-20 (Pedro), #2313: "A"' in declared[name].reason
     floor, screws = print_spec.MINIMUM_NOTES.splitlines()
-    assert floor in declared["RV-02"].where
+    assert floor in declared["RV-05"].where
     assert screws in declared["RV-03"].where
     # The sheet's rows state the same facts, the screws' naming its parts.
     assert floor in drawing.MINIMUM_NOTES and screws in drawing.MINIMUM_NOTES
     # Each states its worst case in inches, rounded down to three places.
     for note, worst in (
-        (floor, print_spec.ENGRAVING_FLOOR_MIN),
+        (floor, print_spec.FIELD_FLOOR_MIN),
         (screws, base_fasteners.NAMEPLATE_INSTALLED_FULL_THREAD_MIN),
     ):
         stated = next(word for word in note.split() if word.startswith("."))
         assert float(stated) == math.floor(worst / 25.4 * 1000.0 + 1e-9) / 1000.0
-    for note in print_spec.MANUFACTURING_NOTES.splitlines()[:3]:
-        assert note in declared["RV-01"].where
+    assert print_spec.MANUFACTURING_NOTES.splitlines()[0] in declared["RV-01"].where
     # The holes' wall to the corner radius meets rule 17's .080 target at the
     # printed worst case, so no shortfall is stated (RV-04 retired).
     assert print_spec.HOLE_LIGAMENT_WORST >= WALL_TARGET_MM
@@ -699,18 +591,16 @@ def test_declared_exceptions_name_the_printed_minimums() -> None:
 
 def test_notes_and_callouts_carry_no_numbers_and_stay_short() -> None:
     notes = print_spec.MANUFACTURING_NOTES.splitlines()
-    # The note block's rows fit the left half above the title band.
-    assert 1 <= len(notes) <= 4
+    # Rule 7 (#1564): the DXF rows and the two stated minimums together stay
+    # within four lines.
+    assert len(notes) + len(drawing.MINIMUM_NOTES.splitlines()) <= 4
     assert all(len(note) <= 60 for note in notes), notes
-    texts = [
-        *notes,
-        *drawing.SECTION_CALLOUTS.values(),
-        print_spec.FLOOR_UNDER_ENGRAVING_CALLOUT,
-    ]
+    texts = [*notes, *drawing.SECTION_CALLOUTS.values()]
     assert not any(re.search(r"\d", text) for text in texts), texts
-    # Each vendored contour by the exact path cut_release stages it at.
-    for name in (part.OUTLINE_DXF, part.FIELD_DXF, part.ENGRAVING_DXF):
-        assert f" PER {bundle_path(name.name)}" in print_spec.MANUFACTURING_NOTES
+    # The one shop artwork by the exact path cut_release stages it at.
+    assert print_spec.MANUFACTURING_NOTES.splitlines()[0] == (
+        f"OUTLINE AND ETCH RESIST PER {bundle_path(print_spec.RESIST_DXF_NAME)}"
+    )
 
 
 def test_texts_stand_inside_the_border_and_off_the_title_block() -> None:
@@ -718,7 +608,6 @@ def test_texts_stand_inside_the_border_and_off_the_title_block() -> None:
         *drawing.FRONT_KEEP.values(),
         *drawing.RIGHT_KEEP.values(),
         *drawing.SECTION_KEEP.values(),
-        drawing.FLOOR_REFERENCE["text_xy"],
         drawing.HOLE_CALLOUT_XY,
         drawing.NOTES_XY,
         drawing.MINIMUM_NOTES_XY,
@@ -731,7 +620,7 @@ def test_texts_stand_inside_the_border_and_off_the_title_block() -> None:
         assert _BORDER[0] + 0.005 < x < _BORDER[2] - 0.005, (x, y)
         assert _BORDER[1] < y < _BORDER[3] - 0.005, (x, y)
         assert not (x > _TITLE_BLOCK[0] and y < _TITLE_BLOCK[1] + 0.008), (x, y)
-    # Dimension texts stand off the plate face, never on the engraving.
+    # Dimension texts stand off the plate face, never on the artwork.
     left, bottom = drawing._front_xy(0.0, 0.0)
     right, top = drawing._front_xy(spec.PLATE_WIDTH, spec.PLATE_HEIGHT)
     for x, y in [

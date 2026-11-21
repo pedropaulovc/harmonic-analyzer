@@ -1,4 +1,4 @@
-r"""Create the curated machinist drawing for the engraved brass nameplate (#628).
+r"""Create the curated machinist drawing for the etched brass nameplate (#628).
 
 The SLDPRT remains authoritative.  This recipe supplies only the nameplate's
 views, dimension layout, section and hole callout; sheet/template and export
@@ -7,14 +7,13 @@ behaviour lives in ``_drawing_common``.
 One B sheet at 2:1: the decorated face (front) carries the outline's width
 and height and each screw hole's station from its two adjacent edges; the
 edge view (right) carries the plate thickness; section A-A, a short cut
-across the left border and the start of the sunk field, carries the
-field's depth, the engraving floor below the decorated face and, as a
-reference, the floor left under the engraving.  Every dimension but that
-reference is a model dimension imported with the places the part authored
-(the outline's and the depths' from the part's hidden reference sketches,
-``fr_nameplate_drawing_spec``).  The outline's corners, the sunk field's
-notched edge and the engraving are the vendored DXF contours the build
-imports (``fr_nameplate_drawing_spec.MANUFACTURING_NOTES`` names them).
+across the left border and the start of the etched field, carries the
+field's depth below the decorated face as its limits.  Every dimension is a
+model dimension imported with the places the part authored (the outline's
+and the depth's from the part's hidden reference sketches,
+``fr_nameplate_drawing_spec``).  The outline and the etch resist are the
+vendored DXF the release bundle carries
+(``fr_nameplate_drawing_spec.MANUFACTURING_NOTES`` names it).
 The base's seats are spotted through this plate at assembly, so no datums.
 
 Run with SolidWorks open::
@@ -49,12 +48,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import (
-    assert_imported_precision,
-    set_dimension_callouts,
-    set_reference_dimension,
-)
-from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
@@ -72,17 +66,12 @@ from fr_nameplate_drawing_spec import (
     DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    DRAWING_REFERENCE_PRECISION,
-    ENGRAVING_DEPTH_CALLOUT,
-    ENGRAVING_FLOOR_DEPTH,
     FIELD_DEPTH,
     FLOOR_MINIMUM_NOTE,
-    FLOOR_UNDER_ENGRAVING,
-    FLOOR_UNDER_ENGRAVING_CALLOUT,
     SCREW_ENGAGEMENT_NOTE,
     SCREW_HOLE_DIA,
+    SECTION_CALLOUTS,
     SECTION_FIELD_X,
-    SECTION_GROOVE_X,
     SECTION_REFERENCE,
     SECTION_Y,
 )
@@ -113,37 +102,27 @@ _M_PER_MM = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
 # y 0.125..0.215.  Third angle: the .063 edge view stands right of it, the
 # isometric top-right, removed section A-A bottom-right above the title
 # block (its crop centred on SECTION_CENTER, its caption hung below-left of
-# it, clear of the floor reference's text below the cut), the notes
-# bottom-left below the face's dimensions.
+# it), the notes bottom-left below the face's dimensions.
 FRONT_CENTER = (0.150, 0.170)
 RIGHT_CENTER = (0.276, 0.170)
 ISO_CENTER = (0.366, 0.222)
 ISO_NOTE_XY = (0.330, 0.183)
 NOTES_XY = (0.030, 0.085)
-# The stated worst-case minimums (fr-nameplate machinist exceptions RV-02 and
-# RV-03), two rows a line below the DXF rows (whose fourth row ends near y
-# 0.064), in the empty bottom-left. The screws' row names the screw and the
+# The stated worst-case minimums (fr-nameplate machinist exceptions RV-05 and
+# RV-03), two rows a line below the two DXF rows (whose second row ends near
+# y 0.075), in the empty bottom-left. The screws' row names the screw and the
 # receiver it threads into by drawing number (rule 4).
 _SCREW_NUMBER = _config.parts("sh-vn-brass-fillister-screw")["number"]
 _BASE_NUMBER = _config.parts("fr-harmonic-base")["number"]
 MINIMUM_NOTES = "\n".join(
     (FLOOR_MINIMUM_NOTE, f"{_SCREW_NUMBER} {SCREW_ENGAGEMENT_NOTE} IN {_BASE_NUMBER}")
 )
-MINIMUM_NOTES_XY = (0.030, 0.055)
+MINIMUM_NOTES_XY = (0.030, 0.066)
 # The thickness is stock with no band of its own, so it carries no reason.
-# The field depth names its feature only. Why it holds three places (it stays
-# shallower than the .028 engraving, which a two-place ±.01 depth could pass)
-# is fr-nameplate RV-06: printed on the sheet it read as a second datum (run
-# 20261107T220230661Z, 2/3) and as narration (run 20261107T234638358Z, 2/3);
-# left off, run 20261107T191011860Z (2/3) asked for it.
-SECTION_CALLOUTS = {
-    "FieldDepth": "SUNK FIELD DEPTH",
-    "EngravingDepth": ENGRAVING_DEPTH_CALLOUT,
-}
+# The field depth names its feature only (SECTION_CALLOUTS): its limits are
+# the owner's etch depth (fr-nameplate RV-07).
 SECTION_CENTER = (0.350, 0.115)
-# The native caption's top centre. r4 printed the floor reference's text
-# right-aligned on its dimension line, its "(0.800)" row 0.88 mm into a
-# caption whose top stood at 0.100; the caption now hangs 11 mm lower.
+# The native caption's top centre, clear below the crop.
 SECTION_CAPTION_XY = (0.288, 0.089)
 
 
@@ -228,13 +207,11 @@ def _hole_rim_edge(edges: ViewEdges, hole: tuple[float, float]) -> Any:
 # section shows (rule 9: a partial section's plane crosses its feature, not
 # the whole part): it starts SECTION_OVERRUN outside the left edge, so that
 # arrow and letter print off the plate (r2 review C3), and ends
-# SECTION_FIELD_RUN past the crop's right edge, on the sunk field.  The
+# SECTION_FIELD_RUN past the crop's right edge, on the etched field.  The
 # removed section is cropped to SECTION_CROP (plate x, z corners): the raised
-# border (x 0..3.15), the pinstripe groove (x 3.16..3.60, the engraving
-# floor) and the sunk field.  Each depth is SectionReference's model
-# dimension, on its own dimension line from the decorated face (the raised
-# border top), its text above the cut; the floor left under the groove
-# chains below the engraving depth as a sheet reference, its text below.
+# border (x 0..3.60) and the etched field.  The depth is SectionReference's
+# model dimension, on its own dimension line from the decorated face (the
+# raised border top), its text above the cut.
 SECTION_OVERRUN = 3.0
 SECTION_FIELD_RUN = 2.0
 SECTION_CROP = ((-0.6, 0.6), (8.0, -(PLATE_THICKNESS + 0.6)))
@@ -271,28 +248,9 @@ def _section_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
     )
 
 
-# SectionReference's depths, each on its own dimension line from the face.
-# The field's callout is two rows, the feature and why it holds three places,
-# so with its value the block is three rows tall (the r4 render's two-row
-# blocks measured ~9 mm). It stands 0.3 higher than on that render and the
-# engraving's block 0.65 higher, keeping a gap between the two blocks and the
-# field's leader shelf above its outside arrow at the face. The b3 layout
-# audit measured the inch texts .016 and .028 1.70 mm apart (1.78 needed) with
-# the engraving at 3.4; 3.45 raises its block 0.4 mm on the 8:1 sheet.
-SECTION_KEEP = {
-    "FieldDepth": _section_xy(SECTION_FIELD_X, 1.7),
-    "EngravingDepth": _section_xy(SECTION_GROOVE_X, 3.45),
-}
-# The floor under the groove: a sheet reference from the groove's floor to
-# the back face (plate x, z), chained below the engraving depth.
-FLOOR_REFERENCE_LABEL = "floor under engraving"
-FLOOR_REFERENCE: dict[str, Any] = {
-    "from": (SECTION_GROOVE_X, -ENGRAVING_FLOOR_DEPTH),
-    "to": (SECTION_GROOVE_X, -PLATE_THICKNESS),
-    "expected_mm": FLOOR_UNDER_ENGRAVING,
-    "text_xy": _section_xy(SECTION_GROOVE_X, -2.9),
-    "callout": FLOOR_UNDER_ENGRAVING_CALLOUT,
-}
+# SectionReference's depth on its dimension line from the face, its block
+# (the two limits and the callout row) above its leader shelf at the face.
+SECTION_KEEP = {"FieldDepth": _section_xy(SECTION_FIELD_X, 1.7)}
 
 
 def _mm_to_m(point: tuple[float, ...]) -> tuple[float, ...]:
@@ -335,24 +293,6 @@ def _set_dimension_prefixes(
         _set_prefix(annotation.GetSpecificAnnotation(), prefix, label=name)
     if remaining:
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
-
-
-def _set_reference_precision(display: Any, label: str) -> None:
-    """Give the one sheet-derived reference its spec-authored decimal places.
-
-    Every other dimension on this print is a model dimension whose places the
-    part authored and ``assert_imported_precision`` reads back.  The floor
-    under the engraving is a parenthesised reference with no band and no
-    model dimension to import, so its places come from the spec's
-    ``DRAWING_REFERENCE_PRECISION`` -- never a literal typed here.
-    """
-    places = DRAWING_REFERENCE_PRECISION[label]
-    display = _early_bound(display, "IDisplayDimension")
-    # -1: do-not-change for the dual and both tolerance places.
-    display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
-    applied = int(display.GetPrimaryPrecision2())
-    if applied != places:
-        raise RuntimeError(f"{label}: prints {applied} decimal places, not {places}")
 
 
 def _orient_section(adapter: Any, view: Any) -> None:
@@ -399,7 +339,7 @@ def _orient_section(adapter: Any, view: Any) -> None:
 
 
 def _crop_section(adapter: Any, view: Any) -> None:
-    """Crop A-A to SECTION_CROP: the border, the groove and the field's start.
+    """Crop A-A to SECTION_CROP: the border and the etched field's start.
 
     The partial cut spans the short cutting line (about 104 mm at 8:1); the
     fence is a rectangle sketched in the section's own sketch round the
@@ -553,7 +493,7 @@ def _section(adapter: Any, front: Any) -> Any:
         section_label=SECTION_LABEL,
         scale=SECTION_SCALE,
         partial=True,
-        label="nameplate field and engraving depths",
+        label="nameplate etched field depth",
     )
     view = _early_bound(view, "IView")
     view.UseParentScale = False
@@ -570,78 +510,6 @@ def _section(adapter: Any, front: Any) -> Any:
         adapter, view, SECTION_CAPTION_XY, label="nameplate section A-A"
     )
     return view
-
-
-def _cut_face_line(
-    edges: ViewEdges, *, x_mm: float, z_mm: float, label: str
-) -> tuple[Any, tuple[float, float, float]]:
-    """The visible cut-face line at height ``z_mm`` spanning ``x_mm``.
-
-    A cut-surface-only section shows its cut face alone, so every visible line
-    lies in the plane y = SECTION_Y; the decorated face, the field floor and
-    an engraving floor are its horizontal lines at their own heights.
-    """
-    for item in edges.lines:
-        start, end = item.line
-        if max(abs(start[1] - SECTION_Y), abs(end[1] - SECTION_Y)) > 1e-4:
-            continue
-        if max(abs(start[2] - z_mm), abs(end[2] - z_mm)) > 1e-4:
-            continue
-        if min(start[0], end[0]) <= x_mm <= max(start[0], end[0]):
-            return item.edge, (x_mm, SECTION_Y, z_mm)
-    seen = sorted(
-        (
-            tuple(round(value, 3) for value in item.line[0]),
-            tuple(round(value, 3) for value in item.line[1]),
-        )
-        for item in edges.lines
-    )
-    raise RuntimeError(f"{label}: no cut-face line at x={x_mm}, z={z_mm}; lines {seen}")
-
-
-def _floor_reference(adapter: Any, section: Any) -> None:
-    """The floor under the groove, chained below the engraving depth."""
-    label = FLOOR_REFERENCE_LABEL
-    edges = scan_view_edges(section, label="section A-A")
-    (from_edge, from_point), (to_edge, to_point) = (
-        _cut_face_line(edges, x_mm=x, z_mm=z, label=f"{label} {end}")
-        for end, (x, z) in (
-            ("from", FLOOR_REFERENCE["from"]),
-            ("to", FLOOR_REFERENCE["to"]),
-        )
-    )
-    points = model_points_in_view(
-        adapter, section, [_mm_to_m(from_point), _mm_to_m(to_point)], label=label
-    )
-    display = add_edge_dimension(
-        adapter,
-        section,
-        p0=points[0],
-        p1=points[1],
-        text_xy=FLOOR_REFERENCE["text_xy"],
-        label=label,
-        orientation="vertical",
-        entities=(from_edge, to_edge),
-    )
-    # Both ends are scanned cut-face lines; 1e-3 mm absorbs the section's
-    # projected-geometry noise in the measured value.
-    assert_dimension_measures(
-        adapter,
-        display,
-        expected_mm=FLOOR_REFERENCE["expected_mm"],
-        label=label,
-        entities=(from_edge, to_edge),
-        tolerance_mm=1e-3,
-    )
-    native = _early_bound(display, "IDisplayDimension")
-    _set_reference_precision(native, label)
-    annotation = _early_bound(native.GetAnnotation(), "IAnnotation")
-    set_reference_dimension(adapter, annotation, label=label)
-    set_dimension_callouts(
-        adapter,
-        [annotation],
-        {dimension_name(adapter, annotation): FLOOR_REFERENCE["callout"]},
-    )
 
 
 def build(adapter: Any) -> dict[str, str]:
@@ -686,7 +554,7 @@ def build(adapter: Any) -> dict[str, str]:
             0: "Nameplate Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "engraved brass nameplate; manufacturing drawing",
+            3: "etched brass nameplate; manufacturing drawing",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -755,10 +623,9 @@ def build(adapter: Any) -> dict[str, str]:
     annotations += depths
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, depths, SECTION_CALLOUTS)
-    _floor_reference(adapter, section)
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
-    # Named exceptions: fr-nameplate RV-02 (floor) and RV-03 (screw thread).
+    # Named exceptions: fr-nameplate RV-05 (floor) and RV-03 (screw thread).
     if add_note(adapter, MINIMUM_NOTES, *MINIMUM_NOTES_XY) is None:
         raise RuntimeError("failed to place the stated-minimum notes")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)

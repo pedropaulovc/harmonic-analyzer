@@ -395,7 +395,7 @@ BOM_DESCRIPTIONS = {
     "fr-rocker-arm-support": "ROCKER-ARM SUPPORT CASTING",
     "fr-vn-lag-screw": "1/4-20 X 3/4 HEX-HEAD SCREW, 18-8 SS",
     "fr-top-frame": "TOP-FRAME CASTING",
-    "fr-nameplate": "ENGRAVED BRASS MAKER'S NAMEPLATE",
+    "fr-nameplate": "ETCHED BRASS MAKER'S NAMEPLATE",
     "sh-vn-brass-fillister-screw": "BRASS #4-40 X 1/4 FILLISTER-HEAD SLOTTED SCREW",
     "fr-vn-frame-cross-screw": (
         "ZINC-PLATED STEEL #10-32 X 1-3/4 NARROW FILLISTER-HEAD SLOTTED SCREW"
