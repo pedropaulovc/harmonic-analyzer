@@ -643,10 +643,11 @@ def _tap_rows() -> list[str]:
 
 def _foot_hole_rows() -> list[str]:
     """The foot-hole callout as printed: the through row (size, DRILL,
-    THRU), the counterbore row, then the mate rows."""
+    THRU), the counterbore row with its stacked limits (owner ruling
+    2026-11-22, #3367; one tolerance row's width each), then the mate rows."""
     return [
         f"Ø .094 {drawing.FOOT_HOLE_THRU}",
-        "⌴ Ø .150 ↧ .083",
+        "⌴ Ø .150 +.004 ↧ .083 -.005",
         *ch_fulcrum_keeper_notes.FOOT_HOLE_MATE.splitlines(),
     ]
 
@@ -685,7 +686,7 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
     notes_top = drawing.NOTES_TOP
     notes = Box(0.020, notes_top - 5 * _PITCH, 0.182, notes_top)
     overall_length = _text_block(drawing.FRONT_KEEP["OverallLength"], ["16.50"])
-    foot_hole = _text_block(drawing.FOOT_HOLE_CALLOUT_XY, _foot_hole_rows())
+    foot_hole = _foot_hole_block()
     tap = _text_block(drawing.SET_SCREW_CALLOUT_XY, _tap_rows())
     keeps = {**drawing.FRONT_KEEP, **drawing.TOP_KEEP}
     callouts: dict[str, str] = {}
@@ -767,7 +768,7 @@ def test_tap_callout_stands_inside_the_border_clear_of_the_plan() -> None:
     )
     station = "SetScrewLocation"
     set_screw_location = _value_block(drawing.TOP_KEEP[station], "4.00", "")
-    foot_hole = _text_block(drawing.FOOT_HOLE_CALLOUT_XY, _foot_hole_rows())
+    foot_hole = _foot_hole_block()
     for other in (plan, set_screw_location, foot_hole):
         assert _box_gap(block, other) >= _AIR, other
     bend = (block.xmax + _SHOULDER_RUN, block.ymin)
@@ -777,12 +778,18 @@ def test_tap_callout_stands_inside_the_border_clear_of_the_plan() -> None:
     assert point_segment_distance((plan.xmin, plan.ymin), leader) >= 0.003
 
 
+def _foot_hole_block():
+    """The foot-hole callout's box: its rows plus the counterbore row's
+    stacked upper limits."""
+    return _text_block(drawing.FOOT_HOLE_CALLOUT_XY, _foot_hole_rows(), stack=True)
+
+
 def _foot_hole_leader():
     """Native hangs the shoulder under the last row and points the arrow at
     the counterbore rim facing the shoulder's end."""
     from _layout_geometry import Segment
 
-    block = _text_block(drawing.FOOT_HOLE_CALLOUT_XY, _foot_hole_rows())
+    block = _foot_hole_block()
     bend = (block.xmin - _SHOULDER_RUN, block.ymin)
     centre = (drawing.HOLE_X_SHEET, drawing.TOP_CENTER[1])
     dx, dy = bend[0] - centre[0], bend[1] - centre[1]
@@ -791,21 +798,22 @@ def _foot_hole_leader():
 
 
 def test_foot_hole_leader_climbs_left_of_its_own_upper_rows() -> None:
-    # Native hangs the shoulder under the last (widest) row; the leader from
-    # there to the counterbore rim clears every row above it. Rule 7 block
-    # limit: four rows.
+    # Native hangs the shoulder under the last row, out past the widest (the
+    # counterbore row with its stacked limits); the leader from there to the
+    # counterbore rim clears every row above it (farm run
+    # 20261122T220015080Z: centred at x 138 it ran 3.4 mm through the
+    # counterbore symbol). Rule 7 block limit: four rows.
     from _layout_geometry import Box, segment_box_distance
 
     rows = _foot_hole_rows()
     assert len(rows) <= 4
-    assert len(rows[-1]) == max(map(len, rows))
-    block = _text_block(drawing.FOOT_HOLE_CALLOUT_XY, rows)
+    block = _foot_hole_block()
     leader = _foot_hole_leader()
     for index, row in enumerate(rows[:-1]):
-        top = block.ymax - index * _PITCH
+        top = block.ymax - index * _PITCH - (_STACK if index else 0.0)
         half = len(row) * _CHAR / 2.0
         cx = drawing.FOOT_HOLE_CALLOUT_XY[0]
-        box = Box(cx - half, top - _CAP, cx + half, top)
+        box = Box(cx - half, top - _CAP, cx + half, top + (_STACK if index == 1 else 0.0))
         assert segment_box_distance(leader, box) >= 0.001, row
 
 
