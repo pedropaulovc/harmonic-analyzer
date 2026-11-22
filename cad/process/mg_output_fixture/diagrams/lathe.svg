@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 1: the 7/16 hex bar in the 3-jaw, .95 out; the spigot end made on the bar</text>
+  <text class="title" x="20" y="20">Setup 1: the 7/16 hex bar in the 3-jaw, .95 out; the spigot end made on the bar (lengths to scale)</text>
   <rect class="fixture-vise" x="40" y="90" width="120" height="220"/>
   <rect class="part-rest" x="160" y="138" width="170" height="124"/>
   <rect class="part-kept" x="330" y="138" width="230" height="124"/>
   <rect class="part-kept" x="560" y="150" width="120" height="100"/>
   <path class="part-removed" d="M 600 150 A 11 11 0 0 0 622 150 Z"/>
   <path class="part-removed" d="M 600 250 A 11 11 0 0 1 622 250 Z"/>
-  <rect class="holes" x="560" y="192" width="117" height="16"/>
+  <rect class="holes" x="445" y="191" width="235" height="18"/>
   <line class="centre-line" x1="140" y1="200" x2="740" y2="200"/>
   <line class="active-face" x1="680" y1="150" x2="680" y2="250"/>
   <line class="datum" x1="680" y1="110" x2="680" y2="290"/>

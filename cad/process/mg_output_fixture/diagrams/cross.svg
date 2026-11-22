@@ -18,6 +18,7 @@
   <line class="dims" x1="120" y1="350" x2="345" y2="350"/>
   <line class="dims" x1="345" y1="380" x2="345" y2="354"/>
   <line class="leader" x1="420" y1="300" x2="350" y2="262"/>
+  <line class="leader" x1="150" y1="68" x2="240" y2="150"/>
   <text class="label" x="20" y="96">X0 spigot face</text>
   <text class="label" x="20" y="118">Z0 top corner</text>
   <text class="label" x="20" y="56">F through both corners,</text>

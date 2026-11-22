@@ -311,7 +311,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Prove MO01_cross_bore in air, Z0 raised 1.000 in; every move clears the jaws. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run MO01_cross_bore through its M6, watching each move clear the jaw tops ({{process.cross_jaw_top_mm:in.3dot}} above the corner). G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run the whole of MO01_cross_bore in air, through both its tool changes (T1, then T2) and the F drill's pass to the program's end, watching each move clear the jaw tops ({{process.cross_jaw_top_mm:in.3dot}} above the corner). G10 L2 P1 Z(the noted Z) puts Z0 back. Op 160 runs the file again from its start, its first M6 T1 putting the centre drill back in."
 feed = "hand"
 
 [[setups.operations]]
