@@ -50,5 +50,5 @@
   <path class="leader" d="M560 150 L560 56"/>
   <text class="datum-label" x="430" y="50">Y0: the blank's rear edge, flush with the bar's rear face</text>
   <text class="label" x="24" y="408">hatched: milled away, {{process.outline_trim_mm:in.2dot}} a side and the left end's surplus</text>
-  <text class="label" x="24" y="426">every pass starts beside the blank; with M3 the stick on the pass's left is conventional milling</text>
+  <text class="label" x="24" y="426">every pass is entered in air, beside the blank and off the bar; with M3 the stick on the pass's left is conventional milling</text>
 </svg>

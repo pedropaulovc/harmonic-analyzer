@@ -53,6 +53,15 @@
 # not in the feature export; the numerals are cut on the model's stroke
 # centrelines (features.numerals.stroke_layers), and cam.py holds the gap
 # between every numeral and its tick above numeral_gap_min_mm.
+# FLAGGED: the model's numeral strokes are 0.24 wide at the face (owner
+# 2026-10-23, ms_stick_spec NUMERAL_STROKE_WIDTH_MM, a near-sharp V). The
+# listed bit's .005 tip cannot cut a stroke narrower than .0136 (0.345) at
+# the .016 MIN depth; this plan cuts them numeral_width_mm (.016) wide at
+# numeral_depth_mm, and the ticks tick_width_mm (.020) against the modelled
+# .016 MIN. The printed limits hold (the depth MINs, the .016-.024 groove
+# width, the .07-.09 numeral height, the .02 gaps at .XX; drawing note 3:
+# any single-stroke sans font), and test_ms_stick_drawing holds the bit's
+# wider stroke inside the gap band. The owner may want a finer-tipped bit.
 #
 # Zeroing: X/Y by the .200 in edge finder at 900 rpm; Z by the tool's tip on
 # a .002 feeler leaf. Every program loads its own first tool (M6, the tool
@@ -161,6 +170,13 @@ bond_area_mm2 = 1615.642
 # a .315 square patch at the derated 0.1725 MPa); 0.282 lifts 2.2 N.
 face_cutter_dia_mm = 12.7
 outline_trim_mm = 0.762
+# The stick's frame as the traveler prints it (cam.py checks both): the
+# ruled edge at Y-(outline_trim_mm + the drawing's width), and the X the
+# edge finder sets on the blank's raw right end, its radius (the .200 in
+# finder, shop-equipment tools.edge-finder) + outline_trim_mm.
+ruled_edge_y_mm = 8.763
+edge_finder_radius_mm = 2.54
+datum_find_x_mm = 3.302
 outline_radial_max_mm = 0.889
 outline_breakthrough_mm = 0.082
 outline_depth_mm = 3.384
@@ -272,7 +288,7 @@ gauge_checks = [{ gauge = "height-gauge", band_mm = ["{{cad.blank_length_mm}}", 
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "The face with fewer marks is the RULED FACE. On the other face write BACK with a marker, and an arrow toward one end: the DATUM END." },
+  { kind = "action", text = "The face with fewer marks is the RULED FACE: it goes up on the mill. On it, within 1 in of one end, write UP with a marker and an arrow toward the other end: the DATUM END (nothing is engraved in that first inch). Keep ink off the other face, the BACK: the tape bonds to it." },
   { kind = "check", text = "On the surface plate, BACK down: a .010 feeler leaf passes under it nowhere." },
   { kind = "stop", text = "A leaf passes: straighten the blank by hand over the plate's edge and check again; still bowed: saw another." },
 ]
@@ -344,12 +360,12 @@ title = "Bond the blank; outline"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The fixture bar as Setup 2 left it, not unclamped. The blank on its faced top on 3M VHB 5906 tape ({{process.tape_thickness_mm:in.3dot}}) under its whole BACK, RULED FACE up, the arrow pointing right, its rear edge flush with the bar's rear face, its ends about 2 in inside the bar's ends. Nothing else holds it: no clamp, no stop."
-datum = "Program MS02_outline. G54: X0 {{process.outline_trim_mm:in.3dot}} inside the blank's right end (where the DATUM END is cut), Y0 the blank's rear edge as bought, Z0 the RULED FACE. The stick lies toward −X and −Y: PLAIN EDGE at Y−0.762, RULED EDGE at Y−8.763 (toward you), ZERO END at X−201.930. The file starts with an M6 for T1 (spindle stopped, tool lifted)."
+holding = "The fixture bar as Setup 2 left it, not unclamped. The blank on its faced top on 3M VHB 5906 tape ({{process.tape_thickness_mm:in.3dot}}) under its whole BACK, the marked RULED FACE up, its arrow pointing right, its rear edge flush with the bar's rear face, its ends about 2 in inside the bar's ends. Nothing else holds it: no clamp, no stop."
+datum = "Program MS02_outline. G54: X0 {{process.outline_trim_mm:in.3dot}} inside the blank's right end (where the DATUM END is cut), Y0 the blank's rear edge as bought, Z0 the RULED FACE. The stick lies toward −X and −Y: PLAIN EDGE at Y−{{process.outline_trim_mm:.3f}}, RULED EDGE at Y−{{process.ruled_edge_y_mm:.3f}} (toward you), ZERO END at X−{{cad.zero_end_length_mm:.3f}}. The file starts with an M6 for T1 (spindle stopped, tool lifted)."
 diagram = { file = "diagrams/outline.svg", alt = "The blank from above, taped on the fixture bar's top between the jaws' positions, rear edge flush with the bar's rear face; X0 at the right end, Y0 the rear edge; the 1/2 in end mill's passes: across the zero end, along the front edge, across the datum end, along the rear edge, anticlockwise, the stick on the left of every pass." }
 # Top: the blank on its tape; deepest: the through cut, into the bar's top
 # by fixture_skim_max_mm at most.
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_width_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.fixture_faced_height_mm}}", "{{process.tape_thickness_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.fixture_faced_height_mm}}", -0.2], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.fixture_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.fixture_faced_height_mm}}", "{{process.tape_thickness_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.fixture_faced_height_mm}}", -0.2], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.fixture_width_mm}}", along_jaws_mm = "{{process.fixture_length_mm}}", part_height_mm = "{{process.fixture_faced_height_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.fixture_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.zero_end_length_mm}}"], seat = "faced fixture bar top", seat_mm = ["{{process.fixture_seat_start_mm}}", "{{process.fixture_seat_end_mm}}"], bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "stick", kind = "part", area_mm2 = "{{process.bond_area_mm2}}", width_mm = "{{cad.ruled_edge_width_mm}}" }] } }
 
@@ -362,7 +378,7 @@ instruction = "Wipe the blank's BACK with isopropyl alcohol and water. Lay the t
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Stand a 1-2-3 block on the fixed jaw's top against the bar's rear face: the fence. Lower the blank onto the tape, BACK down, arrow pointing right, rear edge against the block, ends about 2 in inside the bar's ends. Press it down along its whole length with a clean flat block, about 45 lb (the tape wants 15 psi). Take the 1-2-3 block away."
+instruction = "Stand a 1-2-3 block on the fixed jaw's top against the bar's rear face: the fence. Lower the blank onto the tape, BACK down, the marked RULED FACE up, its arrow pointing right, rear edge against the block, ends about 2 in inside the bar's ends. Press it down along its whole length with a clean flat block, about 45 lb (the tape wants 15 psi). Take the 1-2-3 block away."
 feed = "hand"
 
 [[setups.operations]]
@@ -371,7 +387,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Y0 the blank's rear edge, X0 {{process.outline_trim_mm:in.3dot}} inside its right end: edge finder (900 rpm), its tip .06 below the blank's top, on the brass only."
-instruction_detailed = "Edge finder (900 rpm), its tip .06 below the blank's top, on the brass only. On the blank's rear edge from behind, over the fixed jaw: G10 L20 P1 Y2.540. On its right end from the right: G10 L20 P1 X3.302 (the finder's 2.540 plus the 0.762 trim). Edge finder out."
+instruction_detailed = "Edge finder (900 rpm), its tip .06 below the blank's top, on the brass only. On the blank's rear edge from behind, over the fixed jaw: G10 L20 P1 Y{{process.edge_finder_radius_mm:.3f}}. On its right end from the right: G10 L20 P1 X{{process.datum_find_x_mm:.3f}} (the finder's {{process.edge_finder_radius_mm:.3f}} plus the {{process.outline_trim_mm:.3f}} trim). Edge finder out."
 feed = "hand"
 
 [[setups.operations]]
@@ -392,7 +408,9 @@ feed = "hand"
 
 # With M3 (clockwise) the stick lies on the LEFT of every pass: conventional
 # milling, anticlockwise round the stick (cam.py checks the side on every
-# pass). Each pass starts beside the blank, in air.
+# pass). Each pass is entered in air: beside the blank and off the fixture
+# bar, behind its rear face or in front of its front face (the last levels
+# reach the tape and, under a thin blank, the bar's top), then fed across.
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
@@ -483,7 +501,7 @@ vise_hold = "other"
 beam = "other"
 inspection = [
   "Width {{cad.ruled_edge_width_min_in:.3dot}}–{{cad.ruled_edge_width_max_in:.3dot}}, micrometer, at both ends and the middle (NOTE 1: sliding fit in the MHA-MS-02 rebate). Over: stop and tell the owner (the stick is off its fixture; an edge can only be stoned). Under: scrap.",
-  "Thickness: not miked here. It was gated at Op 10 and no face is cut; it is miked after the polish, Op 280.",
+  "Thickness: not miked here. It was gated at Op 10 and no face is cut; it is miked after the polish, Op 290.",
   "Length {{cad.zero_end_length_min_in:.2f}}–{{cad.zero_end_length_max_in:.2f}}, height gauge, the stick stood on its DATUM END on the surface plate against a 1-2-3 block. Outside: stop and tell the owner.",
   "By eye, with the drawing: {{cad.graduations_count_mm:.0f}} ticks; every tenth a long one with its numeral, 0 to 10, the 10 nearest the DATUM END; the one longest tick halfway between the 0 and the 1; every groove clean to its end. A tick or stroke missing or torn: stop and tell the owner.",
   "Not gauged, held by the program from the zeros of Setup 4: the stations (±.002 from the datum end; X0 found on that face, Op 190, and found unmoved, Op 230); groove width {{cad.graduations_width_min_in:.3dot}}–{{cad.graduations_width_max_in:.3dot}} and depths {{cad.graduations_depth_min_in:.3dot}} and {{cad.numerals_depth_min_in:.3dot}} MIN (the bit's 30° and .005 tip at the programmed depths, Z0 touched with the bit, Op 200); tick lengths {{cad.graduations_minor_length_in:.2dot}}, {{cad.graduations_full_length_in:.2dot}} and {{cad.graduations_half_length_in:.2dot}} and the numeral height {{cad.numerals_height_in:.2dot}}.",
@@ -502,10 +520,14 @@ speed_kind = "other"
 tool = "deburr"
 drilling = "none"
 sizing = "other"
+instruction = "Break the edges R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max with the scraper and a smooth file. Along the RULED EDGE one light stroke only: the ticks' open ends stay crisp. No burr may stand in a groove: pick it out with a brass or wood point."
+feed = "hand"
+
+[[setups.operations]]
 steps = [
-  { kind = "action", text = "Break the edges R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max with the scraper and a smooth file. Along the RULED EDGE one light stroke only: the ticks' open ends stay crisp. No burr may stand in a groove: pick it out with a brass or wood point." },
-  { kind = "check", text = "On the surface plate, each face down in turn: the stick lies flat without rocking." },
-  { kind = "stop", text = "Rocks: set it straight by hand over the plate's edge, RULED FACE never against steel, and check again; still rocks: stop and tell the owner." },
+  { kind = "action", text = "Lay the stick on the surface plate, each face down in turn." },
+  { kind = "check", text = "It lies flat without rocking." },
+  { kind = "stop", text = "Rocks: straighten it by hand over the plate's edge, RULED FACE never against steel, and check again; still rocks: stop and tell the owner." },
 ]
 feed = "hand"
 
@@ -520,7 +542,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Finish (the drawing: {{cad.finish}}). Enamel: the owner's Rust-Oleum Stops Rust Flat Black 376855 (check the shelf; buy if none). To buy: 600-grit wet-or-dry paper and a metal polish (Simichrome). Wipe the stick with isopropyl alcohol and let it dry."
+instruction = "Finish (the drawing: {{cad.finish}}). Enamel: the owner's Rust-Oleum Stops Rust Flat Black 376855 (check the shelf; buy if none). To buy: 600-grit wet-or-dry paper and a metal polish (Simichrome). Wipe the stick with isopropyl alcohol (the marker comes off with it) and let it dry."
 feed = "hand"
 
 [[setups.operations]]

@@ -13,11 +13,13 @@
   <!-- The blank: 8.10 in = 454 px. -->
   <rect class="part-kept" x="52" y="96" width="454" height="63"/>
   <text class="label" x="180" y="133">RULED FACE up: the face with fewer marks</text>
-  <!-- The datum end and its arrow, written on the BACK. -->
+  <!-- The mark, in marker on the RULED FACE within 1 in (56 px) of the end away from the datum end: UP and an arrow toward the DATUM END. Nothing is engraved there, and no ink goes on the BACK (the bond face). -->
+  <text class="label" x="458" y="120">UP</text>
+  <line class="arrow" x1="500" y1="144" x2="454" y2="144"/>
   <line class="datum" x1="52" y1="84" x2="52" y2="171"/>
   <text class="datum-label" x="20" y="78">DATUM END (either end)</text>
-  <line class="arrow" x1="150" y1="212" x2="66" y2="212"/>
-  <text class="label" x="158" y="216">on the BACK: the word BACK and an arrow toward the DATUM END</text>
+  <text class="label" x="52" y="218">the mark at the right, in marker, within 1 in of that end: UP and an arrow toward the DATUM END</text>
+  <text class="label" x="52" y="236">no ink on the BACK: the tape bonds to it</text>
   <!-- Length and the gates. -->
   <path class="dims" d="M52 176 L52 196 M506 176 L506 196 M52 190 L506 190"/>
   <text class="label" x="208" y="184">{{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long</text>

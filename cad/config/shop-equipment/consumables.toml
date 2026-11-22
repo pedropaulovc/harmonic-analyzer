@@ -88,7 +88,7 @@ note = "Not owned: to buy. Under the alkyd enamels of MHA-FR-01 and MHA-FR-02 (t
 [consumables.black-alkyd-enamel]
 name = "Rust-Oleum Stops Rust Custom Spray 5-in-1 Flat Black 376855, 12 oz aerosol (oil-modified alkyd enamel)"
 kind = "paint"
-note = "Ownership not stated by the owner: to check. MHA-FR-01 deck and underside (BLACK DECK/UNDERSIDE), the MHA-SH-01/MHA-SH-02 column clamps and the MHA-DT-02 arbor pedestal (black enamel)."
+note = "Ownership not stated by the owner: to check. MHA-FR-01 deck and underside (BLACK DECK/UNDERSIDE), the MHA-SH-01/MHA-SH-02 column clamps and the MHA-DT-02 arbor pedestal (black enamel); MHA-MS-01 stick: wiped into the graduations and numerals (black-fill)."
 cite = [
   "Owner (Pedro) 2026-11-21, answered in person: \"rust-oleum Flat Black376855\".",
   "The Home Depot, Rust-Oleum Stops Rust 12 oz. Custom Spray 5-in-1 Flat Black Spray Paint 376855 (https://www.homedepot.com/p/Rust-Oleum-Stops-Rust-12-oz-Custom-Spray-5-in-1-Flat-Black-Spray-Paint-376855/323255175), read 2026-11-21.",
@@ -183,8 +183,8 @@ status = "to_order"
 thickness_mm = 0.15
 normal_tensile_kpa = 690
 dynamic_shear_kpa = 690
-purchase = "1-1/2 in wide, or two 3/4 in strips side by side: 12 in per strap, 20 ft for the lot of 20. Rolls are 5 yd (15 ft), so two 1-1/2 in rolls or three 3/4 in rolls (#3083 row 11, owner ruling 2026-11-20). No price or stock read."
-note = "Not owned: to buy. MHA-CH-13 Setup 5: bonds the faced blank to the sub-plate under its whole face while the outline is cut."
+purchase = "1-1/2 in wide, or two 3/4 in strips side by side: 12 in per strap, 20 ft for the lot of 20. Rolls are 5 yd (15 ft), so two 1-1/2 in rolls or three 3/4 in rolls (#3083 row 11, owner ruling 2026-11-20). The MHA-MS-01 stick takes one 9 in strip more, trimmed to its fixture bar's 1/2 in width: inside either purchase (30 ft of 1-1/2 in against the straps' 20 ft, or 45 ft of 3/4 in against their 40 ft). No price or stock read."
+note = "Not owned: to buy. MHA-CH-13 Setup 5: bonds the faced blank to the sub-plate under its whole face while the outline is cut. MHA-MS-01 Setups 3 and 4: bonds the stick's blank to its fixture bar's faced top while its outline is milled and its scale engraved."
 cite = ["3M VHB Tapes Technical Data, November 2015, Typical Performance Characteristics, 5906: thickness .006 in (0.15 mm); 90 degree peel 9 lb/in (16 N/cm); normal tensile (ASTM D-897, to aluminium, 72 h dwell) 100 lb/in2 (690 kPa); dynamic overlap shear (ASTM D-1002, to stainless steel, 72 h dwell) 100 lb/in2 (690 kPa); Application Techniques: clean with 50:50 isopropyl alcohol and water, about 15 psi application pressure, about 50% of ultimate bond strength after 20 minutes, 90% after 24 hours, 100% after 72 hours. Read 2026-11-17 from a distributor's copy (3M's own link refused the fetch): https://www.tspinc.com/pdf/3M-VHB-Tapes-Technical-Data.pdf"]
 
 # --- MHA-MG-02 magnifying clamp: brass black (owner ruling 2026-11-17) -------

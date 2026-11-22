@@ -21,7 +21,8 @@ Route (``plan.toml``): the vise grips a 12 in 6061 bar on edge, and MS01
 faces its top. The blank is bonded to that top on tape and never clamped.
 MS02 mills both ends and both edges with the 1/2 in end mill, level by
 level, anticlockwise (the stick on the left of every pass: conventional
-with M3), every pass straight and entered beside the blank. MS03 engraves
+with M3), every pass entered in air, beside the blank and off the fixture
+bar (the last levels reach the tape and the bar's top). MS03 engraves
 the 101 graduations with the 30 degree V bit, each from off the ruled edge
 inward; MS04 the numerals along their stroke centrelines.
 
@@ -425,15 +426,16 @@ def _levels(
     return [step * k for k in range(1, count + 1)] + [depth]
 
 
-def _pass(start: tuple[float, float], end: tuple[float, float], z: float) -> list[str]:
-    """One straight end-mill pass at ``z``: a rapid to ``start`` at the
-    clearance height, down to the R plane, a plunge beside the blank at the
-    cutting feed, the pass, and back up."""
+def _pass(points: tuple[tuple[float, float], ...], z: float) -> list[str]:
+    """One end-mill pass at ``z``: a rapid to its first point at the clearance
+    height, down to the R plane, a plunge there at the cutting feed, straight
+    moves through the rest, and back up."""
+    entry, *rest = points
     return [
-        f"G0 X{_r(start[0]):.3f} Y{_r(start[1]):.3f}",
+        f"G0 X{_r(entry[0]):.3f} Y{_r(entry[1]):.3f}",
         f"G0 Z{SAFE_MM:.3f}",
         f"G1 Z{_r(z):.3f} F{{feed}}",
-        f"G1 X{_r(end[0]):.3f} Y{_r(end[1]):.3f} F{{feed}}",
+        *(f"G1 X{_r(q[0]):.3f} Y{_r(q[1]):.3f} F{{feed}}" for q in rest),
         f"G0 Z{CLEAR_MM:.3f}",
     ]
 
@@ -601,23 +603,36 @@ def context(
         raise ValueError(
             "the stick's frame does not put the plain edge at Y−trim and the zero end at X−length"
         )
+    # The frame values the traveler prints: the ruled edge's Y, and the X the
+    # edge finder sets on the raw right end, trim outside X0.
+    _agree(plan, "ruled_edge_y_mm", -ruled_y)
+    _agree(plan, "datum_find_x_mm", p["edge_finder_radius_mm"] + trim)
     raw_x = (-length - surplus, trim)
     raw_y = (-p["blank_width_max_mm"], 0.0)
+    # The fixture bar across: its rear face is the fence the blank's rear
+    # edge is set against (Y0). The last levels reach the tape and, under a
+    # thin blank, the bar's top, so every pass is entered clear of the bar
+    # as well as of the blank: behind its rear face or in front of its
+    # front face, where nothing stands at this height.
+    if p["blank_width_max_mm"] > bar_w:
+        raise ValueError("the widest blank overhangs the fixture bar's front face")
     out_x = (raw_x[1] + r + PASS_LEAD_MM, raw_x[0] - r - PASS_LEAD_MM)
-    out_y = (raw_y[1] + r + PASS_LEAD_MM, raw_y[0] - r - PASS_LEAD_MM)
+    out_y = (r + PASS_LEAD_MM, -bar_w - r - PASS_LEAD_MM)
     end_x = [zero_x - r - trim * k for k in range(stations - 1, -1, -1)]
     front_pass_y, rear_pass_y, datum_pass_x = ruled_y - r, plain_y + r, r
+    # Each pass: where it is entered, then the points it feeds through. The
+    # edge passes feed across to their line before running along it.
     passes = (
         *(((x, out_y[0]), (x, out_y[1])) for x in end_x),
-        ((out_x[1], front_pass_y), (out_x[0], front_pass_y)),
+        ((out_x[1], out_y[1]), (out_x[1], front_pass_y), (out_x[0], front_pass_y)),
         ((datum_pass_x, out_y[1]), (datum_pass_x, out_y[0])),
-        ((out_x[0], rear_pass_y), (out_x[1], rear_pass_y)),
+        ((out_x[0], out_y[0]), (out_x[0], rear_pass_y), (out_x[1], rear_pass_y)),
     )
     out_levels = [_r(-step * k) for k in range(1, rounds + 1)]
     outline_lines = [f"G0 Z{CLEAR_MM:.3f}"]
     for z in out_levels:
-        for start, end in passes:
-            outline_lines += _pass(start, end, z)
+        for points in passes:
+            outline_lines += _pass(points, z)
     corners = ((zero_x, plain_y), (zero_x, ruled_y), (0.0, ruled_y), (0.0, plain_y))
     edge_points = [list(c) for c in corners]
     edge_points += [
@@ -1030,7 +1045,7 @@ def context(
             name,
             "holes",
             {
-                "centres": [[_r(s[0]), _r(s[1])] for s, _e in passes],
+                "centres": [[_r(q[0][0]), _r(q[0][1])] for q in passes],
                 "z_bottom": _r(-depth),
             },
         ],

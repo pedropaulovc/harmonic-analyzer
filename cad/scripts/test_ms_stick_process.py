@@ -205,6 +205,9 @@ def test_the_fixture_bar_holds_under_the_screening_load(ctx) -> None:
         ("parallel_height_mm", 12.7, "fixture_raw_proud_mm"),
         ("fixture_proud_mm", 5.8547, "fixture_proud_mm"),
         ("fixture_grip_mm", 25.4, "fixture_grip_mm"),
+        ("ruled_edge_y_mm", 8.7, "ruled_edge_y_mm"),
+        ("datum_find_x_mm", 3.4, "datum_find_x_mm"),
+        ("edge_finder_radius_mm", 3.0, "datum_find_x_mm"),
         ("blank_scribe_in", 8.05, "blank_scribe_in"),
         ("fixture_clamp_end_mm", 240.0, "fixture_clamp_end_mm"),
         ("tick_rough_depth_mm", 0.7, "tick_rough_depth_mm"),
@@ -260,8 +263,13 @@ def _seed(ctx: dict, key: str, old: str, new: str) -> dict:
     [
         # The second facing pass set short of the bar's front face.
         ("fixture_face", "G1 Y-9.525 F{feed}", "G1 Y-8.000 F{feed}", "face"),
-        # The front edge pass started inside the stick's width.
-        ("outline", "G0 X-214.852 Y-15.113", "G0 X-214.852 Y-14.613", "keep_out"),
+        # The front edge pass fed across to a line inside the stick's width.
+        (
+            "outline",
+            "G1 X-214.852 Y-15.113 F{feed}",
+            "G1 X-214.852 Y-14.613 F{feed}",
+            "keep_out",
+        ),
         # Two levels taken at once: twice the lift the tape is rated for here.
         ("outline", "G1 Z-0.282 F{feed}", "G1 Z-0.564 F{feed}", "passes"),
         # A pass of the last level left short of the tape.
@@ -296,17 +304,36 @@ def test_a_seeded_fault_in_a_program_is_caught(
 
 
 def test_a_climb_pass_is_caught(ctx, tmp_path) -> None:
-    """The first rear edge pass run the other way: the stick on its right."""
-    seeded = _seed(ctx, "outline", "G0 X9.112 Y5.588", "G0 X-214.852 Y5.588")
-    seeded = _seed(
-        seeded,
-        "outline",
-        "G1 X-214.852 Y5.588 F{feed}",
-        "G1 X9.112 Y5.588 F{feed}",
-    )
+    """The first rear edge pass run the other way: the stick on its right.
+    The pass line first, so the entry's feed across is the line's first match."""
+    seeded = ctx
+    for line, fault in (
+        ("G1 X-214.852 Y5.588 F{feed}", "G1 X9.112 Y5.588 F{feed}"),
+        ("G1 X9.112 Y5.588 F{feed}", "G1 X-214.852 Y5.588 F{feed}"),
+        ("G0 X9.112 Y8.350", "G0 X-214.852 Y8.350"),
+    ):
+        seeded = _seed(seeded, "outline", line, fault)
     _post(seeded, tmp_path)
     found = {finding.check for finding in _findings(seeded, tmp_path)}
     assert found >= {"passes", "engagement"}
+
+
+def test_every_outline_pass_is_entered_off_the_fixture_bar(ctx) -> None:
+    """The last levels reach the tape and, under a thin blank, the fixture
+    bar's top. Every plunge of MS02 stands with the whole cutter behind the
+    bar's rear face (Y0) or in front of its front face; the blank lies
+    inside the bar's width."""
+    p = PLAN["parameters"]
+    radius = p["face_cutter_dia_mm"] / 2
+    (holes,) = [
+        kwargs
+        for name, check, kwargs in RECIPE.expectations(ctx)
+        if name == "MS02_outline" and check == "holes"
+    ]
+    assert len(holes["centres"]) == p["outline_end_stations"] + 3
+    assert p["blank_width_max_mm"] <= p["fixture_width_mm"]
+    for _x, y in holes["centres"]:
+        assert y - radius > 0 or y + radius < -p["fixture_width_mm"]
 
 
 def _model(
