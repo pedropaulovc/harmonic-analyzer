@@ -135,6 +135,9 @@ resolution_mm = 0.001016
 [gauges.plug-gauges-2500-2505]
 range_mm = [6.35, 6.3627]
 resolution_mm = 0.001016
+[gauges.plug-gauges-0930-0935]
+range_mm = [2.3622, 2.3749]
+resolution_mm = 0.001016
 
 [gauges.height-gauge]
 range_mm = [0.0, 304.8]
@@ -163,6 +166,25 @@ resolution_mm = 0.0254
 # installed MagXact MX-100M DRO, 5 um scales (owner-confirmed 2026-10-27).
 [gauges.mill-x-dro]
 range_mm = [0.0, 584.2]
+resolution_mm = 0.005
+
+# PM-1127VF-LB carriage (Z) DRO read as a length gauge (the dt_pinion_arbor
+# plan's crown and rim stations, the tool touched on the work). Range: the
+# carriage reads no farther than machines.pm-1127vf-lb between_centres_mm
+# (the DRO's scale length is not recorded); resolution: the owner's 5 um
+# (cad/config/shop-equipment/dro.toml dro.pm-1127vf-lb, 2026-11-21).
+[gauges.lathe-z-dro]
+range_mm = [0.0, 699.77]
+resolution_mm = 0.005
+
+# PM-1127VF-LB cross-slide (X) DRO read as a length gauge (the dt_crankshaft
+# plan's drive-pin offsets, ±7.000 mm from the stub's axis). Range: the cross
+# slide reads no farther from the axis than half machines.pm-1127vf-lb
+# swing_over_cross_slide_mm (its scale length is not recorded); resolution:
+# the owner's 5 um (dro.pm-1127vf-lb). Its accuracy is not recorded: the
+# plan proves it on a slug before the part.
+[gauges.lathe-x-dro]
+range_mm = [0.0, 84.582]
 resolution_mm = 0.005
 
 # The owned Mitutoyo 81-piece inch gauge block set (cad/config/shop-equipment/

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 320" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="320"/>
+  <text class="title" x="20" y="20">Setup 6: the head end out of the 3-jaw (not to scale)</text>
+  <rect class="fixture-vise" x="40" y="70" width="140" height="200"/>
+  <rect class="part-rest" x="180" y="125" width="200" height="90"/>
+  <rect class="part-removed" x="380" y="125" width="260" height="90"/>
+  <rect class="part-kept" x="380" y="145" width="120" height="50"/>
+  <rect class="part-kept" x="500" y="130" width="100" height="80"/>
+  <path class="part-kept" d="M600,130 Q640,170 600,210 Z"/>
+  <line class="centre-line" x1="160" y1="170" x2="700" y2="170"/>
+  <line class="active-face" x1="620" y1="125" x2="620" y2="215"/>
+  <rect class="cutter" x="650" y="160" width="80" height="20"/>
+  <text class="label" x="560" y="100">crown apex: DRO Z0</text>
+  <line class="leader" x1="610" y1="104" x2="620" y2="168"/>
+  <text class="label" x="420" y="250">Ø.41 neck, .41 long</text>
+  <line class="leader" x1="440" y1="238" x2="440" y2="196"/>
+  <text class="label" x="510" y="290">Ø.59 head, .48 long; SR.43 crown</text>
+  <line class="leader" x1="550" y1="278" x2="550" y2="211"/>
+  <text class="label" x="200" y="110">bar back through the spindle</text>
+</svg>
