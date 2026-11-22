@@ -204,11 +204,12 @@ def test_the_press_gauge_is_a_setting_accepted_at_the_nuts() -> None:
     assert f"STEP {steps.step_number(steps.AXLE_CHECKED_KEY)}" in (
         notes.STEP_TEXT[steps.AXLE_ACCEPTED_KEY]
     )
-    # The final reading has its own remedy: the stack comes off, back to the
-    # trial fit.
+    # The final reading has its own remedy: the stack comes off and the
+    # failed trial's remedies run from the press re-check, so a stack that
+    # passed the trial low is measured, not re-trialled (Codjiflo r1, #3345).
     assert steps.SEQUENCE[accepted + 1 : accepted + 3] == ("axle-stack-removed", "axle-reset")
     assert notes.STEP_TEXT["axle-reset"].endswith(
-        f"RETURN TO STEP {steps.step_number(steps.AXLE_TRIAL_KEY)}."
+        f"RETURN TO STEP {steps.step_number('axle-press-rechecked')}."
     )
     # The endshake callout keeps one reason line; the steps carry the method.
     assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.ENDSHAKE_DIMENSION] == (
@@ -219,7 +220,31 @@ def test_the_press_gauge_is_a_setting_accepted_at_the_nuts() -> None:
     # it, then replaces the stack part outside its limits; no re-press chases
     # the thread end past the DETAIL A band.
     (trial_step,) = (step for step in steps.STEPS if step[0] == steps.AXLE_TRIAL_KEY)
-    assert trial_step[3:] == (
+    # #3344: the trial jams its nuts over the endshake's go feeler, the
+    # endshake the stack's thread-end corners are booked at, so a conforming
+    # stack reads inside DETAIL B at the trial, and no less endshake follows.
+    assert trial_step[:4] == (
+        steps.AXLE_TRIAL_KEY,
+        "trial-feeler-placed",
+        "trial-nuts-jammed",
+        steps.AXLE_CHECKED_KEY,
+    )
+    assert stack.ENDSHAKE - stack.ENDSHAKE_TOL == pytest.approx(
+        mg_wheel_group.ENDSHAKE_MIN
+    )
+    trial_low, trial_high = (x / 25.4 for x in notes.TRIAL_THREAD_PAST_LOCKNUT)
+    assert (trial_low, trial_high) == pytest.approx((0.031, 0.113), abs=1e-6)
+    band = mg_wheel_group.ENDSHAKE_MAX - mg_wheel_group.ENDSHAKE_MIN
+    # At the trial, and once the endshake is set anywhere in its band.
+    assert low_limit <= notes.TRIAL_THREAD_PAST_LOCKNUT[0] - band
+    assert notes.TRIAL_THREAD_PAST_LOCKNUT[1] <= high_limit
+    feeler = f"THE {notes.ENDSHAKE_GO_TEXT} FEELER BETWEEN {notes._WASHER}"
+    assert feeler in notes.STEP_TEXT["trial-feeler-placed"]
+    assert "FEELER" in notes.STEP_TEXT["trial-nuts-jammed"]
+    assert "JUST FREE" not in notes.STEP_TEXT["trial-nuts-jammed"]
+    for key in ("trial-parts-removed-to-press", "trial-parts-removed"):
+        assert "FEELER" in notes.STEP_TEXT[key]
+    assert trial_step[4:] == (
         "trial-parts-removed-to-press",
         "axle-press-rechecked",
         "axle-repressed",
@@ -230,6 +255,11 @@ def test_the_press_gauge_is_a_setting_accepted_at_the_nuts() -> None:
         "axle-replaced",
     )
     assert notes.PRESS_DETAIL_TITLE in notes.STEP_TEXT["axle-press-rechecked"]
+    # The spacer the setting reads from is held to the bar at every reading.
+    held = f"{notes._SPACER}, HELD AGAINST {notes._BAR}"
+    assert held in notes.STEP_TEXT["axle-press-rechecked"]
+    bond_held = f"{notes._SPACER} HELD AGAINST {notes._BAR}"
+    assert bond_held in notes.STEP_TEXT["axle-bond-set"]
     assert "TO THAT SETTING" in notes.STEP_TEXT["axle-repressed"]
     assert not any(
         word in text for text in notes.STEP_TEXT.values() for word in ("EXCESS", "SHORTFALL")

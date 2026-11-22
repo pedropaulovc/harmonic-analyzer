@@ -1,32 +1,196 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Guide lock MHA-PD-12, four off (owner ruling 2026-11-21: bench and
+# trivially cut parts get travelers too). Route chosen for speed, as the
+# drawing's process reads: saw and file the outline, file the four corner
+# radii, black oxide. Setup 1 at the saw: five .95 pieces off the 1/16 x 5/8
+# 1018 strip (four and a spare). Setup 2 at the bench vise: file each piece's
+# edges to the .45 height, its ends to the .89 width, its four corners to R.07;
+# deburr and inspect. Setup 3: blacken (Presto Black PC9, owner ruling
+# 2026-11-21) and oil. The two Ø.125 screw holes are not made here: they are
+# transferred from MHA-PD-11 and drilled at assembly (MHA-PD-00), and are left
+# bare and oiled there (the drawing's finish).
+#
+# Stock: the drawing's 1/16 low-carbon sheet as 1/16 x 5/8 AISI 1018
+# cold-drawn strip (one of the sheet's grades; McMaster-Carr 7702N136, to
+# order: cad/config/shop-equipment/stock-to-order.toml 1018-strip-1-16x5-8):
+# the shop has no shear for the 16 x 16 in sheet. The thickness is used as
+# supplied, miked before sawing. No corner radius gauge is on record: the
+# Starrett S167AZ set is to order (gauges.radius-gauges).
 title = "Guide Lock"
-part = "MHA-PD-12 Guide Lock"
-revision = "placeholder"
-material = "Low-carbon steel sheet (ASTM A36, AISI 1008/1010 or 1018), 1/16 in, thickness as supplied within +/-.005 in (e.g. McMaster-Carr 1388K196 A36 precision-ground)"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "Low-carbon steel, AISI 1018 (one of the drawing's grades), bought as 1/16 × 5/8 cold-drawn strip; the drawing's sheet thickness is the strip's, as supplied"
+stock = "Qty {{process.quantity:g}} and one spare. {{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in 1018 strip (McMaster-Carr 7702N136, to order, not on hand); five pieces {{process.blank_length_in:.2dot}} long."
+note = "Inches. Saw, then bench vise with soft jaws and files; no machine work on the outline. The two Ø.125 holes are drilled at assembly, not here."
 shop = "../shop"
+stock_refs = ["1018-strip-1-16x5-8"]
+
+[cad]
+file = "../../out/features/pd_guide_lock/features.toml"
+adapter = "flat_bar"
+part = "pd-guide-lock"
+
+[parameters]
+quantity = 4
+# The adapter's axes: the plate's .89 width along model X (along the strip),
+# its 1/16 thickness along model Z; the .45 height (model Y) across the strip.
+blank_length_axis = 0
+blank_thickness_axis = 2
+# Each piece: the .89 width plus about .03 at each end to file the sawn ends
+# square to the width.
+blank_length_in = 0.95
+blank_width_in = 0.625
+blank_thickness_in = 0.0625
+# The strip's width over the plate's .45 height: what Setup 2 files off its
+# two long edges, about half from each.
+edge_stock_in = 0.175
 
 [[tools]]
-id = "drill-1-8"
-name = "1/8 drill"
-ref = "drill-1-8"  # Drills 1/8
+id = "saw"
+name = "14 in metal-cutting saw"
+ref = "saw-evolution-14"
 
 [[tools]]
-id = "india-stone-ib8"
+id = "files"
+name = "Files; bench vise, soft jaws"
+ref = "jig-files"
+
+[[tools]]
+id = "square"
+name = "Combination square"
+ref = "combination-square-starrett-c11h-12"
+
+[[tools]]
+id = "radius"
+name = "Radius gauges (to buy)"
+ref = "radius-gauges"
+
+[[tools]]
+id = "deburr"
+name = "Deburring set"
+ref = "deburring-set"
+
+[[tools]]
+id = "stone"
 name = "India stone"
-ref = "india-stone-ib8"  # F-stone-norton-IB8
-
-[[tools]]
-id = "jig-files"
-name = "Files"
-ref = "jig-files"  # drawing cross-check 2026-11-19: 4X R.07 filed corners
+ref = "india-stone-ib8"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Saw five pieces off the strip"
+machine = "14 in Evolution metal-cutting miter saw"
+indexing = "none"
+holding = "The saw's own vise: the strip lying flat on the saw table, its long end in the vise, the piece to come off standing past the blade on the open side so it drops clear."
+datum = "The strip's sawn end: each piece is measured from it."
+diagram = { file = "diagrams/saw.svg", alt = "Plan of the saw table: the 5/8 in strip flat in the saw vise, a .95 piece standing past the blade on the open side, the scribe line at .95 from the strip's end." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+instruction = "Before sawing, mike the strip's thickness at three places along the first 6 in (the drawing's thickness is the strip as supplied)."
+inspection = "Thickness {{cad.front_face_thickness_min_in:.4dot}}–{{cad.front_face_thickness_max_in:.4dot}} at all three (micrometers). Outside: stop and tell the owner; do not use the strip."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.front_face_thickness_band_mm}}" }]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Saw the strip's end square (a skim). Then scribe {{process.blank_length_in:.2dot}} from it, blade on the waste side of the line, and saw a piece off with a slow, steady feed (thin stock: let the blade cut, never force it). Repeat for five pieces. File the saw burr off each piece's edges."
+
+[[setups]]
+machine_kind = "other"
+title = "File the outline and corners, deburr, inspect"
+machine = "Bench vise, soft jaws"
+indexing = "none"
+holding = "Soft jaws: the piece flat between them with the edge or end being filed standing just above the jaws' top (no more than .06 out, so the thin plate does not chatter)."
+datum = "The guide edge (filed first, straight and square) for the height; the left end (filed first, square to the guide edge) for the width."
+diagram = { file = "diagrams/file.svg", alt = "The finished plate's outline: the .89 width along the strip, the .45 height across it, the guide edge and the left end marked as the filing datums, the four R.07 corners; the two Ø.125 holes shown dashed as drilled at assembly." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Edges: of the strip's {{process.blank_width_in:.3dot}} width, {{process.edge_stock_in:.3dot}} comes off, about half from each long edge. File one long edge straight and square to the faces with the second-cut file, finishing with the smooth file: this is the guide edge. Mark it. Then file the opposite edge down to the plate's height, checking with the calipers as it nears size."
+inspection = "Height {{cad.far_edge_height_min_in:.2dot}}–{{cad.far_edge_height_max_in:.2dot}} along the whole plate (calipers, at both ends); both edges square to the faces (the combination square's blade on the face, no light at the edge)."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.far_edge_height_band_mm}}" }]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "square"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Ends: file one sawn end square to the guide edge (the combination square's stock on the guide edge, blade across the end: no light): the left end. File the other end square the same way, down to the plate's width."
+inspection = "Width {{cad.right_end_width_min_in:.2dot}}–{{cad.right_end_width_max_in:.2dot}} (calipers, near both edges); both ends square to the guide edge."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.right_end_width_band_mm}}" }]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Corners: file each of the four corners round to R{{cad.corners_radius_nominal_in:.2dot}}: first a 45° flat across the corner, then roll the smooth file over it, rocking from one edge round to the other, blending into both edges without a step."
+inspection = "Each corner R{{cad.corners_radius_min_in:.2dot}}–{{cad.corners_radius_max_in:.2dot}}. Screen with the radius gauges' concave leaves held square across it: the 1/16 leaf (R.0625) rests on its two ends with light at its middle and the 5/64 leaf (R.0781) touches at its middle with light at its two ends; the corner is then inside the drawing's band."
+gauge_checks = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "radius"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Only if Op 50's screen failed. The 1/16 leaf touching at its middle with light at its ends (corner sharper than R.0625): roll the file over it again and screen again. The 5/64 leaf showing light at its middle (rounder than R.0781, which may still be inside R{{cad.corners_radius_max_in:.2dot}}): set the plate aside for the owner to judge; make the spare meanwhile."
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "deburr"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Break every edge round the outline, both faces: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, one light stroke of the deburring scraper, then the India stone's fine face flat on each face to take off any raised burr (keep the faces flat; the thickness is the strip's)."
+inspection = "No burr on either face or along any edge (a fingernail drawn across catches nothing); the plate lies flat on the bench without rocking."
+gauge_checks = "other"
+
+[[setups]]
+machine_kind = "other"
+title = "Black oxide: blacken with Presto Black Steel PC9, oil"
+machine = "Bench, ventilated"
+indexing = "none"
+diagram = { file = "diagrams/blacken.svg", alt = "The finished plate face on, blackened all over: both faces, every edge and the four corners; no holes yet (drilled at assembly)." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+instruction = "To buy before this setup (none on record): Birchwood Presto Black Steel PC9, chemical-resistant gloves and safety glasses."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The drawing's finish, {{cad.finish}}: here the whole plate is blackened and oiled (its holes are drilled at assembly and left bare and oiled there). PC9 cold blackening is the drawing's black oxide (owner ruling 2026-11-21); follow its maker's steps below."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Gloves and safety glasses on (the maker: it contains acid). Wash the plates with soap and water to take off the oil and filings; rinse and dry them. Hold each by its edges from here on. No sanding: the filed edges and the strip's faces are clean metal already (the maker's step 1)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mix the PC9 with water 1:1 in a plastic cup (the maker: 50–100% for brush-on). Brush it on both faces and every edge of each plate with even, light strokes; re-wet the brush and go over the corners and any light spot until the plate is an even black (the maker: do not press hard, it lifts the coating)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Rinse each plate thoroughly with clean water to stop the reaction; dry with a lint-free cloth or compressed air. Light spots: brush again, rinse, dry. Collect the solution and rinse water for a hazardous-waste drop-off, not the drain (the maker)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Oil: wipe on the stone lubricant (a light oil), leave it a few minutes, wipe off the excess. Bag the four plates and the spare together, labelled with the drawing number."
+feed = "hand"
+inspection = "Even black all over each plate, no bare spot and no coating wiping off."
+gauge_checks = "other"

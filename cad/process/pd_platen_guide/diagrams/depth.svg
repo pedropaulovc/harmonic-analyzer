@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="430"/>
+  <text class="title" x="20" y="20">Section across the jaws, from the LEFT end (1 in = 100 px)</text>
+  <line class="fixture-table" x1="60" y1="400" x2="420" y2="400"/>
+  <rect class="clamp" x="155" y="223" width="60" height="177"/>
+  <rect class="clamp" x="250" y="223" width="60" height="177"/>
+  <text class="label-on-clamp" x="160" y="390">moving</text>
+  <text class="label-on-clamp" x="260" y="390">fixed</text>
+  <rect class="fixture-support" x="215" y="250" width="12.5" height="150"/>
+  <rect class="fixture-support" x="237.5" y="250" width="12.5" height="150"/>
+  <rect class="part-kept" x="215" y="210.5" width="35" height="39.5"/>
+  <rect class="part-removed" x="215" y="205" width="35" height="5.5"/>
+  <rect class="cutter" x="225" y="140" width="50" height="60"/>
+  <line class="arrow" x1="250" y1="130" x2="220" y2="130"/>
+  <line class="datum" x1="80" y1="250" x2="150" y2="250"/>
+  <text class="datum-label" x="30" y="246">Z0 (F)</text>
+  <line class="datum" x1="250" y1="180" x2="250" y2="200"/>
+  <text class="datum-label" x="300" y="214">Y0 (U)</text>
+  <text class="label-on-clamp" x="168" y="244">top →</text>
+  <text class="label-on-clamp" x="262" y="244">← U</text>
+  <line class="leader" x1="252" y1="207" x2="320" y2="165"/>
+  <text class="label" x="300" y="160">rear face R faced to Z {{process.depth_target_mm:in.4dot}} in levels</text>
+  <line class="dims" x1="380" y1="210.5" x2="380" y2="250"/>
+  <line class="dims" x1="370" y1="210.5" x2="390" y2="210.5"/>
+  <line class="dims" x1="370" y1="250" x2="390" y2="250"/>
+  <text class="label" x="395" y="234">depth {{cad.rear_face_depth_min_in:.3dot}}–{{cad.rear_face_depth_max_in:.3dot}}, miked</text>
+  <text class="label" x="345" y="300">turned over about its length: F down,</text>
+  <text class="label" x="345" y="318">U now at the fixed jaw, LEFT end still left</text>
+</svg>

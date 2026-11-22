@@ -102,6 +102,8 @@ description = "1018 cold-finish carbon steel, flat bar, 3/8 x 1 in"
 description = "1018 cold-finish carbon steel, flat bar, 3/8 x 1/2 in"
 [stock.1018-ground-flat-3-8x1]
 description = "AISI 1018 cold-finished steel, precision ground, flat bar, 3/8 x 1 in"
+[stock.1018-strip-1-16x5-8]
+description = "AISI 1018 cold-drawn low-carbon steel, flat bar, 1/16 x 5/8 in"
 [stock.c260-h02-strip-032x2]
 description = "C26000 cartridge brass, H02 half hard, strip, .032 x 2 x 12 in"
 [stock.c360-flat-1-4x6]

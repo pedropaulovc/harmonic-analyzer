@@ -868,3 +868,89 @@ def test_parts_registry_row() -> None:
     assert "black oxide" in finish and "oil" in finish
     assert "pair-ream" not in finish
     assert int(config["quantity"]) == 2
+
+
+def _in(value: float) -> float:
+    return value * 25.4
+
+
+def test_the_keeper_declares_one_owner_per_face() -> None:
+    import export_features
+    from _gtol_face import FaceGeometry
+
+    spec = ch_fulcrum_keeper_spec
+
+    def plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+        point = tuple(value * offset_mm / 1000 for value in normal)
+        return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+    def cylinder(dia_mm: float, box_mm: tuple[float, ...]) -> FaceGeometry:
+        box = tuple(value / 1000 for value in box_mm)
+        return FaceGeometry(None, 4002, (0.0, 0.0, 0.0, 0, 0, 1, dia_mm / 2000), None, box)
+
+    manifest = export_features.requirement_manifest("ch_fulcrum_keeper")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == {
+        "seat": "face",
+        "foot_top": "face",
+        "inner_face": "face",
+        "lug_outer_face": "face",
+        "foot_tip": "face",
+        "near_side": "face",
+        "far_side": "face",
+        "crown": "arc",
+        "bore": "hole",
+        "crown_tap": "threaded_hole",
+        "foot_hole": "hole",
+    }
+    half_w, half_t = spec.KEEPER_WIDTH / 2, spec.LUG_HALF_T
+    floor = spec.FOOT_H - spec.CBORE_DEPTH_MM
+    x = spec.SCREW_X
+    tap_r = drawing._TAP_DRILL / 2
+    faces = {
+        "seat": plane((0.0, -1.0, 0.0), 0.0),
+        "foot_top": plane((0.0, 1.0, 0.0), spec.FOOT_H),
+        "inner_face": plane((-1.0, 0.0, 0.0), half_t),
+        "lug_outer_face": plane((1.0, 0.0, 0.0), half_t),
+        "foot_tip": plane((1.0, 0.0, 0.0), spec.FOOT_TIP_X),
+        "near_side": plane((0.0, 0.0, -1.0), half_w),
+        "far_side": plane((0.0, 0.0, 1.0), half_w),
+        "crown": cylinder(2 * spec.CROWN_R, (-half_t, spec.SHAFT_AXIS_H, -half_w, half_t, spec.CROWN_TOP_Y, half_w)),
+        "bore": cylinder(spec.BORE_DIA, (-half_t, 21.9, -3.3, half_t, 28.5, 3.3)),
+        "crown_tap": cylinder(drawing._TAP_DRILL, (-tap_r, 28.0, -tap_r, tap_r, spec.CROWN_TOP_Y, tap_r)),
+        "foot_hole/drill": cylinder(spec.HOLE_DIA_MM, (x - 1.2, 0.0, -1.2, x + 1.2, floor, 1.2)),
+        "foot_hole/cbore": cylinder(spec.CBORE_DIA_MM, (x - 1.9, floor, -1.9, x + 1.9, spec.FOOT_H, 1.9)),
+    }
+    selectors = export_features.feature_selectors("ch_fulcrum_keeper")
+    for name, face in faces.items():
+        owners = [
+            owner
+            for owner, specs in selectors.items()
+            if any(selector.matches(face) for selector in specs)
+        ]
+        assert owners == [name.split("/")[0]], name
+
+
+def test_keeper_feature_bands_are_the_printed_ones() -> None:
+    import export_features
+
+    features = export_features.requirement_manifest("ch_fulcrum_keeper")["features"]
+    assert features["foot_top"]["height"] == pytest.approx([_in(0.30), _in(0.32)])
+    assert features["lug_outer_face"]["thickness"] == pytest.approx([_in(0.31), _in(0.33)])
+    assert features["foot_tip"]["length"] == pytest.approx([_in(0.64), _in(0.66)])
+    assert features["far_side"]["width"] == pytest.approx([_in(0.54), _in(0.56)])
+    bore = features["bore"]
+    assert bore["dia"] == pytest.approx([_in(0.2550), _in(0.2560)])
+    assert bore["process"] == "ream" and bore["thru"] is True
+    assert bore["height"] == pytest.approx([_in(0.98), _in(1.00)])
+    assert bore["off_centre"] == pytest.approx([_in(-0.012), _in(0.012)])
+    tap = features["crown_tap"]
+    assert tap["thread"] == "#1-72 UNF-2B" and tap["into"] == "bore"
+    assert tap["station"] == pytest.approx([_in(0.15), _in(0.17)])
+    hole = features["foot_hole"]
+    assert hole["dia"] == pytest.approx([_in(0.094), _in(0.098)], abs=1e-3)
+    assert hole["cbore_dia"] == pytest.approx([_in(0.150), _in(0.154)])
+    assert hole["cbore_depth"] == pytest.approx([_in(0.078), _in(0.088)], abs=1e-3)
+    assert hole["station"] == pytest.approx([_in(0.17), _in(0.19)])
+    assert hole["lateral"] == pytest.approx([_in(0.270), _in(0.280)])
+    assert hole["tip_wall_min"] == pytest.approx(_in(0.072))
