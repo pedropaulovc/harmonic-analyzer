@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 5: turned over, H down on the stacks, across the jaws as Setup 4, O to the right; MB04 faces L and mills the notch's lower half through to MB03's. A section through the notch, 5 px/mm, looking from the sawn end. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 5 (MB04_low): L to the width, then the notch through</text>
+  <rect class="part-removed" x="100" y="200.6" width="271.3" height="4.4"/>
+  <rect class="part-removed" x="100" y="205" width="206.3" height="28.1"/>
+  <rect class="part-kept" x="306.3" y="205" width="65" height="55"/>
+  <text class="label" x="40" y="60">Section through the notch, H down (MB03's half-notch now underneath, open):</text>
+  <line class="active-face" x1="100" y1="205" x2="371.3" y2="205"/>
+  <line class="hidden" x1="100" y1="233.1" x2="306.3" y2="233.1"/>
+  <line class="hidden" x1="80" y1="260" x2="400" y2="260"/>
+  <text class="label" x="100" y="280">F</text>
+  <text class="label" x="362" y="280">O</text>
+  <circle class="datum" cx="371.3" cy="260" r="3.5"/>
+  <text class="datum-label" x="380" y="300">X0 O, Z0 the stacks' top (H)</text>
+  <line class="leader" x1="360" y1="205" x2="430" y2="150"/>
+  <circle class="leader-dot" cx="360" cy="205" r="2"/>
+  <text class="label" x="430" y="146">L: Z {{cad.high_side_width_mm:in.4dot}}, {{process.low_skim_mm:in.3dot}} off</text>
+  <line class="leader" x1="200" y1="220" x2="430" y2="190"/>
+  <circle class="leader-dot" cx="200" cy="220" r="2"/>
+  <text class="label" x="430" y="186">the notch's other half, down to Z {{process.notch_through_mm:in.3dot}}</text>
+  <text class="label" x="430" y="202">({{process.notch_past_mm:in.3dot}} through MB03's floor)</text>
+  <line class="leader" x1="200" y1="246" x2="430" y2="240"/>
+  <circle class="leader-dot" cx="200" cy="246" r="2"/>
+  <text class="label" x="430" y="244">MB03's half: already open</text>
+  <line class="leader" x1="340" y1="232" x2="430" y2="270"/>
+  <circle class="leader-dot" cx="340" cy="232" r="2"/>
+  <text class="label" x="430" y="274">the neck, {{process.neck_stock_mm:in.3dot}} full until Setup 7</text>
+  <text class="label" x="40" y="350">Held as Setup 4: the seat against the fixed jaw, the rod at the sawn end; the jaws</text>
+  <text class="label" x="40" y="366">grip the ends only, below the cuts.</text>
+</svg>
