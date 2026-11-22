@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="440"/>
   <text class="title" x="20" y="22">Setup 4 (KM03), 4 px/mm: on edge on 1 in parallels, A down, F at the fixed jaw; skim the underside U</text>
-  <text class="title" x="40.0" y="50.0">Across the jaws, looking from N</text>
+  <text class="title" x="40.0" y="50.0">Across the jaws, looking from S</text>
   <text class="title" x="500.0" y="50.0">Plan</text>
   <rect class="fixture-vise" x="130.0" y="400.0" width="195.9" height="16.0"/>
   <rect class="clamp" x="150.0" y="220.2" width="50.0" height="179.8"/>

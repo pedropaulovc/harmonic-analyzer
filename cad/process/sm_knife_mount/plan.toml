@@ -100,6 +100,9 @@ tap_peck_mm = 3.556
 drill_past_mm = 1.0
 dowel_ream_past_mm = 0.254
 dowel_ream_tip_height_mm = 20.066      # The height less the depth less the .010; cam.py checks it.
+dowel_ream_r_plane_mm = 30.718        # B's re-ream MDI: the height plus 1.0 (cam.py SAFE_MM); cam.py checks it.
+dowel_ream_clear_mm = 34.718          # The height plus 5.0 (cam.py CLEAR_MM); cam.py checks it.
+dowel_ream_feed_mm_min = 38.1         # The .1280 reamer's setting (750 × 2 × .0254); cam.py checks it.
 dowel_drill_tip_height_mm = 18.15      # Less 1.0 and the #31's 118° point (.916); cam.py checks it.
 tap_drill_tip_height_mm = 17.452       # The height less .438 and the #25's point (1.141); cam.py checks it.
 pilot_tip_height_mm = -2.141           # 1.0 + the #25's point; cam.py checks it.
@@ -643,11 +646,11 @@ gauge_checks = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "GO does not enter B: re-run KM06_top_holes from its M6 T4 line (the reamer's section only) and gauge again; still tight: stop and tell the owner."
+instruction = "GO does not enter B: console M6 T4 (spindle off; the .1280 reamer in the drill chuck; the tool setter measures it); set 750; cutting oil. Then MDI:\n1. M3 S750, G0 Z{{process.dowel_ream_r_plane_mm:.3f}}\n2. G0 X{{cad.dowel_hole_side_mm:.3f}} Y-{{cad.dowel_hole_row_mm:.3f}}\n3. G1 Z{{process.dowel_ream_tip_height_mm:.3f}} F{{process.dowel_ream_feed_mm_min:.2f}}, G1 Z{{process.dowel_ream_r_plane_mm:.3f}}\n4. G0 Z{{process.dowel_ream_clear_mm:.3f}}, M5\nGauge again; still tight: stop and tell the owner."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Datum B's stations, the GO standing in B: calipers outside from S over the GO, less half the GO's Ø (.1273/2); then from F the same way. B's squareness to A (the drawing's ⊥) is held by this setup, not measured: A is faced and B reamed in the one clamping."
+instruction = "Datum B's stations, the GO standing in B: calipers outside from S over the GO, less half the GO's Ø (.1273/2); write that reading on the blank as b (Setup 8 places the bore from it). Then from F the same way. B's squareness to A (the drawing's ⊥) is held by this setup, not measured: A is faced and B reamed in the one clamping."
 inspection = "B from S {{cad.dowel_hole_side_min_in:.3dot}}–{{cad.dowel_hole_side_max_in:.3dot}}, from F {{cad.dowel_hole_row_min_in:.3dot}}–{{cad.dowel_hole_row_max_in:.3dot}}. Outside either: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.dowel_hole_side_band_mm}}" },
@@ -713,7 +716,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in; 1/8 in thick: the bore falls between them). The block lying on them, K DOWN, gripped across its two finished ends: S against the FIXED jaw, A at the LEFT. Centred on the jaws; tap it down onto both stacks while closing the vise. The lower {{process.lying_grip_mm:in.3dot}} of it is in the jaws. The coupon T first, the same way: K down, gripped across its two sawn ends, its A edge at the LEFT."
-datum = "Program KM08_bore. G54: X0 the top seat A (the left), Y0 the fixed jaw's face (S), Z0 the stacks' top (K); +Y toward the fixed jaw. The bore at X {{cad.knife_bore_basic_from_a:.3f}} (.811 BASIC from A), Y −{{process.bore_y_mm:.3f}} mm (from S: datum B's .200 station plus its .300 BASIC); the front face at Z {{cad.back_face_depth_mm:.3f}}. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
+datum = "Program KM08_bore. G54: X0 the top seat A (the left), Y0 the fixed jaw's face (S) shifted by the blank's b less .200, Z0 the stacks' top (K); +Y toward the fixed jaw. The bore at X {{cad.knife_bore_basic_from_a:.3f}} (.811 BASIC from A), Y −{{process.bore_y_mm:.3f}} mm (datum B's .200 station plus its .300 BASIC: the shift puts it .300 from B as measured); the front face at Z {{cad.back_face_depth_mm:.3f}}. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
 diagram = { file = "diagrams/bore.svg", alt = "The block lying K down on two 1.5 in stacks, gripped on its two ends, S at the fixed jaw, A at the left; the centre drill, the #25 pilot, the 11.8 mm drill and the 12 mm reamer make the knife bore through between the stacks." }
 envelope = { x_span_mm = ["{{cad.bottom_face_height_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.minus_x_side_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.back_face_depth_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bore_drill_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_118_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.minus_x_side_width_mm}}", along_jaws_mm = "{{cad.bottom_face_height_mm}}", part_height_mm = "{{cad.back_face_depth_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_bore_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
@@ -726,8 +729,8 @@ gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.reamer_12_shank_m
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the top seat A (left), Y0 the fixed jaw's face (S): edge finder (900 rpm). On the coupon: X0 on its A bar edge."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; its tip .10 below the block's top, on A from the left, G10 L20 P1 X-2.540. A places the bore .811 from it: edge-find it carefully."
+instruction = "Home the mill first ($H). G54 X0 the top seat A (left); Y0 shifted from the fixed jaw's face (S) by the blank's b less {{cad.dowel_hole_side_in:.3dot}}, so the bore lands its BASIC from B: edge finder (900 rpm). On the coupon: X0 on its A bar edge, Y0 on S."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y(-2.540 + (b − {{cad.dowel_hole_side_in:.3dot}}) × 25.4), b the blank's B-from-S written on it in Setup 7 (the coupon: Y-2.540). Its tip .10 below the block's top, on A from the left, G10 L20 P1 X-2.540. A places the bore .811 from it: edge-find it carefully."
 feed = "hand"
 
 [[setups.operations]]
@@ -822,11 +825,18 @@ instruction = "Deburr every edge and the mouths of the three holes, R{{cad.edge_
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Bore position, the .4720 GO in the bore and the .1273 GO in B as pins. From A: the block A down on the surface plate, the height gauge on top of the bore's GO, less half its Ø (.4720/2). From B: calipers outside over both pins, less (.4720 + .1273)/2."
-inspection = "Bore from A {{process.bore_from_a_min_mm:in.4dot}}–{{process.bore_from_a_max_mm:in.4dot}} and from B {{process.bore_from_b_min_mm:in.4dot}}–{{process.bore_from_b_max_mm:in.4dot}}: the square inside the drawing's Ø.008 position zone to A|B, so both in is a good bore. Outside either: stop and tell the owner."
+instruction = "Bore from A: the GO out of B; the block A down on the surface plate, the .4720 GO through the bore; the height gauge on top of the GO where it stands out past F, less half its Ø (.4720/2)."
+inspection = "Bore from A {{process.bore_from_a_min_mm:in.4dot}}–{{process.bore_from_a_max_mm:in.4dot}}. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = ["{{process.bore_from_a_min_mm}}", "{{process.bore_from_a_max_mm}}"] },
-  { gauge = "calipers", band_mm = ["{{process.bore_from_b_min_mm}}", "{{process.bore_from_b_max_mm}}"] },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Bore from B: the block stood on S on the surface plate, the .4720 GO through the bore and the .1273 GO in B, both standing out sideways. Height gauge on top of each GO less half its Ø: the bore's reading less B's is the bore from B."
+inspection = "Bore from B {{process.bore_from_b_min_mm:in.4dot}}–{{process.bore_from_b_max_mm:in.4dot}}. With the bore from A in its band: the square inside the drawing's Ø.008 position zone to A|B, so both in is a good bore. Outside: stop and tell the owner."
+gauge_checks = [
+  { gauge = "height-gauge", band_mm = ["{{process.bore_from_b_min_mm}}", "{{process.bore_from_b_max_mm}}"] },
 ]
 feed = "hand"
 

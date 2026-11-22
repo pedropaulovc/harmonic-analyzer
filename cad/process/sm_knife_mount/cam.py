@@ -576,6 +576,10 @@ def context(
     _agree(plan, "bore_ream_clear_mm", depth + CLEAR_MM)
     # The sheet's re-ream MDI feeds at the reamer's setting.
     _agree(plan, "bore_ream_feed_mm_min", r12_feed)
+    # And B's re-ream MDI (KM06, Z0 = U): over the top, at the .1280's setting.
+    _agree(plan, "dowel_ream_r_plane_mm", height + SAFE_MM)
+    _agree(plan, "dowel_ream_clear_mm", height + CLEAR_MM)
+    _agree(plan, "dowel_ream_feed_mm_min", r128_feed)
 
     # Hand tap (KM07): the bottoming tap's chamfer may be at most the drill's
     # shallowest full-diameter depth less the thread depth; the plug tap's
@@ -750,9 +754,12 @@ def context(
         gap = math.hypot(reach, tip_y - bore["at"][1]) - r12 / 2
         if gap < WEB_MIN_MM:
             raise ValueError(f"{name}'s drill point is {gap:.2f} from the bore")
-    # The bore clears KM08's parallels under S and N.
-    if not (-width + t < bore_xy[1] - r12 / 2 and bore_xy[1] + r12 / 2 < -t):
-        raise ValueError(f"the bore at Y {bore_xy[1]} reaches a parallel ({t} thick)")
+    # The bore clears KM08's parallels under S and N, wherever B's station
+    # in its band shifts it (Setup 8 shifts Y0 by the blank's b less .200).
+    for shift in (s - dowel["side_nominal"] for s in dowel["side"]):
+        y = bore_xy[1] - shift
+        if not (-width + t < y - r12 / 2 and y + r12 / 2 < -t):
+            raise ValueError(f"the bore at Y {y} reaches a parallel ({t} thick)")
     # The coupon (gripped on its sawn ends, its A edge at X0) holds the bore
     # inside it with its shortest length and narrowest width.
     if not (

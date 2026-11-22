@@ -19,5 +19,5 @@
   <circle class="holes" cx="571.6" cy="165.9" r="15.2"/>
   <text class="label-halo" x="571.6" y="239.8" text-anchor="middle">#10-24</text>
   <text class="label-halo" x="470.0" y="265.8">B .200 from S, .275 from F; the tap .300 from B;</text>
-  <text class="label-halo" x="470.0" y="283.8">the bore .300 from B (calipers over the GO pins)</text>
+  <text class="label-halo" x="470.0" y="283.8">the bore .300 from B (height gauge, the block on S)</text>
 </svg>
