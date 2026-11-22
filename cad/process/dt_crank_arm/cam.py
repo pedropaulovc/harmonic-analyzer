@@ -93,6 +93,8 @@ EM_SETTING = "endmill-carbide-3fl-3-8-1018-cf"
 # The tap files' first motion: G53 G0 to machine Z0, the homed top; the owner
 # (Pedro) confirmed it, answered in person 2026-11-21 (cnc rulings record).
 MACHINE_Z_TOP_MM = 0.0
+# The seat helix's free core (cut loose at break-through) at most this thick.
+CORE_DIA_MAX_MM = 1.0
 # Plunges and drill R planes start this far above the stock top.
 SAFE_MM = 1.0
 # Moves between cuts run this far above the jaw tops.
@@ -375,10 +377,11 @@ def context(
     _agree(plan, "seat_path_radius_mm", seat_r)
     if not g["seat_band"][0] <= seat_r * 2 + dem <= g["seat_band"][1]:
         raise ValueError("the seat helix's diameter is outside the seat's band")
-    if seat_r <= 0 or dem / 2 - seat_r < 0:
-        raise ValueError(
-            "the end mill leaves a core in the seat or cannot plunge its helix"
-        )
+    # The helix leaves a core of radius seat_r - cutter radius on the axis:
+    # cut free at break-through, it drops out under the overhang. A core
+    # thicker than CORE_DIA_MAX_MM could jam against the cutter as it falls.
+    if seat_r <= 0 or 2 * (seat_r - dem / 2) > CORE_DIA_MAX_MM:
+        raise ValueError("the seat helix leaves a core too thick to drop free")
     round_r = radius + dem / 2
     _agree(plan, "round_path_radius_mm", round_r)
 
@@ -398,6 +401,17 @@ def context(
     jaw_top = p["vise_jaw_height_mm"] - p["parallel_height_mm"] - t
     _agree(plan, "jaw_top_mm", jaw_top)
     clear = jaw_top + CLEAR_MM
+    # The chuck's and the collets' noses ride over the jaws (the holes sit
+    # within a holder's radius of the jaws' ends): at each tool's deepest
+    # point its least projection keeps the nose above the jaw tops.
+    for what, tip, projection in (
+        ("#50 in the chuck", anchor_tip, p["drill_projection_min_mm"]),
+        ("#43 in the chuck", pivot_tip, p["drill_projection_min_mm"]),
+        ("end mill in its collet", bottom, p["em_projection_min_mm"]),
+        ("chamfer mill in its collet", sink_tip, p["sink_projection_min_mm"]),
+    ):
+        if tip + projection < jaw_top + JAW_CLEARANCE_MM - 1e-6:
+            raise ValueError(f"the {what}'s nose reaches the jaw tops")
     grip = p["vise_jaw_height_mm"] - p["parallel_height_mm"]
     if grip < t:
         raise ValueError("the parallels lift the bar's top over the jaws")
@@ -760,7 +774,9 @@ def context(
         ],
         ["CA01_hub_end", "pauses", {"z_top": jaw_top, "count": 0}],
         ["CA01_hub_end", "depth", {"z_min": _r(min(bottom, anchor_tip))}],
-        ["CA01_hub_end", "keep_out", {"radius": dem / 2, "boxes": ca01_boxes}],
+        ["CA01_hub_end@0", "keep_out", {"radius": dem / 2, "boxes": ca01_boxes}],
+        ["CA01_hub_end@1", "keep_out", {"radius": CENTRE_DRILL["body_mm"] / 2, "boxes": ca01_boxes}],
+        ["CA01_hub_end@2", "keep_out", {"radius": d50 / 2, "boxes": ca01_boxes}],
         ["CA01_hub_end@0", "air_feed", {"z_top": 0.0}],
         [
             "CA01_hub_end@0",
@@ -830,8 +846,11 @@ def context(
         ],
         ["CA03_handle_end", "pauses", {"z_top": jaw_top, "count": 0}],
         ["CA03_handle_end", "depth", {"z_min": _r(min(bottom, pivot_tip))}],
-        ["CA03_handle_end", "keep_out", {"radius": dem / 2, "boxes": ca03_boxes}],
-        ["CA03_handle_end@0", "air_feed", {"z_top": 0.0}],
+        ["CA03_handle_end@0", "keep_out", {"radius": dem / 2, "boxes": ca03_boxes}],
+        ["CA03_handle_end@1", "keep_out", {"radius": CENTRE_DRILL["body_mm"] / 2, "boxes": ca03_boxes}],
+        ["CA03_handle_end@2", "keep_out", {"radius": d43 / 2, "boxes": ca03_boxes}],
+        ["CA03_handle_end@3", "keep_out", {"radius": dsink / 2, "boxes": ca03_boxes}],
+        ["CA03_handle_end", "air_feed", {"z_top": 0.0}],
         ["CA03_handle_end@0", "rapids_clear", {"z_top": 0.0}],
         [
             "CA03_handle_end@0",

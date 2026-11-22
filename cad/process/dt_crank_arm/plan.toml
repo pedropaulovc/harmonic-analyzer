@@ -159,7 +159,9 @@ sink_margin_mm = 0.254
 sink_tip_mm = -1.397
 sink_rpm = 2800
 sink_feed_per_min_mm = 35.56
-sink_projection_min_mm = 12.7
+# The chamfer mill (McMaster 3073A46, 2 in overall) at least .75 out of its
+# collet: its nose clears the jaw tops at the countersink's depth (cam.py).
+sink_projection_min_mm = 19.05
 # Holders: HA holders.r8-collets-lms-4860.gauge_len_mm; archive
 # holders.drill-chuck-r8.gauge_len_mm. Longest tool: the #43 jobber in the
 # chuck, 1-3/4 in overall (ASME B94.11M).
