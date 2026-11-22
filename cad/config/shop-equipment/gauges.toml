@@ -452,6 +452,15 @@ purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .4375 in GO 
 note = "Not owned: to buy. MHA-PD-19 arm plate knob-bush hole (after its ream): GO enters, NO-GO does not; MHA-PD-28 knob bush, Setup 2: the plate hole read before the press diameter is turned to it."
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
 
+[gauges.plug-gauges-1240-1245]
+name = "Plug gauge pair, .1240 GO and .1245 NO-GO, Class X"
+kind = "plug_gauge_pair"
+make = "Vermont Gage"
+status = "to_order"
+purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .1240 in GO (plus tolerance) and .1245 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
+note = "Not owned: to buy. MHA-PD-18 transgear arm Ø.1240-.1245 REAM latch-pin hole (after the ream, Setup 4): GO enters to the .38 depth, NO-GO does not. The pin-gauge sets to buy (gauges.pin-gauges) step by .001 in and hold no .1245."
+cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages"]
+
 [gauges.plug-gauges-0625-0630]
 name = "Plug gauge pair, .0625 GO and .0630 NO-GO, Class X"
 kind = "plug_gauge_pair"

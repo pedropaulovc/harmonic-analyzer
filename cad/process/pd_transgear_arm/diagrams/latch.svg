@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="290" viewBox="0 0 520 290" font-family="sans-serif" font-size="12">
+<rect width="520" height="290" fill="#fff"/>
+<rect x="180" y="30" width="46" height="226" fill="#cde" stroke="#000"/>
+<rect x="226" y="184" width="40" height="72" fill="#aaa" stroke="#000"/>
+<text x="269.72" y="206.0" text-anchor="start">fixed jaw (face A)</text>
+<rect x="140" y="184" width="40" height="72" fill="#aaa" stroke="#000"/>
+<text x="136" y="206.0" text-anchor="end">moving jaw</text>
+<rect x="200" y="30" width="5.1" height="16" fill="#f9c" stroke="#000"/>
+<text x="180" y="22" text-anchor="start">square end up (Z0); latch-pin hole .188 from face A, ream .40 deep</text>
+<text x="180" y="272.24" text-anchor="start">pivot end on the vise bed</text>
+</svg>
