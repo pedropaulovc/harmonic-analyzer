@@ -226,6 +226,8 @@ def test_no_slot_lap_ramps_deeper_than_the_plan_declares(ctx) -> None:
         ("pickup_out_mm", 150.0, "top_out_mm"),
         ("z_touch_b_x_mm", -200.0, "z_touch_b_x_mm"),
         ("parallel_thickness_mm", 12.0, "reaches a stack"),
+        ("eighth_mill_projection_min_mm", 9.0, "collet would reach"),
+        ("eighth_mill_projection_max_mm", 10.0, "projection band is empty"),
         ("tap_point_depth_mm", 12.0, "tap_point_depth_mm"),
         ("tap_stack_max_mm", 300.0, "tap_stack_max_mm"),
         ("tap_wrench_reach_max_mm", 210.0, "tap_wrench_reach_max_mm"),

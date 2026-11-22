@@ -425,8 +425,8 @@ def _racetrack(
     """A slot milled round its racetrack, clockwise (G2: the wall on the
     cutter's left). The cutter centre runs ``offset`` from the slot's centre
     line: +X along the +Y straight, round the +X half circle, -X along the
-    -Y straight, round the -X half circle. It enters at ``top`` beside
-    nothing (the stock's own face) and ramps down the two straights, half a
+    -Y straight, round the -X half circle. It comes down to ``top``, the
+    stock's own face, at the feed and ramps down the two straights, half a
     step on each, in equal laps no deeper than ``max_step`` to ``bottom``;
     one level lap there cleans the last ramp off."""
     x0, x1, ya, yb, e = _racetrack_xy(centre, half_run, offset)
@@ -797,6 +797,8 @@ def context(
         raise ValueError(
             "the 1/8 in end mill's collet would reach the bar at the slots' bottom"
         )
+    if p["eighth_mill_projection_max_mm"] < p["eighth_mill_projection_min_mm"]:
+        raise ValueError("the 1/8 in end mill's projection band is empty")
     slot_rpm, slot_feed = _setting(plan, shop, "slot")
     if _setting(plan, shop, "slot counterbore") != (slot_rpm, slot_feed):
         raise ValueError("'slot counterbore' runs at another setting than 'slot'")
