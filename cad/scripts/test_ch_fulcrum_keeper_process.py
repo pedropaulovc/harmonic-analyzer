@@ -158,9 +158,6 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         # The setting's centre feed on the helix: 5.6x the chip load at the edge.
         ("cbore_feed_per_min_mm", 213.36, "cbore_feed_per_min_mm"),
         ("cbore_edge_feed_per_min_mm", 37.899, "cbore_edge_feed_per_min_mm"),
-        # The drawing's .XX pocket band, not the export's in-process target.
-        ("cbore_accept_dia_min_mm", 3.81, "cbore_accept_dia_min_mm"),
-        ("cbore_accept_depth_max_mm", 2.2352, "cbore_accept_depth_max_mm"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> None:

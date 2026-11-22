@@ -117,8 +117,6 @@ UNF_1_72_MAJOR_MM = 0.073 * IN
 # The long-reach 1/8 in end mill's shop setting on 1018 (shop/ch.toml): its
 # chip load holds at the cutter's edge on the counterbore's helix.
 CBORE_SETTING = "endmill-carbide-3fl-1-8-lr-1018-cf"
-# The title block's .XX general tolerance, ±.010 in.
-XX_TOL_MM = 0.010 * IN
 # The tap file's first motion: G53 G0 to machine Z0, the homed top (as the
 # magnifying clamp's recipe: FluidNC sets an axis's machine position to its
 # homing mpos_mm, default 0, and Z homes up); the owner (Pedro) confirmed
@@ -712,17 +710,6 @@ def context(
     _agree(plan, "cbore_path_radius_mm", (cbore_mid - em8) / 2)
     depth_band = g["hold"]["cbore_depth"]
     _agree(plan, "cbore_depth_mm", sum(depth_band) / 2)
-    # The drawing's acceptance (Setup 8): a Hole Wizard counterbore is a
-    # clearance pocket on the title block's .XX grade round its printed Ø
-    # (the band's low end) and depth (cad/docs/drawing-guidelines.md). FK06's
-    # in-process target stays the export's band.
-    for key, value in (
-        ("cbore_accept_dia_min_mm", cbore_band[0] - XX_TOL_MM),
-        ("cbore_accept_dia_max_mm", cbore_band[0] + XX_TOL_MM),
-        ("cbore_accept_depth_min_mm", sum(depth_band) / 2 - XX_TOL_MM),
-        ("cbore_accept_depth_max_mm", sum(depth_band) / 2 + XX_TOL_MM),
-    ):
-        _agree(plan, key, value)
     cbore_floor = foot_top - p["cbore_depth_mm"]
     pitch = p["cbore_pitch_mm"]
     turns = math.ceil(p["cbore_depth_mm"] / pitch - 1e-9)

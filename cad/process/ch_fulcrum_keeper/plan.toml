@@ -215,15 +215,6 @@ cbore_feed_per_min_mm = 37.899
 # The edge's feed, the setting's 8.4 in/min: the cut's feed (its chip load
 # .001 in/tooth is what deflects the long-reach cutter).
 cbore_edge_feed_per_min_mm = 213.36
-# The drawing's acceptance of the counterbore (Setup 8): its ⌴ Ø.150 ↧ .083
-# is a Hole Wizard clearance pocket on the title block's .XX grade, ±.010
-# (cad/docs/drawing-guidelines.md): Ø.140-.160, .073-.093 deep. FK06's
-# in-process target is the export's .150-.154 × .078-.088 (RV-04's stack);
-# cam.py checks both against the model's nominals.
-cbore_accept_dia_min_mm = 3.556
-cbore_accept_dia_max_mm = 4.064
-cbore_accept_depth_min_mm = 1.8542
-cbore_accept_depth_max_mm = 2.3622
 # The end mill's 1-1/4 in reach (cad/config/shop-equipment/
 # tools.endmill-carbide-3fl-1-8-lr-755708, its seller's page): its neck,
 # under the cutter's Ø, runs that far from the tip.
@@ -759,7 +750,7 @@ feed = "{{process.cbore_feed_per_min_mm:in.2f}} in/min"
 milling_cuts = [
   { name = "cbore", kind = "side", phase = "finish", cutter_dia_mm = 3.175, flutes = 3, axial_doc_mm = 0.124, radial_woc_mm = 3.175, rpm = 2800, feed_mm_min = "{{process.cbore_edge_feed_per_min_mm}}", stations_mm = "{{cad.foot_top_height_mm}}" },
 ]
-inspection = "Still clamped, the in-process target: counterbore Ø{{cad.foot_hole_cbore_dia_min_in:.3dot}}–{{cad.foot_hole_cbore_dia_max_in:.3dot}} (calipers' inside jaws), {{cad.foot_hole_cbore_depth_min_in:.3dot}}–{{cad.foot_hole_cbore_depth_max_in:.3dot}} deep from the foot top (calipers' depth rod), its floor flat. FK06 cuts Ø{{cad.foot_hole_cbore_dia_in:.3dot}} × {{cad.foot_hole_cbore_depth_in:.3dot}}; the target keeps the foot tip's {{cad.foot_hole_tip_wall_min_mm:in.3dot}} wall (owner ruling RV-04). The drawing accepts Ø{{process.cbore_accept_dia_min_mm:in.3dot}}–{{process.cbore_accept_dia_max_mm:in.3dot}} × {{process.cbore_accept_depth_min_mm:in.3dot}}–{{process.cbore_accept_depth_max_mm:in.3dot}} (Setup 8)."
+inspection = "Still clamped: counterbore Ø{{cad.foot_hole_cbore_dia_min_in:.3dot}}–{{cad.foot_hole_cbore_dia_max_in:.3dot}} (calipers' inside jaws), {{cad.foot_hole_cbore_depth_min_in:.3dot}}–{{cad.foot_hole_cbore_depth_max_in:.3dot}} deep from the foot top (calipers' depth rod), its floor flat. FK06 cuts Ø{{cad.foot_hole_cbore_dia_in:.3dot}} × {{cad.foot_hole_cbore_depth_in:.3dot}}; the band keeps the foot tip's {{cad.foot_hole_tip_wall_min_mm:in.3dot}} wall and clears the MHA-CH-VN-52's Ø.140 head (owner ruling RV-04)."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.foot_hole_cbore_dia_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.foot_hole_cbore_depth_band_mm}}" },
@@ -767,19 +758,13 @@ gauge_checks = [
 
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "Smaller or shallower than the target: check the 1/8 end mill's wear and the Z touch-off, then run FK06_crown_cbore again from its start." },
+  { kind = "stop", text = "Smaller or shallower than its band: check the 1/8 end mill's wear and the Z touch-off, then run FK06_crown_cbore again from its start." },
 ]
 feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "Larger or deeper than the target but inside Ø{{process.cbore_accept_dia_min_mm:in.3dot}}–{{process.cbore_accept_dia_max_mm:in.3dot}} × {{process.cbore_accept_depth_min_mm:in.3dot}}–{{process.cbore_accept_depth_max_mm:in.3dot}}: go on; Setup 8 measures the foot tip's wall." },
-]
-feed = "hand"
-
-[[setups.operations]]
-steps = [
-  { kind = "stop", text = "Outside Ø{{process.cbore_accept_dia_min_mm:in.3dot}}–{{process.cbore_accept_dia_max_mm:in.3dot}} × {{process.cbore_accept_depth_min_mm:in.3dot}}–{{process.cbore_accept_depth_max_mm:in.3dot}}: the part is scrap." },
+  { kind = "stop", text = "Larger or deeper than its band: the part is scrap." },
 ]
 feed = "hand"
 
@@ -848,7 +833,7 @@ gauge_checks = "other"
 [[setups.operations]]
 instruction = "Inspect each keeper; record the readings with its number."
 feed = "hand"
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} after the hand ream: the {{process.go_pin_in:.4dot}} pin (GO) enters, the {{process.nogo_pin_in:.4dot}} pin (NO-GO) does not. Bore height {{cad.bore_height_min_in:.3dot}}–{{cad.bore_height_max_in:.3dot}}: the keeper on its seat on the surface plate, the height gauge over the GO pin in the bore less half its Ø. Bore on the width's centre within ±{{cad.bore_off_centre_max_in:.3dot}}: calipers from F and from N over the pin, each less half its Ø; half the difference of the two is the bore's offset. Crown: the drawing's (R{{cad.crown_radius_in:.3dot}}) FULL R is a reference, not checked here; it blends into both sides with no step (Setup 5). Foot hole: the #41 drill's shank slips through; its centre {{cad.foot_hole_station_min_in:.3dot}}–{{cad.foot_hole_station_max_in:.3dot}} from the foot tip and {{cad.foot_hole_lateral_min_in:.3dot}}–{{cad.foot_hole_lateral_max_in:.3dot}} from N, calipers over the shank less half its miked Ø; the station less half the counterbore's reading leaves at least {{cad.foot_hole_tip_wall_min_mm:in.3dot}} of wall to the foot tip. Counterbore Ø{{process.cbore_accept_dia_min_mm:in.3dot}}–{{process.cbore_accept_dia_max_mm:in.3dot}}, {{process.cbore_accept_depth_min_mm:in.3dot}}–{{process.cbore_accept_depth_max_mm:in.3dot}} deep from the foot top (the drawing's ⌴ Ø.150 ↧ .083, a Hole Wizard pocket on the title block's .XX). Crown hole: a #1-72 screw runs in by hand until its end shows in the bore; its centre {{cad.crown_tap_station_min_in:.3dot}}–{{cad.crown_tap_station_max_in:.3dot}} from I by the calipers over the screw less half its Ø."
+inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} after the hand ream: the {{process.go_pin_in:.4dot}} pin (GO) enters, the {{process.nogo_pin_in:.4dot}} pin (NO-GO) does not. Bore height {{cad.bore_height_min_in:.3dot}}–{{cad.bore_height_max_in:.3dot}}: the keeper on its seat on the surface plate, the height gauge over the GO pin in the bore less half its Ø. Bore on the width's centre within ±{{cad.bore_off_centre_max_in:.3dot}}: calipers from F and from N over the pin, each less half its Ø; half the difference of the two is the bore's offset. Crown: the drawing's (R{{cad.crown_radius_in:.3dot}}) FULL R is a reference, not checked here; it blends into both sides with no step (Setup 5). Foot hole: the #41 drill's shank slips through; its centre {{cad.foot_hole_station_min_in:.3dot}}–{{cad.foot_hole_station_max_in:.3dot}} from the foot tip and {{cad.foot_hole_lateral_min_in:.3dot}}–{{cad.foot_hole_lateral_max_in:.3dot}} from N, calipers over the shank less half its miked Ø; the station less half the counterbore's reading leaves at least {{cad.foot_hole_tip_wall_min_mm:in.3dot}} of wall to the foot tip. Counterbore Ø{{cad.foot_hole_cbore_dia_min_in:.3dot}}–{{cad.foot_hole_cbore_dia_max_in:.3dot}} (calipers' inside jaws), {{cad.foot_hole_cbore_depth_min_in:.3dot}}–{{cad.foot_hole_cbore_depth_max_in:.3dot}} deep from the foot top (calipers' depth rod). Crown hole: a #1-72 screw runs in by hand until its end shows in the bore; its centre {{cad.crown_tap_station_min_in:.3dot}}–{{cad.crown_tap_station_max_in:.3dot}} from I by the calipers over the screw less half its Ø."
 gauge_checks = [
   { gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" },
   { gauge = "height-gauge", band_mm = "{{cad.bore_height_band_mm}}" },
@@ -856,8 +841,8 @@ gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.foot_hole_station_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.foot_hole_lateral_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.crown_tap_station_band_mm}}" },
-  { gauge = "calipers", band_mm = ["{{process.cbore_accept_dia_min_mm}}", "{{process.cbore_accept_dia_max_mm}}"] },
-  { gauge = "calipers", band_mm = ["{{process.cbore_accept_depth_min_mm}}", "{{process.cbore_accept_depth_max_mm}}"] },
+  { gauge = "calipers", band_mm = "{{cad.foot_hole_cbore_dia_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.foot_hole_cbore_depth_band_mm}}" },
 ]
 
 [[setups.operations]]
