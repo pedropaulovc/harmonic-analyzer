@@ -46,7 +46,7 @@
 #
 # Stock (cad/config/shop-equipment/ stock-to-order.toml
 # stock.1018-flat-3-8x1-2, to order: OnlineMetals part 7482, 12 in pieces):
-# one 12 in piece yields this blank (10.85 max + the trimmed end).
+# one 12 in piece yields this blank (10.86 max + the trimmed end).
 #
 # Flagged, not owned: the 3/8 x 1/2 bar (above); the spiral-point #4-40
 # tap (owner ruling 2026-11-20, #2427; shop-equipment
@@ -76,9 +76,9 @@
 title = "Platen guide"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
-material = "1018 cold-finished steel, 3/8 x 1/2 in flat: a plain carbon steel (drawing: {{cad.material_spec}})"
-stock = "{{process.blank_height_in:fraction}} x {{process.blank_depth_in:fraction}} in flat bar; {{process.quantity:d}} × {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in blank."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.right_end_length_min_in:.2f}}–{{cad.right_end_length_max_in:.2f}} long (left end to right end), {{cad.top_face_height_min_in:.2f}}–{{cad.top_face_height_max_in:.2f}} high (U, the underside, to the top), {{cad.rear_face_depth_min_in:.3dot}}–{{cad.rear_face_depth_max_in:.3dot}} deep (F, the front face, to R, the rear face). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home. After any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every cutting file is proved in air before it cuts; the tap files move only at the machine top and over a hole, spindle off."
+material = "1018 cold-finished steel, 3/8 x 1/2 in flat: a plain carbon steel (the drawing's MATERIAL: {{cad.material_name}}; the part's spec: {{cad.material_spec}})"
+stock = "{{process.blank_height_in:fraction}} x {{process.blank_depth_in:fraction}} in flat bar; {{process.quantity:d}} blank sawn about {{process.blank_length_nominal_in:.2f}} in long (at least {{process.blank_length_min_in:.2f}}, at most {{process.blank_length_max_in:.2f}}: Setup 1)."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.right_end_length_min_in:.2f}}–{{cad.right_end_length_max_in:.2f}} long (left end to right end), {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} high (U, the underside, to the top), {{cad.rear_face_depth_min_in:.3dot}}–{{cad.rear_face_depth_max_in:.3dot}} deep (F, the front face, to R, the rear face). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home. After any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every cutting file is proved in air before it cuts; the tap files move only at the machine top and over a hole, spindle off."
 shop = "../shop"
 stock_refs = ["1018-flat-3-8x1-2"]
 material_key = "rocker-1018-cold-finished"
@@ -94,7 +94,7 @@ quantity = 1
 # The blank (stock.1018-flat-3-8x1-2): the bar's section and the sawn length
 # the programs are posted for; stock_fit reads blank_<axis>_in (model axes:
 # X the length, Y the height, Z the depth).
-blank_x_in = 10.75
+blank_x_in = 10.8
 blank_y_in = 0.375
 blank_z_in = 0.5
 blank_height_in = 0.375
@@ -107,10 +107,17 @@ blank_height_min_mm = 9.4742
 blank_height_max_mm = 9.5758
 blank_depth_min_mm = 12.6492
 blank_depth_max_mm = 12.7508
-blank_length_min_in = 10.75
-blank_length_max_in = 10.85
-blank_length_min_mm = 273.05
-blank_length_max_mm = 275.59
+# Sawn about 10.80. At least 10.70: X0 is the left-end skim (.060) in, the
+# right end mills at 10.620 from it, and .020 must stand past it to clean
+# up (cam.py). At most 10.86: PG05's right-end passes start at the longest
+# blank's end (10.800 from X0).
+blank_length_nominal_in = 10.8
+blank_length_min_in = 10.7
+blank_length_max_in = 10.86
+blank_length_min_mm = 271.78
+blank_length_max_mm = 275.844
+end_cleanup_min_mm = 0.508       # the shortest blank's stock past the right end.
+right_end_raw_mm = 274.32        # blank_length_max_mm less left_end_skim_mm, from X0.
 kerf_in = 0.125
 # Targets, the middle of each band (cam.py checks them against the export):
 # length 10.62 (10.61-10.63), height .29 (.28-.30), depth .395 (.390-.400
@@ -222,8 +229,8 @@ stack_exit_clear_mm = 0.4826
 # The blank centred on the jaws, the longest one: each end (its length −
 # the jaw width)/2 out past the jaw sides; the jaws grip it from there to
 # vise_clamp_end_mm (the beams' clamp).
-vise_overhang_mm = 58.46
-vise_clamp_end_mm = 217.13
+vise_overhang_mm = 58.5851
+vise_clamp_end_mm = 217.2589
 # Machine-capacity inputs (mm): heights from the table, tool lengths from
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
@@ -282,7 +289,7 @@ machine_kind = "other"
 title = "Saw the blank"
 machine = "Saw / bench"
 indexing = "none"
-diagram = { file = "diagrams/saw.svg", alt = "The 3/8 x 1/2 in flat bar with one blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in long marked off its end." }
+diagram = { file = "diagrams/saw.svg", alt = "The 3/8 x 1/2 in flat bar with one blank about {{process.blank_length_nominal_in:.2f}} in long marked off its end." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -298,9 +305,9 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Saw {{process.quantity:d}} blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in long off the 3/8 x 1/2 in 1018 flat bar, the bar flat in the saw's vise. File the burr off both ends and the four long edges so it seats flat on the parallels and the jaws. Mark the end that is LEFT from here on with marking fluid: every X counts from it."
+instruction = "Saw {{process.quantity:d}} blank about {{process.blank_length_nominal_in:.2f}} in long off the 3/8 x 1/2 in 1018 flat bar, the bar flat in the saw's vise. File the burr off both ends and the four long edges so it seats flat on the parallels and the jaws. Mark the end that is LEFT from here on with marking fluid: every X counts from it."
 feed = "hand"
-inspection = "Blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} long, the combination square's 12 in blade. Shorter: scrap it; longer: saw it again."
+inspection = "Blank length on the combination square's 12 in blade: at least {{process.blank_length_min_in:.2f}} (X0 is {{process.left_end_skim_mm:in.3dot}} in from the left end and the right end mills at {{process.length_target_mm:in.3dot}} from X0; a shorter blank leaves the right end under {{process.end_cleanup_min_mm:in.3dot}} to clean up) and at most {{process.blank_length_max_in:.2f}} (PG05's right-end passes start at {{process.right_end_raw_mm:in.3dot}} from X0; a longer blank loads the first pass past its {{process.end_step_max_mm:in.4dot}}). Longer: saw it again. Shorter: saw a new blank."
 gauge_checks = "other"
 
 [[setups]]
@@ -310,7 +317,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in). The blank lying on them along the jaws, a 3/8 in face up, LEFT end to the left, gripped across the two 1/2 in faces, centred on the jaws (both ends about 2.3 in out past them). Tap it down onto both stacks along its length while closing the vise. The face up becomes the underside U; the lower {{process.lying_grip_mm:in.3dot}} of the blank is in the jaws."
-datum = "Program PG01_underside. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the LEFT end (the finished end, as in every setup), Y0 the fixed jaw's face, Z0 the skimmed underside (the top's high point less {{process.underside_skim_mm:in.3dot}}); +Y toward the fixed jaw. The file starts with an M6 for the end mill; tool lengths from the tool setter."
+datum = "Program PG01_underside. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the LEFT end (the finished end, as in every setup), Y0 the fixed jaw's face, Z0 the skimmed underside (the face up's high point less {{process.underside_skim_mm:in.3dot}}); +Y toward the fixed jaw. The file starts with an M6 for the end mill; tool lengths from the tool setter."
 diagram = { file = "diagrams/underside.svg", alt = "The blank lying along the jaws on stacked parallels, a 3/8 in face up, both ends out past the jaws; the 1/2 in end mill skims the face up, which becomes the underside." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_depth_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_height_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.height_raw_max_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_depth_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.blank_height_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -601,7 +608,7 @@ title = "Top face to the height"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in), as in Setups 2-5. The rail lying on them, U down, gripped on F and R: R against the FIXED jaw, the LEFT end still to the left, centred. Tap it down onto both stacks along its length while closing the vise; the lower {{process.lying_grip_mm:in.3dot}} of the rail is in the jaws, and the finished top stands only {{process.height_jaw_clear_mm:in.3dot}} above the jaw tops."
+holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in), as in Setups 2-5. The rail lying on them, U down, gripped on F and R: R against the FIXED jaw, the LEFT end still to the left, centred. Tap it down onto both stacks along its length while closing the vise; the lower {{process.lying_grip_mm:in.3dot}} of the rail is in the jaws, and the finished top stands only {{process.height_jaw_clear_mm:in.4dot}} above the jaw tops."
 datum = "Program PG15_height. G54: X0 the milled LEFT end, Y0 the fixed jaw's face (R), Z0 the stacks' top (U), set from the miked height."
 diagram = { file = "diagrams/height.svg", alt = "The rail lying on stacked parallels, the underside down, gripped on its front and rear faces; the 1/2 in end mill faces the top down to the height in levels, just above the jaw tops." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.depth_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.rough_height_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.height_target_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
@@ -619,7 +626,7 @@ instruction_detailed = "Console M6 T1 (the tool setter measures it); MDI G0 X134
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Prove PG15_height in air, Z0 raised 1.000 in; every move clears the jaws, the last level only {{process.height_jaw_clear_mm:in.3dot}} over them. Then Z0 back."
+instruction = "Prove PG15_height in air, Z0 raised 1.000 in; every move clears the jaws, the last level only {{process.height_jaw_clear_mm:in.4dot}} over them. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]

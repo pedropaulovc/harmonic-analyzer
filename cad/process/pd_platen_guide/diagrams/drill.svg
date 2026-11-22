@@ -23,9 +23,9 @@
   <line class="leader" x1="238" y1="262" x2="300" y2="300"/>
   <text class="label" x="304" y="304">the #43 exits here, in the air, {{process.stack_exit_clear_mm:in.3dot}} min clear of the stack</text>
   <line class="leader" x1="221" y1="380" x2="221" y2="410"/>
-  <text class="label" x="216" y="422" text-anchor="end">one stack, at the moving jaw, under the top's edge</text>
-  <text class="label-halo" x="217" y="238">top</text>
-  <text class="label-halo" x="241" y="238">U</text>
+  <text class="label" x="228" y="422">one stack, at the moving jaw, under the top's edge</text>
+  <text class="label-on-clamp" x="168" y="244">top →</text>
+  <text class="label-on-clamp" x="262" y="244">← U</text>
   <!-- Plan, fixed jaw at the top, 1 in = 25 px. -->
   <text class="title" x="430" y="60">Plan (fixed jaw at the top, 1 in = 25 px)</text>
   <rect class="clamp" x="514.6" y="110" width="156.2" height="30"/>
@@ -46,8 +46,7 @@
   <circle class="cutter" cx="733.75" cy="144.5" r="6.35"/>
   <line class="arrow" x1="442" y1="185" x2="442" y2="115"/>
   <line class="arrow" x1="744" y1="115" x2="744" y2="185"/>
-  <text class="label" x="430" y="205">left end: passes +Y</text>
-  <text class="label" x="640" y="205">right end: passes −Y</text>
+  <text class="label" x="430" y="370">arrows: the left end's passes run +Y, the right end's −Y</text>
   <line class="datum" x1="460" y1="90" x2="460" y2="135"/>
   <text class="datum-label" x="430" y="85">X0, the milled LEFT end</text>
   <line class="dims" x1="460" y1="235" x2="486.6" y2="235"/>

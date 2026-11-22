@@ -16,8 +16,8 @@
   <text class="datum-label" x="30" y="246">Z0 (F)</text>
   <line class="datum" x1="250" y1="180" x2="250" y2="200"/>
   <text class="datum-label" x="300" y="214">Y0 (U)</text>
-  <text class="label-halo" x="219" y="238">top</text>
-  <text class="label-halo" x="238" y="238">U</text>
+  <text class="label-on-clamp" x="168" y="244">top →</text>
+  <text class="label-on-clamp" x="262" y="244">← U</text>
   <line class="leader" x1="252" y1="207" x2="320" y2="165"/>
   <text class="label" x="300" y="160">rear face R faced to Z {{process.depth_target_mm:in.4dot}} in levels</text>
   <line class="dims" x1="380" y1="210.5" x2="380" y2="250"/>

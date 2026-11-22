@@ -495,7 +495,8 @@ def context(
         raise ValueError(
             "the thinnest bar leaves nothing to face to the height or the depth"
         )
-    if blank_min - left_skim - length < 0.5:
+    _agree(plan, "end_cleanup_min_mm", blank_min - left_skim - length)
+    if p["end_cleanup_min_mm"] < 0.5:
         raise ValueError(
             f"the shortest blank less the left-end skim, {blank_min - left_skim:.3f}, "
             f"leaves under 0.5 mm on the right end over the length {length:.3f}"
@@ -570,6 +571,7 @@ def context(
             raise ValueError(f"'{name}' axial_doc_mm is not process.end_axial_doc_mm")
     left_faces = _end_stations(-left_skim, 0.0, end_step)
     right_raw = blank_max - left_skim
+    _agree(plan, "right_end_raw_mm", right_raw)
     right_faces = _end_stations(right_raw, length, end_step)
 
     # Holes: spot under the drill (no chamfer at the mouth; the tap's start

@@ -20,7 +20,7 @@
   <text class="label" x="300" y="165">skim {{process.underside_skim_mm:in.3dot}}: becomes U (Ra {{cad.bottom_face_finish_callout}})</text>
   <line class="leader" x1="245" y1="320" x2="345" y2="300"/>
   <text class="label" x="345" y="296">1 in + 1/2 in parallels, one stack at each jaw</text>
-  <text class="label" x="345" y="252">{{process.lying_grip_mm:in.3dot}} in the jaws, gripped on the 1/2 in faces</text>
+  <text class="label" x="345" y="318">{{process.lying_grip_mm:in.3dot}} in the jaws, gripped on the 1/2 in faces</text>
   <!-- Plan, fixed jaw at the top. -->
   <text class="title" x="440" y="60">Plan (fixed jaw at the top, 1 in = 25 px)</text>
   <rect class="clamp" x="517.5" y="110" width="156" height="30"/>
