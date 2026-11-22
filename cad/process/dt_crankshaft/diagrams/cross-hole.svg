@@ -4,12 +4,12 @@
   <rect class="fixture-vise" x="230" y="260" width="560" height="30"/>
   <rect class="clamp" x="230" y="110" width="560" height="90"/>
   <rect class="fixture-support" x="230" y="190" width="420" height="70"/>
-  <rect class="fixture-support" x="660" y="190" width="280" height="70"/>
+  <rect class="fixture-support" x="500" y="194" width="300" height="66"/>
   <path class="part-kept" d="M40,170 Q25,160 40,150 Z"/>
   <rect class="part-kept" x="40" y="148" width="120" height="30"/>
   <rect class="part-kept" x="160" y="138" width="30" height="52"/>
   <rect class="part-kept" x="190" y="150" width="420" height="40"/>
-  <rect class="part-kept" x="700" y="150" width="110" height="40"/>
+  <rect class="part-kept" x="700" y="152" width="110" height="40"/>
   <rect class="part-kept" x="810" y="138" width="20" height="52"/>
   <rect class="part-kept" x="830" y="152" width="70" height="38"/>
   <rect class="holes" x="96" y="148" width="10" height="30"/>
@@ -23,9 +23,9 @@
   <text class="label" x="280" y="80">jaws (behind) on the journals, brass shim</text>
   <line class="dims" x1="610" y1="140" x2="700" y2="140"/>
   <text class="label" x="615" y="132">1.20 gap</text>
-  <text class="label" x="700" y="320">slug spacer: journal end 1.20 from F;</text>
-  <text class="label" x="700" y="336">second parallel from .55 right of F</text>
-  <line class="leader" x1="760" y1="306" x2="760" y2="192"/>
+  <text class="label" x="560" y="320">slug spacer: journal end 1.20 from F, spigot past the</text>
+  <text class="label" x="560" y="336">second parallel (behind, against the moving jaw, to 2.75)</text>
+  <line class="leader" x1="760" y1="306" x2="760" y2="196"/>
   <text class="label" x="20" y="320">jaws' left face 3.55 from F, on the outboard journal</text>
   <line class="leader" x1="230" y1="308" x2="230" y2="292"/>
   <rect class="part-rest" x="124" y="160" width="36" height="6"/>

@@ -199,13 +199,18 @@ pin_go_in = 0.093
 # left end flush with the jaws' left face (its right end .45 right of F); the
 # shaft along the jaws on it, F to the right, the jaws' left face 3.55 from F
 # (on the outboard journal), the collar, the stub and the dome out past it.
-# The spacer: the pair's other 1 in parallel in line, its left end .55 right
-# of F (its middle 2.55, inside the jaws' right face at 6.247 − 3.55 = 2.697);
-# on it the proof slug, journal toward F, the journal's end 1.20 right of F:
-# the journal (1.60) runs to 2.80, its spigot .10 past the jaws, and the 1.20
-# gap leaves the Ø.200 edge finder room to touch F (tip .2 right of F).
+# The spacer: the pair's other 1 in parallel on edge against the moving jaw,
+# beside the first (its inner face .099 off the axis, clear of the first's
+# .0625), its right end 2.75 right of F (the jaws' right face at 6.247 −
+# 3.55 = 2.697); on it the proof slug, journal toward F, the journal's end
+# 1.20 right of F: the journal (1.60) runs to 2.80, so the spigot (Ø.687)
+# hangs past the parallel's end and the jaws; the slug's centre of mass
+# (about 2.49) lies over the parallel. The slug sits on the parallel's
+# corner, .023 lower than the shaft: only its diameter sets the jaw. The
+# shaft clears that parallel by the same .023. The 1.20 gap leaves the Ø.200
+# edge finder room to touch F (tip .2 right of F).
 slug_gap_in = 1.2
-spacer_parallel_from_f_in = 0.55
+spacer_parallel_end_in = 2.75
 riser_height_mm = 25.4
 parallel_thickness_mm = 3.175
 vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
@@ -260,7 +265,7 @@ ref = "lathe-ar"
 
 [[tools]]
 id = "sharp"
-name = "Sharp-nose turning tool, R.004 max"
+name = "Lathe turning tool, nose radius .004 in or less, tip under .016 wide (the sharp-nose tool)"
 ref = "lathe-tool-sharp-nose"
 
 [[tools]]
@@ -572,7 +577,7 @@ gauge_checks = [{ gauge = "lathe-z-dro", band_mm = "{{cad.seat_step_station_band
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A face short of its station (material still to come off): face it again to the station and read again. Past its station: the shaft is scrap; start again from Setup 1."
+instruction = "A face short of its band above (material still to come off): face it again toward its station and read again. Past its band: the shaft is scrap; start again from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -944,7 +949,7 @@ instruction = "An offset outside {{cad.drive_pin_1_offset_min_in:.4dot}}–{{cad
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A slug hole the GO does not enter: ream it again by the re-ream ops at the end of this setup, then read it as above."
+instruction = "A slug hole the GO does not enter: ream it again by the re-ream ops at the end of this setup, its tip to Z-{{process.ream_tip_in:.4dot}} as at first (not the shaft's .1555 + c), then read it as above."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -1056,9 +1061,9 @@ title = "Mill: the cross hole"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The PM 6 in vise. One 1 in, 4 in long parallel of the 1/8 in thick set standing on edge, centred between the jaws, its left end flush with the jaws' left face; the shaft on its top edge along the jaws, F to the RIGHT, the jaws' left face 3.55 in from F (on the outboard journal; calipers' depth rod), brass shim over both journals at the jaws. The jaw spacer is the proof slug: the pair's other 1 in parallel on edge in line, its left end {{process.spacer_parallel_from_f_in:.2dot}} right of F; the slug on it, its journal toward F, the journal's end {{process.slug_gap_in:.2dot}} right of F (rule), its spigot just past the jaws' right end. That {{process.slug_gap_in:.2dot}} gap is the edge finder's room at F. Under the hole nothing but air."
+holding = "The PM 6 in vise. One 1 in, 4 in long parallel of the 1/8 in thick set standing on edge, centred between the jaws, its left end flush with the jaws' left face; the shaft on its top edge along the jaws, F to the RIGHT, the jaws' left face 3.55 in from F (on the outboard journal; calipers' depth rod), brass shim over both journals at the jaws. The jaw spacer is the proof slug: the pair's other 1 in parallel on edge against the moving jaw, beside the first, its right end {{process.spacer_parallel_end_in:.2dot}} right of F; the slug on its corner, its journal toward F, the journal's end {{process.slug_gap_in:.2dot}} right of F (rule), the same brass shim over its journal at the jaws, its spigot hanging past the parallel's end and the jaws. That {{process.slug_gap_in:.2dot}} gap is the edge finder's room at F. Under the hole nothing but air."
 datum = "Program PK01_cross_hole (cam:dt_crankshaft). G54: X0 F, +X toward the jaws' right end; Y0 the stub's axis; Z0 the stub's top. The file starts with an M6 for the centre drill; tool lengths from the tool setter at each M6; at each M6 stop the file has stopped the spindle and lifted the tool above the jaws."
-diagram = { file = "diagrams/cross-hole.svg", alt = "The shaft along the vise jaws on a parallel on edge, F to the right; the spigot, the stub and the dome out past the jaws' left face; the #9 hole through the stub 4.53 from F; the slug as the spacer on a second parallel, its journal's end 1.20 right of F." }
+diagram = { file = "diagrams/cross-hole.svg", alt = "The shaft along the vise jaws on a parallel on edge, F to the right; the spigot, the stub and the dome out past the jaws' left face; the #9 hole through the stub 4.53 from F; the slug as the spacer on a second parallel against the moving jaw, its journal's end 1.20 right of F, its spigot past that parallel's end." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.outboard_journal_dia_mm}}", along_jaws_mm = "{{process.part_length_mm}}", part_height_mm = "{{cad.outboard_journal_dia_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.left_overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.part_length_mm}}"], clamp_mm = ["{{process.left_overhang_mm}}", "{{process.part_length_mm}}"], section_mm = { diameter = "{{cad.hub_shaft_dia_mm}}" }, vise_left = "start" }
