@@ -207,11 +207,15 @@ _SECTION_PLACEMENT_TOL = 1e-5
 # Ø leader and its X extension line, the window-side one short of the spoke
 # root width's leader, which crosses TIE 1's row at x 23.7.  Along its row
 # the line lies on TIE 1's Y extension line.  The section stands at 2:1,
-# unturned (TIE 1's axis upright), in the field right of the section's drum
-# row and under the isometric; the slab's centre is placed at
-# TIE1_SECTION_CENTER.
+# unturned (TIE 1's axis upright, the drum face up), in the field right of
+# the section's drum row and under the isometric; the slab's centre is
+# placed at TIE1_SECTION_CENTER.  The isometric's box reaches down to y 129.2
+# mm (run 20261122T201547057Z), and the Ø's block stands 20.1 mm over the
+# slab's centre, so the centre sits at 102 to keep the text 5 mm clear of
+# it; the caption, about 28 mm under the centre, stays 8 mm over the title
+# block's top (65.4).
 TIE1_SECTION_SCALE = (2, 1)
-TIE1_SECTION_CENTER = (0.380, 0.122)
+TIE1_SECTION_CENTER = (0.380, 0.102)
 _BOSS_EDGE_X = math.sqrt((HUB_DIA / 2.0) ** 2 - TIE1_Y**2)
 TIE1_SECTION_LINE_MM = (
     (0.0, TIE1_Y),
