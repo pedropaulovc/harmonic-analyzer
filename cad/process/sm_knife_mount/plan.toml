@@ -115,15 +115,20 @@ tap_x_mm = 12.7
 # KM08 stations: the bore .811 BASIC from A (X) and .500 from S (Y, datum B's
 # side station plus its .300 BASIC). cam.py checks them.
 bore_y_mm = 12.7
-# Position checks: the bore's Ø.008 position zone to A|B as ±.004 from each
-# BASIC, the tap's Ø.005 to A|B|C as ±.0025 from B (the square inside each
-# zone); cam.py checks them.
-bore_from_a_min_mm = 20.4978
-bore_from_a_max_mm = 20.701
-bore_from_b_min_mm = 7.5184
-bore_from_b_max_mm = 7.7216
+# Position checks: the bore's Ø.008 position zone to A|B as the square inside
+# it, ±.0028 from each BASIC, so a pass on both readings is inside the zone;
+# the tap's B-to-tap spacing ±.0025 (Ø.005/2), a gross check only (the
+# program holds its position). cam.py checks them.
+bore_from_a_min_mm = 20.5276
+bore_from_a_max_mm = 20.6712
+bore_from_b_min_mm = 7.5482
+bore_from_b_max_mm = 7.6918
 tap_from_b_min_mm = 7.5565
 tap_from_b_max_mm = 7.6835
+# KM07's tap reference station on A, from S: midway on the solid land between
+# B's edge and the tap drill's, the tap's point (no wider than its #25 drill)
+# clear of both; cam.py checks it.
+tap_ref_x_mm = 8.75
 # The #10-24 bottoming tap: its chamfer (point to the first full thread)
 # measured before tapping, at most the drill's shallowest full-diameter depth
 # less the thread depth (.061), so the full thread reaches .375 with the
@@ -267,7 +272,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Read the bar's mill certificate: AISI 4140 or 4142, heat treated, 28-32 HRC (the drawing's material; the shop cannot test hardness). Anything else: stop and tell the owner."
+instruction = "Check the bar's tag or the order against the drawing's material: 4140 or 4142, heat treated (pre-hardened) 28-32 HRC. Anything else: stop and tell the owner."
 feed = "hand"
 
 [[setups.operations]]
@@ -392,7 +397,7 @@ instruction_detailed = "Over {{cad.back_face_depth_max_in:.3dot}}: send $# and n
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Unclamp; mark this face F; file the burr off its edges. The coupon T is done until Setup 8. Next piece."
+instruction = "Unclamp; mark this face F, and write the piece's number (1, 2 or T) on it again: facing F took the first one off. File the burr off its edges. The coupon T is done until Setup 8. Next piece."
 feed = "hand"
 
 [[setups]]
@@ -629,15 +634,11 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Still clamped, every blank: datum B and the tap drill. Blow both holes out. Datum B: the .1273 GO enters to the bottom, the .1287 NO-GO does not enter. Its depth: the GO standing in B, its length less what stands above A (calipers). Its stations: calipers outside from S over the GO, less half the GO's Ø (.1273/2), and from F the same way. The tap drill: the #25 drill's shank end down in it, its length less what stands above A; and the spacing to B: calipers outside over the GO in B and the #25 shank in the tap hole, less (.1273 + .1495)/2."
-inspection = "B: GO enters, NO-GO does not; depth {{cad.dowel_hole_depth_min_in:.3dot}}–{{cad.dowel_hole_depth_max_in:.3dot}}; from S {{cad.dowel_hole_side_min_in:.3dot}}–{{cad.dowel_hole_side_max_in:.3dot}}, from F {{cad.dowel_hole_row_min_in:.3dot}}–{{cad.dowel_hole_row_max_in:.3dot}}. Tap drill: full Ø depth {{cad.stud_tap_drill_depth_min_in:.3dot}}–{{cad.stud_tap_drill_depth_max_in:.3dot}}; B to the tap hole {{process.tap_from_b_min_mm:in.4dot}}–{{process.tap_from_b_max_mm:in.4dot}} (the drawing's Ø.005 position). Outside any: stop and tell the owner; NO-GO enters B: the blank is scrap."
+instruction = "Still clamped, every blank: blow both holes out. Datum B's size: the .1273 GO enters to the bottom, the .1287 NO-GO does not enter. Its depth: the GO standing in B, its length less what stands above A (calipers)."
+inspection = "B: GO enters, NO-GO does not; depth {{cad.dowel_hole_depth_min_in:.3dot}}–{{cad.dowel_hole_depth_max_in:.3dot}}. NO-GO enters: the blank is scrap. Depth outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "plug-gauges-1273-1287", band_mm = "{{cad.dowel_hole_dia_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.dowel_hole_depth_band_mm}}" },
-  { gauge = "calipers", band_mm = "{{cad.dowel_hole_side_band_mm}}" },
-  { gauge = "calipers", band_mm = "{{cad.dowel_hole_row_band_mm}}" },
-  { gauge = "calipers", band_mm = "{{cad.stud_tap_drill_depth_band_mm}}" },
-  { gauge = "calipers", band_mm = ["{{process.tap_from_b_min_mm}}", "{{process.tap_from_b_max_mm}}"] },
 ]
 feed = "hand"
 
@@ -646,7 +647,29 @@ instruction = "GO does not enter B: re-run KM06_top_holes from its M6 T4 line (t
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Tap check before the tap file: measure each #10-24 tap in the T-handle wrench with the centre hole in its top, from its point to the wrench's centre hole: at most {{process.tap_wrench_reach_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the parallels, this part, the collet, the tap guide's 3 1/8 in and 1 in to bring the point down onto the wrench). And the bottoming tap's chamfer, its point to the first full-height thread (calipers): at most {{process.tap_chamfer_max_mm:in.3dot}}; note it as c. Over either: stop; do not tap on this setup."
+instruction = "Datum B's stations, the GO standing in B: calipers outside from S over the GO, less half the GO's Ø (.1273/2); then from F the same way. B's squareness to A (the drawing's ⊥) is held by this setup, not measured: A is faced and B reamed in the one clamping."
+inspection = "B from S {{cad.dowel_hole_side_min_in:.3dot}}–{{cad.dowel_hole_side_max_in:.3dot}}, from F {{cad.dowel_hole_row_min_in:.3dot}}–{{cad.dowel_hole_row_max_in:.3dot}}. Outside either: stop and tell the owner."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.dowel_hole_side_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.dowel_hole_row_band_mm}}" },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The tap drill: the #25 drill's shank end down in it, its length less what stands above A (calipers). Its spacing to B: calipers outside over the GO in B and the #25 shank, less (.1273 + .1495)/2. The tap's position (the drawing's Ø.005 to A|B|C) is held by the program, B and the tap drilled in this one clamping: the spacing catches a gross error only."
+inspection = "Tap drill full Ø depth {{cad.stud_tap_drill_depth_min_in:.3dot}}–{{cad.stud_tap_drill_depth_max_in:.3dot}}; B to the tap hole {{process.tap_from_b_min_mm:in.4dot}}–{{process.tap_from_b_max_mm:in.4dot}}. Outside either: stop and tell the owner."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.stud_tap_drill_depth_band_mm}}" },
+  { gauge = "calipers", band_mm = ["{{process.tap_from_b_min_mm}}", "{{process.tap_from_b_max_mm}}"] },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Tap length, before the tap file: each #10-24 tap in the T-handle wrench with the centre hole in its top, from its point to the wrench's centre hole: at most {{process.tap_wrench_reach_max_mm:in.2f}} in. That is the mill's 17 in opening less the vise, the parallels, this part, the collet, the tap guide's 3 1/8 in and 1 in to bring the point down onto the wrench. Longer: stop; do not tap on this setup."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The bottoming tap's chamfer, its point to the first full-height thread (calipers): at most {{process.tap_chamfer_max_mm:in.3dot}}; note it as c. Over: stop; do not tap on this setup."
 inspection = "Bottoming tap's chamfer c at most {{process.tap_chamfer_max_mm:in.3dot}}, calipers."
 gauge_checks = [{ gauge = "calipers", band_mm = [0.0, "{{process.tap_chamfer_max_mm}}"] }]
 feed = "hand"
@@ -661,7 +684,7 @@ diagram = { file = "diagrams/tap.svg", alt = "The block on edge in the vise, A u
 
 [[setups.operations]]
 instruction = "Tap depth reference: the DRO's work Z, in inches, with the tap's point standing on A beside the hole and the tap guide's point pushed fully home in the wrench."
-instruction_detailed = "MDI G0 X6.350 (over A between the two holes), then send G20: the DRO reads inches. Stand the #10-24 plug tap, in its wrench, on its point on A; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home. Note the DRO Z. Jog Z up clear, send G21, MDI G0 X{{process.tap_x_mm:.3f}} (over the tap hole), send G20."
+instruction_detailed = "MDI G0 X{{process.tap_ref_x_mm:.3f}} (over solid A between B and the tap hole), then send G20: the DRO reads inches. Stand the #10-24 plug tap, in its wrench, on its point on A there; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home. Note the DRO Z. Jog Z up clear, send G21, MDI G0 X{{process.tap_x_mm:.3f}} (over the tap hole), send G20."
 feed = "hand"
 
 [[setups.operations]]
@@ -678,7 +701,7 @@ speed_kind = "other"
 tool = "tap-bottom"
 drilling = "none"
 sizing = "other"
-instruction = "Then the bottoming tap the same way (its point stood on A for the reference again): stop when the DRO Z reads the noted Z less ({{cad.stud_tap_thread_depth_in:.3dot}} + c): the full thread ends {{cad.stud_tap_thread_depth_min_in:.3dot}}–{{cad.stud_tap_thread_depth_max_in:.3dot}} deep (the drawing's; it sets the MHA-SM-VN-52 stud's tip clearance). Do not force it past: its point is then at the drill's full diameter. Jog Z up clear, send G21, back the tap out by hand; blow the hole out."
+instruction = "Then the bottoming tap the same way (its point stood on A at the same station for the reference again): stop when the DRO Z reads the noted Z less ({{cad.stud_tap_thread_depth_in:.3dot}} + c): the full thread ends {{cad.stud_tap_thread_depth_min_in:.3dot}}–{{cad.stud_tap_thread_depth_max_in:.3dot}} deep (the drawing's; it sets the MHA-SM-VN-52 stud's tip clearance). Do not force it past: its point is then at the drill's full diameter. Jog Z up clear, send G21, back the tap out by hand; blow the hole out."
 inspection = "Thread full to {{cad.stud_tap_thread_depth_min_in:.3dot}}–{{cad.stud_tap_thread_depth_max_in:.3dot}} by the DRO at the stop; a #10-24 screw runs in by hand to the bottom without binding."
 gauge_checks = "other"
 feed = "hand"
@@ -745,7 +768,7 @@ speed_kind = "spindle"
 tool = "drill-11-8"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T6: 11.8 mm drill through in one feed, its full diameter {{process.drill_past_mm:in.3dot}} past K; set 300. Cutting oil. It leaves .008 on the diameter for the reamer."
+instruction = "Same file, M6 T6: 11.8 mm drill through in one feed, its full diameter {{process.drill_past_mm:in.3dot}} past K; set 300. Cutting oil. It leaves .008 on the diameter for the reamer (.010 from an 11.75 mm drill)."
 settings = "drill-11-8mm-4140-ht"
 hole_depth_mm = "{{cad.back_face_depth_mm}}"
 peck = "none"
@@ -773,7 +796,7 @@ instruction = "The coupon T: GO enters and NO-GO does not: go on to blanks 1 and
 feed = "hand"
 
 [[setups.operations]]
-instruction = "1. M3 S200, G0 Z{{process.bore_ream_r_plane_mm:.3f}}\n2. G0 X{{cad.knife_bore_basic_from_a:.3f}} Y-{{process.bore_y_mm:.3f}}\n3. G1 Z{{process.bore_ream_tip_height_mm:.3f}} F{{process.bore_ream_feed_mm_min:.2f}}, G1 Z{{process.bore_ream_r_plane_mm:.3f}}\n4. G0 Z{{process.bore_ream_clear_mm:.3f}}, G0 X-8.000 Y-6.850 (off the block, left of A), M5"
+instruction = "1. T7, the 12 mm reamer, still in the 7/16 collet, its tool length active; set 200 by hand; cutting oil. Then the MDI lines:\n2. M3 S200, G0 Z{{process.bore_ream_r_plane_mm:.3f}}\n3. G0 X{{cad.knife_bore_basic_from_a:.3f}} Y-{{process.bore_y_mm:.3f}}\n4. G1 Z{{process.bore_ream_tip_height_mm:.3f}} F{{process.bore_ream_feed_mm_min:.2f}}, G1 Z{{process.bore_ream_r_plane_mm:.3f}}\n5. G0 Z{{process.bore_ream_clear_mm:.3f}}, G0 X-8.000 Y-6.850 (off the block, left of A), M5"
 feed = "hand"
 
 [[setups.operations]]
@@ -800,7 +823,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Bore position, the .4720 GO in the bore and the .1273 GO in B as pins. From A: the block A down on the surface plate, the height gauge on top of the bore's GO, less half its Ø (.4720/2). From B: calipers outside over both pins, less (.4720 + .1273)/2."
-inspection = "Bore from A {{process.bore_from_a_min_mm:in.4dot}}–{{process.bore_from_a_max_mm:in.4dot}}; bore from B {{process.bore_from_b_min_mm:in.4dot}}–{{process.bore_from_b_max_mm:in.4dot}} (the drawing's Ø.008 position to A|B). Outside either: stop and tell the owner."
+inspection = "Bore from A {{process.bore_from_a_min_mm:in.4dot}}–{{process.bore_from_a_max_mm:in.4dot}} and from B {{process.bore_from_b_min_mm:in.4dot}}–{{process.bore_from_b_max_mm:in.4dot}}: the square inside the drawing's Ø.008 position zone to A|B, so both in is a good bore. Outside either: stop and tell the owner."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = ["{{process.bore_from_a_min_mm}}", "{{process.bore_from_a_max_mm}}"] },
   { gauge = "calipers", band_mm = ["{{process.bore_from_b_min_mm}}", "{{process.bore_from_b_max_mm}}"] },

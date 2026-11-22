@@ -23,7 +23,7 @@
   <rect class="part-kept" x="520.0" y="140.0" width="116.8" height="140.2"/>
   <line class="datum" x1="506.0" y1="140.0" x2="534.0" y2="140.0"/>
   <line class="datum" x1="520.0" y1="128.0" x2="520.0" y2="154.0"/>
-  <text class="datum-label" x="486.0" y="144.0" text-anchor="end">X0 Y0</text>
+  <text class="datum-label" x="520.0" y="108.0" text-anchor="middle">X0 Y0</text>
   <text class="label-halo" x="514.0" y="214.1" text-anchor="end">N</text>
   <text class="label-halo" x="642.8" y="214.1">S</text>
   <text class="label-on-clamp" x="578.4" y="132.0" text-anchor="middle">fixed jaw (A)</text>

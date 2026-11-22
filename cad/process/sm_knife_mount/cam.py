@@ -720,14 +720,25 @@ def context(
     _agree(plan, "bore_y_mm", -bore_xy[1])
     if not math.isclose(-bore_xy[1] - b_xy[0], bore["basic_from_b"], abs_tol=1e-3):
         raise ValueError("the bore is not its BASIC from B")
-    # Position bands: the square inside each zone, ±(zone Ø)/2 from the BASIC.
+    # The bore's two readings: the square inside its zone, ±(zone Ø)/(2√2)
+    # from each BASIC, so a pass on both axes is inside the circle.
     for key, basic, zone in (
         ("bore_from_a", bore["basic_from_a"], bore["position_dia"]),
         ("bore_from_b", bore["basic_from_b"], bore["position_dia"]),
-        ("tap_from_b", tap["basic_from_b"], tap["position_dia"]),
     ):
-        _agree(plan, f"{key}_min_mm", basic - zone / 2)
-        _agree(plan, f"{key}_max_mm", basic + zone / 2)
+        _agree(plan, f"{key}_min_mm", basic - zone / (2 * math.sqrt(2)))
+        _agree(plan, f"{key}_max_mm", basic + zone / (2 * math.sqrt(2)))
+    # The tap's spacing to B, a gross check only (the program holds its
+    # position): ±(zone Ø)/2 from the BASIC.
+    _agree(plan, "tap_from_b_min_mm", tap["basic_from_b"] - tap["position_dia"] / 2)
+    _agree(plan, "tap_from_b_max_mm", tap["basic_from_b"] + tap["position_dia"] / 2)
+    # KM07's reference station on A: the tap's point (no wider than its drill)
+    # stands on solid A between B and the tap drill.
+    ref_x = plan["parameters"]["tap_ref_x_mm"]
+    if not (b_xy[0] + r128 / 2 + d25 / 2 < ref_x < tap_xy[0] - d25):
+        raise ValueError(
+            f"the tap's reference station X {ref_x} is not on solid A between B and the tap drill"
+        )
     # Metal left between each blind hole's drill point and the knife bore.
     for name, hole, tip_depth, dia in (
         ("datum B", dowel, height - dowel_drill_tip, d31),

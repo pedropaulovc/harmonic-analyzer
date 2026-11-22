@@ -15,15 +15,15 @@
   <text class="label-on-clamp" x="325.2" y="390.0" text-anchor="middle">fixed</text>
   <line class="datum" x1="300.2" y1="141.6" x2="300.2" y2="177.6"/>
   <text class="datum-label" x="304.2" y="151.6">Y0 (A)</text>
-  <line class="datum" x1="354.2" y1="247.6" x2="374.2" y2="247.6"/>
-  <text class="datum-label" x="378.2" y="251.6">Z0 = K (faced)</text>
+  <line class="datum" x1="354.2" y1="181.6" x2="374.2" y2="181.6"/>
+  <text class="datum-label" x="378.2" y="185.6">Z0 = K (faced top)</text>
   <text class="label-halo" x="40.0" y="80.0">skim .030: the back face K</text>
   <rect class="clamp" x="490.0" y="115.0" width="176.8" height="25.0"/>
   <rect class="clamp" x="490.0" y="280.2" width="176.8" height="25.0"/>
   <rect class="part-kept" x="520.0" y="140.0" width="116.8" height="140.2"/>
   <line class="datum" x1="506.0" y1="140.0" x2="534.0" y2="140.0"/>
   <line class="datum" x1="520.0" y1="128.0" x2="520.0" y2="154.0"/>
-  <text class="datum-label" x="486.0" y="144.0" text-anchor="end">X0 Y0</text>
+  <text class="datum-label" x="520.0" y="108.0" text-anchor="middle">X0 Y0</text>
   <text class="label-halo" x="514.0" y="214.1" text-anchor="end">S</text>
   <text class="label-halo" x="642.8" y="214.1">N</text>
   <text class="label-on-clamp" x="578.4" y="132.0" text-anchor="middle">fixed jaw (A)</text>
