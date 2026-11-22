@@ -16,8 +16,8 @@
   <line class="leader" x1="360" y1="94" x2="360" y2="122"/>
   <text class="label" x="240" y="250">stub Ø.3746</text>
   <line class="leader" x1="290" y1="238" x2="290" y2="178"/>
-  <text class="datum-label" x="560" y="110">Z0 the faced end; dead centre</text>
-  <line class="leader" x1="640" y1="114" x2="650" y2="150"/>
+  <text class="datum-label" x="540" y="60">Z0 the faced end; dead centre</text>
+  <line class="leader" x1="640" y1="64" x2="650" y2="150"/>
   <text class="label" x="60" y="270">part-off at Z-2.622</text>
   <line class="leader" x1="150" y1="258" x2="230" y2="218"/>
 </svg>

@@ -101,13 +101,14 @@ def test_the_journal_aim_gives_the_drawings_clearance_on_the_strap():
 def test_the_bench_gauges_read_inside_the_drawings_bands():
     p = _plan()["parameters"]
     f = _features()["features"]
-    for hole, go, nogo, far_min, far_max in (
+    for hole, go, nogo, side_min, side_max, sign in (
         (
             "cross_hole",
             "cross_go_pin_in",
             "cross_nogo_pin_in",
-            "cross_far_side_min_in",
-            "cross_far_side_max_in",
+            "cross_near_side_min_in",
+            "cross_near_side_max_in",
+            -1,
         ),
         (
             "pin_hole",
@@ -115,11 +116,12 @@ def test_the_bench_gauges_read_inside_the_drawings_bands():
             "pin_nogo_pin_in",
             "pin_far_side_min_in",
             "pin_far_side_max_in",
+            1,
         ),
     ):
         low, high = (v / IN for v in f[hole]["dia"])
         assert p[go] == pytest.approx(low, abs=1e-4) and p[nogo] <= high + 1e-9
         station = [v / IN for v in f[hole]["station"]]
-        half = p[go] / 2
-        assert p[far_min] == pytest.approx(station[0] + half, abs=1e-4)
-        assert p[far_max] == pytest.approx(station[1] + half, abs=1e-4)
+        half = sign * p[go] / 2
+        assert p[side_min] == pytest.approx(station[0] + half, abs=1e-4)
+        assert p[side_max] == pytest.approx(station[1] + half, abs=1e-4)

@@ -186,13 +186,15 @@ rest_joint_in = 3.2
 # Bench: the pins over which the holes' stations are read: the cross hole's
 # .251 GO (gauges.pin-gauges, class ZZ minus); the pin hole's GO the .0625
 # class ZZ gauge pin (tools.gauge-pin-0625, the band's bottom), its NO-GO the
-# set's .065; the station plus half the pin.
+# set's .065. The cross hole lies in the head, toward the apex from the rear
+# face: the depth rod reads to the pin's near side, the station less half the
+# pin. The pin hole lies in the shaft: the station plus half the pin.
 cross_go_pin_in = 0.251
 cross_nogo_pin_in = 0.255
 pin_go_pin_in = 0.0625
 pin_nogo_pin_in = 0.065
-cross_far_side_min_in = 0.3455
-cross_far_side_max_in = 0.3655
+cross_near_side_min_in = 0.0945
+cross_near_side_max_in = 0.1145
 pin_far_side_min_in = 1.5213
 pin_far_side_max_in = 1.5413
 # Setup 5: the cross hole's .251 GO pin set upright before the pin hole is
@@ -669,7 +671,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "The follow rest still off: finish the head-end stretch from Z+{{process.rest_joint_in:.2f}} to Z+{{cad.neck_length_in:.3dot}} in one pass at the settings column's power feed to Ø{{cad.front_journal_dia_min_in:.4dot}}–{{cad.front_journal_dia_max_in:.4dot}}, aiming {{process.journal_aim_in:.4dot}} (the front journal's band, inside the span's {{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}); leave the cross slide's dial where it is for the rest of the shaft."
+instruction = "The follow rest still off: finish the head-end stretch from Z+{{process.rest_joint_in:.2f}} to Z+{{cad.neck_length_in:.3dot}} in one pass at the settings column's power feed to Ø{{cad.front_journal_dia_min_in:.4dot}}–{{cad.front_journal_dia_max_in:.4dot}}, aiming {{process.journal_aim_in:.4dot}} (the front journal's band, inside the span's {{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}). Write the cross-slide DRO's reading for this finish setting."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
 
@@ -685,7 +687,7 @@ feed = "hand, light"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Bolt the follow rest on the saddle's headstock side. With the rule, measure its jaws' lead L ahead of the AR tool's left edge, and write it. The jaws are set before each pass on the diameter that pass has not yet cut, and stop at Z+{{process.rest_joint_in:.2f}} − L, clear of the neck."
+instruction = "Bolt the follow rest on the saddle's headstock side. With the rule, measure its jaws' lead L ahead of the AR tool's left edge, and write it: it must lie under 2.75 (the jaws then stop clear of the neck). The jaws are set before each pass on the diameter that pass has not yet cut, and stop at Z+{{process.rest_joint_in:.2f}} − L, clear of the neck."
 feed = "hand"
 
 [[setups.operations]]
@@ -704,7 +706,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish from the back end to Z+{{process.rest_joint_in:.2f}} in one pass at the settings column's power feed, the cross slide's dial as the head-end stretch left it (aiming {{process.journal_aim_in:.4dot}}), the follow rest's jaws, ahead of the tool, set on the roughed Ø{{process.rough_dia_in:.3dot}}; stop at Z+{{process.rest_joint_in:.2f}}, where it meets the head-end stretch."
+instruction = "Finish from the back end to Z+{{process.rest_joint_in:.2f}} in one pass at the settings column's power feed, aiming {{process.journal_aim_in:.4dot}}, the follow rest's jaws, ahead of the tool, set on the roughed Ø{{process.rough_dia_in:.3dot}}. First, spindle running, skim .25 in at the back end at the written finish reading, stop, mike it, and move the cross slide by half the difference from {{process.journal_aim_in:.4dot}} (the AR holder may have moved since); then the pass. Stop at Z+{{process.rest_joint_in:.2f}}, where it meets the head-end stretch."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
 
@@ -716,11 +718,16 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.front_journal_dia_band
 
 [[setups.operations]]
 cut_kind = "other"
+instruction = "A journal, span or land over its band's top: spindle stopped, the follow rest lifted off; the AR tool's left edge on the head's rear face, DRO Z0 again. Bolt the rest back (jaws on the finished diameter) unless the stretch lies under Z+{{process.rest_joint_in:.2f}}."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
 speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "A journal, span or land over its band's top: AR tool back; spindle stopped, the follow rest lifted off, its left edge on the head's rear face, DRO Z0 again. Skim that stretch only (a journal Z+{{cad.front_journal_station_in:.2dot}} to Z+{{cad.front_journal_end_station_in:.2dot}} or Z+{{cad.back_journal_station_in:.2dot}} to Z+{{cad.back_journal_end_station_in:.2dot}}; a span or land from the journal's end to the next journal, shoulder or back end) to Ø{{process.journal_aim_in:.4dot}}: the cross slide in by half the miked excess per side (.0001 per side takes .0002 off the diameter), and mike again; head-end stretches (under Z+{{process.rest_joint_in:.2f}}) with the rest left off, the others with it bolted back, its jaws on the finished diameter. Any reading under its band's bottom: the arbor is scrap; start again from Setup 1."
+instruction = "Skim that stretch only to Ø{{process.journal_aim_in:.4dot}}, the cross slide in by half the miked excess per side: a journal Z+{{cad.front_journal_station_in:.2dot}} to Z+{{cad.front_journal_end_station_in:.2dot}} or Z+{{cad.back_journal_station_in:.2dot}} to Z+{{cad.back_journal_end_station_in:.2dot}}; a span or land from the journal's end to the next journal, shoulder or back end. Mike again. Any reading under its band's bottom: the arbor is scrap; start again from Setup 1."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
 
@@ -730,7 +737,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "AR tool back. Spindle stopped, the follow rest lifted off: touch its left edge on the head's rear face, DRO Z0 again; bolt the rest back with its jaws on the finished Ø.3117. Turn the relief from Z+{{cad.bond_relief_station_in:.2dot}} to Z+{{cad.bond_relief_end_station_in:.2dot}} in .008 cuts per side to Ø{{cad.bond_relief_dia_min_in:.3dot}}–{{cad.bond_relief_dia_max_in:.3dot}}, aiming {{process.relief_aim_in:.3dot}}, each fed from the Z+{{cad.bond_relief_end_station_in:.2dot}} end toward the head, the jaws ahead of the tool on the Ø.3117 on the relief's head side; stop .005 short of each end."
+instruction = "AR tool back. Spindle stopped, the follow rest lifted off: touch its left edge on the head's rear face, DRO Z0 again; bolt the rest back. Turn the relief from Z+{{cad.bond_relief_end_station_in:.2dot}} toward Z+{{cad.bond_relief_station_in:.2dot}} in .008 cuts per side to Ø{{cad.bond_relief_dia_min_in:.3dot}}–{{cad.bond_relief_dia_max_in:.3dot}}, aiming {{process.relief_aim_in:.3dot}}. L under 2.55: the jaws set on the diameter the last pass left (the Ø.3117 for the first); each later pass stops when they come .05 short of Z+{{cad.bond_relief_station_in:.2dot}}, then the jaws are backed off and the last stretch fed by hand. L 2.55 or more: the jaws on the Ø.3117 head-side of the relief for every pass. Stop .005 short of each end."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.bond_relief_dia_mm}}"
 
@@ -740,7 +747,7 @@ speed_kind = "spindle"
 tool = "sharp"
 drilling = "none"
 sizing = "other"
-instruction = "Sharp-nose tool. First, spindle stopped, the follow rest lifted off: touch its left side on the head's rear face, DRO Z0, and mike its tip's width; bolt the rest back, its jaws on the Ø.3117. Square the relief's end at Z+{{cad.bond_relief_station_in:.2dot}} with the tool's left side at that reading; the end at Z+{{cad.bond_relief_end_station_in:.2dot}} faces the head, so cut it with the tool's right side, the DRO at Z+{{cad.bond_relief_end_station_in:.2dot}} less the tip's width. Inside corners R.010 max."
+instruction = "Sharp-nose tool. First, spindle stopped, the follow rest lifted off: touch its left side on the head's rear face, DRO Z0, and mike its tip's width; bolt the rest back, its jaws backed off. Square the relief's end at Z+{{cad.bond_relief_station_in:.2dot}} with the tool's left side at that reading; the end at Z+{{cad.bond_relief_end_station_in:.2dot}} faces the head, so cut it with the tool's right side, the DRO at Z+{{cad.bond_relief_end_station_in:.2dot}} less the tip's width. Inside corners R.010 max."
 rpm = 400
 feed = "hand, light"
 
@@ -756,7 +763,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Relief over {{cad.bond_relief_dia_max_in:.3dot}}: AR tool back; spindle stopped, the follow rest lifted off, its left edge on the head's rear face, DRO Z0 again; the rest bolted back, its jaws on the Ø.3117; another .004 cut per side as before, and mike again. Under {{cad.bond_relief_dia_min_in:.3dot}}: the arbor is scrap; start again from Setup 1."
+instruction = "Relief over {{cad.bond_relief_dia_max_in:.3dot}}: AR tool back; spindle stopped, the follow rest lifted off, its left edge on the head's rear face, DRO Z0 again; the rest bolted back, its jaws set as for the relief's passes; another .004 cut per side as before, and mike again. Under {{cad.bond_relief_dia_min_in:.3dot}}: the arbor is scrap; start again from Setup 1."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.bond_relief_dia_mm}}"
 
@@ -830,7 +837,7 @@ instruction = "Deburr both ends of the cross hole and of the pin hole with the s
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Cross hole: the {{process.cross_go_pin_in:.3dot}} GO pin passes, the {{process.cross_nogo_pin_in:.3dot}} NO-GO enters neither end; with the GO in it, calipers from the head's rear face to the pin's far side, {{process.cross_far_side_min_in:.4dot}}–{{process.cross_far_side_max_in:.4dot}}."
+instruction = "Cross hole: the {{process.cross_go_pin_in:.3dot}} GO pin passes, the {{process.cross_nogo_pin_in:.3dot}} NO-GO enters neither end; with the GO in it, the calipers' depth end of the beam on the head's rear face beside the neck, the depth rod along the head's O.D. onto the pin's near side, {{process.cross_near_side_min_in:.4dot}}–{{process.cross_near_side_max_in:.4dot}}."
 inspection = "Cross hole Ø{{cad.cross_hole_dia_min_in:.3dot}}–{{cad.cross_hole_dia_max_in:.3dot}}, {{cad.cross_hole_station_min_in:.2dot}}–{{cad.cross_hole_station_max_in:.2dot}} from the head's rear face."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.cross_hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.cross_hole_station_band_mm}}" }]
 feed = "hand"
