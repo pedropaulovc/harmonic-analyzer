@@ -132,8 +132,13 @@ CAPTION_XY = (SECTION_CENTER[0], SECTION_CENTER[1] - HALF_HUB - 0.045)
 # out that the hub face's finish and caption stand between it and the part;
 # right of the rear face the press Ø, its block beyond the rear face's
 # finish and caption.  Above: the hub station, then the overall length over
-# it.  The root radius below and right of the shoulder, its text off the
-# shoulder's line so its leader slants away from datum A's.
+# it.  The root radius' leader runs through the arc's centre, which lies
+# outside the part above and right of the upper root (r9: with the text
+# below the part it ran 37 mm through both walls and the bore to reach it).
+# Its text (24.8 mm) stands just right of the overall's rear extension line,
+# over the press Ø's upper extension line, so the leader rises 13 degrees
+# from the root clear over the press Ø and crosses only that one extension
+# line (rule 14).
 SECTION_KEEP = {
     "HubDia": (HUB_FACE_X - 0.060, SECTION_CENTER[1]),
     "HubLength": (
@@ -142,7 +147,7 @@ SECTION_KEEP = {
     ),
     "BushLength": (SECTION_CENTER[0], SECTION_CENTER[1] + HALF_HUB + 0.050),
     "PressDia": (REAR_FACE_X + 0.108, SECTION_CENTER[1]),
-    "ShoulderR": (SHOULDER_X + 0.034, SECTION_CENTER[1] - HALF_HUB - 0.012),
+    "ShoulderR": (REAR_FACE_X + 0.0175, SECTION_CENTER[1] + HALF_PRESS + 0.0085),
 }
 # The face view's bore Ø: its block centred above the view and right of the
 # bore's centre, so SolidWorks runs the leader from the shelf's LEFT end
@@ -197,8 +202,7 @@ FACE_FINISHES = {
 # the leader square to it (r6: the tag at (206.2, 128.2) landed at
 # (206.1, 153.3), straight above), so the tag stands left of the line at a
 # height below the hub: the triangle sits on the shoulder's extension, clear
-# under the hub Ø's lower extension line, its leader level and away from
-# the root radius on the right.  r6 picked the 3 mm shoulder line by sheet
+# under the hub Ø's lower extension line, its leader level.  r6 picked the 3 mm shoulder line by sheet
 # point and caught a neighbour instead, its leader crossing the hub Ø's
 # extension line; r8 asked for the shoulder's outer rim, which A-A does not
 # show (the cut face's own lines cover it, the bore's wall hides the rest).

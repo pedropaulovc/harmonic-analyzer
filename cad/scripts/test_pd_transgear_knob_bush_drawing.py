@@ -527,13 +527,31 @@ def test_datum_a_rides_the_shoulder_line_below_the_hub() -> None:
     """Farm r6: datum A landed on a neighbour of the 3 mm shoulder line and
     its leader crossed the hub Ø's extension line.  The tag stands left of
     the shoulder's line below the hub, so its square leader meets the line's
-    extension under the lower extension line, clear of the root radius'
-    text on the right and the section caption under it."""
+    extension under the lower extension line, clear of the section caption
+    under it."""
     x, y = drawing.DATUM_A_XY
     hub_bottom = drawing.SECTION_CENTER[1] - drawing.HALF_HUB
     assert x < drawing.SHOULDER_X - 0.006
     assert drawing.CAPTION_XY[1] + 0.010 < y < hub_bottom - 0.006
-    assert drawing.SECTION_KEEP["ShoulderR"][0] > drawing.SHOULDER_X + 0.020
+
+
+def test_the_root_radius_text_stands_on_its_arc_centre_side() -> None:
+    """Farm r9: the radius' leader runs through the arc's centre, outside the
+    part above and right of the upper root; with its text below the part it
+    crossed both walls and the bore.  The 24.8 mm text now stands right of
+    the rear face's extension line and over the press Ø's upper one, left of
+    the press Ø's block, so the leader rises from the root over the press Ø."""
+    x, y = drawing.SECTION_KEEP["ShoulderR"]
+    half_text = 0.0124
+    press_top = drawing.SECTION_CENTER[1] + drawing.HALF_PRESS
+    root = (drawing.SHOULDER_X, press_top)
+    shelf = (x - half_text - 0.003, y - 0.002)
+    assert shelf[0] > drawing.REAR_FACE_X + 0.0015
+    assert y - 0.002 > press_top + 0.005
+    assert y + 0.002 < drawing.SECTION_KEEP["HubLength"][1] - 0.008
+    assert x + half_text < drawing.SECTION_KEEP["PressDia"][0] - 0.0605 - 0.010
+    # Over the press Ø all the way: the leader only rises from the root.
+    assert shelf[1] > root[1] + 0.004
 
 
 def test_the_isometric_clears_the_title_block_and_the_section() -> None:
