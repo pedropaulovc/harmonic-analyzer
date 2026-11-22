@@ -775,7 +775,11 @@ def context(
         ["CA01_hub_end", "pauses", {"z_top": jaw_top, "count": 0}],
         ["CA01_hub_end", "depth", {"z_min": _r(min(bottom, anchor_tip))}],
         ["CA01_hub_end@0", "keep_out", {"radius": dem / 2, "boxes": ca01_boxes}],
-        ["CA01_hub_end@1", "keep_out", {"radius": CENTRE_DRILL["body_mm"] / 2, "boxes": ca01_boxes}],
+        [
+            "CA01_hub_end@1",
+            "keep_out",
+            {"radius": CENTRE_DRILL["body_mm"] / 2, "boxes": ca01_boxes},
+        ],
         ["CA01_hub_end@2", "keep_out", {"radius": d50 / 2, "boxes": ca01_boxes}],
         ["CA01_hub_end@0", "air_feed", {"z_top": 0.0}],
         [
@@ -847,7 +851,11 @@ def context(
         ["CA03_handle_end", "pauses", {"z_top": jaw_top, "count": 0}],
         ["CA03_handle_end", "depth", {"z_min": _r(min(bottom, pivot_tip))}],
         ["CA03_handle_end@0", "keep_out", {"radius": dem / 2, "boxes": ca03_boxes}],
-        ["CA03_handle_end@1", "keep_out", {"radius": CENTRE_DRILL["body_mm"] / 2, "boxes": ca03_boxes}],
+        [
+            "CA03_handle_end@1",
+            "keep_out",
+            {"radius": CENTRE_DRILL["body_mm"] / 2, "boxes": ca03_boxes},
+        ],
         ["CA03_handle_end@2", "keep_out", {"radius": d43 / 2, "boxes": ca03_boxes}],
         ["CA03_handle_end@3", "keep_out", {"radius": dsink / 2, "boxes": ca03_boxes}],
         ["CA03_handle_end", "air_feed", {"z_top": 0.0}],

@@ -478,3 +478,8 @@ note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-22 Ø.1920 +.0
 kind = "reamer"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-18 Ø.1940 +.001/.000 REAM THRU."
+
+[tools.reamer-2500]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. MHA-DT-20 cone swing platform's pivot bore, Ø.2500 +.0005/.0000 REAM THRU, a running fit on the MHA-DT-VN-52 shoulder (cad/process/dt_cone_swing_platform). Owner ruling 2026-11-20 (#3073) buys a fixed reamer for each running/press fit rather than setting tools.reamers-adjustable-lms-5948, which the placeholder plan named. No vendor or SKU asserted."

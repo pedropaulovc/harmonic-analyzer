@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20" y="20">Setup 2 (plan view): underside up, E on the fixed jaw, both ends overhanging</text>
+  <rect class="clamp" x="165" y="84" width="412" height="26"/>
+  <rect class="clamp" x="165" y="275" width="412" height="26"/>
+  <rect class="part-kept" x="53" y="110" width="633" height="165"/>
+  <rect class="part-removed" x="50" y="110" width="3" height="165"/>
+  <rect class="part-removed" x="686" y="110" width="6" height="165"/>
+  <circle class="holes" cx="666" cy="152" r="8"/>
+  <circle class="holes" cx="623" cy="151" r="7"/>
+  <circle class="holes" cx="631" cy="227" r="7"/>
+  <circle class="holes" cx="126" cy="203" r="7"/>
+  <circle class="holes" cx="110" cy="137" r="7"/>
+  <line class="leader" x1="420" y1="60" x2="420" y2="84"/>
+  <text class="label" x="330" y="56">fixed jaw (edge E against it): Y0</text>
+  <line class="leader" x1="700" y1="60" x2="668" y2="146"/>
+  <text class="label" x="640" y="54">pivot (B drill)</text>
+  <line class="leader" x1="560" y1="130" x2="617" y2="150"/>
+  <text class="label" x="440" y="134">hold-down, cbore</text>
+  <line class="leader" x1="560" y1="245" x2="626" y2="230"/>
+  <text class="label" x="450" y="250">wedge screw #7</text>
+  <line class="leader" x1="230" y1="160" x2="132" y2="200"/>
+  <text class="label" x="236" y="164">post taps 1/4-20</text>
+  <line class="leader" x1="230" y1="160" x2="116" y2="139"/>
+  <text class="label" x="30" y="330">X0 the sawn marked end (left); both ends faced (hatched)</text>
+  <text class="label" x="20" y="368">Z0 the underside (U, up). Every hole and end cut lies outside the jaws' and the parallels' ends.</text>
+</svg>

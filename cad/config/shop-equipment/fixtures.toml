@@ -398,3 +398,29 @@ kind = "fixture"
 status = "to_make"
 supply = "shop_made"
 note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-PD-03 FORMED, 6X (R1.36), .06 BOW RISE."
+
+# MHA-DT-20 cone swing platform (cad/process/dt_cone_swing_platform), Setup
+# 4: the blank screwed to the 1/2 in spoil plate while its outline is cut.
+# To buy: not owned, no vendor or SKU asserted.
+[fixtures.dt-platform-hold-down-screws]
+name = "Alloy steel socket head cap screws: two 1/4-20 x 3/4, one #4-40 x 1/2, one #10-24 x 1/2"
+kind = "fastener"
+status = "to_order"
+pieces = 4
+note = "Not owned: to buy. The 1/4-20 pair up through the spoil plate into the platform's post taps; the #4-40 down through its hold-down hole and the #10-24 down through the west waste into seats tapped in the plate."
+
+# MHA-DT-20 swing platform, owner ruling 2026-11-22 (issue #3363): the
+# platform's top relief is cut to the sheet's .010 REF when the bar is
+# thinner than the MHA-DT-VN-52 shoulder; the axial shake is then taken out
+# at ASSEMBLY (MHA-DT-00) with steel shim washers under the screw's head,
+# stacked until the platform swings free with no shake. Not owned: to buy.
+[fixtures.shim-washers-1-4-id-arbor-19]
+name = "Steel arbor shim assortment, 1/4 in ID x 3/8 in OD, 19 thicknesses .001-.125 in"
+kind = "shim"
+status = "to_order"
+make = "Precision Brand"
+sku = "25100"
+pieces = 19
+source = "https://madeinusatools.com/product/19-piece-1-4-id-x-3-8-od-steel-arbor-shim-assortment/"
+cite = ["Made in USA Tools, 19 Piece 1/4 in ID x 3/8 in OD Steel Arbor Shim Assortment, Precision Brand PRE-25100 (read 2026-11-22): one each .001, .0015, .002, .003, .004, .005, .006, .007, .008, .010, .012, .015, .020, .025, .031, .047, .062, .093, .125 in; low-carbon full-hard cold-rolled steel"]
+note = "Not owned: to buy. Shims under the MHA-DT-VN-52 head at assembly (MHA-DT-00, issue #3363), stacked in .001 steps until the platform swings free with no axial shake; the 3/8 OD matches the head's diameter."
