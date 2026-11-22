@@ -470,31 +470,26 @@ def test_shared_numbers_print_the_item_the_native_bom_gives(monkeypatch) -> None
         )
 
 
-def test_released_cup_pins_are_renewed_once_at_ninety_degrees() -> None:
-    """Owner ruling 2026-11-20 (Pedro), #2497: a released or slipping cup pin
-    is re-pinned once at 90 degrees, and a cup and shaft re-pinned before
-    are renewed; the arm's slipping dowel is bonded and read again once
-    cured. Step 22 carries both, one action per sub-step (machinist review
-    of 592b20079f), so 28 and 33 repeat it whole."""
+def test_a_dowel_that_slides_into_the_arm_is_bonded() -> None:
+    """Owner ruling 2026-11-20 (Pedro), #2497: the arm's slipping dowel is
+    bonded and read again once cured. Its re-pinning half lapsed with the
+    knob cup's cross pin (#2425): a cup taken off is renewed with its screw,
+    and only a faulty pinion renews the shaft."""
     texts = drawing._step_text(operating_domain=_unit_operating_domain())
-    fitted = texts["knob-stack-fitted"]
-    assert fitted[2] == (
-        f"IF THE CUP HAS 2 HOLES, GO TO {drawing.sub_step('knob-stack-fitted', 0)} "
-        "WITH A NEW CUP AND SHAFT."
-    )
-    assert fitted[3].startswith(f"FIT THE {_number('pd-transgear-knob-cup')} CUP")
-    assert "AT 90\u00b0 TO ANY HOLE IN THE CUP" in fitted[4]
-    assert fitted[6] == (
-        "IF IT SLIDES IN BY HAND, PUSH IT OUT; GO TO "
-        f"{drawing.sub_step('knob-stack-fitted', 2)} WITH A NEW PIN."
-    )
-    repeat = (
-        f"REPEAT STEP {steps.step_number('knob-stack-fitted')}, THEN FROM STEP "
+    renewed = (
+        f"REPEAT STEP {steps.step_number('knob-stack-fitted')} WITH A NEW "
+        f"{_number('pd-transgear-knob-cup')} CUP AND "
+        f"{_number('pd-vn-transgear-knob-cup-screw')} SCREW, THEN FROM STEP "
         f"{steps.step_number('fitup-pose-set')}."
     )
     for key in ("fitup-mesh-remedied", "fitup-accepted"):
-        assert any(row.endswith(repeat) for row in texts[key]), key
-        assert not any("RE-PINNED" in row for row in texts[key]), key
+        assert any(row.endswith(renewed) for row in texts[key]), key
+        assert not any("90\u00b0" in row or "2 HOLES" in row for row in texts[key]), key
+    assert not any("2 HOLES" in row for row in texts["knob-stack-fitted"])
+    assert any(
+        row.endswith(f"MAKE A NEW {_number('pd-transgear-knob-shaft')} SHAFT.")
+        for row in texts["fitup-mesh-remedied"]
+    )
     # The bond, its check and the check's remedy are separate sub-steps. The
     # bond's prep and where the compound goes are DETAIL H's bond note, so
     # 13G stays one action in step 13's 24 letters (machinist reviews of
@@ -551,7 +546,7 @@ def test_a_feed_sleeve_found_outside_after_hanging_has_a_renewal_route() -> None
         f"{drawing.sub_step('arm-plate-located', 21)} ON A NEW ONE.",
         f"FOR IT, REPEAT STEPS {steps.step_number('oil-hole-drilled')}-"
         f"{steps.step_number('disc-cluster-shimmed')} AND "
-        f"{drawing.sub_step('knob-stack-fitted', 7)}, THEN FROM "
+        f"{drawing.sub_step('knob-stack-fitted', 17)}, THEN FROM "
         f"{drawing.sub_step('hanger-meshed', 0)}.",
     )
     # The sub-steps it names are the ones that slide the sleeve off and on.
@@ -561,7 +556,7 @@ def test_a_feed_sleeve_found_outside_after_hanging_has_a_renewal_route() -> None
     assert texts["arm-plate-located"][21].startswith(
         "WITH THEM OFF AND THE DISC SCREWS"
     )
-    assert texts["knob-stack-fitted"][7].startswith(
+    assert texts["knob-stack-fitted"][17].startswith(
         f"SLIDE THE {_number('pd-transgear-drive-collar')} COLLAR ON"
     )
     assert (
@@ -1838,8 +1833,8 @@ def test_the_rear_cup_is_faced_bonded_and_screwed_and_the_nut_seats_on_the_faced
     assert "cup-pin-hole" not in drawing.SETTING_ROW_KEYS
     note = drawing.BOM_EXPENDABLES_NOTE.replace("\n", " ")
     assert (
-        f"{s('knob-stack-fitted', drawing.KNOB_CUP_BOND_SUB_STEP)} USES LOCTITE 641 RETAINING "
-        f"COMPOUND; CURE {drawing.KNOB_CUP_BOND_CURE_H} H BEFORE LOAD."
+        f"{s('knob-stack-fitted', drawing.KNOB_CUP_BOND_SUB_STEP)} USES LOCTITE 641; "
+        f"CURE {drawing.KNOB_CUP_BOND_CURE_H} H."
     ) in note
     # Each sub-step prints in at most six lines (rule 22).
     assert all(
@@ -3348,16 +3343,13 @@ def test_the_hub_key_pin_and_collar_flat_pin_are_fitted_and_kept() -> None:
     assert "FROM THE NOSE, THE PIN OVER THE FLAT" in assembled[fit]
     assert assembled[-1].startswith("CHECK:")
     assert "HUB DRIVES THE SLEEVE" in assembled[-1]
-    # The cup pin's re-pin at 90 degrees is the only new pin (owner ruling
-    # 2026-11-20 (Pedro), #2497), in step 22, whose match-drill sets the
-    # 90 degrees; the hub key pin is never renewed in place.
+    # No step re-pins: the knob cup's cross pin is retired (#2425) and the
+    # hub key pin is never renewed in place.
     assert not any(
         "DRIVEN INWARD" in row or "NEW PIN" in row
-        for key, rows in texts.items()
-        if key != "knob-stack-fitted"
+        for rows in texts.values()
         for row in rows
     )
-    assert "AT 90\u00b0" in texts["knob-stack-fitted"][4]
     assert len(texts["oil-hole-drilled"]) == 1
     for key in ("fitup-mesh-remedied", "collar-disc-air-inspected"):
         rows = texts[key]

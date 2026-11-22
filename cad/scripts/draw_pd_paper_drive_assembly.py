@@ -252,7 +252,7 @@ BOM_REFERENCE_SCALE = (1.0, 10.0)
 BOM_REFERENCE_CENTER = (0.060, 0.065)
 BOM_REFERENCE_LIMITS = (0.018, 0.028, 0.095, 0.104)
 # The caption's top row stands under the BOM tables' last rows (y ~.117 on
-# the 47-row fill); 18 rows clear the inner border.
+# the 48-row fill); 19 rows clear the inner border.
 BOM_REFERENCE_CAPTION_XY = (0.100, 0.100)
 BOM_REFERENCE_CAPTION = (
     "REFERENCE\n"
@@ -1189,9 +1189,9 @@ CHAIN_QUANTITIES = {
 # named either row); _validate_bom reads each item back.
 SHARED_NUMBER_ITEMS = {
     explode.RACK_SCREW: 9,
-    explode.DISC_SCREW: 33,
-    "sh-vn-chain-link--InnerLink": 45,
-    "sh-vn-chain-link--OuterLink": 46,
+    explode.DISC_SCREW: 34,
+    "sh-vn-chain-link--InnerLink": 46,
+    "sh-vn-chain-link--OuterLink": 47,
 }
 if {
     stem
@@ -2036,8 +2036,8 @@ BOM_EXPENDABLES_NOTE = (
     "TO CLOSE THE SPARE'S LOOP.\n"
     f"{sub_step('platen-hung', 0)} USES {LOCK_TRANSFER_SCREWS} #4-40 TRANSFER\n"
     "SCREWS, A SHOP TOOL.\n"
-    f"{sub_step('knob-stack-fitted', KNOB_CUP_BOND_SUB_STEP)} USES LOCTITE 641 RETAINING\n"
-    f"COMPOUND; CURE {KNOB_CUP_BOND_CURE_H} H BEFORE LOAD."
+    f"{sub_step('knob-stack-fitted', KNOB_CUP_BOND_SUB_STEP)} USES LOCTITE 641; "
+    f"CURE {KNOB_CUP_BOND_CURE_H} H."
 )
 BOM_SHEET_CAPTION = (
     f"{BOM_REFERENCE_CAPTION}\n{BOM_CHAIN_ORDER_NOTE}\n{BOM_EXPENDABLES_NOTE}"
@@ -2298,7 +2298,7 @@ def _step_text(
     # #3106: a feed sleeve found outside after the cluster is hung is renewed
     # as 12W-12X renew it, from the stripped cluster: the collar slid on at
     # 22 comes off first, the hub's oil hole is drilled on into the new
-    # sleeve (step 17) and the collar goes back on (22S; the bonded cup
+    # sleeve (step 17) and the collar goes back on (22T; the bonded cup
     # stays, #2425). Written once at 24 and pointed to from 26 (the
     # step-line budget), one action per sub-step (machinist review of
     # 592b20079f).

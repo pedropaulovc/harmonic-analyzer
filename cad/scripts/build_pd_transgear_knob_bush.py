@@ -243,11 +243,10 @@ def build(adapter) -> dict[str, str]:
         "bush length",
     )
     profile.record("BushLength", '"BushLength"')
-    check(
-        "bush axis length",
-        adapter.add_sketch_dimension(axis, None, "linear", LENGTH),
-    )
-    profile.record("AxisLength", '"BushLength"')
+    # No length on the centreline: its ends are the axis edge's, so a second
+    # length there is redundant, comes back driven and cannot take an
+    # equation (farm r7: "a driven or reference dimension is not selectable
+    # as the dependent variable").  The MHA-PD-08 journal's profile likewise.
     check(
         "shoulder root radius",
         adapter.add_sketch_dimension(root_arc, None, "radial", root_r),

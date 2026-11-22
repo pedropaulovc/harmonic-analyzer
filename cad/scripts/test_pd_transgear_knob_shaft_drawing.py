@@ -327,17 +327,22 @@ def test_rear_tap_takes_the_cup_screw_with_wall_and_lead_room() -> None:
     }
     screw = _config.parts("pd-vn-transgear-knob-cup-screw")["number"]
     assert drawing.REAR_TAP_CALLOUT_BELOW == f"FOR {screw}" == "FOR MHA-PD-VN-71"
-    # Centred under the rear view (r6: centred up and left at x 20 mm, its
-    # 47 mm rows ran 16 mm past the left border): inside the border, left
-    # of the rear witness line, under datum A's symbol and over GEAR DATA.
+    # In the open field under the journal (r7: centred under the rear view,
+    # the leader to the rows' lower corner struck the "#"; r6: up and left,
+    # the rows ran past the border).  The rows' left end, and the 3 mm
+    # shoulder before it, stand right of the rear witness line, so the hole
+    # is left of the rows and the leader reaches their corner clear of them;
+    # they stand under the journal's REF length and finish symbol, over the
+    # overall's text and right of GEAR DATA.
     x, y = drawing.REAR_TAP_CALLOUT_XY
     half_w = drawing.REAR_TAP_CALLOUT_HALF_WIDTH
     half_h = drawing.REAR_TAP_CALLOUT_HALF_HEIGHT
-    assert x - half_w > 0.0127 + 0.005
-    assert x + half_w < drawing.REAR_X - 0.003
-    assert y + half_h < drawing.END_CENTER[1] - drawing.HALF_OD - 0.010
-    assert y + half_h < drawing.DATUM_A_SYMBOL[1] - 0.004
-    assert y - half_h > drawing.GEAR_DATA_XY[1] + 0.002
+    assert x - half_w - 0.003 > drawing.REAR_X + 0.002
+    assert drawing.END_CENTER[0] < x - half_w
+    assert x - half_w > drawing.GEAR_DATA_RIGHT + 0.010
+    assert y + half_h < drawing.SIDE_KEEP["JournalLength"][1] - 0.008
+    assert y + half_h < drawing.JOURNAL_FINISH_SYMBOL[1] - 0.010
+    assert y - half_h > drawing.SIDE_KEEP["OverallLength"][1] + 0.012
 
 
 def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:

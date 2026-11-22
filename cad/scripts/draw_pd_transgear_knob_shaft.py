@@ -533,15 +533,20 @@ NOTES_XY = (0.300, 0.100)
 TITLE_BLOCK_TOP = 0.0663
 NOTES_CHAR_HEIGHT = GEAR_DATA_CHAR_HEIGHT
 DATUM_A_SYMBOL = (END_CENTER[0] - 0.017, END_CENTER[1] - 0.018)
-# The rear #2-56 tap's native callout on the rear view, centred under it
-# (r6 of #2425: centred up and left at x 20 mm, its 47 mm rows ran 16 mm
-# past the left border): its rows (~47 mm wide, ~14.5 mm tall, centred on
-# the point) run x 24.5-71.5 mm, inside the border and left of the rear
-# witness line (77.3), and y 120.7-135.3 mm, under datum A's symbol and
-# over the GEAR DATA block (top 118).  The drill and
+# The rear #2-56 tap's native callout, from the rear view's hole to the open
+# field under the journal.  Its leader lands on the lower corner of the
+# rows' underline, so rows that straddle the hole's x are struck by it
+# (r7 of #2425: centred under the rear view, the leader hid the "#" of
+# "#2-56" and the rows stood 1.6 mm over GEAR DATA), and the rear view has
+# no 47 mm clear of the border beside or above it (r6: 16 mm past the left
+# border).  Right of the rear witness line (77.3) the rows (~47 mm wide,
+# ~14.5 mm tall, centred on the point) run x 83.3-130.3 mm and y
+# 102.7-117.3 mm: under the journal's REF length line (y ~128), over the
+# overall's (y ~82) and right of the GEAR DATA block; the leader crosses
+# only the rear witness line, an extension line (rule 14).  The drill and
 # the full thread at their places (rule 12: the full thread and the deeper
 # drill each print), the screw it takes under the rows.
-REAR_TAP_CALLOUT_XY = (END_CENTER[0] + 0.003, 0.128)
+REAR_TAP_CALLOUT_XY = (REAR_X + 0.0295, 0.110)
 REAR_TAP_CALLOUT_HALF_WIDTH = 0.0235
 REAR_TAP_CALLOUT_HALF_HEIGHT = 0.0073
 REAR_TAP_CALLOUT_PRECISION = {
