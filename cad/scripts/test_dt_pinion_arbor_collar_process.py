@@ -57,7 +57,10 @@ def test_the_bench_gauges_read_inside_the_drawings_bands():
     p = _plan()["parameters"]
     hole = _features()["features"]["pin_hole"]
     low, high = (v / IN for v in hole["dia"])
-    assert low <= p["go_pin_in"] - 0.0002 and p["nogo_pin_in"] <= high + 1e-9
+    assert (
+        p["go_pin_in"] == pytest.approx(low, abs=1e-6)
+        and p["nogo_pin_in"] <= high + 1e-9
+    )
     station = [v / IN for v in hole["station"]]
     half = p["go_pin_in"] / 2
     assert p["station_far_side_min_in"] == pytest.approx(station[0] + half, abs=1e-4)

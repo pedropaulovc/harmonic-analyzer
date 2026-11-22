@@ -2,8 +2,8 @@
   <rect class="paper" x="0" y="0" width="760" height="280"/>
   <text class="title" x="20" y="20">The finished collar (not to scale)</text>
   <rect class="part-kept" x="200" y="80" width="330" height="140"/>
-  <rect class="part-removed" x="200" y="125" width="330" height="50"/>
-  <rect class="part-removed" x="356" y="80" width="18" height="140"/>
+  <rect class="holes" x="200" y="125" width="330" height="50"/>
+  <rect class="holes" x="356" y="80" width="18" height="140"/>
   <line class="centre-line" x1="170" y1="150" x2="560" y2="150"/>
   <line class="centre-line" x1="365" y1="60" x2="365" y2="240"/>
   <text class="label" x="200" y="70">face F</text>

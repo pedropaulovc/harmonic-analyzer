@@ -33,9 +33,9 @@
 title = "Pinion Arbor Retention Collar"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
-material = "1018 cold-finished steel, 5/8 in round (drawing: {{cad.material_spec}})"
+material = "1018 cold-finished steel, 5/8 in round (drawing: {{cad.material_name}})"
 stock = "Qty {{process.quantity:g}}. {{process.bar_dia_in:fraction}} in round bar on hand: one blank {{process.blank_length_in:.2f}} in long, and a 1 in offcut for the mill setup's spacer."
-note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Finished Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}} × {{cad.far_end_length_min_in:.2dot}}–{{cad.far_end_length_max_in:.2dot}} long, the Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} drilled bore through, the 1/16 pin hole through both walls {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from the faced (datum) end. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) and touch off G54 before the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Prove the file in air first."
+note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Finished Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}} × {{cad.far_end_length_min_in:.2dot}}–{{cad.far_end_length_max_in:.2dot}} long, the Ø{{process.bore_print_min_in:.3dot}}–{{process.bore_print_max_in:.3dot}} drilled bore through, the 1/16 pin hole through both walls {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from the faced (datum) end. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) and touch off G54 before the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Prove the file in air first."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
 material_key = "lathe-1018-cold-finished"
@@ -133,17 +133,23 @@ centre_drill_oal_mm = 31.75
 # depth with the chuck above the jaw tops; cam.py checks it.
 spot_projection_min_mm = 20.0
 drill_projection_min_mm = 26.0
-# Bench: the pin hole's GO / NO-GO pins, class ZZ minus (gauges.pin-gauges:
-# each pin up to .0002 under its size, never over; .001 steps). GO the .063
-# pin, .0628-.0630: a hole it enters is over the band's .0625 bottom (a hole
-# under .0630 may read out: on the safe side). NO-GO the .065 pin, at most
-# .0650: a hole it does not enter is under the band's top.
-go_pin_in = 0.063
+# Bench: the pin hole's GO is the .0625 class ZZ gauge pin (tools.gauge-pin-
+# 0625, the band's bottom); the NO-GO the .065 pin of the class ZZ minus set
+# (gauges.pin-gauges: at most .0650): a hole it does not enter is under the
+# band's top.
+go_pin_in = 0.0625
 nogo_pin_in = 0.065
 # The station read over the GO pin: the faced end to the pin's far side is
-# the station plus half the pin (.0315).
-station_far_side_min_in = 0.3515
-station_far_side_max_in = 0.3715
+# the station plus half the pin (.03125).
+station_far_side_min_in = 0.3513
+station_far_side_max_in = 0.3713
+# The bore as the sheet prints it: Ø.313 DRILL THRU under the title block's
+# DRILLED HOLES +.004/0, .313-.317 (the export carries the unrounded .3125
+# nominal with the same band, .3125-.3165).
+bore_print_min_in = 0.313
+bore_print_max_in = 0.317
+bore_print_min_mm = 7.9502
+bore_print_max_mm = 8.0518
 
 [[tools]]
 id = "saw"
@@ -184,6 +190,17 @@ ref = "cutoff-blade-p1"
 id = "file"
 name = "Files; bench vise with soft jaws"
 ref = "jig-files"
+
+[[tools]]
+id = "lathe-file"
+name = "Smooth file"
+ref = "jig-files"
+
+[[tools]]
+id = "gauge-pin"
+name = "Gauge pin .0625, class ZZ"
+ref = "gauge-pin-0625"
+status = "to_order"
 
 [[setups]]
 machine_kind = "other"
@@ -243,7 +260,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Over {{cad.outer_dia_max_in:.3dot}} at either station: another finish pass and mike again (Op 40). Under {{cad.outer_dia_min_in:.3dot}}: face the turned end off past Z-{{process.turn_length_in:.2f}} and start Setup 2 again on the rest of the blank, or saw another (Setup 1)."
+instruction = "Over {{cad.outer_dia_max_in:.3dot}} at either station: another finish pass and mike again (Op 40). Under {{cad.outer_dia_min_in:.3dot}}: saw another {{process.blank_length_in:.2f}} in blank (Setup 1) and start Setup 2 again."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -270,7 +287,7 @@ peck = "none"
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "file"
+tool = "lathe-file"
 drilling = "none"
 sizing = "other"
 instruction = "Break the faced end's outer edge with a smooth file held flat, and the bore's mouth with the file's corner, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max; spindle at the low range."
@@ -291,8 +308,13 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_dia_mm}}", alo
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_mm}}"], clamp_mm = ["{{process.end_overhang_mm}}", "{{process.blank_length_mm}}"], section_mm = { diameter = "{{cad.outer_dia_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 Y0 the turned O.D.'s axis, X0 face F: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm, Ø.200), its tip level with the blank's axis. Y, on the turned O.D. in the overhang: from the −Y side, G10 L20 P1 Y0; MDI G0 Z clear of the blank, then from the +Y side G10 L20 P1 Y(half the DRO's work Y reading). X, on face F from the left: G10 L20 P1 X-2.540."
+instruction = "Home the mill first ($H). G54 Y0 the turned O.D.'s axis: edge finder (900 rpm)."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm, Ø.200), its tip level with the blank's axis, on the turned O.D. in the overhang: from the −Y side, G10 L20 P1 Y0; MDI G0 Z clear of the blank, then from the +Y side G10 L20 P1 Y(half the DRO's work Y reading)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 X0 face F: edge finder (900 rpm) at Y5.750, on face F's ring between the Ø.313 bore and the Ø.59 O.D."
+instruction_detailed = "X and Z have no work zero yet, so jog: Z up until the tip clears the blank's top; X left until the tip is about .3 in left of face F; then MDI G0 Y5.750 (Y0 is set; the Ø.200 tip then spans R.126–.326, across face F's ring); jog Z down to put the tip at the blank's axis height. Bring the edge finder in from the left onto face F: G10 L20 P1 X-2.540. Jog X left .3 in and Z up clear before Op 110."
 feed = "hand"
 
 [[setups.operations]]
@@ -338,7 +360,7 @@ machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the blank's 5/8 end, the turned end out, {{process.part_off_stickout_mm:in.2f}} in out of the jaw fronts (the turned shoulder .15 in out of them)."
-datum = "DRO Z set on face F (Op 20's datum end) through the blade, as Op 140 says: the collar is parted .66 from it."
+datum = "DRO Z set on face F (Op 20's datum end) through the blade, as Op 150 says: the collar is parted .66 from it."
 diagram = { file = "diagrams/part-off.svg", alt = "The blank back in the 3-jaw, the turned end out; the P1 blade parts the collar off .66 from face F." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.part_off_stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
@@ -372,13 +394,13 @@ instruction = "File the parting burr off the parted face flat on the smooth file
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Length: calipers across face F and the parted face. Bore: the telescoping gauge at both ends, read on the micrometers. Pin hole: the {{process.go_pin_in:.3dot}} pin (GO) passes through both walls, the {{process.nogo_pin_in:.3dot}} pin (NO-GO) enters neither. Station: the GO pin through the hole, calipers from face F to the pin's far side, {{process.station_far_side_min_in:.4dot}}–{{process.station_far_side_max_in:.4dot}} (the station plus half the pin)."
-inspection = "Length {{cad.far_end_length_min_in:.2dot}}–{{cad.far_end_length_max_in:.2dot}}; bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}; pin hole Ø{{cad.pin_hole_dia_min_in:.4dot}}–{{cad.pin_hole_dia_max_in:.4dot}}, {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from face F."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.far_end_length_band_mm}}" }, { gauge = "telescoping-gauges-starrett-s579gz", band_mm = "{{cad.bore_dia_band_mm}}" }, { gauge = "pin-gauges", band_mm = "{{cad.pin_hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.pin_hole_station_band_mm}}" }]
+instruction = "Length: calipers across face F and the parted face. Bore: the telescoping gauge at both ends, read on the micrometers. Pin hole: the {{process.go_pin_in:.4dot}} gauge pin (GO) passes through both walls, the {{process.nogo_pin_in:.3dot}} pin (NO-GO) enters neither. Station: the GO pin through the hole, calipers from face F to the pin's far side, {{process.station_far_side_min_in:.4dot}}–{{process.station_far_side_max_in:.4dot}} (the station plus half the pin)."
+inspection = "Length {{cad.far_end_length_min_in:.2dot}}–{{cad.far_end_length_max_in:.2dot}}; bore Ø{{process.bore_print_min_in:.3dot}}–{{process.bore_print_max_in:.3dot}}; pin hole Ø{{cad.pin_hole_dia_min_in:.4dot}}–{{cad.pin_hole_dia_max_in:.4dot}}, {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from face F."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.far_end_length_band_mm}}" }, { gauge = "telescoping-gauges-starrett-s579gz", band_mm = ["{{process.bore_print_min_mm}}", "{{process.bore_print_max_mm}}"] }, { gauge = "pin-gauges", band_mm = "{{cad.pin_hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.pin_hole_station_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Out of any limit in Op 160: scrap the collar and make another from Setup 1. Over-long only: face the parted end on the lathe (3-jaw over a brass shim wrap, face F in) into the band, then read Op 160 again."
+instruction = "Out of any limit in Op 170: scrap the collar and make another from Setup 1. Over-long only: face the parted end on the lathe (3-jaw over a brass shim wrap, face F in) into the band, break the re-faced end's outer edge and bore mouth again as in Op 160, then read Op 170 again."
 feed = "hand"
 
 [[setups.operations]]

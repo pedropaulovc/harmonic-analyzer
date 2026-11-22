@@ -10,8 +10,10 @@
   <line class="centre-line" x1="160" y1="180" x2="700" y2="180"/>
   <line class="active-face" x1="590" y1="135" x2="590" y2="225"/>
   <rect class="cutter" x="600" y="168" width="110" height="24"/>
-  <text class="label" x="600" y="120">face F (datum end), DRO Z0</text>
+  <text class="label" x="470" y="100">face F (datum end), DRO Z0</text>
+  <line class="dims" x1="560" y1="104" x2="590" y2="135"/>
   <text class="label" x="300" y="120">O.D. turned to Ø.59, .80 long</text>
-  <text class="label" x="600" y="215">5/16 drill, .80 deep</text>
+  <text class="label" x="560" y="250">5/16 drill, .80 deep</text>
+  <line class="dims" x1="600" y1="238" x2="620" y2="192"/>
   <text class="label" x="40" y="315">The collar stays on the blank; the pin hole is drilled next (Setup 3), then it is parted off (Setup 4).</text>
 </svg>

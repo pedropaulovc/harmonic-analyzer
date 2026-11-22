@@ -6,20 +6,24 @@
   <rect class="fixture-support" x="258" y="190" width="296" height="70"/>
   <rect class="part-kept" x="120" y="152" width="160" height="38"/>
   <rect class="part-rest" x="280" y="150" width="140" height="40"/>
-  <rect class="fixture-support" x="480" y="150" width="74" height="40"/>
+  <rect class="part-rest" x="480" y="150" width="74" height="40"/>
   <rect class="part-removed" x="196" y="152" width="8" height="38"/>
   <rect class="cutter" x="196" y="60" width="8" height="86"/>
   <line class="centre-line" x1="200" y1="50" x2="200" y2="210"/>
   <line class="datum" x1="120" y1="130" x2="120" y2="215"/>
   <text class="datum-label" x="20" y="238">X0 face F</text>
+  <line class="dims" x1="80" y1="230" x2="120" y2="212"/>
   <line class="datum" x1="110" y1="152" x2="250" y2="152"/>
   <text class="datum-label" x="225" y="84">Z0 the turned O.D. top</text>
+  <line class="dims" x1="240" y1="88" x2="240" y2="152"/>
   <line class="dims" x1="120" y1="300" x2="200" y2="300"/>
   <text class="label" x="110" y="322">.33 to the pin hole</text>
   <line class="dims" x1="120" y1="250" x2="258" y2="250"/>
   <text class="label" x="150" y="270">.50 out</text>
   <text class="label" x="20" y="48">centre drill, then 1/16 through both walls</text>
   <text class="label" x="420" y="72">jaw (behind) grips the blank's 5/8 end</text>
-  <text class="label" x="330" y="310">4 in parallel on edge, centred</text>
-  <text class="label" x="560" y="310">offcut spacer on the parallel's right end</text>
+  <text class="label" x="300" y="325">4 in parallel on edge, centred</text>
+  <line class="dims" x1="380" y1="313" x2="380" y2="230"/>
+  <text class="label" x="520" y="325">offcut spacer on the parallel's right end</text>
+  <line class="dims" x1="580" y1="313" x2="520" y2="185"/>
 </svg>
