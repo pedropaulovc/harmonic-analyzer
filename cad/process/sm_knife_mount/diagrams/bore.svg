@@ -11,7 +11,7 @@
   <rect class="part-kept" x="200.0" y="191.7" width="101.6" height="55.9"/>
   <rect class="holes" x="226.8" y="191.7" width="48.0" height="55.9"/>
   <line class="centre-line" x1="250.8" y1="177.7" x2="250.8" y2="261.6"/>
-  <rect class="cutter" x="226.8" y="121.7" width="48.0" height="60.0"/>
+  <rect class="cutter" x="226.8" y="141.7" width="48.0" height="40.0"/>
   <text class="label-on-clamp" x="175.0" y="390.0" text-anchor="middle">moving</text>
   <text class="label-on-clamp" x="326.6" y="390.0" text-anchor="middle">fixed</text>
   <line class="datum" x1="301.6" y1="151.7" x2="301.6" y2="187.7"/>

@@ -131,6 +131,10 @@ PARALLEL_LENGTH_MM = 4 * IN
 PLAN_TOL_MM = 0.01
 # The least metal the recipe leaves between a drilled hole and the knife bore.
 WEB_MIN_MM = 1.5
+# The B-to-tap spacing over gauge pins is a gross check (the program holds
+# the tap's Ø.005 position): ±.010, wider than the zone plus the pins'
+# clearance in their holes, so a good part never reads outside it.
+TAP_SPACING_GROSS_MM = 0.254
 FACE_CUTS = ("back face", "depth", "underside", "s end", "width", "height")
 
 
@@ -732,10 +736,14 @@ def context(
     ):
         _agree(plan, f"{key}_min_mm", basic - zone / (2 * math.sqrt(2)))
         _agree(plan, f"{key}_max_mm", basic + zone / (2 * math.sqrt(2)))
-    # The tap's spacing to B, a gross check only (the program holds its
-    # position): ±(zone Ø)/2 from the BASIC.
-    _agree(plan, "tap_from_b_min_mm", tap["basic_from_b"] - tap["position_dia"] / 2)
-    _agree(plan, "tap_from_b_max_mm", tap["basic_from_b"] + tap["position_dia"] / 2)
+    # The tap's spacing to B, a gross check only: wider than half the zone
+    # plus the pins' clearance (B's largest Ø less the GO; the #25 hole's
+    # drill-point wander allowed as much again).
+    pin_play = dowel["dia"][1] - dowel["dia"][0]
+    if TAP_SPACING_GROSS_MM < tap["position_dia"] / 2 + 2 * pin_play:
+        raise ValueError("the tap spacing's gross band is inside the pins' play")
+    _agree(plan, "tap_from_b_min_mm", tap["basic_from_b"] - TAP_SPACING_GROSS_MM)
+    _agree(plan, "tap_from_b_max_mm", tap["basic_from_b"] + TAP_SPACING_GROSS_MM)
     # KM07's reference station on A: the tap's point (no wider than its drill)
     # stands on solid A between B and the tap drill.
     ref_x = plan["parameters"]["tap_ref_x_mm"]

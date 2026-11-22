@@ -12,7 +12,7 @@
   <rect class="part-removed" x="200.0" y="161.2" width="55.9" height="18.3"/>
   <rect class="holes" x="221.4" y="179.5" width="13.0" height="38.6"/>
   <line class="centre-line" x1="227.9" y1="165.5" x2="227.9" y2="232.1"/>
-  <rect class="cutter" x="221.4" y="91.2" width="13.0" height="60.0"/>
+  <rect class="cutter" x="221.4" y="111.2" width="13.0" height="40.0"/>
   <text class="label-on-clamp" x="175.0" y="390.0" text-anchor="middle">moving</text>
   <text class="label-on-clamp" x="280.9" y="390.0" text-anchor="middle">fixed</text>
   <line class="datum" x1="255.9" y1="139.5" x2="255.9" y2="175.5"/>
@@ -33,7 +33,11 @@
   <text class="label-halo" x="607.6" y="191.9">N</text>
   <text class="label-on-clamp" x="550.8" y="152.0" text-anchor="middle">fixed jaw (F)</text>
   <text class="label-on-clamp" x="550.8" y="232.9" text-anchor="middle">moving jaw</text>
-  <text class="label-halo" x="520.3" y="259.9" text-anchor="middle">B</text>
-  <text class="label-halo" x="550.8" y="259.9" text-anchor="middle">#10-24</text>
-  <text class="label-halo" x="380.0" y="300.0">B .37 deep and the #25 .438 deep: blind</text>
+  <text class="label-halo" x="502.3" y="259.9" text-anchor="end">B</text>
+  <line class="leader" x1="502.3" y1="249.9" x2="520.3" y2="194.4"/>
+  <circle class="leader-dot" cx="520.3" cy="194.4" r="2"/>
+  <text class="label-halo" x="568.8" y="259.9" text-anchor="start">#10-24</text>
+  <line class="leader" x1="568.8" y1="249.9" x2="550.8" y2="195.5"/>
+  <circle class="leader-dot" cx="550.8" cy="195.5" r="2"/>
+  <text class="label-halo" x="500.0" y="285.9">B .37 deep, the #25 .438 deep: both blind</text>
 </svg>

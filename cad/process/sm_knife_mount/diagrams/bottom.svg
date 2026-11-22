@@ -10,7 +10,7 @@
   <rect class="fixture-support" x="243.2" y="298.4" width="12.7" height="101.6"/>
   <rect class="part-kept" x="200.0" y="161.2" width="55.9" height="137.2"/>
   <rect class="part-removed" x="200.0" y="158.2" width="55.9" height="3.0"/>
-  <rect class="cutter" x="202.5" y="88.2" width="50.8" height="60.0"/>
+  <rect class="cutter" x="202.5" y="108.2" width="50.8" height="40.0"/>
   <text class="label-on-clamp" x="175.0" y="390.0" text-anchor="middle">moving</text>
   <text class="label-on-clamp" x="280.9" y="390.0" text-anchor="middle">fixed</text>
   <line class="datum" x1="255.9" y1="121.2" x2="255.9" y2="157.2"/>
