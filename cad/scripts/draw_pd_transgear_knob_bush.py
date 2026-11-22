@@ -122,7 +122,7 @@ HUB_FACE_X = SECTION_CENTER[0] - HALF_LENGTH
 SHOULDER_X = HUB_FACE_X + HUB_LENGTH * _S / 1000.0
 REAR_FACE_X = SECTION_CENTER[0] + HALF_LENGTH
 # The native SECTION caption, top-centre anchored, under the section and
-# below datum A's tag and the root radius.
+# below datum A's tag.  Its scale row is dropped (``_drop_caption_scale``).
 CAPTION_XY = (SECTION_CENTER[0], SECTION_CENTER[1] - HALF_HUB - 0.045)
 
 # Section A-A's dimension texts.  Each diameter's text sits between its own
@@ -131,8 +131,9 @@ CAPTION_XY = (SECTION_CENTER[0], SECTION_CENTER[1] - HALF_HUB - 0.045)
 # now prints on the face view).  Left of the hub face the hub Ø, far enough
 # out that the hub face's finish and caption stand between it and the part;
 # right of the rear face the press Ø, its block beyond the rear face's
-# finish and caption.  Above: the hub station, then the overall length over
-# it.  The root radius' leader runs through the arc's centre, which lies
+# finish and caption; its arrows stand outside its extension lines
+# (``_press_arrows_outside``).  Above: the hub station, then the overall
+# length over it.  The root radius' leader runs through the arc's centre, which lies
 # outside the part above and right of the upper root (r9: with the text
 # below the part it ran 37 mm through both walls and the bore to reach it).
 # Its text (24.8 mm) stands just right of the overall's rear extension line,
@@ -157,6 +158,7 @@ SECTION_KEEP = {
 FACE_KEEP = {
     "BoreDia": (FACE_CENTER[0] + 0.015, FACE_CENTER[1] + HALF_HUB + 0.0265),
 }
+_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 # The bore's block, read off r6's A-A: 96 mm wide, 25 mm from shelf to top.
 BORE_BLOCK_SIZE_M = (0.096, 0.025)
 
@@ -364,6 +366,73 @@ def _shoulder_cut_line(adapter: Any, section: Any) -> Any:
     return lines[lower].edge
 
 
+def _drop_caption_scale(adapter: Any, section: Any) -> None:
+    """Print A-A's caption without its scale row.
+
+    The section is at the sheet's 3:1, yet r9 and r10 printed "SCALE 3 : 1"
+    under "SECTION A-A" (machinist review r10, three runs: rule 9 prints a
+    view's scale only where it differs from the sheet's).  The caption keeps
+    its native label fields; any other field layout fails loud.
+    """
+    native = _early_bound(section, "IView")
+    ratio = tuple(float(value) for value in native.ScaleRatio)
+    if ratio != SHEET_SCALE:
+        raise RuntimeError(f"knob bush A-A is not at the sheet scale: {ratio!r}")
+    captions = []
+    for raw_note in native.GetNotes() or ():
+        note = _early_bound(raw_note, "INote")
+        linked_text = str(note.PropertyLinkedText or "")
+        if "<VLLABEL>" in linked_text:
+            captions.append((note, linked_text))
+    if len(captions) != 1:
+        raise RuntimeError(f"expected one knob bush A-A caption, found {len(captions)}")
+    note, linked_text = captions[0]
+    _telemetry.info(f"knob bush A-A caption fields {linked_text!r}")
+    if "<VLSCALE" not in linked_text:
+        return
+    wanted = caption_without_scale(linked_text)
+    note.PropertyLinkedText = wanted
+    rebuild_drawing(adapter, label="knob bush A-A caption without scale")
+    if str(note.PropertyLinkedText or "") != wanted:
+        raise RuntimeError("knob bush A-A caption fields did not persist")
+
+
+def caption_without_scale(linked_text: str) -> str:
+    """The caption's label row (``<VLNAME>`` and ``<VLLABEL>``) alone."""
+    rows = [row for row in linked_text.replace("\r\n", "\n").split("\n") if row.strip()]
+    kept = [row for row in rows if "<VLSCALE" not in row]
+    if (
+        len(rows) - len(kept) != 1
+        or len(kept) != 1
+        or "<VLNAME>" not in kept[0]
+        or "<VLLABEL>" not in kept[0]
+    ):
+        raise RuntimeError(f"caption scale row is not separable: {linked_text!r}")
+    return kept[0]
+
+
+def _press_arrows_outside(adapter: Any, annotations: list[Any]) -> None:
+    """Stand the press Ø's arrows outside its extension lines.
+
+    Its block (stacked limits over two callout rows, 22 mm) is taller than
+    the 19.6 mm the two inside arrows' shafts leave of the 33.3 mm between
+    the lines: r10's lower shaft ran through the "(" of the last row.
+    Outside, no line runs between the extension lines (MHA-PD-16's pilot Ø).
+    """
+    matches = [
+        item for item in annotations if dimension_name(adapter, item) == "PressDia"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one PressDia dimension, found {len(matches)}")
+    display = _early_bound(
+        _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
+    )
+    display.ArrowSide = _ARROWS_OUTSIDE
+    if int(display.ArrowSide) != _ARROWS_OUTSIDE:
+        raise RuntimeError("the press Ø's arrows did not move outside")
+
+
 @_telemetry.traced("drawing.pd_transgear_knob_bush.callouts")
 def _assert_dimension_callouts(adapter: Any, annotations: list[Any]) -> None:
     """Import the part-authored callout rows verbatim; never write them here.
@@ -441,6 +510,7 @@ def build(adapter: Any) -> dict[str, str]:
         label="knob bush axial section",
     )
     _orient_section(adapter, section)
+    _drop_caption_scale(adapter, section)
     position_section_caption(adapter, section, CAPTION_XY, label="knob bush")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     for view in (face, section, iso):
@@ -466,6 +536,7 @@ def build(adapter: Any) -> dict[str, str]:
     annotations = [*section_annotations, *face_annotations]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _assert_dimension_callouts(adapter, annotations)
+    _press_arrows_outside(adapter, section_annotations)
     create_section_axis_centerline(
         adapter, section, length_mm=LENGTH, label="knob bush axis"
     )

@@ -27,7 +27,7 @@ ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 [[tools]]
 id = "endmill-hss-tin-2fl-3-16"
 name = "3/16 two-flute end mill"
-ref = "endmill-hss-tin-2fl-3-16"  # #2425: the Ø.188 head pocket's flat floor, plunged from the tailstock
+ref = "endmill-hss-tin-2fl-3-16"  # #2425: the Ø.19 head pocket's flat floor, plunged from the tailstock
 
 [[tools]]
 id = "drill-b"

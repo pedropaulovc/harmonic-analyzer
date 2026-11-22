@@ -126,13 +126,12 @@ SHAFT_NUMBER = _config.parts("pd-transgear-knob-shaft")["number"]
 BUSH_NUMBER = _config.parts("pd-transgear-knob-bush")["number"]
 # drawing-guidelines.md rule 23: a bonded fit is a fit -- the pilot's band
 # names its mate and the diametral clearance, inside LOCTITE 641's gap fill
-# (the spec asserts it); the grade and method are the assembly step's.  The
-# process row says the blind pilot is end-milled to a flat floor (rule 12),
-# since a reamer cannot reach one.  Rule 7: the process line plus two lines
-# of words, each within the 24 characters that fit between the front face
-# and the isometric.
+# (the spec asserts it); the grade and method are the assembly step's.  No
+# process row: the section draws the pilot's flat floor and R.005 MAX limits
+# its corner, so "FLAT BOTTOM END MILL" named a tool, not a requirement
+# (rule 7; machinist review r10, three runs).  Two lines of words, each
+# within the 24 characters that fit between the front face and the isometric.
 BORE_CALLOUT = (
-    "FLAT BOTTOM END MILL\n"
     f"BONDED FIT ON {SHAFT_NUMBER}\n"
     f"(CLEARANCE {BORE_CLEARANCE_TEXT})"
 )
@@ -155,9 +154,9 @@ SECTION_CALLOUTS = {
 FACE_CALLOUTS = {"HoleDia": HOLE_CALLOUT}
 
 # Half the height of the bore's value-and-callout block: 31 mm on the
-# eecbf88 render for the stacked band over four callout rows; three rows and
-# the shelf row now.
-BORE_BLOCK_HALF_HEIGHT = 0.0153
+# eecbf88 render for the stacked band over four callout rows, 31.7 mm for
+# three and the shelf row (r10); two rows and the shelf row now.
+BORE_BLOCK_HALF_HEIGHT = 0.0130
 # The O.D. outermost on the rear-face side, between the face view and the
 # section; the pocket's Ø inside it, its text dropped below the pocket so the
 # two stand apart.  The pilot right of the front face: its block (taller than
@@ -215,11 +214,15 @@ NOTES = (
 NOTES_XY = (0.020, 0.112)
 # The front face's finish caption names the face's function and its mate
 # (rule 6: a finish only on a face that runs, slides or locates; machinist
-# review: the face's function was stated nowhere).  Just above the symbol (a
-# run-1 reviewer read the 6 mm gap as a caption floating free of it), right
-# of the pilot depth's text and left of the isometric.
-FRONT_FINISH_CAPTION = f"THRUST FACE ON\n{BUSH_NUMBER} REAR FACE"
-FRONT_FINISH_CAPTION_XY = (FRONT_FINISH[1][0] - 0.007, FRONT_FINISH[1][1] + 0.0185)
+# review: the face's function was stated nowhere).  On the symbol's own row,
+# right of its Ra text (which ends 13.7 mm right of the V): over the symbol
+# it stood on the pilot depth's ".152 / SEE NOTE 1" row and read as words on
+# that dimension (machinist review r10, two runs).  Three rows (32.7 mm wide,
+# top-left anchored) end 2 mm short of the isometric's outline and stand
+# over the pilot Ø's upper arrow, which rises 3.5 mm off its extension line.
+FRONT_FINISH_CAPTION = f"THRUST FACE\nON {BUSH_NUMBER}\nREAR FACE"
+FRONT_FINISH_CAPTION_SIZE_M = (0.0327, 0.0146)
+FRONT_FINISH_CAPTION_XY = (FRONT_FINISH[1][0] + 0.016, FRONT_FINISH[1][1] + 0.0163)
 # A note's read-back position may differ from the one asked by this much.
 NOTE_POSITION_TOL_M = 5e-4
 # How far A-A's axis may sit from SECTION_CENTER / level before it is moved.

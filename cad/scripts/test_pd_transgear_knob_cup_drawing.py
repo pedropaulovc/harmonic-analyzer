@@ -115,7 +115,10 @@ def test_pilot_callout_names_its_bonded_mate_and_stands_clear_below_the_pilot() 
     diametral clearance."""
     shaft = _config.parts("pd-transgear-knob-shaft")["number"]
     callout = " ".join(drawing.BORE_CALLOUT.split())
-    assert callout.startswith("FLAT BOTTOM END MILL ")
+    # Rule 7, machinist review r10: no tool or method words; the section
+    # draws the flat floor and R.005 MAX limits its corner.
+    assert "END MILL" not in callout and "FLAT BOTTOM" not in callout
+    assert callout.startswith("BONDED FIT ON ")
     assert "REAM" not in callout
     assert "THRU" not in callout
     assert f"BONDED FIT ON {shaft}" in callout
@@ -127,7 +130,7 @@ def test_pilot_callout_names_its_bonded_mate_and_stands_clear_below_the_pilot() 
     rows = printed.splitlines()
     assert rows[:-1] == [f" {row}" for row in drawing.BORE_CALLOUT.splitlines()]
     assert rows[-1] == "\u00a0"
-    # Rule 7: the process line plus two lines of words, 24 characters each.
+    # Rule 7: two lines of words, 24 characters each.
     assert all(len(row) <= 24 for row in drawing.BORE_CALLOUT.splitlines())
 
     anchor = drawing.SECTION_KEEP["BoreDia"]
@@ -202,7 +205,22 @@ def test_front_finish_caption_names_the_bush_rear_face() -> None:
     caption = " ".join(drawing.FRONT_FINISH_CAPTION.split())
     assert "THRUST FACE" in caption
     assert f"{bush_number} REAR FACE" in caption
-    assert drawing.FRONT_FINISH_CAPTION_XY[1] > drawing.FRONT_FINISH[1][1]
+    # Machinist review r10: over the symbol the caption stood on the pilot
+    # depth's row and read as that dimension's words.  It hangs on the
+    # symbol's row, right of the Ra text, short of the isometric's outline
+    # and over the pilot Ø's upper arrow.
+    left, top = drawing.FRONT_FINISH_CAPTION_XY
+    width, height = drawing.FRONT_FINISH_CAPTION_SIZE_M
+    symbol = drawing.FRONT_FINISH[1]
+    assert left > symbol[0] + 0.0137 + 0.002
+    assert top - height < symbol[1] + 0.0043 < symbol[1] + 0.0068 < top
+    assert left + width < drawing.ISO_CENTER[0] - 0.0372 - 0.0015
+    upper_extension = drawing.SECTION_CENTER[1] + drawing.HALF_BORE
+    assert top - height > upper_extension + 0.0035 + 0.002
+    pilot_text_right = (
+        drawing.SECTION_KEEP["PilotDepth"][0] + drawing.DEPTH_TEXT_HALF_WIDTH
+    )
+    assert left > pilot_text_right + 0.020
     # The pick is on the front face's cut edge, above the pilot's upper
     # extension line; the symbol stands level with it, so the leader runs
     # straight in under the pilot depth's text.
@@ -227,7 +245,7 @@ def test_cup_diameters_stand_between_the_face_view_and_the_section() -> None:
     od_box = estimate_text_box("Ø.44", anchor=od_anchor, height=0.0035, reference=2)
     cbore_anchor = drawing.SECTION_KEEP["CboreDia"]
     cbore_box = estimate_text_box(
-        "Ø.188", anchor=cbore_anchor, height=0.0035, reference=2
+        "Ø.19", anchor=cbore_anchor, height=0.0035, reference=2
     )
     assert od_box is not None and cbore_box is not None
     # Clear of the face view's centre-mark tail and of the section.
@@ -264,10 +282,10 @@ def test_floor_corners_are_max_limits_that_clear_their_mates() -> None:
     assert spec.CORNER_TOL_TYPE == 0
     assert knob_shaft.REAR_CHAMFER_MIN == pytest.approx(0.010 * IN)
     assert knob_shaft.REAR_CHAMFER_MIN >= spec.PILOT_FLOOR_R_MAX
-    cbore_min = spec.CBORE_DIA - _band(spec.CBORE_PLACES)
+    cbore_min = spec.CBORE_DIA - _band(spec.CBORE_DIA_PLACES)
     clearance = cbore_min / 2.0 - spec.POCKET_FLOOR_R_MAX - screw.HEAD_DIA / 2.0
     assert spec.HEAD_CORNER_CLEARANCE_MIN == pytest.approx(clearance)
-    assert clearance == pytest.approx(0.0115 * IN, abs=1e-9)
+    assert clearance == pytest.approx(0.010 * IN, abs=1e-9)
 
 
 def test_a_sharper_journal_chamfer_refuses_the_pilot_corner(monkeypatch) -> None:
@@ -293,7 +311,8 @@ def test_owner_sizes_follow_the_bush_stub() -> None:
     assert spec.LENGTH == pytest.approx(0.36 * IN)
     assert spec.PILOT_DEPTH == pytest.approx(0.152 * IN)
     assert spec.CLEAR_HOLE_DIA == pytest.approx(0.113 * IN)  # #33
-    assert spec.CBORE_DIA == pytest.approx(0.188 * IN)
+    assert spec.CBORE_DIA == pytest.approx(0.19 * IN)
+    assert (spec.CBORE_DIA_PLACES, spec.CBORE_DEPTH_PLACES) == (2, 3)
     assert spec.CBORE_DEPTH == pytest.approx(0.108 * IN)
     assert spec.WEB == pytest.approx(0.100 * IN)
 
@@ -304,17 +323,17 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
     web_min = (
         (spec.LENGTH - _band(spec.LENGTH_PLACES))
         - (spec.PILOT_DEPTH + _band(spec.PILOT_DEPTH_PLACES))
-        - (spec.CBORE_DEPTH + _band(spec.CBORE_PLACES))
+        - (spec.CBORE_DEPTH + _band(spec.CBORE_DEPTH_PLACES))
     )
     pilot_wall = (od_min - (spec.BORE_DIA + max(spec.BORE_BAND))) / 2.0
-    cbore_wall = (od_min - (spec.CBORE_DIA + _band(spec.CBORE_PLACES))) / 2.0
+    cbore_wall = (od_min - (spec.CBORE_DIA + _band(spec.CBORE_DIA_PLACES))) / 2.0
     assert spec.WEB_MIN == pytest.approx(web_min)
     assert spec.PILOT_WALL_WORST == pytest.approx(pilot_wall)
     assert spec.CBORE_WALL_WORST == pytest.approx(cbore_wall)
-    # .080 web (exactly the target), .0895 and .1185 rings.
+    # .080 web (exactly the target), .0895 and .115 rings.
     assert web_min == pytest.approx(0.080 * IN, abs=1e-9)
     assert pilot_wall == pytest.approx(0.0895 * IN, abs=1e-9)
-    assert cbore_wall == pytest.approx(0.1185 * IN, abs=1e-9)
+    assert cbore_wall == pytest.approx(0.115 * IN, abs=1e-9)
     for wall in (web_min, pilot_wall, cbore_wall):
         assert wall >= WALL_TARGET_MM - 1e-9
 
@@ -404,9 +423,9 @@ def test_the_head_seats_on_the_web_inside_the_pocket() -> None:
     assert spec.HOLE_FILLET_CLEARANCE_MIN > 0.0
     assert spec.HEAD_BEARING_LAND == pytest.approx((screw.HEAD_DIA - hole_max) / 2.0)
     assert spec.HEAD_BEARING_LAND > 0.0
-    cbore_min = spec.CBORE_DIA - _band(spec.CBORE_PLACES)
-    assert (cbore_min - screw.HEAD_DIA) / 2.0 == pytest.approx(0.0215 * IN, abs=1e-9)
-    depth_min = spec.CBORE_DEPTH - _band(spec.CBORE_PLACES)
+    cbore_min = spec.CBORE_DIA - _band(spec.CBORE_DIA_PLACES)
+    assert (cbore_min - screw.HEAD_DIA) / 2.0 == pytest.approx(0.020 * IN, abs=1e-9)
+    depth_min = spec.CBORE_DEPTH - _band(spec.CBORE_DEPTH_PLACES)
     assert depth_min - screw.HEAD_H == pytest.approx(0.020 * IN, abs=1e-9)
     # The screw's clearance drill is the #2 close fit, never the tap drill.
     assert spec.CLEAR_HOLE_DIA > TAP_DRILL_MM[knob_shaft.REAR_TAP_THREAD]

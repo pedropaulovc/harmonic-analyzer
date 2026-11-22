@@ -68,21 +68,26 @@ BORE_DIA = 6.35  # .250
 BORE_BAND = (0.0254, 0.0)  # (upper, lower) deviations: +.001/-.000
 PILOT_DEPTH = 3.8608  # .152 as turned (SUPPLY)
 # The web's #33 drill and the rear pocket the screw head sinks in, cut flat
-# with a 3/16 end mill after the drill (a clearance pocket, .XXX row).
+# with a 3/16 end mill after the drill.  The pocket only clears the head, so
+# its Ø prints .XX (rule 3; machinist review r10: ".188" carried a third
+# place with no band and no function); its depth keeps .XXX, which holds the
+# web at the .080 target.
 CLEAR_HOLE_DIA = 2.8702  # #33, .113
-# Modelled on the printed .001 grid (the 3/16 cutter's .1875 lies in its band).
-CBORE_DIA = 4.7752  # .188
+# Modelled on the printed .01 grid (the 3/16 cutter's .1875 lies in its band).
+CBORE_DIA = 4.826  # .19
 CBORE_DEPTH = 2.7432  # .108
 
 # Places each printed dimension carries (drawing-guidelines.md rule 3): the
 # O.D. and the length are routine at .XX; the pilot prints .XXX under its
-# end-milled band; its depth, the drill and the pocket print .XXX.
+# end-milled band; its depth, the drill and the pocket's depth print .XXX,
+# the pocket's Ø .XX.
 OD_PLACES = 2
 LENGTH_PLACES = 2
 BORE_PLACES = 3
 PILOT_DEPTH_PLACES = 3
 HOLE_PLACES = 3
-CBORE_PLACES = 3
+CBORE_DIA_PLACES = 2
+CBORE_DEPTH_PLACES = 3
 
 if not math.isclose(
     OD, math.floor(BUSH.PRESS_DIA / MM_PER_IN * 10**OD_PLACES + 0.5) / 10**OD_PLACES
@@ -95,8 +100,10 @@ WALL_FLOOR = WALL_TARGET_MM
 _OD_LO, _ = printed_deviations(OD, OD_PLACES, unit=UNIT)
 _LENGTH_LO, _LENGTH_HI = printed_deviations(LENGTH, LENGTH_PLACES, unit=UNIT)
 _PILOT_LO, _PILOT_HI = printed_deviations(PILOT_DEPTH, PILOT_DEPTH_PLACES, unit=UNIT)
-_CBORE_DIA_LO, _CBORE_DIA_HI = printed_deviations(CBORE_DIA, CBORE_PLACES, unit=UNIT)
-_CBORE_DEPTH_LO, _CBORE_DEPTH_HI = printed_deviations(CBORE_DEPTH, CBORE_PLACES, unit=UNIT)
+_CBORE_DIA_LO, _CBORE_DIA_HI = printed_deviations(CBORE_DIA, CBORE_DIA_PLACES, unit=UNIT)
+_CBORE_DEPTH_LO, _CBORE_DEPTH_HI = printed_deviations(
+    CBORE_DEPTH, CBORE_DEPTH_PLACES, unit=UNIT
+)
 # DRILLED HOLES: the drill's own size, never under.
 HOLE_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # (upper, lower) deviations
 OD_MIN = OD + _OD_LO
@@ -279,8 +286,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "CupLength": LENGTH_PLACES,
         "BoreDia": BORE_PLACES,
         "PilotDepth": PILOT_DEPTH_PLACES,
-        "CboreDia": CBORE_PLACES,
-        "CboreDepth": CBORE_PLACES,
+        "CboreDia": CBORE_DIA_PLACES,
+        "CboreDepth": CBORE_DEPTH_PLACES,
         "PilotFloorR": CORNER_R_PLACES,
         "PocketFloorR": CORNER_R_PLACES,
     },

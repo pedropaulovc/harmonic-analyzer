@@ -2269,13 +2269,19 @@ def _step_text(
     )
     # Each a pair of sub-steps, one action each (machinist review, #2417).
     # The cured LOCTITE 641 lets go only hot (rule 23: about 250 °C); the bush
-    # runs in oil, so the heat is kept off it (codjiflo review, #2425).
+    # runs in oil, so the heat is kept off it (codjiflo review, #2425).  The
+    # screw's removal is its own sub-step, and the strips at 28 and 33 cite
+    # the pair in step 22 (machinist review r10 of #2425: one action each).
     knob_cup_off = (
-        f"UNSCREW THE {n['pd-vn-transgear-knob-cup-screw']} SCREW, THEN HEAT THE "
-        f"{n['pd-transgear-knob-cup']} CUP TO ABOUT 250\u00b0C, THE HEAT KEPT OFF THE "
-        f"{bush} BUSH'S OIL, AND PULL IT OFF THE JOURNAL.",
-        f"DRAW THE {n['pd-transgear-knob-shaft']} SHAFT OUT FORWARD.",
+        f"UNSCREW THE {n['pd-vn-transgear-knob-cup-screw']} SCREW.",
+        f"PULL THE {n['pd-transgear-knob-cup']} CUP OFF THE JOURNAL HOT, ABOUT "
+        f"250\u00b0C, THE HEAT KEPT OFF THE {bush} BUSH'S OIL.",
     )
+    knob_cup_off_cited = (
+        f"TAKE THE {n['pd-transgear-knob-cup']} CUP OFF AS "
+        f"{s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 15)}."
+    )
+    knob_shaft_out = f"DRAW THE {n['pd-transgear-knob-shaft']} SHAFT OUT FORWARD."
     pivot_unscrewed = (
         f"UNSCREW THE {n['pd-vn-transgear-pivot-screw']} SCREW.",
         "LIFT THE ARM OFF.",
@@ -2298,7 +2304,7 @@ def _step_text(
     # #3106: a feed sleeve found outside after the cluster is hung is renewed
     # as 12W-12X renew it, from the stripped cluster: the collar slid on at
     # 22 comes off first, the hub's oil hole is drilled on into the new
-    # sleeve (step 17) and the collar goes back on (22T; the bonded cup
+    # sleeve (step 17) and the collar goes back on (22U; the bonded cup
     # stays, #2425). Written once at 24 and pointed to from 26 (the
     # step-line budget), one action per sub-step (machinist review of
     # 592b20079f).
@@ -2309,7 +2315,7 @@ def _step_text(
         f"FOR IT, DO {s('arm-plate-located', 20)} AND THE REPEATS IN "
         f"{s('arm-plate-located', 21)} ON A NEW ONE.",
         f"FOR IT, REPEAT STEPS {steps.step_number('oil-hole-drilled')}-"
-        f"{steps.step_number('disc-cluster-shimmed')} AND {s('knob-stack-fitted', 17)}, "
+        f"{steps.step_number('disc-cluster-shimmed')} AND {s('knob-stack-fitted', 18)}, "
         f"THEN FROM {s('hanger-meshed', 0)}.",
     )
 
@@ -2500,16 +2506,19 @@ def _step_text(
             "ARM'S REAMED HOLE FROM THE REAR UNTIL ITS HEAD SEATS ON THE ARM.",
             _press_remedy("PIN", f"{n['pd-transgear-arm']} ARM", "latch-pin-pressed"),
             f"PRESS THE {bush} BUSH, STUB FIRST, INTO THE {n['pd-transgear-arm-plate']} "
-            "PLATE FROM FACE A UNTIL ITS SHOULDER SEATS.",
+            f"PLATE FROM ITS FRONT FACE (FACE A ON {n['pd-transgear-arm-plate']}) "
+            "UNTIL ITS SHOULDER SEATS.",
             # The bush is turned to the plate's measured hole, so a slip fit
             # is an undersize bush, not a bad plate (codjiflo review, #2425).
-            f"IF IT SLIDES IN BY HAND, TAKE IT OUT, TURN A NEW {bush} BUSH TO THE "
-            f"PLATE'S MEASURED HOLE AND REPEAT {s('pin-pressed', 2)}.",
+            # One action per sub-step, the face named by its view and the
+            # ream by its mate, fit and gauge (machinist review r10, #2425).
+            f"IF IT SLIDES IN BY HAND, REPEAT {s('pin-pressed', 2)} WITH A NEW {bush} "
+            "BUSH TURNED TO THE PLATE'S MEASURED HOLE.",
             f"CHECK: A {bush_seat_feeler} FEELER DOES NOT ENTER UNDER THE SHOULDER.",
-            f"IF IT ENTERS, PRESS AGAIN; IF IT STILL ENTERS, MAKE A NEW "
-            f"{n['pd-transgear-arm-plate']} PLATE AND {bush} BUSH AND REPEAT FROM "
-            f"{s('pin-pressed', 2)}.",
-            f"REAM THE BUSH'S BORE \u00d8{bush_ream} THRU.",
+            f"IF IT ENTERS AFTER A SECOND PRESS, REPEAT FROM {s('pin-pressed', 2)} "
+            f"WITH A NEW {n['pd-transgear-arm-plate']} PLATE AND {bush} BUSH.",
+            f"REAM THE BUSH'S BORE \u00d8{bush_ream} THRU, A RUNNING FIT ON THE "
+            f"{n['pd-transgear-knob-shaft']} JOURNAL, CHECKED WITH PIN GAUGES.",
         ),
         # #2417: the pin is already pressed (its shank, not its head, is S),
         # and the reducer is meshed on its real seats while the plate is
@@ -2653,7 +2662,7 @@ def _step_text(
             # within the step's 24 letters (review of 70917f0316).
             "IF A DOWEL SLIDES IN BY HAND, BOND IT PER THE BOND NOTE AT "
             f"{detail_cite('arm-plate-fitted')[1:-1]}.",
-            "CHECK: PUSHED, A BONDED DOWEL DOES NOT MOVE; IT READS AS "
+            "CHECK: A BONDED DOWEL, PUSHED, STILL READS AS "
             f"{s('arm-plate-fitted', 5)}.",
             f"IF IT MOVES OR READS OUTSIDE, RENEW AS {s('arm-plate-fitted', 22)}.",
             "FIT THE PLATE BACK ON ITS DOWELS AND MATCH-MARK ARM AND PLATE.",
@@ -2974,8 +2983,9 @@ def _step_text(
             f"{row_cite('knob-end-float')}.",
             "CHECK: SHAFT HELD, THE CUP DOES NOT TURN OR SLIDE ON THE JOURNAL BY HAND.",
             f"IF BOTH CHECKS PASS, SKIP {s('knob-stack-fitted', 14)}-"
-            f"{s('knob-stack-fitted', 16)}.",
+            f"{s('knob-stack-fitted', 17)}.",
             knob_cup_off[0],
+            knob_cup_off[1],
             "CLEAN THE COMPOUND OFF THE JOURNAL END AND OUT OF ITS TAP.",
             f"REPEAT FROM {s('knob-stack-fitted', 2)} WITH A NEW "
             f"{n['pd-transgear-knob-cup']} CUP AND {n['pd-vn-transgear-knob-cup-screw']} "
@@ -3184,8 +3194,8 @@ def _step_text(
             f"{steps.step_number('disc-cluster-hung')}-"
             f"{steps.step_number('disc-cluster-shimmed')} AND FROM STEP {pose}.",
             f"FOR A LOOSE PLATE OR A FAULT EVERY KNOB TURN (A {KNOB_PINION} TOOTH), "
-            f"{knob_cup_off[0]}",
-            f"FOR EITHER, {knob_cup_off[1]}",
+            f"{knob_cup_off_cited}",
+            f"FOR EITHER, {knob_shaft_out}",
             f"REFIT A LOOSE PLATE AS {s('arm-plate-fitted', 18)}.",
             f"FOR A {KNOB_PINION} TOOTH, MAKE A NEW {n['pd-transgear-knob-shaft']} "
             "SHAFT.",
@@ -3355,8 +3365,8 @@ def _step_text(
             f"FOR {s('fitup-accepted', 0)}, REPEAT STEPS "
             f"{steps.step_number('collar-rear-faced-to-fit')}-"
             f"{steps.step_number('fitup-accepted')}.",
-            f"FOR {s('fitup-accepted', 1)}, {knob_cup_off[0]}",
-            f"FOR {s('fitup-accepted', 1)}, {knob_cup_off[1]}",
+            f"FOR {s('fitup-accepted', 1)}, {knob_cup_off_cited}",
+            f"FOR {s('fitup-accepted', 1)}, {knob_shaft_out}",
             # The shaft is sound; only the cup, faced to its stand-out, and
             # its screw are renewed (#2425).
             f"FOR {s('fitup-accepted', 1)}, REPEAT STEP "

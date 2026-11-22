@@ -523,6 +523,27 @@ def test_the_thrust_face_finishes_stay_clear_of_lines_and_captions() -> None:
             assert _segment_y_at(start, pick, symbol[0]) < symbol[1] - 0.001
 
 
+def test_the_section_caption_drops_only_its_scale_row() -> None:
+    """Machinist review r10: "SCALE 3 : 1" under SECTION A-A repeated the
+    sheet's scale (rule 9)."""
+    label = "SECTION <VLNAME>-<VLLABEL>"
+    assert drawing.caption_without_scale(f"{label}\r\nSCALE <VLSCALEV>") == label
+    for fields in (label, "<VLNAME>\nSCALE <VLSCALEV>", f"{label}\nA\nSCALE <VLSCALE>"):
+        with pytest.raises(RuntimeError, match="not separable"):
+            drawing.caption_without_scale(fields)
+
+
+def test_the_press_block_is_taller_than_inside_arrows_leave() -> None:
+    """Farm r10: the press Ø's lower inside arrow ran through the "(" of its
+    last callout row; the build stands the arrows outside."""
+    between = 2.0 * drawing.HALF_PRESS
+    shafts = 0.0066 + 0.0072  # read off r10
+    block = 0.0222  # stacked limits over the two callout rows, r10
+    assert len(spec.PRESS_CALLOUT.splitlines()) == 2
+    assert block > between - shafts
+    assert block < between - 0.004
+
+
 def test_datum_a_rides_the_shoulder_line_below_the_hub() -> None:
     """Farm r6: datum A landed on a neighbour of the 3 mm shoulder line and
     its leader crossed the hub Ø's extension line.  The tag stands left of

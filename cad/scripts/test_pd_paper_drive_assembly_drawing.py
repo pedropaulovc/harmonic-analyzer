@@ -518,7 +518,7 @@ def test_a_dowel_that_slides_into_the_arm_is_bonded() -> None:
         for row in drawing.SETTING_DETAIL_CAPTIONS["H"].split("\n")
     )
     assert check == (
-        "CHECK: PUSHED, A BONDED DOWEL DOES NOT MOVE; IT READS AS "
+        "CHECK: A BONDED DOWEL, PUSHED, STILL READS AS "
         f"{drawing.sub_step('arm-plate-fitted', 5)}."
     )
     assert remedy.endswith(f"RENEW AS {drawing.sub_step('arm-plate-fitted', 22)}.")
@@ -546,7 +546,7 @@ def test_a_feed_sleeve_found_outside_after_hanging_has_a_renewal_route() -> None
         f"{drawing.sub_step('arm-plate-located', 21)} ON A NEW ONE.",
         f"FOR IT, REPEAT STEPS {steps.step_number('oil-hole-drilled')}-"
         f"{steps.step_number('disc-cluster-shimmed')} AND "
-        f"{drawing.sub_step('knob-stack-fitted', 17)}, THEN FROM "
+        f"{drawing.sub_step('knob-stack-fitted', 18)}, THEN FROM "
         f"{drawing.sub_step('hanger-meshed', 0)}.",
     )
     # The sub-steps it names are the ones that slide the sleeve off and on.
@@ -556,7 +556,7 @@ def test_a_feed_sleeve_found_outside_after_hanging_has_a_renewal_route() -> None
     assert texts["arm-plate-located"][21].startswith(
         "WITH THEM OFF AND THE DISC SCREWS"
     )
-    assert texts["knob-stack-fitted"][17].startswith(
+    assert texts["knob-stack-fitted"][18].startswith(
         f"SLIDE THE {_number('pd-transgear-drive-collar')} COLLAR ON"
     )
     assert (
@@ -1749,24 +1749,33 @@ def test_the_knob_bush_is_pressed_and_reamed_before_the_plate_is_set() -> None:
     bush = _number("pd-transgear-knob-bush")
     plate = _number("pd-transgear-arm-plate")
     assert texts[2] == (
-        f"PRESS THE {bush} BUSH, STUB FIRST, INTO THE {plate} PLATE FROM FACE A UNTIL ITS "
-        "SHOULDER SEATS."
+        f"PRESS THE {bush} BUSH, STUB FIRST, INTO THE {plate} PLATE FROM ITS FRONT "
+        f"FACE (FACE A ON {plate}) UNTIL ITS SHOULDER SEATS."
     )
-    # Turned to the measured hole, a bush that slips is undersize (#2425).
+    # Turned to the measured hole, a bush that slips is undersize (#2425);
+    # one action per sub-step (machinist review r10).
     assert texts[3] == (
-        f"IF IT SLIDES IN BY HAND, TAKE IT OUT, TURN A NEW {bush} BUSH TO THE PLATE'S "
-        f"MEASURED HOLE AND REPEAT {drawing.sub_step('pin-pressed', 2)}."
+        f"IF IT SLIDES IN BY HAND, REPEAT {drawing.sub_step('pin-pressed', 2)} WITH A "
+        f"NEW {bush} BUSH TURNED TO THE PLATE'S MEASURED HOLE."
     )
     feeler = disc.inch_text(knob_bush.SHOULDER_SEAT_GAP_MAX, 4)
     assert feeler == ".0005"
     assert texts[4] == f"CHECK: A {feeler} FEELER DOES NOT ENTER UNDER THE SHOULDER."
     # A check and its remedy are separate sub-steps (rule 22).
-    assert texts[5].startswith("IF IT ENTERS, PRESS AGAIN; IF IT STILL ENTERS, MAKE A NEW")
+    assert texts[5] == (
+        f"IF IT ENTERS AFTER A SECOND PRESS, REPEAT FROM "
+        f"{drawing.sub_step('pin-pressed', 2)} WITH A NEW {plate} PLATE AND {bush} BUSH."
+    )
+    # The in-place ream names its mate, fit and gauge (rules 4 and 22).
+    assert texts[6].endswith(
+        f"THRU, A RUNNING FIT ON THE {_number('pd-transgear-knob-shaft')} JOURNAL, "
+        "CHECKED WITH PIN GAUGES."
+    )
     ream = steps.inch_window(
         tuple(knob_bush.BORE_DIA + limit for limit in knob_bush.BORE_DIA_LIMITS), 4
     )
     assert ream == ".2490-.2495"
-    assert texts[6] == f"REAM THE BUSH'S BORE \u00d8{ream} THRU."
+    assert texts[6].startswith(f"REAM THE BUSH'S BORE \u00d8{ream} THRU, ")
     assert len(texts) == 7
     assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
     located = _step_body("arm-plate-located")
@@ -1818,15 +1827,23 @@ def test_the_rear_cup_is_faced_bonded_and_screwed_and_the_nut_seats_on_the_faced
     assert drawing.KNOB_END_FLOAT_WINDOW == ".006 TO .010"
     assert texts[12] == "CHECK: SHAFT HELD, THE CUP DOES NOT TURN OR SLIDE ON THE JOURNAL BY HAND."
     assert texts[13] == (
-        f"IF BOTH CHECKS PASS, SKIP {s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 16)}."
+        f"IF BOTH CHECKS PASS, SKIP {s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 17)}."
     )
     # The cured bond lets go only hot (rule 23); the heat is kept off the
-    # bush's oil (codjiflo review, #2425).
-    assert texts[14] == (
-        f"UNSCREW THE {_number('pd-vn-transgear-knob-cup-screw')} SCREW, THEN HEAT THE "
-        f"{_number('pd-transgear-knob-cup')} CUP TO ABOUT 250\u00b0C, THE HEAT KEPT OFF THE "
-        f"{_number('pd-transgear-knob-bush')} BUSH'S OIL, AND PULL IT OFF THE JOURNAL."
+    # bush's oil (codjiflo review, #2425).  The screw comes out in its own
+    # sub-step, and the later strips cite the pair (machinist review r10).
+    assert texts[14] == f"UNSCREW THE {_number('pd-vn-transgear-knob-cup-screw')} SCREW."
+    assert texts[15] == (
+        f"PULL THE {_number('pd-transgear-knob-cup')} CUP OFF THE JOURNAL HOT, ABOUT "
+        f"250\u00b0C, THE HEAT KEPT OFF THE {_number('pd-transgear-knob-bush')} BUSH'S OIL."
     )
+    cited = (
+        f"TAKE THE {_number('pd-transgear-knob-cup')} CUP OFF AS "
+        f"{s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 15)}."
+    )
+    every = drawing._step_text(operating_domain=_unit_operating_domain())
+    assert sum(cited in row for rows in every.values() for row in rows) == 2
+    assert sum("250\u00b0C" in row for rows in every.values() for row in rows) == 1
     for word in ("MATCH-DRILL", "PIN (PRESS FIT)", "FEELER AT THE PLATE"):
         assert word not in knob, word
     assert "pd-vn-transgear-knob-cup-pin" not in drawing.BOM_PART_NUMBERS

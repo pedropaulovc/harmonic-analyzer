@@ -562,12 +562,12 @@ REAR_CHAMFER = 0.381  # .015
 REAR_CHAMFER_PLACES = 3
 REAR_CHAMFER_MIN = REAR_CHAMFER - printed_band_mm(REAR_CHAMFER_PLACES, unit=UNIT)
 REAR_CHAMFER_MAX = REAR_CHAMFER + printed_band_mm(REAR_CHAMFER_PLACES, unit=UNIT)
-# Printed as a row of the journal Ø's callout (draw_pd_transgear_knob_shaft
-# JOURNAL_DIA_BELOW): its own sketch dimension (JournalProfile
+# Printed by the drawing's native chamfer dimension, its leader on the
+# chamfer under the rear end (draw_pd_transgear_knob_shaft
+# ``_add_rear_chamfer_dimension``): its own sketch dimension (JournalProfile
 # RearChamferSize, driven) sits under detail B's neck dimensions, where its
 # text and extension lines struck them (farm r6 of #2425).  .XXX: the title
 # block's ±.005 holds .010-.020.
-REAR_CHAMFER_CALLOUT = f"{inch_text(REAR_CHAMFER, REAR_CHAMFER_PLACES)} X 45\u00b0"
 if REAR_CHAMFER_MAX > REAR_TAP_PITCH + EDGE_BREAK_MAX + 1e-9:
     raise AssertionError(
         "MHA-PD-08's rear chamfer runs past the tap mouth's discounted thread"

@@ -484,7 +484,7 @@ def test_journal_rear_chamfer_seats_the_end_flat_on_the_cup_web() -> None:
     """#2425: an explicit .015 X 45° whose least leg clears the MHA-PD-16
     pilot's R.005 MAX floor corner, inside the tap mouth's discounted thread,
     leaving the rear face a flat land; sketched in the journal profile and
-    printed as an attached note under the rear end, clear of detail B."""
+    printed by a native chamfer dimension under the rear end."""
     import pd_transgear_knob_cup_spec as cup
     from _hole_spec import THREAD_MAJOR_MM
 
@@ -503,24 +503,37 @@ def test_journal_rear_chamfer_seats_the_end_flat_on_the_cup_web() -> None:
     # Sketched in the journal profile (a chamfer feature's dimension did not
     # import, farm r3) but not marked: as a native dimension over the rear
     # corner it struck detail B's ".016 SEE NOTE 4" and ".007" (farm r6).
-    # It prints as a row of the journal Ø's own callout instead (a note may
-    # not carry a size), its text from the spec.
+    # As a "REAR END" row of the journal Ø's callout nothing tied it to the
+    # chamfer and its third place stated no function (machinist review r10).
+    # A native chamfer dimension prints it on the chamfer, the function of
+    # its third place on the cap line; no note or callout row carries it.
     assert "RearChamferSize" not in spec.DRAWING_DIMENSIONS["JournalProfile"]
     assert "RearChamferSize" not in drawing.SIDE_KEEP
-    assert "RearChamferSize" not in drawing.DIMENSION_CALLOUTS_BELOW
-    assert spec.REAR_CHAMFER_CALLOUT == ".015 X 45\u00b0"
-    row = drawing.DIMENSION_CALLOUTS_BELOW["JournalDia"]
-    assert row == drawing.JOURNAL_DIA_BELOW == f" REAR END {spec.REAR_CHAMFER_CALLOUT}"
-    assert "\n" not in row
-    assert not hasattr(drawing, "REAR_CHAMFER_NOTE")
-    # The Ø's text hangs right of its line over the journal: the row runs
-    # under the value, over the shaft's top and left of the pinion.
-    line_x, value_y = drawing.SIDE_KEEP["JournalDia"]
-    assert line_x < drawing.SIDE_CENTER[0]
-    row_right = line_x + len(row) * drawing.ABOVE_CALLOUT_CHAR_WIDTH
-    assert row_right < drawing.PINION_REAR_X - 0.003
-    shaft_top = drawing._sheet_y(spec.JOURNAL_DIA / 2.0)
-    assert value_y - 0.0073 - 0.0045 > shaft_top + 0.002
+    assert "JournalDia" not in drawing.DIMENSION_CALLOUTS_BELOW
+    for name in ("REAR_CHAMFER_NOTE", "JOURNAL_DIA_BELOW"):
+        assert not hasattr(drawing, name)
+    assert not hasattr(spec, "REAR_CHAMFER_CALLOUT")
+    cup_number = _config.parts("pd-transgear-knob-cup")["number"]
+    assert drawing.REAR_CHAMFER_FUNCTION == f"CLEARS {cup_number}"
+    assert "\n" not in drawing.REAR_CHAMFER_FUNCTION
+    # The block (centre x, cap line y, shoulder 5.6 mm under it) stands under
+    # the journal's left half: right of the rear witness line, left of the
+    # journal Ø's lower arrow, under the outline and over the journal
+    # length's "(1.55)" row; the leader rises from the shoulder's left end to
+    # the chamfer and stays right of the rear witness line.
+    x, y = drawing.REAR_CHAMFER_TEXT_XY
+    half = drawing.REAR_CHAMFER_BLOCK_HALF_WIDTH
+    shoulder_y = y - drawing.REAR_CHAMFER_SHOULDER_DROP
+    outline = drawing._sheet_y(-spec.JOURNAL_DIA / 2.0)
+    assert x - half > drawing.REAR_X + 0.008
+    assert x + half < drawing.SIDE_KEEP["JournalDia"][0] - 0.003
+    assert y + 0.002 < outline - 0.002
+    assert shoulder_y > drawing.SIDE_KEEP["JournalLength"][1] + 0.003 + 0.002
+    rise = outline - shoulder_y
+    run = x - half - drawing.REAR_X
+    assert 0.5 < rise / run < 2.0
+    # The journal's finish moved right of the block and the "(1.55)".
+    assert drawing.JOURNAL_FINISH_SYMBOL[0] - 0.0064 > x + half + 0.010
 
 
 def test_tool_end_limits_print_as_native_detail_dimensions() -> None:
@@ -884,11 +897,8 @@ def test_tight_bands_name_their_mates_once_by_name_and_number() -> None:
     )
     assert drawing.DIMENSION_SUFFIXES["FrontReliefDia"] == f" {drawing.NECK_LINK}"
     # Vertical Ø callouts go above their text (a below one would sit on the
-    # Ø's own line).  The journal Ø alone carries both: its one below row,
-    # the rear chamfer (#2425), starts one space off its line, as MHA-PD-16's
-    # bore block does.
-    assert set(above) & set(below) == {"JournalDia"}
-    assert below["JournalDia"].startswith(" ")
+    # Ø's own line).
+    assert not set(above) & set(below)
 
 
 def test_gear_data_backlash_is_the_mesh_check_range_rounded_inward() -> None:
@@ -1192,7 +1202,7 @@ def test_run_233549_text_clears_the_border_lines_and_labels() -> None:
 
 
 def test_run_004958_journal_finish_stands_clear() -> None:
-    # The finish lands on the journal's lower outline, mid-left, where no
+    # The finish lands on the journal's lower outline, mid-right, where no
     # tooth, line or text is near (machinist review r5: in the end view it
     # landed where the journal circle meets the teeth).
     px, py = drawing.JOURNAL_FINISH_PICK
@@ -1200,13 +1210,13 @@ def test_run_004958_journal_finish_stands_clear() -> None:
     assert drawing.REAR_X < px < drawing.PINION_REAR_X
     # The symbol (V tip at its position, ~16.7 mm wide, text ~10.3 mm over
     # the tip; its leader runs 6.35 mm level toward the landing) stands
-    # under the outline, right of the rear witness line and left of the
-    # journal Ø's lower arrow and the 40.938 text.
+    # under the outline, right of the journal Ø's lower arrow and the
+    # journal length's "(1.55)" and left of the pinion.
     sx, sy = drawing.JOURNAL_FINISH_SYMBOL
     assert sy + 0.0103 < py - 0.002
-    assert sx - 0.0064 > drawing.REAR_X + 0.002
-    assert sx - 0.0022 + 0.0167 < drawing.SIDE_KEEP["JournalDia"][0] - 0.002
-    assert sx - 0.0022 + 0.0167 < drawing.SIDE_KEEP["JournalLength"][0] - 0.0085 - 0.002
+    assert sx - 0.0064 > drawing.SIDE_KEEP["JournalDia"][0] + 0.002
+    assert sx - 0.0064 > drawing.SIDE_KEEP["JournalLength"][0] + 0.0085 + 0.002
+    assert sx - 0.0022 + 0.0167 < drawing.PINION_REAR_X - 0.003
 
 
 def test_run_022045_flat_prints_in_the_tip_end_view_clear_of_its_neighbours() -> None:
@@ -1498,6 +1508,7 @@ class _BuildRecorder:
             "_add_sheet_note", "_add_view_arrow", "visible_circle_edge",
             "_set_dimension_suffixes", "set_reference_dimension",
             "_require_saved_rear_tap", "_add_rear_tap_callout", "remove_notes_matching",
+            "_add_rear_chamfer_dimension",
         ):
             monkeypatch.setattr(drawing, name, self._recorder(name))
         monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
@@ -1646,6 +1657,9 @@ def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_pa
     # saved source proves its RearTap; its automatic label is swept.
     [(tap_args, _tap)] = seat.made["_add_rear_tap_callout"]
     assert tap_args[1].name == "*Front"
+    # The rear chamfer's native dimension goes on the side view.
+    [(chamfer_args, _chamfer)] = seat.made["_add_rear_chamfer_dimension"]
+    assert chamfer_args[1].name == "*Right"
     assert seat.made["_require_saved_rear_tap"]
     [(sweep_args, _sweep)] = seat.made["remove_notes_matching"]
     assert sweep_args[1] == drawing.TAPPED_HOLE_NOTE
