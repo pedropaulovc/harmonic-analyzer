@@ -237,9 +237,9 @@ def _band_foot_counterbore(adapter) -> None:
         value = float(_com_invoke(raw, "IDimension", "SystemValue")) * 1000.0
         seen.append((str(_com_invoke(raw, "IDimension", "FullName")), value))
         dimensions.append((value, raw))
-    for label, nominal, band in (
-        ("diameter", CBORE_DIA_MM, CBORE_DIA_BAND),
-        ("depth", CBORE_DEPTH_MM, CBORE_DEPTH_BAND),
+    for label, nominal, (lower, upper) in (
+        ("diameter", CBORE_DIA_MM, deviations(CBORE_DIA_BAND)),
+        ("depth", CBORE_DEPTH_MM, deviations(CBORE_DEPTH_BAND)),
     ):
         matches = [raw for value, raw in dimensions if abs(value - nominal) < 1e-4]
         if len(matches) != 1:
@@ -248,7 +248,6 @@ def _band_foot_counterbore(adapter) -> None:
                 f"{label} {nominal} mm, not 1; dimensions {seen!r}"
             )
         dimension = _bind(matches[0], "IDimension")
-        lower, upper = deviations(band)
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         tolerance.Type = _TOL_BILATERAL
         if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
