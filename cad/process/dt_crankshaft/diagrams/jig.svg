@@ -19,9 +19,10 @@
   <line class="leader" x1="175" y1="332" x2="175" y2="186"/>
   <text class="label" x="250" y="300">stub and dome stand 1.21 proud</text>
   <line class="leader" x1="340" y1="288" x2="340" y2="232"/>
-  <text class="label" x="400" y="320">jig bore .4500 reamed in place;</text>
-  <text class="label" x="400" y="336">Ø.750 shank in the No. 4 holder</text>
-  <line class="leader" x1="560" y1="308" x2="560" y2="278"/>
+  <text class="label" x="400" y="320">jig bore .4500 reamed in place</text>
+  <line class="leader" x1="470" y1="308" x2="500" y2="222"/>
+  <text class="label" x="520" y="300">Ø.750 shank in the No. 4 holder</text>
+  <line class="leader" x1="690" y1="288" x2="690" y2="250"/>
   <text class="label" x="430" y="120">10-32 set screw, brass pad on the relief</text>
   <line class="leader" x1="498" y1="124" x2="498" y2="134"/>
   <text class="label" x="260" y="60">1/8 spacer gap behind the spigot</text>

@@ -557,7 +557,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Turn the neck from Z-{{process.neck_rough_start_z_in:.4dot}} to Z-{{process.neck_end_z_in:.4dot}} in .030 cuts per side to Ø.420, stopped .005 short of the bar's shoulder. Each pass starts there, .17 from the head's rear face: the insert's trailing edge then stays clear of that face."
+instruction = "Turn the neck from Z-{{process.neck_rough_start_z_in:.4dot}} toward the bar's shoulder at Z-{{process.neck_end_z_in:.4dot}} in .030 cuts per side to Ø.420, stopped .005 short of it. Each pass starts at Z-{{process.neck_rough_start_z_in:.4dot}}, .17 from the head's rear face: the insert's trailing edge then stays clear of that face."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.neck_dia_mm}}"
 
