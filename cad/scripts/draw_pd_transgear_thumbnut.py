@@ -50,17 +50,30 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
 from _gear_drawing_entities import visible_circle_edge
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
+from _printed_tolerance import angular_band_deg
 from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 from pd_transgear_thumbnut_spec import (
+    CSK_DIA,
     CSK_DIA_SUFFIX,
+    CSK_HALF_ANGLE_DEG,
     CSK_INCLUDED_ANGLE_DEG,
+    CSK_QUALIFIER,
+    DISH_DEPTH,
+    DISH_DIA,
+    DISH_FLOOR_DIA,
+    DISH_FLOOR_Y,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FLANGE_DIA,
@@ -69,10 +82,17 @@ from pd_transgear_thumbnut_spec import (
     HEAD_REAR_Y,
     KNURL_CALLOUT,
     KNURL_DIA_SUFFIX,
+    KNURL_FLANK_ANGLE_DEG,
+    KNURL_ROOT_DIA,
+    KNURL_TEETH,
+    KNURL_TPI,
     OVERALL_LENGTH,
+    RIM_Y,
     TAP_DRILL_DIA,
     TAP_SPEC,
     THREAD,
+    UNIT,
+    WAIST_DIA,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -243,6 +263,276 @@ THREAD_CALLOUT_XY = (FACE_CENTER[0] - 0.020, FACE_CENTER[1] + 0.062)
 # How far the section's axis centreline runs past the seat face and the rim
 # (model mm).
 AXIS_OVERSHOOT_MM = 1.0
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (pd_transgear_thumbnut_spec: axis local +Y; the seat face at y = 0 is the
+# datum end every length runs from, the rim at y = OVERALL_LENGTH).  Every
+# turned size takes the title block's .XX row, the tap drill its drilled-hole
+# row and the countersinks' half-angle its angular row; the countersinks'
+# Ø is a single MAX limit.  Each ``span`` is a feature's model-Y extent.  The
+# declarations print nothing.
+# The sheet prints no manufacturing note: every requirement is a dimension,
+# its band or its native callout, so the feature manifest's notes are empty.
+DRAWING_NOTES = ""
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_transgear_thumbnut"
+_KEEP = (_SELF, "SECTION_KEEP")
+
+
+def _knurl_flanks() -> tuple[PlanarFace, ...]:
+    """Every flank of the straight knurl: the build cuts one V flute from a
+    root at angle pi/N, between crests at 0 and 2 pi/N, and patterns it N
+    times about the axis, so each flank is the plane through a crest and its
+    neighbouring root, parallel to the axis.  Its outward normal points into
+    the flute (the air at crest radius over the root)."""
+    crest_r, root_r = HEAD_DIA / 2.0, KNURL_ROOT_DIA / 2.0
+    pitch = 2.0 * math.pi / KNURL_TEETH
+    flanks = []
+    for tooth in range(KNURL_TEETH):
+        crest_at = tooth * pitch
+        for side in (-1.0, 1.0):
+            root_at = crest_at + side * pitch / 2.0
+            crest = (crest_r * math.cos(crest_at), crest_r * math.sin(crest_at))
+            root = (root_r * math.cos(root_at), root_r * math.sin(root_at))
+            air = (crest_r * math.cos(root_at), crest_r * math.sin(root_at))
+            run = (crest[0] - root[0], crest[1] - root[1])
+            normal = (-run[1], run[0])
+            if normal[0] * (air[0] - crest[0]) + normal[1] * (air[1] - crest[1]) < 0:
+                normal = (-normal[0], -normal[1])
+            size = math.hypot(*normal)
+            normal = (normal[0] / size, normal[1] / size)
+            # Model X and Z: the flute is sketched on the Top plane.
+            flanks.append(
+                PlanarFace(
+                    (normal[0], 0.0, normal[1]),
+                    normal[0] * crest[0] + normal[1] * crest[1],
+                )
+            )
+    return tuple(flanks)
+
+
+part_metadata(
+    model_sources=(
+        "OVERALL_LENGTH",
+        "HEAD_DIA",
+        "HEAD_REAR_Y",
+        "FLANGE_DIA",
+        "FLANGE_LENGTH",
+        "WAIST_DIA",
+        "DISH_DIA",
+        "DISH_FLOOR_DIA",
+        "DISH_DEPTH",
+        "TAP_SPEC",
+        "CSK_DIA",
+    ),
+    precision_sources=("DRAWING_PRECISION_BY_NAME",),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("OVERALL_LENGTH",)),
+        "outward": ([0.0, -1.0, 0.0], ("OVERALL_LENGTH",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), RIM_Y),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": OVERALL_LENGTH},
+            ("OVERALL_LENGTH", "RIM_Y"),
+        ),
+        "outward": ([0.0, 1.0, 0.0], ("RIM_Y",)),
+        "length": (
+            limits(OVERALL_LENGTH, _P["OverallLength"], unit=UNIT),
+            ("OVERALL_LENGTH", "UNIT", _KEEP),
+        ),
+        "length_nominal": (OVERALL_LENGTH, ("OVERALL_LENGTH",)),
+        "length_from": ("datum_end", (_KEEP,)),
+    },
+    precision={"length": _P["OverallLength"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=_knurl_flanks(),
+    requirements=("dia", "knurl"),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("HEAD_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("HEAD_DIA",)),
+        "span": ([HEAD_REAR_Y, OVERALL_LENGTH], ("HEAD_REAR_Y", "OVERALL_LENGTH")),
+        "dia": (
+            limits(HEAD_DIA, _P["HeadDia"], unit=UNIT),
+            ("HEAD_DIA", "UNIT", "KNURL_DIA_SUFFIX", _KEEP),
+        ),
+        "dia_nominal": (HEAD_DIA, ("HEAD_DIA",)),
+        "knurl": (
+            {
+                "pattern": "straight",
+                "tpi": KNURL_TPI,
+                "tooth_angle_deg": KNURL_FLANK_ANGLE_DEG,
+            },
+            ("KNURL_TPI", "KNURL_FLANK_ANGLE_DEG", "KNURL_CALLOUT"),
+        ),
+        "callout": (
+            f"{KNURL_CALLOUT}, Ø OVER KNURL",
+            ("KNURL_CALLOUT", "KNURL_DIA_SUFFIX"),
+        ),
+    },
+    precision={"dia": _P["HeadDia"]},
+)
+requirement(
+    "step_flange",
+    kind="diameter",
+    faces=(CylinderFace(FLANGE_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("FLANGE_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("FLANGE_DIA",)),
+        "span": ([0.0, FLANGE_LENGTH], ("FLANGE_LENGTH",)),
+        "dia": (
+            limits(FLANGE_DIA, _P["FlangeDia"], unit=UNIT),
+            ("FLANGE_DIA", "UNIT", _KEEP),
+        ),
+        "dia_nominal": (FLANGE_DIA, ("FLANGE_DIA",)),
+    },
+    precision={"dia": _P["FlangeDia"]},
+)
+requirement(
+    "step_waist",
+    kind="diameter",
+    faces=(CylinderFace(WAIST_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("WAIST_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("WAIST_DIA",)),
+        "span": ([FLANGE_LENGTH, HEAD_REAR_Y], ("FLANGE_LENGTH", "HEAD_REAR_Y")),
+        "dia": (
+            limits(WAIST_DIA, _P["WaistDia"], unit=UNIT),
+            ("WAIST_DIA", "UNIT", _KEEP),
+        ),
+        "dia_nominal": (WAIST_DIA, ("WAIST_DIA",)),
+    },
+    precision={"dia": _P["WaistDia"]},
+)
+for _name, _normal, _station, _dimension in (
+    ("shoulder_flange", 1.0, FLANGE_LENGTH, "FlangeLength"),
+    ("shoulder_head", -1.0, HEAD_REAR_Y, "HeadRearY"),
+):
+    requirement(
+        _name,
+        kind="face",
+        faces=(PlanarFace((0.0, _normal, 0.0), _normal * _station),),
+        requirements=("station",),
+        fields={
+            "plane": (
+                {"frame": "model", "axis": "y", "value": _station},
+                ("FLANGE_LENGTH", "HEAD_REAR_Y"),
+            ),
+            "outward": ([0.0, _normal, 0.0], ("FLANGE_LENGTH", "HEAD_REAR_Y")),
+            "station": (
+                limits(_station, _P[_dimension], unit=UNIT),
+                ("FLANGE_LENGTH", "HEAD_REAR_Y", "UNIT", _KEEP),
+            ),
+            "station_nominal": (_station, ("FLANGE_LENGTH", "HEAD_REAR_Y")),
+            "station_from": ("datum_end", (_KEEP,)),
+        },
+        precision={"station": _P[_dimension]},
+    )
+requirement(
+    "dish",
+    kind="recess",
+    faces=(
+        ConeFace(
+            math.degrees(math.atan2((DISH_DIA - DISH_FLOOR_DIA) / 2.0, DISH_DEPTH))
+        ),
+        PlanarFace((0.0, 1.0, 0.0), DISH_FLOOR_Y),
+    ),
+    requirements=("dia", "floor_dia", "depth"),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("DISH_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("DISH_DIA",)),
+        "span": ([DISH_FLOOR_Y, OVERALL_LENGTH], ("DISH_FLOOR_Y", "OVERALL_LENGTH")),
+        "dia": (
+            limits(DISH_DIA, _P["DishDia"], unit=UNIT),
+            ("DISH_DIA", "UNIT", _KEEP),
+        ),
+        "dia_nominal": (DISH_DIA, ("DISH_DIA",)),
+        "floor_dia": (
+            limits(DISH_FLOOR_DIA, _P["DishFloorDia"], unit=UNIT),
+            ("DISH_FLOOR_DIA", "UNIT", _KEEP),
+        ),
+        "floor_dia_nominal": (DISH_FLOOR_DIA, ("DISH_FLOOR_DIA",)),
+        "depth": (
+            limits(DISH_DEPTH, _P["DishDepth"], unit=UNIT),
+            ("DISH_DEPTH", "UNIT", _KEEP),
+        ),
+        "depth_nominal": (DISH_DEPTH, ("DISH_DEPTH",)),
+        "depth_from": ("far_end", (_KEEP,)),
+        "shape": ("cone_to_flat_floor", ("DISH_DIA", "DISH_FLOOR_DIA", "DISH_DEPTH")),
+    },
+    precision={
+        "dia": _P["DishDia"],
+        "floor_dia": _P["DishFloorDia"],
+        "depth": _P["DishDepth"],
+    },
+)
+requirement(
+    "tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(TAP_DRILL_DIA),),
+    requirements=("thread", "dia", "thru"),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("TAP_SPEC",)),
+        "at": ([0.0, 0.0, 0.0], ("TAP_SPEC",)),
+        "span": ([0.0, OVERALL_LENGTH], ("OVERALL_LENGTH",)),
+        "thread": (f"{THREAD} UNC-2B", ("THREAD", "TAP_SPEC")),
+        "dia": (
+            drilled_limits(TAP_DRILL_DIA, 3, unit=UNIT),
+            ("TAP_DRILL_DIA", "UNIT", (_SELF, "THREAD_CALLOUT_XY")),
+        ),
+        "nominal_dia": (TAP_DRILL_DIA, ("TAP_DRILL_DIA",)),
+        "thru": (True, ("TAP_SPEC",)),
+        "callout": (f"{THREAD} UNC THRU ALL", ("THREAD", (_SELF, "THREAD_CALLOUT_XY"))),
+    },
+    precision={"dia": 3},
+)
+requirement(
+    "countersinks",
+    kind="countersink",
+    faces=(ConeFace(CSK_HALF_ANGLE_DEG),),
+    requirements=("dia_max", "half_angle"),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("CSK_DIA",)),
+        "dia_max": (CSK_DIA, ("CSK_DIA", "CSK_DIA_SUFFIX", _KEEP)),
+        "half_angle": (
+            limits(
+                CSK_HALF_ANGLE_DEG,
+                _P["CountersinkHalfAngle"],
+                (angular_band_deg(), -angular_band_deg()),
+            ),
+            (
+                "CSK_HALF_ANGLE_DEG",
+                ("pd_transgear_thumbnut_spec", "CSK_HALF_ANGLE_MIN"),
+                "CSK_INCLUDED_ANGLE_DEG",
+            ),
+        ),
+        "half_angle_nominal": (CSK_HALF_ANGLE_DEG, ("CSK_HALF_ANGLE_DEG",)),
+        "at_ends": (["datum_end", "dish"], ("CSK_QUALIFIER",)),
+        "edge_of": ("tap", ("CSK_QUALIFIER",)),
+        "callout": (
+            f"Ø.{round(CSK_DIA / 0.254):02d}{CSK_DIA_SUFFIX} X {CSK_INCLUDED_ANGLE_DEG:.0f}° {CSK_QUALIFIER}",
+            ("CSK_DIA", "CSK_DIA_SUFFIX", "CSK_INCLUDED_ANGLE_DEG", "CSK_QUALIFIER"),
+        ),
+    },
+    precision={"half_angle": _P["CountersinkHalfAngle"]},
+)
 _SW_LINE_CENTER = 4  # swLineStyles_e.swLineCENTER
 
 # How far A-A's axis may sit from where SECTION_KEEP assumes it, or off
