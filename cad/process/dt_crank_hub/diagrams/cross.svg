@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 3. Left: end view from the front face, 200 px to the inch: the barrel Ø.88 between the vise jaws on two 1 in parallels, 1/8 thick, against the jaws. Right: side view, 150 px to the inch, X0 the front face. Styles: prechips.palette. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 3: the hub lying in the vise on two parallels' edges; CM01 drills #14 through the barrel and bore</text>
+  <rect class="clamp" x="172" y="88" width="120" height="212"/>
+  <rect class="clamp" x="468" y="88" width="120" height="212"/>
+  <rect class="fixture-support" x="292" y="241" width="25" height="120"/>
+  <rect class="fixture-support" x="443" y="241" width="25" height="120"/>
+  <circle class="part-kept" cx="380" cy="180" r="88"/>
+  <circle class="part-kept" cx="380" cy="180" r="76"/>
+  <circle class="holes" cx="380" cy="180" r="37.6"/>
+  <polyline class="hidden" points="362,92 362,288"/>
+  <polyline class="hidden" points="398,92 398,288"/>
+  <rect class="cutter" x="362" y="36" width="36" height="52"/>
+  <line class="centre-line" x1="380" y1="30" x2="380" y2="380"/>
+  <line class="centre-line" x1="270" y1="180" x2="490" y2="180"/>
+  <line class="datum" x1="300" y1="92" x2="460" y2="92"/>
+  <text class="datum-label" x="20" y="60">Z0: the barrel's top line</text>
+  <line class="leader" x1="330" y1="92" x2="190" y2="64"/>
+  <text class="label" x="20" y="186">Y0: the barrel's axis</text>
+  <line class="leader" x1="170" y1="181" x2="270" y2="180"/>
+  <line class="leader" x1="300" y1="300" x2="200" y2="360"/>
+  <text class="label" x="30" y="376">1 in parallels, 1/8 thick, against the jaws</text>
+  <text class="label" x="182" y="318">moving jaw</text>
+  <text class="label" x="488" y="80">fixed jaw (+Y)</text>
+  <text class="label" x="492" y="346">+Y →</text>
+  <line class="leader" x1="398" y1="60" x2="430" y2="44"/>
+  <text class="label" x="434" y="48">#14 through, into the gap</text>
+  <polygon class="part-kept" points="610,123 657,123 657,114 735,114 735,131 759,131 759,229 735,229 735,246 657,246 657,237 610,237"/>
+  <line class="centre-line" x1="600" y1="180" x2="760" y2="180"/>
+  <line class="datum" x1="610" y1="100" x2="610" y2="260"/>
+  <line class="leader" x1="610" y1="260" x2="600" y2="306"/>
+  <text class="datum-label" x="530" y="320">X0: the front face</text>
+  <line class="active-face" x1="689" y1="108" x2="689" y2="252"/>
+  <line class="leader" x1="689" y1="252" x2="700" y2="338"/>
+  <text class="label" x="650" y="352">#14 at {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}}</text>
+</svg>
