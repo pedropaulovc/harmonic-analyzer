@@ -1,15 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="460" height="190" viewBox="0 0 460 190" font-family="sans-serif" font-size="12">
-<rect width="460" height="190" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="460" height="220" viewBox="0 0 460 220" font-family="sans-serif" font-size="12">
+<rect width="460" height="220" fill="#fff"/>
 <rect x="40" y="60" width="365" height="64" fill="#cde" stroke="#000"/>
 <rect x="20" y="30" width="400" height="28" fill="#aaa" stroke="#000"/>
 <text x="30" y="48" text-anchor="start">fixed jaw (Y0)</text>
 <rect x="20" y="126" width="400" height="28" fill="#aaa" stroke="#000"/>
-<text x="30" y="145.5" text-anchor="start">moving jaw</text>
+<text x="330" y="144.5" text-anchor="start">moving jaw</text>
 <path d="M397.0,74.2 L76.1,60.5 A31.2,31.2 0 1 0 76.1,123.0 L397.0,109.3 Z" fill="none" stroke="#000" stroke-width="1.5" stroke-dasharray="6 4"/>
 <circle cx="74.75" cy="91.75" r="15.875" fill="#f9c" stroke="#000"/>
 <circle cx="74.8" cy="91.8" r="6.2" fill="#fff" stroke="#000" stroke-width="1.2"/>
 <circle cx="246.8" cy="91.8" r="4.0" fill="#fff" stroke="#000" stroke-width="1.2"/>
-<text x="74.75" y="141.75" text-anchor="middle">pivot B + Ø.500 spot face</text>
-<text x="246.7875" y="141.75" text-anchor="middle">pin bore C, .008 x 45° rear</text>
-<text x="40" y="175" text-anchor="start">X0 blank left end, Z0 parallels' top (face A down)</text>
+<line x1="74.75" y1="107.75" x2="74.75" y2="173.5" stroke="#000"/>
+<text x="74.75" y="187.5" text-anchor="middle">pivot B, Ø.500 spot face</text>
+<line x1="246.7875" y1="95.75" x2="246.7875" y2="173.5" stroke="#000"/>
+<text x="246.7875" y="187.5" text-anchor="middle">pin bore C, .008 x 45° rear</text>
+<text x="40" y="209.5" text-anchor="start">X0 blank left end; Z0 parallels' top (face A down)</text>
 </svg>

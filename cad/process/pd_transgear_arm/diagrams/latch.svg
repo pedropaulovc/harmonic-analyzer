@@ -1,11 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="520" height="290" viewBox="0 0 520 290" font-family="sans-serif" font-size="12">
-<rect width="520" height="290" fill="#fff"/>
-<rect x="180" y="30" width="46" height="226" fill="#cde" stroke="#000"/>
-<rect x="226" y="184" width="40" height="72" fill="#aaa" stroke="#000"/>
-<text x="269.72" y="206.0" text-anchor="start">fixed jaw (face A)</text>
-<rect x="140" y="184" width="40" height="72" fill="#aaa" stroke="#000"/>
-<text x="136" y="206.0" text-anchor="end">moving jaw</text>
-<rect x="200" y="30" width="5.1" height="16" fill="#f9c" stroke="#000"/>
-<text x="180" y="22" text-anchor="start">square end up (Z0); latch-pin hole .188 from face A, ream .40 deep</text>
-<text x="180" y="272.24" text-anchor="start">pivot end on the vise bed</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="440" height="245" viewBox="0 0 440 245" font-family="sans-serif" font-size="12">
+<rect width="440" height="245" fill="#fff"/>
+<rect x="200" y="40" width="70" height="150" fill="#aaa" stroke="#000"/>
+<text x="205" y="35" text-anchor="start">4-jaw</text>
+<rect x="20" y="70" width="180" height="90" fill="#eee" stroke="#000" stroke-dasharray="5 3"/>
+<text x="24" y="64" text-anchor="start">spindle bore</text>
+<rect x="60" y="100" width="250" height="30" fill="#cde" stroke="#000"/>
+<text x="64" y="120" text-anchor="start">arm, pivot end in the bore</text>
+<rect x="240" y="88" width="30" height="10" fill="#666"/>
+<rect x="240" y="132" width="30" height="10" fill="#666"/>
+<rect x="300" y="113" width="20" height="5" fill="#f9c" stroke="#000"/>
+<rect x="340" y="110" width="80" height="10" fill="#888"/>
+<text x="330" y="96" text-anchor="start">tailstock</text><text x="330" y="146" text-anchor="start">drill, reamer</text>
+<text x="20" y="215" text-anchor="start">Square end .25 out of the jaws; hole on the section's centre</text>
+<text x="20" y="232" text-anchor="start">(.188 from face A); quill zero at the spot's rim</text>
 </svg>
