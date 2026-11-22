@@ -5,7 +5,7 @@
   <rect class="fixture-support" x="175.54" y="380" width="184.46" height="6"/>
   <polygon class="part-kept" points="330,380 214.43,380 214.43,324.9 273.1,324.9 273.1,154.7 330,154.7"/>
   <rect class="holes" x="273.1" y="180.95" width="56.9" height="45.3"/>
-  <text class="label" x="297" y="208" text-anchor="end">bore</text>
+  <text class="label" x="336" y="208">bore</text>
   <rect class="holes" x="232.9" y="324.9" width="27" height="14.8"/>
   <rect class="holes" x="237.9" y="339.7" width="17" height="40.3"/>
   <rect class="part-threads" x="296.25" y="154.7" width="10.6" height="31"/>
