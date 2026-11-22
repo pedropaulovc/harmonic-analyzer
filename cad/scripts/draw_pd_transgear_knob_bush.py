@@ -192,15 +192,16 @@ FACE_FINISHES = {
     ),
 }
 # Datum A rides the shoulder face's line, extended below the part, attached
-# to the shoulder's own outer rim (the hub Ø's circle at the shoulder,
-# edge-on in A-A, drawn the full height there).  An edge-attached tag
-# re-solves to the foot of its leader on the edge's line, the leader square
-# to it (r6: the tag at (206.2, 128.2) landed at (206.1, 153.3), straight
-# above), so the tag stands left of the line at a height below the hub: the
-# triangle sits on the shoulder's extension, clear under the hub Ø's lower
-# extension line, its leader level and away from the root radius on the
-# right.  r6 picked the 3 mm shoulder line by sheet point and caught a
-# neighbour instead, its leader crossing the hub Ø's extension line.
+# to the shoulder's lower cut line in A-A (``_shoulder_cut_line``).  An
+# edge-attached tag re-solves to the foot of its leader on the edge's line,
+# the leader square to it (r6: the tag at (206.2, 128.2) landed at
+# (206.1, 153.3), straight above), so the tag stands left of the line at a
+# height below the hub: the triangle sits on the shoulder's extension, clear
+# under the hub Ø's lower extension line, its leader level and away from
+# the root radius on the right.  r6 picked the 3 mm shoulder line by sheet
+# point and caught a neighbour instead, its leader crossing the hub Ø's
+# extension line; r8 asked for the shoulder's outer rim, which A-A does not
+# show (the cut face's own lines cover it, the bore's wall hides the rest).
 DATUM_A_XY = (SHOULDER_X - 0.012, SECTION_CENTER[1] - HALF_HUB - 0.010)
 
 # The face view's bore: the cutting line A runs vertically through its
@@ -330,6 +331,35 @@ def _bore_landing(
     return centre[0] + dx * scale, centre[1] + dy * scale
 
 
+def _shoulder_cut_line(adapter: Any, section: Any) -> Any:
+    """The shoulder face's lower line in A-A, the edge datum A attaches to.
+
+    A-A shows its cut face's lines, in model mm on the Front plane
+    (draw_fr_top_frame._cut_face_edge): the shoulder is the two short lines
+    at y = HUB_LENGTH, one each side of the axis, from the hub Ø in to the
+    root radius.  The one lower on the sheet is read, not assumed.
+    """
+    lines = [
+        item
+        for item in scan_view_edges(section, label="knob bush A-A").lines
+        if all(abs(end[1] - HUB_LENGTH) <= 1e-4 for end in item.line)
+    ]
+    if len(lines) != 2:
+        raise RuntimeError(
+            f"knob bush A-A shows {len(lines)} shoulder cut lines at "
+            f"y={HUB_LENGTH:g} mm, not 2"
+        )
+    heights = model_points_in_view(
+        adapter,
+        _early_bound(section, "IView"),
+        tuple(tuple(value / 1000.0 for value in item.midpoint_mm) for item in lines),
+        label="knob bush shoulder cut lines",
+        names=("first", "second"),
+    )
+    lower = min(range(2), key=lambda index: heights[index][1])
+    return lines[lower].edge
+
+
 @_telemetry.traced("drawing.pd_transgear_knob_bush.callouts")
 def _assert_dimension_callouts(adapter: Any, annotations: list[Any]) -> None:
     """Import the part-authored callout rows verbatim; never write them here.
@@ -439,21 +469,12 @@ def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to the bush face view")
 
     # The same native datum and frame authored on the part: A on the
-    # shoulder's outer rim, the bore's frame on the face view's bore.  The
+    # shoulder's cut line, the bore's frame on the face view's bore.  The
     # bore carries no datum: no frame references one (rule 5).
-    shoulder_rim = (
-        scan_view_edges(section, label="knob bush A-A")
-        .circle_at(
-            (0.0, HUB_LENGTH, 0.0),
-            HUB_DIA / 2.0,
-            axis=(0.0, 1.0, 0.0),
-            label="knob bush shoulder rim (datum A)",
-        )
-        .edge
-    )
+    shoulder_line = _shoulder_cut_line(adapter, section)
     bore_edge = visible_circle_edge(adapter, face, BORE_DIA)
     placements = {
-        "datum:A": PmiDrawingPlacement(section, DATUM_A_XY, edge_entity=shoulder_rim),
+        "datum:A": PmiDrawingPlacement(section, DATUM_A_XY, edge_entity=shoulder_line),
         "bore_perpendicularity": PmiDrawingPlacement(
             face,
             FRAME_XY,
