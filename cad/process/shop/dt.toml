@@ -244,3 +244,20 @@ diameter_mm = 3.9878
 # plan list the pair in its tooling.
 [tools.plug-gauges-3760-3765]
 description = "Plug gauge pair, .3760 GO (plus) and .3765 NO-GO (minus), Vermont Gage Class X"
+
+# --- MHA-DT-32 crank handle pivot screw (cad/process/dt_crank_handle_pivot_screw/plan.toml)
+# The 1018 rod turned between the 3-jaw and the MT3 dead centre (no live
+# centre on record): authored, no source on record, at 560 rpm in the
+# lathe's high range (about 37 sfm on the 1/4 in bar) so the greased dead
+# centre does not gall over the 2.8 in of turning, at .002 in/rev (the
+# plan's finish passes run .001 for the shoulder's Ra 1.6 under the R0.4
+# nose).
+[settings.dt-lathe-ar-1018-centre]
+tool = "lathe-ar"
+material = "lathe-1018-cold-finished"
+rpm = 560
+feed_mm_rev = 0.0508
+# The screwdriver slot, sawn by hand (inventory tools-cutting.toml, same key:
+# to order).
+[tools.hacksaw-32tpi]
+description = "12 in hand hacksaw frame, 32 TPI bi-metal blade, .025 in thick (Starrett KBS1232-2)"

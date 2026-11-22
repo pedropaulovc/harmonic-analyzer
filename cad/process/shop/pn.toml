@@ -153,6 +153,14 @@ tool = "reamer-1260"
 material = "pn-c360-flat"
 rpm = 1400
 feed = "4.2 in/min"
+# MHA-PN-04 pen rod (C36000 key stock): the #0-80 tap drill from the lathe's
+# tailstock, at the C360 drill rows' 160 sfm (shop/lathe.toml
+# lathe-drill-n-c360; the 3/64 runs at the lathe's 2000 rpm top), pecked.
+[settings.pn-lathe-drill-3-64-c360]
+tool = "drill-3-64"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, pecking, dry"
 # The pivot bore's go/no-go pair (cad/config/shop-equipment/
 # gauges.plug-gauges-1260-1265, to buy): GO .1260 and NO-GO .1265 in =
 # 3.2004 and 3.2131 mm. A fixed-limit pair reads no scale; its resolution is

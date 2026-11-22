@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 310" width="760" height="310">
+  <rect class="paper" x="0" y="0" width="760" height="310"/>
+  <text class="title" x="20" y="24">The bonded handle in section: M, the ferrule's face to the pocket's floor (not to scale)</text>
+  <rect class="part-rest" x="150" y="90" width="430" height="80"/>
+  <rect class="paper" x="150" y="122" width="470" height="16"/>
+  <rect class="part-rest" x="120" y="96" width="30" height="68"/>
+  <rect class="part-rest" x="580" y="80" width="60" height="100"/>
+  <rect class="paper" x="600" y="104" width="40" height="52"/>
+  <text class="label" x="40" y="70">MHA-DT-34 ferrule, outer face</text>
+  <text class="label" x="280" y="80">MHA-DT-08 handle and its bore</text>
+  <text class="label" x="470" y="54">MHA-DT-35 butt cup:</text>
+  <text class="label" x="470" y="70">its pocket opens outward</text>
+  <line class="dims" x1="120" y1="226" x2="600" y2="226"/>
+  <line class="dims" x1="120" y1="218" x2="120" y2="234"/>
+  <line class="dims" x1="600" y1="160" x2="600" y2="234"/>
+  <text class="label" x="200" y="248">M = overall length less the pocket's depth</text>
+  <line class="dims" x1="120" y1="264" x2="640" y2="264"/>
+  <line class="dims" x1="120" y1="256" x2="120" y2="272"/>
+  <line class="dims" x1="640" y1="184" x2="640" y2="272"/>
+  <text class="label" x="160" y="290">overall: ferrule face to the cup's outer end</text>
+</svg>

@@ -1,38 +1,381 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# the drawing cross-check of 2026-11-19, until its traveler is written. Not
-# enrolled in _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Magnifying vertical rod MHA-MG-04, one off, on the manual PM-1127VF-LB
+# (owner ruling 2026-11-21: turned parts get lathe travelers, no NC). Route
+# chosen for speed, after the wheel axle's (MHA-MG-07) and the magnifying
+# lever's (MHA-MG-03): the body is the 1/4 in C360 bar as bought (drawing:
+# ROD STOCK, 1/4 REF; owner ruling 2026-11-20 on #2404), so nothing is turned
+# on it. Saw a blank a little long, with a .10 in centre stub beyond the tip;
+# in the 3-jaw over a shim wrap, the tip end out: face it, centre-drill the
+# stub and turn the #4-40 blank to the shoulder on the tailstock dead centre
+# (the .40 in of Ø.11 with its stub is over 3 × Ø out of the jaws, so it is
+# not turned from the chuck alone); withdraw the centre, face the stub off to
+# the tip, chamfer the tip 45° to the thread's minor, run the die on to the
+# shoulder, and plunge the relief at the shoulder with the 1/16 P1 cutoff
+# blade (its .0625 width is inside the relief's .05–.07, so one plunge cuts
+# it, and the .020 grooving tool the placeholder named is not needed). Turned
+# round, the body in the jaws over the shim: face the other end to the 4.92
+# body length, then form the R.13 dome with the R.125 form tool, its apex on
+# the faced plane. Bench: deburr, run the nut, bag (FINISH: machined).
+#
+# Flagged: the R.125 form tool (tools-special-cutters.toml form-tool-r125) is
+# to order, shared with MHA-MG-03. The #4-40 die's chamfer (lead) is not on
+# record: the relief takes its incomplete threads only if the lead is under
+# about 1.5 threads, so the die is run on to the shoulder, then turned over
+# and run on again. No #4-40 ring gauge is on record: the thread is accepted
+# on the MHA-MG-VN-52 nut, as MHA-MG-07's.
 title = "Magnifying Vertical Rod"
-part = "MHA-MG-04 Magnifying Vertical Rod"
-revision = "placeholder"
-material = "C36000 brass rod, 1/4 in; Online Metals part 1257"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "C36000 free-machining brass rod, 1/4 in (drawing: brass)"
+stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} C360 rod, 360-H02 extruded, the 48 in bar on hand (Online Metals part 1257); one blank {{process.blank_length_in:.2dot}} in long."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. The body is the bar as bought (1/4 REF): grip it over a brass shim wrap and never cut it."
 shop = "../shop"
 stock_refs = ["c360-round-1-4"]
+material_key = "lathe-c360"
+turning_material = "brass"
+
+[cad]
+file = "../../out/features/mg_magnifying_vertical_rod/features.toml"
+adapter = "turned_shaft"
+part = "mg-magnifying-vertical-rod"
+
+[parameters]
+quantity = 1
+stock_dia_in = 0.25
+# Sawn over the 5.22 REF: about .03 in to face off the tip end, the .10 in
+# centre stub beyond the tip, and about .10 in to face off the dome end.
+blank_length_in = 5.45
+# The tip's finished plane out of the jaw fronts while the tip end is worked:
+# the .30 in thread plus about .15 in clear of the jaws for the cutoff blade.
+end_stickout_in = 0.45
+# Beyond the tip while the blank is turned: a stub for the tailstock centre,
+# faced off before the tip is chamfered (authored).
+centre_stub_in = 0.1
+centre_stub_mm = 2.54
+# Pulled out of the jaw fronts: end_stickout_in + centre_stub_in.
+tip_pull_in = 0.55
+tip_pull_mm = 13.97
+# Left on the thread blank's diameter by the rough pass, per side.
+finish_allowance_in = 0.002
+# The turning passes start just short of the centre's point, in the stub.
+turn_start_z_mm = 2.3
+# Light passes on the Ø.11 blank between the jaws and the centre, at the
+# centre setting's .002 in/rev feed (shop/mg.toml mg-lathe-ar-c360-centre).
+rough_radial_doc_mm = 0.25
+finish_radial_doc_mm = 0.03
+turn_feed_mm_rev = 0.0508
+# The tip's 45° chamfer runs down to the #4-40 basic minor (the drawing's
+# "TIP 45° CHAMFER TO MINOR Ø"; mg_rod_clamp_joint.THREAD_BASIC_MINOR,
+# checked by test_mg_magnifying_vertical_rod_process.py).
+tip_chamfer_minor_in = 0.085
+# The 1/16 P1 cutoff blade (tools-cutting.toml cutoff-blade-p1 width_in):
+# its width is the relief's.
+blade_width_in = 0.0625
+# The relief's floor is plunged to about this, under the drawing's Ø.072 MAX.
+relief_aim_dia_in = 0.068
+# The R.125 form tool cuts the R.13 dome full on the 1/4 bar: a hemisphere,
+# its apex on the faced plane.
+dome_form_radius_in = 0.125
+# The form tool's feed: straight to Z-.095 (under the R.125 arc's cap height
+# over the smallest bar the drawing allows, Ø.245: .100), then in .001 steps
+# until the faced flat at the apex just vanishes; never past the bar's
+# radius (.125).
+form_rough_feed_in = 0.095
 
 [[tools]]
-id = "dies-zoro-wb7365521946"
-name = "#4-40 round die"
-ref = "dies-zoro-wb7365521946"  # drawing cross-check 2026-11-19: die-cut #4-40 UNC thread
+id = "saw"
+name = "14 in metal-cutting saw"
+ref = "saw-evolution-14"
 
 [[tools]]
-id = "die-stock-13-16"
-name = "13/16 die stock"
-ref = "die-stock-13-16"  # drawing cross-check 2026-11-19: holds the die
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
 
 [[tools]]
-id = "grooving-tool-020"
-name = "Grooving bit .020"
-ref = "grooving-tool-020"  # drawing cross-check 2026-11-19: thread relief, corners R.008 max.
+id = "centre-drill"
+name = "No. 1 centre drill"
+ref = "centre-drills-carbide-60"
 
 [[tools]]
-id = "form-tool-r125"
+id = "dead-centre"
+name = "MT3 dead centre"
+ref = "dead-centre-mt3"
+description = "MT3 dead centre in the lathe tailstock: carries the stub's centre hole while the thread blank is turned (Setup 2)"
+
+[[tools]]
+id = "die"
+name = "#4-40 UNC round die in the 13/16 die stock"
+ref = "dies-zoro-wb7365521946"
+
+[[tools]]
+id = "die-stock"
+name = "Die stock, 13/16 in"
+ref = "die-stock-13-16"
+
+[[tools]]
+id = "part"
+name = "P1 HSS cutoff blade, 1/16 in"
+ref = "cutoff-blade-p1"
+
+[[tools]]
+id = "form"
 name = "R.125 form tool"
-ref = "form-tool-r125"  # 1/4 bar (owner ruling 2026-11-20, #2404): R.13 TANGENT HEMISPHERE
+ref = "form-tool-r125"
+status = "to_order"
+
+[[tools]]
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Saw the blank"
+machine = "Evolution 14 in metal-cutting saw"
+holding = "The rod flat on the saw bed, its long end clamped in the saw's vise, the blank free beyond the blade."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/saw.svg", alt = "The 1/4 in brass bar on the saw: one blank sawn a little over the rod's length plus its centre stub." }
 
 [[setups.operations]]
-instruction = "Process not written yet."
+instruction = "Mike the bar at three places along the blank you will cut: every reading {{cad.outer_stock_dia_min_in:.3dot}} or over (the body is left as bought)."
+inspection = "Bar Ø{{cad.outer_stock_dia_min_in:.3dot}} min."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{cad.outer_stock_dia_min_mm}}", "{{cad.stock_dia_mm}}"] }]
+
+[[setups.operations]]
+instruction = "A reading under {{cad.outer_stock_dia_min_in:.3dot}}: do not cut that length; mike the next length of the bar."
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Scribe {{process.blank_length_in:.2dot}} in from the bar's end and saw on the waste side of the scribe; pick up the blank only after the blade has stopped. Deburr both sawn ends with the file."
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Tip end: thread blank on the centre, tip chamfer, thread, relief"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw over a brass shim wrap on the bar, the tip end out {{process.tip_pull_in:.2dot}} in from the jaw fronts (the tip {{process.end_stickout_in:.2dot}} in out plus the {{process.centre_stub_in:.2dot}} in centre stub); the rest of the blank back in the jaws and the spindle bore. The tailstock dead centre, oiled, in the stub's centre hole for Ops 60–80; the tailstock backed off for Ops 100–130 and brought up again, its centre out, to square the die in Op 140."
+datum = "Z0 (carriage DRO) the tip's finished plane: set {{process.centre_stub_in:.3dot}} in back from the stub's faced end in Op 40, faced to in Op 100."
+diagram = { file = "diagrams/tip.svg", alt = "The blank in the 3-jaw, the tip end out: the #4-40 blank turned on the tailstock centre in a stub beyond the tip; the stub faced off, the thread die-cut and the relief plunged at the shoulder." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{process.tip_pull_mm}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}", support = "tailstock" }
+turning_support = { kind = "tailstock", chuck_z_mm = "{{cad.end_jaw_z_mm}}", centre_z_mm = "{{process.centre_stub_mm}}" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the tip end square, about .03 in off, to the centre with no pip. Set the DRO Z to +{{process.centre_stub_in:.3dot}} on it: Z0 is the tip's finished plane, the {{process.centre_stub_in:.2dot}} in beyond it a stub for the centre."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre-drill"
+drilling = "none"
+sizing = "other"
+instruction = "Centre-drill the stub's end with the No. 1 centre drill from the tailstock chuck, to about Ø.08 at the countersink: the hole stays inside the stub."
+settings = "lathe-centre-c360"
+cut_diameter_mm = 1.191
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Swap the drill chuck for the MT3 dead centre, a drop of oil on its point; bring it into the centre hole just snug and lock the tailstock and quill. Recheck it snug before each pass."
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Thread blank rough", phase = "rough", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.step_datum_out_far_z_mm}}", kept_start_z_mm = "{{cad.step_datum_out_near_z_mm}}", kept_end_z_mm = "{{cad.step_datum_out_far_z_mm}}", start_diameter_mm = "{{cad.stock_dia_mm}}", end_diameter_mm = "{{cad.step_rough_dia_mm}}", max_radial_doc_mm = "{{process.rough_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.step_rough_dia_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Rough the thread blank from the stub's end to the shoulder at Z{{cad.step_datum_out_far_z_mm:in.3dot}} to Ø{{cad.step_rough_dia_mm:in.4dot}}, square shoulder, the tool clear of the centre at the start of each pass."
+settings = "mg-lathe-ar-c360-centre"
+cut_diameter_mm = "{{cad.step_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Thread blank finish", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.step_datum_out_far_z_mm}}", kept_start_z_mm = "{{cad.step_datum_out_near_z_mm}}", kept_end_z_mm = "{{cad.step_datum_out_far_z_mm}}", start_diameter_mm = "{{cad.step_rough_dia_mm}}", end_diameter_mm = "{{cad.step_turn_min_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Finish the blank over the same length to Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}} (the #4-40 UNC-2A major), miking between light passes, spindle stopped, between Z0 and the shoulder; the shoulder at Z{{cad.step_datum_out_far_z_mm:in.3dot}} square."
+settings = "mg-lathe-ar-c360-centre"
+cut_diameter_mm = "{{cad.step_dia_mm}}"
+inspection = "Blank Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.step_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Blank under {{cad.step_dia_min_in:.4dot}}: scrap the blank and make another from Setup 1. Over {{cad.step_dia_max_in:.4dot}}: another light pass."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Withdraw the tailstock. Face the stub off in light skims, from the O.D. to the centre, down to Z0: the centre hole goes with it."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.step_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: read the thread blank from the tip to the shoulder face with the calipers' depth rod: the beam's end on the tip, the rod down beside the blank onto the shoulder face."
+inspection = "Tip to shoulder {{cad.thread_length_min_in:.2dot}}–{{cad.thread_length_max_in:.2dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.thread_length_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Tip to shoulder over {{cad.thread_length_max_in:.2dot}}: face the tip back as Op 100 in light skims, reading again as Op 110. Under {{cad.thread_length_min_in:.2dot}}: scrap the blank and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Chamfer the tip 45° to the minor (the drawing's TO MINOR Ø, the #4-40 basic minor Ø{{process.tip_chamfer_minor_in:.3dot}}): swing the compound to 45°, bring the AR tool's point to the tip's O.D. corner and feed it in along the compound in light cuts until the flat left on the tip reads Ø{{process.tip_chamfer_minor_in:.3dot}} across with the calipers' jaw tips. The die starts on this chamfer."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.step_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped, in low range: take the dead centre out of the quill and bring the tailstock up. Put the #4-40 die in the die stock, lettered face toward the tip, and square its back against the quill's face."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "die"
+drilling = "none"
+sizing = "other"
+instruction = "Start the die on the chamfer, turning the die stock by hand, dry, a half turn forward and a quarter back, the quill following; run it on until it stops at the shoulder, then back it off."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "die"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the die over (lettered face toward the shoulder) and run it on again to the shoulder the same way, so its lead's incomplete threads end in the relief. Back it off and back the tailstock away."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "part"
+drilling = "none"
+sizing = "other"
+instruction = "Relief with the {{process.blade_width_in:.4dot}} cutoff blade (mike its width: {{cad.groove_width_min_in:.3dot}}–{{cad.groove_width_max_in:.3dot}}), on centre height and square to the axis. Spindle stopped: bring the blade's chuck-side face on the shoulder face, just gripping a cigarette paper, and lock the carriage there. Zero the cross-slide dial with the blade's tip touching the thread's crest. Spindle on: plunge (the miked blank − {{process.relief_aim_dia_in:.3dot}})/2 in on the radius, to a floor about Ø{{process.relief_aim_dia_in:.3dot}}; back out for chips."
+settings = "lathe-part-c360"
+cut_diameter_mm = "{{cad.step_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: read the relief's floor with the calipers' jaw tips and run a MHA-MG-VN-52 #4-40 nut (McMaster 92671A005) on by hand to the relief."
+inspection = "Relief Ø{{cad.groove_dia_max_in:.3dot}} max, the blade's {{cad.groove_width_min_in:.3dot}}–{{cad.groove_width_max_in:.3dot}} wide; the nut runs on by hand to the relief."
+gauge_checks = [{ gauge = "calipers", band_mm = [0.0, "{{cad.groove_dia_max_mm}}"] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Relief floor over {{cad.groove_dia_max_in:.3dot}}: plunge again as Op 170, .002 deeper on the dial. A nut that binds: close the split die a little with its adjusting screw and run it over once more as Ops 150–160; still binding: scrap the blank and make another from Setup 1."
+
+[[setups]]
+machine_kind = "lathe"
+title = "Dome end: face to the body length, form the R.13 dome"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "Turned round: 3-jaw over the shim wrap on the body, the dome end's faced plane {{process.end_stickout_in:.2dot}} in out of the jaws (the sawn end about .10 beyond it); the threaded end back through the jaws into the spindle bore."
+datum = "The body length is read from the shoulder face with the calipers (Op 210). For the dome (Op 240) the DRO Z is zeroed where the form tool's arc touches the end's corner."
+diagram = { file = "diagrams/dome.svg", alt = "The rod turned round, the dome end out over a shim wrap: faced to the 4.92 body length, then formed to the R.13 dome." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the end square in light skims toward {{cad.shoulder_in:.2dot}} from the shoulder face, reading the length between them (Op 210); stop inside {{cad.shoulder_min_in:.2dot}}–{{cad.shoulder_max_in:.2dot}}."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Between skims, stop the spindle and take the rod out: read from the shoulder face to the faced end with the calipers, one jaw on the faced end, the other over the thread against the shoulder face; chuck it again over the shim and touch the facing tool on the end before the next skim."
+inspection = "Shoulder to faced end {{cad.shoulder_min_in:.2dot}}–{{cad.shoulder_max_in:.2dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.shoulder_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Faced under {{cad.shoulder_min_in:.2dot}}: scrap the rod and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: set the R.125 form tool (a concave R.125 arc) on centre height, the arc facing the end and spanning it. Bring the arc up along Z, adjusting the cross slide, until the end's O.D. corner touches it on both sides at once, no light showing at either side: the arc is then centred on the axis. Zero the DRO Z at that touch."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "form"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle on: feed the carriage along Z straight to Z−{{process.form_rough_feed_in:.3dot}}, then on in .001 steps, stopping the spindle after each to look at the apex under the loupe: stop at the step where the faced flat at the apex just vanishes (a full R{{process.dome_form_radius_in:.3dot}} dome, its apex on the faced plane). Never past Z−{{cad.dome_far_form_height_in:.3dot}} (the bar's radius)."
+settings = "lathe-form-r125-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Stop the spindle and look at the dome under a loupe: no pip or flat at the apex, no step where the dome meets the body."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A pip (tool off centre height) or a step at the body (arc off centre), found in Op 250: correct the tool's height or the cross slide, spindle stopped; bring the arc up along Z until it just touches the formed dome, zero the DRO Z at that touch, take one light pass to Z−.002 only, and look again as Op 250. Still a pip or step: scrap the rod and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Read from the shoulder face to the dome's apex as Op 210, the faced-end jaw now on the apex."
+inspection = "Shoulder to apex {{cad.shoulder_min_in:.2dot}}–{{cad.shoulder_max_in:.2dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.shoulder_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Under {{cad.shoulder_min_in:.2dot}}: the form ran past its Z: scrap the rod and make another from Setup 1."
+
+[[setups]]
+machine_kind = "other"
+title = "Bench: deburr, check, bag"
+machine = "Bench"
+holding = "In the hand; the bench vise with soft jaws over the shim wrap on the body if needed."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished rod: the #4-40 thread, the relief, the 1/4 body and the R.13 dome." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Break the shoulder's outer edge R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max; leave the body's O.D., the thread and the dome untouched."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Bag the rod (FINISH: machined)."

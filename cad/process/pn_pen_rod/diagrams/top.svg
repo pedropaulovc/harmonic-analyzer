@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300">
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="24">Top end out of the 4-jaw: face, spot, drill 3/64, tap #0-80 (not to scale)</text>
+  <rect class="fixture-vise" x="180" y="60" width="110" height="70"/>
+  <rect class="fixture-vise" x="180" y="170" width="110" height="70"/>
+  <rect class="clamp" x="200" y="120" width="90" height="10"/>
+  <rect class="clamp" x="200" y="170" width="90" height="10"/>
+  <rect class="part-kept" x="40" y="130" width="420" height="40"/>
+  <rect class="paper" x="420" y="146" width="40" height="8"/>
+  <line class="centre-line" x1="30" y1="150" x2="740" y2="150"/>
+  <rect class="cutter" x="470" y="144" width="130" height="12"/>
+  <path class="clamp" d="M620 150 L650 140 L730 140 L730 160 L650 160 Z"/>
+  <line class="datum" x1="460" y1="90" x2="460" y2="210"/>
+  <text class="datum-label" x="440" y="84">Z0 top face</text>
+  <text class="label" x="470" y="200">tap in its wrench; its shank centre</text>
+  <text class="label" x="470" y="218">on the tailstock's dead centre</text>
+  <text class="label" x="40" y="270">4-jaw on the flats over brass shims; indicate each pair of flats</text>
+</svg>

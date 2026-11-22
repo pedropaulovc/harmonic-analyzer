@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 200" width="760" height="200">
+  <rect class="paper" x="0" y="0" width="760" height="200"/>
+  <text class="title" x="20" y="24">Saw the blank from the 1/4 in 1018 rod (not to scale)</text>
+  <rect class="fixture-vise" x="420" y="70" width="80" height="80"/>
+  <rect class="part-kept" x="60" y="100" width="640" height="20"/>
+  <rect class="cutter" x="394" y="40" width="6" height="120"/>
+  <line class="dims" x1="60" y1="176" x2="397" y2="176"/>
+  <line class="dims" x1="60" y1="168" x2="60" y2="184"/>
+  <line class="dims" x1="397" y1="168" x2="397" y2="184"/>
+  <text class="label" x="160" y="196">blank 3.40, sawn on the waste side of the scribe</text>
+  <text class="label" x="510" y="60">saw vise on the long end</text>
+</svg>

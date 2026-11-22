@@ -1,43 +1,407 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Pen rod MHA-PN-04, one off, on the manual PM-1127VF-LB (owner ruling
+# 2026-11-21: turned parts get lathe travelers, no NC), from the 5 x 5 mm
+# C360 key stock (the drawing: SQ as supplied, McMaster-Carr 90457A730):
+#
+# - Saw a blank; mike both pairs of flats (the square is left as bought).
+# - 4-jaw on the flats, the top end out, the square indicated to run true (the
+#   #0-80's .067 TAP WALL leaves no room for the hole off centre): face the
+#   top end, spot, drill 3/64, tap #0-80 with the plug then the bottoming
+#   tap from the tailstock centre.
+# - Turned round in the 4-jaw, indicated again, the pivot end out: face to
+#   the overall length, turn the Ø.125 pivot, square its shoulder corner with
+#   the 1/16 P1 blade (R.008 MAX; the AR insert's R0.4 nose cannot) and
+#   plunge the set-screw groove with it in three overlapping plunges.
+# - Bench: deburr, check, oil (FINISH: square as supplied; ends, pivot
+#   machined; oiled).
+#
+# Flagged: the key stock (stock-to-order.toml c360-square-5mm-key) is to
+# order. The placeholder's sharp-nose tool and ignition wrenches are not
+# needed: the P1 blade cuts the R.008 MAX corner sharp, and the taps turn in
+# a tap wrench.
 title = "Pen Rod"
-part = "MHA-PN-04 Pen Rod"
-revision = "placeholder"
-material = "C36000 brass key stock, 5 x 5 mm, DIN 6880; McMaster-Carr 90457A730"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "{{cad.material_spec}}"
+stock = "Qty {{process.quantity:g}}. 5 x 5 mm C36000 brass key stock, DIN 6880 ({{cad.flat_x_pos_stock}}, to order), the 12 in bar; one blank {{process.blank_length_in:.2dot}} in long."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry, the taps with a drop of cutting oil. The square is the bar as bought: grip it on its flats over a brass shim wrap and never cut it."
 shop = "../shop"
 stock_refs = ["c360-square-5mm-key"]
+material_key = "lathe-c360"
+turning_material = "brass"
+
+[cad]
+file = "../../out/features/pn_pen_rod/features.toml"
+adapter = "drilled_block"
+part = "pn-pen-rod"
+
+[parameters]
+quantity = 1
+# The 5 mm key stock as the stock fit reads it (the export's envelope, the
+# pivot turned from the square).
+blank_x_in = 0.197
+blank_y_in = 5.0
+blank_z_in = 0.197
+# Sawn over the 4.82 overall: about .05 to face off each end, and .10 more.
+blank_length_in = 5.0
+# Setup 2: the top end out of the jaw fronts (the .28 drilled depth and room
+# for the tap wrench's work); Setup 3: the pivot end out (the .41 pivot, the
+# blade's .0625 and .10 clear of the jaws).
+top_stickout_in = 0.5
+pivot_stickout_in = 0.6
+pivot_stickout_mm = 15.24
+jaw_front_z_mm = -15.24
+# The square across its corners, the turning's start: 5.00 mm × √2.
+square_corners_mm = 7.07
+square_mm = 5.0
+# The overall length from the top face to the pivot end, (4.82) REF on the
+# drawing: the top face's 4.41 station plus the .41 pivot. Setup 3 presets
+# its DRO from the blank's length read off the machine (Op 120), so Z0 is
+# the finished pivot end and the shoulder is at Z−.410.
+overall_in = 4.82
+top_station_in = 4.41
+pivot_len_in = 0.41
+# The groove's width, its end station less its station (.310-.320 less
+# .160-.170): .140-.160, gauged with the owned gauge blocks (.140, and .110
+# wrung to .050 for .160).
+groove_width_min_in = 0.140
+groove_width_max_in = 0.160
+groove_width_min_mm = 3.556
+groove_width_max_mm = 4.064
+# The 3/64 drill's corners meet the Ø.055 spot's 60° cone .007 below the top
+# face: the quill scale, zeroed there, reads .263 for a full diameter .270
+# deep.
+drill_scale_in = 0.263
+# The square indicated to run true within this on each pair of flats (TIR):
+# the .067 TAP WALL is the worst case with the hole on the axis.
+indicate_tir_in = 0.0005
+# The tap drill: spotted to about Ø.055 with the No. 1 centre drill (a lead
+# for the tap), then the 3/64 to full diameter .26-.28 deep, pecked every
+# .040 (under one diameter). The taps' points stop by pencil marks: the plug at .15 deep, the
+# bottoming tap at .20 (its 1-1/2-thread lead at 80 per inch is .019, so the
+# full thread runs .18-.19 deep).
+spot_dia_in = 0.055
+peck_mm = 1.016
+plug_tap_reach_in = 0.15
+bottoming_tap_reach_in = 0.20
+# Turning the pivot from the square (Z0 the pivot end): passes end .2 mm
+# short of the shoulder (the blade squares the corner); the shoulder at the
+# drawn .41.
+turn_start_z_mm = 0.0
+turn_end_z_mm = -10.214
+shoulder_z_mm = -10.414
+rough_dia_mm = 3.25
+# The drawing's DRILL .0469 is the 3/64 drill (1.190625 mm); the export
+# rounds its band's low end to 1.191 mm, so the sizing check reads the band
+# from the exact 3/64 to the drawing's .0509 (cad.stud_tap_dia_band_mm).
+tap_drill_min_mm = 1.190625
+tap_drill_max_mm = 1.2926
+pivot_aim_dia_mm = 3.1674
+pivot_dia_min_mm = 3.1496
+rough_radial_doc_mm = 0.25
+# Finish passes .0006 in deep at .001 in/rev: the Ø.125 pivot out of the
+# jaws springs .0001 under them (prechips turning_deflection's .005 mm).
+finish_radial_doc_mm = 0.015
+finish_feed_mm_rev = 0.0254
+turn_feed_mm_rev = 0.0508
+# The 1/16 P1 cutoff blade (tools-cutting.toml cutoff-blade-p1 width_in):
+# the groove's .150 width in three plunges, the blade's chuck-side face at
+# .165, .209 and .2525 from the shoulder (the last puts its tailstock-side
+# face on .315).
+blade_width_in = 0.0625
+groove_plunge_1_in = 0.165
+groove_plunge_2_in = 0.209
+groove_plunge_3_in = 0.2525
+groove_aim_dia_in = 0.106
+
+[[tools]]
+id = "saw"
+name = "14 in metal-cutting saw"
+ref = "saw-evolution-14"
+
+[[tools]]
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "centre-drill"
+name = "No. 1 centre drill"
+ref = "centre-drills-carbide-60"
 
 [[tools]]
 id = "drill-3-64"
 name = "3/64 drill"
-ref = "drill-3-64"  # Drills 3/64
-
-[[tools]]
-id = "tap-0-80-bottoming"
-name = "#0-80 bottoming tap"
-ref = "tap-0-80-bottoming"  # F-tap-bottoming-0-80, Tap coverage #0-80 UNF
+ref = "drill-3-64"
 
 [[tools]]
 id = "tap-0-80-plug"
 name = "#0-80 plug tap"
-ref = "tap-0-80-plug"  # Tap coverage #0-80 UNF
+ref = "tap-0-80-plug"
 
 [[tools]]
-id = "ignition-wrenches"
-name = "Ignition wrenches"
-ref = "ignition-wrenches"  # F-ignition-wrenches
+id = "tap-0-80-bottoming"
+name = "#0-80 bottoming tap"
+ref = "tap-0-80-bottoming"
 
 [[tools]]
-id = "lathe-tool-sharp-nose"
-name = "Sharp-nose turning tool"
-ref = "lathe-tool-sharp-nose"  # drawing cross-check 2026-11-19: R.008 max. shoulder
+id = "dead-centre"
+name = "MT3 dead centre"
+ref = "dead-centre-mt3"
+description = "MT3 dead centre in the lathe tailstock: its point in the tap's shank centre keeps the tap on the axis (Setup 2)"
+
+[[tools]]
+id = "part"
+name = "P1 HSS cutoff blade, 1/16 in"
+ref = "cutoff-blade-p1"
+
+[[tools]]
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Saw the blank"
+machine = "Evolution 14 in metal-cutting saw"
+holding = "The key stock flat on the saw bed, its long end clamped in the saw's vise, the blank free beyond the blade."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/saw.svg", alt = "The 5 mm brass key stock on the saw: one blank sawn a little over the rod's overall length." }
 
 [[setups.operations]]
-instruction = "Process not written yet."
+instruction = "Mike both pairs of flats at three places along the blank you will cut (the square is left as bought)."
+inspection = "Square {{cad.flat_x_pos_across_min_in:.3dot}}–{{cad.flat_x_pos_across_max_in:.3dot}} across both pairs of flats."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.flat_x_pos_across_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "A reading outside {{cad.flat_x_pos_across_min_in:.3dot}}–{{cad.flat_x_pos_across_max_in:.3dot}}: do not cut that length; mike the next length of the bar."
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Scribe {{process.blank_length_in:.2dot}} in from the bar's end and saw on the waste side of the scribe; pick up the blank only after the blade has stopped. Deburr both sawn ends with the file."
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Top end: face, drill and tap #0-80"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "6 in 4-jaw, each jaw on a flat over a brass shim, the top end {{process.top_stickout_in:.2dot}} in out of the jaw fronts, the rest of the blank back through the spindle bore. Indicate two adjacent flats next to the jaws with the dial test indicator, turning the chuck by hand, and adjust opposite jaws until each pair reads within {{process.indicate_tir_in:.4dot}} TIR."
+datum = "Z0 (carriage DRO) the top face, faced in Op 50. The tailstock quill's scale for the drill's depth, zeroed in Op 70."
+diagram = { file = "diagrams/top.svg", alt = "The square in the 4-jaw on its flats, the top end out: faced, spotted, drilled 3/64 and tapped #0-80 from the tailstock." }
+lathe_hold = "other"
+turning_support = { kind = "chuck_only", chuck_z_mm = -12.7 }
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Indicate the square as the holding says; snug every jaw a little at a time, reading again after each."
+inspection = "Each pair of flats within {{process.indicate_tir_in:.4dot}} TIR."
+gauge_checks = [{ gauge = "dti", band_mm = [0.0, 0.0127] }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the top end square in light skims, about .05 in off, to the centre with no pip. Set the DRO Z to zero on it: Z0 is the top face."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{process.square_corners_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre-drill"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre with the No. 1 centre drill from the tailstock chuck to about Ø{{process.spot_dia_in:.3dot}} at the countersink (a lead for the tap)."
+settings = "lathe-centre-c360"
+cut_diameter_mm = 1.191
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-3-64"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = ["{{process.tap_drill_min_mm}}", "{{process.tap_drill_max_mm}}"] }
+instruction = "3/64 drill in the tailstock chuck, short out of it. Feed in until its corners just touch the spot's cone and zero the quill scale there (.007 below the face). Drill until the scale reads {{process.drill_scale_in:.3dot}}: the full diameter is then {{cad.stud_tap_drill_depth_min_in:.2dot}}–{{cad.stud_tap_drill_depth_max_in:.2dot}} deep. Back out to clear chips every .040 in."
+settings = "pn-lathe-drill-3-64-c360"
+cut_diameter_mm = "{{cad.stud_tap_dia_mm}}"
+hole_depth_mm = "{{cad.stud_tap_drill_depth_mm}}"
+peck = { step_mm = "{{process.peck_mm}}", retract = "full" }
+inspection = "Drill depth {{cad.stud_tap_drill_depth_min_in:.2dot}}–{{cad.stud_tap_drill_depth_max_in:.2dot}} to full diameter: quill scale {{process.drill_scale_in:.3dot}} from the corners touching the spot's cone."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.stud_tap_drill_depth_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "tap-0-80-plug"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle off, in neutral. Swap the drill chuck for the dead centre. Pencil-mark the plug tap {{process.plug_tap_reach_in:.2dot}} from its point. Start {{cad.stud_tap_thread}} with it in a tap wrench, its shank centre on the tailstock centre to keep it on the axis; turn the wrench with a drop of cutting oil, backing off every half turn, and stop when the mark reaches the top face."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "tap-0-80-bottoming"
+drilling = "none"
+sizing = "other"
+instruction = "Finish with the bottoming tap the same way, pencil-marked {{process.bottoming_tap_reach_in:.2dot}} from its point; stop when the mark reaches the top face: never bottom the tap in the hole."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Mark a #0-80 screw {{cad.stud_tap_thread_depth_min_in:.2dot}} from its end (the calipers' depth rod against the screw, marker); it runs in by hand until the mark reaches the top face."
+inspection = "Full thread at least {{cad.stud_tap_thread_depth_min_in:.2dot}} deep; the {{cad.stud_tap_thread_depth_max_in:.2dot}} maximum is held by stopping the bottoming tap at its pencil mark."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.stud_tap_thread_depth_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A screw that stops short of its mark: run the bottoming tap in once more to its mark and try again. Still short, or a tap broken in the hole: scrap the blank and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Take the blank out of the chuck. Read its length L from the faced top face to the sawn end with the calipers, and write it on this sheet."
+inspection = "L, at least {{process.overall_in:.2dot}} + .02: written on this sheet."
+gauge_checks = [{ gauge = "calipers", band_mm = [122.94, 127.0] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "L under {{process.overall_in:.2dot}} + .02: too short to face both ends; scrap the blank and make another from Setup 1."
+
+[[setups]]
+machine_kind = "lathe"
+title = "Pivot end: face to length, turn the pivot, groove"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "Turned round: the 4-jaw on the flats over the shims, the pivot end {{process.pivot_stickout_in:.2dot}} in out of the jaw fronts, the tapped end back through the spindle bore; indicated again as Setup 2 to {{process.indicate_tir_in:.4dot}} TIR."
+datum = "Z0 (carriage DRO) the pivot end's finished plane, {{process.overall_in:.3dot}} from the top face: the DRO preset from L (Op 120) in Op 150, the blade touched on it again in Op 190. The shoulder at Z−{{process.pivot_len_in:.3dot}}."
+diagram = { file = "diagrams/pivot.svg", alt = "The square turned round in the 4-jaw, the pivot end out: faced to length, the Ø.125 pivot turned, its shoulder corner squared and the groove plunged with the cutoff blade." }
+lathe_hold = "other"
+turning_support = { kind = "chuck_only", chuck_z_mm = "{{process.jaw_front_z_mm}}" }
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Indicate the square to run true as Setup 2's first step."
+inspection = "Each pair of flats within {{process.indicate_tir_in:.4dot}} TIR."
+gauge_checks = [{ gauge = "dti", band_mm = [0.0, 0.0127] }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Touch the AR tool on the sawn end's high point and set the DRO Z to +(L − {{process.overall_in:.3dot}}). Face the end square in light skims down to Z0, to the centre with no pip."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{process.square_corners_mm}}"
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Pivot rough", phase = "rough", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{process.turn_end_z_mm}}", kept_start_z_mm = "{{process.turn_start_z_mm}}", kept_end_z_mm = "{{process.turn_end_z_mm}}", start_diameter_mm = "{{process.square_corners_mm}}", end_diameter_mm = "{{process.rough_dia_mm}}", max_radial_doc_mm = "{{process.rough_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{process.rough_dia_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Rough the pivot from the end to Z−({{process.pivot_len_in:.3dot}} − .008) to Ø{{process.rough_dia_mm:in.3dot}}, the first passes interrupted on the square's corners: light, steady feed."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{process.square_corners_mm}}"
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Pivot finish", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{process.turn_end_z_mm}}", kept_start_z_mm = "{{process.turn_start_z_mm}}", kept_end_z_mm = "{{process.turn_end_z_mm}}", start_diameter_mm = "{{process.rough_dia_mm}}", end_diameter_mm = "{{process.pivot_aim_dia_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.finish_feed_mm_rev}}", minimum_diameter_mm = "{{process.pivot_dia_min_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Finish the pivot over the same length to Ø{{cad.pivot_dia_min_in:.4dot}}–{{cad.pivot_dia_max_in:.4dot}}, aiming at Ø{{process.pivot_aim_dia_mm:in.4dot}}, miking between light passes."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{process.pivot_aim_dia_mm}}"
+inspection = "Pivot Ø{{cad.pivot_dia_min_in:.4dot}}–{{cad.pivot_dia_max_in:.4dot}}."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.pivot_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Pivot under {{cad.pivot_dia_min_in:.4dot}}: scrap the blank and make another from Setup 1. Over {{cad.pivot_dia_max_in:.4dot}}: another light pass."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "part"
+drilling = "none"
+sizing = "other"
+instruction = "Shoulder, R{{cad.pivot_corner_radius_max_mm:in.3dot}} MAX corner: the blade on centre height, square to the axis. Spindle stopped: touch the blade's chuck-side face on the faced end, a paper feeler between, and set DRO Z to +.001 (the feeler). Bring the blade's chuck-side face on Z−{{process.pivot_len_in:.3dot}}, lock the carriage. Spindle on: plunge to the pivot's O.D., stopping as it marks: the shoulder face square, its corner sharp."
+settings = "lathe-part-c360"
+cut_diameter_mm = "{{process.square_corners_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Read the pivot's length with the calipers' depth rod (the beam's end on the pivot end, the rod down beside the pivot onto the shoulder face)."
+inspection = "Pivot length {{cad.pivot_length_min_in:.2dot}}–{{cad.pivot_length_max_in:.2dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pivot_length_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A ring left standing at the shoulder, or the pivot under {{cad.pivot_length_min_in:.2dot}}: the blade stopped short; plunge again as Op 190 at Z−{{process.pivot_len_in:.3dot}} to the pivot's O.D. and read again. Over {{cad.pivot_length_max_in:.2dot}}: the top face's {{process.top_station_in:.2dot}} station is then short; scrap the blank and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "part"
+drilling = "none"
+sizing = "other"
+instruction = "Groove, three plunges with the {{process.blade_width_in:.4dot}} blade to a floor of Ø{{process.groove_aim_dia_in:.3dot}}: zero the cross-slide dial with the blade's tip on the pivot. Its chuck-side face {{process.groove_plunge_1_in:.4dot}}, then {{process.groove_plunge_2_in:.4dot}}, then {{process.groove_plunge_3_in:.4dot}} toward the end from the shoulder (DRO Z−({{process.pivot_len_in:.3dot}} − each)); lock the carriage and plunge (the miked pivot − {{process.groove_aim_dia_in:.3dot}})/2 in on the radius each time, backing out for chips. The DRO holds the groove's stations."
+settings = "lathe-part-c360"
+cut_diameter_mm = "{{process.pivot_aim_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Read the groove's floor with the calipers' jaw tips. Gauge its width with the gauge blocks: the {{process.groove_width_min_in:.3dot}} block's edge drops between its walls, the {{process.groove_width_max_in:.3dot}} (.110 wrung to .050) does not."
+inspection = "Groove Ø{{cad.groove_dia_min_in:.3dot}}–{{cad.groove_dia_max_in:.3dot}}, {{process.groove_width_min_in:.3dot}}–{{process.groove_width_max_in:.3dot}} wide."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.groove_dia_band_mm}}" }, { gauge = "gauge-blocks-mitutoyo", band_mm = ["{{process.groove_width_min_mm}}", "{{process.groove_width_max_mm}}"] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Groove floor over {{cad.groove_dia_max_in:.3dot}}: plunge again, .002 deeper on the dial. Floor under {{cad.groove_dia_min_in:.3dot}}, or the width outside {{process.groove_width_min_in:.3dot}}–{{process.groove_width_max_in:.3dot}}: scrap the blank and make another from Setup 1."
+
+[[setups]]
+machine_kind = "other"
+title = "Bench: deburr, check, oil"
+machine = "Bench"
+holding = "In the hand; the bench vise with soft jaws on the flats if needed."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished pen rod: the square, the tapped top end, the Ø.125 pivot with its set-screw groove." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Break the square's edges at both ends, the pivot end's edge and the groove's two edges R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, no burr left standing above the pivot's O.D.; leave the flats, the pivot's O.D. and the shoulder's corner otherwise untouched."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Read the top face's station from the shoulder face with the calipers, one jaw on each."
+inspection = "Shoulder to top face {{cad.top_face_station_min_in:.2dot}}–{{cad.top_face_station_max_in:.2dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.top_face_station_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Outside {{cad.top_face_station_min_in:.2dot}}–{{cad.top_face_station_max_in:.2dot}}: scrap the rod and make another from Setup 1."
+
+[[setups.operations]]
+instruction = "Wipe the rod with machine oil (FINISH: {{cad.finish}}) and bag it."
