@@ -1,73 +1,924 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Crankshaft MHA-DT-11, one off, from 1 in round 1018 CF. Route (owner ruling
+# 2026-11-21: turned setups are manual lathe work with a traveler and no NC;
+# milled features run from a program on the PM-30MV; owner ruling 2026-11-22,
+# option C2: the two drive-pin holes on the lathe, the cutters in the
+# headstock, the shaft in a shop-made jig on the cross slide; sketch
+# sketches/turnmill-a-crankshaft-lathe-jig.png):
+# - Setup 1, saw: a 6.50 in blank and a 4.00 in proof-slug blank.
+# - Setup 2, lathe, 3-jaw: face the far end (F) and centre-drill it (the
+#   drawing: LATHE CENTRE OK AT THIS END).
+# - Setup 3, lathe, 3-jaw on 1.00 in of extra stock, the dead centre in F:
+#   every diameter and face from F (Z0), then part off past the dome.
+# - Setup 4, lathe, 3-jaw on the stub (brass shim): face to length, step the
+#   SR.26 dome from a DRO table and file it (no centre hole in the dome).
+# - Setup 5, lathe, 3-jaw: the proof slug, the crankshaft's stub, seat face,
+#   spigot and one journal in one chucking.
+# - Setup 6, lathe: the jig on the tool post bored in place, then the drive-
+#   pin holes: first in the slug (measured; the DRO targets corrected), then
+#   in the shaft. The jig stays on the tool post throughout.
+# - Setup 7, mill, vise: the #9 cross hole through the stub, the pin line
+#   clocked level from the drive-pin holes (PK01_cross_hole).
+# - Setup 8, bench: deburr, punch mark, check, oil.
+#
+# At assembly, not here: the Ø.125 match-ream through MHA-DT-10 and the seat,
+# and the 1:48 taper-ream of the cross hole with MHA-DT-31 (the drawing's
+# notes).
+#
+# Drive-pin offsets .2756 ±.0009 (±22.9 um) from the stub's axis: the C2
+# budget (worst ±20 um, RSS 8 um) holds them only with each assumed term
+# checked or proven on the slug: the DTI's X0 readings (checked), the stub's
+# roundness (miked), the jig bore's clearance (telescoping gauge), the DRO
+# moves approached one way with the gib locked and re-read (procedure), the
+# DRO's scale accuracy and the drills' walk (proven on the slug; the scale's
+# accuracy is not recorded: gauges.lathe-x-dro), the shaft not moving while
+# cut (the stub swept again before unclamping); heat is assumed negligible.
+# The slug's and the shaft's offsets are read with the .0930 GO pin in the
+# hole and the micrometer over pin and stub, about ±8 um worst: the shaft is
+# accepted inside ±.0006 (guard-banded), never re-cut.
+#
+# To order before Setup 6: the drill chuck on its straight arbor
+# (holders.drill-chuck-jt33-straight-1-2), the 1/8 carbide spot drill
+# (tools.spot-drill-carbide-1-8), the #54 taper-length drill
+# (tools.drill-54-taper-length), the .0930 and .4500 reamers
+# (tools.reamer-0930, tools.reamer-4500), the .0930/.0935 plug pair
+# (gauges.plug-gauges-0930-0935); to make: the jig
+# (fixtures.dt-crankshaft-drive-pin-jig).
+#
+# NC (cam:dt_crankshaft, cad/process/dt_crankshaft/cam.py): PK01_cross_hole.
+# The program name, the [parameters] and the milling_cuts names are a
+# contract with that recipe. Tool numbers are the places in the tools list
+# among the mill's tools: T1 the #2 centre drill, T2 the #9 drill.
 title = "Crankshaft"
-part = "MHA-DT-11 Crankshaft"
-revision = "placeholder"
-material = "LOW-CARBON STEEL, E.G. 1018 CF"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "1018 cold-finished steel, 1 in round (drawing: {{cad.material_spec}})"
+stock = "Qty {{process.quantity:g}}. {{process.bar_dia_in:fraction}} in round bar on hand: one blank {{process.blank_length_in:.2f}} in long and one {{process.slug_blank_in:.2f}} in proof-slug blank."
+note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Every station is from the far end F. Inside corners R.010 max: finish each shoulder's corner with the sharp-nose tool. Each lathe tool sets its own DRO Z0 on the setup's datum face before it cuts a station. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) and touch off G54 before the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Prove the file in air first."
 shop = "../shop"
 stock_refs = ["1018-round-1"]
+material_key = "lathe-1018-cold-finished"
+milling_material = "steel_1018"
+
+[cad]
+file = "../../out/features/dt_crankshaft/features.toml"
+adapter = "drilled_block"
+part = "dt-crankshaft"
+
+[parameters]
+quantity = 1
+bar_dia_in = 1.0
+bar_dia_mm = 25.4
+# The 5.13 in shaft (F to the dome's apex), .02 faced off F, .07 left past
+# the apex for facing the parted end, the P1 blade's kerf, .20 clear of the
+# jaws and 1.00 in gripped (Setup 3), rounded up.
+blank_length_in = 6.5
+blank_length_mm = 165.1
+# The blank the shaft is cut from (stock_fit: envelope X, Y, Z; Y the axis).
+blank_x_in = 1.0
+blank_y_in = 6.5
+blank_z_in = 1.0
+# The proof slug's blank: 1.00 gripped, the slug's 2.62 and the blade's kerf
+# out of the jaws, .20 clear.
+slug_blank_in = 4.0
+face_allowance_in = 0.02
+# Setup 2: F 1.00 in out of the jaw fronts.
+end_stickout_mm = 25.4
+# Setup 3: the blank gripped on 1.00 in, F out at 6.50 − .02 − 1.00 = 5.48.
+turn_stickout_mm = 139.192
+# The P1 cutoff blade's width: its record (cad/config/shop-equipment/
+# tools-cutting.toml tools.cutoff-blade-p1 width_in, the makers' 1/16 in).
+# The part-off op mikes the blade's cutting edge and presets the DRO to that.
+blade_width_in = 0.0625
+# Parting kerf: the P1 blade's width plus .0125 (authored), for wander.
+part_kerf_in = 0.075
+# Setup 3 parts off with the blade's tailstock-side face 5.20 from F: the
+# 5.13 apex plus .07 to face in Setup 4. The stub is turned on past the kerf
+# (5.20 + .075) to 5.35, so the blade parts through Ø.375, .13 clear of the
+# jaws at 5.48.
+part_z_in = 5.2
+stub_end_z_in = 5.35
+# Roughing: the whole length to Ø.720 in cuts of .040 per side, then the
+# journals' run (F to the collar's rear face) to Ø.480 and the stub's to
+# Ø.400, each .030 over its finish for the finishing passes.
+rough_doc_in = 0.04
+rough_dia_in = 0.72
+journal_rough_in = 0.48
+stub_rough_in = 0.4
+relief_aim_in = 0.41
+neck_aim_in = 0.375
+# Setup 4: the 3-jaw over a brass shim wrap on the stub itself, the parted
+# end .30 in out of the jaw fronts (.07 to face off plus the .08 dome and
+# .15 of stub), the collar and the rest of the shaft back in the chuck.
+dome_stickout_mm = 7.62
+# The SR.26 dome on the Ø.375 stub (the export's nominal .2597): its height
+# .2597 − √(.2597² − .1875²) = .0800 (.07–.09 printed). Faced to length F to
+# the apex 5.132 (the rim at 5.052, the middle of 5.044–5.060, plus .080),
+# accepted 5.128–5.136 on the height gauge: the rim then lands 5.048–5.056.
+overall_in = 5.132
+overall_min_in = 5.128
+overall_max_in = 5.136
+overall_min_mm = 130.2512
+overall_max_mm = 130.4544
+dome_height_in = 0.08
+# Setup 5: the slug 2.90 in out of the jaw fronts, its faced end centre-
+# drilled and on the dead centre; from that end the journal to Z-1.60 (under
+# the jig's set screw), the spigot to Z-1.872 (.272 thick, as the shaft's),
+# the stub on to the part-off at Z-2.622 (.75 long), turned to Z-2.75 so the
+# blade parts through Ø.375, .15 clear of the jaws.
+slug_stickout_mm = 73.66
+slug_rear_z_in = 1.6
+slug_seat_z_in = 1.872
+slug_stub_end_z_in = 2.75
+slug_part_z_in = 2.622
+# Setup 6 (owner ruling 2026-11-22, option C2): the jig bored in place, the
+# .4500 reamer 2.95 deep (past the inboard neck at 2.89 from the jig face with
+# the 1/8 spacer in), breaking into the 3/8 clearance the jig was made with
+# from its back end for the pinion seat (fixtures.dt-crankshaft-drive-pin-jig).
+jig_ream_depth_in = 2.95
+# The jig bore over the journals: at most .0025 diametral (the budget's
+# ±1.6 um vertical term), read with the telescoping gauge and micrometer.
+jig_clearance_max_in = 0.0025
+# The cross-slide DRO targets for the two holes, ±7.000 mm from the stub's
+# axis (the drawing's .2756), each move ending in −X with the gib locked.
+pin_x_mm = 7.0
+# The cutters stand at least 34 mm out of the drill chuck: the stub and dome
+# stand 30.7 mm proud of the seat face, 7.0 − 4.76 = 2.24 mm off the cutter's
+# axis.
+cutter_projection_min_mm = 34.0
+# Depths from the seat face (carriage DRO, each cutter touched on it): the
+# spot to Ø.070 (.035 deep, 90°); the #43 to full diameter .175 (its point
+# .027 more); the .0930 reamer's full diameter to the .1555 printed; the #54
+# from the hole's floor through the .272 spigot into the gap behind it, its
+# tip to .32.
+spot_depth_in = 0.035
+drill_43_depth_in = 0.175
+knockout_tip_in = 0.32
+# The DTI's X0 sweep: its front and back readings agree within .002 mm, at
+# the seat face and 20 mm out (the budget's ±1 um X0 term).
+dti_x0_mm = 0.002
+# The slug: no correction if each offset is within .0002 (5 um) of .2756;
+# else each side's DRO target moves by its error and the slug, turned 90° in
+# the jig, is cut again. The shaft: accepted .2750–.2762 (±.0006, the
+# printed ±.0009 less the ±8 um measurement uncertainty), else scrap.
+pin_correct_in = 0.0002
+pin_accept_min_in = 0.275
+pin_accept_max_in = 0.2762
+pin_accept_min_mm = 6.985
+pin_accept_max_mm = 7.01548
+# The .0930 GO pin and the hole's mid size, for the offset from the
+# micrometer reading over pin and stub: offset = reading − stub/2 + .09325/2
+# − .0930 (the pin pushed onto the hole's inner wall by the anvil).
+pin_go_in = 0.093
+# Setup 7 (mill, shop workholding.vise-pm-6, fixtures.parallels-lms-6745,
+# 1/8 in thick): one 1 in parallel on edge under the journals, its left end
+# flush with the jaws' left face; the shaft along the jaws on it, F to the
+# right, the jaws' left face 3.55 from F (on the outboard journal), the
+# collar, the stub and the dome out past it; the proof slug's journal on a
+# second parallel at the jaws' right end as the spacer.
+riser_height_mm = 25.4
+parallel_thickness_mm = 3.175
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+parallel_length_mm = 101.6
+jaw_left_from_f_mm = 90.17
+# From the dome's apex (the beam's start): the jaws' left face, the cross
+# hole's station and the shaft's length.
+left_overhang_mm = 40.386
+cross_station_mm = 15.494
+part_length_mm = 130.556
+# G54 X0 is F, +X toward the jaws' right end: the cross hole at X-115.062.
+cross_x_mm = -115.062
+# Z0 the stub's top; the jaw tops stand above it by the jaw height less the
+# parallel, the journal's radius and the stub's; cam.py checks it.
+jaw_top_over_stub_mm = 9.0856
+# Spot Ø.160 with the #2 centre drill (under the #9); the #9 through the
+# Ø.375 stub, its full diameter 1.0 mm past the underside; its tip −(9.525 +
+# 1.0 + its 118° point 1.496).
+cross_spot_dia_mm = 4.064
+drill_past_mm = 1.0
+cross_drill_tip_mm = -12.021
+cross_projection_min_mm = 27.0
+# Speeds and feeds: LittleMachineShop "Cutting Speeds", Drilling & Reaming,
+# Plain carbon steels 1006-1026 (read 2026-11-20): drilling 60-100 ft/min;
+# AutoDrill "Suggested drilling feed rates" (read 2026-11-20), row Stl,
+# Carbon: 3/16 in .003 in/rev. Centre drill 1800 rpm × .001 = 1.8 in/min;
+# #9 1000 rpm (51 ft/min) × .003 = 3.0 in/min.
+spot_feed_per_min_mm = 45.72
+drill_9_feed_per_min_mm = 76.2
+# The pins' line level within 1° before the cross hole (the drawing's ±1°):
+# the DTI on the two .0930 GO pins, 14.0 mm apart, read within 0.10 mm
+# (.10 / 14.0 = 0.4°).
+pin_level_dti_mm = 0.1
+# Bench: the cross hole's .196 GO and .200 NO-GO (gauges.pin-gauges, class ZZ
+# minus); its station from F to the GO pin's far side, 4.53 + .098 ±.01.
+cross_go_pin_in = 0.196
+cross_nogo_pin_in = 0.2
+cross_far_side_min_in = 4.618
+cross_far_side_max_in = 4.638
 
 [[tools]]
-id = "drill-54"
-name = "#54 drill"
-ref = "drill-54"  # Drills #54
+id = "saw"
+name = "14 in metal-cutting saw"
+ref = "saw-evolution-14"
 
 [[tools]]
-id = "jig-drill-43"
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "sharp"
+name = "Sharp-nose turning tool, R.004 max"
+ref = "lathe-tool-sharp-nose"
+
+[[tools]]
+id = "centre-1"
+name = "No. 1 carbide centre drill"
+ref = "centre-drills-carbide-60"
+
+[[tools]]
+id = "dead-centre"
+name = "MT3 dead centre"
+ref = "dead-centre-mt3"
+
+[[tools]]
+id = "cutoff"
+name = "P1 HSS cutoff blade"
+ref = "cutoff-blade-p1"
+
+[[tools]]
+id = "jig"
+name = "Drive-pin jig (shop-made)"
+ref = "dt-crankshaft-drive-pin-jig"
+
+[[tools]]
+id = "drill-7-16"
+name = "7/16 drill"
+ref = "drill-7-16"
+
+[[tools]]
+id = "reamer-4500"
+name = ".4500 reamer"
+ref = "reamer-4500"
+status = "to_order"
+
+[[tools]]
+id = "drill-chuck"
+name = "1/2 in drill chuck on a 1/2 in straight arbor"
+ref = "drill-chuck-jt33-straight-1-2"
+status = "to_order"
+
+[[tools]]
+id = "spot-carbide"
+name = "1/8 carbide 90° spot drill"
+ref = "spot-drill-carbide-1-8"
+status = "to_order"
+
+[[tools]]
+id = "drill-43"
 name = "#43 drill"
-ref = "jig-drill-43"  # Drills #43
-
-[[tools]]
-id = "riser-drill-9"
-name = "#9 drill"
-ref = "riser-drill-9"  # Drills #9
-
-[[tools]]
-id = "taper-pin-reamer"
-name = "No. 3 taper-pin reamer"
-ref = "taper-pin-reamer"  # B-reamer-taper-pin
-
-[[tools]]
-id = "depth-micrometer"
-name = "Depth micrometer"
-ref = "depth-micrometer"  # F-depth-micrometer
-
-[[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
-
-[[tools]]
-id = "arbor-press"
-name = "Arbor press"
-ref = "arbor-press"  # F-arbor-press
-
-[[tools]]
-id = "centre-punch-starrett-18a"
-name = "Automatic centre punch"
-ref = "centre-punch-starrett-18a"  # F-centre-punch-starrett-18A
+ref = "jig-drill-43"
 
 [[tools]]
 id = "reamer-0930"
 name = ".0930 reamer"
-ref = "reamer-0930"  # drawing cross-check 2026-11-19: 2X .0930 +.0005/.0000 REAM .1555
+ref = "reamer-0930"
+status = "to_order"
 
 [[tools]]
-id = "drill-31"
-name = "#31 drill"
-ref = "drill-31"  # drawing cross-check 2026-11-19: pre-drill for the (Ø.125) match ream
+id = "drill-54"
+name = "#54 taper-length drill"
+ref = "drill-54-taper-length"
+status = "to_order"
 
 [[tools]]
-id = "reamer-1240"
-name = ".1240 reamer"
-ref = "reamer-1240"  # drawing cross-check 2026-11-19: (Ø.125) MATCH-REAM THRU MHA-DT-10
+id = "pin-plugs"
+name = "Plug gauges .0930 GO, .0935 NO-GO"
+ref = "plug-gauges-0930-0935"
+status = "to_order"
+
+[[tools]]
+id = "spot"
+name = "#2 centre drill"
+ref = "jig-spot"
+
+[[tools]]
+id = "drill-9"
+name = "#9 drill"
+ref = "riser-drill-9"
+
+[[tools]]
+id = "file"
+name = "Files; bench vise with soft jaws"
+ref = "jig-files"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Saw the blanks"
+machine = "Evolution 14 in metal-cutting saw"
+holding = "The bar flat on the saw bed, its long end clamped in the saw's vise, the blank free beyond the blade."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/saw.svg", alt = "The 1 in bar on the saw: a 6.50 in blank and a 4.00 in proof-slug blank off its end." }
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Mark {{process.blank_length_in:.2f}} in from the bar end with the rule and saw on the waste side of the line; then a {{process.slug_blank_in:.2f}} in blank for the proof slug the same way. Pick each up only after the blade has stopped. File the burrs off the sawn ends."
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Far end: face, centre-drill"
+machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the 6.50 blank, one end {{process.end_stickout_mm:in.2f}} in out of the jaw fronts (rule). That end is the far end F from here on: mark the bar beside it with a felt pen."
+datum = "The faced end F: every station on the shaft is read from it."
+diagram = { file = "diagrams/far-end.svg", alt = "The blank in the 3-jaw, F out 1.00 in, faced square and centre-drilled." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.end_stickout_mm}}", minimum_diameter_mm = "{{process.bar_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face F square, {{process.face_allowance_in:.2f}} in off, to the centre with no pip."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{process.bar_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre-1"
+drilling = "none"
+sizing = "other"
+instruction = "Centre-drill F with the No. 1 centre drill from the tailstock chuck, to about Ø.08 across the countersink (inside the pinion seat's Ø.3121)."
+settings = "lathe-centre-1018"
+cut_diameter_mm = 1.191
+
+[[setups]]
+machine_kind = "lathe"
+title = "Turn every diameter from F; part off"
+machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "Turned round: 3-jaw on 1.00 in of the blank's other end, F {{process.turn_stickout_mm:in.2f}} in out of the jaw fronts; F's centre hole on the MT3 dead centre, a dab of grease on its point, the quill snug and locked. Recheck the centre snug before each finishing pass: the shaft lengthens as it warms."
+datum = "Z0 (carriage DRO) the faced end F, set by each tool on F before it cuts a station (this setup's first op for the AR tool); every station is −Z from F."
+diagram = { file = "diagrams/turn.svg", alt = "The blank between the 3-jaw and the dead centre in F; the pinion seat, the necks, the journals, the relief, the spigot and the stub turned from F, the part-off line past the stub's end." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.turn_stickout_mm}}", minimum_diameter_mm = "{{cad.pinion_seat_dia_mm}}", support = "tailstock" }
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Before the centre goes in, spindle stopped: with a .002 feeler leaf between the AR tool's left edge and F, set DRO Z to +.002, then take the leaf out. Then bring the dead centre into F and lock the quill."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Rough from F to Z-{{process.stub_end_z_in:.2f}} in cuts of {{process.rough_doc_in:.3dot}} per side to Ø{{process.rough_dia_in:.3dot}}; then F to Z-{{cad.collar_rear_station_in:.3dot}} to Ø{{process.journal_rough_in:.3dot}}, and Z-{{cad.collar_seat_station_in:.3dot}} to Z-{{process.stub_end_z_in:.2f}} to Ø{{process.stub_rough_in:.3dot}}, the carriage stopped .010 short of each shoulder."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{process.bar_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Finish the spigot from Z-{{cad.collar_rear_station_in:.3dot}} to Z-{{cad.collar_seat_station_in:.3dot}} to Ø{{cad.spigot_dia_min_in:.3dot}}–{{cad.spigot_dia_max_in:.3dot}}, aiming {{cad.spigot_dia_in:.3dot}}; then the stub from Z-{{cad.collar_seat_station_in:.3dot}} to Z-{{process.stub_end_z_in:.2f}} to Ø{{cad.hub_shaft_dia_min_in:.4dot}}–{{cad.hub_shaft_dia_max_in:.4dot}}, aiming {{cad.hub_shaft_dia_in:.4dot}}."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.spigot_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Finish F to Z-{{cad.outboard_journal_end_station_in:.2dot}} in one pass to Ø{{cad.outboard_journal_dia_min_in:.4dot}}–{{cad.outboard_journal_dia_max_in:.4dot}}, aiming {{cad.outboard_journal_dia_in:.4dot}}: both journals' band, smooth to the nail (Ra 63). Then the relief from Z-{{cad.inboard_journal_end_station_in:.2dot}} to Z-{{cad.outboard_journal_station_in:.2dot}} in .010 cuts per side to Ø{{cad.relief_dia_min_in:.3dot}}–{{cad.relief_dia_max_in:.3dot}}, aiming {{process.relief_aim_in:.3dot}}, .005 short of each end."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.outboard_journal_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "The pinion seat from F to Z-{{cad.seat_step_station_in:.2dot}} in .010 cuts per side to Ø{{cad.pinion_seat_dia_min_in:.4dot}}–{{cad.pinion_seat_dia_max_in:.4dot}}, aiming {{cad.pinion_seat_dia_in:.4dot}}, the last pass light; stop .005 short of the step."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.pinion_seat_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "sharp"
+drilling = "none"
+sizing = "other"
+instruction = "Sharp-nose tool. First, spindle stopped: touch its left side on F, DRO Z0 (the AR tool's zero does not carry over), and mike its tip's width. Faces that point at F take the tool's left side at the station: the seat step Z-{{cad.seat_step_station_in:.2dot}}, the journals' starts Z-{{cad.inboard_journal_station_in:.2dot}} and Z-{{cad.outboard_journal_station_in:.2dot}}, the collar's rear face Z-{{cad.collar_rear_station_in:.3dot}} (Ra 63)."
+rpm = 400
+feed = "hand, light"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "sharp"
+drilling = "none"
+sizing = "other"
+instruction = "Faces that point at the chuck take the tool's right side, the DRO at −(the station + the tip's width): the inboard journal's end Z-{{cad.inboard_journal_end_station_in:.2dot}}, the outboard's Z-{{cad.outboard_journal_end_station_in:.2dot}}, the collar's seat face Z-{{cad.collar_seat_station_in:.3dot}}. Inside corners R.010 max."
+rpm = 400
+feed = "hand, light"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "sharp"
+drilling = "none"
+sizing = "other"
+instruction = "The two necks with the sharp-nose tool in plunges of .010 per side to Ø{{cad.neck_inboard_dia_min_in:.3dot}}–{{cad.neck_inboard_dia_max_in:.3dot}}, aiming {{process.neck_aim_in:.3dot}}: the inboard from Z-{{cad.seat_step_station_in:.2dot}} to Z-{{cad.inboard_journal_station_in:.2dot}}, the outboard from Z-{{cad.outboard_journal_end_station_in:.2dot}} to Z-{{cad.collar_rear_station_in:.3dot}}, never past either face."
+rpm = 400
+feed = "hand, light"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: mike the pinion seat, both journals (each at two places), the relief, both necks, the spigot and the stub."
+inspection = "Seat Ø{{cad.pinion_seat_dia_min_in:.4dot}}–{{cad.pinion_seat_dia_max_in:.4dot}}; journals Ø{{cad.outboard_journal_dia_min_in:.4dot}}–{{cad.outboard_journal_dia_max_in:.4dot}}; relief Ø{{cad.relief_dia_min_in:.3dot}}–{{cad.relief_dia_max_in:.3dot}}; necks Ø{{cad.neck_inboard_dia_min_in:.3dot}}–{{cad.neck_inboard_dia_max_in:.3dot}}; spigot Ø{{cad.spigot_dia_min_in:.3dot}}–{{cad.spigot_dia_max_in:.3dot}}; stub Ø{{cad.hub_shaft_dia_min_in:.4dot}}–{{cad.hub_shaft_dia_max_in:.4dot}}."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.pinion_seat_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.outboard_journal_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.inboard_journal_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.relief_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.neck_inboard_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.spigot_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.hub_shaft_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A diameter over its band: one more light pass over that feature only, the cross slide in by half the miked excess per side, and mike again. Any diameter under its band: the shaft is scrap; start again from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped, the sharp-nose tool zeroed on F as above: touch each face with the side named above and read Z."
+inspection = "Seat step Z-{{cad.seat_step_station_min_in:.2dot}} to -{{cad.seat_step_station_max_in:.2dot}}; journals Z-{{cad.inboard_journal_station_min_in:.2dot}} to -{{cad.inboard_journal_station_max_in:.2dot}} / -{{cad.inboard_journal_end_station_min_in:.2dot}} to -{{cad.inboard_journal_end_station_max_in:.2dot}} and -{{cad.outboard_journal_station_min_in:.2dot}} to -{{cad.outboard_journal_station_max_in:.2dot}} / -{{cad.outboard_journal_end_station_min_in:.2dot}} to -{{cad.outboard_journal_end_station_max_in:.2dot}}; collar Z-{{cad.collar_rear_station_min_in:.3dot}} to -{{cad.collar_rear_station_max_in:.3dot}} and -{{cad.collar_seat_station_min_in:.3dot}} to -{{cad.collar_seat_station_max_in:.3dot}}."
+gauge_checks = [{ gauge = "lathe-z-dro", band_mm = "{{cad.seat_step_station_band_mm}}" }, { gauge = "lathe-z-dro", band_mm = "{{cad.inboard_journal_station_band_mm}}" }, { gauge = "lathe-z-dro", band_mm = "{{cad.inboard_journal_end_station_band_mm}}" }, { gauge = "lathe-z-dro", band_mm = "{{cad.outboard_journal_station_band_mm}}" }, { gauge = "lathe-z-dro", band_mm = "{{cad.outboard_journal_end_station_band_mm}}" }, { gauge = "lathe-z-dro", band_mm = "{{cad.collar_rear_station_band_mm}}" }, { gauge = "lathe-z-dro", band_mm = "{{cad.collar_seat_station_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A face short of its station (material still to come off): face it again to the station and read again. Past its station: the shaft is scrap; start again from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: back the tailstock off clear of F (the shaft stays in the 3-jaw) for the blade's touch-off; mike the P1 blade's cutting edge."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{process.part_z_in:.3dot}}, steady hand feed, cutting oil, the dead centre back in F and locked: down to about Ø.10, then stop, back the tailstock off, hold the shaft in a rag and finish the cut by hand at the lowest speed."
+settings = "lathe-part-1018"
+cut_diameter_mm = "{{cad.hub_shaft_dia_mm}}"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Dome end: face to length, the SR.26 dome"
+machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw over a brass shim wrap on the Ø.3746 stub (a sliding fit: the shim keeps the jaws off it), the parted end {{process.dome_stickout_mm:in.2f}} in out of the jaw fronts; the collar and the rest of the shaft back through the chuck into the spindle bore."
+datum = "Z0 (carriage DRO) the faced apex, set by each tool on it; the length is read from F with the height gauge."
+diagram = { file = "diagrams/dome.svg", alt = "The shaft in the 3-jaw on its stub over a brass shim, the parted end .30 out: faced to length, the SR.26 dome stepped from the table and filed." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.hub_shaft_dia_mm}}", stock_diameter_mm = "{{cad.hub_shaft_dia_mm}}", stickout_mm = "{{process.dome_stickout_mm}}", minimum_diameter_mm = "{{cad.hub_shaft_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the parted end square to the centre with no pip, in light skims toward the length."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.hub_shaft_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Between skims, take the shaft out and stand it on F on the surface plate: the height gauge's scriber on the faced end reads the length. Aim {{process.overall_in:.4dot}}. Write the final reading."
+inspection = "F to the faced end {{process.overall_min_in:.3dot}}–{{process.overall_max_in:.3dot}} (the dome's apex: the rim at {{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}} plus the .080 dome)."
+gauge_checks = [{ gauge = "height-gauge", band_mm = ["{{process.overall_min_mm}}", "{{process.overall_max_mm}}"] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Over {{process.overall_max_in:.3dot}}: chuck it again as in this setup and take another skim. Under {{process.overall_min_in:.3dot}}: the shaft is scrap; start again from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle stopped: touch the AR tool's point on the faced end, DRO Z0. Step the dome: at each line, carriage at the Z, face from the Ø out to the stub's O.D.: Z-.0012 from Ø.050; Z-.0049 Ø.100; Z-.0111 Ø.150; Z-.0200 Ø.200; Z-.0321 Ø.250; Z-.0477 Ø.300; Z-.0678 Ø.350. The dome meets the stub's O.D. at Z-{{process.dome_height_in:.3dot}}."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.hub_shaft_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle at the low range: file the steps off the dome with the smooth file, stroking from the apex out to the rim, until the step corners are just gone (the apex itself untouched); break the rim R{{cad.edge_break_in:.3dot}} max. No centre hole in the dome."
+rpm = 200
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped. Sharp-nose tool (R.004): touch its nose on the apex and set DRO Z0 there; touch its side on the miked stub and set the cross-slide DRO to that diameter (to its half if the DRO reads radius). Touch the nose on the dome at Ø.200 and at Ø.300, reading Z. The bands allow for the R.004 nose."
+inspection = "Dome at Ø.200 Z-.0178 to -.0214 and at Ø.300 Z-.0418 to -.0515: the dome's height {{cad.dome_height_min_in:.2dot}}–{{cad.dome_height_max_in:.2dot}} (SR.26 REF); no flat at the apex."
+gauge_checks = [{ gauge = "lathe-z-dro", band_mm = "{{cad.dome_height_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Either reading nearer zero than its band (the dome too full): file again from the rim inward and read the check above again. Either reading past its band (too deep): the shaft is scrap; start again from Setup 1."
+
+[[setups]]
+machine_kind = "lathe"
+title = "The proof slug"
+machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the 4.00 slug blank, {{process.slug_stickout_mm:in.2f}} in out of the jaw fronts (rule); after the first op, the faced end's centre hole on the MT3 dead centre, greased, the quill snug and locked."
+datum = "Z0 (carriage DRO) the slug's faced end, set by each tool on it; stations −Z."
+diagram = { file = "diagrams/slug.svg", alt = "The slug blank between the 3-jaw and the dead centre: the Ø.4486 journal, the Ø.687 spigot, the seat face and the Ø.3746 stub turned in one chucking, parted off at the chuck end." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.slug_stickout_mm}}", minimum_diameter_mm = "{{cad.hub_shaft_dia_mm}}", support = "tailstock" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the end square. Spindle stopped: with a .002 feeler leaf between the AR tool's left edge and the faced end, set DRO Z to +.002, then take the leaf out."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{process.bar_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre-1"
+drilling = "none"
+sizing = "other"
+instruction = "Centre-drill the faced end with the No. 1 centre drill from the tailstock chuck, to about Ø.08 across the countersink; then the dead centre into it, quill locked."
+settings = "lathe-centre-1018"
+cut_diameter_mm = 1.191
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Rough to Ø{{process.rough_dia_in:.3dot}} from Z0 to Z-{{process.slug_stub_end_z_in:.2f}}. Finish the journal Z0 to Z-{{process.slug_rear_z_in:.3dot}} to Ø{{cad.outboard_journal_dia_min_in:.4dot}}–{{cad.outboard_journal_dia_max_in:.4dot}}, the spigot to Z-{{process.slug_seat_z_in:.3dot}} to Ø{{cad.spigot_dia_in:.3dot}}, the stub on to Z-{{process.slug_stub_end_z_in:.2f}} to Ø{{cad.hub_shaft_dia_min_in:.4dot}}–{{cad.hub_shaft_dia_max_in:.4dot}}: the shaft's own sizes."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{process.bar_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "sharp"
+drilling = "none"
+sizing = "other"
+instruction = "Sharp-nose tool. Spindle stopped: touch its left side on the faced end, DRO Z0, and mike its tip's width. The seat face points at the chuck: face it square and flat with the tool's right side, the DRO at −({{process.slug_seat_z_in:.3dot}} + the tip's width); inside corner R.010 max."
+rpm = 400
+feed = "hand, light"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: mike the stub at three angles 60° apart at the seat face and .50 out, and the journal."
+inspection = "Stub Ø{{cad.hub_shaft_dia_min_in:.4dot}}–{{cad.hub_shaft_dia_max_in:.4dot}}, its six readings within .0001 of each other (round); journal Ø{{cad.outboard_journal_dia_min_in:.4dot}}–{{cad.outboard_journal_dia_max_in:.4dot}}."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.hub_shaft_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.outboard_journal_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Over its band: a light pass and mike again. Under its band, or the stub's readings spread over .0001: saw another slug blank and turn it from this setup's first op."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: back the tailstock off clear of the faced end (the slug stays in the 3-jaw) for the blade's touch-off; mike the P1 blade's cutting edge."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{process.slug_part_z_in:.3dot}}, steady hand feed, cutting oil, the dead centre back in and locked: down to about Ø.10, then stop, back the tailstock off, hold the slug in a rag and finish the cut by hand at the lowest speed."
+settings = "lathe-part-1018"
+cut_diameter_mm = "{{cad.hub_shaft_dia_mm}}"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Drive-pin holes in the jig: the slug, then the shaft"
+machine = "PM-1127VF-LB lathe / the jig on the AXA No. 4 holder; cutters in the 3-jaw, then in the drill chuck"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "The jig's Ø.750 shank in the AXA No. 4 holder on the tool post, its head toward the headstock, the holder's height collar set with the jig's axis at the spindle's centre height (by the centre in the 3-jaw on the jig face). The holder is not moved again until the shaft's holes are done. The cross slide's gib locked between moves. Work in the jig: far end first, the 1/8 spacer between the spigot's rear face and the jig face, the 10-32 set screw on its brass pad down on the relief (snug, not tight), the spacer then withdrawn."
+datum = "X0 (cross-slide DRO) the stub's axis: the DTI in the drill chuck swept round the stub, front and back readings equal. Z (carriage DRO) zeroed by each cutter's tip touched on the seat face. The jig's bore lies on the spindle axis because it is cut in place."
+diagram = { file = "diagrams/jig.svg", alt = "Plan view: the jig on the tool post with the shaft in its bore, the spacer gap behind the spigot, the set screw on the relief; the drill chuck on its arbor in the 3-jaw, the cutter 7.000 off the stub's axis, standing past the stub and dome." }
+lathe_hold = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre-1"
+drilling = "none"
+sizing = "other"
+instruction = "Jig bore, the No. 1 centre drill in the 3-jaw: feed the jig onto it with the carriage handwheel to about Ø.15 across the countersink."
+settings = "lathe-centre-1018"
+cut_diameter_mm = 1.191
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-7-16"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "The 7/16 drill in the 3-jaw: feed the jig onto it with the carriage, pecking every .25, cutting oil, to {{process.jig_ream_depth_in:.2f}} plus .10 deep (carriage DRO from the jig face)."
+rpm = 500
+feed = "carriage handwheel, pecking, cutting oil"
+hole_depth_mm = 77.47
+peck = { step_mm = 6.35, retract = "full" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "reamer-4500"
+drilling = "none"
+sizing = "other"
+instruction = "The .4500 reamer in the 3-jaw: feed the jig onto it steadily to {{process.jig_ream_depth_in:.2f}} deep, and back off with the spindle running. Plenty of cutting oil."
+rpm = 150
+feed = "carriage handwheel, steady, cutting oil"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Telescoping gauge and micrometer in the jig bore at its mouth and 2.5 deep; mike the shaft's two journals and the slug's journal."
+inspection = "Jig bore over each journal by no more than {{process.jig_clearance_max_in:.4dot}}, and each journal slides in by hand."
+gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = [11.43, 11.4935] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Over {{process.jig_clearance_max_in:.4dot}}, or a journal will not enter: the jig is scrap; make another and bore it here again."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The drill chuck's 1/2 in arbor in the 3-jaw; the DTI in the drill chuck. The slug in the jig as Holding says. Sweep the stub at the seat face by turning the spindle by hand: move the cross slide until the front and back readings agree, then again 20 mm out; set DRO X0. Write the four readings and the top and bottom."
+inspection = "Front and back within {{process.dti_x0_mm:.3f}} mm at both places."
+gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{process.dti_x0_mm}}"] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Front and back apart by more than {{process.dti_x0_mm:.3f}} mm at either place: the stub is not square to the spindle; take the slug out, clean the bore and the journal, seat it again and sweep again."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "spot-carbide"
+drilling = "none"
+sizing = "other"
+instruction = "Every cutter stands at least {{process.cutter_projection_min_mm:in.2f}} in out of the drill chuck, and is touched on the seat face for Z0. Each hole: cross slide to X+{{process.pin_x_mm:.3f}} from X+7.500 and to X-{{process.pin_x_mm:.3f}} from X-6.500 (both moves ending in −X), gib locked, DRO re-read. Spot each to Z-{{process.spot_depth_in:.3dot}} (Ø.070)."
+rpm = 1800
+feed = "carriage handwheel, light"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-43"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "The #43 drill, touched on the seat face: each hole, moved to as above, to Z-{{process.drill_43_depth_in:.3dot}} (full diameter) in one steady feed (L/D 2), cutting oil."
+rpm = 1800
+feed = "carriage handwheel, steady, cutting oil"
+hole_depth_mm = 4.445
+peck = "none"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "reamer-0930"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }
+instruction = "The .0930 reamer, touched on the seat face: each hole, moved to as above, its full diameter to Z-{{cad.drive_pin_1_depth_in:.4dot}}, fed in and back out with the spindle running. Cutting oil."
+rpm = 600
+feed = "carriage handwheel, steady, cutting oil"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-54"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "The #54 taper-length drill, touched on the seat face: each hole, moved to as above, from the reamed hole's floor on through the spigot into the gap behind it, its tip to Z-{{process.knockout_tip_in:.2dot}}, pecking .02."
+rpm = 2000
+feed = "carriage handwheel, pecking, cutting oil"
+hole_depth_mm = 8.128
+peck = { step_mm = 0.508, retract = "full" }
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The slug out (the jig, the cross slide and the drill chuck untouched). Each hole: the .0930 GO enters, the .0935 NO-GO does not. With the GO in it, mike over the pin and the stub's far side at the seat face; offset = reading − stub/2 + .04663 − .0930. Write both offsets."
+inspection = "Each offset within {{process.pin_correct_in:.4dot}} of {{cad.drive_pin_1_offset_in:.4dot}}: no correction."
+gauge_checks = [{ gauge = "plug-gauges-0930-0935", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }, { gauge = "micrometers", band_mm = [6.9949, 7.0051] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Either offset more than {{process.pin_correct_in:.4dot}} off: that side's DRO target moves by its error the other way (in mm), the slug goes back in turned 90° and the slug ops above run again at the new targets (90°, 45° and 135° give three more tries). A hole the GO does not enter: ream it again before reading."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The shaft in the jig as Holding says. Mike its stub at three angles at the seat face (round within .0001). Sweep the stub with the DTI as for the slug; set DRO X0. Write the readings."
+inspection = "Front and back within {{process.dti_x0_mm:.3f}} mm at both places; the stub round within .0001."
+gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{process.dti_x0_mm}}"] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Out of either limit: take the shaft out, clean, seat it again and sweep again; a stub out of round by more than .0001 goes back to Setup 3's stub pass first."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "spot-carbide"
+drilling = "none"
+sizing = "other"
+instruction = "The shaft: spot each hole as the slug's, at the targets the slug proved, each move ending in −X, gib locked and the DRO re-read; the spot touched on the seat face for Z0, to Z-{{process.spot_depth_in:.3dot}}."
+rpm = 1800
+feed = "carriage handwheel, light"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-43"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "The shaft: the #43 in each, touched on the seat face, to Z-{{process.drill_43_depth_in:.3dot}} (full diameter) in one steady feed, cutting oil; the moves as above."
+rpm = 1800
+feed = "carriage handwheel, steady, cutting oil"
+hole_depth_mm = 4.445
+peck = "none"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "reamer-0930"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }
+instruction = "The shaft: the .0930 reamer in each, touched on the seat face, its full diameter to Z-{{cad.drive_pin_1_depth_in:.4dot}}, fed in and back out running; the moves as above."
+rpm = 600
+feed = "carriage handwheel, steady, cutting oil"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-54"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "The shaft: the #54 in each, touched on the seat face, from the reamed floor through the spigot into the gap, its tip to Z-{{process.knockout_tip_in:.2dot}}, pecking .02; the moves as above."
+rpm = 2000
+feed = "carriage handwheel, pecking, cutting oil"
+hole_depth_mm = 8.128
+peck = { step_mm = 0.508, retract = "full" }
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Before the set screw comes off: sweep the stub with the DTI again at the seat face."
+inspection = "Front and back within {{process.dti_x0_mm:.3f}} mm of the readings written before cutting (the shaft did not move)."
+gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{process.dti_x0_mm}}"] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Moved by more than {{process.dti_x0_mm:.3f}} mm: the next op's readings decide; write the movement on the traveler."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The shaft out. Each hole: the .0930 GO enters, the .0935 NO-GO does not; offset as for the slug; the depth to the reamed floor with the calipers' depth rod."
+inspection = "Holes Ø{{cad.drive_pin_1_dia_min_in:.4dot}}–{{cad.drive_pin_1_dia_max_in:.4dot}}; offsets {{process.pin_accept_min_in:.4dot}}–{{process.pin_accept_max_in:.4dot}} (the printed {{cad.drive_pin_1_offset_min_in:.4dot}}–{{cad.drive_pin_1_offset_max_in:.4dot}} less the reading's ±8 um); depth {{cad.drive_pin_1_depth_min_in:.4dot}}–{{cad.drive_pin_1_depth_max_in:.4dot}}."
+gauge_checks = [{ gauge = "plug-gauges-0930-0935", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }, { gauge = "micrometers", band_mm = ["{{process.pin_accept_min_mm}}", "{{process.pin_accept_max_mm}}"] }, { gauge = "calipers", band_mm = "{{cad.drive_pin_1_depth_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A hole the GO does not enter: the jig untouched, the shaft back in, swept, the reamer through it again. An offset outside {{process.pin_accept_min_in:.4dot}}–{{process.pin_accept_max_in:.4dot}}, a depth outside its band, or a hole the NO-GO enters: the shaft is scrap (a reamed hole cannot be moved); start again from Setup 1, the jig and the proved targets kept."
+
+[[setups]]
+machine_kind = "other"
+title = "Mill: the cross hole"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "The PM 6 in vise. One 1 in, 4 in long parallel of the 1/8 in thick set standing on edge, centred between the jaws, its left end flush with the jaws' left face; the shaft on its top edge along the jaws, F to the RIGHT, the jaws' left face 3.55 in from F (on the outboard journal; calipers' depth rod), brass shim over both journals at the jaws. The proof slug's journal on a second parallel at the jaws' right end as the spacer. The .0930 GO pins in both drive-pin holes. Under the hole nothing but air."
+datum = "Program PK01_cross_hole (cam:dt_crankshaft). G54: X0 F, +X toward the jaws' right end; Y0 the stub's axis; Z0 the stub's top. The file starts with an M6 for the centre drill; tool lengths from the tool setter at each M6; at each M6 stop the file has stopped the spindle and lifted the tool above the jaws."
+diagram = { file = "diagrams/cross-hole.svg", alt = "The shaft along the vise jaws on a parallel on edge, F to the right; the collar, the stub and the dome out past the jaws' left face; the #9 hole through the stub 4.53 from F; the slug as the spacer at the right end." }
+envelope = "other"
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.outboard_journal_dia_mm}}", along_jaws_mm = "{{process.part_length_mm}}", part_height_mm = "{{cad.outboard_journal_dia_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.left_overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.part_length_mm}}"], clamp_mm = ["{{process.left_overhang_mm}}", "{{process.part_length_mm}}"], section_mm = { diameter = "{{cad.hub_shaft_dia_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Before tightening: the pins' line level. The DTI in the spindle on the top of each GO pin beside the stub; roll the shaft until the two readings agree. Write them."
+inspection = "The two pins' tops within {{process.pin_level_dti_mm:.2f}} mm of each other (the line within 0.4°; the drawing's ±1°)."
+gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{process.pin_level_dti_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Over {{process.pin_level_dti_mm:.2f}} mm: open the vise a little, roll the shaft toward the low pin, close it and read again. Take the pins out once level."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Home the mill ($H). G54 Y0 the stub's axis: edge finder (900 rpm)."
+instruction_detailed = "Edge finder (900 rpm, Ø.200), its tip level with the stub's axis, on the stub between the collar and the dome: from the −Y side, G10 L20 P1 Y0; jog Z up clear of the stub, then from the +Y side G10 L20 P1 Y(half the DRO's work Y reading)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 X0 F: edge finder (900 rpm), 2.5 mm off the axis (off F's centre hole)."
+instruction_detailed = "X and Z have no work zero yet, so jog: Z up until the tip clears the jaws; X right until the tip is about .2 in right of F, in the gap before the slug; MDI G0 Y2.500; jog Z down to the shaft's axis height; bring it in from the right onto F: G10 L20 P1 X2.540. Jog X right .2 in and Z up clear."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the top of the stub, touched with the centre drill over its axis."
+instruction_detailed = "Console M6 T1 (#2 centre drill; the tool setter measures it). MDI G0 X-120.000 Y0.000: over the stub. Spindle stopped, its point just dragging a .002 feeler leaf on the stub's top: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove PK01_cross_hole in air, Z0 raised 1.000 in. Then Z0 back. The #9 stands at least {{process.cross_projection_min_mm:in.2f}} in out of the chuck."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run PK01_cross_hole through every M6, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back, and the centre drill goes back in for the real run."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Run PK01_cross_hole (M6 T1, centre drill; set 1800): spot the cross hole Ø{{process.cross_spot_dia_mm:in.3dot}} on the stub's top at X{{process.cross_x_mm:.3f}} mm."
+rpm = 1800
+feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "cross spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.cross_spot_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = "{{process.cross_station_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-9"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.cross_hole_dia_band_mm}}" }
+instruction = "Same file, M6 T2: the #9 through the stub in one feed (L/D 1.9), its full diameter {{process.drill_past_mm:in.3dot}} past the stub's underside; set 1000. Cutting oil."
+rpm = 1000
+feed = "{{process.drill_9_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{cad.hub_shaft_dia_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "cross drill", kind = "drill", phase = "rough", cutter_dia_mm = 4.9784, flutes = 2, rpm = 1000, feed_mm_min = "{{process.drill_9_feed_per_min_mm}}", stations_mm = "{{process.cross_station_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Before unclamping: the {{process.cross_go_pin_in:.3dot}} pin (GO) passes through the cross hole, the {{process.cross_nogo_pin_in:.3dot}} pin (NO-GO) does not enter."
+inspection = "Cross hole Ø{{cad.cross_hole_dia_min_in:.3dot}}–{{cad.cross_hole_dia_max_in:.3dot}}."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.cross_hole_dia_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "The GO does not pass: T2 still in, MDI G0 X{{process.cross_x_mm:.3f}} Y0 Z1, M3 S1000, G1 Z{{process.cross_drill_tip_mm:.3f}} F{{process.drill_9_feed_per_min_mm:.1f}}, G0 Z10, M5; gauge again. Still tight, or the NO-GO enters: the shaft is scrap; start again from Setup 1."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Bench: deburr, mark, check, oil"
+machine = "Bench"
+holding = "Bench vise with soft jaws on the spigot."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished crankshaft: F with its centre, the Ø.3121 pinion seat, the journals, the Ø.41 relief, the Ø.687 spigot with the two .0930 drive-pin holes and their knockouts, the Ø.3746 stub with the #9 cross hole, the SR.26 dome." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr both ends of the cross hole with the smooth file's corner, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, never on the stub's O.D.; the drive-pin holes' mouths and the knockouts' exits the same; break every other outside edge R{{cad.edge_break_in:.3dot}} max, never on the journals or the collar's faces. Prick one punch mark on the spigot's O.D. (location not critical)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Cross hole: the {{process.cross_go_pin_in:.3dot}} GO pin passes, the {{process.cross_nogo_pin_in:.3dot}} NO-GO enters neither end; with the GO in it, the calipers' outside jaws from F to the pin's far side. Mike the stub across the hole's ends: no raised burr."
+inspection = "Cross hole Ø{{cad.cross_hole_dia_min_in:.3dot}}–{{cad.cross_hole_dia_max_in:.3dot}}; F to the pin's far side {{process.cross_far_side_min_in:.3dot}}–{{process.cross_far_side_max_in:.3dot}} ({{cad.cross_hole_station_min_in:.2dot}}–{{cad.cross_hole_station_max_in:.2dot}} plus half the pin); stub Ø{{cad.hub_shaft_dia_min_in:.4dot}}–{{cad.hub_shaft_dia_max_in:.4dot}} there."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.cross_hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.cross_hole_station_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.hub_shaft_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A raised burr on the stub: stone it off and mike again. The hole out of its band or station: the shaft is scrap; start again from Setup 1."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Wipe on ISO VG 32 oil (FINISH: {{cad.finish}}). Bag the shaft with its number, the journals wrapped."
+feed = "hand"

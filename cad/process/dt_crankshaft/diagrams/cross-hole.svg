@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="340"/>
+  <text class="title" x="20" y="22">Setup 7: side view along the jaws; F to the right, the stub in the overhang (not to scale)</text>
+  <rect class="fixture-vise" x="230" y="260" width="500" height="30"/>
+  <rect class="clamp" x="230" y="110" width="500" height="90"/>
+  <rect class="fixture-support" x="230" y="190" width="320" height="70"/>
+  <rect class="fixture-support" x="660" y="190" width="70" height="70"/>
+  <path class="part-kept" d="M40,170 Q25,160 40,150 Z"/>
+  <rect class="part-kept" x="40" y="148" width="120" height="30"/>
+  <rect class="part-kept" x="160" y="138" width="30" height="52"/>
+  <rect class="part-kept" x="190" y="150" width="440" height="40"/>
+  <rect class="part-kept" x="660" y="150" width="70" height="40"/>
+  <rect class="holes" x="96" y="148" width="10" height="30"/>
+  <rect class="cutter" x="96" y="60" width="10" height="82"/>
+  <line class="datum" x1="40" y1="148" x2="150" y2="148"/>
+  <text class="datum-label" x="130" y="100">Z0 the stub's top</text>
+  <line class="leader" x1="150" y1="104" x2="140" y2="148"/>
+  <line class="datum" x1="630" y1="120" x2="630" y2="215"/>
+  <text class="datum-label" x="560" y="240">X0 F</text>
+  <line class="leader" x1="600" y1="232" x2="630" y2="212"/>
+  <text class="label" x="20" y="50">PK01: #9 at X-115.062</text>
+  <text class="label" x="300" y="80">jaws (behind) on the journals, brass shim</text>
+  <text class="label" x="650" y="320">slug spacer</text>
+  <line class="leader" x1="690" y1="308" x2="690" y2="192"/>
+  <line class="dims" x1="190" y1="300" x2="230" y2="300"/>
+  <text class="label" x="20" y="320">jaws' left face 3.55 from F, on the outboard journal</text>
+  <line class="leader" x1="230" y1="308" x2="230" y2="292"/>
+  <text class="label" x="150" y="230">.0930 pins in the seat face, read level first</text>
+</svg>
