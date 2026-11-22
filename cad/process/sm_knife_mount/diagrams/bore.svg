@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Setup 8 (KM08), 4 px/mm: lying on 1.5 in stacks, K down, gripped on S (fixed) and N, A at the left</text>
+  <text class="title" x="40.0" y="50.0">Across the jaws, looking from A</text>
+  <text class="title" x="480.0" y="50.0">Plan, F up</text>
+  <rect class="fixture-vise" x="130.0" y="400.0" width="241.6" height="16.0"/>
+  <rect class="clamp" x="150.0" y="220.2" width="50.0" height="179.8"/>
+  <rect class="clamp" x="301.6" y="220.2" width="50.0" height="179.8"/>
+  <rect class="fixture-support" x="200.0" y="247.6" width="12.7" height="152.4"/>
+  <rect class="fixture-support" x="288.9" y="247.6" width="12.7" height="152.4"/>
+  <rect class="part-kept" x="200.0" y="191.7" width="101.6" height="55.9"/>
+  <rect class="holes" x="226.8" y="191.7" width="48.0" height="55.9"/>
+  <line class="centre-line" x1="250.8" y1="177.7" x2="250.8" y2="261.6"/>
+  <rect class="cutter" x="226.8" y="121.7" width="48.0" height="60.0"/>
+  <text class="label-on-clamp" x="175.0" y="390.0" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="326.6" y="390.0" text-anchor="middle">fixed</text>
+  <line class="datum" x1="301.6" y1="151.7" x2="301.6" y2="187.7"/>
+  <text class="datum-label" x="305.6" y="161.7">Y0 (S)</text>
+  <line class="datum" x1="355.6" y1="247.6" x2="375.6" y2="247.6"/>
+  <text class="datum-label" x="379.6" y="251.6">Z0 = K</text>
+  <text class="label-halo" x="40.0" y="80.0">12 mm bore through, between the stacks</text>
+  <rect class="clamp" x="450.0" y="135.0" width="178.9" height="25.0"/>
+  <rect class="clamp" x="450.0" y="261.6" width="178.9" height="25.0"/>
+  <rect class="part-kept" x="480.0" y="160.0" width="118.9" height="101.6"/>
+  <circle class="holes" cx="562.4" cy="210.8" r="24.00"/>
+  <line class="datum" x1="466.0" y1="160.0" x2="494.0" y2="160.0"/>
+  <line class="datum" x1="480.0" y1="148.0" x2="480.0" y2="174.0"/>
+  <text class="datum-label" x="446.0" y="164.0" text-anchor="end">X0 Y0</text>
+  <text class="label-halo" x="474.0" y="214.8" text-anchor="end">A</text>
+  <text class="label-halo" x="604.9" y="214.8">U</text>
+  <text class="label-on-clamp" x="539.4" y="152.0" text-anchor="middle">fixed jaw (S)</text>
+  <text class="label-on-clamp" x="539.4" y="278.6" text-anchor="middle">moving jaw</text>
+</svg>

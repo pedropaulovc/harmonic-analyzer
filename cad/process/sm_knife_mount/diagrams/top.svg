@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Setup 7 (KM06), 4 px/mm: on edge on 1 in parallels, U down, F at the fixed jaw, S at the left</text>
+  <text class="title" x="40.0" y="50.0">Across the jaws, looking from S</text>
+  <text class="title" x="500.0" y="50.0">Plan</text>
+  <rect class="fixture-vise" x="130.0" y="400.0" width="195.9" height="16.0"/>
+  <rect class="clamp" x="150.0" y="220.2" width="50.0" height="179.8"/>
+  <rect class="clamp" x="255.9" y="220.2" width="50.0" height="179.8"/>
+  <rect class="fixture-support" x="200.0" y="298.4" width="12.7" height="101.6"/>
+  <rect class="fixture-support" x="243.2" y="298.4" width="12.7" height="101.6"/>
+  <rect class="part-kept" x="200.0" y="179.5" width="55.9" height="118.9"/>
+  <rect class="part-removed" x="200.0" y="161.2" width="55.9" height="18.3"/>
+  <rect class="holes" x="221.4" y="179.5" width="13.0" height="38.6"/>
+  <line class="centre-line" x1="227.9" y1="165.5" x2="227.9" y2="232.1"/>
+  <rect class="cutter" x="221.4" y="91.2" width="13.0" height="60.0"/>
+  <text class="label-on-clamp" x="175.0" y="390.0" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="280.9" y="390.0" text-anchor="middle">fixed</text>
+  <line class="datum" x1="255.9" y1="139.5" x2="255.9" y2="175.5"/>
+  <text class="datum-label" x="259.9" y="149.5">Y0 (F)</text>
+  <line class="datum" x1="309.9" y1="298.4" x2="329.9" y2="298.4"/>
+  <text class="datum-label" x="333.9" y="302.4">Z0 = U</text>
+  <text class="label-halo" x="40.0" y="80.0">face the top seat A to the height 1.17;</text>
+  <text class="label-halo" x="40.0" y="98.0">then spot, #31 and ream B, #25 the tap hole</text>
+  <rect class="clamp" x="470.0" y="135.0" width="161.6" height="25.0"/>
+  <rect class="clamp" x="470.0" y="215.9" width="161.6" height="25.0"/>
+  <rect class="part-kept" x="500.0" y="160.0" width="101.6" height="55.9"/>
+  <circle class="holes" cx="520.3" cy="187.9" r="6.50"/>
+  <circle class="holes" cx="550.8" cy="187.9" r="7.59"/>
+  <line class="datum" x1="486.0" y1="160.0" x2="514.0" y2="160.0"/>
+  <line class="datum" x1="500.0" y1="148.0" x2="500.0" y2="174.0"/>
+  <text class="datum-label" x="466.0" y="164.0" text-anchor="end">X0 Y0</text>
+  <text class="label-halo" x="494.0" y="191.9" text-anchor="end">S</text>
+  <text class="label-halo" x="607.6" y="191.9">N</text>
+  <text class="label-on-clamp" x="550.8" y="152.0" text-anchor="middle">fixed jaw (F)</text>
+  <text class="label-on-clamp" x="550.8" y="232.9" text-anchor="middle">moving jaw</text>
+  <text class="label-halo" x="520.3" y="259.9" text-anchor="middle">B</text>
+  <text class="label-halo" x="550.8" y="259.9" text-anchor="middle">#10-24</text>
+  <text class="label-halo" x="380.0" y="300.0">B .37 deep and the #25 .438 deep: blind</text>
+</svg>

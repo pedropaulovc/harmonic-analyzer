@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Setup 7 (KM07), 4 px/mm: the #10-24 tapped by hand under the spring tap guide</text>
+  <text class="title" x="40.0" y="50.0">Across the jaws, looking from S</text>
+  <rect class="fixture-vise" x="130.0" y="400.0" width="195.9" height="16.0"/>
+  <rect class="clamp" x="150.0" y="220.2" width="50.0" height="179.8"/>
+  <rect class="clamp" x="255.9" y="220.2" width="50.0" height="179.8"/>
+  <rect class="fixture-support" x="200.0" y="298.4" width="12.7" height="101.6"/>
+  <rect class="fixture-support" x="243.2" y="298.4" width="12.7" height="101.6"/>
+  <rect class="part-kept" x="200.0" y="179.5" width="55.9" height="118.9"/>
+  <rect class="holes" x="220.3" y="179.5" width="15.2" height="44.5"/>
+  <line class="centre-line" x1="227.9" y1="165.5" x2="227.9" y2="238.0"/>
+  <text class="label-on-clamp" x="175.0" y="390.0" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="280.9" y="390.0" text-anchor="middle">fixed</text>
+  <line class="datum" x1="255.9" y1="139.5" x2="255.9" y2="175.5"/>
+  <text class="datum-label" x="259.9" y="149.5">Y0 (F)</text>
+  <line class="datum" x1="309.9" y1="298.4" x2="329.9" y2="298.4"/>
+  <text class="datum-label" x="333.9" y="302.4">Z0 = U</text>
+  <text class="label-halo" x="330.0" y="120.0">Fisher tap guide in the 1/2 in collet, spindle off</text>
+  <text class="label-halo" x="330.0" y="160.0">its spring point in the wrench's centre hole</text>
+  <text class="label-halo" x="330.0" y="200.0">#10-24 tap in the T-handle wrench</text>
+  <text class="label-halo" x="330.0" y="260.0">plug tap's point to .430 below A;</text>
+  <text class="label-halo" x="330.0" y="278.0">bottoming tap's to .375 + its chamfer c</text>
+  <rect class="cutter" x="221.9" y="60.0" width="12.0" height="50.0"/>
+  <rect class="fixture-support" x="187.9" y="118.0" width="80.0" height="10.0"/>
+  <rect class="cutter" x="224.9" y="128.0" width="6.0" height="51.5"/>
+</svg>

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20" y="22">Setup 1, plan of the bar (4 px/mm): two blanks and a trial coupon sawn square across the 1-1/4 width</text>
+  <rect class="fixture-table" x="20.0" y="60.0" width="720.0" height="290.0"/>
+  <rect class="part-rest" x="40.0" y="140.0" width="230.0" height="140.2"/>
+  <rect class="part-removed" x="270.0" y="140.0" width="12.7" height="140.2"/>
+  <rect class="part-kept" x="282.7" y="140.0" width="111.8" height="140.2"/>
+  <text class="label-halo" x="338.6" y="200.0" text-anchor="middle">coupon T</text>
+  <text class="label-halo" x="338.6" y="218.0" text-anchor="middle">1.05–1.15</text>
+  <rect class="part-removed" x="394.5" y="140.0" width="12.7" height="140.2"/>
+  <rect class="part-kept" x="407.2" y="140.0" width="111.8" height="140.2"/>
+  <text class="label-halo" x="463.0" y="200.0" text-anchor="middle">blank 2</text>
+  <text class="label-halo" x="463.0" y="218.0" text-anchor="middle">1.05–1.15</text>
+  <rect class="part-removed" x="518.9" y="140.0" width="12.7" height="140.2"/>
+  <rect class="part-kept" x="531.6" y="140.0" width="111.8" height="140.2"/>
+  <text class="label-halo" x="587.5" y="200.0" text-anchor="middle">blank 1</text>
+  <text class="label-halo" x="587.5" y="218.0" text-anchor="middle">1.05–1.15</text>
+  <rect class="part-removed" x="643.4" y="140.0" width="12.7" height="140.2"/>
+  <text class="label-halo" x="155.0" y="205.0" text-anchor="middle">5/8 × 1-1/4 4140 HT (rest of the bar)</text>
+  <text class="label" x="400.0" y="300.0" text-anchor="middle">saw kerfs, 1/8 in; the squaring cut at the right end</text>
+  <line class="dims" x1="662.1" y1="140.0" x2="662.1" y2="280.2"/>
+  <text class="label-halo" x="666.1" y="210.1">1-1/4</text>
+  <text class="label" x="400.0" y="120.0" text-anchor="middle">mark each piece: number on the wide face, A on one bar edge, S on one sawn end</text>
+</svg>
