@@ -6,10 +6,13 @@
   <rect class="part-rest" x="120" y="96" width="30" height="68"/>
   <rect class="part-rest" x="580" y="80" width="60" height="100"/>
   <rect class="paper" x="600" y="104" width="40" height="52"/>
-  <text class="label" x="40" y="70">MHA-DT-34 ferrule, outer face</text>
-  <text class="label" x="280" y="80">MHA-DT-08 handle and its bore</text>
-  <text class="label" x="470" y="54">MHA-DT-35 butt cup:</text>
-  <text class="label" x="470" y="70">its pocket opens outward</text>
+  <text class="label" x="20" y="44">MHA-DT-34 ferrule, outer face</text>
+  <line class="dims" x1="120" y1="48" x2="120" y2="96"/>
+  <text class="label" x="200" y="62">MHA-DT-08 handle and its bore</text>
+  <line class="dims" x1="300" y1="66" x2="300" y2="90"/>
+  <text class="label" x="520" y="44">MHA-DT-35 butt cup:</text>
+  <line class="dims" x1="610" y1="64" x2="610" y2="80"/>
+  <text class="label" x="520" y="60">its pocket opens outward</text>
   <line class="dims" x1="120" y1="226" x2="600" y2="226"/>
   <line class="dims" x1="120" y1="218" x2="120" y2="234"/>
   <line class="dims" x1="600" y1="160" x2="600" y2="234"/>

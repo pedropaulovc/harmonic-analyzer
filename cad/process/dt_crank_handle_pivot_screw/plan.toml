@@ -215,7 +215,7 @@ title = "Lathe: turn the screw on the centre, thread, relief, part off"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the rod, {{process.stickout_in:.2dot}} in out of the jaw fronts, the rest in the jaws. The tailstock dead centre, greased, in the tip's centre hole for Ops 60–180 (backed off for the readings in Op 160 and brought back snug); the tailstock backed away for the tip chamfer (Op 190), brought up in Op 200, its centre out, to square the die, and backed away again for the relief and the part-off (Ops 230–280)."
+holding = "3-jaw on the rod, {{process.stickout_in:.2dot}} in out of the jaw fronts, the rest in the jaws. The tailstock dead centre, greased, in the tip's centre hole for Ops 60–180, the quill backed off for each touch-off on the tip and for the readings (Ops 120, 130, 160, 180) and brought back snug; the tailstock backed away for the tip chamfer (Op 190), brought up in Op 200, its centre out, to square the die, and backed away again for the relief and the part-off (Ops 230–280)."
 datum = "Z0 (carriage DRO) the tip's faced plane, set in Op 40; each tool touched on the tip again when it takes over (Ops 120, 130, 180, 280). The seat at Z−{{process.seat_z_in:.3dot}}; the under-head face at Z−U and the part-off at Z−P from Setup 1."
 diagram = { file = "diagrams/turn.svg", alt = "The rod in the 3-jaw on the dead centre at the tip: the head's Ø.236 next to the jaws, the long Ø.155 shoulder, the #4-40 thread at the tip; the relief at the seat; the part-off at the head's face." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.stock_dia_mm}}", stock_diameter_mm = "{{process.stock_dia_mm}}", stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{process.thread_dia_min_mm}}", support = "tailstock" }
@@ -294,7 +294,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.shoulder_dia_band_mm}}
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Shoulder under {{cad.shoulder_dia_min_in:.4dot}} at any reading: scrap the blank and make another from Setup 2. Over {{cad.shoulder_dia_max_in:.4dot}} at any reading: another light pass (one end over and the other in band: the tailstock is off line; set it over before the pass)."
+instruction = "Shoulder under {{cad.shoulder_dia_min_in:.4dot}} at any reading: scrap the blank and make another from Setup 2. Over at both ends: another light pass. One end over, the other in band: set the tailstock over by half the ends' difference (toward the tool if the tip end is larger), skim, mike both ends again; both in band or scrap as above."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -302,7 +302,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "Under-head corner, R{{cad.shoulder_corner_radius_max_mm:in.3dot}} MAX: the blade on centre height, square to the axis. Spindle stopped: touch the blade's chuck-side face on the faced tip, a paper feeler between, and set DRO Z to +.001 (the feeler). Bring the blade's chuck-side face on Z−U, lock the carriage there. Spindle on: plunge to the shoulder's O.D., stopping as it marks: a sharp corner and the under-head face."
+instruction = "Under-head corner, R{{cad.shoulder_corner_radius_max_mm:in.3dot}} MAX: the blade on centre height, square to the axis. Spindle stopped: back the quill until the centre clears the tip. With the .002 feeler leaf on the faced tip, touch the blade's chuck-side face on it and set DRO Z to +.002; bring the centre back snug. Bring the blade's chuck-side face on Z−U, lock the carriage. Spindle on: plunge to the shoulder's O.D., stopping as it marks."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.head_aim_dia_mm}}"
 
@@ -315,7 +315,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle stopped: the AR tool's point back on the faced tip, the paper feeler between; set the DRO Z to +.001 (the feeler). Rough the thread blank from the tip to the seat at Z−{{process.seat_z_in:.3dot}} to Ø{{process.thread_rough_dia_mm:in.3dot}}, the seat face square."
+instruction = "Spindle stopped: back the quill until the centre clears the tip; the AR tool's point on the faced tip, the .002 feeler leaf between; set the DRO Z to +.002, and bring the centre back snug. Rough the thread blank from the tip to the seat at Z−{{process.seat_z_in:.3dot}} to Ø{{process.thread_rough_dia_mm:in.3dot}}, the seat face square."
 settings = "dt-lathe-ar-1018-centre"
 cut_diameter_mm = "{{process.shoulder_aim_dia_mm}}"
 
@@ -354,7 +354,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "Head chamfer 45°, {{cad.head_chamfer_min_in:.3dot}}–{{cad.head_chamfer_max_in:.3dot}}: swing the compound to 45° (its feed in and toward the tip); re-square the blade's holder. Spindle stopped: touch the blade's chuck-side face on the tip, the paper feeler between, and set DRO Z to +.001; its chuck-side corner on the head's O.D. at Z−(U + {{process.head_chamfer_aim_in:.4dot}}), zero the compound. Spindle on: feed .011 along the compound; the corner runs out on the under-head face."
+instruction = "Head chamfer 45°, {{cad.head_chamfer_min_in:.3dot}}–{{cad.head_chamfer_max_in:.3dot}}: swing the compound to 45° (its feed in and toward the tip); re-square the blade's holder. Spindle stopped: back the quill until the centre clears the tip. With the .002 feeler leaf on the tip, touch the blade's chuck-side face on it and set DRO Z to +.002; its chuck-side corner on the head's O.D. at Z−(U + {{process.head_chamfer_aim_in:.4dot}}), zero the compound. Spindle on: feed .011 along the compound."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.head_aim_dia_mm}}"
 
@@ -436,7 +436,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "Part off: the compound back square, the holder re-squared. Spindle stopped: touch the blade's chuck-side face on the tip, the paper feeler between, and set DRO Z to +(.001 + the blade's width): the DRO reads its tailstock-side face. Bring the blade's tailstock-side face on Z−P (the head's length past the under-head face). Spindle on: cutting oil, steady by hand, backing out for chips; catch the screw by hand as it parts."
+instruction = "Part off: the compound back square, the holder re-squared. Spindle stopped: with the .002 feeler leaf on the tip, touch the blade's chuck-side face on it and set DRO Z to +(.002 + the blade's width): the DRO reads its tailstock-side face. Bring the blade's tailstock-side face on Z−P (the head's length past the under-head face). Spindle on: cutting oil, steady by hand, backing out for chips; catch the screw by hand as it parts."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.head_aim_dia_mm}}"
 
@@ -495,10 +495,10 @@ instruction = "Take the burrs off the slot's edges and the head face's edge with
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Run the #4-40 nut on by hand to the relief once more, and slide the screw through the bonded handle's bore: it turns freely, the head clearing the butt cup's pocket."
+instruction = "Slide the screw through the bonded handle's bore: it turns freely, the head clearing the butt cup's pocket."
 
 [[setups.operations]]
-instruction = "A nut that binds, or a screw that binds in the handle: scrap the screw and make another from Setup 2."
+instruction = "A screw that binds in the handle: scrap the screw and make another from Setup 2."
 
 [[setups.operations]]
 instruction = "Wipe the screw with machine oil (FINISH: {{cad.finish}}) and bag it with its handle."

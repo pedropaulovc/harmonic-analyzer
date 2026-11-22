@@ -3,8 +3,8 @@
 # C360 key stock (the drawing: SQ as supplied, McMaster-Carr 90457A730):
 #
 # - Saw a blank; mike both pairs of flats (the square is left as bought).
-# - 4-jaw on the flats, the top end out, the square indicated to run true (the
-#   #0-80's .067 TAP WALL leaves no room for the hole off centre): face the
+# - 4-jaw on the flats, the top end out, the square indicated to run true
+#   within the shop's .001 TIR (the #0-80's .067 TAP WALL): face the
 #   top end, spot, drill 3/64, tap #0-80 with the plug then the bottoming
 #   tap from the tailstock centre.
 # - Turned round in the 4-jaw, indicated again, the pivot end out: face to
@@ -71,9 +71,10 @@ groove_width_max_mm = 4.064
 # face: the quill scale, zeroed there, reads .263 for a full diameter .270
 # deep.
 drill_scale_in = 0.263
-# The square indicated to run true within this on each pair of flats (TIR):
-# the .067 TAP WALL is the worst case with the hole on the axis.
-indicate_tir_in = 0.0005
+# The square indicated to run true within this on each pair of flats (TIR),
+# the shop table's runout floor: the hole then sits within .0005 of the
+# square's centre, inside the .067 TAP WALL's margin.
+indicate_tir_in = 0.001
 # The tap drill: spotted to about Ø.055 with the No. 1 centre drill (a lead
 # for the tap), then the 3/64 to full diameter .26-.28 deep, pecked every
 # .040 (under one diameter). The taps' points stop by pencil marks: the plug at .15 deep, the
@@ -192,7 +193,7 @@ title = "Top end: face, drill and tap #0-80"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "6 in 4-jaw, each jaw on a flat over a brass shim, the top end {{process.top_stickout_in:.2dot}} in out of the jaw fronts, the rest of the blank back through the spindle bore. Indicate two adjacent flats next to the jaws with the dial test indicator, turning the chuck by hand, and adjust opposite jaws until each pair reads within {{process.indicate_tir_in:.4dot}} TIR."
+holding = "6 in 4-jaw, each jaw on a flat over a brass shim, the top end {{process.top_stickout_in:.2dot}} in out of the jaw fronts, the rest of the blank back through the spindle bore. Indicate two adjacent flats next to the jaws with the dial test indicator, turning the chuck by hand, and adjust opposite jaws until each pair reads within {{process.indicate_tir_in:.3dot}} TIR."
 datum = "Z0 (carriage DRO) the top face, faced in Op 50. The tailstock quill's scale for the drill's depth, zeroed in Op 70."
 diagram = { file = "diagrams/top.svg", alt = "The square in the 4-jaw on its flats, the top end out: faced, spotted, drilled 3/64 and tapped #0-80 from the tailstock." }
 lathe_hold = "other"
@@ -201,8 +202,8 @@ turning_support = { kind = "chuck_only", chuck_z_mm = -12.7 }
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Indicate the square as the holding says; snug every jaw a little at a time, reading again after each."
-inspection = "Each pair of flats within {{process.indicate_tir_in:.4dot}} TIR."
-gauge_checks = [{ gauge = "dti", band_mm = [0.0, 0.0127] }]
+inspection = "Each pair of flats within {{process.indicate_tir_in:.3dot}} TIR."
+gauge_checks = [{ gauge = "dti", band_mm = [0.0, 0.0254] }]
 
 [[setups.operations]]
 cut_kind = "other"
@@ -282,7 +283,7 @@ title = "Pivot end: face to length, turn the pivot, groove"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "Turned round: the 4-jaw on the flats over the shims, the pivot end {{process.pivot_stickout_in:.2dot}} in out of the jaw fronts, the tapped end back through the spindle bore; indicated again as Setup 2 to {{process.indicate_tir_in:.4dot}} TIR."
+holding = "Turned round: the 4-jaw on the flats over the shims, the pivot end {{process.pivot_stickout_in:.2dot}} in out of the jaw fronts, the tapped end back through the spindle bore; indicated again as Setup 2 to {{process.indicate_tir_in:.3dot}} TIR."
 datum = "Z0 (carriage DRO) the pivot end's finished plane, {{process.overall_in:.3dot}} from the top face: the DRO preset from L (Op 120) in Op 150, the blade touched on it again in Op 190. The shoulder at Z−{{process.pivot_len_in:.3dot}}."
 diagram = { file = "diagrams/pivot.svg", alt = "The square turned round in the 4-jaw, the pivot end out: faced to length, the Ø.125 pivot turned, its shoulder corner squared and the groove plunged with the cutoff blade." }
 lathe_hold = "other"
@@ -291,8 +292,8 @@ turning_support = { kind = "chuck_only", chuck_z_mm = "{{process.jaw_front_z_mm}
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Indicate the square to run true as Setup 2's first step."
-inspection = "Each pair of flats within {{process.indicate_tir_in:.4dot}} TIR."
-gauge_checks = [{ gauge = "dti", band_mm = [0.0, 0.0127] }]
+inspection = "Each pair of flats within {{process.indicate_tir_in:.3dot}} TIR."
+gauge_checks = [{ gauge = "dti", band_mm = [0.0, 0.0254] }]
 
 [[setups.operations]]
 cut_kind = "other"
@@ -342,7 +343,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "Shoulder, R{{cad.pivot_corner_radius_max_mm:in.3dot}} MAX corner: the blade on centre height, square to the axis. Spindle stopped: touch the blade's chuck-side face on the faced end, a paper feeler between, and set DRO Z to +.001 (the feeler). Bring the blade's chuck-side face on Z−{{process.pivot_len_in:.3dot}}, lock the carriage. Spindle on: plunge to the pivot's O.D., stopping as it marks: the shoulder face square, its corner sharp."
+instruction = "Shoulder, R{{cad.pivot_corner_radius_max_mm:in.3dot}} MAX corner: the blade on centre height, square to the axis. Spindle stopped: with the .002 feeler leaf on the faced end, touch the blade's chuck-side face on it and set DRO Z to +.002. Bring the blade's chuck-side face on Z−{{process.pivot_len_in:.3dot}}, lock the carriage. Spindle on: plunge to the pivot's O.D., stopping as it marks: the shoulder face square, its corner sharp."
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{process.square_corners_mm}}"
 
@@ -374,7 +375,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.groove_dia_band_mm}}" }, 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Groove floor over {{cad.groove_dia_max_in:.3dot}}: plunge again, .002 deeper on the dial. Floor under {{cad.groove_dia_min_in:.3dot}}, or the width outside {{process.groove_width_min_in:.3dot}}–{{process.groove_width_max_in:.3dot}}: scrap the blank and make another from Setup 1."
+instruction = "Groove floor over {{cad.groove_dia_max_in:.3dot}}: plunge again at all three Op 220 stations, .002 deeper on the radius (the floor about .004 smaller), then read again as Op 230. Floor under {{cad.groove_dia_min_in:.3dot}}, or the width outside {{process.groove_width_min_in:.3dot}}–{{process.groove_width_max_in:.3dot}}: scrap the blank and make another from Setup 1."
 
 [[setups]]
 machine_kind = "other"
