@@ -10,13 +10,11 @@
 # per-tool diameter readings are not used; cad/process/README.md).
 # The 8-32 tap records the plan's authored #29 (.136 in) tap drill. The v48
 # drawing calls the #12 bracket drill (notes.process).
-# No helix_deg or axial_ratio on the 1/2 in end mills (this one, jig-em-half,
+# No helix_deg or axial_ratio on the 1/2 in end mills (basebar-em-half, in
+# common.toml since the MHA-SM-01 bend form cuts with it, jig-em-half,
 # block-em-half-long): no catalogue or measurement states a helix, so their
 # cuts keep prechips' configured axial_ratio 1.0 (owner ruling 2026-11-16,
 # #2873).
-[tools.basebar-em-half]
-description = "1/2 in centre-cutting 2-flute end mill; flutes ≥5/8 in"
-diameter_mm = 12.7
 [tools.basebar-em-face]
 description = "3/4 in 4-flute end mill"
 diameter_mm = 19.05
@@ -76,11 +74,6 @@ tool = "basebar-em-half"
 material = "6061-t6511"
 rpm = 2250
 feed = "15.75 in/min"
-[settings.basebar-slot-rough-6061-t6511]
-tool = "basebar-em-half"
-material = "6061-t6511"
-rpm = 1250
-feed = "5 in/min"
 # Owner ruling 2026-11-11: the source guide's 165 ft/min HSS milling speed and
 # .002 in/tooth: 12*165/(pi*3/4)=840 rpm, rounded to 850;
 # 850 rpm * 4 flutes * .002 in/tooth = 6.8 in/min, rough and finish.
@@ -306,8 +299,6 @@ description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 36 in lengt
 description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 72 in length"
 [stock.1018-square-1-4]
 description = "1018 cold-finish carbon steel, square bar, 1/4 x 1/4 in"
-[stock.6061-flat-1-2x6-54in]
-description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 54 in length"
 # The amplitude bar's riser (cad/process/ch_amplitude_bar, Setup 1) is sawn
 # from this bar: its plan's stock_refs names it.
 [stock.6061-flat-1x3]

@@ -39,7 +39,39 @@ diameter_mm = 3.2512
 [tools.sine-bar-5]  # MHA-SM-03 122.4° ±.5° knife-edge stubs
 description = "Sine bar, 5 in centres"
 [tools.sm-gooseneck-bend-form]  # inventory fixtures.sm-gooseneck-bend-form
-description = "Shop-made grooved bend form with a tail for the MHA-SM-01 gooseneck tube"
+description = "Shop-made two-plate 6061 bend form for the MHA-SM-01 gooseneck tube: a closed half-round channel holding the tail, a quarter cove round the R3 arc"
+
+# --- MHA-SM-01 gooseneck (cad/process/sm_gooseneck/plan.toml) -----------------
+# The bend form's groove is cut with the owned 1/4 in ball end mill (owner
+# ruling 2026-11-22, option A). Ownership: cad/config/shop-equipment/
+# tools-cutting.toml, same key (McMaster 8878A17, on hand). diameter_mm: the
+# nominal 1/4 in × 25.4. flute_length_mm: McMaster's 8878A17 page, read
+# 2026-11-22 (https://www.mcmaster.com/8878A17/): "Length of Cut 3/4"", 2
+# flutes, centre cutting, 30° helix, mill diameter tolerance -0.002 to 0.
+[tools.ball-endmill-carbide-2fl-1-4]
+description = "1/4 in 2-flute uncoated carbide ball end mill, 3/4 in length of cut, 2-1/2 in OAL (McMaster 8878A17)"
+diameter_mm = 6.35
+flute_length_mm = 19.05
+helix_deg = 30
+# 6G Tools, "Carbide End Mill Speeds and Feeds, General Purpose, Uncoated"
+# (https://www.6gtools.com/uploaded/files/feedsandspeeds/Carbide_End_Mill_Feeds_And_Speeds_General_Purpose_Uncoated.pdf,
+# read 2026-11-22): Non-Ferrous, aluminium and aluminium alloys, 500 SFM,
+# 1/4 in (6 mm) column .0022 in (.056 mm) per tooth. 500 SFM on 1/4 in is
+# 3.82 × 500 / .25 = 7640 rpm, over the PM-30MV's 2800 (machines.pm-30mv):
+# run at 2800 at the chart's chip load, 2800 × 2 × .0022 = 12.32 in/min.
+[settings.ball-endmill-carbide-2fl-1-4-6061-t6511]
+tool = "ball-endmill-carbide-2fl-1-4"
+material = "6061-t6511"
+rpm = 2800
+chip_load_mm_per_tooth = 0.05588  # .0022 in
+flutes = 2
+# The finish's oil (sheet: "polished bare; oil or wax") and its polish.
+# Ownership: cad/config/shop-equipment/consumables.toml, same keys (the oil
+# to buy, as MHA-MG-02 needs; the roll on hand).
+[tools.barricade-birchwood-casey]
+description = "Birchwood Casey Barricade rust protection oil"
+[tools.sanding-roll-220]
+description = "Sanding roll, 2 in wide, 220 grit (McMaster 4687A223)"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so

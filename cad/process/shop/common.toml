@@ -651,6 +651,36 @@ description = "Spoil plate: a 5 in length of the 1/2 x 6 in 6061 flat, top as su
 [tools.tape-3m-vhb-5906]
 description = "3M VHB 5906 double-sided tape, .006 in"
 
+# --- The 1/2 in HSS end mill and its slot setting (ch, sm) --------------------
+# Moved here from ch.toml: the MHA-CH-13-TL-01 sub-plate's SP01 slots the 1/2
+# x 6 in 6061 bar on the table with them, and the MHA-SM-01 bend form's plates
+# (cad/process/sm_gooseneck, GF01/GF02) are cut through on the table the same
+# way. Source: base-bar.toml; Pedro's route dated 2026-11-05 and table-clamped
+# squaring sequence dated 2026-11-07. diameter_mm: the nominal size × 25.4. No
+# helix_deg or axial_ratio: no catalogue or measurement states a helix (owner
+# ruling 2026-11-16, #2873). flute_length_mm: the least its description's
+# "flutes ≥5/8 in" allows, 5/8 × 25.4 (the bend form's through cut checks
+# against it). Ownership: cad/config/shop-equipment/tools-cutting.toml, same
+# key (on hand, the dechatter v11 cutter).
+[tools.basebar-em-half]
+description = "1/2 in centre-cutting 2-flute end mill; flutes ≥5/8 in"
+diameter_mm = 12.7
+flute_length_mm = 15.875
+[settings.basebar-slot-rough-6061-t6511]
+tool = "basebar-em-half"
+material = "6061-t6511"
+rpm = 1250
+feed = "5 in/min"
+
+# --- Bench-cut rod and tube (dt, sm) -------------------------------------------
+# Moved here from dt.toml. MHA-DT-30 (cad/process/dt_pinion_lever_pin): a 1/16
+# rod is too slender for the 3-jaw or the 14 in saw's vise, so it is sawn by
+# hand in the bench vise. MHA-SM-01 (cad/process/sm_gooseneck): both ends of
+# the bent tube are sawn in the bench vise, where the 14 in saw cannot hold the
+# bent part. Ownership: cad/config/shop-equipment/tools-hand.toml, same key.
+[tools.junior-hacksaw]
+description = "Junior hacksaw, 6 in blade, 32 TPI"
+
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
 # prechips can check each plan's stock_refs. Description only: the ownership
@@ -672,6 +702,8 @@ description = "1018 cold-finish carbon steel, round bar, 3/8 in"
 description = "1018 cold-finish carbon steel, round bar, 5/8 in"
 [stock.1018-square-3-4]
 description = "1018 cold-finish carbon steel, square bar, 3/4 x 3/4 in"
+[stock.6061-flat-1-2x6-54in]  # moved from ch.toml: the MHA-CH-13-TL-01 sub-plate and the MHA-SM-01 bend form
+description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 54 in length"
 [stock.c360-flat-3-4x1-1-4]
 description = "C36000 free-machining brass (360-H02, extruded), flat bar, 3/4 x 1-1/4 in"
 [stock.c360-round-1-4]
