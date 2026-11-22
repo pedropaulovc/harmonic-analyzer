@@ -126,7 +126,7 @@ ref = "form-tool-r047"
 status = "to_order"
 [[tools]]
 id = "centre"
-name = "Carbide 60° centre drill"
+name = "Carbide 60° centre drill, size 1"
 ref = "centre-drills-carbide-60"
 [[tools]]
 id = "drill-43"
@@ -213,7 +213,17 @@ speed_kind = "spindle"
 tool = "form"
 drilling = "none"
 sizing = "other"
-instruction = "Set the R.047 form tool on centre height, square to the axis. Bring its tailstock-side flank onto the spigot face and set the DRO Z to −{{process.form_half_width_in:.3dot}} there: the DRO then reads the centre of its arc. Move to Z−{{cad.groove_station_in:.3dot}} (the groove's centre, {{cad.groove_station_min_in:.3dot}}–{{cad.groove_station_max_in:.3dot}} from the face). Touch the arc on the spigot's O.D. and zero the cross-slide dial there; feed in slowly by half of (your Op 20 spigot reading − {{cad.groove_root_dia_in:.3dot}}), radially: the root is then Ø{{cad.groove_root_dia_in:.3dot}} ({{cad.groove_root_dia_min_in:.3dot}}–{{cad.groove_root_dia_max_in:.3dot}}) whatever the spigot came out at; on a Ø.420 spigot the infeed is .045, the arc's centre just inside the O.D."
+instruction = "Set the R.047 form tool on centre height, square to the axis. Bring it past the spigot face, its chuck-side flank onto the face, and set the DRO Z to {{process.form_half_width_in:.3dot}} there: the DRO then reads the centre of its arc. Move to Z−{{cad.groove_station_in:.3dot}}, the groove's centre ({{cad.groove_station_min_in:.3dot}}–{{cad.groove_station_max_in:.3dot}} from the face)."
+settings = "fixture-form-r047-c360"
+cut_diameter_mm = "{{cad.spigot_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "form"
+drilling = "none"
+sizing = "other"
+instruction = "Touch the arc on the spigot's O.D. and zero the cross-slide dial there. Feed in slowly by half of (your Op 20 spigot reading − {{cad.groove_root_dia_in:.3dot}}), radially: the root is then Ø{{cad.groove_root_dia_in:.3dot}} ({{cad.groove_root_dia_min_in:.3dot}}–{{cad.groove_root_dia_max_in:.3dot}}) whatever the spigot came out at."
 settings = "fixture-form-r047-c360"
 cut_diameter_mm = "{{cad.spigot_dia_mm}}"
 
@@ -341,7 +351,7 @@ machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "The bar back in the 3-jaw, a jaw on every other flat, the spigot end {{process.stickout_in:.2f}} in out of the jaw fronts."
-datum = "DRO Z set with the blade on the spigot face in Op 180."
+datum = "DRO Z set with the blade on the spigot face in Op 190."
 diagram = { file = "diagrams/part.svg", alt = "The bar in the 3-jaw, the fixture's spigot end out; the P1 blade's chuck-side face touched on the spigot face, then the fixture parted off .72 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = 11.1125, stock_diameter_mm = 12.8316, stickout_mm = 24.13, minimum_diameter_mm = 8.2968, support = "none" }
 
@@ -357,7 +367,7 @@ cut_diameter_mm = 12.8316
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The rod bore's two stations, the GO shank in the bore: calipers from the free end over the shank's far side, less half the shank's miked Ø; then from the spigot face the same way."
+instruction = "The rod bore's two stations, the F drill's shank in the bore (the GO, or the undersize F if Op 120 found no GO): calipers from the free end over the shank's far side, less half the shank's miked Ø; then from the spigot face the same way."
 inspection = "Free end to the bore's axis {{cad.rod_bore_station_min_in:.3dot}}–{{cad.rod_bore_station_max_in:.3dot}}; spigot face to it {{cad.rod_bore_face_station_min_in:.3dot}}–{{cad.rod_bore_face_station_max_in:.3dot}}."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.rod_bore_station_band_mm}}" },
@@ -385,7 +395,7 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "File the parting pip on the free end flat. Break every cut edge {{cad.edge_break_in:.3dot}} max: the free end's, the shoulder's outer edge at the hex, the bore's two mouths at the corners and the groove's lips (a light touch of the smooth file, never into the groove's round); the spigot face's edge was broken in Op 100."
+instruction = "File the parting pip on the free end flat. Break every cut edge {{cad.edge_break_in:.3dot}} max: the free end's, the shoulder's outer edge at the hex, the bore's two mouths at the corners and the groove's lips (a light touch of the smooth file, never into the groove's round); the spigot face's edge was broken in Op 110."
 feed = "hand"
 
 [[setups.operations]]
@@ -407,5 +417,5 @@ instruction = "A screw that binds before the bore: chase again with the bottomin
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Wipe the fixture clean and dry; bag it with its tag."
+instruction = "Wipe the fixture clean and dry; bag it, with its tag if Op 120 tagged it."
 feed = "hand"
