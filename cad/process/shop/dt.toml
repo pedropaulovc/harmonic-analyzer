@@ -53,6 +53,9 @@ diameter_mm = 9.5758
 [tools.drill-7-16]  # Drills 7/16
 description = "7/16 (.4375 in) drill, 115-piece index"
 diameter_mm = 11.1125
+[tools.drill-27-64]  # 115-piece index; MHA-DT-27 winding mandrel (shank)
+description = "27/64 (.4219 in) drill, 115-piece index"
+diameter_mm = 10.715625
 [tools.drill-15-32]  # Drills 15/32
 description = "15/32 (.4688 in) drill, 115-piece index"
 diameter_mm = 11.90625
@@ -254,6 +257,9 @@ rpm = 2800
 chip_load_mm_per_tooth = 0.0254  # .001 in; 2800 × 3 × .001 = 8.4 in/min
 flutes = 3
 feed_unit = "in/min"
+
+[stock.c260-wire-040]
+description = "C26000 cartridge brass, annealed (soft), round wire, .040 in"
 
 # --- .2510-.2515 reamed bores (MHA-DT-18, and any dt part with that band) ---
 # Go/no-go pair for the Ø.2500 +.0010/+.0015 REAM THRU bores, as the MHA-CH-13
