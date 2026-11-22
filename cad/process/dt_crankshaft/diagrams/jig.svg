@@ -15,9 +15,9 @@
   <rect class="holes" x="370" y="176" width="10" height="10"/>
   <rect class="clamp" x="490" y="132" width="16" height="22"/>
   <text class="label" x="110" y="150">drill chuck on its 1/2 arbor in the 3-jaw</text>
-  <text class="label" x="20" y="344">cutter 34 mm+ out, X+7.000 mm off the stub</text>
+  <text class="label" x="20" y="344">cutters 1.35–1.63 in out, X±7.000 mm off the stub</text>
   <line class="leader" x1="175" y1="332" x2="175" y2="186"/>
-  <text class="label" x="250" y="300">stub and dome stand 30.7 mm proud</text>
+  <text class="label" x="250" y="300">stub and dome stand 1.21 proud</text>
   <line class="leader" x1="340" y1="288" x2="340" y2="232"/>
   <text class="label" x="400" y="320">jig bore .4500 reamed in place;</text>
   <text class="label" x="400" y="336">Ø.750 shank in the No. 4 holder</text>

@@ -594,7 +594,7 @@ feed = "hand"
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Spindle stopped. Sharp-nose tool (R.004): touch its nose on the apex and set DRO Z0 there; touch the nose on the head's miked O.D. and set the cross-slide DRO to that diameter (to its half if the DRO reads radius), so X and Z read the same point of the tool. Touch the nose on the crown at Ø.300 and at Ø.500, reading Z. The bands allow for the R.004 nose."
-inspection = "Crown at Ø.300 Z-.0261 to -.0274 and at Ø.500 Z-.0771 to -.0815 (SR{{cad.head_crown_radius_min_in:.2dot}}–{{cad.head_crown_radius_max_in:.2dot}}); no step left at the apex (the Ø.05 face blended in)."
+inspection = "Crown at Ø.300 Z-.0276 to -.0290 and at Ø.500 Z-.0798 to -.0845 (SR{{cad.head_crown_radius_min_in:.2dot}}–{{cad.head_crown_radius_max_in:.2dot}}, read with the R.004 nose); no step left at the apex (the Ø.05 face blended in)."
 gauge_checks = [{ gauge = "lathe-z-dro", band_mm = "{{cad.head_crown_radius_band_mm}}" }]
 
 [[setups.operations]]
@@ -762,7 +762,7 @@ feed = "hand"
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Spindle stopped. Sharp-nose tool (R.004): touch its left side on the head's rear face and set DRO Z0 there; touch the nose on the miked shaft and set the cross-slide DRO to that diameter, as in Setup 6. Touch the nose on the crown at Ø.300, at Ø.280 and at Ø.120, reading Z. The bands allow for the R.004 nose; Ø.300 sits just inside the rim, still sharp."
-inspection = "Crown rise from Ø.280 to Ø.120 +.0293 to +.0318 (SR{{cad.back_crown_radius_min_in:.2dot}}–{{cad.back_crown_radius_max_in:.2dot}}); at Ø.300 Z+9.344 to +9.365: the rim at Z+{{cad.back_crown_rim_station_min_in:.2dot}} to +{{cad.back_crown_rim_station_max_in:.2dot}} plus the crown's .004 rise to Ø.300."
+inspection = "Crown rise from Ø.280 to Ø.120 +.0306 to +.0333 (SR{{cad.back_crown_radius_min_in:.2dot}}–{{cad.back_crown_radius_max_in:.2dot}}, read with the R.004 nose); at Ø.300 Z+9.342 to +9.362: the rim at Z+{{cad.back_crown_rim_station_min_in:.2dot}} to +{{cad.back_crown_rim_station_max_in:.2dot}} plus the crown's .002 rise from the rim to the nose's reading at Ø.300."
 gauge_checks = [{ gauge = "lathe-z-dro", band_mm = "{{cad.back_crown_radius_band_mm}}" }, { gauge = "lathe-z-dro", band_mm = "{{cad.back_crown_rim_station_band_mm}}" }]
 
 [[setups.operations]]

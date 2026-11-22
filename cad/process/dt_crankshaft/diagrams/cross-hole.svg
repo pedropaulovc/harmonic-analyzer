@@ -25,5 +25,8 @@
   <line class="dims" x1="190" y1="300" x2="230" y2="300"/>
   <text class="label" x="20" y="320">jaws' left face 3.55 from F, on the outboard journal</text>
   <line class="leader" x1="230" y1="308" x2="230" y2="292"/>
-  <text class="label" x="150" y="230">.0930 pins in the seat face, read level first</text>
+  <rect class="part-rest" x="124" y="160" width="36" height="6"/>
+  <text class="label" x="20" y="222">.0930 GO pins in the</text>
+  <text class="label" x="20" y="238">drive-pin holes, levelled first</text>
+  <line class="leader" x1="120" y1="210" x2="136" y2="167"/>
 </svg>
