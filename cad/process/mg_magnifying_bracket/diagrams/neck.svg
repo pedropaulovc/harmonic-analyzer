@@ -3,18 +3,18 @@
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="20">Setup 7 (MB05_neck): the neck to thickness; the square inside corner</text>
   <rect class="fixture-vise" x="112.9" y="395.3" width="396.7" height="4.7"/>
-  <rect class="fixture-support" x="144.7" y="300" width="381" height="95.3"/>
+  <rect class="fixture-support" x="144.7" y="300" width="254" height="95.3"/>
   <line class="hidden" x1="112.9" y1="282.9" x2="509.6" y2="282.9"/>
   <line class="hidden" x1="112.9" y1="282.9" x2="112.9" y2="395.3"/>
   <text class="label" x="532" y="287">jaw tops: {{process.lying_grip_mm:in.3dot}} gripped</text>
   <path class="part-kept" d="M100 164.4 H107.9 V268.75 H360.4 V300 H100 Z"/>
   <rect class="part-removed" x="107.9" y="267.5" width="252.5" height="1.25"/>
   <path class="part-removed" d="M107.9 251.6 V267.5 H123.8 A15.9 15.9 0 0 1 107.9 251.6 Z"/>
-  <rect class="fixture-support" x="374" y="261.25" width="135.6" height="38.75"/>
-  <line class="leader" x1="460" y1="270" x2="532" y2="310"/>
-  <circle class="leader-dot" cx="460" cy="270" r="2"/>
-  <text class="label" x="532" y="314">the offcut, on a sawn face,</text>
-  <text class="label" x="532" y="330">clear of the sawn end</text>
+  <rect class="fixture-support" x="466.7" y="259.7" width="42.9" height="135.6"/>
+  <line class="leader" x1="488" y1="330" x2="532" y2="330"/>
+  <circle class="leader-dot" cx="488" cy="330" r="2"/>
+  <text class="label" x="532" y="326">the offcut on the bed,</text>
+  <text class="label" x="532" y="342">F to O up</text>
   <polygon class="cutter" points="107.9,200 139.6,200 139.6,268.75 107.9,268.75"/>
   <circle class="datum" cx="100" cy="300" r="3.5"/>
   <text class="datum-label" x="20" y="320">X0 the seat</text>

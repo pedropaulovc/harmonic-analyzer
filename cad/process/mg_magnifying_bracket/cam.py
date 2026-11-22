@@ -480,6 +480,8 @@ def context(
     seat_skim, low_skim = p["seat_skim_mm"], p["low_skim_mm"]
     high_level = thick + low_skim
     _agree(plan, "high_level_mm", high_level)
+    # MB02 drills from the bar's face that L's skim later comes off.
+    _agree(plan, "mount_y_mm", g["holes"][0]["lateral_nominal"] + low_skim)
     level_max = p["face_step_max_mm"]
     if t_max - high_level > level_max + 1e-9 or low_skim > level_max + 1e-9:
         raise ValueError("H's or L's facing is over one level")
@@ -811,6 +813,17 @@ def context(
     # the nose end, then zigzag X passes to the foot's station and back.
     neck_top = neck_raw + r
     neck_in = _r(part_max - r + FACE_OVERHANG_MM)
+    # The offcut spacer of Setups 7 and 8 stands on the vise bed, F to O up,
+    # a sawn face flush with the jaws' far end, past the stacks' or the
+    # parallels' ends: offcut_long along the jaws, width tall.
+    offcut_long = blank_max - seat_skim - part_min - p["kerf_in"] * IN
+    neck_stack_end = jaw_left + IN / 2 + PARALLEL_LENGTH_MM
+    nose_parallel_start = jaw_right - PARALLEL_LENGTH_MM
+    if (
+        neck_stack_end > jaw_left + jaw_w - offcut_long
+        or nose_parallel_start < jaw_right - jaw_w + offcut_long
+    ):
+        raise ValueError("the offcut has no room on the bed beside the supports")
     foot_x = _r(foot + r)
     side_y = _r(r + APPROACH_MM)
     nclear = _r(neck_top + CLEAR_MM)
@@ -1074,15 +1087,30 @@ def context(
         "notch": across(lying_grip, (0.0, width)),
         "low": across(lying_grip, (-width, 0.0)),
         "neck": jaws(lying_grip, neck_jaws, (-thick, 0.0))
-        # The stacks' left ends .50 inside the jaws' left side, so their
-        # right ends stand past the sawn end for the Z0 touch.
+        + [
+            _box(
+                "offcut",
+                (neck_jaws[1] - offcut_long, neck_jaws[1]),
+                (-thick, 0.0),
+                width - p["riser_height_mm"],
+            )
+        ]
+        # The stacks' left ends .50 inside the jaws' left side.
         + parallels(
             0.0,
-            (jaw_left + IN / 2, jaw_left + IN / 2 + PARALLEL_LENGTH_MM),
+            (jaw_left + IN / 2, neck_stack_end),
             (-thick, 0.0),
         ),
         "nose": jaws(upright_grip, nose_jaws, (-thick, 0.0))
-        + parallels(0.0, (jaw_right - PARALLEL_LENGTH_MM, jaw_right), (-thick, 0.0)),
+        + [
+            _box(
+                "offcut",
+                (nose_jaws[0], nose_jaws[0] + offcut_long),
+                (-thick, 0.0),
+                width - p["parallel_height_mm"],
+            )
+        ]
+        + parallels(0.0, (nose_parallel_start, jaw_right), (-thick, 0.0)),
     }
 
     tn = numbers

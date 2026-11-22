@@ -173,6 +173,9 @@ tap_spot_dia_mm = 4.572
 # notch's waste; its point then at mount_tip_z_mm (Z0 the seat).
 mount_drill_past_mm = 1.0
 mount_tip_z_mm = -4.969
+# MB02 posts the holes at Y −mount_y_mm: .226 from L plus the .035 Setup 5
+# later faces off L.
+mount_y_mm = 6.639
 # Tap drill (MB06): the #7 through the neck from its inner face, one plunge
 # (L/D 2.4), full diameter tap_drill_past_mm below O; its point at
 # tap_tip_z_mm (Z0 the parallels, O).
@@ -217,7 +220,8 @@ vise_width_inset_mm = -52.21
 # MB05: the seat foot_jaw_clear_mm past the underside's line beyond the
 # jaws' left side, neck_overhang_mm in all; MB06: the longest part's sawn end
 # nose_overhang_mm past the jaws' right side. Both hold the offcut spacer at
-# the jaws' other end (it keeps the moving jaw square).
+# the jaws' other end (it keeps the moving jaw square), standing on the bed,
+# F to O up, beyond the supports' ends.
 foot_jaw_clear_mm = 2.0
 neck_overhang_mm = 5.175
 nose_overhang_mm = 19.43
@@ -297,11 +301,17 @@ beam = "other"
 [[setups.operations]]
 instruction = "Mic the bar's thickness at three places along the blank's length, and calipers across its width."
 feed = "hand"
-inspection = "Thickness {{process.bar_thickness_min_in:.3dot}}–{{process.bar_thickness_max_in:.3dot}} everywhere (micrometers); width {{process.bar_width_min_in:.3dot}}–{{process.bar_width_max_in:.3dot}} (calipers). Outside either: stop and tell the owner. Every program assumes this bar."
+inspection = "Thickness {{process.bar_thickness_min_in:.3dot}}–{{process.bar_thickness_max_in:.3dot}} everywhere (micrometers); width {{process.bar_width_min_in:.3dot}}–{{process.bar_width_max_in:.3dot}} (calipers). Every program assumes this bar."
 gauge_checks = [
   { gauge = "micrometers", band_mm = ["{{process.bar_thickness_min_mm}}", "{{process.bar_thickness_max_mm}}"] },
   { gauge = "calipers", band_mm = ["{{process.bar_width_min_mm}}", "{{process.bar_width_max_mm}}"] },
 ]
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "Thickness or width outside its band: stop and tell the owner." },
+]
+feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
@@ -310,8 +320,12 @@ drilling = "none"
 sizing = "other"
 instruction = "Saw one blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in long off the bar, square, the bar flat in the saw's vise. File the burr off both ends and the four long edges so the blank seats flat on the parallels. Mark one long edge O with marking fluid (the outer face: it is never cut, so keep it free of dings)."
 feed = "hand"
-inspection = "The blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} long, calipers. Shorter: saw another. Longer: saw it again."
+inspection = "The blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} long, calipers: MB01's passes and the offcut spacer of Setups 7 and 8 are laid out for it."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.blank_length_min_mm}}", "{{process.blank_length_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "Shorter: saw another blank. Longer: saw it back into the band."
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
@@ -333,7 +347,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Load and clamp the blank (Holding). G54 X0 the blank's left end, Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Load and clamp the blank (Holding). Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's LEFT end from the left, its tip .10 below the top, G10 L20 P1 X-2.540."
+instruction_detailed = "Load and clamp the blank (Holding). Edge finder (900 rpm): on the fixed jaw's face beside the blank, its tip .10 below the jaw top, G10 L20 P1 Y-2.540; on the blank's LEFT end from the left, its tip .10 below the blank's top, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -365,7 +379,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "No parallels. The blank upright on the vise bed, a sawn end up (it becomes the seat), gripped on its two flat faces, O to the LEFT, F to the RIGHT, centred on the jaws. Tap it down onto the bed with a soft mallet while closing the vise. The lower {{process.vise_jaw_height_mm:in.2dot}} of it is in the jaws. The face against the FIXED jaw becomes L: mark it."
-datum = "Program MB02_seat. G54: X0 the free end F (the blank's RIGHT side), the blank to −X; Y0 the fixed jaw's face (L), +Y toward it; Z0 the faced seat. The holes at X −{{cad.mounting_hole_1_station_mm:.3f}} and −{{cad.mounting_hole_2_station_mm:.3f}}, Y −{{cad.mounting_hole_1_lateral_mm:.3f}} less L's {{process.low_skim_mm:in.3dot}} skim to come (cam.py posts them). Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
+datum = "Program MB02_seat. G54: X0 the free end F (the blank's RIGHT side), the blank to −X; Y0 the fixed jaw's face (L), +Y toward it; Z0 the faced seat. The holes at X −{{cad.mounting_hole_1_station_mm:.3f}} and −{{cad.mounting_hole_2_station_mm:.3f}}, Y −{{process.mount_y_mm:.3f}} mm: {{process.mount_y_mm:in.3dot}} from this face now, {{cad.mounting_hole_1_lateral_in:.3dot}} from L once Setup 5 takes {{process.low_skim_mm:in.3dot}} off it. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
 diagram = { file = "diagrams/seat.svg", alt = "The blank upright on the vise bed, a sawn end up, F to the right; the 1/2 in end mill faces the seat, the centre drill spots and the #37 drills the two mounting holes down through the foot into the waste below it." }
 envelope = { x_span_mm = ["{{cad.outer_face_length_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.bar_thickness_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.blank_length_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.blank_length_min_mm}}", "{{process.mount_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_37_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_thickness_max_mm}}", along_jaws_mm = "{{cad.outer_face_length_mm}}", part_height_mm = "{{process.blank_length_max_mm}}", parallel_height_mm = 0, overhang_mm = ["{{process.vise_width_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -373,7 +387,7 @@ beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.blank_lengt
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 the free end F, Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm), its tip .10 below the sawn top: on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on F (the blank's RIGHT side) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of F)."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the blank, its tip .10 below the jaw top, G10 L20 P1 Y-2.540; on F (the blank's RIGHT side) from the right, its tip .10 below the sawn top, G10 L20 P1 X2.540 (plus: the finder's centre is right of F)."
 feed = "hand"
 
 [[setups.operations]]
@@ -435,7 +449,7 @@ title = "High side H and the notch"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The 1 in + 1/2 in stacks against each jaw. The blank lying on them ACROSS the jaws, L down, the seat against the FIXED jaw, a {{process.rod_dia_mm:in.3dot}} rod between the sawn end and the moving jaw, at mid-height; O to the LEFT, centred on the jaws. Tap it down while closing. The jaws grip the lower {{process.lying_grip_mm:in.3dot}} of the ends; H and the notch are cut above the jaw tops."
+holding = "The 1 in + 1/2 in stacks against each jaw. The blank lying on them ACROSS the jaws, L down, the seat against the FIXED jaw, a {{process.rod_dia_mm:in.3dot}} rod between the sawn end and the moving jaw, at mid-height; O to the LEFT, centred on the jaws. Tap it down while closing. The jaws grip the lower {{process.lying_grip_mm:in.3dot}} of the ends. H is cut above the jaw tops; the notch's floor runs below them, between the jaws: the foot keeps the cutter's edge {{cad.foot_underside_thickness_in:.3dot}} off the fixed jaw, the waste beyond the notch keeps it off the rod."
 datum = "Program MB03_notch. G54: X0 O (the blank's LEFT side), +X toward F; Y0 the fixed jaw's face (the seat), +Y toward it; Z0 the stacks' top (L). The foot's underside at Y −{{cad.foot_underside_thickness_mm:.3f}}; the notch from {{process.neck_stock_mm:in.3dot}} past the neck to F, down to Z {{process.notch_split_mm:.3f}} mm. Tool lengths from the tool setter."
 diagram = { file = "diagrams/notch.svg", alt = "The blank lying across the jaws on stacked parallels, L down, the seat against the fixed jaw and a rod at the sawn end; the 1/2 in end mill faces H, then mills the notch between the foot and the neck, open at F, half the part's width deep." }
 envelope = { x_span_mm = ["{{cad.outer_face_length_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bar_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.notch_split_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
@@ -444,7 +458,7 @@ beam = { axis = "y", hold = "between", extent_mm = [0, "{{process.blank_length_m
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 O, Y0 the fixed jaw's face (the seat): edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm), its tip .10 below the top: on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on O (the blank's LEFT side) from the left, G10 L20 P1 X-2.540."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the blank, its tip .10 below the jaw top, G10 L20 P1 Y-2.540; on O (the blank's LEFT side) from the left, its tip .10 below the blank's top, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -490,7 +504,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_length_max_m
 beam = { axis = "y", hold = "between", extent_mm = [0, "{{process.blank_length_max_mm}}"], supports_mm = [0, "{{process.blank_length_min_mm}}"], section_mm = { x = 13.0, z = "{{cad.high_side_width_mm}}" } }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). Edge finder (900 rpm), its tip .10 below the top: on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on O (now the RIGHT side) from the right, G10 L20 P1 X2.540. Console M6 T1; MDI G0 X12.700 Y-6.850: the cutter right of O, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, the .002 feeler on the stack: G10 L20 P1 Z0.051."
+instruction = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the blank, its tip .10 below the jaw top, G10 L20 P1 Y-2.540; on O (now the RIGHT side) from the right, its tip .10 below the blank's top, G10 L20 P1 X2.540. Console M6 T1; MDI G0 X12.700 Y-6.850: the cutter right of O, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, the .002 feeler on the stack: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -536,8 +550,12 @@ drilling = "none"
 sizing = "other"
 instruction = "Scribe a line across the neck {{process.nose_cut_in:.2f}} from the seat. Saw on the waste side of it, the part flat in the saw's vise. Keep the offcut (the waste block): it is the spacer of Setups 7 and 8. File the sawn end's burr."
 feed = "hand"
-inspection = "The seat to the sawn end {{process.part_length_min_mm:in.2f}}–{{process.part_length_max_mm:in.2f}}, calipers. Shorter: the part is scrap. Longer: saw again."
+inspection = "The seat to the sawn end {{process.part_length_min_mm:in.2f}}–{{process.part_length_max_mm:in.2f}}, calipers."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.part_length_min_mm}}", "{{process.part_length_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "Shorter: the part is scrap. Longer: saw again, still on the waste side."
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
@@ -545,7 +563,7 @@ title = "Neck to thickness; the square inside corner"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The 1 in + 1/2 in stacks against each jaw, their left ends .50 inside the jaws' left side. The part on edge on them along the jaws, O DOWN, gripped on L (FIXED jaw) and H; the foot PAST the jaws' left side, its underside {{process.foot_jaw_clear_mm:in.3dot}} outside it. The offcut on the stacks at the jaws' right end, lying on a sawn face, L and H in the jaws, clear of the part's sawn end. The jaws grip the lower {{process.lying_grip_mm:in.3dot}}."
+holding = "The 1 in + 1/2 in stacks (4 in long) against each jaw, their left ends .50 inside the jaws' left side. The part on edge on them along the jaws, O DOWN, gripped on L (FIXED jaw) and H; the foot PAST the jaws' left side, its underside {{process.foot_jaw_clear_mm:in.3dot}} outside it. The offcut standing on the bed at the jaws' right end, F to O up, a sawn face flush with the jaws' right side, L and H in the jaws: past the stacks' ends, well clear of the cutter. The jaws grip the lower {{process.lying_grip_mm:in.3dot}} of the part."
 datum = "Program MB05_neck. G54: X0 the seat (the part's LEFT end), +X toward the nose; Y0 the fixed jaw's face (L), +Y toward it; Z0 the stacks' top (O). The neck's face at Z {{cad.neck_inner_face_thickness_mm:.3f}}, the foot's underside at X {{cad.foot_underside_thickness_mm:.3f}} mm."
 diagram = { file = "diagrams/neck.svg", alt = "The part on edge on stacked parallels, O down, the foot standing past the jaws' left side; the 1/2 in end mill faces the neck down to its thickness, its square corner making the inside corner under the foot." }
 envelope = { x_span_mm = ["{{process.part_length_max_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.high_side_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.outer_face_length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.neck_inner_face_thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
@@ -559,7 +577,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Load and clamp the part and the offcut (Holding). G54 X0 the seat, Y0 the fixed jaw's face (L): edge finder (900 rpm), on the seat above the foot's underside."
-instruction_detailed = "Load and clamp the part and the offcut (Holding). Edge finder (900 rpm): on the fixed jaw's face beside the neck, G10 L20 P1 Y-2.540; its tip .50 below the foot's top, on the seat (the LEFT end) from the left, G10 L20 P1 X-2.540."
+instruction_detailed = "Load and clamp the part and the offcut (Holding). Edge finder (900 rpm): on the fixed jaw's face beside the neck, its tip .10 below the jaw top, G10 L20 P1 Y-2.540; on the seat (the LEFT end) from the left, its tip .50 below the foot's top, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -590,7 +608,7 @@ title = "Nose R.217 and the tap drill; tap 1/4-20"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "A 1 in parallel against each jaw, their right ends at the jaws' right side. The part on edge on them, O DOWN, gripped on L (FIXED jaw) and H, the foot inside the jaws; the nose PAST the jaws' right side, the seat {{process.nose_jaw_side_mm:in.3dot}} from that side (steel rule). The offcut on the parallels at the jaws' left end, lying on a sawn face, L and H in the jaws. The jaws grip the lower {{process.upright_grip_mm:in.3dot}}."
+holding = "A 1 in parallel (4 in long) against each jaw, their right ends at the jaws' right side. The part on edge on them, O DOWN, gripped on L (FIXED jaw) and H, the foot inside the jaws; the nose PAST the jaws' right side, the seat {{process.nose_jaw_side_mm:in.3dot}} from that side (steel rule). The offcut standing on the bed at the jaws' left end, F to O up, a sawn face flush with the jaws' left side, L and H in the jaws. The jaws grip the lower {{process.upright_grip_mm:in.3dot}} of the part."
 datum = "Programs MB06_nose and MB07_lever_tap. G54: X0 the seat (the LEFT end), +X toward the nose; Y0 the fixed jaw's face (L), +Y toward it; Z0 the parallels' top (O). The tap at X {{cad.lever_tap_height_mm:.3f}}, Y −{{cad.lever_tap_lateral_mm:.3f}} mm. Tool lengths from the tool setter at each M6; every file starts with an M6 for its first tool."
 diagram = { file = "diagrams/nose.svg", alt = "The part on edge on two parallels, O down, the nose standing past the jaws' right side; the 1/2 in end mill profiles the R.217 nose round the tap's centre, then the centre drill and the #7 drill the tap hole through the neck." }
 envelope = { x_span_mm = ["{{process.part_length_max_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.high_side_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 2.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.outer_face_length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.tap_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
@@ -604,7 +622,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Load and clamp the part and the offcut (Holding). G54 X0 the seat, Y0 the fixed jaw's face (L): edge finder (900 rpm), on the seat above the jaws."
-instruction_detailed = "Load and clamp the part and the offcut (Holding). Edge finder (900 rpm): on the fixed jaw's face beside the nose, G10 L20 P1 Y-2.540; its tip .50 below the foot's top (above the jaws), on the seat (the LEFT end) from the left, G10 L20 P1 X-2.540."
+instruction_detailed = "Load and clamp the part and the offcut (Holding). Edge finder (900 rpm): on the fixed jaw's face beside the nose, its tip .10 below the jaw top, G10 L20 P1 Y-2.540; on the seat (the LEFT end) from the left, its tip .50 below the foot's top (above the jaws), G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -617,7 +635,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run MB06_nose (M6 T1; set 2650): profile the nose R{{cad.nose_radius_in:.3dot}} round the tap's centre, climb: two levels {{process.nose_finish_stock_mm:in.3dot}} off the radius, then one full-depth finish pass on it, {{process.nose_past_mm:in.3dot}} below O. At the M6 T2 stop look: the nose blends into L and H with no step; a step: stop and tell the owner."
+instruction = "Run MB06_nose (M6 T1; set 2650): profile the nose R{{cad.nose_radius_in:.3dot}} round the tap's centre, climb: two levels {{process.nose_finish_stock_mm:in.3dot}} off the radius, then one full-depth finish pass on it, {{process.nose_past_mm:in.3dot}} below O."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "nose rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.nose_rough_level_mm}}", radial_woc_mm = "{{process.nose_rough_woc_mm}}", traverse_mm = [84.707, "{{process.part_length_max_mm}}"] },
@@ -651,8 +669,8 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Still clamped: hold the #7 by its flutes, its shank down through the hole, the round shank standing above the neck's face. Mic from the nose's tip over the shank, just above the face; calipers from the seat over it."
-inspection = "The hole {{cad.lever_tap_from_tip_min_in:.3dot}}–{{cad.lever_tap_from_tip_max_in:.3dot}} from the tip: mic from the tip over the shank, less half its Ø (.1005). The hole {{cad.lever_tap_height_min_in:.2dot}}–{{cad.lever_tap_height_max_in:.2dot}} from the seat: calipers from the seat over the shank, less .1005. The nose's R and the hole from L: the program's, one zero."
+instruction = "Still clamped: the largest pin gauge that enters the hole, held standing up through it. Mic from the nose's tip over the pin, just above the face; calipers from the seat over it."
+inspection = "The hole {{cad.lever_tap_from_tip_min_in:.3dot}}–{{cad.lever_tap_from_tip_max_in:.3dot}} from the tip: the mic reading less half the pin's Ø. The hole {{cad.lever_tap_height_min_in:.2dot}}–{{cad.lever_tap_height_max_in:.2dot}} from the seat: the calipers reading less half the pin's Ø. The nose's R and the hole from L: the program's, one zero."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.lever_tap_from_tip_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.lever_tap_height_band_mm}}" },
@@ -666,7 +684,13 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Stop check before the tap file: the 1/4-20 tap in the T-handle wrench (centre hole in its top), point to the centre hole, at most {{process.tap_wrench_reach_max_mm:in.2f}} in (calipers or the 12 in rule). Over: stop; do not tap on this setup."
+instruction = "Stop check before the tap file: the 1/4-20 tap in the T-handle wrench (centre hole in its top), point to the centre hole, at most {{process.tap_wrench_reach_max_mm:in.2f}} in (calipers or the 12 in rule)."
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "Over: do not tap on this setup; tell the owner." },
+]
 feed = "hand"
 
 [[setups.operations]]
@@ -765,5 +789,11 @@ feed = "hand"
 [[setups.operations]]
 instruction = "A thin darker coat: a small damp cotton pad of the solution over it, wipe dry, burnish with the steel wool. Repeat for a darker blue. Then a thin film of the stone lubricant (oil) against rust."
 feed = "hand"
-inspection = "An even blue all over, no bare spot. A 1/4-20 screw still runs through the tap by hand and the {{cad.mounting_hole_1_dia_min_in:.3dot}} pin into each mounting hole. Tight: stop and tell the owner; do not re-tap or re-drill."
+inspection = "An even blue all over, no bare spot. A 1/4-20 screw still runs through the tap by hand and the {{cad.mounting_hole_1_dia_min_in:.3dot}} pin into each mounting hole."
 gauge_checks = "other"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "Tight: stop and tell the owner; do not re-tap or re-drill." },
+]
+feed = "hand"

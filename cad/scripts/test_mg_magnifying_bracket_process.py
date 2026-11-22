@@ -149,6 +149,8 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("lying_grip_mm", 7.5, "lying_grip_mm"),
         ("riser_height_mm", 30.0, "lying_grip_mm"),
         ("neck_overhang_mm", 6.0, "neck_overhang_mm"),
+        ("nose_jaw_side_mm", 85.0, "nose_jaw_side_mm"),
+        ("mount_y_mm", 5.75, "mount_y_mm"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> None:

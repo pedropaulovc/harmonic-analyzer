@@ -26,6 +26,6 @@
   <line class="leader" x1="340" y1="232" x2="430" y2="270"/>
   <circle class="leader-dot" cx="340" cy="232" r="2"/>
   <text class="label" x="430" y="274">the neck, {{process.neck_stock_mm:in.3dot}} full until Setup 7</text>
-  <text class="label" x="40" y="350">Held as Setup 4: the seat against the fixed jaw, the rod at the sawn end; the jaws</text>
-  <text class="label" x="40" y="366">grip the ends only, below the cuts.</text>
+  <text class="label" x="40" y="350">Held as Setup 4: the seat against the fixed jaw, the rod at the sawn end. The notch runs</text>
+  <text class="label" x="40" y="366">below the jaw tops, between them: the foot and the waste keep the cutter off the jaws.</text>
 </svg>
