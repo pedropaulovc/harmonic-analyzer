@@ -813,7 +813,8 @@ def test_foot_hole_leader_climbs_left_of_its_own_upper_rows() -> None:
         top = block.ymax - index * _PITCH - (_STACK if index else 0.0)
         half = len(row) * _CHAR / 2.0
         cx = drawing.FOOT_HOLE_CALLOUT_XY[0]
-        box = Box(cx - half, top - _CAP, cx + half, top + (_STACK if index == 1 else 0.0))
+        lift = _STACK if index == 1 else 0.0
+        box = Box(cx - half, top - _CAP, cx + half, top + lift)
         assert segment_box_distance(leader, box) >= 0.001, row
 
 
