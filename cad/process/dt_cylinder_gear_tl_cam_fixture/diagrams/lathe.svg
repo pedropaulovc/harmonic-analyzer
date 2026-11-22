@@ -11,6 +11,7 @@
   <line class="centre-line" x1="140" y1="200" x2="640" y2="200"/>
   <line class="active-face" x1="510" y1="98" x2="510" y2="302"/>
   <rect class="cutter" x="326" y="320" width="11" height="60"/>
+  <line class="leader" x1="560" y1="76" x2="512" y2="110"/>
   <text class="label" x="530" y="70">face F (FRONT), faced first: DRO Z0</text>
   <text class="label" x="350" y="215">disc Ø3.25 × 1.00</text>
   <text class="label" x="345" y="375">P1 blade: part off 1.00 from F</text>

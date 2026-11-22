@@ -130,6 +130,8 @@ def test_the_recipes_programs_pass_every_check_it_declares(ctx, tmp_path) -> Non
         # The #65 ending only .010 under the reamer's end.
         ("pin_drill_full_mm", 5.461, "below the reamer's end"),
         ("vise_jaw_width_mm", 152.4, "overhang_mm"),
+        # The 1.000 in air lift review r2 caught: the 23/64 still cuts face F.
+        ("prove_raise_mm", 25.4, "air prove-out"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> None:

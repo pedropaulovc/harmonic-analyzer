@@ -135,6 +135,9 @@ ream_0365_feed_per_min_mm = 17.78
 # centre's error, held to .0005 in (a centre off by .00025, an eighth of the
 # stations' ±.002).
 pickup_check_mm = 0.0127
+# The air prove-out lifts Z0 1.50 in: the deepest tip (the 23/64's, 1.147 in
+# below face F) then stops .353 above it. cam.py checks it.
+prove_raise_mm = 38.1
 
 [[tools]]
 id = "turn"
@@ -301,13 +304,13 @@ instruction = "Sum off by more: repeat Op 100 and this check. The hole stations 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: face F, the centre drill's point on a .002 feeler leaf at X0 Y-20.000."
-instruction_detailed = "Console M6 T1 (#2 centre drill; the tool setter measures it). MDI G0 X0 Y-20.000 Z5 (on face F, clear of both holes). Spindle stopped, its point just dragging a .002 leaf there: G10 L20 P1 Z0.051."
+instruction = "G54 Z0: face F, the centre drill's point on a .002 feeler leaf at X0 Y-20.000; Z set before any Z move."
+instruction_detailed = "Console M6 T1 (#2 centre drill; the tool setter measures it). MDI G0 X0 Y-20.000 (X and Y only, at the homed Z; on face F, clear of both holes). Spindle stopped, jog Z down until its point just drags a .002 leaf there: G10 L20 P1 Z0.051. Only then MDI G0 Z5."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Prove CF01_stub_hole and CF02_pin_hole in air with Z0 raised 1.000 in, watching each move clear the jaws. Then put Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run each file through every M6. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction = "Prove CF01_stub_hole and CF02_pin_hole in air with Z0 raised {{process.prove_raise_mm:in.2f}} in, more than the deepest tip (the 23/64's, Z{{process.stub_drill_tip_mm:.3f}} mm), watching each move clear the jaws. Then put Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + {{process.prove_raise_mm:.3f}}): the deepest tip, the 23/64's Z{{process.stub_drill_tip_mm:.3f}}, then stops above face F. Run each file through every M6. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
 [[setups.operations]]

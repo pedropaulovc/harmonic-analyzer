@@ -380,6 +380,14 @@ def context(
     _agree(plan, "pin_drill_tip_mm", pin_tip)
     if -pin_tip >= thickness - 1.0:
         raise ValueError("the #65's point comes within 1 mm of the back face")
+    # The air prove-out (Setup 2) lifts Z0 by prove_raise_mm: every tip,
+    # the deepest first, must then stop at least SAFE_MM above face F.
+    deepest = min(stub_tip, stub_ream_tip, pin_tip, p["pin_ream_tip_mm"])
+    if p["prove_raise_mm"] + deepest < SAFE_MM:
+        raise ValueError(
+            f"process.prove_raise_mm {p['prove_raise_mm']:g}: the air prove-out "
+            f"cuts face F (deepest tip {deepest:.3f} mm)"
+        )
 
     for name, binding in (
         ("stub drill", "{{cad.envelope_z_mm}}"),
