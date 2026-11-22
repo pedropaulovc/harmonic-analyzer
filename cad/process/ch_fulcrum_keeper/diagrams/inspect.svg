@@ -10,10 +10,10 @@
   <line class="datum" x1="91.1" y1="360" x2="208.9" y2="360"/>
   <text class="datum-label" x="87.1" y="364" text-anchor="end">seat</text>
   <line class="datum" x1="101.1" y1="364" x2="101.1" y2="340"/>
-  <text class="datum-label" x="97.1" y="380" text-anchor="end">F</text>
+  <text class="datum-label" x="97.1" y="380" text-anchor="end">N</text>
   <line class="datum" x1="198.9" y1="364" x2="198.9" y2="340"/>
-  <text class="datum-label" x="202.9" y="380">N</text>
-  <text class="label" x="20" y="50">Front, looking at I (F on the left):</text>
+  <text class="datum-label" x="202.9" y="380">F</text>
+  <text class="label" x="20" y="50">Front, looking at I (F on the right):</text>
   <text class="label" x="226.9" y="187.6">bore {{cad.bore_height_in:.3dot}} up, on the width's centre ±{{cad.bore_off_centre_max_in:.3dot}}</text>
   <text class="label" x="226.9" y="138.7">crown R{{cad.crown_radius_in:.3dot}}; #1-72 into the bore</text>
   <text class="label" x="226.9" y="308.9">foot top (hidden)</text>

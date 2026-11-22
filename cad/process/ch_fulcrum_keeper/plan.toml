@@ -348,8 +348,14 @@ drilling = "none"
 sizing = "other"
 instruction = "Saw {{process.quantity:d}} blanks about {{process.blank_length_nominal_in:.2f}} in long off the 3/4 in square 1018 bar, the bar flat in the saw's vise. File the burr off both ends and the four long edges so each blank seats flat on the parallels. On each, mark one cold-finished long face I with marking fluid (the inner face: it is never cut, so keep it free of dings) and the blank's number, 1 or 2, on it."
 feed = "hand"
-inspection = "Each blank's length, calipers: at least {{process.blank_length_min_in:.2f}} (the seat skim {{process.seat_skim_mm:in.3dot}} and the keeper's {{cad.crown_overall_height_ref:.3f}} mm height must fit in it) and at most {{process.blank_length_max_in:.2f}} (FK04's rough crown pass is posted for that blank's corners). Longer: saw it again. Shorter: saw a new blank."
+inspection = "Each blank's length, calipers: at least {{process.blank_length_min_in:.2f}} (the seat skim {{process.seat_skim_mm:in.3dot}} and the keeper's {{cad.crown_overall_height_ref:.3f}} mm height must fit in it) and at most {{process.blank_length_max_in:.2f}} (FK04's rough crown pass is posted for that blank's corners)."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.blank_length_min_mm}}", "{{process.blank_length_max_mm}}"] }]
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "A blank over its length: saw it again. Under its length: set it aside and saw a new blank." },
+]
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
@@ -542,12 +548,20 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run FK04_crown_bore (M6 T1, 1/2 in end mill; set 2650): profile the crown R{{cad.crown_radius_in:.3dot}} round the left end, climb, plunging beside a side: two levels {{process.arch_finish_stock_mm:in.3dot}} off the radius, then one full-depth finish pass on it, {{process.arch_depth_mm:in.3dot}} deep from I ({{process.arch_past_mm:in.3dot}} into the waste under the lug). At the M6 T2 stop look: the crown blends into both sides with no step."
+instruction = "Run FK04_crown_bore (M6 T1, 1/2 in end mill; set 2650): profile the crown R{{cad.crown_radius_in:.3dot}} round the left end, climb, plunging beside a side: two levels {{process.arch_finish_stock_mm:in.3dot}} off the radius, then one full-depth finish pass on it, {{process.arch_depth_mm:in.3dot}} deep from I ({{process.arch_past_mm:in.3dot}} into the waste under the lug). The file stops at M6 T2 (spindle off): look at the crown before going on."
+inspection = "At the M6 T2 stop: the crown blends into both sides with no step."
+gauge_checks = "other"
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "arch rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.arch_rough_level_mm}}", radial_woc_mm = "{{process.arch_rough_woc_mm}}", traverse_mm = ["{{cad.crown_y_mm}}", "{{process.blank_length_max_mm}}"] },
   { name = "arch finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.arch_depth_mm}}", radial_woc_mm = "{{process.arch_finish_stock_mm}}", traverse_mm = ["{{cad.crown_y_mm}}", "{{cad.crown_overall_height_ref}}"] },
 ]
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "A step where the crown meets a side: do not go on (no spot, drill or ream); stop the file and tell the owner with the blank's number." },
+]
+feed = "hand"
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -729,7 +743,7 @@ settings = "endmill-carbide-3fl-1-8-lr-1018-cf"
 milling_cuts = [
   { name = "cbore", kind = "side", phase = "finish", cutter_dia_mm = 3.175, axial_doc_mm = 0.124, radial_woc_mm = 3.175, stations_mm = "{{cad.foot_top_height_mm}}" },
 ]
-inspection = "Still clamped: counterbore Ø{{process.cbore_accept_dia_min_mm:in.3dot}}–{{process.cbore_accept_dia_max_mm:in.3dot}} (calipers' inside jaws), {{process.cbore_accept_depth_min_mm:in.3dot}}–{{process.cbore_accept_depth_max_mm:in.3dot}} deep from the foot top (calipers' depth rod), its floor flat; FK06 cuts Ø{{cad.foot_hole_cbore_dia_in:.3dot}} × {{cad.foot_hole_cbore_depth_in:.3dot}} (the model's band middle), inside that band."
+inspection = "Still clamped: counterbore Ø{{process.cbore_accept_dia_min_mm:in.3dot}}–{{process.cbore_accept_dia_max_mm:in.3dot}} (calipers' inside jaws), {{process.cbore_accept_depth_min_mm:in.3dot}}–{{process.cbore_accept_depth_max_mm:in.3dot}} deep from the foot top (calipers' depth rod), its floor flat. FK06 cuts Ø{{cad.foot_hole_cbore_dia_in:.3dot}} × {{cad.foot_hole_cbore_depth_in:.3dot}}, inside that band."
 gauge_checks = [
   { gauge = "calipers", band_mm = ["{{process.cbore_accept_dia_min_mm}}", "{{process.cbore_accept_dia_max_mm}}"] },
   { gauge = "calipers", band_mm = ["{{process.cbore_accept_depth_min_mm}}", "{{process.cbore_accept_depth_max_mm}}"] },
@@ -737,7 +751,7 @@ gauge_checks = [
 
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "Counterbore under its band or shallow: stop and tell the owner (the program aims mid-band: check the 1/8 end mill's wear and the Z touch-off). Over its band or deep: the part is scrap." },
+  { kind = "stop", text = "Counterbore under its band or shallow: stop and tell the owner (check the 1/8 end mill's wear and the Z touch-off). Over its band or deep: the part is scrap." },
 ]
 feed = "hand"
 
@@ -859,5 +873,11 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Seal: wipe on the stone lubricant (a light oil; the maker: clear coat, wax or oil), leave it a few minutes, wipe off the excess."
 feed = "hand"
-inspection = "Even black all over, no bare spot and no wiping-off coating. Fits after blackening: the {{process.go_pin_in:.4dot}} pin still enters the bore and a #1-72 screw still runs into the crown hole by hand. Tight: stop and tell the owner; do not re-ream or re-tap."
+inspection = "Even black all over, no bare spot and no wiping-off coating. Fits after blackening: the {{process.go_pin_in:.4dot}} pin still enters the bore and a #1-72 screw still runs into the crown hole by hand."
 gauge_checks = "other"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "The pin or the screw tight after blackening: stop and tell the owner; do not re-ream or re-tap." },
+]
+feed = "hand"
