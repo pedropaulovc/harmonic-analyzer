@@ -225,14 +225,12 @@ diameter_mm = 9.921875
 description = ".4000 in HSS straight-flute chucking reamer"
 diameter_mm = 10.16
 
-# The strap traveler's fixture and tape, so its plan's refs resolve: the plan
-# prints its own name and description for each. Ownership is
-# cad/config/shop-equipment/ fixtures.strap-sub-plate and
-# consumables.tape-3m-vhb-5906.
+# The strap traveler's fixture, so its plan's ref resolves: the plan prints
+# its own name and description. Ownership is cad/config/shop-equipment/
+# fixtures.strap-sub-plate. Its tape, tools.tape-3m-vhb-5906, is in
+# common.toml (the dt and pd sheet parts bond on it too).
 [tools.strap-sub-plate]
 description = "Fixture MHA-CH-13-TL-00: sub-plate TL-01 with its hub plug, washer, edge clamps and hub screw"
-[tools.tape-3m-vhb-5906]
-description = "3M VHB 5906 double-sided tape, .006 in"
 
 # --- MHA-CH-13-TL-01 rocker-strap sub-plate (cad/process/ch_rocker_strap_tl_sub_plate/plan.toml) ---
 # The 1/8 in carbide end mill on 6061 (fence notches, clamp pockets): The

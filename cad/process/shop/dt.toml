@@ -255,6 +255,60 @@ description = "gray iron, class not ruled, casting for MHA-DT-05 cone pivot post
 description = "Drill rod (O1 or W1 tool steel, annealed, ground), round bar, 1/8 in"
 [stock.o1-drill-rod-5-32]
 description = "AISI O1 drill rod, precision ground, round bar, 5/32 in"
+[stock.drill-rod-1-16]
+description = "Drill rod (O1 or W1 tool steel, annealed, ground), round bar, 1/16 in"
+[stock.key-stock-1-16-undersized]
+description = "1008-1045 carbon steel machine key stock, undersized, square bar, 1/16 in"
+
+# --- Bench-cut drill rod (MHA-DT-30, cad/process/dt_pinion_lever_pin/plan.toml) ---
+# A 1/16 rod is too slender for the 3-jaw or the 14 in saw's vise: it is sawn
+# by hand in the bench vise. Ownership: cad/config/shop-equipment/tools-hand.toml,
+# same key.
+[tools.junior-hacksaw]
+description = "Junior hacksaw, 6 in blade, 32 TPI"
+
+# --- MHA-DT-03-TL-02 phasing comb (cad/process/dt_cone_gear_tl_phasing_comb/plan.toml) ---
+# The comb's blank is snipped off the .020 brass sheet. Ownership:
+# cad/config/shop-equipment/tools-hand.toml tools.aviation-snips-straight and
+# stock-to-order.toml stock.c260-h02-sheet-020-12x12, same keys.
+[tools.aviation-snips-straight]
+description = "Aviation snips, straight cut"
+[stock.c260-h02-sheet-020-12x12]
+description = "C26000 cartridge brass, H02 half hard, sheet, .020 x 12 x 12 in"
+# The comb's outline cutter: Harvey Tool 896262, Variable Helix End Mill for
+# Aluminum Alloys - Square - Downcut (harveytool.com/products/tool-details-
+# 896262 and the family page, read 2026-11-22): .0620 cutter, .186 length of
+# cut, 3 left-hand spiral right-hand cut flutes (a downcut: "prevents lifting
+# of workpiece"), centre cutting, 1/8 shank, 1-1/2 overall, uncoated, the
+# family "excellent performance in copper, brass, and bronze alloys".
+# Ownership: cad/config/shop-equipment/tools-special-cutters.toml, same key.
+# diameter_mm and flute_length_mm: its .0620 and .186 × 25.4.
+[tools.endmill-carbide-3fl-1-16-downcut]
+description = "1/16 in (.0620) 3-flute carbide downcut square end mill, .186 length of cut, 1/8 shank (Harvey Tool 896262)"
+diameter_mm = 1.5748
+flute_length_mm = 4.7244
+# Its setting in half-hard C26000 sheet: Tru-Edge "Solid Carbide Endmills
+# Feeds and Speeds" (tru-edge.com, 20090 spec sheet, read 2026-11-22), row
+# Brass and Bronze: 250-350 SFM, 1/16 in .001 in/tooth. 250 SFM on .062 in is
+# 15,400 rpm, so the spindle's 2800 (machines.pm-30mv; 45 ft/min). 2800 × 3 ×
+# .001 = 8.4 in/min. Harvey's own table for this series (SF_896200, read
+# 2026-11-22) gives brass at .062 in lower, about .00065 slotting and .00087
+# max: .001 is taken because prechips' milling feed-factor table starts at
+# .001 and is not extended without a source. This is CncBenchB's choice, not
+# an owner ruling: it follows the owner's ruling for the MHA-CH-13 strap's
+# 1/8 cutter in 1018 (common.toml
+# settings.endmill-carbide-3fl-1-8-1018-cf-tru-edge, Tru-Edge over a table
+# below the floor), extended here to a 1/16 cutter in brass, about 54 % over
+# Harvey's slotting value. Flagged for the owner in HA PR #3361: run the
+# first comb watching it.
+[settings.endmill-carbide-3fl-1-16-downcut-c260]
+tool = "endmill-carbide-3fl-1-16-downcut"
+material = "c260-h02"
+rpm = 2800
+chip_load_mm_per_tooth = 0.0254  # .001 in; 2800 × 3 × .001 = 8.4 in/min
+flutes = 3
+feed_unit = "in/min"
+
 [stock.c260-wire-040]
 description = "C26000 cartridge brass, annealed (soft), round wire, .040 in"
 

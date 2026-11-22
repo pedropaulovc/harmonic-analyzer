@@ -655,6 +655,17 @@ description = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
 [tools.threading-bits-lms-6685]  # MHA-DT-03-TL-03 1/4-28 UNF single-pointed (owner 2026-11-19); MHA-PD-08 #8-32 UNC single-pointed (owner 2026-11-19); MHA-MG-03 1/4-20 UNC single-pointed (owner 2026-11-19); MHA-DT-03-TL-07 #8-32 UNC single-pointed (drawing callout 2026-11-20, #2356)
 description = "5/16 in HSS threading tool bit, set of two (LMS 6685)"
 
+# --- Sheet parts bonded to a spoil plate on the CNC (dt, pd) ------------------
+# The .020-.032 brass sheet parts (MHA-DT-03-TL-02 phasing comb, and the pd
+# sheet parts) are cut out on the PM-30MV bonded on tape to a plain spoil
+# plate gripped in the vise. Ownership: cad/config/shop-equipment/
+# fixtures.sheet-spoil-plate and consumables.tape-3m-vhb-5906 (moved here
+# from ch.toml: the MHA-CH-13 strap bonds on it too).
+[tools.sheet-spoil-plate]
+description = "Spoil plate: a 5 in length of the 1/2 x 6 in 6061 flat, top as supplied, gripped in the vise on parallels"
+[tools.tape-3m-vhb-5906]
+description = "3M VHB 5906 double-sided tape, .006 in"
+
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
 # prechips can check each plan's stock_refs. Description only: the ownership

@@ -282,6 +282,33 @@ length_in = [4.0]
 status = "to_order"
 cite = ["cad/config/parts/dt-pinion-cam-pin.yaml material_specification", "cad/scripts/dt_pinion_cam_pin_geometry.py PIN_DIA, PIN_LEN"]
 
+[stock.drill-rod-1-16]
+form = "round_bar"
+material = "AISI O1 drill rod, turned, ground and polished"
+note = "To order: Abrams Industries SKU 106183, 1/16 in O1 drill rod, .0625 +/-.0003 in, 36 in (+.125/-0), $5.75. Allocation: dt-pinion-lever-pin (MHA-DT-30), one .65 in piece hand-sawn off a filed end and filed to the .63 cut length (dt_pinion_lever_pin_geometry.PIN_LEN 16.002 mm), diameter as supplied (the sheet's .0625 +/-.0003, 1/16 DRILL ROD, STOCK OK); the rest is spare for remakes. Source: the dt-pinion-lever-pin registry row, AISI O1 or W1 drill rod, 1/16 in. Not owned."
+dia_in = [0.0625]
+length_in = [36.0]
+status = "to_order"
+cite = ["Abrams Industries O1-DR 1/16 x 36 https://us.abrams-industries.com/steel/tool-steel/o1/dr-36/o1-dr-1-16-x-36 read live 2026-11-21: SKU 106183, turned, ground and polished, diameter +/-0.0003 in, length saw cut +0.125/-0.000 in, $5.75", "cad/config/parts/dt-pinion-lever-pin.yaml material_specification", "cad/scripts/dt_pinion_lever_pin_geometry.py PIN_DIA, PIN_LEN"]
+
+[stock.key-stock-1-16-undersized]
+form = "square_bar"
+material = "1008-1045 carbon steel machine key stock, undersized"
+note = "To order: McMaster-Carr 98830A511, 1/16 x 1/16 x 12 in undersized carbon-steel machine key stock (height and width -.002/+.000), the same bar MHA-DT-VN-71 (dt-vn-cone-shaft-key, a 4.86 in key) is cut from, so one bar serves both. Allocation: dt-cone-gear-tl-arbor-key (MHA-DT-03-TL-06), one .17 in piece hand-sawn off a filed end and filed to the .15 cut length (dt_cone_gear_tl_keyed_arbor_spec.KEY_LENGTH 3.81 mm), section as supplied. Source: the dt-cone-gear-tl-arbor-key and dt-vn-cone-shaft-key registry rows. Price not read. Not owned."
+section_mm = [1.5875, 1.5875]
+length_mm = 304.8
+status = "to_order"
+cite = ["cad/config/parts/dt-vn-cone-shaft-key.yaml material_specification, supplier_skus (McMaster-Carr 98830A511, 1/16 x 1/16 x 12 in, undersized -.002/+.000)", "cad/config/parts/dt-cone-gear-tl-arbor-key.yaml material_specification", "cad/scripts/dt_cone_gear_tl_keyed_arbor_spec.py KEY_LENGTH"]
+
+[stock.c260-h02-sheet-020-12x12]
+form = "sheet"
+material = "C26000 cartridge brass, H02 half hard, ASTM B36"
+note = "To order: OnlineMetals 1589, C260 H02 brass sheet, .020 x 12 x 12 in, $42.82 (owner ruling 2026-11-14, #2734, the price as the registry row read it live that day); McMaster-Carr 9011K111 (ASTM B36) is the registry's alternative source. Allocation: dt-cone-gear-tl-phasing-comb (MHA-DT-03-TL-02), one 4.25 x 1.50 in blank snipped from a corner (the comb's 3.65 x .90 U, dt_cone_gear_tl_phasing_comb_spec SHEET_LENGTH x SHEET_HEIGHT, with .30 in margin all round: cad/process/dt_cone_gear_tl_phasing_comb/plan.toml blank_length_in x blank_width_in), thickness as supplied (the sheet's (.020) SHEET STOCK); the rest is spare for remakes. Not owned."
+section_mm = [304.8, 0.508]
+length_mm = 304.8
+status = "to_order"
+cite = ["cad/config/parts/dt-cone-gear-tl-phasing-comb.yaml (owner ruling 2026-11-14 #2734: OnlineMetals 1589, C260 H02 brass sheet, .020 x 12 x 12 in, $42.82, read live 2026-11-14; McMaster-Carr 9011K111 alternative)", "cad/scripts/dt_cone_gear_tl_phasing_comb_spec.py SHEET_THICK, SHEET_LENGTH, SHEET_HEIGHT"]
+
 [stock.c260-wire-040]
 form = "wire"
 material = "C26000 cartridge brass, annealed (soft temper), ASTM B134"
