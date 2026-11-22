@@ -21,12 +21,12 @@
   <rect class="holes" x="470" y="160.95" width="56.9" height="45.3"/>
   <rect class="holes" x="540.1" y="304.9" width="27" height="14.8"/>
   <rect class="holes" x="545.1" y="319.7" width="17" height="40.3"/>
-  <line class="datum" x1="470" y1="370" x2="470" y2="124.7"/>
+  <line class="datum" x1="470" y1="360" x2="470" y2="124.7"/>
   <text class="datum-label" x="466" y="120.7" text-anchor="end">I</text>
   <text class="label" x="470" y="50">Side (I on the left):</text>
   <text class="label" x="536.9" y="154.7">lug {{cad.lug_outer_face_thickness_min_in:.3dot}}–{{cad.lug_outer_face_thickness_max_in:.3dot}}</text>
   <text class="label" x="593.57" y="340">length {{cad.foot_tip_length_in:.2dot}}</text>
-  <text class="label" x="470" y="372">foot hole {{cad.foot_hole_station_in:.3dot}} from the foot tip,</text>
-  <text class="label" x="470" y="388">counterbored from the foot top</text>
+  <text class="label" x="480" y="376">foot hole {{cad.foot_hole_station_in:.3dot}} from the foot tip,</text>
+  <text class="label" x="480" y="392">counterbored from the foot top</text>
   <text class="label" x="536.9" y="292">foot top {{cad.foot_top_height_in:.3dot}} up</text>
 </svg>

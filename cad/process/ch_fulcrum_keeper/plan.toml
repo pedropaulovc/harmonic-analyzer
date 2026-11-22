@@ -729,7 +729,7 @@ settings = "endmill-carbide-3fl-1-8-lr-1018-cf"
 milling_cuts = [
   { name = "cbore", kind = "side", phase = "finish", cutter_dia_mm = 3.175, axial_doc_mm = 0.124, radial_woc_mm = 3.175, stations_mm = "{{cad.foot_top_height_mm}}" },
 ]
-inspection = "Still clamped: counterbore Ø{{process.cbore_accept_dia_min_mm:in.3dot}}–{{process.cbore_accept_dia_max_mm:in.3dot}} (calipers' inside jaws), {{process.cbore_accept_depth_min_mm:in.3dot}}–{{process.cbore_accept_depth_max_mm:in.3dot}} deep from the foot top (calipers' depth rod), its floor flat; the program aims at the middle."
+inspection = "Still clamped: counterbore Ø{{process.cbore_accept_dia_min_mm:in.3dot}}–{{process.cbore_accept_dia_max_mm:in.3dot}} (calipers' inside jaws), {{process.cbore_accept_depth_min_mm:in.3dot}}–{{process.cbore_accept_depth_max_mm:in.3dot}} deep from the foot top (calipers' depth rod), its floor flat; FK06 cuts Ø{{cad.foot_hole_cbore_dia_in:.3dot}} × {{cad.foot_hole_cbore_depth_in:.3dot}} (the model's band middle), inside that band."
 gauge_checks = [
   { gauge = "calipers", band_mm = ["{{process.cbore_accept_dia_min_mm}}", "{{process.cbore_accept_dia_max_mm}}"] },
   { gauge = "calipers", band_mm = ["{{process.cbore_accept_depth_min_mm}}", "{{process.cbore_accept_depth_max_mm}}"] },

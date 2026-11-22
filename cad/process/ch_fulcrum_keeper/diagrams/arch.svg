@@ -6,7 +6,7 @@
   <rect class="clamp" x="183.24" y="58" width="266.76" height="22"/>
   <text class="label-on-clamp" x="347.64" y="73" text-anchor="middle">fixed jaw</text>
   <rect class="clamp" x="183.24" y="156.8" width="266.76" height="22"/>
-  <text class="label-on-clamp" x="347.64" y="171.8" text-anchor="middle">moving jaw</text>
+  <text class="label-on-clamp" x="220" y="171.8" text-anchor="middle">moving jaw</text>
   <rect class="part-removed" x="230" y="80" width="51.4" height="76.8"/>
   <path class="part-kept" d="M420 80 H281.4 A38.4 38.4 0 0 0 281.4 156.8 H420 Z"/>
   <circle class="holes" cx="281.4" cy="118.4" r="17.8"/>
