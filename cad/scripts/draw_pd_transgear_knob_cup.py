@@ -55,11 +55,13 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from pd_paper_drive_assembly_steps import step_ref
+from pd_rack_pinion_spec import inch_text
 from pd_transgear_knob_cup_spec import (
     BORE_DIA,
     BORE_CLEARANCE_TEXT,
     CBORE_DEPTH,
     CBORE_DIA,
+    WEB_MIN,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     LENGTH,
@@ -146,10 +148,15 @@ BORE_CALLOUT_ROWS = "\n".join(f" {row}" for row in BORE_CALLOUT.splitlines()) + 
 # process where it shows round.
 SUPPLY_CALLOUT = "SEE NOTE 1"
 HOLE_CALLOUT = "#33 DRILL THRU"
+# The pocket's depth keeps its third place to hold the web at the .080
+# target (the spec's WEB_MIN), and says so at the dimension (rule 3;
+# machinist review r11, three runs: ".108" stated no function).
+CBORE_DEPTH_CALLOUT = f"HOLDS WEB {inch_text(WEB_MIN, 3)} MIN"
 SECTION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT_ROWS,
     "CupLength": SUPPLY_CALLOUT,
     "PilotDepth": SUPPLY_CALLOUT,
+    "CboreDepth": CBORE_DEPTH_CALLOUT,
 }
 FACE_CALLOUTS = {"HoleDia": HOLE_CALLOUT}
 
@@ -166,15 +173,19 @@ BORE_BLOCK_HALF_HEIGHT = 0.0130
 # Above the section, the two depths on one row, the length a row higher
 # with its note reference under it.  Neither depth's text fits its span
 # with air to both extension lines, so each stands outside: the pocket
-# depth's ".108" (8.5 mm over an 11 mm span) left of the rear face, where
-# the length's extension line rising from that face stood 1.39 mm from it
-# (r6 audit; 2.0 wanted), and the pilot depth's ".152 / SEE NOTE 1" (24 mm
+# depth's ".108" over its function row (18 characters, at most 49.9 mm)
+# left of the rear face, where the length's extension line rising from that
+# face stood 1.39 mm from ".108" alone (r6 audit; 2.0 wanted); the row runs
+# over the O.D.'s upper extension line with 3 mm of air and ends 10 mm right
+# of the cutting line's upper letter; and the pilot depth's ".152 / SEE NOTE 1" (24 mm
 # over 15 mm) right of the front face, where the length's extension line
 # no longer strikes its NOTE row and the pocket depth's arrow no longer
 # runs into its "S" (r5 render).  Below the section, the two floor corners'
 # R.xxx MAX on one row, each under its own corner, the caption beneath.
 DEPTH_TEXT_HALF_WIDTH = 0.012  # "SEE NOTE 1", 23.9 mm on the r5 render
-CBORE_DEPTH_TEXT_HALF_WIDTH = 0.00425  # ".108", 8.5 mm on the r6 render
+# The pocket depth's block: its function row at the callouts' 2.77 mm a
+# character (".108" alone was 8.5 mm on the r6 render).
+CBORE_DEPTH_TEXT_HALF_WIDTH = len(CBORE_DEPTH_CALLOUT) * 0.00277 / 2.0
 SECTION_KEEP = {
     "CupDia": (REAR_FACE_X - 0.030, SECTION_CENTER[1]),
     "CboreDia": (REAR_FACE_X - 0.012, SECTION_CENTER[1] - HALF_CBORE - 0.007),
@@ -183,9 +194,11 @@ SECTION_KEEP = {
     ),
     "PilotDepth": (FRONT_FACE_X + 0.003 + DEPTH_TEXT_HALF_WIDTH, SECTION_TOP + 0.010),
     "CupLength": (SECTION_CENTER[0], SECTION_TOP + 0.026),
+    # 10 mm under the pilot's lower extension line: 4 mm under it the
+    # "BONDED FIT" row ran a hairline under the isometric's lower rim (r11).
     "BoreDia": (
         FRONT_FACE_X + 0.060,
-        SECTION_CENTER[1] - HALF_BORE - BORE_BLOCK_HALF_HEIGHT - 0.004,
+        SECTION_CENTER[1] - HALF_BORE - BORE_BLOCK_HALF_HEIGHT - 0.010,
     ),
     "PocketFloorR": (REAR_FACE_X - 0.002, SECTION_BOTTOM - 0.010),
     "PilotFloorR": (FRONT_FACE_X - 0.004, SECTION_BOTTOM - 0.010),
@@ -217,12 +230,14 @@ NOTES_XY = (0.020, 0.112)
 # review: the face's function was stated nowhere).  On the symbol's own row,
 # right of its Ra text (which ends 13.7 mm right of the V): over the symbol
 # it stood on the pilot depth's ".152 / SEE NOTE 1" row and read as words on
-# that dimension (machinist review r10, two runs).  Three rows (32.7 mm wide,
-# top-left anchored) end 2 mm short of the isometric's outline and stand
-# over the pilot Ø's upper arrow, which rises 3.5 mm off its extension line.
-FRONT_FINISH_CAPTION = f"THRUST FACE\nON {BUSH_NUMBER}\nREAR FACE"
-FRONT_FINISH_CAPTION_SIZE_M = (0.0327, 0.0146)
-FRONT_FINISH_CAPTION_XY = (FRONT_FINISH[1][0] + 0.016, FRONT_FINISH[1][1] + 0.0163)
+# that dimension (machinist review r10, two runs).  Two rows (rule 7; r11:
+# a third, "REAR FACE", was one too many and read as this part's rear), 32.7
+# mm wide and top-left anchored, end 2 mm short of the isometric's outline
+# and stand over the pilot Ø's upper arrow, which rises 3.5 mm off its
+# extension line.
+FRONT_FINISH_CAPTION = f"THRUST FACE\nON {BUSH_NUMBER}"
+FRONT_FINISH_CAPTION_SIZE_M = (0.0327, 0.0096)
+FRONT_FINISH_CAPTION_XY = (FRONT_FINISH[1][0] + 0.016, FRONT_FINISH[1][1] + 0.0105)
 # A note's read-back position may differ from the one asked by this much.
 NOTE_POSITION_TOL_M = 5e-4
 # How far A-A's axis may sit from SECTION_CENTER / level before it is moved.

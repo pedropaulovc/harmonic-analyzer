@@ -182,11 +182,19 @@ def test_depth_rows_stand_above_the_section_clear_of_each_other() -> None:
     assert cbore_y == pilot_y > top + 0.005
     # r6 audit: ".108" (8.5 mm) inside its 11 mm span stood 1.39 mm from the
     # length's extension line (2.0 wanted); it stands outside left of the
-    # rear face, 2 mm or more clear of that shared line.
+    # rear face, 2 mm or more clear of that shared line.  r11: its third
+    # place states its function on the row under it, which runs over the
+    # O.D.'s upper extension line and ends right of the cutting line's letter.
+    assert drawing.CBORE_DEPTH_CALLOUT == "HOLDS WEB .080 MIN"
+    assert drawing.SECTION_CALLOUTS["CboreDepth"] == drawing.CBORE_DEPTH_CALLOUT
+    assert spec.WEB_MIN == pytest.approx(0.080 * IN, abs=1e-9)
     cbore_half = drawing.CBORE_DEPTH_TEXT_HALF_WIDTH
     assert cbore_x + cbore_half < rear - 0.002
     assert drawing.CBORE_DEPTH_ON_SHEET < 2.0 * (cbore_half + 0.002)
-    assert cbore_x - cbore_half > drawing.SECTION_KEEP["CupDia"][0] + 0.005
+    row_bottom = cbore_y - 0.005 - 0.00175
+    assert row_bottom > top + 0.002
+    letter_right = drawing.FACE_CENTER[0] + 0.023  # "A" beside the arrow, r11
+    assert cbore_x - cbore_half > letter_right + 0.005
     # r5 render: ".152 / SEE NOTE 1" (24 mm) over its 15 mm span was struck
     # by the length's extension line from the front face and by the pocket
     # depth's arrow.  Its text now stands wholly right of the front face.
@@ -204,7 +212,8 @@ def test_front_finish_caption_names_the_bush_rear_face() -> None:
     assert bush_number == drawing.BUSH_NUMBER == "MHA-PD-28"
     caption = " ".join(drawing.FRONT_FINISH_CAPTION.split())
     assert "THRUST FACE" in caption
-    assert f"{bush_number} REAR FACE" in caption
+    assert caption == f"THRUST FACE ON {bush_number}"
+    assert len(drawing.FRONT_FINISH_CAPTION.splitlines()) == 2
     # Machinist review r10: over the symbol the caption stood on the pilot
     # depth's row and read as that dimension's words.  It hangs on the
     # symbol's row, right of the Ra text, short of the isometric's outline

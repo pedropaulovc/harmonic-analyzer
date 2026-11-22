@@ -747,8 +747,8 @@ def _apply_neck_and_flat_limits(adapter: Any) -> None:
 def _journal_profile(adapter: Any) -> list[tuple[str, str]]:
     """The source-owned 6g6 journal behind the actual rear tooth ends, its
     rear edge chamfered .015 X 45° in the sketch, as the stud's TipChamfer
-    is.  The drawing prints it with a native chamfer dimension on the
-    chamfer itself, so its own sketch dimension is not marked."""
+    is; its axial leg (RearChamferSize) is marked and prints under the rear
+    end."""
     profile = SketchDims()
     _create_sketch(adapter, "Right", "journal")
     set_sketch_direct_db(adapter, True)

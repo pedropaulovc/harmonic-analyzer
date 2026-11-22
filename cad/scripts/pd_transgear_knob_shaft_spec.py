@@ -562,12 +562,10 @@ REAR_CHAMFER = 0.381  # .015
 REAR_CHAMFER_PLACES = 3
 REAR_CHAMFER_MIN = REAR_CHAMFER - printed_band_mm(REAR_CHAMFER_PLACES, unit=UNIT)
 REAR_CHAMFER_MAX = REAR_CHAMFER + printed_band_mm(REAR_CHAMFER_PLACES, unit=UNIT)
-# Printed by the drawing's native chamfer dimension, its leader on the
-# chamfer under the rear end (draw_pd_transgear_knob_shaft
-# ``_add_rear_chamfer_dimension``): its own sketch dimension (JournalProfile
-# RearChamferSize, driven) sits under detail B's neck dimensions, where its
-# text and extension lines struck them (farm r6 of #2425).  .XXX: the title
-# block's ±.005 holds .010-.020.
+# Printed by its own sketch dimension (JournalProfile RearChamferSize, the
+# axial leg), which the drawing places under the rear end with " X 45°" and
+# the function of its third place (draw_pd_transgear_knob_shaft
+# REAR_CHAMFER_FUNCTION).  .XXX: the title block's ±.005 holds .010-.020.
 if REAR_CHAMFER_MAX > REAR_TAP_PITCH + EDGE_BREAK_MAX + 1e-9:
     raise AssertionError(
         "MHA-PD-08's rear chamfer runs past the tap mouth's discounted thread"
@@ -881,7 +879,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "OutsideDia",
         "OverallLength",
     },
-    "JournalProfile": {"JournalDia", "JournalLength"},
+    "JournalProfile": {"JournalDia", "JournalLength", "RearChamferSize"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
@@ -908,6 +906,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "JournalProfile": {
         "JournalDia": JOURNAL_DIA_PLACES,
         "JournalLength": JOURNAL_LENGTH_PLACES,
+        "RearChamferSize": REAR_CHAMFER_PLACES,
     },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {

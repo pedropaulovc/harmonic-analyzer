@@ -45,8 +45,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _config
 from _check import check
 from _com import _early_bound
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -65,7 +63,6 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
-from _drawing_edges import face_silhouettes_through, scan_view_edges
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_leader_notes import add_attached_note, add_leader_note
@@ -76,7 +73,6 @@ from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _holes import DIAMETER_TOLERANCE_MM, _verify_tap_metadata
-from _gtol_cone import ConeFace
 from _gtol_face_resolve import resolve_faces
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
@@ -110,8 +106,6 @@ from pd_transgear_knob_shaft_spec import (
     GEOMETRIC_TOLERANCES_IN,
     GEOMETRIC_TOLERANCES_MM,
     PART_DATUMS,
-    REAR_CHAMFER,
-    REAR_CHAMFER_PLACES,
     REAR_END_Z,
     REAR_TAP_DEPTH_PLACES,
     REAR_TAP_DRILL_DEPTH,
@@ -387,6 +381,8 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     # of F ran into the face width's left witness line and arrow, which drop
     # to the overall text's height); OVERALL_TEXT_* below check both ends.
     "OverallLength": ((REAR_X + PINION_REAR_X) / 2.0, _ROW_Y[5] + _OVERALL_LIFT),
+    # #2425: the rear chamfer's leg, under the rear end (REAR_CHAMFER_FUNCTION).
+    "RearChamferSize": (REAR_X + 0.030, _sheet_y(-JOURNAL_DIA / 2.0) - 0.0065),
 }
 END_KEEP: dict[str, tuple[float, float]] = {
     # The flat's distance from the axis, where the flat shows true (machinist
@@ -419,41 +415,36 @@ if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
 # GEAR DATA block's backlash acceptance, worded as MHA-PD-06's span callout
 # (two lines of words under "SPAN 2 TEETH" and its limits).  Lengths and
 # locations print their values alone.
+# #2425: the journal's .015 X 45° rear chamfer prints as its own sketch
+# dimension (JournalProfile RearChamferSize, the axial leg) under the rear
+# end, " X 45°" its suffix and the function of its third place on the row
+# under it (pd_transgear_knob_shaft_spec: the least leg clears the MHA-PD-16
+# pilot's floor corner).  Over the rear corner it sat on detail B's ".016
+# SEE NOTE 4" and ".007" (farm r6); as a "REAR END" row of the journal Ø's
+# callout nothing tied it to the chamfer and its third place stated no
+# function (machinist review r10, three runs); a native chamfer dimension
+# needs the chamfer's silhouette, and that sweep of the toothed side view
+# crashed SOLIDWORKS three times (farm r11).  Below the shaft its two
+# extension lines drop from the upper corner along the rear face's line and
+# the chamfer's own edge line (both drawn edge-on), then on under the lower
+# corner to the dimension line, where the journal's finish stood (that moved
+# right, JOURNAL_FINISH_PICK).  The value row (~26 mm) and the function row
+# (16 characters, at most 44.3 mm) centre 30 mm right of the rear end: right
+# of the rear witness line (77.3) and left of the journal Ø's lower arrow
+# (134.8), 4.5 mm under the outline (150.5) and over the journal length's
+# line (127.6).
+REAR_CHAMFER_SUFFIX = " X 45\u00b0"
+REAR_CHAMFER_FUNCTION = f"CLEARS {_config.parts('pd-transgear-knob-cup')['number']}"
+REAR_CHAMFER_BLOCK_HALF_WIDTH = (
+    len(REAR_CHAMFER_FUNCTION) * ABOVE_CALLOUT_CHAR_WIDTH / 2.0
+)
 SPAN_CALLOUT = f"MATCHED FIT,\n{GEAR_DATA_LINK}"
 DIMENSION_CALLOUTS_BELOW = {
     "FaceWidth": FACE_WIDTH_CALLOUT,
     "FlatToAxis": D_SECTION_FIT_LINK,
     "ToothSpan": SPAN_CALLOUT,
+    "RearChamferSize": REAR_CHAMFER_FUNCTION,
 }
-# #2425: the journal's .015 X 45° rear chamfer is a native chamfer dimension
-# (``AddChamferDim``, draw_fr_tube_frame's top-end break) whose leader lands
-# on the chamfer itself.  Its sketch dimension over the rear corner sat on
-# detail B's ".016 SEE NOTE 4" and ".007" (farm r6); as a "REAR END" row of
-# the journal Ø's callout nothing tied it to the chamfer, the leader landing
-# mid-journal, and its third place stated no function (machinist review r10,
-# three runs).  The dimension lands on the LOWER flank, under the rear end,
-# where the journal's finish stood (that moved right, JOURNAL_FINISH_PICK).
-# ``AddChamferDim`` ignores its text point, so ``SetPosition2`` places the
-# block after insertion: its centre at x, the cap line at y, the value
-# line's shoulder 5.6 mm under it (draw_fr_tube_frame, run
-# 20261027T080236834Z).  The cap line states the third place's function
-# (pd_transgear_knob_shaft_spec: the least leg clears the MHA-PD-16 pilot's
-# floor corner): 16 characters, 37.6 mm, so the block runs x 90-127.6 mm,
-# right of the rear witness line (77.3) and left of the journal Ø's lower
-# arrow (134.8), its cap line 4.6 mm under the outline (150.5) and its
-# shoulder (138.5) over the journal length's line (127.6).  The leader rises
-# 45 degrees from the shoulder's left end to the chamfer, right of the rear
-# witness line all the way.
-REAR_CHAMFER_FUNCTION = f"CLEARS {_config.parts('pd-transgear-knob-cup')['number']}"
-REAR_CHAMFER_TEXT_XY = (REAR_X + 0.0315, _sheet_y(-JOURNAL_DIA / 2.0) - 0.0064)
-REAR_CHAMFER_BLOCK_HALF_WIDTH = len(REAR_CHAMFER_FUNCTION) * ABOVE_CALLOUT_CHAR_WIDTH / 2.0
-REAR_CHAMFER_SHOULDER_DROP = 0.0056
-_CHAMFER_POSITION_TOLERANCE_M = 0.001
-_CHAMFER_DIMENSION = 10  # swDimensionType_e.swChamferDimension
-# swDetailingChamferDimLeaderTextStyle_e.swDetailChamferDimDistAng
-_CHAMFER_TEXT_DIST_ANG = 2
-_CHAMFER_LENGTH = 0  # IDisplayDimension.ChamferPrecision index: length
-_CHAMFER_ANGLE = 1  # IDisplayDimension.ChamferPrecision index: angle
 # The two D-flat stations link the seat note and the thread's end the thread
 # note, each on its value's line; detail
 # B's neck Ø (LIMITS) and the D-flat end's limits link the neck note, which
@@ -463,6 +454,7 @@ _CHAMFER_ANGLE = 1  # IDisplayDimension.ChamferPrecision index: angle
 # read a bare `FLAT END` label as coined and unlinked).  (A row under the
 # neck Ø would top out past the border, and the side rows stand 10 mm apart.)
 DIMENSION_SUFFIXES = {
+    "RearChamferSize": REAR_CHAMFER_SUFFIX,
     "ThreadEndFromTip": f" {THREAD_LINK}",
     "CoreFromTip": f" {STATIONS_LINK}",
     "TipStation": f" {STATIONS_LINK}",
@@ -1127,125 +1119,6 @@ def _add_tooth_edge_note(adapter: Any, front: Any) -> None:
     )
 
 
-@_telemetry.traced("drawing.pd_transgear_knob_shaft.rear_chamfer")
-def _add_rear_chamfer_dimension(adapter: Any, side: Any) -> Any:
-    """Dimension the journal's rear chamfer with a native chamfer dimension.
-
-    In the side view the 45-degree chamfer is the cone face's silhouette on
-    the lower flank, resolved from its model face and a projected point on
-    the line it draws; its lead-in is the rear face's outer rim, the circular
-    edge the chamfer leaves, seen edge-on as the end line
-    (draw_fr_tube_frame._add_top_chamfer_dimension: a turned O.D.'s flank is
-    no selectable entity).  Both picks are selected as objects, so no seat
-    hit-test is involved.  Returns the settled check that re-proves the
-    dimension after the final rebuild.
-    """
-    radius = JOURNAL_DIA / 2.0
-    chamfer_mid = model_point_in_view(
-        adapter,
-        side,
-        (
-            0.0,
-            -(radius - REAR_CHAMFER / 2.0) / 1000.0,
-            (REAR_END_Z - REAR_CHAMFER / 2.0) / 1000.0,
-        ),
-        label="journal rear chamfer flank point",
-    )
-    chamfer = face_silhouettes_through(
-        adapter,
-        side,
-        {"chamfer": (ConeFace(45.0), chamfer_mid)},
-        label="journal rear chamfer",
-    )["chamfer"]
-    lead_in = (
-        scan_view_edges(side, label="journal rear face rim")
-        .circle_at(
-            (0.0, 0.0, REAR_END_Z),
-            radius - REAR_CHAMFER,
-            axis=(0.0, 0.0, 1.0),
-            label="journal rear face rim",
-        )
-        .edge
-    )
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    _activate_view(adapter, side, label="rear chamfer")
-    draw.ClearSelection2(True)
-    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    data = manager.CreateSelectData()
-    data.View = side
-    # Chamfered edge first, then its lead-in (SOLIDWORKS chamfer-dimension order).
-    chamfer = _sw_type_info.early_bound_or_flag(chamfer, "ISilhouetteEdge", "Select2")
-    if not bool(chamfer.Select2(False, data)):
-        raise RuntimeError("failed to select the journal rear chamfer silhouette")
-    if not bool(_early_bound(lead_in, "IEntity").Select4(True, data)):
-        raise RuntimeError("failed to select the journal rear face rim edge")
-    selected = int(manager.GetSelectedObjectCount2(-1))
-    if selected != 2:
-        raise RuntimeError(
-            f"journal rear chamfer selection holds {selected} entities, not 2"
-        )
-    text_xy = REAR_CHAMFER_TEXT_XY
-    display = ddoc.AddChamferDim(text_xy[0], text_xy[1], 0.0)
-    draw.ClearSelection2(True)
-    if display is None:
-        raise RuntimeError("failed to add the journal rear chamfer dimension")
-    display = _early_bound(display, "IDisplayDimension")
-    display.ChamferTextStyle = _CHAMFER_TEXT_DIST_ANG
-    display.SetChamferPrecision(_CHAMFER_LENGTH, REAR_CHAMFER_PLACES)
-    display.SetChamferPrecision(_CHAMFER_ANGLE, 0)
-    display.ShowParenthesis = False
-    display.SetText(1, "")
-    display.SetText(2, "")
-    display.SetText(3, REAR_CHAMFER_FUNCTION)
-    display.SetText(4, "")
-    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    if annotation is None:
-        raise RuntimeError("journal rear chamfer dimension has no annotation")
-    if not annotation.SetPosition2(text_xy[0], text_xy[1], 0.0):
-        raise RuntimeError("failed to position the journal rear chamfer text")
-
-    def settled() -> None:
-        if bool(annotation.IsDangling()):
-            raise RuntimeError("journal rear chamfer dimension is dangling")
-        native = _early_bound(display.GetDimension2(0), "IDimension")
-        values = tuple(native.GetSystemChamferValues(0.0, 0.0) or ())
-        if len(values) != 3 or not bool(values[0]):
-            raise RuntimeError(f"journal rear chamfer reads no values: {values!r}")
-        length_mm, angle_deg = float(values[1]) * 1000.0, math.degrees(float(values[2]))
-        if abs(length_mm - REAR_CHAMFER) > 1e-5 or abs(angle_deg - 45.0) > 1e-6:
-            raise RuntimeError(
-                f"journal rear chamfer measures {length_mm:g} mm x {angle_deg:g} "
-                f"deg, expected {REAR_CHAMFER:g} mm x 45 deg"
-            )
-        lanes = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
-        if (
-            int(display.Type2) != _CHAMFER_DIMENSION
-            or int(display.ChamferTextStyle) != _CHAMFER_TEXT_DIST_ANG
-            or int(display.ChamferPrecision(_CHAMFER_LENGTH)) != REAR_CHAMFER_PLACES
-            or int(display.ChamferPrecision(_CHAMFER_ANGLE)) != 0
-            or bool(display.ShowParenthesis)
-            or lanes != {1: "", 2: "", 3: REAR_CHAMFER_FUNCTION, 4: ""}
-        ):
-            raise RuntimeError(
-                "journal rear chamfer dimension style/lanes did not persist: "
-                f"type={display.Type2}, style={display.ChamferTextStyle}, "
-                f"places=({display.ChamferPrecision(_CHAMFER_LENGTH)}, "
-                f"{display.ChamferPrecision(_CHAMFER_ANGLE)}), lanes={lanes!r}"
-            )
-        placed = tuple(float(value) for value in (annotation.GetPosition() or ()))
-        if (
-            len(placed) < 2
-            or math.dist(placed[:2], text_xy) > _CHAMFER_POSITION_TOLERANCE_M
-        ):
-            raise RuntimeError(
-                f"journal rear chamfer text moved: {placed!r}, requested {text_xy!r}"
-            )
-
-    settled()
-    return settled
-
-
 def _add_view_arrow(adapter: Any, side: Any) -> None:
     """VIEW C's lettered viewing arrow on the side view, square onto the stud
     tip face (draw_fr_top_frame._add_view_arrow, pointing -X)."""
@@ -1517,7 +1390,6 @@ def build(adapter: Any) -> dict[str, str]:
         label="knob running journal datum",
     )
     _add_rear_tap_callout(adapter, end)
-    chamfer_settled = _add_rear_chamfer_dimension(adapter, side)
     controls = {control.key: control for control in GEOMETRIC_CONTROLS}
     if set(controls) != set(GEOMETRIC_TOLERANCES_MM):
         raise RuntimeError("knob shaft frames do not cover the spec's geometric controls")
@@ -1577,7 +1449,6 @@ def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         redundant_note_substrings=(TAPPED_HOLE_NOTE,),
         expected_redundant_notes=0,
-        settled_checks=(chamfer_settled,),
     )
 
 
