@@ -1,0 +1,28 @@
+pd-transgear-knob-bush:
+  title: Transgear Knob Bush
+  number: MHA-PD-28
+  material: AISI 1018 cold-finished steel
+  material_specification: AISI 1018 cold-finished steel round bar, ASTM A108, 5/8 in
+  finish: bright machined; protect with ISO VG 32 machine-oil film
+  quantity: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: >-
+    Turned from the bought 5/8 in 1018 CF round bar, in one chucking with the
+    .238 (letter B) drill through: face the rear face, turn the press
+    diameter to the measured MHA-PD-19 hole, the shoulder with its R.005 MAX
+    root and the hub diameter, and finish the hub face at the cut-off. Press
+    into MHA-PD-19 from face A until the shoulder seats (a .0005 feeler does
+    not enter under the shoulder), then ream the bore .249 through before the
+    plate is clamped to MHA-PD-18.
+  machinist_exceptions:
+    - id: "RV-02"
+      kind: "accept"
+      where: "the bush bore's perpendicularity frame to datum A (shoulder face)"
+      finding: "perpendicularity frame on a running bore (rule 5)"
+      reason: "owner ruling 2026-11-08 (Pedro), #2144 item 4.1: K stays a plain ⊥ Ø.002 A, no projected zone (rule 26). Knob axis K carried from the bore to the chain plane must stay inside the reducer's axis zone the air stacks and meshes charge, and this frame is what bounds it: Ø.002 over the shortest bore (28.47 mm) projects to 0.0747 mm at K_PROJECTED_HEIGHT_MM (41.88 mm, the 3/8 arm, #2019) against the 0.0832 mm zone (paper_drive_arm_registration.AXIS_PROJECTED_ZONE_DIAMETER_MM). The frame moved with the bore from MHA-PD-19 RV-02 to this bush under owner ruling 2026-11-20 (Pedro), #2425: \"Variant of C ; I noticed there was a missing screw and an extra pin in current design; updated: C:\\Users\\pedro\\Downloads\\TransgearArmPlate.png\""
+    - id: "RV-03"
+      kind: "minor"
+      where: "the bore callout's WALL .068 MIN (press section)"
+      finding: "press-section wall below the .080 in target (rules 17, 20)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. .068 MIN at the worst printed limits (the press at its .4387 lower limit, the reamed bore at its .2495 upper limit, the title block's .010 edge break on both rims, and 0.3° drill run-off over the bore's longest 1.145) stays above the .060 floor (pd_transgear_knob_bush_geometry.WALLS). No geometry escape: the Ø.4375 FN2 press and the Ø.249 journal bore are the owner's #2425 choices, and the stub must pass the press hole, since the bush is pressed stub-first from face A"

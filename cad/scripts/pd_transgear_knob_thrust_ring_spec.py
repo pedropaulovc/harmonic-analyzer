@@ -1,18 +1,19 @@
-r"""MHA-PD-15 transgear-knob-thrust-ring: the loose brass ring in front of the plate hub.
+r"""MHA-PD-15 transgear-knob-thrust-ring: the loose brass ring in front of the bush hub.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  The ring rides the knob shaft's (MHA-PD-08) Ø.249 journal between the
-pinion's rear face and the arm plate's front hub face (contract §1.7, round 6
-K5: the journal runs straight in the steel plate, no bushing).  It is loose:
-located by the journal, it rotates with the shaft or not.  Its length is the
-FORWARD stop of the knob's end-float pair (the cup behind the rear boss is
-the other), so it carries an explicit band; it is not a fit-up shim.
+pinion's rear face and the hub face of the MHA-PD-28 bush pressed in the arm
+plate.  It is loose: located by the journal, it rotates with the shaft or not.
+Its length is the FORWARD stop of the knob's end-float pair (the cup behind
+the bush's rear face is the other), so it carries an explicit band; it is not
+a fit-up shim.
 
-The O.D. stands a little proud of the plate's front hub radially (book p.59:
-a brass ring slightly larger than the silver hub).
+The O.D. is the bush hub's (owner ruling 2026-11-20 (Pedro), #2425: "thrust
+ring diameter changed to match diameter of bush"); the book's p.59 brass
+ring "slightly larger" than the silver hub no longer holds.
 
 Part frame: axis local +Y through the origin (``Axis1``); the front face
-(on the pinion) is the Top Plane, y = 0; the rear face (on the plate hub's front
+(on the pinion) is the Top Plane, y = 0; the rear face (on the bush's hub
 face) is y = LENGTH.
 """
 
@@ -24,6 +25,7 @@ from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+import pd_transgear_knob_bush_geometry as BUSH
 from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
 
 # #290: the sheet prints decimal inch; nominals are the exact millimetres of
@@ -32,7 +34,7 @@ UNIT = drawing_unit(
     "parts/pd-transgear-knob-thrust-ring", _config.parts("pd-transgear-knob-thrust-ring")
 )
 
-OD = 13.716  # .54
+OD = BUSH.HUB_DIA  # .52
 # .257, a letter F drill (#290 fit F9): the .249 journal forced it up from
 # 6.05, and the charged rear tooth-end bearing stays above 1.0 mm^2.
 ID = 6.5278  # .257
@@ -42,14 +44,14 @@ ID = 6.5278  # .257
 # over-specification).
 ID_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # (upper, lower) deviations
 # #2019: the 3/8 arm's rear face (the plate's seat) stands .0625 further back,
-# and the MHA-PD-19 plate keeps its hub, so the ring takes the .0625, less a
-# half thousandth onto the grid: the knob's F stands .0005 behind its
-# 5/16-arm station, never forward onto the drive collar's knob wheel.
-# .267, was .205.
+# and the bush's hub face keeps the plate hub's station from it, so the ring
+# takes the .0625, less a half thousandth onto the grid: the knob's F stands
+# .0005 behind its 5/16-arm station, never forward onto the drive collar's
+# knob wheel.  .267, was .205.
 LENGTH = 6.7818  # .267
 # The forward stop of the knob's end float (contract §12): explicit ± band.
-# It spaces the knob shaft's pinion (MHA-PD-08) from the arm plate's front hub
-# (MHA-PD-19), so the knob's F datum, chain plane and disc/platen gap stacks
+# It spaces the knob shaft's pinion (MHA-PD-08) from the bush's hub face
+# (MHA-PD-28), so the knob's F datum, chain plane and disc/platen gap stacks
 # (paper_drive_arm_registration, the paper-drive assembly) consume it; the
 # sheet names that stack at the callout (drawing-guidelines rule 4).  F is
 # the disc cluster's printed stack's reference too (transgear_cluster_fit),
@@ -84,12 +86,12 @@ if WALL_WORST < WALL_FLOOR - 1e-9:
 # The sheet: the bore's process under its size.
 BORE_CALLOUT = "DRILL THRU"
 # drawing-guidelines.md rule 4: the length's ± band names the stack it
-# serves -- the ring spaces the knob shaft's pinion from the arm plate's hub,
+# serves -- the ring spaces the knob shaft's pinion from the bush's hub face,
 # a term of the disc cluster's printed stack -- in at most two lines of
 # words (rule 7).
 LENGTH_CALLOUT = (
     f"SPACES {_config.parts('pd-transgear-knob-shaft')['number']} FROM "
-    f"{_config.parts('pd-transgear-arm-plate')['number']}\n"
+    f"{_config.parts('pd-transgear-knob-bush')['number']}\n"
     f"{STACK_NAME}"
 )
 # Below-text the part build authors on its source dimensions; the drawing
@@ -100,7 +102,7 @@ DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "Ring": {"RingLength": LENGTH_CALLOUT},
 }
 
-# Both faces are thrust faces (pinion in front, plate hub behind): MACHINED, on
+# Both faces are thrust faces (pinion in front, bush hub behind): MACHINED, on
 # the exact native faces the part build resolves.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
