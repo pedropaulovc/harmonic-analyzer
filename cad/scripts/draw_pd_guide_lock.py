@@ -46,13 +46,18 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 import _telemetry
 from pd_guide_lock_spec import (
+    CORNER_R,
     DRAWING_PRECISION_BY_NAME,
     HOLE_LOCATION_PLACES,
     HOLE_SPEC,
@@ -61,7 +66,9 @@ from pd_guide_lock_spec import (
     LOCK_HEIGHT,
     LOCK_STOCK_CALLOUT,
     LOCK_THICK,
+    LOCK_THICK_BAND,
     LOCK_WIDTH,
+    UNIT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -189,6 +196,129 @@ HOLE_EXTENT_TEXT = "DRILL THRU"
 # characters so the block keeps between the plate and the right view.
 GUIDE_NUMBER = _config.parts("pd-platen-guide")["number"]
 HOLE_CALLOUT_BELOW = "\n".join((f"TRANSFER FROM {GUIDE_NUMBER}", HOLE_WALL_TEXT))
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_pd_guide_lock: the plate's corner at the origin, width along +X,
+# height along +Y from the guide-side edge, the sheet extruded +Z). The
+# width, height and corner radius take their .XX places; the thickness is the
+# 1/16 sheet's REF, its supplier band governing; the screw holes are
+# transferred from the guide's taps and drilled at assembly (the pattern
+# callout), so they are declared for their size and route only. The
+# declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_guide_lock"
+_HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
+part_metadata(
+    model_sources=("LOCK_WIDTH", "LOCK_HEIGHT", "LOCK_THICK"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "back_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("LOCK_THICK",))},
+)
+requirement(
+    "front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), LOCK_THICK),),
+    requirements=("thickness",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": LOCK_THICK}, ("LOCK_THICK",)),
+        "thickness": (
+            limits(LOCK_THICK, _P["Depth"], (LOCK_THICK_BAND, -LOCK_THICK_BAND)),
+            ("LOCK_THICK", "LOCK_THICK_BAND", (_SELF, "RIGHT_KEEP")),
+        ),
+        "thickness_nominal": (LOCK_THICK, ("LOCK_THICK",)),
+        "thickness_from": ("back_face", ((_SELF, "RIGHT_KEEP"),)),
+        "dimension_type": ("reference", ((_SELF, "THICKNESS_SUFFIX"),)),
+        "callout": (LOCK_STOCK_CALLOUT, ("LOCK_STOCK_CALLOUT",)),
+    },
+    precision={"thickness": _P["Depth"]},
+)
+requirement(
+    "left_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": ({"frame": "model", "axis": "x", "value": 0.0}, ("LOCK_WIDTH",))},
+)
+requirement(
+    "right_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), LOCK_WIDTH),),
+    requirements=("width",),
+    fields={
+        "plane": ({"frame": "model", "axis": "x", "value": LOCK_WIDTH}, ("LOCK_WIDTH",)),
+        "width": (
+            limits(LOCK_WIDTH, _P["Width"], unit=UNIT),
+            ("LOCK_WIDTH", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "width_nominal": (LOCK_WIDTH, ("LOCK_WIDTH",)),
+        "width_from": ("left_end", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"width": _P["Width"]},
+)
+requirement(
+    "guide_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("LOCK_HEIGHT",))},
+)
+requirement(
+    "far_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), LOCK_HEIGHT),),
+    requirements=("height",),
+    fields={
+        "plane": ({"frame": "model", "axis": "y", "value": LOCK_HEIGHT}, ("LOCK_HEIGHT",)),
+        "height": (
+            limits(LOCK_HEIGHT, _P["Height"], unit=UNIT),
+            ("LOCK_HEIGHT", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "height_nominal": (LOCK_HEIGHT, ("LOCK_HEIGHT",)),
+        "height_from": ("guide_edge", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"height": _P["Height"]},
+)
+requirement(
+    "corners",
+    kind="profile",
+    faces=(CylinderFace(2.0 * CORNER_R),),
+    requirements=("radius",),
+    fields={
+        "radius": (
+            limits(CORNER_R, _P["CornerR"], unit=UNIT),
+            ("CORNER_R", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "radius_nominal": (CORNER_R, ("CORNER_R",)),
+        "count": (4, ((_SELF, "DIMENSION_PREFIXES"),)),
+    },
+    precision={"radius": _P["CornerR"]},
+)
+requirement(
+    "screw_holes",
+    kind="hole",
+    faces=(CylinderFace(_HOLE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "at": ([HOLE_XY[0][0], HOLE_XY[0][1], LOCK_THICK], ("HOLE_XY", "LOCK_THICK")),
+        "axis": ([0.0, 0.0, -1.0], ("LOCK_THICK",)),
+        "dia": (
+            drilled_limits(_HOLE_DIA, HOLE_LOCATION_PLACES, unit=UNIT),
+            ("HOLE_SPEC", "HOLE_LOCATION_PLACES", "UNIT"),
+        ),
+        "nominal_dia": (_HOLE_DIA, ("HOLE_SPEC",)),
+        "thru": (True, ((_SELF, "HOLE_EXTENT_TEXT"),)),
+        "count": (len(HOLE_XY), ("HOLE_XY",)),
+        "made_at": ("assembly", ((_SELF, "HOLE_CALLOUT_BELOW"),)),
+        "callout": (HOLE_CALLOUT_BELOW, ((_SELF, "HOLE_CALLOUT_BELOW"),)),
+    },
+    precision={"dia": HOLE_LOCATION_PLACES},
+)
 
 
 def _set_dimension_prefixes(
