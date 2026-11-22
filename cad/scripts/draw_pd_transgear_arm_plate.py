@@ -69,7 +69,12 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _feature_requirements import part_metadata, requirement
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
 from _part_properties import part_drawing_unit
 from _session import run_build
 import _telemetry
@@ -82,20 +87,30 @@ from pd_transgear_arm_plate_notes import (
     SCREW_HOLE_CALLOUT,
 )
 from pd_transgear_arm_plate_geometry import (
+    CSK_ANGLE_BAND_DEG,
+    CSK_ANGLE_DEG,
+    CSK_DIA,
+    CSK_DIA_LIMITS_MM,
     LOCATOR_SITES_MM,
+    LOCATOR_HOLE_BAND_MM,
     LOCATOR_HOLE_DIA_MM,
     EDGE_MINUS_X,
     EDGE_PLUS_X,
     END_R,
     KINK,
     KINK_RIGHT,
+    KINK_TANGENT,
     PRESS_HOLE_CHAMFER,
+    PRESS_HOLE_CHAMFER_LIMITS,
+    PRESS_HOLE_CHAMFER_PLACES,
     PRESS_HOLE_DIA,
     REAR_FACE_Z,
     SCREW_HOLE_DIA,
     SCREW_HOLES,
+    THICKNESS_OVER_ARM,
     TOP_LEFT,
     TOP_RIGHT,
+    UNIT,
     arm_upper_edge_y,
 )
 from pd_transgear_arm_plate_spec import (
@@ -104,10 +119,12 @@ from pd_transgear_arm_plate_spec import (
     DRAWING_REFERENCE_PRECISION,
     FRONT_VIEW_LABEL,
     GEOMETRIC_CONTROLS,
+    GEOMETRIC_TOLERANCES_MM,
     ISO_VIEW_SCALE,
     OVERALL_HEIGHT_MM,
     OVERALL_WIDTH_MM,
     PART_DATUMS,
+    PRESS_HOLE_BAND,
     REAR_VIEW_LABEL,
     SHEET_NAMES,
     THICKNESS_CALLOUT,
@@ -233,6 +250,259 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 SIDE_KEEP: dict[str, tuple[float, float, float]] = {
     "ThicknessOverArm": (0.0, _TOP + 6.0, REAR_FACE_Z + 16.0),
 }
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the keeps that print
+# it, in the part frame (pd_transgear_arm_plate_geometry: origin on K on face
+# A, +Z to the rear face, the long axis along -Y from the screws to the end
+# round). Bands are the title block's rows at the places the part authors
+# (DRAWING_PRECISION_BY_NAME), the press hole its explicit FN2 band, the
+# screw holes the DRILLED HOLES row, the hole positions BASIC with their
+# frames' zones (GEOMETRIC_TOLERANCES_MM). The locating holes are reamed at
+# assembly (note 1, MHA-PD-00 13A/13E: match-drilled with MHA-PD-18):
+# ``made_at = "assembly"``. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_transgear_arm_plate"
+_GEOM = "pd_transgear_arm_plate_geometry"
+_NOTES = "pd_transgear_arm_plate_notes"
+_FRAME = "__frame__"
+_THICK = THICKNESS_OVER_ARM
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+def _outward(start: tuple[float, float], end: tuple[float, float]) -> tuple[float, float, float]:
+    """Unit normal of the edge ``start``->``end`` on its left: outward for an
+    edge walked clockwise round the outline."""
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    length = math.hypot(dx, dy)
+    return (-dy / length, dx / length, 0.0)
+
+
+_TOP_NORMAL = _outward(TOP_LEFT, TOP_RIGHT)
+_LEFT_TAPER_NORMAL = _outward(KINK_TANGENT, KINK)
+_RIGHT_TAPER_NORMAL = (-_LEFT_TAPER_NORMAL[0], _LEFT_TAPER_NORMAL[1], 0.0)
+_OUTLINE_SOURCES = ((_GEOM, "TOP_LEFT"), (_GEOM, "TOP_RIGHT"), (_GEOM, "KINK"), (_GEOM, "KINK_TANGENT"))
+
+part_metadata(
+    model_sources=(
+        (_GEOM, "THICKNESS_OVER_ARM"),
+        (_GEOM, "WIDTH"),
+        (_GEOM, "END_R"),
+        (_GEOM, "TOP_LEFT"),
+    ),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+# Face A, datum A: seats on MHA-PD-18's rear face; the thickness's origin.
+requirement(
+    "face_a",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", 0.0), (_FRAME, "PART_DATUMS"))},
+)
+# The rear face: .197 from face A at .XXX, SETS SCREW REACH IN ARM MHA-PD-18.
+requirement(
+    "rear_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), _THICK),),
+    requirements=("thickness",),
+    fields={
+        "plane": (_plane("z", _THICK), ((_GEOM, "THICKNESS_OVER_ARM"),)),
+        "thickness": (
+            limits(_THICK, _P["ThicknessOverArm"], unit=UNIT),
+            ((_GEOM, "THICKNESS_OVER_ARM"), (_GEOM, "UNIT"), (_SELF, "SIDE_KEEP")),
+        ),
+        "thickness_nominal": (_THICK, ((_GEOM, "THICKNESS_OVER_ARM"),)),
+        "thickness_from": ("face_a", ((_SELF, "SIDE_KEEP"),)),
+        "callout": (THICKNESS_CALLOUT, ("THICKNESS_CALLOUT",)),
+    },
+    precision={"thickness": _P["ThicknessOverArm"]},
+)
+# The outline, every edge .XX from K: the side edges .75 each side (datum C
+# the +X edge), straight up from their kinks (.42 above K) to the top edge's
+# corners (1.67 at -X, 1.61 at +X); below the kinks two tapers tangent to
+# the R.49 end round about K.
+requirement(
+    "outline",
+    kind="profile",
+    faces=(
+        PlanarFace((-1.0, 0.0, 0.0), -EDGE_MINUS_X, contains_z_mm=_THICK / 2.0),
+        PlanarFace((1.0, 0.0, 0.0), EDGE_PLUS_X, contains_z_mm=_THICK / 2.0),
+        PlanarFace(_TOP_NORMAL, _TOP_NORMAL[0] * TOP_LEFT[0] + _TOP_NORMAL[1] * TOP_LEFT[1]),
+        PlanarFace(_LEFT_TAPER_NORMAL, END_R),
+        PlanarFace(_RIGHT_TAPER_NORMAL, END_R),
+        CylinderFace(2.0 * END_R),
+    ),
+    requirements=(
+        "end_r", "edge_left_x", "edge_right_x", "top_left_y", "top_right_y",
+        "kink_y", "kink_right_y",
+    ),
+    fields={
+        "end_r": (
+            limits(END_R, _P["EndR"], unit=UNIT),
+            ((_GEOM, "END_R"), (_GEOM, "UNIT"), (_SELF, "PLAN_KEEP")),
+        ),
+        "end_r_nominal": (END_R, ((_GEOM, "END_R"),)),
+        "edge_left_x": (
+            limits(-EDGE_MINUS_X, _P["EdgeLeftX"], unit=UNIT),
+            ((_GEOM, "EDGE_MINUS_X"), (_GEOM, "UNIT"), (_SELF, "BACK_KEEP")),
+        ),
+        "edge_left_x_nominal": (-EDGE_MINUS_X, ((_GEOM, "EDGE_MINUS_X"),)),
+        "edge_right_x": (
+            limits(EDGE_PLUS_X, _P["EdgeRightX"], unit=UNIT),
+            ((_GEOM, "EDGE_PLUS_X"), (_GEOM, "UNIT"), (_SELF, "BACK_KEEP")),
+        ),
+        "edge_right_x_nominal": (EDGE_PLUS_X, ((_GEOM, "EDGE_PLUS_X"),)),
+        "top_left_y": (
+            limits(TOP_LEFT[1], _P["TopLeftY"], unit=UNIT),
+            ((_GEOM, "TOP_LEFT"), (_GEOM, "UNIT"), (_SELF, "PLAN_KEEP")),
+        ),
+        "top_left_y_nominal": (TOP_LEFT[1], ((_GEOM, "TOP_LEFT"),)),
+        "top_right_y": (
+            limits(TOP_RIGHT[1], _P["TopRightY"], unit=UNIT),
+            ((_GEOM, "TOP_RIGHT"), (_GEOM, "UNIT"), (_SELF, "BACK_KEEP")),
+        ),
+        "top_right_y_nominal": (TOP_RIGHT[1], ((_GEOM, "TOP_RIGHT"),)),
+        "kink_y": (
+            limits(KINK[1], _P["KinkY"], unit=UNIT),
+            ((_GEOM, "KINK_Y"), (_GEOM, "UNIT"), (_SELF, "PLAN_KEEP")),
+        ),
+        "kink_y_nominal": (KINK[1], ((_GEOM, "KINK_Y"),)),
+        "kink_right_y": (
+            limits(KINK_RIGHT[1], _P["KinkRightY"], unit=UNIT),
+            ((_GEOM, "KINK_Y"), (_GEOM, "UNIT"), (_SELF, "PLAN_KEEP")),
+        ),
+        "kink_right_y_nominal": (KINK_RIGHT[1], ((_GEOM, "KINK_Y"),)),
+        "from": ("press_hole", ((_SELF, "PLAN_KEEP"), (_SELF, "BACK_KEEP"))),
+        "tangent_left_at": ([KINK_TANGENT[0], KINK_TANGENT[1], 0.0], _OUTLINE_SOURCES),
+        "tangent_right_at": ([-KINK_TANGENT[0], KINK_TANGENT[1], 0.0], _OUTLINE_SOURCES),
+        "width_ref": (OVERALL_WIDTH_MM, ("OVERALL_WIDTH_MM", "DRAWING_REFERENCE_PRECISION")),
+        "height_ref": (OVERALL_HEIGHT_MM, ("OVERALL_HEIGHT_MM", "DRAWING_REFERENCE_PRECISION")),
+        "extent_x": ([EDGE_MINUS_X, EDGE_PLUS_X], ((_GEOM, "EDGE_MINUS_X"), (_GEOM, "EDGE_PLUS_X"))),
+        "extent_y": ([-END_R, TOP_LEFT[1]], ((_GEOM, "END_R"), (_GEOM, "TOP_LEFT"))),
+    },
+    precision={
+        "end_r": _P["EndR"],
+        "edge_left_x": _P["EdgeLeftX"],
+        "edge_right_x": _P["EdgeRightX"],
+        "top_left_y": _P["TopLeftY"],
+        "top_right_y": _P["TopRightY"],
+        "kink_y": _P["KinkY"],
+        "kink_right_y": _P["KinkRightY"],
+    },
+)
+# Datum B, the press hole on K: REAM THRU Ø.4375 +.0007/.0000, the FN2 press
+# for the MHA-PD-28 bush, its face-A mouth .015 X 45° (the bush's lead-in).
+requirement(
+    "press_hole",
+    kind="hole",
+    faces=(CylinderFace(PRESS_HOLE_DIA), ConeFace(45.0, contains_x_mm=0.0)),
+    requirements=("dia", "thru", "process", "chamfer_leg"),
+    fields={
+        "at": ([0.0, 0.0, _THICK], (_FRAME, (_GEOM, "THICKNESS_OVER_ARM"))),
+        "axis": ([0.0, 0.0, -1.0], (_FRAME, (_NOTES, "PRESS_HOLE_CALLOUT"))),
+        "dia": (
+            limits(PRESS_HOLE_DIA, _P["PressHoleDia"], PRESS_HOLE_BAND, unit=UNIT),
+            ((_GEOM, "PRESS_HOLE_DIA"), "PRESS_HOLE_BAND", (_SELF, "PLAN_KEEP")),
+        ),
+        "nominal_dia": (PRESS_HOLE_DIA, ((_GEOM, "PRESS_HOLE_DIA"),)),
+        "thru": (True, ((_NOTES, "PRESS_HOLE_CALLOUT"),)),
+        "process": ("ream", ((_NOTES, "PRESS_HOLE_CALLOUT"),)),
+        "chamfer_leg": (
+            list(PRESS_HOLE_CHAMFER_LIMITS),
+            ((_GEOM, "PRESS_HOLE_CHAMFER_LIMITS"), (_NOTES, "PRESS_HOLE_CALLOUT")),
+        ),
+        "chamfer_leg_nominal": (PRESS_HOLE_CHAMFER, ((_GEOM, "PRESS_HOLE_CHAMFER"),)),
+        "chamfer_angle_deg": (45.0, ((_NOTES, "PRESS_HOLE_CALLOUT"),)),
+        "chamfer_at": ("face_a", ((_NOTES, "PRESS_HOLE_CALLOUT"),)),
+        "datum": ("B", ("PART_DATUMS",)),
+        "fit": ("press", ((_NOTES, "PRESS_HOLE_CALLOUT"),)),
+        "mates": ("MHA-PD-28", ("BUSH_NUMBER",)),
+        "callout": (PRESS_HOLE_CALLOUT, ((_NOTES, "PRESS_HOLE_CALLOUT"),)),
+    },
+    precision={"dia": _P["PressHoleDia"], "chamfer_leg": PRESS_HOLE_CHAMFER_PLACES},
+)
+# The two screw holes: #1 drill (Ø.228) THRU from the rear face, each with
+# its 82° countersink Ø.312 on the rear face for the MHA-PD-VN-56 heads;
+# BASIC from K, in a Ø.014 zone to A|B|C (the arm's taps are spotted through
+# them at assembly, MHA-PD-00 13L).
+for _index, (_x, _y) in enumerate(SCREW_HOLES, 1):
+    requirement(
+        f"screw_hole_{_index}",
+        kind="hole",
+        faces=(
+            CylinderFace(SCREW_HOLE_DIA, contains_x_mm=_x),
+            ConeFace(CSK_ANGLE_DEG / 2.0, contains_x_mm=_x),
+        ),
+        requirements=(
+            "dia", "thru", "x_basic", "y_basic", "position_dia", "csk_dia", "csk_angle_deg",
+        ),
+        fields={
+            "at": ([_x, _y, _THICK], ((_GEOM, "SCREW_HOLES"), (_GEOM, "THICKNESS_OVER_ARM"))),
+            "axis": ([0.0, 0.0, -1.0], (_FRAME, (_NOTES, "SCREW_HOLE_CALLOUT"))),
+            "dia": (
+                drilled_limits(SCREW_HOLE_DIA, _P["ScrewHoleDia"], unit=UNIT),
+                ((_GEOM, "SCREW_HOLE_DIA"), (_GEOM, "UNIT"), (_SELF, "PLAN_KEEP")),
+            ),
+            "nominal_dia": (SCREW_HOLE_DIA, ((_GEOM, "SCREW_HOLE_DIA"),)),
+            "thru": (True, ((_NOTES, "SCREW_HOLE_CALLOUT"),)),
+            "process": ("drill", ((_NOTES, "SCREW_HOLE_CALLOUT"),)),
+            "x_basic": (_x, ((_GEOM, "SCREW_HOLES"), "BASIC_REDUCER_DIMENSIONS")),
+            "y_basic": (_y, ((_GEOM, "SCREW_HOLES"), "BASIC_REDUCER_DIMENSIONS")),
+            "position_dia": (
+                GEOMETRIC_TOLERANCES_MM["screw_position"],
+                ("GEOMETRIC_TOLERANCES_MM", "GEOMETRIC_CONTROLS"),
+            ),
+            "position_datums": ("A|B|C", ("GEOMETRIC_CONTROLS",)),
+            "csk_dia": (
+                list(CSK_DIA_LIMITS_MM),
+                ((_GEOM, "CSK_DIA_LIMITS_MM"), (_NOTES, "SCREW_HOLE_CALLOUT")),
+            ),
+            "csk_dia_nominal": (CSK_DIA, ((_GEOM, "CSK_DIA"),)),
+            "csk_angle_deg": (
+                [CSK_ANGLE_DEG - CSK_ANGLE_BAND_DEG, CSK_ANGLE_DEG + CSK_ANGLE_BAND_DEG],
+                ((_GEOM, "CSK_ANGLE_DEG"), (_GEOM, "CSK_ANGLE_BAND_DEG")),
+            ),
+            "csk_angle_deg_nominal": (CSK_ANGLE_DEG, ((_GEOM, "CSK_ANGLE_DEG"),)),
+            "csk_at": ("rear_face", ((_NOTES, "SCREW_HOLE_CALLOUT"),)),
+            "mates": ("MHA-PD-VN-56", ("SCREW_NUMBER",)),
+        },
+        precision={"dia": _P["ScrewHoleDia"], "csk_dia": _P["CskDia"]},
+    )
+# The two locating holes Ø.0945 +.0005/.0000 REAM THRU, a locational
+# clearance on the MHA-PD-VN-64 dowels, BASIC from K in a Ø.004 zone:
+# match-drilled with MHA-PD-18 and reamed at assembly (note 1; MHA-PD-00
+# 13A pilots, 13E ream). No part traveler makes them.
+for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
+    requirement(
+        f"locator_{_index}",
+        kind="hole",
+        faces=(CylinderFace(LOCATOR_HOLE_DIA_MM, contains_x_mm=_x, contains_y_mm=_y),),
+        requirements=("dia", "thru", "x_basic", "y_basic", "position_dia"),
+        fields={
+            "at": ([_x, _y, 0.0], ((_GEOM, "LOCATOR_SITES_MM"),)),
+            "axis": ([0.0, 0.0, 1.0], (_FRAME, (_NOTES, "LOCATOR_CALLOUT"))),
+            "dia": (
+                limits(LOCATOR_HOLE_DIA_MM, _P["LocatorDia1"], LOCATOR_HOLE_BAND_MM, unit=UNIT),
+                ((_GEOM, "LOCATOR_HOLE_DIA_MM"), (_GEOM, "LOCATOR_HOLE_BAND_MM"), (_SELF, "PLAN_KEEP")),
+            ),
+            "nominal_dia": (LOCATOR_HOLE_DIA_MM, ((_GEOM, "LOCATOR_HOLE_DIA_MM"),)),
+            "thru": (True, ((_NOTES, "LOCATOR_CALLOUT"),)),
+            "process": ("ream", ((_NOTES, "LOCATOR_CALLOUT"),)),
+            "made_at": ("assembly", ((_NOTES, "LOCATOR_NOTE"),)),
+            "x_basic": (_x, ((_GEOM, "LOCATOR_SITES_MM"), "BASIC_REDUCER_DIMENSIONS")),
+            "y_basic": (_y, ((_GEOM, "LOCATOR_SITES_MM"), "BASIC_REDUCER_DIMENSIONS")),
+            "position_dia": (
+                GEOMETRIC_TOLERANCES_MM["locator_position"],
+                ("GEOMETRIC_TOLERANCES_MM", "GEOMETRIC_CONTROLS"),
+            ),
+            "mates": ("MHA-PD-VN-64", ("DOWEL_NUMBER",)),
+        },
+        precision={"dia": _P["LocatorDia1"]},
+    )
 
 
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
