@@ -20,15 +20,19 @@ the limit.
   (``spigot_share``).
 
 The pivot is taken to bear where it is read: the middle of its bare length
-between MHA-DT-38 and its end. Pure geometry from the specs.
+between MHA-DT-38 and its end. Pure geometry, placement-independent like
+cone_stations: the cone gears' recipes read it through cone_set_stack, so it
+imports neither cone_line (the channel table's placement) nor the shaft's and
+post's specs (their registries). What it needs of theirs is restated below
+and test_cone_running_axis holds each value to its owner.
 """
 
 from __future__ import annotations
 
 import cone_tip_cluster as cluster
-import dt_cone_gear_shaft_spec as shaft
 import dt_cone_gear_spec as cone
-import dt_cone_pivot_post_spec as post
+from cone_pitch import SEAT_PITCH
+from cone_stations import T006_NORTH_FACE
 
 # Seat order on the shaft, T120 at seat 0 to T006 at the tip.
 _SEAT_ORDER = tuple(sorted(cone.CONE_TEETH, reverse=True))
@@ -38,27 +42,52 @@ DT37_TEETH = (min(cone.CONE_TEETH), *cone.SPIGOT_TEETH)
 # layout stations (cone_tip_cluster), as MHA-DT-04's end and the socket are.
 _TIP_SET_TEETH = (*DT37_TEETH, *cone.LAND_2_TEETH)
 
-# The journal's fulcrum: anywhere along the boss, in cone stations.
-BOSS_NORTH_STATION = shaft.JOURNAL_END - shaft.FRONT_STUB
-BOSS_SOUTH_STATION = BOSS_NORTH_STATION - post.CONE_BOSS_LENGTH
+# The journal's fulcrum: anywhere along MHA-DT-05's boss, in cone stations.
+# Restated: cone_line.POST_STATION, the boss's middle, and
+# dt_cone_pivot_post_spec.CONE_BOSS_LENGTH.
+POST_STATION = -39.90136099792956
+CONE_BOSS_LENGTH_MM = 42.011
+BOSS_SOUTH_STATION = POST_STATION - CONE_BOSS_LENGTH_MM / 2.0
+BOSS_NORTH_STATION = POST_STATION + CONE_BOSS_LENGTH_MM / 2.0
+
+
+def seat_faces(teeth: int) -> tuple[float, float]:
+    """(south, north) cone stations of gear ``teeth``'s faces, as modelled:
+    dt_cone_gear_shaft_spec.gear_faces, the tip set its shift north."""
+    seat = _SEAT_ORDER.index(teeth)
+    shift = cluster.TIP_SET_SHIFT_MM if teeth in _TIP_SET_TEETH else 0.0
+    north = T006_NORTH_FACE - (len(_SEAT_ORDER) - 1 - seat) * SEAT_PITCH + shift
+    return north - cone.FACE_WIDTH, north
+
+
+def seat_plane(teeth: int) -> float:
+    """Cone station of gear ``teeth``'s mid-face plane, as modelled."""
+    south, north = seat_faces(teeth)
+    return (south + north) / 2.0
+
 
 # The bare pivot: from MHA-DT-38's north face to the pivot's end.
-_T006_NORTH_FACE = shaft.T006_NORTH_FACE_STATION + cluster.TIP_SET_SHIFT_MM
+_T006_NORTH_FACE = seat_faces(min(cone.CONE_TEETH))[1]
 PIVOT_BARE_STATIONS = (
     _T006_NORTH_FACE + cluster.BUSHING_LENGTH_MM,
     _T006_NORTH_FACE + cluster.PIVOT_LENGTH_MM,
 )
 PIVOT_STATION = sum(PIVOT_BARE_STATIONS) / 2.0
 
-SOCKET_MOUTH_STATION = shaft.TIP_END_STATION
+# MHA-DT-04 ends its recess inside T024's bore
+# (dt_cone_gear_shaft_spec.TIP_END_STATION); the socket opens there.
+(_LAND_2_TEETH,) = cone.LAND_2_TEETH
+SOCKET_MOUTH_STATION = seat_faces(_LAND_2_TEETH)[1] - cluster.TIP_END_RECESS_MM
 # The spigot's offset in the socket: half its largest bonded clearance, at
 # the mouth and at the spigot's inner end alike.
 SPIGOT_FLOAT_MM = cluster.SPIGOT_BOND_CLEARANCE_MM[1] / 2.0
-# The least engagement the shaft spec proves, over the mouth-to-pivot span:
-# the shorter the engagement, the more the float tilts MHA-DT-37.
-_ENGAGEMENT_RATIO = shaft.SPIGOT_ENGAGEMENT_MIN_MM / (
-    PIVOT_STATION - SOCKET_MOUTH_STATION
-)
+# The least engagement over the mouth-to-pivot span: the shorter the
+# engagement, the more the float tilts MHA-DT-37. Booked at the floor the
+# shaft spec must keep at every print limit (1.5 D; it proves a little more,
+# dt_cone_gear_shaft_spec.SPIGOT_ENGAGEMENT_MIN_MM). Owner ruling 2026-11-22
+# (Pedro), #2473: "booked at the least spigot engagement (worst case)".
+SPIGOT_ENGAGEMENT_MIN_MM = cluster.SPIGOT_SOCKET_ENGAGEMENT_MIN_MM
+_ENGAGEMENT_RATIO = SPIGOT_ENGAGEMENT_MIN_MM / (PIVOT_STATION - SOCKET_MOUTH_STATION)
 
 if not (
     BOSS_SOUTH_STATION
@@ -68,13 +97,6 @@ if not (
     < PIVOT_BARE_STATIONS[1]
 ):
     raise AssertionError("the cone set's journal, socket and pivot are out of order")
-
-
-def seat_plane(teeth: int) -> float:
-    """Cone station of gear ``teeth``'s mid-face plane, as modelled."""
-    south, north = shaft.gear_faces(_SEAT_ORDER.index(teeth))
-    shift = cluster.TIP_SET_SHIFT_MM if teeth in _TIP_SET_TEETH else 0.0
-    return (south + north) / 2.0 + shift
 
 
 def _k(station: float, fulcrum: float) -> float:

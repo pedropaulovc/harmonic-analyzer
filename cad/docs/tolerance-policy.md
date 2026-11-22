@@ -144,10 +144,11 @@ T012/T018/T024 are thick-only (+0.075/−0) for the standard blank (owner ruling
   the post is assembled, at .0020 in TIR MAX (MHA-DT-00 steps 2B and 2F,
   sheet 16). Half that reading reaches a gear on MHA-DT-04 by its share of
   the journal-to-pivot span (0.27 at T120 to 0.85 at T024), and T006, T012 and
-  T018 through MHA-DT-37's tilt at the least spigot engagement, which the
+  T018 through MHA-DT-37's tilt at the least spigot engagement (the 1.5 D the
+  shaft spec keeps), which the
   socket's float allows even with the pivot true. T012, T018 and T024 carry
   the standard (N + 2)/DP blank for it, their tooth thickness +.003/−0 in.
-  The least margin is T012's, contact ratio 1.009. Not booked: the runout of
+  The least margin is T012's, contact ratio 1.008. Not booked: the runout of
   MHA-DT-04's lands and socket to its journal, which its sheet does not print.
   No number is booked for the ease out of the bind (check 4N;
   delegated ruling 2026-11-12, #2144, see gear-standard.md). Reported only (REF): the

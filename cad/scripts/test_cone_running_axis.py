@@ -1,17 +1,52 @@
-"""The running-axis geometry of #2473 against the specs it reads."""
+"""The running-axis geometry of #2473 against the specs that own its inputs."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
+import _buildgraph
+import cone_line
 import cone_running_axis as axis
 import cone_set_stack
 import cone_tip_cluster as cluster
 import dt_cone_gear_shaft_spec as shaft
 import dt_cone_gear_spec as cone
+import dt_cone_pivot_post_spec as post
 
 IN = 25.4
 DT04_TEETH = tuple(t for t in cone.CONE_TEETH if t not in axis.DT37_TEETH)
+_RATIO = axis.SPIGOT_ENGAGEMENT_MIN_MM / (
+    axis.PIVOT_STATION - axis.SOCKET_MOUTH_STATION
+)
+
+
+def test_the_restated_stations_are_their_owners() -> None:
+    """The module imports neither cone_line nor the shaft and post specs, so
+    the cone gears' recipes stay off the channel table and those registries
+    (test_buildgraph.test_config_files_track_real_reads)."""
+    assert axis.POST_STATION == cone_line.POST_STATION
+    assert axis.CONE_BOSS_LENGTH_MM == post.CONE_BOSS_LENGTH
+    assert axis.BOSS_NORTH_STATION == pytest.approx(
+        shaft.JOURNAL_END - shaft.FRONT_STUB
+    )
+    assert axis.SOCKET_MOUTH_STATION == pytest.approx(shaft.TIP_END_STATION)
+    order = sorted(cone.CONE_TEETH, reverse=True)
+    for seat, teeth in enumerate(order):
+        south, north = shaft.gear_faces(seat)
+        shift = cluster.TIP_SET_SHIFT_MM if teeth <= 24 else 0.0
+        assert axis.seat_faces(teeth) == pytest.approx((south + shift, north + shift))
+    assert axis.seat_faces(24)[1] == pytest.approx(shaft.T024_NORTH_FACE_STATION)
+    # The booked engagement is the floor the shaft spec proves it keeps.
+    assert axis.SPIGOT_ENGAGEMENT_MIN_MM == cluster.SPIGOT_SOCKET_ENGAGEMENT_MIN_MM
+    assert axis.SPIGOT_ENGAGEMENT_MIN_MM <= shaft.SPIGOT_ENGAGEMENT_MIN_MM
+    assert shaft.SPIGOT_ENGAGEMENT_MIN_MM < (
+        cluster.SPIGOT_LENGTH_MM - 2.0 * cone.FACE_WIDTH - cluster.TIP_END_RECESS_MM
+    )
+    config = _buildgraph.config_files_of(Path(axis.__file__))
+    assert "machine/channels.yaml" not in config
+    assert not any(name.startswith("parts/dt-cone-pivot-post") for name in config)
 
 
 def test_the_pivot_bears_north_of_every_gear_and_the_fulcrum_south_of_them() -> None:
@@ -24,6 +59,7 @@ def test_the_pivot_bears_north_of_every_gear_and_the_fulcrum_south_of_them() -> 
     assert north - south == pytest.approx(
         cluster.PIVOT_LENGTH_MM - cluster.BUSHING_LENGTH_MM
     )
+    assert north - south == pytest.approx(0.090 * IN)
 
 
 def test_k_grows_toward_the_tip_and_stays_under_one() -> None:
@@ -33,9 +69,8 @@ def test_k_grows_toward_the_tip_and_stays_under_one() -> None:
         assert next_lo > lo and next_hi > hi
     # T024 sits next to the socket mouth: k 0.81-0.85 (q2473-verify.md).
     lo, hi = axis.dt04_k_range(24)
-    assert lo == pytest.approx(0.81, abs=0.005) and hi == pytest.approx(
-        0.849, abs=0.005
-    )
+    assert lo == pytest.approx(0.810, abs=0.005)
+    assert hi == pytest.approx(0.849, abs=0.005)
     assert axis.dt04_k_range(24)[1] < axis.K_MOUTH < 1.0
 
 
@@ -55,12 +90,9 @@ def test_a_true_pivot_still_leaves_the_spigot_its_tilt() -> None:
     # With the pivot dead true MHA-DT-37 still pivots about it inside the
     # socket's float: the mouth offset u and the inner-end offset (1 + r) u
     # both stay within the float.
-    r = shaft.SPIGOT_ENGAGEMENT_MIN_MM / (
-        axis.PIVOT_STATION - axis.SOCKET_MOUTH_STATION
-    )
     assert axis.SPIGOT_FLOAT_MM == pytest.approx(0.0009 * IN, abs=1e-4)
     assert axis.spigot_stand_off_mm(0.0) == pytest.approx(
-        axis.SPIGOT_FLOAT_MM / (1.0 + r)
+        axis.SPIGOT_FLOAT_MM / (1.0 + _RATIO)
     )
     assert axis.spigot_stand_off_mm(0.0) < axis.SPIGOT_FLOAT_MM
 
@@ -71,33 +103,29 @@ def test_the_stand_off_is_the_worst_spigot_pose_in_the_socket(
 ) -> None:
     # Brute force over the mouth offset u, along the pivot's offset and
     # against it: the inner end v = (1 + r) u - r p must stay in the float.
-    r = shaft.SPIGOT_ENGAGEMENT_MIN_MM / (
-        axis.PIVOT_STATION - axis.SOCKET_MOUTH_STATION
-    )
     s = axis.SPIGOT_FLOAT_MM
     worst = 0.0
     steps = 4000
     for i in range(-steps, steps + 1):
         u = s * i / steps
-        if abs((1.0 + r) * u - r * pivot_offset) <= s + 1e-12:
+        if abs((1.0 + _RATIO) * u - _RATIO * pivot_offset) <= s + 1e-12:
             worst = max(worst, abs(u - axis.K_MOUTH * pivot_offset))
-    assert worst <= axis.spigot_stand_off_mm(pivot_offset) + 1e-12
-    assert worst == pytest.approx(
-        axis.spigot_stand_off_mm(pivot_offset), abs=2 * s / steps
-    )
+    booked = axis.spigot_stand_off_mm(pivot_offset)
+    assert worst <= booked + 1e-12
+    assert worst == pytest.approx(booked, abs=2 * s / steps)
 
 
-def test_a_shorter_engagement_tilts_more() -> None:
-    # The stack books the least engagement the shaft spec proves, not the
-    # nominal: owner ruling 2026-11-22 on #2473 ("booked at the least spigot
-    # engagement (worst case)").
-    assert shaft.SPIGOT_ENGAGEMENT_MIN_MM < (
+def test_a_shorter_engagement_tilts_more(monkeypatch: pytest.MonkeyPatch) -> None:
+    booked = axis.spigot_stand_off_mm(0.0254)
+    nominal = (
         cluster.SPIGOT_LENGTH_MM - 2.0 * cone.FACE_WIDTH - cluster.TIP_END_RECESS_MM
     )
-    assert axis._ENGAGEMENT_RATIO == pytest.approx(
-        shaft.SPIGOT_ENGAGEMENT_MIN_MM
-        / (axis.PIVOT_STATION - axis.SOCKET_MOUTH_STATION)
+    monkeypatch.setattr(
+        axis,
+        "_ENGAGEMENT_RATIO",
+        nominal / (axis.PIVOT_STATION - axis.SOCKET_MOUTH_STATION),
     )
+    assert axis.spigot_stand_off_mm(0.0254) < booked
 
 
 @pytest.mark.parametrize("teeth", cone.CONE_TEETH)

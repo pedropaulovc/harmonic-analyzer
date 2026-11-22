@@ -113,8 +113,8 @@ def test_the_running_axis_term_needs_every_acceptance_it_is_booked_with() -> Non
     }
     # T012 governs; every other mesh keeps more.
     assert min(margins, key=margins.get) == 12
-    assert margins[12] == pytest.approx(1.0087, abs=5e-4)
-    assert margins[18] == pytest.approx(1.0218, abs=5e-4)
+    assert margins[12] == pytest.approx(1.0081, abs=5e-4)
+    assert margins[18] == pytest.approx(1.0209, abs=5e-4)
     assert margins[24] == pytest.approx(1.0447, abs=5e-4)
     # The pivot at .0025 TIR leaves T012 under the gate at the least spigot
     # engagement (owner ruling 2026-11-22: .0020).
