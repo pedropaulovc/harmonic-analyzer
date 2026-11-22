@@ -579,3 +579,75 @@ def test_release_rejects_pack_collision_from_distinct_original_sources(
             (second,),
             ((destination, {first.name.casefold(): first}),),
         )
+
+
+def test_the_rail_declares_one_owner_per_face() -> None:
+    import export_features
+    from _gtol_face import FaceGeometry
+
+    def plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+        point = tuple(value * offset_mm / 1000 for value in normal)
+        return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+    manifest = export_features.requirement_manifest("pd_platen_guide")
+    names = list(manifest["features"])
+    assert names[:6] == [
+        "left_end",
+        "right_end",
+        "bottom_face",
+        "top_face",
+        "front_face",
+        "rear_face",
+    ]
+    assert names[6:] == [f"tap_a{index}" for index in range(1, 10)]
+    faces = {
+        "left_end": plane((-1.0, 0.0, 0.0), 0.0),
+        "right_end": plane((1.0, 0.0, 0.0), guide.GUIDE_LENGTH),
+        "bottom_face": plane((0.0, -1.0, 0.0), 0.0),
+        "top_face": plane((0.0, 1.0, 0.0), guide.GUIDE_HEIGHT),
+        "front_face": plane((0.0, 0.0, 1.0), 0.0),
+        "rear_face": plane((0.0, 0.0, -1.0), guide.GUIDE_DEPTH),
+    }
+    tap_r = drawing.THREAD_TAP_DRILL_MM / 2
+    for index, x in enumerate(drawing.HOLE_STATIONS_MM, 1):
+        box = tuple(
+            value / 1000
+            for value in (x - tap_r, guide.TAP_Y - tap_r, -guide.GUIDE_DEPTH, x + tap_r, guide.TAP_Y + tap_r, 0.0)
+        )
+        faces[f"tap_a{index}"] = FaceGeometry(
+            None, 4002, (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, tap_r / 1000), None, box
+        )
+    selectors = export_features.feature_selectors("pd_platen_guide")
+    for name, face in faces.items():
+        owners = [
+            owner
+            for owner, specs in selectors.items()
+            if any(selector.matches(face) for selector in specs)
+        ]
+        assert owners == [name], name
+
+
+def test_rail_feature_bands_are_the_printed_ones() -> None:
+    import export_features
+
+    def _in(value: float) -> float:
+        return value * 25.4
+
+    features = export_features.requirement_manifest("pd_platen_guide")["features"]
+    assert features["right_end"]["length"] == pytest.approx([_in(10.61), _in(10.63)])
+    assert features["top_face"]["height"] == pytest.approx([_in(0.28), _in(0.30)])
+    assert features["rear_face"]["depth"] == pytest.approx([_in(0.39), _in(0.40)])
+    assert features["bottom_face"]["finish_callout"] == "63"
+    stations = (1.062, 2.909, 3.185, 3.461, 5.308, 7.155, 7.431, 7.707, 9.554)
+    for index, station in enumerate(stations, 1):
+        tap = features[f"tap_a{index}"]
+        front = index % 2 == 1
+        assert tap["thread"] == "#4-40 UNC-2B" and tap["thru"] is True
+        assert tap["mates"] == ("MHA-PD-02" if front else "MHA-PD-12")
+        assert tap["axis"] == [0.0, 0.0, -1.0 if front else 1.0]
+        assert tap["dia"] == pytest.approx([_in(0.089), _in(0.093)], abs=1e-3)
+        assert tap["station"] == pytest.approx(
+            [_in(station - 0.005), _in(station + 0.005)], abs=1e-3
+        )
+        assert tap["height"] == pytest.approx([_in(0.135), _in(0.145)], abs=1e-3)
+        assert tap["edge_wall_min"] == pytest.approx(_in(0.059))

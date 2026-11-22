@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" font-family="sans-serif" font-size="14">
+  <rect class="paper" x="0" y="0" width="760" height="330"/>
+  <text class="title" x="20" y="24">Front of the bench vise: filing a wire end square, flush with the soft jaws (not to scale)</text>
+  <rect class="fixture-vise" x="150" y="150" width="400" height="130"/>
+  <rect class="clamp" x="250" y="110" width="120" height="120"/>
+  <rect class="clamp" x="390" y="110" width="120" height="120"/>
+  <text class="label-on-clamp" x="262" y="175">soft jaw</text>
+  <text class="label-on-clamp" x="402" y="175">soft jaw</text>
+  <rect class="part-kept" x="372" y="110" width="16" height="150"/>
+  <rect class="part-removed" x="372" y="88" width="16" height="22"/>
+  <rect class="cutter" x="200" y="78" width="360" height="10"/>
+  <line class="datum" x1="230" y1="110" x2="530" y2="110"/>
+  <text class="datum-label" x="572" y="106">jaws' top: the end</text>
+  <text class="datum-label" x="572" y="124">is filed flush with it</text>
+  <text class="label" x="200" y="70">smooth file, flat on the jaws, stroking across</text>
+  <line class="leader" x1="380" y1="250" x2="590" y2="250"/>
+  <circle class="leader-dot" cx="380" cy="250" r="3"/>
+  <text class="label" x="596" y="254">Ø.040 brass wire</text>
+  <text class="label" x="20" y="312">First end: flat and square. Second end: filed down to the developed length, checked with the calipers.</text>
+</svg>

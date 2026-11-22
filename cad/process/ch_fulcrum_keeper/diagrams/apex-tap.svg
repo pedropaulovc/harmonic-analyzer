@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 7: the #1-72 tap in the T-handle wrench under the spring tap guide, spindle off. 1 in = 177.8 px. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 7 (FK07_crown_tap): tap #1-72 by hand under the tap guide</text>
+  <rect class="fixture-support" x="175.54" y="380" width="184.46" height="6"/>
+  <polygon class="part-kept" points="330,380 214.43,380 214.43,324.9 273.1,324.9 273.1,154.7 330,154.7"/>
+  <rect class="holes" x="273.1" y="180.95" width="56.9" height="45.3"/>
+  <text class="label" x="336" y="208">bore</text>
+  <rect class="holes" x="232.9" y="324.9" width="27" height="14.8"/>
+  <rect class="holes" x="237.9" y="339.7" width="17" height="40.3"/>
+  <rect class="part-threads" x="296.25" y="154.7" width="10.6" height="31"/>
+  <line class="centre-line" x1="301.55" y1="104.64" x2="301.55" y2="240"/>
+  <line class="hidden" x1="175.54" y1="243.18" x2="390" y2="243.18"/>
+  <text class="label" x="396" y="247.18">jaw tops</text>
+  <circle class="datum" cx="330" cy="154.7" r="3.5"/>
+  <text class="datum-label" x="336" y="150.7">X0: I</text>
+  <circle class="datum" cx="332" cy="380" r="3.5"/>
+  <text class="datum-label" x="338" y="374">Z0 the parallels' top (the seat)</text>
+  <rect class="part-rest" x="261.55" y="114.64" width="80" height="10"/>
+  <text class="label" x="347.55" y="124.64">T-handle wrench</text>
+  <rect class="part-rest" x="298.55" y="124.64" width="5" height="30"/>
+  <polygon class="cutter" points="289.55,44.64 313.55,44.64 301.55,110.64"/>
+  <text class="label" x="321.55" y="74.64">tap guide in the spindle, spindle OFF</text>
+  <text class="label" x="396" y="178.64">tap point {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the apex: into the bore</text>
+  <text class="label" x="20" y="80">Looking at the moving jaw;</text>
+  <text class="label" x="20" y="96">F at the fixed jaw behind.</text>
+</svg>
