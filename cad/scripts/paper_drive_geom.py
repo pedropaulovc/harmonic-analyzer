@@ -348,7 +348,7 @@ def reducer_axis_tilt_maxima_rad() -> tuple[float, float]:
     one gear plane. Spacer faces set the common mounting-plane inclination.
     """
     import paper_drive_arm_registration as registration
-    import pd_transgear_arm_plate_geometry as plate
+    import pd_transgear_knob_bush_geometry as bush
 
     low_z, high_z = reducer_working_z_band_mm()
     if not (
@@ -368,7 +368,7 @@ def reducer_axis_tilt_maxima_rad() -> tuple[float, float]:
         - pd_transgear_feed_pinion_spec.STATION_TOL - 2.0 * edge
     )
     knob_clearance = (
-        max(plate.BORE_DIA_LIMITS)
+        max(bush.BORE_DIA_LIMITS)
         - min(pd_transgear_knob_shaft_spec.JOURNAL_DIA_BAND)
     )
     if feed_span <= 0.0 or knob_clearance <= 0.0:

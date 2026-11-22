@@ -53,9 +53,6 @@ diameter_mm = 9.5758
 [tools.drill-7-16]  # Drills 7/16
 description = "7/16 (.4375 in) drill, 115-piece index"
 diameter_mm = 11.1125
-[tools.drill-27-64]  # 115-piece index; MHA-DT-27 winding mandrel (shank)
-description = "27/64 (.4219 in) drill, 115-piece index"
-diameter_mm = 10.715625
 [tools.drill-15-32]  # Drills 15/32
 description = "15/32 (.4688 in) drill, 115-piece index"
 diameter_mm = 11.90625
@@ -115,9 +112,6 @@ description = "Shop-made fly cutter bar MHA-DT-37-TL-02 for the cone tip gear fo
 description = "Shop-made form cutter MHA-DT-37-TL-01 for the MHA-DT-37 tooth space"
 [tools.dt-cylinder-gear-cam-fixture]  # MHA-DT-12 cam throw .3402 ±.0020
 description = "Shop-made cam turning fixture MHA-DT-12-TL-01 (stub, clamp, clock pin) for the MHA-DT-12 cams"
-[tools.endmill-hss-2fl-1-4]  # inventory tools.endmill-hss-2fl-1-4
-description = "1/4 in HSS 2-flute square end mill, 5/8 in LOC (McMaster 3051A51)"
-diameter_mm = 6.35
 [tools.follow-rest-pm-1127]  # inventory fixtures.follow-rest-pm-1127
 description = "PM-1127VF-LB follow rest"
 [tools.needle-files-swiss]  # MHA-DT-37-TL-01 file the tooth-space form (.0114-.0323)

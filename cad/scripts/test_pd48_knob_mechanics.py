@@ -13,7 +13,7 @@ import pytest
 
 import _fit_close_running as fits
 import _gear_quality as quality
-import pd_transgear_arm_plate_geometry as plate
+import pd_transgear_knob_bush_geometry as bush
 import pd_transgear_drive_collar_spec as collar
 import pd_transgear_knob_cup_spec as cup
 import pd_transgear_knob_shaft_spec as shaft
@@ -299,16 +299,19 @@ def test_retained_walls_and_axial_stations_need_no_new_waiver():
     assert collar.PILOT_WALL_WORST >= 2.0
     assert collar.BORE_PIN_WALL_WORST >= 2.0
     assert ring.WALL_WORST >= 2.0
-    assert cup.RADIAL_WALL_WORST >= 2.0
-    assert (shaft.JOURNAL_DIA_MIN - 1.65) / 2.0 >= 2.0
-    assert plate.BORE_DIA == 6.3246
-    assert plate.BORE_DIA_LIMITS == (0.0, 0.0127)
-    assert min(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.00508)
-    assert max(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.0254)
+    assert cup.PILOT_WALL_WORST >= 2.0
+    assert cup.WEB_MIN >= 2.032 - 1e-9
+    # #2425: the journal's wall over the rear #2-56 tap, not a cross pin.
+    assert shaft.REAR_TAP_WALL_WORST >= 2.032
+    assert bush.BORE_DIA == 6.3246
+    assert bush.BORE_DIA_LIMITS == (0.0, 0.0127)
+    # The end-milled .250 +.001/0 pilot on the .249 g6 journal: .0012-.0025.
+    assert min(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.03048)
+    assert max(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.0635)
     assert ring.LENGTH == 6.7818  # .267, the 3/8 arm (#2019)
-    assert plate.HUB_LENGTH == pytest.approx(12.6746)
+    assert bush.HUB_LENGTH == pytest.approx(20.5486)  # .809
     assert shaft.CUP_FACE_Z == pytest.approx(41.91)
-    assert shaft.REAR_END_Z == pytest.approx(48.6156)
+    assert shaft.REAR_END_Z == pytest.approx(45.2628)
     assert collar.COLLAR_DISC_AIR_MIN == 0.1016
     assert "ONE FULL TURN" in collar.COLLAR_DISC_AIR_PHRASE
 
