@@ -63,7 +63,6 @@ from _drawing_leaders import (
     dimension_segments,
     leader_crossings,
     leader_segments,
-    section_line_segments,
     set_near_side_diameter,
 )
 from _drawing_notes import add_property_linked_note
@@ -78,6 +77,7 @@ from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _machinist_review_mode import MachinistReviewMode
 from _section_axis import position_section_caption
+from _section_lines import section_line_segments
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 from _transgear_zone_line import (
