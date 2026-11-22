@@ -279,3 +279,32 @@ cite = [
   "Birchwood Technologies product page, Presto Black Steel PC9, SKU 5602, read 2026-11-21 (https://www.birchwoodtechnologies.com/shop/all-products/presto-black-steel-mkp-rpl-pc9/): 'Versatile Liquid Concentrate to create a black Steel patina', $26.49 to $575.50 by size (8 oz, 32 oz, 1 gal).",
   "Presto Black Steel PC9 Instructions (https://www.birchwoodtechnologies.com/wp-content/uploads/2025/11/Presto-Black-Steel-PC9-Inst.pdf), read 2026-11-21: 'works at room temperature to form a non-dimensional, medium-durability, black coating on all iron and steel surfaces'; 1. prepare metal: wash with soap and water or isopropanol, Scotchbrite or blast to fresh metal; 2b. brush or sponge-on: dilute 50-100% with water, apply with even strokes, re-wet and continue, attention to edges and holes, apply lightly; 3. stop the reaction: rinse thoroughly with clean water; 4. dry (compressed air, heat gun or lint-free cloth), repeat step 2 if necessary; 6. seal with a clear-coat, wax, or oil. Acid: acid-resistant gloves and eye protection. Waste and rinse water to a hazardous waste drop-off.",
 ]
+
+# --- MHA-MS-01 stick: final polish (cad/process/ms_stick) --------------------
+
+# The stick's finish is "polished brass; black-fill all engraving with flat
+# black enamel, wipe-filled and cured before final polish" (MHA-MS-01 title
+# block). The enamel is consumables.black-alkyd-enamel (owner 2026-11-21). The
+# polish has no owner ruling and nothing finer than the 220-grit rolls is on
+# record: these two are the author's choice (agent CncFlatB.FlatBStick2,
+# 2026-11-22), FLAGGED for the owner, who may name others.
+[consumables.wetordry-paper-600]
+name = "3M Wetordry sandpaper 32036, 600 grit, 9 x 11 in sheets, pack of 5"
+kind = "abrasive_sheet"
+make = "3M"
+sku = "32036"
+source = "https://www.3m.com/3M/en_US/p/d/v100010909/"
+status = "to_order"
+purchase = "One pack of 5 sheets; no price or stock read (the maker's page lists none)."
+note = "Not owned: to buy. MHA-MS-01 final polish: a sheet wet on the surface plate takes the cured enamel film and the tool marks off the ruled face and leaves the filled grooves."
+cite = ["3M product page, 3M Wetordry Sandpaper, 32036, 600 Grit, 9 in x 11 in, 5 per pack (https://www.3m.com/3M/en_US/p/d/v100010909/), read 2026-11-22: silicon carbide abrasive on a waterproof lightweight (A weight) paper backing; 'Convenient sheet can be used wet or dry on paint, primer, gel coat and metal'."]
+
+[consumables.metal-polish-simichrome]
+name = "Happich Simichrome Polish, 50 g tube"
+kind = "polish"
+make = "Happich"
+source = "https://simichrome-polish.de/shop/simichrome-polish-50g-tube/?lang=en"
+status = "to_order"
+purchase = "One 50 g tube, 13.95 EUR at the maker's shop (read 2026-11-22); any seller."
+note = "Not owned: to buy. MHA-MS-01 final polish, after the 600-grit paper."
+cite = ["Simichrome Polish shop, SIMICHROME POLISH 50g Tube (https://simichrome-polish.de/shop/simichrome-polish-50g-tube/?lang=en), read 2026-11-22: 'polish for all non-ferrous metal surfaces such as chrome, silver, brass, gold, copper, tin, aluminum, magnesium, stainless steel and even Plexiglas'; 13,95 EUR."]

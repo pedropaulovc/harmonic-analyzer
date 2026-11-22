@@ -635,6 +635,8 @@ description = "Lathe turning tool, nose radius .004 in or less, tip under .016 w
 [tools.reamer-0930]  # MHA-DT-11 2X .0930 +.0005/.0000 REAM .1555; MHA-PD-18 Ø.0930 +.0005/.0000 2X REAM THRU; MHA-PD-22 Ø.0930 +.0005/.0000 2X REAM THRU
 description = ".0930 in HSS chucking reamer"
 diameter_mm = 2.3622
+[tools.tape-3m-vhb-5906]  # inventory consumables.tape-3m-vhb-5906; MHA-CH-13 strap on its sub-plate, MHA-MS-01 stick on its fixture bar
+description = "3M VHB 5906 double-sided tape, .006 in"
 [tools.telescoping-gauges-starrett-s579gz]  # inventory gauges.telescoping-gauges-starrett-s579gz
 description = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
 [tools.threading-bits-lms-6685]  # MHA-DT-03-TL-03 1/4-28 UNF single-pointed (owner 2026-11-19); MHA-PD-08 #8-32 UNC single-pointed (owner 2026-11-19); MHA-MG-03 1/4-20 UNC single-pointed (owner 2026-11-19); MHA-DT-03-TL-07 #8-32 UNC single-pointed (drawing callout 2026-11-20, #2356)
