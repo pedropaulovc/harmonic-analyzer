@@ -10,6 +10,6 @@
   <line class="dims" x1="120" y1="216" x2="190" y2="216"/>
   <line class="dims" x1="120" y1="208" x2="120" y2="224"/>
   <line class="dims" x1="190" y1="208" x2="190" y2="224"/>
-  <text class="label" x="100" y="244">calipers: rim to the pin gauge's far side, .181-.201</text>
+  <text class="label" x="60" y="244">calipers: rim to the largest pin gauge D, far side; station = reading − D/2</text>
   <text class="label" x="200" y="66">.082 pin gauge through the hole (.082 enters, .086 does not)</text>
 </svg>
