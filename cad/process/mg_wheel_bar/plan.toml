@@ -285,8 +285,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_thickness_mm
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = ["{{process.vise_overhang_mm}}", "{{process.vise_clamp_end_mm}}"], section_mm = { y = "{{cad.back_face_depth_mm}}", z = "{{process.top_width_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Before clamping: mic edge B to edge A at the blank's middle and write it down (mm = in × 25.4). Clamp it as Holding says. Home the mill ($H). G54 X0 {{process.left_end_skim_mm:in.3dot}} right of the LEFT end, Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Before clamping: mic B to A at the blank's middle; write it down in mm (in × 25.4). Clamp it as Holding says. Home the mill ($H). Edge finder (900 rpm), its tip below the jaw tops: on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's LEFT end from the left, G10 L20 P1 X-4.064 (its .100 radius plus the {{process.left_end_skim_mm:in.3dot}} end skim)."
+instruction = "Before clamping: mic edge B to edge A at the blank's middle and write it down (mm = in × 25.4). Home the mill ($H). G54 Y0 the bare fixed jaw's face, then clamp it as Holding says; X0 {{process.left_end_skim_mm:in.3dot}} right of the LEFT end: edge finder (900 rpm)."
+instruction_detailed = "Before clamping: mic B to A at the blank's middle; write it down in mm (in × 25.4). Home the mill ($H). Edge finder (900 rpm), the vise empty: on the fixed jaw's face, G10 L20 P1 Y-2.540. Clamp it as Holding says. Edge finder, its tip below the jaw tops, on the blank's LEFT end from the left: G10 L20 P1 X-4.064 (its .100 radius plus the {{process.left_end_skim_mm:in.3dot}} end skim)."
 feed = "hand"
 
 [[setups.operations]]
@@ -306,7 +306,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Run WB02_top (M6 T1, 1/2 in end mill; set 2650): face edge A down to Z {{process.top_width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.bar_width_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first), in passes along the bar no wider than {{process.face_stepover_max_mm:in.3dot}}. Unclamp; mark the new face T (the top face) with marking fluid."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
-inspection = "Width B to T {{process.top_width_mm:in.3dot}}, miked at both ends and the middle: within .005 of it (the height is cut to size in Setup 5)."
+inspection = "Width B to T {{process.top_width_mm:in.3dot}}, miked at both ends and the middle: within .005 of it (the height is cut to size in Setup 5). Over: repeat this setup from its first op (a fresh middle reading sets Z0 again) and run WB02_top again. Under: stop and tell the owner."
 gauge_checks = "other"
 milling_cuts = [
   { name = "top face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = ["{{process.left_end_skim_mm}}", "{{process.right_end_station_mm}}"] },
@@ -326,8 +326,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.top_width_mm}}", a
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = ["{{process.end_overhang_mm}}", "{{process.left_clamp_end_mm}}"], section_mm = { y = "{{process.top_width_mm}}", z = "{{cad.back_face_depth_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Before clamping: mic F to the back face at the blank's middle and write it down (mm = in × 25.4). Clamp it as Holding says, home the mill ($H) and set X0 and Y0 as Setup 2: X0 {{process.left_end_skim_mm:in.3dot}} right of the sawn LEFT end, where WB03 mills it; Y0 now T."
-instruction_detailed = "Before clamping: mic F to the back face at the blank's middle; write it down in mm (in × 25.4). Clamp it as Holding says. Home the mill ($H). Edge finder (900 rpm): on the fixed jaw's face, G10 L20 P1 Y-2.540; on the sawn LEFT end from the left, G10 L20 P1 X-4.064. The end mill takes that end back to X0, so every station counts from the end it leaves."
+instruction = "Before clamping: mic F to the back face at the blank's middle and write it down (mm = in × 25.4). Home the mill ($H). G54 Y0 the bare fixed jaw's face (now T's), then clamp it as Holding says; X0 {{process.left_end_skim_mm:in.3dot}} right of the sawn LEFT end, where WB03 mills it."
+instruction_detailed = "Before clamping: mic F to the back face at the blank's middle; write it down in mm (in × 25.4). Home the mill ($H). Edge finder (900 rpm), the vise empty: on the fixed jaw's face, G10 L20 P1 Y-2.540. Clamp it as Holding says. Edge finder on the sawn LEFT end from the left: G10 L20 P1 X-4.064. The end mill takes that end back to X0, so every station counts from the end it leaves."
 feed = "hand"
 
 [[setups.operations]]
@@ -344,7 +344,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run WB03_left (M6 T1; set 2650): the left end with the cutter's side, from the back face to {{process.end_past_mm:in.3dot}} under F, in passes no deeper than {{process.end_step_max_mm:in.3dot}}, each across the bar one way (−Y, conventional), to X0."
+instruction = "Run WB03_left (M6 T1; set 2650): the left end with the cutter's side, from the back face to {{process.end_past_mm:in.3dot}} under F, in passes no deeper than {{process.end_step_max_mm:in.3dot}}, each across the bar one way (−Y: the bar on the pass's left, conventional with M3), to X0."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "left end", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.end_axial_doc_mm}}", radial_woc_mm = "{{process.end_step_max_mm}}", stations_mm = "{{process.left_end_skim_mm}}" },
@@ -420,15 +420,20 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As Setup 3, the bar slid along the jaws to the left: the same stacks, F down, T against the FIXED jaw, the .125 pin along edge B, the sawn RIGHT end {{process.end_overhang_mm:in.2f}} out past the jaws' right side (the rule), the milled LEFT end out past their left side in the air. Tap it down onto the stacks along its length while closing the vise."
-datum = "Program WB04_right. G54: X0 the milled LEFT end (the pickup: the same end Setup 3 cut to X0), Y0 the fixed jaw's face (T), +Y toward it; Z0 the stacks' top (F), set from the miked thickness. The clamp holes at X {{cad.clamp_hole_1_station_in:.3f}} and {{cad.clamp_hole_2_station_in:.3f}} in, Y −{{cad.clamp_hole_1_height_in:.3f}} in; the right end to X {{process.length_target_mm:in.3f}} in."
+datum = "Program WB04_right. G54: X0 the milled LEFT end (the pickup: the same end Setup 3 cut to X0), Y0 the fixed jaw's face (T), +Y toward it; Z0 the stacks' top (F), set from the miked thickness. The clamp holes at X {{cad.clamp_hole_1_station_in:.3f}} and {{cad.clamp_hole_2_station_in:.3f}} in, Y −{{cad.clamp_hole_1_height_in:.3f}} in; the right end to X {{process.length_target_mm:in.3f}} in. At every M6 stop the file has stopped the spindle and lifted the tool above the bar."
 diagram = { file = "diagrams/right.svg", alt = "The bar slid along the jaws, its right end just out past them, the milled left end out in the air where the edge finder picks up X0; the 1/2 in end mill's side mills the right end to the length, the centre drill spots and the #9 drills both clamp holes through beside the stacks." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.top_width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.drill_9_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.top_width_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{cad.back_face_depth_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.right_clamp_start_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "as_bought", moving_jaw_contact = "rod" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = ["{{process.right_clamp_start_mm}}", "{{process.right_clamp_end_mm}}"], section_mm = { y = "{{process.top_width_mm}}", z = "{{cad.back_face_depth_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Before clamping: mic F to the back face at the bar's middle and write it down (mm = in × 25.4). Clamp it as Holding says. Home the mill ($H). The pickup: G54 X0 on the milled LEFT end with the edge finder, Y0 the fixed jaw's face (T)."
-instruction_detailed = "Before clamping: mic F to the back face at the bar's middle; write it down in mm (in × 25.4). Clamp it as Holding says. Home the mill ($H). Edge finder (900 rpm): on the fixed jaw's face, G10 L20 P1 Y-2.540; on the milled LEFT end from the left, its tip on the end below the back face (the end stands {{process.pickup_reach_min_mm:in.2f}} or more out past the jaws: nothing beside it), G10 L20 P1 X-2.540. Every station of this file counts from that end, as Setup 3's did."
+instruction = "Before clamping: mic F to the back face at the bar's middle and write it down (mm = in × 25.4). Home the mill ($H). G54 Y0 on the bare fixed jaw's face with the edge finder."
+instruction_detailed = "Before clamping: mic F to the back face at the bar's middle; write it down in mm (in × 25.4). Home the mill ($H). Edge finder (900 rpm), the vise empty: on the fixed jaw's face, G10 L20 P1 Y-2.540."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Clamp it as Holding says. The pickup: G54 X0 on the milled LEFT end with the edge finder."
+instruction_detailed = "Clamp it as Holding says. Edge finder (900 rpm) on the milled LEFT end from the left, its tip below the back face (the end stands {{process.pickup_reach_min_mm:in.2f}} or more out past the jaws): G10 L20 P1 X-2.540. Every station of this file counts from that end, as Setup 3's did."
 feed = "hand"
 
 [[setups.operations]]
@@ -437,7 +442,7 @@ instruction_detailed = "Console M6 T1 (the tool setter measures it); MDI G0 X{{p
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Pickup check before cutting: MDI G0 Z5.000, then G0 X{{cad.axle_bore_station_mm:.3f}} Y-{{cad.axle_bore_height_mm:.3f}} and G0 Z1.000: the end mill's tip stands centred over the reamed axle bore (look across it from the front and from the side). Off by a visible amount: stop and set X0 again."
+instruction = "Pickup check before cutting, Z from the back face's reading: MDI G0 Z(the reading in mm + 5.000), then G0 X{{cad.axle_bore_station_mm:.3f}} Y-{{cad.axle_bore_height_mm:.3f}}, then G0 Z(the reading in mm + 1.000): the end mill's tip stands centred over the reamed axle bore (look across it from the front and from the side). Off by a visible amount: stop and set X0 again."
 feed = "hand"
 
 [[setups.operations]]
@@ -449,7 +454,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run WB04_right (M6 T1; set 2650): the right end with the cutter's side, from the back face to {{process.end_past_mm:in.3dot}} under F, in passes no deeper than {{process.end_step_max_mm:in.3dot}}, each across the bar one way (+Y, conventional), to X {{process.length_target_mm:in.3f}} in."
+instruction = "Run WB04_right (M6 T1; set 2650): the right end with the cutter's side, from the back face to {{process.end_past_mm:in.3dot}} under F, in passes no deeper than {{process.end_step_max_mm:in.3dot}}, each across the bar one way (+Y: the bar on the pass's left, conventional with M3), to X {{process.length_target_mm:in.3f}} in."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "right end", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.end_axial_doc_mm}}", radial_woc_mm = "{{process.end_step_max_mm}}", stations_mm = "{{process.right_end_station_mm}}" },
@@ -501,8 +506,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.back_face_depth_mm}}",
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.length_target_mm}}"], clamp_mm = ["{{process.vise_overhang_mm}}", "{{process.vise_clamp_end_mm}}"], section_mm = { y = "{{cad.back_face_depth_mm}}", z = "{{process.height_target_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Before clamping: mic T to edge B at the bar's middle and write it down (mm = in × 25.4). Clamp it as Holding says. Home the mill ($H). G54 X0 the milled LEFT end, Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Before clamping: mic T to B at the bar's middle; write it down in mm (in × 25.4). Clamp it as Holding says. Home the mill ($H). Edge finder (900 rpm), its tip below the jaw tops: on the fixed jaw's face beside the bar, G10 L20 P1 Y-2.540; on the LEFT end from the left, G10 L20 P1 X-2.540."
+instruction = "Before clamping: mic T to edge B at the bar's middle and write it down (mm = in × 25.4). Home the mill ($H). G54 Y0 the bare fixed jaw's face, then clamp it as Holding says; X0 the milled LEFT end: edge finder (900 rpm)."
+instruction_detailed = "Before clamping: mic T to B at the bar's middle; write it down in mm (in × 25.4). Home the mill ($H). Edge finder (900 rpm), the vise empty: on the fixed jaw's face, G10 L20 P1 Y-2.540. Clamp it as Holding says. Edge finder, its tip below the jaw tops, on the LEFT end from the left: G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]

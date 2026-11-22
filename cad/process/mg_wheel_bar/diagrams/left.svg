@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="780" height="430"/>
-  <text class="title" x="20" y="20">Setup 3, section across the jaws at a hole, from the LEFT end (1 in = 100 px)</text>
+  <text class="title" x="20" y="20">Setup 3, section across the jaws at a hole, from the RIGHT end (1 in = 100 px)</text>
   <line class="fixture-table" x1="60" y1="400" x2="400" y2="400"/>
   <rect class="clamp" x="131" y="223" width="60" height="177"/>
   <rect class="clamp" x="275" y="223" width="60" height="177"/>
@@ -36,11 +36,13 @@
   <circle class="holes" cx="466.5" cy="144.9" r="2.3"/>
   <circle class="holes" cx="521.5" cy="144.9" r="2.3"/>
   <circle class="cutter" cx="455.1" cy="150.5" r="6.35"/>
-  <line class="arrow" x1="442" y1="185" x2="442" y2="115"/>
-  <text class="label" x="430" y="205">left end: passes +Y</text>
+  <line class="arrow" x1="442" y1="115" x2="442" y2="185"/>
+  <text class="label" x="430" y="205">left end: passes −Y</text>
   <line class="datum" x1="461.5" y1="90" x2="461.5" y2="135"/>
   <text class="datum-label" x="430" y="85">X0, the milled LEFT end</text>
   <line class="dims" x1="460" y1="225" x2="472.5" y2="225"/>
+  <line class="dims" x1="460" y1="162" x2="460" y2="230"/>
+  <line class="dims" x1="472.5" y1="192" x2="472.5" y2="230"/>
   <text class="label" x="478" y="229">sawn end .50 out past the jaws</text>
   <line class="dims" x1="461.5" y1="250" x2="521.5" y2="250"/>
   <line class="dims" x1="521.5" y1="165" x2="521.5" y2="255"/>
