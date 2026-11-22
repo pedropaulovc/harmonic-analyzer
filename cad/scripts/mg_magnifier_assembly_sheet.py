@@ -89,30 +89,33 @@ if UNIT != "in":
 ENDSHAKE_GO_TEXT = render_number((ENDSHAKE - ENDSHAKE_TOL) / _INCH, UNIT, 3)
 ENDSHAKE_NO_GO_TEXT = render_number((ENDSHAKE + ENDSHAKE_TOL) / _INCH, UNIT, 3)
 # The trial fit (#3344) reads the thread end past the second nut before the
-# endshake is set, its nuts jammed over the go leaf: jammed "just free", about
-# no endshake, a conforming stack read .115 against DETAIL B's .114. At the go
-# leaf both of the wheel group's corners land inside DETAIL B's limits, and
-# the endshake set after it is never less, so the acceptance after it reads
-# no more than the trial did. The long corner is mg_wheel_group's own, taken
-# at ENDSHAKE_MIN; the short one is its locknut corner, taken at ENDSHAKE_MAX.
-TRIAL_ENDSHAKE = ENDSHAKE - ENDSHAKE_TOL
+# endshake is set, its nuts jammed over the go leaf (ENDSHAKE_GO_TEXT, the
+# band's low limit, ENDSHAKE_MIN: the spec asserts the band symmetric):
+# jammed "just free", about no endshake, a conforming stack read .115 against
+# DETAIL B's .114. At the go leaf both of the wheel group's corners land
+# inside DETAIL B's limits: the long one is mg_wheel_group's own, taken at
+# ENDSHAKE_MIN; the short one is its locknut corner, taken at ENDSHAKE_MAX.
+# The endshake set after the trial is never less, so the acceptance reads no
+# more than the trial did. It can read up to the band's width less: a
+# conforming stack still passes (.031 less .004), and a stack that passed the
+# trial low and fails there has its parts measured, not re-trialled
+# ("axle-reset", Codjiflo r1 of #3345).
 TRIAL_THREAD_PAST_LOCKNUT = (
     _group.LOCKNUT_THREAD_MARGIN
     + _axle.TIP_INCOMPLETE
-    + (_group.ENDSHAKE_MAX - TRIAL_ENDSHAKE),
-    _group.THREAD_PAST_LOCKNUT_MAX + (_group.ENDSHAKE_MIN - TRIAL_ENDSHAKE),
+    + (_group.ENDSHAKE_MAX - _group.ENDSHAKE_MIN),
+    _group.THREAD_PAST_LOCKNUT_MAX,
 )  # .031 .. .113
-if TRIAL_ENDSHAKE > _group.ENDSHAKE_MIN + 1e-9:
-    raise AssertionError("the set endshake can read the thread end past the trial's")
 if not (
     THREAD_PAST_LOCKNUT_LIMITS[0] - 1e-6
-    <= TRIAL_THREAD_PAST_LOCKNUT[0]
+    <= TRIAL_THREAD_PAST_LOCKNUT[0] - (_group.ENDSHAKE_MAX - _group.ENDSHAKE_MIN)
     <= TRIAL_THREAD_PAST_LOCKNUT[1]
     <= THREAD_PAST_LOCKNUT_LIMITS[1] + 1e-6
 ):
     raise AssertionError(
-        f"a conforming trial stack reads {TRIAL_THREAD_PAST_LOCKNUT} mm of thread "
-        f"past the second nut, outside {THREAD_PAST_LOCKNUT_LIMITS}"
+        f"a conforming stack reads {TRIAL_THREAD_PAST_LOCKNUT} mm of thread past "
+        f"the second nut at the trial, outside {THREAD_PAST_LOCKNUT_LIMITS} at "
+        "the trial or once the endshake is set"
     )
 
 # The summing lever (cad/config/parts/sm-summing-lever.yaml), the mate the
@@ -528,14 +531,17 @@ STEP_TEXT = {
         f"{_step(_steps.AXLE_CHECKED_KEY)}."
     ),
     # The final reading's own remedy: strip the stack back to the bare axle
-    # and take the trial-fit loop again (machinist review, stab-split s2).
+    # (machinist review, stab-split s2) and take the failed trial's remedies
+    # from the press re-check: a stack that read low at the trial's endshake
+    # and fails at a larger set one would pass the trial again (Codjiflo r1
+    # of #3345), so its parts are measured, and with none out, the axle goes.
     "axle-stack-removed": (
         f"IF IT FAILS, REMOVE ITEMS {ITEM_NUMBERS[NUT]}, "
         f"{ITEM_NUMBERS[FRONT_WASHER]}, {ITEM_NUMBERS[WHEEL]} AND "
         f"{ITEM_NUMBERS[BACK_WASHER]}."
     ),
     "axle-reset": (
-        f"IF THEY WERE REMOVED, RETURN TO {_step(_steps.AXLE_TRIAL_KEY)}."
+        f"IF THEY WERE REMOVED, RETURN TO {_step('axle-press-rechecked')}."
     ),
     # The setting names the instrument that reads it (rule 22).
     _steps.LEVER_THREADED_KEY: (

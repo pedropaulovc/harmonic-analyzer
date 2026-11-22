@@ -204,11 +204,12 @@ def test_the_press_gauge_is_a_setting_accepted_at_the_nuts() -> None:
     assert f"STEP {steps.step_number(steps.AXLE_CHECKED_KEY)}" in (
         notes.STEP_TEXT[steps.AXLE_ACCEPTED_KEY]
     )
-    # The final reading has its own remedy: the stack comes off, back to the
-    # trial fit.
+    # The final reading has its own remedy: the stack comes off and the
+    # failed trial's remedies run from the press re-check, so a stack that
+    # passed the trial low is measured, not re-trialled (Codjiflo r1, #3345).
     assert steps.SEQUENCE[accepted + 1 : accepted + 3] == ("axle-stack-removed", "axle-reset")
     assert notes.STEP_TEXT["axle-reset"].endswith(
-        f"RETURN TO STEP {steps.step_number(steps.AXLE_TRIAL_KEY)}."
+        f"RETURN TO STEP {steps.step_number('axle-press-rechecked')}."
     )
     # The endshake callout keeps one reason line; the steps carry the method.
     assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.ENDSHAKE_DIMENSION] == (
@@ -228,11 +229,14 @@ def test_the_press_gauge_is_a_setting_accepted_at_the_nuts() -> None:
         "trial-nuts-jammed",
         steps.AXLE_CHECKED_KEY,
     )
-    assert notes.TRIAL_ENDSHAKE == pytest.approx(mg_wheel_group.ENDSHAKE_MIN)
-    assert notes.TRIAL_ENDSHAKE == pytest.approx(stack.ENDSHAKE - stack.ENDSHAKE_TOL)
+    assert stack.ENDSHAKE - stack.ENDSHAKE_TOL == pytest.approx(
+        mg_wheel_group.ENDSHAKE_MIN
+    )
     trial_low, trial_high = (x / 25.4 for x in notes.TRIAL_THREAD_PAST_LOCKNUT)
     assert (trial_low, trial_high) == pytest.approx((0.031, 0.113), abs=1e-6)
-    assert low_limit <= notes.TRIAL_THREAD_PAST_LOCKNUT[0]
+    band = mg_wheel_group.ENDSHAKE_MAX - mg_wheel_group.ENDSHAKE_MIN
+    # At the trial, and once the endshake is set anywhere in its band.
+    assert low_limit <= notes.TRIAL_THREAD_PAST_LOCKNUT[0] - band
     assert notes.TRIAL_THREAD_PAST_LOCKNUT[1] <= high_limit
     feeler = f"THE {notes.ENDSHAKE_GO_TEXT} FEELER BETWEEN {notes._WASHER}"
     assert feeler in notes.STEP_TEXT["trial-feeler-placed"]
