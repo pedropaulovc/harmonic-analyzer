@@ -130,6 +130,11 @@ resolution_mm = 0.001016
 [gauges.plug-gauges-3760-3765]
 range_mm = [9.5504, 9.5631]
 resolution_mm = 0.001016
+# MHA-DT-20's pivot bore pair (.2500/.2505; tools row in shop/dt.toml;
+# cad/config/shop-equipment/ gauges, same key, to buy).
+[gauges.plug-gauges-2500-2505]
+range_mm = [6.35, 6.3627]
+resolution_mm = 0.001016
 
 [gauges.height-gauge]
 range_mm = [0.0, 304.8]
@@ -657,6 +662,8 @@ description = "5/16 in HSS threading tool bit, set of two (LMS 6685)"
 # owner 2026-11-19).
 [stock.1018-flat-1-2x2-1-4]
 description = "1018 cold-finish carbon steel, flat bar, 1/2 x 2-1/4 in"
+[stock.1018-flat-1-8x1-1-2]
+description = "1018 cold-finish carbon steel, flat bar, 1/8 x 1-1/2 in"
 [stock.1018-flat-3-8x1-1-4]
 description = "1018 cold-finish carbon steel, flat bar, 3/8 x 1-1/4 in"
 [stock.1018-ground-round-1-4]
@@ -671,6 +678,10 @@ description = "1018 cold-finish carbon steel, round bar, 3/8 in"
 description = "1018 cold-finish carbon steel, round bar, 5/8 in"
 [stock.1018-square-3-4]
 description = "1018 cold-finish carbon steel, square bar, 3/4 x 3/4 in"
+[stock.6061-flat-1-2x6-54in]
+description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 54 in length"
+# The amplitude bar's riser (cad/process/ch_amplitude_bar, Setup 1) is sawn
+# from this bar: its plan's stock_refs names it.
 [stock.c360-flat-3-4x1-1-4]
 description = "C36000 free-machining brass (360-H02, extruded), flat bar, 3/4 x 1-1/4 in"
 [stock.c360-round-1-4]
