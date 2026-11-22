@@ -30,8 +30,9 @@
 # as-supplied edges; a same-bar spacer at the jaws' other end keeps them
 # square (TC 9-524 p. 8-16, the README's "balanced" hold).
 #
-# FLAGGED: to buy: nothing for this traveler (every tool and gauge on hand).
-# The seam's #25 drill and .1562 reamer stay with the assembly.
+# FLAGGED: to buy: a .118 minus Class ZZ pin gauge (gauges.pin-gauges,
+# to_order) for the countersink's Ø.122 MAX. The seam's #25 drill and .1562
+# reamer stay with the assembly.
 #
 # NC (cam:dt_crank_arm, cad/process/dt_crank_arm/cam.py): CA01_hub_end,
 # CA02_anchor_tap, CA03_handle_end, CA04_pivot_tap. Program names, the
@@ -44,7 +45,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 5/16 x 1 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:.0f}} in flat bar, the 12 in length: one {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blank and a 1.5 in spacer."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Width and thickness are the bar's, as supplied (drawing note 1): no face or edge is machined. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup. The seam (Ø.156 ream .17 deep, note 3) is made at assembly, not here. Finish: {{cad.finish}}."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Width and thickness are the bar's, as supplied (drawing note 1): no face or edge is machined. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall, controller reset or knock to the work, home again and repeat the setup's first op (its G54 pick-up) before resuming. The seam (Ø.156 ream .17 deep, note 3) is made at assembly, not here. Finish: {{cad.finish}}."
 shop = "../shop"
 stock_refs = ["1018-flat-5-16x1-12in"]
 material_key = "rocker-1018-cold-finished"
@@ -224,6 +225,12 @@ ref = "jig-files"
 id = "deburr"
 name = "Deburring tool"
 ref = "deburring-set"
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauge .118 minus, TO BUY"
+ref = "pin-gauges"  # A1-pin-set-061-500-combined, its minus set
+description = "Class ZZ pin gauge .118 minus (.1178-.1180): the countersink's Ø.122 MAX with the height gauge"
+status = "to_order"
 
 [[setups]]
 machine_kind = "other"
@@ -273,7 +280,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Prove CA01_hub_end in air, Z0 raised 1.000 in: watch every move clear the jaw tops and the end mill pass left of the jaws' left ends. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run CA01_hub_end through every M6. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Prove-out in air, spindle running: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run CA01_hub_end through every M6, watching every move clear the jaw tops and every cut stay left of the jaws' left ends and the parallels. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -318,9 +325,9 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Blow out the chips. Seat: telescoping gauge and micrometer across it at two places 90° apart, mid-thickness. Write the larger reading to .0001 on a tag wired to the arm: MHA-DT-31's seat is turned to it (.0004–.0012 over, drawing note 2)."
+instruction = "Blow out the chips. Seat: telescoping gauge and micrometer across it at two places 90° apart, mid-thickness. Write both readings on a tag wired to the arm: MHA-DT-31's seat is turned to suit this seat (drawing note 2), and its traveler sizes it against the arm."
 feed = "hand"
-inspection = "Seat Ø{{cad.hub_seat_dia_min_in:.3dot}}–{{cad.hub_seat_dia_max_in:.3dot}}, the two readings within .0005 of each other (round for the press). Out: stop and tell the owner; do not re-cut."
+inspection = "Seat Ø{{cad.hub_seat_dia_min_in:.3dot}}–{{cad.hub_seat_dia_max_in:.3dot}}, both readings. Out: stop and tell the owner; do not re-cut."
 gauge_checks = [
   { gauge = "telescoping-gauges-starrett-s579gz", band_mm = "{{cad.hub_seat_dia_band_mm}}" },
   { gauge = "micrometers", band_mm = "{{cad.hub_seat_dia_band_mm}}" },
@@ -343,11 +350,15 @@ speed_kind = "other"
 tool = "tap-2-56"
 drilling = "none"
 sizing = "other"
-instruction = "Tap #2-56 through by hand under the tap guide, spindle off, Tapmatic Gold: tap's point in the hole, jog Z down until the guide's point is pushed fully home in the wrench, then turn the wrench, a half turn back each turn; the spring follows the tap. Stop when the tap's full threads show below the underside (the hole runs into air past the jaws). A #2 tap breaks easily: stop at any rise in effort and back out. Jog Z up clear, back the tap out, blow out the hole."
+instruction = "Tap #2-56 through by hand under the tap guide, spindle off, Tapmatic Gold: tap's point in the hole, jog Z down until the guide's point is pushed fully home in the wrench, then turn the wrench, a half turn back each turn; the spring follows the tap. Stop when the tap's full threads show below the underside. A #2 tap breaks easily: stop at any rise in effort and back out."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Unclamp. Keep the spacer for Setup 3."
+instruction = "Jog Z up clear, back the tap out of the hole by hand and blow out the hole."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Unclamp. File or scrape the exit burrs off the underside at the seat, the R.50 round and the anchor hole, and wipe the parallels, so the underside seats flat in Setup 3. Keep the spacer for Setup 3."
 feed = "hand"
 
 [[setups]]
@@ -364,8 +375,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", alo
 beam = { axis = "x", hold = "cantilever", extent_mm = [-104.14, 0], clamp_mm = [-77.47, 0], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{process.blank_thickness_min_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). G54 Y0 on the fixed jaw's face; X0 on the hub end's tip (edge finder from +X, at Y −.50, the tip's crown). Console M6 T1; Z0 as Setup 2, T1 on a .002 leaf on the O face."
-instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y−2.540. MDI G0 Y−12.7; edge finder on the hub end's tip from +X: G10 L20 P1 X2.540. Console M6 T1. MDI G0 X−20 Y−12.7, spindle stopped, its end just dragging a .002 leaf on the O face: G10 L20 P1 Z0.051."
+instruction = "Home the mill ($H). G54 Y0 on the fixed jaw's face; X0 on the hub end's tip (edge finder from +X, at Y −.50, the tip's crown). Console M6 T1; Z0 as Setup 2, T1 on a .002 leaf on the O face at X −1.18 (solid face between the seat and the anchor hole)."
+instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y−2.540. MDI G0 Y−12.7; edge finder on the hub end's tip from +X: G10 L20 P1 X2.540. Console M6 T1. MDI G0 X−30 Y−12.7 (the end mill over X −.99 to −1.37, clear of the seat's edge at −.88 and of the anchor hole), spindle stopped, its end just dragging a .002 leaf on the O face: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -390,7 +401,7 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T2 (#1 centre drill; set 2800): spot the pivot Ø{{process.pivot_spot_dia_mm:in.3dot}} on the centre drill's countersink."
+instruction = "Same file, M6 T2 (#1 centre drill, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 2800): spot the pivot Ø{{process.pivot_spot_dia_mm:in.3dot}} on the centre drill's countersink."
 rpm = 2800
 feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -419,8 +430,6 @@ sizing = "other"
 instruction = "Same file, M6 T5 (1/4 in 90° chamfer mill, at least {{process.sink_projection_min_mm:in.2f}} out of its collet; set 2800): plunge its point {{process.sink_tip_mm:in.3dot}} below Z0 on the pivot's axis: countersink Ø{{process.sink_dia_mm:in.3dot}} on the O face (the outboard, near side)."
 rpm = 2800
 feed = "{{process.sink_feed_per_min_mm:in.1f}} in/min"
-inspection = "Countersink Ø.100–{{cad.pivot_tap_countersink_dia_max_in:.3dot}} across its rim (calipers' inside jaw tips, two places). Over: reject (the drawing's MAX)."
-gauge_checks = [{ gauge = "calipers", band_mm = [2.54, "{{cad.pivot_tap_countersink_dia_max_mm}}"] }]
 milling_cuts = [
   { name = "pivot sink", kind = "drill", phase = "finish", cutter_dia_mm = 6.35, flutes = 2, rpm = 2800, feed_mm_min = "{{process.sink_feed_per_min_mm}}", stations_mm = -87.63 },
 ]
@@ -441,7 +450,11 @@ speed_kind = "other"
 tool = "tap-4-40"
 drilling = "none"
 sizing = "other"
-instruction = "Tap #4-40 through by hand under the tap guide, spindle off, Tapmatic Gold, as Setup 2: a half turn back each turn, until the tap's full threads show below the underside. Jog Z up clear, back the tap out, blow out the hole. Unclamp."
+instruction = "Tap #4-40 through by hand under the tap guide, spindle off, Tapmatic Gold, as Setup 2: a half turn back each turn, until the tap's full threads show below the underside."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Jog Z up clear, back the tap out of the hole by hand, blow out the hole and unclamp."
 feed = "hand"
 
 [[setups]]
@@ -471,14 +484,31 @@ instruction = "Deburr every edge of both rounds and the two sawn-edge corners wh
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Anchor hole: with a #50 drill's shank in it, calipers from the T edge to the shank's far side less the shank's miked diameter gives the edge offset; from the seat's near wall to the shank's near side, plus half the seat's tagged diameter plus half the shank, the station. Pivot: the same with a #43 shank, from the seat's near wall."
+instruction = "Anchor edge offset: a #50 shank in the anchor hole; calipers from the T edge to the shank's far side, less half the shank's miked diameter."
 feed = "hand"
-inspection = "Anchor {{cad.anchor_tap_station_min_in:.2dot}}–{{cad.anchor_tap_station_max_in:.2dot}} from the seat's axis and {{cad.anchor_tap_edge_offset_min_in:.3dot}}–{{cad.anchor_tap_edge_offset_max_in:.3dot}} from the T edge; pivot {{cad.pivot_tap_station_min_in:.2dot}}–{{cad.pivot_tap_station_max_in:.2dot}} from the seat's axis. Overall length 3.95 (reference) by calipers tip to tip. Out: stop and tell the owner."
+inspection = "Anchor {{cad.anchor_tap_edge_offset_min_in:.3dot}}–{{cad.anchor_tap_edge_offset_max_in:.3dot}} from the T edge. Out: stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.anchor_tap_edge_offset_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Anchor station along the arm: the #50 shank still in; calipers from the hub end's tip (on the seat's axis line, R.50 from the axis, cut with the seat) to the shank's far side, less .500 and half the shank."
+feed = "hand"
+inspection = "Anchor {{cad.anchor_tap_station_min_in:.2dot}}–{{cad.anchor_tap_station_max_in:.2dot}} along the arm from the seat's axis. Out: stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.anchor_tap_station_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Countersink: the arm on the surface plate, O face up. Zero the height gauge on the O face beside the pivot hole. Stand the .118 minus pin end-down in the countersink and read its top; less the pin's miked length, that is where the pin's end sits (90° cone: (rim − .118)/2 below the face)."
+feed = "hand"
+inspection = "The pin's end at most .002 below the O face (reading less length ≥ −.002): rim at most Ø{{cad.pivot_tap_countersink_dia_max_in:.3dot}}. Lower: reject (the drawing's MAX)."
 gauge_checks = [
-  { gauge = "calipers", band_mm = "{{cad.anchor_tap_station_band_mm}}" },
-  { gauge = "calipers", band_mm = "{{cad.anchor_tap_edge_offset_band_mm}}" },
-  { gauge = "calipers", band_mm = "{{cad.pivot_tap_station_band_mm}}" },
+  { gauge = "pin-gauges", band_mm = ["{{cad.pivot_tap_dia_mm}}", "{{cad.pivot_tap_countersink_dia_max_mm}}"] },
+  { gauge = "height-gauge", band_mm = ["{{cad.pivot_tap_dia_mm}}", "{{cad.pivot_tap_countersink_dia_max_mm}}"] },
 ]
+
+[[setups.operations]]
+instruction = "Pivot station: a #43 shank in the pivot hole; outside jaws from the seat's near wall to the shank's far side, plus half the seat's tagged diameter, less half the shank."
+feed = "hand"
+inspection = "Pivot {{cad.pivot_tap_station_min_in:.2dot}}–{{cad.pivot_tap_station_max_in:.2dot}} from the seat's axis. Out: stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pivot_tap_station_band_mm}}" }]
 
 [[setups.operations]]
 instruction = "Wipe on ISO VG 32 oil all over and into the tapped holes ({{cad.finish}}). Bag the arm with its seat tag."
