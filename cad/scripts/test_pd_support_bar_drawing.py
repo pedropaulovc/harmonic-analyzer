@@ -817,3 +817,115 @@ def test_view_arrow_points_level_at_the_front_face_from_outside(side) -> None:
     assert letter_top - drawing.VIEW_LETTER_HEIGHT / 2.0 == pytest.approx(tip_y)
     assert side * (tip_x - front[0]) == pytest.approx(drawing.VIEW_ARROW_TIP_GAP)
     assert side * (letter_x - tip_x) == pytest.approx(drawing.VIEW_ARROW_LENGTH)
+
+
+def _plane_face(normal: tuple[float, float, float], offset: float, box: tuple[float, ...] = ()):
+    from _gtol_face import FaceGeometry
+
+    point = tuple(value * offset / 1000 for value in normal)
+    return FaceGeometry(None, 4001, (*normal, *point), normal, tuple(v / 1000 for v in box))
+
+
+def _bore_face(dia: float, x: float, y: float):
+    from _gtol_face import FaceGeometry
+
+    r, z = dia / 2.0, BAR_DEPTH / 2.0
+    box = tuple(v / 1000 for v in (x - r, y - r, -z, x + r, y + r, z))
+    return FaceGeometry(None, 4002, (x / 1000, y / 1000, 0.0, 0.0, 0.0, 1.0, dia / 2000), None, box)
+
+
+def test_the_bar_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    import export_features
+    from _hole_spec import blind_cut_dia_mm
+
+    manifest = export_features.requirement_manifest("pd_support_bar")
+    features = manifest["features"]
+    assert {name: feature["kind"] for name, feature in features.items()} == {
+        **dict.fromkeys(
+            ("end_a", "far_end", "top_face", "bottom_face", "front_face", "back_face"), "face"
+        ),
+        "pivot_tap": "threaded_hole",
+        "hook_tap_1": "threaded_hole",
+        "hook_tap_2": "threaded_hole",
+        "clamp_hole_1": "hole",
+        "clamp_hole_2": "hole",
+        "clamp_slot_3": "slot",
+        "clamp_slot_4": "slot",
+    }
+    assert manifest["notes"]["manufacturing"] == drawing.SCREW_LINE_NOTE.splitlines()
+    half_length, half_height = part.BAR_LENGTH / 2.0, spec.BAR_HEIGHT / 2.0
+    row, w = spec.CLAMP_TAP_Y, part.CLAMP_SLOT_WIDTH / 2.0
+    expected = {
+        "end_a": [_plane_face((-1.0, 0.0, 0.0), half_length)],
+        "far_end": [_plane_face((1.0, 0.0, 0.0), half_length)],
+        "top_face": [_plane_face((0.0, 1.0, 0.0), half_height)],
+        "bottom_face": [_plane_face((0.0, -1.0, 0.0), half_height)],
+        "front_face": [_plane_face((0.0, 0.0, -1.0), BAR_DEPTH / 2.0)],
+        "back_face": [_plane_face((0.0, 0.0, 1.0), BAR_DEPTH / 2.0)],
+        "pivot_tap": [_bore_face(spec.PIVOT_TAP_DRILL_DIA, spec.PIVOT_TAP_X, spec.HANGER_TAP_Y)],
+        **{
+            f"hook_tap_{index}": [
+                _bore_face(blind_cut_dia_mm(spec.BRACKET_TAP_SPEC), x, spec.HANGER_TAP_Y)
+            ]
+            for index, x in enumerate(spec.BRACKET_TAP_X, 1)
+        },
+    }
+    for index, x in enumerate(part.CLAMP_ROW_X, 1):
+        if x in part.CLAMP_ROUND_X:
+            expected[f"clamp_hole_{index}"] = [
+                _bore_face(part.CLAMP_HOLE_DIA, x, row),
+                _bore_face(part.CLAMP_CBORE_DIA, x, row),
+            ]
+            continue
+        run = part.CLAMP_SLOT_TRAVEL
+        expected[f"clamp_slot_{index}"] = [
+            _plane_face((0.0, 1.0, 0.0), row - w, (x - run, row - w, 0.0, x + run, row - w, 4.0)),
+            _plane_face((0.0, -1.0, 0.0), -(row + w), (x - run, row + w, 0.0, x + run, row + w, 4.0)),
+        ]
+    selectors = export_features.feature_selectors("pd_support_bar")
+    assert set(selectors) == set(features)
+    for name, faces in expected.items():
+        for face in faces:
+            owners = [
+                owner
+                for owner, specs in selectors.items()
+                if any(selector.matches(face) for selector in specs)
+            ]
+            assert owners == [name], name
+
+
+def test_bar_feature_bands_are_the_printed_ones() -> None:
+    import export_features
+
+    inch = 25.4
+    features = export_features.requirement_manifest("pd_support_bar")["features"]
+    assert features["far_end"]["length"] == pytest.approx([17.7 * inch, 17.9 * inch])
+    assert features["bottom_face"]["height"] == pytest.approx([0.99 * inch, 1.01 * inch])
+    # The thickness as supplied, .374 +.001/-.003 (#1563).
+    assert features["back_face"]["depth"] == pytest.approx([0.371 * inch, 0.375 * inch], abs=1e-3)
+    assert features["top_face"]["finish_ra"] == features["front_face"]["finish_ra"]
+    pivot = features["pivot_tap"]
+    assert pivot["thread"] == "#8-32 UNC-2B" and pivot["thru"] is True
+    assert pivot["station"] == pytest.approx([6.612 * inch, 6.622 * inch], abs=1e-3)
+    assert pivot["height"] == pytest.approx([0.566 * inch, 0.576 * inch], abs=1e-3)
+    assert pivot["csk_dia_max"] == pytest.approx(0.169 * inch, abs=1e-3)
+    for name in ("hook_tap_1", "hook_tap_2"):
+        assert features[name]["made_at"] == "assembly"
+        assert "station" not in features[name]
+    for name, station in (
+        ("clamp_hole_1", 0.455),
+        ("clamp_hole_2", 1.833),
+        ("clamp_slot_3", 15.967),
+        ("clamp_slot_4", 17.345),
+    ):
+        clamp = features[name]
+        assert clamp["station"] == pytest.approx(
+            [(station - 0.005) * inch, (station + 0.005) * inch], abs=1e-3
+        ), name
+        assert clamp["height"] == pytest.approx([0.546 * inch, 0.556 * inch], abs=1e-3), name
+        assert clamp["cbore_depth"] == pytest.approx([0.18 * inch, 0.20 * inch], abs=1e-3), name
+    assert features["clamp_hole_1"]["cbore_dia"] == pytest.approx([0.3125 * inch, 0.3225 * inch], abs=1e-3)
+    slot = features["clamp_slot_4"]
+    assert slot["width"] == pytest.approx([0.196 * inch, 0.200 * inch], abs=1e-3)
+    assert slot["run"] == pytest.approx([0.113 * inch, 0.123 * inch], abs=1e-3)
+    assert slot["cbore_width"] == pytest.approx([0.330 * inch, 0.345 * inch], abs=1e-3)

@@ -92,44 +92,65 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
+from _gtol_planar import PlanarFace
+from _hole_spec import blind_cut_dia_mm
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
 from _layout_audit import display_box
 from _layout_geometry import Box, Segment, segment_box_overlap_length
 from _machinist_review_mode import MachinistReviewMode
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 import _telemetry
-from _surface_finish import surface_finish_by_key
+from _surface_finish import MACHINED_UM, surface_finish_by_key
 from build_pd_support_bar import (
     BAR_LENGTH,
     CLAMP_CBORE_DEPTH,
     CLAMP_CBORE_DIA,
+    CLAMP_HOLE_DIA,
     CLAMP_SCREW_LINE_SHORTFALL,
     CLAMP_SLOT_CBORE_WIDTH,
+    CLAMP_SLOT_RUN,
     CLAMP_ROUND_X,
     CLAMP_ROW,
+    CLAMP_ROW_HEIGHT,
+    CLAMP_ROW_X,
     CLAMP_SLOT_WIDTH,
     CLAMP_SLOT_X,
+    CLAMP_STATIONS,
     HANGER_ROW,
+    HANGER_ROW_HEIGHT,
+    HANGER_STATIONS,
+    LEFT_END_X,
     MAX_SUFFIX,
 )
 from sh_column_clamp_fit import note_text, stated_max
 from _column_clamp_interface import BAR_DEPTH
 from pd_support_bar_spec import (
     BACK_FACE_Z,
+    BAR_DEPTH_LIMITS,
     BAR_HEIGHT,
+    BRACKET_TAP_CSK_DIA,
+    BRACKET_TAP_SPEC,
     BRACKET_TAP_X,
     CLAMP_TAP_Y,
     HANGER_TAP_Y,
+    PIVOT_TAP_CSK_DIA,
+    PIVOT_TAP_DRILL_DIA,
+    PIVOT_TAP_THREAD,
     PIVOT_TAP_X,
     TAP_CSK_ANGLE_DEG,
+    UNIT,
 )
 from pd_support_bar_drawing_spec import (
     BACK_VIEW_CAPTION,
     CLAMP_CALLOUT_PRECISION,
     CLAMP_CBORE_DIA_LIMIT_PLACES,
     CLAMP_CBORE_DIA_LIMITS,
+    CLAMP_SLOT_CBORE_WIDTH_LIMITS,
     CLAMP_EAST_HEIGHT_NAME,
     CLAMP_CBORE_CALLOUT,
     CLAMP_HOLE_PROCESS,
@@ -190,6 +211,315 @@ SCREW_LINE_NOTE = (
     "   CLEARANCE."
 )
 SCREW_LINE_NOTE_XY = (0.016, 0.262)
+# The sheet's one manufacturing note, for the feature export (the drawing
+# declares DRAWING_NOTES, so the part's recipe does not re-key on it).
+DRAWING_NOTES = SCREW_LINE_NOTE
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_pd_support_bar: the bar along X centred on the origin, END A, the
+# station end, at LEFT_END_X; Y up, centred; Z through the thickness, the
+# front (platen) face at -BAR_DEPTH/2, the back (hanger) face at
+# BACK_FACE_Z). Stations run from END A and both rows from the top face, as
+# printed; bands are the native ones where the part authors one, else the
+# title block's row at the printed places. The latch-hook taps are spotted
+# through MHA-PD-14 at assembly (made_at = "assembly"; their stations print
+# REF). The declarations print nothing.
+_P = {name: places for by in DRAWING_PRECISION.values() for name, places in by.items()}
+_SELF = "draw_pd_support_bar"
+_BUILD = "build_pd_support_bar"
+_DSPEC = "pd_support_bar_drawing_spec"
+_FRAME = (
+    (_BUILD, "LEFT_END_X"),
+    "BAR_HEIGHT",
+    ("_column_clamp_interface", "BAR_DEPTH"),
+    "BACK_FACE_Z",
+)
+_FRONT_Z = -BAR_DEPTH / 2.0
+_TOP_Y = BAR_HEIGHT / 2.0
+_INTO_FRONT = (0.0, 0.0, 1.0)
+_INTO_BACK = (0.0, 0.0, -1.0)
+_TOP_SLIDE = surface_finish_by_key(SURFACE_FINISHES, "top_slide")
+_FRONT_SLIDE = surface_finish_by_key(SURFACE_FINISHES, "front_slide")
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(*_FRAME, (_BUILD, "BAR_LENGTH")),
+    precision_sources=((_DSPEC, "DRAWING_PRECISION"), (_DSPEC, "CLAMP_CALLOUT_PRECISION")),
+)
+requirement(
+    "end_a",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), -LEFT_END_X),),
+    requirements=("plane",),
+    fields={
+        "plane": (_plane("x", LEFT_END_X), _FRAME),
+        "label": ("END A", ((_DSPEC, "STATION_END_LABEL"),)),
+    },
+)
+# The length 17.8 from END A (FRONT_KEEP "Length").
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), -LEFT_END_X),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("x", -LEFT_END_X), (*_FRAME, (_BUILD, "BAR_LENGTH"))),
+        "length": (
+            limits(BAR_LENGTH, _P["Length"], unit=UNIT),
+            ((_BUILD, "BAR_LENGTH"), "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "length_nominal": (BAR_LENGTH, ((_BUILD, "BAR_LENGTH"),)),
+        "length_from": ("end_a", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"length": _P["Length"]},
+)
+# The top (slide) edge, skimmed (owner ruling 2026-11-20, #2421): Ra 63, the
+# MHA-PD-11 guide slides on it; both rows hang from it.
+requirement(
+    "top_face",
+    kind="face",
+    faces=(_TOP_SLIDE.face,),
+    requirements=("finish_ra",),
+    fields={
+        "plane": (_plane("y", _TOP_Y), _FRAME),
+        "finish_ra": (MACHINED_UM, ((_DSPEC, "SURFACE_FINISHES"),)),
+        "finish_callout": (_TOP_SLIDE.production_method, ((_DSPEC, "SURFACE_FINISHES"),)),
+    },
+)
+# The bottom edge, as supplied (#2421): the height 1.00 at .XX from the top
+# face (BACK_KEEP "Height").
+requirement(
+    "bottom_face",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), _TOP_Y),),
+    requirements=("height",),
+    fields={
+        "plane": (_plane("y", -_TOP_Y), _FRAME),
+        "height": (
+            limits(BAR_HEIGHT, _P["Height"], unit=UNIT),
+            ("BAR_HEIGHT", "BAR_HEIGHT_BAND", "UNIT", (_SELF, "BACK_KEEP")),
+        ),
+        "height_nominal": (BAR_HEIGHT, ("BAR_HEIGHT",)),
+        "height_from": ("top_face", ((_SELF, "BACK_KEEP"),)),
+    },
+    precision={"height": _P["Height"]},
+)
+# The front face, as supplied (#1563 option C): Ra 63 any process, the
+# platen MHA-PD-02 slides across it; the clamp row enters it.
+requirement(
+    "front_face",
+    kind="face",
+    faces=(_FRONT_SLIDE.face,),
+    requirements=("finish_ra",),
+    fields={
+        "plane": (_plane("z", _FRONT_Z), _FRAME),
+        "finish_ra": (MACHINED_UM, ((_DSPEC, "SURFACE_FINISHES"),)),
+        "finish_callout": (_FRONT_SLIDE.production_method, ((_DSPEC, "SURFACE_FINISHES"),)),
+        "finish_process": ("any", ((_DSPEC, "SURFACE_FINISHES"),)),
+    },
+)
+# The back face: the thickness as supplied, .374 +.001/-.003 (#1563), naming
+# the pivot screw's engagement (section A-A, SECTION_KEEP_NAMES "Depth");
+# the hanger row enters it.
+requirement(
+    "back_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), BACK_FACE_Z),),
+    requirements=("depth",),
+    fields={
+        "plane": (_plane("z", BACK_FACE_Z), _FRAME),
+        "depth": (
+            limits(BAR_DEPTH, _P["Depth"], (BAR_DEPTH_LIMITS[1], BAR_DEPTH_LIMITS[0])),
+            (("_column_clamp_interface", "BAR_DEPTH"), "BAR_DEPTH_LIMITS", (_SELF, "SECTION_KEEP_NAMES")),
+        ),
+        "depth_nominal": (BAR_DEPTH, (("_column_clamp_interface", "BAR_DEPTH"),)),
+        "depth_from": ("front_face", ((_SELF, "SECTION_KEEP_NAMES"),)),
+        "callout": (DIMENSION_CALLOUTS["Depth"], ((_DSPEC, "DIMENSION_CALLOUTS"),)),
+        "as_supplied": (True, ("BAR_DEPTH_LIMITS",)),
+    },
+    precision={"depth": _P["Depth"]},
+)
+# The pivot tap: TAP #8-32 UNC THRU from the back face, countersunk .169 MAX
+# x 90 deg both faces, locating MHA-PD-VN-57; 6.617 from END A, the row .571
+# from the top face (FRONT_KEEP).
+requirement(
+    "pivot_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(PIVOT_TAP_DRILL_DIA, contains_x_mm=PIVOT_TAP_X),),
+    requirements=("thread", "dia", "thru", "station", "height", "csk_dia_max"),
+    fields={
+        "at": ([PIVOT_TAP_X, HANGER_TAP_Y, BACK_FACE_Z], ("PIVOT_TAP_X", "HANGER_TAP_Y", "BACK_FACE_Z")),
+        "axis": (_INTO_BACK, _FRAME),
+        "thread": (f"{PIVOT_TAP_THREAD} UNC-2B", ("PIVOT_TAP_THREAD", (_DSPEC, "DIMENSION_CALLOUTS_ABOVE"))),
+        "dia": (
+            drilled_limits(PIVOT_TAP_DRILL_DIA, 3, unit=UNIT),
+            ("PIVOT_TAP_DRILL_DIA", "UNIT"),
+        ),
+        "nominal_dia": (PIVOT_TAP_DRILL_DIA, ("PIVOT_TAP_DRILL_DIA",)),
+        "thru": (True, ((_DSPEC, "DIMENSION_CALLOUTS_ABOVE"),)),
+        "station": (
+            limits(HANGER_STATIONS[0], _P["PivotTapStation"], unit=UNIT),
+            ((_BUILD, "HANGER_STATIONS"), "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "station_nominal": (HANGER_STATIONS[0], ((_BUILD, "HANGER_STATIONS"),)),
+        "station_from": ("end_a", ((_SELF, "FRONT_KEEP"),)),
+        "height": (
+            limits(HANGER_ROW_HEIGHT, _P["HangerRowHeight"], unit=UNIT),
+            ((_BUILD, "HANGER_ROW_HEIGHT"), "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "height_nominal": (HANGER_ROW_HEIGHT, ((_BUILD, "HANGER_ROW_HEIGHT"),)),
+        "height_from": ("top_face", ((_SELF, "FRONT_KEEP"),)),
+        "csk_dia_max": (PIVOT_TAP_CSK_DIA, ("PIVOT_TAP_CSK_DIA",)),
+        "csk_angle_deg": (TAP_CSK_ANGLE_DEG, ("TAP_CSK_ANGLE_DEG",)),
+        "csk_faces": ("both", ((_DSPEC, "DIMENSION_CALLOUTS"),)),
+        "callout": (DIMENSION_CALLOUTS["PivotCskDia"], ((_DSPEC, "DIMENSION_CALLOUTS"),)),
+    },
+    precision={
+        "dia": 3,
+        "station": _P["PivotTapStation"],
+        "height": _P["HangerRowHeight"],
+        "csk_dia_max": _P["PivotCskDia"],
+    },
+)
+# The latch hook's two #4-40 taps, spotted through MHA-PD-14 at assembly:
+# size, countersinks and the transfer only; their stations print REF.
+for _index, (_x, _station) in enumerate(zip(BRACKET_TAP_X, HANGER_STATIONS[1:], strict=True), 1):
+    requirement(
+        f"hook_tap_{_index}",
+        kind="threaded_hole",
+        faces=(CylinderFace(blind_cut_dia_mm(BRACKET_TAP_SPEC), contains_x_mm=_x),),
+        requirements=("thread", "dia", "thru"),
+        fields={
+            "at": ([_x, HANGER_TAP_Y, BACK_FACE_Z], ("BRACKET_TAP_X", "HANGER_TAP_Y", "BACK_FACE_Z")),
+            "axis": (_INTO_BACK, _FRAME),
+            "thread": (f"{BRACKET_TAP_SPEC.size} UNC-2B", ("BRACKET_TAP_SPEC",)),
+            "dia": (
+                drilled_limits(blind_cut_dia_mm(BRACKET_TAP_SPEC), 3, unit=UNIT),
+                ("BRACKET_TAP_SPEC", "UNIT"),
+            ),
+            "nominal_dia": (blind_cut_dia_mm(BRACKET_TAP_SPEC), ("BRACKET_TAP_SPEC",)),
+            "thru": (True, ((_DSPEC, "DIMENSION_CALLOUTS_ABOVE"),)),
+            "made_at": ("assembly", ((_DSPEC, "DIMENSION_CALLOUTS"),)),
+            "transfer": (DIMENSION_CALLOUTS["BracketCskDia"], ((_DSPEC, "DIMENSION_CALLOUTS"),)),
+            "station_ref": (_station, ((_BUILD, "HANGER_STATIONS"), (_DSPEC, "HOOK_TAP_REFERENCE_NAMES"))),
+            "csk_dia_max": (BRACKET_TAP_CSK_DIA, ("BRACKET_TAP_CSK_DIA",)),
+            "csk_faces": ("both", ((_DSPEC, "DIMENSION_CALLOUTS"),)),
+        },
+        precision={"dia": 3},
+    )
+# The clamp row on the front face, .551 from the top face at .XXX
+# (ClampRowReference): the east (END A) pair round #8 clearance holes, DRILL
+# THRU, counterbored Ø.3125 +.010/0 x .19 (CLAMP_CBORE_CALLOUT, note 1);
+# the west pair counterbored slots (DETAIL_KEEP, section B-B).
+_CLAMP_HEIGHT = (
+    limits(CLAMP_ROW_HEIGHT, _P["ClampRowHeight"], unit=UNIT),
+    ((_BUILD, "CLAMP_ROW_HEIGHT"), "UNIT", (_SELF, "BACK_KEEP")),
+)
+_CBORE_DEPTH = (
+    limits(CLAMP_CBORE_DEPTH, CLAMP_CALLOUT_PRECISION["hw-cbdepth"], unit=UNIT),
+    ((_BUILD, "CLAMP_CBORE_DEPTH"), "UNIT", (_DSPEC, "CLAMP_CALLOUT_PRECISION")),
+)
+_CLAMP_NAMES = ("ClampStation1", "ClampStation2", "ClampStation3", "ClampStation4")
+for _index, (_x, _station, _name) in enumerate(
+    zip(CLAMP_ROW_X, CLAMP_STATIONS, _CLAMP_NAMES, strict=True), 1
+):
+    _common: dict[str, Any] = {
+        "at": ([_x, CLAMP_TAP_Y, _FRONT_Z], ((_BUILD, "CLAMP_ROW_X"), "CLAMP_TAP_Y", *_FRAME)),
+        "axis": (_INTO_FRONT, _FRAME),
+        "thru": (True, ((_DSPEC, "CLAMP_CBORE_CALLOUT"),)),
+        "station": (
+            limits(_station, _P[_name], unit=UNIT),
+            ((_BUILD, "CLAMP_STATIONS"), "UNIT", (_SELF, "BACK_KEEP")),
+        ),
+        "station_nominal": (_station, ((_BUILD, "CLAMP_STATIONS"),)),
+        "station_from": ("end_a", ((_SELF, "BACK_KEEP"),)),
+        "height": _CLAMP_HEIGHT,
+        "height_nominal": (CLAMP_ROW_HEIGHT, ((_BUILD, "CLAMP_ROW_HEIGHT"),)),
+        "height_from": ("top_face", ((_SELF, "BACK_KEEP"),)),
+        "cbore_depth": _CBORE_DEPTH,
+        "cbore_depth_nominal": (CLAMP_CBORE_DEPTH, ((_BUILD, "CLAMP_CBORE_DEPTH"),)),
+        "cbore_depth_from": ("front_face", ((_DSPEC, "CLAMP_CALLOUT_PRECISION"),)),
+        "note": (SCREW_LINE_NOTE, ((_SELF, "SCREW_LINE_NOTE"),)),
+    }
+    if _x in CLAMP_ROUND_X:
+        requirement(
+            f"clamp_hole_{_index}",
+            kind="hole",
+            faces=(
+                CylinderFace(CLAMP_HOLE_DIA, contains_x_mm=_x),
+                CylinderFace(CLAMP_CBORE_DIA, contains_x_mm=_x),
+            ),
+            requirements=("dia", "thru", "cbore_dia", "cbore_depth", "station", "height"),
+            fields={
+                **_common,
+                "dia": (
+                    drilled_limits(CLAMP_HOLE_DIA, CLAMP_CALLOUT_PRECISION["hw-thruholedia"], unit=UNIT),
+                    ((_BUILD, "CLAMP_HOLE_DIA"), "UNIT", (_DSPEC, "CLAMP_CALLOUT_PRECISION")),
+                ),
+                "nominal_dia": (CLAMP_HOLE_DIA, ((_BUILD, "CLAMP_HOLE_DIA"),)),
+                "process": ("drill", ((_DSPEC, "CLAMP_HOLE_PROCESS"),)),
+                "cbore_dia": (
+                    limits(CLAMP_CBORE_DIA, CLAMP_CALLOUT_PRECISION["hw-cbdia"], (CLAMP_CBORE_DIA_LIMITS[1], CLAMP_CBORE_DIA_LIMITS[0])),
+                    ((_BUILD, "CLAMP_CBORE_DIA"), (_DSPEC, "CLAMP_CBORE_DIA_LIMITS")),
+                ),
+                "cbore_dia_nominal": (CLAMP_CBORE_DIA, ((_BUILD, "CLAMP_CBORE_DIA"),)),
+                "callout": (CLAMP_CBORE_CALLOUT, ((_DSPEC, "CLAMP_CBORE_CALLOUT"),)),
+            },
+            precision={
+                "dia": CLAMP_CALLOUT_PRECISION["hw-thruholedia"],
+                "cbore_dia": CLAMP_CALLOUT_PRECISION["hw-cbdia"],
+                "cbore_depth": CLAMP_CALLOUT_PRECISION["hw-cbdepth"],
+                "station": _P[_name],
+                "height": _P["ClampRowHeight"],
+            },
+        )
+        continue
+    _w, _cw = CLAMP_SLOT_WIDTH / 2.0, CLAMP_SLOT_CBORE_WIDTH / 2.0
+    requirement(
+        f"clamp_slot_{_index}",
+        kind="slot",
+        faces=(
+            PlanarFace((0.0, 1.0, 0.0), CLAMP_TAP_Y - _w, contains_x_mm=_x),
+            PlanarFace((0.0, -1.0, 0.0), -(CLAMP_TAP_Y + _w), contains_x_mm=_x),
+            PlanarFace((0.0, 1.0, 0.0), CLAMP_TAP_Y - _cw, contains_x_mm=_x),
+            PlanarFace((0.0, -1.0, 0.0), -(CLAMP_TAP_Y + _cw), contains_x_mm=_x),
+        ),
+        requirements=("width", "run", "cbore_width", "cbore_depth", "station", "height"),
+        fields={
+            **_common,
+            "along": ([1.0, 0.0, 0.0], ((_BUILD, "CLAMP_SLOT_RUN"),)),
+            "width": (
+                drilled_limits(CLAMP_SLOT_WIDTH, _P["ClampSlotWidth"], unit=UNIT),
+                ((_BUILD, "CLAMP_SLOT_WIDTH"), (_BUILD, "CLAMP_SLOT_WIDTH_LIMITS"), (_SELF, "DETAIL_KEEP")),
+            ),
+            "width_nominal": (CLAMP_SLOT_WIDTH, ((_BUILD, "CLAMP_SLOT_WIDTH"),)),
+            "run": (
+                limits(CLAMP_SLOT_RUN, _P["ClampSlotTravel"], unit=UNIT),
+                ((_BUILD, "CLAMP_SLOT_RUN"), "UNIT", (_SELF, "DETAIL_KEEP")),
+            ),
+            "run_nominal": (CLAMP_SLOT_RUN, ((_BUILD, "CLAMP_SLOT_RUN"),)),
+            "cbore_width": (
+                limits(CLAMP_SLOT_CBORE_WIDTH, _P["ClampSlotCboreWidth"], (CLAMP_SLOT_CBORE_WIDTH_LIMITS[1], CLAMP_SLOT_CBORE_WIDTH_LIMITS[0])),
+                ((_BUILD, "CLAMP_SLOT_CBORE_WIDTH"), (_DSPEC, "CLAMP_SLOT_CBORE_WIDTH_LIMITS"), (_SELF, "DETAIL_KEEP")),
+            ),
+            "cbore_width_nominal": (CLAMP_SLOT_CBORE_WIDTH, ((_BUILD, "CLAMP_SLOT_CBORE_WIDTH"),)),
+            "width_callout": (DIMENSION_CALLOUTS["ClampSlotWidth"], ((_DSPEC, "DIMENSION_CALLOUTS"),)),
+            "cbore_width_callout": (DIMENSION_CALLOUTS["ClampSlotCboreWidth"], ((_DSPEC, "DIMENSION_CALLOUTS"),)),
+        },
+        precision={
+            "width": _P["ClampSlotWidth"],
+            "run": _P["ClampSlotTravel"],
+            "cbore_width": _P["ClampSlotCboreWidth"],
+            "cbore_depth": _P["ClampSlotCboreDepth"],
+            "station": _P[_name],
+            "height": _P["ClampRowHeight"],
+        },
+    )
 
 LEFT_END = FACE_CENTER[0] - BAR_LENGTH * _S / 2.0
 RIGHT_END = FACE_CENTER[0] + BAR_LENGTH * _S / 2.0
