@@ -42,12 +42,21 @@ pivot's translation and the arbor's float are taken up the same way under
 the mesh load at the set as in running, so they do not move a pair off its
 set. A bonded gear's float is not: the gear cures off its seat by up to half
 its bond clearance and keeps that offset (#3292). T012/T018 book it on top of
-their printed tooth runout to the bore; their seat is MHA-DT-37's spigot,
-one part with the pivot, so the spigot's own float in MHA-DT-04's socket
-moves the axis with them. T024 is centred while its bond is wet and accepted
-after cure on its tooth runout about MHA-DT-04's journal, which reads the
-float and the tooth runout together. How the spigot's float, tilt and the
-socket's runout move the axis off MHA-DT-04 near the tip is #2473.
+their printed tooth runout to the bore. T024 is centred while its bond is wet
+and accepted after cure on its tooth runout about MHA-DT-04's journal, which
+reads the float and the tooth runout together.
+
+Those are each gear's eccentricity about its own seat. The seat is not on the
+running axis (#2473, cone_running_axis): MHA-DT-37's spigot cures off-centre
+and tilted in MHA-DT-04's socket, so its pivot sits off MHA-DT-04's axis and
+MHA-DT-04 wobbles about the journal-to-pivot line. MHA-DT-00 reads the pivot
+after cure, MHA-DT-04 turning in a V-block on its journal, before the post
+is assembled (``PIVOT_RUNOUT_TIR_MM``); half that reading reaches each gear on
+MHA-DT-04 by its share of the journal-to-pivot span, and T006, T012 and T018
+by MHA-DT-37's tilt in the socket, which the spigot's float allows even with
+the pivot true (``cone_running_axis.seat_offset_mm``). Every term is taken
+at the same phase. Not booked, because MHA-DT-04 prints no runout of its
+lands or socket to its journal: that runout.
 
 The CAD places the cone line ``SET_ABOVE_STANDARD_MM`` above standard at
 every cone; the feel set runs T120 tighter than that, by
@@ -63,6 +72,7 @@ from dataclasses import dataclass
 from scipy.optimize import brentq
 
 import _config
+import cone_running_axis
 import cone_stations
 import dt_arbor_pedestal_spec as pedestal
 import dt_cone_gear_spec as cone
@@ -120,6 +130,15 @@ def cone_tooth_runout_tir_mm(teeth: int) -> float:
 # then cure; the assembly sheet gets a check after cure: tooth runout about
 # the shaft .0045 TIR max. No part change."
 LAND_2_ASSEMBLED_RUNOUT_TIR_MM = 0.0045 * 25.4
+# MHA-DT-37's bare pivot, read over a full turn with MHA-DT-04 in the V-block
+# after the tip's bonds cure and before the post is assembled (MHA-DT-00
+# sheet 16). Owner ruling 2026-11-22 (Pedro), #2473, option G: "one reading
+# remains: the pivot, .0025 TIR max in the V-block after cure and before the
+# post is assembled, with a step that taps the pivot true while the adhesive
+# is wet." The limit, same day, after T012 fell under the gate at .0025 with
+# the spigot at its least engagement: "pivot .0020 TIR MAX, booked at the
+# least spigot engagement (worst case)".
+PIVOT_RUNOUT_TIR_MM = 0.0020 * 25.4
 
 
 def bond_float_mm(teeth: int) -> float:
@@ -133,11 +152,21 @@ def bond_float_mm(teeth: int) -> float:
     return 0.0
 
 
-def cone_eccentricity_mm(teeth: int) -> float:
-    """The largest eccentricity of cone ``teeth``'s teeth about the running axis."""
+def seat_eccentricity_mm(teeth: int) -> float:
+    """The largest eccentricity of cone ``teeth``'s teeth about its own seat:
+    MHA-DT-04's axis, or MHA-DT-37's for T006, T012 and T018."""
     if teeth in cone.LAND_2_TEETH:
         return LAND_2_ASSEMBLED_RUNOUT_TIR_MM / 2.0
     return cone_tooth_runout_tir_mm(teeth) / 2.0 + bond_float_mm(teeth)
+
+
+def cone_eccentricity_mm(teeth: int) -> float:
+    """The largest eccentricity of cone ``teeth``'s teeth about the running
+    axis: about its seat, plus the seat's own offset from the running axis
+    with the pivot at its read limit."""
+    return seat_eccentricity_mm(teeth) + cone_running_axis.seat_offset_mm(
+        teeth, PIVOT_RUNOUT_TIR_MM / 2.0
+    )
 
 
 ALPHA_RAD = math.radians(cone.PRESSURE_ANGLE_DEG)

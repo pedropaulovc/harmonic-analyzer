@@ -1,0 +1,116 @@
+"""The running-axis geometry of #2473 against the specs it reads."""
+
+from __future__ import annotations
+
+import pytest
+
+import cone_running_axis as axis
+import cone_set_stack
+import cone_tip_cluster as cluster
+import dt_cone_gear_shaft_spec as shaft
+import dt_cone_gear_spec as cone
+
+IN = 25.4
+DT04_TEETH = tuple(t for t in cone.CONE_TEETH if t not in axis.DT37_TEETH)
+
+
+def test_the_pivot_bears_north_of_every_gear_and_the_fulcrum_south_of_them() -> None:
+    planes = [axis.seat_plane(t) for t in cone.CONE_TEETH]
+    assert axis.BOSS_SOUTH_STATION < axis.BOSS_NORTH_STATION < min(planes)
+    south, north = axis.PIVOT_BARE_STATIONS
+    assert max(planes) < south < axis.PIVOT_STATION < north
+    assert axis.SOCKET_MOUTH_STATION < axis.seat_plane(18) < axis.seat_plane(12)
+    # The bare pivot is what stands past MHA-DT-38: .090 in.
+    assert north - south == pytest.approx(
+        cluster.PIVOT_LENGTH_MM - cluster.BUSHING_LENGTH_MM
+    )
+
+
+def test_k_grows_toward_the_tip_and_stays_under_one() -> None:
+    ranges = [axis.dt04_k_range(t) for t in sorted(DT04_TEETH, reverse=True)]
+    for (lo, hi), (next_lo, next_hi) in zip(ranges, ranges[1:]):
+        assert 0.0 < lo < hi < 1.0
+        assert next_lo > lo and next_hi > hi
+    # T024 sits next to the socket mouth: k 0.81-0.85 (q2473-verify.md).
+    lo, hi = axis.dt04_k_range(24)
+    assert lo == pytest.approx(0.81, abs=0.005) and hi == pytest.approx(
+        0.849, abs=0.005
+    )
+    assert axis.dt04_k_range(24)[1] < axis.K_MOUTH < 1.0
+
+
+def test_only_dt04_gears_take_k_and_only_dt37_gears_take_a_share() -> None:
+    assert axis.DT37_TEETH == (6, 12, 18)
+    for teeth in axis.DT37_TEETH:
+        with pytest.raises(ValueError):
+            axis.dt04_k_range(teeth)
+        assert 0.0 < axis.spigot_share(teeth) < 1.0
+    with pytest.raises(ValueError):
+        axis.spigot_share(24)
+    # The share falls toward the pivot.
+    assert axis.spigot_share(18) > axis.spigot_share(12) > axis.spigot_share(6)
+
+
+def test_a_true_pivot_still_leaves_the_spigot_its_tilt() -> None:
+    # With the pivot dead true MHA-DT-37 still pivots about it inside the
+    # socket's float: the mouth offset u and the inner-end offset (1 + r) u
+    # both stay within the float.
+    r = shaft.SPIGOT_ENGAGEMENT_MIN_MM / (
+        axis.PIVOT_STATION - axis.SOCKET_MOUTH_STATION
+    )
+    assert axis.SPIGOT_FLOAT_MM == pytest.approx(0.0009 * IN, abs=1e-4)
+    assert axis.spigot_stand_off_mm(0.0) == pytest.approx(
+        axis.SPIGOT_FLOAT_MM / (1.0 + r)
+    )
+    assert axis.spigot_stand_off_mm(0.0) < axis.SPIGOT_FLOAT_MM
+
+
+@pytest.mark.parametrize("pivot_offset", (0.0, 0.01, 0.0254, 0.05))
+def test_the_stand_off_is_the_worst_spigot_pose_in_the_socket(
+    pivot_offset: float,
+) -> None:
+    # Brute force over the mouth offset u, along the pivot's offset and
+    # against it: the inner end v = (1 + r) u - r p must stay in the float.
+    r = shaft.SPIGOT_ENGAGEMENT_MIN_MM / (
+        axis.PIVOT_STATION - axis.SOCKET_MOUTH_STATION
+    )
+    s = axis.SPIGOT_FLOAT_MM
+    worst = 0.0
+    steps = 4000
+    for i in range(-steps, steps + 1):
+        u = s * i / steps
+        if abs((1.0 + r) * u - r * pivot_offset) <= s + 1e-12:
+            worst = max(worst, abs(u - axis.K_MOUTH * pivot_offset))
+    assert worst <= axis.spigot_stand_off_mm(pivot_offset) + 1e-12
+    assert worst == pytest.approx(
+        axis.spigot_stand_off_mm(pivot_offset), abs=2 * s / steps
+    )
+
+
+def test_a_shorter_engagement_tilts_more() -> None:
+    # The stack books the least engagement the shaft spec proves, not the
+    # nominal: owner ruling 2026-11-22 on #2473 ("booked at the least spigot
+    # engagement (worst case)").
+    assert shaft.SPIGOT_ENGAGEMENT_MIN_MM < (
+        cluster.SPIGOT_LENGTH_MM - 2.0 * cone.FACE_WIDTH - cluster.TIP_END_RECESS_MM
+    )
+    assert axis._ENGAGEMENT_RATIO == pytest.approx(
+        shaft.SPIGOT_ENGAGEMENT_MIN_MM
+        / (axis.PIVOT_STATION - axis.SOCKET_MOUTH_STATION)
+    )
+
+
+@pytest.mark.parametrize("teeth", cone.CONE_TEETH)
+def test_the_stack_books_each_seat_offset_at_the_read_pivot_limit(teeth: int) -> None:
+    pivot_offset = cone_set_stack.PIVOT_RUNOUT_TIR_MM / 2.0
+    offset = axis.seat_offset_mm(teeth, pivot_offset)
+    if teeth in axis.DT37_TEETH:
+        assert offset == pytest.approx(
+            axis.spigot_share(teeth) * axis.spigot_stand_off_mm(pivot_offset)
+        )
+    else:
+        assert offset == pytest.approx(axis.dt04_k_range(teeth)[1] * pivot_offset)
+    assert offset > 0.0
+    assert cone_set_stack.cone_eccentricity_mm(teeth) == pytest.approx(
+        cone_set_stack.seat_eccentricity_mm(teeth) + offset
+    )

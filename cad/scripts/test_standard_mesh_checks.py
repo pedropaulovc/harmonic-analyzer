@@ -24,6 +24,11 @@ Pending exception rulings (#971):
 from __future__ import annotations
 
 import math
+from dataclasses import replace
+
+import cone_running_axis
+import dt_cylinder_gear_spec as drum
+from standard_mesh_checks import contact_ratio, plane_gear
 
 import pytest
 
@@ -53,9 +58,10 @@ def test_cone_drum_mesh_keeps_contact_at_the_loosest_feel_set(teeth: int) -> Non
 
 @pytest.mark.parametrize("teeth", cone.ROUND_BORE_TEETH)
 def test_bonded_gears_book_their_bond_float(teeth: int) -> None:
-    # #3219 option D and #3292: T012/T018's eccentricity about the running
-    # axis is their printed tooth-space runout / 2 plus the bond float; T024's
-    # is half its after-cure tooth runout about MHA-DT-04, which reads the float.
+    # #3219 option D and #3292: T012/T018's eccentricity about their seat is
+    # their printed tooth-space runout / 2 plus the bond float; T024's is half
+    # its after-cure tooth runout about MHA-DT-04, which reads the float.
+    # #2473: the seat's own offset from the running axis comes on top.
     centre = cone_set_stack.cone_centre(teeth)
     if teeth in cone.SPIGOT_TEETH:
         eccentricity = (
@@ -64,9 +70,84 @@ def test_bonded_gears_book_their_bond_float(teeth: int) -> None:
         )
     else:
         eccentricity = cone_set_stack.LAND_2_ASSEMBLED_RUNOUT_TIR_MM / 2.0
+    assert cone_set_stack.seat_eccentricity_mm(teeth) == pytest.approx(eccentricity)
+    eccentricity += cone_running_axis.seat_offset_mm(
+        teeth, cone_set_stack.PIVOT_RUNOUT_TIR_MM / 2.0
+    )
     assert centre.ceiling_mm - centre.set_max_mm == pytest.approx(
         2.0 * eccentricity + cone_set_stack.TOOTH_RUNOUT_TIR_MM
     )
+
+
+def _nominal_contact_ratio(teeth: int, eccentricity_mm: float) -> float:
+    """cone_check's gated figure with cone ``teeth`` at another eccentricity."""
+    alpha = cone_set_stack.ALPHA_RAD
+    corners = cone_set_stack.drum_corners()
+    thickness = [corner.pitch_thickness for corner in corners]
+    mate = replace(
+        plane_gear(drum.STOCK_FORM, drum.MODULE_MM),
+        pitch_thickness=(max(thickness) + min(thickness)) / 2.0,
+    )
+    centre = (
+        cone_set_stack.cone_centre(teeth).set_max_mm
+        + 2.0 * eccentricity_mm
+        + cone_set_stack.TOOTH_RUNOUT_TIR_MM
+    )
+    gear = plane_gear(cone.stock_form_profile(teeth), cone.MODULE_MM)
+    return contact_ratio(gear, mate, centre, alpha, cone.MODULE_MM)
+
+
+def test_the_running_axis_term_needs_every_acceptance_it_is_booked_with() -> None:
+    """#2473 option G: what each printed acceptance buys, from the gate's own
+    figure. None of #3324's rows is redundant, and the pivot's limit is the
+    owner's .0020, not the .0025 first ruled."""
+    pivot = cone_set_stack.PIVOT_RUNOUT_TIR_MM / 2.0
+    assert cone_set_stack.PIVOT_RUNOUT_TIR_MM == pytest.approx(0.0020 * 25.4)
+    for teeth in CONE_TEETH:
+        assert _nominal_contact_ratio(
+            teeth, cone_set_stack.cone_eccentricity_mm(teeth)
+        ) == pytest.approx(dt_mesh_checks.cone_check(teeth).contact_ratio_nominal)
+    margins = {
+        teeth: dt_mesh_checks.cone_check(teeth).contact_ratio_nominal
+        for teeth in CONE_TEETH
+    }
+    # T012 governs; every other mesh keeps more.
+    assert min(margins, key=margins.get) == 12
+    assert margins[12] == pytest.approx(1.0087, abs=5e-4)
+    assert margins[18] == pytest.approx(1.0218, abs=5e-4)
+    assert margins[24] == pytest.approx(1.0447, abs=5e-4)
+    # The pivot at .0025 TIR leaves T012 under the gate at the least spigot
+    # engagement (owner ruling 2026-11-22: .0020).
+    assert _nominal_contact_ratio(
+        12,
+        cone_set_stack.seat_eccentricity_mm(12)
+        + cone_running_axis.seat_offset_mm(12, 0.0025 * 25.4 / 2.0),
+    ) < 1.0
+    # #3219's .0015 TIR on T012/T018: at the keyed gears' .002 both fall under.
+    for teeth in cone.SPIGOT_TEETH:
+        loose = (
+            cone_set_stack.TOOTH_RUNOUT_TIR_MM / 2.0
+            + cone_set_stack.bond_float_mm(teeth)
+            + cone_running_axis.seat_offset_mm(teeth, pivot)
+        )
+        assert _nominal_contact_ratio(teeth, loose) < 1.0
+    # #3292's after-cure T024 reading: left to its part runout and bond float
+    # it falls under.
+    (land_2,) = cone.LAND_2_TEETH
+    uncentred = (
+        cone_set_stack.TOOTH_RUNOUT_TIR_MM / 2.0
+        + cone_set_stack.bond_float_mm(land_2)
+        + cone_running_axis.seat_offset_mm(land_2, pivot)
+    )
+    assert _nominal_contact_ratio(land_2, uncentred) < 1.0
+    # Unread, the pivot can sit anywhere the socket lets it: at twice the
+    # limit T012, T018 and T024 are all under.
+    for teeth in cone.ROUND_BORE_TEETH:
+        assert _nominal_contact_ratio(
+            teeth,
+            cone_set_stack.seat_eccentricity_mm(teeth)
+            + cone_running_axis.seat_offset_mm(teeth, 2.0 * pivot),
+        ) < 1.0
 
 
 def test_alignment_drum_fitup_mesh_cannot_bind() -> None:

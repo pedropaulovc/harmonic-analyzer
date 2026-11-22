@@ -195,9 +195,31 @@ def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
 
 def test_native_tooth_inspection_reads_the_actual_installed_cutter() -> None:
     # Ordinary +/-.003 thickness band about the cutter's standard-depth
-    # thickness; T006 alone is thin-only (DT6-FORM1 relief clearance).
+    # thickness; T006 alone is thin-only (DT6-FORM1 relief clearance), and
+    # T012/T018/T024 thick-only, +.003/-0, which leaves them the standard
+    # (N + 2)/DP blank (owner ruling 2026-11-22, #2473 option G).
     assert spec.TOOTH_THICKNESS_BAND == (0.0762, -0.0762)
     assert spec.tooth_thickness_band(6) == spec.CUSTOM_SIX_TOOTH_THICKNESS_BAND == (0.0, -0.04064)
+    assert spec.THICK_ONLY_TEETH == spec.ROUND_BORE_TEETH == (12, 18, 24)
+    for teeth in spec.CONFIGURATION_TEETH:
+        thick_only = teeth in spec.THICK_ONLY_TEETH
+        assert spec.tooth_thickness_band(teeth) == (
+            (0.0762, 0.0) if thick_only else (0.0762, -0.0762)
+        )
+        # A thick-only gear's blank is what the cutter's form supports at
+        # standard depth, within .0005 in of the standard (N + 2)/DP; a thin
+        # limit sinks the cutter and costs every other gear .007 or more.
+        under_standard = (teeth + 2) * spec.MODULE_MM - spec.outside_dia_mm(teeth)
+        assert (under_standard < 0.0005 * 25.4) is thick_only, teeth
+        assert thick_only or under_standard > 0.007 * 25.4, teeth
+    assert {
+        teeth: round(spec.outside_dia_mm(teeth) / 25.4, 4)
+        for teeth in spec.THICK_ONLY_TEETH
+    } == {12: 0.2916, 18: 0.4164, 24: 0.5412}
+    assert {
+        teeth: tuple(round(v / 25.4, 4) for v in spec.over_pins_limits_mm(teeth))
+        for teeth in spec.THICK_ONLY_TEETH
+    } == {12: (0.3116, 0.3182), 18: (0.4376, 0.4446), 24: (0.5632, 0.5704)}
     for teeth in spec.CONFIGURATION_TEETH:
         _upper, lower = spec.tooth_thickness_band(teeth)
         profile = spec.stock_form_profile(teeth)
@@ -541,7 +563,12 @@ def test_over_pins_acceptance_matches_the_closed_form_involute() -> None:
             assert closed_form - 0.02 < nominal <= closed_form + 2e-4, teeth
         assert nominal / 2.0 > profile.blank_radius_mm, teeth
         minimum, maximum = spec.over_pins_limits_mm(teeth)
-        assert minimum < nominal < maximum + 1e-3, teeth
+        if teeth in spec.THICK_ONLY_TEETH:
+            # The nominal thickness is the thin limit: the least reading is
+            # the nominal's, rounded inward by under one printed step.
+            assert nominal <= minimum < nominal + 1e-4 * 25.4 < maximum, teeth
+        else:
+            assert minimum < nominal < maximum + 1e-3, teeth
         row = (
             f"OVER 2 PINS \u00d8{spec.inch_text(pin, 3)}, OPPOSITE GAPS:  "
             f"{spec.inch_text(minimum, 4)} TO {spec.inch_text(maximum, 4)}"
@@ -837,7 +864,10 @@ def test_front_view_carries_a_round_bore_callout_clear_of_its_neighbours() -> No
         # The leader runs up left, the one diagonal no other front-view line takes.
         corner_angle = math.degrees(math.atan2(box.ymin - cy, box.xmax - cx))
         assert corner_angle == pytest.approx(drawing.FRONT_BORE_DIA_ANGLE_DEG, abs=5.0)
-        assert abs(math.remainder(corner_angle - spec.WEB_REFERENCE_ANGLE_DEG, 360.0)) >= 90.0
+        assert (
+            abs(math.remainder(corner_angle - spec.WEB_REFERENCE_ANGLE_DEG, 360.0))
+            >= 90.0 - 1e-9
+        )
         assert box.xmin > _ZONE_MARGIN
         notes_bottom = drawing.NUMBERED_NOTES_POS[1] - len(
             drawing.sheet_notes(teeth).splitlines()
@@ -1292,7 +1322,7 @@ def test_invalid_family_member_is_rejected() -> None:
 def test_root_to_bore_webs_keep_the_floor_and_target_guards() -> None:
     # Printed root MIN against the outward-rounded maximum bore, not a nominal
     # floor; a keyed gear's against its keyway's top corner (cone_land_key).
-    # T012's ruled .0646 web (RV-03) is separate from the ordinary target.
+    # T012's .0674 web (RV-03) is separate from the ordinary target.
     for teeth in spec.CONFIGURATION_TEETH:
         web = notes.root_to_bore_web_min_mm(teeth)
         if spec.keyed(teeth):

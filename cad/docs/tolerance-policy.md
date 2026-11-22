@@ -112,7 +112,9 @@ from the specs and config; no build, drawing or import reads study output.
 
 Cone bands are ordinary (user ruling 2026-10-10): OD +0/−0.05, tooth thickness
 ±0.075, H7/g6 running bores, 0.05 tooth-cutting runout; T006 alone keeps its
-own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
+own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief, and
+T012/T018/T024 are thick-only (+0.075/−0) for the standard blank (owner ruling
+2026-11-22, #2473 option G). Gates:
 
 - **Cones T012–T120** (`cone_set_stack`, `dt_mesh_checks.cone_check`): the cone
   centre is set by feel at assembly (owner direction 2026-11-11, #2365,
@@ -135,8 +137,18 @@ own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
   plus their bond float, half their bond clearance (#3219 option D and #3292,
   owner rulings 2026-11-21); for T024, centred while its bond is wet, half its
   .0045 in TIR about MHA-DT-04's journal read after cure (MHA-DT-00 sheet 16,
-  #3292). How the spigot's float and tilt in MHA-DT-04's socket move the
-  running axis off MHA-DT-04 near the tip is not booked (#2473).
+  #3292). On top comes the offset of each gear's seat from the running axis
+  (#2473, owner ruling 2026-11-22, option G; `cone_running_axis`):
+  MHA-DT-37's spigot cures off-centre and tilted in MHA-DT-04's socket, so
+  its pivot is tapped true while the bond is wet and read after cure, before
+  the post is assembled, at .0020 in TIR MAX (MHA-DT-00 steps 2B and 2F,
+  sheet 16). Half that reading reaches a gear on MHA-DT-04 by its share of
+  the journal-to-pivot span (0.27 at T120 to 0.85 at T024), and T006, T012 and
+  T018 through MHA-DT-37's tilt at the least spigot engagement, which the
+  socket's float allows even with the pivot true. T012, T018 and T024 carry
+  the standard (N + 2)/DP blank for it, their tooth thickness +.003/−0 in.
+  The least margin is T012's, contact ratio 1.009. Not booked: the runout of
+  MHA-DT-04's lands and socket to its journal, which its sheet does not print.
   No number is booked for the ease out of the bind (check 4N;
   delegated ruling 2026-11-12, #2144, see gear-standard.md). Reported only (REF): the
   printed-corner contact ratio there. A gear that binds is cleared by easing

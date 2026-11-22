@@ -111,9 +111,11 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
     reaches are waxed, and T024 is bonded, phased, cured and accepted on the
     comb alone; step 2 then bonds and phases the spigot's joints, the spigot
     held home in its blind socket, and accepts the cured tip before the post
-    goes on.  Each failed acceptance parts its bonds, cleans the film out and
-    redoes the round, the second from MHA-DT-38's bond, which the heat
-    undoes."""
+    goes on.  #2473 (owner ruling 2026-11-22, option G): the pivot is tapped
+    true before the comb goes on and its runout is read after cure, beside
+    the comb's check.  Each failed acceptance parts its bonds, cleans the
+    film out and redoes the round, the second from MHA-DT-38's bond, which
+    the heat undoes."""
     feeler = sheet.inch_text(cone_stack_end_play.STACK_FEELER, sheet.FEELER_PLACES)
     comb = "CLIP MHA-DT-03-TL-02"
 
@@ -159,17 +161,19 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
         (
             "BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT",
             "BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024",
+            "HOLDING MHA-DT-37 HOME, TAP ITS PIVOT TRUE",
             comb,
-            "HOLD MHA-DT-37 HOME",
+            "ONCE THE BONDS GRAB, MHA-DT-37 HELD HOME",
             "CLIPS OVER ALL FIVE GEARS",
-            "250 DEG C",
+            "CHECK THE MHA-DT-37 PIVOT'S RUNOUT",
+            "IF EITHER CHECK FAILS, AT 250 DEG C",
             "SPIGOT, PIVOT",
             "REDO FROM 1L.",
             "ALIGN THE MHA-DT-05 COUNTERBORES",
         ),
     )
     assert post.startswith("BOND T012")
-    assert bonds(post[: second[2]]) == 2
+    assert bonds(post[: second[3]]) == 2
     assert "1L. BOND MHA-DT-38 ON THE MHA-DT-37 PIVOT" in "\n".join(SEQUENCE_BLOCKS)
 
 
