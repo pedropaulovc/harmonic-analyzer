@@ -271,10 +271,10 @@ requirement(
     "chamfer_datum",
     kind="chamfer",
     faces=(ConeFace(45.0),),
-    requirements=("leg",),
+    requirements=("leg_max",),
     fields={
-        "leg": (
-            [0.0, FRONT_CHAMFER],
+        "leg_max": (
+            FRONT_CHAMFER,
             ("FRONT_CHAMFER", "CHAMFER_SUFFIX", (_SELF, "PROFILE_KEEP")),
         ),
         "leg_nominal": (FRONT_CHAMFER, ("FRONT_CHAMFER",)),
@@ -286,7 +286,7 @@ requirement(
             ("CHAMFER_CALLOUT",),
         ),
     },
-    precision={"leg": _P["FrontChamferSize"]},
+    precision={"leg_max": _P["FrontChamferSize"]},
 )
 
 

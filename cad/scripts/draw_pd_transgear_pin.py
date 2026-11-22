@@ -491,8 +491,9 @@ requirement(
     fields={
         "radius_max": (SEAT_FILLET_R, ("SEAT_FILLET_R", _KEEP)),
         "radius_nominal": (SEAT_FILLET_R, ("SEAT_FILLET_R",)),
+        "axis": ([0.0, 0.0, 1.0], ("SEAT_FILLET_R",)),
+        "at": ([0.0, 0.0, 0.0], ("SEAT_FILLET_R",)),
         "between": (["shoulder", "step_land"], ("SEAT_FILLET_R",)),
-        "station": (0.0, ("SEAT_FILLET_R",)),
     },
     precision={"radius_max": _P["SeatRadius"]},
 )

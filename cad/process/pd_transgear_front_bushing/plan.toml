@@ -59,11 +59,8 @@ parts_per_pull = 1
 jaw_clearance_in = 0.1
 # Setup 2: how much of the outside the jaws take, from the Setup 1 faced end.
 regrip_grip_in = 0.1
-# Left a side over the band's low end for the finish passes: roughed to the
-# band's top, finished to its middle.
-finish_allowance_in = 0.005
+# Outside passes (authored): the .02 in wide band takes rough passes only.
 rough_radial_doc_mm = 0.25
-finish_radial_doc_mm = 0.05
 turn_feed_mm_rev = 0.1016
 # The tool starts its pass this far off the faced end.
 turn_start_z_mm = 0.5
@@ -130,14 +127,13 @@ cut_diameter_mm = "{{cad.stock_dia_mm}}"
 [[setups.operations]]
 cut_kind = "longitudinal_turning"
 turning_cuts = [
-  { name = "Outside rough", phase = "rough", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.run_end_z_mm}}", kept_start_z_mm = "{{cad.outer_datum_out_near_z_mm}}", kept_end_z_mm = "{{cad.kept_end_z_mm}}", start_diameter_mm = "{{cad.stock_dia_mm}}", end_diameter_mm = "{{cad.outer_rough_dia_mm}}", max_radial_doc_mm = "{{process.rough_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.outer_rough_dia_mm}}" },
-  { name = "Outside finish", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.run_end_z_mm}}", kept_start_z_mm = "{{cad.outer_datum_out_near_z_mm}}", kept_end_z_mm = "{{cad.kept_end_z_mm}}", start_diameter_mm = "{{cad.outer_rough_dia_mm}}", end_diameter_mm = "{{cad.outer_turn_min_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}" },
+  { name = "Outside", phase = "rough", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.run_end_z_mm}}", kept_start_z_mm = "{{cad.outer_datum_out_near_z_mm}}", kept_end_z_mm = "{{cad.kept_end_z_mm}}", start_diameter_mm = "{{cad.stock_dia_mm}}", end_diameter_mm = "{{cad.outer_turn_min_mm}}", max_radial_doc_mm = "{{process.rough_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}" },
 ]
 speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Turn the outside from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}: rough to Ø{{cad.outer_rough_dia_mm:in.3dot}}, then finish in light passes, miking between them, to Ø{{cad.outer_dia_mm:in.3dot}} (the band's middle)."
+instruction = "Turn the outside from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}, to Ø{{cad.outer_dia_mm:in.3dot}} (the band's middle), miking between passes and taking the last one light."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 inspection = "Outside Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}, micrometer."
@@ -181,11 +177,11 @@ speed_kind = "spindle"
 tool = "drill-31"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Feed the #31 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{cad.run_in:.2dot}}, backing fully out to clear chips every .12 in (once its own diameter): the hole runs through the bushing and past the parting line. It leaves the reamer .003 a side."
+instruction = "Feed the #31 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill in one steady feed until the scale reads {{cad.run_in:.2dot}} (the hole is under three diameters deep, so it needs no peck): the hole runs through the bushing and past the parting line. It leaves the reamer .003 a side."
 settings = "lathe-drill-31-c360"
 cut_diameter_mm = 3.048
 hole_depth_mm = "{{cad.run_mm}}"
-peck = { step_mm = 3.048, retract = "full" }
+peck = "none"
 
 [[setups.operations]]
 cut_kind = "other"

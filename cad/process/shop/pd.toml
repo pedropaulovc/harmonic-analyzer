@@ -114,12 +114,16 @@ diameter_mm = 4.7625
 tool = "drill-31"
 material = "lathe-c360"
 sfm = 160
-feed = "tailstock quill by hand, light and steady, dry; back fully out to clear chips"
+feed = "tailstock quill by hand, light and steady, dry"
 [settings.lathe-ream-1260-c360]
 tool = "reamer-1260"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle running"
+# The bores' go/no-go pair (common gauges record gauges.plug-gauges-1260-1265,
+# shop/pn.toml, to buy): the tools record lets a plan list the pair.
+[tools.plug-gauges-1260-1265]
+description = "Plug gauge pair, .1260 GO (plus) and .1265 NO-GO (minus), Vermont Gage Class X"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
