@@ -260,7 +260,7 @@ speed_kind = "other"
 tool = "tap-plug"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle off, in neutral. Put the MT3 dead centre in the tailstock. Pencil-mark the plug tap .40 from its point. Start {{cad.tap_thread}} with it in the T-handle wrench, the dead centre's point in the wrench's centre hole to keep it on axis; hold the chuck still with one hand and turn the wrench with the other, backing off every half turn, and stop when the mark reaches the spigot face: never bottom the tap in the .49 hole."
+instruction = "Spindle off, in neutral. Put the MT3 dead centre in the tailstock. Pencil-mark the plug tap .40 from its point. Start {{cad.tap_thread}} with it in the T-handle wrench, the dead centre's point in the wrench's centre hole to keep it on axis. Rest the wrench's handle on the compound, turn the chuck by hand with one hand and wind the tailstock handwheel in with the other so the centre follows the tap (.025 a turn), backing off every half turn, and stop when the mark reaches the spigot face: never bottom the tap in the .49 hole."
 feed = "hand"
 
 [[setups.operations]]

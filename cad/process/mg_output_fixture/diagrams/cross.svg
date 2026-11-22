@@ -4,8 +4,8 @@
   <rect class="clamp" x="270" y="29" width="470" height="351"/>
   <rect class="fixture-support" x="345" y="260" width="395" height="120"/>
   <rect class="part-kept" x="120" y="137" width="75" height="126"/>
-  <path class="part-removed" d="M 148 137 A 14 14 0 0 0 176 137 Z"/>
-  <path class="part-removed" d="M 148 263 A 14 14 0 0 1 176 263 Z"/>
+  <path class="paper" d="M 148 137 A 14 14 0 0 0 176 137 Z"/>
+  <path class="paper" d="M 148 263 A 14 14 0 0 1 176 263 Z"/>
   <rect class="part-kept" x="195" y="124" width="141" height="152"/>
   <rect class="part-rest" x="336" y="124" width="404" height="152"/>
   <rect class="holes" x="228.5" y="124" width="77" height="152"/>
@@ -17,7 +17,7 @@
   <line class="dims" x1="267" y1="276" x2="267" y2="322"/>
   <line class="dims" x1="120" y1="350" x2="345" y2="350"/>
   <line class="dims" x1="345" y1="380" x2="345" y2="354"/>
-  <line class="leader" x1="420" y1="300" x2="350" y2="262"/>
+  <line class="leader" x1="420" y1="300" x2="380" y2="275"/>
   <line class="leader" x1="150" y1="68" x2="240" y2="150"/>
   <text class="label" x="20" y="96">X0 spigot face</text>
   <text class="label" x="20" y="118">Z0 top corner</text>
