@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="16" y="22">Setup 8 (DT08): the adjuster, N up, at H from SEAT</text>
+  <rect class="fixture-vise" x="120.1" y="330.0" width="159.9" height="22.0"/>
+  <rect class="clamp" x="144.5" y="195.2" width="30.0" height="134.8"/>
+  <rect class="clamp" x="225.5" y="195.2" width="30.0" height="134.8"/>
+  <text class="label" x="159.5" y="368.0" text-anchor="middle">moving jaw</text>
+  <text class="label" x="240.5" y="368.0" text-anchor="middle">fixed jaw</text>
+  <rect class="fixture-support" x="174.5" y="215.7" width="9.5" height="114.3"/>
+  <rect class="fixture-support" x="216.0" y="215.7" width="9.5" height="114.3"/>
+  <line class="dims" x1="174.5" y1="291.9" x2="184.0" y2="291.9"/>
+  <line class="dims" x1="216.0" y1="291.9" x2="225.5" y2="291.9"/>
+  <rect class="part-kept" x="174.5" y="182.2" width="51.1" height="33.5"/>
+  <rect class="holes" x="191.9" y="182.2" width="16.2" height="33.5"/>
+  <polygon class="holes" points="190.2,182.2 209.8,182.2 208.1,183.8 191.9,183.8"/>
+  <line class="centre-line" x1="200.0" y1="172.2" x2="200.0" y2="227.7"/>
+  <rect class="cutter" x="190.5" y="52.2" width="19.0" height="94.3"/>
+  <polygon class="cutter" points="190.5,146.5 209.5,146.5 200.0,152.2"/>
+  <text class="label" x="440.0" y="70.0">centre drill, #3 through, chamfer mill</text>
+  <line class="leader" x1="436.0" y1="66.0" x2="200.0" y2="102.2"/>
+  <circle class="leader-dot" cx="200.0" cy="102.2" r="2.5"/>
+  <text class="label" x="440.0" y="110.0">N up: countersink .252-.262 here</text>
+  <line class="leader" x1="436.0" y1="106.0" x2="209.0" y2="182.2"/>
+  <circle class="leader-dot" cx="209.0" cy="182.2" r="2.5"/>
+  <text class="label" x="440.0" y="150.0">#3 exits S between the stacks</text>
+  <line class="leader" x1="436.0" y1="146.0" x2="200.0" y2="215.7"/>
+  <circle class="leader-dot" cx="200.0" cy="215.7" r="2.5"/>
+  <text class="label" x="440.0" y="190.0">W (moving jaw)</text>
+  <line class="leader" x1="436.0" y1="186.0" x2="176.5" y2="204.2"/>
+  <circle class="leader-dot" cx="176.5" cy="204.2" r="2.5"/>
+  <text class="label" x="440.0" y="230.0">E (fixed jaw)</text>
+  <line class="leader" x1="436.0" y1="226.0" x2="223.5" y2="204.2"/>
+  <circle class="leader-dot" cx="223.5" cy="204.2" r="2.5"/>
+  <text class="label" x="16.0" y="406.0">Section across the jaws, SEAT to the left; X0 on SEAT shifted by H - 1.500. Then the 1/4-28 tap (DT09).</text>
+</svg>

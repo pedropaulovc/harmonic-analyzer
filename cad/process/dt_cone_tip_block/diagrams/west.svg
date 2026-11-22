@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="16" y="22">Setup 6 (DT06): W to the width; the pinch hole</text>
+  <rect class="fixture-vise" x="128.8" y="330.0" width="142.3" height="22.0"/>
+  <rect class="clamp" x="153.2" y="195.2" width="30.0" height="134.8"/>
+  <rect class="clamp" x="216.8" y="195.2" width="30.0" height="134.8"/>
+  <text class="label" x="168.2" y="368.0" text-anchor="middle">moving jaw</text>
+  <text class="label" x="231.8" y="368.0" text-anchor="middle">fixed jaw</text>
+  <rect class="fixture-support" x="183.2" y="215.7" width="9.5" height="114.3"/>
+  <rect class="fixture-support" x="207.2" y="215.7" width="9.5" height="114.3"/>
+  <line class="dims" x1="183.2" y1="291.9" x2="192.8" y2="291.9"/>
+  <line class="dims" x1="207.2" y1="291.9" x2="216.8" y2="291.9"/>
+  <rect class="part-kept" x="183.2" y="164.6" width="33.5" height="51.1"/>
+  <rect class="part-removed" x="183.2" y="154.7" width="33.5" height="9.9"/>
+  <line class="active-face" x1="183.2" y1="164.6" x2="216.8" y2="164.6"/>
+  <rect class="holes" x="196.6" y="164.6" width="6.8" height="51.1"/>
+  <rect class="holes" x="195.1" y="164.6" width="9.8" height="25.5"/>
+  <line class="hidden" x1="183.2" y1="189.1" x2="216.8" y2="189.1"/>
+  <line class="centre-line" x1="200.0" y1="154.6" x2="200.0" y2="227.7"/>
+  <rect class="cutter" x="195.1" y="36.7" width="9.8" height="107.1"/>
+  <polygon class="cutter" points="195.1,143.8 204.9,143.8 200.0,146.7"/>
+  <text class="label" x="440.0" y="70.0">end mill, centre drill, #43, then #30</text>
+  <line class="leader" x1="436.0" y1="66.0" x2="200.0" y2="104.7"/>
+  <circle class="leader-dot" cx="200.0" cy="104.7" r="2.5"/>
+  <text class="label" x="440.0" y="110.0">W faced to .670</text>
+  <line class="leader" x1="436.0" y1="106.0" x2="184.0" y2="164.6"/>
+  <circle class="leader-dot" cx="184.0" cy="164.6" r="2.5"/>
+  <text class="label" x="440.0" y="150.0">#30 to .335 (the slot's place)</text>
+  <line class="leader" x1="436.0" y1="146.0" x2="204.0" y2="182.6"/>
+  <circle class="leader-dot" cx="204.0" cy="182.6" r="2.5"/>
+  <text class="label" x="440.0" y="190.0">#43 through both jaws, exits E between the stacks</text>
+  <line class="leader" x1="436.0" y1="186.0" x2="200.0" y2="215.7"/>
+  <circle class="leader-dot" cx="200.0" cy="215.7" r="2.5"/>
+  <text class="label" x="440.0" y="230.0">N (fixed jaw)</text>
+  <line class="leader" x1="436.0" y1="226.0" x2="214.8" y2="194.6"/>
+  <circle class="leader-dot" cx="214.8" cy="194.6" r="2.5"/>
+  <text class="label" x="16.0" y="406.0">Section across the jaws through the pinch hole, SEAT to the left. Z0 the stacks' top (E).</text>
+</svg>
