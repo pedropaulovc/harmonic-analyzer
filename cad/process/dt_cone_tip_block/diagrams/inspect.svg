@@ -3,8 +3,8 @@
   <text class="title" x="16" y="22">Setup 11: deburr, chase, inspect</text>
   <rect class="part-kept" x="160.0" y="80.0" width="51.1" height="157.7"/>
   <rect class="part-removed" x="183.6" y="80.0" width="3.9" height="45.4"/>
-  <circle class="hole" cx="185.5" cy="123.4" r="8.1"/>
-  <circle class="hole" cx="185.5" cy="123.4" r="9.8"/>
+  <circle class="holes" cx="185.5" cy="123.4" r="9.8"/>
+  <circle class="part-threads" cx="185.5" cy="123.4" r="9.5"/>
   <line class="hidden" x1="160.0" y1="93.4" x2="211.1" y2="93.4"/>
   <line class="hidden" x1="160.0" y1="100.2" x2="211.1" y2="100.2"/>
   <line class="hidden" x1="179.5" y1="237.7" x2="179.5" y2="204.2"/>

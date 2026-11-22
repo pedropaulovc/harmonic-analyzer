@@ -725,6 +725,22 @@ def context(
         "tap_wrench_reach_max_mm",
         math.floor((stack_max - TAP_GUIDE_OAL_MM) / 0.254 + 1e-9) * 0.254,
     )
+    # DT09 taps the 1/4-28 with the block lying on the 1.5 in stacks: its
+    # own ceiling, the deepest block in place of the upright one.
+    adj_stack = (
+        machine["spindle_to_table_mm"][1]
+        - shop["limits"]["tool_change_clearance_mm"]
+        - p["vise_bed_height_mm"]
+        - p["riser_height_mm"]
+        - f["south_face"]["depth"][1]
+        - p["r8_collet_gauge_mm"]
+    )
+    adj_stack_max = math.floor(adj_stack / 0.254 + 1e-9) * 0.254
+    _agree(
+        plan,
+        "adjuster_wrench_reach_max_mm",
+        math.floor((adj_stack_max - TAP_GUIDE_OAL_MM) / 0.254 + 1e-9) * 0.254,
+    )
     # Centred insets of the part along the jaws: (jaw width - its length
     # along them)/2 inside the left jaw side, as the vise holds state them.
     _agree(plan, "vise_strip_inset_mm", -(jaw_w - strip_max) / 2)
