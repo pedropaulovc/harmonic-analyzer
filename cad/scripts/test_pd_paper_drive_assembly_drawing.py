@@ -1760,23 +1760,33 @@ def test_the_knob_bush_is_pressed_and_reamed_before_the_plate_is_set() -> None:
     )
     feeler = disc.inch_text(knob_bush.SHOULDER_SEAT_GAP_MAX, 4)
     assert feeler == ".0005"
-    assert texts[4] == f"CHECK: A {feeler} FEELER DOES NOT ENTER UNDER THE SHOULDER."
+    # Both acceptances cite their setting-table rows (machinist review r13).
+    assert texts[4] == (
+        f"CHECK: A {feeler} FEELER DOES NOT ENTER UNDER THE SHOULDER "
+        f"{drawing.row_cite('bush-seated')}."
+    )
     # A check and its remedy are separate sub-steps (rule 22).
+    # A first failure is pressed home and checked again; a second renews the
+    # pair (codjiflo review round 2).
     assert texts[5] == (
-        f"IF IT ENTERS AFTER A SECOND PRESS, REPEAT FROM "
-        f"{drawing.sub_step('pin-pressed', 2)} WITH A NEW {plate} PLATE AND {bush} BUSH."
+        f"IF IT ENTERS, PRESS AGAIN TO THE SHOULDER AND REPEAT "
+        f"{drawing.sub_step('pin-pressed', 4)}."
+    )
+    assert texts[6] == (
+        f"IF IT STILL ENTERS, REPEAT FROM {drawing.sub_step('pin-pressed', 2)} WITH A "
+        f"NEW {plate} PLATE AND {bush} BUSH."
     )
     # The in-place ream names its mate, fit and gauge (rules 4 and 22).
-    assert texts[6].endswith(
+    assert texts[7].endswith(
         f"THRU, A RUNNING FIT ON THE {_number('pd-transgear-knob-shaft')} JOURNAL, "
-        "CHECKED WITH PIN GAUGES."
+        f"CHECKED WITH PIN GAUGES {drawing.row_cite('bush-reamed')}."
     )
     ream = steps.inch_window(
         tuple(knob_bush.BORE_DIA + limit for limit in knob_bush.BORE_DIA_LIMITS), 4
     )
     assert ream == ".2490-.2495"
-    assert texts[6].startswith(f"REAM THE BUSH'S BORE \u00d8{ream} THRU, ")
-    assert len(texts) == 7
+    assert texts[7].startswith(f"REAM THE BUSH'S BORE \u00d8{ream} THRU, ")
+    assert len(texts) == 8
     assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
     located = _step_body("arm-plate-located")
     assert f"{bush} KNOB BORE {drawing.KNOB_BORE_LETTER} IS STILL TRUE" in located
@@ -3267,7 +3277,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     for remedy in (
         f"REPLACE A {_number('pd-transgear-knob-bush')} BUSH FOUND OUTSIDE WITH A NEW BUSH AND "
         f"{_number('pd-transgear-arm-plate')} PLATE PER {drawing.sub_step('pin-pressed', 2)}-"
-        f"{drawing.sub_step('pin-pressed', 6)} AND REPEAT FROM "
+        f"{drawing.sub_step('pin-pressed', 7)} AND REPEAT FROM "
         f"{drawing.sub_step('arm-plate-located', 0)}.",
         "REPLACE A DISC FOUND OUTSIDE THROUGH "
         f"{drawing.sub_step('disc-cluster-assembled', 2)}-"

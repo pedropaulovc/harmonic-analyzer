@@ -55,13 +55,12 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from pd_paper_drive_assembly_steps import step_ref
-from pd_rack_pinion_spec import inch_text
+from pd_transgear_knob_cup_notes import CBORE_DEPTH_CALLOUT
 from pd_transgear_knob_cup_spec import (
     BORE_DIA,
     BORE_CLEARANCE_TEXT,
     CBORE_DEPTH,
     CBORE_DIA,
-    WEB_MIN,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     LENGTH,
@@ -148,10 +147,8 @@ BORE_CALLOUT_ROWS = "\n".join(f" {row}" for row in BORE_CALLOUT.splitlines()) + 
 # process where it shows round.
 SUPPLY_CALLOUT = "SEE NOTE 1"
 HOLE_CALLOUT = "#33 DRILL THRU"
-# The pocket's depth keeps its third place to hold the web at the .080
-# target (the spec's WEB_MIN), and says so at the dimension (rule 3;
-# machinist review r11, three runs: ".108" stated no function).
-CBORE_DEPTH_CALLOUT = f"HOLDS WEB {inch_text(WEB_MIN, 3)} MIN"
+# The pocket depth's function row is pd_transgear_knob_cup_notes' (the web
+# its third place holds).
 SECTION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT_ROWS,
     "CupLength": SUPPLY_CALLOUT,

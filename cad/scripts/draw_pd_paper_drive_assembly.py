@@ -2163,6 +2163,8 @@ SETTING_ROW_KEYS = (
     "lock-mark-right",
     "lock-gap",
     "disc-tir",
+    "bush-seated",
+    "bush-reamed",
     "reducer-shake",
     "plate-screw-tips",
     "pivot-tip",
@@ -2214,7 +2216,7 @@ def _step_text(
     bush_ream = steps.inch_window(
         tuple(knob_bush.BORE_DIA + limit for limit in knob_bush.BORE_DIA_LIMITS), 4
     )
-    bush_made = f"{sub_step('pin-pressed', 2)}-{sub_step('pin-pressed', 6)}"
+    bush_made = f"{sub_step('pin-pressed', 2)}-{sub_step('pin-pressed', 7)}"
     lock_gap = LOCK_GAP_WINDOW
     lock_gap_min, lock_gap_max = lock_gap.split(" TO ")
     # R9-47: the gap is the rail's depth less the bar's, so facing the rail's
@@ -2514,11 +2516,16 @@ def _step_text(
             # ream by its mate, fit and gauge (machinist review r10, #2425).
             f"IF IT SLIDES IN BY HAND, REPEAT {s('pin-pressed', 2)} WITH A NEW {bush} "
             "BUSH TURNED TO THE PLATE'S MEASURED HOLE.",
-            f"CHECK: A {bush_seat_feeler} FEELER DOES NOT ENTER UNDER THE SHOULDER.",
-            f"IF IT ENTERS AFTER A SECOND PRESS, REPEAT FROM {s('pin-pressed', 2)} "
-            f"WITH A NEW {n['pd-transgear-arm-plate']} PLATE AND {bush} BUSH.",
+            f"CHECK: A {bush_seat_feeler} FEELER DOES NOT ENTER UNDER THE SHOULDER "
+            f"{row_cite('bush-seated')}.",
+            # A first failure is pressed home and checked again before the
+            # pair is renewed (codjiflo review round 2, #2425).
+            f"IF IT ENTERS, PRESS AGAIN TO THE SHOULDER AND REPEAT {s('pin-pressed', 4)}.",
+            f"IF IT STILL ENTERS, REPEAT FROM {s('pin-pressed', 2)} WITH A NEW "
+            f"{n['pd-transgear-arm-plate']} PLATE AND {bush} BUSH.",
             f"REAM THE BUSH'S BORE \u00d8{bush_ream} THRU, A RUNNING FIT ON THE "
-            f"{n['pd-transgear-knob-shaft']} JOURNAL, CHECKED WITH PIN GAUGES.",
+            f"{n['pd-transgear-knob-shaft']} JOURNAL, CHECKED WITH PIN GAUGES "
+            f"{row_cite('bush-reamed')}.",
         ),
         # #2417: the pin is already pressed (its shank, not its head, is S),
         # and the reducer is meshed on its real seats while the plate is
@@ -3493,6 +3500,24 @@ def setting_table_rows(
             f"{DISC_TIR_TEXT} TIR MAX",
             "DIAL INDICATOR, "
             f"\u00d8{steps.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} PIN",
+        ),
+        # The bush's two step-11 acceptances are on no view (machinist
+        # review r13, #2425, two runs).
+        "bush-seated": (
+            s("pin-pressed", 4),
+            f"{n['pd-transgear-knob-bush']} SHOULDER ON THE "
+            f"{n['pd-transgear-arm-plate']} FRONT FACE",
+            f"{steps.inch_text(knob_bush.SHOULDER_SEAT_GAP_MAX, 4)} DOES NOT ENTER",
+            "FEELER",
+        ),
+        "bush-reamed": (
+            s("pin-pressed", 7),
+            f"{n['pd-transgear-knob-bush']} BORE, REAMED IN THE PLATE",
+            "\u00d8"
+            + steps.inch_window(
+                tuple(knob_bush.BORE_DIA + limit for limit in knob_bush.BORE_DIA_LIMITS), 4
+            ),
+            "PIN GAUGES",
         ),
         "reducer-shake": (
             f"{s('arm-plate-located', 12)}, {s('arm-plate-fitted', 20)}, "

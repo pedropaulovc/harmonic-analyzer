@@ -185,7 +185,9 @@ def test_depth_rows_stand_above_the_section_clear_of_each_other() -> None:
     # rear face, 2 mm or more clear of that shared line.  r11: its third
     # place states its function on the row under it, which runs over the
     # O.D.'s upper extension line and ends right of the cutting line's letter.
-    assert drawing.CBORE_DEPTH_CALLOUT == "HOLDS WEB .080 MIN"
+    import pd_transgear_knob_cup_notes as notes
+
+    assert drawing.CBORE_DEPTH_CALLOUT is notes.CBORE_DEPTH_CALLOUT == "HOLDS WEB .080 MIN"
     assert drawing.SECTION_CALLOUTS["CboreDepth"] == drawing.CBORE_DEPTH_CALLOUT
     assert spec.WEB_MIN == pytest.approx(0.080 * IN, abs=1e-9)
     cbore_half = drawing.CBORE_DEPTH_TEXT_HALF_WIDTH
