@@ -65,21 +65,28 @@ STEM = "pd_platen_guide"
 COMMENT = "MHA-PD-11 platen guide"
 # The nine taps the recipe makes, in X order (the export's tags A1-A9).
 TAP_COUNT = 9
-TAP_PROGRAMS = tuple(
-    (f"PG{k + 5:02d}_tap_{k}", (f"tap_{k}",)) for k in range(1, TAP_COUNT + 1)
-)
 # Programs in order, each listing its operation keys. A program whose keys
 # are grouped in tuples is one section per group (a FreeCAD Job), joined at
-# M6 tool changes.
+# M6 tool changes. A literal: dodo.py reads it with ast.literal_eval.
 PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("PG01_underside", ("underside",)),
     ("PG02_top", ("top_skim",)),
     ("PG03_front", ("front_face",)),
     ("PG04_depth", ("rear_face",)),
     ("PG05_ends_drill", (("ends",), ("tap_spot",), ("tap_drill",))),
-    *TAP_PROGRAMS,
+    ("PG06_tap_1", ("tap_1",)),
+    ("PG07_tap_2", ("tap_2",)),
+    ("PG08_tap_3", ("tap_3",)),
+    ("PG09_tap_4", ("tap_4",)),
+    ("PG10_tap_5", ("tap_5",)),
+    ("PG11_tap_6", ("tap_6",)),
+    ("PG12_tap_7", ("tap_7",)),
+    ("PG13_tap_8", ("tap_8",)),
+    ("PG14_tap_9", ("tap_9",)),
     ("PG15_height", ("top_face",)),
 )
+# The nine tap stops, PG06-PG14, one per tap in X order.
+TAP_PROGRAMS = tuple(program for program in PROGRAMS if "_tap_" in program[0])
 # Every program loads its own first tool (M6, the tool setter): each setup
 # starts on whatever the mill last held, and each tap file before its
 # retract (the tap guide).
