@@ -63,7 +63,11 @@ from _drawing_leaders import (
 )
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
 from _supplier_dimensions import supplier_reference_dimension
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
@@ -79,9 +83,11 @@ from dt_crank_arm_notes import (
     SEAM_CALLOUT,
 )
 from dt_crank_arm_spec import (
+    ANCHOR_EDGE_DIST,
     ANCHOR_HOLE_SPEC,
     ANCHOR_SCREW_X,
     ANCHOR_SCREW_Y,
+    ANCHOR_TAP_WALL_MIN,
     ARM_C2C,
     ARM_END_X,
     ARM_THICKNESS,
@@ -97,9 +103,13 @@ from dt_crank_arm_spec import (
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
     HUB_SEAT_DIA,
+    SEAT_PRESS_NOTE,
     STOCK_FRACTION_DENOMINATOR,
     STOCK_FRACTION_DIMENSIONS,
+    UNIT,
 )
+from dt_crank_hub_geometry import SEAM_DEPTH
+from dt_crank_handle_pivot_screw_spec import TAPPED_MOUTH_DIA_MAX
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -400,6 +410,277 @@ def _texts_off_the_part(adapter: Any, annotations: list[Any]) -> None:
     _telemetry.event("drawing.texts_off_part", inside=str(inside))
     if inside:
         raise RuntimeError(f"dimension text inside the arm silhouette {ARM_SILHOUETTE}: {inside}")
+
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame (the build
+# docstring's layout: the hub seat's axis on Z at the origin, the arm along +X,
+# its width across Y, the inboard face at Z0 and the outboard face, the one the
+# front view shows, at +Z). A band is the dimension's own native band, else the
+# title block's row for its printed places. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_crank_arm"
+_SPEC = "dt_crank_arm_spec"
+_NOTES = "dt_crank_arm_notes"
+_HUB = "dt_crank_hub_geometry"
+_FRAME = (_SPEC, "__frame__")
+_UNIT = (_SPEC, "UNIT")
+_Z = (0.0, 0.0, 1.0)
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    fields={"material.thickness": (ARM_THICKNESS, ((_HUB, "ARM_THICKNESS"),))},
+    model_sources=((_SPEC, "__frame__"), (_HUB, "ARM_THICKNESS"), (_HUB, "ARM_WIDTH")),
+    precision_sources=(
+        (_SPEC, "DRAWING_PRECISION"),
+        (_SPEC, "DRAWING_PRECISION_BY_NAME"),
+        (_SPEC, "DRAWING_REFERENCE_PRECISION"),
+        (_SELF, "_tap_drill_precision"),
+    ),
+)
+# The bar's two faces and two long edges, as supplied (note 1, the side
+# view's (5/16") and the front view's (1")): the inboard face at Z0, the
+# outboard face the front view shows; the top edge the bore axis, the anchor
+# tap and the pivot are set from (AxisFromEdge, AnchorOffset).
+requirement(
+    "inboard_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", 0.0), (_FRAME,))},
+)
+requirement(
+    "outboard_face",
+    kind="face",
+    faces=(PlanarFace(_Z, ARM_THICKNESS),),
+    requirements=("thickness_as_supplied",),
+    fields={
+        "plane": (_plane("z", ARM_THICKNESS), (_FRAME, (_HUB, "ARM_THICKNESS"))),
+        "thickness_as_supplied": (
+            ARM_THICKNESS,
+            ((_HUB, "ARM_THICKNESS"), "STOCK_FRACTION_DIMENSIONS", "STOCK_NOTE"),
+        ),
+        "thickness_from": ("inboard_face", ((_SELF, "THICKNESS_PICKS"),)),
+        "callout": ("(5/16\")", ("STOCK_FRACTION_DIMENSIONS",)),
+    },
+)
+requirement(
+    "top_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), HALF_WIDTH),),
+    requirements=("plane",),
+    fields={"plane": (_plane("y", HALF_WIDTH), (_FRAME, (_HUB, "ARM_WIDTH")))},
+)
+requirement(
+    "bottom_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), HALF_WIDTH),),
+    requirements=("width_as_supplied",),
+    fields={
+        "plane": (_plane("y", -HALF_WIDTH), (_FRAME, (_HUB, "ARM_WIDTH"))),
+        "width_as_supplied": (
+            2.0 * HALF_WIDTH,
+            ((_HUB, "ARM_WIDTH"), "STOCK_FRACTION_DIMENSIONS", "STOCK_NOTE"),
+        ),
+        "width_from": ("top_edge", ((_SELF, "FRONT_KEEP"),)),
+        "callout": ("(1\")", ("STOCK_FRACTION_DIMENSIONS",)),
+    },
+)
+# The two full-round ends, R.50 each at .XX (FRONT_KEEP "BossRadius",
+# "EndRadius"), concentric with the hub seat and the handle pivot; the
+# overall over both is the sheet's (3.95) reference.
+requirement(
+    "boss_end",
+    kind="profile",
+    faces=(CylinderFace(2.0 * HALF_WIDTH, contains_x_mm=-HALF_WIDTH / 2.0),),
+    requirements=("radius",),
+    fields={
+        "radius": (
+            limits(HALF_WIDTH, _P["BossRadius"], unit=UNIT),
+            ("END_RADIUS", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "radius_nominal": (HALF_WIDTH, ("END_RADIUS",)),
+        "centre_at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "extent_x": ([-HALF_WIDTH, 0.0], ("END_RADIUS",)),
+        "extent_y": ([-HALF_WIDTH, HALF_WIDTH], ((_HUB, "ARM_WIDTH"),)),
+    },
+    precision={"radius": _P["BossRadius"]},
+)
+requirement(
+    "handle_end",
+    kind="profile",
+    faces=(CylinderFace(2.0 * HALF_WIDTH, contains_x_mm=ARM_C2C + HALF_WIDTH / 2.0),),
+    requirements=("radius",),
+    fields={
+        "radius": (
+            limits(HALF_WIDTH, _P["EndRadius"], unit=UNIT),
+            ("END_RADIUS", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "radius_nominal": (HALF_WIDTH, ("END_RADIUS",)),
+        "centre_at": ([ARM_C2C, 0.0, 0.0], ("ARM_C2C",)),
+        "overall_length_ref": (
+            ARM_END_X + HALF_WIDTH,
+            ("ARM_END_X", "HALF_WIDTH", "DRAWING_REFERENCE_PRECISION"),
+        ),
+        "extent_x": ([0.0, ARM_END_X], ("ARM_END_X",)),
+        "extent_y": ([-HALF_WIDTH, HALF_WIDTH], ((_HUB, "ARM_WIDTH"),)),
+    },
+    precision={"radius": _P["EndRadius"]},
+)
+# The hub seat: .76 at the title block's .XX (FRONT_KEEP "HubSeatDia"), made
+# first; MHA-DT-31 is turned to suit it (note 2). Its axis stands .50 from
+# the top edge at .XX (FRONT_KEEP "AxisFromEdge").
+requirement(
+    "hub_seat",
+    kind="hole",
+    faces=(CylinderFace(HUB_SEAT_DIA),),
+    requirements=("dia", "thru", "axis_from_edge"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": (_Z, (_FRAME,)),
+        "dia": (
+            limits(HUB_SEAT_DIA, _P["HubSeatDia"], unit=UNIT),
+            ((_HUB, "HUB_SEAT_DIA"), _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "dia_nominal": (HUB_SEAT_DIA, ((_HUB, "HUB_SEAT_DIA"),)),
+        "thru": (True, ((_SELF, "FRONT_KEEP"),)),
+        "axis_from_edge": (
+            limits(HALF_WIDTH, _P["AxisFromEdge"], unit=UNIT),
+            ("HALF_WIDTH", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "axis_from_edge_nominal": (HALF_WIDTH, ("HALF_WIDTH",)),
+        "axis_from_edge_from": ("top_edge", ((_SELF, "FRONT_KEEP"),)),
+        "callout": (HUB_SEAT_CALLOUT, ((_NOTES, "HUB_SEAT_CALLOUT"),)),
+        "fit_note": (SEAT_PRESS_NOTE, ("SEAT_PRESS_NOTE",)),
+    },
+    precision={"dia": _P["HubSeatDia"], "axis_from_edge": _P["AxisFromEdge"]},
+)
+# The MHA-DT-VN-59 seam: reamed with the hub at assembly (note 3), so this
+# part's traveler does not make it; the callout's (.156) is a reference, its
+# .17 depth from the outboard face at .XX.
+requirement(
+    "seam",
+    kind="hole",
+    faces=(CylinderFace(AXIAL_PIN_DIA),),
+    requirements=("depth",),
+    fields={
+        "at": ([AXIAL_PIN_X, 0.0, ARM_THICKNESS], ("AXIAL_PIN_X", (_HUB, "ARM_THICKNESS"))),
+        "axis": ((0.0, 0.0, -1.0), (_FRAME,)),
+        "dia_ref": (AXIAL_PIN_DIA, ((_HUB, "AXIAL_PIN_DIA"), (_NOTES, "SEAM_CALLOUT"))),
+        "depth": (
+            limits(SEAM_DEPTH, 2, unit=UNIT),
+            ((_HUB, "SEAM_DEPTH"), _UNIT, (_NOTES, "SEAM_CALLOUT")),
+        ),
+        "depth_nominal": (SEAM_DEPTH, ((_HUB, "SEAM_DEPTH"),)),
+        "depth_from": ("outboard_face", ((_NOTES, "SEAM_CALLOUT"),)),
+        "made_at": ("assembly", ("SEAM_NOTE",)),
+        "callout": (SEAM_CALLOUT, ((_NOTES, "SEAM_CALLOUT"),)),
+    },
+    precision={"depth": 2},
+)
+# The punched match mark on the outboard face: its centre two ordinates from
+# the hub seat's axis at .XX (FRONT_KEEP "FiducialX", "FiducialY"); its size
+# is the callout's, its process a punch.
+requirement(
+    "match_mark",
+    kind="hole",
+    faces=(CylinderFace(FIDUCIAL_MODEL_DIA),),
+    requirements=("x_from_seat", "y_from_seat", "process"),
+    fields={
+        "at": ([FIDUCIAL_X, FIDUCIAL_Y, ARM_THICKNESS], ("FIDUCIAL_X", "FIDUCIAL_Y", (_HUB, "ARM_THICKNESS"))),
+        "axis": ((0.0, 0.0, -1.0), (_FRAME,)),
+        "x_from_seat": (
+            limits(FIDUCIAL_X, _P["FiducialX"], unit=UNIT),
+            ("FIDUCIAL_X", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "x_from_seat_nominal": (FIDUCIAL_X, ("FIDUCIAL_X",)),
+        "y_from_seat": (
+            limits(FIDUCIAL_Y, _P["FiducialY"], unit=UNIT),
+            ("FIDUCIAL_Y", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "y_from_seat_nominal": (FIDUCIAL_Y, ("FIDUCIAL_Y",)),
+        "x_from_seat_from": ("hub_seat", ((_SELF, "FRONT_KEEP"),)),
+        "y_from_seat_from": ("hub_seat", ((_SELF, "FRONT_KEEP"),)),
+        "process": ("punch", ((_NOTES, "FIDUCIAL_CALLOUT"),)),
+        "face": ("outboard_face", ((_NOTES, "FIDUCIAL_CALLOUT"),)),
+        "callout": (FIDUCIAL_CALLOUT, ((_NOTES, "FIDUCIAL_CALLOUT"),)),
+    },
+    precision={"x_from_seat": _P["FiducialX"], "y_from_seat": _P["FiducialY"]},
+)
+# The two taps, each THRU with its native Hole Wizard callout and drill
+# (three places, _tap_drill_precision, the title block's DRILLED HOLES row):
+# the #2-56 keeper-chain anchor .79 from the seat (FRONT_KEEP "AnchorStation")
+# and .110 from the top edge (FRONT_KEEP "AnchorOffset", .XXX), its wall
+# under the callout; the #4-40 handle pivot 2.95 from the seat (FRONT_KEEP
+# "PivotStation") on the seat's axis, its mouth countersink on the outboard
+# face (the near side) at most .122.
+requirement(
+    "anchor_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(_ANCHOR_HOLE_DIA),),
+    requirements=("thread", "dia", "thru", "station", "edge_offset"),
+    fields={
+        "at": ([ANCHOR_SCREW_X, ANCHOR_SCREW_Y, 0.0], ("ANCHOR_SCREW_X", "ANCHOR_SCREW_Y")),
+        "axis": (_Z, (_FRAME,)),
+        "thread": (ANCHOR_HOLE_SPEC.size, ("ANCHOR_HOLE_SPEC",)),
+        "dia": (
+            drilled_limits(_ANCHOR_HOLE_DIA, 3, unit=UNIT),
+            ("ANCHOR_HOLE_SPEC", _UNIT, (_SELF, "_tap_drill_precision")),
+        ),
+        "nominal_dia": (_ANCHOR_HOLE_DIA, ("ANCHOR_HOLE_SPEC",)),
+        "thru": (True, ((_SELF, "ANCHOR_CALLOUT_XY"),)),
+        "station": (
+            limits(ANCHOR_SCREW_X, _P["AnchorStation"], unit=UNIT),
+            ("ANCHOR_SCREW_X", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "station_nominal": (ANCHOR_SCREW_X, ("ANCHOR_SCREW_X",)),
+        "station_from": ("hub_seat", ((_SELF, "FRONT_KEEP"),)),
+        "edge_offset": (
+            limits(ANCHOR_EDGE_DIST, _P["AnchorOffset"], unit=UNIT),
+            ("ANCHOR_EDGE_DIST", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "edge_offset_nominal": (ANCHOR_EDGE_DIST, ("ANCHOR_EDGE_DIST",)),
+        "edge_offset_from": ("top_edge", ((_SELF, "FRONT_KEEP"),)),
+        "wall_min": (ANCHOR_TAP_WALL_MIN, ("ANCHOR_TAP_WALL_MIN", (_NOTES, "ANCHOR_TAP_ROWS"))),
+        "callout_rows": (ANCHOR_TAP_ROWS, ((_NOTES, "ANCHOR_TAP_ROWS"),)),
+    },
+    precision={"dia": 3, "station": _P["AnchorStation"], "edge_offset": _P["AnchorOffset"]},
+)
+requirement(
+    "pivot_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(_HANDLE_PIVOT_HOLE_DIA),),
+    requirements=("thread", "dia", "thru", "station", "countersink_dia_max"),
+    fields={
+        "at": ([ARM_C2C, 0.0, 0.0], ("ARM_C2C",)),
+        "axis": (_Z, (_FRAME,)),
+        "thread": (HANDLE_PIVOT_HOLE_SPEC.size, ("HANDLE_PIVOT_HOLE_SPEC",)),
+        "dia": (
+            drilled_limits(_HANDLE_PIVOT_HOLE_DIA, 3, unit=UNIT),
+            ("HANDLE_PIVOT_HOLE_SPEC", _UNIT, (_SELF, "_tap_drill_precision")),
+        ),
+        "nominal_dia": (_HANDLE_PIVOT_HOLE_DIA, ("HANDLE_PIVOT_HOLE_SPEC",)),
+        "thru": (True, ((_SELF, "PIVOT_CALLOUT_XY"),)),
+        "station": (
+            limits(ARM_C2C, _P["PivotStation"], unit=UNIT),
+            ("ARM_C2C", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "station_nominal": (ARM_C2C, ("ARM_C2C",)),
+        "station_from": ("hub_seat", ((_SELF, "FRONT_KEEP"),)),
+        "countersink_dia_max": (
+            TAPPED_MOUTH_DIA_MAX,
+            (("dt_crank_handle_pivot_screw_spec", "TAPPED_MOUTH_DIA_MAX"), (_NOTES, "PIVOT_TAP_ROWS")),
+        ),
+        "countersink_angle_deg": (90.0, ((_NOTES, "PIVOT_TAP_ROWS"),)),
+        "countersink_face": ("outboard_face", ((_NOTES, "PIVOT_TAP_ROWS"),)),
+        "callout_rows": (PIVOT_TAP_ROWS, ((_NOTES, "PIVOT_TAP_ROWS"),)),
+    },
+    precision={"dia": 3, "station": _P["PivotStation"]},
+)
 
 
 def build(adapter: Any) -> dict[str, str]:
