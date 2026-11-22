@@ -38,14 +38,20 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _printed_limits import limits
 from _section_axis import create_section_axis_centerline, position_section_caption
 from _session import run_build
 import _telemetry
 from dt_cone_tip_bushing_spec import (
     BORE_CALLOUT,
     BORE_DIA,
+    BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     END_CHAMFER,
@@ -56,6 +62,7 @@ from dt_cone_tip_bushing_spec import (
     OUTER_DIA,
     OUTER_DIA_CALLOUT,
     UNIT,
+    WALL_WORST,
 )
 
 
@@ -134,6 +141,113 @@ CUT_START = (END_CENTER[0], END_CENTER[1] - OUTER_R - 0.006)
 CUT_END = (END_CENTER[0], END_CENTER[1] + OUTER_R + 0.006)
 if BORE_DIA >= OUTER_DIA:
     raise AssertionError("MHA-DT-38 bore is not inside its OD")
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_dt_cone_tip_bushing: one revolve about model +X; the south face at
+# x = 0 is the datum end the length runs from, the north face at x =
+# LENGTH). The O.D. and length take the title block's .XXX row, the bore its
+# reamed +.0005/.0000 band, each O.D. corner's 45 deg chamfer the .XX row
+# (one callout, BOTH ENDS). Each ``span`` is a diameter's model-X extent.
+# The declarations print nothing.
+# The sheet prints no manufacturing note: every requirement is a dimension,
+# its band or its native callout, so the feature manifest's notes are empty.
+DRAWING_NOTES = ""
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_cone_tip_bushing"
+part_metadata(
+    model_sources=("LENGTH", "OUTER_DIA", "BORE_DIA", "END_CHAMFER"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "x", "value": 0.0}, ("LENGTH",)),
+        "outward": ([-1.0, 0.0, 0.0], ("LENGTH",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": ({"frame": "model", "axis": "x", "value": LENGTH}, ("LENGTH",)),
+        "outward": ([1.0, 0.0, 0.0], ("LENGTH",)),
+        "length": (
+            limits(LENGTH, _P["Length"], unit=UNIT),
+            ("LENGTH", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "length_nominal": (LENGTH, ("LENGTH",)),
+        "length_from": ("datum_end", ((_SELF, "SECTION_KEEP"),)),
+        "callout": (LENGTH_CALLOUT, ("LENGTH_CALLOUT",)),
+    },
+    precision={"length": _P["Length"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(OUTER_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], ("OUTER_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("OUTER_DIA",)),
+        "span": ([0.0, LENGTH], ("LENGTH",)),
+        "dia": (
+            limits(OUTER_DIA, _P["OuterDia"], unit=UNIT),
+            ("OUTER_DIA", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "dia_nominal": (OUTER_DIA, ("OUTER_DIA",)),
+        "callout": (OUTER_DIA_CALLOUT, ("OUTER_DIA_CALLOUT",)),
+    },
+    precision={"dia": _P["OuterDia"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(BORE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], ("BORE_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("BORE_DIA",)),
+        "span": ([0.0, LENGTH], ("LENGTH",)),
+        "dia": (
+            limits(BORE_DIA, _P["BoreDia"], BORE_DIA_BAND, unit=UNIT),
+            ("BORE_DIA", "BORE_DIA_BAND", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
+        "thru": (True, ("BORE_CALLOUT",)),
+        "process": ("ream", ("BORE_CALLOUT",)),
+        "wall_min": (WALL_WORST, ("WALL_WORST",)),
+        "callout": (BORE_CALLOUT, ("BORE_CALLOUT",)),
+    },
+    precision={"dia": _P["BoreDia"]},
+)
+for _name, _end, _x in (
+    ("chamfer_datum", "datum_end", END_CHAMFER / 2.0),
+    ("chamfer_far", "far_end", LENGTH - END_CHAMFER / 2.0),
+):
+    requirement(
+        _name,
+        kind="chamfer",
+        faces=(ConeFace(45.0, contains_x_mm=_x),),
+        requirements=("leg",),
+        fields={
+            "leg": (
+                limits(END_CHAMFER, _P["EndChamferSize"], unit=UNIT),
+                ("END_CHAMFER", "UNIT", (_SELF, "SECTION_KEEP")),
+            ),
+            "leg_nominal": (END_CHAMFER, ("END_CHAMFER",)),
+            "angle_deg": (45.0, ("END_CHAMFER_CALLOUT",)),
+            "edge_of": ("outer", ("END_CHAMFER_CALLOUT",)),
+            "at_end": (_end, ("END_CHAMFER_CALLOUT",)),
+            "callout": (END_CHAMFER_CALLOUT, ("END_CHAMFER_CALLOUT",)),
+        },
+        precision={"leg": _P["EndChamferSize"]},
+    )
 
 
 def _drop_sheet_scale_from_caption(adapter: Any, section: Any) -> None:

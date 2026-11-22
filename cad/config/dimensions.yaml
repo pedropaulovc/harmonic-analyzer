@@ -1767,7 +1767,7 @@ sections:
         - modeled + counted + historical scaling
         - med
       - - Reducer disc assembled tooth-space inspection
-        - '0.05 mm TIR MAX about the feed sleeve MHA-PD-10 running bore. Seat a nominal Ø1.000 pin in each of the 150 tooth spaces at mid-face and read it radially. Centre the disc before transfer-spotting the #0-80 taps, lock the screws, recheck every space and match-mark disc and hub (MHA-PD-00). OD runout or span variation does not centre the tooth spaces.'
+        - '0.05 mm TIR MAX about the feed sleeve MHA-PD-10 running bore. Centre the disc on its O.D. (cut on the same arbor as its teeth) before transfer-spotting the #0-80 taps; lock the screws, then seat a nominal Ø1.000 pin at mid-face in 12 tooth spaces, every 12th or 13th, and read it radially; if outside, re-centre on the pins and read again; match-mark disc and hub (MHA-PD-00 step 9). Any evenly spaced sample catches a once-a-turn runout (owner rulings 2026-11-20 and 2026-11-21 (Pedro), #2665). OD runout or span variation alone does not centre the tooth spaces.'
         - —
         - '`pd_rack_pinion_spec.TOOTH_SPACE_RUNOUT_TIR_MM`, `TOOTH_SPACE_GAUGE_PIN_DIA_MM`, `tooth_space_gauge_contacts`; `fits.stock_form_quality.toothspace_runout_tir_mm`'
         - specified inspection control
@@ -1839,7 +1839,7 @@ sections:
         - counted + derived
         - med
       - - Pinion and disc angular index
-        - 'Not inspected on the part drawings: the stock-form teeth are indexed on a dividing head, which holds the spacing far inside the 0.010 relative index the feed budget allows (about 0.12–0.14° at the 12T feed and 15T knob pitch radii). The printed tooth-space control is the 0.05 radial TIR over one pin in every space, which also catches gross indexing slips. The budget term stays in `paper_drive_geom`.'
+        - 'Not inspected on the part drawings: the stock-form teeth are indexed on a dividing head, which holds the spacing far inside the 0.010 relative index the feed budget allows (about 0.12–0.14° at the 12T feed and 15T knob pitch radii). The pinions'' printed tooth-space control is a radial TIR over one pin in every space, which also catches gross indexing slips. The MHA-PD-06 disc''s is the 0.05 radial TIR over one pin in 12 spaces, every 12th or 13th (owner rulings 2026-11-20 and 2026-11-21 (Pedro), #2665): it catches eccentricity but not a single mis-indexed space between the sampled ones, which the dividing head holds. The budget term stays in `paper_drive_geom`.'
         - —
         - '`fits.stock_form_quality.pinion_pitch_index_deviation_mm` through `_gear_quality.pinion_pitch_index_deviation_mm`; `paper_drive_geom` feed budget'
         - process allowance

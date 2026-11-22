@@ -73,6 +73,8 @@ def test_the_turned_parts_are_enrolled() -> None:
         "dt_crank_handle_butt_cup",
         "sm_gooseneck_end_plug",
         "dt_cylinder_end_disc",
+        "mg_wheel_drum",
+        "dt_cone_tip_bushing",
     }
 
 
@@ -103,13 +105,18 @@ def test_the_drill_lands_in_the_drawings_hole_band(stem: str) -> None:
     plan = _plan(stem)
     features = export_features.requirement_manifest(stem)["features"]
     tools = {tool["id"]: tool for tool in plan["tools"]}
-    # A drill sized to a hole band must land in that band; a pre-drill
-    # (sizing "other", e.g. under a reamer) is not the finished hole.
+    # A drill or reamer sized to a band must land in its hole band (an
+    # unmapped band fails on SIZED); a pre-drill (sizing "other", under a
+    # reamer) is not the finished hole.
     drills = [
         (tools[op["tool"]]["ref"], SIZED[op["sizing"]["band_mm"]])
         for setup in plan["setups"]
         for op in setup.get("operations", ())
-        if op.get("drilling") == "twist_drill" and op.get("sizing") != "other"
+        if isinstance(op.get("sizing"), dict)
+        and (
+            op.get("drilling") == "twist_drill"
+            or tools[op["tool"]]["ref"].startswith("reamer-")
+        )
     ]
     assert drills
     for ref, feature in drills:
