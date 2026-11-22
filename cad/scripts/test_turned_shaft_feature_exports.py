@@ -11,6 +11,8 @@ from __future__ import annotations
 import pytest
 
 import ch_fulcrum_shaft_spec as fulcrum
+import ch_pivot_shaft_spec as rocker_pivot
+import rocker_bank_layout as rocker_bank
 import cylinder_bank_layout as bank
 import dt_cylinder_gear_shaft_spec as arbor
 import dt_pinion_lever_geometry as lever
@@ -82,6 +84,37 @@ _FACES: dict[str, dict[str, FaceGeometry]] = {
         "flat_far": _plane(
             _Y, fulcrum.FLAT_HEIGHT, _box(_Z, _FULCRUM_FLAT_Z - 2, _FULCRUM_FLAT_Z + 2)
         ),
+    },
+    "ch_pivot_shaft": {
+        "datum_end": _sphere(
+            2 * rocker_pivot.DOME_SPHERE_RADIUS,
+            (0.0, 0.0, rocker_pivot.DOME_HEIGHT - rocker_pivot.DOME_SPHERE_RADIUS),
+        ),
+        "far_end": _sphere(
+            2 * rocker_pivot.DOME_SPHERE_RADIUS,
+            (
+                0.0,
+                0.0,
+                -rocker_bank.PIVOT_SHAFT_LENGTH
+                + rocker_pivot.DOME_SPHERE_RADIUS
+                - rocker_pivot.DOME_HEIGHT,
+            ),
+        ),
+        "outer": _cylinder(
+            rocker_pivot.SHAFT_DIA,
+            _Z,
+            _box(_Z, -rocker_bank.PIVOT_SHAFT_LENGTH, 0.0),
+        ),
+        **{
+            f"flat_{side}": _plane(
+                _Y,
+                rocker_pivot.FLAT_AF - rocker_pivot.SHAFT_DIA / 2,
+                _box(_Z, -station - 2, -station + 2),
+            )
+            for side, station in zip(
+                ("south", "north"), rocker_bank.PIVOT_SHAFT_FLAT_STATIONS, strict=True
+            )
+        },
     },
     "dt_cylinder_gear_shaft": {
         "datum_end": _sphere(
@@ -184,6 +217,20 @@ def test_printed_bands_are_the_sheets() -> None:
     assert _inch(shaft["flat_datum"]["across"]) == [0.233, 0.243]
     assert shaft["far_end"]["radius_ref"] == pytest.approx(0.125 * IN)
 
+    rocker = manifest("ch_pivot_shaft")["features"]
+    assert _inch(rocker["outer"]["dia"]) == [0.2492, 0.25]
+    assert _inch(rocker["far_end"]["length"]) == [6.84, 6.86]
+    assert _inch(rocker["datum_end"]["height"]) == [0.05, 0.07]
+    for side in ("north", "south"):
+        assert _inch(rocker[f"flat_{side}"]["station"]) == [0.21, 0.23]
+        assert _inch(rocker[f"flat_{side}"]["across"]) == [0.2, 0.22]
+        assert _inch(rocker[f"flat_{side}"]["length"]) == [0.23, 0.25]
+        assert rocker[f"flat_{side}"]["station_to"] == "centre"
+    assert rocker["flat_south"]["station_from"] == "far_end"
+    assert rocker["far_end"]["radius_ref"] == pytest.approx(
+        rocker_pivot.DOME_SPHERE_RADIUS
+    )
+
     cylinder = manifest("dt_cylinder_gear_shaft")["features"]
     assert _inch(cylinder["outer"]["dia"]) == [0.3742, 0.375]
     assert _inch(cylinder["far_end"]["height"]) == [0.05, 0.07]
@@ -235,6 +282,7 @@ def test_manifest_notes_are_the_printed_notes() -> None:
         == dt_cylinder_gear_shaft_notes.DRAWING_NOTES.splitlines()
     )
     assert notes["dt_pinion_pivot_shaft"] == [pivot.DRAWING_NOTES]
+    assert notes["ch_pivot_shaft"] == rocker_pivot.DRAWING_NOTES.splitlines()
     assert notes["dt_pinion_lift_rod"] == notes["mg_wheel_axle"] == []
     # The supply length the arbor declares is the one its note prints.
     assert "SUPPLY 7-1/2 LONG" in dt_cylinder_gear_shaft_notes.DRAWING_NOTES

@@ -226,6 +226,13 @@ material = "lathe-1018-cold-finished"
 rpm = 300
 feed = "by hand along Z, light and steady, cutting oil"
 
+# MHA-CH-05 pivot shaft's two .06 domes (ch_pivot_shaft plan): the same rule.
+[settings.lathe-form-r160-1018]
+tool = "form-tool-r160"
+material = "lathe-1018-cold-finished"
+rpm = 300
+feed = "by hand along Z, light and steady, cutting oil"
+
 # The fulcrum shaft's flats, milled on the PM-30MV after its lathe setups: a
 # plan has one material_key, so the 1/8 in end mill's 1018 CF row at
 # Tru-Edge's chip load (ch.toml settings.endmill-carbide-3fl-1-8-1018-cf-tru-edge,

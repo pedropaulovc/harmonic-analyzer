@@ -1,6 +1,7 @@
 """The turned shafts' flat-milling CAM recipes agree with their models and plans.
 
-``cad/process/<stem>/cam.py`` for the fulcrum shaft and the pinion lift rod
+``cad/process/<stem>/cam.py`` for the fulcrum shaft, the pivot shaft and the
+pinion lift rod
 writes every path itself; its ``context`` runs here on the drawing's
 requirement manifest (the features the part's export binds) with no FreeCAD
 and no SolidWorks, and refuses any plan number that disagrees with the
@@ -23,7 +24,7 @@ import _process_plans
 import cam_nc
 import export_features
 
-STEMS = ("ch_fulcrum_shaft", "dt_pinion_lift_rod")
+STEMS = ("ch_fulcrum_shaft", "ch_pivot_shaft", "dt_pinion_lift_rod")
 SHOP = _process_plans.load_shop()
 
 
@@ -92,7 +93,7 @@ def test_the_recipes_program_passes_every_check_it_declares(
     [
         ("flat_depth_mm", 0.05, "axial_doc_mm"),
         ("jaw_top_over_od_mm", 1.0, "jaw_top_over_od_mm"),
-        ("vise_jaw_from_x0_mm", 2.0, "vise_jaw_from_x0_mm"),
+        ("vise_jaw_from_x0_mm", 2.0, "vise_jaw_(from|to)_x0_mm"),
         ("vise_jaw_to_x0_mm", -2.0, "vise_jaw_to_x0_mm"),
         ("flat_stepover_max_mm", 1.0, "over half the cutter"),
         ("stock_dia_in", 0.0625, "stock_dia_in"),
@@ -111,7 +112,8 @@ def test_a_plan_number_off_the_model_or_shop_is_refused(
 def test_a_flat_station_off_the_model_is_refused(stem: str) -> None:
     plan = copy.deepcopy(_plan(stem))
     recipe = _cam_programs.load_recipe(stem)
-    key = f"{recipe.FLATS[0]}_from_mm"
+    # One flat per file (the pivot shaft's) or every flat in one clamping.
+    key = f"{recipe.FLATS[0]}_from_mm" if hasattr(recipe, "FLATS") else "flat_from_mm"
     plan["parameters"][key] += 0.5
     with pytest.raises(ValueError, match=key):
         _context(stem, plan)
@@ -146,7 +148,7 @@ def test_a_seeded_fault_in_the_program_is_caught(stem: str, tmp_path) -> None:
         # The second X station pushed past the flat's end into the kept O.D.
         (
             _first(ctx, "G1 X"),
-            "G1 X" + str(float(_first(ctx, "G1 X")[4:].split()[0]) + 1.0) + " F{feed}",
+            "G1 X" + str(float(_first(ctx, "G1 X")[4:].split()[0]) + 3.0) + " F{feed}",
             "keep_out",
         ),
     ]
@@ -156,3 +158,28 @@ def test_a_seeded_fault_in_the_program_is_caught(stem: str, tmp_path) -> None:
         assert check in {
             finding.check for finding in _findings(stem, seeded, tmp_path)
         }, (old, new, check)
+
+
+def test_the_pivot_shafts_one_file_cuts_both_flats_each_from_its_own_tip(
+    tmp_path,
+) -> None:
+    stem = "ch_pivot_shaft"
+    features = export_features.requirement_manifest(stem)
+    recipe = _cam_programs.load_recipe(stem)
+    # The south flat moved along the shaft is no longer the north one's twin.
+    moved = copy.deepcopy(features)
+    moved["features"]["flat_south"]["span"] = [
+        z + 0.5 for z in moved["features"]["flat_south"]["span"]
+    ]
+    with pytest.raises(ValueError, match="flat_south: not flat_north's place"):
+        recipe.context(moved, _plan(stem), SHOP, "shaft.step")
+    # Centred on the jaws, as the fulcrum shaft is held, the flat's inner end
+    # sits between the jaw faces: the cutter's sweep reaches a jaw.
+    plan = copy.deepcopy(_plan(stem))
+    length = 173.996
+    width = plan["parameters"]["vise_jaw_width_mm"]
+    plan["parameters"]["vise_jaw_from_x0_mm"] = round((length - width) / 2, 3)
+    plan["parameters"]["vise_jaw_to_x0_mm"] = round((length + width) / 2, 3)
+    ctx = recipe.context(features, plan, SHOP, "shaft.step")
+    _post(stem, ctx, tmp_path)
+    assert "keep_out" in {finding.check for finding in _findings(stem, ctx, tmp_path)}
