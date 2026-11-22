@@ -53,6 +53,9 @@ diameter_mm = 9.5758
 [tools.drill-7-16]  # Drills 7/16
 description = "7/16 (.4375 in) drill, 115-piece index"
 diameter_mm = 11.1125
+[tools.drill-27-64]  # 115-piece index; MHA-DT-27 winding mandrel (shank)
+description = "27/64 (.4219 in) drill, 115-piece index"
+diameter_mm = 10.715625
 [tools.drill-15-32]  # Drills 15/32
 description = "15/32 (.4688 in) drill, 115-piece index"
 diameter_mm = 11.90625
@@ -164,6 +167,63 @@ material = "lathe-o1-drill-rod"
 rpm = 300
 feed = "carriage handwheel along Z, a slow steady feed, cutting oil"
 
+# --- MHA-DT-38 cone tip bushing (cad/process/dt_cone_tip_bushing/plan.toml) --
+# Facing, turning, chamfering and parting take shop/lathe.toml's C360 rows.
+# LittleMachineShop "Cutting Speeds" (read live 2026-11-22, lathe.toml header),
+# Drilling & Reaming, Brass (C36000): drilling and reaming both 160-175
+# ft/min. The low end asks about 10,000 rpm of the #53 drill and the .0625
+# reamer; both clamp to the lathe's 2000 rpm top speed.
+[settings.lathe-drill-53-c360]
+tool = "drill-53"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, light and steady, dry; back fully out to clear chips"
+[settings.lathe-ream-0625-c360]
+tool = "reamer-0625"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle running"
+
+# --- MHA-DT-39 cone tip end screw (cad/process/dt_cone_tip_end_screw) --------
+# The bought 18-8 screw's pivot hole. LittleMachineShop "Cutting Speeds" (read
+# live 2026-11-22, lathe.toml header), Drilling & Reaming, Stainless steels
+# (Austenitic) 201-348 (18-8 is 302/304): drilling 50-55, reaming 30-35
+# ft/min; each takes the low end. The centre drill and the #53 drill ask over
+# 3000 rpm and clamp to the lathe's 2000; the .0630 reamer 1819 rpm. 18-8
+# work-hardens under a rubbing edge: a steady positive feed and cutting oil.
+[settings.lathe-centre-18-8]
+tool = "centre-drills-carbide-60"
+material = "lathe-18-8"
+sfm = 50
+feed = "tailstock quill by hand, a steady positive feed, cutting oil; never dwell"
+[settings.lathe-drill-53-18-8]
+tool = "drill-53"
+material = "lathe-18-8"
+sfm = 50
+feed = "tailstock quill by hand, a steady positive feed, cutting oil; back fully out to clear chips, never dwell"
+[settings.lathe-ream-0630-18-8]
+tool = "reamer-0630"
+material = "lathe-18-8"
+sfm = 30
+feed = "tailstock quill by hand, steady, cutting oil; withdraw with the spindle running"
+
+# --- MHA-DT-31 crank hub (cad/process/dt_crank_hub/plan.toml) ----------------
+# Facing, turning, the L drill and parting take shop/lathe.toml's 1018 rows.
+# LittleMachineShop "Cutting Speeds" (read live 2026-11-22, lathe.toml
+# header), Drilling & Reaming, Plain carbon steels 1006-1026: drilling 60-100,
+# reaming 40-65 ft/min; each takes the low end (the 23/64 drill 637 rpm, the
+# .3760 reamer 406 rpm).
+[settings.lathe-drill-23-64-1018]
+tool = "jig-drill-23-64"
+material = "lathe-1018-cold-finished"
+sfm = 60
+feed = "tailstock quill by hand, steady, cutting oil"
+[settings.lathe-ream-3760-1018]
+tool = "reamer-0376"
+material = "lathe-1018-cold-finished"
+sfm = 40
+feed = "tailstock quill by hand, slow and steady, cutting oil; withdraw with the spindle running"
+
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
 # prechips can check each plan's stock_refs. Description only: the ownership
@@ -248,6 +308,9 @@ chip_load_mm_per_tooth = 0.0254  # .001 in; 2800 × 3 × .001 = 8.4 in/min
 flutes = 3
 feed_unit = "in/min"
 
+[stock.c260-wire-040]
+description = "C26000 cartridge brass, annealed (soft), round wire, .040 in"
+
 # --- .2510-.2515 reamed bores (MHA-DT-18, and any dt part with that band) ---
 # Go/no-go pair for the Ø.2500 +.0010/+.0015 REAM THRU bores, as the MHA-CH-13
 # hub pair (common.toml gauges.plug-gauges-4000-4005): Vermont Gage standard
@@ -279,6 +342,26 @@ description = "Plug gauge pair, .1570 GO (plus) and .1575 NO-GO (minus), Vermont
 [tools.reamer-1570-bottoming]
 description = ".1570 in HSS bottoming (square-end) chucking reamer, corner break .002 max"
 diameter_mm = 3.9878
+
+# The MHA-DT-38 bushing bore's go/no-go pair (cad/config/shop-equipment/ gauges.plug-gauges-0625-0630,
+# to buy): GO .0625 and NO-GO .0630 in = 1.5875 and 1.6002 mm. A fixed-limit pair
+# reads no scale; its resolution is each member's Class X tolerance,
+# .000040 in = 0.001016 mm. The tools record lets a plan list the pair.
+[gauges.plug-gauges-0625-0630]
+range_mm = [1.5875, 1.6002]
+resolution_mm = 0.001016
+[tools.plug-gauges-0625-0630]
+description = "Plug gauge pair, .0625 GO (plus) and .0630 NO-GO (minus), Vermont Gage Class X"
+
+# The MHA-DT-39 end screw hole's go/no-go pair (cad/config/shop-equipment/ gauges.plug-gauges-0630-0635,
+# to buy): GO .0630 and NO-GO .0635 in = 1.6002 and 1.6129 mm. A fixed-limit pair
+# reads no scale; its resolution is each member's Class X tolerance,
+# .000040 in = 0.001016 mm. The tools record lets a plan list the pair.
+[gauges.plug-gauges-0630-0635]
+range_mm = [1.6002, 1.6129]
+resolution_mm = 0.001016
+[tools.plug-gauges-0630-0635]
+description = "Plug gauge pair, .0630 GO (plus) and .0635 NO-GO (minus), Vermont Gage Class X"
 
 # --- MHA-DT-02 arbor pedestal (cad/process/dt_arbor_pedestal/plan.toml) -----
 # Go/no-go pair for its reamed arbor bore Ø.3750 +.0015/+.0010 (.3760-.3765),

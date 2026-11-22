@@ -251,6 +251,11 @@ kind = "drill"
 status = "on_hand"
 note = "quotes-2026-11-17-rev3.xlsx Drills 7/16: owned in 115-pc index (quality unverified); not on the buy list."
 
+[tools.drill-27-64]
+kind = "drill"
+status = "on_hand"
+note = "The 27/64 of the owned 115-piece index (1/16-1/2 by 64ths, as the 13/32 and 7/16 above); its shank is the winding mandrel of MHA-DT-27 dt-crank-pin-ring (cad/process/dt_crank_pin_ring/plan.toml), never cut with."
+
 [tools.drill-11-8mm]
 kind = "drill"
 status = "to_order"

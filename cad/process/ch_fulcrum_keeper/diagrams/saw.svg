@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 1: two blanks sawn off the 3/4 in square bar. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 1: saw {{process.quantity:d}} blanks off the 3/4 in square bar</text>
+  <rect class="part-rest" x="40" y="150" width="680" height="76.2"/>
+  <rect class="part-kept" x="60" y="150" width="137.2" height="76.2"/>
+  <text class="label" x="128.6" y="193.1" text-anchor="middle">blank 1</text>
+  <line class="datum" x1="198.2" y1="140" x2="198.2" y2="236.2"/>
+  <rect class="part-kept" x="209.9" y="150" width="137.2" height="76.2"/>
+  <text class="label" x="278.5" y="193.1" text-anchor="middle">blank 2</text>
+  <line class="datum" x1="348.1" y1="140" x2="348.1" y2="236.2"/>
+  <line class="dims" x1="60" y1="256.2" x2="197.2" y2="256.2"/>
+  <line class="dims" x1="60" y1="246.2" x2="60" y2="266.2"/>
+  <line class="dims" x1="197.2" y1="246.2" x2="197.2" y2="266.2"/>
+  <text class="label" x="60" y="286.2">each about {{process.blank_length_nominal_in:.2f}} long (at least {{process.blank_length_min_in:.2f}}, at most {{process.blank_length_max_in:.2f}}), a kerf ({{process.kerf_in:.3dot}}) between</text>
+  <text class="label" x="40" y="120">the bar's end, squared or sawn; I marked on one cold-finished long face of each blank</text>
+  <text class="label" x="40" y="360">Burr off both ends and the four long edges; blank number on I.</text>
+</svg>

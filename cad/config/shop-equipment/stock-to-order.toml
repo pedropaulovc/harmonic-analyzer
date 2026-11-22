@@ -301,3 +301,21 @@ section_mm = [304.8, 0.508]
 length_mm = 304.8
 status = "to_order"
 cite = ["cad/config/parts/dt-cone-gear-tl-phasing-comb.yaml (owner ruling 2026-11-14 #2734: OnlineMetals 1589, C260 H02 brass sheet, .020 x 12 x 12 in, $42.82, read live 2026-11-14; McMaster-Carr 9011K111 alternative)", "cad/scripts/dt_cone_gear_tl_phasing_comb_spec.py SHEET_THICK, SHEET_LENGTH, SHEET_HEIGHT"]
+
+[stock.c260-wire-040]
+form = "wire"
+material = "C26000 cartridge brass, annealed (soft temper), ASTM B134"
+note = "To order: .040 in C26000 brass round wire, annealed (soft), ASTM B134; the cited listing is Small Parts UKV18 (Amazon ASIN B0051X54YS), a 995 ft spool, which showed no featured offer when read: any C26000 .040 in ASTM B134 wire in a short coil serves. Allocation: dt-crank-pin-ring (MHA-DT-27), one ring and one spare, each a 1.50 in piece (the 1.471 in developed length, dt_crank_pin_ring_spec MEAN_R and BUTT_GAP, plus the ends filed square), and about 6 in for a trial ring. The sheet leaves the temper free (C26000 BRASS WIRE, .040; wire as supplied); soft temper winds round the mandrel and closes with pliers without cracking. Not owned."
+dia_in = [0.04]
+length_in = [12.0]
+status = "to_order"
+cite = ["Small Parts UKV18 https://www.amazon.com/dp/B0051X54YS read live 2026-11-22: 260 Brass Wire, Unpolished (Mill) Finish, Annealed, Soft Temper, ASTM B134, 0.04 in diameter, 995 ft, gauge 18; no featured offer at the time", "cad/config/parts/dt-crank-pin-ring.yaml material_specification", "cad/scripts/dt_crank_pin_ring_spec.py WIRE_DIA, MEAN_R, BUTT_GAP"]
+
+[stock.1018-strip-1-16x5-8]
+form = "flat_bar"
+material = "AISI 1018 cold-drawn low-carbon steel, ASTM A108"
+note = "To order: McMaster-Carr 7702N136, 1018 low-carbon steel bar 1/16 x 5/8 in, cold drawn, square edge, 6 ft. Allocation: pd-guide-lock (MHA-PD-12), four plates and one spare, each a .95 in piece sawn off the strip and filed to the .89 x .45 outline (pd_guide_lock_spec LOCK_WIDTH, LOCK_HEIGHT); the 1/16 thickness is used as supplied. The sheet's material lists AISI 1018 among its grades and 1/16 thickness as supplied within +/-.005; a narrow strip of it replaces cutting the plates out of the 1388K196 16 x 16 in sheet, which the shop has no shear to cut. Thickness tolerance not read: each piece is miked before sawing (traveler). Not owned."
+section_mm = [15.875, 1.5875]
+length_mm = 1828.8
+status = "to_order"
+cite = ["McMaster-Carr 7702N136 https://www.mcmaster.com/product/7702N136/ read 2026-11-22 (search summary; the page blocks scripted reads): Low-Carbon Steel Bar, 1018, 1/16 in thick x 5/8 in wide, 6 ft, cold drawn, square edge, ASTM A108", "cad/config/parts/pd-guide-lock.yaml material_specification", "cad/scripts/pd_guide_lock_spec.py LOCK_WIDTH, LOCK_HEIGHT, LOCK_THICK"]
