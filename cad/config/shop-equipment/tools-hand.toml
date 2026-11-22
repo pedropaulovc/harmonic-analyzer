@@ -242,3 +242,12 @@ name = "Roller chain breaker for ANSI #25 chain"
 kind = "chain_breaker"
 status = "to_order"
 note = "Pushes one outer link's pin out to cut the MHA-PD-00 chain loops (step 34). Owner ruling 2026-11-20 (Pedro), #2429, option A."
+
+# MHA-DT-30 pinion lever pin (cad/process/dt_pinion_lever_pin/plan.toml): a 1/16
+# drill rod is too slender for the 3-jaw or the 14 in saw's vise, so its piece is
+# sawn by hand in the bench vise. No vendor or SKU is asserted (a tool to buy).
+[tools.junior-hacksaw]
+name = "Junior hacksaw, 6 in blade, 32 TPI"
+kind = "hacksaw"
+status = "to_order"
+note = "Not owned: to buy (the shop records no hand hacksaw). Saws the MHA-DT-30 pin's .65 piece off the 1/16 drill rod in the bench vise; any 6 in junior frame with a 32 TPI blade serves."
