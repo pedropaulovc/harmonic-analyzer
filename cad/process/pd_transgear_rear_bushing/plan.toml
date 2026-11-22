@@ -117,9 +117,11 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off, finishing with a light skim from the centre out; set DRO Z0 on it."
+instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off, finishing with a light skim from the centre out; set DRO Z0 on it. This end is the thrust face against MHA-PD-10, a running face at Ra 63."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
+inspection = "Thrust face: Look: a bright, even face with no tears or chatter rings, by eye and fingernail (Ra 63: the R0.4 nose at .004 in/rev leaves about Ra 32)."
+gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "longitudinal_turning"
