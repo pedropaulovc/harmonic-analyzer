@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 5: lying, I up, seat to the right (X0); FK04 profiles the crown and drills and reams the bore on its centre, above the jaw tops. 1 in = 139.7 px. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 5 (FK04_crown_bore): the crown and the bore, I up</text>
+  <text class="label" x="20" y="45">From above (the fixed jaw at the top, the seat at the right):</text>
+  <rect class="clamp" x="183.24" y="58" width="266.76" height="22"/>
+  <text class="label-on-clamp" x="347.64" y="73" text-anchor="middle">fixed jaw</text>
+  <rect class="clamp" x="183.24" y="156.8" width="266.76" height="22"/>
+  <text class="label-on-clamp" x="220" y="171.8" text-anchor="middle">moving jaw</text>
+  <rect class="part-removed" x="230" y="80" width="51.4" height="76.8"/>
+  <path class="part-kept" d="M420 80 H281.4 A38.4 38.4 0 0 0 281.4 156.8 H420 Z"/>
+  <circle class="holes" cx="281.4" cy="118.4" r="17.8"/>
+  <line class="centre-line" x1="232" y1="118.4" x2="430" y2="118.4"/>
+  <circle class="datum" cx="420" cy="80" r="3.5"/>
+  <text class="datum-label" x="426" y="74"></text>
+  <line class="leader" x1="420" y1="80" x2="490" y2="80"/>
+  <circle class="leader-dot" cx="420" cy="80" r="2"/>
+  <text class="datum-label" x="490" y="84">X0 the seat; Y0 F</text>
+  <line class="leader" x1="281.4" y1="118.4" x2="490" y2="130.7"/>
+  <circle class="leader-dot" cx="281.4" cy="118.4" r="2"/>
+  <text class="label" x="490" y="134.7">bore on the crown's centre:</text>
+  <text class="label" x="490" y="150.7">spot, D drill, ream .2550</text>
+  <line class="leader" x1="254.25" y1="145.55" x2="490" y2="187.41"/>
+  <circle class="leader-dot" cx="254.25" cy="145.55" r="2"/>
+  <text class="label" x="490" y="191.41">crown R{{cad.crown_radius_in:.3dot}}: climb (G2),</text>
+  <text class="label" x="490" y="207.41">N side to F side</text>
+  <text class="label" x="20" y="240">From the front (the moving jaw toward you):</text>
+  <rect class="fixture-support" x="183.24" y="376" width="266.76" height="4"/>
+  <rect class="part-kept" x="230" y="271.23" width="190" height="104.78"/>
+  <rect class="part-removed" x="230" y="271.23" width="13" height="50.2"/>
+  <rect class="holes" x="272.5" y="271.23" width="17.8" height="55.7"/>
+  <line class="hidden" x1="183.24" y1="338.35" x2="440" y2="338.35"/>
+  <line class="hidden" x1="183.24" y1="315.93" x2="440" y2="315.93"/>
+  <text class="label" x="490" y="275.23">I (up); crown and bore cut {{process.arch_past_mm:in.3dot}} past</text>
+  <text class="label" x="490" y="291.23">the lug's outer face's plane (Setup 6's step)</text>
+  <text class="label" x="490" y="320.93">the lug's outer face's plane</text>
+  <text class="label" x="490" y="350.35">jaw tops: the jaws grip waste only</text>
+  <text class="datum-label" x="490" y="380">Z0 the stacks' top</text>
+  <circle class="datum" cx="420" cy="376" r="3.5"/>
+  <text class="datum-label" x="426" y="370"></text>
+</svg>

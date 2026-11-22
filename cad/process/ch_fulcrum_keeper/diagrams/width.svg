@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 3: F down on the stacks, I at the fixed jaw; FK02 faces N to the width. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 3 (FK02_width): the near side N to the width</text>
+  <rect class="fixture-vise" x="100" y="360" width="275.25" height="18"/>
+  <rect class="clamp" x="130" y="135.27" width="60" height="224.73"/>
+  <rect class="clamp" x="285.25" y="135.27" width="60" height="224.73"/>
+  <rect class="fixture-support" x="190" y="169.5" width="15.88" height="190.5"/>
+  <rect class="fixture-support" x="269.38" y="169.5" width="15.88" height="190.5"/>
+  <text class="label-on-clamp" x="160" y="151.27" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="315.25" y="151.27" text-anchor="middle">fixed</text>
+  <rect class="part-arriving" x="190" y="80.6" width="95.25" height="88.9"/>
+  <rect class="part-kept" x="190" y="99.65" width="95.25" height="69.85"/>
+  <rect class="part-removed" x="190" y="80.6" width="95.25" height="19.05"/>
+  <line class="active-face" x1="190" y1="99.65" x2="285.25" y2="99.65"/>
+  <rect class="cutter" x="205.88" y="22.6" width="63.5" height="48"/>
+  <text class="label" x="197.62" y="46.6" text-anchor="end">1/2 in end mill</text>
+  <line class="leader" x1="281.25" y1="90" x2="375.25" y2="71.6"/>
+  <circle class="leader-dot" cx="281.25" cy="90" r="2"/>
+  <text class="label" x="375.25" y="75.6">faced in levels to Z {{cad.far_side_width_mm:in.4dot}}</text>
+  <line class="leader" x1="275.25" y1="104" x2="375.25" y2="114.22"/>
+  <circle class="leader-dot" cx="275.25" cy="104" r="2"/>
+  <text class="label" x="375.25" y="118.22">this face becomes N</text>
+  <line class="leader" x1="275.25" y1="163.5" x2="375.25" y2="190.5"/>
+  <circle class="leader-dot" cx="275.25" cy="163.5" r="2"/>
+  <text class="label" x="375.25" y="194.5">F on the stacks</text>
+  <text class="label" x="375.25" y="234.5">I against the fixed jaw (right)</text>
+  <text class="label" x="375.25" y="254.5">jaw tops {{process.lying_grip_mm:in.3dot}} above the stacks</text>
+  <text class="label" x="375.25" y="274.5">stacks: 1 in + 1/2 in parallels, one per jaw</text>
+  <circle class="datum" cx="285.25" cy="169.5" r="3.5"/>
+  <text class="datum-label" x="291.25" y="163.5"></text>
+  <line class="leader" x1="285.25" y1="169.5" x2="375.25" y2="305.5"/>
+  <circle class="leader-dot" cx="285.25" cy="169.5" r="2"/>
+  <text class="datum-label" x="375.25" y="309.5">Y0 the fixed jaw; Z0 the stacks' top</text>
+  <text class="label" x="20" y="392">Seen from the right end, looking −X: X0, the blank's left end, is the far end.</text>
+</svg>
