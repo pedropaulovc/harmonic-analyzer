@@ -263,6 +263,11 @@ id = "file"
 name = "Files; bench vise with soft jaws"
 ref = "jig-files"
 
+[[tools]]
+id = "lathe-file"
+name = "Smooth file (in the lathe, spindle at the low range)"
+ref = "jig-files"
+
 [[setups]]
 machine_kind = "other"
 title = "Saw the blank"
@@ -416,7 +421,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "PA01_cross_hole ended with T3 in: before anything moves, the .251 pin (GO) passes through the cross hole, the .255 pin (NO-GO) does not enter."
+instruction = "PA01_cross_hole has ended: its last lines lift T3 to Z8.670 (.34 in over the bar's top) and stop the spindle (M5). Confirm the spindle is stopped; jog Z up clear, X and Y untouched. Then the .251 pin (GO) passes through the cross hole, the .255 pin (NO-GO) does not enter."
 inspection = "Cross hole Ø{{cad.cross_hole_dia_min_in:.3dot}}–{{cad.cross_hole_dia_max_in:.3dot}}."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.cross_hole_dia_band_mm}}" }]
 
@@ -444,7 +449,11 @@ gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{process.pin_square_dti_mm}}"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Over {{process.pin_square_dti_mm:.3f}} mm: open the vise a little, roll the bar toward the low reading, close it again and read the DTI again. Take the pin out once it reads in band."
+instruction = "Over {{process.pin_square_dti_mm:.3f}} mm: open the vise a little, roll the bar toward the low reading, close it again and read the DTI again."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Take the .251 GO pin out of the cross hole."
 feed = "hand"
 
 [[setups.operations]]
@@ -487,7 +496,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Before unclamping: the {{process.pin_go_pin_in:.4dot}} gauge pin (GO) passes through the pin hole, the {{process.pin_nogo_pin_in:.3dot}} pin (NO-GO) does not enter."
+instruction = "PA02_pin_hole has ended: its last lines lift T4 to Z8.670 (.34 in over the bar's top) and stop the spindle (M5). Confirm the spindle is stopped; jog Z up clear, X and Y untouched. Before unclamping: the {{process.pin_go_pin_in:.4dot}} gauge pin (GO) passes through the pin hole, the {{process.pin_nogo_pin_in:.3dot}} pin (NO-GO) does not enter."
 inspection = "Pin hole Ø{{cad.pin_hole_dia_min_in:.4dot}}–{{cad.pin_hole_dia_max_in:.4dot}}."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.pin_hole_dia_band_mm}}" }]
 
@@ -554,7 +563,13 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.head_dia_band_mm}}" },
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Head or neck over its top: another finish pass and read the check above again. Under its bottom, or the rear face outside its acceptance: the arbor is scrap (the holes are in); saw another blank (Setup 1)."
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Head over its top: AR tool back; spindle stopped, its point on the faced head end, DRO Z0 again; another finish pass over the head. Neck over its top: the sharp-nose tool, zeroed as above, another light pass. Read the check above again. Under its bottom, or the rear face outside its acceptance: the arbor is scrap (the holes are in); saw another blank (Setup 1)."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.head_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -569,22 +584,22 @@ cut_diameter_mm = "{{cad.head_dia_mm}}"
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "file"
+tool = "lathe-file"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle at the low range: file the steps off the crown with the smooth file, stroking from the apex out to the rim, until the step corners are just gone (the apex itself untouched). The edges are broken after the head's checks."
+instruction = "Spindle at the low range: file the steps off the crown with the smooth file, stroking from the apex out to the rim, blending the Ø.05 face left at the apex into the crown, until the step corners are just gone. The edges are broken after the head's checks."
 rpm = 200
 feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped. Sharp-nose tool (R.004): touch its nose on the apex and set DRO Z0 there; touch its side on the head's miked O.D. and set the cross-slide DRO to that diameter (to its half if the DRO reads radius). Touch the nose on the crown at Ø.300 and at Ø.500, reading Z. The bands allow for the R.004 nose."
-inspection = "Crown at Ø.300 Z-.0261 to -.0274 and at Ø.500 Z-.0771 to -.0815 (SR{{cad.head_crown_radius_min_in:.2dot}}–{{cad.head_crown_radius_max_in:.2dot}}); no flat at the apex."
+instruction = "Spindle stopped. Sharp-nose tool (R.004): touch its nose on the apex and set DRO Z0 there; touch the nose on the head's miked O.D. and set the cross-slide DRO to that diameter (to its half if the DRO reads radius), so X and Z read the same point of the tool. Touch the nose on the crown at Ø.300 and at Ø.500, reading Z. The bands allow for the R.004 nose."
+inspection = "Crown at Ø.300 Z-.0261 to -.0274 and at Ø.500 Z-.0771 to -.0815 (SR{{cad.head_crown_radius_min_in:.2dot}}–{{cad.head_crown_radius_max_in:.2dot}}); no step left at the apex (the Ø.05 face blended in)."
 gauge_checks = [{ gauge = "lathe-z-dro", band_mm = "{{cad.head_crown_radius_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Either reading nearer zero than its band (the crown too full): file again from the rim inward and read the check above again. Either reading past its band (too deep): the head is scrap; saw another blank (Setup 1)."
+instruction = "Either reading nearer zero than its band (the crown too full), or a step still at the apex: file again from the rim inward (from the apex out for the step) and read the check above again. Either reading past its band (too deep): the head is scrap; saw another blank (Setup 1)."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -599,7 +614,7 @@ instruction = "Head length over {{cad.head_length_max_in:.2dot}}: the crown is t
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "file"
+tool = "lathe-file"
 drilling = "none"
 sizing = "other"
 instruction = "Spindle at the low range: break the head's rim at the crown and its rear edge R{{cad.edge_break_in:.3dot}} max with the smooth file's corner."
@@ -612,7 +627,7 @@ title = "The shaft, between the chuck and the tailstock centre"
 machine = "PM-1127VF-LB lathe / 6 in 3-jaw, follow rest"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw over a brass shim wrap on the Ø.59 head (the neck and the bar out of the jaws), the back end's centre hole on the MT3 dead centre, a dab of grease on its point, the quill snug and locked. The follow rest on the carriage, its jaws just ahead of the tool (on its headstock side): every pass feeds from the back end toward the head. For the roughing and finishing passes the jaws ride on the diameter that pass has not yet cut, reset to it before each pass; for the relief passes they stay set on the finished Ø.3117, bearing on it either side of the relief and standing clear over the relief's first cut. Recheck the centre snug before each pass: the shaft lengthens as it warms."
+holding = "3-jaw over a brass shim wrap on the Ø.59 head (the neck and the bar out of the jaws), the back end's centre hole on the MT3 dead centre, a dab of grease on its point, the quill snug and locked. The follow rest on the carriage, its jaws just ahead of the tool (on its headstock side): every pass feeds from the back end toward the head. Before the first pass, measure with the rule the jaws' lead L, from the tool's left edge to the jaws' headstock-side face. For the roughing and finishing passes the jaws ride on the diameter that pass has not yet cut, reset to it before each pass; they must not reach the neck's end face at Z+{{cad.neck_length_in:.3dot}} (the neck is larger than the jaws' setting), so each pass stops at Z+(.46 + L), the jaws are backed off, and the last stretch to the shoulder is turned unsupported, beside the chuck. For the relief passes they stay set on the finished Ø.3117, bearing on it either side of the relief and standing clear over the relief's first cut. Recheck the centre snug before each pass: the shaft lengthens as it warms."
 datum = "Z0 (carriage DRO) the head's rear face (faced with the sharp-nose tool in Setup 6), touched with the AR tool's left edge in this setup's first op; every station is +Z from it."
 diagram = { file = "diagrams/shaft.svg", alt = "The blank between the 3-jaw on the head and the dead centre in the back end; the follow rest rides just ahead of the tool, on the diameter not yet cut, as the shaft is turned to Ø.3117 its whole length, the Ø.28 relief between 4.20 and 6.80, the SR.28 back crown stepped at the tailstock end." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.head_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = 241.8, minimum_diameter_mm = "{{cad.bond_relief_dia_mm}}", support = "tailstock" }
@@ -628,7 +643,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Rough the shaft from the back end toward Z+{{cad.neck_length_in:.3dot}} (the bar's shoulder) in cuts of {{process.rough_doc_in:.3dot}} per side to Ø{{process.rough_dia_in:.3dot}}; before each pass set the follow rest's jaws, ahead of the tool, on the diameter the last pass left. Stop each pass .010 short of the shoulder."
+instruction = "Rough the shaft from the back end toward Z+{{cad.neck_length_in:.3dot}} (the bar's shoulder) in cuts of {{process.rough_doc_in:.3dot}} per side to Ø{{process.rough_dia_in:.3dot}}; before each pass set the follow rest's jaws, ahead of the tool, on the diameter the last pass left. Each pass: stop the feed at Z+(.46 + L) as Holding says, back the jaws off, and feed on by hand to .010 short of the shoulder."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{process.bar_dia_mm}}"
 
@@ -648,7 +663,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the whole shaft from the back end to Z+{{cad.neck_length_in:.3dot}} in one pass at the settings column's power feed to Ø{{cad.front_journal_dia_min_in:.4dot}}–{{cad.front_journal_dia_max_in:.4dot}}, aiming {{process.journal_aim_in:.4dot}}, the follow rest's jaws, ahead of the tool, set on the roughed Ø{{process.rough_dia_in:.3dot}}: the journals' band, inside the spans' and lands' {{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}."
+instruction = "Finish the whole shaft from the back end to Z+{{cad.neck_length_in:.3dot}} in one pass at the settings column's power feed to Ø{{cad.front_journal_dia_min_in:.4dot}}–{{cad.front_journal_dia_max_in:.4dot}}, aiming {{process.journal_aim_in:.4dot}}, the follow rest's jaws, ahead of the tool, set on the roughed Ø{{process.rough_dia_in:.3dot}}: the journals' band, inside the spans' and lands' {{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}. Stop the power feed at Z+(.46 + L), back the jaws off, and finish the last stretch to the shoulder at the same cross-slide setting by hand feed."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
 
@@ -670,7 +685,13 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.front_journal_dia_band
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A journal over {{cad.front_journal_dia_max_in:.4dot}}: skim that journal only (Z+{{cad.front_journal_station_in:.2dot}} to Z+{{cad.front_journal_end_station_in:.2dot}} or Z+{{cad.back_journal_station_in:.2dot}} to Z+{{cad.back_journal_end_station_in:.2dot}}) to Ø{{process.journal_aim_in:.4dot}}: the cross slide in by half the miked excess per side (.0001 per side takes .0002 off the diameter), and mike again. Any reading under its band's bottom: the arbor is scrap; start again from Setup 1."
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "A journal over {{cad.front_journal_dia_max_in:.4dot}}: AR tool back; spindle stopped, its left edge on the head's rear face, DRO Z0 again. Skim that journal only (Z+{{cad.front_journal_station_in:.2dot}} to Z+{{cad.front_journal_end_station_in:.2dot}} or Z+{{cad.back_journal_station_in:.2dot}} to Z+{{cad.back_journal_end_station_in:.2dot}}) to Ø{{process.journal_aim_in:.4dot}}: the cross slide in by half the miked excess per side (.0001 per side takes .0002 off the diameter), and mike again. Any reading under its band's bottom: the arbor is scrap; start again from Setup 1."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -700,7 +721,13 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.bond_relief_dia_band_m
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Relief over {{cad.bond_relief_dia_max_in:.3dot}}: another .004 cut per side and mike again. Under {{cad.bond_relief_dia_min_in:.3dot}}: the arbor is scrap; start again from Setup 1."
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Relief over {{cad.bond_relief_dia_max_in:.3dot}}: AR tool back; spindle stopped, its left edge on the head's rear face, DRO Z0 again; another .004 cut per side as before, and mike again. Under {{cad.bond_relief_dia_min_in:.3dot}}: the arbor is scrap; start again from Setup 1."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.bond_relief_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -715,7 +742,7 @@ cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "file"
+tool = "lathe-file"
 drilling = "none"
 sizing = "other"
 instruction = "Spindle at the low range: file the crown's steps smooth from the centre hole out to the rim, until the step corners are just gone, never past the rim at Z+{{cad.back_crown_rim_station_in:.2dot}}."
@@ -725,22 +752,32 @@ feed = "hand"
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "file"
+tool = "lathe-file"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle at the low range: break the outside edges R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max with the smooth file's corner: the shoulder's outer edge at Z+{{cad.neck_length_in:.3dot}}, the relief's step edges at Z+{{cad.bond_relief_station_in:.2dot}} and Z+{{cad.bond_relief_end_station_in:.2dot}}, and the back crown's rim at Z+{{cad.back_crown_rim_station_in:.2dot}}. The file's flat never on the journals."
+instruction = "Spindle at the low range: break the outside edges R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max with the smooth file's corner: the shoulder's outer edge at Z+{{cad.neck_length_in:.3dot}} and the relief's step edges at Z+{{cad.bond_relief_station_in:.2dot}} and Z+{{cad.bond_relief_end_station_in:.2dot}}. The file's flat never on the journals. The back crown's rim is broken after its check."
 rpm = 200
 feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped. Sharp-nose tool (R.004): touch its left side on the head's rear face and set DRO Z0 there; set the cross-slide DRO on the miked shaft as in Setup 6. Touch the nose on the crown at Ø.300, at Ø.280 and at Ø.120, reading Z. The bands allow for the R.004 nose; Ø.300 sits just inside the rim."
+instruction = "Spindle stopped. Sharp-nose tool (R.004): touch its left side on the head's rear face and set DRO Z0 there; touch the nose on the miked shaft and set the cross-slide DRO to that diameter, as in Setup 6. Touch the nose on the crown at Ø.300, at Ø.280 and at Ø.120, reading Z. The bands allow for the R.004 nose; Ø.300 sits just inside the rim, still sharp."
 inspection = "Crown rise from Ø.280 to Ø.120 +.0293 to +.0318 (SR{{cad.back_crown_radius_min_in:.2dot}}–{{cad.back_crown_radius_max_in:.2dot}}); at Ø.300 Z+9.344 to +9.365: the rim at Z+{{cad.back_crown_rim_station_min_in:.2dot}} to +{{cad.back_crown_rim_station_max_in:.2dot}} plus the crown's .004 rise to Ø.300."
 gauge_checks = [{ gauge = "lathe-z-dro", band_mm = "{{cad.back_crown_radius_band_mm}}" }, { gauge = "lathe-z-dro", band_mm = "{{cad.back_crown_rim_station_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Rise over its band (the crown too full): file again from the rim inward and read the check above again. Rise under its band, or the rim outside its band: the arbor is scrap; start again from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "lathe-file"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle at the low range: break the back crown's rim at Z+{{cad.back_crown_rim_station_in:.2dot}} R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max with the smooth file's corner."
+rpm = 200
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"

@@ -117,7 +117,8 @@ resolution_mm = 0.00254
 # The dt reamed-bore go/no-go pairs, Vermont Gage Class X as the hub pair
 # (cad/config/shop-equipment/ gauges, same keys, to buy; tools rows in
 # shop/dt.toml): .2510/.2515 (MHA-DT-18, MHA-DT-14, MHA-DT-23), .3135/.3140
-# and .1570/.1575 (MHA-DT-14), .3760/.3765 (MHA-DT-02).
+# and .1570/.1575 (MHA-DT-14), .3760/.3765 (MHA-DT-02), .0930/.0935 and
+# .4500/.4505 (MHA-DT-11).
 [gauges.plug-gauges-2510-2515]
 range_mm = [6.3754, 6.3881]
 resolution_mm = 0.001016
@@ -137,6 +138,9 @@ range_mm = [6.35, 6.3627]
 resolution_mm = 0.001016
 [gauges.plug-gauges-0930-0935]
 range_mm = [2.3622, 2.3749]
+resolution_mm = 0.001016
+[gauges.plug-gauges-4500-4505]
+range_mm = [11.43, 11.4427]
 resolution_mm = 0.001016
 
 [gauges.height-gauge]

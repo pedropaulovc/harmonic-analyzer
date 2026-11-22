@@ -51,25 +51,20 @@ def test_the_faced_length_puts_the_rim_inside_its_band():
     low, high = (v / IN for v in f["far_end"]["length"])
     dome = f["dome"]["height_nominal"] / IN
     assert p["dome_height_in"] == pytest.approx(dome, abs=1e-4)
-    assert low <= p["overall_min_in"] - dome
-    assert p["overall_max_in"] - dome <= high
+    assert p["overall_min_in"] - dome == pytest.approx(low, abs=1e-4)
+    assert p["overall_max_in"] - dome == pytest.approx(high, abs=1e-4)
+    assert p["overall_min_in"] < p["overall_in"] < p["overall_max_in"]
     assert p["overall_min_mm"] == pytest.approx(p["overall_min_in"] * IN, abs=1e-3)
     assert p["overall_max_mm"] == pytest.approx(p["overall_max_in"] * IN, abs=1e-3)
 
 
-def test_the_drive_pin_targets_and_acceptance_sit_inside_the_band():
+def test_the_drive_pin_target_and_its_guard_band_sit_inside_the_band():
     p = _plan()["parameters"]
     f = _features()["features"]
+    guard = p["pin_correct_in"] * IN
     for name in ("drive_pin_1", "drive_pin_2"):
         low, high = f[name]["offset"]
-        assert low < p["pin_x_mm"] < high
-        assert low < p["pin_accept_min_mm"] < p["pin_accept_max_mm"] < high
-    assert p["pin_accept_min_mm"] == pytest.approx(
-        p["pin_accept_min_in"] * IN, abs=1e-3
-    )
-    assert p["pin_accept_max_mm"] == pytest.approx(
-        p["pin_accept_max_in"] * IN, abs=1e-3
-    )
+        assert low < p["pin_x_mm"] - guard < p["pin_x_mm"] + guard < high
 
 
 def test_the_plug_pair_is_the_drive_pin_band():

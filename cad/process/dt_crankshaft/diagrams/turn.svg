@@ -13,7 +13,7 @@
   <rect class="part-kept" x="553" y="151" width="14" height="18"/>
   <rect class="part-kept" x="567" y="153" width="113" height="14"/>
   <line class="active-face" x1="140" y1="120" x2="140" y2="200"/>
-  <polygon class="fixture-support" points="680,160 720,140 720,180"/>
+  <polygon class="fixture-vise" points="680,160 720,140 720,180"/>
   <line class="centre-line" x1="20" y1="160" x2="740" y2="160"/>
   <text class="label" x="110" y="230">part-off: blade face at Z-5.200</text>
   <line class="leader" x1="140" y1="218" x2="140" y2="198"/>
@@ -28,6 +28,6 @@
   <line class="leader" x1="400" y1="203" x2="400" y2="172"/>
   <text class="label" x="560" y="110">seat Ø.3121, F to .89</text>
   <line class="leader" x1="620" y1="114" x2="620" y2="153"/>
-  <text class="datum-label" x="640" y="215">Z0 F; MT3 dead centre</text>
+  <text class="datum-label" x="565" y="215">Z0 F; MT3 dead centre</text>
   <line class="leader" x1="690" y1="205" x2="681" y2="168"/>
 </svg>
