@@ -338,7 +338,7 @@ purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .1260 in GO 
 note = "Not owned: to buy. MHA-PN-05 Ø.1260-.1265 REAM THRU pivot bore (after the ream, and again after the bench clean-up): GO enters, NO-GO does not."
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages"]
 
-# --- CNC bush-c reamed bores (MHA-MG-10, MHA-DT-38) -------------------------
+# --- Reamed bores of lathe parts (MHA-MG-10, MHA-DT-38) ----------------------
 # Fixed-limit pairs as gauges.plug-gauges-2510-2515: each band is .0005 in,
 # under the pin-gauge sets' .001 in step. Range and tolerance:
 # cad/process/shop/ gauges, same keys.

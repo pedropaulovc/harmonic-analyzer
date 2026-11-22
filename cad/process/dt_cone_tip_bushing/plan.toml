@@ -263,7 +263,7 @@ speed_kind = "other"
 tool = "deburr"
 drilling = "none"
 sizing = "other"
-instruction = "Deburr: break both ends of the bore R{{cad.edge_break_in:.3dot}} max with a twist of the deburring set's countersink by hand, without touching the faces' flats or the bore's wall."
+instruction = "Deburr: break both ends of the bore, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, with a twist of the deburring set's countersink by hand, without touching the faces' flats or the bore's wall."
 feed = "hand"
 
 [[setups.operations]]
