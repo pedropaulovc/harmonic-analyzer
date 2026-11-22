@@ -417,7 +417,9 @@ requirement(
             [path.name for path in part.NUMERAL_LAYER_DXFS],
             ("NUMERAL_LAYER_DXFS",),
         ),
-        "bbox_mm": (list(part.NUMERALS_BBOX), ("NUMERALS_BBOX",)),
+        # The numerals' ink box on the ruled face: x then y, each [low, high] mm.
+        "x_span": ([part.NUMERALS_BBOX[0], part.NUMERALS_BBOX[2]], ("NUMERALS_BBOX",)),
+        "y_span": ([part.NUMERALS_BBOX[1], part.NUMERALS_BBOX[3]], ("NUMERALS_BBOX",)),
         "font_note": (callouts.DRAWING_NOTES.splitlines()[-1].strip(), (("ms_stick_callouts", "DRAWING_NOTES"),)),
     },
     precision={"height": _P["NumeralHeight"]},
