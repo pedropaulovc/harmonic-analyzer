@@ -46,37 +46,67 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
+from _printed_limits import limits
 from _section_axis import position_section_caption
 from _session import run_build
 import _config
 import _telemetry
 from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_drive_collar_spec import (
+    BODY_BLANK_LENGTH_MIN,
     BODY_SUPPLY_NOTE,
     BORE_CALLOUT,
+    BORE_CORE_CLEARANCE,
     BORE_DIA,
+    BORE_DIA_BAND,
     DOWEL_NUMBER,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
+    DRIVE_PIN_COLLAR_RIM_WORST,
     FLAT_PIN_CENTRE,
+    FLAT_PIN_CENTRE_TOL,
     FLAT_PIN_FLOOR,
+    FLAT_PIN_FLOOR_LIMITS,
+    FLAT_PIN_HOLE_BAND,
     FLAT_PIN_HOLE_CALLOUT,
+    FLAT_PIN_HOLE_DEPTH_REF,
+    FLAT_PIN_HOLE_DIA,
     FLAT_PIN_HOLE_SUFFIX,
+    FLAT_PIN_NUMBER,
+    FLAT_PIN_WEB_WORST,
     LENGTH,
+    LENGTH_FITTED_MAX,
+    LENGTH_FITTED_MIN,
     OD,
+    OD_BAND,
     OVERALL_LENGTH,
-    PILOT_SUPPLY_NOTE,
+    PILOT_BLANK_LENGTH_MIN,
     PILOT_DIA,
+    PILOT_DIA_BAND,
     PILOT_LENGTH,
+    PILOT_LENGTH_FITTED_MAX,
+    PILOT_LENGTH_FITTED_MIN,
+    PILOT_SUPPLY_NOTE,
     PIN_CIRCLE_RADIUS,
+    PIN_HOLE_BAND,
+    PIN_HOLE_DIA,
+    PIN_OFFSET_TOL,
+    REAR_BREAK,
     REAR_BREAK_CALLOUT,
+    REAR_BREAK_LIMITS,
     REAR_BREAK_SUFFIX,
+    SHAFT_NUMBER,
     SPROCKET_NUMBER,
+    UNIT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -266,6 +296,292 @@ ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
 # block; the actual fit procedure is linked to its assembly step.
 NOTES_XY = (0.016, 0.085)
 NOTES_TEXT = f"{property_link('Manufacturing Notes')}\n{FIT_NOTES}"
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_pd_transgear_drive_collar: axis +Z through the origin, rearward; the
+# seat face at z = 0, the body to the fitted rear face at z = LENGTH, the
+# pilot to z = -PILOT_LENGTH).  The body and the pilot are supplied long and
+# faced to fit at assembly (notes 3 and 4): each end face carries its supply
+# minimum, the fitted band its note prints and the note.  The 2X dowel reams
+# run through the body beside the pilot, entered here from the seat face;
+# the flat pin's ream is blind from the rear face, its floor stationed from
+# the seat face (.08, the controlling dimension; the (.163) depth is its
+# REF from the nominal fitted rear face).  The rear bore mouth's break is cut
+# at assembly through the pressed pin (MHA-PD-00 step 29), never by the
+# part's traveler; the front mouth takes the title block's edge break.  The
+# declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_transgear_drive_collar"
+_PIN = "pd_vn_transgear_collar_flat_pin_spec"
+part_metadata(
+    model_sources=("LENGTH", "OD", "PILOT_DIA", "PILOT_LENGTH", "BORE_DIA"),
+    precision_sources=("DRAWING_PRECISION_BY_NAME",),
+)
+requirement(
+    "seat_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
+        "outward": ([0.0, 0.0, -1.0], ("__frame__",)),
+    },
+)
+requirement(
+    "pilot_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), PILOT_LENGTH),),
+    requirements=("supply_length_min", "fitted_length"),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": -PILOT_LENGTH},
+            ("PILOT_LENGTH",),
+        ),
+        "outward": ([0.0, 0.0, -1.0], ("PILOT_LENGTH",)),
+        "supply_length_min": (
+            PILOT_BLANK_LENGTH_MIN,
+            ("PILOT_BLANK_LENGTH_MIN", "PILOT_SUPPLY_NOTE"),
+        ),
+        "fitted_length": (
+            [PILOT_LENGTH_FITTED_MIN, PILOT_LENGTH_FITTED_MAX],
+            ("PILOT_LENGTH_FITTED_MIN", "PILOT_LENGTH_FITTED_MAX", "PILOT_SUPPLY_NOTE"),
+        ),
+        "fitted_length_nominal": (PILOT_LENGTH, ("PILOT_LENGTH",)),
+        "fitted_length_from": ("seat_face", ((_SELF, "SIDE_KEEP"),)),
+        "faced_at": ("assembly", ((_SELF, "FIT_NOTES"),)),
+        "callout": (
+            DIMENSION_CALLOUTS_BELOW["PilotLength"],
+            ((_SELF, "DIMENSION_CALLOUTS_BELOW"),),
+        ),
+        "note": (FIT_NOTES.split(f"\n{BODY_NOTE}. ")[0], ((_SELF, "FIT_NOTES"),)),
+    },
+    precision={"fitted_length": _P["PilotLength"]},
+)
+requirement(
+    "rear_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), LENGTH),),
+    requirements=("supply_length_min", "fitted_length"),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": LENGTH}, ("LENGTH",)),
+        "outward": ([0.0, 0.0, 1.0], ("LENGTH",)),
+        "supply_length_min": (
+            BODY_BLANK_LENGTH_MIN,
+            ("BODY_BLANK_LENGTH_MIN", "BODY_SUPPLY_NOTE"),
+        ),
+        "fitted_length": (
+            [LENGTH_FITTED_MIN, LENGTH_FITTED_MAX],
+            ("LENGTH_FITTED_MIN", "LENGTH_FITTED_MAX", "BODY_SUPPLY_NOTE"),
+        ),
+        "fitted_length_nominal": (LENGTH, ("LENGTH",)),
+        "fitted_length_from": ("seat_face", ((_SELF, "SIDE_KEEP"),)),
+        "faced_at": ("assembly", ((_SELF, "FIT_NOTES"),)),
+        "callout": (
+            DIMENSION_CALLOUTS_BELOW["CollarLength"],
+            ((_SELF, "DIMENSION_CALLOUTS_BELOW"),),
+        ),
+        "note": (
+            f"{BODY_NOTE}. " + FIT_NOTES.split(f"\n{BODY_NOTE}. ")[1],
+            ((_SELF, "FIT_NOTES"),),
+        ),
+    },
+    precision={"fitted_length": _P["CollarLength"]},
+)
+requirement(
+    "outer",
+    kind="outside_cylinder",
+    faces=(CylinderFace(OD),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "dia": (
+            limits(OD, _P["CollarDia"], OD_BAND, unit=UNIT),
+            ("OD", "OD_BAND", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "nominal_dia": (OD, ("OD",)),
+        "length_nominal": (LENGTH, ("LENGTH",)),
+        "callout": (
+            DIMENSION_CALLOUTS_BELOW["CollarDia"],
+            ((_SELF, "DIMENSION_CALLOUTS_BELOW"),),
+        ),
+    },
+    precision={"dia": _P["CollarDia"]},
+)
+requirement(
+    "pilot",
+    kind="outside_cylinder",
+    faces=(CylinderFace(PILOT_DIA),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
+        "dia": (
+            limits(PILOT_DIA, _P["PilotDia"], PILOT_DIA_BAND, unit=UNIT),
+            ("PILOT_DIA", "PILOT_DIA_BAND", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "nominal_dia": (PILOT_DIA, ("PILOT_DIA",)),
+        "length_nominal": (PILOT_LENGTH, ("PILOT_LENGTH",)),
+        "callout": (
+            DIMENSION_CALLOUTS_BELOW["PilotDia"],
+            ((_SELF, "DIMENSION_CALLOUTS_BELOW"),),
+        ),
+    },
+    precision={"dia": _P["PilotDia"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(BORE_DIA),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, -PILOT_LENGTH], ("PILOT_LENGTH",)),
+        "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "dia": (
+            limits(BORE_DIA, _P["BoreDia"], BORE_DIA_BAND, unit=UNIT),
+            ("BORE_DIA", "BORE_DIA_BAND", "UNIT", (_SELF, "END_KEEP")),
+        ),
+        "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
+        "thru": (True, ("BORE_CALLOUT",)),
+        "process": ("ream", ("BORE_CALLOUT",)),
+        "mate": (SHAFT_NUMBER, ("SHAFT_NUMBER", "BORE_CALLOUT")),
+        "diametral_clearance": (list(BORE_CORE_CLEARANCE), ("BORE_CORE_CLEARANCE",)),
+        "callout": (BORE_CALLOUT, ("BORE_CALLOUT",)),
+    },
+    precision={"dia": _P["BoreDia"]},
+)
+# The 2X dowel reams on the +Y and -Y radius lines, each centre stationed
+# from the bore's axis (the sheet's PinPosY and PinNegY), through the body.
+for _name, _sign, _station in (
+    ("dowel_a", 1.0, "PinPosY"),
+    ("dowel_b", -1.0, "PinNegY"),
+):
+    requirement(
+        _name,
+        kind="hole",
+        faces=(CylinderFace(PIN_HOLE_DIA, contains_y_mm=_sign * PIN_CIRCLE_RADIUS),),
+        requirements=("dia", "offset"),
+        fields={
+            "at": ([0.0, _sign * PIN_CIRCLE_RADIUS, 0.0], ("PIN_CIRCLE_RADIUS",)),
+            "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
+            "dia": (
+                limits(PIN_HOLE_DIA, _P["PinPosDia"], PIN_HOLE_BAND, unit=UNIT),
+                ("PIN_HOLE_DIA", "PIN_HOLE_BAND", "UNIT", (_SELF, "END_KEEP")),
+            ),
+            "nominal_dia": (PIN_HOLE_DIA, ("PIN_HOLE_DIA",)),
+            "thru": (True, ((_SELF, "DIMENSION_CALLOUTS_BELOW"),)),
+            "process": ("ream", ((_SELF, "DIMENSION_CALLOUTS_BELOW"),)),
+            "offset": (
+                limits(
+                    PIN_CIRCLE_RADIUS,
+                    _P[_station],
+                    (PIN_OFFSET_TOL, -PIN_OFFSET_TOL),
+                    unit=UNIT,
+                ),
+                ("PIN_CIRCLE_RADIUS", "PIN_OFFSET_TOL", "UNIT", (_SELF, "END_KEEP")),
+            ),
+            "offset_nominal": (PIN_CIRCLE_RADIUS, ("PIN_CIRCLE_RADIUS",)),
+            "offset_from": ("bore", ((_SELF, "END_KEEP"),)),
+            "offset_axis": ("y", ((_SELF, "END_KEEP"),)),
+            "mate": (
+                DOWEL_NUMBER,
+                ("DOWEL_NUMBER", (_SELF, "DIMENSION_CALLOUTS_BELOW")),
+            ),
+            "wall_min": (DRIVE_PIN_COLLAR_RIM_WORST, ("DRIVE_PIN_COLLAR_RIM_WORST",)),
+            "callout": (
+                DIMENSION_CALLOUTS_BELOW["PinPosDia"],
+                ((_SELF, "DIMENSION_CALLOUTS_BELOW"),),
+            ),
+        },
+        precision={"dia": _P["PinPosDia"], "offset": _P[_station]},
+    )
+requirement(
+    "flat_pin_hole",
+    kind="hole",
+    faces=(CylinderFace(FLAT_PIN_HOLE_DIA),),
+    requirements=("dia", "depth", "centre"),
+    fields={
+        "at": ([0.0, -FLAT_PIN_CENTRE, LENGTH], ("FLAT_PIN_CENTRE", "LENGTH")),
+        "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
+        "dia": (
+            limits(FLAT_PIN_HOLE_DIA, _P["FlatPinDia"], FLAT_PIN_HOLE_BAND, unit=UNIT),
+            (
+                (_PIN, "PRESS_HOLE_DIA"),
+                (_PIN, "PRESS_HOLE_BAND"),
+                "UNIT",
+                (_SELF, "SIDE_KEEP"),
+            ),
+        ),
+        "nominal_dia": (FLAT_PIN_HOLE_DIA, ((_PIN, "PRESS_HOLE_DIA"),)),
+        # From the nominal fitted rear face down to the floor's band: the
+        # (.163) REF; the floor's own station (flat_pin_floor) controls.
+        "depth": (
+            [LENGTH - max(FLAT_PIN_FLOOR_LIMITS), LENGTH - min(FLAT_PIN_FLOOR_LIMITS)],
+            ("LENGTH", "FLAT_PIN_FLOOR_LIMITS"),
+        ),
+        "depth_nominal": (FLAT_PIN_HOLE_DEPTH_REF, ("FLAT_PIN_HOLE_DEPTH_REF",)),
+        "process": ("ream", ("FLAT_PIN_HOLE_SUFFIX",)),
+        "centre": (
+            limits(
+                FLAT_PIN_CENTRE,
+                _P["FlatPinCentre"],
+                (FLAT_PIN_CENTRE_TOL, -FLAT_PIN_CENTRE_TOL),
+                unit=UNIT,
+            ),
+            ("FLAT_PIN_CENTRE", "FLAT_PIN_CENTRE_TOL", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "centre_nominal": (FLAT_PIN_CENTRE, ("FLAT_PIN_CENTRE",)),
+        "centre_from": ("bore", ((_SELF, "SIDE_KEEP"),)),
+        "centre_axis": ("y", ((_SELF, "SIDE_KEEP"),)),
+        "mate": (FLAT_PIN_NUMBER, ("FLAT_PIN_NUMBER", "FLAT_PIN_HOLE_CALLOUT")),
+        "web_min": (FLAT_PIN_WEB_WORST, ("FLAT_PIN_WEB_WORST",)),
+        "callout": (
+            f"REAM \u21a7 {FLAT_PIN_HOLE_SUFFIX.split('<HOLE-DEPTH>')[1].strip()}\n"
+            f"{FLAT_PIN_HOLE_CALLOUT}",
+            ("FLAT_PIN_HOLE_SUFFIX", "FLAT_PIN_HOLE_CALLOUT"),
+        ),
+    },
+    precision={"dia": _P["FlatPinDia"], "depth": 3, "centre": _P["FlatPinCentre"]},
+)
+# The flat pin ream's full-diameter floor, its .08 station from the seat face.
+requirement(
+    "flat_pin_floor",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), FLAT_PIN_FLOOR),),
+    requirements=("station",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": FLAT_PIN_FLOOR},
+            ("FLAT_PIN_FLOOR",),
+        ),
+        "outward": ([0.0, 0.0, 1.0], ("FLAT_PIN_FLOOR",)),
+        "station": (
+            list(FLAT_PIN_FLOOR_LIMITS),
+            ("FLAT_PIN_FLOOR_LIMITS", (_SELF, "SIDE_KEEP")),
+        ),
+        "station_nominal": (FLAT_PIN_FLOOR, ("FLAT_PIN_FLOOR",)),
+        "station_from": ("seat_face", ((_SELF, "SIDE_KEEP"),)),
+        "floor_of": ("flat_pin_hole", ("FLAT_PIN_FLOOR",)),
+    },
+    precision={"station": _P["FlatPinFloor"]},
+)
+requirement(
+    "rear_break",
+    kind="chamfer",
+    faces=(ConeFace(45.0),),
+    requirements=("leg",),
+    fields={
+        "leg": (list(REAR_BREAK_LIMITS), ("REAR_BREAK_LIMITS", (_SELF, "SIDE_KEEP"))),
+        "leg_nominal": (REAR_BREAK, ("REAR_BREAK",)),
+        "angle_deg": (45.0, ("REAR_BREAK_SUFFIX",)),
+        "edge_of": ("bore", ("REAR_BREAK",)),
+        "at_end": ("rear_face", ("REAR_BREAK",)),
+        "made_at": ("assembly", ("REAR_BREAK",)),
+        "callout": (REAR_BREAK_CALLOUT, ("REAR_BREAK_CALLOUT",)),
+    },
+    precision={"leg": _P["RearBreak"]},
+)
 
 
 def _set_dimension_suffixes(

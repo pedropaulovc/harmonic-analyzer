@@ -715,3 +715,110 @@ def test_the_round_bore_clears_the_root_corner_and_bears_on_the_whole_core(monke
     monkeypatch.setattr(shaft, "FRONT_RELIEF_WIDTH_MIN", spec.REAR_BREAK_DEPTH_MAX / 2.0)
     with pytest.raises(AssertionError, match="shortens the bore's support"):
         _fresh_collar_spec()
+
+
+def _plane(normal: tuple[float, float, float], offset_mm: float):
+    from _gtol_face import FaceGeometry
+
+    point = tuple(value * offset_mm / 1000 for value in normal)
+    return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+
+def _cylinder(dia_mm: float, y_mm: float, z0_mm: float, z1_mm: float):
+    from _gtol_face import FaceGeometry
+
+    r = dia_mm / 2
+    box = tuple(v / 1000 for v in (-r, y_mm - r, z0_mm, r, y_mm + r, z1_mm))
+    params = (0.0, y_mm / 1000, 0.0, 0.0, 0.0, 1.0, r / 1000)
+    return FaceGeometry(None, 4002, params, None, box)
+
+
+def test_the_collar_declares_one_owner_per_face() -> None:
+    import export_features
+    from _gtol_face import FaceGeometry
+
+    manifest = export_features.requirement_manifest("pd_transgear_drive_collar")
+    assert list(manifest["features"]) == [
+        "seat_face",
+        "pilot_face",
+        "rear_face",
+        "outer",
+        "pilot",
+        "bore",
+        "dowel_a",
+        "dowel_b",
+        "flat_pin_hole",
+        "flat_pin_floor",
+        "rear_break",
+    ]
+    length, pilot = spec.LENGTH, spec.PILOT_LENGTH
+    r = spec.PIN_CIRCLE_RADIUS
+    faces = {
+        "seat_face": _plane((0.0, 0.0, -1.0), 0.0),
+        "pilot_face": _plane((0.0, 0.0, -1.0), pilot),
+        "rear_face": _plane((0.0, 0.0, 1.0), length),
+        "flat_pin_floor": _plane((0.0, 0.0, 1.0), spec.FLAT_PIN_FLOOR),
+        "outer": _cylinder(spec.OD, 0.0, 0.0, length),
+        "pilot": _cylinder(spec.PILOT_DIA, 0.0, -pilot, 0.0),
+        "bore": _cylinder(spec.BORE_DIA, 0.0, -pilot, length),
+        "dowel_a": _cylinder(spec.PIN_HOLE_DIA, r, 0.0, length),
+        "dowel_b": _cylinder(spec.PIN_HOLE_DIA, -r, 0.0, length),
+        "flat_pin_hole": _cylinder(
+            spec.FLAT_PIN_HOLE_DIA, -spec.FLAT_PIN_CENTRE, spec.FLAT_PIN_FLOOR, length
+        ),
+        "rear_break": FaceGeometry(
+            None,
+            4003,
+            (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 2.6, math.radians(45.0), 1.0, 0.0, 0.0),
+            None,
+            (),
+        ),
+    }
+    selectors = export_features.feature_selectors("pd_transgear_drive_collar")
+    for name, face in faces.items():
+        owners = [
+            owner
+            for owner, specs in selectors.items()
+            if any(selector.matches(face) for selector in specs)
+        ]
+        assert owners == [name], name
+
+
+def test_collar_feature_bands_are_the_printed_ones() -> None:
+    import export_features
+
+    def _in(value: float) -> float:
+        return value * 25.4
+
+    manifest = export_features.requirement_manifest("pd_transgear_drive_collar")
+    features = manifest["features"]
+    assert features["outer"]["dia"] == pytest.approx([_in(0.685), _in(0.689)], abs=1e-3)
+    assert features["pilot"]["dia"] == pytest.approx([_in(0.38), _in(0.40)])
+    assert features["bore"]["dia"] == pytest.approx([_in(0.1920), _in(0.1925)])
+    assert features["bore"]["thru"] is True and features["bore"]["process"] == "ream"
+    for name, sign in (("dowel_a", 1.0), ("dowel_b", -1.0)):
+        dowel = features[name]
+        assert dowel["dia"] == pytest.approx([_in(0.0930), _in(0.0935)])
+        offset = [_in(0.2756 - 0.0009), _in(0.2756 + 0.0009)]
+        assert dowel["offset"] == pytest.approx(offset, abs=2e-3)
+        assert dowel["at"] == pytest.approx([0.0, sign * spec.PIN_CIRCLE_RADIUS, 0.0])
+        assert dowel["thru"] is True and dowel["process"] == "ream"
+        assert dowel["mate"] == "MHA-PD-VN-54"
+    flat = features["flat_pin_hole"]
+    assert flat["dia"] == pytest.approx([_in(0.0615), _in(0.0620)])
+    assert flat["centre"] == pytest.approx([_in(0.116), _in(0.120)])
+    assert flat["depth_nominal"] == pytest.approx(_in(0.163), abs=1e-3)
+    assert flat["process"] == "ream" and flat["mate"] == "MHA-PD-VN-70"
+    floor = features["flat_pin_floor"]
+    assert floor["station"] == pytest.approx([_in(0.07), _in(0.09)])
+    # Supplied long, faced to fit at assembly (notes 3 and 4).
+    pilot, rear = features["pilot_face"], features["rear_face"]
+    assert pilot["supply_length_min"] == pytest.approx(_in(0.134))
+    assert rear["supply_length_min"] == pytest.approx(_in(0.292))
+    assert rear["fitted_length"] == pytest.approx([_in(0.153), _in(0.271)])
+    assert pilot["note"].startswith(f"{drawing.PILOT_NOTE}. PILOT: SUPPLY .134 MIN")
+    assert rear["note"].startswith(f"{drawing.BODY_NOTE}. BODY: SUPPLY .292 MIN")
+    assert pilot["faced_at"] == rear["faced_at"] == "assembly"
+    # The rear mouth's break is cut at assembly (MHA-PD-00 step 29).
+    assert features["rear_break"]["made_at"] == "assembly"
+    assert features["rear_break"]["leg"] == pytest.approx([_in(0.006), _in(0.010)])
