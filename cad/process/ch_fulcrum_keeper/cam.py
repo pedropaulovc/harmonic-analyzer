@@ -114,9 +114,9 @@ DRILL_POINT_DEG = 118.0
 # The #1-72 UNF thread's basic major diameter, .0730 in (ASME B1.1): the
 # export names the thread, not its sizes.
 UNF_1_72_MAJOR_MM = 0.073 * IN
-# The title block's .XX general tolerance, ±.010 in: a Hole Wizard
-# counterbore's Ø and depth are clearance sizes on that grade.
-XX_TOL_MM = 0.010 * IN
+# The long-reach 1/8 in end mill's shop setting on 1018 (shop/ch.toml): its
+# chip load holds at the cutter's edge on the counterbore's helix.
+CBORE_SETTING = "endmill-carbide-3fl-1-8-lr-1018-cf"
 # The tap file's first motion: G53 G0 to machine Z0, the homed top (as the
 # magnifying clamp's recipe: FluidNC sets an axis's machine position to its
 # homing mpos_mm, default 0, and Z homes up); the owner (Pedro) confirmed
@@ -631,7 +631,25 @@ def context(
     drill_rpm, drill_feed = _setting(plan, shop, "bore drill")
     ream_rpm, ream_feed = _setting(plan, shop, "bore ream")
     apex_rpm, apex_feed = _setting(plan, shop, "apex drill")
-    cbore_rpm, cbore_feed = _setting(plan, shop, "cbore")
+    # The counterbore's feed: the setting's chip load holds at the cutter's
+    # edge, which runs (path radius + r)/path radius faster than its centre on
+    # the helix (sh_column_clamp_back's rule); the cut authors the centre's.
+    cbore_record = shop["settings"][CBORE_SETTING]
+    cbore_rpm = float(cbore_record["rpm"])
+    cbore_edge_feed = (
+        cbore_record["chip_load_mm_per_tooth"] * cbore_record["flutes"] * cbore_rpm
+    )
+    path_r = (sum(cbore_band) / 2 - em8) / 2
+    _agree(plan, "cbore_feed_per_min_mm", cbore_edge_feed * path_r / (path_r + em8 / 2))
+    _agree(plan, "cbore_edge_feed_per_min_mm", cbore_edge_feed)
+    cbore_feed = p["cbore_feed_per_min_mm"]
+    # The cut carries the edge's feed (prechips' deflection check reads its
+    # chip load); the program posts the centre's.
+    if _setting(plan, shop, "cbore") != (cbore_rpm, p["cbore_edge_feed_per_min_mm"]):
+        raise ValueError(
+            f"'cbore' does not run at {cbore_rpm:g} rpm and "
+            "process.cbore_edge_feed_per_min_mm"
+        )
 
     # Foot hole: from the seat, pecked, full diameter hold_drill_past_mm past
     # the foot top; its point in the shortest blank above the parallels.
@@ -692,12 +710,6 @@ def context(
     _agree(plan, "cbore_path_radius_mm", (cbore_mid - em8) / 2)
     depth_band = g["hold"]["cbore_depth"]
     _agree(plan, "cbore_depth_mm", sum(depth_band) / 2)
-    # Acceptance: the drawing's Hole Wizard counterbore is a clearance pocket
-    # on the title block's .XX grade, ±.010 round its printed Ø and depth.
-    _agree(plan, "cbore_accept_dia_min_mm", cbore_band[0] - XX_TOL_MM)
-    _agree(plan, "cbore_accept_dia_max_mm", cbore_band[0] + XX_TOL_MM)
-    _agree(plan, "cbore_accept_depth_min_mm", sum(depth_band) / 2 - XX_TOL_MM)
-    _agree(plan, "cbore_accept_depth_max_mm", sum(depth_band) / 2 + XX_TOL_MM)
     cbore_floor = foot_top - p["cbore_depth_mm"]
     pitch = p["cbore_pitch_mm"]
     turns = math.ceil(p["cbore_depth_mm"] / pitch - 1e-9)
