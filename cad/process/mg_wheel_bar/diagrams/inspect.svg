@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 300" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="780" height="300"/>
-  <text class="title" x="20" y="20">The finished bar, looking at F (the front face), T up (1 in = 78 px)</text>
+  <text class="title" x="20" y="20">The finished bar, looking at the back face (F away from you), T up (1 in = 78 px)</text>
   <rect class="part-kept" x="30" y="100" width="717.6" height="33.5"/>
   <circle class="holes" cx="45.6" cy="115.4" r="7.0"/>
   <circle class="holes" cx="217.2" cy="115.4" r="7.3"/>
@@ -25,6 +25,6 @@
   <text class="label" x="640" y="45">2X Ø.196</text>
   <line class="datum" x1="30" y1="150" x2="30" y2="165"/>
   <text class="datum-label" x="34" y="163">LEFT</text>
-  <text class="label" x="380" y="128">F</text>
+  <text class="label" x="360" y="128">back face</text>
   <text class="label" x="30" y="270">edges broken R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max; front and back faces as supplied</text>
 </svg>

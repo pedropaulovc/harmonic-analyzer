@@ -37,13 +37,14 @@
   <circle class="holes" cx="521.5" cy="144.9" r="2.3"/>
   <circle class="cutter" cx="455.1" cy="150.5" r="6.35"/>
   <line class="arrow" x1="442" y1="115" x2="442" y2="185"/>
-  <text class="label" x="430" y="205">left end: passes −Y</text>
+  <text class="label" x="530" y="207">left end: passes −Y (the arrow)</text>
   <line class="datum" x1="461.5" y1="90" x2="461.5" y2="135"/>
   <text class="datum-label" x="430" y="85">X0, the milled LEFT end</text>
   <line class="dims" x1="460" y1="225" x2="472.5" y2="225"/>
   <line class="dims" x1="460" y1="162" x2="460" y2="230"/>
   <line class="dims" x1="472.5" y1="192" x2="472.5" y2="230"/>
-  <text class="label" x="478" y="229">sawn end .50 out past the jaws</text>
+  <line class="leader" x1="466" y1="225" x2="530" y2="236"/>
+  <text class="label" x="532" y="240">sawn end .50 out past the jaws</text>
   <line class="dims" x1="461.5" y1="250" x2="521.5" y2="250"/>
   <line class="dims" x1="521.5" y1="165" x2="521.5" y2="255"/>
   <text class="label" x="470" y="268">axle {{cad.axle_bore_station_in:.3f}}</text>

@@ -14,7 +14,7 @@
   <circle class="holes" cx="68.7" cy="153.8" r="6.3"/>
   <circle class="cutter" cx="738.6" cy="169.4" r="17.8"/>
   <line class="arrow" x1="765" y1="205" x2="765" y2="135"/>
-  <text class="label" x="640" y="275">right end: passes +Y</text>
+  <text class="label" x="330" y="275">right end: passes +Y (the arrow at the right)</text>
   <!-- The edge finder on the milled left end, in the air. -->
   <circle class="cutter" cx="58.2" cy="185" r="7.0"/>
   <line class="datum" x1="65.2" y1="60" x2="65.2" y2="135"/>
@@ -33,7 +33,7 @@
   <line class="leader" x1="582.6" y1="146.8" x2="600" y2="70"/>
   <line class="leader" x1="679.0" y1="146.8" x2="600" y2="70"/>
   <text class="label" x="480" y="64">clamp holes #9 at {{cad.clamp_hole_1_station_in:.3f}} and {{cad.clamp_hole_2_station_in:.3f}}</text>
-  <line class="leader" x1="233.2" y1="150" x2="200" y2="70"/>
+  <line class="leader" x1="233.2" y1="147" x2="233.2" y2="86"/>
   <text class="label" x="140" y="80">axle bore (Setup 3): the pickup check</text>
   <text class="label" x="20" y="420">Section as Setup 3: F down on both stacks at the moving jaw, T at the fixed jaw, the .125 pin at B.</text>
 </svg>
