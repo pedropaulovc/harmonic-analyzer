@@ -39,6 +39,16 @@ id = "feeler-gauges"
 name = "Feeler gauges"
 ref = "feeler-gauges"  # drawing cross-check 2026-11-19: BACKLASH .002-.007, FEELER
 
+[[tools]]
+id = "drill-50"
+name = "#50 drill"
+ref = "drill-50"  # #2425: the rear #2-56 tap drill
+
+[[tools]]
+id = "tap-2-56-bottoming"
+name = "#2-56 bottoming tap"
+ref = "tap-2-56-bottoming"  # #2425: the rear blind tap for the MHA-PD-VN-71 cup screw
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

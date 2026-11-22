@@ -16,13 +16,16 @@ and same-outer custom thumbnut clamp it there, while the removable T24
 still floats on the existing pilot and is driven by the two axial dowels.
 The thread relief carries clamp, not torque.
 
-The Ø.249 journal runs in the plate's Ø.249 reamed bore.  The loose Ø.257-bore
-thrust ring retains its .205 length and bears on the actual rear tooth ends.
+The Ø.249 journal runs in the MHA-PD-28 bush's Ø.249 bore, reamed after the
+bush is pressed into the arm plate.  The loose Ø.257-bore thrust ring bears
+on the actual rear tooth ends.
 Every gap is cut straight at full depth through the whole face (#2034); the
 form root stands above the journal, so the cutter runs out in air over the
-journal at the rear and over the neck and D-core at the front.  The rear
-cup is still set on the existing end-float feeler and match-pinned by
-MHA-PD-VN-62.  No front spring pin or collar slot remains.
+journal at the rear and over the neck and D-core at the front.  The journal
+ends JOURNAL_STANDOUT behind the bush's rear face, inside the MHA-PD-16 cup's
+pilot, and is tapped #2-56 on the axis in its rear end for the MHA-PD-VN-71
+screw that holds the cup (owner ruling 2026-11-20 (Pedro), #2425).  No front
+spring pin, cross hole or collar slot remains.
 
 Part frame: the axis is local +Z through the origin (``Axis1``); +Z is
 machine +Z (rearward), so the assembly places the part without rotation.  The
@@ -61,14 +64,14 @@ from _gear_quality import (
 from paper_drive_stock_inspection import GaugeContact, toothspace_gauge_contact_mm
 from _gtol_controls import GeometricControl, PartDatum
 from _gtol_cylinder import CylinderFace
-from _hole_spec import THREAD_MAJOR_MM
+from _hole_spec import DRILL_POINT_H, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
 from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-from pd_transgear_arm_plate_geometry import HUB_TO_BOSS as PLATE_HUB_TO_BOSS
-from pd_transgear_arm_plate_geometry import HUB_TO_BOSS_BAND as PLATE_HUB_TO_BOSS_BAND
+import pd_transgear_knob_bush_geometry as BUSH
 from pd_transgear_knob_thrust_ring_spec import LENGTH as RING_LENGTH
 from pd_transgear_knob_thrust_ring_spec import LENGTH_TOL as RING_LENGTH_TOL
 from pd_transgear_knob_thrust_ring_spec import ID as RING_ID
@@ -201,11 +204,11 @@ FACE_WIDTH_PLACES = 3
 FACE_WIDTH_BAND = FIT_LENGTH_BAND_IN
 # drawing-guidelines rule 4: the band names the stack it serves and, by
 # drawing number, the parts it stacks with to place F (transgear_cluster_fit
-# F_CHAIN: the thrust ring's length and the arm plate's hub face station).
+# F_CHAIN: the thrust ring's length and the MHA-PD-28 bush's hub face station).
 FACE_WIDTH_CALLOUT = (
     f"{STACK_NAME} WITH\n"
     f"{_config.parts('pd-transgear-knob-thrust-ring')['number']}, "
-    f"{_config.parts('pd-transgear-arm-plate')['number']}"
+    f"{_config.parts('pd-transgear-knob-bush')['number']}"
 )
 GAP_AZIMUTH_DEG = 180.0 / TEETH
 # The assembly spins the shaft and its whole mounted front stack (collar,
@@ -459,37 +462,35 @@ THREAD_STRESS_AREA = math.pi / 4.0 * (THREAD_MAJOR - 0.9743 * THREAD_PITCH) ** 2
 RELIEF_AREA_MIN = math.pi / 4.0 * RELIEF_DIA_MIN**2
 RELIEF_AREA_RATIO_MIN = RELIEF_AREA_MIN / THREAD_STRESS_AREA
 
-# --- Journal: .249 g6 in the arm plate's matching .249 reamed bore ------------
-# #290 fit D8 (owner ruling 2026-10-30: 6 mm -> .249): the plate and the cup
-# are reamed with the owned .2490 reamer.
+# --- Journal: .249 g6 in the MHA-PD-28 bush's matching .249 reamed bore ------
+# #290 fit D8 (owner ruling 2026-10-30: 6 mm -> .249): the bush (reamed after
+# it is pressed into the arm plate) and the cup's pilot take the owned .2490
+# reamer.
 JOURNAL_DIA = 6.3246  # .249
 JOURNAL_DIA_BAND = SHAFT_G6_3_TO_6_MM  # -.0002/-.0005
 JOURNAL_DIA_PLACES = 4
 # The cup's front face, from the pinion's rear face (R9-25): the thrust ring +
-# the plate's hub-to-boss + the .008 end float, the cup running that far
-# behind the rear boss at the stack pose.  K-1 (R9-70): the float is set at
-# assembly, the cup slid on the journal against a .008 feeler at the boss and
-# pinned there, and accepted within END_FLOAT_SET_TOL; the journal's length
-# no longer enters it.
+# the bush's hub face to rear face + the .008 end float, the cup running that
+# far behind the bush's rear face at the stack pose.  The float is set at
+# fit-up (owner ruling 2026-11-20 (Pedro), #2425): the cup's front face is
+# faced until its pilot depth is the journal's measured stand-out less the
+# float, and accepted within END_FLOAT_SET_TOL, so the journal's length does
+# not enter it.
 END_FLOAT = 0.2032  # .008
 END_FLOAT_SET_TOL = 0.0508  # .002
-CUP_FACE_STATION = RING_LENGTH + PLATE_HUB_TO_BOSS + END_FLOAT  # 1.418
-# Where the fitter sets the cup on a real stack: the ring's and the hub-to-
-# boss's own bands, and the feeler setting.
-CUP_FACE_STATION_BAND = RING_LENGTH_TOL + PLATE_HUB_TO_BOSS_BAND + END_FLOAT_SET_TOL
-# The journal runs on behind the cup's front face to carry the cup's pin
-# (K-1).  The rear chucking faces the rear end to the controlled overall
-# length from the tip face (OVERALL_LENGTH, .XXX) and the pinion's rear face
-# to the face width from F, so the journal (pinion rear face to rear end,
-# 1.62 REF) carries the overall's, F's (from the tip) and the face width's
-# bands (#2169, Main delegated ruling 2026-11-04 under #989, re-derived for
-# the tip-referenced scheme): the shortest journal behind the farthest cup
-# station, less its rear-end EDGE_BREAK_MAX, still leaves the knob cup's
-# (MHA-PD-16) pin-hole end wall over its floor, and the longest stays inside
-# the shortest cup (pd_transgear_knob_cup_spec asserts both).
-# The cup and pin stations stay where they are; only the journal grows.
-JOURNAL_REAR_EXTENSION = 6.7056  # .264
-JOURNAL_LENGTH = CUP_FACE_STATION + JOURNAL_REAR_EXTENSION  # 1.62 REF
+CUP_FACE_STATION = RING_LENGTH + BUSH.LENGTH + END_FLOAT  # 1.418
+# Where the fitter sets the cup on a real stack: the ring's and the bush's
+# own bands, and the float's acceptance.
+CUP_FACE_STATION_BAND = RING_LENGTH_TOL + BUSH.LENGTH_BAND + END_FLOAT_SET_TOL
+# The journal ends JOURNAL_STANDOUT behind the bush's rear face at the stack
+# pose: the cup's fitted pilot (.132, which centres the cup on the journal
+# end) plus the float.  The rear chucking faces the rear end to the
+# controlled overall length from the tip face (OVERALL_LENGTH, .XXX) and the
+# pinion's rear face to the face width from F, so the journal (pinion rear
+# face to rear end, REF) carries the overall's, F's (from the tip) and the
+# face width's bands (#2169, Main delegated ruling 2026-11-04 under #989).
+JOURNAL_STANDOUT = 3.556  # .140
+JOURNAL_LENGTH = RING_LENGTH + BUSH.LENGTH + JOURNAL_STANDOUT  # 1.550 REF
 JOURNAL_LENGTH_PLACES = 2
 OVERALL_LENGTH_PLACES = 3  # controlled, tip face to rear face
 _JOURNAL_LENGTH_BAND = (
@@ -497,14 +498,90 @@ _JOURNAL_LENGTH_BAND = (
     + _STUD_STATION_BAND
     + FACE_WIDTH_BAND
 )
-# The journal behind the cup's front face at the printed worst case.
-JOURNAL_REAR_EXTENSION_MIN = JOURNAL_REAR_EXTENSION - (
-    _JOURNAL_LENGTH_BAND + CUP_FACE_STATION_BAND
-)
-JOURNAL_REAR_EXTENSION_MAX = JOURNAL_REAR_EXTENSION + (
-    _JOURNAL_LENGTH_BAND + CUP_FACE_STATION_BAND
-)
+# The stand-out on a real stack, the pinion pushed forward onto the ring and
+# the ring onto the bush's hub face: the journal's, the ring's and the bush's
+# bands.  The cup's facing at fit-up takes it up
+# (pd_transgear_knob_cup_spec.FACING_REMOVAL, never negative only while the
+# overall holds .XXX).
+JOURNAL_STANDOUT_BAND = _JOURNAL_LENGTH_BAND + RING_LENGTH_TOL + BUSH.LENGTH_BAND
 JOURNAL_DIA_MIN = JOURNAL_DIA + min(JOURNAL_DIA_BAND)
+
+# --- Rear tap: the MHA-PD-VN-71 #2-56 on the axis -----------------------------
+# Blind #2-56 UNC, drilled #50 and cut with the owned OSG bottoming tap
+# (G9665591) in the journal's rear chucking, on the turned journal's own axis,
+# so its wall pays no drill run-off.  Rule 12: the full thread prints as a
+# MIN, the deeper tap drill as its own .XX depth; a bottoming tap's two-pitch
+# lead stays inside the shallowest drill.
+REAR_TAP_THREAD = "#2-56"
+REAR_TAP_PITCH = MM_PER_IN / 56.0
+REAR_TAP_FULL_THREAD_MIN = 8.636  # .34
+REAR_TAP_DRILL_DIA = 1.778  # #50, .070
+REAR_TAP_DRILL_DEPTH = 10.668  # .42
+REAR_TAP_DRILL_DIA_PLACES = 3
+REAR_TAP_DEPTH_PLACES = 2
+REAR_TAP_SPEC = HoleSpec(
+    "tapped_bottoming",
+    REAR_TAP_THREAD,
+    end="blind",
+    depth_mm=REAR_TAP_DRILL_DEPTH,
+    thread_class="2B",
+    overrides_mm={"ThreadDepth": REAR_TAP_FULL_THREAD_MIN},
+)
+if blind_cut_dia_mm(REAR_TAP_SPEC) != REAR_TAP_DRILL_DIA:
+    raise AssertionError("MHA-PD-08's rear tap drill is not the wizard's #50")
+REAR_TAP_LEAD_ROOM_MIN = (
+    REAR_TAP_DRILL_DEPTH
+    - printed_band_mm(REAR_TAP_DEPTH_PLACES, unit=UNIT)
+    - REAR_TAP_FULL_THREAD_MIN
+    - 2.0 * REAR_TAP_PITCH
+)
+if REAR_TAP_LEAD_ROOM_MIN < 0.0:
+    raise AssertionError("MHA-PD-08's rear tap drill leaves the bottoming tap no lead")
+# Rule 17: the journal's wall over the thread's basic major, at the smallest
+# g6 journal (.0813 against the .080 target).
+REAR_TAP_WALL_WORST = (JOURNAL_DIA_MIN - THREAD_MAJOR_MM[REAR_TAP_THREAD]) / 2.0
+if REAR_TAP_WALL_WORST < WALL_TARGET_MM - 1e-9:
+    raise AssertionError(
+        f"MHA-PD-08's journal wall over the rear tap {REAR_TAP_WALL_WORST:.4f} mm "
+        "is under the .080 target"
+    )
+_REAR_TAP_R = REAR_TAP_DRILL_DIA / 2.0
+REAR_TAP_VOLUME = math.pi * _REAR_TAP_R**2 * (
+    REAR_TAP_DRILL_DEPTH + _REAR_TAP_R * DRILL_POINT_H / 3.0
+)
+
+# --- Rear end chamfer: the journal end seats flat on the cup's web ----------
+# An explicit .015 X 45° (rule 16), not the title block's break: its least
+# leg (.010) clears every point of the MHA-PD-16 pilot's R.005 MAX floor
+# corner (a 45° chamfer of leg c clears a root fillet of radius r once
+# c >= r; pd_transgear_knob_cup_spec asserts it), so the rear face, not its
+# edge, bears on the web.  The chamfer stays inside the tap mouth's first
+# pitch and break that the screw's engagement already discounts, so the tap's
+# wall over its full thread is the full journal's.
+REAR_CHAMFER = 0.381  # .015
+REAR_CHAMFER_PLACES = 3
+REAR_CHAMFER_MIN = REAR_CHAMFER - printed_band_mm(REAR_CHAMFER_PLACES, unit=UNIT)
+REAR_CHAMFER_MAX = REAR_CHAMFER + printed_band_mm(REAR_CHAMFER_PLACES, unit=UNIT)
+# Printed as a row of the journal Ø's callout (draw_pd_transgear_knob_shaft
+# JOURNAL_DIA_BELOW): its own sketch dimension (JournalProfile
+# RearChamferSize, driven) sits under detail B's neck dimensions, where its
+# text and extension lines struck them (farm r6 of #2425).  .XXX: the title
+# block's ±.005 holds .010-.020.
+REAR_CHAMFER_CALLOUT = f"{inch_text(REAR_CHAMFER, REAR_CHAMFER_PLACES)} X 45\u00b0"
+if REAR_CHAMFER_MAX > REAR_TAP_PITCH + EDGE_BREAK_MAX + 1e-9:
+    raise AssertionError(
+        "MHA-PD-08's rear chamfer runs past the tap mouth's discounted thread"
+    )
+# The rear face's flat land, between the chamfer and the tap mouth's break.
+REAR_FACE_LAND_MIN = (
+    JOURNAL_DIA_MIN / 2.0 - REAR_CHAMFER_MAX
+    - (THREAD_MAJOR_MM[REAR_TAP_THREAD] / 2.0 + EDGE_BREAK_MAX)
+)
+if REAR_FACE_LAND_MIN <= 0.0:
+    raise AssertionError("MHA-PD-08's rear face has no flat land on the cup's web")
+REAR_CHAMFER_VOLUME = math.pi * REAR_CHAMFER**2 * (
+    JOURNAL_DIA / 2.0 - REAR_CHAMFER / 3.0
+)
 
 # --- Local stations along +Z, from F ------------------------------------------
 TIP_Z = -TIP_STATION
@@ -515,7 +592,7 @@ THREAD_END_Z = -PLAIN_CORE
 PINION_REAR_Z = FACE_WIDTH
 CUP_FACE_Z = PINION_REAR_Z + CUP_FACE_STATION  # at the stack pose
 REAR_END_Z = FACE_WIDTH + JOURNAL_LENGTH
-OVERALL_LENGTH = REAR_END_Z - TIP_Z  # 2.854
+OVERALL_LENGTH = REAR_END_Z - TIP_Z  # 2.722
 
 FRONT_CORE_AIR_MIN = (
     ROOT_DIA_EXACT_MIN - CORE_DIA - max(CORE_DIA_BAND)
@@ -671,7 +748,8 @@ if REAR_BEARING_AREA_MIN <= 0.0:
 def expected_volume_bounds_mm3() -> tuple[float, float]:
     """Complete NOMINAL shaft: true D, two neck fillets, straight full-face gaps.
 
-    Thread uses the existing cosmetic-thread turned-blank convention.
+    Thread uses the existing cosmetic-thread turned-blank convention; the
+    rear Hole Wizard tap cuts its #50 drill (cylinder and 118 deg point).
     Nominal round fillets lie wholly inside the D-flat plane; the flat tool
     ends in neck air.  Every gap runs straight through FACE_WIDTH and its
     cutter run-out removes no neck, core or journal (FRONT_NECK_AIR_MIN,
@@ -708,6 +786,8 @@ def expected_volume_bounds_mm3() -> tuple[float, float]:
         - math.pi * TIP_CHAMFER**2 * (r_blank - TIP_CHAMFER / 3.0),
         math.pi * STOCK_PROFILE.blank_radius_mm**2 * FACE_WIDTH,
         math.pi * (JOURNAL_DIA / 2.0)**2 * JOURNAL_LENGTH,
+        -REAR_TAP_VOLUME,
+        -REAR_CHAMFER_VOLUME,
     ))
     straight = TEETH * STOCK_PROFILE.gap_area_mm2 * FACE_WIDTH
     area_error = TEETH * STOCK_PROFILE.gap_area_error_bound_mm2 * FACE_WIDTH
@@ -734,7 +814,7 @@ if TIP_CHAMFER_MAX > THREAD_PITCH + 1e-9:
 DRIVE_COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
 
 
-# One running surface: the journal in the arm plate's bore.  The D-core is a
+# One running surface: the journal in the MHA-PD-28 bush's bore.  The D-core is a
 # sliding seat for the collar, not a running surface (rule 6), and the rest
 # is the title block's process.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (

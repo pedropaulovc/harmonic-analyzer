@@ -1,12 +1,12 @@
 r"""Reproduction script: transgear knob thrust ring (MHA-PD-15; ch. 23; 1 used).
 
-The loose brass ring clears the new six-millimetre rear journal between the
-pinion's rear face and the arm-plate front hub. Its source-owned length and
+The loose brass ring clears the Ø.249 rear journal between the pinion's rear
+face and the MHA-PD-28 bush's hub face. Its source-owned length and
 both actual running faces retain the existing opposing axial stack.
 
 Layout: Top-plane annulus at the origin (O.D., bore) extruded +Y by the
 length, so the front face (on the pinion) is the Top Plane (y = 0) and the rear
-face (on the plate hub) is y = LENGTH.  ``Axis1`` is the ring axis (Front
+face (on the bush hub) is y = LENGTH.  ``Axis1`` is the ring axis (Front
 Plane ∩ Right Plane); the paper-drive assembly mates it to the knob shaft's
 axis and the Top Plane to the pinion's rear face.
 

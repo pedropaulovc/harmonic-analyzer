@@ -115,9 +115,6 @@ description = "Shop-made fly cutter bar MHA-DT-37-TL-02 for the cone tip gear fo
 description = "Shop-made form cutter MHA-DT-37-TL-01 for the MHA-DT-37 tooth space"
 [tools.dt-cylinder-gear-cam-fixture]  # MHA-DT-12 cam throw .3402 ±.0020
 description = "Shop-made cam turning fixture MHA-DT-12-TL-01 (stub, clamp, clock pin) for the MHA-DT-12 cams"
-[tools.endmill-hss-2fl-1-4]  # inventory tools.endmill-hss-2fl-1-4
-description = "1/4 in HSS 2-flute square end mill, 5/8 in LOC (McMaster 3051A51)"
-diameter_mm = 6.35
 [tools.follow-rest-pm-1127]  # inventory fixtures.follow-rest-pm-1127
 description = "PM-1127VF-LB follow rest"
 [tools.needle-files-swiss]  # MHA-DT-37-TL-01 file the tooth-space form (.0114-.0323)

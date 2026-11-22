@@ -1,20 +1,27 @@
-r"""MHA-PD-16 transgear-knob-cup: the brass cup pinned on the knob shaft's rear end.
+r"""MHA-PD-16 transgear-knob-cup: the brass cup on the knob shaft's rear journal end.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  A plain turned ring, reamed to slide on the knob shaft's (MHA-PD-08)
-journal where it runs on behind the arm plate's rear boss.  Its front
-face runs END_FLOAT behind that boss: the cup is the REAR stop of the knob's
-end float (the MHA-PD-15 thrust ring is the forward one).  K-1 (R9-70): at
-assembly the cup is slid on against a feeler at the boss, then the
-MHA-PD-VN-62 pin's hole is match-drilled through cup and journal
-PIN_HOLE_FROM_FRONT behind its front face and the spring pin pressed through
-both, so the cup is locked to the shaft in shear and carries no thread.  The
-hole is drilled at assembly and is not modelled on the part.
+closure.  A blind turned cup (owner ruling 2026-11-20 (Pedro), #2425): its
+flat-bottomed front pilot, plunged .250 with a 1/4 end mill, takes the knob
+shaft's (MHA-PD-08) journal end, bonded on it with LOCTITE 641; its web
+carries the MHA-PD-VN-71 #2-56 fillister on the axis, the head sunk in a rear pocket,
+into the journal's rear tap.  Its front face runs END_FLOAT behind the
+MHA-PD-28 bush's rear face: the cup is the REAR stop of the knob's end float
+(the MHA-PD-15 thrust ring is the forward one).  The float is set at
+fit-up: the cup is turned with its pilot PILOT_DEPTH deep, and at
+MHA-PD-00 its front face is faced until the pilot depth is the journal's
+measured stand-out behind the bush less the float (FACING_REMOVAL), so the
+journal end seats on the pilot's floor.  The cup's O.D. is the bush's rear
+stub's, the Ø the cup's front face meets (owner: "pd-16 diameter should also
+be reduced to match new knob bush").
 
-Decimal inch (#290): the bore is the journal's .249 REAM_H7 at four places.
+Decimal inch (#290): the pilot is .250 +.001/0, the end mill's own Ø band.
 
 Part frame: axis local +Y through the origin (``Axis1``); the front face
-(the running face) is the Top Plane, y = 0; the rear face is y = LENGTH.
+(the running face, as turned) is the Top Plane, y = 0; the pilot's floor
+(the web's front face) is y = PILOT_DEPTH; the pocket's floor (the web's
+rear face, the screw's seat) is y = LENGTH - CBORE_DEPTH; the rear face is
+y = LENGTH.
 """
 
 from __future__ import annotations
@@ -22,152 +29,230 @@ from __future__ import annotations
 import math
 
 import _config
+import pd_transgear_knob_bush_geometry as BUSH
+import pd_vn_transgear_knob_cup_screw_spec as SCREW
 from _gtol_planar import PlanarFace
-from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import (
-    edge_break_chamfer_mm,
-    edge_break_radius_mm,
-    printed_band_mm,
-    printed_deviations,
-)
+from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-from pd_transgear_arm_plate_geometry import BORE_DIA_LIMITS as PLATE_BORE_LIMITS
-from pd_vn_transgear_knob_cup_pin_spec import HOLE_MAX as PIN_HOLE_MAX
-from pd_vn_transgear_knob_cup_pin_spec import PIN_LEN, PIN_LEN_MAX
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_transgear_knob_shaft_spec import (
     EDGE_BREAK_MAX as SHAFT_EDGE_BREAK_MAX,
+    END_FLOAT,
+    END_FLOAT_SET_TOL,
     JOURNAL_DIA,
     JOURNAL_DIA_BAND,
     JOURNAL_DIA_MIN,
-    JOURNAL_REAR_EXTENSION,
-    JOURNAL_REAR_EXTENSION_MAX,
-    JOURNAL_REAR_EXTENSION_MIN,
+    JOURNAL_STANDOUT,
+    JOURNAL_STANDOUT_BAND,
+    REAR_CHAMFER_MIN as SHAFT_REAR_CHAMFER_MIN,
+    REAR_TAP_FULL_THREAD_MIN,
 )
 
+MM_PER_IN = 25.4
 # #290: the registry row's drawing_unit (in) is this sheet's unit.
 UNIT = drawing_unit("parts/pd-transgear-knob-cup", _config.parts("pd-transgear-knob-cup"))
 
-OD = 19.05  # .75
-LENGTH = 8.128  # .32
-BORE_DIA = JOURNAL_DIA  # .249 g6 shaft
-# Reamed to the plate's H7 limits; the same journal runs/slides in both.
-BORE_BAND = (max(PLATE_BORE_LIMITS), min(PLATE_BORE_LIMITS))
+# --- Turned sizes ---------------------------------------------------------------
+# The bush's Ø.4375 rear stub at the .XX row: routine, nothing fits on it.
+OD = 11.176  # .44
+LENGTH = 9.144  # .36 as turned (SUPPLY)
+# The pilot: a blind bore cannot be reamed to a flat floor (the reamer's
+# lead and the drill's cone), and the journal end must seat flat on the web
+# for the fitted float, so after a B pilot drill the owned 1/4 HSS 2-flute
+# centre-cutting square end mill (tools-cutting endmill-hss-2fl-1-4,
+# McMaster 3051A51: Ø tolerance -.000/+.001, read live 2026-11-20 by
+# T20Pdplate) is plunged from the tailstock; the band is the tool's own.
+BORE_DIA = 6.35  # .250
+BORE_BAND = (0.0254, 0.0)  # (upper, lower) deviations: +.001/-.000
+PILOT_DEPTH = 3.8608  # .152 as turned (SUPPLY)
+# The web's #33 drill and the rear pocket the screw head sinks in, cut flat
+# with a 3/16 end mill after the drill (a clearance pocket, .XXX row).
+CLEAR_HOLE_DIA = 2.8702  # #33, .113
+# Modelled on the printed .001 grid (the 3/16 cutter's .1875 lies in its band).
+CBORE_DIA = 4.7752  # .188
+CBORE_DEPTH = 2.7432  # .108
 
-# Places each printed dimension carries (drawing-guidelines.md rule 3 (decimal
-# places carry the tolerance)): the O.D. and the length are routine at .XX
-# (the shortest .32 cup still covers the journal's end and the pin hole's
-# rear wall: machinist review, .315 named no stack); the bore prints four
-# places under its own reamed band.
+# Places each printed dimension carries (drawing-guidelines.md rule 3): the
+# O.D. and the length are routine at .XX; the pilot prints .XXX under its
+# end-milled band; its depth, the drill and the pocket print .XXX.
 OD_PLACES = 2
 LENGTH_PLACES = 2
-BORE_PLACES = 4
+BORE_PLACES = 3
+PILOT_DEPTH_PLACES = 3
+HOLE_PLACES = 3
+CBORE_PLACES = 3
+
+if not math.isclose(
+    OD, math.floor(BUSH.PRESS_DIA / MM_PER_IN * 10**OD_PLACES + 0.5) / 10**OD_PLACES
+    * MM_PER_IN,
+):
+    raise AssertionError("MHA-PD-16's O.D. no longer prints the MHA-PD-28 stub's .44")
 
 WALL_FLOOR = WALL_TARGET_MM
 
 _OD_LO, _ = printed_deviations(OD, OD_PLACES, unit=UNIT)
-_LENGTH_LO, _ = printed_deviations(LENGTH, LENGTH_PLACES, unit=UNIT)
+_LENGTH_LO, _LENGTH_HI = printed_deviations(LENGTH, LENGTH_PLACES, unit=UNIT)
+_PILOT_LO, _PILOT_HI = printed_deviations(PILOT_DEPTH, PILOT_DEPTH_PLACES, unit=UNIT)
+_CBORE_DIA_LO, _CBORE_DIA_HI = printed_deviations(CBORE_DIA, CBORE_PLACES, unit=UNIT)
+_CBORE_DEPTH_LO, _CBORE_DEPTH_HI = printed_deviations(CBORE_DEPTH, CBORE_PLACES, unit=UNIT)
+# DRILLED HOLES: the drill's own size, never under.
+HOLE_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # (upper, lower) deviations
 OD_MIN = OD + _OD_LO
 LENGTH_MIN = LENGTH + _LENGTH_LO
+LENGTH_MAX = LENGTH + _LENGTH_HI
+PILOT_DEPTH_MIN = PILOT_DEPTH + _PILOT_LO
+PILOT_DEPTH_MAX = PILOT_DEPTH + _PILOT_HI
+CBORE_DIA_MIN = CBORE_DIA + _CBORE_DIA_LO
+CBORE_DIA_MAX = CBORE_DIA + _CBORE_DIA_HI
+CBORE_DEPTH_MIN = CBORE_DEPTH + _CBORE_DEPTH_LO
+CBORE_DEPTH_MAX = CBORE_DEPTH + _CBORE_DEPTH_HI
+CLEAR_HOLE_MIN = CLEAR_HOLE_DIA + min(HOLE_BAND)
+CLEAR_HOLE_MAX = CLEAR_HOLE_DIA + max(HOLE_BAND)
 BORE_MAX = BORE_DIA + max(BORE_BAND)
+
+# --- The bonded pilot: the journal end, LOCTITE 641 -----------------------------
+# drawing-guidelines.md rule 23: a bonded fit is a fit; the sheet prints the
+# pilot's limits, names MHA-PD-08 and states the diametral clearance, which
+# must lie inside the grade's gap fill.  Henkel's LOCTITE 641 product page
+# (https://next.henkel-adhesives.com/us/en/products/industrial-adhesives/central-pdp.html/loctite-641/BP000000153498.html,
+# read 2026-11-20) gives "Gap fill: 0.15 mm"; its TDS (May 2004,
+# https://datasheets.tdx.henkel.com/LOCTITE-641-en_GL.pdf) charts full cure
+# on steel pins and collars at 0.05-0.2 mm gaps.  641 is the removable grade
+# (rule 23: "641 where the part must come out").
+LOCTITE_641_GAP_MAX = 0.15
 BORE_JOURNAL_CLEARANCE = (
     BORE_DIA + min(BORE_BAND) - (JOURNAL_DIA + max(JOURNAL_DIA_BAND)),
     BORE_MAX - JOURNAL_DIA_MIN,
 )
 if min(BORE_JOURNAL_CLEARANCE) <= 0.0:
-    raise AssertionError("MHA-PD-16's reamed bore binds on the journal")
-# The bore callout's diametral clearance, rounded outward onto the inch grid.
+    raise AssertionError("MHA-PD-16's pilot bore binds on the journal")
+if max(BORE_JOURNAL_CLEARANCE) > LOCTITE_641_GAP_MAX:
+    raise AssertionError("MHA-PD-16's pilot clearance passes LOCTITE 641's gap fill")
+# The pilot callout's diametral clearance, rounded outward onto the inch grid.
 BORE_CLEARANCE_TEXT = (
     f"{inch_text(inch_floor_mm(min(BORE_JOURNAL_CLEARANCE), 4), 4)}-"
     f"{inch_text(inch_ceil_mm(max(BORE_JOURNAL_CLEARANCE), 4), 4)}"
 )
 
-# --- The pin hole, match-drilled at assembly (R9-70, K-1) ---------------------
-# Its centre stands PIN_HOLE_FROM_FRONT behind the cup's front face; the
-# MHA-PD-00 step that drills it prints that station at three places, so it
-# is held to the title block's .XXX band (#2192); MHA-PD-VN-62's .062
-# +.003/0 hole.
-PIN_HOLE_FROM_FRONT = 3.048  # .120
-PIN_HOLE_STATION_PLACES = 3
-PIN_HOLE_STATION_TOL = printed_band_mm(PIN_HOLE_STATION_PLACES, unit=UNIT)  # .005
-_PIN_HOLE_R_MAX = PIN_HOLE_MAX / 2.0
-# The title block's break on the front face's edges: the hole runs radially
-# from the bore to the O.D., so at either end it loses the full break.
-FRONT_FACE_EDGE_BREAK_MAX = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
+# --- The float, set at fit-up (drawing-guidelines.md rule 19) ------------------
+# The journal end seats on the pilot's floor, so the fitted pilot depth is
+# the journal's stand-out behind the bush's rear face less the float.
+PILOT_DEPTH_FITTED = JOURNAL_STANDOUT - END_FLOAT  # .132
+if not math.isclose(PILOT_DEPTH_FITTED, 3.3528, abs_tol=1e-9):
+    raise AssertionError("MHA-PD-16's fitted pilot is no longer .132")
+# What the fitter faces off the front to reach the nominal float, over the
+# supplied pilot's band and the stand-out's whole stack: never negative, so
+# no cup is ever too short to set.
+FACING_REMOVAL = (
+    PILOT_DEPTH_MIN - (JOURNAL_STANDOUT + JOURNAL_STANDOUT_BAND) + END_FLOAT,
+    PILOT_DEPTH_MAX - (JOURNAL_STANDOUT - JOURNAL_STANDOUT_BAND) + END_FLOAT,
+)
+if min(FACING_REMOVAL) < -1e-9:
+    raise AssertionError("MHA-PD-16's supplied pilot is shallower than the float needs")
+# The pilot depth after facing, over the stand-out's stack and the float's
+# acceptance: the sheet's FITTED range, rounded inward onto the .XXX grid.
+PILOT_DEPTH_FITTED_RANGE = (
+    JOURNAL_STANDOUT - JOURNAL_STANDOUT_BAND - (END_FLOAT + END_FLOAT_SET_TOL),
+    JOURNAL_STANDOUT + JOURNAL_STANDOUT_BAND - (END_FLOAT - END_FLOAT_SET_TOL),
+)
+PILOT_DEPTH_FITTED_TEXT = (
+    f"{inch_text(inch_ceil_mm(PILOT_DEPTH_FITTED_RANGE[0], 3), 3)}-"
+    f"{inch_text(inch_floor_mm(PILOT_DEPTH_FITTED_RANGE[1], 3), 3)}"
+)
+# The shortest fitted pilot still centres the cup on the journal end: the
+# design record's .4D floor (no repository floor exists for a bonded pilot).
+PILOT_DEPTH_FITTED_FLOOR = 0.4 * JOURNAL_DIA
+if PILOT_DEPTH_FITTED_RANGE[0] < PILOT_DEPTH_FITTED_FLOOR:
+    raise AssertionError("MHA-PD-16's shortest fitted pilot no longer centres the cup")
 
-# --- Walls at the printed worst case (contract §8, drawing-guidelines.md rule 17 (walls and webs)) -------------
-# Journal beside the hole.
-JOURNAL_PIN_WALL = (JOURNAL_DIA - PIN_HOLE_MAX) / 2.0
-JOURNAL_PIN_WALL_WORST = (JOURNAL_DIA_MIN - PIN_HOLE_MAX) / 2.0
-# Cup front face to the hole's edge, less the station band and the front
-# face's break.  Under the .080 target and over the .060 floor: owner
-# ruling 2026-11-20 (#2192), the package's RV-01 minor; the sheet prints it
-# (FRONT_PIN_WALL_TEXT).
-FRONT_PIN_WALL = PIN_HOLE_FROM_FRONT - _PIN_HOLE_R_MAX
-FRONT_PIN_WALL_WORST = (
-    PIN_HOLE_FROM_FRONT
-    - PIN_HOLE_STATION_TOL
-    - _PIN_HOLE_R_MAX
-    - FRONT_FACE_EDGE_BREAK_MAX
-)
-FRONT_PIN_WALL_TEXT = (
-    "HOLE WALL TO THRUST FACE "
-    f"{inch_text(inch_floor_mm(FRONT_PIN_WALL_WORST, 3), 3)} MIN"
-)
-# Hole to the journal's rear end, the journal at its shortest behind the
-# cup's front face (MHA-PD-08's length, the ring and hub-to-boss bands and
-# the feeler setting), less the title-block break on the journal's rear-end
-# rim (MHA-PD-08's EDGE_BREAK_MAX, #2169).  The crosshole's mouths are
-# match-drilled through cup and journal together and stay buried in the
-# cup's bore, so they are left unbroken and charge nothing.
-END_PIN_WALL = JOURNAL_REAR_EXTENSION - PIN_HOLE_FROM_FRONT - _PIN_HOLE_R_MAX
-END_PIN_WALL_WORST = (
-    JOURNAL_REAR_EXTENSION_MIN
-    - PIN_HOLE_FROM_FRONT
-    - PIN_HOLE_STATION_TOL
-    - _PIN_HOLE_R_MAX
-    - SHAFT_EDGE_BREAK_MAX
-)
-# Cup ring around the bore at the hole.
-RADIAL_WALL = (OD - BORE_DIA) / 2.0
-RADIAL_WALL_WORST = (OD_MIN - BORE_MAX) / 2.0
-# Hole to the cup's rear face, the shortest cup.
-REAR_PIN_WALL_WORST = (
-    LENGTH_MIN - PIN_HOLE_FROM_FRONT - PIN_HOLE_STATION_TOL - _PIN_HOLE_R_MAX
-)
-for _name, _wall, _floor in (
-    ("journal beside the pin hole", JOURNAL_PIN_WALL_WORST, WALL_FLOOR),
-    ("front face to the pin hole", FRONT_PIN_WALL_WORST, WALL_FLOOR_MM),
-    ("pin hole to the journal's rear end", END_PIN_WALL_WORST, WALL_FLOOR),
-    ("ring round the bore", RADIAL_WALL_WORST, WALL_FLOOR),
-    ("pin hole to the rear face", REAR_PIN_WALL_WORST, WALL_FLOOR),
+# --- Web and walls at the printed worst case (drawing-guidelines.md rule 17) ----
+# The web: the length less the pilot (from the front chucking's face) and the
+# pocket (from the rear's).  Facing the front at fit-up leaves it alone.
+WEB = LENGTH - PILOT_DEPTH - CBORE_DEPTH
+if not math.isclose(WEB, 2.54, abs_tol=1e-9):
+    raise AssertionError("MHA-PD-16's web is no longer .100")
+WEB_MIN = LENGTH_MIN - PILOT_DEPTH_MAX - CBORE_DEPTH_MAX
+WEB_MAX = LENGTH_MAX - PILOT_DEPTH_MIN - CBORE_DEPTH_MIN
+# The ring round the pilot and round the pocket.
+PILOT_WALL_WORST = (OD_MIN - BORE_MAX) / 2.0
+CBORE_WALL_WORST = (OD_MIN - CBORE_DIA_MAX) / 2.0
+for _name, _wall in (
+    ("web", WEB_MIN),
+    ("ring round the pilot", PILOT_WALL_WORST),
+    ("ring round the head pocket", CBORE_WALL_WORST),
 ):
-    if _wall < _floor - 1e-9:
+    if _wall < WALL_FLOOR - 1e-9:
         raise AssertionError(
             f"MHA-PD-16 {_name} {_wall:.3f} at the printed worst case is under "
-            f"the {_floor} floor"
+            f"the {WALL_FLOOR} floor"
         )
 
-# The pin's ends stay inside the cup's O.D., for the longest pin in the
-# smallest cup, pressed centred.
-PIN_END_INSIDE_OD = (OD - PIN_LEN) / 2.0
-PIN_END_INSIDE_OD_WORST = (OD_MIN - PIN_LEN_MAX) / 2.0
-if PIN_END_INSIDE_OD_WORST <= 0.0:
-    raise AssertionError("MHA-PD-VN-62's ends stand out of MHA-PD-16's O.D.")
-# The pin spans the journal and bites both cup walls.
-if not PIN_LEN > BORE_MAX:
-    raise AssertionError("MHA-PD-VN-62 does not reach through both cup walls")
+# --- The MHA-PD-VN-71 screw in the web ----------------------------------------
+# The #33 hole clears the screw's whole under-head fillet envelope (Ø1.3D,
+# ASME B18.6.3), so the head seats on the web, not on the fillet.
+HOLE_FILLET_CLEARANCE_MIN = CLEAR_HOLE_MIN - SCREW.UNDER_HEAD_FILLET_ENVELOPE_DIA
+if HOLE_FILLET_CLEARANCE_MIN <= 0.0:
+    raise AssertionError("MHA-PD-16's #33 hole rides MHA-PD-VN-71's under-head fillet")
+# Informational: the head's bearing land round the largest hole.
+HEAD_BEARING_LAND = (SCREW.HEAD_DIA - CLEAR_HOLE_MAX) / 2.0
+# The head drops into the smallest pocket with room all round, and its top
+# stays below the rear face in the shallowest pocket.
+HEAD_POCKET_CLEARANCE_MIN = (CBORE_DIA_MIN - SCREW.HEAD_DIA) / 2.0
+if HEAD_POCKET_CLEARANCE_MIN <= 0.0:
+    raise AssertionError("MHA-PD-VN-71's head does not enter MHA-PD-16's pocket")
+HEAD_BELOW_REAR_FACE_MIN = CBORE_DEPTH_MIN - SCREW.HEAD_H
+if HEAD_BELOW_REAR_FACE_MIN < 0.0:
+    raise AssertionError("MHA-PD-VN-71's head stands out of MHA-PD-16's rear face")
+# Rule 18: full-thread engagement in the journal's rear tap at the worst
+# case: the shortest screw through the thickest web, less the tap mouth's
+# first thread and title-block break, and the screw's point chamfer.
+SCREW_ENGAGEMENT_MIN = (
+    SCREW.LENGTH_MIN
+    - WEB_MAX
+    - (SCREW.PITCH + SHAFT_EDGE_BREAK_MAX)
+    - SCREW.POINT_CHAMFER_LENGTH_MAX
+)
+SCREW_ENGAGEMENT_MIN_D = SCREW_ENGAGEMENT_MIN / SCREW.MAJOR_DIA
+if SCREW_ENGAGEMENT_MIN_D < 1.5:
+    raise AssertionError(
+        f"MHA-PD-VN-71 engages {SCREW_ENGAGEMENT_MIN_D:.2f}D in MHA-PD-08, under 1.5D"
+    )
+# The longest screw through the thinnest web ends short of the tap's full
+# thread, so it never bottoms.
+SCREW_REACH_MAX = SCREW.LENGTH - WEB_MIN
+SCREW_TIP_SHORT_OF_FULL_THREAD_MIN = REAR_TAP_FULL_THREAD_MIN - SCREW_REACH_MAX
+if SCREW_TIP_SHORT_OF_FULL_THREAD_MIN <= 0.0:
+    raise AssertionError("MHA-PD-VN-71 reaches past MHA-PD-08's full thread")
 
-# The journal's rear end stays inside the cup, behind its rear face.
-JOURNAL_END_INSET = LENGTH - JOURNAL_REAR_EXTENSION
-JOURNAL_END_INSET_WORST = LENGTH_MIN - JOURNAL_REAR_EXTENSION_MAX
-if JOURNAL_END_INSET_WORST <= 0.0:
-    raise AssertionError("the knob shaft's rear end stands out of MHA-PD-16")
-if not math.isclose(JOURNAL_END_INSET, 1.4224, abs_tol=1e-9):
-    raise AssertionError("MHA-PD-16 no longer covers the journal's end by .056")
+# --- Inside corners that matter (drawing-guidelines.md rule 16) ------------------
+# The title block lets an inside corner run to R.040; two here must not.
+# Each is a tangent arc in the turned profile sketch at its largest
+# acceptable radius (a sketch dimension imports into the section; a fillet
+# feature's does not), printed as the single limit "R.xxx MAX" (MHA-PD-28's
+# shoulder root pattern).
+# The pilot's floor corner: the journal's rear face must bear on the web, so
+# its .015 X 45° rear chamfer, at its least leg, clears every point of the
+# corner (a 45° chamfer of leg c clears a root fillet of radius r once c >= r).
+PILOT_FLOOR_R_MAX = 0.127  # .005 MAX
+# The pocket's floor corner: the screw head's bearing face must land flat
+# on the web inside the corner, in the smallest pocket.
+POCKET_FLOOR_R_MAX = 0.254  # .010 MAX
+CORNER_R_PLACES = 3
+CORNER_TOL_TYPE = 0  # swTolType_e.swTolNONE: the " MAX" suffix carries the limit
+CORNER_SUFFIX = " MAX"
+if SHAFT_REAR_CHAMFER_MIN < PILOT_FLOOR_R_MAX - 1e-9:
+    raise AssertionError(
+        "MHA-PD-08's least rear chamfer rides MHA-PD-16's pilot floor corner"
+    )
+HEAD_CORNER_CLEARANCE_MIN = (
+    CBORE_DIA_MIN / 2.0 - POCKET_FLOOR_R_MAX - SCREW.HEAD_DIA / 2.0
+)
+if HEAD_CORNER_CLEARANCE_MIN <= 0.0:
+    raise AssertionError("MHA-PD-VN-71's head rides MHA-PD-16's pocket floor corner")
 
-# The front face is the running face on the plate's rear boss: MACHINED, on
+# The front face is the running face on the bush's rear face: MACHINED, on
 # the exact native face the part build resolves.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -176,17 +261,30 @@ SURFACE_FINISHES = (
 )
 
 # Marked model dimensions and the places the model authors on them
-# (drawing-simplicity-policy.md `How the repository implements the guidelines`).  The turned profile carries the O.D.,
-# the bore and the length, so all three print on the axial section (rule 11).
+# (drawing-simplicity-policy.md `How the repository implements the
+# guidelines`).  The turned profile carries the O.D., the length, the pilot
+# and the pocket, and its two floor arcs their radii, so they print on the
+# axial section (rule 11); the web's drill is its own cut, sized on the face
+# view where it shows round.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "CupProfile": {"CupDia", "CupLength", "BoreDia"},
+    "CupProfile": {
+        "CupDia", "CupLength", "BoreDia", "PilotDepth", "CboreDia", "CboreDepth",
+        "PilotFloorR", "PocketFloorR",
+    },
+    "WebHole": {"HoleDia"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CupProfile": {
         "CupDia": OD_PLACES,
         "CupLength": LENGTH_PLACES,
         "BoreDia": BORE_PLACES,
+        "PilotDepth": PILOT_DEPTH_PLACES,
+        "CboreDia": CBORE_PLACES,
+        "CboreDepth": CBORE_PLACES,
+        "PilotFloorR": CORNER_R_PLACES,
+        "PocketFloorR": CORNER_R_PLACES,
     },
+    "WebHole": {"HoleDia": HOLE_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
