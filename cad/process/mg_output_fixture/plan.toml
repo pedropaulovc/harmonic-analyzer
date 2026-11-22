@@ -260,7 +260,16 @@ speed_kind = "other"
 tool = "tap-plug"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle off, in neutral. Put the MT3 dead centre in the tailstock. Pencil-mark the plug tap .40 from its point. Start {{cad.tap_thread}} with it in the T-handle wrench, the dead centre's point in the wrench's centre hole to keep it on axis. Rest the wrench's handle on the compound, turn the chuck by hand with one hand and wind the tailstock handwheel in with the other so the centre follows the tap (.025 a turn), backing off every half turn, and stop when the mark reaches the spigot face: never bottom the tap in the .49 hole."
+instruction = "Spindle off, in neutral. Put the MT3 dead centre in the tailstock. Pencil-mark the plug tap .40 from its point and set it in the T-handle wrench. Put its point in the drilled hole, the dead centre's point in the wrench's centre hole to keep it on axis, the wrench's handle resting on the compound."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "tap-plug"
+drilling = "none"
+sizing = "other"
+instruction = "Tap {{cad.tap_thread}}: turn the chuck by hand with one hand, winding the tailstock handwheel in with the other so the centre follows the tap (.025 a turn). Back off every half turn; stop when the mark reaches the spigot face: never bottom the tap in the .49 hole."
 feed = "hand"
 
 [[setups.operations]]
@@ -311,7 +320,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Prove MO01_cross_bore in air, Z0 raised 1.000 in; every move clears the jaws. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run the whole of MO01_cross_bore in air, through both its tool changes (T1, then T2) and the F drill's pass to the program's end, watching each move clear the jaw tops ({{process.cross_jaw_top_mm:in.3dot}} above the corner). G10 L2 P1 Z(the noted Z) puts Z0 back. Op 160 runs the file again from its start, its first M6 T1 putting the centre drill back in."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run the whole of MO01_cross_bore in air, through both its tool changes (T1, then T2) and the F drill's pass to the program's end, watching each move clear the jaw tops ({{process.cross_jaw_top_mm:in.3dot}} above the corner). G10 L2 P1 Z(the noted Z) puts Z0 back. Op 170 runs the file again from its start, its first M6 T1 putting the centre drill back in."
 feed = "hand"
 
 [[setups.operations]]
@@ -351,7 +360,7 @@ machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "The bar back in the 3-jaw, a jaw on every other flat, the spigot end {{process.stickout_in:.2f}} in out of the jaw fronts."
-datum = "DRO Z set with the blade on the spigot face in Op 190."
+datum = "DRO Z set with the blade on the spigot face in Op 200."
 diagram = { file = "diagrams/part.svg", alt = "The bar in the 3-jaw, the fixture's spigot end out; the P1 blade's chuck-side face touched on the spigot face, then the fixture parted off .72 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = 11.1125, stock_diameter_mm = 12.8316, stickout_mm = 24.13, minimum_diameter_mm = 8.2968, support = "none" }
 
@@ -367,7 +376,7 @@ cut_diameter_mm = 12.8316
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The rod bore's two stations, the F drill's shank in the bore (the GO, or the undersize F if Op 120 found no GO): calipers from the free end over the shank's far side, less half the shank's miked Ø; then from the spigot face the same way."
+instruction = "The rod bore's two stations, the F drill's shank in the bore (the GO, or the undersize F if Op 130 found no GO): calipers from the free end over the shank's far side, less half the shank's miked Ø; then from the spigot face the same way."
 inspection = "Free end to the bore's axis {{cad.rod_bore_station_min_in:.3dot}}–{{cad.rod_bore_station_max_in:.3dot}}; spigot face to it {{cad.rod_bore_face_station_min_in:.3dot}}–{{cad.rod_bore_face_station_max_in:.3dot}}."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.rod_bore_station_band_mm}}" },
@@ -395,7 +404,7 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "File the parting pip on the free end flat. Break every cut edge {{cad.edge_break_in:.3dot}} max: the free end's, the shoulder's outer edge at the hex, the bore's two mouths at the corners and the groove's lips (a light touch of the smooth file, never into the groove's round); the spigot face's edge was broken in Op 110."
+instruction = "File the parting pip on the free end flat. Break every cut edge {{cad.edge_break_in:.3dot}} max: the free end's, the shoulder's outer edge at the hex, the bore's two mouths at the corners and the groove's lips (a light touch of the smooth file, never into the groove's round); the spigot face's edge was broken in Op 120."
 feed = "hand"
 
 [[setups.operations]]
@@ -417,5 +426,5 @@ instruction = "A screw that binds before the bore: chase again with the bottomin
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Wipe the fixture clean and dry; bag it, with its tag if Op 120 tagged it."
+instruction = "Wipe the fixture clean and dry; bag it, with its tag if Op 130 tagged it."
 feed = "hand"
