@@ -16,12 +16,21 @@
   <text class="label" x="60" y="380">foot holes A1-A4, Ø5/16, up through the foot</text>
   <!-- End view: the trapezoid, 2.50 at the foot, .66 at the top, web .50. -->
   <polygon class="part-kept" points="520,308.9 609,308.9 576.2,60 552.8,60"/>
-  <rect class="holes" x="547.3" y="68.9" width="11.25" height="231.1"/>
-  <rect class="holes" x="573.2" y="68.9" width="11.25" height="231.1"/>
+  <!-- The pockets, behind the slant faces: hidden edges, the web between. -->
+  <line class="hidden" x1="558.55" y1="68.9" x2="558.55" y2="300"/>
+  <line class="hidden" x1="573.2" y1="68.9" x2="573.2" y2="300"/>
+  <line class="hidden" x1="548" y1="300" x2="582" y2="300"/>
+  <line class="hidden" x1="553" y1="68.9" x2="577" y2="68.9"/>
   <line class="arrow" x1="520" y1="330" x2="609" y2="330"/>
   <text class="label" x="530" y="348">2.50 at the foot</text>
-  <text class="label" x="600" y="70">.66 at the top face</text>
-  <text class="label" x="600" y="190">web .50 between</text>
-  <text class="label" x="600" y="208">the two pockets</text>
-  <text class="label" x="618" y="300">foot .25 thick</text>
+  <line class="leader" x1="620" y1="66" x2="574" y2="61"/>
+  <circle class="leader-dot" cx="574" cy="61" r="2"/>
+  <text class="label" x="624" y="70">.66 at the top face</text>
+  <line class="leader" x1="620" y1="186" x2="566" y2="190"/>
+  <circle class="leader-dot" cx="566" cy="190" r="2"/>
+  <text class="label" x="624" y="190">web .50 between</text>
+  <text class="label" x="624" y="208">the two pockets</text>
+  <line class="leader" x1="620" y1="296" x2="590" y2="305"/>
+  <circle class="leader-dot" cx="590" cy="305" r="2"/>
+  <text class="label" x="624" y="300">foot .25 thick</text>
 </svg>

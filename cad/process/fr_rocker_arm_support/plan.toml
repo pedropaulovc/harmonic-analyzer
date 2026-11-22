@@ -46,7 +46,7 @@
 title = "Rocker arm support"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
-material = "1018 cold-finished steel flat bar (drawing: {{cad.material_spec}})"
+material = "1018 cold-finished steel flat bar (drawing: {{cad.material_name}})"
 stock = "3 x 8 in flat bar; {{process.quantity:d}} × 8 in length ({{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} as cut)."
 note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.east_end_length_min_in:.2dot}}–{{cad.east_end_length_max_in:.2dot}} long (end face to end face), {{cad.top_face_height_min_in:.2dot}}–{{cad.top_face_height_max_in:.2dot}} high (foot to top face), {{cad.slant_plus_z_width_min_in:.2dot}}–{{cad.slant_plus_z_width_max_in:.2dot}} wide at the foot; web {{cad.web_plus_z_thickness_min_in:.2dot}}–{{cad.web_plus_z_thickness_max_in:.2dot}}. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. FR02 and FR05 run for hours: stay at the mill, coolant mist or brush oil on the cut, clear chips from the pocket between levels if they pack. After any controller reset, stall or E-stop: home ($H) and touch off G54 again as the setup's zero op says before Cycle Start; a reset loses home (logbook 2026-11-06)."
 shop = "../shop"
@@ -248,7 +248,7 @@ drilling = "none"
 sizing = "other"
 instruction = "File the burrs off the sawn ends and the four long edges so the slab seats flat on the blocks. Calipers: the bar's thickness at the four corners. Mark one 8 x 8 face A (marking fluid), the other B; mark one bar edge FOOT. The width and the length are read on the mill (Setup 2's zero op)."
 feed = "hand"
-inspection = "Thickness {{process.bar_thickness_min_mm:in.3dot}}–{{process.bar_thickness_max_mm:in.3dot}} at every corner: every program is posted for this band. Write the mean on side A: T."
+inspection = "Thickness {{process.bar_thickness_min_mm:in.3dot}}–{{process.bar_thickness_max_mm:in.3dot}} at every corner: every program is posted for this band. Write the mean, T, in inches and in mm, on the middle of side A and of side B (the boss, uncut until FR08): the Z0 ops read it there."
 gauge_checks = [
   { gauge = "calipers", band_mm = ["{{process.bar_thickness_min_mm}}", "{{process.bar_thickness_max_mm}}"] },
 ]
@@ -276,13 +276,23 @@ vise_hold = "other"
 beam = { axis = "x", hold = "between", extent_mm = [-101.6, 101.6], supports_mm = [-95.25, 95.25], section_mm = { y = 177.8, z = 35.56 } }
 
 [[setups.operations]]
-instruction = "Once per table setup, the slab clamped. Home first ($H). Edge finder (900 rpm) on the west sawn end at Y0's line: note X; on the east end: note X; jog to the mean, G10 L20 P1 X0. Same on the FOOT edge and the far edge: G10 L20 P1 Y0 at the mean. Console M6 T2 (#2 centre drill): its tip just dragging a .002 feeler leaf on side A, G10 L20 P1 Z(T/2 + 0.051), T in mm."
+instruction = "Once per table setup, the slab clamped. Home first ($H). Edge finder (900 rpm) on the −X sawn end at Y0's line: note X; on the +X end: note X; jog to the mean, G10 L20 P1 X0. Same on the FOOT edge and the far edge: G10 L20 P1 Y0 at the mean. Console M6 T2 (#2 centre drill): its tip just dragging a .002 feeler leaf on side A, G10 L20 P1 Z(T/2 + 0.051), T in mm."
 feed = "hand"
-inspection = "From the noted readings, less the finder's .200: the slab's length {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} and width {{process.bar_width_min_mm:in.3dot}}–{{process.bar_width_max_mm:in.3dot}} (every program is posted for these). Out of band: stop and tell the owner."
+inspection = "From the noted readings, less the finder's .200: the slab's length {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} and width {{process.bar_width_min_mm:in.3dot}}–{{process.bar_width_max_mm:in.3dot}} (every program is posted for these)."
 gauge_checks = [
   { gauge = "mill-x-dro", band_mm = ["{{process.blank_length_min_mm}}", "{{process.blank_length_max_mm}}"] },
   { gauge = "mill-y-dro", band_mm = ["{{process.bar_width_min_mm}}", "{{process.bar_width_max_mm}}"] },
 ]
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "Length or width out of its band: stop and tell the owner with the reading." },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove each file in air before its first cut, FR01_studs first: send $# and note G54's Z; G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run the file until the tool has passed both end straps; stop, G10 L2 P1 Z(the noted Z) puts Z0 back. Every later file the same way."
+feed = "hand"
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -315,7 +325,7 @@ instruction = "Studs: two 3/8-16 studs (1268 kit) from T-nuts in the middle T-sl
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Prove each file in air before its first cut (here FR02_a_mill; every later file the same way): send $# and note G54's Z; G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run the file until the cutter has passed every nut, stud and strap; stop, G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction = "Prove FR02_a_mill in air the same way: run it raised until the cutter has passed both studs and flange nuts; stop and put Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -376,8 +386,14 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "Before unclamping: measure the pocket (edge finder in the spindle, DRO in inches, G20); then send G21."
-inspection = "Pocket {{cad.pockets_size_min_in:.2dot}}–{{cad.pockets_size_max_in:.2dot}} wall to wall, X and Y: the DRO difference between the two walls plus the finder's .200. Out of band: stop and tell the owner."
+inspection = "Pocket {{cad.pockets_size_min_in:.2dot}}–{{cad.pockets_size_max_in:.2dot}} wall to wall, X and Y: the DRO difference between the two walls plus the finder's .200."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.pockets_size_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "Pocket out of its band: stop and tell the owner with the reading." },
+]
 feed = "hand"
 
 [[setups]]
@@ -396,11 +412,30 @@ vise_hold = "other"
 beam = { axis = "x", hold = "between", extent_mm = [-96.012, 96.012], supports_mm = [-89.281, 89.281], section_mm = { y = 177.8, z = 12.7 } }
 
 [[setups.operations]]
-instruction = "Home ($H). Edge finder (900 rpm) in each empty stud hole: touch its west and east walls, the hole's centre the mean. At the west hole's centre: G10 L20 P1 X-31.750; the east hole's centre then reads X31.750 ±0.10 mm (else set X0 midway between the centres). Finder on the FOOT and far bar edges: G10 L20 P1 Y0 at the mean. Touch the west sawn end; note X."
+instruction = "Home ($H). Edge finder (900 rpm) in each empty stud hole: touch its −X and +X walls, the hole's centre the mean. At the −X hole's centre: G10 L20 P1 X-31.750; read the +X hole's centre. Finder on the FOOT and far bar edges: G10 L20 P1 Y0 at the mean. Note the FOOT edge's Y and the −X sawn end's X."
+feed = "hand"
+inspection = "The +X hole's centre reads X31.750 ±0.10 mm."
+gauge_checks = [{ gauge = "mill-x-dro", band_mm = [31.65, 31.85] }]
+
+[[setups.operations]]
+instruction = "+X hole's centre off: G10 L20 P1 X0 midway between the two holes' centres instead."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Drop each stud through its hole into its T-nut, a flange nut on each, tight. Touch the west sawn end again: it reads the noted X ±0.03 mm (else loosen, tap the part back, tighten). Console M6 T1: its tip on a .002 leaf on side B, G10 L20 P1 Z(T/2 + 0.051)."
+instruction = "Drop each stud through its hole into its T-nut, a flange nut on each, tight. Touch the −X sawn end and the FOOT bar edge again."
+feed = "hand"
+inspection = "Each reads within 0.03 mm of its noted value."
+gauge_checks = [
+  { gauge = "mill-x-dro", band_mm = [0.0, 0.03] },
+  { gauge = "mill-y-dro", band_mm = [0.0, 0.03] },
+]
+
+[[setups.operations]]
+instruction = "Either one off: loosen both nuts, tap the part back, tighten, and touch both again."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Console M6 T1: its tip on a .002 leaf on side B, G10 L20 P1 Z(T/2 + 0.051), T from side B's middle. Send $#; write G54's X and Y on side B's middle: after a reset or stall in this setup, home, G10 L2 P1 X Y those values, and touch Z off here again."
 feed = "hand"
 
 [[setups.operations]]
@@ -465,10 +500,16 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "Before unclamping: the cavity and pocket B (edge finder, DRO in inches, G20); then G21. Unclamp; lift the frame off, the boss stays on the studs."
-inspection = "Cavity {{cad.cavity_size_min_in:.2dot}}–{{cad.cavity_size_max_in:.2dot}} wall to wall, X and Y; pocket B {{cad.pockets_size_min_in:.2dot}}–{{cad.pockets_size_max_in:.2dot}}: each the DRO difference between the two walls plus the finder's .200. Web {{cad.web_plus_z_thickness_min_in:.3dot}}–{{cad.web_plus_z_thickness_max_in:.3dot}} at four places round the cavity (micrometer). Out of band: stop and tell the owner."
+inspection = "Cavity {{cad.cavity_size_min_in:.2dot}}–{{cad.cavity_size_max_in:.2dot}} wall to wall, X and Y; pocket B {{cad.pockets_size_min_in:.2dot}}–{{cad.pockets_size_max_in:.2dot}}: each the DRO difference between the two walls plus the finder's .200. Web {{cad.web_plus_z_thickness_min_in:.3dot}}–{{cad.web_plus_z_thickness_max_in:.3dot}} at four places round the cavity (micrometer)."
 gauge_checks = [
   { gauge = "mill-x-dro", band_mm = "{{cad.cavity_size_band_mm}}" },
   { gauge = "micrometers", band_mm = "{{cad.web_plus_z_thickness_band_mm}}" },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "Cavity, pocket or web out of its band: stop and tell the owner with the reading." },
 ]
 feed = "hand"
 
@@ -487,7 +528,7 @@ vise_hold = "other"
 beam = { axis = "x", hold = "solid", extent_mm = [-96.012, 96.012], seat_mm = [-96.012, 96.012], seat = "the top face flat on the table under the web" }
 
 [[setups.operations]]
-instruction = "Home ($H). Edge finder (900 rpm), its tip .12 below the foot face: on the west end face, note X; on the east, note X; G10 L20 P1 X0 at the mean. Same on the two slant faces: G10 L20 P1 Y0 at the mean. Console M6 T2: its tip on a .002 leaf on the foot face, G10 L20 P1 Z0.051."
+instruction = "Home ($H). Edge finder (900 rpm), its tip .12 below the foot face: on the −X end face, note X; on the +X end face, note X; G10 L20 P1 X0 at the mean. Same on the two slant faces: G10 L20 P1 Y0 at the mean. Console M6 T2: its tip on a .002 leaf on the foot face, G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -518,6 +559,16 @@ milling_cuts = [
   { name = "foot holes", kind = "drill", phase = "finish", cutter_dia_mm = 7.9375, flutes = 2, rpm = 750, feed_mm_min = "{{process.foot_feed_per_min_mm}}", stations_mm = [-60.325, 60.325] },
 ]
 
+[[setups.operations]]
+instruction = "GO pin tight in a hole: still clamped, run FR09_foot again from its M6 T4 line (CNCjs: start from that line), then gauge the holes again."
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "GO still tight, or NO-GO enters: stop and tell the owner." },
+]
+feed = "hand"
+
 [[setups]]
 machine_kind = "other"
 title = "Chamfer the foot's end edges, deburr, inspect, enamel"
@@ -535,7 +586,7 @@ drilling = "none"
 sizing = "other"
 instruction = "The two end faces' foot edges (along the foot's width; not the top edges): scribe {{cad.rim_chamfer_leg_in:.2dot}} from the edge on the end face and on the foot (height gauge on the surface plate), file the chamfer to both lines. The end faces' top edges keep the title block's edge break only."
 feed = "hand"
-inspection = "Each leg {{cad.rim_chamfer_leg_min_in:.2dot}}–{{cad.rim_chamfer_leg_max_in:.2dot}} (calipers' depth rod against the scribed line)."
+inspection = "Each leg filed to its scribed line, the line just split: leg {{cad.rim_chamfer_leg_min_in:.2dot}}–{{cad.rim_chamfer_leg_max_in:.2dot}} from the edge's corner, along the end face and along the foot (calipers' depth rod from the uncut face beyond the chamfer)."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.rim_chamfer_leg_band_mm}}" }]
 
 [[setups.operations]]
@@ -549,7 +600,7 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Inspect; record the readings."
 feed = "hand"
-inspection = "On the surface plate, foot down: the foot lies flat without rocking, its underside smooth to the drawing's Ra ({{cad.foot_finish_ra:.1f}} µm: by eye and fingernail, no tool marks the nail catches); height to the top face {{cad.top_face_height_min_in:.2dot}}–{{cad.top_face_height_max_in:.2dot}} (height gauge). On an end face: length {{cad.east_end_length_min_in:.2dot}}–{{cad.east_end_length_max_in:.2dot}} (height gauge). Foot {{cad.foot_thickness_min_in:.2dot}}–{{cad.foot_thickness_max_in:.2dot}} thick to the pocket wall (calipers, one jaw in the pocket). Foot holes from the west end {{cad.foot_hole_a1_station_min_in:.3dot}}–{{cad.foot_hole_a1_station_max_in:.3dot}} (A1, A2) and {{cad.foot_hole_a3_station_min_in:.3dot}}–{{cad.foot_hole_a3_station_max_in:.3dot}} (A3, A4): calipers from the end face, below its chamfer, to a 5/16 pin in the hole, less half the pin. Not gauged: the slant faces and the holes across the foot, the programs' paths, centred by Setup 4's Y0."
+inspection = "On the surface plate, foot down: the foot lies flat without rocking, its underside smooth to the drawing's Ra ({{cad.foot_finish_ra:.1f}} µm: by eye and fingernail, no tool marks the nail catches); height to the top face {{cad.top_face_height_min_in:.2dot}}–{{cad.top_face_height_max_in:.2dot}} (height gauge). On an end face: length {{cad.east_end_length_min_in:.2dot}}–{{cad.east_end_length_max_in:.2dot}} (height gauge). Foot {{cad.foot_thickness_min_in:.2dot}}–{{cad.foot_thickness_max_in:.2dot}} thick to the pocket wall (calipers, one jaw in the pocket). Foot holes from either end face: the nearer pair {{cad.foot_hole_a1_station_min_in:.3dot}}–{{cad.foot_hole_a1_station_max_in:.3dot}}, the farther pair {{cad.foot_hole_a3_station_min_in:.3dot}}–{{cad.foot_hole_a3_station_max_in:.3dot}}: calipers from the end face, below its chamfer, to a 5/16 pin in the hole, less half the pin. Not gauged: the slant faces and the holes across the foot, the programs' paths, centred by Setup 4's Y0."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = "{{cad.top_face_height_band_mm}}" },
   { gauge = "height-gauge", band_mm = "{{cad.east_end_length_band_mm}}" },

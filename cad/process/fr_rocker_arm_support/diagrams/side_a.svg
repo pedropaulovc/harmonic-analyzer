@@ -23,7 +23,7 @@
   <line class="datum" x1="190" y1="230" x2="210" y2="230"/>
   <text class="datum-label" x="182" y="268">X0 Y0</text>
   <text class="label-halo" x="150" y="400">FOOT edge, toward you</text>
-  <text class="label-halo" x="300" y="200">end strap</text>
+  <text class="label-halo" x="262" y="200">end strap: FR01 only</text>
   <!-- Section along Y at X 0, centre (610, 230): Z up, the foot at the left. -->
   <rect class="fixture-table" x="430" y="363.35" width="380" height="20"/>
   <rect class="fixture-support" x="629.05" y="287.15" width="38.1" height="76.2"/>

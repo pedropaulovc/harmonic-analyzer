@@ -27,10 +27,15 @@
   <text class="datum-label" x="534" y="214">Z0</text>
   <line class="datum" x1="380" y1="200" x2="380" y2="220"/>
   <text class="datum-label" x="384" y="196">X0</text>
-  <text class="label" x="470" y="140">post strap</text>
+  <line class="leader" x1="560" y1="148" x2="580" y2="166"/>
+  <circle class="leader-dot" cx="580" cy="166" r="2"/>
+  <text class="label" x="520" y="144">post strap</text>
   <text class="label" x="530" y="300">screw jack</text>
-  <text class="label" x="330" y="300">middle blocks</text>
-  <text class="label" x="455" y="260">cavity slot</text>
+  <text class="label-halo" x="358" y="300">middle</text>
+  <text class="label-halo" x="358" y="316">blocks</text>
+  <line class="leader" x1="190" y1="146" x2="291" y2="208"/>
+  <circle class="leader-dot" cx="291" cy="208" r="2"/>
+  <text class="label" x="110" y="142">cavity slot</text>
   <text class="label" x="300" y="90">studs from the middle T-slot</text>
   <text class="label" x="20" y="390">side B milled as side A; FR08 slots the cavity through the web round the boss</text>
 </svg>
