@@ -1,28 +1,386 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Pinion arbor retention collar MHA-DT-33, one off, from 5/8 in round 1018 CF.
+# Route, chosen for speed (owner ruling 2026-11-21: turned setups are manual
+# lathe work on the PM-1127VF-LB with a traveler and no NC; milled features
+# run from a program on the PM-30MV):
+# - Setup 1, saw: a 2.00 in blank, and a 1 in offcut for Setup 3's spacer.
+# - Setup 2, lathe, 3-jaw: face the end (the collar's datum end), turn the
+#   Ø.59 O.D. .80 in long, spot and drill 5/16 past the parting line, break
+#   the faced end's edge. The collar stays on its blank.
+# - Setup 3, mill, vise: the 1/16 pin hole is drilled while the collar is
+#   still the blank's turned end: the blank lies along the jaws on one 1 in
+#   parallel on edge, the turned end .50 in out past the jaws' left face, so
+#   the hole (.33 from the faced end) is drilled in that overhang into air.
+#   Program PC01_pin_hole spots it and pecks the 1/16 through both walls.
+#   Drilling it on the blank, not on the parted collar, needs no second
+#   fixture, no balance part of the collar's diameter and no drill run-out
+#   into a parallel.
+# - Setup 4, lathe, 3-jaw: the blank again, turned end out; the P1 blade
+#   parts the collar off .66 from the faced end. The parted face is the
+#   collar's far end, held to .65-.67 by the carriage DRO; no facing.
+# - Setup 5, bench: deburr, check, oil, bag.
+#
+# Checks: the O.D. on the lathe (micrometers); length, bore (telescoping
+# gauge and micrometers), pin hole (pin gauges, class ZZ minus, to order:
+# cad/config/shop-equipment/ gauges.pin-gauges) and the hole's station at
+# the bench. The bore is a plain drilled hole (DRILL THRU, +.004/0) that
+# slides on the MHA-DT-22 arbor, not a matched fit; the pin hole presses the
+# MHA-DT-VN-63 spring pin at assembly.
+#
+# NC (cam:dt_pinion_arbor_collar, cad/process/dt_pinion_arbor_collar/cam.py):
+# PC01_pin_hole. The program name, the [parameters] and the milling_cuts
+# names are a contract with that recipe. Tool numbers are the places in the
+# tools list among the mill's tools: T1 the centre drill, T2 the 1/16 drill.
 title = "Pinion Arbor Retention Collar"
-part = "MHA-DT-33 Pinion Arbor Retention Collar"
-revision = "placeholder"
-material = "low-carbon cold-finished steel bar, ASTM A108 (1018, 1020 or 12L14)"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "1018 cold-finished steel, 5/8 in round (drawing: {{cad.material_spec}})"
+stock = "Qty {{process.quantity:g}}. {{process.bar_dia_in:fraction}} in round bar on hand: one blank {{process.blank_length_in:.2f}} in long, and a 1 in offcut for the mill setup's spacer."
+note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Finished Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}} × {{cad.far_end_length_min_in:.2dot}}–{{cad.far_end_length_max_in:.2dot}} long, the Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} drilled bore through, the 1/16 pin hole through both walls {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from the faced (datum) end. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) and touch off G54 before the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Prove the file in air first."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
+material_key = "lathe-1018-cold-finished"
+milling_material = "steel_1018"
+
+[cad]
+file = "../../out/features/dt_pinion_arbor_collar/features.toml"
+adapter = "drilled_block"
+part = "dt-pinion-arbor-collar"
+
+[parameters]
+quantity = 1
+bar_dia_in = 0.625
+bar_dia_mm = 15.875
+# The blank: the .80 in turned end, the 1.00 in the 3-jaw grips in Setup 2
+# and the faced-off .02, rounded up.
+blank_length_in = 2.0
+blank_length_mm = 50.8
+# The blank the collar is cut from (stock_fit: envelope X, Y, Z; Z the axis).
+blank_x_in = 0.625
+blank_y_in = 0.625
+blank_z_in = 2.0
+# Setup 2: the blank 1.00 in out of the jaw fronts; the O.D. turned .80 in
+# long: the .66 collar, the P1 blade's width and .08 in beyond it, so the
+# blade parts inside the turned length and stands .20 clear of the jaws.
+stickout_mm = 25.4
+turn_length_in = 0.8
+# Facing allowance: enough to square a sawn end.
+face_allowance_in = 0.02
+# Turning (A R Warner AR holder, TCMT insert, R0.4 nose, carbide): the
+# O.D. roughed to .600, then one finish pass to the .58-.60 band, aiming .590.
+rough_dia_in = 0.6
+# The 5/16 drill: its full diameter to .80 from the faced end (past the
+# parting line at .66 + the blade's .0625), in one feed (L/D 2.6).
+drill_run_in = 0.8
+drill_run_mm = 20.32
+# Setup 4: the blank's 5/8 end in the 3-jaw, the turned end .95 in out: the
+# blade's far face at .7225 stays .23 in clear of the jaw fronts.
+part_off_stickout_mm = 24.13
+# The P1 cutoff blade's width: its record (cad/config/shop-equipment/
+# tools-cutting.toml tools.cutoff-blade-p1 width_in, the makers' 1/16 in).
+# The part-off op mikes the blade's cutting edge and presets the DRO to that.
+blade_width_in = 0.0625
+# Parting kerf: the P1 blade's width plus .0125 (authored), for wander.
+part_kerf_in = 0.075
+# Mill (shop workholding.vise-pm-6, fixtures.parallels-lms-6745, 1/8 in
+# thick): one 1 in parallel of the set standing on edge, centred between the
+# jaws, its left end flush with the jaws' left face; the blank lies on its
+# top edge with the turned end .50 in out past the jaws' left face; the 1 in
+# offcut on the parallel's right end balances the jaws.
+riser_height_mm = 25.4
+parallel_thickness_mm = 3.175
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+# The LMS 6745 parallels are 4 in long (as the dt_pinion_bracket plan
+# records); the offcut spacer sits on the parallel's right end.
+parallel_length_mm = 101.6
+# The turned end past the jaws' left face; the pin hole drills in this
+# overhang (its .34 far limit plus half the centre drill's 1/8 body is .40).
+end_overhang_mm = 12.7
+# Z0 is the turned O.D.'s top; the jaw tops stand this far above it (the jaw
+# height less the parallel, the bar's radius and the turned radius); cam.py
+# checks it.
+jaw_top_over_od_mm = 4.1148
+# The 1/16 drill runs this far past the turned O.D.'s underside (authored);
+# its tip then stands this far above the parallel's top (the bar's and the
+# turned O.D.'s radii less the O.D., the run past and the point); cam.py
+# checks it.
+pin_drill_past_mm = 0.5
+pin_tip_height_mm = -0.5324
+# The #1 centre drill spots to Ø2.0 mm (over the 1/16's 1.5875), cam.py
+# computes the depth.
+spot_dia_mm = 2.0
+# The 1/16 drill (shop tools.drill-1-16.diameter_mm); cam.py checks it.
+drill_1_16_dia_mm = 1.5875
+# Pecks of the 1/16: under one diameter (prechips drill_pecking's step
+# limit), full retract.
+pin_peck_mm = 1.5
+# Speeds and feeds: LittleMachineShop "Cutting Speeds", Drilling & Reaming,
+# Plain carbon steels 1006-1026 (read 2026-11-20): drilling 60-100 ft/min;
+# AutoDrill "Suggested drilling feed rates" (read 2026-11-20), row Stl,
+# Carbon: 1/16 in .001 in/rev (both as the dt_pinion_cam plan). The 1/16 at
+# the spindle's 2800 (46 ft/min, under the range: the spindle's top) × .001
+# = 2.8 in/min; the centre drill 1800 × .001 = 1.8 in/min (the cam's spot).
+spot_feed_per_min_mm = 45.72
+drill_feed_per_min_mm = 71.12
+# Machine-capacity inputs (mm): tool lengths from spindle nose to tip.
+drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
+# ASME B94.11M jobber length overall, 1/16: 1-7/8 in; the #1 combined drill
+# and countersink 1-1/4 in. Bounded by their whole length below the chuck.
+drill_1_16_oal_mm = 47.625
+centre_drill_oal_mm = 31.75
+# The least length each must stand out of the drill chuck to reach its
+# depth with the chuck above the jaw tops; cam.py checks it.
+spot_projection_min_mm = 20.0
+drill_projection_min_mm = 26.0
+# Bench: the pin hole's GO / NO-GO pins, class ZZ minus (gauges.pin-gauges:
+# each pin up to .0002 under its size, never over; .001 steps). GO the .063
+# pin, .0628-.0630: a hole it enters is over the band's .0625 bottom (a hole
+# under .0630 may read out: on the safe side). NO-GO the .065 pin, at most
+# .0650: a hole it does not enter is under the band's top.
+go_pin_in = 0.063
+nogo_pin_in = 0.065
+# The station read over the GO pin: the faced end to the pin's far side is
+# the station plus half the pin (.0315).
+station_far_side_min_in = 0.3515
+station_far_side_max_in = 0.3715
+
+[[tools]]
+id = "saw"
+name = "14 in metal-cutting saw"
+ref = "saw-evolution-14"
+
+[[tools]]
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "centre-3"
+name = "No. 3 carbide centre drill"
+ref = "centre-drills-carbide-60"
+
+[[tools]]
+id = "spot"
+name = "#1 carbide centre drill"
+ref = "centre-drills-carbide-60"
+
+[[tools]]
+id = "drill-5-16"
+name = "5/16 drill"
+ref = "block-drill-5-16"
 
 [[tools]]
 id = "drill-1-16"
 name = "1/16 drill"
-ref = "drill-1-16"  # Drills 1/16
+ref = "drill-1-16"
 
 [[tools]]
-id = "block-drill-5-16"
-name = "5/16 drill"
-ref = "block-drill-5-16"  # Drills 5/16
+id = "cutoff"
+name = "P1 HSS cutoff blade"
+ref = "cutoff-blade-p1"
+
+[[tools]]
+id = "file"
+name = "Files; bench vise with soft jaws"
+ref = "jig-files"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Saw the blank"
+machine = "Evolution 14 in metal-cutting saw"
+holding = "The bar flat on the saw bed, its long end clamped in the saw's vise, the blank free beyond the blade."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/saw.svg", alt = "The 5/8 in bar on the saw: a 2.00 in blank off its end, then a 1 in offcut." }
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Scribe {{process.blank_length_in:.2f}} in from the bar end and saw on the waste side of the line; let the blank drop clear and pick it up only after the blade has stopped. Saw a 1 in offcut too: the spacer for Setup 3. File the burrs off the sawn ends."
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Face, turn the O.D., drill 5/16"
+machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the blank, {{process.stickout_mm:in.2f}} in out of the jaw fronts, measured with the rule; the rest of the blank in the jaws."
+datum = "Z0 (carriage DRO) the end faced in Op 20: the collar's datum end. The pin hole's station and the part-off run from it."
+diagram = { file = "diagrams/lathe.svg", alt = "The blank in the 3-jaw, 1.00 in out: the end faced, the O.D. turned to Ø.59 .80 in long, the 5/16 drill run .80 in deep." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the end square, {{process.face_allowance_in:.2f}} in off, to the centre with no pip; set DRO Z0 on it. Mark this face F with a marker dot near its edge: it is the collar's datum end."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{process.bar_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the O.D. from Z0 to Z-{{process.turn_length_in:.2f}}: rough to Ø{{process.rough_dia_in:.3dot}}, then one finish pass to Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}, aiming {{cad.outer_dia_in:.3dot}}."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: mike the turned O.D. by the faced end and at Z-.70."
+inspection = "O.D. Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}} at both stations."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Over {{cad.outer_dia_max_in:.3dot}} at either station: another finish pass and mike again (Op 40). Under {{cad.outer_dia_min_in:.3dot}}: face the turned end off past Z-{{process.turn_length_in:.2f}} and start Setup 2 again on the rest of the blank, or saw another (Setup 1)."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre-3"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock (the No. 3 centre drill in the tailstock chuck), about Ø.20 across the countersink: under the 5/16 drill, so the drill removes it."
+settings = "lathe-centre-1018"
+cut_diameter_mm = 2.778
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-5-16"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Feed the 5/16 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill in one steady feed until the scale reads {{process.drill_run_in:.2f}}: the drill's full diameter then runs past the parting line."
+settings = "lathe-drill-5-16-1018"
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
+hole_depth_mm = "{{process.drill_run_mm}}"
+peck = "none"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Break the faced end's outer edge with a smooth file held flat, and the bore's mouth with the file's corner, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max; spindle at the low range."
+rpm = 200
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Mill: the 1/16 pin hole"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "The PM 6 in vise. One 1 in, 4 in long parallel of the 1/8 in thick set standing on edge, centred between the jaws, its left end flush with the jaws' left face (a rule across both). The blank on its top edge along the jaws, the turned end to the LEFT, set {{process.end_overhang_mm:in.2f}} in out past the jaws' left face with the calipers' depth rod, never under .45; the jaws close on the blank's 5/8 end. The 1 in offcut (Op 10) on the parallel's right end, so the moving jaw closes square. Tap both down onto the parallel while closing the vise. Under the pin hole nothing but air."
+datum = "Program PC01_pin_hole (cam:dt_pinion_arbor_collar). G54: X0 face F (faced in Op 20), +X along the blank; Y0 the turned O.D.'s axis, +Y toward the fixed jaw; Z0 the top of the turned O.D. The file starts with an M6 for the centre drill; tool lengths from the tool setter at each M6; at the M6 stop the file has stopped the spindle and lifted the tool above the jaws."
+diagram = { file = "diagrams/pin-hole.svg", alt = "The blank on a 4 in parallel along the vise jaws, its turned end out past the jaws' left face; the centre drill spots the top and the 1/16 drill pecks through both walls into air, .33 in from face F; an offcut on the parallel's right end balances the jaws." }
+envelope = { x_span_mm = ["{{process.blank_length_mm}}", 3.175], y_span_mm = ["{{process.bar_dia_mm}}", 3.175], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bar_dia_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.pin_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_1_16_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_dia_mm}}", along_jaws_mm = "{{process.blank_length_mm}}", part_height_mm = "{{process.bar_dia_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.end_overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_mm}}"], clamp_mm = ["{{process.end_overhang_mm}}", "{{process.blank_length_mm}}"], section_mm = { diameter = "{{cad.outer_dia_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Home the mill first ($H). G54 Y0 the turned O.D.'s axis, X0 face F: edge finder (900 rpm)."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm, Ø.200), its tip level with the blank's axis. Y, on the turned O.D. in the overhang: from the −Y side, G10 L20 P1 Y0; MDI G0 Z clear of the blank, then from the +Y side G10 L20 P1 Y(half the DRO's work Y reading). X, on face F from the left: G10 L20 P1 X-2.540."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the top of the turned O.D., touched with the centre drill over the axis."
+instruction_detailed = "Console M6 T1 (#1 centre drill in the drill chuck, at least {{process.spot_projection_min_mm:in.2f}} in out of it; the tool setter measures it). MDI G0 X3.000 Y0.000: over the overhang. Spindle stopped, its tip just dragging a .002 feeler leaf on the O.D. top: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove PC01_pin_hole in air, Z0 raised 1.000 in. Then Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run PC01_pin_hole, watching every move clear the jaws; at its first M6 prompt T1 is already in, so continue; at the second put the 1/16 drill in (at least {{process.drill_projection_min_mm:in.2f}} in out of the chuck). G10 L2 P1 Z(the noted Z) puts Z0 back, and the centre drill goes back in for the real run."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Run PC01_pin_hole: the #1 centre drill (T1, set 1800) spots the pin hole {{cad.pin_hole_station_in:.2dot}} in from face F on the axis, to Ø{{process.spot_dia_mm:in.3dot}}; at the M6 stop the 1/16 drill (T2, at least {{process.drill_projection_min_mm:in.2f}} in out of the chuck) goes in."
+rpm = 1800
+feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "pin spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = "{{cad.pin_hole_station_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-1-16"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.pin_hole_dia_band_mm}}" }
+instruction = "Cycle Start: the 1/16 drill (T2, set 2800) pecks the pin hole through the top wall, the bore and the bottom wall into the air under it, {{process.pin_peck_mm:in.3dot}} in pecks, full retract between. Cutting oil."
+rpm = 2800
+feed = "{{process.drill_feed_per_min_mm:in.1f}} in/min"
+peck = { step_mm = "{{process.pin_peck_mm}}", retract = "full" }
+hole_depth_mm = "{{cad.outer_dia_mm}}"
+milling_cuts = [
+  { name = "pin drill", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.drill_1_16_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_feed_per_min_mm}}", stations_mm = "{{cad.pin_hole_station_mm}}" },
+]
+
+[[setups]]
+machine_kind = "lathe"
+title = "Part the collar off"
+machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the blank's 5/8 end, the turned end out, {{process.part_off_stickout_mm:in.2f}} in out of the jaw fronts (the turned shoulder .15 in out of them)."
+datum = "DRO Z set on face F (Op 20's datum end) through the blade, as Op 140 says: the collar is parted .66 from it."
+diagram = { file = "diagrams/part-off.svg", alt = "The blank back in the 3-jaw, the turned end out; the P1 blade parts the collar off .66 from face F." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.part_off_stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.far_end_length_in:.3dot}}, steady hand feed, cutting oil. Catch the collar; the blade breaks into the bore, so no pip is left."
+settings = "lathe-part-1018"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups]]
+machine_kind = "other"
+title = "Bench: deburr, check, oil"
+machine = "Bench"
+holding = "Bench vise with soft jaws on the collar's O.D."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished collar: Ø.59 × .66 long, the 5/16 bore through, the 1/16 pin hole through both walls .33 from face F; the GO pin in the pin hole, the calipers from face F to its far side." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "File the parting burr off the parted face flat on the smooth file; break that face's outer edge and the bore's mouth there, and both ends of the pin hole, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max. Clear the pin hole's breakthrough burr inside the bore with the 1/16 drill turned by hand."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Length: calipers across face F and the parted face. Bore: the telescoping gauge at both ends, read on the micrometers. Pin hole: the {{process.go_pin_in:.3dot}} pin (GO) passes through both walls, the {{process.nogo_pin_in:.3dot}} pin (NO-GO) enters neither. Station: the GO pin through the hole, calipers from face F to the pin's far side, {{process.station_far_side_min_in:.4dot}}–{{process.station_far_side_max_in:.4dot}} (the station plus half the pin)."
+inspection = "Length {{cad.far_end_length_min_in:.2dot}}–{{cad.far_end_length_max_in:.2dot}}; bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}; pin hole Ø{{cad.pin_hole_dia_min_in:.4dot}}–{{cad.pin_hole_dia_max_in:.4dot}}, {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from face F."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.far_end_length_band_mm}}" }, { gauge = "telescoping-gauges-starrett-s579gz", band_mm = "{{cad.bore_dia_band_mm}}" }, { gauge = "pin-gauges", band_mm = "{{cad.pin_hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.pin_hole_station_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Out of any limit in Op 160: scrap the collar and make another from Setup 1. Over-long only: face the parted end on the lathe (3-jaw over a brass shim wrap, face F in) into the band, then read Op 160 again."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Wipe on ISO VG 32 oil, into the bore and the pin hole (FINISH: {{cad.finish}}). Bag the collar with its number."
+feed = "hand"
