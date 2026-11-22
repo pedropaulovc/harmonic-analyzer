@@ -767,7 +767,19 @@ gauge_checks = [
 
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "Off the target, still clamped: smaller or shallower, check the 1/8 end mill's wear and the Z touch-off, then run FK06_crown_cbore again from its start (the spot and the 1/16 pass through their own holes; the helix springs the counterbore to the target). Larger or deeper but inside the drawing's limits: go on; Setup 8 measures the foot tip's wall. Past the drawing's limits: the part is scrap." },
+  { kind = "stop", text = "Smaller or shallower than the target: check the 1/8 end mill's wear and the Z touch-off, then run FK06_crown_cbore again from its start." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "Larger or deeper than the target but inside Ø{{process.cbore_accept_dia_min_mm:in.3dot}}–{{process.cbore_accept_dia_max_mm:in.3dot}} × {{process.cbore_accept_depth_min_mm:in.3dot}}–{{process.cbore_accept_depth_max_mm:in.3dot}}: go on; Setup 8 measures the foot tip's wall." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "Outside Ø{{process.cbore_accept_dia_min_mm:in.3dot}}–{{process.cbore_accept_dia_max_mm:in.3dot}} × {{process.cbore_accept_depth_min_mm:in.3dot}}–{{process.cbore_accept_depth_max_mm:in.3dot}}: the part is scrap." },
 ]
 feed = "hand"
 
