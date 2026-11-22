@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="360"/>
-  <text class="title" x="20" y="20">Setup 6: plan view from above; the jig on the tool post, the cutters in the headstock (not to scale)</text>
+  <text class="title" x="20" y="20">Setup 7: plan view from above; the jig on the tool post, the cutters in the headstock (not to scale)</text>
   <rect class="fixture-vise" x="20" y="60" width="80" height="240"/>
   <rect class="fixture-vise" x="100" y="160" width="70" height="40"/>
   <rect class="cutter" x="170" y="176" width="110" height="8"/>

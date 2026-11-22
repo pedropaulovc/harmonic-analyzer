@@ -58,13 +58,16 @@ def test_the_faced_length_puts_the_rim_inside_its_band():
     assert p["overall_max_mm"] == pytest.approx(p["overall_max_in"] * IN, abs=1e-3)
 
 
-def test_the_drive_pin_target_and_its_guard_band_sit_inside_the_band():
+def test_the_slug_guard_band_is_the_drawing_band_less_the_reading_uncertainty():
     p = _plan()["parameters"]
     f = _features()["features"]
-    guard = p["pin_correct_in"] * IN
+    guard = p["pin_guard_in"] * IN
+    uncertainty = p["pin_uncertainty_in"] * IN
+    assert 0 < uncertainty < guard
     for name in ("drive_pin_1", "drive_pin_2"):
         low, high = f[name]["offset"]
-        assert low < p["pin_x_mm"] - guard < p["pin_x_mm"] + guard < high
+        assert p["pin_x_mm"] - guard - uncertainty == pytest.approx(low, abs=1e-3)
+        assert p["pin_x_mm"] + guard + uncertainty == pytest.approx(high, abs=1e-3)
 
 
 def test_the_plug_pair_is_the_drive_pin_band():
