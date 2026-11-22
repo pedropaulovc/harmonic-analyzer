@@ -1264,3 +1264,193 @@ def test_seat_bound_takes_full_depth_to_the_step() -> None:
     ]
     assert spec.SEAT_CONTACT_AREA == min(full_gap)
     assert spec.SEAT_CONTACT_AREA > 0.0
+
+
+def _plane_face(normal: tuple[float, float, float], z_mm: float):
+    from _gtol_face import FaceGeometry
+
+    return FaceGeometry(None, 4001, (0.0, 0.0, 0.0, 0.0, 0.0, z_mm / 1000), normal, ())
+
+
+def _cylinder_face(
+    dia_mm: float,
+    axis: tuple[float, float, float],
+    centre_mm: tuple[float, float, float],
+    half_length_mm: float,
+):
+    from _gtol_face import FaceGeometry
+
+    r = dia_mm / 2
+    half = [r if not a else half_length_mm for a in axis]
+    box = tuple(
+        value / 1000
+        for value in (
+            *(c - h for c, h in zip(centre_mm, half)),
+            *(c + h for c, h in zip(centre_mm, half)),
+        )
+    )
+    origin = tuple(c / 1000 for c in centre_mm)
+    return FaceGeometry(None, 4002, (*origin, *axis, r / 1000), None, box)
+
+
+def test_the_hub_declares_one_owner_per_face() -> None:
+    """Every face the model carries, synthesised from the spec, has exactly
+    the owner its feature names; the chord ream's stop shoulder has none."""
+    import export_features
+
+    manifest = export_features.requirement_manifest("pd_transgear_disc_hub")
+    names = list(manifest["features"])
+    assert names == [
+        "front_face",
+        "spigot_end",
+        "flange_rear_face",
+        "flange_front_face",
+        "flange",
+        "spigot",
+        "hub_body",
+        "bore",
+        "flange_hole_1",
+        "flange_hole_2",
+        "flange_hole_3",
+        "pin_ream",
+        "pin_knockout",
+        "oil_hole",
+    ]
+    body_mid = (spec.HUB_FRONT_Z - spec.FLANGE_THICK) / 2
+    faces = {
+        "front_face": _plane_face((0.0, 0.0, -1.0), spec.HUB_FRONT_Z),
+        "spigot_end": _plane_face((0.0, 0.0, 1.0), spec.SPIGOT_LENGTH),
+        "flange_rear_face": _plane_face((0.0, 0.0, 1.0), 0.0),
+        "flange_front_face": _plane_face((0.0, 0.0, -1.0), -spec.FLANGE_THICK),
+        "flange": _cylinder_face(
+            spec.FLANGE_DIA,
+            (0, 0, 1),
+            (0, 0, -spec.FLANGE_THICK / 2),
+            spec.FLANGE_THICK / 2,
+        ),
+        "spigot": _cylinder_face(
+            spec.SPIGOT_DIA,
+            (0, 0, 1),
+            (0, 0, spec.SPIGOT_LENGTH / 2),
+            spec.SPIGOT_LENGTH / 2,
+        ),
+        "hub_body": _cylinder_face(
+            spec.HUB_DIA, (0, 0, 1), (0, 0, body_mid), spec.HUB_BODY_LENGTH / 2
+        ),
+        "bore": _cylinder_face(
+            spec.BORE_DIA,
+            (0, 0, 1),
+            (0, 0, spec.SPIGOT_LENGTH - spec.HUB_LENGTH / 2),
+            spec.HUB_LENGTH / 2,
+        ),
+        "pin_ream": _cylinder_face(
+            spec.KEY_PIN_HOLE_DIA,
+            (1, 0, 0),
+            (0, -spec.KEY_PIN_CHORD_OFFSET, spec.KEY_PIN_Z),
+            3.0,
+        ),
+        "pin_knockout": _cylinder_face(
+            spec.KEY_PIN_DRILL_DIA,
+            (1, 0, 0),
+            (-5.0, -spec.KEY_PIN_CHORD_OFFSET, spec.KEY_PIN_Z),
+            1.0,
+        ),
+        "oil_hole": _cylinder_face(
+            spec.OIL_HOLE_DIA, (0, 1, 0), (0, 5.0, spec.KEY_PIN_Z), 1.5
+        ),
+    }
+    for index, (x, y) in enumerate(joint.screw_centres(), 1):
+        faces[f"flange_hole_{index}"] = _cylinder_face(
+            joint.SCREW_HOLE_DIA,
+            (0, 0, 1),
+            (x, y, -spec.FLANGE_THICK / 2),
+            spec.FLANGE_THICK / 2,
+        )
+    stop_shoulder = _plane_face((1.0, 0.0, 0.0), -spec.KEY_PIN_STOP)
+    selectors = export_features.feature_selectors("pd_transgear_disc_hub")
+    for name, face in faces.items():
+        owners = [
+            owner
+            for owner, specs in selectors.items()
+            if any(selector.matches(face) for selector in specs)
+        ]
+        assert owners == [name], name
+    assert not any(
+        selector.matches(stop_shoulder)
+        for specs in selectors.values()
+        for selector in specs
+    )
+
+
+def test_hub_feature_bands_are_the_printed_ones() -> None:
+    import export_features
+
+    features = export_features.requirement_manifest("pd_transgear_disc_hub")["features"]
+
+    def band(low: float, high: float) -> object:
+        return pytest.approx([low * IN, high * IN], abs=1e-6)
+
+    assert features["spigot_end"]["length"] == band(0.538, 0.540)
+    assert features["spigot_end"]["length_from"] == "front_face"
+    assert features["spigot_end"]["perpendicularity_max"] == pytest.approx(0.001 * IN)
+    assert features["flange_rear_face"]["perpendicularity_max"] == pytest.approx(
+        0.001 * IN
+    )
+    assert features["flange_rear_face"]["perpendicularity_datum"] == "A"
+    assert features["flange_front_face"]["thickness"] == band(0.089, 0.099)
+    assert features["flange"]["dia"] == band(1.04, 1.06)
+    assert features["spigot"]["dia"] == band(0.497, 0.498)
+    assert features["spigot"]["length"] == band(0.143, 0.145)
+    assert features["spigot"]["root_radius_max"] == pytest.approx(0.004 * IN)
+    assert features["hub_body"]["dia"] == band(0.535, 0.545)
+    assert features["hub_body"]["pin_ream_wall_min"] == pytest.approx(0.060 * IN)
+    bore = features["bore"]
+    assert bore["dia"] == band(0.3135, 0.3140)
+    assert (bore["process"], bore["thru"], bore["mate"], bore["datum"]) == (
+        "ream",
+        True,
+        "MHA-PD-10",
+        "A",
+    )
+    assert bore["wall_min"] == pytest.approx(0.071 * IN)
+    for index in (1, 2, 3):
+        hole = features[f"flange_hole_{index}"]
+        assert hole["dia"] == band(0.067, 0.071)
+        assert hole["bolt_circle_dia"] == band(0.74, 0.76)
+        assert (hole["process"], hole["thru"], hole["count"]) == ("drill", True, 3)
+        x, y, z = hole["at"]
+        assert math.hypot(x, y) == pytest.approx(0.375 * IN) and z == 0.0
+    ream = features["pin_ream"]
+    assert ream["dia"] == band(0.0615, 0.0620)
+    assert ream["chord"] == band(0.172, 0.176)
+    assert ream["stop"] == band(0.158, 0.162)
+    assert ream["station"] == band(0.14, 0.16)
+    assert (ream["process"], ream["mate"], ream["fit"]) == (
+        "ream",
+        "MHA-PD-VN-69",
+        "press",
+    )
+    entry = math.sqrt((spec.HUB_DIA / 2) ** 2 - spec.KEY_PIN_CHORD_OFFSET**2)
+    assert ream["at"] == pytest.approx(
+        [entry, -spec.KEY_PIN_CHORD_OFFSET, spec.KEY_PIN_Z]
+    )
+    assert ream["depth"] == pytest.approx([entry + 0.158 * IN, entry + 0.162 * IN])
+    knockout = features["pin_knockout"]
+    assert knockout["dia"] == band(0.0465, 0.0505)
+    assert (knockout["drill"], knockout["thru"]) == ("#56", True)
+    oil = features["oil_hole"]
+    assert oil["dia"] == band(0.043, 0.047)
+    assert (oil["made_at"], oil["into"], oil["mate"]) == (
+        "assembly",
+        "bore",
+        "MHA-PD-10",
+    )
+    assert "process" not in oil
+
+
+def test_hub_drawing_notes_are_the_printed_stack_note() -> None:
+    import export_features
+
+    manifest = export_features.requirement_manifest("pd_transgear_disc_hub")
+    assert manifest["notes"]["manufacturing"] == drawing.NOTES_TEXT.splitlines()
+    assert drawing.DRAWING_NOTES == drawing.NOTES_TEXT
