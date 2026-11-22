@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 300" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="300"/>
+  <text class="title" x="20" y="20">The finished bar, looking at F (the front face), T up (1 in = 78 px)</text>
+  <rect class="part-kept" x="30" y="100" width="717.6" height="33.5"/>
+  <circle class="holes" cx="45.6" cy="115.4" r="7.0"/>
+  <circle class="holes" cx="217.2" cy="115.4" r="7.3"/>
+  <circle class="holes" cx="605.8" cy="115.4" r="7.6"/>
+  <circle class="holes" cx="713.3" cy="115.4" r="7.6"/>
+  <line class="centre-line" x1="20" y1="115.4" x2="757" y2="115.4"/>
+  <line class="dims" x1="30" y1="180" x2="217.2" y2="180"/>
+  <line class="dims" x1="30" y1="136" x2="30" y2="230"/>
+  <line class="dims" x1="217.2" y1="124" x2="217.2" y2="186"/>
+  <text class="label-halo" x="70" y="175">axle bore {{cad.axle_bore_station_min_in:.3dot}}–{{cad.axle_bore_station_max_in:.3dot}}</text>
+  <line class="dims" x1="30" y1="220" x2="747.6" y2="220"/>
+  <line class="dims" x1="747.6" y1="136" x2="747.6" y2="230"/>
+  <text class="label-halo" x="320" y="238">length {{cad.right_end_length_min_in:.2f}}–{{cad.right_end_length_max_in:.2f}}</text>
+  <line class="dims" x1="580" y1="100" x2="580" y2="115.4"/>
+  <line class="leader" x1="580" y1="108" x2="540" y2="80"/>
+  <text class="label" x="420" y="75">row {{cad.clamp_hole_1_height_min_in:.3dot}}–{{cad.clamp_hole_1_height_max_in:.3dot}} from T</text>
+  <line class="leader" x1="217.2" y1="108" x2="200" y2="70"/>
+  <text class="label" x="120" y="62">Ø.1865 REAM, GO/NO-GO</text>
+  <line class="leader" x1="45.6" y1="108" x2="40" y2="70"/>
+  <text class="label" x="20" y="45">hanger Ø.180</text>
+  <line class="leader" x1="713.3" y1="108" x2="700" y2="70"/>
+  <text class="label" x="640" y="45">2X Ø.196</text>
+  <line class="datum" x1="30" y1="150" x2="30" y2="165"/>
+  <text class="datum-label" x="34" y="163">LEFT</text>
+  <text class="label" x="380" y="128">F</text>
+  <text class="label" x="30" y="270">edges broken R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max; front and back faces as supplied</text>
+</svg>

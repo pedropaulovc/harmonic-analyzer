@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="430"/>
+  <text class="title" x="20" y="20">Setup 4, section across the jaws, from the LEFT end (1 in = 100 px)</text>
+  <line class="fixture-table" x1="60" y1="400" x2="420" y2="400"/>
+  <rect class="clamp" x="140" y="223" width="60" height="177"/>
+  <rect class="clamp" x="237.5" y="223" width="60" height="177"/>
+  <text class="label-on-clamp" x="146" y="390">moving</text>
+  <text class="label-on-clamp" x="247" y="390">fixed</text>
+  <!-- A 9/16 + 7/8 in stack against each jaw. -->
+  <rect class="fixture-support" x="200" y="256.25" width="12.5" height="143.75"/>
+  <rect class="fixture-support" x="225" y="256.25" width="12.5" height="143.75"/>
+  <!-- The bar on edge, T down; B faced from .840 to .430. -->
+  <rect class="part-kept" x="200" y="213.25" width="37.5" height="43"/>
+  <rect class="part-removed" x="200" y="172.25" width="37.5" height="41"/>
+  <rect class="cutter" x="212" y="100" width="50" height="60"/>
+  <line class="arrow" x1="245" y1="90" x2="215" y2="90"/>
+  <line class="datum" x1="80" y1="256.25" x2="150" y2="256.25"/>
+  <text class="datum-label" x="20" y="252">Z0 (T)</text>
+  <line class="datum" x1="237.5" y1="140" x2="237.5" y2="168"/>
+  <text class="datum-label" x="242" y="150">Y0 (back face)</text>
+  <text class="label-halo" x="204" y="250">T</text>
+  <line class="leader" x1="236" y1="195" x2="320" y2="175"/>
+  <text class="label" x="322" y="172">edge B faced down to Z {{process.height_target_mm:in.4dot}} in levels</text>
+  <line class="dims" x1="340" y1="213.25" x2="340" y2="256.25"/>
+  <line class="dims" x1="330" y1="213.25" x2="350" y2="213.25"/>
+  <line class="dims" x1="330" y1="256.25" x2="350" y2="256.25"/>
+  <text class="label" x="355" y="240">height {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}}, miked</text>
+  <text class="label" x="330" y="300">jaw tops .098 below the finished face;</text>
+  <text class="label" x="330" y="318">the hole row is in the jaws, near T</text>
+</svg>
