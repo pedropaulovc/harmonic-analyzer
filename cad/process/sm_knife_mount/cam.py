@@ -574,6 +574,8 @@ def context(
         )
     _agree(plan, "bore_ream_r_plane_mm", depth + SAFE_MM)
     _agree(plan, "bore_ream_clear_mm", depth + CLEAR_MM)
+    # The sheet's re-ream MDI feeds at the reamer's setting.
+    _agree(plan, "bore_ream_feed_mm_min", r12_feed)
 
     # Hand tap (KM07): the bottoming tap's chamfer may be at most the drill's
     # shallowest full-diameter depth less the thread depth; the plug tap's

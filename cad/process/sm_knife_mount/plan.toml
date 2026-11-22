@@ -107,8 +107,9 @@ bore_drill_tip_height_mm = -4.545      # 1.0 + the 11.8 mm drill's point (3.545)
 bore_ream_tip_height_mm = -2.0
 bore_ream_r_plane_mm = 14.97           # The depth plus 1.0 (cam.py SAFE_MM); cam.py checks it.
 bore_ream_clear_mm = 18.97             # The depth plus 5.0 (cam.py CLEAR_MM); cam.py checks it.
+bore_ream_feed_mm_min = 20.32         # The 12 mm reamer's setting (200 × 2 × .0508); cam.py checks it.
 # KM06 stations from S (X) and F (Y): datum B at the drawing's side and row;
-# the tap .300 BASIC from B toward N (cad.stud_tap_basic_from_b_mm). cam.py
+# the tap .300 BASIC from B toward N (cad.stud_tap_basic_from_b). cam.py
 # checks them.
 tap_x_mm = 12.7
 # KM08 stations: the bore .811 BASIC from A (X) and .500 from S (Y, datum B's
@@ -563,7 +564,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run KM06_top_holes (M6 T1; set 1300): face the top down to Z {{cad.bottom_face_height_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.top_top_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first). This is the top seat A (Ra {{cad.top_seat_finish_ra:.1f}} µm). At the M6 T2 stop, still clamped: check the height."
+instruction = "Run KM06_top_holes (M6 T1; set 1300): face the top down to Z {{cad.bottom_face_height_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.top_top_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first). This is the top seat A, datum A (the drawing's finish mark: the end mill's even finish). At the M6 T2 stop, still clamped: check the height."
 settings = "endmill-carbide-3fl-1-2-4140-ht"
 inspection = "Height {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}} at the M6 T2 stop: the calipers' depth rod from the faced top to the fixed-jaw parallel's top beside the blank, at both ends of the top. No unfaced patch left on the top, and no chatter marks, by eye."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.bottom_face_height_band_mm}}" }]
@@ -759,7 +760,7 @@ drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.knife_bore_dia_band_mm}}" }
 instruction = "Same file, M6 T7 (spindle off, retracted): ream the bore through, the 12 mm reamer in the 7/16 collet {{process.reamer_12_projection_mm:in.2f}} in out; set 200. Cutting oil, plenty. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Leave the block clamped for the check."
 settings = "reamer-12mm-h7-4140-ht"
-inspection = "Still clamped: the bore Ø{{cad.knife_bore_dia_min_in:.4dot}}–{{cad.knife_bore_dia_max_in:.4dot}} through: the .4720 GO plug gauge enters its whole length, the .4735 NO-GO does not enter. As reamed (the drawing's Ra {{cad.knife_bore_finish_ra:.1f}} µm): no tears or chatter marks."
+inspection = "Still clamped: the bore Ø{{cad.knife_bore_dia_min_in:.4dot}}–{{cad.knife_bore_dia_max_in:.4dot}} through: the .4720 GO plug gauge enters its whole length, the .4735 NO-GO does not enter. As reamed (the drawing's finish mark on the bore): no tears or chatter marks."
 gauge_checks = [{ gauge = "plug-gauges-4720-4735", band_mm = "{{cad.knife_bore_dia_band_mm}}" }]
 # No reamer kind: its thrust is analysed as a two-lip twist drill's at the
 # reamer Ø and the same feed (flutes = 2 is that model's, not the reamer's).
@@ -772,7 +773,7 @@ instruction = "The coupon T: GO enters and NO-GO does not: go on to blanks 1 and
 feed = "hand"
 
 [[setups.operations]]
-instruction = "1. M3 S200, G0 Z{{process.bore_ream_r_plane_mm:.3f}}\n2. G0 X{{cad.knife_bore_basic_from_a:.3f}} Y-{{process.bore_y_mm:.3f}}\n3. G1 Z{{process.bore_ream_tip_height_mm:.3f}} F20.32, G1 Z{{process.bore_ream_r_plane_mm:.3f}}\n4. G0 Z{{process.bore_ream_clear_mm:.3f}}, G0 X-8.000 Y-6.850 (off the block, left of A), M5"
+instruction = "1. M3 S200, G0 Z{{process.bore_ream_r_plane_mm:.3f}}\n2. G0 X{{cad.knife_bore_basic_from_a:.3f}} Y-{{process.bore_y_mm:.3f}}\n3. G1 Z{{process.bore_ream_tip_height_mm:.3f}} F{{process.bore_ream_feed_mm_min:.2f}}, G1 Z{{process.bore_ream_r_plane_mm:.3f}}\n4. G0 Z{{process.bore_ream_clear_mm:.3f}}, G0 X-8.000 Y-6.850 (off the block, left of A), M5"
 feed = "hand"
 
 [[setups.operations]]
