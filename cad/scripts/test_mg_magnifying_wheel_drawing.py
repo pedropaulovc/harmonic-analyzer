@@ -234,19 +234,19 @@ def test_tie1_volume_gates_prove_the_counter_drill_and_its_point() -> None:
     assert part.V_TIE1_POINT > 0.0
 
 
-def test_tie1_section_b_b_cuts_through_tie1_from_the_bore_centreline() -> None:
+def test_tie1_section_b_b_cuts_through_tie1_clear_of_the_spigot() -> None:
     # B-B runs along TIE 1's row (the counter-drill profile's plane, y =
-    # TIE1_Y), from the bore's vertical centreline out past the boss's O.D.
-    # into the spoke window, so it crosses the hole whole.
+    # TIE1_Y), from just outside the spigot out past the boss's O.D. into
+    # the spoke window, so it crosses the hole whole and cuts the boss alone.
     (x0, y0), (x1, y1) = drawing.TIE1_SECTION_LINE_MM
     r50 = geom.TIE1_CDRILL_DIA / 2.0
     assert y0 == y1 == geom.TIE1_Y
     assert x0 < geom.TIE1_X - r50 < geom.TIE1_X + r50 < x1
     assert x1 > mg_magnifying_wheel_spec.HUB_DIA / 2.0
-    # The bore-side arrow prints at that end, down the 270 deg window's
-    # middle: its 3 mm head and its letter clear TIE 1's #50 by more than 3 mm.
-    assert x0 == 0.0
-    assert geom.TIE1_X - r50 - (x0 + 3.0) > 3.0
+    assert math.hypot(x0, y0) > mg_magnifying_wheel_spec.SPIGOT_DIA / 2.0
+    # The bore-side arrow prints at that end, down the 270 deg window: its
+    # 3 mm head and its letter clear TIE 1's #50.
+    assert geom.TIE1_X - r50 - (x0 + 2.3) > 0.5
     # Its far end stands in air between the 0 and 300 deg spokes' fillets.
     bearing = math.degrees(math.atan2(y1, x1))
     assert -mg_magnifying_wheel_spec.SPOKE_PITCH_DEG < bearing < 0.0
@@ -255,8 +255,9 @@ def test_tie1_section_b_b_cuts_through_tie1_from_the_bore_centreline() -> None:
         (0.1, 0.2),
         (0.3, 0.2),
     )
-    # The counter-drill's Ø says its process; its depth runs from the face.
-    assert drawing.TIE1_SECTION_CALLOUT == "#50 DRILL"
+    # The counter-drill's Ø reads the whole callout: size, process, depth REF.
+    assert drawing.TIE1_SECTION_SUFFIX == " #50 DRILL <HOLE-DEPTH> (.32)"
+    assert drawing.TIE1_CALLOUT.splitlines()[-1] == "SEE SECTION B-B"
     precision = mg_magnifying_wheel_spec.DRAWING_PRECISION["Tie1CdrillProfile"]
     assert precision == {"Tie1CdrillDia": 3, "Tie1CdrillDepth": 2}
     assert drawing.TIE1_SECTION_SCALE == (2, 1)
@@ -381,7 +382,9 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     # Each tie hole is named plainly at its own callout (rule 26: WIRE TIE
     # HOLE, no coined label), size before process, at most two lines of
     # words (rule 7): no project label, so no key.
-    assert drawing.DIMENSION_CALLOUTS["Tie1HoleDia"] == "#60 DRILL THRU\nWIRE TIE HOLE"
+    assert drawing.DIMENSION_CALLOUTS["Tie1HoleDia"] == (
+        "#60 DRILL THRU\nWIRE TIE HOLE\nSEE SECTION B-B"
+    )
     # TIE 2 states where it runs: radial, from the groove's bottom.
     assert drawing.DIMENSION_CALLOUTS["Tie2HoleDia"] == (
         "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"

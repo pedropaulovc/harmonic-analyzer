@@ -196,29 +196,37 @@ _SECTION_PLACEMENT_TOL = 1e-5
 # plane, build_mg_magnifying_wheel._tie1_counter_drill): the key pin's
 # chord hole on draw_pd_transgear_disc_hub's section is the precedent for a
 # drilled hole's Ø imported in a section under its "#nn DRILL" process.
-# The cutting line runs along TIE 1's row from the bore's vertical centreline
-# out past the boss into the 300-360 spoke window's air, drawn left to right
-# so its arrows point down, away from A-A: SolidWorks sights a section to the
-# right of its line as drawn (drawn right to left in run
-# 20261122T184921959Z, B-B's projection looked along +y, its arrows up across
-# A-A's line).  The arrows print at the chain's ends
+# The Ø reads the whole callout on one line, size, process, then the depth
+# as REF (drawing-guidelines.md rule 26: "a depth is never deferred to a
+# view"; the REF is complete because B-B's .32 locates the shoulder, as
+# draw_fr_harmonic_base's spotface), and the face view's TIE 1 callout
+# points at B-B (machinist review of run 20261122T203050502Z, 3/3: the hole
+# was defined in two places, its depth only as a view dimension).
+# The cutting line runs along TIE 1's row from just outside the spigot
+# (whose chord on that row would stand a sliver over the drum face, under
+# the Ø's line) out past the boss into the 300-360 spoke window's air, drawn
+# left to right so its arrows point down, away from A-A: SolidWorks sights a
+# section to the right of its line as drawn (drawn right to left in run
+# 20261122T184921959Z, B-B's projection looked along +y, its arrows up
+# across A-A's line; drawn left to right in run 20261122T203050502Z, they
+# print down).  The arrows print at the chain's ends
 # (_section_lines._printed_arrow), each letter under its arrow: the
-# bore-side one down the 270 deg spoke window's middle, clear of TIE 1, its
-# Ø leader and its X extension line, the window-side one short of the spoke
-# root width's leader, which crosses TIE 1's row at x 23.7.  Along its row
+# bore-side one down the 270 deg spoke window, clear of TIE 1, its Ø leader
+# and its X extension line, the window-side one short of the spoke root
+# width's leader, which crosses TIE 1's row at x 23.7.  Along its row
 # the line lies on TIE 1's Y extension line.  The section stands at 2:1,
 # unturned (TIE 1's axis upright, the drum face up), in the field right of
 # the section's drum row and under the isometric; the slab's centre is
 # placed at TIE1_SECTION_CENTER.  The isometric's box reaches down to y 129.2
-# mm (run 20261122T201547057Z), and the Ø's block stands 20.1 mm over the
-# slab's centre, so the centre sits at 102 to keep the text 5 mm clear of
-# it; the caption, about 28 mm under the centre, stays 8 mm over the title
-# block's top (65.4).
+# mm (run 20261122T201547057Z), and the Ø's line tops out 11.75 mm over the
+# slab's top, so the centre sits at 99 to keep the text 5 mm clear of it
+# with 1 mm to spare; the caption, about 29 mm under the centre, stays 4 mm
+# over the title block's top (65.4).
 TIE1_SECTION_SCALE = (2, 1)
-TIE1_SECTION_CENTER = (0.380, 0.102)
+TIE1_SECTION_CENTER = (0.380, 0.099)
 _BOSS_EDGE_X = math.sqrt((HUB_DIA / 2.0) ** 2 - TIE1_Y**2)
 TIE1_SECTION_LINE_MM = (
-    (0.0, TIE1_Y),
+    (math.sqrt((SPIGOT_DIA / 2.0) ** 2 - TIE1_Y**2) + 0.5, TIE1_Y),
     (22.0, TIE1_Y),
 )
 # The slab B-B shows: the line's bore-side end to the boss's O.D., the boss's
@@ -228,18 +236,23 @@ _TIE1_SLAB_MM = tuple(
     for x in (TIE1_SECTION_LINE_MM[0][0], _BOSS_EDGE_X)
     for z in (HUB_STEP_Z, HUB_BACK_Z)
 )
-# Text points in model mm: the Ø on TIE 1's axis 3 mm out from the drum face
-# (6 on the sheet), its process on the side away from the slab; the depth 3
-# mm beyond the boss's O.D., midway down the counter-drill.
+# Text points in model mm: the Ø on TIE 1's axis 5 mm out from the drum face
+# (10 on the sheet: the one-line callout is wider than the slab, and the
+# depth's upper arrow stands 6.3 mm over the face beside it, run
+# 20261122T203050502Z); the depth 3 mm beyond the boss's O.D., midway down the
+# counter-drill.
 TIE1_SECTION_TEXT_MM = {
-    "Tie1CdrillDia": (TIE1_X, TIE1_Y, HUB_STEP_Z - 3.0),
+    "Tie1CdrillDia": (TIE1_X, TIE1_Y, HUB_STEP_Z - 5.0),
     "Tie1CdrillDepth": (
         _BOSS_EDGE_X + 3.0,
         TIE1_Y,
         HUB_STEP_Z + TIE1_CDRILL_DEPTH / 2.0,
     ),
 }
-TIE1_SECTION_CALLOUT = "#50 DRILL"
+TIE1_SECTION_SUFFIX = (
+    " #50 DRILL <HOLE-DEPTH> "
+    + f"({TIE1_CDRILL_DEPTH / 25.4:.2f})".replace("(0.", "(.")
+)
 TIE1_SECTION_CENTRELINE = {
     "tie 1 axis": (
         (TIE1_X, TIE1_Y, HUB_STEP_Z - 1.0),
@@ -247,10 +260,9 @@ TIE1_SECTION_CENTRELINE = {
     )
 }
 # The caption's top stands this far under the lowest of the slab and the Ø's
-# process line (a value line and the process under it, 2.8 mm each side of
-# the text point's line).
+# line (3.5 mm text, 1.75 mm each side of the text point's line).
 _TIE1_CAPTION_GAP = 0.004
-_TIE1_DIA_BLOCK_BELOW = 0.0028 + 0.0056
+_TIE1_DIA_BLOCK_BELOW = 0.00175
 
 DRAWING_PRECISION_BY_NAME = {
     name: digits
@@ -435,8 +447,9 @@ WIRE_NUMBER = str(_config.parts("sh-vn-music-wire")["number"])
 # centreline) through to the rim bore, clocked by its 43° from the
 # horizontal.  Each takes at most two lines of words under its process
 # (rule 7).  TIE 1's #60 names its drill (rule 12; dt_crank_pin's "#45 DRILL
-# THRU"), its #50 counter-drill prints on B-B.
-TIE1_CALLOUT = "#60 DRILL THRU\nWIRE TIE HOLE"
+# THRU"); its #50 counter-drill, from the far (drum) side, prints whole on
+# B-B, which the callout names so the hole is not read as a plain #60.
+TIE1_CALLOUT = "#60 DRILL THRU\nWIRE TIE HOLE\nSEE SECTION B-B"
 TIE2_CALLOUT = "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"
 # Each side of a centred tie block past the DRILL THRU line's half-width
 # (capitals about 2.6 mm a character), mm.
@@ -1166,9 +1179,9 @@ def _place_tie1_section(
 def _add_tie1_section(adapter: Any, front: Any) -> list[Any]:
     """Removed partial section B-B through TIE 1 (TIE1_SECTION_*): the cut
     face alone at 2:1, the #50 counter-drill's Ø and depth from the drum face
-    imported from Tie1CdrillProfile, the Ø's process on its side away from
-    the slab, TIE 1's axis as a centreline and the native caption under it
-    all.  Returns its dimension annotations."""
+    imported from Tie1CdrillProfile, the Ø reading the whole callout
+    (TIE1_SECTION_SUFFIX), TIE 1's axis as a centreline and the native
+    caption under it all.  Returns its dimension annotations."""
     ends = model_points_in_view(
         adapter,
         front,
@@ -1227,12 +1240,20 @@ def _add_tie1_section(adapter: Any, front: Any) -> list[Any]:
         view_label="section B-B",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    set_dimension_callouts(
-        adapter,
-        annotations,
-        {"Tie1CdrillDia": TIE1_SECTION_CALLOUT},
-        location="above" if face_up else "below",
+    (diameter,) = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "Tie1CdrillDia"
+    ]
+    display = _early_bound(
+        _early_bound(diameter, "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
     )
+    display.SetText(2, TIE1_SECTION_SUFFIX)  # swDimensionTextSuffix
+    if str(display.GetText(2) or "") != TIE1_SECTION_SUFFIX:
+        raise RuntimeError(
+            f"wheel section B-B: Ø suffix did not persist: {display.GetText(2)!r}"
+        )
     _add_centrelines(
         adapter, section, TIE1_SECTION_CENTRELINE, label="wheel section B-B centreline"
     )
