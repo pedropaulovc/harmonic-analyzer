@@ -36,8 +36,8 @@
   <text class="label-halo" x="502.3" y="259.9" text-anchor="end">B</text>
   <line class="leader" x1="502.3" y1="249.9" x2="520.3" y2="194.4"/>
   <circle class="leader-dot" cx="520.3" cy="194.4" r="2"/>
-  <text class="label-halo" x="568.8" y="259.9" text-anchor="start">#10-24</text>
-  <line class="leader" x1="568.8" y1="249.9" x2="550.8" y2="195.5"/>
+  <text class="label-halo" x="638.8" y="259.9" text-anchor="start">#10-24</text>
+  <line class="leader" x1="638.8" y1="249.9" x2="550.8" y2="195.5"/>
   <circle class="leader-dot" cx="550.8" cy="195.5" r="2"/>
   <text class="label-halo" x="500.0" y="285.9">B .37 deep, the #25 .438 deep: both blind</text>
 </svg>

@@ -726,6 +726,10 @@ inspection = "Thread full to {{cad.stud_tap_thread_depth_min_in:.3dot}}–{{cad.
 gauge_checks = "other"
 feed = "hand"
 
+[[setups.operations]]
+instruction = "Unclamp. File the milled burr off A's four edges with the smooth file, and the mouths of B and the tap hole with the scraper only: A, S and K are Setup 8's seats and datums. Next blank."
+feed = "hand"
+
 [[setups]]
 machine_kind = "other"
 title = "Knife bore: drill and ream 12 mm through"
