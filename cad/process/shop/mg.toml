@@ -169,7 +169,7 @@ diameter_mm = 12.6746
 [tools.form-tool-r024]  # MHA-MG-05 R.024 rim wire groove
 description = "HSS lathe grooving bit ground to a full R.024 (.048 wide) nose"
 [tools.form-tool-r047]  # MHA-MG-06 R .047/.020 FULL R groove
-description = "HSS lathe full-radius grooving bit, nose R.020-.047 (e.g. R.047, .094 wide)"
+description = "HSS lathe full-radius grooving bit, R.047 nose (.094 wide)"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so

@@ -204,7 +204,7 @@ gauge_checks = [
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spigot under Ø{{cad.spigot_dia_min_in:.3dot}} or shoulder past {{cad.spigot_length_max_in:.3dot}}: face the end back past the spigot (it is the bar's end) and start Setup 1 again on the fresh end."
+instruction = "Spigot over Ø{{cad.spigot_dia_max_in:.3dot}} or shoulder short of {{cad.spigot_length_min_in:.3dot}}: take another light pass and check again. Spigot under Ø{{cad.spigot_dia_min_in:.3dot}} or shoulder past {{cad.spigot_length_max_in:.3dot}}: face the end back past the spigot (it is the bar's end) and start Setup 1 again on the fresh end."
 feed = "hand"
 
 [[setups.operations]]
@@ -213,13 +213,13 @@ speed_kind = "spindle"
 tool = "form"
 drilling = "none"
 sizing = "other"
-instruction = "Set the R.047 form tool on centre height, square to the axis. Bring its tailstock-side flank onto the spigot face and set the DRO Z to −{{process.form_half_width_in:.3dot}} there: the DRO then reads the centre of its arc. Move to Z−{{cad.groove_station_in:.3dot}} (the groove's centre, {{cad.groove_station_min_in:.3dot}}–{{cad.groove_station_max_in:.3dot}} from the face). Touch the arc on the spigot's O.D., then feed in {{process.form_half_width_in:.3dot}} radially, slowly: the arc's centre is then on the O.D., the groove a full half round, its root Ø{{cad.groove_root_dia_min_in:.3dot}}–{{cad.groove_root_dia_max_in:.3dot}} on a Ø.420 spigot (aim {{cad.groove_root_dia_in:.3dot}})."
+instruction = "Set the R.047 form tool on centre height, square to the axis. Bring its tailstock-side flank onto the spigot face and set the DRO Z to −{{process.form_half_width_in:.3dot}} there: the DRO then reads the centre of its arc. Move to Z−{{cad.groove_station_in:.3dot}} (the groove's centre, {{cad.groove_station_min_in:.3dot}}–{{cad.groove_station_max_in:.3dot}} from the face). Touch the arc on the spigot's O.D. and zero the cross-slide dial there; feed in slowly by half of (your Op 20 spigot reading − {{cad.groove_root_dia_in:.3dot}}), radially: the root is then Ø{{cad.groove_root_dia_in:.3dot}} ({{cad.groove_root_dia_min_in:.3dot}}–{{cad.groove_root_dia_max_in:.3dot}}) whatever the spigot came out at; on a Ø.420 spigot the infeed is .045, the arc's centre just inside the O.D."
 settings = "fixture-form-r047-c360"
 cut_diameter_mm = "{{cad.spigot_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Look at the groove: a clean half round as wide at the O.D. as the tool (.094), no step at either side. Its root Ø and station are the cross slide's and the DRO's, not gauged (no gauge in the shop enters a .094 groove)."
+instruction = "Look at the groove: a clean round root, no step at either side, about as wide at the O.D. as the tool (.094). Its root Ø and station are the cross slide's and the DRO's, not gauged (no gauge in the shop enters a .094 groove)."
 feed = "hand"
 
 [[setups.operations]]
@@ -250,7 +250,7 @@ speed_kind = "other"
 tool = "tap-plug"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle off, in neutral. Put the MT3 dead centre in the tailstock. Pencil-mark the plug tap .40 from its point. Start {{cad.tap_thread}} with it in the T-handle wrench, the dead centre's point in the wrench's centre hole to keep it on axis; turn the wrench, backing off every half turn, and stop when the mark reaches the spigot face: never bottom the tap in the .49 hole."
+instruction = "Spindle off, in neutral. Put the MT3 dead centre in the tailstock. Pencil-mark the plug tap .40 from its point. Start {{cad.tap_thread}} with it in the T-handle wrench, the dead centre's point in the wrench's centre hole to keep it on axis; hold the chuck still with one hand and turn the wrench with the other, backing off every half turn, and stop when the mark reaches the spigot face: never bottom the tap in the .49 hole."
 feed = "hand"
 
 [[setups.operations]]
@@ -385,7 +385,7 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "File the parting pip on the free end flat. Break every sharp edge {{cad.edge_break_in:.3dot}} max: the free end's, the bore's two mouths at the corners, the groove's lips (a light touch of the smooth file, never into the groove's round)."
+instruction = "File the parting pip on the free end flat. Break every cut edge {{cad.edge_break_in:.3dot}} max: the free end's, the shoulder's outer edge at the hex, the bore's two mouths at the corners and the groove's lips (a light touch of the smooth file, never into the groove's round); the spigot face's edge was broken in Op 100."
 feed = "hand"
 
 [[setups.operations]]

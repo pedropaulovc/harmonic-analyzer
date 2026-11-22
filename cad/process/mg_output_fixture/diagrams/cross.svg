@@ -1,20 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 2 (side view): the bar corner up along the jaws, spigot end .50 out left; MO01 drills F through the corners</text>
-  <rect class="clamp" x="250" y="70" width="480" height="230"/>
-  <rect class="fixture-support" x="330" y="236" width="400" height="64"/>
-  <rect class="part-kept" x="200" y="126" width="56" height="88"/>
-  <rect class="part-kept" x="256" y="120" width="94" height="104"/>
-  <rect class="part-rest" x="350" y="120" width="380" height="104"/>
-  <rect class="holes" x="232" y="120" width="36" height="104"/>
-  <rect class="cutter" x="232" y="40" width="36" height="78"/>
-  <line class="centre-line" x1="180" y1="172" x2="740" y2="172"/>
-  <line class="datum" x1="200" y1="100" x2="200" y2="250"/>
-  <line class="datum" x1="190" y1="120" x2="300" y2="120"/>
-  <text class="label" x="120" y="96">X0 spigot face</text>
-  <text class="label" x="120" y="114">Z0 top corner</text>
-  <text class="label" x="290" y="52">F, .49 from the spigot face, through both corners into air</text>
-  <text class="label" x="420" y="90">jaws from .50 in; jaw tops .32 above the top corner</text>
-  <text class="label" x="420" y="320">1 in parallels, 1/8 thick, against the jaws, from .75 in</text>
-  <text class="label" x="20" y="370">The lower diagonal flats rest on the parallels' inner top edges; the lower corner hangs between them. Nothing under the bore.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="20" y="16">Setup 2 (side view, to scale 300 px/in): the bar corner up along the jaws; MO01 drills F through the corners</text>
+  <rect class="clamp" x="270" y="29" width="470" height="351"/>
+  <rect class="fixture-support" x="345" y="260" width="395" height="120"/>
+  <rect class="part-kept" x="120" y="137" width="75" height="126"/>
+  <path class="part-removed" d="M 148 137 A 14 14 0 0 0 176 137 Z"/>
+  <path class="part-removed" d="M 148 263 A 14 14 0 0 1 176 263 Z"/>
+  <rect class="part-kept" x="195" y="124" width="141" height="152"/>
+  <rect class="part-rest" x="336" y="124" width="404" height="152"/>
+  <rect class="holes" x="228.5" y="124" width="77" height="152"/>
+  <rect class="cutter" x="228.5" y="40" width="77" height="84"/>
+  <line class="centre-line" x1="100" y1="200" x2="740" y2="200"/>
+  <line class="datum" x1="120" y1="100" x2="120" y2="300"/>
+  <line class="datum" x1="100" y1="124" x2="228" y2="124"/>
+  <line class="dims" x1="120" y1="318" x2="267" y2="318"/>
+  <line class="dims" x1="267" y1="276" x2="267" y2="322"/>
+  <line class="dims" x1="120" y1="350" x2="345" y2="350"/>
+  <line class="dims" x1="345" y1="380" x2="345" y2="354"/>
+  <line class="leader" x1="420" y1="300" x2="350" y2="262"/>
+  <text class="label" x="20" y="96">X0 spigot face</text>
+  <text class="label" x="20" y="118">Z0 top corner</text>
+  <text class="label" x="20" y="56">F through both corners,</text>
+  <text class="label" x="20" y="72">into air below the bar</text>
+  <text class="label-on-clamp" x="320" y="60">jaws (behind the bar) from .50;</text>
+  <text class="label-on-clamp" x="320" y="78">their tops .32 above the top corner</text>
+  <text class="label" x="160" y="314">.49</text>
+  <text class="label" x="200" y="346">.75</text>
+  <text class="label" x="424" y="304">1 in parallels, 1/8 thick, against the jaws, from .75:</text>
+  <text class="label" x="424" y="320">the lower diagonal flats on their inner top edges</text>
+  <text class="label" x="20" y="405">The lower corner hangs .054 below the parallels' tops, between them. Nothing under the bore.</text>
 </svg>
