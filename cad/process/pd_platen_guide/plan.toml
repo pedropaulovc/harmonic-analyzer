@@ -547,12 +547,14 @@ instruction = "File done, still clamped: the length, before tapping."
 instruction_detailed = "Send G20 (the DRO reads inches). Edge finder (900 rpm, console) on the right end from the right: the work X DRO reads the length + .100. Send G21."
 inspection = "Length {{cad.right_end_length_min_in:.3dot}}–{{cad.right_end_length_max_in:.3dot}}: the DRO {{process.length_dro_min_mm:in.3dot}}–{{process.length_dro_max_mm:in.3dot}}. Outside: stop and tell the owner (both ends are the program's from one X0)."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.right_end_length_band_mm}}" }]
+feed = "hand"
 
 [[setups.operations]]
 instruction = "Still clamped: hole A1's station from the left end."
 instruction_detailed = "The #43 drill that cut the hole, out of its collet: mic its shank. Its shank in hole A1; the calipers from the left end over the shank, less half its miked Ø."
 inspection = "Hole A1 {{cad.tap_a1_station_min_in:.3dot}}–{{cad.tap_a1_station_max_in:.3dot}} from the left end. The other holes: the program's stations from the same X0, not gauged. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.tap_a1_station_band_mm}}" }]
+feed = "hand"
 
 [[setups.operations]]
 instruction = "No #4-40 spiral-point tap in hand (it is to buy): unclamp, tag the rail AWAITING 4-40 TAP and stop here. When it comes: clamp as this setup, home, edge finder Y0 as before and X0 on the milled left end (G10 L20 P1 X-2.540), then go on."
@@ -680,6 +682,7 @@ gauge_checks = "other"
 instruction = "Hole A1's height from U: a #4-40 screw run into it from R; the calipers from U over the screw's thread, less half the screw's miked thread diameter."
 inspection = "{{cad.tap_a1_height_min_in:.3dot}}–{{cad.tap_a1_height_max_in:.3dot}} from U. The other holes: the program's Y from the same Y0, not gauged. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.tap_a1_height_band_mm}}" }]
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
