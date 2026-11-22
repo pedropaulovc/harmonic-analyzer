@@ -114,3 +114,38 @@ description = "C36000 free-machining brass (360-H02, extruded), round bar, 1-1/8
 description = "C36000 free-machining brass (360-H02, extruded), round bar, 1/2 in"
 [stock.c360-round-5-8]
 description = "C36000 free-machining brass (360-H02, extruded), round bar, 5/8 in"
+
+# MHA-PD-02 platen (cnc/flat-b-pd-platen)
+# Plan: cad/process/pd_platen/plan.toml. Material key platen-c360: the C360
+# flat bar as bought (stock.c360-flat-1-4x6 above); the source's row below is
+# its Brass/Bronze row, read for that bar. On the PM-30MV, whose low belt
+# tops out at 2800 rpm (machines.pm-30mv, owner 2026-11-16).
+#
+# Carbide end mills: The Carbide End Mill Store "Carbide End Mill Speeds and
+# Feeds, General Purpose, Uncoated" (6gtools.com,
+# uploaded/files/feedsandspeeds/Carbide_End_Mill_Feeds_And_Speeds_General_Purpose_Uncoated.pdf,
+# read 2026-11-22; the PDF pn.toml settings.pn-em-half-c360 cites), row
+# Non-Ferrous N, Brass/Bronze: 400 SFM; 1/4 in .0022 and 1/2 in .0042
+# in/tooth at chip-load factor 1.0 (50 % radial engagement and more, the
+# table's lowest load: every cut of the platen engages 50 % or less). 400
+# SFM is 3056 rpm on the 1/2 in and 6112 on the 1/4 in: both run at the
+# spindle's 2800 (367 and 183 ft/min).
+[settings.platen-em-half-c360]
+tool = "endmill-carbide-3fl-1-2"
+material = "platen-c360"
+rpm = 2800
+chip_load_mm_per_tooth = 0.10668  # .0042 in; 2800 × 3 × .0042 = 35.3 in/min
+flutes = 3
+feed_unit = "in/min"
+[settings.platen-em-quarter-c360]
+tool = "endmill-carbide-3fl-1-4"
+material = "platen-c360"
+rpm = 2800
+chip_load_mm_per_tooth = 0.05588  # .0022 in; 2800 × 3 × .0022 = 18.5 in/min
+flutes = 3
+feed_unit = "in/min"
+# The platen's fixture bar (stock_refs): the freed 18 in bar of
+# cad/config/shop-equipment/stock-bought.toml, same key. Description only, as
+# the stock records above.
+[stock.6061-flat-1-2x6-18in]
+description = "6061-T6511 aluminium, flat bar, 1/2 x 6 x 18 in"
