@@ -148,6 +148,17 @@ CLAMP_TOP_MM = 1000.0
 # The engagement check's cell (mm): the edges' radial steps are held to
 # their declared width within one cell.
 ENGAGEMENT_CELL_MM = 0.05
+# Feeds the plan authors, recomputed here from the figures its [parameters]
+# comment cites, so a slip in either place is refused. Drills in in/rev
+# (AutoDrill, row Brass: the centre drill's pilot and the #50 under the 1/16
+# in column, the #27 under the 1/8 in column); the bar's skim in in/tooth
+# (the 6G table, Al/Al Alloys, 1/2 in); end-mill plunges into metal in
+# in/tooth (the author's choice).
+SPOT_FEED_PER_REV_MM = 0.001 * IN
+SOCKET_FEED_PER_REV_MM = 0.001 * IN
+GUIDE_FEED_PER_REV_MM = 0.003 * IN
+BAR_SKIM_CHIP_LOAD_MM = 0.0042 * IN
+PLUNGE_CHIP_LOAD_MM = 0.00025 * IN
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
 # A drill against its hole's printed band: the shop records the drill's
@@ -613,7 +624,12 @@ def context(
     _same(plan, "bar skim", "cutter_dia_mm", "face_cutter_dia_mm")
     _same(plan, "bar skim", "axial_doc_mm", "bar_skim_mm")
     skim_rpm, skim_feed = _setting(plan, shop, "bar skim")
-    _agree(plan, "bar_skim_feed_per_min_mm", skim_feed)
+    _same(plan, "bar skim", "feed_mm_min", "bar_skim_feed_per_min_mm")
+    _agree(
+        plan,
+        "bar_skim_feed_per_min_mm",
+        BAR_SKIM_CHIP_LOAD_MM * _cut(plan, "bar skim", "flutes") * skim_rpm,
+    )
     # Top the bar can have above the blocks: the thinnest skimmed twice, the
     # thickest as bought.
     if not p["bar_top_min_mm"] <= bar_t - skim <= p["bar_top_max_mm"]:
@@ -621,7 +637,12 @@ def context(
     relief = p["relief_depth_mm"]
     relief_rpm, plunge_feed = _setting(plan, shop, "tap relief")
     _same(plan, "tap relief", "cutter_dia_mm", "face_cutter_dia_mm")
-    _agree(plan, "plunge_feed_per_min_mm", plunge_feed)
+    _same(plan, "tap relief", "feed_mm_min", "plunge_feed_per_min_mm")
+    _agree(
+        plan,
+        "plunge_feed_per_min_mm",
+        PLUNGE_CHIP_LOAD_MM * _cut(plan, "tap relief", "flutes") * relief_rpm,
+    )
     if relief_rpm != skim_rpm:
         raise ValueError("'tap relief' runs at another speed than 'bar skim'")
 
@@ -693,9 +714,23 @@ def context(
     spot_rpm, spot_feed = _setting(plan, shop, "spot")
     socket_rpm, socket_feed = _setting(plan, shop, "socket drill")
     guide_rpm, guide_feed = _setting(plan, shop, "guide drill")
-    _agree(plan, "spot_feed_per_min_mm", spot_feed)
-    _agree(plan, "socket_drill_feed_per_min_mm", socket_feed)
-    _agree(plan, "guide_drill_feed_per_min_mm", guide_feed)
+    for name, key, per_rev, rpm in (
+        ("spot", "spot_feed_per_min_mm", SPOT_FEED_PER_REV_MM, spot_rpm),
+        (
+            "socket drill",
+            "socket_drill_feed_per_min_mm",
+            SOCKET_FEED_PER_REV_MM,
+            socket_rpm,
+        ),
+        (
+            "guide drill",
+            "guide_drill_feed_per_min_mm",
+            GUIDE_FEED_PER_REV_MM,
+            guide_rpm,
+        ),
+    ):
+        _same(plan, name, "feed_mm_min", key)
+        _agree(plan, key, per_rev * rpm)
     past = p["drill_past_mm"]
     socket_tip = -(past + _point(d50))
     guide_tip = -(past + _point(d27))
@@ -769,6 +804,14 @@ def context(
     if p["tap_stack_max_mm"] > ceiling:
         raise ValueError(
             f"the tap stack {p['tap_stack_max_mm']} does not fit under {ceiling:.3f}"
+        )
+    # The drill chuck with its longest drill fits there too (the envelope's
+    # longest tool is the tap stack, which bounds it).
+    chuck_stack = p["drill_chuck_gauge_mm"] + p["drill_projection_max_mm"]
+    if chuck_stack > min(ceiling + gauge, gauge + p["tap_stack_max_mm"]):
+        raise ValueError(
+            f"the drill chuck and its longest drill, {chuck_stack}, stand longer "
+            "than the tap stack the envelope allows for"
         )
 
     names = {tool["id"]: tool["name"] for tool in plan["tools"]}
@@ -1194,19 +1237,32 @@ def context(
             [f"PL{k:02d}_{key}", "air_feed", {"z_top": thick}],
         ]
 
-    # The cutter's centre stays inside the machine's travel, the edge
-    # finder's two touches included.
-    reach_x = (min(-(x0_bar + FINDER_RADIUS_MM), face_x[0]), face_x[1])
-    reach_y = (
-        min(-(y0_bar + FINDER_RADIUS_MM), edges["front"][1][0]),
-        max(bar_lead, run_y[0]),
-    )
+    # The cutter's centre stays inside the machine's travel: every station
+    # and run end of every program, and the edge finder's two touches.
+    reach = {
+        "x": [
+            -(x0_bar + FINDER_RADIUS_MM),
+            *seat,
+            *face_x,
+            *run_x,
+            *edges["left"][1],
+            *edges["right"][1],
+        ],
+        "y": [
+            -(y0_bar + FINDER_RADIUS_MM),
+            bar_lead,
+            *bar_ys,
+            *face_ys,
+            *run_y,
+            *edges["front"][1],
+            *edges["back"][1],
+        ],
+    }
     travel = machine["travel_mm"]
-    for axis, (low, high) in (("x", reach_x), ("y", reach_y)):
-        if high - low > travel[axis]:
-            raise ValueError(
-                f"the {axis} travel {high - low:.1f} is over {travel[axis]}"
-            )
+    for axis, stations in reach.items():
+        span = max(stations) - min(stations)
+        if span > travel[axis]:
+            raise ValueError(f"the {axis} travel {span:.1f} is over {travel[axis]}")
 
     return {
         "stem": STEM,

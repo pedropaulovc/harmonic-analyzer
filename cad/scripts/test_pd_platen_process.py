@@ -204,6 +204,12 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("block_height_mm", 12.7, "does not reach"),
         ("tap_stack_max_mm", 400.0, "tap_stack_max_mm"),
         ("tap_wrench_reach_max_mm", 300.0, "tap_stack_max_mm"),
+        ("drill_projection_max_mm", 400.0, "drill chuck"),
+        ("spot_feed_per_min_mm", 711.2, "spot_feed_per_min_mm"),
+        ("socket_drill_feed_per_min_mm", 213.36, "socket_drill_feed_per_min_mm"),
+        ("guide_drill_feed_per_min_mm", 71.12, "guide_drill_feed_per_min_mm"),
+        ("bar_skim_feed_per_min_mm", 89.6112, "bar_skim_feed_per_min_mm"),
+        ("plunge_feed_per_min_mm", 533.4, "plunge_feed_per_min_mm"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> None:

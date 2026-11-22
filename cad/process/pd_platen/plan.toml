@@ -65,6 +65,14 @@
 # (cad/config/shop-equipment/ gauges.pin-gauges, to buy; owner ruling
 # 2026-11-21: "ill buy pin gauges").
 #
+# Form: the drawing carries no flatness frame (#2411); the thickness is a
+# feature of size, so its ASME Y14.5 Rule #1 envelope, perfect form at the
+# .157 maximum, bounds any bow (pd_platen_spec.py). The plate is freed from
+# tape with a blade, so the final inspection checks that envelope: the
+# largest miked thickness plus the thickest feeler leaf that enters under
+# the plate on the surface plate. A bowed blank is not gated in Setup 1: the
+# tape holds it flat for each cut and the envelope check is the acceptance.
+#
 # NC (cam:pd_platen, cad/process/pd_platen/cam.py): PL01_bar_skim,
 # PL02_bar_relief, PL03_face, PL04_platen, PL05_tap_1 to PL08_tap_4.
 # Program names, the [parameters] and the milling_cuts names are a contract
@@ -259,6 +267,8 @@ tap_point_depth_mm = 6.5278
 # Machine-capacity inputs (mm): heights from the table, tool lengths from
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
+# The drill chuck and its longest drill: cam.py checks that together they
+# stand no longer than the tap stack the envelopes allow for.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 drill_projection_max_mm = 112.8  # Archive 13/32 jobber, bounds the drills.
 # 1/2 in end mill at least 1 in out of its collet; 1/4 in end mill at least
@@ -311,6 +321,10 @@ id = "deburring-set"
 name = "Deburring scraper set"
 ref = "deburring-set"
 [[tools]]
+id = "feeler-gauges"
+name = "Feeler gauges"
+ref = "feeler-gauges"
+[[tools]]
 id = "pin-gauges"
 name = "Pin gauges {{cad.guide_b1_dia_min_in:.3dot}} plus, {{cad.guide_b1_dia_max_in:.3dot}} minus, TO BUY"
 ref = "pin-gauges"  # A1-pin-set-061-500-combined and its plus set
@@ -346,7 +360,7 @@ drilling = "none"
 sizing = "other"
 instruction = "File the burr off all eight edges so the blank lies flat. With marking fluid mark one long edge FRONT, on the edge itself, with an arrow pointing to the face called B (the back face); the other face is P (the paper face). No cut takes that mark off before Setup 6."
 feed = "hand"
-inspection = "The blank lies on the surface plate, each face down in turn, without rocking on a burr. Rocks on a bow: go on, the four cuts take it out."
+inspection = "The blank lies on the surface plate, each face down in turn, without rocking on a burr. Rocks on a bow, not a burr: go on; the finished plate's form is checked at the final inspection."
 gauge_checks = "other"
 
 [[setups]]
@@ -720,6 +734,7 @@ vise_hold = "other"
 beam = "other"
 inspection = [
   "Thickness {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}}, micrometer, at the middle of each long edge and of each end (it sets the clearance to the MHA-PD-06 disc). Over: stop and tell the owner (a re-bond and a skim of B is his call). Under: scrap.",
+  "Form, the thickness's envelope (the drawing is to ASME Y14.5: perfect form at {{cad.back_face_thickness_max_in:.3dot}}): the platen free on the surface plate, each face down in turn; the largest thickness reading plus the thickest feeler leaf that enters under it anywhere, at most {{cad.back_face_thickness_max_in:.3dot}}. Over: stop and tell the owner; he rules on straightening.",
   "Hole B1 from the left edge {{cad.guide_b1_station_min_in:.3dot}}–{{cad.guide_b1_station_max_in:.3dot}} and from the bottom edge {{cad.guide_b1_height_min_in:.3dot}}–{{cad.guide_b1_height_max_in:.3dot}}: the #27 drill's shank in the hole, the calipers from the edge over the shank, less half its miked Ø. The other holes are the program's from the same zero, not gauged. Outside: stop and tell the owner.",
   "Counterbore Ø{{cad.guide_b1_cbore_dia_min_in:.2dot}}–{{cad.guide_b1_cbore_dia_max_in:.2dot}} at B1 and B10, the calipers' inside jaws. Outside: stop and tell the owner.",
   "Guide holes Ø{{cad.guide_b1_dia_min_in:.3dot}}–{{cad.guide_b1_dia_max_in:.3dot}}: the {{cad.guide_b1_dia_min_in:.3dot}} plus pin enters every hole (GO), the {{cad.guide_b1_dia_max_in:.3dot}} minus pin enters none (NO-GO); Class ZZ pin gauges, to buy. GO refused: run the #27 drill through by hand. NO-GO enters: stop and tell the owner.",
