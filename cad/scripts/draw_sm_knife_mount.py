@@ -761,7 +761,7 @@ requirement(
         "process": ("ream", ((_SELF, "PIN_HOLE_CALLOUT"),)),
         "callout": (DIMENSION_CALLOUTS["PinHoleDia"], ((_SELF, "DIMENSION_CALLOUTS"),)),
         "mates": (DOWEL_NUMBER, ("DOWEL_NUMBER",)),
-        "clearance_band_mm": (
+        "clearance": (
             [value * DOWEL.MM_PER_IN for value in PIN_SLIP_PRINTED],
             ("PIN_SLIP_PRINTED", (_DOWEL, "SLIP_CLEARANCE_MIN"), (_DOWEL, "SLIP_CLEARANCE_MAX")),
         ),

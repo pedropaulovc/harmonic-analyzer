@@ -152,7 +152,7 @@ def test_mount_feature_bands_are_the_printed_ones() -> None:
     assert pin["process"] == "ream" and pin["drill_point"] is True
     assert pin["callout"] == drawing.DIMENSION_CALLOUTS["PinHoleDia"]
     assert pin["mates"] == drawing.DOWEL_NUMBER
-    assert pin["clearance_band_mm"] == pytest.approx([_in(0.0020), _in(0.0036)])
+    assert pin["clearance"] == pytest.approx([_in(0.0020), _in(0.0036)])
     assert pin["datum"] == "B"
     assert pin["perpendicularity"] == pytest.approx(_in(0.001))
     assert pin["side"] == pytest.approx([_in(0.19), _in(0.21)])
