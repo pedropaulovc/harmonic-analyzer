@@ -613,10 +613,14 @@ def test_the_bush_is_cut_from_the_bought_five_eighths_bar() -> None:
             encoding="utf-8"
         )
     )
-    assert plan["revision"] == "placeholder"
-    assert plan["part"] == "MHA-PD-28 Transgear Knob Bush"
+    assert (plan["part"], plan["revision"]) == (
+        "{{cad.drawing_number}}",
+        "{{cad.revision}}",
+    )
     assert plan["stock_refs"] == ["1018-round-5-8"]
-    assert {tool["ref"] for tool in plan["tools"]} >= {"drill-b", "reamer-2490"}
+    # The B drill only: MHA-PD-00 step 11 reams the bore after pressing.
+    refs = {tool["ref"] for tool in plan["tools"]}
+    assert "drill-b" in refs and "reamer-2490" not in refs
     bar = _shop_equipment.load()["stock"]["1018-round-5-8"]
     assert "MHA-PD-28 pd-transgear-knob-bush" in bar["note"]
     assert bar["dia_in"] == [0.625]

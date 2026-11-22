@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" font-family="sans-serif" font-size="13">
+  <!-- The finished cup in section, 400 px to the inch, front face at the left. Styles: prechips.palette. -->
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">The finished cup in section, front face at the left</text>
+  <rect class="part-kept" x="200" y="92" width="144" height="176"/>
+  <rect class="holes" x="200" y="130" width="61" height="100"/>
+  <rect class="holes" x="261" y="157" width="40" height="46"/>
+  <rect class="holes" x="301" y="142" width="43" height="76"/>
+  <line class="centre-line" x1="170" y1="180" x2="380" y2="180"/>
+  <line class="datum" x1="200" y1="80" x2="200" y2="280"/>
+  <text class="datum-label" x="40" y="300">front face: faced at MHA-PD-00 step 22</text>
+  <line class="leader" x1="240" y1="135" x2="420" y2="60"/>
+  <text class="label" x="424" y="56">pilot Ø{{cad.pilot_dia_min_in:.3dot}}–{{cad.pilot_dia_max_in:.3dot}}, {{cad.pilot_depth_min_in:.3dot}}–{{cad.pilot_depth_max_in:.3dot}} deep (supply)</text>
+  <line class="leader" x1="280" y1="180" x2="420" y2="176"/>
+  <text class="label" x="424" y="180">web hole Ø{{cad.web_hole_dia_min_in:.3dot}}–{{cad.web_hole_dia_max_in:.3dot}}</text>
+  <line class="leader" x1="330" y1="150" x2="420" y2="112"/>
+  <text class="label" x="424" y="116">pocket Ø{{cad.pocket_dia_min_in:.2dot}}–{{cad.pocket_dia_max_in:.2dot}}, {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}} deep</text>
+  <line class="leader" x1="344" y1="250" x2="420" y2="236"/>
+  <text class="label" x="424" y="240">length {{cad.rear_face_length_min_in:.2dot}}–{{cad.rear_face_length_max_in:.2dot}} (supply)</text>
+  <line class="leader" x1="300" y1="268" x2="420" y2="286"/>
+  <text class="label" x="424" y="290">outside Ø{{cad.outside_dia_min_in:.3dot}}–{{cad.outside_dia_max_in:.3dot}}</text>
+</svg>
