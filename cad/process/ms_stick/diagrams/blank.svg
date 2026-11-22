@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Setup 1: the 1/8 x 3/8 in brass bar from above, the blank marked off its gated end and sawn. Hand-drawn: 56 px/in along the bar, the width drawn three times over; styles: prechips.palette. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 250" width="700" height="250" font-family="Arial, Helvetica, sans-serif" font-size="13">
-  <text class="title" x="12" y="20">Setup 1: the blank off the bar (from above; width drawn 3× over)</text>
+  <text class="title" x="12" y="20">Setup 1: the blank off the brass bar (from above; width drawn 3× over)</text>
   <!-- The rest of the 24 in bar, broken off at the right. -->
   <path class="part-rest" d="M514 96 L668 96 L660 112 L672 128 L664 159 L514 159 Z"/>
-  <text class="label" x="560" y="186">rest of the 24 in bar</text>
+  <text class="label" x="524" y="124">rest of the 24 in</text>
+  <text class="label" x="524" y="140">brass bar</text>
   <!-- Saw kerf at the scribed line, 8.10 from the gated end. -->
   <rect class="part-removed" x="506" y="90" width="8" height="75"/>
   <path class="leader" d="M510 90 L510 62"/>
   <text class="label" x="446" y="56">saw at the line, {{process.blank_scribe_in:.2f}}</text>
   <!-- The blank: 8.10 in = 454 px. -->
   <rect class="part-kept" x="52" y="96" width="454" height="63"/>
-  <text class="label-halo" x="180" y="133">RULED FACE up: the face with fewer marks</text>
+  <text class="label" x="180" y="133">RULED FACE up: the face with fewer marks</text>
   <!-- The datum end and its arrow, written on the BACK. -->
   <line class="datum" x1="52" y1="84" x2="52" y2="171"/>
   <text class="datum-label" x="20" y="78">DATUM END (either end)</text>
