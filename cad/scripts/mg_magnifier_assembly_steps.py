@@ -75,8 +75,11 @@ STEPS: tuple[tuple[str, ...], ...] = (
     # end inside its acceptance (mg_wheel_group), so a failed trial reads the
     # setting again, then replaces the stack part outside its limits, and
     # with none the axle itself, whose thread length is the stack's last term.
+    # The trial's nuts jam over the endshake's go feeler, where the stack
+    # lands the thread end inside its acceptance (#3344).
     (
         AXLE_TRIAL_KEY,
+        "trial-feeler-placed",
         "trial-nuts-jammed",
         AXLE_CHECKED_KEY,
         "trial-parts-removed-to-press",

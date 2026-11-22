@@ -315,9 +315,14 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Only if the width is over: clamp it again as Holding says, T up; mic B to T at the middle, touch the end mill off on T as before (Z0 from that reading) and run WB02_top again. It faces only what stands above Z {{process.top_width_mm:in.4dot}}."
+instruction = "Only if the width is over: mic B to T at the middle and write it down (mm). Clamp it again as Holding says, T up. The re-clamp moves the bar: pick up G54 X0 again on the LEFT end."
+instruction_detailed = "Only if the width is over: mic B to T at the middle; write it down in mm. Clamp it again as Holding says, T up. Edge finder (900 rpm), its tip below the jaw tops, on the LEFT end from the left: G10 L20 P1 X-4.064 (Y0 stays: the fixed jaw has not moved)."
 feed = "hand"
-inspection = "Width B to T within .005 of {{process.top_width_mm:in.3dot}}. Still over: wipe the stacks and repeat this op; under: stop and tell the owner."
+
+[[setups.operations]]
+instruction = "Then touch the end mill off on T as in Op 40 (Z0 from that reading) and run WB02_top again: it faces only what stands above Z {{process.top_width_mm:in.4dot}}."
+feed = "hand"
+inspection = "Width B to T within .005 of {{process.top_width_mm:in.3dot}}. Still over: wipe the stacks and repeat from the op before; under: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -336,7 +341,7 @@ title = "Left end; the hanger hole and the axle bore"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Two stacks of the 1 in and the 1/2 in parallels (1.5 in) side by side against the MOVING jaw (1/4 in wide in all), centred along the jaws, none at the fixed jaw: the holes, .197 from T, exit clear of them. The blank lying on them along the jaws, F down, T against the FIXED jaw, edge B (as bought) at the moving jaw, the sawn LEFT end {{process.end_overhang_mm:in.2f}} out past the jaws' left side (the rule), the rest out past their right side. The .125 pin of the pin-gauge set laid along edge B between it and the moving jaw, on the stacks' top, so the jaw seats T flat against the fixed jaw. Tap it down onto the stacks along its length while closing the vise. The lower {{process.lying_grip_mm:in.3dot}} of its thickness is in the jaws."
+holding = "Two stacks of the 1 in and the 1/2 in parallels (1.5 in) side by side against the MOVING jaw (1/4 in wide in all), centred along the jaws, none at the fixed jaw: the holes, .197 from T, exit clear of them. The blank lying on them along the jaws, F down, T against the FIXED jaw, edge B (as bought) at the moving jaw, the sawn LEFT end {{process.end_overhang_mm:in.2f}} out past the jaws' left side (the rule), the rest out past their right side. The .125 pin of the pin-gauge set laid along edge B between it and the moving jaw, on the stacks' top, so the jaw seats T flat against the fixed jaw. The stacks (4 in long) and the pin lie wholly between the jaws' sides: the end mill passes .020 below their top just outside the jaws. Tap it down onto the stacks along its length while closing the vise. The lower {{process.lying_grip_mm:in.3dot}} of its thickness is in the jaws."
 datum = "Program WB03_left. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the sawn LEFT end (where WB03 mills that end), Y0 the fixed jaw's face (T), +Y toward it; Z0 the stacks' top (F), set from the miked thickness. The hanger hole at X {{cad.hanger_hole_station_in:.3f}} and the axle bore at X {{cad.axle_bore_station_in:.3f}} in, Y −{{cad.axle_bore_height_in:.3f}} in. At every M6 stop the file has stopped the spindle and lifted the tool above the bar."
 diagram = { file = "diagrams/left.svg", alt = "The blank lying front face down on two stacks at the moving jaw, the top face at the fixed jaw, its left end just out past the jaws; the 1/2 in end mill's side mills the left end, the centre drill spots, the #15 and #17 drill the hanger hole and the axle bore through beside the stacks and the .1865 reamer reams the axle bore." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.top_width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.ream_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
@@ -359,7 +364,7 @@ instruction_detailed = "Console M6 T1 (the tool setter measures it); MDI G0 X{{p
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Prove WB03_left in air, Z0 raised 1.000 in; every move clears the jaws, through every M6. Then Z0 back."
+instruction = "Prove WB03_left in air, Z0 raised 1.000 in; every move clears the jaws, the stacks and the pin, through every M6. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -442,7 +447,7 @@ title = "Right end to the length; the two clamp holes"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "As Setup 3, the bar slid along the jaws to the left: the same stacks, F down, T against the FIXED jaw, the .125 pin along edge B, the sawn RIGHT end {{process.end_overhang_mm:in.2f}} out past the jaws' right side (the rule), the milled LEFT end out past their left side in the air. Tap it down onto the stacks along its length while closing the vise."
+holding = "As Setup 3, the bar slid along the jaws to the left: the same stacks, F down, T against the FIXED jaw, the .125 pin along edge B, the stacks and the pin wholly between the jaws' sides, the sawn RIGHT end {{process.end_overhang_mm:in.2f}} out past the jaws' right side (the rule), the milled LEFT end out past their left side in the air. Tap it down onto the stacks along its length while closing the vise."
 datum = "Program WB04_right. G54: X0 the milled LEFT end (the pickup: the same end Setup 3 cut to X0), Y0 the fixed jaw's face (T), +Y toward it; Z0 the stacks' top (F), set from the miked thickness. The clamp holes at X {{cad.clamp_hole_1_station_in:.3f}} and {{cad.clamp_hole_2_station_in:.3f}} in, Y −{{cad.clamp_hole_1_height_in:.3f}} in; the right end to X {{process.length_target_mm:in.3f}} in. At every M6 stop the file has stopped the spindle and lifted the tool above the bar."
 diagram = { file = "diagrams/right.svg", alt = "The bar slid along the jaws, its right end just out past them, the milled left end out in the air where the edge finder picks up X0; the 1/2 in end mill's side mills the right end to the length, the centre drill spots and the #9 drills both clamp holes through beside the stacks." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.top_width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.drill_9_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_9_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
@@ -469,7 +474,7 @@ instruction = "Pickup check before cutting, Z from the back face's reading: MDI 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Prove WB04_right in air, Z0 raised 1.000 in; every move clears the jaws, through every M6. Then Z0 back."
+instruction = "Prove WB04_right in air, Z0 raised 1.000 in; every move clears the jaws, the stacks and the pin, through every M6. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]

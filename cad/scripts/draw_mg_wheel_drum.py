@@ -34,11 +34,20 @@ from _part_properties import part_drawing_unit
 from _title_block_units import MM_PER_INCH, render_number
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _printed_limits import limits
 from mg_magnifying_wheel_geom import DRUM_PRESS
+from mg_wheel_drum_geom import WALL_WORST
 from mg_wheel_drum_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    DRUM_BORE,
+    DRUM_BORE_BAND,
     DRUM_LEN,
+    DRUM_OD,
+    UNIT,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -114,6 +123,109 @@ DIMENSION_CALLOUTS = {
     ),
     "DrumLen": "SETS STACK ON MHA-MG-05 SPIGOT",
 }
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_mg_wheel_drum: the Front-plane annulus extruded mid-plane, axis +Z
+# through the origin; the -Z face is the datum end the length runs from).
+# The length takes the title block's .XXX row, the O.D. its .XX row (on the
+# printed .77, round the exact wire-seat model value), the bore its reamed
+# +.0005/.0000 band. Each ``span`` is a diameter's model-Z extent. The
+# declarations print nothing.
+# The sheet prints no manufacturing note: every requirement is a dimension,
+# its band or its native callout, so the feature manifest's notes are empty.
+DRAWING_NOTES = ""
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_mg_wheel_drum"
+_GEOM = "mg_wheel_drum_geom"
+_HALF = DRUM_LEN / 2.0
+part_metadata(
+    model_sources=((_GEOM, "DRUM_LEN"), (_GEOM, "DRUM_OD"), (_GEOM, "DRUM_BORE")),
+    precision_sources=("DRAWING_PRECISION", (_SELF, "DRAWING_PRECISION_BY_NAME")),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), _HALF),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": -_HALF},
+            ((_GEOM, "DRUM_LEN"),),
+        ),
+        "outward": ([0.0, 0.0, -1.0], ((_GEOM, "DRUM_LEN"),)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), _HALF),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": _HALF},
+            ((_GEOM, "DRUM_LEN"),),
+        ),
+        "outward": ([0.0, 0.0, 1.0], ((_GEOM, "DRUM_LEN"),)),
+        "length": (
+            limits(DRUM_LEN, _P["DrumLen"], unit=UNIT),
+            ((_GEOM, "DRUM_LEN"), (_GEOM, "UNIT"), (_SELF, "RIGHT_KEEP")),
+        ),
+        "length_nominal": (DRUM_LEN, ((_GEOM, "DRUM_LEN"),)),
+        "length_from": ("datum_end", ((_SELF, "RIGHT_KEEP"),)),
+        "callout": (
+            DIMENSION_CALLOUTS["DrumLen"],
+            ((_SELF, "DIMENSION_CALLOUTS"),),
+        ),
+    },
+    precision={"length": _P["DrumLen"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(DRUM_OD),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ((_GEOM, "DRUM_OD"),)),
+        "at": ([0.0, 0.0, 0.0], ((_GEOM, "DRUM_OD"),)),
+        "span": ([-_HALF, _HALF], ((_GEOM, "DRUM_LEN"),)),
+        "dia": (
+            limits(DRUM_OD, _P["DrumOd"], unit=UNIT),
+            ((_GEOM, "DRUM_OD"), (_GEOM, "UNIT"), (_SELF, "OD_ON_SIDE")),
+        ),
+        "dia_nominal": (DRUM_OD, ((_GEOM, "DRUM_OD"),)),
+    },
+    precision={"dia": _P["DrumOd"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(DRUM_BORE),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ((_GEOM, "DRUM_BORE"),)),
+        "at": ([0.0, 0.0, 0.0], ((_GEOM, "DRUM_BORE"),)),
+        "span": ([-_HALF, _HALF], ((_GEOM, "DRUM_LEN"),)),
+        "dia": (
+            limits(DRUM_BORE, _P["DrumBore"], DRUM_BORE_BAND, unit=UNIT),
+            (
+                (_GEOM, "DRUM_BORE"),
+                (_GEOM, "DRUM_BORE_BAND"),
+                (_GEOM, "UNIT"),
+                (_SELF, "FRONT_KEEP"),
+            ),
+        ),
+        "nominal_dia": (DRUM_BORE, ((_GEOM, "DRUM_BORE"),)),
+        "thru": (True, ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "process": ("ream", ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "wall_min": (WALL_WORST, ((_GEOM, "WALL_WORST"),)),
+        "callout": (
+            DIMENSION_CALLOUTS["DrumBore"],
+            ((_SELF, "DIMENSION_CALLOUTS"), ("mg_magnifying_wheel_geom", "DRUM_PRESS")),
+        ),
+    },
+    precision={"dia": _P["DrumBore"]},
+)
 
 
 def build(adapter: Any) -> dict[str, str]:

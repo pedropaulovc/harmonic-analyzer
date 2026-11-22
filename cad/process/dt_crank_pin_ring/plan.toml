@@ -1,22 +1,164 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Crank pin ring MHA-DT-27, one off (owner ruling 2026-11-21: bench and
+# trivially cut parts get travelers too). Route chosen for speed: bench only,
+# no machine. The ring's size is set by the wire's cut length, not by the
+# mandrel: a straight piece filed square to the developed length (the wire
+# centreline's circumference, pi x (ID + wire), less the butt gap; the
+# manifest's ring.developed_length from dt_crank_pin_ring_spec MEAN_R and
+# BUTT_GAP) closes, ends butted, on the drawing's ID. Round wire bends about
+# its own centreline, so no K-factor enters. The 27/64 drill shank (under the
+# smallest ID) only shapes the circle. Setup 1: cut and file the piece.
+# Setup 2: wind it on the shank, butt the ends, inspect. A spare ring is made
+# with it: the ring is opened, threaded through the crank pin's hole and closed
+# again at assembly (MHA-DT-00), and a ring that cracks there is replaced.
+#
+# Stock: .040 C26000 wire is to order (cad/config/shop-equipment/
+# stock-to-order.toml c260-wire-040); none is on hand.
 title = "Crank Pin Ring"
-part = "MHA-DT-27 Crank Pin Ring"
-revision = "placeholder"
-material = "C26000 brass wire, .040 in"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "{{cad.material_spec}}, annealed (soft) as bought"
+stock = "Qty {{process.quantity:g}} and one spare. Ø{{process.stock_dia_in:.3dot}} C26000 wire, soft (to order, not on hand); two pieces {{process.blank_length_in:.2dot}} long."
+note = "Inches. Bench work only, in the bench vise with soft jaws; no machine. FINISH: bright (no coating)."
 shop = "../shop"
+stock_refs = ["c260-wire-040"]
+
+[cad]
+file = "../../out/features/dt_crank_pin_ring/features.toml"
+adapter = "formed_blank"
+part = "dt-crank-pin-ring"
+
+[parameters]
+quantity = 1
+stock_dia_in = 0.04
+# Each piece: the developed length plus about .03 to file the second end
+# square to length.
+blank_length_in = 1.5
+# The filed length's band: +/-.005 moves the closed ID by .005/pi, under
+# .002, inside the drawing's .XX band (authored; the calipers read .001).
+length_band_in = 0.005
+
+[[tools]]
+id = "files"
+name = "Smooth file; bench vise, soft jaws"
+ref = "jig-files"
+
+[[tools]]
+id = "mandrel"
+name = "27/64 drill, its shank the mandrel"
+ref = "drill-27-64"
 
 [[tools]]
 id = "pliers"
 name = "Pliers"
-ref = "pliers"  # F-pliers
+ref = "pliers"
+
+[[tools]]
+id = "feelers"
+name = "Feeler gauges"
+ref = "feeler-gauges"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Cut the wire to the developed length, ends square"
+machine = "Bench vise, soft jaws"
+indexing = "none"
+holding = "The wire upright between the soft jaws, the end to be filed level with the jaws' top: the jaws back the wire right at the file."
+datum = "The jaws' top: each end is filed down flush with it."
+diagram = { file = "diagrams/cut.svg", alt = "The brass wire held upright in the soft vise jaws, its end level with the jaws' top, the smooth file stroking flat across the jaws to leave the end square." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Pull a 6 in length off the coil and straighten it by drawing it once through a fold of cloth between finger and thumb. Clamp it in the jaws {{process.blank_length_in:.2dot}} out and file it through flush with the jaws' top (brass files through in a few strokes; never cut it with the pliers, which pinch the end to a wedge). Repeat for the second piece."
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Each piece: clamp it with one end level with the jaws' top and file that end flat and square across, the file flat on the jaws."
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Turn the piece over, clamp it with the other end standing just above the jaws' top and file it down, checking with the calipers, to the developed length {{cad.ring_developed_length_in:.3dot}} (the wire's centreline round the closed ring, less the butt gap)."
+inspection = "Length {{cad.ring_developed_length_in:.3dot}} ±{{process.length_band_in:.3dot}} (calipers)."
+gauge_checks = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Only if Op 30 failed. Over the band: file a few more strokes and check again. Under it: set the piece aside and cut and file a new {{process.blank_length_in:.2dot}} piece from the coil (Ops 10–30) in its place."
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Take the burr off both ends with the file held at 45°, one light stroke each."
+inspection = "Both ends flat and square to the wire, no burr past the wire's diameter (each end looked at square against the light)."
+gauge_checks = "other"
+
+[[setups]]
+machine_kind = "other"
+title = "Wind on the mandrel, butt the ends, inspect"
+machine = "Bench vise, soft jaws"
+indexing = "none"
+holding = "The 27/64 drill gripped by its flutes in the soft jaws, the plain shank standing up out of the jaws."
+datum = "The two filed ends: the ring is closed when they meet square."
+diagram = { file = "diagrams/wind.svg", alt = "The 27/64 drill held by its flutes in the soft jaws with its shank up; the wire piece wound once round the shank, its two filed ends meeting square; beside it the finished ring with its inside diameter and the butt joint marked." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "mandrel"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Hold one end of a piece flat against the shank with the thumb and wrap the wire tightly round it by hand, one turn, the wire square to the shank (not a helix), until the second end comes back beside the first. The shank is under the ring's ID: the wire's length, not the shank, sets the size, so the ring stands slightly loose when closed."
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "pliers"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Slide the ring off the shank. With the pliers on the wire either side of the joint, twist the ends sideways (never pull them apart radially, which opens the circle into an oval) until they line up and press them together end to end: a butt joint, ends square, NOT soldered (the drawing's note). Round the ring with the fingers if it has gone oval."
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "feelers"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Inspect the closed ring: its ID with the calipers' inside jaws, across the joint and again at 90° to it; the joint with the .010 leaf of the feeler gauges; the ring laid flat on the bench."
+inspection = "ID Ø{{cad.ring_inside_dia_min_in:.3dot}}–{{cad.ring_inside_dia_max_in:.3dot}} both ways (calipers); the .010 leaf does not enter the joint (butt gap 0–.010) and the ends do not overlap; the ring lies flat, neither end standing above the other."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.ring_inside_dia_band_mm}}" }]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "pliers"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Only if Op 80 failed. Gap the leaf enters: press the ends closer and check again. ID over the band with the ends butted: open the ring, file one end shorter by three times the excess (.001 of ID is about .003 of length), close and check again. ID under the band: set the ring aside; cut and file a new piece (Ops 10–50) and wind it."
+
+[[setups.operations]]
+instruction = "Wind, close and inspect the spare the same way (Ops 60–90). Bag the ring and the spare together, labelled with the drawing number: bright brass, no oil and no coating (the drawing's finish). The ring is opened, threaded through the crank pin's hole and closed again at assembly (MHA-DT-00), not here."
+feed = "hand"
