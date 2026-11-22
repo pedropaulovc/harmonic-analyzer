@@ -110,6 +110,26 @@ description = "Shop-made dividing-head index plate MHA-DT-03-TL-01 for the cone 
 description = "Shop-made fly cutter bar MHA-DT-37-TL-02 for the cone tip gear form cutter"
 [tools.dt-cone-tip-form-cutter]  # MHA-DT-37 GEAR DATA CUTTER: MHA-DT-37-TL-01
 description = "Shop-made form cutter MHA-DT-37-TL-01 for the MHA-DT-37 tooth space"
+# --- MHA-DT-12-TL-01 cam fixture (cnc/gear-pilot) ---
+# Go/no-go pairs for its two press reams (cad/process/
+# dt_cylinder_gear_tl_cam_fixture/plan.toml): the stub hole Ø.3740
+# +.0005/.0000 (.3740-.3745) and the clock-pin hole Ø.0365 +.0005/.0000
+# (.0365-.0370), as the .2510-.2515 pair: Vermont Gage standard Class X
+# steel pin/plug gages, GO at the low limit (plus tolerance) and NO-GO at the
+# high limit (minus tolerance), each ± .000040 in (= 0.001016 mm, the
+# resolution). Not owned: to buy (cad/config/shop-equipment/ gauges, same
+# keys). The tools records let the plan list each pair in its tooling.
+[tools.plug-gauges-3740-3745]
+description = "Plug gauge pair, .3740 GO (plus) and .3745 NO-GO (minus), Vermont Gage Class X"
+[tools.plug-gauges-0365-0370]
+description = "Plug gauge pair, .0365 GO (plus) and .0370 NO-GO (minus), Vermont Gage Class X"
+[gauges.plug-gauges-3740-3745]
+range_mm = [9.4996, 9.5123]
+resolution_mm = 0.001016
+[gauges.plug-gauges-0365-0370]
+range_mm = [0.9271, 0.9398]
+resolution_mm = 0.001016
+
 [tools.dt-cylinder-gear-cam-fixture]  # MHA-DT-12 cam throw .3402 ±.0020
 description = "Shop-made cam turning fixture MHA-DT-12-TL-01 (stub, clamp, clock pin) for the MHA-DT-12 cams"
 [tools.endmill-hss-2fl-1-4]  # inventory tools.endmill-hss-2fl-1-4

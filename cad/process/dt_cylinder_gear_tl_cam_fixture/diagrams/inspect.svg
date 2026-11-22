@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 3 (plan view): the finished disc, face F up; deburr the hole mouths, check edges, oil</text>
+  <circle class="part-kept" cx="300" cy="190" r="125"/>
+  <circle class="holes" cx="274" cy="190" r="14"/>
+  <circle class="holes" cx="368" cy="185" r="3"/>
+  <line class="centre-line" x1="160" y1="190" x2="440" y2="190"/>
+  <line class="leader" x1="480" y1="250" x2="280" y2="198"/>
+  <text class="label" x="485" y="255">stub hole Ø.3740 thru: both mouths</text>
+  <line class="leader" x1="480" y1="140" x2="371" y2="183"/>
+  <text class="label" x="485" y="135">clock-pin hole Ø.0365: its mouth</text>
+  <text class="label" x="20" y="385">Edges R.010 or chamfer .010 max. Leaves bare; the stub and clock pin are pressed at MHA-DT-12-TL-00.</text>
+</svg>
