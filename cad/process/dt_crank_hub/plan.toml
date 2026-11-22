@@ -349,7 +349,7 @@ cut_diameter_mm = "{{cad.bore_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Still chucked, the bore wiped clean: the {{cad.bore_dia_min_in:.4dot}} GO plug passes through and the {{cad.bore_dia_max_in:.4dot}} NO-GO plug does not enter the front end (the rear end is checked at the bench, Op 280)."
+instruction = "Still chucked, the bore wiped clean: the {{cad.bore_dia_min_in:.4dot}} GO plug passes through and the {{cad.bore_dia_max_in:.4dot}} NO-GO plug does not enter the front end (both ends are checked again at the bench, after the cross hole, Op 280)."
 inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} through."
 gauge_checks = [{ gauge = "plug-gauges-3760-3765", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
@@ -451,7 +451,7 @@ instruction = "Clear the #14's breakthrough burrs inside the bore: grip the .376
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mike the length across the front and rear faces. The {{cad.bore_dia_min_in:.4dot}} GO plug passes the full length of the bore, past the cross hole; the {{cad.bore_dia_max_in:.4dot}} NO-GO plug does not enter the bore's rear end."
+instruction = "Mike the length across the front and rear faces. The {{cad.bore_dia_min_in:.4dot}} GO plug passes the full length of the bore, past the cross hole; the {{cad.bore_dia_max_in:.4dot}} NO-GO plug enters from neither end."
 inspection = "Length {{cad.rear_face_length_min_in:.3dot}}–{{cad.rear_face_length_max_in:.3dot}}, micrometer; bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} through after the cross hole, GO and NO-GO plugs."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.rear_face_length_band_mm}}" }, { gauge = "plug-gauges-3760-3765", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"

@@ -8,7 +8,7 @@
   <rect class="fixture-support" x="292" y="241" width="25" height="120"/>
   <rect class="fixture-support" x="443" y="241" width="25" height="120"/>
   <circle class="part-kept" cx="380" cy="180" r="88"/>
-  <circle class="part-kept" cx="380" cy="180" r="76"/>
+  <circle class="part-kept" cx="380" cy="180" r="65"/>
   <circle class="holes" cx="380" cy="180" r="37.6"/>
   <polyline class="hidden" points="362,92 362,288"/>
   <polyline class="hidden" points="398,92 398,288"/>
@@ -18,8 +18,8 @@
   <line class="datum" x1="300" y1="92" x2="460" y2="92"/>
   <text class="datum-label" x="20" y="60">Z0: the barrel's top line</text>
   <line class="leader" x1="330" y1="92" x2="190" y2="64"/>
-  <text class="label" x="20" y="186">Y0: the barrel's axis</text>
-  <line class="leader" x1="170" y1="181" x2="270" y2="180"/>
+  <line class="leader" x1="392" y1="382" x2="381" y2="340"/>
+  <text class="label" x="392" y="395">Y0: the barrel's axis (the vertical centre line)</text>
   <line class="leader" x1="300" y1="300" x2="200" y2="360"/>
   <text class="label" x="30" y="376">1 in parallels, 1/8 thick, against the jaws</text>
   <text class="label" x="182" y="318">moving jaw</text>
