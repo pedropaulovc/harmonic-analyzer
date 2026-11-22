@@ -406,7 +406,7 @@ def context(
         [name, "depth", {"z_min": _r(tip)}],
     ]
     for k, checks in enumerate(
-        (hole_checks(-spot, CENTRE_DRILL["pilot_mm"] / 2), hole_checks(tip, d14 / 2))
+        (hole_checks(-spot, p["spot_dia_mm"] / 2), hole_checks(tip, d14 / 2))
     ):
         expect += [[f"{name}@{k}", check, kwargs] for check, kwargs in checks]
 

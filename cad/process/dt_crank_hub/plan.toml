@@ -12,7 +12,7 @@
 #   its measured bore and thickness, notes on the sheet). The hub turned
 #   round, its barrel in the 3-jaw over a shim wrap, the parted end out:
 #   face to length from the miked length (Z0 the front face), turn the seat
-#   to the measured bore plus .0008 back to the shoulder at the measured
+#   to the plug-measured bore plus .0009 back to the shoulder at the measured
 #   arm thickness less .001, then centre, drill L and 23/64 and ream .3760
 #   through from the tailstock in the same chucking, so the bore runs true
 #   to the seat the arm is pressed on.
@@ -370,7 +370,7 @@ datum = "Program CM01_pin_hole (cam:dt_crank_hub). G54: X0 the front face, +X to
 diagram = { file = "diagrams/cross.svg", alt = "The hub lying in the vise on two parallels' edges, gripped on its barrel; the #14 drills down through the barrel and bore {{cad.pin_hole_station_in:.2dot}} from the front face, into the gap between the parallels." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.barrel_dia_mm}}", along_jaws_mm = "{{cad.envelope_y_mm}}", part_height_mm = "{{cad.barrel_dia_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = [-66.7639, -66.7639], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "rod" }
-beam = { axis = "y", hold = "solid", extent_mm = [0, "{{cad.envelope_y_mm}}"], seat = "gripped across the barrel in the vise jaws, on the parallels' edges", seat_mm = [7.9375, 21.082] }
+beam = { axis = "x", hold = "solid", extent_mm = [0, "{{cad.envelope_y_mm}}"], seat = "gripped across the barrel in the vise jaws, on the parallels' edges", seat_mm = [7.9375, 21.082] }
 
 [[setups.operations]]
 instruction = "Home the mill ($H). G54 Y0: the barrel's axis, half its miked diameter from the fixed jaw."
