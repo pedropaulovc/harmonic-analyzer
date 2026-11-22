@@ -60,9 +60,6 @@ description = "Straightedge"
 [tools.chamfer-mill-330ch-1-4-90]  # inventory tools.chamfer-mill-330ch-1-4-90
 description = "330CH 1/4 in 90° included 2-flute chamfer mill"
 diameter_mm = 6.35
-[tools.endmill-carbide-3-64]  # MHA-PD-03 2X .04 SLIT, FULL R END
-description = "3/64 in square carbide end mill, 2- or 3-flute"
-diameter_mm = 1.190625
 [tools.form-tool-r180]  # MHA-PD-23 R.18 head dome
 description = "R.180 dome form tool: concave R.180 edge, cuts a convex R.18 dome"
 [tools.gauge-pin-0625]  # MHA-PD-10 .002 TIR TO A Ø.0625 PIN
@@ -72,7 +69,7 @@ description = "Lathe knurling holder with straight 25 TPI wheel"
 [tools.pd-latch-hook-former]  # MHA-PD-14 R3.13 ±.02, R.38 ±.02
 description = "Shop-made latch-hook former: R3.13 roll and R.38 tab form"
 [tools.pd-platen-clip-bow-former]  # MHA-PD-03 FORMED, 6X (R1.36), .06 BOW RISE
-description = "Shop-made platen-clip bow former: R1.36 crown, .06 rise"
+description = "Platen-clip bow former: four laminations of the .032 strip, each split into a male and a female die half (cut by PC01_sheet)"
 [tools.pd-rack-pinion-cutting-arbor]  # inventory fixtures.pd-rack-pinion-cutting-arbor
 description = "Shop-made work arbor with two backing discs for cutting the MHA-PD-06 teeth"
 [tools.reamer-0615]  # MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 +.0005/.0000 REAM (.163)
@@ -90,6 +87,41 @@ diameter_mm = 4.8768
 [tools.reamer-1940]  # MHA-PD-18 Ø.1940 +.001/.000 REAM THRU
 description = ".1940 in HSS chucking reamer"
 diameter_mm = 4.9276
+
+# --- MHA-PD-03 platen clip (cad/process/pd_platen_clip/plan.toml) ---
+# The clip's cutter: Harvey Tool 896231, Variable Helix End Mill for
+# Aluminum Alloys - Square - Downcut (harveytool.com/products/tool-details-
+# 896231 and the family page, read 2026-11-22): .0310 (1/32) cutter, .0930
+# length of cut, 3 left-hand spiral right-hand cut flutes (a downcut:
+# "prevents lifting of workpiece"), centre cutting, 1/8 shank, 1-1/2
+# overall, uncoated, the family "excellent performance in copper, brass, and
+# bronze alloys". It fits the .04 slit, which it cuts by running down one
+# side and back up the other. Ownership: cad/config/shop-equipment/
+# tools-special-cutters.toml, same key. diameter_mm and flute_length_mm: its
+# .0310 and .0930 × 25.4.
+[tools.endmill-carbide-3fl-1-32-downcut]
+description = "1/32 in (.0310) 3-flute carbide downcut square end mill, .093 length of cut, 1/8 shank (Harvey Tool 896231)"
+diameter_mm = 0.7874
+flute_length_mm = 2.3622
+# Its setting in half-hard C26000 strip, as the comb's 1/16 cutter
+# (dt.toml settings.endmill-carbide-3fl-1-16-downcut-c260): Tru-Edge "Solid
+# Carbide Endmills Feeds and Speeds" (tru-edge.com, 20090 spec sheet, read
+# 2026-11-22), row Brass and Bronze: 250-350 SFM, so the spindle's 2800
+# (machines.pm-30mv; 23 ft/min on .031). Harvey's own table for the series
+# (SF_896200, read 2026-11-22) gives brass at .031 in .00033 in/tooth
+# slotting and .00044 max, at .5 x D deep: .001 is taken because prechips'
+# milling feed-factor table starts at .001 and is not extended without a
+# source. This extends the comb's .001 precedent (owner flag #3376) to a
+# 1/32 cutter, about three times Harvey's slotting value; the plan holds
+# each level to Harvey's .5 x D depth. Not an owner ruling: flagged.
+# 2800 × 3 × .001 = 8.4 in/min.
+[settings.endmill-carbide-3fl-1-32-downcut-c260]
+tool = "endmill-carbide-3fl-1-32-downcut"
+material = "c260-h02"
+rpm = 2800
+chip_load_mm_per_tooth = 0.0254  # .001 in; 2800 × 3 × .001 = 8.4 in/min
+flutes = 3
+feed_unit = "in/min"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so

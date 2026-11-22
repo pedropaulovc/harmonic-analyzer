@@ -217,11 +217,9 @@ description = "1008-1045 carbon steel machine key stock, undersized, square bar,
 description = "Junior hacksaw, 6 in blade, 32 TPI"
 
 # --- MHA-DT-03-TL-02 phasing comb (cad/process/dt_cone_gear_tl_phasing_comb/plan.toml) ---
-# The comb's blank is snipped off the .020 brass sheet. Ownership:
-# cad/config/shop-equipment/tools-hand.toml tools.aviation-snips-straight and
-# stock-to-order.toml stock.c260-h02-sheet-020-12x12, same keys.
-[tools.aviation-snips-straight]
-description = "Aviation snips, straight cut"
+# The comb's blank is snipped off the .020 brass sheet (the snips are in
+# common.toml: the MHA-PD-03 clip's blanks are snipped too). Ownership:
+# stock-to-order.toml stock.c260-h02-sheet-020-12x12, same key.
 [stock.c260-h02-sheet-020-12x12]
 description = "C26000 cartridge brass, H02 half hard, sheet, .020 x 12 x 12 in"
 # The comb's outline cutter: Harvey Tool 896262, Variable Helix End Mill for
