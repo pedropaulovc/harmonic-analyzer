@@ -27,6 +27,7 @@ import _telemetry
 from _com import _early_bound
 from _drawing_annotation_extent import callout_ink, move_annotation
 from _drawing_common import rebuild_drawing
+from _drawing_detail_crop import native_circle_geometry
 from _drawing_dimensions import offset_dimension_text
 from _drawing_leaders import ARROW_TEXT_CLEARANCE, dimension_segments
 from _layout_geometry import Box, Segment, segment_box_distance
@@ -323,16 +324,27 @@ def sketch_view_circle(
     *,
     add_to_db: bool,
     label: str,
+    rim_angle_deg: float = 0.0,
 ) -> Any:
     """Sketch a circle in the ACTIVE ``view``'s own sketch from sheet points,
     through the view sketch's ModelToSketchTransform (draw_ch_amplitude_bar's
     ``_sketch_circle``). Without ``add_to_db`` the circle is left selected,
-    which is what Crop2 consumes."""
+    which is what Crop2 consumes.
+
+    Without ``add_to_db`` screen-space inference can snap the rim point to a
+    model point near it and draw a smaller circle (draw_pd_paper_drive_
+    assembly's DETAIL H): ``rim_angle_deg`` picks the rim point clear of the
+    model, and the drawn circle is read back either way."""
     sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    rim_angle = math.radians(rim_angle_deg)
+    rim = (
+        center[0] + radius * math.cos(rim_angle),
+        center[1] + radius * math.sin(rim_angle),
+    )
     points = []
-    for x, y in (center, (center[0] + radius, center[1])):
+    for x, y in (center, rim):
         point = _early_bound(
             utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
         )
@@ -347,6 +359,16 @@ def sketch_view_circle(
         manager.AddToDB = previous_add_to_db
     if circle is None:
         raise RuntimeError(f"failed to sketch the {label} circle")
+    drawn_centre, drawn_radius = native_circle_geometry(circle, label=label)
+    intended = math.dist(points[0][:2], points[1][:2])
+    if (
+        math.dist(drawn_centre[:2], points[0][:2]) > 1e-3 * intended
+        or abs(drawn_radius - intended) > 1e-3 * intended
+    ):
+        raise RuntimeError(
+            f"{label} circle drew at {drawn_centre!r} r {drawn_radius}, "
+            f"not {points[0]!r} r {intended}"
+        )
     return circle
 
 

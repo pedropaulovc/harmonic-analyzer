@@ -992,6 +992,45 @@ def _centre_line_text_air(teeth: int, end_x: float) -> float:
     return segment_box_distance(Segment(drawing.FRONT_CENTER[0], axis_y, end_x, axis_y), block)
 
 
+def test_the_bore_view_crop_rim_is_picked_clear_of_the_keyed_bore() -> None:
+    """Machinist review of run 20261122T215628806Z-4c985630476a4af3977b78cbe1520d58
+    (rule 9): DETAIL A drew no keyway top on any keyed sheet. The crop
+    circle's rim point, picked on +X, snapped to the keyway top's midpoint
+    1.7 mm inside it. Its ray now stands clear of every point of the bore
+    profile; the drawn circle is read back (cone_sheet.sketch_view_circle)."""
+    angle = math.radians(drawing.BORE_VIEW_CROP_RIM_ANGLE_DEG)
+    for teeth in spec.CONFIGURATION_TEETH:
+        if not spec.keyed(teeth):
+            continue
+        ratio = drawing._bore_view_ratio(teeth)
+        crop = drawing.bore_view_crop_radius(teeth)
+        rim = (crop * math.cos(angle), crop * math.sin(angle))
+        bore_radius = spec.bore_dia_mm(teeth) / 2.0
+        half = spec.KEYWAY_HALF_WIDTH_MM
+        top = spec.keyway_top_offset_mm(teeth)
+        side = math.sqrt(bore_radius**2 - half**2)
+        points_mm = [
+            (0.0, 0.0),
+            (-bore_radius, 0.0),
+            (0.0, bore_radius),
+            (0.0, -bore_radius),
+            (top, 0.0),
+            (top, half),
+            (top, -half),
+            (side, half),
+            (side, -half),
+        ]
+        nearest = min(
+            math.dist(rim, (x * ratio / 1000.0, y * ratio / 1000.0))
+            for x, y in points_mm
+        )
+        on_keyway_axis = crop - top * ratio / 1000.0
+        assert on_keyway_axis < 0.002, teeth  # the snap that happened
+        assert nearest >= 0.008, (teeth, nearest)
+        # The bore's arc itself is the nearest ink to the rim point.
+        assert crop - bore_radius * ratio / 1000.0 >= 0.004, teeth
+
+
 def test_front_view_draws_the_centreline_the_flat_and_its_tooth_share() -> None:
     """Machinist review of the C1-keyed sheets (rule 10; PR 2 round 2): the
     clock '90° ±.25° TO TOOTH CENTERLINE' in DETAIL A named a tooth no view
