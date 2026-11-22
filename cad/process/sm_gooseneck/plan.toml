@@ -5,8 +5,10 @@
 #
 # Route. Setup 1 checks the tube as it arrives and saws the blank, its length
 # the developed length plus the ends' allowance (the formed_blank adapter
-# binds both); the rest of the 36 in tube checks the form's groove. Setups 2
-# to 4 make the bend form (fixtures.sm-gooseneck-bend-form; owner ruling
+# binds both); the rest of the 48 in tube (owner ruling 2026-11-22, option A,
+# cnc/questions/bench-b-gooseneck-trial-bend.json) checks the form's groove
+# and is then the trial bend. Setups 2 to 4 make the bend form
+# (fixtures.sm-gooseneck-bend-form; owner ruling
 # 2026-11-22, option A: two 6061 plates from the owned 1/2 x 6 in bar, the
 # groove cut on the CNC with the owned 1/4 in ball end mill): each plate lies
 # on three 1-2-3 blocks under three step clamps (LMS 1268), as the
@@ -19,19 +21,22 @@
 # Plate B's file is plate A's mirrored, so B turned over onto A closes the
 # channel and the cove round the tube. Setup 5 bolts the form through its
 # stud holes into a T-slot of the mill table (spindle off: the table is the
-# heaviest flat thing in the shop) and the tube is pulled round it by hand,
-# checked off the form with the digital angle gauge and bent again until it
-# holds 89–91°. Setup 6 accepts the bend (no kink). Setup 7 saws
-# and files both ends to the reach and the height, deburrs, polishes and
-# oils.
+# heaviest flat thing in the shop). The trial piece is pulled round it by
+# hand to 90° first: no kink, and its springback (90° less the angle read
+# after release) is the blank's overbend. Then the blank is pulled to square
+# plus that springback, checked off the form with the digital angle gauge
+# and bent again until it holds 89–91°. Setup 6 accepts the bend (no kink).
+# Setup 7 saws and files both ends to the reach and the height, deburrs,
+# polishes and oils.
 #
 # The bend's acceptance. Springback: J D Squared, "Model 3 Bender
 # Directions" (2009, https://support.jd2.com/MiscDown/dl/M3BDirections.pdf):
 # "chromemoly tubing will springback roughly twice as far as the exact same
 # size and wall thickness of welded seam mild steel tubing", and for mild
 # steel "over bend a little ... 3 to 4 degrees should be sufficient": the
-# plan allows up to springback_max_deg on the form and pulls first to the
-# mild-steel overbend, then on in small steps. Ovality: ASME B31.3
+# plan allows up to springback_max_deg on the form; the trial bend measures
+# it on this tube and this form, and the blank's first pull overbends by
+# the trial's figure, then goes on in small steps. Ovality: ASME B31.3
 # §332.2.1, the difference between the largest and least outside diameters
 # at any section of a bend at most 8% of the nominal O.D. (internal
 # pressure; this tube carries none). The sheet prints the O.D. as (Ø.500)
@@ -39,7 +44,8 @@
 # ovality only as a diagnostic for a kink starting (machinist review r2: as
 # acceptance it over-specified the sheet); NO KINKS, checked by eye, is the
 # acceptance. A kinked or creased tube is scrap: the plan orders another
-# 36 in.
+# 48 in. A kinked trial stops the bend until the groove and the pull are
+# checked and a trial on the piece's other end bends clean.
 #
 # To order: the tube (stock-to-order.toml stock.4130n-tube-1-2x0065,
 # OnlineMetals 7322), the junior hacksaw (tools-hand.toml junior-hacksaw),
@@ -54,7 +60,7 @@ material = "{{cad.material_spec}}"
 # sawn by hand.
 material_key = "6061-t6511"
 milling_material = "aluminum_6061"
-stock = "Qty {{process.quantity:d}}. 4130-N tube, 36 in (to order, not on hand): one {{process.blank_length_in:.1f}} in blank; the rest checks the bend form. The form: two {{process.plate_length_in:.1f}} in lengths of the owned 1/2 x 6 in 6061 bar."
+stock = "Qty {{process.quantity:d}}. 4130-N tube, 48 in (to order, not on hand): one {{process.blank_length_in:.1f}} in blank; the rest checks the bend form, then is the trial bend. The form: two {{process.plate_length_in:.1f}} in lengths of the owned 1/2 x 6 in 6061 bar."
 note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Each CNC file is proved once in air, Z0 raised 1.000 in, before it cuts metal. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool clear of the plate and straps: change the tool, set the speed, Cycle Start. After any controller reset, stall or E-stop, home ($H) and touch off G54 again: a reset loses home. Finish: {{cad.finish}}."
 shop = "../shop"
 stock_refs = ["4130n-tube-1-2x0065", "6061-flat-1-2x6-54in"]
@@ -82,9 +88,9 @@ foot_line_mm = 502.158
 ovality_fraction_max = 0.08
 ovality_max_mm = 1.016
 # Springback of 4130 bent on the form: J D Squared Model 3 directions, twice
-# mild steel's 3 to 4 degrees. The first pull overbends by the mild-steel
-# figure; the form allows the bend's widest angle plus springback_max_deg.
-first_overbend_deg = 4
+# mild steel's 3 to 4 degrees. The trial bend measures it; over
+# springback_max_deg the blank stops: the form allows the bend's widest angle
+# plus springback_max_deg.
 springback_max_deg = 8.0
 wrap_max_deg = 100.0
 # --- The bend form (plate A's frame: X0 Y0 the arc's centre, Z0 its top) ---
@@ -230,7 +236,7 @@ machine_kind = "other"
 title = "Check the tube; saw the blank"
 machine = "Bench / saw"
 indexing = "none"
-diagram = { file = "diagrams/tube.svg", alt = "The 36 in tube: the micrometer across its O.D. near each end, the calipers' jaw tips across its wall at one end, and the 24.6 in blank sawn off one end, the rest kept." }
+diagram = { file = "diagrams/tube.svg", alt = "The 48 in tube: the micrometer across its O.D. near each end, the calipers' jaw tips across its wall at one end, and the 24.6 in blank sawn off one end; the rest, about 23 in, kept for the groove checks and the trial bend." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -252,7 +258,7 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Saw {{process.blank_length_in:.1f}} in off one end of the tube (tape measure), the tube flat in the saw's vise. Keep the rest: it checks the form's grooves in Setups 3 and 4."
+instruction = "Saw {{process.blank_length_in:.1f}} in off one end of the tube (tape measure), the tube flat in the saw's vise. Keep the rest, the trial piece: it checks the form's grooves in Setups 3 and 4, then is the trial bend in Setup 5."
 feed = "hand"
 
 [[setups.operations]]
@@ -260,7 +266,7 @@ speed_kind = "other"
 tool = "deburr"
 drilling = "none"
 sizing = "other"
-instruction = "Deburr both sawn ends inside and out: the blank's ends must slide in the form's channel."
+instruction = "Deburr all three sawn ends inside and out: the tube's ends must slide in the form's channel."
 feed = "hand"
 
 # --- Setup 2: the form's plates ----------------------------------------------
@@ -378,7 +384,7 @@ feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "Lay the spare tube (Setup 1's rest) in A's channel, its end on the channel's closed end." },
+  { kind = "action", text = "Lay the trial piece (Setup 1's rest) in A's channel, its end on the channel's closed end." },
   { kind = "check", text = "It lies down in the channel its full length and does not rock." },
   { kind = "stop", text = "It rides on a ridge or burr: stone the groove's edge and lay it in again. It will not go in at all: stop; the groove is undersize." },
 ]
@@ -459,7 +465,7 @@ feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "Lay the spare tube in B's channel, its end on the channel's closed end." },
+  { kind = "action", text = "Lay the trial piece in B's channel, its end on the channel's closed end." },
   { kind = "check", text = "It lies down in the channel its full length and does not rock." },
   { kind = "stop", text = "It rides on a ridge or burr: stone the groove's edge and lay it in again. It will not go in at all: stop; the groove is undersize." },
 ]
@@ -483,7 +489,7 @@ instruction = "Spindle off, Z raised to the top. Two T-nuts in the front T-slot 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Lay the blank in A's channel, its end on the channel's closed end, the rest running out over the front of the table."
+instruction = "Lay the trial piece (Setup 1's rest) in A's channel, its end on the channel's closed end, the rest running out over the front of the table."
 feed = "hand"
 
 [[setups.operations]]
@@ -504,7 +510,43 @@ speed_kind = "other"
 tool = "form"
 drilling = "none"
 sizing = "other"
-instruction = "Pull the tube round the arc on the form by hand, steadily, toward your right, until it stands square to the plates' long edges and then {{process.first_overbend_deg:d}}° more (its free end about 1 in farther round at 15 in out). Let it go: it springs back."
+instruction = "Trial bend: pull the trial piece round the arc on the form by hand, steadily, toward your right, until it stands square to the plates' long edges: 90° on the form. Let it go: it springs back."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Both nuts off, plate B off. Lift the trial piece out of A's channel."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Look along the trial's bend inside and out under a bright light."
+inspection = "No crease, ripple or wrinkle on the inside of the bend, no flat on its outside."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A kink in the trial: stop; the form or the pull is wrong. Feel the groove for a ridge or burr and check B's arc meets A's; pull steadily, the tube held down in the cove. Then trial-bend the piece's other end the same way. Bend the blank only after a trial with no kink."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Zero the digital angle gauge on the table. Lay the trial's leg on the table, its outer side down, between two 1-2-3 blocks set against its sides, the arm up. Stand the gauge on the arm's top side, its face in the bend's plane; rock the arm a little either way and read it upright."
+inspection = "Springback (90° less the reading) at most {{process.springback_max_deg:.0f}}°. Write it down: it is the blank's overbend."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Springback over {{process.springback_max_deg:.0f}}°: stop; the form wraps no farther than {{process.wrap_max_deg:.0f}}°, so it cannot overbend the blank that far."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Lay the blank in A's channel as the trial piece. Plate B on as before: back edges flush, no step at the arc, nuts tight."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "form"
+drilling = "none"
+sizing = "other"
+instruction = "Pull the blank round the arc on the form as the trial, until it stands square to the plates' long edges and then the trial's springback more (each degree about 1/4 in at 15 in out). Let it go: it springs back."
 feed = "hand"
 
 [[setups.operations]]
@@ -512,7 +554,7 @@ instruction = "Both nuts off, plate B off. Lift the tube out of A's channel."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Zero the digital angle gauge on the table. Lay the leg on the table, its outer side down, between two 1-2-3 blocks set against its sides, the arm up. Stand the gauge on the arm's top side, its face in the bend's plane; rock the arm a little either way and read it upright."
+instruction = "Read the bend's angle with the digital angle gauge as the trial's: zeroed on the table, the leg between the two 1-2-3 blocks, the gauge on the arm's top side."
 inspection = "Bend {{cad.bend_angle_min_deg:.0f}}–{{cad.bend_angle_max_deg:.0f}}° (digital angle gauge)."
 gauge_checks = "other"
 feed = "hand"
@@ -543,7 +585,7 @@ instruction = "Diagnostic for a kink starting: mike the O.D. at the middle of th
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A kink or a crease (the sheet's {{cad.bend_callout}}): scrap the tube. Order another 36 in of the tube (OnlineMetals 7322) and start again at Setup 1; the form is kept."
+instruction = "A kink or a crease (the sheet's {{cad.bend_callout}}): scrap the tube. Order another 48 in of the tube (OnlineMetals 7322) and start again at Setup 1; the form is kept."
 feed = "hand"
 
 # --- Setup 7: the ends and the finish ---------------------------------------
