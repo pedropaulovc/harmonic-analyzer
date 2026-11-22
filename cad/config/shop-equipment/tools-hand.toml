@@ -251,3 +251,9 @@ name = "Junior hacksaw, 6 in blade, 32 TPI"
 kind = "hacksaw"
 status = "to_order"
 note = "Not owned: to buy (the shop records no hand hacksaw). Saws the MHA-DT-30 pin's .65 piece off the 1/16 drill rod in the bench vise; any 6 in junior frame with a 32 TPI blade serves."
+
+[tools.aviation-snips-straight]
+name = "Aviation snips, straight cut"
+kind = "snips"
+status = "to_order"
+note = "Not owned: to buy (the shop records no snips or sheet shear). Cuts the MHA-DT-03-TL-02 comb's blank off the .020 brass sheet; any straight-cut aviation snips rated for 18 ga mild steel serve on .020 brass."
