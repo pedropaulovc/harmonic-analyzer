@@ -96,7 +96,6 @@ from mg_magnifying_wheel_geom import (
     SPOKE_TIP_WIDTH,
     SPOKE_X0,
     TIE1_CDRILL_DEPTH,
-    TIE1_CDRILL_DIA,
     TIE1_X,
     TIE1_Y,
 )
@@ -197,20 +196,25 @@ _SECTION_PLACEMENT_TOL = 1e-5
 # plane, build_mg_magnifying_wheel._tie1_counter_drill): the key pin's
 # chord hole on draw_pd_transgear_disc_hub's section is the precedent for a
 # drilled hole's Ø imported in a section under its "#nn DRILL" process.
-# The cutting line runs from just past the #50's rim on the bore's side out
-# past the boss into the 300-360 spoke window's air (one end, its arrow and
-# letter off the part), so its other end stops short of TIE 1's Y
-# extension line, which runs on along the same row toward the bore.  Drawn
-# right to left, its arrows point down, away from A-A.  The section stands
-# at 2:1, unturned (TIE 1's axis upright), in the field right of the
-# section's drum row and under the isometric; the slab's centre is placed
-# at TIE1_SECTION_CENTER.
+# The cutting line runs along TIE 1's row from the bore's vertical centreline
+# out past the boss into the 300-360 spoke window's air, drawn left to right
+# so its arrows point down, away from A-A: SolidWorks sights a section to the
+# right of its line as drawn (drawn right to left in run
+# 20261122T184921959Z, B-B's projection looked along +y, its arrows up across
+# A-A's line).  The arrows print at the chain's ends
+# (_section_lines._printed_arrow), each letter under its arrow: the
+# bore-side one down the 270 deg spoke window's middle, clear of TIE 1, its
+# Ø leader and its X extension line, the window-side one short of the spoke
+# root width's leader, which crosses TIE 1's row at x 23.7.  Along its row
+# the line lies on TIE 1's Y extension line.  The section stands at 2:1,
+# unturned (TIE 1's axis upright), in the field right of the section's drum
+# row and under the isometric; the slab's centre is placed at
+# TIE1_SECTION_CENTER.
 TIE1_SECTION_SCALE = (2, 1)
 TIE1_SECTION_CENTER = (0.380, 0.122)
-_TIE1_CDRILL_R = TIE1_CDRILL_DIA / 2.0
 _BOSS_EDGE_X = math.sqrt((HUB_DIA / 2.0) ** 2 - TIE1_Y**2)
 TIE1_SECTION_LINE_MM = (
-    (TIE1_X - _TIE1_CDRILL_R - 1.0, TIE1_Y),
+    (0.0, TIE1_Y),
     (22.0, TIE1_Y),
 )
 # The slab B-B shows: the line's bore-side end to the boss's O.D., the boss's
@@ -1092,10 +1096,10 @@ def _metres(point_mm: tuple[float, ...]) -> tuple[float, ...]:
 def tie1_section_line_ends(
     ends: tuple[tuple[float, float], tuple[float, float]],
 ) -> tuple[tuple[float, float], tuple[float, float]]:
-    """B-B's cutting-line ends on the sheet, the right one first: drawn right
-    to left, its arrows point down, away from A-A's line above it."""
-    right, left = sorted(ends, key=lambda point: -point[0])
-    return right, left
+    """B-B's cutting-line ends on the sheet, the left one first: drawn left
+    to right, its arrows point down, away from A-A's line above it."""
+    left, right = sorted(ends, key=lambda point: point[0])
+    return left, right
 
 
 def _place_tie1_section(

@@ -234,22 +234,26 @@ def test_tie1_volume_gates_prove_the_counter_drill_and_its_point() -> None:
     assert part.V_TIE1_POINT > 0.0
 
 
-def test_tie1_section_b_b_cuts_through_tie1_off_the_y_extension_line() -> None:
+def test_tie1_section_b_b_cuts_through_tie1_from_the_bore_centreline() -> None:
     # B-B runs along TIE 1's row (the counter-drill profile's plane, y =
-    # TIE1_Y), from just past the #50's rim on the bore side out past the
-    # boss's O.D. into the spoke window, so it crosses the hole whole.
+    # TIE1_Y), from the bore's vertical centreline out past the boss's O.D.
+    # into the spoke window, so it crosses the hole whole.
     (x0, y0), (x1, y1) = drawing.TIE1_SECTION_LINE_MM
     r50 = geom.TIE1_CDRILL_DIA / 2.0
     assert y0 == y1 == geom.TIE1_Y
     assert x0 < geom.TIE1_X - r50 < geom.TIE1_X + r50 < x1
     assert x1 > mg_magnifying_wheel_spec.HUB_DIA / 2.0
+    # The bore-side arrow prints at that end, down the 270 deg window's
+    # middle: its 3 mm head and its letter clear TIE 1's #50 by more than 3 mm.
+    assert x0 == 0.0
+    assert geom.TIE1_X - r50 - (x0 + 3.0) > 3.0
     # Its far end stands in air between the 0 and 300 deg spokes' fillets.
     bearing = math.degrees(math.atan2(y1, x1))
     assert -mg_magnifying_wheel_spec.SPOKE_PITCH_DEG < bearing < 0.0
-    # Drawn right to left on the sheet, whichever order the ends come in.
-    assert drawing.tie1_section_line_ends(((0.1, 0.2), (0.3, 0.2))) == (
-        (0.3, 0.2),
+    # Drawn left to right on the sheet, whichever order the ends come in.
+    assert drawing.tie1_section_line_ends(((0.3, 0.2), (0.1, 0.2))) == (
         (0.1, 0.2),
+        (0.3, 0.2),
     )
     # The counter-drill's Ø says its process; its depth runs from the face.
     assert drawing.TIE1_SECTION_CALLOUT == "#50 DRILL"
