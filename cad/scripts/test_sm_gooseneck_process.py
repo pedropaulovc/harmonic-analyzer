@@ -163,6 +163,14 @@ def _seed(ctx: dict, op: str, pick, change) -> dict:
             lambda line: line.replace("Z-13.843", "Z-12.000"),
             "cleared",
         ),
+        # The ball's centred pass run high: the offset steps alone leave the
+        # core round the groove's centre line at the plate top.
+        (
+            "groove_a",
+            lambda line: line.startswith("G1 Z-3.175"),
+            lambda line: "G1 Z-3.000 F{plunge}",
+            "cleared",
+        ),
         # The groove's deepest level run .5 mm off its centre line.
         (
             "groove_a",

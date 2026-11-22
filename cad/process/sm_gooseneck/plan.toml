@@ -219,6 +219,11 @@ id = "oil"
 name = "Barricade oil"
 ref = "barricade-birchwood-casey"
 
+[[tools]]
+id = "digital-angle-gauge"
+name = "Digital angle gauge"
+ref = "digital-angle-gauge"
+
 # --- Setup 1: the tube -------------------------------------------------------
 [[setups]]
 machine_kind = "other"
@@ -357,7 +362,7 @@ speed_kind = "spindle"
 tool = "ball"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, at its M6 T2: the 1/4 in ball end mill, {{process.ball_projection_mm:in.2f}} out of the collet (the tool setter measures it); set 2800. The groove, {{process.groove_radius_mm:in.3dot}} radius, in steps round its centre line: the channel from the tube stop to X0, then the cove round the arc's top edge."
+instruction = "Same file, at its M6 T2: the 1/4 in ball end mill, {{process.ball_projection_mm:in.2f}} out of the collet (the tool setter measures it); set 2800. The groove, {{process.groove_radius_mm:in.3dot}} radius: one pass centred on its centre line, then steps round that line: the channel from the tube stop to X0, then the cove round the arc's top edge."
 settings = "ball-endmill-carbide-2fl-1-4-6061-t6511"
 milling_cuts = [
   { name = "groove", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.ball_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.groove_depth_mm}}", radial_woc_mm = "{{process.ball_cutter_dia_mm}}", traverse_mm = ["{{process.a_groove_from_mm}}", "{{process.a_groove_to_mm}}"] },
@@ -466,7 +471,7 @@ machine_kind = "other"
 title = "Bend the tube on the form"
 machine = "PM-30MV table, spindle off / bench"
 indexing = "none"
-holding = "Plate A groove face up on the clean table, its two stud holes over the front T-slot, the channel's closed end toward the column and the arc toward you. Two 3/8-16 studs in T-nuts (LMS 1268) up through both plates; plate B turned over onto A, groove to groove, the two back edges flush and the two tube-stop ends flush; a flange nut on each stud."
+holding = "Plate A groove face up on the clean table, its two stud holes over the front T-slot, the channel's closed end toward the column and the arc toward you. Two 3/8-16 studs in T-nuts (LMS 1268) up through both plates; plate B turned over onto A, groove to groove, the two back edges flush and B slid along them until its milled arc meets A's with no step; a flange nut on each stud."
 datum = "The channel's closed end: the tube's end sits on it."
 diagram = { file = "diagrams/bend.svg", alt = "Plan of the form on the mill table bolted through its stud holes into the front T-slot: the tube's tail in the closed channel, its end on the channel's end; the tube pulled round the arc from pointing at the operator to pointing right, a little past square to the channel." }
 envelope = "other"
@@ -483,10 +488,15 @@ feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "Plate B over, groove face down onto A over the tube, the studs through its holes. Hold a 1-2-3 block across both back edges, then across both tube-stop ends (the ends beyond the channels' closed ends): push B flush with A at each." },
+  { kind = "action", text = "Plate B over, groove face down onto A over the tube, the studs through its holes; a flange nut on each, finger-tight." },
+  { kind = "action", text = "Hold a 1-2-3 block across both back edges and tap B flush to it. Slide B along the back edges until its arc edge meets A's." },
   { kind = "check", text = "Run a fingernail across the joint round the arc: no step either way." },
-  { kind = "action", text = "A flange nut on each stud; tighten both." },
+  { kind = "action", text = "Tighten both nuts." },
 ]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A step at the joint: loosen the nuts, tap B along the back edges and feel again. A step that will not tap out (one way at the front of the arc, the other at the top): stop; the plates do not match. Re-cut them (Setups 2 to 4)."
 feed = "hand"
 
 [[setups.operations]]

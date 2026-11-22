@@ -1,9 +1,9 @@
 """FreeCAD CAM recipe for the MHA-SM-01 gooseneck's bend form.
 
 The gooseneck itself is bent by hand at the bench; the only milled work in its
-traveler is Setup 0's form (``fixtures.sm-gooseneck-bend-form``, owner ruling
-2026-11-22, option A: two 6061 plates, the groove cut with the owned 1/4 in
-ball end mill). ``cam_nc.py`` loads this module on the host, calls
+traveler is the form of Setups 3 and 4 (``fixtures.sm-gooseneck-bend-form``,
+owner ruling 2026-11-22, option A: two 6061 plates, the groove cut with the
+owned 1/4 in ball end mill). ``cam_nc.py`` loads this module on the host, calls
 :func:`context` with the gooseneck's ``features.toml`` and the plan/shop TOML,
 runs :func:`build` inside headless FreeCAD and checks the posted G-code
 against :func:`expectations`.
@@ -27,10 +27,13 @@ x 6 in bar, lies on three 1-2-3 blocks on the table under three step clamps
 T1, the 1/2 in end mill, plunges the two stud holes and cuts the form's arc
 out through the plate in four levels (the waste, the plate outside the arc,
 comes free under its own clamp); T2, the 1/4 in ball end mill, cuts the
-groove in Z steps: a full half-round channel along the lead that holds the
-tube's tail, and a quarter cove on the arc's top edge. Plate B is plate A
-mirrored, so that turned over onto A its cove meets A's: GF02 is GF01 with X
-negated (its zero at the plate's right end).
+groove: first a pass with the ball centred on the groove's centre line at the
+plate top (the offset steps alone leave a core there whenever the ball is
+narrower than the groove's radius), then Z steps round the centre line: a full
+half-round channel along the lead that holds the tube's tail, and a quarter
+cove on the arc's top edge. Plate B is plate A mirrored, so that turned over
+onto A its cove meets A's: GF02 is GF01 with X negated (its zero at the
+plate's right end).
 
 Work frame (G54, plate A): X0 Y0 the arc's centre, +X from the lead toward the
 arc, +Y toward the plate's back edge (Y0 is found on it); Z0 the plate top.
@@ -406,6 +409,21 @@ def _plate_a(g: dict[str, Any], p: dict[str, Any]) -> dict[str, Any]:
 
     groove: list[tuple] = [("G0", None, None, clear)]
     x_stop = g["x_stop"]
+    # The centred pass: the ball centred on the centre line at the plate top
+    # (tip at -rb), back from beyond the back edge round the arc and down the
+    # channel to the tube stop, where the first step starts. The steps' ball
+    # centres lie rho off the centre line, so with rb < rho they reach only to
+    # rho - rb from it; this pass cuts that core.
+    yb = g["y_back"] + rb + APPROACH_MM
+    xb = _exit_x(radius, yb)
+    groove += [
+        ("G0", xb, yb, None),
+        ("G0", None, None, safe),
+        ("G1p", None, None, -rb),
+        ("cw", 0.0, -radius, None, -xb, -yb),
+        ("G1", x_stop, None, None),
+        ("G0", None, None, clear),
+    ]
     for k, theta in enumerate(g["thetas"]):
         d = g["rho"] * math.cos(theta)
         z = -g["rho"] * math.sin(theta) - rb
@@ -631,7 +649,8 @@ def context(
         line_points = [
             [0.0, _r(a["y_start"] + (-ro - a["y_start"]) * k / 10)] for k in range(11)
         ]
-        # The groove's centre line, cut by the deepest level: the channel
+        # The groove's centre line, cut by the centred pass (tip at -rb: the
+        # core the offset steps leave) and by the deepest level: the channel
         # from the tube stop to X0, then the circle R to the back edge.
         back = math.asin(g["y_back"] / radius)
         centre = [
@@ -663,6 +682,7 @@ def context(
                 {"radius": re1, "boxes": [mirror(b) for b in blocks + lanes]},
             ],
             [f"{name}@1", "depth", {"z_min": _r(-rc)}],
+            [f"{name}@1", "cleared", {"points": centre, "radius": 0.01, "z": _r(-rb)}],
             [f"{name}@1", "cleared", {"points": centre, "radius": 0.01, "z": _r(-rc)}],
             [
                 f"{name}@1",
