@@ -56,6 +56,10 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_finish import add_surface_finish
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _printed_limits import limits
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
@@ -90,6 +94,9 @@ from dt_crank_handle_pivot_screw_notes import (
     UNDER_HEAD_RADIUS_CALLOUT,
 )
 from dt_crank_handle_pivot_screw_spec import (
+    DIAMETRAL_CLEARANCE_MAX,
+    DIAMETRAL_CLEARANCE_MIN,
+    END_PLAY_RANGE,
     HEAD_DIA,
     HEAD_LENGTH,
     OVERALL_LENGTH,
@@ -98,14 +105,24 @@ from dt_crank_handle_pivot_screw_spec import (
     RELIEF_DIA,
     RELIEF_END_STATION,
     RELIEF_LEAD,
+    RELIEF_WIDTH,
+    SEAT_EDGE_BREAK_MAX,
     SEAT_EDGE_NOTE,
     SEAT_STATION,
     SHOULDER_DIA,
+    SHOULDER_DIA_BAND,
+    SHOULDER_LENGTH,
+    SLOT_DEPTH,
+    SLOT_WIDTH,
     SURFACE_FINISHES,
+    THREAD_CALLOUT,
+    THREAD_LENGTH,
+    THREAD_MAJOR_2A_MAX_IN,
     THREAD_MODEL_DIA,
     THREAD_SIZE,
     TIP_CHAMFER,
     TIP_CHAMFER_CALLOUT,
+    UNIT,
 )
 from _fit_deviations import deviations
 
@@ -397,6 +414,272 @@ ISO_NOTE_XY = (0.352, 0.200)
 # above the title block; its widest line (~36 characters at ~2.7 mm) ends
 # short of the right border (0.4191).
 NOTES_XY = (0.315, 0.145)
+# The sheet's numbered notes, as printed (export_features reads them).
+DRAWING_NOTES = SHOULDER_LENGTH_NOTE
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (build_dt_crank_handle_pivot_screw:
+# one revolve about model +Z, the slotted head face at Z = 0, the tip at
+# Z = OVERALL_LENGTH; the driver slot runs along X, its width across Y, cut
+# SLOT_DEPTH into the head from Z = 0).  Axial locations read from the tip
+# (the spec's DRAWING_DIMENSIONS note).  The 45-degree tip chamfer, relief
+# lead and head break and the under-head round are sizes of the features
+# they finish, so they ride on those features' declarations.  The
+# declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_crank_handle_pivot_screw"
+_SEAT = "dt_crank_handle_head_seat_spec"
+_NOTES = "dt_crank_handle_pivot_screw_notes"
+_BUILD = "build_dt_crank_handle_pivot_screw"
+_FRAME = (_BUILD, "__frame__")
+_SHOULDER_FINISH = surface_finish_by_key(SURFACE_FINISHES, "pivot_shoulder")
+# ASME B1.1 #4-40 UNC-2A major: the title block's class 2A, not a printed
+# band; the 2A maximum is the spec's, the minimum .1061 (Machinery's
+# Handbook, as mg_rod_clamp_joint.THREAD_MAJOR_2A).
+THREAD_MAJOR_2A_MIN_IN = 0.1061
+
+
+def _plane(value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": "z", "value": value}
+
+
+part_metadata(
+    model_sources=(_FRAME, "OVERALL_LENGTH", "SEAT_STATION", "HEAD_LENGTH"),
+    precision_sources=((_SEAT, "SCREW_DRAWING_PRECISION"),),
+)
+# The tip, the one faced end every axial location reads from, and the head
+# face, the reference overall from it (SIDE_KEEP "OverallLength").
+requirement(
+    "tip_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), OVERALL_LENGTH),),
+    requirements=("plane",),
+    fields={"plane": (_plane(OVERALL_LENGTH), (_FRAME, "OVERALL_LENGTH"))},
+)
+requirement(
+    "head_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": (_plane(0.0), (_FRAME,)),
+        "station": (OVERALL_LENGTH, ("OVERALL_LENGTH", (_SELF, "SIDE_KEEP"))),
+        "station_from": ("tip_face", ((_SELF, "SIDE_KEEP"),)),
+        "station_ref": (True, ("REFERENCE_DIMENSIONS",)),
+    },
+)
+# The seat on the arm face, the thread length .38 from the tip (SIDE_KEEP
+# "ThreadLength", .XX row), its edge broken .004 max (SEAT_EDGE_NOTE).
+requirement(
+    "seat_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), SEAT_STATION),),
+    requirements=("plane", "station", "edge_break_max"),
+    fields={
+        "plane": (_plane(SEAT_STATION), (_FRAME, "SEAT_STATION")),
+        "station": (
+            limits(THREAD_LENGTH, _P["ThreadLength"], unit=UNIT),
+            ("THREAD_LENGTH", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "station_nominal": (THREAD_LENGTH, ("THREAD_LENGTH",)),
+        "station_from": ("tip_face", ((_SELF, "SIDE_KEEP"),)),
+        "edge_break_max": (
+            SEAT_EDGE_BREAK_MAX,
+            ("SEAT_EDGE_BREAK_MAX", "SEAT_EDGE_NOTE", (_SELF, "SEAT_EDGE_PICK")),
+        ),
+        "note": (SEAT_EDGE_NOTE, ("SEAT_EDGE_NOTE", (_SELF, "SEAT_EDGE_NOTE_XY"))),
+    },
+)
+# The under-head face, the fitted shoulder length from the seat: a
+# reference, turned to suit the bonded handle plus the end play (note 1,
+# SIDE_KEEP "ShoulderLength").
+requirement(
+    "under_head_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), HEAD_LENGTH),),
+    requirements=("plane",),
+    fields={
+        "plane": (_plane(HEAD_LENGTH), (_FRAME, "HEAD_LENGTH")),
+        "station": (SHOULDER_LENGTH, ("SHOULDER_LENGTH", (_SELF, "SIDE_KEEP"))),
+        "station_from": ("seat_face", ((_SELF, "SIDE_KEEP"),)),
+        "station_ref": (True, ("REFERENCE_DIMENSIONS",)),
+        "station_callout": (
+            SHOULDER_LENGTH_CALLOUT,
+            ((_NOTES, "SHOULDER_LENGTH_CALLOUT"),),
+        ),
+        "note": (SHOULDER_LENGTH_NOTE, ((_NOTES, "SHOULDER_LENGTH_NOTE"),)),
+        "end_play": (list(END_PLAY_RANGE), ("END_PLAY_RANGE",)),
+    },
+)
+# The head: Ø.236 and .157 at the .XXX row (SIDE_KEEP "HeadDia",
+# "HeadLength"), each clearing MHA-DT-35; its under-head edge broken
+# .005-.010 X 45 (DETAIL_B_KEEP "HeadChamfer").
+requirement(
+    "head",
+    kind="outside_cylinder",
+    faces=(CylinderFace(HEAD_DIA),),
+    requirements=("dia", "length", "chamfer"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ([0.0, 0.0, 1.0], (_FRAME,)),
+        "dia": (
+            limits(HEAD_DIA, _P["HeadDia"], unit=UNIT),
+            ("HEAD_DIA", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "nominal_dia": (HEAD_DIA, ("HEAD_DIA",)),
+        "callout": (HEAD_DIA_CALLOUT, ((_NOTES, "HEAD_DIA_CALLOUT"),)),
+        "length": (
+            limits(HEAD_LENGTH, _P["HeadLength"], unit=UNIT),
+            ("HEAD_LENGTH", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "length_nominal": (HEAD_LENGTH, ("HEAD_LENGTH",)),
+        "length_callout": (HEAD_LENGTH_CALLOUT, ((_NOTES, "HEAD_LENGTH_CALLOUT"),)),
+        "chamfer": (
+            list(HEAD_CHAMFER_LIMITS),
+            ((_SEAT, "HEAD_CHAMFER_LIMITS"), (_SELF, "DETAIL_B_KEEP")),
+        ),
+        "chamfer_nominal": (HEAD_CHAMFER, ((_SEAT, "HEAD_CHAMFER"),)),
+        "chamfer_callout": (HEAD_CHAMFER_CALLOUT, ((_NOTES, "HEAD_CHAMFER_CALLOUT"),)),
+    },
+    precision={
+        "dia": _P["HeadDia"],
+        "length": _P["HeadLength"],
+        "chamfer": _P["HeadChamfer"],
+    },
+)
+# The driver slot across the head: .04 wide and deep at .XX (END_KEEP
+# "SlotWidth", SIDE_KEEP "SlotDepth").
+requirement(
+    "slot",
+    kind="slot",
+    faces=(
+        PlanarFace((0.0, 0.0, -1.0), -SLOT_DEPTH),
+        PlanarFace((0.0, -1.0, 0.0), -SLOT_WIDTH / 2.0),
+        PlanarFace((0.0, 1.0, 0.0), -SLOT_WIDTH / 2.0),
+    ),
+    requirements=("width", "depth"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ([1.0, 0.0, 0.0], (_FRAME,)),
+        "normal": ([0.0, 0.0, 1.0], (_FRAME,)),
+        "width": (
+            limits(SLOT_WIDTH, _P["SlotWidth"], unit=UNIT),
+            ("SLOT_WIDTH", "UNIT", (_SELF, "END_KEEP")),
+        ),
+        "width_nominal": (SLOT_WIDTH, ("SLOT_WIDTH",)),
+        "depth": (
+            limits(SLOT_DEPTH, _P["SlotDepth"], unit=UNIT),
+            ("SLOT_DEPTH", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "depth_nominal": (SLOT_DEPTH, ("SLOT_DEPTH",)),
+    },
+    precision={"width": _P["SlotWidth"], "depth": _P["SlotDepth"]},
+)
+# The running shoulder: Ø.156 +.000/-.002, a running fit in MHA-DT-08's
+# reamed bore (SIDE_KEEP "ShoulderDia"), Ra 63 (SURFACE_FINISHES
+# "pivot_shoulder"); its under-head corner R.004 MAX (DETAIL_B_KEEP
+# "UnderHeadRadius").  Its length is the fitted reference above.
+requirement(
+    "shoulder",
+    kind="outside_cylinder",
+    faces=(_SHOULDER_FINISH.face,),
+    requirements=("dia", "finish_ra", "corner_radius_max"),
+    fields={
+        "at": ([0.0, 0.0, HEAD_LENGTH], (_FRAME, "HEAD_LENGTH")),
+        "axis": ([0.0, 0.0, 1.0], (_FRAME,)),
+        "dia": (
+            limits(SHOULDER_DIA, _P["ShoulderDia"], SHOULDER_DIA_BAND, unit=UNIT),
+            ("SHOULDER_DIA", "SHOULDER_DIA_BAND", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "nominal_dia": (SHOULDER_DIA, ("SHOULDER_DIA",)),
+        "length_nominal": (SHOULDER_LENGTH, ("SHOULDER_LENGTH",)),
+        "callout": (SHOULDER_FIT_CALLOUT, ((_NOTES, "SHOULDER_FIT_CALLOUT"),)),
+        "diametral_clearance": (
+            [DIAMETRAL_CLEARANCE_MIN, DIAMETRAL_CLEARANCE_MAX],
+            ("DIAMETRAL_CLEARANCE_MIN", "DIAMETRAL_CLEARANCE_MAX"),
+        ),
+        "finish_ra": (_SHOULDER_FINISH.roughness_um, ("SURFACE_FINISHES",)),
+        "corner_radius_max": (
+            UNDER_HEAD_RADIUS_MAX,
+            (
+                (_SEAT, "UNDER_HEAD_RADIUS_MAX"),
+                (_SEAT, "UNDER_HEAD_RADIUS_TOL_TYPE"),
+                (_SELF, "DETAIL_B_KEEP"),
+            ),
+        ),
+        "corner_callout": (
+            UNDER_HEAD_RADIUS_CALLOUT,
+            ((_NOTES, "UNDER_HEAD_RADIUS_CALLOUT"),),
+        ),
+    },
+    precision={
+        "dia": _P["ShoulderDia"],
+        "finish_ra": 1,
+        "corner_radius_max": _P["UnderHeadRadius"],
+    },
+)
+# The #4-40 thread from the seat to the tip, die-cut (CENTRE OK at the tip:
+# THREAD_NOTE), its start chamfered .015 MAX X 45 (SIDE_KEEP "TipChamfer").
+requirement(
+    "thread",
+    kind="outside_cylinder",
+    faces=(CylinderFace(THREAD_MODEL_DIA),),
+    requirements=("dia", "thread", "tip_chamfer_max"),
+    fields={
+        "at": ([0.0, 0.0, SEAT_STATION], (_FRAME, "SEAT_STATION")),
+        "axis": ([0.0, 0.0, 1.0], (_FRAME,)),
+        "dia": (
+            [THREAD_MAJOR_2A_MIN_IN * 25.4, THREAD_MAJOR_2A_MAX_IN * 25.4],
+            ((_SELF, "THREAD_MAJOR_2A_MIN_IN"), "THREAD_MAJOR_2A_MAX_IN"),
+        ),
+        "nominal_dia": (THREAD_MODEL_DIA, ("THREAD_MODEL_DIA",)),
+        "length_nominal": (THREAD_LENGTH, ("THREAD_LENGTH",)),
+        "thread": (THREAD_CALLOUT, ("THREAD_CALLOUT", "THREAD_SIZE")),
+        "callout": (THREAD_NOTE, ((_NOTES, "THREAD_NOTE"),)),
+        "tip_chamfer_max": (
+            TIP_CHAMFER,
+            ("TIP_CHAMFER", "TIP_CHAMFER_TOL_TYPE", (_SELF, "SIDE_KEEP")),
+        ),
+        "tip_chamfer_callout": (TIP_CHAMFER_CALLOUT, ("TIP_CHAMFER_CALLOUT",)),
+    },
+    precision={"dia": 4, "tip_chamfer_max": _P["TipChamfer"]},
+)
+# The thread relief against the seat: Ø.070 at the .XXX row, under the
+# thread root (SIDE_KEEP "ReliefDia"), .09 wide at .XX (SIDE_KEEP
+# "ReliefWidth"), led up into the seat .012 X 45 (DETAIL_KEEP "ReliefLead").
+requirement(
+    "relief",
+    kind="groove",
+    faces=(CylinderFace(RELIEF_DIA),),
+    requirements=("dia", "width", "lead"),
+    fields={
+        "at": ([0.0, 0.0, SEAT_STATION], (_FRAME, "SEAT_STATION")),
+        "axis": ([0.0, 0.0, 1.0], (_FRAME,)),
+        "dia": (
+            limits(RELIEF_DIA, _P["ReliefDia"], unit=UNIT),
+            ("RELIEF_DIA", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "dia_nominal": (RELIEF_DIA, ("RELIEF_DIA",)),
+        "callout": (RELIEF_CALLOUT, ("RELIEF_CALLOUT",)),
+        "width": (
+            limits(RELIEF_WIDTH, _P["ReliefWidth"], unit=UNIT),
+            ("RELIEF_WIDTH", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "width_nominal": (RELIEF_WIDTH, ("RELIEF_WIDTH",)),
+        "lead": (
+            limits(RELIEF_LEAD, _P["ReliefLead"], unit=UNIT),
+            ("RELIEF_LEAD", "UNIT", (_SELF, "DETAIL_KEEP")),
+        ),
+        "lead_nominal": (RELIEF_LEAD, ("RELIEF_LEAD",)),
+        "lead_callout": (RELIEF_LEAD_CALLOUT, ((_NOTES, "RELIEF_LEAD_CALLOUT"),)),
+    },
+    precision={
+        "dia": _P["ReliefDia"],
+        "width": _P["ReliefWidth"],
+        "lead": _P["ReliefLead"],
+    },
+)
 
 
 def _set_relief_arrows_inside(adapter: Any, annotations: list[Any]) -> None:

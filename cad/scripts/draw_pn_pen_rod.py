@@ -71,6 +71,10 @@ from _drawing_view_arrow import square_view_arrow
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _printed_limits import drilled_limits, limits
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
@@ -394,6 +398,249 @@ PARENT_LETTER_XY = (0.087, 0.158)
 # 0.1174..0.2327, 43 mm right of the top face's extension lines) takes its
 # ~60 mm scale note 8 mm under it: x 0.350..0.410, y ~0.1050..0.1085.
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.0577 - 0.008)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (pn_pen_rod_spec: the origin on the
+# rod axis at the shoulder, the square running +Y to its tapped top face,
+# its flats square to X and Z; the pivot running -Y).  The square is bought
+# key stock left as supplied (its SQ band holds the catalogue section).  The
+# shoulder root's R.008 MAX rides on the pivot.  The declarations print
+# nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pn_pen_rod"
+_GROOVE = "pn_pen_rod_groove_spec"
+_FRAME = ("build_pn_pen_rod", "__frame__")
+_FLAT_SOURCES = ("ROD_SECTION", "SECTION_BAND", "UNIT", (_SELF, "END_KEEP"))
+_TAP_DRILL_PLACES = STUD_TAP_PRECISION["hw-tapdrldia"]
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(_FRAME, "ROD_SECTION", "SQUARE_LENGTH", "PIVOT_LENGTH"),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        (_GROOVE, "DRAWING_PRECISION"),
+        (_SELF, "DRAWING_PRECISION_BY_NAME"),
+        (_SELF, "STUD_TAP_PRECISION"),
+    ),
+)
+# The shoulder, the square's bottom face seated on the v-block: the square's
+# length .XX (SIDE_KEEP "Length") and the pivot's run from it.
+requirement(
+    "shoulder_face",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("y", 0.0), (_FRAME,))},
+)
+requirement(
+    "top_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), rod.SQUARE_LENGTH),),
+    requirements=("plane", "station"),
+    fields={
+        "plane": (_plane("y", rod.SQUARE_LENGTH), (_FRAME, "SQUARE_LENGTH")),
+        "station": (
+            limits(rod.SQUARE_LENGTH, _P["Length"], unit=rod.UNIT),
+            ("SQUARE_LENGTH", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "station_nominal": (rod.SQUARE_LENGTH, ("SQUARE_LENGTH",)),
+        "station_from": ("shoulder_face", ((_SELF, "SIDE_KEEP"),)),
+    },
+    precision={"station": _P["Length"]},
+)
+requirement(
+    "pivot_end",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), rod.PIVOT_LENGTH),),
+    requirements=("plane",),
+    fields={"plane": (_plane("y", -rod.PIVOT_LENGTH), (_FRAME, "PIVOT_LENGTH"))},
+)
+# The square's four flats, the bought key stock's: .197 +.000/-.002 SQ, a
+# sliding fit in the hanger's guides (END_KEEP "Depth"), across each pair.
+for _name, _axis, _sign, _pair in (
+    ("flat_x_pos", "x", 1.0, "flat_x_neg"),
+    ("flat_x_neg", "x", -1.0, None),
+    ("flat_z_pos", "z", 1.0, "flat_z_neg"),
+    ("flat_z_neg", "z", -1.0, None),
+):
+    _normal = (_sign, 0.0, 0.0) if _axis == "x" else (0.0, 0.0, _sign)
+    _fields: dict[str, tuple[Any, tuple[Any, ...]]] = {
+        "plane": (
+            _plane(_axis, _sign * rod.ROD_SECTION / 2.0),
+            (_FRAME, "ROD_SECTION"),
+        ),
+    }
+    if _pair is not None:
+        _fields |= {
+            "across": (
+                limits(rod.ROD_SECTION, _P["Depth"], rod.SECTION_BAND, unit=rod.UNIT),
+                _FLAT_SOURCES,
+            ),
+            "across_nominal": (rod.ROD_SECTION, ("ROD_SECTION",)),
+            "across_from": (_pair, ((_SELF, "END_KEEP"),)),
+            "callout": (rod.DIMENSION_CALLOUTS["Depth"], ("DIMENSION_CALLOUTS",)),
+            "stock": (
+                f"McMASTER-CARR {rod.STOCK_SKU}",
+                ("STOCK_SKU", "STOCK_SECTION_MIN", "STOCK_SECTION_MAX"),
+            ),
+        }
+    requirement(
+        _name,
+        kind="face",
+        faces=(PlanarFace(_normal, rod.ROD_SECTION / 2.0),),
+        requirements=("plane", "across") if _pair is not None else ("plane",),
+        fields=_fields,
+        precision={"across": _P["Depth"]} if _pair is not None else None,
+    )
+# The turned pivot: Ø.1240-.1255, a sliding fit in the v-block's reamed
+# pivot bore (note 1; SIDE_KEEP "PivotDia"), .41 long from the shoulder
+# (SIDE_KEEP "PivotLength"), its root R.008 MAX (SIDE_KEEP "ShoulderRadius").
+requirement(
+    "pivot",
+    kind="outside_cylinder",
+    faces=(CylinderFace(rod.PIVOT_DIA),),
+    requirements=("dia", "length", "corner_radius_max"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ([0.0, -1.0, 0.0], (_FRAME,)),
+        "dia": (
+            limits(rod.PIVOT_DIA, _P["PivotDia"], rod.PIVOT_BAND, unit=rod.UNIT),
+            ("PIVOT_DIA", "PIVOT_BAND", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "nominal_dia": (rod.PIVOT_DIA, ("PIVOT_DIA",)),
+        "callout": (rod.DIMENSION_CALLOUTS["PivotDia"], ("DIMENSION_CALLOUTS",)),
+        "diametral_clearance": (
+            list(rod.PIVOT_CLEARANCE_MM),
+            ("PIVOT_CLEARANCE_MM", "DRAWING_NOTES"),
+        ),
+        "note": (rod.DRAWING_NOTES, ("DRAWING_NOTES", "PIVOT_FIT_NOTE")),
+        "length": (
+            limits(rod.PIVOT_LENGTH, _P["PivotLength"], unit=rod.UNIT),
+            ("PIVOT_LENGTH", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "length_nominal": (rod.PIVOT_LENGTH, ("PIVOT_LENGTH",)),
+        "corner_radius_max": (
+            rod.SHOULDER_FILLET_R,
+            ("SHOULDER_FILLET_R", "SHOULDER_FILLET_TOL_TYPE", (_SELF, "SIDE_KEEP")),
+        ),
+        "corner_callout": (
+            rod.DIMENSION_CALLOUTS["ShoulderRadius"],
+            ("DIMENSION_CALLOUTS",),
+        ),
+    },
+    precision={
+        "dia": _P["PivotDia"],
+        "length": _P["PivotLength"],
+        "corner_radius_max": _P["ShoulderRadius"],
+    },
+)
+# The set-screw groove round the pivot (owner ruling B on #2439): Ø.106,
+# its walls .165 and .315 from the shoulder, all at .XXX and flagged to note 2
+# (DETAIL_KEEP).  Its position is the shoulder-side wall.
+requirement(
+    "groove",
+    kind="groove",
+    faces=(
+        CylinderFace(groove.GROOVE_DIA),
+        PlanarFace((0.0, -1.0, 0.0), groove.GROOVE_NEAR_STATION),
+        PlanarFace((0.0, 1.0, 0.0), -groove.GROOVE_FAR_STATION),
+    ),
+    requirements=("dia", "station", "end_station"),
+    fields={
+        "at": (
+            [0.0, -groove.GROOVE_NEAR_STATION, 0.0],
+            (_FRAME, (_GROOVE, "GROOVE_NEAR_STATION")),
+        ),
+        "axis": ([0.0, -1.0, 0.0], (_FRAME,)),
+        "dia": (
+            limits(groove.GROOVE_DIA, _P["GrooveDia"], unit=rod.UNIT),
+            ((_GROOVE, "GROOVE_DIA"), "UNIT", (_SELF, "DETAIL_KEEP")),
+        ),
+        "dia_nominal": (groove.GROOVE_DIA, ((_GROOVE, "GROOVE_DIA"),)),
+        "station": (
+            limits(groove.GROOVE_NEAR_STATION, _P["GrooveStation"], unit=rod.UNIT),
+            ((_GROOVE, "GROOVE_NEAR_STATION"), "UNIT", (_SELF, "DETAIL_KEEP")),
+        ),
+        "station_nominal": (
+            groove.GROOVE_NEAR_STATION,
+            ((_GROOVE, "GROOVE_NEAR_STATION"),),
+        ),
+        "station_from": ("shoulder_face", ((_SELF, "DETAIL_KEEP"),)),
+        "end_station": (
+            limits(groove.GROOVE_FAR_STATION, _P["GrooveEndStation"], unit=rod.UNIT),
+            ((_GROOVE, "GROOVE_FAR_STATION"), "UNIT", (_SELF, "DETAIL_KEEP")),
+        ),
+        "end_station_nominal": (
+            groove.GROOVE_FAR_STATION,
+            ((_GROOVE, "GROOVE_FAR_STATION"),),
+        ),
+        "callout": (groove.GROOVE_CALLOUT, ((_GROOVE, "GROOVE_CALLOUT"),)),
+        "note": (groove.GROOVE_NOTE_TEXT, ((_GROOVE, "GROOVE_NOTE_TEXT"),)),
+    },
+    precision={
+        "dia": _P["GrooveDia"],
+        "station": _P["GrooveStation"],
+        "end_station": _P["GrooveEndStation"],
+    },
+)
+# The adjuster stud's #0-80 blind tap in the top face, on the axis: its
+# wizard callout (tap drill .XXX under DRILLED HOLES, both depths .XX) and
+# RV-01's tap wall .067 MIN (END_KEEP "TapWallMin").
+requirement(
+    "stud_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(rod.STUD_TAP_DRILL_DIA),),
+    requirements=("thread", "dia", "drill_depth", "thread_depth", "wall_min"),
+    fields={
+        "at": ([0.0, rod.SQUARE_LENGTH, 0.0], (_FRAME, "SQUARE_LENGTH")),
+        "axis": ([0.0, -1.0, 0.0], (_FRAME,)),
+        "thread": (
+            f"{rod.STUD_THREAD} UNF-{rod.STUD_TAP_SPEC.thread_class}",
+            ("STUD_THREAD", "STUD_TAP_SPEC"),
+        ),
+        "dia": (
+            drilled_limits(rod.STUD_TAP_DRILL_DIA, _TAP_DRILL_PLACES, unit=rod.UNIT),
+            ("STUD_TAP_DRILL_DIA", "UNIT", (_SELF, "STUD_TAP_PRECISION")),
+        ),
+        "nominal_dia": (rod.STUD_TAP_DRILL_DIA, ("STUD_TAP_DRILL_DIA",)),
+        "process": ("drill", ("STUD_TAP_SPEC",)),
+        "drill_depth": (
+            limits(
+                rod.STUD_TAP_SPEC.depth_mm, rod.STUD_TAP_DEPTH_PLACES, unit=rod.UNIT
+            ),
+            ("STUD_TAP_SPEC", "STUD_TAP_DEPTH_PLACES", "UNIT"),
+        ),
+        "drill_depth_nominal": (rod.STUD_TAP_SPEC.depth_mm, ("STUD_TAP_SPEC",)),
+        "thread_depth": (
+            limits(
+                rod.STUD_TAP_SPEC.overrides_mm["ThreadDepth"],
+                rod.STUD_TAP_DEPTH_PLACES,
+                unit=rod.UNIT,
+            ),
+            ("STUD_TAP_SPEC", "STUD_TAP_DEPTH_PLACES", "UNIT"),
+        ),
+        "thread_depth_nominal": (
+            rod.STUD_TAP_SPEC.overrides_mm["ThreadDepth"],
+            ("STUD_TAP_SPEC",),
+        ),
+        "wall_min": (
+            rod.TAP_WALL_MIN_MM,
+            ("TAP_WALL_MIN_MM", "TAP_WALL_MIN_TOL_TYPE", (_SELF, "END_KEEP")),
+        ),
+        "wall_callout": (rod.TAP_WALL_CALLOUT, ("TAP_WALL_CALLOUT",)),
+    },
+    precision={
+        "dia": _TAP_DRILL_PLACES,
+        "drill_depth": rod.STUD_TAP_DEPTH_PLACES,
+        "thread_depth": rod.STUD_TAP_DEPTH_PLACES,
+        "wall_min": _P["TapWallMin"],
+    },
+)
 
 
 def _add_view_arrow(adapter: Any, side: Any) -> None:

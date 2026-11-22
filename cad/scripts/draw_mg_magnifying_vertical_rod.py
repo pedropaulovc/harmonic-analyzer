@@ -62,6 +62,8 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from mg_magnifying_vertical_rod_spec import (
+    BODY_LENGTH,
+    DOME_R,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     RELIEF_DIA,
@@ -69,15 +71,186 @@ from mg_magnifying_vertical_rod_spec import (
     RELIEF_ROOT_R_TOL_TYPE,
     RELIEF_ROOTS_CALLOUT,
     RELIEF_START_X,
+    RELIEF_WIDTH,
     ROD_DIA,
     ROD_DIA_CALLOUT,
     ROD_DIA_FRACTION_DENOMINATOR,
     ROD_LENGTH,
+    ROD_THREAD_LEN,
     SHOULDER_X,
     STOCK_REFERENCE_DIMENSION,
     THREAD_CALLOUT,
     THREAD_MAJOR,
     TIP_CHAMFER,
+    UNIT,
+)
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
+from _printed_limits import limits
+import mg_rod_clamp_joint as joint
+from mg_magnifying_vertical_rod_geom import ROD_DIA_BAND
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (mg_magnifying_vertical_rod_geom: axis +X, the thread tip at x = 0, the
+# #4-40 end and its relief to the shoulder at SHOULDER_X, the as-bought body
+# to the hemisphere's tip at ROD_LENGTH). The datum end is the thread tip;
+# the shoulder, the seat both printed lengths baseline from, is stationed
+# from the dome's tip (the body length) and the thread length runs from it
+# to the tip. The body is the 1/4 bar as bought (its Ø1/4 REF, the
+# supplier's limits: ROD_DIA_BAND); the thread blank carries the #4-40
+# UNC-2A major limits (mg_rod_clamp_joint.THREAD_MAJOR_2A); the relief prints
+# its Ø as the single limit .072 MAX and its two roots R.008 MAX. The
+# declarations print nothing.
+_P = DRAWING_PRECISION["RodProfile"]
+_GEOM = "mg_magnifying_vertical_rod_geom"
+_JOINT = "mg_rod_clamp_joint"
+part_metadata(
+    model_sources=(
+        (_GEOM, "ROD_DIA"),
+        (_GEOM, "BODY_LENGTH"),
+        (_GEOM, "DOME_R"),
+        (_JOINT, "ROD_THREAD_LEN"),
+    ),
+    precision_sources=("DRAWING_PRECISION",),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": 0.0},
+            ((_GEOM, "SHOULDER_X"),),
+        ),
+        "outward": ([-1.0, 0.0, 0.0], ((_GEOM, "SHOULDER_X"),)),
+    },
+)
+requirement(
+    "shoulder",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), -SHOULDER_X),),
+    requirements=("station",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": SHOULDER_X},
+            ((_GEOM, "SHOULDER_X"),),
+        ),
+        "station": (
+            limits(BODY_LENGTH, _P["BodyLength"], unit=UNIT),
+            ((_GEOM, "BODY_LENGTH"), "UNIT"),
+        ),
+        "station_nominal": (BODY_LENGTH, ((_GEOM, "BODY_LENGTH"),)),
+        "station_from": ("far_end", ((_GEOM, "BODY_LENGTH"),)),
+    },
+    precision={"station": _P["BodyLength"]},
+)
+requirement(
+    "far_end",
+    kind="dome",
+    faces=(SphereFace(2.0 * DOME_R, (ROD_LENGTH - DOME_R, 0.0, 0.0)),),
+    requirements=("radius",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": ROD_LENGTH},
+            ((_GEOM, "ROD_LENGTH"),),
+        ),
+        "outward": ([1.0, 0.0, 0.0], ((_GEOM, "ROD_LENGTH"),)),
+        "length_ref": (ROD_LENGTH, ((_GEOM, "ROD_LENGTH"),)),
+        "length_from": ("datum_end", ((_GEOM, "ROD_LENGTH"),)),
+        "radius": (limits(DOME_R, _P["DomeR"], unit=UNIT), ((_GEOM, "DOME_R"), "UNIT")),
+        "radius_nominal": (DOME_R, ((_GEOM, "DOME_R"),)),
+        # The sheet's TANGENT HEMISPHERE: the dome stands its radius high.
+        "height_ref": (DOME_R, ((_GEOM, "DOME_R"),)),
+    },
+    precision={"radius": _P["DomeR"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(ROD_DIA),),
+    requirements=("stock",),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], ((_GEOM, "ROD_DIA"),)),
+        "at": ([0.0, 0.0, 0.0], ((_GEOM, "ROD_DIA"),)),
+        "span": (
+            [SHOULDER_X, ROD_LENGTH - DOME_R],
+            ((_GEOM, "SHOULDER_X"), (_GEOM, "ROD_LENGTH"), (_GEOM, "DOME_R")),
+        ),
+        "dia_ref": (ROD_DIA, ((_GEOM, "ROD_DIA"),)),
+        # The sheet's "(Ø1/4) ROD STOCK" supplier reference: the bar as bought.
+        "stock": (
+            f"Ø{round(ROD_DIA / 25.4 * ROD_DIA_FRACTION_DENOMINATOR)}"
+            f"/{ROD_DIA_FRACTION_DENOMINATOR} {ROD_DIA_CALLOUT}",
+            (
+                (_GEOM, "ROD_DIA"),
+                (_GEOM, "ROD_DIA_FRACTION_DENOMINATOR"),
+                "ROD_DIA_CALLOUT",
+            ),
+        ),
+        "stock_dia_min": (ROD_DIA + ROD_DIA_BAND[1], ((_GEOM, "ROD_DIA_BAND"),)),
+        "callout": (ROD_DIA_CALLOUT, ("ROD_DIA_CALLOUT",)),
+    },
+)
+requirement(
+    "step",
+    kind="diameter",
+    faces=(CylinderFace(THREAD_MAJOR),),
+    requirements=("dia", "thread_length"),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], ((_JOINT, "THREAD_MAJOR"),)),
+        "at": ([0.0, 0.0, 0.0], ((_JOINT, "THREAD_MAJOR"),)),
+        "span": ([0.0, SHOULDER_X], ((_GEOM, "SHOULDER_X"),)),
+        "dia": (
+            [round(value, 12) for value in joint.THREAD_MAJOR_2A],
+            ((_JOINT, "THREAD_MAJOR_2A"),),
+        ),
+        "dia_nominal": (THREAD_MAJOR, ((_JOINT, "THREAD_MAJOR"),)),
+        "thread": (THREAD_CALLOUT, ((_JOINT, "THREAD_CALLOUT"),)),
+        "thread_length": (
+            limits(ROD_THREAD_LEN, _P["ThreadLength"], unit=UNIT),
+            ((_JOINT, "ROD_THREAD_LEN"), "UNIT"),
+        ),
+        "thread_length_nominal": (ROD_THREAD_LEN, ((_JOINT, "ROD_THREAD_LEN"),)),
+        "thread_end": ("datum_end", ((_JOINT, "ROD_THREAD_LEN"),)),
+        "thread_process": ("die", ((_JOINT, "THREAD_CALLOUT"),)),
+    },
+    precision={"dia": 4, "thread_length": _P["ThreadLength"]},
+)
+requirement(
+    "groove",
+    kind="groove",
+    faces=(CylinderFace(RELIEF_DIA),),
+    requirements=("dia_max", "width", "corner_radius_max"),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], ((_JOINT, "RELIEF_DIA"),)),
+        "at": ([0.0, 0.0, 0.0], ((_JOINT, "RELIEF_DIA"),)),
+        "span": (
+            [RELIEF_START_X, SHOULDER_X],
+            ((_GEOM, "RELIEF_START_X"), (_GEOM, "SHOULDER_X")),
+        ),
+        # "Ø.072 MAX": swTolMAX prints the model value, so the model IS the
+        # limit and any smaller relief is accepted.
+        "dia_max": (
+            RELIEF_DIA,
+            ((_JOINT, "RELIEF_DIA"), (_JOINT, "RELIEF_DIA_TOL_TYPE")),
+        ),
+        "dia_nominal": (RELIEF_DIA, ((_JOINT, "RELIEF_DIA"),)),
+        "width": (
+            limits(RELIEF_WIDTH, _P["ReliefWidth"], unit=UNIT),
+            ((_JOINT, "RELIEF_WIDTH"), "UNIT"),
+        ),
+        "width_nominal": (RELIEF_WIDTH, ((_JOINT, "RELIEF_WIDTH"),)),
+        # Both relief roots ("2X R.008 MAX"), one fillet feature.
+        "corner_radius_max": (
+            RELIEF_ROOT_R,
+            ((_JOINT, "RELIEF_ROOT_R"), (_JOINT, "RELIEF_ROOT_R_TOL_TYPE")),
+        ),
+    },
+    precision={"dia_max": _P["ReliefDia"], "width": _P["ReliefWidth"]},
 )
 
 
