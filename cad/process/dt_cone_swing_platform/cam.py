@@ -1065,7 +1065,9 @@ def context(
     # The relief: Z0 its floor (the shoulder screw's length above the
     # plate); a U of the 1/4 in end mill's centre at the relief's radius
     # less its own, in from beside the north edge along the east side, round
-    # the pivot clockwise, out along the west side.
+    # the pivot clockwise, out along the west side. Its walls run along the
+    # model's length (north), which lies lay_angle_deg off edge E, so the
+    # runs follow work() of that direction, not the work frame's X.
     rr = g["relief_r"] - r1
     _agree(plan, "relief_path_radius_mm", rr)
     if rr <= 0 or rr > r1:
@@ -1077,6 +1079,22 @@ def context(
         if abs(q[1]) <= g["relief_r"] + 1e-6
     )
     x_in = north_relief + r1 + JAW_CLEARANCE_MM + 0.5
+    along = _unit(work((0.0, 1.0)))  # model north in the work frame
+    across = (-along[1], along[0])  # model west
+    run = x_in / along[0]
+    east_pivot = _add((0.0, 0.0), across, -rr)
+    west_pivot = _add((0.0, 0.0), across, rr)
+    east_in = _add(east_pivot, along, run)
+    west_out = _add(west_pivot, along, run)
+    # The U's extent: its four ends and the circle's quadrant points the
+    # clockwise arc from east_pivot to west_pivot passes.
+    a_east = math.atan2(east_pivot[1], east_pivot[0])
+    sweep = (a_east - math.atan2(west_pivot[1], west_pivot[0])) % math.tau
+    relief_extent = [east_in, east_pivot, west_pivot, west_out] + [
+        (rr * math.cos(k), rr * math.sin(k))
+        for k in (0.0, math.pi / 2, math.pi, -math.pi / 2)
+        if (a_east - k) % math.tau <= sweep
+    ]
     # Owner ruling 2026-11-22 (#3363): a bar thinner than the shoulder takes
     # the relief at the sheet's REF depth below its top (Z0 the floor, the
     # top at relief_ref_mm); a thicker bar takes it fitted to the shoulder
@@ -1094,12 +1112,12 @@ def context(
     clear10 = relief_top + HEAD_10_24_MM[1] + CLEAR_MM
     relief = [
         f"G0 Z{_r(clear10):.3f}",
-        f"G0 {_xy((x_in, -rr))}",
+        f"G0 {_xy(east_in)}",
         f"G0 Z{_r(relief_top + SAFE_MM):.3f}",
         "G1 Z0.000 F{feed}",
-        f"G1 {_xy((0.0, -rr))}",
-        f"G2 {_xy((0.0, rr))} I0.000 J{_r(rr):.3f}",
-        f"G1 {_xy((x_in, rr))}",
+        f"G1 {_xy(east_pivot)}",
+        f"G2 {_xy(west_pivot)} I{_r(-east_pivot[0]):.3f} J{_r(-east_pivot[1]):.3f}",
+        f"G1 {_xy(west_out)}",
         f"G0 Z{_r(clear10):.3f}",
     ]
 
@@ -1788,8 +1806,14 @@ def context(
             "bounds",
             {
                 "window": [[-rr - 1.0, x_in + 1.0], [-rr - 1.0, rr + 1.0]],
-                "x": [_r(-rr), _r(x_in)],
-                "y": [_r(-rr), _r(rr)],
+                "x": [
+                    _r(min(q[0] for q in relief_extent)),
+                    _r(max(q[0] for q in relief_extent)),
+                ],
+                "y": [
+                    _r(min(q[1] for q in relief_extent)),
+                    _r(max(q[1] for q in relief_extent)),
+                ],
                 "z_min": 0.0,
                 "arc": "G2",
                 "z_top": relief_top,

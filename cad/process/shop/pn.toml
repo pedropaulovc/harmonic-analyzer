@@ -166,8 +166,6 @@ resolution_mm = 0.001016
 # prechips can check each plan's stock_refs. Description only: the ownership
 # status stays in the inventory under the same key (stock assignment audit,
 # owner 2026-11-19).
-[stock.1018-flat-1-8x3-4]
-description = "1018 cold-finish carbon steel, flat bar, 1/8 x 3/4 in"
 [stock.c360-flat-3-8x1-1-4]
 description = "C36000 free-machining brass (360-H02, extruded), flat bar, 3/8 x 1-1/4 in"
 [stock.c360-square-5mm-key]
