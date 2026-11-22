@@ -74,7 +74,7 @@ vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
 # O.D.; cam.py checks it.
 jaw_top_over_od_mm = 13.1953
 # The out tip (X0) .55 in past the left jaw side: the flat ends .34 in from
-# it, and the 1/8 in cutter then clears the jaws by .09 in (cam.py's jaw
+# it, and the 1/8 in cutter then clears the jaws by .21 in (cam.py's jaw
 # keep-outs prove it); the other tip stands .05 in past the right jaw side.
 vise_jaw_from_x0_mm = 13.97
 # The 1/8 in end mill's flats (shop endmill-carbide-3fl-1-8): its centre
@@ -322,7 +322,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], 
 
 [[setups.operations]]
 instruction = "Console M6 T1 (the 1/8 in end mill). Spindle stopped: jog it by eye over the middle of the datum-end flat (between the jaws, at the right), G54 Y−1.500 (Y0 unchanged from Op 170: same fixed jaw, same O.D.), and lower it until it just drags a .002 feeler leaf on the flat. Note the DRO Z. Do the same at Y1.500."
-inspection = "The two Z readings within 0.025 mm (.001 in) of each other: the flat level across within .5°, half the title block's ±1° angle."
+inspection = "The two Z readings within 0.025 mm (.001 in) of each other: the flat level across within .64° (the end mill's two touches land 2.24 mm apart on the .21-across flat), inside the title block's ±1° angle."
 gauge_checks = "other"
 
 [[setups.operations]]

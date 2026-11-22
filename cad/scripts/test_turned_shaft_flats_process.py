@@ -140,15 +140,17 @@ def test_a_seeded_fault_in_the_program_is_caught(stem: str, tmp_path) -> None:
         for line in ctx["jobs"][0]["ops"][0][2]
         if line.startswith("G1") and " Z" in line
     )
+    last = [line for line in ctx["jobs"][0]["ops"][0][2] if line.startswith("G1 X")][-1]
     cases = [
         # The first ramp leg cut .05 mm under the flat: the flat over-depth.
         (_first(ctx, "G1 Y"), f"G1 Y0.000 Z{depth - 0.05:.3f} F{{feed}}", "depth"),
         # The cutter rapided down into the O.D. before the first flat.
         ("G0 Z0.100", "G0 Z-0.200", "rapid"),
-        # The second X station pushed past the flat's end into the kept O.D.
+        # The last X station (the cutter's edge at the flat's end) pushed
+        # 1 mm on, into the kept O.D.
         (
-            _first(ctx, "G1 X"),
-            "G1 X" + str(float(_first(ctx, "G1 X")[4:].split()[0]) + 3.0) + " F{feed}",
+            last,
+            "G1 X" + str(float(last[4:].split()[0]) + 1.0) + " F{feed}",
             "keep_out",
         ),
     ]

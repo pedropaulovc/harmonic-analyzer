@@ -68,7 +68,7 @@ blade_width_in = 0.0625
 part_kerf_in = 0.075
 # Turning: shop settings.lathe-ar-c360 (sourced there).
 # The groove: the R.047 form tool's half width; the DRO reads its arc's
-# centre once set to minus this on the face touch.
+# centre once set to plus this with its chuck-side flank on the face (Op 40).
 form_half_width_in = 0.047
 # Setup 2, MO01 (cam.py recomputes the ones it can):
 # Spot: the #2 centre drill to Ø.180 on the top corner, under the F drill
@@ -339,7 +339,7 @@ speed_kind = "spindle"
 tool = "drill-f"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.rod_bore_dia_band_mm}}" }
-instruction = "Same file, M6 T2: F drill through both corners in one feed, its full diameter {{process.cross_drill_past_mm:in.3dot}} past the lower corner, into the air left of the parallels; set 2400. At least 1.10 out of its chuck: it reaches .96 below the jaw tops."
+instruction = "Same file, M6 T2: F drill through both corners in one feed, its full diameter {{process.cross_drill_past_mm:in.3dot}} past the lower corner, into the air left of the parallels; set 2400. At least 1.10 out of its chuck: it reaches .94 below the jaw tops."
 settings = "fixture-drill-f-c360"
 hole_depth_mm = "{{cad.hex_ac_mm}}"
 peck = "none"

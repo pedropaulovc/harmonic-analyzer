@@ -15,12 +15,12 @@ the safe and clearance heights and the vise jaws' depth (keep-out shapes
 only).
 
 Route (plan text in ``plan.toml``): the spigot, its groove and the axial
-#4-40 are made on the lathe on the end of the 7/16 hex bar (Setup 2). The
+#4-40 are made on the lathe on the end of the 7/16 hex bar (Setup 1). The
 bar then lies corner up along the vise jaws on two 1 in parallels, its
 spigot end .50 in out past the jaws' left side, the parallels' left ends
 stopping short of the bore: MO01 spots the top corner and drills F through
 both corners into the air under the bar. The part is parted off the bar
-afterwards (Setup 4), so the whole bar is gripped while it is drilled.
+afterwards (Setup 3), so the whole bar is gripped while it is drilled.
 
 Work frame (G54), MO01: X0 the spigot face, +X along the bar away from it;
 Y0 the hex axis (the turned spigot's, by the edge finder); Z0 the top corner.
