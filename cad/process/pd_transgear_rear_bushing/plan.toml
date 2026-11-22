@@ -212,9 +212,9 @@ instruction = "Break both ends of the bore, R{{cad.edge_break_in:.3dot}} or cham
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mike the length across the faces and the outside."
-inspection = "Length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}; outside Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}; micrometer."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+instruction = "Mike the length across the faces."
+inspection = "Length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}, micrometer."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
