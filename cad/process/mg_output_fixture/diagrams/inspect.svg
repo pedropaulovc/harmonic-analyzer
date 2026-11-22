@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 4: the finished fixture (side view, a corner up)</text>
+  <rect class="part-kept" x="150" y="110" width="300" height="180"/>
+  <rect class="part-kept" x="450" y="128" width="160" height="144"/>
+  <path class="part-removed" d="M 510 128 A 30 30 0 0 0 570 128 Z"/>
+  <path class="part-removed" d="M 510 272 A 30 30 0 0 1 570 272 Z"/>
+  <rect class="holes" x="242" y="110" width="94" height="180"/>
+  <rect class="hidden" x="336" y="192" width="274" height="16"/>
+  <line class="centre-line" x1="120" y1="200" x2="650" y2="200"/>
+  <line class="dims" x1="150" y1="330" x2="289" y2="330"/>
+  <line class="dims" x1="289" y1="350" x2="610" y2="350"/>
+  <text class="label" x="170" y="324">.22–.24</text>
+  <text class="label" x="420" y="346">.48–.50</text>
+  <text class="label" x="228" y="100">F Ø.257–.261 through the corners</text>
+  <text class="label" x="470" y="114">FULL R groove, root Ø.32–.34</text>
+  <text class="label" x="470" y="300">spigot Ø.41–.43 × .24–.26</text>
+  <text class="label" x="360" y="186">4-40 full thread to the bore</text>
+  <text class="label" x="20" y="385">Stations: the GO shank in the bore, calipers from each end over its far side, less half its Ø.</text>
+</svg>
