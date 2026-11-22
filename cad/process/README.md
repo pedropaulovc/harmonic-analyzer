@@ -111,6 +111,27 @@ The files are the enrolment: `_process_plans.TRAVELER_STEMS` is every plan
 whose `revision` is not `"placeholder"` and `_cam_programs.CAM_STEMS` every
 part with a `cam.py` (each needs an enrolled plan); no list is edited.
 
+## Shared travelers for near-twin parts (trial)
+
+TRIAL, not merged policy (owner 2026-11-22, after reading both column clamp
+travelers: "theres too much repetition bw front and back clamps ; trial
+authoring a shared traveler for both; dont merge yet").
+`families/sh_column_clamp/plan.toml` is one plan for MHA-SH-01 and MHA-SH-02:
+it binds both halves' manifests with prechips' `[[parts]]` (prechips draft PR
+#571, in no release), writes the setups both halves share once, scopes the
+rest with `part = "front"` or `part = "back"`, and keeps the two recipes' NC
+files as they are (`CF*`, `CB*`). A setup without a part binds only values
+both manifests give alike; prechips refuses the others. It sits a level below
+the `<stem>/plan.toml` glob, so it enrols no stem, has no task and ships
+nothing; the two single-part plans stay the enrolled travelers and the CAM
+recipes' source, and `test_sh_column_clamp_family.py` holds the shared plan's
+parameters, tools and program names to them. Render it with a local prechips
+checkout of that branch:
+
+```text
+uv run --frozen python cad/scripts/prechips_traveler.py sh_column_clamp --family --prechips-from <prechips checkout>
+```
+
 ## Shop records
 
 `shop/` is the prechips shop directory: machines, workholding, gauges, limits,

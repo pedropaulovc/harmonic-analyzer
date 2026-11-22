@@ -61,6 +61,14 @@ def plan_path(stem: str) -> Path:
     return PROCESS_ROOT / stem / "plan.toml"
 
 
+def family_plan_path(name: str) -> Path:
+    """TRIAL (owner 2026-11-22): one shared plan for several near-twin parts,
+    ``families/<name>/plan.toml``. A level below the ``<stem>/plan.toml`` glob,
+    so it enrols no stem, has no task and ships nothing; only
+    ``prechips_traveler.py --family <name>`` reads it."""
+    return PROCESS_ROOT / "families" / name / "plan.toml"
+
+
 def shop_files(directory: Path | None = None) -> tuple[Path, ...]:
     """The shop's files as prechips reads them: every ``*.toml`` directly in
     ``directory`` (default ``SHOP_DIR``) whose name does not start with ``.``,

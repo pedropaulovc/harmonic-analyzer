@@ -31,6 +31,14 @@ or ``×`` diagnostic, never prechips' ``prechips:`` prefix), so an
 infrastructure failure is never read as a plan or shop-data refusal. A missing
 browser (checked before any sheet) or a failed print also exits 1 and removes
 every output.
+
+TRIAL (owner 2026-11-22, shared traveler for near-twin parts): ``--family``
+reads ``cad/process/families/<name>/plan.toml``, one plan that binds several
+parts' manifests (prechips ``[[parts]]``), and writes the same three files
+under ``cad/out/travelers/<name>/``. No prechips release renders a family plan
+yet, so ``--prechips-from <checkout or requirement>`` runs that source instead
+of the latest PyPI release (rebuilt each run, never uv's cached build) and logs
+it as an override. Neither flag is used by any ``prechips:<stem>`` task.
 """
 
 from __future__ import annotations
@@ -122,9 +130,10 @@ def print_pdf(browser_path: str, html: Path, pdf: Path) -> None:
         )
 
 
-def latest_version(uv: str) -> str:
-    """The newest prechips release on PyPI, resolved by ``uv tool run``."""
-    cmd = [uv, "tool", "run", "--from", f"{PACKAGE}@latest", "python", "-c", _VERSION_PROBE]
+def latest_version(uv: str, source: str | None = None) -> str:
+    """The newest prechips release on PyPI, resolved by ``uv tool run``; with
+    ``source``, that checkout's or requirement's version instead."""
+    cmd = [uv, "tool", "run", *_from(source, f"{PACKAGE}@latest"), "python", "-c", _VERSION_PROBE]
     result = subprocess.run(
         cmd, capture_output=True, encoding="utf-8", errors="replace", check=False,
     )
@@ -149,9 +158,19 @@ def uv_error(stderr: str) -> str | None:
     return None
 
 
-def traveler_command(uv: str, version: str, plan: Path, profile: str, html: Path) -> list[str]:
+def _from(source: str | None, release: str) -> list[str]:
+    """``--from`` for a release, or for an override source built afresh."""
+    if source is None:
+        return ["--from", release]
+    # --no-cache: uv otherwise reuses its cached build of an edited checkout.
+    return ["--no-cache", "--from", source]
+
+
+def traveler_command(
+    uv: str, version: str, plan: Path, profile: str, html: Path, source: str | None = None,
+) -> list[str]:
     return [
-        uv, "tool", "run", "--from", f"{PACKAGE}=={version}", PACKAGE, "traveler",
+        uv, "tool", "run", *_from(source, f"{PACKAGE}=={version}"), PACKAGE, "traveler",
         str(plan), "--profile", profile, "--out", str(html),
     ]
 
@@ -170,10 +189,23 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("stem")
     parser.add_argument("--out", type=Path, default=_process_plans.CAD_OUT)
+    parser.add_argument(
+        "--family", action="store_true",
+        help="trial: STEM names a family plan, cad/process/families/STEM/plan.toml",
+    )
+    parser.add_argument(
+        "--prechips-from", metavar="SOURCE",
+        help="trial: run this prechips checkout or requirement, not the latest PyPI release",
+    )
     args = parser.parse_args(argv)
+    source = args.prechips_from
     _telemetry.set_service("prechips-traveler")
     with _telemetry.run_pipeline_span("prechips_traveler", stem=args.stem) as root:
-        plan = _process_plans.plan_path(args.stem)
+        plan = (
+            _process_plans.family_plan_path(args.stem)
+            if args.family
+            else _process_plans.plan_path(args.stem)
+        )
         paths = _process_plans.traveler_paths(args.stem, args.out)
         pdf = _process_plans.traveler_pdf_path(args.stem, args.out)
         outputs = (*paths, pdf)
@@ -186,14 +218,15 @@ def main(argv: list[str] | None = None) -> int:
             uv = _uv()
             printer = browser()
             with _telemetry.span("prechips.resolve", stem=args.stem):
-                version = latest_version(uv)
+                version = latest_version(uv, source)
         except RuntimeError as exc:
             return _fail(root, args.stem, exc, 1, outputs)
         root.set_attribute("prechips.version", version)
-        _telemetry.info(f"{args.stem}: prechips {version} (latest PyPI release)", prechips_version=version)
+        origin = "latest PyPI release" if source is None else f"OVERRIDE, from {source}"
+        _telemetry.info(f"{args.stem}: prechips {version} ({origin})", prechips_version=version)
         paths[0].parent.mkdir(parents=True, exist_ok=True)
         for profile, html in zip(_process_plans.TRAVELER_PROFILES.values(), paths, strict=True):
-            cmd = traveler_command(uv, version, plan, profile, html)
+            cmd = traveler_command(uv, version, plan, profile, html, source)
             with _telemetry.span("prechips.traveler", stem=args.stem, profile=profile) as sp:
                 sp.set_attribute("prechips.version", version)
                 result = subprocess.run(
