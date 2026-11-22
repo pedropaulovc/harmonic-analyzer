@@ -130,7 +130,7 @@ from _session import run_build
 from _mg_wheel_rim_geometry import RIM_AXIAL, RIM_OUTER_DIA
 from mg_lever_thread_joint import ROD_DIA as LEVER_ROD_DIA
 from mg_magnifying_clamp_geom import HEX_AF as CLAMP_HEX_AF
-from mg_magnifying_wheel_geom import TIE1_X, TIE1_Y, TIE_HOLE_DIA
+from mg_magnifying_wheel_geom import TIE1_CDRILL_DIA, TIE1_X, TIE1_Y
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X
 from mg_wheel_axle_spec import TIP_Y
@@ -1465,7 +1465,8 @@ def _wheel_rest_view(
     _assert_tie1_angle(display, label=angle_label)
     source_step(angle_label)
     # TIE 1's label stands outside the crop on TIE 1's side of the axle; its
-    # leader ends on the hole's rim, toward the label.
+    # leader ends on the rim of the hole's drum-side mouth (the #50 counter-
+    # drill, seen from the machine front), toward the label.
     side = math.copysign(1.0, tie[0] - axle[0])
     label_xy = (
         axle[0] + side * abs(TIE1_LABEL_OFFSET[0])
@@ -1474,7 +1475,7 @@ def _wheel_rest_view(
     )
     toward = (label_xy[0] - tie[0], label_xy[1] - tie[1])
     reach = math.hypot(*toward)
-    rim = TIE_HOLE_DIA / 2.0 * detail.mm
+    rim = TIE1_CDRILL_DIA / 2.0 * detail.mm
     tip = (tie[0] + toward[0] / reach * rim, tie[1] + toward[1] / reach * rim)
     add_leader_note(
         adapter, TIE1_LABEL, text_xy=label_xy, attach_xy=tip, view=view,
