@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 8: the finished keeper; what each check reads from. 1 in = 177.8 px. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 8: inspect each keeper</text>
+  <path class="part-kept" d="M101.1 360 V183.6 A48.9 48.9 0 0 1 198.9 183.6 V360 Z"/>
+  <circle class="holes" cx="150" cy="183.6" r="22.67"/>
+  <rect class="part-threads" x="144.7" y="134.7" width="10.6" height="26.2"/>
+  <line class="hidden" x1="101.1" y1="304.9" x2="198.9" y2="304.9"/>
+  <line class="centre-line" x1="150" y1="114.7" x2="150" y2="370"/>
+  <line class="datum" x1="91.1" y1="360" x2="208.9" y2="360"/>
+  <text class="datum-label" x="87.1" y="364" text-anchor="end">seat</text>
+  <line class="datum" x1="101.1" y1="364" x2="101.1" y2="340"/>
+  <text class="datum-label" x="97.1" y="380" text-anchor="end">F</text>
+  <line class="datum" x1="198.9" y1="364" x2="198.9" y2="340"/>
+  <text class="datum-label" x="202.9" y="380">N</text>
+  <text class="label" x="20" y="50">Front, looking at I (F on the left):</text>
+  <text class="label" x="226.9" y="187.6">bore {{cad.bore_height_in:.3dot}} up, on the width's centre ±{{cad.bore_off_centre_max_in:.3dot}}</text>
+  <text class="label" x="226.9" y="138.7">crown R{{cad.crown_radius_in:.3dot}}; #1-72 into the bore</text>
+  <text class="label" x="226.9" y="308.9">foot top (hidden)</text>
+  <polygon class="part-kept" points="470,360 585.57,360 585.57,304.9 526.9,304.9 526.9,134.7 470,134.7"/>
+  <rect class="holes" x="470" y="160.95" width="56.9" height="45.3"/>
+  <rect class="holes" x="540.1" y="304.9" width="27" height="14.8"/>
+  <rect class="holes" x="545.1" y="319.7" width="17" height="40.3"/>
+  <line class="datum" x1="470" y1="370" x2="470" y2="124.7"/>
+  <text class="datum-label" x="466" y="120.7" text-anchor="end">I</text>
+  <text class="label" x="470" y="50">Side (I on the left):</text>
+  <text class="label" x="536.9" y="154.7">lug {{cad.lug_outer_face_thickness_min_in:.3dot}}–{{cad.lug_outer_face_thickness_max_in:.3dot}}</text>
+  <text class="label" x="593.57" y="340">length {{cad.foot_tip_length_in:.2dot}}</text>
+  <text class="label" x="470" y="384">foot hole {{cad.foot_hole_station_in:.3dot}} from the foot tip, counterbored from the foot top</text>
+  <text class="label" x="536.9" y="292">foot top {{cad.foot_top_height_in:.3dot}} up</text>
+</svg>
