@@ -270,7 +270,7 @@ beam = "other"
 
 [[setups.operations]]
 instruction = "Mic the brass bar's thickness and calipers its width at three places along the 8.25 in at one end."
-inspection = "Thickness {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}} (drawing {{cad.back_face_thickness_in:.3dot}} SEE NOTE 1; the brass bar as supplied, never machined); width {{process.blank_width_min_mm:in.3dot}}–{{process.blank_width_max_mm:in.3dot}}, so both edges clean up. Outside: gate the brass bar's other end instead; outside there too: stop and tell the owner."
+inspection = "Thickness {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}} (drawing {{cad.back_face_thickness_in:.3dot}} SEE NOTE 1; the brass bar as supplied, never machined); width {{process.blank_width_min_mm:in.3dot}}–{{process.blank_width_max_mm:in.3dot}}, so both edges clean up.\nStop: Outside: gate the brass bar's other end instead; outside there too: stop and tell the owner."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.back_face_thickness_band_mm}}" },
   { gauge = "calipers", band_mm = ["{{process.blank_width_min_mm}}", "{{process.blank_width_max_mm}}"] },
@@ -283,7 +283,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Stand the brass bar on its gated end on the surface plate against a 1-2-3 block and scribe a line {{process.blank_scribe_in:.2f}} up with the height gauge. Saw it off at the line, the brass bar clamped against a scrap board in the saw's vise so it cannot bend. File the saw burrs off both ends."
 feed = "hand"
-inspection = "Blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long, height gauge, the blank stood on end the same way (MS02 trims {{process.outline_trim_mm:in.2dot}} off one end and the rest off the other). Long: file it back. Short: saw another (the brass bar gives two)."
+inspection = "Blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long, height gauge, the blank stood on end the same way (MS02 trims {{process.outline_trim_mm:in.2dot}} off one end and the rest off the other).\nStop: Long: file it back. Short: saw another (the brass bar gives two)."
 gauge_checks = [{ gauge = "height-gauge", band_mm = ["{{cad.blank_length_mm}}", "{{process.blank_length_max_mm}}"] }]
 
 [[setups.operations]]
@@ -314,12 +314,12 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.fixture_len
 [[setups.operations]]
 instruction = "Home the mill ($H). Clamp the fixture bar as Holding."
 feed = "hand"
-inspection = "Pushed along the jaws by hand the bar does not move, and neither parallel slides. Loose: tap it down and tighten again."
+inspection = "Pushed along the jaws by hand the bar does not move, and neither parallel slides.\nStop: Loose: tap it down and tighten again."
 gauge_checks = "other"
 
 [[setups.operations]]
 instruction = "G54 X0 the bar's right end, Y0 its rear face: edge finder (900 rpm), its tip .10 below the bar's top."
-instruction_detailed = "Edge finder (900 rpm), its tip .10 below the bar's top (the bar stands {{process.fixture_raw_proud_mm:in.2dot}} above the jaws). On the bar's right end from the right: G10 L20 P1 X2.540. On its rear face from behind, over the fixed jaw: G10 L20 P1 Y2.540 (plus both times: the finder's centre is past the face). Edge finder out."
+instruction_detailed = "Edge finder (900 rpm), its tip .10 below the bar's top (the bar stands {{process.fixture_raw_proud_mm:in.2dot}} above the jaws). On the bar's right end from the right: G10 L20 P1 X{{process.edge_finder_radius_mm:.3f}}. On its rear face from behind, over the fixed jaw: G10 L20 P1 Y{{process.edge_finder_radius_mm:.3f}} (plus both times: the finder's centre is past the face). Edge finder out."
 feed = "hand"
 
 [[setups.operations]]
@@ -362,7 +362,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The fixture bar as Setup 2 left it, not unclamped. The blank on its faced top on 3M VHB 5906 tape ({{process.tape_thickness_mm:in.3dot}}) under its whole BACK, the marked RULED FACE up, its arrow pointing right, its rear edge flush with the bar's rear face, its ends about 2 in inside the bar's ends. Nothing else holds it: no clamp, no stop."
 datum = "Program MS02_outline. G54: X0 {{process.outline_trim_mm:in.3dot}} inside the blank's right end (where the DATUM END is cut), Y0 the blank's rear edge as bought, Z0 the RULED FACE. The stick lies toward −X and −Y: PLAIN EDGE at Y−{{process.outline_trim_mm:.3f}}, RULED EDGE at Y−{{process.ruled_edge_y_mm:.3f}} (toward you), ZERO END at X−{{cad.zero_end_length_mm:.3f}}. The file starts with an M6 for T1 (spindle stopped, tool lifted)."
-diagram = { file = "diagrams/outline.svg", alt = "The blank from above, taped on the fixture bar's top between the jaws' positions, rear edge flush with the bar's rear face; X0 at the right end, Y0 the rear edge; the 1/2 in end mill's passes: across the zero end, along the front edge, across the datum end, along the rear edge, anticlockwise, the stick on the left of every pass." }
+diagram = { file = "diagrams/outline.svg", alt = "The blank from above, taped on the fixture bar's top between the jaws' positions, rear edge flush with the bar's rear face; X0 at the right end, Y0 the rear edge; the 1/2 in end mill's passes: across the zero end, along the front edge, across the datum end, along the rear edge, anticlockwise, the stick on the left of every pass; every pass entered off the bar, behind its rear face or in front of its front face, the edge passes then fed across to their lines; the end mill drawn at the datum-end pass's entry, in front of the bar." }
 # Top: the blank on its tape; deepest: the through cut, into the bar's top
 # by fixture_skim_max_mm at most.
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.fixture_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.fixture_faced_height_mm}}", "{{process.tape_thickness_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.fixture_faced_height_mm}}", -0.2], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
@@ -394,7 +394,7 @@ feed = "hand"
 steps = [
   { kind = "action", text = "Console M6 T1 (as Setup 2). Spindle stopped, its tip on a .002 leaf on the RULED FACE at mid-length: G10 L20 P1 Z0.051." },
   { kind = "check", text = "The tip at Z0.051 over the blank .25 in from each end: the .002 leaf just drags there too, as at mid-length." },
-  { kind = "stop", text = "Loose or jammed at an end: the blank is not down flat. Press that end down and check again; still off: peel the blank, clean both faces, new tape, and bond it again." },
+  { kind = "stop", text = "Loose or jammed at an end: press that end down and check again; still off: peel the blank, clean both faces, and do Ops 100–140 again with new tape (new zeros)." },
 ]
 tool = "feeler"
 speed_kind = "other"
@@ -425,7 +425,7 @@ milling_cuts = [
 [[setups.operations]]
 instruction = "MS02 has ended with the spindle stopped, T1 raised. Brush the chips away; the stick stays on its tape. Calipers across the two milled edges at both ends and the middle."
 feed = "hand"
-inspection = "Width {{cad.ruled_edge_width_min_in:.3dot}}–{{cad.ruled_edge_width_max_in:.3dot}} at all three: the stick has stayed on its tape. Outside, or the three differ by more than .003: the blank moved; stop and tell the owner, do not engrave it."
+inspection = "Width {{cad.ruled_edge_width_min_in:.3dot}}–{{cad.ruled_edge_width_max_in:.3dot}} at all three: the stick has stayed on its tape.\nStop: Outside, or the three differ by more than .003: the blank moved; stop and tell the owner, do not engrave it."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.ruled_edge_width_band_mm}}" }]
 
 [[setups]]
@@ -446,7 +446,7 @@ instruction = "Prove both files in air first, Z0 raised 1.000 in (Setup 2's cons
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 X0 on the milled DATUM END: edge finder (900 rpm), its tip .06 below the stick's top, on the stick's right end from the right: G10 L20 P1 X2.540. Edge finder out. From here to the end of MS04: no reset, no homing."
+instruction = "G54 X0 on the milled DATUM END: edge finder (900 rpm), its tip .06 below the stick's top, on the stick's right end from the right: G10 L20 P1 X{{process.edge_finder_radius_mm:.3f}}. Edge finder out. From here to the end of MS04: no reset, no homing."
 feed = "hand"
 
 [[setups.operations]]
@@ -487,7 +487,7 @@ milling_cuts = [
 [[setups.operations]]
 instruction = "MS04 has ended with the spindle stopped, T2 raised. T2 out, edge finder in (900 rpm), its tip .06 below the stick's top: find the DATUM END from the right again and read the console's work X."
 feed = "hand"
-inspection = "X 2.515–2.565 mm on the console (2.540 ±0.025 mm, that is ±.001 in): X0 has not moved since it was set on this face, so every station counts from the datum end. Outside: the table lost position during the engraving; stop and tell the owner, the stations are not proven."
+inspection = "X 2.515–2.565 mm on the console ({{process.edge_finder_radius_mm:.3f}} ±0.025 mm, that is ±.001 in): X0 has not moved since it was set on this face, so every station counts from the datum end.\nStop: Outside: the table lost position during the engraving; stop and tell the owner, the stations are not proven."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = [2.515, 2.565] }]
 
 [[setups]]
@@ -552,7 +552,7 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Lay a sheet of 600-grit paper on the surface plate, wet. Rub the RULED FACE on it lengthwise, flat, light pressure, only until the black film is off the face. Then the metal polish on a soft cloth: all faces and edges bright. Wash and dry. Mic the thickness."
 feed = "hand"
-inspection = "Every tick and numeral black to its edges, the face bright with no black film; thickness still {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}}. A groove not full: clean it with alcohol, fill, cure and polish again. Thickness under: stop and tell the owner."
+inspection = "Every tick and numeral black to its edges, the face bright with no black film; thickness still {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}}.\nStop: A groove not full: clean it with alcohol, fill, cure and polish again. Thickness under: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.back_face_thickness_band_mm}}" }]
 
 [[setups.operations]]

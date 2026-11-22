@@ -17,6 +17,7 @@ import copy
 import math
 import tomllib
 from pathlib import Path
+from xml.etree import ElementTree
 
 import numpy as np
 import pytest
@@ -318,6 +319,16 @@ def test_a_climb_pass_is_caught(ctx, tmp_path) -> None:
     assert found >= {"passes", "engagement"}
 
 
+def _outline_entries(ctx: dict) -> list[list[float]]:
+    """Where MS02 plunges: the recipe's ``holes`` expectation."""
+    (holes,) = [
+        kwargs
+        for name, check, kwargs in RECIPE.expectations(ctx)
+        if name == "MS02_outline" and check == "holes"
+    ]
+    return holes["centres"]
+
+
 def test_every_outline_pass_is_entered_off_the_fixture_bar(ctx) -> None:
     """The last levels reach the tape and, under a thin blank, the fixture
     bar's top. Every plunge of MS02 stands with the whole cutter behind the
@@ -325,15 +336,63 @@ def test_every_outline_pass_is_entered_off_the_fixture_bar(ctx) -> None:
     inside the bar's width."""
     p = PLAN["parameters"]
     radius = p["face_cutter_dia_mm"] / 2
-    (holes,) = [
-        kwargs
-        for name, check, kwargs in RECIPE.expectations(ctx)
-        if name == "MS02_outline" and check == "holes"
-    ]
-    assert len(holes["centres"]) == p["outline_end_stations"] + 3
+    entries = _outline_entries(ctx)
+    assert len(entries) == p["outline_end_stations"] + 3
     assert p["blank_width_max_mm"] <= p["fixture_width_mm"]
-    for _x, y in holes["centres"]:
+    for _x, y in entries:
         assert y - radius > 0 or y + radius < -p["fixture_width_mm"]
+
+
+def test_the_outline_diagram_draws_the_posted_entries(ctx) -> None:
+    """Setup 3's picture shows where MS02 comes down: the end mill at the
+    datum-end pass's entry, and every drawn pass starting at its posted
+    entry (of the zero-end passes it draws the last). The scale and origins
+    are the picture's own: 10 px/mm, Y0 at px 150, X0 at px 650 right of the
+    break, the longest blank's left end (X−206.5) at px 125 left of it."""
+
+    def px(x: float, y: float) -> tuple[float, float]:
+        return (650 + 10 * x if x > -100 else 125 + 10 * (x + 206.5), 150 - 10 * y)
+
+    radius = PLAN["parameters"]["face_cutter_dia_mm"] / 2
+    entries = [tuple(entry) for entry in _outline_entries(ctx)]
+    zero_end = [entry for entry in entries if entry[0] < 0 < entry[1]]
+    drawn = [max(zero_end), *(entry for entry in entries if entry not in zero_end)]
+    (datum,) = [entry for entry in drawn if entry[0] > 0 > entry[1]]
+    svg = ElementTree.parse(
+        _process_plans.plan_path(STEM).parent / "diagrams" / "outline.svg"
+    ).getroot()
+    shapes = {
+        kind: [e for e in svg.iter(f"{{http://www.w3.org/2000/svg}}{kind}")]
+        for kind in ("circle", "line")
+    }
+    (cutter,) = [e for e in shapes["circle"] if e.get("class") == "cutter"]
+    assert [float(cutter.get(k)) for k in ("cx", "cy", "r")] == pytest.approx(
+        [*px(*datum), 10 * radius], abs=0.06
+    )
+    starts = [
+        (float(e.get("x1")), float(e.get("y1")))
+        for e in shapes["line"]
+        if e.get("class") == "arrow"
+    ]
+    for entry in drawn:
+        assert any(start == pytest.approx(px(*entry), abs=0.06) for start in starts), (
+            entry
+        )
+
+
+def test_the_registration_band_is_the_edge_finders_radius() -> None:
+    """Op 230 reads the edge finder back on the datum end: its console band
+    is the offset Ops 50, 130 and 190 enter, the finder's radius, ±0.025."""
+    radius = PLAN["parameters"]["edge_finder_radius_mm"]
+    bands = [
+        check["band_mm"]
+        for setup in PLAN["setups"]
+        for op in setup["operations"]
+        if isinstance(op.get("gauge_checks"), list)
+        for check in op["gauge_checks"]
+        if check["gauge"] == "mill-x-dro"
+    ]
+    assert bands == [pytest.approx([radius - 0.025, radius + 0.025])]
 
 
 def _model(

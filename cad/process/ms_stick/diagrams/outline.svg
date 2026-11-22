@@ -25,30 +25,33 @@
   <text class="label-halo" x="196" y="212">ZERO END at left</text>
   <text class="label-halo" x="492" y="194">DATUM END at right</text>
   <text class="label-halo" x="492" y="212">(the arrow's end)</text>
-  <!-- T1 at the start of the datum-end pass: Ø12.7 (127 px), centre X+6.35. -->
-  <circle class="cutter" cx="714" cy="330" r="63.5"/>
-  <text class="label" x="690" y="334">T1 1/2</text>
-  <!-- Passes, cutter-centre lines, anticlockwise: the stick on the left of each. -->
-  <line class="arrow" x1="107" y1="84" x2="107" y2="330"/>
-  <text class="label" x="24" y="356">1 ZERO END: {{process.outline_end_stations:d}} passes,</text>
-  <text class="label" x="24" y="372">stepping in {{process.outline_trim_mm:in.2dot}} each</text>
-  <line class="arrow" x1="140" y1="301" x2="330" y2="301"/>
-  <line class="arrow" x1="490" y1="301" x2="640" y2="301"/>
+  <!-- T1 at the entry of the datum-end pass, as cam.py posts it: Ø12.7 (127 px), centre X+6.35, Y-21.05 (px 713.5, 360.5). Its top is 2.0 (20 px) in front of the bar's front face. -->
+  <circle class="cutter" cx="713.5" cy="360.5" r="63.5"/>
+  <text class="label" x="722" y="384">T1 1/2</text>
+  <!-- Passes, cutter-centre lines as posted, anticlockwise, the stick on the left of each. Every entry is at Y+8.35, behind the bar (px 66.5), or at Y-21.05, in front of it (px 360.5); the edge passes feed across from X-214.852 (px 41.5) and X+9.112 (px 741.1) to their lines at Y-15.113 (px 301.1) and Y+5.588 (px 94.1). The zero-end arrow is the last of the passes, X-208.28 (px 107.2). -->
+  <line class="arrow" x1="107.2" y1="66.5" x2="107.2" y2="360.5"/>
+  <text class="label" x="118" y="348">1 ZERO END: {{process.outline_end_stations:d}} passes,</text>
+  <text class="label" x="118" y="364">stepping in {{process.outline_trim_mm:in.2dot}} each</text>
+  <line class="arrow" x1="41.5" y1="360.5" x2="41.5" y2="301.1"/>
+  <line class="arrow" x1="41.5" y1="301.1" x2="330" y2="301.1"/>
+  <line class="arrow" x1="490" y1="301.1" x2="741.1" y2="301.1"/>
   <text class="label" x="150" y="320">2 RULED EDGE (front)</text>
-  <line class="arrow" x1="714" y1="262" x2="714" y2="60"/>
-  <text class="label" x="722" y="76">3 DATUM</text>
-  <text class="label" x="722" y="92">END</text>
-  <line class="arrow" x1="690" y1="94" x2="490" y2="94"/>
-  <line class="arrow" x1="330" y1="94" x2="140" y2="94"/>
+  <line class="arrow" x1="713.5" y1="360.5" x2="713.5" y2="66.5"/>
+  <text class="label" x="722" y="118">3 DATUM</text>
+  <text class="label" x="722" y="134">END</text>
+  <line class="arrow" x1="741.1" y1="66.5" x2="741.1" y2="94.1"/>
+  <line class="arrow" x1="741.1" y1="94.1" x2="490" y2="94.1"/>
+  <line class="arrow" x1="330" y1="94.1" x2="41.5" y2="94.1"/>
   <text class="label" x="150" y="84">4 PLAIN EDGE (rear)</text>
   <!-- Datums. -->
   <line class="datum" x1="650" y1="120" x2="650" y2="262"/>
-  <path class="leader" d="M650 262 L590 392"/>
-  <text class="datum-label" x="420" y="408">X0: {{process.outline_trim_mm:in.3dot}} inside the blank's right end</text>
+  <path class="leader" d="M650 262 L612 350"/>
+  <text class="datum-label" x="400" y="364">X0: {{process.outline_trim_mm:in.3dot}} inside the blank's right end</text>
   <line class="datum" x1="125" y1="150" x2="340" y2="150"/>
   <line class="datum" x1="480" y1="150" x2="658" y2="150"/>
   <path class="leader" d="M560 150 L560 56"/>
   <text class="datum-label" x="430" y="50">Y0: the blank's rear edge, flush with the bar's rear face</text>
-  <text class="label" x="24" y="408">hatched: milled away, {{process.outline_trim_mm:in.2dot}} a side and the left end's surplus</text>
-  <text class="label" x="24" y="426">every pass is entered in air, beside the blank and off the bar; with M3 the stick on the pass's left is conventional milling</text>
+  <text class="label" x="24" y="392">hatched: milled away, {{process.outline_trim_mm:in.2dot}} a side and the left end's surplus</text>
+  <text class="label" x="24" y="410">every pass is entered in air, off the bar: behind its rear face or in front of its front face</text>
+  <text class="label" x="24" y="428">T1 is drawn at pass 3's entry; with M3 the stick on the pass's left is conventional milling</text>
 </svg>
