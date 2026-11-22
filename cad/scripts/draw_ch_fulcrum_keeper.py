@@ -75,7 +75,9 @@ from ch_fulcrum_keeper_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
     BORE_FROM_SIDE,
+    CBORE_DEPTH_BAND,
     CBORE_DEPTH_MM,
+    CBORE_DIA_BAND,
     CBORE_DIA_MM,
     CROWN_LEAST_R,
     CROWN_MOST_R,
@@ -540,7 +542,8 @@ requirement(
 )
 # The foot hole, drilled through the foot from its top with a flush
 # counterbore for the #2-56 fillister (the native callout: Ø.094 DRILL THRU,
-# Ø.150 ↧ .083, FOR MHA-CH-VN-52; CENTERS MHA-FR-02 TAP), its station .18
+# Ø.150 +.004/.000 ↧ .083 +.005/-.005, FOR MHA-CH-VN-52; CENTERS MHA-FR-02 TAP:
+# the counterbore's own limits, owner ruling 2026-11-22, #3367), its station .18
 # off the foot tip and .275 off the -Z side face (TOP_KEEP "ScrewFromTip",
 # "ScrewFromSide"); note 2 states the tip wall's worst case.
 _FOOT_CALLOUT = (
@@ -577,14 +580,22 @@ requirement(
         "process": ("drill", ((_SELF, "FOOT_HOLE_THRU"),)),
         "thru": (True, ((_SELF, "FOOT_HOLE_THRU"),)),
         "cbore_dia": (
-            drilled_limits(
-                CBORE_DIA_MM, FOOT_HOLE_CALLOUT_PRECISION["hw-cbdia"], unit=UNIT
+            limits(
+                CBORE_DIA_MM,
+                FOOT_HOLE_CALLOUT_PRECISION["hw-cbdia"],
+                CBORE_DIA_BAND,
+                unit=UNIT,
             ),
-            ("CBORE_DIA_MM", "UNIT", *_FOOT_CALLOUT),
+            ("CBORE_DIA_MM", "CBORE_DIA_BAND", *_FOOT_CALLOUT),
         ),
         "cbore_depth": (
-            limits(CBORE_DEPTH_MM, FOOT_HOLE_CALLOUT_PRECISION["hw-cbdepth"], unit=UNIT),
-            ("CBORE_DEPTH_MM", "UNIT", *_FOOT_CALLOUT),
+            limits(
+                CBORE_DEPTH_MM,
+                FOOT_HOLE_CALLOUT_PRECISION["hw-cbdepth"],
+                CBORE_DEPTH_BAND,
+                unit=UNIT,
+            ),
+            ("CBORE_DEPTH_MM", "CBORE_DEPTH_BAND", *_FOOT_CALLOUT),
         ),
         "mates": (FOOT_HOLE_MATE, ((_NOTES, "FOOT_HOLE_MATE"),)),
         "station": (
@@ -843,6 +854,60 @@ def _set_foot_hole_process(display: Any) -> None:
     _telemetry.info(f"foot-hole callout: {resolved!r}")
 
 
+_TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
+
+
+@_telemetry.traced("drawing.fulcrum_keeper.counterbore_band")
+def _print_counterbore_band(display: Any) -> None:
+    """Print the counterbore's limits (owner ruling 2026-11-22, #3367:
+    Ø.150-.154 x .078-.088) on its native callout. The bands live on the
+    part's Hole Wizard feature (build_ch_fulcrum_keeper._band_foot_counterbore)
+    and ``<hw-cbdia>`` / ``<hw-cbdepth>`` display them; this sets only their
+    tolerance places, the nominals' (FOOT_HOLE_CALLOUT_PRECISION), as
+    draw_pd_support_bar._band_counterbore_diameter does, and reads each
+    displayed band back so a band that did not reach the callout fails here."""
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
+
+    wanted = {
+        "hw-cbdia": (CBORE_DIA_MM, CBORE_DIA_BAND),
+        "hw-cbdepth": (CBORE_DEPTH_MM, CBORE_DEPTH_BAND),
+    }
+    found: dict[str, list[tuple[Any, Any]]] = {name: [] for name in wanted}
+    for raw in display.GetHoleCalloutVariables() or ():
+        variable = dynamic_dispatch(raw._oleobj_)
+        name = str(variable.VariableName)
+        if name in found:
+            found[name].append((raw, variable))
+    for name, (nominal, band) in wanted.items():
+        if len(found[name]) != 1:
+            raise RuntimeError(
+                f"foot-hole callout carries {len(found[name])} {name} variables, not 1"
+            )
+        raw, variable = found[name][0]
+        length = _early_bound(raw, "ICalloutLengthVariable")
+        actual = float(length.Length) * 1000.0
+        if abs(actual - nominal) > 1e-5:
+            raise RuntimeError(
+                f"foot-hole callout {name} reads {actual:g}, expected {nominal:g} mm"
+            )
+        places = FOOT_HOLE_CALLOUT_PRECISION[name]
+        length.TolerancePrecision = places
+        lower, upper = band[1], band[0]
+        if (
+            int(variable.ToleranceType) != _TOL_BILATERAL
+            or abs(float(variable.ToleranceMin) * 1000.0 - lower) > 1e-5
+            or abs(float(variable.ToleranceMax) * 1000.0 - upper) > 1e-5
+            or int(length.TolerancePrecision) != places
+        ):
+            raise RuntimeError(
+                f"foot-hole callout {name} does not display the part's band: wanted "
+                f"swTolBILAT, deviations {(lower, upper)} mm at {places} places; read "
+                f"{int(variable.ToleranceType)}, {float(variable.ToleranceMin)!r}, "
+                f"{float(variable.ToleranceMax)!r}, {int(length.TolerancePrecision)}"
+            )
+        _telemetry.info(f"foot-hole callout {name} {nominal:g} mm, band {band} mm")
+
+
 def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -950,6 +1015,7 @@ def build(adapter: Any) -> dict[str, str]:
     set_hole_callout_precision(
         foot_callout, FOOT_HOLE_CALLOUT_PRECISION, label="keeper foot screw hole"
     )
+    _print_counterbore_band(foot_callout)
     # Crown set-screw tap: the plan sees it end-on at the crown top on the
     # lug mid-plane; its callout sits in the band between the front view
     # and the plan, left of both.
