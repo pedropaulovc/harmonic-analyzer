@@ -49,9 +49,13 @@ from _drawing_edge_dimensions import (
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _config
@@ -59,12 +63,17 @@ import _telemetry
 from dt_cone_tip_block_spec import (
     ADJUSTER_AXIS_HEIGHT,
     ADJUSTER_BORE_DIA,
+    ADJUSTER_BORE_SPEC,
     ADJUSTER_CSK,
+    ADJUSTER_THREAD,
     AXIS_HEIGHT_MATCH_MATE,
     AXIS_HEIGHT_MATCH_REQUIREMENT,
+    AXIS_HEIGHT_MATCH_RESIDUAL_MM,
     BLOCK_HEIGHT,
+    BLOCK_WIDTH_BAND,
     BLOCK_X,
     BLOCK_Z,
+    DOWEL_HOLE_BAND,
     DOWEL_HOLE_DEPTH,
     DOWEL_HOLE_DEPTH_PLACES,
     DOWEL_HOLE_DIA,
@@ -75,20 +84,27 @@ from dt_cone_tip_block_spec import (
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     FOOT_BORE_DIA,
+    FOOT_BORE_SPEC,
     FOOT_DEPTH,
     FOOT_DEPTH_PLACES,
+    FOOT_TAP_OFFSET_X,
     FOOT_TAP_X,
     FOOT_TAP_Z,
     FOOT_THREAD_DEPTH,
     HOLDDOWN_THREAD,
     PINCH_BORE_DIA,
+    PINCH_BORE_SPEC,
     PINCH_CLEARANCE_DIA,
     PINCH_DEPTH_CENTER,
     PINCH_HEIGHT,
+    PINCH_THREAD,
+    PINCH_TO_SLOT_DEPTH_MM,
     PINCH_Z,
     SLIT_DEPTH,
     SLIT_W,
     SURFACE_FINISHES,
+    UNIT,
+    WORST_PINCH_NEAR_WALL_MM,
     length_text,
     printed_value_text,
 )
@@ -173,6 +189,9 @@ AXIS_MATCH_NOTE = textwrap.fill(
     subsequent_indent="   ",
     break_on_hyphens=False,
 )
+# The sheet's two numbered notes, under the name export_features reads a
+# drawing's notes by (the manifest's construction and notes).
+DRAWING_NOTES = "\n".join((DOWEL_NOTE, AXIS_MATCH_NOTE))
 
 # User ruling 2026-09-29 (eight-views-4.png, lower right): the block is a
 # plain straight prism standing on the swing platform, held down by one
@@ -1843,6 +1862,388 @@ def _set_pinch_thread_callout_text(display: Any) -> None:
         )
 
 
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (build_dt_cone_tip_block: plan
+# centred on the origin, +X west across the shaft, +Y up from the foot, +Z
+# north along the adjuster axis). Bands are the title block's rows at the
+# places the part authors (DRAWING_PRECISION_BY_NAME), the width its one-sided
+# BLOCK_WIDTH_BAND, the tap drills and the clearance the DRILLED HOLES row at
+# the callouts' three places. The adjuster axis's absolute height keeps its
+# .XX band and is made to the measured MHA-DT-05 journal axis height within
+# AXIS_HEIGHT_MATCH_RESIDUAL_MM (note 2). The locating dowel's press ream is
+# match-drilled through MHA-DT-20 at MHA-DT-00 (note 1), so a traveler that
+# makes the block leaves it. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_cone_tip_block"
+_FRAME = "__frame__"
+_HALF_X = BLOCK_X / 2.0
+_HALF_Z = BLOCK_Z / 2.0
+_SEAT = surface_finish_by_key(SURFACE_FINISHES, "foot_seat")
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=("BLOCK_X", "BLOCK_Z", "BLOCK_HEIGHT"),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "DRAWING_PRECISION_BY_NAME",
+        (_SELF, "HOLE_CALLOUT_PLACES"),
+        (_SELF, "FOOT_TAP_DEPTH_PRECISION"),
+        ("_surface_finish", "ra"),
+    ),
+)
+# The foot: the seat on MHA-DT-20 (Ra 125); every height runs from it.
+requirement(
+    "seat",
+    kind="face",
+    faces=(_SEAT.face,),
+    requirements=("plane", "finish_ra"),
+    fields={
+        "plane": (_plane("y", 0.0), (_FRAME,)),
+        "finish_ra": (_SEAT.roughness_um, ("SURFACE_FINISHES", (_SELF, "FOOT_FINISH_DX"))),
+        "finish_callout": (_SEAT.roughness_ra, ("SURFACE_FINISHES",)),
+    },
+    precision={"finish_ra": 1},
+)
+# The top: the block height 2.07 off the foot (FRONT_KEEP "BlockHt").
+requirement(
+    "top_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), BLOCK_HEIGHT),),
+    requirements=("height",),
+    fields={
+        "plane": (_plane("y", BLOCK_HEIGHT), ("BLOCK_HEIGHT",)),
+        "height": (
+            limits(BLOCK_HEIGHT, _P["BlockHt"], unit=UNIT),
+            ("BLOCK_HEIGHT", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "height_nominal": (BLOCK_HEIGHT, ("BLOCK_HEIGHT",)),
+        "height_from": ("seat", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"height": _P["BlockHt"]},
+)
+# The -X face: PassageCenter, FootTapX and the dowel's reference station
+# run from it; the pinch thread enters it (VIEW B).
+requirement(
+    "east_face",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), _HALF_X),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", -_HALF_X), (_FRAME, "BLOCK_X"))},
+)
+# The +X face: the width .68 +.00/-.02 off the -X face (BOTTOM_KEEP
+# "Width", WITHIN MHA-DT-20 EDGE); the pinch clearance enters it.
+requirement(
+    "west_face",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), _HALF_X),),
+    requirements=("width",),
+    fields={
+        "plane": (_plane("x", _HALF_X), (_FRAME, "BLOCK_X")),
+        "width": (
+            limits(BLOCK_X, _P["Width"], BLOCK_WIDTH_BAND, unit=UNIT),
+            ("BLOCK_X", "BLOCK_WIDTH_BAND", (_SELF, "BOTTOM_KEEP")),
+        ),
+        "width_nominal": (BLOCK_X, ("BLOCK_X",)),
+        "width_from": ("east_face", ((_SELF, "BOTTOM_KEEP"),)),
+        "callout": (
+            DIMENSION_CALLOUTS_ABOVE["Width"],
+            ((_SELF, "DIMENSION_CALLOUTS_ABOVE"),),
+        ),
+    },
+    precision={"width": _P["Width"]},
+)
+# The north face: the end screw enters it; FootTapZ and PinchDepthCenter run
+# from it.
+requirement(
+    "north_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), _HALF_Z),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", _HALF_Z), (_FRAME, "BLOCK_Z"))},
+)
+# The south face: the depth .44 off the north face (TOP_KEEP "Depth").
+requirement(
+    "south_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), _HALF_Z),),
+    requirements=("depth",),
+    fields={
+        "plane": (_plane("z", -_HALF_Z), (_FRAME, "BLOCK_Z")),
+        "depth": (
+            limits(BLOCK_Z, _P["Depth"], unit=UNIT),
+            ("BLOCK_Z", "UNIT", (_SELF, "TOP_KEEP")),
+        ),
+        "depth_nominal": (BLOCK_Z, ("BLOCK_Z",)),
+        "depth_from": ("north_face", ((_SELF, "TOP_KEEP"),)),
+    },
+    precision={"depth": _P["Depth"]},
+)
+# The end screw's 1/4-28 thread, tapped THRU from the north face with a
+# Ø.257 X 90° countersink at both ends; its axis 1.50 off the foot (SEE NOTE
+# 2: made to the measured MHA-DT-05 journal axis height above MHA-DT-20
+# within ±.003) and .34 off the -X face (PassageCenter).
+_ADJUSTER_CALLOUT = (
+    "ADJUSTER_BORE_SPEC",
+    (_SELF, "_adjuster_callout_definitions"),
+    (_SELF, "THRU_TAP_DRILL_PRECISION"),
+)
+_TAP_DRILL_SOURCES = (("_hole_spec", "blind_cut_dia_mm"),)
+requirement(
+    "adjuster",
+    kind="threaded_hole",
+    faces=(CylinderFace(ADJUSTER_BORE_DIA),),
+    requirements=("thread", "dia", "thru", "csk_dia", "height", "lateral", "height_match"),
+    fields={
+        "at": ([0.0, ADJUSTER_AXIS_HEIGHT, _HALF_Z], ("ADJUSTER_AXIS_HEIGHT", "BLOCK_Z")),
+        "axis": ((0.0, 0.0, -1.0), (_FRAME, "ADJUSTER_BORE_SPEC")),
+        "thread": (
+            f"{ADJUSTER_THREAD} UNF-{ADJUSTER_BORE_SPEC.thread_class}",
+            ("ADJUSTER_THREAD", *_ADJUSTER_CALLOUT),
+        ),
+        "dia": (
+            drilled_limits(ADJUSTER_BORE_DIA, HOLE_CALLOUT_PLACES, unit=UNIT),
+            ("ADJUSTER_BORE_DIA", *_TAP_DRILL_SOURCES, "UNIT", *_ADJUSTER_CALLOUT),
+        ),
+        "nominal_dia": (ADJUSTER_BORE_DIA, ("ADJUSTER_BORE_DIA",)),
+        "thru": (True, _ADJUSTER_CALLOUT),
+        "csk_dia": (
+            limits(ADJUSTER_BORE_DIA + 2.0 * ADJUSTER_CSK, HOLE_CALLOUT_PLACES, unit=UNIT),
+            ("ADJUSTER_CSK_DIA", "UNIT", (_SELF, "ADJUSTER_CSK_QUALIFIER")),
+        ),
+        "csk_dia_nominal": (
+            ADJUSTER_BORE_DIA + 2.0 * ADJUSTER_CSK,
+            ("ADJUSTER_CSK_DIA",),
+        ),
+        "csk_angle_deg": (90.0, ((_SELF, "ADJUSTER_CSK_QUALIFIER"),)),
+        "csk_ends": ("both", ((_SELF, "ADJUSTER_CSK_QUALIFIER"),)),
+        "height": (
+            limits(ADJUSTER_AXIS_HEIGHT, _P["AxisHeight"], unit=UNIT),
+            ("ADJUSTER_AXIS_HEIGHT", "UNIT", (_SELF, "_adjuster_axis_keep")),
+        ),
+        "height_nominal": (ADJUSTER_AXIS_HEIGHT, ("ADJUSTER_AXIS_HEIGHT",)),
+        "height_from": ("seat", ((_SELF, "_adjuster_axis_keep"),)),
+        "height_match": (
+            [-AXIS_HEIGHT_MATCH_RESIDUAL_MM, AXIS_HEIGHT_MATCH_RESIDUAL_MM],
+            ("AXIS_HEIGHT_MATCH_RESIDUAL_MM", (_SELF, "AXIS_MATCH_NOTE")),
+        ),
+        "height_match_nominal": (0.0, ("AXIS_HEIGHT_MATCH_RESIDUAL_MM",)),
+        "height_match_to": (
+            AXIS_HEIGHT_MATCH_REQUIREMENT,
+            ("AXIS_HEIGHT_MATCH_REQUIREMENT", "AXIS_HEIGHT_MATCH_MATE"),
+        ),
+        "lateral": (
+            limits(_HALF_X, _P["PassageCenter"], unit=UNIT),
+            ("BLOCK_X", "UNIT", (_SELF, "_adjuster_axis_keep")),
+        ),
+        "lateral_nominal": (_HALF_X, ("BLOCK_X",)),
+        "lateral_from": ("east_face", ((_SELF, "_adjuster_axis_keep"),)),
+    },
+    precision={
+        "dia": HOLE_CALLOUT_PLACES,
+        "csk_dia": HOLE_CALLOUT_PLACES,
+        "height": _P["AxisHeight"],
+        "height_match": HOLE_CALLOUT_PLACES,
+        "lateral": _P["PassageCenter"],
+    },
+)
+# The pinch slit .05 wide down the top on the adjuster's plane, SLOT INTO
+# BORE (FRONT_KEEP "SlitW"): its floor lies inside the tap drill, so only
+# its width and extent print.
+requirement(
+    "slit",
+    kind="slot",
+    faces=(
+        PlanarFace((-1.0, 0.0, 0.0), -SLIT_W / 2.0),
+        PlanarFace((1.0, 0.0, 0.0), -SLIT_W / 2.0),
+    ),
+    requirements=("width",),
+    fields={
+        "at": ([0.0, BLOCK_HEIGHT, 0.0], ("BLOCK_HEIGHT",)),
+        "axis": ((0.0, -1.0, 0.0), (_FRAME,)),
+        "width": (
+            limits(SLIT_W, _P["SlitW"], unit=UNIT),
+            ("SLIT_W", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "width_nominal": (SLIT_W, ("SLIT_W",)),
+        "extent": (
+            DIMENSION_CALLOUTS_ABOVE["SlitW"],
+            ((_SELF, "DIMENSION_CALLOUTS_ABOVE"),),
+        ),
+        "depth_ref": (SLIT_DEPTH, ("SLIT_DEPTH",)),
+    },
+    precision={"width": _P["SlitW"]},
+)
+# The pinch screw's #4-40 thread in the -X jaw: the Ø.089 joint drill THRU
+# BOTH JAWS, tapped from the -X face TO SLOT (VIEW B); 1.85 off the foot and
+# .22 off the north face (RIGHT_KEEP "PinchHeight", "PinchDepthCenter").
+_PINCH_TAP_CALLOUT = (
+    "PINCH_BORE_SPEC",
+    (_SELF, "_pinch_thread_callout_definitions"),
+    (_SELF, "THRU_TAP_DRILL_PRECISION"),
+)
+requirement(
+    "pinch_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(PINCH_BORE_DIA, contains_y_mm=PINCH_HEIGHT),),
+    requirements=("thread", "dia", "thru", "height", "depth_center"),
+    fields={
+        "at": ([-_HALF_X, PINCH_HEIGHT, PINCH_Z], ("BLOCK_X", "PINCH_HEIGHT", "PINCH_Z")),
+        "axis": ((1.0, 0.0, 0.0), (_FRAME, "PINCH_BORE_SPEC")),
+        "thread": (
+            f"{PINCH_THREAD} UNC-{PINCH_BORE_SPEC.thread_class}",
+            ("PINCH_THREAD", *_PINCH_TAP_CALLOUT),
+        ),
+        "dia": (
+            drilled_limits(PINCH_BORE_DIA, HOLE_CALLOUT_PLACES, unit=UNIT),
+            ("PINCH_BORE_DIA", *_TAP_DRILL_SOURCES, "UNIT", *_PINCH_TAP_CALLOUT),
+        ),
+        "nominal_dia": (PINCH_BORE_DIA, ("PINCH_BORE_DIA",)),
+        "thru": (True, ((_SELF, "PINCH_JOINT_DRILL_TEXT"),)),
+        "drill_extent": (PINCH_JOINT_DRILL_TEXT, ((_SELF, "PINCH_JOINT_DRILL_TEXT"),)),
+        "thread_extent": (PINCH_TAP_EXTENT_TEXT, ((_SELF, "PINCH_TAP_EXTENT_TEXT"),)),
+        "height": (
+            limits(PINCH_HEIGHT, _P["PinchHeight"], unit=UNIT),
+            ("PINCH_HEIGHT", "UNIT", (_SELF, "RIGHT_KEEP")),
+        ),
+        "height_nominal": (PINCH_HEIGHT, ("PINCH_HEIGHT",)),
+        "height_from": ("seat", ((_SELF, "RIGHT_KEEP"),)),
+        "depth_center": (
+            limits(PINCH_DEPTH_CENTER, _P["PinchDepthCenter"], unit=UNIT),
+            ("PINCH_DEPTH_CENTER", "UNIT", (_SELF, "RIGHT_KEEP")),
+        ),
+        "depth_center_nominal": (PINCH_DEPTH_CENTER, ("PINCH_DEPTH_CENTER",)),
+        "depth_center_from": ("north_face", ((_SELF, "RIGHT_KEEP"),)),
+    },
+    precision={
+        "dia": HOLE_CALLOUT_PLACES,
+        "height": _P["PinchHeight"],
+        "depth_center": _P["PinchDepthCenter"],
+    },
+)
+# The pinch screw's clearance in the +X jaw: Ø.129 DRILL THIS JAW TO SLOT,
+# coaxial with the joint drill. Drilled full diameter past the deepest near
+# wall the print allows (WORST_PINCH_NEAR_WALL_MM) and no further than the
+# spec's proven PINCH_TO_SLOT_DEPTH_MM, its point stays inside the far jaw's
+# tap drill.
+requirement(
+    "pinch_clearance",
+    kind="hole",
+    faces=(CylinderFace(PINCH_CLEARANCE_DIA),),
+    requirements=("dia", "depth"),
+    fields={
+        "at": ([_HALF_X, PINCH_HEIGHT, PINCH_Z], ("BLOCK_X", "PINCH_HEIGHT", "PINCH_Z")),
+        "axis": ((-1.0, 0.0, 0.0), (_FRAME,)),
+        "dia": (
+            drilled_limits(PINCH_CLEARANCE_DIA, HOLE_CALLOUT_PLACES, unit=UNIT),
+            ("PINCH_CLEARANCE_DIA", "UNIT", (_SELF, "PINCH_CLEARANCE_PRECISION")),
+        ),
+        "nominal_dia": (PINCH_CLEARANCE_DIA, ("PINCH_CLEARANCE_DIA",)),
+        "process": ("drill", ((_SELF, "PINCH_CLEARANCE_EXTENT_TEXT"),)),
+        "depth": (
+            [WORST_PINCH_NEAR_WALL_MM, PINCH_TO_SLOT_DEPTH_MM],
+            (
+                "WORST_PINCH_NEAR_WALL_MM",
+                "PINCH_TO_SLOT_DEPTH_MM",
+                (_SELF, "PINCH_CLEARANCE_EXTENT_TEXT"),
+            ),
+        ),
+        "extent": (
+            PINCH_CLEARANCE_EXTENT_TEXT,
+            ((_SELF, "PINCH_CLEARANCE_EXTENT_TEXT"),),
+        ),
+    },
+    precision={"dia": HOLE_CALLOUT_PLACES, "depth": HOLE_CALLOUT_PLACES},
+)
+# The hold-down tap up into the foot: Ø.089 ↧ .44, #4-40 UNC-2B ↧ .34; .30 off
+# the -X face and .22 off the north face (BOTTOM_KEEP "FootTapX",
+# "FootTapZ").
+_FOOT_CALLOUT = (
+    "FOOT_BORE_SPEC",
+    (_SELF, "FOOT_TAP_DEPTH_PRECISION"),
+    (_SELF, "_foot_tap_callout_resolved"),
+)
+requirement(
+    "foot_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(FOOT_BORE_DIA, contains_y_mm=FOOT_THREAD_DEPTH / 2.0),),
+    requirements=("thread", "dia", "drill_depth", "thread_depth", "station", "depth_station"),
+    fields={
+        "at": ([FOOT_TAP_OFFSET_X, 0.0, 0.0], ("FOOT_TAP_OFFSET_X",)),
+        "axis": ((0.0, 1.0, 0.0), (_FRAME, "FOOT_BORE_SPEC")),
+        "thread": (
+            f"{HOLDDOWN_THREAD} UNC-{FOOT_BORE_SPEC.thread_class}",
+            ("HOLDDOWN_THREAD", *_FOOT_CALLOUT),
+        ),
+        "dia": (
+            drilled_limits(FOOT_BORE_DIA, HOLE_CALLOUT_PLACES, unit=UNIT),
+            ("FOOT_BORE_DIA", *_TAP_DRILL_SOURCES, "UNIT", *_FOOT_CALLOUT),
+        ),
+        "nominal_dia": (FOOT_BORE_DIA, ("FOOT_BORE_DIA",)),
+        "drill_depth": (
+            limits(FOOT_DEPTH, FOOT_DEPTH_PLACES, unit=UNIT),
+            ("FOOT_DEPTH", "FOOT_DEPTH_PLACES", "UNIT", *_FOOT_CALLOUT),
+        ),
+        "thread_depth": (
+            limits(FOOT_THREAD_DEPTH, FOOT_DEPTH_PLACES, unit=UNIT),
+            ("FOOT_THREAD_DEPTH", "FOOT_DEPTH_PLACES", "UNIT", *_FOOT_CALLOUT),
+        ),
+        "station": (
+            limits(FOOT_TAP_X, _P["FootTapX"], unit=UNIT),
+            ("FOOT_TAP_X", "UNIT", (_SELF, "BOTTOM_KEEP")),
+        ),
+        "station_nominal": (FOOT_TAP_X, ("FOOT_TAP_X",)),
+        "station_from": ("east_face", ((_SELF, "BOTTOM_KEEP"),)),
+        "depth_station": (
+            limits(FOOT_TAP_Z, _P["FootTapZ"], unit=UNIT),
+            ("FOOT_TAP_Z", "UNIT", (_SELF, "BOTTOM_KEEP")),
+        ),
+        "depth_station_nominal": (FOOT_TAP_Z, ("FOOT_TAP_Z",)),
+        "depth_station_from": ("north_face", ((_SELF, "BOTTOM_KEEP"),)),
+    },
+    precision={
+        "dia": HOLE_CALLOUT_PLACES,
+        "drill_depth": FOOT_DEPTH_PLACES,
+        "thread_depth": FOOT_DEPTH_PLACES,
+        "station": _P["FootTapX"],
+        "depth_station": _P["FootTapZ"],
+    },
+)
+# The locating dowel's press ream up into the foot: Ø.0620 +.0005/.0000
+# REAM ↧ .16, SEE NOTE 1 (match-drilled up through MHA-DT-20 at MHA-DT-00);
+# its (.528) station off the -X face is a reference.
+requirement(
+    "dowel_ream",
+    kind="hole",
+    faces=(CylinderFace(DOWEL_HOLE_DIA),),
+    requirements=("dia", "depth"),
+    fields={
+        "at": ([DOWEL_X - _HALF_X, 0.0, 0.0], ("DOWEL_X", "BLOCK_X")),
+        "axis": ((0.0, 1.0, 0.0), (_FRAME,)),
+        "dia": (
+            limits(DOWEL_HOLE_DIA, _P["DowelHoleDia"], DOWEL_HOLE_BAND, unit=UNIT),
+            ("DOWEL_HOLE_DIA", "DOWEL_HOLE_BAND", (_SELF, "BOTTOM_KEEP")),
+        ),
+        "nominal_dia": (DOWEL_HOLE_DIA, ("DOWEL_HOLE_DIA",)),
+        "depth": (
+            limits(DOWEL_HOLE_DEPTH, DOWEL_HOLE_DEPTH_PLACES, unit=UNIT),
+            ("DOWEL_HOLE_DEPTH", "DOWEL_HOLE_DEPTH_PLACES", (_SELF, "DOWEL_HOLE_CALLOUT")),
+        ),
+        "station_ref": (DOWEL_X, ("DOWEL_X", (_SELF, "BOTTOM_KEEP"))),
+        "station_ref_from": ("east_face", ((_SELF, "BOTTOM_KEEP"),)),
+        "made_at": ("assembly", ((_SELF, "DOWEL_NOTE"),)),
+        "transfer": (DOWEL_NOTE, ((_SELF, "DOWEL_NOTE"),)),
+    },
+    precision={
+        "dia": _P["DowelHoleDia"],
+        "depth": DOWEL_HOLE_DEPTH_PLACES,
+        "station_ref": _P["DowelX"],
+    },
+)
 
 
 def _audit_isometric_annotation_provenance(adapter: Any, view: Any) -> int:
