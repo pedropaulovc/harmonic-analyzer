@@ -216,7 +216,7 @@ status = "to_order"
 # Not owned (cad/config/shop-equipment/ tools.reamer-12mm-h7, to_order).
 [[tools]]
 id = "reamer-12"
-name = "12 mm reamer (Shars 416-0477)"
+name = "12 mm reamer, Shars 416-0477"
 ref = "reamer-12mm-h7"
 status = "to_order"
 [[tools]]
