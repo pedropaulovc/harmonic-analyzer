@@ -43,14 +43,19 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_tables import insert_hole_table
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from build_pd_platen_guide import (
+    GUIDE_DEPTH,
     GUIDE_LENGTH,
     HOLE_X as REAR_X,
     ISOMETRIC_VIEW_SCALE,
@@ -60,12 +65,17 @@ from build_pd_platen_guide import (
 from pd_platen_guide_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    GUIDE_DEPTH_BAND,
     GUIDE_DEPTH_CALLOUT,
     GUIDE_HEIGHT,
+    LOCK_TAP_SPEC,
     SURFACE_FINISHES,
     TAPPED_HOLE_SPEC,
+    TAP_STATION_PLACES,
     TAP_Y,
+    TAP_Y_BAND,
     TAP_Y_BAND_TEXT,
+    UNIT,
 )
 
 
@@ -154,6 +164,9 @@ TAP_WALL_NOTE_NUMBER = 1
 TAP_WALL_NOTE = (
     f"{TAP_WALL_NOTE_NUMBER}. {HOLE_TAGS[0]}-{HOLE_TAGS[-1]}: {TAP_EDGE_WALL_TEXT}."
 )
+# The sheet's only numbered note, under the name export_features reads a
+# drawing's notes by (the manifest's construction and notes).
+DRAWING_NOTES = TAP_WALL_NOTE
 # Top-left anchored beside the table's top-right corner (the table ends
 # ~0.195 with its MATE column; the banded Y LOC column takes the native
 # one's width), level with its header; its ~91 mm line ends ~0.296, above
@@ -207,6 +220,184 @@ THREAD_DESIGNATION = f"{TAPPED_HOLE_SPEC.size} UNC-{TAPPED_HOLE_SPEC.thread_clas
 THREAD_MAJOR_DIA_MM = THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size]
 THREAD_PITCH_MM = 25.4 / int(TAPPED_HOLE_SPEC.size.rsplit("-", 1)[1])
 THREAD_TAP_DRILL_MM = blind_cut_dia_mm(TAPPED_HOLE_SPEC)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (build_pd_platen_guide: length +X
+# from the left end, height +Y from the bottom face, depth -Z from the
+# platen-mating front face). Bands are the title block's rows at the places
+# the part authors (DRAWING_PRECISION_BY_NAME), the depth its native one-sided
+# LIMITs, the taps' stations the hole table's .XXX row, their row its printed
+# TAP_Y_BAND and their drill the DRILLED HOLES row at the SIZE cell's three
+# places. Every tap is THRU: the five platen-screw taps from the front face,
+# the four lock taps from the rear face, one hole table (A1-A9 by station)
+# locating all nine. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_platen_guide"
+_BUILD = "build_pd_platen_guide"
+_FRAME = "__frame__"
+_SLIDE = surface_finish_by_key(SURFACE_FINISHES, "bar_slide")
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(
+        (_BUILD, "GUIDE_LENGTH"),
+        "GUIDE_HEIGHT",
+        (_BUILD, "GUIDE_DEPTH"),
+    ),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "DRAWING_PRECISION_BY_NAME",
+        "TAP_STATION_PLACES",
+        ("_surface_finish", "ra"),
+    ),
+)
+requirement(
+    "left_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", 0.0), (_FRAME,))},
+)
+# The length 10.62 from the left end, the hole table's X origin.
+requirement(
+    "right_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), GUIDE_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("x", GUIDE_LENGTH), ((_BUILD, "GUIDE_LENGTH"),)),
+        "length": (
+            limits(GUIDE_LENGTH, _P["Length"], unit=UNIT),
+            ((_BUILD, "GUIDE_LENGTH"), "UNIT", (_SELF, "build")),
+        ),
+        "length_nominal": (GUIDE_LENGTH, ((_BUILD, "GUIDE_LENGTH"),)),
+        "length_from": ("left_end", ((_SELF, "build"),)),
+    },
+    precision={"length": _P["Length"]},
+)
+# The bottom face: the platen hangs by it on MHA-PD-07 and slides along it
+# (SLIDES ON MHA-PD-07, Ra 63); the hole table's Y origin.
+requirement(
+    "bottom_face",
+    kind="face",
+    faces=(_SLIDE.face,),
+    requirements=("plane", "finish_ra"),
+    fields={
+        "plane": (_plane("y", 0.0), (_FRAME,)),
+        "finish_ra": (_SLIDE.roughness_um, ("SURFACE_FINISHES", (_SELF, "build"))),
+        "finish_callout": (_SLIDE.roughness_ra, ("SURFACE_FINISHES",)),
+        "finish_function": (_SLIDE.production_method, ("SURFACE_FINISHES",)),
+    },
+    precision={"finish_ra": 1},
+)
+# The height .29 from the bottom face.
+requirement(
+    "top_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), GUIDE_HEIGHT),),
+    requirements=("height",),
+    fields={
+        "plane": (_plane("y", GUIDE_HEIGHT), ("GUIDE_HEIGHT",)),
+        "height": (
+            limits(GUIDE_HEIGHT, _P["Height"], unit=UNIT),
+            ("GUIDE_HEIGHT", "UNIT", (_SELF, "build")),
+        ),
+        "height_nominal": (GUIDE_HEIGHT, ("GUIDE_HEIGHT",)),
+        "height_from": ("bottom_face", ((_SELF, "build"),)),
+    },
+    precision={"height": _P["Height"]},
+)
+requirement(
+    "front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", 0.0), (_FRAME,))},
+)
+# The depth .40/.39 from the front face: native LIMITs with their reason
+# (LOCK-SCREW HEADS CLEAR MHA-PD-19).
+requirement(
+    "rear_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), GUIDE_DEPTH),),
+    requirements=("depth",),
+    fields={
+        "plane": (_plane("z", -GUIDE_DEPTH), ((_BUILD, "GUIDE_DEPTH"),)),
+        "depth": (
+            limits(GUIDE_DEPTH, _P["Depth"], GUIDE_DEPTH_BAND, unit=UNIT),
+            ((_BUILD, "GUIDE_DEPTH"), "GUIDE_DEPTH_BAND", (_SELF, "DEPTH_TEXT_XY")),
+        ),
+        "depth_nominal": (GUIDE_DEPTH, ((_BUILD, "GUIDE_DEPTH"),)),
+        "depth_from": ("front_face", ((_SELF, "DEPTH_TEXT_XY"),)),
+        "callout": (GUIDE_DEPTH_CALLOUT, ("GUIDE_DEPTH_CALLOUT",)),
+    },
+    precision={"depth": _P["Depth"]},
+)
+# The nine #4-40 taps THRU, one hole-table row each (A1-A9 by station): the
+# five platen-screw taps from the front face (MATE MHA-PD-02), the four lock
+# taps from the rear face (MATE MHA-PD-12); each X LOC .XXX from the left
+# end, the shared Y LOC .140 ±.005 from the bottom face, and note 1's wall
+# from each tap to the edges.
+_TABLE = ((_SELF, "HOLE_TABLE_PHYSICAL_COLUMNS"), (_SELF, "HOLE_TAGS"))
+_TAP_WALL_MIN_MM = float(TAP_EDGE_WALL_TEXT.split()[1]) * 25.4
+for _index, _x in enumerate(HOLE_STATIONS_MM, 1):
+    _front = _x in FRONT_X
+    _spec_name = "TAPPED_HOLE_SPEC" if _front else "LOCK_TAP_SPEC"
+    _tap_spec = TAPPED_HOLE_SPEC if _front else LOCK_TAP_SPEC
+    _drill = blind_cut_dia_mm(_tap_spec)
+    _stations = (_BUILD, "SCREW_STATION_X" if _front else "HOLE_X")
+    requirement(
+        f"tap_a{_index}",
+        kind="threaded_hole",
+        faces=(CylinderFace(_drill, contains_x_mm=_x),),
+        requirements=("thread", "dia", "thru", "station", "height", "edge_wall_min"),
+        fields={
+            "at": (
+                [_x, TAP_Y, 0.0 if _front else -GUIDE_DEPTH],
+                (_stations, "TAP_Y", (_BUILD, "GUIDE_DEPTH")),
+            ),
+            "axis": ((0.0, 0.0, -1.0 if _front else 1.0), (_spec_name, _FRAME)),
+            "thread": (
+                f"{_tap_spec.size} UNC-{_tap_spec.thread_class}",
+                (_spec_name, (_SELF, "THREAD_DESIGNATION")),
+            ),
+            "dia": (
+                drilled_limits(_drill, TAP_STATION_PLACES, unit=UNIT),
+                (_spec_name, ("_hole_spec", "blind_cut_dia_mm"), "UNIT", *_TABLE),
+            ),
+            "nominal_dia": (_drill, (_spec_name, ("_hole_spec", "blind_cut_dia_mm"))),
+            "thru": (True, (_spec_name, *_TABLE)),
+            "tag": (HOLE_TAGS[_index - 1], ((_SELF, "HOLE_TAGS"),)),
+            "mates": (HOLE_TABLE_MATES[_x], ((_SELF, "HOLE_TABLE_MATES"),)),
+            "station": (
+                limits(_x, TAP_STATION_PLACES, unit=UNIT),
+                (_stations, "TAP_STATION_PLACES", "UNIT", *_TABLE),
+            ),
+            "station_nominal": (_x, (_stations,)),
+            "station_from": ("left_end", _TABLE),
+            "height": (
+                limits(TAP_Y, TAP_STATION_PLACES, (TAP_Y_BAND, -TAP_Y_BAND), unit=UNIT),
+                ("TAP_Y", "TAP_Y_BAND", "TAP_Y_BAND_TEXT", *_TABLE),
+            ),
+            "height_nominal": (TAP_Y, ("TAP_Y",)),
+            "height_from": ("bottom_face", _TABLE),
+            "edge_wall_min": (
+                _TAP_WALL_MIN_MM,
+                ((_BUILD, "TAP_EDGE_WALL_TEXT"), (_SELF, "TAP_WALL_NOTE")),
+            ),
+        },
+        precision={
+            "dia": TAP_STATION_PLACES,
+            "station": TAP_STATION_PLACES,
+            "height": TAP_STATION_PLACES,
+            "edge_wall_min": TAP_STATION_PLACES,
+        },
+    )
 
 
 def _bottom_surface_edge(view: Any) -> Any:

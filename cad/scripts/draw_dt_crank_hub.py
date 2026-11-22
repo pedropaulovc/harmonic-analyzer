@@ -43,13 +43,32 @@ from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _printed_limits import drilled_limits, limits
+from dt_crank_hub_geometry import (
+    HUB_BARREL_LENGTH,
+    HUB_BORE_BAND,
+    HUB_LENGTH_BAND,
+    HUB_SEAT_DIA,
+    RELIEF_DIA,
+    RELIEF_LENGTH,
+    SEAT_PRESS_INTERFERENCE,
+    SHAFT_CLEARANCE_MAX,
+    SHAFT_CLEARANCE_MIN,
+    UNIT,
+)
 from dt_crank_hub_notes import (
     BORE_CALLOUT,
     CROSS_HOLE_CALLOUT,
+    CROSS_HOLE_NOTE,
     HUB_LENGTH_CALLOUT,
     SEAM_CALLOUT,
     SEAT_CALLOUT,
     SEAT_LENGTH_CALLOUT,
+    SEAT_LENGTH_MATCH_BAND,
+    SEAT_LENGTH_NOTE,
     SHEET_NOTES,
 )
 from dt_crank_hub_spec import (
@@ -240,6 +259,246 @@ DIMENSION_CALLOUTS = {
     "SeatLength": SEAT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
 }
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_dt_crank_hub: one revolve about model +Y, the faced outboard (front)
+# face at y = 0, +Y inboard to the rear face at y = HUB_LENGTH; the seam at
+# +Z; the MHA-DT-09 pilot radial along X). The seat is a REF turned to the
+# measured MHA-DT-06 bore for the stated interference, its length the arm's
+# measured thickness +.000/-.002 (note 2); the barrel, relief and their
+# lengths take the title block's .XX row; the overall its +.004/-.010; the
+# bore its reamed band; the #14 pilot the DRILLED HOLES row, stationed .XX
+# from the front face and taper-reamed at assembly (note 1); the seam is
+# match-reamed at assembly, never by the part's traveler. The declarations
+# print nothing.
+DRAWING_NOTES = SHEET_NOTES
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_crank_hub"
+_GEOM = "dt_crank_hub_geometry"
+_NOTES = "dt_crank_hub_notes"
+# The printed one-sided match on the arm's measured thickness, (low, high) mm
+# from that thickness.
+_SEAT_MATCH = [
+    round(float(text) * 25.4, 6) for text in reversed(SEAT_LENGTH_MATCH_BAND.split("/"))
+]
+part_metadata(
+    model_sources=(
+        (_GEOM, "HUB_LENGTH"),
+        (_GEOM, "HUB_SEAT_DIA"),
+        (_GEOM, "HUB_SEAT_LENGTH"),
+        (_GEOM, "HUB_BARREL_DIA"),
+        (_GEOM, "RELIEF_DIA"),
+        (_GEOM, "HUB_BORE_DIA"),
+    ),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
+        "outward": ([0.0, -1.0, 0.0], ("__frame__",)),
+    },
+)
+requirement(
+    "rear_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), HUB_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": HUB_LENGTH},
+            ((_GEOM, "HUB_LENGTH"),),
+        ),
+        "outward": ([0.0, 1.0, 0.0], ((_GEOM, "HUB_LENGTH"),)),
+        "length": (
+            limits(HUB_LENGTH, _P["HubLength"], HUB_LENGTH_BAND, unit=UNIT),
+            ((_GEOM, "HUB_LENGTH"), (_GEOM, "HUB_LENGTH_BAND"), (_SELF, "SIDE_KEEP")),
+        ),
+        "length_nominal": (HUB_LENGTH, ((_GEOM, "HUB_LENGTH"),)),
+        "length_from": ("front_face", ((_SELF, "SIDE_KEEP"),)),
+        "callout": (HUB_LENGTH_CALLOUT, ((_NOTES, "HUB_LENGTH_CALLOUT"),)),
+    },
+    precision={"length": _P["HubLength"]},
+)
+# The arm shoulder: the seat's inboard end, where the barrel steps up.
+requirement(
+    "shoulder",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), -HUB_SEAT_LENGTH),),
+    requirements=("station_match",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": HUB_SEAT_LENGTH},
+            ((_GEOM, "HUB_SEAT_LENGTH"),),
+        ),
+        "outward": ([0.0, -1.0, 0.0], ((_GEOM, "HUB_SEAT_LENGTH"),)),
+        "station_nominal": (HUB_SEAT_LENGTH, ((_GEOM, "HUB_SEAT_LENGTH"),)),
+        "station_from": ("front_face", ((_SELF, "SIDE_KEEP"),)),
+        "station_match": (
+            _SEAT_MATCH,
+            ((_NOTES, "SEAT_LENGTH_MATCH_BAND"), (_NOTES, "SEAT_LENGTH_NOTE")),
+        ),
+        "station_mate": (
+            "MHA-DT-06 CRANK ARM THICKNESS",
+            ((_NOTES, "SEAT_LENGTH_NOTE"),),
+        ),
+        "callout": (SEAT_LENGTH_CALLOUT, ((_NOTES, "SEAT_LENGTH_CALLOUT"),)),
+        "note": (SEAT_LENGTH_NOTE, ((_NOTES, "SEAT_LENGTH_NOTE"),)),
+    },
+)
+requirement(
+    "seat",
+    kind="outside_cylinder",
+    faces=(CylinderFace(HUB_SEAT_DIA),),
+    requirements=("dia_ref", "diametral_interference"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "dia_ref": (
+            HUB_SEAT_DIA,
+            ((_GEOM, "HUB_SEAT_DIA"), "REFERENCE_DIMENSIONS", (_SELF, "SIDE_KEEP")),
+        ),
+        "diametral_interference": (
+            list(SEAT_PRESS_INTERFERENCE),
+            ((_GEOM, "SEAT_PRESS_INTERFERENCE"), (_NOTES, "SEAT_CALLOUT")),
+        ),
+        "mate": ("MHA-DT-06 CRANK ARM BORE", ((_NOTES, "SEAT_CALLOUT"),)),
+        "length_nominal": (HUB_SEAT_LENGTH, ((_GEOM, "HUB_SEAT_LENGTH"),)),
+        "callout": (SEAT_CALLOUT, ((_NOTES, "SEAT_CALLOUT"),)),
+    },
+)
+requirement(
+    "barrel",
+    kind="outside_cylinder",
+    faces=(CylinderFace(HUB_BARREL_DIA),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, HUB_SEAT_LENGTH, 0.0], ((_GEOM, "HUB_SEAT_LENGTH"),)),
+        "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "dia": (
+            limits(HUB_BARREL_DIA, _P["BarrelDia"], unit=UNIT),
+            ((_GEOM, "HUB_BARREL_DIA"), (_GEOM, "UNIT"), (_SELF, "SIDE_KEEP")),
+        ),
+        "nominal_dia": (HUB_BARREL_DIA, ((_GEOM, "HUB_BARREL_DIA"),)),
+        "length_nominal": (HUB_BARREL_LENGTH, ((_GEOM, "HUB_BARREL_LENGTH"),)),
+    },
+    precision={"dia": _P["BarrelDia"]},
+)
+requirement(
+    "relief",
+    kind="outside_cylinder",
+    faces=(CylinderFace(RELIEF_DIA),),
+    requirements=("dia", "length"),
+    fields={
+        "at": ([0.0, RELIEF_STATION, 0.0], ((_GEOM, "RELIEF_STATION"),)),
+        "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "dia": (
+            limits(RELIEF_DIA, _P["ReliefDia"], unit=UNIT),
+            ((_GEOM, "RELIEF_DIA"), (_GEOM, "UNIT"), (_SELF, "SIDE_KEEP")),
+        ),
+        "nominal_dia": (RELIEF_DIA, ((_GEOM, "RELIEF_DIA"),)),
+        # Printed back from the rear face (SIDE_KEEP "ReliefLength").
+        "length": (
+            limits(RELIEF_LENGTH, _P["ReliefLength"], unit=UNIT),
+            ((_GEOM, "RELIEF_LENGTH"), (_GEOM, "UNIT"), (_SELF, "SIDE_KEEP")),
+        ),
+        "length_nominal": (RELIEF_LENGTH, ((_GEOM, "RELIEF_LENGTH"),)),
+        "length_end": ("rear_face", ((_SELF, "SIDE_KEEP"),)),
+    },
+    precision={"dia": _P["ReliefDia"], "length": _P["ReliefLength"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(HUB_BORE_DIA),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "dia": (
+            limits(HUB_BORE_DIA, _P["BoreDia"], HUB_BORE_BAND, unit=UNIT),
+            ((_GEOM, "HUB_BORE_DIA"), (_GEOM, "HUB_BORE_BAND"), (_SELF, "END_KEEP")),
+        ),
+        "nominal_dia": (HUB_BORE_DIA, ((_GEOM, "HUB_BORE_DIA"),)),
+        "thru": (True, ((_NOTES, "BORE_CALLOUT"),)),
+        "process": ("ream", ((_NOTES, "BORE_CALLOUT"),)),
+        "mate": ("MHA-DT-11", ((_NOTES, "BORE_CALLOUT"),)),
+        "diametral_clearance": (
+            [SHAFT_CLEARANCE_MIN, SHAFT_CLEARANCE_MAX],
+            ((_GEOM, "SHAFT_CLEARANCE_MIN"), (_GEOM, "SHAFT_CLEARANCE_MAX")),
+        ),
+        "callout": (BORE_CALLOUT, ((_NOTES, "BORE_CALLOUT"),)),
+    },
+    precision={"dia": _P["BoreDia"]},
+)
+# The MHA-DT-09 pilot: #14 through both walls on the X axis, at its .XX
+# station from the faced front face; note 1 taper-reams it at assembly.
+requirement(
+    "pin_hole",
+    kind="hole",
+    faces=(CylinderFace(SERVICE_PIN_DIA),),
+    requirements=("dia", "station"),
+    fields={
+        "at": (
+            [-HUB_BARREL_DIA / 2.0, SERVICE_PIN_STATION, 0.0],
+            ((_GEOM, "HUB_BARREL_DIA"), (_GEOM, "SERVICE_PIN_STATION")),
+        ),
+        "axis": ([1.0, 0.0, 0.0], ("SERVICE_PIN_HOLE_SPEC",)),
+        "dia": (
+            drilled_limits(SERVICE_PIN_DIA, 3, unit=UNIT),
+            ("SERVICE_PIN_HOLE_SPEC", (_GEOM, "UNIT"), (_SELF, "HOLE_CALLOUT_XY")),
+        ),
+        "nominal_dia": (SERVICE_PIN_DIA, ("SERVICE_PIN_HOLE_SPEC",)),
+        "thru": (True, ("SERVICE_PIN_HOLE_SPEC",)),
+        "process": ("drill", ("SERVICE_PIN_HOLE_SPEC",)),
+        "drill": (SERVICE_PIN_HOLE_SPEC.size, ("SERVICE_PIN_HOLE_SPEC",)),
+        "station": (
+            limits(SERVICE_PIN_STATION, _P["ServicePinStation"], unit=UNIT),
+            ((_GEOM, "SERVICE_PIN_STATION"), (_GEOM, "UNIT"), (_SELF, "SIDE_KEEP")),
+        ),
+        "station_nominal": (SERVICE_PIN_STATION, ((_GEOM, "SERVICE_PIN_STATION"),)),
+        "station_from": ("front_face", ((_SELF, "SIDE_KEEP"),)),
+        "callout": (CROSS_HOLE_CALLOUT, ((_NOTES, "CROSS_HOLE_CALLOUT"),)),
+        "note": (CROSS_HOLE_NOTE, ((_NOTES, "CROSS_HOLE_NOTE"),)),
+    },
+    precision={"dia": 3, "station": _P["ServicePinStation"]},
+)
+# The MHA-DT-VN-59 seam: half in the seat, half in the arm, match-reamed with
+# the arm at assembly (its callout); no part of this traveler.
+requirement(
+    "seam",
+    kind="assembly_hole",
+    faces=(CylinderFace(AXIAL_PIN_DIA),),
+    requirements=("depth",),
+    fields={
+        "at": (
+            [0.0, 0.0, AXIAL_PIN_RADIUS_FROM_AXIS],
+            ((_GEOM, "AXIAL_PIN_RADIUS_FROM_AXIS"),),
+        ),
+        "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "dia_ref": (
+            AXIAL_PIN_DIA,
+            ((_GEOM, "AXIAL_PIN_DIA"), (_NOTES, "SEAM_CALLOUT")),
+        ),
+        "depth": (
+            limits(SEAM_DEPTH, _P["SeamDepth"], unit=UNIT),
+            ((_GEOM, "SEAM_DEPTH"), (_GEOM, "UNIT"), (_NOTES, "SEAM_CALLOUT")),
+        ),
+        "depth_nominal": (SEAM_DEPTH, ((_GEOM, "SEAM_DEPTH"),)),
+        "made_at": ("assembly", ((_NOTES, "SEAM_CALLOUT"),)),
+        "callout": (
+            SEAM_CALLOUT.replace("<MOD-DIAM>", "\u00d8").replace(
+                "<HOLE-DEPTH>", "\u21a7"
+            ),
+            ((_NOTES, "SEAM_CALLOUT"),),
+        ),
+    },
+    precision={"depth": _P["SeamDepth"]},
+)
 
 
 def _set_callout_below(display: Any, text: str, label: str) -> None:

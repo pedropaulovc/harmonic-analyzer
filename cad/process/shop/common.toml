@@ -637,6 +637,10 @@ description = ".0930 in HSS chucking reamer"
 diameter_mm = 2.3622
 [tools.tape-3m-vhb-5906]  # inventory consumables.tape-3m-vhb-5906; MHA-CH-13 strap on its sub-plate, MHA-MS-01 stick on its fixture bar
 description = "3M VHB 5906 double-sided tape, .006 in"
+[tools.radius-gauges]  # inventory gauges.radius-gauges (to buy); MHA-PD-12 4X R.07 filed corners
+description = "Starrett S167AZ radius gauge set, 1/32-17/64 in by 64ths, convex and concave leaves"
+[tools.combination-square-starrett-c11h-12]  # inventory tools.combination-square-starrett-c11h-12; MHA-PD-12 filed edges and ends square
+description = "Starrett C11H-12-4R 12 in combination square"
 [tools.telescoping-gauges-starrett-s579gz]  # inventory gauges.telescoping-gauges-starrett-s579gz
 description = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
 [tools.threading-bits-lms-6685]  # MHA-DT-03-TL-03 1/4-28 UNF single-pointed (owner 2026-11-19); MHA-PD-08 #8-32 UNC single-pointed (owner 2026-11-19); MHA-MG-03 1/4-20 UNC single-pointed (owner 2026-11-19); MHA-DT-03-TL-07 #8-32 UNC single-pointed (drawing callout 2026-11-20, #2356)
