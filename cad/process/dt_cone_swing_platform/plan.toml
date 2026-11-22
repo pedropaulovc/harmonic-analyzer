@@ -417,7 +417,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.blank_thickness_m
 
 [[setups.operations]]
 instruction = "Pick the better wide face as the UNDERSIDE (the sliding face, Ra {{cad.underside_finish_ra_uin:d}} µin as supplied) and the straighter long edge as edge E (sight both edges against the steel rule's edge). Mark U on the underside and E on that edge at one end with marking fluid: the MARKED end."
-inspection = "The underside as rolled: no scratch the fingernail catches, no pit, no roll mark, no rust. Neither face good: set the blank aside and tell the owner."
+inspection = "The underside as rolled: no scratch the fingernail catches, no pit, no roll mark, no rust. The top face as rolled (the drawing's Ra 125 is met by the cold-finished face): no pit, deep scratch or rust, by eye. Either face not good: set the blank aside and tell the owner."
 gauge_checks = "other"
 
 [[setups]]
@@ -556,7 +556,7 @@ instruction = "Jog Z up clear, back the tap out by hand. Run PL03_post_near_tap 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Unclamp. File the exit burrs off the top face at the five holes and stone both faces' sawn-end corners, so the blank seats flat on the spoil plate's top face in Setup 4."
+instruction = "Unclamp. File the exit burrs off the top face at the five holes and stone both faces' sawn-end corners; take any raised burr off the underside (U) at the counterbore's rim and the hole mouths with the deburring tool, without stoning U's face, so U seats flat on the spoil plate's top in Setup 4."
 feed = "hand"
 
 [[setups]]
@@ -608,7 +608,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Deburr both holes' mouths top and bottom with the deburring tool, and stone the plate's top round them flat: the blank's top face seats there."
+instruction = "Deburr both holes' mouths top and bottom with the deburring tool, and stone the plate's top round them flat: the blank's underside (U) seats there."
 feed = "hand"
 
 [[setups]]
@@ -818,7 +818,7 @@ speed_kind = "other"
 tool = "deburr"
 drilling = "none"
 sizing = "other"
-instruction = "Deburr every milled edge top and bottom, the notch's and the relief's edges, both mouths of the five holes and the counterbore's rim to R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max (deburring tool, smooth file). Break E's two long corners the same, lightly: E stays straight. Never stone the underside's face."
+instruction = "Deburr every milled edge top and bottom, the notch's and the relief's edges, both mouths of the four holes (two post taps, pivot, hold-down) and the counterbore's rim to R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max (deburring tool, smooth file). Break E's two long corners the same, lightly: E stays straight. Never stone the underside's face."
 feed = "hand"
 
 [[setups.operations]]
