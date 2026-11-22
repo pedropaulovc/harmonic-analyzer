@@ -13,7 +13,7 @@
   <polygon class="fixture-support" points="700,200 740,185 740,215"/>
   <line class="centre-line" x1="10" y1="200" x2="750" y2="200"/>
   <line class="datum" x1="320" y1="150" x2="320" y2="250"/>
-  <text class="datum-label" x="300" y="145">shoulder</text>
+  <text class="datum-label" x="252" y="145">shoulder</text>
   <line class="leader" x1="190" y1="219" x2="160" y2="290"/>
   <text class="label" x="80" y="305">body Ø.600 × 2.50</text>
   <line class="leader" x1="460" y1="212" x2="420" y2="290"/>
@@ -24,7 +24,7 @@
   <text class="label" x="600" y="95">1/4-28 × .47, tail centre</text>
   <line class="leader" x1="323" y1="186" x2="380" y2="110"/>
   <text class="label" x="384" y="110">relief .010 deep at the shoulder (P1 blade)</text>
-  <line class="leader" x1="720" y1="190" x2="730" y2="150"/>
-  <text class="label" x="660" y="140">dead centre</text>
+  <line class="leader" x1="722" y1="212" x2="715" y2="248"/>
+  <text class="label" x="672" y="262">dead centre</text>
   <text class="label" x="20" y="385">Journal miked at both ends and the middle; a reamed blank slides its length with no shake.</text>
 </svg>

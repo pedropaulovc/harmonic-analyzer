@@ -141,6 +141,9 @@ def test_the_depth_check_and_over_pins_numbers_match_the_gear_data() -> None:
     assert P["one_pin_min_in"] == math.ceil(min(one) * 1e4 - 1e-6) / 1e4
     assert P["one_pin_max_in"] == math.floor(max(one) * 1e4 + 1e-6) / 1e4
     assert P["one_pin_min_in"] < P["one_pin_aim_in"] < P["one_pin_max_in"]
+    both = [2 * x for x in one]
+    assert P["pins_less_od_min_in"] == math.ceil(min(both) * 1e4 - 1e-6) / 1e4
+    assert P["pins_less_od_max_in"] == math.floor(max(both) * 1e4 + 1e-6) / 1e4
 
 
 def test_the_boss_holds_the_cam_and_the_arbor_takes_the_cone_kits_collar() -> None:

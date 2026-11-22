@@ -16,9 +16,9 @@
   <line class="leader" x1="320" y1="150" x2="460" y2="100"/>
   <text class="label" x="464" y="104">cam Ø1.203-1.205, to the rim face</text>
   <line class="leader" x1="270" y1="60" x2="300" y2="45"/>
-  <text class="label" x="304" y="45">gear's rim (back face on item 1)</text>
+  <text class="label" x="304" y="45">gear's rim (back face on the fixture body)</text>
   <line class="leader" x1="190" y1="300" x2="190" y2="380"/>
-  <text class="label" x="120" y="390">fixture item 1 in the 4-jaw (set once)</text>
+  <text class="label" x="120" y="390">fixture body of MHA-DT-12-TL-01 (TL-00 item 1) in the 4-jaw (set once)</text>
   <line class="leader" x1="360" y1="240" x2="460" y2="280"/>
   <text class="label" x="464" y="284">stub in the bore; clock pin in the notch</text>
 </svg>
