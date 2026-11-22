@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360">
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="24">Side view along the jaws: the big end out past the jaws, the hole drilled in the overhang (not to scale)</text>
+  <rect class="fixture-vise" x="258" y="276" width="462" height="30"/>
+  <rect class="clamp" x="258" y="120" width="462" height="96"/>
+  <rect class="clamp" x="258" y="216" width="430" height="60"/>
+  <path class="part-kept" d="M150 180 L470 184 L470 212 L150 216 Z"/>
+  <path class="part-kept" d="M150 180 Q140 198 150 216 Z"/>
+  <path class="clamp" d="M590 186 L688 187 L688 213 L590 214 Z"/>
+  <rect class="cutter" x="196" y="96" width="14" height="84"/>
+  <line class="centre-line" x1="203" y1="70" x2="203" y2="240"/>
+  <line class="datum" x1="150" y1="150" x2="150" y2="250"/>
+  <text class="datum-label" x="30" y="146">X0 the big end's rim</text>
+  <line class="dims" x1="150" y1="320" x2="258" y2="320"/>
+  <line class="dims" x1="150" y1="312" x2="150" y2="328"/>
+  <line class="dims" x1="258" y1="312" x2="258" y2="328"/>
+  <text class="label" x="120" y="344">.25 out past the jaws</text>
+  <text class="label" x="216" y="80">#45 at .15 from the rim, through into air</text>
+  <text class="label-on-clamp" x="290" y="252">1 in parallel on edge</text>
+  <text class="label-on-clamp" x="560" y="176">spacer: a second pin</text>
+  <text class="label-on-clamp" x="290" y="140">fixed jaw behind the pin, paper folded over it</text>
+  <text class="label" x="600" y="326">vise body</text>
+  <text class="label" x="300" y="344">Z0 the pin's top at the hole; Y0 its axis, from both sides</text>
+</svg>

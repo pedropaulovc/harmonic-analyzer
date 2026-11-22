@@ -1,25 +1,240 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Crank pin MHA-DT-09, one off: a bought No. 3 x 1-3/4 taper pin (McMaster
+# 98390A254, 12L14, ASME B18.8.2; owner ruling 2026-11-20, #2368) with one
+# added operation, the #45 keeper-ring hole through the big end, drilled on
+# the PM-30MV from a program (the manufacturing premise, AGENTS.md: the CNC
+# mill is never run as a manual mill), as MHA-PN-07's #54 eye (program
+# PS01_eye):
+#
+# - The pin lies along the vise jaws on one 1 in parallel standing on edge,
+#   the big end .25 in out past the jaws' left side, so the hole (.15 from
+#   the big end) is drilled in the overhang into air; a second pin of the
+#   pack on the parallel's right end balances the moving jaw. The jaws grip
+#   the taper at its largest gripped section, at the jaws' left face, .10 in
+#   from the hole: the drill's thrust is down onto the parallel.
+# - Y0 is the pin's axis found by the edge finder on both sides of the
+#   overhang at the hole's station (the midpoint), not from the fixed jaw: the
+#   taper does not lie square to the jaws, and the drawing's .064 MIN web
+#   leaves no room for the axis off by a jaw reading.
+# - X0 is the big end's rim plane, the drawing's station datum: the edge
+#   finder touches the end just under the pin's top, where the ASME crown
+#   (about .03 high at the axis) has fallen away to the rim.
+#
+# Setups: 1 bench: receive and mike the pin; 2 mill: the #45 hole (program
+# DP01_ring_hole); 3 bench: deburr, check, oil (FINISH: as supplied; oiled).
+#
+# Flagged: the taper pin (McMaster 98390A254, pack of 25) is not in the shop
+# records: to order. The pin gauges (gauges.pin-gauges) are to order.
 title = "Crank Pin"
-part = "MHA-DT-09 Crank Pin"
-revision = "placeholder"
-material = "12L14 carbon steel, McMaster-Carr 98390A254 (No. 3 x 1-3/4 taper pin, ASME B18.8.2)"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "{{cad.material_spec}}"
+stock = "Qty {{process.quantity:g}}. A bought {{cad.taper_stock}} ({{cad.taper_standard}}; not in the shop records: to order, pack of 25); a second pin of the pack is the vise spacer in Setup 2."
+note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Home the mill ($H) and touch off G54 before the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Prove the file in air first. Leave the pin as supplied except the hole and its deburr (Op 100); never grip it bare in steel jaws (paper in the mill vise's jaws, soft jaws at the bench)."
 shop = "../shop"
 # A bought taper pin, cross-drilled only (owner ruling 2026-11-20, #2368):
-# no stock row; the stock BOM reads the registry SKU.
-stock_refs = []
+# its pack is the stock row (to order).
+stock_refs = ["taper-pin-no3-1-3-4"]
+material_key = "mill-12l14"
+milling_material = "steel_1018"
+
+[cad]
+file = "../../out/features/dt_crank_pin/features.toml"
+adapter = "drilled_block"
+part = "dt-crank-pin"
+
+[parameters]
+quantity = 1
+# The bought pin is its own blank: the catalogue's 1-3/4 length and .219
+# large end (the stock fit against the export's envelope).
+blank_x_in = 1.75
+blank_y_in = 0.219
+blank_z_in = 0.219
+# Setup 1: the bought pin's big end, ASME B18.8.2 commercial No. 3
+# (cad.taper_dia_band_mm, not printed): mike it before drilling.
+big_end_min_in = 0.2183
+big_end_max_in = 0.2203
+big_end_min_mm = 5.54482
+big_end_max_mm = 5.59562
+# Mill (shop workholding.vise-pm-6, fixtures.parallels-lms-6745, 1/8 in
+# thick): one 1 in parallel of the set standing on edge, centred between the
+# jaws, its left end at the jaws' left side; the pin lies on its top edge
+# with the big end .25 in out past the jaws' left side.
+riser_height_mm = 25.4
+parallel_thickness_mm = 3.175
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+# The LMS 6745 parallels are 4 in long (as the dt_pinion_bracket plan
+# records); the spacer pin sits on the parallel's right end.
+parallel_length_mm = 101.6
+# The big end past the jaws' left side; the hole drills in this overhang.
+big_end_overhang_mm = 6.35
+# The jaw tops over the pin's top at the hole (Z0); cam.py checks it.
+jaw_top_over_pin_mm = 14.0621
+# The #45 drill runs this far past the pin's underside (authored); its tip
+# then stands under the pin by its point and this; cam.py checks it.
+hole_drill_past_mm = 0.5
+hole_tip_height_mm = -1.1258
+# The #1 centre drill spots to Ø2.3 mm (over the #45's 2.083), cam.py
+# computes the depth.
+spot_dia_mm = 2.3
+# The #45 drill (shop tools.drill-45.diameter_mm); cam.py checks it.
+drill_45_dia_mm = 2.0828
+# Pecks of the #45: under one diameter (prechips drill_pecking's step
+# limit), full retract.
+hole_peck_mm = 1.0
+# Machine-capacity inputs (mm): tool lengths from spindle nose to tip.
+drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
+# ASME B94.11M jobber length overall, #45: 2-1/8 in; the #1 combined drill
+# and countersink 1-1/4 in. Bounded by their whole length below the chuck.
+drill_45_oal_mm = 53.975
+centre_drill_oal_mm = 31.75
+# The least length each must stand out of the drill chuck to reach its
+# depth with the chuck above the jaw tops; cam.py checks it.
+spot_projection_min_mm = 22.0
+drill_45_projection_min_mm = 26.0
+# Setup 3: the hole's station read with a .082 pin gauge in it, from the
+# big end's rim to the pin's far side (the calipers' jaw tips overlapping
+# only the rim's edge, clear of the crown, as the X0 pick-up): the .14-.16
+# station plus half the pin (.041).
+station_far_side_min_in = 0.181
+station_far_side_max_in = 0.201
+station_far_side_min_mm = 4.5974
+station_far_side_max_mm = 5.1054
+# The Y pick-up's station: nearer the rim than the hole, so the Ø.200 edge
+# finder (centre X .100, edge X .200) stays clear of the jaws' left face
+# (at .24-.25).
+y_pickup_x_mm = 2.54
+
+[[tools]]
+id = "spot"
+name = "#1 carbide centre drill"
+ref = "centre-drills-carbide-60"
 
 [[tools]]
 id = "drill-45"
 name = "#45 drill"
-ref = "drill-45"  # Drills #45
+ref = "drill-45"
+
+[[tools]]
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Bench: receive the pin"
+machine = "Bench"
+holding = "In the hand."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/pin.svg", alt = "The bought No. 3 taper pin: its big end, the crown on it, and the 1-3/4 length." }
 
 [[setups.operations]]
-instruction = "Process not written yet."
+instruction = "Take two pins from the pack: the part, and a spacer for Setup 2. Mike the part's big end just in from its rim."
+inspection = "Big end Ø{{process.big_end_min_in:.4dot}}–{{process.big_end_max_in:.4dot}} (ASME B18.8.2 commercial No. 3)."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.big_end_min_mm}}", "{{process.big_end_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "A big end outside {{process.big_end_min_in:.4dot}}–{{process.big_end_max_in:.4dot}}: set that pin aside and take another from the pack."
+
+[[setups]]
+machine_kind = "other"
+title = "Mill: the #45 ring hole"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "The PM 6 in vise, a strip of paper folded over each jaw. One 1 in, 4 in long parallel of the 1/8 in thick set standing on edge, centred between the jaws, its left end flush with the jaws' left face (a rule across both). The pin on its top edge along the jaws, the big end to the LEFT, set {{process.big_end_overhang_mm:in.2dot}} in out past the jaws' left face with the calipers' depth rod, never under .24; the spacer pin on the parallel's right end, big end to the right, so the moving jaw closes square. Tap both down onto the parallel while closing the vise. Under the hole nothing but air."
+datum = "Program DP01_ring_hole (cam:dt_crank_pin). G54: X0 the big end's rim plane, +X along the pin; Y0 the pin's axis at the hole, +Y toward the fixed jaw; Z0 the pin's top at the hole. The file starts with an M6 for the centre drill; tool lengths from the tool setter at each M6; at the M6 stop the file has stopped the spindle and lifted the tool above the jaws."
+diagram = { file = "diagrams/hole.svg", alt = "The pin on a 4 in parallel along the vise jaws, its big end out past the jaws' left face; the centre drill spots the top and the #45 drill drills through into air, .15 in from the big end; a second pin on the parallel's right end balances the jaws." }
+envelope = { x_span_mm = ["{{cad.envelope_x_mm}}", 3.175], y_span_mm = ["{{cad.envelope_y_mm}}", 3.175], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.envelope_z_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.hole_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_45_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_y_mm}}", along_jaws_mm = "{{cad.envelope_x_mm}}", part_height_mm = "{{cad.envelope_z_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.big_end_overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_x_mm}}"], clamp_mm = ["{{process.big_end_overhang_mm}}", "{{cad.envelope_x_mm}}"], section_mm = { diameter = "{{cad.taper_small_dia_ref}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Home the mill first ($H). G54 X0 the big end's rim: edge finder (900 rpm)."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm, Ø.200), the pin clamped; its tip lowered only .005 below the pin's top at the big end (where the crown has fallen away to the rim). Touch the big end from the left: G10 L20 P1 X-2.540."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Y0 the pin's axis: edge finder on both sides of the overhang, Y0 at the midpoint."
+instruction_detailed = "Raise the finder above the pin's top; MDI G0 X{{process.y_pickup_x_mm:.3f}} (its edge then stops at X .200, clear of the jaws); jog Y until it is clear of the pin on the moving-jaw side and lower its tip to the pin's axis height (half the miked big end below the top). Touch that side and note the machine Y. Raise it, cross over to the fixed-jaw side, lower it again and touch; note that Y. Raise it, MDI G0 to the midpoint of the two: G10 L20 P1 Y0."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the pin's top at the hole, touched with the centre drill over the axis."
+instruction_detailed = "Console M6 T1 (#1 centre drill in the drill chuck, at least {{process.spot_projection_min_mm:in.2dot}} in out of it; the tool setter measures it). MDI G0 X{{cad.ring_hole_x_mm:.3f}} Y0.000: over the hole's station. Spindle stopped, its tip just dragging a .002 feeler leaf on the pin's top: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove DP01_ring_hole in air, Z0 raised 1.000 in. Then Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run DP01_ring_hole, watching every move clear the jaws; at its first M6 prompt T1 is already in, so continue; at the second put the #45 in (at least {{process.drill_45_projection_min_mm:in.2dot}} in out of the chuck). G10 L2 P1 Z(the noted Z) puts Z0 back, and the centre drill goes back in for the real run."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Run DP01_ring_hole: the #1 centre drill (T1, set 2800) spots the hole {{cad.ring_hole_station_in:.3dot}} in from the big end's rim on the axis, to Ø{{process.spot_dia_mm:in.3dot}}; at the M6 stop the #45 drill (T2, at least {{process.drill_45_projection_min_mm:in.2dot}} in out of the chuck) goes in."
+settings = "dt-centre-drill-12l14"
+milling_cuts = [
+  { name = "hole spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = 71.12, stations_mm = "{{cad.ring_hole_station_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-45"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.ring_hole_dia_band_mm}}" }
+instruction = "Cycle Start: the #45 drill (T2, set 2800) pecks the hole through the pin into the air under it, {{process.hole_peck_mm:in.3dot}} in pecks, full retract between; a drop of cutting oil on the spot first."
+settings = "dt-drill-45-12l14"
+peck = { step_mm = "{{process.hole_peck_mm}}", retract = "full" }
+peck_reason = "a cross hole in a small steel pin: each retract clears the chips before the drill breaks out through the curved underside, so it does not grab and wander there"
+hole_depth_mm = "{{cad.envelope_z_mm}}"
+milling_cuts = [
+  { name = "hole drill", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.drill_45_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = 71.12, stations_mm = "{{cad.ring_hole_station_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Raise the spindle clear and unclamp the pin and the spacer."
+
+[[setups]]
+machine_kind = "other"
+title = "Bench: deburr, check, oil"
+machine = "Bench"
+holding = "In the hand; the bench vise with soft jaws, the pin gripped lightly at its small end, if needed."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished pin: the #45 hole .15 from the big end's rim, read to a pin gauge's far side from the crowned big end." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Take the burr off both mouths of the hole with a few light strokes of the smooth file along the pin, no deeper than the burr (edge break R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Gauge the hole: a {{cad.ring_hole_dia_min_in:.3dot}} pin gauge enters it through, a {{cad.ring_hole_dia_max_in:.3dot}} pin gauge does not."
+inspection = "Hole Ø{{cad.ring_hole_dia_min_in:.3dot}}–{{cad.ring_hole_dia_max_in:.3dot}}."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.ring_hole_dia_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "The {{cad.ring_hole_dia_min_in:.3dot}} pin gauge does not enter: look for a burr at the mouths, deburr as Op 100 and gauge again. Still does not enter, or the {{cad.ring_hole_dia_max_in:.3dot}} pin gauge enters: scrap the pin and take another from the pack (Setup 1)."
+
+[[setups.operations]]
+instruction = "With the {{cad.ring_hole_dia_min_in:.3dot}} pin gauge through the hole, read with the calipers from the big end's rim to the pin gauge's far side: the jaw tips overlap only the rim's edge, about .02 in, clear of the crowned middle."
+inspection = "Rim to the pin gauge's far side {{process.station_far_side_min_in:.3dot}}–{{process.station_far_side_max_in:.3dot}} (the station {{cad.ring_hole_station_min_in:.2dot}}–{{cad.ring_hole_station_max_in:.2dot}} plus half the .082 pin gauge)."
+gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.station_far_side_min_mm}}", "{{process.station_far_side_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "Outside {{process.station_far_side_min_in:.3dot}}–{{process.station_far_side_max_in:.3dot}}: X0 was off the rim; scrap the pin and take another from the pack (Setup 1), setting X0 again."
+
+[[setups.operations]]
+instruction = "Wipe the pin with machine oil (FINISH: {{cad.finish}}) and bag it. MHA-DT-00 drives it into the crank hub and crankshaft, taper-reamed together at assembly."

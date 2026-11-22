@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" width="760" height="260">
+  <rect class="paper" x="0" y="0" width="760" height="260"/>
+  <text class="title" x="20" y="24">The finished pin: the station read from the rim to a pin gauge in the hole (not to scale)</text>
+  <path class="part-kept" d="M120 106 L640 118 L640 142 L120 154 Z"/>
+  <path class="part-kept" d="M120 106 Q104 130 120 154 Z"/>
+  <line class="centre-line" x1="80" y1="130" x2="690" y2="130"/>
+  <rect class="clamp" x="176" y="70" width="14" height="120"/>
+  <line class="datum" x1="120" y1="60" x2="120" y2="200"/>
+  <text class="datum-label" x="60" y="56">big end's rim</text>
+  <line class="dims" x1="120" y1="216" x2="190" y2="216"/>
+  <line class="dims" x1="120" y1="208" x2="120" y2="224"/>
+  <line class="dims" x1="190" y1="208" x2="190" y2="224"/>
+  <text class="label" x="100" y="244">calipers: rim to the pin gauge's far side, .181-.201</text>
+  <text class="label" x="200" y="66">.082 pin gauge through the hole (.082 enters, .086 does not)</text>
+</svg>

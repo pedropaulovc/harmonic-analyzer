@@ -201,6 +201,8 @@ description = "gray iron, class not ruled, casting for MHA-DT-05 cone pivot post
 description = "Drill rod (O1 or W1 tool steel, annealed, ground), round bar, 1/8 in"
 [stock.o1-drill-rod-5-32]
 description = "AISI O1 drill rod, precision ground, round bar, 5/32 in"
+[stock.taper-pin-no3-1-3-4]
+description = "12L14 carbon steel, ASME B18.8.2 No. 3 x 1-3/4 in taper pin (McMaster-Carr 98390A254)"
 
 # --- .2510-.2515 reamed bores (MHA-DT-18, and any dt part with that band) ---
 # Go/no-go pair for the Ø.2500 +.0010/+.0015 REAM THRU bores, as the MHA-CH-13
@@ -244,6 +246,23 @@ diameter_mm = 3.9878
 # plan list the pair in its tooling.
 [tools.plug-gauges-3760-3765]
 description = "Plug gauge pair, .3760 GO (plus) and .3765 NO-GO (minus), Vermont Gage Class X"
+
+# --- MHA-DT-09 crank pin (cad/process/dt_crank_pin/plan.toml) ---------------
+# The bought 12L14 taper pin's #45 ring hole on the PM-30MV (program
+# DP01_ring_hole). Authored, no source on record: both tools at the mill's
+# 2800 rpm top (machines.pm-30mv), the #45 then at about 60 sfm, well under
+# HSS's speed in free-machining 12L14, and fed at .001 in/rev (2.8 in/min),
+# as the pen adjust screw's #54 in brass (pn.toml pn-drill-54-c360).
+[settings.dt-centre-drill-12l14]
+tool = "centre-drills-carbide-60"
+material = "mill-12l14"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.dt-drill-45-12l14]
+tool = "drill-45"
+material = "mill-12l14"
+rpm = 2800
+feed = "2.8 in/min, cutting oil"
 
 # --- MHA-DT-32 crank handle pivot screw (cad/process/dt_crank_handle_pivot_screw/plan.toml)
 # The 1018 rod turned between the 3-jaw and the MT3 dead centre (no live
