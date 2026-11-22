@@ -206,7 +206,7 @@ def test_shop_stock_row_covers_the_bent_tube_and_its_tail() -> None:
     # are faced after the bend, #2401), inside the supplier's -1/8 in cut
     # tolerance, and about 23 in left over for a trial bend to 90° on the form,
     # long enough to pull by hand like the blank (owner ruling 2026-11-22,
-    # option A, cnc/questions/bench-b-gooseneck-trial-bend.json, superseding
+    # option A, https://github.com/pedropaulovc/harmonic-analyzer/issues/2401#issuecomment-7085840331, superseding
     # #2401's 36 in).
     developed = geom.LEG_LENGTH + math.pi / 2.0 * geom.BEND_R + geom.TUBE_STRAIGHT
     part_length = developed + 3.0 * geom.MM_PER_IN

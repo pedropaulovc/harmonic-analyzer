@@ -226,7 +226,7 @@ they need from their process plans. They hold:
   12 mm H7 reamer (`tools.reamer-12mm-h7`) and a 4140/4142 HT `[stock.<key>]` row;
 - the MHA-SM-01 gooseneck tube to buy (owner rulings 2026-10-27 (Pedro), #1951,
   2026-11-08, #2315, 2026-11-14, #2401, and 2026-11-22, option A,
-  `cnc/questions/bench-b-gooseneck-trial-bend.json`, superseding #2401's 36 in):
+  `https://github.com/pedropaulovc/harmonic-analyzer/issues/2401#issuecomment-7085840331`, superseding #2401's 36 in):
   a 4130-N `[stock.<key>]` row of form `round_tube` (OnlineMetals 7322, one
   48 in cut with about 23 in for a trial bend to 90° on the form before the
   part), read by `test_sm_gooseneck_drawing.py` against the bent tube's

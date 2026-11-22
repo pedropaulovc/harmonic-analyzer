@@ -6,7 +6,7 @@
 # Route. Setup 1 checks the tube as it arrives and saws the blank, its length
 # the developed length plus the ends' allowance (the formed_blank adapter
 # binds both); the rest of the 48 in tube (owner ruling 2026-11-22, option A,
-# cnc/questions/bench-b-gooseneck-trial-bend.json) checks the form's groove
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2401#issuecomment-7085840331) checks the form's groove
 # and is then the trial bend. Setups 2 to 4 make the bend form
 # (fixtures.sm-gooseneck-bend-form; owner ruling
 # 2026-11-22, option A: two 6061 plates from the owned 1/2 x 6 in bar, the
@@ -266,7 +266,7 @@ speed_kind = "other"
 tool = "deburr"
 drilling = "none"
 sizing = "other"
-instruction = "Deburr all three sawn ends inside and out: the tube's ends must slide in the form's channel."
+instruction = "Deburr all four ends (the blank's two and the trial piece's two) inside and out: the tube's ends must slide in the form's channel."
 feed = "hand"
 
 # --- Setup 2: the form's plates ----------------------------------------------
