@@ -2,18 +2,18 @@
   <rect class="paper" x="0" y="0" width="760" height="360"/>
   <text class="title" x="20" y="20">Setup 6: plan view from above; the jig on the tool post, the cutters in the headstock (not to scale)</text>
   <rect class="fixture-vise" x="20" y="60" width="80" height="240"/>
-  <rect class="fixture-support" x="100" y="160" width="70" height="40"/>
+  <rect class="fixture-vise" x="100" y="160" width="70" height="40"/>
   <rect class="cutter" x="170" y="176" width="110" height="8"/>
   <line class="centre-line" x1="20" y1="180" x2="740" y2="180"/>
   <line class="centre-line" x1="200" y1="214" x2="740" y2="214"/>
+  <rect class="clamp" x="400" y="150" width="230" height="128"/>
+  <rect class="clamp" x="630" y="178" width="110" height="72"/>
   <path class="part-kept" d="M300,214 Q280,206 300,198 Z"/>
   <rect class="part-kept" x="300" y="198" width="70" height="32"/>
   <rect class="part-kept" x="370" y="183" width="22" height="62"/>
   <rect class="part-kept" x="406" y="194" width="300" height="40"/>
-  <rect class="fixture-support" x="400" y="150" width="230" height="128"/>
-  <rect class="fixture-support" x="630" y="178" width="110" height="72"/>
   <rect class="holes" x="370" y="176" width="10" height="10"/>
-  <rect class="clamp" x="490" y="132" width="16" height="22"/>
+  <rect class="part-rest" x="490" y="132" width="16" height="22"/>
   <text class="label" x="110" y="150">drill chuck on its 1/2 arbor in the 3-jaw</text>
   <text class="label" x="20" y="344">cutters 1.35–1.63 in out, X±7.000 mm off the stub</text>
   <line class="leader" x1="175" y1="332" x2="175" y2="186"/>

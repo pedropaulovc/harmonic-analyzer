@@ -596,7 +596,7 @@ gauge_checks = [{ gauge = "lathe-z-dro", band_mm = "{{cad.far_end_length_band_mm
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Rim past {{cad.far_end_length_max_in:.3dot}} from F: skim the apex .005, step the dome again from the table above (Z0 again on the new face), file, and read the dome and the rim again. Short of {{cad.far_end_length_min_in:.3dot}}: the shaft is scrap; start again from Setup 1."
+instruction = "Rim past {{cad.far_end_length_max_in:.3dot}} from F: skim the apex .005, then stand the shaft on F on the surface plate and write its new length from the height gauge; chuck it again as in this setup, step the dome again from the table above (Z0 again on the new face), file, and read the dome and the rim again against the new length. Short of {{cad.far_end_length_min_in:.3dot}}: the shaft is scrap; start again from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -799,7 +799,7 @@ gauge_checks = [{ gauge = "plug-gauges-0930-0935", band_mm = "{{cad.drive_pin_1_
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Either offset more than {{process.pin_correct_in:.4dot}} off: that side's DRO target moves by its error the other way (in mm), the slug goes back in turned 90° and the slug ops above run again at the new targets (90°, 45° and 135° give three more tries). A hole the GO does not enter: ream it again before reading."
+instruction = "Either offset more than {{process.pin_correct_in:.4dot}} off: that side's DRO target moves by its error the other way (in mm), the slug goes back in turned 90° and the slug ops above run again at the new targets (90°, 45° and 135° give three more tries). A hole the GO does not enter: re-seat and ream it again as the shaft's op below says, then read."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -873,7 +873,7 @@ gauge_checks = [{ gauge = "plug-gauges-0930-0935", band_mm = "{{cad.drive_pin_1_
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A hole the GO does not enter: the jig untouched, the shaft back in, swept, the reamer through it again. An offset outside {{cad.drive_pin_1_offset_min_in:.4dot}}–{{cad.drive_pin_1_offset_max_in:.4dot}}, a depth outside its band, or a hole the NO-GO enters: the shaft is scrap (a reamed hole cannot be moved); start again from Setup 1, the jig and the proved targets kept."
+instruction = "A hole the GO does not enter: re-seat the work in the jig as Holding says, set screw snug only; the .0930 reamer in the drill chuck, the cross slide at that hole's proved target (the move ending in −X, gib locked), spindle stopped: turn the work in the jig by hand until the reamer's tip, fed in by hand on the carriage, enters the hole freely. Tighten the set screw, sweep X0 as before (within {{process.dti_x0_mm:.3f}} mm), go back to the target, touch Z0 on the spigot face and ream again as above. An offset outside {{cad.drive_pin_1_offset_min_in:.4dot}}–{{cad.drive_pin_1_offset_max_in:.4dot}}, a depth outside its band, or a hole the NO-GO enters: the shaft is scrap (a reamed hole cannot be moved); start again from Setup 1, the jig and the proved targets kept."
 
 [[setups]]
 machine_kind = "other"
