@@ -659,8 +659,10 @@ requirement(
         "at": ([ARM_C2C, 0.0, 0.0], ("ARM_C2C",)),
         "axis": (_Z, (_FRAME,)),
         "thread": (HANDLE_PIVOT_HOLE_SPEC.size, ("HANDLE_PIVOT_HOLE_SPEC",)),
+        # The band runs from the printed .089 (the #43), not from the Hole
+        # Wizard's 2.261 mm, which reads .0002 mm over the drill.
         "dia": (
-            drilled_limits(_HANDLE_PIVOT_HOLE_DIA, 3, unit=UNIT),
+            drilled_limits(round(_HANDLE_PIVOT_HOLE_DIA / 25.4, 3) * 25.4, 3, unit=UNIT),
             ("HANDLE_PIVOT_HOLE_SPEC", _UNIT, (_SELF, "_tap_drill_precision")),
         ),
         "nominal_dia": (_HANDLE_PIVOT_HOLE_DIA, ("HANDLE_PIVOT_HOLE_SPEC",)),
