@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 3, section through the axis, headstock left, not to scale: the boss in the jaws, the rim face on the jaw fronts, the back face out. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 3: chucking 2, the boss in the 3-jaw, rim face on the jaw fronts: back face to thickness</text>
+  <rect class="fixture-vise" x="200" y="110" width="80" height="40"/>
+  <rect class="fixture-vise" x="200" y="260" width="80" height="40"/>
+  <rect class="part-kept" x="200" y="150" width="80" height="110"/>
+  <rect class="part-kept" x="280" y="70" width="50" height="270"/>
+  <rect class="part-removed" x="330" y="70" width="10" height="270"/>
+  <rect class="holes" x="200" y="196" width="130" height="18"/>
+  <line class="centre-line" x1="180" y1="205" x2="520" y2="205"/>
+  <line class="datum" x1="280" y1="70" x2="280" y2="110"/>
+  <line class="active-face" x1="330" y1="70" x2="330" y2="340"/>
+  <rect class="cutter" x="360" y="80" width="40" height="22"/>
+  <line class="leader" x1="280" y1="90" x2="170" y2="60"/>
+  <text class="datum-label" x="30" y="60">rim face on the jaw fronts</text>
+  <line class="leader" x1="330" y1="120" x2="450" y2="140"/>
+  <text class="label" x="454" y="144">back face, faced to .2990-.3010 overall</text>
+  <line class="leader" x1="305" y1="320" x2="450" y2="330"/>
+  <text class="label" x="454" y="334">rim .116-.120 (micrometer)</text>
+  <line class="leader" x1="240" y1="250" x2="450" y2="290"/>
+  <text class="label" x="454" y="294">boss in the jaws</text>
+</svg>

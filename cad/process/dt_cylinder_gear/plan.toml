@@ -1,78 +1,819 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Cylinder gear MHA-DT-12 (qty 20), C36000 brass, 120T 48DP 20PA with an
+# eccentric cam boss and an alignment notch in one tooth space.
+#
+# Route R2, a gang of ten blanks on a shop-made arbor (owner ruling
+# 2026-11-22, relayed by Main; Main's conditions of the same day are checks
+# here and in cam.py, not prose only):
+# - Setup 1, saw: 20 slices off the 2-5/8 in C360 bar (and, once, 7 in of the
+#   5/8 in 1018 bar for the arbor).
+# - Setups 2-3, lathe, two chuckings a blank: the cam face, the Ø1.92 boss,
+#   its shoulder (the rim face) and the reamed bore in one; the back face to
+#   thickness in the other, gripped on the boss.
+# - Setup 4, lathe, once (skip if on hand): the gang arbor (cad/config/
+#   shop-equipment/ fixtures.dt-cylinder-gear-gang-arbor). It has no drawing
+#   or part identity, so no feature bundle and no traveler of its own: it is
+#   made here, as the amplitude bar's riser is made in its traveler.
+# - Setup 5, lathe: ten blanks on the arbor, the stack's O.D. turned in one
+#   cut between the 3-jaw (on the arbor's turned body) and the dead centre.
+# - Setups 6-7, PM-30MV CNC with the BS-0 dividing head and its tailstock:
+#   GP01 cuts space 1 for the depth check, GP02 the other 119 spaces and a
+#   closure pass in space 1 (one M0 index stop a space), GP03 the notch
+#   through space 1 with the slotting saw.
+# - Setup 8, bench: the stack broken, each gear deburred and accepted on its
+#   own (over-pins, tooth runout to its bore).
+# - Setup 9, lathe 4-jaw on the cam fixture MHA-DT-12-TL-01 (its kit sheet
+#   MHA-DT-12-TL-00): the cam turned on each gear, located by the notch.
+# - Setup 10, bench: the cam checked, edges broken, cosmetic faces polished.
+# The CNC cuts only the teeth and the notch (AGENTS.md: CNC for milled work,
+# the manual lathe for turning); the index is the BS-0's crank, by hand at
+# each M0.
+#
+# R1 stays recoverable: one blank at a time on the cone gears' keyed arbor
+# MHA-DT-03-TL-03 (seat .3755-.3760, key out), the same GP01-GP03 with one
+# blank's ends. R2b, a gang of 20 on a longer arbor, would save about 1.3 h
+# over the 20 gears (one setup, touch-off and depth check fewer) and is not
+# taken: its arbor's journal doubles in length.
+#
+# Main's conditions (2026-11-22) and where each is checked:
+# 1. Outboard support: the BS-0's tailstock (cad/config/shop-equipment/
+#    fixtures.bs-0-tailstock, from the archived inventory: FLAGGED, the owner
+#    confirms it before the first load). The arbor's deflection under the
+#    cut at its worst station is computed by cam.py (stepped beam, fixed at
+#    the BS-0 jaws, pinned at the tailstock) and booked in the depth budget.
+# 2. Each gear accepted after the stack is broken (Setup 8): over-pins and
+#    tooth runout to its own bore. The arbor fit (.3758-.3760 journal in the
+#    .3760-.3765 bore) is booked in cam.py's runout budget.
+# 3. Index: 120 spaces × 5 holes on the 15-hole circle = 40 crank turns,
+#    back in the start hole (cam.py computes it from machines.bs-0; GP02's
+#    stops print each index; its last pass, in space 1 again, must cut no
+#    chips). GP01 ends after space 1 for the depth check; the stack comes off
+#    only after GP02's closure pass and GP03.
+# 4. Exit burrs: every rim stands free between the cam bosses, so a washer
+#    can back only the end blank; Setup 8 stones the burrs off the rim faces
+#    flat, never into a tooth space, before the cam fixture needs the gear to
+#    lie flat.
+# 5. The arbor: fixtures.dt-cylinder-gear-gang-arbor (to_make), made in
+#    Setup 4 (reason above).
+#
+# Program names, [parameters] and milling_cuts names are a contract with
+# cad/process/dt_cylinder_gear/cam.py. Tool numbers: T1 the gear cutter, T2
+# the slotting saw (the mill's tools in the order of the tools list).
+#
+# To order before the first load (records cited): the #2 48DP cutter TTC
+# 10-289-482 (tools.gear-cutters-48dp-20pa), the 7/8 stub arbor HHIP
+# 3900-0162 (tools.gear-cutter-arbor-7-8) and a 3/4 R8 collet if none is on
+# the shelf, the slotting saw TTC 10-215-014 (tools.cylinder-notch-saw) and
+# its 1 in R8 arbor TTC 67-600-016 (tools.gear-cutter-arbor-1), the
+# .3760/.3765 plug gauges (gauges.plug-gauges-3760-3765), the pin gauges
+# (gauges.pin-gauges, on the owner's order), the 3/8 setting mandrel and the
+# V-blocks (tools.setting-mandrel-375, fixtures.v-blocks), the India stone
+# (tools.india-stone-ib8), the 2-5/8 C360 bar (stock.c360-round-gear-blanks).
+# The cone kit's TL-04 1.75 collar and arbor nut are made by that kit.
+#
+# ASSUMED until bought (each checked at the machine before cutting): the
+# cutter's 12 teeth (shop dt.toml settings.cylinder-gear-cutter-c360), the
+# stub arbor's nut and shoulder no larger than Ø1.50, the saw arbor's nut no
+# larger than 45 mm across, the BS-0 tailstock no wider than 2 in across at
+# centre height within 4 in of its centre point.
 title = "Cylinder Gear"
-part = "MHA-DT-12 Cylinder Gear"
-revision = "placeholder"
-material = "C36000 free-machining brass"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "C36000 free-machining brass, 2-5/8 in round (drawing: {{cad.material_spec}})"
+stock = "2-5/8 in round C360 bar (to order, 12 in, shared with cone gears T108-T120): 20 slices {{process.slice_in:.2dot}} thick. Arbor, once: 7 in of the 5/8 in 1018 CF bar on hand."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Brass cut dry. Lathe PM-1127VF-LB (70-380 and 380-2000 rpm). Teeth: 120, 48DP 20°, cutter #2 (55-134 teeth). Finished O.D. Ø{{cad.teeth_dia_min_in:.3dot}}-{{cad.teeth_dia_max_in:.3dot}}, thickness {{cad.cam_face_thickness_min_in:.3dot}}-{{cad.cam_face_thickness_max_in:.3dot}}, bore Ø{{cad.bore_dia_min_in:.4dot}}-{{cad.bore_dia_max_in:.4dot}}. Twenty gears in two loads of ten. FLAGGED: the BS-0 tailstock's possession (archived inventory only): the owner confirms it before Setup 6."
 shop = "../shop"
-stock_refs = ["c360-round-gear-blanks"]
+stock_refs = ["c360-round-gear-blanks", "1018-round-5-8"]
+material_key = "lathe-c360"
+turning_material = "brass"
+milling_material = "brass"
+
+[cad]
+file = "../../out/features/dt_cylinder_gear/features.toml"
+adapter = "drilled_block"
+part = "dt-cylinder-gear"
+
+[parameters]
+quantity = 20
+# prechips stock_fit: one sawn slice of the 2-5/8 bar.
+blank_x_in = 2.625
+blank_y_in = 2.625
+blank_z_in = 0.34
+# Blanks a load (route R2, owner ruling 2026-11-22).
+gang = 10
+# Slices off the 2-5/8 bar: the gear's .300 and about .02 a face to face.
+slice_in = 0.34
+# Chucking 1: the sawn slice .12 in the jaws, .22 out (the boss and its
+# shoulder are cut in the .22 out, clear of the jaws).
+slice_grip_in = 0.12
+slice_dia_mm = 66.675
+slice_stickout_mm = 5.588
+# The cam boss: Ø1.92 holds the finished cam (its centre .3402 off the bore,
+# its radius .6025: .9427 from the bore's axis, the test checks it) with .017
+# to clean up. Its length, cam face to shoulder: the gear's .300 less the
+# rim's .118.
+boss_dia_mm = 48.768
+boss_length_min_in = 0.181
+boss_length_max_in = 0.183
+# Chucking 2: the boss in the jaws to the rim face, about .15.
+boss_grip_stickout_mm = 4.0
+# The gang arbor (Setup 4; fixtures.dt-cylinder-gear-gang-arbor), from the
+# 5/8 bar's raw stub in the jaws: a body Ø.600 2.50 long, the shoulder, the
+# journal 2.94, the pilot .39 for the TL-04 collar's .290 bore, the 1/4-28
+# thread .47 (its minor .2113 = .250 - 1.0825/28) and the tail centre.
+# X here: from the shoulder (blank 1's back face, G54 X0 in Setup 6).
+arbor_bar_dia_mm = 15.875
+arbor_saw_in = 7.0
+arbor_stub_in = 0.5
+arbor_stickout_mm = 160.02
+body_dia_mm = 15.24
+body_length_in = 2.5
+journal_dia_min_mm = 9.54532
+journal_dia_max_mm = 9.5504
+journal_length_mm = 74.676
+pilot_dia_mm = 6.985
+pilot_length_mm = 9.906
+thread_minor_mm = 5.368
+thread_length_mm = 11.938
+# The shoulder's relief: the P1 blade .010 into the journal at the shoulder
+# (the AR insert's R0.4 nose would leave a fillet past the blank's .010 bore
+# break, and blank 1 would not seat).
+relief_depth_in = 0.010
+# The BS-0's 3-jaw grips the body .75; its jaw fronts stand this far from
+# the shoulder: the cutter's and the saw's reach toward the jaws stays
+# short of it (cam.py).
+standoff_mm = 44.45
+body_grip_in = 0.75
+# TL-04 C175 collar on the pilot (Ø1.75 × .33, MHA-DT-03-TL-04; the test
+# reads the cone arbor spec).
+collar_dia_mm = 44.45
+collar_length_mm = 8.382
+# Setup 5 and 6 mount acceptance: the body at the lathe's jaws, and the
+# stack's O.D. on the BS-0, within .001 TIR (the shop's runout row floor).
+# On the BS-0 it is the stack's eccentricity to the head: it spreads the
+# depth around the circle and is the runout's mount term (cam.py). Any tilt
+# or taper along X is read by the depth check on blanks 2 and 9 instead.
+mount_tir_max_mm = 0.0254
+# Setup 5: the stack's O.D., the print's band, aim mid-band.
+stack_od_min_in = 2.532
+stack_od_max_in = 2.536
+stack_od_aim_mm = 64.3636
+# Prove-out (Setups 6 and 7, first load): G54 Y moved back .200 so the
+# saw's deepest Y (3.048) stays 2.03 short of the tips.
+prove_out_back_mm = 5.08
+# Setup 5 lathe hold: the arbor body in the 3-jaw, the dead centre in the
+# tail: jaw fronts to the tail centre.
+stack_stickout_mm = 140.97
+# GP01/GP02: the cutter lies in the XY plane at the stack's axis height (Z0),
+# on the operator's side of the stack (-Y); +Y into the work. Y0: the
+# cutter's rim on the stack's tips through .001 paper (touch Y -0.025).
+paper_mm = 0.0254
+# Plunge aim: the middle of the print's band (cam.py checks the band and
+# the budget).
+plunge_aim_mm = 1.143
+# Pass ends, past the work by pass_margin_mm at the deepest plunge's reach
+# (cam.py computes them: the cutter's half chord at depth plus the margin).
+pass_margin_mm = 0.5
+cutter_x_start_mm = 79.19
+cutter_x_end_mm = -7.61
+# Every rapid and every index stop's approach stays .100 out from the tips.
+clear_y_mm = -2.54
+# GP01's first run is set .003 shallow (G54 Y back 0.076 mm) and deepened
+# from the depth check.
+first_run_shallow_mm = 0.0762
+# The depth check: one Ø.040 pin in space 1, the micrometer over it to the
+# opposite tips; the reading less that blank's O.D. (the test computes the
+# corners from dt_cylinder_gear_spec's profiles). It moves 1:1 with the depth.
+pin_dia_in = 0.040
+one_pin_min_in = 0.0126
+one_pin_max_in = 0.0145
+one_pin_aim_in = 0.0136
+# Acceptance over two Ø.040 pins in opposite spaces (the test recomputes).
+over_pins_min_in = 2.5572
+over_pins_max_in = 2.5651
+# Setup 10 phase check: the notch level, the cam's centre falls below the
+# bore's axis by the mid throw × sin(3° ∓ .7°), rounded inward (the test
+# recomputes it from the drawing's cam requirement).
+phase_drop_min_in = 0.0137
+phase_drop_max_in = 0.0219
+# The index (prechips' indexing check; cam.py prints it at each stop).
+index_tolerance_deg = 0.01
+# GP03, the notch: the slotting saw at Z0 through space 1 to the notch
+# band's middle, one pass -X to its centre over blank 1's back face (full
+# depth through blank 1, the saw's reach .375 short of the jaws), then out
+# along Y. Y0: the saw's rim on a tooth tip through .001 paper, the saw
+# raised half a space (1.5°) so it touches the tip beside space 1: touch at
+# Z +0.843 and set Y -0.036 (the paper and R(1 - cos 1.5°)); cam.py agrees.
+notch_aim_mm = 3.048
+saw_x_start_mm = 86.9
+saw_x_end_mm = 0.0
+saw_touch_z_mm = 0.843
+saw_touch_y_mm = -0.036
+# ASSUMED until bought (checked at Setups 6 and 7): the stub arbor's nut and
+# shoulder at most Ø1.50; the saw arbor's nut at most 45 mm across (the
+# notch saw's record comment); the BS-0 tailstock within 1 in of its axis at
+# centre height; the BS-0 chuck's 5 in body (workholding.chuck-3jaw-5-bs0).
+cutter_arbor_nut_dia_mm = 38.1
+saw_arbor_nut_dia_mm = 45.0
+tailstock_half_width_mm = 25.4
+bs0_chuck_dia_mm = 127.0
+# The deflection's material constants (cam.py), as prechips' own turning
+# config (prechips turning.toml, materials.brass and materials.steel_1018,
+# Machinery's Handbook Table 3a medium brass and the 30 million psi steel
+# proxy): the brass's unit power, hp per in³/min, and the 1018 arbor's
+# modulus. The HA venv does not carry prechips, so the recipe cannot read it.
+brass_unit_power_hp_min_per_in3 = 0.50
+arbor_modulus_gpa = 207.0
+# prechips' milling_deflection bends the beam with the cut material's
+# modulus (materials.brass, 103 GPa), but the stack rides on the 1018
+# arbor: Setups 6 and 7 declare the beam at the journal's brass-equivalent
+# diameter, the least journal × (207/103)^¼ (equal E·I), which cam.py agrees.
+brass_modulus_gpa = 103.0
+beam_brass_equiv_dia_mm = 11.364
 
 [[tools]]
-id = "jig-drill-23-64"
+id = "saw-bar"
+name = "Evolution miter saw"
+ref = "saw-evolution-14"
+
+[[tools]]
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "centre"
+name = "Carbide 60° centre drill"
+ref = "centre-drills-carbide-60"
+
+[[tools]]
+id = "drill"
 name = "23/64 drill"
-ref = "jig-drill-23-64"  # Drills 23/64
+ref = "jig-drill-23-64"
 
 [[tools]]
-id = "cylinder-notch-saw"
+id = "reamer"
+name = ".3760 reamer"
+ref = "reamer-0376"
+
+[[tools]]
+id = "dead-centre"
+name = "MT3 dead centre"
+ref = "dead-centre-mt3"
+
+[[tools]]
+id = "parting"
+name = "P1 parting blade"
+ref = "cutoff-blade-p1"
+
+[[tools]]
+id = "thread"
+name = "Threading bit"
+ref = "threading-bits-lms-6685"
+
+[[tools]]
+id = "gang-arbor"
+name = "Gang arbor (Setup 4)"
+ref = "dt-cylinder-gear-gang-arbor"
+status = "to_make"
+
+[[tools]]
+id = "collar"
+name = "TL-04 collar and arbor nut (cone kit)"
+ref = "dt-cone-gear-cutting-arbor"
+status = "to_make"
+
+[[tools]]
+id = "tailstock"
+name = "BS-0 tailstock"
+ref = "bs-0-tailstock"
+
+[[tools]]
+id = "cutter"
+name = "#2 48DP gear cutter"
+ref = "gear-cutters-48dp-20pa"  # TTC 10-289-482
+status = "to_order"
+
+[[tools]]
+id = "cutter-arbor"
+name = "7/8 stub arbor"
+ref = "gear-cutter-arbor-7-8"
+status = "to_order"
+
+[[tools]]
+id = "saw"
 name = ".014 slotting saw"
-ref = "cylinder-notch-saw"  # F-notch-saw
+ref = "cylinder-notch-saw"
+status = "to_order"
 
 [[tools]]
-id = "gear-cutter-arbor-1"
-name = "1 in R8 cutter arbor"
-ref = "gear-cutter-arbor-1"  # F-arbor-1in-R8
+id = "saw-arbor"
+name = "1 in R8 arbor"
+ref = "gear-cutter-arbor-1"
+status = "to_order"
 
 [[tools]]
-id = "gear-cutter-arbor-7-8"
-name = "7/8 cutter arbor"
-ref = "gear-cutter-arbor-7-8"  # F-arbor-7-8
-
-[[tools]]
-id = "gear-cutters-48dp-20pa"
-name = "48DP 20PA gear cutter #2"
-ref = "gear-cutters-48dp-20pa"  # F-gear-cutter-10-289-482
-
-[[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
-
-[[tools]]
-id = "india-stone-ib8"
+id = "stone"
 name = "India stone"
-ref = "india-stone-ib8"  # F-stone-norton-IB8
+ref = "india-stone-ib8"
+status = "to_order"
 
 [[tools]]
-id = "setting-mandrel-375"
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
+
+[[tools]]
+id = "deburr"
+name = "Deburring set"
+ref = "deburring-set"
+
+[[tools]]
+id = "pins"
+name = "Pin gauges"
+ref = "pin-gauges"
+status = "to_order"
+
+[[tools]]
+id = "plugs"
+name = ".3760/.3765 plug gauges"
+ref = "plug-gauges-3760-3765"
+status = "to_order"
+
+[[tools]]
+id = "mandrel"
 name = "3/8 setting mandrel"
-ref = "setting-mandrel-375"  # F-setting-mandrel-375
+ref = "setting-mandrel-375"
+status = "to_order"
 
 [[tools]]
 id = "v-blocks"
 name = "V-blocks"
-ref = "v-blocks"  # F-v-blocks
+ref = "v-blocks"
+status = "to_order"
 
 [[tools]]
-id = "reamer-0376"
-name = ".3760 reamer"
-ref = "reamer-0376"  # drawing cross-check 2026-11-19: .3760 +.0005/.0000 REAM THRU
+id = "fixture"
+name = "Cam fixture MHA-DT-12-TL-01"
+ref = "dt-cylinder-gear-cam-fixture"
+status = "to_make"
 
 [[tools]]
-id = "dt-cylinder-gear-cam-fixture"
-name = "Cam turning fixture MHA-DT-12-TL-01"
-ref = "dt-cylinder-gear-cam-fixture"  # drawing cross-check 2026-11-19: cam throw .3402 ±.0020
-
-[[tools]]
-id = "gauge-blocks-mitutoyo"
+id = "gauge-blocks"
 name = "Gauge blocks"
-ref = "gauge-blocks-mitutoyo"  # drawing cross-check 2026-11-19: sets the cam throw on the fixture
+ref = "gauge-blocks-mitutoyo"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Saw the slices"
+machine = "Saw / bench"
+indexing = "none"
+diagram = { file = "diagrams/saw.svg", alt = "The 2-5/8 in bar in the saw's vise, slices .34 thick marked off its end; the 5/8 in arbor bar, 7 in, once." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "saw-bar"
+drilling = "none"
+sizing = "other"
+instruction = "Saw {{process.quantity:d}} slices {{process.slice_in:.2dot}}-.37 thick off the 2-5/8 in bar, the bar in the saw's vise, each mark .34 from the end by the calipers. File the burrs off both faces' edges."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw-bar"
+drilling = "none"
+sizing = "other"
+instruction = "Once, for the gang arbor (skip if it is on hand): saw {{process.arbor_saw_in:.1f}} in off the 5/8 in 1018 bar. File the burrs off."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mike each slice at three places: {{process.slice_in:.2dot}} or over everywhere, else set it aside (too thin to face to {{cad.cam_face_thickness_min_in:.3dot}})."
+inspection = "Each slice at least {{process.slice_in:.2dot}} thick (micrometer, three places)."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Chucking 1: cam face, boss, rim face, bore"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "6 in 3-jaw on the slice's sawn O.D., {{process.slice_grip_in:.2dot}} in the jaws and the rest out past the jaw fronts; jaws tight."
+datum = "The out face, faced here, is the cam face; the boss's shoulder (the rim face) and the bore are cut from it in this chucking, square and concentric to each other."
+diagram = { file = "diagrams/chuck1.svg", alt = "The slice in the 3-jaw, .12 in the jaws; the out face faced, the Ø1.92 boss turned .182 long to its shoulder, the bore drilled and reamed through." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.slice_dia_mm}}", stock_diameter_mm = "{{process.slice_dia_mm}}", stickout_mm = "{{process.slice_stickout_mm}}", minimum_diameter_mm = "{{cad.bore_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the out face clean, about .02 off: the cam face."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{process.slice_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the boss Ø{{process.boss_dia_mm:in.2dot}} ±.01 to a square shoulder {{process.boss_length_min_in:.3dot}}-{{process.boss_length_max_in:.3dot}} from the cam face, and face the shoulder (the rim face) out to Ø2.60. The jaws are .22 behind the cam face: keep the tool on the out side of the shoulder."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{process.boss_dia_mm}}"
+inspection = "Boss length {{process.boss_length_min_in:.3dot}}-{{process.boss_length_max_in:.3dot}}, cam face to shoulder (calipers' depth rod)."
+gauge_checks = [{ gauge = "calipers", band_mm = [4.5974, 4.6482] }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock, under the 23/64 drill."
+settings = "lathe-centre-c360"
+cut_diameter_mm = 2.778
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Drill 23/64 through from the tailstock."
+settings = "lathe-drill-23-64-c360"
+cut_diameter_mm = 9.128125
+hole_depth_mm = 8.636
+peck = "none"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "reamer"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Ream .3760 through from the tailstock, in and out. The bore's Ra 63 comes from the reamer: a sharp reamer, steady feed, no dwell."
+settings = "lathe-ream-0376-c360"
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
+inspection = "Bore: the .3760 plug enters, the .3765 does not. Ra 63: reamed clean, no tears or chatter (visual)."
+gauge_checks = [{ gauge = "plug-gauges-3760-3765", band_mm = "{{cad.bore_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "deburr"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle stopped: break the bore's edge at the cam face {{cad.chamfer_max_in:.3dot}} max with the countersink by hand."
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Chucking 2: back face to thickness"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "6 in 3-jaw on the Ø1.92 boss, the rim face flat against the three jaw fronts (tap it home with a brass rod before tightening); the sawn back face out."
+datum = "The rim face (on the jaw fronts) and the cam face, both from chucking 1."
+diagram = { file = "diagrams/chuck2.svg", alt = "The blank reversed, the boss in the jaws, the rim face on the jaw fronts; the sawn back face faced to the thickness." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.boss_dia_mm}}", stock_diameter_mm = "{{process.slice_dia_mm}}", stickout_mm = "{{process.boss_grip_stickout_mm}}", minimum_diameter_mm = "{{cad.bore_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Number the gears 0-19 in the order they are faced; keep a tally card. Gear k's thickness target is an in-process aim inside the print's {{cad.cam_face_thickness_min_in:.4dot}}-{{cad.cam_face_thickness_max_in:.4dot}}, from the part record's matched-set process note (the twenty stack on shaft MHA-DT-13): .3000 less the running sum of gears 0 to k-1's miked deviations from .3000. A replacement gear's aim is the set's shortfall."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the back face, light skims, miking between them, to gear k's aim, back face to cam face. Write the miked thickness on the card; scribe k on the back face's hub."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{process.slice_dia_mm}}"
+inspection = "Thickness {{cad.cam_face_thickness_min_in:.4dot}}-{{cad.cam_face_thickness_max_in:.4dot}} (micrometer, on the boss); rim {{cad.rim_face_face_width_min_in:.3dot}}-{{cad.rim_face_face_width_max_in:.3dot}} (micrometer across the rim)."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.cam_face_thickness_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.rim_face_face_width_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "deburr"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle stopped: break the bore's edge at the back face {{cad.chamfer_max_in:.3dot}} max by hand."
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Gang arbor (once; skip if on hand)"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "6 in 3-jaw on the 7 in 1018 bar, {{process.arbor_stub_in:.2dot}} in the jaws; after facing and centre drilling the out end, the MT3 dead centre in it, oiled."
+datum = "The shoulder at the body's end (blank 1's seat); every diameter is turned in this one chucking, so the body, the journal and the tail centre share one axis."
+diagram = { file = "diagrams/arbor.svg", alt = "The arbor between the 3-jaw and the dead centre: body Ø.600, shoulder with relief, journal Ø.3758-.3760, pilot Ø.275, 1/4-28 thread, tail centre." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.arbor_bar_dia_mm}}", stock_diameter_mm = "{{process.arbor_bar_dia_mm}}", stickout_mm = "{{process.arbor_stickout_mm}}", minimum_diameter_mm = "{{process.thread_minor_mm}}", support = "tailstock" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the out end to 6.80 overall from the jaws' end of the bar (6.30 out of the jaws), then centre drill it with the No. 1 centre drill for the dead centre and, later, the BS-0 tailstock."
+rpm = 300
+feed = "carriage by hand to the centre, dry"
+cut_diameter_mm = "{{process.arbor_bar_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Dead centre in the end. Turn the body Ø.600 over the {{process.body_length_in:.2f}} next to the jaws, then step down from the tail end: journal Ø{{process.journal_dia_min_mm:in.4dot}}-{{process.journal_dia_max_mm:in.4dot}} × 2.94 to a square shoulder, pilot Ø.275 × .39, thread Ø.250 × .47. Light finishing cuts on the journal."
+rpm = 300
+feed = ".002 in/rev (0.05 mm), power feed; dead centre oiled"
+cut_diameter_mm = "{{process.body_dia_mm}}"
+inspection = "Journal Ø{{process.journal_dia_min_mm:in.4dot}}-{{process.journal_dia_max_mm:in.4dot}} at both ends and the middle (micrometer); a reamed blank slides its whole length with no shake felt."
+gauge_checks = [{ gauge = "micrometers", band_mm = [9.54532, 9.5504] }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "parting"
+drilling = "none"
+sizing = "other"
+instruction = "Relieve the shoulder: plunge the P1 blade {{process.relief_depth_in:.3dot}} into the journal hard against the shoulder, so blank 1's back face seats flat on it."
+rpm = 150
+feed = "cross slide by hand, slow"
+cut_diameter_mm = "{{process.journal_dia_max_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "thread"
+drilling = "none"
+sizing = "other"
+instruction = "Chamfer the thread's start; single-point 1/4-28 UNF .47 long (compound at 29°, the 28 TPI gearbox setting) until the cone kit's arbor nut runs on by hand. Leave the dead centre in."
+rpm = 70
+feed = "compound at 29°, the bit on centre height; .003-.005 a pass, less near depth, cutting oil"
+cut_diameter_mm = 6.35
+
+[[setups]]
+machine_kind = "lathe"
+title = "Load ten blanks; turn the stack's O.D."
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "Ten blanks on the journal, back faces toward the shoulder (blank 1 on it), the TL-04 Ø1.75 collar on the pilot against blank 10's boss, the arbor nut wrench-tight. The arbor in the 3-jaw on the body's last {{process.body_grip_in:.2f}} (the jaw fronts {{process.standoff_mm:in.2f}} from the shoulder, the .50 raw stub behind the jaws); the MT3 dead centre in the tail centre, oiled."
+datum = "The arbor's axis: the body indicated at the jaws, the tail on its own centre."
+diagram = { file = "diagrams/stack.svg", alt = "Ten blanks on the arbor between the 3-jaw and the dead centre, their rims spaced by the cam bosses; the O.D. turned across all ten in one setting." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.body_dia_mm}}", stock_diameter_mm = "{{process.slice_dia_mm}}", stickout_mm = "{{process.stack_stickout_mm}}", minimum_diameter_mm = "{{process.journal_dia_min_mm}}", support = "tailstock" }
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Indicate the body beside the jaws: within {{process.mount_tir_max_mm:in.3dot}} TIR (DTI), shimming under one jaw if needed."
+inspection = "Body TIR at the jaws {{process.mount_tir_max_mm:in.3dot}} or under."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the O.D. across all ten rims in one setting, light finishing cuts at the end, to Ø{{process.stack_od_min_in:.3dot}}-{{process.stack_od_max_in:.3dot}} (aim {{process.stack_od_aim_mm:in.3dot}}): the interrupted cut is the bosses' gaps."
+settings = "mg-lathe-ar-c360-centre"
+cut_diameter_mm = "{{process.stack_od_aim_mm}}"
+inspection = "O.D. {{process.stack_od_min_in:.3dot}}-{{process.stack_od_max_in:.3dot}} on blanks 1 and 10 (micrometer on each rim). Leave the stack on the arbor."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.teeth_dia_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Teeth: GP01, GP02 on the BS-0"
+machine = "PM-30MV CNC (FluidNC, CNCjs) / BS-0 dividing head and tailstock"
+machine_ref = "pm-30mv"
+indexing = { head = "bs-0", tolerance_deg = "{{process.index_tolerance_deg}}", positions = 120 }
+holding = "BS-0 on the table, spindle along X, chuck at the left. The loaded arbor in the BS-0 3-jaw on the body's last {{process.body_grip_in:.2f}}, the jaw fronts {{process.standoff_mm:in.2f}} from the shoulder (calipers), the .50 raw stub behind the jaws; the BS-0 tailstock's centre in the tail centre, oiled, snug. Lock the head's spindle for every cut."
+datum = "Programs GP01_first_space and GP02_teeth. G54: X0 blank 1's back face (the shoulder), +X toward the tailstock; Y0 the stack's tips on the operator's side, +Y into the stack; Z0 the stack's axis. The cutter lies flat at Z0 on the operator's side."
+diagram = { file = "diagrams/teeth.svg", alt = "Top view: the stack on the arbor between the BS-0 chuck and tailstock; the gear cutter flat at the stack's axis height on the operator's side, passing along X; index plate A, 15-hole circle." }
+envelope = "other"
+vise_hold = "other"
+beam = { axis = "x", hold = "between", extent_mm = [-44.45, 96.52], supports_mm = [-44.45, 96.52], section_mm = { diameter = "{{process.beam_brass_equiv_dia_mm}}" } }
+
+[[setups.operations]]
+instruction = "Before the first load: the BS-0 tailstock is on hand and its centre reaches the arbor's tail at centre height (FLAGGED, archived inventory only: if it is not, stop and tell the owner). The cutter is a #2 48DP 20° (55-134 teeth); count its teeth (12 assumed; 6 or more keep the chip at .10 mm or less) and mike its width across its side faces; write both down."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Indicate the stack's O.D. on blanks 1 and 10 within {{process.mount_tir_max_mm:in.3dot}} TIR each, shimming a jaw (the tooth depth and runout budgets rest on it). More after shimming: stop (the stack has moved on the arbor)."
+inspection = "Stack O.D. {{process.mount_tir_max_mm:in.3dot}} TIR or under on blanks 1 and 10."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Index plate A on the head, the plunger on the 15-hole circle, the sector arms spanning 5 spaces (the setup's index setting). Plunger in a hole: that hole is space 1's; mark it with a felt pen. Always crank the same way; overshoot: back half a turn and come in again."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 X0: the edge finder (in a collet, 1000 rpm) on blank 1's back face from the chuck side, at Y about .1 in from the tips: G10 L20 P1 X-2.540. Retract."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Spindle stopped (M5). Mount the cutter on the 7/8 stub arbor in the 3/4 R8 collet, teeth cutting with M3 (clockwise seen from above), its nut and shoulder no larger than Ø{{process.cutter_arbor_nut_dia_mm:in.2f}} (calipers; larger: stop). Do not run the tool setter."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0, the stack's axis: mike blank 5's O.D.; the height gauge on the table reads the top of blank 5's rim, less half that O.D. is the axis height. Set the gauge to that less half the cutter's width; jog Z until the cutter's lower side face just drags the gauge's scriber (cutter beside the stack, Y clear): G10 L20 P1 Z0."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Y0: spindle at 215, the cutter over blank 5's rim (X 32.0), jog +Y until it just takes a .001 paper on the tips: G10 L20 P1 Y-0.025. Jog Y back to -2.54. Then shift Y0 back .003 for the first GP01 run: send $#, G10 L2 P1 Y(the G54 line's Y - {{process.first_run_shallow_mm:.3f}})."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First load only, spindle stopped: jog the cutter to X {{process.cutter_x_end_mm:.2f}} and to X {{process.cutter_x_start_mm:.2f}} at Y -2.54 and then at Y {{process.plunge_aim_mm:.3f}}: its rim, nut and the collet clear the BS-0 jaws, the collar, the nut and the tailstock by eye with a rule held across."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First load only, prove-out with the cutter clear of the work: send $#, note the G54 Y, then G10 L2 P1 Y(that Y - {{process.prove_out_back_mm:.2f}}). Spindle on, single block: run GP01_first_space (an air pass beside the tips), then GP02_teeth to its first stop without indexing; reset. Restore G54 Y to the noted value (G10 L2 P1 Y...): the .003 shallow shift is in it."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "cutter"
+drilling = "none"
+sizing = "other"
+instruction = "Run GP01_first_space (T1 already in; set 215): one pass -X through space 1 of all ten rims to Y {{process.plunge_aim_mm:.3f}}. It ends with the spindle stopped and the program ended, the cutter past blank 1 still at depth: do not jog Y. Check the spindle has stopped before reaching in."
+settings = "cylinder-gear-cutter-c360"
+milling_cuts = [
+  { name = "tooth space", kind = "side", phase = "finish", cutter_dia_mm = 44.45, axial_doc_mm = 1.6624, radial_woc_mm = "{{process.plunge_aim_mm}}", stations_mm = [0.0, 35.79, 71.58] },
+]
+
+[[setups.operations]]
+instruction = "Depth check: lay a Ø.040 pin gauge in space 1 along the stack; mike over it to the opposite tips on blanks 2 and 9 and subtract each blank's O.D. Both over the aim {{process.one_pin_aim_in:.4dot}} (too shallow): send $#, G10 L2 P1 Y(the G54 line's Y + 25.4 × (the smaller difference - {{process.one_pin_aim_in:.4f}})) and run GP01_first_space again; check again. One under {{process.one_pin_min_in:.4dot}}, or both not inside the band at once (the stack is not along X): stop and tell the owner."
+inspection = "Reading less O.D. {{process.one_pin_min_in:.4dot}}-{{process.one_pin_max_in:.4dot}} on both blanks 2 and 9 before GP02."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Index to space 2 by hand: unlock, 5 spaces on the 15-hole circle, lock."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "cutter"
+drilling = "none"
+sizing = "other"
+instruction = "Run GP02_teeth straight after the accepted GP01 and the index to space 2 (no reset, no jog; after a reset run GP01 again first, before the index). It cuts space 2 (+X); at each stop (spindle off) unlock, index 5 spaces as its message says, lock, cycle start: it cuts the next space, alternately -X and +X. Its last stop takes the plunger back to space 1's marked hole: that last pass must cut no chips."
+settings = "cylinder-gear-cutter-c360"
+milling_cuts = [
+  { name = "tooth spaces", kind = "side", phase = "finish", cutter_dia_mm = 44.45, axial_doc_mm = 1.6624, radial_woc_mm = "{{process.plunge_aim_mm}}", stations_mm = [0.0, 35.79, 71.58] },
+]
+inspection = "Plunger back in the marked hole after the last index; the closure pass cut no chips. Chips or the plunger elsewhere: stop and tell the owner (a miscounted index)."
+gauge_checks = "other"
+
+[[setups]]
+machine_kind = "other"
+title = "Notch: GP03 through space 1"
+machine = "PM-30MV CNC (FluidNC, CNCjs) / BS-0 dividing head and tailstock"
+machine_ref = "pm-30mv"
+indexing = "none"
+holding = "As Setup 6, nothing moved: the head left locked on space 1's hole."
+datum = "Program GP03_notch. G54 X0 as Setup 6; Y0 the tips, set again with the saw; Z0 the stack's axis, set again with the saw."
+diagram = { file = "diagrams/notch.svg", alt = "The slotting saw flat at the stack's axis height in space 1, one pass toward the chuck to over blank 1's back face." }
+envelope = "other"
+vise_hold = "other"
+beam = { axis = "x", hold = "between", extent_mm = [-44.45, 96.52], supports_mm = [-44.45, 96.52], section_mm = { diameter = "{{process.beam_brass_equiv_dia_mm}}" } }
+
+[[setups.operations]]
+instruction = "Spindle stopped, Y at -2.54: take out the cutter's collet and arbor; mount T2, the 1 in R8 arbor with the .014 saw, teeth cutting with M3, its nut no larger than Ø{{process.saw_arbor_nut_dia_mm:in.2f}} (calipers). Mike the saw's width."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0 as in Setup 6 with the saw: the gauge set to the axis height less half the saw's width on its lower face: G10 L20 P1 Z0."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Y0 for the saw: Z +{{process.saw_touch_z_mm:.3f}} (half a space up: the saw meets a tooth tip, not space 1), over blank 5 (X 32.0), spindle at 100, jog +Y until it takes a .001 paper: G10 L20 P1 Y{{process.saw_touch_y_mm:.3f}}. Back to Y -2.54, then Z 0."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First load only, spindle stopped: jog the saw to X 0 and to X {{process.saw_x_start_mm:.2f}} at Y -2.54 and then at Y {{process.notch_aim_mm:.3f}}: its rim and nut clear the BS-0 jaws, the collar, the nut and the tailstock by eye with a rule held across. Then the air pass: G54 Y back {{process.prove_out_back_mm:.2f}} as in Setup 6, single block, run GP03_notch beside the tips; restore G54 Y."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Run GP03_notch (T2 already in; set 100): to Y {{process.notch_aim_mm:.3f}} past blank 10, one pass -X through space 1 to over blank 1's back face, then out along Y."
+settings = "cylinder-notch-saw-c360"
+milling_cuts = [
+  { name = "notch", kind = "side", phase = "finish", cutter_dia_mm = 69.85, axial_doc_mm = 0.3556, radial_woc_mm = "{{process.notch_aim_mm}}", stations_mm = [0.0, 35.79, 71.58] },
+]
+
+[[setups.operations]]
+instruction = "Notch width on blanks 1 and 10: a .016 pin gauge does not enter. It enters: stop and tell the owner (a wide notch)."
+inspection = "Notch {{cad.notch_width_max_mm:in.3dot}} max: a .016 pin does not enter."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Bench: break the stack, deburr, accept the teeth"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/accept.svg", alt = "A gear on the 3/8 setting mandrel in the V-blocks, a .040 pin in the top space under the DTI; two pins in opposite spaces under the micrometer." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+instruction = "Take the stack off: nut, collar, then the ten gears off the journal."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "stone"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr each gear: the India stone's fine face flat across each rim face, strokes toward the centre, until no burr catches a fingernail at the tooth ends; never into a tooth space or across the tips. The notch's ends the same way."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Over pins, each gear: Ø.040 pins in two opposite spaces (60 apart), mike over them: {{process.over_pins_min_in:.4dot}}-{{process.over_pins_max_in:.4dot}}, and less the gear's O.D. .0252-.0291."
+inspection = "Over pins {{process.over_pins_min_in:.4dot}}-{{process.over_pins_max_in:.4dot}}; O.D. {{cad.teeth_dia_min_in:.3dot}}-{{cad.teeth_dia_max_in:.3dot}}."
+gauge_checks = [{ gauge = "micrometers", band_mm = [64.95288, 65.15354] }, { gauge = "micrometers", band_mm = "{{cad.teeth_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Tooth runout to the bore, each gear: on the 3/8 setting mandrel in the V-blocks, the gear hanging on it (the bore rests on the mandrel's top). A Ø.040 pin in the top space, the DTI on the pin; turn the gear a space at a time, reading every 10th space (12 readings)."
+inspection = "Runout {{cad.teeth_tooth_runout_tir_max_mm:in.3dot}} TIR or under (largest less smallest reading)."
+gauge_checks = [{ gauge = "dti", band_mm = [0.0, 0.0508] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Rim after the stoning: mike across the rim."
+inspection = "Rim {{cad.rim_face_face_width_min_in:.3dot}}-{{cad.rim_face_face_width_max_in:.3dot}}."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.rim_face_face_width_band_mm}}" }]
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Cam on the fixture MHA-DT-12-TL-01"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "The cam fixture kit fitted and set in the 6 in 4-jaw by sheet MHA-DT-12-TL-00 steps 1-14 (once for all 20). Each gear by its steps 15-19: bore on the stub, cam boss out, notched space over the clock pin, turned clockwise onto the pin, the washer and screw snug."
+datum = "The fixture's stub (the bore) and clock pin (the notch) set the cam's throw and phase; the rim face is the cam's shoulder."
+diagram = { file = "diagrams/cam.svg", alt = "A gear on the fixture in the 4-jaw, its boss out; the cam turned eccentric to the bore down to the rim face." }
+lathe_hold = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the cam from the boss to Ø{{cad.cam_dia_min_in:.3dot}}-{{cad.cam_dia_max_in:.3dot}}, light cuts at first (the cut is interrupted until the cam rounds up), along to the rim face: the last cut stops as the tool's point marks the rim face. The fixture and gear run off-centre: low rpm. The cam's Ra 63 from a light last pass at the power feed. Remove the gear by steps 15-19 reversed."
+settings = "mg-lathe-ar-c360-centre"
+cut_diameter_mm = "{{cad.cam_dia_mm}}"
+inspection = "Cam Ø{{cad.cam_dia_min_in:.3dot}}-{{cad.cam_dia_max_in:.3dot}} (micrometer). Ra 63: no chatter or tears (visual)."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.cam_dia_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Bench: cam check, edges, polish"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/final.svg", alt = "The finished gear on the setting mandrel in the V-blocks, the dial indicator on the cam." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+instruction = "Throw, the first gear of each load and every fifth after: on the setting mandrel in the V-blocks, the dial indicator on the cam's O.D.; turn the gear a full turn: the swing is twice the throw, .6764-.6844."
+inspection = "Throw {{cad.cam_throw_min_in:.4dot}}-{{cad.cam_throw_max_in:.4dot}} (half the swing). Out: stop, check the fixture's setting (TL-00 steps 9-13)."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Cam phase, the first gear of each load: on the setting mandrel in the V-blocks on the surface plate, the cam face toward you, a .014 pin gauge in the notch. Turn the gear until the pin's top reads the mandrel's top less .1805 on the height gauge (the notch level, out to the right). Then read the cam's top and bottom: the axis height (the mandrel's top less .1875) less half their sum is {{process.phase_drop_min_in:.4dot}}-{{process.phase_drop_max_in:.4dot}}, the cam below the axis (the lobe 3° ±.7° clockwise of the notch)."
+inspection = "Cam centre {{process.phase_drop_min_in:.4dot}}-{{process.phase_drop_max_in:.4dot}} below the axis with the notch level (3° ±.7°). Out: stop, check the fixture's clock pin (TL-00)."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Break the cam's two edges R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max with the smooth file; polish the cosmetic faces (the back face and the rim face outside the teeth) on the stone's fine face. Never the bore, the cam's O.D. or the teeth."
+feed = "hand"

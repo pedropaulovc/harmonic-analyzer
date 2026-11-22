@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 6, top view (looking down the spindle), BS-0 chuck at the left, operator at the bottom (-Y), not to scale: the stack on the arbor between the BS-0 chuck and tailstock; the gear cutter flat at the axis height on the operator's side. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 6: GP01 then GP02 on the BS-0; the cutter flat at Z0 on the operator's side, passes along X</text>
+  <rect class="fixture-table" x="20" y="60" width="130" height="190"/>
+  <rect class="fixture-vise" x="150" y="110" width="30" height="90"/>
+  <rect class="part-rest" x="180" y="145" width="80" height="20"/>
+  <rect class="part-kept" x="260" y="95" width="300" height="120"/>
+  <rect class="clamp" x="560" y="130" width="24" height="50"/>
+  <rect class="part-threads" x="584" y="148" width="40" height="14"/>
+  <rect class="fixture-support" x="624" y="125" width="90" height="60"/>
+  <line class="centre-line" x1="140" y1="155" x2="740" y2="155"/>
+  <circle class="cutter" cx="520" cy="290" r="78"/>
+  <line class="arrow" x1="430" y1="375" x2="300" y2="375"/>
+  <line class="arrow" x1="300" y1="390" x2="430" y2="390"/>
+  <line class="datum" x1="260" y1="80" x2="260" y2="230"/>
+  <text class="datum-label" x="240" y="75">X0 blank 1's back face</text>
+  <line class="datum" x1="250" y1="215" x2="575" y2="215"/>
+  <line class="leader" x1="290" y1="215" x2="290" y2="236"/>
+  <text class="datum-label" x="190" y="252">Y0 the tips (+Y into the stack)</text>
+  <line class="leader" x1="85" y1="150" x2="85" y2="270"/>
+  <text class="label" x="20" y="285">BS-0, plate A 15 holes</text>
+  <line class="leader" x1="669" y1="185" x2="669" y2="270"/>
+  <text class="label" x="620" y="285">BS-0 tailstock</text>
+  <line class="leader" x1="590" y1="320" x2="606" y2="334"/>
+  <text class="label" x="608" y="348">#2 48DP cutter, M3</text>
+  <text class="label" x="440" y="395">space 1: -X; then alternate</text>
+  <text class="label" x="20" y="340">Each M0: spindle off, cutter past the stack's end;</text>
+  <text class="label" x="20" y="356">index 5 spaces on the 15-hole circle, lock, cycle start.</text>
+</svg>
