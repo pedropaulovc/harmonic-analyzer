@@ -53,6 +53,9 @@ diameter_mm = 9.5758
 [tools.drill-7-16]  # Drills 7/16
 description = "7/16 (.4375 in) drill, 115-piece index"
 diameter_mm = 11.1125
+[tools.drill-27-64]  # 115-piece index; MHA-DT-27 winding mandrel (shank)
+description = "27/64 (.4219 in) drill, 115-piece index"
+diameter_mm = 10.715625
 [tools.drill-15-32]  # Drills 15/32
 description = "15/32 (.4688 in) drill, 115-piece index"
 diameter_mm = 11.90625
@@ -201,6 +204,8 @@ description = "gray iron, class not ruled, casting for MHA-DT-05 cone pivot post
 description = "Drill rod (O1 or W1 tool steel, annealed, ground), round bar, 1/8 in"
 [stock.o1-drill-rod-5-32]
 description = "AISI O1 drill rod, precision ground, round bar, 5/32 in"
+[stock.c260-wire-040]
+description = "C26000 cartridge brass, annealed (soft), round wire, .040 in"
 
 # --- .2510-.2515 reamed bores (MHA-DT-18, and any dt part with that band) ---
 # Go/no-go pair for the Ø.2500 +.0010/+.0015 REAM THRU bores, as the MHA-CH-13

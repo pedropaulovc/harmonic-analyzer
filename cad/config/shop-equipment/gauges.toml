@@ -173,6 +173,13 @@ kind = "protractor"
 status = "on_hand"
 note = "Owner confirmed on hand 2026-11-19."
 
+[gauges.radius-gauges]
+name = "Starrett S167AZ radius gauge set, 1/32-17/64 in by 64ths"
+kind = "radius_gauge"
+status = "to_order"
+note = "To order (not owned): no radius gauge is on record. For MHA-PD-12 pd-guide-lock's 4X R.07 filed corners (.XX band R.06-.08): the 1/16 (R.0625) and 5/64 (R.0781) leaves bracket the band. Source: Starrett S167AZ, 16 stainless leaves 1/32-17/64 in by 64ths, five convex and concave gauging surfaces per leaf (Amazon B000VDZE6Q; Starrett 167 radius gages page); price not read."
+cite = ["https://www.starrett.com/products/precision-measuring-tools/precision-hand-tools/fixed-gage-standards/radius-gages read 2026-11-22 (search summary): 167 radius gages, sets and singles", "https://www.amazon.com/Starrett-S167AZ-Radius-Gauge-Set/dp/B000VDZE6Q read 2026-11-22 (search summary): S167AZ, 1/32-17/64 in by 64ths, 16 leaves, convex and concave"]
+
 # --- measuring equipment on the mill -------------------------------------
 
 [gauges.touch-probe-diy0-tp05]
