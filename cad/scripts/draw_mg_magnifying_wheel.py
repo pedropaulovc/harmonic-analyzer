@@ -1102,6 +1102,7 @@ def tie1_section_line_ends(
     return left, right
 
 
+@_telemetry.traced("wheel.tie1_section_place")
 def _place_tie1_section(
     adapter: Any, view: Any
 ) -> tuple[bool, tuple[float, float, float, float]]:
@@ -1157,6 +1158,7 @@ def _place_tie1_section(
     return mouth[1] > back[1], (min(xs), min(ys), max(xs), max(ys))
 
 
+@_telemetry.traced("wheel.tie1_section")
 def _add_tie1_section(adapter: Any, front: Any) -> list[Any]:
     """Removed partial section B-B through TIE 1 (TIE1_SECTION_*): the cut
     face alone at 2:1, the #50 counter-drill's Ø and depth from the drum face
