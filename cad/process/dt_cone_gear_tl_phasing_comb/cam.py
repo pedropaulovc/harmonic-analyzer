@@ -15,10 +15,11 @@ printed band the posted path may use.
 Route (plan text in ``plan.toml``): the blank, snipped from the .020 sheet,
 is bonded on 3M VHB 5906 tape to the spoil plate (``fixtures.sheet-spoil-
 plate``) gripped in the vise on parallels. One file, CB01_outline: the 1/16
-in carbide downcut end mill comes down in the air in front of the blank, feeds in
+in carbide downcut end mill comes down in front of the blank, feeds in
 through the blank's margin and runs once round the whole U at the finished
-size, one level, its tip in the tape above the plate, so the comb comes free
-of the blank in one pass and the plate is never cut.
+size, one level, its tip a few thousandths into the spoil plate (past the
+tape, whatever the tape's and the plate top's variation), so the comb comes
+free of the blank in one pass.
 
 Work frame (G54): X0 the plate's left end, Y0 the fixed jaw's face (the
 plate's back edge), +Y toward the fixed jaw; Z0 the plate top. The comb lies
@@ -47,10 +48,10 @@ CAM_TOOLS = ("em-sixteenth",)
 # Blade features south to north (the staircase's order along X).
 BLADES = ("blade_t024", "blade_t018", "blade_t012", "blade_t006")
 IN = 25.4
-# The cutter comes down in the air this far in front of the blank's front
-# edge (beyond its radius), then feeds in through the blank's margin to the
-# path: it never plunges into metal (the end mill is not on record as centre
-# cutting).
+# The cutter comes down this far in front of the blank's front edge (beyond
+# its radius), its tip into the spoil plate only, then feeds in through the
+# blank's margin to the path: it never plunges into the brass sheet, whose
+# burr and tape would lift at a plunge.
 APPROACH_MM = 1.0
 # The descent starts this far above the stock top: real G0 brings the cutter
 # to it.
@@ -373,8 +374,8 @@ def _gcode(
     clear: float,
     entry_y: float,
 ) -> list[str]:
-    """The path as G-code in the work frame: down in the air at ``entry_y``
-    in front of the blank, level with the first segment's middle (the far
+    """The path as G-code in the work frame: down at ``entry_y`` in front of
+    the blank, level with the first segment's middle (the spring arm's front
     edge), in through the margin to it, the segments round and back to it,
     lift."""
 
@@ -435,7 +436,6 @@ def context(
     elements, d = _outline(f)
     top_face = f["top"]
     sheet_max = top_face["stock_thickness"][1]
-    sheet_min = top_face["stock_thickness"][0]
     if not math.isclose(_plane(f, "underside", "z"), 0.0, abs_tol=1e-9):
         raise ValueError("underside: expected the model's Z0")
 
@@ -461,11 +461,25 @@ def context(
             f"the slot under the deepest blade ({gap:.3f}) passes no cutter"
         )
 
-    # Through the sheet in one level: the tip in the tape, above the plate.
+    # Through the sheet in one level: the tip into the spoil plate, through
+    # the thinnest sheet on the thinnest tape by the stated margin, no deeper
+    # into the plate than stated.
     tape = p["tape_thickness_mm"]
     tip = p["outline_tip_z_mm"]
-    if not 0.0 < tip < tape:
-        raise ValueError("the cutter's tip must stand in the tape, above the plate")
+    _agree(plan, "outline_tip_into_plate_mm", -tip)
+    if not -p["spoil_cut_max_mm"] <= tip <= 0.0:
+        raise ValueError(
+            "the cutter's tip must stand at or below the plate top, no deeper"
+            " than spoil_cut_max_mm"
+        )
+    if p["tape_thickness_min_mm"] > tape:
+        raise ValueError("tape_thickness_min_mm is over the tape's thickness")
+    # The sheet's underside rests on the tape's top.
+    if p["tape_thickness_min_mm"] - tip < p["through_margin_min_mm"]:
+        raise ValueError(
+            "the tip is not through_margin_min_mm below the thinnest sheet's"
+            " underside on the thinnest tape"
+        )
     top = tape + sheet_max
     depth = top - tip
     _agree(plan, "outline_depth_mm", depth)
@@ -476,8 +490,6 @@ def context(
         )
     if _cut(plan, "outline", "axial_doc_mm") + 1e-6 < depth:
         raise ValueError("'outline' axial_doc_mm is under the one level's depth")
-    if tape + sheet_min <= tip:
-        raise ValueError("the thinnest sheet's underside stands below the tip")
 
     # The blank and the comb's place on it, the blank's place on the plate.
     margin = p["blank_margin_mm"]
@@ -528,7 +540,7 @@ def context(
         _box(
             "moving jaw", (0.0, plate_l), (-plate_w - JAW_DEPTH_MM, -plate_w), jaw_top
         ),
-        _box("spoil plate", (0.0, plate_l), (-plate_w, 0.0), 0.0),
+        _box("spoil plate", (0.0, plate_l), (-plate_w, 0.0), -p["spoil_cut_max_mm"]),
     ]
 
     numbers = {

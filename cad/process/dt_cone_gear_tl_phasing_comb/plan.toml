@@ -13,8 +13,8 @@
 # the plate's left end, Y0 the fixed jaw's face, Z0 the plate top. CB01_outline
 # (cam:dt_cone_gear_tl_phasing_comb) brings the 1/16 downcut end mill in through
 # the blank's margin and once round the U at the finished size, one level,
-# its tip in the tape: the comb comes free of the blank in one pass and the
-# plate is never cut. Setup 3 at the
+# its tip .004 into the spoil plate: the comb comes free of the blank in one
+# pass. Setup 3 at the
 # bench frees the comb from the tape, deburrs and inspects it (FINISH: as cut).
 #
 # To order: the .020 sheet (stock-to-order.toml c260-h02-sheet-020-12x12),
@@ -97,12 +97,20 @@ waste_bond_area_mm2 = 3102.466
 # spring_width): the width the cut's lift is judged on.
 blank_area_mm2 = 4112.895
 comb_spring_width_mm = 2.286
-# The cutter's tip .003 in above the plate top: inside the .006 tape, below
-# the underside of the thinnest sheet, so every sheet the band allows is cut
-# through and the plate is not. Depth of the one level: from the thickest
-# sheet's top (tape + .022) to the tip.
-outline_tip_z_mm = 0.0762
-outline_depth_mm = 0.6326
+# The cutter's tip .004 in into the spoil plate (Z0 its top beside the
+# blank): the plate is a spoil plate, unfaced, and its mill-finish top, the
+# feeler touch-off and the tape's thickness all vary, so the tip goes past
+# the tape instead of stopping in it. The recipe requires the tip at least
+# through_margin_min_mm below the thinnest sheet's underside on the thinnest
+# tape (.006 in −15 %, as the MHA-CH-13 strap plan budgets it), and no deeper
+# into the plate than spoil_cut_max_mm. Depth of the one level: from the
+# thickest sheet's top (tape + .022) to the tip.
+outline_tip_z_mm = -0.1016
+outline_tip_into_plate_mm = 0.1016
+tape_thickness_min_mm = 0.1295
+through_margin_min_mm = 0.2
+spoil_cut_max_mm = 0.254
+outline_depth_mm = 0.8104
 # The 1/16 end mill (shop tools.endmill-carbide-3fl-1-16-downcut
 # diameter_mm; the recipe checks it).
 outline_cutter_dia_mm = 1.5748
@@ -194,7 +202,7 @@ sizing = "other"
 steps = [
   { kind = "action", text = "Lay the blank on the spoil plate: press any curl at the snipped edges flat with a thumb, then file the burr off both snipped edges, the file flat on the plate's top, so the blank lies flat on the tape." },
   { kind = "check", text = "The blank lies flat on the plate: no edge rocks or stands up when pressed." },
-  { kind = "stop", text = "An edge still stands up: snip a strip off that edge (the margin allows 1/8 in) and file again." },
+  { kind = "stop", text = "An edge still stands up: snip a new blank from the sheet and try again (a strip snipped off this one would eat the margin the cutter needs)." },
 ]
 feed = "hand"
 
@@ -207,8 +215,8 @@ machine_ref = "pm-30mv"
 holding = "Spoil plate on 1 in parallels across the vise jaws, its back edge on the fixed jaw, centred along the jaws; the blank bonded to its top on 3M VHB 5906 tape ({{process.tape_thickness_mm:in.3dot}}) under its whole face, its left end and back edge {{process.blank_left_x_mm:in.2dot}} in from the plate's left end and back edge."
 datum = "Program CB01_outline. G54: X0 the plate's left end, Y0 the fixed jaw's face (the plate's back edge), Z0 the plate top; +Y toward the fixed jaw. The comb's open end stands at X {{process.comb_south_x_mm:in.3dot}}, its back edge (the stepped arm's, toward the fixed jaw) at Y {{process.comb_back_y_mm:in.3dot}}. Set X, Y and Z again after a reset, a stall, an E-stop or any move of the plate."
 diagram = { file = "diagrams/outline.svg", alt = "Plan of the spoil plate in the vise: the blank taped near the fixed jaw and the plate's left end, the comb's U drawn inside it with its open end left and its stepped arm toward the fixed jaw; the 1/16 end mill's path runs once round the U, starting and ending at the middle of the spring arm's front edge (toward the moving jaw)." }
-# Top: the thickest sheet on its tape; deepest: the cutter's tip, in the
-# tape above the plate top.
+# Top: the thickest sheet on its tape; deepest: the cutter's tip, .004 into
+# the spoil plate.
 envelope = { x_span_mm = ["{{process.blank_length_mm}}", "{{process.blank_left_x_mm}}"], y_span_mm = ["{{process.blank_width_mm}}", "{{process.blank_back_y_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.tape_thickness_mm}}", "{{cad.top_stock_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.outline_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_sixteenth_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_sixteenth_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{process.blank_area_mm2}}", width_mm = "{{process.blank_width_mm}}" }] } }
@@ -242,14 +250,14 @@ steps = [
 ]
 feed = "hand"
 
-# One level, one pass at the finished size: the plunge pushes down onto the
-# tape, the comb and the waste each stay on their own tape once cut.
+# One level, one pass at the finished size, entered from the air through the
+# blank's margin; the comb and the waste each stay on their own tape once cut.
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-sixteenth"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB01_outline (M6 T1, spindle off: set 2800). It comes down in the air in front of the blank, feeds in through the margin to the middle of the spring arm's front edge, runs once round the U anticlockwise at the finished size with its tip {{process.outline_tip_z_mm:in.3dot}} above the plate, and lifts where it joined. Air blast the chips off as it goes; no coolant."
+instruction = "Run CB01_outline (M6 T1, spindle off: set 2800). It comes down in front of the blank (its tip into the spoil plate there), feeds in through the margin to the middle of the spring arm's front edge, runs once round the U anticlockwise at the finished size with its tip {{process.outline_tip_into_plate_mm:in.3dot}} into the spoil plate, and lifts where it joined. Air blast the chips off as it goes; no coolant."
 settings = "endmill-carbide-3fl-1-16-downcut-c260"
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "comb", kind = "part", area_mm2 = "{{process.comb_bond_area_mm2}}", width_mm = "{{process.comb_spring_width_mm}}" }, { name = "waste", kind = "waste", area_mm2 = "{{process.waste_bond_area_mm2}}" }] } }
 milling_cuts = [
@@ -268,7 +276,7 @@ beam = "other"
 inspection = [
   "Length {{cad.north_end_length_min_in:.2dot}}–{{cad.north_end_length_max_in:.2dot}}, open end to the closed (full R) end; height {{cad.back_height_min_in:.2dot}}–{{cad.back_height_max_in:.2dot}}, the spring arm's outer edge to the stepped arm's outer edge.",
   "Spring arm {{cad.far_edge_spring_width_min_in:.2dot}}–{{cad.far_edge_spring_width_max_in:.2dot}} wide; grip span {{cad.spring_inner_grip_span_min_in:.3dot}}–{{cad.spring_inner_grip_span_max_in:.3dot}}, the inside jaws across the slot from the MHA-DT-03-T030 seat (the stepped arm's inner edge at the open end) to the spring arm.",
-  "Slot length {{cad.slot_end_slot_length_min_in:.2dot}}–{{cad.slot_end_slot_length_max_in:.2dot}}, the depth rod from the open end to the bottom of the full R.",
+  "Slot length {{cad.slot_end_slot_length_min_in:.2dot}}–{{cad.slot_end_slot_length_max_in:.2dot}} from the open end to the full R's centre: the depth rod from the open end to the bottom of the full R, less half the grip span read above (the R is half the slot's width).",
   "Risers from the open end: MHA-DT-03-T024 level {{cad.blade_t024_start_min_in:.2dot}}–{{cad.blade_t024_start_max_in:.2dot}}, MHA-DT-03-T018 level {{cad.blade_t018_start_min_in:.2dot}}–{{cad.blade_t018_start_max_in:.2dot}}, MHA-DT-03-T012 level {{cad.blade_t012_start_min_in:.2dot}}–{{cad.blade_t012_start_max_in:.2dot}}, MHA-DT-37 level {{cad.blade_t006_start_min_in:.2dot}}–{{cad.blade_t006_start_max_in:.2dot}}; the MHA-DT-37 level ends {{cad.blade_t006_level_end_min_in:.2dot}}–{{cad.blade_t006_level_end_max_in:.2dot}} from the open end.",
   "Depths under the seat line (the levels clear those gears' roots): MHA-DT-03-T024 {{cad.blade_t024_depth_min_in:.3dot}}–{{cad.blade_t024_depth_max_in:.3dot}}, MHA-DT-03-T018 {{cad.blade_t018_depth_min_in:.3dot}}–{{cad.blade_t018_depth_max_in:.3dot}}, MHA-DT-03-T012 {{cad.blade_t012_depth_min_in:.3dot}}–{{cad.blade_t012_depth_max_in:.3dot}}, MHA-DT-37 {{cad.blade_t006_depth_min_in:.3dot}}–{{cad.blade_t006_depth_max_in:.3dot}}.",
 ]

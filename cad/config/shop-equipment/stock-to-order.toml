@@ -294,7 +294,7 @@ cite = ["cad/config/parts/dt-vn-cone-shaft-key.yaml material_specification, supp
 [stock.c260-h02-sheet-020-12x12]
 form = "sheet"
 material = "C26000 cartridge brass, H02 half hard, ASTM B36"
-note = "To order: OnlineMetals 1589, C260 H02 brass sheet, .020 x 12 x 12 in, $42.82 (owner ruling 2026-11-14, #2734, the price as the registry row read it live that day); McMaster-Carr 9011K111 (ASTM B36) is the registry's alternative source. Allocation: dt-cone-gear-tl-phasing-comb (MHA-DT-03-TL-02), one blank about 4.25 x 1.40 in snipped from a corner (the comb's 3.65 x .90 U, dt_cone_gear_tl_phasing_comb_spec SHEET_LENGTH x SHEET_HEIGHT, with a margin all round), thickness as supplied (the sheet's (.020) SHEET STOCK); the rest is spare for remakes. Not owned."
+note = "To order: OnlineMetals 1589, C260 H02 brass sheet, .020 x 12 x 12 in, $42.82 (owner ruling 2026-11-14, #2734, the price as the registry row read it live that day); McMaster-Carr 9011K111 (ASTM B36) is the registry's alternative source. Allocation: dt-cone-gear-tl-phasing-comb (MHA-DT-03-TL-02), one 4.25 x 1.50 in blank snipped from a corner (the comb's 3.65 x .90 U, dt_cone_gear_tl_phasing_comb_spec SHEET_LENGTH x SHEET_HEIGHT, with .30 in margin all round: cad/process/dt_cone_gear_tl_phasing_comb/plan.toml blank_length_in x blank_width_in), thickness as supplied (the sheet's (.020) SHEET STOCK); the rest is spare for remakes. Not owned."
 section_mm = [304.8, 0.508]
 length_mm = 304.8
 status = "to_order"

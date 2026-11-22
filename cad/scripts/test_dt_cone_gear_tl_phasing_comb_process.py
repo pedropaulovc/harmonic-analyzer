@@ -118,7 +118,10 @@ def test_the_recipes_program_passes_every_check_it_declares(context, tmp_path) -
         ("blank_margin_mm", 3.0, "blank_length_mm"),
         ("comb_back_y_mm", -19.0, "comb_back_y_mm"),
         ("blank_left_x_mm", 50.0, "comb_south_x_mm"),
-        ("outline_tip_z_mm", 0.2, "in the tape"),
+        ("outline_tip_z_mm", -0.3, "outline_tip_into_plate_mm"),
+        ("spoil_cut_max_mm", 0.05, "no deeper than spoil_cut_max_mm"),
+        ("through_margin_min_mm", 0.3, "through_margin_min_mm below"),
+        ("tape_thickness_min_mm", 0.2, "over the tape"),
         ("outline_depth_mm", 0.5, "outline_depth_mm"),
         ("comb_bond_area_mm2", 900.0, "comb_bond_area_mm2"),
         ("jaw_top_over_plate_mm", 6.0, "jaw_top_over_plate_mm"),
@@ -155,10 +158,10 @@ def _seed(ctx: dict, pick, change) -> dict:
             lambda line: line.replace("Y-43.967", "Y-43.700"),
             "outline",
         ),
-        # The level taken through the tape into the plate.
+        # The level taken deeper into the spoil plate.
         (
-            lambda line: line.startswith("G1 Z0.076"),
-            lambda line: line.replace("Z0.076", "Z-0.100"),
+            lambda line: line.startswith("G1 Z-0.102"),
+            lambda line: line.replace("Z-0.102", "Z-0.400"),
             "depth",
         ),
         # The feed in through the margin rapided at cutting depth.

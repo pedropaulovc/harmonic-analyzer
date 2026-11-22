@@ -240,10 +240,13 @@ flute_length_mm = 4.7244
 # .001 = 8.4 in/min. Harvey's own table for this series (SF_896200, read
 # 2026-11-22) gives brass at .062 in lower, about .00065 slotting and .00087
 # max: .001 is taken because prechips' milling feed-factor table starts at
-# .001 and is not extended without a source, as the owner ruled for the
-# MHA-CH-13 strap's 1/8 cutter (common.toml
+# .001 and is not extended without a source. This is CncBenchB's choice, not
+# an owner ruling: it follows the owner's ruling for the MHA-CH-13 strap's
+# 1/8 cutter in 1018 (common.toml
 # settings.endmill-carbide-3fl-1-8-1018-cf-tru-edge, Tru-Edge over a table
-# below the floor). Flagged for the owner: run the first comb watching it.
+# below the floor), extended here to a 1/16 cutter in brass, about 54 % over
+# Harvey's slotting value. Flagged for the owner in HA PR #3361: run the
+# first comb watching it.
 [settings.endmill-carbide-3fl-1-16-downcut-c260]
 tool = "endmill-carbide-3fl-1-16-downcut"
 material = "c260-h02"
