@@ -474,3 +474,73 @@ def test_registry_row_is_the_turned_brass_mha_157() -> None:
     process = row["process"]
     assert "#33" in process and "LOCTITE 641" in process
     assert "spring-pin" not in process
+
+
+def _plane_face(normal: tuple[float, float, float], offset_mm: float):
+    from _gtol_face import SURFACE_PLANE, FaceGeometry
+
+    point = tuple(value * offset_mm / 1000 for value in normal)
+    return FaceGeometry(None, SURFACE_PLANE, (*normal, *point), normal, ())
+
+
+def _cylinder_face(dia_mm: float):
+    from _gtol_face import SURFACE_CYLINDER, FaceGeometry
+
+    return FaceGeometry(
+        None, SURFACE_CYLINDER, (0.0, 0.0, 0.0, 0.0, 1.0, 0.0, dia_mm / 2000), None, ()
+    )
+
+
+def test_each_declared_cup_face_has_exactly_one_owner() -> None:
+    import export_features
+
+    selectors = export_features.feature_selectors("pd_transgear_knob_cup")
+    faces = {
+        "front_face": [_plane_face((0.0, -1.0, 0.0), 0.0)],
+        "rear_face": [_plane_face((0.0, 1.0, 0.0), spec.LENGTH)],
+        "outside": [_cylinder_face(spec.OD)],
+        "pilot": [
+            _cylinder_face(spec.BORE_DIA),
+            _plane_face((0.0, -1.0, 0.0), -spec.PILOT_DEPTH),
+        ],
+        "web_hole": [_cylinder_face(spec.CLEAR_HOLE_DIA)],
+        "pocket": [
+            _cylinder_face(spec.CBORE_DIA),
+            _plane_face((0.0, 1.0, 0.0), spec.LENGTH - spec.CBORE_DEPTH),
+        ],
+    }
+    assert set(selectors) == set(faces)
+    for name, geometries in faces.items():
+        for face in geometries:
+            owners = [
+                owner
+                for owner, specs in selectors.items()
+                if any(selector.matches(face) for selector in specs)
+            ]
+            assert owners == [name]
+
+
+def test_declarations_print_the_sheets_bands_and_supply_sizes() -> None:
+    import export_features
+
+    manifest = export_features.requirement_manifest("pd_transgear_knob_cup")
+    features = manifest["features"]
+
+    def inch(values: list[float]) -> list[float]:
+        return [round(value / IN, 4) for value in values]
+
+    assert inch(features["outside"]["dia"]) == [0.43, 0.45]
+    assert inch(features["rear_face"]["length"]) == [0.35, 0.37]
+    assert inch(features["pilot"]["dia"]) == [0.25, 0.251]
+    assert inch(features["pilot"]["depth"]) == [0.147, 0.157]
+    assert inch(features["pilot"]["diametral_clearance"]) == [0.0012, 0.0025]
+    assert inch([features["pilot"]["corner_radius_max"]]) == [0.005]
+    assert inch(features["web_hole"]["dia"]) == [0.113, 0.117]
+    assert inch(features["pocket"]["dia"]) == [0.18, 0.2]
+    assert inch(features["pocket"]["depth"]) == [0.103, 0.113]
+    assert inch([features["pocket"]["corner_radius_max"]]) == [0.01]
+    # Note 1: length and pilot depth are supply sizes; the front face is
+    # faced at MHA-PD-00 to the fitted pilot depth.
+    assert features["rear_face"]["supply"] and features["pilot"]["supply"]
+    assert features["front_face"]["faced_at"] == "assembly"
+    assert manifest["notes"]["manufacturing"] == drawing.NOTES.splitlines()
