@@ -27,5 +27,5 @@
   <text class="label" x="440.0" y="190.0">E (fixed jaw)</text>
   <line class="leader" x1="436.0" y1="186.0" x2="223.5" y2="204.2"/>
   <circle class="leader-dot" cx="223.5" cy="204.2" r="2.5"/>
-  <text class="label" x="16.0" y="406.0">Turned end for end: SEAT to the right; X0 on SEAT shifted by H - 1.500.</text>
+  <text class="label" x="16.0" y="406.0">Turned end over end: S up, SEAT to the right; X0 on SEAT shifted by D = (H - 1.500) x 25.4 mm.</text>
 </svg>

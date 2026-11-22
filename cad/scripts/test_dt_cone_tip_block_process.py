@@ -169,6 +169,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -
         ("lying_grip_mm", 8.0, "lying_grip_mm"),
         ("east_grip_mm", 6.8453, "east_grip_mm"),
         ("tap_stack_max_mm", 261.62, "tap_stack_max_mm"),
+        ("adjuster_wrench_reach_max_mm", 200.0, "adjuster_wrench_reach_max_mm"),
         ("vise_slit_inset_mm", -120.0, "vise_slit_inset_mm"),
     ],
 )

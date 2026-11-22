@@ -28,7 +28,7 @@
   <text class="label" x="440.0" y="150.0">#30 to .335 (the slot's place)</text>
   <line class="leader" x1="436.0" y1="146.0" x2="204.0" y2="182.6"/>
   <circle class="leader-dot" cx="204.0" cy="182.6" r="2.5"/>
-  <text class="label" x="440.0" y="190.0">#43 through both jaws, exits E between the stacks</text>
+  <text class="label" x="440.0" y="190.0">#43 through both halves, exits E between the stacks</text>
   <line class="leader" x1="436.0" y1="186.0" x2="200.0" y2="215.7"/>
   <circle class="leader-dot" cx="200.0" cy="215.7" r="2.5"/>
   <text class="label" x="440.0" y="230.0">N (fixed jaw)</text>

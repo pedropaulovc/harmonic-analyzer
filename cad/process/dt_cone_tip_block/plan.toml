@@ -16,7 +16,7 @@
 # depth (DT01); on edge: skim E (DT02); upright: skim TOP (DT03); upright,
 # TOP down: SEAT to the height, spot and drill the #43 foot hole (DT04), tap
 # it plug then bottoming under the tap guide (DT05); on edge, E down: W to
-# the width, the #43 pinch hole through both jaws and W's jaw opened #30 to
+# the width, the #43 pinch hole through both halves and the W half opened #30 to
 # the slot (DT06); W down: tap the pinch hole from E (DT07); lying N up:
 # spot, drill #3 through and countersink the 1/4-28 adjuster, its height the
 # measured MHA-DT-05 axis height H (DT08), tap it (DT09); S up: countersink
@@ -77,7 +77,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1/2 × 2-1/4 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.bar_thickness_in:fraction}} × {{process.blank_y_in:fraction}} in flat bar; two strips {{process.strip_min_mm:in.2dot}}–{{process.strip_max_mm:in.2dot}} in wide sawn off its end: {{process.quantity:d}} part and the Setup 10 vise spacer."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.top_face_height_min_in:.2dot}}–{{cad.top_face_height_max_in:.2dot}} high (SEAT to TOP), {{cad.west_face_width_min_in:.2dot}}–{{cad.west_face_width_max_in:.2dot}} wide (E to W), {{cad.south_face_depth_min_in:.2dot}}–{{cad.south_face_depth_max_in:.2dot}} deep (N to S). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every cutting file is proved in air first. At every M6 stop the file has stopped the spindle and lifted the tool clear. The Ø.0620 dowel ream (drawing NOTE 1) is done at assembly (MHA-DT-00), not here. Setup 8 waits for H, the measured MHA-DT-05 axis height. To buy: the slotting saw and its arbor, the 4-40 bottoming tap, the PC9."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.top_face_height_min_in:.2dot}}–{{cad.top_face_height_max_in:.2dot}} high (SEAT to TOP), {{cad.west_face_width_min_in:.2dot}}–{{cad.west_face_width_max_in:.2dot}} wide (E to W), {{cad.south_face_depth_min_in:.2dot}}–{{cad.south_face_depth_max_in:.2dot}} deep (N to S). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every cutting file is proved in air first. At every M6 stop the file has stopped the spindle and lifted the tool clear. The slit (Setup 10) splits the TOP end into the E half and the W half; the pinch hole runs through both. The Ø.0620 dowel ream (drawing NOTE 1) is done at assembly (MHA-DT-00), not here. Setup 8 waits for H, the measured MHA-DT-05 axis height. To buy: the slotting saw and its arbor, the 4-40 bottoming tap, the PC9."
 shop = "../shop"
 stock_refs = ["1018-flat-1-2x2-1-4"]
 material_key = "rocker-1018-cold-finished"
@@ -406,7 +406,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Prove DT01_depth in air: Z0 raised 1.000 in; every move clears the jaws. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run DT01_depth, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Prove DT01_depth in air: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run DT01_depth, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -658,7 +658,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and 1/2 in parallels stacked against each jaw (1.5 in). The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; SEAT to the LEFT, centred along the jaws. Tap it down onto both stacks while closing the vise: the pinch hole exits E between them."
 datum = "Program DT06_west. G54: X0 SEAT (left), Y0 the fixed jaw's face (N), Z0 the stacks' top (E), set from the miked width. The pinch hole at X {{cad.pinch_tap_height_in:.3f}}, Y −{{cad.pinch_tap_depth_center_in:.3f}} in."
-diagram = { file = "diagrams/west.svg", alt = "The block on edge on stacked parallels, E down, gripped on N and S; the 1/2 in end mill faces W down to the width; the #43 drills the pinch hole through both jaws and the #30 opens W's jaw to the slot." }
+diagram = { file = "diagrams/west.svg", alt = "The block on edge on stacked parallels, E down, gripped on N and S; the 1/2 in end mill faces W down to the width; the #43 drills the pinch hole through both halves and the #30 opens the W half to the slot." }
 envelope = { x_span_mm = ["{{process.length_target_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.depth_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.west_raw_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.pinch_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_30_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.depth_target_mm}}", along_jaws_mm = "{{process.length_target_mm}}", part_height_mm = "{{process.west_raw_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_length_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.length_target_mm}}"], clamp_mm = [0, "{{process.length_target_mm}}"], section_mm = { y = "{{process.depth_target_mm}}", z = "{{process.width_target_mm}}" }, vise_left = "start" }
@@ -716,7 +716,7 @@ speed_kind = "spindle"
 tool = "drill-43"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-4-40" }
-instruction = "Same file, M6 T3 (#43 drill; set 2800): drill the pinch hole through both jaws, pecks of {{process.peck_43_mm:in.3dot}} with full retract, its full diameter {{process.drill_past_mm:in.3dot}} past E, between the stacks. Cutting oil."
+instruction = "Same file, M6 T3 (#43 drill; set 2800): drill the pinch hole through both halves, pecks of {{process.peck_43_mm:in.3dot}} with full retract, its full diameter {{process.drill_past_mm:in.3dot}} past E, between the stacks. Cutting oil."
 rpm = 2800
 feed = "{{process.drill_43_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.width_target_mm}}"
@@ -733,7 +733,7 @@ drilling = "twist_drill"
 # band's lower limit, .1285-.1325 in, which the export rounds up to 3.264 mm;
 # a twist drill cuts at or over its size.
 sizing = "other"
-instruction = "Same file, M6 T4 (#30 drill; set 1800): open the pinch hole in W's jaw {{process.clearance_depth_mm:in.3dot}} deep (full diameter) from W, to the slot, pecks of {{process.peck_mm:in.3dot}} with full retract. Cutting oil."
+instruction = "Same file, M6 T4 (#30 drill; set 1800): open the pinch hole in the W half {{process.clearance_depth_mm:in.3dot}} deep (full diameter) from W, to the slot, pecks of {{process.peck_mm:in.3dot}} with full retract. Cutting oil."
 rpm = 1800
 feed = "{{process.drill_30_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.clearance_depth_mm}}"
@@ -797,7 +797,7 @@ instruction = "Tap by hand under the tap guide, spindle off, cutting oil, a half
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A 4-40 screw runs in by hand from E through E's jaw into W's #30 hole."
+instruction = "A 4-40 screw runs in by hand from E through the E half into W's #30 hole."
 inspection = "It runs in without binding. Binds: send G20 and run the tap again under the tap guide to the same DRO Z, never deeper, then send G21; still binds: stop and tell the owner."
 gauge_checks = "other"
 feed = "hand"
@@ -830,7 +830,7 @@ gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Write down the shift S = (H − 1.5000) × 25.4, in mm, with its sign (H 1.5030 gives S +0.076)."
+instruction = "Write down the shift D = (H − 1.5000) × 25.4, in mm, with its sign (H 1.5030 gives D +0.076)."
 feed = "hand"
 
 [[setups.operations]]
@@ -838,8 +838,8 @@ instruction = "Before clamping: mic N to S at the block's middle and write it do
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Y0 the fixed jaw's face; X0 on SEAT (left) less the shift S: edge finder (900 rpm)."
-instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on SEAT from the left, G10 L20 P1 X(−2.540 − S). For S +0.076: X-2.616. The program's X 38.100 is then H from SEAT."
+instruction = "G54 Y0 the fixed jaw's face; X0 on SEAT (left) less the shift D: edge finder (900 rpm)."
+instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on SEAT from the left, G10 L20 P1 X(−2.540 − D). For D +0.076: X-2.616. The program's X 38.100 is then H from SEAT."
 feed = "hand"
 
 [[setups.operations]]
@@ -900,7 +900,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.adjuster_lateral_band_mm}
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Stop check before the tap file: measure the 1/4-28 tap in its T-handle wrench from its point to the wrench's centre hole. At most {{process.adjuster_wrench_reach_max_mm:in.2f}} in (as Setup 5's, the block lying on the 1.5 in stacks). Over: stop; do not tap on this setup."
+instruction = "Stop check before the tap file: measure the 1/4-28 tap in its T-handle wrench from its point to the wrench's centre hole. At most {{process.adjuster_wrench_reach_max_mm:in.2f}} in: Setup 5's sum, with the 1.5 in stacks and the .45 block (1.95 in) in place of the 1/2 in parallels and the unfaced 2.165 block (2.665 in). Over: stop; do not tap on this setup."
 feed = "hand"
 
 [[setups.operations]]
@@ -956,8 +956,8 @@ instruction = "Before clamping: mic N to S at the block's middle and write it do
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Y0 the fixed jaw's face; X0 on SEAT (right) plus the shift S of Setup 8: edge finder (900 rpm)."
-instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on SEAT from the right, G10 L20 P1 X(2.540 + S). For S +0.076: X2.616. The program's X −38.100 is then H from SEAT."
+instruction = "G54 Y0 the fixed jaw's face; X0 on SEAT (right) plus the shift D of Setup 8: edge finder (900 rpm)."
+instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on SEAT from the right, G10 L20 P1 X(2.540 + D). For D +0.076: X2.616. The program's X −38.100 is then H from SEAT."
 feed = "hand"
 
 [[setups.operations]]
@@ -977,7 +977,7 @@ sizing = "other"
 instruction = "Run DT10_south_csk (M6 T6, chamfer mill; set 1400): its point fed {{process.csk_tip_depth_mm:in.3dot}} down the adjuster's axis, once round the circle of radius {{process.csk_orbit_mm:in.4dot}}: countersink Ø{{cad.adjuster_csk_dia_in:.3dot}} × 90° at S."
 rpm = 1400
 feed = "{{process.chamfer_feed_per_min_mm:in.1f}} in/min"
-inspection = "Countersink Ø{{cad.adjuster_csk_dia_min_in:.3dot}}–{{cad.adjuster_csk_dia_max_in:.3dot}} at S, as at N; it is round on the thread (an offset rim means the shift S was not set: stop and tell the owner). Under: send $#, G10 L2 P1 Z(the G54 Z − 0.050) and run DT10_south_csk again; over: stop and tell the owner."
+inspection = "Countersink Ø{{cad.adjuster_csk_dia_min_in:.3dot}}–{{cad.adjuster_csk_dia_max_in:.3dot}} at S, as at N; it is round on the thread (an offset rim means the shift D was not set: stop and tell the owner). Under: send $#, G10 L2 P1 Z(the G54 Z − 0.050) and run DT10_south_csk again; over: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.adjuster_csk_dia_band_mm}}" }]
 milling_cuts = [
   { name = "south countersink", kind = "side", phase = "finish", cutter_dia_mm = 6.35, flutes = 2, rpm = 1400, feed_mm_min = "{{process.chamfer_feed_per_min_mm}}", axial_doc_mm = "{{process.csk_tip_depth_mm}}", radial_woc_mm = "{{process.csk_tip_depth_mm}}", stations_mm = "{{cad.adjuster_height_mm}}" },
@@ -989,7 +989,7 @@ title = "Saw the slit"
 machine = "PM-30MV CNC (FluidNC, CNCjs) / vise, swivel off; the slotting saw on the R8 1 in arbor"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The 1 in and 1/2 in parallels stacked against each jaw, their right ends at or left of the right jaw side. The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; TOP to the RIGHT, standing {{process.slit_overhang_mm:in.2dot}} in past the right jaw side. The spacer strip (Setup 2) standing on a sawn face on the vise bed at the jaws' left end, the stacks ending to its right, gripped by the bare jaws on its two .44 faces. Tap the block down onto both stacks while closing the vise."
+holding = "The 1 in and 1/2 in parallels stacked against each jaw, their right ends at or left of the right jaw side. The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; TOP to the RIGHT, standing {{process.slit_overhang_mm:in.2dot}} in past the right jaw side. The spacer strip (Setup 2) standing on end on the vise bed at the jaws' left end (its 2-1/4 length upright, a .44 × .80 end down), the stacks ending to its right, gripped by the bare jaws on its two .44 faces. Tap the block down onto both stacks while closing the vise."
 datum = "Program DT11_slit. G54: X0 TOP (right, the block to −X), Y0 the fixed jaw's face (N), Z0 the stacks' top (E), set from the miked width with the saw's lower face. The file's Z is the saw's lower face; it loads no tool."
 diagram = { file = "diagrams/slit.svg", alt = "The block on edge on stacked parallels, E down, gripped on N and S, TOP .75 in past the right jaw side; the slotting saw, horizontal on its arbor, saws the slit in from TOP across the block's depth, its spacers and nut past the end." }
 envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.slit_depth_mm}}", 5.08], y_span_mm = ["{{process.saw_dia_mm}}", "{{process.depth_target_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.width_target_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.saw_cut_z_mm}}"], longest_tool_mm = "{{process.saw_arbor_length_mm}}", shortest_tool_mm = "{{process.saw_arbor_length_mm}}" }
@@ -1062,7 +1062,7 @@ machine_kind = "other"
 title = "Deburr and inspect"
 machine = "Bench"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished block: SEAT down, the slit from TOP into the adjuster with its two countersinks, the pinch hole through both jaws, the foot hole in SEAT; the adjuster's height from SEAT read with the height gauge over a 1/4-28 screw." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished block: SEAT down, the slit from TOP into the adjuster with its two countersinks, the pinch hole through both halves, the foot hole in SEAT; the adjuster's height from SEAT read with the height gauge over a 1/4-28 screw." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -1096,7 +1096,7 @@ gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.adjuster_height_band_
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Fits: a 4-40 screw runs from E across the slit into W's #30 and draws the jaws together; a 1/4-28 screw runs through the adjuster; the foot hole takes its 4-40 screw to the Setup 5 depth."
+instruction = "Fits: a 4-40 screw runs from E across the slit into W's #30 and draws the two halves together; a 1/4-28 screw runs through the adjuster; the foot hole takes its 4-40 screw to the Setup 5 depth."
 inspection = "Each runs in by hand and seats. Any failure: stop and tell the owner."
 gauge_checks = "other"
 feed = "hand"
