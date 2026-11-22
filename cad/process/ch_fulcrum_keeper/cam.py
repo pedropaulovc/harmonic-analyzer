@@ -34,7 +34,7 @@ crown through the lug and spots, drills and reams the bore through it, both
 into the waste the step removes; the jaws grip only that waste. Lying, I
 down: FK05 faces the foot tip to the length and mills the step to the lug,
 opening the bore and the foot hole. Upright on the seat: FK06 spots and
-drills #53 through the crown into the bore and mills the foot hole's
+drills 1/16 through the crown into the bore and mills the foot hole's
 counterbore from the foot top with the long-reach 1/8 in end mill (a helix
 down, then a full circle at the floor); FK07 is the hand-tap stop.
 
@@ -95,7 +95,7 @@ CAM_TOOLS = (
     "drill-41",
     "drill-d",
     "reamer",
-    "drill-53",
+    "drill-1-16",
     "em-eighth",
     "tap-guide",
 )
@@ -114,6 +114,9 @@ DRILL_POINT_DEG = 118.0
 # The #1-72 UNF thread's basic major diameter, .0730 in (ASME B1.1): the
 # export names the thread, not its sizes.
 UNF_1_72_MAJOR_MM = 0.073 * IN
+# The title block's .XX general tolerance, ±.010 in: a Hole Wizard
+# counterbore's Ø and depth are clearance sizes on that grade.
+XX_TOL_MM = 0.010 * IN
 # The tap file's first motion: G53 G0 to machine Z0, the homed top (as the
 # magnifying clamp's recipe: FluidNC sets an axis's machine position to its
 # homing mpos_mm, default 0, and Z homes up); the owner (Pedro) confirmed
@@ -522,7 +525,7 @@ def context(
     d41 = _shop_tool(plan, shop, "drill-41")["diameter_mm"]
     dd = _shop_tool(plan, shop, "drill-d")["diameter_mm"]
     reamer = _shop_tool(plan, shop, "reamer")["diameter_mm"]
-    d53 = _shop_tool(plan, shop, "drill-53")["diameter_mm"]
+    d16 = _shop_tool(plan, shop, "drill-1-16")["diameter_mm"]
     em8 = _shop_tool(plan, shop, "em-eighth")["diameter_mm"]
     tap_drill = _shop_tool(plan, shop, "tap-1-72")["tap_drill_mm"]
     r = em / 2
@@ -533,9 +536,9 @@ def context(
         raise ValueError(f"reamer Ø{reamer} is outside the bore's band {bore_dia}")
     if not dd < reamer:
         raise ValueError(f"D Ø{dd} is not under the reamer Ø{reamer}")
-    if not _inside(d53, tap_band) or not _close(d53, tap_drill):
+    if not _inside(d16, tap_band) or not _close(d16, tap_drill):
         raise ValueError(
-            f"#53 Ø{d53} is not the #1-72 tap's drill in the band {tap_band}"
+            f"1/16 Ø{d16} is not the #1-72 tap's drill in the band {tap_band}"
         )
     cbore_band = g["hold"]["cbore_dia"]
     if not em8 < cbore_band[0]:
@@ -598,13 +601,13 @@ def context(
             raise ValueError(f"'{name}' depth or width is not the plan's")
 
     # Holes: spots under each drill (no chamfer at the mouth); the crown's
-    # on the pilot's point, under the #53.
+    # on the pilot's point, under the 1/16.
     spot_rpm, spot_feed = _setting(plan, shop, "hold spot")
     spots = {}
     for name, key, drill in (
         ("hold spot", "hold_spot_dia_mm", d41),
         ("bore spot", "bore_spot_dia_mm", dd),
-        ("apex spot", "apex_spot_dia_mm", d53),
+        ("apex spot", "apex_spot_dia_mm", d16),
     ):
         if _setting(plan, shop, name) != (spot_rpm, spot_feed):
             raise ValueError(f"'{name}' runs at another speed than 'hold spot'")
@@ -619,7 +622,7 @@ def context(
         ("hold drill", d41),
         ("bore drill", dd),
         ("bore ream", reamer),
-        ("apex drill", d53),
+        ("apex drill", d16),
         ("cbore", em8),
     ):
         if not math.isclose(_cut(plan, name, "cutter_dia_mm"), dia, abs_tol=1e-6):
@@ -648,16 +651,16 @@ def context(
     if ream_tip < bore_full - 1e-6 or p["bore_ream_past_mm"] <= 0:
         raise ValueError("the reamer's tip runs below the drill's full diameter")
     arch_bottom = section - arch_depth
-    # Crown: the #53 full diameter apex_drill_past_mm past the bore's wall
+    # Crown: the 1/16 full diameter apex_drill_past_mm past the bore's wall
     # where the drill's edge meets it; the tap's lead past the wall at the
     # thread's major diameter and short of the far wall.
     bore_r = bore_dia[0] / 2
-    wall = bore_y + math.sqrt(bore_r**2 - (d53 / 2) ** 2)
+    wall = bore_y + math.sqrt(bore_r**2 - (d16 / 2) ** 2)
     apex_full = wall - p["apex_drill_past_mm"]
-    apex_tip = apex_full - _point(d53)
+    apex_tip = apex_full - _point(d16)
     _agree(plan, "apex_tip_height_mm", apex_tip)
     if apex_tip <= bore_y - bore_r:
-        raise ValueError("the #53's point reaches the bore's far wall")
+        raise ValueError("the 1/16's point reaches the bore's far wall")
     major = UNF_1_72_MAJOR_MM
     major_wall = bore_y + math.sqrt(bore_r**2 - (major / 2) ** 2)
     _agree(plan, "tap_reach_min_mm", height - major_wall + p["plug_tap_lead_mm"])
@@ -689,6 +692,12 @@ def context(
     _agree(plan, "cbore_path_radius_mm", (cbore_mid - em8) / 2)
     depth_band = g["hold"]["cbore_depth"]
     _agree(plan, "cbore_depth_mm", sum(depth_band) / 2)
+    # Acceptance: the drawing's Hole Wizard counterbore is a clearance pocket
+    # on the title block's .XX grade, ±.010 round its printed Ø and depth.
+    _agree(plan, "cbore_accept_dia_min_mm", cbore_band[0] - XX_TOL_MM)
+    _agree(plan, "cbore_accept_dia_max_mm", cbore_band[0] + XX_TOL_MM)
+    _agree(plan, "cbore_accept_depth_min_mm", sum(depth_band) / 2 - XX_TOL_MM)
+    _agree(plan, "cbore_accept_depth_max_mm", sum(depth_band) / 2 + XX_TOL_MM)
     cbore_floor = foot_top - p["cbore_depth_mm"]
     pitch = p["cbore_pitch_mm"]
     turns = math.ceil(p["cbore_depth_mm"] / pitch - 1e-9)
@@ -1053,14 +1062,14 @@ def context(
             ],
         },
         {
-            **drill_tool("drill-53", d53, apex_rpm, apex_feed),
+            **drill_tool("drill-1-16", d16, apex_rpm, apex_feed),
             "frame": "apex",
             "label": "crown drill",
             "stock": stocks["apex"],
             "ops": [
                 [
                     "crown_drill",
-                    "drill the crown hole #53",
+                    "drill the crown hole 1/16",
                     _pecked(
                         tap_xy, height, apex_tip, p["apex_peck_mm"], height + CLEAR_MM
                     ),
@@ -1327,7 +1336,7 @@ def context(
             "tool_changes",
             {
                 "z_top": height,
-                "tools": [tn["spot"], tn["drill-53"], tn["em-eighth"]],
+                "tools": [tn["spot"], tn["drill-1-16"], tn["em-eighth"]],
                 "loads_first": True,
             },
         ],
@@ -1344,7 +1353,7 @@ def context(
                 height - spots["apex spot"],
                 CENTRE_DRILL["body_mm"] / 2,
             ),
-            hole_checks("apex", "apex", height, apex_tip, d53 / 2),
+            hole_checks("apex", "apex", height, apex_tip, d16 / 2),
             [
                 ["depth", {"z_min": _r(cbore_floor)}],
                 [

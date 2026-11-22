@@ -20,6 +20,7 @@
   <text class="label" x="480" y="50">Side:</text>
   <line class="leader" x1="563.6" y1="292" x2="615.57" y2="263.33"/>
   <circle class="leader-dot" cx="563.6" cy="292" r="2"/>
-  <text class="label" x="615.57" y="267.33">the foot hole and its counterbore</text>
+  <text class="label" x="615.57" y="251.33">the foot hole and</text>
+  <text class="label" x="615.57" y="267.33">its counterbore</text>
   <text class="label" x="20" y="385">Every face, edge and hole: washed, scuffed (not the bore or the holes), brushed, rinsed, dried, oiled.</text>
 </svg>

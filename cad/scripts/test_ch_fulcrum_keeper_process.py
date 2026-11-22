@@ -95,7 +95,7 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
         "drill-41": 3,
         "drill-d": 4,
         "reamer": 5,
-        "drill-53": 6,
+        "drill-1-16": 6,
         "em-eighth": 7,
         "tap-guide": 8,
     }
@@ -155,6 +155,8 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("cbore_projection_min_mm", 25.0, "cbore_projection_min_mm"),
         ("long_reach_mm", 25.4, "the end mill reaches"),
         ("foot_hole_station_from_i_mm", 12.5, "foot_hole_station_from_i_mm"),
+        ("cbore_accept_dia_min_mm", 3.81, "cbore_accept_dia_min_mm"),
+        ("cbore_accept_depth_max_mm", 2.2352, "cbore_accept_depth_max_mm"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> None:
@@ -218,10 +220,10 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: "G0 Z20.050",
             "feed_out",
         ),
-        # The #53 stopped short of the bore.
+        # The 1/16 stopped short of the bore.
         (
             "crown_drill",
-            lambda line: line.startswith("G1 Z27.395"),
+            lambda line: line.startswith("G1 Z27.363"),
             lambda line: "G1 Z29.000 F{feed}",
             "holes",
         ),

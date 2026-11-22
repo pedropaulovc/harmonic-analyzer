@@ -26,6 +26,7 @@
   <text class="label" x="470" y="50">Side (I on the left):</text>
   <text class="label" x="536.9" y="154.7">lug {{cad.lug_outer_face_thickness_min_in:.3dot}}–{{cad.lug_outer_face_thickness_max_in:.3dot}}</text>
   <text class="label" x="593.57" y="340">length {{cad.foot_tip_length_in:.2dot}}</text>
-  <text class="label" x="470" y="384">foot hole {{cad.foot_hole_station_in:.3dot}} from the foot tip, counterbored from the foot top</text>
+  <text class="label" x="470" y="372">foot hole {{cad.foot_hole_station_in:.3dot}} from the foot tip,</text>
+  <text class="label" x="470" y="388">counterbored from the foot top</text>
   <text class="label" x="536.9" y="292">foot top {{cad.foot_top_height_in:.3dot}} up</text>
 </svg>
