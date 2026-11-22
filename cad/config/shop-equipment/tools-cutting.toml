@@ -464,18 +464,10 @@ note = "Owner confirmed on hand 2026-11-19 (McMaster 3062A21)."
 # saw cuts it: the 1 in x .032 reaches about 4.7 mm past a 3/8 arbor's nut
 # (and no 3/8 arbor is owned), and the 2-3/4 x .064 is over the .060 MAX.
 # This one goes on the R8 1 in arbor (tools.gear-cutter-arbor-1, to_order),
-# which DT-21 shares with the gear work and the amplitude bar.
-# - Reach: saw radius 38.1 less the spacer radius by the saw, 19.05 (a 1.50
-#   in spacer OD, ASSUMED: the #3314 arbor envelope is assumed until the
-#   arbor is bought, and the traveler mikes it at mounting) leaves 19.05 mm.
-#   The slit is 15.13 mm deep, so the spacer clears the top face by 3.9 mm.
-#   The 1.75 in nut (corner circle radius 22.2) clears the top face's plane
-#   by 0.75 mm. It also hangs at least .50 below the saw, under the block's
-#   lower face, with the block's top end overhanging the jaws and parallels.
-# - Width: catalogue thickness .051, tolerance not stated. The traveler mikes
-#   the blade before the cut. Accept it if the miked thickness plus .003 of
-#   arbor runout is at most .060 and the miked thickness is at least .040:
-#   miked .040-.057.
+# which DT-21 shares with the gear work and the amplitude bar. Its reach past
+# the arbor's spacers and nut, and the blade thickness the slit accepts, are
+# the DT-21 plan's limits, checked by its recipe
+# (cad/process/dt_cone_tip_block/plan.toml and cam.py) and miked at mounting.
 # Read live on penntoolco.com 2026-11-22: Precise 10-200-445, $34.95, in
 # stock, 168 teeth, straight peripheral teeth, no side teeth, HSS 58-60 RC.
 [tools.slitting-saw-3-051]

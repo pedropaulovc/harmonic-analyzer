@@ -32,5 +32,5 @@
   <text class="label" x="440.0" y="230.0">N (fixed jaw)</text>
   <line class="leader" x1="436.0" y1="226.0" x2="214.8" y2="194.6"/>
   <circle class="leader-dot" cx="214.8" cy="194.6" r="2.5"/>
-  <text class="label" x="16.0" y="406.0">Turned end over end: W down, TOP now to the left, N still at the fixed jaw. Spindle off.</text>
+  <text class="label" x="16.0" y="406.0">Turned end over end: W down, SEAT now to the right, N still at the fixed jaw. Spindle off.</text>
 </svg>

@@ -172,6 +172,10 @@ drill_3_feed_per_min_mm = 91.44
 csk_dia_aim_mm = 6.5278
 csk_tip_depth_mm = 2.6
 csk_orbit_mm = 0.6639
+# The countersink point's height in DT08/DT10, the nominal depth less the
+# point's depth: those setups set Z0 the nominal depth below the face they
+# cut, so the rim is cut from the face whatever the block's depth.
+csk_tip_height_mm = 8.576
 chamfer_feed_per_min_mm = 71.12
 # Tap reaches below the face each tap enters, read on the DRO: the foot
 # hole's 4-40 plug tap .410 (short of the .43 drilled depth), its bottoming
@@ -231,8 +235,8 @@ slit_overhang_mm = 19.05
 # Holding (shop workholding.vise-pm-6 and fixtures.parallels-lms-6745, 1/8 in
 # thick, 4 in long, 1/2-1 in by 1/16): lying, the set's 1 in and 1/2 in
 # parallels stacked against each jaw (1.5 in); the strip on edge for E's skim
-# on the 5/8 in and 1/2 in stacked (1-1/8 in: a third of the strip's width
-# in the jaws, E clear above them); upright, the 1/2 in pair.
+# on the 5/8 in and 1/2 in stacked (1-1/8 in: about four fifths of the
+# strip's width in the jaws, E 3-5 mm above them); upright, the 1/2 in pair.
 riser_height_mm = 38.1
 east_riser_height_mm = 28.575
 parallel_height_mm = 12.7
@@ -338,6 +342,10 @@ ref = "saw-evolution-14"
 id = "files"
 name = "Files"
 ref = "jig-files"
+[[tools]]
+id = "reamer-0620"
+name = ".0620 reamer, TO BUY: used at assembly (MHA-DT-00), not on this traveler"
+ref = "reamer-0620"
 [[tools]]
 id = "deburring-set"
 name = "Deburring scraper set"
@@ -595,7 +603,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.foot_tap_station_band_mm}
 feed = "hand"
 
 [[setups.operations]]
-instruction = "No 4-40 bottoming tap in hand (it is to buy): do the stop check, the tap file, the plug tap's depth reference, the plug tap and the scrape now; skip the bottoming tap's depth reference, the bottoming tap and the thread-depth check. Tag the block AWAITING 4-40 BOTTOMING TAP and go on to Setup 6. When the tap comes: clamp, home, the touch-offs above, DT05_foot_tap, then those three ops."
+instruction = "No 4-40 bottoming tap in hand (it is to buy): do the stop check, the tap file, the plug tap's depth reference, the plug tap and the scrape now; skip the bottoming tap's depth reference, the bottoming tap and the thread-depth check. Tag the block AWAITING 4-40 BOTTOMING TAP and go on to Setup 6. When the tap comes: clamp, home, the touch-offs above, the stop check on the bottoming tap, DT05_foot_tap, then those three ops."
 feed = "hand"
 
 [[setups.operations]]
@@ -764,16 +772,16 @@ title = "Tap the pinch hole from E"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The same stacks. The block turned end over end: W down, E up, N still against the FIXED jaw; TOP now to the LEFT, centred. Tap it down onto both stacks while closing the vise."
-datum = "Program DT07_pinch_tap. G54: X0 TOP (left), Y0 the fixed jaw's face (N). No Z0: the tap file moves Z only to the machine top (G53); the depth is the DRO Z you note by hand. The pinch hole is the one drilled in Setup 6, now near the left end."
+holding = "The same stacks. The block turned end over end: W down, E up, N still against the FIXED jaw; SEAT now to the RIGHT, centred. Tap it down onto both stacks while closing the vise."
+datum = "Program DT07_pinch_tap. G54: X0 SEAT (right, the block to −X), Y0 the fixed jaw's face (N). No Z0: the tap file moves Z only to the machine top (G53); the depth is the DRO Z you note by hand. The pinch hole at X −{{cad.pinch_tap_height_in:.3f}}, Y −{{cad.pinch_tap_depth_center_in:.3f}} in: where Setup 6 drilled it from SEAT."
 diagram = { file = "diagrams/pinch-tap.svg", alt = "The block on edge, W down, E up; the 4-40 tap in the T-handle wrench in the pinch hole from E, the tap guide in the spindle; the tap's point to stop {{process.pinch_tap_reach_mm:in.3dot}} below E, inside W's #30." }
 envelope = { x_span_mm = ["{{process.length_target_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{process.depth_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.width_target_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.width_target_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.depth_target_mm}}", along_jaws_mm = "{{process.length_target_mm}}", part_height_mm = "{{process.width_target_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_length_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = "other"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 TOP (left), Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on TOP from the left, G10 L20 P1 X-2.540."
+instruction = "Home the mill first ($H). G54 X0 SEAT (right), Y0 the fixed jaw's face: edge finder (900 rpm)."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on SEAT from the right, G10 L20 P1 X2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -817,7 +825,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same stacks. The block lying N up, S down on them, gripped on E and W: E against the FIXED jaw; SEAT to the LEFT, centred. Tap it down onto both stacks while closing the vise: the adjuster exits S between them."
-datum = "Programs DT08_adjuster and DT09_adjuster_tap. G54: X0 SEAT (left) shifted by H − 1.500 (below), Y0 the fixed jaw's face (E), Z0 the stacks' top (S), set from the miked depth. The adjuster at X 1.500 (that is, H from SEAT), Y −{{cad.adjuster_lateral_in:.3f}} in."
+datum = "Programs DT08_adjuster and DT09_adjuster_tap. G54: X0 SEAT (left) shifted by H − 1.500 (below), Y0 the fixed jaw's face (E), Z0 .4400 below N (touched off on N: the countersink is cut from N whatever the block's depth). The adjuster at X 1.500 (that is, H from SEAT), Y −{{cad.adjuster_lateral_in:.3f}} in."
 diagram = { file = "diagrams/adjuster.svg", alt = "The block lying N up on stacked parallels, gripped on E and W; the centre drill spots, the #3 drills the adjuster through and the chamfer mill circles its countersink at N; then the 1/4-28 tap is turned by hand under the tap guide." }
 envelope = { x_span_mm = ["{{process.length_target_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{process.width_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_target_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.adjuster_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.width_target_mm}}", along_jaws_mm = "{{process.length_target_mm}}", part_height_mm = "{{process.depth_target_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_length_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
@@ -834,7 +842,7 @@ instruction = "Write down the shift D = (H − 1.5000) × 25.4, in mm, with its 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Before clamping: mic N to S at the block's middle and write it down (mm = in × 25.4). Clamp it as Holding says. Home the mill ($H)."
+instruction = "Clamp the block as Holding says. Home the mill ($H)."
 feed = "hand"
 
 [[setups.operations]]
@@ -843,8 +851,8 @@ instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside th
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the stacks' top (S), from the reading and the 1/2 in end mill touched on N at the block's middle."
-instruction_detailed = "Console M6 T1 (the tool setter measures it); MDI G0 X26.289 Y-8.509. Spindle stopped, its tip just dragging a .002 feeler leaf on N: G10 L20 P1 Z(the reading in mm + 0.051). DT08's M6 T2 then measures the centre drill against it."
+instruction = "G54 Z0: .4400 below N, the 1/2 in end mill touched on N at the block's middle."
+instruction_detailed = "Console M6 T1 (the tool setter measures it); MDI G0 X26.289 Y-8.509. Spindle stopped, its tip just dragging a .002 feeler leaf on N: G10 L20 P1 Z11.227 (the nominal .4400 depth plus the .002 leaf). DT08's M6 T2 then measures the centre drill against it."
 feed = "hand"
 
 [[setups.operations]]
@@ -945,14 +953,14 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same stacks. The block turned end over end: lying S up, N down on them, gripped on E and W: E still against the FIXED jaw; SEAT now to the RIGHT, centred. Tap it down onto both stacks while closing the vise."
-datum = "Program DT10_south_csk. G54: X0 SEAT (right, the block to −X) shifted by H − 1.500, Y0 the fixed jaw's face (E), Z0 the stacks' top (N), set from the miked depth. The adjuster at X −1.500 (that is, H from SEAT), Y −{{cad.adjuster_lateral_in:.3f}} in."
+datum = "Program DT10_south_csk. G54: X0 SEAT (right, the block to −X) shifted by H − 1.500, Y0 the fixed jaw's face (E), Z0 .4400 below S (touched off on S: the countersink is cut from S whatever the block's depth). The adjuster at X −1.500 (that is, H from SEAT), Y −{{cad.adjuster_lateral_in:.3f}} in."
 diagram = { file = "diagrams/south.svg", alt = "The block lying S up on stacked parallels, gripped on E and W, SEAT to the right; the chamfer mill circles the adjuster's countersink at S." }
-envelope = { x_span_mm = ["{{process.length_target_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{process.width_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_target_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.csk_tip_depth_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.length_target_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{process.width_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_target_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.csk_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.width_target_mm}}", along_jaws_mm = "{{process.length_target_mm}}", part_height_mm = "{{process.depth_target_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_length_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.length_target_mm}}"], clamp_mm = [0, "{{process.length_target_mm}}"], section_mm = { y = "{{process.width_target_mm}}", z = "{{process.depth_target_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Before clamping: mic N to S at the block's middle and write it down (mm = in × 25.4). Clamp it as Holding says. Home the mill ($H)."
+instruction = "Clamp the block as Holding says. Home the mill ($H)."
 feed = "hand"
 
 [[setups.operations]]
@@ -961,8 +969,8 @@ instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside th
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the stacks' top (N), from the reading and the 1/2 in end mill touched on S at the block's middle."
-instruction_detailed = "Console M6 T1 (the tool setter measures it); MDI G0 X-26.289 Y-8.509. Spindle stopped, its tip just dragging a .002 feeler leaf on S: G10 L20 P1 Z(the reading in mm + 0.051). DT10's M6 T6 then measures the chamfer mill against it."
+instruction = "G54 Z0: .4400 below S, the 1/2 in end mill touched on S at the block's middle."
+instruction_detailed = "Console M6 T1 (the tool setter measures it); MDI G0 X-26.289 Y-8.509. Spindle stopped, its tip just dragging a .002 feeler leaf on S: G10 L20 P1 Z11.227 (the nominal .4400 depth plus the .002 leaf). DT10's M6 T6 then measures the chamfer mill against it."
 feed = "hand"
 
 [[setups.operations]]

@@ -25,8 +25,9 @@ cold-finished N; DT02 (on edge, gripped on N and S) skims E; DT03 (upright)
 skims the top; DT04 (upright, turned over) faces the seat to the height,
 spots and drills the #43 foot hole from it, DT05 brings the tap guide over
 it. DT06 (on edge, E down) faces W to the width, spots and drills the #43
-pinch hole through both jaws, opens W's jaw #30 to the slot; DT07 (W down)
-brings the tap guide over it from E. DT08 (lying, N up) spots, drills #3
+pinch hole through both halves (the block's two sides of the slit), opens
+the W half #30 to the slot; DT07 (W down) brings the tap guide over it from
+E. DT08 (lying, N up) spots, drills #3
 through and countersinks the adjuster, its height from the seat the
 measured MHA-DT-05 axis height H (a G54 X shift the traveler sets); DT09
 brings the tap guide over it; DT10 (S up) countersinks its other end.
@@ -36,16 +37,18 @@ into the adjuster with the 3 x .051 slitting saw on the R8 1 in arbor.
 Work frames (G54), each set in its setup:
 - DT01: X0 the strip's E-marked sawn face (left), Y0 the fixed jaw (the
   bar edge toward the seat), Z0 the stacks' top (N).
-- DT02: X0 the seat-side bar edge (left), Y0 the fixed jaw (N), Z0 E skimmed.
-- DT03: X0 E (left), Y0 the fixed jaw (N), Z0 the top skimmed.
-- DT04/DT05: X0 E (right, the block to -X), Y0 the fixed jaw (N), Z0 the
-  parallels' top (the top).
+- DT02: X0 the unmarked bar edge, the top to be (left; the seat edge to
+  the right), Y0 the fixed jaw (N), Z0 E skimmed.
+- DT03: X0 W (left), Y0 the fixed jaw (N), Z0 the top skimmed.
+- DT04/DT05: X0 E (left), Y0 the fixed jaw (N), Z0 the parallels' top (the
+  top).
 - DT06: X0 the seat (left), Y0 the fixed jaw (N), Z0 the stacks' top (E).
-- DT07: X0 the seat (left), Y0 the fixed jaw (S); no Z0.
+- DT07: X0 the seat (right, the block to -X), Y0 the fixed jaw (N); no Z0.
 - DT08/DT09: X0 the seat (left) shifted by H - 1.500, Y0 the fixed jaw (E),
-  Z0 the stacks' top (S).
+  Z0 the nominal depth below N (touched off on N, so the countersink is cut
+  from the face whatever the block's depth).
 - DT10: X0 the seat (right, the block to -X) shifted by H - 1.500, Y0 the
-  fixed jaw (E), Z0 the stacks' top (N).
+  fixed jaw (E), Z0 the nominal depth below S (touched off on S).
 - DT11: X0 the top (right, the block to -X), Y0 the fixed jaw (N), Z0 the
   stacks' top (E); Z is the saw's lower face.
 
@@ -594,7 +597,7 @@ def context(
     foot_depth = _mid(foot["drill_depth"])
     foot_tip = length - foot_depth - _point(d43)
     _agree(plan, "foot_tip_height_mm", foot_tip)
-    # The pinch hole: #43 through both jaws from W, its full diameter
+    # The pinch hole: #43 through both halves from W, its full diameter
     # drill_past_mm past E (into the air between the stacks); the #30 to the
     # clearance's depth band's middle from W (full diameter).
     pinch_tip = -(p["drill_past_mm"] + _point(d43))
@@ -604,7 +607,7 @@ def context(
     clear_tip = width - clear_depth - _point(d30)
     _agree(plan, "clearance_tip_height_mm", clear_tip)
     # Its shoulder stands in the slit at the slit's narrowest: the slot is
-    # reached, and the full #30 never enters E's jaw.
+    # reached, and the full #30 never enters the E half.
     slit_min = slit["width"][0]
     shoulder = width - clear_depth  # height above E
     lateral = _mid(adj["lateral"])
@@ -613,6 +616,14 @@ def context(
     # The adjuster: #3 through from N, drill_past_mm past S.
     adj_tip = -(p["drill_past_mm"] + _point(d3))
     _agree(plan, "adjuster_tip_height_mm", adj_tip)
+    # DT08 is touched off on N at the nominal depth (so the countersink is
+    # cut from N): the #3's full diameter still runs past S on the deepest
+    # block, and its point no further below the stacks' top on the thinnest
+    # than the stack check below allows (it is in the air between them).
+    if -p["drill_past_mm"] > depth - f["south_face"]["depth"][1] - 0.5:
+        raise ValueError(
+            "process.drill_past_mm: the #3 stops short of S on the deepest block"
+        )
 
     # Countersinks: the chamfer mill's point csk_tip_depth_mm below the face,
     # circling csk_orbit_mm off the axis: the rim at the band's middle. Its
@@ -694,8 +705,8 @@ def context(
         )
 
     # Holding: lying on the 1 in + 1/2 in stacks; the strip on edge for E's
-    # skim on the 5/8 in + 1/2 in stacks (a third of its width in the jaws);
-    # upright on the 1/2 in pair.
+    # skim on the 5/8 in + 1/2 in stacks (about four fifths of its width in
+    # the jaws, E 3-5 mm above them); upright on the 1/2 in pair.
     jaw_h, jaw_w = p["vise_jaw_height_mm"], p["vise_jaw_width_mm"]
     lying_grip = jaw_h - p["riser_height_mm"]
     east_grip = jaw_h - p["east_riser_height_mm"]
@@ -854,7 +865,7 @@ def context(
         ),
         "seat": ([east_x, top_y, north_z], [[1, 0, 0], [0, 0, 1], [0, -1, 0]]),
         "west": ([east_x, seat_y, north_z], [[0, 1, 0], [0, 0, 1], [1, 0, 0]]),
-        "pinch": ([west_x, top_y, north_z], [[0, -1, 0], [0, 0, 1], [-1, 0, 0]]),
+        "pinch": ([west_x, seat_y, north_z], [[0, -1, 0], [0, 0, 1], [-1, 0, 0]]),
         "adjuster": ([east_x, seat_y, south_z], [[0, 1, 0], [-1, 0, 0], [0, 0, 1]]),
         "south": ([east_x, seat_y, north_z], [[0, -1, 0], [-1, 0, 0], [0, 0, -1]]),
         "slit": ([east_x, top_y, north_z], [[0, 1, 0], [0, 0, 1], [1, 0, 0]]),
@@ -876,10 +887,7 @@ def context(
         raise ValueError(f"foot hole {foot_xy} is not where the seat frame puts it")
     if not (0 < pinch_xy[0] < length and -depth < pinch_xy[1] < 0):
         raise ValueError(f"pinch hole {pinch_xy} is not on the block in DT06")
-    if (
-        not math.isclose(pinch_xy[0] + tap_pinch_xy[0], length)
-        or adj_xy[0] != -south_xy[0]
-    ):
+    if not math.isclose(pinch_xy[0], -tap_pinch_xy[0]) or adj_xy[0] != -south_xy[0]:
         raise ValueError("a hole's place differs between its setups")
 
     stocks = {
@@ -888,7 +896,7 @@ def context(
         "top": ((0.0, w_raw_max), (-depth, 0.0), (-s_raw_max, top_skim)),
         "seat": ((0.0, w_raw_max), (-depth, 0.0), (0.0, s_raw_max)),
         "west": ((0.0, length), (-depth, 0.0), (0.0, w_raw_max)),
-        "pinch": ((0.0, length), (-depth, 0.0), (0.0, width)),
+        "pinch": ((-length, 0.0), (-depth, 0.0), (0.0, width)),
         "adjuster": ((0.0, length), (-width, 0.0), (0.0, depth)),
         "south": ((-length, 0.0), (-width, 0.0), (0.0, depth)),
         "slit": ((-length, 0.0), (-depth, 0.0), (0.0, width)),
@@ -1069,13 +1077,14 @@ def context(
             d30_tool,
             "west",
             "pinch_clearance",
-            "open W's jaw #30 to the slot",
+            "open the W half #30 to the slot",
             _pecked(pinch_xy, width, clear_tip, peck, west_clear),
         )
     )
     # DT08: the adjuster from N; DT10: S's countersink.
     adj_clear = depth + CLEAR_MM
     csk_tip = depth - z_t
+    _agree(plan, "csk_tip_height_mm", csk_tip)
     jobs.append(
         job(
             spot_tool,
