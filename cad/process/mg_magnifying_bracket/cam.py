@@ -502,8 +502,8 @@ def context(
         raise ValueError(f"#7 Ø{d7} is not the 1/4-20 tap's drill in its band")
 
     step_max = p["face_stepover_max_mm"]
+    skim_step = p["skim_stepover_max_mm"]
     face_cuts = ("width", "seat", "high side", "low side", "neck")
-    face_rpm, face_feed = _setting(plan, shop, "width")
     for name in (
         *face_cuts,
         "notch",
@@ -517,13 +517,33 @@ def context(
             raise ValueError(
                 f"'{name}' cutter Ø{_cut(plan, name, 'cutter_dia_mm')}, the end mill is Ø{em}"
             )
-        if _setting(plan, shop, name) != (face_rpm, face_feed):
-            raise ValueError(f"'{name}' runs at another setting than 'width'")
-    for name in ("width", "seat", "high side", "low side"):
-        if not math.isclose(_cut(plan, name, "radial_woc_mm"), step_max, abs_tol=1e-6):
-            raise ValueError(
-                f"'{name}' radial_woc_mm is not process.face_stepover_max_mm"
-            )
+    # F and the seat (MB01, MB02) run at their measured setting; MB03-MB06
+    # (the notch's full-width stepovers, the neck at a longer stick-out, the
+    # nose's deep finish) at the chart's, one speed among them.
+    face_rpm, face_feed = _setting(plan, shop, "width")
+    if _setting(plan, shop, "seat") != (face_rpm, face_feed):
+        raise ValueError("'seat' runs at another setting than 'width'")
+    chart_rpm, chart_feed = _setting(plan, shop, "high side")
+    for name in (
+        "low side",
+        "neck",
+        "notch",
+        "foot wall",
+        "notch through",
+        "foot wall through",
+        "nose rough",
+        "nose finish",
+    ):
+        if _setting(plan, shop, name) != (chart_rpm, chart_feed):
+            raise ValueError(f"'{name}' runs at another setting than 'high side'")
+    for name, woc in (
+        ("width", skim_step),
+        ("seat", skim_step),
+        ("high side", step_max),
+        ("low side", step_max),
+    ):
+        if not math.isclose(_cut(plan, name, "radial_woc_mm"), woc, abs_tol=1e-6):
+            raise ValueError(f"'{name}' radial_woc_mm is not its stepover parameter")
 
     # The notch, between the foot's underside and the neck's wall (left
     # neck_stock_mm full), open at F, closed by the waste at the sawn end:
@@ -569,8 +589,8 @@ def context(
         ("foot wall through", thick - through, p["foot_wall_woc_mm"]),
         ("high side", t_max - high_level, step_max),
         ("low side", low_skim, step_max),
-        ("width", p["width_level_mm"], step_max),
-        ("seat", seat_skim, step_max),
+        ("width", p["width_level_mm"], skim_step),
+        ("seat", seat_skim, skim_step),
     ):
         if not (
             math.isclose(_cut(plan, name, "axial_doc_mm"), axial, abs_tol=1e-3)
@@ -774,6 +794,7 @@ def context(
         return {"tool": key, "rpm": rpm, "feed": feed, "plunge": feed, **extra}
 
     em_tool = tool("em-half", face_rpm, face_feed, dia=em, shape="endmill", flutes=3)
+    chart_tool = {**em_tool, "rpm": chart_rpm, "feed": chart_feed, "plunge": chart_feed}
     spot_tool = tool(
         "spot",
         spot_rpm,
@@ -789,8 +810,8 @@ def context(
     def run(x: tuple[float, float]) -> tuple[float, float]:
         return (x[0] - r - APPROACH_MM, x[1] + r + APPROACH_MM)
 
-    edge_ys = _stations((-t_max, 0.0), r, step_max)
-    seat_ys = _stations((-t_max, 0.0), r, step_max)
+    edge_ys = _stations((-t_max, 0.0), r, skim_step)
+    seat_ys = _stations((-t_max, 0.0), r, skim_step)
     long_ys = _stations((-long_max, 0.0), r, step_max)
     neck_ys = _stations((-thick, 0.0), r, step_max)
 
@@ -926,6 +947,21 @@ def context(
                 f"G1 X{_r(cx - lead):.3f} F{{feed}}",
             ]
     nose_lines.append(f"G0 Z{travel:.3f}")
+    # The end mill set half_mill_projection_mm out (MB01-MB04 and, at the
+    # shortest, MB06): its collet's nose clears the stock's top and the jaw
+    # tops at each program's deepest end-mill cut. MB05's longer set is
+    # checked above.
+    for program, deepest, highest in (
+        ("MB01_width", width, max(w_max, upright_grip)),
+        ("MB02_seat", 0.0, seat_skim),
+        ("MB03_notch", split, max(t_max, lying_grip)),
+        ("MB04_low", through, max(high_level, lying_grip)),
+        ("MB06_nose", nose_bottom, max(neck, upright_grip)),
+    ):
+        if deepest + p["half_mill_projection_mm"] < highest + CLEAR_MM:
+            raise ValueError(
+                f"{program}: the end mill's collet would reach the part or the jaws"
+            )
 
     def from_travel(lines: list[str]) -> list[str]:
         """A hole section opened over the tap at ``travel`` and closed there."""
@@ -990,14 +1026,14 @@ def context(
             ],
         },
         {
-            **em_tool,
+            **chart_tool,
             "frame": "notch",
             "label": "notch",
             "stock": stocks["notch"],
             "ops": [["notch", "face H, mill the notch", high_lines[:-1] + notch_lines]],
         },
         {
-            **em_tool,
+            **chart_tool,
             "frame": "low",
             "label": "low side",
             "stock": stocks["low"],
@@ -1010,14 +1046,14 @@ def context(
             ],
         },
         {
-            **em_tool,
+            **chart_tool,
             "frame": "neck",
             "label": "neck",
             "stock": stocks["neck"],
             "ops": [["neck", "face the neck, square the corner", neck_lines]],
         },
         {
-            **em_tool,
+            **chart_tool,
             "frame": "nose",
             "label": "nose",
             "stock": stocks["nose"],
@@ -1163,7 +1199,7 @@ def context(
     tn = numbers
     expect: list[list[Any]] = []
 
-    def face_checks(levels, top, y, span, frame) -> list[list[Any]]:
+    def face_checks(levels, top, y, span, frame, step) -> list[list[Any]]:
         return [
             ["rapids_clear", {"z_top": top}],
             ["air_feed", {"z_top": top}],
@@ -1173,7 +1209,7 @@ def context(
                     {
                         "z": _r(z),
                         "y": list(y),
-                        "max_engagement": step_max,
+                        "max_engagement": step,
                         "radius": r,
                         "span": span,
                         "overhang": FACE_OVERHANG_MM,
@@ -1193,7 +1229,7 @@ def context(
             ["keep_out", {"radius": radius, "boxes": keep[frame]}],
         ]
 
-    def single(name, top, z_min, checks, change_top=None) -> list[list[Any]]:
+    def single(name, top, z_min, checks, rpm, change_top=None) -> list[list[Any]]:
         """``change_top``: what an XY rapid after the M6 must clear, when it
         stands higher than the stock top (the foot, MB05)."""
         return [
@@ -1206,7 +1242,7 @@ def context(
                     "loads_first": True,
                 },
             ],
-            [name, "spindle", {"rpm": [[face_rpm]]}],
+            [name, "spindle", {"rpm": [[rpm]]}],
             [name, "pauses", {"z_top": top, "count": 0}],
             [name, "depth", {"z_min": _r(z_min)}],
             *[[name, check, kwargs] for check, kwargs in checks],
@@ -1216,7 +1252,8 @@ def context(
         "MB01_width",
         w_max,
         width,
-        face_checks(width_levels, w_max, (-t_max, 0.0), blank_max, "width"),
+        face_checks(width_levels, w_max, (-t_max, 0.0), blank_max, "width", skim_step),
+        face_rpm,
     )
 
     name = "MB02_seat"
@@ -1238,7 +1275,7 @@ def context(
         (
             [
                 ["depth", {"z_min": 0.0}],
-                *face_checks([0.0], seat_skim, (-t_max, 0.0), width, "seat"),
+                *face_checks([0.0], seat_skim, (-t_max, 0.0), width, "seat", skim_step),
             ],
             hole_checks(
                 "mount", "seat", 0.0, -spots["mount spot"], CENTRE_DRILL["body_mm"] / 2
@@ -1269,7 +1306,7 @@ def context(
         ]
         lo, hi = sorted((xs[-1], x_air))
         return [
-            *face_checks([surface], top, (-long_max, 0.0), width, frame),
+            *face_checks([surface], top, (-long_max, 0.0), width, frame, step_max),
             ["cleared", {"points": points, "radius": r, "z": _r(bottom)}],
             [
                 "engagement",
@@ -1290,12 +1327,14 @@ def context(
         t_max,
         split,
         notch_checks("notch", t_max, high_level, split, notch_xs, air_x, 1.0),
+        chart_rpm,
     )
     expect += single(
         "MB04_low",
         high_level,
         through,
         notch_checks("low", high_level, thick, through, through_xs, -air_x, -1.0),
+        chart_rpm,
     )
     corner_points = [[_r(foot + 0.1), _r(y)] for y in (-0.1, -thick / 2, -thick + 0.1)]
     expect += single(
@@ -1322,6 +1361,7 @@ def context(
             ["cleared", {"points": corner_points, "radius": r, "z": _r(neck)}],
             ["keep_out", {"radius": r, "boxes": keep["neck"]}],
         ],
+        chart_rpm,
         change_top=width,
     )
 
@@ -1336,7 +1376,7 @@ def context(
                 "loads_first": True,
             },
         ],
-        [name, "spindle", {"rpm": [[face_rpm], [spot_rpm], [tap_rpm]]}],
+        [name, "spindle", {"rpm": [[chart_rpm], [spot_rpm], [tap_rpm]]}],
         [name, "pauses", {"z_top": neck, "count": 0}],
         [name, "depth", {"z_min": _r(tap_tip)}],
     ]

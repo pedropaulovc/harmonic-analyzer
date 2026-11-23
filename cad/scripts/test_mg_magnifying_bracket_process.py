@@ -154,6 +154,8 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         # A short stick-out: the collet would reach the foot at the last level.
         ("neck_mill_projection_min_mm", 40.0, "collet reaches the foot"),
         ("neck_mill_projection_min_mm", 52.0, "less than 1 in"),
+        # The 1/2 in end mill set too short: its collet reaches MB03's part.
+        ("half_mill_projection_mm", 10.0, "MB03_notch: the end mill's collet"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> None:
