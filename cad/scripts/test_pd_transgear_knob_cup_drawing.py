@@ -123,7 +123,7 @@ def test_pilot_callout_names_its_bonded_mate_and_stands_clear_below_the_pilot() 
     assert "THRU" not in callout
     assert f"BONDED FIT ON {shaft}" in callout
     assert f"(CLEARANCE {spec.BORE_CLEARANCE_TEXT})" in callout
-    assert spec.BORE_CLEARANCE_TEXT == ".0012-.0025"
+    assert spec.BORE_CLEARANCE_TEXT == ".0012-.0055"
     # Every printed row stands a space off the dimension line, and a closing
     # no-break-space row keeps the shelf off the parentheses' tails.
     printed = drawing.SECTION_CALLOUTS["BoreDia"]
@@ -309,9 +309,9 @@ def test_only_the_pilot_carries_a_model_band() -> None:
     assert model_toleranced_dimensions(part) == {
         ("CupProfile", "BoreDia"): "*deviations(BORE_BAND)",
     }
-    # The 1/4 end mill's own -.000/+.001 Ø band.
+    # A bonded seat at the DRILLED HOLES row, +.004/0 (fit audit 2026-11-23).
     assert spec.BORE_DIA == pytest.approx(0.250 * IN)
-    assert spec.BORE_BAND == pytest.approx((0.001 * IN, 0.0))
+    assert spec.BORE_BAND == pytest.approx((0.004 * IN, 0.0))
 
 
 def test_owner_sizes_follow_the_bush_stub() -> None:
@@ -341,9 +341,9 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
     assert spec.WEB_MIN == pytest.approx(web_min)
     assert spec.PILOT_WALL_WORST == pytest.approx(pilot_wall)
     assert spec.CBORE_WALL_WORST == pytest.approx(cbore_wall)
-    # .080 web (exactly the target), .0895 and .115 rings.
+    # .080 web (exactly the target), .088 (the +.004 pilot) and .115 rings.
     assert web_min == pytest.approx(0.080 * IN, abs=1e-9)
-    assert pilot_wall == pytest.approx(0.0895 * IN, abs=1e-9)
+    assert pilot_wall == pytest.approx(0.088 * IN, abs=1e-9)
     assert cbore_wall == pytest.approx(0.115 * IN, abs=1e-9)
     for wall in (web_min, pilot_wall, cbore_wall):
         assert wall >= WALL_TARGET_MM - 1e-9
@@ -375,7 +375,10 @@ def test_the_bonded_pilot_clears_the_journal_inside_641_gap_fill() -> None:
 
 
 def test_cup_bore_refuses_binding_on_the_actual_journal(monkeypatch) -> None:
-    assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((0.03048, 0.0635))
+    assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((0.03048, 0.1397))
+    # The .254 limit is what keeps the bond gap inside LOCTITE 641's fill:
+    # one more thousandth on the pilot passes it.
+    assert max(spec.BORE_JOURNAL_CLEARANCE) + 0.0254 > spec.LOCTITE_641_GAP_MAX
     monkeypatch.setattr(knob_shaft, "JOURNAL_DIA_BAND", (0.030, 0.0))
     with pytest.raises(AssertionError, match="bore binds"):
         _fresh_spec()
@@ -531,9 +534,9 @@ def test_declarations_print_the_sheets_bands_and_supply_sizes() -> None:
 
     assert inch(features["outside"]["dia"]) == [0.43, 0.45]
     assert inch(features["rear_face"]["length"]) == [0.35, 0.37]
-    assert inch(features["pilot"]["dia"]) == [0.25, 0.251]
+    assert inch(features["pilot"]["dia"]) == [0.25, 0.254]
     assert inch(features["pilot"]["depth"]) == [0.147, 0.157]
-    assert inch(features["pilot"]["diametral_clearance"]) == [0.0012, 0.0025]
+    assert inch(features["pilot"]["diametral_clearance"]) == [0.0012, 0.0055]
     assert inch([features["pilot"]["corner_radius_max"]]) == [0.005]
     assert inch(features["web_hole"]["dia"]) == [0.113, 0.117]
     assert inch(features["pocket"]["dia"]) == [0.18, 0.2]
