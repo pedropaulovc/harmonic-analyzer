@@ -268,11 +268,9 @@ description = "Drill rod (O1 or W1 tool steel, annealed, ground), round bar, 1/1
 description = "1008-1045 carbon steel machine key stock, undersized, square bar, 1/16 in"
 
 # --- MHA-DT-03-TL-02 phasing comb (cad/process/dt_cone_gear_tl_phasing_comb/plan.toml) ---
-# The comb's blank is snipped off the .020 brass sheet. Ownership:
-# cad/config/shop-equipment/tools-hand.toml tools.aviation-snips-straight and
-# stock-to-order.toml stock.c260-h02-sheet-020-12x12, same keys.
-[tools.aviation-snips-straight]
-description = "Aviation snips, straight cut"
+# The comb's blank is snipped off the .020 brass sheet (the snips are in
+# common.toml: the MHA-PD-03 clip's blanks are snipped too). Ownership:
+# stock-to-order.toml stock.c260-h02-sheet-020-12x12, same key.
 [stock.c260-h02-sheet-020-12x12]
 description = "C26000 cartridge brass, H02 half hard, sheet, .020 x 12 x 12 in"
 # The comb's outline cutter: Harvey Tool 896262, Variable Helix End Mill for
@@ -287,25 +285,30 @@ description = "C26000 cartridge brass, H02 half hard, sheet, .020 x 12 x 12 in"
 description = "1/16 in (.0620) 3-flute carbide downcut square end mill, .186 length of cut, 1/8 shank (Harvey Tool 896262)"
 diameter_mm = 1.5748
 flute_length_mm = 4.7244
-# Its setting in half-hard C26000 sheet: Tru-Edge "Solid Carbide Endmills
-# Feeds and Speeds" (tru-edge.com, 20090 spec sheet, read 2026-11-22), row
-# Brass and Bronze: 250-350 SFM, 1/16 in .001 in/tooth. 250 SFM on .062 in is
-# 15,400 rpm, so the spindle's 2800 (machines.pm-30mv; 45 ft/min). 2800 × 3 ×
-# .001 = 8.4 in/min. Harvey's own table for this series (SF_896200, read
-# 2026-11-22) gives brass at .062 in lower, about .00065 slotting and .00087
-# max: .001 is taken because prechips' milling feed-factor table starts at
-# .001 and is not extended without a source. This is CncBenchB's choice, not
-# an owner ruling: it follows the owner's ruling for the MHA-CH-13 strap's
-# 1/8 cutter in 1018 (common.toml
-# settings.endmill-carbide-3fl-1-8-1018-cf-tru-edge, Tru-Edge over a table
-# below the floor), extended here to a 1/16 cutter in brass, about 54 % over
-# Harvey's slotting value. Flagged for the owner in HA PR #3361: run the
-# first comb watching it.
+# Harvey's own speeds and feeds for the series (SF_896200, "Variable Helix End
+# Mills for Aluminum Alloys - Square - Downcut", harveyperformance.widen.net/
+# content/urxytgzfxb/pdf/SF_896200.pdf, read 2026-11-22), uncoated, Brass
+# (Copper Zinc alloys, C2xxxx): 500 SFM; .062 cutter slotting .00065 in/tooth
+# (1x D radial, .5x D axial), max .00087. The comb's outline is one full-width
+# pass, so the slotting figure is the ceiling (.00065 × 25.4).
+maker_chip_load_mm_per_tooth = { brass = 0.01651 }
+maker_chip_load_source = "Harvey Tool SF_896200 (8962xx downcut), uncoated, Brass C2xxxx, .062 cutter, slotting .00065 in/tooth"
+# Its setting in half-hard C26000 sheet: Harvey's 500 SFM on .062 in is
+# 30,800 rpm, so the spindle's 2800 (machines.pm-30mv; 45 ft/min). Chip load
+# at Harvey's slotting figure, rounded down to the 0.1 in/min the sheet
+# prints: 2800 × 3 × .00065 = 5.46, so 5.4 in/min, .000643 in/tooth
+# (5.4 × 25.4 / 8400 mm). Delegated ruling 2026-11-22 (Main, owner review
+# #2144; issue #3376), no owner precedent: never above the maker's published
+# chip load without a measurement. The milling feed-factor table's .001
+# floor: prechips 0.11.38 (pedropaulovc/prechips#582) checks a cut below it
+# only when the tool states its maker's figure (the two fields above), at
+# the .001 row's force, an upper bound with no factor below the table; it
+# refuses any cut above the stated figure.
 [settings.endmill-carbide-3fl-1-16-downcut-c260]
 tool = "endmill-carbide-3fl-1-16-downcut"
 material = "c260-h02"
 rpm = 2800
-chip_load_mm_per_tooth = 0.0254  # .001 in; 2800 × 3 × .001 = 8.4 in/min
+chip_load_mm_per_tooth = 0.016329  # .000643 in; 2800 × 3 × .000643 = 5.4 in/min
 flutes = 3
 feed_unit = "in/min"
 

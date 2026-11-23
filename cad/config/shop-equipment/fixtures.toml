@@ -413,7 +413,7 @@ note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-PD-14 R3.13 ±.
 kind = "fixture"
 status = "to_make"
 supply = "shop_made"
-note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-PD-03 FORMED, 6X (R1.36), .06 BOW RISE."
+note = "Not made: shop-made from the clip's own strip in the clip's traveler (cad/process/pd_platen_clip/plan.toml, PC01_sheet): four laminations of the .032 C26000 strip, each as long as the clip's rail and split along the bow profile into a male and a female die half; the four male halves stacked face to face against one vise jaw, the four female halves against the other, press the finger standing on edge between them. Drawing cross-check 2026-11-19: MHA-PD-03 FORMED, 6X (R1.36), .06 BOW RISE. The die radius is corrected for springback (Ri/Rf = 4x^3 - 3x + 1, x = Ri Y/(E t); E 16,000 ksi, Y 290-359 MPa, t .030-.034) so the formed rise lands inside .05-.07."
 
 # MHA-DT-20 cone swing platform (cad/process/dt_cone_swing_platform), Setup
 # 4: the blank screwed to the 1/2 in spoil plate while its outline is cut.

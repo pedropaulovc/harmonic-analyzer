@@ -1,33 +1,232 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Transgear rear bushing MHA-PD-24, one off, turned on the manual PM-1127VF-LB
+# (owner ruling 2026-11-21: turned parts get lathe travelers, no NC). Route
+# chosen for speed: one chucking of the 1/2 in C36000 bar on hand
+# (cad/config/shop-equipment/stock-bought.toml c360-round-1-2).
+# Setup 1, the bar: face the end (Z0: the sleeve's thrust face, so it takes
+# the faced finish), turn the outside to its .34-.36 band back past the
+# parting line, spot, drill #31 and ream .1260 through and past the parting
+# line in the same chucking, part off at the length; the parted face is the
+# arm face, which only seats on the MHA-PD-VN-68 shims (the length's .XXX
+# band moves only the shim count, owner ruling 2026-11-01, #2124).
+# Bench: file the parting burr off the arm face flat, break the edges and the
+# bore's ends, mike the length and check the bore with the .1260 GO /
+# .1265 NO-GO plug gauge pair (the band's ends).
+#
+# Not on hand (cad/config/shop-equipment/, to order): the .1260 chucking
+# reamer (tools-reamers-taps.toml reamer-1260) and the .1260 GO / .1265 NO-GO
+# Class X plug gauge pair (gauges.toml plug-gauges-1260-1265): the band is
+# .0005, under the pin-gauge sets' .001 step. Both serve MHA-PD-25 and
+# MHA-PN-05 too.
 title = "Transgear Rear Bushing"
-part = "MHA-PD-24 Transgear Rear Bushing"
-revision = "placeholder"
-material = "C36000 free-machining brass"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "C36000 free-machining brass round bar, 1/2 in"
+stock = "Lot: {{process.quantity:d}} bushing. Ø{{process.stock_dia_in:.3dot}} bar, on hand; the bushing takes {{cad.pitch_in:.2dot}} in of it."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .1260 chucking reamer and the .1260 GO / .1265 NO-GO plug gauge pair for the bore check."
 shop = "../shop"
 stock_refs = ["c360-round-1-2"]
+material_key = "lathe-c360"
+turning_material = "brass"
+
+[cad]
+file = "../../out/features/pd_transgear_rear_bushing/features.toml"
+adapter = "turned_bush"
+part = "pd-transgear-rear-bushing"
+
+[parameters]
+quantity = 1
+stock_dia_in = 0.5
+# A piece of the 12 in bar on hand and the length the 3-jaw grips of it.
+bar_length_in = 3.0
+chuck_grip_in = 0.75
+# Facing allowance: squares a sawn bar end.
+face_allowance_in = 0.02
+# Parting kerf: the P1 blade's width plus .0125 (authored), for wander or a
+# .010 step toward the chuck that widens a deep groove.
+part_kerf_in = 0.075
+# The P1 cutoff blade's width: its record (cad/config/shop-equipment/
+# tools-cutting.toml tools.cutoff-blade-p1 width_in, the makers' 1/16 in).
+# The part-off op mikes the blade's cutting edge and presets the DRO to that.
+blade_width_in = 0.0625
+parts_per_pull = 1
+# The parting blade's clearance to the jaw fronts.
+jaw_clearance_in = 0.1
+# Outside passes (authored): the .02 in wide band takes rough passes only.
+rough_radial_doc_mm = 0.5
+turn_feed_mm_rev = 0.1016
+# The tool starts its pass this far off the faced end.
+turn_start_z_mm = 0.5
 
 [[tools]]
-id = "reamer-1260"
-name = ".1260 reamer"
-ref = "reamer-1260"  # B-reamer-.1260
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
 
 [[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+id = "centre"
+name = "No. 1 centre drill"
+ref = "centre-drills-carbide-60"
 
 [[tools]]
-id = "drill-32"
-name = "#32 drill"
-ref = "drill-32"  # drawing cross-check 2026-11-19: pre-drill for the .1260 ream
+id = "drill-31"
+name = "#31 drill"
+ref = "drill-31"
+
+[[tools]]
+id = "reamer"
+name = ".1260 chucking reamer"
+ref = "reamer-1260"
+status = "to_order"
+
+[[tools]]
+id = "cutoff"
+name = "P1 HSS cutoff blade"
+ref = "cutoff-blade-p1"
+
+[[tools]]
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
+
+[[tools]]
+id = "deburr"
+name = "Deburring countersink"
+ref = "deburring-set"
+
+[[tools]]
+id = "plugs"
+name = "Plug gauges .1260 GO, .1265 NO-GO"
+ref = "plug-gauges-1260-1265"
+status = "to_order"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Bar: face, turn, drill and ream the bore, part off at length"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
+datum = "Z0 (carriage DRO) the bar end faced in Op 10: the sleeve's thrust face."
+diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw: the end faced, the outside turned back past the parting line, the bore spotted, drilled and reamed through past the parting line; the bushing parted off at its length." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}", support = "none" }
+turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off, finishing with a light skim from the centre out; set DRO Z0 on it. This end is the thrust face against MHA-PD-10, a running face at Ra 63."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+inspection = "Thrust face: Look: a bright, even face with no tears or chatter rings, by eye and fingernail (Ra 63: the R0.4 nose at .004 in/rev leaves about Ra 32)."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Outside", phase = "rough", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.run_end_z_mm}}", kept_start_z_mm = "{{cad.outer_datum_out_near_z_mm}}", kept_end_z_mm = "{{cad.kept_end_z_mm}}", start_diameter_mm = "{{cad.stock_dia_mm}}", end_diameter_mm = "{{cad.outer_turn_min_mm}}", max_radial_doc_mm = "{{process.rough_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the outside from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}, to Ø{{cad.outer_dia_mm:in.3dot}} (the band's middle), miking between passes and taking the last one light."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Outside Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}, micrometer."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Outside over {{cad.outer_dia_max_in:.3dot}} in Op 20: take another finish pass and mike again. Under {{cad.outer_dia_min_in:.3dot}}: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock with the No. 1 centre drill, only the point's cone, about Ø.08 across: under the #31 drill, so the drill removes it."
+settings = "lathe-centre-c360"
+cut_diameter_mm = 2.0
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-31"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Feed the #31 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill in one steady feed until the scale reads {{cad.run_in:.2dot}} (the hole is under three diameters deep, so it needs no peck): the hole runs through the bushing and past the parting line. It leaves the reamer .003 a side."
+settings = "lathe-drill-31-c360"
+cut_diameter_mm = 3.048
+hole_depth_mm = "{{cad.run_mm}}"
+peck = "none"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "reamer"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Ream .1260 from the tailstock, spindle running: feed the reamer in until its lead chamfer meets the hole's mouth and zero the quill scale there; feed slowly until it reads {{cad.run_in:.2dot}} (past the parting line), and withdraw with the spindle still running."
+settings = "lathe-ream-1260-c360"
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}, the length's middle. Catch the bushing."
+settings = "lathe-part-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Bench: deburr and check"
+machine = "Bench"
+envelope = "other"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished bushing: its {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} length from the faced thrust face, the turned outside and the reamed bore through." }
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Lay the parted face (the arm face) flat on the smooth file and stroke only the parting burr off, until the face is flat all round (a thou or two: the length keeps its band); break both outside edges, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "deburr"
+drilling = "none"
+sizing = "other"
+instruction = "Break both ends of the bore, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, with a twist of the deburring set's countersink by hand, without touching the bore's wall."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mike the length across the faces."
+inspection = "Length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}, micrometer."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The {{cad.bore_dia_min_in:.4dot}} GO plug enters the bore from both ends and the {{cad.bore_dia_max_in:.4dot}} NO-GO plug enters from neither."
+inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}."
+gauge_checks = [{ gauge = "plug-gauges-1260-1265", band_mm = "{{cad.bore_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A bushing failing a check in Op 100 or Op 110 is scrapped, not reworked: make another from Setup 1."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Finish (drawing: bright machined, oiled): wipe the bushing clean and give it, bore included, a light coat of light machine oil."
+feed = "hand"
