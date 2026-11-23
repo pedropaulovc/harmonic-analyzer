@@ -10,8 +10,9 @@
 # (the thread square to the seat it bears on), part off .02 long.
 # Setup 2: the nut turned round, its knurled head in the 3-jaw over a shim
 # wrap with only the smaller flange and waist behind it; mike the length,
-# preset the DRO from it, face the rim to length, cut the dished face (a cone
-# with the compound, then the flat floor) and countersink the rim end.
+# preset the DRO from it, face the rim to length, cut the dished face (the
+# flat floor to a held Ø and depth, then the cone with the compound into its
+# corner), countersink the rim end and chase the thread from the rim end.
 # Bench: deburr, check against the drawing, oil.
 # The thumbnut leaves nothing for the assembly: MHA-PD-00 faces the drive
 # collar's pilot (MHA-PD-22) and cuts the knob shaft's stud (MHA-PD-08) to
@@ -53,8 +54,11 @@ part_kerf_in = 0.075
 # The waist and part-off ops mike the blade's cutting edge and preset the DRO.
 blade_width_in = 0.0625
 parts_per_pull = 1
-# The parting blade's clearance to the jaw fronts.
-jaw_clearance_in = 0.1
+# Clearance to the jaw fronts at the parting line (authored): the blade's
+# .10, raised to .25 because the knurl is fed to the parting line in Op 50
+# and its holder carries the wheel in a side plate (about 1/8 in, not on
+# record: the knurl is to buy) on the chuck side of the wheel.
+jaw_clearance_in = 0.25
 # Setup 2: how much of the knurled head the jaws take, from its rear face;
 # the rim end stands out past them for the facing and the dish.
 regrip_grip_in = 0.25
@@ -299,7 +303,7 @@ speed_kind = "other"
 tool = "tap"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle off, in its lowest back-gear range so the chuck is stiff to turn. Pencil-mark the plug tap {{process.tap_mark_in:.2dot}} from its point and fit it in the T-handle wrench; the MT3 dead centre in the tailstock, its point in the wrench's centre hole to keep the tap on axis."
+instruction = "Spindle off, in its lowest back-gear range so the chuck is stiff to turn. Pencil-mark the plug tap {{process.tap_mark_in:.2dot}} from its point and fit it in the T-handle wrench that has a centre hole in its top (of the two owned, tap-wrench-t-small and the tap and die set's: use the one with the hole); the MT3 dead centre in the tailstock, its point in the wrench's centre hole to keep the tap on axis."
 feed = "hand"
 
 [[setups.operations]]
@@ -365,7 +369,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Dish floor: cut a flat-bottomed recess Ø{{process.recess_floor_hold_min_in:.3dot}}–{{process.recess_floor_hold_max_in:.3dot}}, {{process.recess_depth_hold_min_in:.3dot}}–{{process.recess_depth_hold_max_in:.3dot}} deep by the DRO from Z0 (inside the drawing's bands: the Op 210 cone puts the rim at about floor Ø + 6 × depth), in facing passes from the hole outward, the last a light skim; check its Ø between passes."
+instruction = "Dish floor, the AR set square to the face as for facing, its nose clear of the hole: cut a flat-bottomed recess Ø{{process.recess_floor_hold_min_in:.3dot}}–{{process.recess_floor_hold_max_in:.3dot}}, {{process.recess_depth_hold_min_in:.3dot}}–{{process.recess_depth_hold_max_in:.3dot}} deep by the DRO from Z0 (inside the drawing's bands: the Op 210 cone puts the rim at about floor Ø + 6 × depth), in facing passes from the hole outward, the last a light skim; check its Ø between passes."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.recess_floor_dia_mm}}"
 inspection = "Floor Ø{{process.recess_floor_hold_min_in:.3dot}}–{{process.recess_floor_hold_max_in:.3dot}}, calipers' inside jaws on the recess's wall; depth {{process.recess_depth_hold_min_in:.3dot}}–{{process.recess_depth_hold_max_in:.3dot}} on the DRO."
