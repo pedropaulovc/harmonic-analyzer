@@ -402,9 +402,9 @@ feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "Check, stack: spindle stopped, the tip just dragging the same leaf on each blank's top 1/2 in in from each end; read Z (mm) at the four spots. Each stack = reading − 0.051 (the leaf) − that end's thickness from op 60." },
+  { kind = "action", text = "Check, stack (spindle stopped): drag the same leaf under the tip on each blank's top 1/2 in in from each end; read Z (mm). Stack = reading − 0.051 (the leaf) − that end's op 60 thickness." },
   { kind = "check", text = "Every stack {{process.tape_stack_min_mm:.2f}}–{{process.tape_stack_max_mm:.2f}} mm ({{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}); each blank's two ends within 0.05 mm (.002) of each other." },
-  { kind = "stop", text = "A stack outside the band or ends differing by more: free that blank as Setup 3 does, clean, re-tape and re-bond it (ops 70–140)." },
+  { kind = "stop", text = "Out of band or ends apart by more: free both blanks as Setup 3 does, peel all the tape, and repeat ops 70–170." },
 ]
 feed = "hand"
 
@@ -412,13 +412,13 @@ feed = "hand"
 steps = [
   { kind = "action", text = "Check, push test: jog Z up clear. With the heel of the hand push each blank hard along and across; try to lift each corner with a thumbnail." },
   { kind = "check", text = "No movement, no creak, no lifted corner." },
-  { kind = "stop", text = "Any movement: free that blank as Setup 3 does, re-tape and re-bond it (ops 70–140), then op 160 again." },
+  { kind = "stop", text = "Any movement: free both blanks as Setup 3 does, peel all the tape, and repeat ops 70–170." },
 ]
 feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "Prove PC01_sheet in air: on the same leaf on the bare plate top, G10 L20 P1 Z-25.349 (Z0 1.000 in high). Run it single block through the first hole and the first clip's feed in, then let it run to the end." },
+  { kind = "action", text = "Prove PC01_sheet in air: the same leaf on the bare plate top, G10 L20 P1 Z-25.349 (Z0 1.000 in high). At the file's M6 T1 stop T1 stays in: set 2800, Cycle Start. Single block through the first hole and the first clip's feed in, then let it run to the end." },
   { kind = "check", text = "Each hole comes down near its centre; each outline comes down beyond the plate's left end and feeds in through the blank's margin. Apart from those lead-ins no path leaves the blanks, and none comes near a jaw." },
   { kind = "stop", text = "A path off a blank or toward a jaw: feed hold, then the next op." },
 ]
@@ -429,7 +429,7 @@ instruction = "Only after a feed hold in the prove-out: stop the program, spindl
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Z0 back to the plate top: the tip dragging the same leaf on the bare plate top, G10 L20 P1 Z0.051."
+instruction = "Program ended, spindle stopped: Z0 back to the plate top, the tip dragging the same leaf on the bare plate top, G10 L20 P1 Z0.051."
 feed = "hand"
 
 # Four equal levels, each piece's last with the tip into the spoil plate:
@@ -441,12 +441,16 @@ speed_kind = "spindle"
 tool = "em-thirty-second"
 drilling = "none"
 sizing = "other"
-instruction = "Run PC01_sheet (M6 T1, spindle off: set 2800; about 114 min). Each hole is plunged near its centre at a quarter of the feed and opened by two circles; then each clip is cut round; then each lamination round and split along its bow profile. Four levels each, the last {{process.sheet_tip_into_plate_mm:in.3dot}} into the spoil plate. Dry: air blast the chips off as it goes; no flood or mist coolant and no water (the paper tape soaks and lets go). A hot smell from the cut (CA softens with heat): feed hold, let it cool 5 minutes, then Cycle Start."
+instruction = "Run PC01_sheet (M6 T1, spindle off: set 2800, then Cycle Start; about 114 min). Each hole is plunged near its centre at a quarter of the feed and opened by two circles; then each clip is cut round; then each lamination round and split along its bow profile. Four levels each, the last {{process.sheet_tip_into_plate_mm:in.3dot}} into the spoil plate."
 settings = "endmill-carbide-3fl-1-32-downcut-c260"
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)", pieces = [{ name = "clip", kind = "part", area_mm2 = "{{process.clip_bond_area_mm2}}", width_mm = "{{process.clip_finger_width_mm}}" }, { name = "male die half", kind = "part", area_mm2 = "{{process.male_bond_area_mm2}}", width_mm = "{{process.lamination_flat_mm}}" }, { name = "female die half", kind = "part", area_mm2 = "{{process.female_bond_area_mm2}}", width_mm = "{{process.female_least_width_mm}}" }, { name = "waste A", kind = "waste", area_mm2 = "{{process.waste_a_bond_area_mm2}}" }, { name = "waste B", kind = "waste", area_mm2 = "{{process.waste_b_bond_area_mm2}}" }] } }
 milling_cuts = [
   { name = "sheet", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.sheet_cutter_dia_mm}}", axial_doc_mm = "{{process.level_depth_mm}}", radial_woc_mm = "{{process.sheet_cutter_dia_mm}}", traverse_mm = ["{{process.sheet_from_x_mm}}", "{{process.sheet_to_x_mm}}"] },
 ]
+
+[[setups.operations]]
+instruction = "While PC01_sheet runs, dry: air blast the chips off as it goes; no flood or mist coolant and no water (the paper tape soaks and lets go). A hot smell from the cut (CA softens with heat): feed hold, let it cool 5 minutes, then Cycle Start."
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
