@@ -44,8 +44,9 @@ blank_z_in = 0.197
 # Sawn over the 4.82 overall: about .05 to face off each end, and .10 more.
 blank_length_in = 5.0
 # Setup 2: the top end out of the jaw fronts (the .28 drilled depth and room
-# for the tap wrench's work); Setup 3: the pivot end out (the .41 pivot, the
-# blade's .0625 and .10 clear of the jaws).
+# for the tap wrench's work); Setup 3: the faced pivot end (Z0) out .60 (the
+# .41 pivot, the blade's .0625 and .125 clear of the jaws), so the sawn end
+# is chucked .60 + (L - 4.82) out: Op 150 faces the excess off.
 top_stickout_in = 0.5
 pivot_stickout_in = 0.6
 pivot_stickout_mm = 15.24
@@ -283,7 +284,7 @@ title = "Pivot end: face to length, turn the pivot, groove"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "Turned round: the 4-jaw on the flats over the shims, the pivot end {{process.pivot_stickout_in:.2dot}} in out of the jaw fronts, the tapped end back through the spindle bore; indicated again as Setup 2 to {{process.indicate_tir_in:.3dot}} TIR."
+holding = "Turned round: the 4-jaw on the flats over the shims, the sawn pivot end {{process.pivot_stickout_in:.2dot}} + (L − {{process.overall_in:.2dot}}) in out of the jaw fronts (L from Op 120), set with the calipers' depth rod, the beam's end on the jaw fronts, so the faced end stands {{process.pivot_stickout_in:.2dot}} out; the tapped end back through the spindle bore; indicated again as Setup 2 to {{process.indicate_tir_in:.3dot}} TIR."
 datum = "Z0 (carriage DRO) the pivot end's finished plane, {{process.overall_in:.3dot}} from the top face: the DRO preset from L (Op 120) in Op 150, the blade touched on it again in Op 190. The shoulder at Z−{{process.pivot_len_in:.3dot}}."
 diagram = { file = "diagrams/pivot.svg", alt = "The square turned round in the 4-jaw, the pivot end out: faced to length, the Ø.125 pivot turned, its shoulder corner squared and the groove plunged with the cutoff blade." }
 lathe_hold = "other"
