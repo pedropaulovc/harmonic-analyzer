@@ -374,7 +374,7 @@ machine_kind = "other"
 title = "Saw the blank and the spoil block"
 machine = "Saw / bench"
 indexing = "none"
-diagram = { file = "diagrams/saw.svg", alt = "The 12 in length of the 1/4 x 1-1/2 in flat with one 2.45 in blank marked off at its end; the 1 x 3 in 6061 bar with a 3.5 in spoil block marked off." }
+diagram = { file = "diagrams/saw.svg", alt = "The 12 in length of the 1/4 x 1-1/2 in flat with one 2.45 in blank and a 2 in offcut marked off at its end; the 1 x 3 in 6061 bar with a 3.5 in spoil block marked off." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -384,7 +384,7 @@ speed_kind = "other"
 tool = "cutoff-saw"
 drilling = "none"
 sizing = "other"
-instruction = "Saw one blank {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} long, aiming at {{process.blank_length_in:.2f}}, off the 1/4 x 1-1/2 in bar, marked off with the steel rule. Saw one spoil block about 3.5 long off the 1 x 3 in 6061 bar. File the burrs off every sawn end."
+instruction = "Saw one blank {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} long, aiming at {{process.blank_length_in:.2f}}, off the 1/4 x 1-1/2 in bar, marked off with the steel rule, then one offcut about 2 long (kept for Setup 2's trial hole, if the reamer's reading calls for it). Saw one spoil block about 3.5 long off the 1 x 3 in 6061 bar. File the burrs off every sawn end."
 feed = "hand"
 inspection = "Blank {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} long (steel rule): the 2.16 plate with .10 at the round's end and .14–.24 at the top."
 gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.blank_length_min_mm}}", "{{process.blank_length_max_mm}}"] }]
