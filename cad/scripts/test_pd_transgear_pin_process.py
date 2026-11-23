@@ -58,13 +58,17 @@ def test_the_land_window_takes_the_drawings_interference_over_the_reading(
     parameters: dict, features: dict, shop: dict
 ) -> None:
     land = features["step_land"]
-    # The ream lies in R to R + one pin step: the least excess over R is the
-    # least interference plus that step.
+    # The ream lies in R - tol to R + step + tol (each Class X pin +/- tol):
+    # the least excess over R is the least interference over the ream's top,
+    # the most the most interference over its bottom.
     step_in = shop["gauges"]["plug-gauges-1261-1264"]["resolution_mm"] / IN
-    least = land["diametral_interference"][0] / IN + step_in
+    tol_in = shop["gauges"]["plug-gauges-1260-1265"]["resolution_mm"] / IN
+    least = land["diametral_interference"][0] / IN + step_in + tol_in
+    most = land["diametral_interference"][1] / IN - tol_in
     assert parameters["land_over_reading_min_in"] == pytest.approx(least, abs=1e-6)
-    # The window stays open: under the drawing's most interference.
-    assert least < land["diametral_interference"][1] / IN
+    assert parameters["land_over_reading_max_in"] == pytest.approx(most, abs=1e-6)
+    # The window stays open and holds the micrometer's R + .0004 reading.
+    assert least < 0.0004 < most
 
 
 def test_the_six_pins_step_the_reams_band(shop: dict, features: dict) -> None:

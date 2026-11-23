@@ -48,10 +48,15 @@ quantity = 1
 stock_dia_in = 0.25
 bar_length_in = 72.0
 chuck_grip_in = 0.75
-# The land's least excess over the ream's reading R: the drawing's least
-# interference (.0002) plus the pins' .0001 step, since the ream may lie up to
-# one step over R; its most is the drawing's .0005 (the ream at least R).
-land_over_reading_min_in = 0.0003
+# The land's window over the ream's reading R. Pin R entering proves the ream
+# at least R - .00004 and pin R + .0001 refusing proves it under R + .00014
+# (each Class X pin +/- .00004, gauges.plug-gauges-1260-1265 / -1261-1264),
+# so the ream lies in R - .00004 to R + .00014. The land's least excess is the
+# drawing's least interference .0002 over the ream's top, R + .00034; its
+# most the drawing's .0005 over the ream's bottom, R + .00046. On the .0001
+# micrometer the land reads R + .0004.
+land_over_reading_min_in = 0.00034
+land_over_reading_max_in = 0.00046
 # A .20 in stub beyond the tip plane for the tailstock centre, and .02 faced
 # off the bar end.
 face_allowance_in = 0.22
@@ -128,6 +133,11 @@ ref = "plug-gauges-1261-1264"
 status = "to_order"
 
 [[tools]]
+id = "feelers"
+name = "Feeler gauge set, 32 leaves .0015-.035 (the .020 and .022 leaves)"
+ref = "feeler-gauges"
+
+[[tools]]
 id = "ar"
 name = "AR turning tool"
 ref = "lathe-ar"
@@ -197,7 +207,7 @@ instruction = "In any ream the .1260 does not enter, or the .1265 enters: that r
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Work out the land's window and write it on this sheet: Ø(R + {{process.land_over_reading_min_in:.4dot}}) to Ø(R + {{cad.step_land_interference_max_in:.4dot}}). The ream may lie up to .0001 over R, so the land then presses in with the drawing's {{cad.step_land_interference_min_in:.4dot}}–{{cad.step_land_interference_max_in:.4dot}} interference."
+instruction = "Work out the land's window and write it on this sheet: Ø(R + {{process.land_over_reading_min_in:.5dot}}) to Ø(R + {{process.land_over_reading_max_in:.5dot}}): on the micrometer the land reads R + .0004. With the pins' ±.00004 the ream lies R − .00004 to R + .00014, so the land then presses in with the drawing's {{cad.step_land_interference_min_in:.4dot}}–{{cad.step_land_interference_max_in:.4dot}} interference."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -265,15 +275,15 @@ speed_kind = "spindle"
 tool = "sharp"
 drilling = "none"
 sizing = "other"
-instruction = "Sharp-nose tool: touch it on the stub's faced end and set DRO Z to +{{process.centre_stub_in:.3dot}}. Face the seat square at Z{{cad.step_land_far_out_far_z_mm:in.3dot}} out to the head, its corner R{{cad.fillet_seat_radius_max_in:.3dot}} max (the tool's nose). Finish the land from the seat to Z{{cad.step_land_far_out_near_z_mm:in.3dot}} ({{cad.step_land_length_in:.2dot}} long) to the Op 30 window, miking between passes: no pass deeper than half of (the miked Ø less the window's middle) on the radius, spring passes allowed."
+instruction = "Sharp-nose tool: touch it on the stub's faced end and set DRO Z to +{{process.centre_stub_in:.3dot}}. Face the seat square at Z{{cad.step_land_far_out_far_z_mm:in.3dot}} out to the head, its corner R{{cad.fillet_seat_radius_max_in:.3dot}} max (the tool's nose). Finish the land from the seat to Z{{cad.step_land_far_out_near_z_mm:in.3dot}} ({{cad.step_land_length_in:.2dot}} long) to the Op 30 window in passes of {{process.finish_radial_doc_mm:in.4dot}} or less on the radius, miking between passes, the last no deeper than half of (the miked Ø less R + .0004); spring passes allowed."
 settings = "lathe-sharp-nose-1018"
 cut_diameter_mm = "{{cad.step_land_dia_mm}}"
-inspection = "Land inside the Op 30 window, micrometer: the land less R lies within {{process.land_over_reading_min_in:.4dot}}–{{cad.step_land_interference_max_in:.4dot}}."
+inspection = "Land inside the Op 30 window, micrometer: the land reads R + .0004."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Land under the Op 30 window: cut the piece off, scrap it, and start again from Op 40. Over it: another pass of half of (the miked Ø less the window's middle) or less on the radius, or a spring pass."
+instruction = "Land under the Op 30 window: cut the piece off, scrap it, and start again from Op 40. Over it: another pass of half of (the miked Ø less R + .0004) or less on the radius, or a spring pass."
 
 [[setups.operations]]
 cut_kind = "longitudinal_turning"
@@ -284,7 +294,7 @@ speed_kind = "spindle"
 tool = "sharp"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the journal from Z+{{process.turn_start_z_mm:in.3dot}} in the stub to the land's end to Ø{{process.polish_dia_min_in:.4dot}}–{{process.polish_dia_max_in:.4dot}}, miking at both ends between passes, no pass deeper than half of (the miked Ø less the middle of that band) on the radius, spring passes allowed: the .0002–.0006 over its Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} is left for polishing."
+instruction = "Finish the journal from Z+{{process.turn_start_z_mm:in.3dot}} in the stub to the land's end to Ø{{process.polish_dia_min_in:.4dot}}–{{process.polish_dia_max_in:.4dot}}, miking at both ends and the middle between passes, in passes of {{process.finish_radial_doc_mm:in.4dot}} or less on the radius, the last no deeper than half of (the miked Ø less the middle of that band); spring passes allowed: the .0002–.0006 over its Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} is left for polishing."
 settings = "lathe-sharp-nose-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 inspection = "Journal Ø{{process.polish_dia_min_in:.4dot}}–{{process.polish_dia_max_in:.4dot}}."
@@ -319,12 +329,12 @@ sizing = "other"
 instruction = "A tool under {{cad.groove_width_min_in:.3dot}} wide: move toward the chuck by .021 less its width and plunge again to the same dial, widening the groove away from the load wall. Read the root with the caliper jaw tips and touch the tool's tailstock-side edge on the load wall to read its station."
 settings = "lathe-groove-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Groove Ø{{cad.groove_dia_min_in:.3dot}}–{{cad.groove_dia_max_in:.3dot}}, {{cad.groove_width_min_in:.3dot}}–{{cad.groove_width_max_in:.3dot}} wide (the tool's width and the DRO moves); load wall at Z+{{cad.groove_station_min_in:.3dot}}–{{cad.groove_station_max_in:.3dot}} from the seat."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.groove_dia_band_mm}}" }, { gauge = "lathe-z-dro", band_mm = "{{cad.groove_station_band_mm}}" }]
+inspection = "Groove Ø{{cad.groove_dia_min_in:.3dot}}–{{cad.groove_dia_max_in:.3dot}}, {{cad.groove_width_min_in:.3dot}}–{{cad.groove_width_max_in:.3dot}} wide (the .020 feeler leaf enters the groove, the .022 does not); load wall at Z+{{cad.groove_station_min_in:.3dot}}–{{cad.groove_station_max_in:.3dot}} from the seat."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.groove_dia_band_mm}}" }, { gauge = "feeler-gauges", band_mm = "{{cad.groove_width_band_mm}}" }, { gauge = "lathe-z-dro", band_mm = "{{cad.groove_station_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Root over {{cad.groove_dia_max_in:.3dot}}: plunge a further (the root reading less .096)/2 on the radius and read it again. Root under {{cad.groove_dia_min_in:.3dot}}, or the load wall outside its station: cut the piece off, scrap it, and start again from Op 40."
+instruction = "Root over {{cad.groove_dia_max_in:.3dot}}: plunge a further (the root reading less .096)/2 on the radius and read it again. The .020 leaf not entering: widen as above. Root under {{cad.groove_dia_min_in:.3dot}}, the .022 leaf entering, or the load wall outside its station: cut the piece off, scrap it, and start again from Op 40."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -435,7 +445,7 @@ instruction = "With a fine stone, break the head's two outer edges and the tip d
 
 [[setups.operations]]
 instruction = "Look over the journal and the land where the jaws held them, then mike them again: the land at its middle, the journal by the land, in the middle and by the tip."
-inspection = "No mark or nick you can feel; the land inside the Op 30 window (the land less R {{process.land_over_reading_min_in:.4dot}}–{{cad.step_land_interference_max_in:.4dot}}); the journal Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} at all three stations."
+inspection = "No mark or nick you can feel; the land inside the Op 30 window (it reads R + .0004); the journal Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} at all three stations."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
 
 [[setups.operations]]
