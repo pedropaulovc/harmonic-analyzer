@@ -175,25 +175,94 @@ status = "on_hand"
 pieces = 1
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 49: \"Sanding Roll for Smooth Finish, 2\" Wide, 220 Grit, 30 Feet Long\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
 
-# --- MHA-CH-13 rocker strap on the CNC (cad/process/ch_rocker_strap) ---------
+# --- Taped holds on the CNC: blue painter's tape both faces, CA between -------
 
-# Tape for the MHA-CH-13 outline hold. Chosen because its data sheet states
-# both a normal tensile and a shear strength; the thin transfer tapes read
-# (3M 468MP, Nitto P-02) state peel and, for 468MP, lap shear only. It is a
-# permanent tape: freeing the strap and cleaning both faces is part of the
-# route (plan Setup 6).
-[consumables.tape-3m-vhb-5906]
-name = "3M VHB tape 5906, .006 in (0.15 mm), black"
-kind = "double_sided_tape"
+# Owner ruling 2026-11-23 (Pedro), taped holds: "for tape isnt it possible to
+# use blue painters tape on both sides and ca glue between them"; "it is widely
+# used in industry with much heavier requirements; take it as given it will
+# work". The six taped parts (MHA-CH-13 strap, MHA-MS-01 stick, MHA-PD-01
+# platen, MHA-PD-03 platen clip, MHA-PD-19 arm plate, MHA-DT-03-TL-02 phasing
+# comb) hold this way; the 3M VHB 5906 record this replaces is retired with
+# its purchase. No pull test; the operator proves each bond by a hand push.
+# Then, on the depth levels the old tape's data-sheet strength had set:
+# "no need to bring to me ; make coarser as you see fit".
+#
+# The hold's strength is ACCEPTED, not read from a data sheet: no maker states
+# a tensile or shear strength for painter's tape under cyanoacrylate (the
+# tape's listing gives a peel adhesion, a force per width of tape being
+# stripped, which is not the strength of a face-bonded area). The owner
+# accepted the hold ("take it as given it will work") and left the coarsening
+# to the planner; accepted_by names him for that: the sheet's line says whose
+# word the hold rests on and prints no figure.
+#
+# The figure is a delegated ruling 2026-11-23 (CncTapeHold, the agent
+# coordinating this work), no precedent, for the owner's review on #2144:
+# accepted_*_kpa = .6 MPa is the planner's number, not the owner's and not a
+# measurement: the most a taped plan's cut may put on a bond in prechips'
+# model (cross force over the piece's area; a lift at a piece's edge as
+# 4 x force over a patch as long as the piece is wide). Most cuts are far
+# under it and are set by the cutter and machine. It binds on narrow parts
+# cut with an upcut end mill, where the edge of a masking-tape bond would
+# peel first: the MHA-MS-01 stick's outline at one full-depth level would ask
+# 1.6 MPa and so takes three (.54 MPa); the MHA-CH-13 strap's outline rough
+# takes four (.46) where three would ask .61. prechips' bond check refuses
+# any cut that would load a bond harder. The owner may raise or lower this
+# one figure; those cuts then re-level.
+#
+# Stack: the listing's 5.4 mil per tape, twice, plus the glue line: a stated
+# assumption, .011 in nominal. The programs work that far above the plate;
+# every bond's stack is miked before its program runs and must read inside
+# stack_min_mm..stack_max_mm.
+[consumables.hold-painters-tape-ca]
+name = "Taped hold: blue painter's tape on both faces, thick CA glue between"
+kind = "bonded_hold"
+status = "on_hand"
+tape = "tape-scotchblue-2090"
+adhesive = "ca-glue-gh1200"
+accelerator = "ca-accelerator-starbond"
+stack_thickness_mm = 0.28
+stack_min_mm = 0.23
+stack_max_mm = 0.33
+accepted_shear_kpa = 600
+accepted_tensile_kpa = 600
+accepted_by = "the shop owner"
+cite = ["Owner (Pedro) 2026-11-23: \"for tape isnt it possible to use blue painters tape on both sides and ca glue between them\"", "Owner (Pedro) 2026-11-23: \"it is widely used in industry with much heavier requirements; take it as given it will work\"", "Owner (Pedro) 2026-11-23: \"no need to bring to me ; make coarser as you see fit\""]
+
+[consumables.tape-scotchblue-2090]
+name = "ScotchBlue Original Multi-Surface 2090 painter's tape, 1.41 in x 60 yd (model 2090-36AP)"
+kind = "masking_tape"
 make = "3M"
-sku = "5906"
-status = "to_order"
-thickness_mm = 0.15
-normal_tensile_kpa = 690
-dynamic_shear_kpa = 690
-purchase = "1-1/2 in wide, or two 3/4 in strips side by side: 12 in per strap, 20 ft for the lot of 20. Rolls are 5 yd (15 ft), so two 1-1/2 in rolls or three 3/4 in rolls (#3083 row 11, owner ruling 2026-11-20). The MHA-MS-01 stick takes one 9 in strip more, trimmed to its fixture bar's 1/2 in width: inside either purchase (30 ft of 1-1/2 in against the straps' 20 ft, or 45 ft of 3/4 in against their 40 ft). No price or stock read."
-note = "Not owned: to buy. MHA-CH-13 Setup 5: bonds the faced blank to the sub-plate under its whole face while the outline is cut. MHA-MS-01 Setups 3 and 4: bonds the stick's blank to its fixture bar's faced top while its outline is milled and its scale engraved."
-cite = ["3M VHB Tapes Technical Data, November 2015, Typical Performance Characteristics, 5906: thickness .006 in (0.15 mm); 90 degree peel 9 lb/in (16 N/cm); normal tensile (ASTM D-897, to aluminium, 72 h dwell) 100 lb/in2 (690 kPa); dynamic overlap shear (ASTM D-1002, to stainless steel, 72 h dwell) 100 lb/in2 (690 kPa); Application Techniques: clean with 50:50 isopropyl alcohol and water, about 15 psi application pressure, about 50% of ultimate bond strength after 20 minutes, 90% after 24 hours, 100% after 72 hours. Read 2026-11-17 from a distributor's copy (3M's own link refused the fetch): https://www.tspinc.com/pdf/3M-VHB-Tapes-Technical-Data.pdf"]
+sku = "2090-36AP"
+status = "on_hand"
+width_mm = 35.814
+thickness_mm = 0.137
+note = "Owned. Both faces of every taped hold: strips side by side, butted, never overlapped (an overlap doubles the stack there). Thickness 5.4 mil and peel adhesion 23 oz/in are a distributor's listing of 3M's series 2090 data, a stated assumption: 3M's own data sheet refused the fetch (HTTP 403, 2026-11-23), so each bond's stack is miked. Use: about 13 yd for the 20 straps (two 12 in strips on each face of each blank), under 3 yd for the other five parts; one 60 yd roll covers it four times over."
+cite = ["Owner (Pedro) 2026-11-23, his listing's title: \"ScotchBlue Original Multi-Surface 2090 1.41-in x 60 Yard(s) Painters Tape ... Model #2090-36AP\"", "AIH listing of ScotchBlue 2090 Original (3M 7100186979), read 2026-11-23: thickness 5.4 mil, adhesion strength 23 oz/in, crepe paper backing, acrylic adhesive: https://www.aih.com/Product/MMM3681"]
+
+[consumables.ca-glue-gh1200]
+name = "GH1200 cyanoacrylate glue, 100 cps thin and 1500 cps thick, 1 oz (28.4 g) each"
+kind = "adhesive"
+make = "GH1200"
+status = "on_hand"
+note = "Owned. The taped holds use the 1500 cps THICK bottle between the two tapes, the shop's choice: it stays where the bead is laid while the blank is lowered. The thin bottle is not used. Use: a zigzag bead about 1/16 in wide with its lines about 3/4 in apart is about one drop to the square inch (the rate Lee Valley's Starbond note gives): 18 sq in a strap blank, 360 sq in for the lot of 20, about 40 sq in for the other five parts; at about .03 ml a drop that is about 12 ml, 13 g of the 28.4 g bottle. An estimate: one bottle covers the lot about twice."
+cite = ["Owner (Pedro) 2026-11-23, his listing's title: \"57 Grams (2 oz) Super Glue All Purpose, 100/1500 CPS (Thin/Thick), Ca Glue GH1200 SuperGlue, 1 Oz Each Anti Clog Cap\"", "Lee Valley, Using Starbond as an Adhesive, read 2026-11-23: about one drop per square inch of bonding area, glue on one side of the joint only, accelerator sprayed on the other side: https://www.leevalley.com/en-us/discover/post-purchase/starbond-ca-glues/using-starbond-as-an-adhesive"]
+
+[consumables.ca-accelerator-starbond]
+name = "Starbond CA glue accelerator spray, 6 oz"
+kind = "adhesive_accelerator"
+make = "Starbond"
+status = "on_hand"
+note = "Owned. Sprayed as a fine mist on the tape face that carries no glue, just before the blank is lowered. Its maker says the glue then cures in seconds; the travelers hold the blank pressed for 1 minute and wait 5 minutes more before the push test, the shop's margin."
+cite = ["Owner (Pedro) 2026-11-23, his listing's title: \"Starbond CA Glue Accelerator Spray ... (6 Ounce)\"", "Starbond, Aerosol Accelerator, read 2026-11-23: spray a fine, even mist on one surface after applying CA glue to the other; cures in seconds: https://starbond.com/products/aerosol-accelerator", "Starbond, recommended amount of accelerator, read 2026-11-23: two to three sprays: https://starbond.com/blogs/tutorials/whats-the-recommended-amount-of-accelerator-to-apply"]
+
+[consumables.ca-glue-loctite-1503241]
+name = "Loctite 1503241 Super Glue Extra Time Control, .14 fl oz"
+kind = "adhesive"
+make = "Loctite"
+sku = "1503241"
+status = "on_hand"
+note = "Owned. A spare: .14 fl oz (about 4 ml) is under a third of the lot's glue, so no taped hold names it."
+cite = ["Owner (Pedro) 2026-11-23, his listing's title: \"Loctite 1503241 Super Glue Extra Time Control, Clear, 0.14 fl oz Bottle\""]
 
 # --- MHA-MG-02 magnifying clamp: brass black (owner ruling 2026-11-17) -------
 

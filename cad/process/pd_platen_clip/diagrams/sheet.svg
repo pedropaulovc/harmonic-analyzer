@@ -6,7 +6,9 @@
   <rect class="clamp" x="50" y="578" width="630" height="40"/>
   <text class="label-on-clamp" x="70.0" y="603.0">moving jaw</text>
   <rect class="fixture-plate" x="60" y="70" width="610" height="508"/>
-  <text class="label" x="460.0" y="542.0">spoil plate 6 x 5 x 1/2</text>
+  <rect class="bond" x="60" y="70" width="406.4" height="508"/>
+  <text class="label" x="480.0" y="566.0">spoil plate 6 x 5 x 1/2</text>
+  <text class="label" x="70.0" y="560.0">blue tape, CA glue, blue tape (4 strips)</text>
   <rect class="part-waste" x="60.0" y="70.0" width="365.8" height="203.2"/>
   <rect class="part-waste" x="60.0" y="273.2" width="365.8" height="203.2"/>
   <text class="label" x="433.8" y="267.2">blank A</text>
@@ -25,13 +27,22 @@
   <path class="part-kept" d="M76.3,369.5 L105.0,369.5 A100.9,100.9 0 0 0 133.4,365.4 A104.2,104.2 0 0 1 162.8,361.2 A104.2,104.2 0 0 1 192.1,365.4 A100.9,100.9 0 0 0 220.5,369.5 L266.2,369.5 A100.9,100.9 0 0 0 294.7,365.4 A104.2,104.2 0 0 1 324.0,361.2 A104.2,104.2 0 0 1 353.3,365.4 A100.9,100.9 0 0 0 381.8,369.5 L410.5,369.5 L410.5,342.3 L76.3,342.3 L76.3,369.5 Z"/>
   <path class="part-kept" d="M76.3,452.0 L410.5,452.0 L410.5,431.7 L381.8,431.7 A104.2,104.2 0 0 1 352.4,427.5 A100.9,100.9 0 0 0 324.0,423.4 A100.9,100.9 0 0 0 295.6,427.5 A104.2,104.2 0 0 1 266.2,431.7 L220.5,431.7 A104.2,104.2 0 0 1 191.2,427.5 A100.9,100.9 0 0 0 162.8,423.4 A100.9,100.9 0 0 0 134.3,427.5 A104.2,104.2 0 0 1 105.0,431.7 L76.3,431.7 L76.3,452.0 Z"/>
   <path class="part-kept" d="M76.3,428.4 L105.0,428.4 A100.9,100.9 0 0 0 133.4,424.4 A104.2,104.2 0 0 1 162.8,420.1 A104.2,104.2 0 0 1 192.1,424.4 A100.9,100.9 0 0 0 220.5,428.4 L266.2,428.4 A100.9,100.9 0 0 0 294.7,424.4 A104.2,104.2 0 0 1 324.0,420.1 A104.2,104.2 0 0 1 353.3,424.4 A100.9,100.9 0 0 0 381.8,428.4 L410.5,428.4 L410.5,401.2 L76.3,401.2 L76.3,428.4 Z"/>
+  <line class="hidden" x1="60" y1="213.3" x2="466.4" y2="213.3"/>
+  <line class="hidden" x1="60" y1="356.5" x2="466.4" y2="356.5"/>
+  <line class="hidden" x1="60" y1="499.8" x2="466.4" y2="499.8"/>
+  <line class="hidden" x1="60" y1="129.9" x2="425.8" y2="129.9"/>
+  <line class="hidden" x1="60" y1="416.5" x2="425.8" y2="416.5"/>
+  <text class="label" x="474.0" y="490.0">dashed: tape seams, along X;</text>
+  <text class="label" x="474.0" y="507.0">the blanks' .59 and 3.41 in,</text>
+  <text class="label" x="474.0" y="524.0">the plate's 1.41, 2.82, 4.23 in,</text>
+  <text class="label" x="474.0" y="541.0">from the fixed jaw</text>
   <line class="datum" x1="60" y1="34" x2="60" y2="628"/>
   <text class="datum-label" x="64.0" y="640.0">X0 plate left end</text>
   <line class="datum" x1="20" y1="70" x2="690" y2="70"/>
   <text class="datum-label" x="480.0" y="88.0">Y0 fixed jaw face</text>
   <circle class="cutter" cx="54.4" cy="100.5" r="4"/>
   <line class="leader" x1="54.4" y1="100.5" x2="54.4" y2="644.0"/>
-  <text class="label" x="220.0" y="640.0">each outline enters off the plate's end (1/32 end mill, 3 levels)</text>
+  <text class="label" x="220.0" y="640.0">each outline enters off the plate's end (1/32 end mill, 4 levels)</text>
   <line class="leader" x1="412.0" y1="127.9" x2="460.0" y2="158.0"/>
   <text class="label" x="464.0" y="162.0">clips 1 and 2: spring edges toward</text>
   <text class="label" x="464.0" y="180.0">the fixed jaw, rails toward the moving jaw</text>

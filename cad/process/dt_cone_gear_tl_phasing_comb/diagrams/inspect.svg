@@ -4,7 +4,7 @@
   <g transform="translate(0,46)">
     <path class="part-kept" d="M60.0,238.3 L727.5,238.3 L727.5,73.7 L60.0,73.7 L60.0,120.0 L127.7,120.0 L127.7,128.2 L182.5,128.2 L182.5,139.6 L235.6,139.6 L235.6,150.9 L290.4,150.9 L290.4,161.7 L327.0,161.7 L327.0,120.0 L630.6,120.0 A50.9,50.9 0 0 1 630.6,221.9 L60.0,221.9 Z"/>
     <line class="datum" x1="30" y1="120" x2="150" y2="120"/>
-    <text class="datum-label" x="4" y="108">seat line</text>
+    <text class="datum-label" x="14" y="92"><tspan x="14" y="92">seat</tspan><tspan x="14" y="110">line</tspan></text>
     <line class="datum" x1="60" y1="44" x2="60" y2="268"/>
     <text class="datum-label" x="20" y="286">open end</text>
     <line class="dims" x1="60" y1="60" x2="127.7" y2="60"/>

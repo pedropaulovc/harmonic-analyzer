@@ -14,8 +14,8 @@ counterbore, which a recipe can state exactly. Typed here, because no record
 carries them: the #1 centre drill's catalogue geometry (it sets the spot
 depth), the twist drills' 118° point, the machine's Z top for the tap files'
 retract, the approach, safe and clearance heights, the face overhang, the
-feeler leaf, the edge finder's radius, the tape's thickness tolerance and
-the clearances the checks below hold.
+feeler leaf, the edge finder's radius and the clearances the checks below
+hold.
 
 Route (plan text in ``plan.toml``): the 1/4 × 6 × 11 in brass blank is
 bonded, for every cut, to the 1/2 × 6 × 18 in 6061 fixture bar clamped on
@@ -36,7 +36,7 @@ table) and work Z counts up from the back face. Z0:
 - PL01: the skimmed bar top (its high point less the skim); PL02 the same.
 - PL03: the cut face (the top's high point less the cut).
 - PL04 and the tap files: the plate's underside (the back face, on the
-  tape), set from the miked thickness.
+  tape stack), set from P's top less the miked thickness.
 
 Toolpath rules (owner rulings 2026-11-16): faces zigzag (ball screws),
 plunges beside the stock at the cutting feed, real G0 above the stock; only
@@ -125,10 +125,6 @@ CLEAR_MM = 5.0
 # radius (.100 in).
 FEELER_MM = 0.002 * IN
 FINDER_RADIUS_MM = 0.1 * IN
-# 3M's thickness tolerance on VHB 5906 (±15 %, as the strap's plan reads it):
-# the through cut stays above the thinnest tape, the stacks allow the
-# thickest.
-TAPE_TOL = 0.15
 # Authored clearances the checks hold. A gated blank leaves at least this
 # much on every edge; a step clamp's zone stays this far from the cutter;
 # the relief pocket stands this far round the tap and below its point; the
@@ -138,9 +134,9 @@ MARGIN_MIN_MM = 1.0
 CLAMP_CLEAR_MM = 5.0
 RELIEF_CLEAR_MM = 0.5
 TAP_PAST_MM = 0.1 * IN
-# The plate bridges the gap between tape strips: the gap is at most this
-# many plate thicknesses (author's criterion; a wider gap would let the
-# cutter push the plate down between strips).
+# The plate bridges a bare seam between tape strips: the widest seam is at
+# most this many plate thicknesses (author's criterion; a wider one would let
+# the cutter push the plate down into it).
 TAPE_GAP_MAX_THICKNESSES = 2.0
 # Keep-out shapes stand this high above Z0: every move over a clamp zone,
 # whatever its height, is refused.
@@ -646,33 +642,67 @@ def context(
     if relief_rpm != skim_rpm:
         raise ValueError("'tap relief' runs at another speed than 'bar skim'")
 
-    # Tape: the through cut stays in it; the strips cover the platen's whole
-    # length whatever the placement; the bond prechips is told is the least
-    # tape under any square patch as long as the plate is high.
-    tape = p["tape_thickness_mm"]
-    tape_min, tape_max = tape * (1 - TAPE_TOL), tape * (1 + TAPE_TOL)
+    # The hold (owner, 2026-11-23): painter's tape on the bar and on the
+    # blank, CA glue between. Z0 is the underside where the plate was miked
+    # and touched; elsewhere the underside sits up to the stack band's width
+    # under it. The through cut clears the underside wherever the stack is
+    # and stays inside the thinnest stack, short of the bar.
+    stack_min, stack_max = p["tape_stack_min_mm"], p["tape_stack_max_mm"]
+    if not stack_min < p["tape_stack_mm"] < stack_max:
+        raise ValueError("process.tape_stack_mm is outside its band")
+    spread = stack_max - stack_min
     through = p["outline_breakthrough_mm"]
-    if not 0 < through < tape_min:
+    if through <= spread:
         raise ValueError(
-            f"the through cut {through} is not inside the thinnest tape {tape_min:.4f}"
+            f"the through cut {through} can leave a skin where the stack is "
+            f"{spread:.2f} thinner than under Z0"
         )
-    strip, pitch = p["tape_strip_width_mm"], p["tape_strip_pitch_mm"]
-    gap = pitch - strip
+    if through >= stack_min:
+        raise ValueError(
+            f"the through cut {through} reaches the bar under the thinnest "
+            f"stack {stack_min}"
+        )
+    # The faced thickness elsewhere differs from the target by the stack's
+    # difference from the touched spot: within half the thickness band.
+    if spread >= (g["thickness_band"][1] - g["thickness_band"][0]) / 2:
+        raise ValueError(
+            "the stack's band does not fit inside the thickness band round the target"
+        )
+    # Butted strips along X on each face: they cover the bar's width and the
+    # widest blank's; the blank's first is centred on its FRONT edge, so its
+    # seams sit a fraction of a strip off the bar's.
+    strip, count = p["tape_strip_width_mm"], p["tape_strip_count"]
+    offset, gap = p["tape_seam_offset_mm"], p["tape_seam_gap_max_mm"]
+    if count * strip < max(bar_w, w_max) or offset + (count - 1) * strip < w_max:
+        raise ValueError(f"{count} strips of {strip} leave a face bare")
+    shift = offset % strip
+    if min(shift, strip - shift) < strip / 4:
+        raise ValueError("the blank's seams lie within a quarter strip of the bar's")
     if not 0 <= gap <= TAPE_GAP_MAX_THICKNESSES * thick:
+        raise ValueError(f"a {gap:.2f} seam: the plate does not bridge it")
+    # The bar's strips start the overhang left of the scribed line and run at
+    # least the overhang past the right end of the longest gated blank placed
+    # long, wholly on the skimmed seat (never across its step) and so clear
+    # of the step clamps' zones; the blank's strips are longer than the
+    # longest gated blank (trimmed flush).
+    overhang = p["tape_end_overhang_mm"]
+    bar_strip = p["tape_bar_strip_length_mm"]
+    tape_x = (-margin_x - overhang, -margin_x - overhang + bar_strip)
+    if overhang <= tol:
+        raise ValueError("the bar's tape can leave the blank's left end bare")
+    if tape_x[1] - (-margin_x + tol + l_max) < overhang:
         raise ValueError(
-            f"a {gap:.2f} gap between strips: the plate does not bridge it"
+            f"the bar's {bar_strip} strips end under {overhang} past the longest blank"
         )
-    # The strips are laid from the scribed line, where the blank's left end
-    # goes: from X0 they sit within the placement tolerance.
-    first = -margin_x + p["tape_first_edge_mm"]
-    last_edge = first + (p["tape_strip_count"] - 1) * pitch + strip
-    if first + tol > 0 or last_edge - tol < length:
-        raise ValueError(
-            f"strips from X {first:.3f} to {last_edge:.3f} can leave an end of the platen bare"
-        )
+    if tape_x[0] < seat[0] or tape_x[1] > seat[1]:
+        raise ValueError("the bar's tape runs off the skimmed seat, across its step")
+    if p["tape_blank_strip_length_mm"] < l_max:
+        raise ValueError("the blank's strips leave an end of the longest blank bare")
+    # The bond prechips is told: the tape under a square patch as long as the
+    # plate is high, less the bare seams it can cross and two relief pockets.
     side = g["height_band"][0]
-    covered = math.floor(side / pitch) * strip + max(0.0, side % pitch - gap)
-    patch = covered * side - 2 * math.pi * r * r
+    seams = math.floor(side / strip) + 1
+    patch = (side - seams * gap) * side - 2 * math.pi * r * r
     _agree(plan, "bond_patch_area_mm2", patch)
 
     # Edges: the cutter's side, one level from P to the through depth, the
@@ -737,7 +767,7 @@ def context(
     _agree(plan, "socket_tip_height_mm", socket_tip)
     _agree(plan, "guide_tip_height_mm", guide_tip)
     # The relief pocket under each socket: wider than the tap, deeper than
-    # the #50's tip and the tap's point, the thinnest tape counted.
+    # the #50's tip and the tap's point, the thinnest tape stack counted.
     major = (
         0.060 + 0.013 * int(re.match(r"#(\d+)-", g["sockets"][0]["thread"]).group(1))
     ) * IN
@@ -745,14 +775,14 @@ def context(
         raise ValueError("the relief pocket is not wider than the tap")
     tap_depth = g["thickness_band"][1] + TAP_PAST_MM
     _agree(plan, "tap_point_depth_mm", tap_depth)
-    pocket_floor = tape_min + relief
+    pocket_floor = stack_min + relief
     tap_below = tap_depth - g["thickness_band"][0]
     if pocket_floor < max(tap_below, -socket_tip) + RELIEF_CLEAR_MM:
         raise ValueError(
             f"the relief pocket's floor {pocket_floor:.3f} under the plate is not "
             f"{RELIEF_CLEAR_MM} below the tap's point {tap_below:.3f}"
         )
-    if -guide_tip - tape_max >= bar_t / 2:
+    if -guide_tip - stack_min >= bar_t / 2:
         raise ValueError("the #27 goes over half way through the bar")
 
     # Counterbores: the 1/4 in end mill down the drilled hole, one circle.
@@ -797,7 +827,7 @@ def context(
         - shop["limits"]["tool_change_clearance_mm"]
         - p["block_height_mm"]
         - p["bar_top_max_mm"]
-        - tape_max
+        - stack_max
         - g["thickness_band"][1]
         - gauge
     )
