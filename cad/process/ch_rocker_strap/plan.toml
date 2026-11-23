@@ -638,7 +638,7 @@ instruction = "For all of RS04: cut dry, or with a light air blast. No flood or 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "CA softens with heat; never touch the work while RS04 runs. If the slot smokes or chips come off blue: Feed Hold, then Reset (the spindle stops). When the blank is cool enough to hold a finger on, run RS04 again from its start: the levels already cut pass in air."
+instruction = "CA softens with heat; never touch the work while RS04 runs. If the slot smokes or chips come off blue: Feed Hold, then Reset (the spindle stops). Jog Z up until T2 clears the blank top and the screw head, the spindle stopped; only then touch the blank. When it is cool enough to hold a finger on, run RS04 again from its start: the levels already cut pass in air."
 feed = "hand"
 
 # Every level starts with a straight plunge (feed: [parameters]); the plunge
