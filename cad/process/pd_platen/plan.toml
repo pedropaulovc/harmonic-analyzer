@@ -1,38 +1,816 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Platen MHA-PD-02 (qty 1), routed for the CNC mill (agent's choice for
+# speed, owner ruling 2026-11-21: the owner corrects the route afterwards).
+# One C360 flat, 1/4 × 6 × 11 in as bought (stock.c360-flat-1-4x6, not yet
+# received), milled to the .152 thickness in four cuts, two off each face
+# and turned over after each (the registry's process note: equal cuts from
+# both sides, so the bar's skin comes off both faces and the plate stays
+# flat), then its outline, the fourteen holes and the ten counterbores from
+# one zero, the four #2-56 sockets tapped by hand under the spring tap guide.
+#
+# No vise: the 6 in blank is wider than the PM vise opens (shop
+# workholding.vise-pm-6 opening_mm, 146.05), and a 1/4 in plate standing
+# over the jaws has no limits.vise_grip_min_mm of grip. The plate is bonded,
+# every cut, to a fixture bar on the table: the freed 1/2 × 6 × 18 in 6061
+# bar (stock.6061-flat-1-2x6-18in) on the owner's two 1-2-3 blocks lying
+# flat (1 in up: on the table itself the short end mills could not reach it,
+# shop machines.pm-30mv spindle_to_table_mm; cam.py checks it), the two
+# screw jacks under its middle, four step clamps (LMS 1268 kit) on its ends,
+# the vise off. PL01 skims the bar's top where the blank goes; PL02 plunges
+# four relief pockets under the socket stations, so the #50 drill and the
+# tap exit into the air. The bar keeps the skim and the pockets.
+#
+# Bond: 3M VHB 5906 tape, .006 in (cad/config/shop-equipment/
+# consumables.tape-3m-vhb-5906, to buy; the strap's tape, owner-approved
+# for MHA-CH-13), eleven 3/4 in strips across the bar at 1 in pitch under
+# the blank's whole length. The 1/4 in gaps let isopropyl alcohol reach the
+# tape at release; the plate bridges them (cam.py bounds the gap). prechips
+# compares each cut with the tape's derated strengths; the bond it is told
+# is the least tape under any square patch as long as the plate is high
+# ([parameters] bond_patch_area_mm2, cam.py checks it). Painter's tape and
+# cyanoacrylate would release more easily but have no strength on record:
+# an owner-correctable choice, stated in the PR.
+#
+# Route: Setup 1 gate the blank; Setup 2 fixture bar on the table, one G54
+# X/Y for every program (edge finder on the bar), PL01_bar_skim and
+# PL02_bar_relief; Setups 3-5 bond B up, P up, B up, PL03_face each time
+# (one file, Z0 the top's high point less the cut), the blank turned over
+# end for end between cuts so the long edge marked FRONT stays at the bar's
+# front edge (the mark, on the edge, outlives the face cuts); Setup 6 bond P
+# up, Z0 the underside from the miked thickness, PL04_platen: face P to the
+# thickness, mill the four edges to size with the cutter's side (the whole
+# margin goes to chips: no rim, no tabs), spot, #50 and #27 through,
+# counterbore; PL05_tap_1 to PL08_tap_4 bring the tap guide over each
+# socket; Setup 7 free, deburr, inspect; Setup 8 blacken with Birchwood
+# Casey Brass Black (the drawing's finish; the solution and its supplies are
+# to buy, so the plate may stop bare, tagged).
+#
+# Frames: the drawing's view shows the back face (the counterbores are on
+# the far side). In Setup 6 the paper face is up, so the plate lies mirrored
+# top to bottom: work X is the hole table's X LOC, work Y is minus its
+# Y LOC (the drawing's bottom edge is at the back, Y0).
+#
+# Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
+# guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner,
+# Pedro, answered in person 2026-11-21, cnc rulings record;
+# cad/config/shop-equipment/ tools.tap-guide-fisher, its ownership to
+# confirm), spindle off; FluidNC refuses jogs while an M0 holds the program,
+# so each tap stop is a file of its own that ends with M30 over its hole.
+#
+# Zeroing: the touch probe has no holder (cad/config/shop-equipment/
+# gauges.touch-probe-diy0-tp05), so X/Y are the owned .200 in edge finder at
+# 900 rpm (tools.edge-finder) and every Z the end mill on a .002 feeler leaf.
+#
+# Guide holes: accepted with Class ZZ pin gauges, the band's low limit as a
+# plus pin (GO) and its high limit as a minus pin (NO-GO)
+# (cad/config/shop-equipment/ gauges.pin-gauges, to buy; owner ruling
+# 2026-11-21: "ill buy pin gauges").
+#
+# Form: the drawing carries no flatness frame (#2411); the thickness is a
+# feature of size, so its ASME Y14.5 Rule #1 envelope, perfect form at the
+# .157 maximum, bounds any bow (pd_platen_spec.py). The plate is freed from
+# tape with a blade, so the final inspection checks that envelope: the
+# largest miked thickness plus the thickest feeler leaf that enters under
+# the plate on the surface plate. A bowed blank is not gated in Setup 1: the
+# tape holds it flat for each cut and the envelope check is the acceptance.
+#
+# NC (cam:pd_platen, cad/process/pd_platen/cam.py): PL01_bar_skim,
+# PL02_bar_relief, PL03_face, PL04_platen, PL05_tap_1 to PL08_tap_4.
+# Program names, the [parameters] and the milling_cuts names are a contract
+# with that recipe. Tool numbers are the places in the tools list among the
+# mill's tools: T1 1/2 in end mill, T2 centre drill, T3 #50, T4 #27, T5 1/4
+# in end mill, T6 the tap guide.
 title = "Platen"
-part = "MHA-PD-02 Platen"
-revision = "placeholder"
-material = "C36000 free-machining brass plate, 1/4 in"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "C36000 free-machining brass flat bar, 1/4 × 6 in, temper as Metal Supermarkets supplied it (invoice EC234347 names none; the bar is not yet received). The part's spec: {{cad.material_spec}}"
+stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:g}} in flat bar; {{process.quantity:d}} × {{process.blank_length_in:g}} in piece, as bought. Fixture: the 1/2 × 6 × 18 in 6061 bar."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.right_edge_width_min_in:.2f}}–{{cad.right_edge_width_max_in:.2f}} long, {{cad.top_edge_height_min_in:.2f}}–{{cad.top_edge_height_max_in:.2f}} high, {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}} thick. Brass is cut dry here: no oil reaches the tape. To buy: 3M VHB 5906 tape, 3/4 in wide, two 5 yd rolls, before starting; the two pin gauges before the final inspection; the Brass Black kit before Setup 8."
 shop = "../shop"
-stock_refs = ["c360-flat-1-4x6"]
+stock_refs = ["c360-flat-1-4x6", "6061-flat-1-2x6-18in"]
+material_key = "platen-c360"
+milling_material = "brass"
 
+[cad]
+file = "../../out/features/pd_platen/features.toml"
+adapter = "flat_bar"
+part = "pd-platen"
+
+[parameters]
+quantity = 1
+# The blank (stock.c360-flat-1-4x6): model X its length, Y its width, Z its
+# thickness; stock_fit reads blank_<role>_in on those axes.
+blank_length_axis = 0
+blank_thickness_axis = 2
+blank_length_in = 11.0
+blank_width_in = 6.0
+blank_thickness_in = 0.25
+# Setup 1's gate (author's bands round the invoice's nominals: the bar is not
+# received): .244-.256 thick, 5.95-6.05 wide, 10.95-11.10 long. The programs
+# are posted for the largest; cam.py checks the smallest still cleans up.
+blank_thickness_min_mm = 6.1976
+blank_thickness_max_mm = 6.5024
+blank_width_min_mm = 151.13
+blank_width_max_mm = 153.67
+blank_length_min_mm = 278.13
+blank_length_max_mm = 281.94
+# Targets, the middle of each band (cam.py checks them against the export):
+# length 10.62 (10.61-10.63), height 5.31 (5.30-5.32), thickness .152
+# (.147-.157).
+length_target_mm = 269.748
+height_target_mm = 134.874
+thickness_target_mm = 3.8608
+# The fixture bar (cad/config/shop-equipment/ stock.6061-flat-1-2x6-18in;
+# the process test checks the three sizes against that record). Its top
+# stands between bar_top_min_mm (a .490 bar less two .010 skims) and
+# bar_top_max_mm (a .505 bar) above the blocks.
+bar_length_mm = 457.2
+bar_width_mm = 152.4
+bar_thickness_mm = 12.7
+bar_top_min_mm = 11.938
+bar_top_max_mm = 12.827
+block_height_mm = 25.4           # 1-2-3 blocks lying flat, 1 in up.
+# Nothing of a step clamp, stud or nut farther than this in from a bar end
+# (Setup 2's Holding says 2 in; cam.py keeps every move clear of 2.5 in).
+clamp_zone_mm = 63.5
+# Where the blank goes: its left end blank_left_mm (3.50 in) from the bar's
+# left end, its front edge flush with the bar's front edge, each within
+# placement_tol_mm (1/16 in). G54 X0/Y0 are then the platen's left and
+# bottom edges, centred in the nominal blank: X0 3.690 in from the bar's
+# left end, Y0 5.655 in behind its front edge. x_set_mm and y_set_mm are the
+# edge finder's entries on those two faces (its .100 radius more). cam.py
+# checks all four.
+blank_left_mm = 88.9
+placement_tol_mm = 1.5875
+x0_from_bar_left_mm = 93.726
+y0_from_bar_front_mm = 143.637
+x_set_mm = -96.266
+y_set_mm = -146.177
+# Setup 6's Z0 is touched over the spot Setup 5 mics: the middle of the
+# blank's FRONT edge, z_touch_inset_in (1/2 in) in from it (z_touch_x_mm,
+# z_touch_y_mm in the work frame); the entry is the miked thickness plus the
+# feeler leaf, z_leaf_mm. After a reset once P is faced, the same touch on
+# the faced P enters faced_z_set_mm (the thickness target plus the leaf);
+# once the edges are cut, X and Y are picked on the plate's own left and
+# back edges, edge_x_set_mm and edge_y_set_mm (the finder's radius). cam.py
+# checks them all.
+z_touch_inset_in = 0.5
+z_touch_x_mm = 134.874
+z_touch_y_mm = -130.937
+z_leaf_mm = 0.0508
+faced_z_set_mm = 3.9116
+edge_x_set_mm = -2.54
+edge_y_set_mm = 2.54
+# PL01, PL02: the bar's top skimmed .010 under its high point over the blank's
+# place and bar_skim_margin_mm round it (bar_skim_left_mm to
+# bar_skim_right_mm from the bar's left end; seat_left_mm to seat_right_mm
+# from X0); four relief pockets, the 1/2 in end mill plunged relief_depth_mm
+# at the socket stations (bar_relief_left_mm and bar_relief_right_mm from
+# the bar's left end). bar_z_set_mm is the Z entry on the .002 feeler.
+bar_skim_mm = 0.254
+bar_skim_margin_mm = 6.35
+bar_z_set_mm = 0.3048
+bar_skim_left_mm = 80.9625
+bar_skim_right_mm = 378.7775
+seat_left_mm = -12.7635
+seat_right_mm = 285.0515
+relief_depth_mm = 3.81
+bar_relief_left_mm = 98.044
+bar_relief_right_mm = 359.048
+# Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2), passes
+# along X no wider than .250 (half the cutter: the 6G chip-load factor 1.0
+# holds to 50 % engagement, shop settings.platen-em-half-c360). Three equal
+# cuts of .0245 (face_cut_mm), each from the face's high point
+# (face_z_set_mm is the Z entry on the .002 feeler), leave .1705-.1825
+# (third_cut_min_mm to third_cut_max_mm); the fourth takes P to the
+# thickness, at most final_face_doc_max_mm. cam.py checks them.
+face_cutter_dia_mm = 12.7
+face_stepover_max_mm = 6.35
+face_cut_mm = 0.6223
+face_z_set_mm = 0.6731
+third_cut_min_mm = 4.3307
+third_cut_max_mm = 4.6355
+final_face_doc_max_mm = 0.7747
+# Tape: 3M VHB 5906, .006 in (cad/config/shop-equipment/
+# consumables.tape-3m-vhb-5906). 3M "VHB Tapes Technical Data" (November
+# 2015), Typical Performance Characteristics, 5906, 72 h dwell at room
+# temperature: normal tensile (ASTM D-897, to aluminium) 100 lb/in² =
+# 690 kPa; dynamic overlap shear (ASTM D-1002, to stainless steel)
+# 100 lb/in² = 690 kPa.
+tape_thickness_mm = 0.15
+tape_shear_mpa = 0.69
+tape_tensile_mpa = 0.69
+# Derating of both strengths, as the strap's plan (ch_rocker_strap): 0.5 for
+# the dwell (same data sheet, Application Techniques: "approximately 50% of
+# ultimate bond strength will be achieved after 20 minutes", so the plan
+# waits 20 minutes) × 0.5, the author's allowance for a warm cut, no source.
+bond_derating = 0.25
+# Eleven 3/4 in strips at 1 in pitch, the first's left edge 1/8 in right of
+# the blank's left end. The bond prechips is told: the least tape under any
+# square patch as long as the plate is high (its lowest height, 5.30: five
+# strips and .050 of a sixth), less two relief pockets' cut-outs.
+tape_strip_width_mm = 19.05
+tape_strip_pitch_mm = 25.4
+tape_strip_count = 11
+tape_first_edge_mm = 3.175
+bond_patch_area_mm2 = 12740.17
+# Edges: the 1/2 in end mill's side, one level from P to
+# outline_breakthrough_mm under the plate (into the tape, short of the bar:
+# under the tape's least thickness, .006 in −15 %), one-way passes with the
+# plate on the cutter's left (conventional with M3), in equal steps no
+# deeper than .100 from the largest margin a gated blank can leave, the last
+# .010. outline_axial_doc_mm is the thickness target plus the breakthrough.
+outline_step_max_mm = 2.54
+outline_finish_mm = 0.254
+outline_breakthrough_mm = 0.08
+outline_axial_doc_mm = 3.9408
+# Holes. Spot all fourteen Ø.065 with the #1 carbide 60° centre drill (shop
+# centre-drills-carbide-60: 3/64 pilot, 1/8 body), under the #50, so no
+# chamfer is left at a socket's mouth. #50 (the sockets' Ø.070 tap drill)
+# and #27 (the guides' Ø.144) through in one plunge each (L/D 2.2 and 1.1),
+# their full diameter drill_past_mm under the plate: the #50 into its relief
+# pocket, the #27 through the tape into the bar (a backed exit). cam.py
+# checks both tips.
+spot_dia_mm = 1.651
+drill_past_mm = 0.5
+socket_tip_height_mm = -1.034
+guide_tip_height_mm = -1.599
+# Counterbores Ø.260 × .115 from P: the 1/4 in carbide end mill (shop
+# endmill-carbide-3fl-1-4) plunged down the drilled hole to the floor, then
+# one circle .005 off centre (cbore_orbit_mm; clockwise, conventional).
+# cbore_floor_height_mm is the floor above the underside, the thickness
+# target less the depth's middle; cam.py checks both.
+cbore_cutter_dia_mm = 6.35
+cbore_orbit_mm = 0.127
+cbore_floor_height_mm = 0.9398
+# Speeds and feeds authored in the operations, all at the spindle's 2800 rpm
+# (shop machines.pm-30mv). Holes: LittleMachineShop "Cutting Speeds",
+# Drilling & Reaming, row Brass (C35600, C37700, C36000, ...): 160-175
+# ft/min (read 2026-11-22), over 2800 rpm on every tool here; AutoDrill
+# "Suggested drilling feed rates" (read 2026-11-22), row Brass: 1/16 in
+# .001, 1/8 in .003, 1/4 in .004 in/rev, a size between two columns taking
+# the lower one's feed: centre drill (3/64 pilot) and #50 (.070) .001 in/rev
+# = 2.8 in/min; #27 (.144) .003 in/rev = 8.4 in/min. The bar's skim: the
+# 6G table shop/pd.toml cites, row Non-Ferrous N, Al/Al Alloys, 500 SFM
+# (3820 rpm, so 2800), 1/2 in .0042 in/tooth = 35.3 in/min. End-mill
+# plunges into metal (the relief pockets, the counterbores): .00025
+# in/tooth, 2.1 in/min, the author's choice, no source.
+spot_feed_per_min_mm = 71.12
+socket_drill_feed_per_min_mm = 71.12
+guide_drill_feed_per_min_mm = 213.36
+bar_skim_feed_per_min_mm = 896.112
+plunge_feed_per_min_mm = 53.34
+# Tapping #2-56 through: the tap's point stops this far below P (.257): the
+# thickest plate (.157) plus .100, past a plug chamfer of at most five
+# threads (.089), inside the relief pocket (cam.py checks the pocket's
+# depth).
+tap_point_depth_mm = 6.5278
+# Machine-capacity inputs (mm): heights from the table, tool lengths from
+# spindle nose to tip.
+r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
+# The drill chuck and its longest drill: cam.py checks that together they
+# stand no longer than the tap stack the envelopes allow for.
+drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
+drill_projection_max_mm = 112.8  # Archive 13/32 jobber, bounds the drills.
+# 1/2 in end mill at least 1 in out of its collet; 1/4 in end mill at least
+# 7/8 in out.
+half_mill_projection_min_mm = 25.4
+quarter_mill_projection_min_mm = 22.225
+# Tapping under the spring tap guide (tools.tap-guide-fisher, 3 1/8 in
+# overall): the guide and the tap in its wrench reach tap_stack_max_mm below
+# the collet face when the tap, point to the wrench's centre hole, is at
+# most tap_wrench_reach_max_mm (6 in; Setup 6 has the operator check it).
+# cam.py checks the stack against the spindle-to-table maximum less the
+# shop's tool-change clearance, the blocks, the bar, the tape and the plate.
+tap_wrench_reach_max_mm = 152.4
+tap_stack_max_mm = 231.775
+
+[[tools]]
+id = "em-half"
+name = "1/2 in carbide end mill"
+ref = "endmill-carbide-3fl-1-2"
+[[tools]]
+id = "spot"
+name = "#1 carbide centre drill, 60°"
+ref = "centre-drills-carbide-60"
 [[tools]]
 id = "drill-50"
 name = "#50 drill"
-ref = "drill-50"  # Drills #50
-
+ref = "drill-50"
 [[tools]]
 id = "drill-27"
 name = "#27 drill"
-ref = "drill-27"  # Drills #27
-
+ref = "drill-27"
 [[tools]]
-id = "tap-2-56-plug"
+id = "em-quarter"
+name = "1/4 in carbide end mill"
+ref = "endmill-carbide-3fl-1-4"
+[[tools]]
+id = "tap-guide"
+name = "Fisher spring tap guide"
+ref = "tap-guide-fisher"
+[[tools]]
+id = "tap-2-56"
 name = "#2-56 plug tap"
-ref = "tap-2-56-plug"  # Tap coverage #2-56 UNC
-
+ref = "tap-2-56-plug"
 [[tools]]
-id = "endmill-carbide-3fl-1-8"
-name = "1/8 carbide end mill"
-ref = "endmill-carbide-3fl-1-8"  # drawing cross-check 2026-11-19: 10X ⌴ Ø.26 ↧ .115 counterbores, interpolated
+id = "files"
+name = "Files"
+ref = "jig-files"
+[[tools]]
+id = "deburring-set"
+name = "Deburring scraper set"
+ref = "deburring-set"
+[[tools]]
+id = "feeler-gauges"
+name = "Feeler gauges"
+ref = "feeler-gauges"
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges {{cad.guide_b1_dia_min_in:.3dot}} plus, {{cad.guide_b1_dia_max_in:.3dot}} minus, TO BUY"
+ref = "pin-gauges"  # A1-pin-set-061-500-combined and its plus set
+description = "Class ZZ pin gauges: the {{cad.guide_b1_dia_min_in:.3dot}} plus pin (GO) and the {{cad.guide_b1_dia_max_in:.3dot}} minus pin (NO-GO)"
+status = "to_order"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Check the blank"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/blank.svg", alt = "The 1/4 × 6 × 11 in brass blank, {{process.blank_length_in:g}} by {{process.blank_width_in:g}} in: one long edge marked FRONT with an arrow to face B; the platen's outline, cut in Setup 6, as a thin line centred in it." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+instruction = "Mic the blank's thickness at the middle of each long edge and of each end."
+inspection = "Every reading {{process.blank_thickness_min_mm:in.3dot}}–{{process.blank_thickness_max_mm:in.3dot}}. Outside: stop and tell the owner; the programs are posted for this plate."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.blank_thickness_min_mm}}", "{{process.blank_thickness_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Measure the blank's length and width with the combination square's 12 in blade."
+inspection = "Length {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}}, width {{process.blank_width_min_mm:in.2f}}–{{process.blank_width_max_mm:in.2f}}. Outside: stop and tell the owner."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "File the burr off all eight edges so the blank lies flat. With marking fluid mark one long edge FRONT, on the edge itself, with an arrow pointing to the face called B (the back face); the other face is P (the paper face). No cut takes that mark off before Setup 6."
+feed = "hand"
+inspection = "The blank lies on the surface plate, each face down in turn, without rocking on a burr. Rocks on a bow, not a burr: go on; the finished plate's form is checked at the final inspection."
+gauge_checks = "other"
+
+[[setups]]
+machine_kind = "other"
+title = "Fixture bar on the table"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / table, vise off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Vise off the table. The 1/2 × 6 × 18 in 6061 bar on the two 1-2-3 blocks lying flat (1 in up), one crosswise under each end, 1/2 in in from the end; the two screw jacks under its middle, one near each long edge, run up finger-tight. Two step clamps (LMS 1268 kit) on each end from studs beyond the ends, bearing over the block; no clamp, stud or nut more than 2 in in from an end. Long edges along X by eye, within 1/16 in over the bar. The bar stays clamped until Setup 6 is done."
+datum = "Programs PL01_bar_skim and PL02_bar_relief. G54 X and Y, set here once for every program of this traveler: X0 {{process.x0_from_bar_left_mm:in.3f}} right of the bar's left end, Y0 {{process.y0_from_bar_front_mm:in.3f}} behind its front edge (where the platen's left and bottom edges will be); +Y toward the back of the table. Z0 here: the skimmed bar top, its high point less {{process.bar_skim_mm:in.3dot}}. After a controller reset, a stall or an E-stop: home ($H) and repeat this setup's first two operations."
+diagram = { file = "diagrams/bar.svg", alt = "Plan of the fixture bar on the table: a 1-2-3 block and two step clamps at each end, two screw jacks under the middle; the skimmed patch where the blank goes, the four relief pockets, X0 and Y0 from the bar's left end and front edge." }
+envelope = { x_span_mm = ["{{process.x0_from_bar_left_mm}}", "{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.bar_skim_margin_mm}}", 5.08], y_span_mm = ["{{process.blank_width_max_mm}}", "{{process.face_cutter_dia_mm}}", 7.62], work_top_mm = ["{{process.block_height_mm}}", "{{process.bar_top_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.bar_top_min_mm}}", -3.81], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+vise_hold = "other"
+# The bar between its two blocks: under a push between them it bears on
+# their inner edges (each block 2 in along X, 1/2 in in from a bar end). The
+# jacks under the middle are given no credit.
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.bar_length_mm}}"], supports_mm = [63.5, 393.7], section_mm = { y = "{{process.bar_width_mm}}", z = "{{process.bar_top_min_mm}}" } }
+
+[[setups.operations]]
+instruction = "Home the mill ($H). G54 X0 and Y0 from the bar's left end and front edge with the edge finder (900 rpm)."
+instruction_detailed = "Home the mill ($H). Edge finder (900 rpm): on the bar's left end, between the two clamps, G10 L20 P1 X{{process.x_set_mm:.3f}}; on its front edge at mid-length, G10 L20 P1 Y{{process.y_set_mm:.3f}} (each entry allows for the finder's .100 radius)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the bar top's high point less the {{process.bar_skim_mm:in.3dot}} skim."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the bar top at mid-length and 5 in either side of it; at the highest of the three: G10 L20 P1 Z{{process.bar_z_set_mm:.3f}} (the skim plus the .002 leaf)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove PL01_bar_skim and PL02_bar_relief in air: Z0 raised 1.000 in; every move stays 1/2 in or more clear of the step clamps. Then Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run PL01_bar_skim, then PL02_bar_relief, watching each move clear the clamps. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run PL01_bar_skim (M6 T1, 1/2 in end mill; set 2800): skim the bar top at Z0 where the blank goes, passes along X no wider than {{process.face_stepover_max_mm:in.3dot}}."
+rpm = 2800
+feed = "{{process.bar_skim_feed_per_min_mm:in.1f}} in/min"
+inspection = "The whole patch is freshly cut. A dull island left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run PL01_bar_skim again."
+gauge_checks = "other"
+milling_cuts = [
+  { name = "bar skim", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.bar_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", rpm = 2800, feed_mm_min = "{{process.bar_skim_feed_per_min_mm}}", traverse_mm = ["{{process.bar_skim_left_mm}}", "{{process.bar_skim_right_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run PL02_bar_relief (M6 T1, the same end mill; set 2800): four relief pockets, the end mill plunged {{process.relief_depth_mm:in.3dot}} into the bar under the four socket stations, so the #50 drill and the tap come out into the air."
+rpm = 2800
+feed = "{{process.plunge_feed_per_min_mm:in.1f}} in/min plunge"
+milling_cuts = [
+  { name = "tap relief", kind = "plunge", phase = "rough", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, rpm = 2800, feed_mm_min = "{{process.plunge_feed_per_min_mm}}", stations_mm = ["{{process.bar_relief_left_mm}}", "{{process.bar_relief_right_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Brush the chips off. Scribe a line across the bar top {{process.blank_left_mm:in.2f}} in from its left end, with the combination square against the bar's front edge: the blank's left end goes on it."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Bond B up; first cut"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / table, vise off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Blank bonded to the bar's skimmed top on eleven 3/4 in strips of 3M VHB 5906 tape ({{process.tape_thickness_mm:in.3dot}}) laid across the bar at 1 in pitch, face P down, B up, its left end on the scribed line, its FRONT edge flush with the bar's front edge, both within 1/16 in. Nothing else holds it. Bar, blocks, jacks and clamps as Setup 2, untouched."
+datum = "Program PL03_face. G54 X and Y as set in Setup 2 (not touched). Z0: the cut face, the top's high point less {{process.face_cut_mm:in.4dot}}. After a controller reset, a stall or an E-stop: home ($H), which brings the stored G54 X and Y back, near enough for a facing cut; set Z0 again as this setup does, on a part of the face not yet cut, and run the file from its start."
+diagram = { file = "diagrams/bond.svg", alt = "Plan and section of the blank on the bar: eleven tape strips across the bar at 1 in pitch under the blank, its left end on the scribed line and its FRONT edge flush with the bar's front edge; the 1/2 in end mill faces the top in passes along X." }
+envelope = { x_span_mm = ["{{process.x0_from_bar_left_mm}}", "{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_width_max_mm}}", "{{process.face_cutter_dia_mm}}", 7.62], work_top_mm = ["{{process.block_height_mm}}", "{{process.bar_top_max_mm}}", "{{process.tape_thickness_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.bar_top_min_mm}}", "{{process.third_cut_min_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+vise_hold = "other"
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.length_target_mm}}"], seat = "skimmed fixture bar", seat_mm = ["{{process.seat_left_mm}}", "{{process.seat_right_mm}}"], bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{process.bond_patch_area_mm2}}", width_mm = "{{process.height_target_mm}}" }] } }
+
+[[setups.operations]]
+instruction = "Degrease the bar's skimmed patch and the blank's face P with isopropyl alcohol and water, half and half; wipe both dry."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Lay eleven 6 in strips of the tape across the bar, edge to edge: the first with its left edge 1/8 in right of the scribed line, the others at 1 in pitch to its right (1/4 in gaps). Rub each strip down; peel the liners."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Lower the blank onto the tape, B up (the FRONT edge's arrow pointing up), left end on the scribed line, FRONT edge against the combination square's blade held on the bar's front edge. It cannot be moved once down. Lean on it over each strip in turn with the heel of the hand, about 70 lb (the tape wants about 15 psi)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Wait 20 minutes: the tape is taken at half strength, which it reaches by then."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the top's high point less the {{process.face_cut_mm:in.4dot}} cut."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the blank at its middle and 1 in in from each end; at the highest of the three: G10 L20 P1 Z{{process.face_z_set_mm:.3f}} (the cut plus the .002 leaf)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First time only: prove PL03_face in air, Z0 raised 1.000 in; every move stays clear of the step clamps. Then Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run PL03_face, watching each move clear the clamps. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run PL03_face (M6 T1; set 2800), dry: one level at Z0 over the whole blank, passes along X no wider than {{process.face_stepover_max_mm:in.3dot}}. The blank shifts or lifts: stop; free it, clean off the tape and bond it again."
+settings = "platen-em-half-c360"
+milling_cuts = [
+  { name = "face", kind = "end", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_cut_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.length_target_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Free the blank: wet the tape along every gap with isopropyl alcohol, wait 2 minutes, then work a thin blade under the blank along each strip from the front edge. Never lever it up by an end or a corner: it must stay flat."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Roll the tape off the blank and the bar with a thumb; clean both with isopropyl alcohol. No tape or chip left on either."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Bond P up; second cut"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / table, vise off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "As Setup 3 with the blank turned over end for end: fresh tape, the cut face B down, P up (the arrow pointing down), the FRONT edge again flush with the bar's front edge, the other end now on the scribed line, both within 1/16 in."
+datum = "Program PL03_face again. G54 X and Y as set in Setup 2. Z0: the cut face, P's high point less {{process.face_cut_mm:in.4dot}}. After a controller reset, a stall or an E-stop: as Setup 3's Datum."
+diagram = { file = "diagrams/cut2.svg", alt = "Section through the blank as it lies in this setup, P up on fresh tape on the bar: this setup's cut, {{process.face_cut_mm:in.4dot}} off P, hatched; thin lines mark the cuts still to come, Setup 5's off B and Setup 6's off P; face B, cut in Setup 3, is down." }
+envelope = { x_span_mm = ["{{process.x0_from_bar_left_mm}}", "{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_width_max_mm}}", "{{process.face_cutter_dia_mm}}", 7.62], work_top_mm = ["{{process.block_height_mm}}", "{{process.bar_top_max_mm}}", "{{process.tape_thickness_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.bar_top_min_mm}}", "{{process.third_cut_min_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+vise_hold = "other"
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.length_target_mm}}"], seat = "skimmed fixture bar", seat_mm = ["{{process.seat_left_mm}}", "{{process.seat_right_mm}}"], bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{process.bond_patch_area_mm2}}", width_mm = "{{process.height_target_mm}}" }] } }
+
+[[setups.operations]]
+instruction = "Bond the blank P up exactly as Setup 3's first four operations: degrease the bar and face B, eleven fresh strips, lower and press, wait 20 minutes."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: P's high point less the {{process.face_cut_mm:in.4dot}} cut."
+instruction_detailed = "Console M6 T1 (the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the blank at its middle and 1 in in from each end; at the highest of the three: G10 L20 P1 Z{{process.face_z_set_mm:.3f}}."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run PL03_face (M6 T1; set 2800), dry: one level at Z0 over the whole blank. Then free the blank and clean off the tape as Setup 3's last two operations."
+settings = "platen-em-half-c360"
+milling_cuts = [
+  { name = "face 2", kind = "end", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_cut_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.length_target_mm}}"] },
+]
+
+[[setups]]
+machine_kind = "other"
+title = "Bond B up; third cut"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / table, vise off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "As Setup 3 with the blank turned over end for end again: fresh tape, P down, B up (the arrow pointing up), the FRONT edge flush with the bar's front edge, the first end back on the scribed line, both within 1/16 in."
+datum = "Program PL03_face a third time. G54 X and Y as set in Setup 2. Z0: the cut face, B's high point less {{process.face_cut_mm:in.4dot}}. After a controller reset, a stall or an E-stop: as Setup 3's Datum."
+diagram = { file = "diagrams/cut3.svg", alt = "Section through the blank as it lies in this setup, B up on fresh tape on the bar: this setup's cut, {{process.face_cut_mm:in.4dot}} off B, hatched; a thin line marks Setup 6's cut still to come off P; face P, cut in Setup 4, is down." }
+envelope = { x_span_mm = ["{{process.x0_from_bar_left_mm}}", "{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_width_max_mm}}", "{{process.face_cutter_dia_mm}}", 7.62], work_top_mm = ["{{process.block_height_mm}}", "{{process.bar_top_max_mm}}", "{{process.tape_thickness_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.bar_top_min_mm}}", "{{process.third_cut_min_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+vise_hold = "other"
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.length_target_mm}}"], seat = "skimmed fixture bar", seat_mm = ["{{process.seat_left_mm}}", "{{process.seat_right_mm}}"], bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{process.bond_patch_area_mm2}}", width_mm = "{{process.height_target_mm}}" }] } }
+
+[[setups.operations]]
+instruction = "Bond the blank B up exactly as Setup 3's first four operations: degrease the bar and face P, eleven fresh strips, lower and press, wait 20 minutes."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: B's high point less the {{process.face_cut_mm:in.4dot}} cut."
+instruction_detailed = "Console M6 T1 (the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the blank at its middle and 1 in in from each end; at the highest of the three: G10 L20 P1 Z{{process.face_z_set_mm:.3f}}."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run PL03_face (M6 T1; set 2800), dry: one level at Z0 over the whole blank. Then free the blank and clean off the tape as Setup 3's last two operations."
+settings = "platen-em-half-c360"
+milling_cuts = [
+  { name = "face 3", kind = "end", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_cut_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.length_target_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Mic the blank at the middle of its FRONT edge, {{process.z_touch_inset_in:fraction}} in in from that edge; write the reading down in mm (in × 25.4): Setup 6 sets Z0 from it, over the same spot."
+inspection = "{{process.third_cut_min_mm:in.4dot}}–{{process.third_cut_max_mm:in.4dot}} (three cuts off the gated blank). Outside: stop and tell the owner; a cut was missed, doubled or set wrong."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.third_cut_min_mm}}", "{{process.third_cut_max_mm}}"] }]
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Bond P up; thickness, edges, holes, counterbores, taps"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / table, vise off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "As Setup 3 with the blank turned over end for end: fresh tape, B down, P up (the arrow pointing down), the FRONT edge flush with the bar's front edge, the other end on the scribed line, both within 1/16 in; the tape cut away over the four relief pockets. The plate lies mirrored against the drawing's view, its bottom edge at the back."
+datum = "Program PL04_platen. G54 X and Y as set in Setup 2: X0 the left edge, Y0 the bottom edge as drawn, at the back; work X is the hole table's X LOC, work Y minus its Y LOC (hole B1 at X {{cad.guide_b1_station_in:.3f}}, Y −{{cad.guide_b1_height_in:.3f}}). Z0 the plate's underside (B, on the tape), set from the miked thickness. At every M6 stop the file has stopped the spindle and lifted the tool above the plate. After a controller reset, a stall or an E-stop: home ($H), which brings the stored G54 X and Y back, then Z: console M6 T1, its tip on the .002 leaf on a faced part of P, G10 L20 P1 Z{{process.faced_z_set_mm:.3f}} (nothing faced yet: the Z0 operation again). Once the four edges are cut, X and Y too, with the edge finder: on the plate's left edge G10 L20 P1 X{{process.edge_x_set_mm:.3f}}, on its back edge G10 L20 P1 Y{{process.edge_y_set_mm:.3f}}. Then run the file from its start: cuts already made cut air."
+diagram = { file = "diagrams/platen.svg", alt = "Plan of the blank on the bar, P up: the platen's outline inside the blank's margin, the 1/2 in end mill's passes round the four edges with the plate on the cutter's left, the four sockets over their relief pockets, the ten guide holes with their counterbores; X0 at the left edge, Y0 at the back edge." }
+envelope = { x_span_mm = ["{{process.x0_from_bar_left_mm}}", "{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_width_max_mm}}", "{{process.face_cutter_dia_mm}}", 7.62], work_top_mm = ["{{process.block_height_mm}}", "{{process.bar_top_max_mm}}", "{{process.tape_thickness_mm}}", "{{process.third_cut_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.bar_top_min_mm}}", "{{process.guide_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.quarter_mill_projection_min_mm}}"] }
+vise_hold = "other"
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.length_target_mm}}"], seat = "skimmed fixture bar", seat_mm = ["{{process.seat_left_mm}}", "{{process.seat_right_mm}}"], bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "platen", kind = "part", area_mm2 = "{{process.bond_patch_area_mm2}}", width_mm = "{{process.height_target_mm}}" }] } }
+
+[[setups.operations]]
+instruction = "Degrease the bar and face B and lay eleven fresh strips as in Setup 3. Before peeling the liners, cut the tape away over the four relief pockets: a knife point round each pocket's rim, the disc lifted out."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Peel the liners. Lower the blank, P up, an end on the scribed line, FRONT edge against the combination square's blade; lean on it over each strip in turn, about 70 lb. Wait 20 minutes."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the plate's underside, from Setup 5's reading and the end mill touched on P over the miked spot."
+instruction_detailed = "Console M6 T1 (the tool setter measures it); MDI G0 X{{process.z_touch_x_mm:.3f}} Y{{process.z_touch_y_mm:.3f}} (the miked spot: the middle of the FRONT edge, {{process.z_touch_inset_in:fraction}} in in). Spindle stopped, its tip just dragging a .002 feeler leaf on P: G10 L20 P1 Z(the reading in mm + {{process.z_leaf_mm:.3f}})."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove PL04_platen in air, Z0 raised 1.000 in; every move stays clear of the step clamps, through every M6. Then Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run PL04_platen through its five tools, watching each move clear the clamps. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run PL04_platen (M6 T1, 1/2 in end mill; set 2800), dry: face P down to {{process.thickness_target_mm:in.3dot}} in above the underside (Z0), one level, passes along X no wider than {{process.face_stepover_max_mm:in.3dot}}."
+settings = "platen-em-half-c360"
+milling_cuts = [
+  { name = "thickness", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.final_face_doc_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.length_target_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, no stop: the four edges to size with the cutter's side, left, right, front, back; one-way passes with the plate on the cutter's left (conventional with M3), steps no deeper than {{process.outline_step_max_mm:in.3dot}}, the last {{process.outline_finish_mm:in.3dot}}, down to {{process.outline_breakthrough_mm:in.3dot}} under the plate, into the tape and short of the bar. The whole margin goes to chips."
+settings = "platen-em-half-c360"
+milling_cuts = [
+  { name = "edge rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_axial_doc_mm}}", radial_woc_mm = "{{process.outline_step_max_mm}}", traverse_mm = [0, "{{process.length_target_mm}}"] },
+  { name = "edge finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_axial_doc_mm}}", radial_woc_mm = "{{process.outline_finish_mm}}", traverse_mm = [0, "{{process.length_target_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T2 (#1 carbide centre drill in the drill chuck; set 2800): spot all fourteen holes Ø{{process.spot_dia_mm:in.3dot}}, under the #50."
+rpm = 2800
+feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = ["{{cad.socket_a1_station_mm}}", "{{cad.guide_b1_station_mm}}", "{{cad.guide_b3_station_mm}}", "{{cad.guide_b5_station_mm}}", "{{cad.guide_b7_station_mm}}", "{{cad.guide_b9_station_mm}}", "{{cad.socket_a3_station_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-50"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.socket_a1_dia_band_mm}}" }
+instruction = "Same file, M6 T3 (#50 drill in the drill chuck; set 2800): the four sockets A1–A4 through, one plunge each, its full diameter {{process.drill_past_mm:in.3dot}} under the plate, into the relief pockets."
+rpm = 2800
+feed = "{{process.socket_drill_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{process.thickness_target_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "socket drill", kind = "drill", phase = "finish", cutter_dia_mm = 1.778, flutes = 2, rpm = 2800, feed_mm_min = "{{process.socket_drill_feed_per_min_mm}}", stations_mm = ["{{cad.socket_a1_station_mm}}", "{{cad.socket_a3_station_mm}}"] },
+]
+
+# The #27 is .1440 in, 3.6576 mm; the export prints the hole's low limit as
+# 3.658, so the band check would refuse the drill by .0004 mm of rounding.
+# cam.py checks the drill against the band to .001 mm instead.
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-27"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T4 (#27 drill in the drill chuck; set 2800): the ten guide holes B1–B10 through, one plunge each, its full diameter {{process.drill_past_mm:in.3dot}} under the plate, through the tape into the bar."
+rpm = 2800
+feed = "{{process.guide_drill_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{process.thickness_target_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "guide drill", kind = "drill", phase = "finish", cutter_dia_mm = 3.6576, flutes = 2, rpm = 2800, feed_mm_min = "{{process.guide_drill_feed_per_min_mm}}", stations_mm = ["{{cad.guide_b1_station_mm}}", "{{cad.guide_b3_station_mm}}", "{{cad.guide_b5_station_mm}}", "{{cad.guide_b7_station_mm}}", "{{cad.guide_b9_station_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-quarter"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T5 (1/4 in end mill, 7/8 to 1 in out of the collet; set 2800): counterbore the ten guide holes from P. First the plunge down each drilled hole to the floor, {{cad.guide_b1_cbore_depth_in:.3dot}} below P."
+rpm = 2800
+feed = "{{process.plunge_feed_per_min_mm:in.1f}} in/min plunge"
+milling_cuts = [
+  { name = "counterbore plunge", kind = "plunge", phase = "rough", cutter_dia_mm = "{{process.cbore_cutter_dia_mm}}", flutes = 3, rpm = 2800, feed_mm_min = "{{process.plunge_feed_per_min_mm}}", stations_mm = ["{{cad.guide_b1_station_mm}}", "{{cad.guide_b3_station_mm}}", "{{cad.guide_b5_station_mm}}", "{{cad.guide_b7_station_mm}}", "{{cad.guide_b9_station_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-quarter"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, no stop, at each floor: one circle {{process.cbore_orbit_mm:in.3dot}} off centre, clockwise (conventional), opens the counterbore to Ø{{cad.guide_b1_cbore_dia_in:.3dot}}."
+settings = "platen-em-quarter-c360"
+inspection = "Still bonded, holes B1 and B10: counterbore depth {{cad.guide_b1_cbore_depth_min_in:.3dot}}–{{cad.guide_b1_cbore_depth_max_in:.3dot}} from P, the calipers' depth rod on the floor. Outside: stop and tell the owner; the taps wait."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.guide_b1_cbore_depth_band_mm}}" }]
+milling_cuts = [
+  { name = "counterbore wall", kind = "side", phase = "finish", cutter_dia_mm = "{{process.cbore_cutter_dia_mm}}", axial_doc_mm = "{{cad.guide_b1_cbore_depth_mm}}", radial_woc_mm = "{{process.cbore_orbit_mm}}", stations_mm = ["{{cad.guide_b1_station_mm}}", "{{cad.guide_b3_station_mm}}", "{{cad.guide_b5_station_mm}}", "{{cad.guide_b7_station_mm}}", "{{cad.guide_b9_station_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "File done, still bonded: the length and the height on the DRO, before tapping."
+instruction_detailed = "Send G20 (the DRO reads inches). Edge finder (900 rpm, console), its tip beside the plate's edge and clear of the bar: note the work X DRO on the left edge and on the right edge, then the work Y DRO on the back edge and on the front edge. Send G21."
+inspection = "Right X − left X − .200 is the length: {{cad.right_edge_width_min_in:.3dot}}–{{cad.right_edge_width_max_in:.3dot}}. Back Y − front Y − .200 is the height: {{cad.top_edge_height_min_in:.3dot}}–{{cad.top_edge_height_max_in:.3dot}}. Outside: stop and tell the owner."
+gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.right_edge_width_band_mm}}" }, { gauge = "mill-y-dro", band_mm = "{{cad.top_edge_height_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The #2-56 plug tap goes in the T-handle tap wrench with the centre hole in its top: the tap guide's point seats in that hole. Measure it, the tap's point to the wrench's centre hole: at most {{process.tap_wrench_reach_max_mm:in.1f}} in. Longer: stop; do not tap on this setup."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-guide"
+drilling = "none"
+sizing = "other"
+instruction = "Run PL05_tap_1: M6 T6, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over socket A1."
+diagram = { file = "diagrams/tap.svg", alt = "Section through a socket: the plate on its tape over a relief pocket in the bar, the #2-56 tap in the T-handle wrench in the hole, the tap guide in the spindle with its spring point in the wrench's centre hole; the tap's point to go {{process.tap_point_depth_mm:in.3dot}} below P, into the pocket." }
+
+[[setups.operations]]
+instruction = "Tap depth reference: the DRO's work Z, in inches, with the tap's point standing on P beside the hole and the tap guide's point pushed fully home in the wrench."
+instruction_detailed = "MDI G91 G0 Y-3.810 (beside the hole, on P), G90, then send G20: the DRO reads inches. Stand the tap, in its wrench, on its point on P; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home. Note the DRO Z. Jog Z up clear, send G21 and MDI G91 G0 Y3.810, G90: back over the hole."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-2-56"
+drilling = "none"
+sizing = "other"
+instruction = "Send G20. Tap {{cad.socket_a1_thread}} through by hand under the tap guide, spindle off, dry: half a turn on, a quarter back. Read the depth with the guide's point pushed fully home, as the reference: stop when the DRO Z reads the noted Z − {{process.tap_point_depth_mm:in.3dot}}, the full thread through the plate and the point in the relief pocket."
+instruction_detailed = "Send G20, as when the depth was noted. Tap's point in the hole; jog Z down until the guide's point is pushed fully home: the spring then holds the tap square and follows it down. Turn the wrench gently, half a turn on and a quarter back to break the chip (a #2 tap snaps if forced). To read, push the point fully home: stop at the noted Z − {{process.tap_point_depth_mm:in.3dot}}."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Jog Z up clear, send G21, back the tap out by hand and blow the hole out."
+inspection = "A #2-56 screw runs through the thread by hand. Binds: run the tap through again under the tap guide; still binds: stop and tell the owner."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-guide"
+drilling = "none"
+sizing = "other"
+instruction = "Run PL06_tap_2, then PL07_tap_3 and PL08_tap_4 (the tap guide still in, spindle off; each ends Idle over its socket: A2, A3, A4). Tap each the same way: G20, depth reference beside it, tap through to the same depth under the tap guide, G21, back out, blow out, screw check."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Free, deburr, inspect"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished platen seen on its back face, as drawn: sockets A1–A4, guide holes B1–B10 with their counterbores on the far side; the length, the height, B1's station and height from the left and bottom edges." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+inspection = [
+  "Thickness {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}}, micrometer, at the middle of each long edge and of each end (it sets the clearance to the MHA-PD-06 disc). Over: stop and tell the owner (a re-bond and a skim of B is his call). Under: scrap.",
+  "Form, the thickness's envelope (the drawing is to ASME Y14.5: perfect form at {{cad.back_face_thickness_max_in:.3dot}}): the platen free on the surface plate, each face down in turn; the largest thickness reading plus the thickest feeler leaf that enters under it anywhere, at most {{cad.back_face_thickness_max_in:.3dot}}. Over: stop and tell the owner; he rules on straightening.",
+  "Hole B1 from the left edge {{cad.guide_b1_station_min_in:.3dot}}–{{cad.guide_b1_station_max_in:.3dot}} and from the bottom edge {{cad.guide_b1_height_min_in:.3dot}}–{{cad.guide_b1_height_max_in:.3dot}}: the #27 drill's shank in the hole, the calipers from the edge over the shank, less half its miked Ø. The other holes are the program's from the same zero, not gauged. Outside: stop and tell the owner.",
+  "Counterbore Ø{{cad.guide_b1_cbore_dia_min_in:.2dot}}–{{cad.guide_b1_cbore_dia_max_in:.2dot}} at B1 and B10, the calipers' inside jaws. Outside: stop and tell the owner.",
+  "Guide holes Ø{{cad.guide_b1_dia_min_in:.3dot}}–{{cad.guide_b1_dia_max_in:.3dot}}: the {{cad.guide_b1_dia_min_in:.3dot}} plus pin enters every hole (GO), the {{cad.guide_b1_dia_max_in:.3dot}} minus pin enters none (NO-GO); Class ZZ pin gauges, to buy. GO refused: run the #27 drill through by hand. NO-GO enters: stop and tell the owner.",
+]
+gauge_checks = [
+  { gauge = "micrometers", band_mm = "{{cad.back_face_thickness_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.guide_b1_station_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.guide_b1_height_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.guide_b1_cbore_dia_band_mm}}" },
+  { gauge = "pin-gauges", band_mm = "{{cad.guide_b1_dia_band_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Unclamp nothing yet. Free the platen: wet the tape along every gap with isopropyl alcohol, wait 2 minutes, then work a thin blade under it along each strip from the front edge. Never lever it up by an end or a corner. Roll the tape off; clean the platen with isopropyl alcohol."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "deburring-set"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr both ends of the fourteen holes and the ten counterbore rims flush with a scraper from the deburring set (no countersink at the sockets)."
+feed = "hand"
+inspection = "No burr stands proud of either face at a hole; a #2-56 screw still runs through each socket by hand. Binds: run the tap through by hand."
+gauge_checks = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "Break all twelve outside edges, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, smooth file: the eight round the two faces and the four at the corners. File off any fin the tape left at the bottom of an edge."
+feed = "hand"
+inspection = "No sharp edge or corner; no burr proud of any face or edge. One left: file it off."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Unclamp the fixture bar; put the blocks, jacks and clamps away. The bar keeps its skim and pockets for the next platen."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Blacken (once the Brass Black is bought)"
+machine = "Bench, ventilated"
+indexing = "none"
+diagram = { file = "diagrams/finish.svg", alt = "The finished platen, every surface to be blackened: both faces, the four edges, the fourteen holes and the ten counterbores." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+instruction = "The drawing's finish: {{cad.finish}}. Start only with Birchwood Casey Brass Black, Birchwood Casey Cleaner-Degreaser and Barricade oil, chemical-resistant gloves and safety glasses in hand: all to buy, none on record. Until then the platen stays bare, tagged AWAITING BRASS BLACK."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Gloves and safety glasses on (the label: severe skin burns and eye damage). Clean the platen with the Cleaner-Degreaser."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Scuff both faces and the four edges lightly with the 220 sanding roll for soft metals (the maker: 00 steel wool or abrasive paper). Not in the holes or the counterbores."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Degrease again with the Cleaner-Degreaser and rinse with clear water. Hold the platen by its edges from here on."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Swab or brush the Brass Black on every surface, into the holes and the counterbores; let it act about one minute (the maker's time). Rinse in cold water; pat dry."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "One coat is this traveler's finish: the maker's darker repeat needs 0000 steel wool, not on record. Solution and rinse waste to local rules, not down the drain (label: very toxic to aquatic life)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Wipe on Barricade oil; leave it overnight, then wipe off the excess (the maker's step)."
+feed = "hand"
+inspection = "An even black on both faces and every edge, no bare patch (else degrease, apply again, rinse, dry and oil); a #2-56 screw runs through each socket by hand. Tight: stop and tell the owner; do not re-tap."
+gauge_checks = "other"
