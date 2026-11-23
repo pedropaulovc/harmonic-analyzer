@@ -8,7 +8,7 @@ bar centred on K leaves the -X countersink under the wall target).  Since
 #2425 (owner ruling 2026-11-20 (Pedro)) it is a flat .197 plate: the knob
 shaft's running bore, the thrust ring's hub face and the cup's thrust face
 are the MHA-PD-28 bush's (``pd_transgear_knob_bush_geometry``), pressed
-into the plate's Ø.4375 FN2 hole on axis K from face A, its shoulder seated
+into the plate's Ø.4385 reamed hole on axis K from face A, its shoulder seated
 on face A.  Two matched stock dowels locate; screws clamp.
 
 Local frame (same axes as the arm, so the assembly places both with one
@@ -97,12 +97,27 @@ KINK_TANGENT_RIGHT = (-KINK_TANGENT[0], KINK_TANGENT[1])
 
 # --- Press hole for the MHA-PD-28 knob bush on K ----------------------------
 # The bush carries the knob shaft's running bore, the thrust ring's hub face
-# and the cup's thrust face; the plate only grips it, ANSI B4.1 FN2 on .4375
-# (pd_transgear_knob_bush_geometry), modelled line to line as the repo's
-# other presses are.  Limits (lower, upper) deviations: +.0000/+.0007.
+# and the cup's thrust face; the plate only grips it.  The hole is cut by
+# the .4385 set reamer and prints that size with no band; the bush's press
+# step is turned to it as measured (pd_transgear_knob_bush_geometry), both
+# modelled line to line as the repo's other presses are.  ANALYSIS limits
+# (lower, upper) deviations, what the reamer is modelled to cut:
+# +.0000/+.0005.
 PRESS_HOLE_DIA = BUSH.PRESS_DIA
 PRESS_HOLE_LIMITS = (min(BUSH.PRESS_HOLE_BAND), max(BUSH.PRESS_HOLE_BAND))
 PRESS_HOLE_PLACES = 4
+# The bush's traveler leaves a slip pilot on its press step's rear end
+# (BUSH.PILOT_LENGTH_MAX_MM): with the shoulder seated on face A it lies
+# wholly behind the thickest plate, so the whole hole grips the press.
+_STUB_BEHIND_PLATE_MIN_MM = (
+    BUSH.STUB_LENGTH
+    - BUSH.LENGTH_BAND
+    - BUSH.HUB_LENGTH_BAND
+    - THICKNESS_OVER_ARM
+    - THICKNESS_OVER_ARM_BAND
+)
+if BUSH.PILOT_LENGTH_MAX_MM > _STUB_BEHIND_PLATE_MIN_MM:
+    raise AssertionError("MHA-PD-28's pilot reaches into MHA-PD-19's press hole")
 # Face A's mouth is chamfered .015 X 45° (#2425): the lead-in for pressing
 # MHA-PD-28 from face A, and room for the bush's shoulder-root radius so the
 # shoulder seats flat on face A.  The bush geometry owns its size and limits
@@ -127,7 +142,9 @@ REAR_FACE_Z = THICKNESS_OVER_ARM
 LOCATOR_SITES_MM = tuple(
     (x - BORE_STATION, y - BORE_OFFSET) for x, y in ARM.LOCATOR_SITES_MM
 )
-LOCATOR_HOLE_DIA_MM = min(LOCATING_PIN.SLIP_HOLE_LIMITS_MM)  # .0945
+# The .1260 set reamer's size, printed with no band (the dowel slides in,
+# no shake); the band is the ANALYSIS band the walls are judged at.
+LOCATOR_HOLE_DIA_MM = min(LOCATING_PIN.SLIP_HOLE_LIMITS_MM)  # .1260
 LOCATOR_HOLE_PLACES = 4
 LOCATOR_HOLE_BAND_MM = tuple(
     limit - LOCATOR_HOLE_DIA_MM for limit in reversed(LOCATING_PIN.SLIP_HOLE_LIMITS_MM)

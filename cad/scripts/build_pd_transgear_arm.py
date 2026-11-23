@@ -100,7 +100,6 @@ from _visibility import blank_reference_geometry
 from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
-    LOCATOR_HOLE_DIA_BAND,
     EDGE_LEAN,
     END_HALF_WIDTH,
     PIN_BORE_DIA,
@@ -110,7 +109,6 @@ from pd_transgear_arm_geometry import (
     PIN_HOLE_DEPTH,
     PIN_HOLE_POINT_LENGTH,
     PIN_HOLE_DIA,
-    PIN_HOLE_DIA_BAND,
     PIN_HOLE_Z,
     PIN_STATION,
     PIVOT_BORE_DIA,
@@ -1067,20 +1065,13 @@ def build(adapter: Any) -> dict[str, str]:
         adapter, "SpotFaceProfile", "FloorDepth", SPOT_FACE_FLOOR_TOLERANCE,
         display_unit=UNIT,
     )
-    # The locating ream prints the .0930 reamer's own band.
-    for index in (1, 2):
-        set_dimension_bilateral_tolerance(
-            adapter, "LocatorProfile", f"LocatorDia{index}",
-            *deviations(LOCATOR_HOLE_DIA_BAND), display_unit=UNIT,
-        )
+    # The locating reams and the latch-pin ream print their set reamer's
+    # size and no band (fit audit 2026-11-23): each is accepted with its
+    # dowel (pd_transgear_arm_notes, notes 2 and 3).
     for feature_name, dimension_name in BASIC_REDUCER_DIMENSIONS:
         set_dimension_basic_tolerance(adapter, feature_name, dimension_name)
     # PinHoleZ carries no explicit band: its .XXX title-block row governs
     # (coordinator ruling (a), #2019).
-    set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND),
-        display_unit=UNIT,
-    )
     # The full-diameter depth is a MIN over the drill point (#3124 item 3):
     # the model value is the printed limit, read back.
     set_single_limit(

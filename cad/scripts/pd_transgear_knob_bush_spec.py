@@ -130,16 +130,21 @@ BORE_CALLOUT = (
     f"RUNNING FIT ON KNOB SHAFT {KNOB_SHAFT_NUMBER}\n"
     f"{WALL_TEXT}"
 )
-# The FN2 band (.0004 wide) is narrower than the shop's turned-diameter row,
-# so it names its route at the feature: turned to the measured hole, the
-# interference the printed limits give as REF (the MHA-CH-12 press land's
-# form, ch_rocker_hub_notes.LAND_CALLOUT).
+# Made to fit (rule 4, form 2): the press step is turned last to MHA-PD-19's
+# hole as measured, so its size prints REF and the interference range
+# (.0011 wide) is the requirement, with what the press protects: it alone
+# holds knob axis K in the plate (the MHA-CH-12 press land's form,
+# ch_rocker_hub_notes.LAND_CALLOUT).
 PRESS_CALLOUT = (
-    f"PRESS FIT IN {PLATE_NUMBER}\n"
+    f"PRESS FIT IN {PLATE_NUMBER}, HOLDS KNOB AXIS\n"
     "TURN TO MEASURED HOLE (INTERFERENCE "
     f"{_inch(BUSH.PRESS_INTERFERENCE[0], 4, math.floor)}-"
     f"{_inch(BUSH.PRESS_INTERFERENCE[1], 4, math.ceil)})"
 )
+# The press Ø prints as a reference, in parentheses (the MHA-PD-23 press
+# land's form, pd_transgear_pin_callouts.DIMENSION_TEXT).
+PRESS_DIA_TEXT_PREFIX = "(<MOD-DIAM>"
+PRESS_DIA_TEXT_SUFFIX = ")"
 # The hub face's station from the shoulder (face A) sets the knob shaft (its
 # integral 15T meshing the reducer disc) and, through the drive collar on
 # the 15T's front face, the removable chain sprocket's plane

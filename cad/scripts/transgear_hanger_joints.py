@@ -351,10 +351,14 @@ def require_arm_plate_joint_inspection(
 
 
 # --- MHA-PD-VN-58 latch pin pressed to its proud height in the arm's end-face hole
-if abs(LATCH_PIN.DIA - ARM.PIN_HOLE_DIA) > 1e-9:
-    raise AssertionError("the arm's press hole is not the latch pin's Ø")
-# The reamed band against the dowel's catalogue band: interference at both
-# limits, (smallest pin - largest hole, largest pin - smallest hole).
+# The hole is modelled at its .1240 set reamer's size (the sheet prints that
+# size and no band), so the 1/8 dowel stands in it with the press's overlap
+# (_pd_paper_drive_interference carries the row).
+if not LATCH_PIN.DIA > ARM.PIN_HOLE_DIA:
+    raise AssertionError("the arm's press hole is not under the latch pin's Ø")
+# The reamer's modelled band (analysis) against the dowel's catalogue band:
+# interference at both limits, (smallest pin - largest hole, largest pin -
+# smallest hole).
 _PIN_OD_MIN = LATCH_PIN.DIA + min(LATCH_PIN.DIA_BAND)
 _PIN_OD_MAX = LATCH_PIN.DIA + max(LATCH_PIN.DIA_BAND)
 _PIN_HOLE_MIN = ARM.PIN_HOLE_DIA + min(ARM.PIN_HOLE_DIA_BAND)
