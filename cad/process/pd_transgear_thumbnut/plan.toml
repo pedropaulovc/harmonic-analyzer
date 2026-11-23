@@ -93,6 +93,9 @@ recess_depth_hold_max_mm = 1.0414
 # fed (.170 - .136) / 2 = .017 past its flutes touching the #29 hole's edge.
 csk_dia_in = 0.17
 csk_feed_in = 0.017
+# The most quill feed past first touch: (.18 - .136) / 2 = .022 gives the
+# drawing's Ø.18 max on the 90° chamfer mill (authored).
+csk_feed_max_in = 0.022
 # Outside passes (authored): the .02 in wide bands take rough passes only.
 rough_radial_doc_mm = 0.5
 turn_feed_mm_rev = 0.1016
@@ -139,11 +142,6 @@ ref = "jig-tap-8-32-plug"  # Tap coverage #8-32 UNC
 id = "centre-dead"
 name = "MT3 dead centre"
 ref = "dead-centre-mt3"
-
-[[tools]]
-id = "drill-15"
-name = "#15 (.180) drill, its shank as a countersink gauge"
-ref = "block-drill-15"
 
 [[tools]]
 id = "deburr"
@@ -292,7 +290,7 @@ sizing = "other"
 instruction = "Countersink the seat end from the tailstock: feed the chamfer mill in until its flutes just touch the hole's edge and zero the quill scale there; feed on {{process.csk_feed_in:.3dot}}, dwell a turn and withdraw: the countersink is then about Ø{{process.csk_dia_in:.3dot}}, over the thread's major so the first thread is broken all round, under the {{cad.countersinks_dia_max_in:.2dot}} max."
 settings = "lathe-csk-c360"
 cut_diameter_mm = "{{cad.countersinks_dia_max_mm}}"
-inspection = "Countersink under Ø{{cad.countersinks_dia_max_in:.2dot}}: the #15 drill's shank (.180), stood square on the seat face over the hole, does not drop into it; its rim runs round the hole."
+inspection = "Countersink under Ø{{cad.countersinks_dia_max_in:.2dot}}, held by the quill: fed {{process.csk_feed_in:.3dot}} from first touch, never past {{process.csk_feed_max_in:.3dot}} (that gives Ø{{cad.countersinks_dia_max_in:.2dot}}); its rim runs round the hole."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -399,7 +397,7 @@ sizing = "other"
 instruction = "Countersink the rim end in the dish's floor as Op 130: flutes touching the hole's edge, quill zeroed, fed on {{process.csk_feed_in:.3dot}}, a turn's dwell, withdrawn."
 settings = "lathe-csk-c360"
 cut_diameter_mm = "{{cad.countersinks_dia_max_mm}}"
-inspection = "Countersink under Ø{{cad.countersinks_dia_max_in:.2dot}}: the #15 drill's shank, stood square on the floor over the hole, does not drop into it; its rim runs round the hole."
+inspection = "Countersink under Ø{{cad.countersinks_dia_max_in:.2dot}}, held by the quill as Op 130: fed {{process.csk_feed_in:.3dot}} from first touch, never past {{process.csk_feed_max_in:.3dot}}; its rim runs round the hole."
 gauge_checks = "other"
 
 [[setups.operations]]
