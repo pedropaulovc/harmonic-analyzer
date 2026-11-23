@@ -390,6 +390,13 @@ tool = "lathe-ar"
 material = "lathe-1018-cold-finished"
 rpm = 560
 feed_mm_rev = 0.0508
+# Its finish passes (the shoulder and the thread blank, Ops 100 and 140) at
+# the .001 in/rev the plan's turning_deflection check passed.
+[settings.dt-lathe-ar-1018-centre-finish]
+tool = "lathe-ar"
+material = "lathe-1018-cold-finished"
+rpm = 560
+feed_mm_rev = 0.0254
 
 # --- MHA-DT-20 cone swing platform (cad/process/dt_cone_swing_platform/plan.toml) ---
 # The pivot bore, Ø.2500 +.0005/.0000 REAM THRU (a running fit on the

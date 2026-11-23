@@ -68,10 +68,11 @@ groove_width_min_in = 0.140
 groove_width_max_in = 0.160
 groove_width_min_mm = 3.556
 groove_width_max_mm = 4.064
-# The 3/64 drill's corners meet the Ø.055 spot's 60° cone .007 below the top
-# face: the quill scale, zeroed there, reads .263 for a full diameter .270
-# deep.
-drill_scale_in = 0.263
+# The 3/64 drill's depth: its point zeroed on a .100 gauge block held flat
+# on the faced top face over the spot (the No. 1 centre drill's pilot is the
+# 3/64 size, so the drill's corners meet no cone to touch); full diameter
+# .270 deep is then .100 + .270 + the 118° point's .014 = .384 on the scale.
+drill_scale_in = 0.384
 # The square indicated to run true within this on each pair of flats (TIR),
 # the shop table's runout floor: the hole then sits within .0005 of the
 # square's centre, inside the .067 TAP WALL's margin.
@@ -149,7 +150,7 @@ ref = "tap-0-80-bottoming"
 id = "dead-centre"
 name = "MT3 dead centre"
 ref = "dead-centre-mt3"
-description = "MT3 dead centre in the lathe tailstock: its point in the tap's shank centre keeps the tap on the axis (Setup 2)"
+description = "MT3 dead centre in the lathe tailstock: its point in the T-handle tap wrench's top centre hole keeps the tap on the axis (Setup 2)"
 
 [[tools]]
 id = "part"
@@ -232,12 +233,12 @@ speed_kind = "spindle"
 tool = "drill-3-64"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = ["{{process.tap_drill_min_mm}}", "{{process.tap_drill_max_mm}}"] }
-instruction = "3/64 drill in the tailstock chuck, short out of it. Feed in until its corners just touch the spot's cone and zero the quill scale there (.007 below the face). Drill until the scale reads {{process.drill_scale_in:.3dot}}: the full diameter is then {{cad.stud_tap_drill_depth_min_in:.2dot}}–{{cad.stud_tap_drill_depth_max_in:.2dot}} deep. Back out to clear chips every .040 in."
+instruction = "3/64 drill in the tailstock chuck, short out of it. Spindle stopped: hold the .100 gauge block flat on the faced top face over the spot, feed the drill's point onto it and zero the quill scale there; take the block away. Drill until the scale reads {{process.drill_scale_in:.3dot}}: full diameter {{cad.stud_tap_drill_depth_min_in:.2dot}}–{{cad.stud_tap_drill_depth_max_in:.2dot}} deep. Back out to clear chips every .040 in."
 settings = "pn-lathe-drill-3-64-c360"
 cut_diameter_mm = "{{cad.stud_tap_dia_mm}}"
 hole_depth_mm = "{{cad.stud_tap_drill_depth_mm}}"
 peck = { step_mm = "{{process.peck_mm}}", retract = "full" }
-inspection = "Drill depth {{cad.stud_tap_drill_depth_min_in:.2dot}}–{{cad.stud_tap_drill_depth_max_in:.2dot}} to full diameter: quill scale {{process.drill_scale_in:.3dot}} from the corners touching the spot's cone."
+inspection = "Drill depth {{cad.stud_tap_drill_depth_min_in:.2dot}}–{{cad.stud_tap_drill_depth_max_in:.2dot}}: a .040 pin gauge dropped to the bottom reads its length less its stick-up above the top face (calipers' depth rod), about .002 past full diameter."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.stud_tap_drill_depth_band_mm}}" }]
 
 [[setups.operations]]
@@ -246,7 +247,7 @@ speed_kind = "other"
 tool = "tap-0-80-plug"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle off, in neutral. Swap the drill chuck for the dead centre. Pencil-mark the plug tap {{process.plug_tap_reach_in:.2dot}} from its point. Start {{cad.stud_tap_thread}} with it in a tap wrench, its shank centre on the tailstock centre to keep it on the axis; turn the wrench with a drop of cutting oil, backing off every half turn, and stop when the mark reaches the top face."
+instruction = "Spindle off, in low range. Swap the drill chuck for the dead centre. Pencil-mark the plug tap {{process.plug_tap_reach_in:.2dot}} from its point. Start {{cad.stud_tap_thread}} with it in the T-handle tap wrench, the dead centre's point seated in the wrench's top centre hole. Hold the chuck still with one hand and turn the wrench with the other, a drop of cutting oil, backing off every half turn, the quill following; stop when the mark reaches the top face."
 feed = "hand"
 
 [[setups.operations]]
@@ -316,7 +317,7 @@ tool = "ar"
 drilling = "none"
 sizing = "other"
 instruction = "Rough the pivot from the end to Z−({{process.pivot_len_in:.3dot}} − .008) to Ø{{process.rough_dia_mm:in.3dot}}, the first passes interrupted on the square's corners: light, steady feed."
-settings = "lathe-ar-c360"
+settings = "pn-lathe-ar-c360-turn"
 cut_diameter_mm = "{{process.square_corners_mm}}"
 
 [[setups.operations]]
@@ -329,7 +330,7 @@ tool = "ar"
 drilling = "none"
 sizing = "other"
 instruction = "Finish the pivot over the same length to Ø{{cad.pivot_dia_min_in:.4dot}}–{{cad.pivot_dia_max_in:.4dot}}, aiming at Ø{{process.pivot_aim_dia_mm:in.4dot}}, miking between light passes."
-settings = "lathe-ar-c360"
+settings = "pn-lathe-ar-c360-finish"
 cut_diameter_mm = "{{process.pivot_aim_dia_mm}}"
 inspection = "Pivot Ø{{cad.pivot_dia_min_in:.4dot}}–{{cad.pivot_dia_max_in:.4dot}}."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.pivot_dia_band_mm}}" }]
