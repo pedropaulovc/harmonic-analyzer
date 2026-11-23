@@ -50,12 +50,6 @@ diameter_mm = 7.493
 [tools.drill-v]  # Drills V
 description = "V (.3770 in) drill, 115-piece index"
 diameter_mm = 9.5758
-[tools.drill-7-16]  # Drills 7/16
-description = "7/16 (.4375 in) drill, 115-piece index"
-diameter_mm = 11.1125
-[tools.drill-15-32]  # Drills 15/32
-description = "15/32 (.4688 in) drill, 115-piece index"
-diameter_mm = 11.90625
 [tools.taper-pin-reamer]  # B-reamer-taper-pin
 description = "Taper-pin reamer 1:48 (No. 3) for MHA-DT-09"
 [tools.reamer-0620]  # B-reamer-.0620
@@ -67,12 +61,6 @@ diameter_mm = 1.6002
 [tools.reamer-2510]  # B-reamer-.2510
 description = ".2510 in HSS chucking reamer"
 diameter_mm = 6.3754
-[tools.reamer-4500]  # B-reamer-.4500
-description = ".4500 in HSS chucking reamer"
-diameter_mm = 11.43
-[tools.reamer-4835]  # B-reamer-.4835
-description = ".4835 in HSS chucking reamer"
-diameter_mm = 12.2809
 # The 7/16 "over" member of the Shars 404-7303 over/under set: both MHA-DT-05
 # journal bores .4385 +.0005/0 and the MHA-DT-11 drive-pin jig's bore (owner
 # ruling 2026-11-23, tool audit Q11: "Both bores dia .4385 +.0005/0 (7/16 over
@@ -111,9 +99,6 @@ description = "3/8 in ground setting mandrel: an offcut of the 3/8 precision-gro
 # record that holds the tool's ownership.
 [tools.boring-bars-meda-6045000]  # inventory tools.boring-bars-meda-6045000
 description = "MEDA 6045000 double-ended lathe boring bars for tool bits, 3/8 to 1 in"
-[tools.drill-30-cobalt]  # MHA-DT-24 #30 DRILL .129 THRU in 17-7 PH Cond C
-description = "#30 (.1285 in) cobalt jobber drill, for 17-7 PH spring steel"
-diameter_mm = 3.2639
 [tools.dt-cone-gear-cutting-arbor]  # MHA-DT-03 TOOTH CUTTING SETUP .002 TIR TO FINISHED BORE
 description = "Shop-made keyed cutting arbor kit for the cone gears: MHA-DT-03-TL-03 arbor, TL-04 backing collars, TL-06 key and arbor nut"
 [tools.dt-cone-gear-round-arbor]  # MHA-DT-03 T024 TOOTH CUTTING SETUP; owner ruling 2026-11-20 (#2356, Option 2)
@@ -139,14 +124,9 @@ diameter_mm = 1.5875
 [tools.reamer-1562]  # MHA-DT-31 (Ø.156) REAM .17 at assembly with MHA-DT-06; MHA-DT-06 (Ø.156) REAM .17 for dowel MHA-DT-VN-59
 description = "5/32 (.1562 in) HSS chucking reamer"
 diameter_mm = 3.96875
-[tools.reamer-1570]  # MHA-DT-03-TL-01 132X .1570 +.0005/.0000 REAM THRU (MHA-DT-14 FLAT-BOTTOM REAM: tools.reamer-1570-bottoming)
+[tools.reamer-1570]  # MHA-DT-03-TL-01 132X .1570 +.0005/.0000 REAM THRU
 description = ".1570 in HSS chucking reamer"
 diameter_mm = 3.9878
-[tools.reamer-1610]  # MHA-DT-08 (Ø.161) REAM THRU, running fit on MHA-DT-32
-description = ".1610 in HSS chucking reamer"
-diameter_mm = 4.0894
-[tools.boring-bar-micro100-bb-180500s]  # MHA-DT-35 pocket bored to the measured head, floor corner R.004 MAX (inventory: to order)
-description = "Micro 100 BB-180500S carbide boring bar, sharp corner, .196 min bore, .500 deep, 1/4 in shank"
 [tools.chamfer-mill-3-16-90]  # MHA-DT-35 #20 hole's floor-side chamfer inside the pocket (inventory: to order)
 description = "3/16 in 90° pointed 2-flute carbide chamfer cutter (Harvey Tool 902345-C3)"
 diameter_mm = 4.7625
@@ -172,15 +152,6 @@ description = "PM-1127VF-LB steady rest"
 # lathe-ar-o1 (O1 drill rod, annealed as supplied; the 1/8 in rod may be O1 or
 # W1, stock-to-order drill-rod-1-8, the slower O1 row serves both) is in
 # lathe.toml: MHA-MG-07 needs it too.
-
-# The cam pin's R.125 form tool cuts its whole width at once: University of
-# Florida EML2322L "Parting Facts" (lathe.toml header), the 300 rpm start for
-# a full-width form cut, fed along Z by hand with cutting oil.
-[settings.lathe-form-r125-o1]
-tool = "form-tool-r125"
-material = "lathe-o1-drill-rod"
-rpm = 300
-feed = "carriage handwheel along Z, a slow steady feed, cutting oil"
 
 # --- MHA-DT-38 cone tip bushing (cad/process/dt_cone_tip_bushing/plan.toml) --
 # Facing, turning, chamfering and parting take shop/lathe.toml's C360 rows.
@@ -289,110 +260,9 @@ description = "1008-1045 carbon steel machine key stock, undersized, square bar,
 # stock-to-order.toml stock.c260-h02-sheet-020-12x12, same key.
 [stock.c260-h02-sheet-020-12x12]
 description = "C26000 cartridge brass, H02 half hard, sheet, .020 x 12 x 12 in"
-# The comb's outline cutter: Harvey Tool 896262, Variable Helix End Mill for
-# Aluminum Alloys - Square - Downcut (harveytool.com/products/tool-details-
-# 896262 and the family page, read 2026-11-22): .0620 cutter, .186 length of
-# cut, 3 left-hand spiral right-hand cut flutes (a downcut: "prevents lifting
-# of workpiece"), centre cutting, 1/8 shank, 1-1/2 overall, uncoated, the
-# family "excellent performance in copper, brass, and bronze alloys".
-# Ownership: cad/config/shop-equipment/tools-special-cutters.toml, same key.
-# diameter_mm and flute_length_mm: its .0620 and .186 × 25.4.
-[tools.endmill-carbide-3fl-1-16-downcut]
-description = "1/16 in (.0620) 3-flute carbide downcut square end mill, .186 length of cut, 1/8 shank (Harvey Tool 896262)"
-diameter_mm = 1.5748
-flute_length_mm = 4.7244
-# Harvey's own speeds and feeds for the series (SF_896200, "Variable Helix End
-# Mills for Aluminum Alloys - Square - Downcut", harveyperformance.widen.net/
-# content/urxytgzfxb/pdf/SF_896200.pdf, read 2026-11-22), uncoated, Brass
-# (Copper Zinc alloys, C2xxxx): 500 SFM; .062 cutter slotting .00065 in/tooth
-# (1x D radial, .5x D axial), max .00087. The comb's outline is one full-width
-# pass, so the slotting figure is the ceiling (.00065 × 25.4).
-maker_chip_load_mm_per_tooth = { brass = 0.01651 }
-maker_chip_load_source = "Harvey Tool SF_896200 (8962xx downcut), uncoated, Brass C2xxxx, .062 cutter, slotting .00065 in/tooth"
-# Its setting in half-hard C26000 sheet: Harvey's 500 SFM on .062 in is
-# 30,800 rpm, so the spindle's 2800 (machines.pm-30mv; 45 ft/min). Chip load
-# at Harvey's slotting figure, rounded down to the 0.1 in/min the sheet
-# prints: 2800 × 3 × .00065 = 5.46, so 5.4 in/min, .000643 in/tooth
-# (5.4 × 25.4 / 8400 mm). Delegated ruling 2026-11-22 (Main, owner review
-# #2144; issue #3376), no owner precedent: never above the maker's published
-# chip load without a measurement. The milling feed-factor table's .001
-# floor: prechips 0.11.38 (pedropaulovc/prechips#582) checks a cut below it
-# only when the tool states its maker's figure (the two fields above), at
-# the .001 row's force, an upper bound with no factor below the table; it
-# refuses any cut above the stated figure.
-[settings.endmill-carbide-3fl-1-16-downcut-c260]
-tool = "endmill-carbide-3fl-1-16-downcut"
-material = "c260-h02"
-rpm = 2800
-chip_load_mm_per_tooth = 0.016329  # .000643 in; 2800 × 3 × .000643 = 5.4 in/min
-flutes = 3
-feed_unit = "in/min"
 
 [stock.c260-wire-040]
 description = "C26000 cartridge brass, annealed (soft), round wire, .040 in"
-
-# --- .2510-.2515 reamed bores (MHA-DT-18, and any dt part with that band) ---
-# Go/no-go pair for the Ø.2500 +.0010/+.0015 REAM THRU bores, as the MHA-CH-13
-# hub pair (common.toml gauges.plug-gauges-4000-4005): Vermont Gage standard
-# Class X steel pin/plug gages, .2510 GO (plus tolerance) and .2515 NO-GO
-# (minus tolerance), each ± .000040 in (= 0.001016 mm, the resolution here).
-# Not owned: to buy (cad/config/shop-equipment/ gauges, same key). The tools
-# record lets a plan list the pair in its tooling.
-[tools.plug-gauges-2510-2515]
-description = "Plug gauge pair, .2510 GO (plus) and .2515 NO-GO (minus), Vermont Gage Class X"
-
-# --- MHA-DT-14 pinion bracket strap (cad/process/dt_pinion_bracket/plan.toml) ---
-# Go/no-go pairs for its other two reamed sizes, as the .2510-.2515 pair
-# above: Vermont Gage standard Class X steel pin/plug gages, GO at the low
-# limit (plus tolerance) and NO-GO at the high limit (minus tolerance), each
-# ± .000040 in (= 0.001016 mm, the resolution here). The arbor bore Ø.3125
-# +.0010/+.0015 (.3135-.3140) and the follower seat Ø.1570 +.0005/.0000
-# (.1570-.1575). Not owned: to buy (cad/config/shop-equipment/ gauges, same
-# keys). The tools records let the plan list each pair in its tooling.
-[tools.plug-gauges-3135-3140]
-description = "Plug gauge pair, .3135 GO (plus) and .3140 NO-GO (minus), Vermont Gage Class X"
-[tools.plug-gauges-1570-1575]
-description = "Plug gauge pair, .1570 GO (plus) and .1575 NO-GO (minus), Vermont Gage Class X"
-# The follower seat's FLAT-BOTTOM REAM (.1570 +.0005/.0000, .16 deep, floor
-# corners R.008 max): a chucking reamer's 45° lead cannot reach the floor
-# corner, so the seat takes a bottoming (square-end, end-cutting) reamer,
-# bought with its corner break .002 in max to stay inside R.008. Not owned:
-# to buy (cad/config/shop-equipment/ tools-reamers-taps, same key).
-# diameter_mm is its nominal size.
-[tools.reamer-1570-bottoming]
-description = ".1570 in HSS bottoming (square-end) chucking reamer, corner break .002 max"
-diameter_mm = 3.9878
-
-# The MHA-DT-38 bushing bore's go/no-go pair (cad/config/shop-equipment/ gauges.plug-gauges-0625-0630,
-# to buy): GO .0625 and NO-GO .0630 in = 1.5875 and 1.6002 mm. A fixed-limit pair
-# reads no scale; its resolution is each member's Class X tolerance,
-# .000040 in = 0.001016 mm. The tools record lets a plan list the pair.
-[gauges.plug-gauges-0625-0630]
-range_mm = [1.5875, 1.6002]
-resolution_mm = 0.001016
-[tools.plug-gauges-0625-0630]
-description = "Plug gauge pair, .0625 GO (plus) and .0630 NO-GO (minus), Vermont Gage Class X"
-
-# The MHA-DT-39 end screw hole's go/no-go pair (cad/config/shop-equipment/ gauges.plug-gauges-0630-0635,
-# to buy): GO .0630 and NO-GO .0635 in = 1.6002 and 1.6129 mm. A fixed-limit pair
-# reads no scale; its resolution is each member's Class X tolerance,
-# .000040 in = 0.001016 mm. The tools record lets a plan list the pair.
-[gauges.plug-gauges-0630-0635]
-range_mm = [1.6002, 1.6129]
-resolution_mm = 0.001016
-[tools.plug-gauges-0630-0635]
-description = "Plug gauge pair, .0630 GO (plus) and .0635 NO-GO (minus), Vermont Gage Class X"
-
-# --- MHA-DT-02 arbor pedestal (cad/process/dt_arbor_pedestal/plan.toml) -----
-# Go/no-go pair for its reamed arbor bore Ø.3750 +.0015/+.0010 (.3760-.3765),
-# as the MHA-CH-13 hub pair (common.toml gauges.plug-gauges-4000-4005):
-# Vermont Gage standard Class X steel pin/plug gages, GO at the low limit
-# (plus tolerance) and NO-GO at the high limit (minus tolerance), each
-# ± .000040 in (= 0.001016 mm, the resolution; the [gauges] table is in common.toml). Not owned: to buy
-# (cad/config/shop-equipment/ gauges, same key). The tools record lets the
-# plan list the pair in its tooling.
-[tools.plug-gauges-3760-3765]
-description = "Plug gauge pair, .3760 GO (plus) and .3765 NO-GO (minus), Vermont Gage Class X"
 
 # --- MHA-DT-09 crank pin (cad/process/dt_crank_pin/plan.toml) ---------------
 # The bought 12L14 taper pin's #45 ring hole on the PM-30MV (program
@@ -440,13 +310,6 @@ feed_mm_rev = 0.0254
 [tools.reamer-2500]
 description = ".2500 in HSS chucking reamer"
 diameter_mm = 6.35
-# Go/no-go pair for that bore (.2500-.2505), as the .2510-.2515 pair above:
-# Vermont Gage standard Class X steel pin/plug gages, .2500 GO (plus
-# tolerance) and .2505 NO-GO (minus tolerance), each ± .000040 in (=
-# 0.001016 mm, the resolution; the [gauges] table is in common.toml). Not
-# owned: to buy (cad/config/shop-equipment/ gauges, same key).
-[tools.plug-gauges-2500-2505]
-description = "Plug gauge pair, .2500 GO (plus) and .2505 NO-GO (minus), Vermont Gage Class X"
 
 # The platform's assembly shims (owner ruling 2026-11-22, issue #3363):
 # description only; the record is fixtures.shim-washers-1-4-id-arbor-19.
@@ -472,8 +335,6 @@ diameter_mm = 1.397
 description = "Drive-pin jig (shop-made, for the crankshaft): 1 in 1018 bar 4.75 long, Ø.750 shank 2.00 long for the AXA No. 4 holder; 3/8 clearance 1.90 deep from the shank end; .4385 bore reamed in place 2.95 deep; 10-32 set screw on a brass pad 1.25 from the front face"
 [tools.plug-gauges-0930-0935]
 description = "Plug gauge pair, .0930 GO (plus) and .0935 NO-GO (minus), Vermont Gage Class X"
-[tools.plug-gauges-4500-4505]
-description = "Plug gauge pair, .4500 GO (plus) and .4505 NO-GO (minus), Vermont Gage Class X"
 
 # --- Class ZZ go/no-go pins for the dt-only reamed bands ---------------------
 # Owner ruling 2026-11-23 (tool audit Q1, re-answered on the corrected facts),
@@ -485,8 +346,9 @@ description = "Plug gauge pair, .4500 GO (plus) and .4505 NO-GO (minus), Vermont
 # the high limit (.0002 under to the limit), from the .061-.500 minus box
 # where that limit is a whole thousandth (cad/config/shop-equipment/
 # gauges.toml gauges.pin-gauges, the #3075 record). range_mm is the band; the
-# resolution is one pin's Class ZZ tolerance, .0002 in = 0.00508 mm. The
-# Class X pairs' records above stay until no plan names them.
+# resolution is one pin's Class ZZ tolerance, .0002 in = 0.00508 mm. Of the
+# Class X pairs only .0930-.0935 (MHA-DT-11) keeps its records: the
+# crankshaft's test reads its range (test_dt_crankshaft_process.py).
 # .3760-.3765: MHA-DT-02 arbor bore, MHA-DT-31 hub bore (MHA-DT-11 re-gauges
 # the hub's).
 [gauges.zz-pins-3760-3765]
