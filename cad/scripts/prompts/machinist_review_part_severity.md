@@ -54,13 +54,18 @@ is printed. No answer, a fit name alone or a mate alone: `over_specification`
 has its answer). An answer of one of rule 4's listed kinds: take it as given
 unless the package itself contradicts it (a `SETS MESH` reason on a part
 with no gear and no gear named as mate), then check the form against rule
-4's order and file a later-than-needed form as `over_specification`. One
-finding per feature, naming the form it should take; never also `missing`
-for the same feature's mate. The test does not apply to a size, length,
-radius or angle printed at its title-block band (three places with a
-function included), a thread designation or class, gear tooth data in a
-gear data block, a title-block row, or a purchased part's catalogue
-designation or supplier REF size.
+4's order and file a later-than-needed form as `over_specification`. Judge
+an answer by its kind, not its wording: `SETS`, `KEEPS` or `HOLDS` followed
+by the gap, stack, room, length, mesh or reading it protects on a named
+mate is an answer (`SETS MHA-PD-VN-63 SPRING ROOM`); never ask for
+different words. One finding per feature, naming the form it should take;
+never also `missing` for the same feature's mate or acceptance, which are
+asked for only once the feature has earned its form. The test does not
+apply to a size, length, radius or angle printed at its title-block band
+(three places with a function included), a hole match-drilled or reamed in
+place through its mate at assembly, a thread designation or class, gear
+tooth data in a gear data block, a title-block row, or a purchased part's
+catalogue designation or supplier REF size.
 
 Shop-table standard — for a band that passes, apply "What the shop holds"
 literally. Read the band's total width, find its row, and decide only
