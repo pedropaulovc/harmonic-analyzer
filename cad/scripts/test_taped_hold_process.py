@@ -35,9 +35,7 @@ def _plan(stem: str) -> dict:
 
 def _bonds(plan: dict) -> list[dict]:
     holders = [
-        holder
-        for setup in plan["setups"]
-        for holder in (setup, *setup["operations"])
+        holder for setup in plan["setups"] for holder in (setup, *setup["operations"])
     ]
     beams = [holder.get("beam") for holder in holders]
     return [beam["bond"] for beam in beams if isinstance(beam, dict) and "bond" in beam]
@@ -79,6 +77,6 @@ def test_a_taped_plan_repeats_the_record(stem: str) -> None:
         assert bond["accepted_by"] == HOLD["accepted_by"]
         assert "derating" not in bond
     refs = {tool.get("ref") for tool in plan["tools"]}
-    assert {
     assert {HOLD["tape"], HOLD["adhesive"], HOLD["accelerator"]} <= refs
+    text = _process_plans.plan_path(stem).read_text(encoding="utf-8")
     assert "VHB" not in text and "5906" not in text
