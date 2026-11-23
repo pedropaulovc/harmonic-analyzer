@@ -119,7 +119,7 @@ boss_grip_stickout_mm = 4.0
 # The gang arbor (Setup 4; fixtures.dt-cylinder-gear-gang-arbor), from the
 # 5/8 bar's raw stub in the jaws: a body Ø.600 2.50 long, the shoulder, the
 # journal 2.94, the pilot .21 for the TL-04 collar's .290 bore, then the
-# 1/4-28 thread .65 to the tail centre, its first .05 a relief groove Ø.180
+# 1/4-28 thread .65 to the tail centre, its first 1/16 a relief groove Ø.180
 # (the cone kit's relief diameter) so the nut runs full threads onto the
 # collar (its minor .2113 = .250 - 1.0825/28). The pilot ends short of the
 # collar's outer face at the thinnest stack (cam.py checks the nut bears on
@@ -200,16 +200,27 @@ clear_y_mm = -2.54
 # GP01's first run is set .003 shallow (G54 Y back 0.076 mm) and deepened
 # from the depth check.
 first_run_shallow_mm = 0.0762
-# The depth check: one Ø.040 pin in space 1, the micrometer over it to the
-# opposite tips; the reading less that blank's O.D. (the test computes the
-# corners from dt_cylinder_gear_spec's profiles). It moves 1:1 with the depth.
+# The depth check (Main's condition 1): GP01 cuts space 1, then, 20 crank
+# turns on (60 spaces, the opposite one), space 61. Two Ø.040 pins in spaces
+# 1 and 61, the micrometer over them, less that blank's O.D.: the drawing's
+# own over-pins measure, in which the stack's eccentricity on the head
+# cancels. It moves 2:1 with the depth. Read on the deepest blank (the least
+# arbor deflection, blank 1) and the shallowest (the most, blank 9; cam.py
+# finds both): every blank lies between them. The window is the acceptance
+# band less a micrometer reading's resolution at each end, two readings; the
+# aim puts the expected blank 1 to blank 9 spread (cam.py) mid-window.
 pin_dia_in = 0.040
-one_pin_min_in = 0.0126
-one_pin_max_in = 0.0145
-one_pin_aim_in = 0.0136
+depth_deep_blank = 1
+depth_shallow_blank = 9
+depth_window_min_in = 0.0254
+depth_window_max_in = 0.0289
+depth_spread_in = 0.0013
+depth_aim_in = 0.0278
+# The crank turns from space 1 to space 61 (half the worm's 40).
+opposite_turns = 20
 # Acceptance over two Ø.040 pins in opposite spaces less the gear's own
 # O.D. (the plunge's effect); the absolute reading prints as REF (the test
-# recomputes both).
+# recomputes both from dt_cylinder_gear_spec's profiles).
 over_pins_min_in = 2.5572
 over_pins_max_in = 2.5651
 pins_less_od_min_in = 0.0252
@@ -226,7 +237,8 @@ index_tolerance_deg = 0.01
 # depth through blank 1, the saw's reach .375 short of the jaws), then out
 # along Y. Y0: the saw's rim on a tooth tip through .001 paper, the saw
 # raised half a space (1.5°) so it touches the tip beside space 1: touch at
-# Z +0.843 and set Y -0.036 (the paper and R(1 - cos 1.5°)); cam.py agrees.
+# Z +0.843 and set Y -0.014 (the paper less R(1 - cos 1.5°): that tip stands the drop
+# past Y0); cam.py agrees.
 notch_aim_mm = 3.048
 saw_x_start_mm = 86.9
 saw_x_end_mm = 0.0
@@ -703,13 +715,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Depth check: lay a Ø.040 pin gauge in space 1 along the stack; mike over it to the opposite tips on blanks 2 and 9 and subtract each blank's O.D. Both over the aim {{process.one_pin_aim_in:.4dot}} (too shallow): send $#, G10 L2 P1 Y(the G54 line's Y + 25.4 × (the smaller difference - {{process.one_pin_aim_in:.4f}})) and run GP01_first_space again; check again. One under {{process.one_pin_min_in:.4dot}}, or both not inside the band at once (the stack is not along X): stop and tell the owner."
-inspection = "Reading less O.D. {{process.one_pin_min_in:.4dot}}-{{process.one_pin_max_in:.4dot}} on both blanks 2 and 9 before GP02."
-gauge_checks = "other"
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Index to space 2 by hand: unlock, 5 spaces on the 15-hole circle, lock."
+instruction = "Index to space 61, the opposite space: unlock, {{process.opposite_turns:d}} whole crank turns the same way (count them; the plunger drops back in the marked hole), lock."
 feed = "hand"
 
 [[setups.operations]]
@@ -717,7 +723,32 @@ speed_kind = "spindle"
 tool = "cutter"
 drilling = "none"
 sizing = "other"
-instruction = "Run GP02_teeth straight after the accepted GP01 and the index to space 2 (no reset, no jog; after a reset run GP01 again first, before the index). It cuts space 2 (+X); at each stop (spindle off) unlock, index 5 spaces as its message says, lock, cycle start: it cuts the next space, alternately -X and +X. Its last stop takes the plunger back to space 1's marked hole: that last pass must cut no chips."
+instruction = "Run GP01_first_space again: it cuts space 61. Spindle stopped at its end, as before."
+settings = "cylinder-gear-cutter-c360"
+milling_cuts = [
+  { name = "tooth space", kind = "side", phase = "finish", cutter_dia_mm = 44.45, axial_doc_mm = 1.6624, radial_woc_mm = "{{process.plunge_aim_mm}}", stations_mm = [0.0, 35.79, 71.58] },
+]
+
+[[setups.operations]]
+instruction = "Depth check on blanks {{process.depth_deep_blank:d}} and {{process.depth_shallow_blank:d}}: Ø.040 pin gauges in spaces 1 and 61, mike over them, subtract that blank's O.D. Accept: both within {{process.depth_window_min_in:.4dot}}-{{process.depth_window_max_in:.4dot}}."
+inspection = "Over pins less O.D. {{process.depth_window_min_in:.4dot}}-{{process.depth_window_max_in:.4dot}} on blanks {{process.depth_deep_blank:d}} and {{process.depth_shallow_blank:d}} before GP02."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Blank {{process.depth_shallow_blank:d}} over {{process.depth_window_max_in:.4dot}} (too shallow): send $#, G10 L2 P1 Y(the G54 line's Y + 25.4 × (its reading - {{process.depth_aim_in:.4f}}) / 2); run GP01_first_space, index {{process.opposite_turns:d}} turns, run it again (both spaces deeper), and check again. Blank {{process.depth_deep_blank:d}} under {{process.depth_window_min_in:.4dot}} (too deep), or any other reading outside the window (blank {{process.depth_deep_blank:d}} over it, blank {{process.depth_shallow_blank:d}} under it): stop and tell the owner."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Index to space 2: unlock; if the last GP01 cut space 61, {{process.opposite_turns:d}} whole turns first (back to space 1); then 5 spaces on the 15-hole circle; lock."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "cutter"
+drilling = "none"
+sizing = "other"
+instruction = "Run GP02_teeth straight after the accepted GP01 and the index to space 2 (no reset, no jog; after a reset run GP01 again first, before the index). It cuts space 2 (+X); at each stop (spindle off) unlock, index 5 spaces as its message says, lock, cycle start: it cuts the next space, alternately -X and +X. Its pass in space 61 and its last, back in space 1's marked hole, cut no chips."
 settings = "cylinder-gear-cutter-c360"
 milling_cuts = [
   { name = "tooth spaces", kind = "side", phase = "finish", cutter_dia_mm = 44.45, axial_doc_mm = 1.6624, radial_woc_mm = "{{process.plunge_aim_mm}}", stations_mm = [0.0, 35.79, 71.58] },
@@ -850,11 +881,11 @@ gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Cam phase, gears 0 and 10 only, at Setup 9's stop (not again here): on the setting mandrel in the V-blocks on the surface plate, the cam face toward you, a .014 pin gauge in the notch. Turn the gear until the pin's top reads the mandrel's top less .1805 on the height gauge (the notch level, out to the right); tape the rim to the V-block to hold it."
+instruction = "Cam phase, gears 0 and 10 only, at Setup 9's stop (not again here): on the setting mandrel in the V-blocks on the surface plate, the cam face toward you, a .013 pin gauge in the notch (the .014 kerf takes it). Turn the gear until the pin's top reads the mandrel's top less .1816 on the height gauge (the notch level, out to the right); tape the rim to the V-block to hold it."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Pin's top again at the mandrel's top less .1805, then read the cam's top and bottom on the height gauge. The axis height (the mandrel's top less .1875) less half their sum is the cam's drop below the axis. Out: stop, check the fixture's clock pin (TL-00)."
+instruction = "Pin's top again at the mandrel's top less .1816, then read the cam's top and bottom on the height gauge. The gear's axis height (the mandrel's top less .1881: the gear hangs on the mandrel's top, half its bore clearance low) less half their sum is the cam's drop below the axis. Out: stop, check the fixture's clock pin (TL-00)."
 inspection = "Drop {{process.phase_drop_min_in:.4dot}}-{{process.phase_drop_max_in:.4dot}} (the lobe 3° ±.7° clockwise of the notch)."
 gauge_checks = "other"
 feed = "hand"

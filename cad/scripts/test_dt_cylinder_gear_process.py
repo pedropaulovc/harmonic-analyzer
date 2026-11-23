@@ -130,21 +130,24 @@ def test_the_depth_check_and_over_pins_numbers_match_the_gear_data() -> None:
     """The plan's pin readings are the spec's corner profiles' (Ø.040 pins),
     rounded inward to .0001."""
     pin = P["pin_dia_in"] * IN
-    over, one = [], []
+    over, both = [], []
     for profile in dt_cylinder_gear_spec.manufacturing_corner_profiles():
         m, _contact, interior = dt_cone_gear_spec._over_pins_mm(profile, pin)
         assert interior
         od = 2 * profile.blank_radius_mm
         over.append(m / IN)
-        one.append((m - od) / 2 / IN)
+        both.append((m - od) / IN)
     assert P["over_pins_min_in"] == math.ceil(min(over) * 1e4 - 1e-6) / 1e4
     assert P["over_pins_max_in"] == math.floor(max(over) * 1e4 + 1e-6) / 1e4
-    assert P["one_pin_min_in"] == math.ceil(min(one) * 1e4 - 1e-6) / 1e4
-    assert P["one_pin_max_in"] == math.floor(max(one) * 1e4 + 1e-6) / 1e4
-    assert P["one_pin_min_in"] < P["one_pin_aim_in"] < P["one_pin_max_in"]
-    both = [2 * x for x in one]
     assert P["pins_less_od_min_in"] == math.ceil(min(both) * 1e4 - 1e-6) / 1e4
     assert P["pins_less_od_max_in"] == math.floor(max(both) * 1e4 + 1e-6) / 1e4
+    assert (
+        P["pins_less_od_min_in"]
+        < P["depth_window_min_in"]
+        < P["depth_aim_in"]
+        < P["depth_window_max_in"]
+        < P["pins_less_od_max_in"]
+    )
 
 
 def test_the_boss_holds_the_cam_and_the_arbor_takes_the_cone_kits_collar() -> None:
@@ -191,7 +194,11 @@ def test_the_plans_cutter_and_saw_records_are_the_inventorys() -> None:
         ("notch_aim_mm", 3.2, "notch_aim_mm"),
         ("stack_stickout_mm", 130.0, "stack_stickout_mm"),
         ("stack_od_max_in", 2.537, "O.D. band"),
-        ("mount_tir_max_mm", 0.04, "depth spread"),
+        ("mount_tir_max_mm", 0.04, "runout budget"),
+        ("depth_deep_blank", 2, "depth check's blanks"),
+        ("depth_aim_in", 0.0272, "depth_aim_in"),
+        ("depth_window_max_in", 0.0291, "depth_window_max_in"),
+        ("opposite_turns", 19, "opposite_turns"),
         ("journal_dia_min_mm", 9.50, "beam_brass_equiv_dia_mm"),
         ("standoff_mm", 25.0, "past the jaws"),
         ("journal_length_mm", 80.0, "blank 10's bore"),
@@ -199,9 +206,9 @@ def test_the_plans_cutter_and_saw_records_are_the_inventorys() -> None:
         ("pilot_length_mm", 9.906, "cannot clamp"),
         ("pilot_length_mm", 1.0, "ride the pilot"),
         ("relief_width_mm", 0.5, "narrower than one pitch"),
-        ("cutter_teeth_min", 6, "depth spread"),
+        ("cutter_teeth_min", 6, "depth_spread_in"),
         ("cutter_member_teeth_max", 110, "cuts 55-110"),
-        ("brass_unit_power_hp_min_per_in3", 3.0, "depth spread"),
+        ("brass_unit_power_hp_min_per_in3", 3.0, "depth_spread_in"),
     ],
 )
 def test_a_plan_number_off_the_model_shop_or_budget_is_refused(

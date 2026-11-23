@@ -15,8 +15,9 @@ vertical spindle lies flat at the stack's axis height and cuts on the
 operator's side of the stack, one X pass a tooth space, the head indexed by
 hand at an M0 between passes:
 
-- GP01_first_space: space 1, -X, ending past blank 1 with the cutter still at
-  depth for the depth check (it is re-run, deeper, from a corrected G54 Y).
+- GP01_first_space: one space, -X, ending past blank 1 with the cutter still
+  at depth: run on space 1 and on space 61 (20 crank turns on) for the
+  two-pin depth check, re-run deeper from a corrected G54 Y.
 - GP02_teeth: spaces 2-120, alternately +X and -X (each pass ends where the
   next begins; no form cutter is drawn back through a cut space), then the
   closure pass in space 1 again (120 indexes of 5 spaces on the 15-hole
@@ -34,10 +35,11 @@ behind it (the keep-out shapes are shifted by that radius).
 
 Checks this recipe makes before any file is posted (Main's conditions,
 2026-11-22): the tooth count and the index (count, plate circle, closure);
-the plunge against the teeth's band; the depth budget around the circle (the
-stack's mount TIR, the arbor's deflection under the cut, the depth check's
-micrometer) against that band, any tilt or taper along X being read by the
-depth check on blanks 2 and 9; the runout budget (the BS-0 mount and the
+the plunge against the teeth's band; the depth budget in the depth check's
+own measure, over two pins in opposite spaces less the O.D. (the blanks
+with the least and the most arbor deflection, their spread and the
+micrometer inside the acceptance); the runout budget (the journal's TIR on
+the BS-0 from the body and blank 10's O.D., Setup 5's O.D. offset, the
 arbor's fit in the bore) against the teeth's runout limit; the cutter and saw reach against the
 BS-0 jaws; and the plan's derived numbers. Typed here, because no record
 carries them: the bending of a stepped beam, the chip of a form cutter and
@@ -74,8 +76,10 @@ SHAPE_TOP_MM = 1000.0
 FAR_MM = 100.0
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
-# Grid along the rims for the deflection's worst station.
-STATIONS = 200
+# Load stations across each rim's face width for the per-blank deflection.
+RIM_STATIONS = 10
+# Inch plan numbers agree to half their last (.0001) digit.
+IN_TOL = 0.00005
 # One horsepower in in·lbf/min, and psi in MPa (unit power to specific
 # cutting energy).
 HP_IN_LBF_MIN = 396000.0
@@ -87,9 +91,11 @@ def _r(value: float) -> float:
     return round(value + 0.0, 3)
 
 
-def _agree(plan: dict[str, Any], key: str, value: float) -> None:
+def _agree(
+    plan: dict[str, Any], key: str, value: float, tol: float = PLAN_TOL_MM
+) -> None:
     stated = plan["parameters"][key]
-    if not math.isclose(stated, value, abs_tol=PLAN_TOL_MM):
+    if not math.isclose(stated, value, abs_tol=tol):
         raise ValueError(f"process.{key} {stated:g}, the recipe computes {value:.4f}")
 
 
@@ -371,35 +377,81 @@ def context(
         (pilot_end, relief_end, p["relief_dia_mm"]),
         (relief_end, tail, p["thread_minor_mm"]),
     ]
-    deflection = max(
-        abs(
-            _deflection(
-                sections,
-                -p["standoff_mm"],
-                tail,
-                rims_end * k / STATIONS,
-                force,
-                modulus,
+
+    # The arbor's deflection under the cut at each blank's rim: the same for
+    # every space of a blank (the same cut), so it moves each blank's mean
+    # depth, not the depth around it.
+    def rim_deflection(blank: int) -> list[float]:
+        x0 = (blank - 1) * pitch
+        return [
+            abs(
+                _deflection(
+                    sections,
+                    -p["standoff_mm"],
+                    tail,
+                    x0 + face * k / RIM_STATIONS,
+                    force,
+                    modulus,
+                )
             )
-        )
-        for k in range(STATIONS + 1)
-    )
-    measure = 2 * shop["gauges"]["micrometers"]["resolution_mm"]
-    depth_spread = p["mount_tir_max_mm"] + deflection + measure
-    if depth_spread > plunge[1] - plunge[0]:
+            for k in range(RIM_STATIONS + 1)
+        ]
+
+    rims = {blank: rim_deflection(blank) for blank in range(1, gang + 1)}
+    deep = min(rims, key=lambda b: min(rims[b]))
+    shallow = max(rims, key=lambda b: max(rims[b]))
+    if (deep, shallow) != (p["depth_deep_blank"], p["depth_shallow_blank"]):
         raise ValueError(
-            f"depth spread {depth_spread:.4f} mm exceeds the plunge band {plunge}"
+            f"the depth check's blanks are {deep} (deepest) and {shallow} "
+            f"(shallowest), not {p['depth_deep_blank']} and {p['depth_shallow_blank']}"
         )
-    # Runout budget (Main's condition 2): the journal's TIR on the BS-0 (the
-    # stack O.D. and the body indicated there), the O.D.'s own offset from
-    # the journal left by Setup 5 (the body's TIR at the lathe's jaws, tapering
-    # to nothing at the tail on its own centre: its share at blank 10's far
-    # face), and the arbor's fit in the largest bore.
-    fit = f["bore"]["dia"][1] - p["journal_dia_min_mm"]
-    lathe = (
-        p["mount_tir_max_mm"] * (tail - (stack_end - pitch)) / (tail + p["standoff_mm"])
+    deflection = max(rims[shallow])
+    # Depth budget (Main's condition 1), in the depth check's own measure:
+    # over two pins in opposite spaces less the O.D., the drawing's acceptance
+    # (the stack's eccentricity on the head cancels across the diameter; it is
+    # the tooth runout the drawing bounds, booked below). The reading moves
+    # twice the depth. Window: the acceptance band less one micrometer
+    # resolution at each end per reading (two readings, over pins and O.D.);
+    # the deep and shallow blanks' expected spread fits inside it, the aim
+    # centring it.
+    resolution_in = shop["gauges"]["micrometers"]["resolution_mm"] / IN
+    window = (
+        p["pins_less_od_min_in"] + 2 * resolution_in,
+        p["pins_less_od_max_in"] - 2 * resolution_in,
     )
-    runout = p["mount_tir_max_mm"] + lathe + fit
+    _agree(plan, "depth_window_min_in", window[0], IN_TOL)
+    _agree(plan, "depth_window_max_in", window[1], IN_TOL)
+    spread_in = 2 * (max(rims[shallow]) - min(rims[deep])) / IN
+    _agree(plan, "depth_spread_in", math.ceil(spread_in * 1e4 - 1e-6) / 1e4, IN_TOL)
+    if p["depth_spread_in"] >= window[1] - window[0]:
+        raise ValueError(
+            f"depth spread {p['depth_spread_in']:.4f} in does not fit the window "
+            f"{window[0]:.4f}-{window[1]:.4f}"
+        )
+    _agree(
+        plan,
+        "depth_aim_in",
+        round(((window[0] + window[1]) / 2 + p["depth_spread_in"] / 2) * 1e4) / 1e4,
+        IN_TOL,
+    )
+    depth_spread = p["depth_spread_in"] * IN
+    # The space-1/space-61 index: 60 spaces is whole turns of the circle.
+    half_turns = Fraction(shop["machines"]["bs-0"]["worm_ratio"], 2)
+    if count % 2 or half_turns.denominator != 1:
+        raise ValueError("the opposite space is not whole crank turns")
+    _agree(plan, "opposite_turns", float(half_turns))
+    # Runout budget (Main's condition 2): the teeth run true to the BS-0 axis;
+    # the bore rides the journal. The journal's axis, a straight line (one
+    # chucking with the body and the tail centre), is bounded at two places
+    # Setup 6 indicates: the body beside the BS-0 jaws (its TIR there) and
+    # blank 10's O.D. (its TIR, plus the O.D.'s own offset from the journal
+    # left by Setup 5: the body's lathe-jaw TIR tapering to nothing at the
+    # tail centre, its share at blank 10's near face). Between the two its
+    # offset is at most the larger; then the arbor's fit in the largest bore.
+    fit = f["bore"]["dia"][1] - p["journal_dia_min_mm"]
+    share = (tail - (stack_end - pitch)) / (tail + p["standoff_mm"])
+    journal = max(p["mount_tir_max_mm"], p["mount_tir_max_mm"] * (1 + share))
+    runout = journal + fit
     if runout > teeth["tooth_runout_tir_max"]:
         raise ValueError(
             f"runout budget {runout:.4f} mm exceeds {teeth['tooth_runout_tir_max']}"
