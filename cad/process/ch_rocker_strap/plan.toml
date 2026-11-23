@@ -3,7 +3,7 @@
 # 1/8 x 1-1/2 in 1018 CF flat (OnlineMetals 4807), 20 off; a shop-made 6061
 # sub-plate gripped in the PM vise carries a fixed fence (Y0), an end stop (X0)
 # and four Mitee-Bite Pitbull 26000 edge clamps (to buy). The sub-plate, hub
-# plug, washer, clamps and hub screw are the fixture MHA-CH-13-TL-00, made
+# plug, bought washer, clamps and hub screw are the fixture MHA-CH-13-TL-00, made
 # beforehand to its drawings (cad/config/shop-equipment/
 # fixtures.strap-*); this traveler cuts only the strap. Per the part
 # registry's process text (cad/config/parts/ch-rocker-strap.yaml): rough both
@@ -112,7 +112,7 @@ fence_height_mm = 2.0066
 end_stop_height_mm = 2.0066
 clamp_height_mm = 1.905
 # Under the hub the plate has a Ø1/2 in counterbore .185 in deep with a
-# 1/4-20 tapped hole through its floor. In RS03 it is the relief the drill
+# #10-32 tapped hole through its floor. In RS03 it is the relief the drill
 # and reamer run into: their tips stop relief_floor_clearance_mm above its
 # floor (25/64 drill: 118° point 2.98 mm long, so its full diameter is 1.0 mm
 # through the strap; the reamer's lead likewise). In RS04 the hub plug sits in
@@ -127,17 +127,35 @@ drill_tip_z_mm = -4.0
 ream_tip_z_mm = -4.0
 # Outline hold-down (fixture assembly MHA-CH-13-TL-00): the hub plug TL-02 in
 # the counterbore, its pilot slipping into the reamed hub hole, the washer
-# TL-03 over the hole and the 1/4-20 × 5/8 button-head screw TL-VN-51
-# (McMaster 91255A539) through both into the plate (owner ruling 2026-11-17:
-# "Use a 1/4-20 hub screw. The .23 in of thread in the 6061 plate is
-# accepted: the screw only snugs the strap during the outline.").
-# bushing_flange_dia_mm is the largest diameter above the strap, the washer's
-# .53 at its .XX maximum, .54 (the head is .437); the outline cutter's edge
-# must pass bushing_clearance_mm from it (prechips refuses otherwise: the
-# strap's bottom edge is at least 7.49 mm from the hub centre, so 0.63 mm).
-# bushing_stack_height_mm is the washer's .06 at its .XX maximum, .07, plus
-# the head's .132 above the strap's top; cam.py keeps the holder and every
-# link move clear of it.
+# TL-VN-52 over the hole and the #10-32 × 5/8 button-head screw TL-VN-51
+# (McMaster 91255A267) through both into the plate. Owner ruling 2026-11-23:
+# "change the screw to #10-32. The sub-plate's tapped hole becomes #10-32 and
+# the plug's bore .201 (#7 drill). The washer is then a #10 SAE washer you
+# already own (McMaster 96659A104, .219 x .500, pack of 100 from PO
+# 1103PCAMPOS), used as supplied. The made washer, its drawing and its lathe
+# traveler are deleted." It reverses 2026-11-17's "Use a 1/4-20 hub screw.
+# The .23 in of thread in the 6061 plate is accepted: the screw only snugs
+# the strap during the outline." (the thread acceptance stands). Owner ruling
+# 2026-11-23, the washer: "Pick one washer from the pack of 100 by
+# measurement and keep it with the fixture: OD .505 or under and bore .220 or
+# under ... The traveler says to mike it once and centre it by eye."
+# washer_od_max_mm and washer_bore_no_go_mm print that selection (the bore by
+# the pin gauge .001 over its limit, which must not enter).
+# bushing_flange_dia_mm (.540) is the diameter the washer stays inside when
+# centred: half of .505, plus ASME B18.21.1's .013 bore-to-rim run-out all
+# one way, plus the tapped hole's .003 position, is .268 from the hub centre
+# (.537 across). The outline cutter's edge must pass
+# bushing_clearance_mm from it (prechips refuses otherwise: the strap's
+# bottom edge is at least 7.49 mm from the hub centre, so 0.63 mm). Pushed
+# fully to one side the washer reaches 7.27 mm from the hub centre
+# (ch_rocker_strap_tl_vn_hub_washer_spec.REACH_MAX), inside the 7.358 the
+# program keeps out of and 0.22 mm short of the cutter's edge: hence centre
+# it, and watch the first level. bushing_stack_height_mm (.202) covers the
+# thickest washer B18.21.1 allows, .065, plus the head's .101 above the
+# strap's top (.166); cam.py keeps the holder and every link move clear of
+# it. All three stand as they were for the made washer, so RS04 is unchanged.
+washer_od_max_mm = 12.827
+washer_bore_no_go_mm = 5.6134
 bushing_flange_dia_mm = 13.716
 bushing_clearance_mm = 0.5
 bushing_stack_height_mm = 5.1308
@@ -295,7 +313,7 @@ ref = "jig-files"
 id = "fixture"
 name = "Fixture MHA-CH-13-TL-00"
 ref = "strap-sub-plate"
-description = "Fixture MHA-CH-13-TL-00, made beforehand to its drawings: sub-plate TL-01, hub plug TL-02, hub washer TL-03 (Ø.53 × .06), 4 Mitee-Bite Pitbull 26000 4-40 edge clamps TL-VN-50, 1/4-20 × 5/8 button-head screw TL-VN-51 (McMaster 91255A539)"
+description = "Fixture MHA-CH-13-TL-00, made beforehand to its drawings: sub-plate TL-01, hub plug TL-02, hub washer TL-VN-52 (a #10 SAE washer, McMaster 96659A104, picked by measurement in Setup 2), 4 Mitee-Bite Pitbull 26000 4-40 edge clamps TL-VN-50, #10-32 × 5/8 button-head screw TL-VN-51 (McMaster 91255A267)"
 [[tools]]
 id = "tape"
 name = "Blue painter's tape"
@@ -364,6 +382,17 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Console M6 T1 (the 1/2 in end mill, 1.10 in out of the collet, measured on the tool setter). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z5.080. The .200 edge finder at 900 rpm on the fence face: G10 L20 P1 Y-2.540; on the end stop's face: G10 L20 P1 X2.540 (its 2.540 mm radius)."
+feed = "hand"
+
+# Owner ruling 2026-11-23: "Pick one washer from the pack of 100 by
+# measurement and keep it with the fixture ... The traveler says to mike it
+# once and centre it by eye." The limits: [parameters] washer_*.
+[[setups.operations]]
+steps = [
+  { kind = "check", text = "Once, for the fixture: pick the hub washer TL-VN-52 from the #10 SAE washer pack (McMaster 96659A104). Its outside diameter mikes {{process.washer_od_max_mm:in.3dot}} or under, and the {{process.washer_bore_no_go_mm:in.3dot}} pin gauge does not enter its bore." },
+  { kind = "stop", text = "Over on either: take another washer from the pack and measure it the same way." },
+  { kind = "action", text = "Mark the washer with a paint pen and keep it with the fixture: no other washer goes on the hub." },
+]
 feed = "hand"
 
 # Prove-out: the clamps, fence and end stop stand about .02 under the finish
@@ -537,7 +566,7 @@ title = "Bond to the plate; outline"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Blank bonded to the plate under its whole face: blue painter's tape on the plate and on the blank's face 1, GH1200 thick CA glue between (the stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}, miked). Face 1 down, the reamed hub hole over the hub plug TL-02's pilot in the plate's counterbore (tape cut away there), one long edge against the fence, the left end on the end stop; screwed down at the hub: the 1/4-20 × 5/8 button-head screw TL-VN-51 through the washer TL-03 into the plate. Edge clamps backed off clear of the blank."
+holding = "Blank bonded to the plate under its whole face: blue painter's tape on the plate and on the blank's face 1, GH1200 thick CA glue between (the stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}, miked). Face 1 down, the reamed hub hole over the hub plug TL-02's pilot in the plate's counterbore (tape cut away there), one long edge against the fence, the left end on the end stop; screwed down at the hub: the #10-32 × 5/8 button-head screw TL-VN-51 through the marked washer TL-VN-52, centred by eye, into the plate. Edge clamps backed off clear of the blank."
 datum = "Program RS04_outline. G54 unchanged: Y0 fence, X0 end stop; Z0 the plate top; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack (blue tape, CA glue, blue tape). The plug puts the hub hole at X {{cad.hub_x_in:.3f}}, Y −{{cad.hub_y_in:.3f}}; the fence sets the blank square."
 diagram = { file = "diagrams/outline.svg", alt = "Plan of the sub-plate: blank bonded to the plate (blue tape, CA glue, blue tape) against the fence, no edge clamps; screw and washer at the hub hole; the fence notched under both tips of the strap; the 1/8 in end mill's slot runs round the whole outline, top arc toward the fence." }
 # Top: the strap on the thickest stack; deepest: the through cut stops in
@@ -629,7 +658,7 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Washer TL-03 on the blank over the hub hole; the button-head screw TL-VN-51 through it into the plate, snug."
+instruction = "The marked washer TL-VN-52 on the blank, centred on the hub hole by eye; the button-head screw TL-VN-51 through it into the plate, snug. Look again after snugging: the washer's rim even all round the hole."
 feed = "hand"
 
 # Cut cautions for the bond, real for CA and paper tape (brief step 8).

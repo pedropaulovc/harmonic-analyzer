@@ -2,7 +2,8 @@ r"""Create the drawing for MHA-DT-03-TL-08, the round arbor's backing collar.
 
 Shop tooling (issue #2356; owner ruling 2026-11-20, Option 2). The keyed
 arbor collar's member sheet (``draw_dt_cone_gear_tl_arbor_collar``) for one
-collar, at 4:1 like the hub washer (``draw_ch_rocker_strap_tl_hub_washer``):
+collar, at 4:1 like the retired hub washer's sheet
+(``a40cbf6124:cad/scripts/draw_ch_rocker_strap_tl_hub_washer.py``):
 the END VIEW (``*Front``) keeps the drilled bore's callout; the outside
 diameter (stock), which imports there too, moves onto the SIDE VIEW
 (``*Right``) right of the collar, where a turned part's diameter reads beside

@@ -4,7 +4,7 @@ Shop tooling for the rocker-strap sub-plate fixture MHA-CH-13-TL-00 (owner,
 2026-11-17). A stepped plug seated in MHA-CH-13-TL-01's hub counterbore: its
 pilot slips into the strap blank's reamed hub hole (MHA-CH-13) and locates
 the blank on the counterbore; the hub screw MHA-CH-13-TL-VN-51 passes its
-bore, through the washer MHA-CH-13-TL-03, into the plate. Turned on the
+bore, through the washer MHA-CH-13-TL-VN-52, into the plate. Turned on the
 manual lathe in one chucking.
 
 - Body: matched slip fit in the counterbore. The counterbore is milled first
@@ -24,11 +24,12 @@ manual lathe in one chucking.
   printed bands. StrapFixtureCad 2026-11-17: the body length moved from the
   contract's .177 to .170 so the title-block band passes (at .177 the
   shoulder stood up to .002 above Z0).
-- Bore: Ø.266 drilled through (H drill), clears the 1/4-20 hub screw
-  (owner ruling 2, 2026-11-17: "Use a 1/4-20 hub screw.", replacing the
-  5/16-18, whose clearance bore left a .033 wall under the pilot). The wall
-  under the pilot is .064 at the worst case: over rule 17's .060 floor,
-  under its .080 target, so the bore states it (rule 20), as MHA-CH-12 does.
+- Bore: Ø.201 drilled through (#7 drill), clears the #10-32 hub screw
+  (owner ruling 2026-11-23: "change the screw to #10-32. The sub-plate's
+  tapped hole becomes #10-32 and the plug's bore .201 (#7 drill).",
+  reversing 2026-11-17's "Use a 1/4-20 hub screw.", whose Ø.266 bore left
+  a .064 wall under the pilot). The wall under the pilot is .096 at the
+  worst case, over rule 17's .080 target, so the bore states no wall.
 
 Frame: axis +Z, centred; z = 0 the body's bottom face (on the counterbore
 floor, the Front Plane), the pilot's top at z = OVERALL_LENGTH.
@@ -66,7 +67,7 @@ INCH = 25.4
 
 STRAP_NUMBER = "MHA-CH-13"
 PLATE_NUMBER = "MHA-CH-13-TL-01"
-WASHER_NUMBER = "MHA-CH-13-TL-03"
+WASHER_NUMBER = "MHA-CH-13-TL-VN-52"
 SCREW_NUMBER = "MHA-CH-13-TL-VN-51"
 
 XX = printed_band_mm(2, unit=UNIT)
@@ -97,8 +98,8 @@ TURNED_DIA_ROW = 0.0127
 TAPE_STACK = 0.28
 TAPE_MIN = 0.23
 TAPE_MAX = 0.33
-# The 1/4-20 hub screw's major diameter, the bore's clearance target.
-SCREW_MAJOR_DIA = 6.35  # 1/4
+# The #10-32 hub screw's major diameter, the bore's clearance target.
+SCREW_MAJOR_DIA = 4.826  # .190
 
 # --- The plug ---
 BODY_DIA = 12.6746  # .499 REF, turned to the measured counterbore
@@ -109,7 +110,7 @@ OVERALL_LENGTH = 6.9088  # .272
 PILOT_LIMITS = (10.1219, 10.1473)  # .3985-.3995
 # The model sits mid-band; the sheet prints the two limits (swTolLIMIT).
 PILOT_DIA = (PILOT_LIMITS[0] + PILOT_LIMITS[1]) / 2.0
-BORE_DIA = 6.7564  # .266, letter H drill
+BORE_DIA = 5.1054  # .201, #7 drill
 CHAMFER = 0.508  # .02 x 45 deg on the pilot's top edge
 PILOT_LENGTH = OVERALL_LENGTH - BODY_LENGTH
 
@@ -210,10 +211,10 @@ if not CHAMFER + XX < PILOT_LENGTH - XXX:
     raise AssertionError("the pilot chamfer eats the whole pilot")
 
 # The bore clears the screw; the wall under the pilot at the worst case
-# (smallest pilot, largest drilled bore) holds rule 17's floor and, under its
-# target, is stated on the bore (rule 20).
+# (smallest pilot, largest drilled bore) holds rule 17's floor and, were it
+# under its target, would be stated on the bore (rule 20).
 if not BORE_DIA > SCREW_MAJOR_DIA:
-    raise AssertionError("the bore does not clear the 1/4 hub screw")
+    raise AssertionError("the bore does not clear the #10 hub screw")
 WALL_MIN = (PILOT_LIMITS[0] - (BORE_DIA + DRILLED_PLUS)) / 2.0
 if WALL_MIN < WALL_FLOOR_MM:
     raise AssertionError(f"pilot wall {WALL_MIN:.3f} mm under the rule-17 floor")

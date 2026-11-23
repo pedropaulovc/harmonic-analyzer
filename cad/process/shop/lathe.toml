@@ -208,8 +208,8 @@ material = "lathe-6061"
 sfm = 350
 feed = "tailstock quill by hand"
 
-[settings.lathe-drill-h-6061]
-tool = "drill-h"
+[settings.lathe-drill-7-6061]
+tool = "jig-drill-7"
 material = "lathe-6061"
 sfm = 350
 feed = "tailstock quill by hand, steady, cutting oil"
