@@ -622,6 +622,27 @@ for _name, _label, _spec, _x, _location, _callout_xy, _sources in (
     )
 
 
+def _land_root_corner_leader(adapter: Any, annotations: list[Any]) -> None:
+    """Carry RootCornerR's leader onto the root it measures.
+
+    SolidWorks ends a radial leader at the circle point facing its text and
+    does not carry it through the centre; the 2X R.065 text stands below the
+    bar, off the root's short arc, so the arrow met the circle in air (farm r1
+    of #3445). ``ArcExtensionLineOrOppositeSide`` True draws the arc's
+    extension out to that point (draw_mg_magnifying_vertical_rod's relief
+    roots)."""
+    found = [a for a in annotations if dimension_name(adapter, a) == "RootCornerR"]
+    if len(found) != 1:
+        raise RuntimeError(f"expected one RootCornerR dimension, found {len(found)}")
+    annotation = _early_bound(found[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric):
+        raise RuntimeError("the imported root corner radius is not radial")
+    display.ArcExtensionLineOrOppositeSide = True
+    if not bool(display.ArcExtensionLineOrOppositeSide):
+        raise RuntimeError("RootCornerR refused its arc extension line")
+
+
 def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -716,7 +737,8 @@ def build(adapter: Any) -> dict[str, str]:
     if len(hub_dia) != 1:
         raise RuntimeError(f"expected one HubDia dimension, found {len(hub_dia)}")
     set_near_side_diameter(hub_dia[0], "hub diameter")
-    rebuild_drawing(adapter, label="hub diameter near-side leader")
+    _land_root_corner_leader(adapter, front_annotations)
+    rebuild_drawing(adapter, label="hub diameter and root corner leaders")
     set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
     set_dimension_callouts(adapter, top_annotations, TOP_CALLOUTS)
 

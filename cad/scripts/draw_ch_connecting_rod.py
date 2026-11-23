@@ -818,6 +818,27 @@ def _fork_detail(adapter: Any, left: Any) -> Any:
     return detail
 
 
+def _land_shank_corner_leader(adapter: Any, annotations: list[Any]) -> None:
+    """Carry ShankCornerR's leader onto the corner it measures.
+
+    SolidWorks ends a radial leader at the circle point facing its text and
+    does not carry it through the centre; the 4X R.065 text stands up-right
+    of the ring, off the corner's arc, so the arrow met the circle in air
+    (farm r1 of #3445). ``ArcExtensionLineOrOppositeSide`` True draws the
+    arc's extension out to that point (draw_mg_magnifying_vertical_rod's
+    relief roots)."""
+    found = [a for a in annotations if dimension_name(adapter, a) == "ShankCornerR"]
+    if len(found) != 1:
+        raise RuntimeError(f"expected one ShankCornerR dimension, found {len(found)}")
+    annotation = _early_bound(found[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric):
+        raise RuntimeError("the imported shank corner radius is not radial")
+    display.ArcExtensionLineOrOppositeSide = True
+    if not bool(display.ArcExtensionLineOrOppositeSide):
+        raise RuntimeError("ShankCornerR refused its arc extension line")
+
+
 def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -929,7 +950,8 @@ def build(adapter: Any) -> dict[str, str]:
         if len(matches) != 1:
             raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
         set_near_side_diameter(matches[0], f"ring {name}")
-    rebuild_drawing(adapter, label="ring diameters' near-side leaders")
+    _land_shank_corner_leader(adapter, front_annotations)
+    rebuild_drawing(adapter, label="ring diameters' and shank corner leaders")
     # Two tines and the slot set the fork over the tines: it prints as a
     # reference.
     fork_thick = [
