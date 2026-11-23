@@ -344,8 +344,8 @@ def test_the_deepest_set_pin_stops_short_of_the_drill_point(monkeypatch) -> None
 
 def test_the_reamed_hole_keeps_the_press_at_both_limits(monkeypatch) -> None:
     assert min(joints.LATCH_PIN_PRESS_INTERFERENCE) > 0.0
-    # The dowel is only +0.0025 over nominal: a hole allowed 0.003 over loses it.
-    monkeypatch.setattr(arm, "PIN_HOLE_DIA_BAND", (0.003, -0.010))
+    # The dowel is only +0.0025 over nominal: a hole cut 0.03 over loses it.
+    monkeypatch.setattr(arm, "PIN_HOLE_DIA_BAND", (0.03, 0.0))
     with pytest.raises(AssertionError, match="loses the latch pin's press"):
         _reload_joints()
 

@@ -9,10 +9,8 @@ re-keys only this sheet.
 
 from __future__ import annotations
 
-import math
 import textwrap
 
-import pd_transgear_knob_bush_geometry as BUSH
 from pd_paper_drive_assembly_steps import knob_setting_ref
 from pd_transgear_arm_plate_geometry import (
     CSK_ANGLE_DEG,
@@ -29,24 +27,16 @@ from pd_transgear_arm_plate_spec import (
     DOWEL_NUMBER,
     SCREW_NUMBER,
 )
-from pd_vn_transgear_arm_plate_locating_pin_spec import SLIP_DIAMETRAL_CLEARANCE_MM
 
-
-def _range_ref_in(limits_mm: tuple[float, float]) -> str:
-    """A diametral clearance or interference range in inches, four places,
-    rounded outward."""
-    low, high = (value / 25.4 * 1e4 for value in limits_mm)
-    return "-".join(
-        f"{bound / 1e4:.4f}".removeprefix("0")
-        for bound in (math.floor(low + 1e-9), math.ceil(high - 1e-9))
-    )
-
-
-# The press hole is a fit (rule 4): REAM, its face-A mouth's lead-in
-# chamfer in the hole callout's size form (as the screw holes carry their
-# countersink), the standard fit name and the bush by drawing number, then
-# the interference the printed limits give (the bush's FN2 press diameter in
-# this hole) as REF.  Two lines of words under the size and process (rule 7).
+# The press hole is reamed with the .4385 set reamer and prints that size
+# with no band (fit audit 2026-11-23, pending owner confirmation): the
+# MHA-PD-28 bush's press step is turned to this hole as measured, so the
+# interference is the bush sheet's requirement, not this one's.  REAM, the
+# face-A mouth's lead-in chamfer in the hole callout's size form (as the
+# screw holes carry their countersink), the fit and the bush by drawing
+# number, then what the press protects (rule 4's necessity test: the press
+# alone holds knob axis K in the plate).  Two lines of words under the size
+# and process (rule 7).
 _PRESS_CHAMFER_TEXT = (
     f"{PRESS_HOLE_CHAMFER / 25.4:.{PRESS_HOLE_CHAMFER_PLACES}f}".removeprefix("0")
 )
@@ -54,23 +44,22 @@ PRESS_HOLE_CALLOUT = "\n".join((
     "REAM THRU",
     f"{_PRESS_CHAMFER_TEXT} X 45\u00b0 AT FACE A",
     f"PRESS FIT FOR {BUSH_NUMBER}",
-    f"(INTERFERENCE {_range_ref_in(BUSH.PRESS_INTERFERENCE)} REF)",
+    "HOLDS KNOB AXIS, NO FASTENER",
 ))
 
-# The locating holes' fit range and match-drilling: one numbered note, which
-# their callout points at (rule 7: under the size and process a callout
-# carries at most two lines of words; a note at most four lines).  The
-# dowel's catalogue limits in the .0945 reamed hole leave a clearance that
-# locates without press: a locational clearance fit (rule 4), its range from
-# the dowel spec's own limits as REF.  The callout names the dowel, so the
-# note does not repeat it.  The match-drill pointer names the MHA-PD-00 view
-# whose native S-K dimension sets the pair (#1388 policy: the setting's
-# value lives on the assembly sheet, not here).  The mouths take the title
-# block's edge break (pd_transgear_arm_plate_geometry.LOCATOR_MOUTH_BREAK_MAX_MM).
+# The locating holes: reamed with the .1260 set reamer, the size printed
+# with no band; the callout names the dowel and the acceptance by the dowel
+# itself, and one numbered note, which the callout points at, carries what
+# the slip protects and the match-drilling (rule 7: under the size and
+# process a callout carries at most two lines of words; a note at most four
+# lines).  The match-drill pointer names the MHA-PD-00 view whose native S-K
+# dimension sets the pair (#1388 policy: the setting's value lives on the
+# assembly sheet, not here).  The mouths take the title block's edge break
+# (pd_transgear_arm_plate_geometry.LOCATOR_MOUTH_BREAK_MAX_MM).
 LOCATOR_NOTE_NUMBER = 1
 LOCATOR_NOTE_WIDTH = 30
 LOCATOR_NOTE = "\n".join(textwrap.wrap(
-    f"{LOCATOR_NOTE_NUMBER}. (CLEARANCE {_range_ref_in(SLIP_DIAMETRAL_CLEARANCE_MM)}). "
+    f"{LOCATOR_NOTE_NUMBER}. KEEPS PLATE AT REDUCER MESH SETTING. "
     f"MATCH-DRILL WITH ARM {ARM_NUMBER}, SET PER {knob_setting_ref()}.",
     width=LOCATOR_NOTE_WIDTH,
     subsequent_indent="   ",
@@ -80,15 +69,15 @@ LOCATOR_NOTE = "\n".join(textwrap.wrap(
 # reads a declared part's DRAWING_NOTES); the drawing prints LOCATOR_NOTE.
 DRAWING_NOTES = LOCATOR_NOTE
 # The count above the size, as on the screw holes; the note pointer on the
-# process line; the fit on the two lines of words under it (rule 7).  At
-# most 21 characters a line, so the shelf under the block ends left of hole
-# 1's witness line (round 1 layout audit on 41ad5cf: at 27 its shelf
-# crossed it).
+# process line; the fit, its mate and the acceptance on the two lines of
+# words under it (rule 7).  At most 21 characters a line, so the shelf under
+# the block ends left of hole 1's witness line (round 1 layout audit on
+# 41ad5cf: at 27 its shelf crossed it).
 LOCATOR_COUNT_CALLOUT = f"{len(LOCATOR_SITES_MM)}X"
 LOCATOR_CALLOUT = "\n".join((
     f"REAM THRU, SEE NOTE {LOCATOR_NOTE_NUMBER}",
-    "LOCATIONAL CLEARANCE",
-    f"FIT ON {DOWEL_NUMBER}",
+    f"SLIP ON {DOWEL_NUMBER},",
+    "SLIDES IN, NO SHAKE",
 ))
 # One hole callout for the screw holes: the drill Ø, the process, through,
 # and the countersink in symbol form on its own line at the model's diameter

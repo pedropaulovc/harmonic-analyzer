@@ -18,6 +18,7 @@ import math
 from _gtol_controls import GeometricControl, PartDatum
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
+from _printed_tolerance import drilled_oversize_mm
 
 import pd_vn_transgear_latch_pin_spec as LATCH_PIN
 import pd_transgear_arm_geometry as ARM
@@ -131,26 +132,18 @@ GEOMETRIC_CONTROLS = (
 )
 
 
-def _floor_mm(value_mm: float, places: int) -> float:
-    """``value_mm`` floored to the inch grid of ``places``, back in mm."""
-    return math.floor(value_mm / 25.4 * 10**places + 1e-6) / 10**places * 25.4
-
-
-def _ceil_mm(value_mm: float, places: int) -> float:
-    """``value_mm`` rounded up to the inch grid of ``places``, back in mm."""
-    return math.ceil(value_mm / 25.4 * 10**places - 1e-6) / 10**places * 25.4
-
-
 # The press and its proud set are assembly (MHA-PD-00 "arm-plate-located").
 # The sheet's callout and its note 2 name the dowel the reamed holes take,
-# its press (rule 4) and what the small mouth breaks keep: the dowel's
-# full-diameter grip
+# its press by trial (the dowel does not enter by hand), what the press
+# protects (the plate's return to the reducer mesh setting) and what the
+# small mouth breaks keep: the dowel's full-diameter grip
 # (``pd_transgear_arm_geometry.LOCATOR_FULL_CYLINDER_SPAN_MIN_MM``), with the
-# match-drill with the plate and its assembly step.  The press is the
-# dowel's band against the printed ream's limits.
+# match-drill with the plate and its assembly step.  The range is ANALYSIS,
+# not printed: the dowel's catalogue band against what the .1240 set reamer
+# is modelled to cut.
 LOCATOR_PRESS_INTERFERENCE = (
-    LOCATOR_PIN.DIA_LIMITS[0] - ARM.LOCATOR_HOLE_PRINTED_LIMITS_MM[1],
-    LOCATOR_PIN.DIA_LIMITS[1] - ARM.LOCATOR_HOLE_PRINTED_LIMITS_MM[0],
+    LOCATOR_PIN.DIA_LIMITS[0] - ARM.LOCATOR_HOLE_REAMED_LIMITS_MM[1],
+    LOCATOR_PIN.DIA_LIMITS[1] - ARM.LOCATOR_HOLE_REAMED_LIMITS_MM[0],
 )
 if LOCATOR_PRESS_INTERFERENCE[0] <= 0.0:
     raise AssertionError("the MHA-PD-18 locating ream loses MHA-PD-VN-64's press")
@@ -197,9 +190,9 @@ OVERALL_LENGTH = PIVOT_END_R + TIP_STATION
 DRAWING_REFERENCE_PRECISION = 3
 
 # --- The MHA-PD-VN-58 latch pin's press in the blind ream -------------------------
-# (loosest, tightest) from the printed ream band and the dowel's catalogue
-# band.  The callout rounds both outward to four inch places, so the range
-# it names holds every pin and hole the two bands accept.
+# (loosest, tightest), ANALYSIS: what the .1240 set reamer is modelled to cut
+# against the dowel's catalogue band.  The sheet prints neither a band nor
+# this range: the dowel is the gauge, it does not enter by hand.
 LATCH_PIN_NUMBER = "MHA-PD-VN-58"
 LATCH_PIN_PRESS_INTERFERENCE = (
     round(
@@ -213,10 +206,16 @@ LATCH_PIN_PRESS_INTERFERENCE = (
 )
 if LATCH_PIN_PRESS_INTERFERENCE[0] <= 0.0:
     raise AssertionError("the MHA-PD-18 latch-pin ream loses MHA-PD-VN-58's press")
-LATCH_PIN_PRESS_PRINTED = (
-    _floor_mm(LATCH_PIN_PRESS_INTERFERENCE[0], 4),
-    _ceil_mm(LATCH_PIN_PRESS_INTERFERENCE[1], 4),
-)  # .0006, .0013
+# A dowel that slides in by hand is bonded (MHA-PD-00's bond note) instead of
+# a new arm.  Even a hole cut the DRILLED HOLES row over the reamer's size
+# keeps the smallest dowel inside LOCTITE 638's gap.
+LATCH_PIN_BOND_GAP_MAX = round(
+    PIN_HOLE_DIA + drilled_oversize_mm(unit=ARM.UNIT)
+    - LATCH_PIN.DIA - min(LATCH_PIN.DIA_BAND),
+    6,
+)
+if LATCH_PIN_BOND_GAP_MAX > LOCATING_PIN.BOND_GAP_LIMIT_MM:
+    raise AssertionError("a bonded MHA-PD-VN-58 exceeds the retaining compound's gap")
 # The depth MIN's native record (#3124; swTolMIN prints only the model value
 # and MIN): its upper deviation is the deepest hole that still holds the wall
 # target at the faces, its drill run-off charged, and from its point to the

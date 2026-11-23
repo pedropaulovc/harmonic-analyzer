@@ -9,12 +9,15 @@ pd-transgear-knob-bush:
   drawing_unit: in
   process: >-
     Turned from the bought 5/8 in 1018 CF round bar, in one chucking with the
-    .238 (letter B) drill through: face the rear face, turn the press
-    diameter to the measured MHA-PD-19 hole, the shoulder with its R.005 MAX
-    root and the hub diameter, and finish the hub face at the cut-off. Press
-    into MHA-PD-19 from face A until the shoulder seats (a .0005 feeler does
-    not enter under the shoulder), then ream the bore .249 through before the
-    plate is clamped to MHA-PD-18.
+    .238 (letter B) drill through: face the rear face, turn the hub
+    diameter, then the press diameter to the measured MHA-PD-19 hole by the
+    pilot method (a short pilot on its rear end turned until the plate's
+    reamed hole just slides on, miked, and the press diameter turned to that
+    reading plus the interference; the pilot stays, behind the plate), the
+    shoulder with its R.005 MAX root, and finish the hub face at the cut-off.
+    Press into MHA-PD-19 from face A until the shoulder seats (a .0005 feeler
+    does not enter under the shoulder), then ream the bore .249 through
+    before the plate is clamped to MHA-PD-18.
   machinist_exceptions:
     - id: "RV-02"
       kind: "accept"
@@ -25,4 +28,4 @@ pd-transgear-knob-bush:
       kind: "minor"
       where: "the bore callout's WALL .068 MIN (press section)"
       finding: "press-section wall below the .080 in target (rules 17, 20)"
-      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. .068 MIN at the worst printed limits (the press at its .4387 lower limit, the reamed bore at its .2495 upper limit, the title block's .010 edge break on both rims, and 0.3° drill run-off over the bore's longest 1.145) stays above the .060 floor (pd_transgear_knob_bush_geometry.WALLS). No geometry escape: the Ø.4375 FN2 press and the Ø.249 journal bore are the owner's #2425 choices, and the stub must pass the press hole, since the bush is pressed stub-first from face A"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. .068 MIN at the worst modelled limits (the press section at its thinnest, the traveler's slip pilot at .4380, .0005 under the smallest hole the .4385 reamer is modelled to cut; the reamed bore at its .2495 upper limit, the title block's .010 edge break on both rims, and 0.3° drill run-off over the bore's longest 1.145) stays above the .060 floor (pd_transgear_knob_bush_geometry.WALLS). No geometry escape: the press in the plate (Ø.4385 REF, the set reamer's size; fit audit 2026-11-23, pending owner confirmation; was Ø.4375 FN2) and the Ø.249 journal bore are the owner's #2425 choices, and the stub must pass the press hole, since the bush is pressed stub-first from face A"

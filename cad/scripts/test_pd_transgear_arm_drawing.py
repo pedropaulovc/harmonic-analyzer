@@ -357,12 +357,12 @@ def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -
 
 def test_the_explicit_bands_are_the_spot_face_and_the_reams() -> None:
     """The latch-pin hole's height has no explicit band: its .XXX title-block
-    row governs (coordinator ruling (a), #2019)."""
+    row governs (coordinator ruling (a), #2019).  The locating reams and the
+    latch-pin ream print their set reamer's size and no band: their dowels
+    are the gauges (fit audit 2026-11-23)."""
     assert model_toleranced_dimensions(part) == {
         ("SpotFaceProfile", "SpotFaceDia"): "*deviations(SPOT_FACE_DIA_BAND)",
         ("SpotFaceProfile", "FloorDepth"): "SPOT_FACE_FLOOR_TOLERANCE",
-        ("LocatorProfile", "f'LocatorDia{index}'"): "*deviations(LOCATOR_HOLE_DIA_BAND)",
-        ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
         ("PivotBoreProfile", "PivotBoreDia"): "*deviations(PIVOT_BORE_DIA_BAND)",
         ("PinBoreProfile", "PinBoreDia"): "*deviations(PIN_BORE_DIA_BAND)",
         ("PinBoreRearMouthProfile", "PinMouthChamfer"): "PIN_MOUTH_CHAMFER_TOLERANCE",
@@ -371,10 +371,12 @@ def test_the_explicit_bands_are_the_spot_face_and_the_reams() -> None:
         geometry.PIN_HOLE_Z, spec.DRAWING_PRECISION_BY_NAME["PinHoleZ"]
     )
     assert not hasattr(spec, "LATCH_PIN_HEIGHT_TOLERANCE")
-    # The piloted counterbore only cuts oversize; the pin's press hole must
-    # never end up larger than nominal.
+    # The piloted counterbore only cuts oversize.  The latch pin's hole is
+    # modelled at its .1240 reamer's size, under the 1/8 dowel at every size
+    # the reamer is modelled to cut.
     assert min(spec.SPOT_FACE_DIA_BAND) == 0.0 < max(spec.SPOT_FACE_DIA_BAND)
-    assert 0.0 >= max(geometry.PIN_HOLE_DIA_BAND) > min(geometry.PIN_HOLE_DIA_BAND)
+    assert geometry.PIN_HOLE_DIA == pytest.approx(0.1240 * 25.4)
+    assert geometry.PIN_HOLE_DIA + max(geometry.PIN_HOLE_DIA_BAND) < pin.DIA + min(pin.DIA_BAND)
 
 
 def test_the_section_cuts_through_the_pivot_and_the_square_end() -> None:
@@ -587,9 +589,11 @@ def test_the_flank_angle_stands_in_its_wedge_over_the_arm() -> None:
 
 
 def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
-    """Review of 6de7230aa (blocker): the blind ream said PRESS FIT with no
-    interference.  Smallest dowel in the largest hole and the reverse, both
-    from printed bands, the callout rounding outward so it holds them."""
+    """Fit audit 2026-11-23 (rule 4, reamed to the bought mate): the blind
+    ream prints the .1240 set reamer's size with no band and no interference
+    range; the MHA-PD-VN-58 dowel is the gauge (it does not enter by hand)
+    and the note says what the press protects.  The range below is analysis:
+    what the reamer is modelled to cut against the dowel's catalogue band."""
     loosest = (
         pin.DIA
         + min(pin.DIA_BAND)
@@ -606,16 +610,22 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
     assert spec.LATCH_PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert joints.LATCH_PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert _config.parts("pd-vn-transgear-latch-pin")["number"] == spec.LATCH_PIN_NUMBER
-    low, high = spec.LATCH_PIN_PRESS_PRINTED
-    assert 0.0 < low <= loosest + 1e-9
-    assert loosest < tightest <= high + 1e-9 < tightest + 0.00254
-    # The callout links the note that names the pin and carries the press.
+    assert not hasattr(spec, "LATCH_PIN_PRESS_PRINTED")
+    # The callout links the note that names the pin, its acceptance by trial
+    # and the necessity answer; no band, range or gauge is printed.
     # On the 3/8 bar the ligament to the faces holds the wall target, so the
     # note no longer prints the 5/16 bar's owner-accepted shortfall (#2019).
     assert spec.LATCH_PIN_NUMBER in arm_notes.NOTES[arm_notes.LATCH_PIN_NOTE - 1]
     assert f"SEE NOTE {arm_notes.LATCH_PIN_NOTE}" in arm_notes.PIN_HOLE_CALLOUT
     note = " ".join(arm_notes.NOTES[arm_notes.LATCH_PIN_NOTE - 1].split())
-    assert ".0006-.0013" in note
+    assert "DOES NOT ENTER BY HAND" in note
+    assert "HOLDS LATCH STOP, NO OTHER FASTENER" in note
+    assert "INTERFERENCE" not in note and not any(char.isdigit() for char in note[2:].replace(
+        spec.LATCH_PIN_NUMBER, ""
+    ))
+    # A dowel that slides in by hand is bonded (MHA-PD-00 10B): the gap
+    # stays inside LOCTITE 638's limit even in a hole cut .004 over.
+    assert 0.0 < spec.LATCH_PIN_BOND_GAP_MAX <= 0.25
     assert geometry.WALLS["pin hole to faces"][1] >= geometry.WALL_TARGET
     assert "PIN HOLE TO FACES" not in note
 
@@ -739,7 +749,7 @@ def test_the_tap_callouts_stand_inside_the_upper_border() -> None:
     transfer line under the thread keeps the block inside it, and clear of
     the locating holes' callout to its right."""
     sheet_top = DRAWING_TEMPLATES[drawing.SPEC.layout].height_m - _BORDER
-    locator_lines = [".0930", *arm_notes.LOCATOR_CALLOUT_TEXT.splitlines()]
+    locator_lines = [".1240", *arm_notes.LOCATOR_CALLOUT_TEXT.splitlines()]
     locator = _centred_box(locator_lines, drawing.FRONT_KEEP["LocatorDia1"])
     for label, _station, _radius, xy, qualifier in drawing.TAP_CALLOUTS:
         # Drill and thread lines, then the qualifier's.
@@ -877,29 +887,37 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
     import pd_rack_pinion_spec as disc
     from pd_paper_drive_assembly_steps import knob_setting_ref
 
-    loosest = min(dowel.DIA_LIMITS) - max(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM)
-    tightest = max(dowel.DIA_LIMITS) - min(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM)
+    loosest = min(dowel.DIA_LIMITS) - max(geometry.LOCATOR_HOLE_REAMED_LIMITS_MM)
+    tightest = max(dowel.DIA_LIMITS) - min(geometry.LOCATOR_HOLE_REAMED_LIMITS_MM)
     assert spec.LOCATOR_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
-    # The printed ream lies inside the interface's press limits.
-    assert min(interface.PRESS_HOLE_LIMITS_MM) <= min(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM) + 1e-9
-    assert max(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM) <= max(interface.PRESS_HOLE_LIMITS_MM) + 1e-9
+    assert (loosest, tightest) == pytest.approx((0.0006 * 25.4, 0.0013 * 25.4))
+    # The holes are the .1240 set reamer's (analysis band +.0005/0), the
+    # interface's press limits; the sheet prints the size and no band.
+    assert geometry.LOCATOR_HOLE_DIA_MM == pytest.approx(0.1240 * 25.4)
+    assert geometry.LOCATOR_HOLE_REAMED_LIMITS_MM == tuple(interface.PRESS_HOLE_LIMITS_MM)
+    # .504 apart (12.8; fit audit 2026-11-23): the 1/8 holes keep the wall
+    # target to both parts' edges.
+    assert geometry.LOCATOR_PAIR_BASELINE_MM == 12.8
     assert _config.parts("pd-vn-transgear-arm-plate-locating-pin")["number"] == dowel.PART_NUMBER
     plate = _config.parts("pd-transgear-arm-plate")["number"]
     flat = " ".join(
         (arm_notes.LOCATOR_CALLOUT_TEXT + " " + arm_notes.NOTES[arm_notes.LOCATOR_NOTE - 1]).split()
     )
     # The contract, not the wording: the through ream, the mouth break's
-    # limit, the dowel and its interference, and the match-drill partner and
-    # the assembly view that sets it.
+    # limit, the dowel, its acceptance by trial, what the press protects,
+    # and the match-drill partner and the assembly view that sets it.  No
+    # interference range is printed.
     for fact in (
         "THRU",
         ".002 MAX",
         dowel.PART_NUMBER,
-        ".0003-.0011",
+        "DOES NOT ENTER BY HAND",
+        "KEEPS PLATE AT REDUCER MESH SETTING",
         plate,
         knob_setting_ref(),
     ):
         assert fact in flat, fact
+    assert "INTERFERENCE" not in flat
     assert f"{disc.CENTRE_DISTANCE:.3f}" not in flat
     assert f"SEE NOTE {arm_notes.LOCATOR_NOTE}" in arm_notes.LOCATOR_CALLOUT_TEXT
     assert arm_notes.DIMENSION_CALLOUTS["LocatorDia1"] == arm_notes.LOCATOR_CALLOUT_TEXT
@@ -1246,7 +1264,7 @@ def test_arm_feature_bands_are_the_printed_ones() -> None:
     assert latch["depth"][0] == pytest.approx(_in(0.38)) and latch["depth_printed"] == "MIN"
     assert latch["height"] == pytest.approx([_in(0.183), _in(0.193)])
     dowels = features["dowel_holes"]
-    assert dowels["dia"] == pytest.approx([_in(0.0930), _in(0.0935)])
+    assert dowels["dia"] == pytest.approx([_in(0.1240), _in(0.1245)])
     assert dowels["made_at"] == "assembly" and dowels["count"] == 2
     assert "process" not in dowels
     taps = features["plate_taps"]

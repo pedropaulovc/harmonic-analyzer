@@ -2106,12 +2106,13 @@ ARM_PLATE_SCREW_HOLE_TEXT = (
 ARM_PLATE_SPOT_DRILL_TEXT = (
     f"#1 (\u00d8{steps.inch_text(plate_geometry.SCREW_HOLE_DIA, 3)})"
 )
-# The located step's pilots: a #44 drill under the press ream leaves stock for both reams
-# (machinist review round 8: the step named no size or place).
-PLATE_DOWEL_PILOT_DIA_MM = 2.1844  # #44 (.086)
+# The located step's pilots: a #32 drill (owned 115-piece index) under the
+# .1240 press ream leaves stock for both reams (machinist review round 8: the
+# step named no size or place; 1/8 dowels, fit audit 2026-11-23).
+PLATE_DOWEL_PILOT_DIA_MM = 2.9464  # #32 (.116)
 if PLATE_DOWEL_PILOT_DIA_MM >= min(plate_locating_interface.PRESS_HOLE_LIMITS_MM) - 0.1:
     raise AssertionError("the dowel pilots must leave ream stock")
-PLATE_DOWEL_PILOT_TEXT = f"#44 (\u00d8{steps.inch_text(PLATE_DOWEL_PILOT_DIA_MM, 3)})"
+PLATE_DOWEL_PILOT_TEXT = f"#32 (\u00d8{steps.inch_text(PLATE_DOWEL_PILOT_DIA_MM, 3)})"
 # MHA-PD-12's holes are struck through the MHA-PD-11 taps with the lock placed
 # by hand; each mark is checked from the lock's edges to the hole locations'
 # printed .XXX band less the transfer's own .001 (the screw point and the
@@ -2487,16 +2488,20 @@ def _step_text(
         # point, so the proud is set as the dowel goes in, not by a floor;
         # the press is permanent (MHA-PD-18 RV-03), so an over-pressed dowel
         # stays in the arm it costs, and both are remade (Codjiflo #3127).
+        # A dowel that slides into the .1240 ream by hand is bonded, not
+        # scrapped with the arm (fit audit 2026-11-23, pending owner
+        # confirmation; machinist exception PD-00-press-salvage): the hole
+        # is reamed with the set reamer and the dowel is its gauge.
         "latch-pin-pressed": (
             f"PRESS THE {n['pd-vn-transgear-latch-pin']} DOWEL, CHAMFERED END FIRST, "
             f"INTO THE {n['pd-transgear-arm']} ARM'S REAMED HOLE, {pin_window} PROUD, "
             f"CALIPER DEPTH ROD {detail_cite('latch-pin-pressed')}.",
-            _press_remedy(
-                "DOWEL",
-                f"{n['pd-transgear-arm']} ARM AND {n['pd-vn-transgear-latch-pin']} DOWEL",
-                "latch-pin-pressed",
-                or_condition=f"READS UNDER {pin_window.split(' TO ')[0]}",
-            ),
+            "IF THE DOWEL SLIDES IN BY HAND, BOND IT PER THE BOND NOTE AT "
+            f"{detail_cite('arm-plate-fitted')[1:-1]}.",
+            f"IF IT READS UNDER {pin_window.split(' TO ')[0]}, OR A BONDED DOWEL "
+            f"MOVES WHEN PUSHED, MAKE A NEW {n['pd-transgear-arm']} ARM AND "
+            f"{n['pd-vn-transgear-latch-pin']} DOWEL AND REPEAT FROM STEP "
+            f"{steps.step_number('latch-pin-pressed')}.",
         ),
         # #2425 (owner ruling 2026-11-20): the MHA-PD-28 bush is pressed into
         # the plate from face A to its shoulder and its bore reamed through
@@ -3988,14 +3993,16 @@ def _steps_label(keys: tuple[str, ...]) -> str:
 SETTING_CAPTION_WIDTH = 26
 # DETAIL H carries the bond 13G points to (owner ruling 2026-11-20 (Pedro),
 # #2497: retaining compound only on the arm, which already carries DETAIL K's
-# jig-boring). Its prep and where the compound goes are the machinist
-# review's (592b20079f); as a note, 13G stays one action (review of
-# 70917f0316). The column under H's caption is empty down to the title
-# block, clear of DETAIL L left and DETAIL J right.
+# jig-boring) and, under the fit audit of 2026-11-23 (pending owner
+# confirmation), the latch dowel's at 10B. Its prep and where the compound
+# goes are the machinist review's (592b20079f); as a note, 13G stays one
+# action (review of 70917f0316). The column under H's caption is empty down
+# to the title block, clear of DETAIL L left and DETAIL J right.
 BOND_NOTE = (
-    f"BOND NOTE ({sub_step('arm-plate-fitted', 6)}): PULL THE DOWEL. DEGREASE IT "
+    f"BOND NOTE ({sub_step('latch-pin-pressed', 1)}, "
+    f"{sub_step('arm-plate-fitted', 6)}): PULL THE DOWEL. DEGREASE IT "
     "AND ITS HOLE. COAT THE DOWEL, NOT THE HOLE, WITH LOCTITE 638. PRESS IT "
-    f"BACK AT ONCE TO {sub_step('arm-plate-fitted', 5)}'S PROUD. CURE 24 H."
+    "BACK AT ONCE TO ITS STEP'S PROUD. CURE 24 H."
 )
 SETTING_DETAIL_NOTES = {"H": BOND_NOTE}
 SETTING_DETAIL_CAPTIONS = {

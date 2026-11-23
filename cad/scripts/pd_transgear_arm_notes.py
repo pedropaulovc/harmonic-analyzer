@@ -20,12 +20,7 @@ from pd_transgear_arm_geometry import (
     PIVOT_FIT_CLEARANCE_PLACES,
 )
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
-from pd_transgear_arm_spec import (
-    LATCH_PIN_NUMBER,
-    LATCH_PIN_PRESS_PRINTED,
-    LOCATOR_PRESS_INTERFERENCE,
-    PIN_PRESS_INTERFERENCE,
-)
+from pd_transgear_arm_spec import LATCH_PIN_NUMBER, PIN_PRESS_INTERFERENCE
 
 
 def _inch_range(limits: tuple[float, float], places: int = 4) -> str:
@@ -63,14 +58,20 @@ NOTES = (
     " SHOULDER\n"
     "   (CLEARANCE "
     f"{_inch_range(PIVOT_BORE_DIAMETRAL_CLEARANCE, PIVOT_FIT_CLEARANCE_PLACES)}).",
-    f"{LOCATOR_NOTE}. 2X DOWEL HOLES: PRESS FIT ON DOWEL {LOCATOR_PIN.PART_NUMBER}"
-    f" (INTERFERENCE {_inch_range(LOCATOR_PRESS_INTERFERENCE)}).\n"
-    "   MOUTH BREAKS "
+    # Notes 2 and 3 (fit audit 2026-11-23, pending owner confirmation): a
+    # hole reamed to a bought dowel prints its set reamer's size and no band;
+    # the dowel tried in it is the gauge, and the note says in six words or
+    # fewer what fails if the hole is loose (rule 4's necessity test): the
+    # plate must come back to the reducer mesh setting; the latch's stop pin
+    # has no other fastener (owner 2026-10-27, #1379).
+    f"{LOCATOR_NOTE}. 2X DOWEL HOLES: PRESS FIT ON DOWEL {LOCATOR_PIN.PART_NUMBER},"
+    " DOES NOT ENTER BY HAND,\n"
+    "   KEEPS PLATE AT REDUCER MESH SETTING. MOUTH BREAKS "
     f"{inch_text(inch_floor_mm(LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM, 3), 3)}"
-    f" MAX FOR DOWEL GRIP. MATCH-DRILL WITH ARM PLATE {_PLATE['number']}\n"
-    f"   AT ASSEMBLY, {knob_setting_ref()}.",
-    f"{LATCH_PIN_NOTE}. LATCH-PIN HOLE: PRESS FIT ON LATCH PIN {LATCH_PIN_NUMBER}\n"
-    f"   (INTERFERENCE {_inch_range(LATCH_PIN_PRESS_PRINTED)}).",
+    " MAX FOR DOWEL GRIP.\n"
+    f"   MATCH-DRILL WITH ARM PLATE {_PLATE['number']} AT ASSEMBLY, {knob_setting_ref()}.",
+    f"{LATCH_PIN_NOTE}. LATCH-PIN HOLE: PRESS FIT ON LATCH PIN {LATCH_PIN_NUMBER},\n"
+    "   DOES NOT ENTER BY HAND. HOLDS LATCH STOP, NO OTHER FASTENER.",
     f"{SPRING_NOTE}. COUNTERBORE Ø AND FLOOR: SEAT AND PRELOAD\n"
     f"   PIVOT SPRING {_SPRING['number']}.",
     # The arm is reamed first; the pin's land is turned to the measured ream
