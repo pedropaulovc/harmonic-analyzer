@@ -267,13 +267,13 @@ instruction = "A flat at the apex: the pivot is short of the axis: one more swee
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Take the pin out and mike it from the apex to end A."
-inspection = "Length over the crown {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}}."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.faced_length_band_mm}}" }]
+instruction = "Take the pin out and stand it on end A on the surface plate, held upright against the 1-2-3 block's face. Lower the height gauge's scriber until its tip, slid in across the top, just stops on the O.D.'s top edge (the crown's root), and read it: the root length."
+inspection = "Root length {{cad.dome_far_root_station_min_in:.2dot}}–{{cad.dome_far_root_station_max_in:.2dot}} from end A."
+gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.dome_far_root_station_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Under {{cad.faced_length_min_in:.3dot}}: the carriage moved during the sweep: scrap the pin and make another from Setup 1."
+instruction = "Root length outside {{cad.dome_far_root_station_min_in:.2dot}}–{{cad.dome_far_root_station_max_in:.2dot}}: scrap the pin and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"

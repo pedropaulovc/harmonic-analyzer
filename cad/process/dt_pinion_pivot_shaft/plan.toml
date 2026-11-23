@@ -57,9 +57,11 @@ end_stickout_in = 0.5
 # it replaces; the adapter binds the crowns' height, the faced length and the
 # sweep from it): each crown is swept full (to the centre, no flat at the
 # apex) on the Ø.250, .180 − √(.180² − .125²) = .0505 high
-# (cad.dome_*_form_height), inside the drawing's .05 (.XX) band; the faced
-# length is the body's 7.70–7.72 plus both (cad.faced_length_*), so holding
-# it holds the body.
+# (cad.dome_*_form_height), inside the drawing's .05 (.XX) band. The set
+# radius is proved on the trial offcut, whose crown is read (Op 140) and may
+# land anywhere in .04-.06; end B is faced to the body's 7.70-7.72 plus twice
+# that reading (each apex stays on its faced plane), so the body holds
+# whatever the trial crown is. cad.faced_length_* (at .0505) is not used.
 dome_form_radius_in = 0.18
 # The bit set by depth reading from a straightedge across the inner frame's
 # edges: the radius plus the maker's 3/16 from the frame's end to the pivot
@@ -217,13 +219,13 @@ instruction = "Between the last sweeps, spindle stopped, look at the apex under 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Take the offcut out and stand it on its other faced end on the surface plate. Zero the height gauge's scriber on the apex; set it {{cad.dome_far_height_min_in:.3dot}} below and slide its tip in across the top: it must ride on the crown; set it {{cad.dome_far_height_max_in:.3dot}} below and slide it in again: it must stop on the O.D., below the crown's edge."
+instruction = "Take the offcut out and stand it on its other faced end on the surface plate. Zero the height gauge's scriber on the apex; lower it until its tip, slid in across the top, just stops on the O.D.'s top edge (the crown's rim) and read it: the crown height. Note it: Op 160 uses it."
 inspection = "Trial crown {{cad.dome_far_height_min_in:.3dot}}–{{cad.dome_far_height_max_in:.3dot}} high; no pip, flat or ring at the apex."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.dome_far_height_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Crown too low (the scriber at the first setting stops on the O.D.): reset the bit (Op 90) to a depth-rod reading .010 shorter; too high: .010 longer (each .010 moves the crown about .004). Chuck the offcut again as Op 60, {{process.end_stickout_in:.2dot}} in out, face the crown off and repeat Op 70 and Ops 100–140. Under .30 in left in the jaws: saw a new trial offcut. Once it passes, leave the bit's set screw alone until both crowns are cut."
+instruction = "Crown under {{cad.dome_far_height_min_in:.3dot}}: reset the bit (Op 90) to a depth-rod reading .010 shorter; over {{cad.dome_far_height_max_in:.3dot}}: .010 longer (each .010 moves the crown about .004). Chuck the offcut again as Op 60, {{process.end_stickout_in:.2dot}} in out, face the crown off and repeat Op 70 and Ops 100–140. Under .30 in left in the jaws: saw a new trial offcut. Once it passes, leave the bit's set screw alone until both crowns are cut."
 
 [[setups]]
 machine_kind = "lathe"
@@ -242,15 +244,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face end B square in light skims, reading the length between them (Op 170), to {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}}, aiming {{cad.faced_length_in:.3dot}}: the body {{cad.body_length_min_in:.2dot}}–{{cad.body_length_max_in:.2dot}} plus two {{cad.dome_far_form_height_in:.4dot}} crowns."
+instruction = "Face end B square in light skims, reading the length between them (Op 170), to the body {{cad.body_length_min_in:.3dot}}–{{cad.body_length_max_in:.3dot}} plus twice the Op 140 crown height, aiming {{cad.body_length_in:.3dot}} plus twice it."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Between skims, take the shaft out, stand it on end A on the surface plate, held upright by hand against the side of a 1-2-3 block, and read end B with the height gauge (the 0–6 in calipers do not reach). Chuck it again {{process.end_stickout_in:.2dot}} out and touch the facing tool on end B before the next skim."
-inspection = "Faced length {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}}."
-gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.faced_length_band_mm}}" }]
+inspection = "Faced length: the body {{cad.body_length_min_in:.3dot}}–{{cad.body_length_max_in:.3dot}} plus twice the Op 140 crown height."
+gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"

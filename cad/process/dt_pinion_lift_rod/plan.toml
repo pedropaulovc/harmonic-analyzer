@@ -251,7 +251,11 @@ instruction = "Inner frame parallel to the axis: bring the carriage up until the
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms (they reach .19 either side of the pivot). If they touch: chuck the offcut {{process.end_stickout_in:.2dot}} in out again and repeat Op 90."
+instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms (they reach .19 either side of the pivot)."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "An arm touches the jaws: unlock the carriage, chuck the offcut {{process.end_stickout_in:.2dot}} in out again over the shim wrap and repeat Ops 90–100."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -275,7 +279,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Light at the leaf's ends (crown too round): reset the bit (Op 80) to a depth-rod reading .005 longer; light at its middle (too flat): .005 shorter. Face the crown off (Op 50), draw the offcut back out to {{process.end_stickout_in:.2dot}} in, and repeat Op 60 and Ops 90–130. Under .30 in left in the jaws: saw a new trial offcut. Once it passes, leave the bit's set screw alone until the rod's crown is cut."
+instruction = "Light at the leaf's ends (crown too round): reset the bit (Op 80) to a depth-rod reading .005 longer; light at its middle (too flat): .005 shorter. Face the crown off (Op 50), draw the offcut back out to {{process.end_stickout_in:.2dot}} in, and repeat Op 60, Ops 90–100 and Ops 120–140. Under .30 in left in the jaws: saw a new trial offcut. Once it passes, leave the bit's set screw alone until the rod's crown is cut."
 
 [[setups]]
 machine_kind = "lathe"
@@ -284,7 +288,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Turned round: 3-jaw over the shim wrap, {{process.end_stickout_in:.2dot}} in out, the front end back in the spindle bore."
-datum = "DRO Z touched on the far end with the facing tool before each skim (Op 150), and with the ball turner's tip in Op 180."
+datum = "DRO Z touched on the far end with the facing tool before each skim (Op 160), and with the ball turner's tip in Op 190."
 diagram = { file = "diagrams/far.svg", alt = "The rod turned round, the far end out: faced to length, then crowned by the ball turner swept about its pivot on the axis." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
@@ -294,13 +298,13 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the far end square in light skims, reading the length between them (Op 160), to {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}}, aiming {{cad.faced_length_in:.3dot}}: the {{cad.body_length_min_in:.2dot}}–{{cad.body_length_max_in:.2dot}} body plus the {{cad.dome_far_form_height_in:.4dot}} crown."
+instruction = "Face the far end square in light skims, reading the length between them (Op 170), to {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}}, aiming {{cad.faced_length_in:.3dot}}: the {{cad.body_length_min_in:.2dot}}–{{cad.body_length_max_in:.2dot}} body plus the {{cad.dome_far_form_height_in:.4dot}} crown."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Between skims, take the rod out, stand it on the front face on the surface plate, held upright by hand against the side of a 1-2-3 block, and read the far end with the height gauge (the 0–6 in calipers do not reach). Chuck it again {{process.end_stickout_in:.2dot}} out and touch the facing tool on the far end before the next skim. Note the last reading: Op 330 uses it."
+instruction = "Between skims, take the rod out, stand it on the front face on the surface plate, held upright by hand against the side of a 1-2-3 block, and read the far end with the height gauge (the 0–6 in calipers do not reach). Chuck it again {{process.end_stickout_in:.2dot}} out and touch the facing tool on the far end before the next skim. Note the last reading: Op 350 uses it."
 inspection = "Faced length {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}}."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.faced_length_band_mm}}" }]
 
@@ -324,6 +328,10 @@ instruction = "Spindle stopped: cross slide out until the bit clears the far end
 
 [[setups.operations]]
 cut_kind = "other"
+instruction = "An arm touches the jaws: unlock the carriage, chuck the rod {{process.end_stickout_in:.2dot}} in out again over the shim wrap and repeat Ops 190–200."
+
+[[setups.operations]]
+cut_kind = "other"
 speed_kind = "spindle"
 tool = "ball"
 drilling = "none"
@@ -344,11 +352,11 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A flat at the apex: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 200), then Op 220 again. A ring or point at the apex, or light under the leaf: scrap the rod and make another from Setup 1."
+instruction = "A flat at the apex: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 220), then Op 240 again. A ring or point at the apex, or light under the leaf: scrap the rod and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Take the rod out, stand it on the front face against the 1-2-3 block as Op 160 and read the crown's apex with the height gauge: the apex is on the faced plane, so it still reads the faced length."
+instruction = "Take the rod out, stand it on the front face against the 1-2-3 block as Op 170 and read the crown's apex with the height gauge: the apex is on the faced plane, so it still reads the faced length."
 inspection = "Apex {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}} over the front face."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.faced_length_band_mm}}" }]
 
@@ -423,7 +431,7 @@ instruction = "Break the front face's edge, the crown's rim and the flats' edges
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Back flat: read with the calipers from the crown's apex to the flat's nearer end, and the flat's length. Front flat: read from the front face to the flat's nearer end and its length; its station from the crown's root is the Op 160 length less the crown's {{cad.dome_far_form_height_in:.4dot}}, that reading and its length."
+instruction = "Back flat: read with the calipers from the crown's apex to the flat's nearer end, and the flat's length. Front flat: read from the front face to the flat's nearer end and its length; its station from the crown's root is the Op 170 length less the crown's {{cad.dome_far_form_height_in:.4dot}}, that reading and its length."
 inspection = "Back flat from the apex {{process.flat_back_apex_min_in:.4dot}}–{{process.flat_back_apex_max_in:.4dot}}, {{cad.flat_back_length_min_in:.2dot}}–{{cad.flat_back_length_max_in:.2dot}} long; front flat from the root {{cad.flat_front_station_min_in:.2dot}}–{{cad.flat_front_station_max_in:.2dot}}, {{cad.flat_front_length_min_in:.2dot}}–{{cad.flat_front_length_max_in:.2dot}} long."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.flat_back_apex_min_mm}}", "{{process.flat_back_apex_max_mm}}"] }, { gauge = "calipers", band_mm = "{{cad.flat_back_length_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.flat_front_length_band_mm}}" }]
 
