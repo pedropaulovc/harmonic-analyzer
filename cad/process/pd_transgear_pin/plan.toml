@@ -204,7 +204,7 @@ title = "Bar: tip end out on the centre; turn, groove, part off"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "The {{process.bar_length_in:g}} in blank, sawn off the bar with the junior hacksaw, in the 3-jaw {{cad.stickout_in:.2dot}} in out of the jaw fronts, the rest inside the chuck: nothing projects past the spindle's rear end (the pin, its kerf, the jaws' clearance and the {{process.centre_stub_in:.2dot}} in stub). The tailstock dead centre, greased, in the stub's centre hole from Op 60 until the stub is cut off in Op 180."
+holding = "The {{process.bar_length_in:g}} in blank, sawn off the bar with the junior hacksaw, in the 3-jaw {{cad.stickout_in:.2dot}} in out of the jaw fronts, the rest inside the chuck: nothing projects past the spindle's rear end; a restart pulls what is left out to {{cad.stickout_in:.2dot}} again, and with under {{process.chuck_grip_in:.2dot}} + {{cad.stickout_in:.2dot}} in left a new blank is sawn (the pin, its kerf, the jaws' clearance and the {{process.centre_stub_in:.2dot}} in stub). The tailstock dead centre, greased, in the stub's centre hole from Op 60 until the stub is cut off in Op 180."
 datum = "Z0 (carriage DRO) the tip plane, {{process.centre_stub_in:.3dot}} in back from the bar end faced in Op 40; the sharp-nose tool is set on that faced end (Op 100); the grooving tool and the blade are set on the seat or the cut tip end as their ops say."
 diagram = { file = "diagrams/bar.svg", alt = "The 1/4 in bar in the 3-jaw, the tip end out: the journal, the press land and the head turned, the ring groove cut, the pin parted off at the head." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.groove_dia_min_mm}}", support = "tailstock" }
@@ -281,7 +281,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.step_head_dia_band_mm}}" 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Head under {{cad.step_head_dia_min_in:.3dot}}: cut the piece off, scrap it, and start again from Op 40 (R stands). Over {{cad.step_head_dia_max_in:.3dot}}: another pass."
+instruction = "Head under {{cad.step_head_dia_min_in:.3dot}}: cut the piece off, scrap it, and start again from Op 40, the blank rechucked as in Setup 1's Holding (R stands). Over {{cad.step_head_dia_max_in:.3dot}}: another pass."
 
 [[setups.operations]]
 cut_kind = "longitudinal_turning"
@@ -300,7 +300,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Land under the Op 30 window: cut the piece off, scrap it, and start again from Op 40. Over it: another pass of half of (the miked Ø less R + .0004) or less on the radius, or a spring pass."
+instruction = "Land under the Op 30 window: cut the piece off, scrap it, and start again from Op 40, the blank rechucked as in Setup 1's Holding. Over it: another pass of half of (the miked Ø less R + .0004) or less on the radius, or a spring pass."
 
 [[setups.operations]]
 cut_kind = "longitudinal_turning"
@@ -325,7 +325,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A station under {{cad.outer_dia_min_in:.4dot}}: cut the piece off, scrap it, and start again from Op 40. Over {{cad.outer_dia_max_in:.4dot}} at one station only: polish there alone."
+instruction = "A station under {{cad.outer_dia_min_in:.4dot}}: cut the piece off, scrap it, and start again from Op 40, the blank rechucked as in Setup 1's Holding. Over {{cad.outer_dia_max_in:.4dot}} at one station only: polish there alone."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -351,7 +351,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.groove_dia_band_mm}}" }, 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Root over {{cad.groove_dia_max_in:.3dot}}: plunge a further (the root reading less .096)/2 on the radius and read it again. The .020 leaf not entering: widen as above. Root under {{cad.groove_dia_min_in:.3dot}}, the .022 leaf entering, or the load wall outside its station: cut the piece off, scrap it, and start again from Op 40."
+instruction = "Root over {{cad.groove_dia_max_in:.3dot}}: plunge a further (the root reading less .096)/2 on the radius and read it again. The .020 leaf not entering: widen as above. Root under {{cad.groove_dia_min_in:.3dot}}, the .022 leaf entering, or the load wall outside its station: cut the piece off, scrap it, and start again from Op 40, the blank rechucked as in Setup 1's Holding."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -398,7 +398,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.head_face_min_mm}}",
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Head under {{process.head_face_min_in:.3dot}}: scrap the pin and make another from Op 40 (R stands)."
+instruction = "Head under {{process.head_face_min_in:.3dot}}: scrap the pin and make another from Op 40, the blank rechucked as in Setup 1's Holding (R stands)."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -435,7 +435,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.far_end_station_band_mm}}
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Seat to tip under {{cad.far_end_station_min_in:.3dot}}: scrap the pin and make another from Op 40 (R stands)."
+instruction = "Seat to tip under {{cad.far_end_station_min_in:.3dot}}: scrap the pin and make another from Op 40, the blank rechucked as in Setup 1's Holding (R stands)."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -466,7 +466,7 @@ inspection = "No mark or nick you can feel; the land inside the Op 30 window (it
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "A mark you can feel, the land outside the Op 30 window, or a journal station outside its band: scrap the pin and make another from Op 40 (R stands)."
+instruction = "A mark you can feel, the land outside the Op 30 window, or a journal station outside its band: scrap the pin and make another from Op 40, the blank rechucked as in Setup 1's Holding (R stands)."
 
 [[setups.operations]]
 instruction = "Wipe the pin with machine oil (FINISH: oiled). Bag it with the {{cad.step_land_mate}} arm whose ream Op 10 read, labelled with R: its land fits that ream only."
