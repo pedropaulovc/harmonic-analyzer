@@ -254,7 +254,7 @@ speed_kind = "other"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Back X out about .05 above the press diameter, clear of the root's fillet. Z: bring the blade's chuck-side face onto the shoulder's face through the leaf until it drags. Leaf out; move the carriage {{process.touch_leaf_in:.3dot}} toward the chuck by its handwheel dial and lock it."
+instruction = "Back X out to DRO X the Op 60 reading plus .04 (on the diameter, .02 a side): above the root's fillet, still below the hub. Z: bring the blade's chuck-side face onto the shoulder's face through the leaf until it drags. Leaf out; move the carriage {{process.touch_leaf_in:.3dot}} toward the chuck by its handwheel dial and lock it."
 feed = "hand"
 
 [[setups.operations]]
