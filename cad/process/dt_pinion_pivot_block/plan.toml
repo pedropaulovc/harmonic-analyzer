@@ -535,7 +535,7 @@ instruction = "Only if the reamer read under the GO pin, before block 1: home th
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Trial hole, MDI: M3 S1000, G0 Z2, G1 Z-15 F{{process.bore_feed_per_min_mm:.1f}}, G0 Z15, M5. Console M6 T5 (the reamer): M3 S650, G0 Z2, G1 Z-15 F{{process.ream_feed_per_min_mm:.1f}}, G1 Z15, M5. Cutting oil. Gauge it as the ream below. The GO pin enters: take the offcut out and go on. Refused: stop and tell the owner (the pins refuse this reamer's holes)."
+instruction = "Trial hole, MDI: set 1000; M3 S1000, G0 Z2, G1 Z-15 F{{process.bore_feed_per_min_mm:.1f}}, G0 Z15, M5. Console M6 T5 (the reamer); set 650; M3 S650, G0 Z2, G1 Z-15 F{{process.ream_feed_per_min_mm:.1f}}, G1 Z15, M5. Cutting oil. Gauge it as the ream below. The GO pin enters: take the offcut out and go on. Refused: stop and tell the owner (the pins refuse this reamer's holes)."
 feed = "hand"
 
 [[setups.operations]]

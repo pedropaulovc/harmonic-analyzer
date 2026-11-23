@@ -159,7 +159,7 @@ cut_diameter_mm = "{{cad.end_hole_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Still chucked, spindle stopped, the tailstock left locked and only the quill wound back, the hole blown clean: the GO pin enters to the bottom and the NO-GO pin does not enter. With the GO pin at the bottom, read how far it stands out of the end face with the calipers' depth rod; the pin's miked length less that is the depth."
+instruction = "Still chucked, spindle stopped, the tailstock left locked and only the quill wound back, the hole blown clean: the GO pin enters to the bottom and the NO-GO pin does not enter. Caliper the GO pin's length; with it at the bottom, read how far it stands out of the end face with the calipers' depth rod; its length less that is the depth."
 inspection = "GO enters, NO-GO does not: hole Ø{{cad.end_hole_dia_min_in:.4dot}}–{{cad.end_hole_dia_max_in:.4dot}}; {{cad.end_hole_depth_min_in:.2dot}}–{{cad.end_hole_depth_max_in:.2dot}} deep at full diameter."
 gauge_checks = [{ gauge = "zz-pins-0630-0635", band_mm = "{{cad.end_hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.end_hole_depth_band_mm}}" }]
 feed = "hand"
