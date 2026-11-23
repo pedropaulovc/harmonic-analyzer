@@ -338,8 +338,8 @@ gauge_checks = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mike the .2510 and .3135 reamers across two opposite margins at their front ends, and the 1/8 end mill across its flutes, E (the seat circle cuts Ø(.0335 + E)). Write the three readings here."
-inspection = "Each reamer under its NO-GO pin's reading, else it is not used: stop and tell the owner. E .1240–.1250 (seat .1575–.1585), else another cutter."
+instruction = "Mike the .2510 and .3135 reamers across two opposite margins at their front ends. Write the two readings here."
+inspection = "Each reamer under its NO-GO pin's reading, else it is not used: stop and tell the owner."
 gauge_checks = "other"
 feed = "hand"
 
@@ -480,7 +480,11 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "A GO pin refused: clear the chips, oil, and with that bore's reamer loaded (console M6 T5 or T6) feed it through the bore once more by MDI at its file speed and feed, to {{process.ream_past_mm:in.3dot}} below face A and back out, spindle running; gauge again; all passing now: unclamp. Still refused (a reamer cannot be made to cut larger), or a NO-GO pin entering (no cut remedies it): stop and tell the owner."
+instruction = "A GO pin refused: clear the chips and oil. Console M6 T5 (.2510, 450 rpm, F45.720) or T6 (.3135, 360 rpm, F36.576), spindle on, then by MDI: G0 X<bore> Y-15.875, G0 Z10.144, G1 Z-2.540 F<feed>, G1 Z10.144 F<feed>, with X 17.000 or 70.000 for a pivot bore, 45.000 or 98.000 for an arbor bore. Gauge again; all passing now: unclamp."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Still refused (a reamer cannot be made to cut larger), or a NO-GO pin entering (no cut remedies it): stop and tell the owner."
 feed = "hand"
 
 [[setups]]

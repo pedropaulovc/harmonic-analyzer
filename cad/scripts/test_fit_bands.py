@@ -132,6 +132,10 @@ OFFLINE_IMPORT_EXCLUSIONS: dict[str, str] = {}
 # Module-level *_BAND tuples that are not fit bands, so no checked consumer
 # reads them. A new band tuple must be fed to a consumer above or listed here.
 NOT_FIT_BANDS: dict[tuple[str, str], str] = {
+    ("dt_pinion_cam_pin_spec", "SEAT_BAND"): (
+        "restatement of dt_pinion_bracket_spec.PIN_SEAT_DIA_BAND (checked there) "
+        "for the MHA-DT-25 bond-gap arithmetic; the cam-pin drawing test pins them equal"
+    ),
     ("build_dt_drive_train_assembly", "ARBOR_PED_SOUTH_Z_BAND"): (
         "plan z extent of the south pedestal foot (clearance geometry)"
     ),
