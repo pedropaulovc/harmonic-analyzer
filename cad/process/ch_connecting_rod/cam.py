@@ -652,14 +652,14 @@ def context(
         raise ValueError("the arbor's nut reaches the crown at the saw's touch-off")
     # CR05 leaves T1 parked over that station, high enough that the arbor
     # mounted in its place (its lowest point no more than saw_arbor_length_mm
-    # from the nose; T1's tip at least its collet and projection out) hangs
+    # from the nose; T1's tip its collet and its set projection out) hangs
     # CLEAR_MM over the stock top: the saw never moves in X or Y on a
     # height the controller does not know.
     park_z = (
         t_max
         + CLEAR_MM
         + p["saw_arbor_length_mm"]
-        - (p["r8_collet_gauge_mm"] + p["half_mill_projection_min_mm"])
+        - (p["r8_collet_gauge_mm"] + p["half_mill_projection_mm"])
     )
     _agree(plan, "saw_park_z_mm", park_z)
 

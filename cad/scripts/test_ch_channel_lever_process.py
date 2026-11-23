@@ -196,8 +196,8 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # A face row skipped: a strip of B left standing.
         (
             "face_b",
-            lambda line: line.startswith("G1 Y-85.795"),
-            lambda line: "G1 Y-78.527 F{feed}",
+            lambda line: line.startswith("G1 Y-84.810"),
+            lambda line: "G1 Y-81.520 F{feed}",
             "face",
         ),
         # The D drill stopped short of the plate.

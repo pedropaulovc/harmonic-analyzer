@@ -532,10 +532,11 @@ def context(
     em = _shop_tool(plan, shop, "em-half")["diameter_mm"]
     r = em / 2
     _agree(plan, "face_cutter_dia_mm", em)
-    em_rpm, em_feed = _setting(plan, shop, "face b")
-    for name in ("pocket b", "pocket a"):
-        if _setting(plan, shop, name) != (em_rpm, em_feed):
-            raise ValueError(f"'{name}' runs at another setting than 'face b'")
+    # Face B runs on its own (measured) setting; the two pockets share one.
+    face_rpm, face_feed = _setting(plan, shop, "face b")
+    em_rpm, em_feed = _setting(plan, shop, "pocket b")
+    if _setting(plan, shop, "pocket a") != (em_rpm, em_feed):
+        raise ValueError("'pocket a' runs at another setting than 'pocket b'")
     woc = _cut(plan, "face b", "radial_woc_mm")
     if r - g["bar_half"] < 1.0 or r < g["tip_r"] + 1.0:
         raise ValueError(
@@ -971,9 +972,9 @@ def context(
             "em-half",
             em,
             "endmill",
-            em_rpm,
-            em_feed,
-            em_feed,
+            face_rpm,
+            face_feed,
+            face_feed,
             "b",
             stock_b,
             face,
@@ -1244,7 +1245,7 @@ def context(
         ]
 
     name = "CL01_face_b"
-    expect += common(name, t_max, [tn["em-half"]], [em_rpm], hub_t)
+    expect += common(name, t_max, [tn["em-half"]], [face_rpm], hub_t)
     expect += [
         [name, "rapids_clear", {"z_top": t_max}],
         [name, "air_feed", {"z_top": t_max}],
