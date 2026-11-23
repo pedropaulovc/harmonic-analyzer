@@ -504,12 +504,15 @@ def test_a_dowel_that_slides_into_the_arm_is_bonded() -> None:
         drawing.detail_cite("arm-plate-fitted") == f"(DETAIL H, SHEET {detail_sheet})"
     )
     note = " ".join(drawing.SETTING_DETAIL_CAPTIONS["H"].split())
-    assert f"BOND NOTE ({drawing.sub_step('arm-plate-fitted', 6)}):" in note
+    assert (
+        f"BOND NOTE ({drawing.sub_step('latch-pin-pressed', 1)}, "
+        f"{drawing.sub_step('arm-plate-fitted', 6)}):"
+    ) in note
     for words in (
         "PULL THE DOWEL.",
         "DEGREASE IT AND ITS HOLE.",
         "COAT THE DOWEL, NOT THE HOLE, WITH LOCTITE 638.",
-        f"PRESS IT BACK AT ONCE TO {drawing.sub_step('arm-plate-fitted', 5)}'S PROUD.",
+        "PRESS IT BACK AT ONCE TO ITS STEP'S PROUD.",
         "CURE 24 H.",
     ):
         assert words in note, words
@@ -1967,15 +1970,24 @@ def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
 def test_an_over_pressed_latch_dowel_is_remade_with_its_arm() -> None:
     """#3124 / Codjiflo #3127: the dowel is pressed to height and the press
     is permanent (MHA-PD-18 RV-03), so a dowel set under the window stays in
-    the arm it scraps; the remedy remakes both, as the later restarts do."""
-    body = " ".join(_step_body("latch-pin-pressed").split())
+    the arm it scraps; the remedy remakes both, as the later restarts do.
+    Fit audit 2026-11-23 (pending owner confirmation): a dowel that slides
+    into the reamed hole by hand is bonded per DETAIL H's note, not scrapped
+    with the arm; a bond that does not hold remakes both."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    rows = [" ".join(row.split()) for row in texts["latch-pin-pressed"]]
     low = steps.inch_text(drawing.setting_details.LATCH_PROUD_BAND[0], 3)
-    assert (
-        f"IF THE DOWEL SLIDES IN BY HAND OR READS UNDER {low}, MAKE A NEW "
+    assert rows[1] == (
+        "IF THE DOWEL SLIDES IN BY HAND, BOND IT PER THE BOND NOTE AT "
+        f"{drawing.detail_cite('arm-plate-fitted')[1:-1]}."
+    )
+    assert rows[2] == (
+        f"IF IT READS UNDER {low}, OR A BONDED DOWEL MOVES WHEN PUSHED, MAKE A NEW "
         f"{_number('pd-transgear-arm')} ARM AND "
         f"{_number('pd-vn-transgear-latch-pin')} DOWEL AND REPEAT FROM STEP "
         f"{steps.step_number('latch-pin-pressed')}."
-    ) in body
+    )
+    assert len(rows) == 3
 
 
 def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
