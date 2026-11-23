@@ -711,6 +711,8 @@ description = "Starrett 18A automatic centre punch"
 description = "Nicholson 10 in mill second-cut file"
 [tools.india-stone-ib8]  # F-stone-norton-IB8
 description = "Norton IB8 India combination stone"
+[tools.sharpening-stone-two-grit]  # inventory tools.sharpening-stone-two-grit (on hand); tool audit 2026-11-23 level 0: the owned stone stands in for the India stone
+description = "Aluminium oxide two-grit sharpening stone, 6 x 2 x 1 in, 100 and 320 grit (McMaster-Carr 4506A2)"
 [tools.pliers]  # F-pliers
 description = "Pliers"
 [tools.steel-rule-48]  # F-steel-rule-48
