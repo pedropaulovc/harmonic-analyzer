@@ -277,7 +277,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Waist: bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Plunge to Ø{{cad.step_waist_dia_in:.3dot}} (the band's middle) with that face at Z-{{cad.shoulder_flange_in:.3dot}}: the flange's rear face."
+instruction = "Waist: bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Plunge to Ø{{cad.step_waist_dia_in:.3dot}} (the band's middle; caliper it between plunges, spindle stopped) with that face at Z-{{cad.shoulder_flange_in:.3dot}}: the flange's rear face."
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.step_waist_dia_mm}}"
 
@@ -390,7 +390,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Rechuck the nut by its knurled head over the brass shim wrap, {{process.regrip_grip_in:.2dot}} in in the jaws, as in the Holding line. Swing the compound {{cad.recess_flank_deg:.1f}}° off the cross slide, so feeding it out moves the tool toward the tailstock; set it with the dial indicator on the compound, its plunger on the faced rim just outside the countersink: feeding out {{process.compound_check_travel_in:.3dot}} on its dial, the plunger extends {{process.compound_check_rise_in:.3dot}}. Lock it."
+instruction = "Rechuck the nut by its knurled head over the brass shim wrap, {{process.regrip_grip_in:.2dot}} in in the jaws, as in the Holding line. Swing the compound {{cad.recess_flank_deg:.1f}}° off the cross slide, so feeding it out moves the tool toward the tailstock; set it with the dial indicator on the compound, its plunger on the faced rim just outside the drilled hole: feeding out {{process.compound_check_travel_in:.3dot}} on its dial, the plunger extends {{process.compound_check_rise_in:.3dot}}. Lock it."
 inspection = "Compound: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends {{process.compound_check_rise_in:.3dot}}."
 gauge_checks = "other"
 
@@ -400,7 +400,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Turn the toolpost so the AR's chuck-side edge stands at least 20° off the face and lock it; zero the compound's dial. Spindle stopped, through a .001 cigarette paper: touch the AR on the faced rim and set DRO Z to +.001; touch it on the knurl's crests and set the X DRO (on diameter) to D0 + .002, D0 the Op 50 reading. From here the compound moves only in Op 220, back to zero after each pass."
+instruction = "Turn the toolpost so the AR's chuck-side edge stands at least 20° off the face and lock it; zero the compound's dial. Spindle stopped, through a .001 cigarette paper: touch the AR on the faced rim and set DRO Z to +.001; touch it on the knurl, rocking the chuck by hand until the paper drags hardest (a crest under the nose), and set the X DRO (on diameter) to D0 + .002, D0 the Op 50 reading. From here the compound moves only in Op 220, back to zero after each pass."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
