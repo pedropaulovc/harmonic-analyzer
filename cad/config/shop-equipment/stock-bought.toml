@@ -497,3 +497,80 @@ dia_in = [0.008]
 length_in = [17340.0]
 status = "on_hand"
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 22: \"Spring-Back 304 Stainless Steel Wire, 0.008\" Diameter, 1445 Feet Long\", 1 each shipped"]
+
+# McMaster-Carr PO 1103PCAMPOS (packing list 8227120-01, 11/03/2026; all
+# shipped as ordered): its raw stock lines 73-80. Each line's "Your Part
+# Number" names the part it was bought for; that is the allocation recorded.
+# Lengths, sizes and tempers are the packing list's descriptions. Its
+# purchased hardware is hardware-bought.toml.
+[stock.drill-rod-1-16]
+form = "round_bar"
+material = "AISI O1 tool steel rod, oil-hardening, tight tolerance"
+note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 73): 8893K115 tight-tolerance oil-hardening O1 tool steel rod, .0625 in diameter, 3 ft, 1 each. Allocation: dt-pinion-lever-pin (MHA-DT-30), one .65 in piece hand-sawn off a filed end and filed to the .63 cut length (dt_pinion_lever_pin_geometry.PIN_LEN 16.002 mm), diameter as supplied; the rest is spare for remakes. The diameter tolerance is not on the packing list."
+dia_in = [0.0625]
+length_in = [36.0]
+status = "on_hand"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 73: \"Tight-Tolerance Oil-Hardening O1 Tool Steel Rod, 0.0625\" Diameter, 3 Feet Long\", 1 each shipped; Your Part Number MHA-DT-30 dt-pinion-lever-pin", "cad/config/parts/dt-pinion-lever-pin.yaml material_specification", "cad/scripts/dt_pinion_lever_pin_geometry.py PIN_DIA, PIN_LEN"]
+
+[stock.o1-drill-rod-0782]
+form = "round_bar"
+material = "AISI O1 tool steel rod, oil-hardening, tight tolerance"
+note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 74): 8893K125 tight-tolerance oil-hardening O1 tool steel rod, .0782 in diameter, 3 ft, 1 each. The packing list names MHA-CH-11 ch-bar-pivot-pin and MHA-CH-10 (stem cut off on the list); no allocation beyond that is recorded."
+dia_in = [0.0782]
+length_in = [36.0]
+status = "on_hand"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 74: \"Tight-Tolerance Oil-Hardening O1 Tool Steel Rod, 0.0782\" Diameter, 3 Feet Long\", 1 each shipped; Your Part Number MHA-CH-11 ch-bar-pivot-pin, MHA-CH-10"]
+
+[stock.drill-rod-1-8]
+form = "round_bar"
+material = "AISI O1 tool steel rod, oil-hardening, tight tolerance"
+note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 75): 8893K148 tight-tolerance oil-hardening O1 tool steel rod, .1250 in diameter, 3 ft, 1 each. Allocation: dt-crank-pinion-pin (MHA-DT-29), one .56 in pin (dt_crank_pinion_pin_spec.PIN_LEN 14.224 mm) plus facing, parting and a chucking end, diameter as supplied."
+dia_in = [0.125]
+length_in = [36.0]
+status = "on_hand"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 75: \"Tight-Tolerance Oil-Hardening O1 Tool Steel Rod, 0.1250\" Diameter, 3 Feet Long\", 1 each shipped; Your Part Number MHA-DT-29 dt-crank-pinion-pin", "cad/config/parts/dt-crank-pinion-pin.yaml material_specification, process", "cad/scripts/dt_crank_pinion_pin_spec.py PIN_LEN"]
+
+[stock.o1-drill-rod-5-32]
+form = "round_bar"
+material = "AISI O1 tool steel rod, oil-hardening, tight tolerance"
+note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 76): 8893K162 tight-tolerance oil-hardening O1 tool steel rod, .1563 in diameter, 3 ft, 1 each. Allocation: dt-pinion-cam-pin (MHA-DT-25) (owner ruling #290, 2026-10-30), two .86 in sawn blanks for the .79 in cam-follower pins with their crowns (dt_pinion_cam_pin_geometry.PIN_LEN 20.066 mm), diameter as supplied; the rest is spare for remakes."
+dia_in = [0.15625]
+length_in = [36.0]
+status = "on_hand"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 76: \"Tight-Tolerance Oil-Hardening O1 Tool Steel Rod, 0.1563\" Diameter, 3 Feet Long\", 1 each shipped; Your Part Number MHA-DT-25 dt-pinion-cam-pin", "cad/config/parts/dt-pinion-cam-pin.yaml material_specification", "cad/scripts/dt_pinion_cam_pin_geometry.py PIN_DIA, PIN_LEN"]
+
+[stock.o1-drill-rod-3-16]
+form = "round_bar"
+material = "AISI O1 tool steel rod, oil-hardening, tight tolerance"
+note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 77): 8893K178 tight-tolerance oil-hardening O1 tool steel rod, .1875 in diameter, 3 ft, 1 each. The packing list names MHA-MG-07 mg-wheel-axle; no allocation beyond that is recorded."
+dia_in = [0.1875]
+length_in = [36.0]
+status = "on_hand"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 77: \"Tight-Tolerance Oil-Hardening O1 Tool Steel Rod, 0.1875\" Diameter, 3 Feet Long\", 1 each shipped; Your Part Number MHA-MG-07 mg-wheel-axle"]
+
+[stock.c260-sheet-032-6x6]
+form = "sheet"
+material = "260 brass, ultra-formable"
+note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 78): 8956K425 ultra-formable 260 brass sheet, 6 x 6 in, .0320 in thick, 1 each. The packing list names MHA-PD-03 pd-platen-clip. Not reconciled with stock.c260-h02-strip-032x2, the H02 strip the platen-clip plan asks for: the temper is not on the packing list and the form differs."
+section_mm = [152.4, 0.8128]
+length_mm = 152.4
+status = "on_hand"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 78: \"Ultra-Formable 260 Brass Sheet, 6\" x 6\", 0.0320\" Thick\", 1 each shipped; Your Part Number MHA-PD-03 pd-platen-clip (C260 .032 6x6)"]
+
+[stock.c260-sheet-040-6x6]
+form = "sheet"
+material = "260 brass, ultra-formable"
+note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 79): 8956K435 ultra-formable 260 brass sheet, 6 x 6 in, .0400 in thick, 1 each. The packing list names MHA-MS-03 ms-stop-plate; no allocation beyond that is recorded."
+section_mm = [152.4, 1.016]
+length_mm = 152.4
+status = "on_hand"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 79: \"Ultra-Formable 260 Brass Sheet, 6\" x 6\", 0.0400\" Thick\", 1 each shipped; Your Part Number MHA-MS-03 ms-stop-plate (C260 .040 6x6)"]
+
+[stock.c260-sheet-063-6x6]
+form = "sheet"
+material = "260 brass, ultra-formable"
+note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 80): 8956K455 ultra-formable 260 brass sheet, 6 x 6 in, .0630 in thick, 1 each. The packing list names MHA-PD-12 pd-guide-lock and MHA-FR-04 (stem cut off on the list); no allocation beyond that is recorded."
+section_mm = [152.4, 1.6002]
+length_mm = 152.4
+status = "on_hand"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 80: \"Ultra-Formable 260 Brass Sheet, 6\" x 6\", 0.0630\" Thick\", 1 each shipped; Your Part Number MHA-PD-12 pd-guide-lock, MHA-FR-04"]
