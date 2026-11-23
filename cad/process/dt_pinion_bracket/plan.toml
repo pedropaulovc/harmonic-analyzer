@@ -55,7 +55,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 3/8 x 1-1/4 in flat (drawing: {{cad.material_spec}})"
 stock = "3/8 x 1-1/4 in flat bar; one blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in long makes both straps."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.broad_face_b_thickness_min_in:.3dot}}–{{cad.broad_face_b_thickness_max_in:.3dot}} thick (face A to face B); face A is the bar's cold-finished face, left as bought. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home. After any controller reset, stall or E-stop, home and touch off again before Cycle Start (Op 100 alone keeps G54: its face is already cut). Every file is proved in air before its first cut. Not on hand, to buy before the job: the .2510 and .3135 reamers and the six Class ZZ pins (.2510, .3135 and .157 plus; .2515, .314 and .160 minus)."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.broad_face_b_thickness_min_in:.3dot}}–{{cad.broad_face_b_thickness_max_in:.3dot}} thick (face A to face B); face A is the bar's cold-finished face, left as bought. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home. After any controller reset, stall or E-stop, home and touch off again before Cycle Start (Op 110 alone keeps G54: its face is already cut). Every file is proved in air before its first cut. Not on hand, to buy before the job: the .2510 and .3135 reamers and the six Class ZZ pins (.2510, .3135 and .157 plus; .2515, .314 and .160 minus)."
 shop = "../shop"
 stock_refs = ["1018-flat-3-8x1-1-4"]
 material_key = "rocker-1018-cold-finished"
@@ -328,8 +328,8 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "On the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the {{cad.pivot_bore_dia_min_in:.4dot}} GO pin, the {{cad.pivot_bore_dia_max_in:.4dot}} NO-GO pin and the .2510 reamer across two opposite margins at its front end; then the {{cad.arbor_bore_dia_min_in:.4dot}} and {{cad.arbor_bore_dia_max_in:.4dot}} pins and the .3135 reamer; then the {{cad.follower_seat_dia_min_in:.3dot}} and {{cad.follower_seat_dia_max_in:.3dot}} pins; then the 1/8 end mill across its flutes, E: its seat circle cuts Ø(.0335 + E), so E .1240–.1250 lands the seat .1575–.1585; another cutter outside that. Write the nine readings here, and each pin's reading on its tag."
-inspection = "GO pins read {{cad.pivot_bore_dia_min_in:.4dot}}–{{process.pivot_go_pin_max_in:.4dot}}, {{cad.arbor_bore_dia_min_in:.4dot}}–{{process.arbor_go_pin_max_in:.4dot}} and {{cad.follower_seat_dia_min_in:.4dot}}–{{process.seat_go_pin_max_in:.4dot}}; NO-GO pins {{process.pivot_nogo_pin_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}, {{process.arbor_nogo_pin_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}} and {{process.seat_nogo_pin_min_in:.4dot}}–{{cad.follower_seat_dia_max_in:.4dot}}: a pin outside its range is not used."
+instruction = "On the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the six Class ZZ pins: {{cad.pivot_bore_dia_min_in:.4dot}} plus and {{cad.pivot_bore_dia_max_in:.4dot}} minus, {{cad.arbor_bore_dia_min_in:.4dot}} plus and {{cad.arbor_bore_dia_max_in:.4dot}} minus, {{cad.follower_seat_dia_min_in:.3dot}} plus and {{cad.follower_seat_dia_max_in:.3dot}} minus. Write each reading here and on its tag."
+inspection = "GO pins read {{cad.pivot_bore_dia_min_in:.4dot}}–{{process.pivot_go_pin_max_in:.4dot}}, {{cad.arbor_bore_dia_min_in:.4dot}}–{{process.arbor_go_pin_max_in:.4dot}} and {{cad.follower_seat_dia_min_in:.4dot}}–{{process.seat_go_pin_max_in:.4dot}}; NO-GO pins {{process.pivot_nogo_pin_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}, {{process.arbor_nogo_pin_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}} and {{process.seat_nogo_pin_min_in:.4dot}}–{{cad.follower_seat_dia_max_in:.4dot}}. A pin outside: replace it before Setup 2."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.pivot_bore_dia_band_mm}}" },
   { gauge = "micrometers", band_mm = "{{cad.arbor_bore_dia_band_mm}}" },
@@ -338,11 +338,13 @@ gauge_checks = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "This sheet accepts a hole its GO pin enters and its NO-GO pin does not: GO reading ≤ hole < NO-GO reading. With the pins at their size limits only {{process.pivot_go_pin_max_in:.4dot}}–{{process.pivot_nogo_pin_min_in:.4dot}} (pivot), {{process.arbor_go_pin_max_in:.4dot}}–{{process.arbor_nogo_pin_min_in:.4dot}} (arbor) and {{process.seat_go_pin_max_in:.4dot}}–{{process.seat_nogo_pin_min_in:.4dot}} (seat) are sure to pass; a good hole within .0002 of a band limit may be refused (owner ruling 2026-11-23)."
+instruction = "Mike the .2510 and .3135 reamers across two opposite margins at their front ends, and the 1/8 end mill across its flutes, E (the seat circle cuts Ø(.0335 + E)). Write the three readings here."
+inspection = "Each reamer under its NO-GO pin's reading, else it is not used: stop and tell the owner. E .1240–.1250 (seat .1575–.1585), else another cutter."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Only if a reamer read under its GO pin, before Setup 2: grip an offcut of the 3/8 flat on the stacks, and by MDI drill it (C for the .2510, N for the .3135) and ream it through with that reamer at its Setup 2 speed and feed; gauge it with that band's pins. The GO pin enters: go on. Refused: stop and tell the owner (the pins refuse this reamer's holes)."
+instruction = "This sheet accepts a hole its GO pin enters and its NO-GO pin does not: GO reading ≤ hole < NO-GO reading. With the pins at their size limits only {{process.pivot_go_pin_max_in:.4dot}}–{{process.pivot_nogo_pin_min_in:.4dot}} (pivot), {{process.arbor_go_pin_max_in:.4dot}}–{{process.arbor_nogo_pin_min_in:.4dot}} (arbor) and {{process.seat_go_pin_max_in:.4dot}}–{{process.seat_nogo_pin_min_in:.4dot}} (seat) are sure to pass; a good hole within .0002 of a band limit may be refused (owner ruling 2026-11-23)."
 feed = "hand"
 
 [[setups]]
@@ -357,6 +359,10 @@ diagram = { file = "diagrams/flat.svg", alt = "The blank lying on stacked parall
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.blank_x_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_top_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.arbor_drill_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_long_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_x_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.blank_top_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_blank_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.blank_length_max_mm}}"], section_mm = { y = "{{cad.blank_x_mm}}", z = "{{cad.broad_face_b_thickness_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Only if a reamer read under its GO pin, before the blank goes in: grip a 3/8 flat offcut in the vise, spindle over it by eye; by the quill handle drill it through (C for the .2510, N for the .3135), then ream it through with that reamer at its file speed; gauge it with that band's pins. The GO pin enters: go on. Refused: stop and tell the owner (the pins refuse this reamer's holes)."
+feed = "hand"
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 the blank's left end, Y0 the fixed jaw's face: edge finder (900 rpm)."
