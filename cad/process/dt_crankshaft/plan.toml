@@ -947,7 +947,17 @@ peck = { step_mm = 0.508, retract = "full" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The slug out (the jig, the cross slide and the drill chuck untouched). Each hole: the .0930 GO enters, the .0935 NO-GO does not. The NO-GO entering: stop and tell the owner (these are the .0930 reamer's trial holes); the GO refused: the re-ream ops at the end of this setup. With the GO in it, mike over the pin and the stub's far side beside the spigot face; offset = reading − stub/2 + .09325/2 − the GO's written reading (the anvil pushes the pin onto the hole's inner wall). Write both offsets."
+instruction = "The slug out (the jig, the cross slide and the drill chuck untouched). Each hole: the .0930 GO enters, the .0935 NO-GO does not."
+inspection = "GO enters, NO-GO does not: holes Ø{{cad.drive_pin_1_dia_min_in:.4dot}}–{{cad.drive_pin_1_dia_max_in:.4dot}}."
+gauge_checks = [{ gauge = "zz-pins-0930-0935", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The NO-GO entering: stop and tell the owner (these are the .0930 reamer's trial holes). The GO refused: the re-ream ops at the end of this setup."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "With the GO pin in each hole in turn, mike over the pin and the stub's far side beside the spigot face; offset = reading − stub/2 + .09325/2 − the GO's written reading (the anvil pushes the pin onto the hole's inner wall). Write both offsets."
 inspection = "Each offset {{cad.drive_pin_1_offset_min_in:.4dot}}–{{cad.drive_pin_1_offset_max_in:.4dot}} (the drawing's band); the slug passes within {{process.pin_guard_in:.4dot}} of {{cad.drive_pin_1_offset_in:.4dot}} (the band less the reading's ±{{process.pin_uncertainty_in:.4dot}})."
 gauge_checks = [{ gauge = "zz-pins-0930-0935", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }, { gauge = "micrometers", band_mm = [6.9848, 7.0152] }]
 

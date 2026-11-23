@@ -467,8 +467,9 @@ diameter_mm = 3.175
 [tools.drill-54-taper-length]
 description = "#54 (.0550 in) taper-length HSS drill, 1.75 in flute, 3 in overall (Fastenal 0306183)"
 diameter_mm = 1.397
+# Bore .4385: owner ruling 2026-11-23, tool audit Q11 (it was .4500).
 [tools.dt-crankshaft-drive-pin-jig]
-description = "Drive-pin jig (shop-made, for the crankshaft): 1 in 1018 bar 4.75 long, Ø.750 shank 2.00 long for the AXA No. 4 holder; 3/8 clearance 1.90 deep from the shank end; .4385 bore (owner ruling 2026-11-23, tool audit Q11) reamed in place 2.95 deep; 10-32 set screw on a brass pad 1.25 from the front face"
+description = "Drive-pin jig (shop-made, for the crankshaft): 1 in 1018 bar 4.75 long, Ø.750 shank 2.00 long for the AXA No. 4 holder; 3/8 clearance 1.90 deep from the shank end; .4385 bore reamed in place 2.95 deep; 10-32 set screw on a brass pad 1.25 from the front face"
 [tools.plug-gauges-0930-0935]
 description = "Plug gauge pair, .0930 GO (plus) and .0935 NO-GO (minus), Vermont Gage Class X"
 [tools.plug-gauges-4500-4505]
