@@ -82,6 +82,9 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("FK05_step", ("step",)),
     ("FK06_crown_cbore", (("crown_spot",), ("crown_drill",), ("cbore",))),
     ("FK07_crown_tap", ("crown_tap",)),
+    # The counterbore alone, FK06's last section: the remedy for a shallow or
+    # undersize counterbore re-cuts it without re-running the crown spot.
+    ("FK08_cbore_recut", ("cbore_recut",)),
 )
 # Every program loads its own first tool (M6, the tool setter): each setup
 # starts on whatever the mill last held, and the tap file before its retract
@@ -1152,6 +1155,15 @@ def context(
             "stock": stocks["apex"],
             "ops": [["cbore", "mill the foot hole's counterbore", cbore_lines]],
         },
+        {
+            **tool(
+                "em-eighth", cbore_rpm, cbore_feed, dia=em8, shape="endmill", flutes=3
+            ),
+            "frame": "apex",
+            "label": "cbore recut",
+            "stock": stocks["apex"],
+            "ops": [["cbore_recut", "re-cut the foot hole's counterbore", cbore_lines]],
+        },
     ]
     manual = {
         "crown_tap": {
@@ -1406,6 +1418,27 @@ def context(
         [_r(cx + wall_r * math.cos(a)), _r(cy + wall_r * math.sin(a))]
         for a in (k * math.pi / 4 for k in range(8))
     ]
+    cbore_checks = [
+        ["depth", {"z_min": _r(cbore_floor)}],
+        [
+            "bounds",
+            {
+                "window": [[cx - 3.0, cx + 3.0], [cy - 3.0, cy + 3.0]],
+                "x": [_r(cx - rp), _r(cx + rp)],
+                "y": [_r(cy - rp), _r(cy + rp)],
+                "z_min": _r(cbore_floor),
+                "arc": "G3",
+                "z_top": foot_top,
+            },
+        ],
+        [
+            "cleared",
+            {"points": cbore_points, "radius": em8 / 2, "z": _r(cbore_floor)},
+        ],
+        ["rapids_clear", {"z_top": foot_top}],
+        ["air_feed", {"z_top": foot_top}],
+        ["keep_out", {"radius": em8 / 2, "boxes": [*keep["apex"], lug]}],
+    ]
     expect += [
         [
             name,
@@ -1430,27 +1463,7 @@ def context(
                 CENTRE_DRILL["body_mm"] / 2,
             ),
             hole_checks("apex", "apex", height, apex_tip, d16 / 2),
-            [
-                ["depth", {"z_min": _r(cbore_floor)}],
-                [
-                    "bounds",
-                    {
-                        "window": [[cx - 3.0, cx + 3.0], [cy - 3.0, cy + 3.0]],
-                        "x": [_r(cx - rp), _r(cx + rp)],
-                        "y": [_r(cy - rp), _r(cy + rp)],
-                        "z_min": _r(cbore_floor),
-                        "arc": "G3",
-                        "z_top": foot_top,
-                    },
-                ],
-                [
-                    "cleared",
-                    {"points": cbore_points, "radius": em8 / 2, "z": _r(cbore_floor)},
-                ],
-                ["rapids_clear", {"z_top": foot_top}],
-                ["air_feed", {"z_top": foot_top}],
-                ["keep_out", {"radius": em8 / 2, "boxes": [*keep["apex"], lug]}],
-            ],
+            cbore_checks,
         )
     ):
         expect += [[f"{name}@{k}", check, kwargs] for check, kwargs in checks]
@@ -1463,6 +1476,18 @@ def context(
             {"tool": tn["tap-guide"], "at": tap_xy, "machine_top": MACHINE_Z_TOP_MM},
         ],
         [name, "air_feed", {"z_top": height}],
+    ]
+
+    name = "FK08_cbore_recut"
+    expect += [
+        [
+            name,
+            "tool_changes",
+            {"z_top": height, "tools": [tn["em-eighth"]], "loads_first": True},
+        ],
+        [name, "spindle", {"rpm": [[cbore_rpm]]}],
+        [name, "pauses", {"z_top": height, "count": 0}],
+        *[[name, check, kwargs] for check, kwargs in cbore_checks],
     ]
 
     return {
