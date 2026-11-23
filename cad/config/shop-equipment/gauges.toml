@@ -685,7 +685,9 @@ note = "Not owned: to buy. MHA-CH-12: the largest of the four pins .4000, .4002,
 
 # --- Bands the 2026-11-23 rulings re-cut (tool audit Q7, Q8, Q11, Q13, Q14) ---
 # Same policy as the zz-pins records above: a plus single is the GO; where the
-# top limit is a whole thousandth the NO-GO is the sets' minus pin.
+# top limit is a whole thousandth the NO-GO is the sets' minus pin. Each record
+# applies once its part's spec and plan carry the re-cut band; until then the
+# plan still gauges the old band with the record it names.
 [gauges.zz-pins-2560-2570]
 name = "Class ZZ pins for the .2560-.2570 band"
 kind = "gauge_pin"
