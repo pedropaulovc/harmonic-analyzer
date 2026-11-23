@@ -118,7 +118,7 @@ indexing = "none"
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-diagram = { file = "diagrams/saw.svg", alt = "The 5/8 in bar on the saw: one 3.0 in piece off its end, for the one plug." }
+diagram = { file = "diagrams/saw.svg", alt = "The 5/8 in bar on the saw: one {{process.bar_length_in:g}} in piece off its end, for the one plug." }
 
 [[setups.operations]]
 speed_kind = "other"

@@ -5,6 +5,6 @@
   <rect class="part-rest" x="430" y="110" width="300" height="40"/>
   <rect class="part-kept" x="40" y="110" width="370" height="40"/>
   <rect class="cutter" x="412" y="40" width="10" height="130"/>
-  <text class="label" x="60" y="180">10 in piece (bar end): the 20 hubs</text>
+  <text class="label" x="60" y="180">{{process.bar_length_in:g}} in piece (bar end): the {{cad.parts_per_bar:d}} hubs</text>
   <text class="label" x="510" y="70">saw vise on the bar</text>
 </svg>

@@ -7,7 +7,7 @@ end: bar longer than that runs unsupported, and a slender bar whips, bends
 and strikes whatever is near. So bar ends inside the spindle unless an
 outboard support is declared. The spindle's length from the jaw fronts to
 its rear end is not published (``cad/config/shop-equipment/machines.toml``
-``machines.pm-1127vf-lb``, ``jaw_fronts_to_spindle_rear``, to measure);
+``machines.pm-1127vf-lb``, ``jaw_fronts_to_spindle_rear_in``, to measure);
 until the owner tapes it, ``bar_behind_jaw_fronts_max_in`` is the assumed
 supported length. A plan's ``bar_length_in`` is the piece the lathe holds,
 so the whole piece, grip included, must fit within it: a plan that starts
@@ -44,7 +44,7 @@ PLANS = _plans()
 
 
 def test_the_spindle_length_is_recorded_or_to_measure() -> None:
-    measured = LATHE["jaw_fronts_to_spindle_rear"]
+    measured = LATHE["jaw_fronts_to_spindle_rear_in"]
     assert measured == "to_measure" or (
         isinstance(measured, (int, float)) and measured > BAR_BEHIND_MAX_IN
     )

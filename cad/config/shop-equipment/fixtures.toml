@@ -107,7 +107,7 @@ name = "6 in 4-jaw independent chuck for the PM-1127VF-LB lathe"
 kind = "chuck"
 status = "on_hand"
 max_jaw_opening_mm = 140.0
-through_bore = "to_measure"
+through_bore_mm = "to_measure"
 note = "Body Ø160 mm and maximum jaw opening 140 mm, measured by the owner 2026-11-22. Not recorded: the through-bore (to measure), the least grip, the body length, and the jaw width and height (neither the lathe's manual nor Precision Matthews' 6 in 4-jaw page states them, read 2026-11-21)."
 cite = [
   "Owner (Pedro) 2026-11-21, answered in person: \"Lathe 6 in 4-jaw independent chuck: on hand.\"",
