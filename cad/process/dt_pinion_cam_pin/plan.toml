@@ -257,23 +257,23 @@ instruction = "Between the last sweeps, spindle stopped, look at the apex under 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: look at the crown under the loupe, then hold the {{cad.dome_far_form_radius_in:fraction}} radius leaf square across it through the axis, at two places 90° apart, against a light."
-inspection = "No pip, flat or ring at the apex; crown R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}}: no light under the {{cad.dome_far_form_radius_in:fraction}} leaf."
+instruction = "Spindle stopped: look at the crown under the loupe. The {{cad.dome_far_form_radius_in:fraction}} leaf across it is a guide only (the trial set the radius); Op 230 reads the crown's height."
+inspection = "No pip, flat or ring at the apex."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A flat at the apex: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 190), then Op 210 again. A ring or point at the apex, or light under the leaf: scrap the pin and make another from Setup 1."
+instruction = "A flat at the apex: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 190), then Op 210 again. A ring or point at the apex: scrap the pin and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Take the pin out and stand it on end A on the surface plate, held upright against the 1-2-3 block's face. Lower the height gauge's scriber until its tip, slid in across the top, just stops on the O.D.'s top edge (the crown's root), and read it: the root length."
-inspection = "Root length {{cad.dome_far_root_station_min_in:.2dot}}–{{cad.dome_far_root_station_max_in:.2dot}} from end A."
-gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.dome_far_root_station_band_mm}}" }]
+instruction = "Take the pin out and stand it on end A on the surface plate, held upright against the 1-2-3 block's face. With the height gauge read the apex; then lower the scriber until its tip, slid in across the top, just stops on the O.D.'s top edge (the crown's root) and read it. Root length = that reading; crown height = apex − root."
+inspection = "Root length {{cad.dome_far_root_station_min_in:.2dot}}–{{cad.dome_far_root_station_max_in:.2dot}} from end A; crown {{cad.dome_far_height_min_in:.3dot}}–{{cad.dome_far_height_max_in:.3dot}} high (R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}})."
+gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.dome_far_root_station_band_mm}}" }, { gauge = "height-gauge", band_mm = "{{cad.dome_far_height_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Root length outside {{cad.dome_far_root_station_min_in:.2dot}}–{{cad.dome_far_root_station_max_in:.2dot}}: scrap the pin and make another from Setup 1."
+instruction = "Root length or crown height outside its band: scrap the pin and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
