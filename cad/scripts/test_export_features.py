@@ -10,7 +10,6 @@ import hashlib
 import importlib
 import importlib.util
 import math
-import re
 import sys
 import tomllib
 from pathlib import Path
@@ -802,6 +801,18 @@ def test_an_undeclared_part_binds_its_step_with_an_empty_features_table_and_no_d
     else:
         assert manifest["construction"] in {"one_piece", "built_up_permitted"}
         assert manifest["notes"]["manufacturing"] == notes.DRAWING_NOTES.splitlines()
+
+
+def test_a_notes_file_without_drawing_notes_falls_through_to_the_spec(tmp_path: Path, monkeypatch) -> None:
+    # Synthetic stem: every real part with such a notes file is declared now.
+    # The static reader only serves repository files, so it is stood in for.
+    monkeypatch.setattr(exporter, "__file__", str(tmp_path / "export_features.py"))
+    monkeypatch.setattr(exporter, "source_tree", lambda path: path.read_text(encoding="utf-8"))
+    monkeypatch.setattr(exporter, "_source_declarations", lambda path, text: dict.fromkeys(text.split()[:1], path))
+    (tmp_path / "zz_part_notes.py").write_text("OTHER_NOTES = 'x'\n", encoding="utf-8")
+    assert exporter._undeclared_notes_path("zz_part") is None
+    (tmp_path / "zz_part_spec.py").write_text("DRAWING_NOTES = 'NOTE 1'\n", encoding="utf-8")
+    assert exporter._undeclared_notes_path("zz_part") == (tmp_path / "zz_part_spec.py").resolve()
 
 
 def test_rocker_hub_root_carries_both_native_fillets_each_split_in_two(tmp_path: Path) -> None:
