@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Bench: the finished bracket looking at L, the seat at the left, 2.5 px/mm; the final checks of ops 430 and 440. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Bench: deburr and inspect the finished bracket</text>
+  <path class="part-kept" d="M60 100 H67.9 V204.35 H308.9 V235.6 H60 Z"/>
+  <line class="hidden" x1="60" y1="122.5" x2="67.9" y2="122.5"/>
+  <line class="hidden" x1="60" y1="156.75" x2="67.9" y2="156.75"/>
+  <line class="hidden" x1="288.7" y1="204.35" x2="288.7" y2="235.6"/>
+  <line class="hidden" x1="301.5" y1="204.35" x2="301.5" y2="235.6"/>
+  <line class="centre-line" x1="295.1" y1="190" x2="295.1" y2="250"/>
+  <line class="leader" x1="60" y1="190" x2="20" y2="190"/>
+  <circle class="leader-dot" cx="60" cy="190" r="2"/>
+  <text class="label" x="20" y="184">seat</text>
+  <line class="leader" x1="64" y1="100" x2="64" y2="70"/>
+  <circle class="leader-dot" cx="64" cy="100" r="2"/>
+  <text class="label" x="58" y="64">F</text>
+  <text class="label" x="40" y="252">O</text>
+  <line class="leader" x1="64" y1="122.5" x2="120" y2="96"/>
+  <circle class="leader-dot" cx="64" cy="122.5" r="2"/>
+  <text class="label" x="120" y="92">#37 holes: a {{cad.mounting_hole_1_dia_min_in:.3dot}} pin enters; from F, calipers over the pin</text>
+  <line class="leader" x1="67.9" y1="204.35" x2="140" y2="130"/>
+  <circle class="leader-dot" cx="67.9" cy="204.35" r="2"/>
+  <text class="label" x="140" y="126">inside corner under the foot as cut: R.040 max</text>
+  <line class="leader" x1="200" y1="204.35" x2="240" y2="166"/>
+  <circle class="leader-dot" cx="200" cy="204.35" r="2"/>
+  <text class="label" x="240" y="162">neck {{cad.neck_inner_face_thickness_min_in:.2dot}}–{{cad.neck_inner_face_thickness_max_in:.2dot}}: miked in Setup 7</text>
+  <line class="leader" x1="295.1" y1="220" x2="380" y2="200"/>
+  <circle class="leader-dot" cx="295.1" cy="220" r="2"/>
+  <text class="label" x="380" y="196">1/4-20 through: a screw runs in by hand</text>
+  <line class="leader" x1="308.9" y1="230" x2="380" y2="240"/>
+  <circle class="leader-dot" cx="308.9" cy="230" r="2"/>
+  <text class="label" x="380" y="244">nose R{{cad.nose_radius_in:.3dot}}: the program's, not gauged</text>
+  <text class="label" x="40" y="300">Every edge broken .010 max; no burr in the holes or the thread's mouth.</text>
+  <text class="label" x="40" y="320">The seat on the surface plate: it does not rock.</text>
+</svg>
