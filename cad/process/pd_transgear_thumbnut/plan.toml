@@ -64,11 +64,30 @@ regrip_grip_in = 0.25
 # flute_len_in), so its Ø.168 shank never reaches the Ø.136 hole. Its 3-5
 # chamfered threads (about .09-.16) then leave full thread to about .56-.63
 # from the seat; the hole ends at the recess floor, .57-.61 from the seat, so
-# at worst the last pitch or two there carry the chamfer's partial thread (the
-# bench screw check runs a #8-32 screw through). The drill runs past the
+# at worst the last pitch or two there carry the chamfer's partial thread,
+# which the rim-end chase (Op 240, tap_chase_mark_in) clears. The drill runs past the
 # tap's point.
 tap_drill_depth_mm = 22.86
 tap_mark_in = 0.72
+# The rim-end chase (Setup 2, Op 240): the seat-end tap leaves up to a
+# chamfer's length (.16) of partial thread above the recess floor, which lies
+# .03-.05 under the rim face, so partial thread runs no farther than .21 from
+# the rim face; the plug tap entered from the rim clears it when its point
+# reaches .21 + .16 = .37: marked .40 from its point (authored), well inside
+# its .75 thread length.
+tap_chase_mark_in = 0.40
+# The dish floor held inside the drawing's bands (authored): the Op 210 cone
+# at the drawing's flank sets the rim at about floor Ø + 6 × depth, so the
+# floor Ø.350 ±.002 and depth .040 ±.001 put the rim at .582-.598, inside
+# its .58-.60. In mm for the gauge checks: × 25.4.
+recess_floor_hold_min_in = 0.348
+recess_floor_hold_max_in = 0.352
+recess_floor_hold_min_mm = 8.8392
+recess_floor_hold_max_mm = 8.9408
+recess_depth_hold_min_in = 0.039
+recess_depth_hold_max_in = 0.041
+recess_depth_hold_min_mm = 0.9906
+recess_depth_hold_max_mm = 1.0414
 # Countersinks (authored): Ø.170, between the #8-32 major Ø.164 (the first
 # thread broken all round) and the drawing's .18 max; the 90° chamfer mill
 # fed (.170 - .136) / 2 = .017 past its flutes touching the #29 hole's edge.
@@ -306,7 +325,7 @@ cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
 [[setups]]
 machine_kind = "lathe"
-title = "Turned round on the head: face to length, cut the dish, countersink the rim end"
+title = "Turned round on the head: face to length, cut the dish, countersink the rim end, chase the thread"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
@@ -348,11 +367,11 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Dish floor: cut a flat-bottomed recess Ø{{cad.recess_floor_dia_in:.2dot}} (the floor's size) {{cad.recess_depth_in:.3dot}} deep from Z0 in facing passes from the hole outward, each stopping at that Ø, the last one a light skim across the floor; check its Ø between passes."
+instruction = "Dish floor: cut a flat-bottomed recess Ø{{process.recess_floor_hold_min_in:.3dot}}–{{process.recess_floor_hold_max_in:.3dot}}, {{process.recess_depth_hold_min_in:.3dot}}–{{process.recess_depth_hold_max_in:.3dot}} deep by the DRO from Z0 (inside the drawing's bands: the Op 210 cone puts the rim at about floor Ø + 6 × depth), in facing passes from the hole outward, the last a light skim; check its Ø between passes."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.recess_floor_dia_mm}}"
-inspection = "Floor Ø{{cad.recess_floor_dia_min_in:.2dot}}–{{cad.recess_floor_dia_max_in:.2dot}}, calipers' inside jaws on the recess's wall; depth {{cad.recess_depth_min_in:.2dot}}–{{cad.recess_depth_max_in:.2dot}}, calipers' depth rod from the rim face to the floor."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.recess_floor_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.recess_depth_band_mm}}" }]
+inspection = "Floor Ø{{process.recess_floor_hold_min_in:.3dot}}–{{process.recess_floor_hold_max_in:.3dot}}, calipers' inside jaws on the recess's wall; depth {{process.recess_depth_hold_min_in:.3dot}}–{{process.recess_depth_hold_max_in:.3dot}} on the DRO."
+gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.recess_floor_hold_min_mm}}", "{{process.recess_floor_hold_max_mm}}"] }, { gauge = "lathe-z-dro", band_mm = ["{{process.recess_depth_hold_min_mm}}", "{{process.recess_depth_hold_max_mm}}"] }]
 
 [[setups.operations]]
 cut_kind = "other"
@@ -368,7 +387,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.recess_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Dish floor small or shallow (Op 200), or the rim under its band or a step left at the corner (Op 210): cut again and recheck. Rim or floor over its band, or deeper than {{cad.recess_depth_max_in:.2dot}}: scrapped; make another from Setup 1."
+instruction = "Floor small or shallow (Op 200): cut again and recheck. A step at the corner (Op 210): another pass down the compound into the corner. Rim under its band with the floor in its Op 200 limits: deepen the floor .001 (the rim grows about .006) and recut the cone. Rim or floor over its band, or deeper than {{cad.recess_depth_max_in:.2dot}}: scrapped; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
@@ -382,6 +401,15 @@ settings = "lathe-csk-c360"
 cut_diameter_mm = "{{cad.countersinks_dia_max_mm}}"
 inspection = "Countersink under Ø{{cad.countersinks_dia_max_in:.2dot}}: the #15 drill's shank, stood square on the floor over the hole, does not drop into it; its rim runs round the hole."
 gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "tap"
+drilling = "none"
+sizing = "other"
+instruction = "Chase the thread from the rim end, spindle off in back gear: the plug tap marked {{process.tap_chase_mark_in:.2dot}} from its point, in the wrench on the MT3 dead centre as Op 140. Start it by hand into the rim-end thread so it picks up the thread's lead, then turn on, backing off every half turn, until the mark reaches the rim face; back it out."
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
@@ -408,7 +436,7 @@ gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A nut whose screw binds in Op 250: run the plug tap through again from the seat end and recheck. A marked knurl, or a check above that more cutting cannot bring into its band, is scrapped, not reworked: make another from Setup 1."
+instruction = "A nut whose screw binds in Op 260: chase it again from the rim end as Op 240, and from the seat end with the plug tap to its Op 140 mark, and recheck. A marked knurl, or a check above that more cutting cannot bring into its band, is scrapped, not reworked: make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
