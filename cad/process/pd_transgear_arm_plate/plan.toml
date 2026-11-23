@@ -59,12 +59,19 @@
 # bonded.
 #
 # One-sided facing: the rear face only (face A, datum A, stays as supplied).
-# A cold-finished bar can bow when one skin is cut off: Setup 4 checks face A
-# on the surface plate once freed and straightens a bowed plate in the bench
-# vise (traveler review 2026-11-23: one-sided removal needs a release or a
-# straightening step); the final inspection checks the thickness's Rule #1
-# envelope (perfect form at .202) on the surface plate, as the platen's does.
-# An owner-correctable choice, stated in the PR.
+# A cold-finished bar can bow when one skin is cut off (.049-.053 off one
+# side here, about a fifth of the section; traveler reviews 2026-11-23:
+# one-sided removal needs a release or a straightening step). Chosen: a
+# check and a straightening step after release, not a rough / release /
+# re-bond / finish. A re-bond is a second taped hold, a second stack check
+# and a second XY and Z pick-up before the holes, and the plate is only 2.16
+# long: whatever bow the cut leaves is measured and corrected on the free
+# plate. Setup 4 lays face A on the surface plate once the plate is freed
+# (acceptance: no rock; stop: the straightening op), straightens a bowed
+# plate in the bench vise and checks again (stop: tell the owner); Setup 5
+# checks the thickness's Rule #1 envelope (perfect form at .202) on the
+# surface plate, as the platen's does. An owner-correctable choice, stated
+# in the PR.
 #
 # FLAGGED: to buy: the stock (stock.1018-flat-1-4x1-1-2), the .4375 reamer
 # (tools.reamer-4375), the 3/8 in 82° countersink (tools.riser-countersink),
@@ -423,12 +430,13 @@ machine_kind = "other"
 title = "Trial ream (only if the reamer reads under the GO pin, or at or over the NO-GO pin)"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
+machine_ref = "pm-30mv"
 holding = "Only if the reamer read under the GO pin, or at or over the NO-GO pin: an offcut of the 1/4 x 1-1/2 bar, about 2 in long, flat on the two 1 in parallels in the 6 in PM vise (one at each jaw), its middle over the gap between them; tap it down and tighten the vise on its long edges."
 datum = "No program: MDI only. X0 Y0 Z0 the 27/64 drill's point on the offcut's top at its middle, spindle stopped; this overwrites G54, which Setup 3 sets again. Tool lengths from the tool setter at each M6."
 diagram = { file = "diagrams/trial.svg", alt = "Section across the vise jaws: the offcut flat on two 1 in parallels, one at each jaw, the jaws closed on its edges; the trial hole through its middle over the gap between the parallels." }
 envelope = "other"
 vise_hold = "other"
-beam = "other"
+beam = { axis = "x", hold = "solid", extent_mm = [-25.4, 25.4], seat = "gripped on its long edges in the vise jaws, on the parallels' edges", seat_mm = [-25.4, 25.4] }
 
 [[setups.operations]]
 instruction = "Home the mill ($H). Clamp the offcut as Holding says."
@@ -442,6 +450,9 @@ sizing = "other"
 instruction = "Console M6 T4 (27/64 drill in the drill chuck; set 600 by hand). Its point on the offcut's middle, spindle stopped: G10 L20 P1 X0 Y0 Z0. MDI M3, G1 Z-10 F{{process.drill_2764_feed_per_min_mm:.1f}}, G0 Z5, M5: drilled through into the gap."
 rpm = 600
 feed = "{{process.drill_2764_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "trial drill", kind = "drill", phase = "rough", cutter_dia_mm = 10.715625, flutes = 2, rpm = 600, feed_mm_min = "{{process.drill_2764_feed_per_min_mm}}", stations_mm = 0 },
+]
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -453,6 +464,9 @@ rpm = 400
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 inspection = "The GO pin enters the trial hole and the NO-GO does not."
 gauge_checks = [{ gauge = "zz-pins-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
+milling_cuts = [
+  { name = "trial ream", kind = "drill", phase = "finish", cutter_dia_mm = 11.1125, flutes = 6, rpm = 400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = 0 },
+]
 
 [[setups.operations]]
 steps = [
@@ -549,7 +563,7 @@ speed_kind = "spindle"
 tool = "em"
 drilling = "none"
 sizing = "other"
-instruction = "Run AP01_holes (M6 T1, 3/8 in end mill; set 2800, dry: no oil reaches the tape): face the rear face in two levels, the second at {{process.thickness_target_mm:in.4dot}} above face A, passes along X no wider than {{process.face_stepover_mm:in.3dot}}, each entered in air past the blank's end."
+instruction = "Run AP01_holes (M6 T1, 3/8 in end mill; set 2800, dry: no oil reaches the tape): face the rear face in two levels, the second at {{process.thickness_target_mm:in.4dot}} above face A, passes along X no wider than {{process.face_stepover_mm:in.3dot}}, each entered in air past the blank's end. One face only: any bow it leaves is checked and straightened once the plate is free (Setup 4)."
 settings = "endmill-carbide-3fl-3-8-1018-cf"
 rpm = 2800
 feed = "{{process.em_feed_per_min_mm:in.1f}} in/min"
