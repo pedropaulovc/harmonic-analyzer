@@ -125,12 +125,12 @@ def test_context_numbers_the_tools_and_places_the_holes_from_the_model(context) 
     b, tap = _centres(context, "KM06_top_holes@1")
     assert b == [pytest.approx(0.200 * IN), pytest.approx(-0.275 * IN)]
     assert tap[0] - b[0] == pytest.approx(0.300 * IN)
-    # KM08: X down from A, Y back from S: .811 BASIC from A, .300 from B.
+    # KM08: X down from A, Y back from S: .824 BASIC from A, .300 from B.
     bore = f["knife_bore"]["at"]
     assert _centres(context, "KM08_bore") == [
         [round(top - bore[1], 3), round(bore[0] - s_end, 3)]
     ]
-    assert top - bore[1] == pytest.approx(0.811 * IN, abs=1e-3)
+    assert top - bore[1] == pytest.approx(0.824 * IN, abs=1e-3)
     # The tap file ends over the tap hole.
     assert context["manual"]["tap_stud"]["at"] == tap
 

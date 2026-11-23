@@ -716,7 +716,7 @@ def context(
     tap_xy = entry("top", tap, height)
     bore_xy = entry("bore", bore, depth)
     # The stations the sheet prints: B at the drawing's side and row, the tap
-    # .300 BASIC from B, the bore .811 BASIC from A and .500 from S.
+    # .300 BASIC from B, the bore .824 BASIC from A and .500 from S.
     if not math.isclose(
         b_xy[0], dowel["side_nominal"], abs_tol=1e-3
     ) or not math.isclose(-b_xy[1], dowel["row_nominal"], abs_tol=1e-3):

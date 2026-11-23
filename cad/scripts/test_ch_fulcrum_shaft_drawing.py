@@ -221,7 +221,7 @@ def test_keeper_bores_reamed_apart_still_pass_the_shaft() -> None:
     # over its .65 length. The shaft runs through both lug centres 6.360
     # apart and each lug, at its thickest printed .33, spends its thickness x
     # (pitch + slope); each bore, reamed in its own setup, may run off 0.3 deg
-    # from its seat (the drill it follows). The .2550 bore keeps the slip
+    # from its seat (the drill it follows). The .2560 bore keeps the slip
     # minimum after all of that.
     keeper = ch_fulcrum_keeper_spec
     spec = ch_fulcrum_shaft_spec

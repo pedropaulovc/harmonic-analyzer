@@ -51,13 +51,13 @@ def test_the_tap_point_leaves_the_web_over_the_bore_crown() -> None:
     assert point_height == pytest.approx(1.2023151463)
     assert knife_mount.STUD_TAP_POINT_H == pytest.approx(point_height)
     assert knife_mount.STUD_TAP_DRILL_DEPTH_MAX == pytest.approx(11.176)
-    # Top 14.866: crown depth 14.605, less the bore's position radius
+    # Top 14.866: crown depth 14.59865 (.57475, owner ruling 2026-11-23, tool audit Q13), less the bore's position radius
     # (Ø.008, owner ruling 2026-10-27), bore radius oversize, maximum
     # cylindrical drill depth and point height.
     assert knife_mount.STUD_TAP_WEB_WORST == pytest.approx(
-        14.605 - 0.1016 - 0.01905 - 11.176 - point_height
+        14.59865 - 0.1016 - 0.01905 - 11.176 - point_height
     )
-    assert knife_mount.STUD_TAP_WEB_WORST == pytest.approx(2.1060348537)
+    assert knife_mount.STUD_TAP_WEB_WORST == pytest.approx(2.0996848537)
     assert knife_mount.STUD_TAP_WEB_WORST >= knife_mount.STUD_TAP_WEB_MIN
     # The built top is the spec's 14.866.
     built = knife_mount.tap_web_worst(
@@ -65,7 +65,7 @@ def test_the_tap_point_leaves_the_web_over_the_bore_crown() -> None:
         knife_mount.STUD_TAP_DRILL_DEPTH,
         knife_mount.STUD_TAP_DIA,
     )
-    assert built == pytest.approx(2.1060348537)
+    assert built == pytest.approx(2.0996848537)
     assert build_sm_knife_mount._TAP_WEB_WORST == pytest.approx(built)
     assert built >= knife_mount.STUD_TAP_WEB_MIN
     # A .004 wider drill-depth band consumes the remaining functional web.
@@ -117,8 +117,8 @@ def test_previous_drill_depth_fails_when_pilot_and_point_limits_are_charged() ->
         drill_dia_oversize=0.0,
         point_angle_deg=118.0,
     )
-    assert optimistic == pytest.approx(2.0028161148, abs=5e-6)
-    assert charged == pytest.approx(1.9412348537)
+    assert optimistic == pytest.approx(1.9964661148, abs=5e-6)
+    assert charged == pytest.approx(1.9348848537)
     assert charged < optimistic < knife_mount.STUD_TAP_WEB_MIN
 
 
@@ -158,7 +158,7 @@ def test_the_retired_half_inch_tap_fails_the_same_web_formula() -> None:
         drill_dia_oversize=0.0,
         point_angle_deg=118.0,
     )
-    assert old == pytest.approx(-1.727, abs=5e-4)
+    assert old == pytest.approx(-1.733, abs=5e-4)
     assert old < knife_mount.STUD_TAP_WEB_MIN
 
 
@@ -535,7 +535,7 @@ def test_the_slip_fit_takes_the_perpendicularity_tilt() -> None:
 
 def test_one_dowel_and_the_gauge_bar_replace_the_slot_and_datum_c() -> None:
     # Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): one dowel
-    # + screw per mount, the (Ø.47) gauge bar through both bores at MHA-SM-00;
+    # + screw per mount, the (Ø.50) gauge bar through both bores at MHA-SM-00;
     # slot C, its notch and datum C deleted; the bore ⌖Ø.008|A|B + ∥.002|A;
     # MHA-FR-02 loses the two -X press reams and their frames; VN-53 qty 2.
     for retired in (
@@ -741,7 +741,7 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
     assert knife_mount.KNIFE_BORE_POSITION_TOL == pytest.approx(0.2032)
     assert knife_mount.KNIFE_BORE_PARALLELISM_TOL == pytest.approx(0.0508)
     assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.422786, abs=5e-6)
-    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(7.120556, abs=5e-6)
+    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(8.507842, abs=5e-6)
 
     # The bore's position zone enters the screw float only through the bar
     # line's turn about the dowel, on top of the bar's own play.  Ø.008
@@ -776,7 +776,7 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
     # The bar-set far-end offset is the bar's diametral clearance in the
     # largest bore plus the ridge's yaw over the mouth span; the bore's
     # ∥.002|A (pitch) does not enter the lateral rock.  The floor holds to a
-    # .0119 bar clearance (t 0.328), nearly three times the gauge bar's .0041.
+    # .0175 bar clearance (t 0.446) in the Ø.4985 bore (owner ruling 2026-11-23, tool audit Q13), over four times the gauge bar's .0041.
     block_depth = knife_mount.SUPPORT_Z_THICK + knife_mount.BLOCK_SIZE_TOL
 
     def rock_at_clearance(clearance: float) -> float:
@@ -791,13 +791,13 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
     assert rock_at_clearance(asm.KNIFE_BAR_CLEARANCE) == pytest.approx(
         asm.KNIFE_FREE_ROCK_WORST_DEG
     )
-    assert rock_at_clearance(0.0035 * inch) == pytest.approx(7.281181, abs=5e-6)
-    assert rock_at_clearance(0.0100 * inch) == pytest.approx(5.520964, abs=5e-6)
-    assert rock_at_clearance(0.0120 * inch) == pytest.approx(4.970705, abs=5e-6)
+    assert rock_at_clearance(0.0035 * inch) == pytest.approx(8.660027, abs=5e-6)
+    assert rock_at_clearance(0.0100 * inch) == pytest.approx(6.991398, abs=5e-6)
+    assert rock_at_clearance(0.0120 * inch) == pytest.approx(6.469350, abs=5e-6)
     assert (
-        rock_at_clearance(0.0120 * inch)
+        rock_at_clearance(0.0176 * inch)
         < asm.KNIFE_FREE_ROCK_FLOOR_DEG
-        <= rock_at_clearance(0.0118 * inch)
+        <= rock_at_clearance(0.0175 * inch)
     )
 
 
@@ -869,11 +869,11 @@ def test_the_knife_mount_webs_hold_round_the_hole() -> None:
         "round hole to +X face": (knife_mount.PIN_HOLE_SIDE_WEB, 3.19151),
         "round hole to Z faces": (knife_mount.PIN_HOLE_Z_WEB, 4.84251),
         "tap to Z faces": (knife_mount.STUD_TAP_Z_WALL, 3.867492),
-        "bore to side faces": (knife_mount.BORE_SIDE_WEB, 5.952810),
-        "bore to bottom face": (knife_mount.BORE_BOTTOM_WALL, 2.74955),
+        "bore to side faces": (knife_mount.BORE_SIDE_WEB, 5.616260),
+        "bore to bottom face": (knife_mount.BORE_BOTTOM_WALL, 2.0828),
         "round hole to tap": (knife_mount.PIN_HOLE_TAP_WEB, 3.50901),
         # To the drill point's cone (owner decision 2026-11-19, #3124 item 4).
-        "round hole to bore": (knife_mount.PIN_HOLE_BORE_WEB, 6.308449),
+        "round hole to bore": (knife_mount.PIN_HOLE_BORE_WEB, 6.253441),
     }
     for label, (web, expected) in webs.items():
         assert web == pytest.approx(expected, abs=5e-4), label
@@ -888,7 +888,7 @@ def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
     # Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): the
     # gauge bar through both bores sets the front mount's yaw, so the
     # far-end offset is the bar's diametral clearance in the largest bore,
-    # .4735 - (.4720 - .0026) = .0041, plus the lever ridge's yaw: the
+    # .5000 - (.4985 - .0026) = .0041, plus the lever ridge's yaw: the
     # ridge spans both mounts' bores, so that clearance yaws it over the
     # 159.90 minimum mouth span, across the block (codjiflo round 3).  The
     # rear mount's yaw is accepted by the rock gauge itself (sheet check 2),
@@ -916,13 +916,13 @@ def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
     # Code review C09 (owner ruling T1): the print holds the ridge .159
     # +/-.002 from each side face and each upper flank 122.4 +/-0.5 deg to its
     # side face.  The worst shoulder is .161 (4.0894) out on a flank 58.1 deg
-    # off the vertical, so 2.5454 under the ridge: 7.12 deg in the smallest bore.
+    # off the vertical, so 2.5454 under the ridge: 8.51 deg in the smallest bore.
     assert lever.KNIFE_SHOULDER_X_MAX == pytest.approx(4.0894)
     assert lever.KNIFE_FLANK_HALF_MAX_DEG == pytest.approx(58.1)
     assert lever.KNIFE_SHOULDER_DROP_MIN == pytest.approx(2.545427, abs=5e-6)
-    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(7.120556, abs=5e-6)
+    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(8.507842, abs=5e-6)
     assert asm.KNIFE_FREE_ROCK_WORST_DEG >= asm.KNIFE_FREE_ROCK_FLOOR_DEG == 5.0
-    assert knife_mount.BORE_R_MIN == pytest.approx(5.9944)
+    assert knife_mount.BORE_R_MIN == pytest.approx(6.33095)
 
     def rock(ridge_from_side: float, flank_to_side_deg: float) -> float:
         half = math.radians(180.0 - flank_to_side_deg)
@@ -944,17 +944,17 @@ def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
     }
     assert min(corners, key=corners.get) == (x_tol, -a_tol)
     assert min(corners.values()) == pytest.approx(asm.KNIFE_FREE_ROCK_WORST_DEG)
-    assert corners[(0.0, 0.0)] == pytest.approx(7.796, abs=5e-3)
-    assert max(corners.values()) == pytest.approx(8.471, abs=5e-3)
+    assert corners[(0.0, 0.0)] == pytest.approx(9.172, abs=5e-3)
+    assert max(corners.values()) == pytest.approx(9.837, abs=5e-3)
     # The counterexample the old controls admitted (code review C09): the
     # included angle at its nominal, held by HexWidth and the angle only, with
     # the flanks split unevenly about the vertical at the widest .XXX
-    # section.  One flank 2, 3 or 5 deg flatter drops the rock to 5.95, 5.20,
-    # 3.66: under the floor at 5 deg.  T1 bounds each flank to its side
+    # section.  One flank 2, 3 or 5 deg flatter drops the rock to 7.32, 6.55,
+    # 4.98: under the floor at 5 deg.  T1 bounds each flank to its side
     # face, so no split past 0.5 deg passes the print.
     widest_half = (lever.HEX_W + lever.HEX_BAND) / 2.0
     split_rock = {}
-    for split, expected in ((2.0, 5.9530), (3.0, 5.2004), (5.0, 3.6578)):
+    for split, expected in ((2.0, 7.3216), (3.0, 6.5536), (5.0, 4.9828)):
         flank_to_side = 180.0 - (lever.RIDGE_ANGLE_DEG / 2.0 + split)
         split_rock[split] = rock(widest_half, flank_to_side)
         assert split_rock[split] == pytest.approx(expected, abs=5e-4)
@@ -964,8 +964,8 @@ def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
     assert split_rock[3.0] < split_rock[2.0]
     # The width, now a reference, cannot reach the old widest section.
     assert 2.0 * lever.KNIFE_SHOULDER_X_MAX < lever.HEX_W + lever.HEX_BAND
-    # Nominal geometry, straight bore: 8.90 deg.
-    assert knife_mount.KNIFE_FREE_ROCK_DEG == pytest.approx(8.900, abs=5e-3)
+    # Nominal geometry, straight bore: 10.22 deg.
+    assert knife_mount.KNIFE_FREE_ROCK_DEG == pytest.approx(10.22, abs=5e-3)
     assert math.isclose(
         lever.KNIFE_FACE_NORMAL[0] ** 2 + lever.KNIFE_FACE_NORMAL[1] ** 2, 1.0
     )
