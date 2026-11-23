@@ -694,7 +694,7 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "First load only: unclamp, lift out the blank against the fixed jaw and mic its ring and shank, then put it back flush and clamp again."
-inspection = "Ring {{cad.ring_far_face_thickness_min_in:.4dot}}–{{cad.ring_far_face_thickness_max_in:.4dot}} thick; shank {{cad.shank_far_face_thickness_min_in:.3dot}}–{{cad.shank_far_face_thickness_max_in:.3dot}} (the micrometers). Ring over: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − (the reading − {{cad.ring_far_face_thickness_in:.4dot}}) × 25.4) and run CR04_finish_2 again. Under: stop and tell the owner."
+inspection = "Ring {{cad.ring_far_face_thickness_min_in:.4dot}}–{{cad.ring_far_face_thickness_max_in:.4dot}} thick; shank {{cad.shank_far_face_thickness_min_in:.3dot}}–{{cad.shank_far_face_thickness_max_in:.3dot}} (the micrometers). Ring over: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − (the reading − {{cad.ring_far_face_thickness_in:.4dot}}) × 25.4) and run CR04_finish_2 again. Ring under, or shank outside its band: stop and tell the owner."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.ring_far_face_thickness_band_mm}}" },
   { gauge = "micrometers", band_mm = "{{cad.shank_far_face_thickness_band_mm}}" },
@@ -720,7 +720,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "CR05_bore ends with T1 parked for the saw: up to Z{{process.saw_park_z_mm:.2f}}, along X past the crowns, along Y in line with the fork against the fixed jaw (X{{process.saw_touch_x_mm:.3f}} Y{{process.saw_touch_y_mm:.3f}}; the saw's rim will sit 3 mm in over its crown). Leave the head there."
+instruction = "CR05_bore ends with T1 parked for the saw: up to Z{{process.saw_park_z_mm:.2f}}, along X past the crowns, along Y in line with the fork against the fixed jaw (X{{process.saw_touch_x_mm:.3f}} Y{{process.saw_touch_y_mm:.3f}}; the saw's rim will sit .118 in over its crown). Leave the head there."
 feed = "hand"
 
 [[setups.operations]]
@@ -763,7 +763,7 @@ instruction = "Only after a reset or homing ($H) since CR05_bore parked T1: from
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0 again, from the saw's lower face, its rim 3 mm in over that fork's crown, the spacers and the nut past it. Spindle stopped, jog Z only, down in CNCjs (.001 in steps near the leaf), until a .002 feeler leaf just drags under the saw on the fork's F face; G10 L20 P1 Z{{process.fork_touch_z_mm:.3f}} (the fork's {{process.fork_thickness_mm:.3f}} plus the leaf). CR06 loads no tool."
+instruction = "G54 Z0 again, from the saw's lower face, its rim .118 in over that fork's crown, the spacers and the nut past it. Spindle stopped, jog Z only, down in CNCjs (.001 in steps near the leaf), until a .002 feeler leaf just drags under the saw on the fork's F face; G10 L20 P1 Z{{process.fork_touch_z_mm:.3f}} (the fork's {{process.fork_thickness_mm:.3f}} plus the leaf). CR06 loads no tool."
 feed = "hand"
 
 [[setups.operations]]
