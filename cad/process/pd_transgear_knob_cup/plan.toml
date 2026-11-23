@@ -287,24 +287,12 @@ sizing = { kind = "band", band_mm = "{{cad.pocket_dia_band_mm}}" }
 instruction = "Chuck it again as Op 120. The head pocket: the 3/16 end mill in the tailstock drill chuck, short. Feed it until its end just touches the rear face and zero the quill scale there. Plunge slowly to {{cad.pocket_depth_in:.3dot}}, backing out to clear chips every .03, centred on the #33 hole: its square corner leaves the floor's R{{cad.pocket_corner_radius_max_mm:in.3dot}} MAX."
 settings = "lathe-plunge-3-16-c360"
 cut_diameter_mm = 4.7625
-inspection = "Pocket Ø{{cad.pocket_dia_min_in:.2dot}}–{{cad.pocket_dia_max_in:.2dot}}, calipers; depth {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}} from the rear face, calipers' depth rod beside the #33 hole; write it down."
+inspection = "Pocket Ø{{cad.pocket_dia_min_in:.2dot}}–{{cad.pocket_dia_max_in:.2dot}}, calipers; depth {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}} from the rear face, calipers' depth rod beside the #33 hole. The length, the pilot depth and the pocket depth inside their bands hold the drawing's {{cad.pocket_callout}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pocket_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.pocket_depth_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Pocket short of {{cad.pocket_depth_min_in:.3dot}} in Op 140: plunge on and read it again. Over {{cad.pocket_depth_max_in:.3dot}}: scrapped, not reworked; make another from Setup 1."
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Web, the drawing's {{cad.pocket_callout}}: the length written in Op 120 less the pilot depth written in Op 90 less the pocket depth written in Op 140."
-inspection = "Web: {{cad.pocket_callout}}, from the three readings."
-gauge_checks = "other"
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "A web under its minimum in Op 160: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups]]
@@ -346,7 +334,7 @@ gauge_checks = [{ gauge = "plug-gauges-2500-2510", band_mm = "{{cad.pilot_dia_ba
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A cup failing Op 200 or Op 210 is scrapped, not reworked: make another from Setup 1."
+instruction = "A cup failing Op 180 or Op 190 is scrapped, not reworked: make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
