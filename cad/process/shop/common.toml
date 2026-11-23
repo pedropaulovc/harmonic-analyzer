@@ -267,10 +267,6 @@ diameter_mm = 3.4544
 [tools.jig-tap-8-32-plug]
 description = "8-32 UNC plug tap; T-handle wrench"
 tap_drill_mm = 3.4544
-# The owned digital angle gauge (inventory gauges.digital-angle-gauge, owner
-# 2026-11-19): the sm and pd plans set a slide or a part's angle with it.
-[tools.digital-angle-gauge]  # F-digital-angle-gauge
-description = "Digital angle gauge"
 [tools.jig-files]
 description = "10 in mill second-cut and 8 in smooth files; bench vise with soft jaws"
 
