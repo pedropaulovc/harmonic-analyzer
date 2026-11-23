@@ -139,7 +139,7 @@ ref = "chamfer-mill-330ch-1-4-90"  # drawing cross-check 2026-11-19: Ø.18 MAX X
 
 [[tools]]
 id = "tap"
-name = "#8-32 plug tap"
+name = "#8-32 plug tap; T-handle tap wrench with a centre hole in its top, for the MT3 dead centre"
 ref = "jig-tap-8-32-plug"  # Tap coverage #8-32 UNC
 
 [[tools]]
@@ -303,7 +303,7 @@ speed_kind = "other"
 tool = "tap"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle off, in its lowest back-gear range so the chuck is stiff to turn. Pencil-mark the plug tap {{process.tap_mark_in:.2dot}} from its point and fit it in the T-handle wrench that has a centre hole in its top (of the two owned, tap-wrench-t-small and the tap and die set's: use the one with the hole); the MT3 dead centre in the tailstock, its point in the wrench's centre hole to keep the tap on axis."
+instruction = "Spindle off, in its lowest back-gear range so the chuck is stiff to turn. Pencil-mark the plug tap {{process.tap_mark_in:.2dot}} from its point and fit it in the T-handle tap wrench (centre hole in its top); the MT3 dead centre in the tailstock, its point in the wrench's centre hole to keep the tap on axis."
 feed = "hand"
 
 [[setups.operations]]
@@ -389,7 +389,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.recess_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Floor small or shallow (Op 200): cut again and recheck. A step at the corner (Op 210): another pass down the compound into the corner. Rim under its band with the floor on its Op 200 target: deepen the floor .001 (the rim grows about .006) and recut the cone. Rim over Ø{{cad.recess_dia_max_in:.2dot}}, floor over the drawing's Ø{{cad.recess_floor_dia_max_in:.2dot}}, or deeper than {{cad.recess_depth_max_in:.2dot}}: scrapped; make another from Setup 1."
+instruction = "Floor small or shallow (Op 200): cut again and recheck. Floor or depth over its Op 200 target but inside the drawing's band: go on to Op 210, cut the cone and read the rim there. A step at the corner (Op 210): another pass down the compound into the corner. Rim under its band with the floor on its Op 200 target: deepen the floor .001 (the rim grows about .006) and recut the cone. Rim over Ø{{cad.recess_dia_max_in:.2dot}}, floor over the drawing's Ø{{cad.recess_floor_dia_max_in:.2dot}}, or deeper than {{cad.recess_depth_max_in:.2dot}}: scrapped; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
