@@ -106,6 +106,7 @@ outline_through_mm = 0.254
 outline_rough_offset_mm = 3.429
 outline_level_max_mm = 1.0
 outline_levels = 10
+outline_level_mm = 0.98044
 outline_plunge_feed_per_min_mm = 25.4
 # The farthest blank corner from the outline (the longest blank): under the
 # rough pass's reach (6.604), so no loose scrap is left.
@@ -126,6 +127,19 @@ plate_overhang_mm = -3.137
 drill_chuck_gauge_mm = 95.0
 r8_collet_gauge_mm = 6.3
 reamer_oal_mm = 88.9
+# Tapping the bare sub-plate under the spring tap guide
+# (tools.tap-guide-fisher; owner ruling 2026-11-21): the guide and the tap in
+# its wrench together reach at most tap_stack_max_mm below the collet face,
+# the spindle-to-table maximum (shop machines.pm-30mv, 431.8) less 25.0 to
+# bring the point down onto the wrench (the shop's tool-change clearance),
+# the vise bed, the 1 in parallels, the 1/2 in sub-plate and the collet
+# gauge: 289.096, rounded down to .01 in. The guide is 3 1/8 in (79.375)
+# overall; the tap's reach in its wrench is not on record, so the traveler
+# stops before AR03 unless the tap, point to the wrench's centre hole, is at
+# most tap_wrench_reach_max_mm: 289.052 less 79.375, 209.677, rounded down
+# to .01 in.
+tap_stack_max_mm = 289.052
+tap_wrench_reach_max_mm = 209.55
 quarter_mill_projection_min_mm = 19.05
 
 [[tools]]
@@ -441,6 +455,10 @@ instruction = "The #10-32 plug tap goes in the T-handle tap wrench with the cent
 feed = "hand"
 
 [[setups.operations]]
+instruction = "Stop check before AR03: measure the #10-32 tap and then the #4-40 tap in the T-handle wrench from the point to the wrench's centre hole (calipers, or the combination square's 12 in blade). Each must be at most {{process.tap_wrench_reach_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the parallels, the sub-plate, the collet, the tap guide's 3 1/8 in and 1 in to bring the point down onto the wrench). Over: stop; do not tap on this setup."
+feed = "hand"
+
+[[setups.operations]]
 speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
@@ -479,7 +497,7 @@ sizing = "other"
 instruction = "Run AR05_outline (M6 T11; set 2800): the rough pass .010 outside the outline in {{process.outline_levels:d}} levels to .010 into the plate, then the finish pass in one level at that depth, anticlockwise: the pivot round R.49, the two flanks, the square end. Each level starts with a slow plunge at the square end's middle. Air blast on the chips; no coolant on the plate."
 settings = "endmill-carbide-3fl-1-4-1018-cf"
 milling_cuts = [
-  { name = "outline rough", kind = "side", phase = "rough", cutter_dia_mm = 6.35, axial_doc_mm = 0.9758, radial_woc_mm = 3.175, stations_mm = "{{process.arm_length_mm}}" },
+  { name = "outline rough", kind = "slot", phase = "rough", cutter_dia_mm = 6.35, axial_doc_mm = "{{process.outline_level_mm}}", radial_woc_mm = 6.35, stations_mm = "{{process.arm_length_mm}}" },
   { name = "outline finish", kind = "side", phase = "finish", cutter_dia_mm = 6.35, axial_doc_mm = 9.8044, radial_woc_mm = 0.254, stations_mm = "{{process.arm_length_mm}}" },
 ]
 

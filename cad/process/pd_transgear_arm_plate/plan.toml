@@ -541,7 +541,10 @@ envelope = { x_span_mm = [54.8924, 9.525, 5.08], y_span_mm = ["{{cad.blank_width
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = 54.8924, part_height_mm = "{{process.plate_thickness_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = [-51.891, "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 # The plate lies wholly between the jaws (prechips' hold); they bear on the
 # side edges' straight run, kink to top corner, and K's chamfer is a light
-# finishing cut .7 mm deep.
+# finishing cut .7 mm deep, its load straight down into the parallels. At
+# .197 thick the grip is under the house limits.vise_grip_min_mm, the reason
+# Setup 2 bonds the blank for the facing and outline cuts; this light hold
+# is the author's choice, flagged for an owner ruling in the PR.
 beam = { axis = "x", hold = "cantilever", extent_mm = [-42.4464, 12.446], clamp_mm = [-42.4464, 12.446], section_mm = { y = "{{cad.blank_width_mm}}", z = 4.8768 }, vise_left = "start" }
 
 [[setups.operations]]

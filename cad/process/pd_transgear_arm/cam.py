@@ -597,6 +597,7 @@ def context(
     depth = t_max + through
     count = math.ceil(depth / p["outline_level_max_mm"] - 1e-9)
     _agree(plan, "outline_levels", count)
+    _agree(plan, "outline_level_mm", depth / count)
     rough_levels = [_r(t_max - depth * k / count) for k in range(1, count + 1)]
     bottom = _r(-through)
     # Every scrap of the blank lies within the rough pass's reach: the
