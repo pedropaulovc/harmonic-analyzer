@@ -855,7 +855,8 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
     # either side (the by-eye set it replaced left 1.90 and 2.75; #290's .XX
     # strap band set the rest; 3.095 before the inch leaves' tolerance, #3042).
     assert math.isclose(min(front), 3.077, abs_tol=5e-3)
-    assert math.isclose(max(back), dt_pinion_cam_geometry.CAM_LEN - min(back), abs_tol=1.0)
+    assert math.isclose(min(back), 3.934, abs_tol=5e-3)  # 3.951 before #3042
+    assert math.isclose(max(back), dt_pinion_cam_geometry.CAM_LEN - 3.077, abs_tol=5e-3)
     assert min(back) >= min(front)
     # North float at the widest setting: the back collar lands first.
     assert _back_collar_gap(_LEAF_ERR) < _hub_gap() - RIG.HUB_STOP_MARGIN

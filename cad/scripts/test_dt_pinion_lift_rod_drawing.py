@@ -181,7 +181,11 @@ def test_the_screw_point_lands_on_its_flat_at_the_worst_case() -> None:
     assert spec.SET_SCREW_POINT_DIA == pytest.approx(
         spec.CAM_SET_SCREW_MAJOR_MAX - 2.0 * spec.CAM_SET_SCREW_PITCH
     )
-    assert spec.SCREW_POINT_ON_FLAT_MARGIN_MM >= 0.0
+    # The flat is the shortest .01 in step that keeps the screw point on it at
+    # the worst stack: .0028 in spare before the inch leaves' tolerance was
+    # booked, under .0001 in after (#3042).
+    assert 0.0 <= spec.SCREW_POINT_ON_FLAT_MARGIN_MM < 0.01 * _IN
+    assert spec.SCREW_POINT_ON_FLAT_MARGIN_MM == pytest.approx(0.0007, abs=0.0005)
     assert spec.FLAT_CHORD_MIN > spec.SET_SCREW_POINT_DIA
     # For the record (owner sketch: the front flat can show past its hub):
     # with the flats' own .XX bands it shows .028 and reaches .014 under the
