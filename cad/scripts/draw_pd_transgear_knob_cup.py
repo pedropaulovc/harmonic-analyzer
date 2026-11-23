@@ -252,8 +252,8 @@ FRONT_FINISH_CAPTION_XY = (FRONT_FINISH[1][0] + 0.016, FRONT_FINISH[1][1] + 0.01
 # (pd_transgear_knob_cup_spec: axis +Y; the front face, the running face
 # on MHA-PD-28, at y = 0; the pilot's floor at y = PILOT_DEPTH; the pocket's
 # floor at y = LENGTH - CBORE_DEPTH; the rear face at y = LENGTH). The O.D.
-# and the length take the title block's .XX row, the pilot its end-milled
-# +.001/0 band, bonded on the MHA-PD-08 journal, its depth and the pocket's
+# and the length take the title block's .XX row, the pilot the DRILLED HOLES
+# +.004/0 band, bonded on the MHA-PD-08 journal, its depth and the pocket's
 # depth the .XXX row, the pocket's Ø the .XX row, the web's #33 the DRILLED
 # HOLES row, each floor corner its R MAX. The length and the pilot depth are
 # supply sizes: MHA-PD-00 faces the front face to the fitted pilot depth
