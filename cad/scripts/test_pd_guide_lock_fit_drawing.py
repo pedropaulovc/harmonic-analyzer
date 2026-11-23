@@ -306,16 +306,17 @@ def test_set_locks_clear_the_pivot_spacer_in_the_sweep(monkeypatch) -> None:
     edge stands its skewed reach and its height band toward the bar. The
     .45 plate (user ruling 2026-10-11, grown with the .29 rails) keeps the spacer far off; the 15.65
     plate it replaced needed a +0/-0.50 band to pass it, and at the general
-    bands runs into it. R9-71: the spacer is pressed on the shoulder, so its
-    O.D. stands off the screw axis only by the bore offset its printed runout
-    to A allows."""
+    bands runs into it. The spacer is bonded on the shoulder (fit audit
+    2026-11-23), so its O.D. stands off the screw axis by the bore offset its
+    printed runout to A allows and by half the bond gap."""
     import build_pd_paper_drive_assembly as assembly
     import pd_support_bar_spec as bar
 
-    assert spacer.BORE_DIA_MAX < (0.1875 - 0.001) * IN
+    assert spacer.SEAT_OFFSET_MAX == pytest.approx(spacer.BOND_GAP[1] / 2.0)
     spacer_r = (
         (spacer.OD + spacer.OD_BAND) / 2.0
         + spacer.BORE_ECCENTRICITY
+        + spacer.SEAT_OFFSET_MAX
         + bar.HOLE_POSITION_BAND
     )
     far_reach = _FAR_REACH
