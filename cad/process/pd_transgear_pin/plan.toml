@@ -20,12 +20,38 @@
 # long at the head (the blade's faces per #3312, test_part_off_datum). Turned
 # round twice over a shim wrap on the journal, the pin running on through the
 # jaws (prechips turned_shaft regrip_stickout_*): face the head to its
-# thickness and form the R.18 dome; face the tip to its station and form the
-# R.07 dome. Bench: deburr, look over, oil, tag with its arm.
+# thickness, step its R.18 dome from a Z/Ø table and file it; face the tip to
+# its station, step its R.07 dome and file it. Bench: deburr, look over, oil,
+# tag with its arm.
 #
-# Flagged (to order): the R.180 and R.070 form tools, the .020 grooving tool
-# and the sharp-nose turning tool (cad/config/shop-equipment/
-# tools-special-cutters.toml), and the six Class X plug gauges
+# The domes (owner ruling 2026-11-23, tool audit Q5, option D: "buy the
+# LittleMachineShop 'Ball and Radius Turning Tool, Small' (SKU 2569, $124.95;
+# convex 0-.75 in dia, 3/8 shank) for all 14 domes; step-and-file is the
+# fallback for any dome it cannot reach. Confirm each dome is convex and
+# reachable before buying."). Reach test, from the spec (dome-pattern,
+# 2026-11-23): both convex, ball Ø.36 and Ø.14 under the tool's .75, each cut
+# on a free end. The frame's arms reach .19 either side of the pivot along Z,
+# so a dome's centre must stand .25 out of the jaws: stick-out R + .25.
+# - Head R.18 (.XX, R.17-.19) on the Ø.19-.21 head: R + .25 = .43 out, which
+#   puts the Ø.1266 land and .02 of the Ø.1248 journal out of the jaws, over
+#   3 × Ø.1248 = .374 (lathe_holding, no centre; the land alone allows
+#   3 × .1266 = .38). The head can only be domed head out after the part-off
+#   (on the bar it faces the chuck). Not reachable.
+# - Tip R.07 (.XX, R.06-.08) on the Ø.125 journal: R + .25 = .32 out, which
+#   takes in the ring groove (its load wall .157 from the tip: 2.08 - 1.923),
+#   over 3 × Ø.095 = .285. Grooving after the dome would set the load wall
+#   (1.923 ±.001 from the seat) from the tip end, out of reach of its band.
+#   Not reachable.
+# Step-and-file, the pattern's fallback (precedent dt_pinion_arbor's crowns):
+# each dome faced in steps from the turned_shaft table (process.dome_steps)
+# at the regrip stick-outs the plan already holds, filed with the smooth
+# file and screened with the radius gauges' leaves that bracket its band
+# (the head 11/64 and 3/16, the tip 1/16 and 5/64). They replace the R.180
+# and R.070 form tools (form-tool-r180, form-tool-r070).
+#
+# Flagged (to order): the .020 grooving tool, the sharp-nose turning tool
+# (cad/config/shop-equipment/tools-special-cutters.toml), the radius gauge
+# set (radius-gauges, Starrett S167AZ), and the six Class X plug gauges
 # (gauges.plug-gauges-1260-1265 and -1261-1264). The arm MHA-PD-18 must be
 # made and reamed before this pin.
 title = "Transgear Pin"
@@ -95,20 +121,22 @@ tip_cut_in = 2.085
 # groove's Ø.095 = .285.
 regrip_stickout_datum_in = 0.2
 regrip_stickout_far_in = 0.25
-# Each dome is cut full by its own form tool: the head's on the head's own Ø
-# anywhere in its .19-.21 band (cad.dome_datum_form_height_min/_max, .0271
-# at Ø.19 to .0338 at Ø.21), the tip's on the journal.
-dome_datum_form_radius_in = 0.18
-dome_datum_form_dia_min_in = 0.19
-dome_datum_form_dia_max_in = 0.21
-dome_far_form_radius_in = 0.07
-# The head's thickness, seat face to faced end, before its dome is formed:
-# the .08-.10 head land plus the dome's height. The window holds the land
-# for any head Ø in its band: .08 + .0338 to .10 + .0271, rounded inward.
-head_face_min_in = 0.114
-head_face_max_in = 0.127
-head_face_min_mm = 2.8956
-head_face_max_mm = 3.2258
+# Each dome is stepped from the turned_shaft table (its height in
+# dome_steps + 1 equal Z steps, each step's corner on the drawn sphere
+# through the apex: cad.dome_datum_step_k_* / cad.dome_far_step_k_*), then
+# filed: three steps leave a face about Ø.10 (head) and Ø.07 (tip) at the
+# apex and step corners a file takes off.
+dome_steps = 3
+# The head's thickness, seat face to faced end, before its dome is stepped:
+# the .08-.10 head land plus the dome's height. That height is
+# R - √(R² - (Ø/2)²) for whatever radius the leaves pass (11/64 to 3/16) on
+# whatever head Op 80 read (Ø.19-.21): at most .0358 (R.1719 on Ø.21), at
+# least .0258 (R.1875 on Ø.19). The window that holds the land for all of
+# them is .08 + .0358 to .10 + .0258, rounded inward.
+head_face_min_in = 0.116
+head_face_max_in = 0.125
+head_face_min_mm = 2.9464
+head_face_max_mm = 3.175
 # Left a side over the finished size by the rough passes.
 finish_allowance_in = 0.002
 # The journal is finish-turned to .1252-.1254 and polished into its
@@ -187,15 +215,14 @@ name = "P1 HSS cutoff blade"
 ref = "cutoff-blade-p1"
 
 [[tools]]
-id = "form-head"
-name = "R.180 form tool: a concave R.180 arc at least .22 across ground into the edge, on the end of a 3/8 in square HSS tool blank, cutting edge at centre height"
-ref = "form-tool-r180"
-status = "to_order"
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
 
 [[tools]]
-id = "form-tip"
-name = "R.070 form tool: a concave R.070 arc .13 across ground into the edge, its two ends the tips, on the end of a 3/8 in square HSS tool blank, cutting edge at centre height"
-ref = "form-tool-r070"
+id = "radius"
+name = "Radius gauges (to buy)"
+ref = "radius-gauges"
 status = "to_order"
 
 [[setups]]
@@ -273,7 +300,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Turn the head from the seat back to Z{{process.head_turn_end_z_mm:in.3dot}}, past the part-off kerf, in the same passes to Ø{{cad.step_head_dia_min_in:.3dot}}–{{cad.step_head_dia_max_in:.3dot}} (aim at .200). Write the head's reading on this sheet: Op 220 forms its dome by it."
+instruction = "Turn the head from the seat back to Z{{process.head_turn_end_z_mm:in.3dot}}, past the part-off kerf, in the same passes to Ø{{cad.step_head_dia_min_in:.3dot}}–{{cad.step_head_dia_max_in:.3dot}} (aim at .200)."
 settings = "lathe-ar-light-1018"
 cut_diameter_mm = "{{cad.step_head_dia_mm}}"
 inspection = "Head Ø{{cad.step_head_dia_min_in:.3dot}}–{{cad.step_head_dia_max_in:.3dot}}, calipers, spindle stopped."
@@ -375,13 +402,13 @@ cut_diameter_mm = "{{cad.step_head_dia_mm}}"
 
 [[setups]]
 machine_kind = "lathe"
-title = "Turned round, head out: face the head, form its dome"
+title = "Turned round, head out: face the head, step and file its dome"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a brass shim wrap on the press land, the head out {{cad.step_land_stickout_datum_mm:in.2dot}} in from the jaw fronts; the rest of the pin on through the jaws into the chuck (the journal, smaller than the land, clears the jaws)."
-datum = "DRO Z0 the head's faced end (Op 200, the AR tool); the form tool zeroes its own Z where its arc touches the head's corners (Op 220)."
-diagram = { file = "diagrams/head.svg", alt = "The pin turned round, the press land in the jaws over a shim wrap, the head out: the head faced and its R.18 dome formed." }
+datum = "DRO Z0 the head's faced end (Op 200, the AR tool); the dome's steps (Op 220) are read from it."
+diagram = { file = "diagrams/head.svg", alt = "The pin turned round, the press land in the jaws over a shim wrap, the head out: the head faced and its R.18 dome stepped from the table and filed." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.step_land_dia_mm}}", stock_diameter_mm = "{{cad.step_land_dia_mm}}", stickout_mm = "{{cad.step_land_stickout_datum_mm}}", minimum_diameter_mm = "{{cad.step_land_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -393,7 +420,7 @@ sizing = "other"
 instruction = "Face the head's parted end square in light skims, to the centre with no pip, about .005 off. Between skims, spindle stopped, read the head with the calipers from the seat face (one jaw beside the land) to the faced end. Set DRO Z0 on the faced end."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.step_head_dia_mm}}"
-inspection = "Head {{process.head_face_min_in:.3dot}}–{{process.head_face_max_in:.3dot}} thick, seat face to faced end: the dome then leaves the {{cad.shoulder_min_in:.2dot}}–{{cad.shoulder_max_in:.2dot}} head land for any head Ø in {{cad.step_head_dia_min_in:.2dot}}–{{cad.step_head_dia_max_in:.2dot}}."
+inspection = "Head {{process.head_face_min_in:.3dot}}–{{process.head_face_max_in:.3dot}} thick, seat face to faced end: the dome then leaves the {{cad.shoulder_min_in:.2dot}}–{{cad.shoulder_max_in:.2dot}} head land for any head Ø in {{cad.step_head_dia_min_in:.2dot}}–{{cad.step_head_dia_max_in:.2dot}} and any dome Op 240 passes."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.head_face_min_mm}}", "{{process.head_face_max_mm}}"] }]
 
 [[setups.operations]]
@@ -403,22 +430,47 @@ instruction = "Head under {{process.head_face_min_in:.3dot}}: scrap the pin and 
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "form-head"
+tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Form the R.18 dome: tool on centre height, square to the axis; set the cross-slide so the arc touches the head's corner on both sides at once, and zero DRO Z there. Feed along Z by the dome's height for the head's Op 80 reading: {{cad.dome_datum_form_height_min_in:.4dot}} at Ø{{process.dome_datum_form_dia_min_in:.3dot}}, .0303 at Ø.200, {{cad.dome_datum_form_height_max_in:.4dot}} at Ø{{process.dome_datum_form_dia_max_in:.3dot}}. Not gauged: the tool's radius."
-settings = "lathe-form-r180-1018"
+instruction = "Step the R.18 dome with the AR tool, Z0 the faced head end: at each line, carriage at the Z, face from the Ø out to the head's O.D.: Z{{cad.dome_datum_step_3_end_z_mm:in.4dot}} from Ø{{cad.dome_datum_step_3_dia_in:.3dot}}; Z{{cad.dome_datum_step_2_end_z_mm:in.4dot}} from Ø{{cad.dome_datum_step_2_dia_in:.3dot}}; Z{{cad.dome_datum_step_1_end_z_mm:in.4dot}} from Ø{{cad.dome_datum_step_1_dia_in:.3dot}}. The dome meets the O.D. about Z−{{cad.dome_datum_height_in:.3dot}}."
+settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.step_head_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle at the low range: file the steps off the dome with the smooth file, stroking from the apex out to the rim, blending the Ø{{cad.dome_datum_step_3_dia_in:.2dot}} face left at the apex into the dome, until the step corners are just gone."
+rpm = 200
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "radius"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Spindle stopped. Screen the dome with the radius gauges' concave leaves held across it through the axis: the 11/64 leaf rests on the rim with light at the apex, and the 3/16 leaf touches at the apex with light at the rim; no flat at the apex, no step left."
+inspection = "Dome R{{cad.dome_datum_radius_min_in:.2dot}}–{{cad.dome_datum_radius_max_in:.2dot}}: between the 11/64 (R.1719) and 3/16 (R.1875) leaves; no flat, no step."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The 3/16 leaf showing light at the apex, a flat or a step (the rim still full): file again from the rim inward and screen again. The 11/64 leaf touching at the apex (filed too far at the rim): scrap the pin and make another from Op 40, the blank rechucked as in Setup 1's Holding (R stands)."
 
 [[setups]]
 machine_kind = "lathe"
-title = "Turned round, tip out: face the tip, form its dome"
+title = "Turned round, tip out: face the tip, step and file its dome"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over the shim wrap on the journal, the tip out {{cad.outer_stickout_far_mm:in.2dot}} in from the jaw fronts (the jaws past the groove); the head and the land inside the chuck."
-datum = "DRO Z0 the tip's faced end (Op 230, the AR tool); the form tool zeroes its own Z where its arc touches the tip's corners (Op 250)."
-diagram = { file = "diagrams/tip.svg", alt = "The pin turned round again, the journal in the jaws over a shim wrap, the tip out: the tip faced and its R.07 dome formed." }
+datum = "DRO Z0 the tip's faced end (Op 260, the AR tool); the dome's steps (Op 280) are read from it."
+diagram = { file = "diagrams/tip.svg", alt = "The pin turned round again, the journal in the jaws over a shim wrap, the tip out: the tip faced and its R.07 dome stepped from the table and filed." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.groove_dia_min_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -440,12 +492,37 @@ instruction = "Seat to tip under {{cad.far_end_station_min_in:.3dot}}: scrap the
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "form-tip"
+tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Form the R.07 dome: tool on centre height, square to the axis; set the cross-slide so the arc touches the tip's corner on both sides at once, and zero DRO Z there. Feed {{cad.dome_far_form_height_in:.4dot}} along Z. Not gauged: the tool's radius."
-settings = "lathe-form-r070-1018"
+instruction = "Step the R.07 dome with the AR tool, Z0 the faced tip: at each line, carriage at the Z, face from the Ø out to the journal's O.D.: Z{{cad.dome_far_step_3_end_z_mm:in.4dot}} from Ø{{cad.dome_far_step_3_dia_in:.3dot}}; Z{{cad.dome_far_step_2_end_z_mm:in.4dot}} from Ø{{cad.dome_far_step_2_dia_in:.3dot}}; Z{{cad.dome_far_step_1_end_z_mm:in.4dot}} from Ø{{cad.dome_far_step_1_dia_in:.3dot}}. The dome meets the O.D. about Z−{{cad.dome_far_height_in:.3dot}}."
+settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle at the low range: file the steps off the dome with the smooth file, stroking from the apex out to the rim, blending the Ø{{cad.dome_far_step_3_dia_in:.2dot}} face left at the apex into the dome, until the step corners are just gone. Keep the file off the journal."
+rpm = 200
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "radius"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Spindle stopped. Screen the dome with the radius gauges' concave leaves held across it through the axis: the 1/16 leaf rests on the rim with light at the apex, and the 5/64 leaf touches at the apex with light at the rim; no flat at the apex, no step left."
+inspection = "Dome R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}}: between the 1/16 (R.0625) and 5/64 (R.0781) leaves; no flat, no step."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The 5/64 leaf showing light at the apex, a flat or a step (the rim still full): file again from the rim inward and screen again. The 1/16 leaf touching at the apex (filed too far at the rim): scrap the pin and make another from Op 40, the blank rechucked as in Setup 1's Holding (R stands)."
 
 [[setups]]
 machine_kind = "other"

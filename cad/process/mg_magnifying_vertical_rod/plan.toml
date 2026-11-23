@@ -13,12 +13,28 @@
 # blade (its .0625 width is inside the relief's .05–.07, so one plunge cuts
 # it, and the .020 grooving tool the placeholder named is not needed). Turned
 # round, the body in the jaws over the shim: face the other end to the 4.92
-# body length, then form the R.13 dome with the R.125 form tool, its apex on
-# the faced plane (the nut is tried on the thread at the lathe, Op 180).
-# Bench: deburr, bag (FINISH: machined).
+# body length, then sweep the R.13 dome with the LittleMachineShop 2569 ball
+# turner, its apex on the faced plane (the nut is tried on the thread at the
+# lathe, Op 180). Bench: deburr, bag (FINISH: machined).
 #
-# Flagged: the R.125 form tool (tools-special-cutters.toml form-tool-r125) is
-# to order, shared with MHA-MG-03. The #4-40 die's chamfer (lead) is not on
+# The dome (owner ruling 2026-11-23, tool audit Q5, option D: "buy the
+# LittleMachineShop 'Ball and Radius Turning Tool, Small' (SKU 2569, $124.95;
+# convex 0-.75 in dia, 3/8 shank) for all 14 domes; step-and-file is the
+# fallback for any dome it cannot reach. Confirm each dome is convex and
+# reachable before buying."). Reach test, from the spec (dome-pattern,
+# 2026-11-23): convex, R.13 (.XX, R.12-.14) tangent hemisphere on the
+# Ø.245-.255 bar (mg_magnifying_vertical_rod_geom DOME_R = ROD_DIA/2), ball
+# Ø.25 under the tool's .75; the dome end is free (no centre in Setup 3);
+# the frame's arms reach .19 either side of the pivot along Z, so the dome's
+# centre must stand .25 out of the jaws: R + .25 = .3775 at most against the
+# .45 stick-out, inside 3 × Ø.245 = .735 (lathe_holding, no centre); nothing
+# over Ø.75 within .25 of the centre (the jaws are .325 from it). Reachable.
+# Swept to the bar's own radius, the dome is tangent on any bar the stock
+# allows, R.1225-.1275, inside R.12-.14 (the R.125 form tool it replaces,
+# form-tool-r125, left a lip on a bar over .250).
+#
+# Flagged: the ball turner (tools.ball-radius-turner-lms-2569) is to order,
+# shared with MHA-MG-03. The #4-40 die's chamfer (lead) is not on
 # record: the relief takes its incomplete threads only if the lead is under
 # about 1.5 threads, so the die is run on to the shoulder, then turned over
 # and run on again. No #4-40 ring gauge is on record: the thread is accepted
@@ -74,14 +90,25 @@ tip_chamfer_minor_in = 0.085
 blade_width_in = 0.0625
 # The relief's floor is plunged to about this, under the drawing's Ø.072 MAX.
 relief_aim_dia_in = 0.068
-# The R.125 form tool cuts the R.13 dome full on the 1/4 bar: a hemisphere,
-# its apex on the faced plane.
+# The ball turner sweeps the R.13 dome to the bar's own radius: a tangent
+# hemisphere, its apex on the faced plane (the radius the turned_shaft
+# adapter derives the dome's height and the faced length from; nominal).
 dome_form_radius_in = 0.125
-# The form tool's feed: straight to Z-.095 (under the R.125 arc's cap height
-# over the smallest bar the drawing allows, Ø.245: .100), then in .001 steps
-# until the faced flat at the apex just vanishes; never past the bar's
-# radius (.125).
-form_rough_feed_in = 0.095
+# Before the sweep the AR tool chamfers the end's corner 45° (dome-pattern
+# step 0: the dome is .125 deep, over .03): a leg L stays outside the
+# tangent hemisphere's sphere while L <= (2 - √2)r = .586r. The op reads the
+# flat the chamfer leaves, Ø.116: the leg is then .0645 on the smallest bar
+# (Ø.245, limit .0718) and .0695 on the largest (Ø.255, limit .0747), about
+# .55r on the nominal Ø.250.
+dome_chamfer_flat_dia_in = 0.116
+# The ball turner's bit set on the rule from a straightedge across the inner
+# frame: the radius plus the pivot's 3/16 in from the frame's end (maker's
+# instructions), .125 + .1875 on the nominal bar; the trial dome (Op 260)
+# corrects it to the bar's own radius.
+ball_rule_in = 0.3125
+# The dome's centre out of the jaw fronts: the .45 stick-out less R .125;
+# the frame's arms need .25 (dome-pattern step 6).
+dome_centre_out_in = 0.325
 
 [[tools]]
 id = "saw"
@@ -120,9 +147,10 @@ name = "P1 HSS cutoff blade, 1/16 in"
 ref = "cutoff-blade-p1"
 
 [[tools]]
-id = "form"
-name = "R.125 form tool"
-ref = "form-tool-r125"
+id = "ball"
+name = "Ball turner (LittleMachineShop 2569)"
+ref = "ball-radius-turner-lms-2569"
+description = "LittleMachineShop 2569 Small Ball and Radius Turning Tool, 3/8 shank in the AXA No. 1 holder: its HSS bit, on an inner frame swung by hand about a vertical pivot, sweeps the convex R.13 dome"
 status = "to_order"
 
 [[tools]]
@@ -299,13 +327,13 @@ instruction = "Relief floor over {{cad.groove_dia_max_in:.3dot}}: plunge again a
 
 [[setups]]
 machine_kind = "lathe"
-title = "Dome end: face to the body length, form the R.13 dome"
+title = "Dome end: face to the body length, sweep the R.13 dome"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Turned round: 3-jaw over the shim wrap on the body, the dome end's faced plane {{process.end_stickout_in:.2dot}} in out of the jaws (the sawn end about .10 beyond it); the threaded end back through the jaws into the spindle bore."
-datum = "The body length is read from the shoulder face with the calipers (Op 210). For the dome (Op 240) the DRO Z is zeroed where the form tool's arc touches the end's corner."
-diagram = { file = "diagrams/dome.svg", alt = "The rod turned round, the dome end out over a shim wrap: faced to the 4.92 body length, then formed to the R.13 dome." }
+datum = "The body length is read from the shoulder face with the calipers (Op 210). For the dome the DRO Z is zeroed where the ball turner's bit touches the faced end (Op 290)."
+diagram = { file = "diagrams/dome.svg", alt = "The rod turned round, the dome end out over a shim wrap: faced to the 4.92 body length, its corner chamfered, then the R.13 dome swept by the ball turner, its pivot one radius behind the faced end." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -330,25 +358,63 @@ instruction = "Faced under {{cad.shoulder_min_in:.2dot}}: scrap the rod and make
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: set the R.125 form tool (a concave R.125 arc) on centre height, the arc facing the end and spanning it. Bring the arc up along Z, adjusting the cross slide, until the end's O.D. corner touches it on both sides at once, no light showing at either side: the arc is then centred on the axis. Zero the DRO Z at that touch."
-
-[[setups.operations]]
-cut_kind = "other"
 speed_kind = "spindle"
-tool = "form"
+tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle on: feed the carriage along Z straight to Z−{{process.form_rough_feed_in:.3dot}}, then on in .001 steps, stopping the spindle after each to look at the apex under the loupe: stop at the step where the faced flat at the apex just vanishes (a full R{{process.dome_form_radius_in:.3dot}} dome, its apex on the faced plane). Never past Z−{{cad.dome_far_form_height_in:.3dot}} (the bar's radius)."
-settings = "lathe-form-r125-c360"
+instruction = "Chamfer the end's corner 45°: swing the compound to 45°, bring the AR tool's point to the corner and feed it in along the compound in light cuts until the flat left on the end reads Ø{{process.dome_chamfer_flat_dia_in:.3dot}} across (the calipers' jaw tips). The chamfer stays outside the dome's sphere: the sweep takes it off."
+settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Stop the spindle and look at the dome under a loupe: no pip or flat at the apex, no step where the dome meets the body."
+instruction = "Spindle stopped. Ball turner: its 3/8 shank in the AXA No. 1 holder, the inner frame swung parallel to the spindle axis; set the bit's tip level with the point of the dead centre in the tailstock. Then take the dead centre out and run the tailstock back: nothing may stand within 4 in beyond the dome end (the frame is 3.25 long)."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A pip (tool off centre height) or a step at the body (arc off centre), found in Op 250: correct the tool's height or the cross slide, spindle stopped; bring the arc up along Z until it just touches the formed dome, zero the DRO Z at that touch, take one light pass to Z−.002 only, and look again as Op 250. Still a pip or step: scrap the rod and make another from Setup 1."
+instruction = "Radius: lay a straightedge across the inner frame's edges and set the bit's tip {{process.ball_rule_in:.4dot}} out past it on the rule (the radius plus the pivot's 3/16 from the frame's end); lock the bit's set screw."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Trial dome: take the rod out. Chuck a 1 in offcut sawn from the same bar over the shim, {{process.end_stickout_in:.2dot}} in out; face its end square and chamfer it as Op 230. Sweep a trial dome on it exactly as Ops 290–320 will sweep the rod's."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Look at the trial dome under the loupe and draw a fingernail over where it meets the bar: no step and no ridge there. A step (bit set short): set it out by about the step's depth. A ridge (the dome meets the bar at an angle: set long): set it .002 shorter. Either: face the trial dome off and repeat Op 260."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Trial passes: the bit's set screw is not touched again on this rod. Take the offcut out and chuck the rod again as this setup's Holding, the dome end {{process.end_stickout_in:.2dot}} in out."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Z: the inner frame parallel to the spindle axis, run the carriage up until the bit's tip just touches the faced end; lock the carriage and zero the DRO Z. The pivot is then one radius behind the faced plane: the apex stays on it and the sweep cannot shorten the rod. Do not move the carriage again."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Sweep limits: from the inner frame parallel to the axis (the tip at the apex) round toward you to 90°, square to the axis: a tangent hemisphere. Never swing the frame toward the chuck past 90°."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle off, cross slide out so the bit clears the work: swing the frame through its whole sweep and turn the chuck one full turn by hand. The frame's arms (.19 either side of the pivot along Z) miss the jaws: the dome's centre stands {{process.dome_centre_out_in:.3dot}} out of the jaw fronts (.25 at least)."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ball"
+drilling = "none"
+sizing = "other"
+instruction = "Cross slide in until the bit just touches the corner somewhere in the sweep. Spindle on. Sweep, cross slide in .003 at most, sweep again; the last passes .001. Stop when the flat left at the apex just vanishes: the pivot is then on the axis. Never further: past the axis the bit leaves a ring or a point."
+settings = "lathe-ball-turner-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Stop the spindle and look at the dome under a loupe: no pip or flat at the apex, no ring, no step or ridge where the dome meets the body."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A flat at the apex: cross slide in .001 and sweep again as Op 320. A ring or a point at the apex, a step or a ridge: scrap the rod and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -358,7 +424,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.shoulder_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Under {{cad.shoulder_min_in:.2dot}}: the form ran past its Z: scrap the rod and make another from Setup 1."
+instruction = "Under {{cad.shoulder_min_in:.2dot}}: the carriage moved after Op 290; scrap the rod and make another from Setup 1."
 
 [[setups]]
 machine_kind = "other"

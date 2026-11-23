@@ -117,6 +117,16 @@ tool = "form-tool-r047"
 material = "lathe-c360"
 rpm = 300
 feed = "cross slide by hand, slow and steady, dry"
+# The output fixture's groove with the one full-radius groover (tool audit
+# 2026-11-23, row form-tool-r047: "cut MG-06's FULL R groove with the one
+# full-radius groover bought for MG-05"): it cuts its whole .048 width at
+# once, as the R.047 did, so the same authored 300 rpm (33 ft/min at the
+# Ø.42 spigot), fed by hand, dry. No maker's figure: a hand-fed form plunge.
+[settings.fixture-form-r024-c360]
+tool = "form-tool-r024"
+material = "lathe-c360"
+rpm = 300
+feed = "cross slide by hand, slow and steady, dry"
 [settings.fixture-spot-c360]
 tool = "jig-spot"
 material = "lathe-c360"

@@ -8,18 +8,39 @@
 # centre-drill the stub and turn the #4-40 blank on the tailstock dead centre
 # (the .35 in of Ø.11 is over 3 × Ø out of the jaws, so it is not turned
 # from the chuck alone); withdraw the centre, face the stub off to the tip,
-# form the R.07 dome, run the die on to the shoulder by hand, groove the
-# relief at the shoulder (these run without the centre: the stub facing, the
-# form and the die load the end along its axis, and the relief sits at the
+# step the R.07 dome from a Z/Ø table and file it, run the die on to the
+# shoulder by hand, groove the relief at the shoulder (these run without the
+# centre: the stub facing, the dome's facing steps and the die load the end
+# along its axis, the file is hand pressure only, and the relief sits at the
 # shoulder, the jaws' end of the Ø.11, so none bends the end as the turning
 # passes would); turn it round, the shank in the jaws: face the back
 # end to the 1.85 shank length. Pressed into MHA-MG-08 at assembly
 # (MHA-MG-00).
 #
+# The dome (owner ruling 2026-11-23, tool audit Q5, option D: "buy the
+# LittleMachineShop 'Ball and Radius Turning Tool, Small' (SKU 2569, $124.95;
+# convex 0-.75 in dia, 3/8 shank) for all 14 domes; step-and-file is the
+# fallback for any dome it cannot reach. Confirm each dome is convex and
+# reachable before buying."). Reach test, from the spec (dome-pattern,
+# 2026-11-23): convex, R.07 (.XX, R.06-.08) through the #4-40 blank's
+# Ø.1061-.1112 major edge, ball Ø.14 under the tool's .75; but the die starts
+# on the dome, so the dome is cut before the thread and the relief, with no
+# centre (the dome end is never on a centre), on the slender end: the
+# Ø.11 blank stands .352 out of the Ø.1875 shoulder (.324 thread + .028
+# dome) even with the shoulder at the jaw fronts, over the shop's 3 × Ø
+# unsupported rule (lathe_holding) on its least Ø, 3 × .1061 = .318, and the
+# ball turner's cut at the root is radial (the plan's own reason the blank
+# is turned on the centre). Not reachable: step-and-file, as the pattern's
+# fallback (precedent dt_pinion_arbor's crowns), from the turned_shaft
+# stepped-turning table (process.dome_steps), filed with the smooth file and
+# screened with the radius gauges' 1/16 and 5/64 leaves, which bracket the
+# drawn R.06-.08 (pd_guide_lock's corner screen). It replaces the R.070 form
+# tool (form-tool-r070).
+#
 # Flagged: 3/16 O1/W1 drill rod has no stock record and is not on hand (to
-# order); the R.070 form tool (form-tool-r070) and the .020 grooving tool
-# (grooving-tool-020) are to order (cad/config/shop-equipment/
-# tools-special-cutters.toml); the lathe's tailstock dead centre is not in
+# order); the .020 grooving tool (grooving-tool-020) and the radius gauge
+# set (radius-gauges, Starrett S167AZ) are to order (cad/config/
+# shop-equipment/); the lathe's tailstock dead centre is not in
 # the shop records (Precision Matthews ships dead centres with the lathe;
 # confirm it). The #4-40 die, the 13/16 die stock and the size 1 centre
 # drill are on hand. No thread gauge is on record: the thread is accepted on
@@ -70,23 +91,28 @@ turn_start_z_mm = 2.3
 rough_radial_doc_mm = 0.15
 finish_radial_doc_mm = 0.03
 turn_feed_mm_rev = 0.1016
-# The R.070 form tool's radius: the dome is cut full (to the centre) on the
-# blank's own Ø, anywhere in the thread blank's .1061–.1112 band, so its
-# height goes by the blank: .070 − √(.070² − (Ø/2)²), .0243 at Ø.1061 to
-# .0275 at Ø.1112 (cad.dome_far_form_height_min/_max; the pictures print
-# that range and Op 110 the per-blank feed).
-dome_form_radius_in = 0.07
-dome_form_dia_min_in = 0.1061
-dome_form_dia_max_in = 0.1112
-# The thread length read from the shoulder face to the dome's apex (the dome
-# root is an edge on the thread; the calipers' beam end seats on the apex):
-# the .314–.334 thread plus the dome's height for the blank's miked Ø, .0243
-# (Ø.1061) to .0275 (Ø.1112). The gauge band is the widest, .314 + .0243 to
-# .334 + .0275; the op prints the per-blank rule.
-thread_apex_min_in = 0.3383
-thread_apex_max_in = 0.3615
-thread_apex_min_mm = 8.5936
-thread_apex_max_mm = 9.1821
+# The dome is stepped from the turned_shaft table: its height cut into
+# dome_steps + 1 equal Z steps, each step's corner on the R.07 sphere through
+# the apex (cad.dome_far_step_k_z / _dia), then filed. Three steps on a .026
+# high dome leave a Ø.06 face at the apex and corners under .004 deep, a
+# file's work (dt_pinion_arbor's precedent steps at .05 Ø).
+dome_steps = 3
+# The radius gauges' leaves that screen the filed dome: the 1/16 (R.0625)
+# rests on its ends and the 5/64 (R.0781) on its middle, so the dome lies
+# between them, inside the drawn R.06-.08.
+leaf_radius_min_in = 0.0625
+leaf_radius_max_in = 0.078125
+# The thread read from the shoulder face to the dome's apex (the dome's root
+# is an edge on the thread; the calipers' beam end seats on the apex): the
+# thread is .314-.334 from the dome's tangent, which lies one dome height
+# below the apex. That height is R - √(R² - (Ø/2)²) for whatever radius the
+# leaves pass on whatever blank Op 80 read: at most .0340 (R.0625 on Ø.1112),
+# at least .0208 (R.0781 on Ø.1061). The window that holds the thread for
+# all of them is .314 + .0340 to .334 + .0208, rounded inward.
+thread_apex_min_in = 0.348
+thread_apex_max_in = 0.3547
+thread_apex_min_mm = 8.8392
+thread_apex_max_mm = 9.00938
 
 [[tools]]
 id = "saw"
@@ -104,9 +130,9 @@ name = "Centre drill, carbide 60°, size 1"
 ref = "centre-drills-carbide-60"
 
 [[tools]]
-id = "form"
-name = "R.070 form tool: a concave R.070 arc .112 across ground into the edge, its two ends the tips, on the end of a 3/8 in square HSS tool blank, cutting edge at centre height"
-ref = "form-tool-r070"
+id = "radius"
+name = "Radius gauges (to buy)"
+ref = "radius-gauges"
 status = "to_order"
 
 [[tools]]
@@ -162,9 +188,9 @@ title = "Tip end: thread blank on the centre, dome, thread, relief"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw over a brass shim wrap on the rod, the tip end out {{process.tip_pull_in:.2dot}} in from the jaw fronts (the tip {{process.end_stickout_in:.2dot}} in out plus the {{process.tip_stub_in:.2dot}} in centre stub); the rest of the blank back in the jaws. The tailstock dead centre, greased, in the stub's centre hole for Ops 60–80; the tailstock backed off for Ops 100–110 and brought up again, its centre out, to square the die in Op 120."
-datum = "Z0 (carriage DRO) the tip's finished plane: set {{process.tip_stub_in:.3dot}} in back from the stub's faced end in Op 40, faced to in Op 100."
-diagram = { file = "diagrams/tip.svg", alt = "The blank in the 3-jaw, the tip end out: the #4-40 blank turned on the tailstock centre in a stub beyond the tip; the stub faced off, the R.07 dome formed, the thread die-cut and the relief grooved at the shoulder." }
+holding = "3-jaw over a brass shim wrap on the rod, the tip end out {{process.tip_pull_in:.2dot}} in from the jaw fronts (the tip {{process.end_stickout_in:.2dot}} in out plus the {{process.tip_stub_in:.2dot}} in centre stub); the rest of the blank back in the jaws. The tailstock dead centre, greased, in the stub's centre hole for Ops 60–80; the tailstock backed off for Ops 100–140 and brought up again, its centre out, to square the die in Op 150."
+datum = "Z0 (carriage DRO) the tip's finished plane: set {{process.tip_stub_in:.3dot}} in back from the stub's faced end in Op 40, faced to in Op 100; the dome's steps (Op 110) are read from it."
+diagram = { file = "diagrams/tip.svg", alt = "The blank in the 3-jaw, the tip end out: the #4-40 blank turned on the tailstock centre in a stub beyond the tip; the stub faced off, the R.07 dome stepped and filed, the thread die-cut and the relief grooved at the shoulder." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{process.tip_pull_mm}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}", support = "tailstock" }
 turning_support = { kind = "tailstock", chuck_z_mm = "{{cad.end_jaw_z_mm}}", centre_z_mm = "{{process.tip_stub_mm}}" }
 
@@ -237,12 +263,37 @@ cut_diameter_mm = "{{cad.step_dia_mm}}"
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "form"
+tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Form the R.07 dome: tool on centre height, square to the axis; set the cross-slide so the arc touches the O.D. corner on both sides at once, and zero the DRO Z there. Feed along Z by the blank's dome height for its Op 80 reading: {{cad.dome_far_form_height_min_in:.4dot}} at Ø{{process.dome_form_dia_min_in:.4dot}}, .0258 at Ø.1086, {{cad.dome_far_form_height_max_in:.4dot}} at Ø{{process.dome_form_dia_max_in:.4dot}}."
-settings = "lathe-form-r070-o1"
+instruction = "Step the R.07 dome with the AR tool, Z0 the faced tip: at each line, carriage at the Z, face from the Ø out to the blank's O.D.: Z{{cad.dome_far_step_3_end_z_mm:in.4dot}} from Ø{{cad.dome_far_step_3_dia_in:.3dot}}; Z{{cad.dome_far_step_2_end_z_mm:in.4dot}} from Ø{{cad.dome_far_step_2_dia_in:.3dot}}; Z{{cad.dome_far_step_1_end_z_mm:in.4dot}} from Ø{{cad.dome_far_step_1_dia_in:.3dot}}. The dome meets the O.D. about Z−{{cad.dome_far_height_in:.3dot}}."
+settings = "lathe-ar-o1"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle at the low range: file the steps off the dome with the smooth file, stroking from the apex out to the rim, blending the Ø{{cad.dome_far_step_3_dia_in:.2dot}} face left at the apex into the dome, until the step corners are just gone. Light strokes: the end has no centre."
+rpm = 200
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "radius"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Spindle stopped. Screen the dome with the radius gauges' concave leaves held across it through the axis: the 1/16 leaf rests on the rim with light at the apex, and the 5/64 leaf touches at the apex with light at the rim; no flat at the apex, no step left."
+inspection = "Dome R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}}: between the 1/16 (R.0625) and 5/64 (R.0781) leaves; no flat, no step."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The 5/64 leaf showing light at the apex, a flat or a step (the rim still full): file again from the rim inward and screen again. The 1/16 leaf touching at the apex (filed too far at the rim): scrap the blank and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -250,7 +301,7 @@ speed_kind = "other"
 tool = "die"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle stopped, in low range: take the dead centre out of the quill and bring the tailstock up. The #4-40 die in the die stock, lettered face toward the tip, its back squared against the quill's face. Start it on the dome, turning the die stock by hand with cutting oil, a half turn forward and a quarter back, the quill following; run it on until it stops at the shoulder. Back it off and back the tailstock away."
+instruction = "Spindle stopped, in low range: take the dead centre out of the quill and bring the tailstock up. The #4-40 die in the die stock, lettered face toward the tip, its back squared against the quill's face. Start it on the filed dome, turning the die stock by hand with cutting oil, a half turn forward and a quarter back, the quill following; run it on until it stops at the shoulder. Back it off and back the tailstock away."
 feed = "hand"
 
 [[setups.operations]]
@@ -259,7 +310,7 @@ speed_kind = "spindle"
 tool = "groove"
 drilling = "none"
 sizing = "other"
-instruction = "Relief, with the .020 grooving tool (mike its width): find the shoulder by touch, the tool's chuck-side edge just touching the shoulder face (the DRO Z was zeroed on the form tool, so its readings do not apply), and zero the DRO Z there. Zero the cross-slide dial with its tip touching the thread blank's O.D. Plunge (the miked blank − {{cad.groove_dia_in:.3dot}})/2 in on the radius, to Ø{{cad.groove_dia_min_in:.3dot}}–{{cad.groove_dia_max_in:.3dot}}."
+instruction = "Relief, with the .020 grooving tool (mike its width): find the shoulder by touch, the tool's chuck-side edge just touching the shoulder face (a new tool: its edge is found by touch, not by the DRO), and zero the DRO Z there. Zero the cross-slide dial with its tip touching the thread blank's O.D. Plunge (the miked blank − {{cad.groove_dia_in:.3dot}})/2 in on the radius, to Ø{{cad.groove_dia_min_in:.3dot}}–{{cad.groove_dia_max_in:.3dot}}."
 settings = "lathe-groove-o1"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
 
@@ -281,7 +332,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.groove_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Relief root over {{cad.groove_dia_max_in:.3dot}}: plunge again. Root under {{cad.groove_dia_min_in:.3dot}}: scrap the blank and make another from Setup 1. A nut that binds: close the split die a little with its adjusting screw and run it over once more as Op 120; still binding: scrap the blank."
+instruction = "Relief root over {{cad.groove_dia_max_in:.3dot}}: plunge again. Root under {{cad.groove_dia_min_in:.3dot}}: scrap the blank and make another from Setup 1. A nut that binds: close the split die a little with its adjusting screw and run it over once more as Op 150; still binding: scrap the blank."
 
 [[setups]]
 machine_kind = "lathe"
@@ -300,7 +351,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the back end square in light skims, to the centre with no pip, reading the shank length (Op 180) between them, to {{cad.shoulder_min_in:.3dot}}–{{cad.shoulder_max_in:.3dot}}."
+instruction = "Face the back end square in light skims, to the centre with no pip, reading the shank length (Op 210) between them, to {{cad.shoulder_min_in:.3dot}}–{{cad.shoulder_max_in:.3dot}}."
 settings = "lathe-ar-o1"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -333,8 +384,8 @@ instruction = "Break the back end's edge and the shoulder's outer edge R{{cad.ed
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Read the thread from the shoulder face to the dome's apex with the calipers' depth rod: the beam's end on the apex, the rod down beside the thread onto the shoulder face. Add the dome's height for the blank's Op 80 reading to the {{cad.thread_length_min_in:.3dot}}–{{cad.thread_length_max_in:.3dot}} thread: {{cad.dome_far_form_height_min_in:.4dot}} at Ø{{process.dome_form_dia_min_in:.4dot}}, .0258 at Ø.1086, {{cad.dome_far_form_height_max_in:.4dot}} at Ø{{process.dome_form_dia_max_in:.4dot}}. Look over the shank where the jaws held it."
-inspection = "Shoulder to apex {{cad.thread_length_min_in:.3dot}} + the dome's height to {{cad.thread_length_max_in:.3dot}} + the dome's height, for this blank's Ø (gauge range {{process.thread_apex_min_in:.4dot}}–{{process.thread_apex_max_in:.4dot}}); shank: no mark you can feel."
+instruction = "Read the thread from the shoulder face to the dome's apex with the calipers' depth rod: the beam's end on the apex, the rod down beside the thread onto the shoulder face. Look over the shank where the jaws held it."
+inspection = "Shoulder to apex {{process.thread_apex_min_in:.4dot}}–{{process.thread_apex_max_in:.4dot}}: the thread is then {{cad.thread_length_min_in:.3dot}}–{{cad.thread_length_max_in:.3dot}} to the dome's tangent for any blank and any dome the leaves passed; shank: no mark you can feel."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.thread_apex_min_mm}}", "{{process.thread_apex_max_mm}}"] }]
 
 [[setups.operations]]
