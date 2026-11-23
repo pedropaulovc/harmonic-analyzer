@@ -353,7 +353,7 @@ instruction_detailed = "Edge finder (900 rpm). Y: its tip .10 below the jaw top,
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mike each blank 1/2 in in from each end and write the four readings down in mm (in × 25.4): op 160 subtracts them from its Z readings to find the tape stack."
+instruction = "Mike each blank 1/2 in in from each end and write the four readings down in mm (in × 25.4): op 170 subtracts them from its Z readings to find the tape stack."
 feed = "hand"
 
 [[setups.operations]]
@@ -421,9 +421,9 @@ feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "Check, stack (spindle stopped): drag the same leaf under the tip on each blank's top 1/2 in in from each end; read Z (mm). Stack = reading − 0.051 (the leaf) − that end's op 60 thickness." },
+  { kind = "action", text = "Check, stack (spindle stopped): drag the same leaf under the tip on each blank's top 1/2 in in from each end; read Z (mm). Stack = reading − 0.051 (the leaf) − that end's op 70 thickness." },
   { kind = "check", text = "Every stack {{process.tape_stack_min_mm:.2f}}–{{process.tape_stack_max_mm:.2f}} mm ({{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}); each blank's two ends within 0.05 mm (.002) of each other." },
-  { kind = "stop", text = "Out of band or ends apart by more: op 180, then this op again." },
+  { kind = "stop", text = "Out of band or ends apart by more: op 190, then this op again." },
 ]
 feed = "hand"
 
@@ -431,12 +431,12 @@ feed = "hand"
 steps = [
   { kind = "action", text = "Check, push test: jog Z up clear. With the heel of the hand push each blank hard along and across; try to lift each corner with a thumbnail." },
   { kind = "check", text = "No movement, no creak, no lifted corner." },
-  { kind = "stop", text = "Any movement: op 180, then ops 160 and 170 again." },
+  { kind = "stop", text = "Any movement: op 190, then ops 170 and 180 again." },
 ]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Only after a Stop at op 160 or 170: jog Z up clear; the plate stays in the vise. Free both blanks with the blade under the plate's tape and peel them as ops 250–260 do, peel all the tape, then repeat ops 70–150."
+instruction = "Only after a Stop at op 170 or 180: jog Z up clear; the plate stays in the vise. Free both blanks with the blade under the plate's tape and peel them as ops 260–270 do, peel all the tape, then repeat ops 80–160."
 feed = "hand"
 
 [[setups.operations]]
@@ -448,7 +448,7 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Only after a feed hold in the prove-out: stop the program, spindle off, jog Z up clear. Re-check the plate's seat and the blanks' places (ops 120 and 140); home ($H) and set G54 again (ops 50 and 150, then this Z0 1.000 in high); prove again from the start."
+instruction = "Only after a feed hold in the prove-out: stop the program, spindle off, jog Z up clear. Re-check the plate's seat and the blanks' places (ops 130 and 150); home ($H) and set G54 again (ops 60 and 160, then this Z0 1.000 in high); prove again from the start."
 feed = "hand"
 
 [[setups.operations]]
