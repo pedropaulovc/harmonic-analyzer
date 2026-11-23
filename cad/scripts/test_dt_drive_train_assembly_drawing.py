@@ -47,7 +47,7 @@ EXTERNAL_NUMBERS = frozenset(
         drawing.ROCKER_ARM,
         # Check 5's feed sense, named on sheet 15's interface lines.
         drawing.PLATEN_NUMBER,
-        # Steps 1T and 2B's phasing comb: a shop tool in the cone-gear indexing kit,
+        # Steps 1T and 2C's phasing comb: a shop tool in the cone-gear indexing kit,
         # never a drive-train BOM row (owner ruling 2026-11-09, PR #1992).
         _config.parts("dt-cone-gear-tl-phasing-comb")["number"],
     }
@@ -269,7 +269,7 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert names[drawing.FULL_DETAIL_SHEET - 1] == "FULL-DETAIL SIDE VIEW"
     assert f"FULL DETAIL: SHEET {drawing.FULL_DETAIL_SHEET}." in drawing.ASSEMBLED_HEADING
     assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE"
-    assert names[drawing.CRANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CRANK"
+    assert names[drawing.CRANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CONE SET + CRANK"
     assert names[drawing.BANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CRANK + CYLINDER BANK"
     assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
     assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK + PINION RIG"
@@ -1158,8 +1158,10 @@ def test_every_sheet_16_row_is_cited_by_its_step_and_fits_its_sheet(
     )
     for key, number in drawing.ACCEPTANCE_ROW_NUMBERS.items():
         cite = f"({drawing.acceptance_ref(key)}"
-        # T024's row is the setup 1S centres in and 1X accepts in (#3292).
-        assert printed.count(cite) == (2 if key in ("tip-gap", "t024-runout") else 1), key
+        # T024's row is the setup 1S centres in and 1X accepts in (#3292),
+        # the pivot's the one 2B centres in and 2F accepts in (#2473).
+        twice = ("tip-gap", "t024-runout", "pivot-runout")
+        assert printed.count(cite) == (2 if key in twice else 1), key
         (row,) = (row for row in drawing.ACCEPTANCE_TABLE_ROWS if row[0] == str(number))
         # The STEP cell names the sub-step (or check) whose text carries the cite.
         first = row[1].split(",")[0]
@@ -1524,7 +1526,7 @@ def test_cone_station_rows_run_front_to_back() -> None:
     assert table[1] == "TNNN = MHA-DT-03 WITH NNN TEETH, BY STATION, FRONT TO BACK:"
     assert table[2].startswith("STN  1  T120")
     assert table[-2] == "GEAR 0-2 = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
-    # Steps 1T and 2B's comb is a shop tool with no BOM row: the key names it
+    # Steps 1T and 2C's comb is a shop tool with no BOM row: the key names it
     # and defines the BLADE the steps cite (machinist review of bd81283964).
     assert table[-1] == "MHA-DT-03-TL-02 = PHASING COMB, A BLADE IN A TOOTH SPACE OF EACH GEAR."
     # Owner, 2026-11-14 (#2734): the comb is a U clipped over the tip of the
@@ -1536,13 +1538,51 @@ def test_cone_station_rows_run_front_to_back() -> None:
         " V-BLOCK, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY."
     )
     # Round 2 waxes the blades again: its wet joints sit beside them.
-    assert steps[steps.index("2B. ") :].startswith(
-        "2B. CLIP MHA-DT-03-TL-02, BLADES WAXED AGAIN, OVER THE TIP, BOTH ARMS"
+    assert steps[steps.index("2C. ") :].startswith(
+        "2C. CLIP MHA-DT-03-TL-02, BLADES WAXED AGAIN, OVER THE TIP, BOTH ARMS"
         " ON T036, T030'S BLADE BESIDE THE KEY."
     )
     for head in ("1W", "2E"):
         step = steps[steps.index(f"{head}. ") :]
         assert step.split(".", 2)[1].endswith("BOTH ARMS ON T036"), step[:120]
+    # #2473 (owner ruling 2026-11-22, option G): the pivot is tapped true
+    # before the comb goes on, read after cure with the comb off and before
+    # the post is assembled (2J on), and a failed reading has its remedy.
+    pivot_row = drawing.acceptance_ref("pivot-runout")
+    order = [steps.index(f"{head}. ") for head in ("2A", "2B", "2C", "2D", "2E", "2F", "2G", "2H", "2J")]
+    assert order == sorted(order)
+    assert steps[order[1] : order[2]].strip() == (
+        "2B. HOLDING MHA-DT-37 HOME, TAP ITS PIVOT TRUE ON AN INDICATOR BEFORE"
+        f" IT GRABS ({pivot_row})."
+    )
+    assert steps[order[3] : order[4]].strip() == (
+        "2D. REMOVE MHA-DT-03-TL-02 ONCE THE BONDS GRAB, MHA-DT-37 HELD HOME ON"
+        " T024 UNTIL THEN."
+    )
+    gear_row = drawing.acceptance_ref("spigot-gear-runout")
+    assert steps[order[5] : order[6]].strip() == (
+        f"2F. CHECK THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT ({pivot_row})"
+        f" AND OF T012'S AND T018'S TEETH ({gear_row})."
+    )
+    assert steps[order[6] : order[7]].startswith("2G. IF ANY CHECK FAILS, AT 250 DEG C TAKE MHA-DT-37,")
+    assert steps[order[7] : order[8]].strip().endswith("FOR A REDO FROM 1L.")
+    assert steps[order[8] :].startswith("2J. ALIGN THE MHA-DT-05 COUNTERBORES")
+    (row,) = (r for r in drawing.ACCEPTANCE_TABLE_ROWS if r[2].startswith("MHA-DT-37 PIVOT"))
+    assert row[1:] == (
+        "2B, 2F",
+        "MHA-DT-37 PIVOT, MHA-DT-04 ON END ON A V-BLOCK",
+        ".0020 TIR MAX",
+        "TEST INDICATOR",
+    )
+    # Owner ruling 2026-11-22 (#2473): T012 and T018 are read after cure in
+    # the same setup, as T024 is.
+    (row,) = (r for r in drawing.ACCEPTANCE_TABLE_ROWS if r[2].startswith("T012 AND T018"))
+    assert row[1:] == (
+        "2F",
+        "T012 AND T018, \u00d8.040 GAUGE PIN, SETUP AS T024",
+        ".0030 TIR MAX EACH SPACE",
+        "TEST INDICATOR",
+    )
     assert "MHA-DT-03-TL-02 BLADES WITH" in steps
 
 

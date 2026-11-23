@@ -103,7 +103,9 @@ The tolerances are ordinary ones for a hobby build of an 1898 machine. Cone
 blanks are OD +0/−0.05 mm and tooth thickness ±0.075 mm, and each cone and drum
 is set up for tooth cutting within 0.05 mm TIR of its finished bore
 (`dt_cone_gear_spec.py`; `cad/config/tolerances/cone_drum_oblique_mesh.yaml`). T006
-keeps its own thin-only bands (thickness +0/−0.04 mm, OD +0/−0.02 mm). Close
+keeps its own thin-only bands (thickness +0/−0.04 mm, OD +0/−0.02 mm), and
+T012, T018 and T024 are thick-only (+0.075/−0 mm), which leaves them the
+standard (N + 2)/DP blank (owner ruling 2026-11-22, #2473 option G). Close
 running fits elsewhere use the ordinary H7/g6 class (`_fit_ream_h7.py`,
 `_fit_close_running.py`).
 

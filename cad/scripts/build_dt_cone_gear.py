@@ -186,7 +186,7 @@ def _author_web_reference(adapter: Any) -> None:
     """RV-03's accepted T012 web, stated natively (rule 20): a construction
     ray from the axis to the largest printed T012 bore, then the web itself,
     collinear, out to the smallest printed root envelope along a T012 gap
-    bisector.  The web line's driving length prints ".0646 MIN" once
+    bisector.  The web line's driving length prints ".0674 MIN" once
     set_single_limit types it.  T012 geometry in every configuration: only
     the T012 sheet imports it, and the part saves the sketch hidden."""
     start, web, _band = web_reference_mm()
