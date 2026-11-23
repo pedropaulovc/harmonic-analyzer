@@ -260,7 +260,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Spoil plate on 1 in parallels across the vise jaws, its back edge on the fixed jaw, centred along the jaws: the jaw tops stand {{process.jaw_top_over_plate_mm:in.3dot}} above the plate top, room for the edge finder's touch. The blank bonded to its top under its whole face: blue tape on the plate, CA glue, blue tape on the blank (stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}), its left end and back edge {{process.blank_left_x_mm:in.2dot}} in from the plate's left end and back edge."
-datum = "Program CB01_outline. G54: X0 the plate's left end, Y0 the fixed jaw's face (the plate's back edge), Z0 the plate top, bare right of the tape; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack, its last level {{process.outline_tip_into_plate_mm:in.3dot}} into the plate on any stack; +Y toward the fixed jaw. The comb's open end stands at X {{process.comb_south_x_mm:in.3dot}}, its back edge (the stepped arm's, toward the fixed jaw) at Y {{process.comb_back_y_mm:in.3dot}}. Set X, Y and Z again after a reset, a stall, an E-stop or any move of the plate."
+datum = "Program CB01_outline. G54: X0 the plate's left end, Y0 the fixed jaw's face (the plate's back edge), Z0 the plate top, bare right of the tape; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack, its last level {{process.outline_tip_into_plate_mm:in.3dot}} into the plate on any stack; +Y toward the fixed jaw. The comb's open end stands at X {{process.comb_south_x_mm:in.3dot}}, its back edge (the stepped arm's, toward the fixed jaw) at Y {{process.comb_back_y_mm:in.3dot}}. Set X, Y and Z again after an alarm, a stall, an E-stop or any move of the plate; a Reset after a Feed Hold keeps them."
 diagram = { file = "diagrams/outline.svg", alt = "Plan of the spoil plate in the vise: the plate's blue tape, two strips along X from its left end to 5 in, and on it the blank near the fixed jaw and the plate's left end; dashed, the tape seams along X, the plate's under the U's slot and the blank's in its back margin; the comb's U drawn inside the blank with its open end left and its stepped arm toward the fixed jaw; the 1/32 end mill's path runs round the U once per level, starting and ending at the middle of the spring arm's front edge (toward the moving jaw)." }
 # Top: the thickest sheet on the thickest tape stack; deepest: the cutter's
 # tip, .004 into the spoil plate.
@@ -376,7 +376,7 @@ milling_cuts = [
 [[setups.operations]]
 steps = [
   { kind = "action", text = "CA softens with heat; never touch the work while CB01_outline runs." },
-  { kind = "stop", text = "The cut smokes or smells hot: Feed Hold, then Reset (the spindle stops); jog Z up clear. When the blank is cool to a finger, run CB01_outline again from its start: the levels already cut pass in air." },
+  { kind = "stop", text = "The cut smokes or smells hot: Feed Hold, then Reset (the spindle stops; G54 stands); jog Z up clear. When the blank is cool to a finger, run CB01_outline again from its start, G54 untouched: the cut levels pass in air." },
 ]
 feed = "hand"
 

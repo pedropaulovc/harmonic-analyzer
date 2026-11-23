@@ -26,5 +26,6 @@
   <text class="label" x="70" y="410">dashed: tape seams, the plate&#8217;s 1.41 in from the fixed jaw (in the U&#8217;s slot),</text>
   <text class="label" x="70" y="428">the blank&#8217;s .59 in (in its back margin)</text>
   <text class="label" x="146" y="143">stepped arm toward the fixed jaw</text>
-  <text class="label" x="91" y="205">open</text>
+  <text class="label" x="68" y="199">open</text>
+  <line class="leader" x1="102" y1="195" x2="139" y2="195"/>
 </svg>
