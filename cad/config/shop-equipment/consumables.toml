@@ -190,11 +190,19 @@ cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), li
 # The hold's strength is ACCEPTED, not read from a data sheet: no maker states
 # a tensile or shear strength for painter's tape under cyanoacrylate (the
 # tape's listing gives a peel adhesion, a force per width of tape being
-# stripped, which is not the strength of a face-bonded area). accepted_*_kpa
-# is the most the reviewed plans' cuts put on a bond (each plan's levels are
-# set by its cutter and machine, not by this figure); prechips' bond check
-# refuses any cut that would load a bond harder, until this record is raised
-# with the cut that needs it. Each traveler prints the figure as accepted.
+# stripped, which is not the strength of a face-bonded area). The owner
+# accepted the hold and left the coarsening to the planner; accepted_*_kpa is
+# the planner's figure under that delegation, not the owner's number and not a
+# measurement: .6 MPa, the most a taped plan's cut may put on a bond in
+# prechips' model (cross force over the piece's area; a lift at a piece's edge
+# as 4 x force over a patch as long as the piece is wide). Most cuts are far
+# under it and are set by the cutter and machine. It binds on narrow parts
+# cut with an upcut end mill, where the edge of a masking-tape bond would
+# peel first: the MHA-MS-01 stick's outline at one full-depth level would ask
+# 1.6 MPa and so takes three (.54 MPa). prechips' bond check refuses any cut
+# that would load a bond harder. Once parts have held, the owner may raise
+# this one figure and those cuts coarsen further. Each traveler prints the
+# figure as accepted.
 #
 # Stack: the listing's 5.4 mil per tape, twice, plus the glue line: a stated
 # assumption, .011 in nominal. The programs work that far above the plate;
@@ -210,9 +218,9 @@ accelerator = "ca-accelerator-starbond"
 stack_thickness_mm = 0.28
 stack_min_mm = 0.23
 stack_max_mm = 0.33
-accepted_shear_kpa = 0
-accepted_tensile_kpa = 0
-accepted_by = "the shop owner, 2026-11-23"
+accepted_shear_kpa = 600
+accepted_tensile_kpa = 600
+accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)"
 cite = ["Owner (Pedro) 2026-11-23: \"for tape isnt it possible to use blue painters tape on both sides and ca glue between them\"", "Owner (Pedro) 2026-11-23: \"it is widely used in industry with much heavier requirements; take it as given it will work\"", "Owner (Pedro) 2026-11-23: \"no need to bring to me ; make coarser as you see fit\""]
 
 [consumables.tape-scotchblue-2090]
