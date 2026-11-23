@@ -133,7 +133,9 @@ floor_flat_nominal_in = 0.345
 floor_flat_read_min_in = 0.335
 floor_flat_read_max_in = 0.355
 compound_check_travel_in = 0.3
-compound_check_rise_in = 0.095
+# .300 sin 18.4° = .095; ±.001 on the indicator is ±0.2° on the flank.
+compound_check_rise_min_in = 0.094
+compound_check_rise_max_in = 0.096
 cone_compound_travel_in = 0.14
 # Countersinks (authored): Ø.170, between the #8-32 major Ø.164 (the first
 # thread broken all round) and the drawing's .18 max; the 90° chamfer mill
@@ -433,12 +435,12 @@ tool = "indicator"
 drilling = "none"
 sizing = "other"
 instruction = "Swing the compound {{cad.recess_flank_deg:.1f}}° off the cross slide (fed out, the tool goes toward the tailstock); set it with the .001 in dial indicator on the compound, plunger on the faced rim by the drilled hole. Lock the swivel; wind the slide back in {{process.compound_check_travel_in:.3dot}} and zero its dial there. Turn the toolpost so the AR's chuck-side edge is 20°–25° off the face (never past 30°) and lock it."
-inspection = "Compound: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends .094–.096 (±0.2°); then back at its dial's zero."
+inspection = "Compound: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends {{process.compound_check_rise_min_in:.3dot}}–{{process.compound_check_rise_max_in:.3dot}} (±0.2°); then back at its dial's zero."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Nut over .001 TIR (Op 190): tap it over and indicate again. Compound outside .094–.096 (Op 200): re-swing and indicate again. Both before the touch-offs in Op 220."
+instruction = "Nut over .001 TIR (Op 190): tap it over and indicate again. Compound outside {{process.compound_check_rise_min_in:.3dot}}–{{process.compound_check_rise_max_in:.3dot}} (Op 200): re-swing and indicate again. Both before the touch-offs in Op 220."
 feed = "hand"
 
 [[setups.operations]]
@@ -468,12 +470,12 @@ instruction = "Dish cone, carriage still locked: each pass, from a start on the 
 settings = "lathe-ar-c360"
 feed = "hand"
 cut_diameter_mm = "{{cad.recess_dia_mm}}"
-inspection = "One clean cone from the floor's corner to the face. Floor, calipers' inside jaws flat on it: {{process.floor_flat_read_min_in:.3dot}}–{{process.floor_flat_read_max_in:.3dot}}, a gross check of the X figure; over it, read again with the jaws held down, then touch a crest as in Op 220: X reads D0 + .002 ±.001. The corner Ø{{cad.recess_floor_dia_min_in:.2dot}}–{{cad.recess_floor_dia_max_in:.2dot}} and the rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}} are held by Op 230's DRO figures and the compound (rim {{process.rim_held_min_in:.3dot}}–{{process.rim_held_max_in:.3dot}}), not gauged."
+inspection = "One clean cone from the floor's corner to the face. Floor, calipers' inside jaws flat on it: {{process.floor_flat_read_min_in:.3dot}}–{{process.floor_flat_read_max_in:.3dot}}, a gross check of the X figure; over it, read again with the jaws held down, then touch a crest as in Op 220 and note X against D0 + .002. The corner Ø{{cad.recess_floor_dia_min_in:.2dot}}–{{cad.recess_floor_dia_max_in:.2dot}} and the rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}} are held by Op 230's DRO figures and the compound (rim {{process.rim_held_min_in:.3dot}}–{{process.rim_held_max_in:.3dot}}), not gauged."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A step at the corner, or the cone short of the face: repeat the last cone pass. Floor off its DRO figure (Op 230): recut it before the cone. Floor still over {{process.floor_flat_read_max_in:.3dot}} (Op 240): crest on D0 + .002, the part stands (the jaws rode the wall); off it, scrapped. Under {{process.floor_flat_read_min_in:.3dot}}: face the floor out by {{process.floor_flat_nominal_in:.3dot}} less the reading, then repeat the last cone pass."
+instruction = "A step at the corner, or the cone short of the face: repeat the last cone pass. Floor off its DRO figure (Op 230): recut it before the cone. Still over {{process.floor_flat_read_max_in:.3dot}} (Op 240): X reading under D0 − .001 (the dish cut .003 or more large: the rim may pass .60), scrapped; else the part stands. Under {{process.floor_flat_read_min_in:.3dot}}: touch off X again (Op 220), face the floor out to X Ø{{process.recess_corner_x_dro_in:.3dot}} and repeat the cone passes."
 feed = "hand"
 
 [[setups.operations]]
