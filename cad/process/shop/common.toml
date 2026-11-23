@@ -827,16 +827,22 @@ description = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
 [tools.threading-bits-lms-6685]  # MHA-DT-03-TL-03 1/4-28 UNF single-pointed (owner 2026-11-19); MHA-PD-08 #8-32 UNC single-pointed (owner 2026-11-19); MHA-MG-03 1/4-20 UNC single-pointed (owner 2026-11-19); MHA-DT-03-TL-07 #8-32 UNC single-pointed (drawing callout 2026-11-20, #2356)
 description = "5/16 in HSS threading tool bit, set of two (LMS 6685)"
 
-# --- Sheet parts bonded to a spoil plate on the CNC (dt, pd) ------------------
+# --- Parts bonded to a plate on the CNC (ch, ms, dt, pd) ----------------------
 # The .020-.032 brass sheet parts (MHA-DT-03-TL-02 phasing comb, and the pd
-# sheet parts) are cut out on the PM-30MV bonded on tape to a plain spoil
-# plate gripped in the vise. Ownership: cad/config/shop-equipment/
-# fixtures.sheet-spoil-plate and consumables.tape-3m-vhb-5906 (moved here
-# from ch.toml: the MHA-CH-13 strap and the MHA-MS-01 stick bond on it too).
+# sheet parts) are cut out on the PM-30MV bonded to a plain spoil plate
+# gripped in the vise; the MHA-CH-13 strap and the MHA-MS-01 stick bond to
+# their own fixtures the same way: blue painter's tape on both faces, thick
+# CA glue between (owner ruling 2026-11-23). Ownership: cad/config/
+# shop-equipment/ fixtures.sheet-spoil-plate and consumables.
+# hold-painters-tape-ca with its three products, same keys.
 [tools.sheet-spoil-plate]
 description = "Spoil plate: a 5 in length of the 1/2 x 6 in 6061 flat, top as supplied, gripped in the vise on parallels"
-[tools.tape-3m-vhb-5906]
-description = "3M VHB 5906 double-sided tape, .006 in"
+[tools.tape-scotchblue-2090]
+description = "ScotchBlue 2090 blue painter's tape, 1.41 in wide"
+[tools.ca-glue-gh1200]
+description = "GH1200 CA glue, the 1500 cps thick bottle"
+[tools.ca-accelerator-starbond]
+description = "Starbond CA accelerator spray"
 # The sheet blanks are snipped off their sheet or strip (the comb's .020
 # sheet, moved here from dt.toml; the MHA-PD-03 clip's .032 strip).
 # Ownership: cad/config/shop-equipment/tools-hand.toml

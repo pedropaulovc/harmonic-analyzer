@@ -13,7 +13,9 @@ it guards.
 from __future__ import annotations
 
 import copy
+import re
 import tomllib
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -152,12 +154,50 @@ def test_the_fixture_bar_and_blank_are_the_shop_equipment_records() -> None:
     )
     assert p["blank_length_in"] * 25.4 == pytest.approx(blank["length_mm"])
     assert PLAN["stock_refs"] == ["c360-flat-1-4x6", "6061-flat-1-2x6-18in"]
-    tape = tomllib.loads((EQUIPMENT / "consumables.toml").read_text(encoding="utf-8"))[
-        "consumables"
-    ]["tape-3m-vhb-5906"]
-    assert p["tape_thickness_mm"] == tape["thickness_mm"]
-    assert p["tape_shear_mpa"] * 1000 == tape["dynamic_shear_kpa"]
-    assert p["tape_tensile_mpa"] * 1000 == tape["normal_tensile_kpa"]
+    consumables = tomllib.loads(
+        (EQUIPMENT / "consumables.toml").read_text(encoding="utf-8")
+    )["consumables"]
+    hold = consumables["hold-painters-tape-ca"]
+    assert p["tape_strip_width_mm"] == consumables[hold["tape"]]["width_mm"]
+    assert [p["tape_stack_min_mm"], p["tape_stack_mm"], p["tape_stack_max_mm"]] == [
+        hold["stack_min_mm"],
+        hold["stack_thickness_mm"],
+        hold["stack_max_mm"],
+    ]
+
+
+def _inch_fraction(mm: float) -> str:
+    """``mm`` as the sheet prints a strip length: whole inches and a fraction."""
+    inches = Fraction(mm / 25.4).limit_denominator(16)
+    whole, rest = divmod(inches, 1)
+    return f"{whole} {rest.numerator}/{rest.denominator}" if rest else f"{whole}"
+
+
+def test_the_printed_strip_lengths_are_the_plans_keys() -> None:
+    """Every bond's printed strip lengths are tape_bar_strip_length_mm and
+    tape_blank_strip_length_mm, so a changed key cannot leave stale text."""
+    p = PLAN["parameters"]
+    expected = {
+        "bar": _inch_fraction(p["tape_bar_strip_length_mm"]),
+        "blank": _inch_fraction(p["tape_blank_strip_length_mm"]),
+    }
+    patterns = {
+        "bar": re.compile(
+            r"(\d+(?: \d+/\d+)?) in strips (?:of the 1\.41 in tape|on the bar)"
+        ),
+        "blank": re.compile(
+            r"(\d+(?: \d+/\d+)?) in (?:strips along the blank's length|on face [BP])"
+        ),
+    }
+    texts = [
+        op.get("instruction", "")
+        for setup in PLAN["setups"]
+        for op in setup["operations"]
+    ]
+    for face, pattern in patterns.items():
+        printed = [length for text in texts for length in pattern.findall(text)]
+        # Setup 3 spells the bond out; Setups 4, 5 and 6 repeat it.
+        assert printed == [expected[face]] * 4, face
 
 
 def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> None:
@@ -189,11 +229,18 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("face_cut_mm", 0.78, "face_z_set_mm"),
         ("seat_right_mm", 279.4, "seat_right_mm"),
         ("clamp_zone_mm", 80.0, "step clamp"),
-        ("outline_breakthrough_mm", 0.15, "thinnest tape"),
-        ("outline_axial_doc_mm", 3.8608, "outline_axial_doc_mm"),
-        ("tape_strip_pitch_mm", 30.0, "does not bridge|bare"),
-        ("tape_strip_count", 10, "bare"),
-        ("bond_patch_area_mm2", 18190.0, "bond_patch_area_mm2"),
+        ("outline_breakthrough_mm", 0.08, "skin"),
+        ("outline_breakthrough_mm", 0.25, "reaches the bar"),
+        ("tape_stack_min_mm", 0.20, "thickness band"),
+        ("outline_axial_doc_mm", 3.9408, "outline_axial_doc_mm"),
+        ("tape_strip_count", 4, "bare"),
+        ("tape_seam_offset_mm", 35.814, "quarter strip"),
+        ("tape_seam_gap_max_mm", 10.0, "bridge"),
+        ("tape_end_overhang_mm", 1.0, "bare"),
+        ("tape_bar_strip_length_mm", 292.1, "past the longest blank"),
+        ("tape_bar_strip_length_mm", 305.0, "skimmed seat"),
+        ("tape_blank_strip_length_mm", 279.4, "longest blank bare"),
+        ("bond_patch_area_mm2", 12740.17, "bond_patch_area_mm2"),
         ("spot_dia_mm", 1.8, "under the #50"),
         ("socket_tip_height_mm", -0.5, "socket_tip_height_mm"),
         ("guide_tip_height_mm", -1.0, "guide_tip_height_mm"),
@@ -248,7 +295,7 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # The bar skim run on past its patch, into the right step clamps.
         (
             "bar_skim",
-            lambda line: line == "G1 X285.052 F{feed}",
+            lambda line: line == "G1 X288.226 F{feed}",
             lambda line: "G1 X310.000 F{feed}",
             "keep_out",
         ),
@@ -290,7 +337,7 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # The through cut taken down into the bar.
         (
             "edges",
-            lambda line: line == "G1 Z-0.080 F{feed}",
+            lambda line: line == "G1 Z-0.152 F{feed}",
             lambda line: "G1 Z-0.300 F{feed}",
             "depth",
         ),

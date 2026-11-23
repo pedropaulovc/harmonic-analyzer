@@ -210,7 +210,7 @@ and tape bond strength is not gated; judge it under rule T3.
 - Whenever a setup claims `G54 unchanged`, every intervening action must leave
   those physical zero surfaces undisturbed. If a tape layer, shim or flip shifts
   the work relative to `Z0`, state whether the NC program offsets for it (`Z0
-  the plate top; the file works .006 above it for the tape`) or the operator
+  the plate top; the file works .011 above it for the tape stack`) or the operator
   re-zeros.
 - On the manual lathe, state the `Z0` faced end for each chucking (rule 11) and
   keep diameter vs. radius convention unambiguous.

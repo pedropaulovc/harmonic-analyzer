@@ -5,7 +5,7 @@ part's exported ``features.toml`` and the plan/shop TOML, then runs
 :func:`build` inside headless FreeCAD (``freecadcmd``) with that context and
 checks the posted G-code against :func:`expectations`. No part dimension is
 typed here: the U's ends, edges, slot, blade steps and sheet come from the
-manifest; the blank, its place on the spoil plate, the tape, the cutter's tip
+manifest; the blank, its place on the spoil plate, the tape stack, the cutter's tip
 height, the vise and the plate from ``plan.toml`` ``[parameters]``; the
 cutter's diameter, flute length, speed and feed from the shop (``shop/``).
 Typed here, because neither record carries them: the safe and clearance
@@ -13,15 +13,16 @@ heights, the vise jaws' depth (keep-out shapes only) and the share of a
 printed band the posted path may use.
 
 Route (plan text in ``plan.toml``): the blank, snipped from the .020 sheet,
-is bonded on 3M VHB 5906 tape to the spoil plate (``fixtures.sheet-spoil-
-plate``) gripped in the vise on parallels. One file, CB01_outline: the 1/32
+is bonded to the spoil plate (``fixtures.sheet-spoil-plate``), gripped in
+the vise on parallels, on blue painter's tape on both faces with CA glue
+between (owner 2026-11-23). One file, CB01_outline: the 1/32
 in carbide downcut end mill comes down in front of the blank, feeds in
 through the blank's margin and runs round the whole U at the finished size
 once per level, in the fewest equal levels each within the maker's slotting
 depth, backing out through the margin and stepping down there between
 levels; the last level's tip stands a few thousandths into the spoil plate
-(past the tape, whatever the tape's and the plate top's variation), so the
-comb comes free of the blank.
+(past the tape stack, whatever the stack's and the plate top's variation),
+so the comb comes free of the blank on its own island of tape.
 
 Work frame (G54): X0 the plate's left end, Y0 the fixed jaw's face (the
 plate's back edge), +Y toward the fixed jaw; Z0 the plate top. The comb lies
@@ -51,9 +52,9 @@ CAM_TOOLS = ("em-thirtysecond",)
 BLADES = ("blade_t024", "blade_t018", "blade_t012", "blade_t006")
 IN = 25.4
 # The cutter comes down this far in front of the blank's front edge (beyond
-# its radius), its tip into the spoil plate only, then feeds in through the
-# blank's margin to the path: it never plunges into the brass sheet, whose
-# burr and tape would lift at a plunge.
+# its radius), its tip into the plate's tape and the spoil plate only, then
+# feeds in through the blank's margin to the path: it never plunges into the
+# brass sheet, whose burr and tape would lift at a plunge.
 APPROACH_MM = 1.0
 # The descent starts this far above the stock top: real G0 brings the cutter
 # to it.
@@ -466,10 +467,16 @@ def context(
             f"the slot under the deepest blade ({gap:.3f}) passes no cutter"
         )
 
-    # Through the sheet: the tip into the spoil plate, through the thinnest
-    # sheet on the thinnest tape by the stated margin, no deeper into the
-    # plate than stated.
-    tape = p["tape_thickness_mm"]
+    # Through the sheet: the tip into the spoil plate. Z0 is the bare plate
+    # top, so the tip's depth into the plate is the same on every tape stack
+    # (the comb's .004, at most spoil_cut_max_mm); its margin under the
+    # sheet's underside (on the stack's top) is least on the thinnest stack.
+    stack = p["tape_stack_mm"]
+    stack_lo, stack_hi = p["tape_stack_min_mm"], p["tape_stack_max_mm"]
+    if stack_lo > stack:
+        raise ValueError("tape_stack_min_mm is over the tape stack")
+    if stack_hi < stack:
+        raise ValueError("tape_stack_max_mm is under the tape stack")
     tip = p["outline_tip_z_mm"]
     _agree(plan, "outline_tip_into_plate_mm", -tip)
     if not -p["spoil_cut_max_mm"] <= tip <= 0.0:
@@ -477,20 +484,20 @@ def context(
             "the cutter's tip must stand at or below the plate top, no deeper"
             " than spoil_cut_max_mm"
         )
-    if p["tape_thickness_min_mm"] > tape:
-        raise ValueError("tape_thickness_min_mm is over the tape's thickness")
-    # The sheet's underside rests on the tape's top.
-    if p["tape_thickness_min_mm"] - tip < p["through_margin_min_mm"]:
+    if stack_lo - tip < p["through_margin_min_mm"]:
         raise ValueError(
             "the tip is not through_margin_min_mm below the thinnest sheet's"
-            " underside on the thinnest tape"
+            " underside on the thinnest tape stack"
         )
-    top = tape + sheet_max
+    top = stack + sheet_max
+    # The thickest sheet on the thickest stack: the first level's real depth
+    # and the floor every rapid and tool change stays above.
+    top_hi = stack_hi + sheet_max
     depth = top - tip
     _agree(plan, "outline_depth_mm", depth)
-    if depth > em["flute_length_mm"]:
+    if top_hi - tip > em["flute_length_mm"]:
         raise ValueError(
-            f"the cut ({depth:.3f}) is deeper than the end mill's flutes"
+            f"the cut ({top_hi - tip:.3f}) is deeper than the end mill's flutes"
             f" ({em['flute_length_mm']:.3f})"
         )
     # Equal levels, the fewest with each no deeper than the stated share of
@@ -507,6 +514,13 @@ def context(
         raise ValueError("'outline' axial_doc_mm is under one level's depth")
     levels = [_r(top - step * (k + 1)) for k in range(count)]
     levels[-1] = _r(tip)
+    # On the thickest stack the sheet stands higher and the first level
+    # takes more: still no deeper than the maker's share of the diameter.
+    if top_hi - levels[0] > p["level_depth_max_fraction"] * dia + 1e-6:
+        raise ValueError(
+            "the first level on the thickest tape stack is deeper than"
+            " level_depth_max_fraction of the cutter's diameter"
+        )
 
     # The blank and the comb's place on it, the blank's place on the plate.
     margin = p["blank_margin_mm"]
@@ -533,7 +547,8 @@ def context(
     ):
         raise ValueError("the blank runs off the plate")
 
-    # Bond: the comb and the waste round it, each on its own tape once cut.
+    # Bond: the comb and the waste round it, each on its own island of tape
+    # once cut.
     comb_area = _area(elements)
     waste_area = p["blank_length_in"] * IN * p["blank_width_in"] * IN - comb_area
     _agree(plan, "comb_bond_area_mm2", comb_area)
@@ -604,25 +619,25 @@ def context(
             "stock": (
                 (bx, bx + p["blank_length_in"] * IN),
                 (-by - p["blank_width_in"] * IN, -by),
-                (tape, top),
+                (stack, top),
             ),
             "ops": [["outline", "cut the U out", lines]],
         }
     ]
     frames = {
         "plate": {
-            "origin": [-shift[0], -shift[1], -tape],
+            "origin": [-shift[0], -shift[1], -stack],
             "axes": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         }
     }
     t = numbers["em-thirtysecond"]
     name = PROGRAMS[0][0]
     expect = [
-        [name, "tool_changes", {"z_top": top, "tools": [t], "loads_first": True}],
+        [name, "tool_changes", {"z_top": top_hi, "tools": [t], "loads_first": True}],
         [name, "spindle", {"rpm": [[rpm]]}],
-        [name, "pauses", {"z_top": top, "count": 0}],
+        [name, "pauses", {"z_top": top_hi, "count": 0}],
         [name, "depth", {"z_min": z_cut}],
-        [name, "rapids_clear", {"z_top": top}],
+        [name, "rapids_clear", {"z_top": top_hi}],
         [name, "air_feed", {"z_top": top}],
         [
             name,

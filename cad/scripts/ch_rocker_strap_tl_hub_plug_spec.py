@@ -91,12 +91,12 @@ STRAP_THICKNESS_MIN = 2.4638
 STRAP_PROFILE_HALF = 0.254
 # drawing-guidelines.md, What the shop holds: a turned diameter +/-.0005.
 TURNED_DIA_ROW = 0.0127
-# Plan tape_thickness_mm (3M VHB 5906, .006 in) and its +/-15 % (the plan's
-# outline_breakthrough_mm comment: "the tape's least thickness, .006 in -15 %").
-TAPE_THICKNESS = 0.15
-TAPE_SPREAD = 0.15
-TAPE_MIN = TAPE_THICKNESS * (1.0 - TAPE_SPREAD)
-TAPE_MAX = TAPE_THICKNESS * (1.0 + TAPE_SPREAD)
+# Plan tape_stack_mm and its band tape_stack_min_mm..tape_stack_max_mm: blue
+# painter's tape on both faces with CA glue between (owner ruling
+# 2026-11-23), .011 nominal, every bond miked into .009-.013.
+TAPE_STACK = 0.28
+TAPE_MIN = 0.23
+TAPE_MAX = 0.33
 # The 1/4-20 hub screw's major diameter, the bore's clearance target.
 SCREW_MAJOR_DIA = 6.35  # 1/4
 
@@ -190,7 +190,7 @@ PILOT_TOP_Z_RANGE = (
     _SEAT_Z_RANGE[0] + OVERALL_LENGTH - XXX,
     _SEAT_Z_RANGE[1] + OVERALL_LENGTH + XXX,
 )
-# The strap's underside is the tape's top; its top the tape plus the strap.
+# The strap's underside is the stack's top; its top the stack plus the strap.
 STRAP_UNDERSIDE_Z_MAX = TAPE_MAX
 STRAP_TOP_Z_MIN = TAPE_MIN + STRAP_THICKNESS_MIN
 if not SEAT_Z + BODY_LENGTH < 0.0:

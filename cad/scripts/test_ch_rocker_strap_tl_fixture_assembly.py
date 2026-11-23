@@ -36,7 +36,9 @@ def plan() -> dict:
 
 
 def test_mirrors_agree_with_the_strap_plan_and_the_rocker_arm(plan: dict) -> None:
-    assert spec.TAPE == plan["tape_thickness_mm"]
+    assert spec.TAPE == plan["tape_stack_mm"]
+    assert spec.TAPE_MIN == plan["tape_stack_min_mm"]
+    assert spec.TAPE_MAX == plan["tape_stack_max_mm"]
     assert spec.CLAMP_TORQUE_IN_LB == pytest.approx(plan["clamp_torque_in_lb"])
     assert plan["parallel_height_mm"] == pytest.approx(1.0 * INCH)
     assert "ON 1.00 IN PARALLELS" in spec.ASSEMBLY_STEPS.replace("\n", " ")

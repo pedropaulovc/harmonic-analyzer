@@ -152,7 +152,7 @@ kind = "fixture_plate"
 status = "to_make"
 supply = "shop_made"
 purchase = "Saw a 5 in length off the owned 1/2 x 6 in 6061-T6511 flat (stock.6061-flat-1-2x6-54in, OnlineMetals 1173; its free remainder after the strap sub-plate's 13 in) and file the sawn ends' burrs off. Nothing else: the top stays as supplied."
-note = "Not made: shop-made from owned stock. Gripped in the PM 6 in vise on parallels across its 5 in length; the sheet blank is bonded to its top with consumables.tape-3m-vhb-5906."
+note = "Not made: shop-made from owned stock. Gripped in the PM 6 in vise on parallels across its 5 in length; the sheet blank is bonded to its top with consumables.hold-painters-tape-ca."
 pieces = 1
 
 # --- MHA-PD-06 disc cutting arbor (#2412) -----------------------------------
@@ -313,7 +313,7 @@ kind = "fixture_plate"
 status = "to_make"
 supply = "shop_made"
 purchase = "Make to drawing MHA-CH-13-TL-01 (ch_rocker_strap_tl_sub_plate) from the owned 1/2 x 6 in 6061-T6511 flat (OnlineMetals 1173, bought for the oblique trammel jig and freed, owner 2026-11-17): saw one 13 in length and mill a 3.00 in wide strip off it (the rest, about 2.8 x 13 in, stays as fixture stock). The drawing holds the interfaces the strap's setups use: .490 overall; the top (the plan's Z0) with the fence along the back edge and the end stop at the blank's left end standing .074 +/-.005 above it, so .416 of plate under Z0; under the hub hole, at X 6.000 from the stop face and Y 1.000 in front of the fence face, a counterbore .500 dia x .185 deep with a 1/4-20 tapped hole through its floor, .231 of thread (owner ruling 2026-11-17: \"Use a 1/4-20 hub screw. The .23 in of thread in the 6061 plate is accepted: the screw only snugs the strap during the outline.\"); the fence notched .17 deep at both ends (X 0-.92 and 11.08 on), where the outline cutter mills away the strip of blank under the strap's tips; four Pitbull clamp pockets with 4-40 holes along the front at the plan's clamp stations (fixtures.edge-clamps-low-profile)."
-note = "Not made: shop-made from owned stock. MHA-CH-13 Setups 2-5: seats the 1/8 x 1-1/2 in blank for facing and the hub hole (edge clamps), and for the outline (bonded with consumables.tape-3m-vhb-5906, screwed down at the hub)."
+note = "Not made: shop-made from owned stock. MHA-CH-13 Setups 2-5: seats the 1/8 x 1-1/2 in blank for facing and the hub hole (edge clamps), and for the outline (bonded with consumables.hold-painters-tape-ca, screwed down at the hub)."
 
 # Model picked from Mitee-Bite's Pitbull table (read 2026-11-17): the 4-40 size
 # is the only one whose minimum clamped height D (.075 in) is under the
