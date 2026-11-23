@@ -10,10 +10,11 @@
 # (the thread square to the seat it bears on), part off .02 long.
 # Setup 2: the nut turned round, its knurled head in the 3-jaw over a shim
 # wrap with only the smaller flange and waist behind it; mike the length,
-# preset the DRO from it, face the rim to length, cut the dished face (rough
-# it, then the cone down the compound from the rim set on the X DRO to the
-# depth on the Z DRO, then face the floor at that depth), countersink the rim
-# end and chase the thread from the rim end.
+# preset the DRO from it, face the rim to length; rechuck, set the compound
+# to the dish's flank by an indicator and turn the toolpost before any
+# touch-off, then face the dish's floor to its depth and corner on the DROs
+# and cut the cone up the compound from that corner, so the rim follows;
+# countersink the rim end and chase the thread from the rim end.
 # Bench: deburr, check against the drawing, oil.
 # The thumbnut leaves nothing for the assembly: MHA-PD-00 faces the drive
 # collar's pilot (MHA-PD-22) and cuts the knob shaft's stud (MHA-PD-08) to
@@ -81,12 +82,25 @@ tap_mark_in = 0.72
 # reaches .21 + .16 = .37: marked .40 from its point (authored), well inside
 # its .75 thread length.
 tap_chase_mark_in = 0.40
-# The dish (authored): the rim is set on the X DRO and the depth on the Z
-# DRO; the cone down the compound at the drawing's flank then puts the floor
-# at rim - 2 x depth / tan(flank) = .59 - 6 x .04 = .35. The compound's own
-# scale sets the flank to about ±0.5°, which moves the floor about ±.006,
-# inside its .34-.36. The rough leaves the floor this far above the depth.
-recess_rough_leave_in = 0.005
+# The dish (authored). The compound is set to the flank, t = 18.4° off the
+# cross slide (tan t = .04 / .12: the drawing's rim .59, floor .35, depth
+# .04), by a .001 dial indicator on it against the faced rim: .500 on the
+# compound's dial moves it .500 sin t = .158 along Z, to about ±0.12°. The
+# floor is faced at Z-.040 on the carriage DRO and out to its corner on the
+# X DRO, then the cone is cut up the compound from that corner (about
+# .040 / sin t = .127 of compound travel to the face), so the rim follows:
+# corner Ø .350 + 2 × .040 / tan t = .590. The AR's R0.4 nose (lathe.toml
+# tools.lathe-ar, r = .0157): the X DRO, set on the knurl's crests at touch,
+# reads the nose's inner edge, so the nose's centre is r out; the floor flat
+# ends at the centre and the sharp floor-cone corner lies a further
+# r sin t - r (1 - cos t) / tan t = .0026 out. The X DRO figure for the
+# corner Ø .350 is .350 - 2 (.0157 + .0026) = .313. Errors: touch-off and
+# DRO about ±.001 on the floor and rim, the depth ±.0005 (±.003 on the rim),
+# the angle ±0.12° (±.002 on the rim): rim .584-.596, floor .349-.351.
+recess_corner_x_dro_in = 0.313
+compound_check_travel_in = 0.5
+compound_check_rise_in = 0.158
+cone_compound_travel_in = 0.14
 # Countersinks (authored): Ø.170, between the #8-32 major Ø.164 (the first
 # thread broken all round) and the drawing's .18 max; the 90° chamfer mill
 # fed (.170 - .136) / 2 = .017 past its flutes touching the #29 hole's edge.
@@ -141,6 +155,11 @@ ref = "jig-tap-8-32-plug"  # Tap coverage #8-32 UNC
 id = "centre-dead"
 name = "MT3 dead centre"
 ref = "dead-centre-mt3"
+
+[[tools]]
+id = "indicator"
+name = ".001 in dial indicator on its magnetic base"
+ref = "dial-indicators"
 
 [[tools]]
 id = "deburr"
@@ -327,7 +346,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a shim wrap of brass shim on the knurled head, {{process.regrip_grip_in:.2dot}} in of it in the jaws from its rear face, the wrap cut no wider than that; the flange and waist stand behind, inside the jaws' bore, and the parted rim end {{cad.outer_stickout_far_mm:in.2dot}} in out. Nothing seats the nut axially: Op 170 locates the seat face through the miked length."
-datum = "Z0: the faced rim, preset in Op 170 from the miked length so the seat face (in the chuck) is Z-{{cad.length_in:.2dot}}; the setting error, about .002, stays inside the {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} band. After the length check the nut is rechucked and Z0 set again on the faced rim (Op 190); the dish's depth runs from it."
+datum = "Z0: the faced rim, preset in Op 170 from the miked length so the seat face (in the chuck) is Z-{{cad.length_in:.2dot}}; the setting error, about .002, stays inside the {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} band. After the length check the nut is rechucked, the compound set and the toolpost turned, and Z0 set again on the faced rim (Op 200); the dish's depth runs from it."
 diagram = { file = "diagrams/regrip.svg", alt = "The nut turned round, its knurled head in the jaws over a shim wrap with the flange and waist inside the jaws' bore: the rim faced to length, the dish cut and the rim end countersunk." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
@@ -350,11 +369,17 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
+instruction = "Rechuck the nut by its knurled head over the brass shim wrap, {{process.regrip_grip_in:.2dot}} in in the jaws, as in the Holding line. Swing the compound to {{cad.recess_flank_deg:.1f}}° off the cross slide; set it with the dial indicator on the compound against the faced rim: {{process.compound_check_travel_in:.3dot}} on the compound's dial moves it {{process.compound_check_rise_in:.3dot}}. Lock it."
+inspection = "Compound: {{process.compound_check_travel_in:.3dot}} on its dial reads {{process.compound_check_rise_in:.3dot}} on the indicator."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
 speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Rechuck the nut by its knurled head over the brass shim wrap, {{process.regrip_grip_in:.2dot}} in in the jaws, as in the Holding line. Turn the toolpost so the AR's chuck-side edge stands at least 20° off the face (clear of the dish's flank) and lock it. Spindle running, touch the AR on the faced rim and set DRO Z0 there; touch it on the knurl's crests and set the X DRO (on diameter) to their Op 50 reading."
+instruction = "Turn the toolpost so the AR's chuck-side edge stands at least 20° off the face and lock it; zero the compound's dial. Spindle running, touch the AR on the faced rim and set DRO Z0; touch it on the knurl's crests and set the X DRO (on diameter) to their Op 50 reading. From here the compound moves only in Op 220, back to zero after each pass."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -364,9 +389,11 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Rough the dish: in facing passes from the hole outward, open a flat recess to about Ø{{cad.recess_floor_dia_in:.2dot}}, {{process.recess_rough_leave_in:.3dot}} short of Z-{{cad.recess_depth_in:.3dot}} (inside the cone at every depth)."
+instruction = "Dish floor: lock the carriage with the Z DRO at Z-{{cad.recess_depth_in:.3dot}} (deeper in light steps); face from the hole out with the cross slide to X Ø{{process.recess_corner_x_dro_in:.3dot}} on the X DRO: with the nose's radius the floor's corner is then Ø{{cad.recess_floor_dia_in:.3dot}}."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.recess_floor_dia_mm}}"
+inspection = "Depth {{cad.recess_depth_min_in:.2dot}}–{{cad.recess_depth_max_in:.2dot}}: Z DRO at Z-{{cad.recess_depth_in:.3dot}}; floor Ø{{cad.recess_floor_dia_min_in:.2dot}}–{{cad.recess_floor_dia_max_in:.2dot}}: X DRO at Ø{{process.recess_corner_x_dro_in:.3dot}}."
+gauge_checks = [{ gauge = "lathe-z-dro", band_mm = "{{cad.recess_depth_band_mm}}" }, { gauge = "lathe-x-dro", band_mm = "{{cad.recess_floor_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
@@ -374,27 +401,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Dish cone: swing the compound to {{cad.recess_flank_deg:.1f}}° off the cross slide by its scale and lock the carriage. Each pass: nose at Z0, cross slide set, feed down the compound until the Z DRO reads Z-{{cad.recess_depth_in:.3dot}}. Start inside the rim and step out; the last pass starts at X Ø{{cad.recess_dia_in:.3dot}}."
+instruction = "Dish cone, carriage still locked: each pass, from a start on the floor, feed the compound out about {{process.cone_compound_travel_in:.2dot}} until the nose leaves the face; wind it back to zero; step the cross slide out .010 or less. The last pass starts at X Ø{{process.recess_corner_x_dro_in:.3dot}}, the floor's corner."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.recess_dia_mm}}"
-inspection = "Rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}}: the last pass's X DRO start; depth {{cad.recess_depth_min_in:.2dot}}–{{cad.recess_depth_max_in:.2dot}}: its Z DRO end."
-gauge_checks = [{ gauge = "lathe-x-dro", band_mm = "{{cad.recess_dia_band_mm}}" }, { gauge = "lathe-z-dro", band_mm = "{{cad.recess_depth_band_mm}}" }]
+inspection = "One clean cone from the floor's corner to the face. The rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}} follows the corner, the depth and the compound's angle (.584–.596), not gauged."
+gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-speed_kind = "spindle"
-tool = "ar"
-drilling = "none"
-sizing = "other"
-instruction = "Dish floor: carriage still locked at Z-{{cad.recess_depth_in:.3dot}}, face the floor from the cone's corner in to the hole with the cross slide, the last pass a light skim; leave no step at the corner."
-settings = "lathe-ar-c360"
-cut_diameter_mm = "{{cad.recess_floor_dia_mm}}"
-inspection = "Floor Ø{{cad.recess_floor_dia_min_in:.2dot}}–{{cad.recess_floor_dia_max_in:.2dot}}, calipers' inside jaws flat on the floor, reading at its corner; one clean cone from the rim to the floor."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.recess_floor_dia_band_mm}}" }]
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Floor over Ø{{cad.recess_floor_dia_max_in:.2dot}} (the compound a little shallow): repeat Ops 210-220 .002 deeper, which shrinks it about .012, depth kept within {{cad.recess_depth_max_in:.2dot}}. Floor under Ø{{cad.recess_floor_dia_min_in:.2dot}}, rim or depth outside its band: scrapped; make another from Setup 1. A step at the corner: one more floor pass."
+instruction = "Compound not reading {{process.compound_check_rise_in:.3dot}} (Op 190): reset it before any touch-off. A step at the floor's corner, or the cone not meeting the face: repeat the last cone pass from Ø{{process.recess_corner_x_dro_in:.3dot}}. Depth or corner off its DRO figure: recut the floor there before the cone."
 feed = "hand"
 
 [[setups.operations]]

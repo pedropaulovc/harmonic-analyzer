@@ -665,6 +665,8 @@ diameter_mm = 6.35
 [tools.drill-27-64]  # 115-piece index; MHA-DT-27 winding mandrel (shank) and the MHA-PD-19 press hole's pre-drill (#2425)
 description = "27/64 (.4219 in) drill, 115-piece index"
 diameter_mm = 10.715625
+[tools.dial-indicators]  # inventory gauges.dial-indicators, gauges.mag-base
+description = ".001 in dial indicator on its magnetic base"
 [tools.feeler-gauges]  # inventory gauges.feeler-gauges
 description = "Pittsburgh SAE/metric feeler gauge set, 32 pieces"
 [tools.form-tool-r070]  # MHA-PD-23 R.07 shank-end dome; MHA-MG-07 R.07 tip
