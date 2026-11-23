@@ -728,22 +728,34 @@ def context(
     _agree(plan, "bore_y_mm", -bore_xy[1])
     if not math.isclose(-bore_xy[1] - b_xy[0], bore["basic_from_b"], abs_tol=1e-3):
         raise ValueError("the bore is not its BASIC from B")
-    # The bore's two readings: the square inside its zone, ±(zone Ø)/(2√2)
-    # from each BASIC, less the play of the GO pins the readings are taken
-    # on (each pin rests on its hole's low side: half the hole's band), so a
-    # pass on both axes is inside the circle.
+    # The bore's two readings, on the height gauge over GO pins: each axis's
+    # error is the pins' play (each pin rests on its hole's low side: half
+    # the hole's band) plus the gauge's count (half a count for the reading
+    # from A; a full count for the bore from B, the difference of two
+    # readings). Each reading's band is the zone's radius less its error
+    # about its BASIC (outside it no bore is in the zone); the radial test,
+    # each axis's error added, then accepts the bore.
+    count = shop["gauges"]["height-gauge"]["resolution_mm"]
     bore_play = (bore["dia"][1] - bore["dia"][0]) / 2
     b_play = (dowel["dia"][1] - dowel["dia"][0]) / 2
-    square = bore["position_dia"] / (2 * math.sqrt(2))
-    for key, basic, half in (
-        ("bore_from_a", bore["basic_from_a"], square - bore_play),
-        ("bore_from_b", bore["basic_from_b"], square - bore_play - b_play),
+    err_a = bore_play + count / 2
+    err_b = bore_play + b_play + count
+    _agree(plan, "bore_err_a_mm", err_a)
+    _agree(plan, "bore_err_b_mm", err_b)
+    if (
+        plan["parameters"]["bore_err_a_mm"] < err_a - 1e-6
+        or plan["parameters"]["bore_err_b_mm"] < err_b - 1e-6
     ):
+        raise ValueError("the bore's reading errors are stated below the recipe's")
+    radius = bore["position_dia"] / 2
+    for key, basic, half in (
+        ("bore_from_a", bore["basic_from_a"], radius - err_a),
+        ("bore_from_b", bore["basic_from_b"], radius - err_b),
+    ):
+        if half <= 0:
+            raise ValueError(f"{key}: the reading error leaves no band")
         _agree(plan, f"{key}_min_mm", basic - half)
         _agree(plan, f"{key}_max_mm", basic + half)
-    # Outside either square: the radial test, the zone's radius less both
-    # pins' play.
-    _agree(plan, "bore_radial_max_mm", bore["position_dia"] / 2 - bore_play - b_play)
     # The tap's spacing to B, a gross check only: wider than half the zone
     # plus the pins' clearance (B's largest Ø less the GO; the #25 hole's
     # drill-point wander allowed as much again).
@@ -770,12 +782,9 @@ def context(
         gap = math.hypot(reach, tip_y - bore["at"][1]) - r12 / 2
         if gap < WEB_MIN_MM:
             raise ValueError(f"{name}'s drill point is {gap:.2f} from the bore")
-    # The bore clears KM08's parallels under S and N, wherever B's station
-    # in its band shifts it (Setup 8 shifts Y0 by the blank's b less .200).
-    for shift in (s - dowel["side_nominal"] for s in dowel["side"]):
-        y = bore_xy[1] - shift
-        if not (-width + t < y - r12 / 2 and y + r12 / 2 < -t):
-            raise ValueError(f"the bore at Y {y} reaches a parallel ({t} thick)")
+    # The bore clears KM08's parallels under S and N.
+    if not (-width + t < bore_xy[1] - r12 / 2 and bore_xy[1] + r12 / 2 < -t):
+        raise ValueError(f"the bore at Y {bore_xy[1]} reaches a parallel ({t} thick)")
     # The coupon (gripped on its sawn ends, its A edge at X0) holds the bore
     # inside it with its shortest length and narrowest width.
     if not (

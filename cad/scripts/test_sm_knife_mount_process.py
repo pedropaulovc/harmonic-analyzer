@@ -171,6 +171,7 @@ def test_every_cut_runs_at_a_cited_4140_ht_setting() -> None:
         ("tap_x_mm", 12.0, "tap_x_mm"),
         ("bore_y_mm", 12.0, "bore_y_mm"),
         ("bore_from_a_max_mm", 20.701, "bore_from_a_max_mm"),
+        ("bore_err_b_mm", 0.0369, "bore_err_b_mm"),
         ("tap_ref_x_mm", 6.35, "reference station"),
         ("bore_ream_feed_mm_min", 30.0, "bore_ream_feed_mm_min"),
         ("tap_from_b_min_mm", 7.5, "tap_from_b_min_mm"),
