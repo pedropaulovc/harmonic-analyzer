@@ -66,6 +66,12 @@ JAW_DEPTH_MM = IN
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
 HOLE = "ring_hole"
+# Setup 3's station read: the ASME crown stands up to .003 proud of the rim
+# under the caliper jaw's .005 overlap, the largest entering pin gauge floats
+# up to .0005, and the printed limits are to .001.
+STATION_CROWN_MM = 0.003 * IN
+STATION_FLOAT_MM = 0.0005 * IN
+STATION_ROUND_MM = 0.001 * IN
 
 
 def _plan_operations(plan: dict[str, Any]):
@@ -232,6 +238,8 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         "small": small,
         "station": station,
         "station_max": hole["station"][1],
+        "station_band": hole["station"],
+        "big_band": taper["dia"],
         "dia": hole["dia"],
         "dia_at_hole": dia_at_hole,
     }
@@ -245,6 +253,19 @@ def context(
     length, big = g["length"], g["big"]
     dia = g["dia_at_hole"]
     radius = dia / 2
+
+    # The receiving band is the export's big-end band; the Setup 3 station
+    # acceptance is the drawing's station band less the crown under the
+    # caliper jaw (low end) and the pin gauge's float (both ends), rounded
+    # inward to the printed .001.
+    _agree(plan, "big_end_min_mm", g["big_band"][0])
+    _agree(plan, "big_end_max_mm", g["big_band"][1])
+    low = g["station_band"][0] + STATION_CROWN_MM + STATION_FLOAT_MM
+    high = g["station_band"][1] - STATION_FLOAT_MM
+    if not low <= p["station_min_mm"] <= low + STATION_ROUND_MM:
+        raise ValueError(f"process.station_min_mm is not {low:.4f} rounded up")
+    if not high - STATION_ROUND_MM <= p["station_max_mm"] <= high:
+        raise ValueError(f"process.station_max_mm is not {high:.4f} rounded down")
 
     d45 = _shop_tool(plan, shop, "drill-45")["diameter_mm"]
     if not g["dia"][0] <= d45 <= g["dia"][1]:

@@ -94,6 +94,9 @@ def test_the_recipes_program_passes_every_check_it_declares(ctx, tmp_path) -> No
         ("hole_peck_mm", 2.5, "over one #45 diameter"),
         ("drill_45_projection_min_mm", 20.0, "drill_45_projection_min_mm"),
         ("parallel_thickness_mm", 6.35, "as wide as the pin"),
+        ("big_end_max_mm", 5.62, "big_end_max_mm"),
+        ("station_min_mm", 3.556, "station_min_mm"),
+        ("station_max_mm", 4.064, "station_max_mm"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> None:
