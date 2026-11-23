@@ -229,7 +229,7 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # The 1/16 stopped short of the bore.
         (
             "crown_drill",
-            lambda line: line.startswith("G1 Z27.363"),
+            lambda line: line.startswith("G1 Z27.376"),
             lambda line: "G1 Z29.000 F{feed}",
             "holes",
         ),
