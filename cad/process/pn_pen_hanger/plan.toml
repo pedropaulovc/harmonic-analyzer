@@ -1,33 +1,694 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
-title = "Pen Hanger"
-part = "MHA-PN-02 Pen Hanger"
-revision = "placeholder"
-material = "AISI 1018 CF flat, 1/8 x 3/4 REF"
-stock = "To be written"
+# Pen hanger MHA-PN-02 (qty 1), routed for the CNC mill (owner ruling
+# 2026-11-21: NC and travelers for every made part; the route is the
+# author's, chosen for speed, the owner corrects it afterwards). A built-up
+# part: the strap and two guide plates, all 1/8 in 1018 CF flat as supplied
+# (no face machined), the plates bonded to the strap's front with Loctite
+# 638 (drawing note 1), then both slots cut in line after the 24 h cure
+# (note 2).
+#
+# Stock (CncFlatA ruling 2026-11-22, no rotation): every piece from the
+# owned 1/8 x 1-1/2 in 1018 CF flat (stock.1018-flat-1-8x1-1-2, 4 × 72 in on
+# hand): the strap's blank 7.00-7.10 in long, and two plate blanks
+# 1.75-1.80 in long, each its own blank (prechips flat_bar blank groups:
+# the plate group is guide_plates, two alike). The placeholder's 1/8 x 3/4
+# in bar is not used: the strap is .870 wide along the bar's width.
+#
+# Route: Setup 1 saw the three blanks and a 1.40 x 6 in spoil plate off the
+# 1/2 x 6 in 6061 flat (stock.6061-flat-1-2x6-54in) and mic the blanks.
+# Setup 2 (PH01): the strap blank flat on the spoil plate on two 1 in
+# parallels, back face up, gripped on its two as-supplied edges: spot and
+# drill the #15 screw hole, then the strap's outline on fourteen tabs (seven
+# on each long edge). Setup 3 (PH02): the two plate blanks end to end the same
+# way: each plate's outline on four tabs (two on each long side). Setup 4,
+# bench: saw the parts off their tabs, file the stubs, deburr, inspect.
+# Setup 5, in the mill's vise (no spindle): degrease, bond the plates to the
+# strap's front with Loctite 638, the lower plate flush with the foot and
+# both corners against a gauge block, the upper one set from the lower by a
+# gauge-block stack; 24 h cure in the clamping. Setup 6 (PH03), the same
+# clamping: the strap's rise and the upper plate's drop read on the DRO,
+# then both slots in line in one set of passes with the 3/16 in end mill.
+# Setup 7, bench: deburr, gauge the slots, check the bond by hand. Setup 8:
+# black oxide in the shop, Presto Black Steel PC9.
+#
+# Workholding: the vise only (no drawn fixture). The blanks lie on a spoil
+# plate cut from the 1/2 x 6 in 6061 flat's free remainder (the channel
+# lever's precedent, ch_channel_lever Setup 2), narrower than the bar so the
+# jaws grip the bar only. The parts hang on tabs in their blanks' frames
+# (frame strips at least .18 wide past the cutter, cam.py checks): the
+# strap, 6.38 in long, is longer than the 6.25 in jaws, so its frame's ends
+# stand past the jaws and the jaws' push reaches the strap only through
+# the tabs; a snug clamp (Setup 2). The bond and the slots use the two owned
+# Taytools 1-2-3 blocks (fixtures.blocks-123), one under the strap, one as
+# the packing between the plates and the moving jaw, and one of the owned
+# HHIP screw jacks under the strap's free end
+# (fixtures.screw-jacks-hhip-3901-0076). The mill is tied up for the 24 h
+# cure (Setups 5-6): plan it for a day the mill is not needed.
+#
+# FLAGGED: to buy: Class ZZ pin gauges for the slots, .200 plus (GO) and
+# .202 minus (NO-GO) (gauges.pin-gauges status to_order; owner ruling
+# 2026-11-20, #3075: plus and minus sets, the GO end a plus pin); the
+# Birchwood Casey Cleaner-Degreaser (consumables.cleaner-degreaser-birchwood-
+# casey, to_order) and the gloves and glasses (consumables.chemical-gloves-
+# eye-protection, to_order), both needed from Setup 5; the PC9
+# (consumables.presto-black-steel-pc9, to_order). Owned and used: the 3/16 in
+# carbide end mill (tools-cutting
+# endmill-carbide-3fl-3-16, 2 on hand; shop record added in shop/pn.toml),
+# Loctite 638 (consumables.loctite-638, on hand), the Mitutoyo 81-piece
+# gauge-block set, the two Taytools 1-2-3 blocks, a screw jack. The
+# placeholder's 1/8 x 3/4 in bar is dropped (above); its #15 drill, 1/8 in
+# end mill and pin gauges stay.
+#
+# Black oxide: the drawing's finish, matte black oxide, oil sealed (all
+# over, no masking), is done in the shop: delegated ruling 2026-11-21
+# (Main, owner review #2144, cnc rulings record; precedent:
+# ch_channel_lever's header) drops MIL-DTL-13924 from the sheet. Owner
+# (Pedro), answered in person 2026-11-21: "Black oxide: cold blackening in
+# the shop with Presto Black PC9 is acceptable as the drawing's black
+# oxide." Setup 8 blackens the hanger with Birchwood Presto Black Steel PC9
+# by the maker's instructions (Presto Black Steel PC9 Instructions, steps 1
+# prepare, 2b brush-on, 3 stop, 4 dry, 6 seal; cad/config/shop-equipment/
+# consumables.presto-black-steel-pc9, which cites them).
+#
+# Zeroing: Setups 2-3: Z0 the spoil plate's bare top before a blank goes on,
+# touched with T3 (1/8 in end mill) on a .002 feeler leaf, kept for both
+# setups (the tool setter measures each M6); Y0 the fixed jaw, edge finder,
+# kept for both; X0 the left end of the (left) blank, edge finder. Setup 6:
+# X0 the strap's foot end, Y0 the fixed jaw, Z0 the plates' far ends.
+#
+# NC (cam:pn_pen_hanger, cad/process/pn_pen_hanger/cam.py): PH01_strap,
+# PH02_plates, PH03_slots. Program names, the [parameters] and the
+# milling_cuts names are a contract with that recipe. Tool numbers are the
+# places in the tools list among the mill's tools: T1 #1 centre drill, T2
+# #15 drill, T3 1/8 in end mill, T4 3/16 in end mill.
+title = "Pen hanger"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "1018 cold-finished steel, 1/8 x 1-1/2 in flat (drawing: LOW-CARBON STEEL, E.G. 1018 CF; (.125) 1/8 CF FLAT)"
+stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:.1f}} in flat bar (one 72 in length): the strap's blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in and two plate blanks {{process.plate_blank_length_in:.2f}}–{{process.plate_blank_length_max_in:.2f}} in. Spoil plate: a 1.35–1.40 x 6 in piece off the 1/2 x 6 in 6061 flat."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Faces: the strap's back (the drawing's back, away from the plates) and front (the plates' side); every face is the bar's as supplied. Words: the spoil plate is the aluminium plate the blanks lie on (Z0 in Setups 2-3); a frame is what is left of a blank round its part. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after a reset, E-stop or stall: home ($H), console M6 for the tool in the spindle, pick up X0 again with the edge finder, then restart the program from its start. The mill stays tied up from Setup 5 to the end of Setup 6 (the 24 h cure). To buy before Setup 5: the degreaser, the chemical-resistant gloves and the safety glasses; before Setup 7: the .200 plus and .202 minus Class ZZ pin gauges; before Setup 8: the PC9."
 shop = "../shop"
-stock_refs = ["1018-flat-1-8x3-4"]
+stock_refs = ["1018-flat-1-8x1-1-2", "6061-flat-1-2x6-54in"]
+material_key = "rocker-1018-cold-finished"
+milling_material = "steel_1018"
+
+[cad]
+file = "../../out/features/pn_pen_hanger/features.toml"
+adapter = "flat_bar"
+part = "pn-pen-hanger"
+
+[parameters]
+quantity = 1
+# The adapter's axes: the strap's length along model Y, its thickness along
+# model Z (the plates stand off the front along -Z: their own group).
+blank_length_axis = 1
+blank_thickness_axis = 2
+# The strap's blank: the 6.380 in strap with .31 at its top end (the left
+# end in Setup 2) and at least .30 at its foot.
+blank_length_in = 7.0
+blank_length_max_in = 7.1
+blank_length_min_mm = 177.8
+blank_length_max_mm = 180.34
+blank_width_in = 1.5
+blank_thickness_in = 0.125
+# The plates (guide_plates, two alike): each its own blank off the same bar,
+# the .970 plate centred in it with .39 each end.
+blank_groups = ["plate"]
+plate_blank_features = ["guide_plates"]
+plate_blank_size_fields = ["guide_plates.reach", "guide_plates.width", "guide_plates.thickness_as_supplied"]
+plate_blank_count = 2
+plate_blank_length_in = 1.75
+plate_blank_length_max_in = 1.8
+plate_blank_length_min_mm = 44.45
+plate_blank_length_max_mm = 45.72
+plate_blank_width_in = 1.5
+plate_blank_thickness_in = 0.125
+# The bar's thickness as supplied (the drawing's 1/8 CF FLAT band,
+# strap_front.thickness_band_mm): the incoming-stock gate.
+blank_thickness_min_mm = 3.0988
+blank_thickness_max_mm = 3.2512
+# Holding, Setups 2-3 (shop workholding.vise-pm-6): the spoil plate (1/2 in
+# 6061, 1.35-1.40 x 6 in, as sawn) on two 1 in parallels (fixtures.parallels-
+# lms-6745), one against each jaw; the blank on it, gripped by its edges.
+# The spoil plate is shorter than the strap: its left end .05-.15 in inside
+# the strap blank's left end, under the top end, the screw hole and the
+# outline's plunge (cam.py checks); the foot is cut over air on its tabs.
+parallel_height_mm = 25.4
+spoil_plate_thickness_mm = 12.7
+spoil_plate_width_mm = 35.56
+spoil_plate_length_mm = 152.4
+spoil_plate_start_min_mm = 1.27
+spoil_plate_start_max_mm = 3.81
+support_height_mm = 38.1
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+vise_grip_min_mm = 6.0           # Shop limits.vise_grip_min_mm.
+# The jaws' top above the spoil plate's top (Z0): the vise's jaw height less
+# the parallels and the plate; Setup 2 gauges it .250-.280.
+jaw_top_mm = 6.8453
+jaw_top_min_mm = 6.35
+jaw_top_max_mm = 7.112
+# The strap in its blank (Setup 2): its top end .315 from the blank's left
+# end; centred across the bar, its outer top corner .555 from the fixed
+# jaw's edge of the bar (cam.py checks both against the frame strips).
+top_waste_mm = 8.0
+bar_edge_offset_mm = 14.097
+# The jaws centred on the blank: their left side from X0.
+jaw_start_mm = 9.5631
+# The plates in theirs (Setup 3): each centred along its blank, the two
+# blanks end to end, the second's plate one mean blank length on.
+plate_end_waste_mm = 9.906
+plate_pitch_mm = 45.085
+plate_jaw_start_mm = -34.8869
+# The 1/8 in carbide end mill: each outline in four equal levels from the
+# thickest bar's top to .010 into the spoil plate; fourteen tabs on the
+# strap (seven per long edge, 6 to 155 mm from its top end, so no run between
+# tabs is over 25 mm and neither end overhangs its last tab more than 7.1 mm;
+# the last stays off the lower plate's seat at the foot) and two on each
+# long side of each plate, a quarter of its length in from each end, all
+# .100 wide and .050 thick on the bar's
+# underside. Plunges into metal at 1 in/min.
+eighth_cutter_dia_mm = 3.175
+outline_levels = 4
+outline_level_mm = 0.8763
+outline_through_mm = 0.254
+tab_thickness_mm = 1.27
+tab_top_mm = 1.27
+tab_width_mm = 2.54
+tab_pitch_max_mm = 25.0
+# The strap's tab stations from X0 (its top end at top_waste_mm), and plate
+# 1's (plate 2's are one plate_pitch_mm on).
+strap_tabs = 7
+tab_station_1_mm = 14.0
+tab_station_2_mm = 39.0
+tab_station_3_mm = 64.0
+tab_station_4_mm = 89.0
+tab_station_5_mm = 114.0
+tab_station_6_mm = 139.0
+tab_station_7_mm = 163.0
+plate_tab_station_1_mm = 16.0655
+plate_tab_station_2_mm = 28.3845
+strap_start_mm = 8.0
+strap_end_mm = 170.052
+# The strap's section between tabs: its narrowest width (the foot) and the
+# bar's thinnest thickness.
+strap_width_min_mm = 12.192
+# Holes: spot Ø.080 with the #1 carbide centre drill on the thinnest bar's
+# top (under the #15), the #15 through in pecks of one diameter with full
+# retracts, its full diameter .020 into the spoil plate.
+spot_dia_mm = 2.032
+spot_z_mm = 1.1795
+drill_past_mm = 0.5
+drill_tip_mm = -1.8736
+# Speeds: LittleMachineShop "Cutting Speeds", Drilling & Reaming, Plain
+# carbon steels 1006-1026 (read 2026-11-20, as ch_channel_lever): drilling
+# 60-100 ft/min. The #15 (.180) at 1700 rpm (80 ft/min), .002 in/rev (the
+# channel lever's #21 rate) = 3.4 in/min; the #1 centre drill at 2800,
+# .0005 in/rev = 1.4 in/min (the channel lever's). The end mills at their
+# shop settings: the 1/8 in at endmill-carbide-3fl-1-8-1018-cf-tru-edge,
+# the 3/16 in at pn-em-3-16-1018-cf (shop/pn.toml).
+spot_rpm = 2800
+spot_feed_per_min_mm = 35.56
+drill_rpm = 1700
+drill_feed_per_min_mm = 86.36
+em_rpm = 2800
+em_feed_per_min_mm = 213.36
+plunge_feed_per_min_mm = 25.4
+slot_rpm = 2800
+slot_feed_per_min_mm = 234.696
+# Setups 5-6 (the bond and the slots, one clamping): the strap's back on a
+# 1-2-3 block laid flat (1 in high, 3 in along the strap under both plates'
+# seats), its outer foot corner and both plates' outer sides against the
+# fixed jaw; the second 1-2-3 block standing on the strap's front (1 in
+# high, 2 in across the jaws, 3 in along) against the plates' inner sides,
+# the moving jaw on it. The upper plate's seat from the lower's: a
+# gauge-block stack 1.440 in (.950 + .350 + .140) between their facing
+# faces; the set's 1.000 block squares the foot end to the fixed jaw.
+support_block_mm = 25.4
+packing_block_mm = 25.4
+packing_width_mm = 50.8
+packing_length_mm = 76.2
+plate_gap_mm = 36.576
+slot_jaw_start_mm = -41.2369
+# The jaws' top and the packing block's top from Z0 (the plates' far ends).
+slot_jaw_top_mm = -8.2677
+packing_top_mm = 0.762
+# The slots: the 3/16 in end mill on two passes .00675 either side of the
+# centre line (.2010 wide, the band's middle), through both plates in line,
+# in 22 equal levels to the drawn depth (.019 each).
+slot_cutter_dia_mm = 4.7625
+slot_offset_mm = 0.1715
+slot_width_mm = 5.1055
+slot_levels = 22
+slot_level_mm = 0.4849
+slot_level_max_mm = 0.508
+slot_depth_mm = 10.668
+# Machine-capacity inputs (mm): heights from the table, tool lengths from
+# spindle nose to tip.
+r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
+drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
+# 1/8 in end mill, 1-1/2 in overall: at least .55 in out (its 1/2 in flutes
+# clear and the collet's nose over the jaws); 3/16 in, 2 in overall: at
+# least .70 in out (its 5/8 in flutes clear, the nose over the packing
+# block); the drills at least 1.00 in out of the chuck. The #15 jobber is
+# under 4 in overall (ASME B94.11M: the D, .246, is 4 in).
+eighth_projection_min_mm = 13.97
+slot_projection_min_mm = 17.78
+drill_projection_min_mm = 25.4
+drill_15_oal_mm = 101.6
+# The strap's and the plates' heights in Setups 5-6: the support block and
+# the strap, the strap and a plate's reach.
+bond_seat_mm = 28.575
+assembly_height_mm = 27.813
 
 [[tools]]
-id = "block-drill-15"
+id = "spot"
+name = "#1 carbide centre drill"
+ref = "centre-drills-carbide-60"
+[[tools]]
+id = "drill-15"
 name = "#15 drill"
-ref = "block-drill-15"  # Drills #15
-
+ref = "block-drill-15"
 [[tools]]
-id = "endmill-carbide-3fl-1-8"
-name = "1/8 carbide end mill"
-ref = "endmill-carbide-3fl-1-8"  # drawing cross-check 2026-11-19: .200 +.002 slots, R.08 max. ends, interpolated
-
+id = "em-eighth"
+name = "1/8 in carbide end mill"
+ref = "endmill-carbide-3fl-1-8"
+[[tools]]
+id = "em-3-16"
+name = "3/16 in carbide end mill"
+ref = "endmill-carbide-3fl-3-16"
+[[tools]]
+id = "cutoff-saw"
+name = "Evolution miter saw"
+ref = "saw-evolution-14"
+[[tools]]
+id = "files"
+name = "Files"
+ref = "jig-files"
+[[tools]]
+id = "deburr"
+name = "Deburring set"
+ref = "deburring-set"
+[[tools]]
+id = "gauge-blocks"
+name = "Mitutoyo 81-piece gauge blocks"
+ref = "gauge-blocks-mitutoyo"
+[[tools]]
+id = "feelers"
+name = "Feeler gauges"
+ref = "feeler-gauges"
 [[tools]]
 id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # drawing cross-check 2026-11-19: .200 GO / .202 NO-GO
+name = "Pin gauges .200 plus, .202 minus"
+ref = "pin-gauges"  # A1-pin-set-061-500-combined, and its plus set
+description = "Class ZZ pin gauges: .200 plus pin (GO, .2000-.2002) and .202 minus pin (NO-GO, .2018-.2020)"
+status = "to_order"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Saw and mic the blanks; the spoil plate"
+machine = "Saw / bench"
+indexing = "none"
+diagram = { file = "diagrams/saw.svg", alt = "A length of the 1/8 x 1-1/2 in flat marked into the 7.0 in strap blank and two 1.75 in plate blanks with kerfs between; beside it the 1/2 x 6 in aluminium flat with a 1.40 in strip marked off its end." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "cutoff-saw"
+drilling = "none"
+sizing = "other"
+instruction = "Saw the strap's blank at least {{process.blank_length_in:.2f}} long (aim 7.05) and two plate blanks {{process.plate_blank_length_in:.2f}}–{{process.plate_blank_length_max_in:.2f}} long (aim 1.77) off the end of a 72 in length of the 1/8 x 1-1/2 in flat, each marked off with the tape. File the burrs off every sawn end."
+feed = "hand"
+inspection = "Strap blank at least {{process.blank_length_in:.2f}} long (the tape): the 6.380 strap with .31 at its top end and at least .30 past its foot for the frame. Each plate blank {{process.plate_blank_length_in:.3f}}–{{process.plate_blank_length_max_in:.3f}} (the calipers): PH02 cuts plate 2 at a fixed place, 1.775 from X0, and the blanks are butted, so blank 1's length sets plate 2's frame ends; inside this band every frame end keeps at least .18 past the cutter. Shorter: saw another; longer: file it down."
+gauge_checks = [
+  { gauge = "calipers", band_mm = ["{{process.plate_blank_length_min_mm}}", "{{process.plate_blank_length_max_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Mic each of the three blanks' thickness at both ends and the middle. Mark one wide face of the strap blank BACK with marking fluid; mark the plate blanks 1 and 2."
+inspection = "Every reading {{process.blank_thickness_min_mm:in.4dot}}–{{process.blank_thickness_max_mm:in.4dot}}: the drawing's 1/8 CF FLAT as supplied (no face is machined). Outside: saw another blank from another part of the bar."
+gauge_checks = [
+  { gauge = "micrometers", band_mm = ["{{process.blank_thickness_min_mm}}", "{{process.blank_thickness_max_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "cutoff-saw"
+drilling = "none"
+sizing = "other"
+instruction = "Saw a 1.40 in strip across the end of the 1/2 x 6 in 6061 flat (the spoil plate, 1.40 x 6 in: narrower than the 1-1/2 in bar, so the jaws grip the bar, not the plate). File its burrs; it lies 6 in along X, 1.40 across the jaws."
+feed = "hand"
+inspection = "Width 1.35–1.40 (the calipers): at least .05 under the bar each side. Wider: file it down."
+gauge_checks = [{ gauge = "calipers", band_mm = [34.29, 35.56] }]
+
+[[setups]]
+machine_kind = "other"
+title = "Strap: screw hole and outline on tabs"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6; jaws 6.25 wide), one against each jaw; the spoil plate on them, 6 in along X. The strap blank on the spoil plate, BACK up, its two as-supplied edges in the jaws, centred along the jaws by eye (about .40 past each jaw side). The spoil plate is shorter than the strap: slide it along under the blank until its left end is .05–.15 inside the blank's left end (a rule), so it lies under the strap's top end and the screw hole; the foot end is cut over air. Close the vise snug, tapping the blank down: the strap hangs on its tabs in the blank's frame, and the frame's two long strips carry the grip; do not crank it."
+datum = "Program PH01_strap (T1, T2, T3). G54: X0 the blank's left end (the strap's top end .315 in from it), Y0 the fixed jaw's face, Z0 the spoil plate's top. +X toward the blank's right end (the strap's foot), +Y toward the fixed jaw: the strap lies at −Y, its outer edge toward the fixed jaw."
+diagram = { file = "diagrams/strap.svg", alt = "Plan view: the strap blank across the jaws on the spoil plate, back face up, the strap's tapering outline drawn in it with the top end to the left, the screw hole near the top end's outer corner, seven tabs along each long edge; the jaws on the blank's long edges, the blank's ends past the jaws' sides." }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.eighth_cutter_dia_mm}}", "{{process.eighth_cutter_dia_mm}}", 5.08], y_span_mm = [38.1, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.drill_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_15_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = 38.1, along_jaws_mm = "{{process.blank_length_min_mm}}", part_height_mm = "{{process.blank_thickness_min_mm}}", parallel_height_mm = "{{process.support_height_mm}}", overhang_mm = ["{{process.jaw_start_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "plate", extent_mm = ["{{process.strap_start_mm}}", "{{process.strap_end_mm}}"], seat = "the blank's frame, gripped along its edges by the jaws; the strap hangs on its tabs in it, its top end over the spoil plate, its foot over air", seat_mm = [0, "{{process.blank_length_min_mm}}"], clamps_mm = ["{{process.tab_station_1_mm}}", "{{process.tab_station_2_mm}}", "{{process.tab_station_3_mm}}", "{{process.tab_station_4_mm}}", "{{process.tab_station_5_mm}}", "{{process.tab_station_6_mm}}", "{{process.tab_station_7_mm}}"], section_mm = { y = "{{process.strap_width_min_mm}}", z = "{{process.blank_thickness_min_mm}}" }, tabs = { stations_mm = ["{{process.tab_station_1_mm}}", "{{process.tab_station_2_mm}}", "{{process.tab_station_3_mm}}", "{{process.tab_station_4_mm}}", "{{process.tab_station_5_mm}}", "{{process.tab_station_6_mm}}", "{{process.tab_station_7_mm}}"], section_mm = { x = "{{process.tab_width_mm}}", z = "{{process.tab_thickness_mm}}" }, length_mm = "{{process.eighth_cutter_dia_mm}}" } }
+
+[[setups.operations]]
+instruction = "Home ($H). Put the two 1 in parallels on the vise bed, one against each jaw, and the spoil plate on them, roughly centred along the jaws; close the vise on a scrap of the 1-1/2 in bar laid on the spoil plate, just snug."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The jaws' top above the spoil plate's top."
+inspection = "Jaws' top {{process.jaw_top_min_mm:in.3dot}}–{{process.jaw_top_max_mm:in.3dot}} above the spoil plate's top (the calipers' depth rod, at both ends of each jaw; the 1/2 in plate on 1 in parallels reads about .270): the jaws grip the bar's whole thickness. Outside: check the parallels' heights and the plate; stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.jaw_top_min_mm}}", "{{process.jaw_top_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "G54 Z0 on the spoil plate's top: console M6 T3 (1/8 in end mill, at least .55 in out of the collet); spindle stopped, its tip just dragging a .002 feeler leaf on the spoil plate beside the scrap. This Z0 stays for Setup 3."
+instruction_detailed = "Console M6 T3 (the tool setter measures it). Spindle stopped, the T3 tip just dragging a .002 feeler leaf on the spoil plate's top: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Y0 the fixed jaw's face: edge finder (900 rpm), from the −Y side, the scrap removed. This Y0 stays for Setup 3."
+instruction_detailed = "Open the vise, lift the scrap out. Edge finder (900 rpm), its tip .10 below the jaw top, touched on the fixed jaw's face from −Y: G10 L20 P1 Y-2.540."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Load the strap blank as in Holding: BACK up on the spoil plate, centred along the jaws (about .40 past each jaw side), the spoil plate slid along under it until its left end is .05–.15 inside the blank's left end; close the vise snug, tapping the blank down onto the spoil plate."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 X0 the blank's left end: edge finder (900 rpm), from the left."
+instruction_detailed = "Edge finder (900 rpm), its tip .05 below the blank's top, on the blank's left end from −X: G10 L20 P1 X-2.540."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove PH01_strap in air, Z0 raised 1.000 in, through each M6: every move clears the jaws. Then Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run PH01_strap in air through each M6. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Run PH01_strap (M6 T1, the #1 centre drill in the drill chuck, at least 1.00 in out; set 2800): spot the screw hole Ø{{process.spot_dia_mm:in.3dot}}, .20 below the strap's top end and .27 in from its outer top corner (toward the fixed jaw)."
+rpm = 2800
+feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "screw spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = 13.0 },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-15"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T2 (#15 drill, at least 1.00 in out of the chuck; set 1700): drill the screw hole through in pecks of .180 with full retracts, its full diameter {{process.drill_past_mm:in.3dot}} into the spoil plate. At the M6 T2 stop (spindle stopped), put a drop of cutting oil on the spot before Cycle Start."
+rpm = 1700
+feed = "{{process.drill_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{process.blank_thickness_max_mm}}"
+peck = { step_mm = 4.572, retract = "full" }
+peck_reason = "the #15 runs through the bar into the spoil plate, about .20 deep in all; full retracts clear its chips"
+milling_cuts = [
+  { name = "screw drill", kind = "drill", phase = "rough", cutter_dia_mm = 4.572, flutes = 2, rpm = 1700, feed_mm_min = "{{process.drill_feed_per_min_mm}}", stations_mm = 13.0 },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-eighth"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T3 (1/8 in end mill, at least .55 in out; set 2800): the strap's outline anticlockwise, four levels from the bar's top to {{process.outline_through_mm:in.3dot}} into the spoil plate; below {{process.tab_top_mm:in.3dot}} above Z0 the cutter lifts over fourteen tabs, {{process.tab_width_mm:in.3dot}} wide and {{process.tab_thickness_mm:in.3dot}} thick, seven on each long edge. Plunges into metal at {{process.plunge_feed_per_min_mm:in.1f}} in/min, at the top end (over the spoil plate); the foot is cut over air."
+settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
+milling_cuts = [
+  { name = "strap outline", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_level_mm}}", radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = ["{{process.strap_start_mm}}", "{{process.strap_end_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Unclamp and lift the blank out, the strap hanging on its tabs in its frame. Brush the spoil plate clean and stone its top flat round the hole and the outline's groove with the India stone; leave it, the parallels and the vise as they are for Setup 3."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Plates: outlines on tabs"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "As Setup 2: the spoil plate on the parallels, where Setup 2 left it. The two plate blanks on it end to end, 1 on the left, their ends butted, centred along the jaws by eye (the pair, about 3.55 long, sits inside the jaws and over the spoil plate), their as-supplied edges in the jaws. Close the vise snug, tapping them down."
+datum = "Program PH02_plates (T3). G54: X0 blank 1's left end (picked up), Y0 and Z0 kept from Setup 2."
+diagram = { file = "diagrams/plates.svg", alt = "Plan view: the two plate blanks end to end across the jaws on the spoil plate, each with a .970 x .480 plate outline centred in it and two tabs on each long side; the jaws on the blanks' long edges." }
+envelope = { x_span_mm = [91.44, "{{process.eighth_cutter_dia_mm}}", "{{process.eighth_cutter_dia_mm}}", 5.08], y_span_mm = [38.1, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", -0.254], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", 38.1], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = 38.1, along_jaws_mm = 88.9, part_height_mm = "{{process.blank_thickness_min_mm}}", parallel_height_mm = "{{process.support_height_mm}}", overhang_mm = ["{{process.plate_jaw_start_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "plate", extent_mm = ["{{process.plate_end_waste_mm}}", 34.544], seat = "the blank's frame, gripped along its edges by the jaws; the plate hangs on its four tabs in it, over the spoil plate", seat_mm = [0, "{{process.plate_blank_length_min_mm}}"], clamps_mm = ["{{process.plate_tab_station_1_mm}}", "{{process.plate_tab_station_2_mm}}"], section_mm = { y = "{{cad.guide_plates_width_mm}}", z = "{{process.blank_thickness_min_mm}}" }, tabs = { stations_mm = ["{{process.plate_tab_station_1_mm}}", "{{process.plate_tab_station_2_mm}}"], section_mm = { x = "{{process.tab_width_mm}}", z = "{{process.tab_thickness_mm}}" }, length_mm = "{{process.eighth_cutter_dia_mm}}" } }
+
+[[setups.operations]]
+instruction = "Load the two plate blanks as in Holding: on the spoil plate end to end, 1 on the left, their ends butted, the pair centred along the jaws; close the vise snug, tapping them down onto the spoil plate."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 X0 blank 1's left end: edge finder (900 rpm), from the left. Y0 and Z0 stay from Setup 2."
+instruction_detailed = "Edge finder (900 rpm), its tip .05 below the blanks' top, on blank 1's left end from −X: G10 L20 P1 X-2.540."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove PH02_plates in air, Z0 raised 1.000 in. Then Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run PH02_plates in air. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-eighth"
+drilling = "none"
+sizing = "other"
+instruction = "Run PH02_plates (M6 T3; set 2800): each plate's outline anticlockwise, four levels to {{process.outline_through_mm:in.3dot}} into the spoil plate; below {{process.tab_top_mm:in.3dot}} the cutter lifts over two tabs on each long side. Each plate's bonded end is its left end (toward −X). Plunges into metal at {{process.plunge_feed_per_min_mm:in.1f}} in/min."
+settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
+milling_cuts = [
+  { name = "plate outline", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_level_mm}}", radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = ["{{process.plate_end_waste_mm}}", 34.544] },
+]
+
+[[setups.operations]]
+instruction = "Unclamp and lift the blanks out, each plate on its tabs. With a felt marker write B on each plate's left end (its bond end, cut square to the faces by the end mill). Clear the vise: parallels and spoil plate off."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Break out, deburr and inspect"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/loose.svg", alt = "The strap off its frame, back face up, with its screw hole near the top end, and the two loose plates, each with its bond end marked B; the widths and lengths the calipers read." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "Saw each part out: the frame flat on the bench, the part supported level beside it, a hacksaw through each tab (never bend or pry the frame). File each tab's stub flush with the edge."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "deburr"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr every edge and both mouths of the screw hole: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, smooth file and the deburring tool. The plates' B ends and the strap's front under the plates: burr off only, keep them flat and their edges sharp to the R.010 limit (the lower plate sits flush on the foot's corners)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Inspect the strap: its top end's run and its foot's width, the screw hole, the tab stubs."
+inspection = "Top end {{cad.top_end_top_run_min_in:.3dot}}–{{cad.top_end_top_run_max_in:.3dot}} across and foot {{cad.foot_bottom_width_min_in:.3dot}}–{{cad.foot_bottom_width_max_in:.3dot}} across (the calipers, at the very ends); the #15 hole round and through, a #15 drill's shank enters it; no tab stub standing proud. The strap's rise and taper and the hole's place are held by the proved PH01 path; the rise is read on the DRO in Setup 6. Outside: stop and tell the owner."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.top_end_top_run_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.foot_bottom_width_band_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Inspect each plate: its width, its length (the drawing's reach from the strap's front), its B end, and the two plates' lengths against each other."
+inspection = "Width {{cad.guide_plates_width_min_in:.3dot}}–{{cad.guide_plates_width_max_in:.3dot}} and length {{cad.guide_plates_reach_min_in:.3dot}}–{{cad.guide_plates_reach_max_in:.3dot}} (the calipers), the two lengths within .008 of each other (Setup 6 cuts both slots from the longer plate's end); the B end square: held on a 1-2-3 block's face on the surface plate, no light under it. Lengths .008 apart or more: file the longer plate's far end (never its B end) down within its band. Outside, or light: stop and tell the owner."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.guide_plates_width_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.guide_plates_reach_band_mm}}" },
+]
+
+[[setups]]
+machine_kind = "other"
+title = "Bond the plates (Loctite 638), 24 h cure in the vise"
+machine = "PM-30MV vise, swivel off (no spindle)"
+indexing = "none"
+holding = "The vise bare (no parallels on the bed). The support 1-2-3 block laid flat on the bed, 1 in high, its 3 in length along the jaws, its 2 in width against the fixed jaw, its left end 1.40 left of the jaws' centre. The strap on it, FRONT up, its foot to the left, its foot end .10 past the support block's left end, its outer foot corner against the fixed jaw. Beside the strap's inner edge, one 1/2 in parallel (1/8 thick: the strap's thickness) laid flat on the support block along the jaws. A screw jack on the bed under the strap, about 4.3 in from the foot, run up to just touch the strap's back (the strap then lies level on the block and the jack, not tipping). The 1.000 gauge block stands 35 mm (1.38) tall on its 1.000 x 9 mm end, one 35 x 9 mm side flat on the fixed jaw, its 1.000 x 35 mm face against the strap's foot end and the lower plate's outer face: it squares the foot end to the jaw (the strap's angle, and with it the upper plate's overhang) and flushes the lower plate. The plates stand on their B ends on the strap's front, their outer sides against the fixed jaw: the lower one at the foot, the upper one 1.440 above it (the gauge-block stack .950 + .350 + .140 between them). The second 1-2-3 block (the packing) lies on its 2 x 3 face on the strap's front and the parallel, 1 in high (its top about .03 above the plates' far ends), 2 in across the jaws, its 3 in length along the jaws from the foot end (centred along the jaws), against both plates' inner sides; the moving jaw closes on it."
+datum = "None (no NC). The fixed jaw squares both plates to the strap's outer foot corner; the 1.000 gauge block on the jaw squares the foot end and flushes the lower plate; the gauge stack sets the upper plate."
+diagram = { file = "diagrams/bond.svg", alt = "Plan view: the strap front up on a 1-2-3 block in the vise, its foot to the left; the two plates standing on it against the fixed jaw, the gauge stack between them, the packing 1-2-3 block between the plates and the moving jaw, the 1.000 gauge block against the fixed jaw across the foot end and the lower plate's outer face; a screw jack under the strap's far end." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+instruction = "Put on the chemical-resistant gloves and the safety glasses (to buy before this setup). Degrease the plates' B ends and the strap's front where each plate sits (from the foot end to 1.25 in up, and from 4.55 to 4.95 in below the top end) with the Birchwood Casey Cleaner-Degreaser (to buy), both faces of every joint, and let them dry; from here on touch none of them."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Wrap one layer of plain paper smoothly over the 1.000 gauge block's 1.000 x 35 mm face: the paper keeps the 638 off the block, and one layer under both the foot end and the plate keeps them flush."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Dry fit: set up the support block, the strap, the jack, the 1.000 block, the plates, the gauge stack (.950 + .350 + .140, wrung) and the packing block as in Holding. Push the strap's foot end lightly against the 1.000 block (a finger on its top end) and close the vise snug on the packing block."
+inspection = "The lower plate flush with the strap's foot end (the 1.000 block bears on both, no light between) and with both foot corners (a fingernail drawn across each corner feels no step); the foot end on the 1.000 block, which lies flat on the fixed jaw; both plates' outer sides on the fixed jaw; the stack touches both plates' facing faces; the upper plate's overhang: beside its top-end face, a .050 feeler stack enters between the fixed jaw and the strap's outer edge and a .070 stack does not ({{cad.guide_plates_upper_overhang_min_in:.3dot}}–{{cad.guide_plates_upper_overhang_max_in:.3dot}}). Any of these off: loosen, reseat, and check again; still off: stop and tell the owner."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Open the vise .02 in. Without moving the strap or the 1.000 block, lift each plate, put one thin bead of Loctite 638 along the middle of its B end, stopping .03 short of its outer and facing edges (no more than covers it when pressed), stand it back in place, the stack between, and close the vise snug again, the strap's foot end pushed lightly against the 1.000 block as in the dry fit."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Check the seat again at once, the stack still in; then slide the gauge stack out from between the plates within 2 min of closing the vise (the jaws now hold both plates; the stack must not stay beside the 638 at their feet). Wipe any squeeze-out off the plates' sides and facing faces and the jaw with a dry cloth. Keep a finger's light push on the strap's top end toward the 1.000 block for 30 min."
+inspection = "Before the stack comes out: the lower plate flush with the foot end and both corners, the foot end on the 1.000 block, both plates on the fixed jaw, the stack touching both; beside the upper plate's top-end face a .050 feeler stack enters between the jaw and the strap's outer edge and a .070 stack does not. Off: correct it now, before the stack comes out."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "After 1 h: slide the 1.000 block out gently, without disturbing the plates or the strap, and peel its paper off; paper held at the joint line: tear it away and scrape the residue off the foot end and the lower plate's outer face with the deburring tool, keeping them flush. Wipe the gauge stack and the block with the degreaser, then oil them. Leave the vise closed and untouched for the rest of the 24 h cure."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "At 24 h from the bond: the cure is done (drawing note 2: slots after the 24 h cure). Leave everything clamped for Setup 6."
+inspection = "No 638 wet at any joint's edge (a toothpick); no gap at either plate's B end (light behind it). Wet or a gap: stop and tell the owner."
+gauge_checks = "other"
+
+[[setups]]
+machine_kind = "other"
+title = "Slots: both in line, after the cure"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Unchanged from Setup 5: the bonded strap front up on the support block and the jack, both plates' outer sides on the fixed jaw, the packing block (on the strap and the parallel) between their inner sides and the moving jaw. Check the vise is still snug (do not tighten more)."
+datum = "Program PH03_slots (T4). G54: X0 the strap's foot end (the lower plate's outer face), Y0 the fixed jaw's face, Z0 the plates' far ends (the higher of the two). +X toward the strap's top end, +Y toward the fixed jaw."
+diagram = { file = "diagrams/slots.svg", alt = "Side view from the moving jaw: the bonded strap on the support block, the two plates standing up from it, the 3/16 in end mill's path along X at the slots' floor through both plates in line; the slots .200 wide and .420 deep from the plates' far ends; the packing block behind, its top .03 above them; the jaws' top." }
+envelope = { x_span_mm = [49.69, "{{process.slot_cutter_dia_mm}}", "{{process.slot_cutter_dia_mm}}", 5.08], y_span_mm = [62.992, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_block_mm}}", "{{process.packing_block_mm}}", "{{cad.strap_front_thickness_as_supplied_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.bond_seat_mm}}", 13.97], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", 50.8], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.slot_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = 62.992, along_jaws_mm = "{{process.packing_length_mm}}", part_height_mm = "{{cad.guide_plates_reach_mm}}", parallel_height_mm = "{{process.bond_seat_mm}}", overhang_mm = ["{{process.slot_jaw_start_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.guide_plates_reach_mm}}"], clamp_mm = 16.37, section_mm = { x = "{{cad.guide_plates_thickness_as_supplied_mm}}", y = 3.556 }, vise_left = "other" }
+
+[[setups.operations]]
+instruction = "Home ($H). G54 Y0 the fixed jaw's face: edge finder (900 rpm), from −Y beside the plates, its tip .10 below the jaw top. G54 X0 the strap's foot end: edge finder from −X on the lower plate's outer face."
+instruction_detailed = "Edge finder (900 rpm) on the fixed jaw's face from −Y, clear of the plates: G10 L20 P1 Y-2.540. Then on the lower plate's outer face, its tip .10 below the plate's far end, from −X: G10 L20 P1 X-2.540."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Read the strap's rise and the upper plate's place on the X DRO, the edge finder (900 rpm) on the strap's top end from +X, then on the upper plate's face toward the top end, from +X."
+inspection = "Rise (the top end's X less the edge finder's .100 radius, from the foot end X0) {{cad.foot_rise_min_in:.2f}}–{{cad.foot_rise_max_in:.2f}}; upper plate's drop (the top end's X less the upper plate's face X) {{cad.guide_plates_upper_drop_min_in:.2f}}–{{cad.guide_plates_upper_drop_max_in:.2f}}. Outside: stop and tell the owner; do not cut the slots."
+gauge_checks = [
+  { gauge = "mill-x-dro", band_mm = "{{cad.foot_rise_band_mm}}" },
+  { gauge = "mill-x-dro", band_mm = "{{cad.guide_plates_upper_drop_band_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "G54 Z0 the plates' far ends: console M6 T4 (3/16 in end mill, at least .70 in out of the collet, so its nose clears the packing block, whose top stands about .03 above the plates' ends); spindle stopped, its tip just dragging a .002 feeler leaf on each plate's far end in turn; Z0 on the higher one."
+instruction_detailed = "Console M6 T4 (the tool setter measures it). Spindle stopped, the T4 tip just dragging a .002 feeler leaf on the lower plate's far end: note the machine Z; the same on the upper plate's: note it. On the higher one: G10 L20 P1 Z0.051."
+inspection = "The two far ends' heights differ by .008 at most (the two noted Z, 0.203 mm): the slot .420 deep in the higher plate is then .412 or more in the lower, inside {{cad.slots_depth_min_in:.3dot}}–{{cad.slots_depth_max_in:.3dot}}. More: stop and tell the owner; do not cut the slots."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove PH03_slots in air, Z0 raised 1.000 in: the cutter runs along the plates' middle, clear of the jaw and the packing block. Then Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run PH03_slots in air. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-3-16"
+drilling = "none"
+sizing = "other"
+instruction = "Run PH03_slots (M6 T4, 3/16 in end mill at least .70 in out of the collet; set 2800): both slots in line, {{process.slot_levels:d}} levels of {{process.slot_level_mm:in.4dot}} to {{cad.slots_depth_in:.3dot}} deep; on each level one pass along X through both plates and back, .00675 either side of the centre line ({{process.slot_width_mm:in.4dot}} wide). Before Cycle Start (spindle stopped), brush cutting oil on both plates' far ends; hands clear while it runs."
+settings = "pn-em-3-16-1018-cf"
+milling_cuts = [
+  { name = "slots", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.slot_cutter_dia_mm}}", axial_doc_mm = "{{process.slot_level_mm}}", radial_woc_mm = "{{process.slot_cutter_dia_mm}}", stations_mm = "{{cad.guide_plates_reach_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Unclamp; lift the hanger out with the strap (never by the plates). Clear the vise and return the blocks, the jack and the gauge blocks (cleaned and oiled) to their places."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Deburr and inspect the slots and the bond"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished hanger: the strap, its screw hole, the two plates standing from its front with their slots in line." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "deburr"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr the slots' edges and the plates' far ends: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, the deburring tool and a smooth file. Wash off the oil and chips."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "pin-gauges"
+drilling = "none"
+sizing = "other"
+instruction = "Gauge both slots with the .200 plus pin and the .202 minus pin of the Class ZZ pin-gauge sets (to buy), each pin laid along the strap through both slots at the slot's mouth and at its floor."
+inspection = "Slot {{cad.slots_width_min_in:.3dot}}–{{cad.slots_width_max_in:.3dot}} wide: the .200 pin passes through both slots in line (GO); the .202 pin enters neither (NO-GO). GO fails or NO-GO enters: stop and tell the owner."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.slots_width_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Inspect each plate: the slot's depth from the plate's far end, the outer arm beside it (the drawing's dimensioned arm, from the plate's outer side to the slot), and the upper plate's overhang past the strap's outer edge."
+inspection = "Slot depth {{cad.slots_depth_min_in:.3dot}}–{{cad.slots_depth_max_in:.3dot}} (the calipers' depth rod); outer arm {{cad.slots_arm_width_min_in:.3dot}}–{{cad.slots_arm_width_max_in:.3dot}} wide (the calipers' outside jaws, from the plate's outer side to the slot wall; the inner arm is what the plate and slot leave: not gauged); the upper plate's outer side {{cad.guide_plates_upper_overhang_min_in:.3dot}}–{{cad.guide_plates_upper_overhang_max_in:.3dot}} past the strap's outer edge (the calipers' step). Outside: stop and tell the owner."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.slots_depth_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.slots_arm_width_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.guide_plates_upper_overhang_band_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Drawing note 1: the bond, by hand."
+inspection = "The lower plate flush with the strap's foot end and both corners (a fingernail drawn across each feels no step); neither plate moves when pushed hard by hand each way along and across the strap. A plate moves: stop and tell the owner (do not re-bond over cured 638)."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Drawing note 2: the pen rod MHA-PN-04 through both slots, if it is made; otherwise at assembly."
+inspection = "Hold the hanger upright by the strap's edges, its top end up and the plates' slots facing you, and lower the pen rod into the upper plate's slot from above: it slides down through both slots under its own weight. Tight: stop and tell the owner."
+gauge_checks = "other"
+
+[[setups]]
+machine_kind = "other"
+title = "Black oxide: blacken with Presto Black Steel PC9"
+machine = "Bench, ventilated"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished hanger, as inspected, to be blackened all over: the strap, the plates, the slots and the screw hole." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+instruction = "The drawing's finish: {{cad.finish}}, all over (no masking). Done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide), by its maker's instructions as below. To buy before this setup (none on record): the PC9; the chemical-resistant gloves and safety glasses are those bought for Setup 5."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Gloves and safety glasses on (the maker: it contains acid). Wash the hanger with soap and water to take off the oil; rinse and dry it. Hold it by the strap's edges from here on."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "No sanding: the faces are the bar's mill finish and the machined edges are fresh metal (the maker's step 1). Mill scale or a rust spot only: touch that spot lightly with the 220 roll, never on the bond lines. Wash again and dry."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mix the PC9 with water 1:1 in a plastic cup (the maker: 50–100% for brush-on). Brush it on every surface with even, light strokes, into the screw hole and both slots and along the bond lines; re-wet the brush and go over the edges and any light spot until the hanger is an even black (the maker: do not press hard, it lifts the coating)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Rinse thoroughly with clean water to stop the reaction (left acid keeps working and rusts the part), flushing the slots and the corners at the bond lines; dry with a lint-free cloth or compressed air. Light spots: brush again, rinse, dry. Collect the solution and rinse water for a hazardous-waste drop-off, not the drain (the maker)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Seal: wipe on the stone lubricant (a light oil; the maker: clear coat, wax or oil), leave it a few minutes, wipe off the excess."
+feed = "hand"
+inspection = "Even black all over, no bare spot and no wiping-off coating. Fit after blackening: the .200 pin (GO) still passes through both slots; neither plate moves by hand. Tight or a plate moves: stop and tell the owner."
+gauge_checks = "other"

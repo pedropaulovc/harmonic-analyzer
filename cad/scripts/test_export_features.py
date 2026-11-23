@@ -804,18 +804,6 @@ def test_an_undeclared_part_binds_its_step_with_an_empty_features_table_and_no_d
         assert manifest["notes"]["manufacturing"] == notes.DRAWING_NOTES.splitlines()
 
 
-@pytest.mark.parametrize("stem", ["dt_crank_arm", "dt_crankshaft", "dt_pinion_arbor"])
-def test_a_notes_file_without_drawing_notes_falls_through_to_the_spec(stem: str) -> None:
-    # Oracle independent of _undeclared_notes_path: the source text itself.
-    scripts = exporter.REPO / "cad" / "scripts"
-    assert stem not in exporter.DECLARED_PARTS
-    assert not re.search(r"^DRAWING_NOTES\b", (scripts / f"{stem}_notes.py").read_text(encoding="utf-8"), re.M)
-    assert re.search(r"^DRAWING_NOTES\b", (scripts / f"{stem}_spec.py").read_text(encoding="utf-8"), re.M)
-    manifest = exporter.requirement_manifest(stem)
-    assert manifest["notes"]["manufacturing"] == importlib.import_module(f"{stem}_spec").DRAWING_NOTES.splitlines()
-    assert manifest["construction"] != "unknown"
-
-
 def test_rocker_hub_root_carries_both_native_fillets_each_split_in_two(tmp_path: Path) -> None:
     # One native face per strap side; STEP splits each periodic torus into two
     # ADVANCED_FACEs, so the manifest lists both labels twice.

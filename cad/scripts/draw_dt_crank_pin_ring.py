@@ -21,6 +21,7 @@ Drawn 5:1 -- an Ø13 ring of Ø1 wire is a speck on a B sheet at anything less.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -43,20 +44,25 @@ import _drawing_hidden_sketches as hidden_sketches
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_planar import PlanarFace
+from _gtol_torus import TorusFace
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import limits
 from _session import run_build
 import _telemetry
 from dt_crank_pin_ring_notes import (
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION_BY_NAME,
     REFERENCE_DIMENSIONS,
     RING_ID,
 )
-from dt_crank_pin_ring_spec import BUTT_GAP, MEAN_R, WIRE_DIA
+from dt_crank_pin_ring_spec import BUTT_GAP, MEAN_R, RING_CENTRE_X, UNIT, WIRE_DIA
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -113,6 +119,62 @@ JOINT_NOTE_NUMBER = 1
 JOINT_FLAG = f"SEE NOTE {JOINT_NOTE_NUMBER}"
 JOINT_TIP = (TOP_CENTER[0] + BUTT_GAP / 2.0 * _S, TOP_CENTER[1] - HALF_OD)
 JOINT_FLAG_XY = (TOP_CENTER[0] + 0.018, TOP_CENTER[1] - HALF_OD - 0.0075)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_dt_crank_pin_ring: the ring in the XZ plane about its centre
+# RING_CENTRE_X along +X, the butt gap square across the wire on its +Z
+# side). The ring is one round-wire blank formed into a circle: its inside
+# diameter takes the .XX row, the wire is stock (REFERENCE), and its length
+# along the wire's centreline, less the butt gap, is the blank the ring is
+# wound from. The butt joint carries note 1. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_crank_pin_ring"
+_NOTES = "dt_crank_pin_ring_notes"
+_SPEC = "dt_crank_pin_ring_spec"
+_GAP_NEAR_X = RING_CENTRE_X - BUTT_GAP / 2.0
+_GAP_FAR_X = RING_CENTRE_X + BUTT_GAP / 2.0
+part_metadata(
+    model_sources=((_SPEC, "MEAN_R"), (_SPEC, "WIRE_DIA"), (_SPEC, "RING_CENTRE_X")),
+    precision_sources=((_NOTES, "DRAWING_PRECISION"), (_NOTES, "DRAWING_PRECISION_BY_NAME")),
+)
+requirement(
+    "ring",
+    kind="blank",
+    faces=(TorusFace(MEAN_R, WIRE_DIA / 2.0),),
+    requirements=("dia", "inside_dia"),
+    fields={
+        "section": ("round", ((_SPEC, "WIRE_DIA"),)),
+        "dia": (WIRE_DIA, ((_SPEC, "WIRE_DIA"), (_SELF, "FRONT_KEEP"))),
+        "dimension_type": ("reference", ((_NOTES, "REFERENCE_DIMENSIONS"),)),
+        "callout": (DIMENSION_CALLOUTS["WireDia"], ((_NOTES, "DIMENSION_CALLOUTS"),)),
+        "developed_length": (
+            2.0 * math.pi * MEAN_R - BUTT_GAP,
+            ((_SPEC, "MEAN_R"), (_SPEC, "BUTT_GAP")),
+        ),
+        "inside_dia": (
+            limits(RING_ID, _P["RingID"], unit=UNIT),
+            ((_NOTES, "RING_ID"), (_SPEC, "UNIT"), (_SELF, "TOP_KEEP")),
+        ),
+        "inside_dia_nominal": (RING_ID, ((_NOTES, "RING_ID"),)),
+        "center": ([RING_CENTRE_X, 0.0, 0.0], ((_SPEC, "RING_CENTRE_X"),)),
+        "axis": ([0.0, 1.0, 0.0], ((_SPEC, "RING_CENTRE_X"),)),
+    },
+    precision={"inside_dia": _P["RingID"]},
+)
+requirement(
+    "butt_joint",
+    kind="profile",
+    faces=(
+        PlanarFace((1.0, 0.0, 0.0), _GAP_NEAR_X),
+        PlanarFace((-1.0, 0.0, 0.0), -_GAP_FAR_X),
+    ),
+    requirements=("note",),
+    fields={
+        "note": (DRAWING_NOTES.removeprefix("1. "), ((_NOTES, "DRAWING_NOTES"),)),
+        "at": ([RING_CENTRE_X, 0.0, MEAN_R], ((_SPEC, "RING_CENTRE_X"), (_SPEC, "MEAN_R"))),
+    },
+)
 
 
 def build(adapter: Any) -> dict[str, str]:

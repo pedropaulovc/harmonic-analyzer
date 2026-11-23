@@ -115,6 +115,7 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_pd_transgear_removable.py",
         "draw_pd_transgear_knob_cup.py",
         "draw_pd_transgear_knob_thrust_ring.py",
+        "draw_pd_transgear_knob_bush.py",
         "draw_pd_transgear_disc_hub.py",
         "draw_pd_transgear_arm.py",
         "draw_pd_transgear_arm_plate.py",

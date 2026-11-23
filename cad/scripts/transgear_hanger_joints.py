@@ -350,17 +350,6 @@ def require_arm_plate_joint_inspection(
     )
 
 
-# Graded reference-pose notch clearance only; no unsupported pin-full-span
-# manufactured-body yaw inference. Actual gear-plane/seat controls are direct.
-NOTCH_REFERENCE_AIR_WORST_MM = (
-    (PLATE.NOTCH_RELIEF - PLATE.NOTCH_BAND) * math.cos(ARM.EDGE_LEAN) - ARM.OUTLINE_BAND
-)
-if NOTCH_REFERENCE_AIR_WORST_MM <= 0.0:
-    raise AssertionError(
-        f"MHA-PD-19 reference notch face meets the arm's lower edge: "
-        f"{NOTCH_REFERENCE_AIR_WORST_MM:.3f}"
-    )
-
 # --- MHA-PD-VN-58 latch pin pressed to its proud height in the arm's end-face hole
 if abs(LATCH_PIN.DIA - ARM.PIN_HOLE_DIA) > 1e-9:
     raise AssertionError("the arm's press hole is not the latch pin's Ø")

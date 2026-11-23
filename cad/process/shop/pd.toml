@@ -90,6 +90,17 @@ diameter_mm = 4.8768
 [tools.reamer-1940]  # MHA-PD-18 Ø.1940 +.001/.000 REAM THRU
 description = ".1940 in HSS chucking reamer"
 diameter_mm = 4.9276
+# MHA-PD-19 press hole Ø.4375 +.0007/0 REAM THRU for the MHA-PD-28 bush (FN2,
+# #2425). The 27/64 (.4219 in) drill is the 115-piece index's, nominal × 25.4;
+# it leaves .0156 in on the diameter for the reamer. The .4375 reamer is not
+# owned (cad/config/shop-equipment/ tools.reamer-4375, to buy); diameter_mm is
+# its nominal size.
+[tools.reamer-4375]
+description = ".4375 in (7/16) HSS straight-flute chucking reamer"
+diameter_mm = 11.1125
+[tools.endmill-hss-tin-2fl-3-16]  # MHA-PD-16 flat floor for the Ø.19 head counterbore, plunged from the tailstock
+description = "3/16 in TiN-coated HSS 2-flute square end mill, centre cutting (McMaster 8949A16)"
+diameter_mm = 4.7625
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
@@ -102,6 +113,8 @@ description = "1018 cold-finish carbon steel, flat bar, 3/8 x 1 in"
 description = "1018 cold-finish carbon steel, flat bar, 3/8 x 1/2 in"
 [stock.1018-ground-flat-3-8x1]
 description = "AISI 1018 cold-finished steel, precision ground, flat bar, 3/8 x 1 in"
+[stock.1018-strip-1-16x5-8]
+description = "AISI 1018 cold-drawn low-carbon steel, flat bar, 1/16 x 5/8 in"
 [stock.c260-h02-strip-032x2]
 description = "C26000 cartridge brass, H02 half hard, strip, .032 x 2 x 12 in"
 [stock.c360-flat-1-4x6]
@@ -114,3 +127,33 @@ description = "C36000 free-machining brass (360-H02, extruded), round bar, 1-1/8
 description = "C36000 free-machining brass (360-H02, extruded), round bar, 1/2 in"
 [stock.c360-round-5-8]
 description = "C36000 free-machining brass (360-H02, extruded), round bar, 5/8 in"
+
+# MHA-PD-02 platen (cnc/flat-b-pd-platen)
+# Plan: cad/process/pd_platen/plan.toml. Material key platen-c360: the C360
+# flat bar as bought (stock.c360-flat-1-4x6 above); the source's row below is
+# its Brass/Bronze row, read for that bar. On the PM-30MV, whose low belt
+# tops out at 2800 rpm (machines.pm-30mv, owner 2026-11-16).
+#
+# Carbide end mills: The Carbide End Mill Store "Carbide End Mill Speeds and
+# Feeds, General Purpose, Uncoated" (6gtools.com,
+# uploaded/files/feedsandspeeds/Carbide_End_Mill_Feeds_And_Speeds_General_Purpose_Uncoated.pdf,
+# read 2026-11-22; the PDF pn.toml settings.pn-em-half-c360 cites), row
+# Non-Ferrous N, Brass/Bronze: 400 SFM; 1/4 in .0022 and 1/2 in .0042
+# in/tooth at chip-load factor 1.0 (50 % radial engagement and more, the
+# table's lowest load: every cut of the platen engages 50 % or less). 400
+# SFM is 3056 rpm on the 1/2 in and 6112 on the 1/4 in: both run at the
+# spindle's 2800 (367 and 183 ft/min).
+[settings.platen-em-half-c360]
+tool = "endmill-carbide-3fl-1-2"
+material = "platen-c360"
+rpm = 2800
+chip_load_mm_per_tooth = 0.10668  # .0042 in; 2800 × 3 × .0042 = 35.3 in/min
+flutes = 3
+feed_unit = "in/min"
+[settings.platen-em-quarter-c360]
+tool = "endmill-carbide-3fl-1-4"
+material = "platen-c360"
+rpm = 2800
+chip_load_mm_per_tooth = 0.05588  # .0022 in; 2800 × 3 × .0022 = 18.5 in/min
+flutes = 3
+feed_unit = "in/min"

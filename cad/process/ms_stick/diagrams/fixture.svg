@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 2: the fixture bar on edge in the vise, its top faced (MS01_fixture_face). Left: seen from the bar's right end (looking toward -X), so +Y and the fixed jaw are on the right; 6 px/mm. Right: from above, 1.2 px/mm. Hand-drawn; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" width="800" height="420" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <text class="title" x="12" y="20">Setup 2: fixture bar, top faced by MS01 (left: seen from its right end; right: from above)</text>
+  <!-- LEFT: view from the right end. Vise bed. -->
+  <rect class="fixture-vise" x="30" y="366" width="300" height="26"/>
+  <!-- Jaws 44.95 mm tall (270 px): moving on the left, fixed on the right. -->
+  <rect class="clamp" x="30" y="96" width="112" height="270"/>
+  <rect class="clamp" x="218" y="96" width="112" height="270"/>
+  <text class="label-on-clamp" x="42" y="350">moving jaw</text>
+  <text class="label-on-clamp" x="238" y="350">fixed jaw</text>
+  <!-- Parallels: 1 in tall (152 px), 1/8 thick (19 px), one against each jaw. -->
+  <rect class="fixture-support" x="142" y="214" width="19" height="152"/>
+  <rect class="fixture-support" x="199" y="214" width="19" height="152"/>
+  <!-- The bar on edge: 12.7 x 25.4 mm (76 x 152 px), its top 5.85 mm (35 px) above the jaw tops. -->
+  <rect class="fixture-plate" x="142" y="62" width="76" height="152"/>
+  <text class="label-halo" x="150" y="150">6061 bar</text>
+  <text class="label-halo" x="150" y="166">1/2 × 1</text>
+  <!-- The 1/2 in end mill over the top. -->
+  <rect class="cutter" x="123" y="22" width="76" height="38"/>
+  <text class="label" x="40" y="46">T1 1/2 in</text>
+  <!-- Faced layer. -->
+  <rect class="part-removed" x="142" y="62" width="76" height="4"/>
+  <!-- Datums. -->
+  <line class="datum" x1="218" y1="30" x2="218" y2="96"/>
+  <text class="datum-label" x="226" y="46">Y0 bar's rear face</text>
+  <line class="datum" x1="228" y1="62" x2="330" y2="62"/>
+  <text class="datum-label" x="238" y="78">Z0 bar's top</text>
+  <!-- Height above the jaws, as bought (Z0). -->
+  <path class="dims" d="M150 62 L96 62 M142 96 L96 96 M104 62 L104 96"/>
+  <text class="label" x="40" y="84">{{process.fixture_raw_proud_mm:in.2dot}}</text>
+  <path class="leader" d="M170 290 L152 290"/>
+  <path class="leader" d="M190 290 L208 290"/>
+  <text class="label-halo" x="150" y="310">parallels</text>
+  <!-- RIGHT: from above. Jaws 158.67 mm (190 px) along X; the bar 304.8 mm (366 px), 73 mm (88 px) past each jaw side. -->
+  <rect class="clamp" x="478" y="120" width="190" height="60"/>
+  <text class="label-on-clamp" x="530" y="150">fixed jaw (rear)</text>
+  <rect class="clamp" x="478" y="195" width="190" height="60"/>
+  <text class="label-on-clamp" x="524" y="232">moving jaw (front)</text>
+  <rect class="fixture-plate" x="390" y="180" width="366" height="15"/>
+  <!-- The two facing passes: right to left, then left to right. -->
+  <line class="arrow" x1="770" y1="184" x2="380" y2="184"/>
+  <line class="arrow" x1="380" y1="191" x2="770" y2="191"/>
+  <path class="leader" d="M430 184 L474 100"/>
+  <text class="label" x="470" y="94">pass 1, then pass 2: whole top, {{process.fixture_face_mm:in.3dot}} deep</text>
+  <!-- Datum X0: the bar's right end. -->
+  <line class="datum" x1="756" y1="124" x2="756" y2="225"/>
+  <text class="datum-label" text-anchor="end" x="796" y="116">X0 bar's right end</text>
+  <!-- Overhang past each jaw side, with extension lines. -->
+  <path class="dims" d="M390 195 L390 330 M478 255 L478 330 M390 322 L478 322"/>
+  <text class="label" x="396" y="316">{{process.fixture_overhang_mm:in.2dot}}</text>
+  <path class="dims" d="M668 255 L668 330 M756 225 L756 330 M668 322 L756 322"/>
+  <text class="label" x="686" y="316">{{process.fixture_overhang_mm:in.2dot}}</text>
+  <text class="label" x="390" y="360">+X to the right, +Y toward the fixed jaw</text>
+  <text class="label" x="390" y="378">the bar stays clamped until Setup 5</text>
+</svg>

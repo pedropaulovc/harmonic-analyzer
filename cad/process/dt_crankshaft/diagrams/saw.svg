@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 240" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="240"/>
+  <text class="title" x="20" y="20">Setup 1: the 1 in bar on the saw (not to scale)</text>
+  <rect class="fixture-vise" x="520" y="80" width="200" height="30"/>
+  <rect class="part-rest" x="470" y="110" width="270" height="50"/>
+  <rect class="part-kept" x="40" y="110" width="250" height="50"/>
+  <rect class="part-kept" x="300" y="110" width="160" height="50"/>
+  <rect class="cutter" x="460" y="40" width="10" height="140"/>
+  <text class="label" x="60" y="190">6.50 in blank (bar end)</text>
+  <text class="label" x="300" y="190">4.00 in slug blank</text>
+  <text class="label" x="530" y="70">saw vise on the bar</text>
+</svg>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 6: a graduation in section, three stages: filled and wiped, cured, face rubbed bright on 600-grit paper. Schematic, 200 px/mm; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" width="760" height="260" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <text class="title" x="12" y="20">Setup 6: black-fill, then polish (a groove in section, much enlarged)</text>
+  <!-- 1: filled and wiped: enamel in the V and a thin film on the face. -->
+  <rect class="section" x="30" y="80" width="200" height="130"/>
+  <path fill="#111" d="M79 80 L181 80 L142 208 L118 208 Z"/>
+  <rect fill="#111" x="30" y="74" width="200" height="6"/>
+  <text class="label" x="30" y="60">1 filled, wiped across the grooves:</text>
+  <text class="label" x="30" y="236">a thin film stays on the face</text>
+  <!-- 2: cured 24 hours. -->
+  <rect class="section" x="280" y="80" width="200" height="130"/>
+  <path fill="#111" d="M329 80 L431 80 L392 208 L368 208 Z"/>
+  <rect fill="#111" x="280" y="74" width="200" height="6"/>
+  <text class="label" x="280" y="60">2 cured 24 hours</text>
+  <!-- 3: the face rubbed on 600-grit paper on the surface plate, then polished. -->
+  <rect class="section" x="530" y="80" width="200" height="130"/>
+  <path fill="#111" d="M579 80 L681 80 L642 208 L618 208 Z"/>
+  <text class="label" x="530" y="60">3 face rubbed on 600 grit, polished:</text>
+  <text class="label" x="530" y="236">black only in the grooves</text>
+  <line class="arrow" x1="240" y1="145" x2="270" y2="145"/>
+  <line class="arrow" x1="490" y1="145" x2="520" y2="145"/>
+</svg>
