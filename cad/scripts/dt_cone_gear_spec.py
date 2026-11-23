@@ -110,6 +110,18 @@ PITCH_DIA = TEETH * MODULE_MM
 # assembly, owner direction 2026-11-11, and dt_mesh_checks.cone_check gates
 # the mesh at the centres cone_set_stack books), +/-.003 in on the inch sheet.
 TOOTH_THICKNESS_BAND = (0.0762, -0.0762)
+# T012, T018 and T024 are thick-only, +.003/-0: the thin limit is the
+# standard-depth thickness, so the cutter never sinks below standard depth
+# and ``_member``'s cap leaves these three the blank the cutter's form
+# supports there: the standard (N + 2)/DP on T012, .0002 and .0004 in under
+# it on T018 and T024. Owner ruling 2026-11-22 (Pedro), #2473, option G:
+# "the standard outside diameter goes back on T012, T018
+# and T024 (.2861 → .2916, .4103 → .4164, .5348 → .5412, +0/−.002) by making
+# their tooth thickness +.003/−0; same stock 48 DP cutters and depth." It
+# reopens #3292's "No part change" and the 2026-10-10 band for these three
+# only.
+THICK_ONLY_TEETH = (12, 18, 24)
+THICK_ONLY_TOOTH_THICKNESS_BAND = (TOOTH_THICKNESS_BAND[0], 0.0)
 
 # DT6-FORM1, T006 option (a) (user ruling 2026-10-10). T006 is pending
 # exception ruling #971: against the shared 20 deg 120T drum no full-depth six-tooth form
@@ -386,7 +398,7 @@ FACE_WIDTH_BAND = (0.0508, -0.0508)  # (upper, lower), +/-.002 in
 # and no mate).  The round bonded tip gears T012..T024 carry no clock on
 # their bores: the MHA-DT-03-TL-02 comb phases each to the keyed T030 while
 # its bond cures, in two rounds (#2470): MHA-DT-00 step 1T engages it for
-# T024 alone, step 2B again for T018, T012 and T006, and step 2E accepts the
+# T024 alone, step 2C again for T018, T012 and T006, and step 2E accepts the
 # cured tip on it (owner ruling 2026-11-10 via PR #1992;
 # dt_cone_gear_tl_phasing_comb_spec, error_budget.yaml cone_tip_bond_clock).
 
@@ -442,15 +454,16 @@ def material_specification(teeth: int) -> str:
 
 
 # The bore webs under rule 17's .080 target (rule 17 on an inch sheet,
-# _inch_wall_limits): T012's .0646 in, its Ø.0625 reamed bore on MHA-DT-37's
+# _inch_wall_limits): T012's .0674 in, its Ø.0625 reamed bore on MHA-DT-37's
 # spigot under the cutter-native T012 root (owner minor RV-03 in
-# cad/config/parts/dt-cone-gear.yaml, owner ruling 2026-11-09 via PR #1992:
-# .0154 in under the target, above the .060 floor).  Every other round bore
+# cad/config/parts/dt-cone-gear.yaml, owner ruling 2026-11-09 via PR #1992,
+# ruled at .0646; .0674 since #2473's thick-only thickness band raised the
+# root envelope MIN: .0126 in under the target, above the .060 floor).  Every other round bore
 # keeps the ordinary .080 in target, not merely the hard floor.  These are
 # acceptance inputs; the factory checks every actual cutter corner.
 MACHINED_WEB_FLOOR_MM = WALL_FLOOR_MM
 MACHINED_WEB_TARGET_MM = WALL_TARGET_MM
-WEB_EXCEPTIONS_MM: dict[int, float] = {12: 1.64084}  # T012: .0646
+WEB_EXCEPTIONS_MM: dict[int, float] = {12: 1.71196}  # T012: .0674
 if min(WEB_EXCEPTIONS_MM.values()) < MACHINED_WEB_FLOOR_MM:
     raise AssertionError("a bore web exception falls under rule 17's .060 floor")
 
@@ -635,7 +648,7 @@ REFERENCE_SKETCHES = (TOOTH_REFERENCE_SKETCH, GAP_FLOOR_SKETCH, WEB_REFERENCE_SK
 # text, the dt-pinion-cam RV-01 form): a hidden construction line from the
 # largest printed bore out to the smallest printed root envelope, along the
 # T012 gap bisector at WEB_REFERENCE_ANGLE_DEG (tooth zero on +X, gaps every
-# 30 deg from 15), printed as the single limit ".0646 MIN".  Only the T012
+# 30 deg from 15), printed as the single limit ".0674 MIN".  Only the T012
 # sheet imports it; the line's geometry is T012's, whichever configuration
 # is active.
 WEB_REFERENCE_TEETH = 12
@@ -656,7 +669,7 @@ def web_reference_mm() -> tuple[float, float, tuple[float, float]]:
     ) / 2.0
     minimum = inch_grid_mm(round_bore_web_min_mm(teeth), WEB_MIN_PLACES, math.floor)
     if minimum < WEB_EXCEPTIONS_MM[teeth] - 1e-9:
-        raise AssertionError("T012 web falls below RV-03's ruled .0646 in")
+        raise AssertionError("T012 web falls below RV-03's .0674 in")
     best = (floor_limits_mm(teeth)[1] - bore_dia_mm(teeth) - lower) / 2.0
     return start, minimum, (round(best - minimum, 6), 0.0)
 
@@ -710,7 +723,11 @@ CUSTOM_SIX_BLANK_DIA_BAND = (0.0, -0.02032)  # 0/-.0008 in
 
 def tooth_thickness_band(teeth: int) -> tuple[float, float]:
     _require_cone(teeth)
-    return CUSTOM_SIX_TOOTH_THICKNESS_BAND if teeth == 6 else TOOTH_THICKNESS_BAND
+    if teeth == 6:
+        return CUSTOM_SIX_TOOTH_THICKNESS_BAND
+    if teeth in THICK_ONLY_TEETH:
+        return THICK_ONLY_TOOTH_THICKNESS_BAND
+    return TOOTH_THICKNESS_BAND
 
 
 def blank_dia_band(teeth: int) -> tuple[float, float]:
@@ -834,7 +851,7 @@ def configuration_number(part_number: str, teeth: int) -> str:
 # the printed size is the modelled one.  The face width prints four, like the
 # cylinder gear's OverallThickness: three would round its nominal by a fifth
 # of the +/-.002 band.  The keyway's width and T print at
-# cone_land_key's places.  RV-03's T012 web prints its ruled .0646 MIN at
+# cone_land_key's places.  RV-03's T012 web prints its .0674 MIN at
 # four.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlankProfile": {"BlankDia": 4},

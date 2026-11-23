@@ -165,7 +165,7 @@ def test_every_keyed_web_is_proved_at_the_keyway_corner() -> None:
 
 def test_every_round_web_is_proved_at_the_largest_printed_bore() -> None:
     # Rule 17 from the largest printed reamed bore to the printed root
-    # envelope MIN: T012 is RV-03's minor (.0646 in), T018 and T024 keep the
+    # envelope MIN: T012 is RV-03's minor (.0674 in), T018 and T024 keep the
     # .080 target.
     for teeth in spec.ROUND_BORE_TEETH:
         bore_max = (
@@ -186,8 +186,8 @@ def test_every_round_web_is_proved_at_the_largest_printed_bore() -> None:
         / 25.4
         for teeth in spec.ROUND_BORE_TEETH
     }
-    assert printed == pytest.approx({12: 0.0646, 18: 0.1268, 24: 0.0947})
-    assert spec.WEB_EXCEPTIONS_MM[12] == pytest.approx(0.0646 * 25.4)
+    assert printed == pytest.approx({12: 0.0674, 18: 0.1299, 24: 0.0980})
+    assert spec.WEB_EXCEPTIONS_MM[12] == pytest.approx(0.0674 * 25.4)
     assert (
         spec.MACHINED_WEB_FLOOR_MM
         < spec.WEB_EXCEPTIONS_MM[12]

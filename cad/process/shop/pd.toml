@@ -99,6 +99,29 @@ diameter_mm = 11.1125
 description = "3/16 in TiN-coated HSS 2-flute square end mill, centre cutting (McMaster 8949A16)"
 diameter_mm = 4.7625
 
+# --- MHA-PD-24/-25 transgear bushings (cad/process/pd_transgear_*_bushing) --
+# The Ø.1260-.1265 running bores on the MHA-PD-23 pin, drilled #31 and reamed
+# .1260 from the tailstock (C36000, dry). LittleMachineShop "Cutting Speeds"
+# (read live 2026-11-22, lathe.toml header), Drilling & Reaming, Brass
+# (C36000): drilling and reaming both 160-175 ft/min. The low end asks about
+# 5,100 rpm of the #31 drill and 4,850 of the .1260 reamer; both clamp to the
+# lathe's 2000 rpm top speed. The #31 (.1200) leaves the reamer .006 on the
+# diameter.
+[settings.lathe-drill-31-c360]
+tool = "drill-31"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, light and steady, dry"
+[settings.lathe-ream-1260-c360]
+tool = "reamer-1260"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle running"
+# The bores' go/no-go pair (gauges record gauges.plug-gauges-1260-1265 in
+# shop/common.toml, to buy): the tools record lets a plan list the pair.
+[tools.plug-gauges-1260-1265]
+description = "Plug gauge pair, .1260 GO (plus) and .1265 NO-GO (minus), Vermont Gage Class X"
+
 # --- MHA-PD-03 platen clip (cad/process/pd_platen_clip/plan.toml) ---
 # The clip's cutter: Harvey Tool 896231, Variable Helix End Mill for
 # Aluminum Alloys - Square - Downcut (harveytool.com/products/tool-details-
