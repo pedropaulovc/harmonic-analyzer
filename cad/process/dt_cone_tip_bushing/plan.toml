@@ -16,8 +16,9 @@
 #
 # Not on hand (cad/config/shop-equipment/, to order): the .0625 reamer
 # (tools-reamers-taps.toml reamer-0625) and the bore's GO pin, a .0625 plus
-# Class ZZ single; its NO-GO is the .063 minus pin of the owned .061-.500
-# Class ZZ box (shop dt.toml zz-pins-0625-0630). Owner ruling 2026-11-23
+# Class ZZ single; its NO-GO is the .063 minus pin of the .061-.500 Class ZZ
+# minus box, also to order (gauges.pin-gauges; shop dt.toml
+# zz-pins-0625-0630). Owner ruling 2026-11-23
 # (tool audit Q1, re-answered on the corrected facts), verbatim: "ZZ singles
 # per the record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept
 # that good holes near a limit may be refused; the traveler mikes each pin so
@@ -28,7 +29,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 1/4 in"
 stock = "Lot: {{process.quantity:d}} bushing. Ø{{process.stock_dia_in:.3dot}} bar, on hand: saw a {{process.bar_length_in:g}} in piece off it for the lathe, never the whole bar (it would run out past the spindle's rear end); the bushing takes {{cad.pitch_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .0625 chucking reamer and the .0625 plus Class ZZ pin (GO); the NO-GO is the .063 pin of the Class ZZ minus box."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .0625 chucking reamer, the .0625 plus Class ZZ pin (GO) and the Class ZZ minus box (its .063 pin is the NO-GO)."
 shop = "../shop"
 stock_refs = ["c360-round-1-4"]
 material_key = "lathe-c360"
@@ -316,7 +317,7 @@ gauge_checks = [{ gauge = "zz-pins-0625-0630", band_mm = "{{cad.bore_dia_band_mm
 feed = "hand"
 
 [[setups.operations]]
-instruction = "GO pin refused in Op 200: break the bore's end again with one light twist of the countersink, blow it out and gauge again. Still refused, or the NO-GO pin entering: scrapped, not reworked; make another from Setup 1."
+instruction = "GO pin refused in Op 200: clear the burr raised at that end with one light touch of the countersink, leaving its chamfer no wider than the other end's ({{cad.chamfer_max_in:.3dot}} max); blow it out and gauge again. Still refused, or the NO-GO pin entering: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]

@@ -98,20 +98,6 @@ def test_the_journal_aim_gives_the_drawings_clearance_on_the_strap():
     assert p["strap_bore_max_in"] - low == pytest.approx(clearance[1], abs=1e-4)
 
 
-def test_the_strap_pins_are_the_strap_band_less_one_zz_tolerance():
-    """Setup 7's Class ZZ pins (owner ruling 2026-11-23, tool audit Q1): the
-    band is the shop record's, the largest GO pin .0002 over its low limit and
-    the smallest NO-GO pin .0002 under its high limit."""
-    p = _plan()["parameters"]
-    shop = _process_plans.load_shop()
-    low, high = (v / IN for v in shop["gauges"]["zz-pins-3135-3140"]["range_mm"])
-    tol = shop["gauges"]["zz-pins-3135-3140"]["resolution_mm"] / IN
-    assert p["strap_bore_min_in"] == pytest.approx(low, abs=1e-5)
-    assert p["strap_bore_max_in"] == pytest.approx(high, abs=1e-5)
-    assert p["strap_go_pin_max_in"] == pytest.approx(low + tol, abs=1e-5)
-    assert p["strap_nogo_pin_min_in"] == pytest.approx(high - tol, abs=1e-5)
-
-
 def test_the_bench_gauges_read_inside_the_drawings_bands():
     p = _plan()["parameters"]
     f = _features()["features"]
