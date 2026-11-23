@@ -563,7 +563,7 @@ cut_diameter_mm = 3.1496
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Still chucked, blow out the hole: its size and depth."
-inspection = "Latch-pin hole Ø{{cad.latch_pin_hole_dia_min_in:.4dot}}–{{cad.latch_pin_hole_dia_max_in:.4dot}}: the .1240 plug enters to at least {{cad.latch_pin_hole_depth_min_in:.2f}} (GO, the calipers' depth rod on the plug's mark); the .1245 does not (NO-GO). GO short or NO-GO enters: stop and tell the owner."
+inspection = "Latch-pin hole Ø{{cad.latch_pin_hole_dia_min_in:.4dot}}–{{cad.latch_pin_hole_dia_max_in:.4dot}}: the .1240 GO plug enters; push it in as far as it goes and read its stand-out with the calipers' depth rod, from the square end's face to the plug's end. The plug's miked length less the stand-out is the depth: at least {{cad.latch_pin_hole_depth_min_in:.2f}}. The .1245 NO-GO does not enter. GO refused or short, or NO-GO enters: stop and tell the owner."
 gauge_checks = [{ gauge = "plug-gauges-1240-1245", band_mm = "{{cad.latch_pin_hole_dia_band_mm}}" }]
 feed = "hand"
 
