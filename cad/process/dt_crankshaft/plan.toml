@@ -42,18 +42,28 @@
 # band less that uncertainty (±.0006); the shaft is accepted to the drawing's
 # band and never re-cut.
 #
-# Note 3, the matched fits: Setup 3 gauges the three mate bores with GO/NO-GO
-# pairs before finishing (MHA-DT-31's hub bore .3760-.3765, MHA-DT-05's crank
-# bore .4500-.4505, MHA-DT-10's bore .3135-.3140); a bore in its band and the
-# diameter in the drawing's band give the .0010-.0023 clearance.
+# Note 3, the matched fits: Setup 3 gauges the three mate bores with Class ZZ
+# pins before finishing (MHA-DT-31's hub bore .3760-.3765, MHA-DT-05's crank
+# bore .4385-.4390, MHA-DT-10's bore .3135-.3140); a bore in its band and the
+# diameter in the drawing's band give the .0010-.0023 clearance. Owner ruling
+# 2026-11-23, tool audit Q11: "Both bores dia .4385 +.0005/0 (7/16 over
+# reamer of the Shars set), both journals .4375 0/-.0008" (they were .4500
+# and .4490 0/-.0008).
+#
+# Owner ruling 2026-11-23 (tool audit Q1), verbatim: "ZZ singles per the
+# record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept that good
+# holes near a limit may be refused; the traveler mikes each pin so the real
+# window is known per pin." Each band's GO is a plus pin at its low limit,
+# its NO-GO a minus pin at its high limit; Setup 3 mikes every pin and the
+# .0930 reamer before any of them is used.
 #
 # To order before Setup 7: the drill chuck on its straight arbor
 # (holders.drill-chuck-jt33-straight-1-2), the 1/8 carbide spot drill
 # (tools.spot-drill-carbide-1-8), the #54 taper-length drill
-# (tools.drill-54-taper-length), the .0930 and .4500 reamers
-# (tools.reamer-0930, tools.reamer-4500), the .0930/.0935 plug pair
-# (gauges.plug-gauges-0930-0935); to make: the jig
-# (fixtures.dt-crankshaft-drive-pin-jig).
+# (tools.drill-54-taper-length), the .0930 and .4385 reamers
+# (tools.reamer-0930, tools.reamer-4385), the Class ZZ pins
+# (zz-pins-0930-0935, zz-pins-3760-3765, zz-pins-4385-4390,
+# zz-pins-3135-3140); to make: the jig (fixtures.dt-crankshaft-drive-pin-jig).
 #
 # NC (cam:dt_crankshaft, cad/process/dt_crankshaft/cam.py): PK01_cross_hole.
 # The program name, the [parameters] and the milling_cuts names are a
@@ -146,12 +156,16 @@ slug_part_z_in = 2.622
 # and the spigot (.272) out, the journal's last .08 too: 1.10 in out.
 slug_face_stickout_mm = 27.94
 # Setup 7 (owner ruling 2026-11-22, option C2): the jig bored in place, the
-# .4500 reamer 2.95 deep (past the inboard neck at 2.89 from the jig face with
+# .4385 reamer (owner ruling 2026-11-23, tool audit Q11: the journals' own
+# reamer) 2.95 deep (past the inboard neck at 2.89 from the jig face with
 # the 1/8 spacer in), breaking into the 3/8 clearance the jig was made with
 # from its back end for the pinion seat (fixtures.dt-crankshaft-drive-pin-jig).
+# The 27/64 drill (.4219) leaves the reamer .0166: a 7/16 drill cuts about
+# the reamer's own size and would leave it nothing to cut.
 jig_ream_depth_in = 2.95
 # The jig bore over the journals: at most .0025 diametral (the budget's
-# ±1.6 um vertical term), read with the telescoping gauge and micrometer.
+# ±1.6 um vertical term), read with the telescoping gauge and micrometer;
+# the reamed .4385-.4390 bore on the .4367-.4375 journals gives .0010-.0023.
 jig_clearance_max_in = 0.0025
 # The cross-slide DRO targets for the two holes, ±7.000 mm from the stub's
 # axis (the drawing's .2756), each move ending in −X with the gib locked.
@@ -227,7 +241,7 @@ part_length_mm = 130.556
 cross_x_mm = -115.062
 # Z0 the stub's top; the jaw tops stand above it by the jaw height less the
 # parallel, the journal's radius and the stub's; cam.py checks it.
-jaw_top_over_stub_mm = 9.0856
+jaw_top_over_stub_mm = 9.2266
 # Spot Ø.160 with the #2 centre drill (under the #9); the #9 through the
 # Ø.375 stub, its full diameter 1.0 mm past the underside; its tip −(9.525 +
 # 1.0 + its 118° point 1.496).
@@ -289,14 +303,14 @@ name = "Drive-pin jig (shop-made); its gap spacer the 1/2 in high, 1/8 in thick 
 ref = "dt-crankshaft-drive-pin-jig"
 
 [[tools]]
-id = "drill-7-16"
-name = "7/16 drill"
-ref = "drill-7-16"
+id = "drill-27-64"
+name = "27/64 drill"
+ref = "drill-27-64"
 
 [[tools]]
-id = "reamer-4500"
-name = ".4500 reamer"
-ref = "reamer-4500"
+id = "reamer-4385"
+name = ".4385 reamer (7/16 over)"
+ref = "reamer-4385"
 status = "to_order"
 
 [[tools]]
@@ -330,26 +344,26 @@ status = "to_order"
 
 [[tools]]
 id = "pin-plugs"
-name = "Plug gauges .0930 GO, .0935 NO-GO"
-ref = "plug-gauges-0930-0935"
+name = "Class ZZ pins: .0930 plus (GO) and .0935 minus (NO-GO)"
+ref = "zz-pins-0930-0935"
 status = "to_order"
 
 [[tools]]
 id = "hub-plugs"
-name = "Plug gauges .3760 GO, .3765 NO-GO"
-ref = "plug-gauges-3760-3765"
+name = "Class ZZ pins: .3760 plus (GO) and .3765 minus (NO-GO)"
+ref = "zz-pins-3760-3765"
 status = "to_order"
 
 [[tools]]
 id = "post-plugs"
-name = "Plug gauges .4500 GO, .4505 NO-GO"
-ref = "plug-gauges-4500-4505"
+name = "Class ZZ pins: .4385 plus (GO) and .439 minus (NO-GO)"
+ref = "zz-pins-4385-4390"
 status = "to_order"
 
 [[tools]]
 id = "pinion-plugs"
-name = "Plug gauges .3135 GO, .3140 NO-GO"
-ref = "plug-gauges-3135-3140"
+name = "Class ZZ pins: .3135 plus (GO) and .314 minus (NO-GO)"
+ref = "zz-pins-3135-3140"
 status = "to_order"
 
 [[tools]]
@@ -450,9 +464,19 @@ cut_diameter_mm = "{{process.bar_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Note 3, before any finishing pass: gauge the mates' bores. MHA-DT-31's hub bore (the stub's mate): the .3760 plug (GO) enters, the .3765 (NO-GO) does not. MHA-DT-05's crank bore (the journals' mate): the .4500 GO enters, the .4505 NO-GO does not. MHA-DT-10's bore (the pinion seat's mate): the .3135 GO enters, the .3140 NO-GO does not. Write the results here."
-inspection = "Hub bore Ø.3760–.3765, crank bore Ø.4500–.4505, pinion bore Ø.3135–.3140: then each diameter below, in its band, gives note 3's .0010–.0023 clearance."
-gauge_checks = [{ gauge = "plug-gauges-3760-3765", band_mm = [9.5504, 9.5631] }, { gauge = "plug-gauges-4500-4505", band_mm = [11.43, 11.4427] }, { gauge = "plug-gauges-3135-3140", band_mm = [7.9629, 7.9756] }]
+instruction = "Note 3, before any finishing pass: on the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the eight Class ZZ pins: .3760 plus and .3765 minus, .4385 plus and .439 minus, .3135 plus and .314 minus, .0930 plus and .0935 minus; and the .0930 reamer across two opposite margins at its front end. Write the nine readings here, and each pin's reading on its tag."
+inspection = "Each plus (GO) pin reads its low limit to .0002 over; each minus (NO-GO) pin its high limit to .0002 under: a pin outside that is not used."
+gauge_checks = [{ gauge = "micrometers", band_mm = [9.5504, 9.5631] }, { gauge = "micrometers", band_mm = [11.1379, 11.1506] }, { gauge = "micrometers", band_mm = [7.9629, 7.9756] }, { gauge = "micrometers", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "This sheet accepts a hole its GO pin enters and its NO-GO pin does not: GO reading ≤ hole < NO-GO reading. With the pins at their size limits only .3762–.3763, .4387–.4388, .3137–.3138 and .0932–.0933 are sure to pass; a good bore within .0002 of a band limit may be refused (owner ruling 2026-11-23). The .0930 reamer reading under its GO pin: the slug's holes in Setup 7 are its trial holes; the GO refused there, stop and tell the owner."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Gauge the mates' bores. MHA-DT-31's hub bore (the stub's mate): the .3760 GO pin enters, the .3765 NO-GO does not. MHA-DT-05's crank bore (the journals' mate): the .4385 GO enters, the .439 NO-GO does not. MHA-DT-10's bore (the pinion seat's mate): the .3135 GO enters, the .314 NO-GO does not. Write the results here."
+inspection = "GO enters, NO-GO does not: hub bore Ø.3760–.3765, crank bore Ø.4385–.4390, pinion bore Ø.3135–.3140: then each diameter below, in its band, gives note 3's .0010–.0023 clearance."
+gauge_checks = [{ gauge = "zz-pins-3760-3765", band_mm = [9.5504, 9.5631] }, { gauge = "zz-pins-4385-4390", band_mm = [11.1379, 11.1506] }, { gauge = "zz-pins-3135-3140", band_mm = [7.9629, 7.9756] }]
 
 [[setups.operations]]
 cut_kind = "other"
@@ -813,7 +837,7 @@ title = "Drive-pin holes in the jig: the slug, then the shaft"
 machine = "PM-1127VF-LB lathe / the jig on the AXA No. 4 holder; cutters in the 3-jaw, then in the drill chuck"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "The drive-pin jig (fixtures record; made before this setup): 1 in 1018, 4.75 long, its Ø.750 shank 2.00 long, a 3/8 clearance 1.90 deep from the shank end, a 10-32 set screw on a brass pad 1.25 from the front face; its .4500 bore, 2.95 deep, is reamed here and breaks into the 3/8 hole. Its shank in the AXA No. 4 holder on the tool post, its head toward the headstock, the holder's height collar set with the jig's axis at the spindle's centre height (by the centre in the 3-jaw on the jig face). The holder is not moved again until the shaft's holes are done, except for a new slug or a restart, whose turning needs the post: then the holder comes off, goes back on its height collar, X0 is swept again and the targets are proved again on the new slug before the shaft. The cross slide's gib locked between moves. The gap spacer: the 1/2 in high parallel of the 1/8 in thick set, stood upright beside the journal between the spigot's rear face and the jig face, slid out sideways once the set screw is snug. The shaft in the jig: far end first, the spacer in, the set screw down on the relief (snug, not tight), the spacer then withdrawn: F then sits 3.53 into the jig, in the 3/8 hole. The slug likewise: its centre-drilled journal end first, the spacer behind its spigot, the set screw on its journal (.23 from its end), the journal's end 1.48 into the jig; its stub end, faced in Setup 6, stands out."
+holding = "The drive-pin jig (fixtures record; made before this setup): 1 in 1018, 4.75 long, its Ø.750 shank 2.00 long, a 3/8 clearance 1.90 deep from the shank end, a 10-32 set screw on a brass pad 1.25 from the front face; its .4385 bore, 2.95 deep, is reamed here and breaks into the 3/8 hole. Its shank in the AXA No. 4 holder on the tool post, its head toward the headstock, the holder's height collar set with the jig's axis at the spindle's centre height (by the centre in the 3-jaw on the jig face). The holder is not moved again until the shaft's holes are done, except for a new slug or a restart, whose turning needs the post: then the holder comes off, goes back on its height collar, X0 is swept again and the targets are proved again on the new slug before the shaft. The cross slide's gib locked between moves. The gap spacer: the 1/2 in high parallel of the 1/8 in thick set, stood upright beside the journal between the spigot's rear face and the jig face, slid out sideways once the set screw is snug. The shaft in the jig: far end first, the spacer in, the set screw down on the relief (snug, not tight), the spacer then withdrawn: F then sits 3.53 into the jig, in the 3/8 hole. The slug likewise: its centre-drilled journal end first, the spacer behind its spigot, the set screw on its journal (.23 from its end), the journal's end 1.48 into the jig; its stub end, faced in Setup 6, stands out."
 datum = "X0 (cross-slide DRO, set to read mm and radius for this setup) the stub's axis: the DTI in the drill chuck swept round the stub, front and back readings equal. Z (carriage DRO, inches) the spigot's stub-side face (the spigot face): its height H below the stub's end (the slug's stub end faced in Setup 6, the shaft's dome apex) read with the calipers' depth rod and written; each cutter at X0, spindle stopped, its tip touched on the stub's end, DRO Z set to +H, then the carriage backed off .10 before any cross-slide move; the spindle started only at the hole's target. No cutter is touched on the face itself: the holes' stations would swallow its tip. The jig's bore lies on the spindle axis because it is cut in place."
 diagram = { file = "diagrams/jig.svg", alt = "Plan view: the jig on the tool post with the shaft in its bore, the spacer gap behind the spigot, the set screw on the relief; the drill chuck on its arbor in the 3-jaw, the cutter 7.000 mm off the stub's axis, standing past the stub and dome." }
 lathe_hold = "other"
@@ -836,10 +860,10 @@ feed = "carriage handwheel, light, cutting oil"
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "drill-7-16"
+tool = "drill-27-64"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "The 7/16 drill in the 3-jaw: feed the jig onto it with the carriage, pecking every .25, cutting oil, to {{process.jig_ream_depth_in:.2f}} plus .10 deep (carriage DRO from the jig face)."
+instruction = "The 27/64 drill in the 3-jaw: feed the jig onto it with the carriage, pecking every .25, cutting oil, to {{process.jig_ream_depth_in:.2f}} plus .10 deep (carriage DRO from the jig face)."
 rpm = 500
 feed = "carriage handwheel, pecking, cutting oil"
 hole_depth_mm = 77.47
@@ -848,10 +872,10 @@ peck = { step_mm = 6.35, retract = "full" }
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "reamer-4500"
+tool = "reamer-4385"
 drilling = "none"
 sizing = "other"
-instruction = "The .4500 reamer in the 3-jaw: feed the jig onto it steadily to {{process.jig_ream_depth_in:.2f}} deep, and back off with the spindle running. Plenty of cutting oil."
+instruction = "The .4385 reamer in the 3-jaw: feed the jig onto it steadily to {{process.jig_ream_depth_in:.2f}} deep, and back off with the spindle running. Plenty of cutting oil."
 rpm = 150
 feed = "carriage handwheel, steady, cutting oil"
 
@@ -859,7 +883,7 @@ feed = "carriage handwheel, steady, cutting oil"
 cut_kind = "other"
 instruction = "Telescoping gauge and micrometer in the jig bore at its mouth and 2.5 deep; mike the shaft's two journals and the slug's journal."
 inspection = "Jig bore over each journal by no more than {{process.jig_clearance_max_in:.4dot}}, and each journal slides in by hand."
-gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = [11.43, 11.4935] }]
+gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = [11.1379, 11.2014] }]
 
 [[setups.operations]]
 cut_kind = "other"
@@ -921,9 +945,9 @@ peck = { step_mm = 0.508, retract = "full" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The slug out (the jig, the cross slide and the drill chuck untouched). Each hole: the .0930 GO enters, the .0935 NO-GO does not. With the GO in it, mike over the pin and the stub's far side beside the spigot face; offset = reading − stub/2 + .09325/2 − .0930: half the reamed hole, taken at its mid size .09325 (between the GO and the NO-GO), less the GO pin, which the anvil pushes onto the hole's inner wall. Write both offsets."
+instruction = "The slug out (the jig, the cross slide and the drill chuck untouched). Each hole: the .0930 GO enters, the .0935 NO-GO does not; GO refused or NO-GO entering, stop and tell the owner. With the GO in it, mike over the pin and the stub's far side beside the spigot face; offset = reading − stub/2 + .09325/2 − the GO pin's written reading: half the reamed hole, taken at its mid size .09325 (between the GO and the NO-GO), less the GO pin, which the anvil pushes onto the hole's inner wall. Write both offsets."
 inspection = "Each offset {{cad.drive_pin_1_offset_min_in:.4dot}}–{{cad.drive_pin_1_offset_max_in:.4dot}} (the drawing's band); the slug passes within {{process.pin_guard_in:.4dot}} of {{cad.drive_pin_1_offset_in:.4dot}} (the band less the reading's ±{{process.pin_uncertainty_in:.4dot}})."
-gauge_checks = [{ gauge = "plug-gauges-0930-0935", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }, { gauge = "micrometers", band_mm = [6.9848, 7.0152] }]
+gauge_checks = [{ gauge = "zz-pins-0930-0935", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }, { gauge = "micrometers", band_mm = [6.9848, 7.0152] }]
 
 [[setups.operations]]
 cut_kind = "other"
@@ -1019,7 +1043,7 @@ instruction = "Moved by more than {{process.dti_x0_mm:.3f}} mm: the next op's re
 cut_kind = "other"
 instruction = "The shaft out. Each hole: the .0930 GO enters, the .0935 NO-GO does not; offset as for the slug. Depth: mike the GO pin's length; stand it in the hole, where it stops on the step to the Ø.089 drilled hole below the ream; the calipers' depth rod from the spigot face to the pin's top reads its protrusion. Depth = the pin's length − the protrusion."
 inspection = "Holes Ø{{cad.drive_pin_1_dia_min_in:.4dot}}–{{cad.drive_pin_1_dia_max_in:.4dot}}; offsets {{cad.drive_pin_1_offset_min_in:.4dot}}–{{cad.drive_pin_1_offset_max_in:.4dot}}; depth {{cad.drive_pin_1_depth_min_in:.4dot}}–{{cad.drive_pin_1_depth_max_in:.4dot}}."
-gauge_checks = [{ gauge = "plug-gauges-0930-0935", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.drive_pin_1_offset_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.drive_pin_1_depth_band_mm}}" }]
+gauge_checks = [{ gauge = "zz-pins-0930-0935", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.drive_pin_1_offset_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.drive_pin_1_depth_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"

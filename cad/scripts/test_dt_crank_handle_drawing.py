@@ -126,7 +126,7 @@ def test_every_profile_size_is_a_model_dimension() -> None:
     assert not hasattr(spec, "DRAWING_NOTES")
     assert spec.REFERENCE_RADII == {"FlareR", "SConcaveR", "SConvexR", "DomeR"}
     assert spec.REFERENCE_RADII <= spec.DRAWING_DIMENSIONS["HandleProfile"]
-    assert drawing.PIVOT_BORE_CALLOUT.startswith("REAM THRU, RUNNING FIT ON\n")
+    assert drawing.PIVOT_BORE_CALLOUT.startswith("DRILL THRU, RUNNING FIT ON\n")
     assert "MHA-DT-32 PIVOT SCREW" in drawing.PIVOT_BORE_CALLOUT
     # The fitted sizes and the small corner features print at three places,
     # the routine contour at the title block's two.

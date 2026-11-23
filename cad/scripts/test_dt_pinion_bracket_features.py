@@ -147,11 +147,12 @@ def test_strap_feature_bands_are_the_printed_ones() -> None:
         "y",
     )
     assert arbor["finish_ra_printed"] == "63"
-    # Ø.1570 +.0005/.0000 FLAT-BOTTOM REAM, .16 deep (Section B-B), floor
-    # corners R.008 max, .276 above the pivot axis and .180 from face A.
+    # Ø.157 +.003/.000 FLAT BOTTOM, end-milled (owner ruling 2026-11-23, tool
+    # audit Q8), .16 deep (Section B-B), floor corners R.008 max, .276 above
+    # the pivot axis and .180 from face A.
     seat = features["follower_seat"]
-    assert seat["dia"] == pytest.approx([_in(0.1570), _in(0.1575)])
-    assert (seat["process"], seat["flat_bottom"]) == ("ream", True)
+    assert seat["dia"] == pytest.approx([_in(0.157), _in(0.160)])
+    assert (seat["process"], seat["flat_bottom"]) == ("mill", True)
     assert "thru" not in seat
     assert seat["depth"] == pytest.approx([_in(0.15), _in(0.17)])
     assert seat["floor_corner_r_max"] == pytest.approx(_in(0.008))
