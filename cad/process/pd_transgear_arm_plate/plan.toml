@@ -67,8 +67,8 @@
 #
 # FLAGGED: to buy: the stock (stock.1018-flat-1-4x1-1-2), the .4375 reamer
 # (tools.reamer-4375), the 3/8 in 82° countersink (tools.riser-countersink),
-# the Class ZZ pins
-# .4375 plus (GO) and .4380 plus (NO-GO) for K (tools.zz-pins-4375-4382) and
+# the Class ZZ pins .4375 plus (GO) and .4380 plus (NO-GO) for K
+# (tools.zz-pins-4375-4382) and
 # a .250 Class ZZ pin gauge (gauges.pin-gauges) for the countersinks.
 #
 # Owner ruling 2026-11-23 (tool audit Q1, re-answered), verbatim: "ZZ singles
@@ -407,15 +407,27 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Before Setup 2 reams K: on the .0001 micrometer, mike the .4375 plus GO pin, the .4380 plus NO-GO pin and the .4375 reamer (across two opposite margins at its front); each reading is good to ±.00005. Write the three on this sheet and each pin's on its tag."
-inspection = "GO pin {{cad.press_hole_dia_min_in:.4dot}}–{{process.k_go_pin_max_mm:in.4dot}}, NO-GO pin {{process.k_nogo_pin_min_mm:in.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}; a pin outside that is not used: stop and tell the owner. Accept a K from the GO pin's reading to under the NO-GO's. Owner ruling 2026-11-23: 'Accept that good holes near a limit may be refused' (sure to pass: {{process.k_go_pin_max_mm:in.4dot}}–{{process.k_nogo_pin_min_mm:in.4dot}} only)."
+inspection = "GO pin {{cad.press_hole_dia_min_in:.4dot}}–{{process.k_go_pin_max_mm:in.4dot}}, NO-GO pin {{process.k_nogo_pin_min_mm:in.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}. Accept a K from the GO pin's reading to under the NO-GO's. Owner ruling 2026-11-23: 'Accept that good holes near a limit may be refused' (sure to pass: {{process.k_go_pin_max_mm:in.4dot}}–{{process.k_nogo_pin_min_mm:in.4dot}} only)."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "A pin outside its band is not used: stop and tell the owner." },
+]
 feed = "hand"
 
 [[setups.operations]]
 instruction = "Only if the reamer read under the GO pin, before Setup 2: drill and ream a trial hole through an offcut of the bar on the mill, by MDI, with T4 and T5; gauge it with the two pins."
 instruction_detailed = "Only if the reamer read under the GO pin: an offcut of the 1/4 x 1-1/2 bar flat on the two 1 in parallels in the vise (one at each jaw), its middle over the gap. Console M6 T4 (27/64); its point on the middle, spindle stopped: G10 L20 P1 X0 Y0 Z0. MDI M3 S600, G1 Z-10 F{{process.drill_2764_feed_per_min_mm:.1f}}, G0 Z5; M6 T5 (.4375 reamer), M3 S400, G1 Z-10 F{{process.ream_feed_per_min_mm:.1f}}, G1 Z5, M5."
-inspection = "The GO pin enters the trial hole and the NO-GO does not: go on. GO refused: this reamer's holes will be refused: stop and tell the owner."
+inspection = "The GO pin enters the trial hole and the NO-GO does not."
 gauge_checks = [{ gauge = "zz-pins-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "Only after a trial hole: GO refused: this reamer's holes will be refused: stop and tell the owner." },
+]
 feed = "hand"
 
 [[setups]]
@@ -564,7 +576,7 @@ sizing = { kind = "band", band_mm = "{{cad.press_hole_dia_band_mm}}" }
 instruction = "Same file, M6 T5 (.4375 reamer in the drill chuck; set 400, cutting oil on the reamer only, a drop, wiped so none runs to the tape): ream K through, fed in and fed out, spindle running, {{process.ream_past_mm:in.3dot}} under face A. The file ends there."
 rpm = 400
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
-inspection = "Still bonded, K blown out and wiped (K Ø{{cad.press_hole_dia_min_in:.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}): GO enters the full depth, NO-GO does not. GO refused: blow the chips out of K, oil the reamer and run AP01_holes again from its start, G54 unchanged (the cuts already made then cut air; the reamer goes through once more); gauge again. Still refused: the plate is scrap (the pins cannot show K at or over {{cad.press_hole_dia_min_in:.4dot}}): stop and tell the owner. NO-GO enters: no cut remedies it; the plate is scrap: stop and tell the owner."
+inspection = "Still bonded, K blown out and wiped (K Ø{{cad.press_hole_dia_min_in:.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}): GO enters the full depth, NO-GO does not."
 gauge_checks = [{ gauge = "zz-pins-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
 milling_cuts = [
   { name = "press ream", kind = "drill", phase = "finish", cutter_dia_mm = 11.1125, flutes = 6, rpm = 400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = 0 },
@@ -572,7 +584,7 @@ milling_cuts = [
 
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "GO refused: run AP01_holes again from its start, G54 unchanged (the cuts already made then cut air; the reamer goes through once more). NO-GO enters: stop and tell the owner." },
+  { kind = "stop", text = "GO refused: blow the chips out of K, oil the reamer and run AP01_holes again from its start, G54 unchanged (the cuts already made then cut air; the reamer goes through once more); gauge again. Still refused: the plate is scrap (the pins cannot show K at or over {{cad.press_hole_dia_min_in:.4dot}}): stop and tell the owner. NO-GO enters: no cut remedies it; the plate is scrap: stop and tell the owner." },
 ]
 feed = "hand"
 
