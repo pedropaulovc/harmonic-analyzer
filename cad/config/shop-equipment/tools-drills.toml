@@ -300,3 +300,15 @@ note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-24 #30 DRILL .
 kind = "drill"
 status = "to_order"
 note = "Not owned: to buy (the 115-piece index stops at #60). Codjiflo round 1 (#3122): pre-drill for the MHA-DT-12-TL-01 clock-pin ream, .0365 +.0005 REAM .20 (dt_cylinder_gear_tl_cam_fixture_spec PIN_HOLE_DIA, PIN_HOLE_DEPTH, read by tools.reamer-0365). #65 (.0350) leaves .0015 on the diameter for the reamer, the author's allowance for a reamer under 1/16 in, no source; #66 (.0330) would leave .0035."
+
+[tools.drill-54-taper-length]
+kind = "drill"
+status = "to_order"
+note = "Not owned: to buy. MHA-DT-11 #54 DRILL 2X Ø.055 THRU ALL drive-pin knockouts, drilled from the reamed pin holes' floors on the lathe (owner ruling 2026-11-22, option C2): the cutter must stand over 40 mm out of the headstock chuck to clear the Ø.375 stub and its dome; a jobber #54 is too short."
+cite = ["Fastenal 0306183 (read 2026-11-22): #54 (.055 in) HSS 118° bright taper length drill, 3 in overall, 1.75 in flute, straight shank: https://www.fastenal.ca/product/details/0306183"]
+
+[tools.spot-drill-carbide-1-8]
+kind = "spot_drill"
+status = "to_order"
+note = "Not owned: to buy. MHA-DT-11 drive-pin holes on the lathe (owner ruling 2026-11-22, option C2): spots each .0930 hole for the #43 drill; its Ø1/8 body and 2 in length let it stand 40 mm out of the headstock drill chuck past the Ø.375 stub, 2.24 mm from the cutter's axis."
+cite = ["Dixie Tool, Titan TC18708 (read 2026-11-22): 1/8 in solid carbide N/C spotting drill, 90°, 1/8 in shank, 1/4 in flute, 2.00 in overall: https://www.dixie-tool.com/drill-1-8-n-c-spot-90-deg-scarb-138686/"]

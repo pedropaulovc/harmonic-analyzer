@@ -4,28 +4,25 @@ screws, the knob-shaft stack and the paper-drive assembly.
 Book ch. 23 (t157 / p.63; ruling 3): a piece of steel bar screwed across the
 MHA-PD-18 arm by two 8-32 oval-head screws.  The book's 1-1/4 in bar is
 widened to 1-1/2 in so the outline can stand symmetric about K (the 1-1/4 in
-bar centred on K leaves the -X countersink under the wall target).  It
-carries the knob shaft's running bore on axis K, a front hub (the thrust
-ring's seat) and a rear boss (the cup runs behind it).  Its rear portion is
-.197 thick where it lies over the arm; below the arm's lower edge it drops
-.31 more, to .065 behind the arm's front face (3/8 stock, #2019), so the step (the
-"notch") wraps that edge, NOTCH_RELIEF clear of it. Two matched stock
-dowels locate; screws clamp.
+bar centred on K leaves the -X countersink under the wall target).  Since
+#2425 (owner ruling 2026-11-20 (Pedro)) it is a flat .197 plate: the knob
+shaft's running bore, the thrust ring's hub face and the cup's thrust face
+are the MHA-PD-28 bush's (``pd_transgear_knob_bush_geometry``), pressed
+into the plate's Ø.4375 FN2 hole on axis K from face A, its shoulder seated
+on face A.  Two matched stock dowels locate; screws clamp.
 
 Local frame (same axes as the arm, so the assembly places both with one
 rotation about Z):
 
-* origin on the bore axis K, on the MOUNTING face -- the plate's front face
+* origin on the press-hole axis K, on face A -- the plate's front face
   that seats on the arm's rear face (machine z -114.888);
 * +X and +Y are the arm's +X (toward its square end) and +Y (toward its upper
   tangent edge); the plate's long axis runs along -Y;
-* +Z toward the rear (machine +Z): the over-arm section spans z 0..5.0038, the
-  section below the arm z -7.874..5.0038, the front hub z -20.5486..-7.874
-  and the rear boss z 5.0038..8.4836.
+* +Z toward the rear (machine +Z): the plate spans z 0..5.0038.
 
 Decimal inch (#290): the plate's own nominals are the exact millimetres of
-their printed inch values; the outline edges, notch and hole sites follow
-the MHA-PD-18 arm's mm geometry and print rounded, their walls judged at the
+their printed inch values; the outline edges and hole sites follow the
+MHA-PD-18 arm's mm geometry and print rounded, their walls judged at the
 printed limits' reach (``printed_reach_mm``), as the arm's do.
 
 Keep drawing-only notes out of this module.
@@ -37,8 +34,8 @@ import math
 
 import _config
 import pd_transgear_arm_geometry as ARM
+import pd_transgear_knob_bush_geometry as BUSH
 import _transgear_arm_plate_locating_interface as LOCATING_PIN
-from _fit_ream_h7 import REAM_H7
 from _gear_quality import reducer_k_setting_diameter_mm
 from _package_units import drawing_unit
 from _printed_tolerance import (
@@ -47,7 +44,6 @@ from _printed_tolerance import (
     printed_band_mm,
     printed_deviations,
 )
-from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
 
 UNIT = drawing_unit("parts/pd-transgear-arm-plate", _config.parts("pd-transgear-arm-plate"))
 
@@ -59,25 +55,20 @@ def printed_reach_mm(model: float, places: int) -> float:
     return max(abs(d) for d in printed_deviations(model, places, unit=UNIT))
 
 
-# --- Where the bore sits on the arm (arm frame, mm) -------------------------
+# --- Where K sits on the arm (arm frame, mm) --------------------------------
 # K follows the reducer's physical mounting centre, transformed into the arm
-# frame by its pure geometry. The screw midpoint follows that same bore.
+# frame by its pure geometry. The screw midpoint follows that same axis.
 BORE_STATION = ARM.KNOB_BORE_STATION
 BORE_OFFSET = ARM.KNOB_BORE_OFFSET
 
 # --- Section ----------------------------------------------------------------
 END_R = 12.446  # R.49, full round about K; both tapers are tangent to it
 WIDTH = 38.1  # 1-1/2 in bar, symmetric about K
-# .XXX bounds the locator dowel span and the screw engagement.
+# .XXX, the whole plate's thickness: it bounds the locator dowel span, the
+# screw engagement and the press length the bush grips.
 THICKNESS_OVER_ARM = 5.0038  # .197
 THICKNESS_OVER_ARM_PLACES = 3
 THICKNESS_OVER_ARM_BAND = printed_band_mm(THICKNESS_OVER_ARM_PLACES, unit=UNIT)
-# The section below the arm only wraps the arm's edge: nothing mates its
-# front face, so its depth prints .XX (machinist review: .313 carried no
-# function). Its worst case stays inside the guide-lock sweep's arm-plate
-# term (build_pd_paper_drive_assembly._assert_lock_station_sweep).
-NOTCH_DEPTH = 7.874  # .31
-THICKNESS_BELOW_ARM = THICKNESS_OVER_ARM + NOTCH_DEPTH  # 12.8778
 
 # Edges along the plate's long axis, in the plate frame (x from K): the
 # outline is symmetric about the long axis through K, so the screws' midpoint
@@ -95,22 +86,6 @@ def arm_upper_edge_y(x: float) -> float:
     return ARM.edge_half_width(x + BORE_STATION) - BORE_OFFSET
 
 
-def arm_lower_edge_y(x: float) -> float:
-    """Plate-frame y of the arm's lower tangent edge."""
-    return -ARM.edge_half_width(x + BORE_STATION) - BORE_OFFSET
-
-
-# The matched locating dowels register the plate; mounting screws clamp ONLY.
-# The notch is clearance, not a third locator. A nominal/graded reference
-# clearance is not a whole-body certificate inferred from pin-end geometry.
-NOTCH_RELIEF = 2.54  # .10
-
-
-def notch_face_y(x: float) -> float:
-    """Plate-frame y of the notch face, NOTCH_RELIEF clear of the arm edge."""
-    return arm_lower_edge_y(x) - NOTCH_RELIEF
-
-
 TOP_LEFT = (EDGE_MINUS_X, arm_upper_edge_y(EDGE_MINUS_X))
 TOP_RIGHT = (EDGE_PLUS_X, arm_upper_edge_y(EDGE_PLUS_X))
 KINK = (EDGE_MINUS_X, KINK_Y)
@@ -119,40 +94,36 @@ _KINK_DIST = math.hypot(*KINK)
 _TANGENT_ANGLE = math.atan2(KINK[1], KINK[0]) + math.acos(END_R / _KINK_DIST)
 KINK_TANGENT = (END_R * math.cos(_TANGENT_ANGLE), END_R * math.sin(_TANGENT_ANGLE))
 KINK_TANGENT_RIGHT = (-KINK_TANGENT[0], KINK_TANGENT[1])
-NOTCH_LEFT = (EDGE_MINUS_X, notch_face_y(EDGE_MINUS_X))
-NOTCH_RIGHT = (EDGE_PLUS_X, notch_face_y(EDGE_PLUS_X))
-if NOTCH_LEFT[1] <= KINK[1]:
-    raise AssertionError("the relieved notch face drops below the -X edge's kink")
 
-# --- Knob-shaft bearing: bore, front hub, rear boss (contract 1.10) ---------
-# .249 REAM_H7 (#290 fit D8, the owned .2490 reamer) over the knob shaft's
-# .249 g6 journal.
-BORE_DIA = 6.3246  # .249
-BORE_DIA_LIMITS = (min(REAM_H7), max(REAM_H7))  # +.0000/+.0005
-HUB_DIA = 13.208  # .52
-# The hub face (the thrust ring's seat) stands at its printed .809 station
-# from the mounting face (R9-25), whatever the arm stock: the hub runs on
-# 12.6746 past the notch's front face.  .XXX: the chain-plane station
-# (contract §13).
-HUB_FACE_TO_MOUNTING = 20.5486  # .809
-HUB_LENGTH = HUB_FACE_TO_MOUNTING - NOTCH_DEPTH  # 12.6746
-# The chain-plane station (contract §13) and the first term of the disc
-# cluster's stack (F, transgear_cluster_fit), which sets the collar's air:
-# .XXX at the cluster's +/-.001 (#2124).
-HUB_STATION_PLACES = 3
-HUB_FACE_TO_MOUNTING_BAND = FIT_LENGTH_BAND_IN
-BOSS_DIA = 20.066  # .79
-# The hub-to-boss length is authoritative: the knob stack runs to the boss
-# face, so the boss takes whatever the over-arm section leaves.
-HUB_TO_BOSS = 29.0322  # 1.143
-HUB_TO_BOSS_BAND = 0.0508  # .002, knob float
-BOSS_FACE_Z = HUB_TO_BOSS - HUB_FACE_TO_MOUNTING  # 8.4836
+# --- Press hole for the MHA-PD-28 knob bush on K ----------------------------
+# The bush carries the knob shaft's running bore, the thrust ring's hub face
+# and the cup's thrust face; the plate only grips it, ANSI B4.1 FN2 on .4375
+# (pd_transgear_knob_bush_geometry), modelled line to line as the repo's
+# other presses are.  Limits (lower, upper) deviations: +.0000/+.0007.
+PRESS_HOLE_DIA = BUSH.PRESS_DIA
+PRESS_HOLE_LIMITS = (min(BUSH.PRESS_HOLE_BAND), max(BUSH.PRESS_HOLE_BAND))
+PRESS_HOLE_PLACES = 4
+# Face A's mouth is chamfered .015 X 45° (#2425): the lead-in for pressing
+# MHA-PD-28 from face A, and room for the bush's shoulder-root radius so the
+# shoulder seats flat on face A.  The bush geometry owns its size and limits
+# (it asserts the root clearance); the rear mouth keeps the title block's
+# break.
+PRESS_HOLE_CHAMFER = BUSH.PRESS_HOLE_MOUTH_CHAMFER
+PRESS_HOLE_CHAMFER_PLACES = BUSH.PRESS_HOLE_MOUTH_CHAMFER_PLACES
+PRESS_HOLE_CHAMFER_LIMITS = (
+    BUSH.PRESS_HOLE_MOUTH_CHAMFER_MIN, BUSH.PRESS_HOLE_MOUTH_CHAMFER_MAX,
+)
+if max(PRESS_HOLE_CHAMFER_LIMITS) < ARM.OUTLINE_EDGE_BREAK_MAX_MM:
+    raise AssertionError("the face-A chamfer, not the title-block break, must govern the mouth")
+PRESS_HOLE_CHAMFER_VOLUME_MM3 = math.pi * PRESS_HOLE_CHAMFER**2 * (
+    PRESS_HOLE_DIA / 2.0 + PRESS_HOLE_CHAMFER / 3.0
+)
 REAR_FACE_Z = THICKNESS_OVER_ARM
-BOSS_HEIGHT = BOSS_FACE_Z - REAR_FACE_Z
-HUB_FACE_Z = -HUB_FACE_TO_MOUNTING
-FRONT_FACE_Z = -NOTCH_DEPTH
 
-# Shared matched-pair sites, expressed in this part's actual K-datum frame.
+# The matched locating dowels register the plate; mounting screws clamp ONLY.
+# A nominal/graded reference clearance is not a whole-body certificate
+# inferred from pin-end geometry.  Shared matched-pair sites, expressed in
+# this part's actual K-datum frame.
 LOCATOR_SITES_MM = tuple(
     (x - BORE_STATION, y - BORE_OFFSET) for x, y in ARM.LOCATOR_SITES_MM
 )
@@ -188,19 +159,15 @@ SCREW_HOLES = tuple(
 # --- Bands the sheet prints (title-block rows, drawing-guidelines.md rule 3 (decimal places carry the tolerance)) ---
 BAND_XX = printed_band_mm(2, unit=UNIT)
 BAND_XXX = printed_band_mm(3, unit=UNIT)
-# The outline and the notch print .XX (rule 3): the .X row's +/-.1 is wider
-# than every wall they bound.  Their nominals follow the arm's mm edges, so
-# each is judged at its printed limits' reach.
+# The outline prints .XX (rule 3): the .X row's +/-.1 is wider than every
+# wall it bounds.  Its nominals follow the arm's mm edges, so each is judged
+# at its printed limits' reach.
 OUTLINE_PLACES = 2
-NOTCH_PLACES = 2
 OUTLINE_BAND = max(
     printed_reach_mm(abs(value), OUTLINE_PLACES)
     for value in (END_R, WIDTH / 2.0, TOP_LEFT[1], TOP_RIGHT[1], KINK[1])
 )
-NOTCH_BAND = max(
-    printed_reach_mm(abs(value), NOTCH_PLACES) for value in (NOTCH_LEFT[1], NOTCH_RIGHT[1])
-)
-# The plate's hole patterns are toleranced from its own knob bore B (= K),
+# The plate's hole patterns are toleranced from its own press hole B (= K),
 # and the matched pilots go through at the arm's pattern from the pin S:
 # K's setting circle about S (MHA-PD-00 VIEW K) carries into every
 # B-referenced frame here, so they take that circle, not the arm's zone.
@@ -294,59 +261,47 @@ _CSK_DEPTH_MAX = _deepest_cone_mm(SCREW_HOLE_ZONE_LENGTH_MIN_MM)
 # R0.25 / C0.25 MAX edge break, on each exposed edge at a wall (the arm's
 # constant). Drill run-off of 0.3 deg (#2000 holds the method) wherever a
 # hole and the wall's other boundary are made in different setups, over the
-# depth from the entry face to the wall: the locating holes and the screw
-# holes are drilled through the plate after the outline is milled; the bore
-# is reamed on the lathe after the outline and the notch are milled, over its
-# whole hub-to-boss length. The hub and boss are turned on the bore axis in
-# the bore's own setup (the part's process), so their walls over the bore
-# pay no run-off.
+# depth from the entry face to the wall: the press hole, the locating holes
+# and the screw holes are each drilled (and the press hole reamed) through
+# the plate after the outline is milled.
 OUTLINE_EDGE_BREAK_MAX_MM = ARM.OUTLINE_EDGE_BREAK_MAX_MM
 _RUN_OFF = math.tan(math.radians(ARM.DRILL_RUN_OFF_DEG))
-# Over the deepest stock the print allows: the .XX thickness and the
-# hub-to-boss length at their upper limits.
+# Over the deepest stock the print allows: the .XXX thickness at its upper
+# limit.
 HOLE_RUN_OFF_MM = (THICKNESS_OVER_ARM + THICKNESS_OVER_ARM_BAND) * _RUN_OFF
-BORE_RUN_OFF_MM = (HUB_TO_BOSS + HUB_TO_BOSS_BAND) * _RUN_OFF
 
-_BORE_R_MAX = (BORE_DIA + BORE_DIA_LIMITS[1]) / 2.0
-_NOTCH_DISTANCE = (
-    BORE_STATION * math.sin(ARM.EDGE_LEAN)
-    - BORE_OFFSET * math.cos(ARM.EDGE_LEAN)
-    - ARM.PIVOT_END_R
-    - NOTCH_RELIEF * math.cos(ARM.EDGE_LEAN)
-)
+_PRESS_R_MAX = (PRESS_HOLE_DIA + PRESS_HOLE_LIMITS[1]) / 2.0
 _NEAR_HOLE = min(SCREW_HOLES, key=lambda xy: math.hypot(*xy))
 # The nearer side edge to either hole's axis (the -X hole sits nearer its edge).
 _HOLE_TO_EDGE = min(SCREW_HOLES[0][0] - EDGE_MINUS_X, EDGE_PLUS_X - SCREW_HOLES[-1][0])
-# Each wall pays the edge breaks of the edges exposed at it: both rims at
-# the hub's and boss's end faces; the outline's or the notch's edge where a
-# hole stands inside it; the screw hole's exit mouth at face A over the bore
-# and under the countersink; and the countersink's rim at the rear face,
-# which the title block does not exempt, on the ligaments beside it.
+# Each wall pays the edge breaks of the edges exposed at it: the press
+# hole's mouths (its face-A chamfer at its upper limit, the title block's
+# break at the rear) and the locating holes' mouths; the outline's edge
+# where a hole stands inside it; the countersink's rim at the rear face,
+# which the title block does not exempt, on the ligaments beside it.  Where
+# a wall meets the press hole on both faces, the face whose mouths reach
+# further into it governs.
+_PRESS_CHAMFER_MAX = max(PRESS_HOLE_CHAMFER_LIMITS)
+_SCREW_REACH_AT_PRESS_HOLE = max(
+    # rear face: the countersink's rim and the press hole's broken mouth
+    CSK_DIA_LIMITS_MM[1] / 2.0 + 2.0 * OUTLINE_EDGE_BREAK_MAX_MM,
+    # face A: the drilled hole's broken mouth and the press hole's chamfer
+    (SCREW_HOLE_DIA + DRILL_GROWTH) / 2.0 + OUTLINE_EDGE_BREAK_MAX_MM + _PRESS_CHAMFER_MAX,
+)
 WALLS: dict[str, tuple[float, float]] = {
-    "hub over the bore": (
-        (HUB_DIA - BORE_DIA) / 2.0,
-        (HUB_DIA - BAND_XX) / 2.0 - _BORE_R_MAX - 2.0 * OUTLINE_EDGE_BREAK_MAX_MM,
+    # At face A, where the chamfer and the outline's broken edge meet it.
+    "press hole to end round": (
+        END_R - PRESS_HOLE_DIA / 2.0 - PRESS_HOLE_CHAMFER,
+        END_R - OUTLINE_BAND - _PRESS_R_MAX - _PRESS_CHAMFER_MAX
+        - OUTLINE_EDGE_BREAK_MAX_MM - HOLE_RUN_OFF_MM,
     ),
-    "boss over the bore": (
-        (BOSS_DIA - BORE_DIA) / 2.0,
-        (BOSS_DIA - BAND_XX) / 2.0 - _BORE_R_MAX - 2.0 * OUTLINE_EDGE_BREAK_MAX_MM,
-    ),
-    "bore to end round": (
-        END_R - BORE_DIA / 2.0,
-        END_R - OUTLINE_BAND - _BORE_R_MAX - OUTLINE_EDGE_BREAK_MAX_MM - BORE_RUN_OFF_MM,
-    ),
-    "bore to notch": (
-        _NOTCH_DISTANCE - BORE_DIA / 2.0,
-        _NOTCH_DISTANCE - NOTCH_BAND - _BORE_R_MAX
-        - OUTLINE_EDGE_BREAK_MAX_MM - BORE_RUN_OFF_MM,
-    ),
-    "bore to screw holes": (
-        math.hypot(*_NEAR_HOLE) - BORE_DIA / 2.0 - SCREW_HOLE_DIA / 2.0,
+    "press hole to countersinks": (
+        math.hypot(*_NEAR_HOLE) - PRESS_HOLE_DIA / 2.0 - CSK_DIA / 2.0,
         math.hypot(*_NEAR_HOLE)
         - SCREW_AXIS_RADIUS_IN_PLATE_MM
-        - _BORE_R_MAX
-        - (SCREW_HOLE_DIA + DRILL_GROWTH) / 2.0
-        - OUTLINE_EDGE_BREAK_MAX_MM - HOLE_RUN_OFF_MM - BORE_RUN_OFF_MM,
+        - _PRESS_R_MAX
+        - _SCREW_REACH_AT_PRESS_HOLE
+        - 2.0 * HOLE_RUN_OFF_MM,
     ),
     "under the countersinks": (
         THICKNESS_OVER_ARM - CSK_DEPTH,
@@ -370,11 +325,10 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
     _edge_air = min(
         _x - EDGE_MINUS_X, EDGE_PLUS_X - _x,
         (arm_upper_edge_y(_x) - _y) * math.cos(ARM.EDGE_LEAN),
-        (_y - notch_face_y(_x)) * math.cos(ARM.EDGE_LEAN),
     )
-    WALLS[f"locator {_index} to plate edge/notch"] = (
+    WALLS[f"locator {_index} to plate edge"] = (
         _edge_air - LOCATOR_HOLE_DIA_MM / 2.0,
-        _edge_air - max(OUTLINE_BAND, NOTCH_BAND) - LOCATOR_MOUTH_POSITION_RADIUS_MM
+        _edge_air - OUTLINE_BAND - LOCATOR_MOUTH_POSITION_RADIUS_MM
         - LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] / 2.0 - LOCATOR_MOUTH_BREAK_MAX_MM
         - OUTLINE_EDGE_BREAK_MAX_MM - HOLE_RUN_OFF_MM,
     )
@@ -386,11 +340,12 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
         - LOCATOR_MOUTH_BREAK_MAX_MM - OUTLINE_EDGE_BREAK_MAX_MM
         - 2.0 * HOLE_RUN_OFF_MM,
     )
-    WALLS[f"locator {_index} to running bore"] = (
-        math.hypot(_x, _y) - (LOCATOR_HOLE_DIA_MM + BORE_DIA) / 2.0,
+    # At face A, where the press hole's chamfer governs its mouth.
+    WALLS[f"locator {_index} to press hole"] = (
+        math.hypot(_x, _y) - (LOCATOR_HOLE_DIA_MM + PRESS_HOLE_DIA) / 2.0 - PRESS_HOLE_CHAMFER,
         math.hypot(_x, _y) - LOCATOR_MOUTH_POSITION_RADIUS_MM
-        - LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] / 2.0 - _BORE_R_MAX
-        - LOCATOR_MOUTH_BREAK_MAX_MM - HOLE_RUN_OFF_MM - BORE_RUN_OFF_MM,
+        - LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] / 2.0 - _PRESS_R_MAX
+        - LOCATOR_MOUTH_BREAK_MAX_MM - _PRESS_CHAMFER_MAX - 2.0 * HOLE_RUN_OFF_MM,
     )
 for _name, (_nominal, _worst) in WALLS.items():
     if _worst < WALL_TARGET:
@@ -440,15 +395,15 @@ def nominal_material_properties(*, density_kg_m3: float = 7870.0) -> dict[str, o
         for axis, coordinate in enumerate((x, y, z)):
             moments[axis] += amount * coordinate
 
-    for left, right, depth, z in (
-        (TOP_LEFT, TOP_RIGHT, THICKNESS_OVER_ARM, THICKNESS_OVER_ARM / 2.0),
-        (NOTCH_LEFT, NOTCH_RIGHT, NOTCH_DEPTH, -NOTCH_DEPTH / 2.0),
-    ):
-        area, ax, ay = section_area_moments(left, right)
-        add(area * depth, ax / area, ay / area, z)
-    add(math.pi * (HUB_DIA / 2.0)**2 * HUB_LENGTH, 0.0, 0.0, HUB_FACE_Z + HUB_LENGTH / 2.0)
-    add(math.pi * (BOSS_DIA / 2.0)**2 * BOSS_HEIGHT, 0.0, 0.0, REAR_FACE_Z + BOSS_HEIGHT / 2.0)
-    add(-math.pi * (BORE_DIA / 2.0)**2 * HUB_TO_BOSS, 0.0, 0.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0)
+    area, ax, ay = section_area_moments(TOP_LEFT, TOP_RIGHT)
+    add(area * THICKNESS_OVER_ARM, ax / area, ay / area, THICKNESS_OVER_ARM / 2.0)
+    add(
+        -math.pi * (PRESS_HOLE_DIA / 2.0)**2 * THICKNESS_OVER_ARM,
+        0.0, 0.0, THICKNESS_OVER_ARM / 2.0,
+    )
+    # The face-A chamfer's ring: a c x c right triangle about K, its
+    # centroid c/3 out from the hole wall and c/3 behind face A.
+    add(-PRESS_HOLE_CHAMFER_VOLUME_MM3, 0.0, 0.0, PRESS_HOLE_CHAMFER / 3.0)
     radius = SCREW_HOLE_DIA / 2.0
     slope = math.tan(math.radians(CSK_ANGLE_DEG / 2.0))
     cone_volume = math.pi * (radius * slope * CSK_DEPTH**2 + slope**2 * CSK_DEPTH**3 / 3.0)

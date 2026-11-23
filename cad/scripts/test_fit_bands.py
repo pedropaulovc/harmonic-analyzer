@@ -73,6 +73,11 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     # for (feature, name), band in spec.MODEL_BANDS_MM.items(): deviations(band)
     ("build_dt_cone_gear_tl_keyed_arbor", "band"): ("spec.MODEL_BANDS_MM", "values"),
     ("build_dt_cylinder_gear_tl_cam_fixture", "deviations"): ("MODEL_BANDS_MM", "values"),
+    # _far_station passes its caller's band: only the collar rear station has one.
+    ("draw_dt_crankshaft", "band"): (
+        "((COLLAR_STATION_TOL, -COLLAR_STATION_TOL),)",
+        "each",
+    ),
     # _single_limits passes each single-limit band (MIN chamfer, MAX rounds).
     ("build_pn_pen_v_block", "limit_band"): (
         "tuple(limit[3] for limit in _SINGLE_LIMITS)",
@@ -360,9 +365,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "
         "sets it natively on PivotDia"
     ),
-    ("pd_vn_transgear_knob_cup_pin_spec", "HOLE_BAND"): (
-        "the retained cup pin's hole match-drilled through cup and journal: "
-        "indexed for HOLE_MAX against the B18.8.2 catalogue window"
+    ("pd_transgear_knob_cup_spec", "HOLE_BAND"): (
+        "title-block drilled-hole deviations (the web's #33 DRILL THRU row, no "
+        "native band); indexed for CLEAR_HOLE_MIN against MHA-PD-VN-71's "
+        "under-head fillet envelope and CLEAR_HOLE_MAX for the head's bearing land"
     ),
     ("pd_transgear_knob_thrust_ring_spec", "ID_BAND"): (
         "title-block drilled-hole deviations (the DRILL THRU callout's row, no "

@@ -4,8 +4,8 @@
 title = "Transgear Arm Plate"
 part = "MHA-PD-19 Transgear Arm Plate"
 revision = "placeholder"
-material = "AISI 1018 cold-finished steel bar, ASTM A108, 1-1/2 in"
-stock = "To be written"
+material = "AISI 1018 cold-finished steel flat bar, ASTM A108, 1/4 x 1-1/2 in"
+stock = "1/4 × 1-1/2 in 1018 CF flat (stock.1018-flat-1-4x1-1-2), faced to .197 (#2425)."
 shop = "../shop"
 
 [[tools]]
@@ -19,14 +19,19 @@ name = "#1 drill"
 ref = "drill-1"  # Drills #1
 
 [[tools]]
-id = "drill-b"
-name = "B drill"
-ref = "drill-b"  # Drills B
+id = "drill-27-64"
+name = "27/64 drill"
+ref = "drill-27-64"  # #2425: pre-drill for the Ø.4375 press-hole ream
 
 [[tools]]
-id = "reamer-2490"
-name = ".2490 reamer"
-ref = "reamer-2490"  # B-reamer-.2490
+id = "reamer-4375"
+name = ".4375 reamer"
+ref = "reamer-4375"  # #2425: Ø.4375 +.0007/.0000 REAM THRU, press fit for MHA-PD-28
+
+[[tools]]
+id = "chamfer-mill-carbide-1-4-90"
+name = "1/4 90° chamfer mill"
+ref = "chamfer-mill-carbide-1-4-90"  # #2425: the press hole's .015 X 45° at face A
 
 [[tools]]
 id = "pin-gauges"

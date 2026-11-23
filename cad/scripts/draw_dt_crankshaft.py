@@ -65,7 +65,12 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_selection import _select_view_entity
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
 from _gtol_face_read import face_geometry
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
+from _printed_limits import drilled_limits, limits
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
@@ -76,7 +81,11 @@ import _telemetry
 from build_dt_crankshaft import PINION_PIN_DIA, PINION_PIN_STATION_Y
 from dt_crank_drive_gear_spec import inch_text
 from dt_crankshaft_notes import (
+    CENTRE_STUB_NOTE,
     CENTRES_NOTE,
+    CROSS_HOLE_NOTE,
+    FIT_CLEARANCES,
+    SPIGOT_NOTE,
     COLLAR_REAR_MATE,
     COLLAR_SEAT_MATE,
     CROSS_HOLE_CALLOUT,
@@ -93,6 +102,25 @@ from dt_crankshaft_notes import (
     SHEET_NOTES,
     SLIDING_FIT,
     SPIGOT_CALLOUT,
+)
+from dt_crankshaft_spec import (
+    COLLAR_STATION_TOL,
+    DRIVE_PIN_DEPTH,
+    DRIVE_PIN_DEPTH_TOL,
+    DRIVE_PIN_HOLE_BAND,
+    DRIVE_PIN_KNOCKOUT_LENGTH,
+    DRIVE_PIN_KNOCKOUT_PROCESS,
+    DRIVE_PIN_KNOCKOUT_RIM_WORST,
+    DRIVE_PIN_OFFSET_TOL,
+    DRIVE_PIN_SPIGOT_RIM_WORST,
+    JOURNAL_DIA_BAND,
+    NECK_DIA_TOL,
+    PINION_SEAT_DIA_BAND,
+    RELIEF_DIA,
+    SHAFT_DIA_BAND,
+    SHAFT_LENGTH_BAND,
+    SPIGOT_DIA_BAND,
+    UNIT,
 )
 from dt_crankshaft_spec import (
     COLLAR_REAR,
@@ -142,6 +170,475 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 _PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
+
+# Feature requirements (package:features; the drilled_block adapter's kinds),
+# in the model frame: the shaft axis along +Y from the dome root (y 0), every
+# printed station from the FAR END (y = SHAFT_LENGTH), the one faced end the
+# shop zeroes on; the drive-pin holes along +Y into the collar's seat face at
+# z = +/-DRIVE_PIN_CIRCLE_RADIUS; the #9 cross hole along model X.  The
+# declarations print nothing; each band is the one the sheet prints
+# (DRAWING_PRECISION_BY_NAME places, the title block's rows, each
+# dimension's own band).
+_P = DRAWING_PRECISION_BY_NAME
+_NOTES = "dt_crankshaft_notes"
+_FRAME = ("build_dt_crankshaft", "__frame__")
+_FAR = ("SHAFT_LENGTH",)
+_PRINT = ("UNIT", "DRAWING_PRECISION_BY_NAME")
+_FIT = ((_NOTES, "FIT_CLEARANCES"), (_NOTES, "FIT_NOTE"))
+_HUB = "dt_crank_hub_geometry"
+_SD = (_HUB, "SHAFT_DIA")
+
+
+def _cap_radius(height: float) -> float:
+    """The sphere a cap ``height`` high on the Ø.375 lies on."""
+    return ((SHAFT_DIA / 2.0) ** 2 + height**2) / (2.0 * height)
+
+
+_DOME_HEIGHT_LIMITS = limits(SHAFT_DOME_HEIGHT, _P["DomeHeight"], unit=UNIT)
+_DOME_R = _cap_radius(SHAFT_DOME_HEIGHT)
+
+
+def _plane_y(value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": "y", "value": value}
+
+
+def _far_station(
+    y: float, name: str, band: tuple[float, float] | None = None
+) -> list[float]:
+    """Model y's station from the far end, limited at ``name``'s places."""
+    return limits(SHAFT_LENGTH - y, _P[name], band, unit=UNIT)
+
+
+def _drive_pin_fields(z: float) -> dict[str, Any]:
+    """One reamed drive-pin hole, blind from the seat face at model ``z``."""
+    return {
+        "at": ([0.0, SEAT_COLLAR, z], ("SEAT_COLLAR", "DRIVE_PIN_CIRCLE_RADIUS")),
+        "axis": ([0.0, 1.0, 0.0], (_FRAME,)),
+        "dia": (
+            limits(DRIVE_PIN_HOLE_DIA, HOLE_CALLOUT_PLACES, DRIVE_PIN_HOLE_BAND, unit=UNIT),
+            ("DRIVE_PIN_HOLE_DIA", "DRIVE_PIN_HOLE_BAND", "HOLE_CALLOUT_PLACES"),
+        ),
+        "nominal_dia": (DRIVE_PIN_HOLE_DIA, ("DRIVE_PIN_HOLE_DIA",)),
+        "process": ("ream", ("DRIVE_PIN_HOLE_PROCESS",)),
+        "depth": (
+            limits(
+                DRIVE_PIN_DEPTH,
+                HOLE_CALLOUT_PLACES,
+                (DRIVE_PIN_DEPTH_TOL, -DRIVE_PIN_DEPTH_TOL),
+                unit=UNIT,
+            ),
+            ("DRIVE_PIN_DEPTH", "DRIVE_PIN_DEPTH_TOL", "HOLE_CALLOUT_PLACES"),
+        ),
+        "depth_nominal": (DRIVE_PIN_DEPTH, ("DRIVE_PIN_DEPTH",)),
+        "offset": (
+            limits(
+                DRIVE_PIN_CIRCLE_RADIUS,
+                _P["DrivePinOffset1"],
+                (DRIVE_PIN_OFFSET_TOL, -DRIVE_PIN_OFFSET_TOL),
+                unit=UNIT,
+            ),
+            ("DRIVE_PIN_CIRCLE_RADIUS", "DRIVE_PIN_OFFSET_TOL", *_PRINT),
+        ),
+        "offset_nominal": (DRIVE_PIN_CIRCLE_RADIUS, ("DRIVE_PIN_CIRCLE_RADIUS",)),
+        "offset_from": ("hub_shaft", ("DRIVE_PIN_CIRCLE_RADIUS",)),
+        "offset_axis": ("z", (_FRAME,)),
+        "callout": (DRIVE_PIN_CALLOUT, ((_NOTES, "DRIVE_PIN_CALLOUT"),)),
+        "rim_min": (DRIVE_PIN_SPIGOT_RIM_WORST, ("DRIVE_PIN_SPIGOT_RIM_WORST",)),
+    }
+
+
+def _knockout_fields(z: float) -> dict[str, Any]:
+    """One #54 knockout, from its drive-pin hole's floor through the rear face."""
+    return {
+        "at": ([0.0, DRIVE_PIN_FLOOR, z], ("DRIVE_PIN_FLOOR", "DRIVE_PIN_CIRCLE_RADIUS")),
+        "axis": ([0.0, 1.0, 0.0], (_FRAME,)),
+        "dia": (
+            drilled_limits(DRIVE_PIN_KNOCKOUT_DIA, 3, unit=UNIT),
+            ("DRIVE_PIN_KNOCKOUT_DIA", "UNIT"),
+        ),
+        "nominal_dia": (DRIVE_PIN_KNOCKOUT_DIA, ("DRIVE_PIN_KNOCKOUT_DIA",)),
+        "process": ("drill", ("DRIVE_PIN_KNOCKOUT_PROCESS",)),
+        "drill": (DRIVE_PIN_KNOCKOUT_PROCESS, ("DRIVE_PIN_KNOCKOUT_PROCESS",)),
+        "length_nominal": (DRIVE_PIN_KNOCKOUT_LENGTH, ("DRIVE_PIN_KNOCKOUT_LENGTH",)),
+        "thru_to": ("collar_rear", ("DRIVE_PIN_KNOCKOUT_LENGTH",)),
+        "callout": (
+            f"{KNOCKOUT_CALLOUT_ABOVE}\n{KNOCKOUT_CALLOUT_BELOW}",
+            ((_NOTES, "KNOCKOUT_CALLOUT_ABOVE"), (_NOTES, "KNOCKOUT_CALLOUT_BELOW")),
+        ),
+        "wall_min": (DRIVE_PIN_KNOCKOUT_RIM_WORST, ("DRIVE_PIN_KNOCKOUT_RIM_WORST",)),
+    }
+
+
+part_metadata(
+    model_sources=(_FRAME, "SHAFT_LENGTH", _SD, "SHAFT_DOME_HEIGHT"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), SHAFT_LENGTH),),
+    requirements=("plane", "length"),
+    fields={
+        "plane": (_plane_y(SHAFT_LENGTH), _FAR),
+        "outward": ([0.0, 1.0, 0.0], (_FRAME,)),
+        # Depth: the far end to the dome root, +.000/-.016, which sets the
+        # MHA-DT-31 to MHA-PD-09 clearance.
+        "length": (
+            limits(SHAFT_LENGTH, _P["Depth"], SHAFT_LENGTH_BAND, unit=UNIT),
+            ("SHAFT_LENGTH", "SHAFT_LENGTH_BAND", *_PRINT),
+        ),
+        "length_nominal": (SHAFT_LENGTH, _FAR),
+        "length_callout": (SHAFT_LENGTH_MATE.strip(), ((_NOTES, "SHAFT_LENGTH_MATE"),)),
+        "centres_note": (CENTRES_NOTE, ((_NOTES, "CENTRES_NOTE"),)),
+    },
+    precision={"length": _P["Depth"]},
+)
+# The dome end: a spherical cap DomeHeight high on the Ø.375, its radius the
+# one the printed height band gives (the SR prints as a reference), and the
+# (5.14) overall a reference too.  Note 4: no centre in the finished dome.
+requirement(
+    "dome",
+    kind="arc",
+    faces=(SphereFace(2.0 * _DOME_R, (0.0, _DOME_R - SHAFT_DOME_HEIGHT, 0.0)),),
+    requirements=("height", "radius"),
+    fields={
+        "center": ([0.0, _DOME_R - SHAFT_DOME_HEIGHT, 0.0], (_SD, "SHAFT_DOME_HEIGHT")),
+        "axis": ([1.0, 0.0, 0.0], (_FRAME,)),
+        "apex": ([0.0, -1.0, 0.0], (_FRAME,)),
+        "radius": (
+            [_cap_radius(_DOME_HEIGHT_LIMITS[1]), _cap_radius(_DOME_HEIGHT_LIMITS[0])],
+            (_SD, "SHAFT_DOME_HEIGHT", *_PRINT),
+        ),
+        "radius_nominal": (_DOME_R, (_SD, "SHAFT_DOME_HEIGHT")),
+        "height": (_DOME_HEIGHT_LIMITS, ("SHAFT_DOME_HEIGHT", *_PRINT)),
+        "height_nominal": (SHAFT_DOME_HEIGHT, ("SHAFT_DOME_HEIGHT",)),
+        "overall_ref": (
+            SHAFT_LENGTH + SHAFT_DOME_HEIGHT,
+            ("SHAFT_LENGTH", "SHAFT_DOME_HEIGHT"),
+        ),
+        "centre_note": (CENTRE_STUB_NOTE, ((_NOTES, "CENTRE_STUB_NOTE"),)),
+    },
+    precision={"height": _P["DomeHeight"], "radius": _P["DomeSphereRadius"]},
+)
+# The Ø.3750 sliding fit in the MHA-DT-31 crank hub (note 3), from the dome
+# root to the collar's seat face.
+requirement(
+    "hub_shaft",
+    kind="outside_cylinder",
+    faces=(CylinderFace(SHAFT_DIA, contains_y_mm=SEAT_COLLAR / 2.0),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ([0.0, 1.0, 0.0], (_FRAME,)),
+        "dia": (
+            limits(SHAFT_DIA, _P["ShaftDiaDim"], SHAFT_DIA_BAND, unit=UNIT),
+            (_SD, (_HUB, "SHAFT_DIA_BAND"), *_PRINT),
+        ),
+        "nominal_dia": (SHAFT_DIA, (_SD,)),
+        "length_nominal": (SEAT_COLLAR, ("SEAT_COLLAR",)),
+        "mates": ("MHA-DT-31", _FIT),
+        "diametral_clearance": (list(FIT_CLEARANCES["MHA-DT-31"]), _FIT),
+    },
+    precision={"dia": _P["ShaftDiaDim"]},
+)
+# The Ø.689 seat spigot (note 2): its seat face (dome side, where the drive
+# pins enter) and its rear face (Ra 63, bears on MHA-DT-05), each a .XXX
+# station from the far end.
+requirement(
+    "spigot",
+    kind="outside_cylinder",
+    faces=(CylinderFace(SPIGOT_DIA),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, SEAT_COLLAR, 0.0], ("SEAT_COLLAR",)),
+        "axis": ([0.0, 1.0, 0.0], (_FRAME,)),
+        "dia": (
+            limits(SPIGOT_DIA, _P["SpigotDiaDim"], SPIGOT_DIA_BAND, unit=UNIT),
+            ("SPIGOT_DIA", "SPIGOT_DIA_BAND", *_PRINT),
+        ),
+        "nominal_dia": (SPIGOT_DIA, ("SPIGOT_DIA",)),
+        "length_nominal": (COLLAR_REAR - SEAT_COLLAR, ("COLLAR_REAR", "SEAT_COLLAR")),
+        "note": (SPIGOT_NOTE, ((_NOTES, "SPIGOT_NOTE"),)),
+    },
+    precision={"dia": _P["SpigotDiaDim"]},
+)
+requirement(
+    "collar_seat",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), -SEAT_COLLAR),),
+    requirements=("plane", "station"),
+    fields={
+        "plane": (_plane_y(SEAT_COLLAR), ("SEAT_COLLAR",)),
+        "outward": ([0.0, -1.0, 0.0], (_FRAME,)),
+        "station": (
+            _far_station(SEAT_COLLAR, "CollarSeatStation"),
+            ("SEAT_COLLAR", *_FAR, *_PRINT),
+        ),
+        "station_nominal": (SHAFT_LENGTH - SEAT_COLLAR, ("SEAT_COLLAR", *_FAR)),
+        "station_from": ("far_end", _FAR),
+    },
+    precision={"station": _P["CollarSeatStation"]},
+)
+requirement(
+    "collar_rear",
+    kind="face",
+    faces=(surface_finish_by_key(SURFACE_FINISHES, "collar_rear_face").face,),
+    requirements=("plane", "station", "finish_ra"),
+    fields={
+        "plane": (_plane_y(COLLAR_REAR), ("COLLAR_REAR",)),
+        "outward": ([0.0, 1.0, 0.0], (_FRAME,)),
+        "station": (
+            _far_station(
+                COLLAR_REAR,
+                "CollarRearStation",
+                (COLLAR_STATION_TOL, -COLLAR_STATION_TOL),
+            ),
+            ("COLLAR_REAR", "COLLAR_STATION_TOL", *_FAR, *_PRINT),
+        ),
+        "station_nominal": (SHAFT_LENGTH - COLLAR_REAR, ("COLLAR_REAR", *_FAR)),
+        "station_from": ("far_end", _FAR),
+        "finish_ra": (
+            surface_finish_by_key(SURFACE_FINISHES, "collar_rear_face").roughness_um,
+            ("SURFACE_FINISHES",),
+        ),
+    },
+    precision={"station": _P["CollarRearStation"], "finish_ra": 1},
+)
+# The two Ø.375 +/-.010 necks either side of the journals.
+requirement(
+    "neck_outboard",
+    kind="outside_cylinder",
+    faces=(CylinderFace(SHAFT_DIA, contains_y_mm=(COLLAR_REAR + JOURNAL_START) / 2.0),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, COLLAR_REAR, 0.0], ("COLLAR_REAR",)),
+        "axis": ([0.0, 1.0, 0.0], (_FRAME,)),
+        "dia": (
+            limits(SHAFT_DIA, _P["NeckDiaDim"], (NECK_DIA_TOL, -NECK_DIA_TOL), unit=UNIT),
+            (_SD, "NECK_DIA_TOL", *_PRINT),
+        ),
+        "nominal_dia": (SHAFT_DIA, (_SD,)),
+        "length_nominal": (JOURNAL_START - COLLAR_REAR, ("JOURNAL_START", "COLLAR_REAR")),
+    },
+    precision={"dia": _P["NeckDiaDim"]},
+)
+requirement(
+    "neck_inboard",
+    kind="outside_cylinder",
+    faces=(CylinderFace(SHAFT_DIA, contains_y_mm=(JOURNAL_END + SEAT_STEP) / 2.0),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, JOURNAL_END, 0.0], ("JOURNAL_END",)),
+        "axis": ([0.0, 1.0, 0.0], (_FRAME,)),
+        "dia": (
+            limits(SHAFT_DIA, _P["NeckDiaDim"], (NECK_DIA_TOL, -NECK_DIA_TOL), unit=UNIT),
+            (_SD, "NECK_DIA_TOL", *_PRINT),
+        ),
+        "nominal_dia": (SHAFT_DIA, (_SD,)),
+        "length_nominal": (SEAT_STEP - JOURNAL_END, ("SEAT_STEP", "JOURNAL_END")),
+    },
+    precision={"dia": _P["NeckDiaDim"]},
+)
+# The 2X Ø.4490 running fits in MHA-DT-05 (note 3, Ra 63): each end a .XX
+# station from the far end, ``station`` the end nearer the far end.
+requirement(
+    "outboard_journal",
+    kind="journal",
+    faces=(surface_finish_by_key(SURFACE_FINISHES, "outboard_journal").face,),
+    requirements=("dia", "station", "end_station", "finish_ra"),
+    fields={
+        "at": ([0.0, RELIEF_START, 0.0], ("RELIEF_START",)),
+        "axis": ([0.0, -1.0, 0.0], (_FRAME,)),
+        "dia": (
+            limits(JOURNAL_DIA, _P["JournalDiaDim"], JOURNAL_DIA_BAND, unit=UNIT),
+            ("JOURNAL_DIA", "JOURNAL_DIA_BAND", *_PRINT),
+        ),
+        "nominal_dia": (JOURNAL_DIA, ("JOURNAL_DIA",)),
+        "station": (
+            _far_station(RELIEF_START, "ReliefOutboardStation"),
+            ("RELIEF_OUTBOARD_STATION", *_PRINT),
+        ),
+        "station_nominal": (SHAFT_LENGTH - RELIEF_START, ("RELIEF_OUTBOARD_STATION",)),
+        "station_from": ("far_end", _FAR),
+        "end_station": (
+            _far_station(JOURNAL_START, "JournalOutboardStation"),
+            ("JOURNAL_START", *_FAR, *_PRINT),
+        ),
+        "end_station_nominal": (SHAFT_LENGTH - JOURNAL_START, ("JOURNAL_START", *_FAR)),
+        "finish_ra": (
+            surface_finish_by_key(SURFACE_FINISHES, "outboard_journal").roughness_um,
+            ("SURFACE_FINISHES",),
+        ),
+        "mates": ("MHA-DT-05", _FIT),
+        "diametral_clearance": (list(FIT_CLEARANCES["MHA-DT-05"]), _FIT),
+    },
+    precision={
+        "dia": _P["JournalDiaDim"],
+        "station": _P["ReliefOutboardStation"],
+        "end_station": _P["JournalOutboardStation"],
+        "finish_ra": 1,
+    },
+)
+requirement(
+    "inboard_journal",
+    kind="journal",
+    faces=(surface_finish_by_key(SURFACE_FINISHES, "inboard_journal").face,),
+    requirements=("dia", "station", "end_station", "finish_ra"),
+    fields={
+        "at": ([0.0, JOURNAL_END, 0.0], ("JOURNAL_END",)),
+        "axis": ([0.0, -1.0, 0.0], (_FRAME,)),
+        "dia": (
+            limits(JOURNAL_DIA, _P["JournalDiaDim"], JOURNAL_DIA_BAND, unit=UNIT),
+            ("JOURNAL_DIA", "JOURNAL_DIA_BAND", *_PRINT),
+        ),
+        "nominal_dia": (JOURNAL_DIA, ("JOURNAL_DIA",)),
+        "station": (
+            _far_station(JOURNAL_END, "JournalInboardStation"),
+            ("JOURNAL_INBOARD_STATION", *_PRINT),
+        ),
+        "station_nominal": (SHAFT_LENGTH - JOURNAL_END, ("JOURNAL_INBOARD_STATION",)),
+        "station_from": ("far_end", _FAR),
+        "end_station": (
+            _far_station(RELIEF_END, "ReliefInboardStation"),
+            ("RELIEF_INBOARD_STATION", *_PRINT),
+        ),
+        "end_station_nominal": (SHAFT_LENGTH - RELIEF_END, ("RELIEF_INBOARD_STATION",)),
+        "finish_ra": (
+            surface_finish_by_key(SURFACE_FINISHES, "inboard_journal").roughness_um,
+            ("SURFACE_FINISHES",),
+        ),
+        "mates": ("MHA-DT-05", _FIT),
+        "diametral_clearance": (list(FIT_CLEARANCES["MHA-DT-05"]), _FIT),
+    },
+    precision={
+        "dia": _P["JournalDiaDim"],
+        "station": _P["JournalInboardStation"],
+        "end_station": _P["ReliefInboardStation"],
+        "finish_ra": 1,
+    },
+)
+requirement(
+    "relief",
+    kind="outside_cylinder",
+    faces=(CylinderFace(RELIEF_DIA),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, RELIEF_START, 0.0], ("RELIEF_START",)),
+        "axis": ([0.0, 1.0, 0.0], (_FRAME,)),
+        "dia": (limits(RELIEF_DIA, _P["ReliefDiaDim"], unit=UNIT), ("RELIEF_DIA", *_PRINT)),
+        "nominal_dia": (RELIEF_DIA, ("RELIEF_DIA",)),
+        "length_nominal": (RELIEF_END - RELIEF_START, ("RELIEF_END", "RELIEF_START")),
+    },
+    precision={"dia": _P["ReliefDiaDim"]},
+)
+# The Ø.3125 sliding fit in the MHA-DT-10 pinion (note 3), from its step (a
+# .XX station from the far end) to the far end.
+requirement(
+    "pinion_seat",
+    kind="outside_cylinder",
+    faces=(CylinderFace(PINION_SEAT_DIA),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, SEAT_STEP, 0.0], ("SEAT_STEP",)),
+        "axis": ([0.0, 1.0, 0.0], (_FRAME,)),
+        "dia": (
+            limits(PINION_SEAT_DIA, _P["PinionSeatDiaDim"], PINION_SEAT_DIA_BAND, unit=UNIT),
+            ("PINION_SEAT_DIA", "PINION_SEAT_DIA_BAND", *_PRINT),
+        ),
+        "nominal_dia": (PINION_SEAT_DIA, ("PINION_SEAT_DIA",)),
+        "length_nominal": (SHAFT_LENGTH - SEAT_STEP, ("SEAT_STEP", *_FAR)),
+        "mates": ("MHA-DT-10", _FIT),
+        "diametral_clearance": (list(FIT_CLEARANCES["MHA-DT-10"]), _FIT),
+        "match_ream_callout": (PINION_PIN_CALLOUT, ((_NOTES, "PINION_PIN_CALLOUT"),)),
+    },
+    precision={"dia": _P["PinionSeatDiaDim"]},
+)
+requirement(
+    "seat_step",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), SEAT_STEP),),
+    requirements=("plane", "station"),
+    fields={
+        "plane": (_plane_y(SEAT_STEP), ("SEAT_STEP",)),
+        "outward": ([0.0, 1.0, 0.0], (_FRAME,)),
+        "station": (
+            _far_station(SEAT_STEP, "PinionSeatStation"),
+            ("PINION_SEAT_STATION", *_PRINT),
+        ),
+        "station_nominal": (SHAFT_LENGTH - SEAT_STEP, ("PINION_SEAT_STATION",)),
+        "station_from": ("far_end", _FAR),
+    },
+    precision={"station": _P["PinionSeatStation"]},
+)
+# The #9 cross hole, drilled through along model X here; note 1 taper-reams
+# it 1:48 at assembly with MHA-DT-31.
+requirement(
+    "cross_hole",
+    kind="hole",
+    faces=(CylinderFace(_PIN_HOLE_DIA),),
+    requirements=("dia", "thru", "station"),
+    fields={
+        "at": ([-SHAFT_DIA / 2.0, PIN_HOLE_HEIGHT, 0.0], ("PIN_HOLE_HEIGHT", _SD)),
+        "axis": ([1.0, 0.0, 0.0], (_FRAME,)),
+        "dia": (drilled_limits(_PIN_HOLE_DIA, 3, unit=UNIT), ("PIN_HOLE_SPEC", "UNIT")),
+        "nominal_dia": (_PIN_HOLE_DIA, ("PIN_HOLE_SPEC",)),
+        "thru": (True, ("CROSS_HOLE_PROCESS",)),
+        "process": ("drill", ("CROSS_HOLE_PROCESS",)),
+        "drill": (CROSS_HOLE_PROCESS, ("CROSS_HOLE_PROCESS",)),
+        "station": (
+            _far_station(PIN_HOLE_HEIGHT, "PinHoleStation"),
+            ("PIN_HOLE_HEIGHT", *_FAR, *_PRINT),
+        ),
+        "station_nominal": (SHAFT_LENGTH - PIN_HOLE_HEIGHT, ("PIN_HOLE_HEIGHT", *_FAR)),
+        "station_from": ("far_end", _FAR),
+        "note": (CROSS_HOLE_NOTE, ((_NOTES, "CROSS_HOLE_NOTE"),)),
+    },
+    precision={"dia": 3, "station": _P["PinHoleStation"]},
+)
+# The two reamed drive-pin holes (pressed MHA-DT-VN-67 pins for the MHA-PD-09
+# sprocket), .2756 +/-.0009 either side of the axis along model Z, blind from
+# the seat face; each #54 knockout runs on from its floor through the rear
+# face.
+requirement(
+    "drive_pin_1",
+    kind="hole",
+    faces=(CylinderFace(DRIVE_PIN_HOLE_DIA, contains_z_mm=-DRIVE_PIN_CIRCLE_RADIUS),),
+    requirements=("dia", "depth", "offset"),
+    fields=_drive_pin_fields(-DRIVE_PIN_CIRCLE_RADIUS),
+    precision={"dia": HOLE_CALLOUT_PLACES, "depth": HOLE_CALLOUT_PLACES, "offset": _P["DrivePinOffset1"]},
+)
+requirement(
+    "drive_pin_2",
+    kind="hole",
+    faces=(CylinderFace(DRIVE_PIN_HOLE_DIA, contains_z_mm=DRIVE_PIN_CIRCLE_RADIUS),),
+    requirements=("dia", "depth", "offset"),
+    fields=_drive_pin_fields(DRIVE_PIN_CIRCLE_RADIUS),
+    precision={"dia": HOLE_CALLOUT_PLACES, "depth": HOLE_CALLOUT_PLACES, "offset": _P["DrivePinOffset2"]},
+)
+requirement(
+    "knockout_1",
+    kind="knockout",
+    faces=(CylinderFace(DRIVE_PIN_KNOCKOUT_DIA, contains_z_mm=-DRIVE_PIN_CIRCLE_RADIUS),),
+    requirements=("dia",),
+    fields=_knockout_fields(-DRIVE_PIN_CIRCLE_RADIUS),
+    precision={"dia": 3},
+)
+requirement(
+    "knockout_2",
+    kind="knockout",
+    faces=(CylinderFace(DRIVE_PIN_KNOCKOUT_DIA, contains_z_mm=DRIVE_PIN_CIRCLE_RADIUS),),
+    requirements=("dia",),
+    fields=_knockout_fields(DRIVE_PIN_CIRCLE_RADIUS),
+    precision={"dia": 3},
+)
+# The centre-punched witness mark on the seat face (location not critical).
+requirement(
+    "punch_mark",
+    kind="mark",
+    faces=(CylinderFace(FIDUCIAL_MODEL_DIA),),
+    requirements=("note",),
+    fields={"note": (FIDUCIAL_NOTE, ((_NOTES, "FIDUCIAL_NOTE"),))},
+)
 
 # Both orthographic views print at the sheet scale, so neither needs a caption.
 SHEET_SCALE = (2.0, 1.0)

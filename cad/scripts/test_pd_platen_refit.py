@@ -446,11 +446,31 @@ def test_clip_screw_tips_sweep_clear_of_the_bar_and_hanger(
         assembly._assert_lock_station_sweep()
 
 
+def test_lock_sweep_judges_the_flat_plate_and_the_knob_bush(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # #2425: the flat plate and its pressed MHA-PD-28 bush replace the notched
+    # plate's lower block and hub; the sweep judges the plate, the bush's hub
+    # forward of face A and its stub behind it.
+    lines: list[str] = []
+    monkeypatch.setattr(assembly, "log", lines.append)
+    assembly._assert_lock_station_sweep()
+    (line,) = lines
+    items = (item.rsplit(" ", 1) for item in line.split(": ", 1)[1].split(", "))
+    gaps = {label: float(gap) for label, gap in items}
+    assert {"arm plate", "knob bush hub", "knob bush stub"} <= gaps.keys()
+    # Negative control: a hub Ø printed loose enough to reach the lock stations.
+    reach = 2.0 * gaps["knob bush hub"] + 0.2
+    monkeypatch.setattr(assembly, "_BUSH_HUB_DIA_DEV", (-reach, reach))
+    with pytest.raises(AssertionError, match="into the knob bush hub"):
+        assembly._assert_lock_station_sweep()
+
+
 @pytest.mark.parametrize(
     ("deviation", "looser", "collides"),
     [
         # A rail printed at the .X row stands the lock plates into the arm
-        # (the inch arm plate's .XX notch leaves the arm the closest section).
+        # (the arm stays the closest section).
         (
             "_GUIDE_DEPTH_DEV",
             printed_deviations(assembly.GUIDE_DEPTH, 1, unit=assembly.GUIDE_UNIT),
@@ -461,14 +481,6 @@ def test_clip_screw_tips_sweep_clear_of_the_bar_and_hanger(
             "_LOCK_THICK_DEV",
             printed_deviations(assembly.LOCK_THICK, 1),
             "heads .* into the arm as",
-        ),
-        # ...and an arm plate whose notch runs 2.5 deep (on the 3/8 arm,
-        # #2019, the plate stands 1.5875 further back, so even a .X notch
-        # row clears; at 2.5 the heads still meet the plate).
-        (
-            "_NOTCH_DEPTH_DEV",
-            (0.0, 2.5),
-            "heads .* into the arm plate as",
         ),
         # A rail that may run 0.9 shallow rubs its plates on the bar.
         ("_GUIDE_DEPTH_DEV", (-0.9, 0.0), "bar's back face"),

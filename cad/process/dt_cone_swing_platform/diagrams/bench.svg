@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="20">The finished platform, top up (pivot end to the right)</text>
+  <path class="part-kept" d="M 72.9 230 L 680.5 230 L 682.5 168 L 55.5 71.8 L 52.6 203.5 Z"/>
+  <path class="holes" d="M 78 76 A 5 5 0 0 0 88 76 Z"/>
+  <path class="holes" d="M 663.6 174 L 682 174 L 682 202 L 663.6 202 A 14 14 0 0 1 663.6 174 Z"/>
+  <circle class="holes" cx="663.6" cy="187.8" r="8"/>
+  <circle class="holes" cx="620.3" cy="189" r="5"/>
+  <circle class="holes" cx="123.7" cy="137.3" r="6"/>
+  <circle class="holes" cx="107.6" cy="202.7" r="6"/>
+  <line class="leader" x1="700" y1="270" x2="664" y2="192"/>
+  <text class="label" x="580" y="284">pivot .2500, top relief</text>
+  <line class="leader" x1="520" y1="270" x2="619" y2="193"/>
+  <text class="label" x="400" y="284">hold-down, cbore under</text>
+  <line class="leader" x1="200" y1="270" x2="110" y2="206"/>
+  <text class="label" x="150" y="284">post taps 1/4-20</text>
+  <line class="leader" x1="40" y1="50" x2="82" y2="83"/>
+  <text class="label" x="22" y="46">lock notch</text>
+  <line class="leader" x1="40" y1="250" x2="60" y2="218"/>
+  <text class="label" x="20" y="264">chamfer</text>
+  <text class="label" x="300" y="248">edge E (the swing-stop face)</text>
+</svg>

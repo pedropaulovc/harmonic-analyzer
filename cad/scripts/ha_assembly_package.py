@@ -393,6 +393,11 @@ TOOLS: tuple[Tool, ...] = (
         ("shop-equipment:consumables.loctite-638",),
     ),
     Tool(
+        "Loctite 641 retaining compound",
+        r"LOCTITE 641",
+        ("shop-equipment:consumables.loctite-641",),
+    ),
+    Tool(
         "30-minute epoxy",
         r"(?:30-MINUTE )?EPOXY",
         ("shop-equipment:consumables.epoxy-30-minute",),

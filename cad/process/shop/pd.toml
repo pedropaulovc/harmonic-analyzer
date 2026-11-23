@@ -90,6 +90,17 @@ diameter_mm = 4.8768
 [tools.reamer-1940]  # MHA-PD-18 Ø.1940 +.001/.000 REAM THRU
 description = ".1940 in HSS chucking reamer"
 diameter_mm = 4.9276
+# MHA-PD-19 press hole Ø.4375 +.0007/0 REAM THRU for the MHA-PD-28 bush (FN2,
+# #2425). The 27/64 (.4219 in) drill is the 115-piece index's, nominal × 25.4;
+# it leaves .0156 in on the diameter for the reamer. The .4375 reamer is not
+# owned (cad/config/shop-equipment/ tools.reamer-4375, to buy); diameter_mm is
+# its nominal size.
+[tools.reamer-4375]
+description = ".4375 in (7/16) HSS straight-flute chucking reamer"
+diameter_mm = 11.1125
+[tools.endmill-hss-tin-2fl-3-16]  # MHA-PD-16 flat floor for the Ø.19 head counterbore, plunged from the tailstock
+description = "3/16 in TiN-coated HSS 2-flute square end mill, centre cutting (McMaster 8949A16)"
+diameter_mm = 4.7625
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so

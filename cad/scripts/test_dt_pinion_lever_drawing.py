@@ -13,8 +13,10 @@ import build_dt_pinion_lever as lever
 import draw_dt_pinion_lever as drawing
 import dt_pinion_lever_geometry
 import dt_pinion_lever_spec
+import export_features
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gtol_face import SURFACE_CYLINDER, SURFACE_PLANE, SURFACE_SPHERE, FaceGeometry
 
 
 def test_required_drawing_paths() -> None:
@@ -232,3 +234,106 @@ def test_station_references_are_points_and_hub_diameters_near_side() -> None:
 
     assert drawing.NEAR_SIDE_DIAMETERS == ("HubOd", "HubBore")
     assert set(drawing.NEAR_SIDE_DIAMETERS) <= set(drawing.FRONT_KEEP)
+
+
+_FEATURE_KINDS = {
+    "mouth_face_b": "face",
+    "hub": "boss",
+    "crown": "profile",
+    "grip_rod": "boss",
+    "bore": "hole",
+    "pin_hole": "hole",
+}
+
+
+def _in(value_in: float) -> float:
+    return value_in * 25.4
+
+
+def _plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+    point = tuple(value * offset_mm / 1000 for value in normal)
+    return FaceGeometry(None, SURFACE_PLANE, (*normal, *point), normal, ())
+
+
+def _cylinder(
+    dia_mm: float, axis: tuple[float, float, float], box_mm: tuple[float, ...]
+) -> FaceGeometry:
+    r = dia_mm / 2000
+    box = tuple(value / 1000 for value in box_mm)
+    return FaceGeometry(None, SURFACE_CYLINDER, (0.0, 0.0, 0.0, *axis, r), None, box)
+
+
+def test_the_lever_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    manifest = export_features.requirement_manifest("dt_pinion_lever")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == _FEATURE_KINDS
+    assert manifest["construction"] == "one_piece"
+    selectors = export_features.feature_selectors("dt_pinion_lever")
+    geometry = dt_pinion_lever_geometry
+    mouth = geometry.HUB_LEN / 2
+    hub_r, rod_r = geometry.HUB_OD / 2, geometry.ROD_DIA / 2
+    apex = mouth - geometry.OVERALL_FROM_B
+    # The STEP inventory (faces.json): one face per surface below.
+    expected = {
+        "mouth_face_b": [_plane((0.0, 0.0, 1.0), mouth)],
+        "hub": [_cylinder(geometry.HUB_OD, (0.0, 0.0, -1.0), (-hub_r, -hub_r, -mouth, hub_r, hub_r, mouth))],
+        "crown": [
+            FaceGeometry(
+                None,
+                SURFACE_SPHERE,
+                (0.0, 0.0, (apex + geometry.CAP_RADIUS) / 1000, geometry.CAP_RADIUS / 1000),
+                None,
+                (),
+            )
+        ],
+        "grip_rod": [
+            _cylinder(geometry.ROD_DIA, (0.0, -1.0, 0.0), (-rod_r, 5.5, -rod_r, rod_r, geometry.ROD_LEN, rod_r)),
+            _plane((0.0, 1.0, 0.0), geometry.ROD_LEN),
+        ],
+        "bore": [
+            _cylinder(geometry.BORE, (0.0, 0.0, -1.0), (-3.175, -3.175, mouth - geometry.BORE_DEPTH, 3.175, 3.175, mouth)),
+            _plane((0.0, 0.0, 1.0), mouth - geometry.BORE_DEPTH),
+        ],
+        "pin_hole": [
+            _cylinder(geometry.PIN_HOLE_DIA, (1.0, 0.0, 0.0), (-hub_r, -0.8, 0.2, -3.0, 0.8, 1.8)),
+            _cylinder(geometry.PIN_HOLE_DIA, (1.0, 0.0, 0.0), (3.0, -0.8, 0.2, hub_r, 0.8, 1.8)),
+        ],
+    }
+    for name, faces in expected.items():
+        for face in faces:
+            owners = [
+                owner
+                for owner, specs in selectors.items()
+                if any(selector.matches(face) for selector in specs)
+            ]
+            assert owners == [name], name
+
+
+def test_lever_feature_bands_are_the_printed_ones() -> None:
+    features = export_features.requirement_manifest("dt_pinion_lever")["features"]
+    assert features["hub"]["dia"] == pytest.approx([_in(0.50), _in(0.52)])
+    crown = features["crown"]
+    assert crown["overall"] == pytest.approx([_in(0.48), _in(0.50)])
+    assert crown["overall_from"] == "mouth_face_b"
+    assert crown["radius"][1] - crown["radius"][0] == pytest.approx(_in(0.02))
+    rod = features["grip_rod"]
+    assert rod["dia"] == pytest.approx([_in(0.23), _in(0.25)])
+    assert rod["length"] == pytest.approx([_in(3.38), _in(3.40)])
+    assert rod["length_from"] == "hub"
+    assert rod["station"] == pytest.approx([_in(0.19), _in(0.21)])
+    assert rod["station_from"] == "mouth_face_b"
+    assert rod["root_corner_r_max"] == pytest.approx(_in(0.040))
+    assert rod["root_corner_exception"] == "RV-01"
+    bore = features["bore"]
+    assert bore["dia"] == pytest.approx([_in(0.2510), _in(0.2515)])
+    assert bore["depth"] == pytest.approx([_in(0.31), _in(0.33)])
+    assert bore["depth_from"] == "mouth_face_b"
+    assert bore["flat_bottom"] is True and bore["process"] == "bore_or_ream"
+    assert bore["mate"] == dt_pinion_lever_spec.LIFT_ROD_NUMBER
+    assert bore["callout"] == drawing.HUB_BORE_CALLOUT
+    pin = features["pin_hole"]
+    assert pin["dia"] == pytest.approx([_in(0.064), _in(0.068)], abs=1e-3)
+    assert pin["station"] == pytest.approx([_in(0.15), _in(0.17)])
+    assert pin["station_from"] == "mouth_face_b"
+    assert pin["made_at"] == "assembly" and pin["thru"] is True
+    assert pin["callout"] == dt_pinion_lever_spec.PIN_HOLE_CALLOUT

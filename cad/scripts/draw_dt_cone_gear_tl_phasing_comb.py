@@ -50,8 +50,12 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _printed_limits import limits
 from _session import run_build
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -189,6 +193,213 @@ FRONT_KEEP = front_keep()
 SHEET_THICK_X = SHEET_BOX[0] - 0.008
 BOTTOM_KEEP = {"SheetThick": (SHEET_THICK_X, BOTTOM_CENTER_Y)}
 OFFSET_TEXT = {"SheetThick": (SHEET_BOX[0] - 0.035, BOTTOM_CENTER_Y - 0.014)}
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_dt_cone_gear_tl_phasing_comb: the U on the Front plane, x north from
+# the south end, y outward through the near arm from the seat line (the near
+# T030 blade's edge), the sheet extruded +Z from z = 0). Every step's start,
+# the T006 level's end, the slot's length and the U's length run from the
+# south end; every blade's depth and the grip span from the seat line; the
+# spring arm's width from its inner edge and the U's height from the far
+# edge. Lengths and widths take the title block's .XX row, the depths and the
+# grip span its .XXX row; the thickness is the stock's reference, the sheet
+# bought .020 +/-.002 (part.SHEET_LIMITS_MM). The declarations print nothing.
+_P = part.DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_cone_gear_tl_phasing_comb"
+_FAR_MM = part.GRIP_SPAN + part.SPRING_WIDTH
+part_metadata(
+    model_sources=("GLOBALS", "profile_points_mm"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+
+
+def _band(name: str) -> list[float]:
+    """A printed sketch dimension's limits at its places."""
+    return limits(part.GLOBALS[name], _P[name], unit=part.UNIT)
+
+
+_PRINTED = ("GLOBALS", "UNIT", (_SELF, "FRONT_KEEP"))
+requirement(
+    "south_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": 0.0},
+            ("profile_points_mm",),
+        ),
+        "outward": ([-1.0, 0.0, 0.0], ("profile_points_mm",)),
+    },
+)
+requirement(
+    "north_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), part.SHEET_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": part.SHEET_LENGTH},
+            ("SHEET_LENGTH",),
+        ),
+        "outward": ([1.0, 0.0, 0.0], ("SHEET_LENGTH",)),
+        "length": (_band("SheetLength"), _PRINTED),
+        "length_nominal": (part.SHEET_LENGTH, ("SHEET_LENGTH",)),
+        "length_from": ("south_end", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"length": _P["SheetLength"]},
+)
+requirement(
+    "seat",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": 0.0},
+            ("profile_points_mm",),
+        ),
+        "outward": ([0.0, -1.0, 0.0], ("profile_points_mm",)),
+    },
+)
+requirement(
+    "spring_inner",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), -part.GRIP_SPAN),),
+    requirements=("grip_span", "grip_callout"),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": -part.GRIP_SPAN},
+            ("GRIP_SPAN",),
+        ),
+        "outward": ([0.0, 1.0, 0.0], ("GRIP_SPAN",)),
+        "grip_span": (_band("GripSpan"), _PRINTED),
+        "grip_span_nominal": (part.GRIP_SPAN, ("GRIP_SPAN",)),
+        "grip_span_from": ("seat", ((_SELF, "FRONT_KEEP"),)),
+        "grip_callout": (part.GRIP_TEXT, ("GRIP_TEXT", "CALLOUTS_BELOW")),
+    },
+    precision={"grip_span": _P["GripSpan"]},
+)
+requirement(
+    "far_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), _FAR_MM),),
+    requirements=("spring_width",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": -_FAR_MM},
+            ("GRIP_SPAN", "SPRING_WIDTH"),
+        ),
+        "outward": ([0.0, -1.0, 0.0], ("SPRING_WIDTH",)),
+        "spring_width": (_band("SpringWidth"), _PRINTED),
+        "spring_width_nominal": (part.SPRING_WIDTH, ("SPRING_WIDTH",)),
+        "spring_width_from": ("spring_inner", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"spring_width": _P["SpringWidth"]},
+)
+requirement(
+    "back",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), part.ARM_WIDTH),),
+    requirements=("height",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": part.ARM_WIDTH},
+            ("ARM_WIDTH",),
+        ),
+        "outward": ([0.0, 1.0, 0.0], ("ARM_WIDTH",)),
+        "height": (_band("SheetHeight"), _PRINTED),
+        "height_nominal": (part.SHEET_HEIGHT, ("SHEET_HEIGHT",)),
+        "height_from": ("far_edge", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"height": _P["SheetHeight"]},
+)
+requirement(
+    "slot_end",
+    kind="slot",
+    faces=(CylinderFace(part.GRIP_SPAN),),
+    requirements=("slot_length", "slot_callout"),
+    fields={
+        "at": (
+            [part.SLOT_LENGTH, -part.GRIP_SPAN / 2.0, 0.0],
+            ("SLOT_LENGTH", "GRIP_SPAN"),
+        ),
+        "slot_length": (_band("SlotLength"), _PRINTED),
+        "slot_length_nominal": (part.SLOT_LENGTH, ("SLOT_LENGTH",)),
+        "slot_length_from": ("south_end", ((_SELF, "FRONT_KEEP"),)),
+        "slot_callout": (part.DEPTH_SUFFIX["SlotLength"].strip(), ("DEPTH_SUFFIX",)),
+        "end_radius_ref": (part.SLOT_END_RADIUS_MM, ("SLOT_END_RADIUS_MM",)),
+    },
+    precision={"slot_length": _P["SlotLength"]},
+)
+for _teeth in part.BONDED_TEETH:
+    _start, _depth = part.blade_start_name(_teeth), part.blade_depth_name(_teeth)
+    _south = part.BLADE_START_MM[_teeth]
+    _deep = part.BLADE_DEPTH_MM[_teeth]
+    _faces = [
+        PlanarFace((-1.0, 0.0, 0.0), -_south),
+        PlanarFace((0.0, -1.0, 0.0), _deep),
+    ]
+    _fields = {
+        "at": ([_south, -_deep, 0.0], ("profile_points_mm", "step_corner_index")),
+        "start": (_band(_start), _PRINTED),
+        "start_nominal": (_south, ("BLADE_START_MM",)),
+        "start_from": ("south_end", ((_SELF, "FRONT_KEEP"),)),
+        "depth": (_band(_depth), _PRINTED),
+        "depth_nominal": (_deep, ("BLADE_DEPTH_MM",)),
+        "depth_from": ("seat", ((_SELF, "FRONT_KEEP"),)),
+        "callout": (part.DEPTH_SUFFIX[_depth].lstrip(", "), ("DEPTH_SUFFIX",)),
+    }
+    _requirements = ["start", "depth", "callout"]
+    _precision = {"start": _P[_start], "depth": _P[_depth]}
+    if _teeth == part.GEARS[-1]:
+        # The last level ends where its blade's return rises to the seat.
+        _faces.append(PlanarFace((1.0, 0.0, 0.0), part.LEVEL_END_MM))
+        _fields["level_end"] = (_band("LevelEnd"), _PRINTED)
+        _fields["level_end_nominal"] = (part.LEVEL_END_MM, ("LEVEL_END_MM",))
+        _fields["level_end_from"] = ("south_end", ((_SELF, "FRONT_KEEP"),))
+        _requirements.append("level_end")
+        _precision["level_end"] = _P["LevelEnd"]
+    requirement(
+        f"blade_{part.gear_tag(_teeth).lower()}",
+        kind="profile",
+        faces=tuple(_faces),
+        requirements=tuple(_requirements),
+        fields=_fields,
+        precision=_precision,
+    )
+requirement(
+    "underside",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("SHEET_THICK",)),
+        "outward": ([0.0, 0.0, -1.0], ("SHEET_THICK",)),
+    },
+)
+requirement(
+    "top",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part.SHEET_THICK),),
+    requirements=("thickness_ref", "stock", "stock_thickness"),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": part.SHEET_THICK},
+            ("SHEET_THICK",),
+        ),
+        "outward": ([0.0, 0.0, 1.0], ("SHEET_THICK",)),
+        "thickness_ref": (part.SHEET_THICK, ("SHEET_THICK", (_SELF, "BOTTOM_KEEP"))),
+        "stock": (part.STOCK_TEXT, ("STOCK_TEXT",)),
+        "stock_thickness": (
+            [part.SHEET_LIMITS_MM[0], part.SHEET_LIMITS_MM[2]],
+            ("SHEET_LIMITS_MM",),
+        ),
+        "stock_thickness_nominal": (part.SHEET_THICK, ("SHEET_THICK",)),
+    },
+    precision={"thickness_ref": _P["SheetThick"], "stock_thickness": _P["SheetThick"]},
+)
 
 
 def text_blocks() -> dict[str, tuple[float, float, float, float]]:
