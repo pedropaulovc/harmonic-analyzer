@@ -29,8 +29,9 @@
 [stock.1018-ground-flat-3-8x1]
 form = "flat_bar"
 material = "AISI 1018 cold-finished steel, precision ground"
-note = "To order: Online Metals part 12095, 3/8 x 1 in 1018 precision-ground flat, $72.20 each (read live 2026-10-27, #2019), thickness +/-.001 as supplied (Online Metals tool-steel tolerances, precision-ground 1018 row); the faces are not machined (pd-transgear-arm registry process; pd_transgear_arm_geometry.STOCK_SKU and THICKNESS_BAND). Allocation: pd-transgear-arm (MHA-PD-18). Length not read. Not owned."
+note = "To order: Online Metals part 12095, 3/8 x 1 in 1018 precision-ground flat, $72.20 each (read live 2026-10-27, #2019), thickness +/-.001 as supplied (Online Metals tool-steel tolerances, precision-ground 1018 row); the faces are not machined (pd-transgear-arm registry process; pd_transgear_arm_geometry.STOCK_SKU and THICKNESS_BAND). Allocation: pd-transgear-arm (MHA-PD-18): one 12 in length, one 5.70-5.75 in blank (pd_transgear_arm/plan.toml) and a spare blank. Not owned."
 section_mm = [25.4, 9.525]
+length_mm = 304.8
 status = "to_order"
 cite = ["cad/config/parts/pd-transgear-arm.yaml process", "cad/scripts/pd_transgear_arm_geometry.py STOCK_SKU = \"12095\"", "https://www.onlinemetals.com/en/buy/carbon-steel/0-375-x-1-tool-steel-rectangle-bar-1018/pid/12095"]
 
@@ -300,6 +301,16 @@ dia_in = [0.15625]
 length_in = [4.0]
 status = "to_order"
 cite = ["cad/config/parts/dt-pinion-cam-pin.yaml material_specification", "cad/scripts/dt_pinion_cam_pin_geometry.py PIN_DIA, PIN_LEN"]
+
+[stock.taper-pin-no3-1-3-4]
+form = "taper_pin"
+material = "12L14 carbon steel, ASME B18.8.2 No. 3 taper pin"
+note = "To order: McMaster-Carr 98390A254, No. 3 x 1-3/4 in taper pin, .219 in large end, 1:48 taper, 12L14 carbon steel, ASME B18.8.2, pack of 25 (dt_crank_pin_spec, read live 2026-11-20). Source: the dt-crank-pin (MHA-DT-09) registry row (owner ruling 2026-11-20, #2368): bought, cross-drilled only. One pin per part; the traveler's mill setup spaces the vise with wrung gauge blocks. Not owned."
+dia_in = [0.219]
+length_in = [1.75]
+pieces = 25
+status = "to_order"
+cite = ["cad/config/parts/dt-crank-pin.yaml material_specification", "cad/scripts/dt_crank_pin_spec.py SKU, DESIGNATION, PIN_LENGTH, BIG_END_DIA"]
 
 [stock.drill-rod-1-16]
 form = "round_bar"

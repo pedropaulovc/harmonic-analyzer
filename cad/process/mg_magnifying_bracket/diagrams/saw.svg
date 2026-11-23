@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 1: one blank sawn off the 1/2 x 2-1/4 in flat bar; 2.5 px/mm. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 1: saw the blank off the 1/2 × 2-1/4 in flat bar</text>
+  <text class="label" x="40" y="80">The bar flat, from above (its 2-1/4 width up the page):</text>
+  <rect class="part-rest" x="40" y="110" width="680" height="142.9"/>
+  <rect class="part-kept" x="60" y="110" width="301.6" height="142.9"/>
+  <text class="label" x="210.8" y="185.4" text-anchor="middle">the blank</text>
+  <line class="datum" x1="361.6" y1="100" x2="361.6" y2="262.9"/>
+  <rect class="part-removed" x="361.6" y="110" width="7.9" height="142.9"/>
+  <line class="dims" x1="60" y1="282.9" x2="361.6" y2="282.9"/>
+  <line class="dims" x1="60" y1="272.9" x2="60" y2="292.9"/>
+  <line class="dims" x1="361.6" y1="272.9" x2="361.6" y2="292.9"/>
+  <text class="label" x="60" y="312.9">{{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} long; the kerf ({{process.kerf_in:.3dot}}) on the bar's side</text>
+  <line class="active-face" x1="60" y1="252.9" x2="361.6" y2="252.9"/>
+  <line class="leader" x1="300" y1="252.9" x2="420" y2="340"/>
+  <circle class="leader-dot" cx="300" cy="252.9" r="2"/>
+  <text class="label" x="420" y="344">one as-bought long edge: mark it O (never cut)</text>
+  <text class="label" x="40" y="370">Mic the thickness and calipers the width first. Burr off both ends and the long edges.</text>
+</svg>

@@ -76,6 +76,9 @@ LOCATOR_NOTE = "\n".join(textwrap.wrap(
     subsequent_indent="   ",
     break_on_hyphens=False,
 ))
+# The sheet's only numbered note, for the feature export (export_features
+# reads a declared part's DRAWING_NOTES); the drawing prints LOCATOR_NOTE.
+DRAWING_NOTES = LOCATOR_NOTE
 # The count above the size, as on the screw holes; the note pointer on the
 # process line; the fit on the two lines of words under it (rule 7).  At
 # most 21 characters a line, so the shelf under the block ends left of hole

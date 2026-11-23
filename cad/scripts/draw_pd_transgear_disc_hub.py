@@ -61,17 +61,22 @@ from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
 from _gear_drawing_entities import visible_circle_edge
+from _gtol_cylinder import CylinderFace
 from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
 from _layout_geometry import Box
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
 from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
+import pd_transgear_disc_hub_geometry as _geom
 from pd_transgear_disc_hub_geometry import BOLT_CIRCLE_DIA
+import pd_transgear_disc_hub_spec as _spec
 from pd_transgear_disc_hub_spec import (
     BORE_CALLOUT_BELOW,
     BORE_DATUM,
@@ -419,6 +424,427 @@ SECTION_CENTERLINES_MODEL = (
 SECTION_CAPTION_XY = (
     SECTION_CENTER[0],
     _section_xy(-_SECTION_REACH_MM, 0.0)[1] - 0.006,
+)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_pd_transgear_disc_hub: the gear axis on model Z, the flange's rear
+# face at z = 0, the spigot toward +Z, the flange and the hub body toward -Z;
+# screw 0° on +X; the key pin's chord parallel to X on -Y, its ream entering
+# from +X; the oil hole on +Y).  The bore is reamed through, datum A; the
+# flange's rear face and the spigot's end are square to it; the overall and
+# the spigot's length print the disc cluster stack's band (note 1); the
+# flange, the hub, the flange thickness and the bolt circle the title
+# block's rows; the screw holes and the #56 knockout its DRILLED HOLES row;
+# the chord ream its press-fit band, its chord offset and stop from the hub
+# axis and its station .XX from the hub front face (SECTION A-A).  The oil
+# hole is match-drilled with MHA-PD-10 at assembly, never by the part's
+# traveler.  The hub body is a plain "diameter", not an outside cylinder:
+# the screw holes run through the flange beside it, never along it.  The
+# declarations print nothing.
+DRAWING_NOTES = NOTES_TEXT
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_transgear_disc_hub"
+_GEOM = "pd_transgear_disc_hub_geometry"
+_UNIT = _geom.UNIT
+_PLUS_MINUS = {
+    "HubLength": (_spec.HUB_LENGTH_BAND, -_spec.HUB_LENGTH_BAND),
+    "SpigotLength": (_geom.SPIGOT_LENGTH_BAND, -_geom.SPIGOT_LENGTH_BAND),
+    "KeyPinLocation": (_spec.KEY_PIN_LOCATION_BAND, -_spec.KEY_PIN_LOCATION_BAND),
+}
+# The chord ream enters the hub body's O.D. where its axis meets it (+X).
+KEY_PIN_ENTRY_X = math.sqrt((HUB_DIA / 2.0) ** 2 - KEY_PIN_CHORD_OFFSET**2)
+KEY_PIN_STOP_LIMITS = limits(
+    KEY_PIN_STOP, _P["KeyPinStop"], _PLUS_MINUS["KeyPinLocation"], unit=_UNIT
+)
+part_metadata(
+    model_sources=(
+        (_GEOM, "SPIGOT_LENGTH"),
+        "FLANGE_THICK",
+        "HUB_LENGTH",
+        "HUB_FRONT_Z",
+        "KEY_PIN_Z",
+    ),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+    datums={
+        BORE_DATUM: (
+            {"feature": "bore", "surface": "reamed bore cylinder"},
+            ("BORE_DATUM", (_SELF, "DATUM_A_SYMBOL")),
+        )
+    },
+)
+requirement(
+    "front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -HUB_FRONT_Z),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": HUB_FRONT_Z},
+            ("HUB_FRONT_Z",),
+        ),
+        "outward": ([0.0, 0.0, -1.0], ("__frame__",)),
+    },
+)
+# The spigot's end: the overall from the hub front face (note 1) and its
+# square to datum A.
+requirement(
+    "spigot_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), SPIGOT_LENGTH),),
+    requirements=("length", "perpendicularity_max"),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": SPIGOT_LENGTH},
+            ((_GEOM, "SPIGOT_LENGTH"),),
+        ),
+        "outward": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "length": (
+            limits(
+                _spec.HUB_LENGTH, _P["HubLength"], _PLUS_MINUS["HubLength"], unit=_UNIT
+            ),
+            ("HUB_LENGTH", "HUB_LENGTH_BAND", (_SELF, "SIDE_KEEP")),
+        ),
+        "length_nominal": (_spec.HUB_LENGTH, ("HUB_LENGTH",)),
+        "length_from": ("front_face", ((_SELF, "SIDE_KEEP"),)),
+        "callout": (HUB_LENGTH_CALLOUT, ("HUB_LENGTH_CALLOUT",)),
+        "note": (STACK_TEXT, ("STACK_TEXT", (_SELF, "DRAWING_NOTES"))),
+        "perpendicularity_max": (
+            _spec.SPIGOT_END_PERPENDICULARITY,
+            ("SPIGOT_END_PERPENDICULARITY", "GEOMETRIC_TOLERANCES_IN"),
+        ),
+        "perpendicularity_datum": (
+            BORE_DATUM,
+            ("BORE_DATUM", (_SELF, "SPIGOT_END_FRAME")),
+        ),
+    },
+    precision={"length": _P["HubLength"]},
+)
+# The flange's rear face: it clamps the disc's front face, square to datum A;
+# the spigot's length and the flange's thickness run from it.
+requirement(
+    "flange_rear_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), 0.0),),
+    requirements=("perpendicularity_max",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
+        "outward": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "perpendicularity_max": (
+            _spec.FLANGE_FACE_PERPENDICULARITY,
+            ("FLANGE_FACE_PERPENDICULARITY", "GEOMETRIC_TOLERANCES_IN"),
+        ),
+        "perpendicularity_datum": (
+            BORE_DATUM,
+            ("BORE_DATUM", (_SELF, "FLANGE_FACE_FRAME")),
+        ),
+    },
+)
+requirement(
+    "flange_front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), FLANGE_THICK),),
+    requirements=("thickness",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": -FLANGE_THICK},
+            ("FLANGE_THICK",),
+        ),
+        "outward": ([0.0, 0.0, -1.0], ("__frame__",)),
+        "thickness": (
+            limits(FLANGE_THICK, _P["FlangeThick"], unit=_UNIT),
+            ("FLANGE_THICK", (_GEOM, "UNIT"), (_SELF, "SIDE_KEEP")),
+        ),
+        "thickness_nominal": (FLANGE_THICK, ("FLANGE_THICK",)),
+        "thickness_from": ("flange_rear_face", ((_SELF, "SIDE_KEEP"),)),
+        "callout": (FLANGE_THICK_CALLOUT, ("FLANGE_THICK_CALLOUT",)),
+    },
+    precision={"thickness": _P["FlangeThick"]},
+)
+requirement(
+    "flange",
+    kind="outside_cylinder",
+    faces=(CylinderFace(FLANGE_DIA),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
+        "dia": (
+            limits(FLANGE_DIA, _P["FlangeDia"], unit=_UNIT),
+            ("FLANGE_DIA", (_GEOM, "UNIT"), (_SELF, "SIDE_KEEP")),
+        ),
+        "nominal_dia": (FLANGE_DIA, ("FLANGE_DIA",)),
+        "length_nominal": (FLANGE_THICK, ("FLANGE_THICK",)),
+    },
+    precision={"dia": _P["FlangeDia"]},
+)
+# The spigot: a sliding fit in the MHA-PD-06 disc's bore, its root sharp,
+# its length from the flange's rear face (note 1).
+requirement(
+    "spigot",
+    kind="outside_cylinder",
+    faces=(CylinderFace(SPIGOT_DIA),),
+    requirements=("dia", "length", "root_radius_max"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "dia": (
+            limits(SPIGOT_DIA, _P["SpigotDia"], _geom.SPIGOT_DIA_BAND, unit=_UNIT),
+            ((_GEOM, "SPIGOT_DIA"), (_GEOM, "SPIGOT_DIA_BAND"), (_SELF, "SIDE_KEEP")),
+        ),
+        "nominal_dia": (SPIGOT_DIA, ((_GEOM, "SPIGOT_DIA"),)),
+        "length": (
+            limits(
+                SPIGOT_LENGTH,
+                _P["SpigotLength"],
+                _PLUS_MINUS["SpigotLength"],
+                unit=_UNIT,
+            ),
+            (
+                (_GEOM, "SPIGOT_LENGTH"),
+                (_GEOM, "SPIGOT_LENGTH_BAND"),
+                (_SELF, "SIDE_KEEP"),
+            ),
+        ),
+        "length_nominal": (SPIGOT_LENGTH, ((_GEOM, "SPIGOT_LENGTH"),)),
+        "length_end": ("flange_rear_face", ((_SELF, "SIDE_KEEP"),)),
+        "length_callout": (SPIGOT_LENGTH_CALLOUT, ("SPIGOT_LENGTH_CALLOUT",)),
+        "root_radius_max": (
+            _spec.CORNER_RADIUS_MAX,
+            ("CORNER_RADIUS_MAX", "SPIGOT_CALLOUT_BELOW"),
+        ),
+        "mate": ("MHA-PD-06", ("DISC_NUMBER", "SPIGOT_CALLOUT_BELOW")),
+        "fit": ("sliding", ("SPIGOT_CALLOUT_BELOW",)),
+        "callout": (SPIGOT_CALLOUT_BELOW, ("SPIGOT_CALLOUT_BELOW",)),
+    },
+    precision={"dia": _P["SpigotDia"], "length": _P["SpigotLength"]},
+)
+# The hub body, from the hub front face to the flange: its third place holds
+# the wall over the chord ream, printed under the size.
+requirement(
+    "hub_body",
+    kind="diameter",
+    faces=(CylinderFace(HUB_DIA),),
+    requirements=("dia", "pin_ream_wall_min"),
+    fields={
+        "at": ([0.0, 0.0, HUB_FRONT_Z], ("HUB_FRONT_Z",)),
+        "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "dia": (
+            limits(HUB_DIA, _P["HubDia"], unit=_UNIT),
+            ("HUB_DIA", (_GEOM, "UNIT"), (_SELF, "SIDE_KEEP")),
+        ),
+        "nominal_dia": (HUB_DIA, ("HUB_DIA",)),
+        "length_nominal": (_spec.HUB_BODY_LENGTH, ("HUB_BODY_LENGTH",)),
+        "pin_ream_wall_min": (
+            _spec.DISC.inch_floor_mm(_spec.KEY_PIN_WALL_WORST, 3),
+            ("KEY_PIN_WALL_WORST", "HUB_DIA_CALLOUT_BELOW"),
+        ),
+        "callout": (HUB_DIA_CALLOUT_BELOW, ("HUB_DIA_CALLOUT_BELOW",)),
+    },
+    precision={"dia": _P["HubDia"]},
+)
+# The bore, datum A: reamed through, a sliding fit on the MHA-PD-10 boss.
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(BORE_DIA),),
+    requirements=("dia", "wall_min"),
+    fields={
+        "at": ([0.0, 0.0, SPIGOT_LENGTH], ((_GEOM, "SPIGOT_LENGTH"),)),
+        "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
+        "dia": (
+            limits(BORE_DIA, _P["BoreDia"], _spec.BORE_BAND, unit=_UNIT),
+            ("BORE_DIA", "BORE_BAND", (_SELF, "END_KEEP")),
+        ),
+        "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
+        "thru": (True, ("BORE_CALLOUT_BELOW",)),
+        "process": ("ream", ("BORE_CALLOUT_BELOW",)),
+        "mate": ("MHA-PD-10", ("SLEEVE_NUMBER", "BORE_CALLOUT_BELOW")),
+        "fit": ("sliding", ("BORE_CALLOUT_BELOW",)),
+        "diametral_clearance": (
+            list(_spec.BOSS_CLEARANCE_LIMITS),
+            ("BOSS_CLEARANCE_LIMITS",),
+        ),
+        "wall_min": (
+            _spec.DISC.inch_floor_mm(_spec.BORE_WALL_FINISHED_MIN, 3),
+            ("BORE_WALL_FINISHED_MIN", "BORE_WALL_TEXT"),
+        ),
+        "datum": (BORE_DATUM, ("BORE_DATUM", (_SELF, "DATUM_A_SYMBOL"))),
+        "callout": (BORE_CALLOUT_BELOW, ("BORE_CALLOUT_BELOW",)),
+    },
+    precision={"dia": _P["BoreDia"]},
+)
+# The three #0-80 screws' holes (MHA-SH-VN-59), drilled through the flange
+# from its rear face, equally spaced on the printed circle; the disc's taps
+# are spotted through them at assembly.
+for _index, (_x, _y) in enumerate(_geom.screw_centres(), 1):
+    requirement(
+        f"flange_hole_{_index}",
+        kind="hole",
+        faces=(CylinderFace(_geom.SCREW_HOLE_DIA, contains_x_mm=_x, contains_y_mm=_y),),
+        requirements=("dia", "bolt_circle_dia"),
+        fields={
+            "at": (
+                [_x, _y, 0.0],
+                ((_GEOM, "screw_centres"), (_GEOM, "SCREW_ANGLES_DEG")),
+            ),
+            "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
+            "dia": (
+                drilled_limits(_geom.SCREW_HOLE_DIA, _P["ScrewHoleDia"], unit=_UNIT),
+                ((_GEOM, "SCREW_HOLE_DIA"), (_GEOM, "UNIT"), (_SELF, "END_KEEP")),
+            ),
+            "nominal_dia": (_geom.SCREW_HOLE_DIA, ((_GEOM, "SCREW_HOLE_DIA"),)),
+            "thru": (True, ("SCREW_HOLE_CALLOUT_BELOW",)),
+            "process": ("drill", ("SCREW_HOLE_CALLOUT_BELOW",)),
+            "bolt_circle_dia": (
+                limits(BOLT_CIRCLE_DIA, _P["BoltCircleDia"], unit=_UNIT),
+                ((_GEOM, "BOLT_CIRCLE_DIA"), (_GEOM, "UNIT"), (_SELF, "END_KEEP")),
+            ),
+            "bolt_circle_dia_nominal": (BOLT_CIRCLE_DIA, ((_GEOM, "BOLT_CIRCLE_DIA"),)),
+            "angle_deg": (
+                _geom.SCREW_ANGLES_DEG[_index - 1],
+                ((_GEOM, "SCREW_ANGLES_DEG"), "SCREW_HOLE_CALLOUT_BELOW"),
+            ),
+            "count": (
+                _geom.SCREW_COUNT,
+                ((_GEOM, "SCREW_COUNT"), "SCREW_HOLE_CALLOUT_ABOVE"),
+            ),
+            "mate": ("MHA-SH-VN-59", ("SCREW_NUMBER",)),
+            "callout": (
+                f"{SCREW_HOLE_CALLOUT_ABOVE} {SCREW_HOLE_CALLOUT_BELOW}",
+                ("SCREW_HOLE_CALLOUT_ABOVE", "SCREW_HOLE_CALLOUT_BELOW"),
+            ),
+        },
+        precision={"dia": _P["ScrewHoleDia"], "bolt_circle_dia": _P["BoltCircleDia"]},
+    )
+# The key pin's chord ream (SECTION A-A): from the +X O.D. to its stop
+# short of the -X O.D., a press fit for the MHA-PD-VN-69 pin, its chord
+# offset and stop from the hub axis, its station from the hub front face.
+# Its blind depth runs from the entry (the nominal O.D. meeting the chord) to
+# the printed stop's band: the depth a blind hole needs, derived from the
+# stop, not a size the sheet prints.
+requirement(
+    "pin_ream",
+    kind="hole",
+    faces=(CylinderFace(_spec.KEY_PIN_HOLE_DIA),),
+    requirements=("dia", "chord", "stop", "station", "depth"),
+    fields={
+        "at": (
+            [KEY_PIN_ENTRY_X, -KEY_PIN_CHORD_OFFSET, KEY_PIN_Z],
+            (
+                "HUB_DIA",
+                "KEY_PIN_CHORD_OFFSET",
+                "KEY_PIN_Z",
+                (_SELF, "KEY_PIN_ENTRY_X"),
+            ),
+        ),
+        "axis": ([-1.0, 0.0, 0.0], ("__frame__",)),
+        "dia": (
+            limits(
+                _spec.KEY_PIN_HOLE_DIA,
+                _P["KeyPinDia"],
+                _spec.KEY_PIN_HOLE_BAND,
+                unit=_UNIT,
+            ),
+            ("KEY_PIN_HOLE_DIA", "KEY_PIN_HOLE_BAND", (_SELF, "SECTION_KEEP")),
+        ),
+        "nominal_dia": (_spec.KEY_PIN_HOLE_DIA, ("KEY_PIN_HOLE_DIA",)),
+        "process": ("ream", ("KEY_PIN_CALLOUT_BELOW",)),
+        "depth": (
+            [KEY_PIN_ENTRY_X + stop for stop in KEY_PIN_STOP_LIMITS],
+            ((_SELF, "KEY_PIN_ENTRY_X"), (_SELF, "KEY_PIN_STOP_LIMITS")),
+        ),
+        "chord": (
+            limits(
+                KEY_PIN_CHORD_OFFSET,
+                _P["KeyPinChord"],
+                _PLUS_MINUS["KeyPinLocation"],
+                unit=_UNIT,
+            ),
+            ("KEY_PIN_CHORD_OFFSET", "KEY_PIN_LOCATION_BAND", (_SELF, "SECTION_KEEP")),
+        ),
+        "chord_nominal": (KEY_PIN_CHORD_OFFSET, ("KEY_PIN_CHORD_OFFSET",)),
+        "chord_from": ("bore", ((_SELF, "SECTION_KEEP"),)),
+        "chord_axis": ("y", ("__frame__",)),
+        "stop": (
+            KEY_PIN_STOP_LIMITS,
+            ("KEY_PIN_STOP", "KEY_PIN_LOCATION_BAND", (_SELF, "SECTION_KEEP")),
+        ),
+        "stop_nominal": (KEY_PIN_STOP, ("KEY_PIN_STOP",)),
+        "stop_x": (-KEY_PIN_STOP, ("KEY_PIN_STOP_X",)),
+        "station": (
+            limits(_spec.KEY_PIN_STATION, _P["KeyPinStation"], unit=_UNIT),
+            ("KEY_PIN_STATION", (_GEOM, "UNIT"), (_SELF, "SIDE_KEEP")),
+        ),
+        "station_nominal": (_spec.KEY_PIN_STATION, ("KEY_PIN_STATION",)),
+        "station_from": ("front_face", ((_SELF, "SIDE_KEEP"),)),
+        "mate": ("MHA-PD-VN-69", ("KEY_PIN_NUMBER", "KEY_PIN_CALLOUT_BELOW")),
+        "fit": ("press", ("KEY_PIN_CALLOUT_BELOW",)),
+        "diametral_interference": (
+            list(_spec.KEY_PIN_INTERFERENCE),
+            ("KEY_PIN_INTERFERENCE",),
+        ),
+        "callout": (KEY_PIN_CALLOUT_BELOW, ("KEY_PIN_CALLOUT_BELOW",)),
+    },
+    precision={
+        "dia": _P["KeyPinDia"],
+        "chord": _P["KeyPinChord"],
+        "stop": _P["KeyPinStop"],
+        "depth": _P["KeyPinStop"],
+        "station": _P["KeyPinStation"],
+    },
+)
+# The #56 knockout, drilled on through from the ream's entry past the -X O.D.
+requirement(
+    "pin_knockout",
+    kind="hole",
+    faces=(CylinderFace(_spec.KEY_PIN_DRILL_DIA),),
+    requirements=("dia",),
+    fields={
+        "at": (
+            [KEY_PIN_ENTRY_X, -KEY_PIN_CHORD_OFFSET, KEY_PIN_Z],
+            (
+                "HUB_DIA",
+                "KEY_PIN_CHORD_OFFSET",
+                "KEY_PIN_Z",
+                (_SELF, "KEY_PIN_ENTRY_X"),
+            ),
+        ),
+        "axis": ([-1.0, 0.0, 0.0], ("__frame__",)),
+        "dia": (
+            drilled_limits(_spec.KEY_PIN_DRILL_DIA, _P["KeyPinDrillDia"], unit=_UNIT),
+            ("KEY_PIN_DRILL_DIA", (_GEOM, "UNIT"), (_SELF, "SECTION_KEEP")),
+        ),
+        "nominal_dia": (_spec.KEY_PIN_DRILL_DIA, ("KEY_PIN_DRILL_DIA",)),
+        "thru": (True, ("KEY_PIN_DRILL_CALLOUT_BELOW",)),
+        "process": ("drill", ("KEY_PIN_DRILL_CALLOUT_BELOW",)),
+        "drill": ("#56", ("KEY_PIN_DRILL_CALLOUT_BELOW",)),
+        "callout": (KEY_PIN_DRILL_CALLOUT_BELOW, ("KEY_PIN_DRILL_CALLOUT_BELOW",)),
+    },
+    precision={"dia": _P["KeyPinDrillDia"]},
+)
+# The oil hole: match-drilled with MHA-PD-10 into the bore at assembly
+# (MHA-PD-00), at the key pin's station; no part of this traveler.
+requirement(
+    "oil_hole",
+    kind="hole",
+    faces=(CylinderFace(_spec.OIL_HOLE_DIA),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, HUB_DIA / 2.0, KEY_PIN_Z], ("HUB_DIA", "KEY_PIN_Z")),
+        "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "dia": (
+            drilled_limits(_spec.OIL_HOLE_DIA, _P["OilHoleDia"], unit=_UNIT),
+            ("OIL_HOLE_DIA", (_GEOM, "UNIT"), (_SELF, "SIDE_KEEP")),
+        ),
+        "nominal_dia": (_spec.OIL_HOLE_DIA, ("OIL_HOLE_DIA",)),
+        "into": ("bore", ("OIL_HOLE_CALLOUT_BELOW",)),
+        "station_nominal": (_spec.KEY_PIN_STATION, ("KEY_PIN_STATION",)),
+        "made_at": ("assembly", ("OIL_HOLE_CALLOUT_BELOW",)),
+        "mate": ("MHA-PD-10", ("SLEEVE_NUMBER", "OIL_HOLE_CALLOUT_BELOW")),
+        "callout": (OIL_HOLE_CALLOUT_BELOW, ("OIL_HOLE_CALLOUT_BELOW",)),
+    },
+    precision={"dia": _P["OilHoleDia"]},
 )
 
 

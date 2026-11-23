@@ -1,93 +1,643 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
-title = "Transgear Arm"
-part = "MHA-PD-18 Transgear Arm"
-revision = "placeholder"
-material = "AISI 1018 cold-finished steel bar, ASTM A108"
-stock = "To be written"
+# MHA-PD-18 transgear arm, prechips traveler (drilled_block adapter; owner
+# order 2026-11-21, paper-drive CNC enrolment).
+#
+# Route, chosen for speed (one part, quantity 1): one blank of 3/8 x 1
+# precision-ground 1018 is sawn to 5.70-5.75 in; Setup 2 (PM-30MV CNC, the
+# blank flat on parallels, AR01_holes) makes every hole through the faces from
+# the rear face: the pivot bore (B) and the pin bore (C) drilled and reamed,
+# the pivot's Ø.500 spot face plunged to its floor with the 1/2 in end mill, the
+# pin bore's rear mouth broken with the chamfer mill. Setup 3 makes a 1/2 in
+# 6061 sub-plate (AR02_plate drills it, AR03/AR04 stop for the hand taps), the
+# arm is screwed down on it through its own bores and AR05_outline cuts the
+# whole outline (pivot round, flanks, square end) through into the plate; the
+# screws hold the part, so no tabs. Setup 4 (the lathe) passes the arm
+# through the spindle bore, its square end in the 4-jaw dialled to the
+# section's centre, and spots, drills and reams the blind latch-pin hole from
+# the tailstock. Bench deburr and inspection; then the oil film.
+#
+# Left to the assembly (MHA-PD-00, not made here; the last op names them):
+# 2X Ø.0930 dowel holes (PD-00 13A pilots through arm and plate, 13D reams the
+# arm's two), the 2X 8-32 tapped holes' match work (13L spot through the
+# plate, 13N #29 drill, 13P tap) and the MHA-PD-23 pin press (11A).
+#
+# PENDING OWNER CORRECTION (#3184): two assumptions this plan rests on.
+# (1) Stock: 3/8 x 1 precision-ground 1018, Online Metals 12095 (±.001
+#     thickness), chosen over cold-finished flat so the faces stay as supplied.
+# (2) Faces as supplied: front face A and the rear face are not machined; the
+#     ground thickness is the drawing's 3/8 (.3750) GROUND STOCK REF.
+#
+# To order (not owned): the 12095 bar (stock.1018-ground-flat-3-8x1, one
+# 12 in length), the .1240/.1245 plug gauge pair (plug-gauges-1240-1245), the
+# .1260/.1265 pair (plug-gauges-1260-1265, already on the to-buy list), the
+# .1940 reamer (reamer-1940, already on the to-buy list), and the two fixture
+# screws (#10-32 x 5/8 and #4-40 x 5/8 socket head cap screws).
+#
+# Programs: AR01_holes (T1-T7), AR02_plate (T1, T8, T9), AR03_tap_pivot and
+# AR04_tap_pin (T10, the tap guide; spindle off), AR05_outline (T11). Setup 4
+# is manual (the lathe). Zeroing per setup is in each setup's datum line.
+title = "Transgear arm"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "AISI 1018 cold-finished steel, 3/8 x 1 in flat, precision ground (drawing: {{cad.material_spec}})"
+stock = "{{process.blank_z_in:fraction}} x {{process.blank_y_in:.0f}} in precision-ground 1018 flat (Online Metals 12095), one 12 in length: one blank {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} in. Sub-plate: a 3.0 in piece sawn off the end of the 1/2 x 6 in 6061 flat."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The bar is bought precision ground (Online Metals 12095, ±.001 thick), so face A (the front) and the rear face stay as supplied and are never machined; mark A in Setup 1 and keep it readable. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; each M6 is measured on the tool setter against G54 Z0; pick G54 up again after any E-stop, reset or vise move. Prove each CNC file in air before its first cut. The 2X Ø.0930 dowel holes and the 2X 8-32 tapped holes' match work are made at assembly (MHA-PD-00), not here."
 shop = "../shop"
-stock_refs = ["1018-ground-flat-3-8x1"]
+stock_refs = ["1018-ground-flat-3-8x1", "6061-flat-1-2x6-54in"]
+material_key = "rocker-1018-cold-finished"
+milling_material = "steel_1018"
+
+[cad]
+file = "../../out/features/pd_transgear_arm/features.toml"
+adapter = "drilled_block"
+part = "pd-transgear-arm"
+
+[parameters]
+quantity = 1
+# The blank: X along the bar, Y across it (1 in), Z its thickness (3/8 in).
+blank_x_in = 5.725
+blank_y_in = 1.0
+blank_z_in = 0.375
+blank_width_mm = 25.4
+blank_length_min_mm = 144.78
+blank_length_max_mm = 146.05
+# The pivot's station from the blank's left end: the 141.4 arm with 1.40 mm
+# at the pivot end and at least 1.48 at the square end of the shortest blank.
+pivot_from_end_mm = 13.9
+blank_end_margin_min_mm = 1.4
+# Holding: two 1 in parallels (shop-equipment fixtures.parallels-lms-6745) in
+# the 6 in PM vise (shop vise-pm-6).
+parallel_height_mm = 25.4
+parallel_thickness_mm = 3.175
+vise_bed_height_mm = 73.3044
+vise_jaw_height_mm = 44.9453
+vise_jaw_width_mm = 158.6738
+# The jaws' top above the parallels' top (Setup 2's Z0): 44.9453 − 25.4.
+holes_jaw_top_mm = 19.5453
+# Holes: the #1 centre drill's spot Ø, the drills' full diameter past face A,
+# their points (118°) below Z0, the reamers' tips below Z0.
+spot_dia_mm = 2.5
+drill_past_mm = 1.0
+drill_14_tip_mm = -2.389
+drill_32_tip_mm = -1.885
+ream_past_mm = 1.5
+drill_peck_mm = 2.54
+# The chamfer mill's point: the rear face less the reamed bore's radius and
+# the .008 leg (45°).
+chamfer_tip_mm = 7.722
+# Setup 3: the sub-plate, 6.0 in along X (the 6 in bar's width) by 3.0 across
+# the jaws, 1/2 in thick, on the same parallels; the arm centred on it.
+plate_length_mm = 152.4
+plate_width_mm = 76.2
+plate_thickness_mm = 12.7
+pivot_on_plate_x_mm = 18.0
+# AR05's G54 X/Y is picked up on the arm itself, not the plate, so the screws'
+# clearance in the bores (up to ~.006 radial) does not move the outline off
+# the bores: AR01 put the pivot pivot_from_end_mm from the blank's left end
+# and on its centre line, .500 in from each ground edge. With the .200 edge
+# finder: from -X on the left end, X = pivot_on_plate_x_mm less
+# pivot_from_end_mm less its radius; from +Y on the ground edge nearer the
+# fixed jaw (the centre line at Y -1.500, the edge .500 above it), Y = that
+# edge plus its radius (cam.py checks both).
+edge_finder_dia_mm = 5.08
+arm_x_set_mm = 1.56
+arm_y_set_mm = -22.86
+plate_jaw_top_mm = 6.845
+plate_drill_past_mm = 1.0
+# The arm on the plate along X: from the pivot round's back to the square end,
+# and the two screws' stations (the pivot and the pin bore).
+arm_start_on_plate_mm = 5.5
+arm_end_on_plate_mm = 146.9
+pin_on_plate_x_mm = 86.815
+plate_drill_21_tip_mm = -14.913
+plate_drill_43_tip_mm = -14.379
+# The outline: the rough pass .010 outside it in levels of at most .039, to
+# .010 into the plate; the finish pass at the cutter's radius in one level.
+outline_finish_mm = 0.254
+outline_through_mm = 0.254
+outline_rough_offset_mm = 3.429
+outline_level_max_mm = 1.0
+outline_levels = 10
+outline_level_mm = 0.98044
+outline_plunge_feed_per_min_mm = 25.4
+# The farthest blank corner from the outline (the longest blank): under the
+# rough pass's reach (6.604), so no loose scrap is left.
+blank_scrap_reach_mm = 6.556
+# Setup 4: the latch-pin hole's reamed full-diameter depth (.400), the
+# reamer's end chamfer (.020) and the #32's full-diameter depth (.460).
+latch_ream_depth_mm = 10.16
+latch_ream_lead_mm = 0.508
+latch_drill_depth_mm = 11.684
+arm_length_mm = 141.4
+# Each vise hold is centred in the 6.247 in jaws: the work's inset (a
+# negative overhang) at the jaws' start, (its length − 158.6738) / 2.
+holes_overhang_mm = -6.947
+plate_overhang_mm = -3.137
+# Tool reach (the capacity checks): the drill chuck's gauge length (shop
+# pm-30mv), the R8 collet's, a chucking reamer's 3-1/2 in overall (ASME
+# B94.2 for these sizes) and the end mills' least stick-out.
+drill_chuck_gauge_mm = 95.0
+r8_collet_gauge_mm = 6.3
+reamer_oal_mm = 88.9
+# Tapping the bare sub-plate under the spring tap guide
+# (tools.tap-guide-fisher; owner ruling 2026-11-21): the guide and the tap in
+# its wrench together reach at most tap_stack_max_mm below the collet face,
+# the spindle-to-table maximum (shop machines.pm-30mv, 431.8) less 25.0 to
+# bring the point down onto the wrench (the shop's tool-change clearance),
+# the vise bed, the 1 in parallels, the 1/2 in sub-plate and the collet
+# gauge: 289.096, rounded down to .01 in. The guide is 3 1/8 in (79.375)
+# overall; the tap's reach in its wrench is not on record, so the traveler
+# stops before AR03 unless the tap, point to the wrench's centre hole, is at
+# most tap_wrench_reach_max_mm: 289.052 less 79.375, 209.677, rounded down
+# to .01 in.
+tap_stack_max_mm = 289.052
+tap_wrench_reach_max_mm = 209.55
+quarter_mill_projection_min_mm = 19.05
 
 [[tools]]
-id = "drill-33"
-name = "#33 drill"
-ref = "drill-33"  # Drills #33
-
-[[tools]]
-id = "drill-32"
-name = "#32 drill"
-ref = "drill-32"  # Drills #32
-
-[[tools]]
-id = "jig-drill-29"
-name = "#29 drill"
-ref = "jig-drill-29"  # Drills #29
-
-[[tools]]
-id = "reamer-1240"
-name = ".1240 reamer"
-ref = "reamer-1240"  # B-reamer-.1240
-
-[[tools]]
-id = "reamer-1260"
-name = ".1260 reamer"
-ref = "reamer-1260"  # B-reamer-.1260
-
-[[tools]]
-id = "jig-tap-8-32-plug"
-name = "#8-32 plug tap"
-ref = "jig-tap-8-32-plug"  # Tap coverage #8-32 UNC
-
-[[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
-
-[[tools]]
-id = "arbor-press"
-name = "Arbor press"
-ref = "arbor-press"  # F-arbor-press
-
-[[tools]]
-id = "straightedge"
-name = "Straightedge"
-ref = "straightedge"  # F-straightedge
-
+id = "spot"
+name = "#1 centre drill, carbide 60°"
+ref = "centre-drills-carbide-60"
 [[tools]]
 id = "drill-14"
 name = "#14 drill"
-ref = "drill-14"  # drawing cross-check 2026-11-19: pre-drill for the .1940 ream
-
+ref = "drill-14"
+[[tools]]
+id = "drill-32"
+name = "#32 drill"
+ref = "drill-32"
+[[tools]]
+id = "em-half"
+name = "1/2 in carbide end mill"
+ref = "endmill-carbide-3fl-1-2"
 [[tools]]
 id = "reamer-1940"
-name = ".1940 reamer"
-ref = "reamer-1940"  # drawing cross-check 2026-11-19: Ø.1940 +.001/.000 REAM THRU
-
+name = ".1940 reamer, TO BUY"
+ref = "reamer-1940"
 [[tools]]
-id = "drill-44"
-name = "#44 drill"
-ref = "drill-44"  # drawing cross-check 2026-11-19: MATCH-DRILL #44 pilots with MHA-PD-19
-
+id = "reamer-1260"
+name = ".1260 reamer"
+ref = "reamer-1260"
 [[tools]]
-id = "reamer-0930"
-name = ".0930 reamer"
-ref = "reamer-0930"  # drawing cross-check 2026-11-19: Ø.0930 +.0005/.0000 2X REAM THRU
-
+id = "chamfer"
+name = "1/4 in 90° carbide chamfer mill"
+ref = "chamfer-mill-carbide-1-4-90"
 [[tools]]
-id = "endmill-carbide-3fl-1-2"
-name = "1/2 carbide end mill"
-ref = "endmill-carbide-3fl-1-2"  # owner ruling 2026-11-20 (#2424 C): Ø.500 +.004/.000 spot face, one plunge
-
+id = "drill-21"
+name = "#21 drill"
+ref = "drill-21"
 [[tools]]
-id = "chamfer-mill-330ch-1-4-90"
-name = "1/4 90° chamfer mill"
-ref = "chamfer-mill-330ch-1-4-90"  # drawing cross-check 2026-11-19: .008 X 45° MOUTH
+id = "drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"
+[[tools]]
+id = "tap-guide"
+name = "Spring tap guide"
+ref = "tap-guide-fisher"
+[[tools]]
+id = "em-quarter"
+name = "1/4 in carbide end mill"
+ref = "endmill-carbide-3fl-1-4"
+[[tools]]
+id = "reamer-1240"
+name = ".1240 reamer"
+ref = "reamer-1240"
+[[tools]]
+id = "tap-10-32"
+name = "#10-32 plug tap"
+ref = "tap-10-32-plug"
+[[tools]]
+id = "tap-4-40"
+name = "#4-40 plug tap"
+ref = "jig-tap-4-40-plug"
+[[tools]]
+id = "cutoff-saw"
+name = "Evolution miter saw"
+ref = "saw-evolution-14"
+[[tools]]
+id = "files"
+name = "Files"
+ref = "jig-files"
+[[tools]]
+id = "deburr"
+name = "Deburring scraper set"
+ref = "deburring-set"
+[[tools]]
+id = "stone"
+name = "India stone"
+ref = "india-stone-ib8"
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .194 minus, .195 minus"
+ref = "pin-gauges"
+[[tools]]
+id = "plug-1260"
+name = "Plug gauges .1260 GO / .1265 NO-GO, TO BUY"
+ref = "plug-gauges-1260-1265"
+[[tools]]
+id = "plug-1240"
+name = "Plug gauges .1240 GO / .1245 NO-GO, TO BUY"
+ref = "plug-gauges-1240-1245"
 
+# --- Setup 1 ------------------------------------------------------------------
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Saw the blank and the sub-plate"
+machine = "Saw / bench"
+indexing = "none"
+diagram = { file = "diagrams/saw.svg", alt = "The 12 in length of 3/8 x 1 ground flat with one 5.70–5.75 in blank marked off its end; beside it the 1/2 x 6 in aluminium flat with a 3.0 in piece marked off its end." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "cutoff-saw"
+drilling = "none"
+sizing = "other"
+instruction = "Saw one blank {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} long off the 3/8 x 1 ground bar, aiming at 5.73, marked off with the tape. File the burrs off both ends; do not touch the ground faces."
+feed = "hand"
+inspection = "Blank {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} long (the calipers): shorter leaves no margin at an end; longer leaves a corner of scrap past the outline pass's reach. Outside: saw another."
+gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.blank_length_min_mm}}", "{{process.blank_length_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "Mic the blank's thickness at both ends and the middle; write the middle reading T on face A. Mark one wide face A with marking fluid; the other is the rear face."
+inspection = "Every reading {{cad.rear_face_thickness_stock_min_in:.4dot}}–{{cad.rear_face_thickness_stock_max_in:.4dot}} (the drawing's ground stock, kept as supplied). Outside: set it aside and tell the owner."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.rear_face_thickness_stock_band_mm}}" }]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "cutoff-saw"
+drilling = "none"
+sizing = "other"
+instruction = "Saw a 3.0 in piece off the end of the 1/2 x 6 in 6061 flat: the sub-plate, 6 in along X and 3.0 in across the jaws. File its burrs; mark one 3.0 in edge LEFT."
+feed = "hand"
+
+# --- Setup 2 ------------------------------------------------------------------
+[[setups]]
+machine_kind = "other"
+title = "Holes: pivot bore, spot face, pin bore"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Two 1 in parallels, each 1/8 thick, on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw: the 1.00 blank's holes at Y −.500 stand .30 clear of each parallel. The blank on them face A down (the rear face up), along X, centred in the jaws' width; the jaws grip its two 1 in ground edges. Tap it down on the parallels with a soft hammer until neither parallel slides."
+datum = "Program AR01_holes (T1–T7). G54: X0 the blank's left end, Y0 the fixed jaw's face, Z0 the parallels' top (face A). +X toward the blank's right end, +Y toward the fixed jaw: the blank lies at −Y, its centre line at Y −.500. The pivot at X {{process.pivot_from_end_mm:in.3dot}}."
+diagram = { file = "diagrams/holes.svg", alt = "The blank across the vise jaws on two parallels, rear face up; the pivot bore {{process.pivot_from_end_mm:in.3dot}} from the left end on the centre line with its Ø.500 spot face, the pin bore {{cad.pin_bore_x_mm:in.3dot}} further right; the arm's outline (made in Setup 3) dashed." }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}"], y_span_mm = ["{{process.blank_width_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.rear_face_thickness_stock_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_14_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.quarter_mill_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_width_mm}}", along_jaws_mm = "{{process.blank_length_min_mm}}", part_height_mm = "{{cad.rear_face_thickness_stock_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.holes_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "solid", extent_mm = [0, "{{process.blank_length_min_mm}}"], seat = "the two parallels under the blank's edges, its whole length", seat_mm = [0, "{{process.blank_length_min_mm}}"] }
+
+[[setups.operations]]
+instruction = "Home ($H). Blank out of the vise: G54 Z0 on the parallels' top and Y0 the fixed jaw's face."
+instruction_detailed = "Console M6 T1 (the #1 centre drill in the drill chuck; the tool setter measures it). The T1 tip just dragging a .002 feeler leaf on a parallel's top: G10 L20 P1 Z0.051. Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y-2.540."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Load and clamp the blank as in Holding; G54 X0 on its left end."
+instruction_detailed = "Edge finder (900 rpm) on the blank's left end from the left, at its centre line (Y −.500), the tip at mid-thickness (the station Setup 3 picks up again before AR05): G10 L20 P1 X-2.540."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove AR01_holes in air, Z0 raised 1.000 in, through each M6; then Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run AR01_holes, watching every move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Run AR01_holes (M6 T1; set 2800): spot the pivot and the pin bore to Ø{{process.spot_dia_mm:in.3dot}}, under both drills."
+rpm = 2800
+feed = "1.4 in/min"
+milling_cuts = [
+  { name = "holes spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = 35.56, stations_mm = "{{process.pivot_from_end_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-14"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T2: #14 through the pivot in one feed (a .375 hole, under 3 diameters: no pecks), its full diameter {{process.drill_past_mm:in.3dot}} past face A; set 1600. Cutting oil."
+rpm = 1600
+feed = "3.2 in/min"
+hole_depth_mm = "{{cad.rear_face_thickness_stock_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "pivot drill", kind = "drill", phase = "rough", cutter_dia_mm = 4.6228, flutes = 2, rpm = 1600, feed_mm_min = 81.28, stations_mm = "{{process.pivot_from_end_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-32"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T3: #32 through the pin bore, pecks of {{process.drill_peck_mm:in.3dot}} with full retract; set 2400. Cutting oil."
+rpm = 2400
+feed = "3.6 in/min"
+hole_depth_mm = "{{cad.rear_face_thickness_stock_mm}}"
+peck = { step_mm = 2.54, retract = "full" }
+milling_cuts = [
+  { name = "pin drill", kind = "drill", phase = "rough", cutter_dia_mm = 2.9464, flutes = 2, rpm = 2400, feed_mm_min = 91.44, stations_mm = "{{cad.pin_bore_x_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T4 (1/2 in end mill, at least .75 in out of the collet; set 2650): plunge once over the pivot, at 1.4 in/min, to {{cad.spot_face_floor_in:.4dot}} above face A, and out at feed: the Ø.500 spot face."
+rpm = 2650
+feed = "1.4 in/min"
+milling_cuts = [
+  { name = "spot face", kind = "drill", phase = "finish", cutter_dia_mm = 12.7, flutes = 3, rpm = 2650, feed_mm_min = 35.56, stations_mm = "{{process.pivot_from_end_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "reamer-1940"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }
+instruction = "Same file, M6 T5: the .1940 reamer through the pivot from the spot face's floor, {{process.ream_past_mm:in.3dot}} past face A, in and out at feed; set 800. Cutting oil."
+rpm = 800
+feed = "3.2 in/min"
+milling_cuts = [
+  { name = "pivot ream", kind = "drill", phase = "finish", cutter_dia_mm = 4.9276, flutes = 6, rpm = 800, feed_mm_min = 81.28, stations_mm = "{{process.pivot_from_end_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "reamer-1260"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.pin_bore_dia_band_mm}}" }
+instruction = "Same file, M6 T6: the .1260 reamer through the pin bore, in and out at feed; set 1200. Cutting oil."
+rpm = 1200
+feed = "3.6 in/min"
+milling_cuts = [
+  { name = "pin ream", kind = "drill", phase = "finish", cutter_dia_mm = 3.2004, flutes = 6, rpm = 1200, feed_mm_min = 91.44, stations_mm = "{{cad.pin_bore_x_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "chamfer"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T7 (the 90° chamfer mill; set 2800): plunge its point down the pin bore to {{process.chamfer_tip_mm:in.4dot}} above face A and out at feed: the .008 × 45° break on the pin bore's rear mouth (the face opposite A)."
+rpm = 2800
+feed = "1.4 in/min"
+milling_cuts = [
+  { name = "pin mouth", kind = "drill", phase = "finish", cutter_dia_mm = 6.35, flutes = 2, rpm = 2800, feed_mm_min = 35.56, stations_mm = "{{cad.pin_bore_x_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Still clamped, blow out the chips: the pivot bore."
+inspection = "Pivot bore Ø{{cad.pivot_bore_dia_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}: the .194 minus pin enters (GO); the .195 minus pin does not (NO-GO). GO fails or NO-GO enters: stop and tell the owner."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "The pin bore."
+inspection = "Pin bore Ø{{cad.pin_bore_dia_min_in:.4dot}}–{{cad.pin_bore_dia_max_in:.4dot}}: the .1260 plug enters (GO); the .1265 does not (NO-GO). Its rear mouth shows an even ring of break all round. GO fails or NO-GO enters: stop and tell the owner."
+gauge_checks = [{ gauge = "plug-gauges-1260-1265", band_mm = "{{cad.pin_bore_dia_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "The spot face: its depth below the rear face (the calipers' depth rod), subtracted from T, the middle thickness written on face A."
+inspection = "Spot face floor {{cad.spot_face_floor_min_in:.4dot}}–{{cad.spot_face_floor_max_in:.4dot}} above face A (T less the depth); Ø{{cad.spot_face_dia_min_in:.3dot}}–{{cad.spot_face_dia_max_in:.3dot}} (the calipers' inside jaws). Outside: stop and tell the owner."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.spot_face_floor_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.spot_face_dia_band_mm}}" },
+]
+
+# --- Setup 3 ------------------------------------------------------------------
+[[setups]]
+machine_kind = "other"
+title = "Outline on the screwed-down sub-plate"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "The same two 1 in parallels; the sub-plate on them, 6 in along X, LEFT edge to the left, gripped across its 3 in. AR02–AR04 drill and tap it with the arm off; then the arm lies face A down on it, held by two socket head cap screws, no washers: a #10-32 x 5/8 (head Ø.312 x .190) through the pivot bore, its head on the spot face's floor, and a #4-40 x 5/8 (head Ø.183 x .112) through the pin bore, its head on the rear face; both into the plate. The plate stays clamped from AR02 to the end of AR05."
+datum = "AR02_plate (T1, T8, T9), AR03_tap_pivot and AR04_tap_pin (T10, spindle off): G54 X0 the plate's left end, Y0 the fixed jaw's face, Z0 the plate's top (face A, once the arm is on); the pivot at X {{process.pivot_on_plate_x_mm:in.3dot}}, Y −1.500 (the plate's centre line). AR05_outline (T11): X and Y picked up again on the arm itself (its left end and ground edge), so the pivot bore, not the tapped hole, is at X {{process.pivot_on_plate_x_mm:in.3dot}}, Y −1.500; Z0 unchanged."
+diagram = { file = "diagrams/outline.svg", alt = "The sub-plate across the jaws on two parallels; the arm screwed down on it face A down through the pivot bore and the pin bore; the 1/4 in end mill's path round the outline: the pivot round, the two flanks, the square end." }
+envelope = { x_span_mm = ["{{process.plate_length_mm}}"], y_span_mm = ["{{process.plate_width_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{cad.rear_face_thickness_stock_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.plate_drill_21_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.quarter_mill_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "plate", extent_mm = ["{{process.arm_start_on_plate_mm}}", "{{process.arm_end_on_plate_mm}}"], seat = "the sub-plate, gripped by the jaws; the arm screwed down on it at the pivot and the pin bore", seat_mm = [0, "{{process.plate_length_mm}}"], clamps_mm = ["{{process.pivot_on_plate_x_mm}}", "{{process.pin_on_plate_x_mm}}"], section_mm = { y = "{{cad.end_face_width_mm}}", z = "{{cad.rear_face_thickness_stock_mm}}" } }
+
+[[setups.operations]]
+instruction = "Home ($H). Clamp the sub-plate as in Holding. G54 Z0 on its top, Y0 the fixed jaw's face, X0 its left end."
+instruction_detailed = "Console M6 T1 (the #1 centre drill). The T1 tip just dragging a .002 feeler leaf on the plate's top: G10 L20 P1 Z0.051. Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y-2.540; on the plate's left end from the left: G10 L20 P1 X-2.540."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Run AR02_plate (M6 T1; set 2800): spot the plate at the pivot and the pin stations."
+rpm = 2800
+feed = "1.4 in/min"
+milling_cuts = [
+  { name = "plate spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = 35.56, stations_mm = "{{process.pivot_on_plate_x_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-21"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T8: #21 through the plate at the pivot (the #10-32 tap drill), pecks of {{process.drill_peck_mm:in.3dot}}; set 2800. WD-40 on the drill."
+rpm = 2800
+feed = "8.4 in/min"
+hole_depth_mm = "{{process.plate_thickness_mm}}"
+peck = { step_mm = 2.54, retract = "full" }
+milling_cuts = [
+  { name = "plate drill 10", kind = "drill", phase = "rough", cutter_dia_mm = 4.0386, flutes = 2, rpm = 2800, feed_mm_min = 213.36, stations_mm = "{{process.pivot_on_plate_x_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-43"
+drilling = "twist_drill"
+sizing = { kind = "tap_drill", tap = "tap-4-40" }
+instruction = "Same file, M6 T9: #43 through the plate at the pin station, pecks of .080 with full retract; set 2800. WD-40 on the drill."
+rpm = 2800
+feed = "5.6 in/min"
+hole_depth_mm = "{{process.plate_thickness_mm}}"
+peck = { step_mm = 2.032, retract = "full" }
+milling_cuts = [
+  { name = "plate drill 4", kind = "drill", phase = "rough", cutter_dia_mm = 2.2606, flutes = 2, rpm = 2800, feed_mm_min = 142.24, stations_mm = "{{process.pivot_on_plate_x_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "The #10-32 plug tap goes in the T-handle tap wrench with the centre hole in its top: the tap guide's point seats in that hole."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Stop check before AR03: measure the #10-32 tap and then the #4-40 tap in the T-handle wrench from the point to the wrench's centre hole (calipers, or the combination square's 12 in blade). Each must be at most {{process.tap_wrench_reach_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the parallels, the sub-plate, the collet, the tap guide's 3 1/8 in and 1 in to bring the point down onto the wrench). Over: stop; do not tap on this setup."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-guide"
+drilling = "none"
+sizing = "other"
+instruction = "Run AR03_tap_pivot: M6 T10, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the pivot hole. Tap #10-32 through the plate by hand, the guide's point kept home in the wrench by jogging Z down as the tap feeds; tapping fluid, back off each half turn. Jog Z up clear."
+diagram = { file = "diagrams/tap.svg", alt = "The bare sub-plate in the vise, the arm off; the tap in its T-handle wrench in the pivot hole, the spring tap guide in the spindle above it, spindle off." }
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-guide"
+drilling = "none"
+sizing = "other"
+instruction = "Swap the wrench to the #4-40 plug tap. Run AR04_tap_pin: the guide stays in (M6 T10 again), spindle off; the file ends Idle at the machine top over the pin hole. Tap #4-40 through the plate the same way. Jog Z up clear; blow the plate clean and stone its top flat of any raised thread. Both screws must run in by hand."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Stone face A flat of the bores' exit burrs (India stone, flat on the face): a burr would rock the arm on the plate. Screw the arm down: face A on the plate, the #10-32 x 5/8 through the pivot bore and the #4-40 x 5/8 through the pin bore, both finger-tight."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Square it: a DTI in the spindle on the blank's ground edge (the fixed jaw side), traverse X over the blank's length; swing the arm about the pivot screw until the reading holds, then tighten the #4-40 and the #10-32 (hex keys, firm, not heavy)."
+inspection = "The blank's edge reads within .001 over its length along X after tightening; the arm does not rock on the plate. Fail: back both screws off to finger-tight, square again, then tighten the #4-40 and the #10-32 and read again."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Pick up G54 X and Y on the arm, not the plate (the screws' clearance in the bores lets the arm sit up to .006 off the tapped holes; AR01 put the bores on the blank's end and edges)."
+instruction_detailed = "Edge finder (900 rpm), its tip at the arm's mid-thickness: on the blank's left end from −X, at Y −1.500: G10 L20 P1 X{{process.arm_x_set_mm:.3f}}. On the blank's ground edge nearer the fixed jaw from +Y, 1/2 in in from the left end: G10 L20 P1 Y{{process.arm_y_set_mm:.3f}}. Z0 stays the plate's top."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove AR05_outline in air, Z0 raised 1.000 in; every move clears both screw heads and the jaws. Then Z0 back."
+instruction_detailed = "Console M6 T11 (1/4 in end mill, at least .75 in out of the collet; the tool setter measures it). Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run AR05_outline, watching it pass round the screw heads. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-quarter"
+drilling = "none"
+sizing = "other"
+instruction = "Run AR05_outline (M6 T11; set 2800): the rough pass .010 outside the outline in {{process.outline_levels:d}} levels to .010 into the plate, then the finish pass in one level at that depth, anticlockwise: the pivot round R.49, the two flanks, the square end. Each level starts with a slow plunge at the square end's middle. Air blast on the chips; no coolant on the plate."
+settings = "endmill-carbide-3fl-1-4-1018-cf"
+milling_cuts = [
+  { name = "outline rough", kind = "slot", phase = "rough", cutter_dia_mm = 6.35, axial_doc_mm = "{{process.outline_level_mm}}", radial_woc_mm = 6.35, stations_mm = "{{process.arm_length_mm}}" },
+  { name = "outline finish", kind = "side", phase = "finish", cutter_dia_mm = 6.35, axial_doc_mm = 9.8044, radial_woc_mm = 0.254, stations_mm = "{{process.arm_length_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Still screwed down: the square end's width."
+inspection = "Square end {{cad.end_face_width_min_in:.2f}}–{{cad.end_face_width_max_in:.2f}} wide across its two corners (the calipers). Outside: stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.end_face_width_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Undo both screws and lift the arm off. The sub-plate is not reused. Then the square end's station: the .194 pin gauge in the pivot bore."
+inspection = "Station {{cad.end_face_station_min_in:.2f}}–{{cad.end_face_station_max_in:.2f}}: the calipers from the square end to the pin's far side, less half the pin (.097). Outside: stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.end_face_station_band_mm}}" }]
+
+# --- Setup 4 ------------------------------------------------------------------
+[[setups]]
+machine_kind = "lathe"
+title = "Latch-pin hole in the square end"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "The 6 in 4-jaw. The arm goes into the chuck pivot end first, through the chuck and into the 1-1/2 in spindle bore (the arm's largest section, 1.00 x .375, is 1.06 across its diagonal); the square end stands .25 out of the jaws. Two opposite jaws on the faces, two on the flanks. Dial it in with the DTI on the square end's sides close to the jaws: the two faces to equal readings, then the two flanks to equal readings, within .001 (the hole's centre is the section's centre: .188 from face A, half the .375). Then face-check the square end: within .001 across it."
+datum = "The square end: the tailstock quill scale zeroed with each tool's lips on the spot's rim."
+diagram = { file = "diagrams/latch.svg", alt = "The arm in the 4-jaw, its pivot end through the chuck into the spindle bore, the square end out; the latch-pin hole on the section's centre, drilled and reamed from the tailstock {{cad.latch_pin_hole_height_in:.3dot}} from face A." }
+lathe_hold = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Before chucking: push the arm, pivot end first, through the open 4-jaw into the spindle bore by hand. It must pass freely to the square end. Tight: stop and tell the owner (the chuck's through bore is not on record)."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "The #1 centre drill in the tailstock drill chuck; set 1800. Spot the square end's centre to about Ø.10, under the #32. Cutting oil."
+rpm = 1800
+cut_diameter_mm = "{{process.spot_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-32"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "#32 drill; set 1800. Lips on the spot's rim, zero the quill scale; drill until it reads {{process.latch_drill_depth_mm:in.3dot}}, backing fully out every .10 to clear chips. Cutting oil."
+rpm = 1800
+cut_diameter_mm = 2.9464
+hole_depth_mm = "{{process.latch_drill_depth_mm}}"
+peck = { step_mm = 2.54, retract = "full" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "reamer-1240"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.latch_pin_hole_dia_band_mm}}" }
+instruction = "The .1240 reamer; set 600. Its lead chamfer on the hole's mouth, zero the quill scale; feed slowly until it reads {{process.latch_ream_depth_mm:in.3dot}} plus its .020 chamfer, and withdraw with the spindle running. Cutting oil."
+rpm = 600
+cut_diameter_mm = 3.1496
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Still chucked, blow out the hole: its size and depth."
+inspection = "Latch-pin hole Ø{{cad.latch_pin_hole_dia_min_in:.4dot}}–{{cad.latch_pin_hole_dia_max_in:.4dot}}: the .1240 GO plug enters; push it in as far as it goes and read its stand-out with the calipers' depth rod, from the square end's face to the plug's end. The plug's miked length less the stand-out is the depth: at least {{cad.latch_pin_hole_depth_min_in:.2f}}. The .1245 NO-GO does not enter. GO refused or short, or NO-GO enters: stop and tell the owner."
+gauge_checks = [{ gauge = "plug-gauges-1240-1245", band_mm = "{{cad.latch_pin_hole_dia_band_mm}}" }]
+feed = "hand"
+
+# --- Setup 5 ------------------------------------------------------------------
+[[setups]]
+machine_kind = "other"
+title = "Deburr and inspect"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished arm: the pivot round with its reamed bore and rear spot face, the tapering flanks, the pin bore with its rear break, the square end with the latch-pin hole." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr the outline's edges with the smooth file and the India stone (strokes along the edge, never across the ground faces), and the bores' and the latch hole's mouths with the deburring scraper: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max. Do not touch the pin bore's .008 break."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Inspect the pivot round and the latch hole's height."
+inspection = "Pivot round R{{cad.pivot_end_radius_min_in:.2f}}–{{cad.pivot_end_radius_max_in:.2f}} (the calipers from the pivot bore's wall to the round's far point, plus half the bore); latch-pin hole {{cad.latch_pin_hole_height_min_in:.3dot}}–{{cad.latch_pin_hole_height_max_in:.3dot}} from face A to its centre (the calipers to the hole's edge plus half the hole). Outside: set it aside and tell the owner."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.pivot_end_radius_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.latch_pin_hole_height_band_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Re-gauge both bores after deburring, then their spacing. Not gauged, held by AR01's one clamping from one G54 with face A on the parallels: C's Y position and its squareness to A."
+inspection = "The pivot pins and the pin-bore plugs as in Setup 2; spacing B to C: the .194 pin in B and the .1260 plug in C, the calipers over both less .160, {{cad.pin_bore_x_mm:in.4dot}} ±.002. Outside: set it aside and tell the owner."
+gauge_checks = [
+  { gauge = "pin-gauges", band_mm = "{{cad.pivot_bore_dia_band_mm}}" },
+  { gauge = "plug-gauges-1260-1265", band_mm = "{{cad.pin_bore_dia_band_mm}}" },
+]
+
+# --- Setup 6 ------------------------------------------------------------------
+[[setups]]
+machine_kind = "other"
+title = "Finish: oil film; assembly-made features"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished arm, as inspected, to be wiped with oil all over." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+instruction = "The drawing's finish: {{cad.finish}}. Wash off the cutting oil and marking fluid, dry, and wipe the arm all over with ISO VG 32 machine oil; bag it."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Not made here, left to the assembly (MHA-PD-00): the 2X Ø.0930 dowel holes (PD-00 step 13A drills #44 pilots through the arm and the arm plate MHA-PD-19 together; 13D reams the arm's two, press fit), the 2X 8-32 tapped holes' match work (13L spots through the plate; 13N drills #29; 13P taps) and the MHA-PD-23 pin pressed into the pin bore (11A). Send the arm to assembly with the plate."
+feed = "hand"

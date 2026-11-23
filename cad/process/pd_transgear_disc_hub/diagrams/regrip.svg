@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 2, section through the axis, 200 px to the inch: the hub turned round, its body in the 3-jaw over a shim wrap, the flange's front face on the jaw fronts at x 250; Z0 the spigot's end at x 297.6. Styles: prechips.palette. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 2: turned round, the body in the jaws; faced to length, spigot turned, flange faced, bore reamed through</text>
+  <rect class="fixture-vise" x="110" y="60" width="80" height="280"/>
+  <rect class="clamp" x="190" y="114" width="60" height="30"/>
+  <rect class="clamp" x="190" y="256" width="60" height="30"/>
+  <rect class="part-removed" x="268.8" y="95" width="32.8" height="55.2"/>
+  <rect class="part-removed" x="268.8" y="249.8" width="32.8" height="55.2"/>
+  <rect class="part-removed" x="297.6" y="150.2" width="4" height="99.6"/>
+  <polygon class="part-kept" points="189.8,146 250,146 250,95 268.8,95 268.8,150.2 297.6,150.2 297.6,249.8 268.8,249.8 268.8,305 250,305 250,254 189.8,254"/>
+  <rect class="holes" x="189.8" y="168.65" width="107.8" height="62.7"/>
+  <line class="centre-line" x1="150" y1="200" x2="600" y2="200"/>
+  <line class="active-face" x1="297.6" y1="150.2" x2="297.6" y2="249.8"/>
+  <line class="active-face" x1="268.8" y1="95" x2="268.8" y2="150.2"/>
+  <line class="active-face" x1="268.8" y1="249.8" x2="268.8" y2="305"/>
+  <rect class="cutter" x="304" y="172" width="150" height="56"/>
+  <line class="leader" x1="297.6" y1="160" x2="420" y2="120"/>
+  <text class="datum-label" x="424" y="116">Z0: the spigot's end, faced to {{process.length_target_in:.3dot}} overall</text>
+  <line class="leader" x1="284" y1="150.2" x2="420" y2="84"/>
+  <text class="label" x="424" y="80">spigot Ø{{cad.spigot_dia_min_in:.4dot}}–{{cad.spigot_dia_max_in:.4dot}}, root R{{cad.spigot_root_radius_max_mm:in.3dot}} MAX</text>
+  <line class="leader" x1="268.8" y1="280" x2="420" y2="300"/>
+  <text class="label" x="424" y="304">the flange's rear face, square to the bore</text>
+  <line class="leader" x1="285" y1="222" x2="480" y2="250"/>
+  <text class="label" x="484" y="254">bore .3135 reamed through</text>
+  <line class="leader" x1="220" y1="286" x2="240" y2="346"/>
+  <text class="label" x="244" y="350">shim wrap; flange's front face on the jaw fronts</text>
+  <text class="label" x="114" y="356">3-jaw</text>
+</svg>
