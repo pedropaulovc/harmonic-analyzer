@@ -734,6 +734,7 @@ sku = "9666K56"
 status = "on_hand"
 pieces = 1
 unit = "each"
+note = "Not the wire the part now calls for: cad/config/hardware.yaml sh-vn-music-wire is Ø.008 music wire (ASTM A228, McMaster 9666K142 envelope); this owned coil is the Ø.031 size the PO bought under the same part number. No inventory record shows the Ø.008 wire owned."
 cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 64: \"Lubricated 1080 Spring Steel Wire, 1/4 lb. Coil, 0.031\" Diameter, 110 Feet Long\", 1 each shipped; Your Part Number MHA-SH-VN-56", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
 
 [hardware.sh-vn-thumb-screw]
