@@ -4,8 +4,8 @@
 # faster route and says why; the owner corrects afterwards):
 # - Setup 1, PM-1127VF-LB lathe, 6 in 3-jaw on the hex, manual (turned setups
 #   get no NC, owner 2026-11-21): on the end of the bar, face the spigot
-#   face, turn the Ø.42 spigot, form the FULL R groove with the R.047 form
-#   tool, centre-drill, drill #43 to the bore's axis and tap #4-40 from the
+#   face, turn the Ø.42 spigot, form the FULL R groove with the R.024
+#   full-radius groover, centre-drill, drill #43 to the bore's axis and tap #4-40 from the
 #   tailstock (plug, then bottoming), the tap wrench's shank centre on the
 #   MT3 dead centre (sm_gooseneck_end_plug's way).
 # - Setup 2, PM-30MV CNC, vise: the whole bar lying corner up along the jaws
@@ -20,9 +20,26 @@
 #   (the P1 blade's touch rule, #3312).
 # - Setup 4, bench: file the parting pip, break edges, chase the thread with
 #   the bottoming tap through the cross bore's burr, inspect.
-# To order before Setup 1 runs: the R.047 grooving form tool
-# (tools.form-tool-r047) and the #4-40 bottoming tap (tools.tap-4-40-bottoming,
-# Travers 12-111-086 per its record).
+# To order before Setup 1 runs: the R.024 full-radius groover
+# (tools.form-tool-r024, the one groover MHA-MG-05's rim groove names) and
+# the #4-40 bottoming tap (tools.tap-4-40-bottoming, Travers 12-111-086 per
+# its record).
+#
+# The groove's tool (tool audit 2026-11-23, row form-tool-r047, level 1:
+# "Do not buy a second grooving form tool: cut MG-06's FULL R groove with the
+# one full-radius groover bought for MG-05 (R .020-.029, e.g. R.024), which
+# lies inside MG-06's R.020-.047 limit"; Main's assignment 2026-11-23: "the
+# wire grooves take one stock 3/64 groover per the audit"). Re-derived on
+# the spec: the groove prints R .047/.020 LIMIT, FULL R
+# (mg_output_fixture_spec.py GROOVE_RADIUS_MIN .020, the model's .047 the
+# MAX), and MHA-MG-05 prints its rim groove R.024 at .XXX (±.005: R.019-.029);
+# a 3/64 (.0469) full-radius nose is R.0234, the record's R.024 within .001
+# of it, inside both. At R.024 the groove is 2R = .048 wide at any printed
+# root and O.D. (FULL R: the shallowest printed groove, .035 deep, is deeper
+# than R, so straight walls run from the arc to the O.D.), wider than the
+# Ø.008 ±.001 lever wire, its floor's radius over the wire's .0045: the
+# spec's own R MIN proofs, which a larger R than .020 only eases; its mouth
+# stays .048 wide, so the shoulder-side clearance grows over the R.047's.
 #
 # NC (cam:mg_output_fixture, cad/process/mg_output_fixture/cam.py):
 # MO01_cross_bore. Program name, the [parameters] and the milling_cuts names
@@ -67,9 +84,11 @@ stickout_in = 0.95
 blade_width_in = 0.0625
 part_kerf_in = 0.075
 # Turning: shop settings.lathe-ar-c360 (sourced there).
-# The groove: the R.047 form tool's half width; the DRO reads its arc's
-# centre once set to plus this with its chuck-side flank on the face (Op 40).
-form_half_width_in = 0.047
+# The groove: the groover's half width, its record's R.024 nose (.048
+# wide; a stock 3/64 nose is .0469). Op 40 mikes the tool and sets the DRO
+# to half its reading with its chuck-side flank on the face, so the DRO
+# reads its arc's centre; this is the figure the op quotes.
+form_half_width_in = 0.024
 # Setup 2, MO01 (cam.py recomputes the ones it can):
 # Spot: the #2 centre drill to Ø.180 on the top corner, under the F drill
 # and its 3/16 body (as the clamp's corner spot).
@@ -121,8 +140,8 @@ name = "AR carbide turning tool"
 ref = "lathe-ar"
 [[tools]]
 id = "form"
-name = "R.047 grooving form tool"
-ref = "form-tool-r047"
+name = "R.024 full-radius groover (about .048 wide)"
+ref = "form-tool-r024"
 status = "to_order"
 [[tools]]
 id = "centre"
@@ -213,8 +232,8 @@ speed_kind = "spindle"
 tool = "form"
 drilling = "none"
 sizing = "other"
-instruction = "Set the R.047 form tool on centre height, square to the axis. Bring it past the spigot face, its chuck-side flank onto the face, and set the DRO Z to {{process.form_half_width_in:.3dot}} there: the DRO then reads the centre of its arc. Move to Z−{{cad.groove_station_in:.3dot}}, the groove's centre ({{cad.groove_station_min_in:.3dot}}–{{cad.groove_station_max_in:.3dot}} from the face)."
-settings = "fixture-form-r047-c360"
+instruction = "Mike the groover across its nose (about .048) and set it on centre height, square to the axis. Bring it past the spigot face, its chuck-side flank onto the face, and set the DRO Z there to half your reading (about {{process.form_half_width_in:.3dot}}): the DRO then reads the centre of its arc. Move to Z−{{cad.groove_station_in:.3dot}}, the groove's centre ({{cad.groove_station_min_in:.3dot}}–{{cad.groove_station_max_in:.3dot}} from the face)."
+settings = "fixture-form-r024-c360"
 cut_diameter_mm = "{{cad.spigot_dia_mm}}"
 
 [[setups.operations]]
@@ -224,12 +243,12 @@ tool = "form"
 drilling = "none"
 sizing = "other"
 instruction = "Touch the arc on the spigot's O.D. and zero the cross-slide dial there. Feed in slowly by half of (your Op 20 spigot reading − {{cad.groove_root_dia_in:.3dot}}), radially: the root is then Ø{{cad.groove_root_dia_in:.3dot}} ({{cad.groove_root_dia_min_in:.3dot}}–{{cad.groove_root_dia_max_in:.3dot}}) whatever the spigot came out at."
-settings = "fixture-form-r047-c360"
+settings = "fixture-form-r024-c360"
 cut_diameter_mm = "{{cad.spigot_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Look at the groove: a clean round root, no step at either side, about as wide at the O.D. as the tool (.094). Its root Ø and station are the cross slide's and the DRO's, not gauged (no gauge in the shop enters a .094 groove)."
+instruction = "Look at the groove: a clean round root, no step at either side, about as wide at the O.D. as the groover (.048). Its root Ø and station are the cross slide's and the DRO's, not gauged (no gauge in the shop enters a .048 groove)."
 feed = "hand"
 
 [[setups.operations]]
