@@ -15,7 +15,9 @@ journal end seats on the pilot's floor.  The cup's O.D. is the bush's rear
 stub's, the Ø the cup's front face meets (owner: "pd-16 diameter should also
 be reduced to match new knob bush").
 
-Decimal inch (#290): the pilot is .250 +.001/0, the end mill's own Ø band.
+Decimal inch (#290): the pilot is .250 +.004/0, the DRILLED HOLES row (fit
+audit 2026-11-23, pending owner confirmation): a bonded seat's gap takes the
+band, and the gap stays inside LOCTITE 641's fill.
 
 Part frame: axis local +Y through the origin (``Axis1``); the front face
 (the running face, as turned) is the Top Plane, y = 0; the pilot's floor
@@ -62,10 +64,18 @@ LENGTH = 9.144  # .36 as turned (SUPPLY)
 # lead and the drill's cone), and the journal end must seat flat on the web
 # for the fitted float, so after a B pilot drill the owned 1/4 HSS 2-flute
 # centre-cutting square end mill (tools-cutting endmill-hss-2fl-1-4,
-# McMaster 3051A51: Ø tolerance -.000/+.001, read live 2026-11-20 by
-# T20Pdplate) is plunged from the tailstock; the band is the tool's own.
+# McMaster 3051A51) is plunged from the tailstock.  The pilot is a bonded
+# seat, so it takes the DRILLED HOLES row, never under the cutter's size
+# (fit audit 2026-11-23, pending owner confirmation; owner, 2026-11-23:
+# "why do we need single micron level tolerance x class plug gauges for a
+# hobby machining project"): it was the end mill's own +.001/0, gauged by a
+# Class X plug pair.  What fails if it is .002 looser still: nothing until
+# the bond gap on the journal passes LOCTITE 641's fill
+# (BORE_JOURNAL_CLEARANCE against LOCTITE_641_GAP_MAX below), which the
+# row's upper limit keeps; the ring round the pilot keeps the wall target
+# (PILOT_WALL_WORST).
 BORE_DIA = 6.35  # .250
-BORE_BAND = (0.0254, 0.0)  # (upper, lower) deviations: +.001/-.000
+BORE_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # (upper, lower): +.004/-.000
 PILOT_DEPTH = 3.8608  # .152 as turned (SUPPLY)
 # The web's #33 drill and the rear pocket the screw head sinks in, cut flat
 # with a 3/16 end mill after the drill.  The pocket only clears the head, so
@@ -121,8 +131,12 @@ BORE_MAX = BORE_DIA + max(BORE_BAND)
 
 # --- The bonded pilot: the journal end, LOCTITE 641 -----------------------------
 # drawing-guidelines.md rule 23: a bonded fit is a fit; the sheet prints the
-# pilot's limits, names MHA-PD-08 and states the diametral clearance, which
-# must lie inside the grade's gap fill.  Henkel's LOCTITE 641 product page
+# pilot at the DRILLED HOLES row, names MHA-PD-08 and states the diametral
+# clearance, which must lie inside the grade's gap fill.  The journal's
+# limits here are the modelled result of its fit by feel in the MHA-PD-28
+# bush (pd_transgear_knob_shaft_spec.JOURNAL_DIA_BAND), not printed limits:
+# the traveler accepts the pilot with the journal itself and one pin of the
+# .001-step set as its upper limit.  Henkel's LOCTITE 641 product page
 # (https://next.henkel-adhesives.com/us/en/products/industrial-adhesives/central-pdp.html/loctite-641/BP000000153498.html,
 # read 2026-11-20) gives "Gap fill: 0.15 mm"; its TDS (May 2004,
 # https://datasheets.tdx.henkel.com/LOCTITE-641-en_GL.pdf) charts full cure
