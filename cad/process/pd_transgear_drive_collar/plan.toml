@@ -424,7 +424,7 @@ speed_kind = "spindle"
 tool = "drill-53"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T4 (#53, at least {{process.tool_out_min_in:.2dot}} out of the chuck): the flat pin's hole blind from the rear face, its full diameter to {{process.flat_drill_station_in:.3dot}} from the seat face (Z{{process.flat_drill_tip_mm:in.3dot}} at the point), pecks of {{process.peck_53_mm:in.3dot}} with full retract; set 2800. It breaks into the bore along its length, as drawn."
+instruction = "Same file, M6 T4 (#53, at least {{process.tool_out_min_in:.2dot}} out of the chuck): the flat pin's hole blind from the rear face, its full diameter to {{process.flat_drill_station_in:.3dot}} from the seat face (the point at Z{{process.flat_drill_tip_mm:.3f}} mm in the file), pecks of {{process.peck_53_mm:in.3dot}} with full retract; set 2800. It breaks into the bore along its length, as drawn."
 settings = "pd-collar-drill-53-c360"
 hole_depth_mm = 5.842
 peck = { step_mm = 1.27, retract = "full" }
@@ -437,7 +437,7 @@ speed_kind = "spindle"
 tool = "reamer-0615"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.flat_pin_hole_dia_band_mm}}" }
-instruction = "Same file, M6 T5 (the .0615 reamer, to buy): ream the flat pin's hole blind, the reamer's end {{process.flat_ream_station_in:.3dot}} from the seat face (Z{{process.flat_ream_tip_mm:in.3dot}}), fed in and fed out; set 1400. The file ends with the spindle stopped and the reamer raised clear."
+instruction = "Same file, M6 T5 (the .0615 reamer, to buy): ream the flat pin's hole blind, the reamer's end {{process.flat_ream_station_in:.3dot}} from the seat face (Z{{process.flat_ream_tip_mm:.3f}} mm in the file), fed in and fed out; set 1400. The file ends with the spindle stopped and the reamer raised clear."
 settings = "pd-collar-ream-0615-c360"
 inspection = "Flat pin's hole Ø{{cad.flat_pin_hole_dia_min_in:.4dot}}–{{cad.flat_pin_hole_dia_max_in:.4dot}}, still clamped: the .0615 GO plug enters to the floor and the .0620 NO-GO plug does not enter."
 gauge_checks = [{ gauge = "plug-gauges-0615-0620", band_mm = "{{cad.flat_pin_hole_dia_band_mm}}" }]
