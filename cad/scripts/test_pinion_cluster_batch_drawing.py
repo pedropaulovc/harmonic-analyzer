@@ -734,11 +734,6 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(
                 ("pd-vn-transgear-latch-pin-1", "pd-transgear-arm-1")
             ): _annulus_limit(3.175, 3.1496, 8.5),
-            # R9-71: MHA-PD-20's Ø.1850 ream pressed on MHA-PD-VN-57's Ø4.7625
-            # shoulder over its 5.0 length.
-            frozenset(("pd-transgear-pivot-spacer-1", "pd-vn-transgear-pivot-screw-1")): (
-                _annulus_limit(4.7625, 4.699, 5.0)
-            ),
             # MHA-PD-VN-61's three prong arcs, atan(3/4) of the turn each, at the
             # Ø2.3876 free diameter inside the MHA-PD-23 Ø2.413 groove floor.
             frozenset(("pd-vn-transgear-retaining-ring-1", "pd-transgear-pin-1")): (

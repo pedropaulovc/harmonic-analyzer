@@ -117,10 +117,7 @@ def _loaded_hanger_bounds() -> tuple[float, float, float]:
     # A tilted seated arm also moves the latch trace in Z. The circular
     # hook-hole lower edge has |dy/dz|=|z|/sqrt(R²-z²); pay its whole accepted
     # offset and the complete latch lever rather than a nominal centre slope.
-    tilt = (
-        math.atan(spacer.FRONT_FACE_PERPENDICULARITY / spacer.FACE_PERPENDICULARITY_ZONE_DIA)
-        + math.atan(spacer.REAR_FACE_PERPENDICULARITY / spacer.FACE_PERPENDICULARITY_ZONE_DIA)
-    )
+    tilt = spacer.SEATED_FACE_TILT
     # The pin hole is match-drilled at the pin's marked axis: the drilled
     # position's .XX band, plus the as-built stack bands kept conservatively.
     z_offset = (
@@ -156,10 +153,7 @@ def _rotating_stud_error_change_mm(angle_change: float) -> float:
 
     projected_radius = registration.S_AXIS_ZONE_DIAMETER_MM / 2.0
     position_radius = reducer_position_diameter_mm() / 2.0
-    tilt = (
-        math.atan(spacer.FRONT_FACE_PERPENDICULARITY / spacer.FACE_PERPENDICULARITY_ZONE_DIA)
-        + math.atan(spacer.REAR_FACE_PERPENDICULARITY / spacer.FACE_PERPENDICULARITY_ZONE_DIA)
-    )
+    tilt = spacer.SEATED_FACE_TILT
     # The complete stud ends at the source groove + front land + dome.
     # Paying that longer lever also encloses the actual feed tooth mid-plane.
     import pd_transgear_pin_spec as pin
@@ -358,10 +352,7 @@ def reducer_axis_tilt_maxima_rad() -> tuple[float, float]:
         <= low_z <= high_z <= registration.PLATE_MOUNT_MACHINE_Z_MM
     ):
         raise ValueError("actual reducer working faces leave the printed S/K projected-axis zones")
-    common = (
-        math.atan(spacer.FRONT_FACE_PERPENDICULARITY / spacer.FACE_PERPENDICULARITY_ZONE_DIA)
-        + math.atan(spacer.REAR_FACE_PERPENDICULARITY / spacer.FACE_PERPENDICULARITY_ZONE_DIA)
-    )
+    common = spacer.SEATED_FACE_TILT
     edge = edge_break_chamfer_mm(unit=pd_transgear_feed_pinion_spec.UNIT)
     feed_span = (
         pd_transgear_feed_pinion_spec.OVERALL_LENGTH

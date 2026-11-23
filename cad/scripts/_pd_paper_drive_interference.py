@@ -170,11 +170,6 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset(
         ("pd-vn-transgear-latch-pin-1", "pd-transgear-arm-1")
     ): smooth_annulus_limit_mm3(3.175, 3.1496, 8.5),
-    # MHA-PD-20 (pd_transgear_pivot_spacer_spec, Ø.1850 ream) pressed on the
-    # MHA-PD-VN-57 Ø4.7625 shoulder over its whole 5.0 length (R9-71): the press.
-    frozenset(("pd-transgear-pivot-spacer-1", "pd-vn-transgear-pivot-screw-1")): (
-        smooth_annulus_limit_mm3(4.7625, 4.699, 5.0)
-    ),
     # MHA-PD-VN-61 (pd_vn_transgear_retaining_ring_spec, McMaster 97431A240)
     # in the MHA-PD-23 groove: the ring as McMaster ships it, its prongs on
     # the Ø2.3876 free diameter, 0.0127 inside the Ø2.413 groove floor: the

@@ -1,18 +1,18 @@
 r"""Create the manufacturing drawing for the transgear pivot spacer (MHA-PD-20).
 
-A turned brass ring: Ø11.0 O.D. over a reamed Ø4.727 +0.008/0 bore (a light
-press on the MHA-PD-VN-57 shoulder), 5.000 long under its explicit band.  The
-profile lies as it sits in the lathe (axis horizontal): the ``*Top`` view
-turned a quarter turn, so model +Z runs LEFT and the bar-side front face
-(z 0) is the profile's right end, the rear face (on the arm) its left end.
-Each end face carries its finish (the arm's bearing face and the bar seat)
-and its perpendicularity to the bore, the length sits under the profile and
-the O.D. moves onto the profile
+A turned brass ring: Ø.44 O.D. over a #12 drilled bore (a bonded slip fit,
+LOCTITE 638, on the MHA-PD-VN-57 shoulder), .197 long under its explicit
+band.  The profile lies as it sits in the lathe (axis horizontal): the
+``*Top`` view turned a quarter turn, so model +Z runs LEFT and the bar-side
+front face (z 0) is the profile's right end, the rear face (on the arm) its
+left end.  Each end face carries its finish (the arm's bearing face and the
+bar seat); the front face is datum B and the rear face holds parallel to
+it; the length sits under the profile and the O.D. moves onto the profile
 (drawing-guidelines.md rule 11 (turned parts read like the lathe): diameters on the side view).  The end view to its left (third
 angle, looking along -Z from the +Z end) keeps the bore, a solid circle only
-end-on, and its axis is datum A.  Each banded size names what it serves
-(rule 4): the bore its press on the screw's shoulder, the length the spring
-room it sets.
+end-on, and its axis is datum A (the O.D.'s runout).  The bore names the
+bonded seat it makes on the screw's shoulder (rule 23), the length the
+spring room it sets (rule 4).
 
 Run with SolidWorks open::
 
@@ -76,24 +76,23 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from _feature_requirements import part_metadata, requirement
-from _printed_limits import limits
+from _printed_limits import drilled_limits, limits
 from _printed_tolerance import printed_deviations
 import pd_transgear_pivot_spacer_callouts as callouts
 from pd_transgear_pivot_spacer_spec import (
+    BOND_GAP,
     BORE_DATUM,
     BORE_DIA,
-    BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    FRONT_FACE_PERPENDICULARITY,
     GEOMETRIC_TOLERANCES_IN,
     ISOMETRIC_VIEW_SCALE,
     LENGTH,
     LENGTH_TOLERANCE,
     OD,
     OD_RUNOUT,
-    PRESS_INTERFERENCE,
-    REAR_FACE_PERPENDICULARITY,
+    REAR_FACE_PARALLELISM,
+    SEAT_DATUM,
     SURFACE_FINISHES,
     UNIT,
     WALL_WORST,
@@ -133,7 +132,7 @@ _PROFILE_REAR_X = PROFILE_CENTER[0] - LENGTH * _S / 2.0  # z LENGTH, left end
 _PROFILE_TOP = PROFILE_CENTER[1] + OD * _S / 2.0
 _PROFILE_BOTTOM = PROFILE_CENTER[1] - OD * _S / 2.0
 
-# The bore stays on the end view, where it is a circle: a reamed through
+# The bore stays on the end view, where it is a circle: a drilled through
 # hole, fully defined by its callout (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)), it needs no section, and the
 # profile is hidden-lines-removed (a dimension never lands on a hidden line).
 # The O.D. arrives there too and is moved onto the profile below.
@@ -141,9 +140,10 @@ END_KEEP = {
     "BoreDia": (0.050, 0.222),
     "RingOd": (0.045, 0.120),  # donor: moved onto the profile
 }
-# Rule 4: every tight band names its mate (pd_transgear_pivot_spacer_callouts).
-# The part authors both below-callouts on its source dimensions; the sheet
-# imports them and only reads them back (#1942).
+# Rule 23 / rule 4: the bonded seat and the banded length name their mates
+# (pd_transgear_pivot_spacer_callouts).  The part authors both
+# below-callouts on its source dimensions; the sheet imports them and only
+# reads them back (#1942).
 DIMENSION_CALLOUTS = {
     name: lanes[callouts.CALLOUT_BELOW]
     for name, lanes in callouts.authored_by_name().items()
@@ -201,26 +201,27 @@ DATUM_A_TRIANGLE_SPAN = 0.005
 _JOIN_TOL_M = 1e-5
 
 # Datum A is the bore's axis, put on the end view's bore circle by
-# SolidWorks' native placement, as the disc hub's is.  Each end face's
-# perpendicularity frame attaches by entity to the FACE on the profile, as
-# the hub's frames do (draw_transgear_disc_hub.py): a sheet pick on an
-# edge-on face's line can find no edge there, and a symbol left on the rim
-# the face shares with the O.D. reads as controlling the cylinder.  Each
-# finds its face's O.D. rim by model geometry and takes, of the rim's two
-# faces, the plane its finish row names (SURFACE_FINISHES: the front face at
-# z 0 facing -Z, the rear at z LENGTH facing +Z).  Its leader lands on the
-# face's projected line at a model x, placed between the rim's projected
-# ends at run time (model +X runs DOWN the profile), and the frame stands
-# outboard of its face, level with the landing, so the leader runs square
-# onto the line.
-# - The rear face's frame (left end) lands below the axis at the annulus'
-#   mid radius and stands left of the face: the free lane between the end
-#   view and the length's left extension line, under the axis centreline.
-#   The rear face's finish stands above-left, the length below.
-# - The front face's frame (right end) lands above the axis at r 3.0 and
-#   stands right of the face inside the O.D.'s extension-line band, its box
-#   under the upper extension line and short of the O.D. dimension line;
-#   the front face's finish holds that band below the axis.
+# SolidWorks' native placement, as the disc hub's is; only the O.D.'s runout
+# reads it.  Datum B is the front face, the bar seat the ring is bonded
+# flush on: its tag hangs on the face's O.D. rim, which the profile shows
+# edge-on as the face's line (draw_ch_rocker_arm's hub-face datum G), its
+# triangle landed above the axis at r 3.0 and its box straight out right,
+# inside the O.D.'s extension-line band, under the upper extension line and
+# short of the O.D. dimension line; the front face's finish holds that band
+# below the axis.  The rear face's parallelism frame attaches by entity to
+# the FACE on the profile, as the hub's frames do
+# (draw_transgear_disc_hub.py): a sheet pick on an edge-on face's line can
+# find no edge there, and a symbol left on the rim the face shares with the
+# O.D. reads as controlling the cylinder.  It finds its face's O.D. rim by
+# model geometry and takes, of the rim's two faces, the plane its finish row
+# names (SURFACE_FINISHES: the rear at z LENGTH facing +Z).  Its leader
+# lands on the face's projected line at a model x, placed between the rim's
+# projected ends at run time (model +X runs DOWN the profile), below the
+# axis at the annulus' mid radius, and the frame stands left of the face,
+# level with the landing, so the leader runs square onto the line: the free
+# lane between the end view and the length's left extension line, under the
+# axis centreline.  The rear face's finish stands above-left, the length
+# below.
 # A frame's box as the hub's farm run drew its ⊥ 0.03 A (20261002T180658288Z):
 # 7.03 tall and 26.75 wide on the sheet, its position its top-left corner,
 # the leader leaving its side at mid-height.
@@ -289,14 +290,24 @@ class EndFaceMark:
 
 REAR_FACE_FRAME = EndFaceMark(
     key="rear_face",
-    label="spacer rear face perpendicularity to bore",
+    label="spacer rear face parallelism to front face",
     landing_x_mm=(BORE_DIA + OD) / 4.0,
 )
-FRONT_FACE_FRAME = EndFaceMark(
+FRONT_FACE_DATUM = EndFaceMark(
     key="front_face",
-    label="spacer front face perpendicularity to bore",
+    label="spacer front face datum B",
     landing_x_mm=-3.0,
 )
+# Datum B's box stands this far straight out of its face's line
+# (draw_ch_rocker_arm.HUB_FACE_DATUM_STANDOFF_M).
+DATUM_B_STANDOFF = 0.0075
+
+
+def datum_b_symbol(landing: tuple[float, float]) -> tuple[float, float]:
+    """Datum B's tag for a triangle landing at ``landing``: outboard of the
+    front face (the profile's right end), level with the landing."""
+    return landing[0] + FRONT_FACE_DATUM.outboard * DATUM_B_STANDOFF, landing[1]
+
 
 # Feature-export declarations (export_features; cad/docs/pipeline/
 # features-travelers.md): what this sheet prints, in the part frame
@@ -305,10 +316,11 @@ FRONT_FACE_FRAME = EndFaceMark(
 # bearing face, at z = LENGTH). The O.D. takes the title block's .XX row
 # and its circular runout to the bore (datum A); the length its printed
 # .197 ±.002 (the native band about the exact 5.0 mm model, read back as the
-# printed limits); the bore its reamed band, a press on MHA-PD-VN-57's
-# shoulder; each end face its perpendicularity to A. Each ``span`` is a
-# diameter's model-Z extent. The sheet prints no manufacturing note. The
-# declarations print nothing.
+# printed limits); the bore its #12 drill under the DRILLED HOLES row, a
+# bonded slip fit on MHA-PD-VN-57's shoulder (the clearance is the spec's
+# analysis range, printed as REF); the front face is datum B and the rear
+# face holds parallel to it. Each ``span`` is a diameter's model-Z extent.
+# The sheet prints no manufacturing note. The declarations print nothing.
 DRAWING_NOTES = ""
 _P = DRAWING_PRECISION_BY_NAME
 _SELF = "draw_pd_transgear_pivot_spacer"
@@ -324,22 +336,18 @@ requirement(
     "datum_end",
     kind="face",
     faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
-    requirements=("plane", "perpendicularity"),
+    requirements=("plane",),
     fields={
         "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
         "outward": ([0.0, 0.0, -1.0], ("__frame__",)),
-        "perpendicularity": (
-            FRONT_FACE_PERPENDICULARITY,
-            ("GEOMETRIC_TOLERANCES_IN", (_SELF, "FRONT_FACE_FRAME")),
-        ),
-        "datum": ("bore", ("BORE_DATUM",)),
+        "datum_feature": (SEAT_DATUM, ("SEAT_DATUM", (_SELF, "FRONT_FACE_DATUM"))),
     },
 )
 requirement(
     "far_end",
     kind="face",
     faces=(PlanarFace((0.0, 0.0, 1.0), LENGTH),),
-    requirements=("length", "perpendicularity"),
+    requirements=("length", "parallelism"),
     fields={
         "plane": ({"frame": "model", "axis": "z", "value": LENGTH}, ("LENGTH",)),
         "outward": ([0.0, 0.0, 1.0], ("LENGTH",)),
@@ -350,11 +358,11 @@ requirement(
         "length_nominal": (LENGTH, ("LENGTH",)),
         "length_from": ("datum_end", ((_SELF, "PROFILE_KEEP"),)),
         "callout": (callouts.LENGTH_CALLOUT, ((_CALLOUTS, "LENGTH_CALLOUT"),)),
-        "perpendicularity": (
-            REAR_FACE_PERPENDICULARITY,
+        "parallelism": (
+            REAR_FACE_PARALLELISM,
             ("GEOMETRIC_TOLERANCES_IN", (_SELF, "REAR_FACE_FRAME")),
         ),
-        "datum": ("bore", ("BORE_DATUM",)),
+        "parallelism_datum": ("datum_end", ("SEAT_DATUM",)),
     },
     precision={"length": _P["RingLength"]},
 )
@@ -390,16 +398,16 @@ requirement(
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
         "span": ([0.0, LENGTH], ("LENGTH",)),
         "dia": (
-            limits(BORE_DIA, _P["BoreDia"], BORE_DIA_BAND, unit=UNIT),
+            drilled_limits(BORE_DIA, _P["BoreDia"], unit=UNIT),
             ("BORE_DIA", "BORE_DIA_BAND", "UNIT", (_SELF, "END_KEEP")),
         ),
         "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
         "thru": (True, ("BORE_CALLOUT",)),
-        "process": ("ream", ("BORE_CALLOUT",)),
+        "process": ("drill", ("BORE_CALLOUT",)),
         "wall_min": (WALL_WORST, ("WALL_WORST",)),
-        "diametral_interference": (
-            list(PRESS_INTERFERENCE),
-            ("PRESS_INTERFERENCE", (_CALLOUTS, "PRESS_CALLOUT")),
+        "diametral_clearance_ref": (
+            list(BOND_GAP),
+            ("BOND_GAP", (_CALLOUTS, "BOND_CALLOUT")),
         ),
         "mate": (callouts.SCREW_NUMBER, ((_CALLOUTS, "SCREW_NUMBER"),)),
         "callout": (
@@ -938,25 +946,38 @@ def build(adapter: Any) -> dict[str, str]:
         label="spacer bore axis",
     )
     datum_a, datum_a_xy = _place_datum_a(adapter, end, bore_edge)
-    # Both end faces square to A.
+    # Datum B, the front face (the bar seat), on its line in the profile:
+    # the tag hangs on the face's O.D. rim, proved first to join the face's
+    # own plane.
     profile_edges = scan_view_edges(profile, label="spacer profile rims")
-    for mark, key in (
-        (REAR_FACE_FRAME, "rear face perpendicularity to bore"),
-        (FRONT_FACE_FRAME, "front face perpendicularity to bore"),
-    ):
-        face, landing = _face_attachment(adapter, profile, profile_edges, mark)
-        add_feature_control_frame(
-            adapter,
-            profile,
-            entity=face,
-            entity_type="FACE",
-            leader_attach_xy=landing,
-            frame_xy=frame_position(mark, landing),
-            characteristic="perpendicularity",
-            tolerance=GEOMETRIC_TOLERANCES_IN[key],
-            datums=(BORE_DATUM,),
-            label=mark.label,
-        )
+    _seat_face, seat_landing = _face_attachment(
+        adapter, profile, profile_edges, FRONT_FACE_DATUM
+    )
+    add_datum_feature(
+        adapter,
+        profile,
+        edge_entity=face_rim(profile_edges, FRONT_FACE_DATUM).edge,
+        leader_attach_xy=seat_landing,
+        symbol_xy=datum_b_symbol(seat_landing),
+        datum=SEAT_DATUM,
+        label=FRONT_FACE_DATUM.label,
+    )
+    # The rear face parallel to B.
+    rear_face, rear_landing = _face_attachment(
+        adapter, profile, profile_edges, REAR_FACE_FRAME
+    )
+    add_feature_control_frame(
+        adapter,
+        profile,
+        entity=rear_face,
+        entity_type="FACE",
+        leader_attach_xy=rear_landing,
+        frame_xy=frame_position(REAR_FACE_FRAME, rear_landing),
+        characteristic="parallelism",
+        tolerance=GEOMETRIC_TOLERANCES_IN["rear face parallelism to front face"],
+        datums=(SEAT_DATUM,),
+        label=REAR_FACE_FRAME.label,
+    )
     # The O.D. runs true to A.
     od_face = resolve_faces(
         _early_bound(_early_bound(profile, "IView").ReferencedDocument, "IModelDoc2"),
