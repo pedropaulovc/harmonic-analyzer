@@ -26,7 +26,7 @@
 title = "Transgear Knob Cup"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
-material = "C36000 free-machining brass round bar, 7/8 in (drawing: {{cad.material_spec}})"
+material = "C36000 free-machining brass round bar, 7/8 in (drawing: {{cad.material_name}})"
 stock = "Lot: {{process.quantity:d}} cup. Ø{{process.bar_dia_in:.3dot}} bar, on hand; the cup takes about {{process.bar_use_in:.2dot}} in of it."
 note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Left for MHA-PD-00 step 22, not made here: facing the front face to the fitted pilot depth and the pilot's bond on MHA-PD-08. To order (not on hand): the .2500 GO / .2510 NO-GO plug gauge pair for the pilot and the .113 and .117 pins (pin-gauge sets) for the web hole."
 shop = "../shop"
@@ -99,7 +99,7 @@ ref = "drill-b"
 
 [[tools]]
 id = "endmill-1-4"
-name = "1/4 two-flute end mill"
+name = "1/4 two-flute end mill (both pieces on hand)"
 ref = "endmill-hss-2fl-1-4"
 
 [[tools]]
@@ -220,7 +220,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "End mill under .2500 or over .2505 in Op 70: mike the other piece on hand the same way. Both outside: stop and report; the pilot cannot be cut to the drawing with them."
+instruction = "End mill under .2500 or over .2505 in Op 70: mike the shop's second 1/4 end mill (the same McMaster 3051A51, both pieces on hand) the same way. Both outside: stop and report; the pilot cannot be cut to the drawing with them."
 feed = "hand"
 
 [[setups.operations]]
