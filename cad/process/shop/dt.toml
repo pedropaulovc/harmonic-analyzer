@@ -380,10 +380,6 @@ tool = "lathe-ar"
 material = "lathe-1018-cold-finished"
 rpm = 560
 feed_mm_rev = 0.0508
-# The screwdriver slot, sawn by hand (inventory tools-cutting.toml, same key:
-# to order).
-[tools.hacksaw-32tpi]
-description = "12 in hand hacksaw frame, 32 TPI bi-metal blade, .025 in thick (Starrett KBS1232-2)"
 
 # --- MHA-DT-20 cone swing platform (cad/process/dt_cone_swing_platform/plan.toml) ---
 # The pivot bore, Ø.2500 +.0005/.0000 REAM THRU (a running fit on the

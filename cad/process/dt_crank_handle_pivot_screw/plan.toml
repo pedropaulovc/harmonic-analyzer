@@ -13,12 +13,13 @@
 #   tip, withdraw the centre, run the die to the seat, plunge the relief at
 #   the seat with the blade and cut its 45° lead with the blade's corner on
 #   the compound; part off at the head's length.
-# - Bench: file the part-off pip, saw the screwdriver slot with a 32 TPI
-#   hacksaw to a scribed depth, deburr, oil (FINISH: bright turned, oiled).
+# - Bench: file the part-off pip, saw the screwdriver slot with the 32 TPI
+#   junior hacksaw to a scribed depth, deburr, oil (FINISH: bright turned,
+#   oiled).
 #
-# Flagged: the hacksaw (tools-cutting.toml hacksaw-32tpi) and the pin gauges
-# (gauges.pin-gauges) are to order. The owned 1 in x .032 slitting saw the
-# placeholder named would need a 3/8 in arbor not on record and an NC slot
+# Flagged: the junior hacksaw (tools-hand.toml junior-hacksaw) and the pin
+# gauges (gauges.pin-gauges) are to order. The owned 1 in x .032 slitting saw
+# the placeholder named would need a 3/8 in arbor not on record and an NC slot
 # file on the mill; the bench saw needs neither. No #4-40 ring gauge is on
 # record: the thread is accepted on a #4-40 nut (the MHA-MG-VN-52 hex nut,
 # McMaster 92671A005), as MHA-MG-04's.
@@ -26,7 +27,7 @@ title = "Crank Handle Pivot Screw"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "{{cad.material_spec}}"
-stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} 1018 cold-finished rod, the bar on hand; one blank {{process.blank_length_in:.2dot}} in long."
+stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} 1018 cold-finished rod, the bar on hand; one blank B = P + {{process.blank_over_p_in:.2dot}} long (Setup 1), {{process.blank_min_in:.2dot}}–{{process.blank_max_in:.2dot}} over the accepted stack."
 note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); steel cut with cutting oil. The shoulder's length is fitted to the bonded handle (Setup 1): write the measured stack and the stations derived from it on this sheet before Setup 3."
 shop = "../shop"
 stock_refs = ["1018-round-1-4"]
@@ -45,16 +46,21 @@ stock_dia_mm = 6.35
 # The 1/4 in rod as the stock fit reads it (the export's envelope).
 blank_x_in = 0.25
 blank_y_in = 0.25
-# Sawn over the 2.62 REF: .03 to face off the tip end, the 1/16 blade and
-# about .15 clear of the jaws at the part-off, and about .55 in the jaws.
-blank_length_in = 3.4
-blank_z_in = 3.4
-# Out of the jaw fronts while it is turned: the 2.62 REF screw (the shoulder
-# at its drawn length; a fitted one changes it by the stack's difference),
-# the blade and about .15 clear for the part-off.
-stickout_in = 2.88
-stickout_mm = 73.152
-jaw_front_z_mm = -73.152
+# The blank and the stickout follow the part-off station P (Setup 1, from the
+# measured stack M): out of the jaw fronts S = P + .33 as chucked (.03 faced
+# off the tip leaves P + .30: the head turn's end at P + .10 then stands .20
+# clear of the jaws), and about .57 in the jaws, so B = P + .90. Over the
+# accepted stack M 1.97-2.20 (P = M + .562: 2.53-2.77) B is 3.43-3.67; the
+# blank envelope and the hold below are the longest case.
+blank_over_p_in = 0.90
+stickout_over_p_in = 0.33
+blank_min_in = 3.43
+blank_max_in = 3.67
+blank_z_in = 3.67
+stickout_mm = 77.9
+jaw_front_z_mm = -77.9
+m_min_in = 1.97
+m_max_in = 2.20
 # Note 1's end play over the measured stack (cad.under_head_face_end_play,
 # .010-.040): the shoulder is cut to the stack plus its middle.
 end_play_min_in = 0.010
@@ -81,17 +87,13 @@ turn_feed_mm_rev = 0.0508
 head_turn_end_z_mm = -69.0
 # Aims, mm: the head at its band's middle, the shoulder .001 under the top
 # of its band (a running fit; cad.shoulder_dia's nominal is the band's top),
-# the thread blank at .1085, inside the #4-40 UNC-2A major .1061-.1112 (the
-# title block's CLASS 2A; the feature's own band runs to .1114).
+# the thread blank at .1085, inside cad.thread_dia (the #4-40 UNC-2A major
+# .1061-.1112, the title block's CLASS 2A).
 head_aim_dia_mm = 5.9944
 shoulder_rough_dia_mm = 4.0
 shoulder_aim_dia_mm = 3.937
 thread_rough_dia_mm = 2.957
 thread_aim_dia_mm = 2.7559
-thread_blank_min_in = 0.1061
-thread_blank_max_in = 0.1112
-thread_blank_min_mm = 2.69494
-thread_blank_max_mm = 2.82448
 # The bands' low ends, mm (cad.head_dia, cad.shoulder_dia, cad.thread_dia):
 # no pass goes under them.
 head_dia_min_mm = 5.8674
@@ -163,7 +165,7 @@ ref = "die-stock-13-16"
 [[tools]]
 id = "hacksaw"
 name = "Hacksaw, 32 TPI blade"
-ref = "hacksaw-32tpi"
+ref = "junior-hacksaw"
 status = "to_order"
 
 [[tools]]
@@ -184,11 +186,11 @@ diagram = { file = "diagrams/handle.svg", alt = "The bonded handle in section: t
 
 [[setups.operations]]
 instruction = "Read the handle's overall length with the calipers' jaws, from the MHA-DT-34 ferrule's outer face to the MHA-DT-35 butt cup's outer end; then the pocket's depth with the depth rod, the beam's end on the cup's outer end, the rod onto the pocket's floor. M = the length less the depth. Read both three times, turning the handle between; write the largest M on this sheet."
-inspection = "M, the stack: written on this sheet."
-gauge_checks = [{ gauge = "calipers", band_mm = [50.0, 56.0] }]
+inspection = "M {{process.m_min_in:.2dot}}–{{process.m_max_in:.2dot}} (the blank and the stickout follow it), written on this sheet; outside it, the handle is not as built: set it aside for the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = [50.038, 55.88] }]
 
 [[setups.operations]]
-instruction = "Work out and write on this sheet: the shoulder's length L = M + {{process.end_play_aim_in:.3dot}}, and its band M + {{process.end_play_min_in:.3dot}} to M + {{process.end_play_max_in:.3dot}}; the under-head station U = {{process.seat_z_in:.3dot}} + L from the tip; the part-off station P = U + {{cad.head_length_in:.3dot}}."
+instruction = "Work out and write on this sheet: the shoulder's length L = M + {{process.end_play_aim_in:.3dot}}, and its band M + {{process.end_play_min_in:.3dot}} to M + {{process.end_play_max_in:.3dot}}; the under-head station U = {{process.seat_z_in:.3dot}} + L from the tip; the part-off station P = U + {{cad.head_length_in:.3dot}}; the blank B = P + {{process.blank_over_p_in:.2dot}}; the stickout S = P + {{process.stickout_over_p_in:.2dot}}."
 
 [[setups]]
 machine_kind = "other"
@@ -206,7 +208,7 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Scribe {{process.blank_length_in:.2dot}} in from the rod's end and saw on the waste side of the scribe; pick up the blank only after the blade has stopped. Deburr both sawn ends with the file."
+instruction = "Scribe B (Setup 1) in from the rod's end and saw on the waste side of the scribe; pick up the blank only after the blade has stopped. Deburr both sawn ends with the file."
 feed = "hand"
 
 [[setups]]
@@ -215,7 +217,7 @@ title = "Lathe: turn the screw on the centre, thread, relief, part off"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the rod, {{process.stickout_in:.2dot}} in out of the jaw fronts, the rest in the jaws. The tailstock dead centre, greased, in the tip's centre hole for Ops 60–180, the quill backed off for each touch-off on the tip and for the readings (Ops 120, 130, 160, 180) and brought back snug; the tailstock backed away for the tip chamfer (Op 190), brought up in Op 200, its centre out, to square the die, and backed away again for the relief and the part-off (Ops 230–280)."
+holding = "3-jaw on the rod, S (Setup 1) out of the jaw fronts, set with the calipers' depth rod, the beam's end on the jaw fronts; the rest in the jaws. The tailstock dead centre, greased, in the tip's centre hole for Ops 60–180, the quill backed off for each touch-off on the tip and for the readings (Ops 120, 130, 160, 180) and brought back snug; the tailstock backed away for the tip chamfer (Op 190), brought up in Op 200, its centre out, to square the die, and backed away again for the relief and the part-off (Ops 230–280)."
 datum = "Z0 (carriage DRO) the tip's faced plane, set in Op 40; each tool touched on the tip again when it takes over (Ops 120, 130, 180, 280). The seat at Z−{{process.seat_z_in:.3dot}}; the under-head face at Z−U and the part-off at Z−P from Setup 1."
 diagram = { file = "diagrams/turn.svg", alt = "The rod in the 3-jaw on the dead centre at the tip: the head's Ø.236 next to the jaws, the long Ø.155 shoulder, the #4-40 thread at the tip; the relief at the seat; the part-off at the head's face." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.stock_dia_mm}}", stock_diameter_mm = "{{process.stock_dia_mm}}", stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{process.thread_dia_min_mm}}", support = "tailstock" }
@@ -254,7 +256,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Turn the whole stickout from the tip to Z−(P + .10) to the head's Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}}, aiming at Ø{{process.head_aim_dia_mm:in.3dot}}; cutting oil."
+instruction = "Spindle stopped: run the carriage by hand to Z−(P + .10); the tool and its holder clear the jaw fronts by .15 or more (or stop: the stickout is short). Turn the whole stickout from the tip to Z−(P + .10) to the head's Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}}, aiming at Ø{{process.head_aim_dia_mm:in.3dot}}; cutting oil."
 settings = "dt-lathe-ar-1018-centre"
 cut_diameter_mm = "{{process.stock_dia_mm}}"
 inspection = "Head Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}}, miked."
@@ -328,15 +330,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the blank over the same length to Ø{{process.thread_blank_min_in:.4dot}}–{{process.thread_blank_max_in:.4dot}} (the {{cad.thread_thread}} UNC-2A major), aiming at Ø{{process.thread_aim_dia_mm:in.4dot}}; the seat face square at Z−{{process.seat_z_in:.3dot}}."
+instruction = "Finish the blank over the same length to Ø{{cad.thread_dia_min_in:.4dot}}–{{cad.thread_dia_max_in:.4dot}} (the {{cad.thread_thread}}-2A major), aiming at Ø{{process.thread_aim_dia_mm:in.4dot}}; the seat face square at Z−{{process.seat_z_in:.3dot}}."
 settings = "dt-lathe-ar-1018-centre"
 cut_diameter_mm = "{{process.thread_aim_dia_mm}}"
-inspection = "Blank Ø{{process.thread_blank_min_in:.4dot}}–{{process.thread_blank_max_in:.4dot}}, miked."
-gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.thread_blank_min_mm}}", "{{process.thread_blank_max_mm}}"] }]
+inspection = "Blank Ø{{cad.thread_dia_min_in:.4dot}}–{{cad.thread_dia_max_in:.4dot}}, miked."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.thread_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Blank under {{process.thread_blank_min_in:.4dot}}: scrap the blank and make another from Setup 2. Over {{process.thread_blank_max_in:.4dot}}: another light pass."
+instruction = "Blank under {{cad.thread_dia_min_in:.4dot}}: scrap the blank and make another from Setup 2. Over {{cad.thread_dia_max_in:.4dot}}: another light pass."
 
 [[setups.operations]]
 cut_kind = "other"
