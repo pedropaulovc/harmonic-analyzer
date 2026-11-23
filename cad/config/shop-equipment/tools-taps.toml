@@ -74,6 +74,10 @@ status = "to_order"
 note = "quotes-2026-11-17-rev3.xlsx F-tap-bottoming-4-40: bottoming tap not owned; recommended Travers 12-111-086."
 
 [tools.tap-4-40-spiral-point]
+make = "TTC"
+sku = "12-604-240"
+source = "https://www.travers.com/product/ttc-production-12-604-240-spiral-pointed-tap-12-604-240"
+purchase = "Travers 12-604-240, TTC Production #4-40 UNC H2 plug-chamfer 2-flute bright HSS spiral-pointed tap, square drive, $6.89, in stock (read live 2026-11-22). Name-brand alternative: YG-1 T6216162 (Travers 12-682-834), $15.77."
 kind = "tap"
 status = "to_order"
 note = "Owner ruling 2026-11-20 (Pedro), #2427: the platen rails' #4-40 UNC-2B THRU taps in 1018 (MHA-PD-11 and MHA-PD-27, split from it by #2410, the same .40 section and tap specs) stay through, and the shop buys a spiral-point #4-40 tap for them; not owned, source not chosen."
