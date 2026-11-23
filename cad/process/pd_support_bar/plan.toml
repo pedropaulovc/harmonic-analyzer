@@ -296,6 +296,10 @@ ref = "jig-spot"
 id = "drill-9"
 name = "#9 drill"
 ref = "riser-drill-9"
+# The LMS 6784 5/16 end mill has a 3/8 shank (LittleMachineShop 6784 page,
+# read 2026-11-22: '3/8" shank: 3/16", 1/4", 5/16", 3/8", 7/16"'; tool audit
+# 2026-11-23, row basebar-counterbore): it goes in the 3/8 R8 collet. The
+# tool setter measures its length; no cam.py check bounds its projection.
 [[tools]]
 id = "cbore"
 name = "5/16 in 2-flute end mill"
@@ -522,7 +526,7 @@ speed_kind = "spindle"
 tool = "cbore"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.clamp_hole_1_cbore_dia_band_mm}}" }
-instruction = "Same file, M6 T4 (5/16 in 2-flute end mill, in the 5/16 collet): counterbore clamp holes 1 and 2, fed straight down the #9 holes to {{cad.clamp_hole_1_cbore_depth_mm:in.3dot}} below F; set 750. Cutting oil."
+instruction = "Same file, M6 T4 (5/16 in 2-flute end mill, in the 3/8 collet: its shank is 3/8): counterbore clamp holes 1 and 2, fed straight down the #9 holes to {{cad.clamp_hole_1_cbore_depth_mm:in.3dot}} below F; set 750. Cutting oil."
 rpm = 750
 feed = "{{process.cbore_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [

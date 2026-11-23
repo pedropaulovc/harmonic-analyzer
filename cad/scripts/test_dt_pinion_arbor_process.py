@@ -94,8 +94,8 @@ def test_the_journal_aim_gives_the_drawings_clearance_on_the_strap():
     low, high = (v / IN for v in journal["dia"])
     assert low <= p["journal_aim_in"] <= high
     clearance = [v / IN for v in journal["diametral_clearance"]]
-    assert 0.3135 - high == pytest.approx(clearance[0], abs=1e-4)
-    assert 0.3140 - low == pytest.approx(clearance[1], abs=1e-4)
+    assert p["strap_bore_min_in"] - high == pytest.approx(clearance[0], abs=1e-4)
+    assert p["strap_bore_max_in"] - low == pytest.approx(clearance[1], abs=1e-4)
 
 
 def test_the_bench_gauges_read_inside_the_drawings_bands():

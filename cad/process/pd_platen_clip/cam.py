@@ -15,7 +15,7 @@ jaws' depth (keep-out shapes only), the share of a printed band the posted
 path may use, the die profile's stray allowance and the hole's clearing
 circle.
 
-Route (plan text in ``plan.toml``): two blanks snipped from the .032 strip
+Route (plan text in ``plan.toml``): two blanks sawn from the .032 strip
 are bonded on 3M VHB 5906 tape to the spoil plate (``fixtures.sheet-spoil-
 plate``) gripped in the vise on parallels: blank A's back edge on the fixed
 jaw, blank B's against blank A's front edge, both left ends flush with the
@@ -776,8 +776,8 @@ def context(
         )
     right = blank_l - (left + d["tip_far"])
     _agree(plan, "blank_right_margin_mm", right)
-    if right < dia + p["snip_error_mm"]:
-        raise ValueError("blank_right_margin_mm: the path may run off the snipped end")
+    if right < dia + p["saw_error_mm"]:
+        raise ValueError("blank_right_margin_mm: the path may run off the sawn end")
     clip_h = d["spring"]
     shifts_a = [(left, -margin - clip_h), (left, -margin - 2 * clip_h - gap)]
     lam_tops = [-margin - 2 * clip_h - 2 * gap]

@@ -19,10 +19,11 @@ id = "steel-rule-48"
 name = "48 in steel rule"
 ref = "steel-rule-48"  # F-steel-rule-48
 
+# Tool audit 2026-11-23 (row transfer-punches): the fractional set only.
 [[tools]]
 id = "transfer-punches"
-name = "Transfer punches"
-ref = "transfer-punches"  # F-transfer-punches-fractional
+name = "Transfer punches, fractional set"
+ref = "transfer-punches"
 
 [[setups]]
 machine_kind = "other"

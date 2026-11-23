@@ -87,8 +87,14 @@ description = "24DP 20PA involute gear cutters #2 and #7"
 description = "1/16 HSS 2-flute DE end mill, 0/+.002"
 [tools.keyway-broach-1-16-a]  # F-keyway-broach
 description = "1/16 keyway broach, style A"
+# Not bought (tool audit 2026-11-23, setting-mandrel-375): an offcut of the
+# 3/8 precision-ground bar ordered for MHA-DT-13 (stock-to-order.toml
+# stock.1018-or-1045-ground-round-3-8, +.0000/-.0008), ordered one mandrel
+# length longer. Same band as the MHA-DT-13 shaft that pushes it out (MHA-DT-00
+# steps 8A-9T: "3/8 GROUND SETTING MANDREL"), so the push is between two
+# pieces of one bar.
 [tools.setting-mandrel-375]  # F-setting-mandrel-375
-description = "3/8 in ground setting mandrel"
+description = "3/8 in ground setting mandrel: an offcut of the 3/8 precision-ground bar ordered for MHA-DT-13, long enough to pass both MHA-DT-02 pedestals, sawn ends deburred"
 
 # --- Drawing cross-check additions (2026-11-19) -------------------------------
 # Tools the v50 drawings call for that the quote workbook left out, from the
@@ -459,3 +465,47 @@ description = "Drive-pin jig (shop-made, for the crankshaft): 1 in 1018 bar 4.75
 description = "Plug gauge pair, .0930 GO (plus) and .0935 NO-GO (minus), Vermont Gage Class X"
 [tools.plug-gauges-4500-4505]
 description = "Plug gauge pair, .4500 GO (plus) and .4505 NO-GO (minus), Vermont Gage Class X"
+
+# --- Class ZZ go/no-go pins for the dt-only reamed bands ---------------------
+# Owner ruling 2026-11-23 (tool audit Q1, re-answered on the corrected facts),
+# verbatim: "ZZ singles per the record: 29 pins (17 plus GO, 12 minus NO-GO),
+# about $130. Accept that good holes near a limit may be refused; the traveler
+# mikes each pin so the real window is known per pin." Same scheme as the
+# shared bands in common.toml (zz-pins-3135-3140, zz-pins-0930-0935): GO a
+# plus pin at the low limit (the limit to .0002 over), NO-GO a minus pin at
+# the high limit (.0002 under to the limit), from the .061-.500 minus box
+# where that limit is a whole thousandth (cad/config/shop-equipment/
+# gauges.toml gauges.pin-gauges, the #3075 record). range_mm is the band; the
+# resolution is one pin's Class ZZ tolerance, .0002 in = 0.00508 mm. The
+# Class X pairs' records above stay until no plan names them.
+# .3760-.3765: MHA-DT-02 arbor bore, MHA-DT-31 hub bore (MHA-DT-11 re-gauges
+# the hub's).
+[gauges.zz-pins-3760-3765]
+range_mm = [9.5504, 9.5631]
+resolution_mm = 0.00508
+[tools.zz-pins-3760-3765]
+description = "Class ZZ pins for .3760-.3765: GO .3760 plus (single), NO-GO .3765 minus (single)"
+# .2510-.2515: MHA-DT-18 pivot and lift bores, MHA-DT-23 bore, MHA-DT-14.
+[gauges.zz-pins-2510-2515]
+range_mm = [6.3754, 6.3881]
+resolution_mm = 0.00508
+[tools.zz-pins-2510-2515]
+description = "Class ZZ pins for .2510-.2515: GO .2510 plus (single), NO-GO .2515 minus (single)"
+# .2500-.2505: MHA-DT-20 pivot bore.
+[gauges.zz-pins-2500-2505]
+range_mm = [6.35, 6.3627]
+resolution_mm = 0.00508
+[tools.zz-pins-2500-2505]
+description = "Class ZZ pins for .2500-.2505: GO .2500 plus (single), NO-GO .2505 minus (single)"
+# .0625-.0630: MHA-DT-38 bushing bore.
+[gauges.zz-pins-0625-0630]
+range_mm = [1.5875, 1.6002]
+resolution_mm = 0.00508
+[tools.zz-pins-0625-0630]
+description = "Class ZZ pins for .0625-.0630: GO .0625 plus (single), NO-GO .063 minus (the .061-.500 box)"
+# .0630-.0635: MHA-DT-39 end screw hole.
+[gauges.zz-pins-0630-0635]
+range_mm = [1.6002, 1.6129]
+resolution_mm = 0.00508
+[tools.zz-pins-0630-0635]
+description = "Class ZZ pins for .0630-.0635: GO .0630 plus (single), NO-GO .0635 minus (single)"

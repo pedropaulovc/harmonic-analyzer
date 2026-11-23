@@ -101,8 +101,8 @@ def test_the_plan_is_an_enrolled_traveler_and_cam_stem() -> None:
         "reamer-3135",
         "endmill",
         "reamer-0615",
-        "plugs-3135",
-        "plugs-0615",
+        "zz-3135",
+        "zz-0615",
     } <= {t["id"] for t in PLAN["tools"] if t.get("status") == "to_order"}
 
 

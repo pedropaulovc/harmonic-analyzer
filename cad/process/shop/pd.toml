@@ -50,6 +50,40 @@ resolution_mm = 0.001016
 [tools.plug-gauges-2500-2510]
 description = "Plug gauge pair, .2500 GO (plus) and .2510 NO-GO (minus), Vermont Gage Class X"
 
+# Class ZZ go/no-go pins for the paper-drive reamed bands (owner ruling
+# 2026-11-23, tool audit Q1, verbatim: "ZZ singles per the record: 29 pins
+# (17 plus GO, 12 minus NO-GO), about $130. Accept that good holes near a
+# limit may be refused; the traveler mikes each pin so the real window is
+# known per pin."). Conventions as common.toml's zz-pins records: GO a plus
+# pin at the low limit, NO-GO a minus pin at the high limit (from the
+# .061-.500 minus box where that limit is a whole thousandth), resolution one
+# pin's Class ZZ tolerance, .0002 in = 0.00508 mm. The K bore's .4375-.4382
+# band is the odd one (tool audit row plug-gauges-4375-4382): its NO-GO is a
+# .4380 plus pin, .4380-.4382, at or under the .4382 limit. Bands only pd
+# plans gauge: .1240-.1245 (MHA-PD-18), .4375-.4382 (MHA-PD-19, and MHA-PD-28
+# re-gauging PD-19's hole with the same pins), .0615-.0620 (MHA-PD-17,
+# MHA-PD-22), .1920-.1925 (MHA-PD-22).
+[gauges.zz-pins-1240-1245]
+range_mm = [3.1496, 3.1623]
+resolution_mm = 0.00508
+[tools.zz-pins-1240-1245]
+description = "Class ZZ pins for .1240-.1245: GO .1240 plus (single), NO-GO .1245 minus (single)"
+[gauges.zz-pins-4375-4382]
+range_mm = [11.1125, 11.13028]
+resolution_mm = 0.00508
+[tools.zz-pins-4375-4382]
+description = "Class ZZ pins for .4375-.4382: GO .4375 plus (single), NO-GO .4380 plus (single)"
+[gauges.zz-pins-0615-0620]
+range_mm = [1.5621, 1.5748]
+resolution_mm = 0.00508
+[tools.zz-pins-0615-0620]
+description = "Class ZZ pins for .0615-.0620: GO .0615 plus (single), NO-GO .062 minus (the .061-.500 box)"
+[gauges.zz-pins-1920-1925]
+range_mm = [4.8768, 4.8895]
+resolution_mm = 0.00508
+[tools.zz-pins-1920-1925]
+description = "Class ZZ pins for .1920-.1925: GO .1920 plus (single), NO-GO .1925 minus (single)"
+
 # --- MHA-PD-15 ring, MHA-PD-20 spacer, MHA-PD-28 bush, MHA-PD-16 cup ---------
 # (cad/process/pd_transgear_knob_thrust_ring, pd_transgear_pivot_spacer,
 # pd_transgear_knob_bush, pd_transgear_knob_cup). Facing, turning and parting
@@ -168,6 +202,8 @@ diameter_mm = 1.190625
 description = "R.180 dome form tool: concave R.180 edge, cuts a convex R.18 dome"
 [tools.gauge-pin-0625]  # MHA-PD-10 .002 TIR TO A Ø.0625 PIN
 description = "Gauge pin .0625 in, class ZZ"
+[tools.dial-indicators]  # MHA-PD-13 compound set to the dish flank; inventory gauges.dial-indicators, gauges.mag-base
+description = ".001 in dial indicator on its magnetic base"
 [tools.knurl-straight-25tpi]  # MHA-PD-13 STRAIGHT KNURL 25 TPI
 description = "Lathe knurling holder with straight 25 TPI wheel"
 [tools.pd-latch-hook-former]  # MHA-PD-14 R3.13 ±.02, R.38 ±.02
@@ -267,43 +303,35 @@ resolution_mm = 0.00254
 [tools.plug-gauges-1261-1264]
 description = "Plug gauges .1261, .1262, .1263, .1264, Vermont Gage Class X"
 
+# --- MHA-PD-13 transgear thumbnut (cad/process/pd_transgear_thumbnut) ---------
+# The #29 tap drill and the 90° chamfer mill's countersinks from the tailstock
+# (C36000, dry): LittleMachineShop "Cutting Speeds" (read live 2026-11-22,
+# lathe.toml header), Drilling & Reaming, Brass (C36000), 160-175 ft/min; both
+# clamp to the lathe's 2000 rpm top speed.
+[settings.lathe-drill-29-c360]
+tool = "jig-drill-29"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, pecking, dry"
+[settings.lathe-csk-c360]
+tool = "chamfer-mill-330ch-1-4-90"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, light, dry; a turn's dwell at depth"
+# Straight knurling the Ø.81 head: Accu-Trak "Speeds & Feeds for Knurling"
+# (https://accu-trak.com/speeds-feeds-for-knurling, read 2026-11-22) caps form
+# knurling at about 150 ft/min and its "Knurling Tips" start slow with a firm
+# infeed so the wheel tracks; 50 ft/min is about 235 rpm at Ø.81.
+[settings.lathe-knurl-c360]
+tool = "knurl-straight-25tpi"
+material = "lathe-c360"
+sfm = 50
+feed = "cross slide by hand, one firm plunge, then the carriage along by hand; oiled"
+
 # --- MHA-PD-03 platen clip (cad/process/pd_platen_clip/plan.toml) ---
-# The clip's cutter: Harvey Tool 896231, Variable Helix End Mill for
-# Aluminum Alloys - Square - Downcut (harveytool.com/products/tool-details-
-# 896231 and the family page, read 2026-11-22): .0310 (1/32) cutter, .0930
-# length of cut, 3 left-hand spiral right-hand cut flutes (a downcut:
-# "prevents lifting of workpiece"), centre cutting, 1/8 shank, 1-1/2
-# overall, uncoated, the family "excellent performance in copper, brass, and
-# bronze alloys". It fits the .04 slit, which it cuts by running down one
-# side and back up the other. Ownership: cad/config/shop-equipment/
-# tools-special-cutters.toml, same key. diameter_mm and flute_length_mm: its
-# .0310 and .0930 × 25.4.
-[tools.endmill-carbide-3fl-1-32-downcut]
-description = "1/32 in (.0310) 3-flute carbide downcut square end mill, .093 length of cut, 1/8 shank (Harvey Tool 896231)"
-diameter_mm = 0.7874
-flute_length_mm = 2.3622
-# Harvey's own speeds and feeds for the series (SF_896200, "Variable Helix End
-# Mills for Aluminum Alloys - Square - Downcut", harveyperformance.widen.net/
-# content/urxytgzfxb/pdf/SF_896200.pdf, read 2026-11-22), uncoated, Brass
-# (Copper Zinc alloys, C2xxxx): 500 SFM; .031 cutter slotting .00033 in/tooth
-# (1x D radial, .5x D axial), max .00044. Every clip cut is a full-width slot
-# level, so the slotting figure is the ceiling (.00033 × 25.4).
-maker_chip_load_mm_per_tooth = { brass = 0.008382 }
-maker_chip_load_source = "Harvey Tool SF_896200 (8962xx downcut), uncoated, Brass C2xxxx, .031 cutter, slotting .00033 in/tooth"
-# Its setting in half-hard C26000 strip: Harvey's 500 SFM on .031 in is
-# 61,600 rpm, so the spindle's 2800 (machines.pm-30mv; 23 ft/min). Chip load
-# at Harvey's slotting figure, rounded down to the 0.1 in/min the sheet
-# prints: 2800 × 3 × .00033 = 2.77, so 2.7 in/min, .000321 in/tooth
-# (2.7 × 25.4 / 8400 mm); the plan holds each level to Harvey's .5 x D depth.
-# Delegated ruling 2026-11-22 (Main, owner review #2144): never above the
-# maker's published chip load without a measurement.
-[settings.endmill-carbide-3fl-1-32-downcut-c260]
-tool = "endmill-carbide-3fl-1-32-downcut"
-material = "c260-h02"
-rpm = 2800
-chip_load_mm_per_tooth = 0.0081643  # .000321 in; 2800 × 3 × .000321 = 2.7 in/min
-flutes = 3
-feed_unit = "in/min"
+# The clip's 1/32 downcut end mill and its C26000 setting are in common.toml
+# (tools.endmill-carbide-3fl-1-32-downcut, settings.endmill-carbide-3fl-1-32-
+# downcut-c260): the MHA-DT-03-TL-02 comb cuts with them too.
 
 # --- MHA-PD-22 drive collar (cad/process/pd_transgear_drive_collar/plan.toml) -
 # Lathe: facing, turning, the centre drill and parting take shop/lathe.toml's
@@ -416,6 +444,21 @@ rpm = 2800
 feed = "2.8 in/min"
 [settings.pd-hub-plunge-3-64-c360]
 tool = "endmill-carbide-3-64"
+material = "lathe-c360"
+rpm = 2800
+feed = "1.4 in/min"
+# MHA-PD-17's flat with Harvey Tool 34662, the 1/16 in (.0620) 3-flute
+# long-reach stub end mill bought for MHA-MS-02 (tool audit 2026-11-23, row
+# endmill-carbide-3-64: it replaces the 3/64). Maker: Harvey Tool Speeds &
+# Feeds, Miniature End Mills - Square - Long Reach, Stub Flute, 9x Reach
+# Multiple (the 9x table, the next longer than 34662's 8x, the lower of the
+# two; W.C. Chapman's copy, read 2026-11-21, as ms.toml's
+# stop-em-sixteenth-c360), row Brass (C2xxxx-C4xxxx): 500 SFM, .062 in
+# Slotting .00035 in/tooth. Here plunged at the spindle's 2800 rpm and the
+# 3/64's .0005 in/rev (half a drill's feed, an end mill plunged off square):
+# .0005 / 3 = .00017 in/tooth, under half the maker's figure; 1.4 in/min.
+[settings.pd-hub-plunge-1-16-c360]
+tool = "endmill-carbide-3fl-1-16-reach-1-2"
 material = "lathe-c360"
 rpm = 2800
 feed = "1.4 in/min"
