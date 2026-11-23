@@ -6,7 +6,7 @@ part's exported ``features.toml`` and the plan/shop TOML, then runs
 checks the posted G-code against :func:`expectations`. No part dimension is
 typed here: the rail, the slits, the finger, the corners, the holes, the
 bows and the developed sheet come from the manifest; the blanks, the parts'
-places on them, the tape, the cutter's tip height, the depth levels, the
+places on them, the tape stack, the cutter's tip height, the depth levels, the
 vise, the plate and the strip's springback inputs from ``plan.toml``
 ``[parameters]``; the cutter's diameter, flute length, speed and feed from
 the shop (``shop/``). Typed here, because neither record carries them: the
@@ -16,7 +16,8 @@ path may use, the die profile's stray allowance and the hole's clearing
 circle.
 
 Route (plan text in ``plan.toml``): two blanks snipped from the .032 strip
-are bonded on 3M VHB 5906 tape to the spoil plate (``fixtures.sheet-spoil-
+are bonded to the spoil plate on blue painter's tape on both faces with CA
+glue between (owner 2026-11-23; ``fixtures.sheet-spoil-
 plate``) gripped in the vise on parallels: blank A's back edge on the fixed
 jaw, blank B's against blank A's front edge, both left ends flush with the
 plate's left end. One file, PC01_sheet, with the 1/32 in carbide downcut end
@@ -24,9 +25,10 @@ mill: the four Ø.116 holes, each plunged near its centre and opened by two
 circles; the two clips' flat outlines (rail, slits, finger) at their
 developed length; then the bow former's four die laminations, each cut out
 round its rectangle and split along its die profile by one pass (the kerf
-between its male and female halves). Every outline and hole runs three
-equal depth levels, the last with its tip a few thousandths into the spoil
-plate, so each piece comes free of its blank on its own tape.
+between its male and female halves). Every outline and hole runs four
+equal depth levels from the thickest strip on the thickest tape stack, the
+last with its tip a few thousandths into the spoil plate, so each piece
+comes free of its blank on its own island of tape.
 
 Work frame (G54): X0 the plate's left end, Y0 the fixed jaw's face (the
 plate's back edge), +Y toward the fixed jaw; Z0 the plate top. Each clip
@@ -650,7 +652,7 @@ def context(
     rpm, feed, flutes = _setting(plan, shop, "sheet")
     if not math.isclose(_cut(plan, "sheet", "cutter_dia_mm"), dia, abs_tol=1e-6):
         raise ValueError("'sheet' cutter_dia_mm is not the end mill's diameter")
-    # The taped clip's fingers pass the bond only on a downcut's helix.
+    # The downcut's helix pushes the taped clip's narrow finger onto the tape.
     if tool.get("axial_direction") != "down":
         raise ValueError("em-thirty-second: the plan's end mill must be a downcut")
 
@@ -664,9 +666,17 @@ def context(
         raise ValueError("the cutter's radius does not fit the slit's full R end")
     _agree(plan, "slit_cutter_clearance_mm", d["slit_width"] - dia)
 
-    # Depth: three-ish equal levels down to the tip, through the thickest
-    # strip on the tape, the tip into the spoil plate.
-    tape = p["tape_thickness_mm"]
+    # Depth: equal levels down to the tip, from the thickest strip on the
+    # thickest tape stack (blue tape, CA glue, blue tape), the tip into the
+    # spoil plate. Z0 is the plate top, so the tip's depth into the plate is
+    # the same on every stack; the tip's margin under the strip's underside
+    # is least on the thinnest stack.
+    stack = p["tape_stack_mm"]
+    stack_lo, stack_hi = p["tape_stack_min_mm"], p["tape_stack_max_mm"]
+    if stack_lo > stack:
+        raise ValueError("tape_stack_min_mm is over the tape stack")
+    if stack_hi < stack:
+        raise ValueError("tape_stack_max_mm is under the tape stack")
     tip = p["sheet_tip_z_mm"]
     _agree(plan, "sheet_tip_into_plate_mm", -tip)
     if not -p["spoil_cut_max_mm"] <= tip <= 0.0:
@@ -674,17 +684,15 @@ def context(
             "the cutter's tip must stand at or below the plate top, no deeper"
             " than spoil_cut_max_mm"
         )
-    if p["tape_thickness_min_mm"] > tape:
-        raise ValueError("tape_thickness_min_mm is over the tape's thickness")
-    if p["tape_thickness_min_mm"] - tip < p["through_margin_min_mm"]:
+    if stack_lo - tip < p["through_margin_min_mm"]:
         raise ValueError(
             "the tip is not through_margin_min_mm below the thinnest strip's"
-            " underside on the thinnest tape"
+            " underside on the thinnest tape stack"
         )
     t_min, t_max = p["strip_thickness_min_mm"], p["strip_thickness_max_mm"]
     if not t_min <= sheet_t <= t_max:
         raise ValueError("the drawing's sheet is outside the strip's thickness band")
-    top = tape + t_max
+    top = stack_hi + t_max
     depth = top - tip
     _agree(plan, "sheet_depth_mm", depth)
     if depth > em["flute_length_mm"]:
@@ -965,13 +973,13 @@ def context(
             "plunge": plunge,
             "frame": "plate",
             "label": "sheet",
-            "stock": ((0.0, blank_l), (-2 * blank_w, 0.0), (tape, top)),
+            "stock": ((0.0, blank_l), (-2 * blank_w, 0.0), (stack, top)),
             "ops": [["sheet", "holes, clips and die laminations", lines]],
         }
     ]
     frames = {
         "plate": {
-            "origin": [-shifts_a[0][0], -shifts_a[0][1], -tape],
+            "origin": [-shifts_a[0][0], -shifts_a[0][1], -stack],
             "axes": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         }
     }
