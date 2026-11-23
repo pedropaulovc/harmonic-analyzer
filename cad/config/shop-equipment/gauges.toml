@@ -385,8 +385,9 @@ cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range 
 # MHA-PD-23's press land is turned to the measured MHA-PD-18 ream (drawing
 # note 1: TURNED TO THE MEASURED REAM, INTERFERENCE .0002-.0005): four Class X
 # steps between the .1260/.1265 pair above read the ream to .0001 in, so the
-# land is turned to R + .0003 to R + .0005 for the largest pin R that enters
-# (the ream lies in R to R + .0001), where the pair alone leaves no window.
+# land is turned to a window over the largest pin R that enters (the
+# pd_transgear_pin plan's land_over_reading_min_in / _max_in, which allow for
+# each pin's +/- .00004), where the pair alone leaves no window.
 # Range and tolerance: cad/process/shop/ gauges.plug-gauges-1261-1264.
 [gauges.plug-gauges-1261-1264]
 name = "Plug gauges .1261, .1262, .1263, .1264, Class X"
