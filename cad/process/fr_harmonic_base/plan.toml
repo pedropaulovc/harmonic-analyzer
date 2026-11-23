@@ -33,16 +33,19 @@ id = "jig-drill-7"
 name = "#7 drill"
 ref = "jig-drill-7"  # Drills #7
 
-# Tool audit 2026-11-23 (row frame-clearance-stub-drill): the #10 close
-# clearance is the #4 (.2090) that cad/config/tolerances/fastener_clearance.yaml
-# names; the #5 (.2055) is under the .206 minimum. A stub #4, as the audit
-# allows where a jobber cannot fit: on edge (machining-dfm.md "Cross-screw
-# setup") a jobber #4 stands over the 17 in spindle limit (shop fr.toml).
+# Main's decision 2026-11-23 (delegated; no owner ruling names a #4): the
+# near-wall clearance stays the #5 stub of the owner's 2026-11-05 wording.
+# The hole is Ø.206 +.004/0 (.206-.210); a #5 (.2055) cutting to size leaves
+# it under .206, so the traveler to come gauges it with the .061-.500 minus
+# pin box (pin-gauges): GO the .207 minus pin (.2068-.2070, so a hole it
+# enters is over .206), NO-GO the .210 minus (.2098-.2100). GO refused: open
+# the hole by hand with the owned #4 (.2090) jobber from the 115-piece index
+# in the T-handle tap wrench, following the drilled hole (.0018 a side), and
+# gauge again. NO-GO entering: stop and tell the owner.
 [[tools]]
-id = "drill-4"
-name = "#4 screw-machine-length drill (2-3/8 OAL)"
-ref = "frame-clearance-stub-drill-4"
-status = "to_order"
+id = "frame-clearance-stub-drill"
+name = "#5 stub drill"
+ref = "frame-clearance-stub-drill"  # G-drill-5-stub, Drills #5
 
 [[tools]]
 id = "jig-tap-1-4-20-plug"
