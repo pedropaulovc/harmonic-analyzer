@@ -7,8 +7,11 @@
   <text class="label-on-clamp" x="70" y="603">moving jaw</text>
   <rect class="fixture-plate" x="60" y="70" width="610" height="508"/>
   <text class="label" x="390" y="470">spoil plate 6 x 5 x 1/2</text>
+  <rect class="bond" x="60" y="70" width="508" height="286.5"/>
   <rect class="part-waste" x="111" y="121" width="432" height="152"/>
   <path class="part-kept" d="M141.3,242.7 L512.1,242.7 L512.1,151.3 L141.3,151.3 L141.3,177.0 L178.9,177.0 L178.9,181.6 L209.4,181.6 L209.4,187.9 L238.8,187.9 L238.8,194.2 L269.3,194.2 L269.3,200.1 L289.6,200.1 L289.6,177.0 L458.3,177.0 A28.3,28.3 0 0 1 458.3,233.6 L141.3,233.6 Z"/>
+  <line class="hidden" x1="60" y1="213.3" x2="568" y2="213.3"/>
+  <line class="hidden" x1="111" y1="130.1" x2="543" y2="130.1"/>
   <line class="datum" x1="60" y1="34" x2="60" y2="648"/>
   <text class="datum-label" x="64" y="664">X0 plate left end</text>
   <line class="datum" x1="20" y1="70" x2="690" y2="70"/>
@@ -18,7 +21,10 @@
   <text class="label" x="370.7" y="308.7">enters and finishes: middle of the spring arm&#8217;s front edge</text>
   <text class="label" x="370.7" y="326.7">1/32 end mill runs round once per level, anticlockwise</text>
   <line class="leader" x1="116" y1="271" x2="116" y2="351"/>
-  <text class="label" x="91" y="369">blank on VHB tape, 1/2 in in from the left end and back edge</text>
+  <text class="label" x="91" y="369">blank on blue tape, CA glue, blue tape: 1/2 in in from the left end and back edge</text>
+  <text class="label" x="70" y="392">plate tape: 2 strips along X, plate left end to 5 in; blank tape: 2 strips</text>
+  <text class="label" x="70" y="410">dashed: tape seams, the plate&#8217;s 1.41 in from the fixed jaw (in the U&#8217;s slot),</text>
+  <text class="label" x="70" y="428">the blank&#8217;s .59 in (in its back margin)</text>
   <text class="label" x="146" y="143">stepped arm toward the fixed jaw</text>
   <text class="label" x="91" y="205">open</text>
 </svg>
