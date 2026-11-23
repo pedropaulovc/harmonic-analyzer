@@ -119,14 +119,14 @@ spigot_rough_length_in = 0.14
 # root's R.004 MAX), turned at the lathe's finest longitudinal power feed,
 # .0025 in/rev (the maker's page: longitudinal feeds .0025-.012 IPR, cross
 # feeds .001-.0056 IPR). Its cusp is f^2/(8r): at R.003, .0025^2/.024 =
-# .00026 radial, so the valleys stand up to spigot_cusp_dia_max_in under the
-# crests the micrometer reads. The micrometer acceptance is the sheet's
-# .4970-.4980 with that taken off its bottom: .4975-.4980, aim .4978. The
+# .00026 radial. The micrometer reads the two-point size across the crests,
+# which is the size the drawing bands and what slides in MHA-PD-06, so the
+# acceptance is the sheet's .4970-.4980 (machinist review 2026-11-23: no
+# guard band for the valleys), aim .4978. The
 # last cut is set from the measured diameter, then a spring pass at the same
 # setting. The flange's rear face takes the .001 in/rev cross feed: its cusp
 # .00004.
-spigot_cusp_dia_max_in = 0.0005
-spigot_accept_min_in = 0.4975
+spigot_accept_min_in = 0.4970
 spigot_aim_in = 0.4978
 # Setup 2 drills and reams through from the spigot end: the quill readings
 # past the hub front face (inside the chuck's bore).
@@ -363,7 +363,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Only if a reamer read under its GO pin, the bar still chucked: face its end and spot it from the tailstock; per such reamer (the .0615 first) drill .30 deep (#53; N for the .3135), ream .25 deep (the .0615 at 1400 rpm, the .3135 as Op 170); gauge it with its pins; part .40 off. This spends the piece's spare: a remake then needs a new 3 in piece (to order)."
+instruction = "Only if a reamer read under its GO pin: pull the bar out to .60 out of the jaws; face and spot its end from the tailstock; per such reamer (the .0615 first) drill .30 deep (#53; N for the .3135), ream .25 deep (the .0615 at 1400 rpm, the .3135 as Op 170); gauge it with its pins; part .40 off. This spends the piece's spare: a remake then needs a new 3 in piece (to order)."
 inspection = "Each trial hole: GO enters, NO-GO does not: go on. GO refused: that reamer's holes will be refused: stop and tell the owner."
 gauge_checks = [{ gauge = "zz-pins-0615-0620", band_mm = "{{cad.pin_ream_dia_band_mm}}" }, { gauge = "zz-pins-3135-3140", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
@@ -420,7 +420,7 @@ sizing = "other"
 instruction = "Sharp-nose tool (nose R.003–.004; to buy), on centre: turn the spigot from Z0 to Z-{{cad.spigot_length_mm:in.3dot}} at the .0025 in/rev power feed, miking after each pass. Within .003 of size, feed the cross slide in by half of (the reading less Ø{{process.spigot_aim_in:.4dot}}) for the last cut, then a spring pass with no infeed. Then face the flange's rear face out to the rim at Z-{{cad.spigot_length_mm:in.3dot}} on the .001 in/rev cross feed, leaving the root sharp (R{{cad.spigot_root_radius_max_mm:in.3dot}} MAX)."
 settings = "lathe-sharp-nose-c360"
 cut_diameter_mm = "{{cad.spigot_dia_mm}}"
-inspection = "Spigot Ø{{cad.spigot_dia_min_in:.4dot}}–{{cad.spigot_dia_max_in:.4dot}}: accept a micrometer reading {{process.spigot_accept_min_in:.4dot}}–{{cad.spigot_dia_max_in:.4dot}} (the feed's cusp leaves the valleys up to {{process.spigot_cusp_dia_max_in:.4dot}} under the crests). The flange's face at Z-{{cad.spigot_length_min_in:.3dot}} to Z-{{cad.spigot_length_max_in:.3dot}}, the tool's point touched on it; the flange {{cad.flange_front_face_thickness_min_in:.3dot}}–{{cad.flange_front_face_thickness_max_in:.3dot}} thick at the rim, micrometer."
+inspection = "Spigot Ø{{cad.spigot_dia_min_in:.4dot}}–{{cad.spigot_dia_max_in:.4dot}}: accept a micrometer reading {{process.spigot_accept_min_in:.4dot}}–{{cad.spigot_dia_max_in:.4dot}}. The flange's face at Z-{{cad.spigot_length_min_in:.3dot}} to Z-{{cad.spigot_length_max_in:.3dot}}, the tool's point touched on it; the flange {{cad.flange_front_face_thickness_min_in:.3dot}}–{{cad.flange_front_face_thickness_max_in:.3dot}} thick at the rim, micrometer."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.spigot_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.flange_front_face_thickness_band_mm}}" }]
 
 [[setups.operations]]
@@ -462,7 +462,7 @@ cut_diameter_mm = "{{cad.bore_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Still chucked, the bore blown out and wiped: GO passes through, NO-GO does not enter the spigot end (both ends are checked again at the bench, Op 410)."
+instruction = "Spindle stopped, tailstock backed away, still chucked, the bore blown out and wiped: GO passes through, NO-GO does not enter the spigot end (both ends are checked again at the bench, Op 410)."
 inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} through."
 gauge_checks = [{ gauge = "zz-pins-3135-3140", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
@@ -615,7 +615,7 @@ drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pin_ream_dia_band_mm}}" }
 instruction = "Run CM03_pin_ream (M6 T6, the .0615 reamer, to buy, at least {{process.pin_tool_out_min_in:.2dot}} out of the chuck; set 1400): ream to the stop, the reamer's end to Z{{process.ream_tip_mm:.3f}}, fed in and fed out. The file ends with the spindle stopped and the reamer raised clear."
 settings = "pd-collar-ream-0615-c360"
-inspection = "Ream Ø{{cad.pin_ream_dia_min_in:.4dot}}–{{cad.pin_ream_dia_max_in:.4dot}}: GO enters to the stop, NO-GO does not enter."
+inspection = "Ream Ø{{cad.pin_ream_dia_min_in:.4dot}}–{{cad.pin_ream_dia_max_in:.4dot}}: GO enters to the stop, NO-GO does not enter. GO refused: Op 380 first."
 gauge_checks = [{ gauge = "zz-pins-0615-0620", band_mm = "{{cad.pin_ream_dia_band_mm}}" }]
 milling_cuts = [
   { name = "pin ream", kind = "drill", phase = "finish", cutter_dia_mm = 1.5621, flutes = 4, rpm = 1400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = ["{{cad.pin_ream_chord_mm}}"] },
@@ -639,7 +639,7 @@ gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.pin_ream_chord_band_mm}
 feed = "hand"
 
 [[setups.operations]]
-instruction = "GO not entering to the stop in Op 340: lift it out, blow out the chips, oil the reamer and run CM03_pin_ream once more, G54 unchanged; gauge again. Still refused: scrapped (the pins cannot show the ream at or over {{cad.pin_ream_dia_min_in:.4dot}}); make another from Setup 1. NO-GO entering (no cut remedies it), or the centre outside its band in Op 370: scrapped, not reworked; make another from Setup 1."
+instruction = "GO not entering to the stop in Op 340: lift it out, blow out the chips, oil the reamer, run CM03_pin_ream once more, G54 unchanged; gauge again. GO now enters: Ops 350–370. Still refused: scrapped (the pins cannot show the ream at or over {{cad.pin_ream_dia_min_in:.4dot}}). NO-GO entering (no cut remedies it), or the centre outside its band in Op 370: scrapped. Either way make another from Setup 1."
 feed = "hand"
 
 [[setups]]
@@ -679,9 +679,13 @@ instruction = "The bore's GO pin refused in Op 410: repeat Op 400 once and gauge
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The .0615 GO pin standing in the ream: calipers from the hub front face to the pin's far side; the station is the reading less half the GO pin's written reading (about .031). Outside its band: scrapped (the hole is reamed and cannot move); make another from Setup 1."
+instruction = "The .0615 GO pin standing in the ream: calipers from the hub front face to the pin's far side; the station is the reading less half the GO pin's written reading (about .031)."
 inspection = "Station {{cad.pin_ream_station_min_in:.2dot}}–{{cad.pin_ream_station_max_in:.2dot}} from the hub front face (calipers read .171–.191)."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pin_ream_station_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Station outside its band in Op 430: scrapped (the hole is reamed and cannot move); make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]

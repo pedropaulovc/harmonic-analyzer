@@ -659,13 +659,13 @@ feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "Both in band: skip the next op. A pin's end higher (rim small): the next op. Lower (rim large): stop and tell the owner." },
+  { kind = "stop", text = "Both in band: skip the next op. A pin's end higher (rim small): the next op, unless the deeper one's depth plus the shortfall (next op) is over {{process.sink_pin_depth_max_mm:in.4dot}}: then stop and tell the owner. Lower (rim large): stop and tell the owner." },
 ]
 feed = "hand"
 
 [[setups.operations]]
 instruction = "Only if a rim is small: lower Z0 by the shortfall, run AP02_sink again, put Z0 back, then repeat the .250 pin check."
-instruction_detailed = "The shortfall: {{process.sink_pin_depth_mid_mm:in.4dot}} less the shallower countersink's pin depth below the rear face; the deeper one's depth plus the shortfall over {{process.sink_pin_depth_max_mm:in.4dot}}: stop and tell the owner instead. Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z − the shortfall in mm). Run AP02_sink. G10 L2 P1 Z(the noted Z) puts Z0 back before AP03_outline."
+instruction_detailed = "The shortfall: {{process.sink_pin_depth_mid_mm:in.4dot}} less the shallower pin end's depth below the rear face. Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z − the shortfall in mm). Run AP02_sink. G10 L2 P1 Z(the noted Z) puts Z0 back before AP03_outline."
 inspection = "The pin's end {{process.sink_pin_depth_min_mm:in.4dot}}–{{process.sink_pin_depth_max_mm:in.4dot}} below the rear face, both countersinks."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.sink_pin_depth_min_mm}}", "{{process.sink_pin_depth_max_mm}}"] }]
 feed = "hand"

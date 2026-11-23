@@ -6,7 +6,7 @@
   <rect class="part-kept" x="258" y="70" width="198" height="110"/>
   <text class="label" x="110.0" y="130.0">blank A 3.60</text>
   <text class="label" x="308.0" y="130.0">blank B 3.60</text>
-  <text class="label" x="500.0" y="130.0">rest (over 4.7): kept for MHA-PD-14</text>
+  <text class="label" x="470.0" y="130.0">rest (over 4.7): kept for MHA-PD-14</text>
   <line class="cutter" x1="258" y1="62" x2="258" y2="188"/>
   <line class="cutter" x1="456" y1="62" x2="456" y2="188"/>
   <text class="label" x="188.0" y="206.0">saw cut 1</text>
