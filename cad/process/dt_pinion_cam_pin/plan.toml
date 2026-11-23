@@ -273,7 +273,7 @@ instruction = "A flat at the apex: the pivot is short of the axis: one more swee
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Take the pin out and stand it on end A on the surface plate, held upright against the 1-2-3 block's face. With the height gauge read the apex; then lower the scriber until its tip, slid in across the top, just stops on the O.D.'s top edge (the crown's root) and read it. Root length = that reading; crown height = apex − root."
+instruction = "Stand the pin on end A on the surface plate against the 1-2-3 block's face. Height gauge: read the apex. Then lower the scriber .001 at a time, each time sliding its tip in from outside the O.D.: the root is the highest setting at which it catches on the cylindrical O.D. without riding onto the crown. Crown height = apex − root."
 inspection = "Root length {{cad.dome_far_root_station_min_in:.2dot}}–{{cad.dome_far_root_station_max_in:.2dot}} from end A; crown {{process.crown_height_min_in:.4dot}}–{{process.crown_height_max_in:.4dot}} high (R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}})."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.dome_far_root_station_band_mm}}" }, { gauge = "height-gauge", band_mm = "{{cad.dome_far_height_band_mm}}" }]
 
