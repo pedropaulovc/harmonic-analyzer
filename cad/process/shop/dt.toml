@@ -144,6 +144,13 @@ description = "Adjustable reamer set, .250-.375 in, 4 pieces (LMS 5948)"
 [tools.slitting-saw-1-032]  # inventory tools.slitting-saw-1-032
 description = "Smooth-finish slitting saw, 1 in diameter, .032 in thick, 3/8 in arbor hole (McMaster 3044A23)"
 diameter_mm = 25.4
+# MHA-DT-21's slit (cad/process/dt_cone_tip_block): the 3 in × .051 jeweler's
+# slotting saw, to buy (cad/config/shop-equipment/ tools.slitting-saw-3-051,
+# Penn Tool 10-200-445), on the R8 1 in arbor (tools.gear-cutter-arbor-1, to
+# buy). diameter_mm: its 3 in × 25.4.
+[tools.slitting-saw-3-051]
+description = "Precise HSS jeweler's slotting saw, 3 in diameter, .051 in thick, 168 teeth (Penn Tool 10-200-445)"
+diameter_mm = 76.2
 [tools.steady-rest-pm-1127]  # inventory fixtures.steady-rest-pm-1127
 description = "PM-1127VF-LB steady rest"
 
@@ -255,6 +262,56 @@ description = "gray iron, class not ruled, casting for MHA-DT-05 cone pivot post
 description = "Drill rod (O1 or W1 tool steel, annealed, ground), round bar, 1/8 in"
 [stock.o1-drill-rod-5-32]
 description = "AISI O1 drill rod, precision ground, round bar, 5/32 in"
+[stock.drill-rod-1-16]
+description = "Drill rod (O1 or W1 tool steel, annealed, ground), round bar, 1/16 in"
+[stock.key-stock-1-16-undersized]
+description = "1008-1045 carbon steel machine key stock, undersized, square bar, 1/16 in"
+
+# --- MHA-DT-03-TL-02 phasing comb (cad/process/dt_cone_gear_tl_phasing_comb/plan.toml) ---
+# The comb's blank is snipped off the .020 brass sheet (the snips are in
+# common.toml: the MHA-PD-03 clip's blanks are snipped too). Ownership:
+# stock-to-order.toml stock.c260-h02-sheet-020-12x12, same key.
+[stock.c260-h02-sheet-020-12x12]
+description = "C26000 cartridge brass, H02 half hard, sheet, .020 x 12 x 12 in"
+# The comb's outline cutter: Harvey Tool 896262, Variable Helix End Mill for
+# Aluminum Alloys - Square - Downcut (harveytool.com/products/tool-details-
+# 896262 and the family page, read 2026-11-22): .0620 cutter, .186 length of
+# cut, 3 left-hand spiral right-hand cut flutes (a downcut: "prevents lifting
+# of workpiece"), centre cutting, 1/8 shank, 1-1/2 overall, uncoated, the
+# family "excellent performance in copper, brass, and bronze alloys".
+# Ownership: cad/config/shop-equipment/tools-special-cutters.toml, same key.
+# diameter_mm and flute_length_mm: its .0620 and .186 × 25.4.
+[tools.endmill-carbide-3fl-1-16-downcut]
+description = "1/16 in (.0620) 3-flute carbide downcut square end mill, .186 length of cut, 1/8 shank (Harvey Tool 896262)"
+diameter_mm = 1.5748
+flute_length_mm = 4.7244
+# Harvey's own speeds and feeds for the series (SF_896200, "Variable Helix End
+# Mills for Aluminum Alloys - Square - Downcut", harveyperformance.widen.net/
+# content/urxytgzfxb/pdf/SF_896200.pdf, read 2026-11-22), uncoated, Brass
+# (Copper Zinc alloys, C2xxxx): 500 SFM; .062 cutter slotting .00065 in/tooth
+# (1x D radial, .5x D axial), max .00087. The comb's outline is one full-width
+# pass, so the slotting figure is the ceiling (.00065 × 25.4).
+maker_chip_load_mm_per_tooth = { brass = 0.01651 }
+maker_chip_load_source = "Harvey Tool SF_896200 (8962xx downcut), uncoated, Brass C2xxxx, .062 cutter, slotting .00065 in/tooth"
+# Its setting in half-hard C26000 sheet: Harvey's 500 SFM on .062 in is
+# 30,800 rpm, so the spindle's 2800 (machines.pm-30mv; 45 ft/min). Chip load
+# at Harvey's slotting figure, rounded down to the 0.1 in/min the sheet
+# prints: 2800 × 3 × .00065 = 5.46, so 5.4 in/min, .000643 in/tooth
+# (5.4 × 25.4 / 8400 mm). Delegated ruling 2026-11-22 (Main, owner review
+# #2144; issue #3376), no owner precedent: never above the maker's published
+# chip load without a measurement. The milling feed-factor table's .001
+# floor: prechips 0.11.38 (pedropaulovc/prechips#582) checks a cut below it
+# only when the tool states its maker's figure (the two fields above), at
+# the .001 row's force, an upper bound with no factor below the table; it
+# refuses any cut above the stated figure.
+[settings.endmill-carbide-3fl-1-16-downcut-c260]
+tool = "endmill-carbide-3fl-1-16-downcut"
+material = "c260-h02"
+rpm = 2800
+chip_load_mm_per_tooth = 0.016329  # .000643 in; 2800 × 3 × .000643 = 5.4 in/min
+flutes = 3
+feed_unit = "in/min"
+
 [stock.c260-wire-040]
 description = "C26000 cartridge brass, annealed (soft), round wire, .040 in"
 
@@ -320,3 +377,46 @@ description = "Plug gauge pair, .0630 GO (plus) and .0635 NO-GO (minus), Vermont
 # plan list the pair in its tooling.
 [tools.plug-gauges-3760-3765]
 description = "Plug gauge pair, .3760 GO (plus) and .3765 NO-GO (minus), Vermont Gage Class X"
+
+# --- MHA-DT-20 cone swing platform (cad/process/dt_cone_swing_platform/plan.toml) ---
+# The pivot bore, Ø.2500 +.0005/.0000 REAM THRU (a running fit on the
+# MHA-DT-VN-52 shoulder): a fixed .2500 chucking reamer, not the adjustable
+# set (owner ruling 2026-11-20, #3073: a fixed reamer for each running/press
+# fit). Not owned: to buy (cad/config/shop-equipment/ tools-reamers-taps,
+# same key). diameter_mm is its nominal size.
+[tools.reamer-2500]
+description = ".2500 in HSS chucking reamer"
+diameter_mm = 6.35
+# Go/no-go pair for that bore (.2500-.2505), as the .2510-.2515 pair above:
+# Vermont Gage standard Class X steel pin/plug gages, .2500 GO (plus
+# tolerance) and .2505 NO-GO (minus tolerance), each ± .000040 in (=
+# 0.001016 mm, the resolution; the [gauges] table is in common.toml). Not
+# owned: to buy (cad/config/shop-equipment/ gauges, same key).
+[tools.plug-gauges-2500-2505]
+description = "Plug gauge pair, .2500 GO (plus) and .2505 NO-GO (minus), Vermont Gage Class X"
+
+# The platform's assembly shims (owner ruling 2026-11-22, issue #3363):
+# description only; the record is fixtures.shim-washers-1-4-id-arbor-19.
+[tools.shim-washers-1-4-id-arbor-19]
+description = "Steel arbor shim assortment, 1/4 in ID x 3/8 in OD, .001-.125 in, Precision Brand 25100"
+
+# --- MHA-DT-11 crankshaft (cad/process/dt_crankshaft/plan.toml) -------------
+# Drive-pin holes on the lathe (owner ruling 2026-11-22, option C2): the
+# cutters in a drill chuck on a straight arbor in the headstock 3-jaw, the
+# shaft in the shop-made jig on the cross slide. Not owned: to buy or make
+# (cad/config/shop-equipment/, same keys). diameter_mm is each tool's
+# nominal size.
+[tools.drill-chuck-jt33-straight-1-2]
+description = "1/2 in JT33 drill chuck on a 1/2 in straight-shank arbor (HHIP 9999-0013)"
+[tools.spot-drill-carbide-1-8]
+description = "1/8 in 90° solid carbide spotting drill, 2 in overall (Titan TC18708)"
+diameter_mm = 3.175
+[tools.drill-54-taper-length]
+description = "#54 (.0550 in) taper-length HSS drill, 1.75 in flute, 3 in overall (Fastenal 0306183)"
+diameter_mm = 1.397
+[tools.dt-crankshaft-drive-pin-jig]
+description = "Drive-pin jig (shop-made, for the crankshaft): 1 in 1018 bar 4.75 long, Ø.750 shank 2.00 long for the AXA No. 4 holder; 3/8 clearance 1.90 deep from the shank end; .4500 bore reamed in place 2.95 deep; 10-32 set screw on a brass pad 1.25 from the front face"
+[tools.plug-gauges-0930-0935]
+description = "Plug gauge pair, .0930 GO (plus) and .0935 NO-GO (minus), Vermont Gage Class X"
+[tools.plug-gauges-4500-4505]
+description = "Plug gauge pair, .4500 GO (plus) and .4505 NO-GO (minus), Vermont Gage Class X"

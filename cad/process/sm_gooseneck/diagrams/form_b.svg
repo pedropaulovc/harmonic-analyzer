@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="560"/>
+  <text class="title" x="20.0" y="18.0">Setup 4: plate B on the table, GF02_form_b: plate A mirrored (plan view)</text>
+  <rect class="fixture-table" x="0" y="28" width="760" height="482"/>
+  <path class="part-kept" d="M626.4,410.0 L401.3,410.0 L401.3,343.5 A160.0,160.0 0 0 1 258.5,90.0 L626.4,90.0 Z"/>
+  <path class="part-removed" d="M401.3,410.0 L374.7,410.0 L374.7,370.3 A186.7,186.7 0 0 1 226.7,90.0 L258.5,90.0 A160.0,160.0 0 0 0 401.3,343.5 Z"/>
+  <path class="part-waste" d="M374.7,410.0 L146.3,410.0 L146.3,90.0 L226.7,90.0 A186.7,186.7 0 0 0 374.7,370.3 Z"/>
+  <path class="hidden" d="M519.7,357.9 L388.0,357.9 M519.7,357.9 L519.7,330.2 L388.0,330.2 A146.2,146.2 0 0 1 276.1,90.0"/>
+  <path class="centre-line" d="M519.7,344.1 L388.0,344.1 A160.0,160.0 0 0 1 258.5,90.0"/>
+  <rect class="fixture-support" x="493.0" y="236.7" width="160.0" height="106.7"/>
+  <rect class="fixture-support" x="333.0" y="103.3" width="106.7" height="160.0"/>
+  <rect class="fixture-support" x="119.7" y="296.7" width="106.7" height="160.0"/>
+  <rect class="clamp" x="546.4" y="263.4" width="866.7" height="53.3"/>
+  <rect class="clamp" x="359.7" y="156.7" width="866.7" height="53.3"/>
+  <rect class="clamp" x="-667.0" y="350.0" width="866.7" height="53.3"/>
+  <circle class="holes" cx="294.7" cy="237.4" r="13.3"/>
+  <circle class="holes" cx="294.7" cy="144.1" r="13.3"/>
+  <path class="arrow" fill="none" d="M388.0,436.7 L388.0,357.4 A173.4,173.4 0 0 1 256.3,71.3"/>
+  <circle class="cutter" cx="388.0" cy="436.7" r="13.3"/>
+  <line class="datum" x1="378.0" y1="184.1" x2="398.0" y2="184.1"/>
+  <line class="datum" x1="388.0" y1="174.1" x2="388.0" y2="194.1"/>
+  <text class="datum-label" x="400.0" y="230.1">X0 Y0</text>
+  <circle class="cutter" cx="632.4" cy="384.8" r="4.2"/>
+  <line class="leader" x1="636.4" y1="384.8" x2="656.4" y2="424.8"/>
+  <text class="label" x="520.0" y="438.8">right end: X here</text>
+  <circle class="cutter" cx="472.0" cy="84.0" r="4.2"/>
+  <text class="label" x="484.0" y="80.0">back edge: Y here (edge finder)</text>
+  <text class="label-halo" x="527.7" y="384.1">tube stop</text>
+  <text class="label-halo" x="421.0" y="379.9">channel</text>
+  <line class="leader" x1="249.3" y1="248.8" x2="299.3" y2="208.8"/>
+  <circle class="leader-dot" cx="249.3" cy="248.8" r="2.5"/>
+  <text class="label-halo" x="299.3" y="202.8">cove</text>
+  <text class="label-halo" x="137.5" y="341.1">waste</text>
+  <text class="label-halo" x="260.7" y="124.1">stud holes</text>
+  <text class="label" x="98.0" y="470.7">1/2 in end mill: up the front at X0, round the arc</text>
+  <text class="label" x="20.0" y="530.0">GF02_form_b: T1 pecks the two stud holes, then cuts the arc through in four levels; T2, the 1/4 in ball,</text>
+  <text class="label" x="20.0" y="548.0">cuts the groove (dashed edges, centre line). 1-2-3 blocks dotted, under each strap. Plan view, to scale.</text>
+</svg>

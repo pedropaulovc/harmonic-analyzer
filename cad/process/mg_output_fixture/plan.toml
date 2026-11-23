@@ -1,48 +1,430 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
-title = "Output Fixture"
-part = "MHA-MG-06 Output Fixture"
-revision = "placeholder"
-material = "C36000 free-cutting brass"
-stock = "To be written"
+# Output fixture MHA-MG-06 (qty 1), from the 7/16 in C36000 hex bar on hand
+# (stock.c360-hex-7-16, a 4 in piece bought for this part).
+# Route, chosen for speed (owner ruling 2026-11-21: the agent picks the
+# faster route and says why; the owner corrects afterwards):
+# - Setup 1, PM-1127VF-LB lathe, 6 in 3-jaw on the hex, manual (turned setups
+#   get no NC, owner 2026-11-21): on the end of the bar, face the spigot
+#   face, turn the Ø.42 spigot, form the FULL R groove with the R.047 form
+#   tool, centre-drill, drill #43 to the bore's axis and tap #4-40 from the
+#   tailstock (plug, then bottoming), the tap wrench's shank centre on the
+#   MT3 dead centre (sm_gooseneck_end_plug's way).
+# - Setup 2, PM-30MV CNC, vise: the whole bar lying corner up along the jaws
+#   on two 1 in parallels, the spigot end .50 out past the jaws' left side;
+#   MO01 spots the top corner and drills F through both corners .49 from the
+#   spigot face, into the air past the parallels' left ends. The cross bore
+#   is drilled before parting off so the vise grips three inches of bar
+#   rather than a .72 in part: a parted part lying corner up has no flat
+#   left beside the bore to rest on the parallels (the clamp MHA-MG-02 rests
+#   on .375 of its own length; this part has .23 on the free-end side).
+# - Setup 3, lathe: the bar back in the 3-jaw, part the fixture off .72 long
+#   (the P1 blade's touch rule, #3312).
+# - Setup 4, bench: file the parting pip, break edges, chase the thread with
+#   the bottoming tap through the cross bore's burr, inspect.
+# To order before Setup 1 runs: the R.047 grooving form tool
+# (tools.form-tool-r047) and the #4-40 bottoming tap (tools.tap-4-40-bottoming,
+# Travers 12-111-086 per its record).
+#
+# NC (cam:mg_output_fixture, cad/process/mg_output_fixture/cam.py):
+# MO01_cross_bore. Program name, the [parameters] and the milling_cuts names
+# are a contract with that recipe. Tool numbers are the places in the tools
+# list among the mill's tools: T1 #2 centre drill, T2 F drill.
+title = "Output fixture"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "C36000 free-cutting brass, 7/16 in hex bar (drawing: {{cad.material_spec}})"
+stock = "{{process.blank_af_in:fraction}} in hex bar, the {{process.blank_x_in:g}} in piece on hand (at least {{process.bar_length_min_in:.2f}} in): one fixture off its end."
+note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB, dry (C36000). Home the mill ($H) and touch off G54 at the start of the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Prove the file in air first. Finish: as machined."
 shop = "../shop"
 stock_refs = ["c360-hex-7-16"]
+material_key = "lathe-c360"
+milling_material = "brass"
+
+[cad]
+file = "../../out/features/mg_output_fixture/features.toml"
+adapter = "drilled_block"
+part = "mg-output-fixture"
+
+[parameters]
+quantity = 1
+blank_af_in = 0.4375
+# The blank the part is cut from (stock_fit: envelope X, Y, Z): the 4 in
+# piece; across its corners and its flats.
+blank_x_in = 4.0
+blank_y_in = 0.5052
+blank_z_in = 0.4375
+# Setup 1 faces about .020 off; Setup 2 needs the bar on the parallels past
+# the part: 4 in less the facing is plenty. The shortest bar the recipe
+# accepts (cam.py: past the parallels' left ends by an inch).
+bar_length_min_in = 3.9
+bar_length_min_mm = 99.06
+# Lathe stick-out, Setups 1 and 3: the spigot and the hex the tools reach,
+# and in Setup 3 the .72 part, the P1 blade's width and .17 to the jaws;
+# under 3 × the groove root's Ø.33 (prechips lathe_holding, unsupported).
+stickout_in = 0.95
+# The P1 cutoff blade's width: its record (cad/config/shop-equipment/
+# tools-cutting.toml tools.cutoff-blade-p1 width_in, the makers' 1/16 in);
+# the kerf the bar loses, with its wander.
+blade_width_in = 0.0625
+part_kerf_in = 0.075
+# Turning: shop settings.lathe-ar-c360 (sourced there).
+# The groove: the R.047 form tool's half width; the DRO reads its arc's
+# centre once set to plus this with its chuck-side flank on the face (Op 40).
+form_half_width_in = 0.047
+# Setup 2, MO01 (cam.py recomputes the ones it can):
+# Spot: the #2 centre drill to Ø.180 on the top corner, under the F drill
+# and its 3/16 body (as the clamp's corner spot).
+corner_spot_dia_mm = 4.572
+# The F drill's full diameter this far past the lower corner, into air.
+cross_drill_past_mm = 1.0
+# Holding (shop workholding.vise-pm-6, fixtures.parallels-lms-6745): two 1
+# in parallels, 1/8 in thick, one against each jaw; the bar's lower diagonal
+# flats on their inner top edges, the gap between them 7/16 − 2 × 1/8.
+parallel_height_mm = 25.4
+parallel_thickness_mm = 3.175
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+# The spigot face .50 in out past the jaws' left side: the edge finder's
+# Ø.200 tip and its Ø.500 shank clear the jaws on the spigot face and both
+# sides of the spigot. The bore (.49 from the face) is then at the jaws'
+# side, the bar gripped from there on.
+jaw_side_from_face_mm = 12.7
+# The parallels' left ends .75 in from the spigot face: 3.3 mm clear of the
+# F drill's edge, so it exits into air.
+cross_parallel_start_mm = 19.05
+# The jaw tops above the parallels' tops (jaw height less the parallels);
+# the jaw tops above the top corner (Z0); the F drill's point below the
+# parallels' tops (the lower corner 1.375 below them, its 1.961 point and
+# cross_drill_past_mm). cam.py checks each.
+cross_grip_mm = 19.5453
+cross_jaw_top_mm = 8.0885
+cross_tip_height_mm = -4.336
+# The part's length the recipe reads from the export (free end to spigot
+# face): the part-off length.
+part_length_mm = 18.288
+# Machine-capacity inputs (mm): tool lengths from spindle nose to tip.
+drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
+# ASME B94.11M jobber lengths, overall: F 4-1/8 in; the #2 combined drill
+# and countersink 1-7/8 in.
+drill_f_oal_mm = 104.775
+centre_drill_oal_mm = 47.625
+# The top corner above the parallels' tops (cam.py's corner_top).
+cross_top_height_mm = 11.4568
+# Feeds the program runs, the shop settings' (mg.toml settings.fixture-*):
+# centre drill 2800 rpm × .001 in/rev = 2.8 in/min; F 2400 × .004 = 9.6 in/min.
+spot_feed_per_min_mm = 71.12
+drill_f_feed_per_min_mm = 243.84
 
 [[tools]]
-id = "jig-drill-43"
-name = "#43 drill"
-ref = "jig-drill-43"  # Drills #43
-
+id = "turn"
+name = "AR carbide turning tool"
+ref = "lathe-ar"
 [[tools]]
-id = "jig-drill-f"
-name = "F drill"
-ref = "jig-drill-f"  # Drills F: the Ø.257 rod bore over the 1/4 rod (#2404)
-
-[[tools]]
-id = "jig-tap-4-40-plug"
-name = "#4-40 plug tap"
-ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
-
-[[tools]]
-id = "tap-4-40-bottoming"
-name = "#4-40 bottoming tap"
-ref = "tap-4-40-bottoming"  # F-tap-bottoming-4-40, Tap coverage #4-40 UNC
-
-[[tools]]
-id = "form-tool-r047"
+id = "form"
 name = "R.047 grooving form tool"
-ref = "form-tool-r047"  # drawing cross-check 2026-11-19: R .047/.020 FULL R groove
-
+ref = "form-tool-r047"
+status = "to_order"
 [[tools]]
-id = "jig-spot"
+id = "centre"
+name = "Carbide 60° centre drill, size 1"
+ref = "centre-drills-carbide-60"
+[[tools]]
+id = "drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"
+[[tools]]
+id = "dead-centre"
+name = "MT3 dead centre"
+ref = "dead-centre-mt3"
+[[tools]]
+id = "tap-plug"
+name = "4-40 plug tap"
+ref = "jig-tap-4-40-plug"
+[[tools]]
+id = "tap-bottoming"
+name = "4-40 bottoming tap"
+ref = "tap-4-40-bottoming"
+status = "to_order"
+[[tools]]
+id = "spot"
 name = "#2 centre drill"
-ref = "jig-spot"  # drawing cross-check 2026-11-19: spot the hex corner before the F
+ref = "jig-spot"
+[[tools]]
+id = "drill-f"
+name = "F drill"
+ref = "jig-drill-f"
+[[tools]]
+id = "drill-g"
+name = "G drill (its shank the NO-GO)"
+ref = "clamp-drill-g"
+[[tools]]
+id = "cutoff"
+name = "P1 HSS cutoff blade"
+ref = "cutoff-blade-p1"
+[[tools]]
+id = "files"
+name = "Files"
+ref = "jig-files"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Spigot end: face, turn, groove, drill and tap"
+machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "The 7/16 hex bar in the 3-jaw, a jaw on every other flat, {{process.stickout_in:.2f}} in out of the jaw fronts; the rest of the bar back in the spindle bore."
+datum = "Z0 (carriage DRO) the spigot face, faced in Op 10."
+diagram = { file = "diagrams/lathe.svg", alt = "The hex bar in the 3-jaw, .95 out: the end faced (the spigot face), the spigot turned Ø.42 for .25, the FULL R groove formed .14 from the face, the #43 hole drilled .49 deep and tapped 4-40 from the tailstock." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = 11.1125, stock_diameter_mm = 12.8316, stickout_mm = 24.13, minimum_diameter_mm = 8.2968, support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "turn"
+drilling = "none"
+sizing = "other"
+instruction = "Face the end square, about .020 off, to the centre with no pip. Zero the carriage DRO Z on the faced end: Z0, the spigot face."
+settings = "lathe-ar-c360"
+cut_diameter_mm = 12.8316
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "turn"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the spigot to Z−{{cad.spigot_length_in:.3dot}}: rough to Ø.440 (the hex's corners first, an interrupted cut: light passes), then one finish pass to Ø{{cad.spigot_dia_min_in:.3dot}}–{{cad.spigot_dia_max_in:.3dot}} (aim {{cad.spigot_dia_in:.3dot}}), the tool's R.016 nose leaving the shoulder's inside corner (R.040 MAX, title block). Face the shoulder square out to the flats at Z−{{cad.spigot_length_in:.3dot}}."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.spigot_dia_mm}}"
+inspection = "Spigot Ø{{cad.spigot_dia_min_in:.3dot}}–{{cad.spigot_dia_max_in:.3dot}} (micrometer, at both ends of it); its length, the spigot face to the shoulder, {{cad.spigot_length_min_in:.3dot}}–{{cad.spigot_length_max_in:.3dot}} (the calipers' depth rod from the face to the shoulder)."
+gauge_checks = [
+  { gauge = "micrometers", band_mm = "{{cad.spigot_dia_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.spigot_length_band_mm}}" },
+]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spigot over Ø{{cad.spigot_dia_max_in:.3dot}} or shoulder short of {{cad.spigot_length_min_in:.3dot}}: take another light pass and check again. Spigot under Ø{{cad.spigot_dia_min_in:.3dot}} or shoulder past {{cad.spigot_length_max_in:.3dot}}: face the end back past the spigot (it is the bar's end) and start Setup 1 again on the fresh end."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "form"
+drilling = "none"
+sizing = "other"
+instruction = "Set the R.047 form tool on centre height, square to the axis. Bring it past the spigot face, its chuck-side flank onto the face, and set the DRO Z to {{process.form_half_width_in:.3dot}} there: the DRO then reads the centre of its arc. Move to Z−{{cad.groove_station_in:.3dot}}, the groove's centre ({{cad.groove_station_min_in:.3dot}}–{{cad.groove_station_max_in:.3dot}} from the face)."
+settings = "fixture-form-r047-c360"
+cut_diameter_mm = "{{cad.spigot_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "form"
+drilling = "none"
+sizing = "other"
+instruction = "Touch the arc on the spigot's O.D. and zero the cross-slide dial there. Feed in slowly by half of (your Op 20 spigot reading − {{cad.groove_root_dia_in:.3dot}}), radially: the root is then Ø{{cad.groove_root_dia_in:.3dot}} ({{cad.groove_root_dia_min_in:.3dot}}–{{cad.groove_root_dia_max_in:.3dot}}) whatever the spigot came out at."
+settings = "fixture-form-r047-c360"
+cut_diameter_mm = "{{cad.spigot_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Look at the groove: a clean round root, no step at either side, about as wide at the O.D. as the tool (.094). Its root Ø and station are the cross slide's and the DRO's, not gauged (no gauge in the shop enters a .094 groove)."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock, about Ø.08 across the countersink: under the #43 drill, so the drill removes it."
+settings = "lathe-centre-c360"
+cut_diameter_mm = 2.032
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-43"
+drilling = "twist_drill"
+sizing = { kind = "tap_drill", tap = "tap-plug" }
+instruction = "Drill #43 from the tailstock: feed it in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill, pecking every .06 to clear chips, until the scale reads {{cad.tap_axis_depth_in:.3dot}}: the full diameter is then {{cad.tap_axis_depth_min_in:.3dot}}–{{cad.tap_axis_depth_max_in:.3dot}} deep, to where the rod bore's axis will be. The depth is the quill scale's, not gauged."
+settings = "fixture-drill-43-c360"
+cut_diameter_mm = "{{cad.tap_dia_mm}}"
+hole_depth_mm = "{{cad.tap_axis_depth_mm}}"
+peck = { step_mm = 1.524, retract = "full" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "tap-plug"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle off, in neutral. Put the MT3 dead centre in the tailstock. Pencil-mark the plug tap .40 from its point and set it in the T-handle wrench. Put its point in the drilled hole, the dead centre's point in the wrench's centre hole to keep it on axis, the wrench's handle resting on the compound."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "tap-plug"
+drilling = "none"
+sizing = "other"
+instruction = "Tap {{cad.tap_thread}}: turn the chuck by hand with one hand, winding the tailstock handwheel in with the other so the centre follows the tap (.025 a turn). Back off every half turn; stop when the mark reaches the spigot face: never bottom the tap in the .49 hole."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "tap-bottoming"
+drilling = "none"
+sizing = "other"
+instruction = "Finish with the bottoming tap the same way, pencil-marked .46 from its point, until the mark reaches the spigot face: full thread to about .41 deep, past where the rod bore's near wall will be (.38 at the deepest, the bore's .50 station less its radius at the thread's crest), and .02 short of the drill's .48 least depth."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "Break the spigot face's outer edge with the smooth file held flat, {{cad.chamfer_max_in:.3dot}} max; 200 rpm. Leave the groove's edges for the bench."
+rpm = 200
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Cross bore through the corners, on the bar"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Two 1 in parallels, 1/8 in thick, one against each jaw, their LEFT ends {{process.cross_parallel_start_mm:in.2f}} in right of where the spigot face will be. The bar lies along the jaws, a corner straight UP and one DOWN, the spigot end to the LEFT, {{process.jaw_side_from_face_mm:in.2f}} in out past the jaws' left side (the calipers' depth rod from the jaw side to the spigot face): its lower diagonal flats rest on the parallels' inner top edges, gripped on the two vertical flats. Tap it down onto both edges while closing the vise. Under the bore nothing but air: the parallels start right of it."
+datum = "Program MO01_cross_bore (cam:mg_output_fixture). G54: X0 the spigot face, +X along the bar to the right; Y0 the spigot's axis, +Y toward the fixed jaw; Z0 the top corner. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the jaws."
+diagram = { file = "diagrams/cross.svg", alt = "The bar lying along the jaws, corner up, the spigot end .50 out past the jaws' left side, its lower diagonal flats on the parallels' inner edges from .75 in; the centre drill spots the top corner and the F drill drills through both corners .49 from the spigot face, into air." }
+envelope = { x_span_mm = ["{{cad.envelope_x_mm}}", 4.7625], y_span_mm = ["{{cad.hex_af_mm}}", 4.7625], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.cross_top_height_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.cross_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_f_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
+vise_hold = "other"
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.bar_length_min_mm}}"], clamp_mm = ["{{process.jaw_side_from_face_mm}}", "{{process.bar_length_min_mm}}"], section_mm = { diameter = "{{cad.hex_af_mm}}" } }
 
 [[setups.operations]]
-instruction = "Process not written yet."
+instruction = "Bore gauges, before the setup: mike the F drill's shank, .2570–.2575 makes it the GO; mike the G drill's shank, .2600–.2610 makes it the NO-GO (each sits inside the band, as fixed gauges do; no pin gauges of the size are owned). F under .2570: no GO; tag the bar BORE MIN NOT GAUGED now, and gauge with the NO-GO only."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Home the mill first ($H). G54 Y0 the spigot's axis, between two touches on its sides; X0 the spigot face."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm), its tip level with the spigot's middle. On the spigot's front side (toward the moving jaw), from the front: G10 L20 P1 Y0. On its back side, from the back: G10 L20 P1 Y(half the DRO Y reading). On the spigot face from the left, at Y0: G10 L20 P1 X-2.540 (minus: the edge finder's centre is left of the face)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the top corner, touched with the centre drill at the bore's station."
+instruction_detailed = "Console M6 T1 (#2 centre drill; the tool setter measures it). MDI G0 X{{cad.rod_bore_face_station_mm:.3f}} Y0. Spindle stopped, its point just dragging a .002 feeler leaf on the top corner: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove MO01_cross_bore in air, Z0 raised 1.000 in; every move clears the jaws. Then Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run the whole of MO01_cross_bore in air, through both its tool changes (T1, then T2) and the F drill's pass to the program's end, watching each move clear the jaw tops ({{process.cross_jaw_top_mm:in.3dot}} above the corner). G10 L2 P1 Z(the noted Z) puts Z0 back. Op 170 runs the file again from its start, its first M6 T1 putting the centre drill back in."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Run MO01_cross_bore (M6 T1, centre drill; set 2800): spot the top corner Ø{{process.corner_spot_dia_mm:in.3dot}} at X {{cad.rod_bore_face_station_mm:.3f}} mm, on the axis."
+settings = "fixture-spot-c360"
+milling_cuts = [
+  { name = "corner spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.corner_spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = 12.446 },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-f"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.rod_bore_dia_band_mm}}" }
+instruction = "Same file, M6 T2: F drill through both corners in one feed, its full diameter {{process.cross_drill_past_mm:in.3dot}} past the lower corner, into the air left of the parallels; set 2400. At least 1.10 out of its chuck: it reaches .94 below the jaw tops."
+settings = "fixture-drill-f-c360"
+hole_depth_mm = "{{cad.hex_ac_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "cross drill", kind = "drill", phase = "rough", cutter_dia_mm = 6.5278, flutes = 2, rpm = 2400, feed_mm_min = "{{process.drill_f_feed_per_min_mm}}", stations_mm = 12.446 },
+]
+inspection = "Bore Ø{{cad.rod_bore_dia_min_in:.3dot}}–{{cad.rod_bore_dia_max_in:.3dot}}, before unclamping: the GO shank (if there is one) enters, the NO-GO shank does not."
+gauge_checks = [{ gauge = "clamp-bore-drill-shanks", band_mm = "{{cad.rod_bore_dia_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "The GO does not enter: run MO01_cross_bore again, still clamped (the F drill through again), and re-check. Still not, or the NO-GO enters: face the bar's end back past the bore and make another from Setup 1 on the fresh end."
+feed = "hand"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Part off to length"
+machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "The bar back in the 3-jaw, a jaw on every other flat, the spigot end {{process.stickout_in:.2f}} in out of the jaw fronts."
+datum = "DRO Z set with the blade on the spigot face in Op 200."
+diagram = { file = "diagrams/part.svg", alt = "The bar in the 3-jaw, the fixture's spigot end out; the P1 blade's chuck-side face touched on the spigot face, then the fixture parted off .72 long." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = 11.1125, stock_diameter_mm = 12.8316, stickout_mm = 24.13, minimum_diameter_mm = 8.2968, support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Bring the blade's chuck-side face onto the spigot face and set DRO Z to {{process.blade_width_in:.4dot}}, the blade's width miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z−{{cad.envelope_x_in:.3dot}}, the blade square to the axis on centre height; catch the fixture."
+settings = "lathe-part-c360"
+cut_diameter_mm = 12.8316
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The rod bore's two stations, the F drill's shank in the bore (the GO, or the undersize F if Op 130 found no GO): calipers from the free end over the shank's far side, less half the shank's miked Ø; then from the spigot face the same way."
+inspection = "Free end to the bore's axis {{cad.rod_bore_station_min_in:.3dot}}–{{cad.rod_bore_station_max_in:.3dot}}; spigot face to it {{cad.rod_bore_face_station_min_in:.3dot}}–{{cad.rod_bore_face_station_max_in:.3dot}}."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.rod_bore_station_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.rod_bore_face_station_band_mm}}" },
+]
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A station out of its band: the fixture is scrap; make another from Setup 1 on the bar's parted end."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Bench: deburr, chase the thread, check"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished fixture: the hex .72 long, the F bore through the corners .23 from the free end, the spigot Ø.42 with its FULL R groove, the 4-40 tap from the spigot face into the bore." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "File the parting pip on the free end flat. Break every cut edge {{cad.edge_break_in:.3dot}} max: the free end's, the shoulder's outer edge at the hex, the bore's two mouths at the corners and the groove's lips (a light touch of the smooth file, never into the groove's round); the spigot face's edge was broken in Op 120."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-bottoming"
+drilling = "none"
+sizing = "other"
+instruction = "Chase the thread: run the bottoming tap in by hand from the spigot face to its .46 mark, clearing the burr the F drill raised where it crossed the thread; blow out the hole and the bore."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Run a 4-40 screw in by hand from the spigot face: it turns freely all the way into the bore, its end showing there."
+inspection = "{{cad.tap_thread}} full to the rod bore: a 4-40 screw runs by hand from the spigot face into the bore."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A screw that binds before the bore: chase again with the bottoming tap to its mark; still binding, the fixture is scrap (make another from Setup 1)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Wipe the fixture clean and dry; bag it, with its tag if Op 130 tagged it."
+feed = "hand"

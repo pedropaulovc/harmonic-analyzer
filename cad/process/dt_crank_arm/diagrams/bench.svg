@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="330"/>
+  <text class="title" x="20" y="20">Setup 4: punch, deburr, inspect, oil</text>
+  <rect class="part-kept" x="60" y="100" width="346" height="88" rx="44"/>
+  <circle class="holes" cx="104" cy="144" r="33"/>
+  <circle class="holes" cx="173" cy="110" r="3"/>
+  <circle class="holes" cx="77" cy="117" r="2"/>
+  <circle class="holes" cx="362" cy="144" r="5"/>
+  <text class="label" x="60" y="218">seat Ø.75–.77 (tagged); anchor #2-56; mark punched; pivot #4-40, countersunk Ø.122 max</text>
+  <text class="label" x="20" y="318">O face up; T edge at the top.</text>
+</svg>

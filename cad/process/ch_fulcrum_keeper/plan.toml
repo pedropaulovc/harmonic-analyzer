@@ -196,8 +196,8 @@ tap_reach_max_mm = 9.224
 # cbore_path_radius_mm round the foot hole's axis (Ø.152, the middle of the
 # drawing's .150-.154 band, less the cutter), 17 helical turns of .0049 down
 # to cbore_depth_mm (.083, the band's middle), then one flat turn on the
-# floor. The band is the Ø.150 at the title block's DRILLED HOLES +.004/0,
-# owner ruling RV-04 (ch-fulcrum-keeper.yaml machinist_exceptions): it keeps
+# floor. The band is the sheet's printed Ø.150 +.004/.000 x .083 +.005/-.005
+# (owner ruling 2026-11-22, #3367; RV-04 in ch-fulcrum-keeper.yaml): it keeps
 # the foot tip's .072 wall and clears the MHA-CH-VN-52's Ø.140 head. Its
 # collet nose stays cbore_collet_clear_mm over the crown's apex with the
 # cutter on the floor: at least cbore_projection_min_mm out of the collet,

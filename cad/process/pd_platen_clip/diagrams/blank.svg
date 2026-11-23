@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" font-family="sans-serif" font-size="14">
+  <rect class="paper" x="0" y="0" width="760" height="280"/>
+  <text class="title" x="20" y="24">Setup 1: two blanks off the end of the strip (not to scale)</text>
+  <rect class="part-rest" x="60" y="70" width="660" height="110"/>
+  <rect class="part-kept" x="60" y="70" width="198" height="110"/>
+  <rect class="part-kept" x="258" y="70" width="198" height="110"/>
+  <text class="label" x="110.0" y="130.0">blank A 3.60</text>
+  <text class="label" x="308.0" y="130.0">blank B 3.60</text>
+  <text class="label" x="500.0" y="130.0">rest 4.80: kept for MHA-PD-14</text>
+  <line class="cutter" x1="258" y1="62" x2="258" y2="188"/>
+  <line class="cutter" x1="456" y1="62" x2="456" y2="188"/>
+  <text class="label" x="200.0" y="206.0">snip 1</text>
+  <text class="label" x="398.0" y="206.0">snip 2</text>
+  <text class="label" x="40.0" y="60.0">bought end</text>
+  <text class="label" x="60.0" y="240.0">2 x 12 x .032 C26000 H02 strip, full 2 in width: mike it 1 in in from each end;</text>
+  <text class="label" x="60.0" y="258.0">file the burr off every snipped end, the blank flat on the spoil plate.</text>
+</svg>

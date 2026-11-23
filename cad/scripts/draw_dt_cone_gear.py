@@ -193,6 +193,11 @@ BORE_VIEW_SCALE_LADDER = (
 # ring, so the Ø read as landing on the unlabelled circle (ENFORCE round 1
 # of #971). Unprinted, the ring only spaces the bore from its callouts.
 BORE_VIEW_CROP_MARGIN = 0.0015
+# Where the crop circle's rim point is picked, degrees from the keyway's +X
+# centreline: up and left, the bore's arc 4.5 mm inside it on paper and no
+# model point on its ray (the keyway top's midpoint stands 1.7 mm inside the
+# circle on +X; the arc's own midpoint is on -X).
+BORE_VIEW_CROP_RIM_ANGLE_DEG = 135.0
 # The view's title stands this far under the crop circle, below the
 # across-flat callout's dimension line, the block's bottom edge. The block is
 # centred on its SetPosition point, ~5.3 mm a row; the flag's line under
@@ -832,7 +837,13 @@ def _crop_bore_view(
     adapter: Any, view: Any, configuration: str, teeth: int, kept: set[str]
 ) -> None:
     """Crop to a native circle round the bore, read back its outline and
-    dimensions; it prints no crop outline (BORE_VIEW_CROP_MARGIN)."""
+    dimensions; it prints no crop outline (BORE_VIEW_CROP_MARGIN).
+
+    The circle's rim point stands off the keyway's +X centreline
+    (BORE_VIEW_CROP_RIM_ANGLE_DEG): on it, inference snapped the rim to the
+    keyway top's midpoint, and the smaller circle cropped the keyway's top
+    edge out of DETAIL A on every keyed sheet (machinist review of run
+    20261122T215628806Z-4c985630476a4af3977b78cbe1520d58)."""
     draw = adapter.currentModel
     view = _early_bound(view, "IView")
     label = f"{configuration} bore view"
@@ -844,6 +855,8 @@ def _crop_bore_view(
         BORE_VIEW_CENTER,
         bore_view_crop_radius(teeth),
         add_to_db=False,
+        rim_angle_deg=BORE_VIEW_CROP_RIM_ANGLE_DEG,
+        center_tolerance=BORE_VIEW_POSITION_TOL_M,
         label=f"{label} crop",
     )
     status = int(view.Crop2(False, True, 1))

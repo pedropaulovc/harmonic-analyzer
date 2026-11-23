@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="960" height="360"/>
+  <text class="title" x="20" y="22">Setup 8: side view along the jaws; F to the right, the stub in the overhang, the slug as the spacer (not to scale)</text>
+  <rect class="fixture-vise" x="230" y="260" width="560" height="30"/>
+  <rect class="clamp" x="230" y="110" width="560" height="90"/>
+  <rect class="fixture-support" x="230" y="190" width="420" height="70"/>
+  <rect class="fixture-support" x="500" y="194" width="300" height="66"/>
+  <path class="part-kept" d="M40,170 Q25,160 40,150 Z"/>
+  <rect class="part-kept" x="40" y="148" width="120" height="30"/>
+  <rect class="part-kept" x="160" y="138" width="30" height="52"/>
+  <rect class="part-kept" x="190" y="150" width="420" height="40"/>
+  <rect class="part-kept" x="700" y="152" width="110" height="40"/>
+  <rect class="part-kept" x="810" y="138" width="20" height="52"/>
+  <rect class="part-kept" x="830" y="152" width="70" height="38"/>
+  <rect class="holes" x="96" y="148" width="10" height="30"/>
+  <rect class="cutter" x="96" y="60" width="10" height="82"/>
+  <line class="datum" x1="40" y1="148" x2="150" y2="148"/>
+  <text class="datum-label" x="130" y="100">Z0 the stub's top</text>
+  <line class="leader" x1="150" y1="104" x2="140" y2="148"/>
+  <line class="datum" x1="610" y1="120" x2="610" y2="215"/>
+  <text class="datum-label" x="600" y="70">X0 F</text>
+  <line class="leader" x1="615" y1="74" x2="611" y2="122"/>
+  <text class="label" x="280" y="80">jaws (behind) on the journals, brass shim</text>
+  <line class="dims" x1="610" y1="140" x2="700" y2="140"/>
+  <text class="label" x="615" y="132">1.20 gap</text>
+  <text class="label" x="560" y="320">slug spacer: journal end 1.20 from F, spigot past the</text>
+  <text class="label" x="560" y="336">second parallel (behind, against the moving jaw, to 2.75)</text>
+  <line class="leader" x1="760" y1="306" x2="760" y2="196"/>
+  <text class="label" x="20" y="320">jaws' left face 3.55 from F, on the outboard journal</text>
+  <line class="leader" x1="230" y1="308" x2="230" y2="292"/>
+  <rect class="part-rest" x="124" y="160" width="36" height="6"/>
+  <text class="label" x="20" y="222">.0930 GO pin in each drive-pin</text>
+  <text class="label" x="20" y="238">hole in turn, levelled first</text>
+  <line class="leader" x1="120" y1="210" x2="136" y2="167"/>
+</svg>

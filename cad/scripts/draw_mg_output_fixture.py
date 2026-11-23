@@ -67,6 +67,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _gtol_torus import TorusFace
+from _printed_limits import drilled_limits, limits
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
@@ -93,6 +98,9 @@ from _gear_drawing_entities import visible_circle_edge
 from mg_output_fixture_geom import (
     FREE_END_X,
     GROOVE_ROOT_DIA,
+    HEX_LENGTH,
+    ROD_STATION,
+    SPIGOT_LENGTH,
     GROOVE_CENTRE_R,
     GROOVE_HALF_OPENING,
     GROOVE_RADIUS,
@@ -101,6 +109,7 @@ from mg_output_fixture_geom import (
     HEX_CORNER_RADIUS,
     SHOULDER_X,
     ROD_BORE_DIA,
+    ROD_BORE_DRILL,
     SPIGOT_DIA,
     SPIGOT_FACE_X,
     TAP_DRILL_DEPTH,
@@ -129,6 +138,197 @@ from mg_output_fixture_spec import (
     TAP_THREAD_DEPTH_VARIABLE,
     UNIT,
 )
+
+# --- Requirement declarations (cad/out/features/mg_output_fixture) ------------
+# Seat-free requirement metadata for the traveler (adapter drilled_block):
+# every feature in the model frame (origin the rod bore's centre on the hex
+# axis, +X free end to spigot face, flats facing +/-Z, corners on +/-Y). Each
+# band is the printed dimension's: its places at the title block's grade
+# (DRAWING_PRECISION_BY_NAME), the drilled holes the DRILLED HOLES row, the
+# groove radius its LIMIT. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_mg_output_fixture"
+_GEOM = "mg_output_fixture_geom"
+_SPECM = "mg_output_fixture_spec"
+_FRAME = ("build_mg_output_fixture", "__frame__")
+
+
+def _plane(value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": "x", "value": value}
+
+
+part_metadata(
+    model_sources=(_FRAME, (_GEOM, "HEX_AF"), (_GEOM, "SPIGOT_FACE_X")),
+    precision_sources=((_SPECM, "DRAWING_PRECISION"), (_SPECM, "TAP_CALLOUT_PRECISION")),
+)
+# The two ends: the faced free end the rod bore's station runs from, and the
+# spigot face the bore's other station, the groove's and the tap run from.
+requirement(
+    "free_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), -FREE_END_X),),
+    requirements=("plane",),
+    fields={"plane": (_plane(FREE_END_X), (_FRAME, (_GEOM, "FREE_END_X")))},
+)
+requirement(
+    "spigot_face",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), SPIGOT_FACE_X),),
+    requirements=("plane",),
+    fields={"plane": (_plane(SPIGOT_FACE_X), (_FRAME, (_GEOM, "SPIGOT_FACE_X")))},
+)
+# The 7/16 hex as bought, free end to shoulder: the (7/16") HEX STOCK REF,
+# untoleranced (the supplier's band governs).
+_FLAT_NORMALS = tuple(
+    (0.0, round(math.sin(math.radians(angle)), 12), round(math.cos(math.radians(angle)), 12))
+    for angle in range(0, 360, 60)
+)
+requirement(
+    "hex",
+    kind="hex_prism",
+    faces=tuple(PlanarFace(normal, HEX_AF / 2.0) for normal in _FLAT_NORMALS),
+    requirements=(),
+    fields={
+        "at": ([FREE_END_X, 0.0, 0.0], (_FRAME, (_GEOM, "FREE_END_X"))),
+        "axis": ((1.0, 0.0, 0.0), (_FRAME,)),
+        "corner": ((0.0, 1.0, 0.0), (_FRAME,)),
+        "length_nominal": (HEX_LENGTH, ((_GEOM, "HEX_LENGTH"),)),
+        "af_ref": (HEX_AF, ((_GEOM, "HEX_AF"), (_SPECM, "STOCK_REFERENCE_DIMENSION"))),
+        "stock_form": (HEX_AF_CALLOUT, ((_SPECM, "HEX_AF_CALLOUT"),)),
+    },
+)
+# The turned spigot: its O.D. (SpigotDia) and its length from the spigot
+# face to the shoulder (SpigotLength), both at .XX.
+requirement(
+    "spigot",
+    kind="outside_cylinder",
+    faces=(CylinderFace(SPIGOT_DIA),),
+    requirements=("dia", "length"),
+    fields={
+        "at": ([SPIGOT_FACE_X, 0.0, 0.0], (_FRAME, (_GEOM, "SPIGOT_FACE_X"))),
+        "axis": ((-1.0, 0.0, 0.0), (_FRAME,)),
+        "dia": (
+            limits(SPIGOT_DIA, _P["SpigotDia"], unit=UNIT),
+            ((_GEOM, "SPIGOT_DIA"), "UNIT", (_SPECM, "DRAWING_PRECISION")),
+        ),
+        "nominal_dia": (SPIGOT_DIA, ((_GEOM, "SPIGOT_DIA"),)),
+        "length": (
+            limits(SPIGOT_LENGTH, _P["SpigotLength"], unit=UNIT),
+            ((_GEOM, "SPIGOT_LENGTH"), "UNIT", (_SPECM, "DRAWING_PRECISION")),
+        ),
+        "length_nominal": (SPIGOT_LENGTH, ((_GEOM, "SPIGOT_LENGTH"),)),
+    },
+    precision={"dia": _P["SpigotDia"], "length": _P["SpigotLength"]},
+)
+# The lever wire's FULL R groove round the spigot: its root Ø, its radius's
+# LIMIT (R.047 over R.020) and its station from the spigot face to its
+# centre, all printed.
+requirement(
+    "groove",
+    kind="groove",
+    faces=(TorusFace(GROOVE_CENTRE_R, GROOVE_RADIUS, (GROOVE_X, 0.0, 0.0)),),
+    requirements=("root_dia", "radius", "station"),
+    fields={
+        "axis": ((1.0, 0.0, 0.0), (_FRAME,)),
+        "root_dia": (
+            limits(GROOVE_ROOT_DIA, _P["GrooveRootDia"], unit=UNIT),
+            ((_GEOM, "GROOVE_ROOT_DIA"), "UNIT", (_SPECM, "DRAWING_PRECISION")),
+        ),
+        "root_dia_nominal": (GROOVE_ROOT_DIA, ((_GEOM, "GROOVE_ROOT_DIA"),)),
+        "radius": (
+            [GROOVE_RADIUS_MIN, GROOVE_RADIUS],
+            ((_SPECM, "GROOVE_RADIUS_MIN"), (_GEOM, "GROOVE_RADIUS")),
+        ),
+        "radius_nominal": (GROOVE_RADIUS, ((_GEOM, "GROOVE_RADIUS"),)),
+        "radius_callout": (GROOVE_RADIUS_CALLOUT, ((_SPECM, "GROOVE_RADIUS_CALLOUT"),)),
+        "station": (
+            limits(GROOVE_STATION, _P["GrooveStation"], unit=UNIT),
+            ((_GEOM, "GROOVE_STATION"), "UNIT", (_SPECM, "DRAWING_PRECISION")),
+        ),
+        "station_nominal": (GROOVE_STATION, ((_GEOM, "GROOVE_STATION"),)),
+        "station_from": ("spigot_face", ((_GEOM, "GROOVE_STATION"),)),
+    },
+    precision={
+        "root_dia": _P["GrooveRootDia"],
+        "radius": _P["GrooveRadius"],
+        "station": _P["GrooveStation"],
+    },
+)
+# The rod bore, drilled through the two corners (RodBoreDia with
+# ROD_BORE_CALLOUT, the DRILLED HOLES row): .23 from the free end
+# (RodStation) and .49 from the spigot face (BoreStation).
+requirement(
+    "rod_bore",
+    kind="hole",
+    faces=(CylinderFace(ROD_BORE_DIA),),
+    requirements=("dia", "thru", "station", "face_station"),
+    fields={
+        "at": ([0.0, -HEX_CORNER_RADIUS, 0.0], (_FRAME, (_GEOM, "HEX_CORNER_RADIUS"))),
+        "axis": ((0.0, 1.0, 0.0), (_FRAME,)),
+        "dia": (
+            drilled_limits(ROD_BORE_DIA, _P["RodBoreDia"], unit=UNIT),
+            ((_GEOM, "ROD_BORE_DIA"), "UNIT", (_SPECM, "DRAWING_PRECISION")),
+        ),
+        "nominal_dia": (ROD_BORE_DIA, ((_GEOM, "ROD_BORE_DIA"),)),
+        "thru": (True, ((_SPECM, "ROD_BORE_CALLOUT"),)),
+        "process": ("drill", ((_SPECM, "ROD_BORE_CALLOUT"),)),
+        "drill": (ROD_BORE_DRILL, ((_GEOM, "ROD_BORE_DRILL"),)),
+        "callout": (ROD_BORE_CALLOUT, ((_SPECM, "ROD_BORE_CALLOUT"),)),
+        "station": (
+            limits(ROD_STATION, _P["RodStation"], unit=UNIT),
+            ((_GEOM, "ROD_STATION"), "UNIT", (_SPECM, "DRAWING_PRECISION")),
+        ),
+        "station_nominal": (ROD_STATION, ((_GEOM, "ROD_STATION"),)),
+        "station_from": ("free_end", ((_GEOM, "ROD_STATION"),)),
+        "face_station": (
+            limits(SPIGOT_FACE_X, _P["BoreStation"], unit=UNIT),
+            ((_GEOM, "SPIGOT_FACE_X"), "UNIT", (_SPECM, "DRAWING_PRECISION")),
+        ),
+        "face_station_nominal": (SPIGOT_FACE_X, ((_GEOM, "SPIGOT_FACE_X"),)),
+        "face_station_from": ("spigot_face", ((_SPECM, "BORE_STATION"),)),
+    },
+    precision={
+        "dia": _P["RodBoreDia"],
+        "station": _P["RodStation"],
+        "face_station": _P["BoreStation"],
+    },
+)
+# The thumb-screw tap on the axis from the spigot face (the native callout:
+# its drill Ø, the drill depth to the bore's axis that governs, the thread
+# depth REF and FULL THREAD TO ROD BORE).
+requirement(
+    "tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(TAP_DRILL_DIA),),
+    requirements=("thread", "dia", "axis_depth"),
+    fields={
+        "at": ([SPIGOT_FACE_X, 0.0, 0.0], (_FRAME, (_GEOM, "SPIGOT_FACE_X"))),
+        "axis": ((-1.0, 0.0, 0.0), (_FRAME,)),
+        "thread": (
+            f"{TAP_SPEC.size} UNC-{TAP_SPEC.thread_class}",
+            ((_GEOM, "TAP_SPEC"), (_GEOM, "THREAD")),
+        ),
+        "dia": (
+            drilled_limits(TAP_DRILL_DIA, TAP_CALLOUT_PRECISION["hw-tapdrldia"], unit=UNIT),
+            ((_GEOM, "TAP_DRILL_DIA"), "UNIT", (_SPECM, "TAP_CALLOUT_PRECISION")),
+        ),
+        "nominal_dia": (TAP_DRILL_DIA, ((_GEOM, "TAP_DRILL_DIA"),)),
+        "process": ("drill", ((_SPECM, "TAP_PROCESS"),)),
+        "into": ("rod_bore", ((_GEOM, "TAP_SPEC"),)),
+        "axis_depth": (
+            limits(TAP_DRILL_DEPTH, TAP_DEPTH_PLACES, unit=UNIT),
+            ((_GEOM, "TAP_DRILL_DEPTH"), "UNIT", (_SPECM, "TAP_DEPTH_PLACES")),
+        ),
+        "axis_depth_nominal": (TAP_DRILL_DEPTH, ((_GEOM, "TAP_DRILL_DEPTH"),)),
+        "thread_depth_ref": (TAP_LENGTH, ((_GEOM, "TAP_LENGTH"),)),
+        "extent": (TAP_EXTENT_CALLOUT, ((_SPECM, "TAP_EXTENT_CALLOUT"),)),
+    },
+    precision={
+        "dia": TAP_CALLOUT_PRECISION["hw-tapdrldia"],
+        "axis_depth": TAP_DEPTH_PLACES,
+    },
+)
+
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE

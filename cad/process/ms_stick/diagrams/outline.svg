@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 3: the blank taped on the fixture bar's faced top, from above, the middle 7 in broken out (MS02_outline). +X right, +Y up (the fixed jaw is at the rear, the top of the picture). 10 px/mm: left part X-215..-185, right part X-17..+13. Hand-drawn; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 440" width="820" height="440" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <text class="title" x="12" y="20">Setup 3: blank on the tape, outline MS02 (from above; the middle 7 in left out)</text>
+  <!-- Jaws: under the middle only (6.25 in), their tops .22 below the bar's top. -->
+  <rect class="clamp" x="350" y="96" width="120" height="54"/>
+  <text class="label-on-clamp" x="358" y="118">fixed jaw</text>
+  <text class="label-on-clamp" x="358" y="136">(rear, lower)</text>
+  <rect class="clamp" x="350" y="277" width="120" height="54"/>
+  <text class="label-on-clamp" x="358" y="300">moving jaw</text>
+  <text class="label-on-clamp" x="358" y="318">(toward you)</text>
+  <!-- Fixture bar's faced top: Y-12.7..0 (127 px), running past both ends of the blank. -->
+  <rect class="fixture-plate" x="20" y="150" width="780" height="127"/>
+  <!-- Blank as bought: Y-9.525..0, X-206.5 (longest) to +0.762; the milled-away margins. -->
+  <rect class="part-removed" x="125" y="150" width="215" height="95"/>
+  <rect class="part-removed" x="480" y="150" width="178" height="95"/>
+  <!-- The stick: Y-8.763..-0.762, X-201.93..0. -->
+  <rect class="part-kept" x="171" y="158" width="169" height="80"/>
+  <rect class="part-kept" x="480" y="158" width="170" height="80"/>
+  <!-- Break. -->
+  <rect class="paper" x="340" y="151" width="140" height="125"/>
+  <path class="dims" d="M340 144 L346 170 L334 200 L346 230 L340 284 M480 144 L486 170 L474 200 L486 230 L480 284"/>
+  <text class="label" x="366" y="218">7 in left out</text>
+  <text class="label-halo" x="196" y="194">RULED FACE up</text>
+  <text class="label-halo" x="196" y="212">ZERO END at left</text>
+  <text class="label-halo" x="492" y="194">DATUM END at right</text>
+  <text class="label-halo" x="492" y="212">(the arrow's end)</text>
+  <!-- T1 at the entry of the datum-end pass, as cam.py posts it: Ø12.7 (127 px), centre X+6.35, Y-21.05 (px 713.5, 360.5). Its top is 2.0 (20 px) in front of the bar's front face. -->
+  <circle class="cutter" cx="713.5" cy="360.5" r="63.5"/>
+  <text class="label" x="722" y="384">T1 1/2</text>
+  <!-- Passes, cutter-centre lines as posted, anticlockwise, the stick on the left of each. Every entry is at Y+8.35, behind the bar (px 66.5), or at Y-21.05, in front of it (px 360.5); the edge passes feed across from X-214.852 (px 41.5) and X+9.112 (px 741.1) to their lines at Y-15.113 (px 301.1) and Y+5.588 (px 94.1). The zero-end arrow is the last of the passes, X-208.28 (px 107.2). -->
+  <line class="arrow" x1="107.2" y1="66.5" x2="107.2" y2="360.5"/>
+  <text class="label" x="118" y="348">1 ZERO END: {{process.outline_end_stations:d}} passes,</text>
+  <text class="label" x="118" y="364">stepping in {{process.outline_trim_mm:in.2dot}} each</text>
+  <line class="arrow" x1="41.5" y1="360.5" x2="41.5" y2="301.1"/>
+  <line class="arrow" x1="41.5" y1="301.1" x2="330" y2="301.1"/>
+  <line class="arrow" x1="490" y1="301.1" x2="741.1" y2="301.1"/>
+  <text class="label" x="150" y="320">2 RULED EDGE (front)</text>
+  <line class="arrow" x1="713.5" y1="360.5" x2="713.5" y2="66.5"/>
+  <text class="label" x="722" y="118">3 DATUM</text>
+  <text class="label" x="722" y="134">END</text>
+  <line class="arrow" x1="741.1" y1="66.5" x2="741.1" y2="94.1"/>
+  <line class="arrow" x1="741.1" y1="94.1" x2="490" y2="94.1"/>
+  <line class="arrow" x1="330" y1="94.1" x2="41.5" y2="94.1"/>
+  <text class="label" x="150" y="84">4 PLAIN EDGE (rear)</text>
+  <!-- Datums. -->
+  <line class="datum" x1="650" y1="120" x2="650" y2="262"/>
+  <path class="leader" d="M650 262 L612 350"/>
+  <text class="datum-label" x="400" y="364">X0: {{process.outline_trim_mm:in.3dot}} inside the blank's right end</text>
+  <line class="datum" x1="125" y1="150" x2="340" y2="150"/>
+  <line class="datum" x1="480" y1="150" x2="658" y2="150"/>
+  <path class="leader" d="M560 150 L560 56"/>
+  <text class="datum-label" x="430" y="50">Y0: the blank's rear edge, flush with the bar's rear face</text>
+  <text class="label" x="24" y="392">hatched: milled away, {{process.outline_trim_mm:in.2dot}} a side and the left end's surplus</text>
+  <text class="label" x="24" y="410">every pass is entered in air, off the bar: behind its rear face or in front of its front face</text>
+  <text class="label" x="24" y="428">T1 is drawn at pass 3's entry; with M3 the stick on the pass's left is conventional milling</text>
+</svg>
