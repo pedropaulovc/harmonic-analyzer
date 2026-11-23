@@ -115,6 +115,15 @@ def _leaf_setting(setting: float) -> str:
     return inch_text(setting, FEELER_PLACES)
 
 
+# The stacks book each leaf within dt_feeler_leaves.LEAF_TOLERANCE of its
+# etched size, an assumption the set's maker does not state: the fitter mics
+# each leaf the sheet's table lists once, which makes it a check (Main, #3042).
+FEELER_LEAF_CHECK = (
+    "MIC EACH LEAF FIRST: WITHIN "
+    f"±{inch_text(dt_feeler_leaves.LEAF_TOLERANCE, 4)} OF ITS ETCHED SIZE, OR REJECT IT."
+)
+
+
 # The step each print carries, uppercase to match the sheets.  Each line is
 # one sub-step that does one thing (drawing-guidelines rule 22); MHA-DT-00
 # letters the lines after the first.  The base
@@ -247,6 +256,7 @@ __all__ = [
     "FEELER_GAGE",
     "FEELER_GAGE_LEAVES_MM",
     "FEELER_GAGE_NAME",
+    "FEELER_LEAF_CHECK",
     "FEELER_SET_BAND",
     "FEELER_SET_ERROR",
     "FRONT_BLOCK_FEELER",

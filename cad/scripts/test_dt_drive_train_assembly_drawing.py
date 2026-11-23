@@ -1071,9 +1071,8 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     )
     # The booked leaf tolerance is checked at the bench, not assumed.
     tolerance = drawing.inch_text(dt_feeler_leaves.LEAF_TOLERANCE, 4)
-    assert f"MIC EACH LEAF IN THAT TABLE: WITHIN ±{tolerance}" in " ".join(
-        drawing.FEELER_TABLE_NOTE.split()
-    )
+    note = " ".join(drawing.FEELER_TABLE_NOTE.split())
+    assert re.search(rf"MIC EACH LEAF\b.*WITHIN ±{re.escape(tolerance)} OF ITS ETCHED SIZE", note)
     rows = {row[0]: row[2] for row in drawing.FEELER_STACK_ROWS}
 
     def printed(setting: float) -> str:

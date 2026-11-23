@@ -2170,20 +2170,14 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
 
 
 # Each feeler the rig steps and checks print is a stack of gage leaves the
-# sheet 15 table lists (rubric sample review of v47: no mm in the steps).
-# The stacks book each leaf within dt_feeler_leaves.LEAF_TOLERANCE of its
-# etched size, an assumption the set's maker does not state: the fitter mics
-# each leaf the table lists once, which makes it a check (Main, #3042).
-FEELER_LEAF_CHECK = (
-    "BEFORE USE, MIC EACH LEAF IN THAT TABLE: WITHIN "
-    f"±{inch_text(dt_feeler_leaves.LEAF_TOLERANCE, 4)} OF ITS ETCHED SIZE, OR DO NOT USE IT."
-)
+# sheet 15 table lists (rubric sample review of v47: no mm in the steps), and
+# the fitter mics each of them once (pinion_rig_fitup.FEELER_LEAF_CHECK).
 FEELER_TABLE_NOTE = _note_text(
     (
         # Round 16 (#0): package-wide, not only the rig's.
         f"ALL SET FEELERS AND SHIMS: {FITUP.FEELER_GAGE_NAME} LEAF STACKS, SHEET "
         f"{SETTING_SHEET} TABLE.",
-        FEELER_LEAF_CHECK,
+        FITUP.FEELER_LEAF_CHECK,
     ),
     heading=False,
 )
