@@ -302,7 +302,7 @@ status = "to_make"
 
 [[tools]]
 id = "collar"
-name = "TL-04 collar and arbor nut (cone kit)"
+name = "MHA-DT-03-TL-04 collar and arbor nut (cone kit)"
 ref = "dt-cone-gear-cutting-arbor"
 status = "to_make"
 
@@ -516,7 +516,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the back face, light skims, miking between them, to gear k's aim, back face to cam face. Write the miked thickness on the card; scribe k on the back face's hub."
+instruction = "Face the back face, light skims, miking between them, to gear k's aim, back face to cam face. Write the miked thickness on the card. No mark on the part: gear k goes in envelope k and lives there between setups; on the arbor the gears go on in number order (blank 1 the lowest) and come off in the same order."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{process.slice_dia_mm}}"
 inspection = "Thickness {{cad.cam_face_thickness_min_in:.4dot}}-{{cad.cam_face_thickness_max_in:.4dot}} (micrometer, on the boss); rim {{cad.rim_face_face_width_min_in:.3dot}}-{{cad.rim_face_face_width_max_in:.3dot}} (micrometer across the rim)."
@@ -616,7 +616,7 @@ title = "Load ten blanks; turn the stack's O.D."
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "Ten blanks on the journal, back faces toward the shoulder (blank 1 on it), the TL-04 Ø1.75 collar on the pilot against blank 10's boss, the arbor nut wrench-tight. The arbor in the 3-jaw on the body's last {{process.body_grip_in:.2f}} (the jaw fronts {{process.standoff_mm:in.2f}} from the shoulder, the .50 raw stub behind the jaws); the MT3 dead centre in the tail centre, oiled."
+holding = "Ten blanks on the journal, back faces toward the shoulder (blank 1 on it), the MHA-DT-03-TL-04 Ø1.75 collar on the pilot against blank 10's boss, the arbor nut wrench-tight. The arbor in the 3-jaw on the body's last {{process.body_grip_in:.2f}} (the jaw fronts {{process.standoff_mm:in.2f}} from the shoulder, the .50 raw stub behind the jaws); the MT3 dead centre in the tail centre, oiled."
 datum = "The arbor's axis: the body indicated at the jaws, the tail on its own centre."
 diagram = { file = "diagrams/stack.svg", alt = "Ten blanks on the arbor between the 3-jaw and the dead centre, their rims spaced by the cam bosses; the O.D. turned across all ten in one setting." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.body_dia_mm}}", stock_diameter_mm = "{{process.slice_dia_mm}}", stickout_mm = "{{process.stack_stickout_mm}}", minimum_diameter_mm = "{{process.journal_dia_min_mm}}", support = "tailstock" }
@@ -830,7 +830,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.cam_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "First gear of each load, before turning the next: check its throw and phase by Setup 10's throw and phase ops. Out: stop, reset the fixture by TL-00 steps 9-13 and its clock pin before going on."
+instruction = "Stop after the first gear of each load (gears 0 and 10): take it through Setup 10's throw and phase checks now (they are its only ones); turn the next only when they pass. Out: stop, reset the fixture by TL-00 steps 9-13 and its clock pin before going on."
 feed = "hand"
 
 [[setups]]
@@ -844,18 +844,18 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Throw, the first gear of each load and every fifth after: on the setting mandrel in the V-blocks, the dial indicator on the cam's O.D.; turn the gear a full turn: the swing is twice the throw, .6764-.6844."
-inspection = "Throw {{cad.cam_throw_min_in:.4dot}}-{{cad.cam_throw_max_in:.4dot}} (half the swing). Out: stop, check the fixture's setting (TL-00 steps 9-13)."
+instruction = "Throw, gears 0 and 10 at Setup 9's stop, then every fifth gear after (5 and 15): on the setting mandrel in the V-blocks, the dial indicator on the cam's O.D.; turn the gear a full turn: the swing is twice the throw, .6764-.6844. Out: stop, check the fixture's setting (TL-00 steps 9-13)."
+inspection = "Throw {{cad.cam_throw_min_in:.4dot}}-{{cad.cam_throw_max_in:.4dot}} (half the swing)."
 gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Cam phase, the first gear of each load: on the setting mandrel in the V-blocks on the surface plate, the cam face toward you, a .014 pin gauge in the notch. Turn the gear until the pin's top reads the mandrel's top less .1805 on the height gauge (the notch level, out to the right); tape the rim to the V-block to hold it."
+instruction = "Cam phase, gears 0 and 10 only, at Setup 9's stop (not again here): on the setting mandrel in the V-blocks on the surface plate, the cam face toward you, a .014 pin gauge in the notch. Turn the gear until the pin's top reads the mandrel's top less .1805 on the height gauge (the notch level, out to the right); tape the rim to the V-block to hold it."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Pin's top again at the mandrel's top less .1805, then read the cam's top and bottom on the height gauge. The axis height (the mandrel's top less .1875) less half their sum is the cam's drop below the axis."
-inspection = "Drop {{process.phase_drop_min_in:.4dot}}-{{process.phase_drop_max_in:.4dot}} (the lobe 3° ±.7° clockwise of the notch). Out: stop, check the fixture's clock pin (TL-00)."
+instruction = "Pin's top again at the mandrel's top less .1805, then read the cam's top and bottom on the height gauge. The axis height (the mandrel's top less .1875) less half their sum is the cam's drop below the axis. Out: stop, check the fixture's clock pin (TL-00)."
+inspection = "Drop {{process.phase_drop_min_in:.4dot}}-{{process.phase_drop_max_in:.4dot}} (the lobe 3° ±.7° clockwise of the notch)."
 gauge_checks = "other"
 feed = "hand"
 
