@@ -336,7 +336,7 @@ title = "CNC mill: bond the blanks to the spoil plate; cut the clips and the for
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Spoil plate on 1 in parallels across the vise jaws, its back edge on the fixed jaw, centred along the jaws: the jaw tops stand {{process.jaw_top_over_plate_mm:in.3dot}} above the plate top, room for the edge finder's touch and blank A's edge, and at the least stickout the collet's nose passes {{process.collet_over_jaw_mm:in.2dot}} over them at the cut. Blanks A and B bonded to its top under their whole faces: blue tape on the plate, CA glue, blue tape on the blank (stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}), both left ends flush with the plate's left end, A's back edge against the fixed jaw and B's against A's front edge."
+holding = "Spoil plate on 1 in parallels across the vise jaws, its back edge on the fixed jaw, centred along the jaws: the jaw tops stand {{process.jaw_top_over_plate_mm:in.3dot}} above the plate top, room for the edge finder's touch and blank A's edge, and at the least stickout the collet's nose passes {{process.collet_over_jaw_mm:in.2dot}} over them at the cut. Blanks A and B bonded to its top: blue tape under their whole faces, on the plate and on each blank, and a zigzag CA bead between that runs under every part (stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}); both left ends flush with the plate's left end, A's back edge against the fixed jaw and B's against A's front edge."
 datum = "Program PC01_sheet. G54: X0 the plate's left end, Y0 the fixed jaw's face (the plate's back edge and blank A's), Z0 the plate top, bare right of the tape; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack, starting each cut over the thickest stack ({{process.tape_stack_max_mm:in.3dot}}) and ending {{process.sheet_tip_into_plate_mm:in.3dot}} into the plate; +Y toward the fixed jaw. Each clip's rail near end stands at X {{process.part_left_x_mm:in.3dot}}, the first clip's spring edge at Y {{process.clip_spring_edge_y_mm:in.3dot}}. Set X, Y and Z again after an alarm, a stall, an E-stop or any move of the plate; a Reset after a Feed Hold keeps them."
 diagram = { file = "diagrams/sheet.svg", alt = "Plan of the spoil plate in the vise: the plate's blue tape, four strips along X from its left end to 4 in, and blank A against the fixed jaw and blank B in front of it on it, both flush with the plate's left end; dashed, the tape seams along X, the blanks' offset from the plate's; on A the two clips, rails toward the moving jaw, and the first lamination; on B the other three; each lamination split along its bow profile into a male half (toward the moving jaw) and a female half. The 1/32 end mill enters every outline from beyond the plate's left end." }
 # Top: the thickest strip on the thickest tape stack; deepest: the cutter's
@@ -394,13 +394,13 @@ tool = "glue"
 drilling = "none"
 sizing = "other"
 steps = [
-  { kind = "action", text = "Glue, blank A: thick CA on the plate's tape in A's place (against the fixed jaw), a zigzag bead about 1/16 wide, lines about 3/4 in apart, kept 1/4 in inside the place: about 7 in of bead, .4 sq in. No glue on bare metal." },
+  { kind = "action", text = "Glue, blank A: thick CA on the plate's tape in A's place (against the fixed jaw), a zigzag bead about 1/16 wide, lines about 3/4 in apart, from 1/16 in off the fixed jaw (under clip 1's finger) to 1/4 in inside A's front edge and ends: about 8 in of bead, .5 sq in. No glue on bare metal." },
   { kind = "action", text = "Mist the accelerator on blank A's tape, two or three sprays." },
 ]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Press, within about 10 seconds of the spray (the glue grabs at once; the blank cannot be slid after): lower blank A, its back edge against the fixed jaw and its left end against a steel rule held on the plate's left end. Press it down over its whole face with a flat block for 1 minute."
+instruction = "Press, within about 10 seconds of the spray (the glue grabs at once; the blank cannot be slid after): lower blank A, its back edge against the fixed jaw and its left end against a steel rule held on the plate's left end. Press it down over its whole face with a flat block for 1 minute. Squeeze-out at the back edge lands on the plate's tape, which is fine; wipe any off the jaw's face with a dry rag at once."
 feed = "hand"
 
 [[setups.operations]]
@@ -409,7 +409,7 @@ tool = "glue"
 drilling = "none"
 sizing = "other"
 steps = [
-  { kind = "action", text = "Glue, blank B: the same bead in B's place, in front of blank A, kept 1/4 in inside it (about 7 in, .4 sq in)." },
+  { kind = "action", text = "Glue, blank B: the same bead in B's place, in front of blank A, from 1/16 in off A's front edge (under lamination 2's female half) to 1/4 in inside B's front edge and ends (about 8 in, .5 sq in)." },
   { kind = "action", text = "Mist the accelerator on blank B's tape, two or three sprays." },
 ]
 feed = "hand"
