@@ -49,9 +49,9 @@ blank_length_in = 5.45
 end_stickout_in = 0.45
 # Beyond the tip while the blank is turned: a stub for the tailstock centre,
 # faced off before the tip is chamfered (authored).
-centre_stub_in = 0.1
-centre_stub_mm = 2.54
-# Pulled out of the jaw fronts: end_stickout_in + centre_stub_in.
+tip_stub_in = 0.1
+tip_stub_mm = 2.54
+# Pulled out of the jaw fronts: end_stickout_in + tip_stub_in.
 tip_pull_in = 0.55
 tip_pull_mm = 13.97
 # Left on the thread blank's diameter by the rough pass, per side.
@@ -161,11 +161,11 @@ title = "Tip end: thread blank on the centre, tip chamfer, thread, relief"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw over a brass shim wrap on the bar, the tip end out {{process.tip_pull_in:.2dot}} in from the jaw fronts (the tip {{process.end_stickout_in:.2dot}} in out plus the {{process.centre_stub_in:.2dot}} in centre stub); the rest of the blank back in the jaws and the spindle bore. The tailstock dead centre, oiled, in the stub's centre hole for Ops 60–80; the tailstock backed off for Ops 100–130 and brought up again, its centre out, to square the die in Op 140."
-datum = "Z0 (carriage DRO) the tip's finished plane: set {{process.centre_stub_in:.3dot}} in back from the stub's faced end in Op 40, faced to in Op 100."
+holding = "3-jaw over a brass shim wrap on the bar, the tip end out {{process.tip_pull_in:.2dot}} in from the jaw fronts (the tip {{process.end_stickout_in:.2dot}} in out plus the {{process.tip_stub_in:.2dot}} in centre stub); the rest of the blank back in the jaws and the spindle bore. The tailstock dead centre, oiled, in the stub's centre hole for Ops 60–80; the tailstock backed off for Ops 100–130 and brought up again, its centre out, to square the die in Op 140."
+datum = "Z0 (carriage DRO) the tip's finished plane: set {{process.tip_stub_in:.3dot}} in back from the stub's faced end in Op 40, faced to in Op 100."
 diagram = { file = "diagrams/tip.svg", alt = "The blank in the 3-jaw, the tip end out: the #4-40 blank turned on the tailstock centre in a stub beyond the tip; the stub faced off, the thread die-cut and the relief plunged at the shoulder." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{process.tip_pull_mm}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}", support = "tailstock" }
-turning_support = { kind = "tailstock", chuck_z_mm = "{{cad.end_jaw_z_mm}}", centre_z_mm = "{{process.centre_stub_mm}}" }
+turning_support = { kind = "tailstock", chuck_z_mm = "{{cad.end_jaw_z_mm}}", centre_z_mm = "{{process.tip_stub_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -173,7 +173,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the tip end square, about .03 in off, to the centre with no pip. Set the DRO Z to +{{process.centre_stub_in:.3dot}} on it: Z0 is the tip's finished plane, the {{process.centre_stub_in:.2dot}} in beyond it a stub for the centre."
+instruction = "Face the tip end square, about .03 in off, to the centre with no pip. Set the DRO Z to +{{process.tip_stub_in:.3dot}} on it: Z0 is the tip's finished plane, the {{process.tip_stub_in:.2dot}} in beyond it a stub for the centre."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
