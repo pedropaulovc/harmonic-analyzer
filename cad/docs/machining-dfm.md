@@ -156,17 +156,19 @@ its first-root position; no second general note restates that location.
   8.25 table with the two stations 15.51 apart, past the 8.75 Y travel. On
   edge the pad face stands 11.06 above the table against the 17 in spindle
   limit, so each tool is chosen for its projection (drill chuck 3.74 in, an
-  unmeasured placeholder): the Ø.35 spotface with an 11/32 end mill in an R8
-  collet (12.6 in to the spindle nose); the Ø.206 near-wall clearance with a
-  #5 screw-machine drill (2-3/8 OAL, 16.4 in at the first touch); and the
+  unmeasured placeholder): the Ø.35 spotface interpolated with the owned
+  LMS 6784 5/16 end mill (3/8 shank) in the 3/8 R8 collet, no chuck; the
+  Ø.206 near-wall clearance with a #4 (.2090, the #10 close clearance)
+  screw-machine drill (2-3/8 OAL, 16.4 in at the first touch; a jobber #4
+  would stand over the limit); and the
   far-wall Ø.159 tap drill with a jobber drill dropped through that
   clearance onto the socket's far wall, 1.50 below the face, before the chuck
   closes on it (15.7 in, 15.1 at the 1.93 depth). The 10-32 tap is turned
   by hand, its .194 shank guided by the Ø.206 clearance. The top frame's
-  paths take the same tools at 10.59 on edge. The 11/32 end mill, the stub
-  drill and the angle plate are to buy (`tools.frame-spotface-endmill`,
-  `tools.frame-clearance-stub-drill`, `fixtures.angle-plate-4`, $45.46 in
-  all).
+  paths take the same tools at 10.59 on edge. The stub drill and the angle
+  plate are to buy (`tools.frame-clearance-stub-drill-4`,
+  `fixtures.angle-plate-4`; tool audit 2026-11-23 replaced the 11/32 end mill
+  and the #5 stub).
 - **`fr-harmonic-base` socket pattern (#2386).** The four Ø1.004 sockets
   are transferred from the finished MHA-FR-02 sockets (sheet 2 note 2; their
   table X/Y are reference), so the bored top frame is the master: its
