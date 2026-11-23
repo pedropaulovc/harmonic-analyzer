@@ -475,6 +475,43 @@ rpm = 2650
 chip_load_mm_per_tooth = 0.07112  # .0028 in; 2650 × 3 × .0028 = 22.3 in/min
 flutes = 3
 feed_unit = "in/min"
+# Measured (#3383): dechatter 0.4.0 reports v5 and v6, 2026-11-22, on the
+# PM-30MV with this cutter in an R8 collet at 30.0 mm stickout, side-milling
+# 1018 cold-finished, conventional, every pass at .0028 in (.071 mm)/tooth:
+# cad/process/dechatter/2026-11-22-pm30mv-em-half-carbide-1018-v5.html and
+# -v6.html. The work: a 126 x 13 x 73 mm 1018 plate upright in the vise, about
+# 30 mm above the jaws, as the column-clamp travelers' Setups 2-3 hold their
+# blank. Valid only for that tool assembly. The chart record above stays for
+# the cuts these do not cover: 10.54 mm side finishing and the full-width
+# 0.25-0.71 mm passes were not tested.
+# Speed: the stable cuts at both depths sit at 2300-2400 rpm; 2800 rpm
+# chattered at both (1.8 mm wide at 1.27 deep, 1.3 mm wide at 6.6 deep), so the
+# chart's 2650 is near chatter.
+# Deep, up to 6.6 mm deep and 2.2 mm wide: 2400 rpm stable at 2.2 mm (2370 at
+# 1.8 mm); chatter at 2.4-3.0 mm wide (2320-2400 rpm; 2320 at 2.7 mm by ear,
+# though the v6 report shows the detector's "stable"), and at 3.0 mm wide 3.2 mm
+# deep (2350 rpm, violent: the machine shook and the pass was aborted). Cut the
+# 6.60 x 3.17 mm rod end trim in passes no wider than 2.2 mm.
+# 2400 × 3 × .0028 = 20.2 in/min.
+[settings.em-half-carbide-1018-v6-deep]
+tool = "endmill-carbide-3fl-1-2"
+material = "rocker-1018-cold-finished"
+rpm = 2400
+chip_load_mm_per_tooth = 0.07112
+flutes = 3
+feed_unit = "in/min"
+# Face, up to 1.27 mm (.050 in) deep and 3.4 mm wide: 2370 rpm stable at 3.0,
+# 3.2 and 3.4 mm; 1800 and 2300 rpm stable to 1.8 mm, 2310-2330 to 2.8 mm. The
+# travelers' .200 in (5.08 mm) facing stepover is wider than any cut measured.
+# The chip-load sweep (0.043 and 0.062 mm/tooth, both stable) ran out of stock
+# before a limit. 2370 × 3 × .0028 = 19.9 in/min.
+[settings.em-half-carbide-1018-v5-face]
+tool = "endmill-carbide-3fl-1-2"
+material = "rocker-1018-cold-finished"
+rpm = 2370
+chip_load_mm_per_tooth = 0.07112
+flutes = 3
+feed_unit = "in/min"
 
 # --- MHA-CH-13 rocker strap (cad/process/ch_rocker_strap/plan.toml), also
 # MHA-DT-14's outline (cad/process/dt_pinion_bracket/plan.toml) ---
