@@ -801,6 +801,7 @@ sku = "96659A104"
 status = "on_hand"
 pieces = 1
 unit = "pack"
+note = "Shared pack: the rocker strap fixture hub clamp takes one washer selected from this pack by measurement and kept with the fixture (owner ruling 2026-11-23: \"Pick one washer from the pack of 100 by measurement and keep it with the fixture\")."
 cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 70: \"18-8 Stainless Steel SAE Washer for Number 10 Screw Size, 0.219\" ID, 0.500\" OD, Packs of 100\", 1 pack shipped; Your Part Number MHA-SM-VN-54", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
 
 [hardware.sm-vn-knife-mount-dowel]
