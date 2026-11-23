@@ -12,8 +12,8 @@ drills', the end mill's and the reamer's diameters and the speeds from the
 shop (``shop/``). Every path is written here (``rt.custom``): straight lines
 a recipe can state exactly. Typed here, because no record carries them: the
 #2 centre drill's catalogue geometry (it sets the spot depth), the twist
-drills' 118° point, the 3/64 end mill's 1/8 in shank (the catalogue size for
-a miniature end mill), the approach, safe and clearance heights and the vise
+drills' 118° point, the 1/16 end mill's 1/8 in shank (Harvey Tool 34662's
+listing), the approach, safe and clearance heights and the vise
 jaws' depth (keep-out shapes only).
 
 Route (plan text in ``plan.toml``): the hub is turned, faced and its bore
@@ -21,7 +21,7 @@ reamed on the lathe (no NC). Setup 3 stands it upright, the flange's front
 face on two stacked parallels, the body hanging between them: CM01 spots and
 drills the three #51 holes through the flange. Setup 4 lays it across the
 vise, gripped end to end, the body on a parallel against the fixed jaw:
-CM02 plunges a flat with the 3/64 end mill where the chord hole meets the
+CM02 plunges a flat with the 1/16 end mill where the chord hole meets the
 sloping O.D., drills the #56 knockout through and the #53 to the stop;
 CM03 reams .0615 to the stop.
 
@@ -67,7 +67,7 @@ CENTRE_DRILL = {
 }
 # Jobber drills' point (the shop records give the diameter only).
 DRILL_POINT_DEG = 118.0
-# The 3/64 end mill's shank (catalogue miniature end mills: 1/8 in).
+# The 1/16 end mill's shank (Harvey Tool 34662: 1/8 in).
 ENDMILL_SHANK_MM = IN / 8
 # The flat's floor this far under the O.D. at the end mill's outer edge.
 FLAT_UNDER_MM = 0.2
@@ -595,7 +595,7 @@ def context(
     # cone below is the pin's firm seat. A corrective CM03 rerun (the stop
     # short by the reamer's bevel, at most .010) is deliberately allowed to
     # end-cut into that cone in free-machining C360, rather than drilling the
-    # #53 deeper and losing the seat; ops 320-330 take it in one rerun by the
+    # #53 deeper and losing the seat; ops 350-360 take it in one rerun by the
     # measured shortfall only.
     pilot_tip = stop - _point(d53)
     _agree(plan, "pilot_tip_mm", pilot_tip)

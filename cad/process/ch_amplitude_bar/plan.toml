@@ -41,10 +41,26 @@
 # .001 and hold no .0775 or .0779. A first-article hand try of the miked pin
 # backs it up.
 #
-# FLAGGED: the length (31.81-31.83) has no gauge on hand. Neither end of a
-# 31.8 in bar reaches the other within the mill's 23 in X travel, and the
-# calipers stop at 6 in. This traveler reads it with the 48 in steel rule on
-# record as to buy (tools.steel-rule-48), which must be graduated in 1/100 in.
+# Length: owner ruling 2026-11-23 (tool audit Q3), verbatim: "B. Buy only the
+# Insize rule; make the 20 bars equal by comparison (stop on the surface
+# plate, ends compared with calipers to .001); absolute length accepted to
+# +/-1/32. Does not prove the printed +/-.01." Neither end of a 31.8 in bar
+# reaches the other within the mill's 23 in X travel, and the calipers stop at
+# 6 in. The one long gauge is the 48 in steel rule to buy (tools.steel-rule-48,
+# the Insize 7110-1200: finest graduation 1/64 in, rated ±.031 over its
+# length). Setup 4 rules bar 1 once (L1, to 1/64) and compares every other
+# bar with it: the two side by side on the surface plate, foot ends against a
+# 1-2-3 block standing on the plate as the stop, the step between their top
+# ends read with the calipers' depth rod to .001 (e, + when the bar is the
+# longer). A bar's excess over the length to face is x = e + (L1 - 31.82);
+# Setup 5 sets each load's X0 on the top end standing farthest right, less
+# that bar's x, after checking the four foot ends flush to .001 with the
+# same depth rod. Every bar is then faced to bar 1's length less (L1 -
+# 31.82): equal to bar 1 within the method's own error, two .001 caliper
+# readings and the edge finder's pick-up, which Setup 6 accepts as .003
+# (compare_spread_max_mm) by comparing every finished bar with bar 1 again.
+# The absolute length is accepted only to ±1/32 (31.79-31.85, the rule,
+# Setup 5): the printed ±.01 (31.81-31.83) is NOT proven by this method.
 #
 # Workholding: the vise on a riser (owner ruling 2026-11-21, "riser": make a
 # plain riser block so 4 bars sit in the vise per load). The riser is not a
@@ -212,9 +228,10 @@ face_cutter_dia_mm = 12.7
 end_step_max_mm = 0.508
 foot_skim_mm = 0.508
 end_tip_below_mm = 0.1
-# The top end's most stock: the longest blank less the foot skim, past the
-# length (computed by cam.py from the export: 811.276 − 0.508 − 808.293).
-top_excess_max_mm = 2.475
+# The top end's most stock past X0: the longest blank less the foot skim,
+# past the length X0 is set to, the drawing band's middle 31.82 (Setup 5;
+# computed by cam.py: 811.276 − 0.508 − 808.228).
+top_excess_max_mm = 2.54
 # The slitting saw (McMaster 3062A21: 2-3/4 in, .064 in, 72 teeth): 100
 # rpm, the mill's slowest, is 72 ft/min at its rim; LittleMachineShop
 # "Cutting Speeds" (read 2026-11-20), Milling, Plain carbon steels
@@ -318,10 +335,31 @@ foot_clamp_end_mm = 177.7238
 top_extent_start_mm = -808.2932
 top_clamp_start_mm = -177.7238
 top_clamp_end_mm = -19.05
-# The bench length reading before Setup 5: at least the length's low limit,
-# at most the longest blank less the foot skim (cam.py checks them).
-measured_length_min_mm = 807.974
+# Bar 1's ruled length L1 (Setup 4): its own x (L1 - 31.82, e = 0) must lie
+# in every bar's x window, 0 to top_excess_max_mm, so L1 runs from the
+# drawing band's middle (31.82 in = 808.228 mm) to that plus top_excess_max_mm
+# (810.768 mm = 31.920 in, the longest blank less the skim; cam.py checks
+# them).
+measured_length_min_mm = 808.228
 measured_length_max_mm = 810.768
+# The absolute length accepted with the 1/64 in rule (owner ruling
+# 2026-11-23, tool audit Q3: "absolute length accepted to +/-1/32"): the
+# drawing band's middle, 31.82 in = 808.228 mm, ± 1/32 in = 0.79375 mm
+# (cam.py checks them against the drawing band).
+length_rule_min_mm = 807.43425
+length_rule_max_mm = 809.02175
+# The comparison's spread (Setup 6; delegated ruling 2026-11-23, no
+# precedent, #2144): every finished bar within .003 of bar 1
+# = 0.0762 mm. Why .003: bar 1's step e is read to .001 with the calipers
+# (their own ±.001), the finished bars are compared again to .001, and the
+# edge finder's X pick-up and the foot-end flush (below) add about .001; the
+# 20 bars are then alike to a sixth of the printed .02 band, though where
+# that band sits is known only to ±1/32.
+compare_spread_max_mm = 0.0762
+# The four foot ends of a load flush before CA03 to .001 (0.0254 mm), one
+# caliper depth-rod reading: CA03 faces the four to one X0, so a foot end
+# standing back makes that bar short by as much.
+foot_flush_max_mm = 0.0254
 # Machine-capacity inputs (mm): heights from the table, tool lengths from
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
@@ -374,7 +412,7 @@ name = "Evolution miter saw"
 ref = "saw-evolution-14"
 [[tools]]
 id = "rule"
-name = "48 in steel rule, 1/100 in, TO BUY"
+name = "48 in steel rule, 1/64 in (Insize 7110-1200), TO BUY"
 ref = "steel-rule-48"
 [[tools]]
 id = "arbor-press"
@@ -408,7 +446,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Saw {{process.quantity:d}} blanks {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long, two from each 72 in length, the bar flat in the saw's vise, each marked off with the 48 in rule. File the burrs off both ends."
 feed = "hand"
-inspection = "Each blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long: the 48 in rule (to buy; it must read 1/100 in). Shorter: scrap it (another length); longer: saw it again."
+inspection = "Each blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long: the 48 in rule (to buy; 1/64 in graduations). Shorter: scrap it (another length); longer: saw it again."
 gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.blank_length_min_mm}}", "{{process.blank_length_max_mm}}"] }]
 
 [[setups.operations]]
@@ -629,10 +667,10 @@ feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Measure each bar's length"
-machine = "Bench"
+title = "Compare each bar's length with bar 1"
+machine = "Bench / surface plate"
 indexing = "none"
-diagram = { file = "diagrams/measure.svg", alt = "A bar on the bench, the 48 in rule from its faced foot end to its sawn top end." }
+diagram = { file = "diagrams/measure.svg", alt = "Bar 1 and another bar side by side on the surface plate, their foot ends against a 1-2-3 block as the stop; at the top ends the calipers' beam end on the end that stands out, the depth rod run out to the other end." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -643,9 +681,27 @@ tool = "rule"
 drilling = "none"
 sizing = "other"
 feed = "hand"
-instruction = "Rule each bar from its faced foot end to its sawn top end, reading to .01 in with a 1-2-3 block square against the foot end. Write the reading on the bar near the top end, and sort the bars into 5 loads of four of near equal length."
-inspection = "Accept {{process.measured_length_min_mm:in.2f}}–{{process.measured_length_max_mm:in.2f}} (the longest blank less the {{process.foot_skim_mm:in.2dot}} skim is the most CA03 is written to face off). Over {{process.measured_length_max_mm:in.2f}}: saw or file the top end back and rule it again. Under {{process.measured_length_min_mm:in.2f}}: scrap it."
+instruction = "Rule bar 1 from its faced foot end to its sawn top end, a 1-2-3 block square against the foot end, to the nearest 1/64 in. Write it on this sheet as a decimal to .001 (for example 31 57/64 = 31.891): L1. Bar 1 is the length every other bar is compared with."
+inspection = "L1 {{process.measured_length_min_mm:in.3f}}–{{process.measured_length_max_mm:in.3f}}: bar 1's own x (L1 − {{cad.top_end_length_in:.2f}}) then lies in Op 380's 0 to {{process.top_excess_max_mm:in.3dot}}, the most CA03 is written to face off. Over: saw or file its top end back and rule it again. Under: it cannot reach the length; scrap it and the next bar becomes bar 1."
 gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.measured_length_min_mm}}", "{{process.measured_length_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "The stop: stand a 1-2-3 block on the surface plate near its left edge, its 2 × 3 in face toward the right, and a V-block against its left side to back it. Push bars against it gently: the stop must not move between two readings."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Each other bar in turn: lay it and bar 1 side by side on the plate, touching, L faces down, and push both foot ends against the stop. Where the bars run past the plate, rest both top ends together on one support level with the plate."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "At the top ends: rest the end of the calipers' beam on the end that stands out, the beam along the bars, and run the depth rod out until it touches the other bar's end; read the step to .001. Write e on the bar, signed: + when this bar's top end stands out past bar 1's, − when bar 1's stands out (a .012 step with bar 1 the longer: e = −.012). Bar 1's e is 0."
+instruction_detailed = "Calipers zeroed closed. Press both foot ends to the stop, rest the end of the beam on the top end that stands out and run the depth rod to the other top end: the step, to .001; read it twice (differ by over .001: push both to the stop again). Write e on the bar, signed: + when this bar stands out past bar 1, − when bar 1 does (a .012 step, bar 1 longer: e = −.012). Bar 1's e is 0."
+inspection = "Each bar's x = e + (L1 − {{cad.top_end_length_in:.2f}}) from 0 to {{process.top_excess_max_mm:in.3dot}}: it reaches the length, and CA03 faces no more off. Over: saw or file its top end back and compare it again. Under 0: the bar is short; scrap it."
+gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.top_excess_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "Write each bar's x near its top end and sort the bars into 5 loads of four of near equal x."
+feed = "hand"
 
 [[setups.operations]]
 instruction = "Mic one MHA-SH-VN-58 pin from the lot the bars will be assembled with (sheet note 1 fits the hole to it)."
@@ -658,7 +714,7 @@ title = "Top ends to length, top notches, pin holes"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The riser as left in Setup 3 (two blocks end to end on the vise bed against the fixed jaw, neither past a jaw side, unclamped; brushed clean). The four bars of one load (paired by length in Setup 4, any blank numbers) side by side across the jaws on the riser in positions P1 (against the fixed jaw) to P4 (against the moving jaw), each on its R face, its B face toward the fixed jaw, top ends to the RIGHT: each bar as in Setup 3, rolled over about its length (L face up) and slid left along the jaws. At the far (foot) ends, beyond the table, hold the 1-2-3 block's 2 in face across the four foot ends and its 1 in face along the P4 bar, and push the ends flush against it; slide the four together until the top ends stand {{process.end_protrusion_mm:in.2dot}} past the right jaw side. Tap each down onto the riser while closing the vise."
+holding = "The riser as left in Setup 3 (two blocks end to end on the vise bed against the fixed jaw, neither past a jaw side, unclamped; brushed clean). The four bars of one load (sorted by x in Setup 4, any blank numbers) side by side across the jaws on the riser in positions P1 (against the fixed jaw) to P4 (against the moving jaw), each on its R face, its B face toward the fixed jaw, top ends to the RIGHT: each bar as in Setup 3, rolled over about its length (L face up) and slid left along the jaws. At the far (foot) ends, beyond the table, hold the 1-2-3 block's 2 in face across the four foot ends and its 1 in face along the P4 bar, and push the ends flush against it; slide the four together until the top ends stand {{process.end_protrusion_mm:in.2dot}} past the right jaw side. Tap each down onto the riser while closing the vise."
 datum = "Programs CA03_top_end (end mill), CA04_top_notch (saw), CA05_pin_hole (centre drill, drill, reamer). G54: X0 the top end at the length, Y0 the fixed jaw's face, Z0 the bars' down face (R, on the riser). +X toward the top ends, +Y toward the fixed jaw."
 diagram = { file = "diagrams/top.svg", alt = "Four bars side by side across the jaws on the riser's two blocks, top ends past the right jaw side; the end mill faces them to length, the slitting saw cuts the top notch across all four, and the pin hole is drilled down through both cheeks of each bar." }
 envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.top_notch_depth_mm}}", 5.0], y_span_mm = ["{{process.saw_dia_mm}}", "{{process.load_width_mm}}", 4.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_max_mm}}", "{{cad.envelope_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_min_mm}}", "{{process.drill_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
@@ -675,8 +731,13 @@ inspection = "Every d within ±{{process.seat_offset_max_mm:in.4dot}}: that bar'
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 Y0 the fixed jaw's face; X0 the top end at the length: edge finder (900 rpm) on the longest bar's top end, less that bar's excess over {{cad.top_end_length_in:.2f}} (its written length − {{cad.top_end_length_in:.2f}})."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm). Y: its tip .10 below the jaw top (well above the bars), on the fixed jaw's face from the bars' side (−Y), G10 L20 P1 Y-2.540. X: its tip .10 below the bars' top, on the top end that stands farthest right, from the right: G10 L20 P1 X(2.540 + (that bar's written length − {{cad.top_end_length_in:.2f}}) × 25.4); for 31.88, X4.064. The four foot ends are flush, so all four bars face to the same length."
+instruction = "Every load, before the X pick-up: at the far (foot) ends, rest the end of the calipers' beam on the foot end that stands out farthest, the beam along the bars, and run the depth rod to each other foot end; read each step to .001."
+inspection = "Every step {{process.foot_flush_max_mm:in.3dot}} or less: the four face to one length. Over: open the vise, push the foot ends flush against the 1-2-3 block, close it tapping each bar down, and repeat the seat sweep and this check."
+gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.foot_flush_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "Home the mill first ($H). G54 Y0 the fixed jaw's face; X0 the top end at the length: edge finder (900 rpm) on the top end that stands farthest right, less that bar's x (Setup 4). It is the bar of the four with the largest x: if not, stop and recheck the x written on them."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm). Y: its tip .10 below the jaw top (well above the bars), on the fixed jaw's face from the bars' side (−Y), G10 L20 P1 Y-2.540. X: its tip .10 below the bars' top, on the top end that stands farthest right (the bar with the largest x of the four; if not, stop and recheck the x written on them), from the right: G10 L20 P1 X(2.540 + that bar's x × 25.4); for x = .060, X4.064."
 feed = "hand"
 
 [[setups.operations]]
@@ -700,25 +761,15 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Still clamped: CA03 has ended with the spindle stopped (M5) and T1 parked up, right of the ends; confirm it has stopped. Check the length in place: the 48 in rule from the flush foot ends to each top end."
-inspection = "Each bar {{cad.top_end_length_min_in:.2f}}–{{cad.top_end_length_max_in:.2f}} long is accepted. Under: that bar is scrap. Over: two more than .01 apart (a foot end was not flush, as they share one X0): do the re-flush op next; the four within .01: do the X0 shift op after it."
-gauge_checks = [{ gauge = "steel-rule-48", band_mm = "{{cad.top_end_length_band_mm}}" }]
+instruction = "Still clamped: CA03 has ended with the spindle stopped (M5) and T1 parked up, right of the ends; confirm it has stopped. Rule each bar in place from its foot end (the 1-2-3 block square across the four) to its top end, to the nearest 1/64 in."
+inspection = "Each bar {{process.length_rule_min_mm:in.3f}}–{{process.length_rule_max_mm:in.3f}} ({{cad.top_end_length_in:.2f}} ± 1/32) is accepted: the length is accepted to ±1/32 only. This does NOT prove the printed ±.01 ({{cad.top_end_length_min_in:.2f}}–{{cad.top_end_length_max_in:.2f}}): the rule cannot read it (owner ruling 2026-11-23, tool audit Q3: \"absolute length accepted to +/-1/32. Does not prove the printed +/-.01.\"). Over: the next op. Under: stop and tell the owner."
+gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.length_rule_min_mm}}", "{{process.length_rule_max_mm}}"] }]
 
 [[setups.operations]]
-instruction = "Only if a bar read over and two differed by more than .01 (otherwise skip): unclamp, re-flush the four foot ends against the 1-2-3 block and re-clamp, tapping each bar down onto the riser; repeat this setup's seat sweep (DTI, every d within ±{{process.seat_offset_max_mm:in.4dot}})."
+instruction = "Only if the four read over {{process.length_rule_max_mm:in.3f}} (otherwise skip): the X0 was set from a wrong x. Check the x written on the bar it was picked on against its e and L1. Send $#, note the G54 line's X; G10 L2 P1 X(that X − (the right x − the x entered) × 25.4); run CA03_top_end again."
 feed = "hand"
-
-[[setups.operations]]
-instruction = "After a re-flush only (otherwise skip): redo this setup's X pick-up (edge finder on the top end that stands farthest right, its new reading as its written length) and its Z0 op (console M6 T1, at least 2.00 out; the touch-off on the P1 bar), then run CA03_top_end again."
-feed = "hand"
-inspection = "Rule all four: each {{cad.top_end_length_min_in:.2f}}–{{cad.top_end_length_max_in:.2f}} is accepted. Under: that bar is scrap. Over, the four within .01: do the next op. Over, two still more than .01 apart: stop and tell the owner."
-gauge_checks = [{ gauge = "steel-rule-48", band_mm = "{{cad.top_end_length_band_mm}}" }]
-
-[[setups.operations]]
-instruction = "Only if a bar still reads over {{cad.top_end_length_max_in:.2f}} with the four within .01 of each other (otherwise skip): take the shortest reading; send $#, note the G54 line's X, G10 L2 P1 X(that X − (that shortest reading − {{cad.top_end_length_in:.2f}}) × 25.4); run CA03_top_end again."
-feed = "hand"
-inspection = "Rule the four again: each {{cad.top_end_length_min_in:.2f}}–{{cad.top_end_length_max_in:.2f}}. Still over: stop and tell the owner. Under: that bar is scrap."
-gauge_checks = [{ gauge = "steel-rule-48", band_mm = "{{cad.top_end_length_band_mm}}" }]
+inspection = "Rule the four again: each {{process.length_rule_min_mm:in.3f}}–{{process.length_rule_max_mm:in.3f}} is accepted (±1/32 only, as above). Still over, or no wrong x found: stop and tell the owner."
+gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.length_rule_min_mm}}", "{{process.length_rule_max_mm}}"] }]
 
 [[setups.operations]]
 instruction = "Spindle stopped (M5), the head where CA03_top_end parked it: do not jog X or Y. Take out the collet and end mill; mount the arbor and slitting saw as in Setup 3, at least {{process.saw_spacer_below_min_mm:in.2dot}} in of spacers under the saw, then the nut; drawbar tight, teeth cutting with M3. Do not move the bars."
@@ -837,7 +888,7 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "Back to the collet (edge finder, then T1), clamp the next four on the riser and repeat this setup from the seat sweep, skipping the first-load-only ops (that load's own longest bar and its written length): 5 loads."
+instruction = "Back to the collet (edge finder, then T1), clamp the next four on the riser and repeat this setup from the seat sweep, skipping the first-load-only ops (the X pick-up uses that load's own largest-x bar and its x): 5 loads."
 feed = "hand"
 
 [[setups]]
@@ -861,6 +912,12 @@ tool = "files"
 drilling = "none"
 sizing = "other"
 instruction = "Deburr the notch edges, the pin holes' mouths and the ends: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, smooth file and a scraper; no burr may stand inside a notch or a hole. Wash off the oil."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The bars equal: on the surface plate against the Setup 4 stop, compare every finished bar with bar 1 as Setup 4 does (side by side, foot ends to the stop, the calipers' depth rod across the top ends' step, to .001)."
+inspection = "Every step {{process.compare_spread_max_mm:in.3dot}} or less: the 20 bars are equal by comparison (the method's own error; it says nothing about the printed ±.01). Over: set that bar aside and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.compare_spread_max_mm}}"] }]
 feed = "hand"
 
 [[setups.operations]]

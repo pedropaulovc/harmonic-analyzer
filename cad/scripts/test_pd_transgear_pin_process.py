@@ -44,7 +44,7 @@ def shop() -> dict:
 
 
 def _cap(radius_in: float, dia_in: float) -> float:
-    """A form tool's dome height cut full on a diameter."""
+    """A dome's height at its radius, ending full on a diameter."""
     return radius_in - math.sqrt(radius_in**2 - (dia_in / 2) ** 2)
 
 
@@ -84,12 +84,12 @@ def test_the_head_window_holds_the_head_land_for_any_head_dia(
     parameters: dict, features: dict
 ) -> None:
     head = [d / IN for d in features["step_head"]["dia"]]
-    assert [
-        parameters["dome_datum_form_dia_min_in"],
-        parameters["dome_datum_form_dia_max_in"],
-    ] == pytest.approx(head)
-    radius = parameters["dome_datum_form_radius_in"]
-    caps = [_cap(radius, d) for d in head]
+    # Filed between the radius gauges' two leaves: any radius they pass on any
+    # head Ø in its band.
+    leaves = [
+        parameters[f"dome_datum_leaf_radius_{side}_in"] for side in ("min", "max")
+    ]
+    caps = [_cap(radius, d) for radius in leaves for d in head]
     land = [s / IN for s in features["shoulder"]["station"]]
     # Faced to the window, then domed: the head land lies in its band for a
     # head anywhere in its Ø band.
@@ -146,7 +146,7 @@ def test_each_regrip_stands_within_the_shops_stickout(
 ) -> None:
     ratio = shop["limits"]["stickout_ld_max"]
     head_dia = features["step_head"]["dia"][1] / IN
-    radius = parameters["dome_datum_form_radius_in"]
+    radius = parameters["dome_datum_leaf_radius_min_in"]
     land = features["step_land"]
     land_length = [s / IN for s in land["length"]]
     # Head out: the jaw fronts on the press land, past the faced head.

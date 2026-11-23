@@ -114,6 +114,19 @@ resolution_mm = 0.001016
 range_mm = [10.16254, 10.17016]
 resolution_mm = 0.00254
 
+# The MHA-CH-13 hub hole read with two Class X steps, .4002 and .4004, between
+# the hub pair above (owner ruling 2026-11-23, tool audit Q2, verbatim: "B.
+# Four reading pins (.4000, .4002, .4004, .4005)."). It replaces the four
+# .4001-.4004 steps above, whose record the tool-records cleanup PR removes
+# once every family has landed. Range:
+# the two pins, .4002-.4004 in = 10.16508-10.17016 mm; resolution: the
+# reading's step, .0002 in = 0.00508 mm (the last step, .4004 to the pair's
+# .4005, is .0001). Not owned: to buy. Its inventory record
+# (cad/config/shop-equipment/, same key) is ShopSourcing's to add.
+[gauges.plug-gauges-4002-4004]
+range_mm = [10.16508, 10.17016]
+resolution_mm = 0.00508
+
 # Class ZZ go/no-go pins for the reamed bands (owner ruling 2026-11-23, tool
 # audit Q1, verbatim: "ZZ singles per the record: 29 pins (17 plus GO, 12
 # minus NO-GO), about $130. Accept that good holes near a limit may be
@@ -226,13 +239,17 @@ range_mm = [1.27, 101.6]
 resolution_mm = 0.00254
 
 # The 48 in steel rule (cad/config/shop-equipment/ tools.steel-rule-48),
-# to buy: the only length gauge on record past the 6 in calipers. A plan
-# that reads it needs its 1/100 in graduation (MHA-CH-01's 31.82 ± .01
-# length), a requirement of the purchase: 48 in = 1219.2 mm, .01 in =
-# .254 mm.
+# to buy: the only length gauge on record past the 6 in calipers. The rule
+# bought is the Insize 7110-1200 (owner ruling 2026-11-23, tool audit Q3:
+# "B. Buy only the Insize rule; ..."): its finest graduation is 1/64 in
+# (also 1/32, 1/16, 0.5 mm and 1 mm), it does not read 1/100 in, and Insize
+# rates it ±0.80 mm (±.031 in) over its length (insize.com/rulers/7110.html,
+# read 2026-11-22). 48 in = 1219.2 mm; resolution 1/64 in = 0.396875 mm.
+# It cannot prove a ±.01 band: MHA-CH-01 accepts its length with it to
+# ±1/32 only and makes the 20 bars equal by comparison with the calipers.
 [gauges.steel-rule-48]
 range_mm = [0.0, 1219.2]
-resolution_mm = 0.254
+resolution_mm = 0.396875
 
 [limits]
 # HA: shop-policy numbers.stickout_ld_max 3.0.
@@ -716,9 +733,12 @@ description = "Aluminium oxide two-grit sharpening stone, 6 x 2 x 1 in, 100 and 
 [tools.pliers]  # F-pliers
 description = "Pliers"
 [tools.steel-rule-48]  # F-steel-rule-48
-description = "Steel rule, 48 in"
-[tools.transfer-punches]  # F-transfer-punches-fractional, F-transfer-punches-number
-description = "Transfer punch sets, fractional 3/32-1/2 by 64ths and number sizes #1-#60"
+description = "Steel rule, 48 in, finest graduation 1/64 in (Insize 7110-1200)"
+# Tool audit 2026-11-23 (row transfer-punches): the fractional set only; a
+# number-size hole is spotted through with the same-number drill from the
+# 115-piece index (no plan names a number-size punch).
+[tools.transfer-punches]  # F-transfer-punches-fractional
+description = "Transfer punch set, fractional 3/32-1/2 by 64ths"
 [tools.v-blocks]  # F-v-blocks
 description = "Matched V-block pair with clamps"
 
@@ -736,8 +756,29 @@ description = "Carbide 60° centre drills, trade sizes 1, 3 and 6"
 description = "Carbide 1/4 in 90° chamfering end mill, 2-flute (McMaster 3073A46)"
 diameter_mm = 6.35
 flute_length_mm = 3.175
-[tools.deburring-set]  # inventory tools.deburring-set (McMaster 4289A78); MHA-MS-03 and MHA-PD-27 edges and hole mouths
-description = "7-piece deburring scraper and countersink set (McMaster 4289A78)"
+# Harvey Tool 34662, here since two families plunge with it (tool audit
+# 2026-11-23, row endmill-carbide-3-64): MHA-MS-02's rebate relief and
+# MHA-PD-17's pin-hole flat. MHA-MS-02: the rebate's corner relief (.05
+# deep × .06 high, beside the roof, at the
+# bottom of the .134 rebate): no owned cutter is under .07 wide and reaches
+# .38 down inside the rebate. It is plunge-milled (owner ruling 2026-11-21,
+# relayed by CncBlockA) with Harvey Tool 34662, Miniature End Mill, Square,
+# Long Reach, Stub Flute: 3 flutes, centre cutting, .0620 cutter × .0930
+# length of cut × .5000 reach (8×), 1/8 shank, 2-1/2 overall, uncoated,
+# "optimized for plunging", $60.30 (harveytool.com/products/tool-details-
+# 34662, read 2026-11-21). Not owned: to buy. diameter_mm and
+# flute_length_mm: its .0620 and .0930 × 25.4.
+[tools.endmill-carbide-3fl-1-16-reach-1-2]
+description = "1/16 in (.0620) 3-flute carbide square end mill, stub flute .093 length of cut, .500 reach, 1/8 shank (Harvey Tool 34662)"
+diameter_mm = 1.5748
+flute_length_mm = 2.3622
+# The set McMaster-Carr sells as 4289A78 is Noga's SP1007 (owner 2026-11-23,
+# tool audit Q12: "the mcmaster kit sold is actually noga sp1007"; "check Noga
+# SP1007"). Noga_Deburring-2017.pdf (noga.com) p.53 lists the RD16.5
+# RotoDrive countersink in SP1007; p.27's blade table, row RD16.5 / BC1651:
+# range 1-16.5 mm, angle 90°. MHA-PD-19 chamfers K's mouth with it.
+[tools.deburring-set]  # inventory tools.deburring-set (McMaster 4289A78 = Noga SP1007); MHA-MS-03 and MHA-PD-27 edges and hole mouths; MHA-PD-19 K chamfer (RD16.5)
+description = "7-piece deburring scraper and countersink set, Noga SP1007 (McMaster 4289A78), with the RD16.5 RotoDrive 90° countersink, 1-16.5 mm"
 [tools.die-stock-13-16]  # inventory holders.die-stock-13-16
 description = "Die stock for 13/16 in round dies (Drillco 3000DS1)"
 [tools.dies-zoro-wb7365521946]  # inventory tools.dies-zoro-wb7365521946

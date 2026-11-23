@@ -52,6 +52,13 @@ import _config
 from _fit_ream_h7 import REAM_H7
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _milled_corner_limit import (
+    CORNER_PLACES,
+    CORNER_R,
+    CORNER_REASON,
+    corner_prefix,
+    corner_r_limits,
+)
 from _package_units import drawing_unit
 from _printed_tolerance import (
     angular_band_deg,
@@ -70,8 +77,10 @@ import sh_vn_arbor_set_screw_spec as rod_set_screw
 # width (it sets the marker axis, pn_pen_carriage_geom.MARKER_POS).  Every
 # printed check below judges the PRINTED limits (printed_deviations).
 UNIT = drawing_unit("parts/pn-pen-v-block", _config.parts("pn-pen-v-block"))
-# Every internal corner the sheet leaves undimensioned: the title block's
-# INSIDE CORNERS R.040 MAX governs it, and every check below judges that limit.
+# Every internal corner the sheet leaves undimensioned (the V's apex rounds):
+# the title block's INSIDE CORNERS R.040 MAX governs it, and every check
+# below judges that limit.  The relief slot's two corners at the step print
+# their own R.065 (RELIEF_CORNER_R below).
 INSIDE_CORNER_R_MAX = inside_corner_radius_mm(unit=UNIT)
 
 # X, along the marker: the CG solve (pn_pen_carriage_geom) puts the carriage's
@@ -158,12 +167,14 @@ RELIEF_Z1 = round(NECK_DEPTH - RELIEF_Z0, 6)  # far (back) wall; prints .74
 RELIEF_WIDTH = round(RELIEF_Z1 - RELIEF_Z0, 6)
 RELIEF_HEIGHT = 6.604  # .26
 # The slot's two internal corners at the step (x = RELIEF_X0) keep the end
-# mill's radius, an .080 cutter .26 deep, at the title block's INSIDE CORNERS
-# R.040 MAX (no callout: the title block governs).  Modelled as plan arcs in
-# the slot profile, not a fillet feature.
-RELIEF_CORNER_R = 1.016  # .040
-if RELIEF_CORNER_R > INSIDE_CORNER_R_MAX:
-    raise AssertionError("the modelled relief corner exceeds the title block's corner")
+# mill's radius.  Nothing seats in them.  Owner ruling 2026-11-23, tool audit
+# Q9: "Print a local corner limit R.065 (.060-.070), cut with the 1/8 end
+# mill; no 5/64 cutter" (_milled_corner_limit): the sheet prints 2X R.065 at
+# the title block's .XXX, naming why it stands over INSIDE CORNERS R.040 MAX,
+# and every check below judges the band's greatest, R.070.  Modelled as plan
+# arcs in the slot profile, not a fillet feature.
+RELIEF_CORNER_R = CORNER_R  # .065
+RELIEF_CORNER_R_MIN, RELIEF_CORNER_R_MAX = corner_r_limits(unit=UNIT)
 # The V is cut on one corner radius past the step, to where the corner arcs
 # end.  Past the step its whole section lies inside the slot's (guard below),
 # so the extra run removes no brass; the step face never ends in a sliver
@@ -190,6 +201,28 @@ PIVOT_BORE_TOP_CHAMFER = 0.3048  # .012
 PIVOT_CHAMFER_BAND = (0.1016, 0.0)  # +.004
 PIVOT_CHAMFER_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints ".012 MIN"
 PIVOT_CHAMFER_PLACES = 3
+
+# --- Neck top-edge breaks (owner seat ruling 2026-11-23, withdrawing the
+# stirrup's PN-01 B1 window change): "break the v-block neck's two top
+# edges .080 x 45° (.075 to .085, cut with the 1/4 in 90° chamfer mill that
+# part already uses)".  The stirrup's window corners print R.065 (.060-.070,
+# tool audit Q9); on a square edge one rides it and lifts the stirrup a full
+# radius.  A 45° break whose shortest leg is at least the corners' greatest
+# radius leaves them nothing to ride (pn_pen_carriage_geom.
+# window_corner_ride_max).  The chamfer mill's point runs along each neck
+# face from beyond the paper end to NECK_BREAK_FULL_X, past the stirrup's
+# far face at its printed maximum (.32), and is fed up there: the cone's part
+# past the stop is the break's run-out, in the neck and, past the step, in
+# the body.  It stops .02 short of the step: there the cone's circle on the
+# top face (radius the leg, .080, the body's side step) would graze the
+# body's side face.
+NECK_EDGE_BREAK = 2.032  # .080
+NECK_EDGE_BREAK_PLACES = 3
+NECK_EDGE_BREAK_MIN, NECK_EDGE_BREAK_MAX = (
+    NECK_EDGE_BREAK + d
+    for d in printed_deviations(NECK_EDGE_BREAK, NECK_EDGE_BREAK_PLACES, unit=UNIT)
+)
+NECK_BREAK_FULL_X = 8.382  # .33
 
 # --- Rod set screw: #4-40 tapped from the body's front face into the pivot bore ---
 SET_SCREW_TAP_SPEC = HoleSpec("tapped", rod_set_screw.THREAD, end="through_next")
@@ -265,13 +298,21 @@ if BLOCK_HEIGHT - SET_SCREW_Y - TAP_DRILL_MM[rod_set_screw.THREAD] / 2.0 < _WALL
 # places it 2.5 past); it is widest in the slot at the bottom face (its axis
 # is below the block), so the corner must stand clear of it there wherever it
 # ends.  The body (wider) must start past x = RELIEF_X0 + RELIEF_CORNER_R; the
-# carriage layout owns where it starts.
+# carriage layout owns where it starts.  Both judge the printed R.070.
 _GRIP_R = marker.BARREL_DIA / 2.0
 _GRIP_GAP_AT_BOTTOM = DEPTH_MID_Z - math.sqrt(_GRIP_R**2 - MARKER_AXIS_Y**2) - RELIEF_Z0
-if _GRIP_GAP_AT_BOTTOM - INSIDE_CORNER_R_MAX < 0.25:
+RELIEF_CORNER_GRIP_MARGIN_MIN = _GRIP_GAP_AT_BOTTOM - RELIEF_CORNER_R_MAX
+if RELIEF_CORNER_GRIP_MARGIN_MIN < 0.25:
     raise AssertionError("relief corner radius reaches the marker grip")
-if RELIEF_Z0 + INSIDE_CORNER_R_MAX >= DEPTH_MID_Z - PIVOT_BORE_DIA / 2.0 - _WALL:
+if RELIEF_Z0 + RELIEF_CORNER_R_MAX >= DEPTH_MID_Z - PIVOT_BORE_DIA / 2.0 - _WALL:
     raise AssertionError("relief corner radius crowds the pivot bore")
+# Past the step the V's mouth stands clear of both corner arcs at their
+# printed greatest, so the V's run past the step stays inside the slot.
+if not (
+    RELIEF_Z0 + RELIEF_CORNER_R_MAX < V_MOUTH_Z0
+    and V_MOUTH_Z1 < RELIEF_Z1 - RELIEF_CORNER_R_MAX
+):
+    raise AssertionError("a relief corner arc reaches the V's mouth")
 # The rod's shoulder fillet (R MAX) is a quarter round on the pivot; with the
 # pivot against the bore wall its arc stands at most R * (2 - sqrt 2) proud of
 # a 45 deg chamfer's leg at the bore edge, so the chamfer's MIN leg must reach
@@ -344,12 +385,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "VMouthZ0",
         "VMouthZ1",
     },
-    "ReliefProfile": {"ReliefX0"},
+    "ReliefProfile": {"ReliefX0", "ReliefCornerR"},
     "ReliefReference": {"ReliefZ0", "ReliefZ1", "ReliefHeight"},
     "PivotBoreProfile": {"PivotX", "PivotDia"},
     "PivotReference": {"PivotZ", "PivotChamferSize"},
     "SetScrewHole": {"SetScrewX", "SetScrewY"},
     "TapWallReference": {"TapWallMin"},
+    "NeckBreakProfile": {"NeckBreak"},
 }
 SECTION_REFERENCE_SKETCHES = ("ReliefReference", "PivotReference")
 # TapWallReference (Front plane) prints in the front view only.
@@ -364,8 +406,9 @@ TAP_WALL_MIN_PLACES = 3
 # the title block's +/-1); the flat's height the flanks leave is a reference,
 # driven in the sketch, at the mouth stations' and flat's two places, so it
 # reads what they close to.  The bore chamfer prints its single limit at three
-# places, the reamed bore its +.0005 band at four; the inside corners print
-# nothing (the title block's R.040 MAX).
+# places, the reamed bore its +.0005 band at four; the relief's step corners
+# their R.065 at three (.060-.070), the neck's edge breaks their .080 at three
+# (.075-.085); the V's apex rounds print nothing (the title block's R.040 MAX).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutlineProfile": {"Length": 2, "NeckZ0": 2, "NeckZ1": 2, "Depth": 2},
     "Block": {"Height": 2},
@@ -376,12 +419,13 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "VMouthZ0": 2,
         "VMouthZ1": 2,
     },
-    "ReliefProfile": {"ReliefX0": 2},
+    "ReliefProfile": {"ReliefX0": 2, "ReliefCornerR": CORNER_PLACES},
     "ReliefReference": {"ReliefZ0": 2, "ReliefZ1": 2, "ReliefHeight": 2},
     "PivotBoreProfile": {"PivotX": 2, "PivotDia": 4},
     "PivotReference": {"PivotZ": 2, "PivotChamferSize": PIVOT_CHAMFER_PLACES},
     "SetScrewHole": {"SetScrewX": 2, "SetScrewY": 2},
     "TapWallReference": {"TapWallMin": TAP_WALL_MIN_PLACES},
+    "NeckBreakProfile": {"NeckBreak": NECK_EDGE_BREAK_PLACES},
 }
 # The one driven sketch dimension the print shows, parenthesised as a
 # reference (no tolerance): the apex flat's height, which the flanks' angles,
@@ -512,6 +556,84 @@ TAP_WALL_MIN_BAND = (round(_TAP_STEP_WALL_PRINTED_MAX - TAP_WALL_MIN_MM, 6), 0.0
 TAP_WALL_START_X = PIVOT_BORE_X - _TAP_THREAD_R
 if TAP_WALL_START_X - TAP_WALL_MIN_MM <= RELIEF_X0:
     raise AssertionError("the tap wall reference runs past the step")
+
+
+def _break_runout(leg: float, stop_x: float, step_x: float) -> tuple[float, float]:
+    """``(volume mm^3, x centroid)`` of the brass one neck-edge break's
+    run-out takes: the chamfer mill's 90° cone, its point ``leg`` under the
+    top on the neck face, fed up at ``stop_x``, past the full break.  At a
+    height h over the point the cone is a disc of radius h about the neck
+    face's line: its quarter on the neck's side past the stop, and past the
+    step (``step_x``) also its half on the body's side.  Simpson's rule
+    over h."""
+    gap = step_x - stop_x
+
+    def slice_(h: float) -> tuple[float, float]:
+        area, moment = math.pi * h * h / 4.0, h**3 / 3.0
+        if h > gap:
+            root = math.sqrt(h * h - gap * gap)
+            area += (h * h * math.acos(gap / h) - gap * root) / 2.0
+            moment += root**3 / 3.0
+        return area, moment
+
+    n = 2000
+    step = leg / n
+    volume = moment = 0.0
+    for i in range(n + 1):
+        weight = 1 if i in (0, n) else (4 if i % 2 else 2)
+        area, first = slice_(i * step)
+        volume += weight * area
+        moment += weight * first
+    volume *= step / 3.0
+    moment *= step / 3.0
+    return volume, stop_x + moment / volume
+
+
+# Per edge: the full break's triangle on the neck from the paper end to the
+# stop, then its run-out.
+NECK_BREAK_VOLUME = NECK_EDGE_BREAK**2 / 2.0 * NECK_BREAK_FULL_X
+NECK_BREAK_RUNOUT_VOLUME, NECK_BREAK_RUNOUT_X = _break_runout(
+    NECK_EDGE_BREAK, NECK_BREAK_FULL_X, RELIEF_X0
+)
+# The stop stands short of the step at its printed nearest, and the cone's
+# circle on the top face then stays inside the body's side faces.
+if NECK_BREAK_FULL_X >= RELIEF_X0 + _dev("ReliefX0")[0]:
+    raise AssertionError("the neck break's stop reaches the step")
+if (
+    math.sqrt(NECK_EDGE_BREAK**2 - (RELIEF_X0 - NECK_BREAK_FULL_X) ** 2)
+    >= BODY_SIDE_STEP
+):
+    raise AssertionError("the neck break's run-out breaks the body's side face")
+# The run-out's circle on the top face, at the greatest leg, keeps the
+# target wall to the pivot bore's chamfer and to a circle round the rod
+# shoulder's square, which seats on the top over the bore (each at the
+# bore's nearest printed station), and stands short of the set-screw
+# thread along X.
+_RUNOUT_TO_BORE = math.hypot(
+    PIVOT_BORE_X + _dev("PivotX")[0] - NECK_BREAK_FULL_X, DEPTH_MID_Z
+)
+NECK_BREAK_BORE_CHAMFER_WALL_MIN = (
+    _RUNOUT_TO_BORE
+    - NECK_EDGE_BREAK_MAX
+    - (PIVOT_BORE_DIA + PIVOT_BORE_BAND[0]) / 2.0
+    - (PIVOT_BORE_TOP_CHAMFER + PIVOT_CHAMFER_BAND[0])
+)
+NECK_BREAK_ROD_SHOULDER_GAP_MIN = (
+    _RUNOUT_TO_BORE - NECK_EDGE_BREAK_MAX - rod.ROD_SECTION / math.sqrt(2.0)
+)
+NECK_BREAK_TAP_GAP_MIN = (PIVOT_BORE_X + _dev("SetScrewX")[0] - _TAP_THREAD_R) - (
+    NECK_BREAK_FULL_X + NECK_EDGE_BREAK_MAX
+)
+if min(NECK_BREAK_BORE_CHAMFER_WALL_MIN, NECK_BREAK_ROD_SHOULDER_GAP_MIN) < (
+    WALL_TARGET_MM
+):
+    raise AssertionError("the neck break's run-out crowds the pivot bore or the rod")
+if NECK_BREAK_TAP_GAP_MIN <= 0.0:
+    raise AssertionError("the neck break's run-out reaches the set-screw thread")
+# The top flat the stirrup's top rail rests on, between the two breaks.
+NECK_TOP_FLAT_PRINTED_MIN = (
+    NECK_DEPTH + _dev("NeckZ1")[0] - _dev("NeckZ0")[1] - (2.0 * NECK_EDGE_BREAK_MAX)
+)
 
 
 class SeatedV(NamedTuple):
@@ -676,10 +798,13 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 # Its callout stands in the bottom view's corner, between the neck's
 # depth dimensions and the title block (draw_pn_pen_v_block's BOTTOM_KEEP).
 PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
+PEN_FRAME_NUMBER = _config.parts("pn-pen-frame")["number"]
 DIMENSION_CALLOUTS: dict[str, str] = {
     "PivotDia": f"REAM THRU\nSLIDING FIT ON\n{PEN_ROD_NUMBER} PIVOT",
     "PivotChamferSize": "X 45°",
     "TapWallMin": "TAP WALL",
+    "ReliefCornerR": CORNER_REASON,
+    "NeckBreak": "X 45°",
 }
 # One row: SolidWorks stores a line break in the above compartment but prints
 # nothing of it, while the dimension line still runs under the unprinted text
@@ -687,6 +812,8 @@ DIMENSION_CALLOUTS: dict[str, str] = {
 # right border; draw_pd_transgear_pin ``_printable_above_callouts``).
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
     "PivotChamferSize": f"CLEARS ROD {PEN_ROD_NUMBER} FILLET",
+    # The breaks clear the stirrup's R.065 window corners.
+    "NeckBreak": f"CLEARS {PEN_FRAME_NUMBER}",
 }
 if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
     raise AssertionError("an above-callout line break would not print")
@@ -694,6 +821,10 @@ if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
 # the pair.
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("VGrooveProfile", "VFlankAngle"): "2X ",
+    # One step corner stands for both.
+    ("ReliefProfile", "ReliefCornerR"): corner_prefix(2),
+    # One neck edge break stands for both.
+    ("NeckBreakProfile", "NeckBreak"): "2X ",
 }
 
 # Material and finish ride the title block; nothing else needs saying.

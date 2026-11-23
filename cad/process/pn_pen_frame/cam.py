@@ -25,8 +25,9 @@ edge on the same pair: PF03 skims the left face, PF04 (turned over) faces
 the right face to the width. Lying on the 1 in + 1/2 in parallel stacks
 under the end rails, gripped on the ends: PF05 skims the back face, PF06
 (turned over) faces the front face to the depth, roughs the window with a
-1/8 in slot round its edge, steps the slot's corners in with the 5/64 in
-end mill and finishes the walls with it. Upright, the bottom end up: PF07
+1/8 in slot round its edge and finishes its walls and corners with the same
+end mill (owner ruling 2026-11-23, tool audit Q9: the corners print R.065,
+.060-.070; no 5/64 cutter). Upright, the bottom end up: PF07
 spots and drills the #43 through the bottom rail into the window, PF08
 brings the tap guide over it for tapping by hand.
 
@@ -78,7 +79,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("PF05_back_face", ("back_face",)),
     (
         "PF06_window",
-        (("front_face",), ("window_rough",), ("window_corners", "window_finish")),
+        (("front_face",), ("window_rough", "window_finish")),
     ),
     ("PF07_tap_drill", (("tap_spot",), ("tap_drill",))),
     ("PF08_tap", ("tap",)),
@@ -89,7 +90,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
 LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these (the tap, the saw and the files are not).
-CAM_TOOLS = ("em-half", "em-eighth", "em-fine", "spot", "drill-43", "tap-guide")
+CAM_TOOLS = ("em-half", "em-eighth", "spot", "drill-43", "tap-guide")
 IN = 25.4
 # ANSI #2 combined drill and countersink, 60° included: the shop record names
 # the tool, not its geometry.
@@ -104,24 +105,16 @@ DRILL_POINT_DEG = 118.0
 # A plug tap's chamfer, in threads: 3-5 (ASME B94.9); the longest is taken,
 # so every thread in the rail is full once the point is this far past it.
 PLUG_CHAMFER_THREADS = 5
-# The window's cut limits the plan cites (Harvey Tool speeds and feeds
+# The window's cut limit the plan cites (Harvey Tool speeds and feeds
 # tables, Brass row): the 1/8 in slot's axial depth at most .35 × its
-# diameter (series 720xx, slotting); the 5/64 in finish's axial depth at most
-# 3 × and its radial depth at most .05 × its diameter (series 762xx,
-# finishing).
+# diameter (series 720xx, slotting). The finish runs the same end mill at
+# the slot's levels and setting, its radial depth the finish stock on the
+# walls and in the corners alike: a lighter cut than the slot before it.
 SLOT_AXIAL_MAX = 0.35
-FINISH_AXIAL_MAX = 3.0
-# The finish's radial limit holds at the corners too: the 1/8 in slot
-# leaves each corner round at its own radius, and the 5/64 in end mill steps
-# in on the corner's diagonal by at most this × its diameter at a time.
-FINISH_RADIAL_MAX = 0.05
-# Each corner step runs in and out this far along the walls from the rough
-# slot path's corner.
-CORNER_LEAD_MM = 1.0
-# Each corner step's point sits this much nearer the wall it arrives along
-# (over the G-code's .001 mm rounding), so the outline check reads its
-# arrival along that wall's way.
-CORNER_BIAS_MM = 0.002
+# The finish turns each corner on an arc about the slot path's corner, of
+# the finish stock's radius, as straight chords: each chord stands at most
+# this far inside its arc (half the outline check's allowance).
+CORNER_SAG_MAX_MM = 0.0025
 # Each window plunge runs at half the cutter's chip load (the rocker strap
 # plan's plunge rule).
 PLUNGE_CHIP_FRACTION = 0.5
@@ -386,51 +379,56 @@ def _loop(
     return lines + [f"G0 Z{clear:.3f}"]
 
 
-def _corner_laps(
+def _finish_loop(
     x: tuple[float, float],
     y: tuple[float, float],
-    path: float,
-    dips: list[float],
+    corner: float,
+    turn: float,
     top: float,
     levels: list[float],
 ) -> list[str]:
-    """Laps round the rough slot's path, ``path`` inside the window's walls
-    ``x`` × ``y``, clockwise, each stepping into every corner on its
-    diagonal: at each of ``levels`` (a straight plunge at the plunge feed at
-    the middle of the left side, in the slot) one lap per offset in
-    ``dips``, the cutter centre that far from both walls at the corner
-    (``CORNER_BIAS_MM`` nearer the arriving wall, so the rounded point is
-    nearer it). Each dip runs in from the arriving side and out to the
-    departing side, ``CORNER_LEAD_MM`` along the wall from the path's
-    corner, so every move runs the outline's way."""
+    """The finish path inside the window's walls ``x`` × ``y``, clockwise
+    seen from above: each wall ``corner`` - ``turn`` in from it, each corner
+    an arc of radius ``turn`` about the point ``corner`` in from both walls
+    (the slot path's corner), so the corners come out at radius ``corner``.
+    Each arc runs as equal chords no more than ``CORNER_SAG_MAX_MM`` inside
+    it. At each of ``levels`` a straight plunge at the plunge feed at the
+    middle of the left wall's path, then once round at the cutting feed.
+    Each coordinate goes onto the G-code's .001 mm grid away from the
+    window's middle (under .001 mm toward its wall), so no rounding
+    leaves the cutter centre farther than its offset from a wall."""
     (x0, x1), (y0, y1) = x, y
     clear = _r(top + CLEAR_MM)
-    xa, ym = x0 + path, (y0 + y1) / 2
-    far = path + CORNER_LEAD_MM
-    # (wall corner, inward signs, True when the arriving wall is an X wall)
-    corners = (
-        ((x0, y1), (1, -1), True),
-        ((x1, y1), (-1, -1), False),
-        ((x1, y0), (-1, 1), True),
-        ((x0, y0), (1, 1), False),
+    xm, ym = (x0 + x1) / 2, (y0 + y1) / 2
+
+    def outward(value: float, middle: float) -> float:
+        step = math.ceil if value > middle else math.floor
+        return step(round(value * 1000, 6)) / 1000
+
+    xa = outward(x0 + corner - turn, xm)
+    chords = math.ceil((math.pi / 4) / math.acos(1 - CORNER_SAG_MAX_MM / turn) - 1e-9)
+    # (arc centre, start angle in degrees), clockwise from the top-left.
+    arcs = (
+        ((x0 + corner, y1 - corner), 180.0),
+        ((x1 - corner, y1 - corner), 90.0),
+        ((x1 - corner, y0 + corner), 0.0),
+        ((x0 + corner, y0 + corner), -90.0),
     )
+    lap = []
+    for (cx, cy), start in arcs:
+        for k in range(chords + 1):
+            a = math.radians(start - 90.0 * k / chords)
+            px = outward(cx + turn * math.cos(a), xm)
+            py = outward(cy + turn * math.sin(a), ym)
+            lap.append(f"G1 X{px:.3f} Y{py:.3f} F{{feed}}")
+    lap.append(f"G1 X{xa:.3f} Y{_r(ym):.3f} F{{feed}}")
     lines = [
         f"G0 Z{clear:.3f}",
-        f"G0 X{_r(xa):.3f} Y{_r(ym):.3f}",
+        f"G0 X{xa:.3f} Y{_r(ym):.3f}",
         f"G0 Z{_r(top + SAFE_MM):.3f}",
     ]
     for z in levels:
-        lines.append(f"G1 Z{_r(z):.3f} F{{plunge}}")
-        for dip in dips:
-            for (kx, ky), (sx, sy), x_wall in corners:
-                arrive = (path, far) if x_wall else (far, path)
-                bias = (CORNER_BIAS_MM, 0.0) if x_wall else (0.0, CORNER_BIAS_MM)
-                dip_at = (dip - bias[0], dip - bias[1])
-                for ox, oy in (arrive, dip_at, arrive[::-1]):
-                    lines.append(
-                        f"G1 X{_r(kx + sx * ox):.3f} Y{_r(ky + sy * oy):.3f} F{{feed}}"
-                    )
-            lines.append(f"G1 X{_r(xa):.3f} Y{_r(ym):.3f} F{{feed}}")
+        lines += [f"G1 Z{_r(z):.3f} F{{plunge}}", *lap]
     return lines + [f"G0 Z{clear:.3f}"]
 
 
@@ -533,7 +531,7 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         **sizes,
         "window_x": (x0, x1),
         "window_y": (y0, y1),
-        "corner_r_max": window["corner_r_max"],
+        "corner_r": window["corner_r"],
         "tap_at": at,
         "tap_dia": tap["dia"],
         "tap_wall_min": tap["wall_min"],
@@ -590,7 +588,6 @@ def context(
 
     em = _shop_tool(plan, shop, "em-half")["diameter_mm"]
     e8 = _shop_tool(plan, shop, "em-eighth")["diameter_mm"]
-    e5 = _shop_tool(plan, shop, "em-fine")["diameter_mm"]
     d43 = _shop_tool(plan, shop, "drill-43")["diameter_mm"]
     r = em / 2
     lo, hi = g["tap_dia"]
@@ -625,28 +622,29 @@ def context(
         if not math.isclose(_cut(plan, name, "axial_doc_mm"), level_max, abs_tol=1e-6):
             raise ValueError(f"'{name}' axial_doc_mm is not process.face_step_max_mm")
 
-    # The window: a 1/8 in slot finish_stock inside the walls, then the 5/64
-    # in finish a cutter radius inside them; both from the front face to
-    # run_past below the back face, between the parallel stacks.
-    for name, dia, key in (
-        ("window rough", e8, "rough_cutter_dia_mm"),
-        ("window plunge", e8, "rough_cutter_dia_mm"),
-        ("window finish", e5, "finish_cutter_dia_mm"),
-        ("window finish plunge", e5, "finish_cutter_dia_mm"),
-    ):
-        if not math.isclose(p[key], dia, abs_tol=1e-6) or not math.isclose(
-            _cut(plan, name, "cutter_dia_mm"), dia, abs_tol=1e-6
+    # The window: the 1/8 in end mill slots round it finish_stock inside the
+    # walls, then finishes the walls and corners a cutter radius inside them,
+    # both from the front face to run_past below the back face, between the
+    # parallel stacks, at the same levels and setting (owner ruling
+    # 2026-11-23, tool audit Q9: no 5/64 cutter).
+    for name in ("window rough", "window plunge", "window finish"):
+        if not math.isclose(p["window_cutter_dia_mm"], e8, abs_tol=1e-6) or not (
+            math.isclose(_cut(plan, name, "cutter_dia_mm"), e8, abs_tol=1e-6)
         ):
-            raise ValueError(f"'{name}' cutter is not the shop's Ø{dia}")
-    r8, r5 = e8 / 2, e5 / 2
-    if r5 > g["corner_r_max"]:
-        raise ValueError(
-            f"the finish cutter's radius {r5:.3f} leaves the window's corners over R{g['corner_r_max']}"
-        )
+            raise ValueError(f"'{name}' cutter is not the shop's Ø{e8}")
+    r8 = e8 / 2
     stock = p["window_finish_stock_mm"]
-    if not 0 < stock <= FINISH_RADIAL_MAX * e5:
+    if stock <= 0:
+        raise ValueError(f"window_finish_stock_mm {stock} leaves no finish")
+    # The finish turns each corner about the slot path's corner, so the
+    # corners come out at the cutter's radius plus the stock: the printed
+    # R.065's band (.060-.070) must hold it.
+    d_rough = r8 + stock
+    corner_lo, corner_hi = g["corner_r"]
+    if not corner_lo <= d_rough <= corner_hi:
         raise ValueError(
-            f"window_finish_stock_mm {stock} is over the finish's {FINISH_RADIAL_MAX} × Ø radial"
+            f"the window's corners come out at R{d_rough:.3f}, outside the printed"
+            f" corner band {corner_lo:.3f}-{corner_hi:.3f}"
         )
     if not math.isclose(
         _cut(plan, "window finish", "radial_woc_mm"), stock, abs_tol=1e-6
@@ -656,68 +654,34 @@ def context(
         )
     run_past = p["window_run_past_mm"]
     bottom = -run_past
-    rough_levels = _levels(D, bottom, SLOT_AXIAL_MAX * e8)
-    finish_levels = _levels(D, bottom, FINISH_AXIAL_MAX * e5)
-    _agree(plan, "window_rough_step_mm", (D - bottom) / len(rough_levels))
-    _agree(plan, "window_finish_step_mm", (D - bottom) / len(finish_levels))
-    for name, key in (
-        ("window rough", "window_rough_step_mm"),
-        ("window finish", "window_finish_step_mm"),
+    window_levels = _levels(D, bottom, SLOT_AXIAL_MAX * e8)
+    _agree(plan, "window_step_mm", (D - bottom) / len(window_levels))
+    for name in ("window rough", "window finish"):
+        if not math.isclose(
+            _cut(plan, name, "axial_doc_mm"), p["window_step_mm"], abs_tol=1e-6
+        ):
+            raise ValueError(f"'{name}' axial_doc_mm is not process.window_step_mm")
+    window_rpm, window_feed = _setting(plan, shop, "window rough")
+    if _setting(plan, shop, "window finish") != (window_rpm, window_feed):
+        raise ValueError("'window finish' runs at another setting than the slot")
+    _agree(plan, "window_plunge_feed_per_min_mm", PLUNGE_CHIP_FRACTION * window_feed)
+    if _setting(plan, shop, "window plunge") != (
+        window_rpm,
+        p["window_plunge_feed_per_min_mm"],
     ):
-        if not math.isclose(_cut(plan, name, "axial_doc_mm"), p[key], abs_tol=1e-6):
-            raise ValueError(f"'{name}' axial_doc_mm is not process.{key}")
-    rough_rpm, rough_feed = _setting(plan, shop, "window rough")
-    finish_rpm, finish_feed = _setting(plan, shop, "window finish")
-    for name, key, rpm, feed in (
-        ("window plunge", "rough_plunge_feed_per_min_mm", rough_rpm, rough_feed),
-        (
-            "window finish plunge",
-            "finish_plunge_feed_per_min_mm",
-            finish_rpm,
-            finish_feed,
-        ),
-    ):
-        _agree(plan, key, PLUNGE_CHIP_FRACTION * feed)
-        if _setting(plan, shop, name) != (rpm, p[key]):
-            raise ValueError(f"'{name}' is not {rpm:g} rpm at process.{key}")
+        raise ValueError(
+            f"'window plunge' is not {window_rpm:g} rpm at"
+            " process.window_plunge_feed_per_min_mm"
+        )
     x0, x1 = g["window_x"]
     y0, y1 = g["window_y"]
     _agree(plan, "window_right_mm", x1)
     _agree(plan, "window_far_mm", H - y0)
     _agree(plan, "window_near_mm", H - y1)
-    d_rough = r8 + stock
     if x1 - x0 <= 2 * (d_rough + r8) or y1 - y0 <= 2 * (d_rough + r8):
         raise ValueError(
             "the rough slot leaves no slug: it would mill the whole window"
         )
-    # The slot leaves each corner round at the 1/8's radius about its path's
-    # corner; the finish leaves it at the 5/64's. Between them the 5/64 steps
-    # in on the diagonal, each step (and the finish's last) at most the
-    # finish's radial limit, as on the walls.
-    left_rough = math.sqrt(2) * d_rough - r8
-    left_finish = (math.sqrt(2) - 1) * r5
-    steps = math.ceil((left_rough - left_finish) / (FINISH_RADIAL_MAX * e5) - 1e-9)
-    corner_step = (left_rough - left_finish) / steps
-    if corner_step > FINISH_RADIAL_MAX * e5 or stock > FINISH_RADIAL_MAX * e5:
-        raise ValueError("a corner step is over the finish's radial limit")
-    _agree(plan, "window_corner_step_mm", corner_step)
-    if p["window_corner_laps"] != steps - 1:
-        raise ValueError(f"process.window_corner_laps is not {steps - 1}")
-    dips = [(left_rough - k * corner_step + r5) / math.sqrt(2) for k in range(1, steps)]
-    if not math.isclose(
-        _cut(plan, "window corners", "radial_woc_mm"),
-        p["window_corner_step_mm"],
-        abs_tol=1e-6,
-    ) or not math.isclose(
-        _cut(plan, "window corners", "axial_doc_mm"),
-        p["window_finish_step_mm"],
-        abs_tol=1e-6,
-    ):
-        raise ValueError(
-            "'window corners' is not process.window_corner_step_mm at the finish's levels"
-        )
-    if _setting(plan, shop, "window corners") != (finish_rpm, finish_feed):
-        raise ValueError("'window corners' runs at another setting than the finish")
 
     # The thumb-screw tap, from the bottom end: spot under the #43, the #43
     # pecked with full retracts until its full diameter is past the bottom
@@ -855,23 +819,14 @@ def context(
         "feed": face_feed,
         "plunge": face_feed,
     }
-    rough_tool = {
+    window_tool = {
         "tool": "em-eighth",
         "dia": e8,
         "shape": "endmill",
         "flutes": 3,
-        "rpm": rough_rpm,
-        "feed": rough_feed,
-        "plunge": p["rough_plunge_feed_per_min_mm"],
-    }
-    finish_tool = {
-        "tool": "em-fine",
-        "dia": e5,
-        "shape": "endmill",
-        "flutes": 2,
-        "rpm": finish_rpm,
-        "feed": finish_feed,
-        "plunge": p["finish_plunge_feed_per_min_mm"],
+        "rpm": window_rpm,
+        "feed": window_feed,
+        "plunge": p["window_plunge_feed_per_min_mm"],
     }
     spot_tool = {
         "tool": "spot",
@@ -959,37 +914,23 @@ def context(
         (wx[0] + d_rough, wx[1] - d_rough),
         (wy[0] + d_rough, wy[1] - d_rough),
     )
-    finish_x, finish_y = (wx[0] + r5, wx[1] - r5), (wy[0] + r5, wy[1] - r5)
     stock_back = ((0.0, W), (-H, 0.0), (0.0, D))
     jobs += [
         {
-            **rough_tool,
+            **window_tool,
             "frame": "flipped",
-            "label": "window rough",
+            "label": "window",
             "stock": stock_back,
             "ops": [
                 [
                     "window_rough",
                     "rough the window",
-                    _loop(rough_x, rough_y, D, rough_levels),
-                ]
-            ],
-        },
-        {
-            **finish_tool,
-            "frame": "flipped",
-            "label": "window finish",
-            "stock": stock_back,
-            "ops": [
-                [
-                    "window_corners",
-                    "step the window's corners in",
-                    _corner_laps(wx, wy, d_rough, dips, D, finish_levels),
+                    _loop(rough_x, rough_y, D, window_levels),
                 ],
                 [
                     "window_finish",
                     "finish the window",
-                    _loop(finish_x, finish_y, D, finish_levels),
+                    _finish_loop(wx, wy, d_rough, stock, D, window_levels),
                 ],
             ],
         },
@@ -1100,32 +1041,29 @@ def context(
             ["keep_out", {"radius": r, "boxes": keep[key]}],
         ]
 
-    def window_checks(
-        offset: float,
-        corner: float,
-        levels: list[float],
-        radius: float,
-        clearing: list[dict[str, Any]],
-    ) -> list[list[Any]]:
-        return [
-            ["depth", {"z_min": _r(bottom)}],
-            ["rapids_clear", {"z_top": D}],
-            ["air_feed", {"z_top": D}],
-            [
-                "outline",
-                {
-                    "elements": _outline(wx, wy, corner),
-                    "passes": [{"offset": offset, "levels": [_r(z) for z in levels]}],
-                    "z_top": D,
-                    "clearing": clearing,
-                },
-            ],
-            ["keep_out", {"radius": radius, "boxes": window_keep}],
-        ]
-
-    if dips[-1] <= r5 + OUTLINE_TOL_MM:
-        raise ValueError("the last corner step reaches the finish's own path")
-    corner_clearing = [{"x": list(wx), "levels": [_r(z) for z in finish_levels]}]
+    # The slot and the finish against the window's outline with its corners
+    # at R d_rough: the slot's path (sharp-cornered) d_rough inside it, the
+    # finish's a cutter radius inside it, turning each corner about the
+    # slot's corner; every level of the slot before any of the finish.
+    window_z = [_r(z) for z in window_levels]
+    window_checks = [
+        ["depth", {"z_min": _r(bottom)}],
+        ["rapids_clear", {"z_top": D}],
+        ["air_feed", {"z_top": D}],
+        [
+            "outline",
+            {
+                "elements": _outline(wx, wy, d_rough),
+                "passes": [
+                    {"offset": d_rough, "levels": window_z},
+                    {"offset": r8, "levels": window_z},
+                ],
+                "z_top": D,
+                "clearing": [],
+            },
+        ],
+        ["keep_out", {"radius": r8, "boxes": window_keep}],
+    ]
 
     def hole_checks(z_bottom: float, radius: float) -> list[list[Any]]:
         return [
@@ -1162,21 +1100,15 @@ def context(
             "tool_changes",
             {
                 "z_top": face_level,
-                "tools": [tn["em-half"], tn["em-eighth"], tn["em-fine"]],
+                "tools": [tn["em-half"], tn["em-eighth"]],
                 "loads_first": True,
             },
         ],
-        [name, "spindle", {"rpm": [[face_rpm], [rough_rpm], [finish_rpm]]}],
+        [name, "spindle", {"rpm": [[face_rpm], [window_rpm]]}],
         [name, "pauses", {"z_top": face_level, "count": 0}],
         [name, "depth", {"z_min": _r(bottom)}],
     ]
-    for k, checks in enumerate(
-        (
-            face_checks("front_face"),
-            window_checks(d_rough, d_rough, rough_levels, r8, []),
-            window_checks(r5, r5, finish_levels, r5, corner_clearing),
-        )
-    ):
+    for k, checks in enumerate((face_checks("front_face"), window_checks)):
         expect += [[f"{name}@{k}", check, kwargs] for check, kwargs in checks]
     name = "PF07_tap_drill"
     expect += [
