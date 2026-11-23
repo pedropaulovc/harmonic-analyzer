@@ -19,7 +19,7 @@
 # hole and makes only the size, so the bore's axis is this drilled hole's.
 # The wall stack budgets the drill's run-off (DRILL_RUN_OFF_DEG) for the WALL
 # .068 MIN, but that run-off is wider than the bore's .002 perpendicularity to
-# A, so the drill does not hold the .002: Op 120 checks the drilled hole over
+# A, so the drill does not hold the .002: Ops 120–130 check the drilled hole over
 # a gauge pin before part-off, still in the chucking that turned the
 # shoulder, and a bush whose hole has run off is scrapped there. No boring
 # bar on hand trues a Ø.24 hole 1.14 deep (cad/config/shop-equipment/
@@ -163,7 +163,7 @@ title = "Bar, rear end out: turn the hub, the press diameter and the shoulder, d
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts. The bar stays in the jaws from Op 10 to Op 140: the press diameter, the shoulder and the B hole share this chucking."
+holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts. The bar stays in the jaws from Op 10 to Op 150: the press diameter, the shoulder and the B hole share this chucking."
 datum = "Z0 (carriage DRO): the bar end faced in Op 10, the bush's rear face. The shoulder (datum A) is at Z{{cad.step_far_out_far_z_mm:in.3dot}}, the hub face {{cad.length_in:.3dot}} in."
 diagram = { file = "diagrams/bar.svg", alt = "The 5/8 in bar in the 3-jaw, rear end out: the rear face faced, the hub turned back past the parting line, the press diameter turned back to the shoulder, the B hole drilled through past the parting line; the bush parted off .02 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}", support = "none" }
@@ -241,7 +241,7 @@ speed_kind = "other"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle stopped, P1 blade in the post. Z: bring the blade's chuck-side face onto the shoulder's face with the {{process.touch_leaf_in:.3dot}} leaf between until it drags, then move the carriage {{process.touch_leaf_in:.3dot}} toward the chuck by its handwheel dial and lock it. X: bring the blade's tip onto the press diameter through the leaf until it drags; set DRO X to the Op 60 reading plus .004 (the leaf, on the diameter)."
+instruction = "Spindle stopped, P1 blade in the post. X first, clear of the root's fillet: the blade's chuck-side face about .10 from the shoulder, bring its tip onto the press diameter through the {{process.touch_leaf_in:.3dot}} leaf until it drags; set DRO X to the Op 60 reading plus .004 (the leaf, on the diameter); leaf out. Z: bring the blade's chuck-side face onto the shoulder's face through the leaf until it drags; leaf out, move the carriage {{process.touch_leaf_in:.3dot}} toward the chuck by its handwheel dial and lock it."
 feed = "hand"
 
 [[setups.operations]]
@@ -250,7 +250,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Leaf out, spindle running, cutting oil: plunge until DRO X reads the Op 60 reading, no further. The blade cuts only the AR's fillet out of the root, leaving its own corner: the sheet's R{{cad.shoulder_root_r_max_in:.3dot}} MAX, which the AR's nose cannot form."
+instruction = "Spindle running, cutting oil: plunge until DRO X reads the Op 60 reading, no further. The blade cuts only the AR's fillet out of the root, leaving its own corner: the sheet's R{{cad.shoulder_root_r_max_in:.3dot}} MAX, which the AR's nose cannot form."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
 inspection = "Root: square to the eye, no fillet, step or groove at the press diameter's end; the press diameter by micrometer next to the root as Op 60."
@@ -286,17 +286,26 @@ peck = { step_mm = 6.0452, retract = "full" }
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "other"
+tool = "pins"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle stopped, tailstock back. A pin for the B hole's squareness check: the largest minus pin of the set that enters the hole by hand (the next size up does not). Push it {{process.pin_depth_in:.2dot}} in into the rear face, calipers' depth rod."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
 tool = "dti"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle stopped, tailstock back. The B hole's squareness to the shoulder, which was turned in this chucking: find the largest minus pin of the set that enters the hole by hand (the next size up does not) and push it {{process.pin_depth_in:.2dot}} in into the rear face, calipers' depth rod. Lever indicator on the carriage, its tip on top of the pin at {{process.pin_near_in:.2dot}} out of the rear face (DRO Z), then at {{process.pin_far_in:.2dot}} out; at each, turn the chuck by hand one full turn and read the movement. Pull the pin."
-inspection = "The two movements added: at most {{process.pin_runout_sum_max_mm:.3f}} mm on the 0.001 mm indicator. That holds the bore's perpendicularity Ø{{cad.bore_perpendicularity_in:.3dot}} to A over its length, with the pin's fit in the hole, up to {{process.pin_fit_max_in:.4dot}}, charged against it: MHA-PD-00 step 11's ream follows this hole and makes only the size."
+instruction = "Lever indicator on the carriage, its tip on top of the pin at {{process.pin_near_in:.2dot}} out of the rear face (DRO Z), then at {{process.pin_far_in:.2dot}} out: at each, turn the chuck by hand one full turn and read the movement. Pull the pin."
+inspection = "The two movements added: at most {{process.pin_runout_sum_max_mm:.3f}} mm on the 0.001 mm indicator: the bore ⊥ Ø{{cad.bore_perpendicularity_in:.3dot}} to A, the pin's fit charged."
 gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{process.pin_runout_sum_max_mm}}"] }]
 feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Over {{process.pin_runout_sum_max_mm:.3f}} mm in Op 120: the B hole has run off; part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10."
+instruction = "Over {{process.pin_runout_sum_max_mm:.3f}} mm in Op 130: the B hole has run off; part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10."
 feed = "hand"
 
 [[setups.operations]]
@@ -316,7 +325,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a shim wrap of brass shim, {{process.regrip_grip_in:.2dot}} in of the hub in the jaws from the shoulder (a pencil line that far from it at the jaw fronts), the wrap cut no wider than that, the press diameter clear of the jaws behind it; the parted end (the hub face) out. Nothing seats the bush axially."
-datum = "Z0 (carriage DRO): the hub face as faced in Op 160, {{cad.shoulder_in:.3dot}} from the shoulder, preset in Op 150 from the shoulder's reading over the .350 gauge block through a {{process.touch_leaf_in:.3dot}} feeler leaf."
+datum = "Z0 (carriage DRO): the hub face as faced in Op 170, {{cad.shoulder_in:.3dot}} from the shoulder, preset in Op 160 from the shoulder's reading over the .350 gauge block through a {{process.touch_leaf_in:.3dot}} feeler leaf."
 diagram = { file = "diagrams/regrip.svg", alt = "The bush turned round, its hub in the jaws over a shim wrap with nothing behind it: the parted end faced to the shoulder station." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_datum_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
@@ -343,7 +352,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.shoulder_band_mm}}" },
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Shoulder over {{cad.shoulder_max_in:.3dot}} in Op 160: chuck it again as Op 150 and repeat Ops 150–160 from that reading. Under {{cad.shoulder_min_in:.3dot}}, or the length outside its band with the shoulder in: scrapped, not reworked; make another from Setup 1."
+instruction = "Shoulder over {{cad.shoulder_max_in:.3dot}} in Op 170: chuck it again as Op 160 and repeat Ops 160–170 from that reading. Under {{cad.shoulder_min_in:.3dot}}, or the length outside its band with the shoulder in: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups]]
