@@ -459,7 +459,7 @@ speed_kind = "spindle"
 tool = "reamer"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.press_hole_dia_band_mm}}" }
-instruction = "Console M6 T5 (.4375 reamer in the drill chuck; set 400 by hand, a drop of cutting oil on the reamer). MDI M3, G1 Z-10 F{{process.ream_feed_per_min_mm:.1f}}, G1 Z5, M5: reamed through, fed in and fed out. Blow the hole out."
+instruction = "Console M6 T5 (.4375 reamer in the drill chuck; set 400 by hand, a drop of cutting oil on the reamer). MDI G0 Z5, G0 X0 Y0 (over the hole), M3, G1 Z-10 F{{process.ream_feed_per_min_mm:.1f}}, G1 Z5, M5: reamed through, fed in and fed out. Blow the hole out."
 rpm = 400
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 inspection = "The GO pin enters the trial hole and the NO-GO does not."
