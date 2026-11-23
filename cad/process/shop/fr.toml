@@ -23,17 +23,6 @@ tap_drill_mm = 3.4544
 [tools.drill-8]  # Drills #8
 description = "#8 (.1990 in) drill, 115-piece index"
 diameter_mm = 5.0546
-# Tool audit 2026-11-23 (row frame-clearance-stub-drill): the #10 close
-# clearance on the cross-screw paths is the #4 that
-# cad/config/tolerances/fastener_clearance.yaml names (#10 close: drill #4,
-# .2090), inside the .206-.210 band; the #5 (.2055) is under it. The audit
-# keeps a stub #4 where a jobber cannot fit, and it cannot on the frames:
-# cad/docs/machining-dfm.md "Cross-screw setup" stands them on edge (pad face
-# 11.06 / 10.59 in up) and only a 2-3/8 OAL screw-machine drill stays under
-# the 17 in spindle limit; a jobber #4 (3-5/8 OAL) comes to about 17.65 in.
-[tools.frame-clearance-stub-drill-4]  # Drills #4, screw-machine length
-description = "#4 (.2090) screw-machine-length drill, 2-3/8 OAL"
-diameter_mm = 5.3086
 [tools.frame-clearance-stub-drill]  # G-drill-5-stub; Drills #5
 description = "#5 (.2055) screw-machine-length drill"
 diameter_mm = 5.2197

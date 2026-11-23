@@ -88,7 +88,6 @@ def test_context_accepts_the_plan_and_numbers_the_tools(context) -> None:
         "reamer-3135": 6,
         "em-eighth": 7,
         "drill-26": 8,
-        "reamer-1570": 9,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     # Both straps' bores on the blank's centre line, the arbor bores the
@@ -130,8 +129,9 @@ def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -
         ("face_b_skim_mm", 0.5, "face_b_skim_mm"),
         ("grip_mm", 7.5, "grip_mm"),
         ("overhang_min_mm", 6.35, "overhang_min_mm"),
-        ("seat_floor_dia_mm", 3.74, "outside the R"),
-        ("seat_ream_floor_gap_mm", 0.1, "outside the R"),
+        ("seat_floor_dia_mm", 3.70, "under the #26"),
+        ("seat_floor_dia_mm", 4.03, "between the end mill"),
+        ("seat_finish_dia_mm", 4.0, "seat_finish_dia_mm"),
         ("seat_floor_z_mm", -4.3, "seat_floor_z_mm"),
         ("pivot_apex_x_mm", -7.5, "pivot_apex_x_mm"),
         ("finder_tip_depth_mm", 2.54, "below the jaw tops"),
@@ -200,9 +200,9 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: "G1 Z-2.000 F{feed}",
             "holes",
         ),
-        # The seat's floor turned climb (G3).
+        # The seat's turns run climb (G3).
         (
-            "seat_floor",
+            "seat_mill",
             lambda line: line.startswith("G2 "),
             lambda line: "G3" + line[2:],
             "bounds",

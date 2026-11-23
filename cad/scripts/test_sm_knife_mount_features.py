@@ -128,18 +128,19 @@ def test_mount_feature_bands_are_the_printed_ones() -> None:
     assert features["back_face"]["depth"] == pytest.approx([_in(0.54), _in(0.56)])
 
     bore = features["knife_bore"]
-    # Ø.4720 +.0015/.0000 REAM THRU, RUNNING FIT ON MHA-SM-03 TRUNNION, Ra 63.
-    assert bore["dia"] == pytest.approx([_in(0.4720), _in(0.4735)])
+    # Ø.4985 +.0015/.0000 REAM THRU, RUNNING FIT ON MHA-SM-03 TRUNNION, Ra 63
+    # (owner ruling 2026-11-23, tool audit Q13).
+    assert bore["dia"] == pytest.approx([_in(0.4985), _in(0.5000)])
     assert bore["precision"]["dia"] == 4
     assert bore["process"] == "ream" and bore["thru"] is True
     assert bore["callout"] == drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert bore["mates"] == drawing.LEVER_NUMBER
     assert bore["finish_ra"] == MACHINED_UM
     assert bore["datum"] == "C"
-    # ⌖Ø.008|A|B at BASIC .811 under A and .300 from B; ∥.002|A.
+    # ⌖Ø.008|A|B at BASIC .824 under A and .300 from B; ∥.002|A.
     assert bore["position_dia"] == pytest.approx(_in(0.008))
     assert bore["position_datums"] == ["A", "B"]
-    assert bore["basic_from_a"] == pytest.approx(_in(0.811), abs=_in(0.0005))
+    assert bore["basic_from_a"] == pytest.approx(_in(0.824), abs=_in(0.0005))
     assert bore["basic_from_a"] == pytest.approx(BORE_CENTRE_DEPTH)
     assert bore["basic_from_b"] == pytest.approx(_in(0.300))
     assert bore["parallelism"] == pytest.approx(_in(0.002))

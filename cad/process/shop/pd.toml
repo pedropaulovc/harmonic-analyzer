@@ -202,6 +202,8 @@ diameter_mm = 1.190625
 description = "R.180 dome form tool: concave R.180 edge, cuts a convex R.18 dome"
 [tools.gauge-pin-0625]  # MHA-PD-10 .002 TIR TO A Ø.0625 PIN
 description = "Gauge pin .0625 in, class ZZ"
+[tools.dial-indicators]  # MHA-PD-13 compound set to the dish flank; inventory gauges.dial-indicators, gauges.mag-base
+description = ".001 in dial indicator on its magnetic base"
 [tools.knurl-straight-25tpi]  # MHA-PD-13 STRAIGHT KNURL 25 TPI
 description = "Lathe knurling holder with straight 25 TPI wheel"
 [tools.pd-latch-hook-former]  # MHA-PD-14 R3.13 ±.02, R.38 ±.02
@@ -300,6 +302,31 @@ range_mm = [3.20294, 3.21056]
 resolution_mm = 0.00254
 [tools.plug-gauges-1261-1264]
 description = "Plug gauges .1261, .1262, .1263, .1264, Vermont Gage Class X"
+
+# --- MHA-PD-13 transgear thumbnut (cad/process/pd_transgear_thumbnut) ---------
+# The #29 tap drill and the 90° chamfer mill's countersinks from the tailstock
+# (C36000, dry): LittleMachineShop "Cutting Speeds" (read live 2026-11-22,
+# lathe.toml header), Drilling & Reaming, Brass (C36000), 160-175 ft/min; both
+# clamp to the lathe's 2000 rpm top speed.
+[settings.lathe-drill-29-c360]
+tool = "jig-drill-29"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, pecking, dry"
+[settings.lathe-csk-c360]
+tool = "chamfer-mill-330ch-1-4-90"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, light, dry; a turn's dwell at depth"
+# Straight knurling the Ø.81 head: Accu-Trak "Speeds & Feeds for Knurling"
+# (https://accu-trak.com/speeds-feeds-for-knurling, read 2026-11-22) caps form
+# knurling at about 150 ft/min and its "Knurling Tips" start slow with a firm
+# infeed so the wheel tracks; 50 ft/min is about 235 rpm at Ø.81.
+[settings.lathe-knurl-c360]
+tool = "knurl-straight-25tpi"
+material = "lathe-c360"
+sfm = 50
+feed = "cross slide by hand, one firm plunge, then the carriage along by hand; oiled"
 
 # --- MHA-PD-03 platen clip (cad/process/pd_platen_clip/plan.toml) ---
 # The clip's 1/32 downcut end mill and its C26000 setting are in common.toml

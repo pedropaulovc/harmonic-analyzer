@@ -20,9 +20,10 @@ the curve. Everything below the guides rides the rod:
   PEN_BLOCK_YAW_DEG to the paper.
 * pn-vn-pen-marker -- the purchased Sharpie Fine Point, its grip in the block's V-groove,
   nib on the paper, body running out forward and east.
-* pn-pen-frame -- the stirrup flush on the block's PAPER end; pn-vn-pen-set-screw
-  (the thumb screw) threads up through its bottom rail and presses the grip
-  into the V.
+* pn-pen-frame -- the stirrup on the block's PAPER end, flush as modelled (its
+  setting: the rear face .310 to .325 from that end, the paper face not
+  proud of it); pn-vn-pen-set-screw (the thumb screw) threads up through its
+  bottom rail and presses the grip into the V.
 * pn-pen-adjust-screw + pn-vn-pen-adjust-nut -- the height adjuster on the rod
   top: the stud threads into the rod's #0-80 tap, the jam nut locks it, and
   the pen wire ties through its eye.
@@ -52,9 +53,10 @@ the DOF manifest, never authored); the carriage parts placed on-solution and
 lock-mated to the rod; transforms asserted by read-back; zero interference
 beyond the thread-envelope allowances in ``_pn_pen_interference``.
 
-Fitter package (draw_pn_pen_assembly.py, MHA-PN-00): the four settings --
-stud height, pen yaw, nib preset and rod travel -- are blanked construction
-sketches (``StudSetting`` and ``TravelSetting`` on the Right plane,
+Fitter package (draw_pn_pen_assembly.py, MHA-PN-00): the five settings --
+stud height, pen yaw, nib preset, the stirrup's setting and rod
+travel -- are blanked construction sketches (``StudSetting`` and
+``TravelSetting`` on the Right plane,
 ``CarriageSetting`` on the Top plane) whose driving, toleranced dimensions
 the drawing imports, and the
 ``PN_EXPLODED`` presentation is authored by ``_pn_pen_explode`` from
@@ -83,6 +85,7 @@ from _session import run_build
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
 from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
     set_dimension_symmetric_angular_tolerance,
     set_dimension_symmetric_tolerance,
 )
@@ -329,22 +332,33 @@ def _add_driving_yaw_angle(adapter: Any, nib_line: str, flat_line: str) -> None:
 
 
 def _author_carriage_setting(adapter: Any) -> None:
-    """PEN YAW and NIB PRESET on the Top plane (sketch u, v = machine X, -Z):
-    from the marker axis at the block's paper-end face, a rod-flat arm along
-    machine -X and the marker-axis arm to the nib tip. Their angle is the yaw,
-    the second arm's length the nib preset. No solid or pose edits."""
+    """PEN YAW, NIB PRESET and the STIRRUP SETTING on the Top plane (sketch
+    u, v = machine X, -Z): from the marker axis at the block's paper-end
+    face, a rod-flat arm along machine -X, the marker-axis arm to the nib tip
+    and, collinear with it into the block, the stirrup arm to the stirrup's
+    rear face. Their angle is the yaw, the second arm's length the nib
+    preset, the third's the stirrup's rear face from the end face (#3467).
+    No solid or pose edits."""
     end_u, end_v = spec.CARRIAGE_END_UV
     dims = SketchDims()
     check("create carriage setting sketch", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    # Both arms start on the one end-face point (exactly coincident
+    # All three arms start on the one end-face point (exactly coincident
     # endpoints merge in the sketch database).
     flat = check("rod-flat arm", adapter.add_line(end_u, end_v, *spec.FLAT_END_UV))
     nib = check("marker-axis arm", adapter.add_line(end_u, end_v, *spec.NIB_UV))
+    stirrup = check(
+        "stirrup arm", adapter.add_line(end_u, end_v, *spec.STIRRUP_REAR_UV)
+    )
     set_sketch_direct_db(adapter, False)
     _construction(adapter, flat, "rod-flat arm")
     _construction(adapter, nib, "marker-axis arm")
+    _construction(adapter, stirrup, "stirrup arm")
     check("rod-flat arm horizontal", adapter.add_sketch_constraint(flat, None, "horizontal"))
+    check(
+        "stirrup arm on the marker axis",
+        adapter.add_sketch_constraint(stirrup, nib, "collinear"),
+    )
     anchor_point_to_origin(adapter, f"{flat}.start", end_u, end_v, "paper-end point")
     dims.record("CarriageEndX")
     dims.record("CarriageEndZ")
@@ -360,20 +374,34 @@ def _author_carriage_setting(adapter: Any) -> None:
     dims.record(spec.NIB_DIMENSION)
     _add_driving_yaw_angle(adapter, nib, flat)
     dims.record(spec.YAW_DIMENSION)
+    dimension_between(
+        adapter, f"{stirrup}.start", f"{stirrup}.end", "distance",
+        spec.STIRRUP_REAR, "stirrup rear face from the paper-end face",
+    )
+    dims.record(spec.STIRRUP_DIMENSION)
     ensure_fully_defined(adapter, "carriage setting")
     check("exit carriage setting sketch", adapter.exit_sketch())
     name_last_feature(adapter, spec.CARRIAGE_FEATURE)
     dims.apply(adapter, spec.CARRIAGE_FEATURE)
+    unit = assembly_contract(ASM_NAME).drawing_unit
     set_dimension_symmetric_tolerance(
         adapter,
         spec.CARRIAGE_FEATURE,
         spec.NIB_DIMENSION,
         spec.NIB_TOLERANCE_MM,
         places=spec.NIB_PRECISION,
-        display_unit=assembly_contract(ASM_NAME).drawing_unit,
+        display_unit=unit,
     )
     set_dimension_symmetric_angular_tolerance(
         adapter, spec.CARRIAGE_FEATURE, spec.YAW_DIMENSION, spec.YAW_TOLERANCE_DEG
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        spec.CARRIAGE_FEATURE,
+        spec.STIRRUP_DIMENSION,
+        *spec.STIRRUP_TOLERANCE_MM,
+        places=spec.STIRRUP_PRECISION,
+        display_unit=unit,
     )
 
 

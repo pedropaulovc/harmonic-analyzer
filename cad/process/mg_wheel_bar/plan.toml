@@ -39,9 +39,16 @@
 # miked width or depth, as the bottom guide's plan does.
 #
 # Not on hand, to buy before Setup 3 (flagged): the .1865 chucking reamer
-# (shop-equipment tools.reamer-1865, to_order) and its .1865/.1870 go/no-go
-# plug gauge pair (gauges.plug-gauges-1865-1870, to_order); the pin-gauge
-# sets (gauges.pin-gauges, to_order) for the drilled holes.
+# (shop-equipment tools.reamer-1865, to_order) and the axle bore's Class ZZ
+# pins, a .1865 plus single (GO) and the .187 minus pin of the .061-.500 box
+# (NO-GO), shop gauges.zz-pins-1865-1870; the pin-gauge sets
+# (gauges.pin-gauges, to_order) for the drilled holes. Owner ruling
+# 2026-11-23 (tool audit Q1, re-answered), verbatim: "ZZ singles per the
+# record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept that good
+# holes near a limit may be refused; the traveler mikes each pin so the real
+# window is known per pin." It replaces the Class X .1865/.1870 pair. Setup 3
+# mikes both pins and the reamer before clamping, and the station check over
+# the GO pin uses its miked reading.
 #
 # NC (cam:mg_wheel_bar, cad/process/mg_wheel_bar/cam.py): WB02_top,
 # WB03_left, WB04_right, WB05_height. Program names, the [parameters] and the
@@ -205,6 +212,18 @@ half_mill_projection_mm = 27.94
 reamer_oal_mm = 114.3
 centre_drill_oal_mm = 47.625
 drill_9_oal_mm = 88.9
+# The axle bore's Class ZZ pins (owner ruling 2026-11-23, tool audit Q1; shop
+# gauges.zz-pins-1865-1870): each pin is made within .0002 in = 0.00508 mm
+# of its size, on one side. GO, the .1865 plus single, is .1865-.1867 in
+# (4.7371 to 4.7371 + 0.00508 mm); NO-GO, the .187 minus pin of the box, is
+# .1868-.1870 in (4.7498 - 0.00508 to 4.7498 mm). go_pin_min_mm and
+# nogo_pin_max_mm are the band's own ends (cad axle bore dia), repeated in
+# mm for the micrometer checks (test_zz_pin_windows binds all four). A pin
+# miking outside its range is not used.
+go_pin_min_mm = 4.7371
+go_pin_max_mm = 4.7422
+nogo_pin_min_mm = 4.7447
+nogo_pin_max_mm = 4.7498
 
 [[tools]]
 id = "em-half"
@@ -244,9 +263,9 @@ id = "deburring-set"
 name = "Deburring scraper set"
 ref = "deburring-set"
 [[tools]]
-id = "plug-1865"
-name = ".1865/.1870 plug gauges, to buy"
-ref = "plug-gauges-1865-1870"
+id = "zz-pins"
+name = "Class ZZ pins: .1865 plus (GO) and .187 minus (NO-GO)"
+ref = "zz-pins-1865-1870"
 status = "to_order"
 [[tools]]
 id = "pin-gauges"
@@ -351,11 +370,21 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Two stacks of the 1 in and the 1/2 in parallels (1.5 in) side by side against the MOVING jaw (1/4 in wide in all), centred along the jaws, none at the fixed jaw: the holes, .197 from T, exit clear of them. The blank lying on them along the jaws, F down, T against the FIXED jaw, edge B (as bought) at the moving jaw, the sawn LEFT end {{process.end_overhang_mm:in.2f}} out past the jaws' left side (the rule), the rest out past their right side. The .125 pin of the pin-gauge set laid along edge B between it and the moving jaw, on the stacks' top, so the jaw seats T flat against the fixed jaw. The stacks (4 in long) and the pin lie wholly between the jaws' sides: the end mill passes .020 below their top just outside the jaws. Tap it down onto the stacks along its length while closing the vise. The lower {{process.lying_grip_mm:in.3dot}} of its thickness is in the jaws."
-datum = "Program WB03_left. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the sawn LEFT end (where WB03 mills that end), Y0 the fixed jaw's face (T), +Y toward it; Z0 the stacks' top (F), set from the miked thickness. The hanger hole at X {{cad.hanger_hole_station_in:.3f}} and the axle bore at X {{cad.axle_bore_station_in:.3f}} in, Y −{{cad.axle_bore_height_in:.3f}} in. At every M6 stop the file has stopped the spindle and lifted the tool above the bar."
+datum = "Program WB03_left. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the sawn LEFT end (where WB03 mills that end), Y0 the fixed jaw's face (T), +Y toward it; Z0 the stacks' top (F), set from the miked thickness. The hanger hole at X {{cad.hanger_hole_station_in:.3f}} and the axle bore at X {{cad.axle_bore_station_mm:in.4f}} in (X{{cad.axle_bore_station_mm:.3f}} mm), Y −{{cad.axle_bore_height_in:.3f}} in. At every M6 stop the file has stopped the spindle and lifted the tool above the bar."
 diagram = { file = "diagrams/left.svg", alt = "The blank lying front face down on two stacks at the moving jaw, the top face at the fixed jaw, its left end just out past the jaws; the 1/2 in end mill's side mills the left end, the centre drill spots, the #15 and #17 drill the hanger hole and the axle bore through beside the stacks and the .1865 reamer reams the axle bore." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.top_width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.ream_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.top_width_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{cad.back_face_depth_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.end_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "as_bought", moving_jaw_contact = "rod" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = ["{{process.end_overhang_mm}}", "{{process.left_clamp_end_mm}}"], section_mm = { y = "{{process.top_width_mm}}", z = "{{cad.back_face_depth_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Before clamping, on the bench: with the .0001 micrometer (it reads to about ±.00005), mike the GO pin, the NO-GO pin, and the reamer across two opposite margins at its front end. Write the three readings here, and each pin's reading on its tag."
+inspection = "GO pin {{cad.axle_bore_dia_min_in:.4dot}}–{{process.go_pin_max_mm:in.4dot}}; NO-GO pin {{process.nogo_pin_min_mm:in.4dot}}–{{cad.axle_bore_dia_max_in:.4dot}}. A pin outside its range is not used: get another before running WB03_left."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.go_pin_min_mm}}", "{{process.go_pin_max_mm}}"] }, { gauge = "micrometers", band_mm = ["{{process.nogo_pin_min_mm}}", "{{process.nogo_pin_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Only if the reamer read under the GO pin's reading (otherwise skip): before clamping the blank, clamp a 1018 offcut in the vise and make a trial hole by hand at the console: the #17 drill through at 1300 rpm, then the .1865 reamer through at 600 rpm, cutting oil. Gauge it with both pins: GO refused, stop and tell the owner (this reamer's holes would be refused)."
+feed = "hand"
 
 [[setups.operations]]
 instruction = "Before clamping: mic F to the back face at the blank's middle and write it down (mm = in × 25.4). Home the mill ($H). G54 Y0 on the bare fixed jaw's face (it becomes T's) with the edge finder."
@@ -448,13 +477,24 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "File done, still clamped, the bore's edges still sharp: gauge the axle bore with the plug pair."
-inspection = "Axle bore Ø{{cad.axle_bore_dia_min_in:.4dot}}–{{cad.axle_bore_dia_max_in:.4dot}}: the .1865 GO enters, the .1870 NO-GO does not (a press fit on MHA-MG-07's axle). GO fails or NO-GO enters: stop and tell the owner."
-gauge_checks = [{ gauge = "plug-gauges-1865-1870", band_mm = "{{cad.axle_bore_dia_band_mm}}" }]
+instruction = "File done, still clamped, the bore's edges still sharp: try the GO pin, then the NO-GO pin, in the axle bore. The sheet accepts a bore from the GO pin's reading up to, not including, the NO-GO pin's reading (the first op of this setup). Both pass: skip the next two ops. GO refused: the next op. NO-GO enters: the op after it."
+inspection = "Axle bore Ø{{cad.axle_bore_dia_min_in:.4dot}}–{{cad.axle_bore_dia_max_in:.4dot}} (a press fit on MHA-MG-07's axle): GO enters, NO-GO does not. With both pins at their limits only {{process.go_pin_max_mm:in.4dot}}–{{process.nogo_pin_min_mm:in.4dot}} is sure to pass: a good bore within .0002 of either end may be refused."
+gauge_checks = [{ gauge = "zz-pins-1865-1870", band_mm = "{{cad.axle_bore_dia_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Only if the GO pin was refused (otherwise skip): still clamped, blow the chips out, oil the bore and ream it once more with T6 by MDI, then gauge it again as the op before. Still refused: the bar is rejected; stop and tell the owner (the pins cannot show the bore at or over {{cad.axle_bore_dia_min_in:.4dot}}; a reamer cuts no larger)."
+instruction_detailed = "Only if the GO pin was refused (otherwise skip): blow the chips out, brush oil into the bore. Console M6 T6 (the tool setter measures it), S600 M3. G0 X{{cad.axle_bore_station_mm:.3f}} Y-{{cad.axle_bore_height_mm:.3f}}, G0 Z(the back-face reading in mm + 5.000); G1 Z{{process.ream_tip_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}; G1 Z(the reading in mm + 5.000) at the same feed; M5. Gauge again with both pins."
+feed = "hand"
+inspection = "GO enters, NO-GO does not: go on (skip the next op). GO still refused: the bar is rejected; stop and tell the owner (the pins cannot show the bore at or over {{cad.axle_bore_dia_min_in:.4dot}}; a reamer cuts no larger)."
+gauge_checks = [{ gauge = "zz-pins-1865-1870", band_mm = "{{cad.axle_bore_dia_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "NO-GO enters: no cut remedies it. The bar is rejected; stop and tell the owner (nothing on the sheet shows the bore at or under {{cad.axle_bore_dia_max_in:.4dot}})."
+feed = "hand"
 
 [[setups.operations]]
 instruction = "Still clamped: the axle bore's station from the left end."
-instruction_detailed = "The .1865 GO plug in the axle bore; the calipers from the left end over the plug, less half its Ø (.0933)."
+instruction_detailed = "The GO pin in the axle bore; the calipers from the left end over the pin, less half the GO pin's miked reading (about .0933)."
 inspection = "Axle bore {{cad.axle_bore_station_min_in:.3dot}}–{{cad.axle_bore_station_max_in:.3dot}} from the left end. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.axle_bore_station_band_mm}}" }]
 
@@ -618,11 +658,12 @@ inspection = "No burr stands proud of any face or end."
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Hole sizes: the pin gauges in the hanger hole and in each clamp hole; the .1865 GO plug in the axle bore."
-inspection = "Hanger hole Ø{{cad.hanger_hole_dia_min_in:.3dot}}–{{cad.hanger_hole_dia_max_in:.3dot}}: the .180 pin enters (GO), the .184 does not (NO-GO). Clamp holes Ø{{cad.clamp_hole_1_dia_min_in:.3dot}}–{{cad.clamp_hole_1_dia_max_in:.3dot}}: the .196 pin enters, the .200 does not. The .1865 GO still enters the axle bore. Outside: stop and tell the owner."
+instruction = "Hole sizes: the pin gauges in the hanger hole and in each clamp hole; the GO and NO-GO Class ZZ pins in the axle bore."
+inspection = "Hanger hole Ø{{cad.hanger_hole_dia_min_in:.3dot}}–{{cad.hanger_hole_dia_max_in:.3dot}}: the .180 pin enters (GO), the .184 does not (NO-GO). Clamp holes Ø{{cad.clamp_hole_1_dia_min_in:.3dot}}–{{cad.clamp_hole_1_dia_max_in:.3dot}}: the .196 pin enters, the .200 does not. Axle bore: the GO pin still enters, the NO-GO still does not. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "pin-gauges", band_mm = "{{cad.hanger_hole_dia_band_mm}}" },
   { gauge = "pin-gauges", band_mm = "{{cad.clamp_hole_1_dia_band_mm}}" },
+  { gauge = "zz-pins-1865-1870", band_mm = "{{cad.axle_bore_dia_band_mm}}" },
 ]
 
 [[setups.operations]]

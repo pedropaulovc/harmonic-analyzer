@@ -8,7 +8,8 @@ sm-knife-mount:
   quantity: 2
   tolerance_class: machined_block
   # S1 of the same ruling supersedes delegated ruling sm Q3 (2026-11-07, Main): the #10-24 tap is located on the part from datum B, not spotted through MHA-FR-02. The owner rulings of 2026-11-05 (tap annealed, inspect hardened) and the delegated sm Q5 have no hardening left to govern.
-  process: "machined complete from 4140/4142 HT bar as supplied (28-32 HRC), no heat treatment; the MHA-SM-03 trunnion bore (12 mm H7 HSS reamer) and the datum-B MHA-SM-VN-53 dowel hole (.1280 HSS reamer) are reamed to their printed bands; one blind #10-24 thread per mount (two mounts total), drilled and tapped at its position from datum B with a bottoming tap and checked with an MHA-SM-VN-52 bolt"
+  # Owner ruling 2026-11-23, tool audit Q13: "dia .4985 +.0015/0 (owner chose against the agent's recommendation to keep .4720); no 12 mm reamer". The trunnion bore was the book's close bore, Ø.472 (ch18 p.42, 2026-09-02 re-read); it is now Ø.4985 +.0015/0, 5.6 % larger than the book's, reamed with the .4990 reamer of the over/under set.
+  process: "machined complete from 4140/4142 HT bar as supplied (28-32 HRC), no heat treatment; the MHA-SM-03 trunnion bore (.4990 HSS reamer) and the datum-B MHA-SM-VN-53 dowel hole (.1280 HSS reamer) are reamed to their printed bands; one blind #10-24 thread per mount (two mounts total), drilled and tapped at its position from datum B with a bottoming tap and checked with an MHA-SM-VN-52 bolt"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"

@@ -8,9 +8,22 @@
 # outline cut through with the 1/8 in end mill all round but for a bridge at
 # its arbor end's apex, which holds the strap in the blank. The saw cuts
 # across each bridge; the stub is filed to the round. Then each strap on
-# edge, seat flank up: the follower seat drilled #26, its floor flattened
-# with the 1/8 in end mill and the seat reamed .1570 to it with a bottoming
-# (square-end) reamer, the drawing's FLAT-BOTTOM REAM.
+# edge, seat flank up: the follower seat drilled #26, then the 1/8 in end
+# mill plunges to its floor and interpolates it: one turn flattens the floor,
+# one finishes the wall at the middle of the drawing's .157 +.003/.000. Owner
+# ruling 2026-11-23 (tool audit Q8), verbatim: "Re-band to +.003/0, finish
+# with the 1/8 end mill, check with .157/.160 pins". It replaces the .1570
+# bottoming reamer (a quoted special): a plunged 1/8 cutter cuts .125, so the
+# seat is interpolated; the band's .0015 either side of the finish circle is
+# the mill's.
+#
+# Gauges: Class ZZ single pins, a plus GO at each band's low limit and a
+# minus NO-GO at its high limit (shop zz-pins-2510-2515, zz-pins-3135-3140,
+# zz-pins-1570-1600), each miked with the reamers in Setup 1. Owner ruling
+# 2026-11-23 (tool audit Q1, re-answered on the corrected facts), verbatim:
+# "ZZ singles per the record: 29 pins (17 plus GO, 12 minus NO-GO), about
+# $130. Accept that good holes near a limit may be refused; the traveler
+# mikes each pin so the real window is known per pin."
 #
 # The cross hole is not drilled here. Owner ruling 2026-11-21 (Pedro, asked
 # in person): "Pinion bracket cross hole: match-drill at assembly". The
@@ -22,7 +35,7 @@
 # under each jaw (PB02: face B, spot, drill C and N, ream .2510 and .3135,
 # both outlines to their bridges); Setup 3 bench: saw each bridge, file the
 # stub, deburr; Setup 4 on edge on the same stacks, face A at the fixed jaw
-# (PB04: spot, drill #26, flatten the seat's floor, ream .1570); Setup 5
+# (PB04: spot, drill #26, end-mill the seat's floor and wall); Setup 5
 # bench: deburr, inspect, oil.
 #
 # Zeroing: every X/Y zero is the owned .200 in edge finder at 900 rpm
@@ -36,13 +49,13 @@
 # are a contract with that recipe. Tool numbers are the places in the tools
 # list among the mill's tools: T1 1/2 in end mill, T2 trade-size 1 centre
 # drill, T3 C, T4 N, T5 .2510 reamer, T6 .3135 reamer, T7 1/8 in end mill,
-# T8 #26, T9 .1570 reamer.
+# T8 #26.
 title = "Pinion bracket strap"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 3/8 x 1-1/4 in flat (drawing: {{cad.material_spec}})"
 stock = "3/8 x 1-1/4 in flat bar; one blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in long makes both straps."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.broad_face_b_thickness_min_in:.3dot}}–{{cad.broad_face_b_thickness_max_in:.3dot}} thick (face A to face B); face A is the bar's cold-finished face, left as bought. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home. After any controller reset, stall or E-stop, home and touch off again before Cycle Start (Op 70 alone keeps G54: its face is already cut). Every file is proved in air before its first cut. Not on hand, to buy before the job: the .2510 and .3135 reamers, the .1570 bottoming reamer and the three go/no-go plug gauge pairs."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.broad_face_b_thickness_min_in:.3dot}}–{{cad.broad_face_b_thickness_max_in:.3dot}} thick (face A to face B); face A is the bar's cold-finished face, left as bought. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home. After any controller reset, stall or E-stop, home and touch off again before Cycle Start (Op 110 alone keeps G54: its face is already cut). Every file is proved in air before its first cut. Not on hand, to buy before the job: the .2510 and .3135 reamers and the six Class ZZ pins (.2510, .3135 and .157 plus; .2515, .314 and .160 minus)."
 shop = "../shop"
 stock_refs = ["1018-flat-3-8x1-1-4"]
 material_key = "rocker-1018-cold-finished"
@@ -127,16 +140,16 @@ outline_past_mm = 0.254
 eighth_plunge_feed_per_min_mm = 106.68
 # The seat (PB04, Z0 the seat flank): spot it Ø.065, under the #26; the
 # #26 point .002 above the seat's floor; the 1/8 in end mill plunges to the
-# floor and turns once at Ø.150, a flat floor under the reamer with .0035
-# in a side left to ream; the .1570 bottoming reamer (square end, corner
-# break .002 max, to order) reams to .001 above that floor. The step and
-# the reamer's corner break left in the floor's corner lie inside the
-# drawing's R.008 max corner; cam.py checks it.
+# floor, turns once at Ø.150 (it takes out the drill's wall and point cone
+# and leaves a flat floor) and once at Ø.1585, the middle of the seat's
+# .157 +.003/.000 (tool audit Q8). Both turns run on the floor, so the
+# floor's corner is the square end mill's own, inside the drawing's R.008
+# max corner. cam.py checks both.
 edge_spot_dia_mm = 1.651
 seat_floor_z_mm = -4.064
 seat_drill_floor_gap_mm = 0.05
 seat_floor_dia_mm = 3.81
-seat_ream_floor_gap_mm = 0.025
+seat_finish_dia_mm = 4.0259
 # Speeds and feeds of the holes, authored in the operations. Drilling:
 # LittleMachineShop "Cutting Speeds", Drilling & Reaming, Plain carbon steels
 # 1006-1026 (read 2026-11-20): 60-100 ft/min, the low end taken; AutoDrill
@@ -146,16 +159,27 @@ seat_ream_floor_gap_mm = 0.025
 # 750 rpm × .003 = 2.25. #26 (.147): 1550 rpm × .003 = 4.65. The
 # trade-size 1 carbide centre drill: 2800 rpm (92 ft/min on its 1/8 body) ×
 # .0005 (half the 1/16 column, for its 3/64 pilot) = 1.4 in/min. Reaming
-# (author's rule of thumb): half the drilling speed, 30 ft/min, .004 in/rev
-# (.003 on the .1570): .2510 at 450 rpm = 1.8 in/min, .3135 at 360 rpm =
-# 1.44, .1570 at 700 rpm = 2.1.
+# (author's rule of thumb): half the drilling speed, 30 ft/min, .004 in/rev:
+# .2510 at 450 rpm = 1.8 in/min, .3135 at 360 rpm = 1.44.
 spot_feed_per_min_mm = 35.56
 drill_c_feed_per_min_mm = 72.39
 drill_n_feed_per_min_mm = 57.15
 drill_26_feed_per_min_mm = 118.11
 ream_2510_feed_per_min_mm = 45.72
 ream_3135_feed_per_min_mm = 36.576
-ream_1570_feed_per_min_mm = 53.34
+# The Class ZZ pins (owner ruling 2026-11-23, tool audit Q1): each GO a plus
+# pin at its band's low limit, true size the limit to .0002 over; each NO-GO
+# a minus pin at the high limit, .0002 under to the limit (one pin's ZZ
+# tolerance, the records' resolution_mm 0.00508). With both pins at those
+# extremes a hole is sure to pass only between the largest GO and the
+# smallest NO-GO below: the middle .0001 of each bore's .0005 band, and
+# .1572-.1598 of the seat's .003.
+pivot_go_pin_max_in = 0.2512
+pivot_nogo_pin_min_in = 0.2513
+arbor_go_pin_max_in = 0.3137
+arbor_nogo_pin_min_in = 0.3138
+seat_go_pin_max_in = 0.1572
+seat_nogo_pin_min_in = 0.1598
 # Holding (shop workholding.vise-pm-6 and fixtures.parallels-lms-6745, 1/8 in
 # thick): the set's 1 in and 1/2 in parallels stacked against each jaw (1.5
 # in), as the column clamp plans stack them, so the blank's face B and, on
@@ -199,10 +223,11 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # 1/2 in flutes clear).
 half_mill_projection_mm = 27.94
 eighth_mill_projection_min_mm = 15.875
-# ANSI B94.2 straight-shank chucking reamers: 6 in overall at .2510 and
-# .3135, 4-1/2 in at .1570; bounded by their whole length below the chuck.
+# ANSI B94.2 straight-shank chucking reamers, 6 in overall at .2510 and
+# .3135; the #26 jobber drill 2-7/8 in (ASME B94.11M), PB04's longest tool;
+# bounded by their whole length below the chuck.
 reamer_long_oal_mm = 152.4
-reamer_short_oal_mm = 114.3
+drill_26_oal_mm = 73.025
 # The trade-size 1 centre drill, 1-1/4 in overall.
 centre_drill_oal_mm = 31.75
 
@@ -241,11 +266,6 @@ id = "drill-26"
 name = "#26 drill"
 ref = "drill-26"
 [[tools]]
-id = "reamer-1570"
-name = ".1570 bottoming reamer"
-ref = "reamer-1570-bottoming"
-status = "to_order"
-[[tools]]
 id = "saw"
 name = "Evolution miter saw"
 ref = "saw-evolution-14"
@@ -258,19 +278,19 @@ id = "feeler-gauges"
 name = "Feeler gauges (Pittsburgh 32-pc)"
 ref = "feeler-gauges"
 [[tools]]
-id = "plug-2510"
-name = ".2510/.2515 plug gauges"
-ref = "plug-gauges-2510-2515"
+id = "pins-2510"
+name = "Class ZZ pins: .2510 plus (GO) and .2515 minus (NO-GO)"
+ref = "zz-pins-2510-2515"
 status = "to_order"
 [[tools]]
-id = "plug-3135"
-name = ".3135/.3140 plug gauges"
-ref = "plug-gauges-3135-3140"
+id = "pins-3135"
+name = "Class ZZ pins: .3135 plus (GO) and .314 minus (NO-GO)"
+ref = "zz-pins-3135-3140"
 status = "to_order"
 [[tools]]
-id = "plug-1570"
-name = ".1570/.1575 plug gauges"
-ref = "plug-gauges-1570-1575"
+id = "pins-1570"
+name = "Class ZZ pins: .157 plus (GO) and .160 minus (NO-GO)"
+ref = "zz-pins-1570-1600"
 status = "to_order"
 
 [[setups]]
@@ -307,6 +327,26 @@ gauge_checks = [
   { gauge = "micrometers", band_mm = ["{{process.blank_z_min_mm}}", "{{process.blank_z_max_mm}}"] },
 ]
 
+[[setups.operations]]
+instruction = "On the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the six Class ZZ pins: {{cad.pivot_bore_dia_min_in:.4dot}} plus and {{cad.pivot_bore_dia_max_in:.4dot}} minus, {{cad.arbor_bore_dia_min_in:.4dot}} plus and {{cad.arbor_bore_dia_max_in:.4dot}} minus, {{cad.follower_seat_dia_min_in:.3dot}} plus and {{cad.follower_seat_dia_max_in:.3dot}} minus. Write each reading here and on its tag."
+inspection = "GO pins read {{cad.pivot_bore_dia_min_in:.4dot}}–{{process.pivot_go_pin_max_in:.4dot}}, {{cad.arbor_bore_dia_min_in:.4dot}}–{{process.arbor_go_pin_max_in:.4dot}} and {{cad.follower_seat_dia_min_in:.4dot}}–{{process.seat_go_pin_max_in:.4dot}}; NO-GO pins {{process.pivot_nogo_pin_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}, {{process.arbor_nogo_pin_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}} and {{process.seat_nogo_pin_min_in:.4dot}}–{{cad.follower_seat_dia_max_in:.4dot}}. A pin outside: replace it before Setup 2."
+gauge_checks = [
+  { gauge = "micrometers", band_mm = "{{cad.pivot_bore_dia_band_mm}}" },
+  { gauge = "micrometers", band_mm = "{{cad.arbor_bore_dia_band_mm}}" },
+  { gauge = "micrometers", band_mm = "{{cad.follower_seat_dia_band_mm}}" },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mike the .2510 and .3135 reamers across two opposite margins at their front ends. Write the two readings here."
+inspection = "Each reamer under its NO-GO pin's reading, else it is not used: stop and tell the owner."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "This sheet accepts a hole its GO pin enters and its NO-GO pin does not: GO reading ≤ hole < NO-GO reading. With the pins at their size limits only {{process.pivot_go_pin_max_in:.4dot}}–{{process.pivot_nogo_pin_min_in:.4dot}} (pivot), {{process.arbor_go_pin_max_in:.4dot}}–{{process.arbor_nogo_pin_min_in:.4dot}} (arbor) and {{process.seat_go_pin_max_in:.4dot}}–{{process.seat_nogo_pin_min_in:.4dot}} (seat) are sure to pass; a good hole within .0002 of a band limit may be refused (owner ruling 2026-11-23)."
+feed = "hand"
+
 [[setups]]
 machine_kind = "other"
 title = "Face B, both straps' bores and outlines"
@@ -319,6 +359,10 @@ diagram = { file = "diagrams/flat.svg", alt = "The blank lying on stacked parall
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.blank_x_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_top_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.arbor_drill_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_long_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_x_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.blank_top_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_blank_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.blank_length_max_mm}}"], section_mm = { y = "{{cad.blank_x_mm}}", z = "{{cad.broad_face_b_thickness_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Only if a reamer read under its GO pin, before the blank goes in: grip a 3/8 flat offcut in the vise, spindle over it by eye; by the quill handle drill it through (C for the .2510, N for the .3135), then ream it through with that reamer at its file speed; gauge it with that band's pins. The GO pin enters: go on. Refused: stop and tell the owner (the pins refuse this reamer's holes)."
+feed = "hand"
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 the blank's left end, Y0 the fixed jaw's face: edge finder (900 rpm)."
@@ -428,12 +472,20 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Still clamped, the bores' edges still sharp: gauge every bore with its plug pair. Unclamp."
-inspection = "Pivot bores Ø{{cad.pivot_bore_dia_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}: the .2510 GO enters, the .2515 NO-GO does not. Arbor bores Ø{{cad.arbor_bore_dia_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}}: the .3135 GO enters, the .3140 NO-GO does not; the arbor bores bright, no tears or chatter (Ra {{cad.arbor_bore_finish_ra_printed}} µin). A bore outside: stop and tell the owner."
+instruction = "Still clamped, the bores' edges still sharp: gauge every bore with its two Class ZZ pins. Every bore passing: unclamp."
+inspection = "GO enters, NO-GO does not: pivot bores Ø{{cad.pivot_bore_dia_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}} (.2510 plus and .2515 minus pins); arbor bores Ø{{cad.arbor_bore_dia_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}} (.3135 plus and .314 minus pins), bright, no tears or chatter (Ra {{cad.arbor_bore_finish_ra_printed}} µin)."
 gauge_checks = [
-  { gauge = "plug-gauges-2510-2515", band_mm = "{{cad.pivot_bore_dia_band_mm}}" },
-  { gauge = "plug-gauges-3135-3140", band_mm = "{{cad.arbor_bore_dia_band_mm}}" },
+  { gauge = "zz-pins-2510-2515", band_mm = "{{cad.pivot_bore_dia_band_mm}}" },
+  { gauge = "zz-pins-3135-3140", band_mm = "{{cad.arbor_bore_dia_band_mm}}" },
 ]
+
+[[setups.operations]]
+instruction = "A GO pin refused: clear the chips and oil. Console M6 T5 (.2510, 450 rpm, F45.720) or T6 (.3135, 360 rpm, F36.576), spindle on, then by MDI: G0 X<bore> Y-15.875, G0 Z10.144, G1 Z-2.540 F<feed>, G1 Z10.144 F<feed>, with X 17.000 or 70.000 for a pivot bore, 45.000 or 98.000 for an arbor bore. Gauge again; all passing now: unclamp."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Still refused (a reamer cannot be made to cut larger), or a NO-GO pin entering (no cut remedies it): stop and tell the owner."
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
@@ -487,8 +539,8 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same stacks. One strap on edge, its far flank down on both stacks, the seat flank up, face A against the FIXED jaw, gripped across faces A and B, its pivot end at the LEFT, centred on the jaws. Tap it down onto both stacks while closing the vise. The lower {{process.grip_mm:in.3dot}} of its width is in the jaws; both round ends' apexes stand above the jaw tops."
 datum = "Program PB04_edge. G54: X0 the pivot bore's axis, Y0 the fixed jaw's face (face A), +Y toward it; Z0 the seat flank. Seat at X {{cad.follower_seat_height_in:.3f}}, Y −{{cad.follower_seat_station_in:.3f}} in. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
-diagram = { file = "diagrams/edge.svg", alt = "The strap on edge on stacked parallels, seat flank up, face A at the fixed jaw, pivot end at the left: the centre drill, the #26, the 1/8 in end mill and the .1570 reamer make the follower seat." }
-envelope = { x_span_mm = ["{{cad.envelope_y_mm}}", 5.08], y_span_mm = ["{{cad.broad_face_b_thickness_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.strap_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.strap_width_mm}}", "{{process.seat_floor_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_short_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
+diagram = { file = "diagrams/edge.svg", alt = "The strap on edge on stacked parallels, seat flank up, face A at the fixed jaw, pivot end at the left: the centre drill, the #26 and the 1/8 in end mill make the follower seat." }
+envelope = { x_span_mm = ["{{cad.envelope_y_mm}}", 5.08], y_span_mm = ["{{cad.broad_face_b_thickness_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.strap_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.strap_width_mm}}", "{{process.seat_floor_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_26_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.broad_face_b_thickness_mm}}", along_jaws_mm = "{{cad.envelope_y_mm}}", part_height_mm = "{{process.strap_width_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_strap_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_y_mm}}"], clamp_mm = [0, "{{cad.envelope_y_mm}}"], section_mm = { y = "{{cad.broad_face_b_thickness_mm}}", z = "{{process.strap_width_mm}}" }, vise_left = "start" }
 
@@ -537,31 +589,23 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T7: the 1/8 in end mill plunges into the seat to its floor at Z {{process.seat_floor_z_mm:in.4f}} and turns once round it at Ø{{process.seat_floor_dia_mm:in.3dot}}: it takes out the drill's cone and leaves a flat floor with square corners, under the reamer; set 2800."
+instruction = "Same file, M6 T7: the 1/8 in end mill plunges to the seat's floor at Z {{process.seat_floor_z_mm:in.4f}}, circles once at Ø{{process.seat_floor_dia_mm:in.3dot}} and once at Ø{{process.seat_finish_dia_mm:in.4dot}}, the band's middle (a plunged 1/8 cuts only .125); set 2800."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
-  { name = "seat floor", kind = "plunge", phase = "finish", cutter_dia_mm = 3.175, flutes = 3, stations_mm = "{{cad.follower_seat_y_from_min_mm}}" },
+  { name = "seat", kind = "plunge", phase = "finish", cutter_dia_mm = 3.175, flutes = 3, stations_mm = "{{cad.follower_seat_y_from_min_mm}}" },
 ]
 
 [[setups.operations]]
-speed_kind = "spindle"
-tool = "reamer-1570"
-drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.follower_seat_dia_band_mm}}" }
-instruction = "Same file, M6 T9: ream the seat .1570 with the bottoming (square-end) reamer, its tip {{process.seat_ream_floor_gap_mm:in.3dot}} above the floor, fed in and out, spindle running; set 700. Cutting oil. Its square end reams the wall to the floor; the step and its .002 max corner break left there lie inside the drawing's R{{cad.follower_seat_floor_corner_r_max_mm:in.3dot}} max floor corner."
-rpm = 700
-feed = "{{process.ream_1570_feed_per_min_mm:in.1f}} in/min, in and out"
-milling_cuts = [
-  { name = "seat ream", kind = "drill", phase = "finish", cutter_dia_mm = 3.9878, flutes = 6, rpm = 700, feed_mm_min = "{{process.ream_1570_feed_per_min_mm}}", stations_mm = "{{cad.follower_seat_y_from_min_mm}}" },
-]
-
-[[setups.operations]]
-instruction = "Still clamped, blow the seat clean and gauge it."
-inspection = "Seat Ø{{cad.follower_seat_dia_min_in:.4dot}}–{{cad.follower_seat_dia_max_in:.4dot}}: the .1570 GO enters to the floor, the .1575 NO-GO does not. Depth {{cad.follower_seat_depth_min_in:.3dot}}–{{cad.follower_seat_depth_max_in:.3dot}}: the calipers' depth rod from the flank to the floor. Out: stop and tell the owner."
+instruction = "Still clamped, blow the seat clean and gauge it: the .157 GO pin enters to the floor, the .160 NO-GO pin does not; the calipers' depth rod from the flank to the floor."
+inspection = "GO enters, NO-GO does not: seat Ø{{cad.follower_seat_dia_min_in:.3dot}}–{{cad.follower_seat_dia_max_in:.3dot}}. Depth {{cad.follower_seat_depth_min_in:.3dot}}–{{cad.follower_seat_depth_max_in:.3dot}}."
 gauge_checks = [
-  { gauge = "plug-gauges-1570-1575", band_mm = "{{cad.follower_seat_dia_band_mm}}" },
+  { gauge = "zz-pins-1570-1600", band_mm = "{{cad.follower_seat_dia_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.follower_seat_depth_band_mm}}" },
 ]
+
+[[setups.operations]]
+instruction = "GO pin refused: clear the chips and gauge again; still refused, the NO-GO pin entering (no cut remedies it), or the depth outside: stop and tell the owner before the second strap."
+feed = "hand"
 
 [[setups.operations]]
 instruction = "Unclamp; repeat this setup for the other strap without the proving run: the same Y0 and Z0, X0 again from its own apex and the radius written on its face B."
@@ -587,14 +631,14 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Inspect each strap: the seat's station from face A."
-inspection = "Seat station {{cad.follower_seat_station_min_in:.3dot}}–{{cad.follower_seat_station_max_in:.3dot}} from face A: the calipers' jaw tips closed on the wall between face A and the seat on the seat flank, plus half the .1570 GO (.0785). Out: stop and tell the owner."
+inspection = "Seat station {{cad.follower_seat_station_min_in:.3dot}}–{{cad.follower_seat_station_max_in:.3dot}} from face A: the calipers' jaw tips closed on the wall between face A and the seat on the seat flank, plus half the GO pin's written reading. Out: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.follower_seat_station_band_mm}}" },
 ]
 
 [[setups.operations]]
 instruction = "Each strap: check the seat's height from the pivot bore's axis."
-inspection = "The seat's height {{cad.follower_seat_height_min_in:.3dot}}–{{cad.follower_seat_height_max_in:.3dot}}, the drawing's {{cad.follower_seat_height_in:.3dot}} from the pivot bore's axis: the calipers' outside jaws from the pivot end's apex to the far side of the .1570 GO standing in the seat, less half the GO (.0785) and the pivot end's radius written on face B. Out: stop and tell the owner."
+inspection = "The seat's height {{cad.follower_seat_height_min_in:.3dot}}–{{cad.follower_seat_height_max_in:.3dot}}, the drawing's {{cad.follower_seat_height_in:.3dot}} from the pivot bore's axis: the calipers' outside jaws from the pivot end's apex to the far side of the .157 GO pin standing in the seat, less half its written reading and the pivot end's radius written on face B. Out: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.follower_seat_height_band_mm}}" },
 ]

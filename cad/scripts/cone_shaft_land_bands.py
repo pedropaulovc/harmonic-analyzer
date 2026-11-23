@@ -49,7 +49,7 @@ SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
 # Shared displayed precision: native drawing and physical-limit consumers
 # read the same per-section table; no unrounded-nominal acceptance mapping.
 # Inch places: four on every land, the places their .0008/.0020 in bands
-# need (.4825, .3750, .2500).
+# need (.4375, .3750, .2500).
 LAND_DIA_PLACES = (4, 4, 4)
 
 

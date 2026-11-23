@@ -117,6 +117,16 @@ tool = "form-tool-r047"
 material = "lathe-c360"
 rpm = 300
 feed = "cross slide by hand, slow and steady, dry"
+# The output fixture's groove with the one full-radius groover (tool audit
+# 2026-11-23, row form-tool-r047: "cut MG-06's FULL R groove with the one
+# full-radius groover bought for MG-05"): it cuts its whole .048 width at
+# once, as the R.047 did, so the same authored 300 rpm (33 ft/min at the
+# Ø.42 spigot), fed by hand, dry. No maker's figure: a hand-fed form plunge.
+[settings.fixture-form-r024-c360]
+tool = "form-tool-r024"
+material = "lathe-c360"
+rpm = 300
+feed = "cross slide by hand, slow and steady, dry"
 [settings.fixture-spot-c360]
 tool = "jig-spot"
 material = "lathe-c360"
@@ -161,6 +171,22 @@ resolution_mm = 0.001016
 [tools.plug-gauges-4990-4995]
 description = "Plug gauge pair, .4990 GO (plus) and .4995 NO-GO (minus), Vermont Gage Class X"
 
+# The MHA-MG-10 drum bore's Class ZZ pins (owner ruling 2026-11-23, tool audit
+# Q1, re-answered, verbatim: "ZZ singles per the record: 29 pins (17 plus GO,
+# 12 minus NO-GO), about $130. Accept that good holes near a limit may be
+# refused; the traveler mikes each pin so the real window is known per
+# pin."). They replace the Class X pair above, which the tool-records cleanup
+# PR removes once every family has landed. Ø.4990 +.0005/.0000: GO a .4990
+# plus single (.4990-.4992), NO-GO
+# a .4995 minus single (.4993-.4995; .4995 is off the .001 box). Range: the
+# band, 12.6746-12.6873 mm; resolution: one pin's Class ZZ tolerance, .0002
+# in = 0.00508 mm.
+[gauges.zz-pins-4990-4995]
+range_mm = [12.6746, 12.6873]
+resolution_mm = 0.00508
+[tools.zz-pins-4990-4995]
+description = "Class ZZ pins for .4990-.4995: GO .4990 plus (single), NO-GO .4995 minus (single)"
+
 # --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
 # The tools the placeholder plans name (cad/process/<stem>/plan.toml with
 # revision = "placeholder", not in _process_plans.TRAVELER_STEMS), from the
@@ -190,9 +216,6 @@ diameter_mm = 4.7371
 [tools.reamer-1885]  # B-reamer-.1885
 description = ".1885 in HSS chucking reamer"
 diameter_mm = 4.7879
-[tools.reamer-4990]  # B-reamer-.4990
-description = ".4990 in HSS chucking reamer"
-diameter_mm = 12.6746
 
 # --- MHA-MG-08 wheel bar (cad/process/mg_wheel_bar/plan.toml) ---
 # The axle bore's go/no-go pair (cad/config/shop-equipment/
@@ -206,6 +229,20 @@ range_mm = [4.7371, 4.7498]
 resolution_mm = 0.001016
 [tools.plug-gauges-1865-1870]
 description = "Plug gauge pair, .1865 GO (plus) and .1870 NO-GO (minus), Vermont Gage Class X"
+
+# The axle bore's Class ZZ pins (owner ruling 2026-11-23, tool audit Q1,
+# re-answered; quoted at gauges.zz-pins-4990-4995 above). They replace the
+# Class X pair above, which the tool-records cleanup PR removes once every
+# family has landed. Ø.1865
+# +.0005/.0000: GO a .1865 plus single (.1865-.1867), NO-GO the .187 minus
+# pin of the .061-.500 minus box (gauges.pin-gauges; .1868-.1870). Range: the
+# band, 4.7371-4.7498 mm; resolution: one pin's Class ZZ tolerance, .0002 in
+# = 0.00508 mm.
+[gauges.zz-pins-1865-1870]
+range_mm = [4.7371, 4.7498]
+resolution_mm = 0.00508
+[tools.zz-pins-1865-1870]
+description = "Class ZZ pins for .1865-.1870: GO .1865 plus (single), NO-GO .187 minus (the .061-.500 box)"
 
 # --- Drawing cross-check additions (2026-11-19) -------------------------------
 # Tools the v50 drawings call for that the quote workbook left out, from the

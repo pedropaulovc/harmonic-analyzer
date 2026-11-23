@@ -72,7 +72,6 @@ from pn_pen_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FRAME_DEPTH,
-    INSIDE_CORNER_R_MAX,
     ISOMETRIC_VIEW_NOTE,
     OUTER_HEIGHT,
     OUTER_WIDTH,
@@ -169,6 +168,9 @@ HOLE_R_SHEET = blind_cut_dia_mm(SET_SCREW_TAP_SPEC) * VIEW_SCALE / 2000.0
 #   the window's bottom-left corner, so neither crosses the other's
 #   dimension line.
 # - The 1.58 height stands 30 mm right of the ring.
+# - The window corners' 4X R.065 rides up-right of the ring, clear of the
+#   1.00 above and the 1.58's line, its leader to the top-right corner (the
+#   fillet's first edge, build_pn_pen_frame).
 FRONT_KEEP = {
     "OuterSpanX": (FRONT_CENTER[0], FRONT_TOP_Y + 0.014),
     "OuterHeightDim": (FRONT_RIGHT_X + 0.030, FRONT_CENTER[1]),
@@ -176,6 +178,7 @@ FRONT_KEEP = {
     "BottomWall": (FRONT_LEFT_X - 0.024, _front_xy(0.0, RAIL_END / 2.0)[1]),
     "WindowWidth": (FRONT_CENTER[0], FRONT_BOTTOM_Y - 0.008),
     "LeftWall": (FRONT_LEFT_X - 0.012, FRONT_BOTTOM_Y - 0.017),
+    "WindowCornerR": (FRONT_RIGHT_X + 0.045, FRONT_TOP_Y + 0.020),
 }
 # Bottom view: the hole's X coordinate below, its Z coordinate left, the depth
 # right; the hole callout stands above-right, between the bottom view and the
@@ -206,9 +209,8 @@ _CALLOUT_DEFINITION_PARTS = (5, 6, 7, 8)  # swDimensionTextParts_e definitions
 # origin the bottom-left outer corner of the sketch face, width +X, height +Y,
 # depth +Z; the window centred in X). Every size and station prints .XX
 # (DRAWING_PRECISION_BY_NAME), the tap drill the DRILLED HOLES row at
-# TAP_DRILL_PLACES; the window's corners print no radius, so the title
-# block's INSIDE CORNERS R.040 MAX governs them. The declarations print
-# nothing.
+# TAP_DRILL_PLACES; the window's corners print 4X R.065 at .XXX (owner
+# ruling 2026-11-23, tool audit Q9). The declarations print nothing.
 _P = DRAWING_PRECISION_BY_NAME
 _SELF = "draw_pn_pen_frame"
 _FRAME = "__frame__"
@@ -302,8 +304,8 @@ for _name, _normal, _axis, _value, _key, _dim, _source, _from, _keep in (
     )
 # The window, through the depth: its width .74 and height 1.10, and its
 # lower-left corner .13 from the left face and .24 from the bottom face
-# (FRONT_KEEP). Its four walls and four corner rounds; the rounds take the
-# title block's R.040 MAX.
+# (FRONT_KEEP). Its four walls and four corner rounds; the rounds print
+# 4X R.065 (FRONT_KEEP WindowCornerR).
 _WINDOW_X = (RAIL_SIDE, RAIL_SIDE + WINDOW_WIDTH)
 _WINDOW_Y = (RAIL_END, RAIL_END + WINDOW_HEIGHT)
 requirement(
@@ -324,7 +326,7 @@ requirement(
             for _y, _sy in ((_WINDOW_Y[0], 1.0), (_WINDOW_Y[1], -1.0))
         ),
     ),
-    requirements=("width", "height", "left_wall", "bottom_wall", "corner_r_max"),
+    requirements=("width", "height", "left_wall", "bottom_wall", "corner_r"),
     fields={
         "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
         "thru": (True, ("FRAME_DEPTH", _FRAME)),
@@ -344,14 +346,20 @@ requirement(
         ),
         "bottom_wall_nominal": (RAIL_END, ("RAIL_END",)),
         "bottom_wall_from": ("bottom_face", ((_SELF, "FRONT_KEEP"),)),
-        "corner_r_max": (INSIDE_CORNER_R_MAX, ("INSIDE_CORNER_R_MAX",)),
-        "corner_r_model": (WINDOW_CORNER_R, ("WINDOW_CORNER_R",)),
+        "corner_r": _band(
+            "WindowCornerR",
+            WINDOW_CORNER_R,
+            ("WINDOW_CORNER_R", (_SELF, "FRONT_KEEP")),
+        ),
+        "corner_r_nominal": (WINDOW_CORNER_R, ("WINDOW_CORNER_R",)),
+        "corner_count": (4, ("DIMENSION_PREFIXES",)),
     },
     precision={
         "width": _P["WindowWidth"],
         "height": _P["WindowHeight"],
         "left_wall": _P["LeftWall"],
         "bottom_wall": _P["BottomWall"],
+        "corner_r": _P["WindowCornerR"],
     },
 )
 # The thumb-screw tap up through the bottom rail into the window: one native

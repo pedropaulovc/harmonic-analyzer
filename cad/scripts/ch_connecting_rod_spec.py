@@ -152,14 +152,17 @@ PIN_HOLE_LIMITS = (1.9685, 1.97866)  # .0775-.0779 in, reamed; native
 PIN_HOLE_DIA = 1.97358  # .0777 in
 if abs(PIN_HOLE_DIA - sum(PIN_HOLE_LIMITS) / 2.0) > 1e-9:
     raise AssertionError("the pin hole's model must sit mid-band")
-# Every inside corner a radius this size can seat in -- the slot floor's two,
-# the fork's root step onto the shank (four) and the shank's flanks onto the
-# ring's OD (two) -- is one modelled fillet, inside the title block's INSIDE
-# CORNERS R.040 MAX, which governs them on the print (machinist review: a
-# tighter all-corners MAX named no function). The two corners where a shank
-# face meets the ring's OD are modelled sharp under the same MAX: the ring
-# stands .015 over the shank's near face, less than this radius, and .025
-# over its far face at nominal only
+# Every other inside corner a radius this size can seat in -- the slot
+# floor's two and the two ledges where the shank's faces meet the fork's root
+# step -- is one modelled fillet, inside the title block's INSIDE CORNERS
+# R.040 MAX, which governs them on the print (machinist review: a tighter
+# all-corners MAX named no function). The shank's four corners onto the
+# ring's OD and the fork's step keep the 1/8 in end mill's radius and print
+# their own R.065 (owner ruling 2026-11-23, tool audit Q9;
+# ch_connecting_rod_notes.SHANK_CORNER_R). The two corners where a shank
+# face meets the ring's OD are modelled sharp under the title block's MAX:
+# the ring stands .015 over the shank's near face, less than this radius,
+# and .025 over its far face at nominal only
 # (build_ch_connecting_rod.RING_STEPS). That ceiling still clears the arm over
 # the slot floor (the offline drawing test checks it against
 # sh_vn_pivot_pin_rod_spec), and stays well inside half the slot.

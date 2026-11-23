@@ -307,11 +307,12 @@ KNIFE_REAR_YAW_RANGE_DEG = math.degrees(
 # (absorb stacks), and the 2026-10-09 ruling: >=5.0 deg).  Owner ruling
 # 2026-11-08 (Pedro), #2144 item 11.3: the part no longer sets the bore's
 # yaw.  The gauge bar sets the front mount's bore, so its far-end offset t
-# is the bar's diametral clearance in the largest bore, .4735 - (.4720 -
+# is the bar's diametral clearance in the largest bore, .5000 - (.4985 -
 # .0026) = .0041 (0.1041), and the lever's ridge, spanning both bores, adds
 # its yaw over the shortest mouth-to-mouth run (codjiflo, PR #1978): that
 # clearance walked across the deepest .XX block, 14.224 * 0.1041 / 166.2 =
-# 0.0089.  t 0.113 leaves about 7.12 deg.  The bore's ∥.002|A is its
+# 0.0089.  t 0.113 leaves about 8.51 deg in the smallest Ø.4985 bore (owner
+# ruling 2026-11-23, tool audit Q13; 7.12 deg in the former Ø.4720).  The bore's ∥.002|A is its
 # pitch, which the lateral rock model (free_rock_deg) does not read.  The
 # rear mount's yaw is accepted by the rock gauge itself
 # (sm_summing_assembly_spec.BOSS_ROCK_TRAVEL, sheet check 2): the fitter
