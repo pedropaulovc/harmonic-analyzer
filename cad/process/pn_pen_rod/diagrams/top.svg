@@ -8,11 +8,17 @@
   <rect class="part-kept" x="40" y="130" width="420" height="40"/>
   <rect class="paper" x="420" y="146" width="40" height="8"/>
   <line class="centre-line" x1="30" y1="150" x2="740" y2="150"/>
-  <rect class="cutter" x="470" y="144" width="130" height="12"/>
-  <path class="clamp" d="M620 150 L650 140 L730 140 L730 160 L650 160 Z"/>
-  <line class="datum" x1="460" y1="90" x2="460" y2="210"/>
-  <text class="datum-label" x="440" y="84">Z0 top face</text>
-  <text class="label" x="470" y="200">tap in its wrench; its shank centre</text>
-  <text class="label" x="470" y="218">on the tailstock's dead centre</text>
+  <rect class="cutter" x="470" y="144" width="90" height="12"/>
+  <rect class="clamp" x="560" y="138" width="40" height="24"/>
+  <rect class="clamp" x="572" y="96" width="16" height="108"/>
+  <path class="clamp" d="M600 150 L630 140 L710 140 L710 160 L630 160 Z"/>
+  <line class="datum" x1="460" y1="90" x2="460" y2="128"/>
+  <text class="datum-label" x="420" y="84">Z0 top face</text>
+  <text class="label" x="600" y="70">T-handle tap wrench</text>
+  <line class="dims" x1="610" y1="74" x2="588" y2="96"/>
+  <text class="label" x="600" y="214">dead centre's point</text>
+  <text class="label" x="600" y="232">in the wrench's top</text>
+  <text class="label" x="600" y="250">centre hole</text>
+  <line class="dims" x1="640" y1="200" x2="602" y2="152"/>
   <text class="label" x="40" y="270">4-jaw on the flats over brass shims; indicate each pair of flats</text>
 </svg>

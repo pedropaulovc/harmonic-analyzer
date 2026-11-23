@@ -9,8 +9,8 @@
 #   ("CENTRE OK" at the tip): turn the head's Ø.236 over the whole length out
 #   of the jaws, the Ø.155 shoulder to the under-head station, the #4-40
 #   blank to the seat; the 1/16 P1 blade squares the under-head corner sharp
-#   (R.004 MAX; the AR insert's R0.4 nose cannot). Chamfer the head and the
-#   tip, withdraw the centre, run the die to the seat, plunge the relief at
+#   (R.004 MAX; the AR insert's R0.4 nose cannot). Chamfer the head,
+#   withdraw the centre, run the die to the seat, plunge the relief at
 #   the seat with the blade and cut its 45° lead with the blade's corner on
 #   the compound; part off at the head's length.
 # - Bench: file the part-off pip, saw the screwdriver slot with the 32 TPI
@@ -288,8 +288,8 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the shoulder over the same length to Ø{{cad.shoulder_dia_min_in:.4dot}}–{{cad.shoulder_dia_max_in:.4dot}}, aiming at Ø{{process.shoulder_aim_dia_mm:in.4dot}}, miking at both ends and the middle between light passes; one last pass at the same setting for the Ra {{cad.shoulder_finish_ra:g}} µm finish, no feed marks you can catch with a fingernail."
-settings = "dt-lathe-ar-1018-centre"
+instruction = "Finish the shoulder over the same length to Ø{{cad.shoulder_dia_min_in:.4dot}}–{{cad.shoulder_dia_max_in:.4dot}}, aiming at Ø{{process.shoulder_aim_dia_mm:in.4dot}}, miking at both ends and the middle between light passes; one last pass at the same setting for the drawing's Ra 63 µin (1.6 µm) finish, no feed marks you can catch with a fingernail."
+settings = "dt-lathe-ar-1018-centre-finish"
 cut_diameter_mm = "{{process.shoulder_aim_dia_mm}}"
 inspection = "Shoulder Ø{{cad.shoulder_dia_min_in:.4dot}}–{{cad.shoulder_dia_max_in:.4dot}} at both ends and the middle."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.shoulder_dia_band_mm}}" }]
@@ -331,7 +331,7 @@ tool = "ar"
 drilling = "none"
 sizing = "other"
 instruction = "Finish the blank over the same length to Ø{{cad.thread_dia_min_in:.4dot}}–{{cad.thread_dia_max_in:.4dot}} (the {{cad.thread_thread}}-2A major), aiming at Ø{{process.thread_aim_dia_mm:in.4dot}}; the seat face square at Z−{{process.seat_z_in:.3dot}}."
-settings = "dt-lathe-ar-1018-centre"
+settings = "dt-lathe-ar-1018-centre-finish"
 cut_diameter_mm = "{{process.thread_aim_dia_mm}}"
 inspection = "Blank Ø{{cad.thread_dia_min_in:.4dot}}–{{cad.thread_dia_max_in:.4dot}}, miked."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.thread_dia_band_mm}}" }]
@@ -412,7 +412,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "Relief lead, 45° from the floor up into the seat face: the compound at 45° as in Op 180 (its feed in and toward the tip), the holder square. Spindle stopped: the blade's chuck-side face back on the seat face, its tip at Ø{{process.lead_outer_dia_in:.3dot}} (the first plunge's floor); lock the carriage, zero the compound. Spindle on: feed {{process.lead_compound_in:.3dot}} along the compound: the chuck-side corner cuts the lead to the floor, {{process.lead_axial_in:.3dot}} along Z."
+instruction = "Relief lead, 45° from the floor up into the seat face: the compound at 45° as in Op 180 (its feed in and toward the tip), the holder square. Spindle stopped: the blade's chuck-side face back on the seat face, its tip at Ø{{process.lead_outer_dia_in:.3dot}} (the first plunge's floor); lock the carriage, zero the compound. Spindle on: feed {{process.lead_compound_in:.3dot}} along the compound to cut the lead to the floor, then wind the compound back to its zero."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.thread_aim_dia_mm}}"
 

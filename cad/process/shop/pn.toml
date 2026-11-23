@@ -161,6 +161,20 @@ tool = "drill-3-64"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, pecking, dry"
+# The Ø.125 pivot turned off the 5 mm square, 4-jaw only: shop/lathe.toml
+# lathe-ar-c360's 1170 sfm at the feeds prechips' turning_deflection passed
+# for the overhung pivot, .002 in/rev roughing and .001 in/rev finishing
+# (its .004 row feed springs the pivot past the finish limit).
+[settings.pn-lathe-ar-c360-turn]
+tool = "lathe-ar"
+material = "lathe-c360"
+sfm = 1170
+feed_mm_rev = 0.0508
+[settings.pn-lathe-ar-c360-finish]
+tool = "lathe-ar"
+material = "lathe-c360"
+sfm = 1170
+feed_mm_rev = 0.0254
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
