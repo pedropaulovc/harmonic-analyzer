@@ -453,7 +453,7 @@ KNOB_SHAFT_XY = PAPER_PLACEMENT.KNOB_SHAFT_XY
 # z stack of the hanger (front -Z -> back). It stands behind the bar's back
 # face on the pivot spacer, so the arm clears the sliding guide-lock stations
 # (_assert_lock_station_sweep).
-SPACER_Z0 = BAR_BACK_Z  # -129.4: spacer pressed flush on the shoulder's end
+SPACER_Z0 = BAR_BACK_Z  # -129.4: spacer bonded flush on the shoulder's end
 ARM_Z0 = ARM.FRONT_FACE_MACHINE_Z  # -124.4: arm front face on the spacer
 # Shoulder screw MHA-PD-VN-57 (Rx+90: shank to -Z): the shoulder bottoms on the
 # bar's back face; under its head the MHA-PD-VN-63 spring (identity: its O.D.
@@ -626,7 +626,7 @@ KNOB_CUP_SCREW_ENGAGED = KNOB_SHAFT_REAR_Z - KNOB_CUP_SCREW_TIP_Z
 # platen's thickness, the thickest disc, the shimmed step's sources and the
 # spigot length (the disc's chain from the arm's front face: the shims close
 # the float off the ring's load wall, transgear_cluster_fit.SHIMMED_STEP_TERMS),
-# the spacer's two faces' squareness tilting the hanger about P (Codex P1 on
+# the spacer's rear face's parallelism tilting the hanger about P (Codex P1 on
 # 6c385465d) at the rim's farthest point from P, the step, spigot-end and
 # flange squareness and the disc's rear-face parallelism at the rim, and the
 # pin's S projected axis zone at the rim.
