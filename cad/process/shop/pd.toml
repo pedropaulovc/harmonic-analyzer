@@ -60,9 +60,6 @@ description = "Straightedge"
 [tools.chamfer-mill-330ch-1-4-90]  # inventory tools.chamfer-mill-330ch-1-4-90
 description = "330CH 1/4 in 90° included 2-flute chamfer mill"
 diameter_mm = 6.35
-[tools.endmill-carbide-3-64]  # MHA-PD-03 2X .04 SLIT, FULL R END
-description = "3/64 in square carbide end mill, 2- or 3-flute"
-diameter_mm = 1.190625
 [tools.form-tool-r180]  # MHA-PD-23 R.18 head dome
 description = "R.180 dome form tool: concave R.180 edge, cuts a convex R.18 dome"
 [tools.gauge-pin-0625]  # MHA-PD-10 .002 TIR TO A Ø.0625 PIN
@@ -72,7 +69,7 @@ description = "Lathe knurling holder with straight 25 TPI wheel"
 [tools.pd-latch-hook-former]  # MHA-PD-14 R3.13 ±.02, R.38 ±.02
 description = "Shop-made latch-hook former: R3.13 roll and R.38 tab form"
 [tools.pd-platen-clip-bow-former]  # MHA-PD-03 FORMED, 6X (R1.36), .06 BOW RISE
-description = "Shop-made platen-clip bow former: R1.36 crown, .06 rise"
+description = "Platen-clip bow former: four laminations of the .032 strip, each split into a male and a female die half (cut by PC01_sheet)"
 [tools.pd-rack-pinion-cutting-arbor]  # inventory fixtures.pd-rack-pinion-cutting-arbor
 description = "Shop-made work arbor with two backing discs for cutting the MHA-PD-06 teeth"
 [tools.reamer-0615]  # MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 +.0005/.0000 REAM (.163)
@@ -124,6 +121,44 @@ feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle 
 # shop/common.toml, to buy): the tools record lets a plan list the pair.
 [tools.plug-gauges-1260-1265]
 description = "Plug gauge pair, .1260 GO (plus) and .1265 NO-GO (minus), Vermont Gage Class X"
+
+# --- MHA-PD-03 platen clip (cad/process/pd_platen_clip/plan.toml) ---
+# The clip's cutter: Harvey Tool 896231, Variable Helix End Mill for
+# Aluminum Alloys - Square - Downcut (harveytool.com/products/tool-details-
+# 896231 and the family page, read 2026-11-22): .0310 (1/32) cutter, .0930
+# length of cut, 3 left-hand spiral right-hand cut flutes (a downcut:
+# "prevents lifting of workpiece"), centre cutting, 1/8 shank, 1-1/2
+# overall, uncoated, the family "excellent performance in copper, brass, and
+# bronze alloys". It fits the .04 slit, which it cuts by running down one
+# side and back up the other. Ownership: cad/config/shop-equipment/
+# tools-special-cutters.toml, same key. diameter_mm and flute_length_mm: its
+# .0310 and .0930 × 25.4.
+[tools.endmill-carbide-3fl-1-32-downcut]
+description = "1/32 in (.0310) 3-flute carbide downcut square end mill, .093 length of cut, 1/8 shank (Harvey Tool 896231)"
+diameter_mm = 0.7874
+flute_length_mm = 2.3622
+# Harvey's own speeds and feeds for the series (SF_896200, "Variable Helix End
+# Mills for Aluminum Alloys - Square - Downcut", harveyperformance.widen.net/
+# content/urxytgzfxb/pdf/SF_896200.pdf, read 2026-11-22), uncoated, Brass
+# (Copper Zinc alloys, C2xxxx): 500 SFM; .031 cutter slotting .00033 in/tooth
+# (1x D radial, .5x D axial), max .00044. Every clip cut is a full-width slot
+# level, so the slotting figure is the ceiling (.00033 × 25.4).
+maker_chip_load_mm_per_tooth = { brass = 0.008382 }
+maker_chip_load_source = "Harvey Tool SF_896200 (8962xx downcut), uncoated, Brass C2xxxx, .031 cutter, slotting .00033 in/tooth"
+# Its setting in half-hard C26000 strip: Harvey's 500 SFM on .031 in is
+# 61,600 rpm, so the spindle's 2800 (machines.pm-30mv; 23 ft/min). Chip load
+# at Harvey's slotting figure, rounded down to the 0.1 in/min the sheet
+# prints: 2800 × 3 × .00033 = 2.77, so 2.7 in/min, .000321 in/tooth
+# (2.7 × 25.4 / 8400 mm); the plan holds each level to Harvey's .5 x D depth.
+# Delegated ruling 2026-11-22 (Main, owner review #2144): never above the
+# maker's published chip load without a measurement.
+[settings.endmill-carbide-3fl-1-32-downcut-c260]
+tool = "endmill-carbide-3fl-1-32-downcut"
+material = "c260-h02"
+rpm = 2800
+chip_load_mm_per_tooth = 0.0081643  # .000321 in; 2800 × 3 × .000321 = 2.7 in/min
+flutes = 3
+feed_unit = "in/min"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
