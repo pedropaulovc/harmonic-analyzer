@@ -90,7 +90,11 @@ ACCEPTANCES = (
         _step_ref("post-and-tip-block", "K"),
         "EACH MHA-DT-VN-61 CUT END TO THE MHA-DT-20 UNDERSIDE",
         f"FLUSH TO {POST_SCREW_SHORT_TEXT} SHORT",
-        "DEPTH MICROMETER",
+        # Owner ruling 2026-11-23, tool audit Q4: "Print CALIPER DEPTH ROD;
+        # no depth micrometer". The owned calipers read .0005 (shop
+        # gauges.calipers) inside each of these four windows (.005, .008,
+        # .040 wide).
+        "CALIPER DEPTH ROD",
     ),
     (
         "shaft-end-play",
@@ -107,7 +111,7 @@ ACCEPTANCES = (
         inch_envelope(
             (max(CRANK_END_PROUD_RANGE[0], 0.0), CRANK_END_PROUD_RANGE[1]), 3
         ),
-        "DEPTH MICROMETER",
+        "CALIPER DEPTH ROD",
     ),
     (
         "ring-butt-gap",
@@ -142,7 +146,7 @@ ACCEPTANCES = (
         _step_ref("straps-pinned-to-torque-shaft", "C"),
         "MHA-DT-19 REAR END TO THE MHA-DT-18 REAR FACE",
         f"FLUSH {FLUSH_SET_TEXT}",
-        "DEPTH MICROMETER",
+        "CALIPER DEPTH ROD",
     ),
     (
         "strap-pin-ends",
@@ -170,7 +174,7 @@ ACCEPTANCES = (
         _step_ref("cam-collars-set", "A"),
         "MHA-DT-17 REAR END TO THE MHA-DT-18 REAR FACE",
         f"FLUSH {FLUSH_SET_TEXT}",
-        "DEPTH MICROMETER",
+        "CALIPER DEPTH ROD",
     ),
     # Attempt 1 review (run 20261117T133225781Z, rule 22): checks 4W and 4Y
     # printed their engagement minimums only in check text.  Each is the lesser

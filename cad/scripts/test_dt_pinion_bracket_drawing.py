@@ -12,7 +12,6 @@ import build_dt_pinion_bracket as bracket
 from _buildgraph import module_deps_of
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_ream_h7 import REAM_H7
 from _fit_ream_slide import REAM_SLIDE
 from _fit_deviations import deviations
 from _inch_wall_limits import WALL_FLOOR_MM
@@ -89,12 +88,14 @@ def test_every_band_traces_to_a_named_fit_class() -> None:
     assert not hasattr(dt_pinion_bracket_spec, "PIN_SEAT_STATION_TOL")
     assert dt_pinion_bracket_spec.PIVOT_BORE_BAND is REAM_SLIDE
     assert dt_pinion_bracket_spec.ARBOR_BORE_BAND is REAM_SLIDE
-    assert dt_pinion_bracket_spec.PIN_SEAT_DIA_BAND is REAM_H7
-    # A running bore must be able to end up LARGER than nominal and a pressed
-    # seat must not: that sign difference is the whole reason the two classes
-    # differ, and swapping them would be silent on the sheet.
+    # Owner ruling 2026-11-23, tool audit Q8: "Re-band to +.003/0, finish with
+    # the 1/8 end mill, check with .157/.160 pins".
+    assert dt_pinion_bracket_spec.PIN_SEAT_DIA_BAND == (0.0762, 0.0)
+    # A running bore must start above nominal; the bonded seat starts at it
+    # (the .157 GO pin): that sign difference is the whole reason the two
+    # bands differ, and swapping them would be silent on the sheet.
     assert deviations(REAM_SLIDE)[0] > 0.0
-    assert deviations(REAM_H7)[0] == 0.0
+    assert deviations(dt_pinion_bracket_spec.PIN_SEAT_DIA_BAND)[0] == 0.0
 
 
 def test_print_contract_carries_no_gdt_datums_or_note_block() -> None:
@@ -466,5 +467,5 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
         assert dt_pinion_bracket_spec.DRAWING_PRECISION_BY_NAME[name] == places, name
     # The values the inch sheet leaves (#290).
     assert math.isclose(worst["cross hole far face"], 3.189, abs_tol=5e-4)
-    assert math.isclose(worst["seat far face"], 2.141, abs_tol=5e-4)
+    assert math.isclose(worst["seat far face"], 2.109, abs_tol=5e-4)
     assert math.isclose(worst["shaft wall"], 2.085, abs_tol=5e-4)

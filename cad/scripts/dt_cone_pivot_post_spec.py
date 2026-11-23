@@ -73,7 +73,8 @@ HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 # initial derivation.
 #
 # v36 geometry (user ruling 2026-09-28): the crankshaft MHA-DT-11 runs directly
-# in the Ø.4500 crank bore, whose height follows the crossed-crank config
+# in the Ø.4385 crank bore (owner ruling 2026-11-23, tool audit Q11; it was
+# Ø.4500), whose height follows the crossed-crank config
 # above the unchanged foot -- no eccentric bushing, no drop, fixed centres.
 # The boss starts .842 north of the post axis, the harvested head's tangent
 # plane (the Ø42.7506 head, radius 21.3753) on the .XXX grid its station
@@ -84,7 +85,7 @@ HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 # north face is the boss's machined end, stationed from the post axis on the
 # print.
 CRANK_BOSS_DIA = 21.844  # .86
-CRANK_BORE_DIA = 11.43  # .4500 in
+CRANK_BORE_DIA = 11.1379  # .4385 in
 CRANK_BORE_HEIGHT = _config.machine("gear_train", "crank_axis_height_mm")
 CRANK_BORE_OFFSET = 0.0
 CRANK_BOSS_NORTH_FACE = 21.3868  # .842
@@ -109,7 +110,7 @@ INCLINE_DEG = _config.machine("cone_incline", "derived_incline_deg")
 CONE_AXIS_VIEW = "CONE JOURNAL"
 BORE_HEIGHT = cone_axis.CONE_AXIS_HEIGHT_MM
 CONE_BOSS_DIA = 17.272  # .68
-BORE_DIA = 12.2682  # .483 in
+BORE_DIA = 11.1379  # .4385 in
 # The journal bore's two rims bound the cone shaft MHA-DT-04's bearing on
 # this post: the north rim is the inner edge of its collar's thrust ring on
 # the .827 face, and both rims end the journal's supported length
@@ -267,10 +268,12 @@ if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _CONE_BOSS_HALF_BAND:
 # The constant is that sum at the 86 mm reference for the inch sizes (#290)
 # and the Ø40.64 body of #2756 (111 108.3126 on the Ø41.91 envelope, 112 123.5736
 # at the harvested Ø42.011), with the letter M through drills of #2697
-# (111 752.8114 at 9/32 on the Ø41.91 body).  The two journal rim breaks
-# come off it.
+# (111 752.8114 at 9/32 on the Ø41.91 body), and with the two journal bores
+# at Ø.4385 (tool audit Q11; 106 527.63207 at Ø.4500 crank and Ø.483 cone
+# bores; the smaller bores leave 1 245.87414 more iron).  The two journal
+# rim breaks come off it.
 HARVESTED_VOLUME_MM3 = (
-    106_527.63207
+    107_773.50621
     + math.pi
     * ((BODY_DIA / 2.0) ** 2 - 2.0 * (ATTACHMENT_THRU_DIA / 2.0) ** 2)
     * (BLOCK_HEIGHT - 86.0)
@@ -278,21 +281,23 @@ HARVESTED_VOLUME_MM3 = (
 )
 HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
 
-# Both bores are running journals reamed with owned decimal reamers, each
-# band the one the `shaft_in_bushing` fit class (.0010-.0023 in) needs on its
-# shaft's fleet `SHAFT_H` (0/-.0008 in) band (tolerance-policy.md, "How a
-# critical-feature tolerance is decided", step 6b):
+# Both bores are running journals, each reamed to the `shaft_in_bushing` fit
+# class (.0010-.0023 in) on its shaft's fleet `SHAFT_H` (0/-.0008 in) band
+# (tolerance-policy.md, "How a critical-feature tolerance is decided", step
+# 6b).  Owner ruling 2026-11-23, tool audit Q11 (option B): "Both bores dia
+# .4385 +.0005/0 (7/16 over reamer of the Shars set), both journals .4375
+# 0/-.0008".  The bores were Ø.4500 and Ø.483 +.0010/+.0005, sized for .4500
+# and .4835 reamers the shop never owned (the inventory owns only the LMS
+# 5948 adjustable set and the .3760); one bought reamer now cuts both:
 #
-#   crank:   bore .4500 +.0005/.0000 (owned .4500 reamer), shaft .449
-#            (crankshaft MHA-DT-11)
-#   journal: bore .483 +.0010/+.0005 (owned .4835 reamer), shaft .4825
-#            (cone shaft MHA-DT-04)
+#   crank:   bore .4385 +.0005/.0000, shaft .4375 (crankshaft MHA-DT-11)
+#   journal: bore .4385 +.0005/.0000, shaft .4375 (cone shaft MHA-DT-04)
 #
 # Apart from these two, the spacing between them and the cone-axis height (both
 # below), nothing else on this casting is an accuracy feature: the title
 # block's general grades govern, the body's diameter included (#2756).
 RUNNING_BORE_BAND = REAM_H7  # the crank bore
-JOURNAL_BORE_BAND = (0.0254, 0.0127)  # the cone journal bore
+JOURNAL_BORE_BAND = REAM_H7  # the cone journal bore
 
 # Crank-above-cone bore spacing (U31, 2026-09-23, option 3a). The crank axis
 # is located FROM THE CONE AXIS, not from the foot. Two foot-referenced .XX
@@ -318,7 +323,7 @@ CRANK_ABOVE_CONE_BAND = (0.3556, 0.0)  # +.014/.000
 # (machinist review); build_dt_drive_train_assembly asserts the capture closes.
 JOURNAL_AXIS_HEIGHT_TOLERANCE_MM = printed_band_mm(2, unit=UNIT)  # +/-.010
 
-# Webs around the Ø.4500 crank bore, at print-worst (drawing-guidelines.md
+# Webs around the Ø.4385 crank bore, at print-worst (drawing-guidelines.md
 # rule 17 (walls and webs); the inch floor).  The bore is centred on the
 # post's symmetry plane, which is what keeps the two mounting holes beside it
 # workable; its worst case is the running band's maximum with the crank axis

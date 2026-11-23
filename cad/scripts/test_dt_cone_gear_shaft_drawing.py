@@ -811,13 +811,15 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     ends = spec.SECTION_ENDS
     assert all(a > b for a, b in zip(dias, dias[1:]))
     assert all(a < b for a, b in zip(ends, ends[1:]))
-    # The integral bearing journal fits the v2 post at 0.0127 diametral
-    # clearance; the gear lands keep their diameters.
-    assert spec.JOURNAL_BORE_DIA == pytest.approx(12.2682)
-    assert spec.JOURNAL_CLEARANCE == pytest.approx(0.0127)
-    assert spec.JOURNAL_DIA == pytest.approx(12.2555)
+    # The integral bearing journal fits the post's .4385 bore at .0010
+    # diametral clearance (owner ruling 2026-11-23, tool audit Q11: journal
+    # .4375 0/-.0008); the gear lands keep their diameters.
+    assert spec.JOURNAL_BORE_DIA == pytest.approx(11.1379)
+    assert spec.JOURNAL_CLEARANCE == pytest.approx(0.0254)
+    assert spec.JOURNAL_DIA == pytest.approx(11.1125)
+    assert spec.JOURNAL_DIAMETRAL_CLEARANCE_MM == pytest.approx((0.0254, 0.05842))
     assert spec.JOURNAL_END == pytest.approx(43.18)
-    assert dias == pytest.approx((12.2555, 9.525, 6.35))
+    assert dias == pytest.approx((11.1125, 9.525, 6.35))
     assert spec.FRONT_STUB == pytest.approx(
         -cone_line.POST_STATION
         + dt_cone_pivot_post_spec.CONE_BOSS_LENGTH / 2.0
@@ -1262,13 +1264,13 @@ def test_the_collar_is_the_bar_as_supplied_and_its_thrust_ring_holds_the_floor()
     widest = post.BORE_DIA + spec.POST_JOURNAL_BORE_BAND[0]
     ring = (thinnest - widest) / 2.0
     assert spec.THRUST_RING_MIN == pytest.approx(ring)
-    # the title block's .010 break on both edges would take it under the floor
-    assert ring - 2.0 * 0.254 < spec.THRUST_RING_FLOOR
-    # the printed break is the largest three-place inch value that keeps the floor
+    # On the former Ø.483 bore the title block's .010 on both edges took the
+    # ring under the floor; the Ø.4385 bore (tool audit Q11) widens it so the
+    # general break would hold too.  The printed .004 MAX is kept as printed.
+    assert ring - 2.0 * 0.254 >= spec.THRUST_RING_FLOOR
     breaks = spec.THRUST_EDGE_BREAK_MAX
     assert ring - 2.0 * breaks >= spec.THRUST_RING_FLOOR
-    assert ring - 2.0 * (breaks + 0.0254) < spec.THRUST_RING_FLOOR
-    assert breaks / 25.4 == pytest.approx(round(breaks / 25.4, 3))
+    assert breaks == pytest.approx(0.004 * 25.4)
     # the thickest bar still bears inside the boss: no overhang toward the post body
     assert spec.STOCK_DIA + spec.STOCK_DIA_BAND[0] < post.CONE_BOSS_DIA
 

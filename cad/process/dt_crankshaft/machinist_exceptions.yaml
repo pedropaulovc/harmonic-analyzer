@@ -1,0 +1,6 @@
+machinist_exceptions:
+  - id: TV-001
+    where: "Setup 3, the op that mikes the eight Class ZZ pins and the .0930 reamer and writes each pin's reading on its tag"
+    finding: "Miking and tagging every bought gauge pin is a calibration log; only the .0930 GO pin's reading is used later"
+    reason: "Owner ruling 2026-11-23 (tool audit Q1), verbatim: 'ZZ singles per the record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept that good holes near a limit may be refused; the traveler mikes each pin so the real window is known per pin.' The readings set each band's real accept window, which the next op states."
+    kind: accept

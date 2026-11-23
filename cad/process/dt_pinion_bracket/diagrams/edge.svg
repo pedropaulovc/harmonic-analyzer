@@ -10,7 +10,7 @@
   <line class="active-face" x1="190" y1="130" x2="358" y2="130"/>
   <rect class="cutter" x="220" y="64" width="24" height="58"/>
   <line class="arrow" x1="268" y1="70" x2="268" y2="120"/>
-  <text class="label-halo" x="278" y="86">follower seat: spot, #26, 1/8 in end mill floor, .1570 reamer</text>
+  <text class="label-halo" x="278" y="86">follower seat: spot, #26, 1/8 in end mill plunged and circled to Ø.1585</text>
   <text class="label-halo" x="278" y="104">no cross hole here: match-drilled at assembly</text>
   <line class="datum" x1="190" y1="284" x2="190" y2="296"/>
   <text class="datum-label" x="200" y="300">X0: pivot bore axis</text>
