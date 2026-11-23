@@ -30,7 +30,7 @@
 title = "Transgear Pin"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
-material = "AISI 1018 cold-finished round, 1/4 in (drawing: 12L14 or 1215 CF; the owned 1018 bar by owner ruling 2026-11-19, drawing text #3124)"
+material = "AISI 1018 cold-finished round, 1/4 in (drawing: Plain Carbon Steel)"
 stock = "Ø{{process.stock_dia_in:.4dot}} × {{process.bar_length_in:g}} in 1018 bar, on hand; the pin takes {{cad.pitch_in:.2dot}} in of it."
 note = "Inches. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil. One pin, turned to the MHA-PD-18 arm it presses into: make and ream that arm first, and read its ream in Op 10."
 shop = "../shop"
@@ -324,7 +324,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.groove_dia_band_mm}}" }, 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Root over {{cad.groove_dia_max_in:.3dot}}: plunge again. Root under {{cad.groove_dia_min_in:.3dot}}, or the load wall outside its station: cut the piece off, scrap it, and start again from Op 40."
+instruction = "Root over {{cad.groove_dia_max_in:.3dot}}: plunge a further (the root reading less .096)/2 on the radius and read it again. Root under {{cad.groove_dia_min_in:.3dot}}, or the load wall outside its station: cut the piece off, scrap it, and start again from Op 40."
 
 [[setups.operations]]
 cut_kind = "other"
