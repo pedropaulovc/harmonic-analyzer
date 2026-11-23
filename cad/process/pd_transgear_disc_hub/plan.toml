@@ -70,7 +70,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass, 360-H02 half-hard, 1-1/8 in round (drawing: {{cad.material_name}})"
 stock = "Lot: {{process.quantity:d}} hub. Ø{{process.bar_dia_in:.3dot}} bar, on hand (one 3 in piece); Setup 1 takes about {{process.bar_use_in:.2dot}} in of it. Chuck it with at least 1.5 in in the jaws."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); mill PM-30MV low belt (100–2800 rpm). Brass cut dry. Home the mill ($H) and touch off G54 at the start of each mill setup; prove each file in air before it cuts. To order (not on hand): the .3135 and .0615 reamers, the .3135/.3140 and .0615/.0620 GO/NO-GO plug gauge pairs, the pin-gauge set, the sharp-nose lathe tool and the 3/64 carbide end mill."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); mill PM-30MV low belt (100–2800 rpm). Brass cut dry. Home the mill ($H) and touch off G54 at the start of each mill setup; prove each file in air before it cuts. To order (not on hand): the .3135 and .0615 reamers, the Class ZZ pins .3135 plus/.314 minus and .0615 plus/.062 minus (GO/NO-GO), the pin-gauge set, the sharp-nose lathe tool and the 1/16 carbide end mill (Harvey Tool 34662)."
 shop = "../shop"
 stock_refs = ["c360-round-1-1-8"]
 material_key = "lathe-c360"
@@ -350,7 +350,7 @@ cut_diameter_mm = "{{cad.flange_dia_mm}}"
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Before any ream: on the .0001 micrometer, mike the .3135 plus GO pin, the .314 minus NO-GO pin and the .3135 reamer (across two opposite margins at its front); each reading is good to ±.00005. Write the three on this sheet and each pin's on its tag."
-inspection = "GO pin {{cad.bore_dia_min_in:.4dot}}–{{process.bore_go_pin_max_mm:in.4dot}}, NO-GO pin {{process.bore_nogo_pin_min_mm:in.4dot}}–{{cad.bore_dia_max_in:.4dot}}; a pin outside that is not used: stop and tell the owner. The sheet accepts a bore from the GO pin's reading up to, not including, the NO-GO's; only {{process.bore_go_pin_max_mm:in.4dot}}–{{process.bore_nogo_pin_min_mm:in.4dot}} is sure to pass, so a good bore within .0002 of either band limit may be refused."
+inspection = "GO pin {{cad.bore_dia_min_in:.4dot}}–{{process.bore_go_pin_max_mm:in.4dot}}, NO-GO pin {{process.bore_nogo_pin_min_mm:in.4dot}}–{{cad.bore_dia_max_in:.4dot}}; a pin outside that is not used: stop and tell the owner. Accept a bore from the GO pin's reading to under the NO-GO's. Owner ruling 2026-11-23: 'Accept that good holes near a limit may be refused' (sure to pass: {{process.bore_go_pin_max_mm:in.4dot}}–{{process.bore_nogo_pin_min_mm:in.4dot}} only)."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
 
@@ -363,7 +363,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Only if a reamer read under its GO pin: the bar still chucked, face its end and spot it from the tailstock; for each such reamer, the .0615 first, drill .30 deep (#53 for the .0615, N for the .3135) and ream .25 deep (the .0615 at 1400 rpm, the .3135 as Op 170). Gauge each trial hole with its pins, then part .40 off the bar's end."
+instruction = "Only if a reamer read under its GO pin, the bar still chucked: face its end and spot it from the tailstock; per such reamer (the .0615 first) drill .30 deep (#53; N for the .3135), ream .25 deep (the .0615 at 1400 rpm, the .3135 as Op 170); gauge it with its pins; part .40 off. This spends the piece's spare: a remake then needs a new 3 in piece (to order)."
 inspection = "Each trial hole: GO enters, NO-GO does not: go on. GO refused: that reamer's holes will be refused: stop and tell the owner."
 gauge_checks = [{ gauge = "zz-pins-0615-0620", band_mm = "{{cad.pin_ream_dia_band_mm}}" }, { gauge = "zz-pins-3135-3140", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
@@ -398,7 +398,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Overall over {{cad.spigot_end_length_max_in:.3dot}} in Op 100: set DRO Z to the excess and skim to Z0 again, mike again. Under {{cad.spigot_end_length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1 (the bar holds a second)."
+instruction = "Overall over {{cad.spigot_end_length_max_in:.3dot}} in Op 100: set DRO Z to the excess and skim to Z0 again, mike again. Under {{cad.spigot_end_length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1 (the bar holds a second unless Op 80 ran)."
 feed = "hand"
 
 [[setups.operations]]
