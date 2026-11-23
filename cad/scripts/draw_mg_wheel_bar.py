@@ -46,24 +46,38 @@ import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 import _telemetry
 from _column_clamp_interface import BAR_DEPTH
 import mg_wheel_bar_callouts as callouts
 from mg_wheel_bar_spec import (
+    AXLE_BORE_BAND,
+    AXLE_BORE_DIA,
+    AXLE_BORE_STATION,
     AXLE_BORE_X,
+    BAR_DEPTH_BAND,
     BAR_LENGTH,
     BAR_SIDE,
+    BAR_TOP_ABOVE_ROW,
+    BORE_ROW_FROM_TOP,
     CLAMP_HOLE_DIA,
     CLAMP_HOLE_X,
+    CLAMP_STATIONS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    HANGER_STATION,
+    LEFT_END_X,
     PEN_HANGER_HOLE_DIA,
     SCREW_HOLE_X,
+    UNIT,
 )
 
 
@@ -160,6 +174,10 @@ SCREW_LINE_NOTE = (
     "   OFFSET UP TO .003 OVER #8 SCREW CLEARANCE."
 )
 SCREW_LINE_NOTE_XY = (0.040, 0.095)
+# The sheet's one manufacturing note, for the feature export (export_features
+# reads DRAWING_NOTES from the drawing when neither a notes module nor the
+# spec declares them, so the part's recipe does not re-key on it).
+DRAWING_NOTES = SCREW_LINE_NOTE
 # The one native through extent reads DRILL THRU ALL, after the size
 # (rule 26: size, then process, then depth).
 DRILL_EXTENT = "DRILL <hw-thru>"
@@ -171,6 +189,236 @@ DRAWING_PRECISION_BY_NAME = {
     for names in DRAWING_PRECISION.values()
     for name, places in names.items()
 }
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_mg_wheel_bar, mg_wheel_bar_geom: the bar along X centred on the
+# origin, the left end at LEFT_END_X; Y up with the bore row at y = 0 and the
+# top face BAR_TOP_ABOVE_ROW above it; Z through the depth, the front face at
+# -BAR_DEPTH/2, every bore entering it along +Z). Stations run from the left
+# end and the row from the top face, as printed; bands are the title block's
+# rows at the printed places, the bore's and the depth's their native ones.
+# The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_mg_wheel_bar"
+_GEOM = "mg_wheel_bar_geom"
+_FRAME = ((_GEOM, "LEFT_END_X"), (_GEOM, "BAR_TOP_ABOVE_ROW"), ("_column_clamp_interface", "BAR_DEPTH"))
+_TOP_Y = BAR_TOP_ABOVE_ROW
+_BOTTOM_Y = BAR_TOP_ABOVE_ROW - BAR_SIDE
+_FRONT_Z = -BAR_DEPTH / 2.0
+_INTO_FRONT = (0.0, 0.0, 1.0)
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(*_FRAME, (_GEOM, "BAR_LENGTH"), (_GEOM, "BAR_SIDE")),
+    precision_sources=("DRAWING_PRECISION", (_SELF, "DRAWING_PRECISION_BY_NAME")),
+)
+requirement(
+    "left_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), -LEFT_END_X),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", LEFT_END_X), _FRAME)},
+)
+# The length 9.2 (FRONT_KEEP "Length"), from the left end.
+requirement(
+    "right_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), -LEFT_END_X),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("x", -LEFT_END_X), (*_FRAME, (_GEOM, "BAR_LENGTH"))),
+        "length": (
+            limits(BAR_LENGTH, _P["Length"], unit=UNIT),
+            ((_GEOM, "BAR_LENGTH"), (_GEOM, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "length_nominal": (BAR_LENGTH, ((_GEOM, "BAR_LENGTH"),)),
+        "length_from": ("left_end", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"length": _P["Length"]},
+)
+# The top face: the bore row hangs from it (FRONT_KEEP "ClampRowFromTop").
+requirement(
+    "top_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), _TOP_Y),),
+    requirements=("plane",),
+    fields={"plane": (_plane("y", _TOP_Y), _FRAME)},
+)
+# The height .43 from the top face (FRONT_KEEP "Side").
+requirement(
+    "bottom_face",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), -_BOTTOM_Y),),
+    requirements=("height",),
+    fields={
+        "plane": (_plane("y", _BOTTOM_Y), (*_FRAME, (_GEOM, "BAR_SIDE"))),
+        "height": (
+            limits(BAR_SIDE, _P["Side"], unit=UNIT),
+            ((_GEOM, "BAR_SIDE"), (_GEOM, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "height_nominal": (BAR_SIDE, ((_GEOM, "BAR_SIDE"),)),
+        "height_from": ("top_face", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"height": _P["Side"]},
+)
+requirement(
+    "front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -_FRONT_Z),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", _FRONT_Z), _FRAME)},
+)
+# The depth .374 at .XXX naming its axle-end stack (RIGHT_KEEP "BarDepth").
+requirement(
+    "back_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), -_FRONT_Z),),
+    requirements=("depth",),
+    fields={
+        "plane": (_plane("z", -_FRONT_Z), _FRAME),
+        "depth": (
+            limits(BAR_DEPTH, _P["BarDepth"], BAR_DEPTH_BAND),
+            (
+                ("_column_clamp_interface", "BAR_DEPTH"),
+                (_GEOM, "BAR_DEPTH_BAND"),
+                (_SELF, "RIGHT_KEEP"),
+            ),
+        ),
+        "depth_nominal": (BAR_DEPTH, (("_column_clamp_interface", "BAR_DEPTH"),)),
+        "depth_from": ("front_face", ((_SELF, "RIGHT_KEEP"),)),
+        "callout": (
+            callouts.BAR_DEPTH_CALLOUT,
+            (("mg_wheel_bar_callouts", "BAR_DEPTH_CALLOUT"),),
+        ),
+    },
+    precision={"depth": _P["BarDepth"]},
+)
+# The bore row, every hole on it .197 from the top face (FRONT_KEEP
+# "ClampRowFromTop": printed once, at the clamp pair, for all four holes).
+_ROW = (
+    limits(BORE_ROW_FROM_TOP, _P["ClampRowFromTop"], unit=UNIT),
+    ("BORE_ROW_FROM_TOP", (_GEOM, "UNIT"), (_SELF, "FRONT_KEEP")),
+)
+_ROW_FIELDS: dict[str, Any] = {
+    "height": _ROW,
+    "height_nominal": (BORE_ROW_FROM_TOP, ("BORE_ROW_FROM_TOP",)),
+    "height_from": ("top_face", ((_SELF, "FRONT_KEEP"),)),
+}
+# The reamed axle bore: .1865 +.0005/0 (FRONT_KEEP "AxleBoreDia"), REAM
+# THRU, press fit on the MHA-MG-07 axle, its least wall; 2.40 from the left
+# end (FRONT_KEEP "AxleBoreStation").
+requirement(
+    "axle_bore",
+    kind="hole",
+    faces=(CylinderFace(AXLE_BORE_DIA),),
+    requirements=("dia", "thru", "process", "station", "height"),
+    fields={
+        "at": ([AXLE_BORE_X, 0.0, _FRONT_Z], ((_GEOM, "AXLE_BORE_X"), *_FRAME)),
+        "axis": (_INTO_FRONT, _FRAME),
+        "dia": (
+            limits(AXLE_BORE_DIA, _P["AxleBoreDia"], AXLE_BORE_BAND),
+            ((_GEOM, "AXLE_BORE_DIA"), (_GEOM, "AXLE_BORE_BAND"), (_SELF, "FRONT_KEEP")),
+        ),
+        "nominal_dia": (AXLE_BORE_DIA, ((_GEOM, "AXLE_BORE_DIA"),)),
+        "thru": (True, (("mg_wheel_bar_callouts", "AXLE_BORE_CALLOUT"),)),
+        "process": ("ream", (("mg_wheel_bar_callouts", "AXLE_BORE_CALLOUT"),)),
+        "callout": (
+            callouts.AXLE_BORE_CALLOUT,
+            (("mg_wheel_bar_callouts", "AXLE_BORE_CALLOUT"),),
+        ),
+        "station": (
+            limits(AXLE_BORE_STATION, _P["AxleBoreStation"], unit=UNIT),
+            ("AXLE_BORE_STATION", (_GEOM, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "station_nominal": (AXLE_BORE_STATION, ("AXLE_BORE_STATION",)),
+        "station_from": ("left_end", ((_SELF, "FRONT_KEEP"),)),
+        **_ROW_FIELDS,
+    },
+    precision={
+        "dia": _P["AxleBoreDia"],
+        "station": _P["AxleBoreStation"],
+        "height": _P["ClampRowFromTop"],
+    },
+)
+# The pen-hanger hole: native Ø.180 DRILL THRU ALL (HOLE_CALLOUT_PRECISION),
+# its least end wall; .20 from the left end (FRONT_KEEP "HangerStation").
+requirement(
+    "hanger_hole",
+    kind="hole",
+    faces=(CylinderFace(PEN_HANGER_HOLE_DIA),),
+    requirements=("dia", "thru", "station", "height"),
+    fields={
+        "at": ([SCREW_HOLE_X, 0.0, _FRONT_Z], ((_GEOM, "SCREW_HOLE_X"), *_FRAME)),
+        "axis": (_INTO_FRONT, _FRAME),
+        "dia": (
+            drilled_limits(PEN_HANGER_HOLE_DIA, HOLE_CALLOUT_PRECISION["hw-diam"], unit=UNIT),
+            ((_GEOM, "PEN_HANGER_HOLE_DIA"), (_GEOM, "UNIT"), (_SELF, "HOLE_CALLOUT_PRECISION")),
+        ),
+        "nominal_dia": (PEN_HANGER_HOLE_DIA, ((_GEOM, "PEN_HANGER_HOLE_DIA"),)),
+        "thru": (True, ((_SELF, "DRILL_EXTENT"),)),
+        "process": ("drill", ((_SELF, "DRILL_EXTENT"),)),
+        "callout": (
+            callouts.HANGER_HOLE_CALLOUT,
+            (("mg_wheel_bar_callouts", "HANGER_HOLE_CALLOUT"),),
+        ),
+        "station": (
+            limits(HANGER_STATION, _P["HangerStation"], unit=UNIT),
+            ((_GEOM, "HANGER_STATION"), (_GEOM, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "station_nominal": (HANGER_STATION, ((_GEOM, "HANGER_STATION"),)),
+        "station_from": ("left_end", ((_SELF, "FRONT_KEEP"),)),
+        **_ROW_FIELDS,
+    },
+    precision={
+        "dia": HOLE_CALLOUT_PRECISION["hw-diam"],
+        "station": _P["HangerStation"],
+        "height": _P["ClampRowFromTop"],
+    },
+)
+# The two clamp-screw holes: native 2X Ø.196 DRILL THRU ALL, clearing the
+# MHA-SH-02 taps (note 1), their least wall; 7.382 and 8.760 from the left
+# end at the title block's .XXX (FRONT_KEEP "ClampStation1/2").
+for _index, (_x, _station) in enumerate(zip(CLAMP_HOLE_X, CLAMP_STATIONS, strict=True), 1):
+    _name = f"ClampStation{_index}"
+    requirement(
+        f"clamp_hole_{_index}",
+        kind="hole",
+        faces=(CylinderFace(CLAMP_HOLE_DIA, contains_x_mm=_x),),
+        requirements=("dia", "thru", "station", "height"),
+        fields={
+            "at": ([_x, 0.0, _FRONT_Z], ((_GEOM, "CLAMP_HOLE_X"), *_FRAME)),
+            "axis": (_INTO_FRONT, _FRAME),
+            "dia": (
+                drilled_limits(CLAMP_HOLE_DIA, HOLE_CALLOUT_PRECISION["hw-diam"], unit=UNIT),
+                ((_GEOM, "CLAMP_HOLE_DIA"), (_GEOM, "UNIT"), (_SELF, "HOLE_CALLOUT_PRECISION")),
+            ),
+            "nominal_dia": (CLAMP_HOLE_DIA, ((_GEOM, "CLAMP_HOLE_DIA"),)),
+            "thru": (True, ((_SELF, "DRILL_EXTENT"),)),
+            "process": ("drill", ((_SELF, "DRILL_EXTENT"),)),
+            "callout": (
+                callouts.CLAMP_HOLE_CALLOUT,
+                (("mg_wheel_bar_callouts", "CLAMP_HOLE_CALLOUT"),),
+            ),
+            "note": (SCREW_LINE_NOTE, ((_SELF, "SCREW_LINE_NOTE"),)),
+            "station": (
+                limits(_station, _P[_name], unit=UNIT),
+                ((_GEOM, "CLAMP_STATIONS"), (_GEOM, "UNIT"), "CLAMP_POSITION_BAND", (_SELF, "FRONT_KEEP")),
+            ),
+            "station_nominal": (_station, ((_GEOM, "CLAMP_STATIONS"),)),
+            "station_from": ("left_end", ((_SELF, "FRONT_KEEP"),)),
+            **_ROW_FIELDS,
+        },
+        precision={
+            "dia": HOLE_CALLOUT_PRECISION["hw-diam"],
+            "station": _P[_name],
+            "height": _P["ClampRowFromTop"],
+        },
+    )
 
 
 @_telemetry.traced("drawing.mg_wheel_bar.part_authored_text")

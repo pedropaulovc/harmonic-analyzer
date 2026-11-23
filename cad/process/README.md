@@ -225,9 +225,11 @@ they need from their process plans. They hold:
   (Pedro), #2334): the MHA-SM-00 gauge bar (`gauges.gauge-bar-0472x8`), the
   12 mm H7 reamer (`tools.reamer-12mm-h7`) and a 4140/4142 HT `[stock.<key>]` row;
 - the MHA-SM-01 gooseneck tube to buy (owner rulings 2026-10-27 (Pedro), #1951,
-  2026-11-08, #2315, and 2026-11-14, #2401): a 4130-N `[stock.<key>]` row of form
-  `round_tube` (OnlineMetals 7322, one 36 in cut with about 11 in for a trial
-  bend), read by `test_sm_gooseneck_drawing.py` against the bent tube's
+  2026-11-08, #2315, 2026-11-14, #2401, and 2026-11-22, option A,
+  `https://github.com/pedropaulovc/harmonic-analyzer/issues/2401#issuecomment-7085840331`, superseding #2401's 36 in):
+  a 4130-N `[stock.<key>]` row of form `round_tube` (OnlineMetals 7322, one
+  48 in cut with about 23 in for a trial bend to 90° on the form before the
+  part), read by `test_sm_gooseneck_drawing.py` against the bent tube's
   developed length plus its ~2 in arm-end tail and ~1 in at the foot, and the
   shop-made bend form it is
   bent on (`fixtures.sm-gooseneck-bend-form`, no toleranced size: the radius

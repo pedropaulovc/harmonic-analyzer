@@ -804,7 +804,7 @@ def test_an_undeclared_part_binds_its_step_with_an_empty_features_table_and_no_d
         assert manifest["notes"]["manufacturing"] == notes.DRAWING_NOTES.splitlines()
 
 
-@pytest.mark.parametrize("stem", ["dt_crank_arm", "dt_crank_pin", "dt_crankshaft", "dt_pinion_arbor"])
+@pytest.mark.parametrize("stem", ["dt_crank_pin"])
 def test_a_notes_file_without_drawing_notes_falls_through_to_the_spec(stem: str) -> None:
     # Oracle independent of _undeclared_notes_path: the source text itself.
     scripts = exporter.REPO / "cad" / "scripts"

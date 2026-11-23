@@ -10,13 +10,11 @@
 # per-tool diameter readings are not used; cad/process/README.md).
 # The 8-32 tap records the plan's authored #29 (.136 in) tap drill. The v48
 # drawing calls the #12 bracket drill (notes.process).
-# No helix_deg or axial_ratio on the 1/2 in end mills (this one, jig-em-half,
+# No helix_deg or axial_ratio on the 1/2 in end mills (basebar-em-half, in
+# common.toml since the MHA-SM-01 bend form cuts with it, jig-em-half,
 # block-em-half-long): no catalogue or measurement states a helix, so their
 # cuts keep prechips' configured axial_ratio 1.0 (owner ruling 2026-11-16,
 # #2873).
-[tools.basebar-em-half]
-description = "1/2 in centre-cutting 2-flute end mill; flutes ≥5/8 in"
-diameter_mm = 12.7
 [tools.basebar-em-face]
 description = "3/4 in 4-flute end mill"
 diameter_mm = 19.05
@@ -76,11 +74,6 @@ tool = "basebar-em-half"
 material = "6061-t6511"
 rpm = 2250
 feed = "15.75 in/min"
-[settings.basebar-slot-rough-6061-t6511]
-tool = "basebar-em-half"
-material = "6061-t6511"
-rpm = 1250
-feed = "5 in/min"
 # Owner ruling 2026-11-11: the source guide's 165 ft/min HSS milling speed and
 # .002 in/tooth: 12*165/(pi*3/4)=840 rpm, rounded to 850;
 # 850 rpm * 4 flutes * .002 in/tooth = 6.8 in/min, rough and finish.
@@ -228,7 +221,7 @@ diameter_mm = 10.16
 # The strap traveler's fixture, so its plan's ref resolves: the plan prints
 # its own name and description. Ownership is cad/config/shop-equipment/
 # fixtures.strap-sub-plate. Its tape, tools.tape-3m-vhb-5906, is in
-# common.toml (the dt and pd sheet parts bond on it too).
+# common.toml (the MHA-MS-01 stick and the dt and pd sheet parts bond on it too).
 [tools.strap-sub-plate]
 description = "Fixture MHA-CH-13-TL-00: sub-plate TL-01 with its hub plug, washer, edge clamps and hub screw"
 
@@ -276,8 +269,28 @@ description = ".2560 in HSS chucking reamer"
 diameter_mm = 6.5024
 [tools.tap-1-72-plug]  # Tap coverage #1-72 UNF
 description = "#1-72 UNF plug hand tap (OSG 1010700)"
+tap_drill_mm = 1.5875  # 1/16 (.0625 in, tools.drill-1-16), ~58% thread: MHA-CH-07's Ø.060 +.004/0 crown hole excludes the usual #53 (.0595).
 [tools.form-tool-r160]  # D-form-tool-R160
 description = "R.160 convex-dome form tool"
+
+# --- MHA-CH-07 fulcrum keeper's counterbore (cad/process/ch_fulcrum_keeper) ---
+# The long-reach 1/8 in end mill (cad/config/shop-equipment/, same key,
+# to_order): diameter, length of cut and reach from its seller's page
+# (dixie-tool.com, read 2026-11-22); helix not stated there. Its setting is
+# the strap's 1/8 in carbide one on 1018 (common.toml
+# settings.endmill-carbide-3fl-1-8-1018-cf-tru-edge: Tru-Edge .001 in/tooth,
+# 2800 rpm).
+[tools.endmill-carbide-3fl-1-8-lr-755708]
+description = "1/8 in 3-flute uncoated carbide long-reach end mill, 1 in LOC, 1-1/4 in reach, 2-1/2 in OAL (Harvey 755708)"
+diameter_mm = 3.175
+flute_length_mm = 25.4
+[settings.endmill-carbide-3fl-1-8-lr-1018-cf]
+tool = "endmill-carbide-3fl-1-8-lr-755708"
+material = "rocker-1018-cold-finished"
+rpm = 2800
+chip_load_mm_per_tooth = 0.0254  # .001 in; 2800 × 3 × .001 = 8.4 in/min
+flutes = 3
+feed_unit = "in/min"
 
 # --- MHA-CH-01/-03 notches and slot (cad/process/ch_amplitude_bar, ch_connecting_rod) ---
 # The owned HSS slitting saw (cad/config/shop-equipment/
@@ -298,18 +311,13 @@ diameter_mm = 69.85
 description = "1018 cold-finish carbon steel, flat bar, 1/4 x 2 in, 36 in length"
 [stock.1018-flat-1-4x2-72in]
 description = "1018 cold-finish carbon steel, flat bar, 1/4 x 2 in, 72 in length"
-[stock.1018-flat-1-8x1-1-2]
-description = "1018 cold-finish carbon steel, flat bar, 1/8 x 1-1/2 in"
 [stock.1018-flat-5-16x1-36in]
 description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 36 in length"
 [stock.1018-flat-5-16x1-72in]
 description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 72 in length"
 [stock.1018-square-1-4]
 description = "1018 cold-finish carbon steel, square bar, 1/4 x 1/4 in"
-[stock.6061-flat-1-2x6-54in]
-description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 54 in length"
-# The amplitude bar's riser (cad/process/ch_amplitude_bar, Setup 1) is sawn
-# from this bar: its plan's stock_refs names it.
+
 [stock.6061-flat-1x3]
 description = "6061-T6511 aluminium, flat bar, 1 x 3 in"
 [stock.6061-round-9-16]

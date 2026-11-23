@@ -81,6 +81,7 @@ recipes:
 | 91794A112 | `dt-vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A055 | `sh-vn-fillister-screw-91794a055` (MHA-SH-VN-59: `DiscScrew`, `RackScrew`) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A078 | `mg-vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
+| 91794A079 | `pd-vn-transgear-knob-cup-screw` (MHA-PD-VN-71; catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A080 | `ch-vn-frame-side-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A558 | — (`dt-cone-tip-end-screw` stock until 2026-11-20: owner ruling on #2726 takes the 3/4 91794A559; `_mcmaster_91794a558` and its diagnostic recipe removed) | 18-8 Stainless Steel Fillister Head Slotted Screw, 1/4"-28 x 5/8" |
 | 91794A559 | `dt-cone-tip-end-screw` (MHA-DT-39, fabricated from stock: one added drill-and-ream pivot hole in its threaded end; owner ruling 2026-11-20, #2726; read live 2026-11-20 at https://www.mcmaster.com/91794A559/: 1/4"-28 UNF class 2A, fully threaded, flat tip, fillister head .237 high × Ø.414, 3/4" under the head, ASME B18.6.3, $11.39 per pack of 25, in stock; catalogue-built on the fillister family law, no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw, 1/4"-28 x 3/4" |
@@ -115,7 +116,7 @@ recipes:
 | 97431A260 | — (retired 2026-10-31, #290: the 1/8 in pin takes 97431A240; replica recipe removed) | Side-Mount External Retaining Ring |
 | 98296A026 | — (former `vn-transgear-collar-cross-pin`, MHA-VN-037 retired; diagnostic recipe removed 2026-11-16, #2886) | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `dt-vn-pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
-| 98296A031 | `pd-vn-transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
+| 98296A031 | — (retired `pd-vn-transgear-knob-cup-pin`, MHA-PD-VN-62, 2026-11-20, #2425: the MHA-PD-VN-71 screw holds the knob cup; spec, data and recipe removed) | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98381A416 | `pd-vn-transgear-hub-key-pin` (MHA-PD-VN-69; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A417 | `dt-vn-locating-pin` (MHA-DT-VN-69; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A433 | `pd-vn-transgear-knob-drive-pin` (catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
@@ -681,6 +682,22 @@ Live catalogue verification on October 10, 2026:
   from the length alone; no vendor SLDPRT has been harvested for it.
   The `diagnostics.diag_build_90280A194` recipe was removed on 2026-11-16 (#2886).
 
+Live catalog verification on November 20, 2026:
+
+- [91794A079](https://www.mcmaster.com/91794A079/) is the MHA-PD-VN-71
+  knob-cup screw (owner ruling 2026-11-20 (Pedro), #2425: "Variant of C ; I
+  noticed there was a missing screw and an extra pin in current design").
+  The live page was read on November 20, 2026: 18-8 stainless fillister head
+  slotted screw, #2-56 UNC 2A, 3/8 in long, fully threaded, flat tip, head
+  diameter 0.14 in (3.556 mm), head height 0.083 in (2.1082 mm), ASME
+  B18.6.3. No supplier drawing was read and no vendor SLDPRT harvested; the
+  part stays catalogue-only. `diagnostics.diag_build_91794A079` reuses the
+  native fillister family recipe from the length alone
+  (`_mcmaster_91794a079.py`). The joint (web grip, engagement in the
+  MHA-PD-08 journal's #2-56 rear tap, the #33 web hole round the under-head
+  fillet, the head in the cup's rear pocket) is asserted in
+  `pd_transgear_knob_cup_spec.py`.
+
 Live catalog verification on October 16, 2026:
 
 - [91794A078](https://www.mcmaster.com/91794A078/) replaces 91794A077 as the
@@ -1210,17 +1227,17 @@ Catalog specifications checked on September 10, 2026:
   0.012 in wall, for a 0.062-0.065 in hole, chamfered ends, no diameter
   tolerance stated. No vendor SLDPRT has been harvested for it yet.
 - [98296A031](https://www.mcmaster.com/98296A031/) (`pd-vn-transgear-knob-cup-pin`,
-  MHA-PD-VN-62) was read live on October 2, 2026: the same 1050-1095 spring
-  steel slotted spring pin, 1/16 in diameter, 5/8 in long, for a
-  0.062-0.065 in hole. It is pressed through the knob cup and the knob
-  shaft's journal in a hole match-drilled at assembly. No vendor SLDPRT has
-  been harvested for it yet.
-- The spring pins have separate data in `_mcmaster_98296a027.py` and
-  `_mcmaster_98296a031.py`, passed to
-  `diagnostics/diag_mcmaster_spring_pin.py`. The shared recipe models each
+  MHA-PD-VN-62, retired 2026-11-20, #2425) was read live on October 2, 2026:
+  the same 1050-1095 spring steel slotted spring pin, 1/16 in diameter,
+  5/8 in long, for a 0.062-0.065 in hole. It was pressed through the knob
+  cup and the knob shaft's journal in a hole match-drilled at assembly,
+  until the MHA-PD-VN-71 screw (91794A079) replaced it.
+- The spring pin's data are in `_mcmaster_98296a027.py`, passed to
+  `diagnostics/diag_mcmaster_spring_pin.py`. The shared recipe models it
   as installed, a 1/16 in tube with the catalog wall, without slot or
-  chamfer; `diag_build_98296A027.py` and `diag_build_98296A031.py` are its
-  per-size runs (the 98296A026 run and data were removed on 2026-11-16, #2886).
+  chamfer; `diag_build_98296A027.py` is its run (the 98296A026 run and data
+  were removed on 2026-11-16, #2886; the 98296A031 run and data on
+  2026-11-20, #2425).
 - [98381A417](https://www.mcmaster.com/98381A417/) (`dt-vn-locating-pin`,
   MHA-DT-VN-69, quantity one; rule-23 retention, owner ruling 2026-11-07,
   MHA-DT-00 rubric sample, PR #2248) was read live on November 7,

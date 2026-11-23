@@ -77,11 +77,15 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_tables import insert_hole_table
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
 from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
@@ -89,6 +93,8 @@ from _title_block_units import LENGTH_UNITS
 from pd_platen_callouts import SOCKET_ENGAGEMENT_LINE
 from pd_platen_spec import (
     CBORE_DEPTH,
+    CBORE_DIA,
+    CBORE_FLOOR,
     CBORE_FLOOR_CALLOUT,
     CBORE_SECTION_HOLE_Y,
     CBORE_SECTION_X,
@@ -355,6 +361,199 @@ SOCKET_CALLOUT_XY = (0.233, 0.252)
 SOCKET_CALLOUT_PROCESS = (  # pd-platen RV-01, RV-03
     f"PATTERN MATCHES {CLIP_NUMBER}\n{SOCKET_ENGAGEMENT_LINE}\nTAP"
 )
+
+# The sheet prints no manufacturing note: every requirement is a dimension or
+# a native hole callout with its rows, so the feature export's notes are
+# empty (as pd_platen_bottom_guide_notes'). Declared here, beside the sheet,
+# so the part's recipe does not re-key on it.
+DRAWING_NOTES = ""
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_pd_platen: the width along +X and the height along +Y from the
+# lower-left corner, the hole table's origin; the thickness along +Z from the
+# paper face, z = 0, where the counterbores open, the callout's FAR SIDE, to
+# the back face). Hole locations are the hole table's .XXX from that corner
+# (tags A1-A4 the clip sockets, B1-B10 the guide holes, in the table's
+# order); sizes the native callouts' at their places, the DRILLED HOLES row
+# on the drills. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_platen"
+_FRAME = ("PLATE_WIDTH", "PLATE_HEIGHT", "PLATE_THICKNESS")
+_INTO = (0.0, 0.0, 1.0)
+_TABLE = ((_SELF, "build"),)
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=_FRAME,
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME", "GUIDE_CALLOUT_PRECISION"),
+)
+requirement(
+    "left_edge",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", 0.0), _FRAME)},
+)
+# The width 10.62 (FRONT_KEEP "Width").
+requirement(
+    "right_edge",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), PLATE_WIDTH),),
+    requirements=("width",),
+    fields={
+        "plane": (_plane("x", PLATE_WIDTH), ("PLATE_WIDTH",)),
+        "width": (
+            limits(PLATE_WIDTH, _P["Width"], unit=UNIT),
+            ("PLATE_WIDTH", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "width_nominal": (PLATE_WIDTH, ("PLATE_WIDTH",)),
+        "width_from": ("left_edge", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"width": _P["Width"]},
+)
+requirement(
+    "bottom_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("y", 0.0), _FRAME)},
+)
+# The height 5.31 (FRONT_KEEP "Height").
+requirement(
+    "top_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), PLATE_HEIGHT),),
+    requirements=("height",),
+    fields={
+        "plane": (_plane("y", PLATE_HEIGHT), ("PLATE_HEIGHT",)),
+        "height": (
+            limits(PLATE_HEIGHT, _P["Height"], unit=UNIT),
+            ("PLATE_HEIGHT", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "height_nominal": (PLATE_HEIGHT, ("PLATE_HEIGHT",)),
+        "height_from": ("bottom_edge", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"height": _P["Height"]},
+)
+# The paper face (z = 0): the counterbores open on it (FAR SIDE on the
+# sheet's front view, which looks at the back face).
+requirement(
+    "paper_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", 0.0), _FRAME)},
+)
+# The thickness .152 at .XXX, naming the disc clearance it sets (RIGHT_KEEP
+# "Depth", DIMENSION_CALLOUTS_ABOVE).
+requirement(
+    "back_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), PLATE_THICKNESS),),
+    requirements=("thickness",),
+    fields={
+        "plane": (_plane("z", PLATE_THICKNESS), ("PLATE_THICKNESS",)),
+        "thickness": (
+            limits(PLATE_THICKNESS, _P["Depth"], unit=UNIT),
+            ("PLATE_THICKNESS", "UNIT", (_SELF, "RIGHT_KEEP")),
+        ),
+        "thickness_nominal": (PLATE_THICKNESS, ("PLATE_THICKNESS",)),
+        "thickness_from": ("paper_face", ((_SELF, "RIGHT_KEEP"),)),
+        "callout": (DIMENSION_CALLOUTS_ABOVE["Depth"], ((_SELF, "DIMENSION_CALLOUTS_ABOVE"),)),
+    },
+    precision={"thickness": _P["Depth"]},
+)
+
+
+def _location(x: float, y: float, sources: tuple[str, ...]) -> dict[str, Any]:
+    """A hole's hole-table X and Y LOC from the lower-left corner, .XXX."""
+    where = (*sources, "UNIT", "POSITION_PLACES", *_TABLE)
+    return {
+        "at": ([x, y, 0.0], (*sources, *_FRAME)),
+        "axis": (_INTO, _FRAME),
+        "station": (limits(x, POSITION_PLACES, unit=UNIT), where),
+        "station_nominal": (x, sources),
+        "station_from": ("left_edge", _TABLE),
+        "height": (limits(y, POSITION_PLACES, unit=UNIT), where),
+        "height_nominal": (y, sources),
+        "height_from": ("bottom_edge", _TABLE),
+    }
+
+
+# The four clip-screw sockets A1-A4: 4X Ø.070 THRU ALL, TAP 2-56 UNC THRU ALL,
+# pattern matching MHA-PD-03, the engagement line (SOCKET_CALLOUT_PROCESS).
+for _index, (_x, _y) in enumerate(SOCKET_XY, 1):
+    requirement(
+        f"socket_a{_index}",
+        kind="threaded_hole",
+        faces=(CylinderFace(SOCKET_DRILL_DIA, contains_x_mm=_x, contains_y_mm=_y),),
+        requirements=("thread", "dia", "thru", "station", "height"),
+        fields={
+            **_location(_x, _y, ("SOCKET_XY",)),
+            "thread": (f"{SOCKET_SPEC.size} UNC-2B", ("SOCKET_SPEC", (_SELF, "SOCKET_CALLOUT_PROCESS"))),
+            "dia": (
+                drilled_limits(SOCKET_DRILL_DIA, 3, unit=UNIT),
+                ("SOCKET_SPEC", "UNIT", (_SELF, "SOCKET_DRILL_DIA")),
+            ),
+            "nominal_dia": (SOCKET_DRILL_DIA, ((_SELF, "SOCKET_DRILL_DIA"),)),
+            "thru": (True, ((_SELF, "SOCKET_CALLOUT_PROCESS"),)),
+            "callout": (SOCKET_CALLOUT_PROCESS, ((_SELF, "SOCKET_CALLOUT_PROCESS"),)),
+            "tag": (f"A{_index}", _TABLE),
+        },
+        precision={"dia": 3, "station": POSITION_PLACES, "height": POSITION_PLACES},
+    )
+# The ten guide-screw holes B1-B10 (the table's order: up each column, left
+# to right): 10X Ø.144 THRU ALL, pattern matching MHA-PD-11, counterbored
+# Ø.26 x .115 on the paper face for the MHA-SH-VN-51 heads.
+_GUIDE_TABLE = tuple((x, y) for x in GUIDE_HOLE_X for y in GUIDE_HOLE_Y)
+for _index, (_x, _y) in enumerate(_GUIDE_TABLE, 1):
+    requirement(
+        f"guide_b{_index}",
+        kind="hole",
+        faces=(
+            CylinderFace(GUIDE_HOLE_DIA, contains_x_mm=_x, contains_y_mm=_y),
+            CylinderFace(CBORE_DIA, contains_x_mm=_x, contains_y_mm=_y),
+        ),
+        requirements=("dia", "thru", "cbore_dia", "cbore_depth", "station", "height"),
+        fields={
+            **_location(_x, _y, ("GUIDE_HOLE_X", "GUIDE_HOLE_Y")),
+            "dia": (
+                drilled_limits(GUIDE_HOLE_DIA, GUIDE_CALLOUT_PRECISION["hw-thruholedia"], unit=UNIT),
+                ("GUIDE_HOLE_DIA", "UNIT", "GUIDE_CALLOUT_PRECISION"),
+            ),
+            "nominal_dia": (GUIDE_HOLE_DIA, ("GUIDE_HOLE_DIA",)),
+            "thru": (True, ((_SELF, "GUIDE_CALLOUT_PROCESS"),)),
+            "cbore_dia": (
+                limits(CBORE_DIA, GUIDE_CALLOUT_PRECISION["hw-cbdia"], unit=UNIT),
+                ("CBORE_DIA", "UNIT", "GUIDE_CALLOUT_PRECISION"),
+            ),
+            "cbore_dia_nominal": (CBORE_DIA, ("CBORE_DIA",)),
+            "cbore_depth": (
+                limits(CBORE_DEPTH, GUIDE_CALLOUT_PRECISION["hw-cbdepth"], unit=UNIT),
+                ("CBORE_DEPTH", "UNIT", "GUIDE_CALLOUT_PRECISION"),
+            ),
+            "cbore_depth_nominal": (CBORE_DEPTH, ("CBORE_DEPTH",)),
+            "cbore_depth_from": ("paper_face", ((_SELF, "GUIDE_CBORE_SUFFIX"),)),
+            "cbore_floor_ref": (CBORE_FLOOR, ("CBORE_FLOOR", "CBORE_FLOOR_CALLOUT")),
+            "callout": (
+                GUIDE_CALLOUT_PROCESS + GUIDE_CBORE_SUFFIX,
+                ((_SELF, "GUIDE_CALLOUT_PROCESS"), (_SELF, "GUIDE_CBORE_SUFFIX")),
+            ),
+            "tag": (f"B{_index}", _TABLE),
+        },
+        precision={
+            "dia": GUIDE_CALLOUT_PRECISION["hw-thruholedia"],
+            "cbore_dia": GUIDE_CALLOUT_PRECISION["hw-cbdia"],
+            "cbore_depth": GUIDE_CALLOUT_PRECISION["hw-cbdepth"],
+            "station": POSITION_PLACES,
+            "height": POSITION_PLACES,
+        },
+    )
 # The template centre-marks every hole as the view is placed (an explicit
 # AutoInsertCenterMarks2 printed all 28 marks twice in r1); the front view
 # proves exactly one mark per hole.

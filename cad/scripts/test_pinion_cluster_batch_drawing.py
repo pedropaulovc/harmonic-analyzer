@@ -702,6 +702,12 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("pd-vn-transgear-pivot-screw-1", "pd-support-bar-1")): _annulus_limit(
                 4.1656, 3.454, 7.9502
             ),
+            # #2425: MHA-PD-VN-71 #2-56 x 3/8 from the supplied MHA-PD-16
+            # web's rear face (.120 behind the journal's end as modelled) into
+            # the MHA-PD-08 journal's rear tap.
+            frozenset(
+                ("pd-vn-transgear-knob-cup-screw-1", "pd-transgear-knob-shaft-1")
+            ): _annulus_limit(2.184, 1.778, 9.525 - 3.048),
             **_expected_numbered_pairs(
                 "sh-vn-fillister-screw-90280a108",
                 range(1, 3),
@@ -912,19 +918,15 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         frozenset(("dt-crank-pin-1", "dt-crank-hub-1")),
         frozenset(("dt-crank-pin-1", "dt-crankshaft-1")),
     }
-    # MHA-PD-VN-62's retained tube pin across the hole match-drilled through
-    # MHA-PD-16 and the journal.
-    cup_pin_pairs = {
-        frozenset(("pd-vn-transgear-knob-cup-pin-1", "pd-transgear-knob-shaft-1")),
-        frozenset(("pd-vn-transgear-knob-cup-pin-1", "pd-transgear-knob-cup-1")),
-    }
+    # #2425: the MHA-PD-VN-62 cup pin is retired; MHA-PD-VN-71 holds the cup
+    # by the journal's rear tap, a threaded pair in pd-paper-drive's table.
     # MHA-PD-VN-66's chain mesh on the T24 at the closing station (#1457).
     connecting_link_pair = frozenset(
         ("pd-transgear-removable-1", "pd-vn-chain-connecting-link-1")
     )
     special_pairs = {
         "dt-drive-train": crank_pairs,
-        "pd-paper-drive": cup_pin_pairs | {connecting_link_pair},
+        "pd-paper-drive": {connecting_link_pair},
     }
     for name, expected_threaded in threaded_by_assembly.items():
         allowed = _allowed(name)

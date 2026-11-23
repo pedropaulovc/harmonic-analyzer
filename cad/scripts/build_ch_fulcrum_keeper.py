@@ -35,10 +35,15 @@ import sys
 import _telemetry
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _check import check
-from _com import _early_bound, _read_member
-from _dimensions import drive_dimension, name_dimensions, set_global
+from _com import _bind, _com_invoke, _early_bound, _read_member
+from _dimensions import (
+    _feature_display_dimensions,
+    drive_dimension,
+    name_dimensions,
+    set_global,
+)
 from _document_units import apply_package_model_units
-from _feature_tree import name_last_feature
+from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
@@ -74,7 +79,9 @@ from ch_fulcrum_keeper_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
     BORE_FROM_SIDE,
+    CBORE_DEPTH_BAND,
     CBORE_DEPTH_MM,
+    CBORE_DIA_BAND,
     CBORE_DIA_MM,
     CORNER_R,
     CROWN_R,
@@ -114,7 +121,7 @@ if FOOT_SCREW_THREAD != FRAME_SIDE_THREAD:
     raise AssertionError("keeper foot screw thread drifted from MHA-CH-VN-52")
 if HOLE_DIA_MM <= FRAME_SIDE_SHANK_DIA:
     raise AssertionError("standard #2 keeper clearance binds on the stock screw")
-if CBORE_DIA_MM <= FRAME_SIDE_HEAD_DIA:
+if CBORE_DIA_MM + CBORE_DIA_BAND[1] <= FRAME_SIDE_HEAD_DIA:
     raise AssertionError("keeper counterbore does not clear the stock screw head")
 if CBORE_DEPTH_MM != FRAME_SIDE_HEAD_H:
     raise AssertionError("keeper counterbore depth is not the stock head height")
@@ -208,6 +215,58 @@ REFERENCE_LINES = (
 )
 if tuple(row[0] for row in REFERENCE_LINES) != REFERENCE_SKETCHES:
     raise AssertionError("REFERENCE_LINES and REFERENCE_SKETCHES disagree")
+
+
+_TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
+
+
+def _band_foot_counterbore(adapter) -> None:
+    """Put the counterbore's printed limits (owner ruling 2026-11-22, #3367:
+    Ø.150-.154 x .078-.088; CBORE_DIA_BAND, CBORE_DEPTH_BAND) on the
+    FootScrewHole Hole Wizard feature's counterbore diameter and depth IN THE
+    PART, so the sheet's native callout displays them (the
+    build_pd_support_bar._band_round_counterbores pattern); the drawing sets
+    only their places. Each dimension is found by its value, the one on the
+    feature equal to CBORE_DIA_MM or CBORE_DEPTH_MM, and its band is read
+    back."""
+    feature = _feature_by_name(adapter, "FootScrewHole")
+    seen = []
+    dimensions = []
+    for display in _feature_display_dimensions(feature):
+        raw = _com_invoke(display, "IDisplayDimension", "GetDimension2", 0)
+        value = float(_com_invoke(raw, "IDimension", "SystemValue")) * 1000.0
+        seen.append((str(_com_invoke(raw, "IDimension", "FullName")), value))
+        dimensions.append((value, raw))
+    for label, nominal, (lower, upper) in (
+        ("diameter", CBORE_DIA_MM, deviations(CBORE_DIA_BAND)),
+        ("depth", CBORE_DEPTH_MM, deviations(CBORE_DEPTH_BAND)),
+    ):
+        matches = [raw for value, raw in dimensions if abs(value - nominal) < 1e-4]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"FootScrewHole: {len(matches)} dimensions read the counterbore "
+                f"{label} {nominal} mm, not 1; dimensions {seen!r}"
+            )
+        dimension = _bind(matches[0], "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = _TOL_BILATERAL
+        if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+            raise RuntimeError(
+                f"FootScrewHole counterbore {label}: SetValues rejected "
+                f"{lower}/{upper} mm"
+            )
+        if (
+            int(tolerance.Type) != _TOL_BILATERAL
+            or abs(float(tolerance.GetMinValue()) * 1000.0 - lower) > 1e-6
+            or abs(float(tolerance.GetMaxValue()) * 1000.0 - upper) > 1e-6
+        ):
+            raise RuntimeError(
+                f"FootScrewHole counterbore {label}: band did not persist"
+            )
+        _telemetry.info(
+            f"FootScrewHole counterbore {label} {dimension.FullName}: "
+            f"band {lower}/{upper} mm"
+        )
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -527,6 +586,7 @@ def build(adapter) -> dict[str, str]:
         *deviations(BORE_DIA_BAND),
         display_unit=UNIT,
     )
+    _band_foot_counterbore(adapter)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.

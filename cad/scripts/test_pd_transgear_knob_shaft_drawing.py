@@ -15,7 +15,7 @@ import pytest
 import _config
 import build_pd_transgear_knob_shaft as part
 import draw_pd_transgear_knob_shaft as drawing
-import pd_transgear_arm_plate_geometry as plate
+import pd_transgear_knob_bush_geometry as bush
 import pd_transgear_knob_shaft_spec as spec
 import pd_transgear_knob_thrust_ring_spec as ring
 import pd_transgear_thumbnut_spec as thumbnut
@@ -191,16 +191,26 @@ def test_the_stud_neck_is_no_longer_the_weak_section_under_the_tool() -> None:
     assert spec.RELIEF_DIA + printed_band_mm(2, unit=spec.UNIT) > spec.THREAD_ROOT_2A_MIN
 
 
-def test_machine_and_float_stations_are_unchanged() -> None:
+def test_machine_and_float_stations() -> None:
+    # #2425: the journal ends .140 behind the MHA-PD-28 bush's rear face, so
+    # the rear face moves forward; the tip, F and the pinion stay.
     for local, machine in (
         (spec.TIP_Z, -171.976), (spec.THREAD_END_Z, -155.72),
-        (spec.PINION_REAR_Z, -142.2072), (spec.REAR_END_Z, -99.4844),
+        (spec.PINION_REAR_Z, -142.2072), (spec.REAR_END_Z, -102.8372),
     ):
         assert F_MACHINE_Z + local == pytest.approx(machine, abs=0.005)
-    assert spec.CUP_FACE_STATION == pytest.approx(ring.LENGTH + plate.HUB_TO_BOSS + spec.END_FLOAT)
+    assert spec.CUP_FACE_STATION == pytest.approx(ring.LENGTH + bush.LENGTH + spec.END_FLOAT)
+    assert spec.CUP_FACE_STATION_BAND == pytest.approx(
+        ring.LENGTH_TOL + bush.LENGTH_BAND + spec.END_FLOAT_SET_TOL
+    )
     assert spec.END_FLOAT > spec.END_FLOAT_SET_TOL
-    assert spec.JOURNAL_LENGTH == pytest.approx(spec.CUP_FACE_STATION + spec.JOURNAL_REAR_EXTENSION)
-    assert spec.OVERALL_LENGTH == pytest.approx(72.4916, abs=0.005)
+    assert spec.JOURNAL_STANDOUT == pytest.approx(0.140 * spec.MM_PER_IN)
+    assert spec.JOURNAL_LENGTH == pytest.approx(
+        ring.LENGTH + bush.LENGTH + spec.JOURNAL_STANDOUT
+    )
+    assert spec.JOURNAL_LENGTH == pytest.approx(1.550 * spec.MM_PER_IN)
+    assert spec.OVERALL_LENGTH == pytest.approx(69.1388, abs=0.005)
+    assert not hasattr(spec, "JOURNAL_REAR_EXTENSION")
 
 
 def test_each_chucking_dimensions_from_its_faced_end() -> None:
@@ -219,11 +229,13 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     xxx = printed_band_mm(3, unit=spec.UNIT)
     assert 2.0 * xxx <= xx + 1e-12
     assert spec.CORE_FRONT_FROM_F_PLACES == spec.PLAIN_CORE_PLACES == spec.TIP_STATION_PLACES == 2
-    # The journal carries the overall's, F's and the face width's bands.
+    # The journal carries the overall's, F's and the face width's bands; its
+    # stand-out behind the bush adds the ring's and the bush's (.014).
     assert spec._JOURNAL_LENGTH_BAND == pytest.approx(2.0 * xxx + spec.FACE_WIDTH_BAND)
-    assert spec.JOURNAL_REAR_EXTENSION_MIN == pytest.approx(
-        spec.JOURNAL_REAR_EXTENSION - spec._JOURNAL_LENGTH_BAND - spec.CUP_FACE_STATION_BAND
+    assert spec.JOURNAL_STANDOUT_BAND == pytest.approx(
+        spec._JOURNAL_LENGTH_BAND + ring.LENGTH_TOL + bush.LENGTH_BAND
     )
+    assert spec.JOURNAL_STANDOUT_BAND == pytest.approx(0.014 * spec.MM_PER_IN)
     assert drawing.REFERENCE_DIMENSIONS["JournalLength"] is False
     assert "OverallLength" not in drawing.REFERENCE_DIMENSIONS
     # The from-tip dimensions stack outward from the tip's witness line, each
@@ -234,8 +246,9 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     # Round 2: each .XXX tip station names what it serves, by its link on the
     # value's line to a note naming the mate whose stack needs .XXX.  Machinist
     # review r1 of #2019 (rule 7): one reason a note, no values in its text.
-    # Round 6: the overall keeps .XXX (the knob cup's pin wall fails at .XX)
-    # and states that function once at the dimension, never in a note (r3).
+    # Round 6: the overall keeps .XXX (at .XX the knob cup's fit-up facing
+    # goes negative) and states that function once at the dimension, never
+    # in a note (r3).
     notes = dict(drawing.NOTE_TEXTS)
     note = notes[drawing.STATIONS_NOTE] + notes[drawing.THREAD_NOTE]
     for name, link in (
@@ -249,19 +262,19 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     assert "D-FLAT SEAT" in notes[drawing.STATIONS_NOTE]
     assert "FULL THREAD" in notes[drawing.THREAD_NOTE]
     cup = _config.parts("pd-transgear-knob-cup")["number"]
-    assert drawing.DIMENSION_SUFFIXES["OverallLength"] == f" SETS PIN WALL IN {cup}"
+    assert drawing.DIMENSION_SUFFIXES["OverallLength"] == f" SETS {cup} FIT-UP"
     assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_BELOW
     assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_ABOVE
-    assert spec.inch_text(spec.OVERALL_LENGTH, 3) == "2.854"
-    assert "2.854" not in drawing.NOTES and cup not in drawing.NOTES
-    # At .XX the journal band would leave the cup's pin-hole end wall under
-    # its floor: the third place is the function the suffix states.
+    assert spec.inch_text(spec.OVERALL_LENGTH, 3) == "2.722"
+    assert "2.722" not in drawing.NOTES and cup not in drawing.NOTES
+    # At .XX the stand-out's band outruns the cup's supplied pilot: the
+    # least facing goes negative, so the third place is the suffix's function.
     import pd_transgear_knob_cup_spec as cup_spec
 
     xx_band = printed_band_mm(2, unit=spec.UNIT) + printed_band_mm(3, unit=spec.UNIT) + spec.FACE_WIDTH_BAND
-    xx_wall = cup_spec.END_PIN_WALL_WORST - (xx_band - spec._JOURNAL_LENGTH_BAND)
-    assert cup_spec.END_PIN_WALL_WORST >= cup_spec.WALL_FLOOR
-    assert xx_wall < cup_spec.WALL_FLOOR
+    xx_facing = min(cup_spec.FACING_REMOVAL) - (xx_band - spec._JOURNAL_LENGTH_BAND)
+    assert min(cup_spec.FACING_REMOVAL) >= 0.0
+    assert xx_facing < 0.0
     for key in ("pd-transgear-drive-collar", "pd-transgear-thumbnut"):
         assert _config.parts(key)["number"] in note, key
     # Rule 7: each note runs to four short lines; no process or coined
@@ -273,13 +286,63 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     # width's left witness line (the pinion's rear face, which drops with its
     # arrow to the text's height) and of the rear witness line.
     x, _y = drawing.SIDE_KEEP["OverallLength"]
-    chars = len("2.854 SETS PIN WALL IN MHA-PD-16")
+    chars = len("2.722 SETS MHA-PD-16 FIT-UP")
     assert drawing.OVERALL_TEXT_CHARS == chars
     half = chars * 0.00275 / 2
     assert x + half <= drawing.PINION_REAR_X - 0.005
     assert x - half >= drawing.REAR_X + 0.005
     # Left of it the GEAR DATA block ends before the rear witness line.
     assert drawing.GEAR_DATA_RIGHT < drawing.REAR_X
+
+
+def test_rear_tap_takes_the_cup_screw_with_wall_and_lead_room() -> None:
+    """#2425: the MHA-PD-VN-71 #2-56 on the axis, drilled #50 and bottom
+    tapped (rule 12: full thread MIN, deeper drill); rule 17 at the journal's
+    least g6 diameter over the thread's major."""
+    from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
+    from _inch_wall_limits import WALL_TARGET_MM
+
+    tap = spec.REAR_TAP_SPEC
+    assert (tap.kind, tap.size, tap.end, tap.thread_class) == (
+        "tapped_bottoming", "#2-56", "blind", "2B"
+    )
+    assert tap.depth_mm == spec.REAR_TAP_DRILL_DEPTH == pytest.approx(0.42 * spec.MM_PER_IN)
+    assert tap.overrides_mm == {"ThreadDepth": spec.REAR_TAP_FULL_THREAD_MIN}
+    assert spec.REAR_TAP_FULL_THREAD_MIN == pytest.approx(0.34 * spec.MM_PER_IN)
+    assert spec.REAR_TAP_DRILL_DIA == TAP_DRILL_MM["#2-56"] == pytest.approx(0.070 * spec.MM_PER_IN)
+    wall = (spec.JOURNAL_DIA_MIN - THREAD_MAJOR_MM["#2-56"]) / 2.0
+    assert spec.REAR_TAP_WALL_WORST == pytest.approx(wall)
+    assert wall >= WALL_TARGET_MM
+    assert wall / spec.MM_PER_IN == pytest.approx(0.0813, abs=1e-4)
+    lead = (
+        spec.REAR_TAP_DRILL_DEPTH - printed_band_mm(2, unit=spec.UNIT)
+        - spec.REAR_TAP_FULL_THREAD_MIN - 2.0 * spec.MM_PER_IN / 56.0
+    )
+    assert spec.REAR_TAP_LEAD_ROOM_MIN == pytest.approx(lead)
+    assert lead / spec.MM_PER_IN == pytest.approx(0.0343, abs=1e-4)
+    # The callout prints the drill at .XXX and both depths at .XX, and names
+    # the screw it takes by number.
+    assert drawing.REAR_TAP_CALLOUT_PRECISION == {
+        "hw-tapdrldia": 3, "hw-threaddepth": 2, "hw-tapdrldepth": 2,
+    }
+    screw = _config.parts("pd-vn-transgear-knob-cup-screw")["number"]
+    assert drawing.REAR_TAP_CALLOUT_BELOW == f"FOR {screw}" == "FOR MHA-PD-VN-71"
+    # In the open field under the journal (r7: centred under the rear view,
+    # the leader to the rows' lower corner struck the "#"; r6: up and left,
+    # the rows ran past the border).  The rows' left end, and the 3 mm
+    # shoulder before it, stand right of the rear witness line, so the hole
+    # is left of the rows and the leader reaches their corner clear of them;
+    # they stand under the journal's REF length and finish symbol, over the
+    # overall's text and right of GEAR DATA.
+    x, y = drawing.REAR_TAP_CALLOUT_XY
+    half_w = drawing.REAR_TAP_CALLOUT_HALF_WIDTH
+    half_h = drawing.REAR_TAP_CALLOUT_HALF_HEIGHT
+    assert x - half_w - 0.003 > drawing.REAR_X + 0.002
+    assert drawing.END_CENTER[0] < x - half_w
+    assert x - half_w > drawing.GEAR_DATA_RIGHT + 0.010
+    assert y + half_h < drawing.SIDE_KEEP["JournalLength"][1] - 0.008
+    assert y + half_h < drawing.JOURNAL_FINISH_SYMBOL[1] - 0.010
+    assert y - half_h > drawing.SIDE_KEEP["OverallLength"][1] + 0.012
 
 
 def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
@@ -357,9 +420,20 @@ def test_complete_nominal_native_volume_uses_full_face_gaps_and_true_d() -> None
     r = spec.CORE_DIA / 2
     h = spec.CORE_FLAT_FROM_AXIS
     flat_removed = (r*r*math.acos(h/r) - h*math.sqrt(r*r-h*h)) * spec.CORE_ACTIVE_LENGTH
+    from _holes import blind_hole_volume_mm3
+
+    rear_tap = blind_hole_volume_mm3(spec.REAR_TAP_DRILL_DIA, spec.REAR_TAP_DRILL_DEPTH)
+    assert spec.REAR_TAP_VOLUME == pytest.approx(rear_tap)
+    c, r_journal = spec.REAR_CHAMFER, spec.JOURNAL_DIA / 2.0
+    rear_chamfer = math.pi * c * c * (r_journal - c / 3.0)
+    assert spec.REAR_CHAMFER_VOLUME == pytest.approx(rear_chamfer)
+    # The chamfer is sketched in the journal profile, so V_JOURNAL carries it.
+    assert part.V_JOURNAL == pytest.approx(
+        math.pi * r_journal**2 * spec.JOURNAL_LENGTH - rear_chamfer
+    )
     turned = (
         math.pi * spec.STOCK_PROFILE.blank_radius_mm**2 * spec.FACE_WIDTH
-        + part.V_STUD + part.V_JOURNAL - flat_removed
+        + part.V_STUD + part.V_JOURNAL - flat_removed - rear_tap
     )
     straight = spec.TEETH * spec.STOCK_PROFILE.gap_area_mm2 * spec.FACE_WIDTH
     assert lower <= turned - straight <= upper
@@ -400,10 +474,62 @@ def test_every_native_dimension_is_placed_once_with_model_places() -> None:
     detail = {"FrontReliefDia", "FrontReliefWidth", "FrontCornerRadius"}
     assert set(drawing.DETAIL_KEEP) == detail | {"FlatEnd", "FlatToolRadius"}
     assert spec.DRAWING_PRECISION["StudProfile"]["ThreadBlankDia"] == 3
-    # #2169: the cup-pin end wall holds with the journal as a reference.
+    # #2169: the journal prints as a reference; the overall controls.
     assert spec.DRAWING_PRECISION["JournalProfile"]["JournalLength"] == 2
     references = {"JournalLength": False, "ThreadBlankDia": True}
     assert drawing.REFERENCE_DIMENSIONS == references
+
+
+def test_journal_rear_chamfer_seats_the_end_flat_on_the_cup_web() -> None:
+    """#2425: an explicit .015 X 45° whose least leg clears the MHA-PD-16
+    pilot's R.005 MAX floor corner, inside the tap mouth's discounted thread,
+    leaving the rear face a flat land; sketched in the journal profile and
+    printed by its own sketch dimension under the rear end."""
+    import pd_transgear_knob_cup_spec as cup
+    from _hole_spec import THREAD_MAJOR_MM
+
+    inch = spec.MM_PER_IN
+    assert spec.REAR_CHAMFER == pytest.approx(0.015 * inch)
+    assert spec.REAR_CHAMFER_PLACES == 3
+    assert spec.REAR_CHAMFER_MIN == pytest.approx(0.010 * inch)
+    assert spec.REAR_CHAMFER_MIN >= cup.PILOT_FLOOR_R_MAX
+    assert spec.REAR_CHAMFER_MAX <= spec.REAR_TAP_PITCH + spec.EDGE_BREAK_MAX + 1e-9
+    land = (
+        spec.JOURNAL_DIA_MIN / 2.0 - spec.REAR_CHAMFER_MAX
+        - (THREAD_MAJOR_MM[spec.REAR_TAP_THREAD] / 2.0 + spec.EDGE_BREAK_MAX)
+    )
+    assert spec.REAR_FACE_LAND_MIN == pytest.approx(land)
+    assert land > 0.0
+    # Sketched in the journal profile (a chamfer feature's dimension did not
+    # import, farm r3) and marked: its axial leg prints as a native
+    # dimension.  Over the rear corner it struck detail B's ".016 SEE NOTE 4"
+    # and ".007" (farm r6); as a "REAR END" row of the journal Ø's callout
+    # nothing tied it to the chamfer and its third place stated no function
+    # (machinist review r10).  It stands under the rear end, " X 45°" its
+    # suffix and the function on the row under it; no note carries it.
+    assert "RearChamferSize" in spec.DRAWING_DIMENSIONS["JournalProfile"]
+    assert spec.DRAWING_PRECISION_BY_NAME["RearChamferSize"] == 3
+    assert "JournalDia" not in drawing.DIMENSION_CALLOUTS_BELOW
+    for name in ("REAR_CHAMFER_NOTE", "JOURNAL_DIA_BELOW"):
+        assert not hasattr(drawing, name)
+    assert not hasattr(spec, "REAR_CHAMFER_CALLOUT")
+    assert drawing.DIMENSION_SUFFIXES["RearChamferSize"] == " X 45\u00b0"
+    cup_number = _config.parts("pd-transgear-knob-cup")["number"]
+    function = drawing.DIMENSION_CALLOUTS_BELOW["RearChamferSize"]
+    assert function == drawing.REAR_CHAMFER_FUNCTION == f"CLEARS {cup_number}"
+    assert "\n" not in function
+    # The two rows centre under the journal's left half: right of the rear
+    # witness line, left of the journal Ø's lower arrow, under the outline
+    # and over the journal length's "(1.55)" row.
+    x, y = drawing.SIDE_KEEP["RearChamferSize"]
+    half = drawing.REAR_CHAMFER_BLOCK_HALF_WIDTH
+    outline = drawing._sheet_y(-spec.JOURNAL_DIA / 2.0)
+    assert x - half > drawing.REAR_X + 0.005
+    assert x + half < drawing.SIDE_KEEP["JournalDia"][0] - 0.003
+    assert y + 0.002 < outline - 0.002
+    assert y - 0.002 - 0.0055 > drawing.SIDE_KEEP["JournalLength"][1] + 0.003 + 0.001
+    # The journal's finish moved right of the block and the "(1.55)".
+    assert drawing.JOURNAL_FINISH_SYMBOL[0] - 0.0064 > x + half + 0.010
 
 
 def test_tool_end_limits_print_as_native_detail_dimensions() -> None:
@@ -704,24 +830,27 @@ def test_part_record_and_running_finishes() -> None:
     assert face.splitlines() == [
         f"{STACK_NAME} WITH",
         f"{_config.parts('pd-transgear-knob-thrust-ring')['number']}, "
-        f"{_config.parts('pd-transgear-arm-plate')['number']}",
+        f"{_config.parts('pd-transgear-knob-bush')['number']}",
     ]
     import transgear_cluster_fit as cluster
 
+    # #2425: the bush's hub face, not the plate's, places F.
     members = {term[0].split()[0] for term, _sign in cluster.F_CHAIN}
-    assert members == {"MHA-PD-08", "MHA-PD-15", "MHA-PD-19"}
+    assert members == {"MHA-PD-08", "MHA-PD-15", "MHA-PD-28"}
     assert all(number in face for number in members - {"MHA-PD-08"})
     assert "TipChamfer" not in drawing.DIMENSION_CALLOUTS_BELOW
 
 
 def test_tight_bands_name_their_mates_once_by_name_and_number() -> None:
     above, below = drawing.DIMENSION_CALLOUTS_ABOVE, drawing.DIMENSION_CALLOUTS_BELOW
-    callouts = {**above, **below}
+    # The journal Ø's mate link is its above-callout (its below row carries
+    # the rear chamfer), so the above lane wins the merge.
+    callouts = {**below, **above}
     # Each matched fit is one numbered note its dimensions link; the
     # D-section's Ø and flat share one (rule 4: one feature names its mate
     # once), each mate by its config title and number.
     links = {
-        "JournalDia": (drawing.JOURNAL_FIT_NOTE, "pd-transgear-arm-plate", "RUNNING FIT IN"),
+        "JournalDia": (drawing.JOURNAL_FIT_NOTE, "pd-transgear-knob-bush", "RUNNING FIT IN"),
         "CoreDia": (drawing.D_SECTION_FIT_NOTE, "pd-transgear-drive-collar", "SLIDING FIT ON"),
         "FlatToAxis": (drawing.D_SECTION_FIT_NOTE, "pd-transgear-drive-collar", "SLIDING FIT ON"),
     }
@@ -734,10 +863,10 @@ def test_tight_bands_name_their_mates_once_by_name_and_number() -> None:
         assert notes[number].startswith(mate), name
         assert f"{number}. {notes[number]}" in printed, name
     # The fit mates are the notes'; only the face width's stack callout names
-    # MHA-PD-19, as a stack member.
+    # MHA-PD-28, as a stack member.
     for name, text in callouts.items():
         assert "MHA-PD-22" not in text, name
-        assert name == "FaceWidth" or "MHA-PD-19" not in text, name
+        assert name == "FaceWidth" or "MHA-PD-28" not in text, name
     # The collar is the D-section's fit mate (note 2) and the neck's (note 4),
     # and the stations note names what its lengths set under it.
     assert sum("MHA-PD-22" in text for _number, text in drawing.NOTE_TEXTS) == 3
@@ -745,7 +874,7 @@ def test_tight_bands_name_their_mates_once_by_name_and_number() -> None:
     # The journal's matched fit states its clearance from both parts' limits.
     low, high = drawing.JOURNAL_CLEARANCE_MM
     assert low == pytest.approx(
-        plate.BORE_DIA + min(plate.BORE_DIA_LIMITS) - spec.JOURNAL_DIA - max(spec.JOURNAL_DIA_BAND)
+        bush.BORE_DIA + min(bush.BORE_DIA_LIMITS) - spec.JOURNAL_DIA - max(spec.JOURNAL_DIA_BAND)
     )
     assert 0.0 < low < high
     assert f"(CLEARANCE {drawing._fit_range_text(low, high)})" in printed
@@ -764,8 +893,9 @@ def test_tight_bands_name_their_mates_once_by_name_and_number() -> None:
     )
     assert drawing.DIMENSION_SUFFIXES["FrontReliefDia"] == f" {drawing.NECK_LINK}"
     # Vertical Ø callouts go above their text (a below one would sit on the
-    # Ø's own line); no dimension carries both.
+    # Ø's own line).
     assert not set(above) & set(below)
+    assert set(below) & set(drawing.DIMENSION_SUFFIXES) == {"RearChamferSize"}
 
 
 def test_gear_data_backlash_is_the_mesh_check_range_rounded_inward() -> None:
@@ -910,7 +1040,7 @@ def test_controlled_overall_runs_on_the_last_row_clear_of_the_gear_data() -> Non
     # inside the border.
     x, y = drawing.SIDE_KEEP["OverallLength"]
     assert drawing.REAR_X - drawing.GEAR_DATA_RIGHT >= 0.003
-    assert y == drawing._ROW_Y[5] > 0.0127 + 0.005
+    assert y == drawing._ROW_Y[5] + drawing._OVERALL_LIFT > 0.0127 + 0.005
     assert drawing.REAR_X < x < drawing.TIP_X
 
 
@@ -1069,7 +1199,7 @@ def test_run_233549_text_clears_the_border_lines_and_labels() -> None:
 
 
 def test_run_004958_journal_finish_stands_clear() -> None:
-    # The finish lands on the journal's lower outline, mid-left, where no
+    # The finish lands on the journal's lower outline, mid-right, where no
     # tooth, line or text is near (machinist review r5: in the end view it
     # landed where the journal circle meets the teeth).
     px, py = drawing.JOURNAL_FINISH_PICK
@@ -1077,13 +1207,13 @@ def test_run_004958_journal_finish_stands_clear() -> None:
     assert drawing.REAR_X < px < drawing.PINION_REAR_X
     # The symbol (V tip at its position, ~16.7 mm wide, text ~10.3 mm over
     # the tip; its leader runs 6.35 mm level toward the landing) stands
-    # under the outline, right of the rear witness line and left of the
-    # journal Ø's lower arrow and the 40.938 text.
+    # under the outline, right of the journal Ø's lower arrow and the
+    # journal length's "(1.55)" and left of the pinion.
     sx, sy = drawing.JOURNAL_FINISH_SYMBOL
     assert sy + 0.0103 < py - 0.002
-    assert sx - 0.0064 > drawing.REAR_X + 0.002
-    assert sx - 0.0022 + 0.0167 < drawing.SIDE_KEEP["JournalDia"][0] - 0.002
-    assert sx - 0.0022 + 0.0167 < drawing.SIDE_KEEP["JournalLength"][0] - 0.0085 - 0.002
+    assert sx - 0.0064 > drawing.SIDE_KEEP["JournalDia"][0] + 0.002
+    assert sx - 0.0064 > drawing.SIDE_KEEP["JournalLength"][0] + 0.0085 + 0.002
+    assert sx - 0.0022 + 0.0167 < drawing.PINION_REAR_X - 0.003
 
 
 def test_run_022045_flat_prints_in_the_tip_end_view_clear_of_its_neighbours() -> None:
@@ -1374,6 +1504,7 @@ class _BuildRecorder:
             "add_toothspace_callout", "_mark_detail_on_side", "_label_views",
             "_add_sheet_note", "_add_view_arrow", "visible_circle_edge",
             "_set_dimension_suffixes", "set_reference_dimension",
+            "_require_saved_rear_tap", "_add_rear_tap_callout", "remove_notes_matching",
         ):
             monkeypatch.setattr(drawing, name, self._recorder(name))
         monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
@@ -1507,14 +1638,24 @@ def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_pa
     tip = (tip_r * math.cos(angle), tip_r * math.sin(angle))
     assert tooth["entity_xy"] == pytest.approx(tip)
     assert tooth["note_xy"] == drawing.TOOTH_EDGE_NOTE_XY
-    # The journal's finish lands on the journal's own side-view silhouette,
-    # not on the end view's circle among the teeth.
+    # The journal's finish attaches to the journal's controlled model FACE
+    # (resolved on the part, not a hit-tested silhouette: farm r5 re-solved
+    # one onto another face), its leader landing on the side view's lower
+    # outline, not on the end view's circle among the teeth.
     [(finish_args, finish)] = seat.made["add_surface_finish"]
     assert finish["label"] == "journal finish"
     assert finish_args[1].name == "*Right"
-    assert finish["entity_type"] == "SILHOUETTE"
-    assert finish["edge_xy"] == drawing.JOURNAL_FINISH_PICK
+    assert finish["entity_type"] == "FACE"
+    assert finish["entity"] == "journal"
+    assert "edge_xy" not in finish
     assert finish["leader_attach_xy"] == drawing.JOURNAL_FINISH_PICK
+    # The rear tap's native callout goes on the rear view (*Front), after the
+    # saved source proves its RearTap; its automatic label is swept.
+    [(tap_args, _tap)] = seat.made["_add_rear_tap_callout"]
+    assert tap_args[1].name == "*Front"
+    assert seat.made["_require_saved_rear_tap"]
+    [(sweep_args, _sweep)] = seat.made["remove_notes_matching"]
+    assert sweep_args[1] == drawing.TAPPED_HOLE_NOTE
 
 
 # The stock-gear part builds, run offline with their seat stubbed

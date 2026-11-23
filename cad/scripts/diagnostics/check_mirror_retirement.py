@@ -1146,14 +1146,6 @@ expect(
 )
 expect(
     PD,
-    "pd-vn-transgear-knob-cup-pin-1",
-    [*_K, p.KNOB_CUP_PIN_Z0],
-    IDENTITY,
-    "knob cup pin",
-    **_SOLV,
-)
-expect(
-    PD,
     "pd-transgear-removable-2",
     [-p.CHAIN_CRANK_CENTRE[0], p.CHAIN_CRANK_CENTRE[1], p.REMOVABLE_Z0],
     IDENTITY,
