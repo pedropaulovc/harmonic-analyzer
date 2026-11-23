@@ -1492,12 +1492,15 @@ def test_the_knob_stack_goes_on_front_to_rear() -> None:
     assert positions == sorted(positions)
 
 
-def test_the_pivot_screw_is_unlocked_and_the_spacer_pressed_as_made() -> None:
+def test_the_pivot_screw_is_unlocked_and_the_spacer_bonded_as_made() -> None:
     """MHA-PD-VN-57 runs through the bar, its tip faced below the front face,
     and carries no lock (owner ruling U-MHA-PD-VN-57-no-lock, #1194): no
     stake, no threadlocker. The seat is shown in the pivot view. R9-6 never
-    faces MHA-PD-20.  R9-71: the spacer is pressed on the shoulder flush with
-    its end, and the MHA-PD-VN-63 spring under the head holds the arm on it."""
+    faces MHA-PD-20.  Fit audit 2026-11-23 (pending owner confirmation): the
+    spacer is bonded on the shoulder flush with its end (rule 23: the grade,
+    the degrease, how it is held square while it cures, the compound kept
+    off the running fit, and the cure before load), and the MHA-PD-VN-63
+    spring under the head holds the arm on it."""
     body = _step_body("hanger-pivoted")
     window = steps.inch_window(pivot_screw.TIP_RECESS, 3, " TO ")
     assert "THREADLOCKER" not in body
@@ -1510,6 +1513,34 @@ def test_the_pivot_screw_is_unlocked_and_the_spacer_pressed_as_made() -> None:
     assert _number("pd-transgear-pivot-spacer") in body
     assert _number("pd-vn-transgear-pivot-spring") in body
     assert "AS MADE" in body
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())["hanger-pivoted"]
+    assert len(texts) == 24
+    assert "PRESS THE" not in body and "REAMED" not in body
+    assert "SLIDES ON BY HAND" not in body
+    assert texts[2] == "FIT THE ARM, ITS BORE AND FRONT FACE WAXED, ON IT FROM THE REAR."
+    # The dry trial proves the bought screw's shoulder end square enough
+    # for the drilled bore before anything is bonded.
+    assert texts[3].startswith("CHECK, DRY: ") and texts[3].endswith("THE ARM SWINGS FREELY.")
+    assert "FLAT PLATE WHOSE HOLE CLEARS" in texts[3]
+    assert texts[4] == (
+        f"IF IT BINDS, REPEAT FROM {drawing.sub_step('hanger-pivoted', 0)} WITH A NEW "
+        f"{_number('pd-vn-transgear-pivot-screw')} SCREW."
+    )
+    assert texts[5].startswith("DEGREASE THE SPACER'S BORE")
+    bond = texts[drawing.PIVOT_SPACER_BOND_SUB_STEP]
+    assert "LOCTITE 638" in bond and "NOT THE SHOULDER" in bond
+    assert "CLEAR OF THE ARM" in bond
+    cure = texts[7]
+    assert cure.startswith("AT ONCE, CLAMP THE SCREW DOWN")
+    assert "BOTH ON THE PLATE" in cure
+    assert f"CURE {drawing.PIVOT_SPACER_BOND_CURE_H} H BEFORE THE SCREW IS SEATED" in cure
+    assert texts[8].startswith("SEAT THE SCREW")
+    assert all(
+        len(lines) <= 6 for lines in drawing._wrapped_sub_steps("hanger-pivoted", texts)
+    )
+    import pd_transgear_pivot_spacer_spec as spacer_spec
+
+    assert spacer_spec.BOND_GAP[1] <= spacer_spec.LOCTITE_638_GAP_MAX
     # No step shortens the spacer.
     assert not re.search(r"\bFACE (IT|THE SPACER|TO)\b", _unit_step_notes().fitup_steps)
 
@@ -1864,9 +1895,11 @@ def test_the_rear_cup_is_faced_bonded_and_screwed_and_the_nut_seats_on_the_faced
     assert "cup-pin-hole" not in drawing.SETTING_ROW_KEYS
     note = drawing.BOM_EXPENDABLES_NOTE.replace("\n", " ")
     assert (
-        f"{s('knob-stack-fitted', drawing.KNOB_CUP_BOND_SUB_STEP)} USES LOCTITE 641; "
+        f"LOCTITE 638 {s('hanger-pivoted', drawing.PIVOT_SPACER_BOND_SUB_STEP)}, "
+        f"641 {s('knob-stack-fitted', drawing.KNOB_CUP_BOND_SUB_STEP)}; "
         f"CURE {drawing.KNOB_CUP_BOND_CURE_H} H."
     ) in note
+    assert drawing.PIVOT_SPACER_BOND_CURE_H == drawing.KNOB_CUP_BOND_CURE_H
     # Each sub-step prints in at most six lines (rule 22).
     assert all(
         len(lines) <= 6 for lines in drawing._wrapped_sub_steps("knob-stack-fitted", texts)
@@ -2713,47 +2746,47 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     assert plate[4] == "CHECK: ROCKED BY HAND, THE PLATE HAS NO SHAKE AND NO DAYLIGHT."
     assert plate[5] == "IF IT SHAKES OR SHOWS DAYLIGHT, DO 13U AND REPEAT 14E."
     pivot = texts["hanger-pivoted"]
-    assert pivot[5].startswith("SEAT THE SCREW, ITS SHOULDER TIGHT ON THE BAR'S BACK FACE")
-    assert pivot[6] == "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE."
-    assert pivot[7] == "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW."
-    assert pivot[8] == "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY."
-    assert pivot[9] == "IF ALL THREE CHECKS PASS, SKIP 15L-15W."
+    assert pivot[8].startswith("SEAT THE SCREW, ITS SHOULDER TIGHT ON THE BAR'S BACK FACE")
+    assert pivot[9] == "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE."
+    assert pivot[10] == "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW."
+    assert pivot[11] == "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY."
+    assert pivot[12] == "IF ALL THREE CHECKS PASS, SKIP 15P-15Z."
     # The remedy takes the captured arm off before anything is cleaned.
-    assert pivot[10].startswith("UNSCREW ") and pivot[11] == "LIFT THE ARM OFF."
-    assert pivot[12].startswith("FLUSH OIL INTO THE ARM'S BORE")
-    assert "BAR BACK FACE" in pivot[13]
-    assert pivot[14] == "REPEAT 15F-15J."
-    assert pivot[15] == "IF ALL THREE CHECKS NOW PASS, SKIP 15S-15W."
+    assert pivot[13].startswith("UNSCREW ") and pivot[14] == "LIFT THE ARM OFF."
+    assert pivot[15].startswith("FLUSH OIL INTO THE ARM'S BORE")
+    assert "BAR BACK FACE" in pivot[16]
+    assert pivot[17] == "REPEAT 15J-15M."
+    assert pivot[18] == "IF ALL THREE CHECKS NOW PASS, SKIP 15V-15Z."
     # #3107: the screw and spacer are renewed once; a second failure sends
     # the bar and the arm to their sheets, and every outcome has a route: a
     # bar outside (with the arm if it is outside too), an arm outside or all
     # inside, one action a step (rule 22).
     bar = _number("pd-support-bar")
-    assert pivot[16:20] == (
-        "DO 15L-15M.",
+    assert pivot[19:23] == (
+        "DO 15P-15Q.",
         f"IF NOT YET RENEWED, REPEAT FROM 15A WITH A NEW "
         f"{_number('pd-vn-transgear-pivot-screw')} SCREW AND "
         f"{_number('pd-transgear-pivot-spacer')} SPACER.",
         f"IF ALREADY RENEWED, INSPECT THE {bar} BAR'S TAP AND BACK FACE AND THE "
         f"{_number('pd-transgear-arm')} ARM'S BORE TO THEIR SHEETS.",
         f"FOR A BAR FOUND OUTSIDE, MAKE A NEW {bar} BAR AND REBUILD FROM STEP "
-        f"{steps.step_number('bar-clamped')}, WITH 15W'S PARTS IF THE ARM IS ALSO OUTSIDE.",
+        f"{steps.step_number('bar-clamped')}, WITH 15Z'S PARTS IF THE ARM IS ALSO OUTSIDE.",
     )
-    assert pivot[20].startswith(
+    assert pivot[23].startswith(
         "FOR AN ARM FOUND OUTSIDE, OR IF ALL ARE INSIDE, REPEAT FROM STEP "
         f"{steps.step_number('latch-pin-pressed')} WITH A NEW {_number('pd-transgear-arm')} ARM,"
     )
     # Only the parts fitted by step 15 are renewed (Codjiflo P3 on f92995b8e6).
     for later in ("pd-transgear-knob-shaft", "pd-transgear-knob-cup", "pd-latch-hook"):
-        assert _number(later) not in pivot[20]
-    assert len(pivot) == 21
+        assert _number(later) not in pivot[23]
+    assert len(pivot) == 24
     assert not any("STAKE" in line for line in pivot)
     accepted = texts["fitup-accepted"]
     # From 33 the reseat runs; a repeat failure takes the knob stack off
     # (28G) and rebuilds the arm as 28R-28V, whose step 15 carries the
     # renewal and the inspection (Codjiflo P2 on e8b4e199aa).
-    assert "IF 33F FAILS, ARM UNLATCHED, DO 15L-15Q." in accepted
-    assert "IF A 15G-15J CHECK THEN FAILS, DO 28G AND 28R-28V." in accepted
+    assert "IF 33F FAILS, ARM UNLATCHED, DO 15P-15T." in accepted
+    assert "IF A 15K-15M CHECK THEN FAILS, DO 28G AND 28R-28V." in accepted
     assert texts["fitup-mesh-remedied"][6].startswith("REMOVE THE ")
     assert texts["fitup-mesh-remedied"][15].startswith(
         "FOR A FAULT ALL ROUND (ARM SETTING)"
@@ -3348,7 +3381,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # The turn only finds the period; nothing on the rebuild is staked.
     assert "TURN THE DISC ONE TURN BY THE COLLAR, NOTING WHERE IT FAULTS." in pose
     assert "STAKING" not in pose
-    assert f"DO {drawing.sub_step('hanger-pivoted', 10)}-{drawing.sub_step('hanger-pivoted', 11)}." in pose[rebuild:]
+    assert f"DO {drawing.sub_step('hanger-pivoted', 13)}-{drawing.sub_step('hanger-pivoted', 14)}." in pose[rebuild:]
     # A new disc takes new screws, cut again to its own rear face, on the
     # same hub, its key pin left in (#2409).
     assert (
