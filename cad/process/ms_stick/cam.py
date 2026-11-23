@@ -538,9 +538,16 @@ def context(
         f"G0 Z{CLEAR_MM:.3f}",
     ]
 
-    # MS02: the outline. Depth: through the thickest bar into the tape; under
-    # the thinnest bar into the fixture's top, by fixture_skim_max_mm at most.
-    tape = p["tape_thickness_mm"]
+    # MS02: the outline. Z0 is the blank's top (the ruled face), so the tape
+    # stack moves the bar under the stick, never the stick's back. Depth:
+    # through the thickest bar into the stack, short of the bar even on the
+    # thinnest stack; under the thinnest bar on the thinnest stack (the bar's
+    # top highest) into the fixture's top by fixture_skim_max_mm at most.
+    stack_min, stack_max = p["tape_stack_min_mm"], p["tape_stack_max_mm"]
+    if not 0 < stack_min <= p["tape_stack_mm"] <= stack_max:
+        raise ValueError(
+            "process.tape_stack_mm is not inside tape_stack_min_mm..tape_stack_max_mm"
+        )
     trim = p["outline_trim_mm"]
     depth = p["outline_depth_mm"]
     step = p["outline_step_mm"]
@@ -550,12 +557,14 @@ def context(
         raise ValueError(
             "process.outline_depth_mm is not outline_levels × outline_step_mm"
         )
-    if not 0 < p["outline_breakthrough_mm"] <= tape:
-        raise ValueError("under the thickest bar the outline does not end in the tape")
-    skim = depth - (thick_min + tape)
+    if not 0 < p["outline_breakthrough_mm"] <= stack_min:
+        raise ValueError(
+            "under the thickest bar the outline does not end in the thinnest tape stack"
+        )
+    skim = depth - (thick_min + stack_min)
     if skim > p["fixture_skim_max_mm"]:
         raise ValueError(
-            f"under the thinnest bar the outline enters the fixture {skim:.3f} mm, over process.fixture_skim_max_mm"
+            f"under the thinnest bar on the thinnest stack the outline enters the fixture {skim:.3f} mm, over process.fixture_skim_max_mm"
         )
     front_max = p["blank_width_max_mm"] - width - trim
     front_min = p["blank_width_min_mm"] - width - trim
@@ -583,7 +592,7 @@ def context(
     _same(plan, "outline", "axial_doc_mm", step)
     _same(plan, "outline", "radial_woc_mm", radial)
     _agree(plan, "bond_area_mm2", length * width, tol=0.01)
-    jaw_top = -(thick_min + tape + proud)
+    jaw_top = -(thick_min + stack_min + proud)
     if -depth - jaw_top < p["jaw_clearance_min_mm"]:
         raise ValueError(
             "the outline's deepest pass is within process.jaw_clearance_min_mm of the jaw tops"
@@ -923,7 +932,8 @@ def context(
 
     # Keep-outs. MS01: the jaws under the bar's middle, their tops below its
     # raw top. MS02 to MS04: the jaws anywhere along the bar (the blank is
-    # set on it by rule), their tops below the thinnest blank on its tape.
+    # set on it by rule), their tops below the thinnest blank on the thinnest
+    # tape stack (the highest they stand under Z0).
     mid = -bar_l / 2
     bar_jaws = [
         _box(
@@ -952,7 +962,7 @@ def context(
         "fixture bar below the skim",
         along,
         (-bar_w, 0.0),
-        -(thick_min + tape + p["fixture_skim_max_mm"]),
+        -(thick_min + stack_min + p["fixture_skim_max_mm"]),
     )
     floor = _box(
         "stock under the engraving",
