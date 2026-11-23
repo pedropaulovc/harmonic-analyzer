@@ -130,16 +130,24 @@ length_dro_max_mm = 272.542
 # taken off its other side. cam.py checks them.
 height_raw_max_mm = 17.8308
 depth_raw_max_mm = 14.6558
-# Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2), equal
-# levels no deeper than .050 and equal passes across the face no wider than
-# .200 in, under half the cutter (the 6G chip-load factor 1.0 holds to 50 %
-# engagement, shop settings.endmill-carbide-3fl-1-2-1018-cf).
+# Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2) at shop
+# settings.em-half-carbide-1018-v5-face, measured stable on the PM-30MV at
+# up to 1.27 mm (.050) deep and 3.4 mm wide at the 27.94 mm stick-out
+# (cad/config/shop-equipment/measured-cuts.toml): equal levels no deeper
+# than .050 and equal passes across the face no wider than .129. The
+# deepest level any face takes is the underside's one .050; the widest pass
+# the rail's .624 faces' (15.85 + the 0.5 overhang in five: 3.270; the 3/4
+# in faces 19.05 + 0.5 in six: 3.258). cam.py checks both are the declared
+# cut. The faces zigzag (owner ruling 2026-11-16), so every other pass
+# climbs: that half is not what the dechatter cut measured.
 face_cutter_dia_mm = 12.7
-face_stepover_max_mm = 5.08
+face_stepover_max_mm = 3.27
 face_step_max_mm = 1.27
 # Ends: the same cutter's side, one level from the rear face to .020 under
 # the front face (end_axial_doc_mm, cam.py checks it), in equal radial steps
-# no deeper than .030, one-way conventional passes across the rail.
+# no deeper than .030, one-way conventional passes across the rail. They
+# stay on the chart setting (shop settings.endmill-carbide-3fl-1-2-1018-cf):
+# 10.541 deep is past the deepest measured cut, 6.6 (measured-cuts.toml).
 end_step_max_mm = 0.762
 end_past_mm = 0.508
 end_axial_doc_mm = 10.541
@@ -189,8 +197,11 @@ vise_clamp_end_mm = 217.13
 # Machine-capacity inputs (mm): heights from the table, tool lengths from
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set at least 1 in out of the collet.
-half_mill_projection_min_mm = 25.4
+# 1/2 in end mill, 3 in overall, set 1.10 in (27.94) out of the collet: the
+# stick-out the measured settings hold for (cad/config/shop-equipment/
+# measured-cuts.toml; owner, Pedro, 2026-11-22: "stickout is recorded as
+# 30mm but is actually 27.94").
+half_mill_projection_mm = 27.94
 # Tapping under the spring tap guide (tools.tap-guide-fisher): the guide and
 # the tap in its wrench together reach at most tap_stack_max_mm below the
 # collet face, the spindle-to-table maximum (shop machines.pm-30mv, 431.8)
@@ -274,7 +285,7 @@ machine_ref = "pm-30mv"
 holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in). The blank lying on them along the jaws, LEFT end to the left, gripped across two opposite cold-finished faces, centred on the jaws (both ends about 2.3 in out past them). Tap it down onto both stacks along its length while closing the vise. The face up becomes the underside; the lower {{process.lying_grip_mm:in.3dot}} of the blank is in the jaws."
 datum = "Program PB01_underside. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the LEFT end (the finished end, as in every setup), Y0 the fixed jaw's face, Z0 the skimmed underside (the top's high point less {{process.underside_skim_mm:in.3dot}}); +Y toward the fixed jaw. The file starts with an M6 for the end mill; tool lengths from the tool setter."
 diagram = { file = "diagrams/underside.svg", alt = "The blank lying along the jaws on stacked parallels, both ends out past the jaws; the 1/2 in end mill skims the top face, which becomes the underside." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.height_raw_max_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.height_raw_max_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_section_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = ["{{process.vise_overhang_mm}}", "{{process.vise_clamp_end_mm}}"], section_mm = { y = "{{process.blank_section_mm}}", z = "{{process.height_raw_max_mm}}" }, vise_left = "start" }
 
@@ -285,7 +296,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the skimmed underside, the top's high point less the {{process.underside_skim_mm:in.3dot}} skim."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the top face (try both ends and the middle): G10 L20 P1 Z1.321 (the {{process.underside_skim_mm:in.3dot}} skim plus the .002 leaf)."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, 1.10 in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the top face (try both ends and the middle): G10 L20 P1 Z1.321 (the {{process.underside_skim_mm:in.3dot}} skim plus the .002 leaf)."
 feed = "hand"
 
 [[setups.operations]]
@@ -298,8 +309,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB01_underside (M6 T1, 1/2 in end mill; set 2650): skim the top face at Z0, in passes along the rail no wider than {{process.face_stepover_max_mm:in.3dot}}. A cold-finished patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; mark this face U (the underside) with marking fluid."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run PB01_underside (M6 T1, 1/2 in end mill; set 2370): skim the top face at Z0, in passes along the rail no wider than {{process.face_stepover_max_mm:in.3dot}}. A cold-finished patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; mark this face U (the underside) with marking fluid."
+settings = "em-half-carbide-1018-v5-face"
 milling_cuts = [
   { name = "underside", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = ["{{process.left_end_skim_mm}}", "{{process.right_end_station_mm}}"] },
 ]
@@ -313,7 +324,7 @@ machine_ref = "pm-30mv"
 holding = "As Setup 2, the blank turned over about its length: U down on both stacks, the LEFT end still to the left, gripped across the same two cold-finished faces, centred. Tap it down onto both stacks along its length while closing the vise."
 datum = "Program PB02_height. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the LEFT end, Y0 the fixed jaw's face, Z0 the stacks' top (U), set from the miked thickness."
 diagram = { file = "diagrams/height.svg", alt = "The blank lying on stacked parallels, the underside down; the 1/2 in end mill faces the top down to the height in levels." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.height_raw_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.height_target_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.height_raw_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.height_target_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_section_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.height_raw_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = ["{{process.vise_overhang_mm}}", "{{process.vise_clamp_end_mm}}"], section_mm = { y = "{{process.blank_section_mm}}", z = "{{process.height_target_mm}}" }, vise_left = "start" }
 
@@ -336,8 +347,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB02_height (M6 T1; set 2650): face the top down to Z {{process.height_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.height_raw_max_mm:in.3dot}} (the thickest bar: a thinner one cuts air first). Unclamp; mic the height."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run PB02_height (M6 T1; set 2370): face the top down to Z {{process.height_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.height_raw_max_mm:in.3dot}} (the thickest bar: a thinner one cuts air first). Unclamp; mic the height."
+settings = "em-half-carbide-1018-v5-face"
 inspection = "Height {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}}, U to the top, miked at both ends and the middle."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.top_face_height_band_mm}}" }]
 milling_cuts = [
@@ -357,7 +368,7 @@ machine_ref = "pm-30mv"
 holding = "The same stacks. The blank lying along the jaws, LEFT end to the left, gripped on U and the top: the TOP against the FIXED jaw, the two cold-finished faces left horizontal; the face up becomes the front face. Centred; tap it down onto both stacks while closing the vise."
 datum = "Program PB03_front. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the LEFT end, Y0 the fixed jaw's face (the top), Z0 the front face (the high point less {{process.front_skim_mm:in.3dot}})."
 diagram = { file = "diagrams/front.svg", alt = "The blank lying on stacked parallels, gripped on its underside and top, top at the fixed jaw; the 1/2 in end mill takes the face up down to the front face in levels." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.height_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_raw_max_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.height_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_raw_max_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.height_target_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = ["{{process.vise_overhang_mm}}", "{{process.vise_clamp_end_mm}}"], section_mm = { y = "{{process.height_target_mm}}", z = "{{process.depth_raw_max_mm}}" }, vise_left = "start" }
 
@@ -380,8 +391,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB03_front (M6 T1; set 2650): face the face up down to Z0 in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. Unclamp; mark this face F (the front face) with marking fluid."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run PB03_front (M6 T1; set 2370): face the face up down to Z0 in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. Unclamp; mark this face F (the front face) with marking fluid."
+settings = "em-half-carbide-1018-v5-face"
 milling_cuts = [
   { name = "front face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = ["{{process.left_end_skim_mm}}", "{{process.right_end_station_mm}}"] },
 ]
@@ -395,7 +406,7 @@ machine_ref = "pm-30mv"
 holding = "As Setup 4, the blank turned over about its length: F down on both stacks, U now against the FIXED jaw, gripped on U and the top, the LEFT end still to the left, centred. Tap it down onto both stacks while closing the vise."
 datum = "Program PB04_depth. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the LEFT end, Y0 the fixed jaw's face (U), Z0 the stacks' top (F), set from the miked thickness."
 diagram = { file = "diagrams/depth.svg", alt = "The blank lying on stacked parallels, front face down, underside at the fixed jaw; the 1/2 in end mill faces the rear face down to the depth in levels." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.height_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_raw_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_target_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.height_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_raw_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_target_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.height_target_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.depth_raw_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = ["{{process.vise_overhang_mm}}", "{{process.vise_clamp_end_mm}}"], section_mm = { y = "{{process.height_target_mm}}", z = "{{process.depth_target_mm}}" }, vise_left = "start" }
 
@@ -418,8 +429,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB04_depth (M6 T1; set 2650): face the rear face down to Z {{process.depth_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.depth_raw_max_mm:in.3dot}}. Unclamp; mark this face R (the rear face); mic the depth."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run PB04_depth (M6 T1; set 2370): face the rear face down to Z {{process.depth_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.depth_raw_max_mm:in.3dot}}. Unclamp; mark this face R (the rear face); mic the depth."
+settings = "em-half-carbide-1018-v5-face"
 inspection = "Depth {{cad.rear_face_depth_min_in:.3dot}}–{{cad.rear_face_depth_max_in:.3dot}}, F to R, miked at both ends and the middle."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.rear_face_depth_band_mm}}" }]
 milling_cuts = [
@@ -439,7 +450,7 @@ machine_ref = "pm-30mv"
 holding = "Both stacks side by side against the FIXED jaw (1/4 in wide in all), none at the moving jaw: the hole exits fall .158 from the top face, clear of them. The rail as in Setup 5: F down on the stacks, U against the FIXED jaw, R up, the LEFT end to the left, centred. Tap it down onto the stacks along its length while closing the vise."
 datum = "Program PB05_ends_drill. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the LEFT end (where PB05 mills that end), Y0 the fixed jaw's face (U), +Y toward it; Z0 the stacks' top (F), set from the miked depth. Lock holes at X {{cad.lock_tap_1_x_mm:in.3f}}, {{cad.lock_tap_2_x_mm:in.3f}}, {{cad.lock_tap_3_x_mm:in.3f}} and {{cad.lock_tap_4_x_mm:in.3f}}, Y −{{cad.lock_tap_1_height_in:.3f}} in. At every M6 stop the file has stopped the spindle and lifted the tool above the rail."
 diagram = { file = "diagrams/drill.svg", alt = "The rail lying front face down on both stacks at the fixed jaw, rear face up; the 1/2 in end mill's side mills both ends, the centre drill spots and the #43 drills the four lock holes through, beside the stacks." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.height_target_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.rear_face_depth_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.drill_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.height_target_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.rear_face_depth_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.drill_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.height_target_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{cad.rear_face_depth_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = ["{{process.vise_overhang_mm}}", "{{process.vise_clamp_end_mm}}"], section_mm = { y = "{{process.height_target_mm}}", z = "{{process.depth_target_mm}}" }, vise_left = "start" }
 
