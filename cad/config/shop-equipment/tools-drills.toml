@@ -287,27 +287,44 @@ status = "on_hand"
 note = "#35 is a member of the owned 115-piece index (owner 2026-11-19: index pre-drills on hand). drawing cross-check 2026-11-19: MHA-PD-27 4X ⌴ Ø.110 ↧ .469 counterbore."
 
 [tools.drill-51-taper-length]
+make = "Cleveland"
+sku = "63725519"
+source = "https://www.mscdirect.com/product/details/63725519"
+purchase = "MSC 63725519, Cleveland C08618 #51 (.0670) HSS 118 deg taper-length drill, 2 in flute, 3-3/4 in overall, $8.22 (read live 2026-11-22). Same size at McMaster-Carr: 28965A827 (Dormer Pramet), $7.84."
 kind = "drill"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-FR-02 #51 DRILL 2X Ø.067 THRU FROM REAM POINT. fr_top_frame_spec.py: a jobber #51 falls short; Cleveland HSS taper length, MSC 63725519."
 
 [tools.drill-30-cobalt]
+make = "Precision Twist Drill"
+sku = "01-304-130"
+source = "https://www.travers.com/product/precision-twist-drill-018330-jobbers-drill-01-304-130"
+purchase = "Travers 01-304-130, Precision Twist Drill 018330 #30 cobalt 135 deg split-point jobber drill, 2-3/4 in overall, $4.53, in stock (read live 2026-11-22). Import alternative: Travers 01-021-030, $2.90."
 kind = "drill"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-24 #30 DRILL .129 THRU in 17-7 PH Cond C. The 115-piece index is HSS; the cobalt drill is for the hard 17-7 PH (not verified)."
 
 [tools.drill-65]
+make = "Chicago-Latrobe"
+sku = "2901A242"
+source = "https://www.mcmaster.com/2901A242/"
+purchase = "Two McMaster-Carr 2901A242, #65 (.035 in) black-oxide HSS jobber drills, 1-1/2 in overall, $3.07 each (read live 2026-11-22)."
 kind = "drill"
 status = "to_order"
 note = "Not owned: to buy (the 115-piece index stops at #60). Codjiflo round 1 (#3122): pre-drill for the MHA-DT-12-TL-01 clock-pin ream, .0365 +.0005 REAM .20 (dt_cylinder_gear_tl_cam_fixture_spec PIN_HOLE_DIA, PIN_HOLE_DEPTH, read by tools.reamer-0365). #65 (.0350) leaves .0015 on the diameter for the reamer, the author's allowance for a reamer under 1/16 in, no source; #66 (.0330) would leave .0035."
 
 [tools.drill-54-taper-length]
+purchase = "Fastenal 0306183: no price read (the listing shows none without an account). Same size, priced: McMaster-Carr 28965A825 (Dormer Pramet), #54 taper length, 1.75 in flute, 3 in overall, $7.89 (read live 2026-11-22)."
 kind = "drill"
 status = "to_order"
 note = "Not owned: to buy. MHA-DT-11 #54 DRILL 2X Ø.055 THRU ALL drive-pin knockouts, drilled from the reamed pin holes' floors on the lathe (owner ruling 2026-11-22, option C2): the cutter must stand over 40 mm out of the headstock chuck to clear the Ø.375 stub and its dome; a jobber #54 is too short."
 cite = ["Fastenal 0306183 (read 2026-11-22): #54 (.055 in) HSS 118° bright taper length drill, 3 in overall, 1.75 in flute, straight shank: https://www.fastenal.ca/product/details/0306183"]
 
 [tools.spot-drill-carbide-1-8]
+make = "Titan USA"
+sku = "TC18708"
+source = "https://www.dixie-tool.com/drill-1-8-n-c-spot-90-deg-scarb-138686/"
+purchase = "Dixie Tool TITUS1-TC18708, $26.33 (was $29.25), stock 2370 (read live 2026-11-22)."
 kind = "spot_drill"
 status = "to_order"
 note = "Not owned: to buy. MHA-DT-11 drive-pin holes on the lathe (owner ruling 2026-11-22, option C2): spots each .0930 hole for the #43 drill; its Ø1/8 body and 2 in length let it stand 40 mm out of the headstock drill chuck past the Ø.375 stub, 2.24 mm from the cutter's axis."

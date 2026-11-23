@@ -18,10 +18,12 @@ id = "drill-13-32"
 name = "13/32 drill"
 ref = "drill-13-32"  # Drills 13/32
 
+# Tool audit 2026-11-23 (row straightedge): the straightedge is the owned
+# 12 in Starrett combination square's blade; nothing to buy.
 [[tools]]
 id = "straightedge"
-name = "Straightedge"
-ref = "straightedge"  # F-straightedge
+name = "Straightedge: the 12 in combination square's blade"
+ref = "combination-square-starrett-c11h-12"
 
 [[setups]]
 machine_kind = "other"

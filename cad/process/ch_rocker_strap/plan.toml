@@ -544,7 +544,7 @@ diagram = { file = "diagrams/outline.svg", alt = "Plan of the sub-plate: blank b
 # the stack, above the plate top.
 envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.outline_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.fence_notch_depth_mm}}", "{{process.outline_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{process.tape_stack_max_mm}}", "{{cad.thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_top_height_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
-beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{cad.blank_bond_area_mm2}}", width_mm = "{{cad.blank_width_mm}}" }] } }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{cad.blank_bond_area_mm2}}", width_mm = "{{cad.blank_width_mm}}" }] } }
 
 # The drill and reamer leave their exit burr on face 1, which seats on the
 # tape and the plug pilot next: it comes off here, the edges kept sharp.
@@ -611,8 +611,11 @@ feed = "hand"
 # a stopped cutter). Work Z read there = .200 block + stack + blank, so
 # stack = Z − 5.080 − the blank's reading at that place (mm, the console's).
 [[setups.operations]]
+instruction = "Console M6 T2 (the 1/8 in end mill, measured on the tool setter). Spindle off: T2 just dragging on the .200 gauge block laid on the blank's top, near each end and beside the hub; read work Z at each. Stack = Z − 5.080 − the blank's reading there."
+feed = "hand"
+
+[[setups.operations]]
 steps = [
-  { kind = "action", text = "Console M6 T2 (the 1/8 in end mill, measured on the tool setter). Spindle off: T2 just dragging on the .200 gauge block laid on the blank's top, near each end and beside the hub; read work Z. Stack = Z − 5.080 − the blank's reading there." },
   { kind = "check", text = "Stack {{process.tape_stack_min_mm:.2f}}–{{process.tape_stack_max_mm:.2f}} mm ({{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}) at all three places, the two ends within 0.05 mm (.002) of each other." },
   { kind = "stop", text = "Outside the band, or the ends further apart: peel the blank off, clean both faces, re-tape and re-bond from the degrease." },
 ]
@@ -631,7 +634,11 @@ feed = "hand"
 
 # Cut cautions for the bond, real for CA and paper tape (brief step 8).
 [[setups.operations]]
-instruction = "For all of RS04: cut dry, or with a light air blast. No flood or mist coolant and no water: paper tape soaks and lets go. No oil on the work. CA softens with heat: if a level leaves the blank too warm to hold a finger on (feel it only with the spindle stopped, at a feed hold), let it cool before resuming."
+instruction = "For all of RS04: cut dry, or with a light air blast. No flood or mist coolant and no water: paper tape soaks and lets go. No oil on the work."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "CA softens with heat; never touch the work while RS04 runs. If the slot smokes or chips come off blue: Feed Hold, then Reset (the spindle stops). Jog Z up until T2 clears the blank top and the screw head, the spindle stopped; only then touch the blank. When it is cool enough to hold a finger on, run RS04 again from its start: the levels already cut pass in air."
 feed = "hand"
 
 # Every level starts with a straight plunge (feed: [parameters]); the plunge
@@ -670,7 +677,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Same file, no stop. Outline rough: a slot {{process.outline_finish_stock_mm:in.3dot}} outside the strap's edge, full perimeter, levels ≤ {{process.outline_rough_step_mm:in.3dot}}, down to a skin {{process.outline_skin_mm:in.3dot}} thick."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
-beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
 milling_cuts = [
   { name = "outline rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.outline_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_rough_step_mm}}", radial_woc_mm = "{{process.outline_cutter_dia_mm}}", traverse_mm = "{{cad.outline_x_mm}}" },
 ]
@@ -682,7 +689,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Same file, no stop. Outline finish: the edge itself, {{process.outline_finish_stock_mm:in.3dot}} radial, one level down to the skin."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
-beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
 milling_cuts = [
   { name = "outline finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.outline_cutter_dia_mm}}", axial_doc_mm = "{{cad.outline_wall_depth_mm}}", radial_woc_mm = "{{process.outline_finish_stock_mm}}", traverse_mm = "{{cad.part_x_mm}}" },
 ]
@@ -694,7 +701,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Same file, no stop. Outline through: the skin, at the finished size, one level {{cad.outline_through_depth_mm:in.3dot}} deep, to {{process.outline_breakthrough_mm:in.3dot}} below the strap's nominal underside, into the tape stack; the cutter does not reach the plate."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
-beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
 milling_cuts = [
   { name = "outline through", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.outline_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_through_step_mm}}", radial_woc_mm = "{{process.outline_cutter_dia_mm}}", traverse_mm = "{{cad.part_x_mm}}" },
 ]
@@ -742,10 +749,11 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-steps = [
-  { kind = "action", text = "Lay the strap tape-up on the surface plate. Hold it down flat with one hand close to the peel line and peel its tape back on itself, low and slow, along the length. The strap is never lifted by an edge while tape still holds it." },
-  { kind = "action", text = "Residue: a CA spot on the strap or plate, acetone on a rag; the tape's adhesive film, isopropyl alcohol. Peel the plate's tape, lift the hub plug out and wipe the plate before the next blank." },
-]
+instruction = "Lay the strap tape-up on the surface plate. Hold it down flat with one hand close to the peel line and peel its tape back on itself, low and slow, along the length. The strap is never lifted by an edge while tape still holds it."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Residue: a CA spot on the strap or plate, acetone on a rag; the tape's adhesive film, isopropyl alcohol. Peel the plate's tape, lift the hub plug out and wipe the plate before the next blank."
 feed = "hand"
 
 [[setups.operations]]

@@ -855,7 +855,7 @@ feed = "hand"
 [[setups]]
 machine_kind = "other"
 title = "Free, deburr, inspect"
-machine = "Bench"
+machine = "PM-30MV table, spindle off (free the platen; the bar stays clamped), then bench"
 indexing = "none"
 diagram = { file = "diagrams/inspect.svg", alt = "The finished platen seen on its back face, as drawn: sockets A1–A4, guide holes B1–B10 with their counterbores on the far side; the length, the height, B1's station and height from the left and bottom edges." }
 envelope = "other"

@@ -6,12 +6,12 @@
   <rect class="part-kept" x="258" y="70" width="198" height="110"/>
   <text class="label" x="110.0" y="130.0">blank A 3.60</text>
   <text class="label" x="308.0" y="130.0">blank B 3.60</text>
-  <text class="label" x="500.0" y="130.0">rest 4.80: kept for MHA-PD-14</text>
+  <text class="label" x="500.0" y="130.0">rest (over 4.7): kept for MHA-PD-14</text>
   <line class="cutter" x1="258" y1="62" x2="258" y2="188"/>
   <line class="cutter" x1="456" y1="62" x2="456" y2="188"/>
-  <text class="label" x="200.0" y="206.0">snip 1</text>
-  <text class="label" x="398.0" y="206.0">snip 2</text>
+  <text class="label" x="188.0" y="206.0">saw cut 1</text>
+  <text class="label" x="386.0" y="206.0">saw cut 2</text>
   <text class="label" x="40.0" y="60.0">bought end</text>
-  <text class="label" x="60.0" y="240.0">2 x 12 x .032 C26000 H02 strip, full 2 in width: mike it 1 in in from each end;</text>
-  <text class="label" x="60.0" y="258.0">file the burr off every snipped end, the blank flat on the spoil plate.</text>
+  <text class="label" x="60.0" y="240.0">2 x 12 x .032 C26000 H02 strip, full 2 in width: mike it 1 in in from each end.</text>
+  <text class="label" x="60.0" y="258.0">Junior hacksaw, the strip between wood blocks in the bench vise; file off each sawn end's burr.</text>
 </svg>

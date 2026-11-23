@@ -17,7 +17,7 @@
 # line, drill #1 short of the pocket floor, then plunge the pocket to the
 # floor depth with the 1/4 carbide square end mill from the tailstock (its
 # square corner leaves the floor corner inside R.004 MAX) and pin it (the
-# reading D goes on the cup's tag for MHA-DT-32). A 3/16 in 90° chamfer
+# reading C goes on the cup's tag for MHA-DT-32). A 3/16 in 90° chamfer
 # cutter chamfers the #20 hole's edge on the floor. Part off .02 long. Setup
 # 3, the cup turned round on its body over a shim wrap: mike its length,
 # touch the AR on the parted end and preset the DRO from that length (nothing
@@ -26,11 +26,12 @@
 #
 # Pocket window: the end mill is 1/4 in -.002/0 (McMaster 88815A43's page,
 # common.toml tools.endmill-carbide-3fl-1-4), so the pocket reads .248 or
-# over; a pocket reading D (the largest minus pin that enters, true size D
-# -.0002 to D +.001) needs a head of D -.015 to D -.009 for the true
-# clearance to stay .008-.016, aimed at D -.012. That lies inside the head's
-# .231-.241 for D .248-.253 (D -.012 at most .241), so the cup accepts D
-# .248-.253: the .248 pin enters to the floor, the .254 does not. The wall
+# over; a pocket reading C (the largest minus pin that enters, true size C
+# -.0002 to C +.001) needs a head of C -.015 to C -.009 for the true
+# clearance to stay .008-.016, aimed at C -.012; MHA-DT-32 clips that window
+# to the head's own .231-.241. The aim lies inside both for C .248-.253 (C
+# -.012 at most .241), so the cup accepts C .248-.253: the .248 pin enters
+# to the floor, the .254 does not. The wall
 # at the face, (.417 - .254)/2 less the two .010 edge breaks, is .0615, over
 # note 1's .060 MIN.
 #
@@ -266,8 +267,8 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pocket_depth_band_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped, the pocket blown clean: try the .248 pin, then each larger pin of the set by .001, to the floor. Write D on this sheet and on the cup's tag: the largest pin that enters to the floor."
-inspection = "The .248 pin enters to the floor and the .254 does not (D .248–.253): the MHA-DT-32 head can then be turned to D less .009–.015 inside its .231–.241. .248 tight: clear the chips and feed the end mill to the floor once more. .254 enters: stop and report (the end mill is running out in the chuck)."
+instruction = "Spindle stopped, the pocket blown clean: try the .248 pin, then each larger pin of the set by .001, to the floor. Write C on this sheet and on the cup's tag: the largest pin that enters to the floor."
+inspection = "The .248 pin enters to the floor and the .254 does not (C .248–.253): MHA-DT-32 then turns its head to C − .012, which keeps note 1's clearance .008–.016. .248 tight: clear the chips and feed the end mill to the floor once more. .254 enters: stop and report (the end mill is running out in the chuck)."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = [6.2992, 6.4516] }]
 
 [[setups.operations]]
@@ -358,5 +359,5 @@ instruction = "A cup long in Op 160 goes back to Op 130 (a new L0, chucked, touc
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Oil the pocket, the pocket-end face and the #20 hole lightly with light machine oil (drawing finish: bright turned, oiled), the faces that show in the handle's butt; leave the body and the far end dry and clean for the epoxy into the MHA-DT-08 counterbore. Tag it with the recorded counterbore and D: it goes to that handle, and the MHA-DT-32 head is turned to D."
+instruction = "Oil the pocket, the pocket-end face and the #20 hole lightly with light machine oil (drawing finish: bright turned, oiled), the faces that show in the handle's butt; leave the body and the far end dry and clean for the epoxy into the MHA-DT-08 counterbore. Tag it with the recorded counterbore and C: it goes to that handle, and the MHA-DT-32 head is turned to C."
 feed = "hand"

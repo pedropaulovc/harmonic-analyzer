@@ -8,8 +8,9 @@
 # to reach; the six bows are pressed in one squeeze per clip between matched
 # dies, the bow former, which the same file cuts from the same strip.
 #
-# Setup 1 at the bench: mike the C26000 H02 strip, snip two 3.60 in blanks
-# (A and B) off a filed-square end, file their burrs. Setup 2 on the
+# Setup 1 at the bench: mike the C26000 H02 strip, saw two 3.60 in blanks
+# (A and B) off its end with the junior hacksaw, the strip sandwiched
+# between scrap wood blocks in the bench vise, file their burrs. Setup 2 on the
 # PM-30MV: the spoil plate (fixtures.sheet-spoil-plate, 6 x 5 x 1/2 6061)
 # on 1 in parallels across the vise jaws, its back edge on the fixed jaw;
 # both blanks bonded to its top on blue painter's tape on the plate and on
@@ -41,18 +42,26 @@
 # To order: the strip (stock-to-order.toml c260-h02-strip-032x2, McMaster
 # 8859K86; its rest goes to MHA-PD-14), the 1/32 downcut end mill
 # (tools-special-cutters.toml endmill-carbide-3fl-1-32-downcut, Harvey Tool
-# 896231), straight-cut
-# aviation snips (tools-hand.toml aviation-snips-straight), the India stone
-# (india-stone-ib8) and the pin gauges (gauges.pin-gauges). The spoil plate
-# is to make from owned stock. On hand: the blue tape, the CA glue and its
-# accelerator (consumables.toml hold-painters-tape-ca).
+# 896231), the junior hacksaw
+# (tools-hand.toml junior-hacksaw, bought for the DT pins anyway) and the pin
+# gauges (gauges.pin-gauges). The spoil plate is to make from owned stock.
+# On hand: the blue tape, the CA glue and its accelerator (consumables.toml
+# hold-painters-tape-ca).
+#
+# Tool audit 2026-11-23 (row aviation-snips-straight): the two 2 in
+# cross-cuts are sawn with the junior hacksaw (32 TPI, pitch .031), not
+# snipped. Fewer than two teeth would bear on the bare .032 sheet, so the
+# strip is sawn sandwiched between two wood blocks, which carry the teeth;
+# nothing curls, so no flattening step. Row india-stone-ib8: the burr is
+# rubbed off on the owned two-grit stone's 320 face (aluminium oxide, as an
+# India stone; McMaster-Carr 4506A2), as ch_rocker_strap words it.
 title = "Platen Clip"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "{{cad.material_spec}}"
 material_key = "c260-h02"
 milling_material = "brass"
-stock = "Qty {{process.quantity:g}}. C26000 H02 brass strip, .032 x 2 x 12 in (McMaster-Carr 8859K86, two strips to order, not on hand): two {{process.blank_length_in:.2dot}} in blanks snipped off one end of the first strip; the rest of it (4.80 in) is MHA-PD-14's, whose blank is 4.08 in. The second strip is the spare: any new blank for this part comes from it."
+stock = "Qty {{process.quantity:g}}. C26000 H02 brass strip, .032 x 2 x 12 in (McMaster-Carr 8859K86, two strips to order, not on hand): two {{process.blank_length_in:.2dot}} in blanks sawn off one end of the first strip; the rest of it (over 4.7 in after the two saw cuts) is MHA-PD-14's, whose blank is 4.08 in. The second strip is the spare: any new blank for this part comes from it."
 note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Bench, the CNC mill (one NC file, proved once in air with Z0 raised 1.000 in before it cuts), the bench, the vise (spindle off). Dry: no coolant on the tape. After any controller reset, stall or E-stop, home ($H) and set G54 again. Finish: {{cad.finish}}."
 shop = "../shop"
 stock_refs = ["c260-h02-strip-032x2"]
@@ -64,7 +73,7 @@ part = "pd-platen-clip"
 
 [parameters]
 quantity = 2
-# The blanks: snipped 3.60 in off the 2 in strip (its own width, as
+# The blanks: sawn 3.60 in off the 2 in strip (its own width, as
 # supplied), each holding parts the recipe lays out; .032 as bought.
 blank_length_in = 3.6
 blank_width_in = 2.0
@@ -92,12 +101,12 @@ part_margin_y_mm = 2.54
 part_gap_mm = 2.032
 clip_spring_edge_y_mm = -2.54
 # What is left of each blank in front of its last part, and right of the
-# far finger tip's path. The snip line, scribed and cut by hand, may wander
+# far finger tip's path. The saw cut, on a line squared by hand, may wander
 # this far (the author's 1/16 in, no source).
 blank_a_front_margin_mm = 7.62
 blank_b_front_margin_mm = 6.096
 blank_right_margin_mm = 3.596
-snip_error_mm = 1.5875
+saw_error_mm = 1.5875
 # The spoil plate (fixtures.sheet-spoil-plate): the 1/2 x 6 in bar's 6 in
 # width along the jaws, its sawn 5 in length across them.
 plate_length_mm = 152.4
@@ -214,9 +223,9 @@ em_projection_min_mm = 19.05
 em_projection_max_mm = 25.4
 
 [[tools]]
-id = "snips"
-name = "Aviation snips, straight cut"
-ref = "aviation-snips-straight"
+id = "saw"
+name = "Junior hacksaw, 32 TPI; two scrap wood blocks"
+ref = "junior-hacksaw"
 
 [[tools]]
 id = "file"
@@ -258,8 +267,8 @@ axial_direction = "down"
 
 [[tools]]
 id = "stone"
-name = "India stone"
-ref = "india-stone-ib8"
+name = "Two-grit sharpening stone (320 face)"
+ref = "sharpening-stone-two-grit"
 
 [[tools]]
 id = "deburr"
@@ -274,11 +283,11 @@ description = "The four male and four female die halves cut in Setup 2, stacked 
 
 [[setups]]
 machine_kind = "other"
-title = "Bench: check the strip, snip two blanks"
+title = "Bench: check the strip, saw two blanks"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/blank.svg", alt = "The 2 x 12 in strip: blank A snipped off its bought end, blank B off the new end, each 3.60 in long and the strip's full 2 in wide; the rest of the strip kept for MHA-PD-14." }
+diagram = { file = "diagrams/blank.svg", alt = "The 2 x 12 in strip: blank A sawn off its bought end, blank B off the new end, each 3.60 in long and the strip's full 2 in wide; the rest of the strip kept for MHA-PD-14." }
 vise_hold = "other"
 beam = "other"
 
@@ -289,11 +298,21 @@ gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.strip_thickness_m
 feed = "hand"
 
 [[setups.operations]]
+steps = [
+  { kind = "action", text = "Take two scrap wood blocks, each about 3/4 in thick, 3 in wide and 9 in long. Lay the strip on one, the other on top, the strip's bought end flush with both blocks' ends." },
+  { kind = "action", text = "Square a line across the top block {{process.blank_length_in:.2dot}} in from that flush end (rule and square). Clamp the stack in the bench vise, the line 1/2 in out past the jaws." },
+]
+feed = "hand"
+
+[[setups.operations]]
 speed_kind = "other"
-tool = "snips"
+tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Mark {{process.blank_length_in:.2dot}} in from the strip's bought end with a scriber and square, and snip on the line, the snips' flat blade on the blank's side so the curl goes into the strip: blank A. Mark and snip blank B the same from the new end. Keep the rest (4.80 in) for MHA-PD-14."
+steps = [
+  { kind = "action", text = "Saw straight down through block, strip and block, the blade upright and its kerf on the line's side away from the flush end; light, full-length strokes. The piece off: blank A." },
+  { kind = "action", text = "Blank B: the same, the blocks turned end for end so their uncut ends lie flush with the strip's sawn end. Keep the rest of the strip for MHA-PD-14." },
+]
 feed = "hand"
 
 [[setups.operations]]
@@ -302,9 +321,9 @@ tool = "file"
 drilling = "none"
 sizing = "other"
 steps = [
-  { kind = "action", text = "Lay each blank on the spoil plate: press any curl at the snipped ends flat with a thumb, then file the burr off every snipped end, the file flat on the plate's top. Mark the blanks A and B with a marker." },
+  { kind = "action", text = "Lay each blank on the spoil plate and file the saw burr off every sawn end, the file flat on the plate's top. Mark the blanks A and B with a marker." },
   { kind = "check", text = "Each blank lies flat on the plate: no end rocks or stands up when pressed." },
-  { kind = "stop", text = "An end still stands up: snip a new blank off the spare strip the same way and try again." },
+  { kind = "stop", text = "An end still stands up: saw a new blank off the spare strip the same way and try again." },
 ]
 feed = "hand"
 
@@ -322,7 +341,7 @@ diagram = { file = "diagrams/sheet.svg", alt = "Plan of the spoil plate in the v
 # them, blank A and the cutter's way in beyond the plate's left end.
 envelope = { x_span_mm = ["{{process.blank_length_mm}}", "{{process.entry_overhang_mm}}"], y_span_mm = ["{{process.blank_width_mm}}", "{{process.blank_width_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.tape_stack_max_mm}}", "{{process.strip_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.sheet_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
-beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{process.blank_area_mm2}}", width_mm = "{{process.blank_width_mm}}" }] } }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{process.blank_area_mm2}}", width_mm = "{{process.blank_width_mm}}" }] } }
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). Spoil plate on the 1 in parallels across the jaws, its back edge on the fixed jaw, centred along the jaws; close the vise and tap the plate down onto the parallels."
@@ -404,7 +423,7 @@ feed = "hand"
 steps = [
   { kind = "action", text = "Check, stack (spindle stopped): drag the same leaf under the tip on each blank's top 1/2 in in from each end; read Z (mm). Stack = reading − 0.051 (the leaf) − that end's op 60 thickness." },
   { kind = "check", text = "Every stack {{process.tape_stack_min_mm:.2f}}–{{process.tape_stack_max_mm:.2f}} mm ({{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}); each blank's two ends within 0.05 mm (.002) of each other." },
-  { kind = "stop", text = "Out of band or ends apart by more: free both blanks as Setup 3 does, peel all the tape, and repeat ops 70–170." },
+  { kind = "stop", text = "Out of band or ends apart by more: op 180, then this op again." },
 ]
 feed = "hand"
 
@@ -412,8 +431,12 @@ feed = "hand"
 steps = [
   { kind = "action", text = "Check, push test: jog Z up clear. With the heel of the hand push each blank hard along and across; try to lift each corner with a thumbnail." },
   { kind = "check", text = "No movement, no creak, no lifted corner." },
-  { kind = "stop", text = "Any movement: free both blanks as Setup 3 does, peel all the tape, and repeat ops 70–170." },
+  { kind = "stop", text = "Any movement: op 180, then ops 160 and 170 again." },
 ]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Only after a Stop at op 160 or 170: jog Z up clear; the plate stays in the vise. Free both blanks with the blade under the plate's tape and peel them as ops 250–260 do, peel all the tape, then repeat ops 70–150."
 feed = "hand"
 
 [[setups.operations]]
@@ -443,13 +466,13 @@ drilling = "none"
 sizing = "other"
 instruction = "Run PC01_sheet (M6 T1, spindle off: set 2800, then Cycle Start; about 114 min). Each hole is plunged near its centre at a quarter of the feed and opened by two circles; then each clip is cut round; then each lamination round and split along its bow profile. Four levels each, the last {{process.sheet_tip_into_plate_mm:in.3dot}} into the spoil plate."
 settings = "endmill-carbide-3fl-1-32-downcut-c260"
-beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)", pieces = [{ name = "clip", kind = "part", area_mm2 = "{{process.clip_bond_area_mm2}}", width_mm = "{{process.clip_finger_width_mm}}" }, { name = "male die half", kind = "part", area_mm2 = "{{process.male_bond_area_mm2}}", width_mm = "{{process.lamination_flat_mm}}" }, { name = "female die half", kind = "part", area_mm2 = "{{process.female_bond_area_mm2}}", width_mm = "{{process.female_least_width_mm}}" }, { name = "waste A", kind = "waste", area_mm2 = "{{process.waste_a_bond_area_mm2}}" }, { name = "waste B", kind = "waste", area_mm2 = "{{process.waste_b_bond_area_mm2}}" }] } }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "clip", kind = "part", area_mm2 = "{{process.clip_bond_area_mm2}}", width_mm = "{{process.clip_finger_width_mm}}" }, { name = "male die half", kind = "part", area_mm2 = "{{process.male_bond_area_mm2}}", width_mm = "{{process.lamination_flat_mm}}" }, { name = "female die half", kind = "part", area_mm2 = "{{process.female_bond_area_mm2}}", width_mm = "{{process.female_least_width_mm}}" }, { name = "waste A", kind = "waste", area_mm2 = "{{process.waste_a_bond_area_mm2}}" }, { name = "waste B", kind = "waste", area_mm2 = "{{process.waste_b_bond_area_mm2}}" }] } }
 milling_cuts = [
   { name = "sheet", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.sheet_cutter_dia_mm}}", axial_doc_mm = "{{process.level_depth_mm}}", radial_woc_mm = "{{process.sheet_cutter_dia_mm}}", traverse_mm = ["{{process.sheet_from_x_mm}}", "{{process.sheet_to_x_mm}}"] },
 ]
 
 [[setups.operations]]
-instruction = "While PC01_sheet runs, dry: air blast the chips off as it goes; no flood or mist coolant and no water (the paper tape soaks and lets go). A hot smell from the cut (CA softens with heat): feed hold, let it cool 5 minutes, then Cycle Start."
+instruction = "While PC01_sheet runs, dry: air blast the chips off as it goes; no flood or mist coolant and no water (the paper tape soaks and lets go). A hot smell from the cut (CA softens with heat): feed hold. The spindle keeps turning and the cutter stays in the kerf, cutting nothing with no feed. Wait 5 minutes, then Cycle Start."
 feed = "hand"
 
 [[setups]]
@@ -498,7 +521,7 @@ speed_kind = "other"
 tool = "stone"
 drilling = "none"
 sizing = "other"
-instruction = "Rub each face of every part flat on the India stone to take the cut's burr off. Break the clips' outside edges R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max with the smooth file; leave the die halves' profile edges sharp."
+instruction = "Rub each face of every part flat on the 320-grit face of the two-grit sharpening stone to take the cut's burr off. Break each clip's edges on both faces, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max: the outside edges with the smooth file; each slit's two edges and its full-R ends with the deburring set's scraper, one light stroke along the edge and round each end. Leave the die halves' profile edges sharp."
 feed = "hand"
 
 [[setups.operations]]

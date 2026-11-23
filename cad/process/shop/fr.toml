@@ -23,6 +23,13 @@ tap_drill_mm = 3.4544
 [tools.drill-8]  # Drills #8
 description = "#8 (.1990 in) drill, 115-piece index"
 diameter_mm = 5.0546
+# Tool audit 2026-11-23 (row frame-clearance-stub-drill): the #10 close
+# clearance on the cross-screw paths is the #4 that
+# cad/config/tolerances/fastener_clearance.yaml names (#10 close: drill #4,
+# .2090), inside the .206-.210 band; the #5 (.2055) is under it.
+[tools.drill-4]  # Drills #4
+description = "#4 (.2090 in) drill, 115-piece index"
+diameter_mm = 5.3086
 [tools.frame-clearance-stub-drill]  # G-drill-5-stub; Drills #5
 description = "#5 (.2055) screw-machine-length drill"
 diameter_mm = 5.2197

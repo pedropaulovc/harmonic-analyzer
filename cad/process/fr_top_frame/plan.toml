@@ -24,20 +24,23 @@ id = "jig-drill-7"
 name = "#7 drill"
 ref = "jig-drill-7"  # Drills #7
 
+# Tool audit 2026-11-23 (row frame-clearance-stub-drill): the #10 close
+# clearance is the #4 (.2090) that cad/config/tolerances/fastener_clearance.yaml
+# names, from the owned 115-piece index; the #5 (.2055) is under the .206
+# minimum. A stub #4 only if this plan shows a jobber #4 cannot fit.
 [[tools]]
-id = "frame-clearance-stub-drill"
-name = "#5 stub drill"
-ref = "frame-clearance-stub-drill"  # G-drill-5-stub, Drills #5
+id = "drill-4"
+name = "#4 drill (115-piece index)"
+ref = "drill-4"
 
 [[tools]]
 id = "drill-c"
 name = "C drill"
 ref = "drill-c"  # Drills C
 
-[[tools]]
-id = "drill-13mm"
-name = "13 mm drill"
-ref = "drill-13mm"  # G-drill-13mm, Drills 13 mm
+# Tool audit 2026-11-23 (row drill-13mm): no 13 mm drill. The gooseneck
+# socket is the 33/64 drill (owner 2026-11-19, #3124 item 2); a pilot, if
+# wanted, is the index's 1/2 or 31/64.
 
 [[tools]]
 id = "drill-33-64"
@@ -74,10 +77,13 @@ id = "tap-2-56-plug"
 name = "#2-56 plug tap"
 ref = "tap-2-56-plug"  # Tap coverage #2-56 UNC
 
+# Tool audit 2026-11-23 (row frame-spotface-endmill): the Ø.35 counterbores
+# are interpolated with the owned LMS 6784 5/16 end mill (3/8 shank, the 3/8
+# R8 collet), path radius (.35 - .3125)/2 = .019; no 11/32 end mill.
 [[tools]]
-id = "frame-spotface-endmill"
-name = "11/32 end mill"
-ref = "frame-spotface-endmill"  # F-spotface-endmill-11-32
+id = "spotface-em"
+name = "5/16 end mill (LMS 6784), interpolated"
+ref = "basebar-counterbore"
 
 [[tools]]
 id = "pin-gauges"
