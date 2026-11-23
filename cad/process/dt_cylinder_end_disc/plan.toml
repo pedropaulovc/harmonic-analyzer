@@ -13,10 +13,12 @@
 # Owner rulings 2026-11-21 (answered in person): the 6 in 4-jaw independent
 # chuck is on hand (cad/config/shop-equipment/fixtures.chuck-4jaw-6), and the
 # tailstock is MT3, which the owner's MT3 dead centre fits
-# (tools.dead-centre-mt3). The 4-jaw's grip range is not recorded
-# (workholding.chuck-4jaw-6 declares none: no source states it), so Setup 2
-# opts out of the lathe-holding screen (lathe_hold = "other"); its grip, the
-# 2-1/2 in blank in a 6 in chuck, is well inside any 6 in 4-jaw's span.
+# (tools.dead-centre-mt3). The 4-jaw's body is Ø160 mm and its jaws open to
+# 140 mm (owner, measured 2026-11-22; fixtures.chuck-4jaw-6), but its least
+# grip is not measured, so workholding.chuck-4jaw-6 declares no grip range
+# and Setup 2 opts out of the lathe-holding screen (lathe_hold = "other");
+# the 2-1/2 in square blank, about 3.54 in (90 mm) across its corners, is
+# well inside the 140 mm opening.
 #
 # FLAGGED, not on record: the mandrel hardware, one 3/8-16 x 1-1/2 in
 # FULLY threaded hex bolt (a standard bolt's 1/2 in plain shank would stop

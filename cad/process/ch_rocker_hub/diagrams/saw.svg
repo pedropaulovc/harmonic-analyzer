@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 240" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="240"/>
+  <text class="title" x="20" y="20">Setup 1: the 1/2 in bar on the saw (not to scale)</text>
+  <rect class="fixture-vise" x="500" y="80" width="200" height="30"/>
+  <rect class="part-rest" x="430" y="110" width="300" height="40"/>
+  <rect class="part-kept" x="40" y="110" width="370" height="40"/>
+  <rect class="cutter" x="412" y="40" width="10" height="130"/>
+  <text class="label" x="60" y="180">{{process.bar_length_in:g}} in piece (bar end): the {{cad.parts_per_bar:d}} hubs</text>
+  <text class="label" x="510" y="70">saw vise on the bar</text>
+</svg>

@@ -57,8 +57,8 @@
 # To buy (flagged): the bar itself (stock.1018-flat-3-8x1, to_order) before
 # Setup 1; the pin-gauge sets (gauges.pin-gauges, to_order) before Setup 3,
 # for the .125 pin at the moving jaw and the hole and slot sizes. The
-# Fisher tap guide's ownership is unconfirmed on record
-# (tools.tap-guide-fisher).
+# Fisher tap guide (tools.tap-guide-fisher, to_order, owner ruling
+# 2026-11-22) before Setup 5's tap stop.
 #
 # NC (cam:pd_support_bar, cad/process/pd_support_bar/cam.py): SB02_top,
 # SB03_end_a, SB04_slots, SB05_back_csk, SB06_tap. Program names, the

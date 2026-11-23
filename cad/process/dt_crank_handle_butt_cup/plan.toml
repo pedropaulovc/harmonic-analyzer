@@ -5,13 +5,16 @@
 # the body to it) and the MHA-DT-32 screw head (note 1: BORE TO THE MEASURED
 # HEAD, RUNNING FIT (CLEARANCE .008-.016); the head is drawn Ø.236 ±.005,
 # dt_crank_handle_pivot_screw_spec.HEAD_DIA at the title block's .XXX). Setup
-# 1, the bar pocket end out: face (Z0), turn the body to the measured
+# 1 saws a 3 in piece off the bar: the lathe never runs the whole bar, whose
+# length behind the jaws would pass the spindle's rear end (#3424; limit
+# cad/config/shop-equipment/ machines.pm-1127vf-lb
+# bar_behind_jaw_fronts_max_in). Setup 2, the piece pocket end out: face (Z0), turn the body to the measured
 # counterbore less its clearance, spot, drill #20 through past the parting
 # line, drill #1 short of the pocket floor, then bore the pocket with a small
 # sharp-corner carbide bar to the floor depth and to the measured head +
 # .008-.016 (GO/NO-GO pins), which covers any conforming head and leaves the
 # floor corner inside R.004 MAX. A 3/16 in 90° chamfer cutter chamfers the
-# #20 hole's edge on the floor. Part off .02 long. Setup 2, the cup turned
+# #20 hole's edge on the floor. Part off .02 long. Setup 3, the cup turned
 # round on its body over a shim wrap: mike its length, touch the AR on the
 # parted end and preset the DRO from that length (nothing seats the cup
 # axially), face the far end to length and chamfer its outside edge. Bench:
@@ -24,7 +27,7 @@ title = "Crank Handle Butt Cup"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished steel rod, 1/2 in"
-stock = "Ø{{process.stock_dia_in:.3dot}} bar, on hand; one cup, which takes {{cad.pitch_in:.2dot}} in of it (any bar end {{process.chuck_grip_in:.2dot}} in longer than {{cad.stickout_in:.2dot}} will do)."
+stock = "Ø{{process.stock_dia_in:.3dot}} bar, on hand; Setup 1 saws one {{process.bar_length_in:g}} in piece off it, which makes the one cup ({{cad.pitch_in:.2dot}} in of it)."
 note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on steel. To order (not on hand): the Micro 100 BB-180500S boring bar with a 1/4 in shank holder, the 3/16 in 90° chamfer cutter, and the Class ZZ pin-gauge sets for the pocket pins and the #20 hole check."
 shop = "../shop"
 stock_refs = ["1018-round-1-2"]
@@ -39,12 +42,14 @@ part = "dt-crank-handle-butt-cup"
 [parameters]
 quantity = 1
 stock_dia_in = 0.5
-# The bar on hand and the length the 3-jaw grips of it.
-bar_length_in = 24.0
+# The piece Setup 1 saws off the bar, and the length the 3-jaw grips of it:
+# 3.0 in leaves about 2.4 in behind the jaw fronts, inside the spindle (limit
+# machines.pm-1127vf-lb bar_behind_jaw_fronts_max_in, test_lathe_bar_length).
+bar_length_in = 3.0
 chuck_grip_in = 0.75
 # Facing allowance: squares a sawn or parted bar end.
 face_allowance_in = 0.02
-# Left on the far end for Setup 2 to face to length.
+# Left on the far end for Setup 3 to face to length.
 regrip_allowance_in = 0.02
 # Parting kerf: the P1 blade's width plus .0125 (authored), for wander or a
 # .010 step toward the chuck that widens a deep groove.
@@ -56,7 +61,7 @@ blade_width_in = 0.0625
 parts_per_pull = 1
 # The parting blade's clearance to the jaw fronts.
 jaw_clearance_in = 0.1
-# Setup 2: how much of the body the jaws take, from the pocket end.
+# Setup 3: how much of the body the jaws take, from the pocket end.
 regrip_grip_in = 0.2
 # Left a side on the body for its finish passes.
 finish_allowance_in = 0.005
@@ -64,6 +69,11 @@ rough_radial_doc_mm = 0.5
 finish_radial_doc_mm = 0.05
 turn_feed_mm_rev = 0.1016
 turn_start_z_mm = 0.5
+
+[[tools]]
+id = "saw"
+name = "14 in metal-cutting saw"
+ref = "saw-evolution-14"
 
 [[tools]]
 id = "ar"
@@ -111,12 +121,31 @@ name = "Smooth file"
 ref = "jig-files"
 
 [[setups]]
+machine_kind = "other"
+title = "Saw the working piece"
+machine = "Evolution 14 in metal-cutting saw"
+holding = "The bar flat on the saw bed, its long end clamped in the saw's vise, the piece free beyond the blade."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/saw.svg", alt = "The 1/2 in bar on the saw: one {{process.bar_length_in:g}} in piece off its end, for the one cup." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Scribe {{process.bar_length_in:g}} in from the bar end and saw on the waste side of the line; let the piece drop clear and pick it up only after the blade has stopped. File the burrs off the sawn ends. The piece makes the one cup; never chuck the whole bar in the lathe (it would run out past the spindle's rear end)."
+feed = "hand"
+
+[[setups]]
 machine_kind = "lathe"
 title = "Bar, pocket end out: turn the body, drill, cut the pocket with the boring bar, part off long"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
+holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} piece from Setup 1, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
 datum = "Z0 (carriage DRO) the bar end, faced in this setup: the pocket end, left flat (it shows flush in the handle's butt)."
 diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw, pocket end out: the end faced, the body turned, the #20 hole drilled through, the pocket cut to a flat floor, the cup parted off .02 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}", support = "none" }
@@ -204,7 +233,7 @@ speed_kind = "spindle"
 tool = "boring-bar"
 drilling = "none"
 sizing = "other"
-instruction = "Boring bar on centre: touch its corner on the faced end and set DRO Z0. Face the floor flat to Z-{{cad.pocket_depth_in:.3dot}} ({{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}}), then open the pocket in .001–.002 passes a side, each run to the floor, until the GO pin written in Op 20 enters to the floor. The sharp corner leaves the floor corner inside R{{cad.pocket_corner_r_max_in:.3dot}} max."
+instruction = "Boring bar on centre: touch its corner on the faced end and set DRO Z0. Face the floor flat to Z-{{cad.pocket_depth_in:.3dot}} ({{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}}), then open the pocket in .001–.002 passes a side, each run to the floor, until the GO pin written in Op 30 enters to the floor. The sharp corner leaves the floor corner inside R{{cad.pocket_corner_r_max_in:.3dot}} max."
 settings = "lathe-bore-1018"
 cut_diameter_mm = "{{cad.pocket_dia_mm}}"
 inspection = "Pocket depth {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}} to a flat floor (calipers' depth rod beside the #20 hole). Pocket Ø the recorded head plus {{cad.pocket_clearance_min_in:.3dot}}–{{cad.pocket_clearance_max_in:.3dot}}: the GO pin enters to the floor, the NO-GO pin does not; GO tight: another pass; NO-GO enters: scrap."
@@ -226,7 +255,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Catch the cup."
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 3. Hands clear: let the cup fall; pick it up from the bed or the chip tray only after the spindle has stopped."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -236,8 +265,8 @@ title = "Turned round on the body: face to length, chamfer the far edge"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw over a shim wrap on the body, {{process.regrip_grip_in:.2dot}} in of it in the jaws from the pocket end, closed lightly (the pocket wall is about .08); the parted end {{cad.outer_stickout_far_mm:in.2dot}} in out. Nothing seats the cup axially: Op 110 locates the pocket end by the miked length instead."
-datum = "The pocket end (in the jaws), located through the miked length: Op 110 presets the DRO so the pocket end is Z-{{cad.length_in:.3dot}} and the faced far end Z0. The setting error, about .002 (the micrometer reading and the tool's touch on the face), stays inside the {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} band; a cup pushed back in the light grip only comes out long."
+holding = "3-jaw over a shim wrap on the body, {{process.regrip_grip_in:.2dot}} in of it in the jaws from the pocket end, closed lightly (the pocket wall is about .08); the parted end {{cad.outer_stickout_far_mm:in.2dot}} in out. Nothing seats the cup axially: Op 120 locates the pocket end by the miked length instead."
+datum = "The pocket end (in the jaws), located through the miked length: Op 120 presets the DRO so the pocket end is Z-{{cad.length_in:.3dot}} and the faced far end Z0. The setting error, about .002 (the micrometer reading and the tool's touch on the face), stays inside the {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} band; a cup pushed back in the light grip only comes out long."
 diagram = { file = "diagrams/regrip.svg", alt = "The cup turned round, its pocket end in the jaws over a shim wrap: the parted end faced to length from the miked pocket end and its outside edge chamfered." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
@@ -247,7 +276,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Before chucking, mike the cup's length across both ends and write it on this sheet as L0 (about {{cad.part_off_in:.2dot}}). Chuck it, then with the spindle running bring the AR in until it just marks the parted end and set the DRO Z there to L0 less {{cad.length_in:.3dot}}. Face the parted end in light skims to Z0: the length is then {{cad.length_in:.3dot}} within the .002 setting error (miked at the bench, Op 140)."
+instruction = "Before chucking, mike the cup's length across both ends and write it on this sheet as L0 (about {{cad.part_off_in:.2dot}}). Chuck it, then with the spindle running bring the AR in until it just marks the parted end and set the DRO Z there to L0 less {{cad.length_in:.3dot}}. Face the parted end in light skims to Z0: the length is then {{cad.length_in:.3dot}} within the .002 setting error (miked at the bench, Op 150)."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -294,7 +323,7 @@ gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A cup long in Op 140 goes back to Op 110 (a new L0, chucked, touched, preset and faced to Z0), then Op 120 (the far chamfer cut and checked again), Op 130 (the far end deburred again), then Op 140. One short in Op 140 or failing the hole check in Op 150 is scrapped, not reworked: make another from a bar end (Setup 1)."
+instruction = "A cup long in Op 150 goes back to Op 120 (a new L0, chucked, touched, preset and faced to Z0), then Op 130 (the far chamfer cut and checked again), Op 140 (the far end deburred again), then Op 150. One short in Op 150 or failing the hole check in Op 160 is scrapped, not reworked: make another from a new sawn piece (Setups 1 and 2)."
 feed = "hand"
 
 [[setups.operations]]

@@ -385,10 +385,15 @@ body_length_mm = 72.0
 # read 2026-11-21)) and Precision Matthews' 6 in 4-jaw accessory page
 # (https://www.precisionmatthews.com/products/chuck-4jaw-6-d1-4, read
 # 2026-11-21: "Removable / Reversible Jaws for ID and OD Work", shipping box
-# 8 x 8 x 8 in only) give no grip range, body size or jaw size, so none is
-# declared (to measure): a plan holding work in it sets lathe_hold = "other".
+# 8 x 8 x 8 in only) give no sizes. The owner measured it 2026-11-22: "i
+# measured the 4 jaw chuck; 160mm diameter ; max jaw opening 140mm":
+# body_diameter_mm below. No grip range is declared (prechips needs its
+# minimum too, not measured; the 140 mm maximum opening is
+# cad/config/shop-equipment/fixtures.toml, same key), so a plan holding work
+# in it sets lathe_hold = "other".
 [workholding.chuck-4jaw-6]
 kind = "chuck"
+body_diameter_mm = 160.0
 
 # --- 3-flute uncoated carbide square end mills (McMaster 88815) ---
 # Owned (McMaster-Carr packing list, PO 0803PCAMPOS, 1616317-01, 08/04/2025;
