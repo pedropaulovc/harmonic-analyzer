@@ -238,7 +238,7 @@ def test_the_setting_guard_refuses_a_stirrup_set_proud_of_the_paper_end() -> Non
     # depth, so the .310-.325 reading alone let the deepest stirrup (.320)
     # stand .010 proud, 0.029 off the paper at the printed worst case, and
     # .020 proud reach it.  The pen assembly has no paper (MHA-HA-00 does),
-    # so its gate is blind to this too; step 5C's square check holds the
+    # so its gate is blind to this too; step 5D's square check holds the
     # paper face flush or behind, and the guard refuses a proud placement.
     deepest = frame.FRAME_DEPTH + 0.01 * 25.4
     assert PAPER_FRONT_Z - _stirrup_worst(proud=0.254) == pytest.approx(0.0289, abs=1e-4)
