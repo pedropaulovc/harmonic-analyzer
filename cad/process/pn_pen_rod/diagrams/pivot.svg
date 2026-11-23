@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 320" width="760" height="320">
+  <rect class="paper" x="0" y="0" width="760" height="320"/>
+  <text class="title" x="20" y="24">Pivot end out of the 4-jaw: face to length, turn the pivot, groove (not to scale)</text>
+  <rect class="fixture-vise" x="180" y="60" width="110" height="70"/>
+  <rect class="fixture-vise" x="180" y="170" width="110" height="70"/>
+  <rect class="clamp" x="200" y="120" width="90" height="10"/>
+  <rect class="clamp" x="200" y="170" width="90" height="10"/>
+  <rect class="part-kept" x="40" y="130" width="300" height="40"/>
+  <rect class="part-kept" x="340" y="138" width="240" height="24"/>
+  <rect class="paper" x="420" y="138" width="90" height="5"/>
+  <rect class="paper" x="420" y="157" width="90" height="5"/>
+  <line class="centre-line" x1="30" y1="150" x2="740" y2="150"/>
+  <rect class="cutter" x="420" y="60" width="30" height="78"/>
+  <line class="datum" x1="580" y1="90" x2="580" y2="210"/>
+  <text class="datum-label" x="590" y="96">Z0 pivot end</text>
+  <line class="dims" x1="340" y1="170" x2="300" y2="252"/>
+  <text class="label" x="40" y="266">shoulder at Z−.410: the blade squares it (R.008 MAX)</text>
+  <line class="dims" x1="465" y1="162" x2="480" y2="282"/>
+  <text class="label" x="400" y="298">groove .165–.315 from the shoulder</text>
+  <text class="label" x="460" y="56">cutoff blade, three plunges</text>
+</svg>

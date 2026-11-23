@@ -378,6 +378,26 @@ description = "Plug gauge pair, .0630 GO (plus) and .0635 NO-GO (minus), Vermont
 [tools.plug-gauges-3760-3765]
 description = "Plug gauge pair, .3760 GO (plus) and .3765 NO-GO (minus), Vermont Gage Class X"
 
+# --- MHA-DT-32 crank handle pivot screw (cad/process/dt_crank_handle_pivot_screw/plan.toml)
+# The 1018 rod turned between the 3-jaw and the MT3 dead centre (no live
+# centre on record): authored, no source on record, at 560 rpm in the
+# lathe's high range (about 37 sfm on the 1/4 in bar) so the greased dead
+# centre does not gall over the 2.8 in of turning, at .002 in/rev (the
+# plan's finish passes run .001 for the shoulder's Ra 1.6 under the R0.4
+# nose).
+[settings.dt-lathe-ar-1018-centre]
+tool = "lathe-ar"
+material = "lathe-1018-cold-finished"
+rpm = 560
+feed_mm_rev = 0.0508
+# Its finish passes (the shoulder and the thread blank, Ops 100 and 140) at
+# the .001 in/rev the plan's turning_deflection check passed.
+[settings.dt-lathe-ar-1018-centre-finish]
+tool = "lathe-ar"
+material = "lathe-1018-cold-finished"
+rpm = 560
+feed_mm_rev = 0.0254
+
 # --- MHA-DT-20 cone swing platform (cad/process/dt_cone_swing_platform/plan.toml) ---
 # The pivot bore, Ø.2500 +.0005/.0000 REAM THRU (a running fit on the
 # MHA-DT-VN-52 shoulder): a fixed .2500 chucking reamer, not the adjustable

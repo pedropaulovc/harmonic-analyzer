@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300">
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="24">Top end out of the 4-jaw: face, spot, drill 3/64, tap #0-80 (not to scale)</text>
+  <rect class="fixture-vise" x="180" y="60" width="110" height="70"/>
+  <rect class="fixture-vise" x="180" y="170" width="110" height="70"/>
+  <rect class="clamp" x="200" y="120" width="90" height="10"/>
+  <rect class="clamp" x="200" y="170" width="90" height="10"/>
+  <rect class="part-kept" x="40" y="130" width="420" height="40"/>
+  <rect class="paper" x="420" y="146" width="40" height="8"/>
+  <line class="centre-line" x1="30" y1="150" x2="740" y2="150"/>
+  <rect class="cutter" x="470" y="144" width="90" height="12"/>
+  <rect class="clamp" x="560" y="138" width="40" height="24"/>
+  <rect class="clamp" x="572" y="96" width="16" height="108"/>
+  <path class="clamp" d="M600 150 L630 140 L710 140 L710 160 L630 160 Z"/>
+  <line class="datum" x1="460" y1="90" x2="460" y2="128"/>
+  <text class="datum-label" x="420" y="84">Z0 top face</text>
+  <text class="label" x="600" y="70">T-handle tap wrench</text>
+  <line class="dims" x1="610" y1="74" x2="588" y2="96"/>
+  <text class="label" x="600" y="214">dead centre's point</text>
+  <text class="label" x="600" y="232">in the wrench's top</text>
+  <text class="label" x="600" y="250">centre hole</text>
+  <line class="dims" x1="640" y1="200" x2="602" y2="152"/>
+  <text class="label" x="40" y="270">4-jaw on the flats over brass shims; indicate each pair of flats</text>
+</svg>
