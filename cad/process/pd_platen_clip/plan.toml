@@ -164,7 +164,7 @@ hole_dia_target_mm = 2.9968
 # Plunges into the strip near each hole's centre at a quarter of the cutting
 # feed (the author's, no source; the gooseneck's ball plunges at half).
 plunge_feed_fraction = 0.25
-plunge_feed_mm_min = 53.34
+plunge_feed_mm_min = 17.145
 # --- The bow former: four laminations of the strip ---
 # Each as long as the rail; its male half's flats this far above its back
 # edge, the whole lamination this high; each half at least
@@ -345,7 +345,7 @@ speed_kind = "spindle"
 tool = "em-thirty-second"
 drilling = "none"
 sizing = "other"
-instruction = "Run PC01_sheet (M6 T1, spindle off: set 2800; about 28 min). Each hole is plunged near its centre at a quarter of the feed and opened by two circles; then each clip is cut round; then each lamination round and split along its bow profile. Three levels each, the last {{process.sheet_tip_into_plate_mm:in.3dot}} into the spoil plate. Air blast the chips off as it goes; no coolant."
+instruction = "Run PC01_sheet (M6 T1, spindle off: set 2800; about 85 min). Each hole is plunged near its centre at a quarter of the feed and opened by two circles; then each clip is cut round; then each lamination round and split along its bow profile. Three levels each, the last {{process.sheet_tip_into_plate_mm:in.3dot}} into the spoil plate. Air blast the chips off as it goes; no coolant."
 settings = "endmill-carbide-3fl-1-32-downcut-c260"
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "clip", kind = "part", area_mm2 = "{{process.clip_bond_area_mm2}}", width_mm = "{{process.clip_finger_width_mm}}" }, { name = "male die half", kind = "part", area_mm2 = "{{process.male_bond_area_mm2}}", width_mm = "{{process.lamination_flat_mm}}" }, { name = "female die half", kind = "part", area_mm2 = "{{process.female_bond_area_mm2}}", width_mm = "{{process.female_least_width_mm}}" }, { name = "waste A", kind = "waste", area_mm2 = "{{process.waste_a_bond_area_mm2}}" }, { name = "waste B", kind = "waste", area_mm2 = "{{process.waste_b_bond_area_mm2}}" }] } }
 milling_cuts = [
@@ -357,7 +357,7 @@ machine_kind = "other"
 title = "Bench: free the parts, deburr, check the first clip"
 machine = "Bench"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "A flat clip: its length over the rail ends, the rail's width, the overall width from the rail edge to the spring edge, and the two holes with the GO and NO-GO pins; beside it a lamination's male and female halves." }
+diagram = { file = "diagrams/inspect.svg", alt = "The first clip, flat, to scale: its length over the rail ends (the calipers' jaws on the rail), the rail's width, the overall width from the rail edge to the spring edge, and its two holes, with the pins each takes: the .116 pin goes in, the .120 pin does not." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
