@@ -217,6 +217,7 @@ sku = "4289A78"
 status = "on_hand"
 pieces = 1
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 34: \"7 Piece Deburring Scraper and Countersink Set\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+note = "Owner 2026-11-23: \"the mcmaster kit sold is actually noga sp1007\". Noga's catalogue lists the SP1007 set's countersink blade as RD16.5 (p. 53), a 90° blade for 1-16.5 mm (p. 27 table, BC1651): https://www.noga.com/wp-content/uploads/2025/05/Noga_Deburring-2017.pdf. The blade in hand was not measured."
 
 [tools.sharpening-stone-two-grit]
 name = "Aluminum oxide two-grit sharpening stone, 6 x 2 x 1 in, 100 x 320 grit"
