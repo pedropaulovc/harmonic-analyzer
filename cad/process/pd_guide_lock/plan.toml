@@ -69,10 +69,13 @@ id = "deburr"
 name = "Deburring set"
 ref = "deburring-set"
 
+# Tool audit 2026-11-23 (row india-stone-ib8): the owned two-grit stone's
+# 320 face (aluminium oxide, as an India stone; McMaster-Carr 4506A2), as
+# ch_rocker_strap's traveler words it.
 [[tools]]
 id = "stone"
-name = "India stone"
-ref = "india-stone-ib8"
+name = "Two-grit sharpening stone (320 face)"
+ref = "sharpening-stone-two-grit"
 
 [[setups]]
 machine_kind = "other"
@@ -155,7 +158,7 @@ tool = "deburr"
 drilling = "none"
 sizing = "other"
 feed = "hand"
-instruction = "Break every edge round the outline, both faces: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, one light stroke of the deburring scraper, then the India stone's fine face flat on each face to take off any raised burr (keep the faces flat; the thickness is the strip's)."
+instruction = "Break every edge round the outline, both faces: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, one light stroke of the deburring scraper, then each face flat on the 320-grit face of the two-grit sharpening stone to take off any raised burr (keep the faces flat; the thickness is the strip's)."
 inspection = "No burr on either face or along any edge (a fingernail drawn across catches nothing); the plate lies flat on the bench without rocking."
 gauge_checks = "other"
 

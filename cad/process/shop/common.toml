@@ -739,8 +739,13 @@ description = "Carbide 60° centre drills, trade sizes 1, 3 and 6"
 description = "Carbide 1/4 in 90° chamfering end mill, 2-flute (McMaster 3073A46)"
 diameter_mm = 6.35
 flute_length_mm = 3.175
-[tools.deburring-set]  # inventory tools.deburring-set (McMaster 4289A78); MHA-MS-03 and MHA-PD-27 edges and hole mouths
-description = "7-piece deburring scraper and countersink set (McMaster 4289A78)"
+# The set McMaster-Carr sells as 4289A78 is Noga's SP1007 (owner 2026-11-23,
+# tool audit Q12: "the mcmaster kit sold is actually noga sp1007"; "check Noga
+# SP1007"). Noga_Deburring-2017.pdf (noga.com) p.53 lists the RD16.5
+# RotoDrive countersink in SP1007; p.27's blade table, row RD16.5 / BC1651:
+# range 1-16.5 mm, angle 90°. MHA-PD-19 chamfers K's mouth with it.
+[tools.deburring-set]  # inventory tools.deburring-set (McMaster 4289A78 = Noga SP1007); MHA-MS-03 and MHA-PD-27 edges and hole mouths; MHA-PD-19 K chamfer (RD16.5)
+description = "7-piece deburring scraper and countersink set, Noga SP1007 (McMaster 4289A78), with the RD16.5 RotoDrive 90° countersink, 1-16.5 mm"
 [tools.die-stock-13-16]  # inventory holders.die-stock-13-16
 description = "Die stock for 13/16 in round dies (Drillco 3000DS1)"
 [tools.dies-zoro-wb7365521946]  # inventory tools.dies-zoro-wb7365521946

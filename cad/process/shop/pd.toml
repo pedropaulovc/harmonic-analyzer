@@ -50,6 +50,39 @@ resolution_mm = 0.001016
 [tools.plug-gauges-2500-2510]
 description = "Plug gauge pair, .2500 GO (plus) and .2510 NO-GO (minus), Vermont Gage Class X"
 
+# Class ZZ go/no-go pins for the paper-drive reamed bands (owner ruling
+# 2026-11-23, tool audit Q1, verbatim: "ZZ singles per the record: 29 pins
+# (17 plus GO, 12 minus NO-GO), about $130. Accept that good holes near a
+# limit may be refused; the traveler mikes each pin so the real window is
+# known per pin."). Conventions as common.toml's zz-pins records: GO a plus
+# pin at the low limit, NO-GO a minus pin at the high limit (from the
+# .061-.500 minus box where that limit is a whole thousandth), resolution one
+# pin's Class ZZ tolerance, .0002 in = 0.00508 mm. The K bore's .4375-.4382
+# band is the odd one (tool audit row plug-gauges-4375-4382): its NO-GO is a
+# .4380 plus pin, .4380-.4382, at or under the .4382 limit. Bands only pd
+# plans gauge: .1240-.1245 (MHA-PD-18), .4375-.4382 (MHA-PD-19), .0615-.0620
+# (MHA-PD-17, MHA-PD-22), .1920-.1925 (MHA-PD-22).
+[gauges.zz-pins-1240-1245]
+range_mm = [3.1496, 3.1623]
+resolution_mm = 0.00508
+[tools.zz-pins-1240-1245]
+description = "Class ZZ pins for .1240-.1245: GO .1240 plus (single), NO-GO .1245 minus (single)"
+[gauges.zz-pins-4375-4382]
+range_mm = [11.1125, 11.13028]
+resolution_mm = 0.00508
+[tools.zz-pins-4375-4382]
+description = "Class ZZ pins for .4375-.4382: GO .4375 plus (single), NO-GO .4380 plus (single)"
+[gauges.zz-pins-0615-0620]
+range_mm = [1.5621, 1.5748]
+resolution_mm = 0.00508
+[tools.zz-pins-0615-0620]
+description = "Class ZZ pins for .0615-.0620: GO .0615 plus (single), NO-GO .062 minus (the .061-.500 box)"
+[gauges.zz-pins-1920-1925]
+range_mm = [4.8768, 4.8895]
+resolution_mm = 0.00508
+[tools.zz-pins-1920-1925]
+description = "Class ZZ pins for .1920-.1925: GO .1920 plus (single), NO-GO .1925 minus (single)"
+
 # --- MHA-PD-15 ring, MHA-PD-20 spacer, MHA-PD-28 bush, MHA-PD-16 cup ---------
 # (cad/process/pd_transgear_knob_thrust_ring, pd_transgear_pivot_spacer,
 # pd_transgear_knob_bush, pd_transgear_knob_cup). Facing, turning and parting
