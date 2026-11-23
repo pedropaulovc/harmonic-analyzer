@@ -441,6 +441,62 @@ def test_rod_travel_prints_on_right_and_the_check_cites_it() -> None:
     assert "(RIGHT VIEW: BLOCK TOP 3.05 ±.98 BELOW THE UPPER GUIDE TOP)" in check
 
 
+def test_stirrup_setting_prints_in_view_c_and_the_clamping_step_sets_it() -> None:
+    """#3467 (Codjiflo P3 on #3445): set toward the step, the stirrup's far
+    window corners ride the neck breaks' run-out.  VIEW C prints its setting
+    natively, the rear face from the end face, .310 +.015/-.000; step 5A sets
+    it as the thumb screw clamps the stirrup, 5C checks it with calipers, 5D
+    checks with a square that the stirrup is not proud (Codjiflo P2 on
+    #3470: calipers over a proud stirrup read only its depth), 5E remedies
+    from the nib preset on.  Machinist review r1: the flush feeler
+    acceptance printed only in steps, and the callout's rationale was
+    narration."""
+    assert spec.STIRRUP_DIMENSION in spec.DRAWING_DIMENSIONS[spec.CARRIAGE_FEATURE]
+    assert spec.STIRRUP_DIMENSION in drawing.DIMENSION_TEXT_POINTS["carriage"]
+    assert notes.DIMENSION_NOMINALS[spec.STIRRUP_DIMENSION] == pytest.approx(
+        0.310 * 25.4
+    )
+    assert spec.STIRRUP_DIMENSION not in notes.DIMENSION_TOLERANCES
+    assert notes.BILATERAL_TOLERANCES[spec.STIRRUP_DIMENSION] == pytest.approx(
+        (0.0, 0.015 * 25.4)
+    )
+    assert notes.TOLERANCE_PRECISION[spec.STIRRUP_DIMENSION] == 3
+    assert notes.DIMENSION_CALLOUTS[spec.STIRRUP_DIMENSION] == (
+        "STIRRUP REAR FACE\nFROM END FACE"
+    )
+    # The near limit is the flush stirrup as modelled; the far limit is the
+    # deepest stirrup flush plus .005, where its far corners still ride
+    # nothing.
+    deepest = frame.FRAME_DEPTH + printed_deviations(frame.FRAME_DEPTH, 2, unit=frame.UNIT)[1]
+    low, high = notes.BILATERAL_TOLERANCES[spec.STIRRUP_DIMENSION]
+    assert spec.STIRRUP_REAR + low == pytest.approx(frame.FRAME_DEPTH)
+    assert spec.STIRRUP_REAR + high == pytest.approx(deepest + 0.005 * 25.4)
+    assert carriage.window_corner_ride_max(spec.STIRRUP_REAR + high) == 0.0
+    # The text stands beyond the rear face and off the marker axis, sheet-up
+    # in the turned plan (toward the neck's front face).
+    beyond = carriage.block_to_machine(
+        (
+            spec.STIRRUP_REAR + notes.STIRRUP_TEXT_BEYOND,
+            v_block.MARKER_AXIS_Y,
+            v_block.DEPTH_MID_Z,
+        )
+    )
+    assert math.dist(notes.STIRRUP_TEXT_MACHINE, beyond) == pytest.approx(
+        notes.STIRRUP_TEXT_OFFSET
+    )
+    steps = {step.split(".", 1)[0]: step for step in notes.ASSEMBLY_STEPS}
+    setting = "REAR FACE .310 TO .325 FROM THE END FACE (VIEW C, CALIPERS)"
+    assert steps["5A"].startswith("5A. TIGHTEN THE THUMB SCREW") and setting in steps["5A"]
+    assert "PAPER FACE NOT PROUD OF THE END FACE" in steps["5A"]
+    assert steps["5C"].startswith("5C. CHECK:") and "STILL STANDS .310 TO .325" in steps["5C"]
+    assert steps["5D"].startswith("5D. CHECK:") and "SQUARE" in steps["5D"]
+    assert "NOT PROUD" in steps["5D"]
+    assert steps["5E"].startswith("5E. IF ") and "REPEAT 5-5D" in steps["5E"]
+    assert "PER STEPS 5-5E" in steps["8D"]
+    assert "FLUSH" not in steps["3"]
+    assert "STIRRUP SET" in notes.SETTINGS_NOTE
+
+
 def test_each_detail_title_carries_its_letter_and_any_other_direction() -> None:
     keys = {detail.key for detail in drawing.DETAILS}
     assert set(drawing.BOUNDED_ON) <= keys
