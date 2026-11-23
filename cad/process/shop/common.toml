@@ -173,7 +173,8 @@ range_mm = [0.0, 584.2]
 resolution_mm = 0.005
 
 # PM-1127VF-LB carriage (Z) DRO read as a length gauge (the dt_pinion_arbor
-# plan's crown and rim stations, the tool touched on the work). Range: the
+# plan's crown and rim stations, the pd_transgear_pin plan's groove load-wall
+# station; the tool touched on the work). Range: the
 # carriage reads no farther than machines.pm-1127vf-lb between_centres_mm
 # (the DRO's scale length is not recorded); resolution: the owner's 5 um
 # (cad/config/shop-equipment/dro.toml dro.pm-1127vf-lb, 2026-11-21).
@@ -665,6 +666,14 @@ diameter_mm = 6.35
 [tools.drill-27-64]  # 115-piece index; MHA-DT-27 winding mandrel (shank) and the MHA-PD-19 press hole's pre-drill (#2425)
 description = "27/64 (.4219 in) drill, 115-piece index"
 diameter_mm = 10.715625
+# The owned Pittsburgh SAE/metric 32-piece feeler set (inventory
+# gauges.feeler-gauges, owner 2026-11-19), Harbor Freight 63665: leaves
+# .0015-.035 in (.0015, .002, .0025, .003-.026 by .001, .028, .030, .032,
+# .035; harborfreight.com/saemetric-feeler-gauge-32-piece-63665.html, read
+# 2026-11-23) = 0.0381-0.889 mm; resolution its .001 in = 0.0254 mm steps.
+[gauges.feeler-gauges]
+range_mm = [0.0381, 0.889]
+resolution_mm = 0.0254
 [tools.feeler-gauges]  # inventory gauges.feeler-gauges
 description = "Pittsburgh SAE/metric feeler gauge set, 32 pieces"
 [tools.form-tool-r070]  # MHA-PD-23 R.07 shank-end dome; MHA-MG-07 R.07 tip
