@@ -67,8 +67,10 @@ def test_a_taped_plan_repeats_the_record(stem: str) -> None:
     assert p["bond_accepted_tensile_mpa"] * 1000 == pytest.approx(
         HOLD["accepted_tensile_kpa"]
     )
-    stale = {"tape_thickness_mm", "tape_shear_mpa", "tape_tensile_mpa", "bond_derating"}
+    stale = {"tape_shear_mpa", "tape_tensile_mpa", "bond_derating"}
     assert not stale & p.keys()
+    # A prechips adapter's own name for the stack under the blank (arc_strap).
+    assert p.get("tape_thickness_mm", p["tape_stack_mm"]) == p["tape_stack_mm"]
     bonds = _bonds(plan)
     assert bonds
     for bond in bonds:
