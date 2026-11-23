@@ -592,7 +592,10 @@ requirement(
             ),
         ),
         "nominal_dia": (PIN_BORE, ((_GEOM, "PIN_BORE"),)),
-        "process": ("mill", _SEAT_CALLOUT),
+        # Drilled #26, then opened and flattened by the 1/8 end mill (owner
+        # ruling 2026-11-23, tool audit Q8): the traveler's hole vocabulary is
+        # drill or ream, and this hole is not reamed.
+        "process": ("drill", _SEAT_CALLOUT),
         "flat_bottom": (True, _SEAT_CALLOUT),
         "depth": (
             limits(PIN_SEAT, _P["PinSeatDepth"], unit=UNIT),

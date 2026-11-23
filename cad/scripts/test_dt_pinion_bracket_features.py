@@ -152,7 +152,7 @@ def test_strap_feature_bands_are_the_printed_ones() -> None:
     # the pivot axis and .180 from face A.
     seat = features["follower_seat"]
     assert seat["dia"] == pytest.approx([_in(0.157), _in(0.160)])
-    assert (seat["process"], seat["flat_bottom"]) == ("mill", True)
+    assert (seat["process"], seat["flat_bottom"]) == ("drill", True)
     assert "thru" not in seat
     assert seat["depth"] == pytest.approx([_in(0.15), _in(0.17)])
     assert seat["floor_corner_r_max"] == pytest.approx(_in(0.008))
