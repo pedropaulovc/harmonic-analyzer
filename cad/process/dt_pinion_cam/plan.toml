@@ -17,12 +17,20 @@
 #   into the bore, CM03 brings the tap guide over it for hand tapping #2-56
 #   (FluidNC cannot rigid-tap; as mg_magnifying_clamp). No drill press is
 #   recorded in the shop.
-# - Setup 4, bench: deburr, inspect (eccentricity over the .2510 GO plug on
-#   the height gauge), oil, bag the set screw.
+# - Setup 4, bench: deburr, inspect (eccentricity over the GO pin on the
+#   height gauge, with the pin's written reading), oil, bag the set screw.
 # To order before Setup 2 runs: the .2510 reamer (tools.reamer-2510, owner
-# ruling #3073 buys fixed reamers for running fits); the .2510 GO / .2515
-# NO-GO plug gauges for the bore (gauges.plug-gauges-2510-2515). No V-blocks
-# or setting mandrel are used.
+# ruling #3073 buys fixed reamers for running fits); the bore's two Class ZZ
+# pins, .2510 plus (GO) and .2515 minus (NO-GO), shop dt.toml
+# zz-pins-2510-2515. Owner ruling 2026-11-23 (tool audit Q1, re-answered on
+# the corrected facts), verbatim: "ZZ singles per the record: 29 pins (17
+# plus GO, 12 minus NO-GO), about $130. Accept that good holes near a limit
+# may be refused; the traveler mikes each pin so the real window is known
+# per pin." Setup 1 ends by miking both pins and the reamer (a trial hole in
+# the bar's remainder if the reamer reads under the GO pin); the bore is
+# accepted between the two pins' written readings, and Setup 4 reads the
+# eccentricity over the GO pin with its reading G in place of the old
+# Class X plug's .2510. No V-blocks or setting mandrel are used.
 #
 # Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
 # guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner, Pedro,
@@ -159,6 +167,14 @@ drill_50_feed_per_min_mm = 71.12
 # to .01 in.
 tap_stack_max_mm = 288.29
 tap_wrench_reach_max_mm = 208.78
+# The Class ZZ pins (shop dt.toml zz-pins-2510-2515; owner ruling 2026-11-23,
+# tool audit Q1): GO a plus pin at the bore band's low limit, true size .2510
+# to .2512; NO-GO a minus pin at the high limit, .2513 to .2515 (one pin's ZZ
+# tolerance, .0002, is the record's resolution_mm 0.00508). The largest GO
+# pin and the smallest NO-GO pin a sheet may use: with both pins there, a
+# bore is sure to pass only between them, the middle .0001 of the .0005 band.
+go_pin_max_in = 0.2512
+nogo_pin_min_in = 0.2513
 
 [[tools]]
 id = "turn"
@@ -198,9 +214,9 @@ id = "feeler"
 name = "Feeler gauges"
 ref = "feeler-gauges"
 [[tools]]
-id = "plugs"
-name = "Plug gauges .2510 GO, .2515 NO-GO"
-ref = "plug-gauges-2510-2515"
+id = "pins"
+name = "Class ZZ pins: .2510 plus (GO) and .2515 minus (NO-GO)"
+ref = "zz-pins-2510-2515"
 status = "to_order"
 [[tools]]
 id = "files"
@@ -294,6 +310,23 @@ feed = "hand"
 inspection = "Length {{cad.cam_od_length_min_in:.3dot}}–{{cad.cam_od_length_max_in:.3dot}}, calipers."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.cam_od_length_band_mm}}" }]
 
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The bar's remainder still chucked, spindle stopped: on the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the {{cad.bore_dia_min_in:.4dot}} GO pin, the {{cad.bore_dia_max_in:.4dot}} NO-GO pin, and the .2510 reamer across two opposite margins at its front end. Write the three readings here (the GO pin's as G), and each pin's on its tag."
+inspection = "GO pin reads {{cad.bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}: a pin outside its range is not used."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.bore_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "This sheet accepts a bore the GO pin enters and the NO-GO pin does not: GO reading ≤ bore < NO-GO reading. With both pins at their size limits only {{process.go_pin_max_in:.4dot}}–{{process.nogo_pin_min_in:.4dot}} is sure to pass; a good bore within .0002 of either band limit may be refused (owner ruling 2026-11-23)."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Only if the reamer read under the GO pin, the bar's remainder still chucked: face it; from the tailstock drill chuck, spot it with the #2 centre drill, drill C .50 deep at 1000 rpm and ream .2510 .40 deep at 400 rpm, Tapmatic Gold, the reamer withdrawn running; gauge it as op 170 does. The GO pin enters: go on. Refused: stop and tell the owner (the pins refuse this reamer's holes)."
+feed = "hand"
+
 
 [[setups]]
 machine_kind = "other"
@@ -309,7 +342,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.cam_od_dia_mm}}", alon
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.envelope_z_mm}}"], clamp_mm = [0, "{{process.bore_grip_mm}}"], section_mm = { diameter = "{{cad.cam_od_dia_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Start only with the .2510 reamer and the .2510 GO / .2515 NO-GO plug gauges in hand (both to order). Mike each cam's O.D. and write it on a tag with the cam."
+instruction = "Start only with the .2510 reamer and the two Class ZZ pins in hand (to order), the pins and the reamer miked in op 80. Mike each cam's O.D. and write it on a tag with the cam."
 feed = "hand"
 
 [[setups.operations]]
@@ -364,15 +397,15 @@ feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
   { name = "bore ream", kind = "drill", phase = "finish", cutter_dia_mm = 6.3754, flutes = 6, rpm = 400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = "{{cad.bore_eccentricity_mm}}" },
 ]
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} before unclamping: the .2510 GO plug enters, the .2515 NO-GO does not."
-gauge_checks = [{ gauge = "plug-gauges-2510-2515", band_mm = "{{cad.bore_dia_band_mm}}" }]
+inspection = "GO enters, NO-GO does not, before unclamping: bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}."
+gauge_checks = [{ gauge = "zz-pins-2510-2515", band_mm = "{{cad.bore_dia_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "The GO does not enter: T3 still in, spindle at 400, MDI G0 X{{cad.bore_eccentricity_mm:.3f}} Y0 Z1, M3 S400, G1 Z{{process.bore_ream_tip_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}, G1 Z1, G0 Z5, M5; re-gauge. Still tight, or the NO-GO enters: reject the cam."
+instruction = "The GO pin refused: T3 still in, spindle at 400, plenty of Tapmatic Gold, the same reamer once more: MDI G0 X{{cad.bore_eccentricity_mm:.3f}} Y0 Z1, M3 S400, G1 Z{{process.bore_ream_tip_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}, G1 Z1, G0 Z5, M5; blow out and gauge again. Still refused (a reamer cannot be made to cut larger), or the NO-GO pin entering (no cut remedies it): reject the cam."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Blow out the chips. Second cam: unclamp, load it the same way and repeat Setup 2 from op 90 with its own Y0 (its tagged O.D.) and its own X0 (both sides of its O.D.): the first cam's zero does not locate the second."
+instruction = "Blow out the chips. Second cam: unclamp, load it the same way and repeat Setup 2 from op 120 with its own Y0 (its tagged O.D.) and its own X0 (both sides of its O.D.): the first cam's zero does not locate the second."
 feed = "hand"
 
 [[setups]]
@@ -477,7 +510,7 @@ machine_kind = "other"
 title = "Deburr, inspect, oil"
 machine = "Bench, surface plate"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The cam lying on the surface plate, thick side down, the .2510 GO plug in the bore; the height gauge reads over the plug to give the eccentricity." }
+diagram = { file = "diagrams/inspect.svg", alt = "The cam lying on the surface plate, thick side down, the .2510 GO pin in the bore; the height gauge reads over the pin to give the eccentricity." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -491,7 +524,7 @@ instruction = "Deburr both bore mouths, the hole's mouth on the O.D. and the rea
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Length and O.D. were accepted on the lathe. Eccentricity: lay the cam on the surface plate on its O.D. with the .2510 GO plug in the bore (under .0005 shake); hold it on the plate by hand, roll it slowly and read the highest point H over the plug with the height gauge. Eccentricity = H − O.D./2 − .1255, {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}}. Thin wall = O.D./2 − eccentricity − .1258 (half the largest bore), at least {{cad.bore_thin_wall_min_mm:in.4dot}}."
+instruction = "Length and O.D. were accepted on the lathe. Eccentricity: lay the cam on the surface plate on its O.D. with the GO pin in the bore (under .0005 shake); hold it on the plate by hand, roll it slowly and read the highest point H over the pin with the height gauge. Eccentricity = H − O.D./2 − G/2 (G the GO pin's reading, op 80), {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}}. Thin wall = O.D./2 − eccentricity − N/2 (N the NO-GO pin's reading: the bore is under it), at least {{cad.bore_thin_wall_min_mm:in.4dot}}."
 feed = "hand"
 inspection = "Eccentricity {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}}; thin wall at least {{cad.bore_thin_wall_min_mm:in.4dot}}."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.bore_eccentricity_band_mm}}" }]
