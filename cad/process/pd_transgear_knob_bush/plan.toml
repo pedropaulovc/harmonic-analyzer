@@ -210,7 +210,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "MHA-PD-19, the plate this bush is pressed into, made first: gauge its knob-bush hole with PD-19's ZZ pins (their readings on their tags). The GO pin enters it from face A; the NO-GO does not. Any hole passing this takes the {{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}} press diameter as a {{cad.step_interference_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}} press: the sheet's measured hole. A hole failing it goes back to MHA-PD-19's traveler; do not turn the press diameter to it."
+instruction = "MHA-PD-19, the plate this bush is pressed into, made first: gauge its knob-bush hole with PD-19's ZZ pins (their readings on their tags). The GO pin enters it from face A; the NO-GO does not. A hole passing this is Ø.4375–.4382, so the {{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}} press diameter is a {{cad.step_interference_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}} press in it. A hole failing it goes back to MHA-PD-19's traveler; do not turn the press diameter to it."
 inspection = "{{cad.step_mate}} Ø.4375–.4382, GO/NO-GO ZZ pins."
 gauge_checks = [{ gauge = "zz-pins-4375-4382", band_mm = [11.1125, 11.13028] }]
 feed = "hand"
@@ -325,7 +325,7 @@ tool = "dti"
 drilling = "none"
 sizing = "other"
 instruction = "The same four readings at {{process.pin_far_in:.2dot}} out, and the same two differences. Pull the pin."
-inspection = "Each difference here less its Op 140 difference, either sign: at most {{process.pin_tilt_reading_max_mm:.3f}} mm on the 0.001 mm indicator: the bore ⊥ Ø{{cad.bore_perpendicularity_in:.3dot}} to A, the pin's fit charged."
+inspection = "Each difference here less its Op 140 difference, either sign: at most {{process.pin_tilt_reading_max_mm:.3f}} mm on the 0.001 mm indicator (holds ⊥ Ø{{cad.bore_perpendicularity_in:.3dot}} to A with the pin's fit charged; a full-swing difference reads twice the tilt)."
 gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{process.pin_tilt_reading_max_mm}}"] }]
 feed = "hand"
 
