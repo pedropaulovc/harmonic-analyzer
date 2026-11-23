@@ -20,5 +20,6 @@
   <text class="label" x="400.0" y="300.0" text-anchor="middle">saw kerfs, 1/8 in; the squaring cut at the right end</text>
   <line class="dims" x1="662.1" y1="140.0" x2="662.1" y2="280.2"/>
   <text class="label-halo" x="666.1" y="210.1">1-1/4</text>
-  <text class="label" x="400.0" y="120.0" text-anchor="middle">mark each piece: number on the wide face, A on one bar edge, S on one sawn end</text>
+  <text class="label" x="400.0" y="112.0" text-anchor="middle">mark each piece: number on a wide face, A on one bar edge;</text>
+  <text class="label" x="400.0" y="128.0" text-anchor="middle">number toward you, A on top: S on the sawn end at your right</text>
 </svg>

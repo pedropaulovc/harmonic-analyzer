@@ -741,6 +741,9 @@ def context(
     ):
         _agree(plan, f"{key}_min_mm", basic - half)
         _agree(plan, f"{key}_max_mm", basic + half)
+    # Outside either square: the radial test, the zone's radius less both
+    # pins' play.
+    _agree(plan, "bore_radial_max_mm", bore["position_dia"] / 2 - bore_play - b_play)
     # The tap's spacing to B, a gross check only: wider than half the zone
     # plus the pins' clearance (B's largest Ø less the GO; the #25 hole's
     # drill-point wander allowed as much again).

@@ -135,6 +135,9 @@ bore_from_a_min_mm = 20.5466
 bore_from_a_max_mm = 20.6522
 bore_from_b_min_mm = 7.585
 bore_from_b_max_mm = 7.655
+# Either reading outside its square: the radial test, the zone's radius less
+# both pins' play (.004 − .00075 − .0007); cam.py checks it.
+bore_radial_max_mm = 0.0647
 tap_from_b_min_mm = 7.366
 tap_from_b_max_mm = 7.874
 # KM07's tap reference station on A, from S: midway on the solid land between
@@ -311,7 +314,7 @@ instruction = "Shorter: saw another piece from the bar; longer: saw it again. Ev
 feed = "hand"
 
 [[setups.operations]]
-instruction = "With marking fluid on each piece: its number (1, 2 or T) on a 1-1/4 in wide face; A on one bar edge (the narrow 5/8 face along the length; it becomes the top seat A); S on one sawn end (it becomes the end nearest datum B)."
+instruction = "With marking fluid on each piece: its number (1, 2 or T) on a 1-1/4 in wide face; A on one bar edge (the narrow 5/8 face along the length; it becomes the top seat A). Then, the numbered face toward you and A on top: S on the sawn end at your RIGHT (it becomes the end nearest datum B). Every later setup's holding depends on this hand."
 feed = "hand"
 
 [[setups]]
@@ -842,7 +845,7 @@ instruction = "T7, the 12 mm reamer, still in the 7/16 collet, its tool length a
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A part's GO still tight after the re-ream: stop and tell the owner. NO-GO enters a part: it is scrap; stop and tell the owner before reaming the other."
+instruction = "A blank 1 or 2 whose GO is tight: re-ream it by the MDI above and gauge again; still tight: stop and tell the owner. NO-GO enters a part: it is scrap; stop and tell the owner before reaming the other."
 feed = "hand"
 
 [[setups]]
@@ -865,7 +868,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Bore from A: the GO out of B; the block A down on the surface plate, the .4720 GO through the bore; the height gauge on top of the GO where it stands out past F, less half its Ø (.4720/2)."
-inspection = "Bore from A {{process.bore_from_a_min_mm:in.4dot}}–{{process.bore_from_a_max_mm:in.4dot}}. Outside: stop and tell the owner."
+inspection = "Bore from A {{process.bore_from_a_min_mm:in.4dot}}–{{process.bore_from_a_max_mm:in.4dot}}. Outside: note it and go on to the bore from B, then the radial test."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = ["{{process.bore_from_a_min_mm}}", "{{process.bore_from_a_max_mm}}"] },
 ]
@@ -873,10 +876,14 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Bore from B: the block stood on S on the surface plate, the .4720 GO through the bore and the .1273 GO in B, both standing out sideways. Height gauge on top of each GO less half its Ø: the bore's reading less B's is the bore from B."
-inspection = "Bore from B {{process.bore_from_b_min_mm:in.4dot}}–{{process.bore_from_b_max_mm:in.4dot}}. With the bore from A in its band (both bands are the square inside the drawing's Ø.008 position zone to A|B, less the pins' play in their holes): both in is a good bore. Outside: stop and tell the owner."
+inspection = "Bore from B {{process.bore_from_b_min_mm:in.4dot}}–{{process.bore_from_b_max_mm:in.4dot}}, with the bore from A in its band: a good bore (the square inside the drawing's Ø.008 zone, less the pins' play). Either outside: the next op."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = ["{{process.bore_from_b_min_mm}}", "{{process.bore_from_b_max_mm}}"] },
 ]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A bore reading outside its band: work out dA = the bore from A less .811 and dB = the bore from B less .300, then r = √(dA² + dB²). r at most {{process.bore_radial_max_mm:in.4dot}}: a good bore (the drawing's Ø.008 zone, radius .004, less the pins' play). Over: stop and tell the owner."
 feed = "hand"
 
 [[setups.operations]]
