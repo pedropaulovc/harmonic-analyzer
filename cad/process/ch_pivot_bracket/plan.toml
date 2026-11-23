@@ -592,7 +592,7 @@ gauge_checks = [{ gauge = "zz-pins-2560-2600", band_mm = "{{cad.bore_dia_band_mm
 # its work, so it is the next op.
 [[setups.operations]]
 instruction = "Only if the GO pin was refused (otherwise skip): still clamped, blow the chips out, oil the bore, ream it once more with T5 by MDI as the file did, then gauge again."
-instruction_detailed = "Only if the GO pin was refused (otherwise skip): still clamped, blow the chips out, brush oil into the bore. Console M6 T5 (the tool setter measures it), S450 M3. G0 X−{{cad.bore_height_mm:.3f}} Y−{{cad.bore_lateral_mm:.3f}}, G0 Z{{process.ream_clear_z_mm:.3f}}; G1 Z{{process.ream_tip_height_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}; G1 Z{{process.ream_clear_z_mm:.3f}} at the same feed; M5. Gauge again with both pins."
+instruction_detailed = "Only if the GO pin was refused (otherwise skip): still clamped, blow the chips out, brush oil into the bore. Console M6 T5 (the tool setter measures it), S450 M3. G0 X-{{cad.bore_height_mm:.3f}} Y-{{cad.bore_lateral_mm:.3f}}, G0 Z{{process.ream_clear_z_mm:.3f}}; G1 Z{{process.ream_tip_height_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}; G1 Z{{process.ream_clear_z_mm:.3f}} at the same feed; M5. Gauge again with both pins."
 feed = "hand"
 inspection = "GO enters, NO-GO does not: go on (skip the next op). GO still refused: the bracket is rejected; stop and tell the owner (the pins cannot show it at or over {{cad.bore_dia_min_in:.4dot}}; a reamer cuts no larger)."
 gauge_checks = [{ gauge = "zz-pins-2560-2600", band_mm = "{{cad.bore_dia_band_mm}}" }]
