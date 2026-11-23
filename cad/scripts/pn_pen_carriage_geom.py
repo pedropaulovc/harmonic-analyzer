@@ -133,10 +133,30 @@ MARKER_GRIP_LOCAL_X = (
 # --- stirrup frame + thumb screw --------------------------------------------------------
 # Frame-local (pn_pen_frame_spec): width X, height Y, depth Z. Placed with its
 # plane across the block length: frame X -> block Z, frame Y -> up, frame Z ->
-# block -X. Flush with the paper end face; the window straddles the block section,
-# its top rail FRAME_TOP_GAP above the block top.
+# block -X. Placed flush with the paper end face; the window straddles the
+# block section, its top rail FRAME_TOP_GAP above the block top.
 FRAME_TOP_GAP = 0.1
 FRAME_X0_LOCAL = 0.0  # the frame's paper-side face, flush with the block end
+# The stirrup's setting along the neck (#3467): nothing but the thumb
+# screw's clamp locates it there, so MHA-PN-00 sets it as that screw clamps
+# it (step 5A) and checks it (5C).  Its rear (rod-side) face stands
+# STIRRUP_REAR_FACE_LIMITS from the block's paper-end face, read with
+# calipers over the two faces, the setting VIEW C prints natively
+# (pn_pen_assembly_spec), and its paper-side face stands no more than
+# STIRRUP_PROUD_MAX proud of that end face, checked with a square's blade
+# laid on the end face across the stirrup (calipers over a proud stirrup
+# read only its own depth).  The near limit is the model's flush stirrup;
+# the far limit is the deepest stirrup flush plus .005: there its far
+# window corners still clear the neck breaks' run-out
+# (window_corner_ride_max); STIRRUP_REAR_FACE_LIMIT is how far they may go.
+_FRAME_DEPTH_UPPER = printed_deviations(
+    frame.FRAME_DEPTH, frame.DRAWING_PRECISION_BY_NAME["Depth"], unit=frame.UNIT
+)[1]
+STIRRUP_REAR_FACE_LIMITS = (
+    FRAME_X0_LOCAL + frame.FRAME_DEPTH,  # .310
+    FRAME_X0_LOCAL + frame.FRAME_DEPTH + _FRAME_DEPTH_UPPER + 0.127,  # .325
+)
+STIRRUP_PROUD_MAX = 0.0
 FRAME_X_CENTER_LOCAL = FRAME_X0_LOCAL + frame.FRAME_DEPTH / 2.0
 FRAME_ORIGIN_LOCAL = (
     FRAME_X0_LOCAL + frame.FRAME_DEPTH,  # frame z 0 is the face nearer the rod
@@ -226,17 +246,18 @@ def paper_side_points() -> dict[str, float]:
 
 # --- paper clearance at the printed extremes (drawing-guidelines.md rule 19) ---
 # paper_side_points() reads the model as placed, the stirrup centred on the
-# neck.  No fit-up setting moves the block or the stirrup off the paper (the
-# nib preset slides only the marker, which the final machine sets from the
-# paper by its nib), so the two prints' loose bands must hold the rigid
-# carriage off it at their worst case together.  About the rod axis (the
-# pivot bore): the block prints its length-wise stations from the paper end
-# and its depth-wise ones from the body's front face, all .XX.  The stirrup
-# seats flush on the paper end (assembly step 3) and sits anywhere across the
-# neck its window lets it: neither its window corner radii nor the thumb
-# screw's tip on the round grip stops it, so at worst its window's front wall
-# lies on the neck's front face.  The narrow window and thin rails
-# (pn_pen_frame_spec) are what keep its paper-side corner off the paper.
+# neck and flush on its end.  No fit-up setting moves the block off the paper
+# (the nib preset slides only the marker, which the final machine sets from
+# the paper by its nib), and the stirrup's setting holds its paper face no
+# more than STIRRUP_PROUD_MAX proud of the end, so the two prints' loose
+# bands must hold the rigid carriage off it at their worst case together.  About the
+# rod axis (the pivot bore): the block prints its length-wise stations from
+# the paper end and its depth-wise ones from the body's front face, all .XX.
+# The stirrup sits anywhere across the neck its window lets it: neither its
+# window corner radii nor the thumb screw's tip on the round grip stops it,
+# so at worst its window's front wall lies on the neck's front face.  The
+# narrow window and thin rails (pn_pen_frame_spec) are what keep its
+# paper-side corner off the paper.
 def _printed_limits(spec: ModuleType, name: str, model: float) -> tuple[float, float]:
     """``(min, max)`` mm of ``spec``'s printed dimension ``name`` (model value
     ``model``) at the title block's limits for its places."""
@@ -261,39 +282,71 @@ def paper_side_points_printed_worst() -> dict[str, float]:
     neck_back = _printed_limits(vb, "NeckZ1", vb.depth_station(vb.NECK_DEPTH))[1]
     step = _printed_limits(vb, "ReliefX0", vb.RELIEF_X0)[0]
     body_back = _printed_limits(vb, "Depth", vb.BODY_DEPTH)[1]
-    # The stirrup's outer faces with its window's front wall on the neck.
+    # The stirrup's outer faces with its window's front wall on the neck, its
+    # paper-side face as proud of the block's end as its setting lets it be.
+    frame_x0 = -STIRRUP_PROUD_MAX
     frame_front = neck_front - _printed_limits(frame, "LeftWall", frame.RAIL_SIDE)[0]
     frame_paper = (
         frame_front + _printed_limits(frame, "OuterSpanX", frame.OUTER_WIDTH)[1]
     )
-    # The thumb screw's axis: ScrewZ from the stirrup's rod-side face, so from
-    # the paper end it stands the depth less ScrewZ.
+    # The thumb screw's axis: ScrewZ from the stirrup's rod-side face, which
+    # the setting holds at least its near limit from the end face.
     screw_x = (
-        _printed_limits(frame, "Depth", frame.FRAME_DEPTH)[0]
+        STIRRUP_REAR_FACE_LIMITS[0]
         - _printed_limits(frame, "ScrewZ", frame.FRAME_DEPTH / 2.0)[1]
     )
     screw_z = frame_front + _printed_limits(frame, "ScrewX", frame.OUTER_WIDTH / 2.0)[1]
     return {
         "v-block neck paper-end corner": z_at(0.0, neck_back),
         "v-block body paper-side corner": z_at(step, body_back),
-        "stirrup paper-side corner": z_at(0.0, frame_paper),
+        "stirrup paper-side corner": z_at(frame_x0, frame_paper),
         "thumb-screw head rim": z_at(screw_x, screw_z) + thumb.HEAD_DIA / 2.0,
     }
 
 
-def window_corner_ride_max() -> float:
+# --- the stirrup's window corners on the neck's broken top edges ----------------
+# Each break runs full from the paper end to NECK_BREAK_FULL_X, where the
+# chamfer mill is fed up (pn_pen_v_block_spec).  That stop is VB06's CNC
+# program number, not a printed band: the cut lands within the PM-30MV's
+# positioning repeatability, ±0.02 mm (cad/config/shop-equipment/cnc.toml
+# cnc.pm-30mv, owner value).
+MILL_REPEATABILITY = 0.02
+NECK_BREAK_STOP_MIN = vb.NECK_BREAK_FULL_X - MILL_REPEATABILITY
+
+
+def window_corner_ride(far_x: float, corner_r: float, leg: float, stop: float) -> float:
+    """How far window corners of radius ``corner_r`` lift the stirrup's top
+    rail off the block top, the window's side wall on the neck's face and the
+    stirrup's far (rod-side) face ``far_x`` from the paper end, on 45 deg
+    neck breaks of ``leg`` run full to ``stop``.
+
+    A corner's metal lies between its arc and the rail's and the wall's
+    faces: measured down from the top (t) and in from the neck's face (z),
+    no point of it has z + t over ``corner_r``.  The full break removes every
+    point with z + t up to ``leg``, so it leaves the corner nothing to ride
+    while ``leg >= corner_r``.  Past the stop the mill's 90 deg cone, its
+    point ``leg`` under the top on the neck face's line, was fed straight
+    up: ``d`` past the stop it has removed the points with
+    sqrt(d^2 + z^2) + t up to ``leg``.  Over the corner's metal that sum is
+    greatest where the arc leaves the wall (z 0, t ``corner_r``): elsewhere
+    sqrt(d^2 + z^2) <= d + z and the arc stands at least z under that point.
+    So the far corners ride the cone's run-out by d + ``corner_r`` - ``leg``
+    once d passes ``leg`` - ``corner_r``."""
+    past = max(0.0, far_x - stop)
+    return max(0.0, past + corner_r - leg)
+
+
+def window_corner_ride_max(rear_face_max: float) -> float:
     """How far the stirrup's window corners, at their printed R.065's
     greatest (R.070; owner ruling 2026-11-23, tool audit Q9), can lift its
-    top rail off the block top by riding the neck's top edges, the window
-    and the neck at their printed limits.
+    top rail off the block top by riding the neck's broken top edges (owner
+    seat ruling 2026-11-23: .080 X 45, .075-.085), the stirrup's rear (far)
+    face set at most ``rear_face_max`` mm from the paper end.
 
     Nothing centres the stirrup across the neck (paper_side_points_printed_
-    worst), so one side wall can lie on the neck's face; on a square edge
-    the corner would lift it a full radius.  The neck's top edges are broken
-    45 deg (owner seat ruling 2026-11-23): a corner's metal reaches at most
-    its radius along either face from the corner, so a break whose shortest
-    leg is at least the greatest radius leaves the corner nothing to ride,
-    over the stirrup's whole printed depth."""
+    worst), so one side wall can lie on the neck's face, the window and the
+    neck at their printed limits; its far corners then meet the breaks'
+    shortest leg and the stop's nearest landing (``window_corner_ride``)."""
     window = _printed_limits(frame, "WindowWidth", frame.WINDOW_WIDTH)[0]
     neck = (
         _printed_limits(vb, "NeckZ1", vb.depth_station(vb.NECK_DEPTH))[1]
@@ -301,11 +354,55 @@ def window_corner_ride_max() -> float:
     )
     if window <= neck:
         raise AssertionError("the stirrup window must pass the neck at both prints")
-    if vb.NECK_EDGE_BREAK_MIN < frame.WINDOW_CORNER_R_MAX:
-        raise AssertionError("a window corner can ride the neck's broken top edge")
-    if vb.NECK_BREAK_FULL_X < _printed_limits(frame, "Depth", frame.FRAME_DEPTH)[1]:
-        raise AssertionError("the neck's edge break stops under the stirrup")
-    return 0.0
+    return window_corner_ride(
+        rear_face_max,
+        frame.WINDOW_CORNER_R_MAX,
+        vb.NECK_EDGE_BREAK_MIN,
+        NECK_BREAK_STOP_MIN,
+    )
+
+
+# The furthest the stirrup's rear face may stand from the paper end with its
+# window corners still off the run-out at the printed worst case: the stop's
+# nearest landing plus the run-out's free reach (shortest leg less greatest
+# radius).
+STIRRUP_REAR_FACE_LIMIT = (
+    NECK_BREAK_STOP_MIN + vb.NECK_EDGE_BREAK_MIN - frame.WINDOW_CORNER_R_MAX
+)
+
+
+def stirrup_setting_ride(rear_face_max: float) -> float:
+    """The window corners' ride with the stirrup's rear face set at most
+    ``rear_face_max`` from the block's paper end; refuses a setting whose
+    corners ride the breaks' run-out.  The module guards below run it on the
+    printed setting at import, before any SolidWorks leaf: the assembly's
+    interference gate cannot see the ride (the model carries the nominal
+    R.065 and .080 leg, its stirrup centred and its rail held FRAME_TOP_GAP
+    off the top)."""
+    ride = window_corner_ride_max(rear_face_max)
+    if ride > 0.0 or rear_face_max > STIRRUP_REAR_FACE_LIMIT:
+        raise AssertionError(
+            f"the stirrup's rear face set {rear_face_max:.3f} mm from the paper "
+            f"end rides the neck breaks' run-out by {ride:.3f} mm (limit "
+            f"{STIRRUP_REAR_FACE_LIMIT:.3f})"
+        )
+    return ride
+
+
+def stirrup_placement_check(frame_x0: float, depth: float) -> float:
+    """The window corners' ride with a stirrup ``depth`` deep placed with its
+    paper-side face ``frame_x0`` from the block's paper end (positive toward
+    the step); refuses it either way out of its setting.  Proud of the end
+    past STIRRUP_PROUD_MAX its paper-side corner leaves the paper clearance
+    paper_side_points_printed_worst() proves; its rear face past
+    STIRRUP_REAR_FACE_LIMIT its far corners ride the breaks' run-out."""
+    if frame_x0 < -STIRRUP_PROUD_MAX:
+        raise AssertionError(
+            f"the stirrup stands {-frame_x0:.3f} mm proud of the paper end "
+            f"(limit {STIRRUP_PROUD_MAX:.3f}): its paper-side corner crowds "
+            "the paper"
+        )
+    return stirrup_setting_ride(frame_x0 + depth)
 
 
 # --- plan balance ---------------------------------------------------------------
@@ -428,9 +525,17 @@ if frame.WINDOW_WIDTH < vb.NECK_DEPTH + 4.0 * CLEARANCE:
     raise AssertionError("stirrup window must pass the neck with 2 x CLEARANCE a side")
 if FRAME_X0_LOCAL + frame.FRAME_DEPTH + 4.0 * CLEARANCE > vb.RELIEF_X0:
     raise AssertionError("the stirrup must slide on the neck clear of the body's step")
-# The thumb screw keeps its throw with the stirrup lifted by its window
-# corners at their worst.
-WINDOW_CORNER_RIDE_MAX = window_corner_ride_max()
+# The stirrup as placed sits inside its setting, and at the setting's far
+# limit its window corners ride nothing (#3467).  The thumb screw keeps its
+# throw with the stirrup lifted by its window corners at that worst.
+if not (
+    STIRRUP_REAR_FACE_LIMITS[0]
+    <= FRAME_X0_LOCAL + frame.FRAME_DEPTH
+    <= STIRRUP_REAR_FACE_LIMITS[1]
+):
+    raise AssertionError("the stirrup as placed stands outside its setting")
+stirrup_placement_check(FRAME_X0_LOCAL, frame.FRAME_DEPTH)
+WINDOW_CORNER_RIDE_MAX = stirrup_setting_ride(STIRRUP_REAR_FACE_LIMITS[1])
 if FRAME_WINDOW_BOTTOM_LOCAL_Y + WINDOW_CORNER_RIDE_MAX > MARKER_BOTTOM_LOCAL_Y - 1.0:
     raise AssertionError("stirrup window leaves the thumb screw under 1.0 of throw")
 if MARKER_BOTTOM_LOCAL_Y - thumb.SHANK_LEN >= FRAME_ORIGIN_LOCAL[1]:

@@ -885,7 +885,7 @@ def test_neck_edge_breaks_print_and_clear_the_stirrup_and_the_body() -> None:
         0.127, abs=1e-3
     )
     assert spec.NECK_BREAK_FULL_X == pytest.approx(0.33 * 25.4)
-    assert carriage.window_corner_ride_max() == 0.0
+    assert carriage.window_corner_ride_max(carriage.STIRRUP_REAR_FACE_LIMITS[1]) == 0.0
     # The chamfer mill stops short of the step at its printed nearest (.34),
     # so its cone on the top face stays inside the body's side faces; its
     # run-out keeps the target to the bore's chamfer (5.50) and to the rod
