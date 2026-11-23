@@ -47,9 +47,7 @@ the spin-up dwell.
 from __future__ import annotations
 
 import math
-import tomllib
 from fractions import Fraction
-from pathlib import Path
 from typing import Any
 
 STEM = "dt_cylinder_gear"
@@ -67,9 +65,6 @@ LOAD_FIRST_TOOL: tuple[str, ...] = ()
 # The plan's tools the mill runs, numbered by their places in its tool list.
 CAM_TOOLS = ("cutter", "saw")
 IN = 25.4
-# Shop-equipment records the shop/ TOML cannot hold: the cutter's and the
-# saw's sizes and the cutter set's tooth ranges.
-EQUIPMENT = Path(__file__).resolve().parents[2] / "config" / "shop-equipment"
 # Seconds the spindle runs up after each restart before the cutter moves.
 DWELL_S = 2
 # Shapes the tools must miss stand this high (every move is at Z0).
@@ -109,11 +104,6 @@ def _box(
         "y": [y[0] + shift, y[1] + shift],
         "z_top": SHAPE_TOP_MM,
     }
-
-
-def _equipment(name: str) -> dict[str, Any]:
-    with open(EQUIPMENT / name, "rb") as handle:
-        return tomllib.load(handle)
 
 
 def _setting(plan: dict[str, Any], shop: dict[str, Any], tool: str) -> dict[str, Any]:
@@ -225,22 +215,22 @@ def context(
         plan, "stack_od_aim_mm", (p["stack_od_min_in"] + p["stack_od_max_in"]) / 2 * IN
     )
 
-    # The cutter: the #2 of the 48DP set, whose range holds the count.
-    cutters = _equipment("tools-gear-cutting.toml")["tools"]["gear-cutters-48dp-20pa"]
-    member = cutters["members"][str(teeth["cutter_number"])]
-    if not member["teeth"][0] <= count <= member["teeth"][1]:
+    # The cutter: the #2 of the 48DP set, whose range holds the count (the
+    # plan states the set's records; the test reads them against the
+    # shop-equipment inventory). Sizes: the shop records' diameter_mm.
+    lo, hi = p["cutter_member_teeth_min"], p["cutter_member_teeth_max"]
+    if not lo <= count <= hi:
         raise ValueError(
-            f"cutter #{teeth['cutter_number']} cuts {member['teeth']}, not {count} teeth"
+            f"cutter #{teeth['cutter_number']} cuts {lo}-{hi}, not {count} teeth"
         )
     if (
-        cutters["diametral_pitch"] != teeth["diametral_pitch"]
-        or cutters["pressure_angle_deg"] != teeth["pressure_angle_deg"]
+        p["cutter_diametral_pitch"] != teeth["diametral_pitch"]
+        or p["cutter_pressure_angle_deg"] != teeth["pressure_angle_deg"]
     ):
         raise ValueError("the cutter set's pitch or pressure angle is not the teeth's")
-    cutter_r = cutters["dia_in"] * IN / 2
-    saw_record = _equipment("tools-cutting.toml")["tools"]["cylinder-notch-saw"]
-    saw_r = saw_record["dia_in"] * IN / 2
-    if saw_record["thickness_in"] * IN > f["notch"]["width_max"]:
+    cutter_r = shop["tools"]["gear-cutters-48dp-20pa"]["diameter_mm"] / 2
+    saw_r = shop["tools"]["cylinder-notch-saw"]["diameter_mm"] / 2
+    if p["saw_thickness_mm"] > f["notch"]["width_max"]:
         raise ValueError("the saw is wider than the notch's limit")
 
     # Speeds: the plan's settings records; the mill's range.
@@ -298,14 +288,38 @@ def context(
         plan, "saw_touch_y_mm", -(p["paper_mm"] + radius * (1 - math.cos(half_space)))
     )
 
-    # Arbor (X from the shoulder): body to the jaws, journal, pilot, thread.
+    # Arbor (X from the shoulder): body to the jaws, journal, pilot, thread
+    # (its first part the relief groove at the pilot's end).
     journal_end = p["journal_length_mm"]
     pilot_end = journal_end + p["pilot_length_mm"]
+    relief_end = pilot_end + p["relief_width_mm"]
     tail = pilot_end + p["thread_length_mm"]
     if stack_end + p["collar_length_mm"] > tail:
         raise ValueError("the collar runs past the arbor's tail")
     if journal_end >= stack_end or journal_end < stack_end - pitch + face:
         raise ValueError("the journal must end inside blank 10's bore")
+    if p["relief_width_mm"] < p["thread_pitch_mm"]:
+        raise ValueError("the thread relief is narrower than one pitch")
+    if (
+        not p["relief_dia_mm"]
+        < p["thread_minor_mm"]
+        < p["thread_major_mm"]
+        < p["pilot_dia_mm"]
+    ):
+        raise ValueError("relief < thread minor < major < pilot does not hold")
+    # The nut clamps: at the thinnest stack the collar's outer face stands at
+    # least two full threads past the relief, so the nut bears on the collar,
+    # never on the pilot's shoulder or the run-out (the cone kit's
+    # NUT_THREAD_MARGIN rule).
+    collar_face_min = gang * f["cam_face"]["thickness"][0] + p["collar_length_mm"]
+    nut_margin = collar_face_min - relief_end - 2 * p["thread_pitch_mm"]
+    if nut_margin <= 0:
+        raise ValueError(
+            f"the nut cannot clamp the stack: collar face {collar_face_min:.3f} mm "
+            f"is not two threads past the relief's end {relief_end:.3f} mm"
+        )
+    if pilot_end <= gang * f["cam_face"]["thickness"][1]:
+        raise ValueError("the collar does not ride the pilot at the thickest stack")
     _agree(plan, "stack_stickout_mm", p["standoff_mm"] + tail)
 
     # Depth budget (Main's condition 1): the cut's peak force on the arbor at
@@ -319,9 +333,18 @@ def context(
         * (p["arbor_modulus_gpa"] / p["brass_modulus_gpa"]) ** 0.25,
     )
     kc = p["brass_unit_power_hp_min_per_in3"] * HP_IN_LBF_MIN * PSI_MPA
+    # The posted feed is the settings record's flutes × chip × rpm; a cutter
+    # with fewer teeth (down to the plan's least accepted) takes a chip larger
+    # by flutes / teeth at that feed: the budget is taken at that chip.
+    if p["cutter_teeth_min"] > cutter_setting["flutes"]:
+        raise ValueError(
+            "the least accepted cutter has more teeth than the feed assumes"
+        )
     chip = (
         2
         * cutter_setting["chip_load_mm_per_tooth"]
+        * cutter_setting["flutes"]
+        / p["cutter_teeth_min"]
         * math.sqrt(plunge[1] / (2 * cutter_r))
     )
     profile = (
@@ -333,7 +356,8 @@ def context(
         (-p["standoff_mm"], 0.0, p["body_dia_mm"]),
         (0.0, journal_end, p["journal_dia_min_mm"]),
         (journal_end, pilot_end, p["pilot_dia_mm"]),
-        (pilot_end, tail, p["thread_minor_mm"]),
+        (pilot_end, relief_end, p["relief_dia_mm"]),
+        (relief_end, tail, p["thread_minor_mm"]),
     ]
     deflection = max(
         abs(

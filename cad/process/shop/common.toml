@@ -605,6 +605,8 @@ description = "1 in R8 stub arbor"
 description = "7/8 stub arbor, 3/4 straight shank"
 [tools.gear-cutters-48dp-20pa]  # F-gear-cutter-10-289-481 to -488
 description = "48DP 20PA involute gear cutters #1 to #8"
+# 1-3/4 in (cad/config/shop-equipment/ tools-gear-cutting, same key, dia_in).
+diameter_mm = 44.45
 [tools.depth-micrometer]  # F-depth-micrometer
 description = "Depth micrometer, inch"
 [tools.pin-gauges]  # A1-pin-set-011-060, A1-pin-set-061-500-combined; ownership: inventory gauges.pin-gauges

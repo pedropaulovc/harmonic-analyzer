@@ -20,6 +20,7 @@ import pytest
 
 import _cam_programs
 import _process_plans
+import _shop_equipment
 import cam_nc
 import dt_cone_gear_spec
 import dt_cone_gear_tl_keyed_arbor_spec as keyed_arbor
@@ -154,6 +155,28 @@ def test_the_boss_holds_the_cam_and_the_arbor_takes_the_cone_kits_collar() -> No
     assert P["collar_length_mm"] == pytest.approx(keyed_arbor.COLLAR_LENGTH)
     assert P["pilot_dia_mm"] == pytest.approx(keyed_arbor.PILOT_DIA)
     assert P["pilot_dia_mm"] < keyed_arbor.COLLAR_BORE
+    assert P["relief_dia_mm"] == pytest.approx(keyed_arbor.RELIEF_DIA)
+    assert P["thread_pitch_mm"] == pytest.approx(keyed_arbor.THREAD_PITCH, abs=1e-6)
+    assert P["thread_major_mm"] == pytest.approx(keyed_arbor.THREAD_MAJOR)
+
+
+def test_the_plans_cutter_and_saw_records_are_the_inventorys() -> None:
+    tools = _shop_equipment.load()["tools"]
+    cutters = tools["gear-cutters-48dp-20pa"]
+    member = cutters["members"][str(FEATURES["features"]["teeth"]["cutter_number"])]
+    assert [P["cutter_member_teeth_min"], P["cutter_member_teeth_max"]] == member[
+        "teeth"
+    ]
+    assert P["cutter_diametral_pitch"] == cutters["diametral_pitch"]
+    assert P["cutter_pressure_angle_deg"] == cutters["pressure_angle_deg"]
+    saw = tools["cylinder-notch-saw"]
+    assert P["saw_thickness_mm"] == pytest.approx(saw["thickness_in"] * IN)
+    assert SHOP["tools"]["gear-cutters-48dp-20pa"]["diameter_mm"] == pytest.approx(
+        cutters["dia_in"] * IN
+    )
+    assert SHOP["tools"]["cylinder-notch-saw"]["diameter_mm"] == pytest.approx(
+        saw["dia_in"] * IN
+    )
 
 
 @pytest.mark.parametrize(
@@ -173,6 +196,11 @@ def test_the_boss_holds_the_cam_and_the_arbor_takes_the_cone_kits_collar() -> No
         ("standoff_mm", 25.0, "past the jaws"),
         ("journal_length_mm", 80.0, "blank 10's bore"),
         ("arbor_modulus_gpa", 20.0, "beam_brass_equiv_dia_mm"),
+        ("pilot_length_mm", 9.906, "cannot clamp"),
+        ("pilot_length_mm", 1.0, "ride the pilot"),
+        ("relief_width_mm", 0.5, "narrower than one pitch"),
+        ("cutter_teeth_min", 6, "depth spread"),
+        ("cutter_member_teeth_max", 110, "cuts 55-110"),
         ("brass_unit_power_hp_min_per_in3", 3.0, "depth spread"),
     ],
 )

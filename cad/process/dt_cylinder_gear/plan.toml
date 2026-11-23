@@ -118,8 +118,12 @@ boss_length_max_in = 0.183
 boss_grip_stickout_mm = 4.0
 # The gang arbor (Setup 4; fixtures.dt-cylinder-gear-gang-arbor), from the
 # 5/8 bar's raw stub in the jaws: a body Ø.600 2.50 long, the shoulder, the
-# journal 2.94, the pilot .39 for the TL-04 collar's .290 bore, the 1/4-28
-# thread .47 (its minor .2113 = .250 - 1.0825/28) and the tail centre.
+# journal 2.94, the pilot .21 for the TL-04 collar's .290 bore, then the
+# 1/4-28 thread .65 to the tail centre, its first .05 a relief groove Ø.180
+# (the cone kit's relief diameter) so the nut runs full threads onto the
+# collar (its minor .2113 = .250 - 1.0825/28). The pilot ends short of the
+# collar's outer face at the thinnest stack (cam.py checks the nut bears on
+# the collar two threads past the relief).
 # X here: from the shoulder (blank 1's back face, G54 X0 in Setup 6).
 arbor_bar_dia_mm = 15.875
 arbor_saw_in = 7.0
@@ -131,9 +135,25 @@ journal_dia_min_mm = 9.54532
 journal_dia_max_mm = 9.5504
 journal_length_mm = 74.676
 pilot_dia_mm = 6.985
-pilot_length_mm = 9.906
+pilot_length_mm = 5.334
+relief_dia_mm = 4.572
+relief_width_mm = 1.5875
+thread_major_mm = 6.35
+thread_pitch_mm = 0.907143
 thread_minor_mm = 5.368
-thread_length_mm = 11.938
+thread_length_mm = 16.51
+# The cutter set's records (cad/config/shop-equipment/tools-gear-cutting.toml,
+# tools.gear-cutters-48dp-20pa: #2 member's tooth range, its pitch and
+# angle) and the saw's width (tools-cutting.toml, tools.cylinder-notch-saw,
+# .014): the test reads them against the inventory. The least cutter tooth
+# count Setup 6 accepts: at the settings record's feed (12 teeth assumed) a
+# 10-tooth cutter's chip still keeps the depth budget (cam.py).
+cutter_member_teeth_min = 55
+cutter_member_teeth_max = 134
+cutter_diametral_pitch = 48
+cutter_pressure_angle_deg = 20
+saw_thickness_mm = 0.3556
+cutter_teeth_min = 10
 # The shoulder's relief: the P1 blade .010 into the journal at the shoulder
 # (the AR insert's R0.4 nose would leave a fillet past the blank's .010 bore
 # break, and blank 1 would not seat).
@@ -550,7 +570,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Dead centre in the end. Turn the body Ø.600 over the {{process.body_length_in:.2f}} next to the jaws, then step down from the tail end: journal Ø{{process.journal_dia_min_mm:in.4dot}}-{{process.journal_dia_max_mm:in.4dot}} × 2.94 to a square shoulder, pilot Ø.275 × .39, thread Ø.250 × .47. Light finishing cuts on the journal."
+instruction = "Dead centre in the end. Turn the body Ø.600 over the {{process.body_length_in:.2f}} next to the jaws, then step down from the tail end: journal Ø{{process.journal_dia_min_mm:in.4dot}}-{{process.journal_dia_max_mm:in.4dot}} × 2.94 to a square shoulder, pilot Ø.275 × {{process.pilot_length_mm:in.2dot}}, thread Ø.250 × {{process.thread_length_mm:in.2dot}}. Light finishing cuts on the journal."
 rpm = 300
 feed = ".002 in/rev (0.05 mm), power feed; dead centre oiled"
 cut_diameter_mm = "{{process.body_dia_mm}}"
@@ -571,10 +591,21 @@ cut_diameter_mm = "{{process.journal_dia_max_mm}}"
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
+tool = "parting"
+drilling = "none"
+sizing = "other"
+instruction = "Thread relief: plunge the P1 blade (1/16 wide) against the pilot's shoulder on the thread side to Ø{{process.relief_dia_mm:in.3dot}} (calipers), so the thread runs out into it and the nut reaches the collar."
+rpm = 150
+feed = "cross slide by hand, slow"
+cut_diameter_mm = "{{process.thread_major_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
 tool = "thread"
 drilling = "none"
 sizing = "other"
-instruction = "Chamfer the thread's start; single-point 1/4-28 UNF .47 long (compound at 29°, the 28 TPI gearbox setting) until the cone kit's arbor nut runs on by hand. Leave the dead centre in."
+instruction = "Chamfer the thread's start at the tail; single-point 1/4-28 UNF from the tail to the relief (compound at 29°, the 28 TPI gearbox setting) until the cone kit's arbor nut runs on by hand up to the relief. Leave the dead centre in."
 rpm = 70
 feed = "compound at 29°, the bit on centre height; .003-.005 a pass, less near depth, cutting oil"
 cut_diameter_mm = 6.35
@@ -623,7 +654,7 @@ vise_hold = "other"
 beam = { axis = "x", hold = "between", extent_mm = [-44.45, 96.52], supports_mm = [-44.45, 96.52], section_mm = { diameter = "{{process.beam_brass_equiv_dia_mm}}" } }
 
 [[setups.operations]]
-instruction = "Before the first load: the BS-0 tailstock's centre reaches the arbor's tail at centre height (if not, stop and tell the owner). The cutter is a #2 48DP 20° (55-134 teeth); count its teeth (12 assumed; 6 or more keep the chip at .10 mm or less) and mike its width across its side faces; write both down."
+instruction = "Before the first load: the BS-0 tailstock's centre reaches the arbor's tail at centre height (if not, stop and tell the owner). The cutter is a #2 48DP 20° (55-134 teeth); count its teeth and mike its width across its side faces; write both down. Fewer than {{process.cutter_teeth_min}} teeth: stop and tell the owner (the programs' feed would overload the arbor)."
 feed = "hand"
 
 [[setups.operations]]
