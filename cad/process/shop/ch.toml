@@ -220,7 +220,7 @@ diameter_mm = 10.16
 
 # The strap traveler's fixture, so its plan's ref resolves: the plan prints
 # its own name and description. Ownership is cad/config/shop-equipment/
-# fixtures.strap-sub-plate. Its tape, tools.tape-3m-vhb-5906, is in
+# fixtures.strap-sub-plate. Its tape and glue, tools.tape-scotchblue-2090 and its neighbours, are in
 # common.toml (the MHA-MS-01 stick and the dt and pd sheet parts bond on it too).
 [tools.strap-sub-plate]
 description = "Fixture MHA-CH-13-TL-00: sub-plate TL-01 with its hub plug, washer, edge clamps and hub screw"
