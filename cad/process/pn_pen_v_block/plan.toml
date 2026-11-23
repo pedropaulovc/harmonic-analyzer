@@ -554,7 +554,7 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "chamfer"
 drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.v_groove_flat_width_band_mm}}" }
+sizing = "other"
 instruction = "Same file, M6 T2: the 1/4 in 90° chamfer mill cuts the V from beyond P to .065 past the step (the slot corners' radius; into the slot), its point stepped down in five levels of {{process.v_level_mm:in.3dot}} to the flat .196 below B, each level swept across in passes {{process.v_stepover_max_mm:in.3dot}} apart; the outermost pass of each level runs its cone on both flanks (45°). At the last level its point then sweeps the flat again in passes {{process.v_flat_stepover_mm:in.4dot}} apart, edge to edge (the outer two on the flat's edges at its nominal width), its ridges .001 high at most. Set 2800."
 settings = "pn-chamfer-1-4-c360"
 milling_cuts = [
