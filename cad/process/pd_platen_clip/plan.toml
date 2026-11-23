@@ -272,13 +272,18 @@ gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.strip_thickness_m
 feed = "hand"
 
 [[setups.operations]]
+steps = [
+  { kind = "action", text = "Take two scrap wood blocks, each about 3/4 in thick, 3 in wide and 9 in long. Lay the strip on one, the other on top, the strip's bought end flush with both blocks' ends." },
+  { kind = "action", text = "Square a line across the top block {{process.blank_length_in:.2dot}} in from that flush end (rule and square). Clamp the stack in the bench vise, the line 1/2 in out past the jaws." },
+]
+feed = "hand"
+
+[[setups.operations]]
 speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
 steps = [
-  { kind = "action", text = "Take two scrap wood blocks, each about 3/4 in thick, 3 in wide and 9 in long. Lay the strip on one, the other on top, the strip's bought end flush with both blocks' ends." },
-  { kind = "action", text = "Square a line across the top block {{process.blank_length_in:.2dot}} in from that flush end (rule and square). Clamp the stack in the bench vise, the line 1/2 in out past the jaws." },
   { kind = "action", text = "Saw straight down through block, strip and block, the blade upright and its kerf on the line's side away from the flush end; light, full-length strokes. The piece off: blank A." },
   { kind = "action", text = "Blank B: the same, the blocks turned end for end so their uncut ends lie flush with the strip's sawn end. Keep the rest of the strip for MHA-PD-14." },
 ]
