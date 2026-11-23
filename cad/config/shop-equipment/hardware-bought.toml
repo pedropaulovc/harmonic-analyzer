@@ -426,7 +426,7 @@ unit = "pack"
 cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 36: \"18-8 Stainless Steel Fillister Head Slotted Screw, 2-56 Thread Size, 5/16\" Long, Packs of 1\", 1 pack shipped; Your Part Number MHA-MG-VN-53", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
 
 [hardware.mg-vn-wheel-axle-back-washer]
-name = "Brass Washer for Number 10 Screw Size, 0.200\" ID, 0.438\" OD 1 Notes about your shipment Certificates for lines 3, 4, 11, 19, 25, 30, 34, 38, 39, 42, 50, 51, 53, 56, 57, 58, 67, 70, 71, 78, 79 and 80 are available at mcmaster.com/order-history."
+name = "Brass Washer for Number 10 Screw Size, 0.200\" ID, 0.438\" OD, Packs of 100"
 kind = "purchased_hardware"
 number = "MHA-MG-VN-54"
 make = "McMaster-Carr"
@@ -434,7 +434,7 @@ sku = "92916A480"
 status = "on_hand"
 pieces = 1
 unit = "pack"
-cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 37: \"Brass Washer for Number 10 Screw Size, 0.200\" ID, 0.438\" OD 1 Notes about your shipment Certificates for lines 3, 4, 11, 19, 25, 30, 34, 38, 39, 42, 50, 51, 53, 56, 57, 58, 67, 70, 71, 78, 79 and 80 are available at mcmaster.com/order-history.\", 1 pack shipped; Your Part Number MHA-MG-VN-54", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 37: \"Brass Washer for Number 10 Screw Size, 0.200\" ID, 0.438\" OD, Packs of 100\", 1 pack shipped; Your Part Number MHA-MG-VN-54", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
 
 [hardware.mg-vn-wheel-axle-front-washer]
 name = "Brass Washer for Number 4 Screw Size, 0.120\" ID, 0.281\" OD, Packs of 100"
@@ -656,7 +656,7 @@ sku = "90480A009"
 status = "on_hand"
 pieces = 1
 unit = "pack"
-note = "Same McMaster-Carr SKU as fixtures.dt-cone-gear-round-arbor-nut names (still to_order there; not reconciled)."
+note = "This pack also supplies the one nut of fixtures.dt-cone-gear-round-arbor-nut (same McMaster-Carr SKU)."
 cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 57: \"Zinc-Plated Low-Strength Steel Hex Nuts, 8-32 Thread Size, Packs of 100\", 1 pack shipped; Your Part Number MHA-PN-VN-54", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
 
 [hardware.pn-vn-pen-set-screw]

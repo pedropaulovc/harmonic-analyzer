@@ -505,10 +505,13 @@ cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), li
 # names the part it was bought for; that is the allocation recorded.
 # Lengths, sizes and tempers are the packing list's descriptions. Its
 # purchased hardware is hardware-bought.toml.
+# McMaster-Carr product pages read live 2026-11-23: each of the five O1 rods
+# (8893K115, 8893K125, 8893K148, 8893K162, 8893K178) states "Diameter
+# Tolerance -0.0005 to 0.0005 in"; straightness is not rated.
 [stock.drill-rod-1-16]
 form = "round_bar"
 material = "AISI O1 tool steel rod, oil-hardening, tight tolerance"
-note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 73): 8893K115 tight-tolerance oil-hardening O1 tool steel rod, .0625 in diameter, 3 ft, 1 each. Allocation: dt-pinion-lever-pin (MHA-DT-30), one .65 in piece hand-sawn off a filed end and filed to the .63 cut length (dt_pinion_lever_pin_geometry.PIN_LEN 16.002 mm), diameter as supplied; the rest is spare for remakes. The diameter tolerance is not on the packing list."
+note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 73): 8893K115 tight-tolerance oil-hardening O1 tool steel rod, .0625 in diameter, 3 ft, 1 each. Allocation: dt-pinion-lever-pin (MHA-DT-30), one .65 in piece hand-sawn off a filed end and filed to the .63 cut length (dt_pinion_lever_pin_geometry.PIN_LEN 16.002 mm), diameter as supplied; the rest is spare for remakes. Diameter tolerance +/-.0005 in (McMaster-Carr 8893K115 page, read live 2026-11-23), wider than the pin drawing's +/-.0003 as-supplied band (dt_pinion_lever_pin_spec.PIN_DIA_BAND), which was set from the Abrams rod this replaces: mike the rod before use; not reconciled here."
 dia_in = [0.0625]
 length_in = [36.0]
 status = "on_hand"
