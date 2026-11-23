@@ -401,3 +401,24 @@ description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 18 in length"
 # description only; the record is fixtures.shim-washers-1-4-id-arbor-19.
 [tools.shim-washers-1-4-id-arbor-19]
 description = "Steel arbor shim assortment, 1/4 in ID x 3/8 in OD, .001-.125 in, Precision Brand 25100"
+
+# --- MHA-DT-11 crankshaft (cad/process/dt_crankshaft/plan.toml) -------------
+# Drive-pin holes on the lathe (owner ruling 2026-11-22, option C2): the
+# cutters in a drill chuck on a straight arbor in the headstock 3-jaw, the
+# shaft in the shop-made jig on the cross slide. Not owned: to buy or make
+# (cad/config/shop-equipment/, same keys). diameter_mm is each tool's
+# nominal size.
+[tools.drill-chuck-jt33-straight-1-2]
+description = "1/2 in JT33 drill chuck on a 1/2 in straight-shank arbor (HHIP 9999-0013)"
+[tools.spot-drill-carbide-1-8]
+description = "1/8 in 90° solid carbide spotting drill, 2 in overall (Titan TC18708)"
+diameter_mm = 3.175
+[tools.drill-54-taper-length]
+description = "#54 (.0550 in) taper-length HSS drill, 1.75 in flute, 3 in overall (Fastenal 0306183)"
+diameter_mm = 1.397
+[tools.dt-crankshaft-drive-pin-jig]
+description = "Drive-pin jig (shop-made, for the crankshaft): 1 in 1018 bar 4.75 long, Ø.750 shank 2.00 long for the AXA No. 4 holder; 3/8 clearance 1.90 deep from the shank end; .4500 bore reamed in place 2.95 deep; 10-32 set screw on a brass pad 1.25 from the front face"
+[tools.plug-gauges-0930-0935]
+description = "Plug gauge pair, .0930 GO (plus) and .0935 NO-GO (minus), Vermont Gage Class X"
+[tools.plug-gauges-4500-4505]
+description = "Plug gauge pair, .4500 GO (plus) and .4505 NO-GO (minus), Vermont Gage Class X"
