@@ -1,0 +1,164 @@
+"""The MHA-PD-23 transgear pin's lathe traveler agrees with its model.
+
+``pd_transgear_pin`` is turned from 1/4 in bar on ``turned_shaft``: the tip end
+out on a tailstock centre in a stub beyond the tip plane, the press land
+turned to the measured MHA-PD-18 ream, the journal finish-turned and polished
+into its band, then turned round twice to face and dome each end. The adapter
+binds the drawing's bands; these tests hold the plan's own numbers to them:
+the land's window over the ream's reading, the head's facing window, the
+stub and the stub cut, the polish allowance and the regrip stickouts.
+"""
+
+from __future__ import annotations
+
+import math
+import tomllib
+
+import pytest
+
+import _process_plans
+import export_features
+
+STEM = "pd_transgear_pin"
+IN = 25.4
+
+
+@pytest.fixture(scope="module")
+def plan() -> dict:
+    return tomllib.loads(_process_plans.plan_path(STEM).read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="module")
+def parameters(plan: dict) -> dict:
+    return plan["parameters"]
+
+
+@pytest.fixture(scope="module")
+def features() -> dict:
+    return export_features.requirement_manifest(STEM)["features"]
+
+
+@pytest.fixture(scope="module")
+def shop() -> dict:
+    merged: dict = {}
+    for path in _process_plans.shop_files():
+        for section, records in tomllib.loads(path.read_text(encoding="utf-8")).items():
+            if isinstance(records, dict):
+                merged.setdefault(section, {}).update(records)
+    return merged
+
+
+def _cap(radius_in: float, dia_in: float) -> float:
+    """A form tool's dome height cut full on a diameter."""
+    return radius_in - math.sqrt(radius_in**2 - (dia_in / 2) ** 2)
+
+
+def test_the_pin_is_enrolled_on_turned_shaft(plan: dict) -> None:
+    assert STEM in _process_plans.TRAVELER_STEMS
+    assert plan["cad"]["adapter"] == "turned_shaft"
+    assert plan["stock_refs"] == ["1018-round-1-4"]
+
+
+def test_the_land_window_takes_the_drawings_interference_over_the_reading(
+    parameters: dict, features: dict, shop: dict
+) -> None:
+    land = features["step_land"]
+    # The ream lies in R to R + one pin step: the least excess over R is the
+    # least interference plus that step.
+    step_in = shop["gauges"]["plug-gauges-1261-1264"]["resolution_mm"] / IN
+    least = land["diametral_interference"][0] / IN + step_in
+    assert parameters["land_over_reading_min_in"] == pytest.approx(least, abs=1e-6)
+    # The window stays open: under the drawing's most interference.
+    assert least < land["diametral_interference"][1] / IN
+
+
+def test_the_six_pins_step_the_reams_band(shop: dict, features: dict) -> None:
+    band = features["step_land"]["mate_dia"]
+    pair = shop["gauges"]["plug-gauges-1260-1265"]["range_mm"]
+    steps = shop["gauges"]["plug-gauges-1261-1264"]["range_mm"]
+    assert pair == pytest.approx(band)
+    step = shop["gauges"]["plug-gauges-1261-1264"]["resolution_mm"]
+    assert steps == pytest.approx([band[0] + step, band[1] - step])
+
+
+def test_the_head_window_holds_the_head_land_for_any_head_dia(
+    parameters: dict, features: dict
+) -> None:
+    head = [d / IN for d in features["step_head"]["dia"]]
+    assert [
+        parameters["dome_datum_form_dia_min_in"],
+        parameters["dome_datum_form_dia_max_in"],
+    ] == pytest.approx(head)
+    radius = parameters["dome_datum_form_radius_in"]
+    caps = [_cap(radius, d) for d in head]
+    land = [s / IN for s in features["shoulder"]["station"]]
+    # Faced to the window, then domed: the head land lies in its band for a
+    # head anywhere in its Ø band.
+    assert parameters["head_face_min_in"] - max(caps) >= land[0] - 1e-9
+    assert parameters["head_face_max_in"] - min(caps) <= land[1] + 1e-9
+    assert parameters["head_face_min_in"] < parameters["head_face_max_in"]
+    for end in ("min", "max"):
+        assert parameters[f"head_face_{end}_mm"] == pytest.approx(
+            parameters[f"head_face_{end}_in"] * IN
+        )
+
+
+def test_the_stub_carries_the_centre_and_is_cut_short_of_the_tip_station(
+    parameters: dict, features: dict
+) -> None:
+    stub = parameters["centre_stub_in"]
+    assert parameters["centre_stub_mm"] == pytest.approx(stub * IN)
+    # The bar end faced .02 beyond the stub.
+    assert parameters["face_allowance_in"] == pytest.approx(stub + 0.02)
+    # The passes start in the stub, short of the centre's point.
+    assert 0 < parameters["turn_start_z_mm"] < parameters["centre_stub_mm"]
+    # The stub is cut a facing skim beyond the tip's station from the seat,
+    # inside the station's band.
+    station = features["far_end"]["station"]
+    nominal = features["far_end"]["station_nominal"]
+    assert nominal < parameters["tip_cut_in"] * IN <= station[1]
+    # The land is roughed short of the seat, which the sharp-nose tool faces.
+    assert parameters["seat_rough_z_mm"] == pytest.approx(-(nominal - 0.005 * IN))
+
+
+def test_the_head_is_turned_past_the_part_off_kerf(
+    parameters: dict, features: dict
+) -> None:
+    length = features["far_end"]["length_ref"]
+    part_off = length + parameters["regrip_allowance_in"] * IN
+    kerf_end = part_off + parameters["part_kerf_in"] * IN
+    assert parameters["head_turn_end_z_mm"] < -kerf_end
+
+
+def test_the_journal_is_left_a_polish_over_its_band(
+    parameters: dict, features: dict
+) -> None:
+    low, high = (d / IN for d in features["outer"]["dia"])
+    assert parameters["polish_dia_min_in"] > high
+    assert parameters["polish_dia_max_in"] - low <= 0.0006 + 1e-9
+    for end in ("min", "max"):
+        assert parameters[f"polish_dia_{end}_mm"] == pytest.approx(
+            parameters[f"polish_dia_{end}_in"] * IN
+        )
+
+
+def test_each_regrip_stands_within_the_shops_stickout(
+    parameters: dict, features: dict, shop: dict
+) -> None:
+    ratio = shop["limits"]["stickout_ld_max"]
+    head_dia = features["step_head"]["dia"][1] / IN
+    radius = parameters["dome_datum_form_radius_in"]
+    land = features["step_land"]
+    land_length = [s / IN for s in land["length"]]
+    # Head out: the jaw fronts on the press land, past the faced head.
+    out = parameters["regrip_stickout_datum_in"]
+    assert parameters["head_face_max_in"] < out
+    assert out < parameters["head_face_min_in"] + land_length[0]
+    assert out <= ratio * land["dia_ref"] / IN
+    assert _cap(radius, head_dia) < parameters["head_face_max_in"]
+    # Tip out: the jaw fronts on the journal past the groove.
+    groove = features["groove"]
+    tip = features["far_end"]["station"][1] - groove["station"][0]
+    out = parameters["regrip_stickout_far_in"]
+    assert out * IN > tip + groove["width"][1]
+    assert out <= ratio * groove["dia"][0] / IN

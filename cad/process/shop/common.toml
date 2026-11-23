@@ -160,6 +160,15 @@ resolution_mm = 0.0254
 range_mm = [0.0, 584.2]
 resolution_mm = 0.005
 
+# PM-1127VF-LB carriage (Z) DRO read as a length gauge (the dt_pinion_arbor
+# plan's crown and rim stations, the tool touched on the work). Range: the
+# carriage reads no farther than machines.pm-1127vf-lb between_centres_mm
+# (the DRO's scale length is not recorded); resolution: the owner's 5 um
+# (cad/config/shop-equipment/dro.toml dro.pm-1127vf-lb, 2026-11-21).
+[gauges.lathe-z-dro]
+range_mm = [0.0, 699.77]
+resolution_mm = 0.005
+
 # The owned Mitutoyo 81-piece inch gauge block set (cad/config/shop-equipment/
 # gauges.gauge-blocks-mitutoyo), read as go/no-go blocks across a slot. Range:
 # the 81-piece inch set's smallest and largest blocks, .050 and 4.000 in

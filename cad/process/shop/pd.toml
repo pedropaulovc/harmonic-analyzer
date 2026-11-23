@@ -125,6 +125,47 @@ feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle 
 [tools.plug-gauges-1260-1265]
 description = "Plug gauge pair, .1260 GO (plus) and .1265 NO-GO (minus), Vermont Gage Class X"
 
+# --- MHA-PD-23 transgear pin (cad/process/pd_transgear_pin) -----------------
+# Turned from the 1/4 in 1018 bar. Speeds: lathe.toml header (LittleMachineShop
+# "Cutting Speeds", read live 2026-11-21), low end of each 1018 range:
+# turning HSS 125, carbide 800 ft/min; the form and grooving tools take the
+# parting rule there (300 rpm, fed by hand, cutting oil). The Ø.1248-.1250
+# journal, about 2.1 in between the chuck and the tailstock centre, is roughed
+# with the AR at .002 in/rev and finished with the sharp-nose tool at .001
+# in/rev, in the passes turning_deflection's 0.10 and 0.005 mm screens allow
+# (the plan's rough_radial_doc_mm and finish_radial_doc_mm); every speed
+# clamps to the lathe's 2000 rpm top speed at these diameters.
+[settings.lathe-ar-light-1018]
+tool = "lathe-ar"
+material = "lathe-1018-cold-finished"
+sfm = 800
+feed_mm_rev = 0.0508
+[settings.lathe-sharp-nose-1018]
+tool = "lathe-tool-sharp-nose"
+material = "lathe-1018-cold-finished"
+sfm = 125
+feed_mm_rev = 0.0254
+[settings.lathe-groove-1018]
+tool = "grooving-tool-020"
+material = "lathe-1018-cold-finished"
+rpm = 300
+feed = "by hand, light and steady, cutting oil"
+[settings.lathe-form-r070-1018]
+tool = "form-tool-r070"
+material = "lathe-1018-cold-finished"
+rpm = 300
+feed = "by hand along Z, light and steady, cutting oil"
+# The MHA-PD-18 ream read to .0001 in for the land's matched press (inventory
+# cad/config/shop-equipment/ gauges.plug-gauges-1261-1264, to buy): with the
+# .1260/.1265 pair the six pins step .1260-.1265 by .0001 in. The set's own
+# pins span .1261-.1264 in = 3.20294-3.21056 mm in .0001 in = 0.00254 mm
+# steps.
+[gauges.plug-gauges-1261-1264]
+range_mm = [3.20294, 3.21056]
+resolution_mm = 0.00254
+[tools.plug-gauges-1261-1264]
+description = "Plug gauges .1261, .1262, .1263, .1264, Vermont Gage Class X"
+
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
 # prechips can check each plan's stock_refs. Description only: the ownership

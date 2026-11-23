@@ -101,6 +101,10 @@ note = "The installed PM-30MV DRO's X scale (dro.pm-30mv: installed DRO confirme
 status = "on_hand"
 note = "The installed PM-30MV DRO's Y scale (dro.pm-30mv: installed DRO confirmed by the owner 2026-10-27)."
 
+[gauges.lathe-z-dro]
+status = "on_hand"
+note = "The PM-1127VF-LB's DRO, carriage (Z) axis (dro.pm-1127vf-lb: 5 um, owner 2026-11-21; its axes are not recorded, a Z axis is assumed: check on first use)."
+
 [gauges.clamp-bore-drill-shanks]
 status = "on_hand"
 note = "The F and G drill shanks of the owned 115-piece index (tools.jig-drill-f, owner 2026-11-19; G per cad/process/shop/ tools.clamp-drill-g, owner 2026-11-17)."
@@ -344,6 +348,21 @@ status = "to_order"
 purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .1260 in GO (plus tolerance) and .1265 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
 note = "Not owned: to buy. MHA-PN-05 Ø.1260-.1265 REAM THRU pivot bore (after the ream, and again after the bench clean-up): GO enters, NO-GO does not."
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages"]
+
+# MHA-PD-23's press land is turned to the measured MHA-PD-18 ream (drawing
+# note 1: TURNED TO THE MEASURED REAM, INTERFERENCE .0002-.0005): four Class X
+# steps between the .1260/.1265 pair above read the ream to .0001 in, so the
+# land is turned to R + .0003 to R + .0005 for the largest pin R that enters
+# (the ream lies in R to R + .0001), where the pair alone leaves no window.
+# Range and tolerance: cad/process/shop/ gauges.plug-gauges-1261-1264.
+[gauges.plug-gauges-1261-1264]
+name = "Plug gauges .1261, .1262, .1263, .1264, Class X"
+kind = "plug_gauge_set"
+make = "Vermont Gage"
+status = "to_order"
+purchase = "Four Vermont Gage standard Class X steel pin/plug gages, .1261, .1262, .1263 and .1264 in, each +/- .000040 in, used with the .1260/.1265 pair (gauges.plug-gauges-1260-1265); no part number, price or stock read."
+note = "Not owned: to buy. MHA-PD-23 Setup 1 Op 10: the largest of the six pins .1260-.1265 that enters the MHA-PD-18 Ø.1260-.1265 ream is its reading R; the pin's press land is turned from it."
+cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages"]
 
 # --- Reamed bores of lathe parts (MHA-MG-10, MHA-DT-38, MHA-DT-39) -----------
 # Fixed-limit pairs as gauges.plug-gauges-2510-2515: each band is .0005 in,

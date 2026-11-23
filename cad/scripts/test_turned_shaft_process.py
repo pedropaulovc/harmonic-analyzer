@@ -116,6 +116,16 @@ def test_each_form_tool_cuts_the_drawn_dome(stem: str) -> None:
     if not domes:
         assert not forms
         return
+    parameters = _plan(stem)["parameters"]
+    ends = {
+        end: features[end]
+        for end in ("datum_end", "far_end")
+        if features[end]["kind"] == "dome"
+        and features[end].get("made_at") != "assembly"
+    }
+    if any(f"dome_{end[:-4]}_form_radius_in" in parameters for end in ends):
+        _each_end_takes_its_own_form_tool(features, parameters, ends, forms)
+        return
     assert len(forms) == 1, forms
     (radius,) = forms
     root = features.get("step", features["outer"])
@@ -167,6 +177,44 @@ def test_each_form_tool_cuts_the_drawn_dome(stem: str) -> None:
             assert math.isclose(
                 parameters[f"{key}_{side}_in"] * IN, value, abs_tol=0.003
             )
+
+
+def _each_end_takes_its_own_form_tool(
+    features: dict, parameters: dict, ends: dict, forms: set
+) -> None:
+    """Per-end form tools (``dome_<end>_form_radius_in``): each dome's tool is
+    in the plan, its radius in the drawn band, and its cap on the diameter the
+    dome ends (the plan's per-end Ø band when it gives one) in a drawn height
+    band, if one is drawn."""
+    diameters = [
+        item
+        for item in features.values()
+        if item.get("kind") == "diameter" and "span" in item
+    ]
+    used = set()
+    for end, dome in ends.items():
+        key = f"dome_{end[:-4]}_form"
+        radius = parameters[f"{key}_radius_in"] * IN
+        assert any(math.isclose(radius, form, abs_tol=1e-6) for form in forms), end
+        used |= {form for form in forms if math.isclose(radius, form, abs_tol=1e-6)}
+        if "radius" in dome:
+            assert dome["radius"][0] - 1e-6 <= radius <= dome["radius"][1] + 1e-6
+        else:
+            assert math.isclose(radius, dome["radius_ref"], abs_tol=0.005 * IN)
+        plane = dome["plane"]["value"]
+        root = min(
+            diameters, key=lambda item: min(abs(s - plane) for s in item["span"])
+        )
+        if f"{key}_dia_min_in" in parameters:
+            band = [parameters[f"{key}_dia_{side}_in"] * IN for side in ("min", "max")]
+            assert band == pytest.approx(root["dia"], abs=1e-6)
+        else:
+            band = [root.get("dia_nominal", root.get("dia_ref"))] * 2
+        if "height" in dome:
+            for dia in band:
+                height = radius - math.sqrt(radius**2 - (dia / 2) ** 2)
+                assert dome["height"][0] <= height <= dome["height"][1]
+    assert used == forms
 
 
 @pytest.mark.parametrize("stem", STEMS)
