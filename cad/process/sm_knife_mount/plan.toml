@@ -722,7 +722,7 @@ instruction = "After the re-ream: blow B out and gauge it again. GO enters and N
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Datum B's stations, the GO standing in B: calipers outside from S over the GO, less half the GO pin's written reading; then from F the same way. B's squareness to A (the drawing's ⊥) is held by this setup, not measured: A is faced and B reamed in the one clamping."
+instruction = "Datum B's stations, the GO standing in B: calipers outside from S over the GO, less half the GO pin's written reading; then from F the same way. Write each blank's B-from-S reading on this sheet beside its number: Setup 8 places the bore .300 from it. B's squareness to A (the drawing's ⊥) is held by this setup, not measured: A is faced and B reamed in the one clamping."
 inspection = "B from S {{cad.dowel_hole_side_min_in:.3dot}}–{{cad.dowel_hole_side_max_in:.3dot}}, from F {{cad.dowel_hole_row_min_in:.3dot}}–{{cad.dowel_hole_row_max_in:.3dot}}. Outside either: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.dowel_hole_side_band_mm}}" },
@@ -796,7 +796,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in; 1/8 in thick: the bore falls between them). The block lying on them, K DOWN, gripped across its two finished ends: S against the FIXED jaw, A at the LEFT. Centred on the jaws; tap it down onto both stacks while closing the vise. The lower {{process.lying_grip_mm:in.3dot}} of it is in the jaws. The coupon T first, the same way: K down, gripped across its two sawn ends, its A edge at the LEFT."
-datum = "Program KM08_bore. G54: X0 the top seat A (the left), Y0 the fixed jaw's face (S), Z0 the stacks' top (K); +Y toward the fixed jaw. The bore at X {{cad.knife_bore_basic_from_a:.3f}} (.824 BASIC from A), Y −{{process.bore_y_mm:.3f}} mm (from S: datum B's .200 station plus its .300 BASIC; B was placed from S by the same edge finder); the front face at Z {{cad.back_face_depth_mm:.3f}}. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
+datum = "Program KM08_bore. G54: X0 the top seat A (the left), Y0 the fixed jaw's face (S) shifted by B's measured station less .200, Z0 the stacks' top (K); +Y toward the fixed jaw. The bore at X {{cad.knife_bore_basic_from_a:.3f}} (.824 BASIC from A), Y −{{process.bore_y_mm:.3f}} mm (datum B's .200 station plus its .300 BASIC, so with the shift .300 from B as measured); the front face at Z {{cad.back_face_depth_mm:.3f}}. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
 diagram = { file = "diagrams/bore.svg", alt = "The block lying K down on two 1.5 in stacks, gripped on its two ends, S at the fixed jaw, A at the left; the centre drill, the #25 pilot, the 31/64 drill and the .4990 reamer make the knife bore through between the stacks." }
 envelope = { x_span_mm = ["{{cad.bottom_face_height_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.minus_x_side_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.back_face_depth_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bore_drill_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_31_64_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.minus_x_side_width_mm}}", along_jaws_mm = "{{cad.bottom_face_height_mm}}", part_height_mm = "{{cad.back_face_depth_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_bore_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
@@ -818,8 +818,8 @@ gauge_checks = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the top seat A (left), Y0 the fixed jaw's face (S): edge finder (900 rpm). On the coupon: X0 on its A bar edge."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; its tip .10 below the block's top, on A from the left, G10 L20 P1 X-2.540. A places the bore .824 from it and S its .300 from B: edge-find both carefully."
+instruction = "Home the mill first ($H). G54 X0 the top seat A (left), Y0 the fixed jaw's face (S) shifted by the blank's written B-from-S reading less .200, so the bore lands .300 from B: edge finder (900 rpm). On the coupon: X0 on its A bar edge, Y0 on S unshifted."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y to −2.540 plus (the blank's written B-from-S reading less .200) × 25.4 mm (B at .205: Y-2.413; at .195: Y-2.667; the coupon: Y-2.540); its tip .10 below the block's top, on A from the left, G10 L20 P1 X-2.540. A places the bore .824 from it and B its .300: edge-find both carefully."
 feed = "hand"
 
 [[setups.operations]]
