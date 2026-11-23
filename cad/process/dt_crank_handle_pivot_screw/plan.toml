@@ -76,10 +76,10 @@ turn_start_z_mm = 0.0
 # Rough passes .004 in deep on the radius: the slender 1018 between the
 # centres bends under more (prechips turning_deflection).
 rough_radial_doc_mm = 0.1
-# Finish passes .0006 in deep at .001 in/rev: the shoulder's Ø.155 between
-# the centres springs .0002 under them (prechips turning_deflection's finish
-# limit, .005 mm).
-finish_radial_doc_mm = 0.015
+# Finish passes .0005 in deep at .001 in/rev: the shoulder's Ø.155 between
+# the centres, at the longest stickout (the stack's top), springs under
+# .0002 (prechips turning_deflection's finish limit, .005 mm).
+finish_radial_doc_mm = 0.012
 finish_feed_mm_rev = 0.0254
 turn_feed_mm_rev = 0.0508
 # The head's diameter turned over the whole stickout, to the part-off and
