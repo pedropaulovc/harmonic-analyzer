@@ -367,7 +367,7 @@ speed_kind = "other"
 tool = "tape"
 drilling = "none"
 sizing = "other"
-instruction = "Tape the plate: four strips of the blue tape (1.41 in wide) along the jaws, each from the plate's left end (trimmed flush) to 4 in (1/4 in past the blanks' 3.60), the first against the fixed jaw, edges butted, never overlapped, no gap over 1/32; trim the fourth at the moving jaw. Seams 1.41, 2.82 and 4.23 in from the fixed jaw. The plate right of the tape stays bare."
+instruction = "Tape the plate: four strips of the blue tape (1.41 in wide) along the jaws, each from the plate's left end (trimmed flush) to 4 in (.40 past the blanks' 3.60), the first against the fixed jaw, edges butted, never overlapped, no gap over 1/32; trim the fourth at the moving jaw. Seams 1.41, 2.82 and 4.23 in from the fixed jaw. The plate right of the tape stays bare."
 feed = "hand"
 
 [[setups.operations]]
