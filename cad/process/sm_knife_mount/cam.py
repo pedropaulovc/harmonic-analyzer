@@ -729,13 +729,18 @@ def context(
     if not math.isclose(-bore_xy[1] - b_xy[0], bore["basic_from_b"], abs_tol=1e-3):
         raise ValueError("the bore is not its BASIC from B")
     # The bore's two readings: the square inside its zone, ±(zone Ø)/(2√2)
-    # from each BASIC, so a pass on both axes is inside the circle.
-    for key, basic, zone in (
-        ("bore_from_a", bore["basic_from_a"], bore["position_dia"]),
-        ("bore_from_b", bore["basic_from_b"], bore["position_dia"]),
+    # from each BASIC, less the play of the GO pins the readings are taken
+    # on (each pin rests on its hole's low side: half the hole's band), so a
+    # pass on both axes is inside the circle.
+    bore_play = (bore["dia"][1] - bore["dia"][0]) / 2
+    b_play = (dowel["dia"][1] - dowel["dia"][0]) / 2
+    square = bore["position_dia"] / (2 * math.sqrt(2))
+    for key, basic, half in (
+        ("bore_from_a", bore["basic_from_a"], square - bore_play),
+        ("bore_from_b", bore["basic_from_b"], square - bore_play - b_play),
     ):
-        _agree(plan, f"{key}_min_mm", basic - zone / (2 * math.sqrt(2)))
-        _agree(plan, f"{key}_max_mm", basic + zone / (2 * math.sqrt(2)))
+        _agree(plan, f"{key}_min_mm", basic - half)
+        _agree(plan, f"{key}_max_mm", basic + half)
     # The tap's spacing to B, a gross check only: wider than half the zone
     # plus the pins' clearance (B's largest Ø less the GO; the #25 hole's
     # drill-point wander allowed as much again).

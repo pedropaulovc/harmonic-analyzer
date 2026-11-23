@@ -112,8 +112,9 @@ feed_unit = "in/min"
 # the bracketed lower speeds are used. Feeds: the handbook's twist-drill feeds
 # (PDF1381/p1060): under 1/8 in .001-.003 in/rev, 1/8-1/4 in .002-.006,
 # 1/4-1/2 in .004-.010, "the lower values ... for hard materials"; each tool
-# takes the low end of its size's range, or half of it (the centre drill and
-# the #31, whose 35 ft/min already runs fast for their size). The reamers take
+# takes the low end of its size's range, or half of it (the centre drill, its
+# 3/16 body in the 1/8-1/4 range; the #31 takes its under-1/8 range's low
+# end). The reamers take
 # the drilling feed of their own size range (author's choice; the handbook
 # gives no reaming feed in that table). Per-tooth figures are per lip of a
 # two-lip drill: rpm × 2 × chip load is the feed per minute.
@@ -141,8 +142,8 @@ rpm = 900
 chip_load_mm_per_tooth = 0.0254  # .001 in/lip; 900 × 2 × .001 = 1.8 in/min
 flutes = 2
 feed_unit = "in/min"
-# 11.8 mm (.4646): 35 × 3.82 / .4646 = 288, set 300 (39 ft/min, inside
-# 35-45); .004 in/rev.
+# 11.8 mm (.4646): 35 × 3.82 / .4646 = 288, set 300 (300 × .4646 / 3.82 =
+# 36.5 ft/min, inside 35-45); .004 in/rev.
 [settings.drill-11-8mm-4140-ht]
 tool = "drill-11-8mm"
 material = "4140-ht-28-32-hrc"

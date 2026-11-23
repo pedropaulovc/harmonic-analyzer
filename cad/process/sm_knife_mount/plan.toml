@@ -17,7 +17,12 @@
 # drills 11.8 mm and reams the 12 mm knife bore through: X from A and Y from
 # S, the faces B and the tap were placed from, so the bore keeps its .811
 # BASIC to A, its .300 to B and its parallelism to A (A was faced square to
-# K). The trial coupon is faced with the blanks (KM01, KM02) and takes KM08
+# K). That needs S square to A: the saw leaves the ends out of square, so
+# KM04 stands U square to the table with the square before it faces S (and
+# KM05 faces N parallel to S), and A is faced parallel to U in KM06.
+# The drawing locates the bore from A and B; B is placed from S, so S only
+# carries B's station to KM08 (the blank's measured b corrects it).
+# The trial coupon is faced with the blanks (KM01, KM02) and takes KM08
 # first (the reamer record's "trial-cut a scrap of the same bar").
 # Cutting data on the hard bar: shop settings *-4140-ht (shop/sm.toml, cited
 # there). prechips' force model reads milling_material steel_o1 as a proxy:
@@ -119,14 +124,17 @@ tap_x_mm = 12.7
 # side station plus its .300 BASIC). cam.py checks them.
 bore_y_mm = 12.7
 # Position checks: the bore's Ø.008 position zone to A|B as the square inside
-# it, ±.0028 from each BASIC, so a pass on both readings is inside the zone;
-# the tap's B-to-tap spacing ±.010 over the pins, a gross check only (the
-# program holds its Ø.005 position; the band clears the pins' play in their
-# holes). cam.py checks them.
-bore_from_a_min_mm = 20.5276
-bore_from_a_max_mm = 20.6712
-bore_from_b_min_mm = 7.5482
-bore_from_b_max_mm = 7.6918
+# it (±.0028 from each BASIC), less the pins' play in their holes, since the
+# readings are taken on GO pins resting on the low side: from A less the
+# bore's (.4735 − .4720)/2, ±.0021; from B less that and B's (.1287 −
+# .1273)/2, ±.0014. A pass on both is inside the zone. The tap's B-to-tap
+# spacing ±.010 over the pins, a gross check only (the program holds its
+# Ø.005 position; the band clears the pins' play in their holes). cam.py
+# checks them.
+bore_from_a_min_mm = 20.5466
+bore_from_a_max_mm = 20.6522
+bore_from_b_min_mm = 7.585
+bore_from_b_max_mm = 7.655
 tap_from_b_min_mm = 7.366
 tap_from_b_max_mm = 7.874
 # KM07's tap reference station on A, from S: midway on the solid land between
@@ -170,16 +178,12 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # 1/2 in end mill, 3 in overall: set at least 1 in out of the collet.
 half_mill_projection_min_mm = 25.4
 # Overall lengths, bounded long: #2 combined drill and countersink 1-7/8 in;
-# ASME B94.11M jobbers #31 2-3/4 in, #25 3-1/8 in (the 5/32 size's); DIN 338
-# 11.8 mm 151 mm; a .1280 chucking reamer 4-1/2 in. The 12 mm reamer (Shars
-# 416-0477: 8 in overall, 2 in flutes, .4355 shank) in the 7/16 R8 collet
+# DIN 338 11.8 mm 151 mm. The 12 mm reamer (Shars 416-0477: 8 in overall,
+# 2 in flutes, .4355 shank) in the 7/16 R8 collet
 # (holders.r8-collets-south-bend-sb1280), set 4-1/4 in out: in the drill chuck
 # its 8 in would pass the mill's 17 in opening over KM08's work.
 centre_drill_oal_mm = 47.625
-drill_31_oal_mm = 69.85
-drill_25_oal_mm = 79.375
 drill_118_oal_mm = 151.0
-reamer_1280_oal_mm = 114.3
 reamer_12_projection_mm = 107.95
 reamer_12_shank_min_mm = 11.049
 reamer_12_shank_max_mm = 11.0744
@@ -248,6 +252,10 @@ ref = "saw-evolution-14"
 id = "files"
 name = "Files"
 ref = "jig-files"
+[[tools]]
+id = "square"
+name = "12 in combination square"
+ref = "combination-square-starrett-c11h-12"
 [[tools]]
 id = "feelers"
 name = "Feeler gauges"
@@ -458,12 +466,22 @@ title = "S end"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "A 1 in parallel against each jaw. The blank upright on them, S UP (N down), gripped across F (against the FIXED jaw) and K, U at the LEFT. Centred on the jaws; tap it down onto both parallels while closing the vise. The lower {{process.edge_grip_mm:in.2dot}} of it is in the jaws."
+holding = "A 1 in parallel against each jaw. The blank upright on them, S UP (N down), gripped across F (against the FIXED jaw) and K, U at the LEFT. Centred on the jaws; tap it down onto both parallels while closing the vise snug, square U (the first op), then tighten. The lower {{process.edge_grip_mm:in.2dot}} of it is in the jaws."
 datum = "Program KM04_s_end. G54: X0 the underside U (the left), Y0 the fixed jaw's face (F), Z0 the faced S end: its high point less {{process.end_skim_mm:in.3dot}}; +Y toward the fixed jaw. S is datum B's end: B, the tap and the bore are all placed from it."
 diagram = { file = "diagrams/s-end.svg", alt = "The blank upright on two 1 in parallels, S up, F against the fixed jaw, U at the left; the 1/2 in end mill skims the S end." }
 envelope = { x_span_mm = ["{{process.top_top_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.back_face_depth_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.blank_length_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.end_top_max_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.back_face_depth_mm}}", along_jaws_mm = "{{process.top_top_max_mm}}", part_height_mm = "{{process.blank_length_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_upright_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.edge_grip_mm}}"], section_mm = { x = "{{process.top_top_max_mm}}", y = "{{cad.back_face_depth_mm}}" }, vise_left = "other" }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "square"
+drilling = "none"
+sizing = "other"
+instruction = "Square U before the cut, the vise snug: the square's head on the fixed jaw's top, its blade down along U. Tap the blank's top sideways until no light shows between the blade and U over its height; tighten the vise and look again. The saw's ends are not square: an end left leaning moves the bore off B."
+inspection = "No light between the square's blade and U, vise tight."
+gauge_checks = "other"
+feed = "hand"
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 the underside U (left), Y0 the fixed jaw's face (F): edge finder (900 rpm)."
@@ -855,7 +873,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Bore from B: the block stood on S on the surface plate, the .4720 GO through the bore and the .1273 GO in B, both standing out sideways. Height gauge on top of each GO less half its Ø: the bore's reading less B's is the bore from B."
-inspection = "Bore from B {{process.bore_from_b_min_mm:in.4dot}}–{{process.bore_from_b_max_mm:in.4dot}}. With the bore from A in its band: the square inside the drawing's Ø.008 position zone to A|B, so both in is a good bore. Outside: stop and tell the owner."
+inspection = "Bore from B {{process.bore_from_b_min_mm:in.4dot}}–{{process.bore_from_b_max_mm:in.4dot}}. With the bore from A in its band (both bands are the square inside the drawing's Ø.008 position zone to A|B, less the pins' play in their holes): both in is a good bore. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = ["{{process.bore_from_b_min_mm}}", "{{process.bore_from_b_max_mm}}"] },
 ]
