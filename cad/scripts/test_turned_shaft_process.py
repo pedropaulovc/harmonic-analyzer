@@ -97,10 +97,15 @@ def test_plan_binds_the_part_from_its_feature_export(stem: str) -> None:
 
 
 @pytest.mark.parametrize("stem", STEMS)
-def test_each_form_tool_cuts_the_drawn_dome(stem: str) -> None:
-    """The form's radius is in the drawn radius band (or is the REF radius as
-    printed, to .XX), and fed to the centre on the diameter it ends cuts a dome whose
-    height lies in the drawn height band, if one is drawn."""
+def test_each_dome_is_cut_to_the_drawn_radius(stem: str) -> None:
+    """Each dome this traveler cuts is cut to a radius in the drawn radius band
+    (or the REF radius as printed, to .XX): the plan's ``dome_form_radius_in``
+    (a form tool's, or the radius the ball turner sweeps, owner ruling
+    2026-11-23 tool audit Q5), else, stepped from the adapter's table and
+    filed (``dome_steps``), the drawing's own. Fed to the centre on the
+    diameter it ends, that radius cuts a dome whose height lies in the drawn
+    height band, if one is drawn; a form tool the plan still names is of that
+    radius."""
     features = _features(stem)
     forms = {
         _form_radius_mm(tool["ref"])
@@ -126,8 +131,14 @@ def test_each_form_tool_cuts_the_drawn_dome(stem: str) -> None:
     if any(f"dome_{end[:-4]}_form_radius_in" in parameters for end in ends):
         _each_end_takes_its_own_form_tool(features, parameters, ends, forms)
         return
-    assert len(forms) == 1, forms
-    (radius,) = forms
+    if "dome_form_radius_in" in parameters:
+        # The adapter derives the dome heights and the faced length from it.
+        radius = parameters["dome_form_radius_in"] * IN
+        assert all(math.isclose(form, radius, abs_tol=1e-6) for form in forms)
+    else:
+        # Stepped and filed: the table is on the drawing's own radius.
+        assert "dome_steps" in parameters and not forms
+        radius = None
     root = features.get("step", features["outer"])
     root_dia = (
         root["dia_nominal"]
@@ -135,26 +146,27 @@ def test_each_form_tool_cuts_the_drawn_dome(stem: str) -> None:
         else (sum(root["dia"]) / 2 if "dia" in root else root["dia_ref"])
     )
     for dome in domes:
+        cut = radius or dome.get("radius_nominal", dome.get("radius_ref"))
         if "radius" in dome:
-            assert dome["radius"][0] - 1e-6 <= radius <= dome["radius"][1] + 1e-6
+            assert dome["radius"][0] - 1e-6 <= cut <= dome["radius"][1] + 1e-6
         else:
-            assert math.isclose(radius, dome["radius_ref"], abs_tol=0.005 * IN)
-        height = radius - math.sqrt(radius**2 - (root_dia / 2) ** 2)
+            assert math.isclose(cut, dome["radius_ref"], abs_tol=0.005 * IN)
+        height = cut - math.sqrt(cut**2 - min(root_dia / 2, cut) ** 2)
         if "height" in dome:
             assert dome["height"][0] <= height <= dome["height"][1]
-    parameters = _plan(stem)["parameters"]
-    # The adapter derives the dome heights and the faced length from the
-    # form's radius: it must be the form tool's.
-    assert math.isclose(parameters["dome_form_radius_in"] * IN, radius, abs_tol=1e-6)
-    if "dome_form_dia_min_in" in parameters:
+    if radius is not None and "dome_form_dia_min_in" in parameters:
         # Formed on each blank's own Ø: the band is the domed diameter's.
         assert [
             parameters[f"dome_form_dia_{side}_in"] * IN for side in ("min", "max")
         ] == pytest.approx(root["dia"], abs=1e-6)
     # Apex readings: a drawn band read from a dome's apex instead of its
-    # root (an edge) is that band plus the form's height. The thread's is
-    # widened over the blank's diameter band (the op prints the per-blank
-    # height); the flat's is on the bar's nominal Ø.
+    # root (an edge) is that band plus the dome's height. Cut to one radius,
+    # the thread's is widened over the blank's diameter band (the op prints
+    # the per-blank height); the flat's is on the bar's nominal Ø. Filed and
+    # screened between two radius-gauge leaves (``leaf_radius_min_in`` /
+    # ``_max_in``), the window holds the band for every leaf radius and every
+    # diameter: the band's low end plus the tallest cap, its high end plus
+    # the shallowest.
     for key, band, root_band in (
         (
             "thread_apex",
@@ -169,10 +181,20 @@ def test_each_form_tool_cuts_the_drawn_dome(stem: str) -> None:
     ):
         if f"{key}_min_in" not in parameters:
             continue
-        low, high = (
-            radius - math.sqrt(radius**2 - (dia / 2) ** 2) for dia in root_band
-        )
-        for side, value in (("min", band[0] + low), ("max", band[1] + high)):
+        if "leaf_radius_min_in" in parameters:
+            leaves = [parameters[f"leaf_radius_{s}_in"] * IN for s in ("min", "max")]
+            caps = [
+                r - math.sqrt(r**2 - (dia / 2) ** 2)
+                for r in leaves
+                for dia in root_band
+            ]
+            window = (band[0] + max(caps), band[1] + min(caps))
+        else:
+            low, high = (
+                radius - math.sqrt(radius**2 - (dia / 2) ** 2) for dia in root_band
+            )
+            window = (band[0] + low, band[1] + high)
+        for side, value in zip(("min", "max"), window, strict=True):
             assert math.isclose(parameters[f"{key}_{side}_mm"], value, abs_tol=0.003)
             assert math.isclose(
                 parameters[f"{key}_{side}_in"] * IN, value, abs_tol=0.003
@@ -195,7 +217,8 @@ def _each_end_takes_its_own_form_tool(
     for end, dome in ends.items():
         key = f"dome_{end[:-4]}_form"
         radius = parameters[f"{key}_radius_in"] * IN
-        assert any(math.isclose(radius, form, abs_tol=1e-6) for form in forms), end
+        if forms:
+            assert any(math.isclose(radius, form, abs_tol=1e-6) for form in forms), end
         used |= {form for form in forms if math.isclose(radius, form, abs_tol=1e-6)}
         if "radius" in dome:
             assert dome["radius"][0] - 1e-6 <= radius <= dome["radius"][1] + 1e-6

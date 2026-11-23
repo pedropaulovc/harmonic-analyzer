@@ -7,14 +7,29 @@
 # diameters out of the 3-jaw (the shop's unsupported stickout limit: a .82
 # pin parted off the rod would stand over 5 diameters out), then turned
 # round: end B faced to the faced length (the root station plus the crown's
-# height, the apex staying on the faced plane) and crowned with the R.125
-# form tool, inside the drawing's R.11-.13 band. Bench: break end A's edge,
-# look for jaw marks (the O.D. is accepted at Op 10 and never cut), oil.
+# height, the apex staying on the faced plane) and crowned with the
+# LittleMachineShop 2569 ball turner swept to R.125, inside the drawing's
+# R.11-.13 band. Bench: break end A's edge, look for jaw marks (the O.D. is
+# accepted at Op 10 and never cut), oil.
+#
+# The crown: owner ruling 2026-11-23 (tool audit Q5, option D): "buy the
+# LittleMachineShop 'Ball and Radius Turning Tool, Small' (SKU 2569,
+# $124.95; convex 0-.75 in dia, 3/8 shank) for all 14 domes; step-and-file
+# is the fallback for any dome it cannot reach. Confirm each dome is convex
+# and reachable before buying." Reach test: the crown is convex, ball Ø.25
+# (2 x R.125) under the tool's .75; end B is free (no centre); the .40
+# stickout holds the crown's centre .40 - .13 = .27 out of the jaws (the
+# frame's arms need .25: R.13 + .25 = .38 at the band's top) and stays under
+# 3 x Ø.156 = .47; nothing over Ø.75 near it. Reachable. The radius is set
+# once on a trial offcut and checked with the radius gauges' 1/8 leaf, the
+# one leaf inside R.11-.13. A crown .03 high or less is swept from the square
+# corner (no roughing chamfer).
 #
 # Flagged: the 5/32 O1 drill rod (stock-to-order.toml o1-drill-rod-5-32,
-# McMaster 8893K162) and the R.125 form tool
-# (tools-special-cutters.toml form-tool-r125) are to order. The O1 lathe
-# settings in shop/dt.toml are LittleMachineShop's low-end O1 row.
+# McMaster 8893K162), the ball turner (shop/lathe.toml
+# tools.ball-radius-turner-lms-2569) and the radius gauges
+# (gauges.radius-gauges) are to order. The O1 lathe settings in shop/dt.toml
+# are LittleMachineShop's low-end O1 row.
 title = "Pinion Cam Pin"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -33,9 +48,18 @@ part = "dt-pinion-cam-pin"
 [parameters]
 quantity = 2
 stock_dia_in = 0.15625
-# The crown is cut by the R.125 form tool (form-tool-r125): its radius sets
-# the cap height on the 5/32 rod and so the faced length.
+# The radius the ball turner is set to (process key named for the form tool
+# it replaces; the adapter binds the crown's height, faced length and sweep
+# from it): R.125 on the 5/32 rod is .0272 high, inside the drawing's R.11-.13
+# band, and the radius gauges' 1/8 leaf checks it.
 dome_form_radius_in = 0.125
+# The bit set by depth reading from a straightedge across the inner frame's
+# edges: the radius plus the maker's 3/16 from the frame's end to the pivot
+# (LittleMachineShop 2569 instructions): .125 + .1875.
+ball_turner_rule_in = 0.3125
+# A trial offcut of the same rod, sawn with the blanks, for setting the
+# radius: the .40 stickout plus about .6 in the jaws.
+trial_offcut_in = 1.0
 # Sawn a little over the faced length: about .02 in to face off each end.
 blank_length_in = 0.86
 as_supplied_outer = 1
@@ -53,11 +77,16 @@ name = "AR turning tool"
 ref = "lathe-ar"
 
 [[tools]]
-id = "form"
-name = "R.125 form tool"
-ref = "form-tool-r125"
-description = "R.125 concave full-radius form tool: its arc cuts the pin's convex R.12 crown"
+id = "ball"
+name = "Ball turner (LittleMachineShop 2569)"
+ref = "ball-radius-turner-lms-2569"
+description = "Ball and radius turning tool, small: a bit on an inner frame swung by hand about a vertical pivot; it sweeps the convex R.12 crown"
 status = "to_order"
+
+[[tools]]
+id = "radius"
+name = "Radius gauges (to buy)"
+ref = "radius-gauges"
 
 [[tools]]
 id = "file"
@@ -88,7 +117,7 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Scribe {{process.blank_length_in:.2dot}} in from the rod end and saw on the waste side of the line; let the blank drop clear onto the saw base and pick it up only after the blade has stopped. Saw the second blank the same way. File the burrs off the sawn ends."
+instruction = "Scribe {{process.blank_length_in:.2dot}} in from the rod end and saw on the waste side of the line; let the blank drop clear onto the saw base and pick it up only after the blade has stopped. Saw the second blank, then a {{process.trial_offcut_in:.2dot}} in trial offcut, the same way. File the burrs off the sawn ends."
 feed = "hand"
 
 [[setups]]
@@ -114,13 +143,13 @@ cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups]]
 machine_kind = "lathe"
-title = "End B: face to length, form the crown"
+title = "Trial offcut: set the ball turner's radius"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "Turned round: 3-jaw over the shim wrap, end B {{process.end_stickout_in:.2dot}} in out, end A toward the chuck."
-datum = "End B's length is read by micrometer across both faces (Op 60). For the crown (Op 80) the DRO Z is zeroed where the form tool's arc touches end B's corner."
-diagram = { file = "diagrams/end-b.svg", alt = "The blank turned round, end B out: faced to length, then crowned with the R.125 form tool." }
+holding = "3-jaw over the brass shim wrap on the trial offcut, {{process.end_stickout_in:.2dot}} in out of the jaw fronts."
+datum = "Z0 (carriage DRO) the offcut's end, faced in Op 50, touched with the ball turner's tip in Op 80."
+diagram = { file = "diagrams/trial.svg", alt = "The trial offcut in the 3-jaw over the shim wrap, its end faced; the ball turner's pivot on the axis one radius behind the faced end, its bit swept from the apex toward you." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -129,7 +158,68 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face end B square in light skims toward {{cad.faced_length_in:.3dot}}, reading the length between them (Op 60); stop inside {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}} ({{cad.dome_far_root_station_min_in:.2dot}}–{{cad.dome_far_root_station_max_in:.2dot}} root + {{cad.dome_far_form_height_in:.4dot}} crown, rounded inward)."
+instruction = "Face the offcut's end square, about .02 off, to the centre with no pip."
+settings = "lathe-ar-o1"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: clamp the ball turner's 3/8 shank in an AXA No. 1 holder, the inner frame swung parallel to the spindle axis. Set the bit's tip level with the tailstock dead centre's point. Take the centre out and run the tailstock back: nothing may stand within 4 in beyond the faced end."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Set the bit to R{{cad.dome_far_form_radius_in:.3dot}}: lay a 1-2-3 block's ground edge across the inner frame's edges and read the bit's tip from it with the calipers' depth rod: {{process.ball_turner_rule_in:.4dot}} (the radius plus the maker's 3/16 from the frame's end to the pivot). Tighten the bit's set screw."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Inner frame parallel to the axis: bring the carriage up until the bit's tip just touches the faced end; lock the carriage and zero the DRO Z. The pivot is now one radius behind the faced plane, so the apex stays on it. The carriage stays locked until the crown is done."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms (they reach .19 either side of the pivot)."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ball"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle on. Cross slide in until the bit just touches the corner somewhere in the sweep. Sweep the frame from parallel to the axis round toward you to {{cad.dome_far_form_sweep_deg:.0f}}°, never toward the chuck; cross slide in .003 at most, sweep again. The last sweeps take .001."
+settings = "lathe-ball-turner-o1"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Between the last sweeps, spindle stopped, look at the apex under a loupe. Stop feeding in when the flat left at the apex just vanishes: the pivot is then on the axis. Never further: past the axis the bit leaves a ring or a point."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: hold the radius gauges' {{cad.dome_far_form_radius_in:fraction}} leaf (concave) square across the crown through the axis, at two places 90° apart, against a light."
+inspection = "Crown R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}}: no light under the {{cad.dome_far_form_radius_in:fraction}} leaf; no pip, flat or ring at the apex."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Light at the leaf's ends (crown too round): move the bit out a little; light at its middle (too flat): move it in. Face the crown off (Op 50) and repeat Ops 80–120. Once it passes, leave the bit's set screw alone until both pins are crowned."
+
+[[setups]]
+machine_kind = "lathe"
+title = "End B: face to length, form the crown"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "Turned round: 3-jaw over the shim wrap, end B {{process.end_stickout_in:.2dot}} in out, end A toward the chuck."
+datum = "End B's length is read by micrometer across both faces (Op 150). For the crown the DRO Z is zeroed where the ball turner's tip touches end B's faced end (Op 170)."
+diagram = { file = "diagrams/end-b.svg", alt = "The blank turned round, end B out: faced to length, then crowned by the ball turner swept about its pivot on the axis." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face end B square in light skims toward {{cad.faced_length_in:.3dot}}, reading the length between them (Op 150); stop inside {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}} ({{cad.dome_far_root_station_min_in:.2dot}}–{{cad.dome_far_root_station_max_in:.2dot}} root + {{cad.dome_far_form_height_in:.4dot}} crown, rounded inward)."
 settings = "lathe-ar-o1"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -145,25 +235,35 @@ instruction = "Faced under {{cad.faced_length_min_in:.3dot}}: scrap the blank an
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: set the R.125 form tool (a concave R.125 arc, inside the drawing's R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}}) on centre height, the arc facing end B and spanning it. Bring the arc up along Z, adjusting the cross slide, until it touches both corners of end B at once, no light showing at either corner: the arc is then centred on the axis. Zero the DRO Z at that touch."
+instruction = "Ball turner in its holder, bit as set in Op 70 (set screw untouched), inner frame parallel to the axis: bring the carriage up until the tip just touches end B's faced end; lock the carriage and zero the DRO Z. It stays locked until the crown is done."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: cross slide out until the bit clears end B through the whole sweep. Swing the frame through it and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms."
 
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "form"
+tool = "ball"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle on: feed the carriage along Z to Z−{{cad.dome_far_form_height_in:.4dot}}, the crown's height on the Ø{{process.stock_dia_in:.4dot}}. The arc's deepest point, on the axis, then just reaches the faced plane, so the apex stays at the faced length. Never past Z−{{cad.dome_far_form_height_in:.4dot}}."
-settings = "lathe-form-r125-o1"
+instruction = "Spindle on. Cross slide in until the bit just touches end B's corner somewhere in the sweep. Sweep from parallel to the axis round toward you to {{cad.dome_far_form_sweep_deg:.0f}}°, never toward the chuck; cross slide in .003 at most, sweep again. The last sweeps take .001."
+settings = "lathe-ball-turner-o1"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Stop the spindle and look at the crown under a loupe: no pip or flat at the apex, no step where the crown meets the O.D."
+instruction = "Between the last sweeps, spindle stopped, look at the apex under a loupe. Stop feeding in when the flat left at the apex just vanishes. Never further: past the axis the bit leaves a ring or a point."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A pip (tool off centre height) or a step at the O.D. (arc off centre): correct the tool's height or the cross slide, spindle stopped. Then bring the arc up along Z until it just touches the formed crown, zero the DRO Z at that touch, and take one light pass to Z−.002 only; Op 120 then reads the length."
+instruction = "Spindle stopped: look at the crown under the loupe, then hold the {{cad.dome_far_form_radius_in:fraction}} radius leaf square across it through the axis, at two places 90° apart, against a light."
+inspection = "No pip, flat or ring at the apex; crown R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}}: no light under the {{cad.dome_far_form_radius_in:fraction}} leaf."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A flat at the apex: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 190), then Op 210 again. A ring or point at the apex, or light under the leaf: scrap the pin and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -173,11 +273,11 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.faced_length_band_mm}}
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Under {{cad.faced_length_min_in:.3dot}}: the form ran past its Z: scrap the pin and make another from Setup 1."
+instruction = "Under {{cad.faced_length_min_in:.3dot}}: the carriage moved during the sweep: scrap the pin and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Repeat Ops 50–130 on the second blank."
+instruction = "Repeat Ops 140–240 on the second blank."
 
 [[setups]]
 machine_kind = "other"
