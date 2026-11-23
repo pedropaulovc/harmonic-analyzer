@@ -527,7 +527,7 @@ tool = "hand-countersink"
 drilling = "none"
 sizing = "other"
 instruction = "Chamfer K's face-A mouth by hand: the plate face A up on the bench, the 90° hand countersink square in K, a few light turns clockwise with even pressure; blow out, stand the .450 pin in K and check. Repeat in light turns until in band."
-instruction_detailed = "The check: the .450 pin standing in K, its end on the chamfer; the calipers' depth rod from face A beside it to the pin's top, less the pin's miked length, is where its end sits."
+instruction_detailed = "Turn the 90° hand countersink in K's face-A mouth, aiming at .015 x 45°. Then the .450 pin standing in K, its end on the chamfer: the calipers' depth rod from face A beside it to the pin's top, less the pin's miked length, is where its end sits."
 feed = "hand"
 inspection = "The pin's end {{process.chamfer_pin_depth_min_mm:in.4dot}}–{{process.chamfer_pin_depth_max_mm:in.4dot}} below face A (chamfer {{cad.press_hole_chamfer_leg_min_in:.3dot}}–{{cad.press_hole_chamfer_leg_max_in:.3dot}} x 45°, rim Ø{{process.chamfer_rim_min_mm:in.4dot}}–{{process.chamfer_rim_max_mm:in.4dot}}). Higher: more turns. Lower: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.chamfer_pin_depth_min_mm}}", "{{process.chamfer_pin_depth_max_mm}}"] }]
@@ -545,14 +545,13 @@ inspection = [
   "Thickness {{cad.rear_face_thickness_min_in:.3dot}}–{{cad.rear_face_thickness_max_in:.3dot}}, micrometer, at four places round the plate (it sets the screws' reach into MHA-PD-18). Over: stop and tell the owner. Under: scrap.",
   "Form, the thickness's envelope (Rule #1, perfect form at {{cad.rear_face_thickness_max_in:.3dot}}): the plate free on the surface plate, each face down in turn; the largest thickness reading plus the thickest feeler leaf that enters under it anywhere, at most {{cad.rear_face_thickness_max_in:.3dot}}. Over: stop and tell the owner.",
   "K Ø{{cad.press_hole_dia_min_in:.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}: the .4375 GO plug enters from either face, the .4382 NO-GO enters from neither. GO refused: stop and tell the owner (do not re-ream). NO-GO enters: scrap. MHA-PD-28's traveler turns the bush to this hole.",
-  "K's chamfer {{cad.press_hole_chamfer_leg_min_in:.3dot}}–{{cad.press_hole_chamfer_leg_max_in:.3dot}} x 45° at face A (rim Ø{{process.chamfer_rim_min_mm:in.4dot}}–{{process.chamfer_rim_max_mm:in.4dot}}): the .450 pin standing in K, its end on the chamfer; the calipers' depth rod from face A beside it to the pin's top, less the pin's miked length: its end {{process.chamfer_pin_depth_min_mm:in.4dot}}–{{process.chamfer_pin_depth_max_mm:in.4dot}} below face A. Outside: stop and tell the owner.",
+  "K's chamfer: accepted in Setup 3 (the .450 pin check that guides the hand cut).",
   "Side edges {{cad.outline_edge_right_x_min_in:.3dot}}–{{cad.outline_edge_right_x_max_in:.3dot}} from K: the GO plug in K, the calipers over the plug and each side edge at the kink and at the top, {{process.side_over_plug_min_mm:in.3dot}}–{{process.side_over_plug_max_mm:in.3dot}}. End round R{{cad.outline_end_r_min_in:.3dot}}–{{cad.outline_end_r_max_in:.3dot}}: over the plug and the round's far point on the centre line, {{process.round_over_plug_min_mm:in.3dot}}–{{process.round_over_plug_max_mm:in.3dot}}. The top edge's corners ({{cad.outline_top_left_y_min_in:.2dot}}–{{cad.outline_top_left_y_max_in:.2dot}} and {{cad.outline_top_right_y_min_in:.2dot}}–{{cad.outline_top_right_y_max_in:.2dot}} from K), the tapers and the kinks are the program's from the same zero as the round, not gauged. Outside: stop and tell the owner.",
   "Screw holes Ø{{cad.screw_hole_1_dia_min_in:.3dot}}–{{cad.screw_hole_1_dia_max_in:.3dot}}: as drilled. Positions (BASIC, Ø{{cad.screw_hole_1_position_dia_in:.3dot}} zone): a #1 drill's shank in each hole; the calipers over the GO plug in K and each shank, less half the shank's miked Ø and the plug's radius, {{process.screw_1_from_k_min_mm:in.3dot}}–{{process.screw_1_from_k_max_mm:in.3dot}} (the hole farther from the C edge) and {{process.screw_2_from_k_min_mm:in.3dot}}–{{process.screw_2_from_k_max_mm:in.3dot}} (the nearer). Each hole's place round K is the program's, from Setup 2's alignment check on the C edge (process-held). Outside: stop and tell the owner.",
 ]
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.rear_face_thickness_band_mm}}" },
   { gauge = "plug-gauges-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" },
-  { gauge = "calipers", band_mm = ["{{process.chamfer_pin_depth_min_mm}}", "{{process.chamfer_pin_depth_max_mm}}"] },
   { gauge = "calipers", band_mm = ["{{process.side_over_plug_min_mm}}", "{{process.side_over_plug_max_mm}}"] },
   { gauge = "calipers", band_mm = ["{{process.round_over_plug_min_mm}}", "{{process.round_over_plug_max_mm}}"] },
   { gauge = "calipers", band_mm = ["{{process.screw_1_from_k_min_mm}}", "{{process.screw_1_from_k_max_mm}}"] },

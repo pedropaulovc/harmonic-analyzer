@@ -288,7 +288,7 @@ beam = { axis = "x", hold = "solid", extent_mm = [0, "{{process.blank_length_min
 
 [[setups.operations]]
 instruction = "Home ($H). G54 Z0 on the parallels' top, Y0 the fixed jaw's face, X0 the blank's left end; then clamp the blank."
-instruction_detailed = "Console M6 T1 (the #1 centre drill in the drill chuck; the tool setter measures it). Blank out: the T1 tip just dragging a .002 feeler leaf on a parallel's top: G10 L20 P1 Z0.051. Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y-2.540. Load the blank as in Holding and clamp; edge finder on its left end from the left: G10 L20 P1 X-2.540."
+instruction_detailed = "Console M6 T1 (the #1 centre drill in the drill chuck; the tool setter measures it). Blank out: the T1 tip just dragging a .002 feeler leaf on a parallel's top: G10 L20 P1 Z0.051. Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y-2.540. Load the blank as in Holding and clamp; edge finder on its left end from the left, at the blank's centre line (Y −.500) and its tip at mid-thickness (the station Setup 3 picks up again before AR05): G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
