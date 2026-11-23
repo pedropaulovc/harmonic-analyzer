@@ -90,7 +90,6 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
         "drill-27-64": 4,
         "reamer": 5,
         "sink": 6,
-        "chamfer": 7,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     holes = {
@@ -105,14 +104,14 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
 
 
 def test_the_frames_put_k_and_a_screw_hole_where_the_programs_cut_them(ctx) -> None:
-    for name, z in (("bond", 5.0038), ("face_a", -5.0038)):
+    for name, z in (("bond", 5.0038),):
         frame = ctx["frames"][name]
         x, y, zz = (
             sum(a * b for a, b in zip(axis, [-10.875, 30.7277, 5.0038]))
             for axis in frame["axes"]
         )
         assert round(x, 3) == -30.728 and round(zz, 4) == z
-        assert round(y, 3) == (-10.875 if name == "bond" else 10.875)
+        assert round(y, 3) == -10.875
 
 
 def test_the_spoil_block_is_the_owned_bars_section() -> None:
@@ -138,8 +137,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("sink_tip_mm", 0.2, "sink_tip_mm"),
         ("outline_level_mm", 0.6, "outline_level_mm"),
         ("rough_arc_radius_mm", 19.0, "corner clearing"),
-        ("chamfer_path_radius_mm", 4.6, "chamfer_path_radius_mm"),
-        ("jaw_top_mm", 12.0, "jaw_top_mm"),
+        ("chamfer_pin_depth_max_mm", 0.5, "chamfer_pin_depth_max_mm"),
         ("bond_area_mm2", 1800.0, "bond_area_mm2"),
         ("side_over_plug_min_mm", 24.0, "side_over_plug_min_mm"),
         ("screw_1_from_k_max_mm", 33.0, "screw_1_from_k_max_mm"),
@@ -212,20 +210,6 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: line.startswith("G0 X-30.728 Y-10.875"),
             lambda line: "G0 X-30.000 Y-10.875",
             "holes",
-        ),
-        # The chamfer's circle cut climb (G3).
-        (
-            "press_chamfer",
-            lambda line: line.startswith("G2"),
-            lambda line: "G3" + line[2:],
-            "bounds",
-        ),
-        # The chamfer mill sent to the jaw over the C edge.
-        (
-            "press_chamfer",
-            lambda line: line == "G0 X0.000 Y0.000",
-            lambda line: "G0 X0.000 Y17.000",
-            "keep_out",
         ),
         # The corner clearing dropped at its last level: the corners stand.
         (

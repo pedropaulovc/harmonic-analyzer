@@ -14,6 +14,10 @@ range_mm = [11.1125, 11.13028]
 resolution_mm = 0.001016
 [tools.plug-gauges-4375-4382]
 description = "Plug gauge pair, .4375 GO (plus) and .4382 NO-GO (minus), Vermont Gage Class X"
+# K's face-A chamfer, by hand (cad/config/shop-equipment/ tools-cutting
+# hand-countersink-90, to buy).
+[tools.hand-countersink-90]
+description = "90° hand countersink with handle, 1/2 in body or larger"
 
 # --- MHA-PD-18 transgear arm (pd_transgear_arm/plan.toml) -----------------------
 # The latch-pin hole's go/no-go pair (cad/config/shop-equipment/

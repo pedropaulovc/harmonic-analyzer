@@ -12,9 +12,10 @@ the spots and the feeds from ``plan.toml`` ``[parameters]`` and
 shop (``shop/``). Every path is written here (``rt.custom``): straight
 lines and arcs a recipe can state exactly. Typed here, because neither
 record carries them: the #1 centre drill's catalogue geometry (it sets the
-spot depth), the twist drills' 118° point, the countersink's 82° and the
-chamfer mill's 90°, the safe and clearance heights, the vise jaws' depth
-(keep-out shapes only).
+spot depth), the twist drills' 118° point, the countersink's 82°, K's
+chamfer's 90° (cut by hand at the bench, checked here only for its pin
+check), the safe and clearance heights, the vise jaws' depth (keep-out
+shapes only).
 
 Route (plan text in ``plan.toml``): the 1/4 x 1-1/2 in bar's long edges are
 the plate's side edges, as supplied. The sawn blank is bonded face A down on
@@ -23,22 +24,20 @@ at the fixed jaw. AP01 faces the rear face to the thickness, spots, drills
 #1 through K and both screw holes, opens K 27/64 and reams it .4375; AP02
 countersinks the screw holes; AP03 clears the end's corners with a half
 circle, then mills the end round, the tapers and the top edge with the
-cutter's side, through into the spoil block. Freed and turned face A up in
-the vise, AP04 chamfers K's face-A mouth on one circle.
+cutter's side, through into the spoil block. K's face-A chamfer is cut by
+hand at the bench after the plate is freed (delegated ruling 2026-11-22,
+owner review #2144): no NC.
 
-Work frames (G54), each set in its setup:
+Work frame (G54), set in Setup 2:
 - AP01-AP03 (``bond``): X0 Y0 K's axis, the plate's length along -X (the
   end round at +X), +Y toward the fixed jaw (the C edge, model +X); Z0 face
   A (model Z0), the rear face up. Work (X, Y, Z) = (-y, x, z).
-- AP04 (``face_a``): X0 Y0 K's axis, Z0 face A, now up. Work (X, Y, Z) =
-  (-y, -x, -z).
 
 Toolpath rules (owner rulings 2026-11-16): plunges beside the stock at the
 cutting feed, real G0 above the stock. The outline is conventional (G3,
 anticlockwise round the plate with M3), each pass entered and left in air on
 an edge's extension past a side edge (a convex corner: the extension lies
-outside the plate); the chamfer's circle conventional inside (G2). The
-reamer is fed in and fed out.
+outside the plate). The reamer is fed in and fed out.
 """
 
 from __future__ import annotations
@@ -59,13 +58,12 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ),
     ("AP02_sink", (("screw_sink",),)),
     ("AP03_outline", (("corner_clear", "outline"),)),
-    ("AP04_chamfer", (("press_chamfer",),)),
 )
 # Every program loads its own first tool (M6, the tool setter).
 LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these (the saw, the files and the gauges are not).
-CAM_TOOLS = ("em", "spot", "drill-1", "drill-27-64", "reamer", "sink", "chamfer")
+CAM_TOOLS = ("em", "spot", "drill-1", "drill-27-64", "reamer", "sink")
 IN = 25.4
 # #1 combined drill and countersink (shop centre-drills-carbide-60, trade
 # size 1): 1/8 body, 3/64 pilot and pilot length, 60° countersink, its pilot
@@ -79,17 +77,16 @@ CENTRE_DRILL = {
 }
 # Jobber drills' point (the shop records give the diameter only).
 DRILL_POINT_DEG = 118.0
-# The countersink's included angle (shop riser-countersink: 82°) and the
-# chamfer mill's (shop chamfer-mill-carbide-1-4-90: 90°, its cone running to
-# a point).
+# The countersink's included angle (shop riser-countersink: 82°) and K's
+# chamfer's (the sheet's 45°, the hand countersink's 90°).
 SINK_DEG = 82.0
 CHAMFER_DEG = 90.0
 # The 3/8 in end mill's shop setting in 1018 CF.
 EM_SETTING = "endmill-carbide-3fl-3-8-1018-cf"
 # Plunges and drill R planes start this far above the stock top.
 SAFE_MM = 1.0
-# Moves between cuts run this far above the stock top (AP01-AP03, nothing
-# stands over the spoil block's top) or the jaw tops (AP04).
+# Moves between cuts run this far above the stock top (nothing stands over
+# the spoil block's top).
 CLEAR_MM = 5.0
 # A face pass reaches this far past each edge of the blank.
 FACE_OVERHANG_MM = 0.5
@@ -348,7 +345,6 @@ def context(
     d1 = _shop_tool(plan, shop, "drill-1")["diameter_mm"]
     d2764 = _shop_tool(plan, shop, "drill-27-64")["diameter_mm"]
     dream = _shop_tool(plan, shop, "reamer")["diameter_mm"]
-    dchamfer = _shop_tool(plan, shop, "chamfer")["diameter_mm"]
     rc = dem / 2
     if not g["screw_band"][0] - 1e-6 <= d1 <= g["screw_band"][1]:
         raise ValueError(f"#1 Ø{d1} outside the screw holes' band {g['screw_band']}")
@@ -359,7 +355,7 @@ def context(
     if not math.isclose(g["sink_angle"], SINK_DEG):
         raise ValueError(f"the countersink is {g['sink_angle']}°, the tool {SINK_DEG}°")
     if not math.isclose(g["chamfer_angle"] * 2, CHAMFER_DEG):
-        raise ValueError("K's chamfer is not the chamfer mill's 45°")
+        raise ValueError("K's chamfer is not the hand countersink's 45°")
     for name, dia in (
         ("face rough", dem),
         ("face finish", dem),
@@ -368,7 +364,6 @@ def context(
         ("screw drill", d1),
         ("press drill", d2764),
         ("press ream", dream),
-        ("press chamfer", dchamfer),
     ):
         if not math.isclose(_cut(plan, name, "cutter_dia_mm"), dia, abs_tol=1e-6):
             raise ValueError(f"'{name}' cutter_dia_mm is not its tool's Ø{dia}")
@@ -390,7 +385,6 @@ def context(
                 f"a {edge} gated width puts the front edge outside its band"
             )
     _agree(plan, "thickness_target_mm", t)
-    _agree(plan, "plate_thickness_max_mm", g["thickness_band"][1])
     wb = p["round_waste_mm"]
     right_end = radius + wb
     length_plate = g["top_left"][1] + radius
@@ -599,8 +593,7 @@ def context(
         element("top edge's left extension", g["top_left"], top_end),
     ]
 
-    # The chamfer (face_a frame, Z0 face A up): the point below face A on
-    # K's axis, the centre on a circle so the cone meets face A at the rim.
+    # K's chamfer, cut by hand at the bench: its rim from the sheet.
     rim = g["k_dia"] / 2 + g["chamfer_leg"]
     _agree(plan, "chamfer_rim_dia_mm", 2 * rim)
     _agree_band(
@@ -619,30 +612,8 @@ def context(
             (g["k_band"][1] + 2 * g["chamfer_band"][1] - pin) / 2,
         ),
     )
-    chamfer_tip = p["chamfer_tip_mm"]
-    path_r = rim - (-chamfer_tip) * math.tan(math.radians(CHAMFER_DEG / 2))
-    _agree(plan, "chamfer_path_radius_mm", path_r)
-    if path_r <= 0 or path_r + 1e-6 >= g["k_dia"] / 2:
-        raise ValueError("the chamfer mill's point is not inside K at its depth")
-    if rim - path_r > dchamfer / 2 - 0.25:
-        raise ValueError("the chamfer reaches past the chamfer mill's cone")
-    leg_depth = g["chamfer_leg"]
-    if -chamfer_tip <= leg_depth:
-        raise ValueError("the chamfer mill's point does not reach below the chamfer")
-    chamfer_lines = [
-        f"G0 Z{_r(p['jaw_top_mm'] + CLEAR_MM):.3f}",
-        "G0 X0.000 Y0.000",
-        f"G0 Z{_r(SAFE_MM):.3f}",
-        f"G1 Z{_r(chamfer_tip):.3f} F{{feed}}",
-        f"G1 X{_r(path_r):.3f} Y0.000 F{{feed}}",
-        f"G2 X{_r(path_r):.3f} Y0.000 I{_r(-path_r):.3f} J0.000 F{{feed}}",
-        "G1 X0.000 Y0.000 F{feed}",
-        f"G1 Z{_r(SAFE_MM):.3f} F{{feed}}",
-        f"G0 Z{_r(p['jaw_top_mm'] + CLEAR_MM):.3f}",
-    ]
 
-    # Holding. The spoil block's top over the jaw tops; the jaws in Setup 4
-    # over face A.
+    # Holding. The spoil block's top over the jaw tops.
     spoil_over = (
         p["parallel_height_mm"] + p["spoil_height_mm"] - p["vise_jaw_height_mm"]
     )
@@ -654,10 +625,6 @@ def context(
         < shop["limits"]["vise_grip_min_mm"]
     ):
         raise ValueError("the jaws grip the spoil block less than the shop's minimum")
-    jaw_top = p["vise_jaw_height_mm"] - p["parallel_height_mm"] - t
-    _agree(plan, "jaw_top_mm", jaw_top)
-    if chamfer_tip + p["chamfer_projection_min_mm"] < jaw_top + 1.5:
-        raise ValueError("the chamfer mill's collet nose reaches the jaw tops")
     # The bond: the finished plate's area less its three holes.
     holes_area = math.pi / 4 * (g["k_dia"] ** 2 + 2 * d1**2)
     _agree(plan, "bond_area_mm2", _area(g) - holes_area)
@@ -695,7 +662,6 @@ def context(
         ("press drill", "drill_2764_rpm", "drill_2764_feed_per_min_mm"),
         ("press ream", "ream_rpm", "ream_feed_per_min_mm"),
         ("screw sink", "sink_rpm", "sink_feed_per_min_mm"),
-        ("press chamfer", "chamfer_rpm", "chamfer_feed_per_min_mm"),
     ):
         op, cut = _op_with_cut(plan, name)
         rpm = _resolve(plan, cut.get("rpm", op.get("rpm", p[rpm_key])), f"'{name}' rpm")
@@ -717,7 +683,7 @@ def context(
     if missing:
         raise ValueError(f"plan tools lack {missing}")
 
-    tips = {"spot": CENTRE_DRILL["point_deg"], "sink": SINK_DEG, "chamfer": CHAMFER_DEG}
+    tips = {"spot": CENTRE_DRILL["point_deg"], "sink": SINK_DEG}
 
     def section(
         tool: str, dia: float, cut: str, shape: str, frame: str, ops: list, stock
@@ -743,13 +709,8 @@ def context(
 
     frames = {
         "bond": {"origin": [0.0, 0.0, 0.0], "axes": [[0, -1, 0], [1, 0, 0], [0, 0, 1]]},
-        "face_a": {
-            "origin": [0.0, 0.0, 0.0],
-            "axes": [[0, -1, 0], [-1, 0, 0], [0, 0, -1]],
-        },
     }
     blank = ((left_end_max, right_end), face_y, (0.0, raw_top))
-    plate = ((-g["top_left"][1], radius), (-half, half), (-t, 0.0))
     dsink = _cut(plan, "screw sink", "cutter_dia_mm")
     spots = [k, *screws]
     jobs = [
@@ -858,22 +819,12 @@ def context(
             ],
             blank,
         ),
-        section(
-            "chamfer",
-            dchamfer,
-            "press chamfer",
-            "drill",
-            "face_a",
-            [["press_chamfer", "chamfer K at face A", chamfer_lines]],
-            plate,
-        ),
     ]
 
     # Keep-outs. Setup 2: the jaws, their tops spoil_over below the spoil
     # block's top (under the tape), the fixed jaw's face at the C edge, the
     # moving jaw's at the block's other edge, along the block centred on
-    # the jaws. Setup 4: the jaws on the side edges, their tops jaw_top over
-    # face A.
+    # the jaws.
     spoil_top = -p["tape_thickness_mm"]
     spoil_x = (
         right_end + p["spoil_end_margin_mm"] - p["spoil_length_mm"],
@@ -890,10 +841,6 @@ def context(
             (half - p["spoil_width_mm"] - JAW_DEPTH_MM, half - p["spoil_width_mm"]),
             jaw_z,
         ),
-    ]
-    vise_boxes = [
-        _box("jaw at +Y", (-100.0, 100.0), (half, half + JAW_DEPTH_MM), jaw_top),
-        _box("jaw at -Y", (-100.0, 100.0), (-half - JAW_DEPTH_MM, -half), jaw_top),
     ]
 
     tn = numbers
@@ -1023,33 +970,6 @@ def context(
                 ],
                 "radius": rc,
                 "z": _r(bottom),
-            },
-        ],
-        [
-            "AP04_chamfer",
-            "tool_changes",
-            {"z_top": jaw_top, "tools": [tn["chamfer"]], "loads_first": True},
-        ],
-        ["AP04_chamfer", "spindle", {"rpm": [[speeds["press chamfer"][0]]]}],
-        ["AP04_chamfer", "pauses", {"z_top": jaw_top, "count": 0}],
-        ["AP04_chamfer", "depth", {"z_min": _r(chamfer_tip)}],
-        [
-            "AP04_chamfer@0",
-            "holes",
-            {"centres": [[0.0, 0.0]], "z_bottom": _r(chamfer_tip)},
-        ],
-        ["AP04_chamfer@0", "air_feed", {"z_top": 0.0}],
-        ["AP04_chamfer@0", "rapids_clear", {"z_top": 0.0}],
-        ["AP04_chamfer@0", "keep_out", {"radius": dchamfer / 2, "boxes": vise_boxes}],
-        [
-            "AP04_chamfer@0",
-            "bounds",
-            {
-                "window": [[_r(path_r) - 1, _r(path_r) + 1], [-1, 1]],
-                "x": [_r(-path_r), _r(path_r)],
-                "y": [_r(-path_r), _r(path_r)],
-                "z_min": _r(chamfer_tip),
-                "arc": "G2",
             },
         ],
     ]

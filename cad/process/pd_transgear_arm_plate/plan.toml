@@ -17,10 +17,11 @@
 # face (checked, and run again lower if small); AP03_outline mills the end
 # round, the two tapers and the top edge with the 3/8 in end mill's side,
 # through into the spoil block: the whole waste goes to chips, the side edges
-# stay as supplied. Setup 3, bench: free the plate from the tape. Setup 4:
-# the plate face A up in the vise, K picked up on the .4375 GO plug with the
-# edge finder; AP04_chamfer chamfers K's face-A mouth .015 x 45° with the
-# chamfer mill on one circle. Setup 5, bench: deburr, inspect, oil.
+# stay as supplied. Setup 3, bench: free the plate from the tape, then
+# chamfer K's face-A mouth .015 x 45° by hand with a 90° hand countersink,
+# checked with the .450 pin (delegated ruling 2026-11-22, Main, owner review
+# #2144: option C; the owner may overrule to re-bonding face A up on the
+# spoil block). Setup 4, bench: deburr, inspect, oil.
 #
 # Not made here (the feature export's made_at, MHA-PD-00): the two Ø.0945
 # locating holes are match-drilled with MHA-PD-18 and reamed at assembly
@@ -53,7 +54,7 @@
 # pin gauge (gauges.pin-gauges) for the countersinks.
 #
 # NC (cam:pd_transgear_arm_plate, cad/process/pd_transgear_arm_plate/cam.py):
-# AP01_holes, AP02_sink, AP03_outline, AP04_chamfer. Program names, the
+# AP01_holes, AP02_sink, AP03_outline. Program names, the
 # [parameters] and the milling_cuts names are a contract with that recipe.
 # Tool numbers are the places in the tools list among the mill's tools: T1
 # 3/8 in end mill, T2 #1 centre drill, T3 #1 drill, T4 27/64 drill, T5 .4375
@@ -172,12 +173,9 @@ ream_tip_mm = -1.0
 # faced rear face (cam.py).
 sink_dia_mm = 7.9248
 sink_tip_mm = 0.4456
-# The press hole's chamfer (Setup 4, Z0 face A, up): .015 x 45°, rim Ø.4675
-# (chamfer_rim_dia_mm); the chamfer mill's point chamfer_tip_mm below face
-# A, its centre on one circle of chamfer_path_radius_mm about K (cam.py).
+# The press hole's chamfer (Setup 3, by hand at the bench): .015 x 45°, rim
+# Ø.4675 (chamfer_rim_dia_mm, cam.py).
 chamfer_rim_dia_mm = 11.8745
-chamfer_tip_mm = -1.524
-chamfer_path_radius_mm = 4.4133
 # Speeds and feeds. The 3/8 in end mill: shop
 # settings.endmill-carbide-3fl-3-8-1018-cf, 2800 rpm, .0025 in/tooth x 3 =
 # 21.0 in/min (cam.py recomputes both). Holes: LittleMachineShop "Cutting
@@ -189,8 +187,7 @@ chamfer_path_radius_mm = 4.4133
 # per rev, the author's choice, no source, as the channel lever's: the #1
 # .002 (2.2 in/min), the 27/64 .003 (1.8), the reamer .004 (1.6), the
 # countersink .002 (0.84); the #1 centre drill at 2800, .0005 in/rev (1.4
-# in/min); the chamfer mill at 2800, .001 in/tooth x 2 (5.6 in/min), the
-# lowest chip load prechips' force table holds (the author's choice).
+# in/min).
 em_rpm = 2800
 em_feed_per_min_mm = 533.4
 spot_rpm = 2800
@@ -203,23 +200,14 @@ ream_rpm = 400
 ream_feed_per_min_mm = 40.64
 sink_rpm = 420
 sink_feed_per_min_mm = 21.336
-chamfer_rpm = 2800
-chamfer_feed_per_min_mm = 142.24
 # Holders and reach: HA holders.r8-collets-lms-4860.gauge_len_mm; archive
 # holders.drill-chuck-r8.gauge_len_mm. The longest tool: the .4375 chucking
 # reamer in the drill chuck, 7 in overall (ASME B94.2 straight-shank chucking
-# reamers, 7/16 in). The end mill at least 1.00 in out of its collet; the
-# chamfer mill at least .75 (its nose clears the jaw tops in Setup 4).
+# reamers, 7/16 in). The end mill at least 1.00 in out of its collet.
 r8_collet_gauge_mm = 6.3
 drill_chuck_gauge_mm = 95.0
 reamer_oal_mm = 177.8
 em_projection_min_mm = 25.4
-chamfer_projection_min_mm = 19.05
-# Setup 4: the plate face A up on the 1 in parallels, gripped on its side
-# edges; the jaws stand jaw_top_mm over face A (cam.py).
-jaw_top_mm = 14.5415
-# The plate's thickest (the sheet's .202) for Setup 4's heights.
-plate_thickness_max_mm = 5.1308
 # Inspection, from K (the .4375 GO plug standing in it, .21875 radius): the
 # calipers over the plug and an edge read the edge's distance from K plus the
 # plug's radius (cam.py computes each band from the export). The screw holes
@@ -277,9 +265,10 @@ name = "3/8 in 82° countersink, TO BUY"
 ref = "riser-countersink"
 status = "to_order"
 [[tools]]
-id = "chamfer"
-name = "1/4 in 90° chamfer mill"
-ref = "chamfer-mill-carbide-1-4-90"
+id = "hand-countersink"
+name = "90° hand countersink with handle, 1/2 in body or larger, TO BUY"
+ref = "hand-countersink-90"
+status = "to_order"
 [[tools]]
 id = "cutoff-saw"
 name = "Evolution miter saw"
@@ -527,56 +516,21 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "File flush any fin the tape left at the bottom of the outline and scrape the drill and reamer burrs off K's and the screw holes' face-A mouths (deburring scraper, flush, no chamfer: K's chamfer is Setup 4's), so face A seats flat."
+instruction = "File flush any fin the tape left at the bottom of the outline and scrape the drill and reamer burrs off K's and the screw holes' face-A mouths (deburring scraper, flush, no chamfer: K's chamfer is the next op's), so face A seats flat."
 feed = "hand"
 inspection = "Face A lies on the surface plate without rocking on a burr."
 gauge_checks = "other"
 
-[[setups]]
-machine_kind = "other"
-title = "Chamfer the press hole"
-machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
-indexing = "none"
-machine_ref = "pm-30mv"
-holding = "Two 1 in parallels on the vise bed, one against each jaw. The plate on them face A up, gripped on its two side edges (between the kinks and the top edge), K between the parallels, the end round to the right; tap it down and tighten lightly. The jaws stand {{process.jaw_top_mm:in.3dot}} above face A."
-datum = "Program AP04_chamfer (T7). G54: X0 Y0 K's axis, picked up on the .4375 GO plug standing in K; Z0 face A, set with T1. The circle is about K, so the plate's turn in the vise does not matter. After a controller reset, a stall or an E-stop: home ($H), which brings the stored G54 back, and run AP04_chamfer from its start."
-diagram = { file = "diagrams/chamfer.svg", alt = "The plate face A up in the vise on two parallels; the chamfer mill's point down in K, its centre on a circle about K's axis cutting the .015 x 45° chamfer at the mouth." }
-envelope = { x_span_mm = [54.8924, 9.525, 5.08], y_span_mm = ["{{cad.blank_width_mm}}", 9.525], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.thickness_target_mm}}", "{{process.chamfer_tip_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_min_mm}}", 76.2], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
-vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = 54.8924, part_height_mm = "{{process.plate_thickness_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = [-51.891, "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
-# The plate lies wholly between the jaws (prechips' hold); they bear on the
-# side edges' straight run, kink to top corner, and K's chamfer is a light
-# finishing cut .7 mm deep, its load straight down into the parallels. At
-# .197 thick the grip is under the house limits.vise_grip_min_mm, the reason
-# Setup 2 bonds the blank for the facing and outline cuts; this light hold
-# is the author's choice, flagged for an owner ruling in the PR.
-beam = { axis = "x", hold = "cantilever", extent_mm = [-42.4464, 12.446], clamp_mm = [-42.4464, 12.446], section_mm = { y = "{{cad.blank_width_mm}}", z = 4.8768 }, vise_left = "start" }
-
 [[setups.operations]]
-instruction = "Home the mill ($H). Stand the .4375 GO plug in K, its handle up. Edge finder (900 rpm) on the plug's member below the handle, from −X and +X, then, at the X centre, from −Y and +Y: G54 X0 Y0 the plug's centre. Take the plug out."
-instruction_detailed = "Edge finder (900 rpm), its tip on the plug's member just above face A. From −X: note the machine X; from +X: note it; MDI G53 G0 X(the mean) then G10 L20 P1 X0. Same from −Y and +Y at X0: G10 L20 P1 Y0. Lift clear and take the plug out."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "G54 Z0: face A, T1 on a .002 leaf."
-instruction_detailed = "Console M6 T1 (3/8 in end mill; the tool setter measures it); MDI G0 X−20 Y0 (solid face A between K and the screw holes). Spindle stopped, its end just dragging a .002 feeler leaf on face A: G10 L20 P1 Z{{process.z_leaf_mm:.3f}}."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove AP04_chamfer in air, Z0 raised 1.000 in. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run AP04_chamfer, watching the point stay inside K's circle. G10 L2 P1 Z(the noted Z) puts Z0 back."
-feed = "hand"
-
-[[setups.operations]]
-speed_kind = "spindle"
-tool = "chamfer"
+speed_kind = "other"
+tool = "hand-countersink"
 drilling = "none"
 sizing = "other"
-instruction = "Run AP04_chamfer (M6 T7, 1/4 in 90° chamfer mill, at least {{process.chamfer_projection_min_mm:in.2f}} out of its collet; set 2800): down K's axis to {{process.chamfer_tip_mm:in.3dot}}, out to a circle R{{process.chamfer_path_radius_mm:in.4dot}}, once round clockwise (conventional inside), back to the axis and up: the mouth chamfered to Ø{{process.chamfer_rim_dia_mm:in.4dot}}."
-rpm = 2800
-feed = "{{process.chamfer_feed_per_min_mm:in.1f}} in/min"
-milling_cuts = [
-  { name = "press chamfer", kind = "side", phase = "finish", cutter_dia_mm = 6.35, flutes = 2, rpm = 2800, feed_mm_min = "{{process.chamfer_feed_per_min_mm}}", axial_doc_mm = 0.381, radial_woc_mm = 0.381, stations_mm = 0 },
-]
+instruction = "Chamfer K's face-A mouth by hand: the plate face A up on the bench, the 90° hand countersink square in K, a few light turns clockwise with even pressure; blow out, stand the .450 pin in K and check. Repeat in light turns until in band."
+instruction_detailed = "The check: the .450 pin standing in K, its end on the chamfer; the calipers' depth rod from face A beside it to the pin's top, less the pin's miked length, is where its end sits."
+feed = "hand"
+inspection = "The pin's end {{process.chamfer_pin_depth_min_mm:in.4dot}}–{{process.chamfer_pin_depth_max_mm:in.4dot}} below face A (chamfer {{cad.press_hole_chamfer_leg_min_in:.3dot}}–{{cad.press_hole_chamfer_leg_max_in:.3dot}} x 45°, rim Ø{{process.chamfer_rim_min_mm:in.4dot}}–{{process.chamfer_rim_max_mm:in.4dot}}). Higher: more turns. Lower: stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.chamfer_pin_depth_min_mm}}", "{{process.chamfer_pin_depth_max_mm}}"] }]
 
 [[setups]]
 machine_kind = "other"
