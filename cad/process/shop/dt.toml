@@ -260,13 +260,6 @@ description = "Drill rod (O1 or W1 tool steel, annealed, ground), round bar, 1/1
 [stock.key-stock-1-16-undersized]
 description = "1008-1045 carbon steel machine key stock, undersized, square bar, 1/16 in"
 
-# --- Bench-cut drill rod (MHA-DT-30, cad/process/dt_pinion_lever_pin/plan.toml) ---
-# A 1/16 rod is too slender for the 3-jaw or the 14 in saw's vise: it is sawn
-# by hand in the bench vise. Ownership: cad/config/shop-equipment/tools-hand.toml,
-# same key.
-[tools.junior-hacksaw]
-description = "Junior hacksaw, 6 in blade, 32 TPI"
-
 # --- MHA-DT-03-TL-02 phasing comb (cad/process/dt_cone_gear_tl_phasing_comb/plan.toml) ---
 # The comb's blank is snipped off the .020 brass sheet. Ownership:
 # cad/config/shop-equipment/tools-hand.toml tools.aviation-snips-straight and

@@ -235,7 +235,7 @@ kind = "oil"
 make = "Birchwood Casey"
 status = "to_order"
 purchase = "The oil Brass Black's directions name to preserve the finish; no size, price or stock read."
-note = "Not owned: to buy. MHA-MG-02 blackening: preserve the blackened surface, overnight."
+note = "Not owned: to buy. MHA-MG-02 blackening: preserve the blackened surface, overnight. MHA-SM-01 gooseneck: the finish's oil (sheet: polished bare; oil or wax), a thin film wiped on after polishing (cad/process/sm_gooseneck/plan.toml Setup 7)."
 cite = ["Birchwood Casey Deutschland, Brass Black directions step 8 (see consumables.brass-black-birchwood-casey)"]
 
 [consumables.chemical-gloves-eye-protection]

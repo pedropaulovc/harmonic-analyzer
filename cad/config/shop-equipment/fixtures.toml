@@ -123,20 +123,23 @@ note = "Not owned: to buy. MHA-FR-01 and MHA-FR-02 on edge for the cross-screw p
 
 # The MHA-SM-01 bend form (owner ruling 2026-11-14 (Pedro), #2401: "bend on a simple
 # form"; the radius is a reference, so the form carries no toleranced size). To make:
-# not owned, no drawing.
+# not owned, no drawing; owner ruling 2026-11-22 (option A): two 6061 plates,
+# the groove coved with the owned 1/4 in ball end mill on the CNC.
 [fixtures.sm-gooseneck-bend-form]
 name = "Gooseneck bend form, shop-made"
 kind = "bend_form"
 status = "to_make"
 supply = "shop_made"
-purchase = "Make from any scrap the shop has (hardwood, 6061 or steel plate, about 1 in thick): a disc or segment about 6 in across with a snug half-round groove round its edge that the 1/2 in tube sits in, a pin or bolt beside the groove to hold the tube's tail, and a short block grooved the same to press the tube into the form as it wraps. Pull the leg round the form by hand; no sand or filler: the groove holds the tube round."
-note = "Workholding for the one MHA-SM-01 bend (sm-gooseneck.yaml process). Try it on the spare tube first (the 36 in stock row). The sheet controls only where the tube's two ends finish (overall height and reach, both ends sawn and faced after the bend) and NO KINKS at the bend; the R3.0 is a reference."
+purchase = "Make from the owned 1/2 x 6 in 6061 bar (stock.6061-flat-1-2x6-54in): two 9 in plates, each cut on the CNC by cam:sm_gooseneck (GF01_form_a, GF02_form_b, plate B plate A mirrored): an R3 arc through the plate, two stud holes, and a half-round groove in one face, a channel along the lead that closes over the tube's 2 in tail and a quarter cove round the arc. Plate B turned over onto plate A closes the groove round the tube. Process: cad/process/sm_gooseneck/plan.toml Setups 2 to 4."
+note = "Workholding for the one MHA-SM-01 bend (sm-gooseneck.yaml process), bolted to the PM-30MV table through its stud holes (3/8-16 studs and T-nuts, clamping kit LMS 1268); the tube is pulled round it by hand. The 48 in tube's spare checks the groove first, then is trial-bent to 90° on the form before the real part (owner ruling 2026-11-22, option A). The sheet controls only where the tube's two ends finish (overall height and reach, both ends sawn and faced after the bend), the bend's angle and NO KINKS at the bend; the R3.0 is a reference."
 pieces = 1
 
 # Spoil plate for the brass sheet parts cut out on the CNC (MHA-DT-03-TL-02
 # phasing comb; the pd sheet parts may share it). Plain: the part is bonded on
-# tape and the cutter stops in the tape, so the plate carries no fence,
-# pocket or relief and its mill-finish top is not faced.
+# tape and the cutter's tip goes a few thousandths into the plate (the comb
+# .004, at most .010: cad/process/dt_cone_gear_tl_phasing_comb/plan.toml
+# spoil_cut_max_mm), so the plate carries no fence, pocket or relief, its
+# mill-finish top is not faced, and every part scores it a little.
 [fixtures.sheet-spoil-plate]
 name = "Spoil plate for bonded sheet parts, 6061, 5 x 6 x 1/2 in"
 kind = "fixture_plate"

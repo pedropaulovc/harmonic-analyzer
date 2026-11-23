@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20.0" y="18.0">Setup 6: accept the bend: no kink; the ovality diagnostic at the bend&#8217;s middle (side view)</text>
+  <path class="part-kept" d="M482.1,254.5 L482.0,248.6 L481.6,242.4 L481.0,236.3 L480.2,230.2 L479.1,224.1 L477.8,218.1 L476.2,212.2 L474.5,206.3 L472.5,200.4 L470.2,194.7 L467.8,189.1 L465.1,183.5 L462.2,178.1 L459.1,172.8 L455.8,167.6 L452.2,162.5 L448.5,157.6 L444.6,152.8 L440.6,148.2 L436.3,143.8 L431.9,139.5 L427.3,135.4 L422.5,131.5 L417.6,127.8 L412.6,124.2 L407.4,120.9 L402.1,117.8 L396.6,114.9 L391.1,112.2 L385.5,109.7 L379.7,107.4 L373.9,105.4 L368.0,103.6 L362.1,102.1 L356.1,100.7 L350.0,99.6 L343.9,98.8 L337.8,98.2 L331.6,97.8 L325.5,97.7 L302.6,97.7 L302.6,121.8 L325.0,121.8 L330.2,121.9 L335.4,122.2 L340.6,122.7 L345.7,123.4 L350.9,124.3 L356.0,125.4 L361.0,126.7 L366.0,128.2 L370.9,129.9 L375.8,131.8 L380.6,133.9 L385.3,136.2 L389.9,138.6 L394.4,141.2 L398.8,144.0 L403.0,147.0 L407.2,150.1 L411.2,153.4 L415.1,156.9 L418.9,160.5 L422.5,164.2 L426.0,168.1 L429.3,172.2 L432.5,176.3 L435.4,180.6 L438.3,185.0 L440.9,189.5 L443.4,194.0 L445.6,198.7 L447.7,203.5 L449.7,208.4 L451.4,213.3 L452.9,218.3 L454.2,223.3 L455.3,228.4 L456.3,233.5 L457.0,238.7 L457.5,243.9 L457.8,249.1 L457.9,254.5 Z"/>
+  <line class="dims" x1="408.8" y1="170.9" x2="446.4" y2="133.3"/>
+  <line class="leader" x1="408.8" y1="170.9" x2="300" y2="70"/>
+  <text class="label" x="20.0" y="64.0">micrometer across the bend&#8217;s plane (toward its centre)</text>
+  <circle class="leader-dot" cx="427.6" cy="152.1" r="3"/>
+  <line class="leader" x1="427.6" y1="152.1" x2="560" y2="230"/>
+  <text class="label" x="520.0" y="250.0">and square to it,</text>
+  <text class="label" x="520.0" y="266.0">at the same place</text>
+  <line class="leader" x1="381.3" y1="134.2" x2="250" y2="200"/>
+  <text class="label" x="20.0" y="216.0">inside of the bend: no crease, ripple or wrinkle</text>
+  <text class="label" x="20.0" y="346.0">Ovality (larger reading less the smaller) is a diagnostic: over the limit the op below prints, look again for a kink.</text>
+  <text class="label" x="20.0" y="366.0">A kink or a crease (NO KINKS): the tube is scrap.</text>
+</svg>
