@@ -22,7 +22,7 @@
   <text class="label" x="20" y="96">each screw hole from K (BASIC)</text>
   <line class="dims" x1="480" y1="170" x2="357.1" y2="126.5"/>
   <line class="leader" x1="498" y1="185" x2="560" y2="270"/>
-  <text class="label" x="470" y="288">K: .4375 GO / .4382 NO-GO,</text>
+  <text class="label" x="470" y="288">K: .4375 plus GO / .4380 plus NO-GO,</text>
   <text class="label" x="470" y="304">chamfer at face A</text>
   <text class="label" x="20" y="330">Countersinks on the far (rear) face. Top edge, tapers and kinks: the program's.</text>
   <text class="label" x="20" y="366">Left for MHA-PD-00: the 2X Ø.0945 locating holes (13A, 13E), the bush press into K (11C) and its ream (11H).</text>

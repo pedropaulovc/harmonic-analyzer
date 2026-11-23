@@ -80,7 +80,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1/4 x 1-1/2 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:fraction}} in flat bar, the 12 in length: one {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} in blank. Spoil block: a 3.5 in length of the 1 x 3 in 6061 bar."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The two long edges are the bar's, as supplied: no cut touches them. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall or controller reset, home again and do what that setup's Datum says before resuming. The two Ø.0945 locating holes, the bush press and its ream are the assembly's (MHA-PD-00 steps 13A, 13E, 11C, 11H). To buy before starting: the bar, the .4375 reamer, the 3/8 in 82° countersink, the VHB 5906 tape, the .4375/.4382 plug pair and the .250 and .450 pin gauges (Setup 2 checks K and the countersinks while the blank is still bonded). Finish: {{cad.finish}}."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The two long edges are the bar's, as supplied: no cut touches them. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall or controller reset, home again and do what that setup's Datum says before resuming. The two Ø.0945 locating holes, the bush press and its ream are the assembly's (MHA-PD-00 steps 13A, 13E, 11C, 11H). To buy before starting: the bar, the .4375 reamer, the 3/8 in 82° countersink, the VHB 5906 tape, the Class ZZ pins .4375 plus (GO) and .4380 plus (NO-GO, reads .4380–.4382) and the .250 and .450 pin gauges (Setup 2 checks K and the countersinks while the blank is still bonded). Finish: {{cad.finish}}."
 shop = "../shop"
 stock_refs = ["1018-flat-1-4x1-1-2", "6061-flat-1x3"]
 material_key = "rocker-1018-cold-finished"
@@ -356,12 +356,13 @@ gauge_checks = [
 
 [[setups.operations]]
 instruction = "Before Setup 2 reams K: on the .0001 micrometer, mike the .4375 plus GO pin, the .4380 plus NO-GO pin and the .4375 reamer (across two opposite margins at its front); each reading is good to ±.00005. Write the three on this sheet and each pin's on its tag."
-inspection = "GO pin {{cad.press_hole_dia_min_in:.4dot}}–{{process.k_go_pin_max_mm:in.4dot}}, NO-GO pin {{process.k_nogo_pin_min_mm:in.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}; a pin outside that is not used: stop and tell the owner. The sheet accepts a K from the GO pin's reading up to, not including, the NO-GO's; only {{process.k_go_pin_max_mm:in.4dot}}–{{process.k_nogo_pin_min_mm:in.4dot}} is sure to pass, so a good K within .0002 of either band limit may be refused."
+inspection = "GO pin {{cad.press_hole_dia_min_in:.4dot}}–{{process.k_go_pin_max_mm:in.4dot}}, NO-GO pin {{process.k_nogo_pin_min_mm:in.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}; a pin outside that is not used: stop and tell the owner. Accept a K from the GO pin's reading to under the NO-GO's. Owner ruling 2026-11-23: 'Accept that good holes near a limit may be refused' (sure to pass: {{process.k_go_pin_max_mm:in.4dot}}–{{process.k_nogo_pin_min_mm:in.4dot}} only)."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Only if the reamer read under the GO pin: before Setup 2, clamp an offcut of the 1/4 x 1-1/2 bar in the vise on parallels; by MDI drill it through with the 27/64 drill (set 600), then ream it with the .4375 reamer (set 400, fed in and out); gauge the trial hole with the two pins."
+instruction = "Only if the reamer read under the GO pin, before Setup 2: drill and ream a trial hole through an offcut of the bar on the mill, by MDI, with T4 and T5; gauge it with the two pins."
+instruction_detailed = "Only if the reamer read under the GO pin: an offcut of the 1/4 x 1-1/2 bar flat on the two 1 in parallels in the vise (one at each jaw), its middle over the gap. Console M6 T4 (27/64); its point on the middle, spindle stopped: G10 L20 P1 X0 Y0 Z0. MDI M3 S600, G1 Z-10 F{{process.drill_2764_feed_per_min_mm:.1f}}, G0 Z5; M6 T5 (.4375 reamer), M3 S400, G1 Z-10 F{{process.ream_feed_per_min_mm:.1f}}, G1 Z5, M5."
 inspection = "The GO pin enters the trial hole and the NO-GO does not: go on. GO refused: this reamer's holes will be refused: stop and tell the owner."
 gauge_checks = [{ gauge = "zz-pins-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
 feed = "hand"
