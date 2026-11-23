@@ -62,8 +62,8 @@ chuck_grip_in = 0.75
 # so the ream lies in R - .00004 to R + .00014. The land's least excess is the
 # drawing's least interference .0002 over the ream's top, R + .00034; its
 # most the drawing's .0005 over the ream's bottom, R + .00046. On the .0001
-# micrometer the land reads R + .0004. Owner ruling 2026-11-22 (via Main,
-# asked with sketches/pd23-pin-land-band.png), verbatim: "the .0001
+# micrometer the land reads R + .0004. Owner ruling 2026-11-22 (via Main;
+# the question's sketch is outside the repository), verbatim: "the .0001
 # micrometer reading 'R + .0004' is the acceptance, and the traveler states
 # its ±.00005 reading uncertainty. No purchase; the press itself is the last
 # check."
@@ -369,7 +369,7 @@ speed_kind = "spindle"
 tool = "blade"
 drilling = "none"
 sizing = "other"
-instruction = "Bring the blade's chuck-side face onto the cut tip end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with the blade's tailstock-side face at Z-{{cad.part_off_in:.3dot}}: the head end about .005 over the head's length, left for facing in Op 200. The pin drops into a tray set on the ways under the cut, clear of the chuck; pick it up with the spindle stopped."
+instruction = "Set a tray on the ways under the cut, clear of the chuck and saddle. Touch the blade's chuck-side face on the cut tip end; set DRO Z to the blade's width (miked, {{process.blade_width_in:.4dot}} nominal), so it reads the tailstock-side face. Part off at Z-{{cad.part_off_in:.3dot}}: the head about .005 long, faced in Op 200. Pick the pin out of the tray with the spindle stopped."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.step_head_dia_mm}}"
 
