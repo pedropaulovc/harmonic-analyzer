@@ -1932,13 +1932,36 @@ def _rescaled(
     return (cx - hw, cy - hh, cx + hw, cy + hh)
 
 
+# The cone set's own ring fits at 1:2.5; it prints at 1:3 since detail F
+# (#2640) took the sheet's right half (fit_cluster_ring keeps its room).
 RAISED_CASES = [
-    ("cone-set", CONE_SET_OUTLINE_R10_1_2_5, (1.0, 2.5), (1.0, 2.5), 0.040),
+    ("cone-set", CONE_SET_OUTLINE_R10_1_2_5, (1.0, 2.5), (1.0, 3.0), 0.040),
     ("pinion-rig", PINION_RIG_OUTLINE_R9_1_3, (1.0, 3.0), (1.0, 2.0), 0.0),
 ]
 
 
-@pytest.mark.parametrize(("cluster", "outline", "read_at", "expected", "_off"), RAISED_CASES)
+def test_the_cone_set_steps_down_until_detail_f_has_room() -> None:
+    """Run 20261123T194841143Z (#3478): the cone set proved its ring at 1:2.5,
+    which left 71.8 mm right of it, and no detail scale fitted (80.4 mm at the
+    ladder's last).  The ring fit itself now refuses a scale that leaves the
+    detail less than its narrowest ring."""
+    at_1_2_5 = CONE_SET_OUTLINE_R10_1_2_5
+    assert drawing.raised_ring_fit(at_1_2_5, "cone-set")[1] == []
+    _shift, overflows, _slide = drawing.fit_cluster_ring(at_1_2_5, "cone-set")
+    assert len(overflows) == 1 and f"detail {drawing.CONE_TIP_DETAIL_LETTER} room" in overflows[0]
+    at_1_3 = _rescaled(at_1_2_5, (1.0, 2.5), (1.0, 3.0))
+    shift, overflows, _slide = drawing.fit_cluster_ring(at_1_3, "cone-set")
+    assert overflows == []
+    region = drawing.cone_tip_detail_region(
+        (at_1_3[0] + shift[0], at_1_3[1] + shift[1], at_1_3[2] + shift[0], at_1_3[3] + shift[1])
+    )
+    assert region[2] - region[0] >= drawing.CONE_TIP_DETAIL_MIN_RING_WIDTH
+    # The rig has no detail: its fit is the raised ring's alone.
+    rig = _rescaled(PINION_RIG_OUTLINE_R9_1_3, (1.0, 3.0), (1.0, 2.0))
+    assert drawing.fit_cluster_ring(rig, "pinion-rig") == drawing.raised_ring_fit(rig, "pinion-rig")
+
+
+@pytest.mark.parametrize(("cluster", "outline", "read_at", "expected", "_off"), RAISED_CASES[1:])
 def test_the_cone_set_and_rig_rise_to_a_readable_scale(
     cluster: str,
     outline: tuple[float, ...],
@@ -1947,8 +1970,8 @@ def test_the_cone_set_and_rig_rise_to_a_readable_scale(
     _off: float,
 ) -> None:
     """Rubric sample round 9 printed both at 1:3, too small to read; raised
-    over the title block, the ladder from the 1:2 preference stops at 1:2.5
-    (cone set) and 1:2 (rig)."""
+    over the title block, the ladder from the 1:2 preference stops at 1:2
+    (rig).  The cone set stays at 1:3: its tip parts read in detail F."""
     preferred = _rescaled(outline, read_at, (1.0, 2.0))
     assert drawing.cluster_ring_scale(preferred, (1.0, 2.0), label=cluster, cluster=cluster) == expected
     # The shared region would not have held it.

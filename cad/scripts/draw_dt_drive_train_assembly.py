@@ -607,6 +607,11 @@ CONE_TIP_DETAIL_REACH = CONE_TIP_DETAIL_BALLOON_MARGIN + BALLOON_DIAMETER / 2.0
 CONE_TIP_DETAIL_RING_GAP = 0.005
 # One caption line under the detail's ring, above the title block.
 CONE_TIP_DETAIL_CAPTION_ALLOWANCE = 0.010
+# The width the detail's ring needs at the ladder's last scale: it read
+# 80.4 mm there (run 20261123T194841143Z, #3478).  That run's cone set proved
+# its own ring at 1:2.5 for the first time, 71.8 mm short of the frame, and
+# no detail scale fitted; the cone set now steps down until this much is left.
+CONE_TIP_DETAIL_MIN_RING_WIDTH = 0.085
 # Seed spot: the empty right half above the title block; the fit re-centres it.
 CONE_TIP_DETAIL_SEED = (0.350, 0.170)
 # The boundary letter's air outside its circle (draw_ch_channel_assembly
@@ -2722,9 +2727,18 @@ def fit_cluster_ring(
     outline: tuple[float, float, float, float], cluster: Cluster
 ) -> tuple[tuple[float, float], list[str], float]:
     """The cluster's ring fit: raised_ring_fit or cluster_ring_fit."""
-    if cluster in RAISED_RING_CLUSTERS:
-        return raised_ring_fit(outline, cluster)
-    return cluster_ring_fit(outline, CLUSTER_RING_REGIONS[cluster])
+    if cluster not in RAISED_RING_CLUSTERS:
+        return cluster_ring_fit(outline, CLUSTER_RING_REGIONS[cluster])
+    shift, overflows, slide = raised_ring_fit(outline, cluster)
+    if cluster == "cone-set" and not overflows:
+        region = cone_tip_detail_region(tuple(v + shift[i % 2] for i, v in enumerate(outline)))
+        room = region[2] - region[0]
+        if room < CONE_TIP_DETAIL_MIN_RING_WIDTH:
+            overflows = [
+                f"detail {CONE_TIP_DETAIL_LETTER} room {room * 1000:.1f} mm < "
+                f"{CONE_TIP_DETAIL_MIN_RING_WIDTH * 1000:.1f} mm"
+            ]
+    return shift, overflows, slide
 
 
 def cone_tip_detail_region(
