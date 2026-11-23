@@ -107,8 +107,8 @@ def test_context_numbers_the_tools_and_places_the_holes_from_the_model(context) 
         "drill-31": 3,
         "reamer-1280": 4,
         "drill-25": 5,
-        "drill-11-8": 6,
-        "reamer-12": 7,
+        "drill-31-64": 6,
+        "reamer-4990": 7,
         "tap-guide": 8,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
@@ -166,7 +166,7 @@ def test_every_cut_runs_at_a_cited_4140_ht_setting() -> None:
         ("dowel_ream_past_mm", 0.4, "outside its depth"),
         ("tap_drill_tip_height_mm", 18.0, "tap_drill_tip_height_mm"),
         ("bore_drill_tip_height_mm", -3.0, "bore_drill_tip_height_mm"),
-        ("bore_ream_tip_height_mm", -5.0, "12 mm reamer tip"),
+        ("bore_ream_tip_height_mm", -5.0, ".4990 reamer tip"),
         ("spot_dia_mm", 3.5, "rising order"),
         ("tap_x_mm", 12.0, "tap_x_mm"),
         ("bore_y_mm", 12.0, "bore_y_mm"),
@@ -249,7 +249,7 @@ def _seed(ctx: dict, key: str, pick, change, last: bool = False) -> dict:
             lambda line: "G1 Z-1.000 F{feed}",
             "depth",
         ),
-        # The 11.8 mm drill stopped above K.
+        # The 31/64 drill stopped above K.
         (
             "bore_drill",
             lambda line: line.startswith("G1 Z"),

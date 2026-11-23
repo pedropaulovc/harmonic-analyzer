@@ -11,9 +11,10 @@ EXACTLY ``DRAWING_DIMENSIONS``.
 
 NOTE on the "knife edge": this heat-treated steel BEARING BLOCK (ch18 p.42,
 2026-09-02 user re-read: unpainted heat-treated steel, not brass) carries a
-circular bore CLOSE around the mating hex trunnion (Ø.472 over the 8.080 x
-10.268 hex), so only the trunnion's TOP VERTEX LINE nears the bore's upper
-inner wall -- the true knife-edge line contact.  The sharp ridge is on the
+circular bore round the mating hex trunnion (the book's CLOSE bore, Ø.472;
+Ø.4985 since owner ruling 2026-11-23, tool audit Q13, 5.6 % larger, over the
+8.080 x 10.268 hex), so only the trunnion's TOP VERTEX LINE nears the bore's
+upper inner wall -- the true knife-edge line contact.  The sharp ridge is on the
 LEVER trunnion (``build_sm_summing_lever``), NOT on this part; this part's
 critical surface is the bore's upper inner wall, the knife SEAT: it carries
 ``MACHINED_UM`` (63 µin, policy drawing-guidelines.md rule 6 (roughness
@@ -71,7 +72,15 @@ from sm_summing_lever_spec import HEX_H, HEX_W
 UNIT = drawing_unit("parts/sm-knife-mount", _config.parts("sm-knife-mount"))
 
 # --- fixed geometry for the drawing's view math (mirrors build_sm_knife_mount) ----
-R_BORE = 5.9944  # Ø.472 knife-bearing bore (2026-09-02 ch18 p.42 re-read: close bore)
+# Ø.4985 knife-bearing bore.  Provenance: the 2026-09-02 ch18 p.42 re-read
+# gave the book's "close bore" round the knife, Ø.472 (Ø12 on the inch
+# grid).  Owner ruling 2026-11-23, tool audit Q13: "dia .4985 +.0015/0 (owner
+# chose against the agent's recommendation to keep .4720); no 12 mm reamer":
+# the bore is now 5.6 % larger than the book's, cut with the .4990 reamer of
+# the over/under set.  The crown (bore top) moves .00025 nearer the top seat
+# (.57475 under it, was .575) so the bore centre's BASIC under the seat
+# stays on the .001 grid, .824 (was .811): the centre drops .013.
+R_BORE = 6.33095  # Ø.4985 / 2
 # Block half-width, owned here (the build reads it): 1.00 across, the width
 # set for the former -X dowel and then its slot (owner ruling 2026-10-24,
 # T+H3).  Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 deletes that
@@ -82,8 +91,10 @@ SUPPORT_Z_THICK = 13.97  # .55 axial depth straddling the trunnion mid
 # Local block top (clamped to the top-frame casting underside): the summing
 # assembly's knife-edge station, 20.0 - HEX_H / 2 under it (top_frame_plane), exact.
 BLK_TOP = 14.866
-BLK_BOT = -14.852  # local block bottom: 1.17 tall (BORE_CY - R_BORE - 3.1242 wall)
-BORE_CY = -5.7334  # bore centre below the ridge origin (TopClear 0.261 - R_BORE)
+# local block bottom: 1.17 tall (BORE_CY - R_BORE - 2.45745 wall; the block
+# kept its 1.17 when the bore grew to Ø.4985, owner ruling 2026-11-23, Q13)
+BLK_BOT = -14.852
+BORE_CY = -6.0636  # bore centre below the ridge origin (TopClear 0.26735 - R_BORE)
 
 # The knife bore's bored seat, Ra 63 µin; the top seat (datum A), which the
 # screw clamps to the casting underside and the dowel locates, Ra 125 µin: a
@@ -106,18 +117,22 @@ SURFACE_FINISHES = (
 # General tolerances the printed places claim (title block, drawing-guidelines.md rule 3 (decimal places carry the tolerance)).
 _XX = printed_band_mm(2, unit=UNIT)
 _XXX = printed_band_mm(3, unit=UNIT)
-# The Ø.472 bore is REAMED through in the supplied 28-32 HRC condition
-# (Owner ruling 2026-11-10 (Pedro), #2334 option B1; formerly bored, as no
-# .472 reamer is owned): a 12 mm H7 HSS reamer cuts .4724-.4731 inside
-# the explicit .4720 +.0015/.0000 band, Ra 63 µin on its knife seat: the rock
-# budget takes the smallest bore, the webs the largest.  A plain inch step
-# (rule 4; machinist review round 4, farm run 20261107T161739921Z: the
-# former +.0012 read as converted millimetres), loosened rather than
-# tightened (fan-out L2): every web still holds at the largest bore.
+# The Ø.4985 bore is REAMED through in the supplied 28-32 HRC condition
+# (Owner ruling 2026-11-10 (Pedro), #2334 option B1; formerly bored).  Owner
+# ruling 2026-11-23, tool audit Q13: "dia .4985 +.0015/0 (owner chose
+# against the agent's recommendation to keep .4720); no 12 mm reamer": the
+# .4990 chucking reamer (shop-equipment tools.reamer-4990; ANSI B94.2
+# +.0001/+.0005, .4991-.4995) cuts inside the explicit .4985 +.0015/.0000
+# band, Ra 63 µin on its knife seat: the rock budget takes the smallest
+# bore, the webs the largest.  A plain inch step (rule 4; machinist review
+# round 4, farm run 20261107T161739921Z: the former +.0012 read as
+# converted millimetres), loosened rather than tightened (fan-out L2):
+# every web still holds at the largest bore, the bottom wall closest
+# (BORE_BOTTOM_WALL, .0820 against the .080 target).
 BORE_DIA_BAND = (0.0381, 0.0)  # +.0015/.0000 in
 BORE_DIA_PLACES = 4
-BORE_R_MIN = R_BORE + min(BORE_DIA_BAND) / 2.0  # 5.9944
-BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.01345
+BORE_R_MIN = R_BORE + min(BORE_DIA_BAND) / 2.0  # 6.33095
+BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.35
 
 # --- Knife-mount gauge bar (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3) --
 # A tool, not a BOM part: with each MHA-SM-02 hung on its one MHA-SM-VN-53
@@ -145,7 +160,7 @@ BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.01345
 # (``build_sm_summing_assembly.KNIFE_BAR_FIT_NEED``, .00255, rounded up to
 # the .0001 step), the band keeps the bore band's .0015 width, so one bar
 # fits both bores of any conforming pair, and the rock budget and both
-# hanger-bolt stacks charge the .0041 maximum.  A bar so cut is Ø.4679-.4709.
+# hanger-bolt stacks charge the .0041 maximum.  A bar so cut is Ø.4944-.4974.
 # The fit lives here, beside the bore it is cut to, so MHA-FR-02's hanger
 # mirror can charge the bar's play without importing the summing spec's
 # config closure (test_dodo_recipe's fine-grained config deps).
@@ -182,7 +197,7 @@ GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
 # its vertical centre plane), for the webs and the tap's crown, and a
 # separate ∥.002|A holds its axis parallel to the top seat (its pitch).  A|B
 # leaves the bore's yaw about B free: the part no longer sets it.  At
-# MHA-SM-00 a (Ø.47) gauge bar slid through both mounts' bores with the
+# MHA-SM-00 a (Ø.50) gauge bar slid through both mounts' bores with the
 # screws finger-tight sets the front mount's yaw before its screw is
 # tightened, and must slide out after; the rear mount's yaw is set by the
 # rock gauge (6G) before its screw is tightened (6H)
@@ -263,7 +278,8 @@ def free_rock_deg(
 
 # Why the bore's yaw is budgeted (2026-10-09 ruling): a yawed bore steals
 # rock.  Free rock of the nominal 8.080 x 10.268 trunnion in the nominal
-# Ø.472 against the far-end offset t across the deep bore: t 0 -> 8.90 deg,
+# Ø.4985 against the far-end offset t across the deep bore: t 0 -> 10.22 deg
+# (8.90 in the former Ø.472),
 # falling about 1 deg each 0.1 of t.  The drawing-guidelines.md rule 17
 # (walls and webs) budget -- the trunnion's ridge-to-side and flank-to-side
 # limits and the bore's size at its band limit, t the MHA-SM-00 gauge bar's
@@ -275,7 +291,7 @@ def free_rock_deg(
 # underside plane (MHA-FR-02, user ruling 2026-10-12), so no bedding term
 # enters: seat form tilts the block, it cannot yaw the bore.
 KNIFE_FREE_ROCK_DEG = free_rock_deg(0.0)
-# The bore crown (its upper inner wall) below the top seat: 14.605.
+# The bore crown (its upper inner wall) below the top seat: 14.59865 (.57475).
 BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
 # MHA-SM-VN-52, a #10-24 plain hex bolt cut from stock at MHA-SM-00 to its
 # hole's measured stack plus the .351 (8.9154, title block +/-.005) fit-up reach
@@ -386,8 +402,8 @@ def drill_point_height(drill_dia: float, point_angle_deg: float) -> float:
 # The metal the tap's drill point leaves over the bore crown, every band at
 # its worst (the drill depth's band, the charged pilot envelope at its
 # sharpest accepted point, the largest bored bore, the bore's position zone
-# KNIFE_BORE_POSITION_TOL): 14.605 - 0.1016 - 0.0191 - 11.176 - 1.2023 =
-# 2.106, over the rule-17 .080 target.
+# KNIFE_BORE_POSITION_TOL): 14.59865 - 0.1016 - 0.01905 - 11.176 - 1.2023 =
+# 2.100, over the rule-17 .080 target.
 STUD_TAP_WEB_MIN = WALL_TARGET_MM
 STUD_TAP_POINT_H = drill_point_height(
     STUD_TAP_DIA_MAX, STUD_TAP_POINT_ANGLE_MIN_DEG
@@ -529,11 +545,11 @@ STUD_TAP_Z_WALL = (
 )
 # The bore's flanks: its axis BASIC PIN_HOLE_X from B within its zone
 # radius, B off the +X face by its .XX band: near 12.7 - 0.254 - 0.102 -
-# 6.013 = 6.331, far 25.146 - 13.056 - 6.013 = 6.077.  ⌖|A|B leaves the
+# 6.350 = 5.994, far 25.146 - 13.056 - 6.350 = 5.740.  ⌖|A|B leaves the
 # bore's yaw about B free (Owner ruling 2026-11-08 (Pedro), #2144 item
 # 11.3), so each flank also charges the title block's angular tolerance on
 # the bore's implied square to the front face, over half the deepest .XX
-# block: 7.112 * tan(1 deg) = 0.124, leaving 6.077 - 0.124 = 5.953.
+# block: 7.112 * tan(1 deg) = 0.124, leaving 5.740 - 0.124 = 5.616.
 _BORE_FROM_PLUS_X_FACE_MAX = (
     BLK_HALF_X + PIN_HOLE_SIDE_TOL + KNIFE_BORE_POSITION_TOL / 2.0
 )
@@ -546,8 +562,9 @@ BORE_SIDE_WEB = (
     - _BORE_YAW_AT_FACE
 )
 # Under the bore: the shortest .XX block below the BASIC bore centre, the
-# bore at the bottom of its zone and at its largest: 29.464 - 20.599 -
-# 0.102 - 6.010 = 2.75.
+# bore at the bottom of its zone and at its largest: 29.464 - 20.930 -
+# 0.102 - 6.350 = 2.083 (.0820, .0020 over the .080 target; owner ruling
+# 2026-11-23, tool audit Q13 took it from 2.75 at the former Ø.4720).
 BORE_BOTTOM_WALL = (
     (BLOCK_HEIGHT_PRINTED - BLOCK_SIZE_TOL)
     - (BLK_TOP - BORE_CY)
@@ -564,7 +581,7 @@ _BORE_CY_MAX = BORE_CY + KNIFE_BORE_POSITION_TOL / 2.0
 # the hole's section nearest the bore is its wall down to the deepest full
 # diameter, then the cone's flank to its tip on B's axis.  The web is the
 # bore centre's distance to that wall-and-flank, less the bore's largest
-# radius: 6.31 (6.33 to the former flat floor's corner).
+# radius: 6.25.
 _PIN_POINT_H_MAX = _PIN_R_MAX / math.tan(
     math.radians(STUD_TAP_POINT_ANGLE_MIN_DEG / 2.0)
 )
@@ -649,7 +666,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 # plane, |A|B), the bore centre's BASIC height under the datum-A top seat,
 # the block's depth, and B's side-face location.  A BASIC states the model's
 # exact value, so its places must print it unrounded: the height is the
-# build's 14.866 + 5.7334 = 20.5994, .811
+# build's 14.866 + 6.0636 = 20.9296, .824
 # (``build_sm_knife_mount.BORE_CENTRE_DEPTH``).
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "dowel hole from tap axis": DOWEL.HANGER_OFFSET_PLACES,

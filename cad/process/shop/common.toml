@@ -687,6 +687,9 @@ diameter_mm = 7.6708
 [tools.drill-31-64]  # Drills 31/64
 description = "31/64 (.4844 in) drill, 115-piece index"
 diameter_mm = 12.303125
+[tools.reamer-4990]  # B-reamer-.4990
+description = ".4990 in HSS chucking reamer"
+diameter_mm = 12.6746
 [tools.reamer-1240]  # B-reamer-.1240
 description = ".1240 in HSS chucking reamer"
 diameter_mm = 3.1496

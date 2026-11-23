@@ -486,7 +486,7 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
     assert "WITHOUT THE LEVER" in step
     assert step.index("BY HAND") < step.index(notes.KNIFE_GAUGE_BAR) < step.index("TIGHTEN")
     assert step.index("TIGHTEN") < step.index("WITHDRAW THE BAR")
-    assert notes.KNIFE_GAUGE_BAR == "(Ø.47) X 8.0 LONG GAUGE BAR"
+    assert notes.KNIFE_GAUGE_BAR == "(Ø.50) X 8.0 LONG GAUGE BAR"
     assert "PIN" not in notes.KNIFE_GAUGE_BAR and "ZZ" not in notes.KNIFE_GAUGE_BAR
     (bar_step,) = [
         line for line in notes.ASSEMBLY_STEPS if notes.KNIFE_GAUGE_BAR in line
@@ -498,13 +498,15 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
     # No four-place size is left in the step for an instrument to read.
     assert re.search(r"\.\d{4}\b", bar_step.replace(notes.KNIFE_GAUGE_BAR, "")) is None
     record = _shop_equipment.load()["gauges"]["gauge-bar-0472x8"]
-    assert "(Ø.47) x 8.0 in" in record["name"]
+    assert "(Ø.50) x 8.0 in" in record["name"]
     low, high = builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN
     assert f"{low:.4f}".lstrip("0") in record["purchase"]
     assert f"{high:.4f}".lstrip("0") in record["purchase"]
-    # Every bar so cut, Ø.4679-.4709, rounds to the printed (Ø.47).
-    assert notes.KNIFE_GAUGE_BAR_SIZES_IN == pytest.approx((0.4679, 0.4709))
-    assert "Ø.4679-.4709" in record["purchase"]
+    # Every bar so cut, Ø.4944-.4974 under the Ø.4985 +.0015/0 bores (owner
+    # ruling 2026-11-23, tool audit Q13), lies inside the printed (Ø.50)'s
+    # .XX band.
+    assert notes.KNIFE_GAUGE_BAR_SIZES_IN == pytest.approx((0.4944, 0.4974))
+    assert "Ø.4944-.4974" in record["purchase"]
     assert max(builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) * 25.4 == pytest.approx(
         builder.KNIFE_BAR_CLEARANCE
     )

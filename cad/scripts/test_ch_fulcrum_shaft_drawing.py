@@ -34,8 +34,9 @@ def test_shaft_carries_no_frames_or_datums() -> None:
 def test_plain_shaft_domed_proud_of_each_keeper() -> None:
     spec = ch_fulcrum_shaft_spec
     keeper = ch_fulcrum_keeper_spec
-    # #2338: the keeper bore is a .2550 reamer's size over the .2500 shaft.
-    assert round((keeper.BORE_DIA - spec.SHAFT_DIA) / 25.4, 4) == 0.0050
+    # #2338: the keeper bore is a .2560 reamer's size over the .2500 shaft
+    # (owner ruling 2026-11-23, tool audit Q7; was .2550).
+    assert round((keeper.BORE_DIA - spec.SHAFT_DIA) / 25.4, 4) == 0.0060
     assert math.isclose(
         spec.CYLINDER_HALF, keeper.KEEPER_Z_OFF + keeper.LUG_HALF_T + 1.016
     )
@@ -236,9 +237,9 @@ def test_keeper_bores_reamed_apart_still_pass_the_shaft() -> None:
     assert math.isclose(keeper.BORE_ALIGNMENT_ALLOWANCE_MM, allowance)
     assert round(allowance, 4) == 0.0926
     least = keeper.BORE_DIA + keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA - spec.SHAFT_DIA_BAND[0]
-    assert round(least / 25.4, 4) == 0.0050
+    assert round(least / 25.4, 4) == 0.0060
     assert math.isclose(spec.ALIGNED_MIN_CLEARANCE_MM, least - allowance)
-    assert round(spec.ALIGNED_MIN_CLEARANCE_MM, 4) == 0.0344
+    assert round(spec.ALIGNED_MIN_CLEARANCE_MM, 4) == 0.0598
     assert spec.ALIGNED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM == 0.010
     # Neither the owned .2510 reamer nor a .2540 one would do it: each one's
     # least clearance is under the slip minimum plus the allowance.

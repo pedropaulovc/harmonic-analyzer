@@ -19,7 +19,7 @@
   <line class="leader" x1="281.4" y1="118.4" x2="490" y2="130.7"/>
   <circle class="leader-dot" cx="281.4" cy="118.4" r="2"/>
   <text class="label" x="490" y="134.7">bore on the crown's centre:</text>
-  <text class="label" x="490" y="150.7">spot, D drill, ream .2550</text>
+  <text class="label" x="490" y="150.7">spot, D drill, ream .2560</text>
   <line class="leader" x1="254.25" y1="145.55" x2="490" y2="187.41"/>
   <circle class="leader-dot" cx="254.25" cy="145.55" r="2"/>
   <text class="label" x="490" y="191.41">crown R{{cad.crown_radius_in:.3dot}}: climb (G2),</text>

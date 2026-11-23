@@ -232,8 +232,9 @@ they need from their process plans. They hold:
   #2333): a gray-iron ASTM A48 class 25B `[stock.<key>]` row of form `casting`,
   with its pattern, datum-target and as-cast mass notes; not quoted or ordered;
 - the MHA-SM-02 knife mount's records to make or buy (owner ruling 2026-11-10
-  (Pedro), #2334): the MHA-SM-00 gauge bar (`gauges.gauge-bar-0472x8`), the
-  12 mm H7 reamer (`tools.reamer-12mm-h7`) and a 4140/4142 HT `[stock.<key>]` row;
+  (Pedro), #2334): the MHA-SM-00 (Ø.50) gauge bar (`gauges.gauge-bar-0472x8`), the
+  .4990 reamer (`tools.reamer-4990`; owner ruling 2026-11-23, tool audit Q13: "no
+  12 mm reamer") and a 4140/4142 HT `[stock.<key>]` row;
 - the MHA-SM-01 gooseneck tube to buy (owner rulings 2026-10-27 (Pedro), #1951,
   2026-11-08, #2315, 2026-11-14, #2401, and 2026-11-22, option A,
   `https://github.com/pedropaulovc/harmonic-analyzer/issues/2401#issuecomment-7085840331`, superseding #2401's 36 in):

@@ -64,7 +64,8 @@ ANCHOR_H = 0.75 * MM_PER_IN  # 19.05 summation-anchor boss height (Y)
 
 # hex knife-edge trunnion (vertex-up).  HEX_W was 8.653 (118.6 deg ridge);
 # narrowed to 8.080 (115.1 deg ridge) so the trunnion still rocks >= 5.0 deg
-# inside the sm-knife-mount Ø12 close bore at the worst case of BOTH parts'
+# inside the sm-knife-mount bore (the book's Ø12 close bore; Ø.4985 since
+# owner ruling 2026-11-23, tool audit Q13) at the worst case of BOTH parts'
 # bands (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``).  The print
 # holds the ridge to each side face and each upper flank to its side face
 # (below); the width prints as a reference, the vertex height .XXX at HEX_BAND.
