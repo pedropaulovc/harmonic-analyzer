@@ -31,8 +31,6 @@ description = "Digital angle gauge"
 [tools.reamer-1280]  # MHA-SM-02 Ø.1280 ±.0007 REAM (.37), drill point
 description = ".1280 in HSS chucking reamer"
 diameter_mm = 3.2512
-[tools.sine-bar-5]  # MHA-SM-03 122.4° ±.5° knife-edge stubs
-description = "Sine bar, 5 in centres"
 [tools.sm-gooseneck-bend-form]  # inventory fixtures.sm-gooseneck-bend-form
 description = "Shop-made two-plate 6061 bend form for the MHA-SM-01 gooseneck tube: a closed half-round channel holding the tail, a quarter cove round the R3 arc"
 
