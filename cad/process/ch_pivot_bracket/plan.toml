@@ -503,7 +503,7 @@ feed = "hand"
 # is listened to.
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "First blank only: the arch's cuts are outside the 1/2 in end mill's measured envelope and run the chart's 2650 rpm, not measured (dechatter #3427): the finish {{process.arch_depth_mm:in.3dot}} deep × {{process.arch_finish_stock_mm:in.3dot}} wide, the rough levels {{process.arch_rough_level_mm:in.3dot}} deep × up to {{process.arch_rough_woc_mm:in.3dot}} wide. Listen through the arch; on chatter stop the file and tell the owner." },
+  { kind = "stop", text = "First blank only: these arch cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3427): the finish pass {{process.arch_depth_mm:in.3dot}} deep × {{process.arch_finish_stock_mm:in.3dot}} wide, the rough levels {{process.arch_rough_level_mm:in.3dot}} deep × up to {{process.arch_rough_woc_mm:in.3dot}} wide. Listen through the arch; on chatter, feed hold, stop the spindle and tell the owner." },
 ]
 feed = "hand"
 
@@ -605,7 +605,7 @@ feed = "hand"
 # listened to.
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "First blank only: PB05_step runs the chart's 2650 rpm, not measured. Its wall pass, .380 deep × {{process.wall_finish_woc_mm:in.3dot}} wide, is deeper than the 1/2 in end mill's measured envelope (dechatter #3427); its foot-end and step passes, .165 wide, are wider than the measured .134 (#3428). Listen on this blank; on chatter stop the file and tell the owner." },
+  { kind = "stop", text = "First blank only: these PB05_step cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3427, #3428): the wall pass .380 deep × {{process.wall_finish_woc_mm:in.3dot}} wide, the foot-end and step passes {{process.face_step_max_mm:in.3dot}} and {{process.step_level_mm:in.3dot}} deep × .165 wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner." },
 ]
 feed = "hand"
 
