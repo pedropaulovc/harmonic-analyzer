@@ -16,7 +16,7 @@
 #
 # Flagged: the key stock (stock-to-order.toml c360-square-5mm-key) and the
 # .040 pin gauge of Op 70's depth check (gauges.pin-gauges) are to order.
-# The groove's stations are held by the DRO plunges (Op 220), not read. The placeholder's sharp-nose tool and ignition wrenches are not
+# The groove's stations are read off a gauge block standing in it (Op 250). The placeholder's sharp-nose tool and ignition wrenches are not
 # needed: the P1 blade cuts the R.008 MAX corner sharp, and the taps turn in
 # a tap wrench.
 title = "Pen Rod"
@@ -352,7 +352,7 @@ cut_diameter_mm = "{{process.square_corners_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Read the pivot's length with the calipers' depth rod (the beam's end on the pivot end, the rod down beside the pivot onto the shoulder face)."
+instruction = "Read the pivot's length with the calipers' depth rod (the beam's end on the pivot end, the rod down beside the pivot onto the shoulder face); write it down as P."
 inspection = "Pivot length {{cad.pivot_length_min_in:.2dot}}–{{cad.pivot_length_max_in:.2dot}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pivot_length_band_mm}}" }]
 
@@ -379,6 +379,16 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.groove_dia_band_mm}}" }, 
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Groove floor over {{cad.groove_dia_max_in:.3dot}}: plunge again at all three Op 220 stations, .002 deeper on the radius (the floor about .004 smaller), then read again as Op 230. Floor under {{cad.groove_dia_min_in:.3dot}}, or the width outside {{process.groove_width_min_in:.3dot}}–{{process.groove_width_max_in:.3dot}}: scrap the blank and make another from Setup 1."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Stand the {{process.groove_width_min_in:.3dot}} block on edge in the groove. Read the calipers' depth rod, the beam's end on the pivot end, the rod down beside the pivot onto the block's face: the block pushed toward the shoulder (R1), then toward the end (R2). Station = P − R1 − {{process.groove_width_min_in:.3dot}}; end station = P − R2."
+inspection = "Groove station {{cad.groove_station_min_in:.3dot}}–{{cad.groove_station_max_in:.3dot}}, end station {{cad.groove_end_station_min_in:.3dot}}–{{cad.groove_end_station_max_in:.3dot}} from the shoulder."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.groove_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.groove_end_station_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Either station outside its band: the groove is off the set screw's seat; scrap the blank and make another from Setup 1."
 
 [[setups]]
 machine_kind = "other"
