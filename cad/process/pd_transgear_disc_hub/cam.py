@@ -591,6 +591,12 @@ def context(
     if knockout_tip < -r_min + AIR_MIN_MM:
         raise ValueError("the #56's point reaches the parallel")
     stop = -g["stop_nominal"]
+    # The #53's full diameter ends at the nominal stop on purpose: its 118°
+    # cone below is the pin's firm seat. A corrective CM03 rerun (the stop
+    # short by the reamer's bevel, at most .010) is deliberately allowed to
+    # end-cut into that cone in free-machining C360, rather than drilling the
+    # #53 deeper and losing the seat; ops 320-330 take it in one rerun by the
+    # measured shortfall only.
     pilot_tip = stop - _point(d53)
     _agree(plan, "pilot_tip_mm", pilot_tip)
     _agree(plan, "ream_tip_mm", stop)
