@@ -88,6 +88,9 @@ description = "Straightedge"
 [tools.chamfer-mill-330ch-1-4-90]  # inventory tools.chamfer-mill-330ch-1-4-90
 description = "330CH 1/4 in 90° included 2-flute chamfer mill"
 diameter_mm = 6.35
+[tools.endmill-carbide-3-64]  # MHA-PD-17 flat at the pin hole's mouth (CM02_pin_hole)
+description = "3/64 in square carbide end mill, 2- or 3-flute"
+diameter_mm = 1.190625
 [tools.form-tool-r180]  # MHA-PD-23 R.18 head dome
 description = "R.180 dome form tool: concave R.180 edge, cuts a convex R.18 dome"
 [tools.gauge-pin-0625]  # MHA-PD-10 .002 TIR TO A Ø.0625 PIN
