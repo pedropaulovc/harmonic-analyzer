@@ -103,22 +103,10 @@ resolution_mm = 0.00254
 range_mm = [10.16, 10.1727]
 resolution_mm = 0.001016
 
-# The MHA-CH-13 hub hole read to .0001 for the MHA-CH-12 matched press (owner
-# ruling 2026-11-21: the land is turned to the measured strap hole): the hub
-# pair above plus four Class X steps .4001-.4004 between them
-# (cad/config/shop-equipment/ gauges.plug-gauges-4001-4004, to buy). The
-# set's own pins span .4001-.4004 = 10.16254-10.17016 mm in .0001 in =
-# 0.00254 mm steps; with the .4000/.4005 pair the largest pin that enters
-# reads the hole over .4000-.4005.
-[gauges.plug-gauges-4001-4004]
-range_mm = [10.16254, 10.17016]
-resolution_mm = 0.00254
-
 # The MHA-CH-13 hub hole read with two Class X steps, .4002 and .4004, between
 # the hub pair above (owner ruling 2026-11-23, tool audit Q2, verbatim: "B.
 # Four reading pins (.4000, .4002, .4004, .4005)."). It replaces the four
-# .4001-.4004 steps above, whose record the tool-records cleanup PR removes
-# once every family has landed. Range:
+# .4001-.4004 steps the hub hole was first read with. Range:
 # the two pins, .4002-.4004 in = 10.16508-10.17016 mm; resolution: the
 # reading's step, .0002 in = 0.00508 mm (the last step, .4004 to the pair's
 # .4005, is .0001). Not owned: to buy. Its inventory record
@@ -139,8 +127,8 @@ resolution_mm = 0.00508
 # scale; its resolution is one pin's Class ZZ tolerance, .0002 in =
 # 0.00508 mm: with both pins at their tolerance limits only the middle .0001
 # of a .0005 band is sure to pass, so each traveler mikes its pins and
-# accepts between the two readings. The Class X pairs' records below stay
-# until no plan names them.
+# accepts between the two readings. Of the Class X pairs the ZZ pins replace,
+# only .0930/.0935's gauges record below stays: a test reads it.
 [gauges.zz-pins-3135-3140]
 range_mm = [7.9629, 7.9756]
 resolution_mm = 0.00508
@@ -152,33 +140,12 @@ resolution_mm = 0.00508
 [tools.zz-pins-0930-0935]
 description = "Class ZZ pins for .0930-.0935: GO .0930 plus (single), NO-GO .0935 minus (single)"
 
-# The dt reamed-bore go/no-go pairs, Vermont Gage Class X as the hub pair
-# (cad/config/shop-equipment/ gauges, same keys, to buy; tools rows in
-# shop/dt.toml): .2510/.2515 (MHA-DT-18, MHA-DT-14, MHA-DT-23), .3135/.3140
-# and .1570/.1575 (MHA-DT-14), .3760/.3765 (MHA-DT-02), .0930/.0935 and
-# .4500/.4505 (MHA-DT-11).
-[gauges.plug-gauges-2510-2515]
-range_mm = [6.3754, 6.3881]
-resolution_mm = 0.001016
-[gauges.plug-gauges-3135-3140]
-range_mm = [7.9629, 7.9756]
-resolution_mm = 0.001016
-[gauges.plug-gauges-1570-1575]
-range_mm = [3.9878, 4.0005]
-resolution_mm = 0.001016
-[gauges.plug-gauges-3760-3765]
-range_mm = [9.5504, 9.5631]
-resolution_mm = 0.001016
-# MHA-DT-20's pivot bore pair (.2500/.2505; tools row in shop/dt.toml;
-# cad/config/shop-equipment/ gauges, same key, to buy).
-[gauges.plug-gauges-2500-2505]
-range_mm = [6.35, 6.3627]
-resolution_mm = 0.001016
+# The MHA-DT-11 drive-pin holes' go/no-go pair .0930/.0935, Vermont Gage
+# Class X as the hub pair (cad/config/shop-equipment/ gauges, same key, to
+# buy; tools row in shop/dt.toml). No plan names it since the ZZ pins
+# replaced it; test_dt_crankshaft_process.py reads its range.
 [gauges.plug-gauges-0930-0935]
 range_mm = [2.3622, 2.3749]
-resolution_mm = 0.001016
-[gauges.plug-gauges-4500-4505]
-range_mm = [11.43, 11.4427]
 resolution_mm = 0.001016
 
 [gauges.height-gauge]
@@ -760,7 +727,7 @@ description = "Carbide 1/4 in 90° chamfering end mill, 2-flute (McMaster 3073A4
 diameter_mm = 6.35
 flute_length_mm = 3.175
 # Harvey Tool 34662, here since two families plunge with it (tool audit
-# 2026-11-23, row endmill-carbide-3-64): MHA-MS-02's rebate relief and
+# 2026-11-23: it replaces the 3/64 in end mill): MHA-MS-02's rebate relief and
 # MHA-PD-17's pin-hole flat. MHA-MS-02: the rebate's corner relief (.05
 # deep × .06 high, beside the roof, at the
 # bottom of the .134 rebate): no owned cutter is under .07 wide and reaches
@@ -805,10 +772,6 @@ range_mm = [0.0381, 0.889]
 resolution_mm = 0.0254
 [tools.feeler-gauges]  # inventory gauges.feeler-gauges
 description = "Pittsburgh SAE/metric feeler gauge set, 32 pieces"
-[tools.form-tool-r070]  # MHA-PD-23 R.07 shank-end dome; MHA-MG-07 R.07 tip
-description = "R.070 dome form tool: concave R.070 edge, cuts a convex R.070 dome"
-[tools.form-tool-r125]  # MHA-CH-04 2X (SR.125) ends; MHA-MG-03 SR.13 tip; MHA-MG-04 R.13 TANGENT HEMISPHERE
-description = "R.125 full-radius dome form tool: concave R.125 edge, cuts a convex SR.125 dome (hemisphere on 1/4 rod)"
 [tools.gauge-blocks-mitutoyo]  # inventory gauges.gauge-blocks-mitutoyo
 description = "Mitutoyo 81-piece inch gauge block set, shop grade"
 [tools.grooving-tool-020]  # MHA-PD-23 .020 +.002/.000 ring groove; MHA-MG-04 thread relief, corners R.008 max.; MHA-MG-07 thread relief, corners R.008 max.

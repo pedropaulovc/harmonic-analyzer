@@ -267,8 +267,6 @@ diameter_mm = 6.5024
 [tools.tap-1-72-plug]  # Tap coverage #1-72 UNF
 description = "#1-72 UNF plug hand tap (OSG 1010700)"
 tap_drill_mm = 1.5875  # 1/16 (.0625 in, tools.drill-1-16), ~58% thread: MHA-CH-07's Ø.060 +.004/0 crown hole excludes the usual #53 (.0595).
-[tools.form-tool-r160]  # D-form-tool-R160
-description = "R.160 convex-dome form tool"
 
 # --- MHA-CH-07 fulcrum keeper's counterbore (cad/process/ch_fulcrum_keeper) ---
 # The long-reach 1/8 in end mill (cad/config/shop-equipment/, same key,
