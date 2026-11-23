@@ -617,6 +617,9 @@ def context(
     ream_tip = ream_full - p["reamer_lead_mm"]
     _agree(plan, "bore_tip_height_mm", bore_tip)
     _agree(plan, "ream_tip_height_mm", ream_tip)
+    # The GO-refused re-ream's MDI moves (Setup 5) repeat PB04's: in and out
+    # from the safe plane over the bar's top.
+    _agree(plan, "ream_clear_z_mm", section + SAFE_MM)
     if ream_tip < bore_full - 1e-6 or p["bore_ream_past_mm"] <= 0:
         raise ValueError("the reamer's tip runs below the drill's full diameter")
     arch_bottom = section - arch_depth

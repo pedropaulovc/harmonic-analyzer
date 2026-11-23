@@ -1,0 +1,42 @@
+"""The Class ZZ pin windows the reamed-bore travelers print (owner ruling
+2026-11-23, tool audit Q1): GO a plus pin at the bore's low limit, NO-GO a
+minus pin at its high limit, each pin's acceptable reading one Class ZZ
+tolerance (.0002 in) wide, and the gauge record spanning the model's band."""
+
+from __future__ import annotations
+
+import math
+import tomllib
+
+import pytest
+
+import _process_plans
+import export_features
+
+ZZ_TOL_MM = 0.0002 * 25.4
+
+# (plan stem, the bore's feature key, the plan's gauge record)
+BORES = [
+    ("ch_pivot_bracket", "bore", "zz-pins-2560-2600"),
+    ("mg_wheel_bar", "axle_bore", "zz-pins-1865-1870"),
+    ("mg_wheel_drum", "bore", "zz-pins-4990-4995"),
+]
+
+
+@pytest.mark.parametrize(("stem", "feature", "gauge"), BORES)
+def test_the_pin_windows_sit_on_the_model_bore_band(stem, feature, gauge) -> None:
+    plan = tomllib.loads(_process_plans.plan_path(stem).read_text(encoding="utf-8"))
+    p = plan["parameters"]
+    manifest = export_features.requirement_manifest(stem)
+    low, high = manifest["features"][feature]["dia"]
+    expected = {
+        "go_pin_min_mm": low,
+        "go_pin_max_mm": low + ZZ_TOL_MM,
+        "nogo_pin_min_mm": high - ZZ_TOL_MM,
+        "nogo_pin_max_mm": high,
+    }
+    for key, value in expected.items():
+        assert math.isclose(p[key], value, abs_tol=1e-4), (stem, key, p[key], value)
+    record = _process_plans.load_shop()["gauges"][gauge]
+    assert record["range_mm"] == pytest.approx([low, high], abs=1e-4)
+    assert any(tool.get("ref") == gauge for tool in plan["tools"])

@@ -114,6 +114,19 @@ resolution_mm = 0.001016
 range_mm = [10.16254, 10.17016]
 resolution_mm = 0.00254
 
+# The MHA-CH-13 hub hole read with two Class X steps, .4002 and .4004, between
+# the hub pair above (owner ruling 2026-11-23, tool audit Q2, verbatim: "B.
+# Four reading pins (.4000, .4002, .4004, .4005)."). It replaces the four
+# .4001-.4004 steps above, whose record the tool-records cleanup PR removes
+# once every family has landed. Range:
+# the two pins, .4002-.4004 in = 10.16508-10.17016 mm; resolution: the
+# reading's step, .0002 in = 0.00508 mm (the last step, .4004 to the pair's
+# .4005, is .0001). Not owned: to buy. Its inventory record
+# (cad/config/shop-equipment/, same key) is ShopSourcing's to add.
+[gauges.plug-gauges-4002-4004]
+range_mm = [10.16508, 10.17016]
+resolution_mm = 0.00508
+
 # Class ZZ go/no-go pins for the reamed bands (owner ruling 2026-11-23, tool
 # audit Q1, verbatim: "ZZ singles per the record: 29 pins (17 plus GO, 12
 # minus NO-GO), about $130. Accept that good holes near a limit may be
@@ -226,13 +239,17 @@ range_mm = [1.27, 101.6]
 resolution_mm = 0.00254
 
 # The 48 in steel rule (cad/config/shop-equipment/ tools.steel-rule-48),
-# to buy: the only length gauge on record past the 6 in calipers. A plan
-# that reads it needs its 1/100 in graduation (MHA-CH-01's 31.82 ± .01
-# length), a requirement of the purchase: 48 in = 1219.2 mm, .01 in =
-# .254 mm.
+# to buy: the only length gauge on record past the 6 in calipers. The rule
+# bought is the Insize 7110-1200 (owner ruling 2026-11-23, tool audit Q3:
+# "B. Buy only the Insize rule; ..."): its finest graduation is 1/64 in
+# (also 1/32, 1/16, 0.5 mm and 1 mm), it does not read 1/100 in, and Insize
+# rates it ±0.80 mm (±.031 in) over its length (insize.com/rulers/7110.html,
+# read 2026-11-22). 48 in = 1219.2 mm; resolution 1/64 in = 0.396875 mm.
+# It cannot prove a ±.01 band: MHA-CH-01 accepts its length with it to
+# ±1/32 only and makes the 20 bars equal by comparison with the calipers.
 [gauges.steel-rule-48]
 range_mm = [0.0, 1219.2]
-resolution_mm = 0.254
+resolution_mm = 0.396875
 
 [limits]
 # HA: shop-policy numbers.stickout_ld_max 3.0.
@@ -716,7 +733,7 @@ description = "Aluminium oxide two-grit sharpening stone, 6 x 2 x 1 in, 100 and 
 [tools.pliers]  # F-pliers
 description = "Pliers"
 [tools.steel-rule-48]  # F-steel-rule-48
-description = "Steel rule, 48 in"
+description = "Steel rule, 48 in, finest graduation 1/64 in (Insize 7110-1200)"
 # Tool audit 2026-11-23 (row transfer-punches): the fractional set only; a
 # number-size hole is spotted through with the same-number drill from the
 # 115-piece index (no plan names a number-size punch).
