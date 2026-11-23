@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 5: the finished stick, ruled face up, as the drawing shows it (0 at the left, ticks hanging from the lower edge). 3.3 px/mm along it, the width drawn 4x over; ticks schematic (every fifth drawn). Hand-drawn; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 250" width="780" height="250" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <text class="title" x="12" y="20">Setup 5: what is gauged (ruled face up; width drawn 4× over; every fifth tick drawn)</text>
+  <!-- The stick: 201.93 mm = 666 px; 8.0 mm x 4 = 106 px. -->
+  <rect class="part-kept" x="50" y="70" width="666" height="106"/>
+  <!-- Long ticks every 14.2 mm (46.9 px) from X 56.5 mm (236 px from the left end); the half tick at 63.6 mm. -->
+  <path class="dims" d="M236.5 176 L236.5 136 M283.3 176 L283.3 136 M330.2 176 L330.2 136 M377.0 176 L377.0 136 M423.9 176 L423.9 136 M470.8 176 L470.8 136 M517.6 176 L517.6 136 M564.5 176 L564.5 136 M611.3 176 L611.3 136 M658.2 176 L658.2 136 M705.0 176 L705.0 136"/>
+  <path class="dims" d="M259.9 176 L259.9 122 M306.8 176 L306.8 152 M353.6 176 L353.6 152 M400.5 176 L400.5 152 M447.3 176 L447.3 152 M494.2 176 L494.2 152 M541.0 176 L541.0 152 M587.9 176 L587.9 152 M634.7 176 L634.7 152 M681.6 176 L681.6 152"/>
+  <text class="label" x="232" y="128">0</text>
+  <text class="label" x="466" y="128">5</text>
+  <text class="label" x="686" y="128">10</text>
+  <line class="datum" x1="716" y1="56" x2="716" y2="190"/>
+  <text class="datum-label" x="636" y="50">DATUM END</text>
+  <text class="label" x="56" y="94">ZERO END</text>
+  <text class="label" x="300" y="94">PLAIN EDGE</text>
+  <text class="label" x="56" y="170">RULED EDGE</text>
+  <!-- Length, by the height gauge. -->
+  <path class="dims" d="M50 182 L50 222 M716 190 L716 222 M50 214 L716 214"/>
+  <text class="label" x="270" y="208">{{cad.zero_end_length_min_in:.2f}}–{{cad.zero_end_length_max_in:.2f}}, height gauge</text>
+  <!-- Width, by the micrometer. -->
+  <path class="dims" d="M44 70 L20 70 M44 176 L20 176 M28 70 L28 176"/>
+  <text class="label" x="34" y="240">width {{cad.ruled_edge_width_min_in:.3dot}}–{{cad.ruled_edge_width_max_in:.3dot}}: micrometer, at both ends and the middle</text>
+  <path class="leader" d="M28 176 L60 228"/>
+</svg>

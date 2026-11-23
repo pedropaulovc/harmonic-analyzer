@@ -117,7 +117,8 @@ resolution_mm = 0.00254
 # The dt reamed-bore go/no-go pairs, Vermont Gage Class X as the hub pair
 # (cad/config/shop-equipment/ gauges, same keys, to buy; tools rows in
 # shop/dt.toml): .2510/.2515 (MHA-DT-18, MHA-DT-14, MHA-DT-23), .3135/.3140
-# and .1570/.1575 (MHA-DT-14), .3760/.3765 (MHA-DT-02).
+# and .1570/.1575 (MHA-DT-14), .3760/.3765 (MHA-DT-02), .0930/.0935 and
+# .4500/.4505 (MHA-DT-11).
 [gauges.plug-gauges-2510-2515]
 range_mm = [6.3754, 6.3881]
 resolution_mm = 0.001016
@@ -129,6 +130,17 @@ range_mm = [3.9878, 4.0005]
 resolution_mm = 0.001016
 [gauges.plug-gauges-3760-3765]
 range_mm = [9.5504, 9.5631]
+resolution_mm = 0.001016
+# MHA-DT-20's pivot bore pair (.2500/.2505; tools row in shop/dt.toml;
+# cad/config/shop-equipment/ gauges, same key, to buy).
+[gauges.plug-gauges-2500-2505]
+range_mm = [6.35, 6.3627]
+resolution_mm = 0.001016
+[gauges.plug-gauges-0930-0935]
+range_mm = [2.3622, 2.3749]
+resolution_mm = 0.001016
+[gauges.plug-gauges-4500-4505]
+range_mm = [11.43, 11.4427]
 resolution_mm = 0.001016
 
 [gauges.height-gauge]
@@ -158,6 +170,25 @@ resolution_mm = 0.0254
 # installed MagXact MX-100M DRO, 5 um scales (owner-confirmed 2026-10-27).
 [gauges.mill-x-dro]
 range_mm = [0.0, 584.2]
+resolution_mm = 0.005
+
+# PM-1127VF-LB carriage (Z) DRO read as a length gauge (the dt_pinion_arbor
+# plan's crown and rim stations, the tool touched on the work). Range: the
+# carriage reads no farther than machines.pm-1127vf-lb between_centres_mm
+# (the DRO's scale length is not recorded); resolution: the owner's 5 um
+# (cad/config/shop-equipment/dro.toml dro.pm-1127vf-lb, 2026-11-21).
+[gauges.lathe-z-dro]
+range_mm = [0.0, 699.77]
+resolution_mm = 0.005
+
+# PM-1127VF-LB cross-slide (X) DRO read as a length gauge (the dt_crankshaft
+# plan's drive-pin offsets, ±7.000 mm from the stub's axis). Range: the cross
+# slide reads no farther from the axis than half machines.pm-1127vf-lb
+# swing_over_cross_slide_mm (its scale length is not recorded); resolution:
+# the owner's 5 um (dro.pm-1127vf-lb). Its accuracy is not recorded: the
+# plan proves it on a slug before the part.
+[gauges.lathe-x-dro]
+range_mm = [0.0, 84.582]
 resolution_mm = 0.005
 
 # The owned Mitutoyo 81-piece inch gauge block set (cad/config/shop-equipment/
@@ -262,6 +293,14 @@ tap_drill_mm = 2.2606
 [gauges.mill-y-dro]
 range_mm = [0.0, 222.25]
 resolution_mm = 0.005
+
+# The .1260 reams' go/no-go pair (pn pivot bore, pd transgear bushings) (cad/config/shop-equipment/
+# gauges.plug-gauges-1260-1265, to buy): GO .1260 and NO-GO .1265 in =
+# 3.2004 and 3.2131 mm. A fixed-limit pair reads no scale; its resolution is
+# each member's Class X tolerance, .000040 in = 0.001016 mm.
+[gauges.plug-gauges-1260-1265]
+range_mm = [3.2004, 3.2131]
+resolution_mm = 0.001016
 
 # Riser (MHA-CH-06-TL-24) plan: the v49 notes.process names the #30 screw and
 # stop holes, the #9 CL/CR clearances and the 12 mm HUB relief; the 1/4 in
@@ -650,6 +689,53 @@ description = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
 [tools.threading-bits-lms-6685]  # MHA-DT-03-TL-03 1/4-28 UNF single-pointed (owner 2026-11-19); MHA-PD-08 #8-32 UNC single-pointed (owner 2026-11-19); MHA-MG-03 1/4-20 UNC single-pointed (owner 2026-11-19); MHA-DT-03-TL-07 #8-32 UNC single-pointed (drawing callout 2026-11-20, #2356)
 description = "5/16 in HSS threading tool bit, set of two (LMS 6685)"
 
+# --- Sheet parts bonded to a spoil plate on the CNC (dt, pd) ------------------
+# The .020-.032 brass sheet parts (MHA-DT-03-TL-02 phasing comb, and the pd
+# sheet parts) are cut out on the PM-30MV bonded on tape to a plain spoil
+# plate gripped in the vise. Ownership: cad/config/shop-equipment/
+# fixtures.sheet-spoil-plate and consumables.tape-3m-vhb-5906 (moved here
+# from ch.toml: the MHA-CH-13 strap and the MHA-MS-01 stick bond on it too).
+[tools.sheet-spoil-plate]
+description = "Spoil plate: a 5 in length of the 1/2 x 6 in 6061 flat, top as supplied, gripped in the vise on parallels"
+[tools.tape-3m-vhb-5906]
+description = "3M VHB 5906 double-sided tape, .006 in"
+# The sheet blanks are snipped off their sheet or strip (the comb's .020
+# sheet, moved here from dt.toml; the MHA-PD-03 clip's .032 strip).
+# Ownership: cad/config/shop-equipment/tools-hand.toml
+# tools.aviation-snips-straight, same key.
+[tools.aviation-snips-straight]
+description = "Aviation snips, straight cut"
+
+# --- The 1/2 in HSS end mill and its slot setting (ch, sm) --------------------
+# Moved here from ch.toml: the MHA-CH-13-TL-01 sub-plate's SP01 slots the 1/2
+# x 6 in 6061 bar on the table with them, and the MHA-SM-01 bend form's plates
+# (cad/process/sm_gooseneck, GF01/GF02) are cut through on the table the same
+# way. Source: base-bar.toml; Pedro's route dated 2026-11-05 and table-clamped
+# squaring sequence dated 2026-11-07. diameter_mm: the nominal size × 25.4. No
+# helix_deg or axial_ratio: no catalogue or measurement states a helix (owner
+# ruling 2026-11-16, #2873). flute_length_mm: the least its description's
+# "flutes ≥5/8 in" allows, 5/8 × 25.4 (the bend form's through cut checks
+# against it). Ownership: cad/config/shop-equipment/tools-cutting.toml, same
+# key (on hand, the dechatter v11 cutter).
+[tools.basebar-em-half]
+description = "1/2 in centre-cutting 2-flute end mill; flutes ≥5/8 in"
+diameter_mm = 12.7
+flute_length_mm = 15.875
+[settings.basebar-slot-rough-6061-t6511]
+tool = "basebar-em-half"
+material = "6061-t6511"
+rpm = 1250
+feed = "5 in/min"
+
+# --- Bench-cut rod and tube (dt, sm) -------------------------------------------
+# Moved here from dt.toml. MHA-DT-30 (cad/process/dt_pinion_lever_pin): a 1/16
+# rod is too slender for the 3-jaw or the 14 in saw's vise, so it is sawn by
+# hand in the bench vise. MHA-SM-01 (cad/process/sm_gooseneck): both ends of
+# the bent tube are sawn in the bench vise, where the 14 in saw cannot hold the
+# bent part. Ownership: cad/config/shop-equipment/tools-hand.toml, same key.
+[tools.junior-hacksaw]
+description = "Junior hacksaw, 6 in blade, 32 TPI"
+
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
 # prechips can check each plan's stock_refs. Description only: the ownership
@@ -657,6 +743,8 @@ description = "5/16 in HSS threading tool bit, set of two (LMS 6685)"
 # owner 2026-11-19).
 [stock.1018-flat-1-2x2-1-4]
 description = "1018 cold-finish carbon steel, flat bar, 1/2 x 2-1/4 in"
+[stock.1018-flat-1-8x1-1-2]
+description = "1018 cold-finish carbon steel, flat bar, 1/8 x 1-1/2 in"
 [stock.1018-flat-3-8x1-1-4]
 description = "1018 cold-finish carbon steel, flat bar, 3/8 x 1-1/4 in"
 [stock.1018-ground-round-1-4]
@@ -671,6 +759,15 @@ description = "1018 cold-finish carbon steel, round bar, 3/8 in"
 description = "1018 cold-finish carbon steel, round bar, 5/8 in"
 [stock.1018-square-3-4]
 description = "1018 cold-finish carbon steel, square bar, 3/4 x 3/4 in"
+[stock.6061-flat-1-2x6-54in]
+description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 54 in length"
+# The amplitude bar's riser (cad/process/ch_amplitude_bar, Setup 1) is sawn
+# from this bar: its plan's stock_refs names it.
+[stock.6061-flat-1-2x6-18in]
+description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 18 in length"
+# The freed 18 in bar (stock-bought, same key, on hand), named by two
+# families' stock_refs: the DT platform's Setups 3-4 spoil plate (whole) and
+# the MHA-PD-02 platen's fixture bar (moved here from dt.toml and pd.toml).
 [stock.c360-flat-3-4x1-1-4]
 description = "C36000 free-machining brass (360-H02, extruded), flat bar, 3/4 x 1-1/4 in"
 [stock.c360-round-1-4]

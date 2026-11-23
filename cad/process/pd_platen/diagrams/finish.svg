@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="900" height="400"/>
+  <text class="title" x="20" y="20">Blackened all over (1 in = 50 px)</text>
+  <rect class="part-kept" x="130" y="94.5" width="531" height="265.5"/>
+  <circle class="holes" cx="138.5" cy="245" r="2.2"/>
+  <circle class="holes" cx="138.5" cy="108.8" r="2.2"/>
+  <circle class="holes" cx="652.3" cy="245" r="2.2"/>
+  <circle class="holes" cx="652.3" cy="108.8" r="2.2"/>
+  <circle class="holes" cx="183.1" cy="332.3" r="3.6"/>
+  <circle class="holes" cx="183.1" cy="265.4" r="3.6"/>
+  <circle class="holes" cx="289.2" cy="332.3" r="3.6"/>
+  <circle class="holes" cx="289.2" cy="265.4" r="3.6"/>
+  <circle class="holes" cx="395.4" cy="332.3" r="3.6"/>
+  <circle class="holes" cx="395.4" cy="265.4" r="3.6"/>
+  <circle class="holes" cx="501.6" cy="332.3" r="3.6"/>
+  <circle class="holes" cx="501.6" cy="265.4" r="3.6"/>
+  <circle class="holes" cx="607.7" cy="332.3" r="3.6"/>
+  <circle class="holes" cx="607.7" cy="265.4" r="3.6"/>
+  <text class="label-halo" x="395.5" y="163.1" text-anchor="middle">both faces, the four edges, the fourteen holes and the ten counterbores</text>
+  <text class="label-halo" x="395.5" y="186.8" text-anchor="middle">{{cad.finish}}</text>
+</svg>

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="16" y="22">Setup 2 (DT01): S faced to the depth, N down</text>
+  <rect class="fixture-vise" x="59.7" y="330.0" width="280.6" height="22.0"/>
+  <rect class="clamp" x="84.1" y="195.2" width="30.0" height="134.8"/>
+  <rect class="clamp" x="285.9" y="195.2" width="30.0" height="134.8"/>
+  <text class="label" x="99.1" y="368.0" text-anchor="middle">moving jaw</text>
+  <text class="label" x="300.9" y="368.0" text-anchor="middle">fixed jaw</text>
+  <rect class="fixture-support" x="114.1" y="215.7" width="9.5" height="114.3"/>
+  <rect class="fixture-support" x="276.4" y="215.7" width="9.5" height="114.3"/>
+  <line class="dims" x1="114.1" y1="291.9" x2="123.6" y2="291.9"/>
+  <line class="dims" x1="276.4" y1="291.9" x2="285.9" y2="291.9"/>
+  <rect class="part-kept" x="114.1" y="182.2" width="171.8" height="33.5"/>
+  <rect class="part-removed" x="114.1" y="177.4" width="171.8" height="4.7"/>
+  <line class="active-face" x1="114.1" y1="182.2" x2="285.9" y2="182.2"/>
+  <rect class="cutter" x="118.7" y="123.4" width="50.8" height="44.0"/>
+  <line class="arrow" x1="174.1" y1="145.4" x2="209.1" y2="145.4"/>
+  <text class="label" x="440.0" y="70.0">1/2 in end mill; levels to Z .4400</text>
+  <line class="leader" x1="436.0" y1="66.0" x2="144.1" y2="147.4"/>
+  <circle class="leader-dot" cx="144.1" cy="147.4" r="2.5"/>
+  <text class="label" x="440.0" y="110.0">becomes S</text>
+  <line class="leader" x1="436.0" y1="106.0" x2="200.0" y2="182.2"/>
+  <circle class="leader-dot" cx="200.0" cy="182.2" r="2.5"/>
+  <text class="label" x="440.0" y="150.0">N down on the stacks</text>
+  <line class="leader" x1="436.0" y1="146.0" x2="200.0" y2="215.7"/>
+  <circle class="leader-dot" cx="200.0" cy="215.7" r="2.5"/>
+  <text class="label" x="440.0" y="190.0">SEAT edge (fixed jaw)</text>
+  <line class="leader" x1="436.0" y1="186.0" x2="285.9" y2="198.9"/>
+  <circle class="leader-dot" cx="285.9" cy="198.9" r="2.5"/>
+  <text class="label" x="440.0" y="230.0">1 in + 1/2 in parallels stacked (1.5 in)</text>
+  <line class="leader" x1="436.0" y1="226.0" x2="279.9" y2="275.7"/>
+  <circle class="leader-dot" cx="279.9" cy="275.7" r="2.5"/>
+  <text class="label" x="16.0" y="406.0">Section across the jaws, E to the left. Z0 the stacks' top from the miked thickness.</text>
+</svg>

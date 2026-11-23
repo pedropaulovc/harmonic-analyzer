@@ -81,6 +81,9 @@ NOTES = (
     f"   THE MEASURED REAM (INTERFERENCE {_inch_range(PIN_PRESS_INTERFERENCE)}).",
 )
 NOTES_TEXT = "\n".join(NOTES)
+# The sheet's numbered notes as export_features reads a declared part's
+# DRAWING_NOTES; the drawing prints NOTES_TEXT.
+DRAWING_NOTES = NOTES_TEXT
 
 PIVOT_BORE_CALLOUT = f"REAM THRU, {see_note(PIVOT_NOTE)}"
 PIN_BORE_CALLOUT = f"REAM THRU, {see_note(PIN_NOTE)}"

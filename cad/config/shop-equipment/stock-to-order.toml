@@ -29,8 +29,9 @@
 [stock.1018-ground-flat-3-8x1]
 form = "flat_bar"
 material = "AISI 1018 cold-finished steel, precision ground"
-note = "To order: Online Metals part 12095, 3/8 x 1 in 1018 precision-ground flat, $72.20 each (read live 2026-10-27, #2019), thickness +/-.001 as supplied (Online Metals tool-steel tolerances, precision-ground 1018 row); the faces are not machined (pd-transgear-arm registry process; pd_transgear_arm_geometry.STOCK_SKU and THICKNESS_BAND). Allocation: pd-transgear-arm (MHA-PD-18). Length not read. Not owned."
+note = "To order: Online Metals part 12095, 3/8 x 1 in 1018 precision-ground flat, $72.20 each (read live 2026-10-27, #2019), thickness +/-.001 as supplied (Online Metals tool-steel tolerances, precision-ground 1018 row); the faces are not machined (pd-transgear-arm registry process; pd_transgear_arm_geometry.STOCK_SKU and THICKNESS_BAND). Allocation: pd-transgear-arm (MHA-PD-18): one 12 in length, one 5.70-5.75 in blank (pd_transgear_arm/plan.toml) and a spare blank. Not owned."
 section_mm = [25.4, 9.525]
+length_mm = 304.8
 status = "to_order"
 cite = ["cad/config/parts/pd-transgear-arm.yaml process", "cad/scripts/pd_transgear_arm_geometry.py STOCK_SKU = \"12095\"", "https://www.onlinemetals.com/en/buy/carbon-steel/0-375-x-1-tool-steel-rectangle-bar-1018/pid/12095"]
 
@@ -136,26 +137,43 @@ status = "to_order"
 cite = ["OnlineMetals 1018 cold-finish round, read live 2026-11-12", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2356"]
 
 # MHA-SM-02 knife mounts (owner ruling 2026-11-10 (Pedro), #2334 option B1).
+# Length 6 in (was 4 in): the traveler (cad/process/sm_knife_mount) saws two
+# blanks and a trial coupon for the 12 mm reamer (the reamer record's "trial-cut
+# a scrap of the same bar"), each 1.05-1.15 in, with a 1/8 in kerf each and a
+# squaring cut off the supplier's end: 3.95 in at worst, too close to 4.
+# Supplier: no 5/8 x 1-1/4 pre-hardened bar is listed at Online Metals (its
+# 4140 heat-treated rectangle list stops at 5/8 x 2) or Key Metals (5/8 x 1,
+# 5/8 x 2); McMaster cuts made-to-order hardened 4140/4142 bars to any width
+# and thickness. Decarb-free pre-hard flat is sold oversize (Key Metals'
+# typical +.020/+.045 in thickness, +.060/+.120 in width), so the traveler
+# mikes the bar against its own blank bands before sawing.
 [stock.4140-ht-flat-5-8x1-1-4]
 form = "flat_bar"
 material = "4140/4142 HT alloy steel, pre-hardened 28-32 HRC as supplied"
-note = "To order: 5/8 x 1-1/4 in 4140/4142 HT (pre-hardened, 28-32 HRC) flat bar, 4 in. Allocation: the two MHA-SM-02 knife mounts (each 1.00 x 1.17 x .55 finished, cut from the bar with facing stock). No heat treatment in the shop; both fits and the tap are cut in the supplied condition. Not owned."
+note = "To order: 5/8 x 1-1/4 in 4140/4142 HT (pre-hardened, 28-32 HRC) flat bar, 6 in, with the mill certificate (the traveler checks grade and hardness on it). Allocation: the two MHA-SM-02 knife mounts (each 1.00 x 1.17 x .55 finished, cut from the bar with facing stock) and one trial coupon for the 12 mm reamer. No heat treatment in the shop; both fits and the tap are cut in the supplied condition. Not owned."
 section_mm = [31.75, 15.875]
-length_mm = 101.6
+length_mm = 152.4
 status = "to_order"
-cite = ["Owner ruling 2026-11-10 (Pedro), https://github.com/pedropaulovc/harmonic-analyzer/issues/2334"]
+cite = [
+  "Owner ruling 2026-11-10 (Pedro), https://github.com/pedropaulovc/harmonic-analyzer/issues/2334",
+  "McMaster-Carr, Made-to-Order Hardened 4140 Alloy Steel Bars (read 2026-11-22): 4140 or 4142, hardened, decarb-free, cut to the ordered thickness and width, material certificate with traceable lot number: https://www.mcmaster.com/products/made-to-order-hardened-4140-alloy-steel-bars/",
+  "Key Metals, 4140 Prehard Alloy Flat (read 2026-11-22): heat treated, typical 26-32 Rockwell C, decarb free ground/milled, typical tolerances +.020/.045 in thickness, +.060/.120 in width; stock sizes 5/8 x 1 and 5/8 x 2, no 5/8 x 1-1/4: https://www.keymetals.com/alloy_steel/4140_Prehard_Flat.html",
+  "Online Metals, Alloy Steel Rectangle Bar 4140 (read 2026-11-22): 0.625 in thick heat-treated (decarb free, ASTM A829) listed at 2 in wide (mp-00002577), no 1.25 in width: https://www.onlinemetals.com/en/buy/alloy-steel-rectangle-bar-4140",
+]
 
 # MHA-SM-01 gooseneck tube (owner rulings 2026-10-27 (Pedro), #1951; 2026-11-08, #2315;
-# 2026-11-14, #2401: a 36 in cut, leaving about 11 in for a trial bend).
+# 2026-11-14, #2401; owner ruling 2026-11-22 (option A,
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2401#issuecomment-7085840331), superseding #2401's 36 in:
+# a 48 in cut, about 23.4 in left for a trial bend to 90° on the form).
 [stock.4130n-tube-1-2x0065]
 form = "round_tube"
 material = "4130-N seamless alloy steel tube"
-note = "To order: 1/2 in OD x .065 in wall 4130-N seamless round tube, one 36 in cut (owner ruling 2026-11-14, #2401). Allocation: MHA-SM-01 (sm-gooseneck), developed length 21.58 in (16.4 leg, the R3.0 x 90 degree bend's 4.71 centreline arc, .47 arm straight) plus the owner's ~2 in tail at the arm end (#2315) and ~1 in at the foot, both ends sawn and faced after the bend: 24.6 in; the rest, about 11 in, is a trial bend on the form (fixtures.sm-gooseneck-bend-form). Bonded at MHA-SM-00 with the owned LOCTITE 638 (consumables.loctite-638); no braze, solder, flux or plating (#2315). Finish: polished bare, oiled or waxed. Not owned."
+note = "To order: 1/2 in OD x .065 in wall 4130-N seamless round tube, one 48 in cut (owner ruling 2026-11-22, option A, https://github.com/pedropaulovc/harmonic-analyzer/issues/2401#issuecomment-7085840331, superseding #2401's 36 in). Allocation: MHA-SM-01 (sm-gooseneck), developed length 21.58 in (16.4 leg, the R3.0 x 90 degree bend's 4.71 centreline arc, .47 arm straight) plus the owner's ~2 in tail at the arm end (#2315) and ~1 in at the foot, both ends sawn and faced after the bend: 24.6 in; the rest, about 23.4 in, is the trial piece: it checks the bend form's groove before it is bent (fixtures.sm-gooseneck-bend-form; cad/process/sm_gooseneck/plan.toml Setups 3 and 4), then is trial-bent to 90° on the form to prove no kink and measure the springback (Setup 5). A kinked or creased bend scraps the blank and orders another 48 in. Bonded at MHA-SM-00 with the owned LOCTITE 638 (consumables.loctite-638); no braze, solder, flux or plating (#2315). Finish: polished bare, oiled or waxed. Not owned."
 od_mm = 12.7
 wall_mm = 1.651
-length_mm = 914.4
+length_mm = 1219.2
 status = "to_order"
-cite = ["OnlineMetals part 7322 https://www.onlinemetals.com/en/buy/alloy-steel/0-5-od-x-0-065-wall-x-0-37-id-alloy-steel-round-tube-4130-cond-n-seamless/pid/7322 read live 2026-11-14: 1/2 OD x .065 wall 4130 Cond. N seamless, 36 in $76.61; length tolerance +/-1/8 in", "Owner rulings 2026-10-27 (Pedro), https://github.com/pedropaulovc/harmonic-analyzer/issues/1951, 2026-11-08, https://github.com/pedropaulovc/harmonic-analyzer/issues/2315 and 2026-11-14, https://github.com/pedropaulovc/harmonic-analyzer/issues/2401"]
+cite = ["OnlineMetals part 7322 https://www.onlinemetals.com/en/buy/alloy-steel/0-5-od-x-0-065-wall-x-0-37-id-alloy-steel-round-tube-4130-cond-n-seamless/pid/7322 read live 2026-11-14: 1/2 OD x .065 wall 4130 Cond. N seamless, 36 in $76.61; length tolerance +/-1/8 in (the 48 in price not read: the page refused a live read 2026-11-22, HTTP 403)", "Owner rulings 2026-10-27 (Pedro), https://github.com/pedropaulovc/harmonic-analyzer/issues/1951, 2026-11-08, https://github.com/pedropaulovc/harmonic-analyzer/issues/2315 and 2026-11-14, https://github.com/pedropaulovc/harmonic-analyzer/issues/2401", "Owner ruling 2026-11-22 (option A: order 48 in, trial-bend the ~23 in spare to 90 degrees before the real part), https://github.com/pedropaulovc/harmonic-analyzer/issues/2401#issuecomment-7085840331, superseding #2401's 36 in"]
 
 # MHA-FR-02 top-frame casting (owner rulings 2026-11-10 (Pedro), #2333).
 [stock.gray-iron-a48-25b-casting]
@@ -175,13 +193,15 @@ cite = ["https://github.com/pedropaulovc/harmonic-analyzer/issues/2359", "cad/co
 
 # MHA-PD-14 latch hook (#2527; owner ruling 2026-11-20 (Pedro): "no heat
 # treatment for now; pd-latch-hook should be changed to not require heat
-# treatment", then the half-hard brass strip below).
+# treatment", then the half-hard brass strip below) and MHA-PD-03 platen
+# clip (cad/process/pd_platen_clip/plan.toml).
 [stock.c260-h02-strip-032x2]
 form = "strip"
 material = "C26000 cartridge brass, H02 half hard, ASTM B36"
-note = "To order: McMaster-Carr 8859K86, 260 brass strip .032 x 2 x 12 in, H02 (1/2 hard), thickness -.002 to +.002, $12.97 each. Allocation: pd-latch-hook (MHA-PD-14), one blank about 1.21 x 4.08 in (pd_latch_hook_geometry FLAT_LENGTH across the bend; WIDTH + DEV_TIP, the base's width and the arm's developed length below it, along the strip), used as supplied with no heat treatment; the rest of the strip is spare for trial bends and the former's trial roll. H01 quarter hard and annealed brass are not acceptable (pd_latch_hook_spec release check). Not owned."
+note = "To order: McMaster-Carr 8859K86, 260 brass strip .032 x 2 x 12 in, H02 (1/2 hard), thickness -.002 to +.002, $12.97 each; buy two. Allocation: pd-platen-clip (MHA-PD-03), two 3.60 in blanks off one strip's end (both clips and the four laminations of their bow former, PC01_sheet); pd-latch-hook (MHA-PD-14), one blank about 1.21 x 4.08 in (pd_latch_hook_geometry FLAT_LENGTH across the bend; WIDTH + DEV_TIP, the base's width and the arm's developed length below it, along the strip), used as supplied with no heat treatment; the rest of the two strips is spare for trial bends and the former's trial roll. H01 quarter hard and annealed brass are not acceptable (pd_latch_hook_spec release check). Not owned."
 section_mm = [50.8, 0.8128]
 length_mm = 304.8
+pieces = 2
 status = "to_order"
 cite = ["McMaster-Carr 8859K86 https://www.mcmaster.com/8859K86/ read live 2026-11-20: Ultra-Formable 260 Brass strip 2 x 12 in, 0.032 in thick (-0.002 to 0.002), temper H02 (1/2 hard), ASTM B36, modulus 16,000 ksi, yield not rated, $12.97 each", "cad/config/parts/pd-latch-hook.yaml material_specification"]
 
@@ -281,6 +301,43 @@ dia_in = [0.15625]
 length_in = [4.0]
 status = "to_order"
 cite = ["cad/config/parts/dt-pinion-cam-pin.yaml material_specification", "cad/scripts/dt_pinion_cam_pin_geometry.py PIN_DIA, PIN_LEN"]
+
+[stock.taper-pin-no3-1-3-4]
+form = "taper_pin"
+material = "12L14 carbon steel, ASME B18.8.2 No. 3 taper pin"
+note = "To order: McMaster-Carr 98390A254, No. 3 x 1-3/4 in taper pin, .219 in large end, 1:48 taper, 12L14 carbon steel, ASME B18.8.2, pack of 25 (dt_crank_pin_spec, read live 2026-11-20). Source: the dt-crank-pin (MHA-DT-09) registry row (owner ruling 2026-11-20, #2368): bought, cross-drilled only. One pin per part; the traveler's mill setup spaces the vise with wrung gauge blocks. Not owned."
+dia_in = [0.219]
+length_in = [1.75]
+pieces = 25
+status = "to_order"
+cite = ["cad/config/parts/dt-crank-pin.yaml material_specification", "cad/scripts/dt_crank_pin_spec.py SKU, DESIGNATION, PIN_LENGTH, BIG_END_DIA"]
+
+[stock.drill-rod-1-16]
+form = "round_bar"
+material = "AISI O1 drill rod, turned, ground and polished"
+note = "To order: Abrams Industries SKU 106183, 1/16 in O1 drill rod, .0625 +/-.0003 in, 36 in (+.125/-0), $5.75. Allocation: dt-pinion-lever-pin (MHA-DT-30), one .65 in piece hand-sawn off a filed end and filed to the .63 cut length (dt_pinion_lever_pin_geometry.PIN_LEN 16.002 mm), diameter as supplied (the sheet's .0625 +/-.0003, 1/16 DRILL ROD, STOCK OK); the rest is spare for remakes. Source: the dt-pinion-lever-pin registry row, AISI O1 or W1 drill rod, 1/16 in. Not owned."
+dia_in = [0.0625]
+length_in = [36.0]
+status = "to_order"
+cite = ["Abrams Industries O1-DR 1/16 x 36 https://us.abrams-industries.com/steel/tool-steel/o1/dr-36/o1-dr-1-16-x-36 read live 2026-11-21: SKU 106183, turned, ground and polished, diameter +/-0.0003 in, length saw cut +0.125/-0.000 in, $5.75", "cad/config/parts/dt-pinion-lever-pin.yaml material_specification", "cad/scripts/dt_pinion_lever_pin_geometry.py PIN_DIA, PIN_LEN"]
+
+[stock.key-stock-1-16-undersized]
+form = "square_bar"
+material = "1008-1045 carbon steel machine key stock, undersized"
+note = "To order: McMaster-Carr 98830A511, 1/16 x 1/16 x 12 in undersized carbon-steel machine key stock (height and width -.002/+.000), the same bar MHA-DT-VN-71 (dt-vn-cone-shaft-key, a 4.86 in key) is cut from, so one bar serves both. Allocation: dt-cone-gear-tl-arbor-key (MHA-DT-03-TL-06), one .17 in piece hand-sawn off a filed end and filed to the .15 cut length (dt_cone_gear_tl_keyed_arbor_spec.KEY_LENGTH 3.81 mm), section as supplied. Source: the dt-cone-gear-tl-arbor-key and dt-vn-cone-shaft-key registry rows. Price not read. Not owned."
+section_mm = [1.5875, 1.5875]
+length_mm = 304.8
+status = "to_order"
+cite = ["cad/config/parts/dt-vn-cone-shaft-key.yaml material_specification, supplier_skus (McMaster-Carr 98830A511, 1/16 x 1/16 x 12 in, undersized -.002/+.000)", "cad/config/parts/dt-cone-gear-tl-arbor-key.yaml material_specification", "cad/scripts/dt_cone_gear_tl_keyed_arbor_spec.py KEY_LENGTH"]
+
+[stock.c260-h02-sheet-020-12x12]
+form = "sheet"
+material = "C26000 cartridge brass, H02 half hard, ASTM B36"
+note = "To order: OnlineMetals 1589, C260 H02 brass sheet, .020 x 12 x 12 in, $42.82 (owner ruling 2026-11-14, #2734, the price as the registry row read it live that day); McMaster-Carr 9011K111 (ASTM B36) is the registry's alternative source. Allocation: dt-cone-gear-tl-phasing-comb (MHA-DT-03-TL-02), one 4.25 x 1.50 in blank snipped from a corner (the comb's 3.65 x .90 U, dt_cone_gear_tl_phasing_comb_spec SHEET_LENGTH x SHEET_HEIGHT, with .30 in margin all round: cad/process/dt_cone_gear_tl_phasing_comb/plan.toml blank_length_in x blank_width_in), thickness as supplied (the sheet's (.020) SHEET STOCK); the rest is spare for remakes. Not owned."
+section_mm = [304.8, 0.508]
+length_mm = 304.8
+status = "to_order"
+cite = ["cad/config/parts/dt-cone-gear-tl-phasing-comb.yaml (owner ruling 2026-11-14 #2734: OnlineMetals 1589, C260 H02 brass sheet, .020 x 12 x 12 in, $42.82, read live 2026-11-14; McMaster-Carr 9011K111 alternative)", "cad/scripts/dt_cone_gear_tl_phasing_comb_spec.py SHEET_THICK, SHEET_LENGTH, SHEET_HEIGHT"]
 
 [stock.c260-wire-040]
 form = "wire"

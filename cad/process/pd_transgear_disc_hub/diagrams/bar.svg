@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 1, section through the axis, 200 px to the inch: the 1-1/8 in bar .80 out of the 3-jaw (jaw fronts at x 150); Z0 the faced hub front face at x 310. Styles: prechips.palette. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1: the 1-1/8 bar in the 3-jaw; Z0 the hub front face; body and flange turned, hub parted off long</text>
+  <rect class="fixture-vise" x="30" y="60" width="80" height="280"/>
+  <rect class="clamp" x="110" y="57" width="40" height="30"/>
+  <rect class="clamp" x="110" y="313" width="40" height="30"/>
+  <rect class="part-rest" x="110" y="87.5" width="73" height="225"/>
+  <rect class="part-removed" x="178" y="87.5" width="136" height="7.5"/>
+  <rect class="part-removed" x="178" y="305" width="136" height="7.5"/>
+  <rect class="part-removed" x="250" y="95" width="64" height="51"/>
+  <rect class="part-removed" x="250" y="254" width="64" height="51"/>
+  <rect class="part-removed" x="310" y="146" width="4" height="108"/>
+  <rect class="part-waste" x="183" y="95" width="15" height="210"/>
+  <polygon class="part-kept" points="198,95 250,95 250,146 310,146 310,254 250,254 250,305 198,305"/>
+  <line class="centre-line" x1="100" y1="200" x2="560" y2="200"/>
+  <line class="active-face" x1="310" y1="146" x2="310" y2="254"/>
+  <line class="active-face" x1="250" y1="95" x2="250" y2="146"/>
+  <rect class="cutter" x="183" y="318" width="15" height="52"/>
+  <line class="leader" x1="310" y1="180" x2="420" y2="176"/>
+  <text class="datum-label" x="424" y="180">Z0: the hub front face, faced in Op 10</text>
+  <line class="leader" x1="225" y1="95" x2="300" y2="56"/>
+  <text class="label" x="304" y="52">flange Ø{{cad.flange_dia_min_in:.3dot}}–{{cad.flange_dia_max_in:.3dot}}, back past the parting line</text>
+  <line class="leader" x1="280" y1="146" x2="420" y2="110"/>
+  <text class="label" x="424" y="106">hub body Ø{{cad.hub_body_dia_min_in:.3dot}}–{{cad.hub_body_dia_max_in:.3dot}}, {{cad.hub_body_length_mm:in.3dot}} long</text>
+  <line class="leader" x1="250" y1="130" x2="420" y2="138"/>
+  <text class="label" x="424" y="142">the flange's front face, faced square in Op 30</text>
+  <line class="leader" x1="198" y1="370" x2="240" y2="382"/>
+  <text class="label" x="244" y="386">blade's tailstock-side face at Z-{{process.part_off_in:.3dot}}</text>
+  <text class="label" x="34" y="356">3-jaw</text>
+</svg>

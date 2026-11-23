@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 240" width="760" height="240">
+  <rect class="paper" x="0" y="0" width="760" height="240"/>
+  <text class="title" x="20" y="24">The finished rod: thread, relief, body and dome (not to scale)</text>
+  <rect class="part-kept" x="60" y="102" width="80" height="36"/>
+  <rect class="part-threads" x="60" y="102" width="80" height="5"/>
+  <rect class="part-threads" x="60" y="133" width="80" height="5"/>
+  <rect class="part-kept" x="140" y="108" width="22" height="24"/>
+  <rect class="part-kept" x="162" y="90" width="460" height="60"/>
+  <path class="part-kept" d="M622 90 A30 30 0 0 1 622 150 Z"/>
+  <line class="centre-line" x1="40" y1="120" x2="720" y2="120"/>
+  <text class="label" x="40" y="48">#4-40 UNC, runs out in the relief at the shoulder</text>
+  <line class="dims" x1="60" y1="76" x2="162" y2="76"/>
+  <line class="dims" x1="60" y1="68" x2="60" y2="96"/>
+  <line class="dims" x1="162" y1="68" x2="162" y2="86"/>
+  <text class="label" x="180" y="80">tip to shoulder .29–.31</text>
+  <line class="dims" x1="162" y1="206" x2="652" y2="206"/>
+  <line class="dims" x1="162" y1="156" x2="162" y2="214"/>
+  <line class="dims" x1="652" y1="156" x2="652" y2="214"/>
+  <text class="label" x="330" y="228">shoulder to dome apex 4.91–4.93</text>
+  <text class="label" x="300" y="176">Ø1/4 bar as bought</text>
+  <text class="label" x="600" y="80">R.13 dome</text>
+</svg>

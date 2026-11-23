@@ -84,9 +84,14 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
+from _printed_limits import limits
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from build_sm_knife_mount import BORE_CENTRE_DEPTH
@@ -124,6 +129,7 @@ from sm_knife_mount_spec import (
     TAP_DRILL_CALLOUT,
 )
 import sm_vn_knife_mount_dowel_spec as DOWEL
+import sm_knife_mount_spec as KM
 
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
@@ -541,6 +547,321 @@ BORE_FINISH_RIM_XY = (
     + R_BORE * math.cos(math.radians(BORE_FINISH_RIM_DEG)) * SHEET_SCALE[0] / 1000.0,
     _front_y(BORE_CY)
     + R_BORE * math.sin(math.radians(BORE_FINISH_RIM_DEG)) * SHEET_SCALE[0] / 1000.0,
+)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (build_sm_knife_mount: the origin on
+# the knife-edge contact ridge, the bore's crown line; +Y up to the top seat,
+# datum A, at BLK_TOP and down to the bottom at BLK_BOT; X across the block,
+# +-BLK_HALF_X, datum B on the +X side; the block a mid-plane extrude along Z,
+# the front face at +SUPPORT_Z_THICK / 2, which B's row runs from). The knife
+# bore runs along Z; datum B's slip hole and the #10-24 tap run down -Y from
+# the top seat. A band is the title block's row for the places the sheet
+# prints (DRAWING_PRECISION_BY_NAME, DRAWING_REFERENCE_PRECISION) on the
+# printed nominal, or the part's explicit band. The GD&T frames bind as
+# their zone and datums, their BASIC locations as numbers. The declarations
+# print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_REF = DRAWING_REFERENCE_PRECISION
+_SELF = "draw_sm_knife_mount"
+_DOWEL = "sm_vn_knife_mount_dowel_spec"
+_BUILD_FN = ((_SELF, "build"),)
+_FRONT_KEEP = ((_SELF, "FRONT_KEEP"),)
+_TOP_KEEP = ((_SELF, "TOP_KEEP"),)
+_SECTION_KEEP = ((_SELF, "SECTION_KEEP"),)
+_HALF_Z = SUPPORT_Z_THICK / 2.0
+_TOP_SEAT_FINISH = surface_finish_by_key(SURFACE_FINISHES, "top_seat")
+_BORE_FINISH = surface_finish_by_key(SURFACE_FINISHES, "knife_bore")
+_TAP_DRILL_FACE_DIA = blind_cut_dia_mm(KM.STUD_TAP_SPEC)
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=("BLK_TOP", "BLK_BOT", "BLK_HALF_X", "SUPPORT_Z_THICK", "BORE_CY"),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "DRAWING_PRECISION_BY_NAME",
+        "DRAWING_REFERENCE_PRECISION",
+        (_SELF, "TAP_CALLOUT_PLACES"),
+    ),
+)
+# The top seat, datum A: clamped to the MHA-FR-02 crossbar's faced
+# underside, Ra 125 (the right view's flag). The height, the bore's BASIC
+# depth and both blind holes run from it.
+requirement(
+    "top_seat",
+    kind="face",
+    faces=(_TOP_SEAT_FINISH.face,),
+    requirements=("plane", "finish_ra"),
+    fields={
+        "plane": (_plane("y", BLK_TOP), ("BLK_TOP", "SURFACE_FINISHES")),
+        "finish_ra": (_TOP_SEAT_FINISH.roughness_um, ("SURFACE_FINISHES",)),
+        "datum": ("A", ((_SELF, "DATUM_A_X"), *_BUILD_FN)),
+    },
+    precision={"finish_ra": 1},
+)
+# The bottom face: the block height 1.17 from the top seat (FRONT_KEEP
+# "BlockHeight").
+requirement(
+    "bottom_face",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), -BLK_BOT),),
+    requirements=("height",),
+    fields={
+        "plane": (_plane("y", BLK_BOT), ("BLK_BOT",)),
+        "height": (
+            limits(KM.BLOCK_HEIGHT_PRINTED, _P["BlockHeight"], unit=UNIT),
+            ("BLOCK_HEIGHT_PRINTED", "UNIT", *_FRONT_KEEP),
+        ),
+        "height_nominal": (KM.BLOCK_HEIGHT_PRINTED, ("BLOCK_HEIGHT_PRINTED",)),
+        "height_from": ("top_seat", _FRONT_KEEP),
+    },
+    precision={"height": _P["BlockHeight"]},
+)
+# The +X side face: datum B's side location .20 runs from it (TOP_KEEP's
+# PIN_SIDE_TEXT_XY row); the -X face closes the width 1.00 (FRONT_KEEP
+# "BlockWidth").
+requirement(
+    "plus_x_side",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), BLK_HALF_X),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", BLK_HALF_X), ("BLK_HALF_X",))},
+)
+requirement(
+    "minus_x_side",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), BLK_HALF_X),),
+    requirements=("width",),
+    fields={
+        "plane": (_plane("x", -BLK_HALF_X), ("BLK_HALF_X",)),
+        "width": (
+            limits(2.0 * BLK_HALF_X, _P["BlockWidth"], unit=UNIT),
+            ("BLK_HALF_X", "UNIT", *_FRONT_KEEP),
+        ),
+        "width_nominal": (2.0 * BLK_HALF_X, ("BLK_HALF_X",)),
+        "width_from": ("plus_x_side", _FRONT_KEEP),
+    },
+    precision={"width": _P["BlockWidth"]},
+)
+# The front face (+Z): B's row .275 +-.010 runs from it (TOP_KEEP
+# "HoleRowFace"); the back face closes the depth .55, added across the
+# right view (_REF "block-depth overall").
+requirement(
+    "front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), _HALF_Z),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", _HALF_Z), ("SUPPORT_Z_THICK",))},
+)
+requirement(
+    "back_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), _HALF_Z),),
+    requirements=("depth",),
+    fields={
+        "plane": (_plane("z", -_HALF_Z), ("SUPPORT_Z_THICK",)),
+        "depth": (
+            limits(SUPPORT_Z_THICK, _REF["block-depth overall"], unit=UNIT),
+            ("SUPPORT_Z_THICK", "UNIT", "DRAWING_REFERENCE_PRECISION", *_BUILD_FN),
+        ),
+        "depth_nominal": (SUPPORT_Z_THICK, ("SUPPORT_Z_THICK",)),
+        "depth_from": ("front_face", _BUILD_FN),
+    },
+    precision={"depth": _REF["block-depth overall"]},
+)
+# The knife bore, datum C: Ø.4720 +.0015/.0000 REAM THRU, RUNNING FIT ON
+# the MHA-SM-03 trunnion (FRONT_KEEP "BoreDia", DIMENSION_CALLOUTS), Ra 63;
+# ⌖Ø.008|A|B at its BASIC .811 under A and BASIC .300 from B's axis
+# (BORE_FRAME_XY, BORE_BASIC_TEXT_XY, TAP_STATION_TEXT_XY), and ∥.002|A
+# (BORE_PARALLELISM_FRAME_XY). Reamed in the supplied 28-32 HRC condition.
+requirement(
+    "knife_bore",
+    kind="hole",
+    faces=(_BORE_FINISH.face,),
+    requirements=("dia", "thru", "finish_ra", "position_dia", "parallelism"),
+    fields={
+        "at": ([0.0, BORE_CY, _HALF_Z], ("BORE_CY", "SUPPORT_Z_THICK")),
+        "axis": ((0.0, 0.0, -1.0), ("__frame__", "SUPPORT_Z_THICK")),
+        "dia": (
+            limits(2.0 * R_BORE, _P["BoreDia"], KM.BORE_DIA_BAND, unit=UNIT),
+            ("R_BORE", "BORE_DIA_BAND", "UNIT", *_FRONT_KEEP),
+        ),
+        "nominal_dia": (2.0 * R_BORE, ("R_BORE",)),
+        "thru": (True, ((_SELF, "BORE_CALLOUT"),)),
+        "process": ("ream", ((_SELF, "BORE_CALLOUT"),)),
+        "callout": (DIMENSION_CALLOUTS["BoreDia"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "mates": (LEVER_NUMBER, ((_SELF, "LEVER_NUMBER"),)),
+        "finish_ra": (_BORE_FINISH.roughness_um, ("SURFACE_FINISHES",)),
+        "datum": ("C", ((_SELF, "BORE_DATUM_C_XY"),)),
+        "basic_from_a": (
+            BORE_CENTRE_DEPTH,
+            (
+                ("build_sm_knife_mount", "BORE_CENTRE_DEPTH"),
+                "DRAWING_REFERENCE_PRECISION",
+                (_SELF, "BORE_BASIC_TEXT_XY"),
+            ),
+        ),
+        "basic_from_b": (
+            PIN_HOLE_X,
+            ("PIN_HOLE_X", "DRAWING_REFERENCE_PRECISION", (_SELF, "TAP_STATION_TEXT_XY")),
+        ),
+        "position_dia": (
+            KM.KNIFE_BORE_POSITION_TOL,
+            ("KNIFE_BORE_POSITION_TOL", "GEOMETRIC_TOLERANCES_IN"),
+        ),
+        "position_datums": (["A", "B"], ((_SELF, "BORE_FRAME_XY"), *_BUILD_FN)),
+        "parallelism": (
+            KM.KNIFE_BORE_PARALLELISM_TOL,
+            ("KNIFE_BORE_PARALLELISM_TOL", "GEOMETRIC_TOLERANCES_IN"),
+        ),
+        "parallelism_datums": (
+            ["A"],
+            ((_SELF, "BORE_PARALLELISM_FRAME_XY"), *_BUILD_FN),
+        ),
+    },
+    precision={
+        "dia": _P["BoreDia"],
+        "finish_ra": 1,
+        "basic_from_a": _REF["knife-bore centre from top seat"],
+        "basic_from_b": _REF["dowel hole from tap axis"],
+        "position_dia": 3,
+        "parallelism": 3,
+    },
+)
+# Datum B, the MHA-SM-VN-53 dowel's slip hole: Ø.1280 +-.0007 REAM to the
+# full diameter's .37 (SECTION_KEEP "PinHoleDepth", the title block's .XX)
+# over a drill point, SLIDING FIT, CLEARANCE .0020-.0036 (TOP_KEEP
+# "PinHoleDia", PIN_HOLE_CALLOUT); ⊥Ø.001|A (PIN_FRAME_XY); its axis .20
+# from the +X side (PIN_SIDE_TEXT_XY) and .275 +-.010 from the front face
+# (TOP_KEEP "HoleRowFace").
+requirement(
+    "dowel_hole",
+    kind="hole",
+    faces=(CylinderFace(PIN_HOLE_DIA),),
+    requirements=("dia", "depth", "perpendicularity", "side", "row"),
+    fields={
+        "at": ([PIN_HOLE_X, BLK_TOP, 0.0], ("PIN_HOLE_X", "BLK_TOP")),
+        "axis": ((0.0, -1.0, 0.0), ("__frame__", "BLK_TOP")),
+        "dia": (
+            limits(PIN_HOLE_DIA, _P["PinHoleDia"], KM.PIN_HOLE_DIA_BAND, unit=UNIT),
+            ("PIN_HOLE_DIA", "PIN_HOLE_DIA_BAND", "UNIT", *_TOP_KEEP),
+        ),
+        "nominal_dia": (PIN_HOLE_DIA, ("PIN_HOLE_DIA",)),
+        "depth": (
+            limits(PIN_HOLE_DEPTH, _P["PinHoleDepth"], unit=UNIT),
+            ("PIN_HOLE_DEPTH", "PIN_HOLE_DEPTH_PLACES", "UNIT", *_SECTION_KEEP),
+        ),
+        "depth_nominal": (PIN_HOLE_DEPTH, ("PIN_HOLE_DEPTH",)),
+        "drill_point": (True, ((_DOWEL, "SLIP_DEPTH"), ("build_sm_knife_mount", "cut_pin_hole_point"))),
+        "process": ("ream", ((_SELF, "PIN_HOLE_CALLOUT"),)),
+        "callout": (DIMENSION_CALLOUTS["PinHoleDia"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "mates": (DOWEL_NUMBER, ("DOWEL_NUMBER",)),
+        "clearance": (
+            [value * DOWEL.MM_PER_IN for value in PIN_SLIP_PRINTED],
+            ("PIN_SLIP_PRINTED", (_DOWEL, "SLIP_CLEARANCE_MIN"), (_DOWEL, "SLIP_CLEARANCE_MAX")),
+        ),
+        "datum": ("B", ((_SELF, "PIN_DATUM_B_XY"),)),
+        "perpendicularity": (
+            KM.DOWEL_HOLE_PERPENDICULARITY_TOL,
+            ("DOWEL_HOLE_PERPENDICULARITY_TOL", "GEOMETRIC_TOLERANCES_IN"),
+        ),
+        "perpendicularity_datums": (["A"], ((_SELF, "PIN_FRAME_XY"), *_BUILD_FN)),
+        "side": (
+            limits(PIN_HOLE_SIDE_DISTANCE, _REF["dowel hole from side face"], unit=UNIT),
+            ("PIN_HOLE_SIDE_DISTANCE", "UNIT", (_SELF, "PIN_SIDE_TEXT_XY")),
+        ),
+        "side_nominal": (PIN_HOLE_SIDE_DISTANCE, ("PIN_HOLE_SIDE_DISTANCE",)),
+        "side_from": ("plus_x_side", ((_SELF, "PIN_SIDE_TEXT_XY"),)),
+        "row": (
+            limits(
+                HOLE_ROW_FACE_DISTANCE,
+                _P["HoleRowFace"],
+                (KM.HOLE_ROW_FACE_TOL, -KM.HOLE_ROW_FACE_TOL),
+                unit=UNIT,
+            ),
+            ("HOLE_ROW_FACE_DISTANCE", "HOLE_ROW_FACE_TOL", *_TOP_KEEP),
+        ),
+        "row_nominal": (HOLE_ROW_FACE_DISTANCE, ("HOLE_ROW_FACE_DISTANCE",)),
+        "row_from": ("front_face", _TOP_KEEP),
+    },
+    precision={
+        "dia": _P["PinHoleDia"],
+        "depth": _P["PinHoleDepth"],
+        "perpendicularity": 3,
+        "side": _REF["dowel hole from side face"],
+        "row": _P["HoleRowFace"],
+    },
+)
+# The #10-24 tap on the bore's vertical centre plane at mid-depth: its
+# native callout (#25 DRILL ↧ .438 +-.002 X 118°, 10-24 UNC ↧ .375, the
+# bottoming tap's full thread at the title block's .XXX; SETS MHA-SM-VN-52
+# TIP CLEARANCE, TAP_CALLOUT_XY), the #25 under the DRILLED HOLES row
+# (STUD_TAP_DIA_ACCEPTED), ⌖Ø.005|A|B|C▷ (TAP_FRAME_XY), BASIC .300 from B.
+requirement(
+    "stud_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(_TAP_DRILL_FACE_DIA),),
+    requirements=("thread", "dia", "drill_depth", "thread_depth", "position_dia"),
+    fields={
+        "at": ([0.0, BLK_TOP, 0.0], ("BLK_TOP",)),
+        "axis": ((0.0, -1.0, 0.0), ("STUD_TAP_SPEC",)),
+        "thread": (
+            f"{KM.STUD_TAP_SPEC.size} UNC-{KM.STUD_TAP_SPEC.thread_class}",
+            ("STUD_TAP_SPEC", "STUD_THREAD"),
+        ),
+        "tap": ("bottoming", ("STUD_TAP_SPEC",)),
+        "drill": (KM.STUD_TAP_DRILL, ("STUD_TAP_DRILL", "TAP_DRILL_CALLOUT")),
+        "dia": (
+            list(KM.STUD_TAP_DIA_ACCEPTED),
+            ("STUD_TAP_DIA_ACCEPTED", "STUD_TAP_DRILL_DIA", "STUD_TAP_DIA_BAND"),
+        ),
+        "nominal_dia": (KM.STUD_TAP_DRILL_DIA, ("STUD_TAP_DRILL_DIA", "STUD_TAP_DRILL_IN")),
+        "drill_depth": (
+            limits(
+                STUD_TAP_DRILL_DEPTH,
+                STUD_TAP_DRILL_DEPTH_PLACES,
+                (STUD_TAP_DRILL_DEPTH_BAND, -STUD_TAP_DRILL_DEPTH_BAND),
+                unit=UNIT,
+            ),
+            ("STUD_TAP_DRILL_DEPTH", "STUD_TAP_DRILL_DEPTH_BAND", (_SELF, "TAP_CALLOUT_BANDS")),
+        ),
+        "drill_depth_nominal": (STUD_TAP_DRILL_DEPTH, ("STUD_TAP_DRILL_DEPTH",)),
+        "thread_depth": (
+            limits(STUD_TAP_THREAD_DEPTH, STUD_TAP_THREAD_DEPTH_PLACES, unit=UNIT),
+            ("STUD_TAP_THREAD_DEPTH", "UNIT", (_SELF, "TAP_CALLOUT_BANDS")),
+        ),
+        "thread_depth_nominal": (STUD_TAP_THREAD_DEPTH, ("STUD_TAP_THREAD_DEPTH",)),
+        "point_angle_deg": (STUD_TAP_POINT_ANGLE_DEG, ("STUD_TAP_POINT_ANGLE_DEG",)),
+        "point_angle_tol_deg": (
+            KM.STUD_TAP_POINT_ANGLE_TOL_DEG,
+            ("STUD_TAP_POINT_ANGLE_TOL_DEG",),
+        ),
+        "callout_reason": (TAP_CALLOUT_REASON, ("TAP_CALLOUT_REASON",)),
+        "mates": (KM.BOLT_NUMBER, ("BOLT_NUMBER",)),
+        "basic_from_b": (
+            PIN_HOLE_X,
+            ("PIN_HOLE_X", "DRAWING_REFERENCE_PRECISION", (_SELF, "TAP_STATION_TEXT_XY")),
+        ),
+        "position_dia": (
+            KM.STUD_TAP_POSITION_TOL,
+            ("STUD_TAP_POSITION_TOL", "GEOMETRIC_TOLERANCES_IN"),
+        ),
+        "position_datums": (["A", "B", "C"], ((_SELF, "TAP_FRAME_XY"), *_BUILD_FN)),
+    },
+    precision={
+        # No Ø prints (the callout names the #25): the DRILLED HOLES row on
+        # the drill's .1495, a size finer than the .XXX row.
+        "dia": 4,
+        "drill_depth": STUD_TAP_DRILL_DEPTH_PLACES,
+        "thread_depth": STUD_TAP_THREAD_DEPTH_PLACES,
+        "basic_from_b": _REF["dowel hole from tap axis"],
+        "position_dia": 3,
+    },
 )
 
 

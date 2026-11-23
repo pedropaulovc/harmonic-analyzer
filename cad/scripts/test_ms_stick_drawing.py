@@ -575,3 +575,68 @@ def test_numeral_profile_scale_makes_the_v_readable_without_crowding() -> None:
     assert drawing.NUMERAL_SECTION_X - (minor + spec.TICK_WIDTH / 2.0) > 0.3
     zero_start = spec.SCALE_START_X + spec.TICK_WIDTH / 2.0 + spec.NUMERAL_GAP_MM
     assert drawing.NUMERAL_SECTION_X < zero_start + 0.84 * spec.NUMERAL_HEIGHT_MM
+
+
+def test_the_stick_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    import export_features
+    from _gtol_face import FaceGeometry
+
+    manifest = export_features.requirement_manifest("ms_stick")
+    features = manifest["features"]
+    assert {name: feature["kind"] for name, feature in features.items()} == {
+        **dict.fromkeys(
+            ("datum_end", "zero_end", "plain_edge", "ruled_edge", "ruled_face", "back_face"),
+            "face",
+        ),
+        "graduations": "notch",
+        "numerals": "profile",
+    }
+    assert manifest["notes"]["manufacturing"] == callouts.DRAWING_NOTES.splitlines()
+
+    def plane(normal: tuple[float, float, float], offset: float) -> FaceGeometry:
+        point = tuple(value * offset / 1000 for value in normal)
+        return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+    expected = {
+        "datum_end": plane((1.0, 0.0, 0.0), spec.BODY_LENGTH),
+        "zero_end": plane((-1.0, 0.0, 0.0), 0.0),
+        "plain_edge": plane((0.0, -1.0, 0.0), 0.0),
+        "ruled_edge": plane((0.0, 1.0, 0.0), spec.BODY_WIDTH),
+        "ruled_face": plane((0.0, 0.0, -1.0), 0.0),
+        "back_face": plane((0.0, 0.0, 1.0), spec.BODY_THICKNESS),
+        # Every tick floor lies at the tick depth, every stroke floor at the
+        # numeral depth: one selector each claims them all.
+        "graduations": plane((0.0, 0.0, -1.0), -spec.TICK_DEPTH),
+        "numerals": plane((0.0, 0.0, -1.0), -spec.NUMERAL_DEPTH),
+    }
+    selectors = export_features.feature_selectors("ms_stick")
+    assert set(selectors) == set(features)
+    for name, face in expected.items():
+        owners = [
+            owner
+            for owner, specs in selectors.items()
+            if any(selector.matches(face) for selector in specs)
+        ]
+        assert owners == [name], name
+
+
+def test_stick_feature_bands_are_the_printed_ones() -> None:
+    import export_features
+
+    inch = 25.4
+    features = export_features.requirement_manifest("ms_stick")["features"]
+    assert features["zero_end"]["length"] == pytest.approx([7.94 * inch, 7.96 * inch])
+    assert features["ruled_edge"]["width"] == pytest.approx([0.310 * inch, 0.320 * inch], abs=1e-3)
+    assert features["back_face"]["thickness"] == pytest.approx([0.120 * inch, 0.130 * inch], abs=1e-3)
+    ticks = features["graduations"]
+    assert ticks["count"] == 101
+    assert ticks["width"] == pytest.approx([0.016 * inch, 0.024 * inch], abs=1e-4)
+    assert ticks["depth_min"] == pytest.approx(0.020 * inch)
+    # The station table's first row, 5.726 +/-.002 from the end nearest the 10.
+    assert ticks["zero_station"] == pytest.approx([5.724 * inch, 5.728 * inch], abs=1e-4)
+    assert ticks["zero_station_from"] == "datum_end"
+    last = ticks["zero_station_nominal"] - (ticks["count"] - 1) * ticks["minor_pitch"]
+    assert last == pytest.approx(ticks["ten_station_ref"])
+    assert round(last / inch, 3) == 0.135
+    assert features["numerals"]["depth_min"] == pytest.approx(0.016 * inch)
+    assert features["numerals"]["height"] == pytest.approx([0.07 * inch, 0.09 * inch])

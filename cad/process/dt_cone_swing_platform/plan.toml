@@ -1,68 +1,874 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
-title = "Cone Swing Platform"
-part = "MHA-DT-20 Cone Swing Platform"
-revision = "placeholder"
-material = "ASTM A108 1018 cold-finished flat bar, 1/4 x 2-1/2 in; thickness as supplied"
-stock = "To be written"
+# Cone swing platform MHA-DT-20 (qty 1), routed for the CNC mill (owner
+# ruling 2026-11-21: NC and travelers for every made part; the route is the
+# author's, chosen for speed, the owner corrects it afterwards). The platform
+# is the bought 1/4 x 2-1/2 in 1018 CF flat as supplied (drawing: thickness
+# as supplied, 1/4 PLATE AS SUPPLIED), sawn to a blank and milled to its
+# outline.
+#
+# Route: the platform is laid in the bar at 1.86° so that its east edge (the
+# swing-stop face, NE corner to SE corner) is the bar's straight edge E, as
+# supplied; every other edge is milled, the waste a wedge on the west side.
+# Setup 1 saws the blank (9.70-9.76 in) and gates its thickness. Setup 2, the
+# UNDERSIDE up on parallels in the vise, E on the fixed jaw, both ends
+# overhanging: PL01 faces both ends to length, spots every hole, drills the
+# hold-down #31 and counterbores it from the underside (the 1/8 in end mill's
+# helix), drills B through the pivot, and drills #7 at the two post taps and
+# the wedge screw's hole; PL02/PL03 bring the tap guide over each post hole
+# for the 1/4-20. Setup 3, vise off: the 1/2 x 6 in aluminium spoil plate on
+# 1-2-3 blocks, step-clamped: PL04 drills its two clearance holes for the
+# post screws. Setup 4, the blank top up on the plate, screwed from below
+# into its post taps and trammed on E; G54 on the pivot hole: PL05 runs the
+# B drill on into the plate and reams the pivot .2500 (the bar flat on the
+# plate: a reamer's thrust on Setup 2's overhang bent it past the finish
+# limit), then drills the plate through the hold-down and wedge holes;
+# PL06-PL07 bring the tap guide over each (4-40, 10-24); the hold-down and
+# wedge screws go in; PL08 cuts the outline through (the SE corner cleared,
+# roughed in levels, finished); the bar's thickness and the shoulder
+# screw's length pick the relief's floor and PL09 cuts the top relief
+# (drawing note 1); a fitted relief is swing-tested on the wedge seat, the
+# flat face its shoulder was measured on.
+# Setup 5, bench: deburr, inspect. Setup 6: black oxide (Presto Black PC9).
+#
+# Not made here: the Ø.0630 tip-dowel hole (MATCH-REAM THRU, note 3) is
+# made at assembly (MHA-DT-00 step 2; the feature export's made_at), after
+# blackening: the drawing's finish leaves it bare, oiled. The placeholder
+# plan's tools placed elsewhere: tools.drill-53, tools.reamer-0630 and
+# tools.pin-gauges go with that assembly step; tools.reamers-adjustable-lms-
+# 5948 is replaced by a fixed .2500 reamer (owner ruling 2026-11-20, #3073:
+# a fixed reamer for each running/press fit); tools.endmill-7-32 is not
+# needed (the owned 1/8 in end mill interpolates the counterbore);
+# tools.depth-micrometer is not needed (the calipers' depth rod holds the
+# counterbore's .010 band).
+#
+# The underside is the bar's cold-finished face as supplied (Ra 63 SLIDING
+# FACE): never faced, so the as-supplied thickness band holds; it is
+# inspected by eye and fingernail in Setup 1 and kept off the vise's jaws'
+# grit by the parallels. The top face is as supplied too (Ra 125).
+#
+# Drawing note 1, FIT TOP RELIEF DEPTH TO MHA-DT-VN-52 SHOULDER: SWINGS
+# FREE, NO AXIAL SHAKE. Owner decision 2026-09-22 (cnc rulings record):
+# "fit the actual purchased shoulder and finished plate; do not invent a
+# numerical axial-clearance band." Owner ruling 2026-11-22 (issue #3363,
+# option B of C:/farm-runs/triage-2026-11-19/cnc/questions/flat-a-platform-
+# relief-fit.json): "keep the screw as bought; relief to the sheet's .010
+# REF; steel shim washers under the head, 1/4 ID, .001 steps, stacked at
+# assembly until it swings free with no shake". Setup 4 mics the bar's
+# thickness t beside the pivot and measures the shoulder's length L with
+# gauge blocks under its head. t over L (the fit branch): the relief's floor
+# L above the underside, then the swing test. t at or under L (the REF
+# branch): the floor .010 below the top; no swing test here, the shims go
+# under the head at assembly (MHA-DT-00, #3363).
+#
+# FLAGGED: to buy before Setup 4: the .2500 reamer (tools.reamer-2500,
+# to_order), the .2500/.2505 plug gauge pair (gauges.plug-gauges-2500-
+# 2505, to_order), the hold-down screws (fixtures.dt-
+# platform-hold-down-screws, to_order: two 1/4-20 x 3/4 SHCS, one #4-40 x
+# 1/2 SHCS, one #10-24 x 1/2 SHCS) and the MHA-DT-VN-52 shoulder screw that
+# will be assembled with this platform (McMaster 91829A560, the assembly's
+# bought part). For the REF branch's assembly: the steel shim washer
+# assortment, 1/4 ID x 3/8 OD, .001 steps (fixtures.shim-washers-1-4-id-
+# arbor-19, Precision Brand 25100, to_order; #3363). Before Setup 1: the
+# 48 in steel rule (tools.steel-rule-48, to_order). Before Setup 6: the PC9
+# and the gloves and glasses (consumables.presto-black-steel-pc9,
+# consumables.chemical-gloves-eye-protection, to_order).
+#
+# Black oxide: the drawing's finish, matte black oxide, oil sealed (the
+# Ø.0630 hole bare, oiled: made after it). Owner (Pedro), answered in person
+# 2026-11-21: "Black oxide: cold blackening in the shop with Presto Black
+# PC9 is acceptable as the drawing's black oxide." Setup 6 blackens the
+# platform with Birchwood Presto Black Steel PC9 by the maker's instructions
+# (Presto Black Steel PC9 Instructions, steps 1 prepare, 2b brush-on, 3
+# stop, 4 dry, 6 seal; cad/config/shop-equipment/
+# consumables.presto-black-steel-pc9, which cites them).
+#
+# Spoil plate: the freed 1/2 x 6 x 18 in 6061 bar (stock.6061-flat-1-2x6-
+# 18in, on hand), whole, its top the Z0 of Setups 3-4; it keeps its holes
+# and can serve again.
+#
+# NC (cam:dt_cone_swing_platform, cad/process/dt_cone_swing_platform/
+# cam.py): PL01_holes, PL02_post_far_tap, PL03_post_near_tap,
+# PL04_plate_holes, PL05_seat_drills, PL06_holddown_tap, PL07_wedge_tap,
+# PL08_outline, PL09_relief. Program names, the [parameters]
+# and the milling_cuts names are a contract with that recipe. Tool numbers
+# are the places in the tools list among the mill's tools: T1 1/4 in end
+# mill, T2 1/8 in end mill, T3 #1 centre drill, T4 #31, T5 B, T6 .2500
+# reamer, T7 #7, T8 L, T9 #25, T10 #43, T11 tap guide.
+title = "Cone swing platform"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "1018 cold-finished steel, 1/4 x 2-1/2 in flat (drawing: {{cad.material_spec}})"
+stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:.1f}} in flat bar (36 in length on hand): one blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in. Spoil plate: the 1/2 x 6 x 18 in 6061 bar, whole."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Thickness and edge E are the bar's, as supplied: neither face is machined. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall, controller reset or knock to the work, home again and repeat the setup's G54 pick-up before resuming. Prove each cutting program in air on its first run (the setups' prove ops); the tap-guide files (PL02, PL03, PL06, PL07) only carry the guide in Idle over a hole: watch their first run, a hand on feed hold. Made at assembly (MHA-DT-00), not here: the Ø.0630 tip-dowel hole (step 2) and, on a bar thinner than the VN-52 shoulder, the steel shim washers under its head (owner ruling 2026-11-22; GitHub issue 3363 adds them to the assembly's hardware). Finish: {{cad.finish}}."
 shop = "../shop"
-stock_refs = ["1018-flat-1-4x2-1-2"]
+stock_refs = ["1018-flat-1-4x2-1-2", "6061-flat-1-2x6-18in"]
+material_key = "rocker-1018-cold-finished"
+milling_material = "steel_1018"
+
+[cad]
+file = "../../out/features/dt_cone_swing_platform/features.toml"
+adapter = "flat_bar"
+part = "dt-cone-swing-platform"
+
+[parameters]
+quantity = 1
+# The adapter's axes: the platform's length along model Z, its thickness
+# (underside to top face) along model Y.
+blank_length_axis = 2
+blank_thickness_axis = 1
+# The blank: the platform's 9.53 in along edge E (plate_along_mm, the NW
+# round to the chamfer's south end) with north_waste_mm and south_waste_mm
+# at its ends after facing (faced_length_mm), south_face_mm faced off the
+# sawn south end and the rest off the north end, sawn 9.70-9.76 in.
+blank_length_in = 9.7
+blank_length_max_in = 9.76
+blank_length_min_mm = 246.38
+blank_length_max_mm = 247.904
+blank_length_mm = 247.142
+blank_width_in = 2.5
+blank_thickness_in = 0.25
+# The drawing's thickness band, the as-supplied bar's (top_face).
+blank_thickness_min_mm = 6.223
+blank_thickness_max_mm = 6.477
+# The platform laid on E: E stands edge_e_from_pivot_mm east of the pivot,
+# lay_angle_deg off the drawing's length axis; it spans plate_across_mm
+# square to E (of the bar's 2.5 in).
+edge_e_from_pivot_mm = 16.2245
+lay_angle_deg = 1.8612
+plate_across_mm = 60.1167
+north_waste_mm = 1.5
+south_waste_mm = 1.0
+faced_length_mm = 244.6388
+south_face_mm = 1.0
+north_face_max_mm = 2.2652
+end_woc_max_mm = 2.54
+# Holding, Setup 2 (shop workholding.vise-pm-6): two 1 in parallels
+# (fixtures.parallels-lms-6745) on the vise bed, one against each jaw; the
+# blank on them underside up, gripped on its edges, E on the fixed jaw. The
+# jaws' tops stand s2_jaw_top_mm over the underside (Z0): jaw height less
+# the parallels and the thinnest bar (cam.py).
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+parallel_height_mm = 25.4
+s2_jaw_top_mm = 13.3223
+# The blank centred in the jaws: its south end s2_overhang_min_mm-
+# s2_overhang_max_mm past the jaws' left ends (s2_overhang_mm on the nominal
+# blank). The south holes reach s2_south_reach_mm from X0 and the north ones
+# start at s2_north_reach_mm: cam.py proves both 1.5 mm clear of the jaws.
+s2_overhang_mm = 44.2341
+s2_overhang_min_mm = 43.18
+s2_overhang_max_mm = 45.72
+s2_south_reach_mm = 31.8807
+s2_north_reach_mm = 217.5807
+pivot_x2_mm = 236.997
+holddown_x2_mm = 220.362
+# The ends: the 1/4 in end mill's side, end_levels levels of end_level_mm
+# to end_bottom_mm (the thickest bar and through_past_mm below it, into air).
+through_past_mm = 0.254
+end_levels = 3
+end_level_mm = 2.2437
+end_bottom_mm = -6.731
+# Spots with the #1 centre drill Ø.100 on its countersink (under every drill
+# it starts).
+spot_dia_mm = 2.54
+spot_rpm = 2800
+spot_feed_per_min_mm = 35.56
+# Drills in 1018: #31 at 2800 rpm, .001 in/rev (2.8 in/min, as the crank
+# arm's #43); B at 1200, .002 (2.4 in/min) and #7 at 1500, .002 (3.0 in/min),
+# the channel lever's D and #21 speeds for their sizes; each through in one
+# feed (at most 3 diameters deep), its full diameter drill_past_mm past the
+# far face (tip = thickest bar + past + the 118° point; cam.py).
+drill_31_rpm = 2800
+drill_31_feed_per_min_mm = 71.12
+drill_b_rpm = 1200
+drill_b_feed_per_min_mm = 60.96
+drill_7_rpm = 1500
+drill_7_feed_per_min_mm = 76.2
+drill_past_mm = 0.5
+drill_31_tip_mm = -7.8927
+drill_b_tip_mm = -8.7932
+drill_7_tip_mm = -8.5108
+# The .2500 reamer, Setup 4 (the bar flat on the spoil plate, its thrust
+# into the plate): 600 rpm, .004 in/rev (2.4 in/min) in and out at feed,
+# its full diameter ream_past_mm into the plate (ream_tip_mm below Z0); the
+# B drill re-enters its hole first, its full diameter drill_past_mm deeper
+# (pivot_redrill_tip_mm), and leaves the reamer ream_allowance_mm on the
+# diameter (the channel lever's reamer speeds).
+ream_rpm = 600
+ream_feed_per_min_mm = 60.96
+ream_past_mm = 1.5
+ream_tip_mm = -1.5
+pivot_redrill_tip_mm = -3.8162
+ream_allowance_mm = 0.3048
+# Drills and the reamer stand at least 1.00 in out of the chuck, the 1/4 in
+# end mill 1.375 in (of its 3 in) and the 1/8 in end mill .75 in out of
+# their collets: each nose clears the jaw tops at its tool's deepest point
+# (cam.py), and the shortest reaches Setup 4's deepest cut (machine
+# capacity: the spindle's 2.46 in least height over the table).
+drill_projection_min_mm = 25.4
+quarter_projection_min_mm = 34.925
+eighth_projection_min_mm = 19.05
+# The counterbore: the 1/8 in end mill's centre on a G2 helix of
+# cbore_path_radius_mm about the hold-down's axis, cbore_helix_pitch_mm a
+# turn, to the counterbore's nominal depth, then one level turn.
+cbore_path_radius_mm = 1.1938
+cbore_helix_pitch_mm = 0.5
+# Shop settings.endmill-carbide-3fl-1-4-1018-cf (2800 rpm, .0017 in/tooth,
+# 3 flutes: 14.3 in/min) and -1-8-1018-cf-tru-edge (2800, .001: 8.4 in/min,
+# the channel lever's rings; the table's lowest feed per tooth); cam.py
+# recomputes both from the settings.
+em_quarter_rpm = 2800
+em_quarter_feed_per_min_mm = 363.22
+em_eighth_rpm = 2800
+em_eighth_feed_per_min_mm = 213.36
+# Setup 3: the spoil plate (spoil_plate_* mm, 1/2 x 6 x 18 in) on five 1-2-3
+# blocks lying flat (1 in up): two under each end, under the step clamps,
+# and one under its middle. Plate frame: X0 its left end, Y0 its front edge,
+# Z0 its top. The pivot lands at pivot_plate_x_mm, pivot_plate_y_mm (the
+# bar centred on the plate's width, the blank on its length; cam.py).
+spoil_plate_length_mm = 457.2
+spoil_plate_width_mm = 152.4
+spoil_plate_thickness_mm = 12.7
+pivot_plate_x_mm = 342.278
+pivot_plate_y_mm = 60.6745
+# Drills in 6061 at 2800 rpm: L .003 in/rev (8.4 in/min) in one feed;
+# #25 .002 (5.6 in/min) and #43 .0015 (4.2 in/min), pecked (their holes run
+# past 3 diameters). Each L hole lets its 1/4-20 screw float screw_float_mm
+# a side, for the tram on E.
+plate_drill_rpm = 2800
+drill_l_feed_per_min_mm = 213.36
+drill_25_feed_per_min_mm = 142.24
+drill_43_feed_per_min_mm = 106.68
+drill_l_tip_mm = -15.413
+screw_float_mm = 0.508
+peck_25_mm = 2.54
+peck_43_mm = 1.27
+drill_25_tip_mm = -14.3408
+# The hold-down's 4-40 seat in the plate: #43 holddown_seat_depth_mm deep;
+# the plug tap tap_4_40_turns turns past its first bite (tap_4_40_depth_mm);
+# the #4-40 x 1/2 screw (holddown_screw_length_mm) reaches its full threads
+# on the thinnest bar (cam.py).
+holddown_seat_depth_mm = 11.43
+tap_4_40_turns = 16
+tap_4_40_depth_mm = 10.16
+holddown_screw_length_mm = 12.7
+# The wedge screw (#10-24 x 1/2) holds the west waste: wedge_x_mm along E
+# and wedge_y_mm across from the pivot (Setup 4 frame), its head clear of
+# the outline's swath and of the bar's edge (cam.py).
+wedge_x_mm = -13.411
+wedge_y_mm = 28.775
+# The outline: Z0 the plate's top; outline_through_mm into the plate. The
+# rough pass finish_stock_mm outside the finish, outline_levels levels of
+# outline_level_mm; the finish pass in finish_levels levels of
+# finish_level_mm; first a clearing pass clear_offset_mm off the chamfer
+# takes the blank's SE corner (cam.py proves every waste corner in reach).
+outline_through_mm = 0.508
+outline_bottom_mm = -0.508
+finish_stock_mm = 0.254
+outline_levels = 8
+outline_level_mm = 0.8731
+# Setup 4's beam: the platform between its post screws and the hold-down,
+# at its narrowest there (beside the hold-down: E to the west edge, 1.08 in).
+platform_narrowest_mm = 27.5
+finish_levels = 2
+finish_level_mm = 3.4925
+clear_offset_mm = 6.4
+# The relief: Z0 its floor. Fit branch (the bar t thicker than the
+# shoulder's length L): the floor L above the plate's top, the bar's top at
+# most the thickest bar less the shortest shoulder (shoulder_min_mm:
+# McMaster 91829A560, 1/4 in +.002/-0) over it. REF branch (t at or under
+# L, owner ruling 2026-11-22, #3363): the floor relief_ref_mm (the sheet's
+# .010 REF) below the bar's top. relief_stock_top_mm: the larger of the two.
+# The 1/4 in end mill's centre on a U, relief_path_radius_mm about the pivot.
+relief_path_radius_mm = 2.159
+shoulder_min_mm = 6.35
+relief_ref_mm = 0.25
+relief_stock_top_mm = 0.25
+# The pivot-end edge's station band (the feature export's north_edge
+# station), printed in mm for the DRO check after PL08.
+north_station_min_mm = 6.858
+north_station_max_mm = 7.366
+# Holders: HA holders.r8-collets-lms-4860.gauge_len_mm; archive
+# holders.drill-chuck-r8.gauge_len_mm. Longest tool: the .2500 chucking
+# reamer, 6 in overall (ASME B94.2).
+r8_collet_gauge_mm = 6.3
+drill_chuck_gauge_mm = 95.0
+# The L jobber drill, 4-1/4 in overall (ASME B94.11M): Setup 3's longest.
+l_drill_oal_mm = 107.95
+reamer_oal_mm = 152.4
+# The B jobber drill, 3-3/4 in overall (ASME B94.11M): Setup 2's longest.
+b_drill_oal_mm = 95.25
+# Tap stack, Setup 2: the PM-30MV's 17 in spindle-to-table less the shop's
+# tool-change clearance, the vise bed, the parallels, the bar and the
+# collet's gauge, rounded down to .01 in (cam.py); the tap in its T-handle
+# wrench reaches at most tap_wrench_reach_max_mm: the stack less the tap
+# guide's 3 1/8 in, rounded down to .01 in.
+tap_stack_max_mm = 295.148
+tap_wrench_reach_max_mm = 215.646
 
 [[tools]]
-id = "drill-53"
-name = "#53 drill"
-ref = "drill-53"  # Drills #53
-
+id = "em-quarter"
+name = "1/4 in carbide end mill"
+ref = "endmill-carbide-3fl-1-4"
+[[tools]]
+id = "em-eighth"
+name = "1/8 in carbide end mill"
+ref = "endmill-carbide-3fl-1-8"
+[[tools]]
+id = "spot"
+name = "#1 carbide centre drill"
+ref = "centre-drills-carbide-60"
 [[tools]]
 id = "drill-31"
 name = "#31 drill"
-ref = "drill-31"  # Drills #31
-
-[[tools]]
-id = "jig-drill-7"
-name = "#7 drill"
-ref = "jig-drill-7"  # Drills #7
-
+ref = "drill-31"
 [[tools]]
 id = "drill-b"
 name = "B drill"
-ref = "drill-b"  # Drills B
-
+ref = "drill-b"
 [[tools]]
-id = "reamer-0630"
-name = ".0630 reamer"
-ref = "reamer-0630"  # B-reamer-.0630
-
+id = "reamer"
+name = ".2500 reamer, TO BUY"
+ref = "reamer-2500"
+status = "to_order"
 [[tools]]
-id = "jig-tap-1-4-20-plug"
+id = "drill-7"
+name = "#7 drill"
+ref = "jig-drill-7"
+[[tools]]
+id = "drill-l"
+name = "L drill"
+ref = "drill-l"
+[[tools]]
+id = "drill-25"
+name = "#25 drill"
+ref = "drill-25"
+[[tools]]
+id = "drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"
+[[tools]]
+id = "tap-guide"
+name = "Fisher spring tap guide"
+ref = "tap-guide-fisher"
+[[tools]]
+id = "tap-1-4-20"
 name = "1/4-20 plug tap"
-ref = "jig-tap-1-4-20-plug"  # Tap coverage 1/4-20 UNC
-
+ref = "jig-tap-1-4-20-plug"
 [[tools]]
-id = "endmill-7-32"
-name = "7/32 end mill"
-ref = "endmill-7-32"  # C-endmill-7-32
-
+id = "tap-10-24"
+name = "#10-24 plug tap"
+ref = "tap-10-24-plug"
 [[tools]]
-id = "depth-micrometer"
-name = "Depth micrometer"
-ref = "depth-micrometer"  # F-depth-micrometer
-
+id = "tap-4-40"
+name = "#4-40 plug tap"
+ref = "jig-tap-4-40-plug"
 [[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined, A1-pin-set-251-500
-
+id = "cutoff-saw"
+name = "Evolution miter saw"
+ref = "saw-evolution-14"
 [[tools]]
-id = "reamers-adjustable-lms-5948"
-name = "Adjustable reamers .250-.375"
-ref = "reamers-adjustable-lms-5948"  # drawing cross-check 2026-11-19: .2500 +.0005/.0000 REAM THRU ALL
+id = "files"
+name = "Files"
+ref = "jig-files"
+[[tools]]
+id = "deburr"
+name = "Deburring tool"
+ref = "deburring-set"
+[[tools]]
+id = "plug-gauges"
+name = "Plug gauges .2500 GO, .2505 NO-GO, TO BUY"
+ref = "plug-gauges-2500-2505"
+status = "to_order"
+[[tools]]
+id = "gauge-blocks"
+name = "Gauge blocks, 81-piece inch set"
+ref = "gauge-blocks-mitutoyo"
+[[tools]]
+id = "shims"
+name = "Steel shim washers 1/4 ID x 3/8 OD, .001 steps, TO BUY (for assembly)"
+ref = "shim-washers-1-4-id-arbor-19"
+status = "to_order"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Saw the blank, gate the bar"
+machine = "Saw / bench"
+indexing = "none"
+diagram = { file = "diagrams/saw.svg", alt = "The 1/4 x 2-1/2 in bar on the saw, a 9.73 in blank marked off; the blank's straighter long edge marked E and its better face marked U (underside)." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "cutoff-saw"
+drilling = "none"
+sizing = "other"
+instruction = "Saw one blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long, aiming at 9.73, off the bar, marked off with the steel rule, the bar flat on the saw bed. File the burrs off both sawn ends and their corners."
+feed = "hand"
+inspection = "Blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long (steel rule): Setup 2 faces it to {{process.faced_length_mm:in.3f}}, .07–.13 off its two ends. Shorter: saw another; longer: saw it back."
+gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.blank_length_min_mm}}", "{{process.blank_length_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "Mic the blank's thickness at both ends and the middle, 1/2 in in from each long edge."
+inspection = "Every reading {{process.blank_thickness_min_mm:in.3dot}}–{{process.blank_thickness_max_mm:in.3dot}} (the drawing's thickness, as supplied). Outside: set the blank aside and tell the owner."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.blank_thickness_min_mm}}", "{{process.blank_thickness_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "Pick the better wide face as the UNDERSIDE (the sliding face, Ra {{cad.underside_finish_ra_uin:d}} µin as supplied) and the straighter long edge as edge E (sight both edges against the steel rule's edge). Mark U on the underside and E on that edge at one end with marking fluid: the MARKED end."
+inspection = "The underside as rolled: no scratch the fingernail catches, no pit, no roll mark, no rust. The top face as rolled (the drawing's Ra 125 is met by the cold-finished face): no pit, deep scratch or rust, by eye. Either face not good: set the blank aside and tell the owner."
+gauge_checks = "other"
+
+[[setups]]
+machine_kind = "other"
+title = "Underside up: ends, holes, counterbore, post taps"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw. The blank on them, U (underside) UP, edge E against the FIXED jaw, its marked end to the LEFT, overhanging the jaws' left ends by {{process.s2_overhang_min_mm:in.2f}}–{{process.s2_overhang_max_mm:in.2f}} (calipers' depth rod from the jaws' left end face to the blank's end): both ends overhang about the same. Tap it down on the parallels with a soft hammer and tighten. The jaws stand at most {{process.s2_jaw_top_mm:in.3dot}} above the underside."
+datum = "Programs PL01_holes (T1–T5, T7), PL02_post_far_tap and PL03_post_near_tap (T11). G54: X0 the blank's sawn marked end, +X toward the pivot end; Y0 the fixed jaw's face (edge E), the blank at −Y; Z0 the underside. Tool lengths from the tool setter at each M6; every move between cuts runs above the jaw tops."
+diagram = { file = "diagrams/holes.svg", alt = "The blank underside up on two parallels in the vise, E on the fixed jaw, both ends overhanging; the two ends faced; near the pivot end (right) the pivot hole, the counterbored hold-down hole and the wedge screw's hole; near the marked end (left) the two post taps." }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", 6.35, 6.35, 3.0], y_span_mm = ["{{cad.blank_width_mm}}", 6.35, 6.35, 3.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.blank_thickness_min_mm}}", "{{process.drill_b_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.b_drill_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{process.blank_length_mm}}", part_height_mm = "{{process.blank_thickness_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.s2_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_mm}}"], clamp_mm = ["{{process.s2_overhang_mm}}", 202.9078], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{process.blank_thickness_min_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Home the mill ($H). G54 Y0 on the fixed jaw's face, X0 on the blank's marked end (edge finder at 900 rpm). Console M6 T1 (1/4 in end mill, at least {{process.quarter_projection_min_mm:in.3dot}} out of its collet). Z0: T1's end on a .002 leaf on the underside."
+instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y−2.540. MDI G0 Y−31.75; on the blank's marked end from −X: G10 L20 P1 X−2.540. Console M6 T1 (the tool setter measures it). MDI G0 X120 Y−31.75, spindle stopped, its end just dragging a .002 leaf on the underside: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove PL01_holes in air, Z0 raised 1.000 in: watch every move clear the jaw tops and every cut stay outside the jaws' ends. Then Z0 back."
+instruction_detailed = "Prove-out in air, spindle running: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run PL01_holes through every M6, watching every move clear the jaw tops and the end passes and holes stay outside the jaws' and parallels' ends. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-quarter"
+drilling = "none"
+sizing = "other"
+instruction = "Run PL01_holes (M6 T1, 1/4 in end mill; set 2800, brush oil): face the marked end {{process.south_face_mm:in.3dot}} in and the pivot end to {{process.faced_length_mm:in.3f}} overall, the end mill's side square across the bar, {{process.end_levels:d}} levels of {{process.end_level_mm:in.3dot}} through, each plunged in air beside an edge."
+settings = "endmill-carbide-3fl-1-4-1018-cf"
+rpm = 2800
+feed = "{{process.em_quarter_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "ends", kind = "side", phase = "rough", cutter_dia_mm = 6.35, flutes = 3, rpm = 2800, feed_mm_min = "{{process.em_quarter_feed_per_min_mm}}", axial_doc_mm = "{{process.end_level_mm}}", radial_woc_mm = "{{process.north_face_max_mm}}", stations_mm = [0, "{{process.blank_length_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T3 (#1 centre drill, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 2800): spot the five holes Ø{{process.spot_dia_mm:in.3dot}}: the two post taps, the pivot, the hold-down and the wedge screw's hole."
+rpm = 2800
+feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "hole spots", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = [29.33, "{{process.pivot_x2_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-31"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.holddown_dia_band_mm}}" }
+instruction = "Same file, M6 T4 (#31, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 2800, cutting oil): the hold-down hole through in one feed, its full diameter {{process.drill_past_mm:in.3dot}} past the top face, into air."
+rpm = 2800
+feed = "{{process.drill_31_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{process.blank_thickness_max_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "holddown drill", kind = "drill", phase = "finish", cutter_dia_mm = 3.048, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_31_feed_per_min_mm}}", stations_mm = "{{process.holddown_x2_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-eighth"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T2 (1/8 in end mill, at least {{process.eighth_projection_min_mm:in.2f}} out of its collet; set 2800): counterbore the hold-down from the underside, a G2 helix of {{process.cbore_path_radius_mm:in.4dot}} radius about its axis, {{process.cbore_helix_pitch_mm:.1f}} mm a turn to {{cad.holddown_cbore_depth_nominal_in:.3dot}} deep, one level turn there: Ø{{cad.holddown_cbore_dia_nominal_in:.3dot}}."
+settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
+rpm = 2800
+feed = "{{process.em_eighth_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "holddown cbore", kind = "slot", phase = "finish", cutter_dia_mm = 3.175, flutes = 3, rpm = 2800, feed_mm_min = "{{process.em_eighth_feed_per_min_mm}}", axial_doc_mm = "{{process.cbore_helix_pitch_mm}}", radial_woc_mm = 3.175, stations_mm = "{{process.holddown_x2_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-b"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T5 (B drill, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 1200, cutting oil): the pivot through in one feed, into air. Setup 4 reams it, the bar flat on the spoil plate."
+rpm = 1200
+feed = "{{process.drill_b_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{process.blank_thickness_max_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "pivot drill", kind = "drill", phase = "rough", cutter_dia_mm = 6.0452, flutes = 2, rpm = 1200, feed_mm_min = "{{process.drill_b_feed_per_min_mm}}", stations_mm = "{{process.pivot_x2_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-7"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.post_mount_west_dia_band_mm}}" }
+instruction = "Same file, M6 T7 (#7, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 1500, cutting oil): the two post tap holes and the wedge screw's hole through, each in one feed, into air. Program end."
+rpm = 1500
+feed = "{{process.drill_7_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{process.blank_thickness_max_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "post drills", kind = "drill", phase = "finish", cutter_dia_mm = 5.1054, flutes = 2, rpm = 1500, feed_mm_min = "{{process.drill_7_feed_per_min_mm}}", stations_mm = [23.11, 29.33, 223.59] },
+]
+
+[[setups.operations]]
+instruction = "The counterbore: calipers' inside jaws across it twice, 90° apart; the depth rod from the underside to its floor."
+inspection = "Ø{{cad.holddown_cbore_dia_min_in:.3dot}}–{{cad.holddown_cbore_dia_max_in:.3dot}} both readings, {{cad.holddown_cbore_depth_min_in:.3dot}}–{{cad.holddown_cbore_depth_max_in:.3dot}} deep. Outside: stop and tell the owner."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.holddown_cbore_dia_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.holddown_cbore_depth_band_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Stop check before the tap files: measure the 1/4-20 tap in the T-handle wrench from its point to the wrench's centre hole (calipers). It must be at most {{process.tap_wrench_reach_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the parallels, the bar, the collet, the tap guide's 3 1/8 in and 1 in to bring the point down onto the wrench). Over: stop; do not tap on this setup."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-guide"
+drilling = "none"
+sizing = "other"
+instruction = "Run PL02_post_far_tap: M6 T11, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the post hole farther from E."
+diagram = { file = "diagrams/tap.svg", alt = "The bar in the vise, the tap in the T-handle wrench in the hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the hole runs through into air." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-1-4-20"
+drilling = "none"
+sizing = "other"
+instruction = "Tap 1/4-20 through by hand under the tap guide, spindle off, cutting oil: tap's point in the hole, jog Z down until the guide's point is pushed fully home in the wrench, then turn the wrench, a half turn back each turn; the spring follows the tap. Stop when the tap's full threads show past the top face (the full .25 thickness threaded: note 2's .88D engagement)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Jog Z up clear, back the tap out by hand. Run PL03_post_near_tap (M6 T11, spindle off; ends Idle over the post hole nearer E) and tap it the same way; jog up, back the tap out, blow out both holes."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Unclamp. File the exit burrs off the top face at the five holes and stone both faces' sawn-end corners; take any raised burr off the underside (U) at the counterbore's rim and the hole mouths with the deburring tool, without stoning U's face, so U seats flat on the spoil plate's top in Setup 4."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Spoil plate on the table: post screw holes"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / table, vise off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Vise off the table. The 1/2 x 6 x 18 in 6061 spoil plate on five 1-2-3 blocks lying flat (1 in up): two under each end, 3 in in from the end, and one under the middle; its long edges along X. One LMS step clamp (1268 kit, 3/8-16 stud in a T-slot, step block set level) over each corner block, the clamp nose on the plate over its block."
+datum = "Program PL04_plate_holes (T3, T8). G54: X0 the plate's left end, Y0 its front edge (edge finder at 900 rpm), Z0 its top (T1's end on a .002 leaf). Every move between cuts runs above the step clamps."
+diagram = { file = "diagrams/plate.svg", alt = "The spoil plate on five 1-2-3 blocks, four step clamps at its corners; the two post screw clearance holes drilled through near its left-middle." }
+envelope = { x_span_mm = ["{{process.spoil_plate_length_mm}}", 7.366, 3.0], y_span_mm = ["{{process.spoil_plate_width_mm}}", 7.366, 3.0], work_top_mm = [25.4, "{{process.spoil_plate_thickness_mm}}"], deepest_cut_mm = [25.4, "{{process.spoil_plate_thickness_mm}}", "{{process.drill_l_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.l_drill_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_min_mm}}"] }
+vise_hold = "other"
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.spoil_plate_length_mm}}"], supports_mm = [76.2, 190.5], section_mm = { y = "{{process.spoil_plate_width_mm}}", z = "{{process.spoil_plate_thickness_mm}}" } }
+
+[[setups.operations]]
+instruction = "Home the mill ($H). G54 Y0 on the plate's front edge, X0 on its left end (edge finder, 900 rpm). Console M6 T1 (1/4 in end mill); Z0: its end on a .002 leaf on the plate top near its middle."
+instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the front edge from −Y: G10 L20 P1 Y−2.540; on the left end from −X: G10 L20 P1 X−2.540. Console M6 T1. MDI G0 X228.6 Y76.2, spindle stopped, its end just dragging a .002 leaf on the plate top: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove PL04_plate_holes in air, Z0 raised 1.000 in, as Setup 2: every move clears the clamps. Then Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Run PL04_plate_holes (M6 T3, #1 centre drill; set 2800): spot the two post screws' holes Ø{{process.spot_dia_mm:in.3dot}}."
+rpm = 2800
+feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "plate spots", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = [128.4, 134.6] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-l"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T8 (L drill; set 2800, a drop of oil): drill both through in one feed, the tip {{process.drill_past_mm:in.3dot}} past the plate's underside, into the space over the table. Program end."
+rpm = 2800
+feed = "{{process.drill_l_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{process.spoil_plate_thickness_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "plate clearance", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 7.366, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_l_feed_per_min_mm}}", stations_mm = [128.4, 134.6] },
+]
+
+[[setups.operations]]
+instruction = "Deburr both holes' mouths top and bottom with the deburring tool, and stone the plate's top round them flat: the blank's underside (U) seats there."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Top up on the plate: seats, taps, outline, relief"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / spoil plate on the table"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "The spoil plate as Setup 3, clamps untouched. The blank TOP UP (U down) on the plate, E toward you (front), its marked end to the LEFT over the two L holes; two 1/4-20 x 3/4 SHCS up through the holes from under the plate into the post taps, snug. Trammed: E along X within .001 over its length (DTI), then both screws tight. Later ops add a #4-40 x 1/2 SHCS (hold-down) and a #10-24 x 1/2 SHCS (the waste wedge on the far edge)."
+datum = "Programs PL05_seat_drills to PL09_relief (T1, T5, T6, T9, T10, T11). G54: X0 Y0 the pivot hole's axis (the B drill's shank standing in it, edge finder), +X toward the pivot end, +Y away from E; Z0 the plate's top (T1 on a .002 leaf), until the re-zero before PL09 moves it to the relief's floor. Every move between cuts runs above the screw heads."
+diagram = { file = "diagrams/outline.svg", alt = "The blank top up on the spoil plate, screwed down at the two post taps from below and at the hold-down and the waste wedge from above; the outline milled through round it, the chamfered corner cleared, the waste wedge left along the far edge; the top relief open to the pivot-end edge round the pivot." }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", 6.35, 6.35, 6.4, 3.0], y_span_mm = ["{{cad.blank_width_mm}}", 6.35, 6.35, 6.4, 3.0], work_top_mm = [25.4, "{{process.spoil_plate_thickness_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = [25.4, "{{process.spoil_plate_thickness_mm}}", "{{process.drill_25_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.quarter_projection_min_mm}}"] }
+vise_hold = "other"
+beam = { axis = "x", hold = "plate", extent_mm = [-235.997, 8.642], seat = "the 1/2 x 6 in 6061 spoil plate", seat_mm = [-342.28, 114.92], clamps_mm = [-213.887, -207.669, -16.635], section_mm = { y = "{{process.platform_narrowest_mm}}", z = "{{process.blank_thickness_min_mm}}" } }
+
+[[setups.operations]]
+instruction = "Before seating: mic the blank's thickness beside the pivot hole, 1/4 in in from each long edge: t, the thinner reading, to .0001 on the job card (it picks the relief's branch below)."
+inspection = "t {{process.blank_thickness_min_mm:in.3dot}}–{{process.blank_thickness_max_mm:in.3dot}}, as Setup 1. Outside: set the blank aside and tell the owner."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.blank_thickness_min_mm}}", "{{process.blank_thickness_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "Seat the blank: brush the plate clean, lay the blank top up over the L holes, E to the front, and run the two 1/4-20 x 3/4 SHCS up into the post taps, snug. The screws' ends sit about flush with the top face."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Tram E: the DTI on the spindle, its tip on E's face 1/2 in in from each end, traverse X; tap the blank round on the screws' float ({{process.screw_float_mm:in.3dot}} a side) until E reads the same at both ends, then tighten both screws and read again."
+inspection = "E reads within .001 end to end (the tram's target). Over: loosen, tap round and read again."
+gauge_checks = [{ gauge = "dti", band_mm = [0.0, 0.0254] }]
+
+[[setups.operations]]
+instruction = "Home the mill ($H). Stand the B drill shank down in the pivot hole. Edge finder (900 rpm) on its shank's two sides along X and along Y: G54 X0 Y0 its axis. Lift the drill out. Console M6 T1 (1/4 in end mill, at least {{process.quarter_projection_min_mm:in.2f}} out); Z0: its end on a .002 leaf on the plate's top beside the blank."
+instruction_detailed = "Home the mill ($H). The B drill shank down in the pivot hole. Edge finder (900 rpm) on the shank from −X, note X; from +X, note X; MDI G0 X(their mean); G10 L20 P1 X0. Same along Y from −Y and +Y: G10 L20 P1 Y0. Lift the drill out. Console M6 T1. MDI G0 X25 Y0 (plate top past the blank's pivot end), spindle stopped, its end dragging a .002 leaf: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove PL05_seat_drills in air, Z0 raised 1.000 in: every move clears the post screws and the clamps. Then Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-b"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Run PL05_seat_drills (M6 T5, B drill, at least {{process.drill_projection_min_mm:in.2f}} out; set 1200): down its own hole in the pivot and on into the plate, the tip {{process.pivot_redrill_tip_mm:in.3dot}} below Z0, so the reamer runs out into a hole."
+rpm = 1200
+feed = "{{process.drill_b_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = 2.0
+peck = "none"
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.spoil_plate_length_mm}}"], supports_mm = [266.7, 381.0], section_mm = { y = "{{process.spoil_plate_width_mm}}", z = "{{process.spoil_plate_thickness_mm}}" } }
+milling_cuts = [
+  { name = "pivot redrill", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 6.0452, flutes = 2, rpm = 1200, feed_mm_min = "{{process.drill_b_feed_per_min_mm}}", stations_mm = "{{process.pivot_plate_x_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "reamer"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }
+instruction = "Same file, M6 T6 (.2500 reamer, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 600, cutting oil): ream the pivot through, in and out at feed (no rapid leaves the bore), its full diameter {{process.ream_past_mm:in.3dot}} into the plate."
+rpm = 600
+feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
+milling_cuts = [
+  { name = "pivot ream", kind = "drill", phase = "finish", cutter_dia_mm = 6.35, flutes = 6, rpm = 600, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = 0.0 },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-43"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T10 (#43, at least {{process.drill_projection_min_mm:in.2f}} out; set 2800): down through the hold-down hole, {{process.holddown_seat_depth_mm:in.3dot}} into the plate, pecks of {{process.peck_43_mm:in.3dot}} with full retract."
+rpm = 2800
+feed = "{{process.drill_43_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{process.holddown_seat_depth_mm}}"
+peck = { step_mm = 1.27, retract = "full" }
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.spoil_plate_length_mm}}"], supports_mm = [266.7, 381.0], section_mm = { y = "{{process.spoil_plate_width_mm}}", z = "{{process.spoil_plate_thickness_mm}}" } }
+milling_cuts = [
+  { name = "holddown seat", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 2.2606, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_43_feed_per_min_mm}}", stations_mm = 325.6 },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-25"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T9 (#25; set 2800): down through the wedge screw's hole, through the plate, pecks of {{process.peck_25_mm:in.3dot}} with full retract. Program end."
+rpm = 2800
+feed = "{{process.drill_25_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{process.spoil_plate_thickness_mm}}"
+peck = { step_mm = 2.54, retract = "full" }
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.spoil_plate_length_mm}}"], supports_mm = [266.7, 381.0], section_mm = { y = "{{process.spoil_plate_width_mm}}", z = "{{process.spoil_plate_thickness_mm}}" } }
+milling_cuts = [
+  { name = "screw seats", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 3.7973, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_25_feed_per_min_mm}}", stations_mm = 328.9 },
+]
+
+[[setups.operations]]
+instruction = "Blow out the chips. Try the pivot bore with the .2500 GO and the .2505 NO-GO plug gauges from the top."
+inspection = "Bore Ø{{cad.pivot_bore_dia_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}: GO enters the full depth, NO-GO does not enter. GO fails or NO-GO enters: stop and tell the owner; do not re-ream."
+gauge_checks = [{ gauge = "plug-gauges-2500-2505", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-guide"
+drilling = "none"
+sizing = "other"
+instruction = "Run PL06_holddown_tap: M6 T11, the tap guide, spindle off; the file ends Idle at the machine top over the hold-down hole."
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-4-40"
+drilling = "none"
+sizing = "other"
+instruction = "Tap #4-40 into the plate by hand under the tap guide, down through the hold-down hole, as Setup 2: {{process.tap_4_40_turns:d}} turns past the first bite ({{process.tap_4_40_depth_mm:in.2f}} into the plate), a half turn back each turn. Jog Z up, back the tap out, blow out the hole."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Run PL07_wedge_tap (M6 T11, spindle off; Idle over the wedge screw's hole). Tap #10-24 through the plate by hand under the guide, down through the blank's #7 hole, until the full threads show under the plate. Jog up, back the tap out, blow out."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Screw a #4-40 x 1/2 SHCS into the hold-down seat and a #10-24 x 1/2 SHCS into the wedge seat, each snug on the top face: the hold-down holds the pivot end, the wedge screw the waste wedge once the outline is through."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove PL08_outline in air, Z0 raised 1.000 in: send $#, note the G54 Z; G10 L2 P1 Z(noted Z + 25.4); run it: every move clears the hold-down and wedge screw heads and the clamps; E is cut only at the pivot-end corner's round. Then G10 L2 P1 Z(noted Z)."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-quarter"
+drilling = "none"
+sizing = "other"
+instruction = "Run PL08_outline (M6 T1, 1/4 in end mill; set 2800, brush oil): one running file, three stages: a clearing pass along the chamfer takes the blank's corner there; the rough pass round the outline {{process.finish_stock_mm:in.3dot}} outside the line, {{process.outline_levels:d}} levels of {{process.outline_level_mm:in.3dot}}; the finish pass on the line, {{process.finish_levels:d}} levels of {{process.finish_level_mm:in.3dot}}. Each level plunged in air beside E; all conventional (G3), {{process.outline_through_mm:in.3dot}} into the plate."
+settings = "endmill-carbide-3fl-1-4-1018-cf"
+rpm = 2800
+feed = "{{process.em_quarter_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "outline rough", kind = "slot", phase = "rough", cutter_dia_mm = 6.35, flutes = 3, rpm = 2800, feed_mm_min = "{{process.em_quarter_feed_per_min_mm}}", axial_doc_mm = "{{process.outline_level_mm}}", radial_woc_mm = 6.35, stations_mm = [-235.0, -112.0, 7.0] },
+  { name = "outline finish", kind = "side", phase = "finish", cutter_dia_mm = 6.35, flutes = 3, rpm = 2800, feed_mm_min = "{{process.em_quarter_feed_per_min_mm}}", axial_doc_mm = "{{process.finish_level_mm}}", radial_woc_mm = "{{process.finish_stock_mm}}", stations_mm = [-235.0, -112.0, 7.0] },
+]
+
+[[setups.operations]]
+instruction = "Spindle stopped, blow the chips away. T1 out of the spindle, the edge finder in (900 rpm): on the pivot-end edge from +X at Y0. X0 is the pivot's axis, so the DRO X there (mm) less 2.540 is that edge's station."
+inspection = "Pivot-end edge {{process.north_station_min_mm:.2f}}–{{process.north_station_max_mm:.2f}} mm ({{cad.north_edge_station_min_in:.2f}}–{{cad.north_edge_station_max_in:.2f}} in) from the pivot's axis: the outline's registration on the pivot. Outside: stop and tell the owner. Not gauged: the rest of the outline and the post, hold-down and wedge holes (PL01 drilled them with the pivot in one program; the paths hold them). Setup 5 checks the relief's and the notch's widths."
+gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.north_edge_station_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Unscrew the wedge screw and lift the waste wedge off (it is free: never lever it against the part). Screw the VN-52 shoulder screw into the wedge seat until its shoulder seats on the plate; find the gauge-block stack that just slides between the plate and the head's underside: L, the shoulder's length. Take the screw out."
+inspection = "L read to .0001 on the job card beside t. t over L: the FIT branch (floor L above the underside, drawing note 1). t at or under L: the REF branch (floor .010 below the top; shims at assembly, owner ruling 2026-11-22)."
+gauge_checks = [{ gauge = "gauge-blocks-mitutoyo", band_mm = [6.35, 6.4008] }]
+
+[[setups.operations]]
+instruction = "Edge finder out. Console M6 T1 (the tool setter measures it), spindle stopped. FIT branch: its end on a .002 leaf on the plate's top (X25 Y0), G10 L20 P1 Z(.051 − L in mm). REF branch: on the leaf on the platform's top (X−40 Y0), G10 L20 P1 Z0.301. Z0 is now the relief's floor."
+instruction_detailed = "Edge finder out, T1 back in: Console M6 T1 (the tool setter measures it). FIT branch: MDI G0 X25 Y0; jog T1 down until it just drags a .002 leaf on the plate's top; G10 L20 P1 Z(0.051 − L), L in mm (L in × 25.4): the plate's top reads −L. REF branch: MDI G0 X−40 Y0 (over the platform, clear of the hold-down head); the leaf on the platform's top; G10 L20 P1 Z0.301: the top reads 0.250 (.010)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove PL09_relief in air, Z0 raised 1.000 in: send $#, note the G54 Z; G10 L2 P1 Z(noted Z + 25.4); run it: every move clears the hold-down screw's head. Then G10 L2 P1 Z(noted Z)."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-quarter"
+drilling = "none"
+sizing = "other"
+instruction = "Run PL09_relief (M6 T1; set 2800): one level at Z0 (the branch's floor), in from beside the pivot-end edge along E's side, round the pivot (G2) and out along the far side: the relief {{cad.top_relief_width_nominal_in:.2dot}} wide, R{{cad.top_relief_end_radius_nominal_in:.2dot}} about the pivot, open to the pivot-end edge."
+settings = "endmill-carbide-3fl-1-4-1018-cf"
+rpm = 2800
+feed = "{{process.em_quarter_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "relief", kind = "slot", phase = "finish", cutter_dia_mm = 6.35, flutes = 3, rpm = 2800, feed_mm_min = "{{process.em_quarter_feed_per_min_mm}}", axial_doc_mm = "{{process.relief_stock_top_mm}}", radial_woc_mm = 6.35, stations_mm = [0.0, 7.0] },
+]
+
+[[setups.operations]]
+instruction = "FIT branch only (REF: skip to the shims op). Take out the hold-down and the post screws. Lay the platform on the plate, its bore over the wedge seat (the flat face L was read on); VN-52 down through the bore into that seat, tight. Swing the platform a few degrees each way, clear of the clamps; push and pull its free end along the screw's axis."
+inspection = "Swings free with no tight spot and no axial shake felt (drawing note 1). Free: skip the next op. Tight: the next op. Shake: stop and tell the owner."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "FIT branch, tight only: VN-52 out; the platform back on its post screws, E trammed as above, hold-down screw in. GO plug in the bore: pick up G54 X/Y on it as above; plug and edge finder out. Send $#, note G54 Z; G10 L2 P1 Z(noted Z − 0.013) (.0005 lower; no touch-off). Run PL09_relief again (its M6 T1 measures T1); repeat the swing test."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "shims"
+drilling = "none"
+sizing = "other"
+instruction = "REF branch only: no swing test here. The shim washers go under the VN-52 head at assembly (MHA-DT-00), stacked until it swings free with no shake. Write \"REF branch, t and L\" on the job card that goes with the platform."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Take the hold-down and post screws out and lift the platform off the plate. Keep the VN-52 with the platform for assembly."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Deburr and inspect"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/bench.svg", alt = "The finished platform top up: the pivot bore and the top relief at the pivot end, the counterbored hold-down beside them, the two post taps near the marked end, the lock notch in the far edge, the chamfered corner." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "deburr"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr every milled edge top and bottom, the notch's and the relief's edges, both mouths of the four holes (two post taps, pivot, hold-down) and the counterbore's rim to R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max (deburring tool, smooth file). Break E's two long corners the same, lightly: E stays straight. Never stone the underside's face."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-1-4-20"
+drilling = "none"
+sizing = "other"
+instruction = "Run the 1/4-20 tap through both post taps again by hand to clear the burrs; wash off the oil and chips."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The relief and the notch: calipers' inside jaws across each, square to its sides."
+inspection = "Relief {{cad.top_relief_width_min_in:.2f}}–{{cad.top_relief_width_max_in:.2f}} wide; notch {{cad.lock_notch_width_min_in:.2f}}–{{cad.lock_notch_width_max_in:.2f}} wide. Outside: tell the owner."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.top_relief_width_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.lock_notch_width_band_mm}}" },
+]
+
+[[setups]]
+machine_kind = "other"
+title = "Black oxide: blacken with Presto Black Steel PC9"
+machine = "Bench, ventilated"
+indexing = "none"
+diagram = { file = "diagrams/bench.svg", alt = "The finished platform, as inspected, to be blackened all over: faces, edges, the bore, the holes and the relief." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+instruction = "The drawing's finish: {{cad.finish}}: all over, no masking (the Ø.0630 hole is made after, at assembly). Done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide), by its maker's instructions as below. To buy before this setup: the PC9, chemical-resistant gloves and safety glasses."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Gloves and safety glasses on (the maker: it contains acid). Wash the platform with soap and water to take off the oil and the marker; rinse and dry it. Hold it by its edges from here on."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "No sanding: the machined edges are fresh metal already (the maker's step 1), and the faces are the bar's as supplied. A rust spot or stain only: touch that spot lightly with the 220 roll, never on the underside. Wash again and dry."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mix the PC9 with water 1:1 in a plastic cup (the maker: 50–100% for brush-on). Brush it on every surface with even, light strokes, into the bore, the counterbore, the tapped holes and the relief; re-wet the brush and go over the edges, the holes and any light spot until the platform is an even black (the maker: do not press hard, it lifts the coating)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Rinse the platform thoroughly with clean water to stop the reaction (left acid keeps working and rusts the part); dry with a lint-free cloth or compressed air. Light spots: brush again, rinse, dry. Collect the solution and rinse water for a hazardous-waste drop-off, not the drain (the maker)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Seal: wipe on the stone lubricant (a light oil; the maker: clear coat, wax or oil), leave it a few minutes, wipe off the excess; oil the tapped holes."
+feed = "hand"
+inspection = "Even black all over, no bare spot and no wiping-off coating. Fit after blackening: the .2500 GO plug still enters the bore. Tight: stop and tell the owner; do not re-ream."
+gauge_checks = [{ gauge = "plug-gauges-2500-2505", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }]

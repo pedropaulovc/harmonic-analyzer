@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 350" font-family="sans-serif" font-size="14">
+  <rect class="paper" x="0" y="0" width="900" height="350"/>
+  <text class="title" x="20" y="24">Setup 4: the bow former in the vise (end view) and the rise check (side view, not to scale)</text>
+  <rect class="fixture-table" x="40" y="280" width="440" height="20"/>
+  <rect class="clamp" x="60" y="80" width="60" height="200"/>
+  <rect class="clamp" x="400" y="80" width="60" height="200"/>
+  <text class="label" x="40.0" y="320.0">moving jaw</text>
+  <text class="label" x="390.0" y="320.0">fixed jaw</text>
+  <rect class="fixture-support" x="120" y="150" width="15" height="130"/>
+  <rect class="fixture-support" x="385" y="150" width="15" height="130"/>
+  <text class="label" x="140.0" y="338.0">1/2 in parallels on edge against the jaws (1/8 thick)</text>
+  <line class="leader" x1="128" y1="270" x2="160" y2="325"/>
+  <line class="leader" x1="392" y1="270" x2="360" y2="325"/>
+  <rect class="part-kept" x="120" y="130" width="135" height="20"/>
+  <rect class="part-kept" x="265" y="130" width="135" height="20"/>
+  <text class="label" x="130.0" y="122.0">4 male halves</text>
+  <text class="label" x="290.0" y="122.0">4 female halves</text>
+  <rect class="part-arriving" x="255" y="130" width="10" height="130"/>
+  <line class="leader" x1="265" y1="220" x2="500" y2="220"/>
+  <text class="label" x="504.0" y="216.0">the clip on edge, rail down: the finger between</text>
+  <text class="label" x="504.0" y="234.0">the stacks, its spring edge flush with their</text>
+  <text class="label" x="504.0" y="252.0">tops; the rail hangs between the parallels</text>
+  <line class="arrow" x1="20" y1="180" x2="58" y2="180"/>
+  <text class="label" x="20.0" y="70.0">close by hand</text>
+  <path class="part-kept" d="M520,120 L600,120 C620,120 630,84 660,84 C690,84 700,120 720,120 L800,120 L800,126 L720,126 C700,126 690,90 660,90 C630,90 620,126 600,126 L520,126 Z"/>
+  <rect class="clamp" x="560" y="126" width="200" height="10"/>
+  <rect class="clamp" x="630" y="72" width="60" height="12"/>
+  <line class="dims" x1="820" y1="84" x2="820" y2="126"/>
+  <text class="label" x="826.0" y="110.0">reading</text>
+  <text class="label" x="520.0" y="160.0">rise check: one caliper jaw across the flats either</text>
+  <text class="label" x="520.0" y="178.0">side of the bow (hollow side), the other on the crest;</text>
+  <text class="label" x="520.0" y="196.0">reading less the finger's miked thickness = the rise</text>
+</svg>
