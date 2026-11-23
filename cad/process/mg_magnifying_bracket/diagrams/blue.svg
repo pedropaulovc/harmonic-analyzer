@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Finish: Brownells Oxpho-Blue cold blue all over, per the maker's sheet; the bracket looking at L, 2.5 px/mm. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Finish: blue all over with Oxpho-Blue (gloves and glasses on)</text>
+  <path class="part-kept" d="M60 100 H67.9 V204.35 H308.9 V235.6 H60 Z"/>
+  <path class="active-face" d="M60 100 H67.9 V204.35 H308.9 V235.6 H60 Z"/>
+  <text class="label" x="360" y="120">1. Brighten the faces (220 roll, the seat kept flat);</text>
+  <text class="label" x="360" y="136">wipe clean with alcohol; hold by the edges only.</text>
+  <text class="label" x="360" y="166">2. Swab Oxpho-Blue over every face, into the holes</text>
+  <text class="label" x="360" y="182">and the thread; 60 s wet, wipe nearly dry, burnish</text>
+  <text class="label" x="360" y="198">with #0 steel wool once dry.</text>
+  <text class="label" x="360" y="228">3. Thin coats again for a darker blue; then oil.</text>
+  <text class="label" x="40" y="300">After: a 1/4-20 screw still runs through the tap; the {{cad.mounting_hole_1_dia_min_in:.3dot}} pin gauge into each hole.</text>
+</svg>
