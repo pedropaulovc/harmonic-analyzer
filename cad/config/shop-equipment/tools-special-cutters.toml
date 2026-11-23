@@ -71,6 +71,9 @@ status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-13 STRAIGHT KNURL 25 TPI."
 
 [tools.lathe-tool-sharp-nose]
+sku = "1965"
+source = "https://littlemachineshop.com/products/tool-bits-1-4-presharpened-individual-tool-bits"
+purchase = "LittleMachineShop 1965, Tool Bit 1/4 in Right Hand Presharpened (HSS), $7.95, available (read live 2026-11-22); its nose is stoned to R.004 or less in the shop. No stock insert for the owned TCMT-21.51 holders reads R.004: LittleMachineShop's TCMT-21.50 (3416) states R.008."
 kind = "turning_tool"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-08 R.004 max. corners, .016 neck; MHA-PD-17 SPIGOT ROOT R.004 MAX; MHA-PD-23 R.005 MAX land-to-head corner; MHA-PN-04 R.008 max. shoulder."
@@ -118,10 +121,10 @@ note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-37-TL-01 file 
 make = "C.H. Hanson"
 sku = "20541"
 source = "https://www.travers.com/product/ch-hanson-20541-letters-figures-99-006-013"
-purchase = "Travers 99-006-013, C.H. Hanson 20541 steel number stamp set, 1/8 in characters, 0-8 (6 serves as 9), $23.75 (read live 2026-11-22). 1/8 in (.125) is the nearest stock size under the sheet's .14 HIGH; the next, 5/32 (.156), is over."
+purchase = "Travers 99-006-013, C.H. Hanson 20541 steel number stamp set, 1/8 in characters, 0-8 (6 serves as 9), $23.75 (read live 2026-11-22): the sheet's 1/8 FIGURE STAMP."
 kind = "stamp_set"
 status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-FR-01 STAMP \"2\" .14 HIGH."
+note = "Not owned: to buy. MHA-FR-01 STAMP \"2\", 1/8 FIGURE STAMP (owner decision 2026-11-19, #3124 item 1)."
 
 [tools.endmill-carbide-3fl-1-16-downcut]
 name = "Harvey Tool 896262 carbide downcut square end mill, 1/16 in (.0620), .186 length of cut, 3 flutes, 1/8 shank, 1-1/2 in overall"

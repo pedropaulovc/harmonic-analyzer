@@ -243,7 +243,8 @@ source = "owner 2026-11-19"
 # --- 82° countersink (riser plan, then the index-plate and arm-plate plans) --
 
 # Same key as its prechips record in cad/process/shop/, which holds the
-# identity (one fact in one file); this record holds only ownership and use.
+# identity (one fact in one file); this record holds ownership, use and the
+# purchase read.
 # Owner decision 2026-11-13: buy two 82° countersinks, 3/16 in and 3/8 in;
 # the owned 330CH 1/4 in 90° chamfer mill is the wrong angle. The oblique
 # jig's riser and kit tools (12 mm drill, the 3/16 in kit countersink,
@@ -262,7 +263,7 @@ note = "Not owned: to buy. The 3/8 in 82° countersink: MHA-DT-03-TL-01 index pl
 # MHA-PD-19 K's face-A chamfer, cut by hand (delegated ruling 2026-11-22,
 # Main, owner review #2144: option C). The owned deburring set (tools-hand
 # deburring-set, McMaster 4289A78) has a countersink blade, but its angle is
-# not on record, so a 90° one is to buy. No part number or price read.
+# not on record, so a 90° one is to buy.
 [tools.hand-countersink-90]
 make = "Noga"
 sku = "99-000-151"

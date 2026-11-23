@@ -501,9 +501,9 @@ cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range 
 
 [gauges.gauge-pin-0625]
 make = "Vermont Gage"
-sku = "89006258"
-source = "https://www.mscdirect.com/product/details/89006258"
-purchase = "MSC 89006258, Vermont Gage Class ZZ .0625 in minus pin (+0/-.0002), $4.48, in stock (read live 2026-11-22); the minus pin enters a hole reamed .0625 +.0005/0 at its floor. The plus pin is MSC 88906250, same price."
+sku = "88906250"
+source = "https://www.mscdirect.com/product/details/88906250"
+purchase = "MSC 88906250, Vermont Gage Class ZZ .0625 in plus pin (+.0002/-0), $4.48 (read live 2026-11-22): the GO of a hole reamed .0625 +.0005/0 is a plus pin (owner ruling #3075, above gauges.pin-gauges). The minus pin, MSC 89006258, is the same price and is not the GO."
 kind = "gauge_pin"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-10 .002 TIR TO A Ø.0625 PIN."
