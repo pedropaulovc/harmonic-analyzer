@@ -16,7 +16,7 @@
   <circle class="cutter" cx="326.7" cy="245.7" r="4"/>
   <line class="leader" x1="326.7" y1="250.7" x2="366.7" y2="302.7"/>
   <text class="label" x="370.7" y="308.7">enters and finishes: middle of the spring arm&#8217;s front edge</text>
-  <text class="label" x="370.7" y="326.7">1/16 end mill runs once round, anticlockwise</text>
+  <text class="label" x="370.7" y="326.7">1/32 end mill runs round once per level, anticlockwise</text>
   <line class="leader" x1="116" y1="271" x2="116" y2="351"/>
   <text class="label" x="91" y="369">blank on VHB tape, 1/2 in in from the left end and back edge</text>
   <text class="label" x="146" y="143">stepped arm toward the fixed jaw</text>

@@ -1,15 +1,25 @@
 # Crank handle pivot screw MHA-DT-32, one off, on the manual PM-1127VF-LB
 # (owner ruling 2026-11-21: turned parts get lathe travelers, no NC), from
-# the owned 1/4 in 1018 rod:
+# the owned 1/4 in 1018 rod. Order of manufacture: the MHA-DT-35 butt cup and
+# its pocket first (bonded into the handle), this screw's head second. Owner
+# ruling 2026-11-23 (tool audit Q6): "B. End-mill the pocket with the owned
+# 1/4 carbide end mill and turn the MHA-DT-32 head to it (pocket less .012
+# +/-.004); no boring bar." The cup's traveler pins its pocket and tags the
+# reading C (the largest minus pin that enters, true size C -.0002 to
+# C +.001, accepted .248-.253); the head is turned to the larger of .231 and
+# C -.015, up to the smaller of .241 and C -.009, aimed at C -.012 (inside
+# that window for every accepted C), so the true clearance stays inside
+# drawing note 1 of MHA-DT-35 (.008-.016) and the head inside its own
+# Ø.231-.241.
 #
 # - Bench: measure the bonded handle (MHA-DT-08 with MHA-DT-34 and -35) for
 #   the shoulder's length (drawing note 1: the measured stack plus .010-.040
-#   end play).
+#   end play); copy C off the cup's tag and work out the head's window.
 # - Saw a blank. Lathe, 3-jaw, the tip end out on the tailstock dead centre
-#   ("CENTRE OK" at the tip): turn the head's Ø.236 over the whole length out
-#   of the jaws, the Ø.155 shoulder to the under-head station, the #4-40
-#   blank to the seat; the 1/16 P1 blade squares the under-head corner sharp
-#   (R.004 MAX; the AR insert's R0.4 nose cannot). Chamfer the head,
+#   ("CENTRE OK" at the tip): turn the head's diameter to the window over the
+#   whole length out of the jaws, the Ø.155 shoulder to the under-head
+#   station, the #4-40 blank to the seat; the 1/16 P1 blade squares the
+#   under-head corner sharp (R.004 MAX; the AR insert's R0.4 nose cannot). Chamfer the head,
 #   withdraw the centre, run the die to the seat, plunge the relief at
 #   the seat with the blade and cut its 45° lead with the blade's corner on
 #   the compound; part off at the head's length.
@@ -85,11 +95,13 @@ turn_feed_mm_rev = 0.0508
 # The head's diameter turned over the whole stickout, to the part-off and
 # .8 mm past the blade: Z of its end (the drawn screw).
 head_turn_end_z_mm = -69.0
-# Aims, mm: the head at its band's middle, the shoulder .001 under the top
+# Aims, mm: the head at C - .012 for a pocket read at the end mill's 1/4
+# (.250 - .012 = .238; the operator aims at the H written in Op 20, the
+# turning checks take this one), the shoulder .001 under the top
 # of its band (a running fit; cad.shoulder_dia's nominal is the band's top),
 # the thread blank at .1085, inside cad.thread_dia (the #4-40 UNC-2A major
 # .1061-.1112, the title block's CLASS 2A).
-head_aim_dia_mm = 5.9944
+head_aim_dia_mm = 6.0452
 shoulder_rough_dia_mm = 4.0
 shoulder_aim_dia_mm = 3.937
 thread_rough_dia_mm = 2.957
@@ -190,7 +202,9 @@ inspection = "M {{process.m_min_in:.2dot}}–{{process.m_max_in:.2dot}} (the bla
 gauge_checks = [{ gauge = "calipers", band_mm = [50.038, 55.88] }]
 
 [[setups.operations]]
-instruction = "Work out and write on this sheet: the shoulder's length L = M + {{process.end_play_aim_in:.3dot}}, and its band M + {{process.end_play_min_in:.3dot}} to M + {{process.end_play_max_in:.3dot}}; the under-head station U = {{process.seat_z_in:.3dot}} + L from the tip; the part-off station P = U + {{cad.head_length_in:.3dot}}; the blank B = P + {{process.blank_over_p_in:.2dot}}; the stickout S = P + {{process.stickout_over_p_in:.2dot}}."
+instruction = "Work out and write on this sheet: the shoulder's length L = M + {{process.end_play_aim_in:.3dot}}, and its band M + {{process.end_play_min_in:.3dot}} to M + {{process.end_play_max_in:.3dot}}; the under-head station U = {{process.seat_z_in:.3dot}} + L from the tip; the part-off station P = U + {{cad.head_length_in:.3dot}}; the blank B = P + {{process.blank_over_p_in:.2dot}}; the stickout S = P + {{process.stickout_over_p_in:.2dot}}. Copy C, the butt cup's pocket reading, off its tag (MHA-DT-35 Op 100). Write the head's window: low = the larger of {{cad.head_dia_min_in:.3dot}} and C − .015, high = the smaller of {{cad.head_dia_max_in:.3dot}} and C − .009; and its aim H = C − .012."
+inspection = "C .248–.253 on the tag (H then lies inside the window); any other C: stop, the cup is not as its traveler accepts it. The window keeps the head in its drawn Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}} and its clearance in the cup's pocket inside MHA-DT-35 note 1's .008–.016."
+gauge_checks = "other"
 
 [[setups]]
 machine_kind = "other"
@@ -256,15 +270,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle stopped: run the carriage by hand to Z−(P + .10); the tool and its holder clear the jaw fronts by .15 or more (or stop: the stickout is short). Turn the whole stickout from the tip to Z−(P + .10) to the head's Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}}, aiming at Ø{{process.head_aim_dia_mm:in.3dot}}; cutting oil."
+instruction = "Spindle stopped: run the carriage by hand to Z−(P + .10); the tool and its holder clear the jaw fronts by .15 or more (or stop: the stickout is short). Turn the whole stickout from the tip to Z−(P + .10) to the head's window written in Op 20, aiming at H; cutting oil."
 settings = "dt-lathe-ar-1018-centre"
 cut_diameter_mm = "{{process.stock_dia_mm}}"
-inspection = "Head Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}}, miked."
+inspection = "Head Ø inside the window written in Op 20 (itself inside Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}}), miked with the .0001 micrometer."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.head_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Head under {{cad.head_dia_min_in:.3dot}}: scrap the blank and make another from Setup 2. Over {{cad.head_dia_max_in:.3dot}}: another light pass."
+instruction = "Head under the window's low end: scrap the blank and make another from Setup 2 (too loose in the cup's pocket). Over its high end: another light pass."
 
 [[setups.operations]]
 cut_kind = "longitudinal_turning"

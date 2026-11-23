@@ -187,6 +187,20 @@ material = "lathe-1018-cold-finished"
 sfm = 65
 feed = "tailstock quill by hand, a light plunge, cutting oil"
 
+# MHA-DT-35 pocket plunged with the owned 1/4 in carbide square end mill in
+# the tailstock drill chuck, the work turning (owner ruling 2026-11-23, tool
+# audit Q6). Speed: the carbide end mills' 1018 ceiling in common.toml (The
+# Carbide End Mill Store, 6gtools.com, Mild - 1018: 350 SFM) is 5350 rpm on
+# .25, so the lathe's 2000 rpm top (131 ft/min). Feed by hand: the same
+# table's 1/4 in figure in 1018, .0017 in/tooth, is .005 in/rev on three
+# flutes; the plunge is fed lighter than that, and only the annulus the #1
+# drill leaves (about .010 a side) and the floor are cut.
+[settings.lathe-endmill-1-4-plunge-1018]
+tool = "endmill-carbide-3fl-1-4"
+material = "lathe-1018-cold-finished"
+sfm = 350
+feed = "tailstock quill by hand, light and steady, under .005 in/rev, backing out for chips, cutting oil"
+
 # MHA-CH-13-TL-02 hub plug (6061-T6511 round, to order); its H hole is
 # shallow, drilled without pecking.
 [settings.lathe-ar-6061]
@@ -278,3 +292,40 @@ tool = "centre-drills-carbide-60"
 material = "lathe-o1-drill-rod"
 sfm = 45
 feed = "tailstock quill by hand"
+
+# The dome ends, swept (owner ruling 2026-11-23, tool audit Q5, option D: buy
+# the LittleMachineShop "Ball and Radius Turning Tool, Small", SKU 2569, "for
+# all 14 domes; step-and-file is the fallback for any dome it cannot reach").
+# Maker's facts (LittleMachineShop listing and "Instructions for Using the
+# Small Ball and Radius Turning Tool", updated 11/12/2024,
+# https://littlemachineshop.com/instructions/SmallRadiusToolInstructions.pdf,
+# read 2026-11-22): convex radii only, 0 to 3/4 in ball diameter; 3/8 in
+# shank; the bit's tip 1/4 in above the shank's bottom; the radius cut is the
+# tip's distance from the inner frame's pivot axis, which lies 3/16 in from
+# the frame's end; a pre-ground HSS bit; "basically a finishing tool ...
+# designed to take a large number of light cuts". The frame is 3/8 in wide
+# (listing: 3.25 L x .375 W x 3.00 H without the handle). Ownership:
+# cad/config/shop-equipment/ tools.ball-radius-turner-lms-2569, to order.
+# Speeds are authored, under each material's HSS turning band above (the bit
+# sweeps by hand to the axis, where the surface speed falls to zero): 600 rpm
+# on steel is 39 ft/min at Ø.250, 1000 rpm on brass 65 ft/min.
+[tools.ball-radius-turner-lms-2569]
+description = "LittleMachineShop 2569 Ball and Radius Turning Tool, Small: convex radii to 3/4 in ball diameter, 3/8 in shank in an AXA No. 1 holder, pre-ground HSS bit"
+
+[settings.lathe-ball-turner-1018]
+tool = "ball-radius-turner-lms-2569"
+material = "lathe-1018-cold-finished"
+rpm = 600
+feed = "inner frame swept by hand, cross slide in .003 a sweep at most, cutting oil"
+
+[settings.lathe-ball-turner-o1]
+tool = "ball-radius-turner-lms-2569"
+material = "lathe-o1-drill-rod"
+rpm = 600
+feed = "inner frame swept by hand, cross slide in .003 a sweep at most, cutting oil"
+
+[settings.lathe-ball-turner-c360]
+tool = "ball-radius-turner-lms-2569"
+material = "lathe-c360"
+rpm = 1000
+feed = "inner frame swept by hand, cross slide in .003 a sweep at most, dry"
