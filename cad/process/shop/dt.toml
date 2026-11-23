@@ -293,8 +293,12 @@ maker_chip_load_source = "Harvey Tool SF_896200 (8962xx downcut), uncoated, Bras
 # at Harvey's slotting figure, rounded down to the 0.1 in/min the sheet
 # prints: 2800 × 3 × .00065 = 5.46, so 5.4 in/min, .000643 in/tooth
 # (5.4 × 25.4 / 8400 mm). Delegated ruling 2026-11-22 (Main, owner review
-# #2144; issue #3376): never above the maker's published chip load without a
-# measurement.
+# #2144; issue #3376), no owner precedent: never above the maker's published
+# chip load without a measurement. The milling feed-factor table's .001
+# floor: prechips 0.11.38 (pedropaulovc/prechips#582) checks a cut below it
+# only when the tool states its maker's figure (the two fields above), at
+# the .001 row's force, an upper bound with no factor below the table; it
+# refuses any cut above the stated figure.
 [settings.endmill-carbide-3fl-1-16-downcut-c260]
 tool = "endmill-carbide-3fl-1-16-downcut"
 material = "c260-h02"
