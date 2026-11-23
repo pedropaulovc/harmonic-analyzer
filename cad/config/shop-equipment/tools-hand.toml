@@ -50,7 +50,11 @@ note = "Owner confirmed on hand 2026-11-19 (Central Machinery, 1 ton). Also push
 # in rule the archived inventory lists (Starrett C604R-6) cannot read the
 # MHA-HA-00 bar height (ha_harmonic_analyzer_assembly_spec.BAR_HEIGHT_MM).
 [tools.steel-rule-48]
-name = "Steel rule, 48 in"
+name = "Steel rule, 48 in, graduated 1/64 in and 0.5 mm"
+make = "Insize"
+sku = "7110-1200"
+source = "https://www.zoro.com/i/G2549342/"
+purchase = "Zoro G2549342, Insize 7110-1200 stainless steel rule, 48 in x 1-3/8 in x .07 in, $65.25 (read live 2026-11-23). Maker's table (https://insize.com/rulers/7110.html, read 2026-11-23): 7110-1200, 1200 mm / 48 in, accuracy +/-0.80 mm, graduations 0.5 mm, 1 mm, 1/64, 1/32 and 1/16 in. Zoro's listing prints +/- .009 in for the same rule; the maker's figure governs. Owner ruling 2026-11-23 (tool audit Q3): buy only this rule; it does not prove a printed +/-.01 length."
 kind = "rule"
 status = "to_order"
 length_in = 48
@@ -74,7 +78,11 @@ kind = "straightedge"
 status = "to_order"
 
 [tools.transfer-punches]
-name = "Transfer punch set, fractional and number sizes"
+name = "Transfer punch set, fractional 3/32-1/2 in by 64ths"
+make = "LittleMachineShop"
+sku = "2031"
+source = "https://littlemachineshop.com/products/transfer-punch-sets-individual-sizes"
+purchase = "LittleMachineShop 2031, transfer punch set 3/32 to 1/2 in by 64ths plus 17/32, 4-7/8 in long, $18.95 (read live 2026-11-23). Fractional set only (tool audit 2026-11-23): every punch a plan names is a 64ths size. The listing does not state how far under nominal the punches are ground: mike the 1/4 in punch on receipt against the note's limit."
 kind = "transfer_punch_set"
 status = "to_order"
 note = "Buy a set ground no more than .003 in under nominal (e.g. Precise spotters, .0025 ±.0005 under from 2.5 mm to 17/32 in, Penn Tool listing read 2026-11-12): cone_set_stack.PIVOT_SEAT_TRANSFER_MM books the 1/4 in punch's radial play in the MHA-DT-20 pivot bore at that grind (#2366)."
@@ -265,7 +273,7 @@ note = "Not owned: to buy (the shop records no hand hacksaw). Saws the MHA-DT-30
 make = "Irwin"
 sku = "2073113"
 source = "https://www.travers.com/product/irwin-2073113-snips-61-163-025"
-purchase = "Travers 61-163-025, Irwin 2073113 aviation snips, 18 ga CRS capacity, 10 in overall, 1-3/8 in cut, $23.48 (read live 2026-11-22). The Travers listing does not state the cut direction; 2073113 is the straight-cut member of Irwin's 2073111/2/3 trio by the maker's numbering (not read live): confirm before ordering."
+purchase = "Travers 61-163-025, Irwin 2073113 aviation snips, 18 ga CRS capacity, 10 in overall, 1-3/8 in cut, $23.48 (read live 2026-11-23). Straight cut: the Travers listing does not state the direction, and Irwin's page for 2073113 (https://www.irwintools.com/product/2073113/utility-snips, read 2026-11-23) lists it as \"IRWIN Aviation Snips Straight\"."
 name = "Aviation snips, straight cut"
 kind = "snips"
 status = "to_order"

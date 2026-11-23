@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The 7/8 in brass bar in the 3-jaw, seat end out: face, turn the knurl blank and knurl the head, turn the flange and cut the waist, drill #29 through, countersink the seat end, tap #8-32 through, part off long. The spot and the seat countersink (Ops 110, 130) are left off data-work: their labels do not fit the picture's width beside the knurl, turn, drill and tap labels. Shell: prechips.bush_diagrams; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" data-cad-template="turned-bush" data-hold="bar" data-out="datum" data-holes="tap" data-work="face turn knurl drill tap part"/>

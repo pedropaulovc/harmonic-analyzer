@@ -41,3 +41,8 @@ ch-connecting-rod:
       where: "front view, boxed .16 BASIC from datum A (the bore axis) to datum B (the shank's left flank)"
       finding: "basic A-to-B tie without a geometric control or acceptance tolerance on datum feature B (rules 5, 10)"
       reason: "owner ruling 2026-10-24 (#1980): the basic tie is the frame's origin across the shank; B's offset is bounded in practice by the .32 width and the title block, so no further control is added (RV-01 stands) (owner-accepted)"
+    - id: "RV-05"
+      kind: "accept"
+      where: "front view, the 4X R.065 at the shank's corners onto the ring and onto the fork's step (callout NOTHING SEATS IN THESE CORNERS)"
+      finding: "a three-place radius with no band of its own and no fit, wall or clearance named, so the third place reads as over-specification; print R.06 or R.07 (rule 3)"
+      reason: "Owner ruling 2026-11-23 (Pedro), tool audit Q9, option A: \"Print a local corner limit R.065 (.060-.070) on those corners and cut them with the 1/8 end mill: no 5/64 cutter\" (MHA-CH-02, CH-03, PN-01, PN-05). The three places are the ruled limit: under the title block's .XXX +/-.005, R.065 prints exactly .060-.070, the band the 1/8 in end mill's R.0625 sits in; a two-place R.06 or R.07 (+/-.01) would print .050-.070 or .060-.080, neither the ruled limit. The callout names why the corner may stand over INSIDE CORNERS R.040 MAX. Accepts these corners' places only, no other band or callout."

@@ -13,10 +13,16 @@ id = "feeler-gauges"
 name = "Feeler gauges (Pittsburgh 32-pc)"
 ref = "feeler-gauges"  # F-feeler-66MA; repointed from the Starrett 66MA (owner 2026-11-19)
 
+# The one #30 hole: the owned HSS #30 of the 115-piece index (tool audit
+# 2026-11-23, drill-30-cobalt: "Drill the one hole with the owned index #30
+# ... with the strip clamped between two scrap plates (no breakthrough grab,
+# no lobing), slow speed, cutting oil; buy a cobalt #30 only if the HSS
+# drill fails on the first trial"). Sandwiched, the drilled depth is the
+# backing stack's, so the .015 strip no longer sits under the drill's point.
 [[tools]]
-id = "drill-30-cobalt"
-name = "#30 cobalt drill"
-ref = "drill-30-cobalt"  # drawing cross-check 2026-11-19: #30 DRILL .129 THRU in 17-7 PH Cond C
+id = "drill-30"
+name = "#30 HSS drill (115-piece index), the strip clamped between two scrap plates"
+ref = "riser-drill-30"
 
 [[setups]]
 machine_kind = "other"

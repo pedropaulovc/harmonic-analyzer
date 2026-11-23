@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 6: same load; the 1/8 in end mill cuts each rod's outline on seven tabs; the 5/64 recuts the roots. Styles: prechips.palette. -->
+<!-- Setup 6: same load; the 1/8 in end mill cuts each rod's outline on seven tabs, its radius leaving the four shank corners. Styles: prechips.palette. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 470" width="640" height="470" font-family="sans-serif" font-size="12">
 <rect class="paper" width="640" height="470"/>
 <text class="title" x="20" y="22">Face F up: outline on tabs (top view)</text>
@@ -39,5 +39,5 @@
 <rect class="part-kept" x="521.9" y="271.6" width="7.4" height="6"/>
 <rect class="part-kept" x="114.1" y="223.0" width="8" height="8"/>
 <rect class="part-kept" x="68.9" y="332.2" width="8" height="8"/>
-<text class="label" x="170" y="433">outline on seven tabs (kept, solid); the 5/64 recuts the inside corners</text>
+<text class="label" x="170" y="433">outline on seven tabs (kept, solid); the 1/8 in leaves the four corners</text>
 </svg>

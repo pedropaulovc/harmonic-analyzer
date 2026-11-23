@@ -35,19 +35,6 @@ feed = "2.8 in/min"
 [tools.ignition-wrenches]  # F-ignition-wrenches
 description = "Open-end wrench, 5/32 in (ignition size)"
 
-# --- Drawing cross-check additions (2026-11-19) -------------------------------
-# Tools the v50 drawings call for that the quote workbook left out, from the
-# drawing cross-check of the placeholder plans (2026-11-19) and the owner's
-# rulings of that day. The comment cites the drawing callout or the inventory
-# record that holds the tool's ownership.
-# MHA-PN-01 needs .34 in of reach (the .31 window through and .020 past) and
-# its axial levels of .165 in within the flutes; carbide, for the Tru-Edge
-# brass setting below (settings.pn-em-5-64-c360). Not owned: to buy
-# (shop-equipment tools-special-cutters.toml holds its status).
-[tools.endmill-5-64-long]  # MHA-PN-01 window corners R.040 max
-description = "5/64 in 2-flute carbide end mill, .34 in or more of reach, 3/16 in or more of flute"
-diameter_mm = 1.984375
-
 # --- PN family C36000 flat brass settings (MHA-PN-01, MHA-PN-05) ---------------
 # Plans: cad/process/pn_pen_frame/plan.toml, cad/process/pn_pen_v_block/plan.toml.
 # Material key pn-c360-flat: C36000 free-machining brass, 360-H02 extruded
@@ -77,24 +64,6 @@ material = "pn-c360-flat"
 rpm = 2800
 chip_load_mm_per_tooth = 0.02794  # .0011 in; 2800 × 3 × .0011 = 9.2 in/min
 flutes = 3
-feed_unit = "in/min"
-# The 5/64 in 2-flute end mill (tools.endmill-5-64-long, to buy): Tru-Edge
-# "Solid Carbide Endmills Feeds and Speeds" (tru-edge.com,
-# wp-content/uploads/2019/09/Feeds-and-Speeds-Endmills.pdf, read
-# 2026-11-21), row Brass and Bronze: 250-350 SFM; 1/16 in .001 and 1/8 in
-# .002 in/tooth. 5/64 lies between the two columns and takes the lower one's
-# .001 (as the drill feeds above take the lower column). 250 SFM is 12,224
-# rpm on 5/64 in: it runs at the spindle's 2800 (57 ft/min). For comparison,
-# Harvey Tool's miniature long-reach table (series 762xx, Brass row,
-# ecomm.productivity.com HAT2_Speeds_Feeds_76210.pdf, read 2026-11-21)
-# starts a .078 in cutter at .00078 in/tooth finishing, below the .001 floor
-# of prechips' milling feed-factor table (Machinery's Handbook Table 4).
-[settings.pn-em-5-64-c360]
-tool = "endmill-5-64-long"
-material = "pn-c360-flat"
-rpm = 2800
-chip_load_mm_per_tooth = 0.0254  # .001 in; 2800 × 2 × .001 = 5.6 in/min
-flutes = 2
 feed_unit = "in/min"
 # Holes (HSS): the sources mg.toml's settings.clamp-*-brass cite.
 # LittleMachineShop "Cutting Speeds", Drilling & Reaming, row Brass

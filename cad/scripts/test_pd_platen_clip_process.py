@@ -130,7 +130,7 @@ def test_the_recipes_program_passes_every_check_it_declares(context, tmp_path) -
         ("blank_b_front_margin_mm", 3.0, "blank_b_front_margin_mm"),
         ("clip_spring_edge_y_mm", -3.0, "clip_spring_edge_y_mm"),
         ("part_left_x_mm", 1.0, "runs off the blank's end"),
-        ("snip_error_mm", 4.0, "may run off the snipped end"),
+        ("saw_error_mm", 4.0, "may run off the sawn end"),
         ("sheet_tip_z_mm", -0.3, "sheet_tip_into_plate_mm"),
         ("spoil_cut_max_mm", 0.05, "no deeper than spoil_cut_max_mm"),
         ("through_margin_min_mm", 0.3, "through_margin_min_mm below"),

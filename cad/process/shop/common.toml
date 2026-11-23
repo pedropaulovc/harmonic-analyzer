@@ -737,8 +737,11 @@ description = "Aluminium oxide two-grit sharpening stone, 6 x 2 x 1 in, 100 and 
 description = "Pliers"
 [tools.steel-rule-48]  # F-steel-rule-48
 description = "Steel rule, 48 in, finest graduation 1/64 in (Insize 7110-1200)"
-[tools.transfer-punches]  # F-transfer-punches-fractional, F-transfer-punches-number
-description = "Transfer punch sets, fractional 3/32-1/2 by 64ths and number sizes #1-#60"
+# Tool audit 2026-11-23 (row transfer-punches): the fractional set only; a
+# number-size hole is spotted through with the same-number drill from the
+# 115-piece index (no plan names a number-size punch).
+[tools.transfer-punches]  # F-transfer-punches-fractional
+description = "Transfer punch set, fractional 3/32-1/2 by 64ths"
 [tools.v-blocks]  # F-v-blocks
 description = "Matched V-block pair with clamps"
 
@@ -756,8 +759,29 @@ description = "Carbide 60° centre drills, trade sizes 1, 3 and 6"
 description = "Carbide 1/4 in 90° chamfering end mill, 2-flute (McMaster 3073A46)"
 diameter_mm = 6.35
 flute_length_mm = 3.175
-[tools.deburring-set]  # inventory tools.deburring-set (McMaster 4289A78); MHA-MS-03 and MHA-PD-27 edges and hole mouths
-description = "7-piece deburring scraper and countersink set (McMaster 4289A78)"
+# Harvey Tool 34662, here since two families plunge with it (tool audit
+# 2026-11-23, row endmill-carbide-3-64): MHA-MS-02's rebate relief and
+# MHA-PD-17's pin-hole flat. MHA-MS-02: the rebate's corner relief (.05
+# deep × .06 high, beside the roof, at the
+# bottom of the .134 rebate): no owned cutter is under .07 wide and reaches
+# .38 down inside the rebate. It is plunge-milled (owner ruling 2026-11-21,
+# relayed by CncBlockA) with Harvey Tool 34662, Miniature End Mill, Square,
+# Long Reach, Stub Flute: 3 flutes, centre cutting, .0620 cutter × .0930
+# length of cut × .5000 reach (8×), 1/8 shank, 2-1/2 overall, uncoated,
+# "optimized for plunging", $60.30 (harveytool.com/products/tool-details-
+# 34662, read 2026-11-21). Not owned: to buy. diameter_mm and
+# flute_length_mm: its .0620 and .0930 × 25.4.
+[tools.endmill-carbide-3fl-1-16-reach-1-2]
+description = "1/16 in (.0620) 3-flute carbide square end mill, stub flute .093 length of cut, .500 reach, 1/8 shank (Harvey Tool 34662)"
+diameter_mm = 1.5748
+flute_length_mm = 2.3622
+# The set McMaster-Carr sells as 4289A78 is Noga's SP1007 (owner 2026-11-23,
+# tool audit Q12: "the mcmaster kit sold is actually noga sp1007"; "check Noga
+# SP1007"). Noga_Deburring-2017.pdf (noga.com) p.53 lists the RD16.5
+# RotoDrive countersink in SP1007; p.27's blade table, row RD16.5 / BC1651:
+# range 1-16.5 mm, angle 90°. MHA-PD-19 chamfers K's mouth with it.
+[tools.deburring-set]  # inventory tools.deburring-set (McMaster 4289A78 = Noga SP1007); MHA-MS-03 and MHA-PD-27 edges and hole mouths; MHA-PD-19 K chamfer (RD16.5)
+description = "7-piece deburring scraper and countersink set, Noga SP1007 (McMaster 4289A78), with the RD16.5 RotoDrive 90° countersink, 1-16.5 mm"
 [tools.die-stock-13-16]  # inventory holders.die-stock-13-16
 description = "Die stock for 13/16 in round dies (Drillco 3000DS1)"
 [tools.dies-zoro-wb7365521946]  # inventory tools.dies-zoro-wb7365521946
@@ -819,6 +843,47 @@ description = "3M VHB 5906 double-sided tape, .006 in"
 # tools.aviation-snips-straight, same key.
 [tools.aviation-snips-straight]
 description = "Aviation snips, straight cut"
+
+# The sheet parts' outline cutter, moved here from pd.toml: the MHA-PD-03
+# platen clip and the MHA-DT-03-TL-02 phasing comb (tool audit 2026-11-23:
+# the comb takes the clip's 1/32 instead of a 1/16 bought for it alone) both
+# cut with it.
+# The clip's cutter: Harvey Tool 896231, Variable Helix End Mill for
+# Aluminum Alloys - Square - Downcut (harveytool.com/products/tool-details-
+# 896231 and the family page, read 2026-11-22): .0310 (1/32) cutter, .0930
+# length of cut, 3 left-hand spiral right-hand cut flutes (a downcut:
+# "prevents lifting of workpiece"), centre cutting, 1/8 shank, 1-1/2
+# overall, uncoated, the family "excellent performance in copper, brass, and
+# bronze alloys". It fits the .04 slit, which it cuts by running down one
+# side and back up the other. Ownership: cad/config/shop-equipment/
+# tools-special-cutters.toml, same key. diameter_mm and flute_length_mm: its
+# .0310 and .0930 × 25.4.
+[tools.endmill-carbide-3fl-1-32-downcut]
+description = "1/32 in (.0310) 3-flute carbide downcut square end mill, .093 length of cut, 1/8 shank (Harvey Tool 896231)"
+diameter_mm = 0.7874
+flute_length_mm = 2.3622
+# Harvey's own speeds and feeds for the series (SF_896200, "Variable Helix End
+# Mills for Aluminum Alloys - Square - Downcut", harveyperformance.widen.net/
+# content/urxytgzfxb/pdf/SF_896200.pdf, read 2026-11-22), uncoated, Brass
+# (Copper Zinc alloys, C2xxxx): 500 SFM; .031 cutter slotting .00033 in/tooth
+# (1x D radial, .5x D axial), max .00044. Every clip cut is a full-width slot
+# level, so the slotting figure is the ceiling (.00033 × 25.4).
+maker_chip_load_mm_per_tooth = { brass = 0.008382 }
+maker_chip_load_source = "Harvey Tool SF_896200 (8962xx downcut), uncoated, Brass C2xxxx, .031 cutter, slotting .00033 in/tooth"
+# Its setting in half-hard C26000 strip: Harvey's 500 SFM on .031 in is
+# 61,600 rpm, so the spindle's 2800 (machines.pm-30mv; 23 ft/min). Chip load
+# at Harvey's slotting figure, rounded down to the 0.1 in/min the sheet
+# prints: 2800 × 3 × .00033 = 2.77, so 2.7 in/min, .000321 in/tooth
+# (2.7 × 25.4 / 8400 mm); the plan holds each level to Harvey's .5 x D depth.
+# Delegated ruling 2026-11-22 (Main, owner review #2144): never above the
+# maker's published chip load without a measurement.
+[settings.endmill-carbide-3fl-1-32-downcut-c260]
+tool = "endmill-carbide-3fl-1-32-downcut"
+material = "c260-h02"
+rpm = 2800
+chip_load_mm_per_tooth = 0.0081643  # .000321 in; 2800 × 3 × .000321 = 2.7 in/min
+flutes = 3
+feed_unit = "in/min"
 
 # --- The 1/2 in HSS end mill and its slot setting (ch, sm) --------------------
 # Moved here from ch.toml: the MHA-CH-13-TL-01 sub-plate's SP01 slots the 1/2

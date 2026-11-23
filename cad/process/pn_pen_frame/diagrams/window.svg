@@ -16,8 +16,8 @@
   <text class="label-halo" x="183.5" y="160.3" text-anchor="middle">slug</text>
   <polyline class="arrow" fill="none" points="144.8,160.3 144.8,98.8 222.2,98.8 222.2,221.9"/>
   <text class="label" x="317.0" y="120.0">1/8 slot round the window,</text>
-  <text class="label" x="317.0" y="136.0">clockwise, then the 5/64 finish</text>
-  <text class="label" x="317.0" y="152.0">(corners R.040 MAX)</text>
+  <text class="label" x="317.0" y="136.0">clockwise, then its finish</text>
+  <text class="label" x="317.0" y="152.0">(corners R.065, .060-.070)</text>
   <text class="label" x="183.5" y="310.7" text-anchor="middle">T at the fixed jaw, B at the moving jaw</text>
   <text class="label" x="317.0" y="185.0">dashed: the parallel stacks under the ends</text>
   <text class="title" x="470.0" y="262.0">Section across the jaws, 2/5 of the plan's scale</text>

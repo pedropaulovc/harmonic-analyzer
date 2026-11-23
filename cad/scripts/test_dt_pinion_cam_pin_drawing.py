@@ -71,9 +71,10 @@ def test_sheet_has_no_general_notes() -> None:
 
 
 def test_bonded_slip_fit_replaces_the_press() -> None:
-    """U27 (Main, 2026-09-23): stock drill rod slipped into the strap's H7 seat
+    """U27 (Main, 2026-09-23): stock drill rod slipped into the strap's seat
     and bonded with LOCTITE 638 (the U6 drum-to-arbor precedent).  #290: 5/32
-    drill rod (+/-.0005) in the .1570 seat."""
+    drill rod (+/-.0005) in the .157 +.003/.000 end-milled seat (owner ruling
+    2026-11-23, tool audit Q8)."""
     import dt_pinion_bracket_spec
 
     assert dt_pinion_cam_pin_spec.PIN_DIA == pytest.approx(0.1563 * 25.4)
@@ -84,7 +85,7 @@ def test_bonded_slip_fit_replaces_the_press() -> None:
     pin_min = dt_pinion_cam_pin_spec.PIN_DIA + dt_pinion_cam_pin_spec.PIN_DIA_BAND[1]
     pin_max = dt_pinion_cam_pin_spec.PIN_DIA + dt_pinion_cam_pin_spec.PIN_DIA_BAND[0]
     assert round(seat_min - pin_max, 6) == 0.00508
-    assert round(seat_max - pin_min, 6) == 0.04318
+    assert round(seat_max - pin_min, 6) == 0.10668
     assert seat_max - pin_min <= dt_pinion_cam_pin_spec.RETAINING_COMPOUND_MAX_GAP_MM
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main's MHA-DT-25 eye pass): the bond is the fit-up step, not a note.
     assert dt_pinion_cam_pin_spec.ASSEMBLY_STEP == (

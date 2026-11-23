@@ -42,7 +42,7 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
     assert spec.HEAD_BASE_Y == pytest.approx(spec.BLOCK_HEIGHT - spec.HEAD_HEIGHT)
     assert (spec.CRANK_BOSS_DIA, spec.CRANK_BORE_DIA, spec.CRANK_BORE_OFFSET) == (
         21.844,
-        11.43,
+        11.1379,
         0.0,
     )
     assert spec.CRANK_BORE_HEIGHT == _config.machine(
@@ -71,7 +71,8 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
     from _cone_axis_constants import CONE_AXIS_HEIGHT_MM
     from dt_post_mount_stack import POST_BODY_HEIGHT_MM
 
-    assert (spec.CONE_BOSS_DIA, spec.BORE_DIA) == (17.272, 12.2682)
+    # Both bores .4385 +.0005/0 (owner ruling 2026-11-23, tool audit Q11).
+    assert (spec.CONE_BOSS_DIA, spec.BORE_DIA) == (17.272, 11.1379)
     assert spec.BORE_HEIGHT == CONE_AXIS_HEIGHT_MM
     assert spec.BLOCK_HEIGHT == POST_BODY_HEIGHT_MM
     assert spec.INCLINE_DEG == _config.machine("cone_incline", "derived_incline_deg")
@@ -495,8 +496,9 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
     """Codex P1 on #916 (PRRT_kwDOPHDy386mTQ-u): the collar's thrust ring is
     bounded by the collar OD edge AND the post's journal rim, and each rim
     ends the journal span the shaft's stack books, so both rims carry the
-    derived break; the title block's .010 would leave the worst-case ring
-    under its 1.5 floor."""
+    break; on the former Ø.483 bore the title block's .010 left the worst-case
+    ring under its 1.5 floor.  The Ø.4385 bore (owner ruling 2026-11-23, tool
+    audit Q11) widens the ring; the printed .004 MAX stays."""
     import _config
     import dt_cone_gear_shaft_spec as shaft
 
@@ -519,12 +521,14 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
     assert f"EDGE BREAK {shaft.inch_text(break_max, 3)} MAX" in shaft.COLLAR_STOCK_CALLOUT
     ring = shaft.THRUST_RING_MIN
     assert ring - 2.0 * break_max >= shaft.THRUST_RING_FLOOR
-    # the title block's general break on the rim would not hold the floor
+    # Ø.4385 bore: the ring now holds the floor even under the general break,
+    # and the printed .004 MAX is kept (the ruling moved the bore only).
     general = max(
         float(_config.title_block("edge_break")[key])
         for key in ("radius_mm", "chamfer_max_mm")
     )
-    assert ring - break_max - general < shaft.THRUST_RING_FLOOR
+    assert ring - break_max - general >= shaft.THRUST_RING_FLOOR
+    assert break_max == pytest.approx(0.004 * 25.4)
     # the ring's bore edge is the post's running bore at its band's top
     assert shaft.POST_JOURNAL_BORE_BAND == spec.JOURNAL_BORE_BAND
 
