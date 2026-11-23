@@ -335,7 +335,7 @@ feed = "hand"
 steps = [
   { kind = "action", text = "Check, stack: spindle stopped, the tip dragging the same leaf on the blank's top at op 60's three spots; read Z (mm). Stack = reading − 0.051 (the leaf) − that spot's op 60 thickness." },
   { kind = "check", text = "Every stack {{process.tape_stack_min_mm:.2f}}–{{process.tape_stack_max_mm:.2f}} mm ({{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}); the two ends within 0.05 mm (.002) of each other." },
-  { kind = "stop", text = "Outside the band or ends differing more: Z up, plate left in the vise (G54 stands); free the blank as ops 190–200 free the comb, peel the plate's tape; ops 70–120, then this op again." },
+  { kind = "stop", text = "Outside the band or ends differing more: Z up, plate left in the vise (G54 stands); free the blank as ops 200–210 free the comb, peel the plate's tape; ops 70–120, then this op again." },
 ]
 feed = "hand"
 
@@ -343,7 +343,7 @@ feed = "hand"
 steps = [
   { kind = "action", text = "Check, push test: jog Z up 1 in clear. With the heel of the hand push the blank hard along and across; try to lift each corner with a thumbnail." },
   { kind = "check", text = "No movement, no creak, no lifted corner." },
-  { kind = "stop", text = "Any movement: the plate left in the vise, free the blank as ops 190–200 free the comb, peel the plate's tape, then ops 70–120 and ops 140–150 again." },
+  { kind = "stop", text = "Any movement: the plate left in the vise, free the blank as ops 200–210 free the comb, peel the plate's tape, then ops 70–120 and ops 140–150 again." },
 ]
 feed = "hand"
 
@@ -364,15 +364,21 @@ speed_kind = "spindle"
 tool = "em-thirtysecond"
 drilling = "none"
 sizing = "other"
-steps = [
-  { kind = "action", text = "Run CB01_outline (M6 T1, spindle off: set 2800; about 19 min): in through the margin, round the U anticlockwise at size and out, {{process.level_count:g}} times, each {{process.level_depth_mm:in.4dot}} deeper, the last {{process.outline_tip_into_plate_mm:in.3dot}} into the plate. Air blast the chips; dry, no coolant or water (paper tape soaks)." },
-  { kind = "stop", text = "Hot smell (CA softens with heat): feed hold, cool 5 minutes, Cycle Start." },
-]
+instruction = "Run CB01_outline (M6 T1, spindle off: set 2800; about 19 min): in through the margin, round the U anticlockwise at size and out, {{process.level_count:g}} times, each {{process.level_depth_mm:in.4dot}} deeper, the last {{process.outline_tip_into_plate_mm:in.3dot}} into the plate. Dry: a light air blast from a nozzle held well clear of the spindle, hands off the work; no coolant or water (paper tape soaks and lets go)."
 settings = "endmill-carbide-3fl-1-32-downcut-c260"
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "comb", kind = "part", area_mm2 = "{{process.comb_bond_area_mm2}}", width_mm = "{{process.comb_spring_width_mm}}" }, { name = "waste", kind = "waste", area_mm2 = "{{process.waste_bond_area_mm2}}" }] } }
 milling_cuts = [
   { name = "outline", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.outline_cutter_dia_mm}}", axial_doc_mm = "{{process.level_depth_mm}}", radial_woc_mm = "{{process.outline_cutter_dia_mm}}", traverse_mm = ["{{process.outline_from_x_mm}}", "{{process.outline_to_x_mm}}"] },
 ]
+
+# CA softens with heat (the brief's cut caution): the remedy stops the
+# spindle and reruns the file, whose cut levels then pass in air.
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "CA softens with heat; never touch the work while CB01_outline runs." },
+  { kind = "stop", text = "The cut smokes or smells hot: Feed Hold, then Reset (the spindle stops); jog Z up clear. When the blank is cool to a finger, run CB01_outline again from its start: the levels already cut pass in air." },
+]
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
@@ -411,7 +417,7 @@ instruction = "The comb: slide the blade flat under the plate's tape at the comb
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Lay the comb tape-up on the plate's bare top in front of its tape (the 2 in strip along the edge that faced the moving jaw), hold it down flat with the other hand close to the peel line, and peel its tape back on itself, low and slow, along its length from the closed end toward the open end."
+instruction = "Lay the comb tape-up on the plate's bare top in front of its tape (about 2.2 in wide, along the edge that faced the moving jaw), hold it down flat with the other hand close to the peel line, and peel its tape back on itself, low and slow, along its length from the closed end toward the open end."
 feed = "hand"
 
 [[setups.operations]]
