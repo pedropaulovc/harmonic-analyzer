@@ -201,17 +201,21 @@ made to their mate.
 
 - **The necessity test.** For every REAM and every tight band ask: *what
   fails on this one machine if it is `.002 in` loose?* The feature passes
-  only when the answer is one of the four below and its callout, or a flag
+  only when the answer is one of the kinds below and its callout, or a flag
   note linked to it, prints that answer in a few words (rule 7):
-  - play, out-of-roundness or run-out that reaches the pen trace or a
-    reading (`PLAY SHOWS AT PEN`, `WHEEL TURNS ON THIS BORE`, `SETS READING
-    ZERO`);
+  - play, out-of-roundness or run-out, or an error in a lever arm, throw or
+    ratio, that reaches the pen trace or a reading (`PLAY SHOWS AT PEN`,
+    `WHEEL TURNS ON THIS BORE`, `SETS READING ZERO`, `THROW SETS CHANNEL
+    GAIN`);
   - a gear mesh's centre distance or run-out (`SETS MESH BACKLASH`);
   - a running gap or stack that closes, or a wall that falls under rule 17,
     at the looser size (`KEEPS GAP TO MHA-CH-06`, `SETS THE 20-GEAR STACK`,
     or the wall in rule 20's form, `WALL .080 MIN`);
   - a fixed joint that must hold with no bond, pin, key or screw
-    (`PRESS, HOLDS CRANK TORQUE`).
+    (`PRESS, HOLDS CRANK TORQUE`);
+  - a groove or seat cut to the installation size its maker gives for a
+    bought part (a retaining-ring groove): the callout names the bought part
+    by its drawing number, and that is the answer.
 
   A fit name alone (`RUNNING FIT ON MHA-CH-04`), a named mate alone, "it
   runs", "it locates" or "a reamer leaves a better hole" is not an answer. A
@@ -267,10 +271,12 @@ made to their mate.
   prints no argument for it.
 - **Every tight band names its mate and what it protects.** A tight band is
   an explicit band narrower than the title-block band for its decimal places,
-  a three-place size given a function, or any REAM callout (REAM marks a fit
-  bore even when it prints no band). A thread designation or class, a gear
-  data block, a purchased part's catalogue designation and the title block's
-  own rows are not tight bands. The callout, or a flagged note attached
+  or any REAM callout (REAM marks a fit bore even when it prints no band). A
+  three-place size given a function, printed at its title-block band, names
+  its mate as below but is not a tight band, and the necessity test does not
+  apply to it; nor is a thread designation or class, a gear data block, a
+  purchased part's catalogue designation or one of the title block's own
+  rows. The callout of a tight band, or a flagged note attached
   to it (rule 7), names the mate, the fit it needs (running, sliding, press,
   bonded or locating) and the answer to the necessity test. The fit is made
   to the mate, not to printed limits: the stated acceptance or the clearance
@@ -281,8 +287,9 @@ made to their mate.
   requirement and a range beside it is REF (`(CLEARANCE .004-.012)`).
   A gear centre distance names the mesh; a width that sets a stack names the
   stack. Where
-  the mate alone does not show why the band is tight, add a few words of
-  reason (`SETS MESH BACKLASH`, `KNIFE-EDGE SEAT`); see rule 7. The shop can
+  the mate alone does not show why the band is tight, the few words of
+  reason are the necessity answer (`SETS MESH BACKLASH`, `SETS LEVER ARM
+  RATIO`); see rule 7. The shop can
   then make the hole to the shaft instead of chasing a number. A tight band
   that names no mate and prints no answer to the necessity test is
   over-specification: it takes the title-block band. Do not ask for a mate

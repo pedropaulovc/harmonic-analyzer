@@ -17,7 +17,7 @@ Do not invent additional findings or infer an unstated functional requirement.
 That cuts both ways: a tight band or REAM is not justified by a function you
 can imagine for it. Rule 4's necessity test is a stated requirement like the
 tables below: confirm a finding that a REAM or tight band prints no answer,
-prints one outside the four kinds, takes a later form than its mate allows,
+prints one outside rule 4's listed kinds, takes a later form than its mate allows,
 or needs a gauge for one size, by reading the callout yourself; reject it
 as `misread` only when the answer is printed and the form is the earliest
 that serves, or when the feature is not a tight band at all (a thread

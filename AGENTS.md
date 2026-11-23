@@ -46,7 +46,14 @@ credibility rests on:
    [`cad/docs/drawing-guidelines.md`](cad/docs/drawing-guidelines.md) and its
    repository governance in
    [`cad/docs/drawing-simplicity-policy.md`](cad/docs/drawing-simplicity-policy.md)
-   before changing CAD geometry or manufacturing drawings. Drawing review is
+   before changing CAD geometry or manufacturing drawings. One machine is
+   built once: every size starts at the title block and every hole drilled.
+   A REAM, a band tighter than the title block, a printed interference or a
+   gauge bought for one size must pass guidelines rule 4's necessity test
+   (the sheet prints what fails if it is `.002 in` loose) and take the least
+   demanding form (drilled, made to fit, reamed to the bought mate, and only
+   last a printed band); no reamer or gauge is bought for one feature
+   without an owner ruling. Drawing review is
    the last DFM backstop: a finding that exposes a plausible model omission,
    contradiction, or unmanufacturable feature must be reconciled against the
    source CAD and primary evidence, not papered over on the sheet. Escalate a
