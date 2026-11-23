@@ -47,26 +47,38 @@ from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
 from _gear_drawing_entities import visible_circle_edge
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import limits
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from pd_transgear_pin_spec import PIN_NUMBER
 from pd_transgear_front_bushing_spec import (
     BORE_CALLOUT,
     BORE_DIA,
+    BORE_DIA_BAND,
     CHAMFER_CALLOUT,
+    CHAMFER_SUFFIX,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FRONT_CHAMFER,
     ISOMETRIC_VIEW_SCALE,
     LENGTH,
+    LENGTH_BAND,
     LENGTH_CALLOUT,
     OD,
     SURFACE_FINISHES,
+    UNIT,
+    WALL_WORST,
 )
+from transgear_cluster_fit import BORE_DIAMETRAL_CLEARANCE
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -165,6 +177,117 @@ BORE_FINISH_ATTACH = (
 BORE_FINISH_SYMBOL = (END_CENTER[0] - OD * _S / 2.0 - 0.022, END_CENTER[1] - 0.012)
 FINISH_CHAR_HEIGHT = 0.0025
 ISO_NOTE_XY = (0.315, 0.145)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_pd_transgear_front_bushing: one extrusion along model +Z).  The
+# chamfered ring face at z = LENGTH is the datum end the length runs from,
+# so the bar's faced end takes the chamfer; the nose face at z = 0 is the far
+# end.  The O.D. takes the title block's .XX row, the length its +/-.001
+# stack band, the bore its reamed band and the chamfer its single .02 MAX
+# limit (any break up to it: the ring bears inside it at its largest).  Each
+# ``span`` is a feature's model-Z extent.  The declarations print nothing.
+# The sheet prints no manufacturing note: every requirement is a dimension,
+# its band or its native callout, so the feature manifest's notes are empty.
+DRAWING_NOTES = ""
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_transgear_front_bushing"
+part_metadata(
+    model_sources=("LENGTH", "OD", "BORE_DIA", "FRONT_CHAMFER"),
+    precision_sources=("DRAWING_PRECISION_BY_NAME",),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), LENGTH),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": LENGTH}, ("LENGTH",)),
+        "outward": ([0.0, 0.0, 1.0], ("LENGTH",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("length",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("LENGTH",)),
+        "outward": ([0.0, 0.0, -1.0], ("LENGTH",)),
+        "length": (
+            limits(LENGTH, _P["RingLength"], (LENGTH_BAND, -LENGTH_BAND), unit=UNIT),
+            ("LENGTH", "LENGTH_BAND", "UNIT", (_SELF, "PROFILE_KEEP")),
+        ),
+        "length_nominal": (LENGTH, ("LENGTH",)),
+        "length_from": ("datum_end", ((_SELF, "PROFILE_KEEP"),)),
+        "callout": (LENGTH_CALLOUT, ("LENGTH_CALLOUT",)),
+    },
+    precision={"length": _P["RingLength"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(OD),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("OD",)),
+        "at": ([0.0, 0.0, 0.0], ("OD",)),
+        "span": ([0.0, LENGTH], ("LENGTH",)),
+        "dia": (
+            limits(OD, _P["RingOd"], unit=UNIT),
+            ("OD", "UNIT", (_SELF, "OD_ON_PROFILE")),
+        ),
+        "dia_nominal": (OD, ("OD",)),
+    },
+    precision={"dia": _P["RingOd"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(BORE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("BORE_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("BORE_DIA",)),
+        "span": ([0.0, LENGTH], ("LENGTH",)),
+        "dia": (
+            limits(BORE_DIA, _P["BoreDia"], BORE_DIA_BAND, unit=UNIT),
+            ("BORE_DIA", "BORE_DIA_BAND", "UNIT", (_SELF, "END_KEEP")),
+        ),
+        "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
+        "thru": (True, ("BORE_CALLOUT",)),
+        "process": ("ream", ("BORE_CALLOUT",)),
+        "wall_min": (WALL_WORST, ("WALL_WORST",)),
+        "diametral_clearance_ref": (
+            list(BORE_DIAMETRAL_CLEARANCE),
+            (("transgear_cluster_fit", "BORE_DIAMETRAL_CLEARANCE"), "BORE_CALLOUT"),
+        ),
+        "mate": (PIN_NUMBER, (("pd_transgear_pin_spec", "PIN_NUMBER"), "BORE_CALLOUT")),
+        "callout": (BORE_CALLOUT, ("BORE_CALLOUT",)),
+    },
+    precision={"dia": _P["BoreDia"]},
+)
+requirement(
+    "chamfer_datum",
+    kind="chamfer",
+    faces=(ConeFace(45.0),),
+    requirements=("leg_max",),
+    fields={
+        "leg_max": (
+            FRONT_CHAMFER,
+            ("FRONT_CHAMFER", "CHAMFER_SUFFIX", (_SELF, "PROFILE_KEEP")),
+        ),
+        "leg_nominal": (FRONT_CHAMFER, ("FRONT_CHAMFER",)),
+        "angle_deg": (45.0, ("CHAMFER_CALLOUT",)),
+        "edge_of": ("outer", ("CHAMFER_CALLOUT",)),
+        "at_end": ("datum_end", ("CHAMFER_CALLOUT",)),
+        "callout": (
+            f"{CHAMFER_SUFFIX.strip()} {CHAMFER_CALLOUT}",
+            ("CHAMFER_CALLOUT",),
+        ),
+    },
+    precision={"leg_max": _P["FrontChamferSize"]},
+)
 
 
 def _move_dimension(

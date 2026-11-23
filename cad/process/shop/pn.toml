@@ -161,13 +161,6 @@ tool = "drill-3-64"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, pecking, dry"
-# The pivot bore's go/no-go pair (cad/config/shop-equipment/
-# gauges.plug-gauges-1260-1265, to buy): GO .1260 and NO-GO .1265 in =
-# 3.2004 and 3.2131 mm. A fixed-limit pair reads no scale; its resolution is
-# each member's Class X tolerance, .000040 in = 0.001016 mm.
-[gauges.plug-gauges-1260-1265]
-range_mm = [3.2004, 3.2131]
-resolution_mm = 0.001016
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
