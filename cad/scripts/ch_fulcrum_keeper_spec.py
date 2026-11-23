@@ -104,20 +104,24 @@ CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_R  # 32.185: the set-screw tap's entry
 # keeper is finished alone, as a detail, to its own print (#2338: the
 # at-assembly pair ream needed a made-to-order 12 in reamer and an undrawn
 # setup). Two bores reamed apart sit out of line by their bore-height bands
-# and each bore's own tilt to its seat, so the bore is a stock .2550
-# chucking reamer's size (shop-equipment tools.reamer-2550),
-# BORE_DIA_BAND +.0010/.0000: its least clearance on the shaft covers the
-# slip minimum plus BORE_ALIGNMENT_ALLOWANCE_MM below.
+# and each bore's own tilt to its seat, so the bore is a stock chucking
+# reamer's size, BORE_DIA_BAND +.0010/.0000: its least clearance on the
+# shaft covers the slip minimum plus BORE_ALIGNMENT_ALLOWANCE_MM below.
+# Owner ruling 2026-11-23, tool audit Q7: "Re-band to dia .2560 +.0010/0,
+# cut with the .2560 reamer" (was .2550 +.0010/0 on a .2550 reamer bought
+# for these two bores alone): the .2560 reamer the MHA-CH-02 levers' and
+# MHA-CH-06 rocker arms' bores take (shop-equipment tools.reamer-2560) cuts it, and the shaft may sit
+# .0005 further from the set screw's far wall.
 # The crown is a full round tangent to both side faces, centred on the bore
 # (ch_fulcrum_keeper_notes.CROWN_CALLOUT). The bore keeps within
 # BORE_CENTRE_BAND_MM of the width's centre plane, so the crown thread's
 # worst case below spends that offset under the round.
-BORE_DIA = 0.2550 * 25.4  # 6.477
+BORE_DIA = 0.2560 * 25.4  # 6.5024
 BORE_RUNNING_MIN_CLEARANCE_MM = 0.010
-BORE_DIA_BAND = (0.0254, 0.0)  # (upper, lower): .2550 +.0010/.0000 in
-# The reamer that cuts it: TTC 06-002-550, ANSI B94.2 diameter tolerance
-# +.0001/+.0005 in over 1/4 in (Machinery's Handbook, chucking reamers); the
-# hole it cuts lies inside the bore band.
+BORE_DIA_BAND = (0.0254, 0.0)  # (upper, lower): .2560 +.0010/.0000 in
+# The reamer that cuts it: a .2560 chucking reamer (tools.reamer-2560),
+# ANSI B94.2 diameter tolerance +.0001/+.0005 in over 1/4 in (Machinery's
+# Handbook, chucking reamers); the hole it cuts lies inside the bore band.
 BORE_REAMER_DIA_RANGE_MM = (BORE_DIA + 0.0001 * 25.4, BORE_DIA + 0.0005 * 25.4)
 if not (
     BORE_DIA + BORE_DIA_BAND[1]
@@ -136,7 +140,7 @@ KEEPER_INNER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF - LUG_HALF_T)  # 153.416
 # through both bores). The fit-up step's slide check accepts the result
 # (MHA-CH-00: the shaft slides freely through both bores; owner ruling
 # 2026-11-20 (Pedro), #1659 option B): the budget is that check's, not a
-# printed control, and the aligned bores still keep 0.0344 of clearance
+# printed control, and the aligned bores still keep 0.0598 of clearance
 # after it, over the 0.010 running minimum
 # (ch_fulcrum_shaft_spec.ALIGNED_MIN_CLEARANCE_MM).
 KEEPER_SEAT_FLATNESS_BUDGET_MM = 0.04
@@ -517,7 +521,7 @@ if DRAWING_PRECISION["Foot"]["Depth"] != KEEPER_WIDTH_PLACES:
 _WIDTH_BAND = _BAND_BY_PLACES[DRAWING_PRECISION["Foot"]["Depth"]]
 BORE_SIDE_WALL_MM = (
     (KEEPER_WIDTH - _WIDTH_BAND) / 2.0 - BORE_CENTRE_BAND_MM - _BORE_MAX_RADIUS
-)  # 3.35
+)  # 3.289
 if BORE_SIDE_WALL_MM < WALL_TARGET_MM:
     raise AssertionError(f"keeper bore side wall {BORE_SIDE_WALL_MM:.3f} < {WALL_TARGET_MM}")
 # The foot hole's (and so the transferred frame tap's) transverse place off

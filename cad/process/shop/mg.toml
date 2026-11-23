@@ -216,9 +216,6 @@ diameter_mm = 4.7371
 [tools.reamer-1885]  # B-reamer-.1885
 description = ".1885 in HSS chucking reamer"
 diameter_mm = 4.7879
-[tools.reamer-4990]  # B-reamer-.4990
-description = ".4990 in HSS chucking reamer"
-diameter_mm = 12.6746
 
 # --- MHA-MG-08 wheel bar (cad/process/mg_wheel_bar/plan.toml) ---
 # The axle bore's go/no-go pair (cad/config/shop-equipment/

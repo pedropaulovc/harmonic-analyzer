@@ -107,8 +107,8 @@ def test_context_numbers_the_tools_and_places_the_holes_from_the_model(context) 
         "drill-31": 3,
         "reamer-1280": 4,
         "drill-25": 5,
-        "drill-11-8": 6,
-        "reamer-12": 7,
+        "drill-31-64": 6,
+        "reamer-4990": 7,
         "tap-guide": 8,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
@@ -125,12 +125,12 @@ def test_context_numbers_the_tools_and_places_the_holes_from_the_model(context) 
     b, tap = _centres(context, "KM06_top_holes@1")
     assert b == [pytest.approx(0.200 * IN), pytest.approx(-0.275 * IN)]
     assert tap[0] - b[0] == pytest.approx(0.300 * IN)
-    # KM08: X down from A, Y back from S: .811 BASIC from A, .300 from B.
+    # KM08: X down from A, Y back from S: .824 BASIC from A, .300 from B.
     bore = f["knife_bore"]["at"]
     assert _centres(context, "KM08_bore") == [
         [round(top - bore[1], 3), round(bore[0] - s_end, 3)]
     ]
-    assert top - bore[1] == pytest.approx(0.811 * IN, abs=1e-3)
+    assert top - bore[1] == pytest.approx(0.824 * IN, abs=1e-3)
     # The tap file ends over the tap hole.
     assert context["manual"]["tap_stud"]["at"] == tap
 
@@ -166,7 +166,7 @@ def test_every_cut_runs_at_a_cited_4140_ht_setting() -> None:
         ("dowel_ream_past_mm", 0.4, "outside its depth"),
         ("tap_drill_tip_height_mm", 18.0, "tap_drill_tip_height_mm"),
         ("bore_drill_tip_height_mm", -3.0, "bore_drill_tip_height_mm"),
-        ("bore_ream_tip_height_mm", -5.0, "12 mm reamer tip"),
+        ("bore_ream_tip_height_mm", -5.0, ".4990 reamer tip"),
         ("spot_dia_mm", 3.5, "rising order"),
         ("tap_x_mm", 12.0, "tap_x_mm"),
         ("bore_y_mm", 12.0, "bore_y_mm"),
@@ -249,7 +249,7 @@ def _seed(ctx: dict, key: str, pick, change, last: bool = False) -> dict:
             lambda line: "G1 Z-1.000 F{feed}",
             "depth",
         ),
-        # The 11.8 mm drill stopped above K.
+        # The 31/64 drill stopped above K.
         (
             "bore_drill",
             lambda line: line.startswith("G1 Z"),
