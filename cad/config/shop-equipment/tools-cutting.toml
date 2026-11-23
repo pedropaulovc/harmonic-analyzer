@@ -235,6 +235,16 @@ kind = "countersink"
 status = "to_order"
 note = "Not owned: to buy. The 3/8 in 82° countersink: MHA-DT-03-TL-01 index plate (.35 x 82°) and MHA-PD-19 arm plate (Ø.312 x 82°) plans."
 
+# MHA-PD-19 K's face-A chamfer, cut by hand (delegated ruling 2026-11-22,
+# Main, owner review #2144: option C). The owned deburring set (tools-hand
+# deburring-set, McMaster 4289A78) has a countersink blade, but its angle is
+# not on record, so a 90° one is to buy. No part number or price read.
+[tools.hand-countersink-90]
+kind = "countersink"
+status = "to_order"
+cite = ["McMaster-Carr, Hole Deburring Tools (read 2026-11-23): hand countersinks with handles, 90° variants: https://www.mcmaster.com/products/hole-deburring-tools/"]
+note = "Not owned: to buy. A 90° hand countersink with a handle, body 1/2 in or larger (over K's .4775 largest rim): MHA-PD-19 arm plate, K's .010-.020 x 45° chamfer at face A, checked with the .450 pin."
+
 # --- McMaster-Carr PO 0803PCAMPOS (owned) ------------------------------------
 
 # Every tool, gauge, cutter, insert, holder, saw and shop fluid on the owner's

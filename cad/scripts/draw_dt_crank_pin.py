@@ -3,6 +3,7 @@ r"""Create the curated machinist drawing for the bought, cross-drilled crank tap
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -20,6 +21,11 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
+from _feature_requirements import part_metadata, requirement
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _printed_limits import drilled_limits, limits
 from _drawing_centerline import add_view_centerline
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
@@ -38,11 +44,19 @@ from dt_crank_pin_notes import (
 )
 from dt_crank_pin_spec import (
     BIG_END_DIA,
+    BIG_END_DIA_BAND,
+    CROSS_HOLE_WEB_MIN,
+    DESIGNATION,
+    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PIN_LENGTH,
+    RING_HOLE_DIA,
     RING_HOLE_X,
+    SKU,
     SMALL_END_DIA,
+    STANDARD,
+    UNIT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -120,6 +134,106 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (build_dt_crank_pin: the pin is a
+# Front-plane revolve about model X, its flat big-end rim plane at X = 0 and
+# the small end at X = PIN_LENGTH; the ring hole is a Front-plane circle at
+# (RING_HOLE_X, 0) cut through both ways, so it runs along model Z).  The pin
+# is bought, its length and end diameters reference (note 1): only the cross
+# hole is made.  The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_crank_pin"
+_SPEC = "dt_crank_pin_spec"
+_BUILD = "build_dt_crank_pin"
+_FRAME = (_BUILD, "__frame__")
+_TAPER_HALF_ANGLE_DEG = math.degrees(
+    math.atan((BIG_END_DIA - SMALL_END_DIA) / 2.0 / PIN_LENGTH)
+)
+# The pin's surface where the hole enters it, on the +Z side at nominal.
+_RING_HOLE_ENTRY_Z = (
+    BIG_END_DIA - (BIG_END_DIA - SMALL_END_DIA) * RING_HOLE_X / PIN_LENGTH
+) / 2.0
+
+
+def _plane(value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": "x", "value": value}
+
+
+part_metadata(
+    model_sources=(_FRAME, "PIN_LENGTH", "BIG_END_DIA", "SMALL_END_DIA"),
+    precision_sources=("DRAWING_PRECISION", (_SELF, "DRAWING_PRECISION_BY_NAME")),
+)
+# The as-bought big end's rim plane: the ring hole's station runs from it.
+requirement(
+    "big_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane(0.0), (_FRAME, (_SELF, "BIG_END_EDGE")))},
+)
+requirement(
+    "small_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), PIN_LENGTH),),
+    requirements=("plane",),
+    fields={"plane": (_plane(PIN_LENGTH), (_FRAME, "PIN_LENGTH"))},
+)
+# The bought No. 3 taper pin, left as supplied: its ends are reference (note
+# 1), its big end held by ASME B18.8.2's commercial band, not a printed one.
+requirement(
+    "taper",
+    kind="outside_cone",
+    faces=(ConeFace(_TAPER_HALF_ANGLE_DEG),),
+    requirements=("stock",),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ([1.0, 0.0, 0.0], (_FRAME,)),
+        "stock": (f"McMASTER-CARR {SKU} {DESIGNATION}", ("SKU", "DESIGNATION")),
+        "standard": (STANDARD, ("STANDARD",)),
+        "dia_ref": (BIG_END_DIA, ("BIG_END_DIA",)),
+        "dia": (
+            [BIG_END_DIA + BIG_END_DIA_BAND[1], BIG_END_DIA + BIG_END_DIA_BAND[0]],
+            ("BIG_END_DIA", "BIG_END_DIA_BAND"),
+        ),
+        "small_dia_ref": (SMALL_END_DIA, ("SMALL_END_DIA",)),
+        "length_ref": (PIN_LENGTH, ("PIN_LENGTH",)),
+        "taper_per_diameter": (1.0 / 48.0, ((_SPEC, "SMALL_END_DIA"),)),
+    },
+)
+# The keeper-ring cross hole: #45 drill through (FRONT_KEEP "RingHoleDia",
+# DRILLED HOLES row, with its web limit under it), .15 from the big end's
+# rim (FRONT_KEEP "RingHoleX", .XX row).
+requirement(
+    "ring_hole",
+    kind="hole",
+    faces=(CylinderFace(RING_HOLE_DIA),),
+    requirements=("dia", "thru", "station", "web_min"),
+    fields={
+        "at": ([RING_HOLE_X, 0.0, _RING_HOLE_ENTRY_Z], (_FRAME, "RING_HOLE_X")),
+        "axis": ([0.0, 0.0, -1.0], (_FRAME,)),
+        "dia": (
+            drilled_limits(RING_HOLE_DIA, _P["RingHoleDia"], unit=UNIT),
+            ("RING_HOLE_DIA", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "nominal_dia": (RING_HOLE_DIA, ("RING_HOLE_DIA",)),
+        "thru": (True, ("DIMENSION_CALLOUTS",)),
+        "process": ("drill", ("DIMENSION_CALLOUTS",)),
+        "callout": (
+            DIMENSION_CALLOUTS["RingHoleDia"],
+            ("DIMENSION_CALLOUTS", (_SELF, "FRONT_KEEP")),
+        ),
+        "station": (
+            limits(RING_HOLE_X, _P["RingHoleX"], unit=UNIT),
+            ("RING_HOLE_X", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "station_nominal": (RING_HOLE_X, ("RING_HOLE_X",)),
+        "station_from": ("big_end", ((_SELF, "FRONT_KEEP"),)),
+        "web_min": (CROSS_HOLE_WEB_MIN, ("CROSS_HOLE_WEB_MIN",)),
+    },
+    precision={"dia": _P["RingHoleDia"], "station": _P["RingHoleX"]},
+)
 
 
 def build(adapter: Any) -> dict[str, str]:

@@ -153,6 +153,29 @@ tool = "reamer-1260"
 material = "pn-c360-flat"
 rpm = 1400
 feed = "4.2 in/min"
+# MHA-PN-04 pen rod (C36000 key stock): the #0-80 tap drill from the lathe's
+# tailstock, at the C360 drill rows' 160 sfm (shop/lathe.toml
+# lathe-drill-n-c360; the 3/64 runs at the lathe's 2000 rpm top), pecked.
+[settings.pn-lathe-drill-3-64-c360]
+tool = "drill-3-64"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, pecking, dry"
+# The Ø.125 pivot turned off the 5 mm square, 4-jaw only: shop/lathe.toml
+# lathe-ar-c360's 1170 sfm at the feeds prechips' turning_deflection passed
+# for the overhung pivot, .002 in/rev roughing and .001 in/rev finishing
+# (its .004 row feed springs the pivot past the finish limit).
+[settings.pn-lathe-ar-c360-turn]
+tool = "lathe-ar"
+material = "lathe-c360"
+sfm = 1170
+feed_mm_rev = 0.0508
+[settings.pn-lathe-ar-c360-finish]
+tool = "lathe-ar"
+material = "lathe-c360"
+sfm = 1170
+feed_mm_rev = 0.0254
+
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
 # prechips can check each plan's stock_refs. Description only: the ownership

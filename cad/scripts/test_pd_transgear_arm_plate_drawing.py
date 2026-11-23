@@ -885,3 +885,76 @@ def test_the_overall_references_stand_clear() -> None:
     assert width_y - 0.002 - drawing.FRONT_LABEL_XY[1] >= 0.004
     assert drawing.FRONT_LABEL_XY[1] - 0.004 >= 0.0125 + 0.002
     assert drawing.OVERALL_WIDTH_TEXT_XY[0] == pytest.approx(drawing._BACK_K[0])
+
+
+def test_the_plate_declares_one_owner_per_face() -> None:
+    import export_features
+    from _gtol_face import FaceGeometry
+
+    def plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+        point = tuple(value * offset_mm / 1000 for value in normal)
+        return FaceGeometry(None, 4001, (*normal, *point), normal, (-1.0, -1.0, -1.0, 1.0, 1.0, 1.0))
+
+    def bore(dia: float, x: float, y: float) -> FaceGeometry:
+        r, t = dia / 2, geometry.THICKNESS_OVER_ARM
+        box = tuple(v / 1000 for v in (x - r, y - r, 0.0, x + r, y + r, t))
+        return FaceGeometry(None, 4002, (x / 1000, y / 1000, 0.0, 0.0, 0.0, 1.0, r / 1000), None, box)
+
+    def cone(half_angle_deg: float, x: float, y: float, r: float) -> FaceGeometry:
+        box = tuple(v / 1000 for v in (x - r, y - r, 0.0, x + r, y + r, geometry.THICKNESS_OVER_ARM))
+        return FaceGeometry(
+            None, 4003, (x / 1000, y / 1000, 0.0, 0.0, 0.0, 1.0, r / 1000, math.radians(half_angle_deg)), None, box
+        )
+
+    t = geometry.THICKNESS_OVER_ARM
+    faces = {
+        "face_a": plane((0.0, 0.0, -1.0), 0.0),
+        "rear_face": plane((0.0, 0.0, 1.0), t),
+        "outline": plane(drawing._TOP_NORMAL, drawing._TOP_NORMAL[0] * geometry.TOP_LEFT[0] + drawing._TOP_NORMAL[1] * geometry.TOP_LEFT[1]),
+        "press_hole": bore(geometry.PRESS_HOLE_DIA, 0.0, 0.0),
+    }
+    selectors = export_features.feature_selectors("pd_transgear_arm_plate")
+    checks = list(faces.items())
+    checks += [("outline", plane(drawing._LEFT_TAPER_NORMAL, geometry.END_R))]
+    checks += [("outline", bore(2 * geometry.END_R, 0.0, 0.0))]
+    checks += [("press_hole", cone(45.0, 0.0, 0.0, 6.0))]
+    for index, (x, y) in enumerate(geometry.SCREW_HOLES, 1):
+        checks += [(f"screw_hole_{index}", bore(geometry.SCREW_HOLE_DIA, x, y))]
+        checks += [(f"screw_hole_{index}", cone(geometry.CSK_ANGLE_DEG / 2, x, y, 4.0))]
+    for index, (x, y) in enumerate(geometry.LOCATOR_SITES_MM, 1):
+        checks += [(f"locator_{index}", bore(geometry.LOCATOR_HOLE_DIA_MM, x, y))]
+    for name, face in checks:
+        owners = [
+            owner
+            for owner, specs in selectors.items()
+            if any(selector.matches(face) for selector in specs)
+        ]
+        assert owners == [name], name
+
+
+def test_the_plate_feature_bands_are_the_printed_ones() -> None:
+    import export_features
+
+    def _in(value: float) -> float:
+        return value * 25.4
+
+    f = export_features.requirement_manifest("pd_transgear_arm_plate")["features"]
+    assert f["rear_face"]["thickness"] == pytest.approx([_in(0.192), _in(0.202)], abs=1e-3)
+    assert f["press_hole"]["dia"] == pytest.approx([_in(0.4375), _in(0.4382)], abs=1e-4)
+    assert f["press_hole"]["chamfer_leg"] == pytest.approx([_in(0.010), _in(0.020)])
+    assert f["press_hole"]["chamfer_at"] == "face_a" and f["press_hole"]["thru"] is True
+    assert f["outline"]["end_r"] == pytest.approx([_in(0.48), _in(0.50)], abs=1e-3)
+    assert f["outline"]["edge_left_x"] == pytest.approx([_in(0.74), _in(0.76)], abs=1e-3)
+    assert f["outline"]["top_left_y"] == pytest.approx([_in(1.66), _in(1.68)], abs=1e-3)
+    assert f["outline"]["top_right_y"] == pytest.approx([_in(1.60), _in(1.62)], abs=1e-3)
+    assert f["outline"]["kink_y"] == pytest.approx([_in(0.41), _in(0.43)], abs=1e-3)
+    for index in (1, 2):
+        hole = f[f"screw_hole_{index}"]
+        assert hole["dia"] == pytest.approx([_in(0.228), _in(0.232)], abs=1e-3)
+        assert hole["csk_dia"] == pytest.approx([_in(0.307), _in(0.317)], abs=1e-3)
+        assert hole["csk_angle_deg"] == [81.0, 83.0] and hole["csk_at"] == "rear_face"
+        assert hole["position_dia"] == pytest.approx(_in(0.014))
+        locator = f[f"locator_{index}"]
+        assert locator["made_at"] == "assembly"
+        assert locator["dia"] == pytest.approx([_in(0.0945), _in(0.0950)], abs=1e-4)
+        assert locator["position_dia"] == pytest.approx(_in(0.004))
