@@ -103,6 +103,11 @@ tap_chase_mark_in = 0.40
 # DRO about ±.001 on the floor and rim, the depth ±.0005 (±.003 on the rim),
 # the angle ±0.12° (±.002 on the rim): rim .584-.596, floor .349-.351.
 recess_corner_x_dro_in = 0.313
+# The corner's caliper acceptance: the rim is the corner + .240 at the
+# .040 depth, so a corner of .344-.356 keeps the rim in .58-.60 with the
+# depth's and angle's ±.005 between them.
+recess_corner_check_min_in = 0.344
+recess_corner_check_max_in = 0.356
 compound_check_travel_in = 0.5
 compound_check_rise_in = 0.158
 cone_compound_travel_in = 0.14
@@ -215,7 +220,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Knurl blank over its ±.001 in Op 20: take another light pass and mike again. Under: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10."
+instruction = "Knurl blank over its ±.001 in Op 20: take another light pass and mike again. Under: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10; with under {{process.chuck_grip_in:.2dot}} + {{cad.stickout_in:.2dot}} in of blank left, saw a new one."
 feed = "hand"
 
 [[setups.operations]]
@@ -242,7 +247,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Over {{cad.outer_dia_max_in:.3dot}} in Op 50: take another pass with more infeed. Under {{cad.outer_dia_min_in:.3dot}}, or double-tracked: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10."
+instruction = "Over {{cad.outer_dia_max_in:.3dot}} in Op 50: take another pass with more infeed. Under {{cad.outer_dia_min_in:.3dot}}, or double-tracked: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10; with under {{process.chuck_grip_in:.2dot}} + {{cad.stickout_in:.2dot}} in of blank left, saw a new one."
 feed = "hand"
 
 [[setups.operations]]
@@ -284,7 +289,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.step_waist_dia_band_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Flange or waist over its band, or a face long of its station (Op 70, Op 90): cut again and recheck. Under its band, or a face short of its station: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10."
+instruction = "Flange or waist over its band, or a face long of its station (Op 70, Op 90): cut again and recheck. Under its band, or a face short of its station: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10; with under {{process.chuck_grip_in:.2dot}} + {{cad.stickout_in:.2dot}} in of blank left, saw a new one."
 feed = "hand"
 
 [[setups.operations]]
@@ -414,12 +419,12 @@ sizing = "other"
 instruction = "Dish cone, carriage still locked: each pass, from a start on the floor, feed the compound out about {{process.cone_compound_travel_in:.2dot}} until the nose leaves the face; wind it back to zero; step the cross slide out .010 or less. The last pass starts at X Ø{{process.recess_corner_x_dro_in:.3dot}}, the floor's corner."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.recess_dia_mm}}"
-inspection = "One clean cone from the floor's corner to the face. Floor's corner Ø{{cad.recess_floor_dia_min_in:.2dot}}–{{cad.recess_floor_dia_max_in:.2dot}}, calipers' inside jaws flat on the floor (a check on the X DRO's nose allowance: a wrong one moves it about .04). The rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}} follows that corner, the depth and the compound's angle (.584–.596)."
+inspection = "One clean cone from the floor's corner to the face. Floor's corner Ø{{process.recess_corner_check_min_in:.3dot}}–{{process.recess_corner_check_max_in:.3dot}}, calipers' inside jaws flat on the floor (a check on the X DRO's nose allowance: a wrong one moves it about .04). The rim, .240 over the corner, then lies in Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.recess_floor_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Compound not reading {{process.compound_check_rise_in:.3dot}} (Op 190): reset it before any touch-off. A step at the floor's corner, or the cone not meeting the face: repeat the last cone pass from Ø{{process.recess_corner_x_dro_in:.3dot}}. Depth or corner off its DRO figure: recut the floor there before the cone. Floor's corner outside its band after the cone (Op 220): the rim is off with it: scrapped; make another from Setup 1."
+instruction = "Compound not reading {{process.compound_check_rise_in:.3dot}} (Op 190): reset it before any touch-off. A step at the floor's corner, or the cone not meeting the face: repeat the last cone pass from Ø{{process.recess_corner_x_dro_in:.3dot}}. Depth or corner off its DRO figure: recut the floor there before the cone. Floor's corner outside Ø{{process.recess_corner_check_min_in:.3dot}}–{{process.recess_corner_check_max_in:.3dot}} after the cone (Op 220): the rim is off with it: scrapped; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
