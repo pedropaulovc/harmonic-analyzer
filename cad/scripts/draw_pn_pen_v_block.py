@@ -380,6 +380,9 @@ BOTTOM_KEEP = {
         (_bz(NECK_DEPTH) + _bz(DEPTH_MID_Z)) / 2.0,
     ),
     "PivotDia": (_fx(0.0) + 0.040, _bz(NECK_DEPTH) - 0.0067),
+    # The step corners' 2X R.065 inside the slot's open bottom, left of the
+    # step and the bore, its leader up-right to the near wall's corner.
+    "ReliefCornerR": (_fx(RELIEF_X0) - 0.040, _bz(RELIEF_Z0) - 0.012),
 }
 # Section A-A looks the same way as the paper-end view beside it: the body's
 # front face at x 0.306 on the LEFT, the bottom face at y 0.156, the top at
@@ -969,7 +972,8 @@ requirement(
 # The relief slot under the body, open at the far end and the bottom: its
 # walls .12 and .74 from the body's front face and roof .26 from the bottom
 # (SECTION_KEEP), its end wall at the step .35 from the paper end; the two
-# corners at the step take the title block's R.040 MAX.
+# corners at the step print 2X R.065 (BOTTOM_KEEP ReliefCornerR; owner ruling
+# 2026-11-23, tool audit Q9).
 _RELIEF_ARC = 0.3 * RELIEF_CORNER_R
 requirement(
     "relief",
@@ -990,7 +994,7 @@ requirement(
             contains_z_mm=RELIEF_Z1 - _RELIEF_ARC,
         ),
     ),
-    requirements=("near_wall", "far_wall", "height", "station", "corner_r_max"),
+    requirements=("near_wall", "far_wall", "height", "station", "corner_r"),
     fields={
         "axis": ((1.0, 0.0, 0.0), (_FRAME,)),
         "near_wall": _printed(
@@ -1011,14 +1015,18 @@ requirement(
         "station": _printed("ReliefX0", RELIEF_X0, "RELIEF_X0", (_SELF, "BOTTOM_KEEP")),
         "station_nominal": (RELIEF_X0, ("RELIEF_X0",)),
         "station_from": ("paper_end", ((_SELF, "BOTTOM_KEEP"),)),
-        "corner_r_max": (INSIDE_CORNER_R_MAX, ("INSIDE_CORNER_R_MAX",)),
-        "corner_r_model": (RELIEF_CORNER_R, ("RELIEF_CORNER_R",)),
+        "corner_r": _printed(
+            "ReliefCornerR", RELIEF_CORNER_R, "RELIEF_CORNER_R", (_SELF, "BOTTOM_KEEP")
+        ),
+        "corner_r_nominal": (RELIEF_CORNER_R, ("RELIEF_CORNER_R",)),
+        "corner_count": (2, ("DIMENSION_PREFIXES",)),
     },
     precision={
         "near_wall": _P["ReliefZ0"],
         "far_wall": _P["ReliefZ1"],
         "height": _P["ReliefHeight"],
         "station": _P["ReliefX0"],
+        "corner_r": _P["ReliefCornerR"],
     },
 )
 # The pivot bore, reamed down from the top face through into the relief:

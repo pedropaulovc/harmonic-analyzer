@@ -282,9 +282,10 @@ def paper_side_points_printed_worst() -> dict[str, float]:
 
 
 def window_corner_ride_max() -> float:
-    """How far the stirrup's window corners, at the title block's INSIDE
-    CORNERS limit, can lift its top rail off the block top by riding the
-    neck's top edges, the window and the neck at their printed limits."""
+    """How far the stirrup's window corners, at their printed R.065's
+    greatest (R.070; owner ruling 2026-11-23, tool audit Q9), can lift its
+    top rail off the block top by riding the neck's top edges, the window
+    and the neck at their printed limits."""
     window = _printed_limits(frame, "WindowWidth", frame.WINDOW_WIDTH)[0]
     neck = (
         _printed_limits(vb, "NeckZ1", vb.depth_station(vb.NECK_DEPTH))[1]
@@ -296,7 +297,7 @@ def window_corner_ride_max() -> float:
     # worst), so one side wall can lie on the neck's face.  That edge then
     # meets its corner's arc where the arc leaves the side wall, a full
     # radius under the top wall.
-    return frame.INSIDE_CORNER_R_MAX
+    return frame.WINDOW_CORNER_R_MAX
 
 
 # --- plan balance ---------------------------------------------------------------
@@ -325,6 +326,16 @@ def plan_mass_items() -> list[tuple[str, float, float, float]]:
             "relief slot",
             -vb.RELIEF_WIDTH * vb.RELIEF_HEIGHT * (L - vb.RELIEF_X0),
             (vb.RELIEF_X0 + L) / 2.0,
+            zc,
+        ),
+        # The slot's two step corners stand R x R less the quarter disc over
+        # its height (R.065, owner ruling 2026-11-23, tool audit Q9), their
+        # centroids R (10 - 3 pi) / (12 - 3 pi) off the step, symmetric in z.
+        (
+            "relief step corners",
+            2.0 * (1.0 - math.pi / 4.0) * vb.RELIEF_CORNER_R**2 * vb.RELIEF_HEIGHT,
+            vb.RELIEF_X0
+            + vb.RELIEF_CORNER_R * (10.0 - 3.0 * math.pi) / (12.0 - 3.0 * math.pi),
             zc,
         ),
         ("pivot bore", -_cyl(pivot_r, H - vb.RELIEF_HEIGHT), vb.PIVOT_BORE_X, zc),

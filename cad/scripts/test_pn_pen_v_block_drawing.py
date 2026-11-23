@@ -106,14 +106,22 @@ def test_hidden_reference_dimensions_reach_their_views() -> None:
     assert {point[0] for point in drawing.SECTION_LINE_MODEL_MM} == {spec.PIVOT_BORE_X}
 
 
-def test_relief_corners_clear_the_grip_at_the_title_block_corner() -> None:
-    # The relief's step corners print no radius: the title block's INSIDE
-    # CORNERS R.040 MAX governs them, and at that limit they still clear the
-    # grip (machinist review 8c9a0a7: "2X R.04" read beside R.040 MAX).
-    assert spec.INSIDE_CORNER_R_MAX == pytest.approx(0.040 * 25.4)
-    assert spec.RELIEF_CORNER_R <= spec.INSIDE_CORNER_R_MAX
-    assert spec._GRIP_GAP_AT_BOTTOM - spec.INSIDE_CORNER_R_MAX >= 0.25
-    assert "ReliefCornerR" not in spec.DRAWING_DIMENSIONS["ReliefProfile"]
+def test_relief_corners_print_r065_and_clear_the_grip_at_r070() -> None:
+    # Owner ruling 2026-11-23, tool audit Q9: the relief's step corners print
+    # 2X R.065 at three places (.060-.070, the title block's .XXX), naming
+    # why they stand over INSIDE CORNERS R.040 MAX; at the band's greatest
+    # they still clear the grip and the bore.
+    assert spec.RELIEF_CORNER_R == pytest.approx(0.065 * 25.4)
+    assert (spec.RELIEF_CORNER_R_MIN, spec.RELIEF_CORNER_R_MAX) == pytest.approx(
+        (0.060 * 25.4, 0.070 * 25.4)
+    )
+    assert spec.DRAWING_PRECISION["ReliefProfile"]["ReliefCornerR"] == 3
+    assert spec.DIMENSION_PREFIXES[("ReliefProfile", "ReliefCornerR")] == "2X R"
+    assert spec.DIMENSION_CALLOUTS["ReliefCornerR"] == "NOTHING SEATS IN\nTHESE CORNERS"
+    assert spec.RELIEF_CORNER_GRIP_MARGIN_MIN == pytest.approx(
+        spec._GRIP_GAP_AT_BOTTOM - 0.070 * 25.4
+    )
+    assert spec.RELIEF_CORNER_GRIP_MARGIN_MIN >= 0.25
 
 
 def test_pivot_bore_drops_wholly_into_the_slot_at_its_printed_limits() -> None:
@@ -140,7 +148,10 @@ def test_pivot_bore_drops_wholly_into_the_slot_at_its_printed_limits() -> None:
     assert end - start == pytest.approx(grip_length)
     seat = min(end, spec.RELIEF_X0) - max(start, 0.0)
     assert seat == spec.RELIEF_X0
-    assert end > spec.RELIEF_X0 + spec.RELIEF_CORNER_R + 1.5
+    # The marker body (wider) starts past the corner arcs at their printed
+    # R.070 (owner ruling 2026-11-23, tool audit Q9): 0.81 clear, down from
+    # the 1.5 this test held at R.040 (open question in the Q9 PR).
+    assert end > spec.RELIEF_X0 + spec.RELIEF_CORNER_R_MAX + 0.8
     assert carriage.plan_cg_residual_mm() <= 0.25
 
 
@@ -767,10 +778,9 @@ def test_v_runs_past_the_step_so_no_knife_edge_shows_in_the_end_view() -> None:
     # curved away from the step.  The simplified E's wider slot stands both
     # corner arcs outside the V's mouth, and the cut still runs on to where
     # they end: past the step the V lies wholly inside the slot.
-    near_corner_z = spec.RELIEF_Z0 + spec.RELIEF_CORNER_R
-    far_corner_z = spec.RELIEF_Z1 - spec.RELIEF_CORNER_R
+    near_corner_z = spec.RELIEF_Z0 + spec.RELIEF_CORNER_R_MAX
+    far_corner_z = spec.RELIEF_Z1 - spec.RELIEF_CORNER_R_MAX
     assert near_corner_z < spec.V_MOUTH_Z0 < spec.V_MOUTH_Z1 < far_corner_z
-    assert spec.RELIEF_CORNER_R == 1.016  # .04
     assert spec.V_CUT_LENGTH == spec.RELIEF_X0 + spec.RELIEF_CORNER_R
     assert spec.V_APEX_Y < spec.RELIEF_HEIGHT
 
@@ -795,11 +805,18 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     # the relief removes that much less.  The apex flat leaves its tip
     # standing; its two R.020 rounds give back 0.011 mm^2 more along the
     # whole cut.
-    assert part.V_GROOVE == pytest.approx(spec.V_GROOVE_AREA * (8.89 + 1.016))
-    assert part.V_APEX_FILLETS == pytest.approx(0.1100, abs=1e-4)
-    assert part.V_GROOVE_PAST_STEP == pytest.approx(35.516, abs=1e-3)
-    # The carriage mass model cuts the relief square-cornered and leaves the
-    # bore's top chamfer: both under 0.05% of the block.
+    assert part.V_GROOVE == pytest.approx(
+        spec.V_GROOVE_AREA * (8.89 + spec.RELIEF_CORNER_R)
+    )
+    assert part.V_APEX_FILLETS == pytest.approx(
+        spec.V_APEX_FILLET_AREA * spec.V_CUT_LENGTH
+    )
+    assert part.V_GROOVE_PAST_STEP == pytest.approx(
+        spec.V_GROOVE_AREA * spec.RELIEF_CORNER_R
+    )
+    # The carriage mass model carries the relief's two R.065 step corners
+    # (owner ruling 2026-11-23, tool audit Q9) and leaves the bore's top
+    # chamfer, under 0.05% of the block.
     assert part.V_RELIEF + part.V_RELIEF_CORNERS + part.V_GROOVE_PAST_STEP == (
         pytest.approx(15.748 * 6.604 * (26.162 - 8.89))
     )
@@ -807,7 +824,6 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     assert part.V_RELIEF_CORNERS == pytest.approx(
         2.0 * (1.0 - math.pi / 4.0) * corner_r**2 * relief_h
     )
-    assert 0.0 < part.V_RELIEF_CORNERS < 0.0005 * part.V_TOTAL
     assert 0.0 < part.V_PIVOT_CHAMFER < 0.0005 * part.V_TOTAL
     bore_length = spec.BLOCK_HEIGHT - spec.RELIEF_HEIGHT
     assert part.V_PIVOT_BORE == pytest.approx(math.pi * 1.6002**2 * bore_length)
@@ -827,9 +843,7 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     )
     sliver = part.V_SET_SCREW_TAP - math.pi * tap_r**2 * spec.SET_SCREW_TAP_LENGTH
     carriage_volume = block_mass / carriage.BRASS_G_PER_MM3 - sliver
-    assert carriage_volume == pytest.approx(
-        part.V_TOTAL - part.V_RELIEF_CORNERS + part.V_PIVOT_CHAMFER
-    )
+    assert carriage_volume == pytest.approx(part.V_TOTAL + part.V_PIVOT_CHAMFER)
 
 
 def test_sheet_runs_at_4_to_1_with_3_to_2_isometric() -> None:

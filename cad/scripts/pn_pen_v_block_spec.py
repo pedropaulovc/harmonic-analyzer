@@ -52,6 +52,13 @@ import _config
 from _fit_ream_h7 import REAM_H7
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _milled_corner_limit import (
+    CORNER_PLACES,
+    CORNER_R,
+    CORNER_REASON,
+    corner_prefix,
+    corner_r_limits,
+)
 from _package_units import drawing_unit
 from _printed_tolerance import (
     angular_band_deg,
@@ -70,8 +77,10 @@ import sh_vn_arbor_set_screw_spec as rod_set_screw
 # width (it sets the marker axis, pn_pen_carriage_geom.MARKER_POS).  Every
 # printed check below judges the PRINTED limits (printed_deviations).
 UNIT = drawing_unit("parts/pn-pen-v-block", _config.parts("pn-pen-v-block"))
-# Every internal corner the sheet leaves undimensioned: the title block's
-# INSIDE CORNERS R.040 MAX governs it, and every check below judges that limit.
+# Every internal corner the sheet leaves undimensioned (the V's apex rounds):
+# the title block's INSIDE CORNERS R.040 MAX governs it, and every check
+# below judges that limit.  The relief slot's two corners at the step print
+# their own R.065 (RELIEF_CORNER_R below).
 INSIDE_CORNER_R_MAX = inside_corner_radius_mm(unit=UNIT)
 
 # X, along the marker: the CG solve (pn_pen_carriage_geom) puts the carriage's
@@ -158,12 +167,14 @@ RELIEF_Z1 = round(NECK_DEPTH - RELIEF_Z0, 6)  # far (back) wall; prints .74
 RELIEF_WIDTH = round(RELIEF_Z1 - RELIEF_Z0, 6)
 RELIEF_HEIGHT = 6.604  # .26
 # The slot's two internal corners at the step (x = RELIEF_X0) keep the end
-# mill's radius, an .080 cutter .26 deep, at the title block's INSIDE CORNERS
-# R.040 MAX (no callout: the title block governs).  Modelled as plan arcs in
-# the slot profile, not a fillet feature.
-RELIEF_CORNER_R = 1.016  # .040
-if RELIEF_CORNER_R > INSIDE_CORNER_R_MAX:
-    raise AssertionError("the modelled relief corner exceeds the title block's corner")
+# mill's radius.  Nothing seats in them.  Owner ruling 2026-11-23, tool audit
+# Q9: "Print a local corner limit R.065 (.060-.070), cut with the 1/8 end
+# mill; no 5/64 cutter" (_milled_corner_limit): the sheet prints 2X R.065 at
+# the title block's .XXX, naming why it stands over INSIDE CORNERS R.040 MAX,
+# and every check below judges the band's greatest, R.070.  Modelled as plan
+# arcs in the slot profile, not a fillet feature.
+RELIEF_CORNER_R = CORNER_R  # .065
+RELIEF_CORNER_R_MIN, RELIEF_CORNER_R_MAX = corner_r_limits(unit=UNIT)
 # The V is cut on one corner radius past the step, to where the corner arcs
 # end.  Past the step its whole section lies inside the slot's (guard below),
 # so the extra run removes no brass; the step face never ends in a sliver
@@ -265,13 +276,21 @@ if BLOCK_HEIGHT - SET_SCREW_Y - TAP_DRILL_MM[rod_set_screw.THREAD] / 2.0 < _WALL
 # places it 2.5 past); it is widest in the slot at the bottom face (its axis
 # is below the block), so the corner must stand clear of it there wherever it
 # ends.  The body (wider) must start past x = RELIEF_X0 + RELIEF_CORNER_R; the
-# carriage layout owns where it starts.
+# carriage layout owns where it starts.  Both judge the printed R.070.
 _GRIP_R = marker.BARREL_DIA / 2.0
 _GRIP_GAP_AT_BOTTOM = DEPTH_MID_Z - math.sqrt(_GRIP_R**2 - MARKER_AXIS_Y**2) - RELIEF_Z0
-if _GRIP_GAP_AT_BOTTOM - INSIDE_CORNER_R_MAX < 0.25:
+RELIEF_CORNER_GRIP_MARGIN_MIN = _GRIP_GAP_AT_BOTTOM - RELIEF_CORNER_R_MAX
+if RELIEF_CORNER_GRIP_MARGIN_MIN < 0.25:
     raise AssertionError("relief corner radius reaches the marker grip")
-if RELIEF_Z0 + INSIDE_CORNER_R_MAX >= DEPTH_MID_Z - PIVOT_BORE_DIA / 2.0 - _WALL:
+if RELIEF_Z0 + RELIEF_CORNER_R_MAX >= DEPTH_MID_Z - PIVOT_BORE_DIA / 2.0 - _WALL:
     raise AssertionError("relief corner radius crowds the pivot bore")
+# Past the step the V's mouth stands clear of both corner arcs at their
+# printed greatest, so the V's run past the step stays inside the slot.
+if not (
+    RELIEF_Z0 + RELIEF_CORNER_R_MAX < V_MOUTH_Z0
+    and V_MOUTH_Z1 < RELIEF_Z1 - RELIEF_CORNER_R_MAX
+):
+    raise AssertionError("a relief corner arc reaches the V's mouth")
 # The rod's shoulder fillet (R MAX) is a quarter round on the pivot; with the
 # pivot against the bore wall its arc stands at most R * (2 - sqrt 2) proud of
 # a 45 deg chamfer's leg at the bore edge, so the chamfer's MIN leg must reach
@@ -344,7 +363,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "VMouthZ0",
         "VMouthZ1",
     },
-    "ReliefProfile": {"ReliefX0"},
+    "ReliefProfile": {"ReliefX0", "ReliefCornerR"},
     "ReliefReference": {"ReliefZ0", "ReliefZ1", "ReliefHeight"},
     "PivotBoreProfile": {"PivotX", "PivotDia"},
     "PivotReference": {"PivotZ", "PivotChamferSize"},
@@ -364,8 +383,9 @@ TAP_WALL_MIN_PLACES = 3
 # the title block's +/-1); the flat's height the flanks leave is a reference,
 # driven in the sketch, at the mouth stations' and flat's two places, so it
 # reads what they close to.  The bore chamfer prints its single limit at three
-# places, the reamed bore its +.0005 band at four; the inside corners print
-# nothing (the title block's R.040 MAX).
+# places, the reamed bore its +.0005 band at four; the relief's step corners
+# their R.065 at three (.060-.070); the V's apex rounds print nothing (the
+# title block's R.040 MAX).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutlineProfile": {"Length": 2, "NeckZ0": 2, "NeckZ1": 2, "Depth": 2},
     "Block": {"Height": 2},
@@ -376,7 +396,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "VMouthZ0": 2,
         "VMouthZ1": 2,
     },
-    "ReliefProfile": {"ReliefX0": 2},
+    "ReliefProfile": {"ReliefX0": 2, "ReliefCornerR": CORNER_PLACES},
     "ReliefReference": {"ReliefZ0": 2, "ReliefZ1": 2, "ReliefHeight": 2},
     "PivotBoreProfile": {"PivotX": 2, "PivotDia": 4},
     "PivotReference": {"PivotZ": 2, "PivotChamferSize": PIVOT_CHAMFER_PLACES},
@@ -680,6 +700,7 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     "PivotDia": f"REAM THRU\nSLIDING FIT ON\n{PEN_ROD_NUMBER} PIVOT",
     "PivotChamferSize": "X 45°",
     "TapWallMin": "TAP WALL",
+    "ReliefCornerR": CORNER_REASON,
 }
 # One row: SolidWorks stores a line break in the above compartment but prints
 # nothing of it, while the dimension line still runs under the unprinted text
@@ -694,6 +715,8 @@ if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
 # the pair.
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("VGrooveProfile", "VFlankAngle"): "2X ",
+    # One step corner stands for both.
+    ("ReliefProfile", "ReliefCornerR"): corner_prefix(2),
 }
 
 # Material and finish ride the title block; nothing else needs saying.

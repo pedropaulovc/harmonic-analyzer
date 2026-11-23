@@ -11,7 +11,7 @@ Part frame: ring in the XY plane, origin at the bottom-left outer corner of the
 sketch (Front-plane) face, width along +X, height along +Y, depth along +Z; the
 window centred in X.  The ring is symmetric about its X centre so it cannot be
 mounted mirrored.  The window's four internal corners are modelled at
-WINDOW_CORNER_R; the sheet prints none (the title block governs).
+WINDOW_CORNER_R and print 4X R.065 (owner ruling 2026-11-23, tool audit Q9).
 The tapped hole's axis is the named axis ``SetScrewAxis``
 (x = OUTER_WIDTH / 2, z = FRAME_DEPTH / 2, along Y).
 
@@ -32,12 +32,15 @@ import math
 import _config
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
-from _package_units import drawing_unit
-from _printed_tolerance import (
-    inside_corner_radius_mm,
-    printed_band_mm,
-    printed_deviations,
+from _milled_corner_limit import (
+    CORNER_PLACES,
+    CORNER_R,
+    CORNER_REASON,
+    corner_prefix,
+    corner_r_limits,
 )
+from _package_units import drawing_unit
+from _printed_tolerance import printed_band_mm, printed_deviations
 
 # The registry row's drawing_unit (in) is this sheet's unit.
 UNIT = drawing_unit("parts/pn-pen-frame", _config.parts("pn-pen-frame"))
@@ -69,17 +72,17 @@ FRAME_DEPTH = 7.874  # .31
 WINDOW_WIDTH = OUTER_WIDTH - 2.0 * RAIL_SIDE  # .74
 WINDOW_HEIGHT = OUTER_HEIGHT - 2.0 * RAIL_END  # 1.10
 # The window's internal corners (drawing-guidelines.md rule 16: no sharp
-# internal corner; as large as function allows).  Nothing needs them small:
-# a corner over the neck's side gap rides the neck's top edges, which only
+# internal corner; as large as function allows).  Nothing seats in them: a
+# corner over the neck's side gap rides the neck's top edges, which only
 # lifts the stirrup, by at most its radius (pn_pen_carriage_geom guards that
-# lift at the title block's limit), so the sheet prints no radius and the
-# title block's INSIDE CORNERS R.040 MAX governs (machinist review: a bare
-# 4X R.02 read as an unexplained tightening).  The model carries the .02
-# side gap.
-INSIDE_CORNER_R_MAX = inside_corner_radius_mm(unit=UNIT)
-WINDOW_CORNER_R = 0.508  # .02
-if WINDOW_CORNER_R > INSIDE_CORNER_R_MAX:
-    raise AssertionError("the modelled window corner exceeds the title block's corner")
+# lift at the printed maximum).  Owner ruling 2026-11-23, tool audit Q9:
+# "Print a local corner limit R.065 (.060-.070), cut with the 1/8 end mill;
+# no 5/64 cutter" (_milled_corner_limit): the sheet prints 4X R.065 at the
+# title block's .XXX, naming why it stands over the INSIDE CORNERS R.040 MAX.
+WINDOW_CORNER_R = CORNER_R  # .065
+WINDOW_CORNER_R_MIN, WINDOW_CORNER_R_MAX = corner_r_limits(unit=UNIT)
+if 2.0 * WINDOW_CORNER_R_MAX >= WINDOW_WIDTH - printed_band_mm(2, unit=UNIT):
+    raise AssertionError("the window's corner radii meet across the window")
 
 # The thumb screw threads INTO the bottom rail, so its hole is an exact #4-40
 # tapped Hole Wizard feature drilled up from the bottom face. THROUGH_NEXT
@@ -95,8 +98,8 @@ if SET_SCREW_RADIAL_WALL < WALL_TARGET_MM:  # drawing-guidelines.md rule 17
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  Front view: the outer envelope, the window's size and the
 # window's lower-left corner from the left and bottom outer faces (rule 10),
-# which together fully define the ring sketch; the window corners print no
-# radius (the title block governs).  Bottom view: the extrude depth and the tapped
+# which together fully define the ring sketch; one window corner's radius
+# stands for all four (4X).  Bottom view: the extrude depth and the tapped
 # hole's two coordinates, each from a real outer face, beside the hole's
 # wizard callout. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -110,6 +113,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "Ring": {"Depth"},
     "ScrewHole": {"ScrewX", "ScrewZ"},
+    "WindowCorners": {"WindowCornerR"},
 }
 
 # Printed places (drawing-guidelines.md rule 3).  Every rail, window and
@@ -119,9 +123,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # protect a wall).  The model keeps the station on the .155 mid-plane, where
 # the carriage puts the thumb screw (pn_pen_carriage_geom.FRAME_X_CENTER_LOCAL
 # reads FRAME_DEPTH / 2), so it prints rounded, .16, and every check below
-# judges it about that printed value.
+# judges it about that printed value.  The window corners' radius prints at
+# CORNER_PLACES (.XXX), the band the ruling's .060-.070 is.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    feature: dict.fromkeys(names, 2) for feature, names in DRAWING_DIMENSIONS.items()
+    feature: dict.fromkeys(names, CORNER_PLACES if feature == "WindowCorners" else 2)
+    for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -195,7 +201,9 @@ if not math.isclose(SET_SCREW_FAR_WALL_MIN, TAP_WALL_MIN_MM, abs_tol=0.001):
 # on drawn geometry (machinist review 20261114T090444426Z, 3/3; #2779).
 _WALL_TEXT = f"{TAP_WALL_MIN_MM / 25.4:.{TAP_WALL_MIN_PLACES}f}".removeprefix("0")
 TAP_WALL_CALLOUT = f"WALL {_WALL_TEXT} MIN"
-DIMENSION_CALLOUTS = {"ScrewZ": TAP_WALL_CALLOUT}
+DIMENSION_CALLOUTS = {"ScrewZ": TAP_WALL_CALLOUT, "WindowCornerR": CORNER_REASON}
+# The one printed window corner stands for all four.
+DIMENSION_PREFIXES = {"WindowCornerR": corner_prefix(4)}
 
 DRAWING_NOTES = ""
 # Every view is at the sheet's 2:1, which the title block states (rule 9);
