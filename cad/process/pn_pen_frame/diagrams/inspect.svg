@@ -11,6 +11,6 @@
   <line class="leader" x1="184.0" y1="216.5" x2="200.0" y2="216.5"/>
   <text class="label" x="180.0" y="220.5" text-anchor="end">L, the left face</text>
   <text class="label" x="301.6" y="200.5" text-anchor="middle">window</text>
-  <text class="label" x="423.2" y="160.0">Corners R.040 MAX: the 5/64 cutter's radius</text>
+  <text class="label" x="423.2" y="160.0">Corners R.065 (.060-.070), cut by the 1/8</text>
   <text class="label" x="423.2" y="180.0">Break every edge R{{cad.edge_break_in:.3dot}} or .010 chamfer max</text>
 </svg>

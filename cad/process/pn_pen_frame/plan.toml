@@ -14,20 +14,20 @@
 # over, face the right face to the width (PF04); Setups 6-7 lying on the
 # 1 in + 1/2 in parallel stacks under the end rails, gripped on the faced
 # ends: skim the back face (PF05), turn over, face the front face to the
-# depth, rough the window with the 1/8 in carbide end mill (a slot round its
-# edge; the slug drops between the stacks), step the slot's corners in and
-# finish the walls and corners with the 5/64 in end mill (PF06); Setup 8
+# depth, slot round the window with the 1/8 in carbide end mill (the slug
+# drops between the stacks), then finish its walls and corners with the
+# same end mill (PF06); Setup 8
 # upright, the bottom end up, the back face to the fixed jaw: spot and
 # drill the #43 through the bottom rail into the window (PF07), then tap
 # 4-40 through by hand under the spring tap guide (PF08); bench deburr and
 # inspect. Finish as machined.
 #
-# To buy before Setup 7: the 5/64 in end mill (shop-equipment
-# tools.endmill-5-64-long, to_order). It is the only cutter on record small
-# enough for the window's R.040 MAX corners (the 1/8 in leaves R.0625); no
-# owned end mill is .080 in or smaller (shop-equipment tools-cutting.toml,
-# tools-special-cutters.toml, tools-gear-cutting.toml). Setups 1-6 and 8 need
-# nothing that is not on hand.
+# The window's corners print R.065 (.060-.070): owner ruling 2026-11-23,
+# tool audit Q9, "Print a local corner limit R.065 (.060-.070), cut with
+# the 1/8 end mill; no 5/64 cutter". The 1/8 in end mill's finish turns
+# each corner about the slot's corner, so the corners come out at its
+# radius plus the finish stock, R.0655 (cam.py checks the band). Every
+# setup needs only what is on hand.
 #
 # Zeroing: every X/Y zero is the owned .200 in edge finder at 900 rpm
 # (tools.edge-finder; the touch probe has no holder) and every Z zero a
@@ -51,14 +51,14 @@
 # PF07_tap_drill, PF08_tap. Program names, the [parameters] and the
 # milling_cuts names are a contract with that recipe. Tool numbers are the
 # places in the tools list among the mill's tools: T1 1/2 in end mill, T2
-# 1/8 in end mill, T3 5/64 in end mill, T4 centre drill, T5 #43, T6 the
-# tap guide (the tap is turned by hand).
+# 1/8 in end mill, T3 centre drill, T4 #43, T5 the tap guide (the tap is
+# turned by hand).
 title = "Pen frame"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass (360-H02, extruded), 3/8 × 1-1/4 in flat bar (drawing: {{cad.material_spec}})"
 stock = "3/8 × 1-1/4 in flat bar; {{process.quantity:d}} × {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in blank."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.right_face_width_min_in:.3dot}}–{{cad.right_face_width_max_in:.3dot}} wide (L, the left face, to the right face), {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} high (B, the bottom end with the tap, to T, the top end), {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}} deep (back face to front face). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home (logbook 2026-11-06). After any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every cutting file is proved in air first, Z0 raised 1.000 in; the tap file moves only at the machine top and over the hole, spindle off. Brass: no coolant on the end mills; a drop of Tapmatic Gold on the drill and the tap. Setup 7 needs the 5/64 in end mill, to buy."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.right_face_width_min_in:.3dot}}–{{cad.right_face_width_max_in:.3dot}} wide (L, the left face, to the right face), {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} high (B, the bottom end with the tap, to T, the top end), {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}} deep (back face to front face). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home (logbook 2026-11-06). After any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every cutting file is proved in air first, Z0 raised 1.000 in; the tap file moves only at the machine top and over the hole, spindle off. Brass: no coolant on the end mills; a drop of Tapmatic Gold on the drill and the tap."
 shop = "../shop"
 stock_refs = ["c360-flat-3-8x1-1-4"]
 material_key = "pn-c360-flat"
@@ -115,44 +115,36 @@ face_stepover_max_mm = 5.08
 # Upright, the longest blank less the top-end skim stands above the
 # parallels in PF02 (44.45 − 0.508); cam.py checks it.
 upright_top_max_mm = 43.942
-# The window (PF06): roughed by a slot the 1/8 in carbide end mill cuts
-# round its edge, window_finish_stock_mm (.003 in) inside the walls, in equal
-# levels no deeper than .35 × its diameter (Harvey Tool miniature square end
-# mills, series 720xx, speeds and feeds table, Brass row, slotting axial
-# depth .35 x Dia, read 2026-11-21): 8 levels of 1.047 mm from the front face
-# to window_run_past_mm (.020 in) below the back face, between the parallel
+# The window (PF06), all with the 1/8 in carbide end mill (owner ruling
+# 2026-11-23, tool audit Q9: no 5/64 cutter). First a slot round its edge,
+# window_finish_stock_mm (.003 in) inside the walls, in equal levels no
+# deeper than .35 × its diameter (Harvey Tool miniature square end mills,
+# series 720xx, speeds and feeds table, Brass row, slotting axial depth
+# .35 x Dia, read 2026-11-21): 8 levels of 1.047 mm from the front face to
+# window_run_past_mm (.020 in) below the back face, between the parallel
 # stacks; the slug inside the slot drops onto the vise bed at the last
-# level. The slot leaves each corner round at the 1/8's radius, .030 in
-# from the corner along its diagonal against the .016 the 5/64 leaves: the
-# 5/64 in end mill first steps every corner in on its diagonal, in
-# window_corner_laps laps of the slot's path at each finish level, each step
-# window_corner_step_mm (.0035 in), under its .05 × Dia radial. Then it takes
-# the walls and corners to size, its path a cutter radius inside them (the
-# corners come out at its radius, under the R.040 MAX), in 2 equal levels no
-# deeper than 3 × its diameter (Harvey Tool long-reach series 762xx table,
-# Brass row, finishing: radial .05 x Dia, axial 3 x Dia, read 2026-11-21);
-# the .003 wall stock and the last corner step are under its .05 × Dia
-# radial. Every path runs clockwise (conventional inside the window,
-# right-hand spindle) and enters each level by a straight plunge on the left
-# wall's path, at half the cutter's chip load (the rocker strap plan's
-# choice): 1/8 in 2800 × 3 × .00055 = 4.62 in/min, 5/64 in 2800 × 2 × .0005
-# = 2.8 in/min.
-rough_cutter_dia_mm = 3.175
-finish_cutter_dia_mm = 1.984375
+# level. Then the finish: walls and corners to size, its path a cutter
+# radius inside the walls, at the slot's 8 levels and setting, taking the
+# .003 stock all round. It turns each corner on an arc of the stock's
+# radius about the slot path's corner, so the stock is even in the corners
+# too and they come out at the cutter's radius plus the stock, R.0655,
+# inside the printed R.065 (.060-.070). At the slot's depth and feed it is
+# a lighter cut than the slot. Every path runs clockwise (conventional
+# inside the window, right-hand spindle) and enters each level by a
+# straight plunge on the left wall's path, at half the cutter's chip load
+# (the rocker strap plan's choice): 2800 × 3 × .00055 = 4.62 in/min.
+window_cutter_dia_mm = 3.175
 window_finish_stock_mm = 0.0762
 window_run_past_mm = 0.508
-window_rough_step_mm = 1.04775
-window_finish_step_mm = 4.191
-window_corner_step_mm = 0.08859
-window_corner_laps = 3
-rough_plunge_feed_per_min_mm = 117.348
-finish_plunge_feed_per_min_mm = 71.12
+window_step_mm = 1.04775
+window_plunge_feed_per_min_mm = 117.348
 # PF06's frame (X0 L, Y0 T at the fixed jaw): the window's right wall from L
 # (the width less the right rail) and its walls from T (the height less the
-# bottom rail, and the top rail); cam.py checks each against the model.
+# bottom rail, and the top rail, .22 by owner ruling 2026-11-23, PN-01 B1);
+# cam.py checks each against the model.
 window_right_mm = 22.098
 window_far_mm = 34.036
-window_near_mm = 6.096
+window_near_mm = 5.588
 # Thumb-screw tap (PF07, PF08), from the bottom end B: spot Ø.080 with the
 # #2 centre drill, under the #43 (the magnifying clamp plan's spot); #43
 # pecks of .080 with full retract, its full diameter tap_drill_past_mm (1.0)
@@ -206,10 +198,8 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # 1/2 in end mill, 3 in overall: set at least 1 in out of the collet. 1/8 in
 # end mill (1-1/2 in overall, 1/2 in of flute): at least 5/8 in out, so its
 # collet stays 7.5 mm above the front face at the window's deepest level.
-# 5/64 in end mill: at least .50 out (its reach is at least .34).
 half_mill_projection_min_mm = 25.4
 eighth_mill_projection_min_mm = 15.875
-fine_mill_projection_min_mm = 12.7
 # ASME B94.11M jobber length, overall: #43 1-7/8 in; the #2 combined drill
 # and countersink 1-7/8 in. Bounded by their whole length below the chuck.
 drill_43_oal_mm = 47.625
@@ -240,10 +230,6 @@ ref = "endmill-carbide-3fl-1-2"
 id = "em-eighth"
 name = "1/8 in carbide end mill"
 ref = "endmill-carbide-3fl-1-8"
-[[tools]]
-id = "em-fine"
-name = "5/64 in end mill"
-ref = "endmill-5-64-long"
 [[tools]]
 id = "spot"
 name = "#2 centre drill"
@@ -462,7 +448,7 @@ title = "Back face"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in). The set's parallels are 1/8 thick; do not use a stack thicker than .20 (in Setup 7 the window cutters run .020 below the stacks' top, .24 from each jaw). The blank lying flat on them, BK up, gripped across its ends: B against the FIXED jaw, T against the moving jaw, L to the LEFT, centred on the jaws. Each stack sits under an end, inside its .24 rail. Tap it down onto both stacks while closing the vise. Its top stands {{process.blank_thick_mm:in.3dot}} above the stacks, the lower {{process.lying_grip_mm:in.3dot}} of it in the jaws."
+holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in). The set's parallels are 1/8 thick; do not use a stack thicker than .18 (in Setup 7 the window cutters run .020 below the stacks' top, .22 from the T jaw and .24 from the B jaw). The blank lying flat on them, BK up, gripped across its ends: B against the FIXED jaw, T against the moving jaw, L to the LEFT, centred on the jaws. Each stack sits under an end, inside its rail (.22 at T, .24 at B). Tap it down onto both stacks while closing the vise. Its top stands {{process.blank_thick_mm:in.3dot}} above the stacks, the lower {{process.lying_grip_mm:in.3dot}} of it in the jaws."
 datum = "Program PF05_back_face. G54: X0 the left face L, Y0 the fixed jaw's face (B), Z0 the stacks' top; +Y toward the fixed jaw."
 diagram = { file = "diagrams/front.svg", alt = "The blank lying on stacked parallels under its two ends, gripped on B and T; the 1/2 in end mill skims the face up, the back face." }
 envelope = { x_span_mm = ["{{cad.right_face_width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.top_face_height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_thick_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", 9.017], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
@@ -500,16 +486,12 @@ title = "Front face to the depth; the window"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The same 1/8 thick stacks (.20 thick at most), under the ends only: the window falls between them, its walls .24 from each jaw, so each stack clears the cutters by .11 with the set's 1/8 parallels (.04 at the .20 most). The blank turned over end for end: BK down on both stacks, T against the FIXED jaw, B against the moving jaw, L to the LEFT, centred. Close the vise snug, not heavy: once the window is cut, the jaw force rides on the two .13 side rails. Tap it down onto both stacks while closing."
+holding = "The same 1/8 thick stacks (.18 thick at most), under the ends only: the window falls between them, its walls .22 from the T jaw and .24 from the B jaw, so the stacks clear the cutters by .09 and .11 with the set's 1/8 parallels (.04 at the .18 most). The blank turned over end for end: BK down on both stacks, T against the FIXED jaw, B against the moving jaw, L to the LEFT, centred. Close the vise snug, not heavy: once the window is cut, the jaw force rides on the two .13 side rails. Tap it down onto both stacks while closing."
 datum = "Program PF06_window. G54: X0 the left face L, Y0 the fixed jaw's face (T), Z0 the stacks' top (BK); +Y toward the fixed jaw. The window spans X {{cad.window_left_wall_mm:in.3f}}–{{process.window_right_mm:in.3f}} and Y −{{process.window_far_mm:in.3f}} to −{{process.window_near_mm:in.3f}}. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
-diagram = { file = "diagrams/window.svg", alt = "The blank lying on stacked parallels under its ends, BK down, T at the fixed jaw; the 1/2 in end mill faces the front face to the depth, the 1/8 in end mill cuts a slot round the window and the slug drops between the stacks, the 5/64 in end mill finishes the walls and corners." }
-envelope = { x_span_mm = ["{{cad.right_face_width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.top_face_height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", 9.017], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", -0.508], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.fine_mill_projection_min_mm}}"] }
+diagram = { file = "diagrams/window.svg", alt = "The blank lying on stacked parallels under its ends, BK down, T at the fixed jaw; the 1/2 in end mill faces the front face to the depth, the 1/8 in end mill cuts a slot round the window, the slug drops between the stacks, and the same end mill finishes the walls and corners." }
+envelope = { x_span_mm = ["{{cad.right_face_width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.top_face_height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", 9.017], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", -0.508], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.top_face_height_mm}}", along_jaws_mm = "{{cad.right_face_width_mm}}", part_height_mm = 9.017, parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.right_face_width_mm}}"], clamp_mm = [0, "{{cad.right_face_width_mm}}"], section_mm = { y = "{{cad.top_face_height_mm}}", z = "{{cad.back_face_depth_mm}}" }, vise_left = "start" }
-
-[[setups.operations]]
-instruction = "Before the setup: mic the 5/64 in end mill's diameter: .080 or under (it sets the window's corners, R.040 MAX). Over: do not use it."
-feed = "hand"
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 the left face L, Y0 the fixed jaw's face (T): edge finder (900 rpm); then M6 T1 and Z0 on the fixed-jaw stack, as Setup 6."
@@ -543,11 +525,11 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T2: the 1/8 in end mill, at least {{process.eighth_mill_projection_min_mm:in.3dot}} out of its collet; set 2800. Each level starts with a straight plunge on the slot's path at the left wall."
+instruction = "Same file, M6 T2: the 1/8 in end mill, at least {{process.eighth_mill_projection_min_mm:in.3dot}} out of its collet; set 2800. It slots and then finishes the window, no tool change. Each level starts with a straight plunge at the left wall, on the slot's path, then on the finish path."
 rpm = 2800
-feed = "{{process.rough_plunge_feed_per_min_mm:in.1f}} in/min plunge"
+feed = "{{process.window_plunge_feed_per_min_mm:in.1f}} in/min plunge"
 milling_cuts = [
-  { name = "window plunge", kind = "plunge", phase = "rough", cutter_dia_mm = "{{process.rough_cutter_dia_mm}}", flutes = 3, rpm = 2800, feed_mm_min = "{{process.rough_plunge_feed_per_min_mm}}", stations_mm = "{{cad.window_left_wall_mm}}" },
+  { name = "window plunge", kind = "plunge", phase = "rough", cutter_dia_mm = "{{process.window_cutter_dia_mm}}", flutes = 3, rpm = 2800, feed_mm_min = "{{process.window_plunge_feed_per_min_mm}}", stations_mm = "{{cad.window_left_wall_mm}}" },
 ]
 
 [[setups.operations]]
@@ -555,31 +537,19 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, no stop. Window rough: a slot round the window, {{process.window_finish_stock_mm:in.3dot}} inside its walls, clockwise, in levels of {{process.window_rough_step_mm:in.3dot}} down to {{process.window_run_past_mm:in.3dot}} below BK. At the last level the slug inside the slot drops onto the vise bed between the stacks: leave it there until the spindle has stopped at the M6 T3."
+instruction = "Same file, no stop. Window rough: a slot round the window, {{process.window_finish_stock_mm:in.3dot}} inside its walls, clockwise, in levels of {{process.window_step_mm:in.3dot}} down to {{process.window_run_past_mm:in.3dot}} below BK. At the last level the slug inside the slot drops onto the vise bed between the stacks, an inch and more below the cutter: leave it there until the file ends."
 settings = "pn-em-eighth-c360"
 milling_cuts = [
-  { name = "window rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.rough_cutter_dia_mm}}", axial_doc_mm = "{{process.window_rough_step_mm}}", radial_woc_mm = "{{process.rough_cutter_dia_mm}}", traverse_mm = [0, "{{cad.right_face_width_mm}}"] },
+  { name = "window rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.window_cutter_dia_mm}}", axial_doc_mm = "{{process.window_step_mm}}", radial_woc_mm = "{{process.window_cutter_dia_mm}}", traverse_mm = [0, "{{cad.right_face_width_mm}}"] },
 ]
 
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "em-fine"
+tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T3 (spindle stopped: lift the slug out from between the stacks first): the 5/64 in end mill, at least {{process.fine_mill_projection_min_mm:in.2dot}} out of its collet; set 2800. Each level starts with a straight plunge on the finish path at the left wall."
-rpm = 2800
-feed = "{{process.finish_plunge_feed_per_min_mm:in.1f}} in/min plunge"
-milling_cuts = [
-  { name = "window finish plunge", kind = "plunge", phase = "finish", cutter_dia_mm = "{{process.finish_cutter_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.finish_plunge_feed_per_min_mm}}", stations_mm = "{{cad.window_left_wall_mm}}" },
-]
-
-[[setups.operations]]
-speed_kind = "spindle"
-tool = "em-fine"
-drilling = "none"
-sizing = "other"
-instruction = "Same file, no stop. The corners first: the slot leaves them round at the 1/8's radius. At each of two levels of {{process.window_finish_step_mm:in.3dot}} down to {{process.window_run_past_mm:in.3dot}} below BK, {{process.window_corner_laps:d}} clockwise laps of the slot's path, each stepping every corner in {{process.window_corner_step_mm:in.4dot}} on its diagonal. Then the window finish: walls and corners to size, clockwise, at the same two levels; the corners come out at the cutter's radius (R.040 MAX). Then unclamp, blow the chips out and inspect the window."
-settings = "pn-em-5-64-c360"
+instruction = "Same file, no stop. Window finish: walls and corners to size, clockwise, at the slot's levels, taking the {{process.window_finish_stock_mm:in.3dot}} left on the walls and in the corners. Each corner turns on a small arc, so the corners come out round at R.0655 (the cutter's radius plus that stock; the drawing's R.065 allows .060–.070). Then lift the slug out from between the stacks, unclamp, blow the chips out and inspect the window."
+settings = "pn-em-eighth-c360"
 inspection = "Window width {{cad.window_width_min_in:.3dot}}–{{cad.window_width_max_in:.3dot}} and height {{cad.window_height_min_in:.3dot}}–{{cad.window_height_max_in:.3dot}}, the calipers' inside jaws, on both faces. The left rail (L to the window) {{cad.window_left_wall_min_in:.3dot}}–{{cad.window_left_wall_max_in:.3dot}} and the bottom rail (B to the window) {{cad.window_bottom_wall_min_in:.3dot}}–{{cad.window_bottom_wall_max_in:.3dot}}, the calipers' outside jaws across each rail. Outside any: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.window_width_band_mm}}" },
@@ -588,8 +558,7 @@ gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.window_bottom_wall_band_mm}}" },
 ]
 milling_cuts = [
-  { name = "window corners", kind = "side", phase = "finish", cutter_dia_mm = "{{process.finish_cutter_dia_mm}}", axial_doc_mm = "{{process.window_finish_step_mm}}", radial_woc_mm = "{{process.window_corner_step_mm}}", traverse_mm = [0, "{{cad.right_face_width_mm}}"] },
-  { name = "window finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.finish_cutter_dia_mm}}", axial_doc_mm = "{{process.window_finish_step_mm}}", radial_woc_mm = "{{process.window_finish_stock_mm}}", traverse_mm = [0, "{{cad.right_face_width_mm}}"] },
+  { name = "window finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.window_cutter_dia_mm}}", axial_doc_mm = "{{process.window_step_mm}}", radial_woc_mm = "{{process.window_finish_stock_mm}}", traverse_mm = [0, "{{cad.right_face_width_mm}}"] },
 ]
 
 [[setups]]
@@ -612,7 +581,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the bottom end B, touched with the centre drill."
-instruction_detailed = "Console M6 T4 (#2 centre drill; the tool setter measures it). MDI G0 X-5.000 Y-3.937. Spindle stopped, its point just dragging a .002 feeler leaf on B: G10 L20 P1 Z0.051."
+instruction_detailed = "Console M6 T3 (#2 centre drill; the tool setter measures it). MDI G0 X-5.000 Y-3.937. Spindle stopped, its point just dragging a .002 feeler leaf on B: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -624,7 +593,7 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Run PF07_tap_drill (M6 T4, #2 centre drill; set 2800): spot the hole Ø{{process.spot_dia_mm:in.3dot}}, under the #43 drill."
+instruction = "Run PF07_tap_drill (M6 T3, #2 centre drill; set 2800): spot the hole Ø{{process.spot_dia_mm:in.3dot}}, under the #43 drill."
 settings = "pn-spot-c360"
 milling_cuts = [
   { name = "tap spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = "{{cad.top_face_height_mm}}" },
@@ -635,7 +604,7 @@ speed_kind = "spindle"
 tool = "drill-43"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-4-40" }
-instruction = "Same file, M6 T5 (spindle stopped and the tool lifted: put a drop of Tapmatic Gold on the #43's point now): #43 drill down through the bottom rail into the window, its full diameter {{process.tap_drill_past_mm:in.3dot}} past the rail, pecks of {{process.peck_mm:in.3dot}} with full retract; set 2800. Look through the window: the drill has broken through."
+instruction = "Same file, M6 T4 (spindle stopped and the tool lifted: put a drop of Tapmatic Gold on the #43's point now): #43 drill down through the bottom rail into the window, its full diameter {{process.tap_drill_past_mm:in.3dot}} past the rail, pecks of {{process.peck_mm:in.3dot}} with full retract; set 2800. Look through the window: the drill has broken through."
 settings = "pn-drill-43-c360"
 hole_depth_mm = "{{process.drill_full_depth_mm}}"
 peck = { step_mm = 2.032, retract = "full" }
@@ -665,7 +634,7 @@ speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run PF08_tap: M6 T6, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
+instruction = "Run PF08_tap: M6 T5, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
 diagram = { file = "diagrams/tap.svg", alt = "The frame upright in the vise, B up, BK at the fixed jaw; the 4-40 tap in the T-handle wrench in the hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to go {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below B, into the window." }
 
 [[setups.operations]]
@@ -703,5 +672,5 @@ drilling = "none"
 sizing = "other"
 instruction = "Deburr: every outside edge, the window's edges on both faces, the drill's exit in the window and the thread's mouth on B, scraper from the deburring set and a smooth file, to R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max; no countersink at the tap. The window's corners stay sharp to the cutter's radius: break their edges only. Wash off the oil. Finish: as machined, no coating."
 feed = "hand"
-inspection = "Accepted on the mill: height, width, depth (Setups 3, 5, 7), the window and its rails (Setup 7), the hole's place (Setup 8). Here: no burr stands on any edge, the window's corners are the 5/64 cutter's radius (no step from the 1/8), and the tapped hole shows full threads through the bottom rail into the window."
+inspection = "Accepted on the mill: height, width, depth (Setups 3, 5, 7), the window and its rails (Setup 7), the hole's place (Setup 8). Here: no burr stands on any edge, the window's corners are round with no step (the 1/8 in end mill's finish), and the tapped hole shows full threads through the bottom rail into the window."
 gauge_checks = "other"
