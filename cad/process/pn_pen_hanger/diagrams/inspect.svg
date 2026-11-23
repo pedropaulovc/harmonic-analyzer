@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 365" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="365"/>
+  <text class="title" x="20" y="20">The finished hanger: the strap, the bonded plates and their slots</text>
+  <path class="part-kept" d="M 623.4 81.9 L 623.4 139.6 L 40.0 103.9 L 40.0 60.0 Z"/>
+  <rect class="part-rest" x="40.0" y="60.0" width="11.4" height="43.9"/>
+  <rect class="part-rest" x="183.1" y="60.0" width="11.4" height="43.9"/>
+  <circle class="holes" cx="605.4" cy="106.4" r="8.2"/>
+  <rect class="part-kept" x="40.0" y="262.0" width="583.4" height="11.4"/>
+  <rect class="part-kept" x="40.0" y="173.3" width="11.4" height="88.7"/>
+  <rect class="part-kept" x="183.1" y="173.3" width="11.4" height="88.7"/>
+  <rect class="holes" x="40.0" y="173.3" width="11.4" height="38.4"/>
+  <rect class="holes" x="183.1" y="173.3" width="11.4" height="38.4"/>
+  <text class="label" x="40.0" y="290.0">foot</text>
+  <text class="label" x="580.0" y="290.0">top end</text>
+  <text class="label" x="20.0" y="312.0">Front view (top): the strap from the foot (left, .480 wide) to the top end (right, .630); the #15 hole; the plates.</text>
+  <text class="label" x="20.0" y="330.0">Side view (below it): the plates standing .970 from the strap's front, the slots .200 x .420 in their far ends.</text>
+  <text class="label" x="20" y="353">The lower plate flush with the strap's foot end and both foot corners.</text>
+</svg>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="260"/>
+  <text class="title" x="20" y="20">The finished arbor (not to scale)</text>
+  <path class="part-kept" d="M40,130 Q20,110 40,90 Z"/>
+  <rect class="part-kept" x="40" y="90" width="50" height="40"/>
+  <rect class="part-kept" x="90" y="98" width="40" height="24"/>
+  <rect class="part-kept" x="130" y="102" width="237" height="16"/>
+  <rect class="part-kept" x="367" y="104" width="163" height="12"/>
+  <rect class="part-kept" x="530" y="102" width="160" height="16"/>
+  <path class="part-kept" d="M690,102 Q705,110 690,118 Z"/>
+  <rect class="holes" x="60" y="90" width="10" height="40"/>
+  <rect class="holes" x="200" y="102" width="4" height="16"/>
+  <line class="centre-line" x1="15" y1="110" x2="720" y2="110"/>
+  <text class="label" x="20" y="70">.2510 reamed cross hole, .23 from the rear face</text>
+  <line class="leader" x1="65" y1="74" x2="65" y2="90"/>
+  <text class="label" x="120" y="160">1/16 pin hole at 1.50</text>
+  <line class="leader" x1="202" y1="148" x2="202" y2="118"/>
+  <line class="dims" x1="218" y1="128" x2="268" y2="128"/>
+  <line class="dims" x1="621" y1="128" x2="670" y2="128"/>
+  <text class="label" x="200" y="200">journals 1.82–2.61</text>
+  <line class="leader" x1="243" y1="188" x2="243" y2="130"/>
+  <text class="label" x="560" y="200">and 8.25–9.04</text>
+  <line class="leader" x1="645" y1="188" x2="645" y2="130"/>
+  <text class="label" x="360" y="80">Ø.28 relief 4.20–6.80</text>
+  <line class="leader" x1="448" y1="84" x2="448" y2="104"/>
+  <text class="label" x="560" y="60">SR.28 crown, rim at 9.35</text>
+  <line class="leader" x1="697" y1="64" x2="697" y2="104"/>
+</svg>

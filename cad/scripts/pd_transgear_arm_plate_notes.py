@@ -1,6 +1,6 @@
 """Words MHA-PD-19's sheet prints: the locating holes' numbered note and the
-short dimension callouts (the locating holes', the screw holes' and the hub
-station's).
+short hole callouts (the press hole's, the locating holes' and the screw
+holes').
 
 Kept out of the drawing script (drawing scripts own placement, not
 manufacturing values) and out of the widely imported spec, so the wording
@@ -12,32 +12,50 @@ from __future__ import annotations
 import math
 import textwrap
 
+import pd_transgear_knob_bush_geometry as BUSH
 from pd_paper_drive_assembly_steps import knob_setting_ref
 from pd_transgear_arm_plate_geometry import (
     CSK_ANGLE_DEG,
     CSK_DIA,
     CSK_DIA_PLACES,
     LOCATOR_SITES_MM,
+    PRESS_HOLE_CHAMFER,
+    PRESS_HOLE_CHAMFER_PLACES,
     SCREW_HOLES,
 )
 from pd_transgear_arm_plate_spec import (
     ARM_NUMBER,
+    BUSH_NUMBER,
     DOWEL_NUMBER,
-    KNOB_SHAFT_NUMBER,
     SCREW_NUMBER,
-    SPROCKET_NUMBER,
 )
 from pd_vn_transgear_arm_plate_locating_pin_spec import SLIP_DIAMETRAL_CLEARANCE_MM
 
 
-def _clearance_ref_in(limits_mm: tuple[float, float]) -> str:
-    """A diametral clearance range in inches, four places, rounded outward."""
+def _range_ref_in(limits_mm: tuple[float, float]) -> str:
+    """A diametral clearance or interference range in inches, four places,
+    rounded outward."""
     low, high = (value / 25.4 * 1e4 for value in limits_mm)
     return "-".join(
         f"{bound / 1e4:.4f}".removeprefix("0")
         for bound in (math.floor(low + 1e-9), math.ceil(high - 1e-9))
     )
 
+
+# The press hole is a fit (rule 4): REAM, its face-A mouth's lead-in
+# chamfer in the hole callout's size form (as the screw holes carry their
+# countersink), the standard fit name and the bush by drawing number, then
+# the interference the printed limits give (the bush's FN2 press diameter in
+# this hole) as REF.  Two lines of words under the size and process (rule 7).
+_PRESS_CHAMFER_TEXT = (
+    f"{PRESS_HOLE_CHAMFER / 25.4:.{PRESS_HOLE_CHAMFER_PLACES}f}".removeprefix("0")
+)
+PRESS_HOLE_CALLOUT = "\n".join((
+    "REAM THRU",
+    f"{_PRESS_CHAMFER_TEXT} X 45\u00b0 AT FACE A",
+    f"PRESS FIT FOR {BUSH_NUMBER}",
+    f"(INTERFERENCE {_range_ref_in(BUSH.PRESS_INTERFERENCE)} REF)",
+))
 
 # The locating holes' fit range and match-drilling: one numbered note, which
 # their callout points at (rule 7: under the size and process a callout
@@ -52,7 +70,7 @@ def _clearance_ref_in(limits_mm: tuple[float, float]) -> str:
 LOCATOR_NOTE_NUMBER = 1
 LOCATOR_NOTE_WIDTH = 30
 LOCATOR_NOTE = "\n".join(textwrap.wrap(
-    f"{LOCATOR_NOTE_NUMBER}. (CLEARANCE {_clearance_ref_in(SLIP_DIAMETRAL_CLEARANCE_MM)}). "
+    f"{LOCATOR_NOTE_NUMBER}. (CLEARANCE {_range_ref_in(SLIP_DIAMETRAL_CLEARANCE_MM)}). "
     f"MATCH-DRILL WITH ARM {ARM_NUMBER}, SET PER {knob_setting_ref()}.",
     width=LOCATOR_NOTE_WIDTH,
     subsequent_indent="   ",
@@ -83,9 +101,3 @@ SCREW_HOLE_CALLOUT = "\n".join((
     f"SCREW {SCREW_NUMBER}",
 ))
 HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
-# The hub face's station from face A sets the knob shaft (its integral 15T
-# meshing the reducer disc) and, through the drive collar on the 15T's front
-# face, the removable chain sprocket's plane (pd_transgear_arm_plate_spec.
-# SPROCKET_NUMBER).  Two short lines between the dimension's own witness
-# lines, naming both by drawing number.
-HUB_STATION_CALLOUT = f"SETS {KNOB_SHAFT_NUMBER}\nAND {SPROCKET_NUMBER}"

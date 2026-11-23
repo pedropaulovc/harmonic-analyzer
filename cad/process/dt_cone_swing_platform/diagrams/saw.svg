@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="20">Setup 1: saw the blank off the 1/4 x 2-1/2 in bar, flat on the saw bed</text>
+  <rect class="part-rest" x="30" y="110" width="700" height="70"/>
+  <rect class="part-kept" x="30" y="110" width="420" height="70"/>
+  <line class="leader" x1="450" y1="80" x2="450" y2="110"/>
+  <text class="label" x="400" y="72">saw cut</text>
+  <text class="label" x="150" y="200">blank 9.70–9.76 (aim 9.73)</text>
+  <text class="label" x="520" y="200">rest of the bar</text>
+  <line class="leader" x1="60" y1="240" x2="60" y2="181"/>
+  <text class="label" x="30" y="256">E: the straighter long edge</text>
+  <text class="label" x="38" y="150">U  E  (marked end)</text>
+  <text class="label" x="20" y="288">Mark U on the better face (the underside) and E on the straighter edge, at one end: the marked end.</text>
+</svg>

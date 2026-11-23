@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 2, section through the axis, 200 px to the inch: the hub turned round, its barrel .40 in the 3-jaw over brass shim, the front end out at the right. Styles: prechips.palette. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 2: the hub turned round on its barrel; faced to length, the seat turned to the arm, the bore reamed</text>
+  <rect class="fixture-vise" x="30" y="60" width="80" height="280"/>
+  <rect class="clamp" x="150" y="80" width="80" height="29"/>
+  <rect class="clamp" x="150" y="291" width="80" height="29"/>
+  <rect class="clamp" x="150" y="109" width="80" height="3"/>
+  <rect class="clamp" x="150" y="288" width="80" height="3"/>
+  <polygon class="part-kept" points="150,135 182,135 182,112 285,112 285,124 347,124 347,276 285,276 285,288 182,288 182,265 150,265"/>
+  <rect class="part-removed" x="285" y="112" width="66" height="12"/>
+  <rect class="part-removed" x="285" y="276" width="66" height="12"/>
+  <rect class="part-removed" x="347" y="124" width="4" height="152"/>
+  <rect class="part-removed" x="150" y="162" width="197" height="76"/>
+  <line class="centre-line" x1="120" y1="200" x2="720" y2="200"/>
+  <line class="active-face" x1="347" y1="124" x2="347" y2="276"/>
+  <rect class="cutter" x="380" y="163" width="200" height="74"/>
+  <line class="leader" x1="347" y1="140" x2="420" y2="96"/>
+  <text class="label" x="424" y="80">Z0: the front face, faced to</text>
+  <text class="label" x="424" y="96">{{process.length_target_in:.3dot}} from the rear face</text>
+  <line class="leader" x1="316" y1="124" x2="300" y2="56"/>
+  <text class="label" x="200" y="40">seat Ø B+.0006 to B+.0012, back to the</text>
+  <text class="label" x="200" y="54">shoulder at Z−S (S = T − .001)</text>
+  <text class="label" x="590" y="190">reamer</text>
+  <line class="leader" x1="250" y1="238" x2="330" y2="340"/>
+  <text class="label" x="334" y="344">bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} through</text>
+  <line class="leader" x1="190" y1="291" x2="150" y2="364"/>
+  <text class="label" x="40" y="378">brass shim; .40 of the hub in the jaws, from the rear face</text>
+</svg>

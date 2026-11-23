@@ -536,3 +536,85 @@ def test_guide_leader_clears_the_socket_tags_and_the_callouts_clear_each_other()
     guide_right = draw.GUIDE_CALLOUT_XY[0] + draw.GUIDE_CALLOUT_HALF_WIDTH
     socket_left = draw.SOCKET_CALLOUT_XY[0] - draw.SOCKET_CALLOUT_HALF_WIDTH
     assert socket_left - guide_right >= 0.004
+
+
+def test_the_plate_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    import export_features
+    from _gtol_face import FaceGeometry
+
+    manifest = export_features.requirement_manifest("pd_platen")
+    features = manifest["features"]
+    assert {name: feature["kind"] for name, feature in features.items()} == {
+        **dict.fromkeys(
+            ("left_edge", "right_edge", "bottom_edge", "top_edge", "paper_face", "back_face"),
+            "face",
+        ),
+        **{f"socket_a{index}": "threaded_hole" for index in range(1, 5)},
+        **{f"guide_b{index}": "hole" for index in range(1, 11)},
+    }
+    assert manifest["notes"]["manufacturing"] == []
+
+    def plane(normal: tuple[float, float, float], offset: float) -> FaceGeometry:
+        point = tuple(value * offset / 1000 for value in normal)
+        return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+    def bore(dia: float, x: float, y: float) -> FaceGeometry:
+        r = dia / 2.0
+        box = tuple(v / 1000 for v in (x - r, y - r, 0.0, x + r, y + r, spec.PLATE_THICKNESS))
+        return FaceGeometry(None, 4002, (x / 1000, y / 1000, 0.0, 0.0, 0.0, 1.0, r / 1000), None, box)
+
+    expected = {
+        "left_edge": [plane((-1.0, 0.0, 0.0), 0.0)],
+        "right_edge": [plane((1.0, 0.0, 0.0), spec.PLATE_WIDTH)],
+        "bottom_edge": [plane((0.0, -1.0, 0.0), 0.0)],
+        "top_edge": [plane((0.0, 1.0, 0.0), spec.PLATE_HEIGHT)],
+        "paper_face": [plane((0.0, 0.0, -1.0), 0.0)],
+        "back_face": [plane((0.0, 0.0, 1.0), spec.PLATE_THICKNESS)],
+        **{
+            f"socket_a{index}": [bore(blind_cut_dia_mm(spec.SOCKET_SPEC), x, y)]
+            for index, (x, y) in enumerate(spec.SOCKET_XY, 1)
+        },
+        **{
+            f"guide_b{index}": [
+                bore(spec.GUIDE_HOLE_DIA, x, y),
+                bore(spec.CBORE_DIA, x, y),
+            ]
+            for index, (x, y) in enumerate(
+                ((x, y) for x in spec.GUIDE_HOLE_X for y in spec.GUIDE_HOLE_Y), 1
+            )
+        },
+    }
+    selectors = export_features.feature_selectors("pd_platen")
+    assert set(selectors) == set(features)
+    for name, faces in expected.items():
+        for face in faces:
+            owners = [
+                owner
+                for owner, specs in selectors.items()
+                if any(selector.matches(face) for selector in specs)
+            ]
+            assert owners == [name], name
+
+
+def test_plate_feature_bands_are_the_printed_ones() -> None:
+    import export_features
+
+    inch = 25.4
+    features = export_features.requirement_manifest("pd_platen")["features"]
+    assert features["right_edge"]["width"] == pytest.approx([10.61 * inch, 10.63 * inch])
+    assert features["top_edge"]["height"] == pytest.approx([5.30 * inch, 5.32 * inch])
+    assert features["back_face"]["thickness"] == pytest.approx([0.147 * inch, 0.157 * inch], abs=1e-3)
+    # The hole table's tags, X LOC and Y LOC from the lower-left corner, .XXX.
+    table = {"socket_a1": (0.170, 2.301), "socket_a4": (10.446, 5.025), "guide_b1": (1.062, 0.553), "guide_b2": (1.062, 1.892), "guide_b10": (9.554, 1.892)}
+    for name, (x, y) in table.items():
+        hole = features[name]
+        assert hole["station"] == pytest.approx([(x - 0.005) * inch, (x + 0.005) * inch], abs=1e-3), name
+        assert hole["height"] == pytest.approx([(y - 0.005) * inch, (y + 0.005) * inch], abs=1e-3), name
+    socket = features["socket_a1"]
+    assert socket["thread"] == "#2-56 UNC-2B" and socket["thru"] is True
+    assert socket["dia"] == pytest.approx([0.070 * inch, 0.074 * inch], abs=1e-3)
+    guide = features["guide_b5"]
+    assert guide["dia"] == pytest.approx([0.144 * inch, 0.148 * inch], abs=1e-3)
+    assert guide["cbore_dia"] == pytest.approx([0.25 * inch, 0.27 * inch], abs=1e-3)
+    assert guide["cbore_depth"] == pytest.approx([0.110 * inch, 0.120 * inch], abs=1e-3)
+    assert guide["cbore_depth_from"] == "paper_face"

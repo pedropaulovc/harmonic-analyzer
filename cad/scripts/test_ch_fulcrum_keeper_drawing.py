@@ -104,8 +104,8 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
     # tip, both bands, so the counterbore keeps 1.092 off it.
     assert round(spec.FOOT_CBORE_LUG_CLEARANCE_MM, 3) == 1.092
     assert round(spec.FOOT_SCREW_ENGAGEMENT_D, 2) == 2.27
-    # The native counterbore callout prints .XXX; the engagement and
-    # bottoming stacks take that printed depth (.083), not 2.1082.
+    # The native counterbore callout prints .XXX with its own limits; the
+    # engagement and bottoming stacks take that printed band (.078-.088).
     assert spec.FOOT_COUNTERBORE_DEPTH_PLACES == 3
     # Owner ruling Q11-B: the lug holds the web at the title block's .XX
     # lug and tap station; Q11-B' and 2026-10-28: the overall length (the
@@ -119,6 +119,29 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
     assert spec.DRAWING_PRECISION["FootScrewReference"]["ScrewFromTip"] == 2
     assert spec.DRAWING_PRECISION["FootScrewSideReference"]["ScrewFromSide"] == 3
     assert spec.KEEPER_SCREW_TRANSVERSE_BAND_MM == spec._BAND_BY_PLACES[3]
+
+
+def test_counterbore_prints_the_owner_ruled_limits() -> None:
+    # Owner ruling 2026-11-22 (#3367): the callout prints Ø.150-.154 x
+    # .078-.088, and the RV-04 tip wall stands on that printed band.
+    spec = ch_fulcrum_keeper_spec
+    dia = [
+        spec.CBORE_DIA_MM + spec.CBORE_DIA_BAND[1],
+        spec.CBORE_DIA_MM + spec.CBORE_DIA_BAND[0],
+    ]
+    depth = [
+        spec.CBORE_DEPTH_MM + spec.CBORE_DEPTH_BAND[1],
+        spec.CBORE_DEPTH_MM + spec.CBORE_DEPTH_BAND[0],
+    ]
+    assert [round(v / 25.4, 3) for v in dia] == [0.150, 0.154]
+    assert [round(v / 25.4, 3) for v in depth] == [0.078, 0.088]
+    assert spec._CBORE_MAX_RADIUS == pytest.approx(dia[1] / 2.0)
+    assert spec.FOOT_TIP_WALL_WORST_MM / 25.4 == pytest.approx(0.0725, abs=5e-5)
+    assert spec.FOOT_TIP_WALL_TEXT == ".072"
+    rows = _config.parts("ch-fulcrum-keeper")["machinist_exceptions"]
+    exception = {row["id"]: row for row in rows}["RV-04"]
+    assert ".0725" in exception["finding"]
+    assert "\u00d8.150-.154 x .078-.088" in exception["reason"]
 
 
 def test_side_station_names_the_frame_tap_and_the_web_needs_xx() -> None:
@@ -620,10 +643,11 @@ def _tap_rows() -> list[str]:
 
 def _foot_hole_rows() -> list[str]:
     """The foot-hole callout as printed: the through row (size, DRILL,
-    THRU), the counterbore row, then the mate rows."""
+    THRU), the counterbore row with its stacked limits (owner ruling
+    2026-11-22, #3367; one tolerance row's width each), then the mate rows."""
     return [
         f"Ø .094 {drawing.FOOT_HOLE_THRU}",
-        "⌴ Ø .150 ↧ .083",
+        "⌴ Ø .150 +.004 ↧ .083 -.005",
         *ch_fulcrum_keeper_notes.FOOT_HOLE_MATE.splitlines(),
     ]
 
@@ -662,7 +686,7 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
     notes_top = drawing.NOTES_TOP
     notes = Box(0.020, notes_top - 5 * _PITCH, 0.182, notes_top)
     overall_length = _text_block(drawing.FRONT_KEEP["OverallLength"], ["16.50"])
-    foot_hole = _text_block(drawing.FOOT_HOLE_CALLOUT_XY, _foot_hole_rows())
+    foot_hole = _foot_hole_block()
     tap = _text_block(drawing.SET_SCREW_CALLOUT_XY, _tap_rows())
     keeps = {**drawing.FRONT_KEEP, **drawing.TOP_KEEP}
     callouts: dict[str, str] = {}
@@ -744,7 +768,7 @@ def test_tap_callout_stands_inside_the_border_clear_of_the_plan() -> None:
     )
     station = "SetScrewLocation"
     set_screw_location = _value_block(drawing.TOP_KEEP[station], "4.00", "")
-    foot_hole = _text_block(drawing.FOOT_HOLE_CALLOUT_XY, _foot_hole_rows())
+    foot_hole = _foot_hole_block()
     for other in (plan, set_screw_location, foot_hole):
         assert _box_gap(block, other) >= _AIR, other
     bend = (block.xmax + _SHOULDER_RUN, block.ymin)
@@ -754,12 +778,18 @@ def test_tap_callout_stands_inside_the_border_clear_of_the_plan() -> None:
     assert point_segment_distance((plan.xmin, plan.ymin), leader) >= 0.003
 
 
+def _foot_hole_block():
+    """The foot-hole callout's box: its rows plus the counterbore row's
+    stacked upper limits."""
+    return _text_block(drawing.FOOT_HOLE_CALLOUT_XY, _foot_hole_rows(), stack=True)
+
+
 def _foot_hole_leader():
     """Native hangs the shoulder under the last row and points the arrow at
     the counterbore rim facing the shoulder's end."""
     from _layout_geometry import Segment
 
-    block = _text_block(drawing.FOOT_HOLE_CALLOUT_XY, _foot_hole_rows())
+    block = _foot_hole_block()
     bend = (block.xmin - _SHOULDER_RUN, block.ymin)
     centre = (drawing.HOLE_X_SHEET, drawing.TOP_CENTER[1])
     dx, dy = bend[0] - centre[0], bend[1] - centre[1]
@@ -768,21 +798,23 @@ def _foot_hole_leader():
 
 
 def test_foot_hole_leader_climbs_left_of_its_own_upper_rows() -> None:
-    # Native hangs the shoulder under the last (widest) row; the leader from
-    # there to the counterbore rim clears every row above it. Rule 7 block
-    # limit: four rows.
+    # Native hangs the shoulder under the last row, out past the widest (the
+    # counterbore row with its stacked limits); the leader from there to the
+    # counterbore rim clears every row above it (farm run
+    # 20261122T220015080Z: centred at x 138 it ran 3.4 mm through the
+    # counterbore symbol). Rule 7 block limit: four rows.
     from _layout_geometry import Box, segment_box_distance
 
     rows = _foot_hole_rows()
     assert len(rows) <= 4
-    assert len(rows[-1]) == max(map(len, rows))
-    block = _text_block(drawing.FOOT_HOLE_CALLOUT_XY, rows)
+    block = _foot_hole_block()
     leader = _foot_hole_leader()
     for index, row in enumerate(rows[:-1]):
-        top = block.ymax - index * _PITCH
+        top = block.ymax - index * _PITCH - (_STACK if index else 0.0)
         half = len(row) * _CHAR / 2.0
         cx = drawing.FOOT_HOLE_CALLOUT_XY[0]
-        box = Box(cx - half, top - _CAP, cx + half, top)
+        lift = _STACK if index == 1 else 0.0
+        box = Box(cx - half, top - _CAP, cx + half, top + lift)
         assert segment_box_distance(leader, box) >= 0.001, row
 
 
@@ -868,3 +900,89 @@ def test_parts_registry_row() -> None:
     assert "black oxide" in finish and "oil" in finish
     assert "pair-ream" not in finish
     assert int(config["quantity"]) == 2
+
+
+def _in(value: float) -> float:
+    return value * 25.4
+
+
+def test_the_keeper_declares_one_owner_per_face() -> None:
+    import export_features
+    from _gtol_face import FaceGeometry
+
+    spec = ch_fulcrum_keeper_spec
+
+    def plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+        point = tuple(value * offset_mm / 1000 for value in normal)
+        return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+    def cylinder(dia_mm: float, box_mm: tuple[float, ...]) -> FaceGeometry:
+        box = tuple(value / 1000 for value in box_mm)
+        return FaceGeometry(None, 4002, (0.0, 0.0, 0.0, 0, 0, 1, dia_mm / 2000), None, box)
+
+    manifest = export_features.requirement_manifest("ch_fulcrum_keeper")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == {
+        "seat": "face",
+        "foot_top": "face",
+        "inner_face": "face",
+        "lug_outer_face": "face",
+        "foot_tip": "face",
+        "near_side": "face",
+        "far_side": "face",
+        "crown": "arc",
+        "bore": "hole",
+        "crown_tap": "threaded_hole",
+        "foot_hole": "hole",
+    }
+    half_w, half_t = spec.KEEPER_WIDTH / 2, spec.LUG_HALF_T
+    floor = spec.FOOT_H - spec.CBORE_DEPTH_MM
+    x = spec.SCREW_X
+    tap_r = drawing._TAP_DRILL / 2
+    faces = {
+        "seat": plane((0.0, -1.0, 0.0), 0.0),
+        "foot_top": plane((0.0, 1.0, 0.0), spec.FOOT_H),
+        "inner_face": plane((-1.0, 0.0, 0.0), half_t),
+        "lug_outer_face": plane((1.0, 0.0, 0.0), half_t),
+        "foot_tip": plane((1.0, 0.0, 0.0), spec.FOOT_TIP_X),
+        "near_side": plane((0.0, 0.0, -1.0), half_w),
+        "far_side": plane((0.0, 0.0, 1.0), half_w),
+        "crown": cylinder(2 * spec.CROWN_R, (-half_t, spec.SHAFT_AXIS_H, -half_w, half_t, spec.CROWN_TOP_Y, half_w)),
+        "bore": cylinder(spec.BORE_DIA, (-half_t, 21.9, -3.3, half_t, 28.5, 3.3)),
+        "crown_tap": cylinder(drawing._TAP_DRILL, (-tap_r, 28.0, -tap_r, tap_r, spec.CROWN_TOP_Y, tap_r)),
+        "foot_hole/drill": cylinder(spec.HOLE_DIA_MM, (x - 1.2, 0.0, -1.2, x + 1.2, floor, 1.2)),
+        "foot_hole/cbore": cylinder(spec.CBORE_DIA_MM, (x - 1.9, floor, -1.9, x + 1.9, spec.FOOT_H, 1.9)),
+    }
+    selectors = export_features.feature_selectors("ch_fulcrum_keeper")
+    for name, face in faces.items():
+        owners = [
+            owner
+            for owner, specs in selectors.items()
+            if any(selector.matches(face) for selector in specs)
+        ]
+        assert owners == [name.split("/")[0]], name
+
+
+def test_keeper_feature_bands_are_the_printed_ones() -> None:
+    import export_features
+
+    features = export_features.requirement_manifest("ch_fulcrum_keeper")["features"]
+    assert features["foot_top"]["height"] == pytest.approx([_in(0.30), _in(0.32)])
+    assert features["lug_outer_face"]["thickness"] == pytest.approx([_in(0.31), _in(0.33)])
+    assert features["foot_tip"]["length"] == pytest.approx([_in(0.64), _in(0.66)])
+    assert features["far_side"]["width"] == pytest.approx([_in(0.54), _in(0.56)])
+    bore = features["bore"]
+    assert bore["dia"] == pytest.approx([_in(0.2550), _in(0.2560)])
+    assert bore["process"] == "ream" and bore["thru"] is True
+    assert bore["height"] == pytest.approx([_in(0.98), _in(1.00)])
+    assert bore["off_centre"] == pytest.approx([_in(-0.012), _in(0.012)])
+    tap = features["crown_tap"]
+    assert tap["thread"] == "#1-72 UNF-2B" and tap["into"] == "bore"
+    assert tap["station"] == pytest.approx([_in(0.15), _in(0.17)])
+    hole = features["foot_hole"]
+    assert hole["dia"] == pytest.approx([_in(0.094), _in(0.098)], abs=1e-3)
+    assert hole["cbore_dia"] == pytest.approx([_in(0.150), _in(0.154)])
+    assert hole["cbore_depth"] == pytest.approx([_in(0.078), _in(0.088)], abs=1e-3)
+    assert hole["station"] == pytest.approx([_in(0.17), _in(0.19)])
+    assert hole["lateral"] == pytest.approx([_in(0.270), _in(0.280)])
+    assert hole["tip_wall_min"] == pytest.approx(_in(0.072))

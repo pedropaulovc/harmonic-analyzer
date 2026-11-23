@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 550" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="550"/>
+  <text class="title" x="20" y="20">Section through a socket (1 in = 200 px; the tape drawn thicker)</text>
+  <rect class="fixture-plate" x="80" y="470" width="440" height="60"/>
+  <rect class="paper" x="250" y="470" width="100" height="30"/>
+  <line class="dims" x1="250" y1="470" x2="250" y2="500"/>
+  <line class="dims" x1="350" y1="470" x2="350" y2="500"/>
+  <line class="dims" x1="250" y1="500" x2="350" y2="500"/>
+  <rect class="bond" x="80" y="466" width="170" height="4"/>
+  <rect class="bond" x="350" y="466" width="170" height="4"/>
+  <rect class="part-kept" x="80" y="435.6" width="440" height="30.4"/>
+  <rect class="holes" x="293" y="435.6" width="14" height="30.4"/>
+  <rect class="cutter" x="291.4" y="285.6" width="17.2" height="193.4"/>
+  <polygon class="cutter" points="291.4,479 308.6,479 300,487"/>
+  <rect class="clamp" x="286" y="225.6" width="28" height="62"/>
+  <rect class="clamp" x="190" y="209.6" width="220" height="16"/>
+  <rect class="cutter" x="250" y="55.6" width="100" height="110"/>
+  <polygon class="cutter" points="282,165.6 318,165.6 300,209.6"/>
+  <line class="centre-line" x1="300" y1="43.6" x2="300" y2="514"/>
+  <line class="leader" x1="350" y1="105.6" x2="450" y2="95.6"/>
+  <text class="label" x="454" y="99.6">tap guide in the 1/2 in collet, spindle off</text>
+  <line class="leader" x1="312" y1="185.6" x2="450" y2="155.6"/>
+  <text class="label" x="454" y="159.6">its spring point in the wrench's centre hole</text>
+  <line class="leader" x1="410" y1="217.6" x2="450" y2="219.6"/>
+  <text class="label" x="454" y="223.6">T-handle tap wrench</text>
+  <line class="leader" x1="308.6" y1="345.6" x2="450" y2="325.6"/>
+  <text class="label" x="454" y="329.6">{{cad.socket_a1_thread}} plug tap</text>
+  <line class="leader" x1="500" y1="450.8" x2="540" y2="440.8"/>
+  <text class="label" x="544" y="444.8">platen, P up</text>
+  <line class="leader" x1="500" y1="468" x2="540" y2="476"/>
+  <text class="label" x="544" y="480">tape, cut away over the pocket</text>
+  <line class="leader" x1="344" y1="494" x2="540" y2="510"/>
+  <text class="label" x="544" y="514">relief pocket in the bar</text>
+  <line class="dims" x1="60" y1="435.6" x2="60" y2="487"/>
+  <line class="dims" x1="291.4" y1="435.6" x2="55" y2="435.6"/>
+  <line class="dims" x1="291.4" y1="487" x2="55" y2="487"/>
+  <text class="label" x="66" y="465.3" text-anchor="start"></text>
+  <text class="label" x="52" y="465.3" text-anchor="end">point</text>
+  <text class="label" x="52" y="481.3" text-anchor="end">{{process.tap_point_depth_mm:in.3dot}}</text>
+  <text class="label" x="52" y="497.3" text-anchor="end">below P</text>
+</svg>

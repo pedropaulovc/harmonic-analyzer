@@ -13,6 +13,8 @@ import pd_transgear_arm_geometry as arm
 import pd_transgear_arm_plate_geometry as plate
 import pd_transgear_arm_spec as arm_spec
 import pd_transgear_arm_plate_spec as plate_spec
+import pd_transgear_knob_bush_geometry as bush
+import pd_transgear_knob_bush_spec as bush_spec
 import _transgear_arm_plate_locating_interface as pin
 import pd_transgear_pin_spec as cluster_pin
 from _printed_tolerance import edge_break_chamfer_mm, edge_break_radius_mm
@@ -116,9 +118,12 @@ def test_three_accessible_rear_indicator_sites_bound_every_tilt_direction() -> N
         edge = arm.PIVOT_END_R - x * math.sin(arm.EDGE_LEAN) - abs(y) * math.cos(arm.EDGE_LEAN)
         assert edge - arm.OUTLINE_BAND - footprint - registration.ARM_SEAT_WITNESS_POSITION_RADIUS_MM > 0.0
         px, py = x - plate.BORE_STATION, y - plate.BORE_OFFSET
+        # The flat plate's outline under the sites runs no higher than its
+        # kinks: the tangents below them fall toward the end round.
+        assert max(plate.KINK[1], plate.KINK_RIGHT[1]) == plate.KINK[1]
         assert min(px - plate.EDGE_MINUS_X, plate.EDGE_PLUS_X - px,
                    (plate.arm_upper_edge_y(px) - py) * math.cos(arm.EDGE_LEAN),
-                   (py - plate.notch_face_y(px)) * math.cos(arm.EDGE_LEAN)) - max(plate.OUTLINE_BAND, plate.NOTCH_BAND) - footprint - 0.1 > 0.0
+                   py - plate.KINK[1]) - plate.OUTLINE_BAND - footprint - 0.1 > 0.0
         for hx, hy in plate.SCREW_HOLES:
             assert math.hypot(px - hx, py - hy) > (plate.CSK_DIA + plate.CSK_DIA_BAND) / 2.0 + footprint + 0.15
         for hx, hy in plate.LOCATOR_SITES_MM:
@@ -169,16 +174,22 @@ def test_native_controls_reference_actual_bores_and_reach_the_real_chain_plane()
         / cluster_pin.PRESS_LAND_GRIP_MIN
     )
     assert registration.S_AXIS_ZONE_DIAMETER_MM > registration.AXIS_PROJECTED_ZONE_DIAMETER_MM
-    # K prints a plain ⊥ Ø.002 to A over its bore (fan-out Q2-A, rule 26);
-    # carried to K's projected height past the real chain plane, that tilt
-    # stays inside the axes' tilt budget the air stacks charge.
-    plate_control = next(
-        control for control in plate_spec.GEOMETRIC_CONTROLS
-        if control.key == "knob_axis_perpendicularity"
+    # K's tilt is the MHA-PD-28 bush bore's frame (#2425: the bore is reamed
+    # after pressing, so the flat plate prints none); carried to K's projected
+    # height past the real chain plane, that tilt stays inside the axes' tilt
+    # budget the air stacks charge.
+    assert not any(
+        control.characteristic == "perpendicularity" for control in plate_spec.GEOMETRIC_CONTROLS
     )
-    assert plate_control.projected_zone_height_mm is None
-    assert plate_control.tolerance == ".002" and plate_control.datums == ("A",)
-    tilt_zone = float(plate_control.tolerance) * 25.4 * registration.K_PROJECTED_HEIGHT_MM / plate_spec.KNOB_BORE_LENGTH_MIN_MM
+    bush_control = next(
+        control for control in bush_spec.GEOMETRIC_CONTROLS
+        if control.characteristic == "perpendicularity"
+    )
+    assert bush_control.projected_zone_height_mm is None
+    tilt_zone = (
+        float(bush_control.tolerance) * 25.4 * registration.K_PROJECTED_HEIGHT_MM
+        / bush.KNOB_BORE_LENGTH_MIN_MM
+    )
     assert tilt_zone <= registration.AXIS_PROJECTED_ZONE_DIAMETER_MM
     for datum_z, height in (
         (registration.ARM_FRONT_MACHINE_Z_MM, registration.S_PROJECTED_HEIGHT_MM),

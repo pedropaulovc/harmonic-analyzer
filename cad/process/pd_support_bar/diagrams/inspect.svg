@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 330" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="330"/>
+  <text class="title" x="20" y="20">Setup 6, the finished bar looking at F, T up, END A at the right (1 in = 40 px)</text>
+  <rect class="part-kept" x="38" y="110" width="712" height="39.7"/>
+  <line class="centre-line" x1="28" y1="132.05" x2="762" y2="132.05"/>
+  <!-- Clamp holes 1 and 2, the pivot hole, slots 3 and 4; the hook taps,
+       not made here. -->
+  <circle class="holes" cx="731.8" cy="132.05" r="6.25"/>
+  <circle class="holes" cx="731.8" cy="132.05" r="3.92"/>
+  <circle class="holes" cx="676.7" cy="132.05" r="6.25"/>
+  <circle class="holes" cx="676.7" cy="132.05" r="3.92"/>
+  <circle class="part-threads" cx="485.3" cy="132.83" r="3.3"/>
+  <rect class="holes" x="102.17" y="125.28" width="18.26" height="13.54" rx="6.77" ry="6.77"/>
+  <rect class="holes" x="105" y="128.07" width="12.6" height="7.96" rx="3.98" ry="3.98"/>
+  <rect class="holes" x="47.07" y="125.28" width="18.26" height="13.54" rx="6.77" ry="6.77"/>
+  <rect class="holes" x="49.9" y="128.07" width="12.6" height="7.96" rx="3.98" ry="3.98"/>
+  <circle class="hidden" cx="291.6" cy="132.83" r="2.2"/>
+  <circle class="hidden" cx="280.6" cy="132.83" r="2.2"/>
+  <text class="label-halo" x="360" y="147">F</text>
+  <text class="label" x="350" y="104">T</text>
+  <line class="datum" x1="750" y1="98" x2="750" y2="162"/>
+  <text class="datum-label" x="776" y="94" text-anchor="end">END A</text>
+  <!-- Callouts above the bar. -->
+  <text class="label" x="30" y="44">2X slot {{cad.clamp_slot_3_width_min_in:.3dot}}–{{cad.clamp_slot_3_width_max_in:.3dot}} wide through,</text>
+  <text class="label" x="30" y="60">counterbore {{cad.clamp_slot_4_cbore_width_min_in:.3dot}}–{{cad.clamp_slot_4_cbore_width_max_in:.3dot}} wide</text>
+  <text class="label" x="30" y="76">× {{cad.clamp_slot_4_cbore_depth_min_in:.2dot}}–{{cad.clamp_slot_4_cbore_depth_max_in:.2dot}} deep</text>
+  <line class="leader" x1="111.3" y1="124.5" x2="100" y2="82"/>
+  <line class="leader" x1="56.2" y1="124.5" x2="60" y2="82"/>
+  <text class="label" x="300" y="44">{{cad.pivot_tap_thread}} through,</text>
+  <text class="label" x="300" y="60">countersunk Ø{{cad.pivot_tap_csk_dia_max_in:.3dot}} max</text>
+  <text class="label" x="300" y="76">on both faces</text>
+  <line class="leader" x1="483.5" y1="130" x2="392" y2="80"/>
+  <text class="label" x="540" y="44">2X Ø{{cad.clamp_hole_1_dia_min_in:.3dot}}–{{cad.clamp_hole_1_dia_max_in:.3dot}} through,</text>
+  <text class="label" x="540" y="60">counterbore Ø{{cad.clamp_hole_1_cbore_dia_min_in:.4dot}}–{{cad.clamp_hole_1_cbore_dia_max_in:.4dot}}</text>
+  <text class="label" x="540" y="76">× {{cad.clamp_hole_1_cbore_depth_min_in:.2dot}}–{{cad.clamp_hole_1_cbore_depth_max_in:.2dot}} deep</text>
+  <line class="leader" x1="729" y1="126.5" x2="690" y2="82"/>
+  <line class="leader" x1="674" y1="126.5" x2="650" y2="82"/>
+  <!-- The row's height below T. -->
+  <line class="dims" x1="600" y1="110" x2="600" y2="132.05"/>
+  <line class="leader" x1="600" y1="122" x2="590" y2="164"/>
+  <text class="label" x="520" y="178">row {{cad.clamp_hole_1_height_min_in:.3dot}}–{{cad.clamp_hole_1_height_max_in:.3dot}} below T</text>
+  <!-- Stations from END A. -->
+  <line class="dims" x1="676.7" y1="198" x2="750" y2="198"/>
+  <line class="dims" x1="676.7" y1="140" x2="676.7" y2="203"/>
+  <text class="label" x="671" y="202" text-anchor="end">clamp hole 2 {{cad.clamp_hole_2_station_min_in:.3dot}}–{{cad.clamp_hole_2_station_max_in:.3dot}}</text>
+  <line class="dims" x1="731.8" y1="218" x2="750" y2="218"/>
+  <line class="dims" x1="731.8" y1="140" x2="731.8" y2="223"/>
+  <text class="label" x="726" y="222" text-anchor="end">clamp hole 1 {{cad.clamp_hole_1_station_min_in:.3dot}}–{{cad.clamp_hole_1_station_max_in:.3dot}}</text>
+  <line class="dims" x1="38" y1="262" x2="750" y2="262"/>
+  <line class="dims" x1="38" y1="152" x2="38" y2="268"/>
+  <line class="dims" x1="750" y1="162" x2="750" y2="268"/>
+  <text class="label" x="330" y="256">length {{cad.far_end_length_min_in:.1f}}–{{cad.far_end_length_max_in:.1f}}</text>
+  <text class="label" x="44" y="170">far end (sawn and filed)</text>
+  <line class="leader" x1="286" y1="136" x2="250" y2="190"/>
+  <text class="label" x="120" y="204">2X #4-40: at assembly, not made here</text>
+  <text class="label" x="30" y="300">Edges broken R{{cad.edge_break_in:.3dot}} or chamfered {{cad.chamfer_max_in:.3dot}} max. Stations are from END A; heights from T.</text>
+  <text class="label" x="30" y="318">Slide faces, {{cad.front_face_finish_ra_uin:d}} µin Ra: T (milled) and F (as supplied). The back face and the bottom edge stay as supplied.</text>
+</svg>

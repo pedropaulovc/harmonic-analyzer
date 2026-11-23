@@ -51,25 +51,40 @@ from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _gtol_torus import TorusFace
 from _machinist_review_mode import MachinistReviewMode
 from _named_views import octant_view_name
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import limits
+from _printed_tolerance import angular_band_deg
 from _session import run_build
 import _telemetry
 from sm_gooseneck_geom import (
     ARM_Y,
     BEND_R,
     LEG_BOTTOM,
+    LEG_LENGTH,
     LEG_TOP,
+    TUBE_BORE_DIA,
     TUBE_DIA,
+    TUBE_DIA_MAX,
+    TUBE_DIA_MIN,
     TUBE_END_X,
+    TUBE_STRAIGHT,
+    WALL_T,
+    WALL_T_MAX,
+    WALL_T_MIN,
 )
 from sm_gooseneck_spec import (
     DIMENSION_CALLOUTS_BY_NAME,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     ISOMETRIC_OCTANT,
+    OVERALL_HEIGHT_TOLERANCE_MM,
     TUBE_OD_REF_Y,
 )
 
@@ -184,6 +199,162 @@ BEND_NOTE_TIP = (
 )
 BEND_NOTE_XY = (ARM_END_X - 0.026, _front_y(ARM_Y - _TUBE_R) - 0.0055)
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, 0.085)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_sm_gooseneck: the leg's axis on model Y through the origin at the
+# leg's mid-height, the foot face at y = LEG_BOTTOM; the arm's axis at
+# y = ARM_Y running toward -X to the faced arm end at x = TUBE_END_X; the
+# bend's centre at (-BEND_R, LEG_TOP), its axis on Z). The governing sizes
+# are where the two ends finish: the overall height (foot face to the arm's
+# top, OVERALL_HEIGHT_TOLERANCE_MM) and the overall reach (faced arm end to
+# the leg's outer side, .XX); the leg and arm stay square at the title
+# block's implied 90 deg. The leg length, the arm straight, the bend's
+# centreline radius and the tube's Ø and wall are references; the blank is
+# the straight tube's length through the bend at those references. The
+# declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_sm_gooseneck"
+_GEOM = "sm_gooseneck_geom"
+UNIT = part_drawing_unit(PART_STEM)
+_ARM_MID_X = (TUBE_END_X - BEND_R) / 2.0
+_OVERALL_HEIGHT = ARM_Y + _TUBE_R - LEG_BOTTOM
+_OVERALL_REACH = _TUBE_R - TUBE_END_X
+_DEVELOPED = LEG_LENGTH + math.pi / 2.0 * BEND_R + TUBE_STRAIGHT
+part_metadata(
+    model_sources=(
+        (_GEOM, "TUBE_DIA"),
+        (_GEOM, "ARM_Y"),
+        (_GEOM, "BEND_R"),
+        (_GEOM, "LEG_BOTTOM"),
+        (_GEOM, "TUBE_END_X"),
+    ),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "foot",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), -LEG_BOTTOM),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": LEG_BOTTOM},
+            ((_GEOM, "LEG_BOTTOM"),),
+        ),
+        "outward": ([0.0, -1.0, 0.0], ((_GEOM, "LEG_BOTTOM"),)),
+    },
+)
+requirement(
+    "leg",
+    kind="boss",
+    faces=(CylinderFace(TUBE_DIA, contains_y_mm=0.0),),
+    requirements=("leg_length_ref",),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ((_GEOM, "LEG_TOP"),)),
+        "at": ([0.0, LEG_BOTTOM, 0.0], ((_GEOM, "LEG_BOTTOM"),)),
+        "leg_length_ref": (
+            LEG_LENGTH,
+            ((_GEOM, "LEG_LENGTH"), "REFERENCE_DIMENSIONS", (_SELF, "FRONT_KEEP")),
+        ),
+        "leg_length_from": ("foot", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"leg_length_ref": _P["LegLength"]},
+)
+requirement(
+    "arm",
+    kind="boss",
+    faces=(CylinderFace(TUBE_DIA, contains_x_mm=_ARM_MID_X),),
+    requirements=("height", "arm_straight_ref"),
+    fields={
+        "axis": ([-1.0, 0.0, 0.0], ((_GEOM, "ARM_Y"),)),
+        "at": ([-BEND_R, ARM_Y, 0.0], ((_GEOM, "BEND_R"), (_GEOM, "ARM_Y"))),
+        "height": (
+            limits(
+                _OVERALL_HEIGHT,
+                _P["OverallHeight"],
+                (OVERALL_HEIGHT_TOLERANCE_MM, -OVERALL_HEIGHT_TOLERANCE_MM),
+                unit=UNIT,
+            ),
+            ("OVERALL_HEIGHT_TOLERANCE_MM", (_SELF, "FRONT_KEEP")),
+        ),
+        "height_nominal": (_OVERALL_HEIGHT, ((_GEOM, "ARM_Y"), (_GEOM, "LEG_BOTTOM"))),
+        "height_from": ("foot", ((_SELF, "FRONT_KEEP"),)),
+        "arm_straight_ref": (
+            TUBE_STRAIGHT,
+            ((_GEOM, "TUBE_STRAIGHT"), "REFERENCE_DIMENSIONS", (_SELF, "FRONT_KEEP")),
+        ),
+    },
+    precision={"height": _P["OverallHeight"], "arm_straight_ref": _P["ArmStraight"]},
+)
+requirement(
+    "arm_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), -TUBE_END_X),),
+    requirements=("reach",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "x", "value": TUBE_END_X},
+            ((_GEOM, "TUBE_END_X"),),
+        ),
+        "outward": ([-1.0, 0.0, 0.0], ((_GEOM, "TUBE_END_X"),)),
+        "reach": (
+            limits(_OVERALL_REACH, _P["OverallReach"], unit=UNIT),
+            ((_GEOM, "TUBE_END_X"), (_SELF, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "reach_nominal": (_OVERALL_REACH, ((_GEOM, "TUBE_END_X"), (_GEOM, "TUBE_DIA"))),
+        "reach_from": ("leg", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"reach": _P["OverallReach"]},
+)
+requirement(
+    "bend",
+    kind="bend",
+    faces=(TorusFace(BEND_R, _TUBE_R, (-BEND_R, LEG_TOP, 0.0)),),
+    requirements=("centreline_radius", "angle", "callout"),
+    fields={
+        "centreline_radius": (
+            BEND_R,
+            ((_GEOM, "BEND_R"), "BEND_RADIUS_CALLOUT", (_SELF, "FRONT_KEEP")),
+        ),
+        "angle": (
+            [90.0 - angular_band_deg(unit=UNIT), 90.0 + angular_band_deg(unit=UNIT)],
+            ((_SELF, "UNIT"),),
+        ),
+        "angle_nominal": (90.0, ((_GEOM, "BEND_R"),)),
+        "at": ([-BEND_R, LEG_TOP, 0.0], ((_GEOM, "BEND_R"), (_GEOM, "LEG_TOP"))),
+        "callout": (BEND_ACCEPTANCE, ((_SELF, "BEND_ACCEPTANCE"),)),
+    },
+    precision={"centreline_radius": _P["BendRadius"]},
+)
+requirement(
+    "blank",
+    kind="blank",
+    faces=(
+        CylinderFace(TUBE_BORE_DIA, contains_y_mm=0.0),
+        CylinderFace(TUBE_BORE_DIA, contains_x_mm=_ARM_MID_X),
+        TorusFace(BEND_R, TUBE_BORE_DIA / 2.0, (-BEND_R, LEG_TOP, 0.0)),
+    ),
+    requirements=("od", "wall", "callout"),
+    fields={
+        "section": ("tube", ((_GEOM, "TUBE_DIA"), (_GEOM, "WALL_T"))),
+        "od": (
+            [TUBE_DIA_MIN, TUBE_DIA_MAX],
+            ((_GEOM, "TUBE_DIA_MIN"), (_GEOM, "TUBE_DIA_MAX")),
+        ),
+        "od_nominal": (TUBE_DIA, ((_GEOM, "TUBE_DIA"), (_SELF, "FRONT_KEEP"))),
+        "wall": (
+            [WALL_T_MIN, WALL_T_MAX],
+            ((_GEOM, "WALL_T_MIN"), (_GEOM, "WALL_T_MAX")),
+        ),
+        "wall_nominal": (WALL_T, ((_GEOM, "WALL_T"), "TUBE_OD_CALLOUT")),
+        "developed_length": (
+            _DEVELOPED,
+            ((_GEOM, "LEG_LENGTH"), (_GEOM, "BEND_R"), (_GEOM, "TUBE_STRAIGHT")),
+        ),
+        "callout": (DIMENSION_CALLOUTS_BY_NAME["TubeOdRef"], ("DIMENSION_CALLOUTS",)),
+    },
+    precision={"od": _P["TubeOdRef"], "wall": _P["TubeOdRef"]},
+)
 
 
 def _assert_part_callouts(adapter: Any, annotations: list[Any]) -> None:

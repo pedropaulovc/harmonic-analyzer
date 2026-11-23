@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="430"/>
+  <text class="title" x="20" y="20">Section across the jaws, from the LEFT end (1 in = 100 px)</text>
+  <line class="fixture-table" x1="60" y1="400" x2="420" y2="400"/>
+  <rect class="clamp" x="155" y="223" width="60" height="177"/>
+  <rect class="clamp" x="250" y="223" width="60" height="177"/>
+  <text class="label-on-clamp" x="160" y="390">moving</text>
+  <text class="label-on-clamp" x="260" y="390">fixed</text>
+  <rect class="fixture-support" x="215" y="250" width="12.5" height="150"/>
+  <rect class="fixture-support" x="237.5" y="250" width="12.5" height="150"/>
+  <rect class="part-kept" x="215" y="205" width="34.5" height="45"/>
+  <rect class="part-removed" x="215" y="200" width="35" height="5"/>
+  <rect class="cutter" x="225" y="135" width="50" height="60"/>
+  <line class="arrow" x1="250" y1="125" x2="220" y2="125"/>
+  <line class="datum" x1="190" y1="205" x2="210" y2="205"/>
+  <text class="datum-label" x="140" y="200">Z0 (F)</text>
+  <line class="datum" x1="250" y1="180" x2="250" y2="198"/>
+  <text class="datum-label" x="300" y="214">Y0 (top)</text>
+  <text class="label-halo" x="218" y="244">U</text>
+  <line class="leader" x1="252" y1="202" x2="320" y2="160"/>
+  <text class="label" x="300" y="155">take {{process.front_skim_mm:in.3dot}} off: becomes F</text>
+  <text class="label" x="345" y="290">gripped on U (moving jaw) and the top (fixed jaw)</text>
+  <text class="label" x="345" y="308">a 1/2 in cold-finished face up, the other down</text>
+</svg>

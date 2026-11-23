@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" font-family="sans-serif" font-size="13">
+  <!-- The finished hub, section through its axis, 250 px to the inch: front face at the left. Styles: prechips.palette. -->
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">The finished hub: front face at the left; its length from the front face to the rear face</text>
+  <polygon class="part-kept" points="200,85 278,85 278,70 408,70 408,99 448,99 448,261 408,261 408,290 278,290 278,275 200,275"/>
+  <rect class="holes" x="200" y="133" width="248" height="94"/>
+  <rect class="holes" x="310" y="70" width="46" height="220"/>
+  <line class="centre-line" x1="170" y1="180" x2="480" y2="180"/>
+  <line class="datum" x1="200" y1="60" x2="200" y2="300"/>
+  <text class="datum-label" x="120" y="316">front face</text>
+  <line class="leader" x1="240" y1="85" x2="150" y2="50"/>
+  <text class="label" x="20" y="46">seat Ø B+.0006 to B+.0012, S long</text>
+  <line class="leader" x1="385" y1="70" x2="360" y2="44"/>
+  <text class="label" x="300" y="40">barrel Ø{{cad.barrel_dia_min_in:.3dot}}–{{cad.barrel_dia_max_in:.3dot}}</text>
+  <line class="leader" x1="428" y1="99" x2="500" y2="70"/>
+  <text class="label" x="504" y="66">relief Ø{{cad.relief_dia_min_in:.3dot}}–{{cad.relief_dia_max_in:.3dot}} × {{cad.relief_length_min_in:.3dot}}–{{cad.relief_length_max_in:.3dot}}</text>
+  <line class="leader" x1="333" y1="290" x2="420" y2="330"/>
+  <text class="label" x="424" y="334">#14 through, {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from the front face</text>
+  <line class="leader" x1="300" y1="227" x2="500" y2="250"/>
+  <text class="label" x="504" y="254">bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} through</text>
+  <line class="leader" x1="448" y1="180" x2="500" y2="180"/>
+  <text class="label" x="504" y="176">rear face: length</text>
+  <text class="label" x="504" y="192">{{cad.rear_face_length_min_in:.3dot}}–{{cad.rear_face_length_max_in:.3dot}}</text>
+</svg>
