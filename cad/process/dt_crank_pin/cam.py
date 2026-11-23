@@ -61,9 +61,8 @@ CLEAR_MM = 5.0
 # Rapid re-entry into a pecked hole stops this far above the last peck.
 PECK_REENTRY_MM = 0.5
 # Keep-outs: each vise jaw's depth outward from the gripped pin; the spacer
-# (a second pin of the pack) on the 4 in parallel's right end.
+# (a wrung gauge-block pair, plan spacer_*) on the 4 in parallel's right end.
 JAW_DEPTH_MM = IN
-SPACER_MM = 1.75 * IN
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
 HOLE = "ring_hole"
@@ -370,7 +369,8 @@ def context(
 
     # Keep-outs: the jaws from the overhang on (to their tops), the 4 in
     # parallel under the pin from the jaws' left face (to its top, the pin's
-    # underside at the hole), the spacer pin on the parallel's right end.
+    # underside at the hole), the gauge-block spacer standing on the
+    # parallel's right end.
     jaw_x = (overhang, overhang + p["vise_jaw_width_mm"])
     parallel_x = (overhang, overhang + p["parallel_length_mm"])
     half = p["parallel_thickness_mm"] / 2
@@ -380,9 +380,9 @@ def context(
         _box("parallel", parallel_x, (-half, half), -dia),
         _box(
             "spacer",
-            (parallel_x[1] - SPACER_MM, parallel_x[1]),
+            (parallel_x[1] - p["spacer_length_mm"], parallel_x[1]),
             (-half_big, half_big),
-            half_big - radius,
+            p["spacer_height_mm"] - dia,
         ),
     ]
     name = PROGRAMS[0][0]

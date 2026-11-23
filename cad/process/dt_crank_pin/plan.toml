@@ -7,10 +7,11 @@
 #
 # - The pin lies along the vise jaws on one 1 in parallel standing on edge,
 #   the big end .25 in out past the jaws' left side, so the hole (.15 from
-#   the big end) is drilled in the overhang into air; a second pin of the
-#   pack on the parallel's right end balances the moving jaw. The jaws grip
-#   the taper at its largest gripped section, at the jaws' left face, .10 in
-#   from the hole: the drill's thrust is down onto the parallel.
+#   the big end) is drilled in the overhang into air; a wrung gauge-block
+#   spacer on the parallel's right end, .001 under the pin's largest gripped
+#   section, keeps the moving jaw square while the pin takes the clamp. The
+#   jaws grip the taper at its largest gripped section, at the jaws' left
+#   face, .10 in from the hole: the drill's thrust is down onto the parallel.
 # - Y0 is the pin's axis found by the edge finder on both sides of the
 #   overhang at the hole's station (the midpoint), not from the fixed jaw: the
 #   taper does not lie square to the jaws, and the drawing's .064 MIN web
@@ -28,7 +29,7 @@ title = "Crank Pin"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "{{cad.material_spec}}"
-stock = "Qty {{process.quantity:g}}. A bought {{cad.taper_stock}} ({{cad.taper_standard}}; not in the shop records: to order, pack of 25); a second pin of the pack is the vise spacer in Setup 2."
+stock = "Qty {{process.quantity:g}}. A bought {{cad.taper_stock}} ({{cad.taper_standard}}; not in the shop records: to order, pack of 25)."
 note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Home the mill ($H) and touch off G54 before the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Prove the file in air first. Leave the pin as supplied except the hole and its deburr (Op 100); never grip it bare in steel jaws (paper in the mill vise's jaws, soft jaws at the bench)."
 shop = "../shop"
 # A bought taper pin, cross-drilled only (owner ruling 2026-11-20, #2368):
@@ -65,8 +66,18 @@ vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
 vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
 vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
 # The LMS 6745 parallels are 4 in long (as the dt_pinion_bracket plan
-# records); the spacer pin sits on the parallel's right end.
+# records); the spacer sits on the parallel's right end.
 parallel_length_mm = 101.6
+# The spacer: a wrung pair of the owned inch gauge blocks
+# (gauges.gauge-blocks-mitutoyo, a .1001-.1009 and a .101-.149 block),
+# 1.375 long along the jaws and .35 tall, its stack the miked big end less
+# .006. The taper (1:48 on the diameter) leaves the pin's largest gripped
+# section, at the jaws' left face .24-.25 in from the rim, .0050-.0052 under
+# the big end: the spacer is .0008-.0010 under it, inside the moving jaw's
+# play, so the pin takes the clamp and the jaw stays square.
+spacer_under_big_end_in = 0.006
+spacer_length_mm = 34.925
+spacer_height_mm = 8.89
 # The big end past the jaws' left side; the hole drills in this overhang.
 big_end_overhang_mm = 6.35
 # The jaw tops over the pin's top at the hole (Z0); cam.py checks it.
@@ -137,7 +148,7 @@ beam = "other"
 diagram = { file = "diagrams/pin.svg", alt = "The bought No. 3 taper pin: its big end, the crown on it, and the 1-3/4 length." }
 
 [[setups.operations]]
-instruction = "Take two pins from the pack: the part, and a spacer for Setup 2. Mike the part's big end just in from its rim."
+instruction = "Take a pin from the pack. Mike its big end just in from its rim; write the spacer S = the reading − {{process.spacer_under_big_end_in:.3dot}} on this sheet, and wring S from two gauge blocks (a .100x and a .1xx)."
 inspection = "Big end Ø{{process.big_end_min_in:.4dot}}–{{process.big_end_max_in:.4dot}} (ASME B18.8.2 commercial No. 3)."
 gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.big_end_min_mm}}", "{{process.big_end_max_mm}}"] }]
 
@@ -150,21 +161,21 @@ title = "Mill: the #45 ring hole"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The PM 6 in vise, a strip of paper folded over each jaw. One 1 in, 4 in long parallel of the 1/8 in thick set standing on edge, centred between the jaws, its left end flush with the jaws' left face (a rule across both). The pin on its top edge along the jaws, the big end to the LEFT, set {{process.big_end_overhang_mm:in.2dot}} in out past the jaws' left face with the calipers' depth rod, never under .24; the spacer pin on the parallel's right end, big end to the right, so the moving jaw closes square. Tap both down onto the parallel while closing the vise. Under the hole nothing but air."
+holding = "The PM 6 in vise, a strip of paper folded over each jaw. One 1 in, 4 in long parallel of the 1/8 in thick set standing on edge, centred between the jaws, its left end flush with the jaws' left face (a rule across both). The pin on its top edge along the jaws, the big end to the LEFT, set {{process.big_end_overhang_mm:in.2dot}} in out past the jaws' left face with the calipers' depth rod, never under .24; the spacer S (Setup 1) standing on the parallel's right end, its 1.375 length along the jaws, so the moving jaw closes square on the pin. Tap the pin down onto the parallel while closing the vise; it must not turn by hand. Under the hole nothing but air."
 datum = "Program DP01_ring_hole (cam:dt_crank_pin). G54: X0 the big end's rim plane, +X along the pin; Y0 the pin's axis at the hole, +Y toward the fixed jaw; Z0 the pin's top at the hole. The file starts with an M6 for the centre drill; tool lengths from the tool setter at each M6; at the M6 stop the file has stopped the spindle and lifted the tool above the jaws."
-diagram = { file = "diagrams/hole.svg", alt = "The pin on a 4 in parallel along the vise jaws, its big end out past the jaws' left face; the centre drill spots the top and the #45 drill drills through into air, .15 in from the big end; a second pin on the parallel's right end balances the jaws." }
+diagram = { file = "diagrams/hole.svg", alt = "The pin on a 4 in parallel along the vise jaws, its big end out past the jaws' left face; the centre drill spots the top and the #45 drill drills through into air, .15 in from the big end; a gauge-block spacer on the parallel's right end keeps the moving jaw square." }
 envelope = { x_span_mm = ["{{cad.envelope_x_mm}}", 3.175], y_span_mm = ["{{cad.envelope_y_mm}}", 3.175], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.envelope_z_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.hole_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_45_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_y_mm}}", along_jaws_mm = "{{cad.envelope_x_mm}}", part_height_mm = "{{cad.envelope_z_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.big_end_overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_x_mm}}"], clamp_mm = ["{{process.big_end_overhang_mm}}", "{{cad.envelope_x_mm}}"], section_mm = { diameter = "{{cad.taper_small_dia_ref}}" }, vise_left = "start" }
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 the big end's rim: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm, Ø.200), the pin clamped; its tip lowered only .005 below the pin's top at the big end (where the crown has fallen away to the rim). Touch the big end from the left: G10 L20 P1 X-2.540."
+instruction_detailed = "Home the mill first ($H). Edge finder (Ø.200) in the collet, the pin clamped. Spindle stopped: lower the finder's tip over the big end until it just drags a .002 feeler leaf on the pin's top; note that machine Z (the top is .002 under it). Raise, move left of the big end, spindle on at 900 rpm, and lower the tip to .005 under the noted top (where the crown has fallen away to the rim). Touch the big end from the left: G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Y0 the pin's axis: edge finder on both sides of the overhang, Y0 at the midpoint."
-instruction_detailed = "Raise the finder above the pin's top; MDI G0 X{{process.y_pickup_x_mm:.3f}} (its edge then stops at X .200, clear of the jaws); jog Y until it is clear of the pin on the moving-jaw side and lower its tip to the pin's axis height (half the miked big end below the top). Touch that side and note the machine Y. Raise it, cross over to the fixed-jaw side, lower it again and touch; note that Y. Raise it, MDI G0 to the midpoint of the two: G10 L20 P1 Y0."
+instruction_detailed = "Raise the finder above the pin's top; MDI G0 X{{process.y_pickup_x_mm:.3f}} (its edge then stops at X .200, clear of the jaws); jog Y until it is clear of the pin on the moving-jaw side and lower its tip to the pin's axis height (half the miked big end under the top noted in Op 30). Touch that side and note the machine Y. Raise it, cross over to the fixed-jaw side, lower it again and touch; note that Y. Raise it, MDI G0 to the midpoint of the two: G10 L20 P1 Y0."
 feed = "hand"
 
 [[setups.operations]]
