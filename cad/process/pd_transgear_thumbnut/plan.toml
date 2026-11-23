@@ -44,9 +44,10 @@ stock_dia_in = 0.875
 # A blank sawn off the bar on hand and the length the 3-jaw grips of it
 # (fleet rule, Main 2026-11-22: no bar past the rear of the spindle). Chucked
 # .99 out, 2.01 in of it lies behind the jaw fronts, grip included, inside
-# the working limit (CncBarWhip's record, harmonic-analyzer #3426)
-# cad/config/shop-equipment/machines.toml
-# machines.pm-1127vf-lb bar_behind_jaw_fronts_max_in. Yield: the nut and one
+# the 8.0 in working limit CncBarWhip's harmonic-analyzer #3426 adds as
+# machines.toml machines.pm-1127vf-lb bar_behind_jaw_fronts_max_in (open
+# at this head; the spindle's length is still to be measured), and well
+# inside the chuck's own body. Yield: the nut and one
 # restart (each takes about .82 in with the kerf; a restart needs 1.74 in).
 bar_length_in = 3.0
 chuck_grip_in = 0.75
@@ -98,14 +99,20 @@ tap_chase_mark_in = 0.40
 # X DRO, then the cone is cut up the compound from that corner (about
 # .040 / sin t = .127 of compound travel to the face), so the rim follows:
 # corner Ø .350 + 2 × .040 / tan t = .590. The AR's R0.4 nose (lathe.toml
-# tools.lathe-ar, r = .0157): the X DRO, set on the knurl's crests at touch,
-# reads the nose's inner edge, so the nose's centre is r out; the floor flat
+# tools.lathe-ar, r = .0157, a TCMT: its nose arc spans 120°): the X DRO,
+# set on the knurl's crests at touch, reads the nose's inner edge, so the
+# nose's centre is r out. That holds with the chuck-side edge 20°-25° off
+# the face: over 18.4° it clears the cone, under 30° the arc still reaches
+# the OD's inner normal (Op 200 bounds it). The floor flat
 # ends at the centre and the sharp floor-cone corner lies a further
 # r sin t - r (1 - cos t) / tan t = .0026 out. The X DRO figure for the
 # corner Ø .350 is .350 - 2 (.0157 + .0026) = .313. Errors: touch-off and
 # DRO about ±.001 on the floor and rim, the depth ±.0005 (±.003 on the rim),
-# the angle ±0.2° (±.003 on the rim): rim .583-.597, floor .349-.351. The
-# touch-offs go through a .001 cigarette paper, spindle stopped, so the
+# the angle ±0.2° (±.003 on the rim), and the regrip's runout at the one
+# crest touched (a 3-jaw over shim, not on record) moves both the floor and
+# rim with it: so both are gauged after the cone (Op 220), the rim with the
+# calipers' inside jaws laid flat on the faced rim, stopping on its edge.
+# The touch-offs go through a .001 cigarette paper, spindle stopped, so the
 # finished knurl and rim take no witness.
 recess_corner_x_dro_in = 0.313
 # The floor's caliper cross-check: calipers flat on the floor stop where its
@@ -396,7 +403,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Turn the toolpost so the AR's chuck-side edge is 20° or more off the face; lock it and zero the compound's dial. Spindle stopped, through a .001 cigarette paper: AR on the faced rim, set DRO Z to +.001; AR on the knurl, the chuck rocked by hand until the paper drags hardest (a crest), set the X DRO (on diameter) to D0 + .002, D0 from Op 50. The compound now moves only in Op 220."
+instruction = "Turn the toolpost so the AR's chuck-side edge is 20°–25° off the face (never past 30°: the nose's inner point must still touch the crest); lock it and zero the compound's dial. Spindle stopped, through a .001 cigarette paper: AR on the faced rim, set DRO Z to +.001; AR on the knurl, the chuck rocked by hand until the paper drags hardest (a crest), set the X DRO (on diameter) to D0 + .002, D0 from Op 50. The compound now moves only in Op 220."
 feed = "hand"
 
 [[setups.operations]]
@@ -421,12 +428,12 @@ instruction = "Dish cone, carriage still locked: each pass, from a start on the 
 settings = "lathe-ar-c360"
 feed = "hand"
 cut_diameter_mm = "{{cad.recess_dia_mm}}"
-inspection = "One clean cone from the floor's corner to the face. Floor, calipers' inside jaws flat on it: {{process.floor_flat_read_min_in:.3dot}}–{{process.floor_flat_read_max_in:.3dot}} (they stop where the flat ends, .005 inside the Ø{{cad.recess_floor_dia_min_in:.2dot}}–{{cad.recess_floor_dia_max_in:.2dot}} corner). The rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}} is held by the corner's DRO figure, the depth and the compound's angle (about ±.007), not gauged."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.recess_floor_dia_band_mm}}" }]
+inspection = "One clean cone from the floor's corner to the face. Rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}}: calipers' inside jaws laid flat on the faced rim, opened until they stop on its edge. Floor: the jaws flat on it, {{process.floor_flat_read_min_in:.3dot}}–{{process.floor_flat_read_max_in:.3dot}} (they stop where the flat ends, .005 inside the Ø{{cad.recess_floor_dia_min_in:.2dot}}–{{cad.recess_floor_dia_max_in:.2dot}} corner)."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.recess_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.recess_floor_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Compound not reading {{process.compound_check_rise_in:.3dot}} (Op 190): reset it before any touch-off. A step at the floor's corner, or the cone not meeting the face: repeat the last cone pass from Ø{{process.recess_corner_x_dro_in:.3dot}}. Depth or corner off its DRO figure: recut the floor there before the cone. Floor reading outside {{process.floor_flat_read_min_in:.3dot}}–{{process.floor_flat_read_max_in:.3dot}} after the cone (Op 220): scrapped; make another from Setup 1."
+instruction = "Compound not reading {{process.compound_check_rise_in:.3dot}} (Op 190): reset it before any touch-off. A step at the floor's corner, or the cone not meeting the face: repeat the last cone pass from Ø{{process.recess_corner_x_dro_in:.3dot}}. Depth or corner off its DRO figure: recut the floor there before the cone. Rim or floor under its band (Op 220): face the floor out by the shortfall and repeat the last cone pass from there; over: scrapped."
 feed = "hand"
 
 [[setups.operations]]
