@@ -107,23 +107,22 @@ tap_chase_mark_in = 0.40
 # ends at the centre and the sharp floor-cone corner lies a further
 # r sin t - r (1 - cos t) / tan t = .0026 out. The X DRO figure for the
 # corner Ø .350 is .350 - 2 (.0157 + .0026) = .313. Errors: touch-off and
-# DRO about ±.001 on the floor and rim, the depth ±.0005 (±.003 on the rim),
-# the angle ±0.2° (±.003 on the rim), and the regrip's runout at the one
-# crest touched (a 3-jaw over shim, not on record) moves both the floor and
-# rim with it: so the floor is calipered after the cone (Op 220) and the rim
-# taken from it (no named tool registers on the rim's edge).
+# DRO about ±.001 on the corner and rim, the regrip's runout at the one
+# crest touched ±.001 (Op 190 trues it to .001 TIR), the depth ±.0005
+# (±.003 on the rim), the angle ±0.2° (±.003 on the rim): worst case the
+# corner .346-.354 and the rim .582-.598, inside the drawing's .34-.36 and
+# .58-.60. Neither is gauged: no named tool registers on the rim's edge,
+# and calipers on the floor ride the shallow wall (a contact .001 up reads
+# .006 large), so the floor reading is only a gross check.
 # The touch-offs go through a .001 cigarette paper, spindle stopped, so the
 # finished knurl and rim take no witness.
 recess_corner_x_dro_in = 0.313
-# The floor's caliper acceptance: calipers flat on the floor stop where its
-# flat ends, at the nose's centre, .005 inside the corner on the diameter
-# (.345 for the Ø .350 corner). The rim is the reading + .005 + 6 × the
-# carriage DRO's .040 depth = reading + .245, within about ±.006 (caliper
-# ±.001, angle ±.003, depth ±.002). A reading of .341-.349 keeps the rim in
-# .586-.594 ±.006 (the drawing's .58-.60) and the corner in .346-.354 (its
-# .34-.36). A wrong nose allowance or regrip runout shows here.
-floor_flat_read_min_in = 0.341
-floor_flat_read_max_in = 0.349
+# The floor's gross check: calipers flat on the floor read about .345 (the
+# flat ends .005 inside the corner), high if they ride the wall. A missed
+# or doubled nose allowance reads about .03 off; .335-.365 passes a good
+# floor and fails those.
+floor_flat_read_min_in = 0.335
+floor_flat_read_max_in = 0.365
 compound_check_travel_in = 0.3
 compound_check_rise_in = 0.095
 cone_compound_travel_in = 0.14
@@ -400,7 +399,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Rechuck the nut by its knurled head over the brass shim wrap, {{process.regrip_grip_in:.2dot}} in in the jaws, as in the Holding line. Swing the compound {{cad.recess_flank_deg:.1f}}° off the cross slide, so feeding it out moves the tool toward the tailstock; set it with the dial indicator on the compound, its plunger on the faced rim just outside the drilled hole: feeding out {{process.compound_check_travel_in:.3dot}} on its dial, the plunger extends {{process.compound_check_rise_in:.3dot}}. Lock it."
+instruction = "Rechuck the nut by its knurled head over the shim wrap, {{process.regrip_grip_in:.2dot}} in in the jaws (Holding line); indicate the crests, the chuck turned by hand, and tap it true to .001 TIR. Swing the compound {{cad.recess_flank_deg:.1f}}° off the cross slide (fed out, the tool goes toward the tailstock); set it with the indicator on the compound, plunger on the faced rim by the drilled hole: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends {{process.compound_check_rise_in:.3dot}}. Lock it."
 inspection = "Compound: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends {{process.compound_check_rise_in:.3dot}}; if not, re-swing and re-indicate before Op 200."
 gauge_checks = "other"
 
@@ -431,12 +430,12 @@ instruction = "Dish cone, carriage still locked: each pass, from a start on the 
 settings = "lathe-ar-c360"
 feed = "hand"
 cut_diameter_mm = "{{cad.recess_dia_mm}}"
-inspection = "One clean cone from the floor's corner to the face. Floor, calipers' inside jaws flat on it: {{process.floor_flat_read_min_in:.3dot}}–{{process.floor_flat_read_max_in:.3dot}} (where the flat ends, .005 inside the corner). The rim, the floor reading + .245 (.005 + 6 × the DRO's .040 depth), then lies in Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}}."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.recess_floor_dia_band_mm}}" }]
+inspection = "One clean cone from the floor's corner to the face. Floor, calipers' inside jaws flat on it: {{process.floor_flat_read_min_in:.3dot}}–{{process.floor_flat_read_max_in:.3dot}}, a gross check of the X figure. The corner Ø{{cad.recess_floor_dia_min_in:.2dot}}–{{cad.recess_floor_dia_max_in:.2dot}} and the rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}} are held by Op 210's DRO figures and the compound (rim .582–.598), not gauged."
+gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A step at the floor's corner, or the cone not meeting the face: repeat the last cone pass from Ø{{process.recess_corner_x_dro_in:.3dot}}. Depth or corner off its DRO figure: recut the floor there before the cone. Floor reading under {{process.floor_flat_read_min_in:.3dot}} (Op 220): face the floor out by the shortfall and repeat the last cone pass from there; over {{process.floor_flat_read_max_in:.3dot}}: scrapped."
+instruction = "A step at the floor's corner, or the cone not meeting the face: repeat the last cone pass from Ø{{process.recess_corner_x_dro_in:.3dot}}. Depth or corner off its DRO figure: recut the floor there before the cone. Floor reading outside {{process.floor_flat_read_min_in:.3dot}}–{{process.floor_flat_read_max_in:.3dot}} (Op 220): the X figure or its touch-off is wrong: scrapped; check Op 200 before the next."
 feed = "hand"
 
 [[setups.operations]]
