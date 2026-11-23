@@ -622,7 +622,7 @@ feed = "hand"
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Only if the GO pin was refused: still chucked, clear the chips, oil the hole and run the .1240 reamer through once more as before (set 600, the same quill reading); blow out and gauge again."
-inspection = "GO enters and NO-GO does not: go on. GO still refused: reject the arm (the pins cannot show the hole at or over {{cad.latch_pin_hole_dia_min_in:.4dot}}, and a reamer cannot be made to cut larger): stop and tell the owner."
+inspection = "GO enters and NO-GO does not: then the depth as Op 380, and go on. GO still refused: reject the arm (the pins cannot show the hole at or over {{cad.latch_pin_hole_dia_min_in:.4dot}}, and a reamer cannot be made to cut larger): stop and tell the owner."
 gauge_checks = [{ gauge = "zz-pins-1240-1245", band_mm = "{{cad.latch_pin_hole_dia_band_mm}}" }]
 feed = "hand"
 
