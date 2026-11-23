@@ -410,9 +410,12 @@ instruction = "Wait 5 minutes before touching the blank (the maker's glue cures 
 feed = "hand"
 
 [[setups.operations]]
+instruction = "Console M6 T1 (3/8 in end mill, at least 1.00 in out of its collet). Spindle stopped, its end just dragging a .002 feeler leaf, note the machine Z (MPos, mm) on the blank's top 1/2 in in from the R end and from the front edge, then on the bare block 1 in in front of the blank at the same X. The same at the far end."
+feed = "hand"
+
+[[setups.operations]]
 steps = [
-  { kind = "action", text = "Console M6 T1 (3/8 in end mill, at least 1.00 in out of its collet). Spindle stopped, its end just dragging a .002 feeler leaf, note the machine Z (MPos, mm) on the blank's top 1/2 in in from the R end and from the front edge, then on the bare block 1 in in front of the blank at the same X. The same at the far end." },
-  { kind = "action", text = "Each end's stack: its blank reading less its block reading less that end's written thickness (in × 25.4)." },
+  { kind = "action", text = "Each end's tape stack: its blank reading less its block reading less that end's written thickness (in × 25.4)." },
   { kind = "check", text = "Both stacks {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}} ({{process.tape_stack_min_mm:.2f}}–{{process.tape_stack_max_mm:.2f}} mm), and within .002 (0.05 mm) of each other." },
   { kind = "stop", text = "Outside, or the ends differ more: peel the blank off as Setup 3 frees the plate, clean both faces, and tape and bond again from this setup's first op." },
 ]
@@ -428,7 +431,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 X0 and Y0 at K with the edge finder (900 rpm): from +X on the R end, from +Y on the C edge."
-instruction_detailed = "Edge finder (900 rpm) on the blank's R end from +X, at mid-width: G10 L20 P1 X{{process.x_set_mm:.3f}}. On the C edge from +Y, 1/2 in in from the R end: G10 L20 P1 Y{{process.y_set_mm:.3f}}. MDI G0 X−33 (1/2 in in from the far end of the shortest blank), touch the C edge again from +Y and read the work Y."
+instruction_detailed = "Edge finder (900 rpm, in place of T1) on the blank's R end from +X, at mid-width: G10 L20 P1 X{{process.x_set_mm:.3f}}. On the C edge from +Y, 1/2 in in from the R end: G10 L20 P1 Y{{process.y_set_mm:.3f}}. MDI G0 X−33 (1/2 in in from the far end of the shortest blank), touch the C edge again from +Y and read the work Y."
 inspection = "The second C-edge reading within .002 of the first (the blank lies along X). More: peel the blank off as Setup 3 frees the plate, clean both faces, and tape and bond again from this setup's first op."
 gauge_checks = "other"
 feed = "hand"
