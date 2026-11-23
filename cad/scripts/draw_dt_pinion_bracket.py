@@ -562,7 +562,7 @@ requirement(
         "finish_ra": 1,
     },
 )
-# The blind follower seat, flat-bottom reamed into the -X flank
+# The blind follower seat, drilled and end-milled flat-bottom into the -X flank
 # (DIMENSION_CALLOUTS "PinSeatDia": PIN_SEAT_CALLOUT, its bonded fit on the
 # MHA-DT-25 stud and the floor-corner allowance), its .16 depth controlled by
 # Section B-B (SECTION_KEEP "PinSeatDepth"), located .276 above the pivot

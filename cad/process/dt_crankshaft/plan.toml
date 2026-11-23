@@ -160,8 +160,10 @@ slug_face_stickout_mm = 27.94
 # reamer) 2.95 deep (past the inboard neck at 2.89 from the jig face with
 # the 1/8 spacer in), breaking into the 3/8 clearance the jig was made with
 # from its back end for the pinion seat (fixtures.dt-crankshaft-drive-pin-jig).
-# The 27/64 drill (.4219) leaves the reamer .0166: a 7/16 drill cuts about
-# the reamer's own size and would leave it nothing to cut.
+# The 27/64 drill (.4219) leaves the reamer .0166 nominal, a hair over the
+# fleet's .016 (ream_stock_max_mm); a 27/64 cuts a little oversize, so the
+# real stock is inside it. A 7/16 drill cuts about the reamer's own size and
+# would leave it nothing to cut.
 jig_ream_depth_in = 2.95
 # The jig bore over the journals: at most .0025 diametral (the budget's
 # ±1.6 um vertical term), read with the telescoping gauge and micrometer;

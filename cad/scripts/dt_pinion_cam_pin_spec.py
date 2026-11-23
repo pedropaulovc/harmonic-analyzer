@@ -15,7 +15,6 @@ from _gtol_cylinder import CylinderFace
 from _package_units import drawing_unit
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_pinion_bracket_geometry import PIN_BORE as SEAT_DIA
-from dt_pinion_bracket_spec import PIN_SEAT_DIA_BAND as SEAT_BAND
 from dt_pinion_cam_pin_geometry import (
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
@@ -23,6 +22,10 @@ from dt_pinion_cam_pin_geometry import (
     PIN_LEN as PIN_LEN,
     SEAT_LEN as SEAT_LEN,
 )
+# The strap's seat band (dt_pinion_bracket_spec.PIN_SEAT_DIA_BAND), restated
+# so this closure stays off the strap spec; the drawing test pins the two
+# equal.  Owner ruling 2026-11-23, tool audit Q8: .157 +.003/0.
+SEAT_BAND = (0.0762, 0.0)
 
 # #290: the registry row's drawing_unit (in) is this sheet's unit.
 UNIT = drawing_unit("parts/dt-pinion-cam-pin", _config.parts("dt-pinion-cam-pin"))

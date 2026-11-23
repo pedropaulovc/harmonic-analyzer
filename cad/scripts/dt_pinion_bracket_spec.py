@@ -44,8 +44,9 @@ from dt_pinion_bracket_geometry import (
 import dt_vn_pinion_strap_pin_spec as _strap_pin
 
 # --- Tolerance bands.  Only the three fitted bores and the cross hole carry
-# one, and each traces to a NAMED fit class in ``_fit_ream_h7`` or
-# ``_fit_ream_slide`` or to the spring pin's own window; every other feature is
+# one: the two running bores trace to ``_fit_ream_slide``, the bonded seat to
+# the owner's .157 +.003/0 (tool audit Q8, 2026-11-23), the cross hole to the
+# spring pin's own window; every other feature is
 # governed by its decimal places against the title block's general grades.
 # The strap's former per-part numbers (a +/-0.10 bore centre distance, +/-0.05
 # on the seat axis and through-thickness station, +/-0.05 on the bar thickness
@@ -95,7 +96,7 @@ CROSS_HOLE_BAND = _strap_pin.HOLE_BAND
 # title block's loose .XX grid at .36 (rules 3 and 17: the wall is fixed with
 # geometry, not a tighter band; Codjiflo on #2106).  The far face then sees
 # the thinnest bar less the station at its upper limit, the seat's
-# upper-limit radius and the 0.05 drilled-hole allowance: .084 in, over the
+# upper-limit radius and the 0.05 drilled-hole allowance: .083 in, over the
 # .080 target.  The near face clears it too.
 _SEAT_STATION_LOWER, _SEAT_STATION_UPPER = printed_deviations(
     THICKNESS / 2.0, 3, unit=UNIT

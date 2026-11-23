@@ -2,8 +2,7 @@ r"""Pure-data dimensional contract shared by the cone gear shaft and drawing."""
 
 from __future__ import annotations
 
-import math
-
+import _config
 import cone_land_key
 import cone_line
 import cone_tip_cluster
@@ -56,13 +55,26 @@ def inch_text(value_mm: float, places: int) -> str:
 # its SHAFT_H band: owner ruling 2026-11-23, tool audit Q11, "both journals
 # .4375 0/-.0008" (it was .4825 in a .483 +.0010/+.0005 bore).
 JOURNAL_BORE_DIA = dt_cone_pivot_post_spec.BORE_DIA
-JOURNAL_CLEARANCE = 0.0254
+# As MHA-DT-11's journals in the same bore (dt_crankshaft_spec): the class's
+# least clearance from the bore's least size.
+_RUNNING_CLEARANCE = tuple(_config.fit("shaft_in_bushing")["diametral_clearance_mm"])
+JOURNAL_CLEARANCE = _RUNNING_CLEARANCE[0] - POST_JOURNAL_BORE_BAND[1]
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
 # Actual limits for this post/shaft pair, not an intended common clearance.
 JOURNAL_DIAMETRAL_CLEARANCE_MM = (
     JOURNAL_BORE_DIA + POST_JOURNAL_BORE_BAND[1] - JOURNAL_DIA - RUNNING_DIA_BAND[0],
     JOURNAL_BORE_DIA + POST_JOURNAL_BORE_BAND[0] - JOURNAL_DIA - RUNNING_DIA_BAND[1],
 )
+if not (
+    _RUNNING_CLEARANCE[0] - 1e-9
+    <= JOURNAL_DIAMETRAL_CLEARANCE_MM[0]
+    <= JOURNAL_DIAMETRAL_CLEARANCE_MM[1]
+    <= _RUNNING_CLEARANCE[1] + 1e-9
+):
+    raise ValueError(
+        f"cone journal clearance {JOURNAL_DIAMETRAL_CLEARANCE_MM} leaves the "
+        f"shaft_in_bushing class {_RUNNING_CLEARANCE}"
+    )
 JOURNAL_END = 43.18  # 1.70
 JOURNAL_PROUD = JOURNAL_END - dt_cone_pivot_post_spec.CONE_BOSS_LENGTH
 if not 1.0 <= JOURNAL_PROUD <= 1.5:

@@ -525,7 +525,7 @@ def context(
 
     # Both straps along the blank's centre line, end to end; the saw cuts
     # across each bridge on a line saw_offset_mm past the arbor end's apex,
-    # its kerf on the line's far side from the strap (the plan's Op 150).
+    # its kerf on the line's far side from the strap (the plan's saw cut, Setup 3).
     first, pitch = p["first_pivot_mm"], p["part_pitch_mm"]
     pivot_xs = (first, first + pitch)
     for k, x in enumerate(pivot_xs, 1):
