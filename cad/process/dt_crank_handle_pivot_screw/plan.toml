@@ -5,16 +5,16 @@
 # ruling 2026-11-23 (tool audit Q6): "B. End-mill the pocket with the owned
 # 1/4 carbide end mill and turn the MHA-DT-32 head to it (pocket less .012
 # +/-.004); no boring bar." The cup's traveler pins its pocket and tags the
-# reading D (the largest minus pin that enters, true size D -.0002 to
-# D +.001, accepted .248-.253); the head is turned to the larger of .231 and
-# D -.015, up to the smaller of .241 and D -.009, aimed at D -.012 (inside
-# that window for every accepted D), so the true clearance stays inside
+# reading C (the largest minus pin that enters, true size C -.0002 to
+# C +.001, accepted .248-.253); the head is turned to the larger of .231 and
+# C -.015, up to the smaller of .241 and C -.009, aimed at C -.012 (inside
+# that window for every accepted C), so the true clearance stays inside
 # drawing note 1 of MHA-DT-35 (.008-.016) and the head inside its own
 # Ø.231-.241.
 #
 # - Bench: measure the bonded handle (MHA-DT-08 with MHA-DT-34 and -35) for
 #   the shoulder's length (drawing note 1: the measured stack plus .010-.040
-#   end play); copy D off the cup's tag and work out the head's window.
+#   end play); copy C off the cup's tag and work out the head's window.
 # - Saw a blank. Lathe, 3-jaw, the tip end out on the tailstock dead centre
 #   ("CENTRE OK" at the tip): turn the head's diameter to the window over the
 #   whole length out of the jaws, the Ø.155 shoulder to the under-head
@@ -95,7 +95,7 @@ turn_feed_mm_rev = 0.0508
 # The head's diameter turned over the whole stickout, to the part-off and
 # .8 mm past the blade: Z of its end (the drawn screw).
 head_turn_end_z_mm = -69.0
-# Aims, mm: the head at D - .012 for a pocket read at the end mill's 1/4
+# Aims, mm: the head at C - .012 for a pocket read at the end mill's 1/4
 # (.250 - .012 = .238; the operator aims at the H written in Op 20, the
 # turning checks take this one), the shoulder .001 under the top
 # of its band (a running fit; cad.shoulder_dia's nominal is the band's top),
@@ -202,8 +202,8 @@ inspection = "M {{process.m_min_in:.2dot}}–{{process.m_max_in:.2dot}} (the bla
 gauge_checks = [{ gauge = "calipers", band_mm = [50.038, 55.88] }]
 
 [[setups.operations]]
-instruction = "Work out and write on this sheet: the shoulder's length L = M + {{process.end_play_aim_in:.3dot}}, and its band M + {{process.end_play_min_in:.3dot}} to M + {{process.end_play_max_in:.3dot}}; the under-head station U = {{process.seat_z_in:.3dot}} + L from the tip; the part-off station P = U + {{cad.head_length_in:.3dot}}; the blank B = P + {{process.blank_over_p_in:.2dot}}; the stickout S = P + {{process.stickout_over_p_in:.2dot}}. Copy D, the butt cup's pocket reading, off its tag (MHA-DT-35 Op 100). Write the head's window: low = the larger of {{cad.head_dia_min_in:.3dot}} and D − .015, high = the smaller of {{cad.head_dia_max_in:.3dot}} and D − .009; and its aim H = D − .012."
-inspection = "D .248–.253 on the tag (H then lies inside the window); any other D: stop, the cup is not as its traveler accepts it. The window keeps the head in its drawn Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}} and its clearance in the cup's pocket inside MHA-DT-35 note 1's .008–.016."
+instruction = "Work out and write on this sheet: the shoulder's length L = M + {{process.end_play_aim_in:.3dot}}, and its band M + {{process.end_play_min_in:.3dot}} to M + {{process.end_play_max_in:.3dot}}; the under-head station U = {{process.seat_z_in:.3dot}} + L from the tip; the part-off station P = U + {{cad.head_length_in:.3dot}}; the blank B = P + {{process.blank_over_p_in:.2dot}}; the stickout S = P + {{process.stickout_over_p_in:.2dot}}. Copy C, the butt cup's pocket reading, off its tag (MHA-DT-35 Op 100). Write the head's window: low = the larger of {{cad.head_dia_min_in:.3dot}} and C − .015, high = the smaller of {{cad.head_dia_max_in:.3dot}} and C − .009; and its aim H = C − .012."
+inspection = "C .248–.253 on the tag (H then lies inside the window); any other C: stop, the cup is not as its traveler accepts it. The window keeps the head in its drawn Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}} and its clearance in the cup's pocket inside MHA-DT-35 note 1's .008–.016."
 gauge_checks = "other"
 
 [[setups]]
