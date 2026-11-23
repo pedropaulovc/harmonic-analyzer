@@ -369,7 +369,7 @@ instruction = "Inner frame parallel to the axis: bring the carriage up until the
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms (they reach .19 either side of the pivot)."
+instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms (they reach .19 either side of the pivot). Any touch: the offcut stands short; chuck it again {{process.end_stickout_in:.2dot}} in out of the jaw fronts on the rule and repeat from Op 200."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -393,7 +393,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A step where it meets the bar (too round): move the bit out a little; a ridge there (too flat): move it in. Face the dome off (Op 200) and repeat Ops 210–280. Once it passes, leave the bit's set screw alone until the rod's dome is cut."
+instruction = "A step where it meets the bar (too round): loosen the bit's set screw and set the tip .005 further out on the depth rod; a ridge there (too flat): .005 further in; tighten. Draw the offcut out to {{process.end_stickout_in:.2dot}} in again, face the dome off (Op 200), chamfer (Op 210), then repeat Ops 240–280. Under .30 in left in the jaws: saw a new trial offcut. Once it passes, leave the set screw alone until the rod's dome is cut."
 
 [[setups]]
 machine_kind = "lathe"
@@ -442,7 +442,7 @@ instruction = "Ball turner in its holder, bit as set in Op 230 (set screw untouc
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: cross slide out until the bit clears the end through the whole sweep. Swing the frame through it and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms."
+instruction = "Spindle stopped: cross slide out until the bit clears the end through the whole sweep. Swing the frame through it and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms. Any touch: unlock the carriage, chuck the rod again with the faced plane {{process.end_stickout_in:.2dot}} in out of the jaw fronts on the rule and repeat from Op 340."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -462,6 +462,7 @@ instruction = "Between the last sweeps, spindle stopped, look at the apex under 
 cut_kind = "other"
 instruction = "Spindle stopped: look at the dome under the loupe and draw a fingernail over where it meets the body."
 inspection = "No pip, flat or ring at the apex; no step or ridge where the dome meets the body."
+gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"

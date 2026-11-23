@@ -432,7 +432,7 @@ instruction = "Inner frame parallel to the axis: bring the carriage up until the
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms (they reach .19 either side of the pivot)."
+instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms (they reach .19 either side of the pivot). Any touch: the offcut stands short; chuck it again {{process.end_stickout_in:.2dot}} in out of the jaw fronts on the rule and repeat from Op 250."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -456,7 +456,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Light at the leaf's ends (dome too round): move the bit out a little; light at its middle, or a ridge at the O.D. (too flat): move it in. Face the dome off (Op 250) and repeat Ops 260–330. Once it passes, leave the bit's set screw alone until the lever's tip is cut."
+instruction = "Light at the leaf's ends (too round): loosen the bit's set screw and set the tip .005 further out on the depth rod; light at its middle, or a ridge at the O.D. (too flat): .005 further in; tighten. Draw the offcut out to {{process.end_stickout_in:.2dot}} in again, face the dome off (Op 250), chamfer (Op 260), then repeat Ops 290–330. Under .30 in left in the jaws: saw a new trial offcut. Once it passes, leave the set screw alone until the lever's tip is cut."
 
 [[setups]]
 machine_kind = "lathe"
@@ -505,7 +505,7 @@ instruction = "Ball turner in its holder, bit as set in Op 280 (set screw untouc
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: cross slide out until the bit clears end A through the whole sweep. Swing the frame through it and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms."
+instruction = "Spindle stopped: cross slide out until the bit clears end A through the whole sweep. Swing the frame through it and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms. Any touch: unlock the carriage, chuck the lever again with end A's faced plane {{process.end_stickout_in:.2dot}} in out of the jaw fronts on the rule and repeat from Op 390."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -523,13 +523,13 @@ instruction = "Between the last sweeps, spindle stopped, look at the apex under 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: look at the tip under the loupe, then hold the {{cad.dome_datum_form_radius_in:fraction}} radius leaf square across it through the axis, at two places 90° apart, against a light."
-inspection = "No pip, flat or ring at the tip; no step or ridge where the tip meets the rod; no light under the {{cad.dome_datum_form_radius_in:fraction}} leaf."
+instruction = "Spindle stopped: look at the tip under the loupe and draw a fingernail over where it meets the rod. Its radius is the trial's (SR{{cad.dome_datum_radius_ref_in:.3dot}} REF), not re-gauged here."
+inspection = "No pip, flat or ring at the tip; no step or ridge where the tip meets the rod."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A flat at the tip: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 410), then Op 430 again. A ring or point at the tip, a step or ridge at the rod, or light under the leaf: scrap the lever and make another from Setup 1."
+instruction = "A flat at the tip: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 410), then Op 430 again. A ring or point at the tip, or a step or ridge at the rod: scrap the lever and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
