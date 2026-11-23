@@ -489,15 +489,25 @@ def context(
         if not low - SIZE_TOL_MM <= d43 <= high:
             raise ValueError(f"#43 Ø{d43} is outside {tap['name']}'s band {tap['dia']}")
     step_max = p["face_stepover_max_mm"]
-    face_cuts = ("underside", "height", "front face", "depth", "left end", "right end")
+    # The four faces run at one setting and the two ends at another: the
+    # ends' depth lies past the faces' measured envelope (plan.toml).
     face_rpm, face_feed = _setting(plan, shop, "underside")
-    for name in face_cuts:
-        if not math.isclose(_cut(plan, name, "cutter_dia_mm"), em, abs_tol=1e-6):
-            raise ValueError(
-                f"'{name}' cutter Ø{_cut(plan, name, 'cutter_dia_mm')}, the end mill is Ø{em}"
-            )
-        if _setting(plan, shop, name) != (face_rpm, face_feed):
-            raise ValueError(f"'{name}' runs at another setting than 'underside'")
+    end_rpm, end_feed = _setting(plan, shop, "left end")
+    for names, first, speeds in (
+        (
+            ("underside", "height", "front face", "depth"),
+            "underside",
+            (face_rpm, face_feed),
+        ),
+        (("left end", "right end"), "left end", (end_rpm, end_feed)),
+    ):
+        for name in names:
+            if not math.isclose(_cut(plan, name, "cutter_dia_mm"), em, abs_tol=1e-6):
+                raise ValueError(
+                    f"'{name}' cutter Ø{_cut(plan, name, 'cutter_dia_mm')}, the end mill is Ø{em}"
+                )
+            if _setting(plan, shop, name) != speeds:
+                raise ValueError(f"'{name}' runs at another setting than '{first}'")
     for name in ("underside", "height", "front face", "depth"):
         if not math.isclose(_cut(plan, name, "radial_woc_mm"), step_max, abs_tol=1e-6):
             raise ValueError(
@@ -672,6 +682,31 @@ def context(
     face_x = (run_x[0] - r - APPROACH_MM, run_x[1] + r + APPROACH_MM)
     square_ys = _stations((-section, 0.0), r, step_max)
     rail_ys = _stations((-height, 0.0), r, step_max)
+    # The faces' declared cut is the deepest level and the widest pass any
+    # of them takes: every level of a face is one equal step, every pass one
+    # equal width (the first engages its width, the cutter overhanging the
+    # edge; the last ends FACE_OVERHANG_MM past the other edge).
+    widest = max(
+        (y[1] - y[0] + FACE_OVERHANG_MM) / len(ys)
+        for y, ys in (((-section, 0.0), square_ys), ((-height, 0.0), rail_ys))
+    )
+    if not math.isclose(widest, step_max, abs_tol=PLAN_TOL_MM):
+        raise ValueError(
+            f"the widest face pass is {widest:.4f}, not process.face_stepover_max_mm"
+        )
+    deepest = max(
+        top - levels[0]
+        for levels, top in (
+            (under_levels, under_skim),
+            (height_levels, height_top),
+            (front_levels, front_skim),
+            (depth_levels, depth_top),
+        )
+    )
+    if not math.isclose(deepest, level_max, abs_tol=PLAN_TOL_MM):
+        raise ValueError(
+            f"the deepest face level is {deepest:.4f}, not process.face_step_max_mm"
+        )
     faces = {
         "underside": (
             under_levels,
@@ -709,6 +744,9 @@ def context(
     jobs.append(
         {
             **em_tool,
+            "rpm": end_rpm,
+            "feed": end_feed,
+            "plunge": end_feed,
             "frame": "depth",
             "label": "ends",
             "stock": stocks["ends"],
@@ -877,7 +915,7 @@ def context(
                 "loads_first": True,
             },
         ],
-        [name, "spindle", {"rpm": [[face_rpm], [spot_rpm], [drill_rpm]]}],
+        [name, "spindle", {"rpm": [[end_rpm], [spot_rpm], [drill_rpm]]}],
         [name, "pauses", {"z_top": depth, "count": 0}],
         [name, "depth", {"z_min": _r(tip)}],
     ]

@@ -120,6 +120,12 @@ plate_thickness_mm = 2.9972
 pocket_b_floor_mm = 5.3213
 pocket_a_floor_mm = 5.3086
 face_removal_max_mm = 0.3048
+# Face B's widest bite: the measured face setting
+# (settings.em-half-carbide-1018-v5-face, dechatter v5, 2026-11-22: stable to
+# 3.4 mm wide at up to 1.27 mm deep; cad/config/shop-equipment/
+# measured-cuts.toml). CL01's first row takes exactly this much, every later
+# row its even share of the rest (cam.py checks every pass).
+face_stepover_max_mm = 3.4
 # Holding (shop workholding.vise-pm-6): the spoil plate (1/2 in 6061, 3.9 x
 # 6 in, its top faced) on two 1 in parallels (fixtures.parallels-lms-6745),
 # one against each jaw; the blanks on the plate, gripped by their edges.
@@ -233,9 +239,12 @@ root_level_max_mm = 0.5588
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set at least 1 in out of the collet; 1/8
-# in end mill, 1-1/2 in overall: at least .75 in out.
-half_mill_projection_min_mm = 25.4
+# 1/2 in end mill, 3 in overall: set 1.10 in out of the collet, the tool
+# assembly the dechatter cuts were measured with (cad/config/shop-equipment/
+# measured-cuts.toml; owner, Pedro, 2026-11-22: "stickout is recorded as 30mm
+# but is actually 27.94"); 1/8 in end mill, 1-1/2 in overall: at least .75 in
+# out.
+half_mill_projection_mm = 27.94
 eighth_mill_projection_min_mm = 19.05
 # ASME B94.11M jobber, D: 4 in overall; the reamer bounded by 6 in.
 drill_d_oal_mm = 101.6
@@ -339,7 +348,7 @@ beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.blank_length_m
 
 [[setups.operations]]
 instruction = "Every lot, before the first load: Home ($H); console M6 T1. Clamp the new spoil plate alone on the parallels and face its top .005, once."
-instruction_detailed = "Home the mill ($H). Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Clamp the new spoil plate alone across the jaws on the parallels, its LEFT edge to the left. Set 2650 and face its top .005 by hand jog in overlapping passes, once: a second facing could lift the jaws' top over the band below."
+instruction_detailed = "Home the mill ($H). Console M6 T1 (1/2 in end mill, 1.10 in out of the collet; the tool setter measures it). Clamp the new spoil plate alone across the jaws on the parallels, its LEFT edge to the left. Set 2650 and face its top .005 by hand jog in overlapping passes, once: a second facing could lift the jaws' top over the band below."
 feed = "hand"
 
 [[setups.operations]]
@@ -381,10 +390,10 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CL01_face_b (M6 T1; set 2650): face B of all four blanks to {{process.hub_thickness_mm:in.4dot}} above the spoil plate in one level, zigzag rows along X, at most {{process.face_removal_max_mm:in.3dot}} deep."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run CL01_face_b (M6 T1; set 2370): face B of all four blanks to {{process.hub_thickness_mm:in.4dot}} above the spoil plate in one level, zigzag rows along X at most {{process.face_stepover_max_mm:in.3dot}} apart, at most {{process.face_removal_max_mm:in.3dot}} deep."
+settings = "em-half-carbide-1018-v5-face"
 milling_cuts = [
-  { name = "face b", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_removal_max_mm}}", radial_woc_mm = 7.62, traverse_mm = [0, "{{process.blank_length_min_mm}}"] },
+  { name = "face b", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_removal_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.blank_length_min_mm}}"] },
 ]
 
 [[setups.operations]]
@@ -401,6 +410,13 @@ feed = "hand"
 instruction = "Only after the Z0 correction: unclamp, mic the same blank again near its left end, write this reading over H, put it back flush and clamp again."
 inspection = "Hub thickness {{cad.hub_far_face_length_min_in:.4dot}}–{{cad.hub_far_face_length_max_in:.4dot}}: on to CL02_pocket_b. Still outside: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.hub_far_face_length_band_mm}}" }]
+
+# Not measured: owner (Pedro), 2026-11-22, on full-width passes: "same log
+# new dechatter issues to try full radial depth but shallow axial" (#3428).
+# CL02's cuts stay as they are, on the chart setting; this stop flags them.
+[[setups.operations]]
+instruction = "First load only: these CL02_pocket_b cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): rough levels .028 deep x {{process.face_cutter_dia_mm:in.3dot}} wide, finish level {{process.pocket_finish_mm:in.3dot}} deep x {{process.face_cutter_dia_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+feed = "hand"
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -545,7 +561,7 @@ machine_ref = "pm-30mv"
 holding = "Take the load's four blanks as left by Setup 2 (side B done, deburred, kept in their order) and turn them over together as one stack about its length (A up, B on the spoil plate): the blank that was against the fixed jaw now lies against the moving jaw; numbers still at the left ends. Back on the spoil plate, left ends flushed as in Setup 2 (the 1-2-3 block's 3 in edge set twice, overlapping, against the spoil plate's left edge; all four ends felt flush). Tap the blanks down while closing the vise."
 datum = "Program CL05_pocket_a (T1, T2). G54: X0 the left end of the blank against the fixed jaw (picked up again on every load), Y0 the noted Setup 2 Y shifted by this load's width (op below), Z0 unchanged."
 diagram = { file = "diagrams/side_a_pocket.svg", alt = "The load turned over as one stack, A up, on the spoil plate, the blanks still whole rectangles (the outline comes in Setup 4); what this setup cuts is hatched: each blank's 1/2 in slot along its centre line from past the right end to the hub with its arc round the hub at ±26°, and the two 1/8 in rings round the hub at ±55°, to the web's far face. The bore and holes from Setup 2 show through. A 2.5 x detail shows one hub." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.hub_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", -0.254], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}", 50.8], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.hub_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", -0.254], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}", 50.8], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = 101.6, along_jaws_mm = "{{process.blank_length_min_mm}}", part_height_mm = "{{process.hub_thickness_mm}}", parallel_height_mm = "{{process.support_height_mm}}", overhang_mm = ["{{process.jaw_start_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.blank_length_min_mm}}"], supports_mm = ["{{process.jaw_start_mm}}", "{{process.jaw_end_mm}}"], section_mm = { y = "{{process.frame_strips_width_mm}}", z = "{{process.hub_thickness_mm}}" } }
 
@@ -571,6 +587,13 @@ feed = "hand"
 [[setups.operations]]
 instruction = "First load only: prove CL05_pocket_a in air, Z0 raised 1.000 in, through each M6. Then Z0 back."
 instruction_detailed = "Send $# and note the G54 line's Z now. G10 L2 P1 Z(that Z + 25.400). Run CL05_pocket_a in air through each M6. G10 L2 P1 Z(the Z noted in this op) puts Z0 back."
+feed = "hand"
+
+# Not measured: owner (Pedro), 2026-11-22, on full-width passes: "same log
+# new dechatter issues to try full radial depth but shallow axial" (#3428).
+# CL05's cuts stay as they are, on the chart setting; this stop flags them.
+[[setups.operations]]
+instruction = "First load only: these CL05_pocket_a cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): rough levels .028 deep x {{process.face_cutter_dia_mm:in.3dot}} wide, finish level {{process.pocket_finish_mm:in.3dot}} deep x {{process.face_cutter_dia_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
 feed = "hand"
 
 [[setups.operations]]

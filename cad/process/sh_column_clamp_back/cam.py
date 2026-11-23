@@ -125,6 +125,10 @@ JAW_DEPTH_MM = IN
 PARALLEL_LENGTH_MM = 4 * IN
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
+# The pair bore's shop setting: the chart record for the 1/2 in carbide end
+# mill in 1018, which its authored rpm and feed follow (the bore's cuts lie
+# outside the measured face envelope; the faces run on the measured one).
+BORE_SETTING = "endmill-carbide-3fl-1-2-1018-cf"
 
 
 def _plan_operations(plan: dict[str, Any]):
@@ -486,8 +490,16 @@ def context(
     ):
         if not math.isclose(_cut(plan, name, "axial_doc_mm"), doc, abs_tol=1e-6):
             raise ValueError(f"'{name}' axial_doc_mm is not its skim")
-    if _op_with_cut(plan, "face off")[1]["axial_doc_mm"] != "{{cad.grip_offset_mm}}":
-        raise ValueError("'face off' axial_doc_mm is not {{cad.grip_offset_mm}}")
+    # The face-off's depth: the plan restates the export's grip offset as a
+    # process parameter (the measured envelope reads plan numbers only).
+    if not math.isclose(p["grip_offset_mm"], g["grip"], abs_tol=1e-6):
+        raise ValueError(
+            f"process.grip_offset_mm {p['grip_offset_mm']:g} is not the export's grip offset {g['grip']:g}"
+        )
+    if not math.isclose(
+        _cut(plan, "face off", "axial_doc_mm"), g["grip"], abs_tol=1e-6
+    ):
+        raise ValueError("'face off' axial_doc_mm is not process.grip_offset_mm")
     level_max = p["face_step_max_mm"]
     length_levels = _levels(upright_top, width, level_max)
     height_levels = _levels(bottom_level, height, level_max)
@@ -658,14 +670,19 @@ def context(
         _cut(plan, "bore rough", "axial_doc_mm"), p["helix_pitch_mm"], abs_tol=1e-6
     ):
         raise ValueError("'bore rough' axial_doc_mm is not process.helix_pitch_mm")
-    # The bore's feeds: the setting's chip load holds at the cutter's edge,
-    # which runs (r_rough + r)/r_rough faster than its centre on the helix.
-    bore_feed = face_feed * r_rough / (r_rough + r)
+    # The bore's feeds: the chart setting's chip load holds at the cutter's
+    # edge, which runs (r_rough + r)/r_rough faster than its centre on the
+    # helix. The bore lies outside the measured face envelope, so it keeps
+    # the chart setting the faces ran on before they were measured.
+    chart = shop["settings"][BORE_SETTING]
+    bore_rpm = float(chart["rpm"])
+    chart_feed = chart["chip_load_mm_per_tooth"] * chart["flutes"] * bore_rpm
+    bore_feed = chart_feed * r_rough / (r_rough + r)
     _agree(plan, "bore_feed_per_min_mm", bore_feed)
     for name in ("bore rough", "bore finish", "bore open"):
-        if _setting(plan, shop, name) != (face_rpm, p["bore_feed_per_min_mm"]):
+        if _setting(plan, shop, name) != (bore_rpm, p["bore_feed_per_min_mm"]):
             raise ValueError(
-                f"'{name}' does not run at {face_rpm:g} rpm and process.bore_feed_per_min_mm"
+                f"'{name}' does not run at {bore_rpm:g} rpm and process.bore_feed_per_min_mm"
             )
     # The pair's holding: a parallel under each outside face's band behind
     # the bore, the back's stopped short of it along the jaws; a 1-2-3 block
@@ -709,7 +726,7 @@ def context(
         "feed": face_feed,
         "plunge": face_feed,
     }
-    bore_tool = {**em_tool, "feed": bore_feed, "plunge": bore_feed}
+    bore_tool = {**em_tool, "rpm": bore_rpm, "feed": bore_feed, "plunge": bore_feed}
     spot_tool = {
         "tool": "spot",
         "dia": CENTRE_DRILL["body_mm"],
@@ -1107,7 +1124,7 @@ def context(
                 "tool_changes",
                 {"z_top": bore_top, "tools": [tn["em-half"]], "loads_first": True},
             ],
-            [name, "spindle", {"rpm": [[face_rpm]]}],
+            [name, "spindle", {"rpm": [[bore_rpm]]}],
             [name, "pauses", {"z_top": bore_top, "count": 0}],
             [name, "depth", {"z_min": _r(bore_bottom)}],
             [

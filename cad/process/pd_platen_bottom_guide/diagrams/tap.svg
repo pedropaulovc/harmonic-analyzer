@@ -29,5 +29,5 @@
   <line class="dims" x1="370" y1="276" x2="390" y2="276"/>
   <text class="label" x="395" y="248">point {{process.tap_point_depth_mm:in.3dot}} below R</text>
   <line class="leader" x1="231" y1="280" x2="231" y2="410"/>
-  <text class="label" x="225" y="422" text-anchor="end">the point stands below F here, in the air</text>
+  <text class="label" x="237" y="422">the point stands below F here, in the air</text>
 </svg>

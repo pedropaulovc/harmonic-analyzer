@@ -253,6 +253,19 @@ def context(
             f"process.blank_thickness_min_in: face 1 roughs at Z {z1:.3f}, so a {b_min:.3f} mm blank "
             f"loses only {b_min - z1:.3f} mm there (< {FACE_SKIN_MIN_MM} mm): it may not clean up"
         )
+    # The face cuts' declared depths (process parameters, so the measured
+    # setting's envelope can be proved from the plan) are their deepest cuts:
+    # rough, the thickest blank's first face or the second face, whichever is
+    # deeper; finish, the finish stock on either face.
+    for name, deepest in (
+        ("face rough", max(b_max - z1, z1 - z2)),
+        ("face finish", max(z2 - z3, z3 - thick)),
+    ):
+        declared = _cut(plan, name, "axial_doc_mm")
+        if not math.isclose(declared, deepest, abs_tol=1e-3):
+            raise ValueError(
+                f"'{name}' axial_doc_mm {declared:g} is not its deepest cut, {deepest:.4f}"
+            )
     # The faces overhang the fence, the clamps and the end stop: all must
     # stand below the lowest faced top.
     for name in ("fence_height_mm", "clamp_height_mm", "end_stop_height_mm"):

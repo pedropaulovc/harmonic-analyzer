@@ -134,6 +134,12 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("arch_past_mm", 0.5, "arch_depth_mm"),
         ("step_level_mm", 1.27, "step_level_mm"),
         ("wall_finish_woc_mm", 0.2, "wall_finish_woc_mm"),
+        # The faces' declared stepovers and E's levels are the true ones.
+        ("lying_stepover_mm", 3.4, "lying_stepover_mm"),
+        ("seat_stepover_mm", 3.4, "seat_stepover_mm"),
+        ("width_level_mm", 1.27, "width_level_mm"),
+        # The measured stick-out leaves the collet nose clear of the stock.
+        ("half_mill_projection_mm", 10.0, "collet nose"),
         ("hold_spot_dia_mm", 4.6, "not under its drill"),
         ("apex_spot_dia_mm", 2.3, "under its drill"),
         ("tap_reach_min_mm", 9.0, "tap_reach_min_mm"),
