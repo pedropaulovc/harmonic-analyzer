@@ -151,6 +151,9 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("neck_overhang_mm", 6.0, "neck_overhang_mm"),
         ("nose_jaw_side_mm", 85.0, "nose_jaw_side_mm"),
         ("mount_y_mm", 5.75, "mount_y_mm"),
+        # A short stick-out: the collet would reach the foot at the last level.
+        ("neck_mill_projection_min_mm", 40.0, "collet reaches the foot"),
+        ("neck_mill_projection_min_mm", 52.0, "less than 1 in"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> None:
@@ -226,6 +229,29 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: line == "G1 Z-2.534 F{feed}",
             lambda line: "G1 Z0.500 F{feed}",
             "holes",
+        ),
+        # MB05's rapids at the old clearance plane, below the foot's top:
+        # entering from beside the seat, the cutter crosses the foot.
+        (
+            "neck",
+            lambda line: line == "G0 Z59.250",
+            lambda line: "G0 X-10.000 Y-5.500 Z24.350",
+            "keep_out",
+        ),
+        # MB06's spot section opened below the foot's top: its first XY
+        # rapid after the M6 runs under the stated tool-change height.
+        (
+            "tap_spot",
+            lambda line: line == "G0 Z59.250",
+            lambda line: "G0 Z24.545",
+            "tools",
+        ),
+        # The foot pass run inside the foot's station: the cutter in the foot.
+        (
+            "neck",
+            lambda line: line == "G0 X9.525",
+            lambda line: "G0 X6.000",
+            "keep_out",
         ),
         # The tap stop holds (M0) instead of ending Idle.
         (

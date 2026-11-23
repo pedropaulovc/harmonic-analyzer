@@ -15,7 +15,11 @@
   <circle class="leader-dot" cx="488" cy="330" r="2"/>
   <text class="label" x="532" y="326">the offcut on the bed,</text>
   <text class="label" x="532" y="342">F to O up</text>
-  <polygon class="cutter" points="107.9,200 139.6,200 139.6,268.75 107.9,268.75"/>
+  <polygon class="cutter" points="107.9,151.25 139.6,151.25 139.6,268.75 107.9,268.75"/>
+  <rect class="part-rest" x="96" y="121" width="55.4" height="30.25"/>
+  <line class="leader" x1="151.4" y1="128" x2="250" y2="114"/>
+  <circle class="leader-dot" cx="151.4" cy="128" r="2"/>
+  <text class="label" x="254" y="118">the collet: the end mill {{process.neck_mill_projection_min_mm:in.2dot}}–2.00 out, so it passes above the foot</text>
   <circle class="datum" cx="100" cy="300" r="3.5"/>
   <text class="datum-label" x="20" y="320">X0 the seat</text>
   <text class="datum-label" x="20" y="336">Z0 the stacks (O)</text>
@@ -26,5 +30,8 @@
   <circle class="leader-dot" cx="112" cy="262" r="2"/>
   <text class="label" x="200" y="146">MB03's R.25 off: the end mill's square corner</text>
   <text class="label" x="200" y="162">under the foot (R.040 max), a pass along it each level</text>
-  <text class="label" x="112" y="110">the foot past the jaws' left side, its underside {{process.foot_jaw_clear_mm:in.3dot}} outside it</text>
+  <line class="leader" x1="102" y1="175" x2="60" y2="108"/>
+  <circle class="leader-dot" cx="102" cy="175" r="2"/>
+  <text class="label" x="20" y="86">the foot, past the jaws' left side,</text>
+  <text class="label" x="20" y="102">its underside {{process.foot_jaw_clear_mm:in.3dot}} outside it</text>
 </svg>

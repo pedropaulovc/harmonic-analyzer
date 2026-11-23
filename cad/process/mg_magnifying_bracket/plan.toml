@@ -232,8 +232,15 @@ rod_dia_mm = 6.35
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set at least 1 in out of the collet.
+# 1/2 in end mill, 3 in overall (tools.endmill-carbide-3fl-1-2's
+# description): set at least 1 in out of the collet.
 half_mill_projection_min_mm = 25.4
+half_mill_oal_mm = 76.2
+# MB05: at the neck's last level the end mill stands beside the foot, which
+# rises the part's width above O. Set it at least 1.85 in out, so the collet
+# stays above the foot's top: width − neck + 5 mm = 46.75 mm, rounded up to
+# .05 in; 1.15 in of the 3 in cutter is still in the collet.
+neck_mill_projection_min_mm = 46.99
 # Overall lengths: jobber #37 2-1/4 in, #7 3-5/8 in (ASME B94.11M); the #2
 # combined drill and countersink 1-7/8 in. Bounded by their whole length
 # below the chuck.
@@ -566,13 +573,13 @@ machine_ref = "pm-30mv"
 holding = "The 1 in + 1/2 in stacks (4 in long) against each jaw, their left ends .50 inside the jaws' left side. The part on edge on them along the jaws, O DOWN, gripped on L (FIXED jaw) and H; the foot PAST the jaws' left side, its underside {{process.foot_jaw_clear_mm:in.3dot}} outside it. The offcut standing on the bed at the jaws' right end, F to O up, a sawn face flush with the jaws' right side, L and H in the jaws: past the stacks' ends, well clear of the cutter. The jaws grip the lower {{process.lying_grip_mm:in.3dot}} of the part."
 datum = "Program MB05_neck. G54: X0 the seat (the part's LEFT end), +X toward the nose; Y0 the fixed jaw's face (L), +Y toward it; Z0 the stacks' top (O). The neck's face at Z {{cad.neck_inner_face_thickness_mm:.3f}}, the foot's underside at X {{cad.foot_underside_thickness_mm:.3f}} mm."
 diagram = { file = "diagrams/neck.svg", alt = "The part on edge on stacked parallels, O down, the foot standing past the jaws' left side; the 1/2 in end mill faces the neck down to its thickness, its square corner making the inside corner under the foot." }
-envelope = { x_span_mm = ["{{process.part_length_max_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.high_side_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.outer_face_length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.neck_inner_face_thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.part_length_max_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.high_side_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.outer_face_length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.neck_inner_face_thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.neck_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.neck_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.high_side_width_mm}}", along_jaws_mm = "{{process.part_length_max_mm}}", part_height_mm = 13.0, parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.neck_overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.part_length_max_mm}}"], clamp_mm = ["{{process.neck_overhang_mm}}", "{{process.part_length_max_mm}}"], section_mm = { y = "{{cad.high_side_width_mm}}", z = "{{cad.neck_inner_face_thickness_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). Before loading the part, G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack, the jaws open."
-instruction_detailed = "Home the mill first ($H). Before loading the part, the stacks in and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw stack, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z."
+instruction = "Home the mill first ($H). Before loading the part, G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack, the jaws open. The end mill {{process.neck_mill_projection_min_mm:in.2dot}}–2.00 out of the collet: the collet must pass above the foot's top."
+instruction_detailed = "Home the mill first ($H). Before loading the part, the stacks in and the jaws open: reset the 1/2 in end mill {{process.neck_mill_projection_min_mm:in.2dot}}–2.00 out of the collet (calipers; the collet then clears the foot's top beside the last pass). Console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw stack, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z."
 feed = "hand"
 
 [[setups.operations]]
@@ -582,7 +589,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Prove MB05_neck in air, Z0 raised 1.000 in; the cutter enters each level over the fixed jaw and never reaches the foot. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run MB05_neck, watching each level enter over the fixed jaw and stop short of the foot. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run MB05_neck, watching each level enter over the fixed jaw and stop short of the foot, and every move between them run above the foot's top. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
 [[setups.operations]]

@@ -828,11 +828,32 @@ def context(
     foot_x = _r(foot + r)
     side_y = _r(r + APPROACH_MM)
     nclear = _r(neck_top + CLEAR_MM)
+    # MB05 and MB06 stand the part on edge: the foot rises to the part's
+    # width above O. Every section opens and closes at ``travel``, above the
+    # foot and every jaw, so no XY rapid after an M6 can reach either. At the
+    # neck's last level the end mill stands beside the foot: its projection
+    # out of the collet keeps the collet above the foot's top, and a 3 in
+    # end mill still has 1 in in the collet.
+    travel = _r(width + CLEAR_MM)
+    projection = p["neck_mill_projection_min_mm"]
+    if projection < width - neck + CLEAR_MM:
+        raise ValueError(
+            "neck_mill_projection_min_mm: the collet reaches the foot at the "
+            "neck's last level"
+        )
+    if projection > p["half_mill_oal_mm"] - IN:
+        raise ValueError(
+            "neck_mill_projection_min_mm: less than 1 in of the end mill left "
+            "in the collet"
+        )
     # After each level's zigzag, one pass along the foot's underside at its
     # station, from beside L to beside H (climb: the foot on the cutter's
     # right), squares the corner across the whole width.
     far_y = _r(-thick - r - APPROACH_MM)
-    neck_lines: list[str] = []
+    neck_lines: list[str] = [
+        f"G0 Z{travel:.3f}",
+        f"G0 X{neck_in:.3f} Y{side_y:.3f}",
+    ]
     for z in neck_levels:
         neck_lines += [
             f"G0 Z{nclear:.3f}",
@@ -855,7 +876,7 @@ def context(
             f"G1 Z{_r(z):.3f} F{{feed}}",
             f"G1 Y{far_y:.3f} F{{feed}}",
         ]
-    neck_lines.append(f"G0 Z{nclear:.3f}")
+    neck_lines.append(f"G0 Z{travel:.3f}")
 
     # MB06: the nose outline (machine XY, climb: round the outside
     # clockwise), from beside L, round the nose, to beside H; the leads run
@@ -884,12 +905,18 @@ def context(
         {"offset": r + stock_n, "levels": [_r(z) for z in rough_levels]},
         {"offset": r, "levels": [_r(nose_bottom)]},
     ]
-    nose_lines: list[str] = []
+    # Between the nose's passes the cutter clears the jaw tops too.
+    nose_clear = _r(max(upright_grip, neck) + CLEAR_MM)
+    first = passes[0]["offset"]
+    nose_lines: list[str] = [
+        f"G0 Z{travel:.3f}",
+        f"G0 X{_r(cx - lead):.3f} Y{_r(cy + radius + first):.3f}",
+    ]
     for pass_ in passes:
         o = pass_["offset"]
         for z in pass_["levels"]:
             nose_lines += [
-                f"G0 Z{_r(neck + CLEAR_MM):.3f}",
+                f"G0 Z{nose_clear:.3f}",
                 f"G0 X{_r(cx - lead):.3f} Y{_r(cy + radius + o):.3f}",
                 f"G0 Z{_r(neck + SAFE_MM):.3f}",
                 f"G1 Z{z:.3f} F{{feed}}",
@@ -898,7 +925,16 @@ def context(
                 f"G2 X{_r(cx):.3f} Y{_r(cy - radius - o):.3f} I{_r(-(radius + o)):.3f} J0.000 F{{feed}}",
                 f"G1 X{_r(cx - lead):.3f} F{{feed}}",
             ]
-    nose_lines.append(f"G0 Z{_r(neck + CLEAR_MM):.3f}")
+    nose_lines.append(f"G0 Z{travel:.3f}")
+
+    def from_travel(lines: list[str]) -> list[str]:
+        """A hole section opened over the tap at ``travel`` and closed there."""
+        return [
+            f"G0 Z{travel:.3f}",
+            f"G0 X{tap_xy[0]:.3f} Y{tap_xy[1]:.3f}",
+            *lines,
+            f"G0 Z{travel:.3f}",
+        ]
 
     jobs = [
         {
@@ -996,7 +1032,9 @@ def context(
                 [
                     "tap_spot",
                     "spot the lever tap",
-                    _spot(tap_xy, neck, neck - spots["tap spot"], neck + CLEAR_MM),
+                    from_travel(
+                        _spot(tap_xy, neck, neck - spots["tap spot"], nose_clear)
+                    ),
                 ]
             ],
         },
@@ -1009,7 +1047,7 @@ def context(
                 [
                     "tap_drill",
                     "drill the lever tap #7",
-                    _plunged([tap_xy], neck, tap_tip, neck + CLEAR_MM),
+                    from_travel(_plunged([tap_xy], neck, tap_tip, nose_clear)),
                 ]
             ],
         },
@@ -1092,7 +1130,9 @@ def context(
         ),
         "notch": across(lying_grip, (0.0, width), p["bar_thickness_max_mm"]),
         "low": across(lying_grip, (-width, 0.0), high_level),
-        "neck": jaws(lying_grip, neck_jaws, (-thick, 0.0))
+        # On edge (MB05, MB06) the foot stands the part's width tall.
+        "neck": [_box("foot", (0.0, foot), (-thick, 0.0), width)]
+        + jaws(lying_grip, neck_jaws, (-thick, 0.0))
         + [
             _box(
                 "offcut",
@@ -1107,7 +1147,8 @@ def context(
             (jaw_left + IN / 2, neck_stack_end),
             (-thick, 0.0),
         ),
-        "nose": jaws(upright_grip, nose_jaws, (-thick, 0.0))
+        "nose": [_box("foot", (0.0, foot), (-thick, 0.0), width)]
+        + jaws(upright_grip, nose_jaws, (-thick, 0.0))
         + [
             _box(
                 "offcut",
@@ -1152,12 +1193,18 @@ def context(
             ["keep_out", {"radius": radius, "boxes": keep[frame]}],
         ]
 
-    def single(name, top, z_min, checks) -> list[list[Any]]:
+    def single(name, top, z_min, checks, change_top=None) -> list[list[Any]]:
+        """``change_top``: what an XY rapid after the M6 must clear, when it
+        stands higher than the stock top (the foot, MB05)."""
         return [
             [
                 name,
                 "tool_changes",
-                {"z_top": top, "tools": [tn["em-half"]], "loads_first": True},
+                {
+                    "z_top": top if change_top is None else change_top,
+                    "tools": [tn["em-half"]],
+                    "loads_first": True,
+                },
             ],
             [name, "spindle", {"rpm": [[face_rpm]]}],
             [name, "pauses", {"z_top": top, "count": 0}],
@@ -1275,6 +1322,7 @@ def context(
             ["cleared", {"points": corner_points, "radius": r, "z": _r(neck)}],
             ["keep_out", {"radius": r, "boxes": keep["neck"]}],
         ],
+        change_top=width,
     )
 
     name = "MB06_nose"
@@ -1283,7 +1331,7 @@ def context(
             name,
             "tool_changes",
             {
-                "z_top": neck,
+                "z_top": width,
                 "tools": [tn["em-half"], tn["spot"], tn["drill-7"]],
                 "loads_first": True,
             },
