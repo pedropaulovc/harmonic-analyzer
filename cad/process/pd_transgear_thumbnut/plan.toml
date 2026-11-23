@@ -59,12 +59,16 @@ jaw_clearance_in = 0.1
 # the rim end stands out past them for the facing and the dish.
 regrip_grip_in = 0.25
 # The #29 drill's full-diameter depth (.90 in) from its lips touching the spot, and
-# the plug tap's pencil mark from its point (authored): the tap's point runs
-# .20 past the .65 parted length, so its 3-5 chamfered threads clear the rim
-# end and the thread is full through the nut; the drill leads the tap's
-# point by .05.
+# the plug tap's pencil mark from its point (authored): .72, inside the plug
+# tap's .75 thread length (tools-reamers-taps.toml taps-unc-hand 8-32-plug
+# flute_len_in), so its Ø.168 shank never reaches the Ø.136 hole. Its 3-5
+# chamfered threads (about .09-.16) then leave full thread to about .56-.63
+# from the seat; the hole ends at the recess floor, .57-.61 from the seat, so
+# at worst the last pitch or two there carry the chamfer's partial thread (the
+# bench screw check runs a #8-32 screw through). The drill runs past the
+# tap's point.
 tap_drill_depth_mm = 22.86
-tap_mark_in = 0.85
+tap_mark_in = 0.72
 # Countersinks (authored): Ø.170, between the #8-32 major Ø.164 (the first
 # thread broken all round) and the drawing's .18 max; the 90° chamfer mill
 # fed (.170 - .136) / 2 = .017 past its flutes touching the #29 hole's edge.
@@ -175,7 +179,7 @@ speed_kind = "spindle"
 tool = "knurl"
 drilling = "none"
 sizing = "other"
-instruction = "Mount the knurl in the AXA No. 10 holder, the wheel square to the work and on centre height. Bring the wheel's chuck-side face onto the faced end and set DRO Z0 there: the DRO then reads that face. Move it to Z-{{cad.shoulder_flange_in:.2dot}} (inside the waist, turned off later, so the knurl runs full up to the head's rear face), oil the work and plunge the wheel in firmly in one go so it tracks; run a few turns and check the pattern is single."
+instruction = "Mount the knurl in the AXA No. 10 holder, the wheel square to the work and on centre height. Bring the wheel's chuck-side face onto the faced end and set DRO Z0 there: the DRO then reads that face. Move it to Z-{{cad.shoulder_flange_in:.2dot}} (the wheel then over the flange, turned off later; the traverse in Op 50 carries the pattern over the head), oil the work and plunge the wheel in firmly in one go so it tracks; run a few turns and check the pattern is single."
 settings = "lathe-knurl-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -185,7 +189,7 @@ speed_kind = "spindle"
 tool = "knurl"
 drilling = "none"
 sizing = "other"
-instruction = "Feed the wheel along toward the chuck until the DRO reads Z{{cad.run_end_z_mm:in.2dot}} (the knurl blank's end) and back, adding infeed each pass, until the crests mike {{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}. Brush the chips off between passes."
+instruction = "Feed the wheel along toward the chuck until the DRO reads Z-{{cad.part_off_in:.2dot}} (the parting line: the head is knurled to it and the holder stays clear of the jaws) and back, adding infeed each pass, until the crests mike {{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}. Brush the chips off between passes."
 settings = "lathe-knurl-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 inspection = "Over the knurl Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}, micrometer across the crests; one sharp single-tracked straight pattern."
@@ -287,7 +291,7 @@ speed_kind = "other"
 tool = "tap"
 drilling = "none"
 sizing = "other"
-instruction = "Holding the chuck by hand against the wrench, start {{cad.tap_thread}} and turn on, backing off every half turn, dry, advancing the quill to follow; stop when the mark reaches the seat face (the thread is then full through the nut) and back the tap out."
+instruction = "Holding the chuck by hand against the wrench, start {{cad.tap_thread}} and turn on, backing off every half turn, dry, advancing the quill to follow; stop when the mark reaches the seat face (never past it: the tap's threads end there) and back the tap out."
 feed = "hand"
 
 [[setups.operations]]
