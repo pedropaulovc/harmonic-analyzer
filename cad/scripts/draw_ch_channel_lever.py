@@ -22,6 +22,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -78,6 +79,8 @@ from ch_channel_lever_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     DRAWING_PRECISION_BY_NAME,
+    ROOT_CORNER_R,
+    ROOT_CORNER_REASON,
 )
 from ch_channel_lever_spec import (
     BAR_PIN_HOLE_SPEC,
@@ -235,11 +238,12 @@ def _inch(value_mm: float) -> str:
     return f"{value_mm / 25.4:.4f}".removeprefix("0")
 
 
-# The bar-to-hub roots are inside corners: the title block's INSIDE CORNERS
-# row controls them, so no callout repeats it (rule 2; review r1-r3). A hole
-# location carries its value and band only (rule 7): each drilled hole's mate
-# rides its own hole callout. The fulcrum bore names its standard fit and the
-# clearance range as REF (rule 4).
+# The bar-to-hub roots print their own 2X R.065 (owner ruling 2026-11-23,
+# tool audit Q9: over the title block's INSIDE CORNERS R.040 MAX), so the
+# radius names why nothing needs them small. A hole location carries its
+# value and band only (rule 7): each drilled hole's mate rides its own hole
+# callout. The fulcrum bore names its standard fit and the clearance range
+# as REF (rule 4).
 FRONT_CALLOUTS = {
     "FulcrumDia": (
         f"REAM THRU\nRUNNING FIT ON {SHAFT_NUMBER}\n"
@@ -250,6 +254,7 @@ FRONT_CALLOUTS = {
     # prints three places for the #21 hole's wall, so it states that wall
     # once (rules 3 and 20; MHA-CH-02 RV-04).
     "TipRadius": f"TANGENT TO EDGES\n{TIP_WALL_TEXT}",
+    "RootCornerR": ROOT_CORNER_REASON,
 }
 # What engages each drilled hole rides its own hole callout (machinist r5:
 # on the arm's location it did not say the hole is a running bore).
@@ -304,6 +309,11 @@ FRONT_KEEP = {
     # The taper start's row between the bar-pin and spring-hole rows.
     "TaperStartX": (_sheet_x(TAPER_START_X / 2.0), 0.115),
     "SpringCx": (_sheet_x(LEVER_SPRING_X / 2.0 + 25.0), 0.104),
+    # The root corners' 2X R.065 below the bar, right of the bore's Ra and
+    # above the 5.000 row, its leader up-left to the bottom root (the
+    # fillet's first edge, build_ch_channel_lever): the REAM leader runs
+    # through the top root, so the bottom one carries the radius.
+    "RootCornerR": (0.143, 0.1405),
 }
 TOP_KEEP = {
     # Above the plate: its arrows come in from outside the 3.00 span.
@@ -321,7 +331,9 @@ TOP_KEEP = {
 OVERALL_TEXT_XY = (FRONT_CENTER[0], 0.082)
 BAR_PIN_CALLOUT_XY = (0.170, 0.188)
 SPRING_CALLOUT_XY = (0.240, 0.188)
-BORE_FINISH_SYMBOL = (0.080, 0.140)
+# Below-right of the hub, under the root radius's leader (the bore's rim
+# point, in build, keeps its leader clear of the bottom root).
+BORE_FINISH_SYMBOL = (0.080, 0.133)
 # Lower left, below the overall length and clear of the title block.
 PLATE_OFFSET_NOTE_XY = (0.020, 0.055)
 FINISH_CHAR_HEIGHT = 0.0025
@@ -470,8 +482,10 @@ requirement(
 # The outline beyond the hub: the bar's two straight edges, .37 apart (at the
 # taper start, FRONT_KEEP "BarHeight"), the taper start 5.50 from the bore
 # (FRONT_KEEP "TaperStartX"), the two taper edges tangent to the full-round
-# tip, and the tip R.167 about the #21 hole (FRONT_KEEP "TipRadius"). The
-# overall length over the hub and the tip is a reference (OVERALL_TEXT_XY).
+# tip, and the tip R.167 about the #21 hole (FRONT_KEEP "TipRadius"); the two
+# roots where the bar's edges meet the hub, 2X R.065 (FRONT_KEEP
+# "RootCornerR", the outline cutter's own radius). The overall length over
+# the hub and the tip is a reference (OVERALL_TEXT_XY).
 _TANGENT_X, _TANGENT_Y = taper_tangent_point()
 _TAPER_NX = (_TANGENT_X - TIP_ARC_CX) / TIP_RADIUS
 _TAPER_NY = _TANGENT_Y / TIP_RADIUS
@@ -487,7 +501,7 @@ requirement(
         PlanarFace((_TAPER_NX, -_TAPER_NY, 0.0), _TAPER_OFFSET),
         CylinderFace(2.0 * TIP_RADIUS),
     ),
-    requirements=("bar_height", "taper_start", "tip_radius"),
+    requirements=("bar_height", "taper_start", "tip_radius", "root_corner_r"),
     fields={
         "bar_height": (
             limits(BAR_TALL, _P["BarHeight"], unit=UNIT),
@@ -511,6 +525,15 @@ requirement(
         "tip_radius_nominal": (TIP_RADIUS, ((_SPEC, "TIP_RADIUS"),)),
         "tip_at": ([TIP_ARC_CX, 0.0, 0.0], ((_SPEC, "TIP_ARC_CX"),)),
         "tip_callout": (FRONT_CALLOUTS["TipRadius"], ((_SELF, "FRONT_CALLOUTS"),)),
+        "root_corner_r": (
+            limits(ROOT_CORNER_R, _P["RootCornerR"], unit=UNIT),
+            ((_NOTES, "ROOT_CORNER_R"), (_SPEC, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "root_corner_r_nominal": (ROOT_CORNER_R, ((_NOTES, "ROOT_CORNER_R"),)),
+        "root_corner_count": (2, ((_NOTES, "ROOT_CORNER_PREFIX"),)),
+        "root_corner_callout": (
+            FRONT_CALLOUTS["RootCornerR"], ((_SELF, "FRONT_CALLOUTS"),)
+        ),
         "overall_length_ref": (
             TIP_END_X + HUB_DIA / 2.0,
             ((_SPEC, "TIP_END_X"), (_SPEC, "HUB_DIA"), (_SELF, "OVERALL_TEXT_XY")),
@@ -523,6 +546,7 @@ requirement(
         "bar_height": _P["BarHeight"],
         "taper_start": _P["TaperStartX"],
         "tip_radius": _P["TipRadius"],
+        "root_corner_r": _P["RootCornerR"],
     },
 )
 # The reamed fulcrum bore (FRONT_KEEP "FulcrumDia", +.0010/.0000, Ra) and the
@@ -674,6 +698,7 @@ def build(adapter: Any) -> dict[str, str]:
             **DRAWING_PRECISION["FulcrumProfile"],
             **DRAWING_PRECISION["BarPinHole"],
             **DRAWING_PRECISION["SpringHole"],
+            **DRAWING_PRECISION["RootCorners"],
         },
     )
     assert_imported_precision(
@@ -780,13 +805,17 @@ def build(adapter: Any) -> dict[str, str]:
     _add_bar_centerlines(adapter, front)
 
     # The reamed fulcrum bore is the one running surface (rule 6): Ra on its
-    # rim at 300 degrees, the symbol below-right of the hub: between the REAM
-    # leader (about 240 degrees through the bore) and the hub's (about 345),
-    # right of the arms' extension line.
+    # rim at 255 degrees, the symbol below-right of the hub: right of the
+    # REAM leader's arrow (225 degrees through the bore), its leader clear of
+    # the bottom root and the root radius's leader above it.
     bore_rim = model_point_in_view(
         adapter,
         front,
-        (PIVOT_HOLE_DIA / 2000.0 * 0.5, -PIVOT_HOLE_DIA / 2000.0 * 0.8660, 0.0),
+        (
+            PIVOT_HOLE_DIA / 2000.0 * math.cos(math.radians(255.0)),
+            PIVOT_HOLE_DIA / 2000.0 * math.sin(math.radians(255.0)),
+            0.0,
+        ),
         label="fulcrum bore rim",
     )
     add_surface_finish(
