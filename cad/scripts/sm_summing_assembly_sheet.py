@@ -12,13 +12,14 @@ so a wording edit here does not rebuild the summing assembly. No SolidWorks.
 
 from __future__ import annotations
 
+import math
+
 import _config
 import ha_harmonic_analyzer_assembly_steps as ha_steps
 import fr_top_frame_spec as top_frame
 import sm_vn_knife_mount_dowel_spec as knife_dowel
 from _assembly_contract import assembly_contract
 from _inch_fraction import inch_fraction
-from _printed_tolerance import printed_band_mm
 from _title_block_units import LENGTH_UNITS, render_number
 from sm_knife_mount_spec import (
     BORE_R_MAX as KNIFE_BORE_R_MAX,
@@ -122,22 +123,26 @@ HUB_SET_SCREW_TORQUE = (
 # gating clarity finding, 2026-11-13: no gauge ceremony for a setting bar).
 # A bar .0026-.0041 under the Ø.4985-.5000 bores (owner ruling 2026-11-23,
 # tool audit Q13; the former Ø.4720-.4735 bores took a Ø.4679-.4709 bar) is
-# Ø.4944-.4974, which straddles a two-place rounding, so its reference size
-# is the two places nearest the middle of that range, every such bar inside
-# the reference's own title-block .XX band, and it shakes in the bores: the
-# hand check is that it slides through both, not that it does not shake.
+# Ø.4944-.4974, which straddles a two-place rounding (.49/.50); a (Ø.50)
+# reads as stock 1/2 in rod, which cannot pass a Ø.4985 bore (Codjiflo r1
+# on PR #3444). So the reference is the two places at or under every
+# conforming bar, under the bores' smallest Ø, and it shakes in the bores:
+# the hand check is that it slides through both, not that it does not shake.
 KNIFE_GAUGE_BAR_SIZES_IN = (
     2.0 * KNIFE_BORE_R_MIN / 25.4 - max(KNIFE_GAUGE_BAR_CLEARANCE_IN),
     2.0 * KNIFE_BORE_R_MAX / 25.4 - min(KNIFE_GAUGE_BAR_CLEARANCE_IN),
 )
-KNIFE_GAUGE_BAR_REF_DIA_IN = round(sum(KNIFE_GAUGE_BAR_SIZES_IN) / 2.0, 2)
-if any(
-    abs(size - KNIFE_GAUGE_BAR_REF_DIA_IN) * 25.4 > printed_band_mm(2, unit=UNIT) + 1e-9
-    for size in KNIFE_GAUGE_BAR_SIZES_IN
+KNIFE_GAUGE_BAR_REF_DIA_IN = math.floor(min(KNIFE_GAUGE_BAR_SIZES_IN) * 100.0 + 1e-9) / 100.0
+if (
+    any(
+        math.floor(size * 100.0 + 1e-9) / 100.0 != KNIFE_GAUGE_BAR_REF_DIA_IN
+        for size in KNIFE_GAUGE_BAR_SIZES_IN
+    )
+    or KNIFE_GAUGE_BAR_REF_DIA_IN * 25.4 >= 2.0 * KNIFE_BORE_R_MIN
 ):
     raise AssertionError(
         f"gauge bars Ø{KNIFE_GAUGE_BAR_SIZES_IN[0]:.4f}-{KNIFE_GAUGE_BAR_SIZES_IN[1]:.4f} "
-        f"stray outside the (Ø{KNIFE_GAUGE_BAR_REF_DIA_IN:.2f}) reference's .XX band"
+        f"do not all floor to a (Ø{KNIFE_GAUGE_BAR_REF_DIA_IN:.2f}) reference under the bore"
     )
 KNIFE_GAUGE_BAR = (
     f"(Ø{_length(KNIFE_GAUGE_BAR_REF_DIA_IN * 25.4, 2)}) X "

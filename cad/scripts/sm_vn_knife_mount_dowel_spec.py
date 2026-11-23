@@ -13,7 +13,7 @@ block carries only slip bands).  Owner ruling 2026-11-08 (Pedro), #2144
 item 11.3 (scheme S1): one dowel and the #10-24 knife-hanger hex bolt
 (MHA-SM-VN-52) hang each block; the bolt clamps the seat to the casting
 underside, the pin locates it, and the block's yaw about the pin is set at
-MHA-SM-00: the front block's by a (Ø.50) gauge bar slid through both
+MHA-SM-00: the front block's by a (Ø.49) gauge bar slid through both
 mounts' bores while its bolt is tightened (step 5), the rear block's by the
 rock gauge (6G) before its bolt is tightened (6H).
 

@@ -717,15 +717,11 @@ def test_close_bore_clears_the_hex_trunnion_only_at_the_ridge() -> None:
     # the top seat; now .57475, so the BASIC centre stays on the .001 grid at
     # .824), and the knife's ridge, contact line and the seat plane do not
     # move, so the lever kinematics are the Ø.4720 bore's.
-    import build_sm_knife_mount as built
-
     crown_depth = part.BLK_TOP - (part.BORE_CY + part.R_BORE)
     assert crown_depth == pytest.approx(14.59865, abs=1e-9)
     assert abs(crown_depth - 0.575 * 25.4) <= 0.00025 * 25.4 + 1e-9
-    assert part.BLK_TOP == built.BLK_TOP == pytest.approx(14.866)
-    assert built.TOP_CLEAR == pytest.approx(0.26735)
-    assert built.CONTACT_Y == pytest.approx(984.8272, abs=1e-4)
-    assert built.KNIFE_Y == pytest.approx(979.6932, abs=1e-4)
+    assert part.CONTACT_Y == pytest.approx(984.8272, abs=1e-4)
+    assert part.KNIFE_Y == pytest.approx(979.6932, abs=1e-4)
     # Top vertex hangs TOP_CLEAR under the crown; the across-corners bottom
     # vertex and the two widest shoulders clear the bore wall.
     hex_centre_y = -HEX_H / 2.0

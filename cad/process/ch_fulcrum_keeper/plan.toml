@@ -577,7 +577,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.go_pin_min_mm}}",
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "The reamer reads under the GO pin's reading: ream one trial hole in a sawn offcut of the same 3/4 in 1018 bar first (D drill, then the reamer, at this setup's speeds) and gauge it; GO refused there: stop and tell the owner before any keeper is reamed." },
+  { kind = "stop", text = "The reamer reads under the GO pin's reading: its holes would be refused. Stop and tell the owner before any keeper is reamed." },
 ]
 feed = "hand"
 
@@ -668,11 +668,22 @@ inspection = "Still clamped, the first part before the second is reamed: bore Ø
 gauge_checks = [{ gauge = "zz-pins-2560-2570", band_mm = "{{cad.bore_dia_band_mm}}" }]
 
 # The ream's remedy follows its check: prechips prints an op's Check after
-# its work, so it is the next op.
+# its work, so it is the next op; the remedy, its stop and the in-band path
+# are one op each (rule T12).
 [[setups.operations]]
 steps = [
   { kind = "action", text = "GO refused (the bore is under the GO pin's reading): clear the chips, oil the bore, give it one more pass with the same .2560 reamer by hand in the tap wrench, forward only, and draw it out still turning forward; gauge again." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
   { kind = "stop", text = "GO still refused, or NO-GO enters (no cut remedies an oversize bore): reject the keeper. Set it aside with its number and tell the owner; the reamer or its runout is out." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
   { kind = "action", text = "In band: the next part is reamed without the check; unclamp." },
 ]
 feed = "hand"

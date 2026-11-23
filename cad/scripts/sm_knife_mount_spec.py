@@ -197,7 +197,7 @@ GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
 # its vertical centre plane), for the webs and the tap's crown, and a
 # separate ∥.002|A holds its axis parallel to the top seat (its pitch).  A|B
 # leaves the bore's yaw about B free: the part no longer sets it.  At
-# MHA-SM-00 a (Ø.50) gauge bar slid through both mounts' bores with the
+# MHA-SM-00 a (Ø.49) gauge bar slid through both mounts' bores with the
 # screws finger-tight sets the front mount's yaw before its screw is
 # tightened, and must slide out after; the rear mount's yaw is set by the
 # rock gauge (6G) before its screw is tightened (6H)
