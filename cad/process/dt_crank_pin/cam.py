@@ -15,8 +15,8 @@ the vise jaws' depth (keep-out shapes only).
 
 Route (``plan.toml``): the pin is bought (McMaster 98390A254, No. 3 taper
 pin); on the mill it lies along the vise jaws on one 1 in parallel standing
-on edge, the big end .25 in out past the jaws' left side, a second pin of the
-pack on the parallel's right end. DP01 spots the hole with the #1 centre
+on edge, the big end .25 in out past the jaws' left side, a wrung gauge-block
+spacer on the parallel's right end. DP01 spots the hole with the #1 centre
 drill and pecks the #45 through, in the overhang, into air.
 
 Work frame (G54): X0 the big end's rim plane, +X along the pin toward the
