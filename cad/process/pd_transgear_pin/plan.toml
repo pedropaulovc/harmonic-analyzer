@@ -185,15 +185,15 @@ turning_support = { kind = "tailstock", chuck_z_mm = "{{cad.jaw_z_mm}}", centre_
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Before turning, read the {{cad.step_land_mate}} ream the land presses into (Ø{{cad.step_land_mate_dia_min_in:.4dot}}–{{cad.step_land_mate_dia_max_in:.4dot}}): try the six plug gauges .1260–.1265 in it, smallest first, by hand and clean, never forced. The largest that enters is its reading R: write R on this sheet."
-inspection = "Ream: .1260 enters, .1265 does not."
+instruction = "Before turning, read the {{cad.step_land_mate}} ream the land presses into (Ø{{cad.step_land_mate_dia_min_in:.4dot}}–{{cad.step_land_mate_dia_max_in:.4dot}}): try the six plug gauges .1260–.1265 in it, smallest first, by hand and clean, never forced. The largest that enters is its reading R: write R on this sheet. Then try the .1260 and .1265 in the reams of {{cad.outer_mates}} that the journal runs in."
+inspection = "Each ream: .1260 enters, .1265 does not."
 # The pair at the ream's band; the four steps between them read it to .0001
 # (their own span, .1261-.1264).
 gauge_checks = [{ gauge = "plug-gauges-1260-1265", band_mm = "{{cad.step_land_mate_dia_band_mm}}" }, { gauge = "plug-gauges-1261-1264", band_mm = [3.20294, 3.21056] }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The .1260 does not enter, or the .1265 enters: the ream is outside the {{cad.step_land_mate}} drawing's band. Stop: make no pin for that arm and tell the owner."
+instruction = "In any ream the .1260 does not enter, or the .1265 enters: that ream is outside its drawing's band. Stop: make no pin for that arm and tell the owner."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -265,7 +265,7 @@ speed_kind = "spindle"
 tool = "sharp"
 drilling = "none"
 sizing = "other"
-instruction = "Sharp-nose tool: touch it on the stub's faced end and set DRO Z to +{{process.centre_stub_in:.3dot}}. Face the seat square at Z{{cad.step_land_far_out_far_z_mm:in.3dot}} out to the head, its corner R{{cad.fillet_seat_radius_max_in:.3dot}} max (the tool's nose). Finish the land from the seat to Z{{cad.step_land_far_out_near_z_mm:in.3dot}} ({{cad.step_land_length_in:.2dot}} long) to the Op 30 window in passes of .0003 in on the radius, miking between passes."
+instruction = "Sharp-nose tool: touch it on the stub's faced end and set DRO Z to +{{process.centre_stub_in:.3dot}}. Face the seat square at Z{{cad.step_land_far_out_far_z_mm:in.3dot}} out to the head, its corner R{{cad.fillet_seat_radius_max_in:.3dot}} max (the tool's nose). Finish the land from the seat to Z{{cad.step_land_far_out_near_z_mm:in.3dot}} ({{cad.step_land_length_in:.2dot}} long) to the Op 30 window, miking between passes: no pass deeper than half of (the miked Ø less the window's middle) on the radius, spring passes allowed."
 settings = "lathe-sharp-nose-1018"
 cut_diameter_mm = "{{cad.step_land_dia_mm}}"
 inspection = "Land inside the Op 30 window, micrometer: the land less R lies within {{process.land_over_reading_min_in:.4dot}}–{{cad.step_land_interference_max_in:.4dot}}."
@@ -273,7 +273,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Land under the Op 30 window: cut the piece off, scrap it, and start again from Op 40. Over it: another .0003 pass."
+instruction = "Land under the Op 30 window: cut the piece off, scrap it, and start again from Op 40. Over it: another pass of half of (the miked Ø less the window's middle) or less on the radius, or a spring pass."
 
 [[setups.operations]]
 cut_kind = "longitudinal_turning"
@@ -284,7 +284,7 @@ speed_kind = "spindle"
 tool = "sharp"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the journal from the stub to the land's end in passes of .0003 in on the radius to Ø{{process.polish_dia_min_in:.4dot}}–{{process.polish_dia_max_in:.4dot}}, miking at both ends between passes: the .0002–.0006 over its Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} is left for polishing."
+instruction = "Finish the journal from the stub to the land's end to Ø{{process.polish_dia_min_in:.4dot}}–{{process.polish_dia_max_in:.4dot}}, miking at both ends between passes, no pass deeper than half of (the miked Ø less the window's middle) on the radius, spring passes allowed: the .0002–.0006 over its Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} is left for polishing."
 settings = "lathe-sharp-nose-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 inspection = "Journal Ø{{process.polish_dia_min_in:.4dot}}–{{process.polish_dia_max_in:.4dot}}."
@@ -342,7 +342,7 @@ speed_kind = "spindle"
 tool = "blade"
 drilling = "none"
 sizing = "other"
-instruction = "Bring the blade's chuck-side face onto the cut tip end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with the blade's tailstock-side face at Z-{{cad.part_off_in:.3dot}}: the head {{process.regrip_allowance_in:.3dot}} long, faced in Setup 2. Catch the pin in a rag."
+instruction = "Bring the blade's chuck-side face onto the cut tip end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with the blade's tailstock-side face at Z-{{cad.part_off_in:.3dot}}: the head end about .005 over the head's length, left for facing in Op 200. Catch the pin in a rag."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.step_head_dia_mm}}"
 
