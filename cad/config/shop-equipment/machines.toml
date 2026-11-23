@@ -32,29 +32,30 @@ tailstock_taper = "MT3"
 spindle_bore_in = 1.5
 longitudinal_feed_in_rev = [0.0025, 0.012]
 cross_feed_in_rev = [0.001, 0.0056]
-# Bar behind the chuck (#3424; fleet rule, Main 2026-11-22: no bar runs in
-# the spindle with unsupported length beyond the spindle's rear end). The
-# length from the 3-jaw's jaw fronts to the spindle's rear end is not
-# published: the maker's product page (the Wayback copy above, its
-# specifications table) and the PM-1127VF-LB Operator's Manual 2015
-# ("Features", p. 5: "Hole Through Spindle ... 1.5"", "Overall Dimension of
-# the lathe ... Length 55" x Width 27.5" x Height 26.5"") give the bore and
+# Bar behind the chuck (#3424; fleet rule, Main 2026-11-22). The change-gear
+# cover has a hole at the spindle's rear (owner, 2026-11-22), so bar CAN pass
+# out the back; what the spindle supports is only the length up to its rear
+# end. Bar must end inside the spindle unless the traveler declares an
+# outboard support. The length from the 3-jaw's jaw fronts to the spindle's
+# rear end is not published: the maker's product page (the Wayback copy
+# above, its specifications table) and the PM-1127VF-LB Operator's Manual
+# 2015 ("Features", p. 5: "Hole Through Spindle ... 1.5"", "Overall Dimension
+# of the lathe ... Length 55" x Width 27.5" x Height 26.5"") give the bore and
 # the machine's size, no spindle or headstock length; read 2026-11-22. So it
 # is to_measure: the owner tapes it, jaw fronts to the spindle's rear end
-# (inside the change-gear cover), before the first bar job.
-# bar_behind_jaw_fronts_max_in is the working limit until then, an
-# assumption (not a measurement): the most bar, grip included, that a lathe
-# traveler puts behind the jaw fronts without an outboard support. About
-# half of the jaw-fronts-to-gear-cover span the manual's p. 6 photograph
-# shows when scaled by that 55 in overall length (roughly 20 in; the
-# spindle ends inside that cover), so it stays inside the spindle by a wide
-# margin. A traveler that loads longer bar saws it to a working length first
-# or declares its outboard support. Replace it with the taped figure less a
-# margin once measured.
+# (he will, 2026-11-23). bar_behind_jaw_fronts_max_in is the supported
+# length a traveler may use until then, an ASSUMPTION (not a measurement):
+# the most bar, grip included, behind the jaw fronts without an outboard
+# support. About half of the jaw-fronts-to-gear-cover span the manual's p. 6
+# photograph shows when scaled by that 55 in overall length (roughly 20 in),
+# so the bar ends inside the spindle by a wide margin. A traveler that loads
+# longer bar saws it to a working length first or declares its outboard
+# support. Replace it with the taped figure less a margin once measured.
 jaw_fronts_to_spindle_rear = "to_measure"
 bar_behind_jaw_fronts_max_in = 10.0
 cite = [
   "Precision Matthews, PM-1127VF-LB product page, specifications (Wayback 2019-12-31, read 2026-11-23): Spindle Bore 1-1/2 in; Longitudinal Feeds .0025-.012 IPR; Cross Feeds .001-.0056 IPR: http://web.archive.org/web/20191231175250/http://www.precisionmatthews.com/shop/pm-1127vf-lb/",
   "PM-1127VF-LB Operator's Manual 2015, Features p. 5 and Physical Features p. 6, read 2026-11-22 (https://archive.org/download/pm-1440-gs-v-3-2020-10/Precision%20Matthews/PM-1127VF-LB-Manual-2015.pdf): \"Hole Through Spindle ... 1.5\", (38mm)\"; \"Overall Dimension of the lathe ... Length 55\" x Width 27.5\" x Height 26.5\"\"; no spindle or headstock length is given",
+  "Owner (Pedro) 2026-11-22, relayed by Main: the change-gear cover has a hole at the spindle's rear, so bar can pass out the back; he tapes jaw fronts to spindle rear on 2026-11-23",
 ]
-note = "Ownership, the tailstock taper, the spindle bore, the power-feed ranges and the bar-behind-the-chuck limit (jaw_fronts_to_spindle_rear to measure; bar_behind_jaw_fronts_max_in the working assumption until then); its other facts are cad/process/shop/, same key. Explicit on_hand preserves the pre-split ASSEMBLY.md OWNED, which read a shop.toml record with no present key as owned."
+note = "Ownership, the tailstock taper, the spindle bore, the power-feed ranges and the supported bar length behind the chuck (jaw_fronts_to_spindle_rear to measure; bar_behind_jaw_fronts_max_in an assumption until then: bar ends inside the spindle unless an outboard support is declared); its other facts are cad/process/shop/, same key. Explicit on_hand preserves the pre-split ASSEMBLY.md OWNED, which read a shop.toml record with no present key as owned."

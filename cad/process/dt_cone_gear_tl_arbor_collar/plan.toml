@@ -124,7 +124,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}. On this Ø1.75, once the blade is about .10 in, back out and step it .010 toward the chuck, then cut in again, alternating, so it does not bind; that face stays at Z-{{cad.part_off_in:.3dot}}. Hands clear: let the collar fall; pick it up from the bed or the chip tray only after the spindle has stopped, and mark it C175."
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}; on this Ø1.75, at .10 deep back out, step .010 toward the chuck and cut in again, alternating, so it does not bind. Hands clear: let it fall; mark it C175 once the spindle stops."
 settings = "lathe-part-1018-large"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 

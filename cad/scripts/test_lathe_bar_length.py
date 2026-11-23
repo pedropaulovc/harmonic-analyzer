@@ -1,14 +1,16 @@
 """No lathe traveler runs bar out past the spindle's rear end or catches a
 parting part by hand (#3424).
 
-Bar chucked through the PM-1127VF-LB's spindle with more length behind the
-jaws than the spindle holds runs unsupported past its rear end: a slender bar
-whips, bends and strikes whatever is near. The spindle's length from the jaw
-fronts to its rear end is not published (``cad/config/shop-equipment/
-machines.toml`` ``machines.pm-1127vf-lb``, ``jaw_fronts_to_spindle_rear``, to
-measure); until the owner tapes it, ``bar_behind_jaw_fronts_max_in`` is the
-working limit. A plan's ``bar_length_in`` is the piece the lathe holds, so the
-whole piece, grip included, must fit within that limit: a plan that starts
+The PM-1127VF-LB's change-gear cover has a hole at the spindle's rear, so
+bar can pass out the back, but the spindle supports it only up to its rear
+end: bar longer than that runs unsupported, and a slender bar whips, bends
+and strikes whatever is near. So bar ends inside the spindle unless an
+outboard support is declared. The spindle's length from the jaw fronts to
+its rear end is not published (``cad/config/shop-equipment/machines.toml``
+``machines.pm-1127vf-lb``, ``jaw_fronts_to_spindle_rear``, to measure);
+until the owner tapes it, ``bar_behind_jaw_fronts_max_in`` is the assumed
+supported length. A plan's ``bar_length_in`` is the piece the lathe holds,
+so the whole piece, grip included, must fit within it: a plan that starts
 from longer bar saws a working piece first.
 
 A part parting off falls on its own; the plan says so and keeps hands clear,
