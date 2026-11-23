@@ -29,8 +29,9 @@
 [stock.1018-ground-flat-3-8x1]
 form = "flat_bar"
 material = "AISI 1018 cold-finished steel, precision ground"
-note = "To order: Online Metals part 12095, 3/8 x 1 in 1018 precision-ground flat, $72.20 each (read live 2026-10-27, #2019), thickness +/-.001 as supplied (Online Metals tool-steel tolerances, precision-ground 1018 row); the faces are not machined (pd-transgear-arm registry process; pd_transgear_arm_geometry.STOCK_SKU and THICKNESS_BAND). Allocation: pd-transgear-arm (MHA-PD-18). Length not read. Not owned."
+note = "To order: Online Metals part 12095, 3/8 x 1 in 1018 precision-ground flat, $72.20 each (read live 2026-10-27, #2019), thickness +/-.001 as supplied (Online Metals tool-steel tolerances, precision-ground 1018 row); the faces are not machined (pd-transgear-arm registry process; pd_transgear_arm_geometry.STOCK_SKU and THICKNESS_BAND). Allocation: pd-transgear-arm (MHA-PD-18): one 12 in length, one 5.70-5.75 in blank (pd_transgear_arm/plan.toml) and a spare blank. Not owned."
 section_mm = [25.4, 9.525]
+length_mm = 304.8
 status = "to_order"
 cite = ["cad/config/parts/pd-transgear-arm.yaml process", "cad/scripts/pd_transgear_arm_geometry.py STOCK_SKU = \"12095\"", "https://www.onlinemetals.com/en/buy/carbon-steel/0-375-x-1-tool-steel-rectangle-bar-1018/pid/12095"]
 

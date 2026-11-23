@@ -76,42 +76,76 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from _printed_limits import drilled_limits, limits
 from pd_transgear_arm_geometry import (
+    EDGE_LEAN,
+    END_HALF_WIDTH,
+    LOCATOR_HOLE_PRINTED_LIMITS_MM,
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
     PIN_BORE_DIA,
+    PIN_BORE_DIA_BAND,
     PIN_HOLE_DEPTH,
+    PIN_HOLE_DIA,
+    PIN_HOLE_DIA_BAND,
+    PIN_HOLE_Z,
     PIN_MOUTH_CHAMFER,
+    PIN_MOUTH_CHAMFER_LIMITS,
     PIN_STATION,
+    PIVOT_BORE_DIA,
+    PIVOT_BORE_DIA_BAND,
+    PIVOT_BORE_DIAMETRAL_CLEARANCE,
     PIVOT_END_R,
     PIVOT_TANGENT_Y,
     PLATE_TAP_SPEC,
     PLATE_TAP_STATIONS,
+    SPOT_FACE_DIA,
+    SPOT_FACE_FLOOR_FROM_FRONT,
+    SPOT_FACE_FLOOR_TOLERANCE,
     THICKNESS,
+    THICKNESS_BAND,
     TIP_STATION,
+    UNIT,
     edge_half_width,
 )
 from pd_transgear_arm_spec import (
     GEOMETRIC_CONTROLS,
+    GEOMETRIC_TOLERANCES_MM,
+    LATCH_PIN_NUMBER,
+    LATCH_PIN_PRESS_PRINTED,
+    LOCATOR_PRESS_INTERFERENCE,
     PART_DATUMS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     ISO_VIEW_SCALE,
     OVERALL_LENGTH,
+    PIN_HOLE_DEPTH_BAND,
+    PIN_PRESS_INTERFERENCE,
+    SPOT_FACE_DIA_BAND,
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
 )
 from pd_transgear_arm_notes import (
     DIMENSION_CALLOUTS,
+    LOCATOR_CALLOUT_TEXT,
+    NOTES,
     NOTES_TEXT,
+    PIN_BORE_CALLOUT,
+    PIN_HOLE_CALLOUT,
     PIN_MOUTH_CALLOUT,
+    PIVOT_BORE_CALLOUT,
     PLATE_TAP_QUALIFIER,
+    SPRING_CALLOUT,
 )
 
 
@@ -425,6 +459,401 @@ TAP_CALLOUTS = (
         PLATE_CALLOUT_XY,
         PLATE_TAP_QUALIFIER,
     ),
+)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the code that prints
+# it, in the part frame (pd_transgear_arm_geometry: origin on the pivot axis
+# on the FRONT face, datum A; +X toward the square end; +Y across; +Z through
+# the thickness to the rear face).  Bands are the title block's rows at the
+# places the part authors (DRAWING_PRECISION), the reams their own bands.
+# The traveler makes the outline, the pivot ream (B) and its rear spot face,
+# the pin ream (C) and its rear mouth, and the latch-pin ream; the 2X dowel
+# reams and the 2X 8-32 taps are made at assembly with MHA-PD-19 on
+# (``made_at``), declared so the traveler can name what it leaves.  The
+# declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_transgear_arm"
+_GEOM = "pd_transgear_arm_geometry"
+_NOTES = "pd_transgear_arm_notes"
+_FRAME = "__frame__"
+_PLATE_TAP_DRILL = blind_cut_dia_mm(PLATE_TAP_SPEC)
+_PLATE_TAP_PLACES = 3  # the native callout's Ø.136
+_FLANK_NORMALS = (
+    (math.sin(EDGE_LEAN), math.cos(EDGE_LEAN), 0.0),
+    (math.sin(EDGE_LEAN), -math.cos(EDGE_LEAN), 0.0),
+)
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(
+        (_GEOM, "THICKNESS"),
+        (_GEOM, "PIVOT_END_R"),
+        (_GEOM, "TIP_STATION"),
+        (_GEOM, "END_HALF_WIDTH"),
+        (_GEOM, "PIN_STATION"),
+        (_GEOM, "PIN_HOLE_Z"),
+    ),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "DRAWING_PRECISION_BY_NAME",
+        (_SELF, "_PLATE_TAP_PLACES"),
+    ),
+)
+# Datum A: the front face, the ground stock's face as supplied.
+requirement(
+    "front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": (_plane("z", 0.0), (_FRAME, "PART_DATUMS")),
+        "datum": ("A", ("PART_DATUMS",)),
+    },
+)
+# The rear face: the stock's other ground face; the thickness is the stock's
+# 3/8 (.3750) GROUND STOCK REF, held by the supplier's band.
+requirement(
+    "rear_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), THICKNESS),),
+    requirements=("plane", "thickness_stock"),
+    fields={
+        "plane": (_plane("z", THICKNESS), ((_GEOM, "THICKNESS"),)),
+        "thickness_stock": (
+            [THICKNESS - THICKNESS_BAND, THICKNESS + THICKNESS_BAND],
+            ((_GEOM, "THICKNESS"), (_GEOM, "THICKNESS_BAND"), "STOCK_TEXT_SUFFIX"),
+        ),
+        "thickness_stock_nominal": (THICKNESS, ((_GEOM, "THICKNESS"),)),
+        "thickness_stock_from": ("front_face", ("STOCK_TEXT_PREFIX",)),
+        "callout": (
+            f"{STOCK_TEXT_PREFIX}{THICKNESS / 25.4:.4f}".replace("(0.", "(.") + STOCK_TEXT_SUFFIX,
+            ("STOCK_TEXT_PREFIX", "STOCK_TEXT_SUFFIX"),
+        ),
+    },
+)
+# The square end: 5.07 from the pivot axis (FRONT_KEEP "TipStation"), .55
+# wide (FRONT_KEEP "EndWidth"); the latch-pin hole enters it.
+requirement(
+    "end_face",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), TIP_STATION),),
+    requirements=("station", "width"),
+    fields={
+        "plane": (_plane("x", TIP_STATION), ((_GEOM, "TIP_STATION"),)),
+        "station": (
+            limits(TIP_STATION, _P["TipStation"], unit=UNIT),
+            ((_GEOM, "TIP_STATION"), (_GEOM, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "station_nominal": (TIP_STATION, ((_GEOM, "TIP_STATION"),)),
+        "station_from": ("pivot_bore", ((_SELF, "FRONT_KEEP"),)),
+        "station_axis": ("x", ((_SELF, "FRONT_KEEP"),)),
+        "width": (
+            limits(2.0 * END_HALF_WIDTH, _P["EndWidth"], unit=UNIT),
+            ((_GEOM, "END_HALF_WIDTH"), (_GEOM, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "width_nominal": (2.0 * END_HALF_WIDTH, ((_GEOM, "END_HALF_WIDTH"),)),
+    },
+    precision={"station": _P["TipStation"], "width": _P["EndWidth"]},
+)
+# The pivot end: R.49 about the pivot axis (FRONT_KEEP "PivotEndR"); its
+# far point is the (5.567) overall's start, its top and bottom the widest
+# the outline stands across.
+requirement(
+    "pivot_end",
+    kind="arc",
+    faces=(CylinderFace(2.0 * PIVOT_END_R),),
+    requirements=("radius",),
+    fields={
+        "center": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
+        "apex": ((-1.0, 0.0, 0.0), (_FRAME,)),
+        "radius": (
+            limits(PIVOT_END_R, _P["PivotEndR"], unit=UNIT),
+            ((_GEOM, "PIVOT_END_R"), (_GEOM, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "radius_nominal": (PIVOT_END_R, ((_GEOM, "PIVOT_END_R"),)),
+        "corners": (
+            [[0.0, PIVOT_END_R, 0.0], [0.0, -PIVOT_END_R, 0.0]],
+            ((_GEOM, "PIVOT_END_R"),),
+        ),
+        "overall_ref": (OVERALL_LENGTH, ("OVERALL_LENGTH", (_SELF, "OVERALL_TEXT_XY"))),
+    },
+    precision={"radius": _P["PivotEndR"], "overall_ref": DRAWING_REFERENCE_PRECISION},
+)
+# The two straight flanks, tangent to the pivot round, leaning in (2.4°)
+# toward the square end (sheet 2 PIN_PLAN_KEEP "FlankAngle", a reference):
+# the printed radius and end width govern them.
+requirement(
+    "flanks",
+    kind="tapered_side",
+    faces=tuple(PlanarFace(normal, PIVOT_END_R) for normal in _FLANK_NORMALS),
+    requirements=("angle_ref_deg",),
+    fields={
+        "normals": (
+            [list(normal) for normal in _FLANK_NORMALS],
+            ((_GEOM, "EDGE_LEAN"), (_GEOM, "PIVOT_END_R")),
+        ),
+        "angle_ref_deg": (
+            math.degrees(EDGE_LEAN),
+            ((_GEOM, "EDGE_LEAN"), (_SELF, "PIN_PLAN_KEEP")),
+        ),
+        "dimension_type": ("reference", ((_SELF, "REFERENCE_DIMENSIONS"),)),
+        "tangent_to": ("pivot_end", ((_GEOM, "EDGE_LEAN"),)),
+        "tangent_y_ref": (PIVOT_TANGENT_Y, ((_GEOM, "PIVOT_TANGENT_Y"),)),
+        "half_width_at_pin_ref": (
+            edge_half_width(PIN_STATION), ((_GEOM, "edge_half_width"), (_GEOM, "PIN_STATION"))
+        ),
+        "corners": (
+            [[TIP_STATION, END_HALF_WIDTH, 0.0], [TIP_STATION, -END_HALF_WIDTH, 0.0]],
+            ((_GEOM, "TIP_STATION"), (_GEOM, "END_HALF_WIDTH")),
+        ),
+    },
+    precision={"angle_ref_deg": _P["FlankAngle"]},
+)
+# Datum B: the pivot bore, Ø.1940 +.0010/.0000 REAM THRU (FRONT_KEEP
+# "PivotBoreDia"), a running fit on the MHA-PD-VN-57 shoulder (note 1).
+_PIVOT_REAM = ((_NOTES, "PIVOT_BORE_CALLOUT"), (_SELF, "FRONT_KEEP"))
+requirement(
+    "pivot_bore",
+    kind="hole",
+    faces=(CylinderFace(PIVOT_BORE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "at": ([0.0, 0.0, THICKNESS], ((_GEOM, "THICKNESS"),)),
+        "axis": ([0.0, 0.0, -1.0], (_FRAME,)),
+        "dia": (
+            limits(PIVOT_BORE_DIA, _P["PivotBoreDia"], PIVOT_BORE_DIA_BAND, unit=UNIT),
+            ((_GEOM, "PIVOT_BORE_DIA"), (_GEOM, "PIVOT_BORE_DIA_BAND"), *_PIVOT_REAM),
+        ),
+        "nominal_dia": (PIVOT_BORE_DIA, ((_GEOM, "PIVOT_BORE_DIA"),)),
+        "process": ("ream", _PIVOT_REAM),
+        "thru": (True, _PIVOT_REAM),
+        "datum": ("B", ("PART_DATUMS",)),
+        "diametral_clearance": (
+            list(PIVOT_BORE_DIAMETRAL_CLEARANCE),
+            ((_GEOM, "PIVOT_BORE_DIAMETRAL_CLEARANCE"), (_NOTES, "NOTES")),
+        ),
+        "mate": ("MHA-PD-VN-57", ((_NOTES, "NOTES"),)),
+        "callout": (PIVOT_BORE_CALLOUT, ((_NOTES, "PIVOT_BORE_CALLOUT"),)),
+    },
+    precision={"dia": _P["PivotBoreDia"]},
+)
+# The rear spot face on the pivot: Ø.500 +.004/.000, its floor .2717 ±.002
+# from the FRONT face (SECTION_KEEP "SpotFaceDia", "FloorDepth"; note 4: it
+# seats and preloads the MHA-PD-VN-63 spring).
+requirement(
+    "spot_face",
+    kind="counterbore",
+    faces=(
+        CylinderFace(SPOT_FACE_DIA),
+        PlanarFace((0.0, 0.0, 1.0), SPOT_FACE_FLOOR_FROM_FRONT),
+    ),
+    requirements=("dia", "floor"),
+    fields={
+        "plane": (_plane("z", SPOT_FACE_FLOOR_FROM_FRONT), ((_GEOM, "SPOT_FACE_FLOOR_FROM_FRONT"),)),
+        "entry": ([0.0, 0.0, THICKNESS], ((_GEOM, "THICKNESS"),)),
+        "axis": ([0.0, 0.0, -1.0], (_FRAME,)),
+        "about": ("pivot_bore", ((_SELF, "SECTION_KEEP"),)),
+        "dia": (
+            limits(SPOT_FACE_DIA, _P["SpotFaceDia"], SPOT_FACE_DIA_BAND, unit=UNIT),
+            ((_GEOM, "SPOT_FACE_DIA"), "SPOT_FACE_DIA_BAND", (_SELF, "SECTION_KEEP")),
+        ),
+        "nominal_dia": (SPOT_FACE_DIA, ((_GEOM, "SPOT_FACE_DIA"),)),
+        "floor": (
+            limits(
+                SPOT_FACE_FLOOR_FROM_FRONT,
+                _P["FloorDepth"],
+                (SPOT_FACE_FLOOR_TOLERANCE, -SPOT_FACE_FLOOR_TOLERANCE),
+                unit=UNIT,
+            ),
+            (
+                (_GEOM, "SPOT_FACE_FLOOR_FROM_FRONT"),
+                (_GEOM, "SPOT_FACE_FLOOR_TOLERANCE"),
+                (_SELF, "SECTION_KEEP"),
+            ),
+        ),
+        "floor_nominal": (SPOT_FACE_FLOOR_FROM_FRONT, ((_GEOM, "SPOT_FACE_FLOOR_FROM_FRONT"),)),
+        "floor_from": ("front_face", ((_SELF, "SECTION_KEEP"),)),
+        "depth_ref": (
+            THICKNESS - SPOT_FACE_FLOOR_FROM_FRONT,
+            ((_GEOM, "THICKNESS"), (_GEOM, "SPOT_FACE_FLOOR_FROM_FRONT")),
+        ),
+        "callout": (SPRING_CALLOUT, ((_NOTES, "SPRING_CALLOUT"),)),
+    },
+    precision={"dia": _P["SpotFaceDia"], "floor": _P["FloorDepth"]},
+)
+# Datum C: the pin bore, Ø.1260 +.0005/.0000 REAM THRU (FRONT_KEEP
+# "PinBoreDia"), 2.7093 BASIC from B, ⌖ Ø.004 A|B and ⊥ Ø.001 A (section
+# A-A); note 5: the MHA-PD-23 pin's land is turned to the measured ream.
+_PIN_REAM = ((_NOTES, "PIN_BORE_CALLOUT"), (_SELF, "FRONT_KEEP"))
+requirement(
+    "pin_bore",
+    kind="hole",
+    faces=(CylinderFace(PIN_BORE_DIA, contains_x_mm=PIN_STATION),),
+    requirements=("dia", "thru", "position_dia_max", "perpendicularity_dia_max"),
+    fields={
+        "at": ([PIN_STATION, 0.0, THICKNESS], ((_GEOM, "PIN_STATION"), (_GEOM, "THICKNESS"))),
+        "axis": ([0.0, 0.0, -1.0], (_FRAME,)),
+        "dia": (
+            limits(PIN_BORE_DIA, _P["PinBoreDia"], PIN_BORE_DIA_BAND, unit=UNIT),
+            ((_GEOM, "PIN_BORE_DIA"), (_GEOM, "PIN_BORE_DIA_BAND"), *_PIN_REAM),
+        ),
+        "nominal_dia": (PIN_BORE_DIA, ((_GEOM, "PIN_BORE_DIA"),)),
+        "process": ("ream", _PIN_REAM),
+        "thru": (True, _PIN_REAM),
+        "datum": ("C", ("PART_DATUMS",)),
+        "station_basic": (PIN_STATION, ((_GEOM, "PIN_STATION"), "BASIC_REDUCER_DIMENSIONS")),
+        "station_basic_from": ("pivot_bore", ((_SELF, "FRONT_KEEP"),)),
+        "station_basic_axis": ("x", ((_SELF, "FRONT_KEEP"),)),
+        "position_dia_max": (GEOMETRIC_TOLERANCES_MM["position"], ("GEOMETRIC_CONTROLS",)),
+        "position_datums": ("A|B", ("GEOMETRIC_CONTROLS",)),
+        "perpendicularity_dia_max": (
+            GEOMETRIC_TOLERANCES_MM["perpendicularity"], ("GEOMETRIC_CONTROLS",)
+        ),
+        "perpendicularity_datums": ("A", ("GEOMETRIC_CONTROLS",)),
+        "diametral_interference": (
+            list(PIN_PRESS_INTERFERENCE), ("PIN_PRESS_INTERFERENCE", (_NOTES, "NOTES"))
+        ),
+        "mate": ("MHA-PD-23", ((_NOTES, "NOTES"),)),
+        "callout": (PIN_BORE_CALLOUT, ((_NOTES, "PIN_BORE_CALLOUT"),)),
+    },
+    precision={"dia": _P["PinBoreDia"], "station_basic": _P["PinStation"]},
+)
+# The pin bore's rear mouth (opposite datum A): .008 ±.002 X 45° (section
+# D-D PIN_SECTION_KEEP "PinMouthChamfer"), clearing the MHA-PD-23 seat fillet.
+requirement(
+    "pin_mouth",
+    kind="chamfer",
+    faces=(ConeFace(45.0, contains_x_mm=PIN_STATION),),
+    requirements=("leg",),
+    fields={
+        "leg": (
+            list(PIN_MOUTH_CHAMFER_LIMITS),
+            ((_GEOM, "PIN_MOUTH_CHAMFER_LIMITS"), (_SELF, "PIN_SECTION_KEEP")),
+        ),
+        "leg_nominal": (PIN_MOUTH_CHAMFER, ((_GEOM, "PIN_MOUTH_CHAMFER"),)),
+        "angle_deg": (45.0, ((_NOTES, "PIN_MOUTH_CALLOUT"),)),
+        "edge_of": ("pin_bore", ((_NOTES, "PIN_MOUTH_CALLOUT"),)),
+        "at_face": ("rear_face", ((_NOTES, "PIN_MOUTH_CALLOUT"),)),
+        "callout": (PIN_MOUTH_CALLOUT, ((_NOTES, "PIN_MOUTH_CALLOUT"),)),
+    },
+    precision={"leg": _P["PinMouthChamfer"]},
+)
+# The latch-pin hole, reamed blind along -X into the square end: Ø.1250
+# -.0005/-.0010 REAM, full diameter (.38) MIN deep over a drill point
+# (END_KEEP "PinHoleDia", SECTION_KEEP "PinHoleDepth"), .188 from face A
+# (END_KEEP "PinHoleZ"); note 3: the MHA-PD-VN-58 press.
+_LATCH_REAM = ((_NOTES, "PIN_HOLE_CALLOUT"), (_SELF, "END_KEEP"))
+requirement(
+    "latch_pin_hole",
+    kind="hole",
+    faces=(CylinderFace(PIN_HOLE_DIA, contains_x_mm=TIP_STATION - PIN_HOLE_DEPTH / 2.0),),
+    requirements=("dia", "depth", "height"),
+    fields={
+        "at": ([TIP_STATION, 0.0, PIN_HOLE_Z], ((_GEOM, "TIP_STATION"), (_GEOM, "PIN_HOLE_Z"))),
+        "axis": ([-1.0, 0.0, 0.0], (_FRAME,)),
+        "dia": (
+            limits(PIN_HOLE_DIA, _P["PinHoleDia"], PIN_HOLE_DIA_BAND, unit=UNIT),
+            ((_GEOM, "PIN_HOLE_DIA"), (_GEOM, "PIN_HOLE_DIA_BAND"), *_LATCH_REAM),
+        ),
+        "nominal_dia": (PIN_HOLE_DIA, ((_GEOM, "PIN_HOLE_DIA"),)),
+        "process": ("ream", _LATCH_REAM),
+        "depth": (
+            limits(PIN_HOLE_DEPTH, _P["PinHoleDepth"], PIN_HOLE_DEPTH_BAND, unit=UNIT),
+            ((_GEOM, "PIN_HOLE_DEPTH"), "PIN_HOLE_DEPTH_BAND", (_SELF, "SECTION_KEEP")),
+        ),
+        "depth_nominal": (PIN_HOLE_DEPTH, ((_GEOM, "PIN_HOLE_DEPTH"),)),
+        "depth_printed": ("MIN", ((_SELF, "SECTION_KEEP"), "PIN_HOLE_DEPTH_BAND")),
+        "height": (
+            limits(PIN_HOLE_Z, _P["PinHoleZ"], unit=UNIT),
+            ((_GEOM, "PIN_HOLE_Z"), (_GEOM, "UNIT"), (_SELF, "END_KEEP")),
+        ),
+        "height_nominal": (PIN_HOLE_Z, ((_GEOM, "PIN_HOLE_Z"),)),
+        "height_from": ("front_face", ((_SELF, "END_KEEP"),)),
+        "diametral_interference": (
+            list(LATCH_PIN_PRESS_PRINTED), ("LATCH_PIN_PRESS_PRINTED", (_NOTES, "NOTES"))
+        ),
+        "mate": (LATCH_PIN_NUMBER, ("LATCH_PIN_NUMBER",)),
+        "callout": (PIN_HOLE_CALLOUT, ((_NOTES, "PIN_HOLE_CALLOUT"),)),
+    },
+    precision={"dia": _P["PinHoleDia"], "depth": _P["PinHoleDepth"], "height": _P["PinHoleZ"]},
+)
+# The 2X dowel holes: Ø.0930 +.0005/.0000 2X REAM THRU (FRONT_KEEP
+# "LocatorDia1"), BASIC sites (LocatorX1, LocatorY1, LocatorY2) under ⌖ Ø.004
+# A|B|C.  Note 2: match-drilled with MHA-PD-19 and reamed at assembly
+# (MHA-PD-00); this traveler does not make them.
+_LOCATOR_SOURCES = ((_GEOM, "LOCATOR_SITES_MM"), "BASIC_REDUCER_DIMENSIONS")
+requirement(
+    "dowel_holes",
+    kind="assembly_hole",
+    faces=tuple(
+        CylinderFace(LOCATOR_HOLE_DIA_MM, contains_x_mm=x, contains_y_mm=y)
+        for x, y in LOCATOR_SITES_MM
+    ),
+    requirements=("dia",),
+    fields={
+        "count": (len(LOCATOR_SITES_MM), _LOCATOR_SOURCES),
+        "axis": ([0.0, 0.0, -1.0], (_FRAME,)),
+        "station_basic": (LOCATOR_SITES_MM[0][0], _LOCATOR_SOURCES),
+        "offset_basic": (abs(LOCATOR_SITES_MM[0][1]), _LOCATOR_SOURCES),
+        "dia": (
+            list(LOCATOR_HOLE_PRINTED_LIMITS_MM),
+            ((_GEOM, "LOCATOR_HOLE_PRINTED_LIMITS_MM"), (_SELF, "FRONT_KEEP")),
+        ),
+        "dia_ref": (LOCATOR_HOLE_DIA_MM, ((_GEOM, "LOCATOR_HOLE_DIA_MM"),)),
+        "thru": (True, ((_NOTES, "LOCATOR_CALLOUT_TEXT"),)),
+        "position_dia_max": (GEOMETRIC_TOLERANCES_MM["position"], ("GEOMETRIC_CONTROLS",)),
+        "position_datums": ("A|B|C", ("GEOMETRIC_CONTROLS",)),
+        "diametral_interference": (
+            list(LOCATOR_PRESS_INTERFERENCE), ("LOCATOR_PRESS_INTERFERENCE", (_NOTES, "NOTES"))
+        ),
+        "made_at": ("assembly", ((_NOTES, "NOTES"),)),
+        "made_with": ("MHA-PD-19", ((_NOTES, "NOTES"),)),
+        "callout": (LOCATOR_CALLOUT_TEXT, ((_NOTES, "LOCATOR_CALLOUT_TEXT"),)),
+        "note": (NOTES[1], ((_NOTES, "NOTES"),)),
+    },
+    precision={
+        "dia": _P["LocatorDia1"],
+        "station_basic": _P["LocatorX1"],
+        "offset_basic": _P["LocatorY1"],
+    },
+)
+# The 2X 8-32 UNC plate taps, Ø.136 THRU ALL (the native tap callout): spotted
+# through MHA-PD-19's screw holes, drilled and tapped at assembly
+# (PLATE_TAP_QUALIFIER); their stations print as references.
+_TAP_SOURCES = ((_GEOM, "PLATE_TAP_SPEC"), (_SELF, "TAP_CALLOUTS"))
+_TAP_STATIONS = ((_GEOM, "PLATE_TAP_STATIONS"), (_SELF, "TAP_STATION_REFERENCES"))
+requirement(
+    "plate_taps",
+    kind="assembly_hole",
+    faces=tuple(CylinderFace(_PLATE_TAP_DRILL, contains_x_mm=x) for x in PLATE_TAP_STATIONS),
+    requirements=("thread", "dia"),
+    fields={
+        "count": (len(PLATE_TAP_STATIONS), ((_GEOM, "PLATE_TAP_STATIONS"),)),
+        "axis": ([0.0, 0.0, -1.0], (_FRAME,)),
+        "thread": (f"{PLATE_TAP_SPEC.size} UNC-2B", _TAP_SOURCES),
+        "dia": (
+            drilled_limits(_PLATE_TAP_DRILL, _PLATE_TAP_PLACES, unit=UNIT),
+            (*_TAP_SOURCES, ("_hole_spec", "blind_cut_dia_mm"), (_SELF, "_PLATE_TAP_PLACES")),
+        ),
+        "nominal_dia": (_PLATE_TAP_DRILL, (("_hole_spec", "blind_cut_dia_mm"),)),
+        "thru": (True, _TAP_SOURCES),
+        "station_1_ref": (PLATE_TAP_STATIONS[0], _TAP_STATIONS),
+        "station_2_ref": (PLATE_TAP_STATIONS[1], _TAP_STATIONS),
+        "made_at": ("assembly", ((_NOTES, "PLATE_TAP_QUALIFIER"),)),
+        "made_with": ("MHA-PD-19", ((_NOTES, "PLATE_TAP_QUALIFIER"),)),
+        "qualifier": (PLATE_TAP_QUALIFIER, ((_NOTES, "PLATE_TAP_QUALIFIER"),)),
+    },
+    precision={
+        "dia": _PLATE_TAP_PLACES,
+        "station_1_ref": _P["PlateTapStation1"],
+        "station_2_ref": _P["PlateTapStation2"],
+    },
 )
 
 

@@ -24,4 +24,13 @@ note = "Ownership only; its facts are cad/process/shop/, same key. Explicit on_h
 kind = "lathe"
 status = "on_hand"
 tailstock_taper = "MT3"
-note = "Ownership and the tailstock taper only; its other facts are cad/process/shop/, same key. Explicit on_hand preserves the pre-split ASSEMBLY.md OWNED, which read a shop.toml record with no present key as owned."
+# The maker's product page, specifications table (Precision Matthews
+# PM-1127VF-LB; read 2026-11-23 from its Wayback copy of 2019-12-31, the live
+# page now 404): "Spindle Bore 1-1/2″", "Longitudinal Feeds .0025-.012 IPR",
+# "Cross Feeds .001-.0056 IPR". prechips has no field for them. The bore is
+# the spindle's; the 4-jaw's through bore is not on record.
+spindle_bore_in = 1.5
+longitudinal_feed_in_rev = [0.0025, 0.012]
+cross_feed_in_rev = [0.001, 0.0056]
+cite = ["Precision Matthews, PM-1127VF-LB product page, specifications (Wayback 2019-12-31, read 2026-11-23): Spindle Bore 1-1/2 in; Longitudinal Feeds .0025-.012 IPR; Cross Feeds .001-.0056 IPR: http://web.archive.org/web/20191231175250/http://www.precisionmatthews.com/shop/pm-1127vf-lb/"]
+note = "Ownership, the tailstock taper, the spindle bore and the power-feed ranges; its other facts are cad/process/shop/, same key. Explicit on_hand preserves the pre-split ASSEMBLY.md OWNED, which read a shop.toml record with no present key as owned."
