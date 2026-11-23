@@ -60,8 +60,9 @@ description = "Plug gauge pair, .2500 GO (plus) and .2510 NO-GO (minus), Vermont
 # pin's Class ZZ tolerance, .0002 in = 0.00508 mm. The K bore's .4375-.4382
 # band is the odd one (tool audit row plug-gauges-4375-4382): its NO-GO is a
 # .4380 plus pin, .4380-.4382, at or under the .4382 limit. Bands only pd
-# plans gauge: .1240-.1245 (MHA-PD-18), .4375-.4382 (MHA-PD-19), .0615-.0620
-# (MHA-PD-17, MHA-PD-22), .1920-.1925 (MHA-PD-22).
+# plans gauge: .1240-.1245 (MHA-PD-18), .4375-.4382 (MHA-PD-19, and MHA-PD-28
+# re-gauging PD-19's hole with the same pins), .0615-.0620 (MHA-PD-17,
+# MHA-PD-22), .1920-.1925 (MHA-PD-22).
 [gauges.zz-pins-1240-1245]
 range_mm = [3.1496, 3.1623]
 resolution_mm = 0.00508
