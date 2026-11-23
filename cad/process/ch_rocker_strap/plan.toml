@@ -189,22 +189,26 @@ outline_finish_stock_mm = 0.2
 outline_skin_mm = 0.25
 outline_breakthrough_mm = 0.165
 # Depth levels (R3, owner 2026-11-23: "no need to bring to me ; make coarser
-# as you see fit"). The bond no longer binds; the 1/8 in end mill slotting
-# 1018 is not in measured-cuts.toml, so no level is deeper than the deepest
-# the same cutter at the same setting slots in 1018 in a reviewed traveler
-# on main: ch_connecting_rod Setup 6 ("Face F: outline on tabs"), program
-# CR08_outline, cut "outline", 1.185 mm (its outline_level_mm). That
-# precedent binds:
-# - fence sliver, top to the through Z (2.654 mm): 3 levels of .885 (was 4
-#   of .642 at the old .75 mm bond limit);
-# - outline rough, top to the skin (the 2.239 mm wall): 2 levels of 1.120
-#   (was 14 of .160 at the old .17 mm bond limit);
+# as you see fit"). Two limits: the bond's accepted 0.6 MPa, a cap (prechips
+# refuses a cut whose lift asks more), and, the 1/8 in end mill slotting 1018
+# being unmeasured (not in measured-cuts.toml), no level deeper than the
+# deepest the same cutter at the same setting slots in 1018 in a reviewed
+# traveler on main: ch_connecting_rod Setup 6 ("Face F: outline on tabs"),
+# program CR08_outline, cut "outline", 1.185 mm (its outline_level_mm).
+# - fence sliver, the blank whole (38.1 mm wide), top to the through Z
+#   (2.654 mm): the precedent binds, 3 levels of .885 (was 4 of .642 at the
+#   old .75 mm bond limit);
+# - outline rough, judged on the strap alone (16 mm wide), top to the skin
+#   (the 2.239 mm wall): the bond cap binds, 4 levels of .560, a lift of
+#   0.46 MPa; the next coarser, 3 levels of .746, would ask 0.61 MPa (prechips:
+#   1.185 mm levels ask 0.972). Was 14 of .160 at the old .17 mm bond limit;
 # - finish pass, one level over the wall depth (cad.outline_wall_depth_mm),
 #   unchanged;
 # - through cut, the skin and the breakthrough (cad.outline_through_depth_mm,
-#   .415 mm), one level (was 2 of .165 at the old .17 mm bond limit): its
-#   cut is declared at that depth. The skin itself stays: it is the
-#   thin-part limit that keeps the freed pieces joined until the last pass.
+#   .415 mm): one level (about 0.34 MPa; was 2 of .165 at the old .17 mm bond
+#   limit), outline_through_step_mm that whole depth. The skin itself stays:
+#   it is the thin-part limit that keeps the freed pieces joined until the
+#   last pass.
 fence_sliver_step_mm = 1.185
 outline_rough_step_mm = 0.56
 outline_through_step_mm = 0.415
@@ -586,8 +590,11 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
+instruction = "Drop the hub plug TL-02 into the counterbore, pilot up. Back the edge clamps off clear of the blank's place."
+feed = "hand"
+
+[[setups.operations]]
 steps = [
-  { kind = "action", text = "Drop the hub plug TL-02 into the counterbore, pilot up. Back the edge clamps off clear of the blank's place." },
   { kind = "action", text = "GH1200 thick CA (the 1500 cps bottle) on the plate's tape: a zigzag bead about 1/16 wide, lines about 3/4 apart, kept 1/4 inside the blank's place and clear of the counterbore, about 20 in of bead. No glue on bare metal." },
   { kind = "action", text = "Mist Starbond accelerator on the blank's tape (the face with no glue), two or three sprays." },
 ]
