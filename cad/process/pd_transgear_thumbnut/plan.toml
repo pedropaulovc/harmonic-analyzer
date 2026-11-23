@@ -475,7 +475,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A step at the corner, or the cone short of the face: repeat the last cone pass. Floor off its DRO figure (Op 230): recut it before the cone. Still over {{process.floor_flat_read_max_in:.3dot}} (Op 240): X reading under D0 − .001 (the dish cut .003 or more large: the rim may pass .60), scrapped; else the part stands. Under {{process.floor_flat_read_min_in:.3dot}}: touch off X again (Op 220), face the floor out to X Ø{{process.recess_corner_x_dro_in:.3dot}} and repeat the cone passes."
+instruction = "A step at the corner, or the cone short of the face: repeat the last cone pass. Floor off its DRO figure (Op 230): recut it before the cone. Still over {{process.floor_flat_read_max_in:.3dot}} (Op 240), the crest reading X: under D0 − .001 (dish .003+ large), scrapped; over D0 + .005 (dish .003+ small), or a floor under {{process.floor_flat_read_min_in:.3dot}}: touch off X again (Op 220), face the floor out to X Ø{{process.recess_corner_x_dro_in:.3dot}} and repeat the cone passes; between, the part stands."
 feed = "hand"
 
 [[setups.operations]]
