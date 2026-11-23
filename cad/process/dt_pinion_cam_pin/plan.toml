@@ -60,6 +60,12 @@ ball_turner_rule_in = 0.3125
 # A trial offcut of the same rod, sawn with the blanks, for setting the
 # radius: the .40 stickout plus about .6 in the jaws.
 trial_offcut_in = 1.0
+# The crown's height band read in Op 230, from the drawing's R.11–.13 on the
+# Ø.15625 rod (r .078125): .13 − √(.13² − r²) = .0261 and
+# .11 − √(.11² − r²) = .0326, printed inward at four places (.0261–.0325);
+# the gauge band is the adapter's exact cad.dome_far_height_band_mm.
+crown_height_min_in = 0.0261
+crown_height_max_in = 0.0325
 # Sawn a little over the faced length: about .02 in to face off each end.
 blank_length_in = 0.86
 as_supplied_outer = 1
@@ -268,7 +274,7 @@ instruction = "A flat at the apex: the pivot is short of the axis: one more swee
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Take the pin out and stand it on end A on the surface plate, held upright against the 1-2-3 block's face. With the height gauge read the apex; then lower the scriber until its tip, slid in across the top, just stops on the O.D.'s top edge (the crown's root) and read it. Root length = that reading; crown height = apex − root."
-inspection = "Root length {{cad.dome_far_root_station_min_in:.2dot}}–{{cad.dome_far_root_station_max_in:.2dot}} from end A; crown {{cad.dome_far_height_min_in:.3dot}}–{{cad.dome_far_height_max_in:.3dot}} high (R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}})."
+inspection = "Root length {{cad.dome_far_root_station_min_in:.2dot}}–{{cad.dome_far_root_station_max_in:.2dot}} from end A; crown {{process.crown_height_min_in:.4dot}}–{{process.crown_height_max_in:.4dot}} high (R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}})."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.dome_far_root_station_band_mm}}" }, { gauge = "height-gauge", band_mm = "{{cad.dome_far_height_band_mm}}" }]
 
 [[setups.operations]]
