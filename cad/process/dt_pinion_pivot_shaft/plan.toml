@@ -34,7 +34,7 @@ title = "Pinion Pivot Shaft"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished steel, precision-ground round, 1/4 in"
-stock = "Ø{{process.stock_dia_in:.4dot}} ground bar (to order, not on hand); one blank {{process.blank_length_in:.2dot}} in long."
+stock = "Ø{{process.stock_dia_in:.4dot}} ground bar (to order, not on hand); one blank {{process.blank_length_in:.2dot}} in long and one {{process.trial_offcut_in:.2dot}} in trial offcut (allow two saw kerfs)."
 note = "Inches, unless marked mm (the settings' feeds). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil. The O.D. is left as supplied: grip it over a brass shim wrap and never cut it."
 shop = "../shop"
 stock_refs = ["1018-ground-round-1-4"]
@@ -223,7 +223,7 @@ gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.dome_far_height_band_
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Crown too low (the scriber at the first setting stops on the O.D.): move the bit in a little; too high: move it out. Chuck the offcut again as Op 60, face the crown off and repeat Ops 70–140. Once it passes, leave the bit's set screw alone until both crowns are cut."
+instruction = "Crown too low (the scriber at the first setting stops on the O.D.): move the bit in a little; too high: move it out. Chuck the offcut again as Op 60, face the crown off and repeat Op 70 and Ops 100–140 (the bit stays where you moved it; skip Ops 80–90). Once it passes, leave the bit's set screw alone until both crowns are cut."
 
 [[setups]]
 machine_kind = "lathe"
@@ -296,9 +296,7 @@ instruction = "A flat at the apex: the pivot is short of the axis: one more swee
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Take the shaft out, stand it on end A against the 1-2-3 block as Op 170 and read crown B's apex with the height gauge: the apex is on the faced plane, so it still reads the faced length."
-inspection = "Apex {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}} over end A."
-gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.faced_length_band_mm}}" }]
+instruction = "Take the shaft out and stand it on end A against the 1-2-3 block as Op 170. Read crown B's apex with the height gauge and compare it with the Op 170 length: no lower shows the carriage held during the sweep. A diagnostic only: Op 260 and Op 350 accept the shaft."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -308,7 +306,7 @@ gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.dome_far_height_band_
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Apex under {{cad.faced_length_min_in:.3dot}} (the carriage moved during the sweep), or crown B outside its band: the shaft is scrap; make another from Setup 1."
+instruction = "Crown B outside its band: the shaft is scrap; make another from Setup 1."
 
 [[setups]]
 machine_kind = "lathe"

@@ -40,7 +40,7 @@ title = "Fulcrum Shaft"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished steel, precision-ground round, 1/4 in"
-stock = "Ø{{process.stock_dia_in:.4dot}} ground bar (to order, not on hand); one blank {{process.blank_length_in:.2dot}} in long."
+stock = "Ø{{process.stock_dia_in:.4dot}} ground bar (to order, not on hand); one blank {{process.blank_length_in:.2dot}} in long and one {{process.trial_offcut_in:.2dot}} in trial offcut (allow two saw kerfs)."
 note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil. The O.D. is left as supplied: grip it over a brass shim wrap (lathe) and never cut it. Home the mill ($H) and touch off G54 before the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Prove the file in air first."
 shop = "../shop"
 stock_refs = ["1018-ground-round-1-4"]
@@ -263,7 +263,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Light at the leaf's ends (dome too round): move the bit out a little; light at its middle, or a ridge at the O.D. (too flat): move it in. Face the dome off (Op 50) and repeat Ops 60–130. Once it passes, leave the bit's set screw alone until both domes are cut."
+instruction = "Light at the leaf's ends (dome too round): move the bit out a little; light at its middle, or a ridge at the O.D. (too flat): move it in. Face the dome off (Op 50) and repeat Op 60 and Ops 90–130 (the bit stays where you moved it; skip Ops 70–80). Once it passes, leave the bit's set screw alone until both domes are cut."
 
 [[setups]]
 machine_kind = "lathe"
@@ -326,13 +326,13 @@ instruction = "Between the last sweeps, spindle stopped, look at the apex under 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: look at the far dome under the loupe, then hold the {{cad.dome_far_form_radius_in:fraction}} radius leaf square across it through the axis, at two places 90° apart, against a light."
-inspection = "No pip, flat or ring at the tip; no step or ridge where the dome meets the O.D.; no light under the {{cad.dome_far_form_radius_in:fraction}} leaf."
+instruction = "Spindle stopped: look at the far dome under the loupe, all round. Its SR is a REF size, set by the trial (Op 130): no leaf check here."
+inspection = "No pip, flat or ring at the tip; no step or ridge where the dome meets the O.D."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A flat at the tip: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 200), then Op 220 again. A ring or point at the tip, a step or ridge at the O.D., or light under the leaf: scrap the shaft and make another from Setup 1."
+instruction = "A flat at the tip: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 200), then Op 220 again. A ring or point at the tip, or a step or ridge at the O.D.: scrap the shaft and make another from Setup 1."
 
 [[setups]]
 machine_kind = "lathe"
@@ -379,13 +379,13 @@ instruction = "Between the last sweeps, spindle stopped, look at the apex under 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: look at the datum dome under the loupe, then hold the {{cad.dome_datum_form_radius_in:fraction}} radius leaf square across it through the axis, at two places 90° apart, against a light."
-inspection = "No pip, flat or ring at the tip; no step or ridge where the dome meets the O.D.; no light under the {{cad.dome_datum_form_radius_in:fraction}} leaf."
+instruction = "Spindle stopped: look at the datum dome under the loupe, all round (its SR is a REF size, set by the trial)."
+inspection = "No pip, flat or ring at the tip; no step or ridge where the dome meets the O.D."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A flat at the tip: one more sweep with the cross slide in .001 (Op 270), then Op 290 again. A ring or point at the tip, a step or ridge at the O.D., or light under the leaf: scrap the shaft and make another from Setup 1."
+instruction = "A flat at the tip: one more sweep with the cross slide in .001 (Op 270), then Op 290 again. A ring or point at the tip, or a step or ridge at the O.D.: scrap the shaft and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -395,7 +395,7 @@ gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.faced_length_band_mm}
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Under {{cad.faced_length_min_in:.3dot}}: a carriage moved during a sweep: scrap the shaft and make another from Setup 1."
+instruction = "Under {{cad.faced_length_min_in:.3dot}} (a carriage moved during a sweep) or over {{cad.faced_length_max_in:.3dot}}: scrap the shaft and make another from Setup 1."
 
 [[setups]]
 machine_kind = "other"
