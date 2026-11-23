@@ -207,7 +207,7 @@ speed_kind = "spindle"
 tool = "form"
 drilling = "none"
 sizing = "other"
-instruction = "Form the far-end dome: feed along Z to Z−{{cad.dome_far_form_height_in:.4dot}} (the dome's height on the Ø.250). The form then reaches the centre, the tip on the faced plane."
+instruction = "Form the far-end dome: feed along Z, the last passes .001, until the flat at the tip just disappears, and no further: the arc then reaches the centre, the tip on the faced plane. Note the DRO Z: the dome's height (Z−{{cad.dome_far_form_height_in:.4dot}} for a true R.160)."
 settings = "lathe-form-r160-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -217,15 +217,15 @@ instruction = "Look at the far-end dome under a light: no pip or flat at the tip
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A pip at the tip: the tool is off centre height. Reset its height; if that moved the tool along Z, touch the arc on the dome's rim (it now sits at Z−{{cad.dome_far_form_height_in:.4dot}}) and set the DRO Z to −{{cad.dome_far_form_height_in:.4dot}} there, not zero. Take one more light pass to Z−{{cad.dome_far_form_height_in:.4dot}}, never deeper (it would shorten the 6.85 length)."
+instruction = "A pip at the tip: the tool is off centre height. Reset its height; if that moved the tool along Z, touch the arc on the dome's rim and set the DRO Z to Op 80's reading there, not zero. Take one more light pass to that reading, never deeper (it would shorten the 6.85 length)."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A step on one side of the rim: the arc is not centred across the bar. Centre it, the arc touching the rim on both sides together, and set the DRO Z to −{{cad.dome_far_form_height_in:.4dot}} there, not zero (the rim sits at Z−{{cad.dome_far_form_height_in:.4dot}}). Take one more light pass to Z−{{cad.dome_far_form_height_in:.4dot}}."
+instruction = "A step on one side of the rim: the arc is not centred across the bar. Centre it, the arc touching the rim on both sides together, and set the DRO Z to Op 80's reading there, not zero (the rim sits at that depth). Take one more light pass to that reading."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A flat at the tip with the DRO at Z−{{cad.dome_far_form_height_in:.4dot}}: the form is not cut to R.160. Stop: the shaft is scrap and the tool goes back."
+instruction = "Op 80's reading outside Z−{{cad.dome_far_height_min_in:.3dot}} to Z−{{cad.dome_far_height_max_in:.3dot}} (the flat gone sooner, or still there deeper): the tool's radius is outside R.147–.181 and the dome out of its height band. Stop: the shaft is scrap and the tool goes back."
 
 [[setups]]
 machine_kind = "lathe"
@@ -248,7 +248,7 @@ speed_kind = "spindle"
 tool = "form"
 drilling = "none"
 sizing = "other"
-instruction = "Form the datum-end dome as Op 80: feed along Z to Z−{{cad.dome_datum_form_height_in:.4dot}}."
+instruction = "Form the datum-end dome as Op 80: feed along Z until the flat at the tip just disappears, no further, and note the DRO Z."
 settings = "lathe-form-r160-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -258,7 +258,7 @@ instruction = "Look at the datum-end dome under a light: no pip or flat at the t
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A fault: as Ops 100–120, never past Z−{{cad.dome_datum_form_height_in:.4dot}}."
+instruction = "A fault: as Ops 100–120, with Op 140's reading for Op 80's, never deeper."
 
 [[setups]]
 machine_kind = "other"
