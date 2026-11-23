@@ -119,12 +119,13 @@ entry_overhang_mm = 1.787
 tape_stack_mm = 0.28
 tape_stack_min_mm = 0.23
 tape_stack_max_mm = 0.33
-# Its strengths are the stresses the owner accepts, used as written (R2: "it
-# is widely used in industry with much heavier requirements; take it as
-# given it will work"; the same record's accepted_shear_kpa and
-# accepted_tensile_kpa). The operator proves each bond by a push test.
-bond_accepted_shear_mpa = 5.0
-bond_accepted_tensile_mpa = 5.0
+# Its strengths are the stresses accepted for the hold, used as written (R2:
+# "it is widely used in industry with much heavier requirements; take it as
+# given it will work"; the figure set by the planner as the owner delegated,
+# the same record's accepted_shear_kpa and accepted_tensile_kpa: 0.6 MPa, a
+# cap as well as an envelope). The operator proves each bond by a push test.
+bond_accepted_shear_mpa = 0.6
+bond_accepted_tensile_mpa = 0.6
 # The pieces the cut leaves on the tape (the recipe recomputes each): a
 # clip, its finger the narrowest width; a male and a female die half, each
 # at its narrowest; and the rest of each blank.
@@ -151,7 +152,9 @@ blank_area_mm2 = 4645.152
 # is held to (delegated ruling 2026-11-22: never above the maker's
 # published chip load). No precedent deeper: no other plan on main runs
 # this cutter. The thicker stack adds .007 to the cut, so four levels of
-# .0127 where the .006 tape took three of .0146.
+# .0127 where the .006 tape took three of .0146. The 0.6 MPa bond cap does
+# not bind: the cut asks 0.056 MPa in shear of the smallest piece (a male
+# die half) and no tension (a downcut).
 sheet_tip_z_mm = -0.1016
 sheet_tip_into_plate_mm = 0.1016
 through_margin_min_mm = 0.2
@@ -319,7 +322,7 @@ diagram = { file = "diagrams/sheet.svg", alt = "Plan of the spoil plate in the v
 # them, blank A and the cutter's way in beyond the plate's left end.
 envelope = { x_span_mm = ["{{process.blank_length_mm}}", "{{process.entry_overhang_mm}}"], y_span_mm = ["{{process.blank_width_mm}}", "{{process.blank_width_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.tape_stack_max_mm}}", "{{process.strip_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.sheet_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
-beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner, 2026-11-23", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{process.blank_area_mm2}}", width_mm = "{{process.blank_width_mm}}" }] } }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{process.blank_area_mm2}}", width_mm = "{{process.blank_width_mm}}" }] } }
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). Spoil plate on the 1 in parallels across the jaws, its back edge on the fixed jaw, centred along the jaws; close the vise and tap the plate down onto the parallels."
@@ -440,7 +443,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Run PC01_sheet (M6 T1, spindle off: set 2800; about 114 min). Each hole is plunged near its centre at a quarter of the feed and opened by two circles; then each clip is cut round; then each lamination round and split along its bow profile. Four levels each, the last {{process.sheet_tip_into_plate_mm:in.3dot}} into the spoil plate. Dry: air blast the chips off as it goes; no flood or mist coolant and no water (the paper tape soaks and lets go). A hot smell from the cut (CA softens with heat): feed hold, let it cool 5 minutes, then Cycle Start."
 settings = "endmill-carbide-3fl-1-32-downcut-c260"
-beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner, 2026-11-23", pieces = [{ name = "clip", kind = "part", area_mm2 = "{{process.clip_bond_area_mm2}}", width_mm = "{{process.clip_finger_width_mm}}" }, { name = "male die half", kind = "part", area_mm2 = "{{process.male_bond_area_mm2}}", width_mm = "{{process.lamination_flat_mm}}" }, { name = "female die half", kind = "part", area_mm2 = "{{process.female_bond_area_mm2}}", width_mm = "{{process.female_least_width_mm}}" }, { name = "waste A", kind = "waste", area_mm2 = "{{process.waste_a_bond_area_mm2}}" }, { name = "waste B", kind = "waste", area_mm2 = "{{process.waste_b_bond_area_mm2}}" }] } }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)", pieces = [{ name = "clip", kind = "part", area_mm2 = "{{process.clip_bond_area_mm2}}", width_mm = "{{process.clip_finger_width_mm}}" }, { name = "male die half", kind = "part", area_mm2 = "{{process.male_bond_area_mm2}}", width_mm = "{{process.lamination_flat_mm}}" }, { name = "female die half", kind = "part", area_mm2 = "{{process.female_bond_area_mm2}}", width_mm = "{{process.female_least_width_mm}}" }, { name = "waste A", kind = "waste", area_mm2 = "{{process.waste_a_bond_area_mm2}}" }, { name = "waste B", kind = "waste", area_mm2 = "{{process.waste_b_bond_area_mm2}}" }] } }
 milling_cuts = [
   { name = "sheet", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.sheet_cutter_dia_mm}}", axial_doc_mm = "{{process.level_depth_mm}}", radial_woc_mm = "{{process.sheet_cutter_dia_mm}}", traverse_mm = ["{{process.sheet_from_x_mm}}", "{{process.sheet_to_x_mm}}"] },
 ]
