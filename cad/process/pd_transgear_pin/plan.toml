@@ -32,7 +32,7 @@ title = "Transgear Pin"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished round, 1/4 in (drawing: Plain Carbon Steel)"
-stock = "Ø{{process.stock_dia_in:.4dot}} × {{process.bar_length_in:g}} in 1018 bar, on hand; the pin takes {{cad.pitch_in:.2dot}} in of it."
+stock = "Ø{{process.stock_dia_in:.4dot}} × {{process.bar_length_in:g}} in blank sawn off the 72 in 1018 bar on hand; the pin takes {{cad.pitch_in:.2dot}} in of it."
 note = "Inches. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil. One pin, turned to the MHA-PD-18 arm it presses into: make and ream that arm first, and read its ream in Op 10."
 shop = "../shop"
 stock_refs = ["1018-round-1-4"]  # owner 2026-11-19: the owned 1018 bar (registry alloy text: #3124)
@@ -47,7 +47,14 @@ part = "pd-transgear-pin"
 [parameters]
 quantity = 1
 stock_dia_in = 0.25
-bar_length_in = 72.0
+# An 8 in blank sawn off the 72 in bar on hand (authored; fleet rule, Main
+# 2026-11-22: no bar past the rear of the spindle). Chucked 2.61 out, 5.39 in
+# of it lies behind the jaw fronts, grip included, inside the working limit
+# cad/config/shop-equipment/machines.toml machines.pm-1127vf-lb
+# bar_behind_jaw_fronts_max_in (the spindle's length from the jaw fronts,
+# jaw_fronts_to_spindle_rear, is still to be measured by the owner). Yield:
+# the pin and one restart from Op 40 (each takes about 2.4 in).
+bar_length_in = 8.0
 chuck_grip_in = 0.75
 # The land's window over the ream's reading R. Pin R entering proves the ream
 # at least R - .00004 and pin R + .0001 refusing proves it under R + .00014
@@ -138,6 +145,11 @@ ref = "plug-gauges-1261-1264"
 status = "to_order"
 
 [[tools]]
+id = "saw"
+name = "Junior hacksaw, 6 in blade, 32 TPI"
+ref = "junior-hacksaw"
+
+[[tools]]
 id = "feelers"
 name = "Feeler gauge set, 32 leaves .0015-.035 (the .020 and .022 leaves)"
 ref = "feeler-gauges"
@@ -192,7 +204,7 @@ title = "Bar: tip end out on the centre; turn, groove, part off"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the bar, {{cad.stickout_in:.2dot}} in out of the jaw fronts (the pin, its kerf, the jaws' clearance and the {{process.centre_stub_in:.2dot}} in stub). The tailstock dead centre, greased, in the stub's centre hole from Op 60 until the stub is cut off in Op 180."
+holding = "The {{process.bar_length_in:g}} in blank, sawn off the bar with the junior hacksaw, in the 3-jaw {{cad.stickout_in:.2dot}} in out of the jaw fronts, the rest inside the chuck: nothing projects past the spindle's rear end (the pin, its kerf, the jaws' clearance and the {{process.centre_stub_in:.2dot}} in stub). The tailstock dead centre, greased, in the stub's centre hole from Op 60 until the stub is cut off in Op 180."
 datum = "Z0 (carriage DRO) the tip plane, {{process.centre_stub_in:.3dot}} in back from the bar end faced in Op 40; the sharp-nose tool is set on that faced end (Op 100); the grooving tool and the blade are set on the seat or the cut tip end as their ops say."
 diagram = { file = "diagrams/bar.svg", alt = "The 1/4 in bar in the 3-jaw, the tip end out: the journal, the press land and the head turned, the ring groove cut, the pin parted off at the head." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.groove_dia_min_mm}}", support = "tailstock" }
@@ -357,7 +369,7 @@ speed_kind = "spindle"
 tool = "blade"
 drilling = "none"
 sizing = "other"
-instruction = "Bring the blade's chuck-side face onto the cut tip end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with the blade's tailstock-side face at Z-{{cad.part_off_in:.3dot}}: the head end about .005 over the head's length, left for facing in Op 200. Catch the pin in a rag."
+instruction = "Bring the blade's chuck-side face onto the cut tip end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with the blade's tailstock-side face at Z-{{cad.part_off_in:.3dot}}: the head end about .005 over the head's length, left for facing in Op 200. The pin drops into a tray set on the ways under the cut, clear of the chuck; pick it up with the spindle stopped."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.step_head_dia_mm}}"
 
