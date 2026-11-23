@@ -21,25 +21,25 @@ X (7.56) along the sawn 8 in length, Y (7.00, the foot at -Y) along the
 bar's 8 in width, Z (2.50) across the 3 in thickness, centred in it. On the
 table on four 1-2-3 blocks under two end straps, side A (+Z) up: FR01 spots
 and drills two 13/32 stud holes through the slab inside the cavity. Studs up
-through them hold the slab by the uncut boss; the straps come off. FR02
-mills side A: the slant face, the pocket ring down to the web, the outline
-to just past the mid-plane, then chamfers the slant face's edges and
-grooves the cavity rim's chamfer into the web. Flipped end over end onto the
-same studs, the boss on the centre blocks and screw jacks under the end
-posts: FR03 mills side B the same way, the outline meeting side A's past the
-mid-plane. Two end straps then hold the frame by its posts and FR04 cuts the
-cavity through the web, freeing the boss on its studs. Standing on its top
-face, the foot up, under two straps: FR05 spots and drills the four foot
-holes.
+through them hold the slab by the uncut boss; the straps come off. Side A in
+three files: FR02 the rough levels, the pocket floor (the web) and the slant
+face; FR03 the pocket walls; FR04 the outline to just past the mid-plane,
+then the chamfer mill on the slant face's edges, the pocket rim and the
+cavity rim's groove in the web. Flipped end over end onto the same studs,
+the boss on the centre blocks and screw jacks under the end posts: FR05-FR07
+mill side B the same way, the outline meeting side A's past the mid-plane.
+Two end straps then hold the frame by its posts and FR08 cuts the cavity
+through the web, freeing the boss on its studs. Standing on its top face,
+the foot up, under two straps: FR09 spots and drills the four foot holes.
 
 Work frames (G54):
-- FR01-FR04: X0 Y0 the part's centre (FR01/FR02 between the sawn ends and
-  the bar's edges; FR03/FR04 on the stud holes and the bar's edges), Z0 the
-  slab's mid-plane (the top less half the miked thickness). FR01/FR02 +Z is
-  model +Z (side A up); FR03/FR04 the slab turned end over end about Y:
+- FR01-FR08: X0 Y0 the part's centre (FR01-FR04 between the sawn ends and
+  the bar's edges; FR05-FR08 on the stud holes and the bar's edges), Z0 the
+  slab's mid-plane (the top less half the miked thickness). FR01-FR04 +Z is
+  model +Z (side A up); FR05-FR08 the slab turned end over end about Y:
   X is model -X, Z model -Z. The part is symmetric in X and in Z, so one
   side's geometry serves both.
-- FR05: X0 the centre between the end faces, Y0 the centre between the
+- FR09: X0 the centre between the end faces, Y0 the centre between the
   slants (Y is model Z), Z0 the foot face (Z is model -Y).
 
 Toolpath rules (owner rulings 2026-11-16): faces and rough levels zigzag
@@ -118,15 +118,17 @@ CHORD_POINTS = 17
 STRAP_HALF_WIDTH_MM = 12.7
 STRAP_NOSE_MM = 12.7
 NUT_RADIUS_MM = 12.7
+# The spindle nose over the studs: wherever a nose of the plan's
+# spindle_nose_dia_max_mm comes over a stud's flange nut, its face (the
+# tool's tip plus its holder's gauge and projection) stays at least
+# NOSE_CLEAR_MM above the stud's highest allowed end.
+NOSE_CLEAR_MM = 5.0
 STRAP_HEIGHT_MM = 25.4
 # Path tolerances: an outline's cutter centre may stray this far from its
 # offset (3 places, arc end-point rounding); a plan number the recipe
 # recomputes must agree to this.
 OUTLINE_TOL_MM = 0.01
 PLAN_TOL_MM = 0.01
-# The engagement simulation's cell (mm): coarser than _gcode's default, the
-# stock is 8 in square.
-ENGAGEMENT_CELL_MM = 0.5
 
 
 def _plan_operations(plan: dict[str, Any]):
@@ -186,6 +188,14 @@ def _levels(top: float, bottom: float, max_step: float) -> list[float]:
 def _r(value: float) -> float:
     """A coordinate as the post prints it (3 places)."""
     return round(value + 0.0, 3)
+
+
+def _segment_distance(a, b, p) -> float:
+    """Distance in XY from point ``p`` to the segment ``a``–``b``."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    length2 = dx * dx + dy * dy
+    t = 0.0 if length2 == 0 else max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length2))
+    return math.hypot(a[0] + t * dx - p[0], a[1] + t * dy - p[1])
 
 
 def _box(name: str, x: tuple[float, float], y: tuple[float, float], z_top: float) -> dict[str, Any]:
@@ -603,7 +613,7 @@ def _raster(
     return lines, entries
 
 
-def _rrect_loop(half: float, rad: float, offset: float, outside: bool, clockwise: bool, start: str = "south"):
+def _rrect_loop(half: float, rad: float, offset: float, outside: bool, clockwise: bool):
     """The cutter-centre loop at ``offset`` outside (``outside``) or inside a
     rounded square, as elements (lines and arcs) and as G-code from its
     start, the middle of its -Y side. Also returns the part outline's
@@ -756,7 +766,7 @@ def _rect_edge(xh: float, yh: float, step: float, corner_steps: int = 18):
     """The outline's edge, anticlockwise from the foot's middle, every
     ``step``; at each sharp corner the normal swings round the corner point
     (the apex circles it)."""
-    corners = [((xh, -yh), (1, 0), (0, 1)), ((xh, yh), (0, 1), (-1, 0)), ((-xh, yh), (-1, 0), (0, -1)), ((-xh, -yh), (0, -1), (1, 0))]
+    corners = [(xh, -yh), (xh, yh), (-xh, yh), (-xh, -yh)]
     pts = []
     sides = [((0.0, -yh), (xh, -yh), (0, -1)), ((xh, -yh), (xh, yh), (1, 0)), ((xh, yh), (-xh, yh), (0, 1)), ((-xh, yh), (-xh, -yh), (-1, 0)), ((-xh, -yh), (0.0, -yh), (0, -1))]
     for index, ((x0, y0), (x1, y1), (nx, ny)) in enumerate(sides):
@@ -765,7 +775,7 @@ def _rect_edge(xh: float, yh: float, step: float, corner_steps: int = 18):
             t = i / n
             pts.append((x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, nx, ny))
         if index < 4:
-            (cx, cy), _a, _b = corners[index]
+            cx, cy = corners[index]
             a0 = math.atan2(ny, nx)
             for j in range(corner_steps + 1):
                 a = a0 + math.pi / 2 * j / corner_steps
@@ -833,7 +843,7 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     if top - bottom > loc:
         raise ValueError(f"the levels reach {top - bottom:.2f} below the top, past the flutes' {loc}")
     # The boss: inside the cavity by the end mill's diameter and a margin,
-    # so FR04's slot at the cavity wall never meets it; the studs' nuts on it.
+    # so FR08's slot at the cavity wall never meets it; the studs' nuts on it.
     cav = g["cavity"]
     if boss > cav - d - p["boss_margin_mm"] + 1e-9:
         raise ValueError(f"the boss {boss} reaches within the cavity slot's {cav - d}")
@@ -871,30 +881,39 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     floor_lines, _ = _raster(floor_field, floor_passes, [web], floor_rough, top, clear, floor_link)
 
     # Pocket walls: one climb loop (anticlockwise inside) at the web, the
-    # whole wall in one pass; the plunge at the -Y side's middle, in the
-    # cleared ring.
+    # whole wall in one pass. Entered and left square to the wall at the -Y
+    # side's middle from wall_lead, a finish allowance in from the loop: the
+    # cutter there stands in the cleared ring, clear of the allowance, so it
+    # plunges and lifts in air (at the plunge feed down).
     wall_seq, wall_part = _rrect_loop(g["pocket"], g["pocket_r"], r, outside=False, clockwise=False)
     wall_start = wall_seq[0][1]
+    wall_lead = (wall_start[0], wall_start[1] + a)
     walls = [
         f"G0 Z{_r(clear):.3f}",
-        f"G0 X{_r(wall_start[0]):.3f} Y{_r(wall_start[1]):.3f}",
+        f"G0 X{_r(wall_lead[0]):.3f} Y{_r(wall_lead[1]):.3f}",
         f"G0 Z{_r(top + SAFE_MM):.3f}",
-        f"G1 Z{_r(web):.3f} F{{feed}}",
+        f"G1 Z{_r(web):.3f} F{{plunge}}",
+        f"G1 X{_r(wall_start[0]):.3f} Y{_r(wall_start[1]):.3f} F{{feed}}",
         *_loop_gcode(wall_seq, web, clockwise=False),
+        f"G1 X{_r(wall_lead[0]):.3f} Y{_r(wall_lead[1]):.3f} F{{feed}}",
         f"G1 Z{_r(top + SAFE_MM):.3f} F{{feed}}",
         f"G0 Z{_r(clear):.3f}",
     ]
 
     # Outline: one climb loop (clockwise outside) at the outline's bottom, the
-    # whole wall in one pass, the plunge outside the foot's middle.
+    # whole wall in one pass, entered and left the same way outside the
+    # foot's middle, in the margin the rough cleared.
     out_seq, out_part = _rect_loop(xe, yt, r)
     out_start = out_seq[0][1]
+    out_lead = (out_start[0], out_start[1] - a)
     outline = [
         f"G0 Z{_r(clear):.3f}",
-        f"G0 X{_r(out_start[0]):.3f} Y{_r(out_start[1]):.3f}",
+        f"G0 X{_r(out_lead[0]):.3f} Y{_r(out_lead[1]):.3f}",
         f"G0 Z{_r(top + SAFE_MM):.3f}",
-        f"G1 Z{_r(bottom):.3f} F{{feed}}",
+        f"G1 Z{_r(bottom):.3f} F{{plunge}}",
+        f"G1 X{_r(out_start[0]):.3f} Y{_r(out_start[1]):.3f} F{{feed}}",
         *_loop_gcode(out_seq, bottom, clockwise=True),
+        f"G1 X{_r(out_lead[0]):.3f} Y{_r(out_lead[1]):.3f} F{{feed}}",
         f"G1 Z{_r(top + SAFE_MM):.3f} F{{feed}}",
         f"G0 Z{_r(clear):.3f}",
     ]
@@ -994,8 +1013,6 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     plunge_cm = feed_cm * p["plunge_feed_fraction"]
 
     # --- FR01: stud holes ------------------------------------------------------
-    spot = _shop_tool(plan, shop, "spot")
-    del spot
     d1332 = _shop_tool(plan, shop, "drill-13-32")["diameter_mm"]
     spot_dia = p["spot_dia_mm"]
     spot_z = top - _spot_depth(spot_dia)
@@ -1016,7 +1033,7 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     stud_spot_lines = [line for xy in studs for line in _spot(xy, top, spot_z, clear)]
     stud_drill_lines = [line for xy in studs for line in _pecked(xy, top, stud_tip, peck_13, clear)]
 
-    # --- FR04: the cavity through the web (side B up) --------------------------
+    # --- FR08: the cavity through the web (side B up) --------------------------
     cav_levels = _levels(web, -web - p["cavity_past_mm"], p["cavity_level_mm"])
     _agree(plan, "cavity_depth_mm", 2 * web + p["cavity_past_mm"])
     if not math.isclose(_cut(plan, "cavity rough", "axial_doc_mm"), web - cav_levels[0], abs_tol=PLAN_TOL_MM):
@@ -1033,17 +1050,19 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     for z in cav_levels:
         cavity_lines.append(f"G1 Z{_r(z):.3f} F{{plunge}}")
         cavity_lines += _loop_gcode(cav_rough_seq, z, clockwise=False)
+    # The finish loop follows the last level without lifting: from the rough
+    # loop's start (in the slot just cut) square out to the wall, round, and
+    # back, then up the cleared slot.
     fstart = cav_fin_seq[0][1]
     cavity_lines += [
-        f"G1 Z{_r(web + SAFE_MM):.3f} F{{feed}}",
         f"G1 X{_r(fstart[0]):.3f} Y{_r(fstart[1]):.3f} F{{feed}}",
-        f"G1 Z{_r(cav_levels[-1]):.3f} F{{feed}}",
         *_loop_gcode(cav_fin_seq, cav_levels[-1], clockwise=False),
+        f"G1 X{_r(cstart[0]):.3f} Y{_r(cstart[1]):.3f} F{{feed}}",
         f"G1 Z{_r(top + SAFE_MM):.3f} F{{feed}}",
         f"G0 Z{_r(clear):.3f}",
     ]
 
-    # --- FR05: foot holes (standing, foot up) ----------------------------------
+    # --- FR09: foot holes (standing, foot up) ----------------------------------
     d516 = _shop_tool(plan, shop, "drill-5-16")["diameter_mm"]
     for x, z, nominal, band_dia in g["holes"]:
         if not band_dia[0] - 0.001 <= d516 <= band_dia[1] + 0.001:
@@ -1114,10 +1133,10 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
         jobs.append({**cm_tool, "label": f"{side} chamfers", "frame": side, "stock": stocks[side], "ops": [[f"{side}_chamfer", "chamfers", chamfers]]})
     jobs.append({**em_tool, "label": "cavity", "frame": "b", "stock": stocks["b"], "ops": [["cavity", "cavity", cavity_lines]]})
     jobs += [
-        {**spot_tool, "label": "FR05 spot", "frame": "foot", "stock": stocks["foot"], "ops": [["foot_spot", "spot foot holes", foot_spot_lines]]},
+        {**spot_tool, "label": "FR09 spot", "frame": "foot", "stock": stocks["foot"], "ops": [["foot_spot", "spot foot holes", foot_spot_lines]]},
         {
             **tool("drill-5-16", d516, "drill", rpm_fd, feed_fd, feed_fd, tip_angle=DRILL_POINT_DEG),
-            "label": "FR05 drill",
+            "label": "FR09 drill",
             "frame": "foot",
             "stock": stocks["foot"],
             "ops": [["foot_drill", "drill foot holes", foot_drill_lines]],
@@ -1127,6 +1146,33 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     # --- Checks ------------------------------------------------------------------
     nut_top = top + p["stud_above_top_mm"]
     nuts = [{"name": f"stud at X{x:g}", "centre": [x, y], "radius": NUT_RADIUS_MM, "z_top": nut_top} for x, y in studs]
+    # The spindle nose over the studs, in every section cut with the studs
+    # in: each move whose path passes within the nose's radius of a nut keeps
+    # the nose's face clear above the stud's end.
+    nose_reach = p["spindle_nose_dia_max_mm"] / 2 + NUT_RADIUS_MM
+    # The end mill in its R8 collet; the chamfer mill in the drill chuck.
+    face_of = {
+        "em-3-8": p["r8_collet_gauge_mm"] + p["em_projection_mm"],
+        "chamfer": p["drill_chuck_gauge_mm"] + p["chamfer_projection_mm"],
+    }
+    for job in jobs:
+        if job["tool"] not in face_of:
+            continue
+        face = face_of[job["tool"]]
+        for key, _label, lines in job["ops"]:
+            pos = [0.0, 0.0, clear]
+            for line in lines:
+                words = {w[0]: float(w[1:]) for w in line.split() if w[0] in "XYZ"}
+                if not words:
+                    continue
+                end = [words.get(axis, pos[i]) for i, axis in enumerate("XYZ")]
+                for sx, sy in studs:
+                    if _segment_distance(pos[:2], end[:2], (sx, sy)) < nose_reach and min(pos[2], end[2]) + face < nut_top + NOSE_CLEAR_MM:
+                        raise ValueError(
+                            f"{key}: the spindle nose comes within {NOSE_CLEAR_MM} of the stud at X{sx:g} "
+                            f"(tip Z{min(pos[2], end[2]):.3f}); lower process.stud_above_top_mm"
+                        )
+                pos = end
     # A strap's lane runs out to its stud and heel, past the table's reach.
     far = 1000.0
     end_straps = [
@@ -1143,7 +1189,6 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
         _box("west strap, from -Y", (-p["foot_strap_x_mm"] - STRAP_HALF_WIDTH_MM, -p["foot_strap_x_mm"] + STRAP_HALF_WIDTH_MM), (-far, -toe + STRAP_NOSE_MM), STRAP_HEIGHT_MM),
         _box("east strap, from +Y", (p["foot_strap_x_mm"] - STRAP_HALF_WIDTH_MM, p["foot_strap_x_mm"] + STRAP_HALF_WIDTH_MM), (toe - STRAP_NOSE_MM, far), STRAP_HEIGHT_MM),
     ]
-    stock_box = [[-xs, xs], [-ys, ys], [-top, top]]
     ring_points = [
         [_r(x), _r(y)]
         for x in np.arange(-g["pocket"] + a + 1.0, g["pocket"] - a - 1.0 + 1e-9, 5.0)
@@ -1193,12 +1238,6 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
                 [mill, "pauses", {"z_top": top, "count": 0}],
                 [mill, "depth", {"z_min": _r(bottom)}],
                 *([mill, check, kwargs] for check, kwargs in common),
-                # The rough levels' passes; the slant finish's ramps are not
-                # slot or side passes and are not selected.
-                *(
-                    [mill, "engagement", {"stock": stock_box, "radius": r, "max_radial": d, "z": _r(z), "cell": ENGAGEMENT_CELL_MM}]
-                    for z in levels
-                ),
                 [mill, "cleared", {"points": ring_points, "radius": r, "z": _r(web)}],
                 [walls_name, "tool_changes", {"z_top": top, "tools": [numbers["em-3-8"]], "loads_first": True}],
                 [walls_name, "spindle", {"rpm": rpm_em}],
@@ -1207,14 +1246,28 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
                 [
                     walls_name,
                     "outline",
-                    {"elements": _elements(wall_part, OUTLINE_TOL_MM), "passes": [{"offset": r, "levels": [_r(web)]}], "z_top": top},
+                    {
+                        "elements": _elements(wall_part, OUTLINE_TOL_MM),
+                        "passes": [{"offset": r, "levels": [_r(web)]}],
+                        "leads": [{"centre": [_r(wall_lead[0]), _r(wall_lead[1])], "radius": a + OUTLINE_TOL_MM, "levels": [_r(web)]}],
+                        "z_top": top,
+                    },
                 ],
                 [outline_name, "tool_changes", {"z_top": top, "tools": [numbers["em-3-8"], numbers["chamfer"]], "loads_first": True}],
                 [outline_name, "spindle", {"rpm": [[rpm_em], [rpm_cm]]}],
                 [outline_name, "pauses", {"z_top": top, "count": 0}],
                 [outline_name, "depth", {"z_min": _r(bottom)}],
                 *([f"{outline_name}@0", check, kwargs] for check, kwargs in common),
-                [f"{outline_name}@0", "outline", {"elements": out_part, "passes": [{"offset": r, "levels": [_r(bottom)]}], "z_top": top}],
+                [
+                    f"{outline_name}@0",
+                    "outline",
+                    {
+                        "elements": out_part,
+                        "passes": [{"offset": r, "levels": [_r(bottom)]}],
+                        "leads": [{"centre": [_r(out_lead[0]), _r(out_lead[1])], "radius": a + OUTLINE_TOL_MM, "levels": [_r(bottom)]}],
+                        "z_top": top,
+                    },
+                ],
                 [f"{outline_name}@1", "depth", {"z_min": _r(chamfer_low)}],
                 [f"{outline_name}@1", "rapids_clear", {"z_top": top}],
                 [f"{outline_name}@1", "feed_out", {"z_top": top}],
@@ -1240,10 +1293,12 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
             "outline",
             {
                 "elements": _elements(cav_part, OUTLINE_TOL_MM),
-                "passes": [
-                    {"offset": r + a, "levels": [_r(z) for z in cav_levels]},
-                    {"offset": r, "levels": [_r(cav_levels[-1])]},
-                ],
+                # The slot levels clear inside the finish pass (as
+                # ch_connecting_rod's bore); the finish loop's step out from
+                # the last level's slot and back to it run inside that slot.
+                "passes": [{"offset": r, "levels": [_r(cav_levels[-1])]}],
+                "clearing": [{"x": [_r(-cav), _r(cav)], "levels": [_r(z) for z in cav_levels]}],
+                "leads": [{"centre": [_r(cstart[0]), _r(cstart[1])], "radius": a + OUTLINE_TOL_MM, "levels": [_r(cav_levels[-1])]}],
                 "z_top": web,
             },
         ],
