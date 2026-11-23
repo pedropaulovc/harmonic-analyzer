@@ -377,7 +377,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.recess_floor_hold_mi
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Floor small or shallow (Op 200): cut again and recheck before the cone. Floor or depth over its Op 200 target but inside the drawing's band: go on to the cone (Op 220). Floor over Ø{{cad.recess_floor_dia_max_in:.2dot}} or deeper than {{cad.recess_depth_max_in:.2dot}}: scrapped; make another from Setup 1."
+instruction = "Floor small or shallow (Op 200): cut again and recheck before the cone. Floor or depth past its Op 200 target: work out floor Ø + 6 × depth from the readings; .582–.598: go on to the cone (Op 220); under .582: deepen the floor; over .598: scrapped; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
@@ -394,7 +394,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A step at the corner (Op 220): another pass down the compound into the corner. A rim edge that does not meet the face cleanly: one more light pass. Rim over Ø{{cad.recess_dia_max_in:.2dot}} by eye against the drawing (the cone run past the face): scrapped; make another from Setup 1."
+instruction = "A step at the corner (Op 220): another pass down the compound into the corner. A rim edge that does not meet the face cleanly: one more light pass."
 feed = "hand"
 
 [[setups.operations]]
