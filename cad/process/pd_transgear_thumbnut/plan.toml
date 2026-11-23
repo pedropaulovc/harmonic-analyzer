@@ -129,6 +129,7 @@ rim_held_max_in = 0.597
 # flat ends .005 inside the corner), high if they ride the wall. A missed
 # or doubled nose allowance reads about .03 off; .335-.355 (the corner's
 # .34-.36 less the .005) passes a good floor and fails those.
+floor_flat_nominal_in = 0.345
 floor_flat_read_min_in = 0.335
 floor_flat_read_max_in = 0.355
 compound_check_travel_in = 0.3
@@ -280,7 +281,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Over {{cad.outer_dia_max_in:.3dot}} in Op 50: take another pass with more infeed. Under {{cad.outer_dia_min_in:.3dot}}, or double-tracked: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10; with under {{process.chuck_grip_in:.2dot}} + {{cad.stickout_in:.2dot}} in of blank left, saw a new one."
+instruction = "Over {{cad.outer_dia_max_in:.3dot}} in Op 50: take another pass with more infeed, then mike the crests and write D0 again. Under {{cad.outer_dia_min_in:.3dot}}, or double-tracked: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10; with under {{process.chuck_grip_in:.2dot}} + {{cad.stickout_in:.2dot}} in of blank left, saw a new one."
 feed = "hand"
 
 [[setups.operations]]
@@ -341,7 +342,7 @@ speed_kind = "spindle"
 tool = "drill-29"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.tap_drill_dia_band_mm}}" }
-instruction = "Feed the #29 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{process.tap_drill_depth_mm:in.2dot}}, backing fully out to clear chips every .14 in (once its own diameter): the hole runs through the nut, past the parting line, deep enough for the tap's point in Op 150."
+instruction = "Feed the #29 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{process.tap_drill_depth_mm:in.2dot}}, backing fully out to clear chips every {{cad.tap_drill_dia_in:.2dot}} in (once its own diameter): the hole runs through the nut, past the parting line, deep enough for the tap's point in Op 150."
 settings = "lathe-drill-29-c360"
 cut_diameter_mm = "{{cad.tap_drill_dia_mm}}"
 hole_depth_mm = "{{process.tap_drill_depth_mm}}"
@@ -472,7 +473,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A step at the floor's corner, or the cone not meeting the face: repeat the last cone pass from Ø{{process.recess_corner_x_dro_in:.3dot}}. Depth or corner off its DRO figure: recut the floor there before the cone. Floor reading over {{process.floor_flat_read_max_in:.3dot}} (Op 240): read it again, the jaws held down on the floor; still over: scrapped. Under {{process.floor_flat_read_min_in:.3dot}}: face the floor out by .345 less the reading (a good floor reads .345) and repeat the last cone pass from there."
+instruction = "A step at the floor's corner, or the cone not meeting the face: repeat the last cone pass from Ø{{process.recess_corner_x_dro_in:.3dot}}. Depth or corner off its DRO figure: recut the floor there before the cone. Floor reading over {{process.floor_flat_read_max_in:.3dot}} (Op 240): read it again, the jaws held down; still over, touch a crest again as in Op 220: X reading D0 + .002 ±.001, the part stands (the jaws rode the wall); off, scrapped. Under {{process.floor_flat_read_min_in:.3dot}}: face the floor out by {{process.floor_flat_nominal_in:.3dot}} less the reading and repeat the last cone pass from there."
 feed = "hand"
 
 [[setups.operations]]
