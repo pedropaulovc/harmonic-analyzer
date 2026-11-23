@@ -327,7 +327,7 @@ machine_kind = "other"
 title = "Saw the blank and the spoil block; trial ream on the mill if needed"
 machine = "Saw / bench; Op 50 only: PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
-holding = "Ops 10–40: the saw and the bench. Op 50, only if it runs: the PM 6 in vise (shop vise-pm-6), the two 1 in parallels on its bed, one against each jaw; an offcut of the 1/4 x 1-1/2 bar flat on them, gripped on its 1/4 edges, its middle over the gap between the parallels; tap it down and tighten."
+holding = "Ops 10–40: the saw and the bench. Op 50, only if it runs: the PM 6 in vise (shop vise-pm-6), the two 1 in parallels on its bed, one against each jaw; the 2 in offcut Op 50 saws off the bar flat on them, gripped on its 1/4 edges, its middle over the gap between the parallels; tap it down and tighten."
 datum = "Op 50 only: G54 X0 Y0 Z0 at the offcut's middle, on its top, set with T4's point (spindle stopped). Tool lengths from the tool setter at each M6. Setup 2 sets G54 again."
 diagram = { file = "diagrams/saw.svg", alt = "The 12 in length of the 1/4 x 1-1/2 in flat with one 2.45 in blank marked off at its end; the 1 x 3 in 6061 bar with a 3.5 in spoil block marked off." }
 envelope = "other"
@@ -364,7 +364,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Only if the reamer read under the GO pin, before Setup 2: home the mill, then drill and ream a trial hole through the offcut (Holding) by MDI with T4 and T5; gauge it with the two pins."
-instruction_detailed = "Only if the reamer read under the GO pin: home the mill ($H); the offcut as Holding says. Console M6 T4 (27/64); its point on the middle, spindle stopped: G10 L20 P1 X0 Y0 Z0. Set 600; MDI M3, G1 Z-10 F{{process.drill_2764_feed_per_min_mm:.1f}}, G0 Z5, M5. M6 T5 (.4375 reamer); set 400; MDI M3, G1 Z-10 F{{process.ream_feed_per_min_mm:.1f}}, G1 Z5, M5."
+instruction_detailed = "Only if the reamer read under the GO pin: saw a 2 in offcut off the rest of the bar, file its burrs, clamp it as Holding says; home the mill ($H). Console M6 T4 (27/64), its point on the offcut's middle, spindle stopped: G10 L20 P1 X0 Y0 Z0. Set 600; MDI M3, G1 Z-10 F{{process.drill_2764_feed_per_min_mm:.1f}}, G0 Z5, M5. M6 T5 (.4375 reamer); set 400; MDI M3, G1 Z-10 F{{process.ream_feed_per_min_mm:.1f}}, G1 Z5, M5."
 inspection = "The GO pin enters the trial hole and the NO-GO does not: go on. GO refused: this reamer's holes will be refused: stop and tell the owner."
 gauge_checks = [{ gauge = "zz-pins-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
 feed = "hand"
@@ -506,7 +506,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Only if a rim is small: lower Z0 by the shortfall, run AP02_sink again, put Z0 back, then repeat the previous op's pin check."
-instruction_detailed = "The shortfall: {{process.sink_pin_depth_mid_mm:in.4dot}} less the pin's end's depth below the rear face. Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z − the shortfall in mm). Run AP02_sink. G10 L2 P1 Z(the noted Z) puts Z0 back before AP03_outline."
+instruction_detailed = "The shortfall: {{process.sink_pin_depth_mid_mm:in.4dot}} less the shallower pin end's depth below the rear face. The deeper one's depth plus the shortfall over {{process.sink_pin_depth_max_mm:in.4dot}}: stop and tell the owner. Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z − the shortfall in mm). Run AP02_sink. G10 L2 P1 Z(the noted Z) puts Z0 back before AP03_outline."
 inspection = "The pin check again: both in band, go on. Still higher: this op again. Lower: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.sink_pin_depth_min_mm}}", "{{process.sink_pin_depth_max_mm}}"] }]
 feed = "hand"
