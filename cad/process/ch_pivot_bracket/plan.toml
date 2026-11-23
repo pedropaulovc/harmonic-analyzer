@@ -588,11 +588,17 @@ gauge_checks = [{ gauge = "zz-pins-2560-2600", band_mm = "{{cad.bore_dia_band_mm
 # The ream's remedy follows its check: prechips prints an op's Check after
 # its work, so it is the next op.
 [[setups.operations]]
+instruction = "Only if the GO pin was refused (otherwise skip): still clamped, blow the chips out, oil the bore, ream it once more with T5 by hand at the console (450 rpm, in and out at feed), and gauge again. Still refused: the bracket is rejected; stop and tell the owner (the pins cannot show it at or over {{cad.bore_dia_min_in:.4dot}}; a reamer cuts no larger)."
+feed = "hand"
+
+[[setups.operations]]
 steps = [
-  { kind = "action", text = "GO refused: still clamped, blow the chips out, oil the bore, ream it once more with T5 by hand at the console (450 rpm, in and out at feed), and gauge again. Still refused: the bracket is rejected; stop and tell the owner (the pins cannot show it at or over {{cad.bore_dia_min_in:.4dot}}; a reamer cuts no larger)." },
-  { kind = "stop", text = "NO-GO enters: no cut remedies it; the bracket is rejected (nothing shows the bore at or under {{cad.bore_dia_max_in:.4dot}}). Stop: the reamer or its runout is out; tell the owner." },
-  { kind = "action", text = "In band: the next part is reamed without the check; unclamp." },
+  { kind = "stop", text = "Only if the NO-GO pin entered: no cut remedies it; the bracket is rejected (nothing shows the bore at or under {{cad.bore_dia_max_in:.4dot}}). Stop: the reamer or its runout is out; tell the owner." },
 ]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "In band: the next part is reamed without the check; unclamp."
 feed = "hand"
 
 [[setups]]

@@ -15,8 +15,10 @@
 <text class="label" x="190" y="140">the bar compared, foot ends against the stop</text>
 <path class="leader" d="M636 116 L582 116 L582 100"/>
 <path class="leader" d="M582 102 L564 102"/>
-<text class="label" x="400" y="56">calipers: beam end on the end that stands out,</text>
-<text class="label" x="400" y="70">depth rod run out to the other end</text>
+<text class="label" x="400" y="28">calipers: beam end on the</text>
+<text class="label" x="400" y="42">end that stands out, depth</text>
+<text class="label" x="400" y="56">rod run to the other end</text>
+<path class="leader" d="M520 60 L600 116"/>
 <text class="label" x="420" y="196">the step e, read to .001</text>
 <path class="leader" d="M480 186 L572 104"/>
 </svg>

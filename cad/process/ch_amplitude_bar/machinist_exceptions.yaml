@@ -1,0 +1,11 @@
+machinist_exceptions:
+  - id: TV-001
+    where: "Header note; Setup 5, the in-place rule check of the length and the wrong-x remedy"
+    finding: "The length is accepted with the 1/64 in rule to 31.82 ± 1/32 (31.789-31.851), looser than the drawing's 31.81-31.83; no op proves the printed ±.01"
+    reason: "Owner ruling 2026-11-23 (tool audit Q3): 'B. Buy only the Insize rule; make the 20 bars equal by comparison (stop on the surface plate, ends compared with calipers to .001); absolute length accepted to +/-1/32. Does not prove the printed +/-.01.' The traveler says so where the length is accepted."
+    kind: accept
+  - id: TV-002
+    where: "Setup 6, the comparison of every finished bar with bar 1"
+    finding: "Every finished bar is held within .003 of bar 1 by comparison, a bar-to-bar limit the drawing does not print"
+    reason: "Owner ruling 2026-11-23 (tool audit Q3): 'make the 20 bars equal by comparison (stop on the surface plate, ends compared with calipers to .001)'. The .003 is the comparison's own error (two .001 caliper readings and the X0 pick-up), the plan's compare_spread_max_mm."
+    kind: accept
