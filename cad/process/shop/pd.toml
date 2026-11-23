@@ -120,8 +120,8 @@ tool = "reamer-1260"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle running"
-# The bores' go/no-go pair (common gauges record gauges.plug-gauges-1260-1265,
-# shop/pn.toml, to buy): the tools record lets a plan list the pair.
+# The bores' go/no-go pair (gauges record gauges.plug-gauges-1260-1265 in
+# shop/common.toml, to buy): the tools record lets a plan list the pair.
 [tools.plug-gauges-1260-1265]
 description = "Plug gauge pair, .1260 GO (plus) and .1265 NO-GO (minus), Vermont Gage Class X"
 
