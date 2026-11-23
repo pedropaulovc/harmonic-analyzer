@@ -433,7 +433,7 @@ inspection = "Each blank {{process.blank_length_in:.2f}}–{{process.blank_lengt
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Mic each blank's thickness at both ends and the middle. Mark one wide face D with marking fluid along its length; the other is F. Number the blanks 1–{{process.quantity:d}} on D at one end, the left end in every setup. Pair them into loads of two whose readings agree within .0005."
+instruction = "Mic each blank's thickness at both ends and the middle. Mark one wide face D with marking fluid along its length; the other is F. Number the blanks 1–{{process.quantity:d}} in marker on one sawn end face (no cut reaches it); that end is the left end in every setup. Pair them into loads of two whose readings agree within .0005."
 inspection = "Every reading {{process.blank_thickness_min_mm:in.4dot}}–{{process.blank_thickness_max_mm:in.4dot}}: this traveler's incoming-stock gate (the fork, ({{cad.fork_far_face_thickness_in:.3dot}}) REF on the drawing, is skimmed from F to this traveler's {{process.fork_thickness_mm:in.4dot}}). Outside: set the blank aside and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.blank_thickness_min_mm}}", "{{process.blank_thickness_max_mm}}"] }]
 
@@ -940,7 +940,7 @@ instruction = "The drawing's finish: {{cad.finish}}, all over as the drawing sta
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Gloves and safety glasses on (the maker: it contains acid). Wash the rods with soap and water to take off the oil and the marker numbers; rinse and dry them. Hold each by its edges from here on."
+instruction = "Gloves and safety glasses on (the maker: it contains acid). Wash the rods with soap and water to take off the oil and any marker left on them; rinse and dry them. Hold each by its edges from here on."
 feed = "hand"
 
 [[setups.operations]]

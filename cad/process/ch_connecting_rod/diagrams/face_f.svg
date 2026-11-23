@@ -8,10 +8,10 @@
 <rect class="fixture-plate" x="50" y="76" width="442" height="283" fill-opacity="0.35"/>
 <rect class="part-rest" x="50" y="70.0" width="548.7" height="147.3"/>
 <path class="part-removed" d="M50.0 75.2 L204.1 75.2 L204.1 115.1 L539.5 115.1 L539.5 92.5 L577.4 92.5 L577.4 194.9 L539.5 194.9 L539.5 172.2 L204.1 172.2 L204.1 212.2 L50.0 212.2 Z"/>
-<text class="label" x="54" y="84.0">1</text>
+<text class="label" x="38" y="84.0">1</text>
 <rect class="part-rest" x="50" y="217.3" width="548.7" height="147.3"/>
 <path class="part-removed" d="M50.0 222.5 L204.1 222.5 L204.1 262.4 L539.5 262.4 L539.5 239.8 L577.4 239.8 L577.4 342.2 L539.5 342.2 L539.5 319.5 L204.1 319.5 L204.1 359.5 L50.0 359.5 Z"/>
-<text class="label" x="54" y="231.3">2</text>
+<text class="label" x="38" y="231.3">2</text>
 <rect class="clamp" x="85" y="365" width="460" height="24"/>
 <text class="label" x="270" y="381">moving jaw</text>
 <line class="datum" x1="50" y1="36" x2="50" y2="399"/>
