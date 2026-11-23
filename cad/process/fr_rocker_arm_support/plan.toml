@@ -181,6 +181,11 @@ stud_peck_mm = 6.35
 drill_past_mm = 1.0
 stud_tip_mm = -42.327
 foot_tip_mm = -9.7346
+# The foot holes in FR09's G54 (X ±foot_hole_x_mm, Y ±foot_hole_y_mm) and
+# its clearance height, for the console ream (cam.py agrees them).
+foot_hole_x_mm = 60.325
+foot_hole_y_mm = 17.45
+foot_clear_mm = 51.8
 # FR08: the cavity through the web from side B: four equal slot levels at
 # the wall less finish_stock_mm, from the web's B face to cavity_past_mm
 # past its A face, then one finish loop at full depth.
@@ -445,7 +450,7 @@ title = "Side B: slant, pocket, outline, chamfers; the cavity through"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / table, vise off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Nuts off; lift the part off the studs, blow the chips off, take the end blocks away; unscrew both studs from their T-nuts and lift them out (the T-nuts stay under the holes). Turn the part end over end (FOOT edge still toward you) and set it on the two middle blocks, the stud holes over the T-nuts. Four jack screws (jack screw set, 2-1/4 to 3-3/8 in) under the end posts' slant faces, two per post at Y ±2.5 in, run up to touch, then a quarter turn. Indicate the FOOT bar edge along X to .001 over 6 in. The studs go back after the zero op. Before FR08: two step clamps (1268 kit) along X from studs in the middle T-slot beyond the ends, toes on the posts' middle over the jacks (paper under each toe), heels on step blocks level with the toe."
+holding = "Nuts off; lift the part off the studs, blow the chips off, take the end blocks away; unscrew both studs from their T-nuts and lift them out (the T-nuts stay under the holes). Turn the part end over end (FOOT edge still toward you) and set it on the two middle blocks, the stud holes over the T-nuts. Four jack screws (jack screw set, 2-1/4 to 3-3/8 in) under the end posts' slant faces, two per post at Y ±2.5 in, run up to touch, then a quarter turn. Indicate the FOOT bar edge along X to .001 over 6 in. The studs go back after the zero op. Before FR08: two step clamps (1268 kit) along X from studs in the middle T-slot beyond the ends, each toe on its post at Y 0, midway between the post's two jacks (paper under each toe), heels on step blocks level with the toe."
 datum = "Programs FR05_b_mill, FR06_b_walls, FR07_b_outline and FR08_cavity: X0 midway between the stud holes, Y0 midway between the bar edges, +Y away from the FOOT edge; Z0 the mid-plane, half T below side B. X here runs opposite to Setup 2's (the part is symmetric in X). Tool lengths from the tool setter at every M6."
 diagram = { file = "diagrams/side_b.svg", alt = "Section of the part turned over: the boss on the two middle blocks, the studs through it, screw jacks under the end posts; side B milled like side A; FR08's straps on the posts and the cavity cut through the web round the boss." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.em_dia_mm}}", 5.08], y_span_mm = ["{{process.raster_y_span_mm}}", "{{process.em_dia_mm}}"], work_top_mm = ["{{process.slab_top_max_mm}}", "{{process.stud_above_seat_mm}}"], deepest_cut_mm = ["{{process.outline_bottom_above_table_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_mm}}"] }
@@ -455,7 +460,7 @@ vise_hold = "other"
 beam = { axis = "x", hold = "between", extent_mm = [-96.012, 96.012], supports_mm = [-89.281, 89.281], section_mm = { y = 177.8, z = 12.7 } }
 
 [[setups.operations]]
-instruction = "Home ($H). Edge finder (900 rpm) in each empty stud hole: touch its −X and +X walls, the hole's centre the mean. At the −X hole's centre: G10 L20 P1 X-31.750; read the +X hole's centre. Finder on the FOOT and far bar edges: G10 L20 P1 Y0 at the mean. Note the FOOT edge's Y and the −X sawn end's X."
+instruction = "Home ($H). Edge finder (900 rpm) in each empty stud hole: touch its −X and +X walls, the hole's centre the mean. At the −X hole's centre: G10 L20 P1 X-31.750; read the +X hole's centre. Finder on the FOOT and far bar edges: G10 L20 P1 Y0 at the mean."
 feed = "hand"
 inspection = "The +X hole's centre reads X31.750 ±0.10 mm."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = [31.65, 31.85] }]
@@ -465,7 +470,7 @@ instruction = "+X hole's centre off: G10 L20 P1 X0 midway between the two holes'
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Drop each stud through its hole into its T-nut, a flange nut on each on side B's boss face, tight; each stud's end at most {{process.stud_above_seat_mm:in.2f}} above side B, the nut on full thread (the kit's stud length that does both). Touch the −X sawn end and the FOOT bar edge again."
+instruction = "X0 and Y0 final: touch the −X sawn end and the FOOT bar edge, note both. Drop each stud through its hole into its T-nut, a flange nut on each on side B's boss face, tight; each stud's end at most {{process.stud_above_seat_mm:in.2f}} above side B, the nut on full thread (the kit's stud length that does both). Touch the −X sawn end and the FOOT bar edge again."
 feed = "hand"
 inspection = "Each reads within 0.03 mm of its noted value."
 gauge_checks = [
@@ -542,7 +547,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "At FR08's M6 T5 stop, spindle stopped: both flange nuts off, lift the boss off the studs, unscrew both studs from their T-nuts and lift them out; blow the chips out of the cavity. The post straps hold the frame; leave them."
+instruction = "At FR08's M6 T5 stop, spindle stopped: jog Z up until the boss, lifted straight up off its studs, clears the end mill. Both flange nuts off, lift the boss off the studs, unscrew both studs from their T-nuts and lift them out; blow the chips out of the cavity. The post straps hold the frame; leave them. The M6 T5 tool length from the setter, then Cycle Start."
 feed = "hand"
 
 [[setups.operations]]
@@ -622,7 +627,7 @@ speed_kind = "spindle"
 tool = "reamer-3135"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.foot_hole_a1_dia_band_mm}}" }
-instruction = "GO pin tight in a hole: still clamped, M6 T6 at the console (.3135 reamer in the drill chuck; set 400). Over that hole (its X Y in FR09_foot's T4 lines): G1 down to the T4 line's Z and back up, both at {{process.foot_feed_per_min_mm:in.2f}} in/min. Cutting oil. Gauge it again."
+instruction = "GO pin tight in a hole: still clamped, M6 T6 at the console (.3135 reamer in the drill chuck, its length from the tool setter; set 400). The holes in FR09's G54, mm: X −{{process.foot_hole_x_mm:.3f}} and X {{process.foot_hole_x_mm:.3f}}, each at Y −{{process.foot_hole_y_mm:.3f}} (side B's slant) and Y {{process.foot_hole_y_mm:.3f}} (side A's). For the tight one: G0 Z{{process.foot_clear_mm:.3f}}, G0 to its X Y, G1 Z{{process.foot_tip_mm:.3f}} F{{process.foot_feed_per_min_mm:.2f}}, then G1 Z{{process.foot_clear_mm:.3f}} at the same feed. Cutting oil. Gauge it again."
 rpm = 400
 feed = "{{process.foot_feed_per_min_mm:in.2f}} in/min, in and out"
 milling_cuts = [

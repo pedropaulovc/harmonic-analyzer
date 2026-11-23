@@ -1114,6 +1114,10 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     foot = g["foot_thickness"]
     foot_tip = -(foot + p["drill_past_mm"] + _point(d516))
     _agree(plan, "foot_tip_mm", foot_tip)
+    # The traveler's console ream (a tight GO pin) types these.
+    _agree(plan, "foot_hole_x_mm", max(abs(x) for x, _z, _n, _b in g["holes"]))
+    _agree(plan, "foot_hole_y_mm", max(abs(z) for _x, z, _n, _b in g["holes"]))
+    _agree(plan, "foot_clear_mm", SAFE_MM + CLEAR_MM)
     foot_spot_z = -_spot_depth(spot_dia)
     foot_xy = [(x, z) for x, z, _n, _b in g["holes"]]
     for x, z in foot_xy:
