@@ -125,6 +125,31 @@ feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle 
 [tools.plug-gauges-1260-1265]
 description = "Plug gauge pair, .1260 GO (plus) and .1265 NO-GO (minus), Vermont Gage Class X"
 
+# --- MHA-PD-13 transgear thumbnut (cad/process/pd_transgear_thumbnut) ---------
+# The #29 tap drill and the 90° chamfer mill's countersinks from the tailstock
+# (C36000, dry): LittleMachineShop "Cutting Speeds" (read live 2026-11-22,
+# lathe.toml header), Drilling & Reaming, Brass (C36000), 160-175 ft/min; both
+# clamp to the lathe's 2000 rpm top speed.
+[settings.lathe-drill-29-c360]
+tool = "jig-drill-29"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, pecking, dry"
+[settings.lathe-csk-c360]
+tool = "chamfer-mill-330ch-1-4-90"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, light, dry; a turn's dwell at depth"
+# Straight knurling the Ø.81 head: Accu-Trak "Speeds & Feeds for Knurling"
+# (https://accu-trak.com/speeds-feeds-for-knurling, read 2026-11-22) caps form
+# knurling at about 150 ft/min and its "Knurling Tips" start slow with a firm
+# infeed so the wheel tracks; 50 ft/min is about 235 rpm at Ø.81.
+[settings.lathe-knurl-c360]
+tool = "knurl-straight-25tpi"
+material = "lathe-c360"
+sfm = 50
+feed = "cross slide by hand, one firm plunge, then the carriage along by hand; oiled"
+
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
 # prechips can check each plan's stock_refs. Description only: the ownership

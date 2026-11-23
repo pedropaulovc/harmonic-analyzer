@@ -1,38 +1,412 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Transgear thumbnut MHA-PD-13, one off, turned on the manual PM-1127VF-LB
+# (owner ruling 2026-11-21: turned parts get lathe travelers, no NC). Route
+# chosen for speed: two chuckings of the 7/8 in C36000 bar on hand
+# (cad/config/shop-equipment/stock-bought.toml c360-round-7-8).
+# Setup 1, the bar, seat end out: face the end (Z0: the seat face), turn the
+# head's knurl blank back past the parting line, straight-knurl the head,
+# turn the flange, cut the waist with the parting blade, spot, drill #29
+# through and past the parting line, countersink the seat end and tap #8-32
+# through by hand from the tailstock, all in the chucking that faced the seat
+# (the thread square to the seat it bears on), part off .02 long.
+# Setup 2: the nut turned round, its knurled head in the 3-jaw over a shim
+# wrap with only the smaller flange and waist behind it; mike the length,
+# preset the DRO from it, face the rim to length, cut the dished face (a cone
+# with the compound, then the flat floor) and countersink the rim end.
+# Bench: deburr, check against the drawing, oil.
+# The thumbnut leaves nothing for the assembly: MHA-PD-00 faces the drive
+# collar's pilot (MHA-PD-22) and cuts the knob shaft's stud (MHA-PD-08) to
+# fit the nut's rim, both on their own parts.
+#
+# Not on hand (cad/config/shop-equipment/, to buy): the straight 25 TPI knurl
+# wheel and its holder (pd.toml tools.knurl-straight-25tpi).
 title = "Transgear Thumbnut"
-part = "MHA-PD-13 Transgear Thumbnut"
-revision = "placeholder"
-material = "C36000 free-machining brass"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "C36000 free-machining brass round bar, 7/8 in"
+stock = "Lot: {{process.quantity:d}} thumbnut. Ø{{process.stock_dia_in:.3dot}} bar, on hand; the nut takes {{cad.pitch_in:.2dot}} in of it."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To buy (not on hand): the straight 25 TPI knurl and its holder for the head."
 shop = "../shop"
 stock_refs = ["c360-round-7-8"]
+material_key = "lathe-c360"
+turning_material = "brass"
+
+[cad]
+file = "../../out/features/pd_transgear_thumbnut/features.toml"
+adapter = "turned_bush"
+part = "pd-transgear-thumbnut"
+
+[parameters]
+quantity = 1
+stock_dia_in = 0.875
+# A piece of the bar on hand and the length the 3-jaw grips of it.
+bar_length_in = 3.0
+chuck_grip_in = 0.75
+# Facing allowance: squares a sawn bar end.
+face_allowance_in = 0.02
+# Left on the parted rim end for Setup 2 to face to length.
+regrip_allowance_in = 0.02
+# Parting kerf: the P1 blade's width plus .0125 (authored), for wander or a
+# .010 step toward the chuck that widens a deep groove.
+part_kerf_in = 0.075
+# The P1 cutoff blade's width: its record (cad/config/shop-equipment/
+# tools-cutting.toml tools.cutoff-blade-p1 width_in, the makers' 1/16 in).
+# The waist and part-off ops mike the blade's cutting edge and preset the DRO.
+blade_width_in = 0.0625
+parts_per_pull = 1
+# The parting blade's clearance to the jaw fronts.
+jaw_clearance_in = 0.1
+# Setup 2: how much of the knurled head the jaws take, from its rear face;
+# the rim end stands out past them for the facing and the dish.
+regrip_grip_in = 0.25
+# The #29 drill's full-diameter depth (.90 in) from its lips touching the spot, and
+# the plug tap's pencil mark from its point (authored): the tap's point runs
+# .20 past the .65 parted length, so its 3-5 chamfered threads clear the rim
+# end and the thread is full through the nut; the drill leads the tap's
+# point by .05.
+tap_drill_depth_mm = 22.86
+tap_mark_in = 0.85
+# Countersinks (authored): Ø.170, between the #8-32 major Ø.164 (the first
+# thread broken all round) and the drawing's .18 max; the 90° chamfer mill
+# fed (.170 - .136) / 2 = .017 past its flutes touching the #29 hole's edge.
+csk_dia_in = 0.17
+csk_feed_in = 0.017
+# Outside passes (authored): the .02 in wide bands take rough passes only.
+rough_radial_doc_mm = 0.5
+turn_feed_mm_rev = 0.1016
+# The tool starts its pass this far off the faced end.
+turn_start_z_mm = 0.5
 
 [[tools]]
-id = "jig-drill-29"
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "knurl"
+name = "Straight knurl 25 TPI and holder"
+ref = "knurl-straight-25tpi"  # drawing cross-check 2026-11-19: STRAIGHT KNURL 25 TPI
+status = "to_order"
+
+[[tools]]
+id = "cutoff"
+name = "P1 HSS cutoff blade"
+ref = "cutoff-blade-p1"
+
+[[tools]]
+id = "centre"
+name = "No. 1 centre drill"
+ref = "centre-drills-carbide-60"
+
+[[tools]]
+id = "drill-29"
 name = "#29 drill"
 ref = "jig-drill-29"  # Drills #29
 
 [[tools]]
-id = "jig-tap-8-32-plug"
+id = "csk"
+name = "1/4 90° chamfer mill"
+ref = "chamfer-mill-330ch-1-4-90"  # drawing cross-check 2026-11-19: Ø.18 MAX X 90° BOTH ENDS
+
+[[tools]]
+id = "tap"
 name = "#8-32 plug tap"
 ref = "jig-tap-8-32-plug"  # Tap coverage #8-32 UNC
 
 [[tools]]
-id = "knurl-straight-25tpi"
-name = "Straight knurl 25 TPI"
-ref = "knurl-straight-25tpi"  # drawing cross-check 2026-11-19: STRAIGHT KNURL 25 TPI
+id = "centre-dead"
+name = "MT3 dead centre"
+ref = "dead-centre-mt3"
 
 [[tools]]
-id = "chamfer-mill-330ch-1-4-90"
-name = "1/4 90° chamfer mill"
-ref = "chamfer-mill-330ch-1-4-90"  # drawing cross-check 2026-11-19: ⌵ Ø.18 MAX X 90° BOTH ENDS
+id = "drill-15"
+name = "#15 (.180) drill, its shank as a countersink gauge"
+ref = "block-drill-15"
+
+[[tools]]
+id = "deburr"
+name = "Deburring scraper"
+ref = "deburring-set"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Bar, seat end out: face, turn and knurl the head, turn the flange and waist, drill, countersink and tap through, part off long"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
+datum = "Z0 (carriage DRO) the bar end faced in Op 10: the seat face."
+diagram = { file = "diagrams/bar.svg", alt = "The 7/8 in brass bar in the 3-jaw, seat end out: the end faced, the head turned to its knurl blank and knurled, the flange turned and the waist cut, drilled through past the parting line, the seat end countersunk and tapped #8-32 through; the nut parted off .02 long." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.step_waist_turn_min_mm}}", support = "none" }
+turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off, finishing with a light skim from the centre out; set DRO Z0 on it. This is the seat face: it bears on the drive collar's pilot."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Knurl blank", phase = "rough", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.run_end_z_mm}}", kept_start_z_mm = "{{cad.outer_datum_out_near_z_mm}}", kept_end_z_mm = "{{cad.kept_end_z_mm}}", start_diameter_mm = "{{cad.stock_dia_mm}}", end_diameter_mm = "{{cad.outer_knurl_blank_mm}}", max_radial_doc_mm = "{{process.rough_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.outer_knurl_blank_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the outside from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}, to Ø{{cad.outer_knurl_blank_in:.4dot}}, the knurl blank ({{cad.outer_knurl_teeth:d}} of the knurl's 25 TPI pitches round it, so the wheel tracks), miking between passes and taking the last one light."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.outer_knurl_blank_mm}}"
+inspection = "Knurl blank Ø{{cad.outer_knurl_blank_in:.4dot}} ±.001, micrometer."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Knurl blank over its ±.001 in Op 20: take another light pass and mike again. Under: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "knurl"
+drilling = "none"
+sizing = "other"
+instruction = "Mount the knurl in the AXA No. 10 holder, the wheel square to the work and on centre height. Bring the wheel's chuck-side face onto the faced end and set DRO Z0 there: the DRO then reads that face. Move it to Z-{{cad.shoulder_flange_in:.2dot}} (inside the waist, turned off later, so the knurl runs full up to the head's rear face), oil the work and plunge the wheel in firmly in one go so it tracks; run a few turns and check the pattern is single."
+settings = "lathe-knurl-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "knurl"
+drilling = "none"
+sizing = "other"
+instruction = "Feed the wheel along toward the chuck until the DRO reads Z{{cad.run_end_z_mm:in.2dot}} (the knurl blank's end) and back, adding infeed each pass, until the crests mike {{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}. Brush the chips off between passes."
+settings = "lathe-knurl-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Over the knurl Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}, micrometer across the crests; one sharp single-tracked straight pattern."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Over {{cad.outer_dia_max_in:.3dot}} in Op 50: take another pass with more infeed. Under {{cad.outer_dia_min_in:.3dot}}, or double-tracked: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Flange", phase = "rough", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.step_waist_datum_out_far_z_mm}}", kept_start_z_mm = "{{cad.step_flange_datum_out_near_z_mm}}", kept_end_z_mm = "{{cad.step_flange_datum_out_far_z_mm}}", start_diameter_mm = "{{cad.outer_knurl_blank_mm}}", end_diameter_mm = "{{cad.step_flange_turn_min_mm}}", max_radial_doc_mm = "{{process.rough_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.step_flange_turn_min_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "AR back in the tool post: spindle running, touch it lightly on the seat face and set DRO Z0 there again. Turn the flange from Z0 back to the head's rear face at Z-{{cad.shoulder_head_in:.3dot}} by the DRO, to Ø{{cad.step_flange_dia_in:.3dot}} (the band's middle), miking between passes and taking the last one light; finish the head's rear face square by feeding the AR out along it at that Z."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.step_flange_dia_mm}}"
+inspection = "Flange Ø{{cad.step_flange_dia_min_in:.3dot}}–{{cad.step_flange_dia_max_in:.3dot}}, micrometer."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.step_flange_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Waist: bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Plunge to Ø{{cad.step_waist_dia_in:.3dot}} (the band's middle) with that face at Z-{{cad.shoulder_flange_in:.3dot}}: the flange's rear face."
+settings = "lathe-part-c360"
+cut_diameter_mm = "{{cad.step_waist_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Step the blade toward the chuck about half its width a plunge, each to the same Ø, until its chuck-side face meets the head's rear face: the DRO then reads Z-{{cad.shoulder_head_in:.3dot}} plus the miked width."
+settings = "lathe-part-c360"
+cut_diameter_mm = "{{cad.step_waist_dia_mm}}"
+inspection = "Waist Ø{{cad.step_waist_dia_min_in:.3dot}}–{{cad.step_waist_dia_max_in:.3dot}}, the tips of the calipers' outside jaws in the groove; flange length (seat face to the flange's rear face) {{cad.shoulder_flange_min_in:.3dot}}–{{cad.shoulder_flange_max_in:.3dot}} and seat face to the head's rear face {{cad.shoulder_head_min_in:.3dot}}–{{cad.shoulder_head_max_in:.3dot}}, calipers' outside jaws over the flange."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.step_waist_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.shoulder_flange_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.shoulder_head_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Flange or waist over its band, or a face long of its station (Op 70, Op 90): cut again and recheck. Under its band, or a face short of its station: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock with the No. 1 centre drill, only the point's cone, about Ø.08 across: under the #29 drill, so the drill removes it."
+settings = "lathe-centre-c360"
+cut_diameter_mm = 2.0
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-29"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.tap_drill_dia_band_mm}}" }
+instruction = "Feed the #29 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{process.tap_drill_depth_mm:in.2dot}}, backing fully out to clear chips every .14 in (once its own diameter): the hole runs through the nut, past the parting line, deep enough for the tap's point in Op 150."
+settings = "lathe-drill-29-c360"
+cut_diameter_mm = "{{cad.tap_drill_dia_mm}}"
+hole_depth_mm = "{{process.tap_drill_depth_mm}}"
+peck = { step_mm = "{{cad.tap_drill_dia_mm}}", retract = "full" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "csk"
+drilling = "none"
+sizing = "other"
+instruction = "Countersink the seat end from the tailstock: feed the chamfer mill in until its flutes just touch the hole's edge and zero the quill scale there; feed on {{process.csk_feed_in:.3dot}}, dwell a turn and withdraw: the countersink is then about Ø{{process.csk_dia_in:.3dot}}, over the thread's major so the first thread is broken all round, under the {{cad.countersinks_dia_max_in:.2dot}} max."
+settings = "lathe-csk-c360"
+cut_diameter_mm = "{{cad.countersinks_dia_max_mm}}"
+inspection = "Countersink under Ø{{cad.countersinks_dia_max_in:.2dot}}: the #15 drill's shank (.180), stood square on the seat face over the hole, does not drop into it; its rim runs round the hole."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "tap"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle off, in its lowest back-gear range so the chuck is stiff to turn. Pencil-mark the plug tap {{process.tap_mark_in:.2dot}} from its point and fit it in the T-handle wrench; the MT3 dead centre in the tailstock, its point in the wrench's centre hole to keep the tap on axis."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "tap"
+drilling = "none"
+sizing = "other"
+instruction = "Holding the chuck by hand against the wrench, start {{cad.tap_thread}} and turn on, backing off every half turn, dry, advancing the quill to follow; stop when the mark reaches the seat face (the thread is then full through the nut) and back the tap out."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Catch the nut."
+settings = "lathe-part-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Turned round on the head: face to length, cut the dish, countersink the rim end"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw over a shim wrap of brass shim on the knurled head, {{process.regrip_grip_in:.2dot}} in of it in the jaws from its rear face, the wrap cut no wider than that; the flange and waist stand behind, inside the jaws' bore, and the parted rim end {{cad.outer_stickout_far_mm:in.2dot}} in out. Nothing seats the nut axially: Op 170 locates the seat face through the miked length."
+datum = "Z0: the faced rim, preset in Op 170 from the miked length so the seat face (in the chuck) is Z-{{cad.length_in:.2dot}}; the setting error, about .002, stays inside the {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} band. After the length check the nut is rechucked and Z0 set again on the faced rim (Op 190); the dish's depth runs from it."
+diagram = { file = "diagrams/regrip.svg", alt = "The nut turned round, its knurled head in the jaws over a shim wrap with the flange and waist inside the jaws' bore: the rim faced to length, the dish cut and the rim end countersunk." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Before chucking, mike the length across the seat face and the parted end's outer rim and write it down as L0 (about {{cad.part_off_in:.2dot}}). Chuck it; spindle running, touch the AR lightly on the parted end's outer rim and set DRO Z there to L0 less {{cad.length_in:.3dot}}. Face in light skims to Z0, the last one from the centre out; unchuck and mike the length."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Length {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} across the seat face and the rim, micrometer."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Over {{cad.length_max_in:.2dot}} in Op 170: chuck it again and repeat Op 170 from that reading. Under {{cad.length_min_in:.2dot}}: scrapped, not reworked; make another from Setup 1."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Rechuck the nut in the band as in the Holding line; spindle running, touch the AR lightly on the faced rim and set DRO Z0 there for the dish."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Dish floor: cut a flat-bottomed recess Ø{{cad.recess_floor_dia_in:.2dot}} (the floor's size) {{cad.recess_depth_in:.3dot}} deep from Z0 in facing passes from the hole outward, each stopping at that Ø, the last one a light skim across the floor; check its Ø between passes."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.recess_floor_dia_mm}}"
+inspection = "Floor Ø{{cad.recess_floor_dia_min_in:.2dot}}–{{cad.recess_floor_dia_max_in:.2dot}}, calipers' inside jaws on the recess's wall; depth {{cad.recess_depth_min_in:.2dot}}–{{cad.recess_depth_max_in:.2dot}}, calipers' depth rod from the rim face to the floor."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.recess_floor_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.recess_depth_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Dish cone: swing the compound to {{cad.recess_flank_deg:.1f}}° off the cross slide (the flank is {{cad.recess_half_angle_deg:.1f}}° off the axis). Take light passes down the compound from the face toward the floor, moving the cross slide out a little between passes, until a pass ends exactly in the floor's corner: the cone then meets the face at Ø{{cad.recess_dia_in:.2dot}} by itself."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.recess_dia_mm}}"
+inspection = "Rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}}, calipers' inside jaws across the cone's mouth at the rim face; one clean cone from the rim to the floor, no step left at the corner."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.recess_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Dish floor small or shallow (Op 200), or the rim under its band or a step left at the corner (Op 210): cut again and recheck. Rim or floor over its band, or deeper than {{cad.recess_depth_max_in:.2dot}}: scrapped; make another from Setup 1."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "csk"
+drilling = "none"
+sizing = "other"
+instruction = "Countersink the rim end in the dish's floor as Op 130: flutes touching the hole's edge, quill zeroed, fed on {{process.csk_feed_in:.3dot}}, a turn's dwell, withdrawn."
+settings = "lathe-csk-c360"
+cut_diameter_mm = "{{cad.countersinks_dia_max_mm}}"
+inspection = "Countersink under Ø{{cad.countersinks_dia_max_in:.2dot}}: the #15 drill's shank, stood square on the floor over the hole, does not drop into it; its rim runs round the hole."
+gauge_checks = "other"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Bench: deburr, check and oil"
+machine = "Bench"
+envelope = "other"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished thumbnut: the knurled head, the flange and waist stepped down to the seat face, the dished rim face, the #8-32 thread through and its countersink at each end." }
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "deburr"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr: break the knurl's ends, the flange's and the waist's edges and the dish's rim, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, with a light stroke of the deburring scraper; leave the seat face flat."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Run a #8-32 screw through the nut by hand from either end; look over the knurl for marks from the Setup 2 jaws."
+inspection = "Thread {{cad.tap_thread}} through: the screw runs freely end to end; knurl crests unmarked."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A nut whose screw binds in Op 250: run the plug tap through again from the seat end and recheck. A marked knurl, or a check above that more cutting cannot bring into its band, is scrapped, not reworked: make another from Setup 1."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Finish (drawing: bright machined, oiled): wipe the nut clean and give it, thread included, a light coat of light machine oil."
+feed = "hand"
