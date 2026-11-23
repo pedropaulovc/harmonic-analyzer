@@ -340,7 +340,7 @@ feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "Prove PC01_sheet in air: on the same leaf, G10 L20 P1 Z-25.349 (Z0 1.000 in high). Run it single block through the first hole and the first clip's feed in, then let it run to the end." },
+  { kind = "action", text = "Prove PC01_sheet in air: on the same leaf, G10 L20 P1 Z-25.349 (Z0 1.000 in high). At the file's M6 T1 stop: same tool, set 2800, Cycle Start. Run it single block through the first hole and the first clip's feed in, then let it run to the end." },
   { kind = "check", text = "Each hole comes down near its centre; each outline comes down beyond the plate's left end and feeds in through the blank's margin. Apart from those lead-ins no path leaves the blanks, and none comes near a jaw." },
   { kind = "stop", text = "A path off a blank or toward a jaw: feed hold, then the next op." },
 ]
