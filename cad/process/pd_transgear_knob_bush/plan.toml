@@ -325,7 +325,7 @@ tool = "dti"
 drilling = "none"
 sizing = "other"
 instruction = "The same four readings at {{process.pin_far_in:.2dot}} out, and the same two differences. Pull the pin."
-inspection = "Each difference here less its Op 140 difference, either sign: at most {{process.pin_tilt_reading_max_mm:.3f}} mm on the 0.001 mm indicator: the bore ⊥ Ø{{cad.bore_perpendicularity_in:.3dot}} to A, the pin's fit charged."
+inspection = "Each difference here less its Op 140 difference, either sign: at most {{process.pin_tilt_reading_max_mm:.3f}} mm on the 0.001 mm indicator. Why: the drawing's ⊥ Ø{{cad.bore_perpendicularity_in:.3dot}} to A over the 1.145 bore allows .00175 of tilt; less the pin's .0012 fit tilt, .00055, split over two planes, .00039 each; a full-swing difference doubles it, over the .80 between stations: 2 x .00039 x .80 = .00062 in (.0157 mm)."
 gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{process.pin_tilt_reading_max_mm}}"] }]
 feed = "hand"
 
