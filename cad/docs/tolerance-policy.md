@@ -112,7 +112,9 @@ from the specs and config; no build, drawing or import reads study output.
 
 Cone bands are ordinary (user ruling 2026-10-10): OD +0/−0.05, tooth thickness
 ±0.075, H7/g6 running bores, 0.05 tooth-cutting runout; T006 alone keeps its
-own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
+own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief, and
+T012/T018/T024 are thick-only (+0.075/−0) for the standard blank (owner ruling
+2026-11-22, #2473 option G). Gates:
 
 - **Cones T012–T120** (`cone_set_stack`, `dt_mesh_checks.cone_check`): the cone
   centre is set by feel at assembly (owner direction 2026-11-11, #2365,
@@ -130,13 +132,23 @@ own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
   4R), opened by both gears'
   running runout: the drum's 0.05 TIR about its bore and each cone gear's
   eccentricity about the running axis (MHA-DT-04's journal to MHA-DT-37's
-  pivot). That is half its 0.05 TIR for a keyed gear;
-  for T012/T018 half their printed .0015 in tooth-space runout to the bore
-  plus their bond float, half their bond clearance (#3219 option D and #3292,
-  owner rulings 2026-11-21); for T024, centred while its bond is wet, half its
-  .0045 in TIR about MHA-DT-04's journal read after cure (MHA-DT-00 sheet 16,
-  #3292). How the spigot's float and tilt in MHA-DT-04's socket move the
-  running axis off MHA-DT-04 near the tip is not booked (#2473).
+  pivot). That is half its 0.05 TIR for a keyed gear. T012, T018 and T024 are
+  bonded and keep their bond float, so each is read after cure about
+  MHA-DT-04's journal with a Ø.040 pin in every space (MHA-DT-00 sheet 16):
+  T024, centred while its bond is wet, at .0045 in TIR (#3292, owner ruling
+  2026-11-21); T012 and T018 at .0030 in TIR (#2473, owner ruling 2026-11-22),
+  which contains their printed .0015 in tooth-space runout to the bore
+  (#3219). The journal's axis is not the running axis (#2473, owner ruling
+  2026-11-22, option G; `cone_running_axis`):
+  MHA-DT-37's spigot cures off-centre and tilted in MHA-DT-04's socket, so
+  its pivot is tapped true while the bond is wet and read after cure, before
+  the post is assembled, at .0020 in TIR MAX (MHA-DT-00 steps 2B and 2F,
+  sheet 16). Half that reading reaches each gear by its plane's share of
+  the journal-to-pivot span (0.27 at T120 to 0.92 at T012). T012, T018 and
+  T024 carry
+  the standard (N + 2)/DP blank for it, their tooth thickness +.003/−0 in.
+  The least margin is T012's, contact ratio 1.023. Not booked: the runout of
+  MHA-DT-04's land 1 to its journal, which its sheet does not print.
   No number is booked for the ease out of the bind (check 4N;
   delegated ruling 2026-11-12, #2144, see gear-standard.md). Reported only (REF): the
   printed-corner contact ratio there. A gear that binds is cleared by easing
