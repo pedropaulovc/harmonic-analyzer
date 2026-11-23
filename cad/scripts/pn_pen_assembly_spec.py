@@ -1,5 +1,5 @@
 """Pure fitting contract for pn-pen.SLDASM (MHA-PN-00): inventory, the
-exploded view's camera and the four carriage settings.
+exploded view's camera and the five carriage settings.
 
 Builder data only: the builder (``build_pn_pen_assembly``) authors the
 settings as blanked construction sketches carrying driving, toleranced model
@@ -26,6 +26,11 @@ setup and adjustment):
 * NIB PRESET -- the nib tip beyond the v-block/stirrup paper-end face along
   the marker axis, ``NibProtrusion@CarriageSetting``. The nib-to-paper
   clearance is set at MHA-HA-00, where the paper exists.
+* STIRRUP SETTING -- the stirrup's rear (rod-side) face from the v-block's
+  paper-end face along the marker axis, ``StirrupRearFace@CarriageSetting``,
+  .310 +.015/-.000 (``pn_pen_carriage_geom.STIRRUP_REAR_FACE_LIMITS``), its
+  paper face not proud of that face (step 5D's square): at its far limit the
+  stirrup's far window corners stay off the neck breaks' run-out (#3467).
 * ROD TRAVEL -- the block top (the rod's shoulder) below the hanger's upper
   U-guide top in the rest pose, ``BlockTopBelowUpperGuide@TravelSetting`` on
   the Right plane, its band the pen's travel each way: the rod slides free
@@ -39,6 +44,7 @@ import math
 
 import pn_pen_adjust_screw_spec as stud
 import pn_pen_carriage_geom as carriage
+import pn_pen_frame_spec as frame
 import pn_pen_hanger_spec as hanger
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as v_block
@@ -224,6 +230,25 @@ YAW_TEXT_UV = (
     CARRIAGE_END_UV[1] + YAW_TEXT_RADIUS * math.sin(math.radians(_BISECTOR_DEG)),
 )
 
+# STIRRUP SETTING (#3467), in the same Top-plane sketch: from the end-face
+# point a third construction line runs into the block along the marker axis,
+# collinear with the nib arm, to the stirrup's rear (rod-side) face, flush as
+# placed.  Its dimension is the setting itself, read with calipers over the
+# end face and the rear face: the model's flush stirrup at its near limit,
+# bilateral -.000/+ to its far limit (carriage.STIRRUP_REAR_FACE_LIMITS).
+STIRRUP_DIMENSION = "StirrupRearFace"
+STIRRUP_REAR = carriage.FRAME_X0_LOCAL + frame.FRAME_DEPTH
+_STIRRUP_REAR_MACHINE = carriage.block_to_machine(
+    (STIRRUP_REAR, v_block.MARKER_AXIS_Y, v_block.DEPTH_MID_Z)
+)
+STIRRUP_REAR_UV = (_STIRRUP_REAR_MACHINE[0], -_STIRRUP_REAR_MACHINE[2])
+STIRRUP_PRECISION = 3
+# (lower, upper) deviations, mm, of the printed setting.
+STIRRUP_TOLERANCE_MM = (
+    carriage.STIRRUP_REAR_FACE_LIMITS[0] - STIRRUP_REAR,
+    carriage.STIRRUP_REAR_FACE_LIMITS[1] - STIRRUP_REAR,
+)
+
 # ROD TRAVEL (Right plane, sketch (u, v) = machine (-Z, Y), the stud
 # setting's convention): a vertical construction line on the rod axis from
 # the hanger's upper U-guide top down to the block top (the rod's shoulder)
@@ -248,12 +273,16 @@ TRAVEL_TOLERANCE_MM = round(carriage.PEN_TRAVEL_HALF_MM / 25.4, TRAVEL_PRECISION
 # The builder marks exactly these for the drawing, at these places.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     STUD_FEATURE: {STUD_DIMENSION},
-    CARRIAGE_FEATURE: {YAW_DIMENSION, NIB_DIMENSION},
+    CARRIAGE_FEATURE: {YAW_DIMENSION, NIB_DIMENSION, STIRRUP_DIMENSION},
     TRAVEL_FEATURE: {TRAVEL_DIMENSION},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     STUD_FEATURE: {STUD_DIMENSION: STUD_PRECISION},
-    CARRIAGE_FEATURE: {YAW_DIMENSION: YAW_PRECISION, NIB_DIMENSION: NIB_PRECISION},
+    CARRIAGE_FEATURE: {
+        YAW_DIMENSION: YAW_PRECISION,
+        NIB_DIMENSION: NIB_PRECISION,
+        STIRRUP_DIMENSION: STIRRUP_PRECISION,
+    },
     TRAVEL_FEATURE: {TRAVEL_DIMENSION: TRAVEL_PRECISION},
 }
 
@@ -291,6 +320,23 @@ _nib_dir = (
 assert math.isclose(
     math.degrees(math.atan2(-_nib_dir[1], -_nib_dir[0])), YAW_DEG, abs_tol=1e-9
 ), _nib_dir
+# The stirrup line runs from the end-face point along the marker axis, away
+# from the nib, its length the stirrup's depth as placed flush.
+assert math.isclose(
+    math.dist(CARRIAGE_END_UV, STIRRUP_REAR_UV), STIRRUP_REAR, abs_tol=1e-9
+)
+assert math.isclose(
+    (STIRRUP_REAR_UV[0] - CARRIAGE_END_UV[0]) / STIRRUP_REAR, -_nib_dir[0], abs_tol=1e-9
+) and math.isclose(
+    (STIRRUP_REAR_UV[1] - CARRIAGE_END_UV[1]) / STIRRUP_REAR, -_nib_dir[1], abs_tol=1e-9
+), STIRRUP_REAR_UV
+# The printed setting is the carriage's, at three exact inch places, and at
+# its far limit the far window corners still ride nothing.
+assert STIRRUP_TOLERANCE_MM[0] == 0.0, STIRRUP_TOLERANCE_MM
+for _limit in (STIRRUP_REAR, STIRRUP_REAR + STIRRUP_TOLERANCE_MM[1]):
+    _thou = _limit / 25.4 * 10**STIRRUP_PRECISION
+    assert math.isclose(_thou, round(_thou), abs_tol=1e-6), _limit
+assert carriage.stirrup_setting_ride(STIRRUP_REAR + STIRRUP_TOLERANCE_MM[1]) == 0.0
 # The printed travel band is the stroke rounded to its places, and at the top
 # of it the block top still stands below the lower guide (the full envelope is
 # test_pn_pen_hanger_drawing's, at the stroke itself).

@@ -235,7 +235,9 @@ def test_window_corners_print_r065_and_clear_the_necks_broken_edges() -> None:
         u, v = r - r * math.cos(a), r - r * math.sin(a)
         assert u + v <= v_block.NECK_EDGE_BREAK_MIN
     assert v_block.NECK_EDGE_BREAK_MIN - r == pytest.approx(0.127, abs=1e-3)
-    assert carriage.window_corner_ride_max() == 0.0
+    # Its rear face at its setting's far limit (#3467), the corners still
+    # ride nothing.
+    assert carriage.window_corner_ride_max(carriage.STIRRUP_REAR_FACE_LIMITS[1]) == 0.0
     # The full break runs past the stirrup's far face at its printed maximum.
     depth_max = (
         spec.FRAME_DEPTH + printed_deviations(spec.FRAME_DEPTH, 2, unit=spec.UNIT)[1]

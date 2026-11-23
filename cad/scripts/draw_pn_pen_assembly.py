@@ -4,7 +4,8 @@ Sheet 1 shows the pen assembled (front and right) beside four details; RIGHT
 and two of the details carry its settings as the builder's driving,
 toleranced model dimensions: RIGHT the rod travel (``TravelSetting``),
 DETAIL A the stud height and its jam nut (``StudSetting``), DETAIL B the
-hanger screw's nut and jam nut, DETAIL C the pen yaw and nib preset
+hanger screw's nut and jam nut, DETAIL C the pen yaw, nib preset and the
+stirrup's setting
 (``CarriageSetting``), DETAIL D the stirrup and its thumb screw on the
 block, with the as-shipped note; sheet 2 the builder-owned ``PN_EXPLODED``
 presentation (``pn_pen_explode_spec``) with its explode trails, the BOM
@@ -293,6 +294,7 @@ DIMENSION_TEXT_POINTS = {
     CARRIAGE_DETAIL.key: {
         spec.YAW_DIMENSION: _top_plan_point(spec.YAW_TEXT_UV),
         spec.NIB_DIMENSION: _top_plan_point(notes.NIB_TEXT_UV),
+        spec.STIRRUP_DIMENSION: _top_plan_point(notes.STIRRUP_TEXT_UV),
     },
 }
 # The rod travel prints on RIGHT itself, which draws the whole stroke: both U
@@ -1145,13 +1147,18 @@ def _assert_dimension_ink_on_sheet(display: Any, *, label: str) -> None:
     )
 
 
-def _band(name: str) -> tuple[float, float]:
-    """``name``'s nominal and symmetric band in SolidWorks system units."""
+def _band(name: str) -> tuple[float, float, float, int]:
+    """``name``'s nominal, lower and upper deviations in SolidWorks system
+    units, and its tolerance type (swTolType_e: 4 symmetric, 2 bilateral)."""
     if name in notes.ANGULAR_TOLERANCES:
-        return math.radians(spec.YAW_DEG), math.radians(notes.ANGULAR_TOLERANCES[name])
-    return notes.DIMENSION_NOMINALS[name] / 1000.0, notes.DIMENSION_TOLERANCES[
-        name
-    ] / 1000.0
+        band = math.radians(notes.ANGULAR_TOLERANCES[name])
+        return math.radians(spec.YAW_DEG), -band, band, 4
+    nominal = notes.DIMENSION_NOMINALS[name] / 1000.0
+    if name in notes.BILATERAL_TOLERANCES:
+        lower, upper = notes.BILATERAL_TOLERANCES[name]
+        return nominal, lower / 1000.0, upper / 1000.0, 2
+    band = notes.DIMENSION_TOLERANCES[name] / 1000.0
+    return nominal, -band, band, 4
 
 
 def _assert_reference(name: str, display: Any, *, when: str) -> None:
@@ -1176,29 +1183,30 @@ def _assert_reference(name: str, display: Any, *, when: str) -> None:
 
 def _assert_settings(displays: list[tuple[str, Any]], *, when: str) -> None:
     """Each setting reads its nominal (the angle 45, not its supplement), its
-    symmetric band and places, and its callout; a reference setting its
-    parenthesised nominal."""
+    band and places, and its callout; a reference setting its parenthesised
+    nominal."""
     for name, display in displays:
         if name in notes.REFERENCE_DIMENSIONS:
             _assert_reference(name, display, when=when)
             continue
-        nominal, band = _band(name)
+        nominal, lower, upper, kind = _band(name)
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         value = abs(float(dimension.SystemValue))
         callout = str(display.GetText(CALLOUT_TEXT_PART) or "").replace("\r\n", "\n")
         if (
             abs(value - nominal) > 1e-8
-            or int(tolerance.Type) != 4  # swTolSYMMETRIC
-            or abs(float(tolerance.GetMaxValue()) - band) > 1e-9
-            or abs(float(tolerance.GetMinValue()) + band) > 1e-9
+            or int(tolerance.Type) != kind
+            or abs(float(tolerance.GetMaxValue()) - upper) > 1e-9
+            or abs(float(tolerance.GetMinValue()) - lower) > 1e-9
             or int(display.GetPrimaryTolPrecision2()) != notes.TOLERANCE_PRECISION[name]
             or callout != notes.DIMENSION_CALLOUTS[name]
         ):
             raise RuntimeError(
                 f"{when} {name}: value {value!r} (nominal {nominal!r}), tolerance "
                 f"type {int(tolerance.Type)} {float(tolerance.GetMinValue())!r}.."
-                f"{float(tolerance.GetMaxValue())!r} (band {band!r}), tol places "
+                f"{float(tolerance.GetMaxValue())!r} (want type {kind} "
+                f"{lower!r}..{upper!r}), tol places "
                 f"{int(display.GetPrimaryTolPrecision2())}, callout {callout!r}"
             )
 
