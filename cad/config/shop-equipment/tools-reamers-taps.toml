@@ -541,8 +541,15 @@ status = "to_order"
 note = "Not owned: to buy. MHA-DT-20 cone swing platform's pivot bore, Ø.2500 +.0005/.0000 REAM THRU, a running fit on the MHA-DT-VN-52 shoulder (cad/process/dt_cone_swing_platform). Owner ruling 2026-11-20 (#3073) buys a fixed reamer for each running/press fit rather than setting tools.reamers-adjustable-lms-5948, which the placeholder plan named."
 
 # Owner ruling 2026-11-23 (tool audit Q11): both MHA-DT-05 post bores become
-# Ø.4385 +.0005/0, cut with the 7/16 over member of the over/under set.
+# Ø.4385 +.0005/0, "7/16 over reamer of the Shars set". Buy it when the
+# MHA-DT-05 spec and the dt_crankshaft plan carry the .4385 bore (the post is
+# a casting on hold); until then tools.reamer-4500 is what the plans name.
 [tools.reamer-4385]
+name = ".4385 in (7/16 over) HSS chucking reamer, member of the Shars 404-7303 set"
+make = "Shars"
+sku = "404-7303"
+source = "https://www.shars.com/0-124-0-501-over-under-hss-chucking-reamer-set"
+purchase = "Shars 404-7303, .124-.501 over and under HSS chucking reamer set, 14 pieces, $77.88, in stock (read live 2026-11-23): one set serves every over/under size. NOT CONFIRMED: the page gives the range and the piece count but no member list, and Shars sells no single .4385 reamer on a page found; fourteen pieces over .124-.501 fit seven fractions from 1/8 to 1/2, each .001 under and over, which puts .4385 in the set. Read the set's label before the bore is cut."
 kind = "reamer"
 status = "to_order"
-note = "Not owned: to buy. The 7/16 over (.4385) member of the Shars 404-7303 over/under chucking reamer set, $77.88 the set (read live 2026-11-23); the member list was not read on the page."
+note = "Not owned: to buy. MHA-DT-05 post bores and the MHA-DT-11 drive-pin jig bore, Ø.4385 +.0005/0."
