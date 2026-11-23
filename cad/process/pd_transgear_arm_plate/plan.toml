@@ -445,7 +445,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 X0 and Y0 at K with the edge finder (900 rpm): from +X on the R end, from +Y on the C edge."
-instruction_detailed = "Edge finder (900 rpm, in place of T1) on the blank's R end from +X, at mid-width: G10 L20 P1 X{{process.x_set_mm:.3f}}. On the C edge from +Y, 1/2 in in from the R end: G10 L20 P1 Y{{process.y_set_mm:.3f}}. MDI G0 X−33 (1/2 in in from the far end of the shortest blank), touch the C edge again from +Y and read the work Y."
+instruction_detailed = "Edge finder (900 rpm, in place of T1) on the blank's R end from +X, at mid-width: G10 L20 P1 X{{process.x_set_mm:.3f}}. On the C edge from +Y, 1/2 in in from the R end: G10 L20 P1 Y{{process.y_set_mm:.3f}}. Back off .10 in +Y; MDI G0 X−33 (1/2 in in from the far end of the shortest blank), touch the C edge again from +Y and read the work Y."
 inspection = "The second C-edge reading within .002 of the first (the blank lies along X)."
 gauge_checks = "other"
 feed = "hand"
@@ -637,7 +637,7 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "File flush any fin the tape left at the bottom of the outline and scrape the drill and reamer burrs off K's and the screw holes' face-A mouths (deburring scraper, flush, no chamfer: K's chamfer is the next op's), so face A seats flat."
+instruction = "File flush any fin the tape left at the bottom of the outline and scrape the drill and reamer burrs off K's and the screw holes' face-A mouths (deburring scraper, flush, no chamfer: K's chamfer is the hand countersink op's), so face A seats flat."
 feed = "hand"
 inspection = "Face A lies on the surface plate without rocking."
 gauge_checks = "other"
@@ -649,9 +649,13 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
+instruction = "Only if face A rocks: soft jaws in the bench vise; the plate standing on a side edge between them, two 1/8 in drill shanks across it near its ends on the hollow face, one across its middle on the crowned face. Close the vise a little, open it, lay the plate on the surface plate again; repeat in small steps."
+inspection = "Face A lies on the surface plate without rocking."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
 steps = [
-  { kind = "action", text = "Only if face A rocks: soft jaws in the bench vise; the plate standing on a side edge between them, two 1/8 in drill shanks across it near its ends on the hollow face, one across its middle on the crowned face. Close the vise a little, open it, lay the plate on the surface plate again; repeat in small steps." },
-  { kind = "check", text = "Face A lies on the surface plate without rocking." },
   { kind = "stop", text = "Still rocks after three tries, or the drill shanks marked the plate: stop and tell the owner." },
 ]
 feed = "hand"
