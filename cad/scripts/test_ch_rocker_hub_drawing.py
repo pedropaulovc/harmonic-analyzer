@@ -161,7 +161,34 @@ def test_the_traveler_land_window_reads_the_drawing_interference() -> None:
     plan = tomllib.loads(
         (CAD_ROOT / "process/ch_rocker_hub/plan.toml").read_text("utf-8")
     )
-    step_in = 0.0001  # the .4000-.4005 plug gauges' step: a hole lies in R..R+.0001
-    assert plan["parameters"]["land_over_reading_min_in"] == pytest.approx(
-        fit.PRESS_INTERFERENCE[0] / 25.4 + step_in
+    # Owner ruling 2026-11-23 (tool audit Q2): "B. Four reading pins (.4000,
+    # .4002, .4004, .4005)." A hole's reading R is the largest pin that
+    # enters; the hole lies under the next pin up.
+    pins = (0.4000, 0.4002, 0.4004, 0.4005)
+    least, greatest = (i / 25.4 for i in fit.PRESS_INTERFERENCE)
+    p = plan["parameters"]
+    assert p["land_over_reading_min_in"] == pytest.approx(least + 0.0002)
+    assert p["top_reading_in"] == pytest.approx(pins[-2])
+    assert p["land_over_top_reading_min_in"] == pytest.approx(
+        least + pins[-1] - pins[-2]
     )
+
+    def land_low(largest: float) -> float:  # the plan's Op 40 rule
+        if largest == pytest.approx(p["top_reading_in"]):
+            return largest + p["land_over_top_reading_min_in"]
+        return largest + p["land_over_reading_min_in"]
+
+    windows = []
+    readings = pins[:-1]
+    for smallest in readings:
+        for largest in (r for r in readings if r >= smallest):
+            low, high = land_low(largest), smallest + greatest
+            # Every hole the lot's readings admit takes the drawing's
+            # interference from both ends of the window.
+            for r in (smallest, largest):
+                top = pins[pins.index(r) + 1]
+                assert low - top >= least - 1e-9
+                assert high - r <= greatest + 1e-9
+            windows.append(high - low)
+    assert min(windows) == pytest.approx(p["land_window_min_in"])
+    assert min(windows) > 0.0

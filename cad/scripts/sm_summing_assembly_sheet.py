@@ -12,6 +12,8 @@ so a wording edit here does not rebuild the summing assembly. No SolidWorks.
 
 from __future__ import annotations
 
+import math
+
 import _config
 import ha_harmonic_analyzer_assembly_steps as ha_steps
 import fr_top_frame_spec as top_frame
@@ -119,19 +121,28 @@ HUB_SET_SCREW_TORQUE = (
 # tool list's TO MAKE row.  The step states no number that needs an
 # instrument, only the fitter's hand check (rule 22; Main on PR #2717's
 # gating clarity finding, 2026-11-13: no gauge ceremony for a setting bar).
-# A bar .0026-.0041 under the Ø.4720-.4735 bores is Ø.4679-.4709, so its
-# reference size is the two places every such bar rounds to, and it shakes
-# in the bores: the hand check is that it slides through both, not that it
-# does not shake.
+# A bar .0026-.0041 under the Ø.4985-.5000 bores (owner ruling 2026-11-23,
+# tool audit Q13; the former Ø.4720-.4735 bores took a Ø.4679-.4709 bar) is
+# Ø.4944-.4974, which straddles a two-place rounding (.49/.50); a (Ø.50)
+# reads as stock 1/2 in rod, which cannot pass a Ø.4985 bore (Codjiflo r1
+# on PR #3444). So the reference is the two places at or under every
+# conforming bar, under the bores' smallest Ø, and it shakes in the bores:
+# the hand check is that it slides through both, not that it does not shake.
 KNIFE_GAUGE_BAR_SIZES_IN = (
     2.0 * KNIFE_BORE_R_MIN / 25.4 - max(KNIFE_GAUGE_BAR_CLEARANCE_IN),
     2.0 * KNIFE_BORE_R_MAX / 25.4 - min(KNIFE_GAUGE_BAR_CLEARANCE_IN),
 )
-KNIFE_GAUGE_BAR_REF_DIA_IN = round(KNIFE_GAUGE_BAR_SIZES_IN[0], 2)
-if round(KNIFE_GAUGE_BAR_SIZES_IN[1], 2) != KNIFE_GAUGE_BAR_REF_DIA_IN:
+KNIFE_GAUGE_BAR_REF_DIA_IN = math.floor(min(KNIFE_GAUGE_BAR_SIZES_IN) * 100.0 + 1e-9) / 100.0
+if (
+    any(
+        math.floor(size * 100.0 + 1e-9) / 100.0 != KNIFE_GAUGE_BAR_REF_DIA_IN
+        for size in KNIFE_GAUGE_BAR_SIZES_IN
+    )
+    or KNIFE_GAUGE_BAR_REF_DIA_IN * 25.4 >= 2.0 * KNIFE_BORE_R_MIN
+):
     raise AssertionError(
         f"gauge bars Ø{KNIFE_GAUGE_BAR_SIZES_IN[0]:.4f}-{KNIFE_GAUGE_BAR_SIZES_IN[1]:.4f} "
-        "share no two-place reference size"
+        f"do not all floor to a (Ø{KNIFE_GAUGE_BAR_REF_DIA_IN:.2f}) reference under the bore"
     )
 KNIFE_GAUGE_BAR = (
     f"(Ø{_length(KNIFE_GAUGE_BAR_REF_DIA_IN * 25.4, 2)}) X "

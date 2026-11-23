@@ -21,9 +21,12 @@ knife-edge suspension: line contact at the ridge, free to rock, replacing the
 M6.4 "diamond knife-bar in the lever tube bore" (which clashed with the lever's
 solid pivot cylinder once the bore was removed). 2026-09-02 user re-read of
 ch18 p.42: the block is an UNPAINTED HEAT-TREATED STEEL block (not brass) with
-a CLOSE bore around the trunnion -- Ø.472 (#290: Ø12 on the inch grid) over
-the 8.080 x 10.268 hex, so the upper shoulders clear by ~0.86 and the lower
-ones by ~1.5.
+a CLOSE bore around the trunnion -- the book's Ø.472 (#290: Ø12 on the inch
+grid) over the 8.080 x 10.268 hex. Owner ruling 2026-11-23, tool audit Q13:
+"dia .4985 +.0015/0 (owner chose against the agent's recommendation to keep
+.4720); no 12 mm reamer": the bore is Ø.4985, 5.6 % larger than the book's,
+so the upper shoulders clear by ~0.99 and the lower ones by ~1.97 (~0.86 and
+~1.5 in the book's Ø.472).
 
 There are TWO supports, one per trunnion (placed front/back in the assembly at
 |z| ~ 87). This single part is built once and placed twice.
@@ -136,21 +139,24 @@ HARDENED_STEEL = (0.30, 0.30, 0.31)  # dark heat-treated grey, left unpainted
 RIDGE_Y = HEX_H / 2.0  # hex top vertex above the pivot/cylinder centreline (5.134)
 
 # --- bore: close around the hex trunnion, top-edge contact only ------------
-R_BORE = sm_knife_mount_spec.R_BORE  # Ø.472 bore (2026-09-02 ch18 p.42 re-read:
-# a CLOSE bore); the hex is 8.080 wide x 10.268 tall -> ~0.86 clear at the
-# upper shoulders, ~1.5 at the lower ones, everywhere but the top vertex line
-# Hex top vertex hangs this far below the bore upper inner wall: 0.261 puts
+R_BORE = sm_knife_mount_spec.R_BORE  # Ø.4985 bore (owner ruling 2026-11-23,
+# tool audit Q13; the 2026-09-02 ch18 p.42 re-read's close bore was Ø.472);
+# the hex is 8.080 wide x 10.268 tall -> ~0.99 clear at the upper shoulders,
+# ~1.97 at the lower ones, everywhere but the top vertex line
+# Hex top vertex hangs this far below the bore upper inner wall: 0.26735 puts
 # the bore centre's BASIC height under the top seat on the inch grid,
-# 14.866 - 0.261 + 5.9944 = 20.5994 (.811).
-TOP_CLEAR = 0.261
+# 14.866 - 0.26735 + 6.33095 = 20.9296 (.824).
+TOP_CLEAR = 0.26735
 # Bore centre BELOW the origin so only the upper wall reaches the ridge:
-BORE_CY = TOP_CLEAR - R_BORE  # -5.7334 (bore top inner wall at local y +TOP_CLEAR)
+BORE_CY = TOP_CLEAR - R_BORE  # -6.0636 (bore top inner wall at local y +TOP_CLEAR)
 
 # --- block (bearing body, held to the crossbar) ----------------------------
 # SUPPORT_Z_THICK (.55) and BLK_HALF_X (1.00 across) are the spec's: the
 # former dowel pattern's webs sized them, and they stand unchanged (owner
 # ruling 2026-11-08 (Pedro), #2144 item 11.3).
-WALL = 3.1242  # material below the bore: the block 1.17 tall
+# The block keeps its 1.17 height under the Ø.4985 bore (owner ruling
+# 2026-11-23, tool audit Q13): 2.45745 of material below it, nominal.
+WALL = 2.45745  # material below the bore: the block 1.17 tall
 BLK_BOT = BORE_CY - R_BORE - WALL  # -14.852
 
 # Mount: the block top seat is clamped to the top-frame casting underside (the
@@ -175,11 +181,11 @@ if (
         f"knife-mount bore centre {BORE_CY:.4f} / bottom {BLK_BOT:.4f} != spec"
     )
 # The bore centre's BASIC height under the datum-A top seat, exactly as
-# modelled: 14.866 + 5.7334 = 20.5994 (.811).  The sheet prints it
+# modelled: 14.866 + 6.0636 = 20.9296 (.824).  The sheet prints it
 # (draw_sm_knife_mount) at the places that carry it unrounded.
 BORE_CENTRE_DEPTH = BLK_TOP - BORE_CY
 # The spec judges the tap's web at its mirror; re-judge it here at the
-# derived top (2.106: the charged pilot envelope, Ø3.924, not the accepted
+# derived top (2.100: the charged pilot envelope, Ø3.924, not the accepted
 # Ø3.8989, at the sharpest accepted point, 117 deg).
 _TAP_WEB_WORST = sm_knife_mount_spec.tap_web_worst(
     BLK_TOP,
@@ -487,7 +493,7 @@ def build(adapter) -> dict[str, str]:
     # coords are zero -> origin-axis relations, no placement dims). The
     # analytic expectation subtracts the nominal drill cylinder to its depth
     # plus its 118 deg point; even the charged pilot envelope at its sharpest
-    # accepted point stops _TAP_WEB_WORST (2.106) above the bore crown, so
+    # accepted point stops _TAP_WEB_WORST (2.100) above the bore crown, so
     # none of it overlaps the bore void.
     wizard_holes(
         adapter,
@@ -623,7 +629,7 @@ def build(adapter) -> dict[str, str]:
         display_unit=UNIT,
     )
     # The bored knife bore's +.0015/0 band (sm_knife_mount_spec.BORE_DIA_BAND),
-    # printed at its four places: Ø.4720 +.0015/.0000 THRU.
+    # printed at its four places: Ø.4985 +.0015/.0000 THRU.
     set_dimension_bilateral_tolerance(
         adapter,
         "BoreProfile",

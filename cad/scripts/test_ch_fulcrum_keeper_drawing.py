@@ -65,9 +65,10 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     assert spec.KEEPER_SCREW_Z_OFF == pytest.approx(spec.KEEPER_Z_OFF + spec.SCREW_X)
     assert spec.KEEPER_SCREW_Z_OFF == pytest.approx(88.646)
     # Plain reamed bore on the plain Ø.2500 shaft, each keeper reamed alone
-    # (#2338) with a stock .2550 chucking reamer: a slip band whose least
-    # clearance covers both keepers' bore heights, tilts and the rail seats.
-    assert spec.BORE_DIA == pytest.approx(0.2550 * 25.4)
+    # (#2338) with the stock .2560 chucking reamer the levers use (owner
+    # ruling 2026-11-23, tool audit Q7): a slip band whose least clearance
+    # covers both keepers' bore heights, tilts and the rail seats.
+    assert spec.BORE_DIA == pytest.approx(0.2560 * 25.4)
     assert spec.BORE_DIA_BAND == (0.0254, 0.0)  # (upper, lower)
     # The stock reamer's ANSI cutting band lies inside the bore band.
     low, high = spec.BORE_REAMER_DIA_RANGE_MM
@@ -97,7 +98,7 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
     # Owner ruling Q10-B: the bore stands within +-.012 of the width's centre
     # plane, so each side wall is half the least .XX width less that band.
     assert spec.BORE_SIDE_WALL_MM >= WALL_TARGET_MM
-    assert round(spec.BORE_SIDE_WALL_MM, 3) == 3.302
+    assert round(spec.BORE_SIDE_WALL_MM, 3) == 3.289
     assert round(spec.SET_SCREW_WEB_MM, 3) == 2.629
     assert round(spec.FOOT_TIP_WALL_MM, 3) == 2.362
     # Owner ruling 2026-10-28: the outer lug face sits .65 - .32 off the
@@ -283,7 +284,7 @@ def test_crown_prints_a_full_round_reference_radius() -> None:
     assert terms["least crown over the bore axis"] + terms[
         "crown fall across the thread"
     ] == pytest.approx(spec.crown_least_height(spec._THREAD_HALF_MAJOR))
-    assert round(spec.SET_SCREW_ENGAGEMENT_D, 3) == 1.622
+    assert round(spec.SET_SCREW_ENGAGEMENT_D, 3) == 1.616
     # The sheet keeps it radial: no near-side diameter style, arrow outside,
     # no solid leader on through the bore to the centre (MR-fleet r6 eye pass).
     assert "CrownRadius" not in drawing.NEAR_SIDE_DIAMETERS
@@ -972,7 +973,7 @@ def test_keeper_feature_bands_are_the_printed_ones() -> None:
     assert features["foot_tip"]["length"] == pytest.approx([_in(0.64), _in(0.66)])
     assert features["far_side"]["width"] == pytest.approx([_in(0.54), _in(0.56)])
     bore = features["bore"]
-    assert bore["dia"] == pytest.approx([_in(0.2550), _in(0.2560)])
+    assert bore["dia"] == pytest.approx([_in(0.2560), _in(0.2570)])
     assert bore["process"] == "ream" and bore["thru"] is True
     assert bore["height"] == pytest.approx([_in(0.98), _in(1.00)])
     assert bore["off_centre"] == pytest.approx([_in(-0.012), _in(0.012)])

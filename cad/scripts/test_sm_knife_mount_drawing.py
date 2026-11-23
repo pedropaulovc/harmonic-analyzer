@@ -119,7 +119,7 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
     assert "FLAT BOTTOM" not in drawing.PIN_HOLE_CALLOUT
     assert not hasattr(sm_knife_mount_spec, "DOWEL_HOLE_FLOOR_CORNER_R_MAX")
     assert sm_knife_mount_spec.PIN_HOLE_POINT_H == pytest.approx(0.97676, abs=1e-5)
-    assert sm_knife_mount_spec.PIN_HOLE_BORE_WEB == pytest.approx(6.3084, abs=1e-4)
+    assert sm_knife_mount_spec.PIN_HOLE_BORE_WEB == pytest.approx(6.2534, abs=1e-4)
     assert sm_knife_mount_spec.PIN_HOLE_BORE_WEB >= sm_knife_mount_spec.STUD_TAP_WEB_MIN
     assert drawing.DEPTH_TEXT_ROWS == 1
     assert sm_knife_mount_spec.PIN_HOLE_DEPTH == pytest.approx(9.398)  # .37
@@ -676,8 +676,8 @@ def test_each_basic_prints_the_modelled_value_unrounded(label: str, basic: float
 
 def test_bore_basic_is_the_built_geometry() -> None:
     assert part.BORE_CENTRE_DEPTH == part.BLK_TOP - part.BORE_CY
-    assert part.BORE_CENTRE_DEPTH == pytest.approx(20.5994, abs=1e-9)
-    assert f"{part.BORE_CENTRE_DEPTH / 25.4:.3f}" == "0.811"
+    assert part.BORE_CENTRE_DEPTH == pytest.approx(20.9296, abs=1e-9)
+    assert f"{part.BORE_CENTRE_DEPTH / 25.4:.3f}" == "0.824"
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -709,9 +709,19 @@ def test_close_bore_clears_the_hex_trunnion_only_at_the_ridge() -> None:
 
     from sm_summing_lever_spec import HEX_H, HEX_W
 
-    assert part.R_BORE == pytest.approx(5.9944)  # Ø.4720
+    assert part.R_BORE == pytest.approx(6.33095)  # Ø.4985 (owner ruling 2026-11-23, tool audit Q13)
     assert abs(part.BLK_BOT - (-14.852)) < 1e-9
-    assert abs(part.BORE_CY - (-5.7334)) < 1e-9
+    assert abs(part.BORE_CY - (-6.0636)) < 1e-9
+    # Owner ruling 2026-11-23, tool audit Q13 (Ø.4985 +.0015/0): the larger
+    # bore keeps its crown within .00025 in of the Ø.4720 bore's (.575 under
+    # the top seat; now .57475, so the BASIC centre stays on the .001 grid at
+    # .824), and the knife's ridge, contact line and the seat plane do not
+    # move, so the lever kinematics are the Ø.4720 bore's.
+    crown_depth = part.BLK_TOP - (part.BORE_CY + part.R_BORE)
+    assert crown_depth == pytest.approx(14.59865, abs=1e-9)
+    assert abs(crown_depth - 0.575 * 25.4) <= 0.00025 * 25.4 + 1e-9
+    assert part.CONTACT_Y == pytest.approx(984.8272, abs=1e-4)
+    assert part.KNIFE_Y == pytest.approx(979.6932, abs=1e-4)
     # Top vertex hangs TOP_CLEAR under the crown; the across-corners bottom
     # vertex and the two widest shoulders clear the bore wall.
     hex_centre_y = -HEX_H / 2.0
@@ -805,8 +815,8 @@ def test_tap_crown_web_charges_a_pilot_wider_than_accepted_at_its_sharpest_point
     assert spec.STUD_TAP_DRILL_DEPTH_MAX == pytest.approx(11.176)
     # The bore's Ø.008 location zone charges 0.1016 of crown (owner ruling
     # 2026-10-27, #2016).
-    assert spec.STUD_TAP_WEB_WORST == pytest.approx(2.1060348537, abs=1e-9)
-    assert part._TAP_WEB_WORST == pytest.approx(2.1060348537, abs=1e-9)
+    assert spec.STUD_TAP_WEB_WORST == pytest.approx(2.0996848537, abs=1e-9)
+    assert part._TAP_WEB_WORST == pytest.approx(2.0996848537, abs=1e-9)
     assert part._TAP_WEB_WORST >= spec.STUD_TAP_WEB_MIN == pytest.approx(2.032)
     # The nominal pilot at an exact 118 deg overstated the web.
     assert spec.tap_web_worst(
@@ -1033,4 +1043,4 @@ def test_the_bore_states_its_band_and_mate() -> None:
     # loosened under fan-out L2.
     assert sm_knife_mount_spec.BORE_DIA_BAND == pytest.approx((0.0381, 0.0))
     assert sm_knife_mount_spec.BORE_R_MIN == sm_knife_mount_spec.R_BORE
-    assert sm_knife_mount_spec.BORE_R_MAX == pytest.approx(6.01345)
+    assert sm_knife_mount_spec.BORE_R_MAX == pytest.approx(6.35)

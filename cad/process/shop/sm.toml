@@ -15,12 +15,6 @@
 [tools.drill-36]  # Drills #36
 description = "#36 (.1065 in) drill, 115-piece index"
 diameter_mm = 2.7051
-[tools.drill-11-8mm]  # G-drill-11.8mm; Drills 11.8 mm
-description = "11.8 mm (or 11.75 mm) pre-drill for 12 mm H7 reamer"
-diameter_mm = 11.8
-[tools.reamer-12mm-h7]  # B-reamer-12mm-h7
-description = "12 mm HSS chucking reamer, .4724-.4726 in"
-diameter_mm = 12.0
 [tools.tap-10-24-bottoming]  # Tap coverage #10-24 UNC
 description = "#10-24 UNC bottoming hand tap (OSG 1025000)"
 tap_drill_mm = 3.7973  # #25 (.1495 in), MHA-SM-02's drawn tap drill
@@ -142,15 +136,6 @@ rpm = 900
 chip_load_mm_per_tooth = 0.0254  # .001 in/lip; 900 × 2 × .001 = 1.8 in/min
 flutes = 2
 feed_unit = "in/min"
-# 11.8 mm (.4646): 35 × 3.82 / .4646 = 288, set 300 (300 × .4646 / 3.82 =
-# 36.5 ft/min, inside 35-45); .004 in/rev.
-[settings.drill-11-8mm-4140-ht]
-tool = "drill-11-8mm"
-material = "4140-ht-28-32-hrc"
-rpm = 300
-chip_load_mm_per_tooth = 0.0508  # .002 in/lip; 300 × 2 × .002 = 1.2 in/min
-flutes = 2
-feed_unit = "in/min"
 # .1280 reamer: 25 × 3.82 / .128 = 746, set 750; .002 in/rev (1/8-1/4 in).
 [settings.reamer-1280-4140-ht]
 tool = "reamer-1280"
@@ -159,29 +144,48 @@ rpm = 750
 chip_load_mm_per_tooth = 0.0254  # .001 in/lip; 750 × 2 × .001 = 1.5 in/min
 flutes = 2
 feed_unit = "in/min"
-# 12 mm reamer (.4724): 25 × 3.82 / .4724 = 202, set 200; .004 in/rev
-# (1/4-1/2 in).
-[settings.reamer-12mm-h7-4140-ht]
-tool = "reamer-12mm-h7"
+# The knife bore at Ø.4985 +.0015/0 (owner ruling 2026-11-23, tool audit Q13:
+# "dia .4985 +.0015/0 (owner chose against the agent's recommendation to
+# keep .4720); no 12 mm reamer"): pre-drilled with the owned 31/64 drill
+# (common.toml tools.drill-31-64) and reamed with the .4990 reamer of the
+# over/under set (common.toml tools.reamer-4990), on the rates above.
+# 31/64 (.4844): 35 × 3.82 / .4844 = 276, set 275 (275 × .4844 / 3.82 =
+# 34.9 ft/min); .004 in/rev.
+[settings.drill-31-64-4140-ht]
+tool = "drill-31-64"
 material = "4140-ht-28-32-hrc"
-rpm = 200
-chip_load_mm_per_tooth = 0.0508  # .002 in/lip; 200 × 2 × .002 = .8 in/min
+rpm = 275
+chip_load_mm_per_tooth = 0.0508  # .002 in/lip; 275 × 2 × .002 = 1.1 in/min
+flutes = 2
+feed_unit = "in/min"
+# .4990 reamer: 25 × 3.82 / .499 = 191, set 190; .004 in/rev (1/4-1/2 in).
+[settings.reamer-4990-4140-ht]
+tool = "reamer-4990"
+material = "4140-ht-28-32-hrc"
+rpm = 190
+chip_load_mm_per_tooth = 0.0508  # .002 in/lip; 190 × 2 × .002 = .76 in/min
 flutes = 2
 feed_unit = "in/min"
 
-# The knife mount's reamed-hole go/no-go pairs, Vermont Gage Class X as the dt
-# pairs (cad/config/shop-equipment/ gauges, same keys, to buy): the knife bore
-# .4720 GO / .4735 NO-GO = 11.9888 and 12.0269 mm, the datum-B dowel hole
-# .1273 GO / .1287 NO-GO = 3.23342 and 3.26898 mm (the pin-gauge sets step by
-# .001 in and hold neither low limit). A fixed-limit pair reads no scale; its
-# resolution is each member's Class X tolerance, .000040 in = 0.001016 mm.
-[gauges.plug-gauges-4720-4735]
-range_mm = [11.9888, 12.0269]
-resolution_mm = 0.001016
-[gauges.plug-gauges-1273-1287]
+# The knife mount's reamed holes gauged with Class ZZ pins (owner ruling
+# 2026-11-23, tool audit Q1, verbatim: "ZZ singles per the record: 29 pins
+# (17 plus GO, 12 minus NO-GO), about $130. Accept that good holes near a
+# limit may be refused; the traveler mikes each pin so the real window is
+# known per pin."). The knife bore .4985-.5000: GO a plus .4985 single
+# (.4985-.4987), NO-GO the .500 minus pin of the .061-.500 box
+# (.4998-.5000). Datum B .1273-.1287: GO a .1275 minus single (.1273-.1275),
+# NO-GO a .1285 plus single (.1285-.1287), the half-thousandth singles whose
+# true sizes are the band's ends. Each pin's resolution is its ZZ tolerance,
+# .0002 in = 0.00508 mm; the traveler mikes each pin and accepts a hole
+# between the two readings.
+[gauges.zz-pins-4985-5000]
+range_mm = [12.6619, 12.7]
+resolution_mm = 0.00508
+[tools.zz-pins-4985-5000]
+description = "Class ZZ pins for .4985-.5000: GO .4985 plus (single), NO-GO .500 minus (the .061-.500 box)"
+[gauges.zz-pins-1273-1287]
 range_mm = [3.23342, 3.26898]
-resolution_mm = 0.001016
-[tools.plug-gauges-4720-4735]
-description = "Plug gauge pair, .4720 GO (plus) and .4735 NO-GO (minus), Vermont Gage Class X"
-[tools.plug-gauges-1273-1287]
-description = "Plug gauge pair, .1273 GO (plus) and .1287 NO-GO (minus), Vermont Gage Class X"
+resolution_mm = 0.00508
+[tools.zz-pins-1273-1287]
+description = "Class ZZ pins for .1273-.1287: GO .1275 minus (single), NO-GO .1285 plus (single)"
+
