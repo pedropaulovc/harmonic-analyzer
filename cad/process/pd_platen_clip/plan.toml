@@ -62,7 +62,7 @@ material = "{{cad.material_spec}}"
 material_key = "c260-h02"
 milling_material = "brass"
 stock = "Qty {{process.quantity:g}}. C26000 H02 brass strip, .032 x 2 x 12 in (McMaster-Carr 8859K86, two strips to order, not on hand): two {{process.blank_length_in:.2dot}} in blanks sawn off one end of the first strip; the rest of it (over 4.7 in after the two saw cuts) is MHA-PD-14's, whose blank is 4.08 in. The second strip is the spare: any new blank for this part comes from it."
-note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Bench, the CNC mill (one NC file, proved once in air with Z0 raised 1.000 in before it cuts), the bench, the vise (spindle off). Dry: no coolant on the tape. After any controller reset, stall or E-stop, home ($H) and set G54 again. Finish: {{cad.finish}}."
+note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Bench, the CNC mill (one NC file, proved once in air with Z0 raised 1.000 in before it cuts), the bench, the vise (spindle off). Dry: no coolant on the tape. After any alarm, stall or E-stop, home ($H) and set G54 again; a Reset after a Feed Hold keeps G54. Finish: {{cad.finish}}."
 shop = "../shop"
 stock_refs = ["c260-h02-strip-032x2"]
 
@@ -159,9 +159,12 @@ blank_area_mm2 = 4645.152
 # slotting depth for the series (SF_896200, read 2026-11-22: axial .5 x D,
 # .0155 a level), the depth that goes with the slotting chip load the feed
 # is held to (delegated ruling 2026-11-22: never above the maker's
-# published chip load). No precedent deeper: no other plan on main runs
-# this cutter. The thicker stack adds .007 to the cut, so four levels of
-# .0127 where the .006 tape took three of .0146. The 0.6 MPa bond cap does
+# published chip load). Precedents for this cutter in brass, both
+# shallower than the maker's limit: this plan on main ran three levels of
+# .0146 under the .006 tape; the phasing comb (dt_cone_gear_tl_phasing_comb,
+# its outline op, on this branch) runs three of .0123 (.3135 mm). The
+# thicker stack adds .007 to the cut, so four levels of .0127 here, no
+# deeper than this plan's own .0146. The 0.6 MPa bond cap does
 # not bind: the cut asks 0.056 MPa in shear of the smallest piece (a male
 # die half) and no tension (a downcut).
 sheet_tip_z_mm = -0.1016
@@ -334,7 +337,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Spoil plate on 1 in parallels across the vise jaws, its back edge on the fixed jaw, centred along the jaws: the jaw tops stand {{process.jaw_top_over_plate_mm:in.3dot}} above the plate top, room for the edge finder's touch and blank A's edge, and at the least stickout the collet's nose passes {{process.collet_over_jaw_mm:in.2dot}} over them at the cut. Blanks A and B bonded to its top under their whole faces: blue tape on the plate, CA glue, blue tape on the blank (stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}), both left ends flush with the plate's left end, A's back edge against the fixed jaw and B's against A's front edge."
-datum = "Program PC01_sheet. G54: X0 the plate's left end, Y0 the fixed jaw's face (the plate's back edge and blank A's), Z0 the plate top, bare right of the tape; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack, starting each cut over the thickest stack ({{process.tape_stack_max_mm:in.3dot}}) and ending {{process.sheet_tip_into_plate_mm:in.3dot}} into the plate; +Y toward the fixed jaw. Each clip's rail near end stands at X {{process.part_left_x_mm:in.3dot}}, the first clip's spring edge at Y {{process.clip_spring_edge_y_mm:in.3dot}}. Set X, Y and Z again after a reset, a stall, an E-stop or any move of the plate."
+datum = "Program PC01_sheet. G54: X0 the plate's left end, Y0 the fixed jaw's face (the plate's back edge and blank A's), Z0 the plate top, bare right of the tape; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack, starting each cut over the thickest stack ({{process.tape_stack_max_mm:in.3dot}}) and ending {{process.sheet_tip_into_plate_mm:in.3dot}} into the plate; +Y toward the fixed jaw. Each clip's rail near end stands at X {{process.part_left_x_mm:in.3dot}}, the first clip's spring edge at Y {{process.clip_spring_edge_y_mm:in.3dot}}. Set X, Y and Z again after an alarm, a stall, an E-stop or any move of the plate; a Reset after a Feed Hold keeps them."
 diagram = { file = "diagrams/sheet.svg", alt = "Plan of the spoil plate in the vise: the plate's blue tape, four strips along X from its left end to 4 in, and blank A against the fixed jaw and blank B in front of it on it, both flush with the plate's left end; dashed, the tape seams along X, the blanks' offset from the plate's; on A the two clips, rails toward the moving jaw, and the first lamination; on B the other three; each lamination split along its bow profile into a male half (toward the moving jaw) and a female half. The 1/32 end mill enters every outline from beyond the plate's left end." }
 # Top: the thickest strip on the thickest tape stack; deepest: the cutter's
 # tip, .004 into the spoil plate. Across the jaws, the two blanks; along
@@ -472,7 +475,10 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "While PC01_sheet runs, dry: air blast the chips off as it goes; no flood or mist coolant and no water (the paper tape soaks and lets go). A hot smell from the cut (CA softens with heat): feed hold. The spindle keeps turning and the cutter stays in the kerf, cutting nothing with no feed. Wait 5 minutes, then Cycle Start."
+steps = [
+  { kind = "action", text = "While PC01_sheet runs, dry: air blast the chips off as it goes; no flood or mist coolant and no water (the paper tape soaks and lets go)." },
+  { kind = "stop", text = "The cut smokes or smells hot (CA softens with heat): Feed Hold, then Reset (the spindle stops; G54 stands); jog Z up clear. When the blank is cool to a finger, run PC01_sheet again from its start, G54 untouched: the cut levels pass in air." },
+]
 feed = "hand"
 
 [[setups]]
