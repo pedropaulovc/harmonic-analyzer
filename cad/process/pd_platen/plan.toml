@@ -89,7 +89,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass flat bar, 1/4 × 6 in, temper as Metal Supermarkets supplied it (invoice EC234347 names none; the bar is not yet received). The part's spec: {{cad.material_spec}}"
 stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:g}} in flat bar; {{process.quantity:d}} × {{process.blank_length_in:g}} in piece, as bought. Fixture: the 1/2 × 6 × 18 in 6061 bar."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.right_edge_width_min_in:.2f}}–{{cad.right_edge_width_max_in:.2f}} long, {{cad.top_edge_height_min_in:.2f}}–{{cad.top_edge_height_max_in:.2f}} high, {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}} thick. Every cut on tape runs dry or under a light air blast: no coolant, mist, oil or water reaches the tape (wet paper tape lets go). CA glue softens with heat: work too warm to hold a finger on, Feed Hold, then Reset (the spindle stops; G54 stands), jog Z up clear; when it is cool to a finger, run the file again from its start (cuts already made pass in air). To buy: the two pin gauges before the final inspection; the Brass Black kit before Setup 8."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.right_edge_width_min_in:.2f}}–{{cad.right_edge_width_max_in:.2f}} long, {{cad.top_edge_height_min_in:.2f}}–{{cad.top_edge_height_max_in:.2f}} high, {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}} thick. Every cut on tape runs dry or under a light air blast: no coolant, mist, oil or water reaches the tape (wet paper tape lets go). CA glue softens with heat: if a cut smokes or smells hot, Feed Hold, then Reset (the spindle stops; G54 stands); jog Z up clear. When the work is cool to a finger, run the file again from its start, G54 untouched: cuts already made pass in air. To buy: the two pin gauges before the final inspection; the Brass Black kit before Setup 8."
 shop = "../shop"
 stock_refs = ["c360-flat-1-4x6", "6061-flat-1-2x6-18in"]
 material_key = "platen-c360"
@@ -172,18 +172,20 @@ faced_z_set_mm = 3.9116
 edge_x_set_mm = -2.54
 edge_y_set_mm = 2.54
 # PL01, PL02: the bar's top skimmed .010 under its high point over the blank's
-# place and bar_skim_margin_mm round it (bar_skim_left_mm to
+# place and bar_skim_margin_mm (3/8 in) round it, so the bar's 11 3/4 in
+# tape strips lie wholly on the skim, never across its step (cam.py checks
+# it) (bar_skim_left_mm to
 # bar_skim_right_mm from the bar's left end; seat_left_mm to seat_right_mm
 # from X0); four relief pockets, the 1/2 in end mill plunged relief_depth_mm
 # at the socket stations (bar_relief_left_mm and bar_relief_right_mm from
 # the bar's left end). bar_z_set_mm is the Z entry on the .002 feeler.
 bar_skim_mm = 0.254
-bar_skim_margin_mm = 6.35
+bar_skim_margin_mm = 9.525
 bar_z_set_mm = 0.3048
-bar_skim_left_mm = 80.9625
-bar_skim_right_mm = 378.7775
-seat_left_mm = -12.7635
-seat_right_mm = 285.0515
+bar_skim_left_mm = 77.7875
+bar_skim_right_mm = 381.9525
+seat_left_mm = -15.9385
+seat_right_mm = 288.2265
 relief_depth_mm = 3.81
 bar_relief_left_mm = 98.044
 bar_relief_right_mm = 359.048

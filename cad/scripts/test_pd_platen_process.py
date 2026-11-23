@@ -13,7 +13,9 @@ it guards.
 from __future__ import annotations
 
 import copy
+import re
 import tomllib
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -164,6 +166,40 @@ def test_the_fixture_bar_and_blank_are_the_shop_equipment_records() -> None:
     ]
 
 
+def _inch_fraction(mm: float) -> str:
+    """``mm`` as the sheet prints a strip length: whole inches and a fraction."""
+    inches = Fraction(mm / 25.4).limit_denominator(16)
+    whole, rest = divmod(inches, 1)
+    return f"{whole} {rest.numerator}/{rest.denominator}" if rest else f"{whole}"
+
+
+def test_the_printed_strip_lengths_are_the_plans_keys() -> None:
+    """Every bond's printed strip lengths are tape_bar_strip_length_mm and
+    tape_blank_strip_length_mm, so a changed key cannot leave stale text."""
+    p = PLAN["parameters"]
+    expected = {
+        "bar": _inch_fraction(p["tape_bar_strip_length_mm"]),
+        "blank": _inch_fraction(p["tape_blank_strip_length_mm"]),
+    }
+    patterns = {
+        "bar": re.compile(
+            r"(\d+(?: \d+/\d+)?) in strips (?:of the 1\.41 in tape|on the bar)"
+        ),
+        "blank": re.compile(
+            r"(\d+(?: \d+/\d+)?) in (?:strips along the blank's length|on face [BP])"
+        ),
+    }
+    texts = [
+        op.get("instruction", "")
+        for setup in PLAN["setups"]
+        for op in setup["operations"]
+    ]
+    for face, pattern in patterns.items():
+        printed = [length for text in texts for length in pattern.findall(text)]
+        # Setup 3 spells the bond out; Setups 4, 5 and 6 repeat it.
+        assert printed == [expected[face]] * 4, face
+
+
 def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> None:
     _post(ctx, tmp_path)
     assert _findings(ctx, tmp_path) == []
@@ -202,7 +238,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("tape_seam_gap_max_mm", 10.0, "bridge"),
         ("tape_end_overhang_mm", 1.0, "bare"),
         ("tape_bar_strip_length_mm", 292.1, "past the longest blank"),
-        ("tape_bar_strip_length_mm", 320.0, "step clamp"),
+        ("tape_bar_strip_length_mm", 305.0, "skimmed seat"),
         ("tape_blank_strip_length_mm", 279.4, "longest blank bare"),
         ("bond_patch_area_mm2", 12740.17, "bond_patch_area_mm2"),
         ("spot_dia_mm", 1.8, "under the #50"),
@@ -259,7 +295,7 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # The bar skim run on past its patch, into the right step clamps.
         (
             "bar_skim",
-            lambda line: line == "G1 X285.052 F{feed}",
+            lambda line: line == "G1 X288.226 F{feed}",
             lambda line: "G1 X310.000 F{feed}",
             "keep_out",
         ),
