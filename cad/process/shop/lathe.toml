@@ -187,6 +187,20 @@ material = "lathe-1018-cold-finished"
 sfm = 65
 feed = "tailstock quill by hand, a light plunge, cutting oil"
 
+# MHA-DT-35 pocket plunged with the owned 1/4 in carbide square end mill in
+# the tailstock drill chuck, the work turning (owner ruling 2026-11-23, tool
+# audit Q6). Speed: the carbide end mills' 1018 ceiling in common.toml (The
+# Carbide End Mill Store, 6gtools.com, Mild - 1018: 350 SFM) is 5350 rpm on
+# .25, so the lathe's 2000 rpm top (131 ft/min). Feed by hand: the same
+# table's 1/4 in figure in 1018, .0017 in/tooth, is .005 in/rev on three
+# flutes; the plunge is fed lighter than that, and only the annulus the #1
+# drill leaves (about .010 a side) and the floor are cut.
+[settings.lathe-endmill-1-4-plunge-1018]
+tool = "endmill-carbide-3fl-1-4"
+material = "lathe-1018-cold-finished"
+sfm = 350
+feed = "tailstock quill by hand, light and steady, under .005 in/rev, backing out for chips, cutting oil"
+
 # MHA-CH-13-TL-02 hub plug (6061-T6511 round, to order); its H hole is
 # shallow, drilled without pecking.
 [settings.lathe-ar-6061]
