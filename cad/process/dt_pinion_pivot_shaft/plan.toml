@@ -58,7 +58,7 @@ end_stickout_in = 0.5
 # sweep from it): each crown is swept full (to the centre, no flat at the
 # apex) on the Ø.250, .180 − √(.180² − .125²) = .0505 high
 # (cad.dome_*_form_height), inside the drawing's .05 (.XX) band. The set
-# radius is proved on the trial offcut, whose crown is read (Op 140) and may
+# radius is proved on the trial offcut, whose crown is read (Op 150) and may
 # land anywhere in .04-.06; end B is faced to the body's 7.70-7.72 plus twice
 # that reading (each apex stays on its faced plane), so the body holds
 # whatever the trial crown is. cad.faced_length_* (at .0505) is not used.
@@ -163,7 +163,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face one end of the offcut square, about .02 off, to the centre with no pip: it is the end the offcut stands on in Op 140."
+instruction = "Face one end of the offcut square, about .02 off, to the centre with no pip: it is the end the offcut stands on in Op 150."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -201,7 +201,11 @@ instruction = "Inner frame parallel to the axis: bring the carriage up until the
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms (they reach .19 either side of the pivot). If they touch: chuck the offcut {{process.end_stickout_in:.2dot}} in out again and repeat Op 100."
+instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms (they reach .19 either side of the pivot)."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "An arm touches the jaws: unlock the carriage, chuck the offcut {{process.end_stickout_in:.2dot}} in out again over the shim wrap and repeat Ops 100–110."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -219,13 +223,13 @@ instruction = "Between the last sweeps, spindle stopped, look at the apex under 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Take the offcut out and stand it on its other faced end on the surface plate. Zero the height gauge's scriber on the apex; lower it until its tip, slid in across the top, just stops on the O.D.'s top edge (the crown's rim) and read it: the crown height. Note it: Op 160 uses it."
+instruction = "Take the offcut out and stand it on its other faced end on the surface plate. Zero the height gauge's scriber on the apex; lower it until its tip, slid in across the top, just stops on the O.D.'s top edge (the crown's rim) and read it: the crown height. Note it: Op 170 uses it."
 inspection = "Trial crown {{cad.dome_far_height_min_in:.3dot}}–{{cad.dome_far_height_max_in:.3dot}} high; no pip, flat or ring at the apex."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.dome_far_height_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Crown under {{cad.dome_far_height_min_in:.3dot}}: reset the bit (Op 90) to a depth-rod reading .010 shorter; over {{cad.dome_far_height_max_in:.3dot}}: .010 longer (each .010 moves the crown about .004). Chuck the offcut again as Op 60, {{process.end_stickout_in:.2dot}} in out, face the crown off and repeat Op 70 and Ops 100–140. Under .30 in left in the jaws: saw a new trial offcut. Once it passes, leave the bit's set screw alone until both crowns are cut."
+instruction = "Crown under {{cad.dome_far_height_min_in:.3dot}}: reset the bit (Op 90) to a depth-rod reading .010 shorter; over {{cad.dome_far_height_max_in:.3dot}}: .010 longer (each .010 moves the crown about .004). Chuck the offcut again as Op 60, {{process.end_stickout_in:.2dot}} in out, face the crown off and repeat Op 70, Ops 100–110 and Ops 130–150. Under .30 in left in the jaws: saw a new trial offcut. Once it passes, leave the bit's set screw alone until both crowns are cut."
 
 [[setups]]
 machine_kind = "lathe"
@@ -234,8 +238,8 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Turned round: 3-jaw over the shim wrap, {{process.end_stickout_in:.2dot}} in out, end A back in the spindle bore."
-datum = "DRO Z touched on end B with the facing tool before each skim (Op 160), and with the ball turner's tip in Op 190."
-diagram = { file = "diagrams/end-b.svg", alt = "The shaft turned round, end B out (faced first, Op 160): crowned by the ball turner swept about its pivot on the axis." }
+datum = "DRO Z touched on end B with the facing tool before each skim (Op 170), and with the ball turner's tip in Op 200."
+diagram = { file = "diagrams/end-b.svg", alt = "The shaft turned round, end B out (faced first, Op 170): crowned by the ball turner swept about its pivot on the axis." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -244,14 +248,14 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face end B square in light skims, reading the length between them (Op 170), to the body {{cad.body_length_min_in:.3dot}}–{{cad.body_length_max_in:.3dot}} plus twice the Op 140 crown height, aiming {{cad.body_length_in:.3dot}} plus twice it."
+instruction = "Face end B square in light skims, reading the length between them (Op 180), to the body {{cad.body_length_min_in:.3dot}}–{{cad.body_length_max_in:.3dot}} plus twice the Op 150 crown height, aiming {{cad.body_length_in:.3dot}} plus twice it."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Between skims, take the shaft out, stand it on end A on the surface plate, held upright by hand against the side of a 1-2-3 block, and read end B with the height gauge (the 0–6 in calipers do not reach). Chuck it again {{process.end_stickout_in:.2dot}} out and touch the facing tool on end B before the next skim."
-inspection = "Faced length: the body {{cad.body_length_min_in:.3dot}}–{{cad.body_length_max_in:.3dot}} plus twice the Op 140 crown height."
+inspection = "Faced length: the body {{cad.body_length_min_in:.3dot}}–{{cad.body_length_max_in:.3dot}} plus twice the Op 150 crown height."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -271,6 +275,10 @@ instruction = "Ball turner in its holder, bit as set in Op 90 (set screw untouch
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Spindle stopped: cross slide out until the bit clears end B through the whole sweep. Swing the frame through it and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "An arm touches the jaws: unlock the carriage, chuck the shaft {{process.end_stickout_in:.2dot}} in out again over the shim wrap and repeat Ops 200–210."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -294,15 +302,15 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A flat at the apex: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 210), then Op 230 again. A ring or point at the apex: scrap the shaft and make another from Setup 1."
+instruction = "A flat at the apex: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 230), then Op 250 again. A ring or point at the apex: scrap the shaft and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Take the shaft out and stand it on end A against the 1-2-3 block as Op 170. Read crown B's apex with the height gauge and compare it with the Op 170 length: no lower shows the carriage held during the sweep. A diagnostic only: Op 260 and Op 350 accept the shaft."
+instruction = "Take the shaft out and stand it on end A against the 1-2-3 block as Op 180. Read crown B's apex with the height gauge and compare it with the Op 180 length: no lower shows the carriage held during the sweep. A diagnostic only: Op 280 and Op 380 accept the shaft."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Still standing, zero the height gauge's scriber on crown B's apex. Lower it .001 at a time, each time sliding its tip in from outside the O.D.: the rim is the highest setting at which it catches on the cylindrical O.D. without riding onto the crown. That reading is crown B's height; note it: Op 350 uses it."
+instruction = "Still standing, zero the height gauge's scriber on crown B's apex. Lower it .001 at a time, each time sliding its tip in from outside the O.D.: the rim is the highest setting at which it catches on the cylindrical O.D. without riding onto the crown. That reading is crown B's height; note it: Op 380 uses it."
 inspection = "Crown B {{cad.dome_far_height_min_in:.3dot}}–{{cad.dome_far_height_max_in:.3dot}} high."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.dome_far_height_band_mm}}" }]
 
@@ -317,7 +325,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Turned round again: 3-jaw over the shim wrap, {{process.end_stickout_in:.2dot}} in out, crown B back in the spindle bore."
-datum = "DRO Z zeroed with the ball turner's tip on end A (faced in Op 40) in Op 290."
+datum = "DRO Z zeroed with the ball turner's tip on end A (faced in Op 40) in Op 310."
 diagram = { file = "diagrams/end-a-crown.svg", alt = "The shaft turned round again, end A out: crowned by the ball turner swept about its pivot on the axis." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
@@ -341,6 +349,10 @@ instruction = "Spindle stopped: cross slide out until the bit clears end A throu
 
 [[setups.operations]]
 cut_kind = "other"
+instruction = "An arm touches the jaws: unlock the carriage, chuck the shaft {{process.end_stickout_in:.2dot}} in out again over the shim wrap and repeat Ops 310–320."
+
+[[setups.operations]]
+cut_kind = "other"
 speed_kind = "spindle"
 tool = "ball"
 drilling = "none"
@@ -361,11 +373,11 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A flat at the apex: one more sweep with the cross slide in .001 (Op 310), then Op 330 again. A ring or point at the apex: scrap the shaft and make another from Setup 1."
+instruction = "A flat at the apex: one more sweep with the cross slide in .001 (Op 340), then Op 360 again. A ring or point at the apex: scrap the shaft and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Stand the shaft on crown B's apex on the surface plate against the 1-2-3 block's face. Height gauge: read crown A's apex; then find crown A's rim as Op 260 (highest setting that catches the O.D.) and read it. Body = crown A's rim − crown B's height (Op 260); crown A = its apex − its rim."
+instruction = "Stand the shaft on crown B's apex on the surface plate against the 1-2-3 block's face. Height gauge: read crown A's apex; then find crown A's rim as Op 280 (highest setting that catches the O.D.) and read it. Body = crown A's rim − crown B's height (Op 280); crown A = its apex − its rim."
 inspection = "Body {{cad.body_length_min_in:.3dot}}–{{cad.body_length_max_in:.3dot}} rim to rim; crown A {{cad.dome_datum_height_min_in:.3dot}}–{{cad.dome_datum_height_max_in:.3dot}} high."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.body_length_band_mm}}" }, { gauge = "height-gauge", band_mm = "{{cad.dome_datum_height_band_mm}}" }]
 
