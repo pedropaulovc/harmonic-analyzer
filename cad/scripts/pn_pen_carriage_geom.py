@@ -140,13 +140,13 @@ FRAME_X0_LOCAL = 0.0  # the frame's paper-side face, flush with the block end
 FRAME_X_CENTER_LOCAL = FRAME_X0_LOCAL + frame.FRAME_DEPTH / 2.0
 FRAME_ORIGIN_LOCAL = (
     FRAME_X0_LOCAL + frame.FRAME_DEPTH,  # frame z 0 is the face nearer the rod
-    vb.BLOCK_HEIGHT + FRAME_TOP_GAP + frame.RAIL_TOP - frame.OUTER_HEIGHT,
+    vb.BLOCK_HEIGHT + FRAME_TOP_GAP + frame.RAIL_END - frame.OUTER_HEIGHT,
     vb.DEPTH_MID_Z - frame.OUTER_WIDTH / 2.0,
 )
 FRAME_POS = block_to_machine(FRAME_ORIGIN_LOCAL)
 FRAME_ROWS = [[_C, 0.0, _S], [0.0, 1.0, 0.0], [-_S, 0.0, _C]]
-FRAME_TOP_LOCAL_Y = vb.BLOCK_HEIGHT + FRAME_TOP_GAP + frame.RAIL_TOP
-FRAME_WINDOW_BOTTOM_LOCAL_Y = FRAME_ORIGIN_LOCAL[1] + frame.RAIL_BOTTOM
+FRAME_TOP_LOCAL_Y = vb.BLOCK_HEIGHT + FRAME_TOP_GAP + frame.RAIL_END
+FRAME_WINDOW_BOTTOM_LOCAL_Y = FRAME_ORIGIN_LOCAL[1] + frame.RAIL_END
 ROD_HALF_DIAGONAL = rod.ROD_SECTION / math.sqrt(
     2.0
 )  # the square spans its diagonal along the yawed block
@@ -285,7 +285,15 @@ def window_corner_ride_max() -> float:
     """How far the stirrup's window corners, at their printed R.065's
     greatest (R.070; owner ruling 2026-11-23, tool audit Q9), can lift its
     top rail off the block top by riding the neck's top edges, the window
-    and the neck at their printed limits."""
+    and the neck at their printed limits.
+
+    Nothing centres the stirrup across the neck (paper_side_points_printed_
+    worst), so one side wall can lie on the neck's face; on a square edge
+    the corner would lift it a full radius.  The neck's top edges are broken
+    45 deg (owner seat ruling 2026-11-23): a corner's metal reaches at most
+    its radius along either face from the corner, so a break whose shortest
+    leg is at least the greatest radius leaves the corner nothing to ride,
+    over the stirrup's whole printed depth."""
     window = _printed_limits(frame, "WindowWidth", frame.WINDOW_WIDTH)[0]
     neck = (
         _printed_limits(vb, "NeckZ1", vb.depth_station(vb.NECK_DEPTH))[1]
@@ -293,11 +301,11 @@ def window_corner_ride_max() -> float:
     )
     if window <= neck:
         raise AssertionError("the stirrup window must pass the neck at both prints")
-    # Nothing centres the stirrup across the neck (paper_side_points_printed_
-    # worst), so one side wall can lie on the neck's face.  That edge then
-    # meets its corner's arc where the arc leaves the side wall, a full
-    # radius under the top wall.
-    return frame.WINDOW_CORNER_R_MAX
+    if vb.NECK_EDGE_BREAK_MIN < frame.WINDOW_CORNER_R_MAX:
+        raise AssertionError("a window corner can ride the neck's broken top edge")
+    if vb.NECK_BREAK_FULL_X < _printed_limits(frame, "Depth", frame.FRAME_DEPTH)[1]:
+        raise AssertionError("the neck's edge break stops under the stirrup")
+    return 0.0
 
 
 # --- plan balance ---------------------------------------------------------------
@@ -338,6 +346,21 @@ def plan_mass_items() -> list[tuple[str, float, float, float]]:
             + vb.RELIEF_CORNER_R * (10.0 - 3.0 * math.pi) / (12.0 - 3.0 * math.pi),
             zc,
         ),
+        # The neck's two top-edge breaks (owner seat ruling 2026-11-23),
+        # symmetric in z: each its triangle from the paper end to the stop,
+        # then its run-out into the step.
+        (
+            "neck edge breaks",
+            -2.0 * vb.NECK_BREAK_VOLUME,
+            vb.NECK_BREAK_FULL_X / 2.0,
+            zc,
+        ),
+        (
+            "neck break run-outs",
+            -2.0 * vb.NECK_BREAK_RUNOUT_VOLUME,
+            vb.NECK_BREAK_RUNOUT_X,
+            zc,
+        ),
         ("pivot bore", -_cyl(pivot_r, H - vb.RELIEF_HEIGHT), vb.PIVOT_BORE_X, zc),
         (
             "set-screw tap",
@@ -352,14 +375,10 @@ def plan_mass_items() -> list[tuple[str, float, float, float]]:
     # ruling 2026-11-23, tool audit Q9) giving back R x R less the quarter
     # disc each, symmetric about the ring's centre, and the tap's drill.
     ring = (
-        (
-            frame.OUTER_WIDTH * frame.OUTER_HEIGHT
-            - frame.WINDOW_WIDTH * frame.WINDOW_HEIGHT
-            + 4.0 * (1.0 - math.pi / 4.0) * frame.WINDOW_CORNER_R**2
-        )
-        * frame.FRAME_DEPTH
-        - _cyl(frame.SET_SCREW_TAP_DRILL_DIA / 2.0, frame.RAIL_BOTTOM)
-    )
+        frame.OUTER_WIDTH * frame.OUTER_HEIGHT
+        - frame.WINDOW_WIDTH * frame.WINDOW_HEIGHT
+        + 4.0 * (1.0 - math.pi / 4.0) * frame.WINDOW_CORNER_R**2
+    ) * frame.FRAME_DEPTH - _cyl(frame.SET_SCREW_TAP_DRILL_DIA / 2.0, frame.RAIL_END)
     items.append(("stirrup frame", ring * BRASS_G_PER_MM3, FRAME_X_CENTER_LOCAL, zc))
     thumb_v = (
         _cyl(thumb.TS_HEAD_R, thumb.TS_HEAD_H)

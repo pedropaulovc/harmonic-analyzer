@@ -16,7 +16,8 @@
 # tip in fine passes, then take the slot's two step corners with the 1/8 in
 # end mill (VB05); B down, face the top to the
 # height, spot, drill #32, ream .1260 and chamfer the pivot bore down into
-# the slot (VB06); front up, spot and drill #43 into the bore (VB07) and tap
+# the slot, then break the neck's two top edges .080 × 45° with the same
+# chamfer mill (VB06); front up, spot and drill #43 into the bore (VB07) and tap
 # 4-40 by hand under the spring tap guide (VB08), the plug tap first, then the
 # bottoming tap to the same reach. Bench: clean the bore with the reamer by
 # hand, deburr, inspect. Bright brass: machined, washed, no coating.
@@ -133,6 +134,11 @@ v_level_mm = 0.9968
 # cone's neighbouring passes leave a ridge half their spacing high, .001 in
 # at most (cam.py V_FLAT_RIDGE_MAX_MM). cam.py computes the spacing.
 v_flat_stepover_mm = 0.0508
+# The neck's two top edges (owner seat ruling 2026-11-23: .080 × 45°, .075
+# to .085, with the 1/4 in chamfer mill), VB06: the chamfer mill's point
+# along each neck face in levels no deeper than the V's, equal: three of
+# .6773 mm to the .080 leg. cam.py checks it.
+break_level_mm = 0.677333
 # Spots, the #2 centre drill (60°): Ø.100 on the pivot bore, under the #32;
 # Ø.080 on the set-screw hole, under the #43, so neither leaves a chamfer.
 spot_bore_dia_mm = 2.54
@@ -603,7 +609,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same stacks. The block turned over: B down on both stacks (it bears on the slot's walls and the neck's lands), P to the LEFT, gripped on the FRONT and BACK faces, FRONT to the fixed jaw, centred. Tap it down while closing the vise. The bore exits into the slot, over the gap between the stacks."
 datum = "Program VB06_top_bore. G54: X0 P, Y0 the fixed jaw's face (FRONT), Z0 the stacks' top (B). Pivot bore at X {{cad.pivot_bore_station_in:.3f}} Y −{{cad.pivot_bore_depth_station_in:.3f}} in."
-diagram = { file = "diagrams/top.svg", alt = "The block lying on stacked parallels, B down, front face at the fixed jaw; the end mill faces the top to the height; the centre drill, #32 and reamer go down through the top into the relief slot; the chamfer mill breaks the bore's top edge." }
+diagram = { file = "diagrams/top.svg", alt = "The block lying on stacked parallels, B down, front face at the fixed jaw; the end mill faces the top to the height; the centre drill, #32 and reamer go down through the top into the relief slot; the chamfer mill breaks the bore's top edge and the neck's two top edges." }
 envelope = { x_span_mm = ["{{cad.far_end_length_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.body_back_depth_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.stack_height_mm}}", 18.542], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.stack_height_mm}}", "{{process.bore_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_max_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.body_back_depth_mm}}", along_jaws_mm = "{{cad.far_end_length_mm}}", part_height_mm = 18.542, parallel_height_mm = "{{process.stack_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.far_end_length_mm}}"], clamp_mm = [0, "{{cad.far_end_length_mm}}"], section_mm = { y = "{{cad.body_back_depth_mm}}", z = 18.542 }, vise_left = "start" }
@@ -691,6 +697,19 @@ milling_cuts = [
 [[setups.operations]]
 instruction = "Chamfer ring uneven or missing on one side: stop and tell the owner before Setup 8 (the bore may be off its spot)."
 feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "chamfer"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, same tool and speed: the chamfer mill breaks the neck's two top edges {{cad.neck_edge_breaks_leg_min_in:.3dot}}–{{cad.neck_edge_breaks_leg_max_in:.3dot}} × 45° (the drawing's 2X .080 X 45°; they clear the MHA-PN-01 stirrup's window corners). Its point runs along each neck face from beside P to {{cad.neck_edge_breaks_full_to_x:in.2dot}} from P in three levels of {{process.break_level_mm:in.4dot}}, then is fed straight up: its cone leaves a small cone-shaped run-out at each break's end, into the step."
+settings = "pn-chamfer-1-4-c360"
+inspection = "Unclamped, the block standing on B on the surface plate: the height gauge's scriber on each break's lower edge on the neck face at P reads the block's height less the leg, the leg {{cad.neck_edge_breaks_leg_min_in:.3dot}}–{{cad.neck_edge_breaks_leg_max_in:.3dot}}. Out of it: stop and tell the owner; do not re-cut."
+gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.neck_edge_breaks_leg_band_mm}}" }]
+milling_cuts = [
+  { name = "neck breaks", kind = "side", phase = "finish", cutter_dia_mm = 4.064, axial_doc_mm = "{{process.break_level_mm}}", radial_woc_mm = "{{process.break_level_mm}}", traverse_mm = [0, "{{cad.neck_edge_breaks_full_to_x}}"] },
+]
 
 [[setups]]
 machine_kind = "other"

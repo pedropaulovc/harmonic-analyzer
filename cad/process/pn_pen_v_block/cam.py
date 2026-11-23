@@ -23,7 +23,8 @@ VB02 (turned over) faces the far end to the length. Lying on the 1/2 in +
 step, VB04 (back down) faces the front to the depth and cuts the front neck
 step, VB05 (bottom up) skims the bottom face B, mills the relief slot, the V
 groove and their corners, VB06 (B down) faces the top to the height, then
-drills, reams and chamfers the pivot bore down into the slot, VB07 (front
+drills, reams and chamfers the pivot bore down into the slot and breaks the
+neck's two top edges with the same chamfer mill, VB07 (front
 up) drills the set-screw tap hole into the bore and VB08 is its hand-tap
 stop.
 
@@ -70,7 +71,13 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("VB05_bottom", (("bottom",), ("v_groove",), ("corners",))),
     (
         "VB06_top_bore",
-        (("top",), ("bore_spot",), ("bore_drill",), ("bore_ream",), ("bore_chamfer",)),
+        (
+            ("top",),
+            ("bore_spot",),
+            ("bore_drill",),
+            ("bore_ream",),
+            ("bore_chamfer", "neck_breaks"),
+        ),
     ),
     ("VB07_set_screw", (("tap_spot",), ("tap_drill",))),
     ("VB08_set_screw_tap", ("tap",)),
@@ -123,6 +130,9 @@ MACHINE_Z_TOP_MM = 0.0
 APPROACH_MM = 2.54
 # Faces reach at least this far past the faces the jaws grip.
 FACE_OVERHANG_MM = 0.5
+# The neck breaks' entry: the chamfer mill's point ramps down this far along
+# X in the air beside the paper end to each pass's level.
+BREAK_RAMP_MM = 1.0
 # Plunges and drill R planes start this far above the stock top: real G0
 # brings the tool down to it.
 SAFE_MM = 1.0
@@ -438,6 +448,30 @@ def _corner(
     return lines + [f"G0 Z{clear:.3f}"]
 
 
+def _breaks(
+    ys: list[float], levels: list[float], top: float, x: tuple[float, float]
+) -> list[str]:
+    """Edge breaks along X: for each edge (its Y) and level (the point's
+    depth under ``top``), the point ramped down in the air beside the part
+    to ``x[0]``, fed along to the stop ``x[1]`` and fed straight up out of
+    the cut there (a rapid would leave the cut below the top), then back
+    above the part.  The ramp, not a plunge: the section's hole check reads
+    every straight Z descent as a hole."""
+    clear, r_plane = _r(top + CLEAR_MM), _r(top + SAFE_MM)
+    lines = [f"G0 Z{clear:.3f}"]
+    for y in ys:
+        for t in levels:
+            lines += [
+                f"G0 X{_r(x[0] - BREAK_RAMP_MM):.3f} Y{_r(y):.3f}",
+                f"G0 Z{r_plane:.3f}",
+                f"G1 X{_r(x[0]):.3f} Z{_r(top - t):.3f} F{{feed}}",
+                f"G1 X{_r(x[1]):.3f} F{{feed}}",
+                f"G1 Z{r_plane:.3f} F{{feed}}",
+                f"G0 Z{clear:.3f}",
+            ]
+    return lines
+
+
 def _v_levels(depth: float, max_step: float) -> list[float]:
     """The V's tip depths below the bottom face, equal steps to ``depth``."""
     n = math.ceil(depth / max_step - 1e-9)
@@ -533,6 +567,24 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
     close(tx, bx, "set screw station")
     if not rel["height_nominal"] < ty < height:
         raise ValueError("set_screw_tap: expected between the slot roof and the top")
+
+    # The neck's two top edges, broken 45° from the paper end to full_to_x
+    # (owner seat ruling 2026-11-23), its run-out past the stop.
+    brk = f["neck_edge_breaks"]
+    if (
+        brk["axis"] != [1.0, 0.0, 0.0]
+        or brk["edges"] != ["neck_front", "neck_back"]
+        or not math.isclose(brk["angle_deg"], 45.0)
+    ):
+        raise ValueError(
+            "neck_edge_breaks: expected the neck's top edges at 45° along X"
+        )
+    if not brk["leg"][0] <= brk["leg_nominal"] <= brk["leg"][1]:
+        raise ValueError("neck_edge_breaks: the leg's nominal is off its band")
+    if not 0.0 < brk["full_to_x"] < steps:
+        raise ValueError(
+            "neck_edge_breaks: the full break must stop short of the steps"
+        )
     return {
         "length": length,
         "height": height,
@@ -558,6 +610,9 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         "tap_at": (tx, ty),
         "tap_dia": tuple(tap["dia"]),
         "tap_pitch": IN / _tpi(tap["thread"]),
+        "break_leg": tuple(brk["leg"]),
+        "break_leg_nominal": brk["leg_nominal"],
+        "break_to": brk["full_to_x"],
     }
 
 
@@ -676,6 +731,8 @@ def context(
     v_rpm, v_feed = _setting(plan, shop, "V groove")
     if _setting(plan, shop, "bore chamfer") != (v_rpm, v_feed):
         raise ValueError("'bore chamfer' runs at another setting than 'V groove'")
+    if _setting(plan, shop, "neck breaks") != (v_rpm, v_feed):
+        raise ValueError("'neck breaks' runs at another setting than 'V groove'")
     e8_rpm, e8_feed = _setting(plan, shop, "relief corners")
     if _setting(plan, shop, "V flat") != (v_rpm, v_feed):
         raise ValueError("'V flat' runs at another setting than 'V groove'")
@@ -854,6 +911,24 @@ def context(
     chamfer_depth = bore_mid / 2 + chamfer_mid  # the pointed 45° cone's plunge
     if chamfer_depth > cone:
         raise ValueError("the bore chamfer is deeper than the chamfer mill's cone")
+    # Neck edge breaks (owner seat ruling 2026-11-23): the chamfer mill's
+    # point along each neck face's top edge, its nominal leg under the top,
+    # in levels no deeper than the V's, from beside P (the whole cone clear
+    # of it) to the export's stop, where it is fed up out of the cut: past
+    # the stop the cone leaves the break's run-out into the step.
+    leg = g["break_leg_nominal"]
+    if leg > cone:
+        raise ValueError("the neck break is deeper than the chamfer mill's cone")
+    break_levels = _v_levels(leg, p["v_step_max_mm"])
+    _agree(plan, "break_level_mm", leg / len(break_levels))
+    if not math.isclose(
+        _cut(plan, "neck breaks", "axial_doc_mm"), p["break_level_mm"], abs_tol=1e-6
+    ):
+        raise ValueError("'neck breaks' axial_doc_mm is not process.break_level_mm")
+    break_stop = g["break_to"]
+    break_start = -(cone + APPROACH_MM)
+    # VB06 frame Y: -(z - z0); each break's point on its neck face.
+    break_ys = [z0 - g["neck0"], z0 - g["neck1"]]
     bx, bz = g["bore_at"]
     tx, ty = g["tap_at"]
     axis = z1 - bz  # VB07 frame: the bore axis above the stacks (back face)
@@ -1134,6 +1209,14 @@ def context(
         }
         for key, (spec, frame, label, lines) in sections.items()
     ]
+    # The neck breaks ride the bore chamfer's Job (same tool, speed and feed).
+    next(job for job in jobs if job["ops"][0][0] == "bore_chamfer")["ops"].append(
+        [
+            "neck_breaks",
+            "break the neck's top edges",
+            _breaks(break_ys, break_levels, height, (break_start, break_stop)),
+        ]
+    )
 
     manual = {
         "tap": {
@@ -1444,15 +1527,63 @@ def context(
             for c, k in hole_checks(bore_xy, height, ream_tip, ream / 2, keep["top"])
         ],
         [f"{name}@3", "feed_out", {"z_top": height}],
-        *[
-            [f"{name}@4", c, k]
-            for c, k in hole_checks(
-                bore_xy,
-                height,
-                height - chamfer_depth,
-                chamfer["diameter_mm"] / 2,
-                keep["top"],
-            )
+        # The bore chamfer, then the neck breaks on the same tool: one
+        # section.  The chamfer is the only hole; the breaks enter on ramps
+        # beside P.  Below the top the point moves sideways only along the
+        # neck faces, short of the stop, never into the neck between them or
+        # the body past the stop (a box the point may not enter: a pinpoint
+        # cutter, 0.01); the cone stands under the jaws' tops by its reach
+        # there at the breaks' depth, the most it ever does.
+        [
+            f"{name}@4",
+            "holes",
+            {"centres": [list(bore_xy)], "z_bottom": _r(height - chamfer_depth)},
+        ],
+        [f"{name}@4", "rapids_clear", {"z_top": height, "open_holes": [list(bore_xy)]}],
+        [f"{name}@4", "air_feed", {"z_top": height}],
+        [f"{name}@4", "depth", {"z_min": _r(height - max(leg, chamfer_depth))}],
+        [
+            f"{name}@4",
+            "keep_out",
+            {"radius": max(0.0, lying_grip - (height - leg)), "boxes": keep["top"]},
+        ],
+        [
+            f"{name}@4",
+            "keep_out",
+            {
+                "radius": 0.01,
+                "boxes": [
+                    _box(
+                        "neck between its breaks",
+                        (-50.0, steps),
+                        (break_ys[1] + 0.05, break_ys[0] - 0.05),
+                        height,
+                    ),
+                    _box(
+                        "body short of the bore",
+                        (break_stop + 0.05, bx - 0.05),
+                        (-depth, 0.0),
+                        height,
+                    ),
+                    _box(
+                        "body past the bore",
+                        (bx + 0.05, length + 50.0),
+                        (-depth, 0.0),
+                        height,
+                    ),
+                ],
+            },
+        ],
+        [
+            f"{name}@4",
+            "cleared",
+            {
+                "points": [
+                    [x, y] for x in (0.05, break_stop / 2, break_stop) for y in break_ys
+                ],
+                "radius": 0.0,
+                "z": _r(height - leg),
+            },
         ],
     ]
 

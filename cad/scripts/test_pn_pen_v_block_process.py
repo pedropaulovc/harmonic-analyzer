@@ -162,6 +162,33 @@ def test_the_tip_sweeps_the_flat_edge_to_edge_within_the_ridge_limit(ctx) -> Non
     assert len(flat) == 41
 
 
+def test_the_neck_breaks_run_each_neck_face_to_the_stop(ctx) -> None:
+    """Owner seat ruling 2026-11-23: the neck's two top edges .080 X 45°
+    with the chamfer mill. Its point runs along each neck face (VB06 Y
+    -.080 and -.780 from the front face) in three equal levels to the .080
+    leg, from a ramp beside P to the export's stop (.33), and is fed up
+    there; the whole cone starts clear of P."""
+    lines = next(
+        op[2] for job in ctx["jobs"] for op in job["ops"] if op[0] == "neck_breaks"
+    )
+    job = next(job for job in ctx["jobs"] if job["ops"][0][0] == "bore_chamfer")
+    assert [op[0] for op in job["ops"]] == ["bore_chamfer", "neck_breaks"]
+    breaks = FEATURES["features"]["neck_edge_breaks"]
+    height = FEATURES["features"]["top_face"]["plane"]["value"]
+    ramps = [line for line in lines if line.startswith("G1 X-5.715 Z")]
+    depths = sorted(
+        {round(height - float(line.split("Z")[1].split()[0]), 3) for line in ramps}
+    )
+    assert depths == pytest.approx([0.677, 1.355, 2.032])
+    assert len(ramps) == 6
+    stops = [line for line in lines if line.startswith("G1 X") and " Z" not in line]
+    assert stops == [f"G1 X{breaks['full_to_x']:.3f} F{{feed}}"] * 6
+    ys = [line.split("Y")[1] for line in lines if line.startswith("G0 X")]
+    assert sorted(set(ys)) == ["-19.812", "-2.032"]
+    # The cone's top radius at the deepest level clears P at the ramp's end.
+    assert -5.715 + breaks["leg_nominal"] < 0.0
+
+
 def test_no_5_64_cutter_and_a_corner_cutter_off_the_corner_band_is_refused() -> None:
     """The slot's step corners print R.065 (.060-.070): the 1/8 in end mill's
     R.0625 is in the band; a 1/4 in end mill's R.125 is refused, and no tool
@@ -227,6 +254,7 @@ def test_every_v_level_plunges_beside_p(stepover) -> None:
         ({"corner_cutter_dia_mm": 2.38125}, "the tool is"),
         ({"corner_step_max_mm": 1.4}, "corner_step_max_mm"),
         ({"v_flat_stepover_mm": 0.1}, "v_flat_stepover_mm"),
+        ({"break_level_mm": 1.016}, "break_level_mm"),
         # One inch parallels lying: the front step's floor sits at the jaw tops.
         (
             {
@@ -309,6 +337,18 @@ def _seed(ctx: dict, key: str, old: str, new: str) -> dict:
         ("bore_ream", "G1 Z19.000 F{feed}", "G0 Z19.000", "feed_out"),
         # A #43 peck re-entry rapided past the depth already drilled.
         ("tap_drill", "G0 Z20.312", "G0 Z18.000", "rapid"),
+        # A neck break run on past its stop, into the body.
+        ("neck_breaks", "G1 X8.382 F{feed}", "G1 X9.500 F{feed}", "keep_out"),
+        # A neck break plunged straight down instead of ramped beside P: a
+        # second hole in the bore chamfer's section.
+        ("neck_breaks", "G1 X-5.715 Z17.323 F{feed}", "G1 Z17.323 F{feed}", "holes"),
+        # A neck break's last level short of the leg.
+        (
+            "neck_breaks",
+            "G1 X-5.715 Z15.968 F{feed}",
+            "G1 X-5.715 Z16.200 F{feed}",
+            "cleared",
+        ),
         # A tap stop that holds (M0) instead of ending Idle.
         ("tap", "M30", "M0", "tap_stop"),
     ],

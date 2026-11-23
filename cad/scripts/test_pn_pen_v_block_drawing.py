@@ -859,6 +859,63 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     assert carriage_volume == pytest.approx(part.V_TOTAL + part.V_PIVOT_CHAMFER)
 
 
+def test_neck_edge_breaks_print_and_clear_the_stirrup_and_the_body() -> None:
+    import pn_pen_carriage_geom as carriage
+    import pn_pen_frame_spec as frame
+
+    # Owner seat ruling 2026-11-23: "break the v-block neck's two top edges
+    # .080 x 45° (.075 to .085, cut with the 1/4 in 90° chamfer mill that
+    # part already uses)".  One prints for both, in the paper-end view, at
+    # three places (the title block's +/-.005), its 45° in words, and why it
+    # is there above it.
+    assert spec.NECK_EDGE_BREAK == pytest.approx(0.080 * 25.4)
+    assert (spec.NECK_EDGE_BREAK_MIN, spec.NECK_EDGE_BREAK_MAX) == pytest.approx(
+        (0.075 * 25.4, 0.085 * 25.4)
+    )
+    assert spec.DRAWING_DIMENSIONS["NeckBreakProfile"] == {"NeckBreak"}
+    assert spec.DRAWING_PRECISION_BY_NAME["NeckBreak"] == 3
+    assert spec.DIMENSION_PREFIXES[("NeckBreakProfile", "NeckBreak")] == "2X "
+    assert spec.DIMENSION_CALLOUTS["NeckBreak"] == "X 45°"
+    assert spec.DIMENSION_CALLOUTS_ABOVE["NeckBreak"] == "CLEARS MHA-PN-01"
+    assert "NeckBreak" in drawing.RIGHT_KEEP
+    # The shortest leg clears the stirrup's window corners at their greatest
+    # R.070 by 0.127, and the full break runs to .33, past the stirrup's far
+    # face at its printed .32.
+    assert spec.NECK_EDGE_BREAK_MIN - frame.WINDOW_CORNER_R_MAX == pytest.approx(
+        0.127, abs=1e-3
+    )
+    assert spec.NECK_BREAK_FULL_X == pytest.approx(0.33 * 25.4)
+    assert carriage.window_corner_ride_max() == 0.0
+    # The chamfer mill stops short of the step at its printed nearest (.34),
+    # so its cone on the top face stays inside the body's side faces; its
+    # run-out keeps the target to the bore's chamfer (5.50) and to the rod
+    # shoulder's circle (3.97), and stops 0.23 short of the set-screw thread.
+    step_min = spec.RELIEF_X0 + _printed_devs(spec.RELIEF_X0, "ReliefX0")[0]
+    assert spec.NECK_BREAK_FULL_X < step_min
+    reach = math.sqrt(
+        spec.NECK_EDGE_BREAK**2 - (spec.RELIEF_X0 - spec.NECK_BREAK_FULL_X) ** 2
+    )
+    assert reach < spec.BODY_SIDE_STEP
+    assert spec.NECK_BREAK_BORE_CHAMFER_WALL_MIN == pytest.approx(5.500, abs=1e-3)
+    assert spec.NECK_BREAK_ROD_SHOULDER_GAP_MIN == pytest.approx(3.975, abs=1e-3)
+    assert spec.NECK_BREAK_TAP_GAP_MIN == pytest.approx(0.2285, abs=1e-4)
+    # The top flat the stirrup's rail rests on keeps .51 at the printed worst.
+    assert spec.NECK_TOP_FLAT_PRINTED_MIN == pytest.approx(0.51 * 25.4)
+    # Volumes: each break's triangle to the stop, and its run-out, the cone's
+    # quarter on the neck's side plus, past the step, its body-side part
+    # (a quadrature of the disc at each height; a sampling agrees to 0.3%).
+    leg, stop = spec.NECK_EDGE_BREAK, spec.NECK_BREAK_FULL_X
+    assert spec.NECK_BREAK_VOLUME == pytest.approx(leg * leg / 2.0 * stop)
+    quarter = math.pi * leg**3 / 12.0
+    assert quarter < spec.NECK_BREAK_RUNOUT_VOLUME < 2.0 * quarter
+    assert spec.NECK_BREAK_RUNOUT_VOLUME == pytest.approx(3.408, abs=1e-3)
+    assert stop < spec.NECK_BREAK_RUNOUT_X < stop + leg
+    assert part.V_NECK_BREAKS == pytest.approx(2.0 * spec.NECK_BREAK_VOLUME)
+    assert part.V_NECK_BREAK_RUNOUTS == pytest.approx(
+        2.0 * spec.NECK_BREAK_RUNOUT_VOLUME
+    )
+
+
 def test_sheet_runs_at_4_to_1_with_3_to_2_isometric() -> None:
     assert drawing.SHEET_SCALE == (4.0, 1.0)
     assert drawing.VIEW_SCALE == (4, 1)
@@ -992,6 +1049,7 @@ _FEATURE_KINDS = {
     "neck_back": "face",
     "body_back": "face",
     "neck_steps": "face",
+    "neck_edge_breaks": "chamfer",
     "v_groove": "vee",
     "relief": "slot",
     "pivot_bore": "hole",
@@ -1036,6 +1094,13 @@ def test_the_block_is_a_feature_export_part_with_one_owner_per_face() -> None:
         "neck_back": [_plane((0.0, 0.0, 1.0), spec.NECK_DEPTH)],
         "body_back": [_plane((0.0, 0.0, 1.0), spec.BODY_Z1)],
         "neck_steps": [_plane((-1.0, 0.0, 0.0), -x0)],
+        "neck_edge_breaks": [
+            _plane((0.0, s, -s), s * (spec.BLOCK_HEIGHT - spec.NECK_EDGE_BREAK)),
+            _plane(
+                (0.0, s, s),
+                s * (spec.BLOCK_HEIGHT - spec.NECK_EDGE_BREAK + spec.NECK_DEPTH),
+            ),
+        ],
         "v_groove": [
             _plane((0.0, -s, s), s * spec.V_MOUTH_Z0),
             _plane((0.0, -s, -s), -s * spec.V_MOUTH_Z1),
@@ -1097,6 +1162,12 @@ def test_block_feature_bands_are_the_printed_ones() -> None:
     assert features["neck_back"]["station"] == pytest.approx([_in(0.77), _in(0.79)])
     assert features["body_back"]["depth"] == pytest.approx([_in(0.85), _in(0.87)])
     assert features["neck_steps"]["station"] == pytest.approx([_in(0.34), _in(0.36)])
+    breaks = features["neck_edge_breaks"]
+    assert breaks["leg"] == pytest.approx([_in(0.075), _in(0.085)])
+    assert breaks["angle_deg"] == 45.0 and breaks["count"] == 2
+    assert breaks["edges"] == ["neck_front", "neck_back"]
+    assert breaks["full_to_x"] == pytest.approx(_in(0.33))
+    assert breaks["note"] == "CLEARS MHA-PN-01"
     vee = features["v_groove"]
     assert vee["flank_angle_deg"] == pytest.approx([44.0, 46.0])
     assert vee["flat_width"] == pytest.approx([_in(0.07), _in(0.09)])

@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from _interference_common import smooth_annulus_limit_mm3
 
 ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
-    # #4-40 thumb screw through the stirrup's .24 bottom rail (pn_pen_frame_spec.RAIL_BOTTOM).
+    # #4-40 thumb screw through the stirrup's .24 bottom rail (pn_pen_frame_spec.RAIL_END).
     frozenset(("pn-vn-pen-set-screw-1", "pn-pen-frame-1")): smooth_annulus_limit_mm3(
         2.8448, 2.261, 6.096
     ),

@@ -131,8 +131,8 @@ def test_the_recipes_programs_pass_every_check_it_declares(ctx, tmp_path) -> Non
         ("window_plunge_feed_per_min_mm", 234.7, "window_plunge_feed_per_min_mm"),
         ("window_cutter_dia_mm", 2.38125, "cutter"),
         ("window_right_mm", 22.5, "window_right_mm"),
-        # The .24 top rail's window wall, before owner ruling 2026-11-23 B1.
-        ("window_near_mm", 6.096, "window_near_mm"),
+        # The .22 top rail's window wall of the withdrawn PN-01 B1.
+        ("window_near_mm", 5.588, "window_near_mm"),
         ("parallel_thickness_mm", 6.35, "parallel stack"),
         ("lying_grip_mm", 7.5, "lying_grip_mm"),
         ("bar_width_min_mm", 31.5, "bar_width_min_mm"),

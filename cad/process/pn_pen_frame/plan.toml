@@ -140,11 +140,10 @@ window_step_mm = 1.04775
 window_plunge_feed_per_min_mm = 117.348
 # PF06's frame (X0 L, Y0 T at the fixed jaw): the window's right wall from L
 # (the width less the right rail) and its walls from T (the height less the
-# bottom rail, and the top rail, .22 by owner ruling 2026-11-23, PN-01 B1);
-# cam.py checks each against the model.
+# bottom rail, and the top rail); cam.py checks each against the model.
 window_right_mm = 22.098
 window_far_mm = 34.036
-window_near_mm = 5.588
+window_near_mm = 6.096
 # Thumb-screw tap (PF07, PF08), from the bottom end B: spot Ø.080 with the
 # #2 centre drill, under the #43 (the magnifying clamp plan's spot); #43
 # pecks of .080 with full retract, its full diameter tap_drill_past_mm (1.0)
@@ -448,7 +447,7 @@ title = "Back face"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in). The set's parallels are 1/8 thick; do not use a stack thicker than .18 (in Setup 7 the window cutters run .020 below the stacks' top, .22 from the T jaw and .24 from the B jaw). The blank lying flat on them, BK up, gripped across its ends: B against the FIXED jaw, T against the moving jaw, L to the LEFT, centred on the jaws. Each stack sits under an end, inside its rail (.22 at T, .24 at B). Tap it down onto both stacks while closing the vise. Its top stands {{process.blank_thick_mm:in.3dot}} above the stacks, the lower {{process.lying_grip_mm:in.3dot}} of it in the jaws."
+holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in). The set's parallels are 1/8 thick; do not use a stack thicker than .20 (in Setup 7 the window cutters run .020 below the stacks' top, .24 from each jaw). The blank lying flat on them, BK up, gripped across its ends: B against the FIXED jaw, T against the moving jaw, L to the LEFT, centred on the jaws. Each stack sits under an end, inside its .24 rail. Tap it down onto both stacks while closing the vise. Its top stands {{process.blank_thick_mm:in.3dot}} above the stacks, the lower {{process.lying_grip_mm:in.3dot}} of it in the jaws."
 datum = "Program PF05_back_face. G54: X0 the left face L, Y0 the fixed jaw's face (B), Z0 the stacks' top; +Y toward the fixed jaw."
 diagram = { file = "diagrams/front.svg", alt = "The blank lying on stacked parallels under its two ends, gripped on B and T; the 1/2 in end mill skims the face up, the back face." }
 envelope = { x_span_mm = ["{{cad.right_face_width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.top_face_height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_thick_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", 9.017], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
@@ -486,7 +485,7 @@ title = "Front face to the depth; the window"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The same 1/8 thick stacks (.18 thick at most), under the ends only: the window falls between them, its walls .22 from the T jaw and .24 from the B jaw, so the stacks clear the cutters by .09 and .11 with the set's 1/8 parallels (.04 at the .18 most). The blank turned over end for end: BK down on both stacks, T against the FIXED jaw, B against the moving jaw, L to the LEFT, centred. Close the vise snug, not heavy: once the window is cut, the jaw force rides on the two .13 side rails. Tap it down onto both stacks while closing."
+holding = "The same 1/8 thick stacks (.20 thick at most), under the ends only: the window falls between them, its walls .24 from each jaw, so each stack clears the cutters by .11 with the set's 1/8 parallels (.04 at the .20 most). The blank turned over end for end: BK down on both stacks, T against the FIXED jaw, B against the moving jaw, L to the LEFT, centred. Close the vise snug, not heavy: once the window is cut, the jaw force rides on the two .13 side rails. Tap it down onto both stacks while closing."
 datum = "Program PF06_window. G54: X0 the left face L, Y0 the fixed jaw's face (T), Z0 the stacks' top (BK); +Y toward the fixed jaw. The window spans X {{cad.window_left_wall_mm:in.3f}}–{{process.window_right_mm:in.3f}} and Y −{{process.window_far_mm:in.3f}} to −{{process.window_near_mm:in.3f}}. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
 diagram = { file = "diagrams/window.svg", alt = "The blank lying on stacked parallels under its ends, BK down, T at the fixed jaw; the 1/2 in end mill faces the front face to the depth, the 1/8 in end mill cuts a slot round the window, the slug drops between the stacks, and the same end mill finishes the walls and corners." }
 envelope = { x_span_mm = ["{{cad.right_face_width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.top_face_height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", 9.017], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", -0.508], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
