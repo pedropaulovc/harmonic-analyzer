@@ -11,12 +11,14 @@
 # then, still in the edge clamps, spot, drill and ream the hub hole.
 #
 # The outline is not held on tabs (owner decision 2026-11-17): the blank is
-# bonded to the plate with double-sided tape and screwed down through the
-# reamed hub hole over a plug in the plate's counterbore; the edge clamps are
-# backed off, since once the cut is through they would push loose waste into
-# the cutter. No tape is under the blank while its faces are cut: the tape's
-# thickness variation would go into the thickness band. The #47 rod-pin hole
-# is not on this part.
+# bonded to the plate on blue painter's tape on both faces with CA glue
+# between (owner ruling 2026-11-23, R1: "for tape isnt it possible to use blue
+# painters tape on both sides and ca glue between them") and screwed down
+# through the reamed hub hole over a plug in the plate's counterbore; the
+# edge clamps are backed off, since once the cut is through they would push
+# loose waste into the cutter. No tape is under the blank while its faces are
+# cut: the stack's thickness variation would go into the thickness band. The
+# #47 rod-pin hole is not on this part.
 #
 # NC (cam:ch_rocker_strap, cad/process/ch_rocker_strap/cam.py): RS01_rough_faces,
 # RS02_finish_face_1, RS03_finish_face_2_hub, RS04_outline. G54 is fixed to
@@ -26,8 +28,8 @@
 #
 # Holding in prechips' terms: clamped stages are a plate hold with clamp
 # stations (a downward push bends nothing). The outline is a bonded plate
-# hold: nothing bends; each cut's forces are compared with the tape's derated
-# strengths under every piece it leaves on the plate.
+# hold: nothing bends; each cut's forces are compared with the bond's
+# accepted strengths under every piece it leaves on the plate.
 title = "Rocker strap"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -139,48 +141,77 @@ ream_tip_z_mm = -4.0
 bushing_flange_dia_mm = 13.716
 bushing_clearance_mm = 0.5
 bushing_stack_height_mm = 5.1308
-# Tape: 3M VHB 5906, .006 in (shop-equipment consumables.tape-3m-vhb-5906).
-# 3M "VHB Tapes Technical Data" (November 2015), Typical Performance
-# Characteristics, 5906, 72 h dwell at room temperature: normal tensile
-# (ASTM D-897, to aluminium) 100 lb/in² = 690 kPa; dynamic overlap shear
-# (ASTM D-1002, to stainless steel) 100 lb/in² = 690 kPa.
-tape_thickness_mm = 0.15
-tape_shear_mpa = 0.69
-tape_tensile_mpa = 0.69
-# Derating of both strengths: 0.5 for the dwell (same data sheet, Application
-# Techniques: "approximately 50% of ultimate bond strength will be achieved
-# after 20 minutes", so the plan waits 20 minutes) × 0.5, the author's
-# allowance for cutting oil at the slot and a warm cut, no source.
-bond_derating = 0.25
+# Hold: blue painter's tape on the plate and on the blank, CA glue between
+# (shop-equipment consumables.hold-painters-tape-ca: ScotchBlue 2090, GH1200
+# thick, Starbond accelerator). Owner, 2026-11-23, R2: "it is widely used in
+# industry with much heavier requirements; take it as given it will work".
+# The stack (tape + glue + tape) is the record's: .011 nominal, every bond
+# miked into .009-.013 before the program runs.
+tape_stack_mm = 0.28
+tape_stack_min_mm = 0.23
+tape_stack_max_mm = 0.33
+# The arc_strap adapter's name for the whole stack under the blank (it
+# derives the through depth from it); the same number as tape_stack_mm,
+# which cam.py checks.
+tape_thickness_mm = 0.28
+# The bond's strengths are stresses the owner accepts (the record's
+# accepted_shear_kpa / accepted_tensile_kpa, the fleet figure the planner set
+# under the owner's delegation), used as written: a cap as well as an
+# envelope, so a cut asking more takes more levels.
+bond_accepted_shear_mpa = 0.6
+bond_accepted_tensile_mpa = 0.6
+# Tape seams, each layer's distance from the fence face. The blank is 1-1/2
+# in wide, the tape 1.41 in (consumables.tape-scotchblue-2090.width_mm): two
+# strips on each face, seams along X. Plate: the first strip's edge on the
+# fence face, the second butted to it, so its seam is a strip's width out.
+# Blank: two strips butted at mid-width, both edges trimmed flush: 16.8 mm
+# (.66 in, about half a strip) off the plate's. The blank's seam lies under
+# the strap's body, 1.9 mm inside its top edge at the hub, and leaves it
+# through both end faces; the plate's runs under the bottom slot for about
+# 68 mm round the hub, where the blank's tape above it is whole. cam.py
+# checks the spacing and that the slot never lies over both seams.
+tape_seam_blank_mm = 19.05
+tape_seam_plate_mm = 35.814
 # Outline, 1/8 in 3-flute carbide end mill at .001 in/tooth (shop
 # settings.endmill-carbide-3fl-1-8-1018-cf-tru-edge); its 30° helix (shop
 # tools.endmill-carbide-3fl-1-8.helix_deg) lifts with tan 30° of the
 # tangential force. The slot is roughed .2 mm outside the edge and the wall
 # finished down to a skin left under the slot (owner-adopted, about .010 in);
-# only then is the skin cut through at the finished size, into the tape and
-# short of the plate (outline_breakthrough_mm below the strap's underside,
-# under the tape's least thickness, .006 in −15 %).
+# only then is the skin cut through at the finished size, into the stack and
+# short of the plate. The file works on the nominal stack, so the skin is
+# .25 ± .05 mm (.008–.012) over the band. outline_breakthrough_mm is below
+# the nominal underside: the through cut runs at Z .115 mm over the plate,
+# inside the plate's own tape (.137 thick), .115 under the strap's underside
+# at the thinnest stack (.23) and .215 at the thickest (.33), and .115 above
+# the plate at either (cam.py checks both ends of the band).
 outline_cutter_dia_mm = 3.175
 outline_finish_stock_mm = 0.2
 outline_skin_mm = 0.25
-outline_breakthrough_mm = 0.08
-# Depth levels, the fewest equal levels the bond check accepts with margin
-# (derated tensile 0.1725 MPa; a lift at an edge loads the bond with 4 × force
-# over a patch as long as the piece is wide):
-# - fence sliver, cut first, the blank whole (38.1 mm wide): levels of 0.75 mm
-#   at most lift 39.4 N, 0.108 MPa;
-# - outline rough, finish and through are all judged on the strap alone
-#   (16 mm wide): near the bottom of the rough slot only the skin joins it to
-#   the blank, and a 0.25 mm skin carries no lift across the slot. So the
-#   rough slot goes down in levels of 0.17 mm at most (14 over the 2.239 mm
-#   wall; 8.9 N, 0.139 MPa); 0.75 mm levels, 39.4 N, would be 0.615 MPa;
-# - finish pass, one level over the wall depth (cad.outline_wall_depth_mm):
-#   7.4 N, 0.116 MPa;
-# - through cut, 0.33 mm: levels of 0.165 mm lift 8.9 N, 0.139 MPa (one
-#   0.33 mm level: 0.271 MPa, refused).
-fence_sliver_step_mm = 0.75
-outline_rough_step_mm = 0.17
-outline_through_step_mm = 0.17
+outline_breakthrough_mm = 0.165
+# Depth levels (R3, owner 2026-11-23: "no need to bring to me ; make coarser
+# as you see fit"). Two limits: the bond's accepted 0.6 MPa, a cap (prechips
+# refuses a cut whose lift asks more), and, the 1/8 in end mill slotting 1018
+# being unmeasured (not in measured-cuts.toml), no level deeper than the
+# deepest the same cutter at the same setting slots in 1018 in a reviewed
+# traveler on main: ch_connecting_rod Setup 6 ("Face F: outline on tabs"),
+# program CR08_outline, cut "outline", 1.185 mm (its outline_level_mm).
+# - fence sliver, the blank whole (38.1 mm wide), top to the through Z
+#   (2.654 mm): the precedent binds, 3 levels of .885 (was 4 of .642 at the
+#   old .75 mm bond limit);
+# - outline rough, judged on the strap alone (16 mm wide), top to the skin
+#   (the 2.239 mm wall): the bond cap binds, 4 levels of .560, a lift of
+#   0.46 MPa; the next coarser, 3 levels of .746, would ask 0.61 MPa (prechips:
+#   1.185 mm levels ask 0.972). Was 14 of .160 at the old .17 mm bond limit;
+# - finish pass, one level over the wall depth (cad.outline_wall_depth_mm),
+#   unchanged;
+# - through cut, the skin and the breakthrough (cad.outline_through_depth_mm,
+#   .415 mm): one level (about 0.34 MPa; was 2 of .165 at the old .17 mm bond
+#   limit), outline_through_step_mm that whole depth. The skin itself stays:
+#   it is the thin-part limit that keeps the freed pieces joined until the
+#   last pass.
+fence_sliver_step_mm = 1.185
+outline_rough_step_mm = 0.56
+outline_through_step_mm = 0.415
 # The fence-side strip is milled away before the outline where it is under
 # sliver_width_min_mm (owner-adopted: no free strip of that order; the value,
 # as wide as the strap is thick, is the author's). That is 133.5 to 148.0 mm
@@ -267,9 +298,19 @@ ref = "strap-sub-plate"
 description = "Fixture MHA-CH-13-TL-00, made beforehand to its drawings: sub-plate TL-01, hub plug TL-02, hub washer TL-03 (Ø.53 × .06), 4 Mitee-Bite Pitbull 26000 4-40 edge clamps TL-VN-50, 1/4-20 × 5/8 button-head screw TL-VN-51 (McMaster 91255A539)"
 [[tools]]
 id = "tape"
-name = "3M VHB 5906 tape"
-ref = "tape-3m-vhb-5906"
-description = "3M VHB 5906 double-sided tape, .006 in, 1-1/2 in wide (or two 3/4 in strips)"
+name = "Blue painter's tape"
+ref = "tape-scotchblue-2090"
+description = "ScotchBlue 2090 blue painter's tape, 1.41 in wide: two strips on the plate and two on the blank's face 1, the outline's bond"
+[[tools]]
+id = "ca-glue"
+name = "CA glue, thick"
+ref = "ca-glue-gh1200"
+description = "GH1200 super glue, the 1500 cps thick bottle: the bead between the two tapes"
+[[tools]]
+id = "ca-accelerator"
+name = "CA accelerator"
+ref = "ca-accelerator-starbond"
+description = "Starbond CA accelerator spray: misted on the blank's tape so the glue grabs at once"
 
 [[setups]]
 machine_kind = "other"
@@ -489,21 +530,21 @@ feed = "hand"
 
 # RS04: the outline, one tool, no stop inside the file. The blank is bonded
 # to the plate and screwed down at the hub; the setup's beam is the whole
-# blank on its tape, which the plunge and the fence sliver cut into.
+# blank on its tape stack, which the plunge and the fence sliver cut into.
 [[setups]]
 machine_kind = "other"
 title = "Bond to the plate; outline"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Blank bonded to the plate on 3M VHB 5906 tape ({{process.tape_thickness_mm:in.3dot}}) under its whole face, face 1 down, the reamed hub hole over the hub plug TL-02's pilot in the plate's counterbore, one long edge against the fence, and screwed down at the hub: the 1/4-20 × 5/8 button-head screw TL-VN-51 through the washer TL-03 into the plate. Edge clamps backed off clear of the blank."
-datum = "Program RS04_outline. G54 unchanged: Y0 fence, X0 end stop, Z0 the plate top; the file works {{process.tape_thickness_mm:in.3dot}} above it for the tape. The plug puts the hub hole at X {{cad.hub_x_in:.3f}}, Y −{{cad.hub_y_in:.3f}}; the fence sets the blank square."
-diagram = { file = "diagrams/outline.svg", alt = "Plan of the sub-plate: blank bonded to the plate against the fence, no edge clamps; screw and washer at the hub hole; the fence notched under both tips of the strap; the 1/8 in end mill's slot runs round the whole outline, top arc toward the fence." }
-# Top: the strap on its tape; deepest: the through cut stops in the tape,
-# above the plate top.
-envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.outline_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.fence_notch_depth_mm}}", "{{process.outline_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{process.tape_thickness_mm}}", "{{cad.thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
+holding = "Blank bonded to the plate under its whole face: blue painter's tape on the plate and on the blank's face 1, GH1200 thick CA glue between (the stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}, miked). Face 1 down, the reamed hub hole over the hub plug TL-02's pilot in the plate's counterbore (tape cut away there), one long edge against the fence, the left end on the end stop; screwed down at the hub: the 1/4-20 × 5/8 button-head screw TL-VN-51 through the washer TL-03 into the plate. Edge clamps backed off clear of the blank."
+datum = "Program RS04_outline. G54 unchanged: Y0 fence, X0 end stop; Z0 the plate top; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack (blue tape, CA glue, blue tape). The plug puts the hub hole at X {{cad.hub_x_in:.3f}}, Y −{{cad.hub_y_in:.3f}}; the fence sets the blank square."
+diagram = { file = "diagrams/outline.svg", alt = "Plan of the sub-plate: blank bonded to the plate (blue tape, CA glue, blue tape) against the fence, no edge clamps; screw and washer at the hub hole; the fence notched under both tips of the strap; the 1/8 in end mill's slot runs round the whole outline, top arc toward the fence." }
+# Top: the strap on the thickest stack; deepest: the through cut stops in
+# the stack, above the plate top.
+envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.outline_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.fence_notch_depth_mm}}", "{{process.outline_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{process.tape_stack_max_mm}}", "{{cad.thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_top_height_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
-beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{cad.blank_bond_area_mm2}}", width_mm = "{{cad.blank_width_mm}}" }] } }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{cad.blank_bond_area_mm2}}", width_mm = "{{cad.blank_width_mm}}" }] } }
 
 # The drill and reamer leave their exit burr on face 1, which seats on the
 # tape and the plug pilot next: it comes off here, the edges kept sharp.
@@ -515,16 +556,82 @@ steps = [
 ]
 feed = "hand"
 
+# The bond (owner rulings 2026-11-23, R1/R2): blue painter's tape on both
+# faces, CA glue between; the operator proves each bond by its stack and a
+# hand push test, there is no pull test. The stack check subtracts the
+# blank's own thickness, miked first.
 [[setups.operations]]
-instruction = "Degrease the plate top and the blank's face 1 with isopropyl alcohol and water. Lay the 3M VHB 5906 tape on the plate over the blank's whole footprint, cut away at the counterbore. Drop the hub plug into the counterbore."
+steps = [
+  { kind = "action", text = "Mic the blank's thickness at both ends and at mid-length beside the hub hole; write the three readings down in mm." },
+  { kind = "action", text = "Degrease the plate top over the blank's place and the blank's face 1 with isopropyl alcohol; wipe both dry." },
+]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Lower the blank, face 1 down, hub hole over the plug's pilot, long edge against the fence, and press it down over its whole face (the tape wants about 15 psi). Washer and screw on at the hub, snug. Back the edge clamps off clear of the blank."
+steps = [
+  { kind = "action", text = "Tape the plate with ScotchBlue 2090 (1.41 in wide), two strips along X from the end stop to 1/4 past the blank's right end: the first with its edge on the fence face, the second butted to it. Edges touching, never overlapped, no gap over 1/32. The seam is {{process.tape_seam_plate_mm:in.2dot}} from the fence." },
+  { kind = "action", text = "Cut the plate's tape away over the counterbore with a knife, round its edge." },
+]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Wait 20 minutes: the tape is taken at half strength, which it reaches by then."
+steps = [
+  { kind = "action", text = "Tape face 1 with two strips along the blank's length, each hanging over one long edge, butted at mid-width: the seam {{process.tape_seam_blank_mm:in.2dot}} from either edge, about .66 off the plate's seam, under the strap's body. Never overlapped, no gap over 1/32." },
+  { kind = "action", text = "Trim the tape flush with the blank's edges and ends with a knife, and cut it away round the hub hole." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Burnish both tapes down hard with the round back of a screwdriver handle, every strip, edges included." },
+  { kind = "check", text = "No bubble, no lifted edge on either tape." },
+  { kind = "stop", text = "A bubble or lifted edge: burnish it again; still lifted, replace that strip." },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Drop the hub plug TL-02 into the counterbore, pilot up. Back the edge clamps off clear of the blank's place."
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "GH1200 thick CA (the 1500 cps bottle) on the plate's tape: a zigzag bead about 1/16 wide, lines about 3/4 apart, kept 1/4 inside the blank's place and clear of the counterbore, about 20 in of bead. No glue on bare metal." },
+  { kind = "action", text = "Mist Starbond accelerator on the blank's tape (the face with no glue), two or three sprays." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Within about 10 seconds of the spray: lower the blank, face 1 down, its hub hole over the plug's pilot, its long edge on the fence, its left end on the end stop. The glue grabs at once: it cannot be slid afterwards." },
+  { kind = "action", text = "Press it down by hand over its whole face with a flat block, for 1 minute. Then wait 5 minutes (the maker: cures in seconds with accelerator; the 1 + 5 minutes is the shop's margin)." },
+]
+feed = "hand"
+
+# The stack: the mill's own Z, the way Z0 was set (the .200 gauge block under
+# a stopped cutter). Work Z read there = .200 block + stack + blank, so
+# stack = Z − 5.080 − the blank's reading at that place (mm, the console's).
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Console M6 T2 (the 1/8 in end mill, measured on the tool setter). Spindle off: T2 just dragging on the .200 gauge block laid on the blank's top, near each end and beside the hub; read work Z. Stack = Z − 5.080 − the blank's reading there." },
+  { kind = "check", text = "Stack {{process.tape_stack_min_mm:.2f}}–{{process.tape_stack_max_mm:.2f}} mm ({{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}) at all three places, the two ends within 0.05 mm (.002) of each other." },
+  { kind = "stop", text = "Outside the band, or the ends further apart: peel the blank off, clean both faces, re-tape and re-bond from the degrease." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "check", text = "Push test: with the heel of the hand push the blank hard along and across; try to lift each corner with a thumbnail. No movement, no creak, no lifted corner." },
+  { kind = "stop", text = "Any movement: peel the blank off, clean both faces, re-tape and re-bond from the degrease. This test is the owner's acceptance of the hold: there is no pull test." },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Washer TL-03 on the blank over the hub hole; the button-head screw TL-VN-51 through it into the plate, snug."
+feed = "hand"
+
+# Cut cautions for the bond, real for CA and paper tape (brief step 8).
+[[setups.operations]]
+instruction = "For all of RS04: cut dry, or with a light air blast. No flood or mist coolant and no water: paper tape soaks and lets go. No oil on the work. CA softens with heat: if a level leaves the blank too warm to hold a finger on (feel it only with the spindle stopped, at a feed hold), let it cool before resuming."
 feed = "hand"
 
 # Every level starts with a straight plunge (feed: [parameters]); the plunge
@@ -563,7 +670,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Same file, no stop. Outline rough: a slot {{process.outline_finish_stock_mm:in.3dot}} outside the strap's edge, full perimeter, levels ≤ {{process.outline_rough_step_mm:in.3dot}}, down to a skin {{process.outline_skin_mm:in.3dot}} thick."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
-beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
 milling_cuts = [
   { name = "outline rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.outline_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_rough_step_mm}}", radial_woc_mm = "{{process.outline_cutter_dia_mm}}", traverse_mm = "{{cad.outline_x_mm}}" },
 ]
@@ -575,7 +682,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Same file, no stop. Outline finish: the edge itself, {{process.outline_finish_stock_mm:in.3dot}} radial, one level down to the skin."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
-beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
 milling_cuts = [
   { name = "outline finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.outline_cutter_dia_mm}}", axial_doc_mm = "{{cad.outline_wall_depth_mm}}", radial_woc_mm = "{{process.outline_finish_stock_mm}}", traverse_mm = "{{cad.part_x_mm}}" },
 ]
@@ -585,9 +692,9 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, no stop. Outline through: the skin, at the finished size, levels ≤ {{process.outline_through_step_mm:in.3dot}}, {{cad.outline_through_depth_mm:in.3dot}} in all, to {{process.outline_breakthrough_mm:in.3dot}} below the strap into the tape; the cutter does not reach the plate."
+instruction = "Same file, no stop. Outline through: the skin, at the finished size, one level {{cad.outline_through_depth_mm:in.3dot}} deep, to {{process.outline_breakthrough_mm:in.3dot}} below the strap's nominal underside, into the tape stack; the cutter does not reach the plate."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
-beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
 milling_cuts = [
   { name = "outline through", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.outline_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_through_step_mm}}", radial_woc_mm = "{{process.outline_cutter_dia_mm}}", traverse_mm = "{{cad.part_x_mm}}" },
 ]
@@ -625,8 +732,20 @@ steps = [
 ]
 feed = "hand"
 
+# Release by peeling, no solvent soak (brief steps 10-11): the plate's tape
+# bends, never the strap.
 [[setups.operations]]
-instruction = "Screw and washer out. Lift the waste pieces. Free the strap by working a thin blade under it along its length; do not lever it up from one end. Lift the hub plug out of the counterbore. Clean the tape off strap and plate with isopropyl alcohol."
+steps = [
+  { kind = "action", text = "Screw and washer out. Waste first: slide a single-edge razor flat under the plate's tape at each waste piece's edge and lift the piece off with its tape." },
+  { kind = "action", text = "The strap: slide the razor (or a .010 feeler leaf) flat under the plate's tape at one long edge and work it along the whole length a little at a time, so the tape bends, not the strap; never lever it up from one end." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Lay the strap tape-up on the surface plate. Hold it down flat with one hand close to the peel line and peel its tape back on itself, low and slow, along the length. The strap is never lifted by an edge while tape still holds it." },
+  { kind = "action", text = "Residue: a CA spot on the strap or plate, acetone on a rag; the tape's adhesive film, isopropyl alcohol. Peel the plate's tape, lift the hub plug out and wipe the plate before the next blank." },
+]
 feed = "hand"
 
 [[setups.operations]]

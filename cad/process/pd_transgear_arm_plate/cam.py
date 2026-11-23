@@ -425,6 +425,13 @@ def context(
     k = (0.0, 0.0)
     screws = [tuple(_r(c) for c in _bond(s)) for s in g["screws"]]
     spot_z = t - _spot_depth(p["spot_dia_mm"])
+    # The drills' full diameter and the reamer's bevel reach into the spoil
+    # block through the tape stack at its thickest.
+    for key in ("drill_past_mm", "ream_past_mm"):
+        if not p[key] > p["tape_stack_max_mm"]:
+            raise ValueError(
+                f"process.{key} does not clear the tape stack at its thickest"
+            )
     drill_1_tip = -(p["drill_past_mm"] + _point(d1))
     drill_2764_tip = -(p["drill_past_mm"] + _point(d2764))
     _agree(plan, "drill_1_tip_mm", drill_1_tip)
@@ -499,9 +506,15 @@ def context(
     level = (t - bottom) / levels_n
     _agree(plan, "outline_level_mm", level)
     levels = [_r(t - level * i) for i in range(1, levels_n + 1)]
-    if bottom >= 0 or -bottom > p["tape_thickness_mm"] + p["spoil_height_mm"]:
+    # The last level is through the stack into the spoil block at its
+    # thickest and still inside the block at its thinnest.
+    if (
+        not p["tape_stack_max_mm"]
+        < -bottom
+        < p["tape_stack_min_mm"] + p["spoil_height_mm"]
+    ):
         raise ValueError(
-            "the outline's last level is not under face A, in the spoil block"
+            "the outline's last level is not through the tape stack, in the spoil block"
         )
     for name in ("corner clear", "outline"):
         if not math.isclose(_cut(plan, name, "axial_doc_mm"), p["outline_level_mm"]):
@@ -824,10 +837,10 @@ def context(
     ]
 
     # Keep-outs. Setup 2: the jaws, their tops spoil_over below the spoil
-    # block's top (under the tape), the fixed jaw's face at the C edge, the
-    # moving jaw's at the block's other edge, along the block centred on
-    # the jaws.
-    spoil_top = -p["tape_thickness_mm"]
+    # block's top (under the tape stack: at its thinnest the jaws stand
+    # highest), the fixed jaw's face at the C edge, the moving jaw's at the
+    # block's other edge, along the block centred on the jaws.
+    spoil_top = -p["tape_stack_min_mm"]
     spoil_x = (
         right_end + p["spoil_end_margin_mm"] - p["spoil_length_mm"],
         right_end + p["spoil_end_margin_mm"],

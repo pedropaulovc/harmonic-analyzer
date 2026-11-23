@@ -143,6 +143,8 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("screw_1_from_k_max_mm", 33.0, "screw_1_from_k_max_mm"),
         ("sink_pin_depth_mid_mm", 0.95, "sink_pin_depth_mid_mm"),
         ("em_feed_per_min_mm", 600.0, "em_feed_per_min_mm"),
+        ("drill_past_mm", 0.3, "drill_past_mm"),
+        ("ream_past_mm", 0.3, "ream_past_mm"),
         ("blank_width_max_mm", 38.5, "front edge outside its band"),
         ("spot_dia_mm", 6.0, "spot"),
     ],
@@ -151,6 +153,16 @@ def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> N
     plan = copy.deepcopy(PLAN)
     plan["parameters"][key] = value
     with pytest.raises(ValueError, match=detail):
+        _context(plan)
+
+
+def test_an_outline_bottom_inside_the_tape_stack_is_refused() -> None:
+    # .012 under face A: through the thinnest stack, not the thickest.
+    plan = copy.deepcopy(PLAN)
+    p = plan["parameters"]
+    p["outline_bottom_mm"] = -0.3
+    p["outline_level_mm"] = (p["thickness_target_mm"] + 0.3) / p["outline_levels"]
+    with pytest.raises(ValueError, match="through the tape stack"):
         _context(plan)
 
 
@@ -214,7 +226,7 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # The corner clearing dropped at its last level: the corners stand.
         (
             "corner_clear",
-            lambda line: line == "G1 Z-0.254 F{feed}",
+            lambda line: line == "G1 Z-0.508 F{feed}",
             lambda line: "G1 Z0.500 F{feed}",
             "cleared",
         ),

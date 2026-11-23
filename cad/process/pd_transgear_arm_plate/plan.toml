@@ -10,7 +10,8 @@
 # spoil block off the owned 1 x 3 in 6061 bar (stock.6061-flat-1x3), and
 # gates the blank. Setup 2: the spoil block in the vise on the 1 in
 # parallels, its top over the jaw tops; the blank bonded face A down on it
-# with 3M VHB 5906 tape, its datum-C edge flush with the block's edge at the
+# with blue painter's tape on both faces and CA glue between, its datum-C
+# edge flush with the block's edge at the
 # fixed jaw. AP01_holes faces the rear face to the thickness, spots, drills
 # #1 through at K and at both screw holes, opens K with the 27/64 drill and
 # reams it .4375; AP02_sink countersinks the two screw holes 82° on the rear
@@ -30,16 +31,22 @@
 # K (step 11C) and its bore reamed after the press (step 11H). The plate
 # leaves with K reamed and chamfered for the press.
 #
-# Workholding: bonded (the strap's and the platen's VHB technique): a 1/4 in
-# blank faced to .197 in the vise would leave less than
-# limits.vise_grip_min_mm of grip under a facing cut, and the outline's tapers
-# and end round leave no parallel faces to grip. The blank's faces are 1-1/2
-# x 2-1/2 in: two 3/4 in strips of tape side by side under it. The tape is
-# taken at a quarter of its data-sheet strength (the platen's derating); the
-# bond prechips is told is the finished plate's own area less its three
-# holes (cam.py computes it), the least the tape holds once the outline is
-# cut. The drills and the reamer run before the outline, with the whole
-# blank still bonded.
+# Workholding: bonded, blue painter's tape on both faces and CA glue between
+# (owner 2026-11-23, R1: "for tape isnt it possible to use blue painters tape
+# on both sides and ca glue between them"; consumables.hold-painters-tape-ca:
+# ScotchBlue 2090, GH1200 thick CA, Starbond accelerator, all on hand): a
+# 1/4 in blank faced to .197 in the vise would leave less than
+# limits.vise_grip_min_mm of grip under a facing cut, and the outline's
+# tapers and end round leave no parallel faces to grip. The blank's faces are
+# 1-1/2 x 2.45 in: two strips of the 1.41 in tape side by side on each face.
+# The bond is the accepted one (owner 2026-11-23, R2: "it is widely used in
+# industry with much heavier requirements; take it as given it will work"):
+# prechips' bond check runs at the stresses the owner accepts, used as
+# written, over the finished plate's own area less its three holes (cam.py
+# computes it), the least the bond holds once the outline is cut. The
+# operator proves each bond by Setup 2's stack check and push test. The
+# drills and the reamer run before the outline, with the whole blank still
+# bonded.
 #
 # One-sided facing: the rear face only (face A, datum A, stays as supplied).
 # A cold-finished bar can bow when one skin is cut off; the final inspection
@@ -49,7 +56,7 @@
 #
 # FLAGGED: to buy: the stock (stock.1018-flat-1-4x1-1-2), the .4375 reamer
 # (tools.reamer-4375), the 3/8 in 82° countersink (tools.riser-countersink),
-# the 3M VHB 5906 tape (consumables.tape-3m-vhb-5906), the .4375 GO / .4382
+# the .4375 GO / .4382
 # NO-GO plug gauge pair (gauges.plug-gauges-4375-4382) and a .250 Class ZZ
 # pin gauge (gauges.pin-gauges) for the countersinks.
 #
@@ -64,7 +71,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1/4 x 1-1/2 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:fraction}} in flat bar, the 12 in length: one {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} in blank. Spoil block: a 3.5 in length of the 1 x 3 in 6061 bar."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The two long edges are the bar's, as supplied: no cut touches them. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall or controller reset, home again and do what that setup's Datum says before resuming. The two Ø.0945 locating holes, the bush press and its ream are the assembly's (MHA-PD-00 steps 13A, 13E, 11C, 11H). To buy before starting: the bar, the .4375 reamer, the 3/8 in 82° countersink, the VHB 5906 tape, the .4375/.4382 plug pair and the .250 and .450 pin gauges (Setup 2 checks K and the countersinks while the blank is still bonded). Finish: {{cad.finish}}."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The two long edges are the bar's, as supplied: no cut touches them. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall or controller reset, home again and do what that setup's Datum says before resuming. The two Ø.0945 locating holes, the bush press and its ream are the assembly's (MHA-PD-00 steps 13A, 13E, 11C, 11H). To buy before starting: the bar, the .4375 reamer, the 3/8 in 82° countersink, the .4375/.4382 plug pair and the .250 and .450 pin gauges (Setup 2 checks K and the countersinks while the blank is still bonded). Finish: {{cad.finish}}."
 shop = "../shop"
 stock_refs = ["1018-flat-1-4x1-1-2", "6061-flat-1x3"]
 material_key = "rocker-1018-cold-finished"
@@ -110,18 +117,23 @@ vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
 vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
 vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
 parallel_height_mm = 25.4
-# Tape: 3M VHB 5906, .006 in (cad/config/shop-equipment/
-# consumables.tape-3m-vhb-5906). 3M "VHB Tapes Technical Data" (November
-# 2015), 5906: normal tensile (ASTM D-897) 100 lb/in² = 690 kPa; dynamic
-# overlap shear (ASTM D-1002) 100 lb/in² = 690 kPa. Derating 0.5 for the
-# 20-minute dwell (same sheet: "approximately 50% of ultimate bond strength
-# will be achieved after 20 minutes") x 0.5, the author's allowance for a
-# warm cut, as the platen's and the strap's. bond_area_mm2: the finished
-# plate's area less its three holes (cam.py).
-tape_thickness_mm = 0.15
-tape_shear_mpa = 0.69
-tape_tensile_mpa = 0.69
-bond_derating = 0.25
+# The hold (consumables.hold-painters-tape-ca): ScotchBlue 2090 on the block
+# and on face A, GH1200 thick CA between. tape_stack_mm the stack's nominal,
+# tape_stack_min_mm-tape_stack_max_mm the band Setup 2's stack check accepts
+# (both from the record). Z0 is face A, set from T1 on the blank's top less
+# its miked thickness (a touch-off from the top), so the stack moves no
+# depth on the plate (the thickness, the countersinks): it sets only how far
+# a cut under face A reaches into the spoil block (cam.py checks each claim
+# at both ends of the band). bond_accepted_shear_mpa and
+# bond_accepted_tensile_mpa: the record's accepted figure (.6 MPa, set by
+# the planner under the owner's delegation, R2/R3, header), used as written
+# and a cap: a cut asking more in prechips' model takes more levels;
+# bond_area_mm2: the finished plate's area less its three holes (cam.py).
+tape_stack_mm = 0.28
+tape_stack_min_mm = 0.23
+tape_stack_max_mm = 0.33
+bond_accepted_shear_mpa = 0.6
+bond_accepted_tensile_mpa = 0.6
 bond_area_mm2 = 1629.15
 # Work frame (Setups 2 and 4): K at X0 Y0, the plate's length along -X (the
 # end round at +X, the top edge at -X), the datum-C edge at +Y against the
@@ -143,16 +155,26 @@ face_rough_z_mm = 5.69
 face_stepover_mm = 4.4
 # The outline: the cutter's centre at its radius outside the round, the two
 # tapers and the top edge, outline_levels levels of outline_level_mm from the
-# rear face to outline_bottom_mm under face A (through the tape, into the
-# spoil block), each pass entered and left outline_lead_mm clear of the side
-# edges on the edges' extensions; the end round's corners first cleared by a
-# half circle of rough_arc_radius_mm about K at every level. Eleven levels:
-# the 3/8 in end mill's helix lifts the plate's edge, and the tape's derated
-# tensile strength over the plate's width allows no deeper a slot (prechips'
-# bond check; six would lift it).
-outline_levels = 11
-outline_level_mm = 0.478
-outline_bottom_mm = -0.254
+# rear face to outline_bottom_mm under face A, each pass entered and left
+# outline_lead_mm clear of the side edges on the edges' extensions; the end
+# round's corners first cleared by a half circle of rough_arc_radius_mm about
+# K at every level. The bottom, .020 under face A, is through both tapes and
+# the glue into the spoil block at the thickest stack (.007 into it) and at
+# most .011 into it at the thinnest (cam.py).
+# Six levels (owner 2026-11-23, R3: "no need to bring to me ; make coarser as
+# you see fit"). The bond no longer binds (it set eleven levels of .019); the
+# binding limit is the deepest level the same cutter runs in a reviewed
+# traveler: this 3/8 in carbide 3-flute end mill is not in measured-cuts.toml,
+# and its deepest full-width slot level in 1018 at this setting (2800 rpm,
+# .0025 in/tooth) on main is dt_crank_arm's 1.0239 mm (CA01_hub_end "boss
+# round" and CA03_handle_end "handle round"). Five levels would be 1.1024,
+# over it; six are .9186 (.036). Feed and speed unchanged. The bond cap
+# (.6 MPa) does not bind: in prechips' model six levels ask .15 MPa in shear
+# and .28 in tension (the corner clear's full-width slot lifting the plate's
+# edge), five would ask .34 in tension.
+outline_levels = 6
+outline_level_mm = 0.9186
+outline_bottom_mm = -0.508
 outline_lead_mm = 1.5
 rough_arc_radius_mm = 24.5
 # Holes. Spot K and the two screw holes Ø.120 with the #1 carbide 60° centre
@@ -160,8 +182,8 @@ rough_arc_radius_mm = 24.5
 # one plunge each (L/D under 1); the 27/64 (.4219) opens K; the .4375 reamer
 # through K, fed in and
 # out. Every tip drill_past_mm full diameter under face A, into the spoil
-# block; the reamer ream_past_mm (its bevel lead allowed for). cam.py checks
-# the tips.
+# block; the reamer ream_past_mm (its bevel lead allowed for). Both clear the
+# stack at its thickest (tape_stack_max_mm). cam.py checks the tips.
 spot_dia_mm = 3.048
 drill_past_mm = 0.5
 ream_past_mm = 1.0
@@ -298,6 +320,21 @@ name = "Pin gauges .250 and .450, TO BUY"
 ref = "pin-gauges"  # A1-pin-set-061-500-combined
 description = "Class ZZ pin gauges .250 and .450 (plus or minus; mike each): the countersinks' rim (.250) and K's chamfer (.450) with the calipers' depth rod"
 status = "to_order"
+[[tools]]
+id = "tape"
+name = "ScotchBlue 2090 blue painter's tape, 1.41 in"
+ref = "tape-scotchblue-2090"
+description = "ScotchBlue Original Multi-Surface 2090, 1.41 in wide: one layer on the spoil block's top and one on the blank's face A (Setup 2)"
+[[tools]]
+id = "ca-glue"
+name = "GH1200 CA glue, thick (1500 cps)"
+ref = "ca-glue-gh1200"
+description = "GH1200 super glue, the 1500 cps thick bottle: the bead between the two tapes that bonds the blank to the spoil block (Setup 2)"
+[[tools]]
+id = "ca-accelerator"
+name = "Starbond CA accelerator spray"
+ref = "ca-accelerator-starbond"
+description = "Starbond CA glue accelerator: misted on face A's tape so the glue grabs at once (Setup 2)"
 
 [[setups]]
 machine_kind = "other"
@@ -324,7 +361,7 @@ instruction = "Pick the straighter long edge as the C edge (datum C) and mark it
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mic the blank's thickness at its middle and 1/2 in in from each end, 1/2 in in from its front edge, and its width at both ends. Write the middle thickness on the rear face with marking fluid (face A is degreased and bonded): Setup 2 sets Z0 from it."
+instruction = "Mic the blank's thickness at its middle and 1/2 in in from each end, 1/2 in in from its front edge, and its width at both ends. Write each thickness on the rear face over its spot with marking fluid (face A is degreased and bonded): Setup 2 checks the tape stack from the end ones and sets Z0 from the middle one."
 inspection = "Every thickness reading {{process.blank_thickness_min_mm:in.4dot}}–{{process.blank_thickness_max_mm:in.4dot}} and the width {{process.blank_width_min_mm:in.4dot}}–{{process.blank_width_max_mm:in.4dot}}: the bar as supplied, this traveler's incoming-stock gate (the width sets the side edges). Outside either: set the blank aside and tell the owner."
 gauge_checks = [
   { gauge = "micrometers", band_mm = ["{{process.blank_thickness_min_mm}}", "{{process.blank_thickness_max_mm}}"] },
@@ -337,33 +374,65 @@ title = "Bonded on the spoil block: thickness, holes, countersinks, outline"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw. The spoil block on them, its 3 in width across the jaws (its as-bought 1 in edges in the jaws), centred along the jaws; tap it down and tighten: its top stands {{process.spoil_over_jaws_mm:in.3dot}} over the jaw tops. The blank bonded on its top with 3M VHB 5906 tape ({{process.tape_thickness_mm:in.3dot}} thick), face A down (rear face up), its C edge flush with the block's edge at the FIXED jaw, its R end to the RIGHT, {{process.spoil_end_margin_mm:in.2f}} in from the block's right end. Nothing else holds it."
-datum = "Programs AP01_holes (T1–T5), AP02_sink (T6), AP03_outline (T1). G54: X0 Y0 the press hole K's axis, the plate's length along −X (the end round at +X, the top edge at −X), +Y toward the fixed jaw (the C edge at Y {{cad.outline_edge_right_x_in:.3dot}}); Z0 face A (the blank's underside, on the tape), set from the miked thickness. Tool lengths from the tool setter at each M6. After a controller reset, a stall or an E-stop: home ($H), which brings the stored G54 back, and run the interrupted program from its start (every cut done is then cut in air)."
-diagram = { file = "diagrams/bond.svg", alt = "Plan and section: the spoil block across the vise jaws on two parallels, its top over the jaw tops; the blank on two strips of tape on it, its C edge flush with the block's fixed-jaw edge, R end to the right; the plate's outline inside it with K, the two screw holes, the end round at +X; X0 Y0 at K." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", 9.525, 9.525, 5.08], y_span_mm = ["{{process.spoil_width_mm}}", 9.525], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.spoil_height_mm}}", "{{process.tape_thickness_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.spoil_height_mm}}", "{{process.tape_thickness_mm}}", "{{process.drill_2764_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_min_mm}}"] }
+holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw. The spoil block on them, its 3 in width across the jaws (its as-bought 1 in edges in the jaws), centred along the jaws; tap it down and tighten: its top stands {{process.spoil_over_jaws_mm:in.3dot}} over the jaw tops. The blank bonded on its top face A down (rear face up): ScotchBlue 2090 blue painter's tape on the block and on face A, GH1200 thick CA glue between, the stack {{process.tape_stack_mm:in.3dot}} thick; its C edge flush with the block's edge at the FIXED jaw, its R end to the RIGHT, {{process.spoil_end_margin_mm:in.2f}} in from the block's right end. Nothing else holds it. Cut dry or with a light air blast: no flood or mist coolant and no water (the paper tape soaks and lets go); oil only where an op says, a drop on the tool, never poured on the work. CA softens with heat: if the blank is too warm to hold a finger on, stop and let it cool."
+datum = "Programs AP01_holes (T1–T5), AP02_sink (T6), AP03_outline (T1). G54: X0 Y0 the press hole K's axis, the plate's length along −X (the end round at +X, the top edge at −X), +Y toward the fixed jaw (the C edge at Y {{cad.outline_edge_right_x_in:.3dot}}); Z0 face A (the blank's underside, {{process.tape_stack_mm:in.3dot}} above the block's top on the tape stack), set from T1 on the blank's top less its miked thickness, so the stack moves no depth on the plate. Tool lengths from the tool setter at each M6. After a controller reset, a stall or an E-stop: home ($H), which brings the stored G54 back, and run the interrupted program from its start (every cut done is then cut in air)."
+diagram = { file = "diagrams/bond.svg", alt = "Plan and section: the spoil block across the vise jaws on two parallels, its top over the jaw tops; the blank on blue tape, CA glue, blue tape on it (two strips on each face), its C edge flush with the block's fixed-jaw edge, R end to the right; the plate's outline inside it with K, the two screw holes, the end round at +X; X0 Y0 at K." }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", 9.525, 9.525, 5.08], y_span_mm = ["{{process.spoil_width_mm}}", 9.525], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.spoil_height_mm}}", "{{process.tape_stack_max_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.spoil_height_mm}}", "{{process.tape_stack_min_mm}}", "{{process.drill_2764_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.spoil_width_mm}}", along_jaws_mm = "{{process.spoil_length_mm}}", part_height_mm = "{{process.spoil_height_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = [-34.887, "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
-beam = { axis = "x", hold = "plate", extent_mm = [-48.514, 14.986], seat = "6061 spoil block", seat_mm = [-61.214, 27.686], bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "plate", kind = "part", area_mm2 = "{{process.bond_area_mm2}}", width_mm = "{{cad.blank_width_mm}}" }] } }
+beam = { axis = "x", hold = "plate", extent_mm = [-48.514, 14.986], seat = "6061 spoil block", seat_mm = [-61.214, 27.686], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "plate", kind = "part", area_mm2 = "{{process.bond_area_mm2}}", width_mm = "{{cad.blank_width_mm}}" }] } }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). Brush the spoil block's top clean. Degrease it and the blank's face A with isopropyl alcohol and water, half and half; wipe both dry."
+instruction = "Home the mill ($H). Brush the spoil block's top clean. Degrease its top and the blank's face A with isopropyl alcohol; wipe both dry."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Lay two strips of the 3/4 in tape along X on the block's top, edge to edge, each the blank's length, starting {{process.spoil_end_margin_mm:in.2f}} in from the block's right end (where the blank's R end goes): the first with its edge on the block's fixed-jaw edge. Rub each down; peel the liners."
+instruction = "Tape the block's top: two strips of ScotchBlue 2090 (1.41 in wide) along X, each about 3 in long from 1/4 in in from the block's right end. The first hangs about 3/4 in over the fixed-jaw edge: knife it off flush with that edge. The second butts against it: edges never overlapped (an overlap rocks the blank), no gap over 1/32. Pencil a line across the tape {{process.spoil_end_margin_mm:in.2f}} in from the block's right end: the R end's place."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Stand a 1-2-3 block on the fixed jaw's top, its 3 in face against the spoil block's edge. Lower the blank onto the tape, face A down, its C edge against the 1-2-3 block, R end to the right {{process.spoil_end_margin_mm:in.2f}} in from the spoil block's right end (steel rule). It cannot be moved once down. Lean on it with the heel of the hand, about 25 lb (the tape wants about 15 psi). Take the 1-2-3 block away."
+instruction = "Tape face A: two strips along the blank's length, edges butted, never overlapped: the first with its edge on the C edge, the second beside it over the front edge. Knife both off flush with the blank's edges and ends. Face A's seam lies 1.41 in from the C edge, the block's about .70: the seams are about .71 (half a strip) apart."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Wait 20 minutes: the tape is taken at half strength, which it reaches by then."
+instruction = "Burnish both tapes down hard with the round back of a screwdriver handle, every strip, edges included: no bubble or lifted edge."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Stand a 1-2-3 block on the fixed jaw's top, its 3 in face against the spoil block's edge. GH1200 thick (1500 cps) CA on the block's tape: a zigzag bead about 1/16 in wide, its lines about 3/4 in apart, kept 1/4 in inside where the blank goes (about 1 x 2 in, about 4 in of bead). Then mist Starbond accelerator, two or three sprays, on face A's tape. No glue on bare metal."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Within about 10 seconds of the spray, lower the blank onto the glue, face A down, its C edge against the 1-2-3 block, its R end on the pencil line: the glue grabs at once and the blank cannot be slid afterwards. Press it down by hand over its whole face for 1 minute. Take the 1-2-3 block away."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Wait 5 minutes before touching the blank (the maker's glue cures in seconds with the accelerator; 1 minute pressed and 5 minutes waited is the shop's margin)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Console M6 T1 (3/8 in end mill, at least 1.00 in out of its collet). Spindle stopped, its end just dragging a .002 feeler leaf, note the machine Z (MPos, mm) on the blank's top 1/2 in in from the R end and from the front edge, then on the bare block 1 in in front of the blank at the same X. The same at the far end."
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Each end's tape stack: its blank reading less its block reading less that end's written thickness (in × 25.4)." },
+  { kind = "check", text = "Both stacks {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}} ({{process.tape_stack_min_mm:.2f}}–{{process.tape_stack_max_mm:.2f}} mm), and within .002 (0.05 mm) of each other." },
+  { kind = "stop", text = "Outside, or the ends differ more: peel the blank off as Setup 3 frees the plate, clean both faces, and tape and bond again from this setup's first op." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Push the blank hard sideways with the heel of the hand, along X and across it; try to lift each corner with a thumbnail." },
+  { kind = "check", text = "No movement, no creak, no lifted corner: the owner's acceptance of the hold (there is no pull test)." },
+  { kind = "stop", text = "Any movement: peel the blank off as Setup 3 frees the plate, clean both faces, and tape and bond again from this setup's first op." },
+]
 feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 X0 and Y0 at K with the edge finder (900 rpm): from +X on the R end, from +Y on the C edge."
-instruction_detailed = "Edge finder (900 rpm) on the blank's R end from +X, at mid-width: G10 L20 P1 X{{process.x_set_mm:.3f}}. On the C edge from +Y, 1/2 in in from the R end: G10 L20 P1 Y{{process.y_set_mm:.3f}}. MDI G0 X−33 (1/2 in in from the far end of the shortest blank), touch the C edge again from +Y and read the work Y."
-inspection = "The second C-edge reading within .002 of the first (the blank lies along X). More: free the blank (Setup 3's first op) and bond it again."
+instruction_detailed = "Edge finder (900 rpm, in place of T1) on the blank's R end from +X, at mid-width: G10 L20 P1 X{{process.x_set_mm:.3f}}. On the C edge from +Y, 1/2 in in from the R end: G10 L20 P1 Y{{process.y_set_mm:.3f}}. MDI G0 X−33 (1/2 in in from the far end of the shortest blank), touch the C edge again from +Y and read the work Y."
+inspection = "The second C-edge reading within .002 of the first (the blank lies along X). More: peel the blank off as Setup 3 frees the plate, clean both faces, and tape and bond again from this setup's first op."
 gauge_checks = "other"
 feed = "hand"
 
@@ -491,7 +560,7 @@ speed_kind = "spindle"
 tool = "em"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, no stop: the end round and the tapers, then the top edge, with the cutter's side, the plate on its left (conventional), the same levels, through the tape into the spoil block. Each pass enters and leaves in air past a side edge; the side edges are not touched."
+instruction = "Same file, no stop: the end round and the tapers, then the top edge, with the cutter's side, the plate on its left (conventional), the same levels, through both tapes and the glue into the spoil block. Each pass enters and leaves in air past a side edge; the side edges are not touched."
 settings = "endmill-carbide-3fl-3-8-1018-cf"
 rpm = 2800
 feed = "{{process.em_feed_per_min_mm:in.1f}} in/min"
@@ -504,13 +573,25 @@ machine_kind = "other"
 title = "Free the plate"
 machine = "Bench"
 indexing = "none"
-diagram = { file = "diagrams/free.svg", alt = "The plate on the spoil block after AP03: its outline cut through into the block, the waste gone; a thin blade worked under it from the C edge along the tape." }
+diagram = { file = "diagrams/free.svg", alt = "The plate on the spoil block after AP03: its outline cut through into the block, the waste gone; a thin blade worked under the block's tape from the C edge along the plate's length." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Unclamp the spoil block, plate still on it. Wet the tape round the plate with isopropyl alcohol, wait 2 minutes, then work a thin blade under the plate from its C edge along the tape. Never lever it up by the round or a corner: it must stay flat. Roll the tape off the plate and the block with a thumb; clean both with isopropyl alcohol."
+instruction = "Unclamp the spoil block and lift it out of the vise, plate still on it; brush the chips off. AP03 turned the whole waste to chips: there is no waste piece to free."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Slide a single-edge razor blade flat under the block's tape at the C edge (the block's fixed-jaw edge) and work it along the plate's whole length a little at a time, so the tape bends, not the plate. Never lever the plate up from one end, the round or a corner, and never lift it by an edge while any tape still holds it."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Lay the plate tape up on the surface plate. Hold it down flat with the other hand close to the peel line and peel its tape (both layers and the glue between) back on itself, low and slow, along its length. No soaking."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Any CA spot on the plate or the block: acetone on a rag (acetone softens CA). A film of tape adhesive: isopropyl alcohol. Peel the rest of the block's tape and wipe the block before the next blank."
 feed = "hand"
 
 [[setups.operations]]
@@ -520,7 +601,7 @@ drilling = "none"
 sizing = "other"
 instruction = "File flush any fin the tape left at the bottom of the outline and scrape the drill and reamer burrs off K's and the screw holes' face-A mouths (deburring scraper, flush, no chamfer: K's chamfer is the next op's), so face A seats flat."
 feed = "hand"
-inspection = "Face A lies on the surface plate without rocking on a burr."
+inspection = "Face A lies on the surface plate without rocking. Still rocks with the face-A burrs off: the plate was bent; do not press it flat: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
