@@ -23,10 +23,12 @@ id = "tap-0-80-plug"
 name = "#0-80 plug tap"
 ref = "tap-0-80-plug"  # Tap coverage #0-80 UNF
 
+# Tool audit 2026-11-23 (row file-nicholson-10-second-cut): the shop owns a
+# 10 in mill second-cut file (tools.jig-files, on hand); nothing to buy.
 [[tools]]
-id = "file-nicholson-10-second-cut"
-name = "10 in mill file"
-ref = "file-nicholson-10-second-cut"  # F-file-nicholson-10-mill-second-cut
+id = "files"
+name = "10 in mill second-cut file"
+ref = "jig-files"
 
 [[tools]]
 id = "pliers"

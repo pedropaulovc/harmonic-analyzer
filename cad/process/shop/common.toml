@@ -717,8 +717,11 @@ description = "Aluminium oxide two-grit sharpening stone, 6 x 2 x 1 in, 100 and 
 description = "Pliers"
 [tools.steel-rule-48]  # F-steel-rule-48
 description = "Steel rule, 48 in"
-[tools.transfer-punches]  # F-transfer-punches-fractional, F-transfer-punches-number
-description = "Transfer punch sets, fractional 3/32-1/2 by 64ths and number sizes #1-#60"
+# Tool audit 2026-11-23 (row transfer-punches): the fractional set only; a
+# number-size hole is spotted through with the same-number drill from the
+# 115-piece index (no plan names a number-size punch).
+[tools.transfer-punches]  # F-transfer-punches-fractional
+description = "Transfer punch set, fractional 3/32-1/2 by 64ths"
 [tools.v-blocks]  # F-v-blocks
 description = "Matched V-block pair with clamps"
 
