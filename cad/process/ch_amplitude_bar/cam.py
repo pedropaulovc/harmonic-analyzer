@@ -414,11 +414,25 @@ def context(
     _agree(plan, "blank_length_min_mm", p["blank_length_in"] * IN)
     _agree(plan, "blank_length_max_mm", p["blank_length_max_in"] * IN)
     skim = p["foot_skim_mm"]
-    _agree(plan, "top_excess_max_mm", p["blank_length_max_mm"] - skim - length)
+    # X0 is set to the length band's middle (Setup 5), so the top end's most
+    # stock past X0 is the longest blank less the skim, less that middle.
+    _agree(
+        plan,
+        "top_excess_max_mm",
+        p["blank_length_max_mm"] - skim - _mid(g["length_band"]),
+    )
     if p["blank_length_min_mm"] - skim < length:
         raise ValueError("the shortest blank less the foot skim is under the length")
-    _agree(plan, "measured_length_min_mm", g["length_band"][0])
-    _agree(plan, "measured_length_max_mm", p["blank_length_max_mm"] - skim)
+    # Bar 1's ruled length L1: its own x (L1 - the band's middle) in every
+    # bar's 0..top_excess_max_mm window (Setup 4).
+    _agree(plan, "measured_length_min_mm", _mid(g["length_band"]))
+    _agree(
+        plan, "measured_length_max_mm", _mid(g["length_band"]) + p["top_excess_max_mm"]
+    )
+    # The 1/64 in rule accepts the length to ±1/32 about the band's middle
+    # (owner ruling 2026-11-23, tool audit Q3); it never proves the band.
+    _agree(plan, "length_rule_min_mm", _mid(g["length_band"]) - IN / 32)
+    _agree(plan, "length_rule_max_mm", _mid(g["length_band"]) + IN / 32)
     pitch = p["bar_pitch_mm"]
     _agree(plan, "bar_pitch_mm", _mid(g["section_band"]))
     _agree(plan, "bar_section_min_mm", g["section_band"][0])
