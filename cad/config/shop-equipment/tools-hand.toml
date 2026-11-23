@@ -161,16 +161,6 @@ sku = "18A"
 status = "on_hand"
 note = "Owner confirmed on hand 2026-11-19 (an automatic centre punch). Purchase approved by Pedro 2026-10-11 (archived inventory)."
 
-[tools.file-nicholson-10-second-cut]
-sku = "08673NN"
-source = "https://www.zoro.com/nicholson-10-mill-single-cut-second-file-08673nn/i/G3071397/"
-purchase = "Zoro G3071397, Nicholson 08673NN 10 in mill single-cut second file, $12.39, in stock (read live 2026-11-22)."
-name = "Nicholson 10 in mill second-cut file (archived inventory)"
-kind = "file"
-make = "Nicholson"
-status = "to_order"
-note = "Purchase approved by Pedro 2026-10-11 (archived inventory); not recorded as received."
-
 [tools.india-stone-ib8]
 name = "Norton IB8 India combination stone (archived inventory)"
 kind = "sharpening_stone"
