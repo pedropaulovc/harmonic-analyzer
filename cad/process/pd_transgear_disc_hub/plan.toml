@@ -363,7 +363,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Only if a reamer read under its GO pin, the bar still chucked: face its end and spot it from the tailstock; per such reamer (the .0615 first) drill .30 deep (#53; N for the .3135), ream .25 deep (the .0615 at 1400 rpm, the .3135 as Op 170); gauge it with its pins; part .40 off. This spends the piece's spare: a remake then needs a new 3 in piece (to order)."
+instruction = "Only if a reamer read under its GO pin: pull the bar out to .60 out of the jaws; face and spot its end from the tailstock; per such reamer (the .0615 first) drill .30 deep (#53; N for the .3135), ream .25 deep (the .0615 at 1400 rpm, the .3135 as Op 170); gauge it with its pins; part .40 off. This spends the piece's spare: a remake then needs a new 3 in piece (to order)."
 inspection = "Each trial hole: GO enters, NO-GO does not: go on. GO refused: that reamer's holes will be refused: stop and tell the owner."
 gauge_checks = [{ gauge = "zz-pins-0615-0620", band_mm = "{{cad.pin_ream_dia_band_mm}}" }, { gauge = "zz-pins-3135-3140", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
@@ -462,7 +462,7 @@ cut_diameter_mm = "{{cad.bore_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Still chucked, the bore blown out and wiped: GO passes through, NO-GO does not enter the spigot end (both ends are checked again at the bench, Op 410)."
+instruction = "Spindle stopped, tailstock backed away, still chucked, the bore blown out and wiped: GO passes through, NO-GO does not enter the spigot end (both ends are checked again at the bench, Op 410)."
 inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} through."
 gauge_checks = [{ gauge = "zz-pins-3135-3140", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
@@ -679,9 +679,13 @@ instruction = "The bore's GO pin refused in Op 410: repeat Op 400 once and gauge
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The .0615 GO pin standing in the ream: calipers from the hub front face to the pin's far side; the station is the reading less half the GO pin's written reading (about .031). Outside its band: scrapped (the hole is reamed and cannot move); make another from Setup 1."
+instruction = "The .0615 GO pin standing in the ream: calipers from the hub front face to the pin's far side; the station is the reading less half the GO pin's written reading (about .031)."
 inspection = "Station {{cad.pin_ream_station_min_in:.2dot}}–{{cad.pin_ream_station_max_in:.2dot}} from the hub front face (calipers read .171–.191)."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pin_ream_station_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Station outside its band in Op 430: scrapped (the hole is reamed and cannot move); make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
