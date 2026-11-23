@@ -255,6 +255,7 @@ def test_every_v_level_plunges_beside_p(stepover) -> None:
         ({"corner_step_max_mm": 1.4}, "corner_step_max_mm"),
         ({"v_flat_stepover_mm": 0.1}, "v_flat_stepover_mm"),
         ({"break_level_mm": 1.016}, "break_level_mm"),
+        ({"break_full_to_mm": 8.89}, "break_full_to_mm"),
         # One inch parallels lying: the front step's floor sits at the jaw tops.
         (
             {

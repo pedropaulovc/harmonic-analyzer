@@ -926,6 +926,7 @@ def context(
     ):
         raise ValueError("'neck breaks' axial_doc_mm is not process.break_level_mm")
     break_stop = g["break_to"]
+    _agree(plan, "break_full_to_mm", break_stop)
     break_start = -(cone + APPROACH_MM)
     # VB06 frame Y: -(z - z0); each break's point on its neck face.
     break_ys = [z0 - g["neck0"], z0 - g["neck1"]]
