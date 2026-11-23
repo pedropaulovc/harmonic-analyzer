@@ -253,7 +253,7 @@ instruction = "Inner frame parallel to the axis: bring the carriage up until the
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms (they reach .19 either side of the pivot)."
+instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms (they reach .19 either side of the pivot). If they touch: chuck the offcut {{process.end_stickout_in:.2dot}} in out again and repeat Op 100."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -277,7 +277,7 @@ gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.dome_far_height_band_
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Dome too low (the scriber at the first setting stops on the O.D.): move the bit in a little; too high: move it out. Chuck the offcut again as Op 60, face the dome off and repeat Op 70 and Ops 100–140 (the bit stays where you moved it; skip Ops 80–90). Once it passes, leave the bit's set screw alone until both domes are cut."
+instruction = "Dome too low (the scriber at the first setting stops on the O.D.): reset the bit (Op 90) to a depth-rod reading .010 shorter; too high: .010 longer (each .010 moves the dome about .006). Chuck the offcut again as Op 60, {{process.end_stickout_in:.2dot}} in out, face the dome off and repeat Op 70 and Ops 100–140. Under .30 in left in the jaws: saw a new trial offcut. Once it passes, leave the bit's set screw alone until both domes are cut."
 
 [[setups]]
 machine_kind = "lathe"
