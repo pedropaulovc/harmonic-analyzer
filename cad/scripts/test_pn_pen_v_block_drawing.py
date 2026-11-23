@@ -106,14 +106,22 @@ def test_hidden_reference_dimensions_reach_their_views() -> None:
     assert {point[0] for point in drawing.SECTION_LINE_MODEL_MM} == {spec.PIVOT_BORE_X}
 
 
-def test_relief_corners_clear_the_grip_at_the_title_block_corner() -> None:
-    # The relief's step corners print no radius: the title block's INSIDE
-    # CORNERS R.040 MAX governs them, and at that limit they still clear the
-    # grip (machinist review 8c9a0a7: "2X R.04" read beside R.040 MAX).
-    assert spec.INSIDE_CORNER_R_MAX == pytest.approx(0.040 * 25.4)
-    assert spec.RELIEF_CORNER_R <= spec.INSIDE_CORNER_R_MAX
-    assert spec._GRIP_GAP_AT_BOTTOM - spec.INSIDE_CORNER_R_MAX >= 0.25
-    assert "ReliefCornerR" not in spec.DRAWING_DIMENSIONS["ReliefProfile"]
+def test_relief_corners_print_r065_and_clear_the_grip_at_r070() -> None:
+    # Owner ruling 2026-11-23, tool audit Q9: the relief's step corners print
+    # 2X R.065 at three places (.060-.070, the title block's .XXX), naming
+    # why they stand over INSIDE CORNERS R.040 MAX; at the band's greatest
+    # they still clear the grip and the bore.
+    assert spec.RELIEF_CORNER_R == pytest.approx(0.065 * 25.4)
+    assert (spec.RELIEF_CORNER_R_MIN, spec.RELIEF_CORNER_R_MAX) == pytest.approx(
+        (0.060 * 25.4, 0.070 * 25.4)
+    )
+    assert spec.DRAWING_PRECISION["ReliefProfile"]["ReliefCornerR"] == 3
+    assert spec.DIMENSION_PREFIXES[("ReliefProfile", "ReliefCornerR")] == "2X R"
+    assert spec.DIMENSION_CALLOUTS["ReliefCornerR"] == "NOTHING SEATS IN\nTHESE CORNERS"
+    assert spec.RELIEF_CORNER_GRIP_MARGIN_MIN == pytest.approx(
+        spec._GRIP_GAP_AT_BOTTOM - 0.070 * 25.4
+    )
+    assert spec.RELIEF_CORNER_GRIP_MARGIN_MIN >= 0.25
 
 
 def test_pivot_bore_drops_wholly_into_the_slot_at_its_printed_limits() -> None:
@@ -140,7 +148,21 @@ def test_pivot_bore_drops_wholly_into_the_slot_at_its_printed_limits() -> None:
     assert end - start == pytest.approx(grip_length)
     seat = min(end, spec.RELIEF_X0) - max(start, 0.0)
     assert seat == spec.RELIEF_X0
-    assert end > spec.RELIEF_X0 + spec.RELIEF_CORNER_R + 1.5
+    # The marker body's shoulder (its widest section, BODY_FRONT_DIA) must not
+    # meet the step's corner arcs.  At the bottom face, where the body is
+    # widest in the slot, its chord stands 1.909 off each slot wall and an
+    # R.070 arc reaches 1.778 into the slot, so the body clears the arcs in plan
+    # wherever it starts (0.131).  It also starts past where the arcs end, with
+    # the step at its printed far limit, by the interference margin.  At
+    # R.070 that is 0.559 clear (owner ruling 2026-11-23, tool audit Q9).  The
+    # 1.5 held here before (074069092e) pinned that day's layout (the grip
+    # ending 2.5 past the step, less R.040); no function asked for it.
+    body_gap = spec.RELIEF_WIDTH / 2.0 - spec._BODY_HALF_CHORD_AT_BOTTOM
+    assert body_gap - spec.RELIEF_CORNER_R_MAX == pytest.approx(0.131, abs=1e-3)
+    worst_step = spec.RELIEF_X0 + _printed_devs(spec.RELIEF_X0, "ReliefX0")[1]
+    body_past_arcs = end - (worst_step + spec.RELIEF_CORNER_R_MAX)
+    assert body_past_arcs == pytest.approx(0.559, abs=1e-3)
+    assert body_past_arcs >= carriage.CLEARANCE
     assert carriage.plan_cg_residual_mm() <= 0.25
 
 
@@ -767,10 +789,9 @@ def test_v_runs_past_the_step_so_no_knife_edge_shows_in_the_end_view() -> None:
     # curved away from the step.  The simplified E's wider slot stands both
     # corner arcs outside the V's mouth, and the cut still runs on to where
     # they end: past the step the V lies wholly inside the slot.
-    near_corner_z = spec.RELIEF_Z0 + spec.RELIEF_CORNER_R
-    far_corner_z = spec.RELIEF_Z1 - spec.RELIEF_CORNER_R
+    near_corner_z = spec.RELIEF_Z0 + spec.RELIEF_CORNER_R_MAX
+    far_corner_z = spec.RELIEF_Z1 - spec.RELIEF_CORNER_R_MAX
     assert near_corner_z < spec.V_MOUTH_Z0 < spec.V_MOUTH_Z1 < far_corner_z
-    assert spec.RELIEF_CORNER_R == 1.016  # .04
     assert spec.V_CUT_LENGTH == spec.RELIEF_X0 + spec.RELIEF_CORNER_R
     assert spec.V_APEX_Y < spec.RELIEF_HEIGHT
 
@@ -795,11 +816,20 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     # the relief removes that much less.  The apex flat leaves its tip
     # standing; its two R.020 rounds give back 0.011 mm^2 more along the
     # whole cut.
-    assert part.V_GROOVE == pytest.approx(spec.V_GROOVE_AREA * (8.89 + 1.016))
-    assert part.V_APEX_FILLETS == pytest.approx(0.1100, abs=1e-4)
-    assert part.V_GROOVE_PAST_STEP == pytest.approx(35.516, abs=1e-3)
-    # The carriage mass model cuts the relief square-cornered and leaves the
-    # bore's top chamfer: both under 0.05% of the block.
+    assert part.V_GROOVE == pytest.approx(
+        spec.V_GROOVE_AREA * (8.89 + spec.RELIEF_CORNER_R)
+    )
+    assert part.V_APEX_FILLETS == pytest.approx(
+        spec.V_APEX_FILLET_AREA * spec.V_CUT_LENGTH
+    )
+    # Past the step the V's section is its triangle less the tip the apex
+    # rounds leave, over one corner radius.
+    assert part.V_GROOVE_PAST_STEP == pytest.approx(
+        spec.V_GROOVE_SECTION * spec.RELIEF_CORNER_R
+    )
+    # The carriage mass model carries the relief's two R.065 step corners
+    # (owner ruling 2026-11-23, tool audit Q9) and leaves the bore's top
+    # chamfer, under 0.05% of the block.
     assert part.V_RELIEF + part.V_RELIEF_CORNERS + part.V_GROOVE_PAST_STEP == (
         pytest.approx(15.748 * 6.604 * (26.162 - 8.89))
     )
@@ -807,7 +837,6 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     assert part.V_RELIEF_CORNERS == pytest.approx(
         2.0 * (1.0 - math.pi / 4.0) * corner_r**2 * relief_h
     )
-    assert 0.0 < part.V_RELIEF_CORNERS < 0.0005 * part.V_TOTAL
     assert 0.0 < part.V_PIVOT_CHAMFER < 0.0005 * part.V_TOTAL
     bore_length = spec.BLOCK_HEIGHT - spec.RELIEF_HEIGHT
     assert part.V_PIVOT_BORE == pytest.approx(math.pi * 1.6002**2 * bore_length)
@@ -827,8 +856,63 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     )
     sliver = part.V_SET_SCREW_TAP - math.pi * tap_r**2 * spec.SET_SCREW_TAP_LENGTH
     carriage_volume = block_mass / carriage.BRASS_G_PER_MM3 - sliver
-    assert carriage_volume == pytest.approx(
-        part.V_TOTAL - part.V_RELIEF_CORNERS + part.V_PIVOT_CHAMFER
+    assert carriage_volume == pytest.approx(part.V_TOTAL + part.V_PIVOT_CHAMFER)
+
+
+def test_neck_edge_breaks_print_and_clear_the_stirrup_and_the_body() -> None:
+    import pn_pen_carriage_geom as carriage
+    import pn_pen_frame_spec as frame
+
+    # Owner seat ruling 2026-11-23: "break the v-block neck's two top edges
+    # .080 x 45° (.075 to .085, cut with the 1/4 in 90° chamfer mill that
+    # part already uses)".  One prints for both, in the paper-end view, at
+    # three places (the title block's +/-.005), its 45° in words, and why it
+    # is there above it.
+    assert spec.NECK_EDGE_BREAK == pytest.approx(0.080 * 25.4)
+    assert (spec.NECK_EDGE_BREAK_MIN, spec.NECK_EDGE_BREAK_MAX) == pytest.approx(
+        (0.075 * 25.4, 0.085 * 25.4)
+    )
+    assert spec.DRAWING_DIMENSIONS["NeckBreakProfile"] == {"NeckBreak"}
+    assert spec.DRAWING_PRECISION_BY_NAME["NeckBreak"] == 3
+    assert spec.DIMENSION_PREFIXES[("NeckBreakProfile", "NeckBreak")] == "2X "
+    assert spec.DIMENSION_CALLOUTS["NeckBreak"] == "X 45°"
+    assert spec.DIMENSION_CALLOUTS_ABOVE["NeckBreak"] == "CLEARS MHA-PN-01"
+    assert "NeckBreak" in drawing.RIGHT_KEEP
+    # The shortest leg clears the stirrup's window corners at their greatest
+    # R.070 by 0.127, and the full break runs to .33, past the stirrup's far
+    # face at its printed .32.
+    assert spec.NECK_EDGE_BREAK_MIN - frame.WINDOW_CORNER_R_MAX == pytest.approx(
+        0.127, abs=1e-3
+    )
+    assert spec.NECK_BREAK_FULL_X == pytest.approx(0.33 * 25.4)
+    assert carriage.window_corner_ride_max() == 0.0
+    # The chamfer mill stops short of the step at its printed nearest (.34),
+    # so its cone on the top face stays inside the body's side faces; its
+    # run-out keeps the target to the bore's chamfer (5.50) and to the rod
+    # shoulder's circle (3.97), and stops 0.23 short of the set-screw thread.
+    step_min = spec.RELIEF_X0 + _printed_devs(spec.RELIEF_X0, "ReliefX0")[0]
+    assert spec.NECK_BREAK_FULL_X < step_min
+    reach = math.sqrt(
+        spec.NECK_EDGE_BREAK**2 - (spec.RELIEF_X0 - spec.NECK_BREAK_FULL_X) ** 2
+    )
+    assert reach < spec.BODY_SIDE_STEP
+    assert spec.NECK_BREAK_BORE_CHAMFER_WALL_MIN == pytest.approx(5.500, abs=1e-3)
+    assert spec.NECK_BREAK_ROD_SHOULDER_GAP_MIN == pytest.approx(3.975, abs=1e-3)
+    assert spec.NECK_BREAK_TAP_GAP_MIN == pytest.approx(0.2285, abs=1e-4)
+    # The top flat the stirrup's rail rests on keeps .51 at the printed worst.
+    assert spec.NECK_TOP_FLAT_PRINTED_MIN == pytest.approx(0.51 * 25.4)
+    # Volumes: each break's triangle to the stop, and its run-out, the cone's
+    # quarter on the neck's side plus, past the step, its body-side part
+    # (a quadrature of the disc at each height; a sampling agrees to 0.3%).
+    leg, stop = spec.NECK_EDGE_BREAK, spec.NECK_BREAK_FULL_X
+    assert spec.NECK_BREAK_VOLUME == pytest.approx(leg * leg / 2.0 * stop)
+    quarter = math.pi * leg**3 / 12.0
+    assert quarter < spec.NECK_BREAK_RUNOUT_VOLUME < 2.0 * quarter
+    assert spec.NECK_BREAK_RUNOUT_VOLUME == pytest.approx(3.408, abs=1e-3)
+    assert stop < spec.NECK_BREAK_RUNOUT_X < stop + leg
+    assert part.V_NECK_BREAKS == pytest.approx(2.0 * spec.NECK_BREAK_VOLUME)
+    assert part.V_NECK_BREAK_RUNOUTS == pytest.approx(
+        2.0 * spec.NECK_BREAK_RUNOUT_VOLUME
     )
 
 
@@ -965,6 +1049,7 @@ _FEATURE_KINDS = {
     "neck_back": "face",
     "body_back": "face",
     "neck_steps": "face",
+    "neck_edge_breaks": "chamfer",
     "v_groove": "vee",
     "relief": "slot",
     "pivot_bore": "hole",
@@ -1009,6 +1094,13 @@ def test_the_block_is_a_feature_export_part_with_one_owner_per_face() -> None:
         "neck_back": [_plane((0.0, 0.0, 1.0), spec.NECK_DEPTH)],
         "body_back": [_plane((0.0, 0.0, 1.0), spec.BODY_Z1)],
         "neck_steps": [_plane((-1.0, 0.0, 0.0), -x0)],
+        "neck_edge_breaks": [
+            _plane((0.0, s, -s), s * (spec.BLOCK_HEIGHT - spec.NECK_EDGE_BREAK)),
+            _plane(
+                (0.0, s, s),
+                s * (spec.BLOCK_HEIGHT - spec.NECK_EDGE_BREAK + spec.NECK_DEPTH),
+            ),
+        ],
         "v_groove": [
             _plane((0.0, -s, s), s * spec.V_MOUTH_Z0),
             _plane((0.0, -s, -s), -s * spec.V_MOUTH_Z1),
@@ -1070,6 +1162,12 @@ def test_block_feature_bands_are_the_printed_ones() -> None:
     assert features["neck_back"]["station"] == pytest.approx([_in(0.77), _in(0.79)])
     assert features["body_back"]["depth"] == pytest.approx([_in(0.85), _in(0.87)])
     assert features["neck_steps"]["station"] == pytest.approx([_in(0.34), _in(0.36)])
+    breaks = features["neck_edge_breaks"]
+    assert breaks["leg"] == pytest.approx([_in(0.075), _in(0.085)])
+    assert breaks["angle_deg"] == 45.0 and breaks["count"] == 2
+    assert breaks["edges"] == ["neck_front", "neck_back"]
+    assert breaks["full_to_x"] == pytest.approx(_in(0.33))
+    assert breaks["note"] == "CLEARS MHA-PN-01"
     vee = features["v_groove"]
     assert vee["flank_angle_deg"] == pytest.approx([44.0, 46.0])
     assert vee["flat_width"] == pytest.approx([_in(0.07), _in(0.09)])

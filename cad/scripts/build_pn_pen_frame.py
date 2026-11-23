@@ -40,6 +40,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
+from _drawing_prefix import set_dimension_prefix
 from _feature_tree import name_last_feature
 from _holes import wizard_holes
 from _part_checks import report_mass_properties, volume_check
@@ -51,6 +52,7 @@ from _session import run_build
 from _sketch import SketchDims, add_line_chain, ensure_fully_defined
 from _sketch_chains import define_rectilinear_chain
 from pn_pen_frame_spec import (
+    DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FRAME_DEPTH,
@@ -173,10 +175,11 @@ def build(adapter) -> dict[str, str]:
 
     # Window internal corners (pn_pen_frame_spec.WINDOW_CORNER_R), one fillet
     # on all four, each concave corner adding back its R x R square less the
-    # quarter disc. The sheet prints no radius (the title block governs). Edge
-    # points sit at mid-depth on each corner's Z edge.
-    window_x = (RAIL_SIDE, OUTER_WIDTH - RAIL_SIDE)
-    window_y = (RAIL_END, OUTER_HEIGHT - RAIL_END)
+    # quarter disc. The sheet prints one as 4X R.065 (owner ruling 2026-11-23,
+    # tool audit Q9). Edge points sit at mid-depth on each corner's Z edge,
+    # the top-right first: the printed radius lands its leader there.
+    window_x = (OUTER_WIDTH - RAIL_SIDE, RAIL_SIDE)
+    window_y = (OUTER_HEIGHT - RAIL_END, RAIL_END)
     edges = [[x, y, FRAME_DEPTH / 2.0] for x in window_x for y in window_y]
     check("fillet WindowCorners", adapter.add_fillet(WINDOW_CORNER_R, edges))
     name_last_feature(adapter, "WindowCorners")
@@ -237,6 +240,9 @@ def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # The one printed window corner stands for all four (4X R.065).
+    for dimension_name, prefix in DIMENSION_PREFIXES.items():
+        set_dimension_prefix(adapter, "WindowCorners", dimension_name, prefix)
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )

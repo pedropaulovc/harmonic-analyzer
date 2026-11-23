@@ -79,6 +79,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
@@ -91,6 +92,10 @@ from ch_channel_lever_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
+    ROOT_CORNER_PREFIX,
+    ROOT_CORNER_R,
+    ROOT_CORNER_X,
+    root_corner_volume,
 )
 from ch_channel_lever_spec import (
     BAR_PIN_HOLE_SPEC,
@@ -401,7 +406,29 @@ def build(adapter) -> dict[str, str]:
     _overlap = _half_strip + math.pi * _h**2 / 2.0
     v_hub = math.pi * _r**2 * HUB_LENGTH - _overlap * LEVER_THICKNESS
     expected += v_hub
-    volume_check(adapter, "lever + hub", expected, 0.005 * expected)
+    v_lever_hub = volume_check(adapter, "lever + hub", expected, 0.005 * expected)
+
+    # The two roots where the bar's edges run into the hub, over the plate's
+    # thickness: the outline cutter's own radius, printed 2X R.065
+    # (ch_channel_lever_notes.ROOT_CORNER_R; owner ruling 2026-11-23, tool
+    # audit Q9). The bottom corner's edge first: the sheet's radius lands
+    # there. Under 0.01 % of the part, so its own volume is checked as the
+    # change it makes.
+    set_global(adapter, "RootCornerR", f"{ROOT_CORNER_R}mm")
+    check(
+        "fillet root corners",
+        adapter.add_fillet(
+            ROOT_CORNER_R,
+            [[ROOT_CORNER_X, -HALF_BAR, 0.0], [ROOT_CORNER_X, HALF_BAR, 0.0]],
+            propagate=False,
+        ),
+    )
+    name_last_feature(adapter, "RootCorners")
+    (root_corner_dim,) = name_dimensions(adapter, "RootCorners", ["RootCornerR"])
+    drive_jobs.append((root_corner_dim, '"RootCornerR"'))
+    v_roots = root_corner_volume(ROOT_CORNER_R)
+    volume_check(adapter, "root corners", v_lever_hub + v_roots, 0.2 * v_roots)
+    expected += v_roots
 
     # Fulcrum hole (Ø.256 reamed, rides the fulcrum shaft): a bearing bore, kept
     # a plain circle cut. On the origin, so only its diameter is a dim.
@@ -522,6 +549,8 @@ def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # The one printed root corner stands for both (2X R.065).
+    set_dimension_prefix(adapter, "RootCorners", "RootCornerR", ROOT_CORNER_PREFIX)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
