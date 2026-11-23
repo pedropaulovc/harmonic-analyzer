@@ -48,13 +48,22 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 import dt_vn_pinion_strap_pin_spec as _pin
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _printed_limits import drilled_limits, limits
 from dt_pinion_arbor_collar_spec import (
     ARBOR_NUMBER,
+    BORE,
     COLLAR_LEN,
     COLLAR_OD,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    PIN_HOLE,
+    PIN_HOLE_BAND,
+    PIN_HOLE_Z,
     PIN_NUMBER,
+    UNIT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -114,6 +123,117 @@ DIMENSION_CALLOUTS = {
     "BoreDia": f"DRILL THRU\nSLIDES ON {ARBOR_NUMBER}",
     "PinHoleDia": f"{_pin.DRILL_THRU_CALLOUT}\nPRESS FIT ON {PIN_NUMBER} SPRING PIN",
 }
+
+# Feature requirements (package:features; the drilled_block adapter's kinds):
+# the collar in its model frame, the bore axis along +Z from the z 0 end
+# face, the spring-pin hole along Y through both walls at the centred
+# station.  The declarations print nothing; each band is the one the sheet
+# prints (DRAWING_PRECISION_BY_NAME places, the title block's rows, the pin
+# hole's own +.0025/.0000).
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_pinion_arbor_collar"
+_GEOM = "dt_pinion_arbor_collar_geometry"
+_FRAME = ("build_dt_pinion_arbor_collar", "__frame__")
+part_metadata(
+    model_sources=(_FRAME, (_GEOM, "COLLAR_OD"), (_GEOM, "COLLAR_LEN"), (_GEOM, "BORE")),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, (_FRAME,)),
+        "outward": ([0.0, 0.0, -1.0], (_FRAME,)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), COLLAR_LEN),),
+    requirements=("plane", "length"),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": COLLAR_LEN},
+            (_FRAME, (_GEOM, "COLLAR_LEN")),
+        ),
+        "outward": ([0.0, 0.0, 1.0], (_FRAME,)),
+        "length": (
+            limits(COLLAR_LEN, _P["Depth"], unit=UNIT),
+            ((_GEOM, "COLLAR_LEN"), "UNIT", "DRAWING_PRECISION_BY_NAME"),
+        ),
+        "length_nominal": (COLLAR_LEN, ((_GEOM, "COLLAR_LEN"),)),
+        "length_from": ("datum_end", ((_GEOM, "COLLAR_LEN"),)),
+    },
+    precision={"length": _P["Depth"]},
+)
+requirement(
+    "outer",
+    kind="outside_cylinder",
+    faces=(CylinderFace(COLLAR_OD),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ([0.0, 0.0, 1.0], (_FRAME,)),
+        "dia": (
+            limits(COLLAR_OD, _P["CollarOd"], unit=UNIT),
+            ((_GEOM, "COLLAR_OD"), "UNIT", "DRAWING_PRECISION_BY_NAME"),
+        ),
+        "nominal_dia": (COLLAR_OD, ((_GEOM, "COLLAR_OD"),)),
+        "length_nominal": (COLLAR_LEN, ((_GEOM, "COLLAR_LEN"),)),
+    },
+    precision={"dia": _P["CollarOd"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(BORE),),
+    requirements=("dia", "thru"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ([0.0, 0.0, 1.0], (_FRAME,)),
+        "dia": (
+            drilled_limits(BORE, _P["BoreDia"], unit=UNIT),
+            ((_GEOM, "BORE"), "UNIT", "DRAWING_PRECISION_BY_NAME"),
+        ),
+        "nominal_dia": (BORE, ((_GEOM, "BORE"),)),
+        "thru": (True, ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "process": ("drill", ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "callout": (DIMENSION_CALLOUTS["BoreDia"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "mates": (ARBOR_NUMBER, ("ARBOR_NUMBER",)),
+    },
+    precision={"dia": _P["BoreDia"]},
+)
+requirement(
+    "pin_hole",
+    kind="hole",
+    faces=(CylinderFace(PIN_HOLE),),
+    requirements=("dia", "thru", "station"),
+    fields={
+        "at": ([0.0, COLLAR_OD / 2.0, PIN_HOLE_Z], (_FRAME, (_GEOM, "PIN_HOLE_Z"))),
+        "axis": ([0.0, -1.0, 0.0], (_FRAME, ("build_dt_pinion_arbor_collar", "build"))),
+        "dia": (
+            limits(PIN_HOLE, _P["PinHoleDia"], PIN_HOLE_BAND, unit=UNIT),
+            ("PIN_HOLE", "PIN_HOLE_BAND", "UNIT", "DRAWING_PRECISION_BY_NAME"),
+        ),
+        "nominal_dia": (PIN_HOLE, ("PIN_HOLE",)),
+        "thru": (True, ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "process": ("drill", ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "callout": (
+            DIMENSION_CALLOUTS["PinHoleDia"],
+            ((_SELF, "DIMENSION_CALLOUTS"),),
+        ),
+        "mates": (PIN_NUMBER, (("dt_pinion_arbor_pin_spec", "PIN_NUMBER"),)),
+        "station": (
+            limits(PIN_HOLE_Z, _P["PinHoleCz"], unit=UNIT),
+            ((_GEOM, "PIN_HOLE_Z"), "UNIT", "DRAWING_PRECISION_BY_NAME"),
+        ),
+        "station_nominal": (PIN_HOLE_Z, ((_GEOM, "PIN_HOLE_Z"),)),
+        "station_from": ("datum_end", ((_GEOM, "PIN_HOLE_Z"),)),
+    },
+    precision={"dia": _P["PinHoleDia"], "station": _P["PinHoleCz"]},
+)
 # swAnnotationType_e.swCenterMarkSym.  The template centre-marks a view's
 # circles as it is placed; an unconditional auto_center_marks printed a second
 # identical mark over the end view's (layout audit duplicate-annotation,

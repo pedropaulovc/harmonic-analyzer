@@ -69,12 +69,13 @@ def test_the_banded_length_names_the_stack_it_serves() -> None:
     """drawing-guidelines.md rule 4: a band tighter than the title block names
     the mating parts it serves, by drawing number."""
     shaft = _config.parts("pd-transgear-knob-shaft")["number"]
-    plate = _config.parts("pd-transgear-arm-plate")["number"]
+    bush = _config.parts("pd-transgear-knob-bush")["number"]
     assert spec.LENGTH_TOL < _printed_tolerance.printed_band_mm(
         spec.LENGTH_PLACES, unit=spec.UNIT
     )
     assert spec.DIMENSION_CALLOUTS["Ring"] == {"RingLength": spec.LENGTH_CALLOUT}
-    assert shaft in spec.LENGTH_CALLOUT and plate in spec.LENGTH_CALLOUT
+    assert shaft in spec.LENGTH_CALLOUT and bush in spec.LENGTH_CALLOUT
+    assert _config.parts("pd-transgear-arm-plate")["number"] not in spec.LENGTH_CALLOUT
     assert STACK_NAME in spec.LENGTH_CALLOUT
 
 
@@ -99,6 +100,12 @@ def test_the_length_text_stands_clear_of_its_extension_lines() -> None:
 
 
 def test_ring_bore_and_opposed_axial_faces_consume_the_new_interface() -> None:
+    # Owner ruling 2026-11-20 (Pedro), #2425: the ring's O.D. is the bush
+    # hub's, read from the bush geometry rather than retyped.
+    import pd_transgear_knob_bush_geometry as bush
+
+    assert spec.OD == bush.HUB_DIA == pytest.approx(13.208)  # .52
+    assert spec.OD_PLACES == bush.HUB_DIA_PLACES
     assert spec.ID == pytest.approx(6.5278)  # .257
     assert spec.ID_BAND == pytest.approx((0.1016, 0.0))
     assert spec.LENGTH == pytest.approx(6.7818)  # .267, the 3/8 arm (#2019)
@@ -120,6 +127,8 @@ def test_wall_holds_at_the_worst_case_the_sheet_prints() -> None:
     worst = ((spec.OD - od_band) - (spec.ID + max(spec.ID_BAND))) / 2.0
     assert worst >= spec.WALL_FLOOR
     assert spec.WALL_WORST == pytest.approx(worst, abs=0.01)
+    # (.51 - .261) / 2 = .1245 at the .52 hub O.D.
+    assert spec.WALL_WORST == pytest.approx(0.1245 * 25.4, abs=1e-9)
 
 
 def _ring_spec_fresh():
