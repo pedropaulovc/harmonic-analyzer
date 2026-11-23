@@ -115,8 +115,7 @@ INDEPENDENT_TOLERANCES = frozenset(
         "MHA-PD-07 support bar depth",
         "MHA-PD-02 platen thickness",
         "MHA-PD-06 disc thickness",
-        "MHA-PD-20 spacer rear face perpendicularity",
-        "MHA-PD-20 spacer front face perpendicularity",
+        "MHA-PD-20 spacer rear face parallelism",
         "MHA-PD-06 disc rear face parallelism",
     }
 )
