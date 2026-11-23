@@ -50,7 +50,7 @@ quantity = 2
 stock_dia_in = 0.15625
 # The radius the ball turner is set to (process key named for the form tool
 # it replaces; the adapter binds the crown's height, faced length and sweep
-# from it): R.125 on the 5/32 rod is .0272 high, inside the drawing's R.11-.13
+# from it): R.125 on the 5/32 rod is .0274 high, inside the drawing's R.11-.13
 # band, and the radius gauges' 1/8 leaf checks it.
 dome_form_radius_in = 0.125
 # The bit set by depth reading from a straightedge across the inner frame's

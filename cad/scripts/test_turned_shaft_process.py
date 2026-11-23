@@ -29,6 +29,10 @@ import mg_wheel_axle_callouts
 ROOT = Path(__file__).resolve().parents[2]
 EQUIPMENT = ROOT / "cad" / "config" / "shop-equipment"
 IN = 25.4
+# Owner ruling 2026-11-23 (tool audit Q5): the LittleMachineShop 2569 ball
+# turner sweeps the domes; it takes convex balls up to Ø.75 in.
+BALL_TURNER = "ball-radius-turner-lms-2569"
+BALL_TURNER_MAX_DIA_IN = 0.75
 STEMS = tuple(
     stem
     for stem in _process_plans.TRAVELER_STEMS
@@ -102,41 +106,45 @@ def test_each_dome_is_cut_to_the_drawn_radius(stem: str) -> None:
     (or the REF radius as printed, to .XX): the plan's ``dome_form_radius_in``
     (a form tool's, or the radius the ball turner sweeps, owner ruling
     2026-11-23 tool audit Q5), else, stepped from the adapter's table and
-    filed (``dome_steps``), the drawing's own. Fed to the centre on the
-    diameter it ends, that radius cuts a dome whose height lies in the drawn
-    height band, if one is drawn; a form tool the plan still names is of that
-    radius."""
+    filed (``dome_steps``), any radius between the two radius-gauge leaves
+    that screen it (``leaf_radius_min_in`` / ``_max_in``). Fed to the centre
+    on the diameter it ends, each such radius spans that diameter and cuts a
+    dome whose height lies in the drawn height band, if one is drawn. A plan
+    cutting to ``dome_form_radius_in`` names exactly one tool that cuts it:
+    a form tool of that radius, or the ball turner (``BALL_TURNER``, a ball
+    no larger than its Ø.75 in)."""
     features = _features(stem)
+    tools = _tools(_plan(stem)).values()
+    turner = any(tool["ref"] == BALL_TURNER for tool in tools)
     forms = {
         _form_radius_mm(tool["ref"])
-        for tool in _tools(_plan(stem)).values()
+        for tool in tools
         if _form_radius_mm(tool["ref"]) is not None
     }
-    domes = [
-        features[end]
-        for end in ("datum_end", "far_end")
-        if features[end]["kind"] == "dome"
-        and features[end].get("made_at") != "assembly"
-    ]
-    if not domes:
-        assert not forms
-        return
-    parameters = _plan(stem)["parameters"]
-    ends = {
+    domes = {
         end: features[end]
         for end in ("datum_end", "far_end")
         if features[end]["kind"] == "dome"
         and features[end].get("made_at") != "assembly"
     }
-    if any(f"dome_{end[:-4]}_form_radius_in" in parameters for end in ends):
-        _each_end_takes_its_own_form_tool(features, parameters, ends, forms)
+    if not domes:
+        assert not forms and not turner
         return
+    parameters = _plan(stem)["parameters"]
     if "dome_form_radius_in" in parameters:
         # The adapter derives the dome heights and the faced length from it.
         radius = parameters["dome_form_radius_in"] * IN
-        assert all(math.isclose(form, radius, abs_tol=1e-6) for form in forms)
+        if turner:
+            assert not forms, forms
+            assert 2 * radius <= BALL_TURNER_MAX_DIA_IN * IN + 1e-6
+        else:
+            assert len(forms) == 1, forms
+            assert math.isclose(next(iter(forms)), radius, abs_tol=1e-6)
+    elif any(f"dome_{end[:-4]}_form_radius_in" in parameters for end in domes):
+        _each_end_takes_its_own_form_tool(features, parameters, domes, forms, turner)
+        return
     else:
-        # Stepped and filed: the table is on the drawing's own radius.
+        # Stepped and filed: the leaves bracket whatever radius is filed.
         assert "dome_steps" in parameters and not forms
         radius = None
     root = features.get("step", features["outer"])
@@ -145,20 +153,41 @@ def test_each_dome_is_cut_to_the_drawn_radius(stem: str) -> None:
         if "dia_nominal" in root
         else (sum(root["dia"]) / 2 if "dia" in root else root["dia_ref"])
     )
-    for dome in domes:
-        cut = radius or dome.get("radius_nominal", dome.get("radius_ref"))
-        if "radius" in dome:
-            assert dome["radius"][0] - 1e-6 <= cut <= dome["radius"][1] + 1e-6
+    diameters = [
+        item
+        for item in features.values()
+        if item.get("kind") == "diameter" and "span" in item
+    ]
+    for end, dome in domes.items():
+        # Per-end leaves (``dome_<end>_leaf_radius_*``): each dome ends on
+        # the diameter nearest its plane, over that diameter's whole band.
+        per_end = f"dome_{end[:-4]}_leaf_radius"
+        if radius is not None:
+            cuts, dias = [radius], [root_dia]
+        elif f"{per_end}_min_in" in parameters:
+            cuts = [parameters[f"{per_end}_{side}_in"] * IN for side in ("min", "max")]
+            plane = dome["plane"]["value"]
+            near = min(
+                diameters, key=lambda item: min(abs(s - plane) for s in item["span"])
+            )
+            dias = near.get("dia", [near.get("dia_nominal", near.get("dia_ref"))])
         else:
-            assert math.isclose(cut, dome["radius_ref"], abs_tol=0.005 * IN)
-        height = cut - math.sqrt(cut**2 - min(root_dia / 2, cut) ** 2)
-        if "height" in dome:
-            assert dome["height"][0] <= height <= dome["height"][1]
-    if radius is not None and "dome_form_dia_min_in" in parameters:
-        # Formed on each blank's own Ø: the band is the domed diameter's.
-        assert [
-            parameters[f"dome_form_dia_{side}_in"] * IN for side in ("min", "max")
-        ] == pytest.approx(root["dia"], abs=1e-6)
+            cuts = [
+                parameters[f"leaf_radius_{side}_in"] * IN for side in ("min", "max")
+            ]
+            dias = [root_dia]
+        for cut in cuts:
+            if "radius" in dome:
+                assert dome["radius"][0] - 1e-6 <= cut <= dome["radius"][1] + 1e-6
+            else:
+                assert math.isclose(cut, dome["radius_ref"], abs_tol=0.005 * IN)
+            for dia in dias:
+                # A radius under the end's half-Ø cannot span it; the tangent
+                # hemisphere (R = Ø/2) is clamped for float error only.
+                assert dia / 2 <= cut + 1e-6
+                height = cut - math.sqrt(cut**2 - min(dia / 2, cut) ** 2)
+                if "height" in dome:
+                    assert dome["height"][0] <= height <= dome["height"][1]
     # Apex readings: a drawn band read from a dome's apex instead of its
     # root (an edge) is that band plus the dome's height. Cut to one radius,
     # the thread's is widened over the blank's diameter band (the op prints
@@ -202,12 +231,13 @@ def test_each_dome_is_cut_to_the_drawn_radius(stem: str) -> None:
 
 
 def _each_end_takes_its_own_form_tool(
-    features: dict, parameters: dict, ends: dict, forms: set
+    features: dict, parameters: dict, ends: dict, forms: set, turner: bool
 ) -> None:
-    """Per-end form tools (``dome_<end>_form_radius_in``): each dome's tool is
-    in the plan, its radius in the drawn band, and its cap on the diameter the
-    dome ends (the plan's per-end Ø band when it gives one) in a drawn height
-    band, if one is drawn."""
+    """Per-end radii (``dome_<end>_form_radius_in``): each dome is cut by a
+    form tool of its radius the plan names, else by the ball turner (a ball
+    no larger than its Ø.75 in); the radius is in the drawn band, spans the
+    diameter the dome ends (the plan's per-end Ø band when it gives one), and
+    its cap there lies in a drawn height band, if one is drawn."""
     diameters = [
         item
         for item in features.values()
@@ -217,9 +247,11 @@ def _each_end_takes_its_own_form_tool(
     for end, dome in ends.items():
         key = f"dome_{end[:-4]}_form"
         radius = parameters[f"{key}_radius_in"] * IN
-        if forms:
-            assert any(math.isclose(radius, form, abs_tol=1e-6) for form in forms), end
-        used |= {form for form in forms if math.isclose(radius, form, abs_tol=1e-6)}
+        matched = {form for form in forms if math.isclose(radius, form, abs_tol=1e-6)}
+        if not matched:
+            assert turner, end
+            assert 2 * radius <= BALL_TURNER_MAX_DIA_IN * IN + 1e-6, end
+        used |= matched
         if "radius" in dome:
             assert dome["radius"][0] - 1e-6 <= radius <= dome["radius"][1] + 1e-6
         else:
@@ -233,9 +265,10 @@ def _each_end_takes_its_own_form_tool(
             assert band == pytest.approx(root["dia"], abs=1e-6)
         else:
             band = [root.get("dia_nominal", root.get("dia_ref"))] * 2
-        if "height" in dome:
-            for dia in band:
-                height = radius - math.sqrt(radius**2 - (dia / 2) ** 2)
+        for dia in band:
+            assert dia / 2 <= radius + 1e-6
+            height = radius - math.sqrt(max(radius**2 - (dia / 2) ** 2, 0.0))
+            if "height" in dome:
                 assert dome["height"][0] <= height <= dome["height"][1]
     assert used == forms
 

@@ -346,7 +346,7 @@ gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.dome_far_height_band_
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A flat at the tip: chuck the shaft again as this setup and take one more sweep with the cross slide in .001 (Ops 190–210), then Op 230 again. A ring or point at the tip, or the dome out of its band: scrap the shaft and make another from Setup 1."
+instruction = "A flat, ring or point at the tip, or the dome out of its band: scrap the shaft and make another from Setup 1 (a dome is not re-swept once the shaft has left the chuck; Op 220 is the gate while it is held)."
 
 [[setups]]
 machine_kind = "lathe"
@@ -399,7 +399,7 @@ gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.faced_length_band_mm}
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A flat at the tip: chuck the shaft again as this setup and take one more sweep with the cross slide in .001 (Ops 260–280), then Op 300 again. Length under {{cad.faced_length_min_in:.3dot}}, a ring or point, or the dome out of its band: scrap the shaft and make another from Setup 1."
+instruction = "Length under {{cad.faced_length_min_in:.3dot}}, a flat, ring or point at the tip, or the dome out of its band: scrap the shaft and make another from Setup 1 (a dome is not re-swept once the shaft has left the chuck; Op 290 is the gate while it is held)."
 
 [[setups]]
 machine_kind = "other"

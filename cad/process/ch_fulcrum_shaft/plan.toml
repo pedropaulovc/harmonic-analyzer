@@ -263,7 +263,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Light at the leaf's ends (dome too round): reset the bit (Op 80) to a depth-rod reading .005 longer; light at its middle, or a ridge at the O.D. (too flat): .005 shorter. Face the dome off (Op 50), draw the offcut back out to {{process.end_stickout_in:.2dot}} in, and repeat Op 60 and Ops 90–130. Under .30 in left in the jaws: saw a new trial offcut. Once it passes, leave the bit's set screw alone until both domes are cut."
+instruction = "Light at the leaf's ends (dome too round): reset the bit (Op 80) to a depth-rod reading .001 longer; light at its middle, or a ridge at the O.D. (too flat): .001 shorter (the tangent hemisphere needs R within about .001 of the bar's). Face the dome off (Op 50), draw the offcut back out to {{process.end_stickout_in:.2dot}} in, and repeat Op 60 and Ops 90–130. Under .30 in left in the jaws: saw a new trial offcut. Once it passes, leave the bit's set screw alone until both domes are cut."
 
 [[setups]]
 machine_kind = "lathe"
