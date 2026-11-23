@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="330"/>
   <text class="title" x="20" y="20">Setup 3: free the plate from the tape (the spoil block out of the vise)</text>
-  <rect class="fixture-plate" x="235" y="54" width="356" height="240"/>
+  <rect class="fixture-plate" x="235" y="94" width="356" height="200"/>
   <path class="part-kept" d="M 310.2 246.2 L 316.7 93.8 L 437.1 93.8 L 501.8 125.2 A 49.78 49.78 0 0 1 501.8 214.8 L 437.1 246.2 Z"/>
   <circle class="holes" cx="480" cy="170" r="22.2"/>
   <circle class="holes" cx="357.1" cy="153.5" r="11.6"/>
   <circle class="holes" cx="357.1" cy="213.5" r="11.6"/>
   <rect class="cutter" x="340" y="60" width="16" height="40"/>
   <line class="arrow" x1="348" y1="60" x2="348" y2="120"/>
-  <line class="arrow" x1="362" y1="78" x2="500" y2="78"/>
-  <line class="leader" x1="230" y1="40" x2="340" y2="70"/>
+  <line class="arrow" x1="362" y1="84" x2="500" y2="84"/>
+  <line class="leader" x1="330" y1="43" x2="342" y2="62"/>
   <text class="label" x="40" y="38">thin blade under the block's tape at the C edge, worked along the length</text>
   <text class="label" x="20" y="309">No soaking; never lift the plate by an edge while any tape holds it.</text>
   <text class="label" x="20" y="325">Then peel its tape back on itself, the plate held flat on the surface plate.</text>

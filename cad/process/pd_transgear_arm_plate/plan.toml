@@ -49,10 +49,12 @@
 # bonded.
 #
 # One-sided facing: the rear face only (face A, datum A, stays as supplied).
-# A cold-finished bar can bow when one skin is cut off; the final inspection
-# checks the thickness's Rule #1 envelope (perfect form at .202) on the
-# surface plate, as the platen's does. An owner-correctable choice, stated in
-# the PR.
+# A cold-finished bar can bow when one skin is cut off: Setup 3 checks face A
+# on the surface plate once freed and straightens a bowed plate in the bench
+# vise (traveler review 2026-11-23: one-sided removal needs a release or a
+# straightening step); the final inspection checks the thickness's Rule #1
+# envelope (perfect form at .202) on the surface plate, as the platen's does.
+# An owner-correctable choice, stated in the PR.
 #
 # FLAGGED: to buy: the stock (stock.1018-flat-1-4x1-1-2), the .4375 reamer
 # (tools.reamer-4375), the 3/8 in 82° countersink (tools.riser-countersink),
@@ -353,8 +355,14 @@ drilling = "none"
 sizing = "other"
 instruction = "Saw one blank {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} long, aiming at {{process.blank_length_in:.2f}}, off the 1/4 x 1-1/2 in bar, marked off with the steel rule. Saw one spoil block about 3.5 long off the 1 x 3 in 6061 bar. File the burrs off every sawn end."
 feed = "hand"
-inspection = "Blank {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} long (steel rule): the 2.16 plate with .10 at the round's end and .14–.24 at the top. Shorter: saw another; longer: saw it back."
+inspection = "Blank {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} long (steel rule): the 2.16 plate with .10 at the round's end and .14–.24 at the top."
 gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.blank_length_min_mm}}", "{{process.blank_length_max_mm}}"] }]
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "A blank shorter: saw another. Longer: saw it back to length." },
+]
+feed = "hand"
 
 [[setups.operations]]
 instruction = "Pick the straighter long edge as the C edge (datum C) and mark it C; mark one sawn end R (the round's end). Lay the blank with C away from you and R to the right: the face down is face A, the face up the rear face."
@@ -362,11 +370,17 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Mic the blank's thickness at its middle and 1/2 in in from each end, 1/2 in in from its front edge, and its width at both ends. Write each thickness on the rear face over its spot with marking fluid (face A is degreased and bonded): Setup 2 checks the tape stack from the end ones and sets Z0 from the middle one."
-inspection = "Every thickness reading {{process.blank_thickness_min_mm:in.4dot}}–{{process.blank_thickness_max_mm:in.4dot}} and the width {{process.blank_width_min_mm:in.4dot}}–{{process.blank_width_max_mm:in.4dot}}: the bar as supplied, this traveler's incoming-stock gate (the width sets the side edges). Outside either: set the blank aside and tell the owner."
+inspection = "Every thickness reading {{process.blank_thickness_min_mm:in.4dot}}–{{process.blank_thickness_max_mm:in.4dot}} and the width {{process.blank_width_min_mm:in.4dot}}–{{process.blank_width_max_mm:in.4dot}}: the bar as supplied, this traveler's incoming-stock gate (the width sets the side edges)."
 gauge_checks = [
   { gauge = "micrometers", band_mm = ["{{process.blank_thickness_min_mm}}", "{{process.blank_thickness_max_mm}}"] },
   { gauge = "micrometers", band_mm = ["{{process.blank_width_min_mm}}", "{{process.blank_width_max_mm}}"] },
 ]
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "A thickness or the width outside: set the blank aside and tell the owner." },
+]
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
@@ -374,7 +388,7 @@ title = "Bonded on the spoil block: thickness, holes, countersinks, outline"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw. The spoil block on them, its 3 in width across the jaws (its as-bought 1 in edges in the jaws), centred along the jaws; tap it down and tighten: its top stands {{process.spoil_over_jaws_mm:in.3dot}} over the jaw tops. The blank bonded on its top face A down (rear face up): ScotchBlue 2090 blue painter's tape on the block and on face A, GH1200 thick CA glue between, the stack {{process.tape_stack_mm:in.3dot}} thick; its C edge flush with the block's edge at the FIXED jaw, its R end to the RIGHT, {{process.spoil_end_margin_mm:in.2f}} in from the block's right end. Nothing else holds it. Cut dry or with a light air blast: no flood or mist coolant and no water (the paper tape soaks and lets go); oil only where an op says, a drop on the tool, never poured on the work. CA softens with heat: if the blank is too warm to hold a finger on, stop and let it cool."
+holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw. The spoil block on them, its 3 in width across the jaws (its as-bought 1 in edges in the jaws), centred along the jaws; tap it down and tighten: its top stands {{process.spoil_over_jaws_mm:in.3dot}} over the jaw tops. The blank bonded on its top face A down (rear face up): ScotchBlue 2090 blue painter's tape on the block and on face A, GH1200 thick CA glue between, the stack {{process.tape_stack_mm:in.3dot}} thick; its C edge flush with the block's edge at the FIXED jaw, its R end to the RIGHT, {{process.spoil_end_margin_mm:in.2dot}} in from the block's right end. Nothing else holds it. Cut dry or with a light air blast: no flood or mist coolant and no water (the paper tape soaks and lets go); oil only where an op says, a drop on the tool, never poured on the work. CA softens with heat: if the blank is too warm to hold a finger on, stop and let it cool."
 datum = "Programs AP01_holes (T1–T5), AP02_sink (T6), AP03_outline (T1). G54: X0 Y0 the press hole K's axis, the plate's length along −X (the end round at +X, the top edge at −X), +Y toward the fixed jaw (the C edge at Y {{cad.outline_edge_right_x_in:.3dot}}); Z0 face A (the blank's underside, {{process.tape_stack_mm:in.3dot}} above the block's top on the tape stack), set from T1 on the blank's top less its miked thickness, so the stack moves no depth on the plate. Tool lengths from the tool setter at each M6. After a controller reset, a stall or an E-stop: home ($H), which brings the stored G54 back, and run the interrupted program from its start (every cut done is then cut in air)."
 diagram = { file = "diagrams/bond.svg", alt = "Plan and section: the spoil block across the vise jaws on two parallels, its top over the jaw tops; the blank on blue tape, CA glue, blue tape on it (two strips on each face), its C edge flush with the block's fixed-jaw edge, R end to the right; the plate's outline inside it with K, the two screw holes, the end round at +X; X0 Y0 at K." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", 9.525, 9.525, 5.08], y_span_mm = ["{{process.spoil_width_mm}}", 9.525], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.spoil_height_mm}}", "{{process.tape_stack_max_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.spoil_height_mm}}", "{{process.tape_stack_min_mm}}", "{{process.drill_2764_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_min_mm}}"] }
@@ -386,7 +400,7 @@ instruction = "Home the mill ($H). Brush the spoil block's top clean. Degrease i
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Tape the block's top: two strips of ScotchBlue 2090 (1.41 in wide) along X, each about 3 in long from 1/4 in in from the block's right end. The first hangs about 3/4 in over the fixed-jaw edge: knife it off flush with that edge. The second butts against it: edges never overlapped (an overlap rocks the blank), no gap over 1/32. Pencil a line across the tape {{process.spoil_end_margin_mm:in.2f}} in from the block's right end: the R end's place."
+instruction = "Tape the block's top: two strips of ScotchBlue 2090 (1.41 in wide) along X, each about 3 in long from 1/4 in in from the block's right end. The first hangs about 3/4 in over the fixed-jaw edge: knife it off flush with that edge. The second butts against it: edges never overlapped (an overlap rocks the blank), no gap over 1/32. Pencil a line across the tape {{process.spoil_end_margin_mm:in.2dot}} in from the block's right end: the R end's place."
 feed = "hand"
 
 [[setups.operations]]
@@ -432,8 +446,14 @@ feed = "hand"
 [[setups.operations]]
 instruction = "G54 X0 and Y0 at K with the edge finder (900 rpm): from +X on the R end, from +Y on the C edge."
 instruction_detailed = "Edge finder (900 rpm, in place of T1) on the blank's R end from +X, at mid-width: G10 L20 P1 X{{process.x_set_mm:.3f}}. On the C edge from +Y, 1/2 in in from the R end: G10 L20 P1 Y{{process.y_set_mm:.3f}}. MDI G0 X−33 (1/2 in in from the far end of the shortest blank), touch the C edge again from +Y and read the work Y."
-inspection = "The second C-edge reading within .002 of the first (the blank lies along X). More: peel the blank off as Setup 3 frees the plate, clean both faces, and tape and bond again from this setup's first op."
+inspection = "The second C-edge reading within .002 of the first (the blank lies along X)."
 gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "More: peel the blank off as Setup 3 frees the plate, clean both faces, and tape and bond again from this setup's first op." },
+]
 feed = "hand"
 
 [[setups.operations]]
@@ -508,11 +528,17 @@ sizing = { kind = "band", band_mm = "{{cad.press_hole_dia_band_mm}}" }
 instruction = "Same file, M6 T5 (.4375 reamer in the drill chuck; set 400, cutting oil on the reamer only, a drop, wiped so none runs to the tape): ream K through, fed in and fed out, spindle running, {{process.ream_past_mm:in.3dot}} under face A. The file ends there."
 rpm = 400
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
-inspection = "Still bonded, K blown out and wiped: the .4375 GO plug enters the full depth, the .4382 NO-GO does not (K Ø{{cad.press_hole_dia_min_in:.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}). GO refused: run AP01_holes again from its start, G54 unchanged (the cuts already made then cut air; the reamer goes through once more). NO-GO enters: stop and tell the owner."
+inspection = "Still bonded, K blown out and wiped: the .4375 GO plug enters the full depth, the .4382 NO-GO does not (K Ø{{cad.press_hole_dia_min_in:.4dot}}–{{cad.press_hole_dia_max_in:.4dot}})."
 gauge_checks = [{ gauge = "plug-gauges-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
 milling_cuts = [
   { name = "press ream", kind = "drill", phase = "finish", cutter_dia_mm = 11.1125, flutes = 6, rpm = 400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = 0 },
 ]
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "GO refused: run AP01_holes again from its start, G54 unchanged (the cuts already made then cut air; the reamer goes through once more). NO-GO enters: stop and tell the owner." },
+]
+feed = "hand"
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -528,7 +554,7 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "Still bonded: the .250 pin standing in each countersink, the calipers' depth rod from the rear face beside it to the pin's top, less the pin's miked length, is where the pin's end sits."
-inspection = "The pin's end {{process.sink_pin_depth_min_mm:in.4dot}}–{{process.sink_pin_depth_max_mm:in.4dot}} below the rear face (rim Ø{{cad.screw_hole_1_csk_dia_min_in:.3dot}}–{{cad.screw_hole_1_csk_dia_max_in:.3dot}}). Both in band: skip the next op. Higher (rim small): the next op. Lower (rim large): stop and tell the owner."
+inspection = "The pin's end {{process.sink_pin_depth_min_mm:in.4dot}}–{{process.sink_pin_depth_max_mm:in.4dot}} below the rear face (rim Ø{{cad.screw_hole_1_csk_dia_min_in:.3dot}}–{{cad.screw_hole_1_csk_dia_max_in:.3dot}})."
 gauge_checks = [
   { gauge = "pin-gauges", band_mm = "{{cad.screw_hole_1_csk_dia_band_mm}}" },
   { gauge = "calipers", band_mm = ["{{process.sink_pin_depth_min_mm}}", "{{process.sink_pin_depth_max_mm}}"] },
@@ -536,10 +562,22 @@ gauge_checks = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Only if a rim is small: lower Z0 by the shortfall, run AP02_sink again, put Z0 back, then repeat the previous op's pin check."
+steps = [
+  { kind = "stop", text = "Both in band: skip the next op. A pin's end higher (rim small): the next op. Lower (rim large): stop and tell the owner." },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Only if a rim is small: lower Z0 by the shortfall, run AP02_sink again, put Z0 back, then repeat the .250 pin check."
 instruction_detailed = "The shortfall: {{process.sink_pin_depth_mid_mm:in.4dot}} less the pin's end's depth below the rear face. Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z − the shortfall in mm). Run AP02_sink. G10 L2 P1 Z(the noted Z) puts Z0 back before AP03_outline."
-inspection = "The pin check again: both in band, go on. Still higher: this op again. Lower: stop and tell the owner."
+inspection = "The pin's end {{process.sink_pin_depth_min_mm:in.4dot}}–{{process.sink_pin_depth_max_mm:in.4dot}} below the rear face, both countersinks."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.sink_pin_depth_min_mm}}", "{{process.sink_pin_depth_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "Both in band: go on. Still higher: the previous op again. Lower: stop and tell the owner." },
+]
 feed = "hand"
 
 [[setups.operations]]
@@ -601,8 +639,22 @@ drilling = "none"
 sizing = "other"
 instruction = "File flush any fin the tape left at the bottom of the outline and scrape the drill and reamer burrs off K's and the screw holes' face-A mouths (deburring scraper, flush, no chamfer: K's chamfer is the next op's), so face A seats flat."
 feed = "hand"
-inspection = "Face A lies on the surface plate without rocking. Still rocks with the face-A burrs off: the plate was bent; do not press it flat: stop and tell the owner."
+inspection = "Face A lies on the surface plate without rocking."
 gauge_checks = "other"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "Still rocks with the face-A burrs off: the facing's released stress bowed the plate; the next op straightens it. Lies flat: skip the next op." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Only if face A rocks: soft jaws in the bench vise; the plate standing on a side edge between them, two 1/8 in drill shanks across it near its ends on the hollow face, one across its middle on the crowned face. Close the vise a little, open it, lay the plate on the surface plate again; repeat in small steps." },
+  { kind = "check", text = "Face A lies on the surface plate without rocking." },
+  { kind = "stop", text = "Still rocks after three tries, or the drill shanks marked the plate: stop and tell the owner." },
+]
+feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
@@ -612,8 +664,14 @@ sizing = "other"
 instruction = "Chamfer K's face-A mouth by hand: the plate face A up on the bench, the 90° hand countersink square in K, a few light turns clockwise with even pressure; blow out, stand the .450 pin in K and check. Repeat in light turns until in band."
 instruction_detailed = "Turn the 90° hand countersink in K's face-A mouth, aiming at .015 x 45°. Then the .450 pin standing in K, its end on the chamfer: the calipers' depth rod from face A beside it to the pin's top, less the pin's miked length, is where its end sits."
 feed = "hand"
-inspection = "The pin's end {{process.chamfer_pin_depth_min_mm:in.4dot}}–{{process.chamfer_pin_depth_max_mm:in.4dot}} below face A (chamfer {{cad.press_hole_chamfer_leg_min_in:.3dot}}–{{cad.press_hole_chamfer_leg_max_in:.3dot}} x 45° for any K in its band). Higher: more turns. Lower: stop and tell the owner."
+inspection = "The pin's end {{process.chamfer_pin_depth_min_mm:in.4dot}}–{{process.chamfer_pin_depth_max_mm:in.4dot}} below face A (chamfer {{cad.press_hole_chamfer_leg_min_in:.3dot}}–{{cad.press_hole_chamfer_leg_max_in:.3dot}} x 45° for any K in its band)."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.chamfer_pin_depth_min_mm}}", "{{process.chamfer_pin_depth_max_mm}}"] }]
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "The pin's end higher: more light turns, then the pin check again. Lower: stop and tell the owner." },
+]
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
