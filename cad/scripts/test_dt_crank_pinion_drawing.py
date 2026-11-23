@@ -586,8 +586,14 @@ def test_w15_boss_walls_the_pin_and_the_shaft_end_stands_proud_at_every_limit() 
         spec.PIN_AXIAL_LIGAMENT_WORST + proud_least
     )
     assert dt_crankshaft_spec.PINION_PIN_EDGE_TO_END_WORST >= spec.PIN_EDGE_MIN_WORST
-    # The seat feeler is directly against the restored boss north face.
-    assert spec.SEAT_FEELER_MM == pytest.approx(0.25)
+    # The seat feeler is directly against the restored boss north face: one
+    # inch leaf of the owned set (#3042).
+    import dt_feeler_leaves
+
+    assert dt_feeler_leaves.leaf_stack(spec.SEAT_FEELER_MM) == (spec.SEAT_FEELER_MM,)
+    assert dt_feeler_leaves.leaf_stack(spec.T120_FITUP_FEELER_MM) == (
+        spec.T120_FITUP_FEELER_MM,
+    )
     concentric = bdt.PINION_T120_CONCENTRIC
     assert concentric["shoulder air"] >= bdt.T120_PINION_AIR_FLOOR
     assert concentric["turned band radial"] >= bdt.T120_TURNED_BAND_RADIAL_FLOOR

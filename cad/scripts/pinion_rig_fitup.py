@@ -45,7 +45,6 @@ from pinion_rig_layout import (
     BACK_COLLAR_LEAF_F,
     DRUM_END_SHIM,
     DRUM_END_SHIM_SET_ERROR,
-    FEELER_LEAF_STEP,
     FEELER_SET_BAND,
     FEELER_SET_ERROR,
     FLUSH_SET_ERROR,
@@ -92,7 +91,8 @@ if abs(sum(RIG_SET_LEAVES) - RIG_SET_LEAF_D) > 1e-9:
 # over it: a leaf tolerance for each one-leaf setting, two for D's pair.
 if not (
     FEELER_SET_ERROR == FRONT_BLOCK_FEELER_BAND == DRUM_END_SHIM_SET_ERROR
-    and abs(FEELER_SET_ERROR - FEELER_SET_BAND - dt_feeler_leaves.LEAF_TOLERANCE) < 1e-12
+    and abs(FEELER_SET_ERROR - FEELER_SET_BAND - dt_feeler_leaves.LEAF_TOLERANCE)
+    < 1e-12
     and abs(
         RIG_SET_ERROR
         - FEELER_SET_BAND

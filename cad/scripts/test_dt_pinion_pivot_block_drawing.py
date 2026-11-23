@@ -277,13 +277,20 @@ def test_rig_layout_sets_the_front_block_by_feeler_off_the_back_stop() -> None:
     assert rig.DRUM_LEN == dt_alignment_pinion_spec.FACE_WIDTH
     assert rig.STRAP_Z_OUTER[1] == pytest.approx(rig.BACK_BLOCK_Z0, abs=1e-9)
     front_inner = rig.FRONT_BLOCK_Z0 + dt_pinion_pivot_block_spec.BLOCK_DEPTH
-    assert rig.STRAP_Z_OUTER[0] - front_inner == pytest.approx(0.25, abs=1e-9)
+    assert rig.STRAP_Z_OUTER[0] - front_inner == pytest.approx(rig.FRONT_BLOCK_FEELER, abs=1e-9)
     assert (rig.DRUM_FRONT_Z - rig.DRUM_END_SHIM, rig.DRUM_BACK_Z) == pytest.approx(
         rig.STRAP_Z_INNER, abs=1e-9
     )
-    # The drum shim is its own 0.45 blade (Main, #858: the 0.25 feeler left the
-    # drum 0.05 over its end-play floor).
-    assert rig.DRUM_END_SHIM == 0.45
+    # The drum shim is its own leaf (Main, #858: the 0.25 feeler left the drum
+    # 0.05 over its end-play floor): the thinnest whose tightest set, the
+    # leaf's tolerance booked, keeps the end-play floor and the spare (#3042).
+    import dt_pinion_arbor_geometry
+
+    assert rig.DRUM_MIN_END_PLAY == dt_pinion_arbor_geometry.MIN_END_PLAY
+    floor = rig.DRUM_MIN_END_PLAY + rig.RIG_MARGIN_SPARE
+    assert rig.DRUM_END_SHIM == rig.smallest_leaf_setting(floor)
+    assert rig.DRUM_END_SHIM - rig.DRUM_END_SHIM_SET_ERROR >= floor
+    assert rig.DRUM_END_SHIM - rig.FEELER_LEAF_STEP - rig.DRUM_END_SHIM_SET_ERROR < floor
     assert not hasattr(rig, "STRAP_AIR")
     assert rig.STRAP_Z_OUTER[1] - rig.STRAP_Z_INNER[1] == pytest.approx(THICKNESS)
 
@@ -481,12 +488,13 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     depth = dt_pinion_pivot_block_spec.BLOCK_DEPTH
     shortest_shaft = rig.TORQUE_SHAFT_LEN - xx_in
     # Straps at their printed .XX limits, the drum at its own row, the
-    # feeler and the drum shim each 0.10 wide, and the flush setting the shaft
-    # is drilled at 0.10 proud (ruling 2).
-    growth = 2.0 * strap_upper + rig.DRUM_LEN_BAND + 0.10 + 0.10
-    shrink = -2.0 * strap_lower + rig.DRUM_LEN_BAND + 0.10 + 0.10
+    # feeler and the drum shim each their set error wide, and the flush
+    # setting the shaft is drilled at 0.10 proud (ruling 2).
+    set_errors = rig.FRONT_BLOCK_FEELER_BAND + rig.DRUM_END_SHIM_SET_ERROR
+    growth = 2.0 * strap_upper + rig.DRUM_LEN_BAND + set_errors
+    shrink = -2.0 * strap_lower + rig.DRUM_LEN_BAND + set_errors
     longest_span = (depth + xx_in) + rig.INNER_SPAN + growth
-    bearing = shortest_shaft - longest_span - 0.10
+    bearing = shortest_shaft - longest_span - rig.FLUSH_SET_ERROR
     assert bearing == pytest.approx(sum(rig.TORQUE_SHAFT_BEARING_STACK.values()))
     required = rig.FRONT_BLOCK_MIN_BEARING + rig.BLOCK_BEARING_MARGIN
     assert bearing >= required and rig.FRONT_BLOCK_MIN_BEARING == 9.5
@@ -498,7 +506,8 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     # hub rides the lift rod, which the blocks carry off the shaft axis.
     longest_shaft = rig.TORQUE_SHAFT_LEN + xx_in
     shortest_outer = 2.0 * (depth - xx_in) + rig.INNER_SPAN - shrink
-    assert longest_shaft - shortest_outer == pytest.approx(2.294, abs=5e-3)
+    # 2.294 on the metric leaves; the inch .010 and .019 lengthen the span.
+    assert longest_shaft - shortest_outer == pytest.approx(2.283, abs=5e-3)
     hub_clear = (
         math.hypot(LIFT_BORE_SPACING, LIFT_BORE_RISE) - (HUB_OD + SHAFT_DIA) / 2.0
     )

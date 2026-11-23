@@ -81,7 +81,8 @@ def leaf_stack(setting: float) -> tuple[float, ...]:
     """The leaves that make up ``setting`` (mm), thickest first, each once:
     the fewest the set allows."""
     return tuple(
-        round(tenths * MM_PER_IN / 10000.0, 5) for tenths in _stack_tenths(_tenths(setting))
+        round(tenths * MM_PER_IN / 10000.0, 5)
+        for tenths in _stack_tenths(_tenths(setting))
     )
 
 

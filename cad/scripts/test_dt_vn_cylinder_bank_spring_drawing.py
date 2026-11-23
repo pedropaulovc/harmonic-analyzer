@@ -50,8 +50,9 @@ def test_spec_carries_the_live_catalogue_facts() -> None:
     assert spec.FREE_HEIGHT == pytest.approx(0.05 * IN)
     assert spec.WORKING_HEIGHT == pytest.approx(0.024 * IN)
     assert spec.WORKING_LOAD_N == pytest.approx(1.5 * LBF)
-    # The model is the installed envelope at the 0.95 set gap.
-    assert spec.MODEL_HEIGHT == spec.INSTALLED_HEIGHT == pytest.approx(0.95)
+    # The model is the installed envelope at the .037 set gap (inch feeler
+    # leaves, #3042; 0.95 on the metric set).
+    assert spec.MODEL_HEIGHT == spec.INSTALLED_HEIGHT == pytest.approx(0.037 * IN)
     assert spec.WORKING_HEIGHT <= spec.MODEL_HEIGHT < spec.FREE_HEIGHT
 
 

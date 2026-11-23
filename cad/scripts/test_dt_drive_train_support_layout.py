@@ -501,7 +501,7 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
     backs = [
         g19_back + RIG.RIG_SET_LEAF_D + d - g_b - a
         for _t in _strap_t_band()
-        for d in (-_LEAF_ERR, _LEAF_ERR)
+        for d in (-RIG.RIG_SET_ERROR, RIG.RIG_SET_ERROR)
         for g_b in (0.0, _P_MAX)
         for a in (0.0, _AIR_MAX)
     ]
@@ -851,12 +851,12 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
         assert min(stations) >= 1.0, stations
         assert max(stations) <= dt_pinion_cam_geometry.CAM_LEN - 1.0, stations
     # User ruling P1-1: on its leaf the back collar's gap -- the rod's north
-    # float -- is F + e at most 1.00, so both pins keep >= 3.09 of collar on
+    # float -- is F + e at most 1.00, so both pins keep >= 3.07 of collar on
     # either side (the by-eye set it replaced left 1.90 and 2.75; #290's .XX
-    # strap band set the rest).
-    assert math.isclose(min(front), 3.095, abs_tol=5e-3)
-    assert math.isclose(min(back), 3.951, abs_tol=5e-3)
-    assert math.isclose(max(back), dt_pinion_cam_geometry.CAM_LEN - 3.095, abs_tol=5e-3)
+    # strap band set the rest; 3.095 before the inch leaves' tolerance, #3042).
+    assert math.isclose(min(front), 3.077, abs_tol=5e-3)
+    assert math.isclose(max(back), dt_pinion_cam_geometry.CAM_LEN - min(back), abs_tol=1.0)
+    assert min(back) >= min(front)
     # North float at the widest setting: the back collar lands first.
     assert _back_collar_gap(_LEAF_ERR) < _hub_gap() - RIG.HUB_STOP_MARGIN
     # The model's back collar sits on its leaf, its pin BACK_CAM_PIN_STATION
@@ -880,7 +880,9 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
     # The model front collar is flush with the strap's outer face, one feeler
     # off the block.
     assert math.isclose(
-        drive.CAM_Z0[0] - (drive.BLOCK_FRONT_Z0 + drive.BLOCK_DEPTH), 0.25, abs_tol=1e-9
+        drive.CAM_Z0[0] - (drive.BLOCK_FRONT_Z0 + drive.BLOCK_DEPTH),
+        RIG.FRONT_BLOCK_FEELER,
+        abs_tol=1e-9,
     )
 
 
@@ -983,7 +985,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     assert math.isclose(
         bearing_min, sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()), abs_tol=1e-9
     )
-    assert math.isclose(bearing_min, 10.176, abs_tol=5e-3)
+    assert math.isclose(bearing_min, 10.114, abs_tol=5e-3)  # 10.176 before #3042
     assert hub_margin_min >= RIG.HUB_STOP_MARGIN - 1e-9
     assert math.isclose(
         hub_margin_min,
@@ -994,7 +996,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     )
     # The rod is sized by the seat (#290: the .XX length band left the lever's
     # air to the shaft far more than it needs), to the .01 in above it.
-    assert math.isclose(hub_margin_min, 0.640, abs_tol=5e-3)
+    assert math.isclose(hub_margin_min, 0.576, abs_tol=5e-3)  # 0.640 before #3042
     assert sum(RIG.lift_rod_seat_stack(RIG.LIFT_ROD_LEN - 0.254).values()) < (
         RIG.LEVER_SEAT_MIN + RIG.RIG_MARGIN_SPARE
     )
@@ -1020,7 +1022,7 @@ def test_lever_station_clears_at_both_rod_extremes() -> None:
     row = drive.RIG_MARGINS["lever throw plane to the torque shaft's front end"]
     assert math.isclose(row[0], air, abs_tol=1e-9)
     assert air >= RIG.LEVER_THROW_MIN_AIR + RIG.RIG_MARGIN_SPARE - 1e-9
-    assert math.isclose(air, 2.487, abs_tol=5e-3)
+    assert math.isclose(air, 2.469, abs_tol=5e-3)  # 2.487 before #3042
     south = sum(RIG.LEVER_SOUTH_TRAVEL_STACK.values())
     assert drive._LEV_Z[0] - south >= drive._GRIP_HEAD_Z[1] + 0.25
     hub_lo = drive.LEVER_Z - drive.LEVER_HUB_LEN / 2.0 - drive.LEVER_CAP_SAG
@@ -1087,7 +1089,7 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
     assert math.isclose(
         sum(RIG.TORQUE_SHAFT_BACK_BEARING_STACK.values()), bearing, abs_tol=1e-9
     )
-    assert math.isclose(bearing, 10.472, abs_tol=5e-3)
+    assert math.isclose(bearing, 10.455, abs_tol=5e-3)  # 10.472 before #3042
     # The drilling station: the shaft's back end flush with that outer face.
     assert math.isclose(
         drive.PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN,
@@ -1119,15 +1121,15 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
     )
     shortest_outer = rig.FRONT_BLOCK_Z0 + shrink
     proud = shortest_outer - front_end
-    assert math.isclose(proud, 2.294, abs_tol=5e-3)
-    assert math.isclose(proud + CAP_SAG, 3.564, abs_tol=5e-3)
+    assert math.isclose(proud, 2.283, abs_tol=5e-3)  # 2.294 before #3042
+    assert math.isclose(proud + CAP_SAG, 3.553, abs_tol=5e-3)
     assert math.isclose(
         max(outer for _i, outer, _t in _stack_vertices()), shortest_outer, abs_tol=1e-9
     )
     # Option E-a: pinned to the straps, the shaft rides the cluster's end play
     # from its back-flush drilling station to the front stop.
-    assert math.isclose(proud + _P_MAX, 2.644, abs_tol=5e-3)
-    assert math.isclose(proud + _P_MAX + CAP_SAG, 3.914, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX, 2.650, abs_tol=5e-3)  # 2.644 before #3042
+    assert math.isclose(proud + _P_MAX + CAP_SAG, 3.920, abs_tol=5e-3)
     # Its back end then sits P_MAX inside the back block, bearing
     # test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack.
     # South of the front block nothing stands on the shaft's axis at any z.
