@@ -72,13 +72,24 @@ part = "ch-pivot-bracket"
 
 [parameters]
 quantity = 2
-# The bore's GO / NO-GO pins, from the class ZZ minus sets (tools.pin-gauges:
-# each pin up to .0002 under its size, never over; sizes in .001 steps).
-# GO: the .256 pin, .2558-.2560, enters a bore at the band's bottom. NO-GO:
-# the .260 pin, at most .2600, so a bore it does not enter is under the
-# band's top (a bore within .0002 of the top may read out: on the safe side).
+# The bore's Class ZZ pins, shop gauges.zz-pins-2560-2600 (owner ruling
+# 2026-11-23, tool audit Q1, re-answered, verbatim: "ZZ singles per the
+# record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept that good
+# holes near a limit may be refused; the traveler mikes each pin so the real
+# window is known per pin."). The plan took GO from the .256 minus pin of the
+# box, which passes a bore up to .0002 under the band, against the #3075
+# record (cad/config/shop-equipment/gauges.toml gauges.pin-gauges: "the GO
+# end of a reamed-hole check is a plus pin"). Ø.2560 +.0040/.0000: GO a .2560
+# plus single, .2560-.2562 (6.5024 to 6.5024 + 0.00508 mm); NO-GO the .260
+# minus pin of the .061-.500 box, .2598-.2600 (6.604 - 0.00508 to 6.604 mm).
+# go_pin_min_mm and nogo_pin_max_mm are the band's own ends (cad bore dia).
+# A pin miking outside its range is not used.
 go_pin_in = 0.2560
 nogo_pin_in = 0.2600
+go_pin_min_mm = 6.5024
+go_pin_max_mm = 6.5075
+nogo_pin_min_mm = 6.5989
+nogo_pin_max_mm = 6.604
 # The bar (stock.1018-square-3-4) and the blank the programs are posted for:
 # 1.45-1.50 in sawn (the 1.38 height, the seat skim and the arch's waste
 # above the apex, the saw's ±.025).
@@ -282,6 +293,11 @@ id = "pins"
 name = "Pin gauges .011-.500, TO ORDER"
 ref = "pin-gauges"
 [[tools]]
+id = "zz-pins"
+name = "Class ZZ pins: .2560 plus (GO) and .260 minus (NO-GO, from the box)"
+ref = "zz-pins-2560-2600"
+status = "to_order"
+[[tools]]
 id = "saw"
 name = "Evolution miter saw"
 ref = "saw-evolution-14"
@@ -482,6 +498,16 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.east_side_width_mm}}",
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.blank_length_max_mm}}"], section_mm = { y = "{{cad.east_side_width_mm}}", z = "{{process.blank_section_mm}}" }, vise_left = "end" }
 
 [[setups.operations]]
+instruction = "Before the first part is clamped, on the bench: with the .0001 micrometer (it reads to about ±.00005), mike the GO pin, the NO-GO pin, and the .2560 reamer across two opposite margins at its front end. Write the three readings here, and each pin's reading on its tag."
+inspection = "GO pin {{cad.bore_dia_min_in:.4dot}}–{{process.go_pin_max_mm:in.4dot}}; NO-GO pin {{process.nogo_pin_min_mm:in.4dot}}–{{cad.bore_dia_max_in:.4dot}}. A pin outside its range is not used: get another before running PB04_arch_bore."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.go_pin_min_mm}}", "{{process.go_pin_max_mm}}"] }, { gauge = "micrometers", band_mm = ["{{process.nogo_pin_min_mm}}", "{{process.nogo_pin_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Only if the reamer read under the GO pin's reading (otherwise skip): before the first part, clamp a 1018 offcut in the vise and make a trial hole by hand at the console: the D drill through at 1000 rpm, then the .2560 reamer through at 450 rpm, cutting oil. Gauge it with both pins: GO refused, stop and tell the owner (this reamer's holes would be refused)."
+feed = "hand"
+
+[[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 the seat (the RIGHT end), Y0 the fixed jaw's face (W): edge finder (900 rpm)."
 instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the seat (the part's RIGHT end) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
 feed = "hand"
@@ -556,14 +582,15 @@ feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [
   { name = "bore ream", kind = "drill", phase = "finish", cutter_dia_mm = 6.5024, flutes = 2, rpm = 450, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = "{{cad.bore_height_mm}}" },
 ]
-inspection = "Still clamped, the first part before the second is reamed: bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}, the {{process.go_pin_in:.4dot}} pin (GO) enters the full depth, the {{process.nogo_pin_in:.4dot}} pin (NO-GO) does not; both from the class ZZ minus sets."
-gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
+inspection = "Still clamped, the first part before the second is reamed: bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}, the GO pin enters the full depth, the NO-GO pin does not. The sheet accepts a bore from the GO pin's reading up to, not including, the NO-GO pin's reading (the first op of this setup); with both pins at their limits only {{process.go_pin_max_mm:in.4dot}}–{{process.nogo_pin_min_mm:in.4dot}} is sure to pass."
+gauge_checks = [{ gauge = "zz-pins-2560-2600", band_mm = "{{cad.bore_dia_band_mm}}" }]
 
 # The ream's remedy follows its check: prechips prints an op's Check after
 # its work, so it is the next op.
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "GO will not enter or NO-GO enters: stop, the reamer or its runout is out; tell the owner." },
+  { kind = "action", text = "GO refused: still clamped, blow the chips out, oil the bore, ream it once more with T5 by hand at the console (450 rpm, in and out at feed), and gauge again. Still refused: the bracket is rejected; stop and tell the owner (the pins cannot show it at or over {{cad.bore_dia_min_in:.4dot}}; a reamer cuts no larger)." },
+  { kind = "stop", text = "NO-GO enters: no cut remedies it; the bracket is rejected (nothing shows the bore at or under {{cad.bore_dia_max_in:.4dot}}). Stop: the reamer or its runout is out; tell the owner." },
   { kind = "action", text = "In band: the next part is reamed without the check; unclamp." },
 ]
 feed = "hand"
@@ -763,9 +790,9 @@ gauge_checks = "other"
 [[setups.operations]]
 instruction = "Inspect each bracket; record the readings with its number."
 feed = "hand"
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} after the hand ream: the {{process.go_pin_in:.4dot}} pin (GO) enters, the {{process.nogo_pin_in:.4dot}} pin (NO-GO) does not. Bore height {{cad.bore_height_min_in:.3dot}}–{{cad.bore_height_max_in:.3dot}}: the bracket on its seat on the surface plate, the height gauge over the GO pin in the bore less half its Ø. Bore from W {{cad.bore_lateral_min_in:.3dot}}–{{cad.bore_lateral_max_in:.3dot}}: calipers from W over the pin, less half its Ø. Hold-down hole: the #15 drill's shank slips through; from I {{cad.hold_down_station_min_in:.3dot}}–{{cad.hold_down_station_max_in:.3dot}} and from W {{cad.hold_down_lateral_min_in:.3dot}}–{{cad.hold_down_lateral_max_in:.3dot}}, calipers over the shank less half its miked Ø. Height {{cad.arch_overall_height_min_in:.3dot}}–{{cad.arch_overall_height_max_in:.3dot}}: the height gauge on the apex, the bracket on its seat. Arch R{{cad.arch_radius_min_in:.3dot}}–{{cad.arch_radius_max_in:.3dot}}: the program's, not gauged; it blends into both sides with no step. Apex hole: a 4-40 screw runs in by hand until its end shows in the bore; its centre {{cad.apex_tap_station_min_in:.3dot}}–{{cad.apex_tap_station_max_in:.3dot}} from I by the calipers over the screw less half its Ø."
+inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} after the hand ream: the GO pin enters, the NO-GO pin does not. Bore height {{cad.bore_height_min_in:.3dot}}–{{cad.bore_height_max_in:.3dot}}: the bracket on its seat on the surface plate, the height gauge over the GO pin in the bore less half its miked reading. Bore from W {{cad.bore_lateral_min_in:.3dot}}–{{cad.bore_lateral_max_in:.3dot}}: calipers from W over the GO pin, less half its miked reading. Hold-down hole: the #15 drill's shank slips through; from I {{cad.hold_down_station_min_in:.3dot}}–{{cad.hold_down_station_max_in:.3dot}} and from W {{cad.hold_down_lateral_min_in:.3dot}}–{{cad.hold_down_lateral_max_in:.3dot}}, calipers over the shank less half its miked Ø. Height {{cad.arch_overall_height_min_in:.3dot}}–{{cad.arch_overall_height_max_in:.3dot}}: the height gauge on the apex, the bracket on its seat. Arch R{{cad.arch_radius_min_in:.3dot}}–{{cad.arch_radius_max_in:.3dot}}: the program's, not gauged; it blends into both sides with no step. Apex hole: a 4-40 screw runs in by hand until its end shows in the bore; its centre {{cad.apex_tap_station_min_in:.3dot}}–{{cad.apex_tap_station_max_in:.3dot}} from I by the calipers over the screw less half its Ø."
 gauge_checks = [
-  { gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" },
+  { gauge = "zz-pins-2560-2600", band_mm = "{{cad.bore_dia_band_mm}}" },
   { gauge = "height-gauge", band_mm = "{{cad.bore_height_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.bore_lateral_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.hold_down_station_band_mm}}" },
@@ -817,5 +844,5 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Seal: wipe on the stone lubricant (a light oil; the maker: clear coat, wax or oil), leave it a few minutes, wipe off the excess."
 feed = "hand"
-inspection = "Even black all over, no bare spot and no wiping-off coating. Fits after blackening: the {{process.go_pin_in:.4dot}} pin still enters the bore and a 4-40 screw still runs into the apex hole by hand. Tight: stop and tell the owner; do not re-ream or re-tap."
+inspection = "Even black all over, no bare spot and no wiping-off coating. Fits after blackening: the GO pin still enters the bore and a 4-40 screw still runs into the apex hole by hand. Tight: stop and tell the owner; do not re-ream or re-tap."
 gauge_checks = "other"

@@ -419,6 +419,10 @@ def context(
         raise ValueError("the shortest blank less the foot skim is under the length")
     _agree(plan, "measured_length_min_mm", g["length_band"][0])
     _agree(plan, "measured_length_max_mm", p["blank_length_max_mm"] - skim)
+    # The 1/64 in rule accepts the length to ±1/32 about the band's middle
+    # (owner ruling 2026-11-23, tool audit Q3); it never proves the band.
+    _agree(plan, "length_rule_min_mm", _mid(g["length_band"]) - IN / 32)
+    _agree(plan, "length_rule_max_mm", _mid(g["length_band"]) + IN / 32)
     pitch = p["bar_pitch_mm"]
     _agree(plan, "bar_pitch_mm", _mid(g["section_band"]))
     _agree(plan, "bar_section_min_mm", g["section_band"][0])

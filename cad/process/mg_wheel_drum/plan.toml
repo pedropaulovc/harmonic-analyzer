@@ -233,12 +233,12 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "GO refused in Op 100: clear the chips, ream once more with the same reamer as Op 90, and gauge again. Still refused: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in and start again at Op 30 (the pins cannot show the bore at or over {{cad.bore_dia_min_in:.4dot}}; a reamer cuts no larger)."
+instruction = "GO refused in Op 100: clear the chips, ream once more with the same reamer as Op 90, and gauge again. Still refused: part the turned length off as scrap and stop; tell the owner. The pins cannot show the bore at or over {{cad.bore_dia_min_in:.4dot}}, and this reamer cuts no larger: a new reamer is proved on an offcut, as Op 20, before Op 30 again."
 feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "NO-GO enters in Op 100: no cut remedies it. Part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in and start again at Op 30: nothing on the sheet shows the bore at or under {{cad.bore_dia_max_in:.4dot}}."
+instruction = "NO-GO enters in Op 100: no cut remedies it (nothing on the sheet shows the bore at or under {{cad.bore_dia_max_in:.4dot}}). Part the turned length off as scrap and stop; tell the owner: this reamer cuts over the NO-GO pin, and a new one is proved on an offcut, as Op 20, before Op 30 again."
 feed = "hand"
 
 [[setups.operations]]

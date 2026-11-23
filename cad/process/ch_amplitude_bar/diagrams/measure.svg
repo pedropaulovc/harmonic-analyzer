@@ -1,14 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 4: each bar's length ruled from its faced foot end. Styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 170" width="640" height="170" font-family="sans-serif" font-size="12">
-<rect class="paper" width="640" height="170"/>
-<rect class="fixture-table" x="20" y="100" width="600" height="20"/>
-<text class="label" x="26" y="140">bench</text>
-<rect class="part-kept" x="60" y="84" width="540" height="16"/>
-<rect class="fixture-support" x="40" y="70" width="20" height="30"/>
-<text class="label" x="20" y="62">square block on the foot end</text>
-<rect class="part-rest" x="60" y="70" width="560" height="10"/>
-<text class="label" x="300" y="62">48 in rule (to buy), 1/100 in</text>
-<text class="label" x="360" y="160">its length written on the bar here</text>
-<path class="leader" d="M560 150 L580 96"/>
+<!-- Setup 4: bar 1 and another bar side by side on the surface plate, foot ends against a 1-2-3 block (backed by a V-block) as the stop; the step between their top ends read with the calipers' depth rod (owner ruling 2026-11-23, tool audit Q3). Top view, not to scale. Styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" width="640" height="220" font-family="sans-serif" font-size="12">
+<rect class="paper" width="640" height="220"/>
+<rect class="fixture-table" x="40" y="60" width="330" height="110"/>
+<text class="label" x="46" y="186">surface plate</text>
+<rect class="fixture-support" x="54" y="80" width="16" height="60"/>
+<rect class="fixture-support" x="72" y="84" width="20" height="52"/>
+<text class="label" x="20" y="30">V-block behind the 1-2-3 block (the stop)</text>
+<path class="leader" d="M70 34 L62 80"/>
+<path class="leader" d="M120 34 L84 84"/>
+<rect class="part-kept" x="92" y="96" width="472" height="12"/>
+<text class="label" x="190" y="90">bar 1</text>
+<rect class="part-kept" x="92" y="110" width="490" height="12"/>
+<text class="label" x="190" y="140">the bar compared, foot ends against the stop</text>
+<path class="leader" d="M636 116 L582 116 L582 100"/>
+<path class="leader" d="M582 102 L564 102"/>
+<text class="label" x="400" y="56">calipers: beam end on the end that stands out,</text>
+<text class="label" x="400" y="70">depth rod run out to the other end</text>
+<text class="label" x="420" y="196">the step e, read to .001</text>
+<path class="leader" d="M480 186 L572 104"/>
 </svg>
