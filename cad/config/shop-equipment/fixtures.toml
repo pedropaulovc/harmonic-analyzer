@@ -437,6 +437,7 @@ note = "Not owned: to buy. The 1/4-20 pair up through the spoil plate into the p
 # at ASSEMBLY (MHA-DT-00) with steel shim washers under the screw's head,
 # stacked until the platform swings free with no shake. Not owned: to buy.
 [fixtures.shim-washers-1-4-id-arbor-19]
+purchase = "Made in USA Tools PRE-25100, $9.98 (read live 2026-11-22)."
 name = "Steel arbor shim assortment, 1/4 in ID x 3/8 in OD, 19 thicknesses .001-.125 in"
 kind = "shim"
 status = "to_order"

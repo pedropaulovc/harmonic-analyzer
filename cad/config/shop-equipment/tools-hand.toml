@@ -154,6 +154,9 @@ status = "on_hand"
 note = "Owner confirmed on hand 2026-11-19 (an automatic centre punch). Purchase approved by Pedro 2026-10-11 (archived inventory)."
 
 [tools.file-nicholson-10-second-cut]
+sku = "08673NN"
+source = "https://www.zoro.com/nicholson-10-mill-single-cut-second-file-08673nn/i/G3071397/"
+purchase = "Zoro G3071397, Nicholson 08673NN 10 in mill single-cut second file, $12.39, in stock (read live 2026-11-22)."
 name = "Nicholson 10 in mill second-cut file (archived inventory)"
 kind = "file"
 make = "Nicholson"
@@ -246,15 +249,22 @@ note = "Pushes one outer link's pin out to cut the MHA-PD-00 chain loops (step 3
 # MHA-DT-30 pinion lever pin (cad/process/dt_pinion_lever_pin/plan.toml): a 1/16
 # drill rod is too slender for the 3-jaw or the 14 in saw's vise, so its piece is
 # sawn by hand in the bench vise. MHA-SM-01 gooseneck (cad/process/sm_gooseneck/
-# plan.toml Setup 7): both ends of the bent tube are sawn in the bench vise. No
-# vendor or SKU is asserted (a tool to buy).
+# plan.toml Setup 7): both ends of the bent tube are sawn in the bench vise.
 [tools.junior-hacksaw]
+make = "Bahco"
+sku = "228"
+source = "https://www.zoro.com/bahco-junior-hacksaw-ergo-handle-6-bah228/i/G7622207/"
+purchase = "Zoro G7622207, Bahco 228 junior hacksaw, 6 in, $14.15, in stock (read live 2026-11-22). The listing read does not state the supplied blade's pitch: fit a 32 TPI junior blade if it differs. Cheaper there: Westward 5WFW7 junior saw, $3.99."
 name = "Junior hacksaw, 6 in blade, 32 TPI"
 kind = "hacksaw"
 status = "to_order"
 note = "Not owned: to buy (the shop records no hand hacksaw). Saws the MHA-DT-30 pin's .65 piece off the 1/16 drill rod and the MHA-SM-01 gooseneck's two ends (1/2 in x .065 wall 4130 tube) in the bench vise; any 6 in junior frame with a 32 TPI blade serves."
 
 [tools.aviation-snips-straight]
+make = "Irwin"
+sku = "2073113"
+source = "https://www.travers.com/product/irwin-2073113-snips-61-163-025"
+purchase = "Travers 61-163-025, Irwin 2073113 aviation snips, 18 ga CRS capacity, 10 in overall, 1-3/8 in cut, $23.48 (read live 2026-11-22). The Travers listing does not state the cut direction; 2073113 is the straight-cut member of Irwin's 2073111/2/3 trio by the maker's numbering (not read live): confirm before ordering."
 name = "Aviation snips, straight cut"
 kind = "snips"
 status = "to_order"
