@@ -537,7 +537,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 X0 and Y0 at K with the edge finder (900 rpm): from +X on the R end, from +Y on the C edge."
-instruction_detailed = "Edge finder (900 rpm, in place of T1) on the blank's R end from +X, at mid-width: G10 L20 P1 X{{process.x_set_mm:.3f}}. On the C edge from +Y, 1/2 in in from the R end: G10 L20 P1 Y{{process.y_set_mm:.3f}}. Back off .10 in +Y; MDI G0 X−33 (1/2 in in from the far end of the shortest blank), touch the C edge again from +Y and read the work Y."
+instruction_detailed = "Fit the edge finder by hand in place of T1 (no M6); set 900 by hand, MDI M3. Its tip lowered to about .12 above the block's top (between the blank's top and face A, clear of the block). On the R end from +X, at mid-width: G10 L20 P1 X{{process.x_set_mm:.3f}}. On the C edge from +Y, 1/2 in in from the R end: G10 L20 P1 Y{{process.y_set_mm:.3f}}. Back off .10 in +Y; MDI G0 X−33 (1/2 in in from the far end of the shortest blank), touch the C edge again from +Y and read the work Y. M5."
 inspection = "The second C-edge reading within .002 of the first (the blank lies along X)."
 gauge_checks = "other"
 feed = "hand"
