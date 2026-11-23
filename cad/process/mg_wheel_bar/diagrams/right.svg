@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="430"/>
+  <text class="title" x="20" y="20">Setup 4, the bar slid along the jaws: plan, fixed jaw at the top (1 in = 70 px)</text>
+  <!-- Bar 9.35 x .84, jaws 6.247 long; the sawn right end .50 out past the jaws. -->
+  <rect class="clamp" x="248.3" y="90" width="437.3" height="50"/>
+  <rect class="clamp" x="248.3" y="198.8" width="437.3" height="50"/>
+  <text class="label-on-clamp" x="440" y="120">fixed jaw</text>
+  <text class="label-on-clamp" x="440" y="230">moving jaw</text>
+  <rect class="part-kept" x="65.2" y="140" width="655.4" height="58.8"/>
+  <rect class="part-removed" x="716.4" y="140" width="4.2" height="58.8"/>
+  <circle class="holes" cx="582.6" cy="153.8" r="7.0"/>
+  <circle class="holes" cx="679.0" cy="153.8" r="7.0"/>
+  <circle class="holes" cx="233.2" cy="153.8" r="6.5"/>
+  <circle class="holes" cx="68.7" cy="153.8" r="6.3"/>
+  <circle class="cutter" cx="738.6" cy="169.4" r="17.8"/>
+  <line class="arrow" x1="765" y1="205" x2="765" y2="135"/>
+  <text class="label" x="330" y="275">right end: passes +Y (the arrow at the right)</text>
+  <!-- The edge finder on the milled left end, in the air. -->
+  <circle class="cutter" cx="58.2" cy="185" r="7.0"/>
+  <line class="datum" x1="65.2" y1="60" x2="65.2" y2="135"/>
+  <text class="datum-label" x="20" y="55">X0: the edge finder on the milled LEFT end (the pickup)</text>
+  <line class="dims" x1="65.2" y1="300" x2="248.3" y2="300"/>
+  <line class="dims" x1="65.2" y1="205" x2="65.2" y2="305"/>
+  <line class="dims" x1="248.3" y1="250" x2="248.3" y2="305"/>
+  <text class="label" x="80" y="318">left end {{process.pickup_reach_min_mm:in.2f}}+ out past the jaws</text>
+  <line class="dims" x1="65.2" y1="340" x2="716.4" y2="340"/>
+  <line class="dims" x1="716.4" y1="205" x2="716.4" y2="345"/>
+  <text class="label" x="330" y="358">length {{process.length_target_mm:in.3f}} to the right end</text>
+  <line class="dims" x1="685.6" y1="380" x2="720.6" y2="380"/>
+  <line class="dims" x1="685.6" y1="250" x2="685.6" y2="385"/>
+  <line class="dims" x1="720.6" y1="200" x2="720.6" y2="385"/>
+  <text class="label" x="560" y="398">sawn end .50 out</text>
+  <line class="leader" x1="582.6" y1="146.8" x2="600" y2="70"/>
+  <line class="leader" x1="679.0" y1="146.8" x2="600" y2="70"/>
+  <text class="label" x="480" y="64">clamp holes #9 at {{cad.clamp_hole_1_station_in:.3f}} and {{cad.clamp_hole_2_station_in:.3f}}</text>
+  <line class="leader" x1="233.2" y1="147" x2="233.2" y2="86"/>
+  <text class="label" x="140" y="80">axle bore (Setup 3): the pickup check</text>
+  <text class="label" x="20" y="420">Section as Setup 3: F down on both stacks at the moving jaw, T at the fixed jaw, the .125 pin at B.</text>
+</svg>

@@ -159,6 +159,19 @@ diameter_mm = 4.7879
 description = ".4990 in HSS chucking reamer"
 diameter_mm = 12.6746
 
+# --- MHA-MG-08 wheel bar (cad/process/mg_wheel_bar/plan.toml) ---
+# The axle bore's go/no-go pair (cad/config/shop-equipment/
+# gauges.plug-gauges-1865-1870, to buy), for its Ø.1865 +.0005/.0000 REAM
+# THRU: GO .1865 and NO-GO .1870 in = 4.7371 and 4.7498 mm. A fixed-limit
+# pair reads no scale; its resolution is each member's Class X tolerance,
+# .000040 in = 0.001016 mm. The pin-gauge sets (gauges.pin-gauges) step by
+# .001 in and hold no .1865. The tools row lets the plan list the pair.
+[gauges.plug-gauges-1865-1870]
+range_mm = [4.7371, 4.7498]
+resolution_mm = 0.001016
+[tools.plug-gauges-1865-1870]
+description = "Plug gauge pair, .1865 GO (plus) and .1870 NO-GO (minus), Vermont Gage Class X"
+
 # --- Drawing cross-check additions (2026-11-19) -------------------------------
 # Tools the v50 drawings call for that the quote workbook left out, from the
 # drawing cross-check of the placeholder plans (2026-11-19) and the owner's
