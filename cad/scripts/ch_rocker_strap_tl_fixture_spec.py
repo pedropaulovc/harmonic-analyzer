@@ -119,11 +119,9 @@ SCREW_TABLE_TITLE = "SCREW SCHEDULE"
 SCREW_TABLE_HEADER = ("ITEM", "NUMBER", "DESCRIPTION", "QTY", "THREAD", "TORQUE")
 BLANK_LABEL = "MHA-CH-13 BLANK, NOT PART OF THE FIXTURE"
 # The hold the strap traveler bonds each blank with for its outline
-# (shop-equipment consumables.hold-painters-tape-ca; plan tape_stack_mm).
-TAPE_NAME = f"BLUE TAPE, CA GLUE, BLUE TAPE ({TAPE / INCH:.3f} STACK)".replace(
-    "(0.", "(."
-)
-_STACK_BAND = f"{TAPE_MIN / INCH:.3f}-{TAPE_MAX / INCH:.3f}".replace("0.", ".")
+# (shop-equipment consumables.hold-painters-tape-ca; plan tape_stack_mm),
+# named without a figure: the stack's band is the traveler's check.
+TAPE_NAME = "BLUE TAPE, CA GLUE, BLUE TAPE"
 
 STEP_WIDTH = 62  # characters a printed line, inside the sheet's right border
 
@@ -217,26 +215,32 @@ _CLAMPED += (
 # The bond steps follow the traveler's (cad/process/ch_rocker_strap/plan.toml,
 # setup 5; owner rulings 2026-11-23: blue painter's tape on both faces, CA
 # glue between, proved by the stack and a hand push test, no pull test),
-# terse: the traveler carries the stack arithmetic and the full wording.
+# terse and one action each: the traveler carries the stack's band and
+# arithmetic. Pressing and the 5 minute wait stay one step (the 25-line
+# limit above the exploded clamps), the wait being no action.
+_TAPE_FIRST = _CLAMP_CHECK + 2
 _TAPED: tuple[str, ...] = (
     f"BACK EVERY ITEM {_C} OFF AND LIFT THE BLANK OFF THE PLATE.",
-    "WIPE THE PLATE TOP AND THE BLANK'S UNDERSIDE WITH ISOPROPYL ALCOHOL; WIPE DRY.",
+    "WIPE PLATE TOP AND BLANK UNDERSIDE WITH ISOPROPYL ALCOHOL.",
     "TAPE THE PLATE: 2 STRIPS ALONG X FROM THE FENCE, BUTTED, NOT "
     "OVERLAPPED; CUT AWAY AT THE COUNTERBORE.",
     "TAPE THE UNDERSIDE: 2 STRIPS BUTTED AT MID-WIDTH, TRIMMED FLUSH "
     "AND CLEAR OF THE HUB HOLE.",
     "BURNISH BOTH TAPES DOWN HARD, EDGES INCLUDED.",
     f"DROP ITEM {_G} INTO THE COUNTERBORE, PILOT UP.",
-    "ZIGZAG THICK CA ON THE PLATE'S TAPE; MIST ACCELERATOR ON THE BLANK'S TAPE.",
-    f"WITHIN 10 S LOWER THE BLANK ONTO ITEM {_G}'S PILOT AND THE FENCE; "
-    "PRESS IT DOWN 1 MINUTE, THEN WAIT 5.",
-    f"CHECK: STACK {_STACK_BAND} AT BOTH ENDS; THE BLANK DOES NOT MOVE "
-    "UNDER A HARD PUSH.",
+    "RUN A ZIGZAG OF THICK CA ON THE PLATE'S TAPE.",
+    "MIST ACCELERATOR ON THE BLANK'S TAPE.",
+    f"LOWER THE BLANK ONTO ITEM {_G} AND THE FENCE WITHIN 10 S.",
+    "PRESS THE BLANK DOWN 1 MINUTE, THEN WAIT 5 MINUTES.",
 )
-_TAPE_FIRST = _CLAMP_CHECK + 2
-_BOND_CHECK = _TAPE_FIRST + len(_TAPED) - 1
+_STACK_CHECK = _TAPE_FIRST + len(_TAPED)
+_PUSH_CHECK = _STACK_CHECK + 2
 _TAPED += (
-    f"IF STEP {_BOND_CHECK} FAILS, PEEL, CLEAN AND REPEAT FROM STEP {_TAPE_FIRST + 1}.",
+    "CHECK: THE STACK IS IN THE MHA-CH-13 TRAVELER'S BAND.",
+    f"IF STEP {_STACK_CHECK} FAILS, PEEL, CLEAN AND REPEAT FROM STEP "
+    f"{_TAPE_FIRST + 1}.",
+    "CHECK: THE BLANK DOES NOT MOVE UNDER A HARD HAND PUSH.",
+    f"IF STEP {_PUSH_CHECK} FAILS, PEEL, CLEAN AND REPEAT FROM STEP {_TAPE_FIRST + 1}.",
     f"PUT ITEM {_W} ON THE BLANK OVER ITS HUB HOLE.",
     f"RUN ITEM {_S} THROUGH ITEM {_W} INTO ITEM {_P}, SNUG.",
 )
@@ -245,7 +249,7 @@ BLANK_STEPS = "\n".join(
         "EACH BLANK, WITH THE MHA-CH-13 TRAVELER",
         f"SETUPS 2-4 (FACES, HUB HOLE), UNDER ITEM {_C}:",
         *numbered(_CLAMPED, start=_FIRST),
-        f"SETUP 5 (OUTLINE): {TAPE_NAME}",
+        f"SETUP 5 (OUTLINE), ON {TAPE_NAME}:",
         *numbered(_TAPED, start=_TAPE_FIRST),
     )
 )
