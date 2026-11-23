@@ -253,7 +253,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}, cutting oil: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Catch the bush."
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}, cutting oil: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Hands clear: let the bush fall; pick it up from the bed or the chip tray only after the spindle has stopped."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 

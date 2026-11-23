@@ -31,7 +31,7 @@ title = "Transgear Pivot Spacer"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 1/2 in"
-stock = "Lot: {{process.quantity:d}} spacer. Ø{{process.stock_dia_in:.3dot}} bar, on hand (the {{process.bar_length_in:g}} in bar, shared with MHA-PD-24, MHA-PD-25 and MHA-MG-11); the spacer takes {{cad.pitch_in:.2dot}} in of it, and the stub mandrel of Setup 2 is turned on the end left in the chuck. Before Setup 1 chucks the bar, hacksaw a 1 in piece off it for the pusher of Op 140: the bar stays in the jaws from Setup 1 to the end of Setup 2."
+stock = "Lot: {{process.quantity:d}} spacer. Ø{{process.stock_dia_in:.3dot}} bar, on hand (the bar, shared with MHA-PD-24, MHA-PD-25 and MHA-MG-11): hacksaw a {{process.bar_length_in:g}} in working piece and a 1 in piece for the pusher of Op 140 off it before Setup 1. The spacer takes {{cad.pitch_in:.2dot}} in of the working piece, and the stub mandrel of Setup 2 is turned on the end left in the chuck: the piece stays in the jaws from Setup 1 to the end of Setup 2."
 note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .1855 chucking reamer and the .1855 GO / .1860 NO-GO plug gauge pair for the bore."
 shop = "../shop"
 stock_refs = ["c360-round-1-2"]
@@ -46,9 +46,11 @@ part = "pd-transgear-pivot-spacer"
 [parameters]
 quantity = 1
 stock_dia_in = 0.5
-# The 12 in bar on hand (stock-bought.toml c360-round-1-2 length_in, shared
-# with MHA-PD-24, MHA-PD-25 and MHA-MG-11) and the length the 3-jaw grips.
-bar_length_in = 12.0
+# A working piece sawn off the 12 in bar on hand (stock-bought.toml
+# c360-round-1-2 length_in, shared with MHA-PD-24, MHA-PD-25 and MHA-MG-11):
+# short enough to stand behind the jaws (the fleet's 10 in limit), and with
+# the two 3 in bushing pieces and the 1 in pusher it leaves 1 in of the bar.
+bar_length_in = 4.0
 chuck_grip_in = 0.75
 # Facing allowance: squares a sawn bar end.
 face_allowance_in = 0.02
@@ -239,7 +241,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.3dot}} over length, for Setup 2. Catch the spacer; leave the bar in the jaws."
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.3dot}} over length, for Setup 2. Hands clear: let the spacer fall; pick it up from the bed or the chip tray only after the spindle has stopped. Leave the bar in the jaws."
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
