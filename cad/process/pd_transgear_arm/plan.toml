@@ -413,7 +413,7 @@ gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.pivot_bore_dia_band_mm}
 
 [[setups.operations]]
 instruction = "The pin bore."
-inspection = "Pin bore Ø{{cad.pin_bore_dia_min_in:.4dot}}–{{cad.pin_bore_dia_max_in:.4dot}}: the .1260 plug enters (GO); the .1265 does not (NO-GO). Its rear mouth shows an even ring of break all round. GO fails or NO-GO enters: stop and tell the owner."
+inspection = "Pin bore Ø{{cad.pin_bore_dia_min_in:.4dot}}–{{cad.pin_bore_dia_max_in:.4dot}}: the .1260 plug enters (GO); the .1265 does not (NO-GO). Its rear mouth shows an even ring of break all round; the break's .008 ±.002 size is not gauged: held by T7's programmed depth in op 130. GO fails or NO-GO enters: stop and tell the owner."
 gauge_checks = [{ gauge = "plug-gauges-1260-1265", band_mm = "{{cad.pin_bore_dia_band_mm}}" }]
 
 [[setups.operations]]
