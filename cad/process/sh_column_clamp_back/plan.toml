@@ -661,7 +661,7 @@ feed = "hand"
 # "log new dechatter issues to try deep axial cuts but with shallow radial
 # depth" (#3427). It keeps the chart setting; the first pair is watched.
 [[setups.operations]]
-instruction = "First pair only: these CB09 cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3427, #3428): rough helix .020 deep a turn x .500 wide, finish turn about .67 deep x .010 wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First pair only: these CB09 cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3427, #3428): rough helix {{process.helix_pitch_mm:in.3dot}} deep a turn x {{process.face_cutter_dia_mm:in.3dot}} wide, finish turn about .67 deep x {{process.bore_finish_stock_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
 feed = "hand"
 
 [[setups.operations]]
@@ -683,7 +683,7 @@ milling_cuts = [
 # ruling (Pedro, 2026-11-22), no re-cut: "log new dechatter issues to try
 # deep axial cuts but with shallow radial depth" (#3427).
 [[setups.operations]]
-instruction = "First pair that needs CB10 only: this CB10 cut at 2650 rpm has not been chatter-tested on this end mill (owner's test list #3427): opening turn about .67 deep x .001 wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First pair that needs CB10 only: this CB10 cut at 2650 rpm has not been chatter-tested on this end mill (owner's test list #3427): opening turn about .67 deep x {{process.bore_open_radial_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
 feed = "hand"
 
 [[setups.operations]]
@@ -739,7 +739,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB11_face_off (M6 T1; set 2370): face the mating face down {{process.grip_offset_mm:in.3dot}} at Z −{{process.grip_offset_mm:in.3dot}} in one level, across the half bore. Unclamp; mic the depth, mating face to outside face, at both ends."
+instruction = "Run CB11_face_off (M6 T1; set 2370): face the mating face down {{cad.grip_offset_mm:in.3dot}} at Z −{{cad.grip_offset_mm:in.3dot}} in one level, across the half bore. Unclamp; mic the depth, mating face to outside face, at both ends."
 settings = "em-half-carbide-1018-v5-face"
 inspection = "Depth {{cad.depth_min_in:.3dot}}–{{cad.depth_max_in:.3dot}}, miked at the N end and the far end; and at each end the grip offset, that end's recorded pre-face depth less its reading here, {{cad.grip_offset_min_in:.3dot}}–{{cad.grip_offset_max_in:.3dot}}."
 gauge_checks = [
