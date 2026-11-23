@@ -398,7 +398,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Overall over {{cad.spigot_end_length_max_in:.3dot}} in Op 100: set DRO Z to the excess and skim to Z0 again, mike again. Under {{cad.spigot_end_length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1 (the bar holds a second unless Op 80 ran)."
+instruction = "Overall over {{cad.spigot_end_length_max_in:.3dot}} in Op 100: spindle running, touch the AR lightly on the spigot end's rim; set DRO Z to the excess (the Op 100 reading less {{process.length_target_in:.3dot}}); face in light skims to Z0; mike again. Under {{cad.spigot_end_length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1 (the bar holds a second unless Op 80 ran)."
 feed = "hand"
 
 [[setups.operations]]
