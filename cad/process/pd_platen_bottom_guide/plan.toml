@@ -468,6 +468,15 @@ feed = "hand"
 instruction = "Prove PB05_ends_drill in air, Z0 raised 1.000 in; every move clears the jaws, through every M6. Then Z0 back."
 feed = "hand"
 
+# The ends are not measured: 10.541 deep is past the deepest measured cut
+# (cad/config/shop-equipment/measured-cuts.toml). Owner (Pedro), 2026-11-22,
+# for deep walls: "log new dechatter issues to try deep axial cuts but with
+# shallow radial depth" (#3427). Until then they keep the chart cut and
+# speed, with a stop on the first part.
+[[setups.operations]]
+instruction = "First part only: these cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3427): PB05's left and right end, {{process.end_axial_doc_mm:in.3dot}} deep × {{process.end_step_max_mm:in.3dot}} wide on the cutter's side. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+feed = "hand"
+
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
@@ -507,14 +516,14 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "File done, still clamped: the length, before tapping."
-instruction_detailed = "Send G20 (the DRO reads inches). Edge finder (900 rpm, console) on the right end from the right: the work X DRO reads the length + .100. Send G21."
+instruction = "File done, still clamped: take the #43 drill out of the spindle (keep it for the next op) and fit the edge finder; then the length, before tapping."
+instruction_detailed = "Take the #43 drill out of its collet and keep it for hole 1's station; fit the edge finder in the spindle. Send G20 (the DRO reads inches). Edge finder (900 rpm, console) on the right end from the right: the work X DRO reads the length + .100. Send G21."
 inspection = "Length {{cad.right_end_length_min_in:.3dot}}–{{cad.right_end_length_max_in:.3dot}}: the DRO {{process.length_dro_min_mm:in.3dot}}–{{process.length_dro_max_mm:in.3dot}}. Outside: stop and tell the owner (both ends are the program's from one X0)."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.right_end_length_band_mm}}" }]
 
 [[setups.operations]]
 instruction = "Still clamped: hole 1's station from the left end."
-instruction_detailed = "The #43 drill that cut the hole, out of its collet: mic its shank. Its shank in hole 1; the calipers from the left end over the shank, less half its miked Ø."
+instruction_detailed = "The #43 drill taken out before the length check: mic its shank. Its shank in hole 1; the calipers from the left end over the shank, less half its miked Ø."
 inspection = "Hole 1 {{cad.lock_tap_1_station_min_in:.3dot}}–{{cad.lock_tap_1_station_max_in:.3dot}} from the left end. The other holes: the program's stations from the same X0, not gauged. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.lock_tap_1_station_band_mm}}" }]
 
