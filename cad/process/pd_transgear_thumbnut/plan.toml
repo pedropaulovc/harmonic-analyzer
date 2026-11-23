@@ -404,12 +404,12 @@ sizing = "other"
 instruction = "Dish cone, carriage still locked: each pass, from a start on the floor, feed the compound out about {{process.cone_compound_travel_in:.2dot}} until the nose leaves the face; wind it back to zero; step the cross slide out .010 or less. The last pass starts at X Ø{{process.recess_corner_x_dro_in:.3dot}}, the floor's corner."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.recess_dia_mm}}"
-inspection = "One clean cone from the floor's corner to the face. The rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}} follows the corner, the depth and the compound's angle (.584–.596), not gauged."
-gauge_checks = "other"
+inspection = "One clean cone from the floor's corner to the face. Floor's corner Ø{{cad.recess_floor_dia_min_in:.2dot}}–{{cad.recess_floor_dia_max_in:.2dot}}, calipers' inside jaws flat on the floor (a check on the X DRO's nose allowance: a wrong one moves it about .04). The rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}} follows that corner, the depth and the compound's angle (.584–.596)."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.recess_floor_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Compound not reading {{process.compound_check_rise_in:.3dot}} (Op 190): reset it before any touch-off. A step at the floor's corner, or the cone not meeting the face: repeat the last cone pass from Ø{{process.recess_corner_x_dro_in:.3dot}}. Depth or corner off its DRO figure: recut the floor there before the cone."
+instruction = "Compound not reading {{process.compound_check_rise_in:.3dot}} (Op 190): reset it before any touch-off. A step at the floor's corner, or the cone not meeting the face: repeat the last cone pass from Ø{{process.recess_corner_x_dro_in:.3dot}}. Depth or corner off its DRO figure: recut the floor there before the cone. Floor's corner outside its band after the cone (Op 220): the rim is off with it: scrapped; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
