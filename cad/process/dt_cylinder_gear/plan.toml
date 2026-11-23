@@ -231,7 +231,7 @@ notch_aim_mm = 3.048
 saw_x_start_mm = 86.9
 saw_x_end_mm = 0.0
 saw_touch_z_mm = 0.843
-saw_touch_y_mm = -0.036
+saw_touch_y_mm = -0.0144
 # ASSUMED until bought (checked at Setups 6 and 7): the stub arbor's nut and
 # shoulder at most Ø1.50; the saw arbor's nut at most 45 mm across (the
 # notch saw's record comment); the BS-0 tailstock within 1 in of its axis at
@@ -658,8 +658,8 @@ instruction = "Before the first load: the BS-0 tailstock's centre reaches the ar
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Indicate the stack's O.D. on blanks 1 and 10 within {{process.mount_tir_max_mm:in.3dot}} TIR each, shimming a jaw (the tooth depth and runout budgets rest on it). More after shimming: stop (the stack has moved on the arbor)."
-inspection = "Stack O.D. {{process.mount_tir_max_mm:in.3dot}} TIR or under on blanks 1 and 10."
+instruction = "Indicate the arbor's body beside the jaws and the stack's O.D. on blanks 1 and 10, each within {{process.mount_tir_max_mm:in.3dot}} TIR, shimming a jaw (the tooth depth and runout budgets rest on them). More after shimming: stop (the stack has moved on the arbor)."
+inspection = "Body and stack O.D. (blanks 1 and 10) {{process.mount_tir_max_mm:in.3dot}} TIR or under."
 gauge_checks = "other"
 feed = "hand"
 

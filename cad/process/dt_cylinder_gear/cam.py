@@ -280,12 +280,13 @@ def context(
             raise ValueError(
                 f"the {name} reaches X{reach:.2f}, past the jaws at X{-p['standoff_mm']:.2f}"
             )
-    # The saw's touch-off: raised half a space, on a tip; Y set past the paper
-    # by the tip's drop there.
+    # The saw's touch-off: raised half a space, on a tip. That crest stands
+    # the tip's drop farther into +Y than the tangent at Z0 (Y0), so the rim,
+    # a paper short of it, is at drop - paper.
     half_space = math.pi / count
     _agree(plan, "saw_touch_z_mm", radius * math.sin(half_space))
     _agree(
-        plan, "saw_touch_y_mm", -(p["paper_mm"] + radius * (1 - math.cos(half_space)))
+        plan, "saw_touch_y_mm", -(p["paper_mm"] - radius * (1 - math.cos(half_space)))
     )
 
     # Arbor (X from the shoulder): body to the jaws, journal, pilot, thread
@@ -320,6 +321,17 @@ def context(
         )
     if pilot_end <= gang * f["cam_face"]["thickness"][1]:
         raise ValueError("the collar does not ride the pilot at the thickest stack")
+    # prechips' beam (Setups 6 and 7): from the jaws to the tail centre.
+    for setup in plan["setups"]:
+        beam = setup.get("beam")
+        if isinstance(beam, dict):
+            span = [-p["standoff_mm"], tail]
+            for key in ("extent_mm", "supports_mm"):
+                if any(abs(a - b) > 0.01 for a, b in zip(beam[key], span)):
+                    raise ValueError(
+                        f"{setup['title']}: beam.{key} {beam[key]}, the arbor spans "
+                        f"[{span[0]:.2f}, {span[1]:.2f}]"
+                    )
     _agree(plan, "stack_stickout_mm", p["standoff_mm"] + tail)
 
     # Depth budget (Main's condition 1): the cut's peak force on the arbor at
@@ -378,9 +390,16 @@ def context(
         raise ValueError(
             f"depth spread {depth_spread:.4f} mm exceeds the plunge band {plunge}"
         )
-    # Runout budget (Main's condition 2): the BS-0 mount and the arbor's fit.
+    # Runout budget (Main's condition 2): the journal's TIR on the BS-0 (the
+    # stack O.D. and the body indicated there), the O.D.'s own offset from
+    # the journal left by Setup 5 (the body's TIR at the lathe's jaws, tapering
+    # to nothing at the tail on its own centre: its share at blank 10's far
+    # face), and the arbor's fit in the largest bore.
     fit = f["bore"]["dia"][1] - p["journal_dia_min_mm"]
-    runout = p["mount_tir_max_mm"] + fit
+    lathe = (
+        p["mount_tir_max_mm"] * (tail - (stack_end - pitch)) / (tail + p["standoff_mm"])
+    )
+    runout = p["mount_tir_max_mm"] + lathe + fit
     if runout > teeth["tooth_runout_tir_max"]:
         raise ValueError(
             f"runout budget {runout:.4f} mm exceeds {teeth['tooth_runout_tir_max']}"

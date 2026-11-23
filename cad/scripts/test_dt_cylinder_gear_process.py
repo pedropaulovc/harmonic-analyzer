@@ -248,6 +248,14 @@ def _seed(posted: list[str], fault: str) -> list[str]:
         k = stops[5]
         assert lines[k - 2] == "M5"
         del lines[k - 2]
+    elif fault == "the spindle not restarted":
+        k = stops[8]
+        assert lines[k + 1].startswith("M3 ")
+        lines[k + 1] = lines[k + 1].split()[1]
+    elif fault == "the spindle restarted after the pass":
+        k = stops[9]
+        assert lines[k + 1].startswith("M3 ") and lines[k + 3].startswith("G1 X")
+        lines.insert(k + 3, lines.pop(k + 1))
     elif fault == "a pass drawn back":
         k = passes[7]
         target = lines[passes[6]].split()[1]
@@ -269,6 +277,8 @@ def _seed(posted: list[str], fault: str) -> list[str]:
         "a stop dropped",
         "a space numbered twice",
         "the spindle left on",
+        "the spindle not restarted",
+        "the spindle restarted after the pass",
         "a pass drawn back",
         "a pass off the depth",
         "a rapid into the stack",

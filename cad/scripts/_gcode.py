@@ -147,6 +147,8 @@ class Program:
     probes: tuple[Probe, ...] = ()
     # Set on the slices :meth:`tool_sections` returns.
     section: int | None = None
+    # Every M3/M4 in file order, as (line, moves before it).
+    starts: tuple[tuple[int, int], ...] = ()
 
     @property
     def name(self) -> str:
@@ -188,6 +190,7 @@ class Program:
                 tuple(n for n in self.machine_moves if first <= n < last),
                 tuple(p for p in self.probes if first <= p.line < last),
                 index,
+                starts=tuple((line, moves - start) for line, moves in self.starts if first <= line < last),
             ))
         return sections
 
@@ -221,6 +224,7 @@ def read_program(path: Path) -> Program:
     moves: list[Move] = []
     stops: list[Stop] = []
     spindle: list[tuple[int, float]] = []
+    starts: list[tuple[int, int]] = []
     machine_moves: list[int] = []
     probes: list[Probe] = []
     previous = ""
@@ -247,6 +251,7 @@ def read_program(path: Path) -> Program:
                 stops.append(Stop(number, kind, comment, (position[0], position[1], position[2]), len(moves), tool, spindle_on))
         if mcodes & {3, 4}:
             spindle_on = True
+            starts.append((number, len(moves)))
         if 5 in mcodes:
             spindle_on = False
         if raw.strip():
@@ -304,7 +309,7 @@ def read_program(path: Path) -> Program:
                 feed=None if motion is Motion.RAPID else feed, centre=centre, plane=plane,
             ))
         position = target
-    return Program(Path(path), tuple(moves), tuple(stops), tuple(spindle), tuple(machine_moves), tuple(probes))
+    return Program(Path(path), tuple(moves), tuple(stops), tuple(spindle), tuple(machine_moves), tuple(probes), starts=tuple(starts))
 
 
 @dataclass(frozen=True)
@@ -794,8 +799,8 @@ def check_indexed_passes(
     each pass ends where the next begins and no form cutter is drawn back
     through a cut space. Between passes one ``M0`` with the spindle off, the
     cutter at the end that pass reached, its operator comment ``messages[i]``
-    in order (the index to make), and an ``S`` word (the spindle restarted)
-    before the next stop. Every feed move is a pass or a Y move at an end;
+    in order (the index to make), and an ``M3``/``M4`` (the spindle restarted)
+    after it and before the next pass's first move. Every feed move is a pass or a Y move at an end;
     every rapid stays at or below ``rapid_y_max`` (outside the work)."""
     name = program.name
     findings: list[Finding] = []
@@ -839,9 +844,9 @@ def check_indexed_passes(
             findings.append(Finding(name, "indexed_passes", f"line {stop.line}: stop {k + 1} says {stop.comment!r}, expected {message!r}"))
         if stop.spindle_on:
             findings.append(Finding(name, "indexed_passes", f"line {stop.line}: stop {k + 1} with the spindle on (no M5 before it)"))
-        after = stops[k + 1].line if k + 1 < len(stops) else math.inf
-        if not any(stop.line < line < after for line, _rpm in program.spindle):
-            findings.append(Finding(name, "indexed_passes", f"line {stop.line}: no S word restarts the spindle after stop {k + 1}"))
+        before = passes[k + 1][0] if k + 1 < len(passes) else len(program.moves)
+        if not any(stop.line < line and moves <= before for line, moves in program.starts):
+            findings.append(Finding(name, "indexed_passes", f"line {stop.line}: no M3/M4 restarts the spindle after stop {k + 1} before the next pass"))
     return findings
 
 
