@@ -19,8 +19,8 @@
 # status: on_hand, not_received (bought, not in the shop) or to_order. Owner
 # (Pedro) 2026-11-17, "assume all stock bought is on hand except for platen
 # c360 brass bar": every bought row is on_hand. The platen's C360 brass bar
-# (Metal Supermarkets invoice EC234347) was refunded and is a to-order row
-# again (stock-to-order.toml c360-flat-1-4x6; owner 2026-11-23).
+# (Metal Supermarkets invoice EC234347) was refunded and is a to_order row
+# again (c360-flat-1-4x6 below; owner 2026-11-23).
 # Each row is keyed by material, form and size (with length where two rows
 # share a size). Parts point at stock from their process plans, never the
 # other way round: a plan's stock reference names the row's key.
@@ -412,6 +412,19 @@ cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2
 # 11in: pd-platen (MHA-PD-02) + pd-platen-rack backer (MHA-PD-05). DOM
 # 1.000x0.120 5 x 41in: fr-tube-frame (MHA-FR-03)". Invoice nominals, not
 # metrology.
+# The C360 bar was refunded: owner (Pedro) 2026-11-23, "brass platen was
+# ordered previously on metalssupermarket but they refunded it because they
+# couldnt find stock so needs to be added to cart again". Its row stays in
+# this file as to_order (test_pd_platen_process reads it here).
+[stock.c360-flat-1-4x6]
+form = "flat_bar"
+material = "C360 brass"
+note = "To order: brass flat bar C360 0.250 x 6.000 in, 1 piece x 11.000 in. Allocation: pd-platen (MHA-PD-02). Not owned: the Metal Supermarkets order (invoice EC234347, $168.60) was refunded for want of stock (owner 2026-11-23). Sources read live 2026-11-23: no 1/4 x 6 in C360 bar could be bought online at OnlineMetals (pid 20203 loads without a length option), McMaster-Carr, Speedy Metals or Midwest Steel; Metal Supermarkets' Kent store page still listed SKU BF360/2506 at $168.60 for 11 in, against the refund. Thicker 6 in wide bar exists (OnlineMetals pid 20986, 3/8 x 6, 12 in, $321.60) but is not this row's size. No supplier chosen."
+section_mm = [152.4, 6.35]
+length_mm = 279.4
+status = "to_order"
+cite = ["Metal Supermarkets Kent invoice EC234347, date ordered 03 Nov 2026, line Brass Flat Bar C360 0.250 X 6.000, qty 1 @ 11.000 in (refunded)", "Owner (Pedro) 2026-11-23: \"brass platen was ordered previously on metalssupermarket but they refunded it because they couldnt find stock so needs to be added to cart again\""]
+
 [stock.1020-dom-tube-1x0120]
 form = "round_tube"
 material = "1020 DOM mild steel tube"
