@@ -50,10 +50,13 @@ id = "saw"
 name = "Junior hacksaw, 32 TPI blade"
 ref = "junior-hacksaw"
 
+# Owned two-grit stone in place of the India stone (tool audit 2026-11-23,
+# level 0, india-stone-ib8: an India stone is aluminium oxide, as is the
+# owned stone's fine face; deburring only, no grit or length asked).
 [[tools]]
 id = "stone"
-name = "India stone"
-ref = "india-stone-ib8"
+name = "Two-grit sharpening stone (320 face)"
+ref = "sharpening-stone-two-grit"
 
 [[setups]]
 machine_kind = "other"
@@ -111,7 +114,7 @@ speed_kind = "other"
 tool = "stone"
 drilling = "none"
 sizing = "other"
-instruction = "Stone the burr off both cut ends and break their edges, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max; leave the four long flats as supplied."
+instruction = "Stone the burr off both cut ends on the 320-grit face of the two-grit sharpening stone and break their edges, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max; leave the four long flats as supplied."
 feed = "hand"
 
 [[setups.operations]]

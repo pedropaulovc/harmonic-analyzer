@@ -44,6 +44,10 @@ note = "One of the owned T-handle tap wrenches, this one or the 40-piece set's (
 cite = ["Photo 20250628_224109095_iOS.heic, 2025-06-28, beside the metric tap set", "Owner (Pedro) 2026-11-17: the photo shows owned tools", "Owner (Pedro) 2026-11-17, asked whether the T-handle tap wrench he will use for the clamp's 4-40 tap has a centre hole in its top for the dead centre's point: \"y\". Owner-confirmed, not measured."]
 
 [holders.drill-chuck-jt33-straight-1-2]
+make = "HHIP"
+sku = "9999-0013"
+source = "https://www.jbtools.com/hhip-1-2-jt33-drill-chuck-with-1-2-straight-shank-arbor-9999-0013/"
+purchase = "J&B Tools JB-DS-ABS-9999-0013, $21.85 (sale; list $27.31), 20 in stock (read live 2026-11-22)."
 name = "1/2 in JT33 drill chuck on a 1/2 in straight-shank arbor (HHIP 9999-0013)"
 kind = "drill_chuck"
 status = "to_order"

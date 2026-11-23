@@ -275,7 +275,9 @@ name = "Plug gauges .4001, .4002, .4003, .4004, Class X"
 kind = "plug_gauge_set"
 make = "Vermont Gage"
 status = "to_order"
-purchase = "Four Vermont Gage standard Class X steel pin/plug gages, .4001, .4002, .4003 and .4004 in, each +/- .000040 in, used with the .4000/.4005 pair (gauges.plug-gauges-4000-4005); no part number, price or stock read."
+sku = "80296312, 85872265, 65607640, 82164948"
+source = "https://www.mscdirect.com/product/details/80296312"
+purchase = "Four Vermont Gage standard Class X steel pin/plug gages, .4001, .4002, .4003 and .4004 in, plus tolerance (+.000040/-0, as the .4000 GO of gauges.plug-gauges-4000-4005, so a pin that enters proves the hole at least its marked size), MSC 80296312, 85872265, 65607640 and 82164948, $20.64-21.27 each, ship from supplier (read live 2026-11-22). The minus pins are MSC 81659344, 80342900, 80342868, 67071886."
 note = "Not owned: to buy. MHA-CH-12 Setup 1 Op 10: the largest of the six pins .4000-.4005 that enters each MHA-CH-13 hub hole is that hole's reading; the lot's land is turned from the readings."
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Owner (Pedro) 2026-11-21: \"ill buy pin gauges\""]
 
@@ -542,11 +544,18 @@ note = "Not owned: to buy. MHA-PD-22 drive collar Ø.0615 +.0005/.0000 blind REA
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
 
 [gauges.gauge-pin-0625]
+make = "Vermont Gage"
+sku = "88906250"
+source = "https://www.mscdirect.com/product/details/88906250"
+purchase = "MSC 88906250, Vermont Gage Class ZZ .0625 in plus pin (+.0002/-0), $4.48 (read live 2026-11-22): the GO of a hole reamed .0625 +.0005/0 is a plus pin (owner ruling #3075, above gauges.pin-gauges). The minus pin, MSC 89006258, is the same price and is not the GO."
 kind = "gauge_pin"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-10 .002 TIR TO A Ø.0625 PIN."
 
 [gauges.sine-bar-5]
+sku = "3525"
+source = "https://littlemachineshop.com/products/sine-bar-5"
+purchase = "LittleMachineShop 3525, Sine Bar, 5 in, $46.95, available (read live 2026-11-22). Alternative: Travers 57-020-220 (TTC ESB-5, 1 in wide), $72.94."
 kind = "sine_bar"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-SM-03 122.4° ±.5° knife-edge stubs."
