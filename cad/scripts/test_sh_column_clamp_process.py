@@ -152,6 +152,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(
         ("sh_column_clamp_back", "spacer_block_width_mm", 38.1, "screw heads"),
         ("sh_column_clamp_back", "screw_length_mm", 33.0, "stand out"),
         ("sh_column_clamp_back", "bore_mill_projection_min_mm", 25.4, "collet's face"),
+        ("sh_column_clamp_back", "grip_offset_mm", 0.635, "export's grip offset"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(
