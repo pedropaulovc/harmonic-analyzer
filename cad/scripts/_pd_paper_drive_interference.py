@@ -39,10 +39,10 @@ _RING_PRONG_SHARE = 3.0 * math.atan(0.75) / (2.0 * math.pi)
 # Pairs with NO row, modelled line to line or with clearance, which the gate
 # reads as contact: the MHA-PD-17 hub's plain bore on the sleeve's Ø9 boss,
 # the MHA-PD-VN-69 key pin's side clear of the sleeve's flat (#2409), the
-# MHA-PD-VN-58 dowel in the arm's Ø3.175 ream, the sleeve and both
+# sleeve and both
 # bushings on the MHA-PD-23 pin (Ø3.9), the disc bore on the boss (Ø9), the
 # knob journal in the MHA-PD-28 bush's bore (Ø6.3246), the bush pressed in
-# the plate's ream (FN2, both modelled line to line at Ø11.1125; owner ruling
+# the plate's ream (both modelled line to line at Ø11.1379; owner ruling
 # 2026-11-20, #2425), the drive collar's drilled round bore on the core made
 # to fit it (both modelled line to line at Ø4.8514, the #11 drill; fit audit
 # 2026-11-23), the MHA-PD-VN-70 pin's crest clear of the core's flat
@@ -153,16 +153,23 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         3.21564, 3.2004, 7.366
     ),
     # The two MHA-PD-VN-64 dowels (pd_vn_transgear_arm_plate_locating_pin_spec,
-    # 3/32 = Ø2.38125 model) pressed into the arm's Ø2.3622 through reams
+    # 1/8 = Ø3.175 model) pressed into the arm's Ø3.1496 through reams
     # (pd_transgear_arm_geometry); _transgear_arm_plate_locating_interface
     # owns the 1.7018 proud set in their 7.9375 - 1.7018 insertion: the press.
-    # They slip in the plate's Ø2.4003 holes, so that pair has no row.
+    # They slip in the plate's Ø3.2004 holes, so that pair has no row.
     **numbered_pairs(
         "pd-vn-transgear-arm-plate-locating-pin",
         range(1, 3),
         "pd-transgear-arm",
-        smooth_annulus_limit_mm3(2.38125, 2.3622, 7.9375 - 1.7018),
+        smooth_annulus_limit_mm3(3.175, 3.1496, 7.9375 - 1.7018),
     ),
+    # The MHA-PD-VN-58 latch pin (pd_vn_transgear_latch_pin_spec, 1/8 =
+    # Ø3.175 model) pressed its 8.5 PRESS_DEPTH into the arm's Ø3.1496 blind
+    # ream (pd_transgear_arm_geometry, the .1240 set reamer's size): the
+    # press.
+    frozenset(
+        ("pd-vn-transgear-latch-pin-1", "pd-transgear-arm-1")
+    ): smooth_annulus_limit_mm3(3.175, 3.1496, 8.5),
     # MHA-PD-20 (pd_transgear_pivot_spacer_spec, Ø.1850 ream) pressed on the
     # MHA-PD-VN-57 Ø4.7625 shoulder over its whole 5.0 length (R9-71): the press.
     frozenset(("pd-transgear-pivot-spacer-1", "pd-vn-transgear-pivot-screw-1")): (
