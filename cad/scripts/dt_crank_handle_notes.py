@@ -42,10 +42,13 @@ def _floor_thou(value_mm: float) -> str:
 # Rule 4: each fit by its standard name and its mate by name and full
 # number, the clearance its limits give as a reference.  The tenon and the
 # counterbore are epoxied (dt_crank_handle_ferrule_spec,
-# dt_crank_handle_butt_cup_spec), so bonded.  The reamed bore runs on the
-# MHA-DT-32 shoulder (#290 fit F12: .0050-.0075).
+# dt_crank_handle_butt_cup_spec), so bonded.  The drilled bore runs on the
+# MHA-DT-32 shoulder (#290 fit F12: .0050-.0075).  Owner ruling 2026-11-23,
+# tool audit Q14: "DRILL #20, read with pins, turn the MHA-DT-32 shoulder
+# last to the bore less .0050-.0075, trial hole in an oak offcut first": the
+# process word is DRILL (#20 is .1610, the bore's printed reference).
 PIVOT_BORE_CALLOUT = (
-    f"REAM THRU, RUNNING FIT ON\n{SCREW_NUMBER} {SCREW_NAME}\n"
+    f"DRILL THRU, RUNNING FIT ON\n{SCREW_NUMBER} {SCREW_NAME}\n"
     f"(CLEARANCE {_range((DIAMETRAL_CLEARANCE_MIN, DIAMETRAL_CLEARANCE_MAX), 4)})"
 )
 TENON_NOTE_NUMBER = 1

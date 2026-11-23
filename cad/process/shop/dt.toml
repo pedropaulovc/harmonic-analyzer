@@ -73,6 +73,14 @@ diameter_mm = 11.43
 [tools.reamer-4835]  # B-reamer-.4835
 description = ".4835 in HSS chucking reamer"
 diameter_mm = 12.2809
+# The 7/16 "over" member of the Shars 404-7303 over/under set: both MHA-DT-05
+# journal bores .4385 +.0005/0 and the MHA-DT-11 drive-pin jig's bore (owner
+# ruling 2026-11-23, tool audit Q11: "Both bores dia .4385 +.0005/0 (7/16 over
+# reamer of the Shars set)"). Inventory record cad/config/shop-equipment/
+# tools.reamer-4385 (to order).
+[tools.reamer-4385]
+description = ".4385 in HSS chucking reamer (7/16 over, Shars 404-7303 set)"
+diameter_mm = 11.1379
 [tools.tap-1-4-28-plug]  # Tap coverage 1/4-28 UNF
 description = "1/4-28 UNF plug hand tap (OSG 1120408)"
 [tools.broach-bushing-3-8-a]  # F-broach-bushing
@@ -509,3 +517,29 @@ range_mm = [1.6002, 1.6129]
 resolution_mm = 0.00508
 [tools.zz-pins-0630-0635]
 description = "Class ZZ pins for .0630-.0635: GO .0630 plus (single), NO-GO .0635 minus (single)"
+# .4385-.4390: MHA-DT-05's two journal bores and the MHA-DT-11 drive-pin
+# jig's bore (owner ruling 2026-11-23, tool audit Q11); MHA-DT-11 re-gauges
+# the post's crank bore.
+[gauges.zz-pins-4385-4390]
+range_mm = [11.1379, 11.1506]
+resolution_mm = 0.00508
+[tools.zz-pins-4385-4390]
+description = "Class ZZ pins for .4385-.4390: GO .4385 plus (single), NO-GO .439 minus (the .061-.500 box)"
+# .157-.160: MHA-DT-14 follower seat, end-milled (owner ruling 2026-11-23,
+# tool audit Q8: "check with .157/.160 pins").
+[gauges.zz-pins-1570-1600]
+range_mm = [3.9878, 4.064]
+resolution_mm = 0.00508
+[tools.zz-pins-1570-1600]
+description = "Class ZZ pins for .157-.160: GO .157 plus (single), NO-GO .160 minus (the .061-.500 box)"
+# .1610-.1635: MHA-DT-08's #20-drilled oak bore and its trial hole (owner
+# ruling 2026-11-23, tool audit Q14: "DRILL #20, read with pins"). A #20 never
+# cuts under .1610; .1635 is the largest bore the MHA-DT-32 shoulder print
+# (.1540-.1560) fits at .0050-.0075 and the handle's walls are sized at
+# (dt_crank_handle_spec.PIVOT_BORE_FIT_MAX). The bore is read with the box's
+# .161, .162 and .163 minus pins; the .1635 minus single is the NO-GO.
+[gauges.zz-pins-1610-1635]
+range_mm = [4.0894, 4.1529]
+resolution_mm = 0.00508
+[tools.zz-pins-1610-1635]
+description = "Class ZZ pins for .1610-.1635: reading pins .161, .162, .163 minus (the .061-.500 box), NO-GO .1635 minus (single)"

@@ -596,7 +596,7 @@ if SHAFT_DIA + NECK_DIA_TOL >= (
     JOURNAL_DIA + JOURNAL_DIA_BAND[1]
 ):
     raise AssertionError("a loose neck must stay under the journal at print-worst")
-# Both Ø.449 lands run in MHA-DT-05 and therefore need their own Ra 63
+# Both Ø.4375 lands run in MHA-DT-05 and therefore need their own Ra 63
 # control on the native cylindrical face and their own drawing leader.  The
 # collar's rear face runs against the post boss's south face, so it
 # carries the running grade too; the wheel's seat face is a static sprocket
@@ -662,7 +662,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDiaDim": 4},
     "Shaft": {"Depth": dt_crank_pinion_spec.SHAFT_LENGTH_PLACES},
     "ShaftDomeProfile": {"DomeHeight": 2},
-    "JournalProfile": {"JournalDiaDim": 4},  # 11.4046, .449 in
+    "JournalProfile": {"JournalDiaDim": 4},  # 11.1125, .4375 in
     "ReliefProfile": {"ReliefDiaDim": RELIEF_DIA_PLACES},
     "PinionSeatProfile": {"PinionSeatDiaDim": 4, "NeckDiaDim": NECK_DIA_PLACES},
     "SpigotProfile": {"SpigotDiaDim": SPIGOT_DIA_PLACES},

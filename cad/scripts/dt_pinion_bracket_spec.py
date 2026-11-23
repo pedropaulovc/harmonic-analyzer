@@ -19,7 +19,6 @@ marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 from __future__ import annotations
 
-from _fit_ream_h7 import REAM_H7
 from _fit_ream_slide import REAM_SLIDE
 from _gtol_cylinder import CylinderFace
 from _inch_wall_limits import WALL_TARGET_MM
@@ -57,10 +56,14 @@ import dt_vn_pinion_strap_pin_spec as _strap_pin
 # shaft for fit-up and the cross hole can be match-drilled through both.
 PIVOT_BORE_BAND = REAM_SLIDE
 ARBOR_BORE_BAND = REAM_SLIDE  # pinion arbor turns in it
-# The MHA-DT-25 5/32 drill-rod stud slips into this seat, cut by the .1570
-# chucking reamer, and is bonded with LOCTITE 638 (U27; dt_pinion_cam_pin_spec
-# proves the bond gap).
-PIN_SEAT_DIA_BAND = REAM_H7
+# The MHA-DT-25 5/32 drill-rod stud slips into this seat and is bonded with
+# LOCTITE 638 (U27; dt_pinion_cam_pin_spec proves the bond gap).  Owner
+# ruling 2026-11-23, tool audit Q8 (option A): "Re-band to +.003/0, finish
+# with the 1/8 end mill, check with .157/.160 pins".  It was +.0005/.0000
+# (REAM_H7) with a FLAT-BOTTOM REAM: no flat-bottom .1570 reamer is sold as a
+# catalogue item, and the bond needs no reamed band (largest gap .0042 against
+# the 638's 0.25 mm).  (upper, lower) deviations.
+PIN_SEAT_DIA_BAND = (0.0762, 0.0)  # +.003/.000
 
 # Option E-a set-pin cross hole (dt_vn_pinion_strap_pin_spec).  Its location is a
 # functional requirement, not habit: the hole is match-drilled at assembly
@@ -112,17 +115,19 @@ if min(PIN_SEAT_WEB_WORST, PIN_SEAT_NEAR_WEB_WORST) < WALL_TARGET_MM:
         f"follower-seat web {PIN_SEAT_WEB_WORST:.3f} is under the .080 in target"
     )
 
-# The seat floor is modelled sharp; the corner allowance lets the builder pick
-# a flat-bottom reamer or end mill (rule 16, r2/r3 machinist review, #1007):
-# a stud bottomed on that corner stands off at most this radius, well inside
-# the seat depth's .XX band.  The seat callout prints it.
+# The seat floor is modelled sharp; the corner allowance is what the 1/8 end
+# mill's corner leaves (rule 16, r2/r3 machinist review, #1007): a stud
+# bottomed on that corner stands off at most this radius, well inside the
+# seat depth's .XX band.  The seat callout prints it.
 PIN_SEAT_FLOOR_CORNER_R_MAX = 0.2032  # .008
-# The seat's size callout: process and its REF depth (rule 26: never deferred
-# to a view; Section B-B's .16 controls the floor), the bonded mate (rule 4),
-# then the floor-corner allowance.
+# The seat's size callout: its REF depth and flat floor (rule 26: never
+# deferred to a view; Section B-B's .16 controls the floor), the bonded mate
+# (rule 4), then the floor-corner allowance.  No cutter is named (tool audit
+# Q8 drops the REAM; MHA-PD-16's pilot precedent: "FLAT BOTTOM END MILL"
+# named a tool, not a requirement).
 PIN_SEAT_CALLOUT = "\n".join(
     (
-        f"FLAT-BOTTOM REAM <HOLE-DEPTH> ({PIN_SEAT / 25.4:.2f})".replace("(0.", "(."),
+        f"<HOLE-DEPTH> ({PIN_SEAT / 25.4:.2f}) FLAT BOTTOM".replace("(0.", "(."),
         "BONDED FIT ON MHA-DT-25",
         f"FLOOR CORNERS R{PIN_SEAT_FLOOR_CORNER_R_MAX / 25.4:.3f} MAX".replace(
             "R0.", "R."
@@ -157,8 +162,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # ), so the MODEL owns them: build_dt_pinion_bracket applies this map to the
 # .SLDPRT and draw_dt_pinion_bracket only reads it back.
 #
-# #290 inch sheet.  Four places on the three reamed bores and the cross hole,
-# whose +.0015/+.0010, +.0005/.0000 and +.0025/.0000 bands need them.  Three
+# #290 inch sheet.  Four places on the two reamed bores and the cross hole,
+# whose +.0015/+.0010 and +.0025/.0000 bands need them; three on the follower
+# seat's +.003/.000 (tool audit Q8).  Three
 # (.XXX, +/-.005) where a stack or web reads the row, each naming its function
 # at the dimension: PinSeatCy (the follower stud's height above the pivot sets
 # how far the drum swings for a given cam lift) and the seat's station (owner
@@ -166,7 +172,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # (the rig feeler-sets its span and reads the printed limits), the bore centre
 # distance (no check reads its band; at the engaged pose a .010 error moves
 # the mesh centre a quarter of that), the unmated end radii and the seat
-# depth, which a flat-bottom reamer bottoms out.
+# depth, which the end mill's flat floor bottoms out.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
         "PivotBoreDia": 4,
@@ -176,7 +182,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "TopCapRadius": END_RADIUS_PLACES,
     },
     "Strap": {"Depth": THICKNESS_PLACES},
-    "PinSeatProfile": {"PinSeatDia": 4, "PinSeatCy": 3, "PinSeatCz": 3},
+    "PinSeatProfile": {"PinSeatDia": 3, "PinSeatCy": 3, "PinSeatCz": 3},
     "PinSeat": {"PinSeatDepth": 2},
     "CrossHoleProfile": {"CrossHoleDia": 4},
 }

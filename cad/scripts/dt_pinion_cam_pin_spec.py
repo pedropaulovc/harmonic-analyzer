@@ -11,11 +11,11 @@ marked-dimension map keeps the part marks and drawing keeps in lockstep
 from __future__ import annotations
 
 import _config
-from _fit_ream_h7 import REAM_H7
 from _gtol_cylinder import CylinderFace
 from _package_units import drawing_unit
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_pinion_bracket_geometry import PIN_BORE as SEAT_DIA
+from dt_pinion_bracket_spec import PIN_SEAT_DIA_BAND as SEAT_BAND
 from dt_pinion_cam_pin_geometry import (
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
@@ -28,11 +28,11 @@ from dt_pinion_cam_pin_geometry import (
 UNIT = drawing_unit("parts/dt-pinion-cam-pin", _config.parts("dt-pinion-cam-pin"))
 
 # U27 (Main, 2026-09-23): no press.  The stud is stock drill rod slipped into
-# the MHA-DT-14 strap's reamed follower seat and bonded with LOCTITE 638,
-# inside the 0.25 mm bond gap the 638 data sheet allows (the U6 drum-to-arbor
+# the MHA-DT-14 strap's follower seat and bonded with LOCTITE 638, inside the
+# 0.25 mm bond gap the 638 data sheet allows (the U6 drum-to-arbor
 # precedent).  A novice cannot hold the old +/-0.004 press band.  #290: 5/32
-# O1 drill rod at the supplier's .1563 +/-.0005 in, in the .1570 +.0005/.0000
-# reamed seat.
+# O1 drill rod at the supplier's .1563 +/-.0005 in, in the .157 +.003/.000
+# end-milled seat (owner ruling 2026-11-23, tool audit Q8).
 PIN_DIA_BAND = (0.0127, -0.0127)  # (upper, lower): +/-.0005 in, the drill rod's
 SEAT_NUMBER = "MHA-DT-14"
 RETAINING_COMPOUND = "LOCTITE 638"
@@ -95,8 +95,8 @@ SURFACE_FINISHES = (
     ),
 )
 
-# The bond gap between the stud's and the seat's printed limits.
-SEAT_BAND = REAM_H7
+# The bond gap between the stud's and the seat's printed limits (the seat's
+# band is the strap spec's).
 BOND_CLEARANCE_MIN = round(SEAT_DIA + SEAT_BAND[1] - (PIN_DIA + PIN_DIA_BAND[0]), 6)
 BOND_CLEARANCE_MAX = round(SEAT_DIA + SEAT_BAND[0] - (PIN_DIA + PIN_DIA_BAND[1]), 6)
 if BOND_CLEARANCE_MIN < 0.0 or BOND_CLEARANCE_MAX > RETAINING_COMPOUND_MAX_GAP_MM:

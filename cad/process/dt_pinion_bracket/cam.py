@@ -30,8 +30,10 @@ face) down.
   until the saw cuts across it (Setup 3).
 - PB04 (one strap on edge on stacked parallels, A against the fixed jaw, the
   far flank down, the seat flank up): spot the follower seat, drill it #26
-  short of its floor, flat-bottom the seat's floor with the 1/8 in end mill,
-  then ream the seat .1570 to just above the floor (fed in and out). The
+  short of its floor, then the 1/8 in end mill plunges to the floor and
+  interpolates the seat: one turn that flattens the floor, one that finishes
+  the wall to the middle of its .157 +.003/.000 band (owner ruling
+  2026-11-23, tool audit Q8: "finish with the 1/8 end mill"). The
   cross hole is not drilled here: it is match-drilled 1/16 through the strap
   and the MHA-DT-19 shaft together at assembly (owner ruling 2026-11-21,
   MHA-DT-00 STEP 16, SHAFT DRILL SET).
@@ -48,7 +50,7 @@ Toolpath rules (owner rulings 2026-11-16): faces zigzag (ball screws),
 plunges beside the stock at the cutting feed, plunges into metal (the outline
 levels and the seat floor) at the plan's plunge feed, real G0 above the
 stock. The outline runs anticlockwise round the strap: conventional with a
-clockwise spindle; the seat floor runs clockwise inside it, conventional too.
+clockwise spindle; the seat's turns run clockwise inside it, conventional too.
 Reamers feed in and out (a rapid retract can score the bore).
 """
 
@@ -81,8 +83,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
         (
             ("edge_spot",),
             ("seat_drill",),
-            ("seat_floor",),
-            ("seat_ream",),
+            ("seat_mill",),
         ),
     ),
 )
@@ -100,7 +101,6 @@ CAM_TOOLS = (
     "reamer-3135",
     "em-eighth",
     "drill-26",
-    "reamer-1570",
 )
 IN = 25.4
 # ANSI trade size 1 combined drill and countersink, 60° included (3/64 pilot,
@@ -136,9 +136,6 @@ EDGE_FINDER_RADIUS_MM = 0.1 * IN
 # and Starrett T436 catalogue pages): PB02's thickness check puts it under
 # the blank's overhang beyond the parallels.
 MIC_ANVIL_MM = 0.25 * IN
-# The .1570 bottoming reamer's corner break, its purchase limit (shop
-# tools.reamer-1570-bottoming: .002 in max).
-REAMER_CORNER_MM = 0.002 * IN
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
 # The posted outline's cutter centre may stray from its offset by this share
@@ -403,21 +400,29 @@ def _outline(
     return lines
 
 
-def _floor(xy: list[float], top: float, floor: float, offset: float) -> list[str]:
-    """The seat's floor: plunge the end mill at the seat's centre to the
-    floor, then one clockwise turn ``offset`` off the centre (two halves),
-    back to the centre and out."""
+def _seat(
+    xy: list[float], top: float, floor: float, offsets: tuple[float, ...]
+) -> list[str]:
+    """The seat: plunge the end mill at the seat's centre to the floor, then
+    one clockwise turn at each of ``offsets`` off the centre (two halves
+    each, stepping out between them on the floor), back to the centre and
+    out."""
     x, y = xy
     clear, safe = _r(top + CLEAR_MM), _r(top + SAFE_MM)
-    e = _r(offset)
-    return [
+    lines = [
         f"G0 Z{clear:.3f}",
         f"G0 X{_r(x):.3f} Y{_r(y):.3f}",
         f"G0 Z{safe:.3f}",
         f"G1 Z{_r(floor):.3f} F{{plunge}}",
-        f"G1 X{_r(x + offset):.3f} F{{feed}}",
-        f"G2 X{_r(x - offset):.3f} Y{_r(y):.3f} I{-e:.3f} J0.000 F{{feed}}",
-        f"G2 X{_r(x + offset):.3f} Y{_r(y):.3f} I{e:.3f} J0.000 F{{feed}}",
+    ]
+    for offset in offsets:
+        e = _r(offset)
+        lines += [
+            f"G1 X{_r(x + offset):.3f} F{{feed}}",
+            f"G2 X{_r(x - offset):.3f} Y{_r(y):.3f} I{-e:.3f} J0.000 F{{feed}}",
+            f"G2 X{_r(x + offset):.3f} Y{_r(y):.3f} I{e:.3f} J0.000 F{{feed}}",
+        ]
+    return lines + [
         f"G1 X{_r(x):.3f} F{{feed}}",
         f"G1 Z{safe:.3f} F{{feed}}",
         f"G0 Z{clear:.3f}",
@@ -621,13 +626,13 @@ def context(
     # The outline: the 1/8 in end mill in equal levels into the gap, round
     # all but the bridge at each arbor end.
     out_rpm, out_feed = _setting(plan, shop, "outline")
-    floor_rpm, floor_feed = _setting(plan, shop, "seat floor")
-    if (floor_rpm, floor_feed) != (out_rpm, out_feed):
-        raise ValueError("'seat floor' runs at another setting than 'outline'")
+    seat_mill_rpm, seat_mill_feed = _setting(plan, shop, "seat")
+    if (seat_mill_rpm, seat_mill_feed) != (out_rpm, out_feed):
+        raise ValueError("'seat' runs at another setting than 'outline'")
     plunge = p["eighth_plunge_feed_per_min_mm"]
     if not 0 < plunge <= out_feed:
         raise ValueError("the 1/8 in end mill's plunge feed is not under its feed")
-    for name in ("outline", "seat floor"):
+    for name in ("outline", "seat"):
         if not math.isclose(_cut(plan, name, "cutter_dia_mm"), e8, abs_tol=1e-6):
             raise ValueError(f"'{name}' cutter is not the 1/8 in end mill")
     if not math.isclose(
@@ -660,49 +665,34 @@ def context(
         plan, "pivot_apex_x_mm", -(sum(g["radius_band"]) / 2 + EDGE_FINDER_RADIUS_MM)
     )
     seat = g["seat"]
-    d26, d1570 = tool_dia("drill-26"), tool_dia("reamer-1570")
-    if not seat["dia"][0] <= d1570 <= seat["dia"][1]:
-        raise ValueError(
-            f"reamer-1570 Ø{d1570} is outside the seat's band {seat['dia']}"
-        )
+    d26 = tool_dia("drill-26")
     # The spot's mouth under the #26, so the drill takes it out.
     if not edge_spot < d26:
         raise ValueError("the edge spot is over the #26")
-    if not 0 < d1570 - d26 <= p["ream_stock_max_mm"]:
-        raise ValueError("the #26 leaves the .1570 reamer no stock or too much")
     floor = -seat["depth_nominal"]
     _agree(plan, "seat_floor_z_mm", floor)
     seat_drill_tip = floor + p["seat_drill_floor_gap_mm"]
-    # The 1/8 in end mill takes out the #26's point cone and flattens the
-    # floor in one turn under the reamer; the bottoming reamer then reams
-    # the wall to its tip seat_ream_floor_gap_mm above that floor. What is
-    # left in the floor's corner, the step (leg up to the gap) and the
-    # reamer's corner break above it, must lie inside the drawing's R max
-    # corner: the step's outer corner outside the fillet's arc, and the
-    # break's 45° line no nearer the arc's centre than R (gap + break
-    # <= (2 - √2) R).
+    # The 1/8 in end mill plunges to the floor and interpolates the seat:
+    # a plunged 1/8 cutter cuts .125, not the .157 +.003/.000 band (owner
+    # ruling 2026-11-23, tool audit Q8). Its first turn takes out the #26's
+    # wall and point cone and flattens the floor; its second finishes the
+    # wall at the band's middle, so the mill's circle may stray half the band
+    # either way. Both turns run on the floor, so the floor's corner is the
+    # square end mill's own, inside the drawing's R max corner.
     floor_dia = p["seat_floor_dia_mm"]
-    if not e8 < floor_dia < d1570:
+    finish_dia = p["seat_finish_dia_mm"]
+    _agree(plan, "seat_finish_dia_mm", sum(seat["dia"]) / 2)
+    if not e8 < floor_dia < finish_dia:
         raise ValueError(
-            "the seat floor's turn is not between the end mill and the reamer"
+            "the seat floor's turn is not between the end mill and the seat's finish"
         )
     if not d26 <= floor_dia:
         raise ValueError(
             "the seat floor's turn is under the #26: it leaves the drill's wall"
         )
-    gap, rmax = p["seat_ream_floor_gap_mm"], seat["floor_corner_r_max"]
-    leg = (d1570 - floor_dia) / 2
-    if (rmax - leg) ** 2 + (
-        rmax - gap
-    ) ** 2 < rmax**2 - 1e-12 or gap + REAMER_CORNER_MM > (
-        2 - math.sqrt(2)
-    ) * rmax + 1e-9:
-        raise ValueError(
-            f"the corner the floor's turn and the reamer leave is outside the R{rmax} floor corner"
-        )
-    seat_ream_tip = floor + gap
+    if not finish_dia - floor_dia <= e8 / 2:
+        raise ValueError("the seat's finish turn takes more than a quarter of the cutter")
     seat_rpm, seat_feed = _setting(plan, shop, "seat drill")
-    sream_rpm, sream_feed = _setting(plan, shop, "seat ream")
 
     names = {tool["id"]: tool["name"] for tool in plan["tools"]}
     numbers = {
@@ -910,26 +900,18 @@ def context(
         {
             **e8_tool,
             "frame": "edge",
-            "label": "seat floor",
+            "label": "seat",
             "stock": stocks["edge"],
             "ops": [
                 [
-                    "seat_floor",
-                    "flat-bottom the seat's floor",
-                    _floor(seat_xy, 0.0, floor, (floor_dia - e8) / 2),
-                ]
-            ],
-        },
-        {
-            **reamer_tool("reamer-1570", d1570, sream_rpm, sream_feed),
-            "frame": "edge",
-            "label": "seat ream",
-            "stock": stocks["edge"],
-            "ops": [
-                [
-                    "seat_ream",
-                    "ream the seat .1570",
-                    _reamed(seat_xy, 0.0, seat_ream_tip, edge_clear),
+                    "seat_mill",
+                    "flatten the seat's floor and finish its wall",
+                    _seat(
+                        seat_xy,
+                        0.0,
+                        floor,
+                        ((floor_dia - e8) / 2, (finish_dia - e8) / 2),
+                    ),
                 ]
             ],
         },
@@ -1126,7 +1108,7 @@ def context(
         expect += [[f"{name}@{k}", check, kwargs] for check, kwargs in checks]
 
     name = "PB04_edge"
-    floor_offset = (floor_dia - e8) / 2
+    finish_offset = (finish_dia - e8) / 2
     sx, sy = seat_xy
     edge_sections = [
         (
@@ -1141,14 +1123,14 @@ def context(
         ),
         ([seat_rpm], hole_checks([seat_xy], seat_drill_tip, 0.0, d26 / 2, edge_keep)),
         (
-            [floor_rpm],
+            [seat_mill_rpm],
             [
                 [
                     "bounds",
                     {
                         "window": [[sx - 2.0, sx + 2.0], [sy - 2.0, sy + 2.0]],
-                        "x": [_r(sx - floor_offset), _r(sx + floor_offset)],
-                        "y": [_r(sy - floor_offset), _r(sy + floor_offset)],
+                        "x": [_r(sx - finish_offset), _r(sx + finish_offset)],
+                        "y": [_r(sy - finish_offset), _r(sy + finish_offset)],
                         "z_min": _r(floor),
                         "arc": "G2",
                         "entry": [sx, sy],
@@ -1160,16 +1142,11 @@ def context(
                 ["keep_out", {"radius": r8, "boxes": edge_keep}],
             ],
         ),
-        (
-            [sream_rpm],
-            hole_checks([seat_xy], seat_ream_tip, 0.0, d1570 / 2, edge_keep, True),
-        ),
     ]
     edge_tools = [
         tn["spot"],
         tn["drill-26"],
         tn["em-eighth"],
-        tn["reamer-1570"],
     ]
     expect += [
         [

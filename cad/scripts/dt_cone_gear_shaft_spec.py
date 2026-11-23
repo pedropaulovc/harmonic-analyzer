@@ -46,16 +46,17 @@ def inch_text(value_mm: float, places: int) -> str:
     return text[1:] if text.startswith("0.") else text
 
 
-# The manually rederived v2 pivot post has a .483 in bearing bore spanning
+# The manually rederived v2 pivot post has a .4385 in bearing bore spanning
 # 42.011 mm along the cone axis.  The shaft begins just proud of the post's
 # front face: the integral journal is turned 1.70 in long (#290: the old
 # 1.0 mm-proud 43.011 snapped up to the printed .XX grid, so the stub still
 # stands the assembly's 1.0 mm proud), JOURNAL_PROUD longer
-# than the post body.  It is turned .0005 in under the bore nominal (.4825
-# in), so the bore's +.0010/+.0005 band closes the shaft_in_bushing class on
-# its SHAFT_H band.
+# than the post body.  It is turned .0010 in under the bore nominal (.4375
+# in), so the bore's +.0005/.0000 band closes the shaft_in_bushing class on
+# its SHAFT_H band: owner ruling 2026-11-23, tool audit Q11, "both journals
+# .4375 0/-.0008" (it was .4825 in a .483 +.0010/+.0005 bore).
 JOURNAL_BORE_DIA = dt_cone_pivot_post_spec.BORE_DIA
-JOURNAL_CLEARANCE = 0.0127
+JOURNAL_CLEARANCE = 0.0254
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
 # Actual limits for this post/shaft pair, not an intended common clearance.
 JOURNAL_DIAMETRAL_CLEARANCE_MM = (
@@ -83,7 +84,7 @@ FRONT_STUB = (
 # boss 1.681 further on.  An integral collar fills that gap: its south face
 # bears on the post's north boss face (flush with the journal end) and the
 # gear stack is pushed onto its north face (dt_cone_gear_stack).  The collar
-# bears on the boss annulus outside the .483 in bore and inside the Ø17.2
+# bears on the boss annulus outside the .4385 in bore and inside the Ø17.2
 # boss.
 #
 # The 64T's SOUTH face sits SOUTH_FACE_SHIFT_NORTH north of where the 8.0
@@ -134,23 +135,20 @@ COLLAR_DIA = STOCK_DIA
 # and the collar OD.  Held to drawing-guidelines.md rule 17 (walls and webs)'s
 # .060 in floor (user ruling 2026-09-26; #290 inch floor) with BOTH bounding
 # edges broken at the worst case: the collar's OD edge and the post's bore
-# rim.  The title block's .010 break would take the .070 ring to .050, so both
-# edges print a smaller break, derived from ring - 2 x break >= floor and
-# rounded DOWN to the printed .001 in grid: the collar under its stock
-# callout, the post's journal rims as the post's modelled chamfer, printed
-# .004 MAX in the post sheet's detail D (dt_cone_pivot_post_spec.
-# JOURNAL_RIM_BREAK restates this value).  Sizing the ring for two .010
-# breaks instead needs a larger bar, which the user's ruling (5/8 bar as
-# supplied) rules out.
+# rim.  On the former Ø.483 bore the title block's .010 break took the .070
+# ring to .050, so both edges print a smaller break, .004 MAX (ring - 2 x
+# break >= floor, rounded DOWN to the printed .001 in grid): the collar under
+# its stock callout, the post's journal rims as the post's modelled chamfer,
+# printed .004 MAX in the post sheet's detail D (dt_cone_pivot_post_spec.
+# JOURNAL_RIM_BREAK restates this value).  The Ø.4385 bore (owner ruling
+# 2026-11-23, tool audit Q11) widens the ring to .092, which two .010 breaks
+# would also clear; the .004 MAX stays as printed (the ruling changes the
+# bore, not the breaks), checked below against the floor.
 THRUST_RING_FLOOR = WALL_FLOOR_MM
 THRUST_RING_MIN = (
     (STOCK_DIA + STOCK_DIA_BAND[1]) - (JOURNAL_BORE_DIA + POST_JOURNAL_BORE_BAND[0])
 ) / 2.0
-THRUST_EDGE_BREAK_MAX = round(
-    math.floor((THRUST_RING_MIN - THRUST_RING_FLOOR) / 2.0 / MM_PER_IN * 1e3 + 1e-9)
-    / 1e3 * MM_PER_IN,
-    9,
-)
+THRUST_EDGE_BREAK_MAX = 0.1016  # .004
 if THRUST_RING_MIN - 2.0 * THRUST_EDGE_BREAK_MAX < THRUST_RING_FLOOR - 1e-9:
     raise AssertionError(
         f"thrust ring {THRUST_RING_MIN:.3f} less two {THRUST_EDGE_BREAK_MAX} "
@@ -297,7 +295,7 @@ SOCKET_CALLOUT = "\n".join(
 # is a gear-stack closure and land 2's end the tip cluster's; only the
 # journal's end is a fabricated length, snapped above.
 SECTION_DIAS: tuple[float, ...] = (
-    JOURNAL_DIA,  # integral v2-post bearing journal, .4825
+    JOURNAL_DIA,  # integral v2-post bearing journal, .4375
     cone_land_key.LAND_DIA_MM,  # 3/8: 64T + T120..T030 seats, keyed
     6.35,  # 1/4: T024, bonded; the socket in its end
 )
@@ -393,7 +391,7 @@ FILLET_RADIUS = 0.1016  # .004
 FILLET_R_BAND = (0.0, -FILLET_RADIUS)  # (upper, lower): any root up to the MAX
 FILLET_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R.004 MAX"
 
-# Surface texture, on the one land that runs: the .4825 journal turns in
+# Surface texture, on the one land that runs: the .4375 journal turns in
 # the pivot post bore.  The gear lands and the socket only carry parts fixed
 # to the shaft -- the land-1 gears are driven by the key, T024 and T006's
 # spigot are bonded -- so they are left to the title-block process row

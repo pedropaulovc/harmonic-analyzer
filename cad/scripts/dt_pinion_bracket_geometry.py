@@ -56,8 +56,8 @@ THICKNESS_LIMITS = tuple(
 )
 PIVOT_BORE = 6.35  # .2500, REAM_SLIDE on the MHA-DT-19 shaft
 ARBOR_BORE = 7.9375  # 5/16 in, REAM_SLIDE on the MHA-DT-22 arbor
-# #290: the MHA-DT-25 stud is 5/32 drill rod, bonded in a seat cut by the
-# purchased .1570 chucking reamer (REAM_H7).
+# #290: the MHA-DT-25 stud is 5/32 drill rod, bonded in a .157 +.003/.000
+# seat finished with the 1/8 end mill (owner ruling 2026-11-23, tool audit Q8).
 PIN_BORE = 3.9878  # .157
 PIN_DROP = -7.0  # NEGATIVE: the stud seat is 7 ABOVE the pivot bore (on the
 # straight flank).  U28 raised it from 6: the seat keeps a 2.4 mm worst-case
