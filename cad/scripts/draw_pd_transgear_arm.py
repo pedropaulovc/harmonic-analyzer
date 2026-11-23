@@ -89,7 +89,7 @@ from _printed_limits import drilled_limits, limits
 from pd_transgear_arm_geometry import (
     EDGE_LEAN,
     END_HALF_WIDTH,
-    LOCATOR_HOLE_PRINTED_LIMITS_MM,
+    LOCATOR_HOLE_REAMED_LIMITS_MM,
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
     PIN_BORE_DIA,
@@ -121,7 +121,7 @@ from pd_transgear_arm_spec import (
     GEOMETRIC_CONTROLS,
     GEOMETRIC_TOLERANCES_MM,
     LATCH_PIN_NUMBER,
-    LATCH_PIN_PRESS_PRINTED,
+    LATCH_PIN_PRESS_INTERFERENCE,
     LOCATOR_PRESS_INTERFERENCE,
     PART_DATUMS,
     DRAWING_DIMENSIONS,
@@ -744,10 +744,12 @@ requirement(
     },
     precision={"leg": _P["PinMouthChamfer"]},
 )
-# The latch-pin hole, reamed blind along -X into the square end: Ø.1250
-# -.0005/-.0010 REAM, full diameter (.38) MIN deep over a drill point
+# The latch-pin hole, reamed blind along -X into the square end: Ø.1240
+# REAM, no printed band, full diameter (.38) MIN deep over a drill point
 # (END_KEEP "PinHoleDia", SECTION_KEEP "PinHoleDepth"), .188 from face A
-# (END_KEEP "PinHoleZ"); note 3: the MHA-PD-VN-58 press.
+# (END_KEEP "PinHoleZ"); note 3: the MHA-PD-VN-58 dowel does not enter by
+# hand.  "dia" and the interference are the spec's ANALYSIS numbers (what
+# the set reamer is modelled to cut), not printed limits.
 _LATCH_REAM = ((_NOTES, "PIN_HOLE_CALLOUT"), (_SELF, "END_KEEP"))
 requirement(
     "latch_pin_hole",
@@ -776,17 +778,18 @@ requirement(
         "height_nominal": (PIN_HOLE_Z, ((_GEOM, "PIN_HOLE_Z"),)),
         "height_from": ("front_face", ((_SELF, "END_KEEP"),)),
         "diametral_interference": (
-            list(LATCH_PIN_PRESS_PRINTED), ("LATCH_PIN_PRESS_PRINTED", (_NOTES, "NOTES"))
+            list(LATCH_PIN_PRESS_INTERFERENCE), ("LATCH_PIN_PRESS_INTERFERENCE",)
         ),
         "mate": (LATCH_PIN_NUMBER, ("LATCH_PIN_NUMBER",)),
         "callout": (PIN_HOLE_CALLOUT, ((_NOTES, "PIN_HOLE_CALLOUT"),)),
     },
     precision={"dia": _P["PinHoleDia"], "depth": _P["PinHoleDepth"], "height": _P["PinHoleZ"]},
 )
-# The 2X dowel holes: Ø.0930 +.0005/.0000 2X REAM THRU (FRONT_KEEP
+# The 2X dowel holes: Ø.1240 2X REAM THRU, no printed band (FRONT_KEEP
 # "LocatorDia1"), BASIC sites (LocatorX1, LocatorY1, LocatorY2) under ⌖ Ø.004
 # A|B|C.  Note 2: match-drilled with MHA-PD-19 and reamed at assembly
-# (MHA-PD-00); this traveler does not make them.
+# (MHA-PD-00); this traveler does not make them.  "dia" and the
+# interference are the spec's ANALYSIS numbers, not printed limits.
 _LOCATOR_SOURCES = ((_GEOM, "LOCATOR_SITES_MM"), "BASIC_REDUCER_DIMENSIONS")
 requirement(
     "dowel_holes",
@@ -802,15 +805,15 @@ requirement(
         "station_basic": (LOCATOR_SITES_MM[0][0], _LOCATOR_SOURCES),
         "offset_basic": (abs(LOCATOR_SITES_MM[0][1]), _LOCATOR_SOURCES),
         "dia": (
-            list(LOCATOR_HOLE_PRINTED_LIMITS_MM),
-            ((_GEOM, "LOCATOR_HOLE_PRINTED_LIMITS_MM"), (_SELF, "FRONT_KEEP")),
+            list(LOCATOR_HOLE_REAMED_LIMITS_MM),
+            ((_GEOM, "LOCATOR_HOLE_REAMED_LIMITS_MM"), (_SELF, "FRONT_KEEP")),
         ),
         "dia_ref": (LOCATOR_HOLE_DIA_MM, ((_GEOM, "LOCATOR_HOLE_DIA_MM"),)),
         "thru": (True, ((_NOTES, "LOCATOR_CALLOUT_TEXT"),)),
         "position_dia_max": (GEOMETRIC_TOLERANCES_MM["position"], ("GEOMETRIC_CONTROLS",)),
         "position_datums": ("A|B|C", ("GEOMETRIC_CONTROLS",)),
         "diametral_interference": (
-            list(LOCATOR_PRESS_INTERFERENCE), ("LOCATOR_PRESS_INTERFERENCE", (_NOTES, "NOTES"))
+            list(LOCATOR_PRESS_INTERFERENCE), ("LOCATOR_PRESS_INTERFERENCE",)
         ),
         "made_at": ("assembly", ((_NOTES, "NOTES"),)),
         "made_with": ("MHA-PD-19", ((_NOTES, "NOTES"),)),
