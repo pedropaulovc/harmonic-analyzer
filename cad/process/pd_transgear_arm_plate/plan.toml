@@ -230,13 +230,15 @@ sink_pin_depth_max_mm = 0.9788
 sink_pin_depth_mid_mm = 0.9058
 # K's chamfer rim: Ø.4375 plus twice the leg's band. The check: a .450 pin
 # (over K's .4382 top limit, under the smallest rim) stands in the chamfer;
-# its end sits half the rim less the pin below face A, from K's low limit
-# and the shortest leg to K's top limit and the longest.
+# its end sits half the rim less the pin below face A. Its band holds for any
+# K in .4375-.4382: from K's top limit and the shortest leg (.0041) to K's
+# low limit and the longest (.01375), so no reading passes a leg outside
+# .010-.020.
 chamfer_rim_min_mm = 11.6205
 chamfer_rim_max_mm = 12.1285
 chamfer_pin_dia_mm = 11.43
-chamfer_pin_depth_min_mm = 0.09525
-chamfer_pin_depth_max_mm = 0.35814
+chamfer_pin_depth_min_mm = 0.10414
+chamfer_pin_depth_max_mm = 0.34925
 
 [[tools]]
 id = "em"
@@ -529,7 +531,7 @@ sizing = "other"
 instruction = "Chamfer K's face-A mouth by hand: the plate face A up on the bench, the 90° hand countersink square in K, a few light turns clockwise with even pressure; blow out, stand the .450 pin in K and check. Repeat in light turns until in band."
 instruction_detailed = "Turn the 90° hand countersink in K's face-A mouth, aiming at .015 x 45°. Then the .450 pin standing in K, its end on the chamfer: the calipers' depth rod from face A beside it to the pin's top, less the pin's miked length, is where its end sits."
 feed = "hand"
-inspection = "The pin's end {{process.chamfer_pin_depth_min_mm:in.4dot}}–{{process.chamfer_pin_depth_max_mm:in.4dot}} below face A (chamfer {{cad.press_hole_chamfer_leg_min_in:.3dot}}–{{cad.press_hole_chamfer_leg_max_in:.3dot}} x 45°, rim Ø{{process.chamfer_rim_min_mm:in.4dot}}–{{process.chamfer_rim_max_mm:in.4dot}}). Higher: more turns. Lower: stop and tell the owner."
+inspection = "The pin's end {{process.chamfer_pin_depth_min_mm:in.4dot}}–{{process.chamfer_pin_depth_max_mm:in.4dot}} below face A (chamfer {{cad.press_hole_chamfer_leg_min_in:.3dot}}–{{cad.press_hole_chamfer_leg_max_in:.3dot}} x 45° for any K in its band). Higher: more turns. Lower: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.chamfer_pin_depth_min_mm}}", "{{process.chamfer_pin_depth_max_mm}}"] }]
 
 [[setups]]

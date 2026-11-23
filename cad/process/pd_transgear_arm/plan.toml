@@ -287,8 +287,13 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_width_mm}}",
 beam = { axis = "x", hold = "solid", extent_mm = [0, "{{process.blank_length_min_mm}}"], seat = "the two parallels under the blank's edges, its whole length", seat_mm = [0, "{{process.blank_length_min_mm}}"] }
 
 [[setups.operations]]
-instruction = "Home ($H). G54 Z0 on the parallels' top, Y0 the fixed jaw's face, X0 the blank's left end; then clamp the blank."
-instruction_detailed = "Console M6 T1 (the #1 centre drill in the drill chuck; the tool setter measures it). Blank out: the T1 tip just dragging a .002 feeler leaf on a parallel's top: G10 L20 P1 Z0.051. Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y-2.540. Load the blank as in Holding and clamp; edge finder on its left end from the left, at the blank's centre line (Y −.500) and its tip at mid-thickness (the station Setup 3 picks up again before AR05): G10 L20 P1 X-2.540."
+instruction = "Home ($H). Blank out of the vise: G54 Z0 on the parallels' top and Y0 the fixed jaw's face."
+instruction_detailed = "Console M6 T1 (the #1 centre drill in the drill chuck; the tool setter measures it). The T1 tip just dragging a .002 feeler leaf on a parallel's top: G10 L20 P1 Z0.051. Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y-2.540."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Load and clamp the blank as in Holding; G54 X0 on its left end."
+instruction_detailed = "Edge finder (900 rpm) on the blank's left end from the left, at its centre line (Y −.500), the tip at mid-thickness (the station Setup 3 picks up again before AR05): G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
