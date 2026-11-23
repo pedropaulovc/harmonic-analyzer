@@ -476,14 +476,19 @@ def context(
     r = em / 2
     step_max = p["face_stepover_max_mm"]
     face_cuts = ("top face", "height", "left end", "right end")
-    face_rpm, face_feed = _setting(plan, shop, "top face")
     for name in face_cuts:
         if not math.isclose(_cut(plan, name, "cutter_dia_mm"), em, abs_tol=1e-6):
             raise ValueError(
                 f"'{name}' cutter Ø{_cut(plan, name, 'cutter_dia_mm')}, the end mill is Ø{em}"
             )
-        if _setting(plan, shop, name) != (face_rpm, face_feed):
-            raise ValueError(f"'{name}' runs at another setting than 'top face'")
+    # The faces run at their measured setting, the ends (deeper than it was
+    # measured) at the chart's: each pair at one speed.
+    face_rpm, face_feed = _setting(plan, shop, "top face")
+    if _setting(plan, shop, "height") != (face_rpm, face_feed):
+        raise ValueError("'height' runs at another setting than 'top face'")
+    end_rpm, end_feed = _setting(plan, shop, "left end")
+    if _setting(plan, shop, "right end") != (end_rpm, end_feed):
+        raise ValueError("'right end' runs at another setting than 'left end'")
     for name in ("top face", "height"):
         if not math.isclose(_cut(plan, name, "radial_woc_mm"), step_max, abs_tol=1e-6):
             raise ValueError(
@@ -507,6 +512,14 @@ def context(
             _cut(plan, name, "axial_doc_mm"), depth_hi - end_z, abs_tol=1e-6
         ):
             raise ValueError(f"'{name}' axial_doc_mm is not process.end_axial_doc_mm")
+    # The end mill's collet: its nose half_mill_projection_mm above the tip
+    # stays clear of the stock's top (over the jaws, the stacks and the pin)
+    # at the deepest end-mill cut: a face's levels or an end's one level.
+    em_depth = max(width_max - top_w, top_w - height, depth_hi - end_z)
+    if p["half_mill_projection_mm"] < em_depth + CLEAR_MM:
+        raise ValueError(
+            f"the end mill's collet would reach the bar {em_depth:.3f} below its top"
+        )
     right_raw = blank_max - left_skim
     left_faces = _end_stations(-left_skim, 0.0, end_step)
     right_faces = _end_stations(right_raw, length, end_step)
@@ -694,6 +707,7 @@ def context(
         "feed": face_feed,
         "plunge": face_feed,
     }
+    end_tool = {**em_tool, "rpm": end_rpm, "feed": end_feed, "plunge": end_feed}
 
     def point_tool(
         tool: str, dia: float, rpm: float, feed: float, angle: float
@@ -795,7 +809,7 @@ def context(
             ],
         },
         {
-            **em_tool,
+            **end_tool,
             "frame": "left",
             "label": "left end",
             "stock": stocks["left"],
@@ -840,7 +854,7 @@ def context(
             ],
         },
         {
-            **em_tool,
+            **end_tool,
             "frame": "right",
             "label": "right end",
             "stock": stocks["right"],
@@ -1019,7 +1033,7 @@ def context(
                 tn["reamer-1865"],
             ],
             [
-                ([face_rpm], end_checks(-r, -left_skim - r, -1.0, "left")),
+                ([end_rpm], end_checks(-r, -left_skim - r, -1.0, "left")),
                 (
                     [spot_rpm],
                     hole_checks(
@@ -1047,7 +1061,7 @@ def context(
         "WB04_right": (
             [tn["em-half"], tn["spot"], tn["drill-9"]],
             [
-                ([face_rpm], end_checks(length + r, right_raw + r, 1.0, "right")),
+                ([end_rpm], end_checks(length + r, right_raw + r, 1.0, "right")),
                 (
                     [spot_rpm],
                     hole_checks(

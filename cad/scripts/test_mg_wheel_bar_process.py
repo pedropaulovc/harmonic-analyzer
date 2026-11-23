@@ -137,6 +137,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("pickup_reach_min_mm", 70.0, "pickup_reach_min_mm"),
         ("z_touch_right_x_mm", 150.0, "z_touch_right_x_mm"),
         ("parallel_thickness_mm", 8.0, "reaches the stacks"),
+        ("half_mill_projection_mm", 12.0, "collet would reach"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> None:
@@ -160,7 +161,7 @@ def _seed(ctx: dict, key: str, changes: dict[str, str]) -> dict:
     ("key", "changes", "check"),
     [
         # The first face pass moved onto the bar's middle: a full-width slot.
-        ("top_face", {"G0 X-10.414 Y1.338": "G0 X-10.414 Y-4.763"}, "face"),
+        ("top_face", {"G0 X-10.414 Y3.008": "G0 X-10.414 Y-4.763"}, "face"),
         # The left end's first pass dropped: the second takes both steps.
         ("left_end", {"G0 X-7.112 Y8.890": "G0 X-6.350 Y8.890"}, "passes"),
         # The right end's first pass run the other way: climb, not conventional.
