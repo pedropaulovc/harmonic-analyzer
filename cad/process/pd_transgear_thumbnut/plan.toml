@@ -81,17 +81,20 @@ tap_mark_in = 0.72
 # its .75 thread length.
 tap_chase_mark_in = 0.40
 # The dish floor held inside the drawing's bands (authored): the Op 220 cone
-# at the drawing's flank sets the rim at about floor Ø + 6 × depth, so the
-# floor Ø.350 ±.002 and depth .040 ±.001 put the rim at .582-.598, inside
+# at the drawing's flank sets the rim at about floor Ø + 6 × depth. The rim
+# is held by the process, its stack: floor Ø.350 ±.002 (calipers) gives
+# ±.002; depth .040 ±.0005 by the DRO from the touched-off rim face (touch-off
+# included) gives ±.003; the compound set to the flank with the digital angle
+# gauge to ±0.1° gives ±.0014 at .04 deep. Rim .590 ±.0064, .584-.596, inside
 # its .58-.60. In mm for the gauge checks: × 25.4.
 recess_floor_hold_min_in = 0.348
 recess_floor_hold_max_in = 0.352
 recess_floor_hold_min_mm = 8.8392
 recess_floor_hold_max_mm = 8.9408
-recess_depth_hold_min_in = 0.039
-recess_depth_hold_max_in = 0.041
-recess_depth_hold_min_mm = 0.9906
-recess_depth_hold_max_mm = 1.0414
+recess_depth_hold_min_in = 0.0395
+recess_depth_hold_max_in = 0.0405
+recess_depth_hold_min_mm = 1.0033
+recess_depth_hold_max_mm = 1.0287
 # Countersinks (authored): Ø.170, between the #8-32 major Ø.164 (the first
 # thread broken all round) and the drawing's .18 max; the 90° chamfer mill
 # fed (.170 - .136) / 2 = .017 past its flutes touching the #29 hole's edge.
@@ -146,6 +149,11 @@ ref = "jig-tap-8-32-plug"  # Tap coverage #8-32 UNC
 id = "centre-dead"
 name = "MT3 dead centre"
 ref = "dead-centre-mt3"
+
+[[tools]]
+id = "angle"
+name = "Digital angle gauge"
+ref = "digital-angle-gauge"
 
 [[tools]]
 id = "deburr"
@@ -369,15 +377,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Dish floor, the AR set square to the face as for facing, its nose clear of the hole: cut a flat-bottomed recess Ø{{process.recess_floor_hold_min_in:.3dot}}–{{process.recess_floor_hold_max_in:.3dot}}, {{process.recess_depth_hold_min_in:.3dot}}–{{process.recess_depth_hold_max_in:.3dot}} deep by the DRO from Z0 (inside the drawing's bands: the Op 220 cone puts the rim at about floor Ø + 6 × depth), in facing passes from the hole outward, the last a light skim; check its Ø between passes."
+instruction = "Dish floor, the toolpost turned so the AR's chuck-side edge stands at least 20° off the face (steeper than the cone, which Op 220 cuts away), its nose clear of the hole: cut a flat-bottomed recess Ø{{process.recess_floor_hold_min_in:.3dot}}–{{process.recess_floor_hold_max_in:.3dot}}, {{process.recess_depth_hold_min_in:.4dot}}–{{process.recess_depth_hold_max_in:.4dot}} deep by the DRO from Z0 (inside the drawing's bands: the Op 220 cone puts the rim at about floor Ø + 6 × depth), in facing passes from the hole outward, the last a light skim; check its Ø between passes."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.recess_floor_dia_mm}}"
-inspection = "Floor Ø{{process.recess_floor_hold_min_in:.3dot}}–{{process.recess_floor_hold_max_in:.3dot}}, calipers' inside jaws on the recess's wall; depth {{process.recess_depth_hold_min_in:.3dot}}–{{process.recess_depth_hold_max_in:.3dot}} on the DRO."
+inspection = "Floor Ø{{process.recess_floor_hold_min_in:.3dot}}–{{process.recess_floor_hold_max_in:.3dot}}, calipers' inside jaws flat on the floor, reading at its corner; depth {{process.recess_depth_hold_min_in:.4dot}}–{{process.recess_depth_hold_max_in:.4dot}} on the DRO."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.recess_floor_hold_min_mm}}", "{{process.recess_floor_hold_max_mm}}"] }, { gauge = "lathe-z-dro", band_mm = ["{{process.recess_depth_hold_min_mm}}", "{{process.recess_depth_hold_max_mm}}"] }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Floor small or shallow (Op 200): cut again and recheck before the cone. Floor or depth past its Op 200 target: work out floor Ø + 6 × depth from the readings; .582–.598: go on to the cone (Op 220); under .582: deepen the floor; over .598: scrapped; make another from Setup 1."
+instruction = "Floor small or shallow (Op 200): cut again and recheck before the cone. Floor over Ø{{cad.recess_floor_dia_max_in:.2dot}} or deeper than {{cad.recess_depth_max_in:.2dot}}: scrapped; make another from Setup 1. Floor or depth past its Op 200 target: work out floor Ø + 6 × depth from the readings; .582–.598: go on to the cone (Op 220); under .582: deepen the floor; over .598: scrapped; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
@@ -386,15 +394,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Dish cone: swing the compound to {{cad.recess_flank_deg:.1f}}° off the cross slide (the flank is {{cad.recess_half_angle_deg:.1f}}° off the axis). Take light passes down the compound from the face toward the floor, moving the cross slide out a little between passes, until a pass ends exactly in the floor's corner: the cone then meets the face at Ø{{cad.recess_dia_in:.2dot}} by itself."
+instruction = "Dish cone: swing the compound to {{cad.recess_flank_deg:.1f}}° off the cross slide, set with the digital angle gauge zeroed on the cross slide (the flank is {{cad.recess_half_angle_deg:.1f}}° off the axis). Take light passes down the compound from the face toward the floor, moving the cross slide out a little between passes, until a pass ends exactly in the floor's corner: the cone then meets the face at Ø{{cad.recess_dia_in:.2dot}} by itself."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.recess_dia_mm}}"
-inspection = "One clean cone from the rim to the floor, no step left at the corner. The rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}} is held by the process, not gauged: about floor Ø + 6 × depth, .582–.598 from the Op 200 floor and depth."
+inspection = "One clean cone from the rim to the floor, no step left at the corner. The rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}} is held by the process (about floor Ø + 6 × depth: the Op 200 floor ±.002 and depth ±.0005 and the compound ±0.1° put it at .584–.596), not gauged."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A step at the corner (Op 220): another pass down the compound into the corner. A rim edge that does not meet the face cleanly: one more light pass."
+instruction = "A step at the corner (Op 220): another pass down the compound into the corner."
 feed = "hand"
 
 [[setups.operations]]

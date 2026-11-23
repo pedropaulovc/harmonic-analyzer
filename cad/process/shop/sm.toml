@@ -26,8 +26,6 @@ description = "#10-24 UNC bottoming hand tap (OSG 1025000)"
 tap_drill_mm = 3.7973  # #25 (.1495 in), MHA-SM-02's drawn tap drill
 [tools.tap-6-32-plug]  # Tap coverage #6-32 UNC
 description = "#6-32 UNC plug hand tap (OSG 1023700)"
-[tools.digital-angle-gauge]  # F-digital-angle-gauge
-description = "Digital angle gauge"
 
 # --- Drawing cross-check additions (2026-11-19) -------------------------------
 # Tools the v50 drawings call for that the quote workbook left out, from the
