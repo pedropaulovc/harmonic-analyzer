@@ -615,7 +615,7 @@ drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pin_ream_dia_band_mm}}" }
 instruction = "Run CM03_pin_ream (M6 T6, the .0615 reamer, to buy, at least {{process.pin_tool_out_min_in:.2dot}} out of the chuck; set 1400): ream to the stop, the reamer's end to Z{{process.ream_tip_mm:.3f}}, fed in and fed out. The file ends with the spindle stopped and the reamer raised clear."
 settings = "pd-collar-ream-0615-c360"
-inspection = "Ream Ø{{cad.pin_ream_dia_min_in:.4dot}}–{{cad.pin_ream_dia_max_in:.4dot}}: GO enters to the stop, NO-GO does not enter."
+inspection = "Ream Ø{{cad.pin_ream_dia_min_in:.4dot}}–{{cad.pin_ream_dia_max_in:.4dot}}: GO enters to the stop, NO-GO does not enter. GO refused: Op 380 first."
 gauge_checks = [{ gauge = "zz-pins-0615-0620", band_mm = "{{cad.pin_ream_dia_band_mm}}" }]
 milling_cuts = [
   { name = "pin ream", kind = "drill", phase = "finish", cutter_dia_mm = 1.5621, flutes = 4, rpm = 1400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = ["{{cad.pin_ream_chord_mm}}"] },
@@ -639,7 +639,7 @@ gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.pin_ream_chord_band_mm}
 feed = "hand"
 
 [[setups.operations]]
-instruction = "GO not entering to the stop in Op 340: lift it out, blow out the chips, oil the reamer and run CM03_pin_ream once more, G54 unchanged; gauge again. Still refused: scrapped (the pins cannot show the ream at or over {{cad.pin_ream_dia_min_in:.4dot}}); make another from Setup 1. NO-GO entering (no cut remedies it), or the centre outside its band in Op 370: scrapped, not reworked; make another from Setup 1."
+instruction = "GO not entering to the stop in Op 340: lift it out, blow out the chips, oil the reamer, run CM03_pin_ream once more, G54 unchanged; gauge again. GO now enters: Ops 350–370. Still refused: scrapped (the pins cannot show the ream at or over {{cad.pin_ream_dia_min_in:.4dot}}). NO-GO entering (no cut remedies it), or the centre outside its band in Op 370: scrapped. Either way make another from Setup 1."
 feed = "hand"
 
 [[setups]]
