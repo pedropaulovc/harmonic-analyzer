@@ -259,7 +259,7 @@ title = "CNC mill: bond the blank to the spoil plate; cut the comb out"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Spoil plate on 1 in parallels across the vise jaws, its back edge on the fixed jaw, centred along the jaws. The blank bonded to its top under its whole face: blue tape on the plate, CA glue, blue tape on the blank (stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}), its left end and back edge {{process.blank_left_x_mm:in.2dot}} in from the plate's left end and back edge."
+holding = "Spoil plate on 1 in parallels across the vise jaws, its back edge on the fixed jaw, centred along the jaws: the jaw tops stand {{process.jaw_top_over_plate_mm:in.3dot}} above the plate top, room for the edge finder's touch. The blank bonded to its top under its whole face: blue tape on the plate, CA glue, blue tape on the blank (stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}), its left end and back edge {{process.blank_left_x_mm:in.2dot}} in from the plate's left end and back edge."
 datum = "Program CB01_outline. G54: X0 the plate's left end, Y0 the fixed jaw's face (the plate's back edge), Z0 the plate top, bare right of the tape; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack, its last level {{process.outline_tip_into_plate_mm:in.3dot}} into the plate on any stack; +Y toward the fixed jaw. The comb's open end stands at X {{process.comb_south_x_mm:in.3dot}}, its back edge (the stepped arm's, toward the fixed jaw) at Y {{process.comb_back_y_mm:in.3dot}}. Set X, Y and Z again after a reset, a stall, an E-stop or any move of the plate."
 diagram = { file = "diagrams/outline.svg", alt = "Plan of the spoil plate in the vise: the plate's blue tape, two strips along X from its left end to 5 in, and on it the blank near the fixed jaw and the plate's left end; dashed, the tape seams along X, the plate's under the U's slot and the blank's in its back margin; the comb's U drawn inside the blank with its open end left and its stepped arm toward the fixed jaw; the 1/32 end mill's path runs round the U once per level, starting and ending at the middle of the spring arm's front edge (toward the moving jaw)." }
 # Top: the thickest sheet on the thickest tape stack; deepest: the cutter's
@@ -333,9 +333,9 @@ feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "Check, stack: spindle stopped, the tip just dragging the same leaf on the blank's top at op 60's three spots; read Z (mm) at each. Each stack = reading − 0.051 (the leaf) − that spot's thickness from op 60." },
+  { kind = "action", text = "Check, stack: spindle stopped, the tip dragging the same leaf on the blank's top at op 60's three spots; read Z (mm). Stack = reading − 0.051 (the leaf) − that spot's op 60 thickness." },
   { kind = "check", text = "Every stack {{process.tape_stack_min_mm:.2f}}–{{process.tape_stack_max_mm:.2f}} mm ({{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}); the two ends within 0.05 mm (.002) of each other." },
-  { kind = "stop", text = "A stack outside the band or ends differing by more: free the blank as Setup 3 frees the comb, clean, re-tape and re-bond it (ops 70–120), then this op again." },
+  { kind = "stop", text = "Outside the band or ends differing more: Z up, plate left in the vise (G54 stands); free the blank as ops 190–200 free the comb, peel the plate's tape; ops 70–120, then this op again." },
 ]
 feed = "hand"
 
@@ -343,7 +343,7 @@ feed = "hand"
 steps = [
   { kind = "action", text = "Check, push test: jog Z up 1 in clear. With the heel of the hand push the blank hard along and across; try to lift each corner with a thumbnail." },
   { kind = "check", text = "No movement, no creak, no lifted corner." },
-  { kind = "stop", text = "Any movement: free the blank, clean, re-tape and re-bond it (ops 70–120), then ops 140 and 150 again." },
+  { kind = "stop", text = "Any movement: the plate left in the vise, free the blank as ops 190–200 free the comb, peel the plate's tape, then ops 70–120 and ops 140–150 again." },
 ]
 feed = "hand"
 
@@ -364,7 +364,10 @@ speed_kind = "spindle"
 tool = "em-thirtysecond"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB01_outline (M6 T1, spindle off: set 2800; about 19 min). It comes down in front of the blank, feeds in through the margin to the middle of the spring arm's front edge, runs round the U anticlockwise at the finished size and back out the way it came, {{process.level_count:g}} times, each {{process.level_depth_mm:in.4dot}} deeper (the last with its tip {{process.outline_tip_into_plate_mm:in.3dot}} into the spoil plate), then lifts. Dry: air blast the chips off as it goes; no flood or mist coolant and no water (the paper tape soaks and lets go). A hot smell from the cut (CA softens with heat): feed hold, let it cool 5 minutes, then Cycle Start."
+steps = [
+  { kind = "action", text = "Run CB01_outline (M6 T1, spindle off: set 2800; about 19 min): in through the margin, round the U anticlockwise at size and out, {{process.level_count:g}} times, each {{process.level_depth_mm:in.4dot}} deeper, the last {{process.outline_tip_into_plate_mm:in.3dot}} into the plate. Air blast the chips; dry, no coolant or water (paper tape soaks)." },
+  { kind = "stop", text = "Hot smell (CA softens with heat): feed hold, cool 5 minutes, Cycle Start." },
+]
 settings = "endmill-carbide-3fl-1-32-downcut-c260"
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "comb", kind = "part", area_mm2 = "{{process.comb_bond_area_mm2}}", width_mm = "{{process.comb_spring_width_mm}}" }, { name = "waste", kind = "waste", area_mm2 = "{{process.waste_bond_area_mm2}}" }] } }
 milling_cuts = [
