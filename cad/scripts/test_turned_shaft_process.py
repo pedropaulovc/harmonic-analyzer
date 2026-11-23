@@ -146,6 +146,9 @@ def test_each_dome_is_cut_to_the_drawn_radius(stem: str) -> None:
     else:
         # Stepped and filed: the leaves bracket whatever radius is filed.
         assert "dome_steps" in parameters and not forms
+        assert "leaf_radius_min_in" in parameters or all(
+            f"dome_{end[:-4]}_leaf_radius_min_in" in parameters for end in domes
+        )
         radius = None
     root = features.get("step", features["outer"])
     root_dia = (
@@ -153,6 +156,11 @@ def test_each_dome_is_cut_to_the_drawn_radius(stem: str) -> None:
         if "dia_nominal" in root
         else (sum(root["dia"]) / 2 if "dia" in root else root["dia_ref"])
     )
+    if radius is not None and "dome_form_dia_min_in" in parameters:
+        # Formed on each blank's own Ø: the band is the domed diameter's.
+        assert [
+            parameters[f"dome_form_dia_{side}_in"] * IN for side in ("min", "max")
+        ] == pytest.approx(root["dia"], abs=1e-6)
     diameters = [
         item
         for item in features.values()

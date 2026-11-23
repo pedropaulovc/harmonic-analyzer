@@ -235,7 +235,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Turned round: 3-jaw over the shim wrap, {{process.end_stickout_in:.2dot}} in out, end A back in the spindle bore."
 datum = "DRO Z touched on end B with the facing tool before each skim (Op 160), and with the ball turner's tip in Op 190."
-diagram = { file = "diagrams/end-b.svg", alt = "The shaft turned round, end B out: faced to length, then crowned by the ball turner swept about its pivot on the axis." }
+diagram = { file = "diagrams/end-b.svg", alt = "The shaft turned round, end B out (faced first, Op 160): crowned by the ball turner swept about its pivot on the axis." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
 [[setups.operations]]
