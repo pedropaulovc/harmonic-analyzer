@@ -218,7 +218,8 @@ drill_9_oal_mm = 88.9
 # (4.7371 to 4.7371 + 0.00508 mm); NO-GO, the .187 minus pin of the box, is
 # .1868-.1870 in (4.7498 - 0.00508 to 4.7498 mm). go_pin_min_mm and
 # nogo_pin_max_mm are the band's own ends (cad axle bore dia), repeated in
-# mm for the micrometer checks. A pin miking outside its range is not used.
+# mm for the micrometer checks (test_zz_pin_windows binds all four). A pin
+# miking outside its range is not used.
 go_pin_min_mm = 4.7371
 go_pin_max_mm = 4.7422
 nogo_pin_min_mm = 4.7447

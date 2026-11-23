@@ -76,7 +76,8 @@ turn_start_z_mm = 0.5
 # .4993-.4995 in: the band's high end 12.6873 less 0.00508 mm. A pin miking
 # outside its own range is not used.
 # go_pin_min_mm and nogo_pin_max_mm are the band's own ends (cad bore dia,
-# 12.6746-12.6873 mm), repeated in mm for the micrometer checks.
+# 12.6746-12.6873 mm), repeated in mm for the micrometer checks
+# (test_zz_pin_windows binds all four).
 go_pin_min_mm = 12.6746
 go_pin_max_mm = 12.6797
 nogo_pin_min_mm = 12.6822

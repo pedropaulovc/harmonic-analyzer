@@ -82,10 +82,9 @@ quantity = 2
 # end of a reamed-hole check is a plus pin"). Ø.2560 +.0040/.0000: GO a .2560
 # plus single, .2560-.2562 (6.5024 to 6.5024 + 0.00508 mm); NO-GO the .260
 # minus pin of the .061-.500 box, .2598-.2600 (6.604 - 0.00508 to 6.604 mm).
-# go_pin_min_mm and nogo_pin_max_mm are the band's own ends (cad bore dia).
-# A pin miking outside its range is not used.
-go_pin_in = 0.2560
-nogo_pin_in = 0.2600
+# go_pin_min_mm and nogo_pin_max_mm are the band's own ends (cad bore dia;
+# test_zz_pin_windows binds all four). A pin miking outside its range is not
+# used.
 go_pin_min_mm = 6.5024
 go_pin_max_mm = 6.5075
 nogo_pin_min_mm = 6.5989
@@ -175,6 +174,10 @@ bore_ream_past_mm = 1.0
 reamer_lead_mm = 1.0
 bore_tip_height_mm = 7.045
 ream_tip_height_mm = 8.922
+# The re-ream's MDI approach and retract height (Setup 5 remedy): the bar's
+# top plus PB04's 1.0 mm safe plane, as the file's own ream moves
+# (cam.py checks it).
+ream_clear_z_mm = 20.05
 # Apex (PB06): the #43 pecked .080 with full retract (L/D 3.5), its full
 # diameter apex_drill_past_mm past the bore's wall; its point then stands
 # apex_tip_height_mm above the parallels.
@@ -588,8 +591,11 @@ gauge_checks = [{ gauge = "zz-pins-2560-2600", band_mm = "{{cad.bore_dia_band_mm
 # The ream's remedy follows its check: prechips prints an op's Check after
 # its work, so it is the next op.
 [[setups.operations]]
-instruction = "Only if the GO pin was refused (otherwise skip): still clamped, blow the chips out, oil the bore, ream it once more with T5 by hand at the console (450 rpm, in and out at feed), and gauge again. Still refused: the bracket is rejected; stop and tell the owner (the pins cannot show it at or over {{cad.bore_dia_min_in:.4dot}}; a reamer cuts no larger)."
+instruction = "Only if the GO pin was refused (otherwise skip): still clamped, blow the chips out, oil the bore, ream it once more with T5 by MDI as the file did, then gauge again."
+instruction_detailed = "Only if the GO pin was refused (otherwise skip): still clamped, blow the chips out, brush oil into the bore. Console M6 T5 (the tool setter measures it), S450 M3. G0 X−{{cad.bore_height_mm:.3f}} Y−{{cad.bore_lateral_mm:.3f}}, G0 Z{{process.ream_clear_z_mm:.3f}}; G1 Z{{process.ream_tip_height_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}; G1 Z{{process.ream_clear_z_mm:.3f}} at the same feed; M5. Gauge again with both pins."
 feed = "hand"
+inspection = "GO enters, NO-GO does not: go on (skip the next op). GO still refused: the bracket is rejected; stop and tell the owner (the pins cannot show it at or over {{cad.bore_dia_min_in:.4dot}}; a reamer cuts no larger)."
+gauge_checks = [{ gauge = "zz-pins-2560-2600", band_mm = "{{cad.bore_dia_band_mm}}" }]
 
 [[setups.operations]]
 steps = [

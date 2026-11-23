@@ -165,8 +165,9 @@ description = "Plug gauge pair, .4990 GO (plus) and .4995 NO-GO (minus), Vermont
 # Q1, re-answered, verbatim: "ZZ singles per the record: 29 pins (17 plus GO,
 # 12 minus NO-GO), about $130. Accept that good holes near a limit may be
 # refused; the traveler mikes each pin so the real window is known per
-# pin."). They replace the Class X pair above, which stays until no plan
-# names it. Ø.4990 +.0005/.0000: GO a .4990 plus single (.4990-.4992), NO-GO
+# pin."). They replace the Class X pair above, which the tool-records cleanup
+# PR removes once every family has landed. Ø.4990 +.0005/.0000: GO a .4990
+# plus single (.4990-.4992), NO-GO
 # a .4995 minus single (.4993-.4995; .4995 is off the .001 box). Range: the
 # band, 12.6746-12.6873 mm; resolution: one pin's Class ZZ tolerance, .0002
 # in = 0.00508 mm.
@@ -224,7 +225,8 @@ description = "Plug gauge pair, .1865 GO (plus) and .1870 NO-GO (minus), Vermont
 
 # The axle bore's Class ZZ pins (owner ruling 2026-11-23, tool audit Q1,
 # re-answered; quoted at gauges.zz-pins-4990-4995 above). They replace the
-# Class X pair above, which stays until no plan names it. Ø.1865
+# Class X pair above, which the tool-records cleanup PR removes once every
+# family has landed. Ø.1865
 # +.0005/.0000: GO a .1865 plus single (.1865-.1867), NO-GO the .187 minus
 # pin of the .061-.500 minus box (gauges.pin-gauges; .1868-.1870). Range: the
 # band, 4.7371-4.7498 mm; resolution: one pin's Class ZZ tolerance, .0002 in

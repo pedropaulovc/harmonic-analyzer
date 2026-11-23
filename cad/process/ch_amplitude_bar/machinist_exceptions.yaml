@@ -7,5 +7,4 @@ machinist_exceptions:
   - id: TV-002
     where: "Setup 6, the comparison of every finished bar with bar 1"
     finding: "Every finished bar is held within .003 of bar 1 by comparison, a bar-to-bar limit the drawing does not print"
-    reason: "Owner ruling 2026-11-23 (tool audit Q3): 'make the 20 bars equal by comparison (stop on the surface plate, ends compared with calipers to .001)'. The .003 is the comparison's own error (two .001 caliper readings and the X0 pick-up), the plan's compare_spread_max_mm."
-    kind: accept
+    reason: "Owner ruling 2026-11-23 (tool audit Q3) sets the method: 'make the 20 bars equal by comparison (stop on the surface plate, ends compared with calipers to .001)'. The .003 limit is a delegated ruling (2026-11-23, no precedent; #2144): the comparison's own error, two .001 caliper readings and the X0 pick-up, the plan's compare_spread_max_mm."

@@ -117,11 +117,12 @@ resolution_mm = 0.00254
 # The MHA-CH-13 hub hole read with two Class X steps, .4002 and .4004, between
 # the hub pair above (owner ruling 2026-11-23, tool audit Q2, verbatim: "B.
 # Four reading pins (.4000, .4002, .4004, .4005)."). It replaces the four
-# .4001-.4004 steps above, whose record stays until no plan names it. Range:
+# .4001-.4004 steps above, whose record the tool-records cleanup PR removes
+# once every family has landed. Range:
 # the two pins, .4002-.4004 in = 10.16508-10.17016 mm; resolution: the
 # reading's step, .0002 in = 0.00508 mm (the last step, .4004 to the pair's
-# .4005, is .0001). Not owned: to buy (cad/config/shop-equipment/, same key,
-# ShopSourcing's record).
+# .4005, is .0001). Not owned: to buy. Its inventory record
+# (cad/config/shop-equipment/, same key) is ShopSourcing's to add.
 [gauges.plug-gauges-4002-4004]
 range_mm = [10.16508, 10.17016]
 resolution_mm = 0.00508

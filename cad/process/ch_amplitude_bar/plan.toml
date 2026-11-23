@@ -228,9 +228,10 @@ face_cutter_dia_mm = 12.7
 end_step_max_mm = 0.508
 foot_skim_mm = 0.508
 end_tip_below_mm = 0.1
-# The top end's most stock: the longest blank less the foot skim, past the
-# length (computed by cam.py from the export: 811.276 − 0.508 − 808.293).
-top_excess_max_mm = 2.475
+# The top end's most stock past X0: the longest blank less the foot skim,
+# past the length X0 is set to, the drawing band's middle 31.82 (Setup 5;
+# computed by cam.py: 811.276 − 0.508 − 808.228).
+top_excess_max_mm = 2.54
 # The slitting saw (McMaster 3062A21: 2-3/4 in, .064 in, 72 teeth): 100
 # rpm, the mill's slowest, is 72 ft/min at its rim; LittleMachineShop
 # "Cutting Speeds" (read 2026-11-20), Milling, Plain carbon steels
@@ -337,16 +338,18 @@ top_clamp_end_mm = -19.05
 # Bar 1's ruled length L1 (Setup 4): its own x (L1 - 31.82, e = 0) must lie
 # in every bar's x window, 0 to top_excess_max_mm, so L1 runs from the
 # drawing band's middle (31.82 in = 808.228 mm) to that plus top_excess_max_mm
-# (810.703 mm = 31.917 in; cam.py checks them).
+# (810.768 mm = 31.920 in, the longest blank less the skim; cam.py checks
+# them).
 measured_length_min_mm = 808.228
-measured_length_max_mm = 810.703
+measured_length_max_mm = 810.768
 # The absolute length accepted with the 1/64 in rule (owner ruling
 # 2026-11-23, tool audit Q3: "absolute length accepted to +/-1/32"): the
 # drawing band's middle, 31.82 in = 808.228 mm, ± 1/32 in = 0.79375 mm
 # (cam.py checks them against the drawing band).
 length_rule_min_mm = 807.43425
 length_rule_max_mm = 809.02175
-# The comparison's spread (Setup 6): every finished bar within .003 of bar 1
+# The comparison's spread (Setup 6; delegated ruling 2026-11-23, no
+# precedent, #2144): every finished bar within .003 of bar 1
 # = 0.0762 mm. Why .003: bar 1's step e is read to .001 with the calipers
 # (their own ±.001), the finished bars are compared again to .001, and the
 # edge finder's X pick-up and the foot-end flush (below) add about .001; the

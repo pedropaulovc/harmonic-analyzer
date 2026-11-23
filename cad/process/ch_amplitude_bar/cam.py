@@ -414,7 +414,13 @@ def context(
     _agree(plan, "blank_length_min_mm", p["blank_length_in"] * IN)
     _agree(plan, "blank_length_max_mm", p["blank_length_max_in"] * IN)
     skim = p["foot_skim_mm"]
-    _agree(plan, "top_excess_max_mm", p["blank_length_max_mm"] - skim - length)
+    # X0 is set to the length band's middle (Setup 5), so the top end's most
+    # stock past X0 is the longest blank less the skim, less that middle.
+    _agree(
+        plan,
+        "top_excess_max_mm",
+        p["blank_length_max_mm"] - skim - _mid(g["length_band"]),
+    )
     if p["blank_length_min_mm"] - skim < length:
         raise ValueError("the shortest blank less the foot skim is under the length")
     # Bar 1's ruled length L1: its own x (L1 - the band's middle) in every
