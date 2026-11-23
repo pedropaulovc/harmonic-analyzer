@@ -244,19 +244,16 @@ feed = "1.4 in/min"
 # The collar's three reamed sizes' go/no-go pairs (cad/config/shop-equipment/
 # gauges.plug-gauges-*, to buy): the pin-gauge sets step by .001 in, so they
 # cannot gauge a .0005 band's top. Each GO at the band's low end, each NO-GO
-# at its top: .1920/.1925, .0930/.0935 and .0615/.0620 in. A fixed-limit pair
-# reads no scale; its resolution is each member's Class X tolerance,
-# .000040 in = 0.001016 mm. The tools records let a plan list each pair.
+# at its top: .1920/.1925 and .0615/.0620 in here; the .0930/.0935 pair is
+# common.toml's gauges record and dt.toml's tools record (shared with
+# MHA-DT-11). A fixed-limit pair reads no scale; its resolution is each
+# member's Class X tolerance, .000040 in = 0.001016 mm. The tools records let
+# a plan list each pair.
 [gauges.plug-gauges-1920-1925]
 range_mm = [4.8768, 4.8895]
 resolution_mm = 0.001016
 [tools.plug-gauges-1920-1925]
 description = "Plug gauge pair, .1920 GO (plus) and .1925 NO-GO (minus), Vermont Gage Class X"
-[gauges.plug-gauges-0930-0935]
-range_mm = [2.3622, 2.3749]
-resolution_mm = 0.001016
-[tools.plug-gauges-0930-0935]
-description = "Plug gauge pair, .0930 GO (plus) and .0935 NO-GO (minus), Vermont Gage Class X"
 [gauges.plug-gauges-0615-0620]
 range_mm = [1.5621, 1.5748]
 resolution_mm = 0.001016
