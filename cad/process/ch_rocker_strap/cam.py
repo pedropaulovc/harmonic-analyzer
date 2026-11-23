@@ -6,14 +6,16 @@ part's exported ``features.toml`` and the plan/shop TOML, then runs
 checks the posted G-code against :func:`expectations`. No part dimension is
 typed here: the thickness, hub hole and outline come from the manifest (and
 its STEP, which FreeCAD profiles); the blank, the part's place in it, the
-face stock split, the tape, skin and depth levels, the plate's relief, fence
-notches and the bushing from ``plan.toml`` ``[parameters]`` and
-``milling_cuts``; cutter diameters, speeds and feeds from the shop (``shop/``).
+face stock split, the tape stack and its seams, skin and depth levels, the
+plate's relief, fence notches and the bushing from ``plan.toml``
+``[parameters]`` and ``milling_cuts``; cutter diameters, speeds and feeds
+from the shop (``shop/``).
 Typed here, because neither record carries them: the #2 centre drill's
 catalogue geometry (it sets the spot depth), the approach clearance, the face
 overhang past the blank's edges, the face-1 least skin, the safe and
-clearance heights, the flip's lift and the share of a printed band the posted
-outline may use.
+clearance heights, the flip's lift, the share of a printed band the posted
+outline may use, the through cut's margin to the strap and the plate, and
+the least spacing of the two tape layers' seams.
 
 Route (owner, 2026-11-17, no tabs; process text in the plan): the 12 x
 1-1/2 x 1/8 in 1018 CF flat lies on a shop-made 6061 sub-plate gripped in the
@@ -32,13 +34,14 @@ relief.
 - RS03: finish face 2 to the finished thickness, spot, drill and ream the hub
   hole into the relief, the tips above the relief's floor. The file ends
   after the ream.
-- RS04 (edge clamps off): the blank on double-sided tape, so Z is the plate
-  top with the tape under the part; a stepped plug in the relief locates the
-  reamed hub, a screw and shouldered bushing hold it, the edge on the fence
+- RS04 (edge clamps off): the blank bonded on blue painter's tape on both
+  faces with CA glue between, so Z is the plate top with the tape stack
+  under the part; a stepped plug in the relief locates the reamed hub, a
+  screw and shouldered bushing hold it, the edge on the fence
   sets its rotation. With the 1/8 in end mill: clear the waste between the
   outline and the fence under both tips (the fence is notched there), rough
   the outline at the finish stock down to the onion skin, finish the wall at
-  size down to the skin, then cut through the skin at size into the tape.
+  size down to the skin, then cut through the skin at size into the stack.
   Every move keeps the cutter off the un-notched fence and the bushing.
 
 Toolpath rules (owner rulings 2026-11-16): faces zigzag (ball screws), plunges
@@ -111,6 +114,13 @@ FLIP_LIFT_MM = 50.0
 # The posted outline's cutter centre may stray from its offset by this share
 # of the tightest printed band locating that edge; the rest is the machine's.
 BAND_FRACTION = 0.1
+# The through cut keeps at least this much (.004 in) to the strap's
+# underside and to the plate at both ends of the tape stack's band: the tool
+# setter's and the Z0 touch-off's repeatability, the author's allowance.
+THROUGH_MARGIN_MM = 0.1
+# The two tape layers' seams at least this far (1/2 in) apart across the
+# blank: the brief asks about half a strip (1.41 in wide), the author's floor.
+SEAM_OFFSET_MIN_MM = 12.7
 
 
 def _plan_operations(plan: dict[str, Any]):
@@ -187,6 +197,16 @@ def _steps(lo: float, hi: float, step: float) -> list[float]:
     """``lo`` to ``hi``, both included, in equal steps no longer than ``step``."""
     n = max(1, math.ceil((hi - lo) / step))
     return [lo + (hi - lo) * k / n for k in range(n + 1)]
+
+
+def _inside(point: tuple[float, float], poly: list[tuple[float, float]]) -> bool:
+    """Whether ``point`` lies inside the closed polygon ``poly`` (even-odd)."""
+    x, y = point
+    inside = False
+    for (x1, y1), (x2, y2) in zip(poly, poly[1:] + poly[:1]):
+        if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+            inside = not inside
+    return inside
 
 
 def _face_layout(width: float, dia: float, woc: float, name: str) -> dict[str, Any]:
@@ -349,18 +369,44 @@ def context(
         raise ValueError(
             "'outline finish' radial_woc_mm is not process.outline_finish_stock_mm"
         )
-    # RS04 frame: the part's underside on the tape, so every part Z rises by
-    # its thickness. Rough and finish stop at the onion skin; the through
-    # pass cuts the skin and into the tape, never the plate.
-    tape = p["tape_thickness_mm"]
-    top4 = tape + thick
-    skin = tape + p["outline_skin_mm"]
-    through = tape - p["outline_breakthrough_mm"]
-    if not 0 < through < tape < skin < top4:
+    # RS04 frame: the part's underside on the bond's stack (blue tape, CA
+    # glue, blue tape), so every part Z rises by the stack. The file is posted
+    # on the nominal stack; the operator mics each bond's stack into the
+    # record's band. Rough and finish stop at the onion skin; the through
+    # pass cuts the skin and into the stack, never the plate.
+    stack = p["tape_stack_mm"]
+    stack_band = (p["tape_stack_min_mm"], p["tape_stack_max_mm"])
+    if p["tape_thickness_mm"] != stack:
         raise ValueError(
-            f"tape {tape:.3f}, skin Z {skin:.3f}, through Z {through:.3f}: not plate < through < tape < skin < top {top4:.3f}"
+            "process.tape_thickness_mm (the adapter's name for the stack) is not process.tape_stack_mm"
         )
-    origin4 = [origin[0], origin[1], z_under - tape]
+    if not stack_band[0] < stack < stack_band[1]:
+        raise ValueError(f"tape stack {stack} is outside its band {stack_band}")
+    top4 = stack + thick
+    skin = stack + p["outline_skin_mm"]
+    through = stack - p["outline_breakthrough_mm"]
+    if not 0 < through < stack < skin < top4:
+        raise ValueError(
+            f"stack {stack:.3f}, skin Z {skin:.3f}, through Z {through:.3f}: not plate < through < stack < skin < top {top4:.3f}"
+        )
+    # The through cut's Z is fixed over the plate; the strap's underside
+    # stands at whatever stack the bond has. At both ends of the band the cut
+    # must clear the strap's underside (binding at the thinnest stack) and
+    # stop short of the plate (its Z does not move with the stack), each by
+    # THROUGH_MARGIN_MM.
+    for s in stack_band:
+        if through > s - THROUGH_MARGIN_MM:
+            raise ValueError(
+                f"at a {s:.2f} mm stack the through cut at Z {through:.3f} is not {THROUGH_MARGIN_MM} mm below the strap's underside"
+            )
+        if through < THROUGH_MARGIN_MM:
+            raise ValueError(
+                f"at a {s:.2f} mm stack the through cut at Z {through:.3f} is not {THROUGH_MARGIN_MM} mm above the plate"
+            )
+    # The highest the strap's top stands: the thickest stack. Rapids and the
+    # bushing's clearance are judged there.
+    top4_max = stack_band[1] + thick
+    origin4 = [origin[0], origin[1], z_under - stack]
 
     # The rough slot reaches 2r + finish stock outside the part: it must stay
     # inside the blank at the far edge and the ends (the waste frame stays
@@ -376,6 +422,34 @@ def context(
     broken = {k: round(v, 3) for k, v in margins.items() if v <= 0}
     if broken:
         raise ValueError(f"the outline slot breaks out of the blank at {broken} mm")
+
+    # Tape seams run along X, each layer's at its distance from the fence face
+    # (plan tape_seam_*_mm). The two layers' seams sit apart, and at no X do
+    # both lie in the slot's band (outside the part, within the rough slot's
+    # reach of its edge): no cut rides on a seam of both layers.
+    seam_blank, seam_plate = -p["tape_seam_blank_mm"], -p["tape_seam_plate_mm"]
+    if abs(seam_blank - seam_plate) < SEAM_OFFSET_MIN_MM:
+        raise ValueError(
+            f"the blank's and the plate's tape seams are {abs(seam_blank - seam_plate):.2f} mm apart (< {SEAM_OFFSET_MIN_MM})"
+        )
+
+    def in_slot(x: float, y: float) -> bool:
+        near = [pt for pt in samples if abs(pt[0] - x) < reach]
+        return (
+            bool(near)
+            and min(math.dist((x, y), pt) for pt in near) < reach
+            and not _inside((x, y), samples)
+        )
+
+    both = [
+        x
+        for x in _steps(0.0, bl, 0.5)
+        if in_slot(x, seam_blank) and in_slot(x, seam_plate)
+    ]
+    if both:
+        raise ValueError(
+            f"both tape seams lie in the outline slot at X {both[0]:.1f}-{both[-1]:.1f}"
+        )
 
     outline_rpm, outline_feed, outline_flutes = _setting(plan, shop, "outline rough")
     for name in ("outline finish", "outline through", "fence sliver"):
@@ -407,7 +481,7 @@ def context(
         raise ValueError(
             f"the outline passes {nearest:.3f} from the hub, inside the bushing flange's {keep:.3f}"
         )
-    flange_top = top4 + p["bushing_stack_height_mm"]
+    flange_top = top4_max + p["bushing_stack_height_mm"]
     clear4 = flange_top + SAFE_MM
 
     # Fence sliver: under each tip the rough slot leaves a strip of blank
@@ -636,6 +710,7 @@ def context(
             "start": xy(bottom["ends"][0]),
             "origin": origin4,
             "top": top4,
+            "top_max": top4_max,
             "skin": skin,
             "bottom": through,
             "clearance": clear4,
@@ -799,7 +874,7 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
         ),
         (rs4, "pauses", {"z_top": top4, "count": 0}),
         (rs4, "depth", {"z_min": ol["bottom"]}),
-        (rs4, "rapids_clear", {"z_top": top4}),
+        (rs4, "rapids_clear", {"z_top": ol["top_max"]}),
         (rs4, "air_feed", {"z_top": top4}),
         (
             rs4,
@@ -938,7 +1013,7 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops["ream"] = rt.bore(
         ream_job, ream_tc, "ream hub", hub, re_["z"], T + SAFE_MM, T + CLEAR_MM
     )
-    # RS04: the strap on the tape (its own model, raised by the tape). The
+    # RS04: the strap on the tape stack (its own model, raised by the stack). The
     # fence-sliver rings (written by context()), then the top face's perimeter
     # outside, anticlockwise (conventional), entered at the bottom arc's -X
     # foot, away from the bushing; links clear the bushing's top.
@@ -947,7 +1022,7 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     strap4 = rt.import_step(
         doc, "Strap on tape", ctx["step"], ol["origin"], ctx["model"]["axes"]
     )
-    stock4 = ((0, bl), (-bw, 0), (top4 - T, top4))  # the tape under the part
+    stock4 = ((0, bl), (-bw, 0), (top4 - T, top4))  # the tape stack under the part
     outline_job = rt.job(doc, "outline", [strap4], stock4)
     otc = tool("em-eighth", ol["rpm"], ol["feed"], ol["plunge"], ol["dia"], flutes=3)
     ops["fence_sliver"] = rt.custom(

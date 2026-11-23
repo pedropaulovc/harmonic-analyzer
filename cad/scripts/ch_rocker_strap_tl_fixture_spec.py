@@ -56,11 +56,15 @@ COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
 QUANTITIES: dict[str, int] = {PLATE: 1, PLUG: 1, WASHER: 1, CLAMP: 4, SCREW: 1}
 
 # --- The blank the kit holds (not a kit item) ----------------------------------
-# The strap plan's tape (0.15 mm nominal) under the blank; the blank at the
-# finished strap thickness's nominal (ch_rocker_arm_spec.ARM_THICKNESS, .098),
-# the washer on its top. Both mirrored, so the kit does not re-key on the
-# rocker arm's spec; test_ch_rocker_strap_tl_fixture_assembly asserts them.
-TAPE = 0.15
+# The strap plan's tape stack under the blank (blue painter's tape on both
+# faces, CA glue between: tape_stack_mm 0.28 nominal, every bond miked into
+# tape_stack_min_mm..tape_stack_max_mm); the blank at the finished strap
+# thickness's nominal (ch_rocker_arm_spec.ARM_THICKNESS, .098), the washer on
+# its top. All mirrored, so the kit does not re-key on the rocker arm's spec;
+# test_ch_rocker_strap_tl_fixture_assembly asserts them.
+TAPE = 0.28
+TAPE_MIN = 0.23
+TAPE_MAX = 0.33
 STRAP_THICKNESS = 2.4892
 BLANK_TOP_Z = TAPE + STRAP_THICKNESS
 
@@ -93,9 +97,9 @@ for _station in CLAMP_POSITIONS:
         raise AssertionError("an edge clamp's heel is off its pocket's back wall")
     if abs(_station[1] + clamp.KNIFE_Y - plate.BLANK_EDGE_Y) > 1e-9:
         raise AssertionError("an edge clamp's knife misses the blank's edge")
-if plate.COUNTERBORE_FLOOR_Z + plug.OVERALL_LENGTH >= BLANK_TOP_Z:
+if plate.COUNTERBORE_FLOOR_Z + plug.OVERALL_LENGTH >= TAPE_MIN + STRAP_THICKNESS:
     raise AssertionError("the plug's pilot stands above the blank's top")
-if plate.COUNTERBORE_FLOOR_Z + plug.OVERALL_LENGTH <= TAPE:
+if plate.COUNTERBORE_FLOOR_Z + plug.OVERALL_LENGTH <= TAPE_MAX:
     raise AssertionError("the plug's pilot does not reach into the blank's hub hole")
 
 # --- Sheet words ------------------------------------------------------------
@@ -114,9 +118,12 @@ FENCE_READING_IN = 0.001
 SCREW_TABLE_TITLE = "SCREW SCHEDULE"
 SCREW_TABLE_HEADER = ("ITEM", "NUMBER", "DESCRIPTION", "QTY", "THREAD", "TORQUE")
 BLANK_LABEL = "MHA-CH-13 BLANK, NOT PART OF THE FIXTURE"
-# The tape the strap traveler bonds each blank with for its outline
-# (shop-equipment consumables.tape-3m-vhb-5906; plan tape_thickness_mm).
-TAPE_NAME = "3M VHB 5906 TAPE (.006 THICK)"
+# The hold the strap traveler bonds each blank with for its outline
+# (shop-equipment consumables.hold-painters-tape-ca; plan tape_stack_mm).
+TAPE_NAME = f"BLUE TAPE, CA GLUE, BLUE TAPE ({TAPE / INCH:.3f} STACK)".replace(
+    "(0.", "(."
+)
+_STACK_BAND = f"{TAPE_MIN / INCH:.3f}-{TAPE_MAX / INCH:.3f}".replace("0.", ".")
 
 STEP_WIDTH = 62  # characters a printed line, inside the sheet's right border
 
@@ -198,7 +205,7 @@ ASSEMBLY_STEPS = "\n".join(
 )
 
 _CLAMPED: tuple[str, ...] = (
-    "SEAT THE BLANK ON THE PLATE TOP AGAINST THE FENCE AND THE END STOP.",
+    "SEAT THE BLANK ON THE PLATE AGAINST THE FENCE AND END STOP.",
     f"TIGHTEN EVERY ITEM {_C} SCREW TO {CLAMP_TORQUE_IN_LB:g} IN-LB (SCREW SCHEDULE).",
     "CHECK: THE BLANK DOES NOT MOVE BY HAND.",
 )
@@ -207,38 +214,38 @@ _CLAMP_CHECK = _FIRST + len(_CLAMPED) - 1
 _CLAMPED += (
     f"IF STEP {_CLAMP_CHECK} FAILS, RESEAT THE BLANK AND REPEAT FROM STEP {_FIRST}.",
 )
-# The tape steps carry the traveler's degrease and dwell (cad/process/
-# ch_rocker_strap/plan.toml, setup 5's first operation; rules 22, 25;
-# Codjiflo review of #3056): its bond analysis takes the tape at half
-# strength, which it reaches 20 minutes after pressing on clean faces.
+# The bond steps follow the traveler's (cad/process/ch_rocker_strap/plan.toml,
+# setup 5; owner rulings 2026-11-23: blue painter's tape on both faces, CA
+# glue between, proved by the stack and a hand push test, no pull test),
+# terse: the traveler carries the stack arithmetic and the full wording.
 _TAPED: tuple[str, ...] = (
-    f"BACK EVERY ITEM {_C} OFF CLEAR OF THE BLANK.",
-    "LIFT THE BLANK OFF THE PLATE.",
-    "DEGREASE THE PLATE TOP AND THE BLANK'S UNDERSIDE WITH ISOPROPYL ALCOHOL "
-    "AND WATER.",
-    f"LAY {TAPE_NAME} ON THE PLATE OVER THE BLANK'S PLACE, CUT AWAY AT THE "
-    "COUNTERBORE.",
+    f"BACK EVERY ITEM {_C} OFF AND LIFT THE BLANK OFF THE PLATE.",
+    "WIPE THE PLATE TOP AND THE BLANK'S UNDERSIDE WITH ISOPROPYL ALCOHOL; WIPE DRY.",
+    "TAPE THE PLATE: 2 STRIPS ALONG X FROM THE FENCE, BUTTED, NOT "
+    "OVERLAPPED; CUT AWAY AT THE COUNTERBORE.",
+    "TAPE THE UNDERSIDE: 2 STRIPS BUTTED AT MID-WIDTH, TRIMMED FLUSH "
+    "AND CLEAR OF THE HUB HOLE.",
+    "BURNISH BOTH TAPES DOWN HARD, EDGES INCLUDED.",
     f"DROP ITEM {_G} INTO THE COUNTERBORE, PILOT UP.",
-    f"LOWER THE BLANK ONTO THE TAPE, ITS HUB HOLE OVER ITEM {_G}'S PILOT, ITS "
-    "LONG EDGE AGAINST THE FENCE.",
-    "PRESS THE BLANK DOWN OVER ITS WHOLE FACE.",
-    f"PUT ITEM {_W} ON THE BLANK OVER ITS HUB HOLE.",
-    f"RUN ITEM {_S} THROUGH ITEM {_W} INTO ITEM {_P}, SNUG.",
-    f"CHECK: THE BLANK DOES NOT TURN BY HAND ABOUT ITEM {_S}.",
+    "ZIGZAG THICK CA ON THE PLATE'S TAPE; MIST ACCELERATOR ON THE BLANK'S TAPE.",
+    f"WITHIN 10 S LOWER THE BLANK ONTO ITEM {_G}'S PILOT AND THE FENCE; "
+    "PRESS IT DOWN 1 MINUTE, THEN WAIT 5.",
+    f"CHECK: STACK {_STACK_BAND} AT BOTH ENDS; THE BLANK DOES NOT MOVE "
+    "UNDER A HARD PUSH.",
 )
 _TAPE_FIRST = _CLAMP_CHECK + 2
-_TURN_CHECK = _TAPE_FIRST + len(_TAPED) - 1
+_BOND_CHECK = _TAPE_FIRST + len(_TAPED) - 1
 _TAPED += (
-    f"IF STEP {_TURN_CHECK} FAILS, TAKE ITEMS {_S} AND {_W} OFF, RENEW THE TAPE "
-    f"AND REPEAT FROM STEP {_TAPE_FIRST + 2}.",
-    "WAIT 20 MINUTES BEFORE THE OUTLINE, FOR THE TAPE TO REACH HALF STRENGTH.",
+    f"IF STEP {_BOND_CHECK} FAILS, PEEL, CLEAN AND REPEAT FROM STEP {_TAPE_FIRST + 1}.",
+    f"PUT ITEM {_W} ON THE BLANK OVER ITS HUB HOLE.",
+    f"RUN ITEM {_S} THROUGH ITEM {_W} INTO ITEM {_P}, SNUG.",
 )
 BLANK_STEPS = "\n".join(
     (
         "EACH BLANK, WITH THE MHA-CH-13 TRAVELER",
         f"SETUPS 2-4 (FACES, HUB HOLE), UNDER ITEM {_C}:",
         *numbered(_CLAMPED, start=_FIRST),
-        "SETUP 5 (OUTLINE), ON TAPE:",
+        f"SETUP 5 (OUTLINE): {TAPE_NAME}",
         *numbered(_TAPED, start=_TAPE_FIRST),
     )
 )

@@ -88,7 +88,9 @@ def test_mirrored_mates_match_the_strap_and_the_plan() -> None:
         )
     )
     plan = _plan()
-    assert spec.TAPE_THICKNESS == plan["tape_thickness_mm"]
+    assert spec.TAPE_STACK == plan["tape_stack_mm"]
+    assert spec.TAPE_MIN == plan["tape_stack_min_mm"]
+    assert spec.TAPE_MAX == plan["tape_stack_max_mm"]
     assert spec.COUNTERBORE_DIA >= plan["hub_relief_dia_mm"]
     assert spec.COUNTERBORE_DEPTH == pytest.approx(
         plan["hub_relief_depth_mm"], abs=0.01
@@ -148,7 +150,7 @@ def test_the_pilot_band_is_one_the_lathe_holds_and_its_play_fits_the_outline() -
 def test_seated_on_the_floor_the_plug_stays_inside_the_strap_at_the_worst_case() -> (
     None
 ):
-    """Plate frame, Z0 the floor the tape lies on; every band at its worst."""
+    """Plate frame, Z0 the floor the tape stack lies on; every band at its worst."""
     floor = (-spec.COUNTERBORE_DEPTH - XXX, -spec.COUNTERBORE_DEPTH + XXX)
     shoulder_max = floor[1] + spec.BODY_LENGTH + XXX
     assert shoulder_max < 0.0
@@ -158,13 +160,15 @@ def test_seated_on_the_floor_the_plug_stays_inside_the_strap_at_the_worst_case()
         floor[1] + spec.OVERALL_LENGTH + XXX,
     )
     assert pilot_top == pytest.approx(spec.PILOT_TOP_Z_RANGE)
-    tape = _plan()["tape_thickness_mm"]
-    strap_top_min = 0.85 * tape + arm.ARM_THICKNESS + arm.ARM_THICKNESS_BAND[1]
+    plan = _plan()
+    strap_top_min = (
+        plan["tape_stack_min_mm"] + arm.ARM_THICKNESS + arm.ARM_THICKNESS_BAND[1]
+    )
     assert pilot_top[1] < strap_top_min
     assert spec.PILOT_TOP_Z == pytest.approx(2.21, abs=0.01)
     # The cylindrical land under the chamfer reaches past the strap's
-    # underside (the tape's top at its thickest).
-    assert pilot_top[0] - (spec.CHAMFER + XX) > 1.15 * tape
+    # underside (the stack's top at its thickest).
+    assert pilot_top[0] - (spec.CHAMFER + XX) > plan["tape_stack_max_mm"]
 
 
 def test_the_bore_clears_the_quarter_inch_screw_and_states_its_wall() -> None:
