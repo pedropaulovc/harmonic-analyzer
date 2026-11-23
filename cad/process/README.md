@@ -168,6 +168,14 @@ names one until a reader labels makerspace equipment as such. No record names
 the parts it serves as data (that is prose in its `note`): parts point at what
 they need from their process plans. They hold:
 
+- `measured_cuts.<setting>`: the envelope a measured cutting setting (a
+  `shop/` `settings.<setting>` record from a dechatter report under
+  `dechatter/`) is valid inside: the tool assembly's measured stick-out and the
+  plan parameter that pins it, the deepest and the widest cut found stable.
+  prechips refuses any other key on a setting, so the limits are data here;
+  `test_measured_cuts.py` checks each against its report and refuses a plan
+  operation that names the setting with another stick-out, or a
+  `milling_cuts` entry deeper or wider than measured;
 - ownership-only records, under the shop key, for the PM-30MV mill, the
   PM-1127VF-LB lathe, the calipers, the DRO scales and the clamp bore's and
   stop plate's drill shanks read as gauges (`machines.*`, `gauges.calipers`,
