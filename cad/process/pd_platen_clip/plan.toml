@@ -347,7 +347,7 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Only after a feed hold in the prove-out: stop the program, spindle off, jog Z up clear. Re-check the plate's seat and the blanks' places (op 70); home ($H) and set G54 again (ops 50 and 80, then this Z0 1.000 in high); prove again from the start."
+instruction = "Only after a feed hold in the prove-out: stop the program, spindle off, jog Z up clear. Re-check the plate's seat and the blanks' places (op 80); home ($H) and set G54 again (ops 60 and 90, then this Z0 1.000 in high); prove again from the start."
 feed = "hand"
 
 [[setups.operations]]
