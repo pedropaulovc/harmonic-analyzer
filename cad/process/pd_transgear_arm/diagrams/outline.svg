@@ -7,5 +7,5 @@
 <circle cx="257.0375" cy="135.25" r="5.8" fill="#888"/>
 <text x="85.0" y="195.25" text-anchor="middle">#10-32 screw</text>
 <text x="257.0375" y="195.25" text-anchor="middle">#4-40 screw</text>
-<text x="40" y="250" text-anchor="start">1/4 in end mill round the outline, anticlockwise; X0 plate left end, Z0 plate top</text>
+<text x="40" y="250" text-anchor="start">1/4 end mill, outline anticlockwise; X, Y off the arm; Z0 plate top</text>
 </svg>
