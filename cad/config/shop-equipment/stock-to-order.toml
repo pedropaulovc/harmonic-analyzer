@@ -329,3 +329,17 @@ section_mm = [15.875, 1.5875]
 length_mm = 1828.8
 status = "to_order"
 cite = ["McMaster-Carr 7702N136 https://www.mcmaster.com/product/7702N136/ read 2026-11-22 (search summary; the page blocks scripted reads): Low-Carbon Steel Bar, 1018, 1/16 in thick x 5/8 in wide, 6 ft, cold drawn, square edge, ASTM A108", "cad/config/parts/pd-guide-lock.yaml material_specification", "cad/scripts/pd_guide_lock_spec.py LOCK_WIDTH, LOCK_HEIGHT, LOCK_THICK"]
+
+# The platen's brass (MHA-PD-02). Bought once and refunded: Metal Supermarkets
+# Kent invoice EC234347, ordered 2026-11-03, "Brass Flat Bar C360 0.250 X
+# 6.000, qty 1 @ 11.000 in", $168.60. Owner (Pedro) 2026-11-23: "brass platen
+# was ordered previously on metalssupermarket but they refunded it because
+# they couldnt find stock so needs to be added to cart again".
+[stock.c360-flat-1-4x6]
+form = "flat_bar"
+material = "C360 brass"
+note = "To order: brass flat bar C360 0.250 x 6.000 in, 1 piece x 11.000 in. Allocation: pd-platen (MHA-PD-02). Not owned: the Metal Supermarkets order (invoice EC234347, $168.60) was refunded for want of stock (owner 2026-11-23). Sources read live 2026-11-23: no 1/4 x 6 in C360 bar could be bought online at OnlineMetals (pid 20203 loads without a length option), McMaster-Carr, Speedy Metals or Midwest Steel; Metal Supermarkets' Kent store page still listed SKU BF360/2506 at $168.60 for 11 in, against the refund. Thicker 6 in wide bar exists (OnlineMetals pid 20986, 3/8 x 6, 12 in, $321.60) but is not this row's size. No supplier chosen."
+section_mm = [152.4, 6.35]
+length_mm = 279.4
+status = "to_order"
+cite = ["Metal Supermarkets Kent invoice EC234347, date ordered 03 Nov 2026, line Brass Flat Bar C360 0.250 X 6.000, qty 1 @ 11.000 in (refunded)", "Owner (Pedro) 2026-11-23: \"brass platen was ordered previously on metalssupermarket but they refunded it because they couldnt find stock so needs to be added to cart again\""]
