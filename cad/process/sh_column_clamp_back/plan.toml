@@ -653,6 +653,17 @@ feed = "hand"
 instruction = "First pair only: prove CB09_pair_bore in air, Z0 raised 1.000 in; the helix circles the bore's place and clears the screw heads and the block. Then Z0 back."
 feed = "hand"
 
+# CB09 runs outside the measured envelope of the 1/2 in end mill (shop
+# settings.em-half-carbide-1018-v5-face/-v6-deep): the rough helix cuts the
+# cutter's full width, the finish a 17.0 mm deep wall. Owner ruling (Pedro,
+# 2026-11-22), no re-cut: for full-width passes "same log new dechatter
+# issues to try full radial depth but shallow axial" (#3428); for deep walls
+# "log new dechatter issues to try deep axial cuts but with shallow radial
+# depth" (#3427). It keeps the chart setting; the first pair is watched.
+[[setups.operations]]
+instruction = "First pair only: these CB09 cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3427, #3428): rough helix .020 deep a turn x .500 wide, finish turn about .67 deep x .010 wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+feed = "hand"
+
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
@@ -667,6 +678,13 @@ milling_cuts = [
   { name = "bore rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.helix_pitch_mm}}", radial_woc_mm = "{{process.face_cutter_dia_mm}}", rpm = 2650, feed_mm_min = "{{process.bore_feed_per_min_mm}}", stations_mm = "{{cad.bore_location_mm}}" },
   { name = "bore finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{cad.height_mm}}", radial_woc_mm = "{{process.bore_finish_stock_mm}}", rpm = 2650, feed_mm_min = "{{process.bore_feed_per_min_mm}}", stations_mm = "{{cad.bore_location_mm}}" },
 ]
+
+# CB10 runs outside the measured envelope too: a 17.0 mm deep wall. Owner
+# ruling (Pedro, 2026-11-22), no re-cut: "log new dechatter issues to try
+# deep axial cuts but with shallow radial depth" (#3427).
+[[setups.operations]]
+instruction = "First pair that needs CB10 only: this CB10 cut at 2650 rpm has not been chatter-tested on this end mill (owner's test list #3427): opening turn about .67 deep x .001 wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+feed = "hand"
 
 [[setups.operations]]
 speed_kind = "spindle"
