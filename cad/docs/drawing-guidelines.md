@@ -276,7 +276,8 @@ made to their mate.
   or any REAM callout (REAM marks a fit bore even when it prints no band). A
   three-place size given a function, printed at its title-block band, names
   its mate as below but is not a tight band, and the necessity test does not
-  apply to it; nor is a thread designation or class, a gear data block, a
+  apply to it; nor is a single-limit corner radius or edge break (`R.03
+  MAX`, rule 16), a thread designation or class, a gear data block, a
   purchased part's catalogue designation or one of the title block's own
   rows. The callout of a tight band, or a flagged note attached
   to it (rule 7), names the mate, the fit it needs (running, sliding, press,

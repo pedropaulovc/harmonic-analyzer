@@ -62,7 +62,8 @@ different words. One finding per feature, naming the form it should take;
 never also `missing` for the same feature's mate or acceptance, which are
 asked for only once the feature has earned its form. The test does not
 apply to a size, length, radius or angle printed at its title-block band
-(three places with a function included), a hole match-drilled or reamed in
+(three places with a function included), a single-limit corner radius or
+edge break (`R.03 MAX`), a hole match-drilled or reamed in
 place through its mate at assembly, a thread designation or class, gear
 tooth data in a gear data block, a title-block row, or a purchased part's
 catalogue designation or supplier REF size.
