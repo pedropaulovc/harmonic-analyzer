@@ -231,6 +231,10 @@ id = "drill-5-16"
 name = "5/16 drill"
 ref = "block-drill-5-16"
 [[tools]]
+id = "reamer-3135"
+name = ".3135 reamer"
+ref = "reamer-3135"
+[[tools]]
 id = "chamfer"
 name = "1/4 in 90° chamfer mill"
 ref = "chamfer-mill-carbide-1-4-90"
@@ -348,7 +352,11 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Studs: two 3/8-16 studs (1268 kit) from T-nuts in the middle T-slot up through the stud holes, a flange nut on each down in its counterbore, snug. Each stud's end at most {{process.stud_above_seat_mm:in.2f}} above the counterbore's floor, the nut on full thread (pick the kit's stud length that does both). Tighten both nuts, then take the two end straps off. The end blocks stay. Calipers across the spindle's nose: the end mill and the chamfer mill pass over the studs with it."
+instruction = "Studs: two 3/8-16 studs (1268 kit) from T-nuts in the middle T-slot up through the stud holes, a flange nut on each down in its counterbore. Each stud's end at most {{process.stud_above_seat_mm:in.2f}} above the counterbore's floor, the nut on full thread (pick the kit's stud length that does both). Tighten both nuts, then take the two end straps off; the end blocks stay."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Calipers across the spindle's nose: the end mill and the chamfer mill take it over the studs."
 inspection = "Spindle nose {{process.spindle_nose_dia_max_mm:in.2f}} across or less."
 gauge_checks = [{ gauge = "calipers", band_mm = [0.0, "{{process.spindle_nose_dia_max_mm}}"] }]
 feed = "hand"
@@ -610,8 +618,16 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "GO pin tight in a hole: still clamped, run FR09_foot again from its M6 T4 line (CNCjs: start from that line), then gauge the holes again."
-feed = "hand"
+speed_kind = "spindle"
+tool = "reamer-3135"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.foot_hole_a1_dia_band_mm}}" }
+instruction = "GO pin tight in a hole: still clamped, M6 T6 at the console (.3135 reamer in the drill chuck; set 400). Over that hole (its X Y in FR09_foot's T4 lines): G1 down to the T4 line's Z and back up, both at {{process.foot_feed_per_min_mm:in.2f}} in/min. Cutting oil. Gauge it again."
+rpm = 400
+feed = "{{process.foot_feed_per_min_mm:in.2f}} in/min, in and out"
+milling_cuts = [
+  { name = "foot hole ream", kind = "drill", phase = "finish", cutter_dia_mm = 7.9629, flutes = 6, rpm = 400, feed_mm_min = "{{process.foot_feed_per_min_mm}}", stations_mm = [-60.325, 60.325] },
+]
 
 [[setups.operations]]
 steps = [
