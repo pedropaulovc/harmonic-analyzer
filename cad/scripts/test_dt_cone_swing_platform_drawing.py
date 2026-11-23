@@ -2031,3 +2031,191 @@ def test_drawing_side_callout_precision_is_the_declared_exception() -> None:
     }
     assert set(written.values()) == {3} and "written as 3" in entry.where
     assert all(name in entry.where for name in written)
+
+
+_FEATURE_KINDS = {
+    "underside": "face",
+    "top_face": "face",
+    "pivot_bore": "hole",
+    "north_edge": "face",
+    "south_edge": "face",
+    "outline": "profile",
+    "se_chamfer": "profile",
+    "top_relief": "notch",
+    "post_mount_west": "threaded_hole",
+    "post_mount_east": "threaded_hole",
+    "holddown": "hole",
+    "tip_dowel": "hole",
+    "lock_notch": "slot",
+}
+
+
+def _in(value_in: float) -> float:
+    return value_in * 25.4
+
+
+def _face_plane(normal: tuple[float, float, float], offset_mm: float):
+    from _gtol_face import FaceGeometry
+
+    point = tuple(value * offset_mm / 1000 for value in normal)
+    return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+
+def _face_cylinder(dia_mm: float, x_mm: float, z_mm: float):
+    from _gtol_face import FaceGeometry
+
+    r = dia_mm / 2
+    t = spec.PLATE_THICKNESS
+    box = tuple(v / 1000 for v in (x_mm - r, 0.0, z_mm - r, x_mm + r, t, z_mm + r))
+    return FaceGeometry(
+        None, 4002, (x_mm / 1000, 0.0, z_mm / 1000, 0.0, 1.0, 0.0, r / 1000), None, box
+    )
+
+
+def _edge_plane(start: tuple[float, float], end: tuple[float, float], outward: float):
+    dx, dz = end[0] - start[0], end[1] - start[1]
+    length = math.hypot(dx, dz)
+    nx, nz = dz / length * outward, -dx / length * outward
+    return _face_plane((nx, 0.0, nz), nx * start[0] + nz * start[1])
+
+
+def test_the_platform_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    import export_features
+
+    assert "dt_cone_swing_platform" in export_features.SUPPORTED_PARTS
+    manifest = export_features.requirement_manifest("dt_cone_swing_platform")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == _FEATURE_KINDS
+    assert manifest["construction"] == "one_piece"
+    selectors = export_features.feature_selectors("dt_cone_swing_platform")
+    t = spec.PLATE_THICKNESS
+    ne = (-geometry.HALF_WIDTH_N, geometry.NORTH_OVERHANG)
+    nw = (geometry.WEST_HALF_N, geometry.NORTH_OVERHANG)
+    sw = (geometry.WEST_HALF_S, geometry.PLATE_SOUTH_Z)
+    se = (-geometry.EAST_HALF_S, geometry.PLATE_SOUTH_Z)
+    corner = {label: (x, z, r) for label, x, z, r in geometry.PLATE_CORNERS}
+    notch_n = (geometry.SLOT_TZ, 0.0, -geometry.SLOT_TX)
+    notch_mid = notch_n[0] * geometry.SLOT_E_X + notch_n[2] * geometry.SLOT_E_Z
+    relief_half = spec.PIVOT_BEARING_RELIEF_DIAMETER / 2
+    west, east = checks.POST_MOUNT_WEST_XZ, checks.POST_MOUNT_EAST_XZ
+    tap = spec.POST_MOUNT_TAP_DIA
+    hx, hz = spec.HOLDDOWN_LOCAL_X, spec.HOLDDOWN_LOCAL_Z
+    expected = {
+        "underside": [_face_plane((0.0, -1.0, 0.0), 0.0)],
+        "top_face": [_face_plane((0.0, 1.0, 0.0), t)],
+        "pivot_bore": [_face_cylinder(drawing.PIVOT_HOLE_DIA, 0.0, 0.0)],
+        "north_edge": [_face_plane((0.0, 0.0, 1.0), geometry.NORTH_OVERHANG)],
+        "south_edge": [_face_plane((0.0, 0.0, -1.0), -geometry.PLATE_SOUTH_Z)],
+        "outline": [
+            _edge_plane(ne, se, 1.0),
+            _edge_plane(nw, sw, -1.0),
+            *(
+                _face_cylinder(2 * corner[label][2], corner[label][0], corner[label][1])
+                for label in ("NE", "NW", "SW")
+            ),
+        ],
+        "se_chamfer": [
+            _edge_plane(geometry.SE_CHAMFER_SOUTH_XZ, geometry.SE_CHAMFER_EAST_XZ, -1.0)
+        ],
+        "top_relief": [
+            _face_plane((0.0, 1.0, 0.0), spec.PIVOT_BEARING_THICKNESS),
+            _face_cylinder(spec.PIVOT_BEARING_RELIEF_DIAMETER, 0.0, 0.0),
+            _face_plane((1.0, 0.0, 0.0), -relief_half),
+            _face_plane((-1.0, 0.0, 0.0), -relief_half),
+        ],
+        "post_mount_west": [_face_cylinder(tap, *west)],
+        "post_mount_east": [_face_cylinder(tap, *east)],
+        "holddown": [
+            _face_cylinder(spec.HOLDDOWN_CLEARANCE_DIA, hx, hz),
+            _face_cylinder(spec.HOLDDOWN_CBORE_DIA, hx, hz),
+            _face_plane((0.0, -1.0, 0.0), -spec.HOLDDOWN_CBORE_DEPTH),
+        ],
+        "tip_dowel": [
+            _face_cylinder(spec.TIP_DOWEL_HOLE_DIA, spec.TIP_DOWEL_LOCAL_X, spec.TIP_DOWEL_LOCAL_Z)
+        ],
+        "lock_notch": [
+            _face_cylinder(geometry.SLOT_W, geometry.SLOT_E_X, geometry.SLOT_E_Z),
+            _face_plane(notch_n, notch_mid - geometry.SLOT_W / 2),
+            _face_plane(tuple(-v for v in notch_n), -notch_mid - geometry.SLOT_W / 2),
+        ],
+    }
+    assert set(expected) == set(_FEATURE_KINDS)
+    for name, faces in expected.items():
+        for face in faces:
+            owners = [
+                owner
+                for owner, specs in selectors.items()
+                if any(selector.matches(face) for selector in specs)
+            ]
+            assert owners == [name], name
+
+
+def test_platform_feature_bands_are_the_printed_ones() -> None:
+    import export_features
+
+    features = export_features.requirement_manifest("dt_cone_swing_platform")["features"]
+    assert features["underside"]["finish_ra"] == pytest.approx(MACHINED_UM)
+    assert features["underside"]["finish_target"] == "SLIDING FACE"
+    top = features["top_face"]
+    assert top["finish_ra"] == pytest.approx(SEAT_UM)
+    assert top["thickness_as_supplied"] == pytest.approx(_in(0.25))
+    assert top["callout"] == "1/4 PLATE AS SUPPLIED"
+    bore = features["pivot_bore"]
+    assert bore["dia"] == pytest.approx([_in(0.2500), _in(0.2505)])
+    assert bore["process"] == "ream"
+    assert bore["fit"] == "RUNNING FIT ON MHA-DT-VN-52 SHOULDER"
+    assert features["north_edge"]["station"] == pytest.approx([_in(0.27), _in(0.29)])
+    assert features["north_edge"]["station_from"] == "pivot_bore"
+    assert features["south_edge"]["length"] == pytest.approx([_in(9.53), _in(9.55)])
+    assert features["south_edge"]["length_from"] == "north_edge"
+    outline = features["outline"]
+    for field, value in (
+        ("north_east_x", 0.63),
+        ("north_west_x", 0.31),
+        ("south_east_x", 0.94),
+        ("south_west_x", 1.46),
+        ("ne_radius", 0.39),
+        ("nw_radius", 0.31),
+        ("sw_radius", 0.20),
+    ):
+        assert outline[field] == pytest.approx([_in(value - 0.01), _in(value + 0.01)]), field
+    chamfer = features["se_chamfer"]
+    assert chamfer["start_x"] == pytest.approx([_in(0.09), _in(0.11)])
+    assert chamfer["rise"] == pytest.approx([_in(0.33), _in(0.35)])
+    assert chamfer["rise_from"] == "south_edge"
+    assert chamfer["run_ref"] == pytest.approx(_in(1.04))
+    relief = features["top_relief"]
+    assert relief["width"] == pytest.approx([_in(0.41), _in(0.43)])
+    assert relief["end_radius"] == pytest.approx([_in(0.20), _in(0.22)])
+    # (.010), the reference the pivot screw's 0.25 mm axial clearance books.
+    assert relief["depth_ref"] == pytest.approx(spec.PIVOT_BEARING_RELIEF_DEPTH)
+    assert "MHA-DT-VN-52" in relief["depth_fit"]
+    assert relief["open_to"] == "north_edge"
+    for name, z_in in (("post_mount_west", 8.197), ("post_mount_east", 8.409)):
+        taps = features[name]
+        assert taps["thread"] == "1/4-20"
+        assert taps["dia"] == pytest.approx([_in(0.201), _in(0.205)], abs=1e-3)
+        assert taps["x_from_pivot"] == pytest.approx([_in(0.494), _in(0.504)], abs=1e-3)
+        assert taps["z_from_pivot"] == pytest.approx(
+            [_in(z_in - 0.005), _in(z_in + 0.005)], abs=2e-3
+        )
+        assert taps["engagement_note"] == spec.POST_MOUNT_ENGAGEMENT_NOTE
+    hold = features["holddown"]
+    assert hold["dia"] == pytest.approx([_in(0.120), _in(0.124)], abs=1e-3)
+    assert hold["process"] == "drill"
+    assert hold["cbore_dia"] == pytest.approx([_in(0.214), _in(0.224)], abs=1e-3)
+    assert hold["cbore_depth"] == pytest.approx([_in(0.133), _in(0.143)], abs=1e-3)
+    assert hold["cbore_depth_from"] == "underside"
+    assert hold["x_from_pivot"] == pytest.approx([_in(0.035), _in(0.045)], abs=1e-3)
+    station = -spec.HOLDDOWN_LOCAL_Z
+    assert hold["z_from_pivot"] == pytest.approx([station - _in(0.005), station + _in(0.005)])
+    dowel = features["tip_dowel"]
+    assert dowel["dia"] == pytest.approx([_in(0.0630), _in(0.0635)])
+    assert dowel["x_from_holddown"] == pytest.approx([_in(0.224), _in(0.232)], abs=1e-3)
+    assert dowel["x_from_holddown_from"] == "holddown"
+    assert dowel["made_at"] == "assembly" and dowel["process"] == "ream"
+    notch = features["lock_notch"]
+    assert notch["width"] == pytest.approx([_in(0.30), _in(0.32)])
+    assert notch["seat_x"] == pytest.approx([_in(1.29), _in(1.31)])
+    assert notch["seat_z"] == pytest.approx([_in(8.83), _in(8.85)])
+    assert notch["seat_z_from"] == "pivot_bore"

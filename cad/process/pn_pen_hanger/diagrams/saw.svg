@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 310" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="310"/>
+  <text class="title" x="20" y="20">Setup 1: the strap blank, two plate blanks (1/8 x 1-1/2 in bar), the spoil plate</text>
+  <rect class="part-rest" x="20" y="90" width="720" height="95.2"/>
+  <rect class="part-kept" x="20.0" y="90" width="447.7" height="95.2"/>
+  <text class="label" x="24.0" y="205.2">strap blank 7.00–7.10 (aim 7.05)</text>
+  <rect class="part-kept" x="475.6" y="90" width="112.4" height="95.2"/>
+  <text class="label" x="479.6" y="80.0">plate blank 1</text>
+  <rect class="part-kept" x="595.9" y="90" width="112.4" height="95.2"/>
+  <text class="label" x="599.9" y="205.2">plate blank 2</text>
+  <text class="label" x="600.0" y="80.0">rest of the bar →</text>
+  <rect class="part-rest" x="20" y="230" width="381.0" height="31.8"/>
+  <rect class="part-kept" x="20" y="230" width="88.9" height="31.8"/>
+  <text class="label" x="413.0" y="250.0">1/2 x 6 in 6061 flat: saw a 1.35–1.40 strip off its end</text>
+  <text class="label" x="20.0" y="222.0">spoil plate</text>
+  <text class="label" x="20" y="298">Plate blanks 1.75–1.80 each. Mark the strap blank BACK on one face; number the plate blanks 1 and 2.</text>
+</svg>

@@ -2,8 +2,9 @@ r"""Build the integral finite-stock 48DP pinion knob shaft MHA-PD-08.
 
 The pure source owns the actual stock-form master (``CUTTER_NUMBER``,
 ``TEETH`` teeth), printed-span-inverted tool setting, contact-critical
-blank, D-core, conventional front neck, #8-32 stud and 6g6 running
-journal. F and all retained cup/chain stations are unchanged. Exact finite
+blank, D-core, conventional front neck, #8-32 stud, 6g6 running journal
+and the journal's rear #2-56 blind tap (a native Hole Wizard feature) for
+the MHA-PD-VN-71 cup screw. F and the chain stations are unchanged. Exact finite
 gaps run straight at full depth through the whole face width; the stock
 disk runs out in air over the neck, D-core and journal, so no generated-
 profile shift, endcut or flat end-mill slot is modelled.
@@ -57,6 +58,7 @@ from _fit_deviations import deviations
 from _gear import ToothedDisc
 from _part_pmi import author_part_pmi
 from _part_properties import part_drawing_unit
+from _holes import blind_hole_volume_mm3, wizard_holes
 from _visibility import blank_reference_geometry
 from paper_drive_stock_native import (
     apply_span_limits,
@@ -100,7 +102,12 @@ from pd_transgear_knob_shaft_spec import (
     PINION_REAR_Z,
     PLAIN_CORE,
     PART_DATUMS,
+    REAR_CHAMFER,
+    REAR_CHAMFER_VOLUME,
     REAR_END_Z,
+    REAR_TAP_DRILL_DEPTH,
+    REAR_TAP_DRILL_DIA,
+    REAR_TAP_SPEC,
     RELIEF_DIA,
     ROOT_DIA_MIN,
     ROOT_DIA_TOL_TYPE,
@@ -146,7 +153,8 @@ V_STUD = (
     + math.pi * _R_BLANK**2 * (TIP_STATION - PLAIN_CORE)
     - math.pi * TIP_CHAMFER**2 * (_R_BLANK - TIP_CHAMFER / 3.0)
 )
-V_JOURNAL = math.pi * _R_JOURNAL**2 * JOURNAL_LENGTH
+# The journal with its sketched .015 X 45° rear chamfer.
+V_JOURNAL = math.pi * _R_JOURNAL**2 * JOURNAL_LENGTH - REAR_CHAMFER_VOLUME
 
 
 
@@ -737,7 +745,10 @@ def _apply_neck_and_flat_limits(adapter: Any) -> None:
 
 
 def _journal_profile(adapter: Any) -> list[tuple[str, str]]:
-    """The source-owned 6g6 journal behind the actual rear tooth ends."""
+    """The source-owned 6g6 journal behind the actual rear tooth ends, its
+    rear edge chamfered .015 X 45° in the sketch, as the stud's TipChamfer
+    is; its axial leg (RearChamferSize) is marked and prints under the rear
+    end."""
     profile = SketchDims()
     _create_sketch(adapter, "Right", "journal")
     set_sketch_direct_db(adapter, True)
@@ -748,26 +759,32 @@ def _journal_profile(adapter: Any) -> list[tuple[str, str]]:
     points = [
         (-PINION_REAR_Z, 0.0),
         (-PINION_REAR_Z, _R_JOURNAL),
-        (-REAR_END_Z, _R_JOURNAL),
+        (-(REAR_END_Z - REAR_CHAMFER), _R_JOURNAL),
+        (-REAR_END_Z, _R_JOURNAL - REAR_CHAMFER),
         (-REAR_END_Z, 0.0),
     ]
     lines = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
-    for i, line in enumerate(lines):
-        (_, y1), (_, y2) = points[i], points[(i + 1) % len(lines)]
-        relation = "horizontal" if y1 == y2 else "vertical"
+    shoulder, journal, chamfer, rear_face, axis_edge = lines
+    for line, relation in (
+        (shoulder, "vertical"),
+        (journal, "horizontal"),
+        (rear_face, "vertical"),
+        (axis_edge, "horizontal"),
+    ):
         check(
             f"journal {relation} {line}",
             adapter.add_sketch_constraint(line, None, relation),
         )
     anchor_point_to_origin(
-        adapter, f"{lines[0]}.start", -PINION_REAR_Z, 0.0, "journal at the rear teeth"
+        adapter, f"{shoulder}.start", -PINION_REAR_Z, 0.0, "journal at the rear teeth"
     )
     profile.record("ProfileStart", '"FaceWidth"')
+    # The journal's length to the rear FACE, past the chamfer.
     dimension_between(
         adapter,
-        f"{lines[1]}.start",
-        f"{lines[1]}.end",
+        f"{journal}.start",
+        f"{rear_face}.start",
         "horizontal_distance",
         JOURNAL_LENGTH,
         "journal JournalLength",
@@ -776,11 +793,31 @@ def _journal_profile(adapter: Any) -> list[tuple[str, str]]:
     add_diametric_linear_dimension(
         adapter,
         axis,
-        lines[1],
+        journal,
         (-(PINION_REAR_Z + REAR_END_Z) / 2.0, _R_JOURNAL + 5.0),
         "JournalDia",
     )
     profile.record("JournalDia", '"JournalDia"')
+    # The chamfer's axial leg; its radial leg equals it by equation: 45
+    # degrees.
+    dimension_between(
+        adapter,
+        f"{chamfer}.start",
+        f"{chamfer}.end",
+        "horizontal_distance",
+        REAR_CHAMFER,
+        "journal RearChamferSize",
+    )
+    profile.record("RearChamferSize", '"RearChamferSize"')
+    dimension_between(
+        adapter,
+        f"{chamfer}.start",
+        f"{chamfer}.end",
+        "vertical_distance",
+        REAR_CHAMFER,
+        "journal rear chamfer rise",
+    )
+    profile.record("RearChamferRise", '"RearChamferSize"')
     ensure_fully_defined(adapter, "journal sketch")
     check("exit_sketch journal", adapter.exit_sketch())
     name_last_feature(adapter, "JournalProfile")
@@ -817,6 +854,7 @@ def build(adapter: Any) -> dict[str, str]:
         ("TipChamfer", TIP_CHAMFER),
         ("JournalDia", JOURNAL_DIA),
         ("JournalLength", JOURNAL_LENGTH),
+        ("RearChamferSize", REAR_CHAMFER),
     ):
         set_global(adapter, name, f"{value}mm")
 
@@ -836,6 +874,30 @@ def build(adapter: Any) -> dict[str, str]:
     volume = _native_volume_check(
         adapter, "actual running journal", volume + V_JOURNAL, volume + V_JOURNAL,
         0.005 * V_JOURNAL,
+    )
+
+    # The rear #2-56 tap on the axis, from the rear face inward (its outward
+    # normal is +Z): the native Hole Wizard drill, thread and depths the
+    # drawing's callout reads.
+    tap = wizard_holes(
+        adapter,
+        REAR_TAP_SPEC,
+        [[0.0, 0.0, REAR_END_Z]],
+        (0.0, 0.0, 1.0),
+        f"knob shaft rear ({REAR_TAP_SPEC.size} blind)",
+        name="RearTap",
+        expect_dia_mm=REAR_TAP_DRILL_DIA,
+        placement_dims=[((None, None), (None, None))],
+    )
+    if abs(tap.depth_mm - REAR_TAP_DRILL_DEPTH) > 0.005:
+        raise RuntimeError(
+            f"knob shaft rear tap drill depth {tap.depth_mm:.3f} != "
+            f"{REAR_TAP_DRILL_DEPTH:.3f} mm"
+        )
+    drive_jobs += tap.placement_drive_jobs
+    v_tap = blind_hole_volume_mm3(tap.hole_dia_mm, tap.depth_mm)
+    volume = _native_volume_check(
+        adapter, "rear blind tap", volume - v_tap, volume - v_tap, 0.02 * v_tap,
     )
 
     # Both cutter terminals are genuinely empty by the pure envelope proofs:

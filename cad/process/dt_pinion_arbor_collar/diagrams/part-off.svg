@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="20">Setup 4: the blank back in the 3-jaw, the turned end out (not to scale)</text>
+  <rect class="fixture-vise" x="40" y="70" width="140" height="190"/>
+  <rect class="part-rest" x="180" y="120" width="60" height="90"/>
+  <rect class="part-waste" x="240" y="124" width="60" height="82"/>
+  <rect class="part-removed" x="300" y="124" width="24" height="82"/>
+  <rect class="part-kept" x="324" y="124" width="260" height="82"/>
+  <rect class="holes" x="240" y="150" width="344" height="30"/>
+  <rect class="holes" x="449" y="124" width="10" height="82"/>
+  <line class="centre-line" x1="160" y1="165" x2="680" y2="165"/>
+  <line class="active-face" x1="584" y1="124" x2="584" y2="206"/>
+  <rect class="cutter" x="300" y="215" width="24" height="60"/>
+  <text class="label" x="590" y="110">face F</text>
+  <line class="dims" x1="600" y1="114" x2="584" y2="126"/>
+  <text class="label" x="340" y="250">P1 blade: its tailstock-side face at Z-.660</text>
+  <text class="label" x="420" y="100">pin hole, .33 from face F</text>
+  <line class="dims" x1="454" y1="104" x2="454" y2="124"/>
+  <text class="label" x="460" y="288">5/16 bore: the blade breaks into it</text>
+  <line class="dims" x1="660" y1="276" x2="660" y2="230"/>
+  <line class="dims" x1="660" y1="230" x2="560" y2="178"/>
+</svg>

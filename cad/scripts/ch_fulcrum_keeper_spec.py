@@ -38,7 +38,6 @@ from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
-    drilled_oversize_mm,
     edge_break_radius_mm,
     printed_band_mm,
 )
@@ -193,6 +192,13 @@ HOLE_DIA_MM = blind_cut_dia_mm(SCREW_CLEARANCE_SPEC)
 # build), so the head is flush.
 CBORE_DIA_MM = 3.81  # .150
 CBORE_DEPTH_MM = 2.1082
+# The counterbore prints its own limits on the native callout (owner ruling
+# 2026-11-22, #3367): Ø.150-.154 x .078-.088 deep, so the sheet, the feature
+# record, the RV-04 tip wall below and the traveler read one band. The
+# part's Hole Wizard dimensions carry them (build_ch_fulcrum_keeper
+# ._band_foot_counterbore). (upper, lower), millimetres.
+CBORE_DIA_BAND = (0.1016, 0.0)  # Ø.150 +.004/.000
+CBORE_DEPTH_BAND = (0.127, -0.127)  # .083 +.005/-.005
 SCREW_HOLE_SPEC = HoleSpec(
     "counterbore_fillister",
     SCREW_CLEARANCE_SPEC.size,
@@ -228,7 +234,6 @@ SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # drawing-guidelines.md rule 18 (thread engage
 # case (inch title block .X +-.1, .XX +-.01, .XXX +-.005, DRILLED HOLES
 # +.004/0; DRAWING_PRECISION below) against the .080 target. ---
 _BAND_BY_PLACES = {places: printed_band_mm(places, unit=UNIT) for places in (1, 2, 3)}
-_DRILLED_PLUS = drilled_oversize_mm(unit=UNIT)
 _FRAME_TAP_BAND = printed_band_mm(1)  # MHA-FR-02's .X tap depths, millimetres
 _THREAD_HALF_MAJOR = THREAD_MAJOR_MM[SET_SCREW_THREAD] / 2.0
 _BORE_MAX_RADIUS = (BORE_DIA + BORE_DIA_BAND[0]) / 2.0
@@ -325,32 +330,33 @@ if SET_SCREW_WEB_MM < WALL_TARGET_MM:
 # off a side face at .XXX (FootScrewReference / FootScrewSideReference: the
 # side station is the frame tap's transverse place, transferred at fit-up);
 # the lug thickness and the overall length print .XX off the inner lug face,
-# the width .XX, and the counterbore is a drilled diameter. Located off the
-# tip, the tip wall takes only the station's band: .093 here, .0726 at the
-# full worst case (less two .010 title-block edge breaks, the counterbore rim
-# and the tip's top edge, and 0.3 deg run-off over its .083 depth), between
+# the width .XX, and the counterbore prints its own Ø.150-.154 x .078-.088
+# (CBORE_DIA_BAND, CBORE_DEPTH_BAND). Located off the tip, the tip wall
+# takes only the station's band: .093 here, .0725 at the full worst case
+# (less two .010 title-block edge breaks, the counterbore rim and the tip's
+# top edge, and 0.3 deg run-off over its .088 deepest), between
 # the .060 floor and the .080 target. Off the inner lug face (.47) the .65's
-# band would join the station's and leave .0626 at the full worst case, so
+# band would join the station's and leave .0625 at the full worst case, so
 # the plan keeps the hole off the tip: owner ruling 2026-10-28 (option D),
 # review exception RV-03 (cad/config/parts/ch-fulcrum-keeper.yaml).
 # The lug side is no wall: the foot runs on under the lug to the inner face,
 # so there the counterbore need only stay off the lug's outer face, which
 # sits .65 - .32 off the tip (both bands).
-_CBORE_MAX_RADIUS = (CBORE_DIA_MM + _DRILLED_PLUS) / 2.0
+_CBORE_MAX_RADIUS = (CBORE_DIA_MM + CBORE_DIA_BAND[0]) / 2.0
 FOOT_TIP_WALL_MM = SCREW_FROM_TIP - _BAND_BY_PLACES[2] - _CBORE_MAX_RADIUS
 if FOOT_TIP_WALL_MM < WALL_TARGET_MM:
     raise AssertionError(
         f"keeper counterbore tip wall {FOOT_TIP_WALL_MM:.3f} < {WALL_TARGET_MM}"
     )
 # The full worst case the sheet states as a plain fact (rule 20; review
-# exception RV-04): the band-and-oversize wall less two title-block edge
-# breaks and the 0.3 deg drill run-off over the counterbore depth, floored to
-# .001 so the MIN never overstates it.
+# exception RV-04): the wall at the counterbore's printed Ø.154 less two
+# title-block edge breaks and the 0.3 deg drill run-off over its printed
+# .088 deepest, floored to .001 so the MIN never overstates it.
 FOOT_TIP_WALL_WORST_MM = (
     FOOT_TIP_WALL_MM
     - 2.0 * edge_break_radius_mm(unit=UNIT)
-    - CBORE_DEPTH_MM * tan(radians(0.3))
-)  # 1.843 (.0726)
+    - (CBORE_DEPTH_MM + CBORE_DEPTH_BAND[0]) * tan(radians(0.3))
+)  # 1.842 (.0725)
 FOOT_TIP_WALL_TEXT = (
     f"{floor(FOOT_TIP_WALL_WORST_MM / 25.4 * 1000 + 1e-9) / 1000:.3f}".removeprefix("0")
 )  # .072
@@ -386,17 +392,18 @@ if FOOT_SIDE_WALL_MM < WALL_TARGET_MM:
 # The foot screw's thread in the frame tap (drawing-guidelines.md rule 18
 # (thread engagement): >= 1.5D). The screw enters below the under-head plane
 # FOOT_H - CBORE_DEPTH: least with the foot (FootRise, .XX) tall and the
-# counterbore (native callout, printed to FOOT_COUNTERBORE_DEPTH_PLACES; its
-# .083 lies on that grid) shallow, most the other way. The frame thread's .X
-# least depth must reach past the deepest entry, and the drill's .X least
-# depth must clear the deepest thread by a plug tap's five-pitch lead.
+# counterbore at its printed .078 shallowest, most the other way
+# (CBORE_DEPTH_BAND, printed to FOOT_COUNTERBORE_DEPTH_PLACES). The frame
+# thread's .X least depth must reach past the deepest entry, and the drill's
+# .X least depth must clear the deepest thread by a plug tap's five-pitch
+# lead.
 FOOT_COUNTERBORE_DEPTH_PLACES = 3
 FOOT_HOLE_CALLOUT_PRECISION = dict.fromkeys(
     ("hw-thruholedia", "hw-cbdia", "hw-cbdepth"), FOOT_COUNTERBORE_DEPTH_PLACES
 )
 _FOOT_SCREW_PITCH = 25.4 / 56.0
 _SCREW_ENTRY = FOOT_SCREW_LENGTH_MM - (FOOT_H - CBORE_DEPTH_MM)  # 5.3467
-_ENTRY_REACH = _BAND_BY_PLACES[2] + _BAND_BY_PLACES[FOOT_COUNTERBORE_DEPTH_PLACES]
+_ENTRY_REACH = _BAND_BY_PLACES[2] + max(CBORE_DEPTH_BAND[0], -CBORE_DEPTH_BAND[1])
 FOOT_SCREW_ENGAGEMENT_D = (_SCREW_ENTRY - _ENTRY_REACH) / THREAD_MAJOR_MM[
     FOOT_SCREW_THREAD
 ]

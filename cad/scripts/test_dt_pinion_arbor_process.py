@@ -1,0 +1,127 @@
+"""The pinion arbor's traveler and hole programs agree with its model.
+
+Both cross holes are drilled while the blank is still 5/8 bar, each in its
+own clamping's overhang past the vise jaws, stationed from the faced head end
+(the head crown's apex): the stations land on the drawing's, the drills end
+under the bar in air, the length and the matched journal fit sit inside the
+drawing's bands, and the bench's pin gauges and caliper readings too.
+"""
+
+from __future__ import annotations
+
+import math
+import tomllib
+
+import pytest
+
+import _cam_programs
+import _process_plans
+import export_features
+
+STEM = "dt_pinion_arbor"
+IN = 25.4
+
+
+def _plan() -> dict:
+    return tomllib.loads(_process_plans.plan_path(STEM).read_text(encoding="utf-8"))
+
+
+def _features() -> dict:
+    return export_features.requirement_manifest(STEM)
+
+
+def _apex_to_rear(features: dict) -> float:
+    f = features["features"]
+    crown = f["head_crown"]
+    return f["head_rear"]["plane"]["value"] - (
+        crown["center"][2] - crown["radius_nominal"]
+    )
+
+
+def test_the_programs_drill_each_station_in_its_overhang_into_air():
+    plan = _plan()
+    p = plan["parameters"]
+    features = _features()
+    ctx = _cam_programs.load_recipe(STEM).context(
+        features, plan, _process_plans.load_shop(), "arbor.step"
+    )
+    offset = _apex_to_rear(features)
+    f = features["features"]
+    cross = round(offset - f["cross_hole"]["station_nominal"], 3)
+    pin = round(offset + f["pin_hole"]["station_nominal"], 3)
+    centres = {
+        program.split("@")[0]: k["centres"]
+        for program, check, k in ctx["expect"]
+        if check == "holes"
+    }
+    assert centres == {"PA01_cross_hole": [[cross, 0.0]], "PA02_pin_hole": [[pin, 0.0]]}
+    bottoms = [k["z_bottom"] for _p, check, k in ctx["expect"] if check == "holes"]
+    assert min(bottoms) < -p["bar_dia_mm"]
+    assert offset - f["cross_hole"]["station"][0] < p["cross_jaw_left_mm"]
+    assert offset + f["pin_hole"]["station"][1] < p["jaw_left_x_mm"]
+
+
+def test_the_lathe_stations_match_the_model():
+    p = _plan()["parameters"]
+    features = _features()
+    f = features["features"]
+    assert p["head_rear_z_in"] * IN == pytest.approx(_apex_to_rear(features), abs=0.01)
+    assert p["neck_end_z_in"] - p["head_rear_z_in"] == pytest.approx(
+        f["neck"]["length_nominal"] / IN, abs=1e-4
+    )
+    crown = f["head_crown"]["radius_nominal"] / IN
+    half = f["head"]["nominal_dia"] / IN / 2
+    assert p["crown_height_in"] == pytest.approx(
+        crown - math.sqrt(crown**2 - half**2), abs=1e-4
+    )
+    back = f["back_crown"]
+    rim = back["rim_station_nominal"] / IN
+    r = back["radius_nominal"] / IN
+    shaft = f["shaft"]["nominal_dia"] / IN / 2
+    assert p["back_crown_height_in"] == pytest.approx(
+        r - math.sqrt(r**2 - shaft**2), abs=1e-4
+    )
+    assert p["overall_in"] == pytest.approx(
+        p["head_rear_z_in"] + rim + p["back_crown_height_in"], abs=1e-4
+    )
+    assert p["overall_min_mm"] == pytest.approx(p["overall_min_in"] * IN, abs=1e-3)
+    assert p["overall_max_mm"] == pytest.approx(p["overall_max_in"] * IN, abs=1e-3)
+
+
+def test_the_journal_aim_gives_the_drawings_clearance_on_the_strap():
+    p = _plan()["parameters"]
+    journal = _features()["features"]["front_journal"]
+    low, high = (v / IN for v in journal["dia"])
+    assert low <= p["journal_aim_in"] <= high
+    clearance = [v / IN for v in journal["diametral_clearance"]]
+    assert 0.3135 - high == pytest.approx(clearance[0], abs=1e-4)
+    assert 0.3140 - low == pytest.approx(clearance[1], abs=1e-4)
+
+
+def test_the_bench_gauges_read_inside_the_drawings_bands():
+    p = _plan()["parameters"]
+    f = _features()["features"]
+    for hole, go, nogo, side_min, side_max, sign in (
+        (
+            "cross_hole",
+            "cross_go_pin_in",
+            "cross_nogo_pin_in",
+            "cross_near_side_min_in",
+            "cross_near_side_max_in",
+            -1,
+        ),
+        (
+            "pin_hole",
+            "pin_go_pin_in",
+            "pin_nogo_pin_in",
+            "pin_far_side_min_in",
+            "pin_far_side_max_in",
+            1,
+        ),
+    ):
+        low, high = (v / IN for v in f[hole]["dia"])
+        assert p[go] == pytest.approx(low, abs=1e-4) and p[nogo] <= high + 1e-9
+        station = [v / IN for v in f[hole]["station"]]
+        half = sign * p[go] / 2
+        assert p[side_min] == pytest.approx(station[0] + half, abs=1e-4)
+        assert p[side_max] == pytest.approx(station[1] + half, abs=1e-4)

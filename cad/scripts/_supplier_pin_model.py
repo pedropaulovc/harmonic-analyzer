@@ -64,7 +64,8 @@ def _reference_suffix(source: SupplierPinReference) -> str:
 
     The drawing shares this model-owned text, so the package's sheet unit
     names it, not a document's: a millimetre part keeps its template's units,
-    which read inches on one farm seat and millimetres on another (98296A031).
+    which read inches on one farm seat and millimetres on another (seen on the
+    retired 98296A031).
     """
     return ")" if source.units == "in" and source.sheet_unit == "in" else f" {source.units})"
 

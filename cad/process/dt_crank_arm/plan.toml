@@ -1,58 +1,515 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
-title = "Crank Arm"
-part = "MHA-DT-06 Crank Arm"
-revision = "placeholder"
-material = "LOW-CARBON STEEL, E.G. 1018 CF"
-stock = "To be written"
+# Crank arm MHA-DT-06 (qty 1), routed for the CNC mill (owner ruling
+# 2026-11-21: NC and travelers for every made part; the route is the
+# author's, chosen for speed, the owner corrects it afterwards). The arm is the
+# bought 5/16 x 1 in 1018 CF flat as supplied (drawing note 1: width and
+# thickness as supplied), sawn to a blank and milled at its two ends.
+#
+# Route: Setup 1 saws the blank (4.20-4.30 in) and a 1.5 in spacer off the 12
+# in bar. Setup 2, the outboard face up on 1 in parallels, the top edge on the
+# fixed jaw, the hub end overhanging the jaws' left ends, the spacer at their
+# right ends: CA01 bores the hub seat by helical interpolation with the 3/8 in
+# end mill, rounds the boss end R.50 in levels, spots the anchor hole and the
+# match mark and drills the anchor #50 through; CA02 brings the tap guide over
+# the anchor hole and the #2-56 is tapped by hand. Setup 3, turned end for
+# end, outboard face still up, the bottom edge on the fixed jaw, the handle
+# end overhanging: CA03 rounds the handle end R.50, spots, drills #43 through
+# and countersinks the pivot hole; CA04 the tap guide over it for the #4-40.
+# Setup 4, bench: punch the match mark in its spot, deburr, inspect, oil.
+#
+# Not made here: the seam ((Ø.156) REAM .17, drawing note 3) is made at
+# assembly across the arm and MHA-DT-31 (the feature export's made_at); its
+# #25 drill and .1562 reamer (the placeholder plan's tools.drill-25 and
+# tools.reamer-1562) belong to the assembly's process. The hub seat is the
+# arm's real limits, .75-.77; MHA-DT-31's seat is turned to suit it for the
+# .0004-.0012 press (dt_crank_hub_geometry.SEAT_PRESS_INTERFERENCE), so this
+# traveler tags the arm with its miked seat.
+#
+# Workholding: the vise only (no fixture): every cut is at an end, in the
+# overhang past the jaws' left ends, where the round's cutter and the drills
+# reach through into air. The jaws grip the bar's full thickness on its two
+# as-supplied edges; a same-bar spacer at the jaws' other end keeps them
+# square (TC 9-524 p. 8-16, the README's "balanced" hold).
+#
+# FLAGGED: to buy: a .118 minus Class ZZ pin gauge (gauges.pin-gauges,
+# to_order) for the countersink's Ø.122 MAX. The seam's #25 drill and .1562
+# reamer stay with the assembly.
+#
+# NC (cam:dt_crank_arm, cad/process/dt_crank_arm/cam.py): CA01_hub_end,
+# CA02_anchor_tap, CA03_handle_end, CA04_pivot_tap. Program names, the
+# [parameters] and the milling_cuts names are a contract with that recipe.
+# Tool numbers are the places in the tools list among the mill's tools: T1
+# 3/8 in end mill, T2 #1 centre drill, T3 #50 drill, T4 #43 drill, T5 chamfer
+# mill, T6 tap guide.
+title = "Crank arm"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "1018 cold-finished steel, 5/16 x 1 in flat (drawing: {{cad.material_spec}})"
+stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:.0f}} in flat bar, the 12 in length: one {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blank and a 1.5 in spacer."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Width and thickness are the bar's, as supplied (drawing note 1): no face or edge is machined. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall, controller reset or knock to the work, home again and repeat the setup's first op (its G54 pick-up) before resuming. The seam (Ø.156 ream .17 deep, note 3) is made at assembly, not here. Finish: {{cad.finish}}."
 shop = "../shop"
 stock_refs = ["1018-flat-5-16x1-12in"]
+material_key = "rocker-1018-cold-finished"
+milling_material = "steel_1018"
 
+[cad]
+file = "../../out/features/dt_crank_arm/features.toml"
+adapter = "flat_bar"
+part = "dt-crank-arm"
+
+[parameters]
+quantity = 1
+# The adapter's axes: the arm's length along model X, its thickness (the
+# inboard and outboard faces) along model Z.
+blank_length_axis = 0
+blank_thickness_axis = 2
+# The blank: the 3.95 in arm (hub tip to handle tip) with .15 at the hub end
+# (hub_waste_mm) and .10-.20 at the handle end, sawn 4.20-4.30 from the 12 in
+# bar (4.30 + 1.5 spacer + 2 × .125 kerf = 6.05).
+blank_length_in = 4.2
+blank_length_max_in = 4.3
+blank_length_min_mm = 106.68
+blank_length_max_mm = 109.22
+blank_length_mm = 107.95
+blank_width_in = 1.0
+blank_thickness_in = 0.3125
+# ASTM A108 cold-drawn flat, 1 in wide: thickness +.000/-.004.
+blank_thickness_max_mm = 7.9375
+blank_thickness_min_mm = 7.8359
+# The hub end's waste: the hub tip .15 in from the blank's left end, so the
+# seat's axis is R.50 + .15 from X0 (cam.py checks the round's swath clears
+# the waste's corners).
+hub_waste_mm = 3.81
+# The handle end's waste after CA01, from the longest blank (cam.py).
+handle_waste_max_mm = 5.08
+# Holding (shop workholding.vise-pm-6): two 1 in parallels
+# (fixtures.parallels-lms-6745) on the vise bed, one against each jaw, their
+# left ends at or right of the jaws' left ends; the bar on them outboard face
+# up, gripped on its edges. The jaws' tops stand jaw_top_mm over the outboard
+# face (Z0): jaw height less the parallels and the thickest bar (cam.py).
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+parallel_height_mm = 25.4
+jaw_top_mm = 11.6078
+# Setup 2: the blank's left end 1.55-1.65 in past the jaws' left ends
+# (overhang_min_mm-overhang_max_mm, set with the steel rule). CA01's farthest
+# reach right (the #50's edge at the anchor) is ca01_reach_mm: cam.py proves
+# it at least 1.5 mm short of the jaws and parallels at the least overhang.
+overhang_mm = 40.64
+overhang_min_mm = 39.37
+overhang_max_mm = 41.91
+ca01_reach_mm = 37.465
+# Setup 3: the jaws' left ends 3.00-3.10 in from the hub tip
+# (handle_jaw_end_min_mm-handle_jaw_end_max_mm); the handle round's nearest
+# reach to the hub tip is ca03_reach_mm (cam.py: 1.5 mm clear of the jaws at
+# 3.10). After CA01 the bar is handle_along_mm long (nominal blank less the
+# hub waste) and overhangs the jaws' left ends by handle_overhang_mm.
+handle_jaw_end_mm = 77.47
+handle_jaw_end_min_mm = 76.2
+handle_jaw_end_max_mm = 78.74
+ca03_reach_mm = 82.8675
+handle_along_mm = 104.14
+handle_overhang_mm = 26.67
+# Through cuts: the thickest bar plus .010 below its underside, into air.
+through_past_mm = 0.254
+through_bottom_mm = -8.1915
+# The seat: the 3/8 in end mill's centre on a helix of seat_path_radius_mm
+# ((.76 - .375)/2) about the seat's axis, seat_helix_pitch_mm per turn, then
+# one level turn at the bottom.
+seat_path_radius_mm = 4.8895
+seat_helix_pitch_mm = 0.8
+# The rounds: the cutter's centre on R.50 + its radius, conventional, in
+# round_levels levels of round_level_mm to through_bottom_mm.
+round_path_radius_mm = 17.4625
+round_levels = 8
+round_level_mm = 1.0239
+# Shop settings.endmill-carbide-3fl-3-8-1018-cf: 2800 rpm, .0025 in/tooth, 3
+# flutes: 21.0 in/min (cam.py recomputes both from the setting).
+em_rpm = 2800
+em_feed_per_min_mm = 533.4
+# 3/8 in end mill, 4 in overall: at least 1.00 in out of its collet, so the
+# collet's nose stays over the jaw tops at the through depth.
+em_projection_min_mm = 25.4
+# Spots with the #1 centre drill: the anchor and the match mark Ø.030 (on
+# the pilot's point: under the #50, and the punched mark's Ø.03); the pivot
+# Ø.080 (on the 60° countersink, under the #43).
+hub_spot_dia_mm = 0.762
+pivot_spot_dia_mm = 2.032
+spot_rpm = 2800
+spot_feed_per_min_mm = 71.12
+# Drills: #50 and #43 at 2800 rpm, 2.8 in/min (as dt_pinion_cam's #50 and
+# mg_magnifying_clamp's #43), pecked; their full diameter drill_past_mm past
+# the underside (tip = thickest bar + past + the 118° point; cam.py).
+drill_rpm = 2800
+drill_feed_per_min_mm = 71.12
+peck_50_mm = 1.016
+peck_43_mm = 1.27
+drill_past_mm = 0.5
+anchor_drill_tip_mm = -8.9717
+pivot_drill_tip_mm = -9.1166
+# The deepest point under the bar's underside (the #43's tip): the envelope.
+pivot_tip_below_underside_mm = -1.1791
+# Drills stand at least 1.00 in out of the chuck: the chuck's nose clears
+# the jaw tops at the drills' tips.
+drill_projection_min_mm = 25.4
+# The pivot's countersink: Ø.110 at the face (the drawing's .122 MAX less
+# sink_margin_mm), the 90° chamfer mill's point on the hole's axis
+# sink_tip_mm below Z0 (cam.py), plunged at .0005 in/rev (1.4 in/min).
+sink_dia_mm = 2.794
+sink_margin_mm = 0.254
+sink_tip_mm = -1.397
+sink_rpm = 2800
+sink_feed_per_min_mm = 35.56
+# The chamfer mill (McMaster 3073A46, 2 in overall) at least .75 out of its
+# collet: its nose clears the jaw tops at the countersink's depth (cam.py).
+sink_projection_min_mm = 19.05
+# Holders: HA holders.r8-collets-lms-4860.gauge_len_mm; archive
+# holders.drill-chuck-r8.gauge_len_mm. Longest tool: the #43 jobber in the
+# chuck, 1-3/4 in overall (ASME B94.11M).
+r8_collet_gauge_mm = 6.3
+drill_chuck_gauge_mm = 95.0
+drill_43_oal_mm = 44.45
+# Tap stack: the PM-30MV's 17 in spindle-to-table less the shop's tool-change
+# clearance, the vise bed, the parallels, the bar and the collet's gauge,
+# rounded down to .01 in (cam.py); the tap in its T-handle wrench reaches at
+# most tap_wrench_reach_max_mm: the stack less the tap guide's 3 1/8 in,
+# rounded down to .01 in.
+tap_stack_max_mm = 293.624
+tap_wrench_reach_max_mm = 214.122
+
+[[tools]]
+id = "em"
+name = "3/8 in carbide end mill"
+ref = "endmill-carbide-3fl-3-8"
+[[tools]]
+id = "spot"
+name = "#1 carbide centre drill"
+ref = "centre-drills-carbide-60"
 [[tools]]
 id = "drill-50"
 name = "#50 drill"
-ref = "drill-50"  # Drills #50
-
+ref = "drill-50"
 [[tools]]
-id = "jig-drill-43"
+id = "drill-43"
 name = "#43 drill"
-ref = "jig-drill-43"  # Drills #43
-
+ref = "jig-drill-43"
 [[tools]]
-id = "jig-tap-4-40-plug"
-name = "#4-40 plug tap"
-ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
-
+id = "sink"
+name = "1/4 in 90° chamfer mill"
+ref = "chamfer-mill-carbide-1-4-90"
 [[tools]]
-id = "tap-2-56-plug"
+id = "tap-guide"
+name = "Fisher spring tap guide"
+ref = "tap-guide-fisher"
+[[tools]]
+id = "tap-2-56"
 name = "#2-56 plug tap"
-ref = "tap-2-56-plug"  # Tap coverage #2-56 UNC
-
+ref = "tap-2-56-plug"
 [[tools]]
-id = "centre-punch-starrett-18a"
-name = "Automatic centre punch"
-ref = "centre-punch-starrett-18a"  # F-centre-punch-starrett-18A
-
+id = "tap-4-40"
+name = "#4-40 plug tap"
+ref = "jig-tap-4-40-plug"
 [[tools]]
-id = "drill-25"
-name = "#25 drill"
-ref = "drill-25"  # drawing cross-check 2026-11-19: pre-drill for the 5/32 dowel ream
-
+id = "punch"
+name = "Starrett 18A automatic centre punch"
+ref = "centre-punch-starrett-18a"
 [[tools]]
-id = "reamer-1562"
-name = "5/32 reamer"
-ref = "reamer-1562"  # drawing cross-check 2026-11-19: (Ø.156) REAM .17 for dowel MHA-DT-VN-59
-
+id = "cutoff-saw"
+name = "Evolution miter saw"
+ref = "saw-evolution-14"
 [[tools]]
-id = "chamfer-mill-carbide-1-4-90"
-name = "1/4 90° chamfer mill"
-ref = "chamfer-mill-carbide-1-4-90"  # drawing cross-check 2026-11-19: Ø.122 MAX X 90° NEAR SIDE
+id = "files"
+name = "Files"
+ref = "jig-files"
+[[tools]]
+id = "deburr"
+name = "Deburring tool"
+ref = "deburring-set"
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauge .118 minus, TO BUY"
+ref = "pin-gauges"  # A1-pin-set-061-500-combined, its minus set
+description = "Class ZZ pin gauge .118 minus (.1178-.1180): the countersink's Ø.122 MAX with the height gauge"
+status = "to_order"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Saw the blank and the spacer"
+machine = "Saw / bench"
+indexing = "none"
+diagram = { file = "diagrams/saw.svg", alt = "The 12 in length of the 5/16 x 1 in flat marked off into a 4.25 in blank and a 1.5 in spacer, kerfs between." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "cutoff-saw"
+drilling = "none"
+sizing = "other"
+instruction = "Saw one blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long, aiming at 4.25, and one spacer about 1.5 long off the 12 in bar, each marked off with the steel rule. File the burrs off every sawn end."
+feed = "hand"
+inspection = "Blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long (steel rule): the 3.95 arm with .15 at the hub end and .10–.20 at the handle end. Shorter: saw another; longer: saw it back."
+gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.blank_length_min_mm}}", "{{process.blank_length_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "Mic the blank's thickness at both ends and the middle, and its width at the middle. Pick the better wide face as the OUTBOARD face and the straighter edge as the TOP edge; mark O on the outboard face and T on the top edge with marking fluid at the blank's left end (the hub end): O up, T away from you."
+inspection = "Every thickness reading {{process.blank_thickness_min_mm:in.4dot}}–{{process.blank_thickness_max_mm:in.4dot}} and the width .996–1.004: the bar as supplied (drawing note 1), this traveler's incoming-stock gate. Outside either: set the blank aside and tell the owner."
+gauge_checks = [
+  { gauge = "micrometers", band_mm = ["{{process.blank_thickness_min_mm}}", "{{process.blank_thickness_max_mm}}"] },
+  { gauge = "micrometers", band_mm = [25.2984, 25.5016] },
+]
+
+[[setups]]
+machine_kind = "other"
+title = "Hub end: seat, round, anchor hole and mark spot"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw, their left ends at or right of the jaws' left ends. The blank on them, O face up, the T edge against the fixed jaw, its hub end (marked) to the LEFT, overhanging the jaws' left ends by {{process.overhang_min_mm:in.2f}}–{{process.overhang_max_mm:in.2f}} (steel rule from the jaws' left end face to the blank's end). The spacer on the parallels at the jaws' RIGHT ends, same way up, so the jaws close square. Tap both down on the parallels with a soft hammer and tighten: the parallels must not slide. The jaws stand {{process.jaw_top_mm:in.3dot}} above the O face."
+datum = "Programs CA01_hub_end (T1, T2, T3) and CA02_anchor_tap (T6). G54: X0 the blank's left end, +X toward the jaws; Y0 the fixed jaw's face (the T edge), the blank at −Y; Z0 the O face. Tool lengths from the tool setter at each M6; every move between cuts runs above the jaw tops."
+diagram = { file = "diagrams/hub-end.svg", alt = "The blank on two parallels in the vise, the hub end overhanging the jaws' left ends, the spacer at their right ends; hatched: the seat bored through and the end rounded R.50 about it, the anchor hole drilled .79 along from the seat's axis and .11 down from the T edge, the mark spot up and left of the seat." }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", 9.525, 9.525, 5.08], y_span_mm = ["{{cad.blank_width_mm}}", 9.525, 9.525], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", -1.0342], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_43_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{process.blank_length_mm}}", part_height_mm = "{{process.blank_thickness_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_mm}}"], clamp_mm = ["{{process.overhang_mm}}", "{{process.blank_length_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{process.blank_thickness_min_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Home the mill ($H). G54 Y0 on the fixed jaw's face, X0 on the blank's left end (edge finder at 900 rpm). Console M6 T1 (3/8 in end mill, at least {{process.em_projection_min_mm:in.2f}} out of its collet). Z0: T1's end on a .002 leaf on the O face."
+instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y−2.540. On the blank's left end from −X: G10 L20 P1 X−2.540. Console M6 T1 (3/8 in end mill, at least 1.00 in out of the collet; the tool setter measures it). MDI G0 X20 Y−12.7, spindle stopped, its end just dragging a .002 leaf on the O face: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove CA01_hub_end in air, Z0 raised 1.000 in: watch every move clear the jaw tops and the end mill pass left of the jaws' left ends. Then Z0 back."
+instruction_detailed = "Prove-out in air, spindle running: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run CA01_hub_end through every M6, watching every move clear the jaw tops and every cut stay left of the jaws' left ends and the parallels. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em"
+drilling = "none"
+sizing = "other"
+instruction = "Run CA01_hub_end (M6 T1, 3/8 in end mill; set 2800, flood or brush oil): the seat, a G2 helix of {{process.seat_path_radius_mm:in.4dot}} radius about the seat's axis ({{process.hub_waste_mm:in.3dot}} + R.50 from X0, .50 below Y0), {{process.seat_helix_pitch_mm:.1f}} mm a turn down through the bar into air, one level turn at the bottom: Ø{{cad.hub_seat_dia_nominal_in:.2dot}}. Then the boss end's R.50 round about the seat's axis, conventional (G3), {{process.round_levels:d}} levels of {{process.round_level_mm:in.3dot}} through, each plunged in air beside the T edge."
+settings = "endmill-carbide-3fl-3-8-1018-cf"
+rpm = 2800
+feed = "{{process.em_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "seat", kind = "slot", phase = "finish", cutter_dia_mm = 9.525, flutes = 3, rpm = 2800, feed_mm_min = "{{process.em_feed_per_min_mm}}", axial_doc_mm = "{{process.seat_helix_pitch_mm}}", radial_woc_mm = 9.525, stations_mm = 16.51 },
+  { name = "boss round", kind = "slot", phase = "finish", cutter_dia_mm = 9.525, flutes = 3, rpm = 2800, feed_mm_min = "{{process.em_feed_per_min_mm}}", axial_doc_mm = "{{process.round_level_mm}}", radial_woc_mm = 9.525, stations_mm = 0 },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T2 (#1 centre drill, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 2800): spot Ø{{process.hub_spot_dia_mm:in.3dot}} with the pilot's point at the anchor hole ({{cad.anchor_tap_station_in:.2dot}} from the seat's axis, {{cad.anchor_tap_edge_offset_in:.3dot}} below the T edge) and at the match mark ({{cad.match_mark_x_from_seat_nominal_in:.2dot}} along and {{cad.match_mark_y_from_seat_nominal_in:.2dot}} toward the T edge from the seat's axis)."
+rpm = 2800
+feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "anchor spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.hub_spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = 36.576 },
+  { name = "mark spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.hub_spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = 8.636 },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-50"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.anchor_tap_dia_band_mm}}" }
+instruction = "Same file, M6 T3 (#50, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 2800, Tapmatic Gold): the anchor hole through, pecks of {{process.peck_50_mm:in.3dot}} with full retract, its full diameter {{process.drill_past_mm:in.3dot}} past the underside, into air."
+rpm = 2800
+feed = "{{process.drill_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{process.blank_thickness_max_mm}}"
+peck = { step_mm = 1.016, retract = "full" }
+milling_cuts = [
+  { name = "anchor drill", kind = "drill", phase = "rough", cutter_dia_mm = 1.778, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_feed_per_min_mm}}", stations_mm = 36.576 },
+]
+
+[[setups.operations]]
+instruction = "Blow out the chips. Seat: telescoping gauge and micrometer across it at two places 90° apart, mid-thickness. Write both readings on a tag wired to the arm: MHA-DT-31's seat is turned to suit this seat (drawing note 2), and its traveler sizes it against the arm."
+feed = "hand"
+inspection = "Seat Ø{{cad.hub_seat_dia_min_in:.3dot}}–{{cad.hub_seat_dia_max_in:.3dot}}, both readings. Out: stop and tell the owner; do not re-cut."
+gauge_checks = [
+  { gauge = "telescoping-gauges-starrett-s579gz", band_mm = "{{cad.hub_seat_dia_band_mm}}" },
+  { gauge = "micrometers", band_mm = "{{cad.hub_seat_dia_band_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Stop check before the tap file: measure the 2-56 tap in the T-handle wrench from its point to the wrench's centre hole (calipers). It must be at most {{process.tap_wrench_reach_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the parallels, the bar, the collet, the tap guide's 3 1/8 in and 1 in to bring the point down onto the wrench). Over: stop; do not tap on this setup."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-guide"
+drilling = "none"
+sizing = "other"
+instruction = "Run CA02_anchor_tap: M6 T6, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the anchor hole."
+diagram = { file = "diagrams/tap.svg", alt = "The bar in the vise, the tap in the T-handle wrench in the hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the hole runs through into air." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-2-56"
+drilling = "none"
+sizing = "other"
+instruction = "Tap #2-56 through by hand under the tap guide, spindle off, Tapmatic Gold: tap's point in the hole, jog Z down until the guide's point is pushed fully home in the wrench, then turn the wrench, a half turn back each turn; the spring follows the tap. Stop when the tap's full threads show below the underside. A #2 tap breaks easily: stop at any rise in effort and back out."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Jog Z up clear, back the tap out of the hole by hand and blow out the hole."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Unclamp. File or scrape the exit burrs off the underside at the seat, the R.50 round and the anchor hole, and wipe the parallels, so the underside seats flat in Setup 3. Keep the spacer for Setup 3."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Handle end: round, pivot hole, countersink and tap"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "As Setup 2, the arm turned end for end about the vertical: O face still up, the T edge now against the MOVING jaw (the bottom edge on the fixed jaw), the handle end to the LEFT. The jaws' left end faces {{process.handle_jaw_end_min_mm:in.2f}}–{{process.handle_jaw_end_max_mm:in.2f}} from the hub end's tip (steel rule along the bar from the tip to the jaws' left end face): the seat and the anchor hole in the jaws, the handle end overhanging. The spacer at the jaws' RIGHT ends again; the parallels' left ends at or right of the jaws' left ends."
+datum = "Programs CA03_handle_end (T1, T2, T4, T5) and CA04_pivot_tap (T6). G54: X0 the hub end's tip (machined in Setup 2), the arm at −X; Y0 the fixed jaw's face (the bottom edge), the arm at −Y; Z0 the O face. Tool lengths from the tool setter at each M6; every move between cuts runs above the jaw tops."
+diagram = { file = "diagrams/handle-end.svg", alt = "The arm turned end for end on the parallels, the handle end overhanging the jaws' left ends, the hub end and its seat in the jaws; hatched: the handle end rounded R.50 about the pivot, the pivot hole drilled 2.95 from the seat's axis and countersunk." }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", 9.525, 9.525, 5.08], y_span_mm = ["{{cad.blank_width_mm}}", 9.525, 9.525], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.pivot_tip_below_underside_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_43_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.sink_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{process.handle_along_mm}}", part_height_mm = "{{process.blank_thickness_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.handle_overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [-104.14, 0], clamp_mm = [-77.47, 0], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{process.blank_thickness_min_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Home the mill ($H). G54 Y0 on the fixed jaw's face; X0 on the hub end's tip (edge finder from +X, at Y −.50, the tip's crown). Console M6 T1; Z0 as Setup 2, T1 on a .002 leaf on the O face at X −1.18 (solid face between the seat and the anchor hole)."
+instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y−2.540. MDI G0 Y−12.7; edge finder on the hub end's tip from +X: G10 L20 P1 X2.540. Console M6 T1. MDI G0 X−30 Y−12.7 (the end mill over X −.99 to −1.37, clear of the seat's edge at −.88 and of the anchor hole), spindle stopped, its end just dragging a .002 leaf on the O face: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove CA03_handle_end in air, Z0 raised 1.000 in, as Setup 2. Then Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em"
+drilling = "none"
+sizing = "other"
+instruction = "Run CA03_handle_end (M6 T1; set 2800): the handle end's R.50 round about the pivot's axis ({{cad.pivot_tap_station_in:.2dot}} + R.50 from X0, .50 below Y0), conventional (G3), {{process.round_levels:d}} levels of {{process.round_level_mm:in.3dot}} through, each plunged in air beside the bottom edge."
+settings = "endmill-carbide-3fl-3-8-1018-cf"
+rpm = 2800
+feed = "{{process.em_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "handle round", kind = "slot", phase = "finish", cutter_dia_mm = 9.525, flutes = 3, rpm = 2800, feed_mm_min = "{{process.em_feed_per_min_mm}}", axial_doc_mm = "{{process.round_level_mm}}", radial_woc_mm = 9.525, stations_mm = -100.33 },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T2 (#1 centre drill, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 2800): spot the pivot Ø{{process.pivot_spot_dia_mm:in.3dot}} on the centre drill's countersink."
+rpm = 2800
+feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "pivot spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.pivot_spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = -87.63 },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-43"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.pivot_tap_dia_band_mm}}" }
+instruction = "Same file, M6 T4 (#43, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 2800, Tapmatic Gold): the pivot hole through, pecks of {{process.peck_43_mm:in.3dot}} with full retract, into air."
+rpm = 2800
+feed = "{{process.drill_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{process.blank_thickness_max_mm}}"
+peck = { step_mm = 1.27, retract = "full" }
+milling_cuts = [
+  { name = "pivot drill", kind = "drill", phase = "rough", cutter_dia_mm = 2.2606, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_feed_per_min_mm}}", stations_mm = -87.63 },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "sink"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T5 (1/4 in 90° chamfer mill, at least {{process.sink_projection_min_mm:in.2f}} out of its collet; set 2800): plunge its point {{process.sink_tip_mm:in.3dot}} below Z0 on the pivot's axis: countersink Ø{{process.sink_dia_mm:in.3dot}} on the O face (the outboard, near side)."
+rpm = 2800
+feed = "{{process.sink_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "pivot sink", kind = "drill", phase = "finish", cutter_dia_mm = 6.35, flutes = 2, rpm = 2800, feed_mm_min = "{{process.sink_feed_per_min_mm}}", stations_mm = -87.63 },
+]
+
+[[setups.operations]]
+instruction = "Stop check before the tap file: the 4-40 tap in the T-handle wrench, point to the wrench's centre hole, at most {{process.tap_wrench_reach_max_mm:in.2f}} in (as Setup 2). Over: stop; do not tap on this setup."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-guide"
+drilling = "none"
+sizing = "other"
+instruction = "Run CA04_pivot_tap: M6 T6, the tap guide in the 1/2 in collet, spindle off; the file ends Idle at the machine top over the pivot hole."
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-4-40"
+drilling = "none"
+sizing = "other"
+instruction = "Tap #4-40 through by hand under the tap guide, spindle off, Tapmatic Gold, as Setup 2: a half turn back each turn, until the tap's full threads show below the underside."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Jog Z up clear, back the tap out of the hole by hand, blow out the hole and unclamp."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Punch the mark, deburr, inspect, oil"
+machine = "Bench, surface plate"
+indexing = "none"
+diagram = { file = "diagrams/bench.svg", alt = "The finished arm on the bench, O face up: the seat at the hub end with the punched mark up and left of it, the anchor hole near the T edge, the countersunk pivot hole at the handle end." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "punch"
+drilling = "none"
+sizing = "other"
+instruction = "The arm flat on the surface plate, O face up: set the Starrett 18A's point in the mark's spot and press until it fires once: the match mark (Ø.03) to MHA-DT-11."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "deburr"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr every edge of both rounds and the two sawn-edge corners where the rounds meet the edges, both mouths of the seat, the anchor hole's two mouths and the pivot hole's underside mouth (not the countersink), to R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max (deburring tool and smooth file). Run the taps through again by hand to clear the burrs. Wash off the oil and chips."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Anchor edge offset: a #50 shank in the anchor hole; calipers from the T edge to the shank's far side, less half the shank's miked diameter."
+feed = "hand"
+inspection = "Anchor {{cad.anchor_tap_edge_offset_min_in:.3dot}}–{{cad.anchor_tap_edge_offset_max_in:.3dot}} from the T edge. Out: stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.anchor_tap_edge_offset_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Anchor station along the arm: the #50 shank still in; calipers from the hub end's tip (on the seat's axis line, R.50 from the axis, cut with the seat) to the shank's far side, less .500 and half the shank."
+feed = "hand"
+inspection = "Anchor {{cad.anchor_tap_station_min_in:.2dot}}–{{cad.anchor_tap_station_max_in:.2dot}} along the arm from the seat's axis. Out: stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.anchor_tap_station_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Countersink: the arm on the surface plate, O face up. Zero the height gauge on the O face beside the pivot hole. Stand the .118 minus pin end-down in the countersink and read its top; less the pin's miked length, that is where the pin's end sits (90° cone: (rim − .118)/2 below the face)."
+feed = "hand"
+inspection = "The pin's end at most .002 below the O face (reading less length ≥ −.002): rim at most Ø{{cad.pivot_tap_countersink_dia_max_in:.3dot}}. Lower: reject (the drawing's MAX)."
+gauge_checks = [
+  { gauge = "pin-gauges", band_mm = ["{{cad.pivot_tap_dia_mm}}", "{{cad.pivot_tap_countersink_dia_max_mm}}"] },
+  { gauge = "height-gauge", band_mm = ["{{cad.pivot_tap_dia_mm}}", "{{cad.pivot_tap_countersink_dia_max_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Pivot station: a #43 shank in the pivot hole; outside jaws from the seat's near wall to the shank's far side, plus half the seat's tagged diameter, less half the shank."
+feed = "hand"
+inspection = "Pivot {{cad.pivot_tap_station_min_in:.2dot}}–{{cad.pivot_tap_station_max_in:.2dot}} from the seat's axis. Out: stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pivot_tap_station_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Wipe on ISO VG 32 oil all over and into the tapped holes ({{cad.finish}}). Bag the arm with its seat tag."
+feed = "hand"
