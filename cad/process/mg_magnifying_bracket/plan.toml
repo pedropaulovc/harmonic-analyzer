@@ -414,7 +414,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "A sawn patch left: abort the file, set Z0 .010 lower (send $#, G10 L2 P1 Z(the G54 Z − 0.254)) and run MB02_seat again from the start."
+instruction = "A sawn patch left: stop and tell the owner. Do not skim the seat again: on a short blank the waste beyond the notch would be too short to grip."
 feed = "hand"
 
 [[setups.operations]]
@@ -449,7 +449,7 @@ title = "High side H and the notch"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The 1 in + 1/2 in stacks against each jaw. The blank lying on them ACROSS the jaws, L down, the seat against the FIXED jaw, a {{process.rod_dia_mm:in.3dot}} rod between the sawn end and the moving jaw, at mid-height; O to the LEFT, centred on the jaws. Tap it down while closing. The jaws grip the lower {{process.lying_grip_mm:in.3dot}} of the ends. H is cut above the jaw tops; the notch's floor runs below them, between the jaws: the foot keeps the cutter's edge {{cad.foot_underside_thickness_in:.3dot}} off the fixed jaw, the waste beyond the notch keeps it off the rod."
+holding = "Two 1 in + 1/2 in stacks lying along the jaws: one against the FIXED jaw, the other under the blank's sawn end, its outer face flush with that end. The blank lying on them ACROSS the jaws, L down, the seat against the FIXED jaw; a {{process.rod_dia_mm:in.3dot}} rod between the sawn end and the moving jaw, held at the blank's mid-height until the jaw nips it (nothing under the rod); O to the LEFT, centred on the jaws. Tap the blank down onto both stacks while closing. The jaws grip the lower {{process.lying_grip_mm:in.3dot}} of the ends. H is cut above the jaw tops and the rod; the notch's floor runs below the jaw tops, between the jaws: the foot keeps the cutter's edge {{cad.foot_underside_thickness_in:.3dot}} off the fixed jaw, the waste beyond the notch keeps it off the rod."
 datum = "Program MB03_notch. G54: X0 O (the blank's LEFT side), +X toward F; Y0 the fixed jaw's face (the seat), +Y toward it; Z0 the stacks' top (L). The foot's underside at Y −{{cad.foot_underside_thickness_mm:.3f}}; the notch from {{process.neck_stock_mm:in.3dot}} past the neck to F, down to Z {{process.notch_split_mm:.3f}} mm. Tool lengths from the tool setter."
 diagram = { file = "diagrams/notch.svg", alt = "The blank lying across the jaws on stacked parallels, L down, the seat against the fixed jaw and a rod at the sawn end; the 1/2 in end mill faces H, then mills the notch between the foot and the neck, open at F, half the part's width deep." }
 envelope = { x_span_mm = ["{{cad.outer_face_length_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bar_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.notch_split_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
@@ -496,7 +496,7 @@ title = "Low side L to the width; the notch through"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "As Setup 4, the blank turned over: H DOWN on both stacks, across the jaws, the seat against the FIXED jaw, the rod at the sawn end; O to the RIGHT, centred. L, up, still the bar's face."
+holding = "As Setup 4, the blank turned over: H DOWN on both stacks, one against the FIXED jaw, the other under the sawn end, flush with it; the seat against the FIXED jaw, the rod at the sawn end at mid-height; O to the RIGHT, centred. L, up, still the bar's face."
 datum = "Program MB04_low. G54: X0 O (the blank's RIGHT side), the part to −X; Y0 the fixed jaw's face (the seat); Z0 the stacks' top (H)."
 diagram = { file = "diagrams/low.svg", alt = "The blank lying across the jaws, H down, MB03's half-notch underneath; the 1/2 in end mill faces L down to the width, then mills the notch's other half through to it." }
 envelope = { x_span_mm = ["{{cad.outer_face_length_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.high_level_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.notch_through_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }

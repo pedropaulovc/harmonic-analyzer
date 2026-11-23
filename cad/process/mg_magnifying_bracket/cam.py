@@ -24,11 +24,12 @@ parallels: face the bar's upper edge to the foot's length (the free end F;
 the lower, as-bought edge stays as the outer face O). MB02, upright on the
 vise bed: face the seat, spot and drill the two #37 mounting holes down from
 it, through the foot into the notch's waste. MB03, lying on the 1 in + 1/2 in
-stacks, gripped across its length (the seat on the fixed jaw, a rod on the
-sawn end): face the high side H, then pocket the notch between the foot and
-the neck, open at F, from H down to a skin above the stacks, the neck's wall
-left 0.5 mm full. MB04, H down: face the low side L to the thickness, which
-takes the skin off and frees the notch. The nose waste is sawn off at the
+stacks (one under the seat end, one under the sawn end), gripped across its
+length (the seat on the fixed jaw, a rod on the sawn end): face the high side
+H, then mill the notch between the foot and the neck, open at F, half the
+width deep, the neck's wall left 0.5 mm full. MB04, H down: face the low side
+L to the width, then mill the notch's other half through to MB03's, so no
+thin skin is ever cut. The nose waste is sawn off at the
 bench. MB05, on edge on the stacks, the foot past the jaws' left side: face
 the neck's inner face to the neck thickness and square the inside corner
 under the foot (the end mill's square corner; MB03's cutter left its radius
@@ -1052,22 +1053,27 @@ def context(
             _box("fixed-jaw parallels", x, (y[1] - t, y[1]), z_top),
         ]
 
-    # Gripped across the length (MB03-MB04): the fixed jaw on the seat, the
-    # rod and the moving jaw past the sawn end, wherever the blank's length
-    # puts them.
+    # Gripped across the length (MB03-MB04): the fixed jaw on the seat; one
+    # stack against it under the seat end, the other under the sawn end, its
+    # outer face flush with it; the rod between the sawn end and the moving
+    # jaw at the part's mid-height, wherever the blank's length puts them.
     near_end = -(blank_min - seat_skim)
-    far_end = -long_max - p["rod_dia_mm"] - JAW_DEPTH_MM
+    rod_d = p["rod_dia_mm"]
+    far_end = -long_max - rod_d - JAW_DEPTH_MM
 
-    def across(z_top: float, x: tuple[float, float]) -> list[dict[str, Any]]:
+    def across(
+        z_top: float, x: tuple[float, float], part_h: float
+    ) -> list[dict[str, Any]]:
         span = centred(x, jaw_w)
         return [
             _box("fixed jaw", span, (0.0, JAW_DEPTH_MM), z_top),
-            _box("moving jaw and rod", span, (far_end, near_end), z_top),
+            _box("moving jaw", span, (far_end, near_end - rod_d), z_top),
+            _box("rod", span, (-long_max - rod_d, near_end), part_h / 2 + rod_d / 2),
             _box("fixed-jaw stack", centred(x, PARALLEL_LENGTH_MM), (-t, 0.0), 0.0),
             _box(
-                "moving-jaw stack",
+                "sawn-end stack",
                 centred(x, PARALLEL_LENGTH_MM),
-                (near_end, near_end + t),
+                (-long_max, near_end + t),
                 0.0,
             ),
         ]
@@ -1084,8 +1090,8 @@ def context(
             centred((-width, 0.0), jaw_w),
             (-t_max, 0.0),
         ),
-        "notch": across(lying_grip, (0.0, width)),
-        "low": across(lying_grip, (-width, 0.0)),
+        "notch": across(lying_grip, (0.0, width), p["bar_thickness_max_mm"]),
+        "low": across(lying_grip, (-width, 0.0), high_level),
         "neck": jaws(lying_grip, neck_jaws, (-thick, 0.0))
         + [
             _box(
