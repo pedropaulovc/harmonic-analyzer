@@ -700,6 +700,12 @@ description = "5/16 in HSS threading tool bit, set of two (LMS 6685)"
 description = "Spoil plate: a 5 in length of the 1/2 x 6 in 6061 flat, top as supplied, gripped in the vise on parallels"
 [tools.tape-3m-vhb-5906]
 description = "3M VHB 5906 double-sided tape, .006 in"
+# The sheet blanks are snipped off their sheet or strip (the comb's .020
+# sheet, moved here from dt.toml; the MHA-PD-03 clip's .032 strip).
+# Ownership: cad/config/shop-equipment/tools-hand.toml
+# tools.aviation-snips-straight, same key.
+[tools.aviation-snips-straight]
+description = "Aviation snips, straight cut"
 
 # --- The 1/2 in HSS end mill and its slot setting (ch, sm) --------------------
 # Moved here from ch.toml: the MHA-CH-13-TL-01 sub-plate's SP01 slots the 1/2

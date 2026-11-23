@@ -75,24 +75,49 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from _feature_requirements import part_metadata, requirement
+from _gtol_planar import PlanarFace
+from _printed_limits import drilled_limits, limits
+from _printed_tolerance import inside_corner_radius_mm
 from build_fr_rocker_arm_support import (
     BIG,
     BOSS_DEPTH,
     CAV,
+    CAVITY_END_STATION,
+    CAVITY_TOP_STATION,
     CHAMFER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    END_LOCATION_PLACES,
+    FILLET_R,
     HALF_Y,
+    HEIGHT_LOCATION_PLACES,
     HOLD_DOWN_LOCAL_HALF_X,
     HOLD_DOWN_LOCAL_HALF_Z,
     HOLE_DIA,
     HOLES,
     NARROW,
+    POCKET_BOTTOM_STATION,
+    POCKET_END_STATION,
+    POCKET_FILLET_R,
+    RIM_CHAMFER_PLACES,
+    SEAT_STATION_PLACES,
+    SECTION_LOCATION_PLACES,
     WEB,
+    WEB_FACE_STATION,
     WIDE,
 )
 from fr_rocker_arm_support_drawing_spec import SURFACE_FINISHES
-from rocker_bracket_seat_layout import SEAT_LOCAL_X, SEAT_SPEC, WEB_PLACES
+from fr_rocker_arm_support_spec import UNIT
+from rocker_bracket_seat_layout import (
+    SEAT_DRILL_DEPTH,
+    SEAT_LOCAL_X,
+    SEAT_SPEC,
+    SEAT_THREAD_DEPTH,
+    TOP_FLAT_EDGE_FROM_WEB,
+    TOP_FLAT_PLACES,
+    WEB_PLACES,
+)
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -196,6 +221,8 @@ CHAMFER_NOTE = (
     f"{CHAMFER_NOTE_NUMBER}. CHAMFER ON ALL OUTSIDE EDGES AND ON THE POCKET AND CAVITY RIMS,\n"
     "    EXCEPT THE TOP EDGES OF BOTH END FACES."
 )
+# The sheet's one numbered note, for the feature manifest's notes.
+DRAWING_NOTES = CHAMFER_NOTE
 # Bottom-left, under the bottom view's origin arrows and left of the title
 # block: the sheet's one open band (y 15-40 mm).
 CHAMFER_NOTE_XY = (0.022, 0.033)
@@ -419,6 +446,544 @@ HOLE_TABLE_COLUMN_WIDTHS = {0: 0.014, 1: 0.022, 2: 0.022, 3: 0.050, 4: 0.032}
 _RIGHT_BORDER_X = 0.419
 if HOLE_TABLE_ANCHOR[0] + sum(HOLE_TABLE_COLUMN_WIDTHS.values()) > _RIGHT_BORDER_X - 0.005:
     raise AssertionError("rocker-arm-support hole table would reach the right border")
+# The native hole table's places: its LOC cells (.XXX stations) and its SIZE
+# cells (the 5/16 drill as .313) print the drawing document's decimals.
+HOLE_TABLE_PLACES = 3
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (build_fr_rocker_arm_support: origin
+# at the body's centre, X along the 7.56 length, +Y up from the foot at
+# Y = -HALF_Y to the top face, Z across the wall, the trapezoid WIDE half-wide
+# at the foot and NARROW at the top, the web the +/-WEB band about Z = 0). A
+# band is the title block's row for the places the sheet prints
+# (DIMENSION_PRECISION, the part's DRAWING_PRECISION, the hole table's
+# HOLE_TABLE_PLACES) on the printed nominal; the drills take the DRILLED
+# HOLES row. Every X location runs off the -X end face and every Y location
+# off the foot or the top face, as the front view prints them; the hole
+# table's Y LOC (model Z) and the web's 1.00 run off the -Z foot edge, the
+# -Z slant face's foot line. Both pockets print once with BOTH SIDES, so one
+# feature owns both. The declarations print nothing.
+_SELF = "draw_fr_rocker_arm_support"
+_BUILD = "build_fr_rocker_arm_support"
+_SECTION = "fr_rocker_arm_support_section_spec"
+_SEATS = "rocker_bracket_seat_layout"
+_FRONT_KEEP = ((_SELF, "FRONT_KEEP"),)
+_RIGHT_KEEP = ((_SELF, "RIGHT_KEEP"),)
+_P = DIMENSION_PRECISION
+_HALF_LENGTH = BOSS_DEPTH / 2.0
+_SEAT_FINISH = surface_finish_by_key(SURFACE_FINISHES, "mounting_face")
+_FINISHES = ("fr_rocker_arm_support_drawing_spec", "SURFACE_FINISHES")
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(
+        "SUPPORT_HALF_MACHINE_Z",
+        (_SECTION, "WIDE"),
+        (_SECTION, "NARROW"),
+        (_SECTION, "HALF_Y"),
+        (_BUILD, "BOSS_DEPTH"),
+    ),
+    precision_sources=(
+        (_SELF, "DIMENSION_PRECISION"),
+        (_BUILD, "DRAWING_PRECISION"),
+        (_SELF, "HOLE_TABLE_PLACES"),
+        (_SELF, "SEAT_CALLOUT_PRECISION"),
+    ),
+)
+# The mounting foot's underside on MHA-FR-01: the Ra 125 face (the one face
+# the seat grade flags), the height's datum, and the face the hole table's
+# drills run up from. The section's .25 foot (FootThickness, sheet-made)
+# runs from it to the pockets' bottom wall, the front view's .25 BOTH SIDES.
+requirement(
+    "foot",
+    kind="face",
+    faces=(_SEAT_FINISH.face,),
+    requirements=("plane", "finish_ra", "thickness"),
+    fields={
+        "plane": (_plane("y", -HALF_Y), ("__frame__", _FINISHES)),
+        "finish_ra": (_SEAT_FINISH.roughness_um, (_FINISHES,)),
+        "thickness": (
+            limits(POCKET_BOTTOM_STATION, _P["FootThickness"], unit=UNIT),
+            (
+                (_BUILD, "POCKET_BOTTOM_STATION"),
+                "UNIT",
+                (_SELF, "DIMENSION_PRECISION"),
+                (_SELF, "FOOT_TEXT_XY"),
+            ),
+        ),
+        "thickness_nominal": (
+            POCKET_BOTTOM_STATION,
+            ((_BUILD, "POCKET_BOTTOM_STATION"),),
+        ),
+        "thickness_from": ("pockets", ((_SELF, "FOOT_TEXT_XY"),)),
+        "thickness_axis": ("y", ((_SELF, "FOOT_TEXT_XY"),)),
+    },
+    precision={"thickness": _P["FootThickness"]},
+)
+# The top face the MHA-CH-08 brackets stand on (masked under the enamel):
+# the 7.00 height off the foot (RIGHT_KEEP "WallHeight").
+requirement(
+    "top_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), HALF_Y),),
+    requirements=("height",),
+    fields={
+        "plane": (_plane("y", HALF_Y), ((_SECTION, "HALF_Y"),)),
+        "height": (
+            limits(2.0 * HALF_Y, _P["WallHeight"], unit=UNIT),
+            ((_SECTION, "HALF_Y"), "UNIT", *_RIGHT_KEEP),
+        ),
+        "height_nominal": (2.0 * HALF_Y, ((_SECTION, "HALF_Y"),)),
+        "height_from": ("foot", _RIGHT_KEEP),
+    },
+    precision={"height": _P["WallHeight"]},
+)
+# The two end faces: the -X one is the X origin of every front-view location
+# and of the hole table; the +X one closes the 7.56 length (FRONT_KEEP
+# "Depth").
+requirement(
+    "west_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), _HALF_LENGTH),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", -_HALF_LENGTH), ("SUPPORT_HALF_MACHINE_Z",))},
+)
+requirement(
+    "east_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), _HALF_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("x", _HALF_LENGTH), ("SUPPORT_HALF_MACHINE_Z",)),
+        "length": (
+            limits(BOSS_DEPTH, _P["Depth"], unit=UNIT),
+            ((_BUILD, "BOSS_DEPTH"), "UNIT", *_FRONT_KEEP),
+        ),
+        "length_nominal": (BOSS_DEPTH, ((_BUILD, "BOSS_DEPTH"),)),
+        "length_from": ("west_end", _FRONT_KEEP),
+    },
+    precision={"length": _P["Depth"]},
+)
+# The two slant faces of the trapezoidal wall, each a plane through the foot
+# edge WIDE off the centre plane and the top-flat edge NARROW off it, run the
+# whole length. Each is located at its foot line (the section's 2.50 foot,
+# RIGHT_KEEP "FootSpan", across the two), and each top-flat edge stands .08
+# off its nearer web face (RIGHT_KEEP "TopFlatPlusZStation", BOTH SIDES): a
+# station from an edge, so it binds by its band. ``corners`` are the face's
+# four model corners before the rim chamfer: the box a slant face bounds.
+_SLANT_RUN = WIDE - NARROW
+_SLANT_RISE = 2.0 * HALF_Y
+_SLANT_LENGTH = math.hypot(_SLANT_RUN, _SLANT_RISE)
+_SLANT_OFFSET = (_SLANT_RISE * WIDE - _SLANT_RUN * HALF_Y) / _SLANT_LENGTH
+_SLANT_SOURCES = ((_SECTION, "WIDE"), (_SECTION, "NARROW"), (_SECTION, "HALF_Y"))
+_TOP_FLAT = (
+    limits(TOP_FLAT_EDGE_FROM_WEB, TOP_FLAT_PLACES, unit=UNIT),
+    (
+        (_SEATS, "TOP_FLAT_EDGE_FROM_WEB"),
+        (_SEATS, "TOP_FLAT_PLACES"),
+        "UNIT",
+        (_BUILD, "TOP_FLAT_STATIONS"),
+        *_RIGHT_KEEP,
+    ),
+)
+
+
+def _slant_fields(sign: float) -> dict[str, tuple[Any, tuple[Any, ...]]]:
+    """The slant face on the ``sign`` side of the web: its outward normal,
+    its foot line, its corners and its top-flat edge's station."""
+    web_face = "web_plus_z" if sign > 0 else "web_minus_z"
+    return {
+        "normal": (
+            [0.0, _SLANT_RUN / _SLANT_LENGTH, sign * _SLANT_RISE / _SLANT_LENGTH],
+            _SLANT_SOURCES,
+        ),
+        "at": ([0.0, -HALF_Y, sign * WIDE], _SLANT_SOURCES),
+        "corners": (
+            [
+                [x, y, sign * half]
+                for x in (-_HALF_LENGTH, _HALF_LENGTH)
+                for y, half in ((-HALF_Y, WIDE), (HALF_Y, NARROW))
+            ],
+            (*_SLANT_SOURCES, "SUPPORT_HALF_MACHINE_Z"),
+        ),
+        "foot_half_width_nominal": (WIDE, ((_SECTION, "WIDE"),)),
+        "top_half_width_nominal": (NARROW, ((_SECTION, "NARROW"),)),
+        "top_flat_station": _TOP_FLAT,
+        "top_flat_station_nominal": (
+            TOP_FLAT_EDGE_FROM_WEB,
+            ((_SEATS, "TOP_FLAT_EDGE_FROM_WEB"),),
+        ),
+        "top_flat_station_web_face": (web_face, ((_BUILD, "TOP_FLAT_STATIONS"),)),
+        "callout": (
+            DIMENSION_CALLOUTS["TopFlatPlusZStation"],
+            ((_SELF, "DIMENSION_CALLOUTS"),),
+        ),
+    }
+
+
+requirement(
+    "slant_minus_z",
+    kind="tapered_side",
+    faces=(PlanarFace((0.0, _SLANT_RUN, -_SLANT_RISE), _SLANT_OFFSET),),
+    requirements=("top_flat_station",),
+    fields=_slant_fields(-1.0),
+    precision={"top_flat_station": TOP_FLAT_PLACES},
+)
+requirement(
+    "slant_plus_z",
+    kind="tapered_side",
+    faces=(PlanarFace((0.0, _SLANT_RUN, _SLANT_RISE), _SLANT_OFFSET),),
+    requirements=("width", "top_flat_station"),
+    fields={
+        **_slant_fields(1.0),
+        "width": (
+            limits(2.0 * WIDE, _P["FootSpan"], unit=UNIT),
+            ((_SECTION, "WIDE"), "UNIT", *_RIGHT_KEEP),
+        ),
+        "width_nominal": (2.0 * WIDE, ((_SECTION, "WIDE"),)),
+        "width_from": ("slant_minus_z", _RIGHT_KEEP),
+        "width_axis": ("z", _RIGHT_KEEP),
+    },
+    precision={"width": _P["FootSpan"], "top_flat_station": TOP_FLAT_PLACES},
+)
+# The web's two faces, each pocket's floor: the -Z one 1.00 off the -Z foot
+# edge (RIGHT_KEEP "WebFaceStation"), the +Z one closing the .50 web
+# (WebThickness, sheet-made between the two cut floors). Inside faces, so a
+# floor kind: a ``face`` kind bounds the part's envelope.
+requirement(
+    "web_minus_z",
+    kind="pocket_floor",
+    faces=(PlanarFace((0.0, 0.0, -1.0), WEB),),
+    requirements=("station",),
+    fields={
+        "plane": (_plane("z", -WEB), ((_SEATS, "WEB"),)),
+        "station": (
+            limits(WEB_FACE_STATION, SECTION_LOCATION_PLACES, unit=UNIT),
+            (
+                (_BUILD, "WEB_FACE_STATION"),
+                (_BUILD, "SECTION_LOCATION_PLACES"),
+                "UNIT",
+                *_RIGHT_KEEP,
+            ),
+        ),
+        "station_nominal": (WEB_FACE_STATION, ((_BUILD, "WEB_FACE_STATION"),)),
+        "station_from": ("slant_minus_z", _RIGHT_KEEP),
+        "station_axis": ("z", _RIGHT_KEEP),
+    },
+    precision={"station": SECTION_LOCATION_PLACES},
+)
+requirement(
+    "web_plus_z",
+    kind="pocket_floor",
+    faces=(PlanarFace((0.0, 0.0, 1.0), WEB),),
+    requirements=("thickness",),
+    fields={
+        "plane": (_plane("z", WEB), ((_SEATS, "WEB"),)),
+        "thickness": (
+            limits(2.0 * WEB, _P["WebThickness"], unit=UNIT),
+            ((_SEATS, "WEB"), "UNIT", (_SELF, "WEB_TEXT_XY")),
+        ),
+        "thickness_nominal": (2.0 * WEB, ((_SEATS, "WEB"),)),
+        "thickness_from": ("web_minus_z", ((_SELF, "WEB_TEXT_XY"),)),
+    },
+    precision={"thickness": _P["WebThickness"]},
+)
+# The two opposed pockets, one 6.50 SQ callout BOTH SIDES (FRONT_KEEP
+# "WinWidth"): their walls stand square to the web from its faces to the
+# slant faces, the corners R.25 8X ("PocketRadius"); located .53 off the -X
+# end face ("PocketEndStation") and .25 up from the foot
+# ("PocketBottomStation"), both BOTH SIDES. ``at`` is the +Z pocket's
+# -X/-Y floor corner. The floor-to-wall corners print no size: the title
+# block's INSIDE CORNERS max governs them.
+requirement(
+    "pockets",
+    kind="pocket",
+    faces=(
+        PlanarFace((-1.0, 0.0, 0.0), -BIG),
+        PlanarFace((1.0, 0.0, 0.0), -BIG),
+        PlanarFace((0.0, -1.0, 0.0), -BIG),
+        PlanarFace((0.0, 1.0, 0.0), -BIG),
+        CylinderFace(2.0 * POCKET_FILLET_R),
+    ),
+    requirements=(
+        "size",
+        "corner_radius",
+        "end_station",
+        "bottom_station",
+        "floor_corner_radius_max",
+    ),
+    fields={
+        "at": ([-BIG, -BIG, WEB], ((_SECTION, "BIG"), (_SEATS, "WEB"))),
+        "size": (
+            limits(2.0 * BIG, _P["WinWidth"], unit=UNIT),
+            ((_SECTION, "BIG"), "UNIT", *_FRONT_KEEP),
+        ),
+        "size_nominal": (2.0 * BIG, ((_SECTION, "BIG"),)),
+        "corner_radius": (
+            limits(POCKET_FILLET_R, _P["PocketRadius"], unit=UNIT),
+            ((_BUILD, "POCKET_FILLET_R"), "UNIT", *_FRONT_KEEP),
+        ),
+        "corner_radius_nominal": (POCKET_FILLET_R, ((_BUILD, "POCKET_FILLET_R"),)),
+        "end_station": (
+            limits(POCKET_END_STATION, END_LOCATION_PLACES, unit=UNIT),
+            (
+                (_BUILD, "POCKET_END_STATION"),
+                (_BUILD, "END_LOCATION_PLACES"),
+                "UNIT",
+                *_FRONT_KEEP,
+            ),
+        ),
+        "end_station_nominal": (POCKET_END_STATION, ((_BUILD, "POCKET_END_STATION"),)),
+        "end_station_from": ("west_end", _FRONT_KEEP),
+        "bottom_station": (
+            limits(POCKET_BOTTOM_STATION, HEIGHT_LOCATION_PLACES, unit=UNIT),
+            (
+                (_BUILD, "POCKET_BOTTOM_STATION"),
+                (_BUILD, "HEIGHT_LOCATION_PLACES"),
+                "UNIT",
+                *_FRONT_KEEP,
+            ),
+        ),
+        "bottom_station_nominal": (
+            POCKET_BOTTOM_STATION,
+            ((_BUILD, "POCKET_BOTTOM_STATION"),),
+        ),
+        "bottom_station_from": ("foot", _FRONT_KEEP),
+        "floor_corner_radius_max": (
+            inside_corner_radius_mm(unit=UNIT),
+            (("_printed_tolerance", "inside_corner_radius_mm"), "UNIT"),
+        ),
+        "floor_face_plus_z": ("web_plus_z", ((_BUILD, "__frame__"),)),
+        "floor_face_minus_z": ("web_minus_z", ((_BUILD, "__frame__"),)),
+        "both_sides": (True, ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "callout": (DIMENSION_CALLOUTS["WinWidth"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "corner_callout": (
+            DIMENSION_CALLOUTS["PocketRadius"],
+            ((_SELF, "DIMENSION_CALLOUTS"),),
+        ),
+    },
+    precision={
+        "size": _P["WinWidth"],
+        "corner_radius": _P["PocketRadius"],
+        "end_station": END_LOCATION_PLACES,
+        "bottom_station": HEIGHT_LOCATION_PLACES,
+    },
+)
+# The 5.00 SQ cavity through the web ("CavWidth", SQ CAVITY THRU), its
+# corners R.50 4X ("CavityRadius"), 1.28 off the -X end face
+# ("CavityEndStation") and 1.00 down from the top face ("CavityTopStation").
+# ``at`` is its -X/+Y corner on the centre plane.
+requirement(
+    "cavity",
+    kind="cavity",
+    faces=(
+        PlanarFace((-1.0, 0.0, 0.0), -CAV),
+        PlanarFace((1.0, 0.0, 0.0), -CAV),
+        PlanarFace((0.0, -1.0, 0.0), -CAV),
+        PlanarFace((0.0, 1.0, 0.0), -CAV),
+        CylinderFace(2.0 * FILLET_R),
+    ),
+    requirements=("size", "corner_radius", "end_station", "top_station"),
+    fields={
+        "at": ([-CAV, CAV, 0.0], ((_BUILD, "CAV"),)),
+        "size": (
+            limits(2.0 * CAV, _P["CavWidth"], unit=UNIT),
+            ((_BUILD, "CAV"), "UNIT", *_FRONT_KEEP),
+        ),
+        "size_nominal": (2.0 * CAV, ((_BUILD, "CAV"),)),
+        "corner_radius": (
+            limits(FILLET_R, _P["CavityRadius"], unit=UNIT),
+            ((_BUILD, "FILLET_R"), "UNIT", *_FRONT_KEEP),
+        ),
+        "corner_radius_nominal": (FILLET_R, ((_BUILD, "FILLET_R"),)),
+        "end_station": (
+            limits(CAVITY_END_STATION, END_LOCATION_PLACES, unit=UNIT),
+            (
+                (_BUILD, "CAVITY_END_STATION"),
+                (_BUILD, "END_LOCATION_PLACES"),
+                "UNIT",
+                *_FRONT_KEEP,
+            ),
+        ),
+        "end_station_nominal": (CAVITY_END_STATION, ((_BUILD, "CAVITY_END_STATION"),)),
+        "end_station_from": ("west_end", _FRONT_KEEP),
+        "top_station": (
+            limits(CAVITY_TOP_STATION, HEIGHT_LOCATION_PLACES, unit=UNIT),
+            (
+                (_BUILD, "CAVITY_TOP_STATION"),
+                (_BUILD, "HEIGHT_LOCATION_PLACES"),
+                "UNIT",
+                *_FRONT_KEEP,
+            ),
+        ),
+        "top_station_nominal": (CAVITY_TOP_STATION, ((_BUILD, "CAVITY_TOP_STATION"),)),
+        "top_station_from": ("top_face", _FRONT_KEEP),
+        "thru": (True, ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "callout": (DIMENSION_CALLOUTS["CavWidth"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "corner_callout": (
+            DIMENSION_CALLOUTS["CavityRadius"],
+            ((_SELF, "DIMENSION_CALLOUTS"),),
+        ),
+    },
+    precision={
+        "size": _P["CavWidth"],
+        "corner_radius": _P["CavityRadius"],
+        "end_station": END_LOCATION_PLACES,
+        "top_station": HEIGHT_LOCATION_PLACES,
+    },
+)
+# The four 5/16 clearance drills through the foot, the hole table's rows
+# A1-A4 (DRILL Ø.313 THRU ALL, MATE MHA-FR-01): X LOC off the -X end face,
+# Y LOC (model Z) off the -Z foot edge, both .XXX. Each enters at the foot's
+# underside, where the base's hold-down pattern meets it.
+_FOOT_HOLE_TAGS = {"a1": (-1, -1), "a2": (-1, 1), "a3": (1, -1), "a4": (1, 1)}
+_FOOT_HOLE_SOURCES = (
+    "HOLD_DOWN_LOCAL_HALF_X",
+    "HOLD_DOWN_LOCAL_HALF_Z",
+    "SUPPORT_HALF_MACHINE_Z",
+    (_SECTION, "WIDE"),
+    (_SELF, "EXPECTED_HOLE_TABLE_LOCATIONS_MM"),
+)
+for _tag, (_sx, _sz) in _FOOT_HOLE_TAGS.items():
+    _x = _sx * HOLD_DOWN_LOCAL_HALF_X
+    _z = _sz * HOLD_DOWN_LOCAL_HALF_Z
+    requirement(
+        f"foot_hole_{_tag}",
+        kind="hole",
+        faces=(CylinderFace(HOLE_DIA, contains_x_mm=_x, contains_z_mm=_z),),
+        requirements=("dia", "thru", "station", "lateral"),
+        fields={
+            "at": ([_x, -HALF_Y, _z], _FOOT_HOLE_SOURCES),
+            "axis": ((0.0, 1.0, 0.0), ("HOLE_SPEC",)),
+            "dia": (
+                drilled_limits(HOLE_DIA, HOLE_TABLE_PLACES, unit=UNIT),
+                ("HOLE_DIA", "HOLE_SPEC", "UNIT", (_SELF, "HOLE_TABLE_PLACES")),
+            ),
+            "nominal_dia": (HOLE_DIA, ("HOLE_DIA", "HOLE_SPEC")),
+            "thru": (True, ("HOLE_SPEC",)),
+            "process": ("drill", ((_SELF, "HOLE_TABLE_SIZE_HEADING"),)),
+            "tag": (_tag.upper(), ((_SELF, "EXPECTED_HOLE_TABLE_LOCATIONS_MM"),)),
+            "mates": (HOLE_TABLE_MATE, ((_SELF, "HOLE_TABLE_MATE"),)),
+            "station": (
+                limits(_HALF_LENGTH + _x, HOLE_TABLE_PLACES, unit=UNIT),
+                (*_FOOT_HOLE_SOURCES, "UNIT", (_SELF, "HOLE_TABLE_PLACES")),
+            ),
+            "station_nominal": (_HALF_LENGTH + _x, _FOOT_HOLE_SOURCES),
+            "station_from": ("west_end", ((_SELF, "HOLE_TABLE_DATUM_XZ_MM"),)),
+            "lateral": (
+                limits(WIDE + _z, HOLE_TABLE_PLACES, unit=UNIT),
+                (*_FOOT_HOLE_SOURCES, "UNIT", (_SELF, "HOLE_TABLE_PLACES")),
+            ),
+            "lateral_nominal": (WIDE + _z, _FOOT_HOLE_SOURCES),
+            "lateral_from": ("slant_minus_z", ((_SELF, "HOLE_TABLE_DATUM_XZ_MM"),)),
+            "lateral_axis": ("z", ((_SELF, "HOLE_TABLE_DATUM_XZ_MM"),)),
+        },
+        precision={
+            "dia": HOLE_TABLE_PLACES,
+            "station": HOLE_TABLE_PLACES,
+            "lateral": HOLE_TABLE_PLACES,
+        },
+    )
+# The MHA-CH-08 brackets' two #8-32 seats down the top face on the
+# centreline (VIEW B, one native callout: 2X Ø.136 ↧ .59, TRANSFER FROM
+# MHA-CH-08 AT ASSEMBLY; 8-32 UNC-2B ↧ .46): drilled and tapped at assembly
+# through the set brackets, so no traveler makes them. Each prints its REF
+# station off its nearer end face (SeatEastStation / SeatWestStation).
+_SEAT_TAP_DRILL = blind_cut_dia_mm(SEAT_SPEC)
+_SEAT_CALLOUT = ((_SELF, "SEAT_CALLOUT_PROCESS"), (_SELF, "SEAT_CALLOUT_PRECISION"))
+for _name, _x, _end in (
+    ("seat_west", min(SEAT_LOCAL_X), "west_end"),
+    ("seat_east", max(SEAT_LOCAL_X), "east_end"),
+):
+    requirement(
+        _name,
+        kind="threaded_hole",
+        faces=(CylinderFace(_SEAT_TAP_DRILL, contains_x_mm=_x),),
+        requirements=("thread", "dia", "drill_depth", "thread_depth"),
+        fields={
+            "at": ([_x, HALF_Y, 0.0], ((_SEATS, "SEAT_LOCAL_X"), (_SECTION, "HALF_Y"))),
+            "axis": ((0.0, -1.0, 0.0), ((_SEATS, "SEAT_SPEC"),)),
+            "thread": (
+                f"{SEAT_SPEC.size} UNC-{SEAT_SPEC.thread_class}",
+                ((_SEATS, "SEAT_SPEC"),),
+            ),
+            "dia": (
+                drilled_limits(
+                    _SEAT_TAP_DRILL, SEAT_CALLOUT_PRECISION["hw-tapdrldia"], unit=UNIT
+                ),
+                ((_SEATS, "SEAT_SPEC"), ("_hole_spec", "TAP_DRILL_MM"), "UNIT", *_SEAT_CALLOUT),
+            ),
+            "nominal_dia": (
+                _SEAT_TAP_DRILL,
+                ((_SEATS, "SEAT_SPEC"), ("_hole_spec", "TAP_DRILL_MM")),
+            ),
+            "drill_depth": (
+                limits(SEAT_DRILL_DEPTH, SEAT_CALLOUT_PRECISION["hw-tapdrldepth"], unit=UNIT),
+                ((_SEATS, "SEAT_DRILL_DEPTH"), "UNIT", *_SEAT_CALLOUT),
+            ),
+            "drill_depth_nominal": (SEAT_DRILL_DEPTH, ((_SEATS, "SEAT_DRILL_DEPTH"),)),
+            "thread_depth": (
+                limits(SEAT_THREAD_DEPTH, SEAT_CALLOUT_PRECISION["hw-threaddepth"], unit=UNIT),
+                ((_SEATS, "SEAT_THREAD_DEPTH"), "UNIT", *_SEAT_CALLOUT),
+            ),
+            "thread_depth_nominal": (SEAT_THREAD_DEPTH, ((_SEATS, "SEAT_THREAD_DEPTH"),)),
+            "made_at": ("assembly", _SEAT_CALLOUT),
+            "transfer_part": (
+                _config.parts("ch-pivot-bracket")["number"],
+                ((_SELF, "SEAT_CALLOUT_PROCESS"),),
+            ),
+            "station_ref": (
+                _HALF_LENGTH - abs(_x),
+                ((_SEATS, "SEAT_LOCAL_X"), "SUPPORT_HALF_MACHINE_Z", (_BUILD, "SEAT_STATION_LINES")),
+            ),
+            "station_ref_from": (_end, ((_SELF, "VIEW_B_KEEP"),)),
+            "dimension_type": ("reference", ((_SELF, "VIEW_B_KEEP"),)),
+        },
+        precision={
+            "dia": SEAT_CALLOUT_PRECISION["hw-tapdrldia"],
+            "drill_depth": SEAT_CALLOUT_PRECISION["hw-tapdrldepth"],
+            "thread_depth": SEAT_CALLOUT_PRECISION["hw-threaddepth"],
+            "station_ref": SEAT_STATION_PLACES,
+        },
+    )
+# The one .06 X 45° chamfer callout (FRONT_KEEP "RimChamferSize", SEE NOTE
+# 1): its size sits on the +X end face's foot edge; the note puts the same
+# chamfer on every outside edge and on the pocket and cavity rims except the
+# end faces' top edges. The feature owns the two end faces' foot-edge
+# chamfers (build_fr_rocker_arm_support.CHAMFER_EDGES' first two).
+_FOOT_CHAMFER_OFFSET = (_HALF_LENGTH + HALF_Y - CHAMFER) / math.sqrt(2.0)
+requirement(
+    "rim_chamfer",
+    kind="chamfer",
+    faces=(
+        PlanarFace((1.0, -1.0, 0.0), _FOOT_CHAMFER_OFFSET),
+        PlanarFace((-1.0, -1.0, 0.0), _FOOT_CHAMFER_OFFSET),
+    ),
+    requirements=("leg",),
+    fields={
+        "leg": (
+            limits(CHAMFER, RIM_CHAMFER_PLACES, unit=UNIT),
+            ((_BUILD, "CHAMFER"), (_BUILD, "RIM_CHAMFER_PLACES"), "UNIT", *_FRONT_KEEP),
+        ),
+        "leg_nominal": (CHAMFER, ((_BUILD, "CHAMFER"),)),
+        "angle_deg": (45.0, ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "callout": (
+            DIMENSION_CALLOUTS["RimChamferSize"],
+            ((_SELF, "DIMENSION_CALLOUTS"),),
+        ),
+        "note": (CHAMFER_NOTE, ((_SELF, "CHAMFER_NOTE"),)),
+        "except_edges": (
+            "top edges of both end faces",
+            ((_SELF, "CHAMFER_NOTE"), (_BUILD, "CHAMFER_EDGES")),
+        ),
+    },
+    precision={"leg": RIM_CHAMFER_PLACES},
+)
 
 
 @_telemetry.traced("drawing.rocker_support.hole_table_mate")
@@ -848,7 +1413,7 @@ def build(adapter: Any) -> dict[str, str]:
         property_view=PART_STEM,
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        decimals=3,
+        decimals=HOLE_TABLE_PLACES,
         unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
@@ -1050,7 +1615,7 @@ def build(adapter: Any) -> dict[str, str]:
         datum_point=datum_point,
         expected_locations_mm=EXPECTED_HOLE_TABLE_LOCATIONS_MM,
         unit=part_drawing_unit(PART_STEM),
-        location_places=3,
+        location_places=HOLE_TABLE_PLACES,
         datum_axes=datum_axes,
         anchor_xy=HOLE_TABLE_ANCHOR,
         basic_locations=False,

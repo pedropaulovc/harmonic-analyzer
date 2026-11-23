@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Setup 6 (KM05), 4 px/mm: upright, S down on 1 in parallels, U at the right; face N to the width</text>
+  <text class="title" x="40.0" y="50.0">Across the jaws, looking from U</text>
+  <text class="title" x="500.0" y="50.0">Plan, N up (X0 on U, at the right)</text>
+  <rect class="fixture-vise" x="130.0" y="400.0" width="195.9" height="16.0"/>
+  <rect class="clamp" x="150.0" y="220.2" width="50.0" height="179.8"/>
+  <rect class="clamp" x="255.9" y="220.2" width="50.0" height="179.8"/>
+  <rect class="fixture-support" x="200.0" y="298.4" width="12.7" height="101.6"/>
+  <rect class="fixture-support" x="243.2" y="298.4" width="12.7" height="101.6"/>
+  <rect class="part-kept" x="200.0" y="196.8" width="55.9" height="101.6"/>
+  <rect class="part-removed" x="200.0" y="184.6" width="55.9" height="12.2"/>
+  <rect class="cutter" x="202.5" y="134.6" width="50.8" height="40.0"/>
+  <text class="label-on-clamp" x="175.0" y="390.0" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="280.9" y="390.0" text-anchor="middle">fixed</text>
+  <line class="datum" x1="255.9" y1="156.8" x2="255.9" y2="192.8"/>
+  <text class="datum-label" x="259.9" y="166.8">Y0 (F)</text>
+  <line class="datum" x1="309.9" y1="298.4" x2="329.9" y2="298.4"/>
+  <text class="datum-label" x="333.9" y="302.4">Z0 = S</text>
+  <text class="label-halo" x="40.0" y="80.0">face the N end to the width 1.00</text>
+  <rect class="clamp" x="450.0" y="135.0" width="197.2" height="25.0"/>
+  <rect class="clamp" x="450.0" y="215.9" width="197.2" height="25.0"/>
+  <rect class="part-kept" x="480.0" y="160.0" width="137.2" height="55.9"/>
+  <line class="datum" x1="603.2" y1="160.0" x2="631.2" y2="160.0"/>
+  <line class="datum" x1="617.2" y1="148.0" x2="617.2" y2="174.0"/>
+  <text class="datum-label" x="617.2" y="128.0" text-anchor="middle">X0 Y0</text>
+  <text class="label-halo" x="474.0" y="191.9" text-anchor="end">top (A)</text>
+  <text class="label-halo" x="623.2" y="191.9">U</text>
+  <text class="label-on-clamp" x="548.6" y="152.0" text-anchor="middle">fixed jaw (F)</text>
+  <text class="label-on-clamp" x="548.6" y="232.9" text-anchor="middle">moving jaw</text>
+</svg>
