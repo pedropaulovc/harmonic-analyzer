@@ -696,22 +696,24 @@ def _circular_edge(
 
 
 @_telemetry.traced("drawing.bore_rim_scan")
-def _bore_rim_edge(view: Any, *, diameter_mm: float) -> Any:
-    """Return a rim adjacent to the unique cylindrical bore of this diameter."""
-    expected_radius_m = diameter_mm / 2000.0
+def _bore_rim_edge(view: Any, *, face: Any) -> Any:
+    """Return a rim adjacent to the bore ``face`` (a spec CylinderFace).
+
+    Owner ruling 2026-11-23, tool audit Q11 gives both bores the same .4385,
+    so the diameter alone no longer tells them apart: the face's own match
+    (diameter and a point on its axis) does.
+    """
+    from _gtol_face_read import face_geometry
+
     for raw in visible_view_entities(view, 1, label="pivot-post bore rims"):
         edge = _early_bound(raw, "IEdge")
-        for face in edge.GetTwoAdjacentFaces2() or []:
-            if face is None:
+        for adjacent in edge.GetTwoAdjacentFaces2() or []:
+            if adjacent is None:
                 continue
-            face = _early_bound(face, "IFace2")
-            surface = _early_bound(face.GetSurface(), "ISurface")
-            if not surface.IsCylinder():
-                continue
-            if abs(float(surface.CylinderParams[6]) - expected_radius_m) > 1e-6:
-                continue
-            return edge
-    raise RuntimeError(f"view has no rim adjacent to a {diameter_mm:g} mm bore")
+            geometry = face_geometry(adjacent)
+            if geometry is not None and face.matches(geometry):
+                return edge
+    raise RuntimeError(f"view has no rim adjacent to {face!r}")
 
 
 # The collar's Ra symbol sits just above and left of its leader's landing
@@ -2225,7 +2227,9 @@ def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        edge_entity=_bore_rim_edge(front, diameter_mm=CRANK_BORE_DIA),
+        edge_entity=_bore_rim_edge(
+            front, face=surface_finish_by_key(SURFACE_FINISHES, "crank_bore").face
+        ),
         symbol_xy=(0.050, 0.1505),
         leader_attach_xy=model_point_in_view(
             adapter,
@@ -2264,7 +2268,9 @@ def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         journal,
-        edge_entity=_bore_rim_edge(journal, diameter_mm=BORE_DIA),
+        edge_entity=_bore_rim_edge(
+            journal, face=surface_finish_by_key(SURFACE_FINISHES, "journal_bore").face
+        ),
         symbol_xy=JOURNAL_BORE_FINISH_XY,
         leader_attach_xy=(
             journal_centre[0] + journal_radius * math.cos(finish_bearing),
