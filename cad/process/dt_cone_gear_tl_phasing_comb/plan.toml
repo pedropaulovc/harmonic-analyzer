@@ -131,8 +131,8 @@ comb_spring_width_mm = 2.286
 # .5 x D), never exceeded (delegated ruling 2026-11-22: never above the
 # maker's published figure), as MHA-PD-03's plan cuts with the same cutter.
 # .9404 / (.5 × .7874) = 2.39, so 3 levels of .3135 mm (.0123 in), where the
-# .006 tape took 3 of .2701; under MHA-PD-03's .3717 mm levels on main in
-# the same cutter and brass. The 0.6 MPa bond cap does not bind: the cut
+# .006 tape took 3 of .2701; MHA-PD-03 runs .3238 mm levels by the same
+# rule in the same cutter and brass. The 0.6 MPa bond cap does not bind: the cut
 # asks .026 MPa in shear of the comb (the smallest piece, 1010 mm²) and no
 # tension (a downcut).
 outline_tip_z_mm = -0.1016

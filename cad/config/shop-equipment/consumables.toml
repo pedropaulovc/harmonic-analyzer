@@ -191,18 +191,23 @@ cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), li
 # a tensile or shear strength for painter's tape under cyanoacrylate (the
 # tape's listing gives a peel adhesion, a force per width of tape being
 # stripped, which is not the strength of a face-bonded area). The owner
-# accepted the hold and left the coarsening to the planner; accepted_*_kpa is
-# the planner's figure under that delegation, not the owner's number and not a
-# measurement: .6 MPa, the most a taped plan's cut may put on a bond in
-# prechips' model (cross force over the piece's area; a lift at a piece's edge
-# as 4 x force over a patch as long as the piece is wide). Most cuts are far
+# accepted the hold ("take it as given it will work") and left the coarsening
+# to the planner; accepted_by names him for that: the sheet's line says whose
+# word the hold rests on and prints no figure.
+#
+# The figure is a delegated ruling 2026-11-23 (CncTapeHold, the agent
+# coordinating this work), no precedent, for the owner's review on #2144:
+# accepted_*_kpa = .6 MPa is the planner's number, not the owner's and not a
+# measurement: the most a taped plan's cut may put on a bond in prechips'
+# model (cross force over the piece's area; a lift at a piece's edge as
+# 4 x force over a patch as long as the piece is wide). Most cuts are far
 # under it and are set by the cutter and machine. It binds on narrow parts
 # cut with an upcut end mill, where the edge of a masking-tape bond would
 # peel first: the MHA-MS-01 stick's outline at one full-depth level would ask
-# 1.6 MPa and so takes three (.54 MPa). prechips' bond check refuses any cut
-# that would load a bond harder. Once parts have held, the owner may raise
-# this one figure and those cuts coarsen further. Each traveler prints the
-# figure as accepted.
+# 1.6 MPa and so takes three (.54 MPa); the MHA-CH-13 strap's outline rough
+# takes four (.46) where three would ask .61. prechips' bond check refuses
+# any cut that would load a bond harder. The owner may raise or lower this
+# one figure; those cuts then re-level.
 #
 # Stack: the listing's 5.4 mil per tape, twice, plus the glue line: a stated
 # assumption, .011 in nominal. The programs work that far above the plate;
