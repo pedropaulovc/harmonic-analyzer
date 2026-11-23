@@ -399,7 +399,7 @@ speed_kind = "other"
 tool = "stone"
 drilling = "none"
 sizing = "other"
-instruction = "Rub each face of every part flat on the 320-grit face of the two-grit sharpening stone to take the cut's burr off. Break the clips' outside edges R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max with the smooth file; leave the die halves' profile edges sharp."
+instruction = "Rub each face of every part flat on the 320-grit face of the two-grit sharpening stone to take the cut's burr off. Break each clip's edges on both faces, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max: the outside edges with the smooth file; each slit's two edges and its full-R ends with the deburring set's scraper, one light stroke along the edge and round each end. Leave the die halves' profile edges sharp."
 feed = "hand"
 
 [[setups.operations]]
