@@ -586,6 +586,17 @@ instruction = "First blank only: prove PA04_step_bore in air, Z0 raised {{proces
 instruction_detailed = "First blank only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + {{process.step_prove_raise_mm:.3f}}) raises Z0 {{process.step_prove_raise_mm:in.3dot}} in: the reamer's and the drill's lowest point then stands above N. Run PA04_step_bore through every M6, watching each move cut only air and each pass cross above the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
+# The step's depth and width lie inside em-half-carbide-1018-v6-deep, but
+# cad/config/shop-equipment/measured-cuts.toml records its direction as
+# conventional (every measured pass), and the owner's 2026-11-16 ruling
+# (cam.py: ball screws) keeps the step's passes climb: the first part is
+# listened to.
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "First part only: the step passes at 2400 rpm are inside the depth and width the owner chatter-tested on this end mill, but they cut climb, which was not tested: {{process.step_level_mm:in.3dot}} deep x {{process.step_station_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner." },
+]
+feed = "hand"
+
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
