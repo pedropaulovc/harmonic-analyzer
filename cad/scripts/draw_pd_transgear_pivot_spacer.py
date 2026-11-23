@@ -75,17 +75,28 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from _feature_requirements import part_metadata, requirement
+from _printed_limits import limits
+from _printed_tolerance import printed_deviations
 import pd_transgear_pivot_spacer_callouts as callouts
 from pd_transgear_pivot_spacer_spec import (
     BORE_DATUM,
     BORE_DIA,
+    BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    FRONT_FACE_PERPENDICULARITY,
     GEOMETRIC_TOLERANCES_IN,
     ISOMETRIC_VIEW_SCALE,
     LENGTH,
+    LENGTH_TOLERANCE,
     OD,
+    OD_RUNOUT,
+    PRESS_INTERFERENCE,
+    REAR_FACE_PERPENDICULARITY,
     SURFACE_FINISHES,
+    UNIT,
+    WALL_WORST,
 )
 
 
@@ -285,6 +296,118 @@ FRONT_FACE_FRAME = EndFaceMark(
     key="front_face",
     label="spacer front face perpendicularity to bore",
     landing_x_mm=-3.0,
+)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (pd_transgear_pivot_spacer_spec: axis +Z; the front face, on the bar, at
+# z = 0 is the datum end the length runs from; the rear face, the arm's
+# bearing face, at z = LENGTH). The O.D. takes the title block's .XX row
+# and its circular runout to the bore (datum A); the length its printed
+# .197 ±.002 (the native band about the exact 5.0 mm model, read back as the
+# printed limits); the bore its reamed band, a press on MHA-PD-VN-57's
+# shoulder; each end face its perpendicularity to A. Each ``span`` is a
+# diameter's model-Z extent. The sheet prints no manufacturing note. The
+# declarations print nothing.
+DRAWING_NOTES = ""
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_transgear_pivot_spacer"
+_CALLOUTS = "pd_transgear_pivot_spacer_callouts"
+_LENGTH_LOW, _LENGTH_HIGH = printed_deviations(
+    LENGTH, _P["RingLength"], (-LENGTH_TOLERANCE, LENGTH_TOLERANCE), unit=UNIT
+)
+part_metadata(
+    model_sources=("LENGTH", "OD", "BORE_DIA"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane", "perpendicularity"),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
+        "outward": ([0.0, 0.0, -1.0], ("__frame__",)),
+        "perpendicularity": (
+            FRONT_FACE_PERPENDICULARITY,
+            ("GEOMETRIC_TOLERANCES_IN", (_SELF, "FRONT_FACE_FRAME")),
+        ),
+        "datum": ("bore", ("BORE_DATUM",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), LENGTH),),
+    requirements=("length", "perpendicularity"),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": LENGTH}, ("LENGTH",)),
+        "outward": ([0.0, 0.0, 1.0], ("LENGTH",)),
+        "length": (
+            limits(LENGTH, _P["RingLength"], (_LENGTH_HIGH, _LENGTH_LOW), unit=UNIT),
+            ("LENGTH", "LENGTH_TOLERANCE", "UNIT", (_SELF, "PROFILE_KEEP")),
+        ),
+        "length_nominal": (LENGTH, ("LENGTH",)),
+        "length_from": ("datum_end", ((_SELF, "PROFILE_KEEP"),)),
+        "callout": (callouts.LENGTH_CALLOUT, ((_CALLOUTS, "LENGTH_CALLOUT"),)),
+        "perpendicularity": (
+            REAR_FACE_PERPENDICULARITY,
+            ("GEOMETRIC_TOLERANCES_IN", (_SELF, "REAR_FACE_FRAME")),
+        ),
+        "datum": ("bore", ("BORE_DATUM",)),
+    },
+    precision={"length": _P["RingLength"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(OD),),
+    requirements=("dia", "runout"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "span": ([0.0, LENGTH], ("LENGTH",)),
+        "dia": (
+            limits(OD, _P["RingOd"], unit=UNIT),
+            ("OD", "UNIT", (_SELF, "OD_ON_PROFILE")),
+        ),
+        "dia_nominal": (OD, ("OD",)),
+        "runout": (
+            OD_RUNOUT,
+            ("GEOMETRIC_TOLERANCES_IN", (_SELF, "OD_RUNOUT_FRAME")),
+        ),
+        "datum": ("bore", ("BORE_DATUM",)),
+    },
+    precision={"dia": _P["RingOd"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(BORE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "span": ([0.0, LENGTH], ("LENGTH",)),
+        "dia": (
+            limits(BORE_DIA, _P["BoreDia"], BORE_DIA_BAND, unit=UNIT),
+            ("BORE_DIA", "BORE_DIA_BAND", "UNIT", (_SELF, "END_KEEP")),
+        ),
+        "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
+        "thru": (True, ("BORE_CALLOUT",)),
+        "process": ("ream", ("BORE_CALLOUT",)),
+        "wall_min": (WALL_WORST, ("WALL_WORST",)),
+        "diametral_interference": (
+            list(PRESS_INTERFERENCE),
+            ("PRESS_INTERFERENCE", (_CALLOUTS, "PRESS_CALLOUT")),
+        ),
+        "mate": (callouts.SCREW_NUMBER, ((_CALLOUTS, "SCREW_NUMBER"),)),
+        "callout": (
+            DIMENSION_CALLOUTS["BoreDia"],
+            ((_CALLOUTS, "CALLOUTS"), (_SELF, "DIMENSION_CALLOUTS")),
+        ),
+    },
+    precision={"dia": _P["BoreDia"]},
 )
 
 

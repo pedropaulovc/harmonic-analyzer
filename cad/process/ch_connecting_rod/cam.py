@@ -23,8 +23,9 @@ shank's width plus the outline's kerf, the waste beyond it staying whole.
 Side 2 (the fork's far face) up: CR01 skims the fork's far face and roughs
 side 2 to .020 over its floors. Side 1 (the datum face, as bought) up: CR02
 roughs side 1; the blanks are released and reseated; CR03 finishes side 1.
-Side 2 up again: CR04 finishes side 2, trims the blank's right end to the
-fork's crown and clears the waste beside the fork's end through; CR05 bores
+Side 2 up again: CR04a trims the blank's right end to the fork's crown on
+the measured deep setting; CR04 finishes side 2 and clears the waste beside
+the fork's end through; CR05 bores
 the ring by interpolation; CR06 saws the fork slot with the slitting saw
 running horizontally; CR07 spots, drills and reams the pin hole; CR08 cuts
 the outline on seven tabs with the 1/8 in end mill and recuts the four
@@ -33,7 +34,7 @@ replaces CR08 and its setup only.
 
 Work frames (G54): X0 the blanks' left ends (flush), Y0 the fixed jaw, blank
 k's centre line at Y −(k + ½) × the pitch, the ring's centre
-``ring_from_end_mm`` from the left end. Side 2 up (CR01, CR04-CR08): Z0 the
+``ring_from_end_mm`` from the left end. Side 2 up (CR01, CR04a-CR08): Z0 the
 support plate's top, which is the datum face (model y → X, model −x → Y,
 model z → Z). Side 1 up (CR02, CR03): Z0 the datum face, on top (model y →
 X, model x → Y, model −z → Z).
@@ -59,6 +60,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("CR01_rough_2", (("rough_2",), ("band_rough_2",))),
     ("CR02_rough_1", (("rough_1",), ("band_rough_1",))),
     ("CR03_finish_1", (("finish_1",), ("band_1",))),
+    ("CR04a_end_trim", ("end_trim",)),
     ("CR04_finish_2", (("finish_2",), ("band_2",))),
     ("CR05_bore", ("bore",)),
     ("CR06_slot", ("slot",)),
@@ -547,9 +549,11 @@ def context(
     r = em / 2
     _agree(plan, "face_cutter_dia_mm", em)
     em_rpm, em_feed = _setting(plan, shop, "rough 2")
-    for name in ("skim 2", "rough 1", "finish 1", "finish 2", "end zone", "end trim"):
+    for name in ("skim 2", "rough 1", "finish 1", "finish 2", "end zone"):
         if _setting(plan, shop, name) != (em_rpm, em_feed):
             raise ValueError(f"'{name}' runs at another setting than 'rough 2'")
+    # The end trim runs on its own (measured) setting, in its own program.
+    trim_rpm, trim_feed = _setting(plan, shop, "end trim")
     e8 = _shop_tool(plan, shop, "em-eighth")["diameter_mm"]
     r8 = e8 / 2
     _agree(plan, "eighth_cutter_dia_mm", e8)
@@ -652,14 +656,14 @@ def context(
         raise ValueError("the arbor's nut reaches the crown at the saw's touch-off")
     # CR05 leaves T1 parked over that station, high enough that the arbor
     # mounted in its place (its lowest point no more than saw_arbor_length_mm
-    # from the nose; T1's tip at least its collet and projection out) hangs
+    # from the nose; T1's tip its collet and its set projection out) hangs
     # CLEAR_MM over the stock top: the saw never moves in X or Y on a
     # height the controller does not know.
     park_z = (
         t_max
         + CLEAR_MM
         + p["saw_arbor_length_mm"]
-        - (p["r8_collet_gauge_mm"] + p["half_mill_projection_min_mm"])
+        - (p["r8_collet_gauge_mm"] + p["half_mill_projection_mm"])
     )
     _agree(plan, "saw_park_z_mm", park_z)
 
@@ -963,13 +967,36 @@ def context(
     finish1, band1_levels, band1 = side_pockets(side1, 0.0, False)
     finish2, band2_levels, band2 = side_pockets(side2, t_max, False)
 
-    # The end: trim the right end to the crown through the full thickness,
-    # then cut through round each fork's end, from the crown along both its
-    # sides to past the slot's floor (both faces' contours took the kerf
-    # there to the shank's faces).
+    # The end trim, its own program (CR04a_end_trim, the measured deep
+    # setting), run before CR04_finish_2: the end zone's arcs below come down
+    # at the cutting feed on the crown's apex, beside the stock only once the
+    # end is trimmed. Passes from the longest blank's end in to the crown,
+    # each the plan's even step wide and the full depth to
+    # end_trim_run_past_mm below Z0, along +Y: with M3 and the end on the
+    # cutter's -X side that is conventional, the direction the setting was
+    # measured in.
     trim_x = crown_x + r
+    trim_raw = l_max + r
+    trim_step = _cut(plan, "end trim", "radial_woc_mm")
+    n_trim = math.ceil((trim_raw - trim_x) / trim_step - 1e-9)
+    if not math.isclose(trim_step, (trim_raw - trim_x) / n_trim, abs_tol=PLAN_TOL_MM):
+        raise ValueError(
+            f"'end trim' radial_woc_mm {trim_step:g} is not its {n_trim} passes' "
+            f"even step, {(trim_raw - trim_x) / n_trim:.4f}"
+        )
+    trim_run_past = p["end_trim_run_past_mm"]
+    trim_doc = _cut(plan, "end trim", "axial_doc_mm")
+    _agree(plan, "end_trim_doc_mm", t_max + trim_run_past)
+    if not math.isclose(trim_doc, t_max + trim_run_past, abs_tol=1e-6):
+        raise ValueError(
+            "'end trim' axial_doc_mm is not the thickest blank plus its run-past"
+        )
+    trim_xs = [trim_raw - trim_step * k for k in range(1, n_trim + 1)]
     trim = _side(
-        [trim_x], [-through], (r + APPROACH_MM, -load - r - APPROACH_MM), t_max
+        trim_xs,
+        [-trim_run_past],
+        (-load - r - APPROACH_MM, r + APPROACH_MM),
+        t_max,
     )
     end_levels = _levels(shank_far, shank_near - through, level_max)
     end_zone: list[str] = []
@@ -990,7 +1017,7 @@ def context(
                     f"G1 X{_r(slot_floor_x - FORK_OVERLAP_MM):.3f} F{{feed}}",
                 ]
         end_zone.append(f"G0 Z{clear2:.3f}")
-    finish2 = finish2 + trim + end_zone
+    finish2 = finish2 + end_zone
 
     # The bores: every blank's rough levels, then every blank's finish
     # circle and its spring pass (the check orders clearing before passes).
@@ -1433,8 +1460,22 @@ def context(
             3,
         ),
         job(
+            "end_trim",
+            "trim the ends to the crowns",
+            "em-half",
+            em,
+            "endmill",
+            trim_rpm,
+            trim_feed,
+            trim_feed,
+            "two",
+            stock_two,
+            trim,
+            3,
+        ),
+        job(
             "finish_2",
-            "finish side 2, trim and clear the end",
+            "finish side 2 and clear the end",
             "em-half",
             em,
             "endmill",
@@ -1753,11 +1794,54 @@ def context(
                         {"points": fork_pts, "radius": r, "z": _r(side2["top"])},
                     ]
                 )
+    boxes, circles = islands(side2)
+    # CR04a: every pass at full depth on the measured deep setting, from the
+    # longest blank's end in to the crown along +Y (conventional), each pass
+    # taking no more than the plan's step and stepping down no more than the
+    # declared depth, clear of the jaws, the frames and the fork.
+    name = "CR04a_end_trim"
+    expect += common(name, t_max, [tn["em-half"]], [trim_rpm], -trim_run_past)
+    trim_pts = [
+        [_r(crown_x + 0.3), _r(y)]
+        for y in (-0.5, -pitch + 0.5, -pitch - 0.5, -load + 0.5)
+    ]
+    expect += [
+        [name, "rapids_clear", {"z_top": t_max}],
+        [name, "air_feed", {"z_top": t_max}],
+        [
+            name,
+            "side_passes",
+            {
+                "axis": "X",
+                "final": _r(trim_x),
+                "raw": _r(trim_raw),
+                "max_step": trim_step,
+                "direction": 1,
+                "span": load,
+                "below_z": t_max,
+                "max_stepdown": trim_doc,
+            },
+        ],
+        [name, "cleared", {"points": trim_pts, "radius": r, "z": _r(-trim_run_past)}],
+        [
+            name,
+            "keep_out",
+            {
+                "radius": r,
+                "boxes": jaws2 + boxes + frames_of(t_max),
+                "circles": circles,
+            },
+        ],
+    ]
+
     name = "CR04_finish_2"
     expect += common(
-        name, t_max, [tn["em-half"], tn["em-eighth"]], [em_rpm, e8_rpm], -through
+        name,
+        t_max,
+        [tn["em-half"], tn["em-eighth"]],
+        [em_rpm, e8_rpm],
+        end_levels[-1],
     )
-    boxes, circles = islands(side2)
     pts = [q for yc in centres for q in pocket_points(yc, slot_floor_x - r)]
     end_pts = []
     for yc in centres:
@@ -1766,10 +1850,6 @@ def context(
             for dy in (w + 0.5, w + r, w + 2 * r - 0.5):
                 end_pts += [[_r(x), _r(yc + dy)], [_r(x), _r(yc - dy)]]
             x += 3.0
-    trim_pts = [
-        [_r(crown_x + 0.3), _r(y)]
-        for y in (-0.5, -pitch + 0.5, -pitch - 0.5, -load + 0.5)
-    ]
     expect += [
         [f"{name}@0", "rapids_clear", {"z_top": t_max}],
         [f"{name}@0", "air_feed", {"z_top": t_max}],
@@ -1779,7 +1859,6 @@ def context(
             "cleared",
             {"points": end_pts, "radius": r, "z": _r(end_levels[-1])},
         ],
-        [f"{name}@0", "cleared", {"points": trim_pts, "radius": r, "z": _r(-through)}],
         [
             f"{name}@0",
             "keep_out",

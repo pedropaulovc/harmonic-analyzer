@@ -82,6 +82,9 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("FK05_step", ("step",)),
     ("FK06_crown_cbore", (("crown_spot",), ("crown_drill",), ("cbore",))),
     ("FK07_crown_tap", ("crown_tap",)),
+    # The counterbore alone, FK06's last section: the remedy for a shallow or
+    # undersize counterbore re-cuts it without re-running the crown spot.
+    ("FK08_cbore_recut", ("cbore_recut",)),
 )
 # Every program loads its own first tool (M6, the tool setter): each setup
 # starts on whatever the mill last held, and the tap file before its retract
@@ -346,13 +349,21 @@ def _reamed(xy: tuple[float, float], top: float, tip: float, clear: float) -> li
     ]
 
 
+def _stepover(y: tuple[float, float], max_step: float) -> tuple[int, float]:
+    """(passes, stepover) of a zigzag face across ``y`` (low, high): equal
+    widths, each at most ``max_step``, reaching ``FACE_OVERHANG_MM`` past
+    both edges. Every pass engages at most the stepover: the first one's
+    edge runs one stepover inside the high edge, the last one's overhangs."""
+    span = y[1] - y[0] + FACE_OVERHANG_MM
+    n = math.ceil(span / max_step - 1e-9)
+    return n, span / n
+
+
 def _stations(y: tuple[float, float], radius: float, max_step: float) -> list[float]:
     """Zigzag pass stations across the face ``y`` (low, high), from its high
     side: each pass takes the same width, at most ``max_step``, and together
     the cutter reaches ``FACE_OVERHANG_MM`` past both edges."""
-    span = y[1] - y[0] + FACE_OVERHANG_MM
-    n = math.ceil(span / max_step - 1e-9)
-    step = span / n
+    n, step = _stepover(y, max_step)
     if 2 * radius - step < FACE_OVERHANG_MM:
         raise ValueError(
             f"a {step:.3f} stepover leaves the first pass short of the edge"
@@ -544,21 +555,40 @@ def context(
     if not em8 < cbore_band[0]:
         raise ValueError(f"the 1/8 end mill Ø{em8} is not under the counterbore")
 
-    step_max = p["face_stepover_max_mm"]
-    face_cuts = ("west side", "width", "seat", "foot end", "step")
+    # The faces F, N and the seat run the measured face setting; the crown
+    # and FK05 (the foot tip, the step and its full-depth wall pass, one
+    # operation) stay on the chart's: the crown's finish and the wall pass
+    # cut deeper than any measured pass. Each face cut declares its true
+    # stepover, the most any of its passes engages (posted: face_passes).
+    face_cap = p["face_stepover_max_mm"]
+    step_max = p["step_stepover_max_mm"]
+    face_cuts = {
+        "west side": "lying_stepover_mm",
+        "width": "lying_stepover_mm",
+        "seat": "seat_stepover_mm",
+    }
+    chart_cuts = ("foot end", "step", "arch rough", "arch finish", "step wall")
     face_rpm, face_feed = _setting(plan, shop, "west side")
-    for name in (*face_cuts, "arch rough", "arch finish", "step wall"):
+    em_rpm, em_feed = _setting(plan, shop, "step")
+    for name in (*face_cuts, *chart_cuts):
         if not math.isclose(_cut(plan, name, "cutter_dia_mm"), em, abs_tol=1e-6):
             raise ValueError(
                 f"'{name}' cutter Ø{_cut(plan, name, 'cutter_dia_mm')}, the end mill is Ø{em}"
             )
-        if _setting(plan, shop, name) != (face_rpm, face_feed):
-            raise ValueError(f"'{name}' runs at another setting than 'west side'")
-    for name in face_cuts:
-        if not math.isclose(_cut(plan, name, "radial_woc_mm"), step_max, abs_tol=1e-6):
-            raise ValueError(
-                f"'{name}' radial_woc_mm is not process.face_stepover_max_mm"
-            )
+    for names, first, speeds in (
+        (face_cuts, "west side", (face_rpm, face_feed)),
+        (chart_cuts, "step", (em_rpm, em_feed)),
+    ):
+        for name in names:
+            if _setting(plan, shop, name) != speeds:
+                raise ValueError(f"'{name}' runs at another setting than '{first}'")
+    for name, key in (
+        *face_cuts.items(),
+        ("foot end", "step_stepover_max_mm"),
+        ("step", "step_stepover_max_mm"),
+    ):
+        if not math.isclose(_cut(plan, name, "radial_woc_mm"), p[key], abs_tol=1e-6):
+            raise ValueError(f"'{name}' radial_woc_mm is not process.{key}")
     level_max = p["face_step_max_mm"]
     for name, doc in (
         ("west side", west_skim),
@@ -573,8 +603,14 @@ def context(
         raise ValueError("the F skim is over one level")
     width_levels = _levels(west_level, width, level_max)
     foot_levels = _levels(section, length, level_max)
-    if not _close((section - length) / len(foot_levels), level_max):
-        raise ValueError("the foot tip's levels are not face_step_max_mm each")
+    # 'width' and 'foot end' declare face_step_max_mm: their levels are that
+    # deep, no shallower (the declared depth is the true one).
+    for what, top, bottom, levels in (
+        ("N's", west_level, width, width_levels),
+        ("the foot tip's", section, length, foot_levels),
+    ):
+        if not _close((top - bottom) / len(levels), level_max):
+            raise ValueError(f"{what} levels are not face_step_max_mm each")
     step_levels = _levels(length, ear, level_max)
     _agree(plan, "step_level_mm", (length - ear) / len(step_levels))
 
@@ -737,6 +773,22 @@ def context(
     _agree(plan, "lying_grip_mm", lying_grip)
     if arch_bottom <= lying_grip or ear <= lying_grip:
         raise ValueError("the arch or the step's floor reaches the jaw tops")
+    # The 1/2 in end mill's stick-out is the measured settings' assembly
+    # (half_mill_projection_mm): at each program's deepest end-mill cut its
+    # collet nose stays CLEAR_MM over that program's stock top.
+    projection = p["half_mill_projection_mm"]
+    for what, top, deepest in (
+        ("FK01", section, west_level),
+        ("FK02", west_level, width),
+        ("FK03", seat_skim, 0.0),
+        ("FK04", section, arch_bottom),
+        ("FK05", section, ear),
+    ):
+        if deepest + projection < top + CLEAR_MM:
+            raise ValueError(
+                f"{what}: the collet nose {projection:g} out comes to "
+                f"{top - deepest - projection:.3f} above the stock top"
+            )
     t = p["parallel_thickness_mm"]
     jaw_w = p["vise_jaw_width_mm"]
     for key, along in (
@@ -822,7 +874,8 @@ def context(
     def tool(key: str, rpm: float, feed: float, **extra: Any) -> dict[str, Any]:
         return {"tool": key, "rpm": rpm, "feed": feed, "plunge": feed, **extra}
 
-    em_tool = tool("em-half", face_rpm, face_feed, dia=em, shape="endmill", flutes=3)
+    em_face = tool("em-half", face_rpm, face_feed, dia=em, shape="endmill", flutes=3)
+    em_tool = tool("em-half", em_rpm, em_feed, dia=em, shape="endmill", flutes=3)
     spot_tool = tool(
         "spot",
         spot_rpm,
@@ -838,7 +891,12 @@ def context(
     def run(x: tuple[float, float]) -> tuple[float, float]:
         return (x[0] - r - APPROACH_MM, x[1] + r + APPROACH_MM)
 
-    lying_ys = _stations((-section, 0.0), r, step_max)
+    # The faces at the measured cap; FK05's foot tip and step at their own
+    # (unchanged, chart) stepover.
+    lying_ys = _stations((-section, 0.0), r, face_cap)
+    seat_ys = _stations((-width, 0.0), r, face_cap)
+    _agree(plan, "lying_stepover_mm", _stepover((-section, 0.0), face_cap)[1])
+    _agree(plan, "seat_stepover_mm", _stepover((-width, 0.0), face_cap)[1])
     width_ys = _stations((-width, 0.0), r, step_max)
     blank_x = run((0.0, blank_max))
     # The step: X passes from beside the far end to the foot top's station
@@ -940,7 +998,7 @@ def context(
     seat_top = seat_skim
     jobs = [
         {
-            **em_tool,
+            **em_face,
             "frame": "west",
             "label": "west side",
             "stock": stocks["west"],
@@ -949,7 +1007,7 @@ def context(
             ],
         },
         {
-            **em_tool,
+            **em_face,
             "frame": "width",
             "label": "east side",
             "stock": stocks["width"],
@@ -962,7 +1020,7 @@ def context(
             ],
         },
         {
-            **em_tool,
+            **em_face,
             "frame": "seat",
             "label": "seat",
             "stock": stocks["seat"],
@@ -970,7 +1028,7 @@ def context(
                 [
                     "seat",
                     "face the seat",
-                    _face([0.0], seat_top, run((0.0, section)), width_ys),
+                    _face([0.0], seat_top, run((0.0, section)), seat_ys),
                 ]
             ],
         },
@@ -1097,6 +1155,15 @@ def context(
             "stock": stocks["apex"],
             "ops": [["cbore", "mill the foot hole's counterbore", cbore_lines]],
         },
+        {
+            **tool(
+                "em-eighth", cbore_rpm, cbore_feed, dia=em8, shape="endmill", flutes=3
+            ),
+            "frame": "apex",
+            "label": "cbore recut",
+            "stock": stocks["apex"],
+            "ops": [["cbore_recut", "re-cut the foot hole's counterbore", cbore_lines]],
+        },
     ]
     manual = {
         "crown_tap": {
@@ -1159,7 +1226,7 @@ def context(
     tn = numbers
     expect: list[list[Any]] = []
 
-    def face_checks(levels, top, y, span, frame) -> list[list[Any]]:
+    def face_checks(levels, top, y, span, frame, engagement) -> list[list[Any]]:
         return [
             ["rapids_clear", {"z_top": top}],
             ["air_feed", {"z_top": top}],
@@ -1169,7 +1236,7 @@ def context(
                     {
                         "z": _r(z),
                         "y": list(y),
-                        "max_engagement": step_max,
+                        "max_engagement": engagement,
                         "radius": r,
                         "span": span,
                         "overhang": FACE_OVERHANG_MM,
@@ -1195,6 +1262,7 @@ def context(
         ("FK02_width", width_levels, west_level),
     ):
         frame = "west" if name == "FK01_far" else "width"
+        engagement = p["lying_stepover_mm"]
         expect += [
             [
                 name,
@@ -1207,7 +1275,7 @@ def context(
             *[
                 [name, check, kwargs]
                 for check, kwargs in face_checks(
-                    levels, top, (-section, 0.0), blank_max, frame
+                    levels, top, (-section, 0.0), blank_max, frame, engagement
                 )
             ],
         ]
@@ -1231,7 +1299,14 @@ def context(
         (
             [
                 ["depth", {"z_min": 0.0}],
-                *face_checks([0.0], seat_top, (-width, 0.0), section, "seat"),
+                *face_checks(
+                    [0.0],
+                    seat_top,
+                    (-width, 0.0),
+                    section,
+                    "seat",
+                    p["seat_stepover_mm"],
+                ),
             ],
             hole_checks(
                 "hold", "seat", 0.0, -spots["hold spot"], CENTRE_DRILL["body_mm"] / 2
@@ -1252,7 +1327,7 @@ def context(
                 "loads_first": True,
             },
         ],
-        [name, "spindle", {"rpm": [[face_rpm], [spot_rpm], [drill_rpm], [ream_rpm]]}],
+        [name, "spindle", {"rpm": [[em_rpm], [spot_rpm], [drill_rpm], [ream_rpm]]}],
         [name, "pauses", {"z_top": section, "count": 0}],
         [name, "depth", {"z_min": _r(bore_tip)}],
     ]
@@ -1290,7 +1365,7 @@ def context(
             "tool_changes",
             {"z_top": section, "tools": [tn["em-half"]], "loads_first": True},
         ],
-        [name, "spindle", {"rpm": [[face_rpm]]}],
+        [name, "spindle", {"rpm": [[em_rpm]]}],
         [name, "pauses", {"z_top": section, "count": 0}],
         [name, "depth", {"z_min": _r(ear)}],
         *[
@@ -1301,6 +1376,7 @@ def context(
                 (-width, 0.0),
                 top_max - foot_top - r,
                 "step",
+                step_max,
             )
         ],
         [name, "cleared", {"points": floor_points, "radius": r, "z": _r(ear)}],
@@ -1342,6 +1418,27 @@ def context(
         [_r(cx + wall_r * math.cos(a)), _r(cy + wall_r * math.sin(a))]
         for a in (k * math.pi / 4 for k in range(8))
     ]
+    cbore_checks = [
+        ["depth", {"z_min": _r(cbore_floor)}],
+        [
+            "bounds",
+            {
+                "window": [[cx - 3.0, cx + 3.0], [cy - 3.0, cy + 3.0]],
+                "x": [_r(cx - rp), _r(cx + rp)],
+                "y": [_r(cy - rp), _r(cy + rp)],
+                "z_min": _r(cbore_floor),
+                "arc": "G3",
+                "z_top": foot_top,
+            },
+        ],
+        [
+            "cleared",
+            {"points": cbore_points, "radius": em8 / 2, "z": _r(cbore_floor)},
+        ],
+        ["rapids_clear", {"z_top": foot_top}],
+        ["air_feed", {"z_top": foot_top}],
+        ["keep_out", {"radius": em8 / 2, "boxes": [*keep["apex"], lug]}],
+    ]
     expect += [
         [
             name,
@@ -1366,27 +1463,7 @@ def context(
                 CENTRE_DRILL["body_mm"] / 2,
             ),
             hole_checks("apex", "apex", height, apex_tip, d16 / 2),
-            [
-                ["depth", {"z_min": _r(cbore_floor)}],
-                [
-                    "bounds",
-                    {
-                        "window": [[cx - 3.0, cx + 3.0], [cy - 3.0, cy + 3.0]],
-                        "x": [_r(cx - rp), _r(cx + rp)],
-                        "y": [_r(cy - rp), _r(cy + rp)],
-                        "z_min": _r(cbore_floor),
-                        "arc": "G3",
-                        "z_top": foot_top,
-                    },
-                ],
-                [
-                    "cleared",
-                    {"points": cbore_points, "radius": em8 / 2, "z": _r(cbore_floor)},
-                ],
-                ["rapids_clear", {"z_top": foot_top}],
-                ["air_feed", {"z_top": foot_top}],
-                ["keep_out", {"radius": em8 / 2, "boxes": [*keep["apex"], lug]}],
-            ],
+            cbore_checks,
         )
     ):
         expect += [[f"{name}@{k}", check, kwargs] for check, kwargs in checks]
@@ -1399,6 +1476,18 @@ def context(
             {"tool": tn["tap-guide"], "at": tap_xy, "machine_top": MACHINE_Z_TOP_MM},
         ],
         [name, "air_feed", {"z_top": height}],
+    ]
+
+    name = "FK08_cbore_recut"
+    expect += [
+        [
+            name,
+            "tool_changes",
+            {"z_top": height, "tools": [tn["em-eighth"]], "loads_first": True},
+        ],
+        [name, "spindle", {"rpm": [[cbore_rpm]]}],
+        [name, "pauses", {"z_top": height, "count": 0}],
+        *[[name, check, kwargs] for check, kwargs in cbore_checks],
     ]
 
     return {

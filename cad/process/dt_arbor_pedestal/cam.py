@@ -517,30 +517,35 @@ def context(
     em = _shop_tool(plan, shop, "em-half")["diameter_mm"]
     r = em / 2
     step_max = p["face_stepover_max_mm"]
+    far_step_max = p["far_face_stepover_max_mm"]
     level_max = p["face_step_max_mm"]
+    # Three settings: the faces (PA01-PA03, PA05), the step (PA04), and the
+    # far face with the outline (PA07, one Job, one speed).
     face_rpm, face_feed = _setting(plan, shop, "width")
-    face_cuts = (
-        "width",
-        "depth",
-        "seat",
-        "step",
-        "top",
-        "far face",
-        "outline rough",
-        "outline finish",
+    step_rpm, step_feed = _setting(plan, shop, "step")
+    outline_rpm, outline_feed = _setting(plan, shop, "far face")
+    groups = (
+        ("width", ("width", "depth", "seat", "top")),
+        ("step", ("step",)),
+        ("far face", ("far face", "outline rough", "outline finish")),
     )
-    for name in face_cuts:
-        if not math.isclose(_cut(plan, name, "cutter_dia_mm"), em, abs_tol=1e-6):
-            raise ValueError(
-                f"'{name}' cutter Ø{_cut(plan, name, 'cutter_dia_mm')}, the end mill is Ø{em}"
-            )
-        if _setting(plan, shop, name) != (face_rpm, face_feed):
-            raise ValueError(f"'{name}' runs at another setting than 'width'")
-    for name in ("width", "depth", "seat", "top", "far face"):
-        if not math.isclose(_cut(plan, name, "radial_woc_mm"), step_max, abs_tol=1e-6):
-            raise ValueError(
-                f"'{name}' radial_woc_mm is not process.face_stepover_max_mm"
-            )
+    for lead, names in groups:
+        for name in names:
+            if not math.isclose(_cut(plan, name, "cutter_dia_mm"), em, abs_tol=1e-6):
+                raise ValueError(
+                    f"'{name}' cutter Ø{_cut(plan, name, 'cutter_dia_mm')}, the end mill is Ø{em}"
+                )
+            if _setting(plan, shop, name) != _setting(plan, shop, lead):
+                raise ValueError(f"'{name}' runs at another setting than '{lead}'")
+    for names, stepover, key in (
+        (("width", "depth", "seat", "top"), step_max, "face_stepover_max_mm"),
+        (("far face",), far_step_max, "far_face_stepover_max_mm"),
+    ):
+        for name in names:
+            if not math.isclose(
+                _cut(plan, name, "radial_woc_mm"), stepover, abs_tol=1e-6
+            ):
+                raise ValueError(f"'{name}' radial_woc_mm is not process.{key}")
     if not math.isclose(_cut(plan, "seat", "axial_doc_mm"), seat_skim, abs_tol=1e-6):
         raise ValueError("'seat' axial_doc_mm is not process.seat_skim_mm")
     for name in ("width", "depth", "top"):
@@ -549,6 +554,18 @@ def context(
     width_levels = _levels(blank_x, width, level_max)
     depth_levels = _levels(blank_z, height, level_max)
     top_levels = _levels(upright_top, top, level_max)
+    # The bar checked before sawing (Setup 1): PA01 and PA02 face from the
+    # nominal 1 in and 1-1/4 in, so a bar over them deepens each program's
+    # first level by the excess; it may grow only to the measured level
+    # depth, and the same amount under is accepted (a thinner bar still
+    # cleans up: its first level cuts less).
+    for key, nominal, levels in (
+        ("bar_x", blank_x, width_levels),
+        ("bar_z", blank_z, depth_levels),
+    ):
+        headroom = level_max - (nominal - levels[0])
+        _agree(plan, f"{key}_max_mm", nominal + headroom)
+        _agree(plan, f"{key}_min_mm", nominal - headroom)
     far_level_max = p["far_face_level_mm"]
     if not math.isclose(
         _cut(plan, "far face", "axial_doc_mm"), far_level_max, abs_tol=1e-6
@@ -570,7 +587,7 @@ def context(
     if not math.isclose(_cut(plan, "step", "axial_doc_mm"), step_level, abs_tol=1e-6):
         raise ValueError("'step' axial_doc_mm is not process.step_level_mm")
     raw_x, final_x = -(upright_top + r), -(foot_top + r)
-    n_stations = math.ceil((final_x - raw_x) / step_max - 1e-9)
+    n_stations = math.ceil((final_x - raw_x) / p["step_station_max_mm"] - 1e-9)
     station = (final_x - raw_x) / n_stations
     _agree(plan, "step_station_mm", station)
     if not math.isclose(
@@ -854,7 +871,7 @@ def context(
 
     width_ys = _stations((-blank_z, 0.0), r, step_max)
     side_ys = _stations((-width, 0.0), r, step_max)
-    far_ys = _stations((-top, 0.0), r, step_max)
+    far_ys = _stations((-top, 0.0), r, far_step_max)
     strap_x = (-height, -(depth - strap))
     faces = {
         "width": (
@@ -992,6 +1009,7 @@ def context(
     # PA07 is one Job: the far face, then the outline, same tool and speed.
     outline_job = jobs[-1]
     outline_job["label"] = "far face and outline"
+    outline_job.update(rpm=outline_rpm, feed=outline_feed, plunge=outline_feed)
     outline_job["ops"].append(
         ["outline", "profile the flanks and the crown", outline_lines]
     )
@@ -1001,6 +1019,9 @@ def context(
     jobs.append(
         {
             **em_tool,
+            "rpm": step_rpm,
+            "feed": step_feed,
+            "plunge": step_feed,
             "frame": "step",
             "label": "step",
             "stock": stocks["step"],
@@ -1206,6 +1227,7 @@ def context(
 
     def face_checks(key: str, boxes: list[dict[str, Any]]) -> list[list[Any]]:
         _frame_key, levels, face_top, _xs, _ys, y, span = faces[key]
+        engagement = far_step_max if key == "far_face" else step_max
         return [
             *[
                 [
@@ -1213,7 +1235,7 @@ def context(
                     {
                         "z": _r(z),
                         "y": list(y),
-                        "max_engagement": step_max,
+                        "max_engagement": engagement,
                         "radius": r,
                         "span": span,
                         "overhang": FACE_OVERHANG_MM,
@@ -1283,7 +1305,7 @@ def context(
         "PA04_step_bore": (
             height,
             [tn["em-half"], tn["spot"], tn["drill-23-64"], tn["reamer"]],
-            [[face_rpm], [spot_rpm], [bore_rpm], [ream_rpm]],
+            [[step_rpm], [spot_rpm], [bore_rpm], [ream_rpm]],
             bore_tip,
             [
                 [
@@ -1372,7 +1394,7 @@ def context(
             "tool_changes",
             {"z_top": height, "tools": [tn["em-half"]], "loads_first": True},
         ],
-        [name, "spindle", {"rpm": [[face_rpm]]}],
+        [name, "spindle", {"rpm": [[outline_rpm]]}],
         [name, "pauses", {"z_top": height, "count": 0}],
         [name, "depth", {"z_min": _r(outline_bottom)}],
         *[

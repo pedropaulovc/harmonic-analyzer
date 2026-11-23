@@ -58,9 +58,17 @@ def _drills(plan: dict) -> list[str]:
     ]
 
 
+def _assembly_bore(stem: str) -> bool:
+    bore = export_features.requirement_manifest(stem)["features"].get("bore", {})
+    return bore.get("made_at") == "assembly"
+
+
 # A plan that drills must land its drill in the drawing's bore band; the
-# sawn-and-faced pins drill nothing.
-DRILLED = tuple(stem for stem in STEMS if _drills(_plan(stem)))
+# sawn-and-faced pins drill nothing. A bore the drawing reams at assembly
+# (MHA-PD-28, reamed after pressing) is drilled under its band instead.
+_DRILLING = tuple(stem for stem in STEMS if _drills(_plan(stem)))
+ASSEMBLY_BORED = tuple(stem for stem in _DRILLING if _assembly_bore(stem))
+DRILLED = tuple(stem for stem in _DRILLING if stem not in ASSEMBLY_BORED)
 
 
 def test_the_turned_parts_are_enrolled() -> None:
@@ -122,6 +130,13 @@ def test_the_drill_lands_in_the_drawings_hole_band(stem: str) -> None:
     for ref, feature in drills:
         band = features[feature]["dia"]
         assert band[0] <= SHOP["tools"][ref]["diameter_mm"] <= band[1], ref
+
+
+@pytest.mark.parametrize("stem", ASSEMBLY_BORED)
+def test_an_assembly_bore_is_drilled_under_its_band(stem: str) -> None:
+    band = export_features.requirement_manifest(stem)["features"]["bore"]["dia"]
+    for ref in _drills(_plan(stem)):
+        assert SHOP["tools"][ref]["diameter_mm"] < band[0], ref
 
 
 # A plan turns its part from round bar (stock_dia_in) or from a squared blank

@@ -370,7 +370,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Bring the blade's chuck-side face onto the spigot face and set DRO Z to {{process.blade_width_in:.4dot}}, the blade's width miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z−{{cad.envelope_x_in:.3dot}}, the blade square to the axis on centre height; catch the fixture."
+instruction = "Bring the blade's chuck-side face onto the spigot face and set DRO Z to {{process.blade_width_in:.4dot}}, the blade's width miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z−{{cad.envelope_x_in:.3dot}}, the blade square to the axis on centre height. Hands clear: let the fixture fall; pick it up from the bed or the chip tray only after the spindle has stopped."
 settings = "lathe-part-c360"
 cut_diameter_mm = 12.8316
 

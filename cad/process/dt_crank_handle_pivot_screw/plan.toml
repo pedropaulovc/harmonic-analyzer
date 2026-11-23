@@ -432,7 +432,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "Part off: tailstock away, compound square, holder re-squared. Spindle stopped: with the .002 feeler leaf on the tip, touch the blade's chuck-side face on it and set DRO Z to +(.002 + the blade's width): the DRO reads its tailstock-side face. The blade's tailstock-side face on Z−P. Spindle on: cutting oil, steady, backing out for chips; catch the screw as it parts."
+instruction = "Part off: tailstock away, compound square, holder re-squared. Spindle stopped: with the .002 feeler leaf on the tip, touch the blade's chuck-side face on it and set DRO Z to +(.002 + the blade's width): the DRO reads its tailstock-side face. The blade's tailstock-side face on Z−P. Spindle on: cutting oil, steady, backing out for chips. Hands clear: let the screw fall; pick it up from the bed or the chip tray only after the spindle has stopped."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.head_aim_dia_mm}}"
 

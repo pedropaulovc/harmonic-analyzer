@@ -45,8 +45,8 @@
 # guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner, Pedro,
 # answered in person 2026-11-21: "remove mention of dead centre ; use
 # https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
-# on r8 0.5 collet"; cad/config/shop-equipment/ tools.tap-guide-fisher, its
-# ownership to confirm): its spring-loaded point seats in the T-handle
+# on r8 0.5 collet"; cad/config/shop-equipment/ tools.tap-guide-fisher, to
+# buy, owner ruling 2026-11-22): its spring-loaded point seats in the T-handle
 # wrench's centre hole and follows the tap down 1/2 in, spindle off; the
 # operator jogs Z only to push the point home again and to read the depth.
 # FluidNC refuses jogs in the Hold an M0 leaves
@@ -59,7 +59,8 @@
 #
 # NC (cam:ch_fulcrum_keeper, cad/process/ch_fulcrum_keeper/cam.py): FK01_far,
 # FK02_width, FK03_seat, FK04_crown_bore, FK05_step, FK06_crown_cbore,
-# FK07_crown_tap. Program names, the [parameters] and the milling_cuts names
+# FK07_crown_tap, FK08_cbore_recut (FK06's counterbore alone: the remedy for
+# a shallow or undersize one). Program names, the [parameters] and the milling_cuts names
 # are a contract with that recipe (the recipe keeps the bracket's names for
 # them: west = F, hold = the foot hole, arch = the crown, apex = the crown
 # hole). Tool numbers are the places in the tools list among the mill's
@@ -114,13 +115,25 @@ blank_z_in = 0.75
 seat_skim_mm = 0.508
 west_skim_mm = 1.27
 face_step_max_mm = 1.27
-# Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2), equal
-# passes no wider than .150 in, under half the cutter (the 6G chip-load
-# factor 1.0 holds to 50 % engagement, shop
-# settings.endmill-carbide-3fl-1-2-1018-cf); .150 also gives the step an
-# even number of passes across the .55 width (cam.py).
+# Facing F, N and the seat (FK01-FK03): the 1/2 in carbide end mill (shop
+# endmill-carbide-3fl-1-2) on the measured face setting
+# em-half-carbide-1018-v5-face, valid to 1.27 mm deep and 3.4 mm wide
+# (cad/config/shop-equipment/measured-cuts.toml): equal passes no wider
+# than face_stepover_max_mm, its width limit. Each face cut declares its
+# true stepover, the most any of its passes engages, the first and the last
+# included (cam.py computes both and the post checks every pass): lying
+# across the 3/4 section 6 passes of lying_stepover_mm, upright across the
+# .55 width 5 of seat_stepover_mm.
 face_cutter_dia_mm = 12.7
-face_stepover_max_mm = 3.81
+face_stepover_max_mm = 3.4
+lying_stepover_mm = 3.2583
+seat_stepover_mm = 2.894
+# FK05 (the foot tip, the step and its wall pass: one operation, on the
+# chart setting endmill-carbide-3fl-1-2-1018-cf, whose wall pass is deeper
+# than any measured cut): passes no wider than .150 in, under half the
+# cutter (the 6G chip-load factor 1.0 holds to 50 % engagement); .150 also
+# gives the step an even number of passes across the .55 width (cam.py).
+step_stepover_max_mm = 3.81
 # The step (FK05): equal levels from the faced foot tip down to the lug's
 # outer face (7 × 1.1974), each a zigzag of X passes across the width (the
 # facing stations, the last moved onto N's line) from beside the far end to
@@ -261,8 +274,12 @@ upright_top_max_mm = 34.544
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set at least 1 in out of the collet.
-half_mill_projection_min_mm = 25.4
+# The 1/2 in end mill, 3 in overall, 1.10 in out of the R8 collet: the
+# assembly the measured settings were cut with
+# (cad/config/shop-equipment/measured-cuts.toml; owner, Pedro, 2026-11-22:
+# "stickout is recorded as 30mm but is actually 27.94"). cam.py checks its
+# collet nose clears the stock at every program's deepest cut.
+half_mill_projection_mm = 27.94
 # Overall lengths: jobber #41 2-1/8 in, D 4 in, 1/16 1-7/8 in (ASME B94.11M);
 # the #2 combined drill and countersink 1-7/8 in; a 1/4 in class chucking
 # reamer 6 in; the long-reach 1/8 in end mill 2-1/2 in. Bounded by their
@@ -372,7 +389,7 @@ machine_ref = "pm-30mv"
 holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in). The blank lying on them along the jaws, gripped on I (against the FIXED jaw) and its opposite, centred on the jaws; the face up becomes the far side F. Tap it down onto both stacks while closing the vise. Its top stands {{process.blank_section_in:.3dot}} above the stacks, the lower {{process.lying_grip_mm:in.3dot}} of it in the jaws."
 datum = "Program FK01_far (cam:ch_fulcrum_keeper). G54: X0 the blank's LEFT end, Y0 the fixed jaw's face (I), Z0 the stacks' top; +Y toward the fixed jaw. The file starts with an M6 for the end mill; tool lengths from the tool setter."
 diagram = { file = "diagrams/west.svg", alt = "The blank lying along the jaws on stacked parallels, I against the fixed jaw; the 1/2 in end mill skims the top face, which becomes the far side F." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", 17.78], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", 17.78], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_section_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.blank_length_max_mm}}"], section_mm = { y = "{{process.blank_section_mm}}", z = "{{process.blank_section_mm}}" }, vise_left = "start" }
 
@@ -383,7 +400,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack left of the blank."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). MDI G0 X-12.700 Y-6.850: the cutter left of the blank, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2dot}} in out of the collet; the tool setter measures it). MDI G0 X-12.700 Y-6.850: the cutter left of the blank, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -396,12 +413,12 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run FK01_far (M6 T1, 1/2 in end mill; set 2650): skim the top face {{process.west_skim_mm:in.3dot}}, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}."
+instruction = "Run FK01_far (M6 T1, 1/2 in end mill; set 2370): skim the top face {{process.west_skim_mm:in.3dot}}, in passes no wider than {{process.lying_stepover_mm:in.3dot}}."
 inspection = "Still clamped: the whole top face cut, no cold-finished patch left."
 gauge_checks = "other"
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+settings = "em-half-carbide-1018-v5-face"
 milling_cuts = [
-  { name = "west side", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.west_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
+  { name = "west side", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.west_skim_mm}}", radial_woc_mm = "{{process.lying_stepover_mm}}", traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
 ]
 
 [[setups.operations]]
@@ -421,7 +438,7 @@ machine_ref = "pm-30mv"
 holding = "As Setup 2, the blank turned over: F down on both stacks, gripped on I (against the FIXED jaw) and its opposite, centred. The face up becomes the near side N."
 datum = "Program FK02_width. G54: X0 the blank's LEFT end, Y0 the fixed jaw's face (I), Z0 the stacks' top (F)."
 diagram = { file = "diagrams/width.svg", alt = "The blank lying on stacked parallels, F down, I against the fixed jaw; the 1/2 in end mill faces the top down to the width in levels." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", 17.78], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.far_side_width_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", 17.78], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.far_side_width_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_section_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = 17.78, parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.blank_length_max_mm}}"], section_mm = { y = "{{process.blank_section_mm}}", z = 17.78 }, vise_left = "start" }
 
@@ -438,16 +455,16 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run FK02_width (M6 T1; set 2650): face the top down to Z {{cad.far_side_width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. Unclamp; mic the width. Mark this face N."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run FK02_width (M6 T1; set 2370): face the top down to Z {{cad.far_side_width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. Unclamp; mic the width. Mark this face N."
+settings = "em-half-carbide-1018-v5-face"
 inspection = "Width {{cad.far_side_width_min_in:.3dot}}–{{cad.far_side_width_max_in:.3dot}}, F to N, miked at both ends."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.far_side_width_band_mm}}" }]
 milling_cuts = [
-  { name = "width", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
+  { name = "width", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.lying_stepover_mm}}", traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
 ]
 
 [[setups.operations]]
-instruction = "Over {{cad.far_side_width_max_in:.3dot}}: reclamp as before; send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.far_side_width_mm:in.3dot}}) × 25.4); run FK02_width again. Under {{cad.far_side_width_min_in:.3dot}}: the blank is scrap."
+instruction = "Over {{cad.far_side_width_max_in:.3dot}}: reclamp as before; pick up X0 (the left end) and Y0 (the fixed jaw) again with the edge finder as at this setup's start (Z0 stays the stacks' top); send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.far_side_width_mm:in.3dot}}) × 25.4); run FK02_width again. Under {{cad.far_side_width_min_in:.3dot}}: the blank is scrap."
 feed = "hand"
 
 [[setups]]
@@ -459,7 +476,7 @@ machine_ref = "pm-30mv"
 holding = "A 1 in parallel against each jaw. The blank upright on them, a sawn end up (it becomes the seat), gripped on F (against the FIXED jaw) and N, I to the LEFT, centred on the jaws. Tap it down onto both parallels with a soft mallet while closing the vise; both parallels pinned. The lower {{process.upright_grip_mm:in.2dot}} of it is in the jaws."
 datum = "Program FK03_seat. G54: X0 the inner face I (the blank's left side), +X toward its opposite; Y0 the fixed jaw's face (F), +Y toward it; Z0 the faced seat. The foot hole at X {{process.foot_hole_station_from_i_mm:.3f}}, Y −{{process.width_middle_mm:.3f}} mm (the width's middle). Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
 diagram = { file = "diagrams/seat.svg", alt = "The blank upright on two 1 in parallels, a sawn end up, I to the left; the 1/2 in end mill faces the seat, the centre drill spots and the #41 drills the foot hole down into the foot, past the foot top into the waste." }
-envelope = { x_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.far_side_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.blank_length_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.hold_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_41_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.far_side_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.blank_length_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.hold_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_41_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.far_side_width_mm}}", along_jaws_mm = "{{process.blank_section_mm}}", part_height_mm = "{{process.blank_length_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_upright_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{process.blank_section_mm}}", y = "{{cad.far_side_width_mm}}" }, vise_left = "other" }
 
@@ -470,7 +487,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the faced seat, the sawn top's high point less the {{process.seat_skim_mm:in.3dot}} skim."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z0.559 (the {{process.seat_skim_mm:in.3dot}} skim plus the .002 leaf)."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2dot}} in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z0.559 (the {{process.seat_skim_mm:in.3dot}} skim plus the .002 leaf)."
 feed = "hand"
 
 [[setups.operations]]
@@ -483,12 +500,12 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run FK03_seat (M6 T1, 1/2 in end mill; set 2650): face the seat at Z0, {{process.seat_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}; the file then stops at its M6 T2."
+instruction = "Run FK03_seat (M6 T1, 1/2 in end mill; set 2370): face the seat at Z0, {{process.seat_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.seat_stepover_mm:in.3dot}}; the file then stops at its M6 T2."
 inspection = "At the M6 T2 stop: the whole end faced, no sawn patch left."
 gauge_checks = "other"
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+settings = "em-half-carbide-1018-v5-face"
 milling_cuts = [
-  { name = "seat", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.seat_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", stations_mm = "{{process.upright_top_max_mm}}" },
+  { name = "seat", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.seat_skim_mm}}", radial_woc_mm = "{{process.seat_stepover_mm}}", stations_mm = "{{process.upright_top_max_mm}}" },
 ]
 
 [[setups.operations]]
@@ -530,7 +547,7 @@ machine_ref = "pm-30mv"
 holding = "The 1 in + 1/2 in stacks against each jaw (1/8 in thick: the bore falls between them). The part lying along the jaws, I UP, the opposite (still the bar's face) down on both stacks; gripped on F (against the FIXED jaw) and N; the seat to the RIGHT; centred on the jaws. The jaws grip only the lower {{process.lying_grip_mm:in.3dot}}, the waste under the lug that Setup 6 cuts away: the crown and the bore are cut above the jaw tops."
 datum = "Program FK04_crown_bore. G54: X0 the seat (the part's RIGHT end), the part to −X; Y0 the fixed jaw's face (F), +Y toward it; Z0 the stacks' top. The crown's centre and the bore at X −{{cad.bore_height_mm:.3f}}, Y −{{cad.bore_lateral_ref:.3f}} mm (the width's middle). Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
 diagram = { file = "diagrams/arch.svg", alt = "The part lying along the jaws on stacked parallels, I up, the seat to the right; the 1/2 in end mill profiles the full R.275 crown at the left end through the lug, then the centre drill, the D drill and the .2550 reamer make the bore through the lug on the crown's centre, all above the jaw tops." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.far_side_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 2.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bore_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.far_side_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 2.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bore_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.far_side_width_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.blank_length_max_mm}}"], section_mm = { y = "{{cad.far_side_width_mm}}", z = "{{process.blank_section_mm}}" }, vise_left = "end" }
 
@@ -547,6 +564,17 @@ feed = "hand"
 [[setups.operations]]
 instruction = "First blank only: prove FK04_crown_bore in air, Z0 raised 1.000 in; every move clears the jaws, through every M6. Then Z0 back."
 instruction_detailed = "First blank only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run FK04_crown_bore through every M6, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+# FK04's crown stays on the chart setting, outside the measured envelope
+# (finish 9.128 deep x 0.508, rough 4.564 deep x 4.173 wide). Owner (Pedro),
+# 2026-11-22, on deep walls: "log new dechatter issues to try deep axial
+# cuts but with shallow radial depth" (#3427). No re-cut: the first blank
+# is listened to.
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "First blank only: these crown cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3427): the finish pass {{process.arch_depth_mm:in.3dot}} deep × {{process.arch_finish_stock_mm:in.3dot}} wide, the rough levels {{process.arch_rough_level_mm:in.3dot}} deep × up to {{process.arch_rough_woc_mm:in.3dot}} wide. Listen through the crown; on chatter, feed hold, stop the spindle and tell the owner." },
+]
 feed = "hand"
 
 [[setups.operations]]
@@ -627,7 +655,7 @@ machine_ref = "pm-30mv"
 holding = "The same stacks. The part turned over: I DOWN on both stacks, gripped on F (against the FIXED jaw) and N, the seat to the LEFT, centred. The jaws grip the lower {{process.lying_grip_mm:in.3dot}} of the lug; the step's floor stands above the jaw tops."
 datum = "Program FK05_step. G54: X0 the seat (the part's LEFT end), +X toward the crown; Y0 the fixed jaw's face (F), +Y toward it; Z0 the stacks' top (I). The foot top at X {{cad.foot_top_height_mm:.3f}}, the lug's outer face at Z {{cad.lug_outer_face_thickness_mm:.3f}} mm."
 diagram = { file = "diagrams/step.svg", alt = "The part lying on stacked parallels, I down, the seat to the left; the 1/2 in end mill faces the foot tip to the length, then cuts the step in passes across the width, stepping from the crown end to the foot, level by level down to the lug's outer face." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.far_side_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.lug_outer_face_thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.far_side_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.lug_outer_face_thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.far_side_width_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.blank_length_max_mm}}"], section_mm = { y = "{{cad.far_side_width_mm}}", z = "{{process.blank_section_mm}}" }, vise_left = "start" }
 
@@ -646,6 +674,19 @@ instruction = "First blank only: prove FK05_step in air, Z0 raised 1.000 in; eve
 instruction_detailed = "First blank only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run FK05_step, watching each pass cross above the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
+# FK05 stays on the chart setting, outside the measured envelope: the wall
+# pass 8.382 deep x 0.263, the foot-end and step passes 3.6175 wide (the
+# measured 3.4 at most). Owner (Pedro), 2026-11-22: deep walls, "log new
+# dechatter issues to try deep axial cuts but with shallow radial depth"
+# (#3427); full-width passes, "same log new dechatter issues to try full
+# radial depth but shallow axial" (#3428). No re-cut: the first blank is
+# listened to.
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "First blank only: these FK05_step cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3427, #3428): the wall pass .330 deep × {{process.wall_finish_woc_mm:in.3dot}} wide, the foot-tip and step passes {{process.face_step_max_mm:in.3dot}} and {{process.step_level_mm:in.3dot}} deep × .142 wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner." },
+]
+feed = "hand"
+
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
@@ -654,8 +695,8 @@ sizing = "other"
 instruction = "Run FK05_step (M6 T1; set 2650): face the foot tip down to Z {{cad.foot_tip_length_mm:in.4dot}} across the whole part in two {{process.face_step_max_mm:in.3dot}} levels, then the step down to Z {{cad.lug_outer_face_thickness_mm:in.4dot}} in {{process.step_level_mm:in.4dot}} levels, each in passes along the part from beside the crown end to the foot top and back; then one full-depth pass along the foot top, from F to N (climb), takes off the {{process.wall_finish_woc_mm:in.3dot}} scallops the stepovers left on it. The step cuts the waste under the bore and the foot hole away: both open."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
-  { name = "foot end", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
-  { name = "step", kind = "end", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.step_level_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = ["{{cad.foot_top_height_mm}}", "{{process.blank_length_max_mm}}"] },
+  { name = "foot end", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.step_stepover_max_mm}}", traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
+  { name = "step", kind = "end", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.step_level_mm}}", radial_woc_mm = "{{process.step_stepover_max_mm}}", traverse_mm = ["{{cad.foot_top_height_mm}}", "{{process.blank_length_max_mm}}"] },
   { name = "step wall", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 8.382, radial_woc_mm = "{{process.wall_finish_woc_mm}}", traverse_mm = [0, "{{cad.far_side_width_mm}}"] },
 ]
 
@@ -688,7 +729,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in parallels back against the jaws. The part upright, the SEAT down on both parallels, the crown up, gripped on F (against the FIXED jaw) and N, I to the RIGHT, centred on the jaws. Tap it down onto both parallels while closing the vise. The jaws grip the lower {{process.upright_grip_mm:in.2dot}}; the crown stands above them, the foot top {{cad.foot_top_height_in:.3dot}} above the parallels, between the jaws."
-datum = "Programs FK06_crown_cbore and FK07_crown_tap. G54: X0 the inner face I (the RIGHT side), the part to −X; Y0 the fixed jaw's face (F), +Y toward it; Z0 the parallels' top (the seat). The crown hole at X −{{cad.crown_tap_station_mm:.3f}}, the apex at Z {{cad.crown_overall_height_ref:.3f}}; the foot hole at X −{{process.foot_hole_station_from_i_mm:.3f}}; both at Y −{{process.width_middle_mm:.3f}} mm (the width's middle). Tool lengths from the tool setter at each M6; every file starts with an M6 for its first tool; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
+datum = "Programs FK06_crown_cbore, FK07_crown_tap and FK08_cbore_recut. G54: X0 the inner face I (the RIGHT side), the part to −X; Y0 the fixed jaw's face (F), +Y toward it; Z0 the parallels' top (the seat). The crown hole at X −{{cad.crown_tap_station_mm:.3f}}, the apex at Z {{cad.crown_overall_height_ref:.3f}}; the foot hole at X −{{process.foot_hole_station_from_i_mm:.3f}}; both at Y −{{process.width_middle_mm:.3f}} mm (the width's middle). Tool lengths from the tool setter at each M6; every file starts with an M6 for its first tool; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
 diagram = { file = "diagrams/apex.svg", alt = "The keeper upright on two parallels, seat down, the crown up, I to the right; the centre drill spots the crown and the 1/16 drill drills down into the bore; the long-reach 1/8 in end mill mills the counterbore from the foot top, beside the lug." }
 envelope = { x_span_mm = ["{{cad.foot_tip_length_mm}}", "{{process.centre_drill_oal_mm}}"], y_span_mm = ["{{cad.far_side_width_mm}}", "{{process.centre_drill_oal_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.crown_overall_height_ref}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", 5.766], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_1_16_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.far_side_width_mm}}", along_jaws_mm = "{{cad.foot_tip_length_mm}}", part_height_mm = "{{cad.crown_overall_height_ref}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_seat_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
@@ -758,7 +799,13 @@ gauge_checks = [
 
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "Smaller or shallower than its band: check the 1/8 end mill's wear and the Z touch-off, then run FK06_crown_cbore again from its start." },
+  { kind = "action", text = "Smaller in Ø than its band: the 1/8 end mill is worn. Fit a new long-reach 1/8 in end mill, at least {{process.cbore_projection_min_mm:in.3dot}} out, and run FK08_cbore_recut (the counterbore alone; its M6 T7 measures the new cutter). Check again." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Shallower than its band: send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − ({{process.cbore_depth_mm:in.3dot}} − the depth reading) × 25.4). Run FK08_cbore_recut (no spot, no drill), then G10 L2 P1 Z(the noted Z) puts Z0 back. Check again." },
 ]
 feed = "hand"
 
@@ -831,19 +878,34 @@ inspection = "I down on the surface plate: it does not rock. The combination squ
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Inspect each keeper; record the readings with its number."
+instruction = "Inspect each keeper, recording every reading with its number. Bore size, after the hand ream: the class ZZ pins."
 feed = "hand"
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} after the hand ream: the {{process.go_pin_in:.4dot}} pin (GO) enters, the {{process.nogo_pin_in:.4dot}} pin (NO-GO) does not. Bore height {{cad.bore_height_min_in:.3dot}}–{{cad.bore_height_max_in:.3dot}}: the keeper on its seat on the surface plate, the height gauge over the GO pin in the bore less half its Ø. Bore on the width's centre within ±{{cad.bore_off_centre_max_in:.3dot}}: calipers from F and from N over the pin, each less half its Ø; half the difference of the two is the bore's offset. Crown: the drawing's (R{{cad.crown_radius_in:.3dot}}) FULL R is a reference, not checked here; it blends into both sides with no step (Setup 5). Foot hole: the #41 drill's shank slips through; its centre {{cad.foot_hole_station_min_in:.3dot}}–{{cad.foot_hole_station_max_in:.3dot}} from the foot tip and {{cad.foot_hole_lateral_min_in:.3dot}}–{{cad.foot_hole_lateral_max_in:.3dot}} from N, calipers over the shank less half its miked Ø; the station less half the counterbore's reading leaves at least {{cad.foot_hole_tip_wall_min_mm:in.3dot}} of wall to the foot tip. Counterbore Ø{{cad.foot_hole_cbore_dia_min_in:.3dot}}–{{cad.foot_hole_cbore_dia_max_in:.3dot}} (calipers' inside jaws), {{cad.foot_hole_cbore_depth_min_in:.3dot}}–{{cad.foot_hole_cbore_depth_max_in:.3dot}} deep from the foot top (calipers' depth rod). Crown hole: a #1-72 screw runs in by hand until its end shows in the bore; its centre {{cad.crown_tap_station_min_in:.3dot}}–{{cad.crown_tap_station_max_in:.3dot}} from I by the calipers over the screw less half its Ø."
+inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}: the {{process.go_pin_in:.4dot}} pin (GO) enters, the {{process.nogo_pin_in:.4dot}} pin (NO-GO) does not."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Bore height and centring: the keeper on its seat on the surface plate, the GO pin in the bore."
+feed = "hand"
+inspection = "Bore height {{cad.bore_height_min_in:.3dot}}–{{cad.bore_height_max_in:.3dot}}: the height gauge over the pin less half its Ø. Bore on the width's centre within ±{{cad.bore_off_centre_max_in:.3dot}}: calipers from F and from N over the pin, each less half its Ø; half their difference is the offset."
 gauge_checks = [
-  { gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" },
   { gauge = "height-gauge", band_mm = "{{cad.bore_height_band_mm}}" },
   { gauge = "calipers", band_mm = ["{{process.bore_from_f_min_mm}}", "{{process.bore_from_f_max_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Foot hole: the #41 drill's shank in it, its Ø miked."
+feed = "hand"
+inspection = "The shank slips through. Its centre {{cad.foot_hole_station_min_in:.3dot}}–{{cad.foot_hole_station_max_in:.3dot}} from the foot tip and {{cad.foot_hole_lateral_min_in:.3dot}}–{{cad.foot_hole_lateral_max_in:.3dot}} from N: calipers over the shank less half its Ø. The station less half Setup 7's counterbore reading leaves at least {{cad.foot_hole_tip_wall_min_mm:in.3dot}} of wall to the foot tip."
+gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.foot_hole_station_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.foot_hole_lateral_band_mm}}" },
-  { gauge = "calipers", band_mm = "{{cad.crown_tap_station_band_mm}}" },
-  { gauge = "calipers", band_mm = "{{cad.foot_hole_cbore_dia_band_mm}}" },
-  { gauge = "calipers", band_mm = "{{cad.foot_hole_cbore_depth_band_mm}}" },
 ]
+
+[[setups.operations]]
+instruction = "Crown hole: run a #1-72 screw in by hand until its end shows in the bore."
+feed = "hand"
+inspection = "The screw runs in. Its centre {{cad.crown_tap_station_min_in:.3dot}}–{{cad.crown_tap_station_max_in:.3dot}} from I: calipers over the screw less half its Ø. The crown's FULL R (R{{cad.crown_radius_in:.3dot}}) is a reference: it blends into both sides with no step (Setup 5)."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.crown_tap_station_band_mm}}" }]
 
 [[setups.operations]]
 steps = [
