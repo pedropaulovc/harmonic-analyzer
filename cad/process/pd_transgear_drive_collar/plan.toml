@@ -138,6 +138,18 @@ tool_out_min_in = 0.6
 # (.07725, printed to 4 places).
 over_pins_half_sum_in = 0.1425
 over_flat_half_sum_in = 0.0773
+# Each GO plug may stand up to .0005 under its hole (.1920 in .1920-.1925,
+# .0930 in .0930-.0935, .0615 in .0615-.0620), and the anvils push both
+# plugs toward each other, so an over-plugs reading is low by up to the two
+# half-clearances, .00025 + .00025 = over_plugs_clearance_max_in. The dowel
+# acceptance is the sheet's .2747-.2765 with that taken off its top (the
+# reading can only be low): .2747-.2760. The flat pin's centre, D + .0773 -
+# R, is biased either way by up to the same .0005 (D low, R low), so its
+# acceptance is the sheet's .116-.120 with .0005 off each end: .1165-.1195.
+over_plugs_clearance_max_in = 0.0005
+dowel_accept_max_in = 0.276
+flat_accept_min_in = 0.1165
+flat_accept_max_in = 0.1195
 # Speeds and feeds: the shop settings (cad/process/shop/pd.toml, the
 # MHA-PD-22 block, sourced there): spot, #43 and #53 2800 rpm × .001 in/rev
 # = 2.8 in/min; the reamers 1400 × .001 = 1.4 in/min. cam.py refuses a feed
@@ -471,13 +483,13 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Push the .1920 GO plug through the bore and the .0930 GO plug through one dowel hole, each standing about .3 out of the rear face. Mike over the two plugs; the reading less {{process.over_pins_half_sum_in:.4dot}} is that hole's centre from the bore's axis. Repeat for the other dowel hole; write the one beside the flat pin's hole as D."
-inspection = "Each dowel centre {{cad.dowel_a_offset_min_in:.4dot}}–{{cad.dowel_a_offset_max_in:.4dot}} from the bore's axis."
+inspection = "Each dowel centre {{cad.dowel_a_offset_min_in:.4dot}}–{{cad.dowel_a_offset_max_in:.4dot}} from the bore's axis: accept a reading {{cad.dowel_a_offset_min_in:.4dot}}–{{process.dowel_accept_max_in:.4dot}} (each plug's centre may sit up to .00025 off its hole's, so the reading is up to {{process.over_plugs_clearance_max_in:.4dot}} low). Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.dowel_a_offset_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
 instruction = "The bore's plug out. The .0930 GO plug in dowel hole D, the .0615 GO plug in the flat pin's hole, both standing out of the rear face. Mike over the two plugs as R. The flat pin's centre from the bore's axis is D + {{process.over_flat_half_sum_in:.4dot}} − R."
-inspection = "Flat pin's centre {{cad.flat_pin_hole_centre_min_in:.3dot}}–{{cad.flat_pin_hole_centre_max_in:.3dot}} from the bore's axis."
+inspection = "Flat pin's centre {{cad.flat_pin_hole_centre_min_in:.3dot}}–{{cad.flat_pin_hole_centre_max_in:.3dot}} from the bore's axis: accept {{process.flat_accept_min_in:.4dot}}–{{process.flat_accept_max_in:.4dot}} (the plugs' clearances bias it up to {{process.over_plugs_clearance_max_in:.4dot}} either way). Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.flat_pin_hole_centre_band_mm}}" }]
 feed = "hand"
 

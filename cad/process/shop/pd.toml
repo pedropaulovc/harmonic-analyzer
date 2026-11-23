@@ -265,8 +265,11 @@ description = "Plug gauge pair, .0615 GO (plus) and .0620 NO-GO (minus), Vermont
 # shop/lathe.toml's C360 rows. The .3135 reamer (to buy) takes the
 # LittleMachineShop drilling and reaming row for brass (lathe.toml header,
 # 160-175 ft/min) at its low end. The sharp-nose finishing tool is HSS (its
-# .004 nose): the same page's HSS turning row for brass, 300-350 ft/min, at
-# its low end and the page's .004 in/rev.
+# R.003-.004 nose): the same page's HSS turning row for brass, 300-350
+# ft/min, at its low end. Its feed is not the page's .004 in/rev roughing
+# reference: the PM-1127's finest longitudinal power feed, .0025 in/rev
+# (shop machines.pm-1127vf-lb longitudinal_feed_mm_rev), whose cusp the
+# hub plan charges against the spigot's band (Codjiflo #3407 P2).
 [settings.lathe-ream-3135-c360]
 tool = "reamer-3135"
 material = "lathe-c360"
@@ -276,7 +279,7 @@ feed = "tailstock quill by hand, slow and steady, dry; withdraw with the spindle
 tool = "lathe-tool-sharp-nose"
 material = "lathe-c360"
 sfm = 300
-feed_mm_rev = 0.1016
+feed_mm_rev = 0.0635
 # Mill (PM-30MV low belt, 100-2800 rpm), the rows the MHA-PD-22 block above
 # cites: #51 (.067 in) and #56 (.0465 in) at 160 ft/min are 9120 and 13140
 # rpm, so 2800; the AutoDrill 1/16 in column's .001 in/rev (the #56 under
