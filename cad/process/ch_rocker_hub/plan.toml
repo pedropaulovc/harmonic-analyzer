@@ -3,14 +3,17 @@
 # for speed (owner ruling 2026-11-21: the agent chooses the route; comparison
 # sketch on PR #3262, branch evidence/cnc-bush-hub-sketch): bar-fed from the 24 in 1/2 in
 # 1018 bar, two hubs per pull, about 128 min for the lot against 191 min one
-# at a time from 20 sawn slugs. Each pull: face the bar end (Z0), rough and
+# at a time from 20 sawn slugs. Setup 1 saws a 10 in piece off the bar for
+# the lathe (#3424: the whole bar would run out past the spindle's rear end;
+# limit cad/config/shop-equipment/ machines.pm-1127vf-lb
+# bar_behind_jaw_fronts_max_in); it makes all 20. Each pull: face the bar end (Z0), rough and
 # finish the land over both hubs to the lot's land window, spot, drill D
 # through both and past the second parting line, part off the first hub, face
 # the new end to Z0 again, part off the second. The land is turned before the
 # drill (the turning-deflection screen models solid round). The drawing's
 # matched fit governs the land (owner ruling 2026-11-21, "matched fit only"):
 # (Ø.400) REF, TURN TO MEASURED STRAP HOLE / .0004-.0013 DIAMETRAL
-# INTERFERENCE ON MHA-CH-13. Op 10 reads every MHA-CH-13 hub hole with the
+# INTERFERENCE ON MHA-CH-13. Op 20 reads every MHA-CH-13 hub hole with the
 # six Class X plug gauges .4000-.4005 by .0001 (the .4000/.4005 pair,
 # plug-gauges-4000-4005, plus the steps plug-gauges-4001-4004; all to buy):
 # the largest that enters is the hole's reading R, the hole lies in R to
@@ -25,8 +28,8 @@ title = "Rocker Hub"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished round, 1/2 in"
-stock = "Ø{{process.stock_dia_in:.2dot}} × {{process.bar_length_in:g}} in bar, on hand; {{process.quantity:d}} hubs at {{cad.pitch_in:.2dot}} in each ({{cad.parts_per_bar:d}} fit the bar)."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Setup 1 runs ten times, two hubs per pull. Bore and length are finished after joining to MHA-CH-13 (drawing note 1, MHA-CH-06)."
+stock = "Ø{{process.stock_dia_in:.2dot}} bar, on hand; Setup 1 saws a {{process.bar_length_in:g}} in piece off it: {{process.quantity:d}} hubs at {{cad.pitch_in:.2dot}} in each ({{cad.parts_per_bar:d}} fit the piece)."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Setup 2 runs ten times, two hubs per pull. Bore and length are finished after joining to MHA-CH-13 (drawing note 1, MHA-CH-06)."
 shop = "../shop"
 stock_refs = ["1018-round-1-2"]
 material_key = "lathe-1018-cold-finished"
@@ -45,7 +48,11 @@ quantity = 20
 # ch_rocker_hub_fit.PRESS_INTERFERENCE).
 land_over_reading_min_in = 0.0005
 stock_dia_in = 0.5
-bar_length_in = 24.0
+# The piece Setup 1 saws off the bar: it makes the 20 hubs (prechips'
+# parts_per_bar) and, at the first pull, leaves about 9 in behind the jaw
+# fronts, inside the spindle (limit machines.pm-1127vf-lb
+# bar_behind_jaw_fronts_max_in, test_lathe_bar_length).
+bar_length_in = 10.0
 chuck_grip_in = 1.0
 # Facing allowance: squares a parted bar end.
 face_allowance_in = 0.02
@@ -70,6 +77,11 @@ finish_allowance_in = 0.002
 turn_feed_mm_rev = 0.1016
 # The tool starts its pass this far off the faced end.
 turn_start_z_mm = 0.5
+
+[[tools]]
+id = "saw"
+name = "14 in metal-cutting saw"
+ref = "saw-evolution-14"
 
 [[tools]]
 id = "ar"
@@ -97,13 +109,32 @@ name = "Smooth file"
 ref = "jig-files"
 
 [[setups]]
+machine_kind = "other"
+title = "Saw the working piece"
+machine = "Evolution 14 in metal-cutting saw"
+holding = "The bar flat on the saw bed, its long end clamped in the saw's vise, the piece free beyond the blade."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/saw.svg", alt = "The 1/2 in bar on the saw: one 10 in piece off its end, for the 20 hubs." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Scribe {{process.bar_length_in:g}} in from the bar end and saw on the waste side of the line; let the piece drop clear and pick it up only after the blade has stopped. File the burrs off the sawn ends. The piece makes {{cad.parts_per_bar:d}} hubs; never chuck the whole bar in the lathe (it would run out past the spindle's rear end)."
+feed = "hand"
+
+[[setups]]
 machine_kind = "lathe"
 title = "Bar: two hubs per pull, ten pulls"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the Ø{{process.stock_dia_in:.2dot}} bar through the spindle; pull {{cad.stickout_in:.2dot}} in out of the jaw fronts each time."
-datum = "Z0 (carriage DRO) the bar end faced in Op 40, set again on the parted end in Op 110."
+holding = "3-jaw on the Ø{{process.stock_dia_in:.2dot}} piece from Setup 1, the rest of it back in the spindle bore; pull {{cad.stickout_in:.2dot}} in out of the jaw fronts each time."
+datum = "Z0 (carriage DRO) the bar end faced in Op 50, set again on the parted end in Op 120."
 diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw with two hubs out: the end faced, the land turned over both, the D hole drilled through both past the second parting line, each hub parted off {{cad.part_off_in:.2dot}} from its faced end." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
@@ -156,15 +187,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the land over the same length to the lot's land window (Op 30) in light passes, miking each hub's length of land between passes; over the window, take another pass."
+instruction = "Finish the land over the same length to the lot's land window (Op 40) in light passes, miking each hub's length of land between passes; over the window, take another pass."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Land inside the Op 30 window on both hubs, micrometer: the measured land less each hole's R lies within {{process.land_over_reading_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}}."
+inspection = "Land inside the Op 40 window on both hubs, micrometer: the measured land less each hole's R lies within {{process.land_over_reading_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}}."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A land under the Op 30 window: part both hubs off and scrap them; pull the bar and start the pair again from Op 40."
+instruction = "A land under the Op 40 window: part both hubs off and scrap them; pull the piece and start the pair again from Op 50. If the piece runs short, saw another (Setup 1)."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -194,7 +225,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off the first hub with that face at Z-{{cad.part_off_in:.2dot}}: {{process.regrip_allowance_in:.2dot}} over the {{cad.length_min_in:.2dot}} MIN supply length. Catch it."
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off the first hub with that face at Z-{{cad.part_off_in:.2dot}}: {{process.regrip_allowance_in:.2dot}} over the {{cad.length_min_in:.2dot}} MIN supply length. Hands clear: let it fall; pick it up from the bed or the chip tray only after the spindle has stopped."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -204,7 +235,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the parted end {{process.face_allowance_in:.2dot}} in with the AR tool; set DRO Z0 on it again. Bring the blade's chuck-side face onto the new faced end and set DRO Z there to the blade's width, as in Op 100: the DRO again reads the blade's tailstock-side face."
+instruction = "Face the parted end {{process.face_allowance_in:.2dot}} in with the AR tool; set DRO Z0 on it again. Bring the blade's chuck-side face onto the new faced end and set DRO Z there to the blade's width, as in Op 110: the DRO again reads the blade's tailstock-side face."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -214,7 +245,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Part off the second hub with the blade's tailstock-side face at Z-{{cad.part_off_in:.2dot}}. Catch it. Pull the bar for the next two and repeat from Op 40 until there is a hub for every strap kept in Op 20."
+instruction = "Part off the second hub with the blade's tailstock-side face at Z-{{cad.part_off_in:.2dot}}. Hands clear: let it fall; pick it up from the bed or the chip tray only after the spindle has stopped. Pull the piece for the next two and repeat from Op 50 until there is a hub for every strap kept in Op 30."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -237,11 +268,11 @@ instruction = "Deburr each hub: file the parting burr off the parted face, break
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Each hub: length across the faces at least {{cad.length_min_in:.2dot}}, calipers; land inside the Op 30 window again after deburring, micrometer."
-inspection = "Length {{cad.length_min_in:.2dot}} min; land inside the Op 30 window (largest R + {{process.land_over_reading_min_in:.4dot}} to smallest R + {{cad.outer_interference_max_in:.4dot}})."
+instruction = "Each hub: length across the faces at least {{cad.length_min_in:.2dot}}, calipers; land inside the Op 40 window again after deburring, micrometer."
+inspection = "Length {{cad.length_min_in:.2dot}} min; land inside the Op 40 window (largest R + {{process.land_over_reading_min_in:.4dot}} to smallest R + {{cad.outer_interference_max_in:.4dot}})."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{cad.length_min_mm}}", "{{cad.part_off_mm}}"] }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A hub under the length or outside the land window in Op 140 is scrapped, not reworked: the next pull makes another."
+instruction = "A hub under the length or outside the land window in Op 150 is scrapped, not reworked: the next pull makes another (if the piece runs short, saw another, Setup 1)."
 feed = "hand"

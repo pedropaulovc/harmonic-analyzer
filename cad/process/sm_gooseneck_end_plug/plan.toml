@@ -1,9 +1,13 @@
 # Gooseneck end plug MHA-SM-05, one off, turned on the manual PM-1127VF-LB
 # (owner ruling 2026-11-21: turned parts get lathe travelers, no NC). Route
-# chosen for speed, two chuckings of the 5/8 in 1018 bar on hand. Setup 1,
-# the bar head end out: face the end (Z0), turn the head Ø back through the
+# chosen for speed, two chuckings of the 5/8 in 1018 bar on hand. Setup 1
+# saws a 3 in piece off the bar: the lathe never runs the whole bar, whose
+# length behind the jaws would pass the spindle's rear end (#3424; limit
+# cad/config/shop-equipment/ machines.pm-1127vf-lb
+# bar_behind_jaw_fronts_max_in). Setup 2, the piece head end out: face the
+# end (Z0), turn the head Ø back through the
 # parting line, spot, drill #25, tap #10-24 with the plug then the bottoming
-# tap from the tailstock, part off .02 long. Setup 2, the plug turned round
+# tap from the tailstock, part off .02 long. Setup 3, the plug turned round
 # on its head over a shim wrap: measure the MHA-SM-01 bore (note 1 turns the
 # spigot to it), mike the parted plug's length, then touch the AR on the
 # parted end and preset the DRO from that length, so Z is measured from the
@@ -15,7 +19,7 @@ title = "Gooseneck End Plug"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-drawn round, 5/8 in"
-stock = "Ø{{process.stock_dia_in:.3dot}} bar, on hand; one plug, which takes {{cad.pitch_in:.2dot}} in of it (any bar end {{process.chuck_grip_in:.2dot}} in longer than {{cad.stickout_in:.2dot}} will do)."
+stock = "Ø{{process.stock_dia_in:.3dot}} bar, on hand; Setup 1 saws one {{process.bar_length_in:g}} in piece off it, which makes the one plug ({{cad.pitch_in:.2dot}} in of it)."
 note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on steel."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
@@ -30,12 +34,14 @@ part = "sm-gooseneck-end-plug"
 [parameters]
 quantity = 1
 stock_dia_in = 0.625
-# The bar on hand and the length the 3-jaw grips of it.
-bar_length_in = 48.0
+# The piece Setup 1 saws off the bar, and the length the 3-jaw grips of it:
+# 3.0 in leaves 1.76 in behind the jaw fronts, inside the spindle (limit
+# machines.pm-1127vf-lb bar_behind_jaw_fronts_max_in, test_lathe_bar_length).
+bar_length_in = 3.0
 chuck_grip_in = 0.75
 # Facing allowance: squares a sawn or parted bar end.
 face_allowance_in = 0.02
-# Left on the spigot end for Setup 2 to face to length.
+# Left on the spigot end for Setup 3 to face to length.
 regrip_allowance_in = 0.02
 # Parting kerf: the P1 blade's width plus .0125 (authored), for wander or a
 # .010 step toward the chuck that widens a deep groove.
@@ -47,7 +53,7 @@ blade_width_in = 0.0625
 parts_per_pull = 1
 # The parting blade's clearance to the jaw fronts.
 jaw_clearance_in = 0.1
-# Setup 2: how much of the head the jaws take, from the head end.
+# Setup 3: how much of the head the jaws take, from the head end.
 regrip_grip_in = 0.3
 # The bottoming tap's lead: about 1.5 threads at 24 per inch.
 tap_lead_in = 0.0625
@@ -57,6 +63,11 @@ rough_radial_doc_mm = 0.5
 finish_radial_doc_mm = 0.05
 turn_feed_mm_rev = 0.1016
 turn_start_z_mm = 0.5
+
+[[tools]]
+id = "saw"
+name = "14 in metal-cutting saw"
+ref = "saw-evolution-14"
 
 [[tools]]
 id = "ar"
@@ -99,12 +110,31 @@ name = "Smooth file"
 ref = "jig-files"
 
 [[setups]]
+machine_kind = "other"
+title = "Saw the working piece"
+machine = "Evolution 14 in metal-cutting saw"
+holding = "The bar flat on the saw bed, its long end clamped in the saw's vise, the piece free beyond the blade."
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+diagram = { file = "diagrams/saw.svg", alt = "The 5/8 in bar on the saw: one 3.0 in piece off its end, for the one plug." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Scribe {{process.bar_length_in:g}} in from the bar end and saw on the waste side of the line; let the piece drop clear and pick it up only after the blade has stopped. File the burrs off the sawn ends. The piece makes the one plug; never chuck the whole bar in the lathe (it would run out past the spindle's rear end)."
+feed = "hand"
+
+[[setups]]
 machine_kind = "lathe"
 title = "Bar, head end out: turn the head, drill and tap, part off long"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
+holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} piece from Setup 1, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
 datum = "Z0 (carriage DRO) the bar end, faced first in this setup: the head end."
 diagram = { file = "diagrams/bar.svg", alt = "The 5/8 in bar in the 3-jaw, head end out: the end faced, the head turned, spotted, drilled #25 and tapped #10-24, the plug parted off .02 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}", support = "none" }
@@ -185,7 +215,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Catch the plug."
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 3. Hands clear: let the plug fall; pick it up from the bed or the chip tray only after the spindle has stopped."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -195,8 +225,8 @@ title = "Turned round on the head: face to length, turn the spigot"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw over a shim wrap on the head, {{process.regrip_grip_in:.2dot}} in of it in the jaws from the head end; the parted end {{cad.outer_stickout_far_mm:in.2dot}} in out. Nothing seats the plug axially: Op 90 locates the head-end face by the miked length instead."
-datum = "The head-end face (in the jaws), located through the miked length: Op 90 presets the DRO so the head-end face is Z-{{cad.length_in:.3dot}} and the faced spigot end Z0. The length and the shoulder are both cut from that face, as the drawing dimensions them; the setting error, about .002 (the micrometer reading and the tool's touch on the face), stays inside their {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} and {{cad.shoulder_min_in:.3dot}}–{{cad.shoulder_max_in:.3dot}} bands."
+holding = "3-jaw over a shim wrap on the head, {{process.regrip_grip_in:.2dot}} in of it in the jaws from the head end; the parted end {{cad.outer_stickout_far_mm:in.2dot}} in out. Nothing seats the plug axially: Op 100 locates the head-end face by the miked length instead."
+datum = "The head-end face (in the jaws), located through the miked length: Op 100 presets the DRO so the head-end face is Z-{{cad.length_in:.3dot}} and the faced spigot end Z0. The length and the shoulder are both cut from that face, as the drawing dimensions them; the setting error, about .002 (the micrometer reading and the tool's touch on the face), stays inside their {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} and {{cad.shoulder_min_in:.3dot}}–{{cad.shoulder_max_in:.3dot}} bands."
 diagram = { file = "diagrams/regrip.svg", alt = "The plug turned round, its head in the jaws over a shim wrap: the parted end faced to length from the miked head-end face and the spigot turned to the measured MHA-SM-01 bore." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.outer_regrip_jaw_z_far_mm}}" }
@@ -261,7 +291,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }, {
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Long overall (Op 120): mike a new L0 as in Op 80 (the bore record stands), then Op 90 with it (the shoulder untouched), Op 110 (the spigot end's edge broken again) and Op 120. Short overall or head length out (Op 120), or spigot under the recorded bore less {{cad.step_clearance_max_in:.3dot}} (Op 100): scrap; make another from a bar end (Setup 1)."
+instruction = "Long overall (Op 130): mike a new L0 as in Op 90 (the bore record stands), then Op 100 with it (the shoulder untouched), Op 120 (the spigot end's edge broken again) and Op 130. Short overall or head length out (Op 130), or spigot under the recorded bore less {{cad.step_clearance_max_in:.3dot}} (Op 110): scrap; make another from a new sawn piece (Setups 1 and 2)."
 feed = "hand"
 
 [[setups.operations]]

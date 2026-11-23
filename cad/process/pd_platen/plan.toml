@@ -52,8 +52,8 @@
 # Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
 # guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner,
 # Pedro, answered in person 2026-11-21, cnc rulings record;
-# cad/config/shop-equipment/ tools.tap-guide-fisher, its ownership to
-# confirm), spindle off; FluidNC refuses jogs while an M0 holds the program,
+# cad/config/shop-equipment/ tools.tap-guide-fisher, to buy, owner ruling
+# 2026-11-22), spindle off; FluidNC refuses jogs while an M0 holds the program,
 # so each tap stop is a file of its own that ends with M30 over its hole.
 #
 # Zeroing: the touch probe has no holder (cad/config/shop-equipment/

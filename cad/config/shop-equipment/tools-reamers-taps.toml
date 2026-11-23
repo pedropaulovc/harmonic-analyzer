@@ -88,9 +88,9 @@ cite = [
 # holders.r8-collets-south-bend-sb1280 (on hand). Its pointed end seats in
 # the T-handle wrench's centre hole (holders.tap-wrench-t-small), as its
 # sellers describe; its concave end takes a small tap's own 60° shank
-# point, with no wrench in the way. The owner named the product, not
-# whether it is owned: no status (stock_bom reads it unrecorded), to
-# confirm. It is a spring tap guide in the spindle as the #2837 ruling on
+# point, with no wrench in the way. The owner named the product on
+# 2026-11-21 and ruled it to buy on 2026-11-22 ("tap guide to order"):
+# status to_order. It is a spring tap guide in the spindle as the #2837 ruling on
 # tools.spring-tap-guide asked (that record's 0.05° squareness is not
 # stated for this one). Its prechips description is cad/process/shop/, same
 # key.
@@ -100,14 +100,16 @@ kind = "tap_guide"
 make = "Fisher Machine Shop"
 sku = "1963"
 source = "https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805"
+status = "to_order"
 purchase = "$19.95 (LittleMachineShop, read live 2026-11-21)"
 shank_dia_in = 0.5
 overall_length_in = 3.125
 point_dia_in = 0.1875
 point_travel_in = 0.5
-note = "Ownership not stated by the owner: to confirm. Spring-loaded reversible 3/16 in point, pointed at one end, concave (a centre hole) at the other; the point retracts 1/2 in into the body; spring tension adjustable by the end screw. Overall 3 1/8 in. Sizes are the sellers', not measured here."
+note = "Not owned: to buy (owner ruling 2026-11-22, \"tap guide to order\"). Spring-loaded reversible 3/16 in point, pointed at one end, concave (a centre hole) at the other; the point retracts 1/2 in into the body; spring tension adjustable by the end screw. Overall 3 1/8 in. Sizes are the sellers', not measured here."
 cite = [
   "Owner (Pedro) 2026-11-21, answered in person, on tap guiding on the mill: \"remove mention of dead centre ; use https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805 on r8 0.5 collet\"",
+  "Owner (Pedro) 2026-11-22, relayed by Main: \"tap guide to order\"",
   "LittleMachineShop, Tap Guide, Fisher, SKU 1963, read 2026-11-21: \"0.500\" diameter body\"; \"The reversible point is spring loaded to maintain pressure on the tap. One end of the point has a center hole for small taps, while the other end is pointed for larger taps.\"; \"The 0.500\" diameter straight shank body is ground and knurled cap for easy handling.\"; \"Remove the setscrew in the back end to reverse the point.\"",
   "Primary Tactical, Fisher Machine Shop, Inc. Micro Tap Guide (https://www.primarytactical.com/product/fisher-machine-shop-inc-micro-tap-guide/), read 2026-11-21: \"31/8\" (7.9cm) OAL, 1/2\" (13mm) diameter shank, 3/16\" (4.8mm) diameter tip, retracts 1/2\" into body. Adjustable spring tension.\"",
   "Carter Tools, Fisher Machine Shop #20MTG 1/2\" Shank Micro Tap Guide (https://www.cartertools.com/fmpdtg.html), read 2026-11-21: \"3/16\" diameter spring loaded point that can be reversed. The tip has a point on one end (l) and a concave taper (c) on the other.\"; \"The point will retract 1/2\" into the body.\"; \"The point is placed in the small hole at the end of the tap wrench ... and the tailstock advanced until the tap is against the hole and the point is fully retracted.\"; \"As you turn the tap wrench, the point springs forward, maintaining pressure againt the wrench\"",

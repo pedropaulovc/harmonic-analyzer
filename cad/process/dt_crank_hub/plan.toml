@@ -33,7 +33,7 @@ title = "Crank Hub"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1 in round (drawing: {{cad.material_spec}})"
-stock = "Lot: {{process.quantity:d}} hub. Ø{{process.bar_dia_in:.3dot}} bar, on hand; Setup 1 takes about {{process.bar_use_in:.2dot}} in of it, the sizing plug included; start with a piece at least 2.25 long (1.75 out of the jaws, .50 in them)."
+stock = "Lot: {{process.quantity:d}} hub. Ø{{process.bar_dia_in:.3dot}} bar, on hand; Setup 1 takes about {{process.bar_use_in:.2dot}} in of it, the sizing plug included: saw a 3 in piece off it for the lathe (1.75 out of the jaws, .50 in them), never the whole bar (it would run out past the spindle's rear end)."
 note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); mill PM-30MV low belt (100–2800 rpm). Cutting oil on the steel. Crank arm MHA-DT-06 is finished before Setup 1: Op 20 sizes a plug to its bore and Op 30 mikes its thickness; the seat is turned to both. Home the mill ($H) and touch off G54 at the start of the mill setup; prove CM01 in air before it cuts. To order (not on hand): the .3760 GO / .3765 NO-GO plug gauge pair."
 shop = "../shop"
 stock_refs = ["1018-round-1"]
@@ -256,7 +256,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{process.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Catch the hub."
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{process.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Hands clear: let the hub fall; pick it up from the bed or the chip tray only after the spindle has stopped."
 settings = "lathe-part-1018"
 cut_diameter_mm = 25.4
 
