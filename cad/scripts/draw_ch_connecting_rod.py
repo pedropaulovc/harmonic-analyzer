@@ -83,6 +83,9 @@ from ch_connecting_rod_notes import (
     DRAWING_PRECISION,
     PIN_FIT_NOTE_NUMBER,
     PIN_NUMBER,
+    SHANK_CORNER_CALLOUT,
+    SHANK_CORNER_COUNT,
+    SHANK_CORNER_R,
     SLOT_FIT_NOTE_NUMBER,
 )
 from ch_connecting_rod_spec import (
@@ -192,6 +195,12 @@ FRONT_KEEP = {
     # The reamed pin hole's value stands right of the fork, below the position
     # FCF's level leader, so the two leaders cannot cross.
     "PinHoleDia": (0.218, 0.196),
+    # The shank's four corners, 4X R.065 (owner ruling 2026-11-23, tool audit
+    # Q9): up-right of the ring, right of the shank, its leader down-left to
+    # the right-hand flank's corner on the ring (the ShankCorners fillet's
+    # first edge, build_ch_connecting_rod); its two reason lines stand above
+    # the bore's finish symbol, clear of the ring's ink.
+    "ShankCornerR": (0.214, 0.106),
 }
 # One arrow on the rim nearest each text (set_near_side_diameter).
 NEAR_SIDE_DIAMETERS = ("RingOuterDia", "StrapBoreDia")
@@ -216,6 +225,7 @@ FRONT_CALLOUTS = {
     ),
     "ForkWidthDim": "FULL R",
     "PinHoleDia": f"REAM THRU\nSEE NOTE {PIN_FIT_NOTE_NUMBER}",
+    "ShankCornerR": SHANK_CORNER_CALLOUT,
 }
 
 # The side view at 1:1, below the ring (#3114: the ring is the sliding fit in
@@ -477,7 +487,10 @@ for _name, _z, _field, _dim, _nominal, _source, _from, _keep in _Z_FACES:
         precision={_field: _P[_dim]},
     )
 # The shank's flanks, .32 apart (FRONT_KEEP "ShankWidthDim"): the left one is
-# datum B, .16 BASIC from datum A (DATUM_B_FROM_A_TEXT_XY).
+# datum B, .16 BASIC from datum A (DATUM_B_FROM_A_TEXT_XY). Both flanks round
+# into the ring's OD and onto the fork's step at 4X R.065, .060-.070 at the
+# title block's .XXX (FRONT_KEEP "ShankCornerR"; owner ruling 2026-11-23,
+# tool audit Q9), the 1/8 in end mill's radius.
 requirement(
     "shank_left_flank",
     kind="face",
@@ -496,7 +509,7 @@ requirement(
     "shank_right_flank",
     kind="face",
     faces=(PlanarFace((1.0, 0.0, 0.0), SHANK_WIDTH / 2.0),),
-    requirements=("width",),
+    requirements=("width", "corner_r"),
     fields={
         "plane": (_plane("x", SHANK_WIDTH / 2.0), (*_FRAME, (_SPEC, "SHANK_WIDTH"))),
         "width": (
@@ -505,8 +518,15 @@ requirement(
         ),
         "width_nominal": (SHANK_WIDTH, ((_SPEC, "SHANK_WIDTH"),)),
         "width_from": ("shank_left_flank", ((_SELF, "FRONT_KEEP"),)),
+        "corner_r": (
+            limits(SHANK_CORNER_R, _P["ShankCornerR"], unit=UNIT),
+            ((_NOTES, "SHANK_CORNER_R"), (_SPEC, "UNIT"), (_SELF, "FRONT_KEEP")),
+        ),
+        "corner_r_nominal": (SHANK_CORNER_R, ((_NOTES, "SHANK_CORNER_R"),)),
+        "corner_count": (SHANK_CORNER_COUNT, ((_NOTES, "DIMENSION_PREFIXES"),)),
+        "corner_callout": (SHANK_CORNER_CALLOUT, ((_SELF, "FRONT_CALLOUTS"),)),
     },
-    precision={"width": _P["ShankWidthDim"]},
+    precision={"width": _P["ShankWidthDim"], "corner_r": _P["ShankCornerR"]},
 )
 # The ring's outside, 1.61 (FRONT_KEEP "RingOuterDia"), concentric with the
 # strap bore.
@@ -886,6 +906,9 @@ def build(adapter: Any) -> dict[str, str]:
         adapter,
         front_annotations,
         DRAWING_PRECISION["PinHoleProfile"],
+    )
+    assert_imported_precision(
+        adapter, front_annotations, DRAWING_PRECISION["ShankCorners"]
     )
     assert_imported_precision(adapter, left_annotations, _kept_precision(LEFT_KEEP))
     assert_imported_precision(

@@ -39,8 +39,9 @@ photo-scaled (low).
 Layout: ring centre at the origin, shank rising +Y to the fork; ring and
 fork centred on the Front plane (z = 0). Build order matters: the ring
 disc, the shank (its foot buried in the ring's wall) and the fork are bossed
-first, the slot is cut through the fork, the inside corners are rounded, then
-the bore and the pin hole.
+first, the slot is cut through the fork, the inside corners are rounded (the
+shank's two corners onto the fork's step bossed in as the 1/8 in end mill
+leaves them), then the bore and the pin hole.
 
 Run (SolidWorks already open)::
 
@@ -75,12 +76,21 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
+from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _limit_tolerance import set_limits
+from _milled_corner_limit import (
+    corner_r_limits,
+    line_circle_fillet_area,
+    runout_fillet_area,
+    runout_rise,
+)
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
+from _visibility import blank_reference_geometry
 from ch_connecting_rod_notes import ISOMETRIC_VIEW_NOTE
+from ch_connecting_rod_notes import DIMENSION_PREFIXES, SHANK_CORNER_R
 from ch_connecting_rod_notes import DRAWING_DIMENSIONS, DRAWING_NOTES, DRAWING_PRECISION
 from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
@@ -156,8 +166,8 @@ SHANK_FAR_X = SHANK_NEAR_X - SHANK_THICKNESS
 # (near, far) how far each ring face stands over its shank face (#3114): the
 # shank lies inside the ring on both sides, which boss_volume relies on. The
 # two corners where a shank face meets the ring's OD wall stay sharp in the
-# model, inside the title block's INSIDE CORNERS R.040 MAX like every other
-# inside corner: the near step is shallower than the modelled corner radius,
+# model, inside the title block's INSIDE CORNERS R.040 MAX like the other
+# title-block corners: the near step is shallower than the modelled corner radius,
 # so a fillet has no seat there, and the far step would seat one only at
 # nominal (the printed bands take it down to .001).
 RING_STEPS = (
@@ -176,6 +186,20 @@ DATUM_FACE_REF_RUN = 2.0
 FORK_BOSS_LENGTH = FORK_TOP_Y - FORK_BASE_Y  # crown top -> root step (.71)
 SLOT_DEPTH = FORK_TOP_Y - FORK_CROTCH_Y  # crown top -> slot floor (.58)
 SLOT_CUT_HEIGHT = SLOT_DEPTH + SLOT_RUNOUT
+
+# The shank's four Q9 corners (ch_connecting_rod_notes.SHANK_CORNER_R) and
+# the printed R.065's band (.060-.070). The fork's step beside the shank is
+# narrower than the least radius the print allows, so the 1/8 in cutter that
+# rounds the corner, tangent to the flank, runs through the step's outer
+# corner and leaves no step face: the step corners are bossed in as that
+# cutter leaves them (StepCorners), not filleted.
+SHANK_CORNER_R_LIMITS = corner_r_limits(unit=UNIT)
+FORK_STEP = (FORK_WIDTH - SHANK_WIDTH) / 2.0  # .035
+if FORK_STEP >= SHANK_CORNER_R_LIMITS[0]:
+    raise AssertionError("the fork's step seats a full fillet at the least corner radius")
+# The step corners' plane: the shank's mid-thickness, in model z (the shank
+# is not centred on the rod's mid-plane).
+SHANK_MID_Z = -(SHANK_NEAR_X + SHANK_FAR_X) / 2.0
 
 
 def _circle_cap_area(radius: float, half_width: float) -> float:
@@ -236,22 +260,31 @@ def _fillet_area(radius: float, opening: float) -> float:
     return radius**2 * (1.0 / math.tan(opening / 2.0) - (math.pi - opening) / 2.0)
 
 
-# The shank's flank meets the ring's OD at its tangent's angle: the air
-# between them opens past square by the flank's angle on the circle.
-SHANK_RING_OPENING = math.pi / 2.0 + math.asin(SHANK_WIDTH / 2.0 / RING_OUTER_RADIUS)
-
-
 def inside_corner_volume() -> float:
-    """The inside-corner fillets: the slot floor's two corners across the
-    fork's width, the root step's loop round the shank's end (two corners
-    across its width, two through its thickness), and the shank's two
-    flanks onto the ring's OD through the shank's thickness (the ring is
-    the thicker, so each fillet ends flat on a shank face). The loop's four
-    meeting corners add only an R^3 sliver, inside the gate's allowance."""
+    """The title-block inside corners' fillets: the slot floor's two corners
+    across the fork's width, and the two ledges where the shank's faces meet
+    the fork's root step, across the shank's width. Each ledge fillet ends
+    flush with the flanks' planes, which the step corners' boss (outside
+    the ledges' fillets, inside the shank's faces) then extends."""
     square = _fillet_area(INSIDE_CORNER_R, math.pi / 2.0)
-    straight = 2.0 * FORK_WIDTH + 2.0 * SHANK_WIDTH + 2.0 * SHANK_THICKNESS
-    ring = _fillet_area(INSIDE_CORNER_R, SHANK_RING_OPENING) * 2.0 * SHANK_THICKNESS
-    return square * straight + ring
+    return square * (2.0 * FORK_WIDTH + 2.0 * SHANK_WIDTH)
+
+
+def shank_corner_volume() -> float:
+    """ShankCorners: the shank's two flanks onto the ring's OD, through the
+    shank's thickness (the ring is the thicker, so each fillet ends flat on
+    a shank face)."""
+    return (
+        2.0
+        * line_circle_fillet_area(SHANK_CORNER_R, RING_OUTER_RADIUS, SHANK_WIDTH / 2.0)
+        * SHANK_THICKNESS
+    )
+
+
+def step_corner_volume() -> float:
+    """StepCorners: the shank's two flanks onto the fork's step, through the
+    shank's thickness."""
+    return 2.0 * runout_fillet_area(SHANK_CORNER_R, FORK_STEP) * SHANK_THICKNESS
 
 
 def finished_volume() -> float:
@@ -259,13 +292,15 @@ def finished_volume() -> float:
         boss_volume()
         - slot_volume()
         + inside_corner_volume()
+        + shank_corner_volume()
+        + step_corner_volume()
         - strap_bore_volume()
         - pin_hole_volume()
     )
 
 
 def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
@@ -293,6 +328,7 @@ def build(adapter) -> dict[str, str]:
     set_global(adapter, "SlotRunout", f"{SLOT_RUNOUT}mm")
     set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
     set_global(adapter, "InsideCornerR", f"{INSIDE_CORNER_R}mm")
+    set_global(adapter, "CornerR", f"{SHANK_CORNER_R}mm")
     set_global(adapter, "RingOuterRadius", '"RingBoreDia" / 2 + "RingWall"')
     set_global(adapter, "ForkBaseY", '"CenterDistance" - "ForkBaseBelowPin"')
     set_global(
@@ -619,22 +655,15 @@ def build(adapter) -> dict[str, str]:
     v_expected -= slot_volume()
     volume_check(adapter, "fork slot", v_expected, 0.01 * slot_volume() + 0.05)
 
-    # Every inside corner an R of this size can seat in gets the one modelled
-    # radius, inside the title block's INSIDE CORNERS R.040 MAX, which governs
-    # it on the print (ch_connecting_rod_spec): the shank's two flanks onto
-    # the ring's OD (through the shank's thickness), the root step's loop
-    # round the shank's end (the flanks' corners, then the shank faces'), and
-    # the slot floor's two corners. The two corners where a shank face meets
-    # the ring's OD stay sharp (RING_STEPS). Points are model coordinates:
-    # model z is the Right-plane sketch's -x, and z = 0 lies on every flank
-    # edge, between the shank's two faces.
-    shank_x = SHANK_WIDTH / 2.0
-    junction_y = math.sqrt(RING_OUTER_RADIUS**2 - shank_x**2)
+    # Every other inside corner an R of this size can seat in gets the one
+    # modelled radius, inside the title block's INSIDE CORNERS R.040 MAX,
+    # which governs it on the print (ch_connecting_rod_spec): the two ledges
+    # where the shank's faces meet the fork's root step, and the slot floor's
+    # two corners. Each ledge fillet ends flush with the flanks' planes. The
+    # two corners where a shank face meets the ring's OD stay sharp
+    # (RING_STEPS). Points are model coordinates: model z is the Right-plane
+    # sketch's -x.
     corner_edges = [
-        [shank_x, junction_y, 0.0],
-        [-shank_x, junction_y, 0.0],
-        [shank_x, FORK_BASE_Y, 0.0],
-        [-shank_x, FORK_BASE_Y, 0.0],
         [0.0, FORK_BASE_Y, -SHANK_NEAR_X],
         [0.0, FORK_BASE_Y, -SHANK_FAR_X],
         [0.0, FORK_CROTCH_Y, FORK_SLOT_WIDTH / 2.0],
@@ -650,6 +679,125 @@ def build(adapter) -> dict[str, str]:
     v_corners = inside_corner_volume()
     v_expected += v_corners
     volume_check(adapter, "inside corner fillets", v_expected, 0.1 * v_corners + 0.05)
+
+    # ShankCorners: the shank's two flanks onto the ring's OD at the 1/8 in
+    # end mill's R.065 (owner ruling 2026-11-23, tool audit Q9;
+    # ch_connecting_rod_notes), through the shank's thickness. The right-hand
+    # edge first: the printed 4X R.065 lands its leader there (FRONT_KEEP).
+    # z = 0 lies on both edges, between the shank's two faces.
+    shank_x = SHANK_WIDTH / 2.0
+    junction_y = math.sqrt(RING_OUTER_RADIUS**2 - shank_x**2)
+    check(
+        "fillet shank corners",
+        adapter.add_fillet(
+            SHANK_CORNER_R,
+            [[shank_x, junction_y, 0.0], [-shank_x, junction_y, 0.0]],
+            propagate=False,
+        ),
+    )
+    name_last_feature(adapter, "ShankCorners")
+    shank_corner_dim = name_dimensions(adapter, "ShankCorners", ["ShankCornerR"])
+    drive_jobs.append((shank_corner_dim[0], '"CornerR"'))
+    v_corners = shank_corner_volume()
+    v_expected += v_corners
+    volume_check(adapter, "shank corner fillets", v_expected, 0.1 * v_corners + 0.05)
+
+    # StepCorners: the shank's two flanks onto the fork's step at the same
+    # radius. The step is narrower than the radius (FORK_STEP), so the 1/8 in
+    # cutter, tangent to the flank, passes through the step's outer corner
+    # (cam.py's outline): its arc runs from the flank straight onto that
+    # corner and no step face is left, which a fillet cannot model. Each
+    # corner is a region bossed through the shank's thickness: the flank from
+    # the arc's tangent point up to the step, the step out to its outer
+    # corner, and the arc back, its radius driven by the "CornerR" global
+    # that ShankCorners carries. The regions are sketched on a plane at the
+    # shank's mid-thickness (SHANK_MID_Z) and bossed mid-plane to the
+    # shank's thickness, so their faces lie in the shank's; the ledge fillets
+    # above stop at the flanks' planes, outside them. The sketch is mirror-
+    # symmetric about the rod's axis. Dim EMISSION ORDER per region (right,
+    # then left): the inside corner's x and y (general anchor, TWO dims), the
+    # step's width, the arc's radius. 14 DOF = per region: flank vertical,
+    # step horizontal, arc tangent to the flank + 4 dims.
+    check(
+        "create_plane ShankMidPlane",
+        adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Front Plane", offset=SHANK_MID_Z
+            )
+        ),
+    )
+    name_last_feature(adapter, "ShankMidPlane")
+    (shank_mid_dim,) = name_dimensions(adapter, "ShankMidPlane", ["ShankMidZ"])
+    drive_jobs.append(
+        (shank_mid_dim, '"ForkThickness" / 2 - "ShankFaceNear" - "ShankThickness" / 2')
+    )
+    step_sd = SketchDims()
+    check("create_sketch step corners", adapter.create_sketch("ShankMidPlane"))
+    tangent_y = FORK_BASE_Y - runout_rise(SHANK_CORNER_R, FORK_STEP)
+    regions = []
+    set_sketch_direct_db(adapter, True)
+    for side, label, suffix in ((1.0, "right", "R"), (-1.0, "left", "L")):
+        inside = (side * shank_x, FORK_BASE_Y)
+        outer = (side * fw, FORK_BASE_Y)
+        tangent = (side * shank_x, tangent_y)
+        centre = (side * (shank_x + SHANK_CORNER_R), tangent_y)
+        # add_arc runs anticlockwise start -> end.
+        if side > 0.0:
+            flank, step = add_line_chain(adapter, [tangent, inside, outer], close=False)
+            arc = check(
+                f"step corner {label} arc", adapter.add_arc(*centre, *outer, *tangent)
+            )
+            corner = f"{flank}.end"
+        else:
+            step, flank = add_line_chain(adapter, [outer, inside, tangent], close=False)
+            arc = check(
+                f"step corner {label} arc", adapter.add_arc(*centre, *tangent, *outer)
+            )
+            corner = f"{step}.end"
+        regions.append((side, label, suffix, flank, step, arc, corner))
+    set_sketch_direct_db(adapter, False)
+    for side, label, suffix, flank, step, arc, corner in regions:
+        for line, relation in ((flank, "vertical"), (step, "horizontal")):
+            check(
+                f"step corner {label} {relation}",
+                adapter.add_sketch_constraint(line, None, relation),
+            )
+        check(
+            f"step corner {label} arc tangent to the flank",
+            adapter.add_sketch_constraint(arc, flank, "tangent"),
+        )
+        anchor_point_to_origin(
+            adapter, corner, side * shank_x, FORK_BASE_Y, f"step corner {label}"
+        )
+        step_sd.record(f"StepCornerX{suffix}", '"ShankWidth" / 2')
+        step_sd.record(f"StepCornerY{suffix}", '"ForkBaseY"')
+        dimension_between(
+            adapter, f"{step}.start", f"{step}.end", "horizontal_distance",
+            FORK_STEP, f"step corner {label} step",
+        )
+        step_sd.record(f"StepWidth{suffix}", '("ForkWidth" - "ShankWidth") / 2')
+        check(
+            f"dimension step corner {label} radius",
+            adapter.add_sketch_dimension(arc, None, "radial", SHANK_CORNER_R),
+        )
+        step_sd.record(f"StepCornerR{suffix}", '"CornerR"')
+    ensure_fully_defined(adapter, "step corners sketch")
+    check("exit_sketch step corners", adapter.exit_sketch())
+    name_last_feature(adapter, "StepCornersProfile")
+    drive_jobs += step_sd.apply(adapter, "StepCornersProfile")
+    check(
+        "extrude step corners",
+        adapter.create_extrusion(
+            ExtrusionParameters(depth=SHANK_THICKNESS, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "StepCorners")
+    (step_thick_dim,) = name_dimensions(adapter, "StepCorners", ["StepCornersThick"])
+    drive_jobs.append((step_thick_dim, '"ShankThickness"'))
+    blank_reference_geometry(adapter, (("ShankMidPlane", "PLANE"),))
+    v_corners = step_corner_volume()
+    v_expected += v_corners
+    volume_check(adapter, "step corner bosses", v_expected, 0.1 * v_corners + 0.05)
 
     # Strap bore - rides the eccentric cam. On-axis circle: diameter only.
     bore_sd = SketchDims()
@@ -864,6 +1012,9 @@ def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # The one printed shank corner stands for all four (4X R.065).
+    for (feature_name, dimension_name), prefix in DIMENSION_PREFIXES.items():
+        set_dimension_prefix(adapter, feature_name, dimension_name, prefix)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
