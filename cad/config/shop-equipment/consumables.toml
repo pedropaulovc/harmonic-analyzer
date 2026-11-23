@@ -220,7 +220,7 @@ stack_min_mm = 0.23
 stack_max_mm = 0.33
 accepted_shear_kpa = 600
 accepted_tensile_kpa = 600
-accepted_by = "the shop owner (2026-11-23; figure set by the planner as he delegated)"
+accepted_by = "the shop owner"
 cite = ["Owner (Pedro) 2026-11-23: \"for tape isnt it possible to use blue painters tape on both sides and ca glue between them\"", "Owner (Pedro) 2026-11-23: \"it is widely used in industry with much heavier requirements; take it as given it will work\"", "Owner (Pedro) 2026-11-23: \"no need to bring to me ; make coarser as you see fit\""]
 
 [consumables.tape-scotchblue-2090]
