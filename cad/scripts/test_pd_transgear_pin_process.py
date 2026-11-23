@@ -40,12 +40,7 @@ def features() -> dict:
 
 @pytest.fixture(scope="module")
 def shop() -> dict:
-    merged: dict = {}
-    for path in _process_plans.shop_files():
-        for section, records in tomllib.loads(path.read_text(encoding="utf-8")).items():
-            if isinstance(records, dict):
-                merged.setdefault(section, {}).update(records)
-    return merged
+    return _process_plans.load_shop()
 
 
 def _cap(radius_in: float, dia_in: float) -> float:

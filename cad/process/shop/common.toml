@@ -160,8 +160,8 @@ resolution_mm = 0.0254
 range_mm = [0.0, 584.2]
 resolution_mm = 0.005
 
-# PM-1127VF-LB carriage (Z) DRO read as a length gauge (the dt_pinion_arbor
-# plan's crown and rim stations, the tool touched on the work). Range: the
+# PM-1127VF-LB carriage (Z) DRO read as a length gauge (the pd_transgear_pin
+# plan's groove load-wall station, the tool touched on the seat). Range: the
 # carriage reads no farther than machines.pm-1127vf-lb between_centres_mm
 # (the DRO's scale length is not recorded); resolution: the owner's 5 um
 # (cad/config/shop-equipment/dro.toml dro.pm-1127vf-lb, 2026-11-21).
