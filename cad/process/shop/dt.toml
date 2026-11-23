@@ -87,8 +87,14 @@ description = "24DP 20PA involute gear cutters #2 and #7"
 description = "1/16 HSS 2-flute DE end mill, 0/+.002"
 [tools.keyway-broach-1-16-a]  # F-keyway-broach
 description = "1/16 keyway broach, style A"
+# Not bought (tool audit 2026-11-23, setting-mandrel-375): an offcut of the
+# 3/8 precision-ground bar ordered for MHA-DT-13 (stock-to-order.toml
+# stock.1018-or-1045-ground-round-3-8, +.0000/-.0008), ordered one mandrel
+# length longer. Same band as the MHA-DT-13 shaft that pushes it out (MHA-DT-00
+# steps 8A-9T: "3/8 GROUND SETTING MANDREL"), so the push is between two
+# pieces of one bar.
 [tools.setting-mandrel-375]  # F-setting-mandrel-375
-description = "3/8 in ground setting mandrel"
+description = "3/8 in ground setting mandrel: an offcut of the 3/8 precision-ground bar ordered for MHA-DT-13, long enough to pass both MHA-DT-02 pedestals, sawn ends deburred"
 
 # --- Drawing cross-check additions (2026-11-19) -------------------------------
 # Tools the v50 drawings call for that the quote workbook left out, from the
