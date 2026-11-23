@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 3, section across the jaws through the axis, seen along +X, 150 px to the inch: the vise bed at y 360, the 1-1/2 in stacked parallels against the jaws, the flange's front face on them, the body hanging in the gap, Z0 the flange's rear face at y 120.9. The 120° and 240° holes project at x 331.3 and 428.7 (the 0° hole lies on +X, behind the bore). Styles: prechips.palette. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 3: the hub upright on stacked parallels in the vise; CM01 drills the three #51 holes through the flange</text>
+  <rect class="clamp" x="220" y="94.5" width="81.25" height="265.5"/>
+  <rect class="clamp" x="458.75" y="94.5" width="81.25" height="265.5"/>
+  <rect class="fixture-support" x="301.25" y="135" width="18.75" height="225"/>
+  <rect class="fixture-support" x="440" y="135" width="18.75" height="225"/>
+  <line class="hidden" x1="301.25" y1="210" x2="320" y2="210"/>
+  <line class="hidden" x1="440" y1="210" x2="458.75" y2="210"/>
+  <polygon class="part-kept" points="301.25,120.9 342.65,120.9 342.65,99.3 417.35,99.3 417.35,120.9 458.75,120.9 458.75,135 420.5,135 420.5,180.2 339.5,180.2 339.5,135 301.25,135"/>
+  <rect class="holes" x="356.5" y="99.3" width="47" height="80.9"/>
+  <rect class="holes" x="326.3" y="120.9" width="10" height="14.1"/>
+  <rect class="holes" x="423.7" y="120.9" width="10" height="14.1"/>
+  <line class="centre-line" x1="380" y1="50" x2="380" y2="380"/>
+  <line class="datum" x1="280" y1="120.9" x2="560" y2="120.9"/>
+  <rect class="cutter" x="423.7" y="40" width="10" height="78"/>
+  <line class="leader" x1="540" y1="120.9" x2="580" y2="110"/>
+  <text class="datum-label" x="584" y="106">Z0: the flange's rear face</text>
+  <line class="leader" x1="449" y1="280" x2="580" y2="280"/>
+  <text class="label" x="584" y="276">1 in + 1/2 in parallels,</text>
+  <text class="label" x="584" y="292">1/8 thick, against each jaw</text>
+  <line class="leader" x1="420.5" y1="170" x2="580" y2="190"/>
+  <text class="label" x="584" y="194">body hanging in the gap</text>
+  <line class="leader" x1="433" y1="128" x2="580" y2="60"/>
+  <text class="label" x="584" y="56">#51 thru, 3X on Ø.75</text>
+  <text class="label" x="200" y="380">moving jaw</text>
+  <text class="label" x="470" y="380">fixed jaw</text>
+</svg>

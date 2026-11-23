@@ -263,6 +263,46 @@ resolution_mm = 0.001016
 [tools.plug-gauges-0615-0620]
 description = "Plug gauge pair, .0615 GO (plus) and .0620 NO-GO (minus), Vermont Gage Class X"
 
+# --- MHA-PD-17 disc hub (cad/process/pd_transgear_disc_hub/plan.toml) --------
+# Lathe: facing, turning, the centre drill, the N drill and parting take
+# shop/lathe.toml's C360 rows. The .3135 reamer (to buy) takes the
+# LittleMachineShop drilling and reaming row for brass (lathe.toml header,
+# 160-175 ft/min) at its low end. The sharp-nose finishing tool is HSS (its
+# .004 nose): the same page's HSS turning row for brass, 300-350 ft/min, at
+# its low end and the page's .004 in/rev.
+[settings.lathe-ream-3135-c360]
+tool = "reamer-3135"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, slow and steady, dry; withdraw with the spindle running"
+[settings.lathe-sharp-nose-c360]
+tool = "lathe-tool-sharp-nose"
+material = "lathe-c360"
+sfm = 300
+feed_mm_rev = 0.1016
+# Mill (PM-30MV low belt, 100-2800 rpm), the rows the MHA-PD-22 block above
+# cites: #51 (.067 in) and #56 (.0465 in) at 160 ft/min are 9120 and 13140
+# rpm, so 2800; the AutoDrill 1/16 in column's .001 in/rev (the #56 under
+# the first column takes it): 2.8 in/min. The 3/64 carbide end mill plunges a
+# flat on the sloping O.D. at 2800 rpm and half the drill's feed, .0005
+# in/rev (author: an end mill plunged off square deflects at a drill's
+# feed): 1.4 in/min.
+[settings.pd-hub-drill-51-c360]
+tool = "drill-51"
+material = "lathe-c360"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.pd-hub-drill-56-c360]
+tool = "drill-56"
+material = "lathe-c360"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.pd-hub-plunge-3-64-c360]
+tool = "endmill-carbide-3-64"
+material = "lathe-c360"
+rpm = 2800
+feed = "1.4 in/min"
+
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
 # prechips can check each plan's stock_refs. Description only: the ownership
