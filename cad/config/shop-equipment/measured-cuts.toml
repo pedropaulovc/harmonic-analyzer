@@ -1,0 +1,46 @@
+# The envelope each measured cutting setting is valid inside. The record key is
+# the prechips setting's key in cad/process/shop/ (which carries its speed and
+# chip load, once); these are the facts prechips has no field for: it refuses
+# any other key on a setting record (pedropaulovc/prechips#586). A dechatter
+# result holds for one tool assembly (cutter, holder, stick-out) and only as
+# deep and as wide as the passes that were cut, so a plan operation naming one
+# of these settings must pin the assembly's stick-out in the plan parameter
+# named here and declare each cut (milling_cuts) no deeper and no wider than
+# the limits: cad/scripts/_measured_cuts.py, test_measured_cuts.py.
+#
+# stickout_mm is the owner's own measurement of the assembly that made the
+# cuts. report_setup_stickout_mm is what the report's setup field reads, where
+# the two differ: the reports are the owner's recorded data and are not edited.
+# direction is the reports' setup: every pass was conventional. No plan field
+# states a cut's direction, so it is recorded here and not checked: a zigzag
+# face climbs on every other pass, and that half is not measured.
+
+# dechatter 0.4.0 report v5, 2026-11-22: 1.27 mm deep only. 2370 rpm was
+# stable at 3.0, 3.2 and 3.4 mm wide; 3.4 mm was the widest cut made, so wider
+# is untested.
+[measured_cuts.em-half-carbide-1018-v5-face]
+tool = "endmill-carbide-3fl-1-2"
+holder = "R8 collet"
+report = "cad/process/dechatter/2026-11-22-pm30mv-em-half-carbide-1018-v5.html"
+stickout_mm = 27.94
+report_setup_stickout_mm = 30.0
+stickout_parameter = "half_mill_projection_mm"
+direction = "conventional"
+axial_doc_max_mm = 1.27
+radial_woc_max_mm = 3.4
+cite = ["Owner (Pedro) 2026-11-22: \"stickout is recorded as 30mm but is actually 27.94\""]
+
+# dechatter 0.4.0 report v6, 2026-11-22: 6.6 mm deep. 2400 rpm was stable at
+# 2.2 mm wide; 2.4 mm (2330 rpm), 2.6 mm (2400 rpm) and 3.0 mm (2330 rpm,
+# aborted) chattered. Nothing deeper was cut.
+[measured_cuts.em-half-carbide-1018-v6-deep]
+tool = "endmill-carbide-3fl-1-2"
+holder = "R8 collet"
+report = "cad/process/dechatter/2026-11-22-pm30mv-em-half-carbide-1018-v6.html"
+stickout_mm = 27.94
+report_setup_stickout_mm = 30.0
+stickout_parameter = "half_mill_projection_mm"
+direction = "conventional"
+axial_doc_max_mm = 6.6
+radial_woc_max_mm = 2.2
+cite = ["Owner (Pedro) 2026-11-22: \"stickout is recorded as 30mm but is actually 27.94\"", "Owner (Pedro) 2026-11-22: \"deeper cuts caused violent chatter\""]

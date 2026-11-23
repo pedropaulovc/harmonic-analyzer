@@ -3937,6 +3937,11 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             # Shop-equipment contracts read the tracked shop records at runtime.
             *(str(path.resolve()) for path in _process_plans.shop_files()),
             *(str(path.resolve()) for path in _shop_equipment.files()),
+            # test_measured_cuts reads the dechatter reports measured-cuts.toml names.
+            *(
+                str(path.resolve())
+                for path in sorted((_process_plans.PROCESS_ROOT / "dechatter").glob("*.html"))
+            ),
             # test_cam_nc loads each CAM recipe by path (importlib, outside
             # cad/scripts); process tests read every plan at runtime, and a
             # plan's presence enrols it (_process_plans.enrolled_stems).
