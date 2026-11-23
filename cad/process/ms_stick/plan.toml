@@ -470,7 +470,7 @@ feed = "hand"
 steps = [
   { kind = "action", text = "The same with the .002 leaf on the RULED FACE .25 in from the right end, at mid-length and .25 in from the left end. Note each work Z." },
   { kind = "check", text = "Stack: each reading less the bar's (Op 180), less the blank's thickness in mm there (Op 100) = {{process.tape_stack_min_mm:.2f}}–{{process.tape_stack_max_mm:.2f}} mm ({{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}) at all three; the two ends within 0.05 mm (.002) of each other." },
-  { kind = "stop", text = "Outside the band, or the ends differ by more: free the blank with a razor blade under the bar's tape as Op 310 does, the bar left clamped; peel and clean as Ops 320–330, then re-tape and re-bond (Ops 110–160) and take new zeros from Op 170." },
+  { kind = "stop", text = "Outside the band, or the ends differ by more: free and re-bond the blank as Op 200's Stop says." },
 ]
 tool = "feeler"
 speed_kind = "other"
@@ -482,7 +482,7 @@ feed = "hand"
 steps = [
   { kind = "action", text = "T1 raised clear. With the heel of the hand push the blank hard along the bar and across it; try to lift each corner with a thumbnail." },
   { kind = "check", text = "No movement, no creak, no lifted corner." },
-  { kind = "stop", text = "Any movement: free the blank with a razor blade under the bar's tape as Op 310 does, the bar left clamped; peel and clean as Ops 320–330, then re-tape and re-bond (Ops 110–160) and take new zeros from Op 170." },
+  { kind = "stop", text = "Any movement: free the blank with a razor blade under the bar's tape (Op 310's way, the bar left clamped), peel and clean (Ops 320–330), re-bond (Ops 110–160), new zeros from Op 170." },
 ]
 feed = "hand"
 
