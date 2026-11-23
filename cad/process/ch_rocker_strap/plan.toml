@@ -58,9 +58,17 @@ blank_thickness_min_in = 0.122
 blank_thickness_max_in = 0.126
 # Left on each face by RS01 for the finish passes (.005 in).
 face_finish_stock_mm = 0.127
-# Face stepover of the 1/2 in end mill: four passes over the 1-1/2 in width
-# plus the recipe's overhang, a width cam.py posts exactly.
-face_stepover_mm = 9.652
+# The face cuts' depths, restated from the facing arithmetic (the adapter's
+# cad.face_*_doc_mm; cam.py recomputes and checks both): the deepest rough
+# cut is the thickest blank's first face, the finish takes the finish stock.
+face_rough_doc_mm = 0.2413
+face_finish_doc_mm = 0.127
+# Face stepover of the 1/2 in end mill, the measured face setting
+# (settings.em-half-carbide-1018-v5-face, dechatter v5, 2026-11-22: stable to
+# 3.4 mm wide at up to 1.27 mm deep; cad/config/shop-equipment/
+# measured-cuts.toml): twelve passes over the 1-1/2 in width plus the
+# recipe's overhang, a width cam.py posts exactly (26 % of the cutter).
+face_stepover_mm = 3.302
 # The strap in the blank, setup frame: X from the end stop, Y from the fence
 # into the blank (machine −Y), top arc toward the fence, bottom arc toward
 # the front edge. The hub is centred along the blank and 1.000 in from the
@@ -212,10 +220,13 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # whole length below the chuck.
 reamer_oal_mm = 177.8
 # 1/2 in carbide end mill, 3 in overall (shop-equipment
-# tools.endmill-carbide-3fl-1-2): held at least 1 in in its collet, so at most
-# 2 in out; set at least 1 in out.
-half_mill_projection_min_mm = 25.4
-half_mill_projection_max_mm = 50.8
+# tools.endmill-carbide-3fl-1-2): set 1.10 in out of the collet, the tool
+# assembly the dechatter cuts were measured with (cad/config/shop-equipment/
+# measured-cuts.toml; owner, Pedro, 2026-11-22: "stickout is recorded as 30mm
+# but is actually 27.94"). The collet's lower end then stands about 30 mm over
+# the plate top while the faces are cut: the jaws' top is 9 mm over it, the
+# fence, end stop and clamp noses at most 2 mm.
+half_mill_projection_mm = 27.94
 # 1/8 in end mill, 1-1/2 in overall, 1/2 in of flute: between this much out
 # of the collet and its flute length (4 diameters).
 eighth_mill_projection_min_mm = 12.0
@@ -290,7 +301,7 @@ machine_ref = "pm-30mv"
 holding = "Sub-plate MHA-CH-13-TL-01 in the vise on 1 in parallels, centred, the fence indicated <.001 along X and the plate top indicated within .001 over the 12 in under the blank; it stays there for every blank. Blank flat on the plate, one long edge against the fence, its left end against the end stop, pushed by the Mitee-Bite Pitbull 26000 (4-40) edge clamps TL-VN-50 at X {{cad.clamp_stations_in}} from the end stop, each tightened to {{process.clamp_torque_in_lb:g}} in-lb. Clamp noses, fence and end-stop tops at most {{process.fence_height_mm:in.3dot}} above the plate, below the cut."
 datum = "Program RS01_rough_faces (cam:ch_rocker_strap). One G54 while the plate stays put: Z0 = the plate top, Y0 = the fence face (blank at −Y), X0 = the end stop's face, set in Op 30; set again after the plate moves, a stall or an E-stop. Each M6 measures its tool on the tool setter against T1's length when Z0 was set; every file (RS01–RS04) starts with an M6, so none runs on the length the last file left, even re-run or restarted."
 diagram = { file = "diagrams/rough.svg", alt = "Plan of the sub-plate: fence along the back, blank against it and against the end stop at its left end, edge clamps at the front at X {{cad.clamp_stations_in}}; the 1/2 in end mill faces the full blank, one face, then the other after the flip." }
-envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 # The vise grips the sub-plate, not the blank: every size here is the plate's.
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_top_height_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 # Section at the finished thickness, the thinnest the blank gets.
@@ -311,7 +322,7 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Console M6 T1 (the 1/2 in end mill, measured on the tool setter). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z5.080. The .200 edge finder at 900 rpm on the fence face: G10 L20 P1 Y-2.540; on the end stop's face: G10 L20 P1 X2.540 (its 2.540 mm radius)."
+instruction = "Console M6 T1 (the 1/2 in end mill, 1.10 in out of the collet, measured on the tool setter). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z5.080. The .200 edge finder at 900 rpm on the fence face: G10 L20 P1 Y-2.540; on the end stop's face: G10 L20 P1 X2.540 (its 2.540 mm radius)."
 feed = "hand"
 
 # Prove-out: the clamps, fence and end stop stand about .02 under the finish
@@ -342,10 +353,10 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS01_rough_faces (M6 T1, 1/2 in end mill; set 2650): face 1 at Z {{cad.rough_face_1_z_in:.4dot}}. At its M0 (spindle off, cutter retracted): unclamp, turn the blank over end for end (face 2 up, the same long edge on the fence, the other end on the end stop), reclamp, Cycle Start: face 2 at Z {{cad.rough_face_2_z_in:.4dot}}."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run RS01_rough_faces (M6 T1, 1/2 in end mill; set 2370): face 1 at Z {{cad.rough_face_1_z_in:.4dot}}. At its M0 (spindle off, cutter retracted): unclamp, turn the blank over end for end (face 2 up, the same long edge on the fence, the other end on the end stop), reclamp, Cycle Start: face 2 at Z {{cad.rough_face_2_z_in:.4dot}}."
+settings = "em-half-carbide-1018-v5-face"
 milling_cuts = [
-  { name = "face rough", kind = "end", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{cad.face_rough_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "face rough", kind = "end", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_rough_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
 
 [[setups]]
@@ -357,7 +368,7 @@ machine_ref = "pm-30mv"
 holding = "Release the blank, turn it over end for end (face 1, the first one roughed, up), the same long edge on the fence and the other end on the end stop, and clamp again at the same stations, {{process.clamp_torque_in_lb:g}} in-lb: the rough passes' stress is let go before the finish cuts."
 datum = "Program RS02_finish_face_1. G54 unchanged: Z0 plate top, Y0 fence, X0 end stop."
 diagram = { file = "diagrams/finish.svg", alt = "Plan of the sub-plate: the reseated blank against the fence and the end stop under the edge clamps; the 1/2 in end mill takes the finish pass over the full face." }
-envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_top_height_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", clamps_mm = "{{cad.clamp_x_mm}}", section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.thickness_mm}}" } }
 
@@ -366,10 +377,10 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS02_finish_face_1 (M6 T1 at its start, the 1/2 in end mill: set it on the tool setter again; 2650): the face at Z {{cad.finish_face_1_z_in:.4dot}}."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run RS02_finish_face_1 (M6 T1 at its start, the 1/2 in end mill: set it on the tool setter again; 2370): the face at Z {{cad.finish_face_1_z_in:.4dot}}."
+settings = "em-half-carbide-1018-v5-face"
 milling_cuts = [
-  { name = "face finish", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{cad.face_finish_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "face finish", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_finish_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
 
 # RS03, still in the edge clamps, no tape: finish face 2, then the hub hole.
@@ -386,7 +397,7 @@ datum = "Program RS03_finish_face_2_hub. G54 unchanged: Z0 plate top, Y0 fence, 
 diagram = { file = "diagrams/hub.svg", alt = "Plan of the sub-plate: blank against the fence and the end stop under the edge clamps; the 1/2 in end mill takes the finish pass over the full face; the hub hole at X {{cad.hub_x_in:.3f}} Y −{{cad.hub_y_in:.3f}}." }
 # Deepest: the drill and reamer tips in the counterbore; longest tool: the
 # reamer in the drill chuck; shortest: the 1/2 in end mill in its collet.
-envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{process.ream_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{process.ream_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_top_height_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", clamps_mm = "{{cad.clamp_x_mm}}", section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.thickness_mm}}" } }
 
@@ -395,12 +406,12 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS03_finish_face_2_hub (M6 T1 at its start, the 1/2 in end mill; 2650): the face at Z {{cad.thickness_in:.4dot}}. It stops at its M6 T3 (spindle off, cutter retracted), before the centre drill goes in: unclamp the blank and lift it off for the check, since the micrometer cannot reach under it on the plate."
+instruction = "Run RS03_finish_face_2_hub (M6 T1 at its start, the 1/2 in end mill; 2370): the face at Z {{cad.thickness_in:.4dot}}. It stops at its M6 T3 (spindle off, cutter retracted), before the centre drill goes in: unclamp the blank and lift it off for the check, since the micrometer cannot reach under it on the plate."
 inspection = "Every blank's thickness acceptance: {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}, micrometer at both ends and mid-length."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.thickness_band_mm}}" }]
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+settings = "em-half-carbide-1018-v5-face"
 milling_cuts = [
-  { name = "face finish", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{cad.face_finish_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "face finish", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_finish_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
 
 # The thickness check's remedy and the reseat follow the check: prechips

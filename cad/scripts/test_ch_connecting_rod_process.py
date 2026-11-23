@@ -115,8 +115,22 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
     }
     assert outline["passes"] == [{"offset": 1.5875, "levels": [3.387, 2.201, 1.016]}]
     # The saw's two heights, each one step into the crowns.
-    saw = next(kw for p, c, kw in ctx["expect"] if c == "side_passes")
+    saw = next(
+        kw for p, c, kw in ctx["expect"] if p == "CR06_slot" and c == "side_passes"
+    )
     assert (saw["final"], saw["raw"], saw["max_step"]) == (207.012, 221.744, 14.732)
+    # The end trim: two passes of 1/16 in from the longest blank's end to the
+    # crowns, each 6.6 mm deep, on the measured deep setting.
+    trim = next(
+        kw for p, c, kw in ctx["expect"] if p == "CR04a_end_trim" and c == "side_passes"
+    )
+    assert (
+        trim["final"],
+        trim["raw"],
+        trim["max_step"],
+        trim["direction"],
+        trim["max_stepdown"],
+    ) == (193.169, 196.342, 1.5865, 1, 6.6)
 
 
 def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> None:
@@ -171,6 +185,8 @@ def test_a_root_run_short_of_the_eighth_cutters_round_is_refused(monkeypatch) ->
         ({"saw_nut_dia_max_mm": 64.0}, "nut reaches the crown"),
         ({"saw_arbor_length_mm": 76.2}, "saw_park_z_mm"),
         ({"root_station_mm": 168.0}, "root_station_mm"),
+        ({"end_trim_run_past_mm": 0.254}, "thickest blank plus its run-past"),
+        ({"end_trim_step_mm": 2.0}, "even step"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(changes, detail) -> None:
@@ -268,6 +284,21 @@ def _nth(text: str, n: int):
             _nth("G0 Z30.400", 2),
             lambda line: "G0 Z11.350",
             "keep_out",
+        ),
+        # The end trim's first pass skipped: the crown pass takes the whole
+        # excess, past the measured width.
+        (
+            "end_trim",
+            lambda line: line == "G0 X194.755 Y-110.490",
+            lambda line: "G0 X193.169 Y-110.490",
+            "passes",
+        ),
+        # The end trim run deeper than its declared depth.
+        (
+            "end_trim",
+            lambda line: line == "G1 Z-0.250 F{feed}",
+            lambda line: "G1 Z-0.500 F{feed}",
+            "depth",
         ),
     ],
 )

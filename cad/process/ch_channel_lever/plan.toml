@@ -411,6 +411,13 @@ instruction = "Only after the Z0 correction: unclamp, mic the same blank again n
 inspection = "Hub thickness {{cad.hub_far_face_length_min_in:.4dot}}–{{cad.hub_far_face_length_max_in:.4dot}}: on to CL02_pocket_b. Still outside: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.hub_far_face_length_band_mm}}" }]
 
+# Not measured: owner (Pedro), 2026-11-22, on full-width passes: "same log
+# new dechatter issues to try full radial depth but shallow axial" (#3428).
+# CL02's cuts stay as they are, on the chart setting; this stop flags them.
+[[setups.operations]]
+instruction = "First load only: these CL02_pocket_b cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): rough levels .028 deep x .500 wide, finish level .008 deep x .500 wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+feed = "hand"
+
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
@@ -580,6 +587,13 @@ feed = "hand"
 [[setups.operations]]
 instruction = "First load only: prove CL05_pocket_a in air, Z0 raised 1.000 in, through each M6. Then Z0 back."
 instruction_detailed = "Send $# and note the G54 line's Z now. G10 L2 P1 Z(that Z + 25.400). Run CL05_pocket_a in air through each M6. G10 L2 P1 Z(the Z noted in this op) puts Z0 back."
+feed = "hand"
+
+# Not measured: owner (Pedro), 2026-11-22, on full-width passes: "same log
+# new dechatter issues to try full radial depth but shallow axial" (#3428).
+# CL05's cuts stay as they are, on the chart setting; this stop flags them.
+[[setups.operations]]
+instruction = "First load only: these CL05_pocket_a cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): rough levels .028 deep x .500 wide, finish level .008 deep x .500 wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
 feed = "hand"
 
 [[setups.operations]]
