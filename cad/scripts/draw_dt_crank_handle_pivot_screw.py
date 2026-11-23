@@ -117,7 +117,6 @@ from dt_crank_handle_pivot_screw_spec import (
     SURFACE_FINISHES,
     THREAD_CALLOUT,
     THREAD_LENGTH,
-    THREAD_MAJOR_2A_MAX_IN,
     THREAD_MODEL_DIA,
     THREAD_SIZE,
     TIP_CHAMFER,
@@ -434,10 +433,12 @@ _NOTES = "dt_crank_handle_pivot_screw_notes"
 _BUILD = "build_dt_crank_handle_pivot_screw"
 _FRAME = (_BUILD, "__frame__")
 _SHOULDER_FINISH = surface_finish_by_key(SURFACE_FINISHES, "pivot_shoulder")
-# ASME B1.1 #4-40 UNC-2A major: the title block's class 2A, not a printed
-# band; the 2A maximum is the spec's, the minimum .1061 (Machinery's
-# Handbook, as mg_rod_clamp_joint.THREAD_MAJOR_2A).
+# ASME B1.1 #4-40 UNC-2A major .1061-.1112: the title block's class 2A, not
+# a printed band (Machinery's Handbook, as mg_rod_clamp_joint.THREAD_MAJOR_2A).
+# The spec's THREAD_MAJOR_2A_MAX_IN (.1114) is the UNR reference its relief
+# floor is built from, not the acceptance band.
 THREAD_MAJOR_2A_MIN_IN = 0.1061
+THREAD_MAJOR_2A_MAX_IN = 0.1112
 
 
 def _plane(value: float) -> dict[str, Any]:
@@ -631,7 +632,7 @@ requirement(
         "axis": ([0.0, 0.0, 1.0], (_FRAME,)),
         "dia": (
             [THREAD_MAJOR_2A_MIN_IN * 25.4, THREAD_MAJOR_2A_MAX_IN * 25.4],
-            ((_SELF, "THREAD_MAJOR_2A_MIN_IN"), "THREAD_MAJOR_2A_MAX_IN"),
+            ((_SELF, "THREAD_MAJOR_2A_MIN_IN"), (_SELF, "THREAD_MAJOR_2A_MAX_IN")),
         ),
         "nominal_dia": (THREAD_MODEL_DIA, ("THREAD_MODEL_DIA",)),
         "length_nominal": (THREAD_LENGTH, ("THREAD_LENGTH",)),
