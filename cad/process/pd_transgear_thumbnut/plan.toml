@@ -334,7 +334,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Rechuck the nut in the band as in the Holding line; spindle running, touch the AR lightly on the faced rim and set DRO Z0 there for the dish."
+instruction = "Rechuck the nut by its knurled head over the brass shim wrap, {{process.regrip_grip_in:.2dot}} in in the jaws, as in the Holding line; spindle running, touch the AR lightly on the faced rim and set DRO Z0 there for the dish."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
