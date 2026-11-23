@@ -356,3 +356,117 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material"] == config["material_specification"]
     assert config["finish"]
     assert int(config["quantity"]) == 1
+
+
+def _feature_faces(manifest_features: dict, geometries: dict) -> None:
+    """Each named synthetic face is claimed by exactly its own feature."""
+    import export_features
+
+    selectors = export_features.feature_selectors("mg_wheel_bar")
+    for name, faces in geometries.items():
+        for face in faces:
+            owners = [
+                owner
+                for owner, specs in selectors.items()
+                if any(selector.matches(face) for selector in specs)
+            ]
+            assert owners == [name], name
+    assert set(selectors) == set(manifest_features)
+
+
+def test_the_bar_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    import export_features
+    from _gtol_face import FaceGeometry
+    from mg_wheel_bar_geom import (
+        AXLE_BORE_DIA,
+        AXLE_BORE_X,
+        BAR_SIDE,
+        BAR_TOP_ABOVE_ROW,
+        CLAMP_HOLE_DIA,
+        CLAMP_HOLE_X,
+        LEFT_END_X,
+        PEN_HANGER_HOLE_DIA,
+        SCREW_HOLE_X,
+    )
+    from _column_clamp_interface import BAR_DEPTH
+
+    manifest = export_features.requirement_manifest("mg_wheel_bar")
+    features = manifest["features"]
+    assert {name: feature["kind"] for name, feature in features.items()} == {
+        **dict.fromkeys(
+            (
+                "left_end",
+                "right_end",
+                "top_face",
+                "bottom_face",
+                "front_face",
+                "back_face",
+            ),
+            "face",
+        ),
+        **dict.fromkeys(
+            ("axle_bore", "hanger_hole", "clamp_hole_1", "clamp_hole_2"), "hole"
+        ),
+    }
+    assert manifest["notes"]["manufacturing"] == drawing.SCREW_LINE_NOTE.splitlines()
+
+    def plane(normal: tuple[float, float, float], offset: float) -> FaceGeometry:
+        point = tuple(value * offset / 1000 for value in normal)
+        return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+    def bore(dia: float, x: float) -> FaceGeometry:
+        r, z = dia / 2.0, BAR_DEPTH / 2.0
+        box = tuple(v / 1000 for v in (x - r, -r, -z, x + r, r, z))
+        return FaceGeometry(
+            None, 4002, (x / 1000, 0.0, 0.0, 0.0, 0.0, 1.0, dia / 2000), None, box
+        )
+
+    _feature_faces(
+        features,
+        {
+            "left_end": [plane((-1.0, 0.0, 0.0), -LEFT_END_X)],
+            "right_end": [plane((1.0, 0.0, 0.0), -LEFT_END_X)],
+            "top_face": [plane((0.0, 1.0, 0.0), BAR_TOP_ABOVE_ROW)],
+            "bottom_face": [plane((0.0, -1.0, 0.0), BAR_SIDE - BAR_TOP_ABOVE_ROW)],
+            "front_face": [plane((0.0, 0.0, -1.0), BAR_DEPTH / 2.0)],
+            "back_face": [plane((0.0, 0.0, 1.0), BAR_DEPTH / 2.0)],
+            "axle_bore": [bore(AXLE_BORE_DIA, AXLE_BORE_X)],
+            "hanger_hole": [bore(PEN_HANGER_HOLE_DIA, SCREW_HOLE_X)],
+            "clamp_hole_1": [bore(CLAMP_HOLE_DIA, CLAMP_HOLE_X[0])],
+            "clamp_hole_2": [bore(CLAMP_HOLE_DIA, CLAMP_HOLE_X[1])],
+        },
+    )
+
+
+def test_bar_feature_bands_are_the_printed_ones() -> None:
+    import export_features
+
+    features = export_features.requirement_manifest("mg_wheel_bar")["features"]
+    assert features["right_end"]["length"] == pytest.approx([9.1 * IN, 9.3 * IN])
+    assert features["bottom_face"]["height"] == pytest.approx([0.42 * IN, 0.44 * IN])
+    assert features["back_face"]["depth"] == pytest.approx(
+        [0.369 * IN, 0.379 * IN], abs=1e-3
+    )
+    bore = features["axle_bore"]
+    assert bore["process"] == "ream" and bore["thru"] is True
+    assert bore["dia"] == pytest.approx([0.1865 * IN, 0.1870 * IN], abs=1e-3)
+    stations = {
+        "hanger_hole": (0.20, 0.01),
+        "axle_bore": (2.40, 0.01),
+        "clamp_hole_1": (7.382, 0.005),
+        "clamp_hole_2": (8.760, 0.005),
+    }
+    for name, (station, band) in stations.items():
+        hole = features[name]
+        assert hole["station"] == pytest.approx(
+            [(station - band) * IN, (station + band) * IN], abs=1e-3
+        ), name
+        assert hole["station_from"] == "left_end"
+        assert hole["height"] == pytest.approx([0.192 * IN, 0.202 * IN], abs=1e-3), name
+        assert hole["height_from"] == "top_face"
+    assert features["hanger_hole"]["dia"] == pytest.approx(
+        [0.180 * IN, 0.184 * IN], abs=1e-3
+    )
+    assert features["clamp_hole_1"]["dia"] == pytest.approx(
+        [0.196 * IN, 0.200 * IN], abs=1e-3
+    )

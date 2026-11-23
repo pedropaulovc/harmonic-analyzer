@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 457" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="457"/>
+  <text class="title" x="20" y="20">Setup 5 (plan view): bond both plates (Loctite 638) in the vise; 24 h cure</text>
+  <rect class="clamp" x="32.4" y="70.3" width="523.6" height="29.7"/>
+  <rect class="clamp" x="32.4" y="307.9" width="523.6" height="29.7"/>
+  <rect class="fixture-support" x="176.9" y="100.0" width="251.5" height="167.6" fill="none" stroke-dasharray="4 3"/>
+  <rect class="fixture-support" x="176.9" y="167.0" width="335.3" height="41.9" fill="none" stroke-dasharray="2 2"/>
+  <path class="part-kept" d="M 703.3 120.1 L 703.3 172.9 L 168.5 140.2 L 168.5 100.0 Z"/>
+  <rect class="part-kept" x="168.5" y="100.0" width="10.5" height="40.2"/>
+  <rect class="part-kept" x="299.7" y="100.0" width="10.5" height="40.2"/>
+  <rect class="fixture-support" x="168.5" y="140.2" width="251.5" height="167.6"/>
+  <rect class="part-removed" x="179.0" y="105.0" width="120.7" height="29.7"/>
+  <rect class="part-removed" x="138.8" y="100.0" width="29.7" height="83.8"/>
+  <circle class="fixture-support" cx="531.5" cy="129.7" r="19.8"/>
+  <text class="label" x="36.5" y="62.3">fixed jaw (Y0)</text>
+  <text class="label" x="36.5" y="355.6">moving jaw</text>
+  <line class="leader" x1="153.7" y1="166.0" x2="86.0" y2="232.0"/>
+  <text class="label" x="20.0" y="245.2">1.000 gauge block</text>
+  <text class="label" x="20.0" y="261.2">(on the jaw, across</text>
+  <text class="label" x="20.0" y="277.2">the foot end)</text>
+  <line class="leader" x1="237.8" y1="119.8" x2="267.5" y2="48.3"/>
+  <text class="label" x="234.5" y="44.3">gauge stack .950 + .350 + .140</text>
+  <line class="leader" x1="428.3" y1="248.5" x2="468.3" y2="371.6"/>
+  <text class="label" x="472.3" y="375.6">support 1-2-3 block (dashed, under all)</text>
+  <line class="leader" x1="512.2" y1="185.8" x2="572.2" y2="395.6"/>
+  <text class="label" x="576.2" y="399.6">1/2 in parallel (dotted)</text>
+  <line class="leader" x1="300.5" y1="298.0" x2="234.5" y2="395.6"/>
+  <text class="label" x="36.5" y="399.6">packing 1-2-3 block</text>
+  <line class="leader" x1="545.4" y1="115.8" x2="591.5" y2="58.3"/>
+  <text class="label" x="595.5" y="62.3">screw jack (under the strap)</text>
+  <text class="label" x="20" y="445">Hatched: the gauge stack (out within 2 min of closing) and the 1.000 block (out after 1 h).</text>
+</svg>

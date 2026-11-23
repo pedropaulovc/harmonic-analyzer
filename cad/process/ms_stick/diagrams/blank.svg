@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 1: the 1/8 x 3/8 in brass bar from above, the blank marked off its gated end and sawn. Hand-drawn: 56 px/in along the bar, the width drawn three times over; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 250" width="700" height="250" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <text class="title" x="12" y="20">Setup 1: the blank off the brass bar (from above; width drawn 3× over)</text>
+  <!-- The rest of the 24 in bar, broken off at the right. -->
+  <path class="part-rest" d="M514 96 L668 96 L660 112 L672 128 L664 159 L514 159 Z"/>
+  <text class="label" x="524" y="124">rest of the 24 in</text>
+  <text class="label" x="524" y="140">brass bar</text>
+  <!-- Saw kerf at the scribed line, 8.10 from the gated end. -->
+  <rect class="part-removed" x="506" y="90" width="8" height="75"/>
+  <path class="leader" d="M510 90 L510 62"/>
+  <text class="label" x="446" y="56">saw at the line, {{process.blank_scribe_in:.2f}}</text>
+  <!-- The blank: 8.10 in = 454 px. -->
+  <rect class="part-kept" x="52" y="96" width="454" height="63"/>
+  <text class="label" x="180" y="133">RULED FACE up: the face with fewer marks</text>
+  <!-- The mark, in marker on the RULED FACE within 1 in (56 px) of the end away from the datum end: UP and an arrow toward the DATUM END. Nothing is engraved there, and no ink goes on the BACK (the bond face). -->
+  <text class="label" x="458" y="120">UP</text>
+  <line class="arrow" x1="500" y1="144" x2="454" y2="144"/>
+  <line class="datum" x1="52" y1="84" x2="52" y2="171"/>
+  <text class="datum-label" x="20" y="78">DATUM END (either end)</text>
+  <text class="label" x="52" y="218">the mark at the right, in marker, within 1 in of that end: UP and an arrow toward the DATUM END</text>
+  <text class="label" x="52" y="236">no ink on the BACK: the tape bonds to it</text>
+  <!-- Length and the gates. -->
+  <path class="dims" d="M52 176 L52 196 M506 176 L506 196 M52 190 L506 190"/>
+  <text class="label" x="208" y="184">{{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} long</text>
+  <path class="leader" d="M300 96 L300 62"/>
+  <text class="label" x="150" y="56">thickness {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}}, width {{process.blank_width_min_mm:in.3dot}}–{{process.blank_width_max_mm:in.3dot}}</text>
+  <text class="label" x="150" y="40">gated before the saw (Op 10):</text>
+</svg>

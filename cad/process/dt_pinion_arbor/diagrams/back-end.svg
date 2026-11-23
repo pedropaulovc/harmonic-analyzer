@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="20">Setup 3: turned round, the back end out (not to scale)</text>
+  <rect class="fixture-vise" x="40" y="70" width="140" height="200"/>
+  <rect class="part-rest" x="180" y="125" width="360" height="90"/>
+  <rect class="part-removed" x="540" y="125" width="14" height="90"/>
+  <line class="centre-line" x1="160" y1="170" x2="700" y2="170"/>
+  <line class="active-face" x1="540" y1="125" x2="540" y2="215"/>
+  <rect class="cutter" x="570" y="164" width="90" height="12"/>
+  <text class="label" x="400" y="100">faced end: length from the faced head end</text>
+  <line class="leader" x1="530" y1="104" x2="540" y2="126"/>
+  <text class="label" x="560" y="250">No. 1 centre drill</text>
+  <line class="leader" x1="600" y1="238" x2="600" y2="177"/>
+  <text class="label" x="200" y="110">head end back in the spindle</text>
+</svg>

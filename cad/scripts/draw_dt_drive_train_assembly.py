@@ -203,7 +203,7 @@ SHEET_NAMES = (
     "CRANK EXPLODED",
     "ALIGNMENT PINION RIG EXPLODED",
     "ASSEMBLY SEQUENCE",
-    "ASSEMBLY SEQUENCE CONT. - CRANK",
+    "ASSEMBLY SEQUENCE CONT. - CONE SET + CRANK",
     "ASSEMBLY SEQUENCE CONT. - CRANK + CYLINDER BANK",
     "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK + PINION RIG",
     "ASSEMBLY SEQUENCE CONT. - PINION RIG + CONE SET ON THE BASE",
@@ -235,7 +235,7 @@ CLUSTER_TITLES: dict[Cluster, str] = {
 # extra sheets as needed").  The rubric sample review of v47 split every step
 # into one-thing sub-steps (rule 22), so a field may end inside a step, at a
 # lettered sub-step, and its pointer names that sub-step.  The numbered steps
-# read in sheet order: 1-3 on sheet 7, 4-6 on sheet 8 (MHA-PD-00 cites 4 and
+# read in sheet order: 1-2 on sheet 7, 3-6 on sheet 8 (MHA-PD-00 cites 4 and
 # 5 there), 7-23 on 9-11 (split at the sub-steps below); the checks follow the
 # full-detail view (gate review of 042726e87: the steps jumped 6 -> 11 -> 7 ->
 # 8 -> 11).  #2470's two-cure tip bonds outgrew sheet 7, which held 1-5, so
@@ -1351,7 +1351,7 @@ CHANNEL_RODS_SET_AT = _step_ref("cylinder-stack-accepted", "B")
 # key defines TNNN for MHA-DT-03 only (review of 5994f29c83, rule 4).
 CRANK_CHAIN_WHEEL = str(_config.parts("pd-transgear-removable")["number"])
 PLATEN_NUMBER = str(_config.parts("pd-platen")["number"])
-# Steps 1T and 2B's phasing comb is a shop tool in the cone-gear indexing kit, never
+# Steps 1T and 2C's phasing comb is a shop tool in the cone-gear indexing kit, never
 # a BOM row (owner rulings 2026-11-09 and 2026-11-10); the code key names it
 # and its blade (machinist review of bd81283964: an undefined tool and word).
 PHASING_COMB = str(_config.parts("dt-cone-gear-tl-phasing-comb")["number"])
@@ -1512,28 +1512,47 @@ CONE_CRANK_STEPS = _note_text(
         # before the post goes on.
         "2. BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT PER THE SHEET 1 NOTE.",
         "2A. BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024, PER THE SHEET 1 NOTE.",
+        # #2473 (owner ruling 2026-11-22, option G): MHA-DT-37 cures in the
+        # socket wherever its float and tilt leave it, so its pivot is tapped
+        # true while the 638 is wet and accepted after cure (2F) on its
+        # runout about MHA-DT-04's journal, the value cone_set_stack books.
+        # Both read in the sheet 16 row's setup, the one 1S left standing:
+        # MHA-DT-04 on end, its journal in a V-block.  The comb is a flat U
+        # round the pivot, so the pivot is centred before it goes on and read
+        # after it has come off.  The pivot is held home through the centring
+        # as through 2D: the socket's trapped air pushes it out until the
+        # bonds grab.
+        f"2B. HOLDING MHA-DT-37 HOME, TAP ITS PIVOT TRUE ON AN INDICATOR BEFORE IT GRABS ({acceptance_ref('pivot-runout')}).",
         # Round 2's wet joints sit beside the deeper blades, and 1Q's film has
         # been through 1U and 1V, so the blades are coated again (Codjiflo
         # review of PR #2735); step 2 has no letter left for a step of its own.
         # MHA-DT-04 still stands on end in the V-block from 1S and 1T.
-        f"2B. CLIP {PHASING_COMB}, BLADES WAXED AGAIN, OVER THE TIP, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY.",
+        f"2C. CLIP {PHASING_COMB}, BLADES WAXED AGAIN, OVER THE TIP, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY.",
         # #2470: the coated spigot seals the blind socket's air in as it
         # enters; held home, the compressed air cannot back T018 off T024
         # before the bonds grab.  Standing on its journal does not hold it:
         # the tip's few grams are far less than that air's push, so the hold
         # stays; the comb's bridge stands clear above the pivot, open at both
-        # faces of the sheet.
-        "2C. HOLD MHA-DT-37 HOME, T018 ON T024, UNTIL THE BONDS GRAB.",
-        f"2D. REMOVE {PHASING_COMB}.",
-        # The cured tip is accepted on the comb; the remedy parts every tip
-        # bond, cleans the film off the coated spigot and the pivot too, and
-        # redoes the tip from 1L: cleaning the pivot takes MHA-DT-38 off, so
-        # it is bonded back on at 1L (Codjiflo reviews of PR #2531;
-        # machinist review of PR #2557 named the parts and the restart).
+        # faces of the sheet.  Step 2 has every letter in use (#2473 added 2B
+        # and 2F), so the hold is the condition 2B starts and this step ends:
+        # the comb comes off once the bonds grab, as 1U takes it off.
+        f"2D. REMOVE {PHASING_COMB} ONCE THE BONDS GRAB, MHA-DT-37 HELD HOME ON T024 UNTIL THEN.",
+        # The cured tip is accepted on the comb and on its pivot's runout,
+        # before the post is assembled, so a failure costs no more than the
+        # tip: the one remedy parts every tip bond, cleans the film off the
+        # coated spigot and the pivot too, and redoes the tip from 1L:
+        # cleaning the pivot takes MHA-DT-38 off, so it is bonded back on at
+        # 1L (Codjiflo reviews of PR #2531; machinist review of PR #2557
+        # named the parts and the restart).  The clean names the redo it
+        # prepares, as 1Z does.
         f"2E. ONCE CURED, CHECK THAT {PHASING_COMB} CLIPS OVER ALL FIVE GEARS, BOTH ARMS ON T036.",
-        "2F. IF IT DOES NOT, AT 250 DEG C TAKE MHA-DT-37, T018, T012, T024 AND MHA-DT-38 OFF.",
-        "2G. CLEAN THE CURED 638 OFF EVERY PARTED FACE: SPIGOT, PIVOT, LAND, BORES, SOCKET.",
-        "2H. REDO FROM 1L.",
+        # 2F reads the pivot and, in the same setup, T012's and T018's teeth
+        # (#2473, owner ruling 2026-11-22: the pivot's reading does not see
+        # MHA-DT-04's socket standing off its journal).
+        f"2F. CHECK THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT ({acceptance_ref('pivot-runout')})"
+        f" AND OF T012'S AND T018'S TEETH ({acceptance_ref('spigot-gear-runout')}).",
+        "2G. IF ANY CHECK FAILS, AT 250 DEG C TAKE MHA-DT-37, T018, T012, T024 AND MHA-DT-38 OFF.",
+        "2H. CLEAN THE CURED 638 OFF EVERY PARTED FACE: SPIGOT, PIVOT, LAND, BORES, SOCKET, FOR A REDO FROM 1L.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
         # Each screw is cut against its own matched post/platform hole, never
@@ -2404,16 +2423,19 @@ def _split_sequence_chain(
 
 # The fields, in reading order (package_note_fields): sheet 7's left field
 # carries the direction key, step 1 and step 2's head line, its full-height
-# right field 2A-3 (the spigot's bond round); sheet 8 carries 4-6 (MHA-PD-00
-# cites 4 and 5 on CRANK_SHEET), each step whole; sheets 9-11 carry 7-23, each
+# right field 2A-2Z (the spigot's bond round, the post and the tip block);
+# sheet 8 carries 3-6 (MHA-PD-00 cites 4 and 5 on CRANK_SHEET), each step
+# whole; sheets 9-11 carry 7-23, each
 # field cut at a sub-step by the constants below.  Sub-step splits keep every
 # field full once the one-thing lines grew the sequence (rubric sample rounds
 # 2 and 4); test_every_note_field_holds_its_stacked_blocks proves each fits.
 # Step 3G (#1177/#3085, 2026-11-20) took the right field's last spare line,
-# so step 2's head line moved to the left field.
+# so step 2's head line moved to the left field; #2473's pivot centring and
+# reading (2B, 2F) then moved step 3 whole to sheet 8, whose heading names
+# the cone set for it.
 CONE_CONTINUED_FROM = f"{steps.step_number('post-and-tip-block')}A"
-CRANK_SHEET_FROM = str(steps.step_number("crank-mesh-checked"))
-CRANK_SHEET_RIGHT_FROM = f"{steps.step_number('crank-hub-fitted')}D"
+CRANK_SHEET_FROM = str(steps.step_number("end-play-set"))
+CRANK_SHEET_RIGHT_FROM = f"{steps.step_number('crank-hub-fitted')}C"
 CRANK_CONTINUED_FROM = str(steps.step_number("crank-handle-fitted"))
 _CRANK_CONTINUED_HEADING = f"ASSEMBLY SEQUENCE CONT. - CRANK {CODE_KEY_POINTER}"
 (
@@ -2425,7 +2447,10 @@ _CRANK_CONTINUED_HEADING = f"ASSEMBLY SEQUENCE CONT. - CRANK {CODE_KEY_POINTER}"
 ) = _split_sequence_chain(
     CONE_CRANK_STEPS,
     (CONE_CONTINUED_FROM, "ASSEMBLY SEQUENCE CONT. - CONE SET"),
-    (CRANK_SHEET_FROM, _CRANK_CONTINUED_HEADING),
+    (
+        CRANK_SHEET_FROM,
+        f"ASSEMBLY SEQUENCE CONT. - CONE SET AND CRANK {CODE_KEY_POINTER}",
+    ),
     (CRANK_SHEET_RIGHT_FROM, "ASSEMBLY SEQUENCE CONT. - CRANK"),
     (CRANK_CONTINUED_FROM, _CRANK_CONTINUED_HEADING),
 )
@@ -3104,7 +3129,7 @@ def code_key_text(rows: Sequence[tuple[int, str]], cylinder_gears: int) -> str:
     MHA-DT-03 codes as the model configures them, by station front to back
     (``rows``, from the placed cone gears), two columns, GEAR 0 to the last of
     the ``cylinder_gears`` MHA-DT-12, counted from the front, and steps 1T
-    and 2B's phasing comb and its blades (a shop tool on its own print, no
+    and 2C's phasing comb and its blades (a shop tool on its own print, no
     BOM row)."""
     code = rows[0][1]
     digits = "N" * (len(code) - 1)

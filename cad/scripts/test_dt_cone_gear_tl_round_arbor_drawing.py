@@ -65,7 +65,7 @@ def test_the_arbor_carries_t024_alone_on_its_round_bore() -> None:
     assert spec.BORE_MAX_MM == pytest.approx(0.2518 * INCH)
     assert spec.FACE_MIN_MM == pytest.approx(cone.FACE_WIDTH - 0.002 * INCH)
     assert spec.FACE_MAX_MM == pytest.approx(cone.FACE_WIDTH + 0.002 * INCH)
-    assert spec.ROOT_MIN_MM == pytest.approx(0.4413 * INCH)
+    assert spec.ROOT_MIN_MM == pytest.approx(0.4478 * INCH)
 
 
 def test_the_rules_are_the_keyed_arbors() -> None:
@@ -162,7 +162,7 @@ def test_the_shoulder_collar_and_nut_stand_under_t024s_root() -> None:
     assert spec.COLLAR_DIA / spec.BLANK.root_min_dia >= spec.BACKING_SHARE_MIN
     corners = spec.NUT_ACROSS_FLATS / math.cos(math.radians(30.0))
     assert corners / 2.0 + spec.AIR_MIN <= spec.BLANK.root_min_dia / 2.0
-    assert spec.NUT_ROOT_AIR == pytest.approx(0.0222 * INCH, abs=0.0001 * INCH)
+    assert spec.NUT_ROOT_AIR == pytest.approx(0.0254 * INCH, abs=0.0001 * INCH)
     assert spec.ROOT_AIR >= spec.AIR_MIN - 1e-9
 
 

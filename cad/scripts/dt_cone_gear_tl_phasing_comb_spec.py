@@ -5,7 +5,7 @@ fixture MHA-DT-00 engages while LOCTITE 638 grabs, so the bonded tip gears
 cure in phase with the keyed stack (owner ruling 2026-11-09 (b1) via PR
 #1992, C1 keyed; single blade per gear, owner ruling 2026-11-10 via PR #1992).
 The bonds cure in two rounds (#2470): step 1T clips it on for T024 alone
-(the other blades stand over air), step 2B again for T018, T012 and T006,
+(the other blades stand over air), step 2C again for T018, T012 and T006,
 and step 2E accepts the cured tip on it.
 The 1898 machine has no such tool (its gears are fixed differently); this is
 shop tooling for the replica's bonded tip. Owner ruling 2026-11-13: the comb

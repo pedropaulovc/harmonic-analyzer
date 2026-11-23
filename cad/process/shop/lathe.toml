@@ -124,6 +124,14 @@ material = "lathe-1018-cold-finished"
 sfm = 60
 feed = "tailstock quill by hand, steady, cutting oil"
 
+# MHA-DT-33's 5/16 bore, .80 deep from the tailstock in one feed: the
+# drilling row as the letter drills above.
+[settings.lathe-drill-5-16-1018]
+tool = "block-drill-5-16"
+material = "lathe-1018-cold-finished"
+sfm = 60
+feed = "tailstock quill by hand, steady, cutting oil"
+
 [settings.lathe-drill-n-c360]
 tool = "drill-n"
 material = "lathe-c360"
@@ -222,6 +230,13 @@ feed = "by hand along Z, light and steady, cutting oil"
 
 [settings.lathe-form-r180-1018]
 tool = "form-tool-r180"
+material = "lathe-1018-cold-finished"
+rpm = 300
+feed = "by hand along Z, light and steady, cutting oil"
+
+# MHA-CH-05 pivot shaft's two .06 domes (ch_pivot_shaft plan): the same rule.
+[settings.lathe-form-r160-1018]
+tool = "form-tool-r160"
 material = "lathe-1018-cold-finished"
 rpm = 300
 feed = "by hand along Z, light and steady, cutting oil"
