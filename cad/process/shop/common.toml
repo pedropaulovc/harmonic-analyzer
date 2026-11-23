@@ -51,6 +51,15 @@ rpm_ranges = [[70, 380], [380, 2000]]
 swing_over_bed_mm = 279.4
 swing_over_cross_slide_mm = 169.164
 between_centres_mm = 699.77
+# The maker's product page (Precision Matthews, PM-1127VF-LB, specifications
+# table; read 2026-11-23 from its Wayback copy of 2019-12-31,
+# http://web.archive.org/web/20191231175250/http://www.precisionmatthews.com/shop/pm-1127vf-lb/,
+# the live page now 404): "Spindle Bore 1-1/2″", "Longitudinal Feeds
+# .0025-.012 IPR", "Cross Feeds .001-.0056 IPR". × 25.4. The bore is the
+# spindle's; the 4-jaw's through bore is not on record.
+spindle_bore_mm = 38.1
+longitudinal_feed_mm_rev = [0.0635, 0.3048]
+cross_feed_mm_rev = [0.0254, 0.14224]
 
 # HA: fixtures.vise-pm-6 (Precision Matthews VISE-6in-HIGHPREC; make, SKU and
 # source stay in cad/config/shop-equipment/), from the deleted inventory
