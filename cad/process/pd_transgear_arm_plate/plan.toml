@@ -1,57 +1,613 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
-title = "Transgear Arm Plate"
-part = "MHA-PD-19 Transgear Arm Plate"
-revision = "placeholder"
-material = "AISI 1018 cold-finished steel flat bar, ASTM A108, 1/4 x 1-1/2 in"
-stock = "1/4 × 1-1/2 in 1018 CF flat (stock.1018-flat-1-4x1-1-2), faced to .197 (#2425)."
+# Transgear arm plate MHA-PD-19 (qty 1), routed for the CNC mill (owner
+# ruling 2026-11-21: NC and travelers for every made part; the route is the
+# author's, chosen for speed, the owner corrects it afterwards). The plate is
+# the bought 1/4 x 1-1/2 in 1018 CF flat (stock.1018-flat-1-4x1-1-2, to buy):
+# its two long edges as supplied (the sheet's side edges, .75 each side of
+# K), faced to .197 on the rear face, its holes and its outline milled from
+# one zero (#2425, owner ruling 2026-11-20).
+#
+# Route: Setup 1 saws one 2.40-2.50 in blank off the 12 in bar and a 3.5 in
+# spoil block off the owned 1 x 3 in 6061 bar (stock.6061-flat-1x3), and
+# gates the blank. Setup 2: the spoil block in the vise on the 1 in
+# parallels, its top over the jaw tops; the blank bonded face A down on it
+# with 3M VHB 5906 tape, its datum-C edge flush with the block's edge at the
+# fixed jaw. AP01_holes faces the rear face to the thickness, spots, drills
+# #1 through at K and at both screw holes, opens K with the 27/64 drill and
+# reams it .4375; AP02_sink countersinks the two screw holes 82° on the rear
+# face (checked, and run again lower if small); AP03_outline mills the end
+# round, the two tapers and the top edge with the 3/8 in end mill's side,
+# through into the spoil block: the whole waste goes to chips, the side edges
+# stay as supplied. Setup 3, bench: free the plate from the tape. Setup 4:
+# the plate face A up in the vise, K picked up on the .4375 GO plug with the
+# edge finder; AP04_chamfer chamfers K's face-A mouth .015 x 45° with the
+# chamfer mill on one circle. Setup 5, bench: deburr, inspect, oil.
+#
+# Not made here (the feature export's made_at, MHA-PD-00): the two Ø.0945
+# locating holes are match-drilled with MHA-PD-18 and reamed at assembly
+# (steps 13A and 13E), so the placeholder plan's tools.reamer-0945 and the #44
+# drill belong to the assembly's process; the MHA-PD-28 bush is pressed into
+# K (step 11C) and its bore reamed after the press (step 11H). The plate
+# leaves with K reamed and chamfered for the press.
+#
+# Workholding: bonded (the strap's and the platen's VHB technique): a 1/4 in
+# blank faced to .197 in the vise would leave less than
+# limits.vise_grip_min_mm of grip under a facing cut, and the outline's tapers
+# and end round leave no parallel faces to grip. The blank's faces are 1-1/2
+# x 2-1/2 in: two 3/4 in strips of tape side by side under it. The tape is
+# taken at a quarter of its data-sheet strength (the platen's derating); the
+# bond prechips is told is the finished plate's own area less its three
+# holes (cam.py computes it), the least the tape holds once the outline is
+# cut. The drills and the reamer run before the outline, with the whole
+# blank still bonded.
+#
+# One-sided facing: the rear face only (face A, datum A, stays as supplied).
+# A cold-finished bar can bow when one skin is cut off; the final inspection
+# checks the thickness's Rule #1 envelope (perfect form at .202) on the
+# surface plate, as the platen's does. An owner-correctable choice, stated in
+# the PR.
+#
+# FLAGGED: to buy: the stock (stock.1018-flat-1-4x1-1-2), the .4375 reamer
+# (tools.reamer-4375), the 3/8 in 82° countersink (tools.riser-countersink),
+# the 3M VHB 5906 tape (consumables.tape-3m-vhb-5906), the .4375 GO / .4382
+# NO-GO plug gauge pair (gauges.plug-gauges-4375-4382) and a .250 Class ZZ
+# pin gauge (gauges.pin-gauges) for the countersinks.
+#
+# NC (cam:pd_transgear_arm_plate, cad/process/pd_transgear_arm_plate/cam.py):
+# AP01_holes, AP02_sink, AP03_outline, AP04_chamfer. Program names, the
+# [parameters] and the milling_cuts names are a contract with that recipe.
+# Tool numbers are the places in the tools list among the mill's tools: T1
+# 3/8 in end mill, T2 #1 centre drill, T3 #1 drill, T4 27/64 drill, T5 .4375
+# reamer, T6 82° countersink, T7 chamfer mill.
+title = "Transgear arm plate"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "1018 cold-finished steel, 1/4 x 1-1/2 in flat (drawing: {{cad.material_spec}})"
+stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:fraction}} in flat bar, the 12 in length: one {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} in blank. Spoil block: a 3.5 in length of the 1 x 3 in 6061 bar."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The two long edges are the bar's, as supplied: no cut touches them. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall or controller reset, home again and do what that setup's Datum says before resuming. The two Ø.0945 locating holes, the bush press and its ream are the assembly's (MHA-PD-00 steps 13A, 13E, 11C, 11H). To buy before starting: the bar, the .4375 reamer, the 3/8 in 82° countersink, the VHB 5906 tape, the .4375/.4382 plug pair and the .250 and .450 pin gauges (Setup 2 checks K and the countersinks while the blank is still bonded). Finish: {{cad.finish}}."
 shop = "../shop"
+stock_refs = ["1018-flat-1-4x1-1-2", "6061-flat-1x3"]
+material_key = "rocker-1018-cold-finished"
+milling_material = "steel_1018"
+
+[cad]
+file = "../../out/features/pd_transgear_arm_plate/features.toml"
+adapter = "flat_bar"
+part = "pd-transgear-arm-plate"
+
+[parameters]
+quantity = 1
+# The adapter's axes: the plate's length (K to the top edge) along model Y,
+# its thickness (face A to the rear face) along model Z.
+blank_length_axis = 1
+blank_thickness_axis = 2
+# The blank: the 2.16 in plate (end round to top-left corner) with .100 at
+# the round's end (round_waste_mm) and .14-.24 at the top, sawn 2.40-2.50.
+blank_length_in = 2.45
+blank_length_min_mm = 60.96
+blank_length_max_mm = 63.5
+blank_width_in = 1.5
+blank_thickness_in = 0.25
+# Setup 1's gate. ASTM A108 cold-drawn flat as the crank arm's: thickness
+# +.000/-.004, width ±.004. The width leaves each side edge .746-.754 from K
+# (Y0 on the datum-C edge, K .750 in from it), inside the sheet's .74-.76.
+blank_thickness_min_mm = 6.2484
+blank_thickness_max_mm = 6.35
+blank_width_min_mm = 37.9984
+blank_width_max_mm = 38.2016
+round_waste_mm = 2.54
+# The spoil block (stock.6061-flat-1x3; the process test checks its section
+# against that record): 3.5 in sawn off the bar, gripped across its 3 in
+# width on its as-bought 1 in edges, on the two 1 in parallels: its top
+# stands spoil_over_jaws_mm over the jaw tops. The blank lies on it, its
+# round end spoil_end_margin_mm in from the block's right end.
+spoil_length_mm = 88.9
+spoil_width_mm = 76.2
+spoil_height_mm = 25.4
+spoil_end_margin_mm = 12.7
+spoil_over_jaws_mm = 5.8547
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+parallel_height_mm = 25.4
+# Tape: 3M VHB 5906, .006 in (cad/config/shop-equipment/
+# consumables.tape-3m-vhb-5906). 3M "VHB Tapes Technical Data" (November
+# 2015), 5906: normal tensile (ASTM D-897) 100 lb/in² = 690 kPa; dynamic
+# overlap shear (ASTM D-1002) 100 lb/in² = 690 kPa. Derating 0.5 for the
+# 20-minute dwell (same sheet: "approximately 50% of ultimate bond strength
+# will be achieved after 20 minutes") x 0.5, the author's allowance for a
+# warm cut, as the platen's and the strap's. bond_area_mm2: the finished
+# plate's area less its three holes (cam.py).
+tape_thickness_mm = 0.15
+tape_shear_mpa = 0.69
+tape_tensile_mpa = 0.69
+bond_derating = 0.25
+bond_area_mm2 = 1629.15
+# Work frame (Setups 2 and 4): K at X0 Y0, the plate's length along -X (the
+# end round at +X, the top edge at -X), the datum-C edge at +Y against the
+# fixed jaw; Z0 face A. x_set_mm and y_set_mm are the edge finder's entries
+# (its .100 radius) on the blank's round end and its datum-C edge;
+# z_touch_x_mm, z_touch_y_mm the miked spot (the blank's middle, 1/2 in in
+# from its front edge) where T1 sets Z0 on the raw top; z_leaf_mm the .002
+# feeler leaf. cam.py checks them.
+x_set_mm = 17.526
+y_set_mm = 21.59
+z_touch_x_mm = -16.129
+z_touch_y_mm = -6.35
+z_leaf_mm = 0.0508
+# Facing the rear face: the 3/8 in end mill, two levels, the first at
+# face_rough_z_mm, the second at the thickness target; passes along X no
+# wider than face_stepover_mm (under half the cutter).
+thickness_target_mm = 5.0038
+face_rough_z_mm = 5.69
+face_stepover_mm = 4.4
+# The outline: the cutter's centre at its radius outside the round, the two
+# tapers and the top edge, outline_levels levels of outline_level_mm from the
+# rear face to outline_bottom_mm under face A (through the tape, into the
+# spoil block), each pass entered and left outline_lead_mm clear of the side
+# edges on the edges' extensions; the end round's corners first cleared by a
+# half circle of rough_arc_radius_mm about K at every level. Eleven levels:
+# the 3/8 in end mill's helix lifts the plate's edge, and the tape's derated
+# tensile strength over the plate's width allows no deeper a slot (prechips'
+# bond check; six would lift it).
+outline_levels = 11
+outline_level_mm = 0.478
+outline_bottom_mm = -0.254
+outline_lead_mm = 1.5
+rough_arc_radius_mm = 24.5
+# Holes. Spot K and the two screw holes Ø.120 with the #1 carbide 60° centre
+# drill (on its countersink, under the #1). The #1 (.228) through all three,
+# one plunge each (L/D under 1); the 27/64 (.4219) opens K; the .4375 reamer
+# through K, fed in and
+# out. Every tip drill_past_mm full diameter under face A, into the spoil
+# block; the reamer ream_past_mm (its bevel lead allowed for). cam.py checks
+# the tips.
+spot_dia_mm = 3.048
+drill_past_mm = 0.5
+ream_past_mm = 1.0
+drill_1_tip_mm = -2.2399
+drill_2764_tip_mm = -3.7193
+ream_tip_mm = -1.0
+# The countersinks: the 82° countersink's point on each screw hole's axis
+# sink_tip_mm above face A, its cone reaching Ø.312 (sink_dia_mm) at the
+# faced rear face (cam.py).
+sink_dia_mm = 7.9248
+sink_tip_mm = 0.4456
+# The press hole's chamfer (Setup 4, Z0 face A, up): .015 x 45°, rim Ø.4675
+# (chamfer_rim_dia_mm); the chamfer mill's point chamfer_tip_mm below face
+# A, its centre on one circle of chamfer_path_radius_mm about K (cam.py).
+chamfer_rim_dia_mm = 11.8745
+chamfer_tip_mm = -1.524
+chamfer_path_radius_mm = 4.4133
+# Speeds and feeds. The 3/8 in end mill: shop
+# settings.endmill-carbide-3fl-3-8-1018-cf, 2800 rpm, .0025 in/tooth x 3 =
+# 21.0 in/min (cam.py recomputes both). Holes: LittleMachineShop "Cutting
+# Speeds", Drilling & Reaming, Plain carbon steels 1006-1026 (read
+# 2026-11-20, as the channel lever's): drilling 60-100 ft/min, reaming 40-65.
+# #1 (.228) at 1100 rpm (66 ft/min), 27/64 (.4219) at 600 (66 ft/min), the
+# .4375 reamer at 400 (46 ft/min), the countersink at 420 (41 ft/min, the
+# reaming row: a countersink cuts like a reamer, the author's choice). Feeds
+# per rev, the author's choice, no source, as the channel lever's: the #1
+# .002 (2.2 in/min), the 27/64 .003 (1.8), the reamer .004 (1.6), the
+# countersink .002 (0.84); the #1 centre drill at 2800, .0005 in/rev (1.4
+# in/min); the chamfer mill at 2800, .001 in/tooth x 2 (5.6 in/min), the
+# lowest chip load prechips' force table holds (the author's choice).
+em_rpm = 2800
+em_feed_per_min_mm = 533.4
+spot_rpm = 2800
+spot_feed_per_min_mm = 35.56
+drill_1_rpm = 1100
+drill_1_feed_per_min_mm = 55.88
+drill_2764_rpm = 600
+drill_2764_feed_per_min_mm = 45.72
+ream_rpm = 400
+ream_feed_per_min_mm = 40.64
+sink_rpm = 420
+sink_feed_per_min_mm = 21.336
+chamfer_rpm = 2800
+chamfer_feed_per_min_mm = 142.24
+# Holders and reach: HA holders.r8-collets-lms-4860.gauge_len_mm; archive
+# holders.drill-chuck-r8.gauge_len_mm. The longest tool: the .4375 chucking
+# reamer in the drill chuck, 7 in overall (ASME B94.2 straight-shank chucking
+# reamers, 7/16 in). The end mill at least 1.00 in out of its collet; the
+# chamfer mill at least .75 (its nose clears the jaw tops in Setup 4).
+r8_collet_gauge_mm = 6.3
+drill_chuck_gauge_mm = 95.0
+reamer_oal_mm = 177.8
+em_projection_min_mm = 25.4
+chamfer_projection_min_mm = 19.05
+# Setup 4: the plate face A up on the 1 in parallels, gripped on its side
+# edges; the jaws stand jaw_top_mm over face A (cam.py).
+jaw_top_mm = 14.5415
+# The plate's thickest (the sheet's .202) for Setup 4's heights.
+plate_thickness_max_mm = 5.1308
+# Inspection, from K (the .4375 GO plug standing in it, .21875 radius): the
+# calipers over the plug and an edge read the edge's distance from K plus the
+# plug's radius (cam.py computes each band from the export). The screw holes
+# with a #1 drill's shank in each: each hole from K over the plug and the
+# shank less both radii. The countersinks with the .250 pin standing in each: its end
+# sink_pin_depth_min_mm-sink_pin_depth_max_mm below the rear face for a rim
+# in the sheet's band.
+plug_radius_mm = 5.55625
+side_over_plug_min_mm = 24.3522
+side_over_plug_max_mm = 24.8602
+round_over_plug_min_mm = 17.7482
+round_over_plug_max_mm = 18.2562
+screw_1_from_k_min_mm = 32.4175
+screw_1_from_k_max_mm = 32.7731
+screw_2_from_k_min_mm = 30.8255
+screw_2_from_k_max_mm = 31.1811
+sink_pin_dia_mm = 6.35
+sink_pin_depth_min_mm = 0.8328
+sink_pin_depth_max_mm = 0.9788
+sink_pin_depth_mid_mm = 0.9058
+# K's chamfer rim: Ø.4375 plus twice the leg's band. The check: a .450 pin
+# (over K's .4382 top limit, under the smallest rim) stands in the chamfer;
+# its end sits half the rim less the pin below face A, from K's low limit
+# and the shortest leg to K's top limit and the longest.
+chamfer_rim_min_mm = 11.6205
+chamfer_rim_max_mm = 12.1285
+chamfer_pin_dia_mm = 11.43
+chamfer_pin_depth_min_mm = 0.09525
+chamfer_pin_depth_max_mm = 0.35814
 
 [[tools]]
-id = "drill-44"
-name = "#44 drill"
-ref = "drill-44"  # Drills #44
-
+id = "em"
+name = "3/8 in carbide end mill"
+ref = "endmill-carbide-3fl-3-8"
+[[tools]]
+id = "spot"
+name = "#1 carbide centre drill"
+ref = "centre-drills-carbide-60"
 [[tools]]
 id = "drill-1"
 name = "#1 drill"
-ref = "drill-1"  # Drills #1
-
+ref = "drill-1"
 [[tools]]
 id = "drill-27-64"
 name = "27/64 drill"
-ref = "drill-27-64"  # #2425: pre-drill for the Ø.4375 press-hole ream
-
+ref = "drill-27-64"
 [[tools]]
-id = "reamer-4375"
-name = ".4375 reamer"
-ref = "reamer-4375"  # #2425: Ø.4375 +.0007/.0000 REAM THRU, press fit for MHA-PD-28
-
+id = "reamer"
+name = ".4375 reamer, TO BUY"
+ref = "reamer-4375"
+status = "to_order"
 [[tools]]
-id = "chamfer-mill-carbide-1-4-90"
-name = "1/4 90° chamfer mill"
-ref = "chamfer-mill-carbide-1-4-90"  # #2425: the press hole's .015 X 45° at face A
-
+id = "sink"
+name = "3/8 in 82° countersink, TO BUY"
+ref = "riser-countersink"
+status = "to_order"
+[[tools]]
+id = "chamfer"
+name = "1/4 in 90° chamfer mill"
+ref = "chamfer-mill-carbide-1-4-90"
+[[tools]]
+id = "cutoff-saw"
+name = "Evolution miter saw"
+ref = "saw-evolution-14"
+[[tools]]
+id = "files"
+name = "Files"
+ref = "jig-files"
+[[tools]]
+id = "deburr"
+name = "Deburring scraper set"
+ref = "deburring-set"
+[[tools]]
+id = "feeler-gauges"
+name = "Feeler gauges"
+ref = "feeler-gauges"
+[[tools]]
+id = "plugs"
+name = "Plug gauges .4375 GO, .4382 NO-GO, TO BUY"
+ref = "plug-gauges-4375-4382"
+status = "to_order"
 [[tools]]
 id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
-
-[[tools]]
-id = "reamer-0945"
-name = ".0945 reamer"
-ref = "reamer-0945"  # drawing cross-check 2026-11-19: 2X Ø.0945 +.0005/.0000 REAM THRU
-
-[[tools]]
-id = "riser-countersink"
-name = "3/8 82° countersink"
-ref = "riser-countersink"  # drawing cross-check 2026-11-19: ⌵ Ø.312 X 82°
+name = "Pin gauges .250 and .450, TO BUY"
+ref = "pin-gauges"  # A1-pin-set-061-500-combined
+description = "Class ZZ pin gauges .250 and .450 (plus or minus; mike each): the countersinks' rim (.250) and K's chamfer (.450) with the calipers' depth rod"
+status = "to_order"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Saw the blank and the spoil block"
+machine = "Saw / bench"
+indexing = "none"
+diagram = { file = "diagrams/saw.svg", alt = "The 12 in length of the 1/4 x 1-1/2 in flat with one 2.45 in blank marked off at its end; the 1 x 3 in 6061 bar with a 3.5 in spoil block marked off." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "cutoff-saw"
+drilling = "none"
+sizing = "other"
+instruction = "Saw one blank {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} long, aiming at {{process.blank_length_in:.2f}}, off the 1/4 x 1-1/2 in bar, marked off with the steel rule. Saw one spoil block about 3.5 long off the 1 x 3 in 6061 bar. File the burrs off every sawn end."
+feed = "hand"
+inspection = "Blank {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} long (steel rule): the 2.16 plate with .10 at the round's end and .14–.24 at the top. Shorter: saw another; longer: saw it back."
+gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.blank_length_min_mm}}", "{{process.blank_length_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "Mic the blank's thickness at its middle and 1/2 in in from each end, 1/2 in in from its front edge, and its width at both ends. Write the middle thickness with marking fluid on the face that will be the rear face (up in Setup 2; face A is degreased and bonded): Setup 2 sets Z0 from it. Pick the straighter long edge as the C edge (datum C) and mark it C, and mark one sawn end R (the round's end): with C away from you and face A down, R is to the right."
+inspection = "Every thickness reading {{process.blank_thickness_min_mm:in.4dot}}–{{process.blank_thickness_max_mm:in.4dot}} and the width {{process.blank_width_min_mm:in.4dot}}–{{process.blank_width_max_mm:in.4dot}}: the bar as supplied, this traveler's incoming-stock gate (the width sets the side edges). Outside either: set the blank aside and tell the owner."
+gauge_checks = [
+  { gauge = "micrometers", band_mm = ["{{process.blank_thickness_min_mm}}", "{{process.blank_thickness_max_mm}}"] },
+  { gauge = "micrometers", band_mm = ["{{process.blank_width_min_mm}}", "{{process.blank_width_max_mm}}"] },
+]
+
+[[setups]]
+machine_kind = "other"
+title = "Bonded on the spoil block: thickness, holes, countersinks, outline"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw. The spoil block on them, its 3 in width across the jaws (its as-bought 1 in edges in the jaws), centred along the jaws; tap it down and tighten: its top stands {{process.spoil_over_jaws_mm:in.3dot}} over the jaw tops. The blank bonded on its top with 3M VHB 5906 tape ({{process.tape_thickness_mm:in.3dot}} thick), face A down (rear face up), its C edge flush with the block's edge at the FIXED jaw, its R end to the RIGHT, {{process.spoil_end_margin_mm:in.2f}} in from the block's right end. Nothing else holds it."
+datum = "Programs AP01_holes (T1–T5), AP02_sink (T6), AP03_outline (T1). G54: X0 Y0 the press hole K's axis, the plate's length along −X (the end round at +X, the top edge at −X), +Y toward the fixed jaw (the C edge at Y {{cad.outline_edge_right_x_in:.3dot}}); Z0 face A (the blank's underside, on the tape), set from the miked thickness. Tool lengths from the tool setter at each M6. After a controller reset, a stall or an E-stop: home ($H), which brings the stored G54 back, and run the interrupted program from its start (every cut done is then cut in air)."
+diagram = { file = "diagrams/bond.svg", alt = "Plan and section: the spoil block across the vise jaws on two parallels, its top over the jaw tops; the blank on two strips of tape on it, its C edge flush with the block's fixed-jaw edge, R end to the right; the plate's outline inside it with K, the two screw holes, the end round at +X; X0 Y0 at K." }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", 9.525, 9.525, 5.08], y_span_mm = ["{{process.spoil_width_mm}}", 9.525], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.spoil_height_mm}}", "{{process.tape_thickness_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.spoil_height_mm}}", "{{process.tape_thickness_mm}}", "{{process.drill_2764_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.spoil_width_mm}}", along_jaws_mm = "{{process.spoil_length_mm}}", part_height_mm = "{{process.spoil_height_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = [-34.887, "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "plate", extent_mm = [-48.514, 14.986], seat = "6061 spoil block", seat_mm = [-61.214, 27.686], bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "plate", kind = "part", area_mm2 = "{{process.bond_area_mm2}}", width_mm = "{{cad.blank_width_mm}}" }] } }
+
+[[setups.operations]]
+instruction = "Home the mill ($H). Brush the spoil block's top clean. Degrease it and the blank's face A with isopropyl alcohol and water, half and half; wipe both dry."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Lay two strips of the 3/4 in tape along X on the block's top, edge to edge, each the blank's length, starting {{process.spoil_end_margin_mm:in.2f}} in from the block's right end (where the blank's R end goes): the first with its edge on the block's fixed-jaw edge. Rub each down; peel the liners."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Stand a 1-2-3 block on the fixed jaw's top, its 3 in face against the spoil block's edge. Lower the blank onto the tape, face A down, its C edge against the 1-2-3 block, R end to the right {{process.spoil_end_margin_mm:in.2f}} in from the spoil block's right end (steel rule). It cannot be moved once down. Lean on it with the heel of the hand, about 25 lb (the tape wants about 15 psi). Take the 1-2-3 block away."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Wait 20 minutes: the tape is taken at half strength, which it reaches by then."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 X0 and Y0 at K with the edge finder (900 rpm): from +X on the R end, from +Y on the C edge."
+instruction_detailed = "Edge finder (900 rpm) on the blank's R end from +X, at mid-width: G10 L20 P1 X{{process.x_set_mm:.3f}}. On the C edge from +Y, 1/2 in in from the R end: G10 L20 P1 Y{{process.y_set_mm:.3f}}. MDI G0 X−33 (1/2 in in from the far end of the shortest blank), touch the C edge again from +Y and read the work Y."
+inspection = "The second C-edge reading within .002 of the first (the blank lies along X). More: free the blank (Setup 3's first op) and bond it again."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: face A, from the thickness written on the blank and T1 touched on its top over the miked spot."
+instruction_detailed = "Console M6 T1 (3/8 in end mill, at least 1.00 in out of its collet; the tool setter measures it); MDI G0 X{{process.z_touch_x_mm:.3f}} Y{{process.z_touch_y_mm:.3f}} (the blank's middle, 1/2 in in from its front edge). Spindle stopped, its end just dragging a .002 feeler leaf on the blank: G10 L20 P1 Z(the written thickness in mm + {{process.z_leaf_mm:.3f}})."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove AP01_holes, AP02_sink and AP03_outline in air, Z0 raised 1.000 in: every move stays over the spoil block or the fixed jaw's side, clear of the vise. Then Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run AP01_holes through every M6, then AP02_sink and AP03_outline, watching every move. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em"
+drilling = "none"
+sizing = "other"
+instruction = "Run AP01_holes (M6 T1, 3/8 in end mill; set 2800, dry: no oil reaches the tape): face the rear face in two levels, the second at {{process.thickness_target_mm:in.4dot}} above face A, passes along X no wider than {{process.face_stepover_mm:in.3dot}}, each entered in air past the blank's end."
+settings = "endmill-carbide-3fl-3-8-1018-cf"
+rpm = 2800
+feed = "{{process.em_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "face rough", kind = "end", phase = "rough", cutter_dia_mm = 9.525, flutes = 3, rpm = 2800, feed_mm_min = "{{process.em_feed_per_min_mm}}", axial_doc_mm = 0.66, radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [-48.514, 14.986] },
+  { name = "face finish", kind = "end", phase = "finish", cutter_dia_mm = 9.525, flutes = 3, rpm = 2800, feed_mm_min = "{{process.em_feed_per_min_mm}}", axial_doc_mm = 0.6862, radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [-48.514, 14.986] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T2 (#1 centre drill in the drill chuck; set 2800): spot K and the two screw holes Ø{{process.spot_dia_mm:in.3dot}}, under the #1."
+rpm = 2800
+feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = [0, -30.7277] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-1"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.screw_hole_1_dia_band_mm}}" }
+instruction = "Same file, M6 T3 (#1 drill in the drill chuck; set 1100): K and both screw holes through, one plunge each, the full diameter {{process.drill_past_mm:in.3dot}} under face A, into the spoil block."
+rpm = 1100
+feed = "{{process.drill_1_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{process.thickness_target_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "screw drill", kind = "drill", phase = "finish", cutter_dia_mm = 5.7912, flutes = 2, rpm = 1100, feed_mm_min = "{{process.drill_1_feed_per_min_mm}}", stations_mm = [0, -30.7277] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-27-64"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T4 (27/64 drill in the drill chuck; set 600): open K through in one plunge, the full diameter {{process.drill_past_mm:in.3dot}} under face A. It leaves .016 on the diameter for the reamer."
+rpm = 600
+feed = "{{process.drill_2764_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{process.thickness_target_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "press drill", kind = "drill", phase = "rough", cutter_dia_mm = 10.715625, flutes = 2, rpm = 600, feed_mm_min = "{{process.drill_2764_feed_per_min_mm}}", stations_mm = 0 },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "reamer"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.press_hole_dia_band_mm}}" }
+instruction = "Same file, M6 T5 (.4375 reamer in the drill chuck; set 400, cutting oil on the reamer only, a drop, wiped so none runs to the tape): ream K through, fed in and fed out, spindle running, {{process.ream_past_mm:in.3dot}} under face A. The file ends there."
+rpm = 400
+feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
+inspection = "Still bonded, K blown out and wiped: the .4375 GO plug enters the full depth, the .4382 NO-GO does not (K Ø{{cad.press_hole_dia_min_in:.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}). GO refused: run AP01_holes again from its start, G54 unchanged (the cuts already made then cut air; the reamer goes through once more). NO-GO enters: stop and tell the owner."
+gauge_checks = [{ gauge = "plug-gauges-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
+milling_cuts = [
+  { name = "press ream", kind = "drill", phase = "finish", cutter_dia_mm = 11.1125, flutes = 6, rpm = 400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = 0 },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "sink"
+drilling = "none"
+sizing = "other"
+instruction = "Run AP02_sink (M6 T6, 3/8 in 82° countersink in the drill chuck; set 420): its point {{process.sink_tip_mm:in.3dot}} above face A on each screw hole's axis: countersinks Ø{{process.sink_dia_mm:in.3dot}} on the rear face."
+rpm = 420
+feed = "{{process.sink_feed_per_min_mm:in.2f}} in/min"
+milling_cuts = [
+  { name = "screw sink", kind = "drill", phase = "finish", cutter_dia_mm = 9.525, flutes = 3, rpm = 420, feed_mm_min = "{{process.sink_feed_per_min_mm}}", stations_mm = -30.7277 },
+]
+
+[[setups.operations]]
+instruction = "Still bonded: the .250 pin standing in each countersink, the calipers' depth rod from the rear face beside it to the pin's top, less the pin's miked length, is where the pin's end sits."
+inspection = "The pin's end {{process.sink_pin_depth_min_mm:in.4dot}}–{{process.sink_pin_depth_max_mm:in.4dot}} below the rear face (rim Ø{{cad.screw_hole_1_csk_dia_min_in:.3dot}}–{{cad.screw_hole_1_csk_dia_max_in:.3dot}}). Both in band: skip the next op. Higher (rim small): the next op. Lower (rim large): stop and tell the owner."
+gauge_checks = [
+  { gauge = "pin-gauges", band_mm = "{{cad.screw_hole_1_csk_dia_band_mm}}" },
+  { gauge = "calipers", band_mm = ["{{process.sink_pin_depth_min_mm}}", "{{process.sink_pin_depth_max_mm}}"] },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Only if a rim is small: lower Z0 by the shortfall, run AP02_sink again, put Z0 back, then repeat the previous op's pin check."
+instruction_detailed = "The shortfall: {{process.sink_pin_depth_mid_mm:in.4dot}} less the pin's end's depth below the rear face. Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z − the shortfall in mm). Run AP02_sink. G10 L2 P1 Z(the noted Z) puts Z0 back before AP03_outline."
+inspection = "The pin check again: both in band, go on. Still higher: this op again. Lower: stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.sink_pin_depth_min_mm}}", "{{process.sink_pin_depth_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em"
+drilling = "none"
+sizing = "other"
+instruction = "Run AP03_outline (M6 T1, 3/8 in end mill; set 2800, dry): first the end's corners, a half circle R{{process.rough_arc_radius_mm:in.3dot}} about K round the R end at each of {{process.outline_levels:d}} levels of {{process.outline_level_mm:in.3dot}}, down to {{process.outline_bottom_mm:in.3dot}} under face A."
+settings = "endmill-carbide-3fl-3-8-1018-cf"
+rpm = 2800
+feed = "{{process.em_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "corner clear", kind = "slot", phase = "rough", cutter_dia_mm = 9.525, flutes = 3, rpm = 2800, feed_mm_min = "{{process.em_feed_per_min_mm}}", axial_doc_mm = "{{process.outline_level_mm}}", radial_woc_mm = 9.525, stations_mm = 0 },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, no stop: the end round and the tapers, then the top edge, with the cutter's side, the plate on its left (conventional), the same levels, through the tape into the spoil block. Each pass enters and leaves in air past a side edge; the side edges are not touched."
+settings = "endmill-carbide-3fl-3-8-1018-cf"
+rpm = 2800
+feed = "{{process.em_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "outline", kind = "slot", phase = "finish", cutter_dia_mm = 9.525, flutes = 3, rpm = 2800, feed_mm_min = "{{process.em_feed_per_min_mm}}", axial_doc_mm = "{{process.outline_level_mm}}", radial_woc_mm = 9.525, traverse_mm = [-42.4464, 12.446] },
+]
+
+[[setups]]
+machine_kind = "other"
+title = "Free the plate"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/free.svg", alt = "The plate on the spoil block after AP03: its outline cut through into the block, the waste gone; a thin blade worked under it from the C edge along the tape." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+instruction = "Unclamp the spoil block, plate still on it. Wet the tape round the plate with isopropyl alcohol, wait 2 minutes, then work a thin blade under the plate from its C edge along the tape. Never lever it up by the round or a corner: it must stay flat. Roll the tape off the plate and the block with a thumb; clean both with isopropyl alcohol."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "File flush any fin the tape left at the bottom of the outline and scrape the drill and reamer burrs off K's and the screw holes' face-A mouths (deburring scraper, flush, no chamfer: K's chamfer is Setup 4's), so face A seats flat."
+feed = "hand"
+inspection = "Face A lies on the surface plate without rocking on a burr."
+gauge_checks = "other"
+
+[[setups]]
+machine_kind = "other"
+title = "Chamfer the press hole"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Two 1 in parallels on the vise bed, one against each jaw. The plate on them face A up, gripped on its two side edges (between the kinks and the top edge), K between the parallels, the end round to the right; tap it down and tighten lightly. The jaws stand {{process.jaw_top_mm:in.3dot}} above face A."
+datum = "Program AP04_chamfer (T7). G54: X0 Y0 K's axis, picked up on the .4375 GO plug standing in K; Z0 face A, set with T1. The circle is about K, so the plate's turn in the vise does not matter. After a controller reset, a stall or an E-stop: home ($H), which brings the stored G54 back, and run AP04_chamfer from its start."
+diagram = { file = "diagrams/chamfer.svg", alt = "The plate face A up in the vise on two parallels; the chamfer mill's point down in K, its centre on a circle about K's axis cutting the .015 x 45° chamfer at the mouth." }
+envelope = { x_span_mm = [54.8924, 9.525, 5.08], y_span_mm = ["{{cad.blank_width_mm}}", 9.525], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.thickness_target_mm}}", "{{process.chamfer_tip_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_min_mm}}", 76.2], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = 54.8924, part_height_mm = "{{process.plate_thickness_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = [-51.891, "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+# The plate lies wholly between the jaws (prechips' hold); they bear on the
+# side edges' straight run, kink to top corner, and K's chamfer is a light
+# finishing cut .7 mm deep.
+beam = { axis = "x", hold = "cantilever", extent_mm = [-42.4464, 12.446], clamp_mm = [-42.4464, 12.446], section_mm = { y = "{{cad.blank_width_mm}}", z = 4.8768 }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Home the mill ($H). Stand the .4375 GO plug in K, its handle up. Edge finder (900 rpm) on the plug's member below the handle, from −X and +X, then, at the X centre, from −Y and +Y: G54 X0 Y0 the plug's centre. Take the plug out."
+instruction_detailed = "Edge finder (900 rpm), its tip on the plug's member just above face A. From −X: note the machine X; from +X: note it; MDI G53 G0 X(the mean) then G10 L20 P1 X0. Same from −Y and +Y at X0: G10 L20 P1 Y0. Lift clear and take the plug out."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: face A, T1 on a .002 leaf."
+instruction_detailed = "Console M6 T1 (3/8 in end mill; the tool setter measures it); MDI G0 X−20 Y0 (solid face A between K and the screw holes). Spindle stopped, its end just dragging a .002 feeler leaf on face A: G10 L20 P1 Z{{process.z_leaf_mm:.3f}}."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove AP04_chamfer in air, Z0 raised 1.000 in. Then Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run AP04_chamfer, watching the point stay inside K's circle. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "chamfer"
+drilling = "none"
+sizing = "other"
+instruction = "Run AP04_chamfer (M6 T7, 1/4 in 90° chamfer mill, at least {{process.chamfer_projection_min_mm:in.2f}} out of its collet; set 2800): down K's axis to {{process.chamfer_tip_mm:in.3dot}}, out to a circle R{{process.chamfer_path_radius_mm:in.4dot}}, once round clockwise (conventional inside), back to the axis and up: the mouth chamfered to Ø{{process.chamfer_rim_dia_mm:in.4dot}}."
+rpm = 2800
+feed = "{{process.chamfer_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "press chamfer", kind = "side", phase = "finish", cutter_dia_mm = 6.35, flutes = 2, rpm = 2800, feed_mm_min = "{{process.chamfer_feed_per_min_mm}}", axial_doc_mm = 0.381, radial_woc_mm = 0.381, stations_mm = 0 },
+]
+
+[[setups]]
+machine_kind = "other"
+title = "Deburr, inspect, oil"
+machine = "Bench, surface plate"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished plate face A up: K with its chamfer, the two screw holes (countersunk on the far face), the end round, the tapers, the top edge; the side-edge and round distances from the GO plug in K; the screw holes' distances from K." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+inspection = [
+  "Thickness {{cad.rear_face_thickness_min_in:.3dot}}–{{cad.rear_face_thickness_max_in:.3dot}}, micrometer, at four places round the plate (it sets the screws' reach into MHA-PD-18). Over: stop and tell the owner. Under: scrap.",
+  "Form, the thickness's envelope (Rule #1, perfect form at {{cad.rear_face_thickness_max_in:.3dot}}): the plate free on the surface plate, each face down in turn; the largest thickness reading plus the thickest feeler leaf that enters under it anywhere, at most {{cad.rear_face_thickness_max_in:.3dot}}. Over: stop and tell the owner.",
+  "K Ø{{cad.press_hole_dia_min_in:.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}: the .4375 GO plug enters from either face, the .4382 NO-GO enters from neither. GO refused: stop and tell the owner (do not re-ream). NO-GO enters: scrap. MHA-PD-28's traveler turns the bush to this hole.",
+  "K's chamfer {{cad.press_hole_chamfer_leg_min_in:.3dot}}–{{cad.press_hole_chamfer_leg_max_in:.3dot}} x 45° at face A (rim Ø{{process.chamfer_rim_min_mm:in.4dot}}–{{process.chamfer_rim_max_mm:in.4dot}}): the .450 pin standing in K, its end on the chamfer; the calipers' depth rod from face A beside it to the pin's top, less the pin's miked length: its end {{process.chamfer_pin_depth_min_mm:in.4dot}}–{{process.chamfer_pin_depth_max_mm:in.4dot}} below face A. Outside: stop and tell the owner.",
+  "Side edges {{cad.outline_edge_right_x_min_in:.3dot}}–{{cad.outline_edge_right_x_max_in:.3dot}} from K: the GO plug in K, the calipers over the plug and each side edge at the kink and at the top, {{process.side_over_plug_min_mm:in.3dot}}–{{process.side_over_plug_max_mm:in.3dot}}. End round R{{cad.outline_end_r_min_in:.3dot}}–{{cad.outline_end_r_max_in:.3dot}}: over the plug and the round's far point on the centre line, {{process.round_over_plug_min_mm:in.3dot}}–{{process.round_over_plug_max_mm:in.3dot}}. The top edge's corners ({{cad.outline_top_left_y_min_in:.2dot}}–{{cad.outline_top_left_y_max_in:.2dot}} and {{cad.outline_top_right_y_min_in:.2dot}}–{{cad.outline_top_right_y_max_in:.2dot}} from K), the tapers and the kinks are the program's from the same zero as the round, not gauged. Outside: stop and tell the owner.",
+  "Screw holes Ø{{cad.screw_hole_1_dia_min_in:.3dot}}–{{cad.screw_hole_1_dia_max_in:.3dot}}: as drilled. Positions (BASIC, Ø{{cad.screw_hole_1_position_dia_in:.3dot}} zone): a #1 drill's shank in each hole; the calipers over the GO plug in K and each shank, less half the shank's miked Ø and the plug's radius, {{process.screw_1_from_k_min_mm:in.3dot}}–{{process.screw_1_from_k_max_mm:in.3dot}} (the hole farther from the C edge) and {{process.screw_2_from_k_min_mm:in.3dot}}–{{process.screw_2_from_k_max_mm:in.3dot}} (the nearer). Each hole's place round K is the program's, from op 70's alignment to the C edge (process-held). Outside: stop and tell the owner.",
+]
+gauge_checks = [
+  { gauge = "micrometers", band_mm = "{{cad.rear_face_thickness_band_mm}}" },
+  { gauge = "plug-gauges-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" },
+  { gauge = "calipers", band_mm = ["{{process.chamfer_pin_depth_min_mm}}", "{{process.chamfer_pin_depth_max_mm}}"] },
+  { gauge = "calipers", band_mm = ["{{process.side_over_plug_min_mm}}", "{{process.side_over_plug_max_mm}}"] },
+  { gauge = "calipers", band_mm = ["{{process.round_over_plug_min_mm}}", "{{process.round_over_plug_max_mm}}"] },
+  { gauge = "calipers", band_mm = ["{{process.screw_1_from_k_min_mm}}", "{{process.screw_1_from_k_max_mm}}"] },
+  { gauge = "calipers", band_mm = ["{{process.screw_2_from_k_min_mm}}", "{{process.screw_2_from_k_max_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "deburr"
+drilling = "none"
+sizing = "other"
+instruction = "Break every outside edge of the outline on both faces to R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max (deburring scraper and smooth file); deburr the screw holes' face-A mouths and K's rear-face mouth flush (not K's chamfer, not the countersinks). Wash off the chips."
+feed = "hand"
+inspection = "No sharp edge or burr anywhere."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "The plate leaves without the two Ø.0945 locating holes: MHA-PD-00 step 13A match-drills them with MHA-PD-18 and step 13E reams them; step 11C presses the MHA-PD-28 bush into K and step 11H reams its bore. Wipe on ISO VG 32 oil all over and into K ({{cad.finish}}); bag the plate."
+feed = "hand"
