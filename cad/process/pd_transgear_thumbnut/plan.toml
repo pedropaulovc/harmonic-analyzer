@@ -125,20 +125,23 @@ recess_corner_x_dro_in = 0.313
 # The rim's worst case from the errors above (printed in Op 240).
 rim_held_min_in = 0.583
 rim_held_max_in = 0.597
-# After the cone (Op 240) a crest touched again as in Op 220 reads the X
-# datum's drift d against D0 + .002: the corner is then .350 - d and the rim
-# .590 - d ± .006 (depth and angle). The rim leaves .58-.60 only past
-# d = ±.004: under D0 - .002 the dish is cut large (scrapped), over
-# D0 + .006 it is cut small (X touched off again and the dish recut).
-crest_drift_scrap_in = 0.002
-crest_drift_recut_in = 0.006
-# The floor's low-side check: calipers flat on the floor read about .345
-# (the flat ends .005 inside the corner), never low but high if they ride
-# the wall; a reading under .335 (the corner's .34 less .005) with the
-# crest in band means a small nose (a short corner): faced out by the
-# shortfall from .345.
+# After the cone (Op 240) the three crests touched again as in Op 220 give
+# the X datum's drift d against D0 + .002 (their mean, ±.001): the corner is
+# then .350 - d and the rim .590 - d ± .006 (depth and angle). With the
+# re-touch's ±.001 the rim stays in .58-.60 for a reading inside d = ±.003:
+# under D0 - .001 the dish is cut large (scrapped), over D0 + .005 it is cut
+# small (X touched off again and the dish recut).
+crest_drift_scrap_in = 0.001
+crest_drift_recut_in = 0.005
+# The floor check: calipers flat on the floor read about .345 (the flat
+# ends .005 inside the corner), never low but high if they ride the wall.
+# Under .341 the corner is under .346 and the rim may fall under .58 (a
+# small nose, or the floor short): faced out by the shortfall from .345.
+# Over .355 held down, the corner is over .36 (a larger nose than the
+# .313 figure's R0.4, or the floor cut to the printed .350): scrapped.
 floor_flat_nominal_in = 0.345
-floor_flat_read_min_in = 0.335
+floor_flat_read_min_in = 0.341
+floor_flat_read_max_in = 0.355
 compound_check_travel_in = 0.3
 # .300 sin 18.4° = .095; ±.001 on the indicator is ±0.2° on the flank.
 compound_check_rise_min_in = 0.094
@@ -477,12 +480,12 @@ instruction = "Dish cone, carriage still locked: each pass, from a start on the 
 settings = "lathe-ar-c360"
 feed = "hand"
 cut_diameter_mm = "{{cad.recess_dia_mm}}"
-inspection = "One clean cone from the floor's corner to the face. A crest touched as in Op 220: X reads D0 − {{process.crest_drift_scrap_in:.3dot}} to D0 + {{process.crest_drift_recut_in:.3dot}}. Floor, calipers' inside jaws flat on it: {{process.floor_flat_read_min_in:.3dot}} or more. The corner Ø{{cad.recess_floor_dia_min_in:.2dot}}–{{cad.recess_floor_dia_max_in:.2dot}} and the rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}} follow (rim {{process.rim_held_min_in:.3dot}}–{{process.rim_held_max_in:.3dot}}), not gauged."
+inspection = "One clean cone from the floor's corner to the face. The three crests touched as in Op 220, their mean: D0 − {{process.crest_drift_scrap_in:.3dot}} to D0 + {{process.crest_drift_recut_in:.3dot}}. Floor, calipers' inside jaws flat on it: {{process.floor_flat_read_min_in:.3dot}}–{{process.floor_flat_read_max_in:.3dot}} (over: read again, the jaws held down). The rim then lies in Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}}, not gauged."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A step at the corner, or the cone short of the face: repeat the last cone pass. Floor off its DRO figure (Op 230): recut it first. Crest (Op 240) under its band: the dish is cut large, scrapped. Over it: touch off X again (Op 220), face the floor out to X Ø{{process.recess_corner_x_dro_in:.3dot}}, repeat the cone passes. Floor under {{process.floor_flat_read_min_in:.3dot}}: face it out by {{process.floor_flat_nominal_in:.3dot}} less the reading, repeat the cone passes."
+instruction = "A step at the corner, or the cone short of the face: repeat the last cone pass. Floor off its DRO figure (Op 230): recut it first. Crest mean (Op 240) under its band, or the floor still over {{process.floor_flat_read_max_in:.3dot}} held down: scrapped. Crest over its band: touch off X again (Op 220), face the floor out to X Ø{{process.recess_corner_x_dro_in:.3dot}}, repeat the cones. Floor under {{process.floor_flat_read_min_in:.3dot}}: face it out by {{process.floor_flat_nominal_in:.3dot}} less the reading, repeat the cones."
 feed = "hand"
 
 [[setups.operations]]
