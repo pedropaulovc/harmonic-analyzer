@@ -349,7 +349,7 @@ kind = "plug_gauge_pair"
 make = "Vermont Gage"
 status = "to_order"
 purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .0930 in GO (plus tolerance) and .0935 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
-note = "Not owned: to buy. MHA-DT-11 drive-pin holes (dt_crankshaft plan, the lathe-jig setup): GO enters, NO-GO does not; the GO in each hole is read over with the stub for the hole's offset."
+note = "Not owned: to buy. MHA-DT-11 drive-pin holes (dt_crankshaft plan, the lathe-jig setup): GO enters, NO-GO does not; the GO in each hole is read over with the stub for the hole's offset. Also MHA-PD-22 drive collar 2X Ø.0930 +.0005/.0000 REAM THRU dowel holes (checked still clamped after the ream; the GO stands in each hole for the measurement over pins): one pair serves both."
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages"]
 
 # MHA-DT-11 note 3's matched journal fit: the crank bore of MHA-DT-05,
@@ -477,6 +477,24 @@ make = "Vermont Gage"
 status = "to_order"
 purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .0630 in GO (plus tolerance) and .0635 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
 note = "Not owned: to buy. MHA-DT-39 cone tip end screw Ø.0630 +.0005/.0000 REAM .12 pivot hole (checked in the lathe after the ream): GO enters to the depth, NO-GO does not. The pin-gauge sets to buy (gauges.pin-gauges) step by .001 in."
+cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
+
+[gauges.plug-gauges-1920-1925]
+name = "Plug gauge pair, .1920 GO and .1925 NO-GO, Class X"
+kind = "plug_gauge_pair"
+make = "Vermont Gage"
+status = "to_order"
+purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .1920 in GO (plus tolerance) and .1925 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
+note = "Not owned: to buy. MHA-PD-22 drive collar Ø.1920 +.0005/.0000 REAM THRU bore (checked in the lathe after the ream and at the bench): GO enters, NO-GO does not; the GO also stands in the bore for the dowel holes' measurement over pins. The pin-gauge sets to buy (gauges.pin-gauges) step by .001 in."
+cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
+
+[gauges.plug-gauges-0615-0620]
+name = "Plug gauge pair, .0615 GO and .0620 NO-GO, Class X"
+kind = "plug_gauge_pair"
+make = "Vermont Gage"
+status = "to_order"
+purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .0615 in GO (plus tolerance) and .0620 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
+note = "Not owned: to buy. MHA-PD-22 drive collar Ø.0615 +.0005/.0000 blind REAM for the MHA-PD-VN-70 pin (checked still clamped after the ream): GO enters to the floor, NO-GO does not. The pin-gauge sets to buy (gauges.pin-gauges) step by .001 in."
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
 
 [gauges.gauge-pin-0625]

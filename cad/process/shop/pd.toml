@@ -88,6 +88,9 @@ description = "Straightedge"
 [tools.chamfer-mill-330ch-1-4-90]  # inventory tools.chamfer-mill-330ch-1-4-90
 description = "330CH 1/4 in 90° included 2-flute chamfer mill"
 diameter_mm = 6.35
+[tools.endmill-carbide-3-64]  # MHA-PD-17 flat at the pin hole's mouth (CM02_pin_hole)
+description = "3/64 in square carbide end mill, 2- or 3-flute"
+diameter_mm = 1.190625
 [tools.form-tool-r180]  # MHA-PD-23 R.18 head dome
 description = "R.180 dome form tool: concave R.180 edge, cuts a convex R.18 dome"
 [tools.gauge-pin-0625]  # MHA-PD-10 .002 TIR TO A Ø.0625 PIN
@@ -187,6 +190,121 @@ rpm = 2800
 chip_load_mm_per_tooth = 0.0081643  # .000321 in; 2800 × 3 × .000321 = 2.7 in/min
 flutes = 3
 feed_unit = "in/min"
+
+# --- MHA-PD-22 drive collar (cad/process/pd_transgear_drive_collar/plan.toml) -
+# Lathe: facing, turning, the centre drill and parting take shop/lathe.toml's
+# C360 rows. LittleMachineShop "Cutting Speeds" (read live 2026-11-22,
+# lathe.toml header), Drilling & Reaming, Brass (C36000): drilling and
+# reaming both 160-175 ft/min; the low end asks over 3000 rpm of the #14 and
+# the .1920 reamer, so both clamp to the lathe's 2000 rpm top speed.
+[settings.lathe-drill-14-c360]
+tool = "drill-14"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, pecking, dry; back fully out to clear chips"
+[settings.lathe-ream-1920-c360]
+tool = "reamer-1920"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, slow and steady, dry; withdraw with the spindle running"
+# Mill (PM-30MV low belt, 100-2800 rpm), the same LittleMachineShop row and
+# AutoDrill "Suggested drilling feed rates" (read 2026-11-20, as shop/pn.toml),
+# row Brass: 1/16 in .001, 1/8 in .003 in/rev, a size between two columns
+# (or under the first) taking the lower column's feed.
+# - #2 centre drill (5/64 pilot): 160 ft/min is over 7800 rpm on the pilot,
+#   so 2800; .001 in/rev: 2.8 in/min.
+# - #43 (.089 in) and #53 (.0595 in): 160 ft/min is 6870 and 10270 rpm, so
+#   2800; .001 in/rev: 2.8 in/min.
+# - .0930 and .0615 chucking reamers (to buy): the same row's 160 ft/min is
+#   the ceiling; the author reams at half the spindle's 2800, 1400 rpm (34
+#   and 23 ft/min), at the 1/16 in column's .001 in/rev: 1.4 in/min, fed in
+#   and fed out.
+[settings.pd-collar-spot-c360]
+tool = "jig-spot"
+material = "lathe-c360"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.pd-collar-drill-43-c360]
+tool = "jig-drill-43"
+material = "lathe-c360"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.pd-collar-drill-53-c360]
+tool = "drill-53"
+material = "lathe-c360"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.pd-collar-ream-0930-c360]
+tool = "reamer-0930"
+material = "lathe-c360"
+rpm = 1400
+feed = "1.4 in/min"
+[settings.pd-collar-ream-0615-c360]
+tool = "reamer-0615"
+material = "lathe-c360"
+rpm = 1400
+feed = "1.4 in/min"
+# The collar's three reamed sizes' go/no-go pairs (cad/config/shop-equipment/
+# gauges.plug-gauges-*, to buy): the pin-gauge sets step by .001 in, so they
+# cannot gauge a .0005 band's top. Each GO at the band's low end, each NO-GO
+# at its top: .1920/.1925 and .0615/.0620 in here; the .0930/.0935 pair is
+# common.toml's gauges record and dt.toml's tools record (shared with
+# MHA-DT-11). A fixed-limit pair reads no scale; its resolution is each
+# member's Class X tolerance, .000040 in = 0.001016 mm. The tools records let
+# a plan list each pair.
+[gauges.plug-gauges-1920-1925]
+range_mm = [4.8768, 4.8895]
+resolution_mm = 0.001016
+[tools.plug-gauges-1920-1925]
+description = "Plug gauge pair, .1920 GO (plus) and .1925 NO-GO (minus), Vermont Gage Class X"
+[gauges.plug-gauges-0615-0620]
+range_mm = [1.5621, 1.5748]
+resolution_mm = 0.001016
+[tools.plug-gauges-0615-0620]
+description = "Plug gauge pair, .0615 GO (plus) and .0620 NO-GO (minus), Vermont Gage Class X"
+
+# --- MHA-PD-17 disc hub (cad/process/pd_transgear_disc_hub/plan.toml) --------
+# Lathe: facing, turning, the centre drill, the N drill and parting take
+# shop/lathe.toml's C360 rows. The .3135 reamer (to buy) takes the
+# LittleMachineShop drilling and reaming row for brass (lathe.toml header,
+# 160-175 ft/min) at its low end. The sharp-nose finishing tool is HSS (its
+# R.003-.004 nose): the same page's HSS turning row for brass, 300-350
+# ft/min, at its low end. Its feed is not the page's .004 in/rev roughing
+# reference: the PM-1127's finest longitudinal power feed, .0025 in/rev
+# (shop machines.pm-1127vf-lb longitudinal_feed_mm_rev), whose cusp the
+# hub plan charges against the spigot's band (Codjiflo #3407 P2).
+[settings.lathe-ream-3135-c360]
+tool = "reamer-3135"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, slow and steady, dry; withdraw with the spindle running"
+[settings.lathe-sharp-nose-c360]
+tool = "lathe-tool-sharp-nose"
+material = "lathe-c360"
+sfm = 300
+feed_mm_rev = 0.0635
+# Mill (PM-30MV low belt, 100-2800 rpm), the rows the MHA-PD-22 block above
+# cites: #51 (.067 in) and #56 (.0465 in) at 160 ft/min are 9120 and 13140
+# rpm, so 2800; the AutoDrill 1/16 in column's .001 in/rev (the #56 under
+# the first column takes it): 2.8 in/min. The 3/64 carbide end mill plunges a
+# flat on the sloping O.D. at 2800 rpm and half the drill's feed, .0005
+# in/rev (author: an end mill plunged off square deflects at a drill's
+# feed): 1.4 in/min.
+[settings.pd-hub-drill-51-c360]
+tool = "drill-51"
+material = "lathe-c360"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.pd-hub-drill-56-c360]
+tool = "drill-56"
+material = "lathe-c360"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.pd-hub-plunge-3-64-c360]
+tool = "endmill-carbide-3-64"
+material = "lathe-c360"
+rpm = 2800
+feed = "1.4 in/min"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
