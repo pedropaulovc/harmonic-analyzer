@@ -467,7 +467,7 @@ cut_diameter_mm = "{{process.bar_dia_mm}}"
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Note 3, before any finishing pass: on the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the eight Class ZZ pins: .3760 plus and .3765 minus, .4385 plus and .439 minus, .3135 plus and .314 minus, .0930 plus and .0935 minus; and the .0930 reamer across two opposite margins at its front end. Write the nine readings here, and each pin's reading on its tag."
-inspection = "Each plus (GO) pin reads its low limit to .0002 over; each minus (NO-GO) pin its high limit to .0002 under: a pin outside that is not used."
+inspection = "Each plus (GO) pin reads its low limit to .0002 over; each minus (NO-GO) pin its high limit to .0002 under: a pin outside that is not used. The .0930 reamer reads under the .0935 pin's reading, else it is not used: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = [9.5504, 9.5631] }, { gauge = "micrometers", band_mm = [11.1379, 11.1506] }, { gauge = "micrometers", band_mm = [7.9629, 7.9756] }, { gauge = "micrometers", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }]
 
 [[setups.operations]]
