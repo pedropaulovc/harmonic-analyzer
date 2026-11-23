@@ -47,15 +47,21 @@ from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import limits
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from pd_transgear_pin_spec import PIN_NUMBER
 from pd_transgear_rear_bushing_spec import (
     BORE_CALLOUT,
     BORE_DIA,
+    BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     ISOMETRIC_VIEW_SCALE,
@@ -64,7 +70,10 @@ from pd_transgear_rear_bushing_spec import (
     OD,
     SURFACE_FINISHES,
     THRUST_FACE_CAPTION,
+    UNIT,
+    WALL_WORST,
 )
+from transgear_cluster_fit import BORE_DIAMETRAL_CLEARANCE
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -135,6 +144,95 @@ THRUST_CAPTION_XY = (
     FACE_FINISHES["sleeve_face"][1][1] + 0.0185,
 )
 ISO_NOTE_XY = (0.315, 0.145)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_pd_transgear_rear_bushing: one extrusion along model +Z).  The
+# sleeve's thrust face at z = LENGTH is the datum end the length runs from,
+# so the bar's faced end takes the finish; the arm face at z = 0 is the far
+# end.  The O.D. takes the title block's .XX row, the length its .XXX row,
+# the bore its reamed band.  Each ``span`` is a diameter's model-Z extent.
+# The declarations print nothing.
+# The sheet prints no manufacturing note: every requirement is a dimension,
+# its band or its native callout, so the feature manifest's notes are empty.
+DRAWING_NOTES = ""
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_transgear_rear_bushing"
+part_metadata(
+    model_sources=("LENGTH", "OD", "BORE_DIA"),
+    precision_sources=("DRAWING_PRECISION_BY_NAME",),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), LENGTH),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": LENGTH}, ("LENGTH",)),
+        "outward": ([0.0, 0.0, 1.0], ("LENGTH",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("length",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("LENGTH",)),
+        "outward": ([0.0, 0.0, -1.0], ("LENGTH",)),
+        "length": (
+            limits(LENGTH, _P["RingLength"], unit=UNIT),
+            ("LENGTH", "UNIT", (_SELF, "PROFILE_KEEP")),
+        ),
+        "length_nominal": (LENGTH, ("LENGTH",)),
+        "length_from": ("datum_end", ((_SELF, "PROFILE_KEEP"),)),
+        "callout": (LENGTH_CALLOUT, ("LENGTH_CALLOUT",)),
+    },
+    precision={"length": _P["RingLength"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(OD),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("OD",)),
+        "at": ([0.0, 0.0, 0.0], ("OD",)),
+        "span": ([0.0, LENGTH], ("LENGTH",)),
+        "dia": (
+            limits(OD, _P["RingOd"], unit=UNIT),
+            ("OD", "UNIT", (_SELF, "OD_ON_PROFILE")),
+        ),
+        "dia_nominal": (OD, ("OD",)),
+    },
+    precision={"dia": _P["RingOd"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(BORE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("BORE_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("BORE_DIA",)),
+        "span": ([0.0, LENGTH], ("LENGTH",)),
+        "dia": (
+            limits(BORE_DIA, _P["BoreDia"], BORE_DIA_BAND, unit=UNIT),
+            ("BORE_DIA", "BORE_DIA_BAND", "UNIT", (_SELF, "END_KEEP")),
+        ),
+        "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
+        "thru": (True, ("BORE_CALLOUT",)),
+        "process": ("ream", ("BORE_CALLOUT",)),
+        "wall_min": (WALL_WORST, ("WALL_WORST",)),
+        "diametral_clearance_ref": (
+            list(BORE_DIAMETRAL_CLEARANCE),
+            (("transgear_cluster_fit", "BORE_DIAMETRAL_CLEARANCE"), "BORE_CALLOUT"),
+        ),
+        "mate": (PIN_NUMBER, (("pd_transgear_pin_spec", "PIN_NUMBER"), "BORE_CALLOUT")),
+        "callout": (BORE_CALLOUT, ("BORE_CALLOUT",)),
+    },
+    precision={"dia": _P["BoreDia"]},
+)
 
 
 def _move_dimension(
