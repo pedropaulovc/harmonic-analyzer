@@ -139,7 +139,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off: the rear face, the cup's thrust face, Ra 63. The last skim no more than .002 deep at the settings' feed: the AR's R0.4 mm nose at that feed leaves about Ra 32. Set DRO Z0 on it."
+instruction = "Face the bar end square, {{process.face_allowance_in:.3dot}} in off: the rear face, the cup's thrust face, Ra 63. The last skim no more than .002 deep at the settings' feed: the AR's R0.4 mm nose at that feed leaves about Ra 32. Set DRO Z0 on it."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 

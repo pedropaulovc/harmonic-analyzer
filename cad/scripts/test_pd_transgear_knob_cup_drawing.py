@@ -558,6 +558,12 @@ def test_the_travelers_name_the_assembly_steps_they_leave_work_for():
         ("pd_transgear_knob_cup", "knob-stack-fitted"),
         ("pd_transgear_knob_bush", "pin-pressed"),
     ):
-        text = (process / stem / "plan.toml").read_text(encoding="utf-8")
+        text = "".join(
+            path.read_text(encoding="utf-8")
+            for path in (
+                process / stem / "plan.toml",
+                *(process / stem).glob("diagrams/*.svg"),
+            )
+        )
         cited = set(re.findall(r"MHA-PD-00 step (\d+)", text))
         assert cited == {str(steps.step_number(key))}, stem
