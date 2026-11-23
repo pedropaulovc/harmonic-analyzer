@@ -15,8 +15,8 @@
 # on 1 in parallels across the vise jaws, its back edge on the fixed jaw;
 # both blanks bonded to its top on blue painter's tape on the plate and on
 # each blank with CA glue between (owner 2026-11-23), their left ends flush
-# with the plate's left end, blank A's back edge on the fixed jaw's face and
-# blank B's on blank A's front edge. G54: X0 the plate's left end, Y0 the
+# with the plate's left end, blank A's back edge on a strip of the tape on
+# the fixed jaw's face and blank B's on blank A's front edge. G54: X0 the plate's left end, Y0 the
 # fixed jaw's face, Z0 the plate top. PC01_sheet (cam:pd_platen_clip,
 # cad/process/pd_platen_clip/cam.py) runs the 1/32 downcut end mill (T1) in
 # four equal levels, the last .004 into the spoil plate: each Ø.116 hole
@@ -95,7 +95,8 @@ strip_yield_max_mpa = 359.0
 # Both blanks' left ends flush with the plate's left end (X0), so each
 # clip's rail near end, and each lamination's left end, stands this far in.
 part_left_x_mm = 4.064
-# From blank A's back edge (on the fixed jaw, Y0) to the first clip's
+# From Y0 (the fixed jaw's face; blank A's back edge sits .005 off it, on
+# the jaw's tape strip) to the first clip's
 # spring edge, and between parts down each blank.
 part_margin_y_mm = 2.54
 part_gap_mm = 2.032
@@ -160,11 +161,11 @@ blank_area_mm2 = 4645.152
 # .0155 a level), the depth that goes with the slotting chip load the feed
 # is held to (delegated ruling 2026-11-22: never above the maker's
 # published chip load). Precedents for this cutter in brass, both
-# shallower than the maker's limit: this plan on main ran three levels of
-# .0146 under the .006 tape; the phasing comb (dt_cone_gear_tl_phasing_comb,
-# its outline op, on this branch) runs three of .0123 (.3135 mm). The
-# thicker stack adds .007 to the cut, so four levels of .0127 here, no
-# deeper than this plan's own .0146. The 0.6 MPa bond cap does
+# shallower than the maker's limit: the .006-tape version of this plan ran
+# three levels of .0146; dt_cone_gear_tl_phasing_comb's outline runs three
+# of .0123 (.3135 mm). The thicker stack adds .007 to the cut, so four
+# levels of .0127 here, no deeper than the .006-tape version's .0146. The
+# 0.6 MPa bond cap does
 # not bind: the cut asks 0.056 MPa in shear of the smallest piece (a male
 # die half) and no tension (a downcut).
 sheet_tip_z_mm = -0.1016
@@ -336,8 +337,8 @@ title = "CNC mill: bond the blanks to the spoil plate; cut the clips and the for
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Spoil plate on 1 in parallels across the vise jaws, its back edge on the fixed jaw, centred along the jaws: the jaw tops stand {{process.jaw_top_over_plate_mm:in.3dot}} above the plate top, room for the edge finder's touch and blank A's edge, and at the least stickout the collet's nose passes {{process.collet_over_jaw_mm:in.2dot}} over them at the cut. Blanks A and B bonded to its top: blue tape under their whole faces, on the plate and on each blank, and a zigzag CA bead between that runs under every part (stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}); both left ends flush with the plate's left end, A's back edge against the fixed jaw and B's against A's front edge."
-datum = "Program PC01_sheet. G54: X0 the plate's left end, Y0 the fixed jaw's face (the plate's back edge and blank A's), Z0 the plate top, bare right of the tape; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack, starting each cut over the thickest stack ({{process.tape_stack_max_mm:in.3dot}}) and ending {{process.sheet_tip_into_plate_mm:in.3dot}} into the plate; +Y toward the fixed jaw. Each clip's rail near end stands at X {{process.part_left_x_mm:in.3dot}}, the first clip's spring edge at Y {{process.clip_spring_edge_y_mm:in.3dot}}. Set X, Y and Z again after an alarm, a stall, an E-stop or any move of the plate; a Reset after a Feed Hold keeps them."
+holding = "Spoil plate on 1 in parallels across the vise jaws, its back edge on the fixed jaw, centred along the jaws: the jaw tops stand {{process.jaw_top_over_plate_mm:in.3dot}} above the plate top, room for the edge finder's touch and blank A's edge, and at the least stickout the collet's nose passes {{process.collet_over_jaw_mm:in.2dot}} over them at the cut. Blanks A and B bonded to its top: blue tape under their whole faces, on the plate and on each blank, and a zigzag CA bead between that runs under every part (stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}); both left ends flush with the plate's left end, A's back edge against a 1/8 in strip of the tape on the fixed jaw's face (so no glue reaches the jaw) and B's against A's front edge."
+datum = "Program PC01_sheet. G54: X0 the plate's left end, Y0 the fixed jaw's bare face (the plate's back edge; blank A's stands .005 off it on the jaw's tape strip, which the program does not need: it cuts from G54), Z0 the plate top, bare right of the tape; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack, starting each cut over the thickest stack ({{process.tape_stack_max_mm:in.3dot}}) and ending {{process.sheet_tip_into_plate_mm:in.3dot}} into the plate; +Y toward the fixed jaw. Each clip's rail near end stands at X {{process.part_left_x_mm:in.3dot}}, the first clip's spring edge at Y {{process.clip_spring_edge_y_mm:in.3dot}}. Set X, Y and Z again after an alarm, a stall, an E-stop or any move of the plate; a Reset after a Feed Hold keeps them."
 diagram = { file = "diagrams/sheet.svg", alt = "Plan of the spoil plate in the vise: the plate's blue tape, four strips along X from its left end to 4 in, and blank A against the fixed jaw and blank B in front of it on it, both flush with the plate's left end; dashed, the tape seams along X, the blanks' offset from the plate's; on A the two clips, rails toward the moving jaw, and the first lamination; on B the other three; each lamination split along its bow profile into a male half (toward the moving jaw) and a female half. The 1/32 end mill enters every outline from beyond the plate's left end." }
 # Top: the thickest strip on the thickest tape stack; deepest: the cutter's
 # tip, .004 into the spoil plate. Across the jaws, the two blanks; along
@@ -356,7 +357,7 @@ instruction_detailed = "Edge finder (900 rpm). Y: its tip .10 below the jaw top,
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mike each blank 1/2 in in from each end and write the four readings down in mm (in × 25.4): op 170 subtracts them from its Z readings to find the tape stack."
+instruction = "Mike each blank 1/2 in in from each end and write the four readings down in mm (in × 25.4): op 180 subtracts them from its Z readings to find the tape stack."
 feed = "hand"
 
 [[setups.operations]]
@@ -390,17 +391,25 @@ feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
+tool = "tape"
+drilling = "none"
+sizing = "other"
+instruction = "Tape the fixed jaw: knife a 1/8 in strip off the blue tape against a steel rule and lay it along the jaw's face over the plate's length, its lower edge down on the plate's tape. Glue squeezed out at blank A's back edge lands on it, not on jaw steel. It stays below the edge finder's touch (.10 below the jaw top) and above the plate's seat."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
 tool = "glue"
 drilling = "none"
 sizing = "other"
 steps = [
-  { kind = "action", text = "Glue, blank A: thick CA on the plate's tape in A's place (against the fixed jaw), a zigzag bead about 1/16 wide, lines about 3/4 in apart, from 1/16 in off the fixed jaw (under clip 1's finger) to 1/4 in inside A's front edge and ends: about 8 in of bead, .5 sq in. No glue on bare metal." },
+  { kind = "action", text = "Glue, blank A: thick CA on the plate's tape in A's place (against the jaw's tape strip), a zigzag bead about 1/16 wide, lines about 3/4 in apart, from 1/16 in off the jaw's strip (under clip 1's finger) to 1/4 in inside A's front edge and ends: about 8 in of bead, .5 sq in. No glue on bare metal." },
   { kind = "action", text = "Mist the accelerator on blank A's tape, two or three sprays." },
 ]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Press, within about 10 seconds of the spray (the glue grabs at once; the blank cannot be slid after): lower blank A, its back edge against the fixed jaw and its left end against a steel rule held on the plate's left end. Press it down over its whole face with a flat block for 1 minute. Squeeze-out at the back edge lands on the plate's tape, which is fine; wipe any off the jaw's face with a dry rag at once."
+instruction = "Press, within about 10 seconds of the spray (the glue grabs at once; the blank cannot be slid after): lower blank A, its back edge against the jaw's tape strip and its left end against a steel rule held on the plate's left end. Press it down over its whole face with a flat block for 1 minute. Squeeze-out at the back edge lands on the tape strip: leave it."
 feed = "hand"
 
 [[setups.operations]]
@@ -426,7 +435,7 @@ feed = "hand"
 steps = [
   { kind = "action", text = "Check, stack (spindle stopped): drag the same leaf under the tip on each blank's top 1/2 in in from each end; read Z (mm). Stack = reading − 0.051 (the leaf) − that end's op 70 thickness." },
   { kind = "check", text = "Every stack {{process.tape_stack_min_mm:.2f}}–{{process.tape_stack_max_mm:.2f}} mm ({{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}); each blank's two ends within 0.05 mm (.002) of each other." },
-  { kind = "stop", text = "Out of band or ends apart by more: op 190, then this op again." },
+  { kind = "stop", text = "Out of band or ends apart by more: op 200, then this op again." },
 ]
 feed = "hand"
 
@@ -434,12 +443,12 @@ feed = "hand"
 steps = [
   { kind = "action", text = "Check, push test: jog Z up clear. With the heel of the hand push each blank hard along and across; try to lift each corner with a thumbnail." },
   { kind = "check", text = "No movement, no creak, no lifted corner." },
-  { kind = "stop", text = "Any movement: op 190, then ops 170 and 180 again." },
+  { kind = "stop", text = "Any movement: op 200, then ops 180 and 190 again." },
 ]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Only after a Stop at op 170 or 180: jog Z up clear; the plate stays in the vise. Free both blanks with the blade under the plate's tape and peel them as ops 260–270 do, peel all the tape, then repeat ops 80–160."
+instruction = "Only after a Stop at op 180 or 190: jog Z up clear; the plate stays in the vise. Free both blanks with the blade under the plate's tape and peel them as ops 270–280 do, peel all the tape, then repeat ops 80–170."
 feed = "hand"
 
 [[setups.operations]]
@@ -451,7 +460,7 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Only after a feed hold in the prove-out: stop the program, spindle off, jog Z up clear. Re-check the plate's seat and the blanks' places (ops 50, 130 and 150); home ($H) and set G54 again (ops 60 and 160, then this Z0 1.000 in high); prove again from the start."
+instruction = "Only after a feed hold in the prove-out: stop the program, spindle off, jog Z up clear. Re-check the plate's seat and the blanks' places (ops 50, 140 and 160); home ($H) and set G54 again (ops 60 and 170, then this Z0 1.000 in high); prove again from the start."
 feed = "hand"
 
 [[setups.operations]]
@@ -507,7 +516,7 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "Plate out of the vise, on the bench. No solvent soak: the parts come off by peeling. Wastes first: slide a thin blade (single-edge razor or .010 feeler) flat under the plate's tape at a waste's outer edge, work it along, and peel the waste off with its tape."
+instruction = "Peel the tape strip off the fixed jaw's face; where squeeze-out holds it to blank A's edge, leave it on the blank. Plate out of the vise, on the bench. No solvent soak: the parts come off by peeling. Wastes first: slide a thin blade (single-edge razor or .010 feeler) flat under the plate's tape at a waste's outer edge, work it along, and peel the waste off with its tape."
 feed = "hand"
 
 [[setups.operations]]
