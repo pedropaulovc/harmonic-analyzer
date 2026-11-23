@@ -28,10 +28,11 @@ _MODEL_VALUES = {
     "WindowWidth": spec.WINDOW_WIDTH,
     "WindowHeight": spec.WINDOW_HEIGHT,
     "LeftWall": spec.RAIL_SIDE,
-    "BottomWall": spec.RAIL_END,
+    "BottomWall": spec.RAIL_BOTTOM,
     "Depth": spec.FRAME_DEPTH,
     "ScrewX": spec.OUTER_WIDTH / 2.0,
     "ScrewZ": spec.FRAME_DEPTH / 2.0,
+    "WindowCornerR": spec.WINDOW_CORNER_R,
 }
 
 
@@ -40,10 +41,12 @@ def _half_width(text: str) -> float:
 
 
 def _printed_text(name: str) -> str:
-    """The decimal-inch text the sheet prints, leading zero dropped."""
+    """The decimal-inch text the sheet prints, leading zero dropped, behind
+    its native prefix (the window corners' 4X R)."""
     places = spec.DRAWING_PRECISION_BY_NAME[name]
     text = f"{_MODEL_VALUES[name] / 25.4:.{places}f}"
-    return text[1:] if text.startswith("0.") else text
+    text = text[1:] if text.startswith("0.") else text
+    return spec.DIMENSION_PREFIXES.get(name, "") + text
 
 
 def test_required_drawing_paths() -> None:
@@ -62,12 +65,15 @@ def test_spec_is_the_single_source_of_geometry_and_marked_dimensions() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.BOTTOM_KEEP)
     assert kept == marked == set(_MODEL_VALUES)
     assert not set(drawing.FRONT_KEEP) & set(drawing.BOTTOM_KEEP)
-    assert set(drawing.FRONT_KEEP) == spec.DRAWING_DIMENSIONS["RingProfile"]
+    assert set(drawing.FRONT_KEEP) == (
+        spec.DRAWING_DIMENSIONS["RingProfile"] | spec.DRAWING_DIMENSIONS["WindowCorners"]
+    )
     for name in (
         "OUTER_WIDTH",
         "OUTER_HEIGHT",
         "RAIL_SIDE",
-        "RAIL_END",
+        "RAIL_BOTTOM",
+        "RAIL_TOP",
         "FRAME_DEPTH",
         "WINDOW_CORNER_R",
     ):
@@ -80,13 +86,13 @@ def test_spec_is_the_single_source_of_geometry_and_marked_dimensions() -> None:
 
 def test_volume_expectations_are_analytic() -> None:
     window = (spec.OUTER_WIDTH - 2 * spec.RAIL_SIDE) * (
-        spec.OUTER_HEIGHT - 2 * spec.RAIL_END
+        spec.OUTER_HEIGHT - spec.RAIL_BOTTOM - spec.RAIL_TOP
     )
     ring = (spec.OUTER_WIDTH * spec.OUTER_HEIGHT - window) * spec.FRAME_DEPTH
-    assert part.V_RING == pytest.approx(ring) == pytest.approx(3891.272)
+    assert part.V_RING == pytest.approx(ring) == pytest.approx(3816.088, abs=1e-3)
     r = spec.WINDOW_CORNER_R
     corners = 4 * (r * r - math.pi * r * r / 4.0) * spec.FRAME_DEPTH
-    hole = math.pi * (TAP_DRILL_MM["#4-40"] / 2.0) ** 2 * spec.RAIL_END
+    hole = math.pi * (TAP_DRILL_MM["#4-40"] / 2.0) ** 2 * spec.RAIL_BOTTOM
     assert part.V_FINAL == pytest.approx(ring + corners - hole)
 
 
@@ -113,8 +119,14 @@ def test_printed_precision_is_authored_for_every_marked_dimension() -> None:
     for feature, names in spec.DRAWING_DIMENSIONS.items():
         assert set(spec.DRAWING_PRECISION[feature]) == names
     # Every rail, window and envelope size feeds a printed-worst-case stack,
-    # so nothing prints .X: everything prints the title block's .XX.
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {2}
+    # so nothing prints .X: everything prints the title block's .XX, the
+    # window corners' R.065 its .XXX (.060-.070, owner ruling 2026-11-23,
+    # tool audit Q9).
+    assert {
+        name: places
+        for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
+        if places != 2
+    } == {"WindowCornerR": 3}
 
 
 def test_printed_worst_case_keeps_the_window_rails_thread_and_tap_wall() -> None:
@@ -133,13 +145,31 @@ def test_printed_worst_case_keeps_the_window_rails_thread_and_tap_wall() -> None
     assert (spec.OUTER_WIDTH - one) - (spec.RAIL_SIDE + two) - (
         spec.WINDOW_WIDTH + two
     ) < WALL_FLOOR_MM
+    # The top rail, thinned to .22 (owner ruling 2026-11-23, PN-01 B1), is
+    # unprinted: 1.57 - .25 - 1.13 = .19 at the printed worst, over the target.
+    assert spec.RAIL_TOP == pytest.approx(0.22 * 25.4)
+    assert spec.WINDOW_HEIGHT == pytest.approx(1.12 * 25.4)
+    assert spec.OUTER_HEIGHT == pytest.approx(1.58 * 25.4)
+    assert spec.TOP_WALL_PRINTED_MIN == pytest.approx(
+        (spec.OUTER_HEIGHT - two)
+        - (spec.RAIL_BOTTOM + two)
+        - (spec.WINDOW_HEIGHT + two)
+    )
+    assert spec.TOP_WALL_PRINTED_MIN == pytest.approx(0.19 * 25.4)
     assert spec.TOP_WALL_PRINTED_MIN >= WALL_TARGET_MM
+    # Per unit thumb-screw load the thinned top rail, at its printed worst,
+    # bends less than the unchanged bottom rail at its printed best: 0.44 of
+    # its stress, 0.55 of its deflection.
+    assert spec.TOP_RAIL_STRESS_RATIO == pytest.approx(0.439, abs=1e-3)
+    assert spec.TOP_RAIL_DEFLECTION_RATIO == pytest.approx(0.546, abs=1e-3)
     # Rule 18: 1.5D of full thread in the bottom rail, and not at .X.
     major = THREAD_MAJOR_MM[spec.SET_SCREW_TAP_SPEC.size]
     lead = 1.5 * 25.4 / 40.0
-    assert spec.BOTTOM_RAIL_FULL_THREAD_MIN == pytest.approx(spec.RAIL_END - two - lead)
+    assert spec.BOTTOM_RAIL_FULL_THREAD_MIN == pytest.approx(
+        spec.RAIL_BOTTOM - two - lead
+    )
     assert spec.BOTTOM_RAIL_FULL_THREAD_MIN >= 1.5 * major
-    assert spec.RAIL_END - one - lead < 1.5 * major
+    assert spec.RAIL_BOTTOM - one - lead < 1.5 * major
     # Rule 17: the tap station prints .16 (.XX) about the .155 mid-plane, so
     # the near wall keeps the target and the far wall falls between the floor
     # and the target (RV-01), stated once on the .16 that sets it (rule 20).
@@ -152,7 +182,7 @@ def test_printed_worst_case_keeps_the_window_rails_thread_and_tap_wall() -> None
     assert WALL_FLOOR_MM <= far < WALL_TARGET_MM
     assert spec.TAP_WALL_MIN_MM == pytest.approx(0.074 * 25.4)
     assert far == pytest.approx(spec.TAP_WALL_MIN_MM, abs=0.001)
-    assert list(spec.DIMENSION_CALLOUTS) == ["ScrewZ"]
+    assert list(spec.DIMENSION_CALLOUTS) == ["ScrewZ", "WindowCornerR"]
     assert ".074 MIN" in spec.DIMENSION_CALLOUTS["ScrewZ"]
 
 
@@ -160,7 +190,11 @@ def test_window_height_band_keeps_the_thumb_screw_throw() -> None:
     # The stirrup hangs from the window's top edge, so a short window lifts
     # its bottom rail toward the marker: the printed band must stay inside the
     # carriage's throw slack, with the block's own printed height band and the
-    # window corners' worst ride on the neck (below) on top.
+    # window corners' worst ride on the neck (below) on top.  Owner ruling
+    # 2026-11-23, PN-01 B1: the 1.12 window (the top rail .22, the outside
+    # unchanged) drops the bottom rail .02 farther from the marker.  At R.070
+    # the slack is 2.553 against 0.254 + 0.288 + 1.778, so 0.233 spare.  The
+    # 1.10 window would have left -0.275 (sketch q9-pn01-throw-stack.png).
     slack = carriage.MARKER_BOTTOM_LOCAL_Y - 1.0 - carriage.FRAME_WINDOW_BOTTOM_LOCAL_Y
     window_band = printed_band_mm(
         spec.DRAWING_PRECISION_BY_NAME["WindowHeight"], unit=spec.UNIT
@@ -168,7 +202,14 @@ def test_window_height_band_keeps_the_thumb_screw_throw() -> None:
     block_band = max(
         abs(d) for d in printed_deviations(v_block.BLOCK_HEIGHT, 2, unit=v_block.UNIT)
     )
-    assert slack >= window_band + block_band + carriage.WINDOW_CORNER_RIDE_MAX
+    needed = window_band + block_band + carriage.WINDOW_CORNER_RIDE_MAX
+    assert (slack, window_band, block_band) == pytest.approx(
+        (2.553, 0.254, 0.288), abs=1e-3
+    )
+    assert carriage.WINDOW_CORNER_RIDE_MAX == pytest.approx(0.070 * 25.4)
+    assert slack - needed == pytest.approx(0.233, abs=1e-3)
+    assert slack >= needed
+    assert slack - 0.02 * 25.4 - needed == pytest.approx(-0.275, abs=1e-3)
 
 
 def _corner_ride(r: float, gap: float) -> float:
@@ -177,15 +218,22 @@ def _corner_ride(r: float, gap: float) -> float:
     return 0.0 if gap >= r else r - math.sqrt(r * r - (r - gap) ** 2)
 
 
-def test_window_corners_ride_the_neck_at_most_a_full_radius() -> None:
-    # The sheet prints no window radius, so the title block's INSIDE CORNERS
-    # R.040 MAX governs it.  With the window at its printed minimum, the neck
-    # at its printed maximum and the stirrup anywhere across the neck (nothing
-    # centres it), the corners ride the neck's top edges and lift the stirrup:
-    # the carriage takes the worst lift.
-    assert spec.WINDOW_CORNER_R <= spec.INSIDE_CORNER_R_MAX
-    assert "WindowCornerR" not in spec.DRAWING_PRECISION_BY_NAME
-    r = spec.INSIDE_CORNER_R_MAX
+def test_window_corners_print_r065_and_ride_the_neck_at_most_a_full_radius() -> None:
+    # Owner ruling 2026-11-23, tool audit Q9: the window corners print 4X
+    # R.065 at three places (.060-.070, the title block's .XXX), naming why
+    # they stand over INSIDE CORNERS R.040 MAX.  With the window at its
+    # printed minimum, the neck at its printed maximum and the stirrup
+    # anywhere across the neck (nothing centres it), the corners ride the
+    # neck's top edges and lift the stirrup: the carriage takes the worst
+    # lift, at the band's greatest R.070.
+    assert spec.WINDOW_CORNER_R == pytest.approx(0.065 * 25.4)
+    assert (spec.WINDOW_CORNER_R_MIN, spec.WINDOW_CORNER_R_MAX) == pytest.approx(
+        (0.060 * 25.4, 0.070 * 25.4)
+    )
+    assert spec.DRAWING_DIMENSIONS["WindowCorners"] == {"WindowCornerR"}
+    assert spec.DIMENSION_PREFIXES == {"WindowCornerR": "4X R"}
+    assert spec.DIMENSION_CALLOUTS["WindowCornerR"] == "NOTHING SEATS IN\nTHESE CORNERS"
+    r = spec.WINDOW_CORNER_R_MAX
     band = printed_band_mm(2, unit=spec.UNIT)
     float_total = spec.WINDOW_WIDTH - band - (v_block.NECK_DEPTH + 2.0 * band)
     assert float_total > 0.0
@@ -272,7 +320,7 @@ def test_front_dimensions_stack_smaller_nearer_the_ring() -> None:
     assert keep["LeftWall"][1] < keep["WindowWidth"][1] < drawing.FRONT_BOTTOM_Y
     assert keep["WindowWidth"][1] - keep["LeftWall"][1] >= 0.008
     # The bottom wall's text sits between its own extension lines.
-    low, high = drawing.FRONT_BOTTOM_Y, drawing._front_xy(0.0, spec.RAIL_END)[1]
+    low, high = drawing.FRONT_BOTTOM_Y, drawing._front_xy(0.0, spec.RAIL_BOTTOM)[1]
     assert low + 0.0035 < keep["BottomWall"][1] < high - 0.0035
     # The left wall stays clear above the bottom view.
     assert keep["LeftWall"][1] - drawing.BOTTOM_HIGH_Y > 0.010
@@ -373,7 +421,7 @@ def test_the_ring_is_a_feature_export_part_with_one_owner_per_face() -> None:
     selectors = export_features.feature_selectors("pn_pen_frame")
     w, h, d = spec.OUTER_WIDTH, spec.OUTER_HEIGHT, spec.FRAME_DEPTH
     x0, x1 = spec.RAIL_SIDE, spec.RAIL_SIDE + spec.WINDOW_WIDTH
-    y0, y1 = spec.RAIL_END, spec.RAIL_END + spec.WINDOW_HEIGHT
+    y0, y1 = spec.RAIL_BOTTOM, spec.RAIL_BOTTOM + spec.WINDOW_HEIGHT
     r = spec.WINDOW_CORNER_R
     corners = [
         _cylinder(
@@ -432,10 +480,11 @@ def test_ring_feature_bands_are_the_printed_ones() -> None:
     assert features["back_face"]["depth"] == pytest.approx([_in(0.30), _in(0.32)])
     window = features["window"]
     assert window["width"] == pytest.approx([_in(0.73), _in(0.75)])
-    assert window["height"] == pytest.approx([_in(1.09), _in(1.11)])
+    assert window["height"] == pytest.approx([_in(1.11), _in(1.13)])
     assert window["left_wall"] == pytest.approx([_in(0.12), _in(0.14)])
     assert window["bottom_wall"] == pytest.approx([_in(0.23), _in(0.25)])
-    assert window["corner_r_max"] == pytest.approx(_in(0.040))
+    assert window["corner_r"] == pytest.approx([_in(0.060), _in(0.070)])
+    assert window["corner_count"] == 4
     tap = features["thumb_screw_tap"]
     assert tap["thread"] == "#4-40 UNC-2B" and tap["thru"] is True
     assert tap["breaks_into"] == "window"

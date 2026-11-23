@@ -75,7 +75,7 @@ from pn_pen_frame_spec import (
     ISOMETRIC_VIEW_NOTE,
     OUTER_HEIGHT,
     OUTER_WIDTH,
-    RAIL_END,
+    RAIL_BOTTOM,
     RAIL_SIDE,
     SET_SCREW_TAP_SPEC,
     TAP_WALL_CALLOUT,
@@ -156,7 +156,7 @@ HOLE_SHEET_XY = _bottom_xy(HOLE_CENTER_MM[0], HOLE_CENTER_MM[2])
 HOLE_R_SHEET = blind_cut_dia_mm(SET_SCREW_TAP_SPEC) * VIEW_SCALE / 2000.0
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # text position.  Front view (ring x 0.090..0.140, y 0.145..0.225; window
-# x 0.096..0.134, y 0.157..0.213):
+# x 0.096..0.134, y 0.157..0.214):
 # - The 28.0 width rides above, alone: no other dimension leaves the top.
 # - The window corner's two location dims and its two sizes all leave from
 #   the window's left and bottom edges (build_pn_pen_frame's chain order), so
@@ -175,7 +175,7 @@ FRONT_KEEP = {
     "OuterSpanX": (FRONT_CENTER[0], FRONT_TOP_Y + 0.014),
     "OuterHeightDim": (FRONT_RIGHT_X + 0.030, FRONT_CENTER[1]),
     "WindowHeight": (FRONT_LEFT_X - 0.010, FRONT_CENTER[1]),
-    "BottomWall": (FRONT_LEFT_X - 0.024, _front_xy(0.0, RAIL_END / 2.0)[1]),
+    "BottomWall": (FRONT_LEFT_X - 0.024, _front_xy(0.0, RAIL_BOTTOM / 2.0)[1]),
     "WindowWidth": (FRONT_CENTER[0], FRONT_BOTTOM_Y - 0.008),
     "LeftWall": (FRONT_LEFT_X - 0.012, FRONT_BOTTOM_Y - 0.017),
     "WindowCornerR": (FRONT_RIGHT_X + 0.045, FRONT_TOP_Y + 0.020),
@@ -302,12 +302,12 @@ for _name, _normal, _axis, _value, _key, _dim, _source, _from, _keep in (
         },
         precision={_key: _P[_dim]},
     )
-# The window, through the depth: its width .74 and height 1.10, and its
+# The window, through the depth: its width .74 and height 1.12, and its
 # lower-left corner .13 from the left face and .24 from the bottom face
 # (FRONT_KEEP). Its four walls and four corner rounds; the rounds print
 # 4X R.065 (FRONT_KEEP WindowCornerR).
 _WINDOW_X = (RAIL_SIDE, RAIL_SIDE + WINDOW_WIDTH)
-_WINDOW_Y = (RAIL_END, RAIL_END + WINDOW_HEIGHT)
+_WINDOW_Y = (RAIL_BOTTOM, RAIL_BOTTOM + WINDOW_HEIGHT)
 requirement(
     "window",
     kind="pocket",
@@ -342,9 +342,9 @@ requirement(
         "left_wall_nominal": (RAIL_SIDE, ("RAIL_SIDE",)),
         "left_wall_from": ("left_face", ((_SELF, "FRONT_KEEP"),)),
         "bottom_wall": _band(
-            "BottomWall", RAIL_END, ("RAIL_END", (_SELF, "FRONT_KEEP"))
+            "BottomWall", RAIL_BOTTOM, ("RAIL_BOTTOM", (_SELF, "FRONT_KEEP"))
         ),
-        "bottom_wall_nominal": (RAIL_END, ("RAIL_END",)),
+        "bottom_wall_nominal": (RAIL_BOTTOM, ("RAIL_BOTTOM",)),
         "bottom_wall_from": ("bottom_face", ((_SELF, "FRONT_KEEP"),)),
         "corner_r": _band(
             "WindowCornerR",
@@ -368,7 +368,7 @@ requirement(
 requirement(
     "thumb_screw_tap",
     kind="threaded_hole",
-    faces=(CylinderFace(_TAP_DRILL, contains_y_mm=RAIL_END / 2.0),),
+    faces=(CylinderFace(_TAP_DRILL, contains_y_mm=RAIL_BOTTOM / 2.0),),
     requirements=("thread", "dia", "thru", "station", "depth_station"),
     fields={
         "at": (list(_SCREW_AT), ("OUTER_WIDTH", "FRAME_DEPTH", _FRAME)),

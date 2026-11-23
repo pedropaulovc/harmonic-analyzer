@@ -59,8 +59,9 @@ from pn_pen_frame_spec import (
     ISOMETRIC_VIEW_NOTE,
     OUTER_HEIGHT,
     OUTER_WIDTH,
-    RAIL_END,
+    RAIL_BOTTOM,
     RAIL_SIDE,
+    RAIL_TOP,
     SET_SCREW_TAP_DRILL_DIA,
     SET_SCREW_TAP_SPEC,
     WINDOW_CORNER_R,
@@ -81,12 +82,12 @@ _SAVED_DRAWING_PROPERTIES = (
 # Analytic volumes (mm^3): the ring is the outer rectangle less the window,
 # extruded FRAME_DEPTH; each concave window-corner fillet ADDS back its R x R
 # square less the quarter disc; the tapped hole pierces only the bottom rail
-# (y 0..RAIL_END) at the tap-drill diameter.
+# (y 0..RAIL_BOTTOM) at the tap-drill diameter.
 V_RING = (OUTER_WIDTH * OUTER_HEIGHT - WINDOW_WIDTH * WINDOW_HEIGHT) * FRAME_DEPTH
 V_WINDOW_CORNER = (
     WINDOW_CORNER_R**2 - math.pi * WINDOW_CORNER_R**2 / 4.0
 ) * FRAME_DEPTH
-V_SCREW_HOLE = math.pi * (SET_SCREW_TAP_DRILL_DIA / 2.0) ** 2 * RAIL_END
+V_SCREW_HOLE = math.pi * (SET_SCREW_TAP_DRILL_DIA / 2.0) ** 2 * RAIL_BOTTOM
 V_FINAL = V_RING + 4.0 * V_WINDOW_CORNER - V_SCREW_HOLE
 
 
@@ -96,15 +97,16 @@ def build(adapter) -> dict[str, str]:
     check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
-    # Editable knobs (Tools > Equations): the outer envelope, the two rail
-    # widths, the window corner radius and the depth. The mm suffix is
+    # Editable knobs (Tools > Equations): the outer envelope, the side, bottom
+    # and top rails, the window corner radius and the depth. The mm suffix is
     # load-bearing -- this is an INCH document and the equation manager reads
     # BARE numbers in document units (an unsuffixed 28 = 28 in, blowing the
     # part up 25.4x in-plane).
     set_global(adapter, "OuterWidth", f"{OUTER_WIDTH}mm")
     set_global(adapter, "OuterHeight", f"{OUTER_HEIGHT}mm")
     set_global(adapter, "RailSide", f"{RAIL_SIDE}mm")
-    set_global(adapter, "RailEnd", f"{RAIL_END}mm")
+    set_global(adapter, "RailBottom", f"{RAIL_BOTTOM}mm")
+    set_global(adapter, "RailTop", f"{RAIL_TOP}mm")
     set_global(adapter, "FrameDepth", f"{FRAME_DEPTH}mm")
     set_global(adapter, "WindowCornerR", f"{WINDOW_CORNER_R}mm")
 
@@ -130,10 +132,10 @@ def build(adapter) -> dict[str, str]:
     ]
     outer = add_line_chain(adapter, outer_rect)
     inner_rect = [
-        (RAIL_SIDE, OUTER_HEIGHT - RAIL_END),
-        (RAIL_SIDE, RAIL_END),
-        (OUTER_WIDTH - RAIL_SIDE, RAIL_END),
-        (OUTER_WIDTH - RAIL_SIDE, OUTER_HEIGHT - RAIL_END),
+        (RAIL_SIDE, OUTER_HEIGHT - RAIL_TOP),
+        (RAIL_SIDE, RAIL_BOTTOM),
+        (OUTER_WIDTH - RAIL_SIDE, RAIL_BOTTOM),
+        (OUTER_WIDTH - RAIL_SIDE, OUTER_HEIGHT - RAIL_TOP),
     ]
     inner = add_line_chain(adapter, inner_rect)
     define_rectilinear_chain(
@@ -154,10 +156,10 @@ def build(adapter) -> dict[str, str]:
         dims=ring,
         names=["WindowHeight", "WindowWidth", "LeftWall", "BottomWall"],
         drives=[
-            '"OuterHeight" - 2 * "RailEnd"',
+            '"OuterHeight" - "RailBottom" - "RailTop"',
             '"OuterWidth" - 2 * "RailSide"',
             '"RailSide"',
-            '"RailEnd"',
+            '"RailBottom"',
         ],
     )
     ensure_fully_defined(adapter, "ring sketch")
@@ -179,7 +181,7 @@ def build(adapter) -> dict[str, str]:
     # tool audit Q9). Edge points sit at mid-depth on each corner's Z edge,
     # the top-right first: the printed radius lands its leader there.
     window_x = (OUTER_WIDTH - RAIL_SIDE, RAIL_SIDE)
-    window_y = (OUTER_HEIGHT - RAIL_END, RAIL_END)
+    window_y = (OUTER_HEIGHT - RAIL_TOP, RAIL_BOTTOM)
     edges = [[x, y, FRAME_DEPTH / 2.0] for x in window_x for y in window_y]
     check("fillet WindowCorners", adapter.add_fillet(WINDOW_CORNER_R, edges))
     name_last_feature(adapter, "WindowCorners")

@@ -140,13 +140,13 @@ FRAME_X0_LOCAL = 0.0  # the frame's paper-side face, flush with the block end
 FRAME_X_CENTER_LOCAL = FRAME_X0_LOCAL + frame.FRAME_DEPTH / 2.0
 FRAME_ORIGIN_LOCAL = (
     FRAME_X0_LOCAL + frame.FRAME_DEPTH,  # frame z 0 is the face nearer the rod
-    vb.BLOCK_HEIGHT + FRAME_TOP_GAP + frame.RAIL_END - frame.OUTER_HEIGHT,
+    vb.BLOCK_HEIGHT + FRAME_TOP_GAP + frame.RAIL_TOP - frame.OUTER_HEIGHT,
     vb.DEPTH_MID_Z - frame.OUTER_WIDTH / 2.0,
 )
 FRAME_POS = block_to_machine(FRAME_ORIGIN_LOCAL)
 FRAME_ROWS = [[_C, 0.0, _S], [0.0, 1.0, 0.0], [-_S, 0.0, _C]]
-FRAME_TOP_LOCAL_Y = vb.BLOCK_HEIGHT + FRAME_TOP_GAP + frame.RAIL_END
-FRAME_WINDOW_BOTTOM_LOCAL_Y = FRAME_ORIGIN_LOCAL[1] + frame.RAIL_END
+FRAME_TOP_LOCAL_Y = vb.BLOCK_HEIGHT + FRAME_TOP_GAP + frame.RAIL_TOP
+FRAME_WINDOW_BOTTOM_LOCAL_Y = FRAME_ORIGIN_LOCAL[1] + frame.RAIL_BOTTOM
 ROD_HALF_DIAGONAL = rod.ROD_SECTION / math.sqrt(
     2.0
 )  # the square spans its diagonal along the yawed block
@@ -348,10 +348,18 @@ def plan_mass_items() -> list[tuple[str, float, float, float]]:
     ]
     items = [(f"v-block {n}", v * BRASS_G_PER_MM3, x, z) for n, v, x, z in block]
 
+    # The ring less its window, the window's four R.065 corners (owner
+    # ruling 2026-11-23, tool audit Q9) giving back R x R less the quarter
+    # disc each, symmetric about the ring's centre, and the tap's drill.
     ring = (
-        frame.OUTER_WIDTH * frame.OUTER_HEIGHT
-        - frame.WINDOW_WIDTH * frame.WINDOW_HEIGHT
-    ) * frame.FRAME_DEPTH - _cyl(frame.SET_SCREW_TAP_DRILL_DIA / 2.0, frame.RAIL_END)
+        (
+            frame.OUTER_WIDTH * frame.OUTER_HEIGHT
+            - frame.WINDOW_WIDTH * frame.WINDOW_HEIGHT
+            + 4.0 * (1.0 - math.pi / 4.0) * frame.WINDOW_CORNER_R**2
+        )
+        * frame.FRAME_DEPTH
+        - _cyl(frame.SET_SCREW_TAP_DRILL_DIA / 2.0, frame.RAIL_BOTTOM)
+    )
     items.append(("stirrup frame", ring * BRASS_G_PER_MM3, FRAME_X_CENTER_LOCAL, zc))
     thumb_v = (
         _cyl(thumb.TS_HEAD_R, thumb.TS_HEAD_H)

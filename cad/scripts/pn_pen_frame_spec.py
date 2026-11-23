@@ -59,10 +59,17 @@ V_BLOCK_DEPTH = 17.78  # .70
 # (pn_pen_carriage_geom.paper_side_points_printed_worst).
 OUTER_WIDTH = 25.4  # 1.00
 RAIL_SIDE = 3.302  # .13, side rails (local X)
-# End rails (local Y). .24 gives the #4-40 thumb screw drawing-guidelines.md
+# Bottom rail (local Y). .24 gives the #4-40 thumb screw drawing-guidelines.md
 # rule 18 (>= 1.5 D full thread) engagement: .24 less the tap's incomplete
 # lead (1.5 pitches) still leaves more than 1.5 x .112.
-RAIL_END = 6.096  # .24
+RAIL_BOTTOM = 6.096  # .24
+# Top rail, resting on the block top.  Owner ruling 2026-11-23, PN-01 B1:
+# "window height 1.10 to 1.12 in, top rail thinned from .24 to .22 in.
+# Outside size unchanged."  The stirrup hangs from the window's top edge, so
+# the taller window drops the bottom rail .02 farther from the marker: the
+# thumb screw's throw then takes the R.065 window corners' ride on the neck
+# at their printed greatest (pn_pen_carriage_geom, test_pn_pen_frame_drawing).
+RAIL_TOP = 5.588  # .22
 # Y: window height = block height + the marker barrel standing proud of the
 # V-groove + the thumb screw's working throw (pn_pen_carriage_geom asserts it).
 OUTER_HEIGHT = 40.132  # 1.58
@@ -70,7 +77,7 @@ OUTER_HEIGHT = 40.132  # 1.58
 # end and its body step (pn_pen_carriage_geom).
 FRAME_DEPTH = 7.874  # .31
 WINDOW_WIDTH = OUTER_WIDTH - 2.0 * RAIL_SIDE  # .74
-WINDOW_HEIGHT = OUTER_HEIGHT - 2.0 * RAIL_END  # 1.10
+WINDOW_HEIGHT = OUTER_HEIGHT - RAIL_BOTTOM - RAIL_TOP  # 1.12
 # The window's internal corners (drawing-guidelines.md rule 16: no sharp
 # internal corner; as large as function allows).  Nothing seats in them: a
 # corner over the neck's side gap rides the neck's top edges, which only
@@ -155,7 +162,7 @@ RIGHT_WALL_PRINTED_MIN = (
 )
 TOP_WALL_PRINTED_MIN = (
     (OUTER_HEIGHT - _band("OuterHeightDim"))
-    - (RAIL_END + _band("BottomWall"))
+    - (RAIL_BOTTOM + _band("BottomWall"))
     - (WINDOW_HEIGHT + _band("WindowHeight"))
 )
 if min(RIGHT_WALL_PRINTED_MIN, TOP_WALL_PRINTED_MIN) < WALL_TARGET_MM:
@@ -163,9 +170,41 @@ if min(RIGHT_WALL_PRINTED_MIN, TOP_WALL_PRINTED_MIN) < WALL_TARGET_MM:
 # Full #4-40 thread in the bottom rail at its printed minimum, less the tap's
 # incomplete lead (1.5 pitches), against rule 18's 1.5 D.
 _TAP_PITCH = 25.4 / int(SET_SCREW_TAP_SPEC.size.split("-")[1])
-BOTTOM_RAIL_FULL_THREAD_MIN = RAIL_END - _band("BottomWall") - 1.5 * _TAP_PITCH
+BOTTOM_RAIL_FULL_THREAD_MIN = RAIL_BOTTOM - _band("BottomWall") - 1.5 * _TAP_PITCH
 if BOTTOM_RAIL_FULL_THREAD_MIN < 1.5 * THREAD_MAJOR_MM[SET_SCREW_TAP_SPEC.size]:
     raise AssertionError("printed bottom rail leaves the thumb screw under 1.5D")
+# The thinned top rail (owner ruling 2026-11-23, PN-01 B1) against the
+# unchanged bottom rail that carries the same thumb-screw load F.  The screw
+# pushes the bottom rail down at its centre: a beam on the side rails, the
+# tap's drill through its depth.  The side rails pull the top rail's ends
+# down onto the neck's top edges, each end overhanging an edge by half a side
+# rail, plus the window's float on the far side with the stirrup hard over.
+# Between the edges the rail carries that end moment (it bows off the block
+# top), which turns it at each edge, so an end drops by its overhang's own
+# bend plus that turn.  Per unit F, the top rail at its printed worst (thin,
+# long overhang, wide neck) must bend less than the bottom rail at its
+# printed best (thick, short span), in both stress and deflection.  That way
+# the .22 rail is never the weak member.
+_NECK = (
+    V_BLOCK_DEPTH - 2.0 * printed_band_mm(2, unit=UNIT),
+    V_BLOCK_DEPTH + 2.0 * printed_band_mm(2, unit=UNIT),
+)
+_TOP_ARM = (RAIL_SIDE + _band("LeftWall")) / 2.0 + (
+    WINDOW_WIDTH + _band("WindowWidth") - _NECK[0]
+)
+_TOP_B = FRAME_DEPTH - _band("Depth")
+_BOTTOM_SPAN = (WINDOW_WIDTH - _band("WindowWidth")) + (RAIL_SIDE - _band("LeftWall"))
+_BOTTOM_B = FRAME_DEPTH + _band("Depth") - SET_SCREW_TAP_DRILL_DIA
+_BOTTOM_H = RAIL_BOTTOM + _band("BottomWall")
+TOP_RAIL_STRESS_RATIO = ((_TOP_ARM / 2.0) / (_TOP_B * TOP_WALL_PRINTED_MIN**2)) / (
+    (_BOTTOM_SPAN / 4.0) / (_BOTTOM_B * _BOTTOM_H**2)
+)
+TOP_RAIL_DEFLECTION_RATIO = (
+    (_TOP_ARM**2 * (_TOP_ARM / 3.0 + _NECK[1] / 2.0) / 2.0)
+    / (_TOP_B * TOP_WALL_PRINTED_MIN**3)
+) / ((_BOTTOM_SPAN**3 / 48.0) / (_BOTTOM_B * _BOTTOM_H**3))
+if max(TOP_RAIL_STRESS_RATIO, TOP_RAIL_DEFLECTION_RATIO) >= 1.0:
+    raise AssertionError("the thinned top rail bends more than the bottom rail")
 # The thumb-screw thread's wall to each face along Z at the printed worst
 # case: the hole station at its band's far limit about the printed .16 (not
 # the model's .155) and the depth at its low limit.  FRAME_DEPTH cannot grow
