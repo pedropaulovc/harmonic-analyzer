@@ -179,7 +179,7 @@ speed_kind = "spindle"
 tool = "knurl"
 drilling = "none"
 sizing = "other"
-instruction = "Mount the knurl in the AXA No. 10 holder, the wheel square to the work and on centre height. Bring the wheel's chuck-side face onto the faced end and set DRO Z0 there: the DRO then reads that face. Move it to Z-{{cad.shoulder_flange_in:.2dot}} (the wheel then over the flange, turned off later; the traverse in Op 50 carries the pattern over the head), oil the work and plunge the wheel in firmly in one go so it tracks; run a few turns and check the pattern is single."
+instruction = "Mount the knurl in the AXA No. 10 holder, the wheel square and on centre. Set DRO Z0 with the wheel's chuck-side face on the faced end. Move to Z-{{cad.shoulder_flange_in:.2dot}} (over the flange, turned off later), oil the work and plunge firmly in one go so it tracks; run a few turns: the pattern must be single."
 settings = "lathe-knurl-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
