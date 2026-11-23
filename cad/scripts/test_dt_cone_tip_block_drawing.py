@@ -1046,3 +1046,91 @@ def test_dowel_leader_crosses_no_text_and_no_dimension_line() -> None:
     assert note[2] < template.width_m - 0.0127 - drawing.TEXT_CLEARANCE
     assert note[3] < drawing.ISO_CENTER[1] - 0.054 - drawing.TEXT_CLEARANCE
     assert note[0] > texts["ViewBPinchHeight"][2] + drawing.TEXT_CLEARANCE
+
+
+def test_the_block_declares_one_owner_per_face() -> None:
+    import export_features
+    from _gtol_face import FaceGeometry
+
+    spec = dt_cone_tip_block_spec
+
+    def plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+        point = tuple(value * offset_mm / 1000 for value in normal)
+        return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+    def cylinder(dia_mm: float, box_mm: tuple[float, ...]) -> FaceGeometry:
+        box = tuple(value / 1000 for value in box_mm)
+        return FaceGeometry(None, 4002, (0.0, 0.0, 0.0, 0, 0, 1, dia_mm / 2000), None, box)
+
+    manifest = export_features.requirement_manifest("dt_cone_tip_block")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == {
+        "seat": "face",
+        "top_face": "face",
+        "east_face": "face",
+        "west_face": "face",
+        "north_face": "face",
+        "south_face": "face",
+        "adjuster": "threaded_hole",
+        "slit": "slot",
+        "pinch_tap": "threaded_hole",
+        "pinch_clearance": "hole",
+        "foot_tap": "threaded_hole",
+        "dowel_ream": "hole",
+    }
+    assert manifest["features"]["dowel_ream"]["made_at"] == "assembly"
+    hx, hz, w = spec.BLOCK_X / 2, spec.BLOCK_Z / 2, spec.SLIT_W / 2
+    r = spec.PINCH_BORE_DIA / 2
+    faces = {
+        "seat": plane((0.0, -1.0, 0.0), 0.0),
+        "top_face": plane((0.0, 1.0, 0.0), spec.BLOCK_HEIGHT),
+        "east_face": plane((-1.0, 0.0, 0.0), hx),
+        "west_face": plane((1.0, 0.0, 0.0), hx),
+        "north_face": plane((0.0, 0.0, 1.0), hz),
+        "south_face": plane((0.0, 0.0, -1.0), hz),
+        "slit/east": plane((1.0, 0.0, 0.0), -w),
+        "slit/west": plane((-1.0, 0.0, 0.0), -w),
+        "adjuster": cylinder(spec.ADJUSTER_BORE_DIA, (-2.8, 35.3, -hz, 2.8, 40.9, hz)),
+        "pinch_tap": cylinder(spec.PINCH_BORE_DIA, (-hx, spec.PINCH_HEIGHT - r, -r, -w, spec.PINCH_HEIGHT + r, r)),
+        "pinch_clearance": cylinder(spec.PINCH_CLEARANCE_DIA, (w, 45.3, -1.7, hx, 48.7, 1.7)),
+        "foot_tap": cylinder(spec.FOOT_BORE_DIA, (-2.2, 0.0, -r, 0.2, spec.FOOT_DEPTH, r)),
+        "dowel_ream": cylinder(spec.DOWEL_HOLE_DIA, (4.0, 0.0, -0.8, 5.6, spec.DOWEL_HOLE_DEPTH, 0.8)),
+    }
+    selectors = export_features.feature_selectors("dt_cone_tip_block")
+    for name, face in faces.items():
+        owners = [
+            owner
+            for owner, specs in selectors.items()
+            if any(selector.matches(face) for selector in specs)
+        ]
+        assert owners == [name.split("/")[0]], name
+
+
+def test_block_feature_bands_are_the_printed_ones() -> None:
+    import export_features
+
+    def _in(value: float) -> float:
+        return value * 25.4
+
+    features = export_features.requirement_manifest("dt_cone_tip_block")["features"]
+    assert features["top_face"]["height"] == pytest.approx([_in(2.06), _in(2.08)])
+    assert features["west_face"]["width"] == pytest.approx([_in(0.66), _in(0.68)])
+    assert features["south_face"]["depth"] == pytest.approx([_in(0.43), _in(0.45)])
+    adjuster = features["adjuster"]
+    assert adjuster["thread"] == "1/4-28 UNF-2B" and adjuster["thru"] is True
+    assert adjuster["height"] == pytest.approx([_in(1.49), _in(1.51)])
+    assert adjuster["height_match"] == pytest.approx([_in(-0.003), _in(0.003)])
+    assert adjuster["lateral"] == pytest.approx([_in(0.33), _in(0.35)])
+    assert adjuster["csk_dia"] == pytest.approx([_in(0.252), _in(0.262)], abs=1e-3)
+    assert features["slit"]["width"] == pytest.approx([_in(0.04), _in(0.06)])
+    assert features["slit"]["extent"] == "SLOT INTO BORE"
+    pinch = features["pinch_tap"]
+    assert pinch["thread"] == "#4-40 UNC-2B"
+    assert pinch["height"] == pytest.approx([_in(1.84), _in(1.86)])
+    assert pinch["depth_center"] == pytest.approx([_in(0.21), _in(0.23)])
+    assert features["pinch_clearance"]["dia"] == pytest.approx([_in(0.1285), _in(0.1325)], abs=1e-3)
+    foot = features["foot_tap"]
+    assert foot["drill_depth"] == pytest.approx([_in(0.43), _in(0.45)])
+    assert foot["thread_depth"] == pytest.approx([_in(0.33), _in(0.35)])
+    assert foot["station"] == pytest.approx([_in(0.29), _in(0.31)])
+    assert foot["depth_station"] == pytest.approx([_in(0.21), _in(0.23)])

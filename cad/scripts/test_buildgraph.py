@@ -130,10 +130,11 @@ _INSERTED_SOURCES = {
     "sh_column_clamp_back sh_column_clamp_front sh_vn_brass_fillister_screw pd_guide_lock pd_vn_guide_lock_screw pd_latch_hook "
     "sh_vn_fillister_screw_90280a108 pd_vn_platen_clip_screw "
     "pd_feed_rack pd_platen pd_platen_bottom_guide pd_platen_clip pd_platen_guide pd_platen_paper pd_rack_pinion pd_support_bar "
-    "pd_transgear_arm pd_transgear_arm_plate pd_vn_transgear_arm_plate_locating_pin pd_vn_transgear_arm_plate_screw "
+    "pd_transgear_arm pd_transgear_arm_plate pd_transgear_knob_bush "
+    "pd_vn_transgear_arm_plate_locating_pin pd_vn_transgear_arm_plate_screw "
     "pd_transgear_disc_hub pd_vn_transgear_hub_key_pin sh_vn_fillister_screw_91794a055 "
     "pd_transgear_drive_collar pd_vn_transgear_collar_flat_pin pd_transgear_feed_pinion "
-    "pd_transgear_knob_cup pd_vn_transgear_knob_cup_pin pd_vn_transgear_knob_drive_pin "
+    "pd_transgear_knob_cup pd_vn_transgear_knob_cup_screw pd_vn_transgear_knob_drive_pin "
     "pd_transgear_knob_shaft pd_transgear_knob_thrust_ring pd_vn_transgear_latch_pin pd_vn_transgear_pivot_screw "
     "pd_transgear_pin pd_transgear_pivot_spacer pd_vn_transgear_pivot_spring pd_transgear_rear_bushing "
     "pd_transgear_front_bushing "
@@ -224,6 +225,9 @@ def test_arm_plate_locating_pin_has_real_assembly_dependents() -> None:
         # formed anchor eye nor the bead chain's loop link remains.
         ("dt_crank_pin_eye", "MHA-DT-28"),
         ("dt_vn_keeper_chain_link", "MHA-DT-VN-66"),
+        # Owner ruling 2026-11-20 (Pedro), #2425: the MHA-PD-VN-71 screw and a
+        # LOCTITE 641 bond replace the cup's cross pin; its number is retired.
+        ("pd_vn_transgear_knob_cup_pin", "MHA-PD-VN-62"),
     ],
 )
 def test_retired_orphan_families_are_not_allocated(stem, number) -> None:
@@ -245,42 +249,44 @@ def test_retired_orphan_families_are_not_allocated(stem, number) -> None:
                 assert row.get("number") != number, registry
 
 
-def test_retired_front_pin_is_not_allocated_but_rear_cup_pin_is() -> None:
+def test_retired_cross_pins_are_not_allocated_but_cup_screw_is() -> None:
     from _drawing_registry import DRAWINGS_BY_NAME
     from _fastener_catalog import FASTENERS
     from _test_stock_recipes import discovered_recipes
     from hardware_schedule import SCHEDULE
 
-    obsolete = "vn_transgear_collar_cross_pin"
-    retained = "pd_vn_transgear_knob_cup_pin"
+    obsolete = ("vn_transgear_collar_cross_pin", "pd_vn_transgear_knob_cup_pin")
+    retained = "pd_vn_transgear_knob_cup_screw"
     parts = set(part_stems())
     assert retained in parts
     # Standard hardware: delivered as its HARDWARE.md row, not a sheet (#2886).
     assert retained.replace("_", "-") in SCHEDULE
     assert retained not in DRAWINGS_BY_NAME
-    assert FASTENERS[retained.replace("_", "-")].skus == ("98296A031",)
-    assert "98296A031" in discovered_recipes()
-    assert obsolete not in parts
-    assert obsolete not in DRAWINGS_BY_NAME
-    assert obsolete.replace("_", "-") not in FASTENERS
-    assert not (
-        bg.CONFIG_DIR / "parts" / f"{obsolete.replace('_', '-')}.yaml"
-    ).exists()
-    for name in (
-        f"build_{obsolete}.py",
-        f"draw_{obsolete}.py",
-        f"{obsolete}_spec.py",
-        f"test_{obsolete}_drawing.py",
-    ):
-        assert not (SCRIPTS_DIR / name).exists()
+    assert FASTENERS[retained.replace("_", "-")].skus == ("91794A079",)
+    assert "91794A079" in discovered_recipes()
+    for stem in obsolete:
+        assert stem not in parts
+        assert stem not in DRAWINGS_BY_NAME
+        assert stem.replace("_", "-") not in FASTENERS
+        assert not (bg.CONFIG_DIR / "parts" / f"{stem.replace('_', '-')}.yaml").exists()
+        for name in (
+            f"build_{stem}.py",
+            f"draw_{stem}.py",
+            f"{stem}_spec.py",
+            f"test_{stem}_drawing.py",
+            f"test_{stem}_hardware.py",
+        ):
+            assert not (SCRIPTS_DIR / name).exists()
+    for source in ("build_pd_paper_drive_assembly.py", f"build_{retained}.py"):
+        assert f"{retained}_spec" in _helper_names(source)
     for source in (
         "build_pd_paper_drive_assembly.py",
         "draw_pd_paper_drive_assembly.py",
         f"build_{retained}.py",
     ):
         dependencies = _helper_names(source)
-        assert f"{retained}_spec" in dependencies
-        assert f"{obsolete}_spec" not in dependencies
+        for stem in obsolete:
+            assert f"{stem}_spec" not in dependencies
 
 
 def _source_references(tmp_path, monkeypatch, source, parts=("ch_rocker_arm",)):

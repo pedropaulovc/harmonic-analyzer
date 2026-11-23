@@ -54,9 +54,13 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 import _telemetry
 from ch_fulcrum_keeper_notes import (
@@ -66,18 +70,37 @@ from ch_fulcrum_keeper_notes import (
     SET_SCREW_QUALIFIER,
 )
 from ch_fulcrum_keeper_spec import (
+    BORE_CENTRE_BAND_MM,
     BORE_CENTRE_CALLOUT,
+    BORE_DIA,
+    BORE_DIA_BAND,
+    BORE_FROM_SIDE,
+    CBORE_DEPTH_BAND,
+    CBORE_DEPTH_MM,
+    CBORE_DIA_BAND,
     CBORE_DIA_MM,
+    CROWN_LEAST_R,
+    CROWN_MOST_R,
     CROWN_R,
     CROWN_TOP_Y,
     DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    FOOT_H,
     FOOT_HOLE_CALLOUT_PRECISION,
+    FOOT_TIP_WALL_TEXT,
     FOOT_TIP_X,
+    HOLE_DIA_MM,
+    KEEPER_WIDTH,
     LUG_HALF_T,
     OVERALL_LENGTH,
     REFERENCE_DIMENSIONS,
+    SCREW_FROM_SIDE,
+    SCREW_FROM_TIP,
     SCREW_X,
     SET_SCREW_HOLE_SPEC,
+    SET_SCREW_THREAD,
+    SHAFT_AXIS_H,
+    UNIT,
 )
 
 
@@ -135,15 +158,18 @@ TAP_R_SHEET = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) * SHEET_SCALE[0] / 2000.0
 # farm run 20261113T004704480Z): size first, then process, then extent, so
 # the through row reads "Ø .094 DRILL THRU" (FOOT_HOLE_THRU_ROW), then the
 # counterbore, then the two mate rows (FOOT_HOLE_MATE, widest last); four
-# rows, inside the 4-row block limit. The 17-character top row is wider than
-# the counterbore row under it, so the block stands right of where the
-# 5-row DRILL-on-top block stood: centred at x 138 the shoulder ends at x
-# ~108, ~9 mm short of the rim, and the leader clears the top row's left end
-# by ~2 mm (~4 mm at the printed 2.57 mm a character); the right end (x
-# ~165) stands ~4 mm over the crown radius's rows and ~11 mm left of the
-# .275 station's line. Centred at y 199 the top row stays under the plan's
-# bottom edge (y 214).
-FOOT_HOLE_CALLOUT_XY = (0.138, 0.199)
+# rows. The counterbore row now carries its own limits (owner ruling
+# 2026-11-22, #3367), stacked +.004/.000 and +.005/-.005, so it is the
+# block's widest row (x 104..172 centred at x 138, layout audit of farm run
+# 20261122T220015080Z) and its left end stood right of the shoulder's: the
+# leader rising from x 102 to the hole at x 116 ran 3.4 mm through the
+# counterbore symbol (leader-through-own-text). Centred at x 157 the
+# shoulder ends at x ~121, right of the hole, so the leader leans left
+# away from every row (~3.7 mm clear of the counterbore row's start); the
+# block's top (y ~206) stands ~6 mm under the .275 station's text and its
+# shoulder (y ~181) ~5.5 mm over the crown radius's block. The top row
+# stays well under the plan's bottom edge (y 214).
+FOOT_HOLE_CALLOUT_XY = (0.157, 0.194)
 # The crown tap stops at the bore (MR-fleet r2, 0eca37c). The native sizes
 # lead and say where they stop (both "<hw-thru>" extents read TO BORE; the
 # thread class is the title block's), and the mate closes the thread's own
@@ -230,15 +256,17 @@ TOP_KEEP = {
 #   drew them up from y 98.8) and stop ~7 mm under the view.
 # - CrownRadius: above-left, between the front view's crown stack (x <= 112)
 #   and the end view; the leader lands on the crown arc at ~127 deg, clear of
-#   every other line, the block ~6 mm under the foot-hole callout (MR-fleet
-#   r5: the 180 deg end round prints a radius, its arrow outside the arc).
+#   every other line, its top row ~5 mm under the foot-hole callout's
+#   shoulder (farm run 20261122T220015080Z: at y 180 the two blocks stood
+#   2.5 mm apart and read as one) (MR-fleet r5: the 180 deg end round prints
+#   a radius, its arrow outside the arc).
 # - BoreDia: below-right, under the isometric note (>= 4 mm air; MR-fleet r1's
 #   supply-condition row made it a row taller, so it sits 1.5 mm lower); the
 #   leader leaves the bore at ~-55 deg and crosses only the lug's right edge.
 RIGHT_KEEP = {
     "Depth": (0.225, 0.090),
     "LugRise": (0.196, 0.126),
-    "CrownRadius": (0.168, 0.180),
+    "CrownRadius": (0.168, 0.171),
     "BoreDia": (0.304, 0.1225),
     # Above the crown and wholly right of the sheet-right side face (the
     # 7.000's precedent in the plan: a horizontal dimension's block centres on
@@ -266,6 +294,341 @@ FRONT_REFERENCE_WITNESSES = {
 }
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
 REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the lines are fully defined sketch lengths
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (ch_fulcrum_keeper_spec: +X along the
+# shaft, outboard, x 0 the lug mid-plane; +Y up from the seat; +Z across the
+# width, z 0 its centre plane). Bands are the title block's rows at the places
+# the part authors (DRAWING_PRECISION), the reamed bore its own BORE_DIA_BAND,
+# the drilled holes and the tap drill the DRILLED HOLES row at their callouts'
+# three places. The (1.27) height, the (R.275) crown and the (.275) bore
+# station are references: the crown follows the width's .XX band and the bore
+# stands on the width's centre plane within BORE_CENTRE_BAND_MM. The title
+# block's INSIDE CORNERS row governs the foot-to-lug round, which the sheet
+# does not print. The declarations print nothing.
+_P = {name: places for dims in DRAWING_PRECISION.values() for name, places in dims.items()}
+_SELF = "draw_ch_fulcrum_keeper"
+_NOTES = "ch_fulcrum_keeper_notes"
+_FRAME = "__frame__"
+_HALF_W = KEEPER_WIDTH / 2.0
+_TAP_DRILL = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC)
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(
+        "LUG_HALF_T",
+        "KEEPER_WIDTH",
+        "SHAFT_AXIS_H",
+        "FOOT_H",
+        "FOOT_TIP_X",
+        "CROWN_TOP_Y",
+    ),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "FOOT_HOLE_CALLOUT_PRECISION",
+        (_SELF, "SET_SCREW_CALLOUT_PRECISION"),
+    ),
+)
+# The seat: the whole underside, every height runs from it.
+requirement(
+    "seat",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("y", 0.0), (_FRAME,))},
+)
+# The foot top: the foot .31 off the seat (FRONT_KEEP "FootRise").
+requirement(
+    "foot_top",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), FOOT_H),),
+    requirements=("height",),
+    fields={
+        "plane": (_plane("y", FOOT_H), ("FOOT_H",)),
+        "height": (
+            limits(FOOT_H, _P["FootRise"], unit=UNIT),
+            ("FOOT_H", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "height_nominal": (FOOT_H, ("FOOT_H",)),
+        "height_from": ("seat", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"height": _P["FootRise"]},
+)
+# The lug's inner face (toward the lever bank): every length along X runs
+# from it (FRONT_KEEP, TOP_KEEP "SetScrewLocation").
+requirement(
+    "inner_face",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), LUG_HALF_T),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", -LUG_HALF_T), (_FRAME, "LUG_HALF_T"))},
+)
+# The lug's outer face: the lug thickness .32 off the inner face
+# (FRONT_KEEP "LugThickness").
+requirement(
+    "lug_outer_face",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), LUG_HALF_T),),
+    requirements=("thickness",),
+    fields={
+        "plane": (_plane("x", LUG_HALF_T), (_FRAME, "LUG_HALF_T")),
+        "thickness": (
+            limits(2.0 * LUG_HALF_T, _P["LugThickness"], unit=UNIT),
+            ("LUG_HALF_T", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "thickness_nominal": (2.0 * LUG_HALF_T, ("LUG_HALF_T",)),
+        "thickness_from": ("inner_face", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"thickness": _P["LugThickness"]},
+)
+# The foot tip: the overall length .65 off the inner face (FRONT_KEEP
+# "OverallLength", a real size; the foot length prints nowhere).
+requirement(
+    "foot_tip",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), FOOT_TIP_X),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("x", FOOT_TIP_X), ("FOOT_TIP_X",)),
+        "length": (
+            limits(OVERALL_LENGTH, _P["OverallLength"], unit=UNIT),
+            ("OVERALL_LENGTH", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "length_nominal": (OVERALL_LENGTH, ("OVERALL_LENGTH",)),
+        "length_from": ("inner_face", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"length": _P["OverallLength"]},
+)
+# The two side faces, each one flat down the lug and the foot: the -Z one
+# locates the foot hole (TOP_KEEP "ScrewFromSide"); the +Z one closes the
+# width .55 (RIGHT_KEEP "Depth").
+requirement(
+    "near_side",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), _HALF_W),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", -_HALF_W), (_FRAME, "KEEPER_WIDTH"))},
+)
+requirement(
+    "far_side",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), _HALF_W),),
+    requirements=("width",),
+    fields={
+        "plane": (_plane("z", _HALF_W), (_FRAME, "KEEPER_WIDTH")),
+        "width": (
+            limits(KEEPER_WIDTH, _P["Depth"], unit=UNIT),
+            ("KEEPER_WIDTH", "UNIT", (_SELF, "RIGHT_KEEP")),
+        ),
+        "width_nominal": (KEEPER_WIDTH, ("KEEPER_WIDTH",)),
+        "width_from": ("near_side", ((_SELF, "RIGHT_KEEP"),)),
+    },
+    precision={"width": _P["Depth"]},
+)
+# The crown: a full round about the bore axis, tangent to both side faces
+# (RIGHT_KEEP "CrownRadius", printed as the reference (R.275) with FULL R).
+# It carries no band of its own: it follows the width's .XX band, so its
+# radius runs CROWN_LEAST_R..CROWN_MOST_R. Its apex is the (1.27) finished
+# height (FRONT_KEEP "OverallHeight", a reference).
+requirement(
+    "crown",
+    kind="arc",
+    faces=(CylinderFace(2.0 * CROWN_R),),
+    requirements=("radius",),
+    fields={
+        "center": ([0.0, SHAFT_AXIS_H, 0.0], ("SHAFT_AXIS_H",)),
+        "axis": ((1.0, 0.0, 0.0), (_FRAME,)),
+        "apex": ((0.0, 1.0, 0.0), (_FRAME,)),
+        "radius": (
+            [CROWN_LEAST_R, CROWN_MOST_R],
+            ("CROWN_LEAST_R", "CROWN_MOST_R", (_SELF, "RIGHT_KEEP")),
+        ),
+        "radius_nominal": (CROWN_R, ("CROWN_R",)),
+        "callout": (CROWN_CALLOUT, ((_NOTES, "CROWN_CALLOUT"),)),
+        "overall_height_ref": (CROWN_TOP_Y, ("CROWN_TOP_Y", (_SELF, "FRONT_KEEP"))),
+    },
+    precision={
+        "radius": _P["CrownRadius"],
+        "overall_height_ref": _P["OverallHeight"],
+    },
+)
+# The shaft bore, reamed through the lug from its outer face: Ø.2550
+# +.0010/.0000 REAM THRU, SLIDING FIT ON MHA-CH-04 (RIGHT_KEEP "BoreDia"); its
+# axis .99 off the seat (RIGHT_KEEP "LugRise") and on the width's centre
+# plane within ±.012 (RIGHT_KEEP "BoreFromSide": the (.275) reference off the
+# -Z side face with BORE_CENTRE_CALLOUT).
+_REAM = ((_SELF, "DIMENSION_CALLOUTS"),)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(BORE_DIA),),
+    requirements=("dia", "thru", "height", "off_centre"),
+    fields={
+        "at": ([LUG_HALF_T, SHAFT_AXIS_H, 0.0], ("LUG_HALF_T", "SHAFT_AXIS_H")),
+        "axis": ((-1.0, 0.0, 0.0), (_FRAME,)),
+        "dia": (
+            limits(BORE_DIA, _P["BoreDia"], BORE_DIA_BAND, unit=UNIT),
+            ("BORE_DIA", "BORE_DIA_BAND", (_SELF, "RIGHT_KEEP")),
+        ),
+        "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
+        "process": ("ream", _REAM),
+        "thru": (True, _REAM),
+        "callout": (BORE_CALLOUT, ((_NOTES, "BORE_CALLOUT"), *_REAM)),
+        "height": (
+            limits(SHAFT_AXIS_H, _P["LugRise"], unit=UNIT),
+            ("SHAFT_AXIS_H", "UNIT", (_SELF, "RIGHT_KEEP")),
+        ),
+        "height_nominal": (SHAFT_AXIS_H, ("SHAFT_AXIS_H",)),
+        "height_from": ("seat", ((_SELF, "RIGHT_KEEP"),)),
+        "off_centre": (
+            [-BORE_CENTRE_BAND_MM, BORE_CENTRE_BAND_MM],
+            ("BORE_CENTRE_BAND_MM", "BORE_CENTRE_CALLOUT"),
+        ),
+        "off_centre_nominal": (0.0, ("BORE_CENTRE_BAND_MM",)),
+        "lateral_ref": (BORE_FROM_SIDE, ("BORE_FROM_SIDE", (_SELF, "RIGHT_KEEP"))),
+        "lateral_ref_from": ("near_side", ((_SELF, "RIGHT_KEEP"),)),
+        "centre_callout": (BORE_CENTRE_CALLOUT, ("BORE_CENTRE_CALLOUT",)),
+    },
+    precision={
+        "dia": _P["BoreDia"],
+        "height": _P["LugRise"],
+        "off_centre": _P["BoreFromSide"],
+        "lateral_ref": _P["BoreFromSide"],
+    },
+)
+# The crown set-screw tap, #1-72 down through the crown top on the lug
+# mid-plane into the bore (the native callout: Ø.060 TO BORE, 1-72 UNF TO
+# BORE, FOR MHA-CH-VN-55 SET SCREW; the class is the title block's 2B), its
+# station .16 off the inner face (TOP_KEEP "SetScrewLocation").
+_TAP_CALLOUT = (
+    "SET_SCREW_HOLE_SPEC",
+    (_SELF, "set_screw_callout_definitions"),
+    (_SELF, "SET_SCREW_CALLOUT_PRECISION"),
+)
+_TAP_DRILL_SOURCES = ("SET_SCREW_HOLE_SPEC", ("_hole_spec", "blind_cut_dia_mm"))
+requirement(
+    "crown_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(_TAP_DRILL),),
+    requirements=("thread", "dia", "into", "station"),
+    fields={
+        "at": ([0.0, CROWN_TOP_Y, 0.0], ("CROWN_TOP_Y", "SET_SCREW_HOLE_SPEC")),
+        "axis": ((0.0, -1.0, 0.0), (_FRAME, "SET_SCREW_HOLE_SPEC")),
+        "thread": (
+            f"{SET_SCREW_THREAD} UNF-{SET_SCREW_HOLE_SPEC.thread_class}",
+            ("SET_SCREW_THREAD", *_TAP_CALLOUT),
+        ),
+        "dia": (
+            drilled_limits(
+                _TAP_DRILL, SET_SCREW_CALLOUT_PRECISION["hw-tapdrldia"], unit=UNIT
+            ),
+            (*_TAP_DRILL_SOURCES, "UNIT", *_TAP_CALLOUT),
+        ),
+        "nominal_dia": (_TAP_DRILL, _TAP_DRILL_SOURCES),
+        "into": ("bore", ("SET_SCREW_HOLE_SPEC", (_SELF, "SET_SCREW_EXTENT"))),
+        "extent": (SET_SCREW_EXTENT, ((_SELF, "SET_SCREW_EXTENT"),)),
+        "mates": (SET_SCREW_QUALIFIER, ((_NOTES, "SET_SCREW_QUALIFIER"),)),
+        "station": (
+            limits(LUG_HALF_T, _P["SetScrewLocation"], unit=UNIT),
+            ("LUG_HALF_T", "UNIT", (_SELF, "TOP_KEEP")),
+        ),
+        "station_nominal": (LUG_HALF_T, ("LUG_HALF_T",)),
+        "station_from": ("inner_face", ((_SELF, "TOP_KEEP"),)),
+    },
+    precision={
+        "dia": SET_SCREW_CALLOUT_PRECISION["hw-tapdrldia"],
+        "station": _P["SetScrewLocation"],
+    },
+)
+# The foot hole, drilled through the foot from its top with a flush
+# counterbore for the #2-56 fillister (the native callout: Ø.094 DRILL THRU,
+# Ø.150 +.004/.000 ↧ .083 +.005/-.005, FOR MHA-CH-VN-52; CENTERS MHA-FR-02 TAP:
+# the counterbore's own limits, owner ruling 2026-11-22, #3367), its station .18
+# off the foot tip and .275 off the -Z side face (TOP_KEEP "ScrewFromTip",
+# "ScrewFromSide"); note 2 states the tip wall's worst case.
+_FOOT_CALLOUT = (
+    "SCREW_HOLE_SPEC",
+    "FOOT_HOLE_CALLOUT_PRECISION",
+    (_SELF, "foot_hole_callout_definitions"),
+)
+_FOOT_PLACES = FOOT_HOLE_CALLOUT_PRECISION["hw-thruholedia"]
+_FOOT_FLOOR = FOOT_H - CBORE_DEPTH_MM
+requirement(
+    "foot_hole",
+    kind="hole",
+    faces=(
+        CylinderFace(HOLE_DIA_MM, contains_y_mm=_FOOT_FLOOR / 2.0),
+        CylinderFace(CBORE_DIA_MM, contains_y_mm=(FOOT_H + _FOOT_FLOOR) / 2.0),
+    ),
+    requirements=(
+        "dia",
+        "thru",
+        "cbore_dia",
+        "cbore_depth",
+        "station",
+        "lateral",
+        "tip_wall_min",
+    ),
+    fields={
+        "at": ([SCREW_X, FOOT_H, 0.0], ("SCREW_X", "FOOT_H")),
+        "axis": ((0.0, -1.0, 0.0), (_FRAME,)),
+        "dia": (
+            drilled_limits(HOLE_DIA_MM, _FOOT_PLACES, unit=UNIT),
+            ("HOLE_DIA_MM", "UNIT", *_FOOT_CALLOUT),
+        ),
+        "nominal_dia": (HOLE_DIA_MM, ("HOLE_DIA_MM",)),
+        "process": ("drill", ((_SELF, "FOOT_HOLE_THRU"),)),
+        "thru": (True, ((_SELF, "FOOT_HOLE_THRU"),)),
+        "cbore_dia": (
+            limits(
+                CBORE_DIA_MM,
+                FOOT_HOLE_CALLOUT_PRECISION["hw-cbdia"],
+                CBORE_DIA_BAND,
+                unit=UNIT,
+            ),
+            ("CBORE_DIA_MM", "CBORE_DIA_BAND", *_FOOT_CALLOUT),
+        ),
+        "cbore_depth": (
+            limits(
+                CBORE_DEPTH_MM,
+                FOOT_HOLE_CALLOUT_PRECISION["hw-cbdepth"],
+                CBORE_DEPTH_BAND,
+                unit=UNIT,
+            ),
+            ("CBORE_DEPTH_MM", "CBORE_DEPTH_BAND", *_FOOT_CALLOUT),
+        ),
+        "mates": (FOOT_HOLE_MATE, ((_NOTES, "FOOT_HOLE_MATE"),)),
+        "station": (
+            limits(SCREW_FROM_TIP, _P["ScrewFromTip"], unit=UNIT),
+            ("SCREW_FROM_TIP", "UNIT", (_SELF, "TOP_KEEP")),
+        ),
+        "station_nominal": (SCREW_FROM_TIP, ("SCREW_FROM_TIP",)),
+        "station_from": ("foot_tip", ((_SELF, "TOP_KEEP"),)),
+        "lateral": (
+            limits(SCREW_FROM_SIDE, _P["ScrewFromSide"], unit=UNIT),
+            ("SCREW_FROM_SIDE", "UNIT", (_SELF, "TOP_KEEP")),
+        ),
+        "lateral_nominal": (SCREW_FROM_SIDE, ("SCREW_FROM_SIDE",)),
+        "lateral_from": ("near_side", ((_SELF, "TOP_KEEP"),)),
+        "tip_wall_min": (
+            float(FOOT_TIP_WALL_TEXT) * 25.4,
+            ("FOOT_TIP_WALL_TEXT", (_NOTES, "DRAWING_NOTES")),
+        ),
+    },
+    precision={
+        "dia": _FOOT_PLACES,
+        "cbore_dia": FOOT_HOLE_CALLOUT_PRECISION["hw-cbdia"],
+        "cbore_depth": FOOT_HOLE_CALLOUT_PRECISION["hw-cbdepth"],
+        "station": _P["ScrewFromTip"],
+        "lateral": _P["ScrewFromSide"],
+        "tip_wall_min": FOOT_HOLE_CALLOUT_PRECISION["hw-cbdepth"],
+    },
+)
 
 
 def _one(adapter: Any, annotations: list[Any], name: str) -> Any:
@@ -496,6 +859,60 @@ def _set_foot_hole_process(display: Any) -> None:
     _telemetry.info(f"foot-hole callout: {resolved!r}")
 
 
+_TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
+
+
+@_telemetry.traced("drawing.fulcrum_keeper.counterbore_band")
+def _print_counterbore_band(display: Any) -> None:
+    """Print the counterbore's limits (owner ruling 2026-11-22, #3367:
+    Ø.150-.154 x .078-.088) on its native callout. The bands live on the
+    part's Hole Wizard feature (build_ch_fulcrum_keeper._band_foot_counterbore)
+    and ``<hw-cbdia>`` / ``<hw-cbdepth>`` display them; this sets only their
+    tolerance places, the nominals' (FOOT_HOLE_CALLOUT_PRECISION), as
+    draw_pd_support_bar._band_counterbore_diameter does, and reads each
+    displayed band back so a band that did not reach the callout fails here."""
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
+
+    wanted = {
+        "hw-cbdia": (CBORE_DIA_MM, CBORE_DIA_BAND),
+        "hw-cbdepth": (CBORE_DEPTH_MM, CBORE_DEPTH_BAND),
+    }
+    found: dict[str, list[tuple[Any, Any]]] = {name: [] for name in wanted}
+    for raw in display.GetHoleCalloutVariables() or ():
+        variable = dynamic_dispatch(raw._oleobj_)
+        name = str(variable.VariableName)
+        if name in found:
+            found[name].append((raw, variable))
+    for name, (nominal, band) in wanted.items():
+        if len(found[name]) != 1:
+            raise RuntimeError(
+                f"foot-hole callout carries {len(found[name])} {name} variables, not 1"
+            )
+        raw, variable = found[name][0]
+        length = _early_bound(raw, "ICalloutLengthVariable")
+        actual = float(length.Length) * 1000.0
+        if abs(actual - nominal) > 1e-5:
+            raise RuntimeError(
+                f"foot-hole callout {name} reads {actual:g}, expected {nominal:g} mm"
+            )
+        places = FOOT_HOLE_CALLOUT_PRECISION[name]
+        length.TolerancePrecision = places
+        lower, upper = band[1], band[0]
+        if (
+            int(variable.ToleranceType) != _TOL_BILATERAL
+            or abs(float(variable.ToleranceMin) * 1000.0 - lower) > 1e-5
+            or abs(float(variable.ToleranceMax) * 1000.0 - upper) > 1e-5
+            or int(length.TolerancePrecision) != places
+        ):
+            raise RuntimeError(
+                f"foot-hole callout {name} does not display the part's band: wanted "
+                f"swTolBILAT, deviations {(lower, upper)} mm at {places} places; read "
+                f"{int(variable.ToleranceType)}, {float(variable.ToleranceMin)!r}, "
+                f"{float(variable.ToleranceMax)!r}, {int(length.TolerancePrecision)}"
+            )
+        _telemetry.info(f"foot-hole callout {name} {nominal:g} mm, band {band} mm")
+
+
 def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -603,6 +1020,7 @@ def build(adapter: Any) -> dict[str, str]:
     set_hole_callout_precision(
         foot_callout, FOOT_HOLE_CALLOUT_PRECISION, label="keeper foot screw hole"
     )
+    _print_counterbore_band(foot_callout)
     # Crown set-screw tap: the plan sees it end-on at the crown top on the
     # lug mid-plane; its callout sits in the band between the front view
     # and the plan, left of both.

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="340"/>
+  <text class="title" x="20" y="22">Setup 5: side view along the jaws, the 5/8 blank, the pin hole in the overhang (not to scale)</text>
+  <rect class="fixture-vise" x="300" y="260" width="440" height="30"/>
+  <rect class="clamp" x="300" y="100" width="440" height="90"/>
+  <rect class="fixture-support" x="300" y="190" width="300" height="70"/>
+  <rect class="part-rest" x="40" y="150" width="700" height="40"/>
+  <rect class="holes" x="78" y="150" width="10" height="40"/>
+  <rect class="part-removed" x="246" y="150" width="6" height="40"/>
+    <rect class="cutter" x="246" y="60" width="6" height="84"/>
+  <line class="datum" x1="40" y1="120" x2="40" y2="215"/>
+  <text class="datum-label" x="20" y="240">X0 the faced head end</text>
+  <line class="leader" x1="40" y1="228" x2="40" y2="210"/>
+  <line class="datum" x1="120" y1="150" x2="290" y2="150"/>
+  <text class="datum-label" x="100" y="84">Z0 the bar's top</text>
+  <line class="leader" x1="200" y1="88" x2="200" y2="150"/>
+  <text class="label" x="20" y="50">cross hole (Setup 4)</text>
+  <text class="label" x="300" y="50">PA02: 1/16 at 2.097</text>
+  <line class="leader" x1="60" y1="54" x2="82" y2="150"/>
+  <line class="leader" x1="320" y1="54" x2="252" y2="165"/>
+  <text class="label" x="400" y="72">jaw (behind) grips the 5/8 bar</text>
+  <text class="label" x="320" y="320">1 in parallel on edge, from the jaws' left face</text>
+  <line class="leader" x1="420" y1="308" x2="420" y2="230"/>
+  <line class="dims" x1="40" y1="300" x2="300" y2="300"/>
+  <text class="label" x="70" y="290">2.25 (2.22–2.28) to the jaws</text>
+</svg>

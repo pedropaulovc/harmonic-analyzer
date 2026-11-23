@@ -54,12 +54,41 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from diagnostics.drawing_layout_audit import collect_document
+from _feature_requirements import part_metadata, requirement
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
+from _printed_limits import limits
 from dt_pinion_arbor_pin_spec import (
+    PIN_HOLE_CALLOUT as _PIN_HOLE_CALLOUT,
     PIN_HOLE_DIA as _PIN_HOLE_DIA,
+    PIN_HOLE_DIA_BAND as _PIN_HOLE_DIA_BAND,
     PIN_HOLE_DIA_MAX as _PIN_HOLE_DIA_MAX,
     PIN_NUMBER as _PIN_NUMBER,
 )
 from dt_vn_pinion_strap_pin_spec import DRILL_THRU_CALLOUT as _PIN_DRILL_THRU_CALLOUT
+from dt_pinion_arbor_geometry import (
+    BACK_CAP_R,
+    BACK_CAP_SAG,
+    BACK_JOURNAL_END_FROM_HEAD_REAR,
+    BACK_JOURNAL_FROM_HEAD_REAR,
+    BACK_RIM_FROM_HEAD_REAR,
+    BOND_RELIEF_BACK_FROM_HEAD_REAR,
+    BOND_RELIEF_DIA,
+    BOND_RELIEF_FROM_HEAD_REAR,
+    CROSS_HOLE_DIA,
+    CROSS_HOLE_DIA_BAND,
+    CROSS_HOLE_STATION,
+    FRONT_JOURNAL_END_FROM_HEAD_REAR,
+    FRONT_JOURNAL_FROM_HEAD_REAR,
+    HEAD_CAP_R,
+    HEAD_DIA,
+    HEAD_LEN,
+    NECK_DIA,
+    NECK_END_Z,
+    NECK_LEN,
+    PIN_STATION_FROM_HEAD_REAR,
+    UNIT,
+)
 from dt_pinion_arbor_spec import (
     BACK_JOURNAL_Z,
     BOND_RELIEF_LEN,
@@ -182,6 +211,335 @@ SHEET_NOTES = (
 )
 # Under the property-linked inside-corner note (top-left at y 0.060).
 NOTES_XY = (0.020, 0.052)
+
+# Feature requirements (package:features; the drilled_block adapter's kinds),
+# in the model frame: the turning axis along +Z, the head toward -Z, every
+# station from the head rear face (z = HEAD_REAR_Z), both cross holes along
+# model Y.  The declarations print nothing; each band is the one the sheet
+# prints (DRAWING_PRECISION_BY_NAME places, the title block's rows, each
+# dimension's own band).
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_pinion_arbor"
+_GEOM = "dt_pinion_arbor_geometry"
+_PINSPEC = "dt_pinion_arbor_pin_spec"
+_FRAME = ("build_dt_pinion_arbor", "__frame__")
+_REAR = ((_GEOM, "HEAD_REAR_Z"),)
+# The sheet's unit and printed places every printed band reads.
+_PRINT = ((_GEOM, "UNIT"), ("dt_pinion_arbor_notes", "DRAWING_PRECISION_BY_NAME"))
+_HEAD_CAP_CENTER_Z = HEAD_FRONT_Z - HEAD_CAP_SAG + HEAD_CAP_R
+_BACK_CAP_CENTER_Z = SHAFT_LEN + BACK_CAP_SAG - BACK_CAP_R
+
+
+def _xx(value: float, name: str) -> list[float]:
+    """``value``'s printed limits at the places the sheet prints ``name`` at."""
+    return limits(value, _P[name], unit=UNIT)
+
+
+part_metadata(
+    model_sources=(
+        _FRAME,
+        (_GEOM, "SHAFT_DIA"),
+        (_GEOM, "SHAFT_LEN"),
+        (_GEOM, "HEAD_REAR_Z"),
+        (_GEOM, "HEAD_FRONT_Z"),
+    ),
+    precision_sources=(("dt_pinion_arbor_notes", "DRAWING_PRECISION_BY_NAME"),),
+)
+requirement(
+    "head_rear",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), HEAD_REAR_Z),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": HEAD_REAR_Z}, _REAR),
+        "outward": ([0.0, 0.0, 1.0], (_FRAME,)),
+    },
+)
+requirement(
+    "head",
+    kind="outside_cylinder",
+    faces=(CylinderFace(HEAD_DIA),),
+    requirements=("dia", "length"),
+    fields={
+        "at": ([0.0, 0.0, HEAD_REAR_Z], _REAR),
+        "axis": ([0.0, 0.0, -1.0], (_FRAME,)),
+        "dia": (_xx(HEAD_DIA, "HeadDia"), ((_GEOM, "HEAD_DIA"), *_PRINT)),
+        "nominal_dia": (HEAD_DIA, ((_GEOM, "HEAD_DIA"),)),
+        "length": (_xx(HEAD_LEN, "HeadLen"), ((_GEOM, "HEAD_LEN"), *_PRINT)),
+        "length_nominal": (HEAD_LEN, ((_GEOM, "HEAD_LEN"),)),
+    },
+    precision={"dia": _P["HeadDia"], "length": _P["HeadLen"]},
+)
+requirement(
+    "head_crown",
+    kind="arc",
+    faces=(SphereFace(2.0 * HEAD_CAP_R, (0.0, 0.0, _HEAD_CAP_CENTER_Z)),),
+    requirements=("radius",),
+    fields={
+        "center": (
+            [0.0, 0.0, _HEAD_CAP_CENTER_Z],
+            ((_GEOM, "HEAD_FRONT_Z"), (_GEOM, "HEAD_CAP_R"), (_GEOM, "HEAD_CAP_SAG")),
+        ),
+        "axis": ([1.0, 0.0, 0.0], (_FRAME,)),
+        "apex": ([0.0, 0.0, -1.0], (_FRAME,)),
+        "radius": (_xx(HEAD_CAP_R, "HeadCapR"), ((_GEOM, "HEAD_CAP_R"), *_PRINT)),
+        "radius_nominal": (HEAD_CAP_R, ((_GEOM, "HEAD_CAP_R"),)),
+        "height_ref": (HEAD_CAP_SAG, ((_GEOM, "HEAD_CAP_SAG"),)),
+    },
+    precision={"radius": _P["HeadCapR"]},
+)
+requirement(
+    "neck",
+    kind="outside_cylinder",
+    faces=(CylinderFace(NECK_DIA),),
+    requirements=("dia", "length"),
+    fields={
+        "at": ([0.0, 0.0, HEAD_REAR_Z], _REAR),
+        "axis": ([0.0, 0.0, 1.0], (_FRAME,)),
+        "dia": (_xx(NECK_DIA, "NeckDia"), ((_GEOM, "NECK_DIA"), *_PRINT)),
+        "nominal_dia": (NECK_DIA, ((_GEOM, "NECK_DIA"),)),
+        "length": (_xx(NECK_LEN, "NeckLen"), ((_GEOM, "NECK_LEN"), *_PRINT)),
+        "length_nominal": (NECK_LEN, ((_GEOM, "NECK_LEN"),)),
+    },
+    precision={"dia": _P["NeckDia"], "length": _P["NeckLen"]},
+)
+# Every Ø5/16 span but the two journals: the collar's span and the back stub
+# (note 2, sliding fit in MHA-DT-33) and the two drum bond lands (note 3,
+# bonded in MHA-DT-01).  It runs from the neck shoulder to the back crown's
+# root.
+requirement(
+    "shaft",
+    kind="outside_cylinder",
+    faces=(CylinderFace(SHAFT_DIA, contains_z_mm=BACK_STUB_DIA_Z),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, NECK_END_Z], ((_GEOM, "NECK_END_Z"),)),
+        "axis": ([0.0, 0.0, 1.0], (_FRAME,)),
+        "dia": (
+            limits(SHAFT_DIA, _P["BondZoneDia"], SHAFT_DIA_BAND, unit=UNIT),
+            ((_GEOM, "SHAFT_DIA"), (_GEOM, "SHAFT_DIA_BAND"), *_PRINT),
+        ),
+        "nominal_dia": (SHAFT_DIA, ((_GEOM, "SHAFT_DIA"),)),
+        "length_nominal": (
+            SHAFT_LEN - NECK_END_Z,
+            ((_GEOM, "SHAFT_LEN"), (_GEOM, "NECK_END_Z")),
+        ),
+        "collar_clearance": (list(COLLAR_CLEARANCE), ((_SELF, "COLLAR_CLEARANCE"),)),
+        "collar_mates": (COLLAR_NUMBER, (("dt_pinion_arbor_collar_spec", "COLLAR_NUMBER"),)),
+        "bond_clearance": (list(BOND_CLEARANCE), ((_SELF, "BOND_CLEARANCE"),)),
+        "bond_mates": (DRUM_NUMBER, (("dt_pinion_arbor_spec", "DRUM_NUMBER"),)),
+    },
+    precision={"dia": _P["BondZoneDia"]},
+)
+# The two journals: note 1's running fit in the MHA-DT-14 strap bores, turned
+# to the measured bore; each end a .XX station from the head rear face.
+requirement(
+    "front_journal",
+    kind="journal",
+    faces=(surface_finish_by_key(SURFACE_FINISHES, "front_journal").face,),
+    requirements=("dia", "station", "end_station", "finish_ra"),
+    fields={
+        "at": ([0.0, 0.0, FRONT_JOURNAL_Z], ((_GEOM, "FRONT_JOURNAL_Z"),)),
+        "axis": ([0.0, 0.0, 1.0], (_FRAME,)),
+        "dia": (
+            limits(SHAFT_DIA, _P["BackJournalDia"], JOURNAL_DIA_BAND, unit=UNIT),
+            ((_GEOM, "SHAFT_DIA"), (_GEOM, "JOURNAL_DIA_BAND"), *_PRINT),
+        ),
+        "nominal_dia": (SHAFT_DIA, ((_GEOM, "SHAFT_DIA"),)),
+        "station": (
+            _xx(FRONT_JOURNAL_FROM_HEAD_REAR, "FrontJournalFromHeadRear"),
+            ((_GEOM, "FRONT_JOURNAL_FROM_HEAD_REAR"), *_PRINT),
+        ),
+        "station_nominal": (
+            FRONT_JOURNAL_FROM_HEAD_REAR,
+            ((_GEOM, "FRONT_JOURNAL_FROM_HEAD_REAR"),),
+        ),
+        "station_from": ("head_rear", _REAR),
+        "end_station": (
+            _xx(FRONT_JOURNAL_END_FROM_HEAD_REAR, "FrontJournalEndFromHeadRear"),
+            ((_GEOM, "FRONT_JOURNAL_END_FROM_HEAD_REAR"), *_PRINT),
+        ),
+        "end_station_nominal": (
+            FRONT_JOURNAL_END_FROM_HEAD_REAR,
+            ((_GEOM, "FRONT_JOURNAL_END_FROM_HEAD_REAR"),),
+        ),
+        "finish_ra": (
+            surface_finish_by_key(SURFACE_FINISHES, "front_journal").roughness_um,
+            (("dt_pinion_arbor_spec", "SURFACE_FINISHES"),),
+        ),
+        "diametral_clearance": (list(JOURNAL_CLEARANCE), ((_SELF, "JOURNAL_CLEARANCE"),)),
+        "mates": (STRAP_NUMBER, (("dt_pinion_arbor_spec", "STRAP_NUMBER"),)),
+    },
+    precision={
+        "dia": _P["BackJournalDia"],
+        "station": _P["FrontJournalFromHeadRear"],
+        "end_station": _P["FrontJournalEndFromHeadRear"],
+        "finish_ra": 1,
+    },
+)
+requirement(
+    "back_journal",
+    kind="journal",
+    faces=(surface_finish_by_key(SURFACE_FINISHES, "back_journal").face,),
+    requirements=("dia", "station", "end_station", "finish_ra"),
+    fields={
+        "at": ([0.0, 0.0, BACK_JOURNAL_Z], ((_GEOM, "BACK_JOURNAL_Z"),)),
+        "axis": ([0.0, 0.0, 1.0], (_FRAME,)),
+        "dia": (
+            limits(SHAFT_DIA, _P["BackJournalDia"], JOURNAL_DIA_BAND, unit=UNIT),
+            ((_GEOM, "SHAFT_DIA"), (_GEOM, "JOURNAL_DIA_BAND"), *_PRINT),
+        ),
+        "nominal_dia": (SHAFT_DIA, ((_GEOM, "SHAFT_DIA"),)),
+        "station": (
+            _xx(BACK_JOURNAL_FROM_HEAD_REAR, "BackJournalFromHeadRear"),
+            ((_GEOM, "BACK_JOURNAL_FROM_HEAD_REAR"), *_PRINT),
+        ),
+        "station_nominal": (
+            BACK_JOURNAL_FROM_HEAD_REAR,
+            ((_GEOM, "BACK_JOURNAL_FROM_HEAD_REAR"),),
+        ),
+        "station_from": ("head_rear", _REAR),
+        "end_station": (
+            _xx(BACK_JOURNAL_END_FROM_HEAD_REAR, "BackJournalEndFromHeadRear"),
+            ((_GEOM, "BACK_JOURNAL_END_FROM_HEAD_REAR"), *_PRINT),
+        ),
+        "end_station_nominal": (
+            BACK_JOURNAL_END_FROM_HEAD_REAR,
+            ((_GEOM, "BACK_JOURNAL_END_FROM_HEAD_REAR"),),
+        ),
+        "finish_ra": (
+            surface_finish_by_key(SURFACE_FINISHES, "back_journal").roughness_um,
+            (("dt_pinion_arbor_spec", "SURFACE_FINISHES"),),
+        ),
+        "diametral_clearance": (list(JOURNAL_CLEARANCE), ((_SELF, "JOURNAL_CLEARANCE"),)),
+        "mates": (STRAP_NUMBER, (("dt_pinion_arbor_spec", "STRAP_NUMBER"),)),
+    },
+    precision={
+        "dia": _P["BackJournalDia"],
+        "station": _P["BackJournalFromHeadRear"],
+        "end_station": _P["BackJournalEndFromHeadRear"],
+        "finish_ra": 1,
+    },
+)
+requirement(
+    "bond_relief",
+    kind="relief",
+    faces=(CylinderFace(BOND_RELIEF_DIA),),
+    requirements=("dia", "station", "end_station"),
+    fields={
+        "at": ([0.0, 0.0, BOND_RELIEF_Z], ((_GEOM, "BOND_RELIEF_Z"),)),
+        "axis": ([0.0, 0.0, 1.0], (_FRAME,)),
+        "dia": (_xx(BOND_RELIEF_DIA, "BondReliefDia"), ((_GEOM, "BOND_RELIEF_DIA"), *_PRINT)),
+        "nominal_dia": (BOND_RELIEF_DIA, ((_GEOM, "BOND_RELIEF_DIA"),)),
+        "station": (
+            _xx(BOND_RELIEF_FROM_HEAD_REAR, "BondReliefFromHeadRear"),
+            ((_GEOM, "BOND_RELIEF_FROM_HEAD_REAR"), *_PRINT),
+        ),
+        "station_nominal": (BOND_RELIEF_FROM_HEAD_REAR, ((_GEOM, "BOND_RELIEF_FROM_HEAD_REAR"),)),
+        "station_from": ("head_rear", _REAR),
+        "end_station": (
+            _xx(BOND_RELIEF_BACK_FROM_HEAD_REAR, "BondReliefBackFromHeadRear"),
+            ((_GEOM, "BOND_RELIEF_BACK_FROM_HEAD_REAR"), *_PRINT),
+        ),
+        "end_station_nominal": (
+            BOND_RELIEF_BACK_FROM_HEAD_REAR,
+            ((_GEOM, "BOND_RELIEF_BACK_FROM_HEAD_REAR"),),
+        ),
+    },
+    precision={
+        "dia": _P["BondReliefDia"],
+        "station": _P["BondReliefFromHeadRear"],
+        "end_station": _P["BondReliefBackFromHeadRear"],
+    },
+)
+# The SR.28 back crown: its root (the back rim) a .XX station from the head
+# rear face, its sag a reference.
+requirement(
+    "back_crown",
+    kind="arc",
+    faces=(SphereFace(2.0 * BACK_CAP_R, (0.0, 0.0, _BACK_CAP_CENTER_Z)),),
+    requirements=("radius", "rim_station"),
+    fields={
+        "center": (
+            [0.0, 0.0, _BACK_CAP_CENTER_Z],
+            ((_GEOM, "SHAFT_LEN"), (_GEOM, "BACK_CAP_R"), (_GEOM, "BACK_CAP_SAG")),
+        ),
+        "axis": ([1.0, 0.0, 0.0], (_FRAME,)),
+        "apex": ([0.0, 0.0, 1.0], (_FRAME,)),
+        "radius": (_xx(BACK_CAP_R, "BackCapR"), ((_GEOM, "BACK_CAP_R"), *_PRINT)),
+        "radius_nominal": (BACK_CAP_R, ((_GEOM, "BACK_CAP_R"),)),
+        "height_ref": (BACK_CAP_SAG, ((_GEOM, "BACK_CAP_SAG"),)),
+        "rim_station": (
+            _xx(BACK_RIM_FROM_HEAD_REAR, "BackRimFromHeadRear"),
+            ((_GEOM, "BACK_RIM_FROM_HEAD_REAR"), *_PRINT),
+        ),
+        "rim_station_nominal": (BACK_RIM_FROM_HEAD_REAR, ((_GEOM, "BACK_RIM_FROM_HEAD_REAR"),)),
+        "overall_ref": (OVERALL_LEN, ((_GEOM, "OVERALL_LEN"),)),
+    },
+    precision={"radius": _P["BackCapR"], "rim_station": _P["BackRimFromHeadRear"]},
+)
+# The head's reamed crossrod hole along model Y, a .XX station from the head
+# rear face, bonded on MHA-DT-15 (its own +.005/+.001 band).
+requirement(
+    "cross_hole",
+    kind="hole",
+    faces=(CylinderFace(CROSS_HOLE_DIA),),
+    requirements=("dia", "thru", "station"),
+    fields={
+        "at": (
+            [0.0, -HEAD_DIA / 2.0, HEAD_CENTER_Z],
+            ((_GEOM, "HEAD_CENTER_Z"), (_GEOM, "HEAD_DIA")),
+        ),
+        "axis": ([0.0, 1.0, 0.0], (_FRAME, ("build_dt_pinion_arbor", "build"))),
+        "dia": (
+            limits(CROSS_HOLE_DIA, _P["CrossHoleDia"], CROSS_HOLE_DIA_BAND, unit=UNIT),
+            ((_GEOM, "CROSS_HOLE_DIA"), (_GEOM, "CROSS_HOLE_DIA_BAND"), *_PRINT),
+        ),
+        "nominal_dia": (CROSS_HOLE_DIA, ((_GEOM, "CROSS_HOLE_DIA"),)),
+        "thru": (True, ((_SELF, "CROSS_HOLE_CALLOUT"),)),
+        "process": ("ream", ((_SELF, "CROSS_HOLE_CALLOUT"),)),
+        "callout": (CROSS_HOLE_CALLOUT, ((_SELF, "CROSS_HOLE_CALLOUT"),)),
+        "mates": (CROSSROD_NUMBER, (("dt_pinion_arbor_spec", "CROSSROD_NUMBER"),)),
+        "station": (
+            _xx(CROSS_HOLE_STATION, "CrossHoleFromHeadRear"),
+            ((_GEOM, "CROSS_HOLE_STATION"), *_PRINT),
+        ),
+        "station_nominal": (CROSS_HOLE_STATION, ((_GEOM, "CROSS_HOLE_STATION"),)),
+        "station_from": ("head_rear", _REAR),
+    },
+    precision={"dia": _P["CrossHoleDia"], "station": _P["CrossHoleFromHeadRear"]},
+)
+# The MHA-DT-33 collar's 1/16 spring-pin hole, on the crossrod's axis so one
+# hold serves both cross holes.
+requirement(
+    "pin_hole",
+    kind="hole",
+    faces=(CylinderFace(_PIN_HOLE_DIA),),
+    requirements=("dia", "thru", "station"),
+    fields={
+        "at": ([0.0, -SHAFT_DIA / 2.0, PIN_Z], ((_GEOM, "PIN_Z"), (_GEOM, "SHAFT_DIA"))),
+        "axis": ([0.0, 1.0, 0.0], (_FRAME, ("build_dt_pinion_arbor", "build"))),
+        "dia": (
+            limits(_PIN_HOLE_DIA, _P["PinHoleDia"], _PIN_HOLE_DIA_BAND, unit=UNIT),
+            ((_PINSPEC, "PIN_HOLE_DIA"), (_PINSPEC, "PIN_HOLE_DIA_BAND"), *_PRINT),
+        ),
+        "nominal_dia": (_PIN_HOLE_DIA, ((_PINSPEC, "PIN_HOLE_DIA"),)),
+        "thru": (True, ((_PINSPEC, "PIN_HOLE_CALLOUT"),)),
+        "process": ("drill", ((_PINSPEC, "PIN_HOLE_CALLOUT"),)),
+        "callout": (_PIN_HOLE_CALLOUT, ((_PINSPEC, "PIN_HOLE_CALLOUT"),)),
+        "mates": (_PIN_NUMBER, ((_PINSPEC, "PIN_NUMBER"),)),
+        "station": (
+            _xx(PIN_STATION_FROM_HEAD_REAR, "PinStationFromHeadRear"),
+            ((_GEOM, "PIN_STATION_FROM_HEAD_REAR"), *_PRINT),
+        ),
+        "station_nominal": (
+            PIN_STATION_FROM_HEAD_REAR,
+            ((_GEOM, "PIN_STATION_FROM_HEAD_REAR"),),
+        ),
+        "station_from": ("head_rear", _REAR),
+    },
+    precision={"dia": _P["PinHoleDia"], "station": _P["PinStationFromHeadRear"]},
+)
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE

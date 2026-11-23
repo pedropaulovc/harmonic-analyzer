@@ -56,16 +56,23 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 import _telemetry
 from build_pd_platen_clip import (
     ARCH_RISE,
+    BEND_ANGLE,
+    BEND_RADIUS,
     BRIDGE_X0,
     BRIDGE_X1,
+    CENTER_BRIDGE_LENGTH,
     CLIP_LENGTH,
     CLIP_WIDTH,
     DRAWING_DIMENSIONS,
@@ -78,11 +85,15 @@ from build_pd_platen_clip import (
     HOLE_WALL_TEXT,
     HOLE_INSET,
     HOLE_Y,
+    NOTCH_WIDTH,
     REFERENCE_DIMENSIONS,
+    SCREW_RAIL_END_RADIUS,
     SCREW_RAIL_SLIT_RADIUS,
     SCREW_RAIL_WIDTH,
     SHEET_T,
+    SPRING_END_RADIUS,
     SPRING_RAIL_Y0,
+    UNIT,
 )
 
 
@@ -318,6 +329,233 @@ if set().union(*_VIEW_KEEPS.values()) != set().union(*DRAWING_DIMENSIONS.values(
     raise AssertionError(
         "the platen-clip views must keep exactly the marked dimensions"
     )
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (pd_platen_clip_spec's docstring; the nominals are build_pd_platen_clip's).
+# The clip is one strip blank, slit, drilled and formed: the blank's straight
+# length is the bridge plus both developed fingers, its width the overall
+# width; the bows' printed radius is the sheet's mid-surface (a centreline
+# radius) and each bow's lift and return arcs turn BEND_ANGLE, the crown twice
+# that. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_platen_clip"
+_BUILD = "build_pd_platen_clip"
+
+
+def _b(*names: str) -> tuple[tuple[str, str], ...]:
+    return tuple((_BUILD, name) for name in names)
+
+
+def _band(value: float, name: str, *sources: str) -> tuple[list[float], tuple]:
+    return (
+        limits(value, _P[name], unit=UNIT),
+        (*_b(*sources, "UNIT"), (_SELF, "FRONT_KEEP" if name in FRONT_KEEP else "TOP_KEEP")),
+    )
+
+
+part_metadata(
+    model_sources=_b("CLIP_LENGTH", "CLIP_WIDTH", "SHEET_T", "ARCH_RISE"),
+    precision_sources=_b("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "sheet",
+    kind="blank",
+    faces=(PlanarFace((0.0, 0.0, 1.0), SHEET_T),),
+    requirements=("thickness",),
+    fields={
+        "section": ("strip", _b("SHEET_T")),
+        "width": (CLIP_WIDTH, _b("CLIP_WIDTH")),
+        "thickness": (SHEET_T, (*_b("SHEET_T"), (_SELF, "TOP_KEEP"))),
+        "dimension_type": ("reference", _b("REFERENCE_DIMENSIONS")),
+        "callout": (DIMENSION_CALLOUTS["SheetDepth"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "developed_length": (
+            CENTER_BRIDGE_LENGTH + 2.0 * FLAT_FINGER_LENGTH,
+            _b("CENTER_BRIDGE_LENGTH", "FLAT_FINGER_LENGTH"),
+        ),
+    },
+)
+requirement(
+    "outer_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": ({"frame": "model", "axis": "z", "value": 0.0}, _b("SHEET_T"))},
+)
+requirement(
+    "near_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": ({"frame": "model", "axis": "x", "value": 0.0}, _b("CLIP_LENGTH"))},
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), CLIP_LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": ({"frame": "model", "axis": "x", "value": CLIP_LENGTH}, _b("CLIP_LENGTH")),
+        "length": _band(CLIP_LENGTH, "Length", "CLIP_LENGTH"),
+        "length_nominal": (CLIP_LENGTH, _b("CLIP_LENGTH")),
+        "length_from": ("near_end", ((_SELF, "FRONT_KEEP"),)),
+        "callout": (DIMENSION_CALLOUTS_ABOVE["Length"], ((_SELF, "DIMENSION_CALLOUTS_ABOVE"),)),
+    },
+    precision={"length": _P["Length"]},
+)
+requirement(
+    "outer_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": ({"frame": "model", "axis": "y", "value": 0.0}, _b("CLIP_WIDTH"))},
+)
+requirement(
+    "rail_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), SCREW_RAIL_WIDTH),),
+    requirements=("width",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": SCREW_RAIL_WIDTH},
+            _b("SCREW_RAIL_WIDTH"),
+        ),
+        "width": _band(SCREW_RAIL_WIDTH, "RailWidth", "SCREW_RAIL_WIDTH"),
+        "width_nominal": (SCREW_RAIL_WIDTH, _b("SCREW_RAIL_WIDTH")),
+        "width_from": ("outer_edge", ((_SELF, "FRONT_KEEP"),)),
+        "callout": (DIMENSION_CALLOUTS["RailWidth"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+    },
+    precision={"width": _P["RailWidth"]},
+)
+requirement(
+    "spring_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), CLIP_WIDTH),),
+    requirements=("width",),
+    fields={
+        "plane": ({"frame": "model", "axis": "y", "value": CLIP_WIDTH}, _b("CLIP_WIDTH")),
+        "width": _band(CLIP_WIDTH, "OverallWidth", "CLIP_WIDTH"),
+        "width_nominal": (CLIP_WIDTH, _b("CLIP_WIDTH")),
+        "width_from": ("outer_edge", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"width": _P["OverallWidth"]},
+)
+requirement(
+    "slits",
+    kind="slot",
+    faces=(
+        PlanarFace((0.0, -1.0, 0.0), -SPRING_RAIL_Y0),
+        CylinderFace(NOTCH_WIDTH),
+    ),
+    requirements=("width", "bridge_near", "bridge_far"),
+    fields={
+        "width": _band(NOTCH_WIDTH, "SlitWidth", "NOTCH_WIDTH"),
+        "width_nominal": (NOTCH_WIDTH, _b("NOTCH_WIDTH")),
+        "width_from": ("rail_edge", ((_SELF, "FRONT_KEEP"),)),
+        "bridge_near": _band(BRIDGE_X0, "BridgeX0", "BRIDGE_X0"),
+        "bridge_near_nominal": (BRIDGE_X0, _b("BRIDGE_X0")),
+        "bridge_far": _band(BRIDGE_X1, "BridgeX1", "BRIDGE_X1"),
+        "bridge_far_nominal": (BRIDGE_X1, _b("BRIDGE_X1")),
+        "bridge_near_from": ("near_end", ((_SELF, "FRONT_KEEP"),)),
+        "end_radius": (NOTCH_WIDTH / 2.0, _b("SLIT_END_RADIUS")),
+        "count": (2, ((_SELF, "_COUNTS"),)),
+        "callout": (DIMENSION_CALLOUTS["SlitWidth"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+    },
+    precision={"width": _P["SlitWidth"], "bridge_near": _P["BridgeX0"], "bridge_far": _P["BridgeX1"]},
+)
+requirement(
+    "rail_end_corners",
+    kind="profile",
+    faces=(CylinderFace(2.0 * SCREW_RAIL_END_RADIUS),),
+    requirements=("radius",),
+    fields={
+        "radius": _band(SCREW_RAIL_END_RADIUS, "EndR1", "SCREW_RAIL_END_RADIUS"),
+        "radius_nominal": (SCREW_RAIL_END_RADIUS, _b("SCREW_RAIL_END_RADIUS")),
+        "count": (2, ((_SELF, "_COUNTS"),)),
+    },
+    precision={"radius": _P["EndR1"]},
+)
+requirement(
+    "slit_corners",
+    kind="profile",
+    faces=(CylinderFace(2.0 * SCREW_RAIL_SLIT_RADIUS),),
+    requirements=("radius",),
+    fields={
+        "radius": _band(SCREW_RAIL_SLIT_RADIUS, "SlitCornerR1", "SCREW_RAIL_SLIT_RADIUS"),
+        "radius_nominal": (SCREW_RAIL_SLIT_RADIUS, _b("SCREW_RAIL_SLIT_RADIUS")),
+        "count": (2, ((_SELF, "_COUNTS"),)),
+    },
+    precision={"radius": _P["SlitCornerR1"]},
+)
+requirement(
+    "spring_tips",
+    kind="profile",
+    faces=(CylinderFace(2.0 * SPRING_END_RADIUS),),
+    requirements=("width",),
+    fields={
+        "width": (2.0 * SPRING_END_RADIUS, (*_b("SPRING_END_RADIUS"), (_SELF, "FRONT_KEEP"))),
+        "dimension_type": ("reference", _b("REFERENCE_DIMENSIONS")),
+        "callout": (DIMENSION_CALLOUTS["SpringRailWidth"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "count": (2, _b("SPRING_END_RADIUS")),
+    },
+)
+requirement(
+    "screw_holes",
+    kind="hole",
+    faces=(CylinderFace(HOLE_DIA),),
+    requirements=("dia", "x_near", "x_far", "y", "thru"),
+    fields={
+        "at": ([HOLE_INSET, HOLE_Y, 0.0], _b("HOLE_INSET", "HOLE_Y")),
+        "axis": ([0.0, 0.0, 1.0], _b("SHEET_T")),
+        "dia": (
+            drilled_limits(HOLE_DIA, HOLE_CALLOUT_PRECISION["hw-diam"], unit=UNIT),
+            _b("HOLE_DIA", "HOLE_CALLOUT_PRECISION", "UNIT"),
+        ),
+        "nominal_dia": (HOLE_DIA, _b("HOLE_DIA")),
+        "x_near": _band(HOLE_INSET, "LeftX", "HOLE_INSET"),
+        "x_near_nominal": (HOLE_INSET, _b("HOLE_INSET")),
+        "x_far": _band(HOLE_FAR_X, "RightX", "HOLE_INSET", "CLIP_LENGTH"),
+        "x_far_nominal": (HOLE_FAR_X, _b("HOLE_INSET", "CLIP_LENGTH")),
+        "x_near_from": ("near_end", ((_SELF, "FRONT_KEEP"),)),
+        "y": _band(HOLE_Y, "LeftZ", "HOLE_Y"),
+        "y_nominal": (HOLE_Y, _b("HOLE_Y")),
+        "y_from": ("outer_edge", ((_SELF, "FRONT_KEEP"),)),
+        "thru": (True, ((_SELF, "HOLE_EXTENT_TEXT"),)),
+        "process": ("drill", ((_SELF, "HOLE_EXTENT_TEXT"),)),
+        "count": (2, _b("HOLE_INSET")),
+        "callout": (HOLE_CALLOUT_MATE, ((_SELF, "HOLE_CALLOUT_MATE"),)),
+    },
+    precision={
+        "dia": HOLE_CALLOUT_PRECISION["hw-diam"],
+        "x_near": _P["LeftX"],
+        "x_far": _P["RightX"],
+        "y": _P["LeftZ"],
+    },
+)
+requirement(
+    "bows",
+    kind="bend",
+    faces=(
+        CylinderFace(2.0 * (BEND_RADIUS - SHEET_T / 2.0)),
+        CylinderFace(2.0 * (BEND_RADIUS + SHEET_T / 2.0)),
+    ),
+    requirements=("centreline_radius", "rise", "developed_finger"),
+    fields={
+        "centreline_radius": (BEND_RADIUS, (*_b("BEND_RADIUS"), (_SELF, "TOP_KEEP"))),
+        "angle": (math.degrees(BEND_ANGLE), _b("BEND_ANGLE")),
+        "crown_angle_deg": (2.0 * math.degrees(BEND_ANGLE), _b("BEND_ANGLE")),
+        "rise": _band(ARCH_RISE, "CrestRise", "ARCH_RISE"),
+        "rise_nominal": (ARCH_RISE, _b("ARCH_RISE")),
+        "rise_from": ("outer_face", ((_SELF, "TOP_KEEP"),)),
+        "developed_finger": (FLAT_FINGER_LENGTH, (*_b("FLAT_FINGER_LENGTH"), (_SELF, "TOP_KEEP"))),
+        "dimension_type": ("reference", _b("REFERENCE_DIMENSIONS")),
+        "callout": (DIMENSION_CALLOUTS["FlatFinger"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "leave_near": (HOLE_INSET, _b("TANGENT_STATIONS")),
+        "rejoin_near": (BRIDGE_X0, _b("TANGENT_STATIONS")),
+        "count": (6, ((_SELF, "_COUNTS"),)),
+    },
+    precision={"rise": _P["CrestRise"]},
+)
 
 
 def _set_dimension_affixes(

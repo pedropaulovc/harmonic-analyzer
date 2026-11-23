@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 640" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="640"/>
+  <text class="title" x="20" y="20">Setup 3, section across the jaws at clamp hole 1, seen from the right, from END A (1 in = 100 px)</text>
+  <line class="fixture-table" x1="60" y1="330" x2="470" y2="330"/>
+  <rect class="clamp" x="150" y="153" width="60" height="177"/>
+  <rect class="clamp" x="321.8" y="153" width="60" height="177"/>
+  <text class="label-on-clamp" x="158" y="320">moving</text>
+  <text class="label-on-clamp" x="334" y="320">fixed</text>
+  <!-- Three 1.5 in stacks, 1/8 in thick: the outer and inner at the moving
+       jaw, one at the fixed jaw; the .125 pin on the outer one. -->
+  <rect class="fixture-support" x="210" y="180" width="12.5" height="150"/>
+  <rect class="fixture-support" x="222.5" y="180" width="12.5" height="150"/>
+  <rect class="fixture-support" x="309.3" y="180" width="12.5" height="150"/>
+  <circle class="fixture-support" cx="216.25" cy="173.75" r="6.25"/>
+  <!-- The bar lying, F up, T against the fixed jaw. -->
+  <rect class="part-kept" x="222.5" y="142.5" width="99.3" height="37.5"/>
+  <rect class="holes" x="256.9" y="142.5" width="19.6" height="37.5"/>
+  <rect class="holes" x="251.1" y="142.5" width="31.2" height="19"/>
+  <line class="centre-line" x1="266.7" y1="124" x2="266.7" y2="200"/>
+  <!-- The 5/16 in end mill above its counterbore. -->
+  <rect class="cutter" x="251.1" y="60" width="31.2" height="60"/>
+  <line class="arrow" x1="266.7" y1="38" x2="266.7" y2="58"/>
+  <text class="label-halo" x="303" y="166">T</text>
+  <line class="datum" x1="110" y1="142.5" x2="222.5" y2="142.5"/>
+  <text class="datum-label" x="20" y="136">Z0: the front face F</text>
+  <line class="datum" x1="321.8" y1="96" x2="321.8" y2="180"/>
+  <text class="datum-label" x="328" y="104">Y0: the fixed jaw's face (T against it)</text>
+  <line class="dims" x1="266.7" y1="132" x2="321.8" y2="132"/>
+  <line class="leader" x1="300" y1="132" x2="388" y2="140"/>
+  <text class="label" x="392" y="144">clamp holes {{cad.clamp_hole_1_height_in:.3dot}} below T (the pivot hole {{cad.pivot_tap_height_in:.3dot}})</text>
+  <line class="leader" x1="282.3" y1="80" x2="388" y2="64"/>
+  <text class="label" x="392" y="68">5/16 in end mill: the counterbore, down the #9 hole</text>
+  <line class="leader" x1="213" y1="167" x2="212" y2="102"/>
+  <text class="label" x="210" y="96" text-anchor="end">.125 pin on the outer stack</text>
+  <line class="leader" x1="266.7" y1="186" x2="266.7" y2="346"/>
+  <text class="label" x="150" y="362">every drill comes out here, between the stacks</text>
+  <text class="label" x="400" y="210">Three 1.5 in stacks (dotted):</text>
+  <text class="label" x="400" y="228">at the fixed jaw, a 1 in on a 1/2 in;</text>
+  <text class="label" x="400" y="246">at the moving jaw, a 1 in on a 1/2 in under the</text>
+  <text class="label" x="400" y="264">bar's bottom edge and, outside it, the two</text>
+  <text class="label" x="400" y="282">3/4 in under the pin.</text>
+  <!-- Plan, fixed jaw at the top, 1 in = 40 px; X0 (the milled END A) at
+       x = 745. -->
+  <text class="title" x="20" y="410">Plan (fixed jaw at the top, 1 in = 40 px)</text>
+  <rect class="clamp" x="477.5" y="450" width="249.9" height="30"/>
+  <rect class="clamp" x="477.5" y="524.7" width="249.9" height="30"/>
+  <text class="label-on-clamp" x="560" y="470">fixed jaw</text>
+  <text class="label-on-clamp" x="560" y="545">moving jaw</text>
+  <rect class="fixture-support" x="562" y="519.7" width="80" height="5"/>
+  <rect class="part-kept" x="30.6" y="480" width="714.4" height="39.7"/>
+  <rect class="part-removed" x="745" y="480" width="2.4" height="39.7"/>
+  <circle class="holes" cx="726.8" cy="502.05" r="6.25"/>
+  <circle class="holes" cx="726.8" cy="502.05" r="3.92"/>
+  <circle class="holes" cx="671.7" cy="502.05" r="6.25"/>
+  <circle class="holes" cx="671.7" cy="502.05" r="3.92"/>
+  <circle class="holes" cx="480.3" cy="502.83" r="2.72"/>
+  <text class="label-halo" x="708" y="496">1</text>
+  <text class="label-halo" x="653" y="496">2</text>
+  <text class="label-halo" x="487" y="497">P</text>
+  <circle class="cutter" cx="755" cy="545" r="10"/>
+  <line class="arrow" x1="770" y1="540" x2="770" y2="470"/>
+  <line class="datum" x1="745" y1="440" x2="745" y2="560"/>
+  <text class="datum-label" x="741" y="576" text-anchor="end">X0: the milled END A</text>
+  <line class="dims" x1="727.4" y1="425" x2="747.4" y2="425"/>
+  <line class="dims" x1="727.4" y1="420" x2="727.4" y2="450"/>
+  <line class="dims" x1="747.4" y1="420" x2="747.4" y2="480"/>
+  <text class="label" x="722" y="424" text-anchor="end">sawn END A {{process.end_overhang_mm:in.2dot}} out past the jaws</text>
+  <text class="label" x="40" y="470">the rest of the bar out past the jaws' left side, in the air</text>
+  <text class="label" x="40" y="578">1, 2: clamp holes, at X {{cad.clamp_hole_1_station_in:.3dot}} and {{cad.clamp_hole_2_station_in:.3dot}} left of X0</text>
+  <text class="label" x="40" y="595">P: the pivot hole, at X {{cad.pivot_tap_station_in:.3dot}} left of X0</text>
+  <text class="label" x="40" y="612">the pin lies on the outer stack, against the bottom edge</text>
+  <text class="label" x="40" y="629">END A: the 1/2 in end mill's side, each pass +Y, the bar on its left (conventional)</text>
+</svg>

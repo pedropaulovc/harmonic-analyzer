@@ -16,6 +16,7 @@ import math
 
 import ha_harmonic_analyzer_assembly_steps as _ha_steps
 import mg_magnifier_assembly_steps as _steps
+import mg_wheel_group as _group
 import sh_vn_clamp_screw_spec as _clamp_screw
 import mg_wheel_axle_spec as _axle
 import mg_vn_magnifying_bracket_screw_spec as _bracket_screw
@@ -31,6 +32,7 @@ from mg_magnifier_assembly_spec import (
     FEATURE,
     PRESS_GAUGE_DIMENSION,
     THREAD_PAST_LOCKNUT_DIMENSION,
+    THREAD_PAST_LOCKNUT_LIMITS,
     UNIT,
 )
 from _title_block_units import LENGTH_UNITS, render_number
@@ -86,6 +88,35 @@ if UNIT != "in":
     raise AssertionError("the endshake feeler check reads inch leaves")
 ENDSHAKE_GO_TEXT = render_number((ENDSHAKE - ENDSHAKE_TOL) / _INCH, UNIT, 3)
 ENDSHAKE_NO_GO_TEXT = render_number((ENDSHAKE + ENDSHAKE_TOL) / _INCH, UNIT, 3)
+# The trial fit (#3344) reads the thread end past the second nut before the
+# endshake is set, its nuts jammed over the go leaf (ENDSHAKE_GO_TEXT, the
+# band's low limit, ENDSHAKE_MIN: the spec asserts the band symmetric):
+# jammed "just free", about no endshake, a conforming stack read .115 against
+# DETAIL B's .114. At the go leaf both of the wheel group's corners land
+# inside DETAIL B's limits: the long one is mg_wheel_group's own, taken at
+# ENDSHAKE_MIN; the short one is its locknut corner, taken at ENDSHAKE_MAX.
+# The endshake set after the trial is never less, so the acceptance reads no
+# more than the trial did. It can read up to the band's width less: a
+# conforming stack still passes (.031 less .004), and a stack that passed the
+# trial low and fails there has its parts measured, not re-trialled
+# ("axle-reset", Codjiflo r1 of #3345).
+TRIAL_THREAD_PAST_LOCKNUT = (
+    _group.LOCKNUT_THREAD_MARGIN
+    + _axle.TIP_INCOMPLETE
+    + (_group.ENDSHAKE_MAX - _group.ENDSHAKE_MIN),
+    _group.THREAD_PAST_LOCKNUT_MAX,
+)  # .031 .. .113
+if not (
+    THREAD_PAST_LOCKNUT_LIMITS[0] - 1e-6
+    <= TRIAL_THREAD_PAST_LOCKNUT[0] - (_group.ENDSHAKE_MAX - _group.ENDSHAKE_MIN)
+    <= TRIAL_THREAD_PAST_LOCKNUT[1]
+    <= THREAD_PAST_LOCKNUT_LIMITS[1] + 1e-6
+):
+    raise AssertionError(
+        f"a conforming stack reads {TRIAL_THREAD_PAST_LOCKNUT} mm of thread past "
+        f"the second nut at the trial, outside {THREAD_PAST_LOCKNUT_LIMITS} at "
+        "the trial or once the endshake is set"
+    )
 
 # The summing lever (cad/config/parts/sm-summing-lever.yaml), the mate the
 # bracket screws to at MHA-HA-00; rule 4 names it by its drawing number.
@@ -393,27 +424,33 @@ STEP_TEXT = {
         f"IF IT WAS BONDED, SLIDE {_SPACER} ONTO ITS SHANK AGAINST {_BAR}."
     ),
     "axle-bond-set": (
-        f"IF IT WAS BONDED, SET IT AT ONCE AS {PRESS_DETAIL_TITLE} SETS IT "
-        f"{_PRESS_READ}."
+        f"IF IT WAS BONDED, SET IT AT ONCE, {_SPACER} HELD AGAINST {_BAR}, AS "
+        f"{PRESS_DETAIL_TITLE} SETS IT {_PRESS_READ}."
     ),
     "axle-bond-cured": (
         f"IF IT WAS BONDED, RETURN TO {_step(_steps.AXLE_HELD_KEY)} ONCE IT HAS "
         "CURED 24 H."
     ),
     _steps.AXLE_TRIAL_KEY: f"TRIAL-FIT {_STACK} ON {_AXLE}, IN THAT ORDER.",
+    # The trial reads the thread end at the go leaf's endshake, where both
+    # stack corners land inside DETAIL B (TRIAL_THREAD_PAST_LOCKNUT, #3344).
+    "trial-feeler-placed": (
+        f"SLIDE THE {ENDSHAKE_GO_TEXT} FEELER BETWEEN {_WASHER} AND THE SPIGOT FACE, "
+        f"{_WHEEL} PUSHED TOWARD {_BAR}."
+    ),
     "trial-nuts-jammed": (
-        f"JAM BOTH {_NUT} NUTS ON {_AXLE} WITH {_WHEEL} JUST FREE."
+        f"JAM BOTH {_NUT} NUTS ON {_AXLE} WITH THE FEELER JUST NIPPED."
     ),
     _steps.AXLE_CHECKED_KEY: (
         f"CHECK THE THREAD END STANDS PAST THE SECOND NUT AS "
         f"{ENDSHAKE_DETAIL_TITLE} SETS IT (CALIPER DEPTH ROD)."
     ),
     "trial-parts-removed-to-press": (
-        f"IF IT FAILS, REMOVE THE TRIAL NUTS AND PARTS FROM {_AXLE}."
+        f"IF IT FAILS, REMOVE THE TRIAL NUTS, FEELER AND PARTS FROM {_AXLE}."
     ),
     "axle-press-rechecked": (
         f"IF THEY WERE REMOVED, CHECK THE SHOULDER OF {_AXLE} STANDS PAST "
-        f"{_SPACER} AS {PRESS_DETAIL_TITLE} SETS IT {_PRESS_READ}."
+        f"{_SPACER}, HELD AGAINST {_BAR}, AS {PRESS_DETAIL_TITLE} SETS IT {_PRESS_READ}."
     ),
     "axle-repressed": (
         f"IF IT FAILS, PRESS {_AXLE} TO THAT SETTING: IN ON ITS SHOULDER "
@@ -442,7 +479,7 @@ STEP_TEXT = {
         f"IF IT WAS PRESSED OUT, RETURN TO {_step(_steps.SPACER_FITTED_KEY)} "
         f"WITH A NEW {_AXLE}."
     ),
-    "trial-parts-removed": f"REMOVE THE TRIAL NUTS AND PARTS FROM {_AXLE}.",
+    "trial-parts-removed": f"REMOVE THE TRIAL NUTS, FEELER AND PARTS FROM {_AXLE}.",
     "column-clamps-fitted": (
         f"FIT {_item(CLAMP_FRONT)} AND {_item(CLAMP_BACK)} TO {_BAR} AS THE "
         "SHEET 2 EXPLODED VIEW SHOWS."
@@ -494,14 +531,17 @@ STEP_TEXT = {
         f"{_step(_steps.AXLE_CHECKED_KEY)}."
     ),
     # The final reading's own remedy: strip the stack back to the bare axle
-    # and take the trial-fit loop again (machinist review, stab-split s2).
+    # (machinist review, stab-split s2) and take the failed trial's remedies
+    # from the press re-check: a stack that read low at the trial's endshake
+    # and fails at a larger set one would pass the trial again (Codjiflo r1
+    # of #3345), so its parts are measured, and with none out, the axle goes.
     "axle-stack-removed": (
         f"IF IT FAILS, REMOVE ITEMS {ITEM_NUMBERS[NUT]}, "
         f"{ITEM_NUMBERS[FRONT_WASHER]}, {ITEM_NUMBERS[WHEEL]} AND "
         f"{ITEM_NUMBERS[BACK_WASHER]}."
     ),
     "axle-reset": (
-        f"IF THEY WERE REMOVED, RETURN TO {_step(_steps.AXLE_TRIAL_KEY)}."
+        f"IF THEY WERE REMOVED, RETURN TO {_step('axle-press-rechecked')}."
     ),
     # The setting names the instrument that reads it (rule 22).
     _steps.LEVER_THREADED_KEY: (

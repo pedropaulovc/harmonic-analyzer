@@ -2,15 +2,18 @@ pd-transgear-arm-plate:
   title: Transgear Arm Plate
   number: MHA-PD-19
   material: AISI 1018 cold-finished steel
-  material_specification: AISI 1018 cold-finished steel bar, ASTM A108, 1-1/2 in
+  material_specification: 1/4 x 1-1/2 1018 CF flat bar
   finish: bright machined; protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
   process: >-
-    Mill the outline from 1-1/2 in bar and step the notch; turn the front hub
-    and rear boss on the bore axis; ream the bore; drill and countersink the
-    two clamp screw holes. At assembly (MHA-PD-00 steps 12-13), after the
+    Mill the outline from the 1/4 x 1-1/2 flat bar and face it to .197;
+    drill and ream the 7/16 press hole on K and chamfer its face-A mouth;
+    drill and countersink the two clamp screw holes. Press the MHA-PD-28
+    bush in from face A until its shoulder seats, then ream its bore,
+    before the plate is clamped to MHA-PD-18. At assembly (MHA-PD-00 steps
+    12-13), after the
     MHA-PD-23 pin is pressed into MHA-PD-18: clamp the plate on the arm's
     rear face and, on the mill DRO, set the knob bore at the MHA-PD-00
     DETAIL K settings from the pin's shank in the arm's pin bore S, indicated
@@ -33,8 +36,3 @@ pd-transgear-arm-plate:
       where: "the two locator holes' and the two screw holes' position frames (A|B|C)"
       finding: "position controls over-specified (rule 5)"
       reason: "required by the whole-stack stock-form gate including the rigid two-hole registration yaw; stock dowels in reamed holes locate, the screws clamp (owner-accepted). Owner ruling 2026-11-20 (#1571): \"Follow recommendations unless noted otherwise\": the recommended option 1, the location names every printed frame."
-    - id: "RV-02"
-      kind: "accept"
-      where: "the knob bore's perpendicularity frame to datum A (face-A view)"
-      finding: "perpendicularity frame on a running bore (rule 5)"
-      reason: "owner ruling 2026-11-08 (Pedro), #2144 item 4.1: K stays a plain ⊥ Ø.002 A, no projected zone (rule 26). Knob axis K carried from the bore to the chain plane must stay inside the reducer's axis zone the air stacks and meshes charge, and this frame is what bounds it: Ø.002 over the shortest bore (28.47 mm) projects to 0.0747 mm at K_PROJECTED_HEIGHT_MM (41.88 mm, the 3/8 arm, #2019) against the 0.0832 mm zone (paper_drive_arm_registration.AXIS_PROJECTED_ZONE_DIAMETER_MM)"

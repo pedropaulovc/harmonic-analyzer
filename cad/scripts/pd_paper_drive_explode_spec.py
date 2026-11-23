@@ -140,41 +140,47 @@ KNOB_WHEEL_INSTANCE = "pd-transgear-removable-1"
 # and the knob stack are drawn in separate views, so a wide part (the 120T
 # disc, the hub flange, the T24) never sits over the other axis's parts.
 TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
-    # Knob shaft's rear: the cup off the journal, its cross pin out along
-    # its own (machine X) axis toward -X, the side sheet 3's isometric sees.
-    # Along +X the pin stood behind the plate's lower block: its balloon
-    # anchor fell back to a listed edge and the leader landed on the block
-    # (run 20261028T074113068Z, ENFORCE review r1-r3 gating on balloon 40).
+    # Knob shaft's rear, in the reverse of the A06 knob stack (the shaft on
+    # the ring, the journal's stand-out measured, the cup's front faced and
+    # bonded, the screw in): the cup off the journal with its MHA-PD-VN-71
+    # screw, then the screw rearward out of the cup along the knob axis, its
+    # tip (3.1 in front of the cup's front face when seated) clear of the
+    # cup's rear face by about 6.
     ExplodeStep(
         "knob cup rearward",
-        ("pd-transgear-knob-cup", "pd-vn-transgear-knob-cup-pin"),
+        ("pd-transgear-knob-cup", "pd-vn-transgear-knob-cup-screw"),
         "z",
         64.0,
     ),
     ExplodeStep(
-        "cup pin out of the cup", ("pd-vn-transgear-knob-cup-pin",), "x", -22.0
+        "cup screw out of the cup", ("pd-vn-transgear-knob-cup-screw",), "z", 18.0
     ),
     # The thrust ring rearward along the journal, clear of the 15T it bears
-    # on, so the shaft's teeth, the ring and the plate hub read in fitting
+    # on, so the shaft's teeth, the ring and the bush's hub read in fitting
     # order (2026-11-03 ENFORCE review of #2095's run 20261103T013313660Z,
     # r1/r3: the pinion was drawn partly inside ring 38).  The ring stops
-    # well short of the plate's hub, thrown 40 mm rearward below.
+    # well short of the bush's hub, thrown 58 mm rearward with the plate below.
     ExplodeStep("thrust ring rearward", ("pd-transgear-knob-thrust-ring",), "z", 12.0),
-    # The plate off the arm's rear face, its screws behind it and the two
-    # locating dowels drawn out of the arm between them.  At 16 mm the
+    # The plate off the arm's rear face with its pressed MHA-PD-28 bush (pressed
+    # and reamed before the plate goes on the arm), its screws behind it and
+    # the two locating dowels drawn out of the arm between them.  At 16 mm the
     # isometric drew the plate on the arm's top edge with the dowels hidden
     # under it (2026-10-27 ENFORCE review, r1, r2: balloon 20 landed on a
     # barely visible tip).  At 20 mm the dowels stood behind the arm's hub
     # (ENFORCE reviews of 30dde0c577 and b1161da53b, two runs each: balloon
     # 19 ended on a sliver at the hub's edge, 1.2 mm under its top), so they
     # come 20 mm further out, which lifts them about 5 mm on the 2:3 sheet,
-    # and the plate and the knob cup (behind the plate's hub) with them.  The
-    # screws follow the plate at 18 mm, not 24: at 70/24/50 (cup 76) the
-    # view's balloon ring stood 199.1 mm in its 197.0 mm room (run
-    # 20261111T093403871Z).
+    # and the plate and the knob cup with them; the cup's front stays about 6
+    # behind the moved bush's rear face.  The screws follow the plate at
+    # 18 mm, not 24: at 70/24/50 (cup 76) the view's balloon ring stood
+    # 199.1 mm in its 197.0 mm room (run 20261111T093403871Z).
     ExplodeStep(
         "arm plate rearward",
-        ("pd-transgear-arm-plate", "pd-vn-transgear-arm-plate-screw"),
+        (
+            "pd-transgear-arm-plate",
+            "pd-transgear-knob-bush",
+            "pd-vn-transgear-arm-plate-screw",
+        ),
         "z",
         58.0,
     ),

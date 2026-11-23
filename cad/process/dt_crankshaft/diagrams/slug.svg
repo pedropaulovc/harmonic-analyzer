@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="280"/>
+  <text class="title" x="20" y="20">Setup 5: the proof slug between the 3-jaw and the dead centre (not to scale)</text>
+  <rect class="fixture-vise" x="60" y="70" width="120" height="180"/>
+  <rect class="part-rest" x="100" y="110" width="110" height="100"/>
+  <rect class="part-removed" x="210" y="110" width="440" height="100"/>
+  <rect class="part-kept" x="240" y="142" width="120" height="36"/>
+  <rect class="part-kept" x="360" y="122" width="45" height="76"/>
+  <rect class="part-kept" x="405" y="137" width="245" height="46"/>
+  <line class="active-face" x1="232" y1="100" x2="232" y2="220"/>
+  <polygon class="clamp" points="650,160 690,140 690,180"/>
+  <line class="centre-line" x1="40" y1="160" x2="720" y2="160"/>
+  <text class="label" x="450" y="250">journal Ø.4486, Z0 to Z-1.600</text>
+  <line class="leader" x1="520" y1="238" x2="520" y2="183"/>
+  <text class="label" x="300" y="90">spigot Ø.687; its stub-side face at Z-1.872</text>
+  <line class="leader" x1="360" y1="94" x2="360" y2="122"/>
+  <text class="label" x="240" y="250">stub Ø.3746</text>
+  <line class="leader" x1="290" y1="238" x2="290" y2="178"/>
+  <text class="datum-label" x="540" y="60">Z0 the faced end; dead centre</text>
+  <line class="leader" x1="640" y1="64" x2="650" y2="150"/>
+  <text class="label" x="60" y="270">part-off at Z-2.622</text>
+  <line class="leader" x1="150" y1="258" x2="230" y2="218"/>
+</svg>

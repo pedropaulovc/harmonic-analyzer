@@ -756,7 +756,7 @@ if NUT_RELIEF_RADIAL_AIR <= 0.0:
 # wheel forward. R9-70 adds the wheel's own float under the thumbnut, forward
 # only (the collar body is its rear stop), and K-1 sets the knob's end float
 # on a feeler at fit-up, so it no longer carries the journal, ring and
-# hub-to-boss bands (contract: 0..0.35).  R9-71: the MHA-PD-VN-63 spring holds
+# MHA-PD-28 bush length bands (contract: 0..0.35).  R9-71: the MHA-PD-VN-63 spring holds
 # the arm on the MHA-PD-20 spacer, which is pressed on the MHA-PD-VN-57
 # shoulder, so the hanger has no end play and its tilt is fixed in the bar's
 # frame, where the fit-up reads it.  The setting (CHAIN_SET_RANGE) and the
