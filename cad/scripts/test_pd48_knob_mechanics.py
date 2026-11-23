@@ -307,9 +307,11 @@ def test_retained_walls_and_axial_stations_need_no_new_waiver():
     assert shaft.REAR_TAP_WALL_WORST >= 2.032
     assert bush.BORE_DIA == 6.3246
     assert bush.BORE_DIA_LIMITS == (0.0, 0.0127)
-    # The end-milled .250 +.001/0 pilot on the .249 g6 journal: .0012-.0025.
+    # The .250 +.004/0 pilot (the DRILLED HOLES row) bonded on the journal
+    # modelled .2485-.2488: .0012-.0055, inside LOCTITE 641's .0059 fill.
     assert min(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.03048)
-    assert max(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.0635)
+    assert max(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.1397)
+    assert max(cup.BORE_JOURNAL_CLEARANCE) <= cup.LOCTITE_641_GAP_MAX
     assert ring.LENGTH == 6.7818  # .267, the 3/8 arm (#2019)
     assert bush.HUB_LENGTH == pytest.approx(20.5486)  # .809
     assert shaft.CUP_FACE_Z == pytest.approx(41.91)
