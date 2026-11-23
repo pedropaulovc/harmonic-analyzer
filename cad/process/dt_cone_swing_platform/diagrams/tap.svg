@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 370" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="370"/>
+  <text class="title" x="20" y="20">PL02 / PL03: the tap guide over the post hole; tap by hand</text>
+  <rect class="clamp" x="300" y="210" width="60" height="90"/>
+  <rect class="fixture-support" x="300" y="275" width="60" height="25"/>
+  <rect class="part-kept" x="120" y="250" width="240" height="25"/>
+  <rect class="part-threads" x="160" y="250" width="10" height="25"/>
+  <rect class="cutter" x="162" y="150" width="6" height="105"/>
+  <rect class="part-rest" x="90" y="140" width="150" height="12"/>
+  <polygon class="cutter" points="158,90 172,90 165,135"/>
+  <line class="leader" x1="380" y1="100" x2="168" y2="132"/>
+  <text class="label" x="384" y="104">tap guide's spring point in the wrench's centre hole</text>
+  <line class="leader" x1="120" y1="320" x2="165" y2="276"/>
+  <text class="label" x="40" y="334">hole runs through into air, left of the jaws</text>
+  <text class="label" x="250" y="135">T-handle wrench</text>
+  <text class="label" x="20" y="358">Spindle off; a half turn back each turn; full threads through the top face.</text>
+</svg>

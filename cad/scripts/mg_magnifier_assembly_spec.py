@@ -1,11 +1,12 @@
 """The MHA-MG-00 magnifier assembly settings: the builder's and the sheet's.
 
-Five settings belong to no single part: the press gauge the wheel axle is
+Four settings belong to no single part: the press gauge the wheel axle is
 pressed to in the bar, from the spacer's outer face (the press's setting),
-the axle's plain end below the bar's far face (where that press leaves it),
-the drum's outer face below the wheel's spigot end,
-the endshake the first nut sets, and the axle's thread end past the second
-nut (the press's acceptance). Each one is printed as a native model dimension
+the drum's outer face below the wheel's spigot end, the endshake the first
+nut sets, and the axle's thread end past the second nut (the press's
+acceptance). A fifth length, the axle's plain end below the bar's far face
+(where the press leaves it), prints as a reference no step reads. Each one
+is printed as a native model dimension
 on the MHA-MG-00 sheet. A construction chain in the assembly carries them all
 (the ms-measuring-stick ClampedSetting pattern). It runs along the axle
 centreline on the Right plane, through ten stations (CHAIN_D), from the bar's
@@ -109,10 +110,11 @@ ENDSHAKE_TOL = _group.ENDSHAKE_MAX - _group.ENDSHAKE
 if abs((_group.ENDSHAKE - _group.ENDSHAKE_MIN) - ENDSHAKE_TOL) > 1e-9:
     raise AssertionError("the endshake band is not symmetric about its model value")
 
-# The press and thread-end settings the MHA-MG-00 steps read with a caliper
-# depth rod, each a model length on the same chain (rule 22: a measurable
-# setting prints on a view even though the steps print in ASSEMBLY.md).
-# Each prints as its two limits; the model's own pose sits inside them.
+# The stack lengths the MHA-MG-00 sheet prints, each a model length on the
+# same chain (rule 22: a measurable setting prints on a view even though the
+# steps print in ASSEMBLY.md). The press gauge and the endshake print banded
+# (DIMENSION_TOLERANCES), the drum recess and the thread end as their two
+# limits (LIMIT_DIMENSIONS); the model's own pose sits inside them.
 # The axle's plain end below the bar's far face: where the press setting
 # leaves it, a window the axle spec proves from the printed shank, spacer,
 # gauge and bar depth (its low limit keeps the end inside the bore). No step

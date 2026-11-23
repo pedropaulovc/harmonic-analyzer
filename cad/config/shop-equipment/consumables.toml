@@ -34,6 +34,14 @@ name = "Loctite 638 retaining compound (archived inventory)"
 kind = "retaining_compound"
 status = "on_hand"
 
+# #2425 (owner ruling 2026-11-20 (Pedro)): the MHA-PD-16 knob cup's bonded
+# pilot on the MHA-PD-08 journal end; 641 is the removable grade
+# (drawing-guidelines.md, retention: "641 where the part must come out").
+[consumables.loctite-641]
+name = "Loctite 641 retaining compound"
+kind = "retaining_compound"
+status = "to_order"
+
 [consumables.epoxy-30-minute]
 name = "30-minute epoxy"
 kind = "adhesive"
@@ -88,7 +96,7 @@ note = "Not owned: to buy. Under the alkyd enamels of MHA-FR-01 and MHA-FR-02 (t
 [consumables.black-alkyd-enamel]
 name = "Rust-Oleum Stops Rust Custom Spray 5-in-1 Flat Black 376855, 12 oz aerosol (oil-modified alkyd enamel)"
 kind = "paint"
-note = "Ownership not stated by the owner: to check. MHA-FR-01 deck and underside (BLACK DECK/UNDERSIDE), the MHA-SH-01/MHA-SH-02 column clamps and the MHA-DT-02 arbor pedestal (black enamel)."
+note = "Ownership not stated by the owner: to check. MHA-FR-01 deck and underside (BLACK DECK/UNDERSIDE), the MHA-SH-01/MHA-SH-02 column clamps and the MHA-DT-02 arbor pedestal (black enamel); MHA-MS-01 stick: wiped into the graduations and numerals (black-fill)."
 cite = [
   "Owner (Pedro) 2026-11-21, answered in person: \"rust-oleum Flat Black376855\".",
   "The Home Depot, Rust-Oleum Stops Rust 12 oz. Custom Spray 5-in-1 Flat Black Spray Paint 376855 (https://www.homedepot.com/p/Rust-Oleum-Stops-Rust-12-oz-Custom-Spray-5-in-1-Flat-Black-Spray-Paint-376855/323255175), read 2026-11-21.",
@@ -183,8 +191,8 @@ status = "to_order"
 thickness_mm = 0.15
 normal_tensile_kpa = 690
 dynamic_shear_kpa = 690
-purchase = "1-1/2 in wide, or two 3/4 in strips side by side: 12 in per strap, 20 ft for the lot of 20. Rolls are 5 yd (15 ft), so two 1-1/2 in rolls or three 3/4 in rolls (#3083 row 11, owner ruling 2026-11-20). No price or stock read."
-note = "Not owned: to buy. MHA-CH-13 Setup 5: bonds the faced blank to the sub-plate under its whole face while the outline is cut."
+purchase = "1-1/2 in wide, or two 3/4 in strips side by side: 12 in per strap, 20 ft for the lot of 20. Rolls are 5 yd (15 ft), so two 1-1/2 in rolls or three 3/4 in rolls (#3083 row 11, owner ruling 2026-11-20). The MHA-MS-01 stick takes one 9 in strip more, trimmed to its fixture bar's 1/2 in width: inside either purchase (30 ft of 1-1/2 in against the straps' 20 ft, or 45 ft of 3/4 in against their 40 ft). No price or stock read."
+note = "Not owned: to buy. MHA-CH-13 Setup 5: bonds the faced blank to the sub-plate under its whole face while the outline is cut. MHA-MS-01 Setups 3 and 4: bonds the stick's blank to its fixture bar's faced top while its outline is milled and its scale engraved."
 cite = ["3M VHB Tapes Technical Data, November 2015, Typical Performance Characteristics, 5906: thickness .006 in (0.15 mm); 90 degree peel 9 lb/in (16 N/cm); normal tensile (ASTM D-897, to aluminium, 72 h dwell) 100 lb/in2 (690 kPa); dynamic overlap shear (ASTM D-1002, to stainless steel, 72 h dwell) 100 lb/in2 (690 kPa); Application Techniques: clean with 50:50 isopropyl alcohol and water, about 15 psi application pressure, about 50% of ultimate bond strength after 20 minutes, 90% after 24 hours, 100% after 72 hours. Read 2026-11-17 from a distributor's copy (3M's own link refused the fetch): https://www.tspinc.com/pdf/3M-VHB-Tapes-Technical-Data.pdf"]
 
 # --- MHA-MG-02 magnifying clamp: brass black (owner ruling 2026-11-17) -------
@@ -227,7 +235,7 @@ kind = "oil"
 make = "Birchwood Casey"
 status = "to_order"
 purchase = "The oil Brass Black's directions name to preserve the finish; no size, price or stock read."
-note = "Not owned: to buy. MHA-MG-02 blackening: preserve the blackened surface, overnight."
+note = "Not owned: to buy. MHA-MG-02 blackening: preserve the blackened surface, overnight. MHA-SM-01 gooseneck: the finish's oil (sheet: polished bare; oil or wax), a thin film wiped on after polishing (cad/process/sm_gooseneck/plan.toml Setup 7)."
 cite = ["Birchwood Casey Deutschland, Brass Black directions step 8 (see consumables.brass-black-birchwood-casey)"]
 
 [consumables.chemical-gloves-eye-protection]
@@ -279,3 +287,32 @@ cite = [
   "Birchwood Technologies product page, Presto Black Steel PC9, SKU 5602, read 2026-11-21 (https://www.birchwoodtechnologies.com/shop/all-products/presto-black-steel-mkp-rpl-pc9/): 'Versatile Liquid Concentrate to create a black Steel patina', $26.49 to $575.50 by size (8 oz, 32 oz, 1 gal).",
   "Presto Black Steel PC9 Instructions (https://www.birchwoodtechnologies.com/wp-content/uploads/2025/11/Presto-Black-Steel-PC9-Inst.pdf), read 2026-11-21: 'works at room temperature to form a non-dimensional, medium-durability, black coating on all iron and steel surfaces'; 1. prepare metal: wash with soap and water or isopropanol, Scotchbrite or blast to fresh metal; 2b. brush or sponge-on: dilute 50-100% with water, apply with even strokes, re-wet and continue, attention to edges and holes, apply lightly; 3. stop the reaction: rinse thoroughly with clean water; 4. dry (compressed air, heat gun or lint-free cloth), repeat step 2 if necessary; 6. seal with a clear-coat, wax, or oil. Acid: acid-resistant gloves and eye protection. Waste and rinse water to a hazardous waste drop-off.",
 ]
+
+# --- MHA-MS-01 stick: final polish (cad/process/ms_stick) --------------------
+
+# The stick's finish is "polished brass; black-fill all engraving with flat
+# black enamel, wipe-filled and cured before final polish" (MHA-MS-01 title
+# block). The enamel is consumables.black-alkyd-enamel (owner 2026-11-21). The
+# polish has no owner ruling and nothing finer than the 220-grit rolls is on
+# record: these two are the author's choice (agent CncFlatB.FlatBStick2,
+# 2026-11-22), FLAGGED for the owner, who may name others.
+[consumables.wetordry-paper-600]
+name = "3M Wetordry sandpaper 32036, 600 grit, 9 x 11 in sheets, pack of 5"
+kind = "abrasive_sheet"
+make = "3M"
+sku = "32036"
+source = "https://www.3m.com/3M/en_US/p/d/v100010909/"
+status = "to_order"
+purchase = "One pack of 5 sheets; no price or stock read (the maker's page lists none)."
+note = "Not owned: to buy. MHA-MS-01 final polish: a sheet wet on the surface plate takes the cured enamel film and the tool marks off the ruled face and leaves the filled grooves."
+cite = ["3M product page, 3M Wetordry Sandpaper, 32036, 600 Grit, 9 in x 11 in, 5 per pack (https://www.3m.com/3M/en_US/p/d/v100010909/), read 2026-11-22: silicon carbide abrasive on a waterproof lightweight (A weight) paper backing; 'Convenient sheet can be used wet or dry on paint, primer, gel coat and metal'."]
+
+[consumables.metal-polish-simichrome]
+name = "Happich Simichrome Polish, 50 g tube"
+kind = "polish"
+make = "Happich"
+source = "https://simichrome-polish.de/shop/simichrome-polish-50g-tube/?lang=en"
+status = "to_order"
+purchase = "One 50 g tube, 13.95 EUR at the maker's shop (read 2026-11-22); any seller."
+note = "Not owned: to buy. MHA-MS-01 final polish, after the 600-grit paper."
+cite = ["Simichrome Polish shop, SIMICHROME POLISH 50g Tube (https://simichrome-polish.de/shop/simichrome-polish-50g-tube/?lang=en), read 2026-11-22: 'polish for all non-ferrous metal surfaces such as chrome, silver, brass, gold, copper, tin, aluminum, magnesium, stainless steel and even Plexiglas'; 13,95 EUR."]

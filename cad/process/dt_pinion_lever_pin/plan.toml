@@ -1,0 +1,131 @@
+# Pinion lever pin MHA-DT-30, one off (owner ruling 2026-11-21: bench and
+# trivially cut parts get travelers too). Route chosen for speed: all at the
+# bench, no machine. The 1/16 in drill rod's diameter is the drawing's STOCK
+# OK band, left as supplied (miked once on arrival). A 1/16 rod is too slender
+# for the 3-jaw or the 14 in saw's vise, so it is cut by hand: Setup 1 in the
+# bench vise's soft jaws files the rod end square (the datum end), saws a .65
+# piece off it with a junior hacksaw and files the sawn end to the .62-.64 cut
+# length, calipered between strokes. Setup 2 at the bench breaks the edges,
+# checks the length and oils the pin (FINISH: bare steel, machine-oil film).
+# The cut length is trimmed and peened flush at assembly (MHA-DT-00 LEVER PIN
+# SET), where its hole is match-drilled.
+#
+# Stock: 1/16 in drill rod is to order (cad/config/shop-equipment/
+# stock-to-order.toml drill-rod-1-16); the junior hacksaw is to order too
+# (tools-hand.toml tools.junior-hacksaw).
+title = "Pinion Lever Pin"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "AISI O1 or W1 drill rod, 1/16 in"
+stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.4dot}} drill rod, a 36 in length (to order, not on hand); the pin takes {{process.saw_length_in:.2dot}} in of it."
+note = "Inches unless mm. All bench work: no machine runs. Hand tools on the drill rod, dry."
+shop = "../shop"
+stock_refs = ["drill-rod-1-16"]
+
+[cad]
+file = "../../out/features/dt_pinion_lever_pin/features.toml"
+adapter = "turned_bush"
+part = "dt-pinion-lever-pin"
+
+[parameters]
+quantity = 1
+stock_dia_in = 0.0625
+# The rod is the drawing's Ø.0625 ±.0003 as supplied: never turned.
+as_supplied_outer = 1
+# Sawn off the filed end: the .63 pin and the allowance left on the sawn end
+# for filing it to length, which also takes up the saw's squareness.
+saw_length_in = 0.65
+# Filed off the rod's end to square it (Op 20).
+face_allowance_in = 0.01
+# Left on the sawn end for Op 40 to file the pin to length.
+regrip_allowance_in = 0.02
+# The junior hacksaw's kerf (authored; the blade is not measured on record).
+part_kerf_in = 0.03
+
+[[tools]]
+id = "file"
+name = "8 in smooth file; bench vise with soft jaws"
+ref = "jig-files"
+
+[[tools]]
+id = "saw"
+name = "Junior hacksaw, 32 TPI blade"
+ref = "junior-hacksaw"
+
+[[tools]]
+id = "stone"
+name = "India stone"
+ref = "india-stone-ib8"
+
+[[setups]]
+machine_kind = "other"
+title = "Bench vise: square the rod end, saw the piece, file it to length"
+machine = "Bench vise with soft jaws"
+holding = "The 1/16 rod, then the sawn piece, upright in the bench vise's soft jaws. Each op says how far it stands out: to file, no more than 1/16 in above the jaw tops (the thin rod bends under the file)."
+envelope = "other"
+indexing = "none"
+diagram = { file = "diagrams/vise.svg", alt = "Three panels in the bench vise's soft jaws: Op 20 the rod end filed square 1/16 out; Op 30 the .65 piece standing above the jaws, sawn off at the mark; Op 40 the piece filed end down, its sawn end filed to the .63 cut length." }
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+instruction = "Mike the rod as it arrives, at three places along the first 2 in."
+inspection = "Every reading {{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}}, else stop: the rod is not the drawing's stock."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Clamp the rod with its end 1/16 in above the jaw tops. File the end square to the rod, about {{process.face_allowance_in:.2dot}} in off, in light strokes across the end. This is the datum end the length runs from."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Mark the rod {{process.saw_length_in:.2dot}} in from the filed end with the calipers' jaw tips. Clamp the rod with the mark 1/16 in above the jaw tops, the .65 piece standing above it. Saw just below the mark, on the jaw (waste) side, so the kerf comes out of the rod and the piece stays at least that long; light strokes, the piece held between finger and thumb so it does not fly."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Clamp the piece filed end down, its sawn end 1/16 in above the jaw tops. File the sawn end square toward the {{cad.length_nominal_in:.2dot}} length; between passes take it out and caliper it across both ends. Stop inside {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}}; Op 60 is the acceptance."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Bench: break the edges, check the length, oil"
+machine = "Bench"
+envelope = "other"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished pin: its .63 cut length and the 1/16 rod outside as supplied." }
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "stone"
+drilling = "none"
+sizing = "other"
+instruction = "Stone the burr off both ends and break each end edge, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, rolling the pin on the stone at a slant."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Measure the length across the ends with calipers."
+inspection = "Length {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Over {{cad.length_max_in:.2dot}}: file the sawn end again as in Op 40, then repeat Ops 50 and 60. Under {{cad.length_min_in:.2dot}}: scrap it, not reworked; make another by repeating Ops 20 to 60 on the rest of the rod."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Wipe the pin with a light machine-oil film (FINISH: bare steel, ISO VG 32 machine-oil film) and bag it with its number."
+feed = "hand"

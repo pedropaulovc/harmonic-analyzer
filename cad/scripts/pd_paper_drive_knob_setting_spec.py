@@ -5,7 +5,7 @@ pin bore S, on the shank of the MHA-PD-23 pin already pressed into it (the
 cluster's running axis; #2417): the arm trammed on its pivot bore P and
 S, the DRO zeroed on S, the plate tapped till its knob bore indicates true at
 K's two coordinates from S, along the arm toward P and across it to the
-plate's notch side. K is aimed at the middle of the +x/-0 set band
+plate's end-round side. K is aimed at the middle of the +x/-0 set band
 (``pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW``) so the DRO and indicator
 setting error, worst case, stays inside it at both ends
 (test_pd_paper_drive_assembly_drawing). The two coordinates are DRO counts:
@@ -63,8 +63,8 @@ DRO_COUNT_MM = 0.00508
 K_SET_CENTRE_DISTANCE_MM = sum(disc.CENTRE_DISTANCE_WINDOW) / 2.0
 _S_TO_K = (arm.KNOB_BORE_STATION - arm.PIN_STATION, arm.KNOB_BORE_OFFSET)
 _S_TO_K_UNIT = (_S_TO_K[0] / math.hypot(*_S_TO_K), _S_TO_K[1] / math.hypot(*_S_TO_K))
-# From S: toward the pivot along the arm, and across it to the plate's notch
-# side (both negative in the arm frame).
+# From S: toward the pivot along the arm, and across it to the plate's
+# end-round side (both negative in the arm frame).
 K_AIM_FROM_S_MM = (
     -_S_TO_K_UNIT[0] * K_SET_CENTRE_DISTANCE_MM,
     -_S_TO_K_UNIT[1] * K_SET_CENTRE_DISTANCE_MM,
@@ -91,7 +91,7 @@ def _off_middle(point: tuple[float, float]) -> tuple[float, float]:
 
 K_FROM_S_ALONG_MM, K_FROM_S_ACROSS_MM = min(dro_count_candidates(), key=_off_middle)
 if K_FROM_S_ALONG_MM <= 0.0 or K_FROM_S_ACROSS_MM <= 0.0:
-    raise AssertionError("K is no longer toward the pivot and the notch side of S")
+    raise AssertionError("K is no longer toward the pivot and the end-round side of S")
 
 # The chain's points in the machine frame (the assembly's Front plane).
 P_XY = placement.PIVOT_XY

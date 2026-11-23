@@ -28,9 +28,12 @@ from _drawing_dimensions import assert_imported_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import limits
 from _session import run_build
 from _supplier_dimensions import supplier_reference_dimension
 import _telemetry
@@ -39,6 +42,7 @@ from dt_cone_gear_tl_arbor_key_spec import (
     DRAWING_PRECISION_BY_NAME,
     LENGTH,
     SIZE,
+    SIZE_BAND,
     STOCK_FRACTION_DENOMINATOR,
     STOCK_FRACTION_DIMENSIONS,
 )
@@ -86,6 +90,72 @@ RIGHT_KEEP = {
     "CutLength": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_SIZE - 0.012),
 }
 NOTES_XY = (0.030, 0.120)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (build_dt_cone_gear_tl_arbor_key: the section on the Front Plane, height
+# along +X from x = 0, width centred on y = 0; the length along +Z from the
+# z = 0 end, the datum end the cut length runs from). The cut length takes the
+# title block's .XX row. The section is the stock's (1/16") reference, its
+# band the undersized key stock's as supplied (cone_land_key.KEY_STOCK_BAND,
+# the material cell's "UNDERSIZED", the note's SECTION AS SUPPLIED). The
+# declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_cone_gear_tl_arbor_key"
+UNIT = part_drawing_unit(PART_STEM)
+part_metadata(
+    model_sources=("SIZE", "LENGTH"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("LENGTH",)),
+        "outward": ([0.0, 0.0, -1.0], ("LENGTH",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": LENGTH}, ("LENGTH",)),
+        "outward": ([0.0, 0.0, 1.0], ("LENGTH",)),
+        "length": (
+            limits(LENGTH, _P["CutLength"], unit=UNIT),
+            ("LENGTH", (_SELF, "UNIT"), (_SELF, "RIGHT_KEEP")),
+        ),
+        "length_nominal": (LENGTH, ("LENGTH",)),
+        "length_from": ("datum_end", ((_SELF, "RIGHT_KEEP"),)),
+    },
+    precision={"length": _P["CutLength"]},
+)
+requirement(
+    "section",
+    kind="profile",
+    faces=(
+        PlanarFace((-1.0, 0.0, 0.0), 0.0),
+        PlanarFace((1.0, 0.0, 0.0), SIZE),
+        PlanarFace((0.0, -1.0, 0.0), SIZE / 2.0),
+        PlanarFace((0.0, 1.0, 0.0), SIZE / 2.0),
+    ),
+    requirements=("size_ref", "stock"),
+    fields={
+        "size_ref": (
+            SIZE,
+            ("SIZE", "STOCK_FRACTION_DENOMINATOR", (_SELF, "FRONT_KEEP")),
+        ),
+        "stock": (limits(SIZE, 4, SIZE_BAND, unit=UNIT), ("SIZE", "SIZE_BAND")),
+        "stock_nominal": (SIZE, ("SIZE",)),
+        "extent_x": ([0.0, SIZE], ("SIZE",)),
+        "extent_y": ([-SIZE / 2.0, SIZE / 2.0], ("SIZE",)),
+    },
+    precision={"size_ref": _P["KeyWidth"], "stock": _P["KeyWidth"]},
+)
 
 
 def build(adapter: Any) -> dict[str, str]:

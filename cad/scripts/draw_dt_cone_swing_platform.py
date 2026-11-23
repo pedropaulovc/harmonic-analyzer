@@ -73,6 +73,10 @@ from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _printed_limits import drilled_limits, limits
 from _drawing_scan import _zoomed_on
 from _drawing_sections import create_section_view
 from _drawing_selection import _select_view_entity
@@ -88,6 +92,10 @@ from _surface_finish import surface_finish_by_key
 import _config
 import _telemetry
 import build_dt_cone_swing_platform as _part
+import dt_cone_swing_platform_checks as _chk
+import dt_cone_swing_platform_geometry as _geo
+import dt_cone_swing_platform_pivot_spec as _pv
+import dt_cone_swing_platform_spec as _sp
 from diagnostics.drawing_layout_audit import (
     _display_data,
     _display_lines,
@@ -2502,6 +2510,509 @@ def _place_holes_sheet(adapter: Any) -> list[Any]:
     )
     _assert_one_post_tap_callout(plan, label="hole-pattern plan")
     return [*plan_annotations, *detail_annotations]
+
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame (the
+# build's layout: the pivot bore's axis on Y at the origin, the underside on
+# Y0 and the top face at +Y, north +Z, the cone axis running south down -Z,
+# west +X).  Every plan station is printed from the pivot bore (the scribed
+# layout centre).  A band is the dimension's own native band, else the title
+# block's row for its printed places.  The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_cone_swing_platform"
+_GEO = "dt_cone_swing_platform_geometry"
+_DSPEC = "dt_cone_swing_platform_drawing_spec"
+_PIVOT = "dt_cone_swing_platform_pivot_spec"
+_CHECKS = "dt_cone_swing_platform_checks"
+_UNIT = "UNIT"
+_FRAME = "__frame__"
+_Y = (0.0, 1.0, 0.0)
+_DOWN = (0.0, -1.0, 0.0)
+_T = PLATE_THICKNESS
+_SEAT_FINISH = surface_finish_by_key(SURFACE_FINISHES, "post_seat")
+_SLIDE_FINISH = surface_finish_by_key(SURFACE_FINISHES, "base_slide")
+# The sheet's numbered notes, one line each (export_features reads them as
+# the part's manufacturing notes; the sheets print them as composed above).
+DRAWING_NOTES = "\n".join(
+    " ".join(note.split()) for note in (RELIEF_NOTE, ENGAGEMENT_NOTE, TIP_DOWEL_NOTE)
+)
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+def _edge_face(
+    start: tuple[float, float], end: tuple[float, float], outward: tuple[float, float]
+) -> PlanarFace:
+    """The plan edge from ``start`` to ``end`` ((x, z) mm), its normal toward ``outward``."""
+    dx, dz = end[0] - start[0], end[1] - start[1]
+    length = math.hypot(dx, dz)
+    nx, nz = dz / length, -dx / length
+    if nx * outward[0] + nz * outward[1] < 0.0:
+        nx, nz = -nx, -nz
+    return PlanarFace((nx, 0.0, nz), nx * start[0] + nz * start[1])
+
+
+_NE = (-_geo.HALF_WIDTH_N, _geo.NORTH_OVERHANG)
+_NW = (_geo.WEST_HALF_N, _geo.NORTH_OVERHANG)
+_SW = (_geo.WEST_HALF_S, _geo.PLATE_SOUTH_Z)
+_SE = (-_geo.EAST_HALF_S, _geo.PLATE_SOUTH_Z)
+_CORNER_R = {label: radius for label, _x, _z, radius in _geo.PLATE_CORNERS}
+_SE_START_X = _geo.SE_CHAMFER_RUN - _geo.EAST_HALF_S
+# The lock notch's two walls, either side of its run through the seat centre.
+_NOTCH_N = (_geo.SLOT_TZ, 0.0, -_geo.SLOT_TX)
+_NOTCH_MID = _NOTCH_N[0] * _geo.SLOT_E_X + _NOTCH_N[2] * _geo.SLOT_E_Z
+_RELIEF_HALF = _sp.PIVOT_BEARING_RELIEF_DIAMETER / 2.0
+_HOLDDOWN_BAND = (_sp.HOLDDOWN_STATION_TOL_MM, -_sp.HOLDDOWN_STATION_TOL_MM)
+_DOWEL_BAND = (_sp.TIP_DOWEL_STATION_TOL_MM, -_sp.TIP_DOWEL_STATION_TOL_MM)
+
+part_metadata(
+    fields={"material.thickness": (_T, ("PLATE_THICKNESS", "PLATE_STOCK_CALLOUT"))},
+    model_sources=(
+        _FRAME,
+        "PLATE_THICKNESS",
+        (_GEO, "PLATE_CORNERS"),
+        (_GEO, "PLATE_OUTLINE"),
+    ),
+    precision_sources=(
+        (_DSPEC, "DRAWING_PRECISION"),
+        (_DSPEC, "DRAWING_PRECISION_BY_NAME"),
+        (_DSPEC, "DRAWING_REFERENCE_PRECISION"),
+        (_SELF, "HOLDDOWN_CALLOUT_PRECISION"),
+        (_SELF, "POST_MOUNT_CALLOUT_PRECISION"),
+    ),
+)
+# The plate's two faces, 1/4 plate as supplied ((.25) reference, section
+# A-A): the underside the sliding face on the base deck, Ra 63; the top,
+# which seats the post and tip block, Ra 125 (SURFACE_FINISHES).
+requirement(
+    "underside",
+    kind="face",
+    faces=(_SLIDE_FINISH.face,),
+    requirements=("plane", "finish_ra"),
+    fields={
+        "plane": (_plane("y", 0.0), (_FRAME,)),
+        "finish_ra": (_SLIDE_FINISH.roughness_um, ("SURFACE_FINISHES",)),
+        "finish_target": (_SLIDE_FINISH.production_method, ("BASE_SLIDE_FINISH_TARGET",)),
+        "label": (UNDERSIDE_LABEL, ((_DSPEC, "UNDERSIDE_LABEL"),)),
+    },
+    precision={"finish_ra": 1},
+)
+requirement(
+    "top_face",
+    kind="face",
+    faces=(_SEAT_FINISH.face,),
+    requirements=("thickness_as_supplied", "finish_ra"),
+    fields={
+        "plane": (_plane("y", _T), (_FRAME, "PLATE_THICKNESS")),
+        "thickness_as_supplied": (_T, ("PLATE_THICKNESS", "PLATE_STOCK_CALLOUT")),
+        "thickness_band_mm": (
+            [_T - _sp.PLATE_STOCK_BAND, _T + _sp.PLATE_STOCK_BAND],
+            ("PLATE_STOCK_BAND",),
+        ),
+        "thickness_from": ("underside", ((_SELF, "SECTION_KEEP"),)),
+        "callout": (" ".join(PLATE_STOCK_CALLOUT.split()), ("PLATE_STOCK_CALLOUT",)),
+        "finish_ra": (_SEAT_FINISH.roughness_um, ("SURFACE_FINISHES",)),
+        "label": (TOP_FACE_LABEL, ((_DSPEC, "TOP_FACE_LABEL"),)),
+    },
+    precision={"finish_ra": 1},
+)
+# The pivot bore, the layout origin: a native 1/4 Hole Wizard hole reamed
+# .2500 +.0005/.0000 THRU (PIVOT_HOLE_BAND, four places), a running fit on
+# the MHA-DT-VN-52 shoulder.
+requirement(
+    "pivot_bore",
+    kind="hole",
+    faces=(CylinderFace(PIVOT_HOLE_DIA),),
+    requirements=("dia", "thru", "process"),
+    fields={
+        "at": ([0.0, _T, 0.0], (_FRAME, "PLATE_THICKNESS")),
+        "axis": (_DOWN, (_FRAME,)),
+        "dia": (
+            limits(PIVOT_HOLE_DIA, 4, _pv.PIVOT_HOLE_BAND),
+            (
+                (_PIVOT, "PIVOT_HOLE_DIA"),
+                (_PIVOT, "PIVOT_HOLE_BAND"),
+                (_SELF, "_print_pivot_band_exactly"),
+            ),
+        ),
+        "dia_nominal": (PIVOT_HOLE_DIA, ((_PIVOT, "PIVOT_HOLE_DIA"),)),
+        "thru": (True, ((_PIVOT, "PIVOT_HOLE_SPEC"),)),
+        "process": (PIVOT_PROCESS.lower(), ((_DSPEC, "PIVOT_PROCESS"),)),
+        "fit": (PIVOT_BORE_CALLOUT_BELOW[0], ((_DSPEC, "PIVOT_BORE_CALLOUT_BELOW"),)),
+    },
+    precision={"dia": 4},
+)
+# The plan outline (sheet 1's profile plan, .XX): the north edge .28 from
+# the pivot and the south edge 9.54 on from it; the east edge .63 at the
+# north end and .94 at the south, the west edge .31 and 1.46, each from the
+# pivot; the corner radii R.39 (NE), R.31 (NW), R.20 (SW).
+requirement(
+    "north_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), _geo.NORTH_OVERHANG),),
+    requirements=("station",),
+    fields={
+        "plane": (_plane("z", _geo.NORTH_OVERHANG), ((_GEO, "NORTH_OVERHANG"),)),
+        "station": (
+            limits(_geo.NORTH_OVERHANG, _P["NorthEdgeZ"], unit=UNIT),
+            ((_GEO, "NORTH_OVERHANG"), _UNIT, (_SELF, "NOTCH_KEEP")),
+        ),
+        "station_nominal": (_geo.NORTH_OVERHANG, ((_GEO, "NORTH_OVERHANG"),)),
+        "station_from": ("pivot_bore", ((_SELF, "NOTCH_KEEP"),)),
+    },
+    precision={"station": _P["NorthEdgeZ"]},
+)
+requirement(
+    "south_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -_geo.PLATE_SOUTH_Z),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("z", _geo.PLATE_SOUTH_Z), ((_GEO, "PLATE_SOUTH_Z"),)),
+        "length": (
+            limits(_geo.PLATE_LEN, _P["PlateLenDim"], unit=UNIT),
+            ((_GEO, "PLATE_LEN"), _UNIT, (_SELF, "PROFILE_KEEP")),
+        ),
+        "length_nominal": (_geo.PLATE_LEN, ((_GEO, "PLATE_LEN"),)),
+        "length_from": ("north_edge", ((_SELF, "PROFILE_KEEP"),)),
+    },
+    precision={"length": _P["PlateLenDim"]},
+)
+requirement(
+    "outline",
+    kind="profile",
+    faces=(
+        _edge_face(_NE, _SE, (-1.0, 0.0)),
+        _edge_face(_NW, _SW, (1.0, 0.0)),
+        CylinderFace(2.0 * _CORNER_R["NE"]),
+        CylinderFace(2.0 * _CORNER_R["NW"]),
+        CylinderFace(2.0 * _CORNER_R["SW"]),
+    ),
+    requirements=(
+        "north_east_x",
+        "north_west_x",
+        "south_east_x",
+        "south_west_x",
+        "ne_radius",
+        "nw_radius",
+        "sw_radius",
+    ),
+    fields={
+        "north_east_x": (
+            limits(_geo.HALF_WIDTH_N, _P["NorthEastX"], unit=UNIT),
+            ((_GEO, "HALF_WIDTH_N"), _UNIT, (_SELF, "PROFILE_KEEP")),
+        ),
+        "north_east_x_nominal": (_geo.HALF_WIDTH_N, ((_GEO, "HALF_WIDTH_N"),)),
+        "north_east_x_from": ("pivot_bore", ((_SELF, "PROFILE_KEEP"),)),
+        "north_west_x": (
+            limits(_geo.WEST_HALF_N, _P["NorthWestX"], unit=UNIT),
+            ((_GEO, "WEST_HALF_N"), _UNIT, (_SELF, "PROFILE_KEEP")),
+        ),
+        "north_west_x_nominal": (_geo.WEST_HALF_N, ((_GEO, "WEST_HALF_N"),)),
+        "north_west_x_from": ("pivot_bore", ((_SELF, "PROFILE_KEEP"),)),
+        "south_east_x": (
+            limits(_geo.EAST_HALF_S, _P["SouthEastX"], unit=UNIT),
+            ((_GEO, "EAST_HALF_S"), _UNIT, (_SELF, "PROFILE_KEEP")),
+        ),
+        "south_east_x_nominal": (_geo.EAST_HALF_S, ((_GEO, "EAST_HALF_S"),)),
+        "south_east_x_from": ("pivot_bore", ((_SELF, "PROFILE_KEEP"),)),
+        "south_west_x": (
+            limits(_geo.WEST_HALF_S, _P["SouthWestX"], unit=UNIT),
+            ((_GEO, "WEST_HALF_S"), _UNIT, (_SELF, "PROFILE_KEEP")),
+        ),
+        "south_west_x_nominal": (_geo.WEST_HALF_S, ((_GEO, "WEST_HALF_S"),)),
+        "south_west_x_from": ("pivot_bore", ((_SELF, "PROFILE_KEEP"),)),
+        "ne_radius": (
+            limits(_CORNER_R["NE"], _P["CornerNER"], unit=UNIT),
+            ((_GEO, "PLATE_CORNERS"), _UNIT, (_SELF, "PROFILE_KEEP")),
+        ),
+        "ne_radius_nominal": (_CORNER_R["NE"], ((_GEO, "PLATE_CORNERS"),)),
+        "nw_radius": (
+            limits(_CORNER_R["NW"], _P["CornerNWR"], unit=UNIT),
+            ((_GEO, "PLATE_CORNERS"), _UNIT, (_SELF, "PROFILE_KEEP")),
+        ),
+        "nw_radius_nominal": (_CORNER_R["NW"], ((_GEO, "PLATE_CORNERS"),)),
+        "sw_radius": (
+            limits(_CORNER_R["SW"], _P["CornerSWR"], unit=UNIT),
+            ((_GEO, "PLATE_CORNERS"), _UNIT, (_SELF, "PROFILE_KEEP")),
+        ),
+        "sw_radius_nominal": (_CORNER_R["SW"], ((_GEO, "PLATE_CORNERS"),)),
+        "extent_x": ([-_geo.EAST_HALF_S, _geo.WEST_HALF_S], ((_GEO, "PLATE_OUTLINE"),)),
+        "extent_z": ([_geo.PLATE_SOUTH_Z, _geo.NORTH_OVERHANG], ((_GEO, "PLATE_OUTLINE"),)),
+    },
+    precision={
+        "north_east_x": _P["NorthEastX"],
+        "north_west_x": _P["NorthWestX"],
+        "south_east_x": _P["SouthEastX"],
+        "south_west_x": _P["SouthWestX"],
+        "ne_radius": _P["CornerNER"],
+        "nw_radius": _P["CornerNWR"],
+        "sw_radius": _P["CornerSWR"],
+    },
+)
+# The south-east chamfer: its start on the south edge .10 from the pivot
+# (CornerSEStartX, not chained from the sharp corner: #2697) and its rise
+# .34 up the east edge from the south edge; the run along the south edge
+# from the sharp corner is the 1.04 leg the two printed stations imply.
+requirement(
+    "se_chamfer",
+    kind="profile",
+    faces=(_edge_face(_geo.SE_CHAMFER_SOUTH_XZ, _geo.SE_CHAMFER_EAST_XZ, (-1.0, -1.0)),),
+    requirements=("start_x", "rise"),
+    fields={
+        "start_x": (
+            limits(_SE_START_X, _P["CornerSEStartX"], unit=UNIT),
+            ((_GEO, "SE_CHAMFER_RUN"), (_GEO, "EAST_HALF_S"), _UNIT, (_SELF, "PROFILE_KEEP")),
+        ),
+        "start_x_nominal": (_SE_START_X, ((_GEO, "SE_CHAMFER_RUN"), (_GEO, "EAST_HALF_S"))),
+        "start_x_from": ("pivot_bore", ((_SELF, "PROFILE_KEEP"),)),
+        "rise": (
+            limits(_geo.SE_CHAMFER_RISE, _P["CornerSERise"], unit=UNIT),
+            ((_GEO, "SE_CHAMFER_RISE"), _UNIT, (_SELF, "PROFILE_KEEP")),
+        ),
+        "rise_nominal": (_geo.SE_CHAMFER_RISE, ((_GEO, "SE_CHAMFER_RISE"),)),
+        "rise_from": ("south_edge", ((_SELF, "PROFILE_KEEP"),)),
+        "run_ref": (_geo.SE_CHAMFER_RUN, ((_GEO, "SE_CHAMFER_RUN"),)),
+    },
+    precision={"start_x": _P["CornerSEStartX"], "rise": _P["CornerSERise"]},
+)
+# The top relief: .42 wide (FEATURE_KEEP), its round end R.21 about the
+# pivot (detail B), open through the pivot (north) end; its depth fitted to
+# the MHA-DT-VN-52 shoulder (note 1), (.010) a reference (SECTION_KEEP).
+requirement(
+    "top_relief",
+    kind="notch",
+    faces=(
+        PlanarFace(_Y, _sp.PIVOT_BEARING_THICKNESS),
+        CylinderFace(_sp.PIVOT_BEARING_RELIEF_DIAMETER),
+        PlanarFace((1.0, 0.0, 0.0), -_RELIEF_HALF),
+        PlanarFace((-1.0, 0.0, 0.0), -_RELIEF_HALF),
+    ),
+    requirements=("width", "end_radius", "depth_ref", "depth_fit"),
+    fields={
+        "width": (
+            limits(_sp.PIVOT_BEARING_RELIEF_DIAMETER, _P["PivotBearingReliefDia"], unit=UNIT),
+            ("PIVOT_BEARING_RELIEF_DIAMETER", _UNIT, (_SELF, "FEATURE_KEEP")),
+        ),
+        "width_nominal": (
+            _sp.PIVOT_BEARING_RELIEF_DIAMETER,
+            ("PIVOT_BEARING_RELIEF_DIAMETER",),
+        ),
+        "end_radius": (
+            limits(_RELIEF_HALF, DRAWING_REFERENCE_PRECISION["top relief end"], unit=UNIT),
+            ("PIVOT_BEARING_RELIEF_DIAMETER", _UNIT, (_DSPEC, "DRAWING_REFERENCE_PRECISION")),
+        ),
+        "end_radius_nominal": (_RELIEF_HALF, ("PIVOT_BEARING_RELIEF_DIAMETER",)),
+        "centre_at": ([0.0, _T, 0.0], (_FRAME, "PLATE_THICKNESS")),
+        "depth_ref": (
+            PIVOT_BEARING_RELIEF_DEPTH,
+            ("PIVOT_BEARING_RELIEF_DEPTH", (_SELF, "SECTION_KEEP")),
+        ),
+        "depth_from": ("top_face", ((_SELF, "SECTION_KEEP"),)),
+        "depth_fit": (
+            " ".join(RELIEF_NOTE.split()[1:]),
+            ((_SELF, "RELIEF_NOTE"), "PIVOT_RELIEF_FIT_REQUIREMENT"),
+        ),
+        "open_to": ("north_edge", ((_DSPEC, "RELIEF_WIDTH_CALLOUT"),)),
+        "callout": (" ".join(RELIEF_WIDTH_CALLOUT.split()), ((_DSPEC, "RELIEF_WIDTH_CALLOUT"),)),
+    },
+    precision={
+        "width": _P["PivotBearingReliefDia"],
+        "end_radius": DRAWING_REFERENCE_PRECISION["top relief end"],
+    },
+)
+# The two 1/4-20 UNC post-mount taps, Ø.201 drill THRU (three places,
+# POST_MOUNT_CALLOUT_PRECISION, the drilled-hole row), each located .499
+# across and 8.409/8.197 along from the pivot at .XXX (FEATURE_KEEP); their
+# short engagement is note 2 (owner exception RV-01).
+for _name, _xz, _x_dim, _z_dim, _xz_name in (
+    ("post_mount_west", _chk.POST_MOUNT_WEST_XZ, "PostMountWestX", "PostMountWestZ", "POST_MOUNT_WEST_XZ"),
+    ("post_mount_east", _chk.POST_MOUNT_EAST_XZ, "PostMountEastX", "PostMountEastZ", "POST_MOUNT_EAST_XZ"),
+):
+    requirement(
+        _name,
+        kind="threaded_hole",
+        faces=(
+            CylinderFace(_sp.POST_MOUNT_TAP_DIA, contains_x_mm=_xz[0], contains_z_mm=_xz[1]),
+        ),
+        requirements=("thread", "dia", "thru", "x_from_pivot", "z_from_pivot"),
+        fields={
+            "at": ([_xz[0], _T, _xz[1]], ((_CHECKS, _xz_name), "PLATE_THICKNESS")),
+            "axis": (_DOWN, (_FRAME,)),
+            "thread": (POST_MOUNT_SPEC.size, ("POST_MOUNT_SPEC",)),
+            "dia": (
+                drilled_limits(_sp.POST_MOUNT_TAP_DIA, 3, unit=UNIT),
+                ("POST_MOUNT_TAP_DIA", _UNIT, (_SELF, "POST_MOUNT_CALLOUT_PRECISION")),
+            ),
+            "nominal_dia": (_sp.POST_MOUNT_TAP_DIA, ("POST_MOUNT_TAP_DIA",)),
+            "thru": (True, ("POST_MOUNT_SPEC",)),
+            "x_from_pivot": (
+                limits(abs(_xz[0]), _P[_x_dim], unit=UNIT),
+                ((_CHECKS, "POST_MOUNT_X"), _UNIT, (_SELF, "FEATURE_KEEP")),
+            ),
+            "x_from_pivot_nominal": (abs(_xz[0]), ((_CHECKS, "POST_MOUNT_X"),)),
+            "x_from_pivot_from": ("pivot_bore", ((_SELF, "FEATURE_KEEP"),)),
+            "z_from_pivot": (
+                limits(-_xz[1], _P[_z_dim], unit=UNIT),
+                ((_CHECKS, _xz_name), "POST_MOUNT_STATION_TOL_MM", _UNIT, (_SELF, "FEATURE_KEEP")),
+            ),
+            "z_from_pivot_nominal": (-_xz[1], ((_CHECKS, _xz_name),)),
+            "z_from_pivot_from": ("pivot_bore", ((_SELF, "FEATURE_KEEP"),)),
+            "mate": (POST_MOUNT_LOCATING_CALLOUT, ((_DSPEC, "POST_MOUNT_LOCATING_CALLOUT"),)),
+            "engagement_note": (POST_MOUNT_ENGAGEMENT_NOTE, ("POST_MOUNT_ENGAGEMENT_NOTE",)),
+            "engagement_min_d": (
+                _sp.POST_MOUNT_ENGAGEMENT_PRINTED,
+                ("POST_MOUNT_ENGAGEMENT_PRINTED",),
+            ),
+        },
+        precision={"dia": 3, "x_from_pivot": _P[_x_dim], "z_from_pivot": _P[_z_dim]},
+    )
+# The tip-block hold-down: Ø.120 DRILL THRU, Ø.219 counterbore .138 deep
+# FROM UNDERSIDE (HOLDDOWN_CALLOUT_PRECISION, three places), located from
+# the pivot along (.XXX) and .04 across at its own ±.005
+# (HOLDDOWN_STATION_TOL_MM, detail B).
+requirement(
+    "holddown",
+    kind="hole",
+    faces=(
+        CylinderFace(HOLDDOWN_CLEARANCE_DIA),
+        CylinderFace(HOLDDOWN_CBORE_DIA),
+        PlanarFace(_DOWN, -_sp.HOLDDOWN_CBORE_DEPTH),
+    ),
+    requirements=(
+        "dia",
+        "thru",
+        "process",
+        "cbore_dia",
+        "cbore_depth",
+        "x_from_pivot",
+        "z_from_pivot",
+    ),
+    fields={
+        "at": ([HOLDDOWN_LOCAL_X, 0.0, HOLDDOWN_LOCAL_Z], ("HOLDDOWN_LOCAL_X", "HOLDDOWN_LOCAL_Z")),
+        "axis": (_Y, ((_DSPEC, "HOLDDOWN_CALLOUT_BELOW"),)),
+        "dia": (
+            drilled_limits(HOLDDOWN_CLEARANCE_DIA, 3, unit=UNIT),
+            ("HOLDDOWN_CLEARANCE_DIA", _UNIT, (_SELF, "HOLDDOWN_CALLOUT_PRECISION")),
+        ),
+        "nominal_dia": (HOLDDOWN_CLEARANCE_DIA, ("HOLDDOWN_CLEARANCE_DIA",)),
+        "thru": (True, ("HOLDDOWN_HOLE_SPEC",)),
+        "process": (HOLDDOWN_PROCESS.lower(), ((_DSPEC, "HOLDDOWN_PROCESS"),)),
+        "cbore_dia": (
+            limits(HOLDDOWN_CBORE_DIA, 3, unit=UNIT),
+            ("HOLDDOWN_CBORE_DIA", _UNIT, (_SELF, "HOLDDOWN_CALLOUT_PRECISION")),
+        ),
+        "cbore_dia_nominal": (HOLDDOWN_CBORE_DIA, ("HOLDDOWN_CBORE_DIA",)),
+        "cbore_depth": (
+            limits(_sp.HOLDDOWN_CBORE_DEPTH, 3, unit=UNIT),
+            ("HOLDDOWN_CBORE_DEPTH", _UNIT, (_SELF, "HOLDDOWN_CALLOUT_PRECISION")),
+        ),
+        "cbore_depth_nominal": (_sp.HOLDDOWN_CBORE_DEPTH, ("HOLDDOWN_CBORE_DEPTH",)),
+        "cbore_depth_from": ("underside", ((_DSPEC, "HOLDDOWN_CALLOUT_BELOW"),)),
+        "x_from_pivot": (
+            limits(-HOLDDOWN_LOCAL_X, _P["HoldDownX"], _HOLDDOWN_BAND),
+            ("HOLDDOWN_LOCAL_X", "HOLDDOWN_STATION_TOL_MM", (_SELF, "DETAIL_KEEP")),
+        ),
+        "x_from_pivot_nominal": (-HOLDDOWN_LOCAL_X, ("HOLDDOWN_LOCAL_X",)),
+        "x_from_pivot_from": ("pivot_bore", ((_SELF, "DETAIL_KEEP"),)),
+        "z_from_pivot": (
+            limits(-HOLDDOWN_LOCAL_Z, _P["HoldDownZ"], unit=UNIT),
+            ("HOLDDOWN_LOCAL_Z", "HOLDDOWN_STATION_TOL_MM", _UNIT, (_SELF, "DETAIL_KEEP")),
+        ),
+        "z_from_pivot_nominal": (-HOLDDOWN_LOCAL_Z, ("HOLDDOWN_LOCAL_Z",)),
+        "z_from_pivot_from": ("pivot_bore", ((_SELF, "DETAIL_KEEP"),)),
+        "callout_below": (list(HOLDDOWN_CALLOUT_BELOW), ((_DSPEC, "HOLDDOWN_CALLOUT_BELOW"),)),
+    },
+    precision={
+        "dia": 3,
+        "cbore_dia": 3,
+        "cbore_depth": 3,
+        "x_from_pivot": _P["HoldDownX"],
+        "z_from_pivot": _P["HoldDownZ"],
+    },
+)
+# The tip-block dowel's slip ream, Ø.0630 +.0005/.0000 MATCH-REAM THRU at
+# assembly (note 3), so this part's traveler does not make it: .228 ±.004
+# from the hold-down hole on its line (TIP_DOWEL_STATION_TOL_MM), (.188)
+# from the pivot a reference (detail B).
+requirement(
+    "tip_dowel",
+    kind="hole",
+    faces=(CylinderFace(_sp.TIP_DOWEL_HOLE_DIA),),
+    requirements=("dia", "thru", "process", "x_from_holddown"),
+    fields={
+        "at": (
+            [TIP_DOWEL_LOCAL_X, 0.0, _sp.TIP_DOWEL_LOCAL_Z],
+            ("TIP_DOWEL_LOCAL_X", "TIP_DOWEL_LOCAL_Z"),
+        ),
+        "axis": (_Y, (_FRAME,)),
+        "dia": (
+            limits(_sp.TIP_DOWEL_HOLE_DIA, _P["TipDowelDia"], _sp.TIP_DOWEL_HOLE_BAND),
+            ("TIP_DOWEL_HOLE_DIA", "TIP_DOWEL_HOLE_BAND", (_SELF, "DETAIL_KEEP")),
+        ),
+        "dia_nominal": (_sp.TIP_DOWEL_HOLE_DIA, ("TIP_DOWEL_HOLE_DIA",)),
+        "thru": (True, ((_SELF, "TIP_DOWEL_CALLOUT"),)),
+        "process": ("ream", ((_SELF, "TIP_DOWEL_CALLOUT"),)),
+        "x_from_holddown": (
+            limits(_sp.TIP_DOWEL_FROM_HOLDDOWN, _P["TipDowelX"], _DOWEL_BAND),
+            ("TIP_DOWEL_FROM_HOLDDOWN", "TIP_DOWEL_STATION_TOL_MM", (_SELF, "DETAIL_KEEP")),
+        ),
+        "x_from_holddown_nominal": (_sp.TIP_DOWEL_FROM_HOLDDOWN, ("TIP_DOWEL_FROM_HOLDDOWN",)),
+        "x_from_holddown_from": ("holddown", ((_SELF, "DETAIL_KEEP"),)),
+        "x_from_pivot_ref": (TIP_DOWEL_LOCAL_X, ("TIP_DOWEL_LOCAL_X", (_SELF, "DETAIL_KEEP"))),
+        "made_at": ("assembly", ((_SELF, "TIP_DOWEL_NOTE"),)),
+        "callout": (" ".join(TIP_DOWEL_CALLOUT.split()), ((_SELF, "TIP_DOWEL_CALLOUT"),)),
+        "note": (" ".join(TIP_DOWEL_NOTE.split()[1:]), ((_SELF, "TIP_DOWEL_NOTE"),)),
+    },
+    precision={"dia": _P["TipDowelDia"], "x_from_holddown": _P["TipDowelX"]},
+)
+# The lock notch, open through the west edge along its run: .31 wide
+# (Ø.31 seat end, CapEDia), its seat centre 1.30 across and 8.84 along from
+# the pivot (NOTCH_KEEP); the run's direction is the model's chord
+# (NOTCH_RUN_DEG), not a printed dimension.
+requirement(
+    "lock_notch",
+    kind="slot",
+    faces=(
+        CylinderFace(_geo.SLOT_W),
+        PlanarFace(_NOTCH_N, _NOTCH_MID - _geo.SLOT_W / 2.0),
+        PlanarFace(tuple(-v for v in _NOTCH_N), -_NOTCH_MID - _geo.SLOT_W / 2.0),
+    ),
+    requirements=("width", "seat_x", "seat_z"),
+    fields={
+        "width": (
+            limits(_geo.SLOT_W, _P["CapEDia"], unit=UNIT),
+            ((_GEO, "SLOT_W"), _UNIT, (_SELF, "NOTCH_KEEP")),
+        ),
+        "width_nominal": (_geo.SLOT_W, ((_GEO, "SLOT_W"),)),
+        "seat_at": (
+            [_geo.SLOT_E_X, 0.0, _geo.SLOT_E_Z],
+            ((_GEO, "SLOT_E_X"), (_GEO, "SLOT_E_Z")),
+        ),
+        "seat_x": (
+            limits(_geo.SLOT_E_X, _P["CapECx"], unit=UNIT),
+            ((_GEO, "SLOT_E_X"), _UNIT, (_SELF, "NOTCH_KEEP")),
+        ),
+        "seat_x_nominal": (_geo.SLOT_E_X, ((_GEO, "SLOT_E_X"),)),
+        "seat_x_from": ("pivot_bore", ((_SELF, "NOTCH_KEEP"),)),
+        "seat_z": (
+            limits(-_geo.SLOT_E_Z, _P["CapECz"], unit=UNIT),
+            ((_GEO, "SLOT_E_Z"), _UNIT, (_SELF, "NOTCH_KEEP")),
+        ),
+        "seat_z_nominal": (-_geo.SLOT_E_Z, ((_GEO, "SLOT_E_Z"),)),
+        "seat_z_from": ("pivot_bore", ((_SELF, "NOTCH_KEEP"),)),
+        "run_dir": (
+            [_geo.SLOT_TX, 0.0, _geo.SLOT_TZ],
+            ((_GEO, "SLOT_TX"), (_GEO, "SLOT_TZ")),
+        ),
+        "run_deg_ref": (_geo.NOTCH_RUN_DEG, ((_GEO, "NOTCH_RUN_DEG"),)),
+        "open_to": ("outline", ((_GEO, "SLOT_OUT_X"),)),
+    },
+    precision={"width": _P["CapEDia"], "seat_x": _P["CapECx"], "seat_z": _P["CapECz"]},
+)
 
 
 def build(adapter: Any) -> dict[str, str]:

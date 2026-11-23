@@ -44,24 +44,39 @@ from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
+from _printed_tolerance import inside_corner_radius_mm
 from _paths import CAD_ROOT
 from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
+from _title_block_units import inside_corner_display
 from dt_pinion_lever_geometry import BORE, BORE_DEPTH, BORE_DEPTH_PLACES
+from dt_pinion_lever_geometry import ROD_DIA as GRIP_ROD_DIA
 from dt_pinion_lever_spec import (
     BORE_BAND,
+    CAP_RADIUS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    HUB_LEN,
     HUB_OD,
     LIFT_ROD_NUMBER,
+    OVERALL_FROM_B,
     PIN_HOLE_CALLOUT,
+    PIN_HOLE_DIA,
+    PIN_HOLE_FROM_MOUTH,
+    PIN_HOLE_Z,
     REFERENCE_SKETCHES,
     ROD_LEN,
+    UNIT,
 )
 from dt_pinion_lift_rod_spec import ROD_DIA, ROD_DIA_BAND
 
@@ -476,6 +491,202 @@ def _hub_detail(adapter: Any, section: Any) -> Any:
         raise RuntimeError(f"detail B's letter did not persist: {letter}")
     _rod_axis_in_detail(adapter, detail)
     return detail
+
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame (the hub's
+# axis on Z through the origin, mouth face B at +Z, the crown at -Z, the grip
+# rod standing along +Y from the hub axis, the pin hole along X). One piece
+# machined from solid. The declarations print nothing.
+# The sheet prints no general notes: every requirement rides its feature's
+# callout or the title block.
+DRAWING_NOTES = ""
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_pinion_lever"
+_SPEC = "dt_pinion_lever_spec"
+_GEOM = "dt_pinion_lever_geometry"
+_FRAME = (_SPEC, "__frame__")
+_UNIT = (_GEOM, "UNIT")
+_CONFIG = ("_config", "parts")
+_MOUTH_Z = HUB_LEN / 2.0
+_APEX_Z = _MOUTH_Z - OVERALL_FROM_B
+_DETAIL = ((_SELF, "DETAIL_KEEP"),)
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(_FRAME, (_GEOM, "HUB_LEN"), (_GEOM, "HUB_OD"), (_GEOM, "ROD_LEN")),
+    precision_sources=((_SPEC, "DRAWING_PRECISION"), (_SPEC, "DRAWING_PRECISION_BY_NAME")),
+)
+# Face B, the flat mouth face: rule 10's one baseline every axial station
+# reads from (DETAIL B).
+requirement(
+    "mouth_face_b",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), _MOUTH_Z),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", _MOUTH_Z), (_FRAME, (_GEOM, "HUB_LEN")))},
+)
+# The hub, Ø.51 at .XX (FRONT_KEEP "HubOd").
+requirement(
+    "hub",
+    kind="boss",
+    faces=(CylinderFace(HUB_OD),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
+        "dia": (
+            limits(HUB_OD, _P["HubOd"], unit=UNIT),
+            ((_GEOM, "HUB_OD"), _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "dia_nominal": (HUB_OD, ((_GEOM, "HUB_OD"),)),
+        "extent_x": ([-HUB_OD / 2.0, HUB_OD / 2.0], ((_GEOM, "HUB_OD"),)),
+        "extent_z": ([_APEX_Z, _MOUTH_Z], ((_GEOM, "HUB_LEN"), (_GEOM, "OVERALL_FROM_B"))),
+    },
+    precision={"dia": _P["HubOd"]},
+)
+# The domed crown, SR.41 (TOP_KEEP "CapR"), its apex .49 from B (DETAIL_KEEP
+# "OverallFromB"); the end wall behind the bore reads from those two baselines.
+requirement(
+    "crown",
+    kind="profile",
+    faces=(SphereFace(2.0 * CAP_RADIUS, (0.0, 0.0, _APEX_Z + CAP_RADIUS)),),
+    requirements=("radius", "overall"),
+    fields={
+        "radius": (
+            limits(CAP_RADIUS, _P["CapR"], unit=UNIT),
+            ((_GEOM, "CAP_RADIUS"), _UNIT, (_SELF, "TOP_KEEP")),
+        ),
+        "radius_nominal": (CAP_RADIUS, ((_GEOM, "CAP_RADIUS"),)),
+        "radius_callout": ("SR", ((_SELF, "TOP_KEEP"),)),
+        "overall": (
+            limits(OVERALL_FROM_B, _P["OverallFromB"], unit=UNIT),
+            ((_GEOM, "OVERALL_FROM_B"), _UNIT, *_DETAIL),
+        ),
+        "overall_nominal": (OVERALL_FROM_B, ((_GEOM, "OVERALL_FROM_B"),)),
+        "overall_from": ("mouth_face_b", _DETAIL),
+        "apex_at": ([0.0, 0.0, _APEX_Z], (_FRAME, (_GEOM, "OVERALL_FROM_B"))),
+    },
+    precision={"radius": _P["CapR"], "overall": _P["OverallFromB"]},
+)
+# The grip rod, Ø.24 (FRONT_KEEP "RodDia"), its tip 3.39 from the hub axis
+# (FRONT_KEEP "RodTipY"), its axis .20 from B (DETAIL_KEEP "GripFromB"). RV-01
+# (cad/config/parts/dt-pinion-lever.yaml): the sharp rod-to-hub inside corner
+# takes the title block's inside-corner ceiling.
+requirement(
+    "grip_rod",
+    kind="boss",
+    faces=(
+        CylinderFace(GRIP_ROD_DIA, contains_y_mm=ROD_LEN / 2.0),
+        PlanarFace((0.0, 1.0, 0.0), ROD_LEN),
+    ),
+    requirements=("dia", "length", "station", "root_corner_r_max"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ((0.0, 1.0, 0.0), (_FRAME,)),
+        "dia": (
+            limits(GRIP_ROD_DIA, _P["RodDia"], unit=UNIT),
+            ((_GEOM, "ROD_DIA"), _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "dia_nominal": (GRIP_ROD_DIA, ((_GEOM, "ROD_DIA"),)),
+        "length": (
+            limits(ROD_LEN, _P["RodTipY"], unit=UNIT),
+            ((_GEOM, "ROD_LEN"), _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "length_nominal": (ROD_LEN, ((_GEOM, "ROD_LEN"),)),
+        "length_from": ("hub", ((_SELF, "FRONT_KEEP"),)),
+        "station": (
+            limits(_MOUTH_Z, _P["GripFromB"], unit=UNIT),
+            ((_GEOM, "HUB_LEN"), _UNIT, *_DETAIL),
+        ),
+        "station_nominal": (_MOUTH_Z, ((_GEOM, "HUB_LEN"),)),
+        "station_from": ("mouth_face_b", _DETAIL),
+        "extent_y": ([-HUB_OD / 2.0, ROD_LEN], ((_GEOM, "HUB_OD"), (_GEOM, "ROD_LEN"))),
+        "root_corner_r_max": (
+            inside_corner_radius_mm(unit=UNIT),
+            (("_printed_tolerance", "inside_corner_radius_mm"), _UNIT, _CONFIG),
+        ),
+        "root_corner_callout": (
+            inside_corner_display(unit=UNIT),
+            (("_title_block_units", "inside_corner_display"), _CONFIG),
+        ),
+        "root_corner_exception": ("RV-01", (_CONFIG,)),
+    },
+    precision={"dia": _P["RodDia"], "length": _P["RodTipY"], "station": _P["GripFromB"]},
+)
+# The blind bore, Ø.2500 +.0015/+.0010 (FRONT_KEEP "HubBore"), bored or
+# reamed to the measured MHA-DT-17 rod; its flat floor .32 from B (DETAIL_KEEP
+# "BoreDepthFromB"; the callout repeats it as (.32) REF).
+requirement(
+    "bore",
+    kind="hole",
+    faces=(
+        CylinderFace(BORE, contains_z_mm=0.0),
+        PlanarFace((0.0, 0.0, 1.0), _MOUTH_Z - BORE_DEPTH),
+    ),
+    requirements=("dia", "depth", "flat_bottom", "process", "mate"),
+    fields={
+        "at": ([0.0, 0.0, _MOUTH_Z], (_FRAME, (_GEOM, "HUB_LEN"))),
+        "axis": ((0.0, 0.0, -1.0), (_FRAME,)),
+        "dia": (
+            limits(BORE, _P["HubBore"], BORE_BAND, unit=UNIT),
+            ((_GEOM, "BORE"), "BORE_BAND", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "dia_nominal": (BORE, ((_GEOM, "BORE"),)),
+        "depth": (
+            limits(BORE_DEPTH, _P["BoreDepthFromB"], unit=UNIT),
+            ((_GEOM, "BORE_DEPTH"), _UNIT, *_DETAIL),
+        ),
+        "depth_nominal": (BORE_DEPTH, ((_GEOM, "BORE_DEPTH"),)),
+        "depth_from": ("mouth_face_b", _DETAIL),
+        "depth_callout": (f"({_BORE_DEPTH_TEXT})", ((_SELF, "HUB_BORE_CALLOUT"),)),
+        "flat_bottom": (True, ((_SELF, "HUB_BORE_CALLOUT"),)),
+        "process": ("bore_or_ream", ((_SELF, "HUB_BORE_CALLOUT"),)),
+        "mate": (LIFT_ROD_NUMBER, ("LIFT_ROD_NUMBER", (_SELF, "HUB_BORE_CALLOUT"))),
+        "fit": ("sliding, fit to measured rod", ((_SELF, "HUB_BORE_CALLOUT"),)),
+        "clearance": (
+            [value * _MM_PER_IN for value in BORE_CLEARANCE_IN],
+            ((_SELF, "BORE_CLEARANCE_IN"),),
+        ),
+        "callout": (HUB_BORE_CALLOUT, ((_SELF, "DIMENSION_CALLOUTS"),)),
+    },
+    precision={"dia": _P["HubBore"], "depth": _P["BoreDepthFromB"]},
+)
+# The Ø.064 pin hole, match-drilled through hub and rod at assembly on
+# MHA-DT-17 (DETAIL_KEEP "PinHoleDia"), .16 from B (DETAIL_KEEP "PinHoleFromB").
+_PIN_CALLOUT = ("PIN_HOLE_CALLOUT", (_SELF, "DIMENSION_CALLOUTS"))
+requirement(
+    "pin_hole",
+    kind="hole",
+    faces=(CylinderFace(PIN_HOLE_DIA),),
+    requirements=("dia", "thru", "process", "station"),
+    fields={
+        "at": ([0.0, 0.0, PIN_HOLE_Z], (_FRAME, (_GEOM, "PIN_HOLE_Z"))),
+        "axis": ((1.0, 0.0, 0.0), (_FRAME,)),
+        "dia": (
+            drilled_limits(PIN_HOLE_DIA, _P["PinHoleDia"], unit=UNIT),
+            ((_GEOM, "PIN_HOLE_DIA"), _UNIT, *_DETAIL),
+        ),
+        "dia_nominal": (PIN_HOLE_DIA, ((_GEOM, "PIN_HOLE_DIA"),)),
+        "thru": (True, _PIN_CALLOUT),
+        "process": ("match_drill", _PIN_CALLOUT),
+        "made_at": ("assembly", _PIN_CALLOUT),
+        "mate": (LIFT_ROD_NUMBER, ("LIFT_ROD_NUMBER", *_PIN_CALLOUT)),
+        "crosses": ("bore", (_FRAME, *_DETAIL)),
+        "station": (
+            limits(PIN_HOLE_FROM_MOUTH, _P["PinHoleFromB"], unit=UNIT),
+            ((_GEOM, "PIN_HOLE_FROM_MOUTH"), _UNIT, *_DETAIL),
+        ),
+        "station_nominal": (PIN_HOLE_FROM_MOUTH, ((_GEOM, "PIN_HOLE_FROM_MOUTH"),)),
+        "station_from": ("mouth_face_b", _DETAIL),
+        "callout": (PIN_HOLE_CALLOUT, _PIN_CALLOUT),
+    },
+    precision={"dia": _P["PinHoleDia"], "station": _P["PinHoleFromB"]},
+)
 
 
 def build(adapter: Any) -> dict[str, str]:

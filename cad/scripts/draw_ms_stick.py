@@ -53,6 +53,10 @@ from _drawing_projection import model_point_in_view
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_planar import PlanarFace
+from _printed_limits import limits
+from _printed_tolerance import printed_deviations
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_registry import DRAWINGS_BY_NAME
 from _named_views import octant_view_name
@@ -204,6 +208,222 @@ NUMERAL_KEEP = {
 DEPTH_KEEP = {"TickDepth": (0.330, 0.188)}
 # Text centre: the block ends left of G-G, its underside dimension line at the V.
 NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.229, 0.138)}
+
+# The sheet's notes (ms_stick_callouts), for the feature export: declared on
+# the drawing, so the part's recipe does not re-key on them.
+DRAWING_NOTES = callouts.DRAWING_NOTES
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what the four sheets print, in the part frame
+# (build_ms_stick: the bar along +X from the end nearest the 0, x = 0, to the
+# end face nearest the 10, x = BODY_LENGTH, the graduations' datum; Y across
+# the width, the ticks hanging from the ruled edge at y = BODY_WIDTH; Z
+# through the thickness, the ruled face at z = 0, engraved into +Z). The
+# graduations are one feature: 101 V grooves whose floors all lie at the
+# tick depth, tick i at SCALE_START_X + i * MINOR_SPACING, each station from
+# the datum end at +/-.002 (the station table, note 2); the numerals another,
+# their single-stroke floors at the numeral depth. The declarations print
+# nothing.
+_P = part.DRAWING_PRECISION_BY_NAME
+_SELF = "draw_ms_stick"
+_GEOM = "ms_stick_geom"
+_FRAME = ("BODY_LENGTH", "BODY_WIDTH", "BODY_THICKNESS")
+_UNIT = part.UNIT
+_TABLE = ((_SELF, "STATION_TITLE_XY"), ("ms_stick_callouts", "STATION_TABLE_TITLE"))
+_TICK_COUNT = (part.DIVISION_COUNT - 1) * part.MINOR_PER_DIVISION + 1
+_ZERO_STATION = part.BODY_LENGTH - part.SCALE_START_X
+_TEN_STATION = part.BODY_LENGTH - part.SCALE_START_X - part.SCALE_SPAN
+_STATION_TOL = part.GRADUATION_POSITION_TOLERANCE_MM
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+def _station_band(station: float) -> list[float]:
+    """A station-table row's +/-.002 about its printed .XXX value, in mm."""
+    low, high = printed_deviations(station, 3, (-_STATION_TOL, _STATION_TOL), unit=_UNIT)
+    return [round(station + low, 12), round(station + high, 12)]
+
+
+part_metadata(
+    model_sources=_FRAME,
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+# The end face nearest the 10: the graduations' datum (note 2; #2434).
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), part.BODY_LENGTH),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", part.BODY_LENGTH), _FRAME)},
+)
+# The length 7.95 (FRONT_KEEP "BodyLength").
+requirement(
+    "zero_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("x", 0.0), _FRAME),
+        "length": (
+            limits(part.BODY_LENGTH, _P["BodyLength"], unit=_UNIT),
+            ("BODY_LENGTH", "BODY_LENGTH_TOLERANCE_MM", (_SELF, "FRONT_KEEP")),
+        ),
+        "length_nominal": (part.BODY_LENGTH, ("BODY_LENGTH",)),
+        "length_from": ("datum_end", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={"length": _P["BodyLength"]},
+)
+requirement(
+    "plain_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("y", 0.0), _FRAME)},
+)
+# The width .315 at .XXX, SEE NOTE 1: the sliding fit in the MHA-MS-02 stop
+# block's rebate (FRONT_KEEP "BodyWidth").
+requirement(
+    "ruled_edge",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), part.BODY_WIDTH),),
+    requirements=("width",),
+    fields={
+        "plane": (_plane("y", part.BODY_WIDTH), ("BODY_WIDTH",)),
+        "width": (
+            limits(part.BODY_WIDTH, _P["BodyWidth"], unit=_UNIT),
+            ("BODY_WIDTH", "BODY_FIT_TOLERANCE_MM", (_SELF, "FRONT_KEEP")),
+        ),
+        "width_nominal": (part.BODY_WIDTH, ("BODY_WIDTH",)),
+        "width_from": ("plain_edge", ((_SELF, "FRONT_KEEP"),)),
+        "callout": (callouts.REBATE_LINK, (("ms_stick_callouts", "REBATE_LINK"),)),
+    },
+    precision={"width": _P["BodyWidth"]},
+)
+# The ruled face (z = 0): every graduation and numeral is engraved into it.
+requirement(
+    "ruled_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", 0.0), _FRAME)},
+)
+# The thickness .125 at .XXX, SEE NOTE 1: the 1/8 flat as supplied (owner
+# ruling 2026-11-20, #2441; TOP_KEEP "BodyThickness").
+requirement(
+    "back_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part.BODY_THICKNESS),),
+    requirements=("thickness",),
+    fields={
+        "plane": (_plane("z", part.BODY_THICKNESS), ("BODY_THICKNESS",)),
+        "thickness": (
+            limits(part.BODY_THICKNESS, _P["BodyThickness"], unit=_UNIT),
+            ("BODY_THICKNESS", "BODY_FIT_TOLERANCE_MM", (_SELF, "TOP_KEEP")),
+        ),
+        "thickness_nominal": (part.BODY_THICKNESS, ("BODY_THICKNESS",)),
+        "thickness_from": ("ruled_face", ((_SELF, "TOP_KEEP"),)),
+        "as_supplied": (True, ("BODY_THICKNESS",)),
+        "callout": (callouts.REBATE_LINK, (("ms_stick_callouts", "REBATE_LINK"),)),
+    },
+    precision={"thickness": _P["BodyThickness"]},
+)
+# The graduations: 101 30-degree V grooves into the ruled face, hanging from
+# the ruled edge, .016 MIN wide at the face (.024 MAX), .020 MIN deep with
+# .080 MIN stock under them (DETAIL_KEEP, LENGTH_DETAILS, DEPTH_KEEP); full
+# ticks .12, half-division .16, minor .07 long (.XX); each station from the
+# datum end +/-.002 (the station table): tick 0 at the 0, tick 100 at the
+# 10, the 10's .135 a reference (FRONT_KEEP "Tick10FromEnd").
+requirement(
+    "graduations",
+    kind="notch",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -part.TICK_DEPTH),),
+    requirements=(
+        "width",
+        "depth_min",
+        "zero_station",
+        "full_length",
+        "half_length",
+        "minor_length",
+    ),
+    fields={
+        "open_to": ("ruled_edge", _FRAME),
+        "axis": ([0.0, 0.0, 1.0], _FRAME),
+        "v_angle_deg": (part.ENGRAVING_V_INCLUDED_ANGLE_DEG, ("ENGRAVING_V_INCLUDED_ANGLE_DEG",)),
+        "width": (
+            [part.TICK_WIDTH, part.GRADUATION_WIDTH_MAX_MM],
+            ("TICK_WIDTH", "GRADUATION_WIDTH_MAX_MM", "MIN_LIMIT_DEVIATIONS_MM", (_SELF, "LENGTH_DETAILS")),
+        ),
+        "width_callout": (part.GRADUATION_WIDTH_CALLOUT, ("GRADUATION_WIDTH_CALLOUT",)),
+        "depth_min": (part.TICK_DEPTH, ("TICK_DEPTH", "MIN_LIMIT_DEVIATIONS_MM", (_SELF, "DEPTH_KEEP"))),
+        "floor_min": (part.GRADUATION_FLOOR_MIN_MM, ("GRADUATION_FLOOR_MIN_MM", "GRADUATION_FLOOR_CALLOUT")),
+        "count": (_TICK_COUNT, ((_GEOM, "DIVISION_COUNT"), (_GEOM, "MINOR_PER_DIVISION"))),
+        "per_division": (part.MINOR_PER_DIVISION, ((_GEOM, "MINOR_PER_DIVISION"),)),
+        "minor_pitch": (part.MINOR_SPACING, ((_GEOM, "MINOR_SPACING"), (_SELF, "DETAIL_KEEP"))),
+        "zero_station": (
+            _station_band(_ZERO_STATION),
+            ("BODY_LENGTH", "SCALE_START_X", "GRADUATION_POSITION_TOLERANCE_MM", *_TABLE),
+        ),
+        "zero_station_nominal": (_ZERO_STATION, ("BODY_LENGTH", "SCALE_START_X")),
+        "zero_station_from": ("datum_end", _TABLE),
+        "ten_station_ref": (_TEN_STATION, ("SCALE_END_MARGIN", (_SELF, "FRONT_KEEP"))),
+        "station_tolerance": (_STATION_TOL, ("GRADUATION_POSITION_TOLERANCE_MM", *_TABLE)),
+        "station_note": (callouts.STATION_LINK, (("ms_stick_callouts", "STATION_LINK"),)),
+        "full_length": (
+            limits(part.TICK_LENGTH, _P["FullTickLength"], unit=_UNIT),
+            ("TICK_LENGTH", (_SELF, "LENGTH_DETAILS")),
+        ),
+        "full_length_nominal": (part.TICK_LENGTH, ("TICK_LENGTH",)),
+        "half_length": (
+            limits(part.HALF_TICK_LENGTH, _P["HalfTickLength"], unit=_UNIT),
+            ("HALF_TICK_LENGTH", (_SELF, "LENGTH_DETAILS")),
+        ),
+        "half_length_nominal": (part.HALF_TICK_LENGTH, ("HALF_TICK_LENGTH",)),
+        "minor_length": (
+            limits(part.MINOR_TICK_LENGTH, _P["MinorTickLength"], unit=_UNIT),
+            ("MINOR_TICK_LENGTH", (_SELF, "LENGTH_DETAILS")),
+        ),
+        "minor_length_nominal": (part.MINOR_TICK_LENGTH, ("MINOR_TICK_LENGTH",)),
+    },
+    precision={
+        "width": 3,
+        "zero_station": 3,
+        "full_length": _P["FullTickLength"],
+        "half_length": _P["HalfTickLength"],
+        "minor_length": _P["MinorTickLength"],
+    },
+)
+# The numerals 0-10: single-stroke sans (note 3), V-engraved with the same
+# 30-degree bit, .016 MIN deep with .080 MIN stock under them, .08 tall
+# (NUMERAL_KEEP, NUMERAL_DEPTH_KEEP); the stroke paths are the generated
+# layer DXFs the model is cut from.
+requirement(
+    "numerals",
+    kind="profile",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -part.NUMERAL_DEPTH),),
+    requirements=("depth_min", "height"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], _FRAME),
+        "v_angle_deg": (part.ENGRAVING_V_INCLUDED_ANGLE_DEG, ("ENGRAVING_V_INCLUDED_ANGLE_DEG",)),
+        "depth_min": (part.NUMERAL_DEPTH, ("NUMERAL_DEPTH", "MIN_LIMIT_DEVIATIONS_MM", (_SELF, "NUMERAL_DEPTH_KEEP"))),
+        "floor_min": (part.GRADUATION_FLOOR_MIN_MM, ("GRADUATION_FLOOR_MIN_MM", "NUMERAL_FLOOR_CALLOUT")),
+        "height": (
+            limits(part.NUMERAL_HEIGHT_MM, _P["NumeralHeight"], unit=_UNIT),
+            ("NUMERAL_HEIGHT_MM", (_SELF, "NUMERAL_KEEP")),
+        ),
+        "height_nominal": (part.NUMERAL_HEIGHT_MM, ("NUMERAL_HEIGHT_MM",)),
+        "stroke_layers": (
+            [path.name for path in part.NUMERAL_LAYER_DXFS],
+            ("NUMERAL_LAYER_DXFS",),
+        ),
+        # The numerals' ink box on the ruled face: x then y, each [low, high] mm.
+        "x_span": ([part.NUMERALS_BBOX[0], part.NUMERALS_BBOX[2]], ("NUMERALS_BBOX",)),
+        "y_span": ([part.NUMERALS_BBOX[1], part.NUMERALS_BBOX[3]], ("NUMERALS_BBOX",)),
+        "font_note": (callouts.DRAWING_NOTES.splitlines()[-1].strip(), (("ms_stick_callouts", "DRAWING_NOTES"),)),
+    },
+    precision={"height": _P["NumeralHeight"]},
+)
 
 
 @_telemetry.traced("drawing.ms_ruled_face")

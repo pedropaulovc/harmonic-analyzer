@@ -423,10 +423,8 @@ def test_spring_pin_readback_checks_only_the_declared_references(monkeypatch):
         _spring_pin_readback(monkeypatch, undeclared, both)
 
 
-def test_strap_pin_declares_no_application_hole_and_the_cup_pin_keeps_its_own():
+def test_strap_pin_declares_no_application_hole():
     from _supplier_pin_model import declares_application_hole
     import dt_vn_pinion_strap_pin_spec as strap_pin
-    import pd_vn_transgear_knob_cup_pin_spec as cup_pin
 
     assert not declares_application_hole(strap_pin.SUPPLIER_REFERENCE)
-    assert declares_application_hole(cup_pin.SUPPLIER_REFERENCE)

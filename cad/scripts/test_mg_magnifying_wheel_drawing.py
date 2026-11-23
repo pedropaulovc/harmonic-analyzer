@@ -34,9 +34,17 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         set(drawing.FRONT_KEEP)
         | set(drawing.SECTION_KEEP)
         | set(drawing.SECTION_DIAMETER_KEEP)
+        | set(drawing.TIE1_SECTION_TEXT_MM)
     )
     assert kept == marked
     assert not set(drawing.FRONT_KEEP) & set(drawing.SECTION_KEEP)
+    # TIE 1's counter-drill prints on B-B alone, from its own profile.
+    assert set(drawing.TIE1_SECTION_TEXT_MM) == set(
+        mg_magnifying_wheel_spec.DRAWING_DIMENSIONS["Tie1CdrillProfile"]
+    )
+    assert not set(drawing.TIE1_SECTION_TEXT_MM) & (
+        set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
+    )
     # The rim's Ø and the spokes' back face print on A-A from the hidden
     # reference sketch alone.
     assert set(drawing.SECTION_DIAMETER_KEEP) == set(
@@ -89,7 +97,8 @@ def test_tight_bands_sit_on_the_model_dimensions() -> None:
     assert geom.CAST_TOL == pytest.approx(0.03 * 25.4)
     precision = mg_magnifying_wheel_spec.DRAWING_PRECISION
     assert precision["HubProfile"]["HubDia"] == 2
-    assert precision["Tie1Profile"]["Tie1X"] == precision["Tie1Profile"]["Tie1Y"] == 2
+    tie1 = precision["Tie1Profile"]
+    assert tie1["Tie1X"] == tie1["Tie1Y"] == 2
 
 
 def test_walls_and_groove_hold_at_the_printed_bands() -> None:
@@ -107,19 +116,26 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     assert geom.TIE1_OFFSET_MAX == pytest.approx(offset)
     tie1_r = math.hypot(0.38, 0.22) * inch
     assert geom.TIE1_R == pytest.approx(tie1_r)
-    # The #60 ties at the title block's drilled row, .040 +.004.
-    tie_r_max = (0.040 + 0.004) * inch / 2.0
+    # TIE 1's walls take its #50 counter-drill (Ø.070) at the title block's
+    # drilled row, +.004: it runs from the boss front face past the spokes'
+    # plane, so it is TIE 1's widest Ø at the boss OD, the fillets and the bore.
+    tie1_r_max = (0.070 + 0.004) * inch / 2.0
     assert spec.WALLS["tie1_to_hub_od"] == pytest.approx(
-        (1.18 - 0.01) * inch / 2.0 - (tie1_r + offset) - tie_r_max
+        (1.18 - 0.01) * inch / 2.0 - (tie1_r + offset) - tie1_r_max
+    )
+    assert spec.WALLS["tie1_to_hub_od"] == pytest.approx(0.0851 * inch, abs=1e-4 * inch)
+    assert spec.WALLS["tie1_to_bore"] == pytest.approx(
+        tie1_r - offset - tie1_r_max - mg_magnifying_wheel_spec.WHEEL_BORE_MAX / 2.0
     )
     # The cast spokes, fillets and rim bore at their +/-.03 casting band.
     assert spec.WALLS["tie2_to_rim_fillet"] == pytest.approx(2.6006, abs=1e-3)
     assert spec.WALLS["tie1_to_hub_fillet"] >= spec.MIN_WALL
-    # TIE 1 stands outboard of the drum it sits behind: the smallest hole,
-    # at its worst offset, still opens a wire diameter past the largest drum
-    # (.77 + .01).
+    # TIE 1 stands outboard of the drum it sits behind: its smallest
+    # drum-side mouth, the #50, at its worst offset, still opens a wire
+    # diameter past the largest printed drum, whatever the drum's O.D.
+    drum_r_max = (geom.DRUM_OD + geom.DRUM_OD_DEVIATIONS[1]) / 2.0
     assert geom.TIE1_DRUM_OPENING == pytest.approx(
-        tie1_r - offset + 0.020 * inch - 0.78 * inch / 2.0
+        tie1_r - offset + 0.035 * inch - drum_r_max
     )
     assert geom.TIE1_DRUM_OPENING >= geom.LEVER_WIRE_DIA
     # 8 o'clock seen from the front, midway between two spokes.
@@ -163,6 +179,88 @@ def test_feature_volumes_are_consistent() -> None:
     assert hole * floor < part.V_TIE2 < hole * (floor + 2.0 * rim.GROOVE_R)
     assert part.V_GROOVE == pytest.approx(292.88, abs=0.05)
     assert part.V_SPOKE_FREE > part.V_SPOKE_WEB > 0.0
+
+
+def test_tie1_counter_drill_leaves_a_short_60_at_the_back_face() -> None:
+    # Owner ruling on #2406 (A): #50 (.070) from the drum face, leaving about
+    # .10 of #60 (2.5 x D) at the back face, not the whole .417 boss.
+    inch = 25.4
+    boss = geom.HUB_BACK_Z - geom.HUB_STEP_Z
+    assert geom.TIE1_CDRILL_DIA == pytest.approx(0.070 * inch)
+    assert (boss - geom.TIE1_CDRILL_DEPTH) / inch == pytest.approx(0.10, abs=0.005)
+    assert (boss - geom.TIE1_CDRILL_DEPTH) / geom.TIE_HOLE_DIA < 2.6
+    # The depth's only function is that land, so it prints at the title
+    # block's .XX: its model value is exact at two places.
+    assert geom.TIE1_CDRILL_DEPTH_PLACES == 2
+    assert round(geom.TIE1_CDRILL_DEPTH / inch, 2) * inch == pytest.approx(
+        geom.TIE1_CDRILL_DEPTH
+    )
+    # At the shortest printed boss, the deepest printed shoulder (+.01) and
+    # the largest drilled #50's 118 deg point, full #60 is still left.
+    point = (0.070 + 0.004 - 0.040) * inch / 2.0 / math.tan(math.radians(59.0))
+    boss_min = geom.HUB_LEN_LIMITS[0] - geom.SPIGOT_LEN_LIMITS[1]
+    assert geom.TIE1_LAND_MIN == pytest.approx(
+        boss_min - geom.TIE1_CDRILL_DEPTH - 0.01 * inch - point
+    )
+    assert geom.TIE1_LAND_MIN > 0.0
+    # The shallowest printed shoulder (-.01) still stands past the spokes'
+    # front face, so the #50 is the Ø the boss walls are judged on.
+    assert (
+        geom.HUB_STEP_Z + geom.TIE1_CDRILL_DEPTH - 0.01 * inch
+        > -mg_magnifying_wheel_spec.SPOKE_AXIAL / 2.0
+    )
+
+
+def test_tie1_volume_gates_prove_the_counter_drill_and_its_point() -> None:
+    # The #60 through the boss, then the #50 with its 118 deg point beyond
+    # the #60's air: together the union integrated along TIE 1's axis.
+    r60, r50 = geom.TIE_HOLE_DIA / 2.0, geom.TIE1_CDRILL_DIA / 2.0
+    boss = geom.HUB_BACK_Z - geom.HUB_STEP_Z
+    depth = geom.TIE1_CDRILL_DEPTH
+    assert part.V_TIE1 == pytest.approx(math.pi * r60**2 * boss)
+    k = 1.0 / math.tan(math.radians(59.0))
+    steps = 200000
+    dz = (depth + r50 * k) / steps
+    removed = math.pi * r60**2 * (boss - depth - r50 * k)
+    for i in range(steps):
+        z = (i + 0.5) * dz
+        r = r50 if z <= depth else r50 - (z - depth) / k
+        removed += math.pi * max(r, r60) ** 2 * dz
+    assert part.V_TIE1 + part.V_TIE1_CDRILL == pytest.approx(removed, rel=1e-6)
+    # The counter-drill's gate band is half its point: a flat-bottomed #50
+    # misses the gate.
+    flat = math.pi * (r50**2 - r60**2) * depth
+    assert part.V_TIE1_CDRILL - flat == pytest.approx(part.V_TIE1_POINT)
+    assert part.V_TIE1_POINT > 0.0
+
+
+def test_tie1_section_b_b_cuts_through_tie1_clear_of_the_spigot() -> None:
+    # B-B runs along TIE 1's row (the counter-drill profile's plane, y =
+    # TIE1_Y), from just outside the spigot out past the boss's O.D. into
+    # the spoke window, so it crosses the hole whole and cuts the boss alone.
+    (x0, y0), (x1, y1) = drawing.TIE1_SECTION_LINE_MM
+    r50 = geom.TIE1_CDRILL_DIA / 2.0
+    assert y0 == y1 == geom.TIE1_Y
+    assert x0 < geom.TIE1_X - r50 < geom.TIE1_X + r50 < x1
+    assert x1 > mg_magnifying_wheel_spec.HUB_DIA / 2.0
+    assert math.hypot(x0, y0) > mg_magnifying_wheel_spec.SPIGOT_DIA / 2.0
+    # The bore-side arrow prints at that end, down the 270 deg window: its
+    # 3 mm head and its letter clear TIE 1's #50.
+    assert geom.TIE1_X - r50 - (x0 + 2.3) > 0.5
+    # Its far end stands in air between the 0 and 300 deg spokes' fillets.
+    bearing = math.degrees(math.atan2(y1, x1))
+    assert -mg_magnifying_wheel_spec.SPOKE_PITCH_DEG < bearing < 0.0
+    # Drawn left to right on the sheet, whichever order the ends come in.
+    assert drawing.tie1_section_line_ends(((0.3, 0.2), (0.1, 0.2))) == (
+        (0.1, 0.2),
+        (0.3, 0.2),
+    )
+    # The counter-drill's Ø reads the whole callout: size, process, depth REF.
+    assert drawing.TIE1_SECTION_SUFFIX == " #50 DRILL <HOLE-DEPTH> (.32)"
+    assert drawing.TIE1_CALLOUT.splitlines()[-1] == "SEE SECTION B-B"
+    precision = mg_magnifying_wheel_spec.DRAWING_PRECISION["Tie1CdrillProfile"]
+    assert precision == {"Tie1CdrillDia": 3, "Tie1CdrillDepth": 2}
+    assert drawing.TIE1_SECTION_SCALE == (2, 1)
 
 
 def test_tie2_profile_runs_radially_and_ends_in_air() -> None:
@@ -284,12 +382,14 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     # Each tie hole is named plainly at its own callout (rule 26: WIRE TIE
     # HOLE, no coined label), size before process, at most two lines of
     # words (rule 7): no project label, so no key.
-    assert drawing.DIMENSION_CALLOUTS["Tie1HoleDia"] == "DRILL THRU\nWIRE TIE HOLE"
+    assert drawing.DIMENSION_CALLOUTS["Tie1HoleDia"] == (
+        "#60 DRILL THRU\nWIRE TIE HOLE\nSEE SECTION B-B"
+    )
     # TIE 2 states where it runs: radial, from the groove's bottom.
     assert drawing.DIMENSION_CALLOUTS["Tie2HoleDia"] == (
         "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"
     )
-    assert not {"Tie1HoleDia", "Tie2HoleDia"} & set(drawing.CALLOUTS_ABOVE)
+    assert "Tie2HoleDia" not in drawing.CALLOUTS_ABOVE
     assert "TIE 1" not in notes and "TIE 2" not in notes
     for callout in drawing.DIMENSION_CALLOUTS.values():
         assert "TIE 1" not in callout and "TIE 2" not in callout

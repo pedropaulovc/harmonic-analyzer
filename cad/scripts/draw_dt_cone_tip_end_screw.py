@@ -42,19 +42,30 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _mcmaster_91794a559 import SKU, THREAD, THREAD_CLASS
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _printed_limits import limits
 from _section_axis import create_section_axis_centerline, position_section_caption
 from _session import run_build
 import _telemetry
 from dt_cone_tip_end_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    END_HOLE_BAND,
     END_HOLE_CALLOUT,
     END_HOLE_DEPTH,
+    END_HOLE_DIA,
+    END_HOLE_WALL_PRINTED_IN,
+    HEAD_DIA,
+    HEAD_H,
     HEAD_RADIUS,
     ISOMETRIC_VIEW_SCALE,
     OVERALL_LENGTH,
+    SHANK_LEN,
     STOCK_NOTE,
     UNIT,
 )
@@ -115,6 +126,85 @@ DIMENSION_CALLOUTS = {"EndHoleDia": END_HOLE_CALLOUT}
 # along model Z, so a vertical cut through the centre is the Right plane.
 CUT_START = (END_CENTER[0], END_CENTER[1] - HEAD_R - 0.006)
 CUT_END = (END_CENTER[0], END_CENTER[1] + HEAD_R + 0.006)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame (the
+# stock fillister frame, build_dt_cone_tip_end_screw: axis +Y, head up, the
+# under-head face at y = 0, the threaded end face TipFace at y =
+# -SHANK_LEN). The one shop feature is the reamed hole from TipFace: its
+# model band at four places, its depth at the title block's .XX row and the
+# wall to the thread root it holds (the floored MIN its callout prints). The
+# head is the stock's own, printed nowhere (note 2: undimensioned purchased
+# geometry is reference): declared as the catalogue's reference size, the
+# outside a lathe holds it by. The declarations print nothing.
+DRAWING_NOTES = STOCK_NOTE
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_cone_tip_end_screw"
+_STOCK = "_mcmaster_91794a559"
+part_metadata(
+    model_sources=((_STOCK, "SHANK_LEN"), (_STOCK, "HEAD_DIA"), "END_HOLE_DIA"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "tip_face",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), SHANK_LEN),),
+    requirements=("plane",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": -SHANK_LEN},
+            ((_STOCK, "SHANK_LEN"),),
+        ),
+        "outward": ([0.0, -1.0, 0.0], ((_STOCK, "SHANK_LEN"),)),
+        "thread": (
+            f"{THREAD} UNF-{THREAD_CLASS}",
+            ((_STOCK, "THREAD"), (_STOCK, "THREAD_CLASS"), "STOCK_NOTE"),
+        ),
+        "stock": (SKU, ((_STOCK, "SKU"), "STOCK_NOTE")),
+    },
+)
+requirement(
+    "head",
+    kind="outside_cylinder",
+    faces=(CylinderFace(HEAD_DIA),),
+    requirements=("dia_ref",),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ((_STOCK, "HEAD_H"),)),
+        "axis": ([0.0, 1.0, 0.0], ((_STOCK, "HEAD_H"),)),
+        "dia_ref": (HEAD_DIA, ((_STOCK, "HEAD_DIA"), "STOCK_NOTE")),
+        "length_nominal": (HEAD_H, ((_STOCK, "HEAD_H"),)),
+    },
+)
+requirement(
+    "end_hole",
+    kind="hole",
+    faces=(CylinderFace(END_HOLE_DIA),),
+    requirements=("dia", "depth", "wall_min"),
+    fields={
+        "at": ([0.0, -SHANK_LEN, 0.0], ((_STOCK, "SHANK_LEN"),)),
+        "axis": ([0.0, 1.0, 0.0], ((_STOCK, "SHANK_LEN"),)),
+        "dia": (
+            limits(END_HOLE_DIA, _P["EndHoleDia"], END_HOLE_BAND, unit=UNIT),
+            ("END_HOLE_DIA", "END_HOLE_BAND", "UNIT", (_SELF, "END_KEEP")),
+        ),
+        "nominal_dia": (END_HOLE_DIA, ("END_HOLE_DIA",)),
+        "depth": (
+            limits(END_HOLE_DEPTH, _P["EndHoleDepth"], unit=UNIT),
+            ("END_HOLE_DEPTH", "UNIT", "END_HOLE_CALLOUT"),
+        ),
+        "depth_nominal": (END_HOLE_DEPTH, ("END_HOLE_DEPTH",)),
+        "process": ("ream", ("END_HOLE_CALLOUT",)),
+        "wall_min": (
+            END_HOLE_WALL_PRINTED_IN * 25.4,
+            ("END_HOLE_WALL_PRINTED_IN", "END_HOLE_CALLOUT"),
+        ),
+        "callout": (
+            END_HOLE_CALLOUT.replace("<HOLE-DEPTH>", "\u21a7"),
+            ("END_HOLE_CALLOUT", (_SELF, "DIMENSION_CALLOUTS")),
+        ),
+    },
+    precision={"dia": _P["EndHoleDia"], "depth": _P["EndHoleDepth"]},
+)
 
 
 def build(adapter: Any) -> dict[str, str]:
