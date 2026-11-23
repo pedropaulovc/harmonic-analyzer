@@ -398,8 +398,8 @@ sections:
 
       Notes: all 20 gears rotate together on one shaft (owner decision C1
       keyed, 2026-11-09, PR #1992): the 64T and T030–T120 are keyed on land 1;
-      T024 is bonded with LOCTITE 638 on round land 2, one 0.45 mm feeler off
-      T030, for 0.35–0.55 mm stack float; T018 and T012 are bonded on the
+      T024 is bonded with LOCTITE 638 on round land 2, one .019 in (0.483 mm) feeler leaf off
+      T030, for 0.37–0.60 mm stack float (#3042); T018 and T012 are bonded on the
       integral spigot of T006 (MHA-DT-37), whose spigot is bonded in the
       shaft's end socket. Their 7.4528 ±0.051 faces touch from the
       collar-supported 64T to T030 and from T024 to T006. The MHA-DT-38
@@ -512,9 +512,9 @@ sections:
         - derived from matched fit
         - med
       - - Cylinder arbor length
-        - 176.464 mm cylindrical strap-to-strap span; 179.512 mm including two domes
+        - 176.454 mm cylindrical strap-to-strap span; 179.502 mm including two domes
         - —
-        - 'Current cylinder_bank_layout.ARBOR_LENGTH / ARBOR_OVERALL_LENGTH: accepted gear stack plus one 2.794 mm (.11 in) south disc and the 0.95 mm north spring gap, with full depth of both 10.16 mm (.40 in) pedestal straps; each dome 1.524 mm (.06 in) proud. User ruling 2026-10-20 removes the north disc and relocates both pedestal origins from this stack. The #1038 re-pitch adds 20 × 0.5635 mm; the 7-1/2 in supply still covers it. The earlier ~200 mm estimate, the 165.08 mm cylinder and the 164.88 / 167.88, 164.874 / 167.922 and 165.194 / 168.242 mm lengths are historical, not current cut lengths; final length is measured at fit-up.'
+        - 'Current cylinder_bank_layout.ARBOR_LENGTH / ARBOR_OVERALL_LENGTH: accepted gear stack plus one 2.794 mm (.11 in) south disc and the 0.940 mm (.037 in) north spring gap, with full depth of both 10.16 mm (.40 in) pedestal straps; each dome 1.524 mm (.06 in) proud. User ruling 2026-10-20 removes the north disc and relocates both pedestal origins from this stack. The #1038 re-pitch adds 20 × 0.5635 mm; the 7-1/2 in supply still covers it. The earlier ~200 mm estimate, the 165.08 mm cylinder and the 164.88 / 167.88, 164.874 / 167.922 and 165.194 / 168.242 mm lengths are historical, not current cut lengths; final length is measured at fit-up.'
         - derived from current bank layout
         - med
       - - Cylinder bank south end disc ×1 (user ruling 2026-10-20)
@@ -530,7 +530,7 @@ sections:
         - derived
         - med
       - - Cylinder bank preload spring (#948 ruling R, PR #1292)
-        - McMaster 9714K392 wave disc spring Ø9.78 × Ø12.7 × 0.127, free 1.27; set on a 0.95 blade directly between gear 19's north planar face and the north pedestal strap, 2.2–4.2 N over the ±0.10 set band (MHA-DT-VN-68)
+        - McMaster 9714K392 wave disc spring Ø9.78 × Ø12.7 × 0.127, free 1.27; set on a .037 in (0.940 mm) feeler stack directly between gear 19's north planar face and the north pedestal strap, 2.1–4.6 N over the ±0.10 set band and the stack's leaf tolerance (MHA-DT-VN-68; inch leaves, owner ruling 2026-11-23, #3042)
         - —
         - 'User ruling 2026-10-20 reverses preload south onto the single brass disc and south hard datum, retaining the existing installed-gap and inferred linear-rate contracts. The north pedestal follows the accepted stack, not a nominal gear-19 hard datum (`cylinder_bank_layout.BANK_PRELOAD`, `test_channel_axial_budget.py`).'
         - derived
@@ -671,7 +671,7 @@ sections:
         - 'cone_line exact tracking retains sin i = 1.5875/7.62 and tan(cone half-angle) = 1.5875/7.452801067384 = tan i, making the drum-side generator parallel to the drum axis (#1038, the .300 in channel grid; 7.0565 and 6.875611681880 before). GEAR_AXIS_SHIFT = −33.114642580298 mm; dt_cone_gear_shaft_spec.gear_faces owns touching solid faces. Earlier y = 90.518 was the lower-axis layout.'
         - low
       - - Cylinder arbor (stationary)
-        - 'x = −60.393602135, y = 95.25; cylindrical span z −88.159312220..+88.304687780 (176.46 mm), domes 1.524 mm (.06 in) proud of each end. Stationary plain-bore support stations follow cylinder_bank_layout; earlier y = 90.518 belonged to the lower-axis design.'
+        - 'x = −60.393602135, y = 95.25; cylindrical span z −88.159312220..+88.294487780 (176.45 mm), domes 1.524 mm (.06 in) proud of each end. Stationary plain-bore support stations follow cylinder_bank_layout; earlier y = 90.518 belonged to the lower-axis design.'
         - ch30 GT supplies historical topology; cone_line and cylinder_bank_layout own current placement and strap-to-strap cut length
         - med (derived current layout)
       - - Cylinder gear j
@@ -679,7 +679,7 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - 'Along machine Z on the configured axis (x, y) = (−131.027340308105, 138.2776). The crossed-pair centre is 43.391204809691 mm with 0.298 mm extension, a source pose, not the former ideal-profile contact qualification. Cylindrical outboard face remains z −183; length, far-end recess and Ø9.0 pinion-seat step follow dt_crankshaft_spec. Boss spans z −147.384867524108..−75.350467524108; pinion south face is feeler-set 0.25 north at z −75.100467524108. Its 11.6 mm face comprises an 8.5 mm full-blank Ø18.87 shoulder and 3.1 mm north band Ø18.55 ±0.10. Ø11.388 journals run directly in the post. The collar''s rear face bears directly on the boss south face (owner ruling D1, 2026-10-15); no seat washer or shim, and the obsolete MHA-DT-36 0.50–4.00 / 4.30 MIN figures are historical.'
+        - 'Along machine Z on the configured axis (x, y) = (−131.027340308105, 138.2776). The crossed-pair centre is 43.391204809691 mm with 0.298 mm extension, a source pose, not the former ideal-profile contact qualification. Cylindrical outboard face remains z −183; length, far-end recess and Ø9.0 pinion-seat step follow dt_crankshaft_spec. Boss spans z −147.384867524108..−75.350467524108; pinion south face is feeler-set .010 in (0.254) north at z −75.096467524108 (an inch feeler leaf, #3042). Its 11.6 mm face comprises an 8.5 mm full-blank Ø18.87 shoulder and 3.1 mm north band Ø18.55 ±0.10. Ø11.388 journals run directly in the post. The collar''s rear face bears directly on the boss south face (owner ruling D1, 2026-10-15); no seat washer or shim, and the obsolete MHA-DT-36 0.50–4.00 / 4.30 MIN figures are historical.'
         - 'gear_train.yaml crank height, cone_line post station and the pure shaft/pinion specs own current geometry. ch30 GT crank_sprocket (−122.84, 144.78) remains independent historical image evidence; the primary crank photo governs the separate hub and flush outboard face. Former crank Y 138.345643503 / 133.613643503 / 129.850 and ideal pinion tip Ø19.05 are historical. Final source-bound centre/phase/contact selection is not established by these nominal stations.'
         - med (selected/derived geometry; GT provenance separate)
       - - Chain run
@@ -748,7 +748,7 @@ sections:
         - high stock identity and sourced limits; nominal depiction and installed acceptance separate
       - - '`dt-cone-tip-gear` (MHA-DT-37, T006 with integral spigot and pivot)'
         - 'C67500 solid: six DT6-FORM1 leaves Ø4.31 +0/−0.02 OD, face 7.4528 ±0.051; integral Ø1.5875 (.0625 in) spigot × 19.304 (.76 in, #1038) to the south, bonded with LOCTITE 638 in the reamed MHA-DT-04 socket (5.08, .20 in deep) and through T018/T012; integral Ø1.5875 pivot × 6.35 (.25 in) to the north, made to the measured MHA-DT-38 bore. cone_tip_cluster owns the stems; dt_cone_gear_spec owns the T006 tooth form.'
-        - 'Leaves at the T006 layout station plus STACK_FEELER 0.45 (cone_tip_cluster.TIP_SET_SHIFT_MM); phased to the keyed T030 at bonding by the MHA-DT-03-TL-02 phasing comb (owner ruling 2026-11-09). (owner decision C1 keyed, 2026-11-09, PR #1992)'
+        - 'Leaves at the T006 layout station plus STACK_FEELER .019 in, 0.4826 (cone_tip_cluster.TIP_SET_SHIFT_MM; an inch feeler leaf, #3042); phased to the keyed T030 at bonding by the MHA-DT-03-TL-02 phasing comb (owner ruling 2026-11-09). (owner decision C1 keyed, 2026-11-09, PR #1992)'
         - 'cone_tip_cluster / dt_cone_tip_gear_spec; replaces the T006 configuration of MHA-DT-03 and the former Ø.031 in terminal land.'
         - selected design; native realization pending farm proof
       - - '`dt-cone-tip-bushing` (MHA-DT-38, end-play thrust bushing)'
@@ -2089,7 +2089,7 @@ sections:
       - - Drum length
         - 153.924 mm
         - '6.06'
-        - 'Current pinion_rig_layout locates the 153.924 mm (6.06 in) drum from its back end: pushed-back bank j19 back face +1.25 mm setup leaf, preserving the full 3.0 mm face at printed worst stack. The #1038 re-pitch grew it from 5.64 in by 19 × 0.5635 mm rounded to the .01 in grid, keeping the j = 0 slack (3.367 mm; 5.93 in is the shortest that covers gear 0). The historical p.67 photo motivates a long drum spanning all 20 gears, not a frozen 0.274 mm short-back placement.'
+        - 'Current pinion_rig_layout locates the 153.924 mm (6.06 in) drum from its back end: pushed-back bank j19 back face +.053 in (1.346 mm) setup leaf pair (inch feeler leaves, owner ruling 2026-11-23, #3042), preserving the full 3.0 mm face at printed worst stack. The #1038 re-pitch grew it from 5.64 in by 19 × 0.5635 mm rounded to the .01 in grid, keeping the j = 0 slack (3.245 mm; 5.93 in is the shortest that covers gear 0). The historical p.67 photo motivates a long drum spanning all 20 gears, not a frozen 0.274 mm short-back placement.'
         - derived
         - med
       - - Material
@@ -2155,9 +2155,9 @@ sections:
       dimensions.yaml / the pure rig readers has axis (−17.130, 95.25), from
       X_DRUM plus drum radius 32.207, pinion radius 8.814 and parked gap 2.2425;
       former axis (−16.876, 90.518) / radii 32.279 and 8.996 were ideal-tooth
-      lower-rig references. Drum z −75.479..+78.445 (153.924 face, all 20
-      stations), integral steel arbor/head root z −135.779..+101.051,
-      head/crossrod axis z −142.281, and separate MHA-DT-15 crossrod at +65°.
+      lower-rig references. Drum z −75.383..+78.541 (153.924 face, all 20
+      stations), integral steel arbor/head root z −135.683..+101.147,
+      head/crossrod axis z −142.185, and separate MHA-DT-15 crossrod at +65°.
       Straps: 15 wide × 9.144 thick with R7.5 ends, plain (no cam relief), pivot
       (−13.166, 67.532), bore-to-bore c2c 28.0, parked at an 8.139° lean; the
       former pivot (−12.912, 62.8) belonged to the lower ideal-tooth rig. The swing

@@ -11,9 +11,10 @@ stations, then clamped, and the base seats are spotted through the blocks.
 
 This module derives that rest gap from the rig's parked geometry (the pure
 pinion_rig_park_geometry the assembly places the rig from), rounds it to the
-feeler gage's leaf step and makes it up from the same STARRETT 66MA the rig's
-other settings use.  It is not a fit-up setting (pinion_rig_fitup allows
-those one or two leaves); the tip gap takes three.  Only drawing steps and
+feeler gauge's thousandth and makes it up from the same inch feeler gauge the
+rig's other settings use (dt_feeler_leaves).  It is not a fit-up setting
+(pinion_rig_fitup allows those one or two leaves); the tip gap is past the
+three thickest leaves together, so it takes four.  Only drawing steps and
 tests import it.
 """
 
@@ -21,13 +22,14 @@ from __future__ import annotations
 
 import math
 
+import dt_feeler_leaves
 import pinion_rig_park_geometry as park
 from cone_line import X_DRUM, Y_DRIVE
 from dt_pinion_cam_geometry import CAM_OD
 from dt_pinion_cam_geometry import ECC as CAM_ECC
 from dt_pinion_cam_pin_geometry import PIN_DIA as FPIN_DIA
 from dt_drive_train_assembly_sheet import FEELER_PLACES, inch_text
-from pinion_rig_fitup import FEELER_GAGE_LEAVES_MM
+from dt_feeler_leaves import leaf_stack
 from pinion_rig_layout import FEELER_LEAF_STEP
 
 
@@ -75,37 +77,26 @@ MODEL_TIP_GAP = _tip_gap(0.0)
 REST_TIP_GAP = _tip_gap(_rest_swing())
 if not math.isclose(MODEL_TIP_GAP, park.APINION_GAP, abs_tol=1e-9):
     raise AssertionError("the parked pinion is off the level line of centres")
-# The gage sets whole leaf steps, so the printed nominal is the rest gap to
-# the nearest step.
-TIP_GAP_FEELER = round(round(REST_TIP_GAP / FEELER_LEAF_STEP) * FEELER_LEAF_STEP, 2)
+# The gage sets whole thousandths, so the printed nominal is the rest gap to
+# the nearest one.
+TIP_GAP_FEELER = dt_feeler_leaves.thousandths(round(REST_TIP_GAP / FEELER_LEAF_STEP))
 # Main's U28 corollary (2026-09-23): the rig is accepted within 0.2 of the
 # feeler either way at both stations.
 TIP_GAP_ACCEPT_BAND = 0.2
 TIP_GAP_ACCEPT = (
-    round(TIP_GAP_FEELER - TIP_GAP_ACCEPT_BAND, 2),
-    round(TIP_GAP_FEELER + TIP_GAP_ACCEPT_BAND, 2),
+    round(TIP_GAP_FEELER - TIP_GAP_ACCEPT_BAND, 4),
+    round(TIP_GAP_FEELER + TIP_GAP_ACCEPT_BAND, 4),
 )
 
-
-def leaf_stack(setting: float) -> tuple[float, ...]:
-    """The gage leaves that make up ``setting``, thickest first: as many of the
-    thickest leaf as fit, then the one leaf for the remainder."""
-    thickest = FEELER_GAGE_LEAVES_MM[-1]
-    steps, per_leaf = round(setting / FEELER_LEAF_STEP), round(thickest / FEELER_LEAF_STEP)
-    count, remainder = divmod(steps, per_leaf)
-    leaves = (thickest,) * count
-    if remainder:
-        leaves += (FEELER_GAGE_LEAVES_MM[remainder - 1],)
-    return leaves
-
-
 TIP_GAP_LEAVES = leaf_stack(TIP_GAP_FEELER)
-TIP_GAP_LEAVES_TEXT = " + ".join(f"{leaf:.2f}" for leaf in TIP_GAP_LEAVES)
+# The stack's own error and the rounding to the thousandth both sit inside
+# the acceptance: a snug stack never sets a rig that check 7 would reject.
+TIP_GAP_STACK_ERROR = dt_feeler_leaves.stack_error(TIP_GAP_FEELER)
+if abs(TIP_GAP_FEELER - REST_TIP_GAP) + TIP_GAP_STACK_ERROR > TIP_GAP_ACCEPT_BAND:
+    raise AssertionError("the tip-gap stack's error leaves the acceptance band")
 # MHA-DT-00 prints decimal inch (#290): the setting to the thousandth; the
 # drawing's sheet 16 row prints the acceptance, rounded inward.  Its leaves
-# print once, by their stamped metric size, in the drawing's feeler-stack
-# table mm column (an inch sheet prints inch values only, drawing-guidelines
-# rule 26).
+# print once, by their etched inch size, in the drawing's feeler-stack table.
 TIP_GAP_SETTING_TEXT = inch_text(TIP_GAP_FEELER, FEELER_PLACES)
 TIP_GAP_FEELER_TEXT = f"{TIP_GAP_SETTING_TEXT} FEELER"
 
@@ -118,5 +109,6 @@ __all__ = [
     "TIP_GAP_FEELER_TEXT",
     "TIP_GAP_SETTING_TEXT",
     "TIP_GAP_LEAVES",
+    "TIP_GAP_STACK_ERROR",
     "leaf_stack",
 ]

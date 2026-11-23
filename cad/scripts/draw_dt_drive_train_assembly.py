@@ -116,6 +116,7 @@ import dt_crank_pinion_spec as pinion
 from dt_crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
 import dt_cylinder_gear_spec as drum
+import dt_feeler_leaves
 import dt_drum_station_setting_spec as drum_station_setting
 from dt_pinion_lever_pin_spec import (
     LEVER_NUMBER,
@@ -1024,11 +1025,9 @@ STACK_WINDOW = inch_window(
 # indicator reading to a recorded value).  The blocks print at the model leg's own
 # places (dt_cylinder_bank_setting_spec.PLACES; Codjiflo review of #2532).
 STACK_GAUGE_BLOCKS = inch_text(_STACK_LENGTH, bank_settings.PLACES)
-# Step 9D's spring gap is set with one leaf of the rig's STARRETT 66MA gage
-# (v47 machinist review: the blade was never identified); the steps print its
-# inch size and the feeler-stack table its stamped size.
-if round(bank.BANK_SPRING_SET, 2) not in FITUP.FEELER_GAGE_LEAVES_MM:
-    raise AssertionError(f"spring set {bank.BANK_SPRING_SET} mm is not one gage leaf")
+# Step 9D's spring gap is set on a stack of the inch feeler gauge's leaves
+# (v47 machinist review: the blade was never identified); the steps print the
+# setting and the feeler-stack table the leaves that make it up.
 BANK_SPRING_FEELER = inch_text(bank.BANK_SPRING_SET, FEELER_PLACES)
 
 # --- sheet 15: the setting tables ----------------------------------------------
@@ -1088,66 +1087,43 @@ SETTING_TABLE_ROWS = (
     ),
 )
 
-# The rig's settings and the bank's spring gap are stacks of the STARRETT
-# 66MA metric gage's leaves (pinion_rig_fitup): the steps print each setting's
-# inch size, this table the stamped leaves that make it up.
+# The rig's settings and the bank's spring gap are stacks of the shop's inch
+# feeler gauge leaves (dt_feeler_leaves, #3042): the steps print each setting,
+# this table the leaves that make it up, each by its etched inch size.
 FEELER_STACK_TITLE = f"FEELER STACKS - {FITUP.FEELER_GAGE_NAME} LEAVES"
-# Round 16: "LEAVES (MM STAMPED)" leaves the STEPS column room for its CHECK
-# cites while the table stays left of the cone station table (x 158 mm).
-FEELER_STACK_HEADER = ("SETTING", "LEAVES (MM STAMPED)", "STEPS")
-
-
-def _nearest_leaf(setting: float) -> float:
-    """The one gage leaf that prints as ``setting`` to the thousandth: a
-    cone feeler is a stack-derived reading, not a whole leaf step."""
-    leaf = min(FITUP.FEELER_GAGE_LEAVES_MM, key=lambda value: abs(value - setting))
-    if inch_text(leaf, FEELER_PLACES) != inch_text(setting, FEELER_PLACES):
-        raise AssertionError(f"no single leaf prints as {inch_text(setting, FEELER_PLACES)}")
-    return leaf
+# "LEAVES (IN)" leaves the STEPS column room for its CHECK cites while the
+# table stays left of the cone station table (x 158 mm).
+FEELER_STACK_HEADER = ("SETTING", "LEAVES (IN)", "STEPS")
 
 
 def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
     settings = (
         # Rubric sample round 13 (#4): the cone set's feelers are leaves too.
-        (STACK_FEELER, (STACK_FEELER,), _step_ref("cone-gears-stacked", "R")),
-        (PINION_SEAT_FEELER, (PINION_SEAT_FEELER,), _step_ref("crank-mesh-checked", "F")),
-        (
-            FITUP.DRUM_END_SHIM,
-            (FITUP.DRUM_END_SHIM,),
-            _step_ref("straps-pinned-to-torque-shaft", "B"),
-        ),
-        (FITUP.FRONT_BLOCK_FEELER, (FITUP.FRONT_BLOCK_FEELER,), _step_ref("rig-set")),
-        (FITUP.RIG_SET_LEAF_D, FITUP.RIG_SET_LEAVES, _step_ref("rig-set", "A")),
-        (FITUP.SPRING_PAD_LEAF, (FITUP.SPRING_PAD_LEAF,), _step_ref("rig-set", "B")),
-        (FITUP.FRONT_COLLAR_LEAF, (FITUP.FRONT_COLLAR_LEAF,), _step_ref("cam-collars-set", "C")),
-        (FITUP.BACK_COLLAR_LEAF_F, (FITUP.BACK_COLLAR_LEAF_F,), _step_ref("cam-collars-set", "D")),
-        (bank.BANK_SPRING_SET, (bank.BANK_SPRING_SET,), _step_ref("cylinder-bank-located", "D")),
-        (
-            TIP_GAP.TIP_GAP_FEELER,
-            TIP_GAP.TIP_GAP_LEAVES,
-            f"{_step_ref('rig-located', 'E')}, CHECK 7",
-        ),
-    )
-    # Rubric sample round 16 (#0, 3/3 runs): the crank fit-up feeler, printed
-    # to the thousandth, one leaf.  The cone swing is set by feel (owner
-    # direction 2026-11-11, #2365): it takes no leaves.
-    nearest = (
+        (STACK_FEELER, _step_ref("cone-gears-stacked", "R")),
+        (PINION_SEAT_FEELER, _step_ref("crank-mesh-checked", "F")),
+        (FITUP.DRUM_END_SHIM, _step_ref("straps-pinned-to-torque-shaft", "B")),
+        (FITUP.FRONT_BLOCK_FEELER, _step_ref("rig-set")),
+        (FITUP.RIG_SET_LEAF_D, _step_ref("rig-set", "A")),
+        (FITUP.SPRING_PAD_LEAF, _step_ref("rig-set", "B")),
+        (FITUP.FRONT_COLLAR_LEAF, _step_ref("cam-collars-set", "C")),
+        (FITUP.BACK_COLLAR_LEAF_F, _step_ref("cam-collars-set", "D")),
+        (bank.BANK_SPRING_SET, _step_ref("cylinder-bank-located", "D")),
+        (TIP_GAP.TIP_GAP_FEELER, f"{_step_ref('rig-located', 'E')}, CHECK 7"),
+        # Rubric sample round 16 (#0, 3/3 runs): the crank fit-up feeler.  The
+        # cone swing is set by feel (owner direction 2026-11-11, #2365): it
+        # takes no leaves.
         (
             pinion.T120_FITUP_FEELER_MM,
             f"{_step_ref('crank-mesh-checked', 'H')}, {_step_ref('crank-mesh-checked', 'J')}",
         ),
     )
-    for setting, leaves, _step in settings:
-        if abs(sum(leaves) - setting) > 1e-9:
-            raise AssertionError(f"the {inch_text(setting, FEELER_PLACES)} leaves miss it")
     rows: dict[tuple[str, str], list[str]] = {}
-    for setting, leaves, step in (
-        *settings,
-        *((setting, (_nearest_leaf(setting),), step) for setting, step in nearest),
-    ):
+    for setting, step in settings:
+        # leaf_stack refuses a setting that is not whole leaves of the set.
+        leaves = dt_feeler_leaves.leaf_stack(setting)
         key = (
             inch_text(setting, FEELER_PLACES),
-            " + ".join(f"{leaf:.2f}" for leaf in sorted(leaves, reverse=True)),
+            " + ".join(dt_feeler_leaves.leaf_text(leaf) for leaf in leaves),
         )
         rows.setdefault(key, []).append(step)
     return tuple(
@@ -2195,11 +2171,19 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
 
 # Each feeler the rig steps and checks print is a stack of gage leaves the
 # sheet 15 table lists (rubric sample review of v47: no mm in the steps).
+# The stacks book each leaf within dt_feeler_leaves.LEAF_TOLERANCE of its
+# etched size, an assumption the set's maker does not state: the fitter mics
+# each leaf the table lists once, which makes it a check (Main, #3042).
+FEELER_LEAF_CHECK = (
+    "BEFORE USE, MIC EACH LEAF IN THAT TABLE: WITHIN "
+    f"±{inch_text(dt_feeler_leaves.LEAF_TOLERANCE, 4)} OF ITS ETCHED SIZE, OR DO NOT USE IT."
+)
 FEELER_TABLE_NOTE = _note_text(
     (
         # Round 16 (#0): package-wide, not only the rig's.
         f"ALL SET FEELERS AND SHIMS: {FITUP.FEELER_GAGE_NAME} LEAF STACKS, SHEET "
         f"{SETTING_SHEET} TABLE.",
+        FEELER_LEAF_CHECK,
     ),
     heading=False,
 )

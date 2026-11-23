@@ -18,7 +18,7 @@ brass end disc (MHA-DT-26) closes gear 0's cam slot at the south end.
 * The arbor fills both strap bores and domes proud of each strap. Its two
   crown-apex set screws (MHA-DT-VN-64) bear midway through the straps:
   tighten the datum-side south screw before the north one.
-* The BACK (north) strap is set one BANK_SPRING_SET blade off gear 19's
+* The BACK (north) strap is set one BANK_SPRING_SET feeler stack off gear 19's
   north planar face. The MHA-DT-VN-68 wave spring squeezed directly between
   them preloads the whole stack south onto the datum. There is no north disc
   (user ruling 2026-10-20).
@@ -41,6 +41,7 @@ from __future__ import annotations
 import math
 
 import _config
+import dt_feeler_leaves as _leaves
 import dt_arbor_pedestal_spec as _pedestal
 import sh_vn_arbor_set_screw_spec as _screw
 import ch_connecting_rod_spec as _rod
@@ -86,16 +87,20 @@ def station_z(j: int) -> float:
 
 
 # --- preload (#948 ruling R) ----------------------------------------------------
-# The north strap is set off gear 19's north face by one gauge blade. The
-# spring in that gap holds the stack south, with no end play. Re-setting the
-# north strap changes only spring height and preload, never the datum.
+# The north strap is set off gear 19's north face on a feeler stack, a pair of
+# inch leaves of the shop's one set (dt_feeler_leaves, #3042). The spring in
+# that gap holds the stack south, with no end play. Re-setting the north strap
+# changes only spring height and preload, never the datum.
 MARGIN_SPARE = 0.25  # novice spare over every floor (pinion_rig_layout rule)
-FEELER_STEP = 0.05  # blades of the metric gauge set (pinion_rig_fitup)
-BANK_SPRING_SET = _spring.INSTALLED_HEIGHT  # the set blade, 0.95
-BANK_SPRING_SET_BAND = 0.10  # set error: north strap re-set on its hold-downs
+BANK_SPRING_SET = _spring.INSTALLED_HEIGHT  # .037
+BANK_SPRING_LEAVES = _leaves.leaf_stack(BANK_SPRING_SET)
+# The printed set band: the north strap re-set on its hold-downs.
+BANK_SPRING_SET_BAND = 0.10
+# The height the spring can be left at: the set band and the stack's own error.
+BANK_SPRING_SET_ERROR = BANK_SPRING_SET_BAND + _leaves.stack_error(BANK_SPRING_SET)
 BANK_SPRING_HEIGHT = (
-    BANK_SPRING_SET - BANK_SPRING_SET_BAND,
-    BANK_SPRING_SET + BANK_SPRING_SET_BAND,
+    BANK_SPRING_SET - BANK_SPRING_SET_ERROR,
+    BANK_SPRING_SET + BANK_SPRING_SET_ERROR,
 )
 # (min, max) preload, N, over the set band [INFERENCE: linear rate].
 BANK_PRELOAD = (
@@ -106,8 +111,6 @@ BANK_PRELOAD = (
 # south against its axial drag on the arbor (#948 analysis: ~0.3 N of turning
 # drag per gear at 3 N, mu 0.15) [INFERENCE: the 1 N floor].
 PRELOAD_LIMITS = (1.0, 10.0)
-if abs(BANK_SPRING_SET / FEELER_STEP - round(BANK_SPRING_SET / FEELER_STEP)) > 1e-9:
-    raise AssertionError(f"the spring set {BANK_SPRING_SET} is not a gauge blade")
 if (
     not _spring.WORKING_HEIGHT
     <= BANK_SPRING_HEIGHT[0]
@@ -313,8 +316,10 @@ __all__ = [
     "SOUTH_DISC_CLEARANCE",
     "BANK_PRELOAD",
     "BANK_SPRING_HEIGHT",
+    "BANK_SPRING_LEAVES",
     "BANK_SPRING_SET",
     "BANK_SPRING_SET_BAND",
+    "BANK_SPRING_SET_ERROR",
     "BANK_SPRING_Z",
     "BANK_PITCH",
     "CAM_THICKNESS",

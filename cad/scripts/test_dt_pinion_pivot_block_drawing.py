@@ -390,24 +390,30 @@ def test_worst_stack_bands_are_the_printed_places() -> None:
 
 def test_front_block_feeler_setting_is_the_ruled_band() -> None:
     # Codex #854 P1: the fit-up setting that makes INNER_SPAN (and so the
-    # torque shaft and lift rod lengths) true is ruling (c)'s 0.25 +/- 0.10
-    # feeler between the front strap and the front block.  The band is a
+    # torque shaft and lift rod lengths) true is ruling (c)'s feeler between
+    # the front strap and the front block, .010 +/- 0.10 mm of set band plus
+    # its one leaf's tolerance (#3042).  The band is a
     # named fit-up value so the MHA-DT-00 step and every worst-case gate read
     # one source; it never closes the gap or doubles it.  The layout owns it
     # (its worst stack sizes the shaft and rod, Codex #837) and pinion_rig_fitup
     # re-exports it for the print.
+    import dt_feeler_leaves
     import pinion_rig_fitup as fitup
     import pinion_rig_layout as rig
 
     assert fitup.FRONT_BLOCK_FEELER is rig.FRONT_BLOCK_FEELER
     assert fitup.FRONT_BLOCK_FEELER_BAND is rig.FRONT_BLOCK_FEELER_BAND
-    assert (fitup.FRONT_BLOCK_FEELER, fitup.FRONT_BLOCK_FEELER_BAND) == (0.25, 0.10)
-    # Main (#858): both feelers are stock leaves of one purchased set.
-    assert fitup.DRUM_END_SHIM == 0.45
-    assert fitup.FEELER_GAGE_LEAVES_MM[4] == 0.25
-    assert fitup.FEELER_GAGE_LEAVES_MM[8] == 0.45
-    assert len(fitup.FEELER_GAGE_LEAVES_MM) == 20
-    assert "66MA" in fitup.FEELER_GAGE
+    assert rig.FEELER_SET_BAND == 0.10
+    assert fitup.FRONT_BLOCK_FEELER_BAND == pytest.approx(
+        rig.FEELER_SET_BAND + dt_feeler_leaves.LEAF_TOLERANCE
+    )
+    # Main (#858): both feelers are leaves of one set, the one the shop owns
+    # (owner ruling 2026-11-23, #3042): 32 blades, 31 inch sizes.
+    for leaf in (fitup.FRONT_BLOCK_FEELER, fitup.DRUM_END_SHIM):
+        assert leaf in fitup.FEELER_GAGE_LEAVES_MM
+    assert len(fitup.FEELER_GAGE_LEAVES_MM) == 31 == dt_feeler_leaves.BLADE_COUNT - 1
+    assert (min(dt_feeler_leaves.LEAVES_IN), max(dt_feeler_leaves.LEAVES_IN)) == (0.0015, 0.035)
+    assert "INCH" in fitup.FEELER_GAGE and "66MA" not in fitup.FEELER_GAGE
     assert 0.0 < fitup.FRONT_BLOCK_FEELER - fitup.FRONT_BLOCK_FEELER_BAND
     assert fitup.FRONT_BLOCK_FEELER_BAND < fitup.FRONT_BLOCK_FEELER
 
@@ -470,7 +476,7 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     assert rig.LENGTH_PLACES == ROD_PRECISION["RodProfile"]["RodBody"]
     # A nominal that does not print exactly moves its term by the rounding.
     assert printed_deviations(10.254, 2) == pytest.approx((-0.514, 0.506))
-    assert rig.FRONT_BLOCK_FEELER_BAND == 0.10
+    assert rig.FRONT_BLOCK_FEELER_BAND == rig.FEELER_SET_ERROR
 
     depth = dt_pinion_pivot_block_spec.BLOCK_DEPTH
     shortest_shaft = rig.TORQUE_SHAFT_LEN - xx_in

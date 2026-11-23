@@ -223,7 +223,7 @@ FACE_WIDTH_LIMITS = deviations(FACE_WIDTH_BAND)  # (lower, upper)
 # The toothed south face is set directly off the restored MHA-DT-05 north
 # boss face with the assembly step-4 feeler. There is no spot-face retreat
 # or eccentric sleeve in this stack.
-SEAT_FEELER_MM = 0.25
+SEAT_FEELER_MM = 0.254  # .010, one inch feeler leaf (#3042; 0.25 on the metric set)
 SEAT_GAP_MAX_MM = 1.0
 PINION_BOSS_NORTH_GAP_RANGE = (SEAT_FEELER_MM, SEAT_GAP_MAX_MM)
 
@@ -250,7 +250,7 @@ T120_TURNED_BAND_RADIAL_WORST = 1.68
 # the feeler is turned down, never under TURNED_DIA_FITUP_MIN; a shoulder
 # that stops it is faced back, never under its printed short limit. The
 # assembly proves the fit-up limits clear the feeler and retain engagement.
-T120_FITUP_FEELER_MM = 0.10
+T120_FITUP_FEELER_MM = 0.1016  # .004, one inch feeler leaf (#3042; was 0.10)
 TURNED_DIA_FITUP_MIN = 18.2372  # .718
 SHOULDER_LENGTH_FITUP_MIN = SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[0]
 

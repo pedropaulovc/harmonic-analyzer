@@ -1,7 +1,7 @@
 """Fit-up settings for the pinion rig that the prints state and no build reads.
 
-Every fit-up setting is a stock leaf, or a pair of leaves, of one purchased
-thickness gage (FEELER_GAGE), and each is sized in pinion_rig_layout, where the
+Every fit-up setting is a leaf, or a pair of leaves, of the one inch feeler
+gauge the shop owns (FEELER_GAGE), and each is sized in pinion_rig_layout, where the
 worst fitted stacks that need it live.  This module is the print-facing import
 point: it re-exports the settings, checks each is a leaf or a leaf pair of the
 gage, and words the step each print carries.  Only tests and drawing steps
@@ -35,6 +35,7 @@ import it.
 
 from __future__ import annotations
 
+import dt_feeler_leaves
 import dt_pinion_arbor_collar_spec
 import dt_pinion_arbor_spec
 import dt_pinion_cam_pin_spec
@@ -44,12 +45,13 @@ from pinion_rig_layout import (
     BACK_COLLAR_LEAF_F,
     DRUM_END_SHIM,
     DRUM_END_SHIM_SET_ERROR,
-    FEELER_LEAF_MAX,
     FEELER_LEAF_STEP,
+    FEELER_SET_BAND,
     FEELER_SET_ERROR,
     FLUSH_SET_ERROR,
     FRONT_BLOCK_FEELER,
     FRONT_BLOCK_FEELER_BAND,
+    RIG_SET_ERROR,
     RIG_SET_LEAF_D,
     RIG_SET_LEAVES,
     SPRING_PAD_LEAF,
@@ -57,17 +59,14 @@ from pinion_rig_layout import (
 from dt_vn_pinion_strap_pin_spec import HOLE_DIA, PIN_SUB_FLUSH_MAX
 from dt_drive_train_assembly_sheet import FEELER_PLACES, inch_max_text, inch_text
 
-# One purchased set, pinned like any other bought part: Starrett 66MA metric
-# thickness gage, 20 straight tempered-steel leaves 0.05-1.00 mm in 0.05 steps
-# (starrett.com cat-no 66MA, EDP 55974, read 2026-09-25).
-FEELER_GAGE_NAME = "STARRETT 66MA"
-FEELER_GAGE = f"{FEELER_GAGE_NAME} METRIC THICKNESS GAGE (EDP 55974)"
-FEELER_GAGE_LEAVES_MM = tuple(round(0.05 * k, 2) for k in range(1, 21))
-if (FEELER_GAGE_LEAVES_MM[0], FEELER_GAGE_LEAVES_MM[-1]) != (
-    FEELER_LEAF_STEP,
-    FEELER_LEAF_MAX,
-):
-    raise AssertionError("pinion_rig_layout sizes leaves the gage does not carry")
+# One set, the feeler gauge the shop owns (owner ruling 2026-11-23, #3042;
+# dt_feeler_leaves pins its leaves from the maker's page): 31 inch leaf sizes,
+# .0015 to .035.  The sheet names it by what it is, not by its brand.
+FEELER_GAGE_NAME = "INCH FEELER"
+FEELER_GAGE = f"{FEELER_GAGE_NAME} GAUGE SET"
+FEELER_GAGE_LEAVES_MM = tuple(
+    round(leaf * dt_feeler_leaves.MM_PER_IN, 5) for leaf in dt_feeler_leaves.LEAVES_IN
+)
 
 # The front collar sits flush with the front strap's outer face, so its leaf
 # is the front block's own feeler (ruling (c)).
@@ -82,18 +81,24 @@ SINGLE_LEAF_SETTINGS = {
     "spring pad leaf": SPRING_PAD_LEAF,
 }
 for _name, _leaf in SINGLE_LEAF_SETTINGS.items():
-    if round(_leaf, 2) not in FEELER_GAGE_LEAVES_MM:
+    if dt_feeler_leaves.leaf_stack(_leaf) != (_leaf,):
         raise AssertionError(f"{_name} {_leaf} mm is not a leaf of the {FEELER_GAGE}")
 # The rig-set D is the one setting that needs a pair of leaves.
-if len(RIG_SET_LEAVES) > 2 or any(
-    round(leaf, 2) not in FEELER_GAGE_LEAVES_MM for leaf in RIG_SET_LEAVES
-):
+if len(RIG_SET_LEAVES) > 2 or not set(RIG_SET_LEAVES) <= set(FEELER_GAGE_LEAVES_MM):
     raise AssertionError(f"rig-set D {RIG_SET_LEAVES} is not one or two gage leaves")
 if abs(sum(RIG_SET_LEAVES) - RIG_SET_LEAF_D) > 1e-9:
     raise AssertionError("the rig-set leaves do not make up D")
-# Every setting is made to the same band as the front-block feeler.
-if FEELER_SET_ERROR != FRONT_BLOCK_FEELER_BAND or DRUM_END_SHIM_SET_ERROR != (
-    FRONT_BLOCK_FEELER_BAND
+# Every setting is made to the same band, and books its own stack's error
+# over it: a leaf tolerance for each one-leaf setting, two for D's pair.
+if not (
+    FEELER_SET_ERROR == FRONT_BLOCK_FEELER_BAND == DRUM_END_SHIM_SET_ERROR
+    and abs(FEELER_SET_ERROR - FEELER_SET_BAND - dt_feeler_leaves.LEAF_TOLERANCE) < 1e-12
+    and abs(
+        RIG_SET_ERROR
+        - FEELER_SET_BAND
+        - len(RIG_SET_LEAVES) * dt_feeler_leaves.LEAF_TOLERANCE
+    )
+    < 1e-12
 ):
     raise AssertionError("a fit-up setting carries its own band")
 
@@ -105,7 +110,7 @@ RIG_SET_BANK_PRECONDITION = "BANK HELD TO THE FRONT ON MHA-DT-26"
 # MHA-DT-00 prints decimal inch (#290) and an inch sheet prints inch values
 # only (drawing-guidelines rule 26): each setting prints its inch value to the
 # gage's thousandth, and MHA-DT-00's feeler-stack table (draw_dt_drive_train_
-# assembly.FEELER_STACK_ROWS) lists the stamped metric leaves that make it up.
+# assembly.FEELER_STACK_ROWS) lists the inch leaves that make it up.
 def _leaf_setting(setting: float) -> str:
     return inch_text(setting, FEELER_PLACES)
 
@@ -242,11 +247,13 @@ __all__ = [
     "FEELER_GAGE",
     "FEELER_GAGE_LEAVES_MM",
     "FEELER_GAGE_NAME",
+    "FEELER_SET_BAND",
     "FEELER_SET_ERROR",
     "FRONT_BLOCK_FEELER",
     "FRONT_BLOCK_FEELER_BAND",
     "FRONT_COLLAR_LEAF",
     "RIG_SET_BANK_PRECONDITION",
+    "RIG_SET_ERROR",
     "RIG_SET_LEAF_D",
     "RIG_SET_LEAVES",
     "RIG_SET_NAME",

@@ -71,11 +71,21 @@ def test_partial_stack_band_is_the_worst_accepted_split(n: int) -> None:
 
 def test_the_bank_is_preloaded_by_its_spring() -> None:
     # #948 ruling R: the 0.45 leaf became a 9714K392 wave spring set on a
-    # 0.95 blade; its whole set band stays in the spring's working range at a
-    # light, single-digit-newton preload, and the bank has no end play.
-    assert bank.BANK_SPRING_SET == pytest.approx(0.95)
-    assert bank.BANK_SPRING_HEIGHT == pytest.approx((0.85, 1.05))
-    assert bank.BANK_PRELOAD == pytest.approx((2.22, 4.24), abs=0.01)
+    # feeler stack; its whole set band, the stack's own leaf tolerance booked
+    # (#3042), stays in the spring's working range at a light,
+    # single-digit-newton preload, and the bank has no end play.
+    import dt_feeler_leaves
+
+    leaves = dt_feeler_leaves.leaf_stack(bank.BANK_SPRING_SET)
+    assert bank.BANK_SPRING_LEAVES == leaves and len(set(leaves)) == len(leaves)
+    error = bank.BANK_SPRING_SET_BAND + len(leaves) * dt_feeler_leaves.LEAF_TOLERANCE
+    assert bank.BANK_SPRING_SET_ERROR == pytest.approx(error)
+    assert bank.BANK_SPRING_HEIGHT == pytest.approx(
+        (bank.BANK_SPRING_SET - error, bank.BANK_SPRING_SET + error)
+    )
+    assert bank.PRELOAD_LIMITS == (1.0, 10.0)
+    assert bank.PRELOAD_LIMITS[0] <= bank.BANK_PRELOAD[0] < bank.BANK_PRELOAD[1]
+    assert bank.BANK_PRELOAD[1] < bank.PRELOAD_LIMITS[1]
     assert bank.BANK_SPRING_Z == (bank.G19_BACK_FACE_Z, bank.BACK_STRAP_INNER_Z)
     assert not hasattr(bank, "BANK_END_PLAY")
     assert not hasattr(bank, "RING_OVERHANG_MAX")

@@ -158,16 +158,7 @@ status = "to_order"
 name = "Pittsburgh SAE/metric feeler gauge, 32 pieces"
 kind = "feeler_gauge_set"
 status = "on_hand"
-note = "Owner confirmed on hand 2026-11-19: Pittsburgh SAE/metric 32-piece feeler gauge. Owned (Pedro, 2026-11-17, PR #2874), superseding the archived inventory's 2026-10-11 \"feeler gauges are not owned\". The placeholder process plans name this set where the quote workbook named the Starrett 66MA (owner 2026-11-19); MHA-DT-00's metric leaf stacks still name gauges.feeler-gauges-metric."
-
-# MHA-DT-00 builds every set feeler and shim from this metric gage
-# (pinion_rig_fitup.FEELER_GAGE). The shop owns inch leaves only (owner,
-# Pedro, 2026-11-17), so it is to buy until #3042 moves the stacks to inch.
-[gauges.feeler-gauges-metric]
-name = "Starrett 66MA metric thickness gage (EDP 55974)"
-kind = "feeler_gauge_set"
-status = "to_order"
-note = "Hold the order until #3042 is ruled: the $94.05 set is not needed if the MHA-DT-00 stacks move to inch leaves (#3083 row 16, owner ruling 2026-11-20)."
+note = "Owner confirmed on hand 2026-11-19: Pittsburgh SAE/metric 32-piece feeler gauge. Owned (Pedro, 2026-11-17, PR #2874), superseding the archived inventory's 2026-10-11 \"feeler gauges are not owned\". Harbor Freight SKU 63665 (also sold as 32214), 32 blades in 31 sizes, each etched with its inch and metric size: .0015, .002, .0025, .003 to .026 by .001 (the .010 twice), .028, .030, .032, .035 in; the page states no accuracy (harborfreight.com/saemetric-feeler-gauge-32-piece-63665.html, read 2026-11-23). The placeholder process plans name this set where the quote workbook named the Starrett 66MA (owner 2026-11-19), and MHA-DT-00 builds every set feeler and shim from its inch leaves (cad/scripts/dt_feeler_leaves.py; owner ruling 2026-11-23, #3042: \"arent all measurements be done in inches by now\"), so the metric Starrett 66MA ($94.05, #3083 row 16) is not bought."
 
 [gauges.digital-angle-gauge]
 name = "Digital angle gauge"

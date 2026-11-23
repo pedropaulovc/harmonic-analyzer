@@ -516,11 +516,18 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
         abs_tol=1e-9,
     )
     assert math.isclose(min(backs) - g19_back, drive.J19_FULL_FACE_MARGIN, abs_tol=1e-9)
-    # D is the thinnest gage setting that leaves RIG_MARGIN_SPARE: one leaf
-    # step thinner leaves j = 19 short of it.
-    assert math.isclose(drive.J19_FULL_FACE_MARGIN, RIG.RIG_MARGIN_SPARE, abs_tol=1e-9)
+    # D is the thinnest gage setting that leaves RIG_MARGIN_SPARE with its own
+    # set band and two leaf tolerances booked: one thousandth thinner leaves
+    # j = 19 short of it.
+    import dt_feeler_leaves
+
+    assert drive.J19_FULL_FACE_MARGIN >= RIG.RIG_MARGIN_SPARE - 1e-9
     assert drive.J19_FULL_FACE_MARGIN - RIG.FEELER_LEAF_STEP < RIG.RIG_MARGIN_SPARE
-    assert (RIG.RIG_SET_LEAF_D, RIG.RIG_SET_LEAVES) == (1.25, (1.00, 0.25))
+    assert RIG.RIG_SET_LEAVES == dt_feeler_leaves.leaf_stack(RIG.RIG_SET_LEAF_D)
+    assert len(set(RIG.RIG_SET_LEAVES)) == len(RIG.RIG_SET_LEAVES) == 2
+    assert RIG.RIG_SET_ERROR == pytest.approx(
+        RIG.FEELER_SET_BAND + 2 * dt_feeler_leaves.LEAF_TOLERANCE
+    )
     # j = 0 at the front: the drum's front end never uncovers gear 0, even
     # with the thickest leaf D and the shortest drum (the drum hard aft, the
     # pose), while g0 sits south by a long g0 -> g19 pitch stack (Codex #858,
@@ -532,16 +539,17 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
     face_min = drive.APINION_DRUM_LEN - RIG.DRUM_LEN_BAND
     slack = min(
         (g0_front - g0_south - 1.0) - (g19_back + RIG.RIG_SET_LEAF_D + d - face_min)
-        for d in (-_LEAF_ERR, _LEAF_ERR)
+        for d in (-RIG.RIG_SET_ERROR, RIG.RIG_SET_ERROR)
     )
     assert slack >= RIG.RIG_MARGIN_SPARE, slack
     assert math.isclose(slack, drive.J0_SLACK_WORST, abs_tol=1e-9)
     # #1038 re-pitch: the 6.06 in drum (the former 5.64 + 19 x 0.5635 = 6.0615,
-    # rounded down to the .01 in grid) gives up 0.0385 of the former 3.4051.
-    assert math.isclose(slack, 3.3666, abs_tol=5e-4)
-    # Positive control: without the bank terms the row reads 3.5428 on the 3.0
-    # face (3.5813 at the 5.64 drum; the .118 in face freed its 0.0028).
-    assert math.isclose(slack + g0_south, 3.5428, abs_tol=5e-4)
+    # rounded down to the .01 in grid) gave up 0.0385 of the former 3.4051;
+    # the inch leaf D and its booked stack error (#3042) take 0.1216 more.
+    assert math.isclose(slack, 3.2450, abs_tol=5e-4)
+    # Positive control: without the bank terms the row reads 3.4212 on the 3.0
+    # face.
+    assert math.isclose(slack + g0_south, 3.4212, abs_tol=5e-4)
 
 
 def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
@@ -552,13 +560,14 @@ def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
         for name in stack:
             assert "MHA-DT-14" not in name and "strap" not in name.lower(), name
             assert "MHA-DT-12" not in name and "g19" not in name, name
-    assert math.isclose(
-        sum(RIG.DRUM_BACK_ADVANCE_STACK.values()) + RIG.RIG_MARGIN_SPARE,
-        RIG.RIG_SET_LEAF_D,
-        abs_tol=1e-9,
+    plays = sum(
+        value for name, value in RIG.DRUM_BACK_ADVANCE_STACK.items() if "leaf D" not in name
     )
-    assert RIG.RIG_SET_LEAF_D == RIG.smallest_leaf_setting(
-        sum(RIG.DRUM_BACK_ADVANCE_STACK.values()) + RIG.RIG_MARGIN_SPARE
+    assert RIG.DRUM_BACK_ADVANCE_STACK["rig-set leaf D, thinnest setting"] == RIG.RIG_SET_ERROR
+    assert RIG.RIG_SET_LEAF_D == RIG.smallest_leaf_setting(plays + RIG.RIG_MARGIN_SPARE)
+    assert (
+        RIG.RIG_SET_LEAF_D - sum(RIG.DRUM_BACK_ADVANCE_STACK.values())
+        >= RIG.RIG_MARGIN_SPARE - 1e-9
     )
     assert math.isclose(
         RIG.BACK_STOP_Z,
@@ -859,10 +868,15 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
         abs_tol=1e-9,
     )
     assert drive.CAM_PIN_STATION[1] == RIG.BACK_CAM_PIN_STATION
-    assert math.isclose(RIG.BACK_CAM_PIN_STATION, 5.328, abs_tol=1e-9)
-    assert (RIG.BACK_COLLAR_GAP_MIN, RIG.BACK_COLLAR_GAP_MAX) == pytest.approx(
-        (0.80, 1.00), abs=1e-9
+    assert math.isclose(
+        RIG.BACK_CAM_PIN_STATION,
+        dt_pinion_cam_geometry.CAM_LEN + RIG.BACK_COLLAR_LEAF_F - drive.STRAP_T / 2.0,
+        abs_tol=1e-9,
     )
+    assert (RIG.BACK_COLLAR_GAP_MIN, RIG.BACK_COLLAR_GAP_MAX) == pytest.approx(
+        (RIG.BACK_COLLAR_LEAF_F - _LEAF_ERR, RIG.BACK_COLLAR_LEAF_F + _LEAF_ERR), abs=1e-9
+    )
+    assert RIG.BACK_COLLAR_GAP_MIN >= RIG.BACK_COLLAR_MIN_GAP + RIG.RIG_MARGIN_SPARE
     # The model front collar is flush with the strap's outer face, one feeler
     # off the block.
     assert math.isclose(
@@ -927,7 +941,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == pytest.approx(
         (7.71 * 25.4, 8.15 * 25.4)
     )
-    assert math.isclose(RIG.BACK_COLLAR_GAP_MAX, 1.00, abs_tol=1e-9)
+    assert RIG.BACK_COLLAR_GAP_MAX == pytest.approx(RIG.BACK_COLLAR_LEAF_F + _LEAF_ERR)
     bearing_min = math.inf
     hub_margin_min = math.inf
     nominal_inner = RIG.FRONT_BLOCK_Z0 + RIG.BLOCK_DEPTH
@@ -1559,7 +1573,12 @@ def test_spring_is_stationed_from_the_block_on_its_pad_leaf() -> None:
     import dt_pinion_spring_geometry as geometry
     from dt_pinion_spring_section import PAD_WIDTH, WIDTH
 
-    assert RIG.SPRING_PAD_LEAF == 0.65  # Main's ruling, a stock gage leaf
+    # Main's ruling: a stock gage leaf, one step over the thinnest that keeps
+    # the pad's air and spare (0.65 on the metric set; .026 on the inch one).
+    assert RIG.SPRING_PAD_LEAF == pytest.approx(
+        RIG.smallest_leaf_setting(RIG.SPRING_PAD_MIN_AIR + RIG.RIG_MARGIN_SPARE)
+        + RIG.FEELER_LEAF_STEP
+    )
     aft = RIG.BACK_BLOCK_Z0 - RIG.SPRING_PAD_LEAF
     assert math.isclose(RIG.SPRING_PAD_AFT_Z, aft, abs_tol=1e-12)
     assert math.isclose(RIG.SPRING_Z + WIDTH / 2.0, aft, abs_tol=1e-12)
@@ -1650,7 +1669,7 @@ def test_spring_strip_clears_gear_j19_at_the_worst_fit_up() -> None:
     j19_back = drive.Z_DRUM0 + 19 * drive.Z_PITCH + drive.DRUM_FACE / 2.0
     terms = {
         "strip front edge, nominal": RIG.SPRING_Z - WIDTH / 2.0 - j19_back,
-        "rig-set leaf D set error": -RIG.FEELER_SET_ERROR,
+        "rig-set leaf D set error": -RIG.RIG_SET_ERROR,
         "MHA-DT-14 strap thickness .XX, thinnest": printed_deviations(
             THICKNESS, THICKNESS_PLACES, unit=STRAP_UNIT
         )[0],
@@ -1736,10 +1755,15 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
     import dt_drive_train_steps
     import dt_pinion_cam_spec
 
+    import dt_feeler_leaves
+
     for name, leaf in FITUP.SINGLE_LEAF_SETTINGS.items():
-        assert round(leaf, 2) in FITUP.FEELER_GAGE_LEAVES_MM, name
-    assert FITUP.RIG_SET_LEAVES == (1.00, 0.25)
-    assert FITUP.BACK_COLLAR_LEAF_F == 0.90
+        assert leaf in FITUP.FEELER_GAGE_LEAVES_MM, name
+    assert FITUP.RIG_SET_LEAVES == dt_feeler_leaves.leaf_stack(FITUP.RIG_SET_LEAF_D)
+    assert set(FITUP.RIG_SET_LEAVES) <= set(FITUP.FEELER_GAGE_LEAVES_MM)
+    assert FITUP.BACK_COLLAR_LEAF_F >= RIG.smallest_leaf_setting(
+        RIG.BACK_COLLAR_MIN_GAP + RIG.RIG_MARGIN_SPARE
+    )
     assert FITUP.FRONT_COLLAR_LEAF == FITUP.FRONT_BLOCK_FEELER
     # The base's rig callouts cite this step on MHA-DT-00 by key (plate-r1
     # review: the procedure is the assembly's, not the base's).

@@ -297,13 +297,6 @@ TOOLS: tuple[Tool, ...] = (
             "shop-equipment:gauges.mag-base",
         ),
     ),
-    # MHA-DT-00's metric leaf stacks (#3042): ahead of the inch row so the
-    # 66MA wording lists the unowned metric set.
-    Tool(
-        "Feeler gauge, metric (Starrett 66MA)",
-        r"STARRETT 66MA(?: METRIC THICKNESS GAGE| LEAF STACKS| LEAVES)?",
-        ("shop-equipment:gauges.feeler-gauges-metric",),
-    ),
     Tool(
         "Feeler gauge leaves, inch",
         r"(?:\.\d+ )?FEELERS?(?: GAUGES?| GAUGE LEAF| LEAVES| STACKS?)?\b|THICKNESS GAGE",

@@ -1011,8 +1011,9 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
 
 def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
     """Main's TbPB ruling (Q1 b): the rig's east-west feeler is the bench
-    rest gap (pins on the cams), to the gage's leaf step, made up only of
-    the STARRETT 66MA leaves the fit-up uses; nothing on it is typed."""
+    rest gap (pins on the cams), to the gage's thousandth, made up only of
+    the owned inch feeler gauge's leaves, each once; nothing on it is typed."""
+    import dt_feeler_leaves
     import pinion_rig_fitup as fitup
     import pinion_rig_layout as rig
     import pinion_rig_tip_gap as tip_gap
@@ -1022,7 +1023,16 @@ def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
     assert tip_gap.REST_TIP_GAP > tip_gap.MODEL_TIP_GAP
     assert abs(tip_gap.TIP_GAP_FEELER - tip_gap.REST_TIP_GAP) <= rig.FEELER_LEAF_STEP / 2.0
     assert set(tip_gap.TIP_GAP_LEAVES) <= set(fitup.FEELER_GAGE_LEAVES_MM)
+    assert len(set(tip_gap.TIP_GAP_LEAVES)) == len(tip_gap.TIP_GAP_LEAVES)
     assert math.isclose(sum(tip_gap.TIP_GAP_LEAVES), tip_gap.TIP_GAP_FEELER, abs_tol=1e-9)
+    # The stack's own error and the rounding stay inside check 7's acceptance.
+    assert tip_gap.TIP_GAP_STACK_ERROR == pytest.approx(
+        len(tip_gap.TIP_GAP_LEAVES) * dt_feeler_leaves.LEAF_TOLERANCE
+    )
+    assert (
+        abs(tip_gap.TIP_GAP_FEELER - tip_gap.REST_TIP_GAP) + tip_gap.TIP_GAP_STACK_ERROR
+        <= tip_gap.TIP_GAP_ACCEPT_BAND
+    )
     assert tip_gap.TIP_GAP_ACCEPT == pytest.approx(
         (
             tip_gap.TIP_GAP_FEELER - tip_gap.TIP_GAP_ACCEPT_BAND,
@@ -1030,25 +1040,48 @@ def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
         )
     )
     # The inch sheet prints the setting to the thousandth; the feeler stack
-    # table (sheet 15) lists the leaves by their stamped metric size.
+    # table (sheet 15) lists the leaves by their etched inch size.
     printed = re.search(r"^(\.\d{3}) FEELER$", tip_gap.TIP_GAP_FEELER_TEXT)
     assert printed is not None
-    assert float(printed.group(1)) * 25.4 == pytest.approx(tip_gap.TIP_GAP_FEELER, abs=0.0127)
+    assert float(printed.group(1)) * 25.4 == pytest.approx(tip_gap.TIP_GAP_FEELER, abs=1e-9)
     (row,) = (row for row in drawing.FEELER_STACK_ROWS if row[0] == printed.group(1))
     leaves = [float(leaf) for leaf in row[1].split(" + ")]
-    assert math.isclose(sum(leaves), tip_gap.TIP_GAP_FEELER, abs_tol=1e-9)
-    assert set(leaves) <= set(fitup.FEELER_GAGE_LEAVES_MM)
+    assert math.isclose(sum(leaves), float(printed.group(1)), abs_tol=1e-9)
+    assert set(leaves) <= set(dt_feeler_leaves.LEAVES_IN)
     assert "CHECK 7" in row[2]
 
 
 def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     """Rubric sample round 16 (#0, 3/3 runs): each feeler a step or check
     sets is a sheet 15 row citing it; check cites carry CHECK.  The table
-    stays left of the cone station table."""
+    stays left of the cone station table.  #3042: every row is whole inch
+    leaves of the owned set, each once, summing to the printed setting."""
+    import dt_feeler_leaves
+    from cone_stack_end_play import STACK_FEELER
+
+    assert drawing.FEELER_STACK_HEADER[1] == "LEAVES (IN)"
+    for setting, leaves, _cited in drawing.FEELER_STACK_ROWS:
+        sizes = [float(leaf) for leaf in leaves.split(" + ")]
+        assert set(sizes) <= set(dt_feeler_leaves.LEAVES_IN), setting
+        assert len(set(sizes)) == len(sizes) <= dt_feeler_leaves.MAX_STACK_LEAVES, setting
+        assert sizes == sorted(sizes, reverse=True), setting
+        assert math.isclose(sum(sizes), float(setting), abs_tol=1e-9), setting
+    assert "MM" not in " ".join(
+        (drawing.FEELER_STACK_TITLE, *drawing.FEELER_STACK_HEADER, drawing.FEELER_TABLE_NOTE)
+    )
+    # The booked leaf tolerance is checked at the bench, not assumed.
+    tolerance = drawing.inch_text(dt_feeler_leaves.LEAF_TOLERANCE, 4)
+    assert f"MIC EACH LEAF IN THAT TABLE: WITHIN ±{tolerance}" in " ".join(
+        drawing.FEELER_TABLE_NOTE.split()
+    )
     rows = {row[0]: row[2] for row in drawing.FEELER_STACK_ROWS}
-    assert "4H, 4J" in rows[".004"]
-    assert "1R" in rows[".018"]
-    assert "4F" in rows[".010"]
+
+    def printed(setting: float) -> str:
+        return drawing.inch_text(setting, drawing.FEELER_PLACES)
+
+    assert "4H, 4J" in rows[printed(drawing.pinion.T120_FITUP_FEELER_MM)]
+    assert "1R" in rows[printed(STACK_FEELER)]
+    assert "4F" in rows[printed(drawing.pinion.SEAT_FEELER_MM)]
     # The cone swing is set by feel (#2365): no row cites check 4.
     assert not any("CHECK 4" in cited for cited in rows.values())
     checks = " ".join(drawing.CHECKS.split())
@@ -1306,15 +1339,41 @@ def test_one_code_key_defines_every_code_and_every_step_sheet_points_to_it() -> 
         assert all(0 <= gear <= last_gear for gear in gears), sheet
 
 
-@pytest.mark.parametrize("setting", (0.05, 0.95, 1.0, 1.05, 2.0, 2.5, 2.95))
-def test_a_leaf_stack_sums_to_its_setting_from_gage_leaves(setting: float) -> None:
+@pytest.mark.parametrize("thousandths", (4, 10, 19, 27, 36, 37, 53, 97, 99, 125))
+def test_a_leaf_stack_sums_to_its_setting_from_gage_leaves(thousandths: int) -> None:
+    import dt_feeler_leaves
     import pinion_rig_fitup as fitup
-    import pinion_rig_tip_gap as tip_gap
 
-    leaves = tip_gap.leaf_stack(setting)
+    setting = dt_feeler_leaves.thousandths(thousandths)
+    leaves = dt_feeler_leaves.leaf_stack(setting)
     assert math.isclose(sum(leaves), setting, abs_tol=1e-9)
     assert set(leaves) <= set(fitup.FEELER_GAGE_LEAVES_MM)
+    assert len(set(leaves)) == len(leaves)  # one set: no leaf twice
     assert list(leaves) == sorted(leaves, reverse=True)
+    # The fewest leaves: no shorter stack of the set reaches the setting.
+    fewer = (
+        stack
+        for count in range(1, len(leaves))
+        for stack in itertools.combinations(fitup.FEELER_GAGE_LEAVES_MM, count)
+    )
+    assert not any(math.isclose(sum(stack), setting, abs_tol=1e-9) for stack in fewer)
+    assert dt_feeler_leaves.stack_error(setting) == pytest.approx(
+        len(leaves) * dt_feeler_leaves.LEAF_TOLERANCE
+    )
+
+
+def test_a_setting_the_set_cannot_make_is_refused() -> None:
+    import dt_feeler_leaves
+
+    with pytest.raises(AssertionError, match="whole thousandth"):
+        dt_feeler_leaves.leaf_stack(0.45)  # the metric set's leaf
+    with pytest.raises(AssertionError, match="more than"):
+        dt_feeler_leaves.leaf_stack(dt_feeler_leaves.thousandths(126))
+    # The thinnest setting keeps its floor with the set band and leaf booked.
+    setting = dt_feeler_leaves.smallest_setting(0.35, 0.10)
+    assert setting - 0.10 - dt_feeler_leaves.stack_error(setting) >= 0.35
+    thinner = setting - dt_feeler_leaves.LEAF_STEP
+    assert thinner - 0.10 - dt_feeler_leaves.stack_error(thinner) < 0.35
 
 
 def test_the_spring_is_stationed_east_west_where_its_preload_is_gated() -> None:

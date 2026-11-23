@@ -34,6 +34,7 @@ from __future__ import annotations
 import math
 
 import _config
+import dt_feeler_leaves as _leaves
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm, printed_deviations
 from _title_block_units import LENGTH_UNITS
@@ -70,49 +71,47 @@ from dt_pinion_spring_section import WIDTH_PLACES as SPRING_W_PLACES
 # drive train asserts the whole table at import.
 RIG_MARGIN_SPARE = 0.25
 
-# The front-block feeler and its ruled band (Codex #854 P1: MHA-DT-00 prints
-# FEELER +/- BAND).  It sets the pinned cluster's end play, and the worst
-# stacks read its band as the setting's error.
-FRONT_BLOCK_FEELER = 0.25
-FRONT_BLOCK_FEELER_BAND = 0.10
+# Every fit-up setting is a stack of whole inch leaves of the one feeler gauge
+# the shop owns (dt_feeler_leaves; owner ruling 2026-11-23, #3042), made to
+# the ruled band FEELER_SET_BAND by feel (Main, restricted review of #858).
+# What a setting can be off by is that band plus its stack's own error, a
+# leaf tolerance per leaf: FEELER_SET_ERROR for a one-leaf setting,
+# setting_error() for any other.
+FEELER_LEAF_STEP = _leaves.LEAF_STEP
+FEELER_SET_BAND = 0.10
+FEELER_SET_ERROR = FEELER_SET_BAND + _leaves.LEAF_TOLERANCE
+
+
+def setting_error(setting: float) -> float:
+    """The set band plus the error of the leaf stack ``setting`` is made of."""
+    return FEELER_SET_BAND + _leaves.stack_error(setting)
+
+
+def smallest_leaf_setting(floor: float) -> float:
+    """The thinnest setting whose tightest set, its stack's error booked,
+    still keeps ``floor``."""
+    return _leaves.smallest_setting(floor, FEELER_SET_BAND)
+
+
+# The front-block feeler (Codex #854 P1).  It sets the pinned cluster's end
+# play, and the worst stacks read its band as the setting's error.
+FRONT_BLOCK_FEELER = _leaves.thousandths(10)  # .010, was 0.25 on the metric set
+FRONT_BLOCK_FEELER_BAND = FEELER_SET_ERROR
 # The drum turns between the pinned straps, so it needs running clearance:
 # the shaft is match-drilled with a feeler as a shim at the drum's FRONT end
 # (MHA-DT-00's SHAFT DRILL SET), freezing the strap spacing at the drum plus the
 # shim.  The drum then runs in DRUM_END_SHIM +/- DRUM_END_SHIM_SET_ERROR of end
 # play (dt_pinion_arbor_geometry.drum_total_air), set with the same band as the
-# front-block feeler.  The shim is the smallest 0.05 blade whose tightest
-# setting keeps the drum's MIN_END_PLAY (0.1) with RIG_MARGIN_SPARE to spare:
-# 0.45, a stock leaf of the same metric gage set as the 0.25 feeler
-# (pinion_rig_fitup.FEELER_GAGE); the rig's 0.25 feeler left 0.05.
-DRUM_END_SHIM = 0.45
-DRUM_END_SHIM_SET_ERROR = FRONT_BLOCK_FEELER_BAND
+# front-block feeler.  The shim is the thinnest leaf whose tightest setting
+# keeps the drum's MIN_END_PLAY with RIG_MARGIN_SPARE to spare: .019 (the
+# metric set's 0.45 printed .018, which the leaf tolerance leaves .0002 short).
+DRUM_MIN_END_PLAY = 0.1  # dt_pinion_arbor_geometry.MIN_END_PLAY, by lockstep
+DRUM_END_SHIM = smallest_leaf_setting(DRUM_MIN_END_PLAY + RIG_MARGIN_SPARE)
+DRUM_END_SHIM_SET_ERROR = FEELER_SET_ERROR
 # The shaft is set for that drill with its rear end flush with MHA-DT-18's rear
 # face.  The SR crown keeps a straightedge off the crown root, so the setting
 # carries its own error, printed on that step.
 FLUSH_SET_ERROR = 0.10
-
-# Every fit-up setting is a stock leaf (or a pair of leaves) of one purchased
-# metric thickness gage (pinion_rig_fitup.FEELER_GAGE pins the set: 0.05 to
-# 1.00 in 0.05 steps), set to the same +/- FEELER_SET_ERROR.
-FEELER_LEAF_STEP = 0.05
-FEELER_LEAF_MAX = 1.00
-FEELER_SET_ERROR = FRONT_BLOCK_FEELER_BAND
-
-
-def smallest_leaf_setting(required: float) -> float:
-    """The thinnest gage setting (one leaf, or a pair) of at least ``required``."""
-    setting = round(math.ceil(required / FEELER_LEAF_STEP - 1e-9) * FEELER_LEAF_STEP, 2)
-    if setting > 2.0 * FEELER_LEAF_MAX:
-        raise AssertionError(f"{setting} needs more than two gage leaves")
-    return setting
-
-
-def leaf_pair(setting: float) -> tuple[float, ...]:
-    """The leaves a setting is made of: one leaf up to the thickest, else the
-    thickest plus the remainder."""
-    if setting <= FEELER_LEAF_MAX + 1e-9:
-        return (setting,)
-    return (FEELER_LEAF_MAX, round(setting - FEELER_LEAF_MAX, 2))
 
 
 # MHA-DT-01 drum.  The length is dt_alignment_pinion_spec.FACE_WIDTH (a drawing
@@ -149,19 +148,29 @@ DRUM_LEN_BAND = printed_band_mm(DRUM_LEN_PLACES, unit=DRUM_LEN_UNIT)  # .01 in
 # grows the drum's overhang at j = 0.
 # G19_BACK_FACE_Z is the nominal configured-grid end face, not a hard datum.
 # At fit-up every rig station and transferred seat follows its ACTUAL face.
-DRUM_BACK_ADVANCE_STACK = {
+_DRUM_BACK_ADVANCE_PLAY = {
     "MHA-DT-00 feeler, widest (the pinned cluster's end play)": FRONT_BLOCK_FEELER
     + FRONT_BLOCK_FEELER_BAND,
     "MHA-DT-00 feeler, widest (the drum's shimmed end play)": DRUM_END_SHIM
     + DRUM_END_SHIM_SET_ERROR,
-    "rig-set leaf D, thinnest setting": FEELER_SET_ERROR,
+}
+# D is the thinnest setting that still covers both plays with RIG_MARGIN_SPARE
+# at its own tightest set: .053, the .028 and .025 leaves (was 1.25, .049).
+RIG_SET_LEAF_D = smallest_leaf_setting(
+    sum(_DRUM_BACK_ADVANCE_PLAY.values()) + RIG_MARGIN_SPARE
+)
+RIG_SET_LEAVES = _leaves.leaf_stack(RIG_SET_LEAF_D)
+RIG_SET_ERROR = setting_error(RIG_SET_LEAF_D)
+DRUM_BACK_ADVANCE_STACK = {
+    **_DRUM_BACK_ADVANCE_PLAY,
+    "rig-set leaf D, thinnest setting": RIG_SET_ERROR,
 }
 DRUM_BACK_ADVANCE_OPEN_TERMS: tuple[str, ...] = ()  # bank held south; set follows actual g19
 DRUM_FRONT_RETREAT_STACK = {
     "MHA-DT-01 drum length .XX": -printed_deviations(
         DRUM_LEN, DRUM_LEN_PLACES, unit=DRUM_LEN_UNIT
     )[0],
-    "rig-set leaf D, thickest setting": FEELER_SET_ERROR,
+    "rig-set leaf D, thickest setting": RIG_SET_ERROR,
 }
 # g0's front face south of the rig's g19-based set: gears 1-19 long inside
 # the L20 acceptance and gear 0's face width at +0.05. These are relative
@@ -170,10 +179,6 @@ G0_FRONT_SOUTH_STACK = {
     f"MHA-DT-12 {name}": value for name, value in _BANK_G0_FRONT_SOUTH_STACK.items()
 }
 DRUM_FRONT_RETREAT_OPEN_TERMS: tuple[str, ...] = ()  # booked in G0_FRONT_SOUTH_STACK
-RIG_SET_LEAF_D = smallest_leaf_setting(
-    sum(DRUM_BACK_ADVANCE_STACK.values()) + RIG_MARGIN_SPARE
-)  # 1.25
-RIG_SET_LEAVES = leaf_pair(RIG_SET_LEAF_D)  # (1.00, 0.25)
 BACK_STOP_Z = G19_BACK_FACE_Z + RIG_SET_LEAF_D + STRAP_T
 # BACK_STOP_Z, the back block's inner face, is where every station below
 # derives from.  The U28 block put it at 77.75 (its outer face at the
@@ -338,18 +343,16 @@ if sum(TORQUE_SHAFT_BACK_BEARING_STACK.values()) < _BACK_BEARING_REQUIRED - 1e-9
 # rides wherever that puts it (BACK_CAM_PIN_STATION, from the collar's front
 # face).  The by-eye set to the pin it replaces had no feasible station once
 # the collar's .X length band was booked (Main, restricted review of #858).
-# F = 0.90 (user ruling): one step thicker than the thinnest leaf whose
-# tightest setting keeps the collar BACK_COLLAR_MIN_GAP + RIG_MARGIN_SPARE off
-# the block (0.85), so that row keeps 0.05 in hand.
+# F = .035 (user ruling: 0.90 on the metric set, which printed .035): the
+# thinnest setting whose tightest set keeps the collar BACK_COLLAR_MIN_GAP +
+# RIG_MARGIN_SPARE off the block, and one leaf.
 BACK_COLLAR_MIN_GAP = 0.5  # the collar never lands on the block but as the stop
 HUB_STOP_MARGIN = 0.25
-BACK_COLLAR_LEAF_F = 0.90
-if BACK_COLLAR_LEAF_F < smallest_leaf_setting(
-    BACK_COLLAR_MIN_GAP + RIG_MARGIN_SPARE + FEELER_SET_ERROR
-):
+BACK_COLLAR_LEAF_F = _leaves.thousandths(35)
+if BACK_COLLAR_LEAF_F < smallest_leaf_setting(BACK_COLLAR_MIN_GAP + RIG_MARGIN_SPARE):
     raise AssertionError("the back-collar leaf no longer covers its floor and spare")
-BACK_COLLAR_GAP_MIN = BACK_COLLAR_LEAF_F - FEELER_SET_ERROR  # 0.80
-BACK_COLLAR_GAP_MAX = BACK_COLLAR_LEAF_F + FEELER_SET_ERROR  # 1.00
+BACK_COLLAR_GAP_MIN = BACK_COLLAR_LEAF_F - FEELER_SET_ERROR  # 0.776
+BACK_COLLAR_GAP_MAX = BACK_COLLAR_LEAF_F + FEELER_SET_ERROR  # 1.002
 _STRAP_T_LOWER = printed_deviations(STRAP_T, STRAP_T_PLACES, unit=STRAP_UNIT)[0]
 BACK_CAM_PIN_STATION = CAM_LEN + BACK_COLLAR_LEAF_F - STRAP_T / 2.0  # 5.404
 # The deepest printed MHA-DT-16 bore seats the hub furthest onto the rod, so
@@ -492,14 +495,12 @@ LIFT_ROD_Z0 = BACK_BLOCK_OUTER_Z - LIFT_ROD_LEN
 # against the block's inner face and overhangs that end to meet the pad
 # (pinion_rig_fitup).  At the worst setting a thin strap (inner face 0.8
 # aft), the leaf's set error and the widest strip all move the blade's front
-# edge onto less flank.  F = 0.65 (Main's ruling, a stock leaf): one step
-# thicker than the thinnest leaf that keeps the pad SPRING_PAD_MIN_AIR +
-# RIG_MARGIN_SPARE off the block, so that row keeps 0.05 in hand.
+# edge onto less flank.  F = .026 (Main's ruling: 0.65 on the metric set, a
+# stock leaf, which printed .026): one step thicker than the thinnest leaf
+# that keeps the pad SPRING_PAD_MIN_AIR + RIG_MARGIN_SPARE off the block.
 SPRING_PAD_MIN_AIR = 0.25
-SPRING_PAD_LEAF = 0.65
-if SPRING_PAD_LEAF < smallest_leaf_setting(
-    SPRING_PAD_MIN_AIR + RIG_MARGIN_SPARE + FEELER_SET_ERROR
-):
+SPRING_PAD_LEAF = _leaves.thousandths(26)
+if SPRING_PAD_LEAF < smallest_leaf_setting(SPRING_PAD_MIN_AIR + RIG_MARGIN_SPARE):
     raise AssertionError("the spring pad leaf no longer covers its floor and spare")
 SPRING_PAD_AFT_Z = BACK_BLOCK_Z0 - SPRING_PAD_LEAF  # the pad's and the strip's
 SPRING_Z = SPRING_PAD_AFT_Z - SPRING_W / 2.0  # the strip's mid-plane
@@ -512,7 +513,16 @@ SPRING_BLADE_ON_FLANK_WORST = (
     - FEELER_SET_ERROR
     - printed_deviations(SPRING_W, SPRING_W_PLACES, unit=SPRING_UNIT)[1]
 )
-SPRING_PAD_TO_BLOCK_WORST = SPRING_PAD_LEAF - FEELER_SET_ERROR  # 0.55
+SPRING_PAD_TO_BLOCK_WORST = SPRING_PAD_LEAF - FEELER_SET_ERROR  # 0.548
+# Each of these settings books FEELER_SET_ERROR, a one-leaf stack's.
+for _name, _setting in (
+    ("front block feeler", FRONT_BLOCK_FEELER),
+    ("drum end shim", DRUM_END_SHIM),
+    ("back collar leaf F", BACK_COLLAR_LEAF_F),
+    ("spring pad leaf", SPRING_PAD_LEAF),
+):
+    if len(_leaves.leaf_stack(_setting)) != 1:
+        raise AssertionError(f"the {_name} is not one leaf of the set")
 for _name, _worst, _floor in (
     (
         "spring blade on the back strap flank",
