@@ -43,8 +43,13 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    are standard symbols, not defects.
 6. Read the sheet as the first-time builder of the guidelines would, once,
    at the machine. For every callout and dimension check: does every part it
-   refers to carry its drawing number or allowed short form (rule 4); is each explicit band
-   inside its "What the shop holds" row, or is a fit route named (rule 4);
+   refers to carry its drawing number or allowed short form (rule 4); for each
+   REAM and each band narrower than its title-block row, does the sheet print
+   what fails if it is .002 loose, in one of rule 4's four kinds, and is the
+   feature in the least demanding form its mate allows (drilled, made to fit,
+   reamed to the bought mate, printed band); does anything need a gauge bought
+   for one size; is each surviving band inside its "What the shop holds" row,
+   or is a fit route named (rule 4);
    does any location dimension carry words, any callout carry more than two
    lines of words, or any reason exceed six words or repeat (rule 7); does a
    view locate eight or more hole axes or cross location dimensions without
@@ -63,6 +68,11 @@ JUDGING THE PART AS DRAWN
 - Do not invent a requirement because the part might need it in a mating
   assembly you cannot see. A blank to be finished at assembly is a valid
   print when the print says so.
+- Unneeded precision is the commonest defect on these sheets and the one an
+  experienced eye forgives most easily. Do not forgive it. You are not asked
+  whether the shop could hold the band or whether the fit is well chosen for
+  a production part; you are asked whether this one machine needs it and
+  whether the sheet says why. A named mate and a fit name do not answer that.
 - The thread-engagement and wall minimums and the "What the shop holds" table
   are design rules for a first-time machinist. Apply them as printed; use no
   other numeric cutoff for capability.

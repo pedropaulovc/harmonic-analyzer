@@ -223,11 +223,28 @@ their sheet re-keys for another reason or the review leaf is force-refreshed.
   scale changes. The fixture's Material `LineLength` write
   was observed to persist without widening its wrapped text, so that ineffective
   write is removed for Material only; actual native bounds still decide fit.
-- **Fit-up at assembly (rule 19) is a last resort.** Slots, shims, cut-to-fit
-  and match-drilling open space for sloppy work, so avoid them as much as
-  possible: prefer geometry whose loose bands hold the stack at the worst
-  case. A stated fit-up adjustment is the escape hatch when the stack cannot
-  be held otherwise — never the design default.
+- **Fit-up of a stack at assembly (rule 19) is a last resort; fitting a pair
+  is the default (rule 4).** Slots, shims and cut-to-fit lengths that absorb
+  a multi-part stack open space for sloppy work: prefer geometry whose loose
+  bands hold the stack at the worst case. That does not apply to a single
+  fit. A shaft turned to its hole, a pin bonded in a drilled hole and a hole
+  reamed to the bought shaft are how this machine's fits are made (owner
+  direction 2026-11-23: "can the holes not be reamed in the first place").
+- **A spec constant that bands a fit carries its necessity.** A `*_BAND`,
+  `*_LIMITS` or fit class narrower than the title block states, in the
+  comment above it, what fails if it is `.002 in` loose and which module
+  computes it (a stack, a mesh check, `error_budget`). "Running fit", "the
+  reamer's band" and a fit-table row are not reasons. `error_budget.yaml`
+  already says it: a limit tighter than its allowable "is a fit, process or
+  capability choice, not a benchmark requirement".
+- **No tool or gauge is bought for one feature without an owner ruling.** A
+  plan that names a reamer outside the standard set, a plug gauge or a pin
+  pair for one band is a signal that the drawing is wrong: change the
+  feature's form (rule 4) before adding the inventory record.
+- **A REAM or tight band that fails rule 4's necessity test stays only by an
+  owner ruling**, declared as a `machinist_exceptions` entry (kind `accept`)
+  under the package's own key, quoting his words (see "Named exceptions").
+  The sheet prints no argument for it.
 - **Thread engagement (rule 18)** is owned by the CAD: the build's seat-fit
   and stack asserts enforce it. Through-tapped receivers use actual retained
   material and external full-form overlap, not blind drilling depths or raw
