@@ -127,10 +127,10 @@ rim_held_min_in = 0.583
 rim_held_max_in = 0.597
 # The floor's gross check: calipers flat on the floor read about .345 (the
 # flat ends .005 inside the corner), high if they ride the wall. A missed
-# or doubled nose allowance reads about .03 off; .335-.365 passes a good
-# floor and fails those.
+# or doubled nose allowance reads about .03 off; .335-.355 (the corner's
+# .34-.36 less the .005) passes a good floor and fails those.
 floor_flat_read_min_in = 0.335
-floor_flat_read_max_in = 0.365
+floor_flat_read_max_in = 0.355
 compound_check_travel_in = 0.3
 compound_check_rise_in = 0.095
 cone_compound_travel_in = 0.14
@@ -417,13 +417,13 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Rechuck the nut by its knurled head over the shim wrap, {{process.regrip_grip_in:.2dot}} in in the jaws (Holding line). Swing the compound {{cad.recess_flank_deg:.1f}}° off the cross slide (fed out, the tool goes toward the tailstock); set it with the indicator on the compound, plunger on the faced rim by the drilled hole: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends {{process.compound_check_rise_in:.3dot}}. Lock it; zero its dial. Turn the toolpost so the AR's chuck-side edge is 20°–25° off the face (never past 30°) and lock it."
-inspection = "Nut true: the test indicator on a .002 feeler leaf laid on the crests (it bridges the roots), the chuck turned by hand, .001 TIR or less; tap it true if not. Compound: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends {{process.compound_check_rise_in:.3dot}}; if not, re-swing and re-indicate before Op 200."
+instruction = "Rechuck the nut by its knurled head over the shim wrap, {{process.regrip_grip_in:.2dot}} in in the jaws (Holding line). Swing the compound {{cad.recess_flank_deg:.1f}}° off the cross slide (fed out, the tool goes toward the tailstock); set it with the indicator on the compound, plunger on the faced rim by the drilled hole: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends {{process.compound_check_rise_in:.3dot}}. Lock the swivel; wind the slide back in {{process.compound_check_travel_in:.3dot}} and zero its dial there. Turn the toolpost so the AR's chuck-side edge is 20°–25° off the face (never past 30°) and lock it."
+inspection = "Nut true: the test indicator on a .002 feeler leaf laid on the crests (it bridges the roots), the chuck turned by hand, .001 TIR or less; tap it true if not. Compound: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends {{process.compound_check_rise_in:.3dot}}, then back at its dial's zero for Op 200; if not, re-swing and re-indicate before Op 200."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped, through a .001 paper: AR on the faced rim, DRO Z +.001. On the knurl by each jaw in turn, the chuck rocked till the paper drags hardest (a crest): set X (diameter) to D0 + .002 at the first, read it at the other two, then add D0 + .002 less the three readings' mean."
+instruction = "Spindle stopped, through a .001 paper: AR on the faced rim, DRO Z +.001. On the knurl by each jaw in turn, the chuck rocked till the paper drags hardest (a crest): set X (diameter) to D0 + .002 at the first, read it at the other two; then, the tool still at the third, preset X to its reading plus (D0 + .002 − the three readings' mean)."
 feed = "hand"
 
 [[setups.operations]]
