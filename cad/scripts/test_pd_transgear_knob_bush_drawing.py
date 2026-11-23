@@ -632,3 +632,22 @@ def test_the_bush_is_cut_from_the_bought_five_eighths_bar() -> None:
             - (BUSH.BORE_DIA / 2.0) ** 2 * BUSH.LENGTH
         )
     )
+
+
+def test_the_pin_check_holds_the_bore_square_to_the_shoulder() -> None:
+    params = tomllib.loads(
+        (CAD_ROOT / "process" / "pd_transgear_knob_bush" / "plan.toml").read_text(
+            encoding="utf-8"
+        )
+    )["parameters"]
+    zone = float(spec.GEOMETRIC_TOLERANCES_IN["bore_perpendicularity"])
+    bore = (BUSH.LENGTH + BUSH.LENGTH_BAND) / 25.4
+    # The pin can lie tilted by its fit over its depth in the hole; each
+    # reading is twice the pin's offset from the spindle axis.
+    tilt = zone / bore - params["pin_fit_max_in"] / params["pin_depth_in"]
+    spacing = params["pin_far_in"] - params["pin_near_in"]
+    limit_mm = 2.0 * tilt * spacing * 25.4
+    assert 0.0 < params["pin_runout_sum_max_mm"] <= limit_mm
+    # A drill run off by the wall stack's budget reads well over the limit.
+    run_off = math.tan(math.radians(BUSH.DRILL_RUN_OFF_DEG))
+    assert 2.0 * run_off * spacing * 25.4 > 3.0 * limit_mm

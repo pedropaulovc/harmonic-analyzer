@@ -16,8 +16,16 @@
 # shoulder within the drill's run-off. MHA-PD-00 step 11 presses the bush
 # into MHA-PD-19 from face A and reams the B hole .2490-.2495 in place
 # (sheet: REAM THRU AFTER PRESSING IN MHA-PD-19); the reamer follows this
-# hole, so this chucking holds the WALL .068 MIN and the .002 perpendicularity
-# to A; the ream makes only the size.
+# hole and makes only the size, so the bore's axis is this drilled hole's.
+# The wall stack budgets the drill's run-off (DRILL_RUN_OFF_DEG) for the WALL
+# .068 MIN, but that run-off is wider than the bore's .002 perpendicularity to
+# A, so the drill does not hold the .002: Op 120 checks the drilled hole over
+# a gauge pin before part-off, still in the chucking that turned the
+# shoulder, and a bush whose hole has run off is scrapped there. No boring
+# bar on hand trues a Ø.24 hole 1.14 deep (cad/config/shop-equipment/
+# tools-cutting.toml: the MEDA 6045000 set's smallest bar is 3/8 in, the
+# S10R-SCLCR3 has a 10 mm shank, and the Micro 100 BB-180500S, to order,
+# reaches .500 deep), so the hole is not bored true.
 # Setup 2: the bush turned round, its hub in the 3-jaw over a shim wrap, the
 # parted end (the hub face) out: faced to .809 from the shoulder, read over a
 # .350 gauge block standing on the shoulder.
@@ -71,6 +79,23 @@ rough_radial_doc_mm = 0.5
 finish_radial_doc_mm = 0.05
 turn_feed_mm_rev = 0.0762
 turn_start_z_mm = 0.5
+# Op 120, the B hole's squareness to the shoulder over a gauge pin. The pin
+# is the largest minus pin of the set (gauges.toml pin-gauges, Class ZZ, .001
+# steps) that enters by hand, pushed in pin_depth_in; the indicator reads it
+# at pin_near_in and pin_far_in out of the rear face. The pin can lie in the
+# hole tilted by its fit: under the next size up plus the ZZ minus
+# tolerance, .001 + .0002, over pin_depth_in. The bore's Ø.002 zone over its
+# longest length (1.145) allows .002/1.145 of tilt; less the pin's
+# .0012/1.00 that leaves .00055, and each reading is twice the pin's offset
+# from the spindle axis, so the two readings added are at least twice the
+# tilt times the stations' .80 spacing: .00088 in (.022 mm), set down to
+# .020 mm on the 0.001 mm indicator. test_pd_transgear_knob_bush_drawing
+# holds it to the spec and the geometry.
+pin_depth_in = 1.0
+pin_near_in = 0.1
+pin_far_in = 0.9
+pin_fit_max_in = 0.0012
+pin_runout_sum_max_mm = 0.02
 # The feeler leaf the tools are touched through (the shop's feeler gauges,
 # cad/config/shop-equipment/gauges.toml feeler-gauges).
 touch_leaf_in = 0.002
@@ -107,6 +132,17 @@ ref = "plug-gauges-4375-4382"
 status = "to_order"
 
 [[tools]]
+id = "pins"
+name = "Minus pin gauges (the size the B hole takes)"
+ref = "pin-gauges"
+status = "to_order"
+
+[[tools]]
+id = "dti"
+name = "Lever test indicator on its magnetic base"
+ref = "dti"
+
+[[tools]]
 id = "blocks"
 name = "Gauge blocks (the .350)"
 ref = "gauge-blocks-mitutoyo"
@@ -127,7 +163,7 @@ title = "Bar, rear end out: turn the hub, the press diameter and the shoulder, d
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts. The bar stays in the jaws from Op 10 to Op 120: the press diameter, the shoulder and the B hole share this chucking."
+holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts. The bar stays in the jaws from Op 10 to Op 140: the press diameter, the shoulder and the B hole share this chucking."
 datum = "Z0 (carriage DRO): the bar end faced in Op 10, the bush's rear face. The shoulder (datum A) is at Z{{cad.step_far_out_far_z_mm:in.3dot}}, the hub face {{cad.length_in:.3dot}} in."
 diagram = { file = "diagrams/bar.svg", alt = "The 5/8 in bar in the 3-jaw, rear end out: the rear face faced, the hub turned back past the parting line, the press diameter turned back to the shoulder, the B hole drilled through past the parting line; the bush parted off .02 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}", support = "none" }
@@ -249,6 +285,22 @@ peck = { step_mm = 6.0452, retract = "full" }
 
 [[setups.operations]]
 cut_kind = "other"
+speed_kind = "other"
+tool = "dti"
+drilling = "none"
+sizing = "other"
+instruction = "Spindle stopped, tailstock back. The B hole's squareness to the shoulder, which was turned in this chucking: find the largest minus pin of the set that enters the hole by hand (the next size up does not) and push it {{process.pin_depth_in:.2dot}} in into the rear face, calipers' depth rod. Lever indicator on the carriage, its tip on top of the pin at {{process.pin_near_in:.2dot}} out of the rear face (DRO Z), then at {{process.pin_far_in:.2dot}} out; at each, turn the chuck by hand one full turn and read the movement. Pull the pin."
+inspection = "The two movements added: at most {{process.pin_runout_sum_max_mm:.3f}} mm on the 0.001 mm indicator. That holds the bore's perpendicularity Ø{{cad.bore_perpendicularity_in:.3dot}} to A over its length, with the pin's fit in the hole, up to {{process.pin_fit_max_in:.4dot}}, charged against it: MHA-PD-00 step 11's ream follows this hole and makes only the size."
+gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{process.pin_runout_sum_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Over {{process.pin_runout_sum_max_mm:.3f}} mm in Op 120: the B hole has run off; part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
 speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
@@ -264,7 +316,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a shim wrap of brass shim, {{process.regrip_grip_in:.2dot}} in of the hub in the jaws from the shoulder (a pencil line that far from it at the jaw fronts), the wrap cut no wider than that, the press diameter clear of the jaws behind it; the parted end (the hub face) out. Nothing seats the bush axially."
-datum = "Z0 (carriage DRO): the hub face as faced in Op 140, {{cad.shoulder_in:.3dot}} from the shoulder, preset in Op 130 from the shoulder's reading over the .350 gauge block through a {{process.touch_leaf_in:.3dot}} feeler leaf."
+datum = "Z0 (carriage DRO): the hub face as faced in Op 160, {{cad.shoulder_in:.3dot}} from the shoulder, preset in Op 150 from the shoulder's reading over the .350 gauge block through a {{process.touch_leaf_in:.3dot}} feeler leaf."
 diagram = { file = "diagrams/regrip.svg", alt = "The bush turned round, its hub in the jaws over a shim wrap with nothing behind it: the parted end faced to the shoulder station." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_datum_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
@@ -291,7 +343,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.shoulder_band_mm}}" },
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Shoulder over {{cad.shoulder_max_in:.3dot}} in Op 140: chuck it again as Op 130 and repeat Ops 130–140 from that reading. Under {{cad.shoulder_min_in:.3dot}}, or the length outside its band with the shoulder in: scrapped, not reworked; make another from Setup 1."
+instruction = "Shoulder over {{cad.shoulder_max_in:.3dot}} in Op 160: chuck it again as Op 150 and repeat Ops 150–160 from that reading. Under {{cad.shoulder_min_in:.3dot}}, or the length outside its band with the shoulder in: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups]]
