@@ -14,7 +14,9 @@
 # opened, so it runs true to the spindle): its end faced square, a pilot
 # turned a light press in the gauged bore and relieved at its root, its body
 # stepped down behind the shoulder so the spacer's rim overhangs it. The
-# spacer pushed on, parted face to the shoulder, by the tailstock dead centre:
+# spacer pushed on, parted face to the shoulder, by a flat pusher in the
+# tailstock drill chuck (a dead centre's point would land on the pilot's
+# solid tip, which stands below the spacer's face, before the spacer seats):
 # its front face skimmed clean; pushed off by the parting blade on the
 # overhang, turned round, pushed on front face to the shoulder, the rear
 # face faced to length from the shoulder's DRO station. Each face is faced
@@ -74,7 +76,7 @@ finish_radial_doc_mm = 0.05
 turn_feed_mm_rev = 0.1016
 turn_start_z_mm = 0.5
 # Setup 2's stub mandrel (authored). The pilot is fitted to the spacer (a
-# light press: it starts by hand and the dead centre pushes it home); its
+# light press: it starts by hand and the flat pusher pushes it home); its
 # aim, .0002-.0005 over the gauged bore's top limit, is printed as an aim
 # only. Enough to hold a light facing skim, pushed off at the carriage; .15 long, under the spacer's
 # length so the facing tool never meets it. Its root relieved by the P1
@@ -123,11 +125,6 @@ id = "plugs"
 name = "Plug gauges .1855 GO, .1860 NO-GO"
 ref = "plug-gauges-1855-1860"
 status = "to_order"
-
-[[tools]]
-id = "dead-centre"
-name = "MT3 dead centre"
-ref = "dead-centre-mt3"
 
 [[tools]]
 id = "feelers"
@@ -252,10 +249,10 @@ title = "Stub mandrel on the bar: face both ends of the spacer square to its bor
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "The bar left in the 3-jaw from Setup 1, the jaws not opened: a stub mandrel turned on its end runs true to the spindle. The spacer pushed onto the mandrel's pilot by the MT3 dead centre in the tailstock quill, spindle stopped, the centre's point in the bore's mouth, until the face toward the chuck seats on the mandrel's shoulder; its rim overhangs the shoulder all round."
+holding = "The bar left in the 3-jaw from Setup 1, the jaws not opened: a stub mandrel turned on its end runs true to the spindle. The spacer pushed onto the mandrel's pilot by a flat pusher in the tailstock drill chuck, spindle stopped, until the face toward the chuck seats on the mandrel's shoulder; its rim overhangs the shoulder all round."
 datum = "Z0 (carriage DRO): the spacer's rear face as finished in Op 190, {{cad.length_in:.3dot}} out from the mandrel's shoulder: set by touching the AR on the shoulder, faced in Op 110, and setting DRO Z-{{cad.length_in:.3dot}} there. The P1 blade (Ops 120, 180) works from its own holder: the AR's holder comes off and goes back on the toolpost dovetail with its height nut untouched, and the AXA post returns it within about .0005 in Z, inside the ±.002 length band."
 diagram = { file = "diagrams/mandrel.svg", alt = "The bar stub in the 3-jaw turned into a stub mandrel: shoulder faced, body stepped down behind it, pilot with a root relief; the spacer pushed on, front face to the shoulder, its rear face faced to Z0, a lever indicator on it." }
-lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = 8.38, minimum_diameter_mm = 4.73, support = "none" }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = 8.38, minimum_diameter_mm = 4.318, support = "none" }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -300,11 +297,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-speed_kind = "other"
-tool = "dead-centre"
-drilling = "none"
-sizing = "other"
-instruction = "Spindle stopped: start the spacer on the pilot parted face first, and wind the tailstock quill to push it on with the dead centre's point in the bore's mouth until it seats on the shoulder; withdraw the tailstock."
+instruction = "The pusher: a 1 in offcut hacksawn from the 1/2 in bar, its sawn end filed flat and its edges broken, the other end in the tailstock drill chuck. Spindle stopped: start the spacer on the pilot parted face first, bring the pusher's flat end onto the spacer's face (the pilot's tip stands about .07 below that face, so only the spacer is pushed) and wind the quill until the spacer seats on the shoulder; withdraw the tailstock."
 inspection = "Seated: a {{process.seat_leaf_in:.3dot}} leaf does not enter between the spacer and the shoulder."
 gauge_checks = "other"
 feed = "hand"

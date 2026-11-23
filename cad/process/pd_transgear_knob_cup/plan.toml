@@ -259,7 +259,7 @@ machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a shim wrap of brass shim, {{process.regrip_grip_in:.2dot}} in of the outside in the jaws from the front face (a pencil line that far from it at the jaw fronts), the wrap cut no wider than that, closed lightly (the pilot's wall is about .095); the parted end about .20 in out. Nothing seats the cup axially."
 datum = "Z0 (carriage DRO): the rear face, {{cad.rear_face_length_in:.2dot}} from the front face, preset from the length miked in Op 120 through a {{process.touch_leaf_in:.3dot}} feeler leaf. The pocket's depth runs from it by the tailstock quill scale."
 diagram = { file = "diagrams/regrip.svg", alt = "The cup turned round, its front end in the jaws over a shim wrap: the parted end faced to length, the 3/16 end mill plunged from the tailstock for the head pocket over the #33 hole." }
-lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outside_dia_mm}}", stock_diameter_mm = "{{cad.outside_dia_mm}}", stickout_mm = 5.59, minimum_diameter_mm = "{{cad.outside_dia_mm}}", support = "none" }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outside_dia_mm}}", stock_diameter_mm = "{{cad.outside_dia_mm}}", stickout_mm = 5.08, minimum_diameter_mm = "{{cad.outside_dia_mm}}", support = "none" }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -340,7 +340,13 @@ gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.web_hole_dia_band_mm}}"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A cup failing Op 200 is scrapped, not reworked: make another from Setup 1."
+instruction = "Pilot again, after Setup 2's jaws held it: the {{cad.pilot_dia_min_in:.4dot}} GO plug enters to the floor, the {{cad.pilot_dia_max_in:.4dot}} NO-GO plug does not, each tried at three places round the mouth (a jaw-pressed wall closes the pilot)."
+inspection = "Pilot Ø{{cad.pilot_dia_min_in:.4dot}}–{{cad.pilot_dia_max_in:.4dot}} (the bond gap on {{cad.pilot_mate}})."
+gauge_checks = [{ gauge = "plug-gauges-2500-2510", band_mm = "{{cad.pilot_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A cup failing Op 200 or Op 210 is scrapped, not reworked: make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]

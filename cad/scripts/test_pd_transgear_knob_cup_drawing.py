@@ -544,3 +544,20 @@ def test_declarations_print_the_sheets_bands_and_supply_sizes() -> None:
     assert features["rear_face"]["supply"] and features["pilot"]["supply"]
     assert features["front_face"]["faced_at"] == "assembly"
     assert manifest["notes"]["manufacturing"] == drawing.NOTES.splitlines()
+
+
+def test_the_travelers_name_the_assembly_steps_they_leave_work_for():
+    # The cup's and the bush's travelers print MHA-PD-00's step numbers as
+    # text; they must follow the assembly sequence when steps are inserted.
+    import re
+
+    import pd_paper_drive_assembly_steps as steps
+
+    process = Path(__file__).resolve().parents[1] / "process"
+    for stem, key in (
+        ("pd_transgear_knob_cup", "knob-stack-fitted"),
+        ("pd_transgear_knob_bush", "pin-pressed"),
+    ):
+        text = (process / stem / "plan.toml").read_text(encoding="utf-8")
+        cited = set(re.findall(r"MHA-PD-00 step (\d+)", text))
+        assert cited == {str(steps.step_number(key))}, stem
