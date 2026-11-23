@@ -130,6 +130,11 @@ resolution_mm = 0.001016
 [gauges.plug-gauges-3760-3765]
 range_mm = [9.5504, 9.5631]
 resolution_mm = 0.001016
+# MHA-DT-20's pivot bore pair (.2500/.2505; tools row in shop/dt.toml;
+# cad/config/shop-equipment/ gauges, same key, to buy).
+[gauges.plug-gauges-2500-2505]
+range_mm = [6.35, 6.3627]
+resolution_mm = 0.001016
 
 [gauges.height-gauge]
 range_mm = [0.0, 304.8]
@@ -620,6 +625,12 @@ description = "Round adjustable split dies, HSS, 13/16 in OD: #0-80 UNF and #4-4
 [tools.endmill-carbide-3-32]  # MHA-PD-27 flat floor for the Ø.110 counterbore; MHA-CH-03 .106 ±.002 fork slot
 description = "3/32 in square carbide end mill, .47 in or more of reach"
 diameter_mm = 2.38125
+[tools.endmill-hss-2fl-1-4]  # inventory tools.endmill-hss-2fl-1-4; MHA-DT-16 and the MHA-PD-16 pilot's flat floor (#2425)
+description = "1/4 in HSS 2-flute square end mill, 5/8 in LOC (McMaster 3051A51)"
+diameter_mm = 6.35
+[tools.drill-27-64]  # 115-piece index; MHA-DT-27 winding mandrel (shank) and the MHA-PD-19 press hole's pre-drill (#2425)
+description = "27/64 (.4219 in) drill, 115-piece index"
+diameter_mm = 10.715625
 [tools.feeler-gauges]  # inventory gauges.feeler-gauges
 description = "Pittsburgh SAE/metric feeler gauge set, 32 pieces"
 [tools.form-tool-r070]  # MHA-PD-23 R.07 shank-end dome; MHA-MG-07 R.07 tip
@@ -692,6 +703,8 @@ description = "Junior hacksaw, 6 in blade, 32 TPI"
 # owner 2026-11-19).
 [stock.1018-flat-1-2x2-1-4]
 description = "1018 cold-finish carbon steel, flat bar, 1/2 x 2-1/4 in"
+[stock.1018-flat-1-8x1-1-2]
+description = "1018 cold-finish carbon steel, flat bar, 1/8 x 1-1/2 in"
 [stock.1018-flat-3-8x1-1-4]
 description = "1018 cold-finish carbon steel, flat bar, 3/8 x 1-1/4 in"
 [stock.1018-ground-round-1-4]
@@ -706,8 +719,10 @@ description = "1018 cold-finish carbon steel, round bar, 3/8 in"
 description = "1018 cold-finish carbon steel, round bar, 5/8 in"
 [stock.1018-square-3-4]
 description = "1018 cold-finish carbon steel, square bar, 3/4 x 3/4 in"
-[stock.6061-flat-1-2x6-54in]  # moved from ch.toml: the MHA-CH-13-TL-01 sub-plate and the MHA-SM-01 bend form
+[stock.6061-flat-1-2x6-54in]
 description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 54 in length"
+# The amplitude bar's riser (cad/process/ch_amplitude_bar, Setup 1) is sawn
+# from this bar: its plan's stock_refs names it.
 [stock.c360-flat-3-4x1-1-4]
 description = "C36000 free-machining brass (360-H02, extruded), flat bar, 3/4 x 1-1/4 in"
 [stock.c360-round-1-4]

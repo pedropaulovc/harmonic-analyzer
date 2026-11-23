@@ -34,6 +34,14 @@ name = "Loctite 638 retaining compound (archived inventory)"
 kind = "retaining_compound"
 status = "on_hand"
 
+# #2425 (owner ruling 2026-11-20 (Pedro)): the MHA-PD-16 knob cup's bonded
+# pilot on the MHA-PD-08 journal end; 641 is the removable grade
+# (drawing-guidelines.md, retention: "641 where the part must come out").
+[consumables.loctite-641]
+name = "Loctite 641 retaining compound"
+kind = "retaining_compound"
+status = "to_order"
+
 [consumables.epoxy-30-minute]
 name = "30-minute epoxy"
 kind = "adhesive"

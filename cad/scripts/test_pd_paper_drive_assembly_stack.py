@@ -32,6 +32,7 @@ import pd_transgear_disc_hub_geometry as DISC_HUB_GEOM
 import pd_transgear_disc_hub_spec as DISC_HUB
 import pd_transgear_drive_collar_spec as COLLAR
 import pd_transgear_feed_pinion_spec as FEED
+import pd_transgear_knob_bush_geometry as BUSH
 import pd_transgear_knob_cup_spec as CUP
 import pd_transgear_knob_shaft_spec as KNOB_SPEC
 import pd_transgear_knob_thrust_ring_spec as RING
@@ -41,7 +42,7 @@ import pd_transgear_rear_bushing_spec as REAR_BUSHING
 import pd_transgear_removable_spec as REMOVABLE
 import pd_vn_transgear_arm_plate_locating_pin_spec as LOCATING_PIN
 import pd_vn_transgear_hub_key_pin_spec as HUB_KEY_PIN
-import pd_vn_transgear_knob_cup_pin_spec as CUP_PIN
+import pd_vn_transgear_knob_cup_screw_spec as CUP_SCREW
 import pd_vn_transgear_knob_drive_pin_spec as KNOB_PIN
 import pd_vn_transgear_latch_pin_spec as LATCH_PIN
 import transgear_cluster_fit as CLUSTER
@@ -229,33 +230,63 @@ def _knob_collar_and_drive_pins(paper) -> None:
     assert COLLAR.PIN_CIRCLE_RADIUS == seat_geometry.PIN_CIRCLE_RADIUS, (
         "the collar's pin circle is not the removable's"
     )
+    # #2425: the thrust ring's rear face on the MHA-PD-28 bush's hub face, the
+    # bush's shoulder on the plate's face A.
+    assert abs(paper.KNOB_RING_Z0 + RING.LENGTH - paper.KNOB_BUSH_Z0) <= 1e-9, (
+        "the thrust ring does not reach the knob bush's hub face"
+    )
+    assert abs(paper.KNOB_BUSH_Z0 + BUSH.HUB_LENGTH - paper.PLATE_Z0) <= 1e-9, (
+        "the knob bush's shoulder is off the plate's face A"
+    )
+    assert abs(paper.KNOB_BUSH_REAR_Z - paper.KNOB_BUSH_Z0 - BUSH.LENGTH) <= 1e-9, (
+        "the knob bush's rear face is off its length from the hub face"
+    )
+    # The cup's front face END_FLOAT behind the bush's rear face (faced to it at
+    # fit-up); the journal's end its stand-out behind that face, in the pilot.
+    assert abs(paper.KNOB_END_FLOAT - KNOB_SPEC.END_FLOAT) <= 1e-9
     assert (
-        abs(paper.KNOB_RING_Z0 + RING.LENGTH - (paper.PLATE_Z0 + ARM_PLATE.HUB_FACE_Z))
+        abs(
+            paper.KNOB_SHAFT_REAR_Z
+            - paper.KNOB_BUSH_REAR_Z
+            - KNOB_SPEC.JOURNAL_STANDOUT
+        )
         <= 1e-9
-    ), "the thrust ring does not reach the arm plate's hub face"
-    KNOB_CUP_REAR_Z = paper.KNOB_CUP_Z0 + CUP.LENGTH  # -99.6607
-    assert paper.KNOB_CUP_Z0 < paper.KNOB_SHAFT_REAR_Z < KNOB_CUP_REAR_Z, (
-        "the knob shaft's rear end is not inside the knob cup"
-    )
-    assert paper.KNOB_CUP_PIN_Z0 + CUP_PIN.HOLE_MAX / 2.0 < paper.KNOB_SHAFT_REAR_Z, (
-        "the knob cup's pin hole runs off the journal's end"
-    )
+    ), "the journal's end is off its stand-out behind the bush's rear face"
+    KNOB_CUP_REAR_Z = paper.KNOB_CUP_Z0 + CUP.LENGTH
+    assert (
+        paper.KNOB_CUP_Z0
+        < paper.KNOB_SHAFT_REAR_Z
+        <= paper.KNOB_CUP_Z0 + CUP.PILOT_DEPTH
+    ), "the knob shaft's rear end is not inside the knob cup's pilot"
+    # MHA-PD-VN-71: under its head on the web's rear face (the counterbore
+    # floor), its head inside the cup, its fully threaded shank through the
+    # web into the journal's tap: rule 18 engagement, tip short of the tap's
+    # full thread.
+    assert abs(paper.KNOB_CUP_SCREW_Z0 - (KNOB_CUP_REAR_Z - CUP.CBORE_DEPTH)) <= 1e-9
+    assert paper.KNOB_CUP_SCREW_Z0 + CUP_SCREW.HEAD_H <= KNOB_CUP_REAR_Z
+    engaged = paper.KNOB_SHAFT_REAR_Z - (paper.KNOB_CUP_SCREW_Z0 - CUP_SCREW.LENGTH)
+    assert abs(engaged - paper.KNOB_CUP_SCREW_ENGAGED) <= 1e-9
+    assert (
+        KNOB_SPEC.ENGAGEMENT_FLOOR_D * CUP_SCREW.MAJOR_DIA
+        <= engaged
+        <= KNOB_SPEC.REAR_TAP_FULL_THREAD_MIN
+    ), f"the cup screw engages {engaged:.4f} of the journal's tap"
     # F, the knob shaft's 15T front face (the drive collar's seat), stands the
-    # plate hub face, thrust ring and 15T chain ahead of the arm's rear face.
+    # bush's hub, thrust ring and 15T chain ahead of the arm's rear face.
     # The disc is not fitted to it: the cluster's stack places the disc from the
     # same rear face (transgear_cluster_fit), and the model's m is the cluster
     # rearward, m_fwd plus the model's shimmed end float.
     _F_FROM_ARM_Z = (
         paper.ARM_Z0
         + ARM.THICKNESS
-        + ARM_PLATE.HUB_FACE_Z
+        - BUSH.HUB_LENGTH
         - RING.LENGTH
         - KNOB_SPEC.FACE_WIDTH
     )
     assert (
         abs(_F_FROM_ARM_Z - paper.KNOB_SHAFT_Z0) <= 1e-9
         and abs(CLUSTER.F_Z - paper.KNOB_SHAFT_Z0) <= 1e-9
-    ), "F is off the arm, plate hub and thrust ring chain"
+    ), "F is off the arm, bush hub and thrust ring chain"
     assert abs(paper.DISC_Z0 - paper.KNOB_SHAFT_Z0 - CLUSTER.MODEL_M) <= 1e-9, (
         "the model's disc is off the cluster stack's station from F"
     )

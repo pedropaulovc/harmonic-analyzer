@@ -190,7 +190,7 @@ cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2
 [stock.1018-round-5-8]
 form = "round_bar"
 material = "1018 cold-finish carbon steel"
-note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4794, 5/8 in round 1018 CF, 1 x 48 in, $14.47. Item notes: Drawing Number: MHA-DT-04, MHA-DT-22, MHA-DT-33, MHA-DT-23 | Custom Part: dt-cone-gear-shaft, dt-pinion-arbor, dt-pinion-arbor-collar, dt-pinion-cam."
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4794, 5/8 in round 1018 CF, 1 x 48 in, $14.47. Item notes: Drawing Number: MHA-DT-04, MHA-DT-22, MHA-DT-33, MHA-DT-23 | Custom Part: dt-cone-gear-shaft, dt-pinion-arbor, dt-pinion-arbor-collar, dt-pinion-cam. Also allocated: MHA-PD-28 pd-transgear-knob-bush, turned from this bar (owner ruling 2026-11-20 (Pedro), #2425; registry process)."
 dia_in = [0.625]
 length_in = [48]
 status = "on_hand"

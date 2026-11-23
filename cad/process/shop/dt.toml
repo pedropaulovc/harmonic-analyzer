@@ -53,9 +53,6 @@ diameter_mm = 9.5758
 [tools.drill-7-16]  # Drills 7/16
 description = "7/16 (.4375 in) drill, 115-piece index"
 diameter_mm = 11.1125
-[tools.drill-27-64]  # 115-piece index; MHA-DT-27 winding mandrel (shank)
-description = "27/64 (.4219 in) drill, 115-piece index"
-diameter_mm = 10.715625
 [tools.drill-15-32]  # Drills 15/32
 description = "15/32 (.4688 in) drill, 115-piece index"
 diameter_mm = 11.90625
@@ -115,9 +112,6 @@ description = "Shop-made fly cutter bar MHA-DT-37-TL-02 for the cone tip gear fo
 description = "Shop-made form cutter MHA-DT-37-TL-01 for the MHA-DT-37 tooth space"
 [tools.dt-cylinder-gear-cam-fixture]  # MHA-DT-12 cam throw .3402 ±.0020
 description = "Shop-made cam turning fixture MHA-DT-12-TL-01 (stub, clamp, clock pin) for the MHA-DT-12 cams"
-[tools.endmill-hss-2fl-1-4]  # inventory tools.endmill-hss-2fl-1-4
-description = "1/4 in HSS 2-flute square end mill, 5/8 in LOC (McMaster 3051A51)"
-diameter_mm = 6.35
 [tools.follow-rest-pm-1127]  # inventory fixtures.follow-rest-pm-1127
 description = "PM-1127VF-LB follow rest"
 [tools.needle-files-swiss]  # MHA-DT-37-TL-01 file the tooth-space form (.0114-.0323)
@@ -373,3 +367,30 @@ description = "Plug gauge pair, .0630 GO (plus) and .0635 NO-GO (minus), Vermont
 # plan list the pair in its tooling.
 [tools.plug-gauges-3760-3765]
 description = "Plug gauge pair, .3760 GO (plus) and .3765 NO-GO (minus), Vermont Gage Class X"
+
+# --- MHA-DT-20 cone swing platform (cad/process/dt_cone_swing_platform/plan.toml) ---
+# The pivot bore, Ø.2500 +.0005/.0000 REAM THRU (a running fit on the
+# MHA-DT-VN-52 shoulder): a fixed .2500 chucking reamer, not the adjustable
+# set (owner ruling 2026-11-20, #3073: a fixed reamer for each running/press
+# fit). Not owned: to buy (cad/config/shop-equipment/ tools-reamers-taps,
+# same key). diameter_mm is its nominal size.
+[tools.reamer-2500]
+description = ".2500 in HSS chucking reamer"
+diameter_mm = 6.35
+# Go/no-go pair for that bore (.2500-.2505), as the .2510-.2515 pair above:
+# Vermont Gage standard Class X steel pin/plug gages, .2500 GO (plus
+# tolerance) and .2505 NO-GO (minus tolerance), each ± .000040 in (=
+# 0.001016 mm, the resolution; the [gauges] table is in common.toml). Not
+# owned: to buy (cad/config/shop-equipment/ gauges, same key).
+[tools.plug-gauges-2500-2505]
+description = "Plug gauge pair, .2500 GO (plus) and .2505 NO-GO (minus), Vermont Gage Class X"
+# The platform's Setups 3-4 spoil plate: the freed 1/2 x 6 x 18 in bar
+# (stock-bought, same key, on hand), whole. Description only, as the stock
+# records above.
+[stock.6061-flat-1-2x6-18in]
+description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 18 in length"
+
+# The platform's assembly shims (owner ruling 2026-11-22, issue #3363):
+# description only; the record is fixtures.shim-washers-1-4-id-arbor-19.
+[tools.shim-washers-1-4-id-arbor-19]
+description = "Steel arbor shim assortment, 1/4 in ID x 3/8 in OD, .001-.125 in, Precision Brand 25100"

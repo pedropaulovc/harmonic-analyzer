@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="20">Setup 2 (plan view): hub end overhanging; seat, R.50 round, anchor hole, mark spot</text>
+  <rect class="clamp" x="142" y="94" width="438" height="26"/>
+  <rect class="clamp" x="142" y="190" width="438" height="26"/>
+  <rect class="part-kept" x="30" y="120" width="298" height="70"/>
+  <path class="part-removed" d="M 30 120 L 76 120 A 35 35 0 0 0 76 190 L 30 190 Z"/>
+  <circle class="holes" cx="76" cy="155" r="27"/>
+  <circle class="holes" cx="131" cy="128" r="3"/>
+  <circle class="holes" cx="54" cy="133" r="2"/>
+  <rect class="fixture-support" x="474" y="120" width="105" height="70"/>
+  <line class="leader" x1="527" y1="240" x2="527" y2="155"/>
+  <text class="label" x="488" y="254">spacer at the jaws' right ends</text>
+  <line class="leader" x1="161" y1="60" x2="131" y2="128"/>
+  <text class="label" x="165" y="58">anchor #50</text>
+  <line class="leader" x1="48" y1="60" x2="54" y2="133"/>
+  <text class="label" x="20" y="54">mark spot</text>
+  <line class="leader" x1="373" y1="60" x2="373" y2="107"/>
+  <text class="label" x="377" y="58">fixed jaw (T edge against it)</text>
+  <text class="label" x="30" y="286">X0 the blank's left end; it overhangs the jaws' left ends 1.55–1.65</text>
+  <text class="label" x="20" y="348">Hatched: removed in CA01; holes white. Every cut lies left of the jaws and the parallels.</text>
+</svg>

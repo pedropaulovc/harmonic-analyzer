@@ -1296,11 +1296,10 @@ Pure physical part specifications keep interface grades and tooth/hole datum
 geometry independent of calibration publication. They must not import a
 qualification gate even inside a function: recipe dependencies include the
 complete lexical import closure. `transgear_cluster_fit` reads the geometry-owned
-`pd_transgear_arm_plate_geometry.HUB_FACE_TO_MOUNTING_BAND`, derived from
-`HUB_STATION_PLACES = 3` through the existing `printed_band_mm` title-block reader,
-not the annotation-rich plate specification or the `ARM.BAND_XXX` wall-band
-literal. The plate specification consumes that same geometry-owned precision,
-without a public alias. `dt_crank_pinion_spec` and `dt_crankshaft_spec`
+`pd_transgear_knob_bush_geometry.HUB_LENGTH_BAND` (the cluster's `FIT_LENGTH_BAND_IN`)
+and `SHOULDER_SEAT_GAP_MAX`, not the annotation-rich bush specification or the
+`ARM.BAND_XXX` wall-band literal. The bush build consumes that same
+geometry-owned band, without a public alias. `dt_crank_pinion_spec` and `dt_crankshaft_spec`
 therefore supply physical data without pulling cone/crank qualification into PD
 interface consumers. `crank_mesh_stack.require_selected_pin_clocking()` owns the
 current-source phase gate; native crankshaft and DT assembly callers retain it

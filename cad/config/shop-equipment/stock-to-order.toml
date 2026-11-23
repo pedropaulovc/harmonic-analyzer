@@ -43,6 +43,15 @@ length_mm = 304.8
 status = "to_order"
 cite = ["OnlineMetals part 7482 https://www.onlinemetals.com/en/buy/carbon-steel/0-375-x-0-5-carbon-steel-rectangle-bar-1018-cold-finish/pid/7482 read live 2026-11-10: 3/8 x 1/2 1018 cold finish, ASTM A108, 12 in $4.80", "MHA-PD-11 sheet and pd_platen_guide_spec: GUIDE_HEIGHT .29 at .XX, GUIDE_DEPTH .40 +.00/-.01, length 10.62, quantity 2"]
 
+[stock.1018-flat-1-4x1-1-2]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "To order: 1/4 x 1-1/2 in 1018 CF flat, 1 piece x 12 in. Allocation: pd-transgear-arm-plate (MHA-PD-19): faced to .197 and its 1.50-wide outline milled from the bar (owner ruling 2026-11-20 (Pedro), #2425). Price not read: the product page refused the live read (HTTP 403, 2026-11-20); the part number is from the OnlineMetals search listing. Not owned."
+section_mm = [38.1, 6.35]
+length_mm = 304.8
+status = "to_order"
+cite = ["OnlineMetals part 7467 https://www.onlinemetals.com/en/buy/carbon-steel/0-25-x-1-5-carbon-steel-rectangle-bar-1018-cold-finish/pid/7467 (search listing 2026-11-20: 1/4 x 1-1/2 1018 cold finish; price not read)", "cad/config/parts/pd-transgear-arm-plate.yaml material_specification", "cad/scripts/pd_transgear_arm_plate_geometry.py WIDTH, THICKNESS_OVER_ARM"]
+
 # Ground rod for the five Ø.2500/Ø.3750 +.0000/-.0008 shafts (owner ruling
 # 2026-11-20, #2346: "Buy ground rod; it costs little and leaves the fit
 # stacks alone"). Cold-finished round is about +.000/-.002 as drawn and can

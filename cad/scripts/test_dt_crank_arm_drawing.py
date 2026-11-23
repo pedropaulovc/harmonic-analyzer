@@ -458,3 +458,83 @@ def test_arm_stock_sizes_print_as_supplier_fractions() -> None:
     (x0, y0), (x1, y1) = drawing.THICKNESS_PICKS
     assert y0 == y1 == drawing.RIGHT_CENTER[1]
     assert (x1 - x0) * 1000.0 == pytest.approx(spec.ARM_THICKNESS * drawing.SHEET_SCALE[0])
+
+
+# The SolidWorks face inventory (``<dashed>.faces.json``, metres) of the part
+# as built at origin/main ad92cf646d: identity, parameters, outward normal
+# and box per face, in the exporter's FaceGeometry form.
+_ARM_FACES = (
+    (4002, (0.0, 0.0, 0.0079375, 0.0, 0.0, -1.0, 0.0127), None, (-0.0127, -0.0127, 0.0, 0.0, 0.0127, 0.0079375)),
+    (4001, (0.0, 0.0, 1.0, 0.0, 0.0, 0.0), (0.0, 0.0, -1.0), (-0.0127, -0.0127, 0.0, 0.08763, 0.0127, 0.0)),
+    (4001, (0.0, 0.0, 1.0, 0.0, 0.0, 0.0079375), (0.0, 0.0, 1.0), (-0.0127, -0.0127, 0.0079375, 0.08763, 0.0127, 0.0079375)),
+    (4002, (0.0, 0.0, -0.02, 0.0, 0.0, 1.0, 0.009652), None, (-0.009652, -0.009652, 0.0, 0.009652, 0.009652, 0.0079375)),
+    (4001, (0.0, 0.0, 1.0, -0.007874, 0.007874, 0.0077375), (0.0, 0.0, 1.0), (-0.008274, 0.007474, 0.0077375, -0.007474, 0.008274, 0.0077375)),
+    (4002, (-0.007874, 0.007874, 0.0077375, 0.0, 0.0, 1.0, 0.0004), None, (-0.008274, 0.007474, 0.0077375, -0.007474, 0.008274, 0.0079375)),
+    (4001, (0.0, 1.0, 0.0, 0.0, -0.0127, 0.0079375), (0.0, -1.0, 0.0), (0.0, -0.0127, 0.0, 0.07493, -0.0127, 0.0079375)),
+    (4001, (0.0, -1.0, 0.0, 0.07493, 0.0127, 0.0079375), (0.0, 1.0, 0.0), (0.0, 0.0127, 0.0, 0.07493, 0.0127, 0.0079375)),
+    (4001, (0.0, 0.0, 1.0, 0.009652, 0.0, 0.0036195), (0.0, 0.0, 1.0), (0.009448, -0.0019844, 0.0036195, 0.0116364, 0.0019844, 0.0036195)),
+    (4002, (0.009652, 0.0, 0.0036195, 0.0, 0.0, 1.0, 0.0019844), None, (0.009448, -0.0019844, 0.0036195, 0.0116364, 0.0019844, 0.0079375)),
+    (4002, (0.020066, 0.009906, 0.0079375, 0.0, 0.0, 1.0, 0.000889), None, (0.019177, 0.009017, 0.0, 0.020955, 0.010795, 0.0079375)),
+    (4002, (0.07493, 0.0, 0.0079375, 0.0, 0.0, 1.0, 0.0011303), None, (0.0737997, -0.0011303, 0.0, 0.0760603, 0.0011303, 0.0079375)),
+    (4002, (0.07493, 0.0, 0.0079375, 0.0, 0.0, -1.0, 0.0127), None, (0.07493, -0.0127, 0.0, 0.08763, 0.0127, 0.0079375)),
+)
+_ARM_KINDS = {
+    "inboard_face": "face",
+    "outboard_face": "face",
+    "top_edge": "face",
+    "bottom_edge": "face",
+    "boss_end": "profile",
+    "handle_end": "profile",
+    "hub_seat": "hole",
+    "seam": "hole",
+    "match_mark": "hole",
+    "anchor_tap": "threaded_hole",
+    "pivot_tap": "threaded_hole",
+}
+
+
+def test_the_arm_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    from _gtol_face import FaceGeometry
+    import export_features
+
+    manifest = export_features.requirement_manifest("dt_crank_arm")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == _ARM_KINDS
+    assert manifest["construction"] == "one_piece"
+    selectors = export_features.feature_selectors("dt_crank_arm")
+    owned = {name: 0 for name in selectors}
+    for identity, parameters, normal, box in _ARM_FACES:
+        face = FaceGeometry(None, identity, parameters, normal, box)
+        owners = [n for n, specs in selectors.items() if any(s.matches(face) for s in specs)]
+        assert len(owners) <= 1, (parameters, owners)
+        for owner in owners:
+            owned[owner] += 1
+    assert all(owned.values()), owned
+
+
+def test_arm_feature_bands_are_the_printed_ones() -> None:
+    import export_features
+
+    f = export_features.requirement_manifest("dt_crank_arm")["features"]
+    inch = 25.4
+    assert f["hub_seat"]["dia"] == pytest.approx([0.75 * inch, 0.77 * inch])
+    assert f["hub_seat"]["axis_from_edge"] == pytest.approx([0.49 * inch, 0.51 * inch])
+    assert f["hub_seat"]["axis_from_edge_from"] == "top_edge"
+    for end in ("boss_end", "handle_end"):
+        assert f[end]["radius"] == pytest.approx([0.49 * inch, 0.51 * inch])
+    assert f["handle_end"]["overall_length_ref"] == pytest.approx(3.95 * inch)
+    anchor, pivot = f["anchor_tap"], f["pivot_tap"]
+    assert (anchor["thread"], pivot["thread"]) == ("#2-56", "#4-40")
+    assert anchor["station"] == pytest.approx([0.78 * inch, 0.80 * inch])
+    assert anchor["edge_offset"] == pytest.approx([0.105 * inch, 0.115 * inch])
+    assert anchor["dia"] == pytest.approx([0.070 * inch, 0.074 * inch], abs=1e-3)
+    assert pivot["station"] == pytest.approx([2.94 * inch, 2.96 * inch])
+    assert pivot["dia"] == pytest.approx([0.089 * inch, 0.093 * inch], abs=1e-3)
+    assert pivot["countersink_dia_max"] == pytest.approx(0.122 * inch)
+    assert pivot["countersink_face"] == "outboard_face"
+    assert f["seam"]["made_at"] == "assembly"
+    assert f["seam"]["depth"] == pytest.approx([0.16 * inch, 0.18 * inch])
+    mark = f["match_mark"]
+    assert mark["process"] == "punch"
+    assert mark["x_from_seat"] == pytest.approx([-0.32 * inch, -0.30 * inch])
+    assert mark["y_from_seat"] == pytest.approx([0.30 * inch, 0.32 * inch])

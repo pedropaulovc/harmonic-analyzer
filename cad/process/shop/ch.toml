@@ -311,16 +311,13 @@ diameter_mm = 69.85
 description = "1018 cold-finish carbon steel, flat bar, 1/4 x 2 in, 36 in length"
 [stock.1018-flat-1-4x2-72in]
 description = "1018 cold-finish carbon steel, flat bar, 1/4 x 2 in, 72 in length"
-[stock.1018-flat-1-8x1-1-2]
-description = "1018 cold-finish carbon steel, flat bar, 1/8 x 1-1/2 in"
 [stock.1018-flat-5-16x1-36in]
 description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 36 in length"
 [stock.1018-flat-5-16x1-72in]
 description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 72 in length"
 [stock.1018-square-1-4]
 description = "1018 cold-finish carbon steel, square bar, 1/4 x 1/4 in"
-# The amplitude bar's riser (cad/process/ch_amplitude_bar, Setup 1) is sawn
-# from this bar: its plan's stock_refs names it.
+
 [stock.6061-flat-1x3]
 description = "6061-T6511 aluminium, flat bar, 1 x 3 in"
 [stock.6061-round-9-16]
