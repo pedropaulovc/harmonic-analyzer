@@ -472,6 +472,14 @@ instruction = "Prove SB03_end_a in air, Z0 raised 1.000 in; every move clears th
 instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run SB03_end_a through every M6, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
+# Not measured (#3427): END A's side cut is deeper than the 1/2 in end
+# mill's measured envelope (6.6 mm, settings.em-half-carbide-1018-v6-deep)
+# and runs at the chart's 2650 rpm. Owner, Pedro, 2026-11-22: "log new
+# dechatter issues to try deep axial cuts but with shallow radial depth".
+[[setups.operations]]
+instruction = "First part only: this cut at 2650 rpm has not been chatter-tested on this end mill (owner's test list #3427): END A's side cut {{process.end_axial_doc_mm:in.3dot}} deep x {{process.end_step_max_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+feed = "hand"
+
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
