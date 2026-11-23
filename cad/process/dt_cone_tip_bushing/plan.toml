@@ -130,7 +130,7 @@ turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Before chucking: on the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the {{cad.bore_dia_min_in:.4dot}} GO pin, the {{cad.bore_dia_max_in:.4dot}} NO-GO pin, and the reamer across two opposite margins at its front end. Write the three readings here, and each pin's reading on its tag."
-inspection = "GO pin reads {{cad.bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}: a pin outside its range is not used."
+inspection = "GO pin reads {{cad.bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}: a pin outside its range is not used. The reamer reads under the NO-GO pin's reading, else it is not used: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
 
@@ -141,7 +141,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Only if the reamer read under the GO pin: first saw a 1 in piece off the same bar, chuck it as Holding says, and face, spot, drill and ream its end as Ops 40, 90, 100 and 110; gauge it as Op 120. The GO pin enters: go on with the bushing's bar. Refused: stop and tell the owner (the pins refuse this reamer's holes)."
+instruction = "Only if the reamer read under the GO pin: first saw a 1.25 in piece off the same bar, chuck it as Holding says, and face, spot, drill and ream its end as Ops 40, 90, 100 and 110; gauge it as Op 120. The GO pin enters: go on with the bushing's bar. Refused: stop and tell the owner (the pins refuse this reamer's holes)."
 feed = "hand"
 
 [[setups.operations]]

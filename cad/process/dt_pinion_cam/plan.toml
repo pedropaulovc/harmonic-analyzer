@@ -313,7 +313,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.cam_od_length_band_mm}}" 
 [[setups.operations]]
 cut_kind = "other"
 instruction = "The bar's remainder still chucked, spindle stopped: on the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the {{cad.bore_dia_min_in:.4dot}} GO pin, the {{cad.bore_dia_max_in:.4dot}} NO-GO pin, and the .2510 reamer across two opposite margins at its front end. Write the three readings here (the GO pin's as G), and each pin's on its tag."
-inspection = "GO pin reads {{cad.bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}: a pin outside its range is not used."
+inspection = "GO pin reads {{cad.bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}: a pin outside its range is not used. The reamer reads under the NO-GO pin's reading, else it is not used: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
 
@@ -414,7 +414,7 @@ title = "Drill and tap the set-screw hole"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat). A 1 in parallel, 1/8 in thick, against each jaw. The cam lying along the jaws, face F to the LEFT, its rear face {{process.cross_jaw_end_mm:in.2f}} in from the jaws' RIGHT ends, its O.D. on the parallels' inner top edges, the bore BELOW the O.D.'s centre (thick wall up). A 1/4 in drill from the 115-piece index, shank first, in the bore from the right, standing out past the jaw ends. The other cam (or, for the second, the finished first) lies the same way at the jaws' LEFT ends as the balance, so the jaws close square. Snug the vise (ops 170–200 orient it)."
+holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat). A 1 in parallel, 1/8 in thick, against each jaw. The cam lying along the jaws, face F to the LEFT, its rear face {{process.cross_jaw_end_mm:in.2f}} in from the jaws' RIGHT ends, its O.D. on the parallels' inner top edges, the bore BELOW the O.D.'s centre (thick wall up). A 1/4 in drill from the 115-piece index, shank first, in the bore from the right, standing out past the jaw ends. The other cam (or, for the second, the finished first) lies the same way at the jaws' LEFT ends as the balance, so the jaws close square. Snug the vise (ops 210–230 orient it)."
 datum = "Programs CM02_set_screw and CM03_set_screw_tap. G54: X0 face F, +X toward the rear face; Y0 the O.D. axis; Z0 the O.D.'s top line. Tool lengths from the tool setter at each M6; every move between holes runs above the jaw tops, which stand {{process.cross_jaw_top_mm:in.3dot}} above Z0."
 diagram = { file = "diagrams/cross.svg", alt = "The cam lying in the vise on the parallels' edges, thick side up, a drill shank in the bore; the #50 drills down from the top {{cad.set_screw_tap_station_in:.2dot}} from face F into the bore." }
 envelope = "other"
@@ -431,7 +431,7 @@ instruction = "Orient: the shank resting on the bore's bottom (do not lift it), 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Average more than {{process.orient_band_mm:.3f}} mm from 0: loosen, turn the cam a touch by the shank (0.035 mm of shank movement is 1° of turn), snug, and repeat op 180."
+instruction = "Average more than {{process.orient_band_mm:.3f}} mm from 0: loosen, turn the cam a touch by the shank (0.035 mm of shank movement is 1° of turn), snug, and repeat op 210."
 feed = "hand"
 
 [[setups.operations]]
@@ -502,7 +502,7 @@ instruction = "Tap #2-56 by hand under the tap guide, spindle off, Tapmatic Gold
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Jog Z up clear, back the tap out, blow out the hole and the bore. Swap the two cams' positions: load the second cam at the jaws' RIGHT ends per Setup 3 Holding (face F LEFT, rear face .25 from the jaw ends, bore below centre, the 1/4 shank back in the bore), the drilled cam at the LEFT ends as the balance; then repeat from op 170 in order: its own Y0 from its O.D., orient it, then its X0 and Z0."
+instruction = "Jog Z up clear, back the tap out, blow out the hole and the bore. Swap the two cams' positions: load the second cam at the jaws' RIGHT ends per Setup 3 Holding (face F LEFT, rear face .25 from the jaw ends, bore below centre, the 1/4 shank back in the bore), the drilled cam at the LEFT ends as the balance; then repeat from op 200 in order: its own Y0 from its O.D., orient it, then its X0 and Z0."
 feed = "hand"
 
 [[setups]]
@@ -524,10 +524,16 @@ instruction = "Deburr both bore mouths, the hole's mouth on the O.D. and the rea
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Length and O.D. were accepted on the lathe. Eccentricity: lay the cam on the surface plate on its O.D. with the GO pin in the bore (under .0005 shake); hold it on the plate by hand, roll it slowly and read the highest point H over the pin with the height gauge. Eccentricity = H − O.D./2 − G/2 (G the GO pin's reading, op 80), {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}}. Thin wall = O.D./2 − eccentricity − N/2 (N the NO-GO pin's reading: the bore is under it), at least {{cad.bore_thin_wall_min_mm:in.4dot}}."
+instruction = "Length and O.D. were accepted on the lathe. Eccentricity: lay the cam on the surface plate on its O.D. with the GO pin in the bore (under .0005 shake); hold it on the plate by hand, roll it slowly and read the highest point H over the pin with the height gauge. Eccentricity = H − O.D./2 − G/2 (G the GO pin's reading, op 80)."
 feed = "hand"
-inspection = "Eccentricity {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}}; thin wall at least {{cad.bore_thin_wall_min_mm:in.4dot}}."
+inspection = "Eccentricity {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}}."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.bore_eccentricity_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Thin wall from that eccentricity: O.D./2 − eccentricity − N/2 (N the NO-GO pin's reading, op 80: the bore is under it)."
+feed = "hand"
+inspection = "Thin wall at least {{cad.bore_thin_wall_min_mm:in.4dot}}."
+gauge_checks = "other"
 
 [[setups.operations]]
 instruction = "Set-screw hole: station from face F {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_screw_tap_station_max_in:.3dot}} (calipers from face F over the #50's shank in the hole, less half the miked shank); the hole on the thick side, opposite the bore offset; a #2-56 screw runs in by hand to the bore."

@@ -642,7 +642,7 @@ beam = { axis = "x", hold = "plate", extent_mm = [-235.997, 8.642], seat = "the 
 
 [[setups.operations]]
 instruction = "Before seating: on the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the {{cad.pivot_bore_dia_min_in:.4dot}} GO pin, the {{cad.pivot_bore_dia_max_in:.4dot}} NO-GO pin, and the .2500 reamer across two opposite margins at its front end. Write the three readings on the job card, and each pin's on its tag."
-inspection = "GO pin reads {{cad.pivot_bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}: a pin outside its range is not used."
+inspection = "GO pin reads {{cad.pivot_bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}: a pin outside its range is not used. The reamer reads under the NO-GO pin's reading, else it is not used: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }]
 
 [[setups.operations]]

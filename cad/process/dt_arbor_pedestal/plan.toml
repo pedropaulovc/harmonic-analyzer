@@ -596,7 +596,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "On the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the {{cad.arbor_bore_dia_min_in:.4dot}} GO pin, the {{cad.arbor_bore_dia_max_in:.4dot}} NO-GO pin, and the reamer across two opposite margins at its front end. Write the three readings here, and each pin's on its tag."
-inspection = "GO pin reads {{cad.arbor_bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}}: a pin outside its range is not used."
+inspection = "GO pin reads {{cad.arbor_bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}}: a pin outside its range is not used. The reamer reads under the NO-GO pin's reading, else it is not used: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.arbor_bore_dia_band_mm}}" }]
 feed = "hand"
 
@@ -605,7 +605,7 @@ instruction = "This sheet accepts a bore the GO pin enters and the NO-GO pin doe
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Only if the reamer read under the GO pin, before the first part: home the mill ($H). Grip a 2 in offcut of the 1 x 1-1/4 flat on the stacks as Holding says, a 1 in face up. Console M6 T4 (23/64; the tool setter measures it). Jog it over the offcut's middle, above the gap between the stacks; spindle stopped, its point on a .002 leaf on the top: G10 L20 P1 X0 Y0 Z0.051."
+instruction = "Only if the reamer read under the GO pin, before the first part: home the mill ($H). Grip a 2 in offcut of the 1 x 1-1/4 flat on the stacks as Holding says, lying on a 1-1/4 in face (1.00 thick). Console M6 T4 (23/64; the tool setter measures it). Jog it over the offcut's middle, above the gap between the stacks; spindle stopped, its point on a .002 leaf on the top: G10 L20 P1 X0 Y0 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -692,11 +692,17 @@ gauge_checks = [{ gauge = "zz-pins-3760-3765", band_mm = "{{cad.arbor_bore_dia_b
 # The ream's remedy follows its check: prechips prints an op's Check after
 # its work, so it is the next op.
 [[setups.operations]]
+instruction = "GO pin refused: blow out the chips and oil; T5 still in, the part still clamped. MDI G0 Z{{process.reream_clear_mm:.3f}}, G0 X-{{cad.arbor_bore_height_mm:.3f}} Y-{{cad.arbor_bore_lateral_mm:.3f}}, M3 S400, G0 Z{{process.reream_r_plane_mm:.3f}}, G1 Z{{process.ream_tip_height_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}, G1 Z{{process.reream_r_plane_mm:.3f}}, G0 Z{{process.reream_clear_mm:.3f}}, M5 (the same reamer once more); gauge again."
+feed = "hand"
+
+[[setups.operations]]
 steps = [
-  { kind = "stop", text = "GO pin refused: blow out the chips and oil; T5 still in and the part still clamped, MDI G0 Z{{process.reream_clear_mm:.3f}}, G0 X-{{cad.arbor_bore_height_mm:.3f}} Y-{{cad.arbor_bore_lateral_mm:.3f}}, M3 S400, G0 Z{{process.reream_r_plane_mm:.3f}}, G1 Z{{process.ream_tip_height_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}, G1 Z{{process.reream_r_plane_mm:.3f}}, G0 Z{{process.reream_clear_mm:.3f}}, M5 (the same reamer once more); gauge again." },
-  { kind = "stop", text = "GO pin still refused (a reamer cannot be made to cut larger), NO-GO pin enters (no cut remedies it), or the bore shows chatter or tears: the part is scrap; stop, the reamer or its runout is out; tell the owner." },
-  { kind = "action", text = "In band: the next part is reamed without the check." },
+  { kind = "stop", text = "GO pin still refused (a reamer cannot be made to cut larger), NO-GO pin enters (no cut remedies it), or chatter or tears in the bore: the part is scrap; stop and tell the owner." },
 ]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "In band: the next part is reamed without the check."
 feed = "hand"
 
 [[setups.operations]]

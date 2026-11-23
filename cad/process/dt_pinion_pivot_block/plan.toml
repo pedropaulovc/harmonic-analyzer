@@ -522,7 +522,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.top_face_height
 
 [[setups.operations]]
 instruction = "Start only with the .2510 reamer and the two Class ZZ pins in hand (to buy). On the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the {{cad.pivot_bore_dia_min_in:.4dot}} GO pin, the {{cad.pivot_bore_dia_max_in:.4dot}} NO-GO pin, and the reamer across two opposite margins at its front end. Write the three readings here (the GO pin's as G), and each pin's on its tag."
-inspection = "GO pin reads {{cad.pivot_bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}: a pin outside its range is not used."
+inspection = "GO pin reads {{cad.pivot_bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}: a pin outside its range is not used. The reamer reads under the NO-GO pin's reading, else it is not used: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }]
 feed = "hand"
 
