@@ -652,7 +652,7 @@ CLUSTER_TILT_AT_DISC_RIM = (
     * CLUSTER.BORE_DIAMETRAL_CLEARANCE[1]
     / (FEED.OVERALL_LENGTH - FEED.OVERALL_LENGTH_BAND)
 )  # 0.0317
-# The hanger tilts about P by the spacer's face squareness
+# The hanger tilts about P by the spacer's face parallelism
 # (transgear_hanger_joints.HANGER_TILT): a point r from P moves r times it.
 _P_TO_S = math.dist(PIVOT_XY, STUD_XY)  # 68.81
 _P_TO_DISC_RIM = _P_TO_S + DISC_SPEC.OUTSIDE_DIA / 2.0
@@ -711,11 +711,8 @@ PLATEN_AIR = CLUSTER_AIR.AirStack(
         "MHA-PD-06 disc thickness": DISC_SPEC.FACE_WIDTH_MAX - DISC_SPEC.FACE_WIDTH,
         **dict(CLUSTER.SHIMMED_STEP_TERMS),
         CLUSTER.SP[0]: CLUSTER.SP[2],
-        "MHA-PD-20 spacer rear face perpendicularity": SPACER.REAR_FACE_PERPENDICULARITY
-        / SPACER.FACE_PERPENDICULARITY_ZONE_DIA
-        * _P_TO_DISC_RIM,
-        "MHA-PD-20 spacer front face perpendicularity": SPACER.FRONT_FACE_PERPENDICULARITY
-        / SPACER.FACE_PERPENDICULARITY_ZONE_DIA
+        "MHA-PD-20 spacer rear face parallelism": SPACER.REAR_FACE_PARALLELISM
+        / SPACER.FACE_PARALLELISM_ZONE_DIA
         * _P_TO_DISC_RIM,
         "sleeve step face perpendicularity": _STEP_AT_RIM,
         "hub spigot end perpendicularity": _SPIGOT_END_AT_RIM,
@@ -1535,11 +1532,16 @@ def _assert_lock_station_sweep() -> None:
     ky = KNOB_SHAFT_XY[1]
     # R9-61: the hanger hangs on the pivot screw, whose #8-32 tap the bar
     # prints at its ±HOLE_POSITION_BAND, so every hung section stands off its
-    # model by that band in y. The spacer is pressed on the shoulder, so its
-    # bore is on the screw axis; its largest O.D. stands off that axis by the
+    # model by that band in y. The spacer is bonded on the shoulder, so its
+    # bore may cure off the screw axis by half the bond's greatest gap
+    # (SPACER.SEAT_OFFSET_MAX); its largest O.D. stands off the bore by the
     # offset its printed runout to A allows (SPACER.BORE_ECCENTRICITY).
     pivot_tap = BAR.HOLE_POSITION_BAND
-    spacer_r = (SPACER.OD + SPACER.OD_BAND) / 2.0 + SPACER.BORE_ECCENTRICITY
+    spacer_r = (
+        (SPACER.OD + SPACER.OD_BAND) / 2.0
+        + SPACER.BORE_ECCENTRICITY
+        + SPACER.SEAT_OFFSET_MAX
+    )
     # The arm's front face on the shortest spacer; the flat plate's face A on
     # the thinnest arm stock. The bush's hub face stands its longest hub, and
     # the shoulder's largest seat gap, forward of face A.

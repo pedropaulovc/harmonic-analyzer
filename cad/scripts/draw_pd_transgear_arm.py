@@ -467,7 +467,7 @@ TAP_CALLOUTS = (
 # on the FRONT face, datum A; +X toward the square end; +Y across; +Z through
 # the thickness to the rear face).  Bands are the title block's rows at the
 # places the part authors (DRAWING_PRECISION), the reams their own bands.
-# The traveler makes the outline, the pivot ream (B) and its rear spot face,
+# The traveler makes the outline, the pivot drill (B) and its rear spot face,
 # the pin ream (C) and its rear mouth, and the latch-pin ream; the 2X dowel
 # reams and the 2X 8-32 taps are made at assembly with MHA-PD-19 on
 # (``made_at``), declared so the traveler can name what it leaves.  The
@@ -615,9 +615,10 @@ requirement(
     },
     precision={"angle_ref_deg": _P["FlankAngle"]},
 )
-# Datum B: the pivot bore, Ø.1940 +.0010/.0000 REAM THRU (FRONT_KEEP
-# "PivotBoreDia"), a running fit on the MHA-PD-VN-57 shoulder (note 1).
-_PIVOT_REAM = ((_NOTES, "PIVOT_BORE_CALLOUT"), (_SELF, "FRONT_KEEP"))
+# Datum B: the pivot bore, Ø.196 #9 DRILL THRU (FRONT_KEEP "PivotBoreDia"),
+# a running clearance on the MHA-PD-VN-57 shoulder (note 1); the clearance
+# is the geometry's analysis range, exported for the traveler, not printed.
+_PIVOT_DRILL = ((_NOTES, "PIVOT_BORE_CALLOUT"), (_SELF, "FRONT_KEEP"))
 requirement(
     "pivot_bore",
     kind="hole",
@@ -628,15 +629,15 @@ requirement(
         "axis": ([0.0, 0.0, -1.0], (_FRAME,)),
         "dia": (
             limits(PIVOT_BORE_DIA, _P["PivotBoreDia"], PIVOT_BORE_DIA_BAND, unit=UNIT),
-            ((_GEOM, "PIVOT_BORE_DIA"), (_GEOM, "PIVOT_BORE_DIA_BAND"), *_PIVOT_REAM),
+            ((_GEOM, "PIVOT_BORE_DIA"), (_GEOM, "PIVOT_BORE_DIA_BAND"), *_PIVOT_DRILL),
         ),
         "nominal_dia": (PIVOT_BORE_DIA, ((_GEOM, "PIVOT_BORE_DIA"),)),
-        "process": ("ream", _PIVOT_REAM),
-        "thru": (True, _PIVOT_REAM),
+        "process": ("drill", _PIVOT_DRILL),
+        "thru": (True, _PIVOT_DRILL),
         "datum": ("B", ("PART_DATUMS",)),
         "diametral_clearance": (
             list(PIVOT_BORE_DIAMETRAL_CLEARANCE),
-            ((_GEOM, "PIVOT_BORE_DIAMETRAL_CLEARANCE"), (_NOTES, "NOTES")),
+            ((_GEOM, "PIVOT_BORE_DIAMETRAL_CLEARANCE"),),
         ),
         "mate": ("MHA-PD-VN-57", ((_NOTES, "NOTES"),)),
         "callout": (PIVOT_BORE_CALLOUT, ((_NOTES, "PIVOT_BORE_CALLOUT"),)),

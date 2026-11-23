@@ -112,7 +112,6 @@ from pd_transgear_arm_geometry import (
     PIN_HOLE_Z,
     PIN_STATION,
     PIVOT_BORE_DIA,
-    PIVOT_BORE_DIA_BAND,
     PIVOT_END_R,
     PIVOT_TANGENT_X,
     PIVOT_TANGENT_Y,
@@ -1078,10 +1077,8 @@ def build(adapter: Any) -> dict[str, str]:
         adapter, "PinHole", "PinHoleDepth", limit=PIN_HOLE_DEPTH,
         band=PIN_HOLE_DEPTH_BAND, tol_type=SW_TOL_MIN,
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "PivotBoreProfile", "PivotBoreDia", *deviations(PIVOT_BORE_DIA_BAND),
-        display_unit=UNIT,
-    )
+    # The pivot bore carries no band of its own: its DRILL THRU callout takes
+    # the title block's DRILLED HOLES row (geometry PIVOT_BORE_DIA_BAND).
     set_dimension_bilateral_tolerance(
         adapter, "PinBoreProfile", "PinBoreDia", *deviations(PIN_BORE_DIA_BAND),
         display_unit=UNIT,

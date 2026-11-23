@@ -16,8 +16,7 @@ from pd_paper_drive_assembly_steps import knob_setting_ref
 from pd_transgear_arm_geometry import (
     PIN_HOLE_DEPTH,
     PIN_HOLE_DEPTH_PLACES,
-    PIVOT_BORE_DIAMETRAL_CLEARANCE,
-    PIVOT_FIT_CLEARANCE_PLACES,
+    PIVOT_BORE_DRILL,
 )
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_transgear_arm_spec import LATCH_PIN_NUMBER, PIN_PRESS_INTERFERENCE
@@ -54,10 +53,10 @@ def see_note(number: int) -> str:
 
 
 NOTES = (
-    f"{PIVOT_NOTE}. PIVOT BORE: RUNNING FIT ON PIVOT SCREW {_PIVOT_SCREW['number']}"
-    " SHOULDER\n"
-    "   (CLEARANCE "
-    f"{_inch_range(PIVOT_BORE_DIAMETRAL_CLEARANCE, PIVOT_FIT_CLEARANCE_PLACES)}).",
+    # A drilled hole at the DRILLED HOLES row: the note names its mate and
+    # prints no numbers (fit audit 2026-11-23, pending owner confirmation).
+    f"{PIVOT_NOTE}. PIVOT BORE: RUNNING CLEARANCE ON PIVOT SCREW {_PIVOT_SCREW['number']}"
+    " SHOULDER.",
     # Notes 2 and 3 (fit audit 2026-11-23, pending owner confirmation): a
     # hole reamed to a bought dowel prints its set reamer's size and no band;
     # the dowel tried in it is the gauge, and the note says in six words or
@@ -86,7 +85,7 @@ NOTES_TEXT = "\n".join(NOTES)
 # DRAWING_NOTES; the drawing prints NOTES_TEXT.
 DRAWING_NOTES = NOTES_TEXT
 
-PIVOT_BORE_CALLOUT = f"REAM THRU, {see_note(PIVOT_NOTE)}"
+PIVOT_BORE_CALLOUT = f"{PIVOT_BORE_DRILL} DRILL THRU, {see_note(PIVOT_NOTE)}"
 PIN_BORE_CALLOUT = f"REAM THRU, {see_note(PIN_NOTE)}"
 # Note 2 names the dowel and its press; the callout links it (round 2: the
 # dowel named on both was named twice for one pattern).

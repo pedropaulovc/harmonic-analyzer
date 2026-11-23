@@ -115,8 +115,26 @@ def test_the_shallower_spot_face_gives_the_spring_its_model_room(monkeypatch) ->
 
 def test_seated_hanger_enclosure_uses_actual_spacer_face_grades() -> None:
     assert joints.HANGER_TILT == pytest.approx(
-        (spacer.FRONT_FACE_PERPENDICULARITY + spacer.REAR_FACE_PERPENDICULARITY)
-        / spacer.FACE_PERPENDICULARITY_ZONE_DIA,
+        spacer.REAR_FACE_PARALLELISM / spacer.FACE_PARALLELISM_ZONE_DIA,
+    )
+
+
+def test_the_spacer_bond_carries_the_spring_drag_and_push() -> None:
+    """LOCTITE 638 on the #12 bore over the shoulder (fit audit 2026-11-23,
+    pending owner confirmation): derated for brass and the widest gap, it
+    holds the spring's friction torque on the whole O.D. radius and the
+    spring's push before the screw is seated, each with the margin."""
+    land = spacer.BOND_LAND_MIN
+    area = math.pi * (pivot.SHOULDER_DIA + min(pivot.SHOULDER_DIA_LIMITS)) * land
+    assert joints.SPACER_BOND_SHEAR_N == pytest.approx(
+        joints.LOCTITE_638_SHEAR_MPA * joints.SPACER_BOND_FACTOR * area
+    )
+    assert joints.SPACER_BOND_SHEAR_N == pytest.approx(198.1, abs=0.1)
+    assert joints.SPACER_BOND_TORQUE_MARGIN == pytest.approx(4.16, abs=0.01)
+    assert joints.SPACER_BOND_PUSH_MARGIN == pytest.approx(5.02, abs=0.01)
+    assert (
+        min(joints.SPACER_BOND_TORQUE_MARGIN, joints.SPACER_BOND_PUSH_MARGIN)
+        >= joints.SPACER_BOND_MARGIN_MIN
     )
 
 
@@ -310,9 +328,10 @@ def test_the_far_face_gate_refuses_the_three_quarter_pin(monkeypatch) -> None:
     With the hook's screw holes at the title block's ±.005 (delegated ruling
     2026-11-07, pending owner confirmation) the 3/4 dowel falls short even
     in the 6.20 hole that once barely cleared. The bar's pivot tap at the
-    title block's ±.005 (owner ruling 2026-11-20, #2422; it was ±.002) and
-    the 3/8 arm (#2019, #3184) leave the 7/8 pin 0.283 past the face."""
-    assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST == pytest.approx(0.283, abs=1e-3)
+    title block's ±.005 (owner ruling 2026-11-20, #2422; it was ±.002), the
+    3/8 arm (#2019, #3184) and the #9 drilled pivot bore (fit audit
+    2026-11-23) leave the 7/8 pin 0.219 past the face."""
+    assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST == pytest.approx(0.219, abs=1e-3)
     # The retired 3/4 pin bottomed in a 6.20 hole printed .24: its proud
     # window, length grade and depth reach included.
     reach = 6.20 - (0.24 - 0.01) * 25.4

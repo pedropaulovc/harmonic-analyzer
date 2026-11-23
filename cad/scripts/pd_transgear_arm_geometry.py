@@ -130,12 +130,15 @@ END_HALF_WIDTH_BAND = printed_reach_mm(2.0 * END_HALF_WIDTH, OUTLINE_PLACES) / 2
 # Either printed outline row moves a straight edge at most this far.
 OUTLINE_BAND = max(PIVOT_END_R_BAND, END_HALF_WIDTH_BAND)
 
-# --- Pivot at P: a reamed running fit on the as-supplied shoulder ----------
-# #2413 (DFM, 2026-11-11): one standard .1940 chucking reamer, banded
-# +.0010/0 so .194 GO and .195 NO-GO pin gauges accept it; every as-supplied
-# MHA-PD-VN-57 shoulder (.1865-.1875) runs in every accepted bore.  Nothing
-# reads a tenth-level clearance window: the latch sets the arm's working
-# position and the hanger stack pays the whole maximum clearance as float.
+# --- Pivot at P: a drilled running clearance on the as-supplied shoulder ---
+# Fit audit 2026-11-23 (pending owner confirmation; owner: "can the holes not
+# be reamed in the first place"): a #9 drill at the title block's DRILLED
+# HOLES row, where #2413's .1940 reamer and its GO / NO-GO pair stood.  The
+# arm only swings a few degrees to throw the feed in and is held on the
+# spacer by its spring; nothing reads a clearance window: the latch sets the
+# arm's working position and the hanger stack pays the whole maximum
+# clearance as float.  The traveler keeps one .194 set pin as a GO check
+# against a wrong drill.
 
 
 # The spot face seats the MHA-PD-VN-63 curved disc spring's OD rim (Ø10.744) under
@@ -167,22 +170,25 @@ SPOT_FACE_DEPTH = THICKNESS - SPOT_FACE_FLOOR_FROM_FRONT
 PIVOT_BEARING_LENGTH_MAX = SPOT_FACE_FLOOR_FROM_FRONT + SPOT_FACE_FLOOR_BAND
 PIVOT_BORE_TO_FRONT_FACE_ANGLE_DEG = 90.0
 PIVOT_BORE_TO_FRONT_FACE_ANGLE_BAND_DEG = angular_band_deg(unit=UNIT)
+# The seated arm's bore against the shoulder's axis, at the printed bands:
+# the bore's general angular row to the front face, and the bonded spacer's
+# rear face to the plane it seats in (SPACER.SEATED_FACE_TILT, one frame).
 PIVOT_SEATED_AXIS_ANGLE_MAX = (
-    math.radians(PIVOT_BORE_TO_FRONT_FACE_ANGLE_BAND_DEG)
-    + math.atan(SPACER.FRONT_FACE_PERPENDICULARITY / SPACER.FACE_PERPENDICULARITY_ZONE_DIA)
-    + math.atan(SPACER.REAR_FACE_PERPENDICULARITY / SPACER.FACE_PERPENDICULARITY_ZONE_DIA)
+    math.radians(PIVOT_BORE_TO_FRONT_FACE_ANGLE_BAND_DEG) + SPACER.SEATED_FACE_TILT
 )
 PIVOT_AXIS_BINDING_SWEEP_MAX = PIVOT_BEARING_LENGTH_MAX * math.tan(PIVOT_SEATED_AXIS_ANGLE_MAX)
-# The clearance prints in inches, to four places.
-PIVOT_FIT_CLEARANCE_PLACES = 4
 # The least clearance the shoulder needs to run free: the shared
 # close-running minimum plus the sweep of a bore at the general angular row
-# on the seated spacer, both spacer face grades paid.
+# on the seated spacer.
 if not 3.0 < PIVOT.SHOULDER_DIA <= 6.0:
     raise ValueError("the pivot running minimum requires the shared ISO 3-through-6 mm clearance class")
-PIVOT_RUNNING_CLEARANCE_MIN = measured_close_running_clearance_mm()[0] + PIVOT_AXIS_BINDING_SWEEP_MAX
-PIVOT_BORE_DIA = 4.9276  # .1940, the reamer's size
-PIVOT_BORE_DIA_BAND = (0.0254, 0.0)  # (upper, lower) deviations: +.0010/0
+_PIVOT_CLOSE_RUNNING_MIN = measured_close_running_clearance_mm()[0]
+PIVOT_RUNNING_CLEARANCE_MIN = _PIVOT_CLOSE_RUNNING_MIN + PIVOT_AXIS_BINDING_SWEEP_MAX
+PIVOT_BORE_DRILL = "#9"
+PIVOT_BORE_DIA = 4.9784  # .196, the drill's size
+# ANALYSIS band, what the drill cuts (the DRILLED HOLES row); the sheet
+# prints the drill and no band of its own.
+PIVOT_BORE_DIA_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # (upper, lower)
 PIVOT_BORE_FULL_LIMITS = (
     PIVOT_BORE_DIA + PIVOT_BORE_DIA_BAND[1],
     PIVOT_BORE_DIA + PIVOT_BORE_DIA_BAND[0],
@@ -190,9 +196,26 @@ PIVOT_BORE_FULL_LIMITS = (
 PIVOT_BORE_DIAMETRAL_CLEARANCE = (
     round(PIVOT_BORE_FULL_LIMITS[0] - PIVOT.SHOULDER_DIA - max(PIVOT.SHOULDER_DIA_LIMITS), 6),
     round(PIVOT_BORE_FULL_LIMITS[1] - PIVOT.SHOULDER_DIA - min(PIVOT.SHOULDER_DIA_LIMITS), 6),
-)  # .0065, .0085
+)  # .0085, .0135
 if PIVOT_BORE_DIAMETRAL_CLEARANCE[0] < PIVOT_RUNNING_CLEARANCE_MIN:
-    raise AssertionError("the MHA-PD-18 pivot ream binds the largest MHA-PD-VN-57 shoulder")
+    raise AssertionError("the MHA-PD-18 pivot drill binds the largest MHA-PD-VN-57 shoulder")
+# The bonded spacer cures with its front face and the bought screw's
+# shoulder end in one plane, so the shoulder's axis leans to the seat by the
+# shoulder end's own out-of-square, which the catalogue does not state.  The
+# least clearance leaves it this much, as an angle and across the smallest
+# shoulder; MHA-PD-00's dry trial before the bond (the arm swings free on the
+# seated screw and spacer) and its free-fall check after are what hold one
+# screw inside it.
+PIVOT_SHOULDER_END_ANGLE_ALLOWED = (
+    math.atan(
+        (PIVOT_BORE_DIAMETRAL_CLEARANCE[0] - _PIVOT_CLOSE_RUNNING_MIN)
+        / PIVOT_BEARING_LENGTH_MAX
+    )
+    - PIVOT_SEATED_AXIS_ANGLE_MAX
+)
+PIVOT_SHOULDER_END_SQUARENESS_ALLOWED = (
+    PIVOT.SHOULDER_DIA + min(PIVOT.SHOULDER_DIA_LIMITS)
+) * math.tan(PIVOT_SHOULDER_END_ANGLE_ALLOWED)  # .0019
 
 
 # --- Pin at S: REAM THROUGH, the press for the MHA-PD-23 pin (R9-68) ---------

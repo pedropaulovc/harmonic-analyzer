@@ -252,11 +252,12 @@ def test_the_paper_drive_bushes_print_the_sheets_bands() -> None:
     # The sheet prints .197 ±.002 about the exact 5.0 mm model.
     assert _inch(pivot["far_end"]["length"]) == [0.195, 0.199]
     assert _inch(pivot["outer"]["dia"]) == [0.43, 0.45]
-    assert _inch(pivot["bore"]["dia"]) == [0.1855, 0.186]
-    assert _inch(pivot["bore"]["diametral_interference"]) == [0.0005, 0.002]
-    for end in ("datum_end", "far_end"):
-        assert _inch([pivot[end]["perpendicularity"]]) == [0.001]
-        assert pivot[end]["datum"] == "bore"
+    assert _inch(pivot["bore"]["dia"]) == [0.189, 0.193]
+    assert pivot["bore"]["process"] == "drill"
+    assert _inch(pivot["bore"]["diametral_clearance_ref"]) == [0.0015, 0.0065]
+    assert _inch([pivot["far_end"]["parallelism"]]) == [0.001]
+    assert pivot["far_end"]["parallelism_datum"] == "datum_end"
+    assert "perpendicularity" not in pivot["datum_end"]
     assert _inch([pivot["outer"]["runout"]]) == [0.016]
 
     bush = manifest("pd_transgear_knob_bush")["features"]

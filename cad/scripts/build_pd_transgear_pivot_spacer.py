@@ -4,8 +4,8 @@ The turned brass ring on the MHA-PD-VN-57 pivot screw's shoulder between the
 MHA-PD-07 support bar's back face and the MHA-PD-18 arm's front face
 (``pd_transgear_pivot_spacer_spec``; contract §3.4).  Its length sets the pivot
 head play, so it carries an explicit band; it is fitted as made, never faced
-(R9-6).  Its reamed bore is a light press on the shoulder, under its own
-one-sided band.
+(R9-6).  Its #12 drilled bore is a bonded slip fit (LOCTITE 638) on the
+shoulder, under the title block's DRILLED HOLES row.
 
 Layout: Front-plane annulus at the origin (O.D., bore) extruded +Z by the
 length, so the bar-side (front) face is the Front Plane (z = 0) and the rear
@@ -42,12 +42,8 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _document_units import apply_package_model_units
-from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _part_properties import part_drawing_unit
 from _saved_part_guard import require_saved_drawing_properties
@@ -55,7 +51,6 @@ from _visibility import blank_reference_geometry
 import pd_transgear_pivot_spacer_callouts as callouts
 from pd_transgear_pivot_spacer_spec import (
     BORE_DIA,
-    BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
@@ -187,14 +182,12 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The pivot head play rides the length: its explicit band.  The bore is
-    # a press on the shoulder: its reamed one-sided band.  The O.D. is
-    # governed by its places alone (the title block's row).
+    # The pivot head play rides the length: its explicit band.  The bore
+    # carries no band of its own: its DRILL THRU callout takes the title
+    # block's DRILLED HOLES row (spec BORE_DIA_BAND).  The O.D. is governed
+    # by its places alone (the title block's row).
     set_dimension_symmetric_tolerance(
         adapter, "Ring", "RingLength", LENGTH_TOLERANCE, display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "RingProfile", "BoreDia", *deviations(BORE_DIA_BAND), display_unit=UNIT
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
