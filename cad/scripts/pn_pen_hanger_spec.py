@@ -84,7 +84,7 @@ STRAP_BOT_X = (-6.096, 6.096)  # .48 wide at the foot, centred on the rod (low)
 # below the screw; this is 157, inside the photo's +-15 % parallax).  The
 # foot (the lower plate's bottom) stands where the pen carriage's top, at the
 # top of the +-25 mm pen travel (#748 owner ruling 2026-11-20), stays
-# GUIDE_ENGAGE_MARGIN under it: 6.39 would leave 2.998 mm, 6.38 leaves 3.252
+# GUIDE_ENGAGE_MARGIN under it: 6.39 would leave 3.506 mm, 6.38 leaves 3.760
 # (pn_pen_carriage_geom.CARRIAGE_TOP_Y; the hanger test asserts it).
 STRAP_RISE = 162.052  # 6.38
 STRAP_BOT_Y = -STRAP_RISE
