@@ -78,7 +78,11 @@ kind = "straightedge"
 status = "to_order"
 
 [tools.transfer-punches]
-name = "Transfer punch set, fractional and number sizes"
+name = "Transfer punch set, fractional 3/32-1/2 in by 64ths"
+make = "LittleMachineShop"
+sku = "2031"
+source = "https://littlemachineshop.com/products/transfer-punch-sets-individual-sizes"
+purchase = "LittleMachineShop 2031, transfer punch set 3/32 to 1/2 in by 64ths plus 17/32, 4-7/8 in long, $18.95 (read live 2026-11-23). Fractional set only (tool audit 2026-11-23): every punch a plan names is a 64ths size. The listing does not state how far under nominal the punches are ground: mike the 1/4 in punch on receipt against the note's limit."
 kind = "transfer_punch_set"
 status = "to_order"
 note = "Buy a set ground no more than .003 in under nominal (e.g. Precise spotters, .0025 ±.0005 under from 2.5 mm to 17/32 in, Penn Tool listing read 2026-11-12): cone_set_stack.PIVOT_SEAT_TRANSFER_MM books the 1/4 in punch's radial play in the MHA-DT-20 pivot bore at that grind (#2366)."
