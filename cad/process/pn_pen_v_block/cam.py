@@ -84,7 +84,7 @@ LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 CAM_TOOLS = (
     "em-half",
     "chamfer",
-    "em-5-64",
+    "em-eighth",
     "spot",
     "drill-32",
     "reamer",
@@ -138,6 +138,17 @@ PARALLEL_LENGTH_MM = 4 * IN
 PLAN_TOL_MM = 0.01
 # Model agreement between two exported values (they share CAD constants).
 MODEL_TOL_MM = 1e-3
+# The 1/8 in end mill's slotting limit the plan cites (Harvey Tool miniature
+# square end mills, series 720xx, speeds and feeds table, Brass row: axial
+# depth .35 × its diameter): it takes the slot's step corners, buried at the
+# step, in levels no deeper.
+SLOT_AXIAL_MAX = 0.35
+# The V's flat is swept by the chamfer mill's pointed tip at the flat's
+# level (owner ruling 2026-11-23, tool audit Q9: no 5/64 cutter). A 90°
+# cone's two neighbouring tip passes leave a ridge half their spacing high,
+# so every point of the flat lies within this of a tip pass: its ridges
+# stand at most .001 in, a tenth of the flat's printed .XX band.
+V_FLAT_RIDGE_MAX_MM = 0.0254
 
 
 def _plan_operations(plan: dict[str, Any]):
@@ -534,11 +545,13 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         "centre": centre,
         "mouth_half": mouth_half,
         "flat_half": flat_half,
+        "flat_width": tuple(v["flat_width"]),
         "v_depth": v_depth,
-        "v_end": steps + v["corner_r_max"],
+        # The V runs on past the steps to where the slot's corner arcs end.
+        "v_end": steps + rel["corner_r_nominal"],
         "relief": (rz0, rz1),
         "relief_height": rel["height_nominal"],
-        "relief_corner_max": rel["corner_r_max"],
+        "relief_corner": tuple(rel["corner_r"]),
         "bore_at": (bx, bz),
         "bore_dia": tuple(bore["dia"]),
         "chamfer": tuple(bore["top_chamfer"]),
@@ -614,17 +627,22 @@ def context(
         raise ValueError(
             "the chamfer mill's 45° cone does not run to a point: the V offsets assume it"
         )
-    e5 = _shop_tool(plan, shop, "em-5-64")["diameter_mm"]
-    r5 = e5 / 2
+    eighth = _shop_tool(plan, shop, "em-eighth")
+    e8 = eighth["diameter_mm"]
+    r8 = e8 / 2
     d32 = _shop_tool(plan, shop, "drill-32")["diameter_mm"]
     ream = _shop_tool(plan, shop, "reamer")["diameter_mm"]
     d43 = _shop_tool(plan, shop, "drill-43")["diameter_mm"]
-    if r5 > g["relief_corner_max"]:
+    # Owner ruling 2026-11-23, tool audit Q9: the slot's step corners print
+    # R.065 (.060-.070) and the 1/8 in end mill leaves them at its radius.
+    corner_lo, corner_hi = g["relief_corner"]
+    if not corner_lo <= r8 <= corner_hi:
         raise ValueError(
-            f"the corner cutter's R{r5:.3f} is over the slot corners' R{g['relief_corner_max']:.3f} max"
+            f"the corner cutter's R{r8:.3f} is outside the slot corners' printed"
+            f" band {corner_lo:.3f}-{corner_hi:.3f}"
         )
-    if e5 > 2 * g["flat_half"]:
-        raise ValueError("the corner cutter is wider than the V's flat")
+    if eighth["flute_length_mm"] < g["relief_height"]:
+        raise ValueError("the 1/8 in end mill's flutes do not reach the slot's floor")
     if not g["bore_dia"][0] <= ream <= g["bore_dia"][1]:
         raise ValueError(f"reamer Ø{ream} is outside the bore band {g['bore_dia']}")
     if not d32 < ream:
@@ -634,8 +652,7 @@ def context(
     for name, dia in (
         ("paper end", em),
         ("relief", em),
-        ("relief corners", e5),
-        ("V flat", e5),
+        ("relief corners", e8),
     ):
         if not math.isclose(_cut(plan, name, "cutter_dia_mm"), dia, abs_tol=1e-6):
             raise ValueError(
@@ -659,9 +676,9 @@ def context(
     v_rpm, v_feed = _setting(plan, shop, "V groove")
     if _setting(plan, shop, "bore chamfer") != (v_rpm, v_feed):
         raise ValueError("'bore chamfer' runs at another setting than 'V groove'")
-    e5_rpm, e5_feed = _setting(plan, shop, "relief corners")
-    if _setting(plan, shop, "V flat") != (e5_rpm, e5_feed):
-        raise ValueError("'V flat' runs at another setting than 'relief corners'")
+    e8_rpm, e8_feed = _setting(plan, shop, "relief corners")
+    if _setting(plan, shop, "V flat") != (v_rpm, v_feed):
+        raise ValueError("'V flat' runs at another setting than 'V groove'")
     spot_rpm, spot_feed = _setting(plan, shop, "bore spot")
     if _setting(plan, shop, "tap spot") != (spot_rpm, spot_feed):
         raise ValueError("'tap spot' runs at another setting than 'bore spot'")
@@ -719,7 +736,7 @@ def context(
         raise ValueError("the neck step cutter does not reach the paper end")
 
     # Relief slot: the 1/2 in end mill from the far end in to one radius off
-    # the step, its passes one radius inside each wall; the 5/64 end mill
+    # the step, its passes one radius inside each wall; the 1/8 in end mill
     # then takes the two inside corners at the step down to its own radius.
     rz0, rz1 = g["relief"]
     relief_floor = bottom_level - g["relief_height"]
@@ -739,6 +756,7 @@ def context(
     )
     slot_x = (steps + r, length + r + APPROACH_MM)
     corner_levels = _levels(bottom_level, relief_floor, p["corner_step_max_mm"])
+    _agree(plan, "corner_step_max_mm", SLOT_AXIAL_MAX * e8)
     if not math.isclose(
         _cut(plan, "relief corners", "axial_doc_mm"),
         p["corner_step_max_mm"],
@@ -747,16 +765,16 @@ def context(
         raise ValueError(
             "'relief corners' axial_doc_mm is not process.corner_step_max_mm"
         )
-    corner_x = steps + r5
+    corner_x = steps + r8
     # Each corner path runs along its wall from where the 1/2 in end mill's
-    # last position cut it (one end-mill radius off the step) to one 5/64
+    # last position cut it (one end-mill radius off the step) to one 1/8
     # radius off the step, then along the step face to where the end mill
     # cut that face flat.
     corners = [
-        [(steps + r, rz0 - z1 + r5), (corner_x, rz0 - z1 + r5), (corner_x, slot_ys[0])],
+        [(steps + r, rz0 - z1 + r8), (corner_x, rz0 - z1 + r8), (corner_x, slot_ys[0])],
         [
-            (steps + r, rz1 - z1 - r5),
-            (corner_x, rz1 - z1 - r5),
+            (steps + r, rz1 - z1 - r8),
+            (corner_x, rz1 - z1 - r8),
             (corner_x, slot_ys[-1]),
         ],
     ]
@@ -766,11 +784,11 @@ def context(
         for x, y in (path[0], path[-1]):
             past = (
                 x >= slot_x[0] - 1e-6
-                and slot_lo - r + r5 - 1e-6 <= y <= slot_hi + r - r5 + 1e-6
+                and slot_lo - r + r8 - 1e-6 <= y <= slot_hi + r - r8 + 1e-6
             )
             within = (
                 min(math.dist((x, y), (slot_x[0], sy)) for sy in slot_ys)
-                <= r - r5 + 1e-6
+                <= r - r8 + 1e-6
             )
             if not (past or within):
                 raise ValueError(
@@ -779,8 +797,10 @@ def context(
 
     # V groove: the pointed 90° chamfer mill, its tip stepped down the V in
     # levels, at each level swept across it in passes along X; the outer
-    # passes put the cone on both flanks. The 5/64 end mill then sweeps the
-    # flat at the bottom between the last level's ridges.
+    # passes put the cone on both flanks. At the last level, the flat's, the
+    # tip then sweeps the flat again in passes V_FLAT_RIDGE_MAX_MM × 2 apart,
+    # its outer passes on the flat's edges (owner ruling 2026-11-23, tool
+    # audit Q9: no 5/64 cutter; the flat keeps its .08 and its place).
     v_levels = _v_levels(g["v_depth"], p["v_step_max_mm"])
     if not math.isclose(
         _cut(plan, "V groove", "axial_doc_mm"),
@@ -791,16 +811,26 @@ def context(
     v_passes = [
         (t, _v_offsets(g["mouth_half"] - t, p["v_stepover_max_mm"])) for t in v_levels
     ]
+    flat_offsets = _v_offsets(g["flat_half"], 2 * V_FLAT_RIDGE_MAX_MM)
+    flat_step = 2 * g["flat_half"] / (len(flat_offsets) - 1)
+    _agree(plan, "v_flat_stepover_mm", flat_step)
+    if not math.isclose(
+        _cut(plan, "V flat", "radial_woc_mm"), p["v_flat_stepover_mm"], abs_tol=1e-6
+    ):
+        raise ValueError("'V flat' radial_woc_mm is not process.v_flat_stepover_mm")
+    # The tip's outer passes stand the flat's edges at its nominal width,
+    # inside its printed band.
+    if not g["flat_width"][0] <= 2 * g["flat_half"] <= g["flat_width"][1]:
+        raise ValueError("the tip's outer flat passes leave the flat off its band")
     # Below the cone's depth the shank (the cone's top radius) meets the
     # flank exactly where the cone does and the 45° flank widens upward, so
     # the shank never cuts it.
     yc = g["centre"] - z1
     v_x = (-(cone + APPROACH_MM), g["v_end"])
-    flat_x = (-(r5 + APPROACH_MM), g["v_end"])
     # Past the steps the V's whole section lies in the slot (the slot first):
     # the chamfer mill's reach across the V stays inside the slot's walls
     # less their corner radius.
-    if g["mouth_half"] > (rz1 - rz0) / 2 - g["relief_corner_max"]:
+    if g["mouth_half"] > (rz1 - rz0) / 2 - g["relief_corner"][1]:
         raise ValueError("the V's end runs into the slot's corners")
 
     # Pivot bore and set screw.
@@ -944,7 +974,7 @@ def context(
     chamfer_tool = tool(
         "chamfer", chamfer["diameter_mm"], "chamfer", v_rpm, v_feed, flutes=2
     )
-    e5_tool = tool("em-5-64", e5, "endmill", e5_rpm, e5_feed, flutes=2)
+    e8_tool = tool("em-eighth", e8, "endmill", e8_rpm, e8_feed, flutes=3)
     spot_tool = tool(
         "spot",
         CENTRE_DRILL["body_mm"],
@@ -981,19 +1011,27 @@ def context(
     ]
     # Every level's plunge is beside P, in the air: a level that ends at the
     # V's far end (an odd count of passes) runs back along its last pass
-    # first, since a plunge there would put the cone past the flank.
+    # first, since a plunge there would put the cone past the flank. The
+    # flat's fine sweep follows the last level at its depth. Its cone, the
+    # tip inside the flat's edges, stays inside the finished V, so those
+    # passes start just off P instead of with the whole cone clear of it.
+    flat_x = (-APPROACH_MM, g["v_end"])
     at_start = True
     reverse = False
-    for t_level, offsets in v_passes:
+    last_t = None
+    sweeps = [(t, offsets, v_x) for t, offsets in v_passes]
+    for t_level, offsets, xs in [*sweeps, (g["v_depth"], flat_offsets, flat_x)]:
         order = list(reversed(offsets)) if reverse else list(offsets)
-        v_lines.append(f"G1 Z{_r(bottom_level - t_level):.3f} F{{feed}}")
+        if t_level != last_t:
+            v_lines.append(f"G1 Z{_r(bottom_level - t_level):.3f} F{{feed}}")
+        last_t = t_level
         for k, e in enumerate(order):
             if k or t_level != first_t:
                 v_lines.append(f"G1 Y{_r(yc + e):.3f} F{{feed}}")
-            v_lines.append(f"G1 X{_r(v_x[1] if at_start else v_x[0]):.3f} F{{feed}}")
+            v_lines.append(f"G1 X{_r(xs[1] if at_start else xs[0]):.3f} F{{feed}}")
             at_start = not at_start
         if not at_start:
-            v_lines.append(f"G1 X{_r(v_x[0]):.3f} F{{feed}}")
+            v_lines.append(f"G1 X{_r(xs[0]):.3f} F{{feed}}")
             at_start = True
         reverse = not reverse
     v_lines.append(f"G0 Z{clear_b:.3f}")
@@ -1001,14 +1039,6 @@ def context(
         line for path in corners for line in _corner(corner_levels, bottom_level, path)
     ]
     flat_z = bottom_level - g["v_depth"]
-    corner_lines += [
-        f"G0 Z{clear_b:.3f}",
-        f"G0 X{_r(flat_x[0]):.3f} Y{_r(yc):.3f}",
-        f"G0 Z{_r(bottom_level + SAFE_MM):.3f}",
-        f"G1 Z{_r(flat_z):.3f} F{{feed}}",
-        f"G1 X{_r(flat_x[1]):.3f} F{{feed}}",
-        f"G0 Z{clear_b:.3f}",
-    ]
 
     sections = {
         "paper_end": (
@@ -1046,9 +1076,9 @@ def context(
         ),
         "v_groove": (chamfer_tool, "bottom", "cut the V groove", v_lines),
         "corners": (
-            e5_tool,
+            e8_tool,
             "bottom",
-            "mill the slot corners and the V's flat",
+            "mill the slot corners",
             corner_lines,
         ),
         "top": (
@@ -1179,7 +1209,7 @@ def context(
         + stacks(lying, (-height, 0.0)),
     }
     # The 1/2 in end mill in the slot also keeps one radius off the step
-    # between the neck lands (the V's flat column is cut later, by the 5/64).
+    # between the neck lands (the V's flat column is the chamfer mill's).
     slot_keep = keep["bottom"][:4] + [
         _box("step face", (-50.0, steps), (rz0 - z1, rz1 - z1), bottom_level),
     ]
@@ -1285,10 +1315,18 @@ def context(
         for y in (slot_ys[0], yc, slot_ys[-1])
     ] + [[slot_x[0], rz0 - z1 + 0.05], [slot_x[0], rz1 - z1 - 0.05]]
     corner_points = [
-        [steps + 0.05, rz0 - z1 + r5],
+        [steps + 0.05, rz0 - z1 + r8],
         [corner_x, rz0 - z1 + 0.05],
-        [steps + 0.05, rz1 - z1 - r5],
+        [steps + 0.05, rz1 - z1 - r8],
         [corner_x, rz1 - z1 - 0.05],
+    ]
+    # Across the flat every quarter of a fine pass spacing, at P, midway and
+    # at the step: each within the ridge limit of a tip pass at the flat.
+    n_flat = 4 * (len(flat_offsets) - 1)
+    flat_points = [
+        [x, yc - g["flat_half"] + 2 * g["flat_half"] * j / n_flat]
+        for x in (0.05, steps / 2, steps - 0.05)
+        for j in range(n_flat + 1)
     ]
     expect += [
         [
@@ -1296,11 +1334,11 @@ def context(
             "tool_changes",
             {
                 "z_top": thick,
-                "tools": [tn["em-half"], tn["chamfer"], tn["em-5-64"]],
+                "tools": [tn["em-half"], tn["chamfer"], tn["em-eighth"]],
                 "loads_first": True,
             },
         ],
-        [name, "spindle", {"rpm": [[face_rpm], [v_rpm], [e5_rpm]]}],
+        [name, "spindle", {"rpm": [[face_rpm], [v_rpm], [e8_rpm]]}],
         [name, "pauses", {"z_top": thick, "count": 0}],
         [name, "depth", {"z_min": _r(relief_floor)}],
         *[
@@ -1341,23 +1379,19 @@ def context(
                 ],
             },
         ],
+        [
+            f"{name}@1",
+            "cleared",
+            {"points": flat_points, "radius": V_FLAT_RIDGE_MAX_MM, "z": _r(flat_z)},
+        ],
         [f"{name}@2", "depth", {"z_min": _r(relief_floor)}],
         [f"{name}@2", "rapids_clear", {"z_top": bottom_level}],
         [f"{name}@2", "air_feed", {"z_top": bottom_level}],
-        [f"{name}@2", "keep_out", {"radius": r5, "boxes": keep["bottom"]}],
+        [f"{name}@2", "keep_out", {"radius": r8, "boxes": keep["bottom"]}],
         [
             f"{name}@2",
             "cleared",
-            {"points": corner_points, "radius": r5, "z": _r(relief_floor)},
-        ],
-        [
-            f"{name}@2",
-            "cleared",
-            {
-                "points": [[0.05, yc], [steps, yc], [g["v_end"], yc]],
-                "radius": r5,
-                "z": _r(flat_z),
-            },
+            {"points": corner_points, "radius": r8, "z": _r(relief_floor)},
         ],
     ]
 
@@ -1480,6 +1514,7 @@ def context(
             "bottom": bottom_level,
             "mouth_half": g["mouth_half"],
             "passes": v_passes,
+            "flat": flat_offsets,
             "x": list(v_x),
         },
     }

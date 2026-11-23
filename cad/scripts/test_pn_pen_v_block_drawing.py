@@ -148,10 +148,21 @@ def test_pivot_bore_drops_wholly_into_the_slot_at_its_printed_limits() -> None:
     assert end - start == pytest.approx(grip_length)
     seat = min(end, spec.RELIEF_X0) - max(start, 0.0)
     assert seat == spec.RELIEF_X0
-    # The marker body (wider) starts past the corner arcs at their printed
-    # R.070 (owner ruling 2026-11-23, tool audit Q9): 0.81 clear, down from
-    # the 1.5 this test held at R.040 (open question in the Q9 PR).
-    assert end > spec.RELIEF_X0 + spec.RELIEF_CORNER_R_MAX + 0.8
+    # The marker body's shoulder (its widest section, BODY_FRONT_DIA) must not
+    # meet the step's corner arcs.  At the bottom face, where the body is
+    # widest in the slot, its chord stands 1.909 off each slot wall and an
+    # R.070 arc reaches 1.778 into the slot, so the body clears the arcs in plan
+    # wherever it starts (0.131).  It also starts past where the arcs end, with
+    # the step at its printed far limit, by the interference margin.  At
+    # R.070 that is 0.559 clear (owner ruling 2026-11-23, tool audit Q9).  The
+    # 1.5 held here before (074069092e) pinned that day's layout (the grip
+    # ending 2.5 past the step, less R.040); no function asked for it.
+    body_gap = spec.RELIEF_WIDTH / 2.0 - spec._BODY_HALF_CHORD_AT_BOTTOM
+    assert body_gap - spec.RELIEF_CORNER_R_MAX == pytest.approx(0.131, abs=1e-3)
+    worst_step = spec.RELIEF_X0 + _printed_devs(spec.RELIEF_X0, "ReliefX0")[1]
+    body_past_arcs = end - (worst_step + spec.RELIEF_CORNER_R_MAX)
+    assert body_past_arcs == pytest.approx(0.559, abs=1e-3)
+    assert body_past_arcs >= carriage.CLEARANCE
     assert carriage.plan_cg_residual_mm() <= 0.25
 
 
@@ -811,8 +822,10 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     assert part.V_APEX_FILLETS == pytest.approx(
         spec.V_APEX_FILLET_AREA * spec.V_CUT_LENGTH
     )
+    # Past the step the V's section is its triangle less the tip the apex
+    # rounds leave, over one corner radius.
     assert part.V_GROOVE_PAST_STEP == pytest.approx(
-        spec.V_GROOVE_AREA * spec.RELIEF_CORNER_R
+        spec.V_GROOVE_SECTION * spec.RELIEF_CORNER_R
     )
     # The carriage mass model carries the relief's two R.065 step corners
     # (owner ruling 2026-11-23, tool audit Q9) and leaves the bore's top
