@@ -90,6 +90,17 @@ plate_length_mm = 152.4
 plate_width_mm = 76.2
 plate_thickness_mm = 12.7
 pivot_on_plate_x_mm = 18.0
+# AR05's G54 X/Y is picked up on the arm itself, not the plate, so the screws'
+# clearance in the bores (up to ~.006 radial) does not move the outline off
+# the bores: AR01 put the pivot pivot_from_end_mm from the blank's left end
+# and on its centre line, .500 in from each ground edge. With the .200 edge
+# finder: from -X on the left end, X = pivot_on_plate_x_mm less
+# pivot_from_end_mm less its radius; from +Y on the ground edge nearer the
+# fixed jaw (the centre line at Y -1.500, the edge .500 above it), Y = that
+# edge plus its radius (cam.py checks both).
+edge_finder_dia_mm = 5.08
+arm_x_set_mm = 1.56
+arm_y_set_mm = -22.86
 plate_jaw_top_mm = 6.845
 plate_drill_past_mm = 1.0
 # The arm on the plate along X: from the pivot round's back to the square end,
@@ -483,6 +494,11 @@ feed = "hand"
 instruction = "Square it: a DTI in the spindle on the blank's ground edge (the fixed jaw side), traverse X over the blank's length; swing the arm about the pivot screw until the reading holds, then tighten the #4-40 and the #10-32 (hex keys, firm, not heavy)."
 inspection = "The blank's edge reads within .001 over its length along X after tightening; the arm does not rock on the plate. Fail: back both screws off to finger-tight, square again, then tighten the #4-40 and the #10-32 and read again."
 gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Pick up G54 X and Y on the arm, not the plate (the screws' clearance in the bores lets the arm sit up to .006 off the tapped holes; AR01 put the bores on the blank's end and edges)."
+instruction_detailed = "Edge finder (900 rpm), its tip at the arm's mid-thickness: on the blank's left end from −X, at Y −1.500: G10 L20 P1 X{{process.arm_x_set_mm:.3f}}. On the blank's ground edge nearer the fixed jaw from +Y, 1/2 in in from the left end: G10 L20 P1 Y{{process.arm_y_set_mm:.3f}}. Z0 stays the plate's top."
+feed = "hand"
 
 [[setups.operations]]
 instruction = "Prove AR05_outline in air, Z0 raised 1.000 in; every move clears both screw heads and the jaws. Then Z0 back."

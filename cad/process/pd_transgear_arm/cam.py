@@ -558,6 +558,9 @@ def context(
     origin = (px, -plate_w / 2)
     if not (px - g["radius"] > 0 and px + g["tip"] < plate_l):
         raise ValueError("the arm does not lie wholly on the plate")
+    ef_r = p["edge_finder_dia_mm"] / 2
+    _agree(plan, "arm_x_set_mm", px - p["pivot_from_end_mm"] - ef_r)
+    _agree(plan, "arm_y_set_mm", -plate_w / 2 + p["blank_width_mm"] / 2 + ef_r)
     plate_jaw_top = p["vise_jaw_height_mm"] - p["parallel_height_mm"] - plate_t
     _agree(plan, "plate_jaw_top_mm", plate_jaw_top)
     frames["plate"] = _frame([-px, plate_w / 2, 0.0], [0, 1, 0], [0, 0, 1])
