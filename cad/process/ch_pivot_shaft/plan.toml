@@ -321,8 +321,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.stock_dia_mm}}", along
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{process.vise_jaw_from_x0_mm}}", "{{process.vise_jaw_to_x0_mm}}"], section_mm = { diameter = "{{cad.stock_dia_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Console M6 T1 (the 1/8 in end mill). Spindle stopped: jog it by eye over the middle of the datum-end flat (between the jaws, at the right), G54 Y−1.500 (Y0 unchanged from Op 170: same fixed jaw, same O.D.), and lower it until it just drags a .002 feeler leaf on the flat. Note the DRO Z. Do the same at Y1.500."
-inspection = "The two Z readings within 0.025 mm (.001 in) of each other: the flat level across within .64° (the end mill's two touches land 2.24 mm apart on the .21-across flat), inside the title block's ±1° angle."
+instruction = "Console M6 T1 (the 1/8 in end mill). Spindle stopped: jog it by eye over the middle of the datum-end flat (between the jaws, at the right), G54 Y−1.200 (Y0 unchanged from Op 170: same fixed jaw, same O.D.; the cutter's edge then stands .015 in clear of each jaw face), and lower it until it just drags a .002 feeler leaf on the flat. Note the DRO Z. Do the same at Y1.200."
+inspection = "The two Z readings within 0.025 mm (.001 in) of each other: the flat level across within .74° (the end mill's two touches land 1.94 mm apart on the .21-across flat), inside the title block's ±1° angle."
 gauge_checks = "other"
 
 [[setups.operations]]
