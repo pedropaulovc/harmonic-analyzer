@@ -123,8 +123,8 @@ lead_axial_in = 0.012
 lead_compound_in = 0.017
 # The head's chamfer (.005-.010 X 45°) aimed at its middle.
 head_chamfer_aim_in = 0.0075
-# The tip's thread-start chamfer: .010 X 45° (the drawing's .015 MAX).
-tip_chamfer_aim_in = 0.010
+# The tip's thread-start chamfer (the drawing's .015 MAX) is filed at the
+# bench after the part-off (Setup 4): no lathe cut at the unsupported tip.
 
 [[tools]]
 id = "saw"
@@ -217,7 +217,7 @@ title = "Lathe: turn the screw on the centre, thread, relief, part off"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the rod, S (Setup 1) out of the jaw fronts, set with the calipers' depth rod, the beam's end on the jaw fronts; the rest in the jaws. The tailstock dead centre, greased, in the tip's centre hole for Ops 60–180, the quill backed off for each touch-off on the tip and for the readings (Ops 120, 130, 160, 180) and brought back snug; the tailstock backed away for the tip chamfer (Op 190), brought up in Op 200, its centre out, to square the die, and backed away again for the relief and the part-off (Ops 230–280)."
+holding = "3-jaw on the rod, S (Setup 1) out of the jaw fronts, set with the calipers' depth rod, the beam's end on the jaw fronts; the rest in the jaws. The tailstock dead centre, greased, in the tip's centre hole for every cut but the die and the part-off: in for Ops 60–180 and 230–270, the quill backed off for each touch-off on the tip and for the readings (Ops 120, 130, 160, 180, 260) and brought back snug; out for the die (Ops 190–220, the quill squaring it) and the part-off (Op 280)."
 datum = "Z0 (carriage DRO) the tip's faced plane, set in Op 40; each tool touched on the tip again when it takes over (Ops 120, 130, 180, 280). The seat at Z−{{process.seat_z_in:.3dot}}; the under-head face at Z−U and the part-off at Z−P from Setup 1."
 diagram = { file = "diagrams/turn.svg", alt = "The rod in the 3-jaw on the dead centre at the tip: the head's Ø.236 next to the jaws, the long Ø.155 shoulder, the #4-40 thread at the tip; the relief at the seat; the part-off at the head's face." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.stock_dia_mm}}", stock_diameter_mm = "{{process.stock_dia_mm}}", stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{process.thread_dia_min_mm}}", support = "tailstock" }
@@ -344,7 +344,7 @@ instruction = "Blank under {{cad.thread_dia_min_in:.4dot}}: scrap the blank and 
 cut_kind = "other"
 instruction = "Spindle stopped: back the quill until the dead centre clears the tip. With the calipers' depth rod, the beam's end on the tip each time, read down beside the blank onto the seat face, then down beside the shoulder onto the under-head face; the shoulder is the second less the first. Bring the centre back in, snug as in Op 60."
 inspection = "Tip to seat {{cad.seat_face_station_min_in:.2dot}}–{{cad.seat_face_station_max_in:.2dot}}; the shoulder M + {{process.end_play_min_in:.3dot}} to M + {{process.end_play_max_in:.3dot}}."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.seat_face_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.under_head_face_end_play_band_mm}}" }]
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.seat_face_station_band_mm}}" }, { gauge = "calipers", band_mm = [50.292, 56.896] }]
 
 [[setups.operations]]
 cut_kind = "other"
@@ -356,23 +356,17 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "Head chamfer 45°, {{cad.head_chamfer_min_in:.3dot}}–{{cad.head_chamfer_max_in:.3dot}}: swing the compound to 45° (its feed in and toward the tip); re-square the blade's holder. Spindle stopped: back the quill until the centre clears the tip. With the .002 feeler leaf on the tip, touch the blade's chuck-side face on it and set DRO Z to +.002; its chuck-side corner on the head's O.D. at Z−(U + {{process.head_chamfer_aim_in:.4dot}}), zero the compound. Spindle on: feed .011 along the compound."
+instruction = "Head chamfer 45°, {{cad.head_chamfer_min_in:.3dot}}–{{cad.head_chamfer_max_in:.3dot}}: swing the compound to 45° (its feed in and toward the tip); re-square the blade's holder. Spindle stopped: back the quill until the centre clears the tip. With the .002 feeler leaf on the tip, touch the blade's chuck-side face on it and set DRO Z to +.002; its chuck-side corner on the head's O.D. at Z−(U + {{process.head_chamfer_aim_in:.4dot}}), zero the compound. Spindle on: feed .011 along the compound, then back to its zero."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.head_aim_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-speed_kind = "spindle"
-tool = "part"
-drilling = "none"
-sizing = "other"
-instruction = "Tip chamfer 45°, {{cad.thread_tip_chamfer_max_mm:in.3dot}} MAX: back the tailstock away, the centre out of the tip. Spindle stopped: the blade's chuck-side corner on the blank's O.D. at Z−{{process.tip_chamfer_aim_in:.3dot}}; zero the compound (still at 45°). Spindle on: feed .014 along it; the corner runs out on the tip face."
-settings = "lathe-part-1018"
-cut_diameter_mm = "{{process.thread_aim_dia_mm}}"
+instruction = "Spindle stopped: back the tailstock away and take the dead centre out of the quill (it goes back in for the relief, Op 230)."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped, in low range: take the dead centre out of the quill and bring the tailstock up. Put the #4-40 die in the die stock, lettered face toward the tip, and square its back against the quill's face."
+instruction = "In low range: bring the tailstock up. Put the #4-40 die in the die stock, lettered face toward the tip, and square its back against the quill's face."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -380,7 +374,7 @@ speed_kind = "other"
 tool = "die"
 drilling = "none"
 sizing = "other"
-instruction = "Start the die on the chamfer, turning the die stock by hand with cutting oil, a half turn forward and a quarter back, the quill following; run it on until it stops at the seat, then back it off."
+instruction = "Start the die square on the tip's end (its own lead starts the thread; the tip's chamfer is filed in Setup 4), turning the die stock by hand with cutting oil, a half turn forward and a quarter back, the quill following; run it on until it stops at the seat, then back it off."
 feed = "hand"
 
 [[setups.operations]]
@@ -398,7 +392,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "Relief, first plunge, with the {{process.blade_width_in:.4dot}} cutoff blade on centre height, square to the axis. Spindle stopped: bring the blade's chuck-side face on the seat face (Z−{{process.seat_z_in:.3dot}}), just gripping a cigarette paper, and lock the carriage. Zero the cross-slide dial with the blade's tip on the thread's crest. Spindle on: feed in (the blank miked in Op 140 − {{process.lead_outer_dia_in:.3dot}})/2 on the radius, to a floor of Ø{{process.lead_outer_dia_in:.3dot}} (the lead's outer edge); back out."
+instruction = "Relief, first plunge, the {{process.blade_width_in:.4dot}} blade on centre height, square. Spindle stopped: the dead centre back in the tip, greased, snug. The blade's chuck-side face on the seat face (Z−{{process.seat_z_in:.3dot}}) over a cigarette paper; lock the carriage; zero the cross-slide on the thread's crest. Spindle on: feed in (Op 140's blank − {{process.lead_outer_dia_in:.3dot}})/2 on the radius, to Ø{{process.lead_outer_dia_in:.3dot}}; back out."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.thread_aim_dia_mm}}"
 
@@ -424,7 +418,7 @@ cut_diameter_mm = "{{process.thread_aim_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Read the relief's floor with the calipers' jaw tips and its width with the inside jaws; run the #4-40 nut on by hand to the relief. Under the loupe: the lead's 45° runs from the floor into the seat face, the seat face square above it."
+instruction = "Spindle stopped: back the quill until the centre clears the tip. Read the relief's floor with the calipers' jaw tips and its width with the inside jaws; run the #4-40 nut on by hand to the relief and off. Under the loupe: the lead's 45° runs from the floor into the seat face. Bring the centre back snug."
 inspection = "Relief Ø{{cad.relief_dia_min_in:.3dot}}–{{cad.relief_dia_max_in:.3dot}}, {{cad.relief_width_min_in:.2dot}}–{{cad.relief_width_max_in:.2dot}} wide; the nut runs on by hand to the relief."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.relief_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.relief_width_band_mm}}" }]
 
@@ -438,7 +432,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "Part off: the compound back square, the holder re-squared. Spindle stopped: with the .002 feeler leaf on the tip, touch the blade's chuck-side face on it and set DRO Z to +(.002 + the blade's width): the DRO reads its tailstock-side face. Bring the blade's tailstock-side face on Z−P (the head's length past the under-head face). Spindle on: cutting oil, steady by hand, backing out for chips; catch the screw by hand as it parts."
+instruction = "Part off: tailstock away, compound square, holder re-squared. Spindle stopped: with the .002 feeler leaf on the tip, touch the blade's chuck-side face on it and set DRO Z to +(.002 + the blade's width): the DRO reads its tailstock-side face. The blade's tailstock-side face on Z−P. Spindle on: cutting oil, steady, backing out for chips; catch the screw as it parts."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.head_aim_dia_mm}}"
 
@@ -494,6 +488,14 @@ tool = "file"
 drilling = "none"
 sizing = "other"
 instruction = "Take the burrs off the slot's edges and the head face's edge with light strokes of the smooth file (R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max); the seat face's edge burr only, {{cad.seat_face_edge_break_max_mm:in.3dot}} MAX. Leave the shoulder and the thread untouched."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Tip chamfer 45° for the thread's start, {{cad.thread_tip_chamfer_max_mm:in.3dot}} MAX: the head in the bench vise's soft jaws, the smooth file at 45° to the axis, light strokes all round the tip's corner until the first thread's crest is just cut back (under the loupe, the chamfer no wider than that first crest, about .015); no burr left on it."
 feed = "hand"
 
 [[setups.operations]]
