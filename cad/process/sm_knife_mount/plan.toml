@@ -366,7 +366,7 @@ instruction = "An unfaced patch left: send $#, note the G54 line's Z; work out w
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Unclamp; mark this face K; file its edges' burr off so K seats flat. Next piece."
+instruction = "Unclamp; mark this face K; file its edges' burr off so K seats flat. Next piece: this setup again from its edge-find."
 feed = "hand"
 
 [[setups]]
@@ -415,7 +415,7 @@ instruction_detailed = "Over {{cad.back_face_depth_max_in:.3dot}}: send $# and n
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Unclamp; mark this face F, and write the piece's number (1, 2 or T) on it again: facing F took the first one off. File the burr off its edges. The coupon T is done until Setup 8. Next piece."
+instruction = "Unclamp; mark this face F, and write the piece's number (1, 2 or T) on it again: facing F took the first one off. File the burr off its edges. The coupon T is done until Setup 8. Next piece: this setup again from its edge-find."
 feed = "hand"
 
 [[setups]]
@@ -751,7 +751,7 @@ gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Unclamp. File the milled burr off A's four edges with the smooth file, and the mouths of B and the tap hole with the scraper only: A, S and K are Setup 8's seats and datums. Next blank."
+instruction = "Unclamp. File the milled burr off A's four edges with the smooth file, and the mouths of B and the tap hole with the scraper only: A, S and K are Setup 8's seats and datums. Next blank: this setup again from its edge-find."
 feed = "hand"
 
 [[setups]]
@@ -840,7 +840,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "The coupon T: GO enters and NO-GO does not: go on to blanks 1 and 2. NO-GO enters the coupon: stop and tell the owner (the reamer cuts oversize in this bar). GO tight: re-ream by MDI (next op) and gauge again; still tight: stop and tell the owner."
+instruction = "The coupon T: GO enters and NO-GO does not: unclamp it; blanks 1 and 2 follow, each clamped as the Holding says and this setup run again from its edge-find (X0 on each blank's faced A). NO-GO enters the coupon: stop and tell the owner (the reamer cuts oversize in this bar). GO tight: re-ream by MDI (next op) and gauge again; still tight: stop and tell the owner."
 feed = "hand"
 
 [[setups.operations]]
@@ -848,7 +848,7 @@ instruction = "T7, the 12 mm reamer, still in the 7/16 collet, its tool length a
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A blank 1 or 2 whose GO is tight: re-ream it by the MDI above and gauge again; still tight: stop and tell the owner. NO-GO enters a part: it is scrap; stop and tell the owner before reaming the other."
+instruction = "A blank 1 or 2 whose GO is tight: re-ream it by the MDI above and gauge again; still tight: stop and tell the owner. NO-GO enters a part: it is scrap; stop and tell the owner before reaming the other. Gauged: unclamp; the next blank from this setup's edge-find."
 feed = "hand"
 
 [[setups]]
@@ -871,7 +871,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Bore from A: the GO out of B; the block A down on the surface plate, the .4720 GO through the bore; the height gauge on top of the GO where it stands out past F, less half its Ø (.4720/2)."
-inspection = "Bore from A {{process.bore_from_a_min_mm:in.4dot}}–{{process.bore_from_a_max_mm:in.4dot}}: note it for the radial test. Outside: the bore is out of its zone; stop and tell the owner."
+inspection = "Bore from A {{process.bore_from_a_min_mm:in.4dot}}–{{process.bore_from_a_max_mm:in.4dot}}: note it for the radial test. Outside: these gauges cannot show the bore in its zone; stop and tell the owner (a finer check decides; do not scrap it)."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = ["{{process.bore_from_a_min_mm}}", "{{process.bore_from_a_max_mm}}"] },
 ]
@@ -879,7 +879,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Bore from B: the block stood on S on the surface plate, the .4720 GO through the bore and the .1273 GO in B, both standing out sideways. Height gauge on top of each GO less half its Ø: the bore's reading less B's is the bore from B."
-inspection = "Bore from B {{process.bore_from_b_min_mm:in.4dot}}–{{process.bore_from_b_max_mm:in.4dot}}: note it for the radial test. Outside: the bore is out of its zone; stop and tell the owner."
+inspection = "Bore from B {{process.bore_from_b_min_mm:in.4dot}}–{{process.bore_from_b_max_mm:in.4dot}}: note it for the radial test. Outside: these gauges cannot show the bore in its zone; stop and tell the owner (a finer check decides; do not scrap it)."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = ["{{process.bore_from_b_min_mm}}", "{{process.bore_from_b_max_mm}}"] },
 ]
@@ -887,7 +887,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Radial test, every block: dA = the bore from A less .811, dB = the bore from B less .300; r = √((|dA| + {{process.bore_err_a_mm:in.4dot}})² + (|dB| + {{process.bore_err_b_mm:in.4dot}})²), each reading's pin play and gauge count added."
-inspection = "r at most .0040 (the drawing's Ø.008 position zone to A|B): a good bore. Over: stop and tell the owner."
+inspection = "r at most .0040 (the drawing's Ø.008 position zone to A|B): a good bore, proven with each reading's error allowed. Over: the gauges cannot prove it; stop and tell the owner (it may still be in the zone: a finer check decides; do not scrap it)."
 gauge_checks = "other"
 feed = "hand"
 
