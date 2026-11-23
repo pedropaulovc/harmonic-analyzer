@@ -166,15 +166,11 @@ purchase = "Travers 01-071-005, $2.40 each, 61 in stock (listing read live 2026-
 status = "to_order"
 note = "Not owned: to buy. MHA-FR-01 and MHA-FR-02 4X Ø.206 DRILL TO SOCKET, part on edge."
 
-# The #4 (.209 in) clearance drill the repo's fastener table names for the same
-# cross-screw holes (tool audit 2026-11-23): the jobber from the owned index,
-# and its screw-machine length for the frame-on-edge setup, where a jobber
-# stands over the spindle limit (machining-dfm.md "Cross-screw setup").
-[tools.drill-4]
-kind = "drill"
-status = "on_hand"
-note = "The #4 (.209 in) jobber drill of the owned 115-piece index (owner 2026-11-17, as tools.clamp-drill-g records). No purchase."
-
+# The #4 (.209 in) screw-machine length drill for the same cross-screw holes,
+# for the plan change in #3451 (tool audit 2026-11-23: the fastener table's
+# clearance drill is #4; a jobber #4, tools.drill-4, stands over the spindle
+# limit with the frame on edge). It applies once the MHA-FR-01/-02 plans name
+# it; until then they name the #5 above. Buy one of the two, not both.
 [tools.frame-clearance-stub-drill-4]
 name = "TTC 01-071-004, #4 (.2090 in) HSS screw-machine length drill, 118 deg, 2-3/8 in OAL"
 kind = "drill"
