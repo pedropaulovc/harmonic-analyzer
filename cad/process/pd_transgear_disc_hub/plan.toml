@@ -28,6 +28,11 @@
 #   (±.002) is measured with the .0615 GO plug standing in the ream and
 #   CM03 is run again deeper by the shortfall: a chucking reamer's bevel
 #   leaves its full diameter short of its tip by an unknown .000-.010.
+#   That rerun may end-cut up to .010 into the #53's 118° point cone below
+#   the stop, by design (Codjiflo #3407 P2): the cone is the VN-69 pin's
+#   firm seat, so the #53 is not drilled deeper to make room. The reamer
+#   end-cuts free-machining C360 lightly and only once, by the measured
+#   shortfall (ops 320-330). cam.py repeats this rationale beside the stop.
 # - Setup 5, bench: deburr, clear the bore, gauge both reams, oil.
 # Left to MHA-PD-00 (final op): the MHA-PD-VN-69 pin pressed into the ream
 # (step 8A), the disc spotted through the three flange holes (9G), the
