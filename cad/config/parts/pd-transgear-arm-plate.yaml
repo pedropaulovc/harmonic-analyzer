@@ -9,7 +9,8 @@ pd-transgear-arm-plate:
   drawing_unit: in
   process: >-
     Mill the outline from the 1/4 x 1-1/2 flat bar and face it to .197;
-    drill and ream the 7/16 press hole on K and chamfer its face-A mouth;
+    drill and ream the press hole on K with the .4385 set reamer and chamfer
+    its face-A mouth;
     drill and countersink the two clamp screw holes. Press the MHA-PD-28
     bush in from face A until its shoulder seats, then ream its bore,
     before the plate is clamped to MHA-PD-18. At assembly (MHA-PD-00 steps
@@ -17,9 +18,9 @@ pd-transgear-arm-plate:
     MHA-PD-23 pin is pressed into MHA-PD-18: clamp the plate on the arm's
     rear face and, on the mill DRO, set the knob bore at the MHA-PD-00
     DETAIL K settings from the pin's shank in the arm's pin bore S, indicated
-    true; run the trial mesh; once it reads, drill the two common #44 (.086)
+    true; run the trial mesh; once it reads, drill the two common #32 (.116)
     locating pilots through the arm and the plate in that setting.
-    Ream plate holes .0945 through and arm holes .0930
+    Ream plate holes .1260 through and arm holes .1240
     separately; never pass the larger plate reamer into an arm press seat.
     Arm-hole mouth breaks .002 MAX (plate holes per the title block).
     Reassemble the original matched pair and inspect
