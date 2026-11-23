@@ -635,7 +635,7 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Run CL06_outline (M6 T2; set 2800): each lever's outline anticlockwise round its drawn edge over the web's thickness, in levels from the web's far face to .010 past its near face; below {{process.tab_top_mm:in.3dot}} above Z0 the cutter lifts over seven tabs, {{process.tab_width_mm:in.3dot}} wide and {{process.tab_thickness_mm:in.3dot}} thick on the web's near face: one at the hub's far side, six along the bar, alternately top and bottom. The cutter leaves its own R.0625 in the two roots where the bar's edges meet the hub: the drawing's 2X R.065 (.060–.070). Plunges into metal at {{process.eighth_plunge_feed_per_min_mm:in.1f}} in/min."
+instruction = "Run CL06_outline (M6 T2; set 2800): each lever's outline anticlockwise round its drawn edge over the web's thickness, in levels from the web's far face to .010 past its near face; below {{process.tab_top_mm:in.3dot}} above Z0 the cutter lifts over seven tabs, {{process.tab_width_mm:in.3dot}} wide and {{process.tab_thickness_mm:in.3dot}} thick on the web's near face: one at the hub's far side, six along the bar, alternately top and bottom. Plunges into metal at {{process.eighth_plunge_feed_per_min_mm:in.1f}} in/min."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
   { name = "outline", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = 1.0837, radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = ["{{process.lever_start_mm}}", "{{process.lever_end_mm}}"] },
@@ -702,7 +702,7 @@ gauge_checks = [
 
 [[setups.operations]]
 instruction = "The lowest-numbered lever of each load only (the flip's registration and the proved outline): its hub, bar and tip. The other levers are not gauged on these: the proved program's path holds them."
-inspection = "Hub Ø{{cad.hub_dia_min_in:.2f}}–{{cad.hub_dia_max_in:.2f}}, bar {{cad.outline_bar_height_min_in:.2f}}–{{cad.outline_bar_height_max_in:.2f}} high at 5.50 from the bore's centre (the drawing's station; the bar tapers past it) and the tip's wall round the spring hole at least .060 (the calipers). Outside: set that load's four levers aside and tell the owner. The roots are not gauged: the 1/8 in cutter's own R.0625 holds them in the drawing's R{{cad.outline_root_corner_r_min_in:.3dot}}–{{cad.outline_root_corner_r_max_in:.3dot}}."
+inspection = "Hub Ø{{cad.hub_dia_min_in:.2dot}}–{{cad.hub_dia_max_in:.2dot}}, bar {{cad.outline_bar_height_min_in:.2dot}}–{{cad.outline_bar_height_max_in:.2dot}} high at 5.50 from the bore's centre (the drawing's station; the bar tapers past it) and the tip's wall round the spring hole at least .060 (the calipers). Outside: set that load's four levers aside and tell the owner. The roots are not gauged: the 1/8 in cutter's own R.0625 holds them in the drawing's R{{cad.outline_root_corner_r_min_in:.3dot}}–{{cad.outline_root_corner_r_max_in:.3dot}}."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.hub_dia_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.outline_bar_height_band_mm}}" },
