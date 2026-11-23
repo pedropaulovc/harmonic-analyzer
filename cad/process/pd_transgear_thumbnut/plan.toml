@@ -69,18 +69,18 @@ regrip_grip_in = 0.25
 # chamfered threads (about .09-.16) then leave full thread to about .56-.63
 # from the seat; the hole ends at the recess floor, .57-.61 from the seat, so
 # at worst the last pitch or two there carry the chamfer's partial thread,
-# which the rim-end chase (Op 240, tap_chase_mark_in) clears. The drill runs past the
+# which the rim-end chase (Op 250, tap_chase_mark_in) clears. The drill runs past the
 # tap's point.
 tap_drill_depth_mm = 22.86
 tap_mark_in = 0.72
-# The rim-end chase (Setup 2, Op 240): the seat-end tap leaves up to a
+# The rim-end chase (Setup 2, Op 250): the seat-end tap leaves up to a
 # chamfer's length (.16) of partial thread above the recess floor, which lies
 # .03-.05 under the rim face, so partial thread runs no farther than .21 from
 # the rim face; the plug tap entered from the rim clears it when its point
 # reaches .21 + .16 = .37: marked .40 from its point (authored), well inside
 # its .75 thread length.
 tap_chase_mark_in = 0.40
-# The dish floor held inside the drawing's bands (authored): the Op 210 cone
+# The dish floor held inside the drawing's bands (authored): the Op 220 cone
 # at the drawing's flank sets the rim at about floor Ø + 6 × depth, so the
 # floor Ø.350 ±.002 and depth .040 ±.001 put the rim at .582-.598, inside
 # its .58-.60. In mm for the gauge checks: × 25.4.
@@ -369,11 +369,16 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Dish floor, the AR set square to the face as for facing, its nose clear of the hole: cut a flat-bottomed recess Ø{{process.recess_floor_hold_min_in:.3dot}}–{{process.recess_floor_hold_max_in:.3dot}}, {{process.recess_depth_hold_min_in:.3dot}}–{{process.recess_depth_hold_max_in:.3dot}} deep by the DRO from Z0 (inside the drawing's bands: the Op 210 cone puts the rim at about floor Ø + 6 × depth), in facing passes from the hole outward, the last a light skim; check its Ø between passes."
+instruction = "Dish floor, the AR set square to the face as for facing, its nose clear of the hole: cut a flat-bottomed recess Ø{{process.recess_floor_hold_min_in:.3dot}}–{{process.recess_floor_hold_max_in:.3dot}}, {{process.recess_depth_hold_min_in:.3dot}}–{{process.recess_depth_hold_max_in:.3dot}} deep by the DRO from Z0 (inside the drawing's bands: the Op 220 cone puts the rim at about floor Ø + 6 × depth), in facing passes from the hole outward, the last a light skim; check its Ø between passes."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.recess_floor_dia_mm}}"
 inspection = "Floor Ø{{process.recess_floor_hold_min_in:.3dot}}–{{process.recess_floor_hold_max_in:.3dot}}, calipers' inside jaws on the recess's wall; depth {{process.recess_depth_hold_min_in:.3dot}}–{{process.recess_depth_hold_max_in:.3dot}} on the DRO."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.recess_floor_hold_min_mm}}", "{{process.recess_floor_hold_max_mm}}"] }, { gauge = "lathe-z-dro", band_mm = ["{{process.recess_depth_hold_min_mm}}", "{{process.recess_depth_hold_max_mm}}"] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Floor small or shallow (Op 200): cut again and recheck before the cone. Floor or depth over its Op 200 target but inside the drawing's band: go on to the cone (Op 220). Floor over Ø{{cad.recess_floor_dia_max_in:.2dot}} or deeper than {{cad.recess_depth_max_in:.2dot}}: scrapped; make another from Setup 1."
+feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -384,12 +389,12 @@ sizing = "other"
 instruction = "Dish cone: swing the compound to {{cad.recess_flank_deg:.1f}}° off the cross slide (the flank is {{cad.recess_half_angle_deg:.1f}}° off the axis). Take light passes down the compound from the face toward the floor, moving the cross slide out a little between passes, until a pass ends exactly in the floor's corner: the cone then meets the face at Ø{{cad.recess_dia_in:.2dot}} by itself."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.recess_dia_mm}}"
-inspection = "Rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}}, calipers' inside jaws across the cone's mouth at the rim face; one clean cone from the rim to the floor, no step left at the corner."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.recess_dia_band_mm}}" }]
+inspection = "One clean cone from the rim to the floor, no step left at the corner. The rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}} is held by the process, not gauged: about floor Ø + 6 × depth, .582–.598 from the Op 200 floor and depth."
+gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Floor small or shallow (Op 200): cut again and recheck. Floor or depth over its Op 200 target but inside the drawing's band: go on to Op 210, cut the cone and read the rim there. A step at the corner (Op 210): another pass down the compound into the corner. Rim under its band with the floor on its Op 200 target: deepen the floor .001 (the rim grows about .006) and recut the cone. Rim over Ø{{cad.recess_dia_max_in:.2dot}}, floor over the drawing's Ø{{cad.recess_floor_dia_max_in:.2dot}}, or deeper than {{cad.recess_depth_max_in:.2dot}}: scrapped; make another from Setup 1."
+instruction = "A step at the corner (Op 220): another pass down the compound into the corner. A rim edge that does not meet the face cleanly: one more light pass. Rim over Ø{{cad.recess_dia_max_in:.2dot}} by eye against the drawing (the cone run past the face): scrapped; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
@@ -438,7 +443,7 @@ gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A nut whose screw binds in Op 260: chase it again from the rim end as Op 240, and from the seat end with the plug tap to its Op 140 mark, and recheck. A marked knurl, or a check above that more cutting cannot bring into its band, is scrapped, not reworked: make another from Setup 1."
+instruction = "A nut whose screw binds in Op 270: chase it again from the rim end as Op 250, and from the seat end with the plug tap to its Op 140 mark, and recheck. A marked knurl, or a check above that more cutting cannot bring into its band, is scrapped, not reworked: make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
