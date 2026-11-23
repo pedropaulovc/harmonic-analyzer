@@ -81,8 +81,8 @@ def test_the_envelope_is_what_the_report_shows(key: str) -> None:
     depth, width = record["axial_doc_max_mm"], record["radial_woc_max_mm"]
     # The limit itself was cut, at the setting's speed, and was stable.
     assert (depth, setting["rpm"], width, "analysed", "stable") in passes
-    # Nothing deeper was cut stable, and no stable pass at the limit's depth
-    # was wider unless a narrower pass at that depth chattered below it.
+    # Nothing deeper was cut stable; and at the limit's depth and the setting's
+    # speed, every pass no wider than the limit was stable.
     deepest = max(p[0] for p in passes if p[4] == "stable")
     assert deepest == depth
     at_speed = [p for p in passes if p[1] == setting["rpm"] and p[0] == depth]

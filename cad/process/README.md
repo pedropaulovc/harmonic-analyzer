@@ -175,7 +175,9 @@ they need from their process plans. They hold:
   prechips refuses any other key on a setting, so the limits are data here;
   `test_measured_cuts.py` checks each against its report and refuses a plan
   operation that names the setting with another stick-out, or a
-  `milling_cuts` entry deeper or wider than measured;
+  `milling_cuts` entry deeper or wider than measured. The cut direction the
+  passes ran (`direction`) is recorded and NOT checked: a cut has no direction
+  field, so a climb pass on a measured setting is not refused;
 - ownership-only records, under the shop key, for the PM-30MV mill, the
   PM-1127VF-LB lathe, the calipers, the DRO scales and the clamp bore's and
   stop plate's drill shanks read as gauges (`machines.*`, `gauges.calipers`,
