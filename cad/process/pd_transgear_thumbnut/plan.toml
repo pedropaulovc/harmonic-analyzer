@@ -417,19 +417,27 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Rechuck the nut by its knurled head over the shim wrap, {{process.regrip_grip_in:.2dot}} in in the jaws (Holding line). True it: the test indicator on a .002 feeler leaf laid on the crests (the leaf bridges the roots), the chuck turned by hand, tapping the nut over."
-inspection = "Nut true: .001 TIR or less on the leaf."
+speed_kind = "other"
+tool = "dti"
+drilling = "none"
+sizing = "other"
+instruction = "Rechuck the nut by its knurled head over the shim wrap, {{process.regrip_grip_in:.2dot}} in in the jaws (Holding line). True it: the lever test indicator on a .002 feeler leaf laid on the crests (the leaf bridges the roots), the chuck turned by hand, tapping the nut over."
+inspection = "Nut true: .001 in TIR (.025 mm on the test indicator) or less on the leaf."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Swing the compound {{cad.recess_flank_deg:.1f}}° off the cross slide (fed out, the tool goes toward the tailstock); set it with the indicator on the compound, plunger on the faced rim by the drilled hole. Lock the swivel; wind the slide back in {{process.compound_check_travel_in:.3dot}} and zero its dial there. Turn the toolpost so the AR's chuck-side edge is 20°–25° off the face (never past 30°) and lock it."
-inspection = "Compound: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends {{process.compound_check_rise_in:.3dot}}; then back at its dial's zero."
+speed_kind = "other"
+tool = "indicator"
+drilling = "none"
+sizing = "other"
+instruction = "Swing the compound {{cad.recess_flank_deg:.1f}}° off the cross slide (fed out, the tool goes toward the tailstock); set it with the .001 in dial indicator on the compound, plunger on the faced rim by the drilled hole. Lock the swivel; wind the slide back in {{process.compound_check_travel_in:.3dot}} and zero its dial there. Turn the toolpost so the AR's chuck-side edge is 20°–25° off the face (never past 30°) and lock it."
+inspection = "Compound: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends .094–.096 (±0.2°); then back at its dial's zero."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Nut over .001 TIR (Op 190): tap it over and indicate again. Compound not reading {{process.compound_check_rise_in:.3dot}} (Op 200): re-swing and indicate again. Both before the touch-offs in Op 220."
+instruction = "Nut over .001 TIR (Op 190): tap it over and indicate again. Compound outside .094–.096 (Op 200): re-swing and indicate again. Both before the touch-offs in Op 220."
 feed = "hand"
 
 [[setups.operations]]
