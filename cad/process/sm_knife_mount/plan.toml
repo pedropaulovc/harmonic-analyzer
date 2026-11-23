@@ -614,9 +614,7 @@ inspection = "GO reads {{process.dowel_go_pin_min_mm:in.4dot}}–{{process.dowel
 gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.dowel_go_pin_min_mm}}", "{{process.dowel_go_pin_max_mm}}"] }, { gauge = "micrometers", band_mm = ["{{process.dowel_nogo_pin_min_mm}}", "{{process.dowel_nogo_pin_max_mm}}"] }]
 
 [[setups.operations]]
-steps = [
-  { kind = "stop", text = "The .1280 reamer reads under the GO pin's reading: its holes would be refused. Stop and tell the owner before any blank is reamed." },
-]
+instruction = "If the .1280 reamer reads under the GO pin's reading, its holes would be refused: stop and tell the owner before reaming any blank."
 feed = "hand"
 
 [[setups.operations]]
@@ -733,8 +731,8 @@ gauge_checks = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The tap drill: the #25 drill's shank end down in it, its length less what stands above A (calipers). Its spacing to B: calipers outside over the GO in B and the #25 shank, less half the sum of the GO pin's written reading and .1495. The tap's position (the drawing's Ø.005 to A|B|C) is held by the program, B and the tap drilled in this one clamping: the spacing catches a gross error only."
-inspection = "Tap drill full Ø depth {{cad.stud_tap_drill_depth_min_in:.3dot}}–{{cad.stud_tap_drill_depth_max_in:.3dot}}; B to the tap hole {{process.tap_from_b_min_mm:in.4dot}}–{{process.tap_from_b_max_mm:in.4dot}}. Outside either: stop and tell the owner."
+instruction = "The tap drill, every blank: the #25 drill's shank end down in it, its length less what stands above A (calipers). The first blank only, its spacing to B: calipers outside over the GO in B and the #25 shank, less half the sum of the GO pin's written reading and .1495. The tap's position (the drawing's Ø.005 to A|B|C) is held by the program, B and the tap drilled in this one clamping: the spacing catches a gross error only."
+inspection = "Tap drill full Ø depth {{cad.stud_tap_drill_depth_min_in:.3dot}}–{{cad.stud_tap_drill_depth_max_in:.3dot}}; on the first blank, B to the tap hole {{process.tap_from_b_min_mm:in.4dot}}–{{process.tap_from_b_max_mm:in.4dot}}. Outside either: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.stud_tap_drill_depth_band_mm}}" },
   { gauge = "calipers", band_mm = ["{{process.tap_from_b_min_mm}}", "{{process.tap_from_b_max_mm}}"] },
@@ -812,7 +810,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Mike the GO pin (.4985 plus), the NO-GO pin (.500 minus) and the reamer (across two opposite margins at its front) on the .0001 micrometer, each to ±.00005. Write the readings on this sheet and each pin's reading on its tag. A pin outside its range is not used."
-inspection = "GO reads {{cad.knife_bore_dia_min_in:.4dot}}–{{process.go_pin_max_mm:in.4dot}}, NO-GO {{process.nogo_pin_min_mm:in.4dot}}–{{cad.knife_bore_dia_max_in:.4dot}}. The bore is accepted between the two pin readings (GO reading ≤ bore < NO-GO reading): with both pins at their limits only {{process.go_pin_max_mm:in.4dot}}–{{process.nogo_pin_min_mm:in.4dot}} is sure to pass, so a good bore within .0002 of a limit may be refused. The reamer reads under the GO pin's reading: the coupon T, reamed first, shows whether the pins accept its holes."
+inspection = "GO reads {{cad.knife_bore_dia_min_in:.4dot}}–{{process.go_pin_max_mm:in.4dot}}, NO-GO {{process.nogo_pin_min_mm:in.4dot}}–{{cad.knife_bore_dia_max_in:.4dot}}. The bore is accepted between the two pin readings (GO reading ≤ bore < NO-GO reading): with both pins at their limits only {{process.go_pin_max_mm:in.4dot}}–{{process.nogo_pin_min_mm:in.4dot}} is sure to pass, so a good bore within .0002 of a limit may be refused. If the reamer reads under the GO pin's reading, the coupon T, reamed first, shows whether the pins accept its holes."
 gauge_checks = [
   { gauge = "micrometers", band_mm = ["{{process.go_pin_min_mm}}", "{{process.go_pin_max_mm}}"] },
   { gauge = "micrometers", band_mm = ["{{process.nogo_pin_min_mm}}", "{{process.nogo_pin_max_mm}}"] },

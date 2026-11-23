@@ -496,7 +496,7 @@ beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.blank_lengt
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 the inner face I, Y0 the fixed jaw's face (F): edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm), its tip .10 below the sawn top: on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on I (the blank's LEFT side) from the left, G10 L20 P1 X-2.540."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the blank, below the jaw top, G10 L20 P1 Y-2.540; its tip .10 below the sawn top, on I (the blank's LEFT side) from the left, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -576,9 +576,7 @@ inspection = "GO reads {{cad.bore_dia_min_in:.4dot}}–{{process.go_pin_max_mm:i
 gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.go_pin_min_mm}}", "{{process.go_pin_max_mm}}"] }, { gauge = "micrometers", band_mm = ["{{process.nogo_pin_min_mm}}", "{{process.nogo_pin_max_mm}}"] }]
 
 [[setups.operations]]
-steps = [
-  { kind = "stop", text = "The reamer reads under the GO pin's reading: its holes would be refused. Stop and tell the owner before any keeper is reamed." },
-]
+instruction = "If the reamer reads under the GO pin's reading, its holes would be refused: stop and tell the owner before reaming any keeper."
 feed = "hand"
 
 [[setups.operations]]
