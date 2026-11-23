@@ -26,7 +26,7 @@ title = "Transgear Thumbnut"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 7/8 in"
-stock = "Lot: {{process.quantity:d}} thumbnut. Ø{{process.stock_dia_in:.3dot}} bar, on hand; the nut takes {{cad.pitch_in:.2dot}} in of it."
+stock = "Lot: {{process.quantity:d}} thumbnut. Ø{{process.stock_dia_in:.3dot}} × {{process.bar_length_in:g}} in blank sawn off the bar on hand; the nut takes {{cad.pitch_in:.2dot}} in of it."
 note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To buy (not on hand): the straight 25 TPI knurl and its holder for the head."
 shop = "../shop"
 stock_refs = ["c360-round-7-8"]
@@ -41,7 +41,12 @@ part = "pd-transgear-thumbnut"
 [parameters]
 quantity = 1
 stock_dia_in = 0.875
-# A piece of the bar on hand and the length the 3-jaw grips of it.
+# A blank sawn off the bar on hand and the length the 3-jaw grips of it
+# (fleet rule, Main 2026-11-22: no bar past the rear of the spindle). Chucked
+# .99 out, 2.01 in of it lies behind the jaw fronts, grip included, inside
+# the working limit cad/config/shop-equipment/machines.toml
+# machines.pm-1127vf-lb bar_behind_jaw_fronts_max_in. Yield: the nut and one
+# restart (each takes about .82 in with the kerf; a restart needs 1.74 in).
 bar_length_in = 3.0
 chuck_grip_in = 0.75
 # Facing allowance: squares a sawn bar end.
@@ -162,6 +167,11 @@ name = ".001 in dial indicator on its magnetic base"
 ref = "dial-indicators"
 
 [[tools]]
+id = "saw"
+name = "Junior hacksaw, 6 in blade, 32 TPI"
+ref = "junior-hacksaw"
+
+[[tools]]
 id = "deburr"
 name = "Deburring scraper"
 ref = "deburring-set"
@@ -172,7 +182,7 @@ title = "Bar, seat end out: face, turn and knurl the head, turn the flange and w
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
+holding = "The {{process.bar_length_in:g}} in blank, sawn off the Ø{{process.stock_dia_in:.3dot}} bar with the junior hacksaw and its burr filed off, in the 3-jaw {{process.chuck_grip_in:.2dot}} in in the jaws, the rest inside the chuck (nothing past the spindle's rear end); {{cad.stickout_in:.2dot}} in out of the jaw fronts."
 datum = "Z0 (carriage DRO) the bar end faced in Op 10: the seat face."
 diagram = { file = "diagrams/bar.svg", alt = "The 7/8 in brass bar in the 3-jaw, seat end out: the end faced, the head turned to its knurl blank and knurled, the flange turned and the waist cut, drilled through past the parting line, the seat end countersunk and tapped #8-32 through; the nut parted off .02 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.step_waist_turn_min_mm}}", support = "none" }
@@ -335,7 +345,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Catch the nut."
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. The nut drops into a tray set on the ways under the cut, clear of the chuck; pick it up with the spindle stopped."
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
