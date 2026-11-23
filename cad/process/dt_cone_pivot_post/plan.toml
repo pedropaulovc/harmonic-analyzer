@@ -15,29 +15,27 @@ name = "M drill"
 ref = "drill-m"  # Drills M
 
 [[tools]]
-id = "drill-7-16"
-name = "7/16 drill"
-ref = "drill-7-16"  # Drills 7/16
+# Owner ruling 2026-11-23, tool audit Q11: "Both bores dia .4385 +.0005/0
+# (7/16 over reamer of the Shars set), both journals .4375 0/-.0008" (the
+# bores were .4500 and .4830 +.0010/+.0005). Both bores: the 27/64 drill
+# leaves the reamer .0166 (a 7/16 drill cuts about the reamer's size), then
+# the .4385 reamer; GO .4385 plus, NO-GO .439 minus, each miked with the
+# reamer first (owner ruling 2026-11-23, tool audit Q1).
+id = "drill-27-64"
+name = "27/64 drill"
+ref = "drill-27-64"
 
 [[tools]]
-id = "drill-15-32"
-name = "15/32 drill"
-ref = "drill-15-32"  # Drills 15/32
+id = "reamer-4385"
+name = ".4385 reamer (7/16 over)"
+ref = "reamer-4385"
+status = "to_order"
 
 [[tools]]
-id = "reamer-4500"
-name = ".4500 reamer"
-ref = "reamer-4500"  # B-reamer-.4500
-
-[[tools]]
-id = "reamer-4835"
-name = ".4835 reamer"
-ref = "reamer-4835"  # B-reamer-.4835
-
-[[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+id = "bore-pins"
+name = "Class ZZ pins: .4385 plus (GO) and .439 minus (NO-GO)"
+ref = "zz-pins-4385-4390"
+status = "to_order"
 
 [[tools]]
 id = "endmill-carbide-3fl-1-4"

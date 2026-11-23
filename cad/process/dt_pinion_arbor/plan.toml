@@ -28,15 +28,22 @@
 # - Setup 8, bench: deburr, check, oil, bag.
 #
 # Matched fit (note 1): the journals run in the MHA-DT-14 strap's two .3135-
-# .3140 reamed bores; Setup 7 gauges both bores with the strap's .3135 GO /
-# .3140 NO-GO plug pair before the journals are finished: a strap in its
-# band and a journal in .3113-.3121 give the drawing's .0014-.0027
-# clearance. The spans' sliding fit in MHA-DT-33 and the lands' bond in
-# MHA-DT-01 are fixed bands.
+# .3140 reamed bores; Setup 7 mikes the band's two Class ZZ pins, .3135 plus
+# (GO) and .3140 minus (NO-GO), and gauges both bores with them before the
+# journals are finished: a strap bore the GO pin enters and the NO-GO pin
+# does not lies between the two pins' readings, so inside .3135-.3140, and a
+# journal in .3113-.3121 gives the drawing's .0014-.0027 clearance (no
+# constant here assumed the old pair's size). The spans' sliding fit in
+# MHA-DT-33 and the lands' bond in MHA-DT-01 are fixed bands.
 #
 # To order before Setup 4 runs: the .2510 reamer (tools.reamer-2510, owner
-# ruling #3073); pin gauges (gauges.pin-gauges); the .3135/.3140 plug pair
-# (tools.plug-gauges-3135-3140) before Setup 7.
+# ruling #3073); pin gauges (gauges.pin-gauges); before Setup 7, the strap
+# band's .3135 plus Class ZZ pin (GO; the .314 NO-GO is the Class ZZ minus
+# box's), shop common.toml zz-pins-3135-3140. Owner ruling 2026-11-23 (tool
+# audit Q1, re-answered on the corrected facts), verbatim: "ZZ singles per
+# the record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept that
+# good holes near a limit may be refused; the traveler mikes each pin so the
+# real window is known per pin."
 #
 # NC (cam:dt_pinion_arbor, cad/process/dt_pinion_arbor/cam.py):
 # PA01_cross_hole, PA02_pin_hole. The program names, the [parameters] and the
@@ -210,6 +217,18 @@ pin_far_side_max_in = 1.5413
 # angles): the spindle DTI (shop gauges.dti) on the pin over .200 of Z,
 # .200 × tan 1° = .0035 in = 0.089 mm.
 pin_square_dti_mm = 0.089
+# Setup 7: the MHA-DT-14 strap's arbor bores, Ø.3125 +.0015/+.0010 =
+# .3135-.3140 (dt_pinion_bracket_spec.py REAM_SLIDE; shop common.toml
+# gauges.zz-pins-3135-3140 range_mm). Their Class ZZ pins (owner ruling
+# 2026-11-23, tool audit Q1): GO a plus pin at the low limit, true size
+# .3135 to .3137; NO-GO the box's .314 minus pin, .3138 to .3140 (one pin's
+# ZZ tolerance, .0002, is the record's resolution_mm 0.00508). The largest
+# GO pin and the smallest NO-GO pin the sheet may use: with both pins there,
+# a bore is sure to pass only between them, the middle .0001 of the band.
+strap_bore_min_in = 0.3135
+strap_bore_max_in = 0.314
+strap_go_pin_max_in = 0.3137
+strap_nogo_pin_min_in = 0.3138
 
 [[tools]]
 id = "saw"
@@ -263,9 +282,9 @@ name = "1/16 drill"
 ref = "drill-1-16"
 
 [[tools]]
-id = "strap-plugs"
-name = "Plug gauges .3135 GO, .3140 NO-GO"
-ref = "plug-gauges-3135-3140"
+id = "strap-pins"
+name = "Class ZZ pins: .3135 plus (GO) and .3140 minus (NO-GO)"
+ref = "zz-pins-3135-3140"
 status = "to_order"
 
 [[tools]]
@@ -675,13 +694,19 @@ cut_diameter_mm = "{{process.bar_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Gauge both bores of the MHA-DT-14 strap (the journals' mate): the .3135 plug (GO) enters each, the .3140 (NO-GO) enters neither. Write the result here."
-inspection = "Strap bores Ø.3135–.3140, both."
-gauge_checks = [{ gauge = "plug-gauges-3135-3140", band_mm = [7.9629, 7.9756] }]
+instruction = "On the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the strap's {{process.strap_bore_min_in:.4dot}} GO pin and {{process.strap_bore_max_in:.4dot}} NO-GO pin (Class ZZ). Write both readings here and each on its pin's tag."
+inspection = "GO pin reads {{process.strap_bore_min_in:.4dot}}–{{process.strap_go_pin_max_in:.4dot}}, NO-GO pin {{process.strap_nogo_pin_min_in:.4dot}}–{{process.strap_bore_max_in:.4dot}}: a pin outside its range is not used."
+gauge_checks = [{ gauge = "micrometers", band_mm = [7.9629, 7.9756] }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A strap bore outside .3135–.3140: stop; the strap goes back to its own traveler, and the journals are not finished until it gauges in band."
+instruction = "Gauge both bores of the MHA-DT-14 strap (the journals' mate): the GO pin enters each, the NO-GO pin enters neither; write the result here. A bore passing lies between the two readings: GO reading ≤ bore < NO-GO reading. Only {{process.strap_go_pin_max_in:.4dot}}–{{process.strap_nogo_pin_min_in:.4dot}} is sure to pass; a good bore within .0002 of a limit may be refused (owner ruling 2026-11-23)."
+inspection = "GO enters, NO-GO does not: strap bores Ø{{process.strap_bore_min_in:.4dot}}–{{process.strap_bore_max_in:.4dot}}, both."
+gauge_checks = [{ gauge = "zz-pins-3135-3140", band_mm = [7.9629, 7.9756] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A strap bore the GO pin does not enter, or the NO-GO pin enters: stop; the strap goes back to its own traveler, and the journals are not finished until it gauges in band."
 
 [[setups.operations]]
 cut_kind = "other"
