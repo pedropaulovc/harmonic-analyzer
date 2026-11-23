@@ -9,7 +9,7 @@
 # arm face, which only seats on the MHA-PD-VN-68 shims (the length's .XXX
 # band moves only the shim count, owner ruling 2026-11-01, #2124).
 # Bench: file the parting burr off the arm face flat, break the edges and the
-# bore's ends, check the length, the outside and the bore with the .1260 GO /
+# bore's ends, mike the length and check the bore with the .1260 GO /
 # .1265 NO-GO plug gauge pair (the band's ends).
 #
 # Not on hand (cad/config/shop-equipment/, to order): the .1260 chucking
@@ -117,9 +117,11 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off, finishing with a light skim from the centre out; set DRO Z0 on it."
+instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off, finishing with a light skim from the centre out; set DRO Z0 on it. This end is the thrust face against MHA-PD-10, a running face at Ra 63."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
+inspection = "Thrust face: Look: a bright, even face with no tears or chatter rings, by eye and fingernail (Ra 63: the R0.4 nose at .004 in/rev leaves about Ra 32)."
+gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "longitudinal_turning"
@@ -210,9 +212,9 @@ instruction = "Break both ends of the bore, R{{cad.edge_break_in:.3dot}} or cham
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mike the length across the faces and the outside."
-inspection = "Length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}; outside Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}; micrometer."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+instruction = "Mike the length across the faces."
+inspection = "Length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}, micrometer."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]

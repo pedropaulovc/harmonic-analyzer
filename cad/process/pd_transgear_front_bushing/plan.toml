@@ -120,9 +120,11 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off, finishing with a light skim from the centre out; set DRO Z0 on it."
+instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off, finishing with a light skim from the centre out; set DRO Z0 on it. This end is the thrust face on MHA-PD-VN-61, a running face at Ra 63."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
+inspection = "Ring face: Look: a bright, even face with no tears or chatter rings, by eye and fingernail (Ra 63: the R0.4 nose at .004 in/rev leaves about Ra 32)."
+gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "longitudinal_turning"
@@ -189,7 +191,7 @@ speed_kind = "spindle"
 tool = "reamer"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Ream .1260 from the tailstock, spindle running: feed the reamer in until its lead chamfer meets the hole's mouth and zero the quill scale there; feed slowly until it reads {{cad.run_in:.2dot}} (past the parting line), and withdraw with the spindle still running."
+instruction = "Ream .1260 from the tailstock, spindle running: feed the reamer in until its lead chamfer meets the hole's mouth and zero the quill scale there; feed slowly until it reads {{cad.run_in:.2dot}} (past the parting line), and withdraw with the spindle still running. The bore runs on the MHA-PD-23 pin: Ra 63."
 settings = "lathe-ream-1260-c360"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 
@@ -220,10 +222,10 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Mike the length at the outer rim; write it down (about {{cad.part_off_in:.3dot}} the first time). Chuck it; spindle running, touch the AR lightly on the parted end's outer rim, a mark no deeper than .0005, and set DRO Z to that length less {{cad.length_nominal_in:.4dot}}. Face in light skims to Z0, the last one .001 deep from the centre out; unchuck and mike at the rim."
+instruction = "Mike the length at the outer rim; write it down (about {{cad.part_off_in:.3dot}} the first time). Chuck it; spindle running, touch the AR lightly on the parted end's outer rim, a mark no deeper than .0005, and set DRO Z to that length less {{cad.length_nominal_in:.4dot}}. Face in light skims to Z0, the last one .001 deep from the centre out (the nose face, thrust on MHA-PD-10, a running face at Ra 63); unchuck and mike at the rim."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Length {{cad.length_min_in:.4dot}}–{{cad.length_max_in:.4dot}} across the faces, micrometer."
+inspection = "Length {{cad.length_min_in:.4dot}}–{{cad.length_max_in:.4dot}} across the faces, micrometer. Nose face: Look: a bright, even face with no tears or chatter rings, by eye and fingernail (Ra 63: the R0.4 nose at .004 in/rev leaves about Ra 32)."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
 
 [[setups.operations]]
@@ -251,7 +253,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "The {{cad.bore_dia_min_in:.4dot}} GO plug enters the bore from both ends and the {{cad.bore_dia_max_in:.4dot}} NO-GO plug enters from neither."
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}."
+inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}; its wall bright and smooth, no chatter rings or tears, by eye under a light (Ra 63, held by the reamer)."
 gauge_checks = [{ gauge = "plug-gauges-1260-1265", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
 

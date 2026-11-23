@@ -446,7 +446,7 @@ for _name, _normal, _station, _dimension in (
         precision={"station": _P[_dimension]},
     )
 requirement(
-    "dish",
+    "recess",
     kind="recess",
     faces=(
         ConeFace(
@@ -524,7 +524,7 @@ requirement(
             ),
         ),
         "half_angle_nominal": (CSK_HALF_ANGLE_DEG, ("CSK_HALF_ANGLE_DEG",)),
-        "at_ends": (["datum_end", "dish"], ("CSK_QUALIFIER",)),
+        "at_ends": (["datum_end", "recess"], ("CSK_QUALIFIER",)),
         "edge_of": ("tap", ("CSK_QUALIFIER",)),
         "callout": (
             f"Ø.{round(CSK_DIA / 0.254):02d}{CSK_DIA_SUFFIX} X {CSK_INCLUDED_ANGLE_DEG:.0f}° {CSK_QUALIFIER}",
