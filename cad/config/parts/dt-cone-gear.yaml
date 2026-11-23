@@ -30,9 +30,9 @@ dt-cone-gear:
   machinist_exceptions:
     - id: "RV-03"
       kind: "minor"
-      where: "sheet T012, front view: the root-to-bore web stated by the native .0646 MIN dimension (WebMin) from the Ø.0625 +.0005/-.0000 reamed bore to the root envelope MIN"
-      finding: "the T012 web is .0646 in (1.6408 mm) at the printed worst case (largest bore .0630, smallest root envelope .1922): .0154 in under the .080 in target (rule 17), .0046 in over the .060 in floor"
-      reason: "Owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992), C1 keyed: T012 is reamed round Ø.0625 and bonded on MHA-DT-37's Ø.0625 spigot, which must stand under T006's root so the DT6-FORM1 cutter runs off; the cutter-native T012 root fixes the web at .0646 (research: drive-train-cone-tip-options.md, option C). It replaces the 2026-11-01 ruling's .0797 on the retired .031 terminal land. Anything thinner must be ruled again"
+      where: "sheet T012, front view: the root-to-bore web stated by the native .0674 MIN dimension (WebMin) from the Ø.0625 +.0005/-.0000 reamed bore to the root envelope MIN"
+      finding: "the T012 web is .0674 in (1.7120 mm) at the printed worst case (largest bore .0630, smallest root envelope .1979): .0126 in under the .080 in target (rule 17), .0074 in over the .060 in floor"
+      reason: "Owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992), C1 keyed: T012 is reamed round Ø.0625 and bonded on MHA-DT-37's Ø.0625 spigot, which must stand under T006's root so the DT6-FORM1 cutter runs off; the cutter-native T012 root fixes the web (research: drive-train-cone-tip-options.md, option C), ruled at .0646. It replaces the 2026-11-01 ruling's .0797 on the retired .031 terminal land. Owner ruling 2026-11-22 (Pedro, #2473, option G) made T012's tooth thickness +.003/-0 at the same cutter and depth, so the cutter no longer sinks to a thin limit and the root envelope MIN rises from .1922 to .1979: the web is .0674, thicker than ruled. Anything thinner than .0674 must be ruled again"
     - id: "RV-06"
       kind: "accept"
       where: "sheets T024-T120: the bore Ø +.0018/+.0010 (REAM THRU; BoreCutDia on T024's front view, KeyedBoreDia in DETAIL A on T030-T120), flagged SEE NOTE 1"
