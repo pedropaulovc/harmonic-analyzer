@@ -27,11 +27,11 @@
   <text class="label-halo" x="470" y="320">moving jaw: FRONT face</text>
   <line class="leader" x1="466" y1="150" x2="412" y2="150"/>
   <text class="label-halo" x="470" y="146">relief slot {{cad.relief_height_in:.3dot}} deep below B,</text>
-  <text class="label-halo" x="470" y="162">1/2 in end mill from the far end; 5/64</text>
-  <text class="label-halo" x="470" y="178">end mill in its two corners at the step</text>
+  <text class="label-halo" x="470" y="162">1/2 in end mill from the far end; 1/8</text>
+  <text class="label-halo" x="470" y="178">end mill in its two corners at the step, R.065</text>
   <line class="leader" x1="466" y1="196" x2="250" y2="196"/>
   <text class="label-halo" x="470" y="200">V groove: 1/4 in chamfer mill in 5 levels,</text>
-  <text class="label-halo" x="470" y="216">flat by the 5/64 end mill (Y −.430 centre)</text>
+  <text class="label-halo" x="470" y="216">flat by its tip in fine passes (Y −.430 centre)</text>
   <line class="leader" x1="40" y1="280" x2="75" y2="216"/>
   <text class="label-halo" x="20" y="293">1/4 in chamfer mill, on the V's centre</text>
   <!-- Section across the jaws through the neck, looking from P (5 px/mm, fixed jaw at the right). -->

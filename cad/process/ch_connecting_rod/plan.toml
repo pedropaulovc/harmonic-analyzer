@@ -16,9 +16,10 @@
 # the fork's crown (CR04a); finish F and cut through round the fork's end (CR04);
 # bore the ring (CR05). Setup 5, the same clamping: saw the fork slot (CR06);
 # spot, drill and ream the pin hole (CR07). Setup 6, the same clamping: cut
-# the outline on seven tabs and recut the four inside corners to R.039
-# (CR08). Setup 7, bench: break the rods out, file the stubs, deburr,
-# inspect. Setup 8: black oxide in the shop, Presto Black Steel PC9.
+# the outline on seven tabs, the 1/8 in end mill leaving the shank's four
+# corners at its R.0625 (CR08). Setup 7, bench: break the rods out, file the
+# stubs, deburr, inspect. Setup 8: black oxide in the shop, Presto Black
+# Steel PC9.
 #
 # The route departs from the drawing's process (cad/config/parts/ch-
 # connecting-rod.yaml), by the owner's ruling of 2026-11-21 (the author
@@ -28,11 +29,12 @@
 # frame (not after it). Both faces are still roughed in turns to .020 over,
 # the blanks released and reseated, then both finished.
 #
-# Speed (owner's priority): NC 45 min per load of two (about 22 min a rod),
+# Speed (owner's priority): NC 43 min per load of two (about 22 min a rod),
 # from 100 in the first draft: only the ring's zone and the shank's band are
 # pocketed (the waste beside the shank was pocketed on both faces), the skim
-# covers the fork alone, the outline takes three levels instead of five and
-# the roots three instead of fourteen.
+# covers the fork alone and the outline takes three levels instead of five.
+# The 5/64 in corner recut and its tool change went with owner ruling
+# 2026-11-23, tool audit Q9 (2 min and one M6 a load).
 #
 # Workholding: the agent's recommendation (option A, the vise; owner's
 # per-part choice pending, 2026-11-21). The plate supports the two blanks'
@@ -53,8 +55,10 @@
 # saw_below_max_mm of its lower face, the nut under saw_nut_dia_max_mm.
 # CR06 and its touch-off are laid out on those limits (cam.py checks every
 # move of the saw, its spacers and its nut against the stock and the vise).
-# Also to buy: the .0775 reamer (tools.reamer-0775) and the 5/64 in end mill
-# (tools.endmill-5-64-long). The pin hole's size is gauged by a special
+# Also to buy: the .0775 reamer (tools.reamer-0775). The shank's four
+# corners take the 1/8 in end mill's R.0625 inside their printed R.065
+# (.060-.070; owner ruling 2026-11-23, tool audit Q9): no 5/64 in end mill.
+# The pin hole's size is gauged by a special
 # Class ZZ pin-gauge pair, GO .0775 plus and NO-GO .0779 minus, TO BUY (as
 # CH-01's; owner ruling 2026-11-21, "ill buy pin gauges", superseding the
 # 2026-11-19 decision of #3124 item 5): a reamed hole is the reamer's size
@@ -84,14 +88,14 @@
 # [parameters] and the milling_cuts names are a contract with that recipe.
 # Tool numbers are the
 # places in the tools list among the mill's tools: T1 1/2 in end mill, T2 1/8
-# in end mill, T3 #1 centre drill, T4 #49 drill, T5 .0775 reamer, T6 5/64 in
-# end mill, T7 the slitting saw (no tool-setter length; CR06 loads no tool).
+# in end mill, T3 #1 centre drill, T4 #49 drill, T5 .0775 reamer, T6 the
+# slitting saw (no tool-setter length; CR06 loads no tool).
 title = "Connecting rod"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1/4 x 2 in flat (the drawing's MATERIAL: Plain Carbon Steel; 1018 CF chosen)"
 stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:.0f}} in flat bar: two 72 in lengths and one 36 in; {{process.quantity:d}} × {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blanks. Support plate: one 3.9 x 6 in piece of the 1/2 x 6 in 6061 flat."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Faces: D, the datum face (the fork's near face), stays as bought; F, the fork's far face, is skimmed in Setup 2. Mark D on each blank in Setup 1 and keep it readable. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and pick up G54 X and Y once, in Setup 2, and again after any reset, stall or E-stop (FluidNC loses home), except with the saw mounted (Setup 5): there $H brings the stored G54 back, the edge finder not fitting with the arbor in; the vise, the parallels and the plate stay put, so X and Y carry through Setups 2 to 6. Z0 is touched where each setup's Datum says. Setups 2 and 3 each run for all the loads in turn before the next; Setups 4, 5 and 6 are one clamping, run through on each load before the next load is clamped. Tools to buy before Setup 5: the R8 1 in saw arbor, the .0775 reamer and the 5/64 in end mill."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Faces: D, the datum face (the fork's near face), stays as bought; F, the fork's far face, is skimmed in Setup 2. Mark D on each blank in Setup 1 and keep it readable. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and pick up G54 X and Y once, in Setup 2, and again after any reset, stall or E-stop (FluidNC loses home), except with the saw mounted (Setup 5): there $H brings the stored G54 back, the edge finder not fitting with the arbor in; the vise, the parallels and the plate stay put, so X and Y carry through Setups 2 to 6. Z0 is touched where each setup's Datum says. Setups 2 and 3 each run for all the loads in turn before the next; Setups 4, 5 and 6 are one clamping, run through on each load before the next load is clamped. Tools to buy before Setup 5: the R8 1 in saw arbor and the .0775 reamer."
 shop = "../shop"
 stock_refs = ["1018-flat-1-4x2-72in", "1018-flat-1-4x2-36in", "6061-flat-1-2x6-54in"]
 material_key = "rocker-1018-cold-finished"
@@ -296,13 +300,10 @@ pin_dia_max_mm = 1.98882
 # mill's top, is 54 ft/min; AutoDrill "Suggested drilling feed rates" (read
 # 2026-11-20), Stl, Carbon, 1/16 in: .001 in/rev = 2.8 in/min. The #1 centre
 # drill at 2800, .0005 in/rev = 1.4 in/min. The reamer at 2000 rpm (41
-# ft/min), .002 in/rev = 4.0 in/min. The 5/64 in end mill: no shop setting;
-# 2800 rpm, .001 in/tooth × 2 = 5.6 in/min, the lowest chip load prechips'
-# force table holds (the author's choice).
+# ft/min), .002 in/rev = 4.0 in/min.
 spot_feed_per_min_mm = 35.56
 drill_feed_per_min_mm = 71.12
 ream_feed_per_min_mm = 101.6
-root_feed_per_min_mm = 142.24
 # The outline: the 1/8 in end mill round each rod at its radius outside the
 # drawn edge, through the shank's thickness (both faces pocketed to the
 # shank's over the kerf) in levels no deeper than .047 (1.2 mm, 0.37 of its
@@ -338,18 +339,6 @@ tab_station_6_mm = 134.5
 tab_station_7_mm = 164.0
 rod_start_mm = 3.053
 outline_end_mm = 173.087
-# The roots: the title block's INSIDE CORNERS R.040 MAX; the 5/64 in end
-# mill's radius .039 is under it. A side cut .024 wide (the 1/8 in cutter's
-# radius less its own) at each corner, in levels no deeper than .047 (1.2
-# mm, 0.6 of its diameter) through the shank's thickness; the bending
-# screen takes it at the fork's step, the corner farthest from the ring
-# (cam.py checks the cutter, the station and the width).
-inside_corner_max_mm = 1.016
-root_level_max_mm = 1.2
-root_level_mm = 1.185
-root_cutter_dia_mm = 1.984375
-root_station_mm = 168.785
-root_woc_mm = 0.595
 # Machine-capacity inputs (mm): heights from the table, tool lengths from
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
@@ -389,10 +378,6 @@ ref = "drill-49"
 id = "reamer-0775"
 name = ".0775 reamer, TO BUY"
 ref = "reamer-0775"
-[[tools]]
-id = "em-5-64"
-name = "5/64 in end mill, TO BUY"
-ref = "endmill-5-64-long"
 [[tools]]
 id = "saw"
 name = "2-3/4 x .064 HSS slitting saw on the TTC 67-600-016 R8 1 in spacer-type arbor, its spacers and nut, arbor TO BUY"
@@ -851,14 +836,14 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Unchanged from Setups 4 and 5: the same load, F up, still clamped."
-datum = "Program CR08_outline (T2, T6). G54 X0 and Y0 unchanged; Z0 as set with T3 in Setup 5 (the plate's top; the tool setter measures T2 and T6 at each M6): do not touch off again."
-diagram = { file = "diagrams/outline.svg", alt = "The pair F up on the support plate; the 1/8 in end mill cuts each rod's outline through the waste on seven tabs, two on the ring and five along the shank, lifting past the fork's end; the 5/64 in end mill recuts the four inside corners." }
+datum = "Program CR08_outline (T2). G54 X0 and Y0 unchanged; Z0 as set with T3 in Setup 5 (the plate's top; the tool setter measures T2 at its M6): do not touch off again."
+diagram = { file = "diagrams/outline.svg", alt = "The pair F up on the support plate; the 1/8 in end mill cuts each rod's outline through the waste on seven tabs, two on the ring and five along the shank, lifting past the fork's end; its radius leaves the four corners where the shank meets the ring and the fork's step." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.eighth_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", 1.016], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", 50.8], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = 101.6, along_jaws_mm = "{{process.blank_length_min_mm}}", part_height_mm = "{{process.blank_thickness_max_mm}}", parallel_height_mm = "{{process.support_height_mm}}", overhang_mm = ["{{process.jaw_start_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "plate", extent_mm = ["{{process.rod_start_mm}}", "{{process.outline_end_mm}}"], seat = "the blanks' frames, gripped along their edges by the jaws; the rods hang on their tabs in them, over the support plate", seat_mm = [0, "{{process.blank_length_min_mm}}"], clamps_mm = ["{{process.tab_station_1_mm}}", "{{process.tab_station_2_mm}}", "{{process.tab_station_3_mm}}", "{{process.tab_station_4_mm}}", "{{process.tab_station_5_mm}}", "{{process.tab_station_6_mm}}", "{{process.tab_station_7_mm}}"], section_mm = { y = "{{cad.shank_right_flank_width_mm}}", z = "{{cad.shank_far_face_thickness_mm}}" }, tabs = { stations_mm = ["{{process.tab_station_1_mm}}", "{{process.tab_station_2_mm}}", "{{process.tab_station_3_mm}}", "{{process.tab_station_4_mm}}", "{{process.tab_station_5_mm}}", "{{process.tab_station_6_mm}}", "{{process.tab_station_7_mm}}"], section_mm = { x = "{{process.tab_width_mm}}", z = "{{process.tab_thickness_mm}}" }, length_mm = "{{process.eighth_cutter_dia_mm}}" } }
 
 [[setups.operations]]
-instruction = "Back to the collet. First load only: prove CR08_outline in air, Z0 raised 1.000 in, through each M6. Then Z0 back."
+instruction = "Back to the collet. First load only: prove CR08_outline in air, Z0 raised 1.000 in, through its M6. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -870,18 +855,6 @@ instruction = "Run CR08_outline (M6 T2; set 2800): each rod's outline anticlockw
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
   { name = "outline", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_level_mm}}", radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = ["{{process.rod_start_mm}}", "{{process.outline_end_mm}}"] },
-]
-
-[[setups.operations]]
-speed_kind = "spindle"
-tool = "em-5-64"
-drilling = "none"
-sizing = "other"
-instruction = "Same file, M6 T6 (5/64 in end mill, to buy; set 2800): the four inside corners of each rod, where the shank's flanks meet the ring and the fork's step, recut through the waste from the 1/8 in cutter's R.0625 to R.039, under the drawing's INSIDE CORNERS R.040 MAX."
-rpm = 2800
-feed = "{{process.root_feed_per_min_mm:in.2f}} in/min"
-milling_cuts = [
-  { name = "roots", kind = "side", phase = "finish", cutter_dia_mm = "{{process.root_cutter_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.root_feed_per_min_mm}}", axial_doc_mm = "{{process.root_level_mm}}", radial_woc_mm = "{{process.root_woc_mm}}", stations_mm = "{{process.root_station_mm}}" },
 ]
 
 [[setups.operations]]
@@ -910,7 +883,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 instruction = "Inspect each rod; the first rod of the batch in full."
-inspection = "Each rod: ring {{cad.ring_far_face_thickness_min_in:.4dot}}–{{cad.ring_far_face_thickness_max_in:.4dot}} thick (the micrometers; its near face and the bore were checked on the mill for every load); no tab stub standing proud. The first rod also: ring Ø{{cad.ring_dia_min_in:.2f}}–{{cad.ring_dia_max_in:.2f}}; shank {{cad.shank_far_face_thickness_min_in:.3dot}}–{{cad.shank_far_face_thickness_max_in:.3dot}} thick and {{cad.shank_right_flank_width_min_in:.2dot}}–{{cad.shank_right_flank_width_max_in:.2dot}} wide; the fork {{cad.fork_width_min_in:.2dot}}–{{cad.fork_width_max_in:.2dot}} wide and its step {{cad.fork_boss_length_min_in:.2dot}}–{{cad.fork_boss_length_max_in:.2dot}} from the crown (the micrometers, the calipers); later rods hold these on the program's path. The inside corners: process-held by the 5/64 in cutter in Setup 6 (R.039, under R.040 MAX). Outside: set it aside and tell the owner."
+inspection = "Each rod: ring {{cad.ring_far_face_thickness_min_in:.4dot}}–{{cad.ring_far_face_thickness_max_in:.4dot}} thick (the micrometers; its near face and the bore were checked on the mill for every load); no tab stub standing proud. The first rod also: ring Ø{{cad.ring_dia_min_in:.2f}}–{{cad.ring_dia_max_in:.2f}}; shank {{cad.shank_far_face_thickness_min_in:.3dot}}–{{cad.shank_far_face_thickness_max_in:.3dot}} thick and {{cad.shank_right_flank_width_min_in:.2dot}}–{{cad.shank_right_flank_width_max_in:.2dot}} wide; the fork {{cad.fork_width_min_in:.2dot}}–{{cad.fork_width_max_in:.2dot}} wide and its step {{cad.fork_boss_length_min_in:.2dot}}–{{cad.fork_boss_length_max_in:.2dot}} from the crown (the micrometers, the calipers); later rods hold these on the program's path. The shank's four corners at the ring and the fork's step, R{{cad.shank_right_flank_corner_r_min_in:.3dot}}–{{cad.shank_right_flank_corner_r_max_in:.3dot}}: process-held by the 1/8 in end mill's R.0625 in Setup 6. Outside: set it aside and tell the owner."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.ring_far_face_thickness_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.ring_dia_band_mm}}" },
