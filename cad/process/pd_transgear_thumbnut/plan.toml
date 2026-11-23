@@ -110,8 +110,10 @@ tap_chase_mark_in = 0.40
 # eccentricity e moves one crest touch by up to 2e on the diameter, so
 # Op 200 touches a crest by each of the three jaws, 120° apart, and sets the
 # X DRO on their mean: e cos(a) summed at three equal spacings is zero, so
-# the mean is the crests' diameter about the spindle axis (a knurl cannot be
-# indicated: the contact drops into its roots). Errors: touch-off and DRO
+# the mean is the crests' diameter about the spindle axis. Op 190 also
+# trues the regrip to .001 TIR (a test indicator on a feeler leaf laid on
+# the crests, bridging the roots) so the rim-end countersink and chase run
+# on the hole's axis. Errors: touch-off and DRO
 # about ±.001 on the corner and rim, the depth ±.0005 (±.003 on the rim),
 # the angle ±0.2° (±.003 on the rim): worst case the corner .349-.351 and
 # the rim .583-.597, inside the drawing's .34-.36 and .58-.60. Neither is gauged: no named tool registers on the rim's edge,
@@ -120,6 +122,9 @@ tap_chase_mark_in = 0.40
 # The touch-offs go through a .001 cigarette paper, spindle stopped, so the
 # finished knurl and rim take no witness.
 recess_corner_x_dro_in = 0.313
+# The rim's worst case from the errors above (printed in Op 220).
+rim_held_min_in = 0.583
+rim_held_max_in = 0.597
 # The floor's gross check: calipers flat on the floor read about .345 (the
 # flat ends .005 inside the corner), high if they ride the wall. A missed
 # or doubled nose allowance reads about .03 off; .335-.365 passes a good
@@ -183,6 +188,16 @@ ref = "jig-tap-8-32-plug"  # Tap coverage #8-32 UNC
 id = "centre-dead"
 name = "MT3 dead centre"
 ref = "dead-centre-mt3"
+
+[[tools]]
+id = "dti"
+name = "Dial test indicator (lever), .001 mm"
+ref = "dti"
+
+[[tools]]
+id = "feelers"
+name = "Feeler gauge set, .0015-.035 in leaves"
+ref = "feeler-gauges"
 
 [[tools]]
 id = "indicator"
@@ -403,7 +418,7 @@ feed = "hand"
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Rechuck the nut by its knurled head over the shim wrap, {{process.regrip_grip_in:.2dot}} in in the jaws (Holding line). Swing the compound {{cad.recess_flank_deg:.1f}}° off the cross slide (fed out, the tool goes toward the tailstock); set it with the indicator on the compound, plunger on the faced rim by the drilled hole: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends {{process.compound_check_rise_in:.3dot}}. Lock it; zero its dial. Turn the toolpost so the AR's chuck-side edge is 20°–25° off the face (never past 30°) and lock it."
-inspection = "Compound: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends {{process.compound_check_rise_in:.3dot}}; if not, re-swing and re-indicate before Op 200."
+inspection = "Nut true: the test indicator on a .002 feeler leaf laid on the crests (it bridges the roots), the chuck turned by hand, .001 TIR or less; tap it true if not. Compound: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends {{process.compound_check_rise_in:.3dot}}; if not, re-swing and re-indicate before Op 200."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -433,12 +448,12 @@ instruction = "Dish cone, carriage still locked: each pass, from a start on the 
 settings = "lathe-ar-c360"
 feed = "hand"
 cut_diameter_mm = "{{cad.recess_dia_mm}}"
-inspection = "One clean cone from the floor's corner to the face. Floor, calipers' inside jaws flat on it: {{process.floor_flat_read_min_in:.3dot}}–{{process.floor_flat_read_max_in:.3dot}}, a gross check of the X figure. The corner Ø{{cad.recess_floor_dia_min_in:.2dot}}–{{cad.recess_floor_dia_max_in:.2dot}} and the rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}} are held by Op 210's DRO figures and the compound (rim .582–.598), not gauged."
+inspection = "One clean cone from the floor's corner to the face. Floor, calipers' inside jaws flat on it: {{process.floor_flat_read_min_in:.3dot}}–{{process.floor_flat_read_max_in:.3dot}}, a gross check of the X figure. The corner Ø{{cad.recess_floor_dia_min_in:.2dot}}–{{cad.recess_floor_dia_max_in:.2dot}} and the rim Ø{{cad.recess_dia_min_in:.2dot}}–{{cad.recess_dia_max_in:.2dot}} are held by Op 210's DRO figures and the compound (rim {{process.rim_held_min_in:.3dot}}–{{process.rim_held_max_in:.3dot}}), not gauged."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A step at the floor's corner, or the cone not meeting the face: repeat the last cone pass from Ø{{process.recess_corner_x_dro_in:.3dot}}. Depth or corner off its DRO figure: recut the floor there before the cone. Floor reading over {{process.floor_flat_read_max_in:.3dot}} (Op 220): read it again, the jaws held down on the floor; still over: scrapped. Under {{process.floor_flat_read_min_in:.3dot}}: face the floor out by the shortfall and repeat the last cone pass from there."
+instruction = "A step at the floor's corner, or the cone not meeting the face: repeat the last cone pass from Ø{{process.recess_corner_x_dro_in:.3dot}}. Depth or corner off its DRO figure: recut the floor there before the cone. Floor reading over {{process.floor_flat_read_max_in:.3dot}} (Op 220): read it again, the jaws held down on the floor; still over: scrapped. Under {{process.floor_flat_read_min_in:.3dot}}: face the floor out by .345 less the reading (a good floor reads .345) and repeat the last cone pass from there."
 feed = "hand"
 
 [[setups.operations]]
