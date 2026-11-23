@@ -253,7 +253,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "The bar left in the 3-jaw from Setup 1, the jaws not opened: a stub mandrel turned on its end runs true to the spindle. The spacer pushed onto the mandrel's pilot by the MT3 dead centre in the tailstock quill, spindle stopped, the centre's point in the bore's mouth, until the face toward the chuck seats on the mandrel's shoulder; its rim overhangs the shoulder all round."
-datum = "Z0 (carriage DRO): the spacer's rear face as finished in Op 180, {{cad.length_in:.3dot}} out from the mandrel's shoulder: set by touching the AR on the shoulder, faced in Op 110, and setting DRO Z-{{cad.length_in:.3dot}} there."
+datum = "Z0 (carriage DRO): the spacer's rear face as finished in Op 190, {{cad.length_in:.3dot}} out from the mandrel's shoulder: set by touching the AR on the shoulder, faced in Op 110, and setting DRO Z-{{cad.length_in:.3dot}} there. The P1 blade (Ops 120, 180) works from its own holder: the AR's holder comes off and goes back on the toolpost dovetail with its height nut untouched, and the AXA post returns it within about .0005 in Z, inside the ±.002 length band."
 diagram = { file = "diagrams/mandrel.svg", alt = "The bar stub in the 3-jaw turned into a stub mandrel: shoulder faced, body stepped down behind it, pilot with a root relief; the spacer pushed on, front face to the shoulder, its rear face faced to Z0, a lever indicator on it." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = 8.38, minimum_diameter_mm = 4.73, support = "none" }
 
@@ -326,8 +326,13 @@ tool = "dti"
 drilling = "none"
 sizing = "other"
 instruction = "Lever indicator on the carriage, its tip on the front face just inside the rim; turn the chuck by hand one full turn and read the movement."
-inspection = "Front face perpendicularity to the bore {{cad.datum_end_perpendicularity_in:.3dot}}: the indicator moves no more than that over the turn."
+inspection = "Front face perpendicularity to the bore {{cad.datum_end_perpendicularity_in:.3dot}} ({{cad.datum_end_perpendicularity_mm:.3f}} mm: {{cad.datum_end_perpendicularity_mm:.3f}} on the 0.001 mm indicator): it moves no more than that over the turn."
 gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{cad.datum_end_perpendicularity_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Front face reading over {{cad.datum_end_perpendicularity_in:.3dot}} in Op 160: push the spacer off as Op 180, wipe the pilot and the shoulder clean, push it on again parted face to the shoulder as Op 140, skim the front face .001 more as Op 150 and indicate it again as Op 160; then go on at Op 180."
 feed = "hand"
 
 [[setups.operations]]
@@ -347,20 +352,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the rear face (the arm's bearing face, Ra 63) to Z0 in light skims, the last no more than .001 deep at the settings' feed, fed from the outside in to the bore: about Ra 32 from the R0.4 mm nose. Spindle stopped, the indicator's tip on the rear face just inside the rim, one turn of the chuck by hand; then push it off as Op 170, a strip of paper on the rim, and mike the length at three places round the rim."
+instruction = "Face the rear face (the arm's bearing face, Ra 63) to Z0 in light skims, the last no more than .001 deep at the settings' feed, fed from the outside in to the bore: about Ra 32 from the R0.4 mm nose. Spindle stopped, the indicator's tip on the rear face just inside the rim, one turn of the chuck by hand; then push it off as Op 180, a strip of paper on the rim, and mike the length at three places round the rim."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Rear face perpendicularity to the bore {{cad.far_end_perpendicularity_in:.3dot}} (indicator); length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} at every place, micrometer."
+inspection = "Rear face perpendicularity to the bore {{cad.far_end_perpendicularity_in:.3dot}} ({{cad.far_end_perpendicularity_mm:.3f}} mm on the 0.001 mm indicator); length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} at every place, micrometer."
 gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{cad.far_end_perpendicularity_mm}}"] }, { gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Front face reading over {{cad.datum_end_perpendicularity_in:.3dot}} in Op 160: push the spacer off as Op 170, wipe the pilot and the shoulder clean, push it on again parted face to the shoulder as Op 140, skim the front face .001 more as Op 150 and indicate it again as Op 160; then go on at Op 170."
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Rear face reading over {{cad.far_end_perpendicularity_in:.3dot}} in Op 180: push it off, wipe the pilot and the shoulder, push it on again front face to the shoulder, face the rear .001 past Z0 (Z-.001) and repeat Op 180's checks. Length over {{cad.length_max_in:.3dot}}: push it on again the same way and face the rear to Z0 again. Under {{cad.length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1."
+instruction = "Rear face reading over {{cad.far_end_perpendicularity_in:.3dot}} in Op 190: push it off, wipe the pilot and the shoulder, push it on again front face to the shoulder, face the rear .001 past Z0 (Z-.001) and repeat Op 190's checks. Length over {{cad.length_max_in:.3dot}}: push it on again the same way and face the rear to Z0 again. Under {{cad.length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups]]
