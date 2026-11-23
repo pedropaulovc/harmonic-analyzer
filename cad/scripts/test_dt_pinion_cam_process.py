@@ -104,7 +104,7 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
 def test_the_plan_is_an_enrolled_traveler_and_cam_stem() -> None:
     assert PLAN["revision"] != "placeholder"
     assert STEM in _process_plans.enrolled_stems()
-    assert {"reamer", "plugs"} <= {
+    assert {"reamer", "pins"} <= {
         t["id"] for t in PLAN["tools"] if t.get("status") == "to_order"
     }
 

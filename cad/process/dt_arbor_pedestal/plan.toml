@@ -177,6 +177,21 @@ bore_ream_past_mm = 1.0
 reamer_lead_mm = 1.0
 bore_tip_height_mm = -3.742
 ream_tip_height_mm = -2.0
+# The bore's re-ream by MDI after a GO refusal (owner ruling 2026-11-23,
+# tool audit Q1: one more pass with the same reamer): it feeds from 3.3 mm
+# above the step's floor (step_floor_mm 11.684) and leaves at 5.5 mm over
+# the uncut top (depth_top_mm 29.464), above the part and the jaw tops.
+reream_r_plane_mm = 15.0
+reream_clear_mm = 35.0
+# The Class ZZ pins (shop dt.toml zz-pins-3760-3765; owner ruling
+# 2026-11-23, tool audit Q1): GO a plus pin at the bore's low limit, true
+# size .3760 to .3762; NO-GO a minus pin at the high limit, .3763 to .3765
+# (one pin's ZZ tolerance, .0002, is the record's resolution_mm 0.00508).
+# The largest GO pin and the smallest NO-GO pin the sheet may use: with
+# both pins there, a bore is sure to pass only between them, the middle
+# .0001 of the .0005 band.
+go_pin_max_in = 0.3762
+nogo_pin_min_in = 0.3763
 # Apex (PA05): the #43 pecked .080 with full retract (L/D 4.8), its full
 # diameter apex_drill_past_mm past the bore's wall; its point then stands
 # apex_tip_height_mm above the parallels.
@@ -311,10 +326,18 @@ ref = "tap-guide-fisher"
 id = "tap-4-40"
 name = "4-40 plug tap"
 ref = "jig-tap-4-40-plug"
+# The arbor bore's Class ZZ pins (shop dt.toml zz-pins-3760-3765), not on
+# hand. Owner ruling 2026-11-23 (tool audit Q1, re-answered on the corrected
+# facts), verbatim: "ZZ singles per the record: 29 pins (17 plus GO, 12
+# minus NO-GO), about $130. Accept that good holes near a limit may be
+# refused; the traveler mikes each pin so the real window is known per pin."
+# They replace the Class X .3760/.3765 pair: Setup 5 mikes both pins and the
+# reamer, and the bore is accepted between the two pins' readings.
 [[tools]]
-id = "plugs-3760"
-name = "Plug gauge pair .3760 GO / .3765 NO-GO, TO ORDER"
-ref = "plug-gauges-3760-3765"
+id = "pins"
+name = "Class ZZ pins: .3760 plus (GO) and .3765 minus (NO-GO)"
+ref = "zz-pins-3760-3765"
+status = "to_order"
 [[tools]]
 id = "feeler"
 name = "Feeler gauges"
@@ -555,18 +578,8 @@ feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "Start this setup only with the {{cad.arbor_bore_dia_min_in:.4dot}} GO / {{cad.arbor_bore_dia_max_in:.4dot}} NO-GO plug gauges in hand: they are to order, not in the shop." },
+  { kind = "stop", text = "Start this setup only with the .3760 reamer and the two Class ZZ pins, {{cad.arbor_bore_dia_min_in:.4dot}} plus (GO) and {{cad.arbor_bore_dia_max_in:.4dot}} minus (NO-GO), in hand: the pins are to order, not in the shop." },
 ]
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the seat (the RIGHT end), Y0 the fixed jaw's face (W): edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the seat (the part's RIGHT end) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack right of the part."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X12.700 Y-6.850: the cutter right of the seat, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -579,6 +592,34 @@ feed = "hand"
 steps = [
   { kind = "stop", text = "Shank outside {{process.reamer_shank_min_mm:in.4dot}}–{{process.reamer_shank_max_mm:in.4dot}}: stop and tell the owner (the 5/16 collet will not hold it, and the drill chuck stands it too long for this setup)." },
 ]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "On the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the {{cad.arbor_bore_dia_min_in:.4dot}} GO pin, the {{cad.arbor_bore_dia_max_in:.4dot}} NO-GO pin, and the reamer across two opposite margins at its front end. Write the three readings here, and each pin's on its tag."
+inspection = "GO pin reads {{cad.arbor_bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}}: a pin outside its range is not used. The reamer reads under the NO-GO pin's reading, else it is not used: stop and tell the owner."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.arbor_bore_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "This sheet accepts a bore the GO pin enters and the NO-GO pin does not: GO reading ≤ bore < NO-GO reading. With both pins at their size limits only {{process.go_pin_max_in:.4dot}}–{{process.nogo_pin_min_in:.4dot}} is sure to pass; a good bore within .0002 of either band limit may be refused (owner ruling 2026-11-23)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Only if the reamer read under the GO pin, before the first part: home the mill ($H). Grip a 2 in offcut of the 1 x 1-1/4 flat on the stacks as Holding says, lying on a 1-1/4 in face (1.00 thick). Console M6 T4 (23/64; the tool setter measures it). Jog it over the offcut's middle, above the gap between the stacks; spindle stopped, its point on a .002 leaf on the top: G10 L20 P1 X0 Y0 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Trial hole, MDI: M3 S650, G0 Z2, G1 Z-29 F{{process.bore_drill_feed_per_min_mm:.1f}}, G0 Z15, M5. Console M6 T5 (the reamer in its collet): M3 S400, G0 Z2, G1 Z-29 F{{process.ream_feed_per_min_mm:.1f}}, G1 Z15, M5. Cutting oil. Gauge it with the pins. The GO pin enters: take the offcut out and go on. Refused: stop and tell the owner (the pins refuse this reamer's holes)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Home the mill first ($H). G54 X0 the seat (the RIGHT end), Y0 the fixed jaw's face (W): edge finder (900 rpm)."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the seat (the part's RIGHT end) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack right of the part."
+instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X12.700 Y-6.850: the cutter right of the seat, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -645,16 +686,23 @@ feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [
   { name = "bore ream", kind = "drill", phase = "finish", cutter_dia_mm = 9.5504, flutes = 2, rpm = 400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = "{{cad.arbor_bore_height_mm}}" },
 ]
-inspection = "Still clamped, the first part before the second is reamed: bore Ø{{cad.arbor_bore_dia_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}}, the {{cad.arbor_bore_dia_min_in:.4dot}} GO plug enters the full depth, the {{cad.arbor_bore_dia_max_in:.4dot}} NO-GO plug does not. Finish Ra {{cad.arbor_bore_finish_ra}} µm: an even reamed bore, bright, no chatter rings, tears or spiral marks."
-gauge_checks = [{ gauge = "plug-gauges-3760-3765", band_mm = "{{cad.arbor_bore_dia_band_mm}}" }]
+inspection = "Still clamped, the first part before the second is reamed: GO enters, NO-GO does not: bore Ø{{cad.arbor_bore_dia_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}}, the GO pin the full depth. Finish Ra {{cad.arbor_bore_finish_ra}} µm: an even reamed bore, bright, no chatter rings, tears or spiral marks."
+gauge_checks = [{ gauge = "zz-pins-3760-3765", band_mm = "{{cad.arbor_bore_dia_band_mm}}" }]
 
 # The ream's remedy follows its check: prechips prints an op's Check after
 # its work, so it is the next op.
 [[setups.operations]]
+instruction = "GO pin refused: blow out the chips and oil; T5 still in, the part still clamped. MDI G0 Z{{process.reream_clear_mm:.3f}}, G0 X-{{cad.arbor_bore_height_mm:.3f}} Y-{{cad.arbor_bore_lateral_mm:.3f}}, M3 S400, G0 Z{{process.reream_r_plane_mm:.3f}}, G1 Z{{process.ream_tip_height_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}, G1 Z{{process.reream_r_plane_mm:.3f}}, G0 Z{{process.reream_clear_mm:.3f}}, M5 (the same reamer once more); gauge again."
+feed = "hand"
+
+[[setups.operations]]
 steps = [
-  { kind = "stop", text = "GO will not enter, NO-GO enters, or the bore shows chatter or tears: stop, the reamer or its runout is out; tell the owner." },
-  { kind = "action", text = "In band: the next part is reamed without the check." },
+  { kind = "stop", text = "GO pin still refused (a reamer cannot be made to cut larger), NO-GO pin enters (no cut remedies it), or chatter or tears in the bore: the part is scrap; stop and tell the owner." },
 ]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "In band: the next part is reamed without the check."
 feed = "hand"
 
 [[setups.operations]]
@@ -891,11 +939,15 @@ gauge_checks = "other"
 [[setups.operations]]
 instruction = "Inspect each pedestal; record the readings with its number."
 feed = "hand"
-inspection = "Every pedestal: bore Ø{{cad.arbor_bore_dia_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}} after the hand ream, the {{cad.arbor_bore_dia_min_in:.4dot}} GO plug enters the full depth, the {{cad.arbor_bore_dia_max_in:.4dot}} NO-GO plug does not; the arbor {{cad.arbor_bore_mates}} slides through it; the bore bright, no chatter or tears (Ra {{cad.arbor_bore_finish_ra}} µm). Bore height {{cad.arbor_bore_height_min_in:.3dot}}–{{cad.arbor_bore_height_max_in:.3dot}}: the pedestal on its seat on the surface plate, the height gauge on the bore's bottom and top walls, their mean. A 4-40 screw runs in by hand into the bore."
+inspection = "Every pedestal: GO enters, NO-GO does not: bore Ø{{cad.arbor_bore_dia_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}} after the hand ream, the GO pin the full depth; the arbor {{cad.arbor_bore_mates}} slides through it; the bore bright, no chatter or tears (Ra {{cad.arbor_bore_finish_ra}} µm). Bore height {{cad.arbor_bore_height_min_in:.3dot}}–{{cad.arbor_bore_height_max_in:.3dot}}: the pedestal on its seat on the surface plate, the height gauge on the bore's bottom and top walls, their mean. A 4-40 screw runs in by hand into the bore."
 gauge_checks = [
-  { gauge = "plug-gauges-3760-3765", band_mm = "{{cad.arbor_bore_dia_band_mm}}" },
+  { gauge = "zz-pins-3760-3765", band_mm = "{{cad.arbor_bore_dia_band_mm}}" },
   { gauge = "height-gauge", band_mm = "{{cad.arbor_bore_height_band_mm}}" },
 ]
+
+[[setups.operations]]
+instruction = "GO pin refused: oil, and turn the same reamer through the bore by hand once more as above; gauge again. Still refused (a reamer cannot be made to cut larger), or the NO-GO pin entering (no cut remedies it): the pedestal is scrap; tell the owner."
+feed = "hand"
 
 [[setups.operations]]
 instruction = "First pedestal only (the programs hold the second): the crown and the hole stations."
