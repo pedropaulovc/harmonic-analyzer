@@ -129,7 +129,9 @@ reserved:
                                    # review on #2144; precedent owner ruling 2026-11-10, #2334 B1)
                                    # on a 28-32 HRC 4140 HT seat. Worst stationary load (rect_half,
                                    # 134.8 N): about 68 N on the rear mount over .55 in, 4.85 N/mm.
-                                   # At the R.004 MAX ridge in the Ø.4720 bore, Hertz line contact
+                                   # At the R.004 MAX ridge in the Ø.4985 bore (owner ruling
+                                   # 2026-11-23, tool audit Q13; the former Ø.4720 bore's figures
+                                   # hold to three places), Hertz line contact
                                    # (E 117/205 GPa) peaks at 1.10 GPa over a 2.8 um half-width.
                                    # That peak and any sharper conforming edge exceed class 40's
                                    # ~0.97 GPa compressive strength, so the edge beds in at first
