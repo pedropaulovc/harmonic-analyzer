@@ -28,7 +28,7 @@ cutter's side, through into the spoil block. K's face-A chamfer is cut by
 hand at the bench after the plate is freed (delegated ruling 2026-11-22,
 owner review #2144): no NC.
 
-Work frame (G54), set in Setup 2:
+Work frame (G54), set in Setup 3:
 - AP01-AP03 (``bond``): X0 Y0 K's axis, the plate's length along -X (the
   end round at +X), +Y toward the fixed jaw (the C edge, model +X); Z0 face
   A (model Z0), the rear face up. Work (X, Y, Z) = (-y, x, z).
@@ -836,7 +836,7 @@ def context(
         ),
     ]
 
-    # Keep-outs. Setup 2: the jaws, their tops spoil_over below the spoil
+    # Keep-outs. Setup 3: the jaws, their tops spoil_over below the spoil
     # block's top (under the tape stack: at its thinnest the jaws stand
     # highest), the fixed jaw's face at the C edge, the moving jaw's at the
     # block's other edge, along the block centred on the jaws.

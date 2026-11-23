@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 600" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="600"/>
-  <text class="title" x="20" y="20">Setup 2 (plan view, rear face up): the blank bonded on the spoil block in the vise</text>
+  <text class="title" x="20" y="20">Setup 3 (plan view, rear face up): the blank bonded on the spoil block in the vise</text>
   <rect class="clamp" x="96" y="68" width="634" height="26"/>
   <text class="label-on-clamp" x="110" y="86">fixed jaw</text>
   <rect class="clamp" x="96" y="399" width="634" height="26"/>

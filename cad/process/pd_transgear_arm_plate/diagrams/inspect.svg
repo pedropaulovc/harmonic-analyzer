@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="380"/>
-  <text class="title" x="20" y="20">Setup 4: the finished plate, face A up; the checks from the GO pin in K</text>
+  <text class="title" x="20" y="20">Setup 5: the finished plate, face A up; the checks from the GO pin in K</text>
   <path class="part-kept" d="M 310.2 93.8 L 316.7 246.2 L 437.1 246.2 L 501.8 214.8 A 49.78 49.78 0 0 0 501.8 125.2 L 437.1 93.8 Z"/>
   <circle class="holes" cx="480" cy="170" r="22.2"/>
   <circle class="holes" cx="357.1" cy="186.5" r="11.6"/>

@@ -8,7 +8,8 @@
 #
 # Route: Setup 1 saws one 2.40-2.50 in blank off the 12 in bar and a 3.5 in
 # spoil block off the owned 1 x 3 in 6061 bar (stock.6061-flat-1x3), and
-# gates the blank. Setup 2: the spoil block in the vise on the 1 in
+# gates the blank; Setup 2, only if the miked reamer reads outside the pins,
+# reams a trial hole in an offcut. Setup 3: the spoil block in the vise on the 1 in
 # parallels, its top over the jaw tops; the blank bonded face A down on it
 # with blue painter's tape on both faces and CA glue between, its datum-C
 # edge flush with the block's edge at the
@@ -18,11 +19,11 @@
 # face (checked, and run again lower if small); AP03_outline mills the end
 # round, the two tapers and the top edge with the 3/8 in end mill's side,
 # through into the spoil block: the whole waste goes to chips, the side edges
-# stay as supplied. Setup 3, bench: free the plate from the tape, then
+# stay as supplied. Setup 4, bench: free the plate from the tape, then
 # chamfer K's face-A mouth .015 x 45° by hand with the owned deburring set's
 # RD16.5 RotoDrive 90° countersink, checked with the .450 pin (delegated
 # ruling 2026-11-22, Main, owner review #2144: option C; the owner may
-# overrule to re-bonding face A up on the spoil block). Setup 4, bench:
+# overrule to re-bonding face A up on the spoil block). Setup 5, bench:
 # deburr, inspect, oil.
 #
 # The countersink (owner 2026-11-23, tool audit Q12: "the mcmaster kit sold
@@ -53,12 +54,12 @@
 # prechips' bond check runs at the stresses the owner accepts, used as
 # written, over the finished plate's own area less its three holes (cam.py
 # computes it), the least the bond holds once the outline is cut. The
-# operator proves each bond by Setup 2's stack check and push test. The
+# operator proves each bond by Setup 3's stack check and push test. The
 # drills and the reamer run before the outline, with the whole blank still
 # bonded.
 #
 # One-sided facing: the rear face only (face A, datum A, stays as supplied).
-# A cold-finished bar can bow when one skin is cut off: Setup 3 checks face A
+# A cold-finished bar can bow when one skin is cut off: Setup 4 checks face A
 # on the surface plate once freed and straightens a bowed plate in the bench
 # vise (traveler review 2026-11-23: one-sided removal needs a release or a
 # straightening step); the final inspection checks the thickness's Rule #1
@@ -89,7 +90,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1/4 x 1-1/2 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:fraction}} in flat bar, the 12 in length: one {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} in blank. Spoil block: a 3.5 in length of the 1 x 3 in 6061 bar."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The two long edges are the bar's, as supplied: no cut touches them. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall or controller reset, home again and do what that setup's Datum says before resuming. The two Ø.0945 locating holes, the bush press and its ream are the assembly's (MHA-PD-00 steps 13A, 13E, 11C, 11H). To buy before starting: the bar, the .4375 reamer, the 3/8 in 82° countersink, the Class ZZ pins .4375 plus (GO) and .4380 plus (NO-GO, reads .4380–.4382) and the .250 and .450 pin gauges (Setup 2 checks K and the countersinks while the blank is still bonded). Finish: {{cad.finish}}."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The two long edges are the bar's, as supplied: no cut touches them. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall or controller reset, home again and do what that setup's Datum says before resuming. The two Ø.0945 locating holes, the bush press and its ream are the assembly's (MHA-PD-00 steps 13A, 13E, 11C, 11H). To buy before starting: the bar, the .4375 reamer, the 3/8 in 82° countersink, the Class ZZ pins .4375 plus (GO) and .4380 plus (NO-GO, reads .4380–.4382) and the .250 and .450 pin gauges (Setup 3 checks K and the countersinks while the blank is still bonded). Finish: {{cad.finish}}."
 shop = "../shop"
 stock_refs = ["1018-flat-1-4x1-1-2", "6061-flat-1x3"]
 material_key = "rocker-1018-cold-finished"
@@ -137,7 +138,7 @@ vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
 parallel_height_mm = 25.4
 # The hold (consumables.hold-painters-tape-ca): ScotchBlue 2090 on the block
 # and on face A, GH1200 thick CA between. tape_stack_mm the stack's nominal,
-# tape_stack_min_mm-tape_stack_max_mm the band Setup 2's stack check accepts
+# tape_stack_min_mm-tape_stack_max_mm the band Setup 3's stack check accepts
 # (both from the record). Z0 is face A, set from T1 on the blank's top less
 # its miked thickness (a touch-off from the top), so the stack moves no
 # depth on the plate (the thickness, the countersinks): it sets only how far
@@ -153,7 +154,7 @@ tape_stack_max_mm = 0.33
 bond_accepted_shear_mpa = 0.6
 bond_accepted_tensile_mpa = 0.6
 bond_area_mm2 = 1629.15
-# Work frame (Setups 2 and 4): K at X0 Y0, the plate's length along -X (the
+# Work frame (Setups 3 and 5): K at X0 Y0, the plate's length along -X (the
 # end round at +X, the top edge at -X), the datum-C edge at +Y against the
 # fixed jaw; Z0 face A. x_set_mm and y_set_mm are the edge finder's entries
 # (its .100 radius) on the blank's round end and its datum-C edge;
@@ -213,7 +214,7 @@ ream_tip_mm = -1.0
 # faced rear face (cam.py).
 sink_dia_mm = 7.9248
 sink_tip_mm = 0.4456
-# The press hole's chamfer (Setup 3, by hand at the bench): .015 x 45°, rim
+# The press hole's chamfer (Setup 4, by hand at the bench): .015 x 45°, rim
 # Ø.4675 (chamfer_rim_dia_mm, cam.py).
 chamfer_rim_dia_mm = 11.8745
 # Speeds and feeds. The 3/8 in end mill: shop
@@ -349,17 +350,17 @@ status = "to_order"
 id = "tape"
 name = "ScotchBlue 2090 blue painter's tape, 1.41 in"
 ref = "tape-scotchblue-2090"
-description = "ScotchBlue Original Multi-Surface 2090, 1.41 in wide: one layer on the spoil block's top and one on the blank's face A (Setup 2)"
+description = "ScotchBlue Original Multi-Surface 2090, 1.41 in wide: one layer on the spoil block's top and one on the blank's face A (Setup 3)"
 [[tools]]
 id = "ca-glue"
 name = "GH1200 CA glue, thick (1500 cps)"
 ref = "ca-glue-gh1200"
-description = "GH1200 super glue, the 1500 cps thick bottle: the bead between the two tapes that bonds the blank to the spoil block (Setup 2)"
+description = "GH1200 super glue, the 1500 cps thick bottle: the bead between the two tapes that bonds the blank to the spoil block (Setup 3)"
 [[tools]]
 id = "ca-accelerator"
 name = "Starbond CA accelerator spray"
 ref = "ca-accelerator-starbond"
-description = "Starbond CA glue accelerator: misted on face A's tape so the glue grabs at once (Setup 2)"
+description = "Starbond CA glue accelerator: misted on face A's tape so the glue grabs at once (Setup 3)"
 
 [[setups]]
 machine_kind = "other"
@@ -392,7 +393,7 @@ instruction = "Pick the straighter long edge as the C edge (datum C) and mark it
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mic the blank's thickness at its middle and 1/2 in in from each end, 1/2 in in from its front edge, and its width at both ends. Write each thickness on the rear face over its spot with marking fluid (face A is degreased and bonded): Setup 2 checks the tape stack from the end ones and sets Z0 from the middle one."
+instruction = "Mic the blank's thickness at its middle and 1/2 in in from each end, 1/2 in in from its front edge, and its width at both ends. Write each thickness on the rear face over its spot with marking fluid (face A is degreased and bonded): Setup 3 checks the tape stack from the end ones and sets Z0 from the middle one."
 inspection = "Every thickness reading {{process.blank_thickness_min_mm:in.4dot}}–{{process.blank_thickness_max_mm:in.4dot}} and the width {{process.blank_width_min_mm:in.4dot}}–{{process.blank_width_max_mm:in.4dot}}: the bar as supplied, this traveler's incoming-stock gate (the width sets the side edges)."
 gauge_checks = [
   { gauge = "micrometers", band_mm = ["{{process.blank_thickness_min_mm}}", "{{process.blank_thickness_max_mm}}"] },
@@ -406,27 +407,56 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Before Setup 2 reams K: on the .0001 micrometer, mike the .4375 plus GO pin, the .4380 plus NO-GO pin and the .4375 reamer (across two opposite margins at its front); each reading is good to ±.00005. Write the three on this sheet and each pin's on its tag."
+instruction = "Before Setup 3 reams K: on the .0001 micrometer, mike the .4375 plus GO pin, the .4380 plus NO-GO pin and the .4375 reamer (across two opposite margins at its front); each reading is good to ±.00005. Write the three on this sheet and each pin's on its tag."
 inspection = "GO pin {{cad.press_hole_dia_min_in:.4dot}}–{{process.k_go_pin_max_mm:in.4dot}}, NO-GO pin {{process.k_nogo_pin_min_mm:in.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}. Accept a K from the GO pin's reading to under the NO-GO's. Owner ruling 2026-11-23: 'Accept that good holes near a limit may be refused' (sure to pass: {{process.k_go_pin_max_mm:in.4dot}}–{{process.k_nogo_pin_min_mm:in.4dot}} only)."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "A pin outside its band is not used: stop and tell the owner." },
+  { kind = "stop", text = "A pin outside its band is not used: stop and tell the owner. The reamer under the GO pin's reading, or at or over the NO-GO's: Setup 2 first; otherwise skip Setup 2." },
 ]
 feed = "hand"
 
+[[setups]]
+machine_kind = "other"
+title = "Trial ream (only if the reamer reads under the GO pin, or at or over the NO-GO pin)"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+holding = "Only if the reamer read under the GO pin, or at or over the NO-GO pin: an offcut of the 1/4 x 1-1/2 bar, about 2 in long, flat on the two 1 in parallels in the 6 in PM vise (one at each jaw), its middle over the gap between them; tap it down and tighten the vise on its long edges."
+datum = "No program: MDI only. X0 Y0 Z0 the 27/64 drill's point on the offcut's top at its middle, spindle stopped; this overwrites G54, which Setup 3 sets again. Tool lengths from the tool setter at each M6."
+diagram = { file = "diagrams/trial.svg", alt = "Section across the vise jaws: the offcut flat on two 1 in parallels, one at each jaw, the jaws closed on its edges; the trial hole through its middle over the gap between the parallels." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
 [[setups.operations]]
-instruction = "Only if the reamer read under the GO pin, before Setup 2: drill and ream a trial hole through an offcut of the bar on the mill, by MDI, with T4 and T5; gauge it with the two pins."
-instruction_detailed = "Only if the reamer read under the GO pin: an offcut of the 1/4 x 1-1/2 bar flat on the two 1 in parallels in the vise (one at each jaw), its middle over the gap. Console M6 T4 (27/64); its point on the middle, spindle stopped: G10 L20 P1 X0 Y0 Z0. MDI M3 S600, G1 Z-10 F{{process.drill_2764_feed_per_min_mm:.1f}}, G0 Z5; M6 T5 (.4375 reamer), M3 S400, G1 Z-10 F{{process.ream_feed_per_min_mm:.1f}}, G1 Z5, M5."
-inspection = "The GO pin enters the trial hole and the NO-GO does not."
-gauge_checks = [{ gauge = "zz-pins-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
+instruction = "Home the mill ($H). Clamp the offcut as Holding says."
 feed = "hand"
 
 [[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-27-64"
+drilling = "none"
+sizing = "other"
+instruction = "Console M6 T4 (27/64 drill in the drill chuck; set 600 by hand). Its point on the offcut's middle, spindle stopped: G10 L20 P1 X0 Y0 Z0. MDI M3, G1 Z-10 F{{process.drill_2764_feed_per_min_mm:.1f}}, G0 Z5, M5: drilled through into the gap."
+rpm = 600
+feed = "{{process.drill_2764_feed_per_min_mm:in.1f}} in/min"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "reamer"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.press_hole_dia_band_mm}}" }
+instruction = "Console M6 T5 (.4375 reamer in the drill chuck; set 400 by hand, a drop of cutting oil on the reamer). MDI M3, G1 Z-10 F{{process.ream_feed_per_min_mm:.1f}}, G1 Z5, M5: reamed through, fed in and fed out. Blow the hole out."
+rpm = 400
+feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
+inspection = "The GO pin enters the trial hole and the NO-GO does not."
+gauge_checks = [{ gauge = "zz-pins-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
+
+[[setups.operations]]
 steps = [
-  { kind = "stop", text = "Only after a trial hole: GO refused: this reamer's holes will be refused: stop and tell the owner." },
+  { kind = "stop", text = "GO refused, or NO-GO enters: this reamer's holes will be refused: stop and tell the owner." },
 ]
 feed = "hand"
 
@@ -479,7 +509,7 @@ feed = "hand"
 steps = [
   { kind = "action", text = "Each end's tape stack: its blank reading less its block reading less that end's written thickness (in × 25.4)." },
   { kind = "check", text = "Both stacks {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}} ({{process.tape_stack_min_mm:.2f}}–{{process.tape_stack_max_mm:.2f}} mm), and within .002 (0.05 mm) of each other." },
-  { kind = "stop", text = "Outside, or the ends differ more: peel the blank off as Setup 3 frees the plate, clean both faces, and tape and bond again from this setup's first op." },
+  { kind = "stop", text = "Outside, or the ends differ more: peel the blank off as Setup 4 frees the plate, clean both faces, and tape and bond again from this setup's first op." },
 ]
 feed = "hand"
 
@@ -487,7 +517,7 @@ feed = "hand"
 steps = [
   { kind = "action", text = "Push the blank hard sideways with the heel of the hand, along X and across it; try to lift each corner with a thumbnail." },
   { kind = "check", text = "No movement, no creak, no lifted corner: the owner's acceptance of the hold (there is no pull test)." },
-  { kind = "stop", text = "Any movement: peel the blank off as Setup 3 frees the plate, clean both faces, and tape and bond again from this setup's first op." },
+  { kind = "stop", text = "Any movement: peel the blank off as Setup 4 frees the plate, clean both faces, and tape and bond again from this setup's first op." },
 ]
 feed = "hand"
 
@@ -500,7 +530,7 @@ feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "More: peel the blank off as Setup 3 frees the plate, clean both faces, and tape and bond again from this setup's first op." },
+  { kind = "stop", text = "More: peel the blank off as Setup 4 frees the plate, clean both faces, and tape and bond again from this setup's first op." },
 ]
 feed = "hand"
 
@@ -617,7 +647,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Only if a rim is small: lower Z0 by the shortfall, run AP02_sink again, put Z0 back, then repeat the .250 pin check."
-instruction_detailed = "The shortfall: {{process.sink_pin_depth_mid_mm:in.4dot}} less the pin's end's depth below the rear face. Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z − the shortfall in mm). Run AP02_sink. G10 L2 P1 Z(the noted Z) puts Z0 back before AP03_outline."
+instruction_detailed = "The shortfall: {{process.sink_pin_depth_mid_mm:in.4dot}} less the shallower countersink's pin depth below the rear face; the deeper one's depth plus the shortfall over {{process.sink_pin_depth_max_mm:in.4dot}}: stop and tell the owner instead. Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z − the shortfall in mm). Run AP02_sink. G10 L2 P1 Z(the noted Z) puts Z0 back before AP03_outline."
 inspection = "The pin's end {{process.sink_pin_depth_min_mm:in.4dot}}–{{process.sink_pin_depth_max_mm:in.4dot}} below the rear face, both countersinks."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.sink_pin_depth_min_mm}}", "{{process.sink_pin_depth_max_mm}}"] }]
 feed = "hand"
@@ -737,10 +767,10 @@ beam = "other"
 inspection = [
   "Thickness {{cad.rear_face_thickness_min_in:.3dot}}–{{cad.rear_face_thickness_max_in:.3dot}}, micrometer, at four places round the plate (it sets the screws' reach into MHA-PD-18). Over: stop and tell the owner. Under: scrap.",
   "Form, the thickness's envelope (Rule #1, perfect form at {{cad.rear_face_thickness_max_in:.3dot}}): the plate free on the surface plate, each face down in turn; the largest thickness reading plus the thickest feeler leaf that enters under it anywhere, at most {{cad.rear_face_thickness_max_in:.3dot}}. Over: stop and tell the owner.",
-  "K Ø{{cad.press_hole_dia_min_in:.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}: GO enters from either face, NO-GO enters from neither (the pins miked before Setup 2). GO refused: stop and tell the owner (do not re-ream). NO-GO enters: scrap. MHA-PD-28's traveler turns the bush to this hole.",
-  "K's chamfer: accepted in Setup 3 (the .450 pin check that guides the hand cut).",
+  "K Ø{{cad.press_hole_dia_min_in:.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}: GO enters from either face, NO-GO enters from neither (the pins miked in Setup 1). GO refused: stop and tell the owner (do not re-ream). NO-GO enters: scrap. MHA-PD-28's traveler turns the bush to this hole.",
+  "K's chamfer: accepted in Setup 4 (the .450 pin check that guides the hand cut).",
   "Side edges {{cad.outline_edge_right_x_min_in:.3dot}}–{{cad.outline_edge_right_x_max_in:.3dot}} from K: the GO pin in K, the calipers over the pin and each side edge at the kink and at the top, {{process.side_over_plug_min_mm:in.3dot}}–{{process.side_over_plug_max_mm:in.3dot}}. End round R{{cad.outline_end_r_min_in:.3dot}}–{{cad.outline_end_r_max_in:.3dot}}: over the pin and the round's far point on the centre line, {{process.round_over_plug_min_mm:in.3dot}}–{{process.round_over_plug_max_mm:in.3dot}}. The top edge's corners ({{cad.outline_top_left_y_min_in:.2dot}}–{{cad.outline_top_left_y_max_in:.2dot}} and {{cad.outline_top_right_y_min_in:.2dot}}–{{cad.outline_top_right_y_max_in:.2dot}} from K), the tapers and the kinks are the program's from the same zero as the round, not gauged. Outside: stop and tell the owner.",
-  "Screw holes Ø{{cad.screw_hole_1_dia_min_in:.3dot}}–{{cad.screw_hole_1_dia_max_in:.3dot}}: as drilled. Positions (BASIC, Ø{{cad.screw_hole_1_position_dia_in:.3dot}} zone): a #1 drill's shank in each hole; the calipers over the GO pin in K and each shank, less half the shank's miked Ø and half the GO pin's written reading, {{process.screw_1_from_k_min_mm:in.3dot}}–{{process.screw_1_from_k_max_mm:in.3dot}} (the hole farther from the C edge) and {{process.screw_2_from_k_min_mm:in.3dot}}–{{process.screw_2_from_k_max_mm:in.3dot}} (the nearer). Each hole's place round K is the program's, from Setup 2's alignment check on the C edge (process-held). Outside: stop and tell the owner.",
+  "Screw holes Ø{{cad.screw_hole_1_dia_min_in:.3dot}}–{{cad.screw_hole_1_dia_max_in:.3dot}}: as drilled. Positions (BASIC, Ø{{cad.screw_hole_1_position_dia_in:.3dot}} zone): a #1 drill's shank in each hole; the calipers over the GO pin in K and each shank, less half the shank's miked Ø and half the GO pin's written reading, {{process.screw_1_from_k_min_mm:in.3dot}}–{{process.screw_1_from_k_max_mm:in.3dot}} (the hole farther from the C edge) and {{process.screw_2_from_k_min_mm:in.3dot}}–{{process.screw_2_from_k_max_mm:in.3dot}} (the nearer). Each hole's place round K is the program's, from Setup 3's alignment check on the C edge (process-held). Outside: stop and tell the owner.",
 ]
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.rear_face_thickness_band_mm}}" },
