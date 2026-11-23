@@ -325,6 +325,7 @@ def sketch_view_circle(
     add_to_db: bool,
     label: str,
     rim_angle_deg: float = 0.0,
+    center_tolerance: float = 0.0,
 ) -> Any:
     """Sketch a circle in the ACTIVE ``view``'s own sketch from sheet points,
     through the view sketch's ModelToSketchTransform (draw_ch_amplitude_bar's
@@ -334,7 +335,10 @@ def sketch_view_circle(
     Without ``add_to_db`` screen-space inference can snap the rim point to a
     model point near it and draw a smaller circle (draw_pd_paper_drive_
     assembly's DETAIL H): ``rim_angle_deg`` picks the rim point clear of the
-    model, and the drawn circle is read back either way."""
+    model, and the drawn circle is read back either way.
+    ``center_tolerance`` (sheet metres) is how far the model point the circle
+    is centred on may stand from ``center``: inference may snap the centre
+    onto it, which draws the circle the caller meant."""
     sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
@@ -361,13 +365,14 @@ def sketch_view_circle(
         raise RuntimeError(f"failed to sketch the {label} circle")
     drawn_centre, drawn_radius = native_circle_geometry(circle, label=label)
     intended = math.dist(points[0][:2], points[1][:2])
+    allowed = (1e-3 + center_tolerance / radius) * intended
     if (
-        math.dist(drawn_centre[:2], points[0][:2]) > 1e-3 * intended
-        or abs(drawn_radius - intended) > 1e-3 * intended
+        math.dist(drawn_centre[:2], points[0][:2]) > allowed
+        or abs(drawn_radius - intended) > allowed
     ):
         raise RuntimeError(
             f"{label} circle drew at {drawn_centre!r} r {drawn_radius}, "
-            f"not {points[0]!r} r {intended}"
+            f"not {points[0]!r} r {intended} within {allowed}"
         )
     return circle
 

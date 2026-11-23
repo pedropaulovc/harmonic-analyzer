@@ -16,7 +16,11 @@ ha_assembly_package reads its instruments into the ASSEMBLY.md tool list.
 
 from __future__ import annotations
 
-from cone_set_stack import LAND_2_ASSEMBLED_RUNOUT_TIR_MM, PIVOT_RUNOUT_TIR_MM
+from cone_set_stack import (
+    LAND_2_ASSEMBLED_RUNOUT_TIR_MM,
+    PIVOT_RUNOUT_TIR_MM,
+    SPIGOT_ASSEMBLED_RUNOUT_TIR_MM,
+)
 from cone_stack_end_play import SHAFT_END_PLAY
 import cylinder_bank_layout as bank
 import dt_cone_gear_spec as cone_gear
@@ -216,6 +220,20 @@ ACCEPTANCES = (
         f"{_step_ref('post-and-tip-block', 'B')}, {_step_ref('post-and-tip-block', 'F')}",
         "MHA-DT-37 PIVOT, MHA-DT-04 ON END ON A V-BLOCK",
         f"{inch_text(inch_floor_mm(PIVOT_RUNOUT_TIR_MM, 4), 4)} TIR MAX",
+        "TEST INDICATOR",
+    ),
+    # #2473 (owner ruling 2026-11-22): "Add an after-cure reading of the 12-
+    # and 18-tooth gears in the same setup: Ø.040 pin in each tooth space,
+    # shaft on end on the V-block, .0030 TIR MAX (as the 24-tooth already
+    # has)". The pivot's reading does not see MHA-DT-04's socket standing off
+    # its journal; this one does, in row 21's setup.
+    (
+        "spigot-gear-runout",
+        _step_ref("post-and-tip-block", "F"),
+        f"{' AND '.join(f'T{teeth:03d}' for teeth in cone_gear.SPIGOT_TEETH)}, "
+        f"\u00d8{inch_text(cone_gear.over_pins_pin_dia_mm(cone_gear.SPIGOT_TEETH[0]), 3)} GAUGE PIN, "
+        f"SETUP AS T{_LAND_2_TEETH:03d}",
+        f"{inch_text(inch_floor_mm(SPIGOT_ASSEMBLED_RUNOUT_TIR_MM, 4), 4)} TIR MAX EACH SPACE",
         "TEST INDICATOR",
     ),
 )

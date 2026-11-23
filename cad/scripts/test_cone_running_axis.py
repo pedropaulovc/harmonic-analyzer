@@ -129,16 +129,36 @@ def test_a_shorter_engagement_tilts_more(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 @pytest.mark.parametrize("teeth", cone.CONE_TEETH)
-def test_the_stack_books_each_seat_offset_at_the_read_pivot_limit(teeth: int) -> None:
+def test_the_stack_books_each_axis_offset_at_the_read_pivot_limit(teeth: int) -> None:
     pivot_offset = cone_set_stack.PIVOT_RUNOUT_TIR_MM / 2.0
-    offset = axis.seat_offset_mm(teeth, pivot_offset)
-    if teeth in axis.DT37_TEETH:
+    if teeth in cone_set_stack.ASSEMBLED_RUNOUT_TIR_MM:
+        # Read after cure about the journal: the journal axis's own offset
+        # from the running axis at the gear's plane, wherever it is seated.
+        offset = axis.journal_axis_offset_mm(teeth, pivot_offset)
+        assert offset == pytest.approx(
+            axis.k_range(axis.seat_plane(teeth))[1] * pivot_offset
+        )
+        assert cone_set_stack.seat_eccentricity_mm(teeth) == pytest.approx(
+            cone_set_stack.ASSEMBLED_RUNOUT_TIR_MM[teeth] / 2.0
+        )
+    elif teeth in axis.DT37_TEETH:
+        offset = axis.seat_offset_mm(teeth, pivot_offset)
         assert offset == pytest.approx(
             axis.spigot_share(teeth) * axis.spigot_stand_off_mm(pivot_offset)
         )
     else:
+        offset = axis.seat_offset_mm(teeth, pivot_offset)
         assert offset == pytest.approx(axis.dt04_k_range(teeth)[1] * pivot_offset)
-    assert offset > 0.0
+        assert offset == pytest.approx(axis.journal_axis_offset_mm(teeth, pivot_offset))
+    assert 0.0 < offset < pivot_offset
     assert cone_set_stack.cone_eccentricity_mm(teeth) == pytest.approx(
         cone_set_stack.seat_eccentricity_mm(teeth) + offset
     )
+
+
+def test_only_t006_is_left_to_the_tilt_model() -> None:
+    unread = [
+        t for t in axis.DT37_TEETH if t not in cone_set_stack.ASSEMBLED_RUNOUT_TIR_MM
+    ]
+    assert unread == [6]
+    assert sorted(cone_set_stack.ASSEMBLED_RUNOUT_TIR_MM) == [12, 18, 24]

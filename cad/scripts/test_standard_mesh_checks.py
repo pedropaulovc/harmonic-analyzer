@@ -57,21 +57,27 @@ def test_cone_drum_mesh_keeps_contact_at_the_loosest_feel_set(teeth: int) -> Non
 
 
 @pytest.mark.parametrize("teeth", cone.ROUND_BORE_TEETH)
-def test_bonded_gears_book_their_bond_float(teeth: int) -> None:
-    # #3219 option D and #3292: T012/T018's eccentricity about their seat is
-    # their printed tooth-space runout / 2 plus the bond float; T024's is half
-    # its after-cure tooth runout about MHA-DT-04, which reads the float.
-    # #2473: the seat's own offset from the running axis comes on top.
+def test_bonded_gears_book_their_assembled_reading(teeth: int) -> None:
+    # #3292 and #2473: T012, T018 and T024 cure off their seats by their bond
+    # float, so each is accepted after cure on its tooth runout about
+    # MHA-DT-04's journal, which reads the float, the part's own runout and
+    # the seat's runout to the journal together. The journal axis's offset
+    # from the running axis comes on top.
     centre = cone_set_stack.cone_centre(teeth)
     if teeth in cone.SPIGOT_TEETH:
-        eccentricity = (
+        eccentricity = cone_set_stack.SPIGOT_ASSEMBLED_RUNOUT_TIR_MM / 2.0
+        # The reading is an acceptance, not a sum the prints guarantee: a
+        # part at its .0015 TIR cured at its full bond float is .0033 TIR
+        # before the spigot's own float, so a set can fail 2F and be redone.
+        assert (
             cone_set_stack.SPIGOT_TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
-            + cone.bond_clearance_mm(teeth)[1] / 2.0
+            + cone_set_stack.bond_float_mm(teeth)
+            > eccentricity
         )
     else:
         eccentricity = cone_set_stack.LAND_2_ASSEMBLED_RUNOUT_TIR_MM / 2.0
     assert cone_set_stack.seat_eccentricity_mm(teeth) == pytest.approx(eccentricity)
-    eccentricity += cone_running_axis.seat_offset_mm(
+    eccentricity += cone_running_axis.journal_axis_offset_mm(
         teeth, cone_set_stack.PIVOT_RUNOUT_TIR_MM / 2.0
     )
     assert centre.ceiling_mm - centre.set_max_mm == pytest.approx(
@@ -99,10 +105,13 @@ def _nominal_contact_ratio(teeth: int, eccentricity_mm: float) -> float:
 
 def test_the_running_axis_term_needs_every_acceptance_it_is_booked_with() -> None:
     """#2473 option G: what each printed acceptance buys, from the gate's own
-    figure. None of #3324's rows is redundant, and the pivot's limit is the
-    owner's .0020, not the .0025 first ruled."""
+    figure. The pivot's limit is the owner's .0020, T012 and T018 are read
+    after cure at .0030 as T024 is at .0045, and neither reading stands in
+    for the other."""
     pivot = cone_set_stack.PIVOT_RUNOUT_TIR_MM / 2.0
     assert cone_set_stack.PIVOT_RUNOUT_TIR_MM == pytest.approx(0.0020 * 25.4)
+    assert cone_set_stack.SPIGOT_ASSEMBLED_RUNOUT_TIR_MM == pytest.approx(0.0030 * 25.4)
+    assert set(cone_set_stack.ASSEMBLED_RUNOUT_TIR_MM) == set(cone.ROUND_BORE_TEETH)
     for teeth in CONE_TEETH:
         assert _nominal_contact_ratio(
             teeth, cone_set_stack.cone_eccentricity_mm(teeth)
@@ -113,24 +122,38 @@ def test_the_running_axis_term_needs_every_acceptance_it_is_booked_with() -> Non
     }
     # T012 governs; every other mesh keeps more.
     assert min(margins, key=margins.get) == 12
-    assert margins[12] == pytest.approx(1.0081, abs=5e-4)
-    assert margins[18] == pytest.approx(1.0209, abs=5e-4)
+    assert margins[12] == pytest.approx(1.0229, abs=5e-4)
+    assert margins[18] == pytest.approx(1.0771, abs=5e-4)
     assert margins[24] == pytest.approx(1.0447, abs=5e-4)
-    # The pivot at .0025 TIR leaves T012 under the gate at the least spigot
-    # engagement (owner ruling 2026-11-22: .0020).
-    assert _nominal_contact_ratio(
-        12,
-        cone_set_stack.seat_eccentricity_mm(12)
-        + cone_running_axis.seat_offset_mm(12, 0.0025 * 25.4 / 2.0),
-    ) < 1.0
-    # #3219's .0015 TIR on T012/T018: at the keyed gears' .002 both fall under.
-    for teeth in cone.SPIGOT_TEETH:
-        loose = (
-            cone_set_stack.TOOTH_RUNOUT_TIR_MM / 2.0
-            + cone_set_stack.bond_float_mm(teeth)
-            + cone_running_axis.seat_offset_mm(teeth, pivot)
+
+    def read_about_the_journal(teeth: int, reading_tir_in: float, pivot_mm: float) -> float:
+        return _nominal_contact_ratio(
+            teeth,
+            reading_tir_in * 25.4 / 2.0
+            + cone_running_axis.journal_axis_offset_mm(teeth, pivot_mm),
         )
-        assert _nominal_contact_ratio(teeth, loose) < 1.0
+
+    # The after-cure reading of T012 has .0005 in to spare: at .0040 it fails.
+    assert read_about_the_journal(12, 0.0035, pivot) >= 1.0
+    assert read_about_the_journal(12, 0.0040, pivot) < 1.0
+    # Without that reading (the stack as first booked for G: the part's
+    # .0015, the bond float and MHA-DT-37's tilt in a socket taken true to
+    # the journal) T012 kept 1.008, and a socket .0005 in TIR off the journal,
+    # which no sheet limits, took it under (Codjiflo review of #3374).
+    spigot_true = (
+        cone_set_stack.SPIGOT_TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
+        + cone_set_stack.bond_float_mm(12)
+        + cone_running_axis.seat_offset_mm(12, pivot)
+    )
+    assert _nominal_contact_ratio(12, spigot_true) == pytest.approx(1.0081, abs=5e-4)
+    socket_off = cone_running_axis.spigot_share(12) * (0.0005 * 25.4 / 2.0)
+    assert _nominal_contact_ratio(12, spigot_true + socket_off) < 1.0
+    # The pivot's reading is still needed: the gears' readings are about the
+    # journal, not the running axis. At .0030 TIR T012 falls under, at .0040
+    # T018, and at .0060 T024.
+    assert read_about_the_journal(12, 0.0030, 0.0030 * 25.4 / 2.0) < 1.0
+    assert read_about_the_journal(18, 0.0030, 0.0040 * 25.4 / 2.0) < 1.0
+    assert read_about_the_journal(24, 0.0045, 0.0060 * 25.4 / 2.0) < 1.0
     # #3292's after-cure T024 reading: left to its part runout and bond float
     # it falls under.
     (land_2,) = cone.LAND_2_TEETH
@@ -140,14 +163,11 @@ def test_the_running_axis_term_needs_every_acceptance_it_is_booked_with() -> Non
         + cone_running_axis.seat_offset_mm(land_2, pivot)
     )
     assert _nominal_contact_ratio(land_2, uncentred) < 1.0
-    # Unread, the pivot can sit anywhere the socket lets it: at twice the
-    # limit T012, T018 and T024 are all under.
-    for teeth in cone.ROUND_BORE_TEETH:
-        assert _nominal_contact_ratio(
-            teeth,
-            cone_set_stack.seat_eccentricity_mm(teeth)
-            + cone_running_axis.seat_offset_mm(teeth, 2.0 * pivot),
-        ) < 1.0
+    # The keyed gears' .002 TIR to the bore is their booked term: T030 at
+    # .004 falls under.
+    assert _nominal_contact_ratio(
+        30, 0.004 * 25.4 / 2.0 + cone_running_axis.seat_offset_mm(30, pivot)
+    ) < 1.0
 
 
 def test_alignment_drum_fitup_mesh_cannot_bind() -> None:

@@ -17,7 +17,11 @@ the limit.
   MHA-DT-37's own axis. That axis meets the running axis at the pivot and
   stands off it at the socket mouth (``spigot_stand_off_mm``); the gear's
   share of that falls from 1 at the socket mouth to 0 at the pivot
-  (``spigot_share``).
+  (``spigot_share``). This takes the socket true to the journal, which no
+  sheet promises, so the stack books it for T006 only.
+* A gear read after cure about the journal (T012, T018, T024) adds only the
+  journal axis's own offset from the running axis at its plane
+  (``journal_axis_offset_mm``), wherever it is seated.
 
 The pivot is taken to bear where it is read: the middle of its bare length
 between MHA-DT-38 and its end. Pure geometry, placement-independent like
@@ -145,7 +149,15 @@ def spigot_stand_off_mm(pivot_offset_mm: float) -> float:
 
 def seat_offset_mm(teeth: int, pivot_offset_mm: float) -> float:
     """Largest offset of gear ``teeth``'s seat axis from the running axis,
-    the pivot up to ``pivot_offset_mm`` off MHA-DT-04's axis."""
+    the pivot up to ``pivot_offset_mm`` off MHA-DT-04's axis and the socket
+    true to the journal."""
     if teeth in DT37_TEETH:
         return spigot_share(teeth) * spigot_stand_off_mm(pivot_offset_mm)
     return dt04_k_range(teeth)[1] * abs(pivot_offset_mm)
+
+
+def journal_axis_offset_mm(teeth: int, pivot_offset_mm: float) -> float:
+    """Largest offset of MHA-DT-04's journal axis from the running axis at
+    gear ``teeth``'s plane: what a gear whose teeth are read about the
+    journal, wherever it is seated, still adds to that reading."""
+    return k_range(seat_plane(teeth))[1] * abs(pivot_offset_mm)

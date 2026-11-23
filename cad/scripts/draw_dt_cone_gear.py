@@ -856,6 +856,7 @@ def _crop_bore_view(
         bore_view_crop_radius(teeth),
         add_to_db=False,
         rim_angle_deg=BORE_VIEW_CROP_RIM_ANGLE_DEG,
+        center_tolerance=BORE_VIEW_POSITION_TOL_M,
         label=f"{label} crop",
     )
     status = int(view.Crop2(False, True, 1))

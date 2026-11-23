@@ -203,7 +203,7 @@ SHEET_NAMES = (
     "CRANK EXPLODED",
     "ALIGNMENT PINION RIG EXPLODED",
     "ASSEMBLY SEQUENCE",
-    "ASSEMBLY SEQUENCE CONT. - CRANK",
+    "ASSEMBLY SEQUENCE CONT. - CONE SET + CRANK",
     "ASSEMBLY SEQUENCE CONT. - CRANK + CYLINDER BANK",
     "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK + PINION RIG",
     "ASSEMBLY SEQUENCE CONT. - PINION RIG + CONE SET ON THE BASE",
@@ -235,7 +235,7 @@ CLUSTER_TITLES: dict[Cluster, str] = {
 # extra sheets as needed").  The rubric sample review of v47 split every step
 # into one-thing sub-steps (rule 22), so a field may end inside a step, at a
 # lettered sub-step, and its pointer names that sub-step.  The numbered steps
-# read in sheet order: 1-3 on sheet 7, 4-6 on sheet 8 (MHA-PD-00 cites 4 and
+# read in sheet order: 1-2 on sheet 7, 3-6 on sheet 8 (MHA-PD-00 cites 4 and
 # 5 there), 7-23 on 9-11 (split at the sub-steps below); the checks follow the
 # full-detail view (gate review of 042726e87: the steps jumped 6 -> 11 -> 7 ->
 # 8 -> 11).  #2470's two-cure tip bonds outgrew sheet 7, which held 1-5, so
@@ -1546,8 +1546,12 @@ CONE_CRANK_STEPS = _note_text(
         # named the parts and the restart).  The clean names the redo it
         # prepares, as 1Z does.
         f"2E. ONCE CURED, CHECK THAT {PHASING_COMB} CLIPS OVER ALL FIVE GEARS, BOTH ARMS ON T036.",
-        f"2F. CHECK THE MHA-DT-37 PIVOT'S RUNOUT ABOUT MHA-DT-04 ({acceptance_ref('pivot-runout')}).",
-        "2G. IF EITHER CHECK FAILS, AT 250 DEG C TAKE MHA-DT-37, T018, T012, T024 AND MHA-DT-38 OFF.",
+        # 2F reads the pivot and, in the same setup, T012's and T018's teeth
+        # (#2473, owner ruling 2026-11-22: the pivot's reading does not see
+        # MHA-DT-04's socket standing off its journal).
+        f"2F. CHECK THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT ({acceptance_ref('pivot-runout')})"
+        f" AND OF T012'S AND T018'S TEETH ({acceptance_ref('spigot-gear-runout')}).",
+        "2G. IF ANY CHECK FAILS, AT 250 DEG C TAKE MHA-DT-37, T018, T012, T024 AND MHA-DT-38 OFF.",
         "2H. CLEAN THE CURED 638 OFF EVERY PARTED FACE: SPIGOT, PIVOT, LAND, BORES, SOCKET, FOR A REDO FROM 1L.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.

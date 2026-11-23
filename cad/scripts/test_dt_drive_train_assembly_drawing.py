@@ -269,7 +269,7 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert names[drawing.FULL_DETAIL_SHEET - 1] == "FULL-DETAIL SIDE VIEW"
     assert f"FULL DETAIL: SHEET {drawing.FULL_DETAIL_SHEET}." in drawing.ASSEMBLED_HEADING
     assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE"
-    assert names[drawing.CRANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CRANK"
+    assert names[drawing.CRANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CONE SET + CRANK"
     assert names[drawing.BANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CRANK + CYLINDER BANK"
     assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
     assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK + PINION RIG"
@@ -1559,10 +1559,12 @@ def test_cone_station_rows_run_front_to_back() -> None:
         "2D. REMOVE MHA-DT-03-TL-02 ONCE THE BONDS GRAB, MHA-DT-37 HELD HOME ON"
         " T024 UNTIL THEN."
     )
+    gear_row = drawing.acceptance_ref("spigot-gear-runout")
     assert steps[order[5] : order[6]].strip() == (
-        f"2F. CHECK THE MHA-DT-37 PIVOT'S RUNOUT ABOUT MHA-DT-04 ({pivot_row})."
+        f"2F. CHECK THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT ({pivot_row})"
+        f" AND OF T012'S AND T018'S TEETH ({gear_row})."
     )
-    assert steps[order[6] : order[7]].startswith("2G. IF EITHER CHECK FAILS, AT 250 DEG C TAKE MHA-DT-37,")
+    assert steps[order[6] : order[7]].startswith("2G. IF ANY CHECK FAILS, AT 250 DEG C TAKE MHA-DT-37,")
     assert steps[order[7] : order[8]].strip().endswith("FOR A REDO FROM 1L.")
     assert steps[order[8] :].startswith("2J. ALIGN THE MHA-DT-05 COUNTERBORES")
     (row,) = (r for r in drawing.ACCEPTANCE_TABLE_ROWS if r[2].startswith("MHA-DT-37 PIVOT"))
@@ -1570,6 +1572,15 @@ def test_cone_station_rows_run_front_to_back() -> None:
         "2B, 2F",
         "MHA-DT-37 PIVOT, MHA-DT-04 ON END ON A V-BLOCK",
         ".0020 TIR MAX",
+        "TEST INDICATOR",
+    )
+    # Owner ruling 2026-11-22 (#2473): T012 and T018 are read after cure in
+    # the same setup, as T024 is.
+    (row,) = (r for r in drawing.ACCEPTANCE_TABLE_ROWS if r[2].startswith("T012 AND T018"))
+    assert row[1:] == (
+        "2F",
+        "T012 AND T018, \u00d8.040 GAUGE PIN, SETUP AS T024",
+        ".0030 TIR MAX EACH SPACE",
         "TEST INDICATOR",
     )
     assert "MHA-DT-03-TL-02 BLADES WITH" in steps
