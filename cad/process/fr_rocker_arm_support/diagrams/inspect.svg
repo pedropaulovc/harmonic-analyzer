@@ -7,13 +7,17 @@
   <rect class="holes" x="85.5" y="95.6" width="177.8" height="177.8" rx="17.8"/>
   <line class="hidden" x1="90" y1="308.9" x2="90" y2="300"/>
   <line class="hidden" x1="258.8" y1="308.9" x2="258.8" y2="300"/>
-  <line class="arrow" x1="40" y1="335" x2="308.8" y2="335"/>
-  <text class="label" x="130" y="352">length 7.56 (end to end)</text>
+  <line class="arrow" x1="40" y1="48" x2="308.8" y2="48"/>
+  <text class="label" x="110" y="42">length 7.56 (end to end)</text>
   <line class="arrow" x1="325" y1="308.9" x2="325" y2="60"/>
   <text class="label" x="330" y="190">7.00</text>
   <text class="label-halo" x="110" y="190">cavity 5.00 SQ thru</text>
   <text class="label-halo" x="70" y="88">pocket 6.50 SQ both sides</text>
   <text class="label" x="60" y="380">foot holes A1-A4, Ø5/16, up through the foot</text>
+  <line class="leader" x1="90" y1="368" x2="90" y2="310"/>
+  <circle class="leader-dot" cx="90" cy="310" r="2"/>
+  <line class="leader" x1="258.8" y1="368" x2="258.8" y2="310"/>
+  <circle class="leader-dot" cx="258.8" cy="310" r="2"/>
   <!-- End view: the trapezoid, 2.50 at the foot, .66 at the top, web .50. -->
   <polygon class="part-kept" points="520,308.9 609,308.9 576.2,60 552.8,60"/>
   <!-- The pockets, behind the slant faces: hidden edges, the web between. -->

@@ -24,6 +24,10 @@
   <text class="label" x="520" y="395">top face on paper on the table</text>
   <text class="label" x="40" y="100">5/16 drill: A1-A4 thru</text>
   <text class="label" x="40" y="118">the foot into the pocket</text>
+  <line class="leader" x1="190" y1="104" x2="292" y2="112"/>
+  <circle class="leader-dot" cx="292" cy="112" r="2"/>
+  <line class="leader" x1="200" y1="122" x2="292" y2="156"/>
+  <circle class="leader-dot" cx="292" cy="156" r="2"/>
   <text class="label-halo" x="320" y="280">cavity (through the web)</text>
   <text class="label-halo" x="300" y="176">pocket floor (the web)</text>
 </svg>

@@ -11,22 +11,25 @@
 #
 # Route: bench, check and mark the slab. Setup 2, side A (+Z) up on four
 # 1-2-3 blocks under two end straps: FR01 spots and drills two 13/32 stud
-# holes through the middle (inside the cavity, which is cut out last). Two
-# studs from the middle T-slot up through them, flange nuts on the slab: the
-# straps come off and side A is milled in three files: FR02 (rough levels,
-# the pocket floor (the web face), the slant face), FR03 (the pocket walls),
-# FR04 (the outline to .100 past the mid-plane; then the chamfer mill breaks
-# the slant face's outer edges and the pocket rim and grooves the cavity
-# rim's chamfer into the web). The middle (the boss, under the nuts) stays
-# uncut. Setup 3: turned end over end onto the same studs, the boss on the
-# centre blocks, screw jacks under the end posts: FR05-FR07 mill side B the
-# same way, the outline overlapping side A's past the mid-plane; two step
-# clamps then hold the posts and FR08 cuts the cavity through the web,
-# freeing the boss on its studs. Setup 4: standing on its top face, the foot
-# up, two step clamps on the foot: FR09 spots and drills the four foot holes
-# into the pocket. Bench: file the two end faces'
-# foot edges to the chamfer, deburr, inspect; RAL 6005 enamel over primer,
-# the foot underside and the top face masked, the bare faces oiled.
+# holes through the middle (inside the cavity, which is cut out last) and
+# counterbores them for the flange nuts. Two studs from the middle T-slot
+# up through them, the nuts in the counterbores: the straps come off and
+# side A is milled in three files: FR02 (rough levels, the pocket floor
+# (the web face), the slant face), FR03 (the pocket walls), FR04 (the
+# outline to .100 past the mid-plane; then the chamfer mill breaks the slant
+# face's outer edges and the pocket rim and grooves the cavity rim's chamfer
+# into the web). The middle (the boss, under the nuts) stays uncut. Setup 3:
+# turned end over end onto the same studs, the nuts on the boss's side B
+# face, the boss on the centre blocks, screw jacks under the end posts:
+# FR05-FR07 mill side B the same way (no groove), the outline overlapping
+# side A's past the mid-plane; two step clamps then hold the posts and FR08
+# cuts the cavity through the web, freeing the boss on its studs; at its
+# M6 T5 stop the boss and studs come out and the chamfer mill breaks side
+# B's cavity rim. Setup 4: standing on its top face, the foot up, two step
+# clamps on the foot: FR09 spots and drills the four foot holes into the
+# pocket. Bench: file the two end faces' foot edges to the chamfer, deburr,
+# inspect; RAL 6005 enamel over primer, the foot underside and the top face
+# masked, the bare faces oiled.
 #
 # The two #8-32 rocker-bracket seats in the top face are made at assembly,
 # transferred from MHA-CH-08 (the sheet's REF stations): not in this route.
@@ -95,10 +98,8 @@ em_projection_mm = 63.5
 r8_collet_gauge_mm = 6.3
 drill_chuck_gauge_mm = 95.0
 drill_projection_max_mm = 112.8
-# The chamfer mill runs in the drill chuck, chamfer_projection_mm out of its
-# jaws: the jaws stay above the slab's top while the mill grooves the web,
-# and the chuck lifts the spindle nose clear of the studs' ends beside it
-# (the recipe checks it).
+# The chamfer mill stands chamfer_projection_mm out of its 1/4 collet: the
+# collet stays above the slab's top while the mill grooves the web.
 chamfer_projection_mm = 38.1
 # Roughing (FR02, FR05): equal levels no deeper than rough_level_max_mm
 # (1/8 in) from the thickest bar's top to the outline's bottom
@@ -121,12 +122,17 @@ outline_past_mm = 2.54
 boss_half_mm = 50.8
 boss_margin_mm = 3.0
 # The studs: 13/32 holes at X ±stud_x_mm on the middle line (Y 0), the
-# T-slot under it; each stud's end stands at most stud_above_top_mm above
-# the slab: the rapids clear it at 2.000 above the top, and the recipe
-# keeps the spindle nose clear above it wherever the nose comes over a nut
-# (FR08's last level is the lowest).
+# T-slot under it. FR01 counterbores them stud_cbore_dia_mm across and
+# stud_cbore_depth_mm deep in side A's boss (waste: FR08 frees it), so side
+# A's nuts sit below the top; side B's sit on the boss's uncut face. Each
+# stud's end stands at most stud_above_seat_mm above its nut's seat: the
+# rapids clear it at 2.000 above the top, and the recipe keeps the spindle
+# nose clear above it wherever the nose comes over a nut, every tool, both
+# sides.
 stud_x_mm = 31.75
-stud_above_top_mm = 15.875
+stud_cbore_dia_mm = 28.575
+stud_cbore_depth_mm = 19.05
+stud_above_seat_mm = 12.7
 # The spindle nose (no shop record gives it; the PM-30MV's listing gives a
 # 3 in quill): the studs op has the operator check it is no wider; the
 # recipe keeps a nose this wide clear above the studs' ends.
@@ -277,8 +283,8 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Vise off, table wiped. Four 1-2-3 blocks standing on a 1 x 3 face (2 in up): two along X under the middle, 3 in long, their inner faces 1/2 in either side of the middle line, the middle T-slot between them; two along Y under the ends, each half under the slab. The slab on them, side A up, FOOT edge toward you, its middle over the middle T-slot. Before clamping: the edge finder in the spindle, jog Y to each bar edge: the spindle reaches .05 past both (else move the slab along Y). Indicate the FOOT edge along X to .001 over 6 in. Two step clamps (LittleMachineShop 1268 clamping kit, 1/2 in T-slot: 3/8-16 studs, T-nuts, flange nuts) along X from studs in the middle T-slot beyond the ends, toes on the slab over the end blocks (3.5 in from the middle), heels on step blocks level with the slab."
 datum = "Programs FR01_studs, FR02_a_mill, FR03_a_walls and FR04_a_outline: X0 midway between the sawn ends, Y0 midway between the bar edges, +Y away from the FOOT edge; Z0 the slab's mid-plane, half its thickness T below side A. Tool lengths from the tool setter at every M6."
-diagram = { file = "diagrams/side_a.svg", alt = "Plan and section of the slab on four 1-2-3 blocks: two end straps for FR01; after FR01 two studs from the middle T-slot through the stud holes with flange nuts on the boss, the straps off. Section: side A milled to the slant, the pocket ring to the web, the outline to .100 past the mid-plane." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.em_dia_mm}}", 5.08], y_span_mm = ["{{process.raster_y_span_mm}}", "{{process.em_dia_mm}}"], work_top_mm = ["{{process.slab_top_max_mm}}", "{{process.stud_above_top_mm}}"], deepest_cut_mm = ["{{process.stud_tip_above_table_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_mm}}"] }
+diagram = { file = "diagrams/side_a.svg", alt = "Plan and section of the slab on four 1-2-3 blocks: two end straps for FR01; after FR01 two studs from the middle T-slot through the stud holes with flange nuts in counterbores in the boss, the straps off. Section: side A milled to the slant, the pocket ring to the web, the outline to .100 past the mid-plane." }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.em_dia_mm}}", 5.08], y_span_mm = ["{{process.raster_y_span_mm}}", "{{process.em_dia_mm}}"], work_top_mm = ["{{process.slab_top_max_mm}}", "{{process.stud_above_seat_mm}}"], deepest_cut_mm = ["{{process.stud_tip_above_table_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_mm}}"] }
 vise_hold = "other"
 # The slab between the end blocks (the middle blocks only push up), the
 # half below the outline's bottom left whole: its section is the part's
@@ -301,7 +307,7 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Prove each file in air before its first cut: send $# and note G54's Z; G10 L2 P1 Z(that Z + 50.800) raises Z0 2.000 in, above every cut. Run FR01_studs so up to its M6 T3 (the drill would reach the slab), then stop; G10 L2 P1 Z(the noted Z) puts Z0 back. Every later file the same way, to its end unless its op says where to stop."
+instruction = "Prove each file in air before its first cut: send $# and note G54's Z; G10 L2 P1 Z(that Z + 50.800) raises Z0 2.000 in, above every cut. Run FR01_studs up to its M6 T3 (the drill would reach the slab), then stop; G10 L2 P1 Z(the noted Z) puts Z0 back. Every later file the same way, to its end unless its op says where to stop."
 feed = "hand"
 
 [[setups.operations]]
@@ -331,7 +337,26 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Studs: two 3/8-16 studs (1268 kit) from T-nuts in the middle T-slot up through the stud holes, a flange nut on each, snug. Each stud's end at most {{process.stud_above_top_mm:in.2f}} above side A, the nut on full thread (pick the kit's stud length that does both): the end mill's spindle nose passes over them. Check the nose is no wider than {{process.spindle_nose_dia_max_mm:in.2f}} across; if it is, stop and ask. Tighten both nuts, then take the two end straps off. The end blocks stay."
+speed_kind = "spindle"
+tool = "em-3-8"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T1 (3/8 in end mill, {{process.em_projection_mm:in.2f}} out of the collet; set 2800): counterbore both stud holes Ø{{process.stud_cbore_dia_mm:in.3dot}}, {{process.stud_cbore_depth_mm:in.3dot}} deep, for the flange nuts: the mill drops into each hole and circles out, levels of {{process.rough_level_max_mm:in.3dot}}. The boss is waste: it comes out with the cavity."
+settings = "endmill-carbide-3fl-3-8-1018-cf"
+milling_cuts = [
+  { name = "stud counterbores", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.em_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.rough_level_max_mm}}", radial_woc_mm = "{{process.em_dia_mm}}", traverse_mm = [-41.275, 41.275] },
+]
+
+[[setups.operations]]
+instruction = "Studs: two 3/8-16 studs (1268 kit) from T-nuts in the middle T-slot up through the stud holes, a flange nut on each down in its counterbore, snug. Each stud's end at most {{process.stud_above_seat_mm:in.2f}} above the counterbore's floor, the nut on full thread (pick the kit's stud length that does both). Tighten both nuts, then take the two end straps off. The end blocks stay. Calipers across the spindle's nose: the end mill and the chamfer mill pass over the studs with it."
+inspection = "Spindle nose {{process.spindle_nose_dia_max_mm:in.2f}} across or less."
+gauge_checks = [{ gauge = "calipers", band_mm = [0.0, "{{process.spindle_nose_dia_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "Spindle nose wider than {{process.spindle_nose_dia_max_mm:in.2f}}: stop and tell the owner with the reading." },
+]
 feed = "hand"
 
 [[setups.operations]]
@@ -388,7 +413,7 @@ speed_kind = "spindle"
 tool = "chamfer"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T5 (1/4 in 90° chamfer mill in the drill chuck, {{process.chamfer_projection_mm:in.2f}} out of its jaws; set 2800): {{cad.rim_chamfer_leg_in:.2dot}} × 45° round the slant face's outer edges and the pocket rim, then a groove along the cavity line on the web (the cavity rim's chamfer: FR08 cuts the cavity out inside it)."
+instruction = "Same file, M6 T5 (1/4 in 90° chamfer mill, {{process.chamfer_projection_mm:in.2f}} out of the collet; set 2800): {{cad.rim_chamfer_leg_in:.2dot}} × 45° round the slant face's outer edges and the pocket rim, then a groove along the cavity line on the web (side A's cavity rim chamfer: FR08 cuts the cavity out inside it)."
 settings = "fr-chamfer-mill-1018-cf"
 milling_cuts = [
   { name = "chamfers", kind = "side", phase = "finish", cutter_dia_mm = 3.556, flutes = 2, axial_doc_mm = 2.12, radial_woc_mm = 2.12, traverse_mm = [-96.012, 96.012] },
@@ -415,7 +440,7 @@ machine_ref = "pm-30mv"
 holding = "Nuts off; lift the part off the studs, blow the chips off, take the end blocks away; unscrew both studs from their T-nuts and lift them out (the T-nuts stay under the holes). Turn the part end over end (FOOT edge still toward you) and set it on the two middle blocks, the stud holes over the T-nuts. Four jack screws (jack screw set, 2-1/4 to 3-3/8 in) under the end posts' slant faces, two per post at Y ±2.5 in, run up to touch, then a quarter turn. Indicate the FOOT bar edge along X to .001 over 6 in. The studs go back after the zero op. Before FR08: two step clamps (1268 kit) along X from studs in the middle T-slot beyond the ends, toes on the posts' middle over the jacks (paper under each toe), heels on step blocks level with the toe."
 datum = "Programs FR05_b_mill, FR06_b_walls, FR07_b_outline and FR08_cavity: X0 midway between the stud holes, Y0 midway between the bar edges, +Y away from the FOOT edge; Z0 the mid-plane, half T below side B. X here runs opposite to Setup 2's (the part is symmetric in X). Tool lengths from the tool setter at every M6."
 diagram = { file = "diagrams/side_b.svg", alt = "Section of the part turned over: the boss on the two middle blocks, the studs through it, screw jacks under the end posts; side B milled like side A; FR08's straps on the posts and the cavity cut through the web round the boss." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.em_dia_mm}}", 5.08], y_span_mm = ["{{process.raster_y_span_mm}}", "{{process.em_dia_mm}}"], work_top_mm = ["{{process.slab_top_max_mm}}", "{{process.stud_above_top_mm}}"], deepest_cut_mm = ["{{process.outline_bottom_above_table_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.chamfer_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.em_dia_mm}}", 5.08], y_span_mm = ["{{process.raster_y_span_mm}}", "{{process.em_dia_mm}}"], work_top_mm = ["{{process.slab_top_max_mm}}", "{{process.stud_above_seat_mm}}"], deepest_cut_mm = ["{{process.outline_bottom_above_table_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_mm}}"] }
 vise_hold = "other"
 # The frame between the jacks under its posts; its thinnest section across
 # the pockets is the web.
@@ -432,7 +457,7 @@ instruction = "+X hole's centre off: G10 L20 P1 X0 midway between the two holes'
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Drop each stud through its hole into its T-nut, a flange nut on each, tight. Touch the −X sawn end and the FOOT bar edge again."
+instruction = "Drop each stud through its hole into its T-nut, a flange nut on each on side B's boss face, tight; each stud's end at most {{process.stud_above_seat_mm:in.2f}} above side B, the nut on full thread (the kit's stud length that does both). Touch the −X sawn end and the FOOT bar edge again."
 feed = "hand"
 inspection = "Each reads within 0.03 mm of its noted value."
 gauge_checks = [
@@ -486,7 +511,7 @@ speed_kind = "spindle"
 tool = "chamfer"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T5 (the chamfer mill in the drill chuck, {{process.chamfer_projection_mm:in.2f}} out of its jaws; set 2800): side B's chamfers and cavity groove, as side A's."
+instruction = "Same file, M6 T5 (the chamfer mill, {{process.chamfer_projection_mm:in.2f}} out of the collet; set 2800): side B's slant-face edges and pocket rim, as side A's. No groove: FR08 breaks side B's cavity rim once the boss is out."
 settings = "fr-chamfer-mill-1018-cf"
 milling_cuts = [
   { name = "side B chamfers", kind = "side", phase = "finish", cutter_dia_mm = 3.556, flutes = 2, axial_doc_mm = 2.12, radial_woc_mm = 2.12, traverse_mm = [-96.012, 96.012] },
@@ -501,7 +526,7 @@ speed_kind = "spindle"
 tool = "em-3-8"
 drilling = "none"
 sizing = "other"
-instruction = "Run FR08_cavity (M6 T1, {{process.em_projection_mm:in.2f}} out of the collet; set 2800): the cavity ({{cad.cavity_size_in:.2f}} square, corners R{{cad.cavity_corner_radius_in:.2dot}}) through the web: four slot levels, each {{process.cavity_level_mm:in.3dot}} deep and {{process.finish_stock_mm:in.3dot}} inside the wall, each started with a straight plunge; then one climb loop at full depth. The boss comes free on its studs at the last level."
+instruction = "Run FR08_cavity (M6 T1, {{process.em_projection_mm:in.2f}} out of the collet; set 2800): the cavity ({{cad.cavity_size_in:.2f}} square, corners R{{cad.cavity_corner_radius_in:.2dot}}) through the web: four slot levels, each {{process.cavity_level_mm:in.3dot}} deep and {{process.finish_stock_mm:in.3dot}} inside the wall, each started with a straight plunge; then one climb loop at full depth. The boss comes free on its studs at the last level; the file stops at its M6 T5."
 settings = "endmill-carbide-3fl-3-8-1018-cf"
 milling_cuts = [
   { name = "cavity rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.em_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.cavity_level_mm}}", radial_woc_mm = "{{process.em_dia_mm}}", traverse_mm = [-63.5, 63.5] },
@@ -509,7 +534,22 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Before unclamping: the cavity and pocket B (edge finder, DRO in inches, G20); then G21. Unclamp; lift the frame off, the boss stays on the studs."
+instruction = "At FR08's M6 T5 stop, spindle stopped: both flange nuts off, lift the boss off the studs, unscrew both studs from their T-nuts and lift them out; blow the chips out of the cavity. The post straps hold the frame; leave them."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "chamfer"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T5 (the chamfer mill, {{process.chamfer_projection_mm:in.2f}} out of the collet; set 2800): {{cad.rim_chamfer_leg_in:.2dot}} × 45° round side B's cavity rim, entered from the cavity."
+settings = "fr-chamfer-mill-1018-cf"
+milling_cuts = [
+  { name = "cavity rim chamfer", kind = "side", phase = "finish", cutter_dia_mm = 3.556, flutes = 2, axial_doc_mm = 2.12, radial_woc_mm = 2.12, traverse_mm = [-63.5, 63.5] },
+]
+
+[[setups.operations]]
+instruction = "Before unclamping: the cavity and pocket B (edge finder, DRO in inches, G20); then G21. Unclamp; lift the frame off."
 inspection = "Cavity {{cad.cavity_size_min_in:.2dot}}–{{cad.cavity_size_max_in:.2dot}} wall to wall, X and Y; pocket B {{cad.pockets_size_min_in:.2dot}}–{{cad.pockets_size_max_in:.2dot}}: each the DRO difference between the two walls plus the finder's .200. Web {{cad.web_plus_z_thickness_min_in:.3dot}}–{{cad.web_plus_z_thickness_max_in:.3dot}} at four places round the cavity (micrometer)."
 gauge_checks = [
   { gauge = "mill-x-dro", band_mm = "{{cad.cavity_size_band_mm}}" },

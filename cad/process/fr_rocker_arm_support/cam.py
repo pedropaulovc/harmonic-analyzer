@@ -20,17 +20,21 @@ Route (plan text in ``plan.toml``): one 3 x 8 x 8 in 1018 slab, the part's
 X (7.56) along the sawn 8 in length, Y (7.00, the foot at -Y) along the
 bar's 8 in width, Z (2.50) across the 3 in thickness, centred in it. On the
 table on four 1-2-3 blocks under two end straps, side A (+Z) up: FR01 spots
-and drills two 13/32 stud holes through the slab inside the cavity. Studs up
-through them hold the slab by the uncut boss; the straps come off. Side A in
-three files: FR02 the rough levels, the pocket floor (the web) and the slant
-face; FR03 the pocket walls; FR04 the outline to just past the mid-plane,
-then the chamfer mill on the slant face's edges, the pocket rim and the
-cavity rim's groove in the web. Flipped end over end onto the same studs,
-the boss on the centre blocks and screw jacks under the end posts: FR05-FR07
-mill side B the same way, the outline meeting side A's past the mid-plane.
-Two end straps then hold the frame by its posts and FR08 cuts the cavity
-through the web, freeing the boss on its studs. Standing on its top face,
-the foot up, under two straps: FR09 spots and drills the four foot holes.
+and drills two 13/32 stud holes through the slab inside the cavity and
+counterbores them in the boss (waste) for the flange nuts. Studs up through
+them hold the slab by the uncut boss, nuts and stud ends below the top; the
+straps come off. Side A in three files: FR02 the rough levels, the pocket
+floor (the web) and the slant face; FR03 the pocket walls; FR04 the outline
+to just past the mid-plane, then the chamfer mill on the slant face's
+edges, the pocket rim and the cavity rim's groove in the web. Flipped end
+over end onto the same studs (nuts on the boss's side B face), the boss on
+the centre blocks and screw jacks under the end posts: FR05-FR07 mill side
+B the same way (no groove), the outline meeting side A's past the
+mid-plane. Two end straps then hold the frame by its posts and FR08 cuts
+the cavity through the web, freeing the boss on its studs; at its M6 T5
+stop the boss and studs come out and the chamfer mill cuts side B's cavity
+rim. Standing on its top face, the foot up, under two straps: FR09 spots
+and drills the four foot holes.
 
 Work frames (G54):
 - FR01-FR08: X0 Y0 the part's centre (FR01-FR04 between the sawn ends and
@@ -63,14 +67,14 @@ COMMENT = "MHA-FR-05 rocker arm support"
 # own that check_outline reads whole: the rough levels, the floor and the
 # slant face; the pocket walls; the outline, then the chamfers.
 PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
-    ("FR01_studs", (("stud_spot",), ("stud_drill",))),
+    ("FR01_studs", (("stud_spot",), ("stud_drill",), ("stud_cbore",))),
     ("FR02_a_mill", (("a_rough",), ("a_floor",), ("a_slant",))),
     ("FR03_a_walls", (("a_walls",),)),
     ("FR04_a_outline", (("a_outline",), ("a_chamfer",))),
     ("FR05_b_mill", (("b_rough",), ("b_floor",), ("b_slant",))),
     ("FR06_b_walls", (("b_walls",),)),
     ("FR07_b_outline", (("b_outline",), ("b_chamfer",))),
-    ("FR08_cavity", (("cavity",),)),
+    ("FR08_cavity", (("cavity",), ("b_cavity_chamfer",))),
     ("FR09_foot", (("foot_spot",), ("foot_drill",))),
 )
 # Every program loads its first tool (M6, the tool setter): each runs after a
@@ -96,7 +100,7 @@ APPROACH_MM = 2.54
 SAFE_MM = 1.0
 # Rapids between cuts run this far above the stock top: over the studs'
 # flange nuts and the studs' ends (the plan's holding keeps each stud's end
-# at most stud_above_top_mm above the slab).
+# at most stud_above_seat_mm above its nut's seat).
 CLEAR_MM = 50.8
 # Rapid re-entry into a pecked hole stops this far above the last peck.
 PECK_REENTRY_MM = 0.5
@@ -1007,8 +1011,19 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
         out += [f"G1 Z{_r(top + SAFE_MM):.3f} F{{feed}}", f"G0 Z{_r(clear):.3f}"]
         return out
 
-    chamfers = loop(outer_nodes) + loop(pocket_nodes) + loop(cavity_nodes, ramp_mm=p["groove_ramp_mm"])
-    chamfer_low = min(n[2] for n in (*outer_nodes, *pocket_nodes, *cavity_nodes))
+    # Side A's cavity rim: a groove along the cavity line on the web (FR08
+    # cuts the cavity out inside it). Side B's: its real edge, cut in FR08
+    # after the cavity, the boss and the studs out.
+    chamfers = {
+        "a": loop(outer_nodes) + loop(pocket_nodes) + loop(cavity_nodes, ramp_mm=p["groove_ramp_mm"]),
+        "b": loop(outer_nodes) + loop(pocket_nodes),
+    }
+    chamfer_low = {
+        "a": min(n[2] for n in (*outer_nodes, *pocket_nodes, *cavity_nodes)),
+        "b": min(n[2] for n in (*outer_nodes, *pocket_nodes)),
+    }
+    cavity_chamfer = loop(cavity_nodes)
+    cavity_chamfer_low = min(n[2] for n in cavity_nodes)
     rpm_cm, feed_cm = _setting(plan, shop, "chamfers")
     plunge_cm = feed_cm * p["plunge_feed_fraction"]
 
@@ -1032,6 +1047,35 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
         raise ValueError("a stud hole meets a centre block")
     stud_spot_lines = [line for xy in studs for line in _spot(xy, top, spot_z, clear)]
     stud_drill_lines = [line for xy in studs for line in _pecked(xy, top, stud_tip, peck_13, clear)]
+
+    # Counterbores for the flange nuts in side A's boss, so side A's nuts and
+    # stud ends sit below the top: T1 drops into each drilled hole and
+    # circles out (climb), level by level. The boss is waste: FR08 frees it
+    # and it comes out at FR08's M6 T5 stop.
+    cb_r = p["stud_cbore_dia_mm"] / 2
+    cb_floor = top - p["stud_cbore_depth_mm"]
+    if d >= d1332:
+        raise ValueError("the end mill does not drop into a stud hole")
+    if cb_r < NUT_RADIUS_MM:
+        raise ValueError("a counterbore does not take its flange nut")
+    for x, y in studs:
+        if max(abs(x), abs(y)) + cb_r > boss - 1e-9:
+            raise ValueError(f"the counterbore at X{x:g} reaches past the boss into the part")
+    cb_rings = math.ceil((cb_r - r) / (d / 3) - 1e-9)
+    cbore_lines = []
+    for x, y in studs:
+        cbore_lines += [f"G0 Z{_r(clear):.3f}", f"G0 X{_r(x):.3f} Y{_r(y):.3f}", f"G0 Z{_r(top + SAFE_MM):.3f}"]
+        for z in _levels(top, cb_floor, p["rough_level_max_mm"]):
+            cbore_lines.append(f"G1 Z{_r(z):.3f} F{{plunge}}")
+            for i in range(1, cb_rings + 1):
+                rho = (cb_r - r) * i / cb_rings
+                cbore_lines += [
+                    f"G1 X{_r(x + rho):.3f} Y{_r(y):.3f} F{{feed}}",
+                    f"G3 X{_r(x + rho):.3f} Y{_r(y):.3f} I{_r(-rho):.3f} J0.000 F{{feed}}",
+                ]
+            cbore_lines.append(f"G1 X{_r(x):.3f} Y{_r(y):.3f} F{{feed}}")
+        cbore_lines.append(f"G1 Z{_r(top + SAFE_MM):.3f} F{{feed}}")
+    cbore_lines.append(f"G0 Z{_r(clear):.3f}")
 
     # --- FR08: the cavity through the web (side B up) --------------------------
     cav_levels = _levels(web, -web - p["cavity_past_mm"], p["cavity_level_mm"])
@@ -1120,7 +1164,9 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
             "stock": stocks["a"],
             "ops": [["stud_drill", "drill stud holes", stud_drill_lines]],
         },
+        {**em_tool, "label": "FR01 counterbores", "frame": "a", "stock": stocks["a"], "ops": [["stud_cbore", "counterbore stud holes", cbore_lines]]},
     ]
+    # "studs": the side whose nuts and studs stand while the section runs.
     for side in ("a", "b"):
         for key, label, lines in (
             ("rough", "rough levels", rough),
@@ -1129,9 +1175,10 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
             ("outline", "outline finish", outline),
             ("slant", "slant finish", slant),
         ):
-            jobs.append({**em_tool, "label": f"{side} {label}", "frame": side, "stock": stocks[side], "ops": [[f"{side}_{key}", label, lines]]})
-        jobs.append({**cm_tool, "label": f"{side} chamfers", "frame": side, "stock": stocks[side], "ops": [[f"{side}_chamfer", "chamfers", chamfers]]})
-    jobs.append({**em_tool, "label": "cavity", "frame": "b", "stock": stocks["b"], "ops": [["cavity", "cavity", cavity_lines]]})
+            jobs.append({**em_tool, "label": f"{side} {label}", "frame": side, "stock": stocks[side], "studs": side, "ops": [[f"{side}_{key}", label, lines]]})
+        jobs.append({**cm_tool, "label": f"{side} chamfers", "frame": side, "stock": stocks[side], "studs": side, "ops": [[f"{side}_chamfer", "chamfers", chamfers[side]]]})
+    jobs.append({**em_tool, "label": "cavity", "frame": "b", "stock": stocks["b"], "studs": "b", "ops": [["cavity", "cavity", cavity_lines]]})
+    jobs.append({**cm_tool, "label": "cavity rim", "frame": "b", "stock": stocks["b"], "ops": [["b_cavity_chamfer", "cavity rim chamfer", cavity_chamfer]]})
     jobs += [
         {**spot_tool, "label": "FR09 spot", "frame": "foot", "stock": stocks["foot"], "ops": [["foot_spot", "spot foot holes", foot_spot_lines]]},
         {
@@ -1144,20 +1191,31 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     ]
 
     # --- Checks ------------------------------------------------------------------
-    nut_top = top + p["stud_above_top_mm"]
-    nuts = [{"name": f"stud at X{x:g}", "centre": [x, y], "radius": NUT_RADIUS_MM, "z_top": nut_top} for x, y in studs]
+    # Each side's nuts sit on their seat: side A's on its counterbores'
+    # floors, side B's on the boss's uncut face; each stud's end at most
+    # stud_above_seat_mm above it.
+    seats = {"a": cb_floor, "b": top}
+    stud_end = {side: seat + p["stud_above_seat_mm"] for side, seat in seats.items()}
+    nuts = {
+        side: [{"name": f"stud at X{x:g}", "centre": [x, y], "radius": NUT_RADIUS_MM, "z_top": stud_end[side]} for x, y in studs]
+        for side in seats
+    }
     # The spindle nose over the studs, in every section cut with the studs
-    # in: each move whose path passes within the nose's radius of a nut keeps
-    # the nose's face clear above the stud's end.
+    # in, every tool: each move whose path passes within the nose's radius of
+    # a nut keeps the nose's face clear above the stud's end.
     nose_reach = p["spindle_nose_dia_max_mm"] / 2 + NUT_RADIUS_MM
-    # The end mill in its R8 collet; the chamfer mill in the drill chuck.
+    # Both tools in the R8 collet: the face is the tip plus the collet's
+    # gauge and the tool's projection.
     face_of = {
         "em-3-8": p["r8_collet_gauge_mm"] + p["em_projection_mm"],
-        "chamfer": p["drill_chuck_gauge_mm"] + p["chamfer_projection_mm"],
+        "chamfer": p["r8_collet_gauge_mm"] + p["chamfer_projection_mm"],
     }
     for job in jobs:
-        if job["tool"] not in face_of:
+        side = job.get("studs")
+        if side is None:
             continue
+        if job["tool"] not in face_of:
+            raise ValueError(f"{job['label']}: no holder face for {job['tool']} over the studs")
         face = face_of[job["tool"]]
         for key, _label, lines in job["ops"]:
             pos = [0.0, 0.0, clear]
@@ -1167,10 +1225,11 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
                     continue
                 end = [words.get(axis, pos[i]) for i, axis in enumerate("XYZ")]
                 for sx, sy in studs:
-                    if _segment_distance(pos[:2], end[:2], (sx, sy)) < nose_reach and min(pos[2], end[2]) + face < nut_top + NOSE_CLEAR_MM:
+                    low = min(pos[2], end[2])
+                    if _segment_distance(pos[:2], end[:2], (sx, sy)) < nose_reach and low + face < stud_end[side] + NOSE_CLEAR_MM:
                         raise ValueError(
                             f"{key}: the spindle nose comes within {NOSE_CLEAR_MM} of the stud at X{sx:g} "
-                            f"(tip Z{min(pos[2], end[2]):.3f}); lower process.stud_above_top_mm"
+                            f"(tip Z{low:.3f}); lower process.stud_above_seat_mm"
                         )
                 pos = end
     # A strap's lane runs out to its stud and heel, past the table's reach.
@@ -1217,20 +1276,25 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     ):
         expect += [[f"{fr01}@{k_}", check, kwargs] for check, kwargs in checks]
     expect += [
-        [fr01, "tool_changes", {"z_top": top, "tools": [numbers["spot"], numbers["drill-13-32"]], "loads_first": True}],
-        [fr01, "spindle", {"rpm": [[rpm_sp], [rpm_13]]}],
+        [fr01, "tool_changes", {"z_top": top, "tools": [numbers["spot"], numbers["drill-13-32"], numbers["em-3-8"]], "loads_first": True}],
+        [fr01, "spindle", {"rpm": [[rpm_sp], [rpm_13], [rpm_em]]}],
         [fr01, "pauses", {"z_top": top, "count": 0}],
         [fr01, "depth", {"z_min": _r(stud_tip)}],
+        [f"{fr01}@2", "depth", {"z_min": _r(cb_floor)}],
+        [f"{fr01}@2", "rapids_clear", {"z_top": top}],
+        [f"{fr01}@2", "feed_out", {"z_top": top}],
+        [f"{fr01}@2", "air_feed", {"z_top": top}],
+        [f"{fr01}@2", "keep_out", {"radius": r, "boxes": end_straps}],
     ]
 
-    common = [
-        ["rapids_clear", {"z_top": top}],
-        ["feed_out", {"z_top": top}],
-        ["air_feed", {"z_top": top}],
-        ["keep_out", {"radius": r, "circles": nuts}],
-    ]
 
-    def side_checks(mill: str, walls_name: str, outline_name: str) -> None:
+    def side_checks(side: str, mill: str, walls_name: str, outline_name: str) -> None:
+        common = [
+            ["rapids_clear", {"z_top": top}],
+            ["feed_out", {"z_top": top}],
+            ["air_feed", {"z_top": top}],
+            ["keep_out", {"radius": r, "circles": nuts[side]}],
+        ]
         expect.extend(
             [
                 [mill, "tool_changes", {"z_top": top, "tools": [numbers["em-3-8"]], "loads_first": True}],
@@ -1268,28 +1332,34 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
                         "z_top": top,
                     },
                 ],
-                [f"{outline_name}@1", "depth", {"z_min": _r(chamfer_low)}],
+                [f"{outline_name}@1", "depth", {"z_min": _r(chamfer_low[side])}],
                 [f"{outline_name}@1", "rapids_clear", {"z_top": top}],
                 [f"{outline_name}@1", "feed_out", {"z_top": top}],
                 [f"{outline_name}@1", "air_feed", {"z_top": top}],
-                [f"{outline_name}@1", "keep_out", {"radius": cm_r, "circles": nuts}],
+                [f"{outline_name}@1", "keep_out", {"radius": cm_r, "circles": nuts[side]}],
             ]
         )
     # The slant finish's lowest point is the top edge's (checked above): the
     # mill program's depth is the outline's bottom, the levels' last.
 
-    side_checks(a_mill, a_walls, a_outline)
-    side_checks(b_mill, b_walls, b_outline)
+    side_checks("a", a_mill, a_walls, a_outline)
+    side_checks("b", b_mill, b_walls, b_outline)
     expect += [
-        [fr_cavity, "tool_changes", {"z_top": top, "tools": [numbers["em-3-8"]], "loads_first": True}],
-        [fr_cavity, "spindle", {"rpm": rpm_em}],
-        [fr_cavity, "depth", {"z_min": _r(cav_levels[-1])}],
-        [fr_cavity, "rapids_clear", {"z_top": top}],
-        [fr_cavity, "feed_out", {"z_top": top}],
-        [fr_cavity, "air_feed", {"z_top": top}],
-        [fr_cavity, "keep_out", {"radius": r, "boxes": frame_straps, "circles": nuts}],
+        [fr_cavity, "tool_changes", {"z_top": top, "tools": [numbers["em-3-8"], numbers["chamfer"]], "loads_first": True}],
+        [fr_cavity, "spindle", {"rpm": [[rpm_em], [rpm_cm]]}],
+        [fr_cavity, "depth", {"z_min": _r(min(cav_levels[-1], cavity_chamfer_low))}],
+        [f"{fr_cavity}@0", "rapids_clear", {"z_top": top}],
+        [f"{fr_cavity}@0", "feed_out", {"z_top": top}],
+        [f"{fr_cavity}@0", "air_feed", {"z_top": top}],
+        [f"{fr_cavity}@0", "keep_out", {"radius": r, "boxes": frame_straps, "circles": nuts["b"]}],
+        # The boss and the studs are out: the rim chamfer misses the straps.
+        [f"{fr_cavity}@1", "depth", {"z_min": _r(cavity_chamfer_low)}],
+        [f"{fr_cavity}@1", "rapids_clear", {"z_top": top}],
+        [f"{fr_cavity}@1", "feed_out", {"z_top": top}],
+        [f"{fr_cavity}@1", "air_feed", {"z_top": top}],
+        [f"{fr_cavity}@1", "keep_out", {"radius": cm_r, "boxes": frame_straps}],
         [
-            fr_cavity,
+            f"{fr_cavity}@0",
             "outline",
             {
                 "elements": _elements(cav_part, OUTLINE_TOL_MM),
