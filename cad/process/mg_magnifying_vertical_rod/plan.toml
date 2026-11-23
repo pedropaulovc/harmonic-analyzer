@@ -14,7 +14,8 @@
 # it, and the .020 grooving tool the placeholder named is not needed). Turned
 # round, the body in the jaws over the shim: face the other end to the 4.92
 # body length, then form the R.13 dome with the R.125 form tool, its apex on
-# the faced plane. Bench: deburr, run the nut, bag (FINISH: machined).
+# the faced plane (the nut is tried on the thread at the lathe, Op 180).
+# Bench: deburr, check, bag (FINISH: machined).
 #
 # Flagged: the R.125 form tool (tools-special-cutters.toml form-tool-r125) is
 # to order, shared with MHA-MG-03. The #4-40 die's chamfer (lead) is not on

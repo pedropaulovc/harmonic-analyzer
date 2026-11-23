@@ -14,8 +14,9 @@
 # - Bench: deburr, check, oil (FINISH: square as supplied; ends, pivot
 #   machined; oiled).
 #
-# Flagged: the key stock (stock-to-order.toml c360-square-5mm-key) is to
-# order. The placeholder's sharp-nose tool and ignition wrenches are not
+# Flagged: the key stock (stock-to-order.toml c360-square-5mm-key) and the
+# .040 pin gauge of Op 70's depth check (gauges.pin-gauges) are to order.
+# The groove's stations are held by the DRO plunges (Op 220), not read. The placeholder's sharp-nose tool and ignition wrenches are not
 # needed: the P1 blade cuts the R.008 MAX corner sharp, and the taps turn in
 # a tap wrench.
 title = "Pen Rod"
