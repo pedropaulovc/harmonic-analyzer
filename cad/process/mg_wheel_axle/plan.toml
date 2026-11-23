@@ -10,10 +10,10 @@
 # from the chuck alone); withdraw the centre, face the stub off to the tip,
 # step the R.07 dome from a Z/Ø table and file it, run the die on to the
 # shoulder by hand, groove the relief at the shoulder (these run without the
-# centre: the stub facing, the dome's facing steps and the die load the end
-# along its axis, the file is hand pressure only, and the relief sits at the
-# shoulder, the jaws' end of the Ø.11, so none bends the end as the turning
-# passes would); turn it round, the shank in the jaws: face the back
+# centre, as the form tool's plunge did before: the stub facing and the die
+# load the end along its axis, the dome's steps are three light cuts .007
+# long at the tip, the file is hand pressure only, and the relief sits at
+# the shoulder, the jaws' end of the Ø.11); turn it round, the shank in the jaws: face the back
 # end to the 1.85 shank length. Pressed into MHA-MG-08 at assembly
 # (MHA-MG-00).
 #
@@ -28,9 +28,9 @@
 # centre (the dome end is never on a centre), on the slender end: the
 # Ø.11 blank stands .352 out of the Ø.1875 shoulder (.324 thread + .028
 # dome) even with the shoulder at the jaw fronts, over the shop's 3 × Ø
-# unsupported rule (lathe_holding) on its least Ø, 3 × .1061 = .318, and the
-# ball turner's cut at the root is radial (the plan's own reason the blank
-# is turned on the centre). Not reachable: step-and-file, as the pattern's
+# unsupported rule (lathe_holding) on its least Ø, 3 × .1061 = .318, which
+# the dome pattern (tool-travelers, 2026-11-23) makes part of the ball
+# turner's reach test. Not reachable by that test: step-and-file, as the pattern's
 # fallback (precedent dt_pinion_arbor's crowns), from the turned_shaft
 # stepped-turning table (process.dome_steps), filed with the smooth file and
 # screened with the radius gauges' 1/16 and 5/64 leaves, which bracket the
@@ -287,13 +287,13 @@ tool = "radius"
 drilling = "none"
 sizing = "other"
 feed = "hand"
-instruction = "Spindle stopped. Screen the dome with the radius gauges' concave leaves held across it through the axis: the 1/16 leaf rests on the rim with light at the apex, and the 5/64 leaf touches at the apex with light at the rim; no flat at the apex, no step left."
-inspection = "Dome R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}}: between the 1/16 (R.0625) and 5/64 (R.0781) leaves; no flat, no step."
+instruction = "Spindle stopped. Screen the dome with the radius gauges' concave leaves held across it through the axis: the {{process.leaf_radius_min_in:fraction}} leaf rests on the rim with light at the apex, and the {{process.leaf_radius_max_in:fraction}} leaf touches at the apex with light at the rim; no flat at the apex, no step left."
+inspection = "Dome R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}}: between the {{process.leaf_radius_min_in:fraction}} (R{{process.leaf_radius_min_in:.4dot}}) and {{process.leaf_radius_max_in:fraction}} (R{{process.leaf_radius_max_in:.4dot}}) leaves; no flat, no step."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The 5/64 leaf showing light at the apex, a flat or a step (the rim still full): file again from the rim inward and screen again. The 1/16 leaf touching at the apex (filed too far at the rim): scrap the blank and make another from Setup 1."
+instruction = "The {{process.leaf_radius_max_in:fraction}} leaf showing light at the apex, a flat or a step (the rim still full): file again from the rim inward and screen again. The {{process.leaf_radius_min_in:fraction}} leaf touching at the apex (filed too far at the rim): scrap the blank and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"

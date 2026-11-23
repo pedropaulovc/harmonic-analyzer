@@ -127,6 +127,14 @@ regrip_stickout_far_in = 0.25
 # filed: three steps leave a face about Ø.10 (head) and Ø.07 (tip) at the
 # apex and step corners a file takes off.
 dome_steps = 3
+# The radius gauges' leaves that screen each filed dome (Starrett S167AZ):
+# the lesser rests on the rim, the greater touches at the apex, so the dome
+# lies between them, inside the drawn band. Head R.17-.19: 11/64 (R.1719)
+# and 3/16 (R.1875); tip R.06-.08: 1/16 (R.0625) and 5/64 (R.0781).
+dome_datum_leaf_radius_min_in = 0.171875
+dome_datum_leaf_radius_max_in = 0.1875
+dome_far_leaf_radius_min_in = 0.0625
+dome_far_leaf_radius_max_in = 0.078125
 # The head's thickness, seat face to faced end, before its dome is stepped:
 # the .08-.10 head land plus the dome's height. That height is
 # R - √(R² - (Ø/2)²) for whatever radius the leaves pass (11/64 to 3/16) on
@@ -454,13 +462,13 @@ tool = "radius"
 drilling = "none"
 sizing = "other"
 feed = "hand"
-instruction = "Spindle stopped. Screen the dome with the radius gauges' concave leaves held across it through the axis: the 11/64 leaf rests on the rim with light at the apex, and the 3/16 leaf touches at the apex with light at the rim; no flat at the apex, no step left."
-inspection = "Dome R{{cad.dome_datum_radius_min_in:.2dot}}–{{cad.dome_datum_radius_max_in:.2dot}}: between the 11/64 (R.1719) and 3/16 (R.1875) leaves; no flat, no step."
+instruction = "Spindle stopped. Screen the dome with the radius gauges' concave leaves held across it through the axis: the {{process.dome_datum_leaf_radius_min_in:fraction}} leaf rests on the rim with light at the apex, and the {{process.dome_datum_leaf_radius_max_in:fraction}} leaf touches at the apex with light at the rim; no flat at the apex, no step left."
+inspection = "Dome R{{cad.dome_datum_radius_min_in:.2dot}}–{{cad.dome_datum_radius_max_in:.2dot}}: between the {{process.dome_datum_leaf_radius_min_in:fraction}} (R{{process.dome_datum_leaf_radius_min_in:.4dot}}) and {{process.dome_datum_leaf_radius_max_in:fraction}} (R{{process.dome_datum_leaf_radius_max_in:.4dot}}) leaves; no flat, no step."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The 3/16 leaf showing light at the apex, a flat or a step (the rim still full): file again from the rim inward and screen again. The 11/64 leaf touching at the apex (filed too far at the rim): scrap the pin and make another from Op 40, the blank rechucked as in Setup 1's Holding (R stands)."
+instruction = "The {{process.dome_datum_leaf_radius_max_in:fraction}} leaf showing light at the apex, a flat or a step (the rim still full): file again from the rim inward and screen again. The {{process.dome_datum_leaf_radius_min_in:fraction}} leaf touching at the apex (filed too far at the rim): scrap the pin and make another from Op 40, the blank rechucked as in Setup 1's Holding (R stands)."
 
 [[setups]]
 machine_kind = "lathe"
@@ -516,13 +524,13 @@ tool = "radius"
 drilling = "none"
 sizing = "other"
 feed = "hand"
-instruction = "Spindle stopped. Screen the dome with the radius gauges' concave leaves held across it through the axis: the 1/16 leaf rests on the rim with light at the apex, and the 5/64 leaf touches at the apex with light at the rim; no flat at the apex, no step left."
-inspection = "Dome R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}}: between the 1/16 (R.0625) and 5/64 (R.0781) leaves; no flat, no step."
+instruction = "Spindle stopped. Screen the dome with the radius gauges' concave leaves held across it through the axis: the {{process.dome_far_leaf_radius_min_in:fraction}} leaf rests on the rim with light at the apex, and the {{process.dome_far_leaf_radius_max_in:fraction}} leaf touches at the apex with light at the rim; no flat at the apex, no step left."
+inspection = "Dome R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}}: between the {{process.dome_far_leaf_radius_min_in:fraction}} (R{{process.dome_far_leaf_radius_min_in:.4dot}}) and {{process.dome_far_leaf_radius_max_in:fraction}} (R{{process.dome_far_leaf_radius_max_in:.4dot}}) leaves; no flat, no step."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The 5/64 leaf showing light at the apex, a flat or a step (the rim still full): file again from the rim inward and screen again. The 1/16 leaf touching at the apex (filed too far at the rim): scrap the pin and make another from Op 40, the blank rechucked as in Setup 1's Holding (R stands)."
+instruction = "The {{process.dome_far_leaf_radius_max_in:fraction}} leaf showing light at the apex, a flat or a step (the rim still full): file again from the rim inward and screen again. The {{process.dome_far_leaf_radius_min_in:fraction}} leaf touching at the apex (filed too far at the rim): scrap the pin and make another from Op 40, the blank rechucked as in Setup 1's Holding (R stands)."
 
 [[setups]]
 machine_kind = "other"
