@@ -472,7 +472,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = [9.5504, 9.5631] }, { gauge =
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "This sheet accepts a hole its GO pin enters and its NO-GO pin does not: GO reading ≤ hole < NO-GO reading. With the pins at their size limits only .3762–.3763, .4387–.4388, .3137–.3138 and .0932–.0933 are sure to pass; a good bore within .0002 of a band limit may be refused (owner ruling 2026-11-23). The .0930 reamer reading under its GO pin: the slug's holes in Setup 7 are its trial holes; the GO refused there, stop and tell the owner."
+instruction = "Accept a hole its GO pin enters and its NO-GO pin does not. With the pins at their size limits only .3762–.3763, .4387–.4388, .3137–.3138 and .0932–.0933 are sure to pass; a good bore within .0002 of a band limit may be refused."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -719,7 +719,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the 4.00 slug blank, {{process.slug_stickout_mm:in.2f}} in out of the jaw fronts (rule); after the centre-drilling op, the faced end's centre hole on the MT3 dead centre, greased, the quill snug and locked."
 datum = "Z0 (carriage DRO) the slug's faced end, set by each tool on it; stations −Z."
-diagram = { file = "diagrams/slug.svg", alt = "The slug blank between the 3-jaw and the dead centre: the Ø.4486 journal, the Ø.687 spigot and its stub-side face, and the Ø.3746 stub turned in one chucking, parted off at the chuck end." }
+diagram = { file = "diagrams/slug.svg", alt = "The slug blank between the 3-jaw and the dead centre: the Ø.4371 journal, the Ø.687 spigot and its stub-side face, and the Ø.3746 stub turned in one chucking, parted off at the chuck end." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.slug_stickout_mm}}", minimum_diameter_mm = "{{cad.hub_shaft_dia_mm}}", support = "tailstock" }
 
 [[setups.operations]]
@@ -813,7 +813,7 @@ title = "The slug's stub end: face it"
 machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw over a brass shim wrap on the slug's Ø.4486 journal (the shim keeps the jaws off it: it registers in the jig bore), the parted stub end {{process.slug_face_stickout_mm:in.2f}} in out of the jaw fronts; the centre-drilled end back in the chuck."
+holding = "3-jaw over a brass shim wrap on the slug's Ø.4371 journal (the shim keeps the jaws off it: it registers in the jig bore), the parted stub end {{process.slug_face_stickout_mm:in.2f}} in out of the jaw fronts; the centre-drilled end back in the chuck."
 datum = "The faced stub end: in Setup 7 every cutter touches off on its centre."
 diagram = { file = "diagrams/slug-face.svg", alt = "The slug in the 3-jaw on its journal over a brass shim, the spigot and the stub out, the parted stub end faced flat to the centre." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outboard_journal_dia_mm}}", stock_diameter_mm = "{{cad.outboard_journal_dia_mm}}", stickout_mm = "{{process.slug_face_stickout_mm}}", minimum_diameter_mm = "{{cad.hub_shaft_dia_mm}}", support = "none" }
@@ -947,7 +947,7 @@ peck = { step_mm = 0.508, retract = "full" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The slug out (the jig, the cross slide and the drill chuck untouched). Each hole: the .0930 GO enters, the .0935 NO-GO does not; GO refused or NO-GO entering, stop and tell the owner. With the GO in it, mike over the pin and the stub's far side beside the spigot face; offset = reading − stub/2 + .09325/2 − the GO pin's written reading: half the reamed hole, taken at its mid size .09325 (between the GO and the NO-GO), less the GO pin, which the anvil pushes onto the hole's inner wall. Write both offsets."
+instruction = "The slug out (the jig, the cross slide and the drill chuck untouched). Each hole: the .0930 GO enters, the .0935 NO-GO does not; otherwise stop and tell the owner (these are the .0930 reamer's trial holes). With the GO in it, mike over the pin and the stub's far side beside the spigot face; offset = reading − stub/2 + .09325/2 − the GO's written reading (the anvil pushes the pin onto the hole's inner wall). Write both offsets."
 inspection = "Each offset {{cad.drive_pin_1_offset_min_in:.4dot}}–{{cad.drive_pin_1_offset_max_in:.4dot}} (the drawing's band); the slug passes within {{process.pin_guard_in:.4dot}} of {{cad.drive_pin_1_offset_in:.4dot}} (the band less the reading's ±{{process.pin_uncertainty_in:.4dot}})."
 gauge_checks = [{ gauge = "zz-pins-0930-0935", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }, { gauge = "micrometers", band_mm = [6.9848, 7.0152] }]
 

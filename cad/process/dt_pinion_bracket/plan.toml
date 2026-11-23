@@ -466,7 +466,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Still clamped, the bores' edges still sharp: gauge every bore with its two Class ZZ pins. Unclamp."
+instruction = "Still clamped, the bores' edges still sharp: gauge every bore with its two Class ZZ pins. Every bore passing: unclamp."
 inspection = "GO enters, NO-GO does not: pivot bores Ø{{cad.pivot_bore_dia_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}} (.2510 plus and .2515 minus pins); arbor bores Ø{{cad.arbor_bore_dia_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}} (.3135 plus and .314 minus pins), bright, no tears or chatter (Ra {{cad.arbor_bore_finish_ra_printed}} µin)."
 gauge_checks = [
   { gauge = "zz-pins-2510-2515", band_mm = "{{cad.pivot_bore_dia_band_mm}}" },
@@ -474,7 +474,7 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "A GO pin refused: clear the chips, oil, and with that bore's reamer loaded (console M6 T5 or T6) feed it through the bore once more by MDI at its file speed and feed, to {{process.ream_past_mm:in.3dot}} below face A and back out, spindle running; gauge again. Still refused (a reamer cannot be made to cut larger), or a NO-GO pin entering (no cut remedies it): stop and tell the owner."
+instruction = "A GO pin refused: clear the chips, oil, and with that bore's reamer loaded (console M6 T5 or T6) feed it through the bore once more by MDI at its file speed and feed, to {{process.ream_past_mm:in.3dot}} below face A and back out, spindle running; gauge again; all passing now: unclamp. Still refused (a reamer cannot be made to cut larger), or a NO-GO pin entering (no cut remedies it): stop and tell the owner."
 feed = "hand"
 
 [[setups]]
@@ -579,7 +579,7 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T7: the 1/8 in end mill plunges into the seat to its floor at Z {{process.seat_floor_z_mm:in.4f}}, turns once round it at Ø{{process.seat_floor_dia_mm:in.3dot}} (it takes out the drill's wall and cone and leaves a flat floor with square corners), then once at Ø{{process.seat_finish_dia_mm:in.4dot}}, the middle of the seat's band: a plunged 1/8 cutter cuts only .125, so the mill interpolates the seat, and the band leaves .0015 either side for the circle; set 2800."
+instruction = "Same file, M6 T7: the 1/8 in end mill plunges to the seat's floor at Z {{process.seat_floor_z_mm:in.4f}}, circles once at Ø{{process.seat_floor_dia_mm:in.3dot}} and once at Ø{{process.seat_finish_dia_mm:in.4dot}}, the band's middle (a plunged 1/8 cuts only .125); set 2800."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
   { name = "seat", kind = "plunge", phase = "finish", cutter_dia_mm = 3.175, flutes = 3, stations_mm = "{{cad.follower_seat_y_from_min_mm}}" },
@@ -594,7 +594,7 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "GO pin refused: clear the chips and gauge again; still refused, the NO-GO pin entering (no cut remedies it), or the depth outside: stop and tell the owner before the second strap (the circle came out off size: the cutter or the mill's backlash)."
+instruction = "GO pin refused: clear the chips and gauge again; still refused, the NO-GO pin entering (no cut remedies it), or the depth outside: stop and tell the owner before the second strap."
 feed = "hand"
 
 [[setups.operations]]
