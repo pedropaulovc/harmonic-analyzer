@@ -54,20 +54,31 @@ from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _printed_limits import drilled_limits, limits
 from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_knob_cup_notes import CBORE_DEPTH_CALLOUT
 from pd_transgear_knob_cup_spec import (
+    BORE_BAND,
     BORE_DIA,
     BORE_CLEARANCE_TEXT,
+    BORE_JOURNAL_CLEARANCE,
     CBORE_DEPTH,
     CBORE_DIA,
+    CLEAR_HOLE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     LENGTH,
     OD,
     PILOT_DEPTH,
     PILOT_DEPTH_FITTED_TEXT,
+    PILOT_FLOOR_R_MAX,
+    POCKET_FLOOR_R_MAX,
     SURFACE_FINISHES,
+    UNIT,
+    WEB_MIN,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -235,6 +246,166 @@ NOTES_XY = (0.020, 0.112)
 FRONT_FINISH_CAPTION = f"THRUST FACE\nON {BUSH_NUMBER}"
 FRONT_FINISH_CAPTION_SIZE_M = (0.0327, 0.0096)
 FRONT_FINISH_CAPTION_XY = (FRONT_FINISH[1][0] + 0.016, FRONT_FINISH[1][1] + 0.0105)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (pd_transgear_knob_cup_spec: axis +Y; the front face, the running face
+# on MHA-PD-28, at y = 0; the pilot's floor at y = PILOT_DEPTH; the pocket's
+# floor at y = LENGTH - CBORE_DEPTH; the rear face at y = LENGTH). The O.D.
+# and the length take the title block's .XX row, the pilot its end-milled
+# +.001/0 band, bonded on the MHA-PD-08 journal, its depth and the pocket's
+# depth the .XXX row, the pocket's Ø the .XX row, the web's #33 the DRILLED
+# HOLES row, each floor corner its R MAX. The length and the pilot depth are
+# supply sizes: MHA-PD-00 faces the front face to the fitted pilot depth
+# (note 1). A counterbore's ``at`` is its floor's centre, so its depth is
+# that floor's distance from the face it opens on. The declarations print
+# nothing.
+DRAWING_NOTES = NOTES
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_transgear_knob_cup"
+_NOTES = "pd_transgear_knob_cup_notes"
+part_metadata(
+    model_sources=(
+        "LENGTH",
+        "OD",
+        "BORE_DIA",
+        "PILOT_DEPTH",
+        "CBORE_DIA",
+        "CBORE_DEPTH",
+    ),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
+        "outward": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "faced_at": ("assembly", ((_SELF, "NOTES"),)),
+    },
+)
+requirement(
+    "rear_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": ({"frame": "model", "axis": "y", "value": LENGTH}, ("LENGTH",)),
+        "outward": ([0.0, 1.0, 0.0], ("LENGTH",)),
+        "length": (
+            limits(LENGTH, _P["CupLength"], unit=UNIT),
+            ("LENGTH", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "length_nominal": (LENGTH, ("LENGTH",)),
+        "length_from": ("front_face", ((_SELF, "SECTION_KEEP"),)),
+        "supply": (True, ((_SELF, "NOTES"), (_SELF, "SUPPLY_CALLOUT"))),
+    },
+    precision={"length": _P["CupLength"]},
+)
+requirement(
+    "outside",
+    kind="outside_cylinder",
+    faces=(CylinderFace(OD),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "dia": (
+            limits(OD, _P["CupDia"], unit=UNIT),
+            ("OD", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "nominal_dia": (OD, ("OD",)),
+        "length_nominal": (LENGTH, ("LENGTH",)),
+    },
+    precision={"dia": _P["CupDia"]},
+)
+requirement(
+    "pilot",
+    kind="counterbore",
+    faces=(CylinderFace(BORE_DIA), PlanarFace((0.0, -1.0, 0.0), -PILOT_DEPTH)),
+    requirements=("dia", "depth", "corner_radius_max", "diametral_clearance"),
+    fields={
+        "at": ([0.0, PILOT_DEPTH, 0.0], ("PILOT_DEPTH",)),
+        "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "dia": (
+            limits(BORE_DIA, _P["BoreDia"], BORE_BAND, unit=UNIT),
+            ("BORE_DIA", "BORE_BAND", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
+        "depth": (
+            limits(PILOT_DEPTH, _P["PilotDepth"], unit=UNIT),
+            ("PILOT_DEPTH", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "depth_nominal": (PILOT_DEPTH, ("PILOT_DEPTH",)),
+        "depth_from": ("front_face", ((_SELF, "SECTION_KEEP"),)),
+        "supply": (True, ((_SELF, "NOTES"), (_SELF, "SUPPLY_CALLOUT"))),
+        "corner_radius_max": (
+            PILOT_FLOOR_R_MAX,
+            ("PILOT_FLOOR_R_MAX", "CORNER_SUFFIX"),
+        ),
+        "diametral_clearance": (
+            list(BORE_JOURNAL_CLEARANCE),
+            ("BORE_JOURNAL_CLEARANCE", "BORE_CLEARANCE_TEXT"),
+        ),
+        "mate": (SHAFT_NUMBER, ((_SELF, "SHAFT_NUMBER"), (_SELF, "BORE_CALLOUT"))),
+        "bonded": (True, ((_SELF, "BORE_CALLOUT"),)),
+        "callout": (BORE_CALLOUT, ((_SELF, "BORE_CALLOUT"),)),
+    },
+    precision={"dia": _P["BoreDia"], "depth": _P["PilotDepth"]},
+)
+requirement(
+    "web_hole",
+    kind="hole",
+    faces=(CylinderFace(CLEAR_HOLE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "at": ([0.0, LENGTH - CBORE_DEPTH, 0.0], ("LENGTH", "CBORE_DEPTH")),
+        "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "dia": (
+            drilled_limits(CLEAR_HOLE_DIA, _P["HoleDia"], unit=UNIT),
+            ("CLEAR_HOLE_DIA", "HOLE_BAND", "UNIT", (_SELF, "FACE_KEEP")),
+        ),
+        "nominal_dia": (CLEAR_HOLE_DIA, ("CLEAR_HOLE_DIA",)),
+        "thru": (True, ((_SELF, "HOLE_CALLOUT"),)),
+        "process": ("drill", ((_SELF, "HOLE_CALLOUT"),)),
+        "drill": ("#33", ((_SELF, "HOLE_CALLOUT"),)),
+        "callout": (HOLE_CALLOUT, ((_SELF, "HOLE_CALLOUT"),)),
+    },
+    precision={"dia": _P["HoleDia"]},
+)
+requirement(
+    "pocket",
+    kind="counterbore",
+    faces=(
+        CylinderFace(CBORE_DIA),
+        PlanarFace((0.0, 1.0, 0.0), LENGTH - CBORE_DEPTH),
+    ),
+    requirements=("dia", "depth", "corner_radius_max"),
+    fields={
+        "at": ([0.0, LENGTH - CBORE_DEPTH, 0.0], ("LENGTH", "CBORE_DEPTH")),
+        "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "dia": (
+            limits(CBORE_DIA, _P["CboreDia"], unit=UNIT),
+            ("CBORE_DIA", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "nominal_dia": (CBORE_DIA, ("CBORE_DIA",)),
+        "depth": (
+            limits(CBORE_DEPTH, _P["CboreDepth"], unit=UNIT),
+            ("CBORE_DEPTH", "UNIT", (_SELF, "SECTION_KEEP")),
+        ),
+        "depth_nominal": (CBORE_DEPTH, ("CBORE_DEPTH",)),
+        "depth_from": ("rear_face", ((_SELF, "SECTION_KEEP"),)),
+        "corner_radius_max": (
+            POCKET_FLOOR_R_MAX,
+            ("POCKET_FLOOR_R_MAX", "CORNER_SUFFIX"),
+        ),
+        "web_min": (WEB_MIN, ("WEB_MIN", (_NOTES, "CBORE_DEPTH_CALLOUT"))),
+        "callout": (CBORE_DEPTH_CALLOUT, ((_NOTES, "CBORE_DEPTH_CALLOUT"),)),
+    },
+    precision={"dia": _P["CboreDia"], "depth": _P["CboreDepth"]},
+)
 # A note's read-back position may differ from the one asked by this much.
 NOTE_POSITION_TOL_M = 5e-4
 # How far A-A's axis may sit from SECTION_CENTER / level before it is moved.

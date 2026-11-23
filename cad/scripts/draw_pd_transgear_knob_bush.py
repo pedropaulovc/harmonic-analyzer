@@ -55,20 +55,38 @@ from _section_axis import create_section_axis_centerline, position_section_capti
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _printed_limits import limits
 from pd_transgear_knob_bush_geometry import (
     BORE_DIA,
     HUB_DIA,
     HUB_LENGTH,
+    HUB_LENGTH_BAND,
     LENGTH,
+    LENGTH_BAND,
     PRESS_DIA,
+    PRESS_DIA_BAND,
+    PRESS_INTERFERENCE,
+    SHOULDER_ROOT_R_MAX_MM,
+    UNIT,
+    WALL_STATED_MIN,
 )
 from pd_transgear_knob_bush_spec import (
+    BORE_BAND,
+    BORE_CALLOUT,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FINISH_CAPTIONS,
     GEOMETRIC_CONTROLS,
+    GEOMETRIC_TOLERANCES_MM,
+    HUB_LENGTH_CALLOUT,
+    LENGTH_CALLOUT,
     PART_DATUMS,
+    PLATE_NUMBER,
+    PRESS_CALLOUT,
     SURFACE_FINISHES,
 )
 
@@ -230,6 +248,167 @@ FINISH_CHAR_HEIGHT = 0.0025
 NOTE_POSITION_TOL_M = 5e-4
 # How far A-A's axis may sit from SECTION_CENTER / level before it is moved.
 SECTION_POSITION_TOL_M = 1e-4
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (pd_transgear_knob_bush_geometry: axis +Y; the hub face, the MHA-PD-15
+# ring's thrust face, at y = 0 is the datum end the lengths run from; the
+# shoulder (datum A) at y = HUB_LENGTH; the rear face, the MHA-PD-16 cup's
+# thrust face, at y = LENGTH). The hub takes the title block's .XX row; the
+# press its FN2 band, turned to the measured MHA-PD-19 hole (its callout);
+# the shoulder's station its ±.001 and its root the printed R.005 MAX; the
+# length its ±.002; the bore its H7 band, reamed through after pressing in
+# MHA-PD-19 (MHA-PD-00), square to A, under the stated wall. Each ``span``
+# is a diameter's model-Y extent. The sheet prints no manufacturing note.
+# The declarations print nothing.
+DRAWING_NOTES = ""
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_transgear_knob_bush"
+_GEOM = "pd_transgear_knob_bush_geometry"
+part_metadata(
+    model_sources=(
+        (_GEOM, "LENGTH"),
+        (_GEOM, "HUB_LENGTH"),
+        (_GEOM, "HUB_DIA"),
+        (_GEOM, "PRESS_DIA"),
+        (_GEOM, "BORE_DIA"),
+    ),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
+        "outward": ([0.0, -1.0, 0.0], ("__frame__",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": LENGTH},
+            ((_GEOM, "LENGTH"),),
+        ),
+        "outward": ([0.0, 1.0, 0.0], ((_GEOM, "LENGTH"),)),
+        "length": (
+            limits(LENGTH, _P["BushLength"], (LENGTH_BAND, -LENGTH_BAND), unit=UNIT),
+            ((_GEOM, "LENGTH"), (_GEOM, "LENGTH_BAND"), (_SELF, "SECTION_KEEP")),
+        ),
+        "length_nominal": (LENGTH, ((_GEOM, "LENGTH"),)),
+        "length_from": ("datum_end", ((_SELF, "SECTION_KEEP"),)),
+        "callout": (LENGTH_CALLOUT, ("LENGTH_CALLOUT",)),
+    },
+    precision={"length": _P["BushLength"]},
+)
+requirement(
+    "shoulder",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), HUB_LENGTH),),
+    requirements=("station", "root_radius_max"),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "y", "value": HUB_LENGTH},
+            ((_GEOM, "HUB_LENGTH"),),
+        ),
+        "outward": ([0.0, 1.0, 0.0], ((_GEOM, "HUB_LENGTH"),)),
+        "station": (
+            limits(
+                HUB_LENGTH,
+                _P["HubLength"],
+                (HUB_LENGTH_BAND, -HUB_LENGTH_BAND),
+                unit=UNIT,
+            ),
+            (
+                (_GEOM, "HUB_LENGTH"),
+                (_GEOM, "HUB_LENGTH_BAND"),
+                (_SELF, "SECTION_KEEP"),
+            ),
+        ),
+        "station_nominal": (HUB_LENGTH, ((_GEOM, "HUB_LENGTH"),)),
+        "station_from": ("datum_end", ((_SELF, "SECTION_KEEP"),)),
+        "root_radius_max": (
+            SHOULDER_ROOT_R_MAX_MM,
+            ((_GEOM, "SHOULDER_ROOT_R_MAX_MM"), "SHOULDER_ROOT_SUFFIX"),
+        ),
+        "datum": ("A", ("PART_DATUMS", (_SELF, "DATUM_A_XY"))),
+        "callout": (HUB_LENGTH_CALLOUT, ("HUB_LENGTH_CALLOUT",)),
+    },
+    precision={"station": _P["HubLength"], "root_radius_max": _P["ShoulderR"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(HUB_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "span": ([0.0, HUB_LENGTH], ((_GEOM, "HUB_LENGTH"),)),
+        "dia": (
+            limits(HUB_DIA, _P["HubDia"], unit=UNIT),
+            ((_GEOM, "HUB_DIA"), (_GEOM, "UNIT"), (_SELF, "SECTION_KEEP")),
+        ),
+        "dia_nominal": (HUB_DIA, ((_GEOM, "HUB_DIA"),)),
+    },
+    precision={"dia": _P["HubDia"]},
+)
+requirement(
+    "step",
+    kind="diameter",
+    faces=(CylinderFace(PRESS_DIA),),
+    requirements=("dia", "diametral_interference"),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "span": ([HUB_LENGTH, LENGTH], ((_GEOM, "HUB_LENGTH"), (_GEOM, "LENGTH"))),
+        "dia": (
+            limits(PRESS_DIA, _P["PressDia"], PRESS_DIA_BAND, unit=UNIT),
+            ((_GEOM, "PRESS_DIA"), (_GEOM, "PRESS_DIA_BAND"), (_SELF, "SECTION_KEEP")),
+        ),
+        "dia_nominal": (PRESS_DIA, ((_GEOM, "PRESS_DIA"),)),
+        "diametral_interference": (
+            list(PRESS_INTERFERENCE),
+            ((_GEOM, "PRESS_INTERFERENCE"), "PRESS_CALLOUT"),
+        ),
+        "mate": (f"{PLATE_NUMBER} HOLE", ("PLATE_NUMBER", "PRESS_CALLOUT")),
+        "turn_to_measured_mate": (True, ("PRESS_CALLOUT",)),
+        "callout": (PRESS_CALLOUT, ("PRESS_CALLOUT",)),
+    },
+    precision={"dia": _P["PressDia"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(BORE_DIA),),
+    requirements=("dia", "thru", "perpendicularity"),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "span": ([0.0, LENGTH], ((_GEOM, "LENGTH"),)),
+        "dia": (
+            limits(BORE_DIA, _P["BoreDia"], BORE_BAND, unit=UNIT),
+            ((_GEOM, "BORE_DIA"), "BORE_BAND", (_SELF, "FACE_KEEP")),
+        ),
+        "nominal_dia": (BORE_DIA, ((_GEOM, "BORE_DIA"),)),
+        "thru": (True, ("BORE_CALLOUT",)),
+        "process": ("ream", ("BORE_CALLOUT",)),
+        "made_at": ("assembly", ("BORE_CALLOUT",)),
+        "wall_min": (WALL_STATED_MIN, ((_GEOM, "WALL_STATED_MIN"), "WALL_TEXT")),
+        "perpendicularity": (
+            GEOMETRIC_TOLERANCES_MM["bore_perpendicularity"],
+            ("GEOMETRIC_TOLERANCES_IN", "GEOMETRIC_CONTROLS"),
+        ),
+        "datum": ("shoulder", ("GEOMETRIC_CONTROLS", "PART_DATUMS")),
+        "callout": (BORE_CALLOUT, ("BORE_CALLOUT",)),
+    },
+    precision={"dia": _P["BoreDia"]},
+)
 
 
 def _add_placed_note(
