@@ -739,6 +739,22 @@ description = "Carbide 60° centre drills, trade sizes 1, 3 and 6"
 description = "Carbide 1/4 in 90° chamfering end mill, 2-flute (McMaster 3073A46)"
 diameter_mm = 6.35
 flute_length_mm = 3.175
+# Harvey Tool 34662, here since two families plunge with it (tool audit
+# 2026-11-23, row endmill-carbide-3-64): MHA-MS-02's rebate relief and
+# MHA-PD-17's pin-hole flat. MHA-MS-02: the rebate's corner relief (.05
+# deep × .06 high, beside the roof, at the
+# bottom of the .134 rebate): no owned cutter is under .07 wide and reaches
+# .38 down inside the rebate. It is plunge-milled (owner ruling 2026-11-21,
+# relayed by CncBlockA) with Harvey Tool 34662, Miniature End Mill, Square,
+# Long Reach, Stub Flute: 3 flutes, centre cutting, .0620 cutter × .0930
+# length of cut × .5000 reach (8×), 1/8 shank, 2-1/2 overall, uncoated,
+# "optimized for plunging", $60.30 (harveytool.com/products/tool-details-
+# 34662, read 2026-11-21). Not owned: to buy. diameter_mm and
+# flute_length_mm: its .0620 and .0930 × 25.4.
+[tools.endmill-carbide-3fl-1-16-reach-1-2]
+description = "1/16 in (.0620) 3-flute carbide square end mill, stub flute .093 length of cut, .500 reach, 1/8 shank (Harvey Tool 34662)"
+diameter_mm = 1.5748
+flute_length_mm = 2.3622
 # The set McMaster-Carr sells as 4289A78 is Noga's SP1007 (owner 2026-11-23,
 # tool audit Q12: "the mcmaster kit sold is actually noga sp1007"; "check Noga
 # SP1007"). Noga_Deburring-2017.pdf (noga.com) p.53 lists the RD16.5
