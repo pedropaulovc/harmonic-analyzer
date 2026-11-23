@@ -18,10 +18,19 @@
 # round, the two tapers and the top edge with the 3/8 in end mill's side,
 # through into the spoil block: the whole waste goes to chips, the side edges
 # stay as supplied. Setup 3, bench: free the plate from the tape, then
-# chamfer K's face-A mouth .015 x 45° by hand with a 90° hand countersink,
-# checked with the .450 pin (delegated ruling 2026-11-22, Main, owner review
-# #2144: option C; the owner may overrule to re-bonding face A up on the
-# spoil block). Setup 4, bench: deburr, inspect, oil.
+# chamfer K's face-A mouth .015 x 45° by hand with the owned deburring set's
+# RD16.5 RotoDrive 90° countersink, checked with the .450 pin (delegated
+# ruling 2026-11-22, Main, owner review #2144: option C; the owner may
+# overrule to re-bonding face A up on the spoil block). Setup 4, bench:
+# deburr, inspect, oil.
+#
+# The countersink (owner 2026-11-23, tool audit Q12: "the mcmaster kit sold
+# is actually noga sp1007"; "check Noga SP1007"): the owned McMaster-Carr
+# 4289A78 set is Noga's SP1007, which carries the RD16.5 RotoDrive
+# countersink (Noga_Deburring-2017.pdf, noga.com: p.27 blade table, RD16.5 /
+# BC1651, range 1-16.5 mm, angle 90°; p.53 lists RD16.5 in SP1007). Its
+# 1-16.5 mm (.039-.650) range spans K's .4375-.4382 mouth and the chamfer's
+# Ø.4575-.4775 rim; 90° is the chamfer's 45° each side. Nothing to buy.
 #
 # Not made here (the feature export's made_at, MHA-PD-00): the two Ø.0945
 # locating holes are match-drilled with MHA-PD-18 and reamed at assembly
@@ -49,9 +58,16 @@
 #
 # FLAGGED: to buy: the stock (stock.1018-flat-1-4x1-1-2), the .4375 reamer
 # (tools.reamer-4375), the 3/8 in 82° countersink (tools.riser-countersink),
-# the 3M VHB 5906 tape (consumables.tape-3m-vhb-5906), the .4375 GO / .4382
-# NO-GO plug gauge pair (gauges.plug-gauges-4375-4382) and a .250 Class ZZ
-# pin gauge (gauges.pin-gauges) for the countersinks.
+# the 3M VHB 5906 tape (consumables.tape-3m-vhb-5906), the Class ZZ pins
+# .4375 plus (GO) and .4380 plus (NO-GO) for K (tools.zz-pins-4375-4382) and
+# a .250 Class ZZ pin gauge (gauges.pin-gauges) for the countersinks.
+#
+# Owner ruling 2026-11-23 (tool audit Q1, re-answered), verbatim: "ZZ singles
+# per the record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept
+# that good holes near a limit may be refused; the traveler mikes each pin so
+# the real window is known per pin." K's .4375-.4382 band takes a .4380 plus
+# NO-GO (.4380-.4382, at or under the top limit; tool audit row
+# plug-gauges-4375-4382): no minus pin from the box lies in .4380-.4382.
 #
 # NC (cam:pd_transgear_arm_plate, cad/process/pd_transgear_arm_plate/cam.py):
 # AP01_holes, AP02_sink, AP03_outline. Program names, the
@@ -64,7 +80,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1/4 x 1-1/2 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:fraction}} in flat bar, the 12 in length: one {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} in blank. Spoil block: a 3.5 in length of the 1 x 3 in 6061 bar."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The two long edges are the bar's, as supplied: no cut touches them. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall or controller reset, home again and do what that setup's Datum says before resuming. The two Ø.0945 locating holes, the bush press and its ream are the assembly's (MHA-PD-00 steps 13A, 13E, 11C, 11H). To buy before starting: the bar, the .4375 reamer, the 3/8 in 82° countersink, the VHB 5906 tape, the .4375/.4382 plug pair and the .250 and .450 pin gauges (Setup 2 checks K and the countersinks while the blank is still bonded). Finish: {{cad.finish}}."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The two long edges are the bar's, as supplied: no cut touches them. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall or controller reset, home again and do what that setup's Datum says before resuming. The two Ø.0945 locating holes, the bush press and its ream are the assembly's (MHA-PD-00 steps 13A, 13E, 11C, 11H). To buy before starting: the bar, the .4375 reamer, the 3/8 in 82° countersink, the VHB 5906 tape, the Class ZZ pins .4375 plus (GO) and .4380 plus (NO-GO, reads .4380–.4382) and the .250 and .450 pin gauges (Setup 2 checks K and the countersinks while the blank is still bonded). Finish: {{cad.finish}}."
 shop = "../shop"
 stock_refs = ["1018-flat-1-4x1-1-2", "6061-flat-1x3"]
 material_key = "rocker-1018-cold-finished"
@@ -208,10 +224,13 @@ r8_collet_gauge_mm = 6.3
 drill_chuck_gauge_mm = 95.0
 reamer_oal_mm = 177.8
 em_projection_min_mm = 25.4
-# Inspection, from K (the .4375 GO plug standing in it, .21875 radius): the
-# calipers over the plug and an edge read the edge's distance from K plus the
-# plug's radius (cam.py computes each band from the export). The screw holes
-# with a #1 drill's shank in each: each hole from K over the plug and the
+# Inspection, from K (the .4375 GO pin standing in it, .21875 radius): the
+# calipers over the pin and an edge read the edge's distance from K plus the
+# pin's radius (cam.py computes each band from the export). The Class ZZ GO
+# pin reads at most .0002 over .4375, so it moves an over-pin reading at most
+# .0001, a fifth of the calipers' .0005 step: the bands stand on .21875.
+# The screw holes
+# with a #1 drill's shank in each: each hole from K over the GO pin and the
 # shank less both radii. The countersinks with the .250 pin standing in each: its end
 # sink_pin_depth_min_mm-sink_pin_depth_max_mm below the rear face for a rim
 # in the sheet's band.
@@ -239,6 +258,11 @@ chamfer_rim_max_mm = 12.1285
 chamfer_pin_dia_mm = 11.43
 chamfer_pin_depth_min_mm = 0.10414
 chamfer_pin_depth_max_mm = 0.34925
+# K's Class ZZ pins (header): GO .4375 plus, true size .4375-.4377; NO-GO
+# .4380 plus, .4380-.4382. The most a usable GO pin reads and the least a
+# usable NO-GO does: with both there, only .4377-.4380 is sure to pass.
+k_go_pin_max_mm = 11.11758
+k_nogo_pin_min_mm = 11.1252
 
 [[tools]]
 id = "em"
@@ -268,9 +292,8 @@ ref = "riser-countersink"
 status = "to_order"
 [[tools]]
 id = "hand-countersink"
-name = "90° hand countersink with handle, 1/2 in body or larger, TO BUY"
-ref = "hand-countersink-90"
-status = "to_order"
+name = "RD16.5 RotoDrive 90° countersink, deburring set (Noga SP1007)"
+ref = "deburring-set"
 [[tools]]
 id = "cutoff-saw"
 name = "Evolution miter saw"
@@ -281,16 +304,16 @@ name = "Files"
 ref = "jig-files"
 [[tools]]
 id = "deburr"
-name = "Deburring scraper set"
+name = "Deburring set (Noga SP1007): scrapers"
 ref = "deburring-set"
 [[tools]]
 id = "feeler-gauges"
 name = "Feeler gauges"
 ref = "feeler-gauges"
 [[tools]]
-id = "plugs"
-name = "Plug gauges .4375 GO, .4382 NO-GO, TO BUY"
-ref = "plug-gauges-4375-4382"
+id = "zz-4375"
+name = "Class ZZ pins: .4375 plus (GO) and .4380 plus (NO-GO)"
+ref = "zz-pins-4375-4382"
 status = "to_order"
 [[tools]]
 id = "pin-gauges"
@@ -301,9 +324,11 @@ status = "to_order"
 
 [[setups]]
 machine_kind = "other"
-title = "Saw the blank and the spoil block"
-machine = "Saw / bench"
+title = "Saw the blank and the spoil block; trial ream on the mill if needed"
+machine = "Saw / bench; Op 50 only: PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
+holding = "Ops 10–40: the saw and the bench. Op 50, only if it runs: the PM 6 in vise (shop vise-pm-6), the two 1 in parallels on its bed, one against each jaw; the 2 in offcut Op 50 saws off the bar flat on them, gripped on its 1/4 edges, its middle over the gap between the parallels; tap it down and tighten."
+datum = "Op 50 only: G54 X0 Y0 Z0 at the offcut's middle, on its top, set with T4's point (spindle stopped). Tool lengths from the tool setter at each M6. Setup 2 sets G54 again."
 diagram = { file = "diagrams/saw.svg", alt = "The 12 in length of the 1/4 x 1-1/2 in flat with one 2.45 in blank marked off at its end; the 1 x 3 in 6061 bar with a 3.5 in spoil block marked off." }
 envelope = "other"
 vise_hold = "other"
@@ -330,6 +355,19 @@ gauge_checks = [
   { gauge = "micrometers", band_mm = ["{{process.blank_thickness_min_mm}}", "{{process.blank_thickness_max_mm}}"] },
   { gauge = "micrometers", band_mm = ["{{process.blank_width_min_mm}}", "{{process.blank_width_max_mm}}"] },
 ]
+
+[[setups.operations]]
+instruction = "Before Setup 2 reams K: on the .0001 micrometer, mike the .4375 plus GO pin, the .4380 plus NO-GO pin and the .4375 reamer (across two opposite margins at its front); each reading is good to ±.00005. Write the three on this sheet and each pin's on its tag."
+inspection = "GO pin {{cad.press_hole_dia_min_in:.4dot}}–{{process.k_go_pin_max_mm:in.4dot}}, NO-GO pin {{process.k_nogo_pin_min_mm:in.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}; a pin outside that is not used: stop and tell the owner. Accept a K from the GO pin's reading to under the NO-GO's. Owner ruling 2026-11-23: 'Accept that good holes near a limit may be refused' (sure to pass: {{process.k_go_pin_max_mm:in.4dot}}–{{process.k_nogo_pin_min_mm:in.4dot}} only)."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Only if the reamer read under the GO pin, before Setup 2: home the mill, then drill and ream a trial hole through the offcut (Holding) by MDI with T4 and T5; gauge it with the two pins."
+instruction_detailed = "Only if the reamer read under the GO pin: saw a 2 in offcut off the rest of the bar, file its burrs, clamp it as Holding says; home the mill ($H). Console M6 T4 (27/64), its point on the offcut's middle, spindle stopped: G10 L20 P1 X0 Y0 Z0. Set 600; MDI M3, G1 Z-10 F{{process.drill_2764_feed_per_min_mm:.1f}}, G0 Z5, M5. M6 T5 (.4375 reamer); set 400; MDI M3, G1 Z-10 F{{process.ream_feed_per_min_mm:.1f}}, G1 Z5, M5."
+inspection = "The GO pin enters the trial hole and the NO-GO does not: go on. GO refused: this reamer's holes will be refused: stop and tell the owner."
+gauge_checks = [{ gauge = "zz-pins-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
@@ -439,8 +477,8 @@ sizing = { kind = "band", band_mm = "{{cad.press_hole_dia_band_mm}}" }
 instruction = "Same file, M6 T5 (.4375 reamer in the drill chuck; set 400, cutting oil on the reamer only, a drop, wiped so none runs to the tape): ream K through, fed in and fed out, spindle running, {{process.ream_past_mm:in.3dot}} under face A. The file ends there."
 rpm = 400
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
-inspection = "Still bonded, K blown out and wiped: the .4375 GO plug enters the full depth, the .4382 NO-GO does not (K Ø{{cad.press_hole_dia_min_in:.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}). GO refused: run AP01_holes again from its start, G54 unchanged (the cuts already made then cut air; the reamer goes through once more). NO-GO enters: stop and tell the owner."
-gauge_checks = [{ gauge = "plug-gauges-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
+inspection = "Still bonded, K blown out and wiped (K Ø{{cad.press_hole_dia_min_in:.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}): GO enters the full depth, NO-GO does not. GO refused: blow the chips out of K, oil the reamer and run AP01_holes again from its start, G54 unchanged (the cuts already made then cut air; the reamer goes through once more); gauge again. Still refused: the plate is scrap (the pins cannot show K at or over {{cad.press_hole_dia_min_in:.4dot}}): stop and tell the owner. NO-GO enters: no cut remedies it; the plate is scrap: stop and tell the owner."
+gauge_checks = [{ gauge = "zz-pins-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" }]
 milling_cuts = [
   { name = "press ream", kind = "drill", phase = "finish", cutter_dia_mm = 11.1125, flutes = 6, rpm = 400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = 0 },
 ]
@@ -468,7 +506,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Only if a rim is small: lower Z0 by the shortfall, run AP02_sink again, put Z0 back, then repeat the previous op's pin check."
-instruction_detailed = "The shortfall: {{process.sink_pin_depth_mid_mm:in.4dot}} less the pin's end's depth below the rear face. Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z − the shortfall in mm). Run AP02_sink. G10 L2 P1 Z(the noted Z) puts Z0 back before AP03_outline."
+instruction_detailed = "The shortfall: {{process.sink_pin_depth_mid_mm:in.4dot}} less the shallower pin end's depth below the rear face. The deeper one's depth plus the shortfall over {{process.sink_pin_depth_max_mm:in.4dot}}: stop and tell the owner. Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z − the shortfall in mm). Run AP02_sink. G10 L2 P1 Z(the noted Z) puts Z0 back before AP03_outline."
 inspection = "The pin check again: both in band, go on. Still higher: this op again. Lower: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.sink_pin_depth_min_mm}}", "{{process.sink_pin_depth_max_mm}}"] }]
 feed = "hand"
@@ -528,8 +566,8 @@ speed_kind = "other"
 tool = "hand-countersink"
 drilling = "none"
 sizing = "other"
-instruction = "Chamfer K's face-A mouth by hand: the plate face A up on the bench, the 90° hand countersink square in K, a few light turns clockwise with even pressure; blow out, stand the .450 pin in K and check. Repeat in light turns until in band."
-instruction_detailed = "Turn the 90° hand countersink in K's face-A mouth, aiming at .015 x 45°. Then the .450 pin standing in K, its end on the chamfer: the calipers' depth rod from face A beside it to the pin's top, less the pin's miked length, is where its end sits."
+instruction = "Chamfer K's face-A mouth by hand: the plate face A up on the bench, the RD16.5 RotoDrive countersink (deburring set) square in K, a few light turns clockwise with even pressure; blow out, stand the .450 pin in K and check. Repeat in light turns until in band."
+instruction_detailed = "Turn the RD16.5 RotoDrive 90° countersink in K's face-A mouth, aiming at .015 x 45°. Then the .450 pin standing in K, its end on the chamfer: the calipers' depth rod from face A beside it to the pin's top, less the pin's miked length, is where its end sits."
 feed = "hand"
 inspection = "The pin's end {{process.chamfer_pin_depth_min_mm:in.4dot}}–{{process.chamfer_pin_depth_max_mm:in.4dot}} below face A (chamfer {{cad.press_hole_chamfer_leg_min_in:.3dot}}–{{cad.press_hole_chamfer_leg_max_in:.3dot}} x 45° for any K in its band). Higher: more turns. Lower: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.chamfer_pin_depth_min_mm}}", "{{process.chamfer_pin_depth_max_mm}}"] }]
@@ -546,14 +584,14 @@ beam = "other"
 inspection = [
   "Thickness {{cad.rear_face_thickness_min_in:.3dot}}–{{cad.rear_face_thickness_max_in:.3dot}}, micrometer, at four places round the plate (it sets the screws' reach into MHA-PD-18). Over: stop and tell the owner. Under: scrap.",
   "Form, the thickness's envelope (Rule #1, perfect form at {{cad.rear_face_thickness_max_in:.3dot}}): the plate free on the surface plate, each face down in turn; the largest thickness reading plus the thickest feeler leaf that enters under it anywhere, at most {{cad.rear_face_thickness_max_in:.3dot}}. Over: stop and tell the owner.",
-  "K Ø{{cad.press_hole_dia_min_in:.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}: the .4375 GO plug enters from either face, the .4382 NO-GO enters from neither. GO refused: stop and tell the owner (do not re-ream). NO-GO enters: scrap. MHA-PD-28's traveler turns the bush to this hole.",
+  "K Ø{{cad.press_hole_dia_min_in:.4dot}}–{{cad.press_hole_dia_max_in:.4dot}}: GO enters from either face, NO-GO enters from neither (the pins miked before Setup 2). GO refused: stop and tell the owner (do not re-ream). NO-GO enters: scrap. MHA-PD-28's traveler turns the bush to this hole.",
   "K's chamfer: accepted in Setup 3 (the .450 pin check that guides the hand cut).",
-  "Side edges {{cad.outline_edge_right_x_min_in:.3dot}}–{{cad.outline_edge_right_x_max_in:.3dot}} from K: the GO plug in K, the calipers over the plug and each side edge at the kink and at the top, {{process.side_over_plug_min_mm:in.3dot}}–{{process.side_over_plug_max_mm:in.3dot}}. End round R{{cad.outline_end_r_min_in:.3dot}}–{{cad.outline_end_r_max_in:.3dot}}: over the plug and the round's far point on the centre line, {{process.round_over_plug_min_mm:in.3dot}}–{{process.round_over_plug_max_mm:in.3dot}}. The top edge's corners ({{cad.outline_top_left_y_min_in:.2dot}}–{{cad.outline_top_left_y_max_in:.2dot}} and {{cad.outline_top_right_y_min_in:.2dot}}–{{cad.outline_top_right_y_max_in:.2dot}} from K), the tapers and the kinks are the program's from the same zero as the round, not gauged. Outside: stop and tell the owner.",
-  "Screw holes Ø{{cad.screw_hole_1_dia_min_in:.3dot}}–{{cad.screw_hole_1_dia_max_in:.3dot}}: as drilled. Positions (BASIC, Ø{{cad.screw_hole_1_position_dia_in:.3dot}} zone): a #1 drill's shank in each hole; the calipers over the GO plug in K and each shank, less half the shank's miked Ø and the plug's radius, {{process.screw_1_from_k_min_mm:in.3dot}}–{{process.screw_1_from_k_max_mm:in.3dot}} (the hole farther from the C edge) and {{process.screw_2_from_k_min_mm:in.3dot}}–{{process.screw_2_from_k_max_mm:in.3dot}} (the nearer). Each hole's place round K is the program's, from Setup 2's alignment check on the C edge (process-held). Outside: stop and tell the owner.",
+  "Side edges {{cad.outline_edge_right_x_min_in:.3dot}}–{{cad.outline_edge_right_x_max_in:.3dot}} from K: the GO pin in K, the calipers over the pin and each side edge at the kink and at the top, {{process.side_over_plug_min_mm:in.3dot}}–{{process.side_over_plug_max_mm:in.3dot}}. End round R{{cad.outline_end_r_min_in:.3dot}}–{{cad.outline_end_r_max_in:.3dot}}: over the pin and the round's far point on the centre line, {{process.round_over_plug_min_mm:in.3dot}}–{{process.round_over_plug_max_mm:in.3dot}}. The top edge's corners ({{cad.outline_top_left_y_min_in:.2dot}}–{{cad.outline_top_left_y_max_in:.2dot}} and {{cad.outline_top_right_y_min_in:.2dot}}–{{cad.outline_top_right_y_max_in:.2dot}} from K), the tapers and the kinks are the program's from the same zero as the round, not gauged. Outside: stop and tell the owner.",
+  "Screw holes Ø{{cad.screw_hole_1_dia_min_in:.3dot}}–{{cad.screw_hole_1_dia_max_in:.3dot}}: as drilled. Positions (BASIC, Ø{{cad.screw_hole_1_position_dia_in:.3dot}} zone): a #1 drill's shank in each hole; the calipers over the GO pin in K and each shank, less half the shank's miked Ø and half the GO pin's written reading, {{process.screw_1_from_k_min_mm:in.3dot}}–{{process.screw_1_from_k_max_mm:in.3dot}} (the hole farther from the C edge) and {{process.screw_2_from_k_min_mm:in.3dot}}–{{process.screw_2_from_k_max_mm:in.3dot}} (the nearer). Each hole's place round K is the program's, from Setup 2's alignment check on the C edge (process-held). Outside: stop and tell the owner.",
 ]
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.rear_face_thickness_band_mm}}" },
-  { gauge = "plug-gauges-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" },
+  { gauge = "zz-pins-4375-4382", band_mm = "{{cad.press_hole_dia_band_mm}}" },
   { gauge = "calipers", band_mm = ["{{process.side_over_plug_min_mm}}", "{{process.side_over_plug_max_mm}}"] },
   { gauge = "calipers", band_mm = ["{{process.round_over_plug_min_mm}}", "{{process.round_over_plug_max_mm}}"] },
   { gauge = "calipers", band_mm = ["{{process.screw_1_from_k_min_mm}}", "{{process.screw_1_from_k_max_mm}}"] },
