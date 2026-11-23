@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="280"/>
+  <text class="title" x="20" y="20">The finished crankshaft (not to scale)</text>
+  <path class="part-kept" d="M60,150 Q40,140 60,130 Z"/>
+  <rect class="part-kept" x="60" y="127" width="130" height="26"/>
+  <rect class="part-kept" x="190" y="113" width="32" height="54"/>
+  <rect class="part-kept" x="222" y="128" width="8" height="24"/>
+  <rect class="part-kept" x="230" y="125" width="60" height="30"/>
+  <rect class="part-kept" x="290" y="127" width="180" height="26"/>
+  <rect class="part-kept" x="470" y="125" width="70" height="30"/>
+  <rect class="part-kept" x="540" y="128" width="16" height="24"/>
+  <rect class="part-kept" x="556" y="130" width="120" height="20"/>
+  <rect class="holes" x="120" y="127" width="8" height="26"/>
+  <rect class="holes" x="190" y="116" width="16" height="6"/>
+  <rect class="holes" x="206" y="117" width="16" height="4"/>
+  <rect class="holes" x="190" y="158" width="16" height="6"/>
+  <rect class="holes" x="206" y="159" width="16" height="4"/>
+  <line class="centre-line" x1="30" y1="140" x2="700" y2="140"/>
+  <text class="label" x="20" y="70">#9 cross hole 4.53 from F</text>
+  <line class="leader" x1="124" y1="74" x2="124" y2="127"/>
+  <text class="label" x="150" y="210">2X .0930 drive-pin holes, .2756 each side of the axis; knockouts through</text>
+  <line class="leader" x1="187" y1="198" x2="197" y2="163"/>
+  <text class="label" x="300" y="100">journals Ø.4486</text>
+  <line class="leader" x1="320" y1="104" x2="260" y2="125"/>
+  <line class="leader" x1="370" y1="104" x2="505" y2="125"/>
+  <text class="label" x="330" y="190">relief Ø.41</text>
+  <line class="leader" x1="380" y1="178" x2="380" y2="153"/>
+  <text class="label" x="560" y="190">seat Ø.3121; F with its centre</text>
+  <line class="leader" x1="610" y1="178" x2="610" y2="150"/>
+  <rect class="holes" x="47" y="132" width="4" height="4"/>
+  <text class="label" x="20" y="250">SR.26 dome; the punch mark on it, off the apex</text>
+  <line class="leader" x1="40" y1="238" x2="48" y2="137"/>
+  <text class="label" x="70" y="230">Ø.3746 stub</text>
+  <line class="leader" x1="100" y1="218" x2="100" y2="153"/>
+  <text class="label" x="230" y="60">Ø.687 spigot</text>
+  <line class="leader" x1="240" y1="64" x2="206" y2="113"/>
+</svg>

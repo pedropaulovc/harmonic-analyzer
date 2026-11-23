@@ -63,7 +63,11 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -72,22 +76,35 @@ from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 from pn_pen_hanger_spec import (
+    ARM_WIDTH,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION_BY_NAME,
+    FLAT_BAR_T_RANGE,
     GUIDE_PLATE_T,
     GUIDE_PLATE_WIDTH,
     GUIDE_PLATE_YS,
     ISOMETRIC_VIEW_NOTE,
     PLATE_FRONT_Z,
+    PLATE_REACH,
     REFERENCE_DIMENSIONS,
     SCREW_HOLE_DIA,
     SCREW_HOLE_XY,
+    SLOT_BOTTOM,
     SLOT_BOTTOM_Z,
+    SLOT_CORNER_R,
+    SLOT_DEPTH,
+    SLOT_WIDTH,
+    SLOT_WIDTH_BAND,
     STRAP_BOT_X,
     STRAP_BOT_Y,
+    STRAP_OUTLINE,
+    STRAP_T,
     STRAP_TOP_X,
     STRAP_Z,
+    UNIT,
+    UPPER_PLATE_DROP,
     UPPER_PLATE_OVERHANG,
 )
 
@@ -624,6 +641,269 @@ def _set_screw_hole_callout_text(display: Any) -> None:
             f"definitions={persisted!r}, resolved={resolved!r}"
         )
     _telemetry.info(f"hanger screw-hole callout: {resolved!r}")
+
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame (the build
+# docstring's layout: the origin at the strap's top outer corner, the strap
+# down -Y, its back face on Z0 and its front, which carries the two bonded
+# guide plates, at -Z). A band is the dimension's own native band, else the
+# title block's row for its printed places. The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pn_pen_hanger"
+_UNIT = "UNIT"
+_FRAME = "__frame__"
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+def _edge_normal(start: tuple[float, float], end: tuple[float, float]) -> tuple[float, float, float]:
+    """Outward normal of one straight strap edge (the outline runs anticlockwise)."""
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    length = math.hypot(dx, dy)
+    return (dy / length, -dx / length, 0.0)
+
+
+_LEFT_N = _edge_normal(STRAP_OUTLINE[1], STRAP_OUTLINE[2])
+_RIGHT_N = _edge_normal(STRAP_OUTLINE[3], STRAP_OUTLINE[0])
+_TOP_RUN = STRAP_TOP_X[1] - STRAP_TOP_X[0]
+_TAPER_DX = STRAP_BOT_X[0] - STRAP_TOP_X[0]
+_BOT_WIDTH = STRAP_BOT_X[1] - STRAP_BOT_X[0]
+_SCREW_X = abs(SCREW_HOLE_XY[0])
+_SCREW_Y = abs(SCREW_HOLE_XY[1])
+_SLOT_HALF = SLOT_WIDTH / 2.0
+
+part_metadata(
+    fields={"material.thickness": (STRAP_T, ("STRAP_T", "FLAT_BAR_T"))},
+    model_sources=("__frame__", "STRAP_OUTLINE", "STRAP_Z"),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "DRAWING_PRECISION_BY_NAME",
+        (_SELF, "SCREW_HOLE_CALLOUT_PRECISION"),
+    ),
+)
+# The strap: the 1/8 flat's faces as supplied ((.125) 1/8 CF FLAT, a
+# reference), its top end (the hole and the upper plate are set from it), the
+# foot 6.38 below it, flush with the lower plate's foot (note 1), and the two
+# tapered edges: .63 across the top, the inner edge's .39 run in to the foot,
+# .48 across the foot (FRONT_KEEP).
+requirement(
+    "strap_back",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane("z", STRAP_Z[1]), (_FRAME, "STRAP_Z"))},
+)
+requirement(
+    "strap_front",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), STRAP_T),),
+    requirements=("thickness_as_supplied",),
+    fields={
+        "plane": (_plane("z", STRAP_Z[0]), (_FRAME, "STRAP_Z")),
+        "thickness_as_supplied": (STRAP_T, ("STRAP_T", "FLAT_BAR_T", "REFERENCE_DIMENSIONS")),
+        "thickness_band_mm": (list(FLAT_BAR_T_RANGE), ("FLAT_BAR_T_RANGE",)),
+        "thickness_from": ("strap_back", ((_SELF, "SECTION_KEEP"),)),
+        "callout": (DIMENSION_CALLOUTS["StrapThick"], ("DIMENSION_CALLOUTS",)),
+    },
+)
+requirement(
+    "top_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), 0.0),),
+    requirements=("top_run",),
+    fields={
+        "plane": (_plane("y", 0.0), (_FRAME, "STRAP_OUTLINE")),
+        "top_run": (
+            limits(_TOP_RUN, _P["StrapTopRun"], unit=UNIT),
+            ("STRAP_TOP_X", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "top_run_nominal": (_TOP_RUN, ("STRAP_TOP_X",)),
+    },
+    precision={"top_run": _P["StrapTopRun"]},
+)
+requirement(
+    "foot",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), -STRAP_BOT_Y),),
+    requirements=("rise", "bottom_width"),
+    fields={
+        "plane": (_plane("y", STRAP_BOT_Y), (_FRAME, "STRAP_RISE")),
+        "rise": (
+            limits(-STRAP_BOT_Y, _P["StrapRise"], unit=UNIT),
+            ("STRAP_RISE", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "rise_nominal": (-STRAP_BOT_Y, ("STRAP_RISE",)),
+        "rise_from": ("top_end", ((_SELF, "FRONT_KEEP"),)),
+        "bottom_width": (
+            limits(_BOT_WIDTH, _P["StrapBotWidth"], unit=UNIT),
+            ("STRAP_BOT_X", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "bottom_width_nominal": (_BOT_WIDTH, ("STRAP_BOT_X",)),
+        "note": (DRAWING_NOTES.splitlines()[1].strip(), ("DRAWING_NOTES",)),
+    },
+    precision={"rise": _P["StrapRise"], "bottom_width": _P["StrapBotWidth"]},
+)
+requirement(
+    "strap_edges",
+    kind="profile",
+    faces=(
+        PlanarFace(_LEFT_N, sum(a * b for a, b in zip(_LEFT_N, (*STRAP_OUTLINE[1], 0.0)))),
+        PlanarFace(_RIGHT_N, sum(a * b for a, b in zip(_RIGHT_N, (*STRAP_OUTLINE[0], 0.0)))),
+    ),
+    requirements=("taper_dx",),
+    fields={
+        "taper_dx": (
+            limits(_TAPER_DX, _P["StrapTaperDx"], unit=UNIT),
+            ("STRAP_TOP_X", "STRAP_BOT_X", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "taper_dx_nominal": (_TAPER_DX, ("STRAP_TOP_X", "STRAP_BOT_X")),
+        "inner_top_at": ([STRAP_TOP_X[0], 0.0, 0.0], ("STRAP_OUTLINE",)),
+        "inner_foot_at": ([STRAP_BOT_X[0], STRAP_BOT_Y, 0.0], ("STRAP_OUTLINE",)),
+        "outer_top_at": ([STRAP_TOP_X[1], 0.0, 0.0], ("STRAP_OUTLINE",)),
+        "outer_foot_at": ([STRAP_BOT_X[1], STRAP_BOT_Y, 0.0], ("STRAP_OUTLINE",)),
+        "extent_x": ([STRAP_TOP_X[0], STRAP_BOT_X[1]], ("STRAP_OUTLINE",)),
+        "extent_y": ([STRAP_BOT_Y, 0.0], ("STRAP_OUTLINE",)),
+    },
+    precision={"taper_dx": _P["StrapTaperDx"]},
+)
+# The #8 close-clearance screw hole, DRILL THRU (its native callout, three
+# places): .27 in from the top outer corner and .20 down from the top end.
+requirement(
+    "screw_hole",
+    kind="hole",
+    faces=(CylinderFace(SCREW_HOLE_DIA),),
+    requirements=("dia", "thru", "process", "x_from_corner", "drop"),
+    fields={
+        "at": ([SCREW_HOLE_XY[0], SCREW_HOLE_XY[1], 0.0], ("SCREW_HOLE_XY",)),
+        "axis": ((0.0, 0.0, -1.0), (_FRAME,)),
+        "dia": (
+            drilled_limits(SCREW_HOLE_DIA, SCREW_HOLE_CALLOUT_PRECISION["hw-diam"], unit=UNIT),
+            ("SCREW_HOLE_DIA", _UNIT, (_SELF, "SCREW_HOLE_CALLOUT_PRECISION")),
+        ),
+        "nominal_dia": (SCREW_HOLE_DIA, ("SCREW_HOLE_DIA",)),
+        "thru": (True, ((_SELF, "CALLOUT_XY"),)),
+        "process": ("drill", ((_SELF, "SCREW_HOLE_PROCESS"),)),
+        "x_from_corner": (
+            limits(_SCREW_X, _P["ScrewX"], unit=UNIT),
+            ("SCREW_HOLE_XY", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "x_from_corner_nominal": (_SCREW_X, ("SCREW_HOLE_XY",)),
+        "drop": (
+            limits(_SCREW_Y, _P["ScrewY"], unit=UNIT),
+            ("SCREW_HOLE_XY", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "drop_nominal": (_SCREW_Y, ("SCREW_HOLE_XY",)),
+        "drop_from": ("top_end", ((_SELF, "FRONT_KEEP"),)),
+    },
+    precision={
+        "dia": SCREW_HOLE_CALLOUT_PRECISION["hw-diam"],
+        "x_from_corner": _P["ScrewX"],
+        "drop": _P["ScrewY"],
+    },
+)
+# The two guide plates alike, the 1/8 flat as supplied ((.125), note 1),
+# bonded across the strap front: .48 wide, reaching .97 from the strap
+# front; the upper plate's top 4.69 below the strap top, its outer edge .06
+# past the strap's outer edge; the lower plate flush with the foot and both
+# its corners (note 1).
+requirement(
+    "guide_plates",
+    kind="profile",
+    faces=(
+        PlanarFace((-1.0, 0.0, 0.0), GUIDE_PLATE_WIDTH / 2.0),
+        PlanarFace((1.0, 0.0, 0.0), GUIDE_PLATE_WIDTH / 2.0),
+        PlanarFace((0.0, 0.0, -1.0), -PLATE_FRONT_Z),
+    ),
+    requirements=("width", "reach", "upper_drop", "upper_overhang", "thickness_as_supplied"),
+    fields={
+        "width": (
+            limits(GUIDE_PLATE_WIDTH, _P["PlateWidth"], unit=UNIT),
+            ("GUIDE_PLATE_WIDTH", _UNIT, (_SELF, "SECTION_KEEP")),
+        ),
+        "width_nominal": (GUIDE_PLATE_WIDTH, ("GUIDE_PLATE_WIDTH",)),
+        "reach": (
+            limits(PLATE_REACH, _P["PlateReach"], unit=UNIT),
+            ("PLATE_REACH", _UNIT, (_SELF, "SECTION_KEEP")),
+        ),
+        "reach_nominal": (PLATE_REACH, ("PLATE_REACH",)),
+        "reach_from": ("strap_front", ((_SELF, "SECTION_KEEP"),)),
+        "upper_drop": (
+            limits(UPPER_PLATE_DROP, _P["UpperPlateDrop"], unit=UNIT),
+            ("UPPER_PLATE_DROP", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "upper_drop_nominal": (UPPER_PLATE_DROP, ("UPPER_PLATE_DROP",)),
+        "upper_drop_from": ("top_end", ((_SELF, "FRONT_KEEP"),)),
+        "upper_overhang": (
+            limits(UPPER_PLATE_OVERHANG, _P["PlateOverhang"], unit=UNIT),
+            ("UPPER_PLATE_OVERHANG", _UNIT, (_SELF, "SECTION_KEEP")),
+        ),
+        "upper_overhang_nominal": (UPPER_PLATE_OVERHANG, ("UPPER_PLATE_OVERHANG",)),
+        "upper_overhang_from": ("strap_edges", ((_SELF, "SECTION_KEEP"),)),
+        "thickness_as_supplied": (GUIDE_PLATE_T, ("GUIDE_PLATE_T", "REFERENCE_DIMENSIONS")),
+        "plate_ys": (list(GUIDE_PLATE_YS), ("GUIDE_PLATE_YS",)),
+        "bond": (
+            " ".join(line.strip() for line in DRAWING_NOTES.splitlines()[:2]),
+            ("DRAWING_NOTES", "BOND_NOTE"),
+        ),
+        "callout": (DIMENSION_CALLOUTS["PlateThick"], ("DIMENSION_CALLOUTS",)),
+        "extent_z": ([PLATE_FRONT_Z, STRAP_Z[1]], ("PLATE_FRONT_Z", "STRAP_Z")),
+    },
+    precision={
+        "width": _P["PlateWidth"],
+        "reach": _P["PlateReach"],
+        "upper_drop": _P["UpperPlateDrop"],
+        "upper_overhang": _P["PlateOverhang"],
+    },
+)
+# The two slots, one in each plate, cut together after the bond's 24 h cure
+# and in line (note 2): .200 +.002/0 wide for the pen rod's sliding fit, .42
+# deep from the plates' free end, the near arm .14, each slot's two floor
+# corners R.08 MAX (SECTION_KEEP).
+requirement(
+    "slots",
+    kind="slot",
+    faces=(
+        PlanarFace((1.0, 0.0, 0.0), -_SLOT_HALF),
+        PlanarFace((-1.0, 0.0, 0.0), -_SLOT_HALF),
+        PlanarFace((0.0, 0.0, -1.0), SLOT_BOTTOM),
+        CylinderFace(2.0 * SLOT_CORNER_R),
+    ),
+    requirements=("width", "depth", "arm_width", "corner_r_max"),
+    fields={
+        "width": (
+            limits(SLOT_WIDTH, _P["SlotWidth"], SLOT_WIDTH_BAND),
+            ("SLOT_WIDTH", "SLOT_WIDTH_BAND", (_SELF, "SECTION_KEEP")),
+        ),
+        "width_nominal": (SLOT_WIDTH, ("SLOT_WIDTH",)),
+        "depth": (
+            limits(SLOT_DEPTH, _P["SlotDepth"], unit=UNIT),
+            ("SLOT_DEPTH", _UNIT, (_SELF, "SECTION_KEEP")),
+        ),
+        "depth_nominal": (SLOT_DEPTH, ("SLOT_DEPTH",)),
+        "depth_from": ("guide_plates", ((_SELF, "SECTION_KEEP"),)),
+        "arm_width": (
+            limits(ARM_WIDTH, _P["ArmWidth"], unit=UNIT),
+            ("ARM_WIDTH", _UNIT, (_SELF, "SECTION_KEEP")),
+        ),
+        "arm_width_nominal": (ARM_WIDTH, ("ARM_WIDTH",)),
+        "corner_r_max": (SLOT_CORNER_R, ("SLOT_CORNER_R", "SLOT_CORNER_R_BAND")),
+        "centre_x": (0.0, ("GUIDE_PLATE_WIDTH", "ARM_WIDTH")),
+        "callout": (DIMENSION_CALLOUTS["SlotWidth"], ("DIMENSION_CALLOUTS",)),
+        "corner_callout": (DIMENSION_CALLOUTS["SlotCornerR"], ("DIMENSION_CALLOUTS",)),
+        "after_bond": (
+            " ".join(line.strip() for line in DRAWING_NOTES.splitlines()[2:]),
+            ("DRAWING_NOTES", "SLOTS_NOTE"),
+        ),
+    },
+    precision={
+        "width": _P["SlotWidth"],
+        "depth": _P["SlotDepth"],
+        "arm_width": _P["ArmWidth"],
+    },
+)
 
 
 def build(adapter: Any) -> dict[str, str]:

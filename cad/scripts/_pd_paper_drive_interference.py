@@ -19,43 +19,6 @@ from _sprocket_seat_geometry import DRIVE_PIN_DIA as _SEAT_PIN_DIA
 from _sprocket_seat_geometry import DRIVE_PIN_HOLE_DIA as _SEAT_PIN_HOLE_DIA
 
 
-def _cross_pin_overlap_mm3(pin_od: float, pin_id: float, shaft_d: float) -> float:
-    """Volume a tube pin lying diametrally across a solid shaft shares with it:
-    the perpendicular-cylinder intersection at its OD less that at its ID.
-    _holes.cross_hole_volume_mm3's trapezoid integral, restated so this
-    table stays clear of the Hole Wizard helpers."""
-
-    def solid(pin_d: float, n: int = 20001) -> float:
-        r, big_r = pin_d / 2.0, shaft_d / 2.0
-        dx = 2.0 * r / (n - 1)
-        total = 0.0
-        for i in range(n):
-            x = -r + i * dx
-            weight = 0.5 if i in (0, n - 1) else 1.0
-            total += (
-                weight
-                * 4.0
-                * math.sqrt(max(big_r**2 - x * x, 0.0))
-                * math.sqrt(max(r**2 - x * x, 0.0))
-            )
-        return total * dx
-
-    return solid(pin_od) - solid(pin_id)
-
-
-# MHA-PD-VN-62 (98296A031), a 1/16-in tube with a 0.012-in wall, 5/8 long, lies
-# diametrally across the MHA-PD-08 journal's rear end and the MHA-PD-16 cup ring,
-# in a hole match-drilled through both at assembly and not modelled (R9-70,
-# K-1): its chord through the journal, and the rest of its length in the cup
-# (its ends stay inside the cup's O.D.).
-_CUP_PIN_OD = 25.4 / 16.0
-_CUP_PIN_ID = _CUP_PIN_OD - 2.0 * 0.012 * 25.4
-_CUP_PIN_JOURNAL_MM3 = _cross_pin_overlap_mm3(_CUP_PIN_OD, _CUP_PIN_ID, 6.3246)
-_CUP_PIN_CUP_MM3 = (
-    math.pi / 4.0 * (_CUP_PIN_OD**2 - _CUP_PIN_ID**2) * (5.0 * 25.4 / 8.0)
-    - _CUP_PIN_JOURNAL_MM3
-)
-
 # MHA-PD-VN-61, McMaster 97431A240: three prong arcs on its free diameter,
 # atan(3/4) of the turn each (diag_build_97431A240's outline, the 97431A260
 # replica's law: the window prongs from 90 to 126.87 deg, the far one
@@ -78,13 +41,15 @@ _RING_PRONG_SHARE = 3.0 * math.atan(0.75) / (2.0 * math.pi)
 # the MHA-PD-VN-69 key pin's side clear of the sleeve's flat (#2409), the
 # MHA-PD-VN-58 dowel in the arm's Ø3.175 ream, the sleeve and both
 # bushings on the MHA-PD-23 pin (Ø3.9), the disc bore on the boss (Ø9), the
-# knob journal in the plate bore (Ø6.3246), the drive collar's round bore on
+# knob journal in the MHA-PD-28 bush's bore (Ø6.3246), the bush pressed in
+# the plate's ream (FN2, both modelled line to line at Ø11.1125; owner ruling
+# 2026-11-20, #2425), the drive collar's round bore on
 # the core (Ø4.8768), the MHA-PD-VN-70 pin's crest clear of the core's flat
 # and its faced rear end flush on F, the MHA-PD-VN-54 dowels in the T24's Ø2.5
-# holes, every screw in its
-# clearance hole, and the MHA-PD-14 latch hook: its base on the bar's back
-# face under the MHA-PD-VN-59 heads, their shanks through its Ø3.2 holes, and
-# the MHA-PD-VN-58 pin through its Ø3.3 pin hole.
+# holes, every screw in its clearance hole (the MHA-PD-VN-71 shank in the
+# MHA-PD-16 cup web's #33 hole among them), and the MHA-PD-14 latch hook: its
+# base on the bar's back face under the MHA-PD-VN-59 heads, their shanks
+# through its Ø3.2 holes, and the MHA-PD-VN-58 pin through its Ø3.3 pin hole.
 ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     # The bar-clamp screws: the receiver length past bar, front arc and the
     # 0.5 grip gap (build_pd_paper_drive_assembly's clamp stack).
@@ -229,11 +194,17 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset(
         ("pd-vn-transgear-hub-key-pin-1", "pd-transgear-disc-hub-1")
     ): smooth_annulus_limit_mm3(1.5875, 1.5621, 7.9375),
-    # MHA-PD-VN-62 through the knob shaft's journal and the cup (above).
-    frozenset(("pd-vn-transgear-knob-cup-pin-1", "pd-transgear-knob-shaft-1")): 1.10
-    * _CUP_PIN_JOURNAL_MM3,
-    frozenset(("pd-vn-transgear-knob-cup-pin-1", "pd-transgear-knob-cup-1")): 1.10
-    * _CUP_PIN_CUP_MM3,
+    # MHA-PD-VN-71 #2-56 x 3/8 fillister, modelled plain at the thread major
+    # (pd_vn_transgear_knob_cup_screw_spec, 91794A079) under-head on the
+    # MHA-PD-16 cup web's rear face, 3.048 (.120)
+    # behind the journal's end (the web's .252 from the cup front less the
+    # fitted .132 pilot), into the MHA-PD-08 journal's blind #2-56 tap at its
+    # #50 drill: 9.525 - 3.048 = 6.477 in the tap.
+    frozenset(
+        ("pd-vn-transgear-knob-cup-screw-1", "pd-transgear-knob-shaft-1")
+    ): smooth_annulus_limit_mm3(
+        THREAD_MAJOR_MM["#2-56"], TAP_DRILL_MM["#2-56"], 9.525 - 3.048
+    ),
     # Seats modelled line to line that the gate read as solid overlap on run
     # 20261001T035353825Z (assembly:paper_drive, R9-35): each MHA-PD-VN-56 oval
     # head in its 82-degree countersink (0.00809 mm^3).  Sub-micron slivers

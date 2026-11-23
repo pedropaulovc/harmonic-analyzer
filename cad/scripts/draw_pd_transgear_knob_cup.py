@@ -2,16 +2,17 @@ r"""Create the manufacturing drawing for the transgear knob cup (MHA-PD-16).
 
 Section A-A is the lathe view (drawing-guidelines.md rule 11): it cuts the
 cup on its axis through the Front plane, the plane of the turned profile,
-and lies axis-horizontal, so the O.D., the length and the six-millimetre H7
-bore print together on solid cut edges.  The bore's callout names the
-MHA-PD-08 journal it slides on and the diametral clearance it keeps there.
-The face view, the ``*Top`` orientation turned a quarter, only carries the
-cutting plane.  A separate sheet note says the MHA-PD-VN-62 cross pin hole
-is not drilled on this part: it is made through cup and journal together at
-assembly, at the paper-drive step the note cites, so it is not dimensioned
-here.  The front face is the thrust face on the arm plate's rear boss (the
-rear stop of the knob's end float) and carries its finish under a caption
-that names that boss.
+and lies axis-horizontal, so the O.D., the length, the end-milled .250
+flat-bottom pilot and its depth, the rear head pocket and the two floor
+corners' R.xxx MAX limits print together on solid cut edges.
+The pilot's callout names the MHA-PD-08 journal it is bonded on and the
+diametral clearance it keeps there (rule 23).  The face view, the ``*Top``
+orientation turned a quarter, carries the cutting plane and the web's #33
+drill for the MHA-PD-VN-71 screw, where it shows round.  The length and the
+pilot depth are supply sizes: NOTE 1 gives the fitted pilot depth the front
+face is faced to at assembly (rule 19).  The front face is the thrust face on
+the MHA-PD-28 bush's rear face (the rear stop of the knob's end float) and
+carries its finish under a caption that names that face.
 """
 
 from __future__ import annotations
@@ -54,14 +55,18 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from pd_paper_drive_assembly_steps import step_ref
+from pd_transgear_knob_cup_notes import CBORE_DEPTH_CALLOUT
 from pd_transgear_knob_cup_spec import (
     BORE_DIA,
     BORE_CLEARANCE_TEXT,
+    CBORE_DEPTH,
+    CBORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    FRONT_PIN_WALL_TEXT,
     LENGTH,
     OD,
+    PILOT_DEPTH,
+    PILOT_DEPTH_FITTED_TEXT,
     SURFACE_FINISHES,
 )
 
@@ -81,8 +86,8 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø19 x 8 ring: 4:1 keeps the section (32 x 76 mm on the sheet) and the
-# bore's callout legible without crowding the landscape sheet.
+# A Ø.44 x .36 cup: 4:1 keeps the section (37 x 45 mm on the sheet), its
+# stacked depth rows and the pilot's callout legible.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -90,11 +95,14 @@ FACE_CENTER = (0.090, 0.170)
 SECTION_CENTER = (0.200, FACE_CENTER[1])
 # Right of the bore's block (it ends near x 283 mm).
 ISO_CENTER = (0.350, FACE_CENTER[1])
-# Half the cup's O.D., bore and length on the sheet, and the cutting line's
-# overrun past the O.D.
+# Half the cup's O.D., pilot, pocket and length on the sheet, the pilot's
+# and the pocket's depths there, and the cutting line's overrun past the O.D.
 HALF_OD = OD * _S / 2000.0
 HALF_BORE = BORE_DIA * _S / 2000.0
+HALF_CBORE = CBORE_DIA * _S / 2000.0
 HALF_LENGTH = LENGTH * _S / 2000.0
+PILOT_DEPTH_ON_SHEET = PILOT_DEPTH * _S / 1000.0
+CBORE_DEPTH_ON_SHEET = CBORE_DEPTH * _S / 1000.0
 SECTION_LINE_OVERRUN = 0.005
 # The face view turned a quarter: sheet Y is then model X, so a vertical cut
 # on the cup axis is the Front plane, the plane of the turned profile, and
@@ -108,78 +116,125 @@ SECTION_LINE = (
 # A-A lays the front face on the right (``_orient_section``): its finish
 # rises there above the bore's dimension, and the O.D. takes the rear side.
 FRONT_FACE_X = SECTION_CENTER[0] + HALF_LENGTH
-# The native SECTION / SCALE caption, top-centre anchored, under the section.
-CAPTION_XY = (SECTION_CENTER[0], SECTION_CENTER[1] - HALF_OD - 0.010)
+REAR_FACE_X = SECTION_CENTER[0] - HALF_LENGTH
+SECTION_TOP = SECTION_CENTER[1] + HALF_OD
+SECTION_BOTTOM = SECTION_CENTER[1] - HALF_OD
+# The native SECTION / SCALE caption, top-centre anchored, under the floor
+# corners' radius row.
+CAPTION_XY = (SECTION_CENTER[0], SECTION_BOTTOM - 0.026)
 
 SHAFT_NUMBER = _config.parts("pd-transgear-knob-shaft")["number"]
-PLATE_NUMBER = _config.parts("pd-transgear-arm-plate")["number"]
-PIN_NUMBER = _config.parts("pd-vn-transgear-knob-cup-pin")["number"]
-# drawing-guidelines.md rule 4: the reamed bore's band names its mate with a
-# standard fit name and the clearance as REF -- the cup slides on the knob
-# shaft's journal to its feeler setting before it is pinned.  Rule 7: the
-# process line plus two lines of words, each within the 24 characters that
-# fit between the front face and the isometric.
+BUSH_NUMBER = _config.parts("pd-transgear-knob-bush")["number"]
+# drawing-guidelines.md rule 23: a bonded fit is a fit -- the pilot's band
+# names its mate and the diametral clearance, inside LOCTITE 641's gap fill
+# (the spec asserts it); the grade and method are the assembly step's.  No
+# process row: the section draws the pilot's flat floor and R.005 MAX limits
+# its corner, so "FLAT BOTTOM END MILL" named a tool, not a requirement
+# (rule 7; machinist review r10, three runs).  Two lines of words, each
+# within the 24 characters that fit between the front face and the isometric.
 BORE_CALLOUT = (
-    "REAM THRU\n"
-    f"SLIDING FIT ON {SHAFT_NUMBER}\n"
+    f"BONDED FIT ON {SHAFT_NUMBER}\n"
     f"(CLEARANCE {BORE_CLEARANCE_TEXT})"
 )
 # The block hangs right of its own vertical dimension line, which drops to
-# the shelf under the block's last row: the line struck the S of SLIDING and
-# the shelf both parentheses' tails (machinist review r1-r3, text on lines).
+# the shelf under the block's last row: the line struck the first row's text
+# and the shelf both parentheses' tails (machinist review r1-r3, text on lines).
 # A leading space on every row holds the ink off the line
 # (draw_ch_fulcrum_shaft's across-flat block), and a closing no-break-space
 # row drops the shelf a row below the parentheses.
 BORE_CALLOUT_ROWS = "\n".join(f" {row}" for row in BORE_CALLOUT.splitlines()) + "\n\u00a0"
-DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT_ROWS}
+# The supply sizes refer to NOTE 1 (rule 19); the web drill prints its
+# process where it shows round.
+SUPPLY_CALLOUT = "SEE NOTE 1"
+HOLE_CALLOUT = "#33 DRILL THRU"
+# The pocket depth's function row is pd_transgear_knob_cup_notes' (the web
+# its third place holds).
+SECTION_CALLOUTS = {
+    "BoreDia": BORE_CALLOUT_ROWS,
+    "CupLength": SUPPLY_CALLOUT,
+    "PilotDepth": SUPPLY_CALLOUT,
+    "CboreDepth": CBORE_DEPTH_CALLOUT,
+}
+FACE_CALLOUTS = {"HoleDia": HOLE_CALLOUT}
 
 # Half the height of the bore's value-and-callout block: 31 mm on the
-# eecbf88 render for the stacked band over four callout rows; three rows and
-# the shelf row now.
-BORE_BLOCK_HALF_HEIGHT = 0.0153
-# The O.D. on the rear-face side, between the face view and the section.
-# The bore right of the front face: its block (taller than the 24 mm between
-# the bore's extension lines) stands below the lower one, clear of the
-# finish above and the section caption to its left.  The length above.
+# eecbf88 render for the stacked band over four callout rows, 31.7 mm for
+# three and the shelf row (r10); two rows and the shelf row now.
+BORE_BLOCK_HALF_HEIGHT = 0.0130
+# The O.D. outermost on the rear-face side, between the face view and the
+# section; the pocket's Ø inside it, its text dropped below the pocket so the
+# two stand apart.  The pilot right of the front face: its block (taller than
+# the 25 mm between the pilot's extension lines) stands below the lower one,
+# clear of the finish above, the corner radii and the caption to its left,
+# its dimension line right of the finish symbol's Ra text.
+# Above the section, the two depths on one row, the length a row higher
+# with its note reference under it.  Neither depth's text fits its span
+# with air to both extension lines, so each stands outside: the pocket
+# depth's ".108" over its function row (18 characters, at most 49.9 mm)
+# left of the rear face, where the length's extension line rising from that
+# face stood 1.39 mm from ".108" alone (r6 audit; 2.0 wanted); the row runs
+# over the O.D.'s upper extension line with 3 mm of air and ends 10 mm right
+# of the cutting line's upper letter; and the pilot depth's ".152 / SEE NOTE 1" (24 mm
+# over 15 mm) right of the front face, where the length's extension line
+# no longer strikes its NOTE row and the pocket depth's arrow no longer
+# runs into its "S" (r5 render).  Below the section, the two floor corners'
+# R.xxx MAX on one row, each under its own corner, the caption beneath.
+DEPTH_TEXT_HALF_WIDTH = 0.012  # "SEE NOTE 1", 23.9 mm on the r5 render
+# The pocket depth's block: its function row at the callouts' 2.77 mm a
+# character (".108" alone was 8.5 mm on the r6 render).
+CBORE_DEPTH_TEXT_HALF_WIDTH = len(CBORE_DEPTH_CALLOUT) * 0.00277 / 2.0
 SECTION_KEEP = {
-    "CupDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.020, SECTION_CENTER[1]),
-    "CupLength": (SECTION_CENTER[0], SECTION_CENTER[1] + HALF_OD + 0.012),
-    "BoreDia": (
-        FRONT_FACE_X + 0.042,
-        SECTION_CENTER[1] - HALF_BORE - BORE_BLOCK_HALF_HEIGHT - 0.004,
+    "CupDia": (REAR_FACE_X - 0.030, SECTION_CENTER[1]),
+    "CboreDia": (REAR_FACE_X - 0.012, SECTION_CENTER[1] - HALF_CBORE - 0.007),
+    "CboreDepth": (
+        REAR_FACE_X - 0.0025 - CBORE_DEPTH_TEXT_HALF_WIDTH, SECTION_TOP + 0.010
     ),
+    "PilotDepth": (FRONT_FACE_X + 0.003 + DEPTH_TEXT_HALF_WIDTH, SECTION_TOP + 0.010),
+    "CupLength": (SECTION_CENTER[0], SECTION_TOP + 0.026),
+    # 10 mm under the pilot's lower extension line: 4 mm under it the
+    # "BONDED FIT" row ran a hairline under the isometric's lower rim (r11).
+    "BoreDia": (
+        FRONT_FACE_X + 0.060,
+        SECTION_CENTER[1] - HALF_BORE - BORE_BLOCK_HALF_HEIGHT - 0.010,
+    ),
+    "PocketFloorR": (REAR_FACE_X - 0.002, SECTION_BOTTOM - 0.010),
+    "PilotFloorR": (FRONT_FACE_X - 0.004, SECTION_BOTTOM - 0.010),
 }
+# The web drill's Ø on the face view, up and left of it on a leader.
+FACE_KEEP = {"HoleDia": (FACE_CENTER[0] - 0.040, FACE_CENTER[1] + 0.037)}
 
 # The front face's pick lies on its cut edge, midway between the bore and
-# the O.D. on the upper half; the symbol stands above and outboard, clear of
-# the length dimension's extension line rising from the same face.
+# the O.D. on the upper half.  The symbol stands level with it, outboard
+# past the pilot depth's text, so its leader runs straight in under that
+# text and over the pilot's upper extension line (a leader rising to a
+# symbol over the face crossed the text's place).
 _FRONT_PICK = (
     FRONT_FACE_X,
     SECTION_CENTER[1] + (BORE_DIA + OD) / 4.0 * _S / 1000.0,
 )
-FRONT_FINISH = (_FRONT_PICK, (_FRONT_PICK[0] + 0.020, _FRONT_PICK[1] + 0.022))
+FRONT_FINISH = (_FRONT_PICK, (_FRONT_PICK[0] + 0.037, _FRONT_PICK[1]))
 
-# The cross pin hole is no feature of the supplied cup: a sheet note, apart
-# from the bore's callout, says so and points at the assembly step that sizes
-# and locates it (machinist review: on the bore's leader the line read as the
-# bore, and it gave the hole no definition).  Below the face view.  Its last
-# row states the hole's front wall at the worst case as a plain fact (rule
-# 20): under the .080 target, the package's declared RV-01 minor (owner
-# ruling 2026-11-20, #2192).
-PIN_HOLE_NOTE = (
-    f"NO CROSS HOLE ON THIS PART: THE {PIN_NUMBER}\n"
-    f"PIN HOLE IS MADE THROUGH CUP AND {SHAFT_NUMBER}\n"
-    f"AT ASSEMBLY PER {step_ref('knob-stack-fitted')}.\n"
-    f"{FRONT_PIN_WALL_TEXT}."
+# Rule 19: the supply sizes and the fitted size, with the step that sets it;
+# the float it sets and how are the assembly step's.  Below the face view.
+NOTES = (
+    "NOTES:\n"
+    "1. LENGTH AND PILOT DEPTH ARE SUPPLY SIZES. FITTED\n"
+    f"   PILOT DEPTH {PILOT_DEPTH_FITTED_TEXT} AT {step_ref('knob-stack-fitted')}."
 )
-PIN_HOLE_NOTE_XY = (0.020, 0.112)
+NOTES_XY = (0.020, 0.112)
 # The front face's finish caption names the face's function and its mate
 # (rule 6: a finish only on a face that runs, slides or locates; machinist
-# review: the face's function was stated nowhere).  Just above the symbol (a
-# run-1 reviewer read the 6 mm gap as a caption floating free of it), left of
-# the isometric.
-FRONT_FINISH_CAPTION = f"THRUST FACE ON\n{PLATE_NUMBER} REAR BOSS"
-FRONT_FINISH_CAPTION_XY = (FRONT_FINISH[1][0] - 0.009, FRONT_FINISH[1][1] + 0.0185)
+# review: the face's function was stated nowhere).  On the symbol's own row,
+# right of its Ra text (which ends 13.7 mm right of the V): over the symbol
+# it stood on the pilot depth's ".152 / SEE NOTE 1" row and read as words on
+# that dimension (machinist review r10, two runs).  Two rows (rule 7; r11:
+# a third, "REAR FACE", was one too many and read as this part's rear), 32.7
+# mm wide and top-left anchored, end 2 mm short of the isometric's outline
+# and stand over the pilot Ø's upper arrow, which rises 3.5 mm off its
+# extension line.
+FRONT_FINISH_CAPTION = f"THRUST FACE\nON {BUSH_NUMBER}"
+FRONT_FINISH_CAPTION_SIZE_M = (0.0327, 0.0096)
+FRONT_FINISH_CAPTION_XY = (FRONT_FINISH[1][0] + 0.016, FRONT_FINISH[1][1] + 0.0105)
 # A note's read-back position may differ from the one asked by this much.
 NOTE_POSITION_TOL_M = 5e-4
 # How far A-A's axis may sit from SECTION_CENTER / level before it is moved.
@@ -341,11 +396,21 @@ def build(adapter: Any) -> dict[str, str]:
         view_label="axial section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    face_annotations = curate_view_dimensions(
+        adapter,
+        face,
+        keep=FACE_KEEP,
+        view_label="face view",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     # Decimal places (and so the general-tolerance row each dimension claims)
-    # and the bore's band are authored on the part; the sheet only proves the
+    # and the pilot's band are authored on the part; the sheet only proves the
     # import kept them.
-    assert_imported_precision(adapter, section_annotations, DRAWING_PRECISION_BY_NAME)
-    set_dimension_callouts(adapter, section_annotations, DIMENSION_CALLOUTS)
+    assert_imported_precision(
+        adapter, section_annotations + face_annotations, DRAWING_PRECISION_BY_NAME
+    )
+    set_dimension_callouts(adapter, section_annotations, SECTION_CALLOUTS)
+    set_dimension_callouts(adapter, face_annotations, FACE_CALLOUTS)
     create_section_axis_centerline(
         adapter, section, length_mm=LENGTH, label="knob cup axis"
     )
@@ -367,7 +432,7 @@ def build(adapter: Any) -> dict[str, str]:
         FRONT_FINISH_CAPTION_XY,
         "front face finish caption",
     )
-    _add_placed_note(adapter, PIN_HOLE_NOTE, PIN_HOLE_NOTE_XY, "cross pin hole note")
+    _add_placed_note(adapter, NOTES, NOTES_XY, "supply and fit-up notes")
 
     return finalize_drawing(
         adapter,

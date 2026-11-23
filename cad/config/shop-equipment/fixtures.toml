@@ -133,6 +133,19 @@ purchase = "Make from any scrap the shop has (hardwood, 6061 or steel plate, abo
 note = "Workholding for the one MHA-SM-01 bend (sm-gooseneck.yaml process). Try it on the spare tube first (the 36 in stock row). The sheet controls only where the tube's two ends finish (overall height and reach, both ends sawn and faced after the bend) and NO KINKS at the bend; the R3.0 is a reference."
 pieces = 1
 
+# Spoil plate for the brass sheet parts cut out on the CNC (MHA-DT-03-TL-02
+# phasing comb; the pd sheet parts may share it). Plain: the part is bonded on
+# tape and the cutter stops in the tape, so the plate carries no fence,
+# pocket or relief and its mill-finish top is not faced.
+[fixtures.sheet-spoil-plate]
+name = "Spoil plate for bonded sheet parts, 6061, 5 x 6 x 1/2 in"
+kind = "fixture_plate"
+status = "to_make"
+supply = "shop_made"
+purchase = "Saw a 5 in length off the owned 1/2 x 6 in 6061-T6511 flat (stock.6061-flat-1-2x6-54in, OnlineMetals 1173; its free remainder after the strap sub-plate's 13 in) and file the sawn ends' burrs off. Nothing else: the top stays as supplied."
+note = "Not made: shop-made from owned stock. Gripped in the PM 6 in vise on parallels across its 5 in length; the sheet blank is bonded to its top with consumables.tape-3m-vhb-5906."
+pieces = 1
+
 # --- MHA-PD-06 disc cutting arbor (#2412) -----------------------------------
 
 # The reducer disc (MHA-PD-06, 150T 48DP, .118 thick at Ø3.1655) cannot take
@@ -398,3 +411,43 @@ kind = "fixture"
 status = "to_make"
 supply = "shop_made"
 note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-PD-03 FORMED, 6X (R1.36), .06 BOW RISE."
+
+# MHA-DT-20 cone swing platform (cad/process/dt_cone_swing_platform), Setup
+# 4: the blank screwed to the 1/2 in spoil plate while its outline is cut.
+# To buy: not owned, no vendor or SKU asserted.
+[fixtures.dt-platform-hold-down-screws]
+name = "Alloy steel socket head cap screws: two 1/4-20 x 3/4, one #4-40 x 1/2, one #10-24 x 1/2"
+kind = "fastener"
+status = "to_order"
+pieces = 4
+note = "Not owned: to buy. The 1/4-20 pair up through the spoil plate into the platform's post taps; the #4-40 down through its hold-down hole and the #10-24 down through the west waste into seats tapped in the plate."
+
+# MHA-DT-20 swing platform, owner ruling 2026-11-22 (issue #3363): the
+# platform's top relief is cut to the sheet's .010 REF when the bar is
+# thinner than the MHA-DT-VN-52 shoulder; the axial shake is then taken out
+# at ASSEMBLY (MHA-DT-00) with steel shim washers under the screw's head,
+# stacked until the platform swings free with no shake. Not owned: to buy.
+[fixtures.shim-washers-1-4-id-arbor-19]
+name = "Steel arbor shim assortment, 1/4 in ID x 3/8 in OD, 19 thicknesses .001-.125 in"
+kind = "shim"
+status = "to_order"
+make = "Precision Brand"
+sku = "25100"
+pieces = 19
+source = "https://madeinusatools.com/product/19-piece-1-4-id-x-3-8-od-steel-arbor-shim-assortment/"
+cite = ["Made in USA Tools, 19 Piece 1/4 in ID x 3/8 in OD Steel Arbor Shim Assortment, Precision Brand PRE-25100 (read 2026-11-22): one each .001, .0015, .002, .003, .004, .005, .006, .007, .008, .010, .012, .015, .020, .025, .031, .047, .062, .093, .125 in; low-carbon full-hard cold-rolled steel"]
+note = "Not owned: to buy. Shims under the MHA-DT-VN-52 head at assembly (MHA-DT-00, issue #3363), stacked in .001 steps until the platform swings free with no axial shake; the 3/8 OD matches the head's diameter."
+
+# The MHA-DT-11 drive-pin jig (owner ruling 2026-11-22: the holes on the
+# lathe, option C2; sketch sketches/turnmill-a-crankshaft-lathe-jig.png). The
+# shaft lies in the jig parallel to the spindle on the cross slide; the
+# cutters turn in the headstock; the cross-slide DRO steps the two holes
+# ±7.000 mm from the stub's axis, which a DTI swept round the stub from the
+# spindle sets as X0.
+[fixtures.dt-crankshaft-drive-pin-jig]
+name = "MHA-DT-11 drive-pin jig: 1 in 1018 bar, Ø.750 shank, .4500 bore reamed in place"
+kind = "fixture"
+status = "to_make"
+supply = "shop_made"
+purchase = "Make from the 1 in 1018 CF bar on hand (stock.1018-round-1), 4.75 in long: turn 2.00 in of one end to Ø.750 for the AXA No. 4 heavy-duty boring holder (tools.qctp-axa-lms-2280), face both ends square, and drill 3/8 from the shank's end 1.90 deep (the pinion seat's clearance). On the mill: drill #21 and tap 10-32 radially into the Ø1.0 head 1.25 in from its front face, .50 deep. Its .4500 bore is not made here: the dt_crankshaft traveler bores it in place on the lathe, the jig in the No. 4 holder on the tool post, each cutter in the 3-jaw and the carriage feeding the jig (centre drill, 7/16 drill, the .4500 reamer 2.95 deep into the 3/8 hole), so the bore lies on the spindle axis and along the carriage travel by construction. The holder stays on the tool post until the crankshaft's holes are done."
+note = "Workholding for the MHA-DT-11 drive-pin holes (dt_crankshaft plan). The crankshaft goes in far end first: its two Ø.4490 journals (.4482-.4490) and the Ø.375 inboard neck in the .4500 bore, the Ø.3125 pinion seat in the 3/8 hole; a 10-32 set screw on a brass pad bears down on the Ø.41 relief and seats both journals on the bore's bottom; a 1/8 in spacer between the spigot's rear face and the jig face while clamping, then withdrawn, leaves the gap the #54 knockouts break into."

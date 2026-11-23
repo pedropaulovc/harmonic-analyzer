@@ -1,36 +1,30 @@
 r"""Reproduction script: transgear arm plate (MHA-PD-19; ch. 23; 1 used).
 
-The steel plate screwed across the MHA-PD-18 arm by two MHA-PD-VN-56 oval-head
-screws: it carries the knob shaft's running bore on axis K, a front hub (the
-MHA-PD-15 thrust ring's seat) and a rear boss (the MHA-PD-16 cup runs behind it)
+The flat steel plate screwed across the MHA-PD-18 arm by two MHA-PD-VN-56
+oval-head screws: it holds the MHA-PD-28 knob bush, pressed into its hole on
+axis K, which carries the knob shaft's running bore and both thrust faces
 (``pd_transgear_arm_plate_geometry``; the sheet's contract is
 ``pd_transgear_arm_plate_spec``).
 
-Layout (part frame of ``pd_transgear_arm_plate_geometry``: origin on K at the
-MOUNTING face, the Front Plane, which seats on the arm's rear face; +X/+Y the
+Layout (part frame of ``pd_transgear_arm_plate_geometry``: origin on K at
+face A, the Front Plane, which seats on the arm's rear face; +X/+Y the
 arm's axes; +Z to the rear):
 
 * ``PlateOutline`` (Front plane): the ``END_R`` end round about K, each side edge
   parallel to the long axis down to its kink [INFERENCE] and straight on to
   tangency with the round (symmetric about K), the top edge on the arm's
   upper edge; extruded ``THICKNESS_OVER_ARM`` toward +Z as ``Plate``.
-* ``LowerOutline``: the same outline below the notch line (``NOTCH_RELIEF``
-  clear of the arm's lower edge), extruded ``NOTCH_DEPTH`` toward -Z as
-  ``LowerSection``; its top edge is the notch face.
-* ``BearingProfile`` (Right plane, the section plane through K): the front
-  hub and the rear boss [INFERENCE], revolved as ``Bearing``.  The hub face's
-  station is dimensioned from the notch's inner corner on the mounting face.
-* ``Bore``: the knob shaft's running bore through on K.
+* ``PressHole``: the bush's reamed press hole through on K, a cut like the
+  other reamed holes; ``PressHoleChamfer`` its face-A mouth's 45° lead-in.
 * ``ScrewHoles``: two drilled clearance holes through, over the arm's taps.
 * ``Countersink1`` / ``Countersink2``: the 82-degree seats of the oval heads,
   revolved cuts sketched on ``ScrewHolePlane`` (y through both hole axes).
 * ``CountersinkReference`` (blanked, on ``RearFace``, round the +X hole): the
   printed countersink Ø; the revolved cuts' own profiles lie edge-on to the plan.
 
-Datums (all blanked): ``Axis1`` bore, ``Axis2``/``Axis3`` screw holes (-X,
-+X); planes ``RearFace`` (z = THICKNESS_OVER_ARM), ``HubFace``
-(z = -HUB_FACE_TO_MOUNTING), ``BossFace`` (z = BOSS_FACE_Z) and
-``ScrewHolePlane``; the Front Plane is the mounting face.
+Datums (all blanked): ``Axis1`` press hole, ``Axis2``/``Axis3`` screw holes
+(-X, +X); planes ``RearFace`` (z = THICKNESS_OVER_ARM) and
+``ScrewHolePlane``; the Front Plane is face A.
 
 Run (SolidWorks already open)::
 
@@ -74,7 +68,6 @@ from _drawing_marks import (
 from _drawing_tolerances import (
     set_dimension_basic_tolerance,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _document_units import apply_package_model_units
 from _fit_deviations import deviations
@@ -86,27 +79,17 @@ from pd_transgear_arm_plate_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
     LOCATOR_HOLE_BAND_MM,
-    BORE_DIA,
-    BOSS_DIA,
-    BOSS_FACE_Z,
-    BOSS_HEIGHT,
     CSK_ANGLE_DEG,
     CSK_DEPTH,
     CSK_DIA,
     END_R,
-    HUB_DIA,
-    HUB_FACE_TO_MOUNTING,
-    HUB_FACE_TO_MOUNTING_BAND,
-    HUB_FACE_Z,
-    HUB_LENGTH,
-    HUB_TO_BOSS,
     KINK,
     KINK_RIGHT,
     KINK_TANGENT,
     KINK_TANGENT_RIGHT,
-    NOTCH_DEPTH,
-    NOTCH_LEFT,
-    NOTCH_RIGHT,
+    PRESS_HOLE_DIA,
+    PRESS_HOLE_CHAMFER,
+    PRESS_HOLE_CHAMFER_VOLUME_MM3,
     REAR_FACE_Z,
     SCREW_HOLE_DIA,
     SCREW_HOLES,
@@ -114,20 +97,17 @@ from pd_transgear_arm_plate_geometry import (
     TOP_LEFT,
     TOP_RIGHT,
     WIDTH,
-    notch_face_y,
     section_area_moments,
     UNIT,
 )
 from pd_transgear_arm_plate_spec import (
-    BORE_BAND,
     BASIC_REDUCER_DIMENSIONS,
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    HUB_TO_BOSS_TOLERANCE,
     ISOMETRIC_VIEW_NOTE,
-    SURFACE_FINISHES,
+    PRESS_HOLE_BAND,
 )
 
 PART_NAME = "pd-transgear-arm-plate"
@@ -140,7 +120,7 @@ _SAVED_DRAWING_PROPERTIES = (
     "Isometric View Note",
 )
 
-THROUGH_CUT_DEPTH = 4.0 * HUB_TO_BOSS  # mid-plane total; > the plate's depth
+THROUGH_CUT_DEPTH = 4.0 * THICKNESS_OVER_ARM  # mid-plane total; > the plate's depth
 # The countersink profiles run this far past the rear face so the revolved
 # cut clears it, and their axis this far again (not printed).
 CSK_OVERRUN = 1.0
@@ -152,16 +132,11 @@ if any(abs(y - SCREW_HOLE_Y) > 1e-9 for _, y in SCREW_HOLES):
 # the sheet leads the two callouts to different holes and they never cross.
 CSK_REFERENCE_HOLE = 1
 
-_R_BORE = BORE_DIA / 2.0
-_R_HUB = HUB_DIA / 2.0
-_R_BOSS = BOSS_DIA / 2.0
+_R_PRESS = PRESS_HOLE_DIA / 2.0
 _R_HOLE = SCREW_HOLE_DIA / 2.0
 _R_CSK = CSK_DIA / 2.0
 _CSK_HALF_ANGLE = CSK_ANGLE_DEG / 2.0
 _CSK_APEX_Z = REAR_FACE_Z - _R_CSK / math.tan(math.radians(_CSK_HALF_ANGLE))
-# The notch's inner corner in the section plane (x = 0): the mounting-face
-# point the hub station is measured from.
-_NOTCH_CORNER_Y = notch_face_y(0.0)
 
 
 def _csk_removed() -> float:
@@ -171,10 +146,7 @@ def _csk_removed() -> float:
 
 
 V_PLATE = section_area_moments(TOP_LEFT, TOP_RIGHT)[0] * THICKNESS_OVER_ARM
-V_LOWER = section_area_moments(NOTCH_LEFT, NOTCH_RIGHT)[0] * NOTCH_DEPTH
-V_HUB = math.pi * _R_HUB**2 * HUB_LENGTH
-V_BOSS = math.pi * _R_BOSS**2 * BOSS_HEIGHT
-V_BORE = math.pi * _R_BORE**2 * HUB_TO_BOSS
+V_PRESS_HOLE = math.pi * _R_PRESS**2 * THICKNESS_OVER_ARM
 V_HOLES = len(SCREW_HOLES) * math.pi * _R_HOLE**2 * THICKNESS_OVER_ARM
 V_CSK = _csk_removed()
 
@@ -184,15 +156,6 @@ def _mass(adapter: Any) -> tuple[float, list[float]]:
     if not res.is_success:
         raise RuntimeError(f"arm-plate mass properties failed: {res.error}")
     return float(res.data.volume), [float(c) for c in res.data.center_of_mass]
-
-
-def _as_construction(adapter: Any, entity_id: str) -> None:
-    """Flag a registered sketch line as construction geometry (the flag is
-    ISketchSegment's, not the derived ISketchLine's)."""
-    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
 def _sketch_mapper(
@@ -364,15 +327,9 @@ def build(adapter: Any) -> dict[str, str]:
         ("TopLeftY", TOP_LEFT[1]),
         ("TopRightY", TOP_RIGHT[1]),
         ("KinkY", KINK[1]),
-        ("NotchLeftY", NOTCH_LEFT[1]),
-        ("NotchRightY", NOTCH_RIGHT[1]),
         ("ThicknessOverArm", THICKNESS_OVER_ARM),
-        ("NotchDepth", NOTCH_DEPTH),
-        ("HubDia", HUB_DIA),
-        ("BossDia", BOSS_DIA),
-        ("HubFaceToMounting", HUB_FACE_TO_MOUNTING),
-        ("HubToBoss", HUB_TO_BOSS),
-        ("BoreDia", BORE_DIA),
+        ("PressHoleDia", PRESS_HOLE_DIA),
+        ("PressHoleChamferSize", PRESS_HOLE_CHAMFER),
         ("ScrewHoleX1", abs(SCREW_HOLES[0][0])),
         ("ScrewHoleX2", abs(SCREW_HOLES[1][0])),
         ("ScrewHoleY", SCREW_HOLE_Y),
@@ -387,7 +344,7 @@ def build(adapter: Any) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # --- Over-arm section: the whole outline, 5 toward +Z --------------------
+    # --- The plate: the whole outline, THICKNESS_OVER_ARM toward +Z ----------
     outline = SketchDims()
     check("create_sketch plate outline", adapter.create_sketch("Front"))
     _outline(
@@ -425,209 +382,61 @@ def build(adapter: Any) -> dict[str, str]:
         )
     ]
     expected = V_PLATE
-    volume_check(adapter, "over-arm section", expected, 0.002 * expected)
+    volume_check(adapter, "plate", expected, 0.002 * expected)
     _, com = _mass(adapter)
     if abs(com[2] - THICKNESS_OVER_ARM / 2.0) > 0.01:
         raise RuntimeError(
-            f"over-arm section centre of mass z = {com[2]:.3f}: the extrusion "
+            f"plate centre of mass z = {com[2]:.3f}: the extrusion "
             "must run toward +Z"
         )
 
-    # --- Section below the arm: under the notch line, 8 toward -Z ------------
-    lower = SketchDims()
-    check("create_sketch lower outline", adapter.create_sketch("Front"))
-    _outline(
-        adapter,
-        lower,
-        NOTCH_LEFT,
-        NOTCH_RIGHT,
-        {
-            "EndR": "LowerEndR",
-            "EdgeLeftX": "LowerEdgeLeftX",
-            "EdgeRightX": "LowerEdgeRightX",
-            "LeftY": "NotchLeftY",
-            "LeftYDrive": '"NotchLeftY"',
-            "RightY": "NotchRightY",
-            "RightYDrive": '"NotchRightY"',
-            "KinkY": "LowerKinkY",
-            "KinkYDrive": '"KinkY"',
-            "KinkRightY": "LowerKinkRightY",
-            "KinkRightYDrive": '"KinkY"',
-        },
-        "lower outline",
-    )
-    check("exit_sketch lower outline", adapter.exit_sketch())
-    name_last_feature(adapter, "LowerOutline")
-    drive_jobs += lower.apply(adapter, "LowerOutline")
-    check(
-        "extrude section below the arm",
-        adapter.create_extrusion(
-            ExtrusionParameters(depth=NOTCH_DEPTH, reverse_direction=True)
-        ),
-    )
-    name_last_feature(adapter, "LowerSection")
-    drive_jobs += [
-        (name_dimensions(adapter, "LowerSection", ["NotchDepth"])[0], '"NotchDepth"')
-    ]
-    expected += V_LOWER
-    volume_check(adapter, "plate with lower section", expected, 0.002 * expected)
-    _, com = _mass(adapter)
-    want_z = (V_PLATE * THICKNESS_OVER_ARM / 2.0 - V_LOWER * NOTCH_DEPTH / 2.0) / (
-        V_PLATE + V_LOWER
-    )
-    if abs(com[2] - want_z) > 0.02:
-        raise RuntimeError(
-            f"plate centre of mass z = {com[2]:.3f}, expected {want_z:.3f}: the "
-            "lower section must run toward -Z"
-        )
-
-    # --- Hub and boss: revolved in the section plane through K ---------------
-    bearing = SketchDims()
-    check("create_sketch bearing profile", adapter.create_sketch("Right"))
-    to_sketch = _sketch_mapper(adapter, u_axis=2, v_axis=1, label="bearing profile")
-    corners = [
-        to_sketch((0.0, 0.0, HUB_FACE_Z)),
-        to_sketch((0.0, _R_HUB, HUB_FACE_Z)),
-        to_sketch((0.0, _R_HUB, REAR_FACE_Z)),
-        to_sketch((0.0, _R_BOSS, REAR_FACE_Z)),
-        to_sketch((0.0, _R_BOSS, BOSS_FACE_Z)),
-        to_sketch((0.0, 0.0, BOSS_FACE_Z)),
-    ]
-    notch_corner = to_sketch((0.0, _NOTCH_CORNER_Y, 0.0))
-    set_sketch_direct_db(adapter, True)
-    axis = check("bearing axis", adapter.add_centerline(0.0, 0.0, *corners[0]))
-    reference = check(
-        "mounting-face reference", adapter.add_line(0.0, 0.0, *notch_corner)
-    )
-    bearing_lines = add_line_chain(adapter, corners)
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, reference)
-    # Along Z (sketch u) the lines read horizontal, along Y vertical.
-    for index, line in enumerate(bearing_lines):
-        relation = "vertical" if index % 2 == 0 else "horizontal"
-        check(
-            f"bearing profile {relation} {line}",
-            adapter.add_sketch_constraint(line, None, relation),
-        )
-    check(
-        "bearing axis horizontal",
-        adapter.add_sketch_constraint(axis, None, "horizontal"),
-    )
-    check(
-        "bearing axis ends on the hub face",
-        adapter.add_sketch_constraint(
-            f"{axis}.end", f"{bearing_lines[0]}.start", "coincident"
-        ),
-    )
-    check(
-        "mounting-face reference vertical",
-        adapter.add_sketch_constraint(reference, None, "vertical"),
-    )
-    anchor_point_to_origin(
-        adapter, f"{axis}.start", 0.0, 0.0, "bearing axis on K"
-    )
-    check(
-        "mounting-face reference on K",
-        adapter.add_sketch_constraint(
-            f"{reference}.start", "origin", "coincident"
-        ),
-    )
-    add_diametric_linear_dimension(
-        adapter,
-        axis,
-        bearing_lines[1],
-        (corners[1][0] + 4.0, corners[1][1] + 4.0),
-        "HubDia",
-    )
-    bearing.record("HubDia", '"HubDia"')
-    add_diametric_linear_dimension(
-        adapter,
-        axis,
-        bearing_lines[3],
-        (corners[4][0] - 4.0, corners[4][1] + 4.0),
-        "BossDia",
-    )
-    bearing.record("BossDia", '"BossDia"')
-    dimension_between(
-        adapter,
-        f"{reference}.end",
-        f"{bearing_lines[0]}.end",
-        "horizontal_distance",
-        HUB_FACE_TO_MOUNTING,
-        "hub face from the mounting face",
-    )
-    bearing.record("HubFaceToMounting", '"HubFaceToMounting"')
-    dimension_between(
-        adapter,
-        f"{bearing_lines[0]}.end",
-        f"{bearing_lines[4]}.start",
-        "horizontal_distance",
-        HUB_TO_BOSS,
-        "hub face to boss face",
-    )
-    bearing.record("HubToBoss", '"HubToBoss"')
-    # The boss seats on the rear face: its step follows the over-arm
-    # thickness (not printed; the three dimensions above fix the boss face).
-    dimension_between(
-        adapter,
-        "origin",
-        f"{bearing_lines[2]}.start",
-        "horizontal_distance",
-        REAR_FACE_Z,
-        "boss seat on the rear face",
-    )
-    bearing.record("BossSeat", '"ThicknessOverArm"')
-    # Where the reference meets the notch face (not printed).
-    dimension_between(
-        adapter,
-        f"{reference}.start",
-        f"{reference}.end",
-        "vertical_distance",
-        abs(_NOTCH_CORNER_Y),
-        "mounting-face reference to the notch corner",
-    )
-    bearing.record("NotchCornerY")
-    ensure_fully_defined(adapter, "bearing profile")
-    check("exit_sketch bearing profile", adapter.exit_sketch())
-    name_last_feature(adapter, "BearingProfile")
-    drive_jobs += bearing.apply(adapter, "BearingProfile")
-    check(
-        "revolve hub and boss",
-        adapter.create_revolve(RevolveParameters(angle=360.0)),
-    )
-    name_last_feature(adapter, "Bearing")
-    expected += V_HUB + V_BOSS
-    volume_check(adapter, "plate with hub and boss", expected, 0.002 * expected)
-    bbox_extent_check(adapter, "hub face to boss face", "z", HUB_TO_BOSS)
-
-    # --- Running bore through on K --------------------------------------------
-    bore = SketchDims()
-    check("create_sketch bore", adapter.create_sketch("Front"))
+    # --- The bush's press hole through on K -----------------------------------
+    press = SketchDims()
+    check("create_sketch press hole", adapter.create_sketch("Front"))
     define_circle(
         adapter,
         0.0,
         0.0,
-        _R_BORE,
-        "knob-shaft bore",
-        dims=bore,
-        names=(None, None, "BoreDia"),
-        drives=(None, None, '"BoreDia"'),
+        _R_PRESS,
+        "bush press hole",
+        dims=press,
+        names=(None, None, "PressHoleDia"),
+        drives=(None, None, '"PressHoleDia"'),
     )
-    ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", adapter.exit_sketch())
-    name_last_feature(adapter, "BoreProfile")
-    drive_jobs += bore.apply(adapter, "BoreProfile")
+    ensure_fully_defined(adapter, "press hole sketch")
+    check("exit_sketch press hole", adapter.exit_sketch())
+    name_last_feature(adapter, "PressHoleProfile")
+    drive_jobs += press.apply(adapter, "PressHoleProfile")
     check(
-        "cut bore",
+        "cut press hole",
         adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
-    name_last_feature(adapter, "Bore")
-    expected -= V_BORE
-    volume_check(adapter, "plate with bore", expected, 0.01 * V_BORE)
+    name_last_feature(adapter, "PressHole")
+    expected -= V_PRESS_HOLE
+    volume_check(adapter, "plate with press hole", expected, 0.01 * V_PRESS_HOLE)
+    # The face-A mouth's .015 X 45° lead-in for the bush, one native 45 deg
+    # chamfer picked on the hole's edge in face A (the rear mouth keeps the
+    # title block's break).
+    check(
+        "chamfer the press hole's face-A mouth",
+        adapter.add_chamfer(PRESS_HOLE_CHAMFER, [[_R_PRESS, 0.0, 0.0]]),
+    )
+    name_last_feature(adapter, "PressHoleChamfer")
+    drive_jobs.append(
+        (
+            name_dimensions(adapter, "PressHoleChamfer", ["PressHoleChamferSize"])[0],
+            '"PressHoleChamferSize"',
+        )
+    )
+    expected -= PRESS_HOLE_CHAMFER_VOLUME_MM3
+    volume_check(
+        adapter, "press hole's face-A chamfer", expected,
+        0.02 * PRESS_HOLE_CHAMFER_VOLUME_MM3 + 0.05,
+    )
 
-    # --- Screw holes through the over-arm section -----------------------------
+    # --- Screw holes through the plate ----------------------------------------
     holes = SketchDims()
     check("create_sketch screw holes", adapter.create_sketch("Front"))
     for index, ((x, y), names, drives) in enumerate(
@@ -672,8 +481,6 @@ def build(adapter: Any) -> dict[str, str]:
     # --- Named planes -----------------------------------------------------------
     for plane, base, offset, drive in (
         ("RearFace", "Front Plane", REAR_FACE_Z, '"ThicknessOverArm"'),
-        ("BossFace", "Front Plane", BOSS_FACE_Z, '"HubToBoss" - "HubFaceToMounting"'),
-        ("HubFace", "Front Plane", HUB_FACE_Z, '"HubFaceToMounting"'),
         ("ScrewHolePlane", "Top Plane", SCREW_HOLE_Y, '"ScrewHoleY"'),
         ("LocatorClock", "Right Plane", LOCATOR_SITES_MM[0][0], '"LocatorX"'),
     ):
@@ -691,8 +498,6 @@ def build(adapter: Any) -> dict[str, str]:
         adapter,
         (
             ("RearFace", "PLANE"),
-            ("BossFace", "PLANE"),
-            ("HubFace", "PLANE"),
             ("ScrewHolePlane", "PLANE"),
             ("LocatorClock", "PLANE"),
         ),
@@ -839,7 +644,7 @@ def build(adapter: Any) -> dict[str, str]:
 
     # --- Named axes for the assembly mates ------------------------------------
     for label, plane_a, offset_b, drive_b, want in (
-        ("bore axis", "Top Plane", 0.0, None, "Axis1"),
+        ("press hole axis", "Top Plane", 0.0, None, "Axis1"),
         (
             "screw hole 1 axis",
             "ScrewHolePlane",
@@ -913,14 +718,7 @@ def build(adapter: Any) -> dict[str, str]:
     # Size/axial fit bands are separate from the locating-hole circular
     # position controls. Their coordinates are BASIC, never +/- substitutes.
     set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *deviations(BORE_BAND), display_unit=UNIT,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "BearingProfile", "HubToBoss", HUB_TO_BOSS_TOLERANCE, display_unit=UNIT,
-    )
-    # The hub face station: a disc-cluster stack term at the cluster's band.
-    set_dimension_symmetric_tolerance(
-        adapter, "BearingProfile", "HubFaceToMounting", HUB_FACE_TO_MOUNTING_BAND,
+        adapter, "PressHoleProfile", "PressHoleDia", *deviations(PRESS_HOLE_BAND),
         display_unit=UNIT,
     )
     for index in (1, 2):
@@ -938,12 +736,8 @@ def build(adapter: Any) -> dict[str, str]:
     apply_material(adapter, MATERIAL)
     apply_color(adapter, POLISHED_STEEL)
     report_mass_properties(adapter)
-    # The sourced H7 running bore and the hub and boss thrust faces, resolved
-    # on its exact native face (the HubFace and BossFace stations are unique).
-    author_part_pmi(
-        adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS,
-        surface_finishes=SURFACE_FINISHES,
-    )
+    # Datum B is the press hole, resolved on its exact native face.
+    author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
     apply_drawing_properties(
         adapter,
         PART_NAME,
