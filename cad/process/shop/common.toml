@@ -173,7 +173,8 @@ range_mm = [0.0, 584.2]
 resolution_mm = 0.005
 
 # PM-1127VF-LB carriage (Z) DRO read as a length gauge (the dt_pinion_arbor
-# plan's crown and rim stations, the tool touched on the work). Range: the
+# plan's crown and rim stations, the pd_transgear_pin plan's groove load-wall
+# station; the tool touched on the work). Range: the
 # carriage reads no farther than machines.pm-1127vf-lb between_centres_mm
 # (the DRO's scale length is not recorded); resolution: the owner's 5 um
 # (cad/config/shop-equipment/dro.toml dro.pm-1127vf-lb, 2026-11-21).
@@ -384,10 +385,15 @@ body_length_mm = 72.0
 # read 2026-11-21)) and Precision Matthews' 6 in 4-jaw accessory page
 # (https://www.precisionmatthews.com/products/chuck-4jaw-6-d1-4, read
 # 2026-11-21: "Removable / Reversible Jaws for ID and OD Work", shipping box
-# 8 x 8 x 8 in only) give no grip range, body size or jaw size, so none is
-# declared (to measure): a plan holding work in it sets lathe_hold = "other".
+# 8 x 8 x 8 in only) give no sizes. The owner measured it 2026-11-22: "i
+# measured the 4 jaw chuck; 160mm diameter ; max jaw opening 140mm":
+# body_diameter_mm below. No grip range is declared (prechips needs its
+# minimum too, not measured; the 140 mm maximum opening is
+# cad/config/shop-equipment/fixtures.toml, same key), so a plan holding work
+# in it sets lathe_hold = "other".
 [workholding.chuck-4jaw-6]
 kind = "chuck"
+body_diameter_mm = 160.0
 
 # --- 3-flute uncoated carbide square end mills (McMaster 88815) ---
 # Owned (McMaster-Carr packing list, PO 0803PCAMPOS, 1616317-01, 08/04/2025;
@@ -473,6 +479,59 @@ tool = "endmill-carbide-3fl-1-2"
 material = "rocker-1018-cold-finished"
 rpm = 2650
 chip_load_mm_per_tooth = 0.07112  # .0028 in; 2650 × 3 × .0028 = 22.3 in/min
+flutes = 3
+feed_unit = "in/min"
+# Measured (#3383): dechatter 0.4.0 reports v5 and v6, 2026-11-22, on the
+# PM-30MV with this cutter in an R8 collet, side-milling 1018 cold-finished,
+# conventional, every pass at .0028 in (.071 mm)/tooth except v5's chip-load
+# sweep: cad/process/dechatter/2026-11-22-pm30mv-em-half-carbide-1018-v5.html
+# and -v6.html. Stick-out 27.94 mm (1.100 in), the owner's measurement; both
+# reports' setup field reads 30.0, the value entered before the cut (owner,
+# Pedro, 2026-11-22: "stickout is recorded as 30mm but is actually 27.94").
+# The reports are his recorded data and stay as written. The work: a
+# 126 x 13 x 73 mm 1018 plate upright in the vise, about 30 mm above the jaws
+# (the reports' setup text). Valid only for that tool assembly, and only inside
+# each record's depth and width; those limits and the stick-out are data in
+# cad/config/shop-equipment/measured-cuts.toml (prechips refuses any other key
+# on a setting), and test_measured_cuts.py refuses a plan cut outside them.
+# NOT tested, so the chart record above still carries them: any cut deeper
+# than 6.6 mm (the 10.54 mm side finishing); any cut wider than 3.4 mm at
+# 1.27 mm deep or wider than 3.0 mm deeper (the 12.7 mm full-width passes,
+# the .200 in facing stepover); climb milling; slotting; any other stick-out,
+# holder or material. 3.2 mm deep had one pass, which chattered; v6 planned a
+# 1.27 mm re-check and did not run it.
+# Speed: 2800 rpm chattered at both depths (1.8 mm wide at 1.27 deep, 1.3 mm
+# wide at 6.6 deep) and no speed between 2400 and 2800 was cut, so the chart's
+# 2650 is unmeasured, between the stable 2400 and the chattering 2800.
+# Deep, up to 6.6 mm deep and 2.2 mm wide. Owner, Pedro, 2026-11-22: "deeper
+# cuts caused violent chatter". v6 at 6.6 mm deep: stable at 1500 rpm 0.6 and
+# 1.3 mm wide (0.3 mm chattered), 1930 and 2370 rpm 0.3-1.3 mm, 2370 at
+# 1.8 mm, 2400 at 2.2 mm, 2800 at 0.3 and 0.6 mm; chatter at 2330 rpm 2.4 mm,
+# 2400 rpm 2.6 mm and 2330 rpm 3.0 mm (aborted, verdict set by hand). The
+# report logs 2320 rpm 2.7 mm as stable and lists it first of its
+# recommended cuts; it lies between those chattering passes, so this record
+# does not take it. At 3.2 mm deep the one pass, 2350 rpm 3.0 mm wide, was
+# aborted as chatter. 2400 × 3 × .0028 = 20.2 in/min.
+[settings.em-half-carbide-1018-v6-deep]
+tool = "endmill-carbide-3fl-1-2"
+material = "rocker-1018-cold-finished"
+rpm = 2400
+chip_load_mm_per_tooth = 0.07112
+flutes = 3
+feed_unit = "in/min"
+# Face, up to 1.27 mm (.050 in) deep and 3.4 mm wide. v5, all at 1.27 mm
+# deep: 2370 rpm stable at 3.0, 3.2 and 3.4 mm, the widest cut made; 1800 and
+# 2300 rpm stable at 0.5-1.8 mm; 2310 at 2.1, 2320 at 2.4, 2330 at 2.6 and
+# 2.8 mm; 2800 rpm stable at 0.5 and 1.0 mm, chatter at 1.8 mm, the only
+# chatter in v5. No width limit was found at 2370 rpm: wider than 3.4 mm is
+# untested, not known bad. The chip-load sweep at 2370 rpm 3.4 mm cut 0.043
+# and 0.062 mm/tooth, both stable, below the 0.071 the round before held;
+# nothing above 0.071 was cut. 2370 × 3 × .0028 = 19.9 in/min.
+[settings.em-half-carbide-1018-v5-face]
+tool = "endmill-carbide-3fl-1-2"
+material = "rocker-1018-cold-finished"
+rpm = 2370
+chip_load_mm_per_tooth = 0.07112
 flutes = 3
 feed_unit = "in/min"
 
@@ -667,6 +726,14 @@ diameter_mm = 6.35
 [tools.drill-27-64]  # 115-piece index; MHA-DT-27 winding mandrel (shank) and the MHA-PD-19 press hole's pre-drill (#2425)
 description = "27/64 (.4219 in) drill, 115-piece index"
 diameter_mm = 10.715625
+# The owned Pittsburgh SAE/metric 32-piece feeler set (inventory
+# gauges.feeler-gauges, owner 2026-11-19), Harbor Freight 63665: leaves
+# .0015-.035 in (.0015, .002, .0025, .003-.026 by .001, .028, .030, .032,
+# .035; harborfreight.com/saemetric-feeler-gauge-32-piece-63665.html, read
+# 2026-11-23) = 0.0381-0.889 mm; resolution its .001 in = 0.0254 mm steps.
+[gauges.feeler-gauges]
+range_mm = [0.0381, 0.889]
+resolution_mm = 0.0254
 [tools.feeler-gauges]  # inventory gauges.feeler-gauges
 description = "Pittsburgh SAE/metric feeler gauge set, 32 pieces"
 [tools.form-tool-r070]  # MHA-PD-23 R.07 shank-end dome; MHA-MG-07 R.07 tip

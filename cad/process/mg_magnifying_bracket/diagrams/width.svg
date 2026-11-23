@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 2: on edge on the 1 in parallels, O down; MB01 faces the top edge to the foot's length (F). 3 px/mm, looking along the jaws from the right end (-X). -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 2 (MB01_width): the upper edge faced to the foot's length; it becomes F</text>
+  <rect class="fixture-vise" x="40" y="380" width="220" height="14"/>
+  <rect class="clamp" x="70" y="245.2" width="60" height="134.8"/>
+  <rect class="clamp" x="168.1" y="245.2" width="60" height="134.8"/>
+  <text class="label-on-clamp" x="100" y="262" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="198.1" y="262" text-anchor="middle">fixed</text>
+  <rect class="fixture-support" x="130" y="303.8" width="9.5" height="76.2"/>
+  <rect class="fixture-support" x="158.6" y="303.8" width="9.5" height="76.2"/>
+  <rect class="part-arriving" x="130" y="132.3" width="38.1" height="171.5"/>
+  <rect class="part-kept" x="130" y="141.1" width="38.1" height="162.7"/>
+  <rect class="part-removed" x="130" y="132.3" width="38.1" height="8.8"/>
+  <line class="active-face" x1="130" y1="141.1" x2="168.1" y2="141.1"/>
+  <polygon class="cutter" points="130,95 168.1,95 168.1,132.3 130,132.3"/>
+  <line class="leader" x1="166" y1="141.1" x2="300" y2="141.1"/>
+  <circle class="leader-dot" cx="166" cy="141.1" r="2"/>
+  <text class="label" x="300" y="145.1">F: Z {{cad.outer_face_length_mm:in.4dot}} above the parallels, in {{process.width_level_mm:in.3dot}} levels</text>
+  <line class="leader" x1="166" y1="303.8" x2="300" y2="303.8"/>
+  <circle class="leader-dot" cx="166" cy="303.8" r="2"/>
+  <text class="label" x="300" y="307.8">O, as bought, on the parallels: Z0</text>
+  <line class="hidden" x1="40" y1="245.2" x2="290" y2="245.2"/>
+  <text class="label" x="300" y="249.2">jaw tops: {{process.upright_grip_mm:in.3dot}} gripped</text>
+  <circle class="datum" cx="168.1" cy="303.8" r="3.5"/>
+  <text class="datum-label" x="300" y="200">Y0 the fixed jaw; X0 the blank's left end (far side)</text>
+  <text class="label" x="300" y="360">Looking along the jaws from the right end;</text>
+  <text class="label" x="300" y="376">the fixed jaw on your right.</text>
+</svg>

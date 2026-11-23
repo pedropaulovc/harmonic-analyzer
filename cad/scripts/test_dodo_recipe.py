@@ -2136,6 +2136,7 @@ def test_shop_file_readers_stay_outside_every_com_leaf():
         str((dodo.SCRIPTS_DIR / name).resolve())
         for name in (
             "_process_plans.py",
+            "_measured_cuts.py",
             "_shop_equipment.py",
             "cam_nc.py",
             "ha_assembly_package.py",

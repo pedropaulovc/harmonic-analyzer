@@ -18,8 +18,8 @@
 # guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner, Pedro,
 # answered in person 2026-11-21: "remove mention of dead centre ; use
 # https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
-# on r8 0.5 collet"; cad/config/shop-equipment/ tools.tap-guide-fisher, its
-# ownership to confirm): its spring-loaded point seats in the T-handle
+# on r8 0.5 collet"; cad/config/shop-equipment/ tools.tap-guide-fisher, to
+# buy, owner ruling 2026-11-22): its spring-loaded point seats in the T-handle
 # wrench's centre hole and follows the tap down 1/2 in, spindle off; the
 # operator jogs Z only to push the point home again and to read the depth.
 # FluidNC refuses jogs in the Hold an M0 leaves

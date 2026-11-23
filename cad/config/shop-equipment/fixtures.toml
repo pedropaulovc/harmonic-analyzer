@@ -97,15 +97,21 @@ cite = ["Owner (Pedro) 2026-11-17: \"already have follow and steady rests for th
 
 # The lathe's 6 in 4-jaw independent chuck. Owner (Pedro), answered in person
 # 2026-11-21 (cnc rulings record): "Lathe 6 in 4-jaw independent chuck: on
-# hand." Its prechips record is cad/process/shop/common.toml
-# workholding.chuck-4jaw-6 (kind only: no source gives its sizes).
+# hand." Owner (Pedro) 2026-11-22, measured: "i measured the 4 jaw chuck;
+# 160mm diameter ; max jaw opening 140mm". Its prechips record is
+# cad/process/shop/common.toml workholding.chuck-4jaw-6 (kind and the body
+# diameter). The maximum jaw opening stays here: prechips' grip_range_mm
+# needs a minimum too, not measured. The through-bore is not measured.
 [fixtures.chuck-4jaw-6]
 name = "6 in 4-jaw independent chuck for the PM-1127VF-LB lathe"
 kind = "chuck"
 status = "on_hand"
-note = "Grip range, body diameter and length, and jaw width and height not recorded: neither the lathe's manual nor Precision Matthews' 6 in 4-jaw page states them (read 2026-11-21). To measure."
+max_jaw_opening_mm = 140.0
+through_bore_mm = "to_measure"
+note = "Body Ø160 mm and maximum jaw opening 140 mm, measured by the owner 2026-11-22. Not recorded: the through-bore (to measure), the least grip, the body length, and the jaw width and height (neither the lathe's manual nor Precision Matthews' 6 in 4-jaw page states them, read 2026-11-21)."
 cite = [
   "Owner (Pedro) 2026-11-21, answered in person: \"Lathe 6 in 4-jaw independent chuck: on hand.\"",
+  "Owner (Pedro) 2026-11-22, relayed by Main: \"i measured the 4 jaw chuck; 160mm diameter ; max jaw opening 140mm\"",
   "PM-1127VF-LB Operator's Manual (2015), \"Chuck\", read 2026-11-21 (https://archive.org/download/pm-1440-gs-v-3-2020-10/Precision%20Matthews/PM-1127VF-LB-Manual-2015.pdf): \"PM-1127VF-LB comes equiped with a 6\" 3-jaw chuck, a 6\" 4-jaw chuck and a 9\" faceplate\"; \"the 4-jaw chuck features four independent jaws. The 4-jaw chuck is used to clamp square or unevenly-shaped work-pieces.\"",
 ]
 

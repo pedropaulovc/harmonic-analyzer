@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 8: on edge on the 1 in parallels, O down, the nose past the jaws' right side; MB06 profiles the nose and drills the tap hole. From above, the fixed jaw (L) at the top, 5 px/mm, the last 1.7 in of the neck. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 8 (MB06_nose): the nose R.217 round the tap's centre, then the tap drill</text>
+  <rect class="clamp" x="20" y="70" width="123.5" height="50"/>
+  <text class="label-on-clamp" x="81.8" y="100" text-anchor="middle">fixed jaw</text>
+  <rect class="clamp" x="20" y="175" width="123.5" height="50"/>
+  <text class="label-on-clamp" x="81.8" y="205" text-anchor="middle">moving jaw</text>
+  <path class="part-removed" d="M190.3 120 H240.7 V175 H190.3 A27.5 27.5 0 0 0 190.3 120 Z"/>
+  <path class="part-kept" d="M20 120 H190.3 A27.5 27.5 0 0 1 190.3 175 H20 Z"/>
+  <circle class="holes" cx="190.3" cy="147.5" r="12.8"/>
+  <line class="centre-line" x1="170" y1="147.5" x2="260" y2="147.5"/>
+  <line class="centre-line" x1="190.3" y1="110" x2="190.3" y2="185"/>
+  <path class="hidden" d="M185.3 88.25 H190.3 A59.25 59.25 0 0 1 249.55 147.5 A59.25 59.25 0 0 1 190.3 206.75 H185.3"/>
+  <circle class="cutter" cx="185.3" cy="88.25" r="31.75"/>
+  <line class="datum" x1="143.5" y1="60" x2="143.5" y2="235"/>
+  <text class="label" x="100" y="250">jaws' right side, {{process.nose_jaw_side_mm:in.3dot}} from the seat</text>
+  <line class="leader" x1="215" y1="135" x2="300" y2="110"/>
+  <circle class="leader-dot" cx="215" cy="135" r="2"/>
+  <text class="label" x="300" y="106">nose R{{cad.nose_radius_in:.3dot}}: climb (G2), L side round to H side</text>
+  <text class="label" x="300" y="122">2 rough levels {{process.nose_finish_stock_mm:in.3dot}} off, then the finish, {{process.nose_past_mm:in.3dot}} below O</text>
+  <line class="leader" x1="190.3" y1="147.5" x2="300" y2="160"/>
+  <circle class="leader-dot" cx="190.3" cy="147.5" r="2"/>
+  <text class="label" x="300" y="164">tap: spot, #7 through; X {{cad.lever_tap_height_mm:.3f}}, Y −{{cad.lever_tap_lateral_mm:.3f}} mm</text>
+  <line class="leader" x1="235" y1="165" x2="300" y2="200"/>
+  <circle class="leader-dot" cx="235" cy="165" r="2"/>
+  <text class="label" x="300" y="204">the sawn stub, cut away by the profile</text>
+  <text class="datum-label" x="20" y="290">Y0 the fixed jaw (L); X0 the seat, off to the left; Z0 the parallels' top (O).</text>
+  <text class="label" x="20" y="320">The parallels' right ends at the jaws' right side: nothing under the nose.</text>
+  <text class="label" x="20" y="336">The foot stands inside the jaws at the left; the offcut at the jaws' left end.</text>
+</svg>
