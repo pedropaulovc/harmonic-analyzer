@@ -10,7 +10,6 @@ import hashlib
 import importlib
 import importlib.util
 import math
-import re
 import sys
 import tomllib
 from pathlib import Path
@@ -439,10 +438,10 @@ def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -
     assert "depth_ref" not in features["profile_outer"]["requirements"]
     assert "centre_from_pivot_ref" not in features["top_edge"]["requirements"]
     shaft = exporter.requirement_manifest("ch_pivot_shaft")
-    assert "length" not in shaft["features"]["pivot_bearing"]["requirements"]
+    assert "length" not in shaft["features"]["outer"]["requirements"]
     assert shaft["datums"] == {}
-    assert set(shaft["features"]) == {"pivot_bearing", "north_flat", "south_flat", "north_dome", "south_dome"}
-    assert shaft["features"]["pivot_bearing"]["requirements"] == ["dia", "finish_ra"]
+    assert set(shaft["features"]) == {"outer", "flat_north", "flat_south", "datum_end", "far_end"}
+    assert shaft["features"]["outer"]["requirements"] == ["dia", "finish_ra"]
 
 
 def test_rocker_profile_zones_export_the_printed_frames_and_govern_their_own_basics() -> None:
@@ -473,13 +472,16 @@ def test_shaft_flats_are_coplanar_faces_named_by_their_stations() -> None:
     flat_y = shaft.FLAT_AF - shaft.SHAFT_DIA / 2
     half_chord = shaft.flat_chord(shaft.FLAT_DEPTH) / 2
     for side, station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS):
-        name = f"{side}_flat"
-        assert features[name]["kind"] == "face"
-        # Printed from its own end's tip (BOTH ENDS); the face sits at the
-        # layout's station from the north cylinder end.
+        name = f"flat_{side}"
+        assert features[name]["kind"] == "flat"
+        # Printed from its own end's tip (BOTH ENDS) to its centre; the face
+        # sits at the layout's station from the north cylinder end.
         assert features[name]["station_nominal"] == shaft.FLAT_TIP_STATION
+        assert features[name]["station_from"] == ("far_end" if side == "south" else "datum_end")
+        assert features[name]["station_to"] == "centre"
+        assert sum(features[name]["span"]) / 2 == pytest.approx(-station)
         assert features[name]["note"] == shaft.FLAT_STATION_CALLOUT
-        assert features[name]["height_nominal"] == shaft.FLAT_AF
+        assert features[name]["across_nominal"] == shaft.FLAT_AF
         assert selectors[name][0].contains_z_mm == -station
         box = (
             -half_chord / 1000, flat_y / 1000, (-station - shaft.FLAT_LENGTH / 2) / 1000,
@@ -652,23 +654,23 @@ def test_rocker_arm_general_rows_follow_its_inch_sheet() -> None:
 def test_shaft_axial_extents_tile_the_turned_axis() -> None:
     features = exporter.requirement_manifest("ch_pivot_shaft")["features"]
     selectors = exporter.feature_selectors("ch_pivot_shaft")
-    order = ("south_dome", "pivot_bearing", "north_dome")
-    spans = {name: features[name]["z_mm"] for name in order}
-    assert all(features[name]["frame"] == "model" and low < high for name, (low, high) in spans.items())
-    for below, above in zip(order, order[1:]):
-        assert spans[below][1] == pytest.approx(spans[above][0]), (below, above)
     # The O.D. runs the whole cylinder; its named patch lies inside it.
-    assert spans["pivot_bearing"] == pytest.approx([-bank.PIVOT_SHAFT_LENGTH, 0.0])
-    low, high = spans["pivot_bearing"]
-    assert low < selectors["pivot_bearing"][0].contains_z_mm < high
-    # Domes run from the end circle of the O.D. to the sphere's apex.
-    for name, apex_index, base_index in (("north_dome", 1, 0), ("south_dome", 0, 1)):
+    low, high = features["outer"]["span"]
+    assert [low, high] == pytest.approx([-bank.PIVOT_SHAFT_LENGTH, 0.0])
+    assert low < selectors["outer"][0].contains_z_mm < high
+    # Each dome runs from the O.D.'s end circle to its apex, the end's plane.
+    radius_od = features["outer"]["dia_nominal"] / 2
+    for name, root in (("datum_end", high), ("far_end", low)):
         sphere = selectors[name][0]
         radius, centre = sphere.diameter_mm / 2, sphere.center_mm[2]
-        apex, base = spans[name][apex_index], spans[name][base_index]
+        apex = features[name]["plane"]["value"]
         assert abs(apex - centre) == pytest.approx(radius)
-        assert features[name]["base_radius"] ** 2 + (base - centre) ** 2 == pytest.approx(radius**2)
-        assert features[name]["base_radius"] * 2 == pytest.approx(features["pivot_bearing"]["dia_nominal"])
+        assert abs(apex - root) == pytest.approx(features[name]["height_nominal"])
+        assert radius_od**2 + (root - centre) ** 2 == pytest.approx(radius**2)
+        assert features[name]["radius_ref"] == pytest.approx(radius)
+    # Tip to tip is the printed overall length.
+    span = features["datum_end"]["plane"]["value"] - features["far_end"]["plane"]["value"]
+    assert span == pytest.approx(features["far_end"]["length_nominal"])
 
 
 def _on_axis(point: list[float], at: list[float], axis: list[float]) -> bool:
@@ -804,16 +806,16 @@ def test_an_undeclared_part_binds_its_step_with_an_empty_features_table_and_no_d
         assert manifest["notes"]["manufacturing"] == notes.DRAWING_NOTES.splitlines()
 
 
-@pytest.mark.parametrize("stem", ["dt_crank_pin"])
-def test_a_notes_file_without_drawing_notes_falls_through_to_the_spec(stem: str) -> None:
-    # Oracle independent of _undeclared_notes_path: the source text itself.
-    scripts = exporter.REPO / "cad" / "scripts"
-    assert stem not in exporter.DECLARED_PARTS
-    assert not re.search(r"^DRAWING_NOTES\b", (scripts / f"{stem}_notes.py").read_text(encoding="utf-8"), re.M)
-    assert re.search(r"^DRAWING_NOTES\b", (scripts / f"{stem}_spec.py").read_text(encoding="utf-8"), re.M)
-    manifest = exporter.requirement_manifest(stem)
-    assert manifest["notes"]["manufacturing"] == importlib.import_module(f"{stem}_spec").DRAWING_NOTES.splitlines()
-    assert manifest["construction"] != "unknown"
+def test_a_notes_file_without_drawing_notes_falls_through_to_the_spec(tmp_path: Path, monkeypatch) -> None:
+    # Synthetic stem: every real part with such a notes file is declared now.
+    # The static reader only serves repository files, so it is stood in for.
+    monkeypatch.setattr(exporter, "__file__", str(tmp_path / "export_features.py"))
+    monkeypatch.setattr(exporter, "source_tree", lambda path: path.read_text(encoding="utf-8"))
+    monkeypatch.setattr(exporter, "_source_declarations", lambda path, text: dict.fromkeys(text.split()[:1], path))
+    (tmp_path / "zz_part_notes.py").write_text("OTHER_NOTES = 'x'\n", encoding="utf-8")
+    assert exporter._undeclared_notes_path("zz_part") is None
+    (tmp_path / "zz_part_spec.py").write_text("DRAWING_NOTES = 'NOTE 1'\n", encoding="utf-8")
+    assert exporter._undeclared_notes_path("zz_part") == (tmp_path / "zz_part_spec.py").resolve()
 
 
 def test_rocker_hub_root_carries_both_native_fillets_each_split_in_two(tmp_path: Path) -> None:
@@ -863,8 +865,8 @@ def test_writer_uses_supplied_revision_and_replaces_adjacent_manifest(tmp_path: 
 
 def test_a_declaration_matching_no_face_fails_before_writing_the_manifest(tmp_path: Path) -> None:
     step, selectors = _step(tmp_path, "ch_pivot_shaft")
-    selectors[None]["north_dome"] = (IdSelector(999),)
-    with pytest.raises(FeatureFaceError, match="north_dome: selector IdSelector.999. matched no face"):
+    selectors[None]["datum_end"] = (IdSelector(999),)
+    with pytest.raises(FeatureFaceError, match="datum_end: selector IdSelector.999. matched no face"):
         bind_manifest("ch_pivot_shaft", step, selectors, revision="v40")
     assert not step.with_name("features.toml").exists()
 

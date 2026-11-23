@@ -47,9 +47,13 @@ from _paths import CAD_ROOT
 from _surface_finish import surface_finish_by_key
 from _session import run_build
 import _telemetry
-from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, SIDE_PLATE_X, SIDE_PLATE_Y, SIDE_PLATE_Z
-from mg_lever_thread_joint import MOUTH_CHAMFER, NECK_HALF_X, NOSE_R, TAP_DRILL_DIA, THREAD
-from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_REFERENCE_PRECISION, MOUNTING_HOLE_PRECISION, MOUNTING_HOLE_PROCESS, TAP_HOLE_PRECISION, TAP_PROCESS
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _printed_limits import drilled_limits, limits
+from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, CLEARANCE_SPEC, SIDE_PLATE_X, SIDE_PLATE_Y, SIDE_PLATE_Z
+from mg_lever_thread_joint import HOLE_LOCATION_DEVIATIONS, MOUTH_CHAMFER, NECK_HALF_X, NECK_THICKNESS, NOSE_R, NOSE_R_DEVIATIONS, TAP_DRILL_DIA, TAP_SPEC, THREAD
+from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_PRECISION, DRAWING_REFERENCE_PRECISION, MOUNTING_HOLE_PRECISION, MOUNTING_HOLE_PROCESS, TAP_HOLE_PRECISION, TAP_PROCESS, UNIT
 from mg_magnifying_bracket_finish_spec import SURFACE_FINISHES
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -72,6 +76,295 @@ SIDE_KEEP = {"NoseR": (0.266, 0.229), "SeatToAxis": (0.196, 0.165)}
 MOUNTING_KEEP = {"MountingX0": (0.045, 0.056), "MountingX1": (0.060, 0.046), "MountingY0": (0.030, 0.080)}
 TAP_KEEP = {"TapFromTip": (0.206, 0.226), "TapFromSide": (0.240, 0.240)}
 OVERALL_REFERENCE_XY = (0.174, 0.185)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (build_mg_magnifying_bracket: origin
+# on the 1/4-20 tap axis at the nose centre, the tap along X through the .49
+# neck, the neck rising +Z to the seat at SIDE_PLATE_Z[1], the foot running -X
+# from the neck's +X face to its free end, the part .43 wide in Y about
+# Y = 0). The nose and tap locations run off the nose tip and the -Y side, the
+# foot holes off the free end and the -Y side, as the end and mounting-face
+# views print them. A band is the title block's row for the places the sheet
+# prints (DRAWING_PRECISION) on the printed nominal, the head's ±.002 on its
+# printed .217 (mg_lever_thread_joint's printed deviations), and the drilled
+# holes take the DRILLED HOLES row. The declarations print nothing.
+_SELF = "draw_mg_magnifying_bracket"
+_JOINT = "magnifying_bracket_joint_layout"
+_THREAD_JOINT = "mg_lever_thread_joint"
+_FRONT_KEEP = ((_SELF, "FRONT_KEEP"),)
+_BOTTOM_KEEP = ((_SELF, "BOTTOM_KEEP"),)
+_SIDE_KEEP = ((_SELF, "SIDE_KEEP"),)
+_MOUNTING_KEEP = ((_SELF, "MOUNTING_KEEP"),)
+_TAP_KEEP = ((_SELF, "TAP_KEEP"),)
+_SEAT_FINISH = surface_finish_by_key(SURFACE_FINISHES, "foot_seat")
+_SEAT_Z = SIDE_PLATE_Z[1]
+_UNDERSIDE_Z = SIDE_PLATE_Z[0]
+_FREE_END_X = SIDE_PLATE_X[0]
+_LOW_SIDE_Y = SIDE_PLATE_Y[0]
+_FOOT_LENGTH = NECK_HALF_X - _FREE_END_X
+_FOOT_THICKNESS = _SEAT_Z - _UNDERSIDE_Z
+_WIDTH = SIDE_PLATE_Y[1] - SIDE_PLATE_Y[0]
+_OVERALL = _SEAT_Z + NOSE_R
+# Hole Wizard drills the foot holes from the screw-head underside (-Z face,
+# _mounting_rims) and the tap from the +X face; both run through.
+_TAP_ENTRY = [NECK_HALF_X, 0.0, 0.0]
+# The sheet's .217 ±.002 on the head: the printed .217 with its own band.
+_HEAD_BAND = [round(NOSE_R + deviation, 12) for deviation in NOSE_R_DEVIATIONS]
+_TAP_LOCATION_BAND = [round(NOSE_R + deviation, 12) for deviation in HOLE_LOCATION_DEVIATIONS]
+# The sheet prints no numbered manufacturing note (drawing-guidelines.md rule
+# 7: every requirement is a dimension, its band, a native callout or the words
+# under one -- RETAINS TAP WALL, SCREW GRIP and the two MATES rows), so the
+# feature manifest's notes are empty. Kept here, not in the spec the part
+# build imports, so a notes change re-keys no part.
+DRAWING_NOTES = ""
+
+
+def _plane(axis: str, value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": axis, "value": value}
+
+
+part_metadata(
+    model_sources=(
+        (_JOINT, "BRACKET_ORIGIN"),
+        (_JOINT, "SIDE_PLATE_X"),
+        (_JOINT, "SIDE_PLATE_Y"),
+        (_JOINT, "SIDE_PLATE_Z"),
+        (_THREAD_JOINT, "NECK_HALF_X"),
+        (_THREAD_JOINT, "NOSE_R"),
+    ),
+    precision_sources=(
+        "DRAWING_PRECISION",
+        "DRAWING_REFERENCE_PRECISION",
+        "MOUNTING_HOLE_PRECISION",
+        "TAP_HOLE_PRECISION",
+    ),
+)
+# The SM-facing foot back, flush with the neck's end: the locating seat the
+# Ra 125 flag says must be cut (_add_foot_finish), and the datum the 3.70
+# seat-to-axis and the .125 foot grip run from.
+requirement(
+    "seat",
+    kind="face",
+    faces=(_SEAT_FINISH.face,),
+    requirements=("plane", "finish_ra"),
+    fields={
+        "plane": (_plane("z", _SEAT_Z), ((_JOINT, "SIDE_PLATE_Z"), ("mg_magnifying_bracket_finish_spec", "SURFACE_FINISHES"))),
+        "finish_ra": (_SEAT_FINISH.roughness_um, (("mg_magnifying_bracket_finish_spec", "SURFACE_FINISHES"), (_SELF, "_add_foot_finish"))),
+    },
+    precision={"finish_ra": 1},
+)
+# The foot's underside, where the MHA-MG-VN-53 heads bear: the foot thickness
+# .125 at the title block's .XXX, MHA-MG-VN-53 SCREW GRIP (FRONT_KEEP
+# "FlangeDepth", DIMENSION_CALLOUTS).
+requirement(
+    "foot_underside",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -_UNDERSIDE_Z),),
+    requirements=("thickness",),
+    fields={
+        "plane": (_plane("z", _UNDERSIDE_Z), ((_JOINT, "SIDE_PLATE_Z"),)),
+        "thickness": (
+            limits(_FOOT_THICKNESS, DRAWING_PRECISION["FlangeProfile"]["FlangeDepth"], unit=UNIT),
+            ((_JOINT, "SIDE_PLATE_Z"), (_JOINT, "SIDE_PLATE_THICKNESS"), "UNIT", "FOOT_GRIP_TOL", *_FRONT_KEEP),
+        ),
+        "thickness_nominal": (_FOOT_THICKNESS, ((_JOINT, "SIDE_PLATE_THICKNESS"),)),
+        "thickness_from": ("seat", _FRONT_KEEP),
+        "callout": (DIMENSION_CALLOUTS["FlangeProfile"]["FlangeDepth"], ("DIMENSION_CALLOUTS",)),
+    },
+    precision={"thickness": DRAWING_PRECISION["FlangeProfile"]["FlangeDepth"]},
+)
+# The foot's free end: the X datum the two hole stations run from.
+requirement(
+    "free_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), -_FREE_END_X),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", _FREE_END_X), ((_JOINT, "SIDE_PLATE_X"),))},
+)
+# The +X face: the neck's outer face and the foot's other end, one plane (no
+# ledge, build_mg_magnifying_bracket); the foot length 2.14 off the free end
+# (FRONT_KEEP "FlangeWidth").
+requirement(
+    "outer_face",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), NECK_HALF_X),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("x", NECK_HALF_X), ((_THREAD_JOINT, "NECK_HALF_X"),)),
+        "length": (
+            limits(_FOOT_LENGTH, DRAWING_PRECISION["FlangeProfile"]["FlangeWidth"], unit=UNIT),
+            ((_JOINT, "SIDE_PLATE_X"), (_THREAD_JOINT, "NECK_HALF_X"), "UNIT", *_FRONT_KEEP),
+        ),
+        "length_nominal": (_FOOT_LENGTH, ((_JOINT, "SIDE_PLATE_X"), (_THREAD_JOINT, "NECK_HALF_X"))),
+        "length_from": ("free_end", _FRONT_KEEP),
+    },
+    precision={"length": DRAWING_PRECISION["FlangeProfile"]["FlangeWidth"]},
+)
+# The neck's inner face over the foot: the neck thickness .49 off the outer
+# face (FRONT_KEEP "NeckThickness"), the tap's through length.
+requirement(
+    "neck_inner_face",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), NECK_HALF_X),),
+    requirements=("thickness",),
+    fields={
+        "plane": (_plane("x", -NECK_HALF_X), ((_THREAD_JOINT, "NECK_HALF_X"),)),
+        "thickness": (
+            limits(NECK_THICKNESS, DRAWING_PRECISION["Neck"]["NeckThickness"], unit=UNIT),
+            ((_THREAD_JOINT, "NECK_THICKNESS"), "UNIT", *_FRONT_KEEP),
+        ),
+        "thickness_nominal": (NECK_THICKNESS, ((_THREAD_JOINT, "NECK_THICKNESS"),)),
+        "thickness_from": ("outer_face", _FRONT_KEEP),
+    },
+    precision={"thickness": DRAWING_PRECISION["Neck"]["NeckThickness"]},
+)
+# The two side faces, each one plane along neck and foot (matched width): the
+# -Y one is the datum the tap's side location and the foot holes' .226 run
+# from; the +Y one closes the width .43 (BOTTOM_KEEP "FlangeHeight").
+requirement(
+    "low_side",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), -_LOW_SIDE_Y),),
+    requirements=("plane",),
+    fields={"plane": (_plane("y", _LOW_SIDE_Y), ((_JOINT, "SIDE_PLATE_Y"),))},
+)
+requirement(
+    "high_side",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), SIDE_PLATE_Y[1]),),
+    requirements=("width",),
+    fields={
+        "plane": (_plane("y", SIDE_PLATE_Y[1]), ((_JOINT, "SIDE_PLATE_Y"),)),
+        "width": (
+            limits(_WIDTH, DRAWING_PRECISION["Flange"]["FlangeHeight"], unit=UNIT),
+            ((_JOINT, "SIDE_PLATE_HEIGHT"), (_JOINT, "SIDE_PLATE_HEIGHT_DEVIATIONS"), "UNIT", *_BOTTOM_KEEP),
+        ),
+        "width_nominal": (_WIDTH, ((_JOINT, "SIDE_PLATE_HEIGHT"),)),
+        "width_from": ("low_side", _BOTTOM_KEEP),
+    },
+    precision={"width": DRAWING_PRECISION["Flange"]["FlangeHeight"]},
+)
+# The semicircular nose: R.217 ±.002 RETAINS TAP WALL (SIDE_KEEP "NoseR",
+# _exterior_nose_radius) on the tap axis; its tip bounds the part at -Z, the
+# (3.92) seat-to-tip reference (_overall_reference) the arc's centre plus its
+# radius, so it carries no `_from` (an arc's coordinate is its centre).
+requirement(
+    "nose",
+    kind="arc",
+    faces=(CylinderFace(2.0 * NOSE_R),),
+    requirements=("radius",),
+    fields={
+        "center": ([0.0, 0.0, 0.0], ((_JOINT, "BRACKET_ORIGIN"),)),
+        "axis": ((1.0, 0.0, 0.0), ((_THREAD_JOINT, "NECK_HALF_X"),)),
+        "apex": ((0.0, 0.0, -1.0), ((_JOINT, "SIDE_PLATE_Z"),)),
+        "radius": (
+            _HEAD_BAND,
+            ((_THREAD_JOINT, "NOSE_R"), (_THREAD_JOINT, "NOSE_R_DEVIATIONS"), "HEAD_MATERIAL_TOL", *_SIDE_KEEP),
+        ),
+        "radius_nominal": (NOSE_R, ((_THREAD_JOINT, "NOSE_R"),)),
+        "callout": (DIMENSION_CALLOUTS["NeckProfile"]["NoseR"], ("DIMENSION_CALLOUTS",)),
+        "concentric_with": ("lever_tap", ((_SELF, "_exterior_nose_radius"),)),
+        "overall_height_ref": (
+            _OVERALL,
+            ((_JOINT, "SIDE_PLATE_Z"), (_THREAD_JOINT, "NOSE_R"), (_SELF, "OVERALL_REFERENCE_XY"), (_SELF, "_overall_reference")),
+        ),
+    },
+    precision={
+        "radius": DRAWING_PRECISION["NeckProfile"]["NoseR"],
+        "overall_height_ref": DRAWING_REFERENCE_PRECISION["OverallHeight"],
+    },
+)
+# The 1/4-20 UNC through tap for MHA-MG-03 along the neck: its native callout
+# (Ø.201 DRILL THRU ALL / 1/4-20 UNC THRU ALL / MATES MHA-MG-03 LEVER, the
+# class from the title block); its axis 3.70 off the seat (SIDE_KEEP
+# "SeatToAxis") and .217 ±.002 RETAINS TAP WALL from the nose tip and the -Y
+# side (TAP_KEEP). The tip is the nose's apex, not a face: that location is
+# a band with its datum named, not a `_from`.
+_TAP_CALLOUT = ((_THREAD_JOINT, "TAP_SPEC"), (_SELF, "_curate_tap_callout"), (_SELF, "_set_hole_process"))
+_TAP_LOCATION_SOURCES = ((_THREAD_JOINT, "NOSE_R"), (_THREAD_JOINT, "HOLE_LOCATION_DEVIATIONS"), "HEAD_MATERIAL_TOL", *_TAP_KEEP)
+requirement(
+    "lever_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(TAP_DRILL_DIA),),
+    requirements=("thread", "dia", "thru", "height", "from_tip", "lateral"),
+    fields={
+        "at": (_TAP_ENTRY, ((_JOINT, "BRACKET_ORIGIN"), (_THREAD_JOINT, "NECK_HALF_X"))),
+        "axis": ((-1.0, 0.0, 0.0), ((_THREAD_JOINT, "TAP_SPEC"),)),
+        "thread": (f"{THREAD} UNC-{TAP_SPEC.thread_class}", _TAP_CALLOUT),
+        "dia": (
+            drilled_limits(TAP_DRILL_DIA, TAP_HOLE_PRECISION["hw-thrutapdrldia"], unit=UNIT),
+            ((_THREAD_JOINT, "TAP_DRILL_DIA"), "UNIT", "TAP_HOLE_PRECISION"),
+        ),
+        "nominal_dia": (TAP_DRILL_DIA, ((_THREAD_JOINT, "TAP_DRILL_DIA"), (_THREAD_JOINT, "TAP_SPEC"))),
+        "thru": (True, _TAP_CALLOUT),
+        "note": (TAP_PROCESS, ("TAP_PROCESS",)),
+        "height": (
+            limits(_SEAT_Z, DRAWING_PRECISION["NeckProfile"]["SeatToAxis"], unit=UNIT),
+            ((_JOINT, "SIDE_PLATE_Z"), "UNIT", *_SIDE_KEEP),
+        ),
+        "height_nominal": (_SEAT_Z, ((_JOINT, "SIDE_PLATE_Z"),)),
+        "height_from": ("seat", _SIDE_KEEP),
+        "from_tip": (_TAP_LOCATION_BAND, _TAP_LOCATION_SOURCES),
+        "from_tip_nominal": (NOSE_R, ((_THREAD_JOINT, "NOSE_R"),)),
+        "from_tip_datum": ("nose", _TAP_KEEP),
+        "lateral": (_TAP_LOCATION_BAND, _TAP_LOCATION_SOURCES),
+        "lateral_nominal": (NOSE_R, ((_THREAD_JOINT, "NOSE_R"),)),
+        "lateral_from": ("low_side", _TAP_KEEP),
+        "location_callout": (DIMENSION_CALLOUTS["TapCoordinates"]["TapFromTip"], ("DIMENSION_CALLOUTS",)),
+    },
+    precision={
+        "dia": TAP_HOLE_PRECISION["hw-thrutapdrldia"],
+        "height": DRAWING_PRECISION["NeckProfile"]["SeatToAxis"],
+        "from_tip": DRAWING_PRECISION["TapCoordinates"]["TapFromTip"],
+        "lateral": DRAWING_PRECISION["TapCoordinates"]["TapFromSide"],
+    },
+)
+# The two #2 clearance holes through the foot: one native callout (2X Ø.102
+# DRILL THRU ALL / MATES MHA-SM-03 TAPPED HOLES, _add_mounting_callout),
+# stations .354 and .894 off the free end and .226 off the -Y side
+# (MOUNTING_KEEP), at the title block's .XXX: the MHA-SM-03 taps are spotted
+# through them at assembly.
+_CLEARANCE = (
+    drilled_limits(CLEARANCE_DIA, MOUNTING_HOLE_PRECISION["hw-diam"], unit=UNIT),
+    ((_JOINT, "CLEARANCE_DIA"), (_JOINT, "CLEARANCE_HOLE_DEVIATIONS"), "UNIT", "MOUNTING_HOLE_PRECISION"),
+)
+_MOUNTING_LATERAL = BRACKET_HOLE_POINTS[0][1] - _LOW_SIDE_Y
+for _index, (_point, _dim) in enumerate(zip(BRACKET_HOLE_POINTS, ("MountingX0", "MountingX1"), strict=True), 1):
+    requirement(
+        f"mounting_hole_{_index}",
+        kind="hole",
+        faces=(CylinderFace(CLEARANCE_DIA, contains_x_mm=_point[0]),),
+        requirements=("dia", "thru", "station", "lateral"),
+        fields={
+            "at": (list(_point), ((_JOINT, "BRACKET_HOLE_POINTS"),)),
+            "axis": ((0.0, 0.0, 1.0), ((_JOINT, "CLEARANCE_SPEC"), (_SELF, "_mounting_rims"))),
+            "dia": _CLEARANCE,
+            "nominal_dia": (CLEARANCE_DIA, ((_JOINT, "CLEARANCE_DIA"), (_JOINT, "CLEARANCE_SPEC"))),
+            "clearance_for": (CLEARANCE_SPEC.size, ((_JOINT, "CLEARANCE_SPEC"),)),
+            "thru": (True, ((_JOINT, "CLEARANCE_SPEC"), (_SELF, "_add_mounting_callout"))),
+            "process": ("drill", ((_SELF, "_add_mounting_callout"),)),
+            "count": (len(BRACKET_HOLE_POINTS), ((_JOINT, "BRACKET_HOLE_POINTS"), (_SELF, "_add_mounting_callout"))),
+            "note": (MOUNTING_HOLE_PROCESS, ("MOUNTING_HOLE_PROCESS",)),
+            "station": (
+                limits(_point[0] - _FREE_END_X, DRAWING_PRECISION["MountingCoordinates"][_dim], unit=UNIT),
+                ((_JOINT, "BRACKET_HOLE_POINTS"), (_JOINT, "SIDE_PLATE_X"), "UNIT", *_MOUNTING_KEEP),
+            ),
+            "station_nominal": (_point[0] - _FREE_END_X, ((_JOINT, "BRACKET_HOLE_POINTS"), (_JOINT, "SIDE_PLATE_X"))),
+            "station_from": ("free_end", _MOUNTING_KEEP),
+            "lateral": (
+                limits(_MOUNTING_LATERAL, DRAWING_PRECISION["MountingCoordinates"]["MountingY0"], unit=UNIT),
+                ((_JOINT, "BRACKET_HOLE_POINTS"), (_JOINT, "SIDE_PLATE_Y"), "UNIT", *_MOUNTING_KEEP),
+            ),
+            "lateral_nominal": (_MOUNTING_LATERAL, ((_JOINT, "BRACKET_HOLE_POINTS"), (_JOINT, "SIDE_PLATE_Y"))),
+            "lateral_from": ("low_side", _MOUNTING_KEEP),
+        },
+        precision={
+            "dia": MOUNTING_HOLE_PRECISION["hw-diam"],
+            "station": DRAWING_PRECISION["MountingCoordinates"][_dim],
+            "lateral": DRAWING_PRECISION["MountingCoordinates"]["MountingY0"],
+        },
+    )
 
 
 def _mounting_rims(view: Any) -> tuple[Any, ...]:

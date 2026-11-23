@@ -51,31 +51,56 @@ from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
+from _gtol_torus import TorusFace
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import limits
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+import pd_transgear_arm_geometry as ARM
 import pd_transgear_pin_callouts as callouts
 from pd_transgear_pin_spec import (
+    ARM_NUMBER,
     DIA,
+    DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     FRONT_LAND,
+    GROOVE_DIA,
+    GROOVE_DIA_BAND,
     GROOVE_REAR_STATION,
     GROOVE_STATION,
+    GROOVE_STATION_BAND,
+    GROOVE_WIDTH,
+    GROOVE_WIDTH_BAND,
     HEAD_DIA,
+    HEAD_DOME_R,
+    HEAD_DOME_SAG,
     HEAD_HEIGHT,
     HEAD_LAND,
     LENGTH,
     OVERALL_LENGTH,
+    PRESS_INTERFERENCE,
+    PRESS_LAND_DIA,
     PRESS_LAND_LENGTH,
+    RING_NUMBER,
+    RUNNING_MATES,
+    SEAT_FILLET_R,
     SURFACE_FINISHES,
+    TIP_DOME_R,
+    TIP_DOME_SAG,
+    TIP_STATION,
+    UNIT,
 )
 
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -208,6 +233,270 @@ FINISH_SYMBOL = (_sheet_x(FINISH_STATION_MM), SHANK_TOP_Y + 0.008)
 CENTERLINE_PICK = (SHANK_MID_X + 0.010, SIDE_CENTER[1] + 0.001)
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
 NOTES_XY = (0.016, 0.070)
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (pd_transgear_pin_spec: one revolve about local +Z; z = 0 is the head's
+# underside, the seat).  The domed ends are the part's ends: the head's apex
+# (datum end, z = -HEAD_HEIGHT) and the tip's (far end, z = LENGTH), the
+# overall between them a reference.  The seat is the pin's one faced origin
+# (rule 11): the head land, the press land's length, the groove's load wall
+# and the tip apex are stationed from it (``station_from = "shoulder"``; the
+# head land runs back to the head dome's root).  The press land is a
+# reference Ø turned to the measured MHA-PD-18 ream for its interference;
+# the shank takes its +.0000/-.0002 band and, as REF, its running clearance
+# in its mates' measured reams (note 1).  Each ``span`` is a feature's
+# model-Z extent.  The declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_transgear_pin"
+_KEEP = (_SELF, "SIDE_KEEP")
+_NOTES = ("pd_transgear_pin_callouts", "DRAWING_NOTES")
+_TIP_ROOT = LENGTH - TIP_DOME_SAG
+part_metadata(
+    model_sources=(
+        "LENGTH",
+        "OVERALL_LENGTH",
+        "HEAD_DIA",
+        "HEAD_LAND",
+        "HEAD_DOME_R",
+        "TIP_DOME_R",
+        "DIA",
+        "PRESS_LAND_DIA",
+        "PRESS_LAND_LENGTH",
+        "GROOVE_STATION",
+        "GROOVE_DIA",
+        "GROOVE_WIDTH",
+        "SEAT_FILLET_R",
+    ),
+    precision_sources=("DRAWING_PRECISION_BY_NAME", "DRAWING_REFERENCE_PRECISION"),
+)
+requirement(
+    "datum_end",
+    kind="dome",
+    faces=(SphereFace(2.0 * HEAD_DOME_R),),
+    requirements=("radius", "height_ref"),
+    fields={
+        "plane": (
+            {"frame": "model", "axis": "z", "value": -HEAD_HEIGHT},
+            ("HEAD_HEIGHT",),
+        ),
+        "outward": ([0.0, 0.0, -1.0], ("HEAD_HEIGHT",)),
+        "radius": (
+            limits(HEAD_DOME_R, _P["HeadDomeR"], unit=UNIT),
+            ("HEAD_DOME_R", "UNIT", _KEEP),
+        ),
+        "radius_nominal": (HEAD_DOME_R, ("HEAD_DOME_R",)),
+        "height_ref": (HEAD_DOME_SAG, ("HEAD_DOME_SAG", _KEEP)),
+    },
+    precision={"radius": _P["HeadDomeR"], "height_ref": _P["HeadDomeSagDim"]},
+)
+requirement(
+    "far_end",
+    kind="dome",
+    faces=(SphereFace(2.0 * TIP_DOME_R),),
+    requirements=("radius", "height_ref", "length_ref", "station"),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": LENGTH}, ("LENGTH",)),
+        "outward": ([0.0, 0.0, 1.0], ("LENGTH",)),
+        "radius": (
+            limits(TIP_DOME_R, _P["TipDomeR"], unit=UNIT),
+            ("TIP_DOME_R", "UNIT", _KEEP),
+        ),
+        "radius_nominal": (TIP_DOME_R, ("TIP_DOME_R",)),
+        "height_ref": (TIP_DOME_SAG, ("TIP_DOME_SAG", _KEEP)),
+        "length_ref": (
+            OVERALL_LENGTH,
+            (
+                "OVERALL_LENGTH",
+                "DRAWING_REFERENCE_PRECISION",
+                (_SELF, "OVERALL_TEXT_XY"),
+            ),
+        ),
+        "length_from": ("datum_end", ((_SELF, "OVERALL_TEXT_XY"),)),
+        "station": (
+            limits(TIP_STATION, _P["TipDomeZ"], unit=UNIT),
+            ("TIP_STATION", "UNIT", _KEEP),
+        ),
+        "station_nominal": (TIP_STATION, ("TIP_STATION",)),
+        "station_from": ("shoulder", (_KEEP,)),
+    },
+    precision={
+        "radius": _P["TipDomeR"],
+        "height_ref": _P["TipDomeSagDim"],
+        "length_ref": DRAWING_REFERENCE_PRECISION,
+        "station": _P["TipDomeZ"],
+    },
+)
+requirement(
+    "shoulder",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), 0.0),),
+    requirements=("station",),
+    fields={
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("HEAD_LAND",)),
+        "outward": ([0.0, 0.0, 1.0], ("HEAD_LAND",)),
+        "origin": (True, ((_SELF, "SIDE_KEEP"),)),
+        "station": (
+            limits(HEAD_LAND, _P["HeadLand"], unit=UNIT),
+            ("HEAD_LAND", "UNIT", _KEEP),
+        ),
+        "station_nominal": (HEAD_LAND, ("HEAD_LAND",)),
+        "station_from": ("datum_root", (_KEEP,)),
+        "seats_on": (ARM_NUMBER, ("ARM_NUMBER",)),
+    },
+    precision={"station": _P["HeadLand"]},
+)
+requirement(
+    "step_head",
+    kind="diameter",
+    faces=(CylinderFace(HEAD_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("HEAD_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("HEAD_DIA",)),
+        "span": ([-HEAD_LAND, 0.0], ("HEAD_LAND",)),
+        "dia": (
+            limits(HEAD_DIA, _P["HeadDia"], unit=UNIT),
+            ("HEAD_DIA", "UNIT", _KEEP),
+        ),
+        "dia_nominal": (HEAD_DIA, ("HEAD_DIA",)),
+    },
+    precision={"dia": _P["HeadDia"]},
+)
+requirement(
+    "step_land",
+    kind="diameter",
+    faces=(CylinderFace(PRESS_LAND_DIA, contains_z_mm=PRESS_LAND_LENGTH / 2.0),),
+    requirements=("dia_ref", "diametral_interference", "length"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("PRESS_LAND_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("PRESS_LAND_DIA",)),
+        "span": ([0.0, PRESS_LAND_LENGTH], ("PRESS_LAND_LENGTH",)),
+        "dia_ref": (PRESS_LAND_DIA, ("PRESS_LAND_DIA", _KEEP, _NOTES)),
+        "diametral_interference": (
+            [PRESS_INTERFERENCE[0], PRESS_INTERFERENCE[1]],
+            ("PRESS_INTERFERENCE", _NOTES),
+        ),
+        "mate": (ARM_NUMBER, ("ARM_NUMBER", _NOTES)),
+        "mate_dia": (
+            [ARM.PIN_BORE_DIA_MIN, ARM.PIN_BORE_DIA_MAX],
+            (
+                ("pd_transgear_arm_geometry", "PIN_BORE_DIA_MIN"),
+                ("pd_transgear_arm_geometry", "PIN_BORE_DIA_MAX"),
+                _NOTES,
+            ),
+        ),
+        "length": (
+            limits(PRESS_LAND_LENGTH, _P["LandLength"], unit=UNIT),
+            ("PRESS_LAND_LENGTH", "UNIT", _KEEP),
+        ),
+        "length_nominal": (PRESS_LAND_LENGTH, ("PRESS_LAND_LENGTH",)),
+        "length_from": ("shoulder", (_KEEP,)),
+        "callout": (
+            callouts.SHANK_CALLOUT,
+            (("pd_transgear_pin_callouts", "SHANK_CALLOUT"), _NOTES),
+        ),
+    },
+    precision={"dia_ref": _P["LandDia"], "length": _P["LandLength"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(
+        CylinderFace(
+            DIA, contains_z_mm=(PRESS_LAND_LENGTH + GROOVE_REAR_STATION) / 2.0
+        ),
+        CylinderFace(DIA, contains_z_mm=(GROOVE_STATION + _TIP_ROOT) / 2.0),
+    ),
+    requirements=("dia", "diametral_clearance"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("DIA",)),
+        "span": (
+            [PRESS_LAND_LENGTH, _TIP_ROOT],
+            ("PRESS_LAND_LENGTH", "LENGTH", "TIP_DOME_SAG"),
+        ),
+        "dia": (
+            limits(DIA, _P["ShankDia"], DIA_BAND, unit=UNIT),
+            ("DIA", "DIA_BAND", "UNIT", _KEEP),
+        ),
+        "dia_nominal": (DIA, ("DIA",)),
+        "diametral_clearance": (
+            list(callouts.RUNNING_CLEARANCE),
+            (("pd_transgear_pin_callouts", "RUNNING_CLEARANCE"), _NOTES),
+        ),
+        "mates": (list(RUNNING_MATES), ("RUNNING_MATES", _NOTES)),
+        "callout": (
+            callouts.SHANK_CALLOUT,
+            (("pd_transgear_pin_callouts", "SHANK_CALLOUT"), _NOTES),
+        ),
+    },
+    precision={"dia": _P["ShankDia"]},
+)
+requirement(
+    "groove",
+    kind="groove",
+    faces=(
+        CylinderFace(GROOVE_DIA),
+        PlanarFace((0.0, 0.0, -1.0), -GROOVE_STATION),
+        PlanarFace((0.0, 0.0, 1.0), GROOVE_REAR_STATION),
+    ),
+    requirements=("dia", "width", "station"),
+    fields={
+        "axis": ([0.0, 0.0, 1.0], ("GROOVE_DIA",)),
+        "at": ([0.0, 0.0, 0.0], ("GROOVE_DIA",)),
+        "span": (
+            [GROOVE_REAR_STATION, GROOVE_STATION],
+            ("GROOVE_STATION", "GROOVE_WIDTH"),
+        ),
+        "dia": (
+            limits(GROOVE_DIA, _P["GrooveDia"], GROOVE_DIA_BAND, unit=UNIT),
+            ("GROOVE_DIA", "GROOVE_DIA_BAND", "UNIT", _KEEP),
+        ),
+        "dia_nominal": (GROOVE_DIA, ("GROOVE_DIA",)),
+        "width": (
+            limits(GROOVE_WIDTH, _P["GrooveWidth"], GROOVE_WIDTH_BAND, unit=UNIT),
+            ("GROOVE_WIDTH", "GROOVE_WIDTH_BAND", "UNIT", _KEEP),
+        ),
+        "width_nominal": (GROOVE_WIDTH, ("GROOVE_WIDTH",)),
+        "station": (
+            limits(
+                GROOVE_STATION,
+                _P["GrooveStation"],
+                (GROOVE_STATION_BAND, -GROOVE_STATION_BAND),
+                unit=UNIT,
+            ),
+            ("GROOVE_STATION", "GROOVE_STATION_BAND", "UNIT", _KEEP),
+        ),
+        "station_nominal": (GROOVE_STATION, ("GROOVE_STATION",)),
+        "station_from": ("shoulder", (_KEEP,)),
+        "station_to": ("far_wall", (_KEEP,)),
+        "ring": (RING_NUMBER, ("RING_NUMBER", _NOTES)),
+        "callout": (
+            callouts.GROOVE_CALLOUT,
+            (("pd_transgear_pin_callouts", "GROOVE_CALLOUT"), _NOTES),
+        ),
+    },
+    precision={
+        "dia": _P["GrooveDia"],
+        "width": _P["GrooveWidth"],
+        "station": _P["GrooveStation"],
+    },
+)
+requirement(
+    "fillet_seat",
+    kind="fillet",
+    faces=(TorusFace(PRESS_LAND_DIA / 2.0 + SEAT_FILLET_R, SEAT_FILLET_R),),
+    requirements=("radius_max",),
+    fields={
+        "radius_max": (SEAT_FILLET_R, ("SEAT_FILLET_R", _KEEP)),
+        "radius_nominal": (SEAT_FILLET_R, ("SEAT_FILLET_R",)),
+        "axis": ([0.0, 0.0, 1.0], ("SEAT_FILLET_R",)),
+        "at": ([0.0, 0.0, 0.0], ("SEAT_FILLET_R",)),
+        "between": (["shoulder", "step_land"], ("SEAT_FILLET_R",)),
+    },
+    precision={"radius_max": _P["SeatRadius"]},
+)
 
 
 def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:

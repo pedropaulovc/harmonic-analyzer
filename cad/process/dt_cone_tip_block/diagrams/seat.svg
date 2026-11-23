@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="16" y="22">Setup 5 (DT04): SEAT to the height; the foot hole</text>
+  <rect class="fixture-vise" x="128.8" y="330.0" width="142.3" height="22.0"/>
+  <rect class="clamp" x="153.2" y="195.2" width="30.0" height="134.8"/>
+  <rect class="clamp" x="216.8" y="195.2" width="30.0" height="134.8"/>
+  <text class="label" x="168.2" y="368.0" text-anchor="middle">moving jaw</text>
+  <text class="label" x="231.8" y="368.0" text-anchor="middle">fixed jaw</text>
+  <rect class="fixture-support" x="183.2" y="291.9" width="9.5" height="38.1"/>
+  <rect class="fixture-support" x="207.2" y="291.9" width="9.5" height="38.1"/>
+  <rect class="part-kept" x="183.2" y="134.2" width="33.5" height="157.7"/>
+  <rect class="part-removed" x="183.2" y="126.9" width="33.5" height="7.2"/>
+  <line class="active-face" x1="183.2" y1="134.2" x2="216.8" y2="134.2"/>
+  <rect class="holes" x="196.6" y="134.2" width="6.8" height="33.5"/>
+  <line class="centre-line" x1="200.0" y1="124.2" x2="200.0" y2="179.7"/>
+  <rect class="cutter" x="196.6" y="49.7" width="6.8" height="118.0"/>
+  <polygon class="cutter" points="196.6,167.7 203.4,167.7 200.0,169.7"/>
+  <text class="label" x="440.0" y="70.0">#43 drill (after the end mill, centre drill)</text>
+  <line class="leader" x1="436.0" y1="66.0" x2="200.0" y2="74.2"/>
+  <circle class="leader-dot" cx="200.0" cy="74.2" r="2.5"/>
+  <text class="label" x="440.0" y="110.0">SEAT faced to 2.070; Ra 125</text>
+  <line class="leader" x1="436.0" y1="106.0" x2="182.0" y2="134.2"/>
+  <circle class="leader-dot" cx="182.0" cy="134.2" r="2.5"/>
+  <text class="label" x="440.0" y="150.0">foot hole .440 deep, centred N-S</text>
+  <line class="leader" x1="436.0" y1="146.0" x2="200.0" y2="154.3"/>
+  <circle class="leader-dot" cx="200.0" cy="154.3" r="2.5"/>
+  <text class="label" x="440.0" y="190.0">N (fixed jaw)</text>
+  <line class="leader" x1="436.0" y1="186.0" x2="214.8" y2="224.2"/>
+  <circle class="leader-dot" cx="214.8" cy="224.2" r="2.5"/>
+  <text class="label" x="440.0" y="230.0">TOP down on the 1/2 in parallels</text>
+  <line class="leader" x1="436.0" y1="226.0" x2="200.0" y2="291.9"/>
+  <circle class="leader-dot" cx="200.0" cy="291.9" r="2.5"/>
+  <text class="label" x="16.0" y="406.0">Section across the jaws, E to the left (the hole is .30 from E). Z0 the parallels' top.</text>
+</svg>

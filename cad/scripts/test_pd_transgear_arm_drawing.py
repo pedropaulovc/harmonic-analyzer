@@ -1137,3 +1137,119 @@ def test_the_drawing_enforces_machinist_review() -> None:
     from _machinist_review_mode import MachinistReviewMode
 
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
+
+
+def _in(value: float) -> float:
+    return value * 25.4
+
+
+def test_the_arm_declares_one_owner_per_face() -> None:
+    import export_features
+    from _gtol_face import FaceGeometry
+
+    def plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+        point = tuple(value * offset_mm / 1000 for value in normal)
+        return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+    def cylinder(dia_mm: float, box_mm: tuple[float, ...]) -> FaceGeometry:
+        box = tuple(value / 1000 for value in box_mm)
+        return FaceGeometry(None, 4002, (0.0, 0.0, 0.0, 0, 0, 1, dia_mm / 2000), None, box)
+
+    def cone(half_angle_deg: float, box_mm: tuple[float, ...]) -> FaceGeometry:
+        box = tuple(value / 1000 for value in box_mm)
+        parameters = (0.0, 0.0, 0.0, 0, 0, 1, 0.002, math.radians(half_angle_deg), 1, 0, 0)
+        return FaceGeometry(None, 4003, parameters, None, box)
+
+    manifest = export_features.requirement_manifest("pd_transgear_arm")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == {
+        "front_face": "face",
+        "rear_face": "face",
+        "end_face": "face",
+        "pivot_end": "arc",
+        "flanks": "tapered_side",
+        "pivot_bore": "hole",
+        "spot_face": "counterbore",
+        "pin_bore": "hole",
+        "pin_mouth": "chamfer",
+        "latch_pin_hole": "hole",
+        "dowel_holes": "assembly_hole",
+        "plate_taps": "assembly_hole",
+    }
+    t, s = geometry.THICKNESS, geometry.PIN_STATION
+    lean = geometry.EDGE_LEAN
+    tip, depth = geometry.TIP_STATION, geometry.PIN_HOLE_DEPTH
+    tap = drawing._PLATE_TAP_DRILL
+    (lx, ly), (_lx2, ly2) = geometry.LOCATOR_SITES_MM
+    floor = geometry.SPOT_FACE_FLOOR_FROM_FRONT
+    faces = {
+        "front_face": plane((0.0, 0.0, -1.0), 0.0),
+        "rear_face": plane((0.0, 0.0, 1.0), t),
+        "end_face": plane((1.0, 0.0, 0.0), tip),
+        "pivot_end": cylinder(2 * geometry.PIVOT_END_R, (-12.5, -12.5, 0.0, 0.6, 12.5, t)),
+        "flanks/upper": plane((math.sin(lean), math.cos(lean), 0.0), geometry.PIVOT_END_R),
+        "flanks/lower": plane((math.sin(lean), -math.cos(lean), 0.0), geometry.PIVOT_END_R),
+        "pivot_bore": cylinder(geometry.PIVOT_BORE_DIA, (-2.5, -2.5, 0.0, 2.5, 2.5, floor)),
+        "spot_face/wall": cylinder(geometry.SPOT_FACE_DIA, (-6.4, -6.4, floor, 6.4, 6.4, t)),
+        "spot_face/floor": plane((0.0, 0.0, 1.0), floor),
+        "pin_bore": cylinder(geometry.PIN_BORE_DIA, (s - 1.6, -1.6, 0.0, s + 1.6, 1.6, t - 0.2)),
+        "pin_mouth": cone(45.0, (s - 1.8, -1.8, t - 0.2, s + 1.8, 1.8, t)),
+        "latch_pin_hole": cylinder(geometry.PIN_HOLE_DIA, (tip - depth, -1.6, 3.2, tip, 1.6, 6.4)),
+        "dowel_holes/1": cylinder(geometry.LOCATOR_HOLE_DIA_MM, (lx - 1.2, ly - 1.2, 0.0, lx + 1.2, ly + 1.2, t)),
+        "dowel_holes/2": cylinder(geometry.LOCATOR_HOLE_DIA_MM, (lx - 1.2, ly2 - 1.2, 0.0, lx + 1.2, ly2 + 1.2, t)),
+        **{
+            f"plate_taps/{index}": cylinder(tap, (x - 1.8, -1.8, 0.2, x + 1.8, 1.8, t - 0.2))
+            for index, x in enumerate(geometry.PLATE_TAP_STATIONS, 1)
+        },
+    }
+    # The tap mouths' 90-degree breaks and the latch hole's drill point are
+    # nobody's: no declared selector takes them.
+    strays = {
+        "tap break": cone(45.0, (geometry.PLATE_TAP_STATIONS[0] - 2.0, -2.0, t - 0.3, geometry.PLATE_TAP_STATIONS[0] + 2.0, 2.0, t)),
+        "drill point": cone(59.0, (tip - depth - 1.0, -1.6, 3.2, tip - depth, 1.6, 6.4)),
+    }
+    selectors = export_features.feature_selectors("pd_transgear_arm")
+    for name, face in faces.items():
+        owners = [owner for owner, specs in selectors.items() if any(spec_.matches(face) for spec_ in specs)]
+        assert owners == [name.split("/")[0]], name
+    for name, face in strays.items():
+        assert not [owner for owner, specs in selectors.items() if any(spec_.matches(face) for spec_ in specs)], name
+
+
+def test_arm_feature_bands_are_the_printed_ones() -> None:
+    import export_features
+
+    features = export_features.requirement_manifest("pd_transgear_arm")["features"]
+    end = features["end_face"]
+    assert end["station"] == pytest.approx([_in(5.06), _in(5.08)])
+    assert end["width"] == pytest.approx([_in(0.54), _in(0.56)])
+    assert features["pivot_end"]["radius"] == pytest.approx([_in(0.48), _in(0.50)])
+    assert features["flanks"]["angle_ref_deg"] == pytest.approx(2.4, abs=0.05)
+    assert features["rear_face"]["thickness_stock"] == pytest.approx([_in(0.374), _in(0.376)])
+    assert features["rear_face"]["callout"] == "3/8 (.3750) GROUND STOCK REF"
+    pivot = features["pivot_bore"]
+    assert pivot["dia"] == pytest.approx([_in(0.1940), _in(0.1950)])
+    assert pivot["process"] == "ream" and pivot["thru"] is True and pivot["datum"] == "B"
+    spot = features["spot_face"]
+    assert spot["dia"] == pytest.approx([_in(0.500), _in(0.504)])
+    # The native ±.002 qualifies the 6.9 model floor (.2717 printed).
+    assert spot["floor"] == pytest.approx([6.9 - _in(0.002), 6.9 + _in(0.002)])
+    assert spot["floor_from"] == "front_face"
+    pin = features["pin_bore"]
+    assert pin["dia"] == pytest.approx([_in(0.1260), _in(0.1265)])
+    assert pin["station_basic"] == pytest.approx(_in(2.7093), abs=_in(0.00005))
+    assert pin["position_dia_max"] == pytest.approx(_in(0.004))
+    assert pin["perpendicularity_dia_max"] == pytest.approx(_in(0.001))
+    assert features["pin_mouth"]["leg"] == pytest.approx([_in(0.006), _in(0.010)])
+    latch = features["latch_pin_hole"]
+    assert latch["dia"] == pytest.approx([_in(0.1240), _in(0.1245)])
+    assert latch["depth"][0] == pytest.approx(_in(0.38)) and latch["depth_printed"] == "MIN"
+    assert latch["height"] == pytest.approx([_in(0.183), _in(0.193)])
+    dowels = features["dowel_holes"]
+    assert dowels["dia"] == pytest.approx([_in(0.0930), _in(0.0935)])
+    assert dowels["made_at"] == "assembly" and dowels["count"] == 2
+    assert "process" not in dowels
+    taps = features["plate_taps"]
+    assert taps["thread"] == "#8-32 UNC-2B" and taps["made_at"] == "assembly"
+    assert taps["dia"][0] == pytest.approx(_in(0.136), abs=1e-3)
+    assert "process" not in taps

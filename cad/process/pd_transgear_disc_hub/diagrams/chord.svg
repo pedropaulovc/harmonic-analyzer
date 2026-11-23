@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 4, side elevation through the hole's plane, 200 px to the inch: +Y to the right along the hub's axis (y 200), Y0 the fixed jaw's face at x 500, the hub front face on it; the 1 in parallel under the body against the fixed jaw; the hole .174 in front of the axis at Y-.15 (x 470), the ream to .160 below the axis, the #56 knockout on through. Styles: prechips.palette. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 4: the hub gripped end to end on a parallel; CM02 drills, CM03 reams the key pin's chord hole</text>
+  <rect class="clamp" x="500" y="100" width="60" height="270"/>
+  <rect class="clamp" x="332" y="100" width="60.2" height="270"/>
+  <rect class="fixture-support" x="475" y="254" width="25" height="116"/>
+  <polygon class="part-kept" points="392.2,150.2 421,150.2 421,95 439.8,95 439.8,146 500,146 500,254 439.8,254 439.8,305 421,305 421,249.8 392.2,249.8"/>
+  <line class="hidden" x1="392.2" y1="168.65" x2="500" y2="168.65"/>
+  <line class="hidden" x1="392.2" y1="231.35" x2="500" y2="231.35"/>
+  <rect class="holes" x="463.85" y="158.7" width="12.3" height="73.3"/>
+  <rect class="holes" x="465.35" y="232" width="9.3" height="9.3"/>
+  <line class="centre-line" x1="320" y1="200" x2="572" y2="200"/>
+  <line class="datum" x1="500" y1="60" x2="500" y2="100"/>
+  <rect class="cutter" x="465.2" y="50" width="9.6" height="105"/>
+  <line class="leader" x1="560" y1="200" x2="580" y2="200"/>
+  <text class="datum-label" x="584" y="204">Z0: the hub's axis</text>
+  <line class="leader" x1="500" y1="80" x2="580" y2="80"/>
+  <text class="datum-label" x="584" y="76">Y0: the fixed jaw's face</text>
+  <line class="leader" x1="476" y1="232" x2="580" y2="250"/>
+  <text class="label" x="584" y="246">ream .0615 to the stop,</text>
+  <text class="label" x="584" y="262">{{cad.pin_ream_stop_min_in:.3dot}}–{{cad.pin_ream_stop_max_in:.3dot}} under the axis</text>
+  <line class="leader" x1="470" y1="241" x2="580" y2="300"/>
+  <text class="label" x="584" y="304">#56 knockout through</text>
+  <line class="leader" x1="490" y1="340" x2="580" y2="340"/>
+  <text class="label" x="584" y="344">1 in parallel, 1/8 thick</text>
+  <text class="label" x="330" y="388">moving jaw</text>
+  <text class="label" x="500" y="388">fixed jaw</text>
+</svg>

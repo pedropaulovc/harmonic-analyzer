@@ -452,7 +452,7 @@ note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-PD-14 R3.13 ±.
 kind = "fixture"
 status = "to_make"
 supply = "shop_made"
-note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-PD-03 FORMED, 6X (R1.36), .06 BOW RISE."
+note = "Not made: shop-made from the clip's own strip in the clip's traveler (cad/process/pd_platen_clip/plan.toml, PC01_sheet): four laminations of the .032 C26000 strip, each as long as the clip's rail and split along the bow profile into a male and a female die half; the four male halves stacked face to face against one vise jaw, the four female halves against the other, press the finger standing on edge between them. Drawing cross-check 2026-11-19: MHA-PD-03 FORMED, 6X (R1.36), .06 BOW RISE. The die radius is corrected for springback (Ri/Rf = 4x^3 - 3x + 1, x = Ri Y/(E t); E 16,000 ksi, Y 290-359 MPa, t .030-.034) so the formed rise lands inside .05-.07."
 
 # MHA-DT-20 cone swing platform (cad/process/dt_cone_swing_platform), Setup
 # 4: the blank screwed to the 1/2 in spoil plate while its outline is cut.
@@ -493,3 +493,11 @@ status = "to_make"
 supply = "shop_made"
 purchase = "Make from the 1 in 1018 CF bar on hand (stock.1018-round-1), 4.75 in long: turn 2.00 in of one end to Ø.750 for the AXA No. 4 heavy-duty boring holder (tools.qctp-axa-lms-2280), face both ends square, and drill 3/8 from the shank's end 1.90 deep (the pinion seat's clearance). On the mill: drill #21 and tap 10-32 radially into the Ø1.0 head 1.25 in from its front face, .50 deep. Its .4500 bore is not made here: the dt_crankshaft traveler bores it in place on the lathe, the jig in the No. 4 holder on the tool post, each cutter in the 3-jaw and the carriage feeding the jig (centre drill, 7/16 drill, the .4500 reamer 2.95 deep into the 3/8 hole), so the bore lies on the spindle axis and along the carriage travel by construction. The holder stays on the tool post until the crankshaft's holes are done."
 note = "Workholding for the MHA-DT-11 drive-pin holes (dt_crankshaft plan). The crankshaft goes in far end first: its two Ø.4490 journals (.4482-.4490) and the Ø.375 inboard neck in the .4500 bore, the Ø.3125 pinion seat in the 3/8 hole; a 10-32 set screw on a brass pad bears down on the Ø.41 relief and seats both journals on the bore's bottom; a 1/8 in spacer between the spigot's rear face and the jig face while clamping, then withdrawn, leaves the gap the #54 knockouts break into."
+
+[fixtures.pd-arm-sub-plate-screws]
+name = "Socket head cap screws, #10-32 x 5/8 and #4-40 x 5/8, alloy steel black oxide, one each"
+kind = "fixture"
+status = "to_order"
+purchase = "McMaster-Carr 91251A344 (#10-32 x 5/8, head Ø5/16 x .19 high) and the 4-40 x 5/8 row of the same black-oxide alloy steel socket head screws (part number not read); one pack each, price not read."
+note = "Not owned: to buy. MHA-PD-18 transgear arm, Setup 3 (pd_transgear_arm/plan.toml): hold the arm on its 1/2 in 6061 sub-plate through the pivot bore (head on the spot face's floor) and the pin bore while AR05_outline cuts it free."
+cite = ["McMaster-Carr socket head screws, 10-32 thread, 91251A344 (read 2026-11-22): https://www.mcmaster.com/products/socket-head-cap-screws/thread-size~10-32/", "McMaster-Carr socket head screws, black-oxide alloy steel, UNRC (read 2026-11-22): https://www.mcmaster.com/products/socket-head-screws/thread-type~unrc/"]

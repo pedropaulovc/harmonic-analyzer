@@ -93,6 +93,41 @@ material = "lathe-c360"
 rpm = 70
 feed = "compound at 29°, the bit on centre height and square to the axis; half-nuts on the 20 TPI gearbox setting; compound .003-.005 a pass, less near depth, dry"
 
+# --- MHA-MG-06 output fixture (cad/process/mg_output_fixture/plan.toml) ------
+# C36000 7/16 hex bar: its lathe facing and turning take shop/lathe.toml
+# lathe-ar-c360, its spotting the lathe-centre-c360 row, its parting
+# lathe-part-c360. Every setting it names is under the one material key
+# lathe-c360 (prechips refuses a plan whose settings name two).
+# - #43 (.089 in) from the tailstock: LittleMachineShop "Cutting Speeds",
+#   Drilling & Reaming, row Brass (C35600, C37700, C36000, ...): 160-175
+#   ft/min (read 2026-11-17, as the clamp's rows above), taken at 160; fed by
+#   hand, pecking, dry.
+# - The R.047 grooving form tool cuts its whole .094 width at once: 300 rpm,
+#   as the shop's other form settings (lathe-form-r125-c360 above), by hand.
+# - Mill, the cross bore: the clamp's brass rows above (#2 centre drill 2800
+#   rpm × .001 in/rev = 2.8 in/min; F 2400 rpm × .004 in/rev = 9.6 in/min),
+#   restated under lathe-c360 for this plan.
+[settings.fixture-drill-43-c360]
+tool = "jig-drill-43"
+material = "lathe-c360"
+sfm = 160
+feed = "tailstock quill by hand, pecking every .06, dry"
+[settings.fixture-form-r047-c360]
+tool = "form-tool-r047"
+material = "lathe-c360"
+rpm = 300
+feed = "cross slide by hand, slow and steady, dry"
+[settings.fixture-spot-c360]
+tool = "jig-spot"
+material = "lathe-c360"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.fixture-drill-f-c360]
+tool = "jig-drill-f"
+material = "lathe-c360"
+rpm = 2400
+feed = "9.6 in/min"
+
 # --- MHA-MG-10 wheel drum (cad/process/mg_wheel_drum/plan.toml) -------------
 # Facing, turning and parting take shop/lathe.toml's C360 rows. The V pilot
 # and the 31/64 drill run blind into the bar past the parting line, so their
@@ -180,7 +215,7 @@ description = "Plug gauge pair, .1865 GO (plus) and .1870 NO-GO (minus), Vermont
 [tools.form-tool-r024]  # MHA-MG-05 R.024 rim wire groove
 description = "HSS lathe grooving bit ground to a full R.024 (.048 wide) nose"
 [tools.form-tool-r047]  # MHA-MG-06 R .047/.020 FULL R groove
-description = "HSS lathe full-radius grooving bit, nose R.020-.047 (e.g. R.047, .094 wide)"
+description = "HSS lathe full-radius grooving bit, R.047 nose (.094 wide)"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so

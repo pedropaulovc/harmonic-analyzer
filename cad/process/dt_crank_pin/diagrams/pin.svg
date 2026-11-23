@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 240" width="760" height="240">
+  <rect class="paper" x="0" y="0" width="760" height="240"/>
+  <text class="title" x="20" y="24">The bought No. 3 x 1-3/4 taper pin, as supplied (not to scale)</text>
+  <path class="part-kept" d="M120 96 L640 108 L640 132 L120 144 Z"/>
+  <path class="part-kept" d="M120 96 Q104 120 120 144 Z"/>
+  <line class="centre-line" x1="80" y1="120" x2="690" y2="120"/>
+  <line class="dims" x1="120" y1="180" x2="640" y2="180"/>
+  <line class="dims" x1="120" y1="172" x2="120" y2="188"/>
+  <line class="dims" x1="640" y1="172" x2="640" y2="188"/>
+  <text class="label" x="320" y="204">1-3/4 REF, 1:48 taper on Ø</text>
+  <text class="label" x="20" y="70">big end Ø.219: mike it</text>
+  <line class="dims" x1="90" y1="76" x2="118" y2="98"/>
+  <text class="label" x="20" y="224">crowned end, about .03 high at the axis</text>
+  <line class="dims" x1="60" y1="212" x2="108" y2="124"/>
+  <text class="label" x="560" y="70">small end Ø.183 REF</text>
+  <line class="dims" x1="620" y1="76" x2="638" y2="106"/>
+</svg>

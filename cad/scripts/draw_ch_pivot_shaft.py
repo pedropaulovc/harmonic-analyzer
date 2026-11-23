@@ -121,22 +121,35 @@ FLATS_CALLOUT = "2X"
 
 _P = shaft.DRAWING_PRECISION_BY_NAME
 part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_surface_finish", "ra")))
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md), as the turned shafts declare theirs: the north dome
+# is the datum end (its apex z = +DOME_HEIGHT, the part origin on the north
+# cylinder end), the south dome the far end, the tip-to-tip length between
+# their apexes; the O.D. runs the cylinder between the dome roots; each flat
+# is stationed to its centre (the ear's mid-plane) from its own end's tip.
+# The declarations print nothing.
+_SOUTH_TIP_Z = -(bank.PIVOT_SHAFT_LENGTH + shaft.DOME_HEIGHT)
 for _side, _station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS, strict=True):
     requirement(
-        f"{_side}_flat", kind="face",
+        f"flat_{_side}", kind="flat",
         faces=(PlanarFace((0, 1, 0), shaft.FLAT_AF - shaft.SHAFT_DIA / 2, contains_z_mm=-_station),),
-        requirements=("height", "length", "station"), fields={
-            "height": (_band(shaft.FLAT_AF, _P["FlatAF"], unit=shaft.UNIT), ("FLAT_AF",)),
-            "height_nominal": (shaft.FLAT_AF, ("FLAT_AF",)),
-            "height_from": ("pivot_bearing", (("draw_ch_pivot_shaft", "build"),)),
+        requirements=("across", "length", "station"), fields={
+            "normal": ([0.0, 1.0, 0.0], ("FLAT_AF",)),
+            "span": (
+                [round(-_station - shaft.FLAT_LENGTH / 2, 12), round(-_station + shaft.FLAT_LENGTH / 2, 12)],
+                (("rocker_bank_layout", "PIVOT_SHAFT_FLAT_STATIONS"), "FLAT_LENGTH"),
+            ),
+            "across": (_band(shaft.FLAT_AF, _P["FlatAF"], unit=shaft.UNIT), ("FLAT_AF",)),
+            "across_nominal": (shaft.FLAT_AF, ("FLAT_AF",)),
             "length": (_band(shaft.FLAT_LENGTH, _P["FlatLength"], unit=shaft.UNIT), ("FLAT_LENGTH",)),
             "length_nominal": (shaft.FLAT_LENGTH, ("FLAT_LENGTH",)),
             "station": (_band(shaft.FLAT_TIP_STATION, _P["FlatStation"], unit=shaft.UNIT), ("FLAT_TIP_STATION",)),
             "station_nominal": (shaft.FLAT_TIP_STATION, ("FLAT_TIP_STATION",)),
-            # Each from its own end's dome tip.
+            # Each from its own end's dome tip, to the flat's centre.
+            "station_from": ("far_end" if _side == "south" else "datum_end", ("FLAT_TIP_STATION",)),
+            "station_to": ("centre", ("FLAT_TIP_STATION",)),
             "note": (shaft.FLAT_STATION_CALLOUT, ("FLAT_STATION_CALLOUT",)),
-            "plane": ({"frame": "model", "axis": "y", "value": shaft.FLAT_AF - shaft.SHAFT_DIA / 2}, ("FLAT_AF", "SHAFT_DIA")),
-        }, precision={"height": _P["FlatAF"], "length": _P["FlatLength"], "station": _P["FlatStation"]},
+        }, precision={"across": _P["FlatAF"], "length": _P["FlatLength"], "station": _P["FlatStation"]},
     )
 
 # The O.D.'s band is for the 20 rocker hubs it runs in; the callout names
@@ -159,16 +172,17 @@ PROFILE_KEEP = {
     "ShaftDia": (SOUTH_END_X + 0.030, PROFILE_CENTER[1] - 0.020),
 }
 
-PIVOT_BEARING = requirement(
-    "pivot_bearing", kind="shaft", faces=(shaft.SURFACE_FINISHES[0].face,),
+requirement(
+    "outer", kind="diameter", faces=(shaft.SURFACE_FINISHES[0].face,),
     requirements=("dia", "finish_ra"), fields={
-        "at": ([0.0, 0.0, shaft.BODY_PROBE_Z_MM], ("BODY_PROBE_Z_MM",)),
         "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        # The cylinder's extent, root to root; the domes run on to the tips.
+        "span": ([round(-bank.PIVOT_SHAFT_LENGTH, 12), 0.0], (("rocker_bank_layout", "PIVOT_SHAFT_LENGTH"),)),
         "dia": (_band(shaft.SHAFT_DIA, _P["ShaftDia"], shaft.SHAFT_DIA_BAND), ("SHAFT_DIA", "SHAFT_DIA_BAND")),
         "dia_nominal": (shaft.SHAFT_DIA, ("SHAFT_DIA",)),
+        "callout": (SHAFT_FIT_CALLOUT, (("draw_ch_pivot_shaft", "SHAFT_FIT_CALLOUT"),)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
-        # The cylinder's extent; the domes run on to the tips.
-        "z_mm": ([round(-bank.PIVOT_SHAFT_LENGTH, 12), 0.0], (("rocker_bank_layout", "PIVOT_SHAFT_LENGTH"),)),
     }, precision={"dia": _P["ShaftDia"], "finish_ra": 1},
 )
 
@@ -234,32 +248,33 @@ DETAIL_KEEP = {
     ),
 }
 
-for _name, _z, _centre in (
-    ("north_dome", 0.0, shaft.DOME_HEIGHT - shaft.DOME_SPHERE_RADIUS),
-    ("south_dome", -bank.PIVOT_SHAFT_LENGTH, -bank.PIVOT_SHAFT_LENGTH + shaft.DOME_SPHERE_RADIUS - shaft.DOME_HEIGHT),
+for _name, _tip, _centre in (
+    ("datum_end", shaft.DOME_HEIGHT, shaft.DOME_HEIGHT - shaft.DOME_SPHERE_RADIUS),
+    ("far_end", _SOUTH_TIP_Z, -bank.PIVOT_SHAFT_LENGTH + shaft.DOME_SPHERE_RADIUS - shaft.DOME_HEIGHT),
 ):
-    _south = _name == "south_dome"
-    # The overall length runs tip to tip; the south tip carries it.
+    _far = _name == "far_end"
+    # The overall length runs tip to tip, from the north (datum) tip.
     _overall = {
         "length": (_band(bank.PIVOT_SHAFT_OVERALL_LENGTH, _P["OverallLength"], unit=shaft.UNIT), (("rocker_bank_layout", "PIVOT_SHAFT_OVERALL_LENGTH"),)),
         "length_nominal": (bank.PIVOT_SHAFT_OVERALL_LENGTH, (("rocker_bank_layout", "PIVOT_SHAFT_OVERALL_LENGTH"),)),
-    } if _south else {}
+        "length_from": ("datum_end", (("rocker_bank_layout", "PIVOT_SHAFT_OVERALL_LENGTH"),)),
+    } if _far else {}
     requirement(
         _name, kind="dome", faces=(SphereFace(2 * shaft.DOME_SPHERE_RADIUS, (0, 0, _centre)),),
-        requirements=("height", "length") if _south else ("height",), fields={
-            "height": (_band(shaft.DOME_HEIGHT, _P["DomeHeight"], unit=shaft.UNIT), ("DOME_HEIGHT",)),
-            "height_nominal": (shaft.DOME_HEIGHT, ("DOME_HEIGHT",)),
-            "sphere_radius": (shaft.DOME_SPHERE_RADIUS, ("DOME_SPHERE_RADIUS",)),
-            "base_radius": (shaft.SHAFT_DIA / 2, ("SHAFT_DIA",)),
-            "base_z": (_z, ("__frame__",) if _name == "north_dome" else (("rocker_bank_layout", "PIVOT_SHAFT_LENGTH"),)),
-            "note": (shaft.DOME_CALLOUT, ("DOME_CALLOUT",)),
-            "z_mm": (
-                [0.0, round(shaft.DOME_HEIGHT, 12)] if _name == "north_dome"
-                else [round(_z - shaft.DOME_HEIGHT, 12), round(_z, 12)],
+        requirements=("height", "length") if _far else ("height",), fields={
+            # The dome's apex, on the axis.
+            "plane": (
+                {"frame": "model", "axis": "z", "value": round(_tip, 12)},
                 ("DOME_HEIGHT", ("rocker_bank_layout", "PIVOT_SHAFT_LENGTH")),
             ),
+            "outward": ([0.0, 0.0, -1.0] if _far else [0.0, 0.0, 1.0], ("__frame__",)),
+            "height": (_band(shaft.DOME_HEIGHT, _P["DomeHeight"], unit=shaft.UNIT), ("DOME_HEIGHT",)),
+            "height_nominal": (shaft.DOME_HEIGHT, ("DOME_HEIGHT",)),
+            # The sphere's radius prints as a REF.
+            "radius_ref": (shaft.DOME_SPHERE_RADIUS, ("DOME_SPHERE_RADIUS",)),
+            "note": (shaft.DOME_CALLOUT, ("DOME_CALLOUT",)),
             **_overall,
-        }, precision={"height": _P["DomeHeight"], **({"length": _P["OverallLength"]} if _south else {})},
+        }, precision={"height": _P["DomeHeight"], **({"length": _P["OverallLength"]} if _far else {})},
     )
 # Ra on the running face: the body the 20 hubs rock on and the two ears
 # journal. A revolved flank is a drawing SILHOUETTE, not a model edge, so the
