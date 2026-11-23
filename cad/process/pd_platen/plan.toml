@@ -224,9 +224,13 @@ bond_accepted_tensile_mpa = 0.6
 # Five 1.41 in strips (consumables.tape-scotchblue-2090 width_mm) on each
 # face, along X, edges butted, never overlapped, no gap over 1/32
 # (tape_seam_gap_max_mm). On the bar the first is flush with its front edge,
-# the fifth trimmed at its back edge, all from tape_end_overhang_mm (1/4 in)
-# left of the scribed line to 1/4 in past the blank's right end (11 1/2 in).
-# On the blank the first is centred on its FRONT edge (its front half
+# the fifth trimmed at its back edge, each tape_bar_strip_length_mm (11 3/4
+# in) from tape_end_overhang_mm (1/4 in) left of the scribed line: at least
+# 1/4 in past the right end of the longest gated blank (11.10) placed 1/16
+# in long, and clear of the step clamps' zones.
+# On the blank each strip is tape_blank_strip_length_mm (11 1/4 in), longer
+# than the longest gated blank, knife-trimmed flush with its ends; the first
+# is centred on its FRONT edge (its front half
 # trimmed off), so the blank's seams sit tape_seam_offset_mm (half a strip,
 # about .70) behind the bar's. The bond prechips is told: the tape under a
 # square patch as long as the plate is high (its lowest height, 5.30), less
@@ -237,6 +241,8 @@ tape_strip_count = 5
 tape_seam_offset_mm = 17.907
 tape_seam_gap_max_mm = 0.79375
 tape_end_overhang_mm = 6.35
+tape_bar_strip_length_mm = 298.45
+tape_blank_strip_length_mm = 285.75
 bond_patch_area_mm2 = 17441.77
 # Edges: the 1/2 in end mill's side, one level from P to
 # outline_breakthrough_mm (.006) under Z0, into the tape stack: deeper than
@@ -482,7 +488,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Blank bonded to the bar's skimmed top: ScotchBlue 2090 blue painter's tape on the bar and on face P, GH1200 thick CA glue between, the stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}} (miked); five 1.41 in strips on each, along X, butted, the blank's seams half a strip off the bar's. Face P down, B up, its left end on the scribed line, its FRONT edge flush with the bar's front edge, both within 1/16 in. Nothing else holds it. Bar, blocks, jacks and clamps as Setup 2, untouched."
 datum = "Program PL03_face. G54 X and Y as set in Setup 2 (not touched). Z0: the cut face, the top's high point less {{process.face_cut_mm:in.4dot}}, touched on the blank, so the tape stack under it does not enter. After a controller reset, a stall or an E-stop: home ($H), which brings the stored G54 X and Y back, near enough for a facing cut; set Z0 again as this setup does, on a part of the face not yet cut, and run the file from its start."
-diagram = { file = "diagrams/bond.svg", alt = "Plan and section of the blank on the bar: five blue tape strips along X on the bar, butted, from 1/4 in left of the scribed line to 1/4 in past the blank; the blank's own five strips, their seams dashed, half a strip off the bar's; its left end on the scribed line and its FRONT edge flush with the bar's front edge. Section: blue tape, CA glue, blue tape between bar and blank; the 1/2 in end mill faces the top in passes along X." }
+diagram = { file = "diagrams/bond.svg", alt = "Plan and section of the blank on the bar: five blue tape strips along X on the bar, butted, from 1/4 in left of the scribed line to past the blank's right end; the blank's own five strips, their seams dashed, half a strip off the bar's; its left end on the scribed line and its FRONT edge flush with the bar's front edge. Section: blue tape, CA glue, blue tape between bar and blank; the 1/2 in end mill faces the top in passes along X." }
 envelope = { x_span_mm = ["{{process.x0_from_bar_left_mm}}", "{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_width_max_mm}}", "{{process.face_cutter_dia_mm}}", 7.62], work_top_mm = ["{{process.block_height_mm}}", "{{process.bar_top_max_mm}}", "{{process.tape_stack_max_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.bar_top_min_mm}}", "{{process.third_cut_min_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = "other"
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.length_target_mm}}"], seat = "skimmed fixture bar", seat_mm = ["{{process.seat_left_mm}}", "{{process.seat_right_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{process.bond_patch_area_mm2}}", width_mm = "{{process.height_target_mm}}" }] } }
@@ -500,7 +506,7 @@ tool = "tape"
 speed_kind = "other"
 drilling = "none"
 sizing = "other"
-instruction = "Tape the bar: five 11 1/2 in strips of the 1.41 in tape along X, from 1/4 in left of the scribed line; the first flush with the bar's front edge, the others behind it, edges butted. Never overlap two strips (that doubles the stack and rocks the blank); no gap over 1/32. Knife-trim the fifth flush with the bar's back edge."
+instruction = "Tape the bar: five 11 3/4 in strips of the 1.41 in tape along X, from 1/4 in left of the scribed line; the first flush with the bar's front edge, the others behind it, edges butted. Never overlap two strips (that doubles the stack and rocks the blank); no gap over 1/32. Knife-trim the fifth flush with the bar's back edge."
 feed = "hand"
 
 [[setups.operations]]
@@ -508,7 +514,7 @@ tool = "tape"
 speed_kind = "other"
 drilling = "none"
 sizing = "other"
-instruction = "Tape face P: five 11 in strips along the blank's length, the first centred on the FRONT edge (half its width over the edge), the others butted behind it, no overlap, no gap over 1/32. Its seams then sit about .70 in, half a strip, off the bar's. Knife-trim every strip flush with the blank's edges and ends."
+instruction = "Tape face P: five 11 1/4 in strips along the blank's length, the first centred on the FRONT edge (half its width over the edge), the others butted behind it, no overlap, no gap over 1/32. Its seams then sit about .70 in, half a strip, off the bar's. Knife-trim every strip flush with the blank's edges and ends."
 feed = "hand"
 
 [[setups.operations]]
@@ -588,7 +594,7 @@ vise_hold = "other"
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.length_target_mm}}"], seat = "skimmed fixture bar", seat_mm = ["{{process.seat_left_mm}}", "{{process.seat_right_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{process.bond_patch_area_mm2}}", width_mm = "{{process.height_target_mm}}" }] } }
 
 [[setups.operations]]
-instruction = "Bond the blank P up as Setup 3, from its mic of the blank to its press: mic the blank at the three stations; degrease the bar and face B; five fresh 11 1/2 in strips on the bar and five 11 in on face B, the first centred on the FRONT edge; burnish; glue; lower it P up within 10 seconds; press 1 minute, wait 5."
+instruction = "Bond the blank P up as Setup 3, from its mic of the blank to its press: mic the blank at the three stations; degrease the bar and face B; five fresh 11 3/4 in strips on the bar and five 11 1/4 in on face B, trimmed flush, the first centred on the FRONT edge; burnish; glue; lower it P up within 10 seconds; press 1 minute, wait 5."
 feed = "hand"
 
 [[setups.operations]]
@@ -632,7 +638,7 @@ vise_hold = "other"
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.length_target_mm}}"], seat = "skimmed fixture bar", seat_mm = ["{{process.seat_left_mm}}", "{{process.seat_right_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{process.bond_patch_area_mm2}}", width_mm = "{{process.height_target_mm}}" }] } }
 
 [[setups.operations]]
-instruction = "Bond the blank B up as Setup 3, from its mic of the blank to its press: mic the blank at the three stations; degrease the bar and face P; five fresh 11 1/2 in strips on the bar and five 11 in on face P, the first centred on the FRONT edge; burnish; glue; lower it B up within 10 seconds; press 1 minute, wait 5."
+instruction = "Bond the blank B up as Setup 3, from its mic of the blank to its press: mic the blank at the three stations; degrease the bar and face P; five fresh 11 3/4 in strips on the bar and five 11 1/4 in on face P, trimmed flush, the first centred on the FRONT edge; burnish; glue; lower it B up within 10 seconds; press 1 minute, wait 5."
 feed = "hand"
 
 [[setups.operations]]
@@ -682,7 +688,7 @@ vise_hold = "other"
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.length_target_mm}}"], seat = "skimmed fixture bar", seat_mm = ["{{process.seat_left_mm}}", "{{process.seat_right_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "platen", kind = "part", area_mm2 = "{{process.bond_patch_area_mm2}}", width_mm = "{{process.height_target_mm}}" }] } }
 
 [[setups.operations]]
-instruction = "Prepare as Setup 3, from its mic of the blank to its burnish: mic the blank at the three stations; degrease the bar and face B; five fresh 11 1/2 in strips on the bar and five 11 in on face B, the first centred on the FRONT edge; burnish both."
+instruction = "Prepare as Setup 3, from its mic of the blank to its burnish: mic the blank at the three stations; degrease the bar and face B; five fresh 11 3/4 in strips on the bar and five 11 1/4 in on face B, trimmed flush, the first centred on the FRONT edge; burnish both."
 feed = "hand"
 
 [[setups.operations]]

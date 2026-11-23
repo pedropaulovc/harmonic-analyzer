@@ -680,14 +680,23 @@ def context(
         raise ValueError("the blank's seams lie within a quarter strip of the bar's")
     if not 0 <= gap <= TAPE_GAP_MAX_THICKNESSES * thick:
         raise ValueError(f"a {gap:.2f} seam: the plate does not bridge it")
-    # The bar's tape runs past each end of the blank wherever it was placed,
-    # on the skimmed seat.
+    # The bar's strips start the overhang left of the scribed line and run at
+    # least the overhang past the right end of the longest gated blank placed
+    # long, clear of the step clamps' zones; the blank's strips are longer
+    # than the longest gated blank (trimmed flush).
     overhang = p["tape_end_overhang_mm"]
-    tape_x = (-margin_x - overhang, -margin_x + l_max + overhang)
+    bar_strip = p["tape_bar_strip_length_mm"]
+    tape_x = (-margin_x - overhang, -margin_x - overhang + bar_strip)
     if overhang <= tol:
-        raise ValueError("the bar's tape can leave an end of the blank bare")
-    if tape_x[0] < seat[0] or tape_x[1] > seat[1]:
-        raise ValueError("the bar's tape runs off the skimmed seat")
+        raise ValueError("the bar's tape can leave the blank's left end bare")
+    if tape_x[1] - (-margin_x + tol + l_max) < overhang:
+        raise ValueError(
+            f"the bar's {bar_strip} strips end under {overhang} past the longest blank"
+        )
+    if tape_x[0] < bar_x[0] + clamp or tape_x[1] > bar_x[1] - clamp:
+        raise ValueError("the bar's tape runs into a step clamp's zone")
+    if p["tape_blank_strip_length_mm"] < l_max:
+        raise ValueError("the blank's strips leave an end of the longest blank bare")
     # The bond prechips is told: the tape under a square patch as long as the
     # plate is high, less the bare seams it can cross and two relief pockets.
     side = g["height_band"][0]
