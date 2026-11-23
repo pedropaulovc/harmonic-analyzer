@@ -224,7 +224,7 @@ speed_kind = "spindle"
 tool = "knurl"
 drilling = "none"
 sizing = "other"
-instruction = "Feed the wheel along toward the chuck until the DRO reads Z{{cad.kept_end_z_mm:in.2dot}} (the parting line: the head is knurled to it and the holder stays clear of the jaws) and back, adding infeed each pass, until the crests mike {{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}. Brush the chips off between passes."
+instruction = "Feed the wheel along toward the chuck until the DRO reads Z{{cad.kept_end_z_mm:in.2dot}} (the parting line: the head is knurled to it and the holder stays clear of the jaws) and back, adding infeed each pass, until the crests mike {{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}. Brush the chips off between passes; write the last crest reading down as D0."
 settings = "lathe-knurl-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 inspection = "Over the knurl Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}, micrometer across the crests; one sharp single-tracked straight pattern."
@@ -269,7 +269,7 @@ sizing = "other"
 instruction = "Step the blade toward the chuck about half its width a plunge, each to the same Ø, until its chuck-side face meets the head's rear face: the DRO then reads Z-{{cad.shoulder_head_in:.3dot}} plus the miked width."
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.step_waist_dia_mm}}"
-inspection = "Waist Ø{{cad.step_waist_dia_min_in:.3dot}}–{{cad.step_waist_dia_max_in:.3dot}}, the tips of the calipers' outside jaws in the groove; flange length (seat face to the flange's rear face) {{cad.shoulder_flange_min_in:.3dot}}–{{cad.shoulder_flange_max_in:.3dot}} and seat face to the head's rear face {{cad.shoulder_head_min_in:.3dot}}–{{cad.shoulder_head_max_in:.3dot}}, calipers' outside jaws over the flange."
+inspection = "Waist Ø{{cad.step_waist_dia_min_in:.3dot}}–{{cad.step_waist_dia_max_in:.3dot}}, the tips of the calipers' outside jaws in the groove; flange length (seat face to the flange's rear face) {{cad.shoulder_flange_min_in:.3dot}}–{{cad.shoulder_flange_max_in:.3dot}} and seat face to the head's rear face {{cad.shoulder_head_min_in:.3dot}}–{{cad.shoulder_head_max_in:.3dot}}: the flange length with the calipers' outside jaws over the flange, the head's rear face with their depth rod from the seat face."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.step_waist_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.shoulder_flange_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.shoulder_head_band_mm}}" }]
 
 [[setups.operations]]
@@ -369,8 +369,8 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Rechuck the nut by its knurled head over the brass shim wrap, {{process.regrip_grip_in:.2dot}} in in the jaws, as in the Holding line. Swing the compound to {{cad.recess_flank_deg:.1f}}° off the cross slide; set it with the dial indicator on the compound against the faced rim: {{process.compound_check_travel_in:.3dot}} on the compound's dial moves it {{process.compound_check_rise_in:.3dot}}. Lock it."
-inspection = "Compound: {{process.compound_check_travel_in:.3dot}} on its dial reads {{process.compound_check_rise_in:.3dot}} on the indicator."
+instruction = "Rechuck the nut by its knurled head over the brass shim wrap, {{process.regrip_grip_in:.2dot}} in in the jaws, as in the Holding line. Swing the compound {{cad.recess_flank_deg:.1f}}° off the cross slide, so feeding it out moves the tool toward the tailstock; set it with the dial indicator on the compound against the faced rim: feeding out {{process.compound_check_travel_in:.3dot}} on its dial, the plunger extends {{process.compound_check_rise_in:.3dot}}. Lock it."
+inspection = "Compound: fed out {{process.compound_check_travel_in:.3dot}}, the plunger extends {{process.compound_check_rise_in:.3dot}}."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -379,7 +379,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Turn the toolpost so the AR's chuck-side edge stands at least 20° off the face and lock it; zero the compound's dial. Spindle running, touch the AR on the faced rim and set DRO Z0; touch it on the knurl's crests and set the X DRO (on diameter) to their Op 50 reading. From here the compound moves only in Op 220, back to zero after each pass."
+instruction = "Turn the toolpost so the AR's chuck-side edge stands at least 20° off the face and lock it; zero the compound's dial. Spindle running, touch the AR on the faced rim and set DRO Z0; touch it on the knurl's crests and set the X DRO (on diameter) to D0, the Op 50 reading. From here the compound moves only in Op 220, back to zero after each pass."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
