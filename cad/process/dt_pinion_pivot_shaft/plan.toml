@@ -302,8 +302,8 @@ instruction = "Take the shaft out and stand it on end A against the 1-2-3 block 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Still standing, the height gauge's go/no-go on the crown's rim: zero the scriber on crown B's apex; set it {{cad.dome_far_height_min_in:.3dot}} below and slide its tip in across the top: it must ride on the crown, clear of the O.D.'s edge; set it {{cad.dome_far_height_max_in:.3dot}} below and slide it in again: it must stop on the O.D., below the edge."
-inspection = "Crown B height {{cad.dome_far_height_min_in:.3dot}}–{{cad.dome_far_height_max_in:.3dot}}."
+instruction = "Still standing, zero the height gauge's scriber on crown B's apex. Lower it .001 at a time, each time sliding its tip in from outside the O.D.: the rim is the highest setting at which it catches on the cylindrical O.D. without riding onto the crown. That reading is crown B's height; note it: Op 350 uses it."
+inspection = "Crown B {{cad.dome_far_height_min_in:.3dot}}–{{cad.dome_far_height_max_in:.3dot}} high."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.dome_far_height_band_mm}}" }]
 
 [[setups.operations]]
@@ -365,7 +365,7 @@ instruction = "A flat at the apex: one more sweep with the cross slide in .001 (
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Take the shaft out and stand it on crown B's apex on the surface plate, held upright against the 1-2-3 block's face. With the height gauge read crown A's apex; then lower the scriber until its tip, slid in across the top, just stops on the O.D.'s top edge (crown A's rim) and read it; then set it where its tip just stops under the O.D.'s bottom edge (crown B's rim) and read it. Body = crown A's rim − crown B's rim; crown A = its apex − its rim."
+instruction = "Stand the shaft on crown B's apex on the surface plate against the 1-2-3 block's face. Height gauge: read crown A's apex; then find crown A's rim as Op 260 (highest setting that catches the O.D.) and read it. Body = crown A's rim − crown B's height (Op 260); crown A = its apex − its rim."
 inspection = "Body {{cad.body_length_min_in:.3dot}}–{{cad.body_length_max_in:.3dot}} rim to rim; crown A {{cad.dome_datum_height_min_in:.3dot}}–{{cad.dome_datum_height_max_in:.3dot}} high."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.body_length_band_mm}}" }, { gauge = "height-gauge", band_mm = "{{cad.dome_datum_height_band_mm}}" }]
 
