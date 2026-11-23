@@ -131,7 +131,7 @@ ref = "centre-drills-carbide-60"
 
 [[tools]]
 id = "radius"
-name = "Radius gauges (to buy)"
+name = "Starrett S167AZ radius gauges"
 ref = "radius-gauges"
 status = "to_order"
 

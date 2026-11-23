@@ -140,7 +140,7 @@ name = "AR carbide turning tool"
 ref = "lathe-ar"
 [[tools]]
 id = "form"
-name = "R.024 full-radius groover (3/64 wide)"
+name = "R.024 full-radius groover (about .048 wide)"
 ref = "form-tool-r024"
 status = "to_order"
 [[tools]]
