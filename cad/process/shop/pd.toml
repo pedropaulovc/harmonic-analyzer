@@ -157,8 +157,3 @@ rpm = 2800
 chip_load_mm_per_tooth = 0.05588  # .0022 in; 2800 × 3 × .0022 = 18.5 in/min
 flutes = 3
 feed_unit = "in/min"
-# The platen's fixture bar (stock_refs): the freed 18 in bar of
-# cad/config/shop-equipment/stock-bought.toml, same key. Description only, as
-# the stock records above.
-[stock.6061-flat-1-2x6-18in]
-description = "6061-T6511 aluminium, flat bar, 1/2 x 6 x 18 in"

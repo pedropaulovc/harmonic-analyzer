@@ -391,11 +391,6 @@ diameter_mm = 6.35
 # owned: to buy (cad/config/shop-equipment/ gauges, same key).
 [tools.plug-gauges-2500-2505]
 description = "Plug gauge pair, .2500 GO (plus) and .2505 NO-GO (minus), Vermont Gage Class X"
-# The platform's Setups 3-4 spoil plate: the freed 1/2 x 6 x 18 in bar
-# (stock-bought, same key, on hand), whole. Description only, as the stock
-# records above.
-[stock.6061-flat-1-2x6-18in]
-description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 18 in length"
 
 # The platform's assembly shims (owner ruling 2026-11-22, issue #3363):
 # description only; the record is fixtures.shim-washers-1-4-id-arbor-19.
