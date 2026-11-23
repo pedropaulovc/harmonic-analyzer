@@ -26,12 +26,14 @@ ref = "jig-drill-7"  # Drills #7
 
 # Tool audit 2026-11-23 (row frame-clearance-stub-drill): the #10 close
 # clearance is the #4 (.2090) that cad/config/tolerances/fastener_clearance.yaml
-# names, from the owned 115-piece index; the #5 (.2055) is under the .206
-# minimum. A stub #4 only if this plan shows a jobber #4 cannot fit.
+# names; the #5 (.2055) is under the .206 minimum. A stub #4, as the audit
+# allows where a jobber cannot fit: on edge (machining-dfm.md "Cross-screw
+# setup") a jobber #4 stands over the 17 in spindle limit (shop fr.toml).
 [[tools]]
 id = "drill-4"
-name = "#4 drill (115-piece index)"
-ref = "drill-4"
+name = "#4 screw-machine-length drill (2-3/8 OAL)"
+ref = "frame-clearance-stub-drill-4"
+status = "to_order"
 
 [[tools]]
 id = "drill-c"
