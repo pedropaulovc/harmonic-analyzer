@@ -168,8 +168,6 @@ diameter_mm = 1.190625
 description = "R.180 dome form tool: concave R.180 edge, cuts a convex R.18 dome"
 [tools.gauge-pin-0625]  # MHA-PD-10 .002 TIR TO A Ø.0625 PIN
 description = "Gauge pin .0625 in, class ZZ"
-[tools.dti]  # MHA-PD-13 regrip trued on its knurl; inventory gauges.dti
-description = "Dial test indicator (lever), .001 mm"
 [tools.dial-indicators]  # MHA-PD-13 compound set to the dish flank; inventory gauges.dial-indicators, gauges.mag-base
 description = ".001 in dial indicator on its magnetic base"
 [tools.knurl-straight-25tpi]  # MHA-PD-13 STRAIGHT KNURL 25 TPI
