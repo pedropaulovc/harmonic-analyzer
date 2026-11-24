@@ -42,8 +42,10 @@ def see_note(number: int) -> str:
     return f"SEE NOTE {number}, SHEET {NOTES_SHEET}"
 
 
-# Rule 4's necessity answer for the reamed pin bore, one line and no size.
-# A looser bore lets the bonded pin lean (paper_drive_arm_registration.
+# Why the pin bore is reamed stands in the part's necessity file, not on
+# the sheet (owner ruling 2026-11-24: "In the part's registry file, not on
+# the sheet"; cad/config/necessity/pd-transgear-arm.yaml): a looser bore
+# lets the bonded pin lean (paper_drive_arm_registration.
 # S_AXIS_TILT_MAX_RAD, which takes no credit for the clamped head: the bore
 # is what squares the pin); the lean is charged to the platen air, the
 # reducer and rack meshes and the collar air, and the first to close as the
@@ -51,8 +53,6 @@ def see_note(number: int) -> str:
 # 12T's full-depth teeth stopping inside the MHA-PD-26 rack's reach
 # (test_pd_feed_rack_drawing; build_pd_paper_drive_assembly's platen, rack
 # and chain check; fit audit 2026-11-23 batch sweep).
-_RACK = _config.parts("pd-feed-rack")
-PIN_BORE_NECESSITY = f"KEEPS PIN SQUARE TO {_RACK['number']} RACK MESH"
 
 
 NOTES = (
@@ -62,20 +62,20 @@ NOTES = (
     " SHOULDER.",
     # Notes 2 and 3 (fit audit 2026-11-23, pending owner confirmation): a
     # hole reamed to a bought dowel prints its set reamer's size and no band;
-    # the dowel tried in it is the gauge, and the note says in six words or
-    # fewer what fails if the hole is loose (rule 4's necessity test): the
-    # plate must come back to the reducer mesh setting; the latch's stop pin
-    # has no other fastener (owner 2026-10-27, #1379).
+    # the dowel tried in it is the gauge.  What fails if the hole is loose
+    # (the plate must come back to the reducer mesh setting; the latch's
+    # stop pin has no other fastener, owner 2026-10-27, #1379) is in
+    # cad/config/necessity/pd-transgear-arm.yaml, not on the sheet (owner
+    # ruling 2026-11-24).
     # The mouths break at the title block's row (fit batch review r1: "MOUTH
     # BREAKS .002 MAX FOR DOWEL GRIP" was a second reason with a dimension
     # in it; pd_transgear_arm_geometry.LOCATOR_MOUTH_BREAK_MAX_MM carries
     # the title block's break through the grip, the punch air and the walls).
     f"{LOCATOR_NOTE}. 2X DOWEL HOLES: PRESS FIT ON DOWEL {LOCATOR_PIN.PART_NUMBER},"
-    " DOES NOT ENTER BY HAND,\n"
-    "   KEEPS PLATE AT REDUCER MESH SETTING.\n"
+    " DOES NOT ENTER BY HAND.\n"
     f"   MATCH-DRILL WITH ARM PLATE {_PLATE['number']} AT ASSEMBLY, {knob_setting_ref()}.",
     f"{LATCH_PIN_NOTE}. LATCH-PIN HOLE: PRESS FIT ON LATCH PIN {LATCH_PIN_NUMBER},\n"
-    "   DOES NOT ENTER BY HAND. HOLDS LATCH STOP, NO OTHER FASTENER.",
+    "   DOES NOT ENTER BY HAND.",
 )
 NOTES_TEXT = "\n".join(NOTES)
 # The sheet's numbered notes as export_features reads a declared part's
@@ -85,15 +85,14 @@ DRAWING_NOTES = NOTES_TEXT
 PIVOT_BORE_CALLOUT = f"{PIVOT_BORE_DRILL} DRILL THRU, {see_note(PIVOT_NOTE)}"
 # The pin bore's callout (fit audit 2026-11-23, pending owner confirmation:
 # the one-diameter pin is bonded in the reamed bore): size and process,
-# then two lines of words.  The first names the mate and says it is made
-# to this bore: MHA-PD-23 is turned last, so its sheet carries the bond's
-# clearance and the trial, once (fit batch review r2: with the range here
-# the pin's sheet printed none; r1: a linked note 5 repeated the mate and
-# the bond with a second acceptance).  The second is rule 4's necessity
-# answer for the REAM.  The grade and the method stand in MHA-PD-00's pin
-# step, and the set pin that checks the bore is the traveler's.
+# then the mate and that it is made to this bore: MHA-PD-23 is turned
+# last, so its sheet carries the bond's clearance and the trial, once (fit
+# batch review r2: with the range here the pin's sheet printed none; r1: a
+# linked note 5 repeated the mate and the bond with a second acceptance).
+# The grade and the method stand in MHA-PD-00's pin step, and the set pin
+# that checks the bore is the traveler's.
 PIN_BORE_MATE_TEXT = f"{PIN.PIN_NUMBER} IS TURNED TO THIS BORE"
-PIN_BORE_CALLOUT = f"REAM THRU\n{PIN_BORE_MATE_TEXT}\n{PIN_BORE_NECESSITY}"
+PIN_BORE_CALLOUT = f"REAM THRU\n{PIN_BORE_MATE_TEXT}"
 # Note 2 names the dowel and its press; the callout links it (round 2: the
 # dowel named on both was named twice for one pattern).
 LOCATOR_CALLOUT_TEXT = f"2X REAM THRU, {see_note(LOCATOR_NOTE)}"
@@ -114,15 +113,13 @@ PIN_HOLE_CALLOUT = "\n".join((
 # The counterbore is drawn in section A-A.  Its Ø is a clearance pocket at
 # the title block's .XX and carries the counterbore symbol
 # (pd_transgear_arm_spec.COUNTERBORE_PREFIX, authored on the part) and no
-# words.  Its floor's band is under the title block's row for what it sets,
-# which its callout names with the mate (rule 4's necessity answer): the
-# room between the floor and the pivot screw's head is the MHA-PD-VN-63
-# spring's installed height, which leaves the spring's working range at a
-# looser floor (transgear_hanger_joints.SPRING_ROOM_MIN: .0003 over the
-# working height at ±.002, .0027 under it at the title block's ±.005).
-FLOOR_CALLOUT = "\n".join(
-    (f"SEATS SPRING {_SPRING['number']}", "SETS ITS WORKING HEIGHT")
-)
+# words.  Its floor's row names the mate it seats.  The floor's band is
+# under the title block's row for the spring's room (the room between the
+# floor and the pivot screw's head is the MHA-PD-VN-63 spring's installed
+# height: transgear_hanger_joints.SPRING_ROOM_MIN, .0003 over the working
+# height at ±.002, .0027 under it at the title block's ±.005); that reason
+# is in the part's necessity file.
+FLOOR_CALLOUT = f"SEATS SPRING {_SPRING['number']}"
 # Section D-D (sheet 2, with the notes) shows the rear mouth's chamfer.  Its
 # face is named by the datum it faces away from (round 4: REAR was a direction
 # word the sheet never defined); the minimum clears the pin's seat fillet

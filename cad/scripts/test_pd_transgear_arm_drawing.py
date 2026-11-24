@@ -454,10 +454,11 @@ def test_the_pin_is_bonded_in_the_bore_with_clearance_at_every_limit() -> None:
     )
     assert spec.PIN_BOND_GAP_ACCEPTED_MAX < cluster_pin.LOCTITE_638_GAP_MAX
     assert spec.PIN_BOND_CLEARANCE_PRINTED == (least, spec.PIN_BOND_GAP_ACCEPTED_MAX)
+    # Owner ruling 2026-11-24: the reason the bore is reamed is in the
+    # part's necessity file, not on the sheet.
     assert arm_notes.PIN_BORE_CALLOUT.split("\n") == [
         "REAM THRU",
         f"{cluster_pin.PIN_NUMBER} IS TURNED TO THIS BORE",
-        "KEEPS PIN SQUARE TO MHA-PD-26 RACK MESH",
     ]
     assert "CLEARANCE" not in arm_notes.PIN_BORE_CALLOUT
     # The pin station's extension line stands left of the text and the
@@ -471,9 +472,7 @@ def test_the_pin_is_bonded_in_the_bore_with_clearance_at_every_limit() -> None:
     assert "PIN BORE" not in arm_notes.NOTES_TEXT
     assert cluster_pin.RETAINING_COMPOUND not in arm_notes.NOTES_TEXT
     assert "DOES NOT ENTER" not in arm_notes.PIN_BORE_CALLOUT
-    # The necessity answer is one line of at most six words beyond the
-    # mate's number.
-    assert len(re.sub(r"MHA-\S+", "", arm_notes.PIN_BORE_NECESSITY).split()) <= 6
+    assert not hasattr(arm_notes, "PIN_BORE_NECESSITY")
     # #2174: the rear mouth's band is its own native leg dimension's, in
     # section D-D, not callout text.
     assert "MOUTH" not in arm_notes.PIN_BORE_CALLOUT
@@ -656,7 +655,7 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
     assert f"SEE NOTE {arm_notes.LATCH_PIN_NOTE}" in arm_notes.PIN_HOLE_CALLOUT
     note = " ".join(arm_notes.NOTES[arm_notes.LATCH_PIN_NOTE - 1].split())
     assert "DOES NOT ENTER BY HAND" in note
-    assert "HOLDS LATCH STOP, NO OTHER FASTENER" in note
+    assert "HOLDS" not in note and "FASTENER" not in note
     assert "INTERFERENCE" not in note and not any(char.isdigit() for char in note[2:].replace(
         spec.LATCH_PIN_NUMBER, ""
     ))
@@ -904,18 +903,16 @@ def test_the_counterbore_and_its_floor_name_the_pivot_spring() -> None:
     """Machinist review (blocker): the counterbore's +0.1/0 and its floor's
     ±0.05 named no mate. The spring seats in it; the floor sets its room.
     Fit batch review r1: the Ø is a clearance pocket at the title block's
-    row and carries no words; the floor's band names the spring and what it
-    sets, on its own callout."""
+    row and carries no words; the floor's row names the spring it seats.
+    Owner ruling 2026-11-24: why the floor's band is tight is in the part's
+    necessity file, not on the sheet."""
     spring = _config.parts("pd-vn-transgear-pivot-spring")["number"]
     assert spring == "MHA-PD-VN-63"
     assert "SpotFaceDia" not in arm_notes.DIMENSION_CALLOUTS
     assert arm_notes.DIMENSION_CALLOUTS["FloorDepth"] == arm_notes.FLOOR_CALLOUT
-    assert arm_notes.FLOOR_CALLOUT.splitlines() == [
-        f"SEATS SPRING {spring}",
-        "SETS ITS WORKING HEIGHT",
-    ]
+    assert arm_notes.FLOOR_CALLOUT == f"SEATS SPRING {spring}"
     assert "SPRING" not in arm_notes.NOTES_TEXT
-    # What the answer states: the room leaves the spring's working range at
+    # The registry reason: the room leaves the spring's working range at
     # the title block's ±.005.
     import transgear_hanger_joints as joints
 
@@ -975,7 +972,6 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
         "THRU",
         dowel.PART_NUMBER,
         "DOES NOT ENTER BY HAND",
-        "KEEPS PLATE AT REDUCER MESH SETTING",
         plate,
         knob_setting_ref(),
     ):

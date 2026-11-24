@@ -252,10 +252,10 @@ FRONT_KEEP = {
     # callouts.  SOLIDWORKS centres the block on this point, midway between
     # the pin station's extension line, which drops through this band to
     # the 2.7093 row, and the 5.07 row's at the square end, 120 mm apart:
-    # its widest row, the necessity answer's 39 characters (~102 mm at the
-    # 2.61 mm a character run 20261124T030945233Z printed), stands 9 mm
-    # off each (fit batch reviews: r1's 47-character row struck the first
-    # line, r2's 46-character row, moved right, the second).
+    # its widest row, the mate's 32 characters (~84 mm at the 2.61 mm a
+    # character run 20261124T030945233Z printed), stands 18 mm off each
+    # (fit batch reviews: r1's 47-character row struck the first line,
+    # r2's 46-character row, moved right, the second).
     "PinBoreDia": (_front_x(PIN_STATION) + 0.060, _UNDER_FRONT - 0.024),
     "EndWidth": (_front_x(TIP_STATION) + 0.0115, FRONT_CENTER[1]),
     # Mid-line, or further left: it keeps 12 mm between its centre and the
@@ -318,9 +318,9 @@ SECTION_KEEP = {
     ),
 }
 # Its left edge stands ~12 mm right of the line.  SOLIDWORKS centres its
-# three lines (the value, the spring it seats and what the floor sets) on
-# this point; 8 mm right of 0.081 since the 25-character mate row replaced
-# the 19-character link to a note.
+# two lines (the value and the spring the floor seats) on this point;
+# 8 mm right of 0.081 since the 25-character mate row replaced the
+# 19-character link to a note.
 FLOOR_TEXT_XY = (0.089, 0.059)
 # Section A-A's column right of the stud bore, where both its frames stand.
 _STUD_FRAME_X = _front_x(PIN_STATION) + 0.012
