@@ -37,7 +37,7 @@
 # locating holes are match-drilled #32 with MHA-PD-18 and reamed at assembly
 # (steps 13A and 13E) with the set's .1260 reamer, the arm's with its .1240;
 # the MHA-PD-28 bush is pressed into
-# K (step 11C) and its bore reamed after the press (step 11H). The plate
+# K (step 11K) and its bore reamed after the press (step 11Q). The plate
 # leaves with K reamed and chamfered for the press.
 #
 # Workholding: bonded, blue painter's tape on both faces and CA glue between
@@ -99,7 +99,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1/4 x 1-1/2 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:fraction}} in flat bar, the 12 in length: one {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} in blank. Spoil block: a 3.5 in length of the 1 x 3 in 6061 bar."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The two long edges are the bar's, as supplied: no cut touches them. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall or controller reset, home again and do what that setup's Datum says before resuming. The two Ø.1260 locating holes, the bush press and its ream are the assembly's (MHA-PD-00 steps 13A, 13E, 11C, 11H). K is reamed with the over/under set's .4385 reamer and not gauged: MHA-PD-28 is turned to it. To buy before starting: the bar, the over/under reamer set (its .4385), the 3/8 in 82° countersink and the .250, .438 and .450 pin gauges (Setup 2 checks the countersinks while the blank is still bonded). Finish: {{cad.finish}}."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The two long edges are the bar's, as supplied: no cut touches them. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall or controller reset, home again and do what that setup's Datum says before resuming. The two Ø.1260 locating holes, the bush press and its ream are the assembly's (MHA-PD-00 steps 13A, 13E, 11H, 11N). K is reamed with the over/under set's .4385 reamer and not gauged: MHA-PD-28 is turned to it. To buy before starting: the bar, the over/under reamer set (its .4385), the 3/8 in 82° countersink and the .250, .438 and .450 pin gauges (Setup 2 checks the countersinks while the blank is still bonded). Finish: {{cad.finish}}."
 shop = "../shop"
 stock_refs = ["1018-flat-1-4x1-1-2", "6061-flat-1x3"]
 material_key = "rocker-1018-cold-finished"
@@ -732,5 +732,5 @@ inspection = "No sharp edge or burr anywhere."
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "The plate leaves without the two Ø.1260 locating holes: MHA-PD-00 step 13A match-drills them with MHA-PD-18 and step 13E reams them; step 11C presses the MHA-PD-28 bush into K and step 11H reams its bore. Wipe on ISO VG 32 oil all over and into K ({{cad.finish}}); bag the plate."
+instruction = "The plate leaves without the two Ø.1260 locating holes: MHA-PD-00 step 13A match-drills them with MHA-PD-18 and step 13E reams them; step 11K presses the MHA-PD-28 bush into K and step 11Q reams its bore. Wipe on ISO VG 32 oil all over and into K ({{cad.finish}}); bag the plate."
 feed = "hand"

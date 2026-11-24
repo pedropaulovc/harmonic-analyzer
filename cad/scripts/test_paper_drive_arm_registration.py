@@ -86,7 +86,7 @@ def test_locator_sites_share_real_part_frames_and_paid_mouth_walls() -> None:
     assert arm.OUTLINE_EDGE_BREAK_MAX_MM == outline_break
     expected = (arm.PIVOT_END_R - x * math.sin(arm.EDGE_LEAN) - abs(y) * math.cos(arm.EDGE_LEAN)
                 - arm.OUTLINE_BAND - arm.LOCATOR_MOUTH_POSITION_RADIUS_MM - pin.PRESS_HOLE_LIMITS_MM[1] / 2.0
-                - pin.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - outline_break
+                - arm.LOCATOR_MOUTH_BREAK_MAX_MM - outline_break
                 - (arm.THICKNESS + arm.THICKNESS_BAND) * math.tan(math.radians(0.3)))
     assert arm.WALLS["locator 1 to arm edge"][1] == pytest.approx(expected)
     assert "locator blind floor" not in arm.WALLS
@@ -160,20 +160,42 @@ def test_native_controls_reference_actual_bores_and_reach_the_real_chain_plane()
     assert arm_control.projected_zone_height_mm is None
     assert arm_control.characteristic == "perpendicularity"
     assert arm_control.tolerance == ".001" and arm_control.datums == ("A",)
-    # #2415: the axis follows the bore over the press land's grip only, and
-    # runs on from the land's front end, behind face A, to the chain plane.
-    assert registration.S_PIN_LAND_GRIP_MIN_MM == pytest.approx(cluster_pin.PRESS_LAND_GRIP_MIN)
-    assert registration.S_PIN_LAND_LENGTH_MIN_MM == pytest.approx(
-        2.0 * cluster_pin.PRESS_LAND_LENGTH - cluster_pin.PRESS_LAND_LENGTH_MAX
-    )
-    land_end_behind_face_a = arm.THICKNESS + arm.THICKNESS_BAND - registration.S_PIN_LAND_LENGTH_MIN_MM
-    assert land_end_behind_face_a > 0.0
+    # Owner ruling 2026-11-24, fit audit question 4: the one-diameter pin
+    # is bonded in the bore, so its axis may lean by the bore's own tilt plus
+    # the widest gap the arm sheet's NO-GO accepts, over the shortest bond,
+    # and runs on from the arm's broken front edge to the chain plane.
+    assert registration.S_PIN_BOND_LENGTH_MIN_MM == pytest.approx(cluster_pin.BOND_LENGTH_MIN)
+    assert registration.S_PIN_BOND_GAP_MAX_MM == pytest.approx(arm_spec.PIN_BOND_GAP_ACCEPTED_MAX)
+    assert registration.S_PIN_BOND_GAP_MAX_MM >= max(cluster_pin.BOND_GAP)
     assert registration.S_AXIS_ZONE_DIAMETER_MM == pytest.approx(
-        float(arm_control.tolerance) * 25.4
-        * (registration.S_PROJECTED_HEIGHT_MM + land_end_behind_face_a)
-        / cluster_pin.PRESS_LAND_GRIP_MIN
+        (float(arm_control.tolerance) * 25.4 + registration.S_PIN_BOND_GAP_MAX_MM)
+        / cluster_pin.BOND_LENGTH_MIN
+        * (registration.S_PROJECTED_HEIGHT_MM + registration.S_ARM_FRONT_EDGE_BREAK_MAX_MM)
     )
     assert registration.S_AXIS_ZONE_DIAMETER_MM > registration.AXIS_PROJECTED_ZONE_DIAMETER_MM
+    # Codjiflo on #3494: a slip fit leaning on opposite walls stands half the
+    # gap off the bore's axis at the bore's front end, and the whole tilt
+    # carries it on from there; the position consumer reads that radius, and
+    # the tilt consumers still read the tilt alone.
+    import paper_drive_geom
+
+    assert registration.S_AXIS_TILT_MAX_RAD == pytest.approx(
+        (float(arm_control.tolerance) * 25.4 + arm_spec.PIN_BOND_GAP_ACCEPTED_MAX)
+        / cluster_pin.BOND_LENGTH_MIN
+    )
+    assert registration.S_AXIS_RADIAL_OFFSET_MAX_MM == pytest.approx(
+        arm_spec.PIN_BOND_GAP_ACCEPTED_MAX / 2.0
+        + registration.S_AXIS_TILT_MAX_RAD * registration.S_AXIS_RUN_ON_MM
+    )
+    assert registration.S_AXIS_RADIAL_OFFSET_MAX_MM > registration.S_AXIS_ZONE_DIAMETER_MM / 2.0
+    angle = 0.01
+    stud_error = paper_drive_geom._rotating_stud_error_change_mm(angle)
+    assert stud_error >= (
+        2.0 * registration.S_AXIS_RADIAL_OFFSET_MAX_MM * math.sin(angle / 2.0)
+    )
+    assert math.tan(paper_drive_geom.reducer_axis_tilt_maxima_rad()[1]) > (
+        registration.S_AXIS_TILT_MAX_RAD
+    )
     # K's tilt is the MHA-PD-28 bush bore's frame (#2425: the bore is reamed
     # after pressing, so the flat plate prints none); carried to K's projected
     # height past the real chain plane, that tilt stays inside the axes' tilt

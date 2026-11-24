@@ -34,7 +34,6 @@ from pd_transgear_arm_geometry import (
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
     PIVOT_END_R,
-    SPOT_FACE_DIA_GROWTH,
     STOCK_THICKNESS_IN,
     TIP_STATION,
 )
@@ -45,8 +44,9 @@ from pd_transgear_arm_geometry import (
 # station is .XX (R9-23, ``pd_transgear_arm_geometry.TIP_STATION``); the
 # thickness is the ground stock's, a reference (the stock band governs it,
 # ``STOCK_TEXT_PREFIX``); the pivot bore prints its #9 drill's size under
-# the DRILLED HOLES row; the latch-pin hole and pin bore print
-# under their explicit ream bands; the pin station and the locating sites
+# the DRILLED HOLES row; the latch-pin hole prints under its explicit ream
+# band; the pin bore prints the .1260 reamer's size at three places
+# with no band (fit audit 2026-11-23); the pin station and the locating sites
 # are BASIC under circular position controls; the plate-tap stations print
 # as references, the taps being spotted through MHA-PD-19's screw holes at
 # assembly (``pd_transgear_arm_geometry.PLATE_TAP_LOCATION_RADIUS_MM``); the
@@ -59,11 +59,11 @@ OUTLINE_PLACES = ARM.OUTLINE_PLACES
 TIP_STATION_PLACES = ARM.TIP_STATION_PLACES
 THICKNESS_PLACES = 4
 PIVOT_BORE_PLACES = 3
-SPOT_FACE_DIA_PLACES = 3
+SPOT_FACE_DIA_PLACES = ARM.SPOT_FACE_DIA_PLACES
 SPOT_FACE_FLOOR_PLACES = ARM.SPOT_FACE_FLOOR_PLACES
 STATION_PLACES = 4
 PIN_HOLE_DIA_PLACES = 4
-PIN_BORE_DIA_PLACES = 4
+PIN_BORE_DIA_PLACES = 3
 PIN_HOLE_DEPTH_PLACES = ARM.PIN_HOLE_DEPTH_PLACES
 # The flank's lean to the P-T centreline prints as a reference to one place
 # of a degree, 2.4 (owner ruling 2026-11-20 (Pedro), #2424 option B): the
@@ -71,8 +71,17 @@ PIN_HOLE_DEPTH_PLACES = ARM.PIN_HOLE_DEPTH_PLACES
 FLANK_ANGLE_PLACES = 1
 
 # Explicit model bands, (upper, lower) deviations where one-sided.
-# The counterbore only cuts oversize (drilled-hole row).
-SPOT_FACE_DIA_BAND = (SPOT_FACE_DIA_GROWTH, 0.0)
+# The counterbore's Ø prints at the title block's .XX with no band of its
+# own; this is that row, for the feature export's limits.
+SPOT_FACE_DIA_BAND = (ARM.SPOT_FACE_DIA_BAND_MM, -ARM.SPOT_FACE_DIA_BAND_MM)
+# It prints with the counterbore symbol (rule 26), authored on the part's
+# dimension; the prefix lane replaces the native Ø, so it carries it.
+COUNTERBORE_PREFIX = "<HOLE-SPOT> <MOD-DIAM>"
+# A single MIN limit prints the model value and this suffix, with no native
+# tolerance: swTolMIN prints a lowercase "min." (fit batch review r1 on
+# section A-A's ".38 min."; pd_transgear_front_bushing_spec.CHAMFER_SUFFIX
+# is the same form for a MAX).
+MIN_SUFFIX = " MIN"
 # Floor from the FRONT face: the MHA-PD-VN-63 spring's room under the head (R9-71).
 SPOT_FACE_FLOOR_TOLERANCE = ARM.SPOT_FACE_FLOOR_TOLERANCE
 
@@ -92,8 +101,8 @@ PART_DATUMS = (
 # precedent; owner review #2144): no projected zone anywhere on MHA-PD-18
 # (rule 26 bars the modifier). The pin bore S (datum C) takes ⌖ Ø.004 to
 # A|B and a plain ⊥ Ø.001 to A over the bore, the reamed-hole row (owner
-# ruling 2026-11-08 (Pedro), #2144 item 4.1). The axis it allows, gripped by
-# the pin's press land and run on to the chain plane in front of face A, is
+# ruling 2026-11-08 (Pedro), #2144 item 4.1). The axis it allows, the bonded
+# pin leaning in the bore's gap and run on to the chain plane in front of face A, is
 # paper_drive_arm_registration.S_AXIS_ZONE_DIAMETER_MM: the meshes and the
 # platen air charge it, and MHA-PD-00's collar feeler accepts the collar air
 # it closes (pd_cluster_air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES).
@@ -134,13 +143,13 @@ GEOMETRIC_CONTROLS = (
 
 # The press and its proud set are assembly (MHA-PD-00 "arm-plate-located").
 # The sheet's callout and its note 2 name the dowel the reamed holes take,
-# its press by trial (the dowel does not enter by hand), what the press
-# protects (the plate's return to the reducer mesh setting) and what the
-# small mouth breaks keep: the dowel's full-diameter grip
-# (``pd_transgear_arm_geometry.LOCATOR_FULL_CYLINDER_SPAN_MIN_MM``), with the
-# match-drill with the plate and its assembly step.  The range is ANALYSIS,
-# not printed: the dowel's catalogue band against what the .1240 set reamer
-# is modelled to cut.
+# its press by trial (the dowel does not enter by hand) and what the press
+# protects (the plate's return to the reducer mesh setting), with the
+# match-drill with the plate and its assembly step.  The mouths break at
+# the title block's row (``pd_transgear_arm_geometry.
+# LOCATOR_MOUTH_BREAK_MAX_MM``).  The range is ANALYSIS, not printed: the
+# dowel's catalogue band against what the .1240 set reamer is modelled to
+# cut.
 LOCATOR_PRESS_INTERFERENCE = (
     LOCATOR_PIN.DIA_LIMITS[0] - ARM.LOCATOR_HOLE_REAMED_LIMITS_MM[1],
     LOCATOR_PIN.DIA_LIMITS[1] - ARM.LOCATOR_HOLE_REAMED_LIMITS_MM[0],
@@ -152,7 +161,7 @@ if LOCATOR_PRESS_INTERFERENCE[0] <= 0.0:
 # of the front face's mouth break on the thinnest stock, so a punch from the
 # front drives it out.
 LOCATOR_PUNCH_AIR_MIN_MM = (
-    THICKNESS - ARM.THICKNESS_BAND - LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
+    THICKNESS - ARM.THICKNESS_BAND - ARM.LOCATOR_MOUTH_BREAK_MAX_MM
     - LOCATOR_PIN.INSERTION_LIMITS_MM[1]
 )
 if LOCATOR_PUNCH_AIR_MIN_MM <= 0.0:
@@ -170,18 +179,39 @@ STOCK_TEXT_PREFIX = f"{STOCK_THICKNESS_IN} ("
 # REF: an as-bought size with the supplier's tolerance (units guidance).
 STOCK_TEXT_SUFFIX = ") GROUND STOCK REF"
 
-# --- The MHA-PD-23 pin's press in the reamed bore at S (R9-68) -----------------
-# The pin spec owns the press (it imports the arm geometry, so the geometry
-# cannot import it back); the arm prints it under the bore.  #2415: only the
-# pin's short land presses, turned to the measured ream.
-PIN_PRESS_INTERFERENCE = PIN.PRESS_INTERFERENCE
-if not all(
-    math.isclose(value, expected, abs_tol=1e-9)
-    for value, expected in zip(PIN_PRESS_INTERFERENCE, (0.00508, 0.0127), strict=True)
-):
+# --- The MHA-PD-23 pin's bonded slip fit in the reamed bore at S (R9-68) -------
+# Owner ruling 2026-11-24, fit audit question 4: the pin is one diameter
+# and is bonded in the bore with LOCTITE 638; nothing presses.  The pin spec
+# owns the bond (it imports the arm geometry, so the geometry cannot import
+# it back).  The bore stays REAMED and prints the reamer's size with no
+# band: its gap is the lean the pin's axis is allowed
+# (paper_drive_arm_registration.S_AXIS_TILT_MAX_RAD), and a drilled #30
+# (.1285 +.004/0) would open it past what the meshes and the airs clear.
+# ``pd_transgear_arm_geometry.PIN_BORE_DIA_BAND`` is the ANALYSIS band the
+# set reamer is modelled to cut, not a printed limit.  The sheet states the
+# fit once, at the bore's callout, as the bond's clearance range (rule 23);
+# the traveler checks the range's upper end with one pin of the .001-step
+# set that must not enter (the sheet prints no gauge).
+# (PIN_BORE_DIA_PLACES above: three places, Ø.126 REAM THRU.)
+PIN_BOND_GAP = PIN.BOND_GAP  # modelled (least, greatest) diametral
+PIN_BORE_NO_GO_PIN_DIA = PIN.BOND_NO_GO_PIN_DIA  # .127, one pin of the .001-step set
+PIN_BORE_NO_GO_PLACES = 3
+_SET_PIN_UNDER_SIZE_MAX = 0.00508  # .0002, a Class ZZ minus pin
+# The widest gap the pin's sheet accepts: a bore that just refuses the .127
+# pin, on the pin's smallest modelled shank.
+PIN_BOND_GAP_ACCEPTED_MAX = PIN.BOND_GAP_ACCEPTED_MAX  # .0022
+# Rule 23: the bond's clearance as the pin's note 1 prints it.
+PIN_BOND_CLEARANCE_PRINTED = PIN.BOND_CLEARANCE_PRINTED  # .0010-.0022
+if not 0.0 < PIN_BOND_GAP[0] <= PIN_BOND_GAP[1] <= PIN_BOND_GAP_ACCEPTED_MAX:
     raise AssertionError(
-        f"MHA-PD-18 pin bore press on MHA-PD-23 is {PIN_PRESS_INTERFERENCE}, "
-        "not .0002..0005"
+        f"MHA-PD-18 pin bore bond gap on MHA-PD-23 is {PIN_BOND_GAP}, outside "
+        f"0..{PIN_BOND_GAP_ACCEPTED_MAX}"
+    )
+if PIN_BOND_GAP_ACCEPTED_MAX > PIN.LOCTITE_638_GAP_MAX:
+    raise AssertionError("the .127 NO-GO accepts a gap over LOCTITE 638's gap fill")
+if ARM.PIN_BORE_DIA_MAX >= PIN_BORE_NO_GO_PIN_DIA - _SET_PIN_UNDER_SIZE_MAX:
+    raise AssertionError(
+        "the smallest .127 set pin enters a pin bore inside the reamer's modelled band"
     )
 # The true overall, pivot-end extreme to the square end, prints as a
 # reference; a derived reference has no part-side places, so the spec owns
@@ -216,7 +246,7 @@ LATCH_PIN_BOND_GAP_MAX = round(
 )
 if LATCH_PIN_BOND_GAP_MAX > LOCATING_PIN.BOND_GAP_LIMIT_MM:
     raise AssertionError("a bonded MHA-PD-VN-58 exceeds the retaining compound's gap")
-# The depth MIN's native record (#3124; swTolMIN prints only the model value
+# The depth MIN's analysis record (#3124; the sheet prints the model value
 # and MIN): its upper deviation is the deepest hole that still holds the wall
 # target at the faces, its drill run-off charged, and from its point to the
 # pin bore (the latter governs on the 3/8 bar, #2019).

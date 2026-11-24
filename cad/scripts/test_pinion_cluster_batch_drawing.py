@@ -716,9 +716,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.261,
                 8.7122,
             ),
-            frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): _annulus_limit(
-                3.21564, 3.2004, 7.366
-            ),
+            # Owner ruling 2026-11-24, fit audit question 4: MHA-PD-23 is
+            # a bonded slip fit in the arm's ream, modelled with clearance,
+            # so the pair needs no interference allowance.
             # MHA-PD-VN-64 1/8 (Ø3.175) dowels pressed into the arm's Ø3.1496
             # through reams, the 5/16 stock less the 1.7018 proud set.
             **_expected_numbered_pairs(

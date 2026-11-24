@@ -39,8 +39,10 @@ _RING_PRONG_SHARE = 3.0 * math.atan(0.75) / (2.0 * math.pi)
 # Pairs with NO row, modelled line to line or with clearance, which the gate
 # reads as contact: the MHA-PD-17 hub's plain bore on the sleeve's Ø9 boss,
 # the MHA-PD-VN-69 key pin's side clear of the sleeve's flat (#2409), the
-# sleeve and both
-# bushings on the MHA-PD-23 pin (Ø3.9), the disc bore on the boss (Ø9), the
+# one-diameter MHA-PD-23
+# pin bonded in the arm's Ø3.2004 ream (a slip fit, fit audit 2026-11-23:
+# nothing presses), the sleeve and both
+# bushings on the MHA-PD-23 pin (Ø3.175 in Ø3.2004), the disc bore on the boss (Ø9), the
 # knob journal in the MHA-PD-28 bush's bore (Ø6.3246), the bush pressed in
 # the plate's ream (both modelled line to line at Ø11.1379; owner ruling
 # 2026-11-20, #2425), the drive collar's drilled round bore on the core made
@@ -145,12 +147,6 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         range(1, 3),
         "pd-support-bar",
         smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 0.8128),
-    ),
-    # MHA-PD-23's press land (pd_transgear_pin_spec, Ø.1266 REF) pressed into
-    # the arm's .126 ream (pd_transgear_arm_geometry) over its 7.366 length:
-    # the press (#2415; the journal passes the ream clear).
-    frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): smooth_annulus_limit_mm3(
-        3.21564, 3.2004, 7.366
     ),
     # The two MHA-PD-VN-64 dowels (pd_vn_transgear_arm_plate_locating_pin_spec,
     # 1/8 = Ø3.175 model) pressed into the arm's Ø3.1496 through reams
