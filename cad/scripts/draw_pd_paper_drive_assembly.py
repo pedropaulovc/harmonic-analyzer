@@ -1897,26 +1897,29 @@ PIN_BOND_CURE_H = 24
 # flanks let it, so the cluster's shift on the pin and the pin's own bending
 # are not read as shake.
 #
-# The window is every reading the charged terms can give: the
-# circular backlash over the S to N set band at every printed corner
-# (paper_drive_mesh_check.reducer_mesh), at the band's bottom closed by the
-# largest clearances for the floor and at its top closed by the smallest for
-# the ceiling, moved to the tip by the tip radius over the pitch radius and
+# The ceiling is the loosest reading the charged terms can give: the
+# circular backlash at the top of the S to N set band at every printed corner
+# (paper_drive_mesh_check.reducer_mesh), closed by the smallest clearances,
+# moved to the tip by the tip radius over the pitch radius and
 # rounded outward onto the shop indicator's division, so that a build inside
-# those terms is never refused and a reading outside sends the fitter to
-# inspect the parts the remedy names. The pin's lean in its bore (S is held
+# those terms is never refused and a reading over it sends the fitter to
+# the remedy. It is the only check at assembly on the loose side of this
+# mesh, the side the contact ratio lives on. The pin's lean in its bore (S is held
 # square only within .001 over the arm, which the disc's height multiplies)
 # is not in the window: the located step indicates S on the shank at the
 # height the disc runs, so the setting is made where the mesh is (codjiflo
 # P2 on 176fad0). The smaller tilt terms at the knob
 # (paper_drive_geom.reducer_axis_tilt_maxima_rad) are not charged: #2510.
-# The floor is a positive shake at the tightest centre the fits allow, which
-# is the mesh check's own gate (backlash over zero at the tight extreme);
-# the no-tight-spot turn checks the same thing all round. Outward rounding
+# Outward rounding
 # departs from the package's inward windows (steps.inch_window) because this
 # reading is a cross-check of parts already accepted on their own sheets.
-# Delegated ruling 2026-11-10 (PR #2494 takeover agent), no precedent; owner
-# review #2144; pending owner confirmation.
+# No floor prints: the disc shakes, which the needle moving shows, and the
+# no-tight-spot turn checks the same thing all round (owner ruling
+# 2026-11-24, audit part 2 question C2: "Yes." to THE DISC SHAKES (THE
+# NEEDLE MOVES), .008 MAX; it retires the half-division floor of the
+# delegated ruling of 2026-11-10, review finding #2960). What stays coded is
+# that the tightest mesh the fits allow does not bind: a positive shake at
+# the band's bottom closed by the largest clearances.
 _KNOB_JOURNAL_CLEARANCE_MM = (
     min(knob_bush.BORE_DIA_LIMITS) - max(knob_shaft.JOURNAL_DIA_BAND),
     max(knob_bush.BORE_DIA_LIMITS) - min(knob_shaft.JOURNAL_DIA_BAND),
@@ -1939,9 +1942,7 @@ _DISC_TIP_RADII_MM = [profile.blank_radius_mm for profile in disc.manufactured_p
 # Read on one of the shop's .001 in dial indicators (shop.toml
 # gauges.dial-indicators): the loosest mesh shakes about 0.19 mm at the tip,
 # past the 1 um lever indicator's 0.14 mm range (gauges.dti, owner
-# 2026-11-17). The ceiling prints on the .001 grid, rounded up; the
-# tightest mesh still shakes over half a division, which prints as the floor
-# (#2960: "visibly" let a needle twitch pass).
+# 2026-11-17). The ceiling prints on the .001 grid, rounded up.
 REDUCER_DIAL_STEP_MM = 0.001 * 25.4
 REDUCER_SHAKE_MIN_MM = (
     _REDUCER_CIRCULAR_BACKLASH_MM[0] * min(_DISC_TIP_RADII_MM) / (disc.PITCH_DIA / 2.0)
@@ -1950,12 +1951,11 @@ REDUCER_SHAKE_MAX_MM = math.ceil(
     _REDUCER_CIRCULAR_BACKLASH_MM[1] * max(_DISC_TIP_RADII_MM) / (disc.PITCH_DIA / 2.0)
     / REDUCER_DIAL_STEP_MM - 1e-9
 ) * REDUCER_DIAL_STEP_MM
-if REDUCER_SHAKE_MIN_MM < REDUCER_DIAL_STEP_MM / 2.0:
-    raise AssertionError("the reducer's tightest shake reads under half a division")
-# The floor prints as half a .001 division.
+if not REDUCER_SHAKE_MIN_MM > 0.0:
+    raise AssertionError("the reducer's tightest mesh binds when pressed together")
+# The acceptance: any shake the needle shows, under the ceiling.
 REDUCER_BACKLASH_DIAL_TEXT = (
-    f"{steps.inch_text(REDUCER_DIAL_STEP_MM / 2.0, 4)} TO "
-    f"{steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}"
+    f"(THE NEEDLE MOVES), {steps.inch_max_text(REDUCER_SHAKE_MAX_MM, 3)}"
 )
 # The disc is read at stations round one turn: 45 degrees apart sample its
 # once-a-turn tooth-space runout within cos 22.5 (92 %) of its peak. Each
@@ -3686,8 +3686,7 @@ def setting_table_rows(
             f"{s('arm-plate-located', 12)}, {s('arm-plate-fitted', 20)}, "
             f"{s('fitup-pose-set', 9)}",
             "DISC SHAKE AT THE TIP OF THE TOOTH IN MESH",
-            f"{steps.inch_text(REDUCER_DIAL_STEP_MM / 2.0, 4)} TO "
-            f"{steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}",
+            f"THE NEEDLE MOVES, {steps.inch_max_text(REDUCER_SHAKE_MAX_MM, 3)}",
             f"DIAL INDICATOR, {REDUCER_DIAL_STATIONS} PLACES",
         ),
         "plate-screw-tips": (

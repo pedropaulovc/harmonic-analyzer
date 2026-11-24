@@ -346,10 +346,10 @@ def test_bore_callout_links_its_fit_note() -> None:
     assert len(bore_note.splitlines()) == 1
 
 
-def test_sheet_gear_data_names_the_mesh_once_with_its_backlash_acceptance() -> None:
+def test_sheet_gear_data_names_the_mesh_once_with_its_acceptance() -> None:
     """Policy 3: the span and tip keep their bands; their fit route is the
-    backlash acceptance against MHA-PD-08, inside the reducer's budget."""
-    import paper_drive_mesh_check as mesh_check
+    trial against MHA-PD-08, by feel: no feeler backlash row (owner ruling
+    2026-11-24, audit part 2 question C2)."""
 
     data = callouts.GEAR_DATA_NOTE
     rows = data.splitlines()
@@ -375,15 +375,8 @@ def test_sheet_gear_data_names_the_mesh_once_with_its_backlash_acceptance() -> N
     # The span prints once, on the face view; the block carries its route.
     for limit in spec.SPAN_LIMITS:
         assert f"{limit / 25.4:.4f}".lstrip("0") not in data
-    low, high = callouts.BACKLASH_ACCEPT_MM
-    assert (
-        f"SPAN MATCHED FIT:  BACKLASH WITH MATE {low / 25.4:.3f}-{high / 25.4:.3f}, FEELER"
-    ).replace("0.", ".") in rows
-    tight, loose = mesh_check.reducer_band_meshes()
-    assert 0.0 < callouts.BACKLASH_BUDGET_MM[0] <= low < high
-    assert high <= callouts.BACKLASH_BUDGET_MM[1]
-    assert callouts.BACKLASH_BUDGET_MM[0] < tight.backlash_mm[0]
-    assert callouts.BACKLASH_BUDGET_MM[1] < loose.backlash_mm[1]
+    assert "SPAN MATCHED FIT:  RUNS ON MATE WITH NO TIGHT SPOT" in rows
+    assert "FEELER" not in data and "BACKLASH" not in data
     # Rule 4: the teeth's one mate is named once on the sheet; span and tip
     # link the block.
     sheet_text = "\n".join(
