@@ -108,10 +108,11 @@ def test_the_sheet_prints_the_overall_and_the_flange_never_the_hub_body() -> Non
     assert _places("HubLength") == cluster_fit.LENGTH_PLACES == 3
     assert spec.FLANGE_THICK == pytest.approx(0.094 * IN) and _places("FlangeThick") == 3
     assert spec.SPIGOT_LENGTH == pytest.approx(0.144 * IN) and _places("SpigotLength") == 3
-    assert spec.BORE_DIA == spec.SLEEVE.BOSS_DIA and _places("BoreDia") == 4
+    # The bore prints the .3135 reamer's size; the sleeve's boss is turned to it.
+    assert spec.BORE_DIA == pytest.approx(0.3135 * IN) and _places("BoreDia") == 4
     assert spec.DRAWING_DIMENSIONS["BoreProfile"] == {"BoreDia"}
     assert spec.HUB_DIA == pytest.approx(0.540 * IN) and _places("HubDia") == 3
-    assert spec.SPIGOT_DIA == pytest.approx(0.498 * IN) and _places("SpigotDia") == 4
+    assert spec.SPIGOT_DIA == pytest.approx(0.498 * IN) and _places("SpigotDia") == 3
     assert spec.FLANGE_DIA == pytest.approx(1.05 * IN) and _places("FlangeDia") == 2
     assert joint.BOLT_CIRCLE_DIA == pytest.approx(0.75 * IN)
     assert joint.BOLT_CIRCLE_PLACES == 2
@@ -140,18 +141,20 @@ def test_the_overall_and_the_spigot_are_terms_of_the_disc_cluster_stack() -> Non
     assert STACK_NAME in spec.STACK_TEXT
 
 
-def test_the_bore_the_spigot_and_the_stack_lengths_carry_model_bands() -> None:
+def test_the_spigot_and_the_stack_lengths_carry_model_bands() -> None:
     """Every other size is governed by its printed places and the holes by
-    the title block's DRILLED HOLES row."""
+    the title block's DRILLED HOLES row.  The two reamed holes (the bore and
+    the key pin's) print their reamers' sizes and no band (rule 4, fit audit
+    2026-11-23): their mates are their gauges."""
     assert model_toleranced_dimensions(part) == {
-        ("BoreProfile", "BoreDia"): "*BORE_DEVIATIONS",
         ("HubProfile", "SpigotDia"): "*SPIGOT_DIA_DEVIATIONS",
         ("HubProfile", "HubLength"): "HUB_LENGTH_BAND",
         ("HubProfile", "SpigotLength"): "SPIGOT_LENGTH_BAND",
-        ("KeyPinProfile", "KeyPinDia"): "*KEY_PIN_HOLE_DEVIATIONS",
         ("KeyPinProfile", "KeyPinChord"): "KEY_PIN_LOCATION_BAND",
         ("KeyPinProfile", "KeyPinStop"): "KEY_PIN_LOCATION_BAND",
     }
+    for name in ("BORE_DEVIATIONS", "KEY_PIN_HOLE_DEVIATIONS"):
+        assert not hasattr(spec, name) and not hasattr(part, name)
 
 
 def _printed_limits(build, spec_module, feature: str, name: str, nominal: float):
@@ -165,38 +168,67 @@ def _printed_limits(build, spec_module, feature: str, name: str, nominal: float)
     return nominal + lower, nominal + upper
 
 
-def test_the_round_bore_slides_on_the_sleeve_boss_at_every_printed_limit() -> None:
-    """#2409: the bore is plain round and reamed through; the two parts are
-    made apart, each to its own sheet, so it keeps a clearance (never a
-    bind) at every printed limit, and its callout names the mate it slides
-    on (rule 4) and ends on the least finished wall over it (rule 20)."""
+def test_the_round_bore_is_reamed_and_the_sleeve_boss_made_to_it() -> None:
+    """#2409: the bore is plain round and reamed through.  Fit audit
+    2026-11-23 (rule 4, made to fit): it prints the .3135 reamer's size and
+    no band, and the sleeve's boss prints REF and is turned last to it, so
+    neither sheet prints limits; the specs keep analysis bands whose
+    clearance (never a bind, .0010 at most) the stacks consume.  The callout
+    names the mate it slides on and what the fit protects (the necessity
+    answer, no dimension in it) and ends on the least finished wall over it
+    (rule 20)."""
     import build_pd_transgear_feed_pinion as sleeve_part
     import pd_transgear_feed_pinion_spec as sleeve
 
-    assert spec.BORE_DIA == sleeve.BOSS_DIA
-    assert spec.BORE_BAND == pytest.approx((0.0010 * IN, 0.0005 * IN))  # +.0010/+.0005
+    assert spec.BORE_DIA == pytest.approx(sleeve.BOSS_DIA + max(sleeve.BOSS_DIA_BAND))
+    assert spec.BORE_BAND == pytest.approx((0.0005 * IN, 0.0))  # analysis: +.0005/0
     assert part.BORE_DIA == drawing.BORE_DIA == spec.BORE_DIA
-    assert part.BORE_R == pytest.approx(sleeve.BOSS_DIA / 2.0)
-    assert part.BORE_DEVIATIONS == spec.BORE_DEVIATIONS
-    # The reamer's .3135 is the bore's least size.
-    assert spec.BORE_DIA + spec.BORE_BAND[1] == pytest.approx(0.3135 * IN)
+    assert part.BORE_R == pytest.approx(0.3135 * IN / 2.0)
     # One round cut through the whole part: no flat, no second bore.
     assert part.V_BORE == pytest.approx(math.pi * part.BORE_R**2 * spec.HUB_LENGTH)
     for name in ("FLAT_TO_AXIS", "FLAT_CLEARANCE", "BORE_FIT_TEXT"):
         assert not hasattr(spec, name)
 
-    bore = _printed_limits(part, spec, "BoreProfile", "BoreDia", spec.BORE_DIA)
-    boss = _printed_limits(
-        sleeve_part, sleeve, "SleeveProfile", "BossDia", sleeve.BOSS_DIA
+    # Neither build applies a band to the pair.
+    assert ("BoreProfile", "BoreDia") not in model_toleranced_dimensions(part)
+    assert ("SleeveProfile", "BossDia") not in model_toleranced_dimensions(sleeve_part)
+    bore = (spec.BORE_DIA + spec.BORE_BAND[1], spec.BORE_DIA + spec.BORE_BAND[0])
+    boss = (
+        sleeve.BOSS_DIA + min(sleeve.BOSS_DIA_BAND),
+        sleeve.BOSS_DIA + max(sleeve.BOSS_DIA_BAND),
     )
+    assert bore == pytest.approx((0.3135 * IN, 0.3140 * IN))
     round_fit = (bore[0] - boss[1], bore[1] - boss[0])
     assert round_fit[0] >= -1e-9
     assert round_fit == pytest.approx(spec.BOSS_CLEARANCE_LIMITS, abs=1e-6)
+    assert round_fit == pytest.approx((0.0, 0.0010 * IN), abs=1e-6)
     assert spec.BOSS_CLEARANCE == spec.BOSS_CLEARANCE_LIMITS[1]
     callout = drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].splitlines()
-    assert any(spec.SLEEVE_NUMBER in line for line in callout)
-    assert callout[-1] == spec.BORE_WALL_TEXT
-    assert len(callout) <= 3
+    assert callout == [
+        "REAM THRU",
+        f"SLIDING FIT ON {spec.SLEEVE_NUMBER}, KEEPS {spec.COLLAR_NUMBER} GAP",
+        spec.BORE_WALL_TEXT,
+    ]
+    assert spec.BORE_NECESSITY == f"KEEPS {spec.COLLAR_NUMBER} GAP"
+    assert not re.search(r"\.\d", callout[1])
+
+
+def test_a_looser_boss_fit_closes_the_collar_air() -> None:
+    """The necessity answer the bore prints, derived: the hub's rock on the
+    boss is the collar air's largest clearance term, and .002 more diametral
+    clearance (rule 4's test) closes the air under its floor."""
+    import pd_cluster_air as air
+
+    terms = dict(air.COLLAR_AIR.terms)
+    label = "hub rock on the sleeve boss"
+    assert terms[label] == pytest.approx(
+        spec.BOSS_CLEARANCE / spec.ROUND_ENGAGEMENT_MIN * air.DISC_TILT_LEVER
+    )
+    assert air.COLLAR_AIR.air_mm("statistical") >= air.COLLAR_AIR_MIN
+    looser = (spec.BOSS_CLEARANCE + 0.002 * IN) / spec.ROUND_ENGAGEMENT_MIN
+    terms[label] = looser * air.DISC_TILT_LEVER
+    loose = air.AirStack("looser boss", air.COLLAR_AIR.nominal_mm, terms, air.COLLAR_AIR_MIN)
+    assert loose.air_mm("statistical") < air.COLLAR_AIR_MIN
 
 
 def test_boss_round_engagement_follows_the_live_sleeve() -> None:
@@ -666,7 +698,7 @@ def test_finished_walls_over_the_bore_pay_both_end_breaks() -> None:
     """#2168 (Codjiflo on #2124): at the hub front face and at the spigot's
     end the wall over the round bore also loses the OD's and the bore
     mouth's .010 breaks: the Ø.540 body .1105 -> .0905, back over the target,
-    the spigot .0931 -> .0731, over the .060 floor (the bore and the spigot
+    the spigot (.498 +.000/-.002) .0910 -> .0710, over the .060 floor (the bore and the spigot
     are the cluster's fits).  The bore's callout states the least (rule
     20)."""
     breaks = 2.0 * 0.010 * IN
@@ -680,7 +712,7 @@ def test_finished_walls_over_the_bore_pay_both_end_breaks() -> None:
     assert finished["hub wall over the bore"] == pytest.approx(0.0905 * IN, abs=1e-3)
     assert finished["hub wall over the bore"] >= WALL_FLOOR
     spigot = finished["spigot wall over the bore"]
-    assert spigot == pytest.approx(0.0715 * IN, abs=1e-3)
+    assert spigot == pytest.approx(0.0710 * IN, abs=1e-4)
     assert 0.060 * IN - 1e-9 <= spigot < WALL_FLOOR
     assert not hasattr(spec, "FLAT_WALL_FINISHED")
     assert spec.BORE_WALL_TEXT == "WALL .071 MIN"
@@ -749,18 +781,16 @@ def _spec_fresh():
     return fresh
 
 
-def test_the_native_bore_follows_the_feed_boss_instead_of_an_old_literal(
+def test_the_native_bore_is_the_reamer_over_the_feed_boss(
     monkeypatch,
 ) -> None:
+    """The bore is the .3135 reamer's size, the boss's modelled largest: a
+    boss moved without the reamer is refused."""
+    assert _spec_fresh().BORE_DIA == pytest.approx(0.3135 * IN)
     old_boss = spec.SLEEVE.BOSS_DIA
     monkeypatch.setattr(spec.SLEEVE, "BOSS_DIA", old_boss - 0.1)
-    fresh = _spec_fresh()
-    assert fresh.BORE_DIA == pytest.approx(old_boss - 0.1)
-    assert fresh.BORE_BAND == spec.BORE_BAND
-    assert fresh.HUB_DIA == spec.HUB_DIA
-    assert fresh.SPIGOT_DIA == spec.SPIGOT_DIA
-    assert fresh.FLANGE_DIA == spec.FLANGE_DIA
-    assert fresh.HUB_WALL_WORST > spec.HUB_WALL_WORST
+    with pytest.raises(AssertionError, match="reamer is not the sleeve boss"):
+        _spec_fresh()
 
 
 def test_the_wall_gate_refuses_a_coarser_printed_row(monkeypatch) -> None:
@@ -847,11 +877,10 @@ _NOMINAL = {
     "KeyPinChord": spec.KEY_PIN_CHORD_OFFSET,
     "KeyPinStop": spec.KEY_PIN_STOP,
 }
-# The bore's and the spigot's native bands print beside their values.
+# The spigot's native band prints beside its value; the reamed bore and
+# key-pin hole print their reamers' sizes and no band.
 _BANDS = {
-    "BoreDia": spec.BORE_BAND,
     "SpigotDia": spec.SPIGOT_DIA_BAND,
-    "KeyPinDia": spec.KEY_PIN_HOLE_BAND,
 }
 # The disc cluster stack's printed lengths and the chord hole's locations
 # carry their symmetric band.
@@ -873,6 +902,7 @@ def _printed_box(name: str, anchor: tuple[float, float]) -> Box:
         value += f" +{_BANDS[name][0] / IN:.4f}".replace("0.", ".", 1)
     if name in _SYMMETRIC:
         value += f"\u00b1{_SYMMETRIC[name] / IN:.{_places(name)}f}".replace("0.", ".", 1)
+    value += drawing.SECTION_SUFFIXES.get(name, "")
     lines = [
         drawing.DIMENSION_CALLOUTS_ABOVE.get(name),
         value,
@@ -1057,8 +1087,12 @@ def test_the_chord_hole_dimensions_print_left_of_the_ring() -> None:
     stands inline between the hub axis's and the stop's extension lines, the
     chord's above the ring right of the axis's extension line."""
     callout = drawing.SECTION_CALLOUTS_BELOW["KeyPinDia"]
-    assert spec.KEY_PIN_NUMBER in callout
-    assert len(callout.splitlines()) <= 2
+    # Fit audit 2026-11-23 (rule 4): the reamed hole prints the reamer's
+    # size with REAM beside it and no band, its pin (the gauge) and what the
+    # ream is for, with no dimension in the answer.
+    assert drawing.SECTION_SUFFIXES == {"KeyPinDia": " REAM"}
+    assert callout.splitlines() == [f"PIN {spec.KEY_PIN_NUMBER}", "PRESS, NO BOND"]
+    assert spec.KEY_PIN_HOLE_BAND == pytest.approx((0.0005 * IN, 0.0))  # analysis
     assert len(drawing.SECTION_CALLOUTS_BELOW["KeyPinDrillDia"].splitlines()) <= 2
     assert set(drawing.SECTION_CALLOUTS_BELOW) == {"KeyPinDia", "KeyPinDrillDia"}
     xy = drawing._section_xy
@@ -1399,7 +1433,7 @@ def test_hub_feature_bands_are_the_printed_ones() -> None:
     assert features["flange_rear_face"]["perpendicularity_datum"] == "A"
     assert features["flange_front_face"]["thickness"] == band(0.089, 0.099)
     assert features["flange"]["dia"] == band(1.04, 1.06)
-    assert features["spigot"]["dia"] == band(0.497, 0.498)
+    assert features["spigot"]["dia"] == band(0.496, 0.498)
     assert features["spigot"]["length"] == band(0.143, 0.145)
     assert features["spigot"]["root_radius_max"] == pytest.approx(0.004 * IN)
     assert features["hub_body"]["dia"] == band(0.535, 0.545)

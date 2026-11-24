@@ -51,14 +51,15 @@ def test_every_marked_dimension_is_kept_once_with_part_authored_places() -> None
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "FaceWidth": 3,
         "OutsideDia": 4,
-        "BoreDia": 4,
+        "BoreDia": 3,
         "ToothSpan": 4,
     }
     assert "draw_pd_rack_pinion.py" in PRECISION_MIGRATED_DRAWINGS
+    # The reamed bore prints the reamer's size and no band (rule 4).
     assert model_toleranced_dimensions(part) == {
-        ("BoreProfile", "BoreDia"): "*BORE_DEVIATIONS",
         ("GearBlankProfile", "OutsideDia"): "*deviations(OUTSIDE_DIA_BAND)",
     }
+    assert not hasattr(spec, "BORE_DEVIATIONS")
 
 
 def test_the_disc_prints_no_tap_position() -> None:
@@ -134,11 +135,12 @@ def test_tap_to_bore_wall_meets_the_target_worst_case() -> None:
 
 def test_finished_tap_web_pays_both_mouths_and_prints_its_least() -> None:
     """#2167 (Codjiflo on #2124): at the front face the web also loses the
-    bore's chamfer at its .015 leg and the tap's .004 break (.0650 since
-    #2412's Ø.501 bore over the hub spigot's turned .498 -.001), at the rear the
-    bore's .010 title-block break and the .004: over the .060 floor, under
-    the .080 target, and the taps' numbered note (their callout links it)
-    states the least (rule 20)."""
+    bore's chamfer at its .015 leg and the tap's .004 break (.0630 with the
+    .501 reamer's analysis band +.002/0 over the hub spigot's turned .498
+    +.000/-.002, fit audit 2026-11-23; it was .0650 at the printed +.0005
+    and -.001), at the rear the bore's .010 title-block break and the .004:
+    over the .060 floor, under the .080 target, and the taps' numbered note
+    (their callout links it) states the least (rule 20)."""
     inch = 25.4
     finished = spec.TAP_TO_BORE_WALL_FINISHED
     assert finished["front face"] == pytest.approx(
@@ -149,8 +151,9 @@ def test_finished_tap_web_pays_both_mouths_and_prints_its_least() -> None:
     )
     assert spec.TAP_TO_BORE_WALL_FINISHED_MIN == finished["front face"]
     assert 0.060 * inch <= spec.TAP_TO_BORE_WALL_FINISHED_MIN < 0.080 * inch
-    assert spec.TAP_TO_BORE_WALL_FINISHED_MIN == pytest.approx(0.06502 * inch, abs=1e-3)
-    assert spec.TAP_WALL_TEXT == "WALL .065 MIN TO BORE"
+    assert spec.TAP_TO_BORE_WALL_FINISHED_MIN == pytest.approx(0.0630 * inch, abs=1e-3)
+    # The web the owner confirmed (#2144 item 3.1, RV-03): never under .063.
+    assert spec.TAP_WALL_TEXT == "WALL .063 MIN TO BORE"
     tap_note = callouts.DRAWING_NOTES.split(f"\n{callouts.TAP_NOTE}. ")[1]
     assert tap_note.rstrip(".").endswith(spec.TAP_WALL_TEXT)
 
@@ -179,10 +182,11 @@ def test_the_runout_accept_names_the_sample_the_sheet_prints() -> None:
 
 
 def test_the_bore_clears_the_hub_spigot_for_centring_at_every_limit() -> None:
-    """The bands the two builds apply (the disc's Ø.501 REAM_H7 bore, the
-    MHA-PD-17 hub's turned spigot) never bind and leave at least the
-    clearance MHA-PD-00 centres the disc in, and the fit note quotes the
-    clearance the limits give."""
+    """The disc's reamed Ø.501 bore (no band printed; its analysis band is
+    what the reamer is taken to cut) and the MHA-PD-17 hub's turned spigot
+    never bind and leave at least the clearance MHA-PD-00 centres the disc
+    in; the fit note names the spigot that is tried in the bore and what the
+    ream protects, with no number in it."""
     import build_pd_transgear_disc_hub as hub_part
     import pd_transgear_disc_hub_spec as hub
 
@@ -191,8 +195,10 @@ def test_the_bore_clears_the_hub_spigot_for_centring_at_every_limit() -> None:
         == "*SPIGOT_DIA_DEVIATIONS"
     )
     assert spec.BORE_DIA == pytest.approx(0.501 * 25.4)
-    bore_lower, bore_upper = spec.BORE_DEVIATIONS
+    assert spec.BORE_BAND == pytest.approx((0.002 * 25.4, 0.0))
+    bore_upper, bore_lower = spec.BORE_BAND
     spigot_lower, spigot_upper = hub.SPIGOT_DIA_DEVIATIONS
+    assert (spigot_lower, spigot_upper) == pytest.approx((-0.002 * 25.4, 0.0))
     least = (spec.BORE_DIA + bore_lower) - (hub.SPIGOT_DIA + spigot_upper)
     greatest = (spec.BORE_DIA + bore_upper) - (hub.SPIGOT_DIA + spigot_lower)
     assert least >= -1e-9
@@ -205,16 +211,18 @@ def test_the_bore_clears_the_hub_spigot_for_centring_at_every_limit() -> None:
         <= spec.TOOTH_SPACE_RUNOUT_TIR_MM
     )
     assert (least, greatest) == pytest.approx(spec.SPIGOT_DIAMETRAL_CLEARANCE)
+    assert greatest == pytest.approx(0.0070 * 25.4)
     # The disc's float on the spigot feeds the transferred taps' wall.
     assert spec.DISC_OFFSET_MAX == pytest.approx(greatest / 2.0)
-    note = callouts.DRAWING_NOTES
-    assert f"LOCATIONAL CLEARANCE FIT ON {spec.HUB_NUMBER}" in note
-    printed = re.search(r"\(CLEARANCE (\d*\.\d+)-(\d*\.\d+) REF\)", note)
-    assert printed is not None
-    assert [float(v) * 25.4 for v in printed.groups()] == pytest.approx(
-        [least, greatest], abs=0.5e-4 * 25.4
+    note = callouts.DRAWING_NOTES.split(f"\n{callouts.TAP_NOTE}. ")[0]
+    assert note == (
+        f"{callouts.BORE_NOTE}. CLEARANCE FIT ON {spec.HUB_NUMBER} SPIGOT: "
+        f"THE SPIGOT ENTERS.\n   KEEPS THE NOTE {callouts.TAP_NOTE} TAP WALL."
     )
-    for banned in ("DIA CLR", "DIAMETRAL", "GOVERN"):
+    # Rule 4: the necessity answer carries no dimension, and no band or
+    # clearance range prints for a reamed hole.
+    assert not re.search(r"\.\d", note)
+    for banned in ("DIA CLR", "DIAMETRAL", "GOVERN", "CLEARANCE ."):
         assert banned not in note
 
 

@@ -44,6 +44,7 @@ from pd_transgear_pin_spec import FRONT_BUSHING_NUMBER
 RACK_NUMBER = _config.parts("pd-feed-rack")["number"]
 
 TEXT_PREFIX = 1  # swDimensionTextPrefix
+TEXT_SUFFIX = 2  # swDimensionTextSuffix
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
 
@@ -82,20 +83,31 @@ SPAN_CALLOUT = "MATCHED FIT,\nSEE GEAR DATA"
 # The hub as the shop reads it (its config title's last words; hard-coded
 # like HUB_NUMBER, checked against the registry by the drawing test).
 HUB_NAME = "DISC HUB"
-# The boss is the hub's locating fit, +.0005/.0000 under its +.0010/+.0005
-# bore: a band under the turned-diameter row, so it is turned to the hub's
-# bore (the matched-fit route, rule 4: the mate by name and number), both
-# parts' limits still applying.
+# The boss is made to fit (rule 4): turned last to the hub's reamed bore,
+# accepted by feel, so its size prints REF (parenthesised by the prefix and
+# suffix lanes, _drawing_dimensions.set_reference_dimension's texts) and
+# the callout names the mate by name and number, the acceptance and what
+# the fit protects (the necessity answer: the hub's rock on a loose boss
+# closes the MHA-PD-22 collar's gap to the disc).
+COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
+BOSS_REF_PREFIX = "(<MOD-DIAM>"
+BOSS_REF_SUFFIX = ")"
+BOSS_NECESSITY = f"KEEPS {COLLAR_NUMBER} GAP"
 BOSS_CALLOUT = "\n".join(
     (
-        f"LOCATIONAL CLEARANCE FIT IN {HUB_NAME} {HUB_NUMBER},",
-        f"TURN TO BORE {_clearance(HUB.BOSS_CLEARANCE_LIMITS)}",
+        f"TURN TO {HUB_NAME} {HUB_NUMBER}: SLIDES ON, NO ROCK",
+        BOSS_NECESSITY,
     )
 )
 # #2409: the flat takes the side of the hub's MHA-PD-VN-69 chord key pin,
 # which keys hub and disc to the sleeve; the hub's plain bore fits the boss
 # only.  The pin bears across the flat, so the pin is the mate it names.
-FLAT_CALLOUT = "\n".join(("KEYS PIN", HUB.KEY_PIN_NUMBER))
+# Its ±.002 is under the title block's row for what it keeps (rule 4's
+# necessity answer): the pin's air to the flat
+# (pd_transgear_disc_hub_spec.KEY_PIN_FLAT_AIR, .0006 least), which closes
+# at a looser band, so the hub would not slide on.
+FLAT_NECESSITY = "KEEPS PIN GAP"
+FLAT_CALLOUT = "\n".join((f"KEYS {HUB.KEY_PIN_NUMBER}", FLAT_NECESSITY))
 # The step seats the hub's spigot: the tooth length places hub and disc.  Its
 # ±band is a term of the disc cluster's printed stack (transgear_cluster_fit.TL),
 # named once, on the overall (r8 machinist review, rule 7: a second reason).
@@ -133,7 +145,11 @@ ROOT_PREFIX = "ROOT DIAMETER <MOD-DIAM>"
 
 # lane -> (feature, dimension) -> text.
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
-    TEXT_PREFIX: {("RootProfile", "RootDia"): ROOT_PREFIX},
+    TEXT_PREFIX: {
+        ("RootProfile", "RootDia"): ROOT_PREFIX,
+        ("SleeveProfile", "BossDia"): BOSS_REF_PREFIX,
+    },
+    TEXT_SUFFIX: {("SleeveProfile", "BossDia"): BOSS_REF_SUFFIX},
     CALLOUT_BELOW: {
         ("SleeveProfile", "BoreDia"): BORE_CALLOUT,
         ("SleeveProfile", "OutsideDia"): MESH_CALLOUT,
