@@ -113,8 +113,7 @@ _PROFILE_BOTTOM = PROFILE_CENTER[1] - OD * _S / 2.0
 # profile is hidden-lines-removed (a dimension never lands on a hidden line).
 # The O.D. arrives there too and is moved onto the profile below.  The bore's
 # callout is centred 6 mm right of where its 30-character block stood: its
-# necessity row is 34 characters, and centred at 60 mm it began 2 mm inside
-# the border.
+# mate row is 32 characters.
 END_KEEP = {
     "BoreDia": (0.066, 0.225),
     "RingOd": (0.045, 0.120),  # donor: moved onto the profile

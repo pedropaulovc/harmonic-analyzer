@@ -129,10 +129,10 @@ def test_fits_take_standard_names_and_name_their_mates() -> None:
     # clearance; the pair's acceptance prints once, on the pin's sheet
     # (review-fix r1: not on both members).
     text = callouts.BORE_CALLOUT
-    assert any(name in text for name in standard), text
+    assert not any(name in text for name in standard), text
     assert spec.PIN_NUMBER in text, text
     assert callouts.BORE_PROCESS_CALLOUT == "REAM THRU"
-    assert callouts.BORE_FIT_CALLOUT.split("\n")[0] == f"RUNNING FIT ON {spec.PIN_NUMBER}"
+    assert callouts.BORE_FIT_CALLOUT.split("\n")[0] == f"{spec.PIN_NUMBER} IS TURNED TO THIS BORE"
     assert "NO SHAKE" not in text
     assert not re.search(r"\d*\.\d", callouts.BORE_CALLOUT)
     # Rule 4's necessity answer: one line, at most six words beyond the
@@ -534,7 +534,7 @@ def test_sheet_text_names_the_right_parts() -> None:
     # #2409: the oil hole shares the key-pin hole's printed station.
     assert hub.OIL_HOLE_SLEEVE_Z == hub.KEY_PIN_SLEEVE_Z
     assert "KeyPinStation" in hub.DRAWING_PRECISION_BY_NAME
-    assert f"RUNNING FIT ON {spec.PIN_NUMBER}" in callouts.BORE_FIT_CALLOUT
+    assert f"{spec.PIN_NUMBER} IS TURNED TO THIS BORE" in callouts.BORE_FIT_CALLOUT
     assert _config.parts("pd-transgear-front-bushing")["number"] == "MHA-PD-25"
 
 

@@ -48,16 +48,17 @@ OD_PLACES = 2
 BORE_DIA = FIT.BORE_DIA  # .1260
 BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower) ANALYSIS deviations
 BORE_PLACES = 3
-# The callout: size and process, then two rows of words (rule 7): the
-# running fit on its mate and rule 4's necessity answer: play here cocks
-# the bushing and the ring on the pin and tilts the disc into the drive
-# collar (pd_cluster_air, "front bushing and ring cocking on the pin").
-# The pair's one acceptance prints on the pin's sheet, which is turned
-# last to this bore (MHA-PD-23 note 1; machinist review r1 of the fit
-# batch: three rows of words, and an acceptance on both members).
+# The callout: size and process, then two rows of words (rule 7): the mate
+# and that it is turned to this bore (a bare fit name is not enough), and
+# rule 4's necessity answer: play here cocks the bushing and the ring on
+# the pin and tilts the disc into the drive collar (pd_cluster_air, "front
+# bushing and ring cocking on the pin").  The pair's one acceptance prints
+# on the sheet of the member made last, the pin's (MHA-PD-23 note 1;
+# machinist review r1 of the fit batch: three rows of words, and an
+# acceptance on both members).
 BORE_CALLOUT = (
     "REAM THRU\n"
-    f"RUNNING FIT ON {PIN.PIN_NUMBER}\n"
+    f"{PIN.PIN_NUMBER} IS TURNED TO THIS BORE\n"
     f"KEEPS {_config.parts('pd-rack-pinion')['number']} CLEAR OF "
     f"{_config.parts('pd-transgear-drive-collar')['number']}"
 )

@@ -79,7 +79,7 @@ def test_the_bore_runs_on_the_pin_and_names_it() -> None:
     callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert callout.splitlines() == [
         "REAM THRU",
-        f"RUNNING FIT ON {pin.PIN_NUMBER}",
+        f"{pin.PIN_NUMBER} IS TURNED TO THIS BORE",
         "KEEPS MHA-PD-06 CLEAR OF MHA-PD-22",
     ]
     assert not re.search(r"\d*\.\d", callout)
