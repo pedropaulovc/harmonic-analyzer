@@ -1,0 +1,15 @@
+# The cone set's not-coming-loose check (tolerance-policy.md, "Checks in spec
+# modules and tests"; cad/scripts/check_register.py). Applied by
+# dt_mesh_checks.cone_check and test_standard_mesh_checks; the centres are
+# cone_set_stack's: the set's highest first bind, then the running runout
+# (cone and drum added), the keyed gear's seat float and the drum floats'
+# spread, combined by root sum square with the plain sum reported. Fit batch
+# DT, 2026-11-24: statement and per-station table in the batch's
+# cone-set-check.md.
+checks:
+  - id: C-01
+    check: "NOMINAL_CONTACT_RATIO_MIN"
+    kind: mesh
+    reason: "a cone gear lets go of its drum, which hesitates"
+    source: "delegated ruling 2026-11-12 (Main) after owner direction 2026-11-11, #2416; root sum square after the set: owner ruling 2026-11-24, audit part 2 P1"
+    basis: after_setting
