@@ -3008,11 +3008,18 @@ def _step_text(
             _press_remedy(
                 "DOWEL", f"{n['pd-transgear-drive-collar']} COLLAR", "collar-pins-pressed"
             ),
-            f"PRESS THE {n['pd-vn-transgear-collar-flat-pin']} PIN INTO THE COLLAR'S "
-            "REAR BLIND HOLE TO THE BOTTOM; COLLAR AND PIN ARE ONE PERMANENT UNIT.",
-            _press_remedy(
-                "PIN", f"{n['pd-transgear-drive-collar']} COLLAR", "collar-pins-pressed"
-            ),
+            # The flat pin is pressed on the collar's own traveler, so the
+            # collar arrives with it and MHA-PD-08's D-flat, milled to that
+            # pin (its note 2), is finished before the shaft is first used
+            # at the arm-plate-located step (Codjiflo P2 on #3485: the flat
+            # needed a pin pressed at this later step).  This step checks
+            # the joint (rule 23: a bench acceptance).
+            f"CHECK: THE {n['pd-vn-transgear-collar-flat-pin']} PIN STANDS ON THE "
+            "BOTTOM OF THE COLLAR'S REAR BLIND HOLE AND DOES NOT MOVE BY HAND; "
+            "COLLAR AND PIN ARE ONE PERMANENT UNIT.",
+            "IF THE PIN MOVES, MAKE A NEW "
+            f"{n['pd-transgear-drive-collar']} COLLAR AND REPEAT FROM STEP "
+            f"{steps.step_number('collar-pins-pressed')}.",
             f"CHECK: EACH OF THE {len(sprocket.CONFIGS)} "
             f"{n['pd-transgear-removable']} WHEELS DROPS ON THE COLLAR'S DOWELS "
             "FREELY AND LIFTS OFF.",

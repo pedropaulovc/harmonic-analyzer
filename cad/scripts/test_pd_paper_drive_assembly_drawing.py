@@ -3471,19 +3471,28 @@ def test_the_hub_key_pin_and_collar_flat_pin_are_fitted_and_kept() -> None:
     pressed = texts["collar-pins-pressed"]
     pin = _number("pd-vn-transgear-collar-flat-pin")
     assert pin == collar.FLAT_PIN_NUMBER
-    assert any(
-        row.startswith(f"PRESS THE {pin} PIN")
-        and row.endswith("COLLAR AND PIN ARE ONE PERMANENT UNIT.")
-        for row in pressed
-    )
+    # The pin is pressed on the collar's traveler (MHA-PD-08's D-flat is
+    # milled to it before the shaft is first used); the step checks it.
+    assert not any(row.startswith(f"PRESS THE {pin} PIN") for row in pressed)
+    check = next(row for row in pressed if row.startswith(f"CHECK: THE {pin} PIN"))
+    assert "DOES NOT MOVE BY HAND" in check
+    assert check.endswith("COLLAR AND PIN ARE ONE PERMANENT UNIT.")
+    assert pressed[pressed.index(check) + 1].startswith("IF THE PIN MOVES, ")
+    from pathlib import Path
+
+    plan = (
+        Path(__file__).resolve().parent.parent
+        / "process" / "pd_transgear_drive_collar" / "plan.toml"
+    ).read_text(encoding="utf-8")
+    assert f"Press the {pin} pin into the flat pin's hole" in plan
     assert len(pressed) <= len(drawing.SUB_STEP_LETTERS)
-    # A dowel or the pin that slides in by hand is rule 23's slip fit: the
-    # collar is renewed, never bonded (the reamed holes print no band, so no
-    # bonded clearance could be stated: Codjiflo P2 on #3485).  The three
+    # A dowel that slides in by hand is rule 23's slip fit: the collar is
+    # renewed, never bonded (the reamed holes print no band, so no bonded
+    # clearance could be stated: Codjiflo P2 on #3485).  The three
     # wheels are then tried on the dowels, the drive-pin offsets'
     # acceptance; a wheel that binds is renewed, no easing drill printed.
     loose = [row for row in pressed if "SLIDES IN BY HAND" in row]
-    assert len(loose) == 2
+    assert len(loose) == 1
     assert all("BOND" not in row for row in pressed)
     assert all("MAKE A NEW" in row for row in loose)
     wheel = _number("pd-transgear-removable")

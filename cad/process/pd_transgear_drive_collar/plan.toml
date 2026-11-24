@@ -19,9 +19,14 @@
 #   through, then drills #53 and reams the .0615 flat-pin hole blind to its
 #   floor, all on one line through the axis.
 # - Setup 3, bench: deburr, clear the flat-pin breakthrough from the bore,
-#   check the flat pin's centre over pins and its floor, oil.
+#   check the flat pin's centre over pins and its floor, press the
+#   MHA-PD-VN-70 flat pin to the floor, oil. The pin is pressed here, not at
+#   MHA-PD-00: MHA-PD-08's D-flat is milled to this collar with its pin
+#   pressed (MHA-PD-08 note 2), and that shaft is needed finished before the
+#   collar's own assembly step (Codjiflo P2 on #3485). Collar and pin leave
+#   this traveler as one permanent pair.
 # Left to MHA-PD-00 (final op): the MHA-PD-VN-54 dowel presses (step 20A),
-# the MHA-PD-VN-70 flat-pin press (20C), the three MHA-PD-09 wheels tried on
+# the pressed flat pin checked (20C), the three MHA-PD-09 wheels tried on
 # the dowels (20E), the pilot faced to fit (21A), the rear faced to fit (29D)
 # and the rear bore mouth's .008 X 45° break through the pin (29E).
 #
@@ -232,6 +237,11 @@ id = "files"
 name = "Files"
 ref = "jig-files"
 
+[[tools]]
+id = "arbor-press"
+name = "Arbor press, 1 ton"
+ref = "arbor-press"
+
 [[setups]]
 machine_kind = "lathe"
 title = "Bar: turn the outside and the pilot, drill the bore, part off"
@@ -439,7 +449,7 @@ feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Bench: deburr, clear the bore, check the flat pin's centre and floor, oil"
+title = "Bench: deburr, clear the bore, check the flat pin's centre and floor, press the flat pin, oil"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
@@ -490,9 +500,19 @@ instruction = "The .191 pin refused in the bore in Op 240: repeat Op 230 once an
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Finish (drawing: bright machined, oiled): wipe the collar clean and give it a light coat of light machine oil; wipe the dowel holes and the flat pin's hole dry for their presses."
+speed_kind = "other"
+tool = "arbor-press"
+drilling = "none"
+sizing = "other"
+instruction = "Press the MHA-PD-VN-70 pin into the flat pin's hole: the collar on the arbor press's plate on its pilot's front face, rear face up; start the pin's lead in the hole's mouth and press it flush with the ram, then on to the floor with a 3/64 pin punch under the ram, until it stops solid. Collar and pin are one permanent pair from here: MHA-PD-08's D-flat is milled to this pin."
+feed = "hand"
+inspection = "The pin's end lies below the rear face and does not move under the punch pushed by hand. It moves: the collar is scrap; make another from Setup 1."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Finish (drawing: bright machined, oiled): wipe the collar clean and give it a light coat of light machine oil; wipe the dowel holes dry for their presses."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Left to MHA-PD-00, not done here: the two MHA-PD-VN-54 dowels pressed (step 20A) and the MHA-PD-VN-70 pin pressed to the floor (20C); the three MHA-PD-09 wheels tried on the dowels (20E); the pilot faced to fit (21A, note 5); the rear face faced to fit (29D, note 6) and the rear bore mouth broken .008 X 45° (29E)."
+instruction = "Left to MHA-PD-00, not done here: the two MHA-PD-VN-54 dowels pressed (step 20A); the three MHA-PD-09 wheels tried on the dowels (20E); the pilot faced to fit (21A, note 5); the rear face faced to fit (29D, note 6) and the rear bore mouth broken .008 X 45° (29E)."
 feed = "hand"
