@@ -136,6 +136,7 @@ from pd_transgear_arm_spec import (
 )
 from pd_transgear_arm_notes import (
     DIMENSION_CALLOUTS,
+    FLOOR_CALLOUT,
     LOCATOR_CALLOUT_TEXT,
     NOTES,
     NOTES_TEXT,
@@ -144,7 +145,6 @@ from pd_transgear_arm_notes import (
     PIN_MOUTH_CALLOUT,
     PIVOT_BORE_CALLOUT,
     PLATE_TAP_QUALIFIER,
-    SPRING_CALLOUT,
 )
 
 
@@ -249,8 +249,12 @@ FRONT_KEEP = {
     "PivotBoreDia": (0.060, _front_y(PIVOT_END_R) + 0.021),
     # The pin bore's Ø and its callout lines stand below right of the arm,
     # right of the station stack; the upper band holds the tap and locator
-    # callouts.
-    "PinBoreDia": (_front_x(PIN_STATION) + 0.056, _UNDER_FRONT - 0.024),
+    # callouts.  SOLIDWORKS centres the block on this point: its widest row,
+    # the bonded fit's 46 characters (~117 mm), begins 4 mm right of the pin
+    # station's extension line, which drops through this band to the 2.7093
+    # row (fit batch review r1: centred 56 mm right, the line struck the
+    # "O" of BONDED), and ends 20 mm left of section B-B.
+    "PinBoreDia": (_front_x(PIN_STATION) + 0.063, _UNDER_FRONT - 0.024),
     "EndWidth": (_front_x(TIP_STATION) + 0.0115, FRONT_CENTER[1]),
     # Mid-line, or further left: it keeps 12 mm between its centre and the
     # lower 6.850's box, which hangs left of tap 1 (since #2034 moved K, tap 1
@@ -311,10 +315,11 @@ SECTION_KEEP = {
         SECTION_CENTER[1] - 0.016,
     ),
 }
-# Its left edge stands ~12 mm right of the line.  SOLIDWORKS centres its two
-# lines (the value, and the link to note 4 on sheet 2) on this point; 6 mm
-# right of 0.075 since the link names the notes' sheet (round 4).
-FLOOR_TEXT_XY = (0.081, 0.059)
+# Its left edge stands ~12 mm right of the line.  SOLIDWORKS centres its
+# three lines (the value, the spring it seats and what the floor sets) on
+# this point; 8 mm right of 0.081 since the 25-character mate row replaced
+# the 19-character link to a note.
+FLOOR_TEXT_XY = (0.089, 0.059)
 # Section A-A's column right of the stud bore, where both its frames stand.
 _STUD_FRAME_X = _front_x(PIN_STATION) + 0.012
 END_KEEP = {
@@ -643,9 +648,10 @@ requirement(
     },
     precision={"dia": _P["PivotBoreDia"]},
 )
-# The rear spot face on the pivot: Ø.500 +.004/.000, its floor .2717 ±.002
-# from the FRONT face (SECTION_KEEP "SpotFaceDia", "FloorDepth"; note 4: it
-# seats and preloads the MHA-PD-VN-63 spring).
+# The rear counterbore on the pivot: ⌴ Ø.50 at the title block's row, its
+# floor .2717 ±.002 from the FRONT face (SECTION_KEEP "SpotFaceDia",
+# "FloorDepth"; the floor's callout: it seats the MHA-PD-VN-63 spring and
+# sets its working height).
 requirement(
     "spot_face",
     kind="counterbore",
@@ -683,16 +689,16 @@ requirement(
             THICKNESS - SPOT_FACE_FLOOR_FROM_FRONT,
             ((_GEOM, "THICKNESS"), (_GEOM, "SPOT_FACE_FLOOR_FROM_FRONT")),
         ),
-        "callout": (SPRING_CALLOUT, ((_NOTES, "SPRING_CALLOUT"),)),
+        "callout": (FLOOR_CALLOUT, ((_NOTES, "FLOOR_CALLOUT"),)),
     },
     precision={"dia": _P["SpotFaceDia"], "floor": _P["FloorDepth"]},
 )
 # Datum C: the pin bore, Ø.126 REAM THRU with no band (FRONT_KEEP
 # "PinBoreDia"), 2.7093 BASIC from B, ⌖ Ø.004 A|B and ⊥ Ø.001 A (section
-# A-A); note 5: the MHA-PD-23 pin is a bonded slip fit, and the callout's
-# .127 set pin is the gap's upper limit.  ``dia`` carries the geometry's
-# ANALYSIS band (what the reamer is modelled to cut) because the traveler's
-# adapter and cam.py bind a band; no step quotes it as an acceptance.
+# A-A); its callout: the MHA-PD-23 pin is a bonded fit at the printed
+# clearance.  ``dia`` carries the geometry's ANALYSIS band (what the reamer
+# is modelled to cut) because the traveler's adapter and cam.py bind a
+# band; no step quotes it as an acceptance.
 _PIN_REAM = ((_NOTES, "PIN_BORE_CALLOUT"), (_SELF, "FRONT_KEEP"))
 requirement(
     "pin_bore",
@@ -719,7 +725,7 @@ requirement(
             GEOMETRIC_TOLERANCES_MM["perpendicularity"], ("GEOMETRIC_CONTROLS",)
         ),
         "perpendicularity_datums": ("A", ("GEOMETRIC_CONTROLS",)),
-        "mate": ("MHA-PD-23", ((_NOTES, "NOTES"),)),
+        "mate": ("MHA-PD-23", ((_NOTES, "PIN_BORE_CALLOUT"),)),
         "callout": (PIN_BORE_CALLOUT, ((_NOTES, "PIN_BORE_CALLOUT"),)),
     },
     precision={"dia": _P["PinBoreDia"], "station_basic": _P["PinStation"]},

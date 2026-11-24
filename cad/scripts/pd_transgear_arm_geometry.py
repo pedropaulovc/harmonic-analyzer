@@ -42,6 +42,7 @@ from _printed_tolerance import (
     drilled_oversize_mm,
     edge_break_chamfer_mm,
     edge_break_radius_mm,
+    printed_band_mm,
     printed_deviations,
 )
 import pd_transgear_pivot_spacer_spec as SPACER
@@ -146,8 +147,16 @@ OUTLINE_BAND = max(PIVOT_END_R_BAND, END_HALF_WIDTH_BAND)
 # Ø.500 (was .453; owner ruling 2026-11-20 (Pedro), #2424 option C: "B, C
 # and D together in the #2019 stock-change"): one plunge of an owned 1/2
 # end mill, where .453 had no cutter but a boring head.
-SPOT_FACE_DIA = 12.7  # .500
-SPOT_FACE_DIA_GROWTH = drilled_oversize_mm(unit=UNIT)  # +.004/0 (drilled row)
+SPOT_FACE_DIA = 12.7  # .50
+# A clearance pocket at the title block's .XX (fit batch review r1: its
+# +.004/0, the drilled-hole row's growth, was a band under the three-place
+# row with no necessity answer).  Nothing reads it closer: at .49 the
+# spring's rim keeps .027 radial clearance (transgear_hanger_joints.
+# SPRING_RIM_CLEARANCE) and the head .089; at .51 the wall to the end
+# round keeps .225.
+SPOT_FACE_DIA_PLACES = 2
+SPOT_FACE_DIA_BAND_MM = printed_band_mm(SPOT_FACE_DIA_PLACES, unit=UNIT)  # ±.01
+SPOT_FACE_DIA_MIN = SPOT_FACE_DIA - SPOT_FACE_DIA_BAND_MM
 # The floor is dimensioned from the FRONT face so the spring's room never
 # sees the arm's stock thickness (transgear_hanger_joints.SPRING_ROOM_*).
 # 6.9 (was 6.4; owner ruling 2026-10-31, #290): the spot face is 0.5
@@ -363,20 +372,25 @@ REDUCER_POSITION_RADIUS = REDUCER_POSITION_DIAMETER / 2.0
 # which keep over 6 mm to spare (transgear_hanger_joints checks the chain,
 # PD-19's screw-hole zone included, against it).
 PLATE_TAP_LOCATION_RADIUS_MM = 0.508
-# The dowel's full-diameter grip runs the through ream between its two
-# mouth breaks, on the thinnest stock (as the plate's slip holes).
-LOCATOR_FULL_CYLINDER_SPAN_MIN_MM = (
-    THICKNESS - THICKNESS_BAND - 2.0 * LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
-)
-LOCATOR_MOUTH_POSITION_RADIUS_MM = REDUCER_POSITION_RADIUS * (
-    1.0 + 2.0 * LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
-    / LOCATOR_FULL_CYLINDER_SPAN_MIN_MM
-)
 WALL_TARGET = WALL_TARGET_MM
 # The inch title block's edge-break row: either permitted form, the round or
 # the chamfer, takes its full size off a wall at the outline's face edges.
 OUTLINE_EDGE_BREAK_MAX_MM = max(
     edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT)
+)
+# The locating holes' mouths break at the title block's row, as the plate's
+# do (pd_transgear_arm_plate_geometry.LOCATOR_MOUTH_BREAK_MAX_MM; fit batch
+# review r1: the sheet's .002 MAX mouth break was a second reason with a
+# dimension in it, and no stack needs it: the grip keeps .354, the punch
+# air .103 and the wall to the arm's edge .084 at the title block's .010).
+LOCATOR_MOUTH_BREAK_MAX_MM = OUTLINE_EDGE_BREAK_MAX_MM
+# The dowel's full-diameter grip runs the through ream between its two
+# mouth breaks, on the thinnest stock (as the plate's slip holes).
+LOCATOR_FULL_CYLINDER_SPAN_MIN_MM = (
+    THICKNESS - THICKNESS_BAND - 2.0 * LOCATOR_MOUTH_BREAK_MAX_MM
+)
+LOCATOR_MOUTH_POSITION_RADIUS_MM = REDUCER_POSITION_RADIUS * (
+    1.0 + 2.0 * LOCATOR_MOUTH_BREAK_MAX_MM / LOCATOR_FULL_CYLINDER_SPAN_MIN_MM
 )
 # The locating holes are match-drilled through after the outline is milled,
 # in another setup: their walls to the outline pay 0.3 deg of drill run-off
@@ -403,9 +417,7 @@ WALLS: dict[str, tuple[float, float]] = {
     ),
     "pivot bore to spot face": (
         (SPOT_FACE_DIA - PIVOT_BORE_DIA) / 2.0,
-        # conservative, as the contract: the counterbore's growth is charged
-        # against the ring too (it only widens it in fact)
-        (SPOT_FACE_DIA - SPOT_FACE_DIA_GROWTH - PIVOT_BORE_FULL_LIMITS[1]) / 2.0,
+        (SPOT_FACE_DIA_MIN - PIVOT_BORE_FULL_LIMITS[1]) / 2.0,
     ),
     "spot-face floor": (
         SPOT_FACE_FLOOR_FROM_FRONT,
@@ -413,7 +425,7 @@ WALLS: dict[str, tuple[float, float]] = {
     ),
     "spot face to end round": (
         PIVOT_END_R - SPOT_FACE_DIA / 2.0,
-        PIVOT_END_R - PIVOT_END_R_BAND - (SPOT_FACE_DIA + SPOT_FACE_DIA_GROWTH) / 2.0,
+        PIVOT_END_R - PIVOT_END_R_BAND - (SPOT_FACE_DIA + SPOT_FACE_DIA_BAND_MM) / 2.0,
     ),
     "pin bore to edges": (
         edge_half_width(PIN_STATION) - PIN_BORE_DIA / 2.0,
@@ -475,7 +487,7 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
     WALLS[f"locator {_index} to arm edge"] = (
         _edge_air - LOCATOR_HOLE_DIA_MM / 2.0,
         _edge_air - OUTLINE_BAND - LOCATOR_MOUTH_POSITION_RADIUS_MM
-        - LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] / 2.0 - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM
+        - LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] / 2.0 - LOCATOR_MOUTH_BREAK_MAX_MM
         - OUTLINE_EDGE_BREAK_MAX_MM - LOCATOR_RUN_OFF_MM,
     )
     _tap_air = min(math.hypot(_x - station, _y) for station in PLATE_TAP_STATIONS)
@@ -483,7 +495,7 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
         _tap_air - (LOCATOR_HOLE_DIA_MM + PLATE_TAP_MOUTH_DIA_MAX_MM) / 2.0,
         _tap_air - LOCATOR_MOUTH_POSITION_RADIUS_MM - PLATE_TAP_LOCATION_RADIUS_MM
         - (LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] + PLATE_TAP_MOUTH_DIA_MAX_MM) / 2.0
-        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - LOCATOR_RUN_OFF_MM,
+        - LOCATOR_MOUTH_BREAK_MAX_MM - LOCATOR_RUN_OFF_MM,
     )
 # The latch pin's hole-to-face ligament holds the .080 target on the 3/8 bar
 # (#2019; on the 5/16 bar it was the owner-accepted .065 shortfall, #1379).

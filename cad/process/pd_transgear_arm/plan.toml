@@ -5,7 +5,7 @@
 # precision-ground 1018 is sawn to 5.70-5.75 in; Setup 2 (PM-30MV CNC, the
 # blank flat on parallels, AR01_holes) makes every hole through the faces from
 # the rear face: the pivot bore (B) drilled #9 and the pin bore (C) drilled and reamed,
-# the pivot's Ø.500 spot face plunged to its floor with the 1/2 in end mill, the
+# the pivot's Ø.50 counterbore plunged to its floor with the 1/2 in end mill, the
 # pin bore's rear mouth broken with the chamfer mill. Setup 3 makes a 1/2 in
 # 6061 sub-plate (AR02_plate drills it, AR03/AR04 stop for the hand taps), the
 # arm is screwed down on it through its own bores and AR05_outline cuts the
@@ -28,7 +28,8 @@
 #
 # To order (not owned): the 12095 bar (stock.1018-ground-flat-3-8x1, one
 # 12 in length), the pin-gauge set for the pin
-# bore's one check (pin-gauges: its .127 pin must not enter; fit audit
+# bore's one check (pin-gauges: its .127 pin must not enter, the upper end
+# of the drawing's bond clearance on the smallest MHA-PD-23 shank; fit audit
 # 2026-11-23, pending owner confirmation: the bore prints the .1260 reamer's
 # size with no band and the MHA-PD-23 pin is bonded in it, so the Class X
 # .1260/.1265 pair is gone from this plan; cad.pin_bore_dia_band_mm is the
@@ -291,7 +292,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Two 1 in parallels, each 1/8 thick, on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw: the 1.00 blank's holes at Y −.500 stand .30 clear of each parallel. The blank on them face A down (the rear face up), along X, centred in the jaws' width; the jaws grip its two 1 in ground edges. Tap it down on the parallels with a soft hammer until neither parallel slides."
 datum = "Program AR01_holes (T1–T7). G54: X0 the blank's left end, Y0 the fixed jaw's face, Z0 the parallels' top (face A). +X toward the blank's right end, +Y toward the fixed jaw: the blank lies at −Y, its centre line at Y −.500. The pivot at X {{process.pivot_from_end_mm:in.3dot}}."
-diagram = { file = "diagrams/holes.svg", alt = "The blank across the vise jaws on two parallels, rear face up; the pivot bore {{process.pivot_from_end_mm:in.3dot}} from the left end on the centre line with its Ø.500 spot face, the pin bore {{cad.pin_bore_x_mm:in.3dot}} further right; the arm's outline (made in Setup 3) dashed." }
+diagram = { file = "diagrams/holes.svg", alt = "The blank across the vise jaws on two parallels, rear face up; the pivot bore {{process.pivot_from_end_mm:in.3dot}} from the left end on the centre line with its Ø.50 counterbore, the pin bore {{cad.pin_bore_x_mm:in.3dot}} further right; the arm's outline (made in Setup 3) dashed." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}"], y_span_mm = ["{{process.blank_width_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.rear_face_thickness_stock_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_14_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.quarter_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_width_mm}}", along_jaws_mm = "{{process.blank_length_min_mm}}", part_height_mm = "{{cad.rear_face_thickness_stock_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.holes_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "solid", extent_mm = [0, "{{process.blank_length_min_mm}}"], seat = "the two parallels under the blank's edges, its whole length", seat_mm = [0, "{{process.blank_length_min_mm}}"] }
@@ -356,7 +357,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T4 (1/2 in end mill, at least .75 in out of the collet; set 2650): plunge once over the pivot, at 1.4 in/min, to {{cad.spot_face_floor_in:.4dot}} above face A, and out at feed: the Ø.500 spot face."
+instruction = "Same file, M6 T4 (1/2 in end mill, at least .75 in out of the collet; set 2650): plunge once over the pivot, at 1.4 in/min, to {{cad.spot_face_floor_in:.4dot}} above face A, and out at feed: the Ø.50 counterbore."
 rpm = 2650
 feed = "1.4 in/min"
 milling_cuts = [
@@ -408,7 +409,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 instruction = "The pin bore."
-inspection = "Pin bore (drawing: Ø.126 REAM THRU, .127 PIN DOES NOT ENTER): the pin-gauge set's .127 pin does not enter from either face, by hand, never forced. The MHA-PD-23 pin is fitted to this bore on its own traveler. Its rear mouth shows an even ring of break all round; the break's .008 ±.002 size is not gauged: held by T7's programmed depth in op 130. The .127 pin enters: stop and tell the owner."
+inspection = "Pin bore (drawing: Ø.126 REAM THRU, BONDED FIT ON MHA-PD-23, CLEARANCE .0010-.0022): the pin-gauge set's .127 pin does not enter from either face, by hand, never forced (the clearance's upper end). The MHA-PD-23 pin is fitted to this bore on its own traveler. Its rear mouth shows an even ring of break all round; the break's .008 ±.002 size is not gauged: held by T7's programmed depth in op 130. The .127 pin enters: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]

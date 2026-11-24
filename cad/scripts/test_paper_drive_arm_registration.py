@@ -86,7 +86,7 @@ def test_locator_sites_share_real_part_frames_and_paid_mouth_walls() -> None:
     assert arm.OUTLINE_EDGE_BREAK_MAX_MM == outline_break
     expected = (arm.PIVOT_END_R - x * math.sin(arm.EDGE_LEAN) - abs(y) * math.cos(arm.EDGE_LEAN)
                 - arm.OUTLINE_BAND - arm.LOCATOR_MOUTH_POSITION_RADIUS_MM - pin.PRESS_HOLE_LIMITS_MM[1] / 2.0
-                - pin.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - outline_break
+                - arm.LOCATOR_MOUTH_BREAK_MAX_MM - outline_break
                 - (arm.THICKNESS + arm.THICKNESS_BAND) * math.tan(math.radians(0.3)))
     assert arm.WALLS["locator 1 to arm edge"][1] == pytest.approx(expected)
     assert "locator blind floor" not in arm.WALLS
