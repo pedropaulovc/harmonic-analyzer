@@ -176,7 +176,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a brass shim wrap on the ground O.D., {{process.end_stickout_in:.2dot}} in out of the jaw fronts; the rest of the blank back in the spindle bore."
-datum = "Z0 (carriage DRO) the datum end, faced in Op 40."
+datum = "Z0 (carriage DRO) the datum end, faced in Op 30."
 diagram = { file = "diagrams/end-a.svg", alt = "The blank in the 3-jaw, the datum end out a half inch: faced square." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
@@ -197,7 +197,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over the brass shim wrap on the trial offcut, {{process.end_stickout_in:.2dot}} in out of the jaw fronts."
-datum = "Z0 (carriage DRO) the offcut's end, faced in Op 50, touched with the ball turner's tip in Op 90."
+datum = "Z0 (carriage DRO) the offcut's end, faced in Op 40, touched with the ball turner's tip in Op 80."
 diagram = { file = "diagrams/trial.svg", alt = "The trial offcut in the 3-jaw over the shim wrap, its end faced; the ball turner's pivot on the axis one radius behind the faced end, its bit swept from the apex toward you." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
@@ -235,7 +235,7 @@ instruction = "Inner frame parallel to the axis: bring the carriage up until the
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms (they reach .19 either side of the pivot). If they touch: chuck the offcut {{process.end_stickout_in:.2dot}} in out again and repeat Op 90."
+instruction = "Spindle stopped: run the cross slide out until the bit clears the end through the whole sweep. Swing the frame through the sweep and turn the chuck one full turn by hand: the jaws must miss the outer frame's arms (they reach .19 either side of the pivot). If they touch: chuck the offcut {{process.end_stickout_in:.2dot}} in out again and repeat Ops 80–90."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -259,7 +259,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Light at the leaf's ends (too round): set the bit (Op 80) .001 longer on the depth rod; light at its middle or a ridge at the O.D. (too flat): .001 shorter. Face the dome off (Op 50), draw the offcut back out to {{process.end_stickout_in:.2dot}} in, repeat Op 60 and Ops 90–130; under .30 in the jaws, saw a new offcut. Once it passes, leave the set screw alone."
+instruction = "Light at the leaf's ends (too round): set the bit (Op 70) .001 longer on the depth rod; light at its middle or a ridge at the O.D. (too flat): .001 shorter. Face the dome off (Op 40), draw the offcut back out to {{process.end_stickout_in:.2dot}} in, repeat Op 50 and Ops 80–120; under .30 in the jaws, saw a new offcut. Once it passes, leave the set screw alone."
 
 [[setups]]
 machine_kind = "lathe"
@@ -267,9 +267,9 @@ title = "Far end: face to length, form its dome"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "Turned round: 3-jaw over the shim wrap, {{process.end_stickout_in:.2dot}} in out, the datum end back in the spindle bore."
-datum = "DRO Z touched on the far end with the facing tool before each skim (Op 150), and with the ball turner's tip in Op 180."
-diagram = { file = "diagrams/end-b.svg", alt = "The shaft turned round, the far end out: faced to the 7.01 length, then domed by the ball turner swept about its pivot on the axis." }
+holding = "Reversed end for end: 3-jaw over the shim wrap, {{process.end_stickout_in:.2dot}} in out, the datum end back in the spindle bore."
+datum = "DRO Z touched on the far end with the facing tool before each skim (Op 150), and with the ball turner's tip in Op 170."
+diagram = { file = "diagrams/end-b.svg", alt = "The shaft reversed end for end, the far end out: faced to the 7.01 length, then domed by the ball turner swept about its pivot on the axis." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -278,7 +278,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the far end square in light skims, reading the length between them (Op 160), to {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}}, aiming {{cad.faced_length_in:.3dot}}: the tip-to-tip length (each dome is a full hemisphere, its tip on the faced plane)."
+instruction = "Face the far end square in light skims, reading the length between them (Op 150), to {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}}, aiming {{cad.faced_length_in:.3dot}}: the tip-to-tip length (each dome is a full hemisphere, its tip on the faced plane)."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -294,13 +294,13 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Compound at 45°: rough the far end's corner off as Op 60, a 45° chamfer {{process.dome_chamfer_in:.3dot}} along the face and along the O.D."
+instruction = "Compound at 45°: rough the far end's corner off as Op 50, a 45° chamfer {{process.dome_chamfer_in:.3dot}} along the face and along the O.D."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Ball turner in its holder, bit as set in Op 80 (set screw untouched), inner frame parallel to the axis: bring the carriage up until the tip just touches the far end's faced end; lock the carriage and zero the DRO Z. It stays locked until the dome is done."
+instruction = "Ball turner in its holder, bit as set in Op 70 (set screw untouched), inner frame parallel to the axis: bring the carriage up until the tip just touches the far end's faced end; lock the carriage and zero the DRO Z. It stays locked until the dome is done."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -322,13 +322,13 @@ instruction = "Between the last sweeps, spindle stopped, look at the apex under 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: look at the far dome under the loupe, all round. Its SR is a REF size, set by the trial (Op 130): no leaf check here."
+instruction = "Spindle stopped: look at the far dome under the loupe, all round. Its SR is a REF size, set by the trial (Op 120): no leaf check here."
 inspection = "No pip, flat or ring at the tip; no step or ridge where the dome meets the O.D."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A flat at the tip: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 200), then Op 220 again. A ring or point at the tip, or a step or ridge at the O.D.: scrap the shaft and make another from Setup 1."
+instruction = "A flat at the tip: the pivot is short of the axis: one more sweep with the cross slide in .001 (Op 190), then Op 210 again. A ring or point at the tip, or a step or ridge at the O.D.: scrap the shaft and make another from Setup 1."
 
 [[setups]]
 machine_kind = "lathe"
@@ -336,9 +336,9 @@ title = "Datum end: form its dome"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "Turned round again: 3-jaw over the shim wrap, {{process.end_stickout_in:.2dot}} in out, the far dome back in the spindle bore."
-datum = "DRO Z zeroed with the ball turner's tip on the datum end (faced in Op 40) in Op 250."
-diagram = { file = "diagrams/end-a-dome.svg", alt = "The shaft turned round again, the datum end out: domed by the ball turner swept about its pivot on the axis." }
+holding = "Reversed end for end again: 3-jaw over the shim wrap, {{process.end_stickout_in:.2dot}} in out, the far dome back in the spindle bore."
+datum = "DRO Z zeroed with the ball turner's tip on the datum end (faced in Op 30) in Op 240."
+diagram = { file = "diagrams/end-a-dome.svg", alt = "The shaft reversed end for end again, the datum end out: domed by the ball turner swept about its pivot on the axis." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -347,13 +347,13 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Compound at 45°: rough the datum end's corner off as Op 60, a 45° chamfer {{process.dome_chamfer_in:.3dot}} along the face and along the O.D."
+instruction = "Compound at 45°: rough the datum end's corner off as Op 50, a 45° chamfer {{process.dome_chamfer_in:.3dot}} along the face and along the O.D."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Ball turner in its holder, bit as set in Op 80 (set screw untouched), inner frame parallel to the axis: bring the carriage up until the tip just touches the datum end's faced end; lock the carriage and zero the DRO Z. It stays locked until the dome is done."
+instruction = "Ball turner in its holder, bit as set in Op 70 (set screw untouched), inner frame parallel to the axis: bring the carriage up until the tip just touches the datum end's faced end; lock the carriage and zero the DRO Z. It stays locked until the dome is done."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -381,11 +381,11 @@ gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A flat at the tip: one more sweep with the cross slide in .001 (Op 270), then Op 290 again. A ring or point at the tip, or a step or ridge at the O.D.: scrap the shaft and make another from Setup 1."
+instruction = "A flat at the tip: one more sweep with the cross slide in .001 (Op 260), then Op 280 again. A ring or point at the tip, or a step or ridge at the O.D.: scrap the shaft and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Take the shaft out, stand it on the datum tip on the surface plate against the 1-2-3 block as Op 160, and read the far tip with the height gauge: each tip stayed on its faced plane."
+instruction = "Take the shaft out, stand it on the datum tip on the surface plate against the 1-2-3 block as Op 150, and read the far tip with the height gauge: each tip stayed on its faced plane."
 inspection = "Length tip to tip {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}}."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.faced_length_band_mm}}" }]
 
@@ -460,7 +460,7 @@ instruction = "Break the flats' edges with the smooth file, R{{cad.edge_break_in
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Datum flat: read with the calipers from the datum tip to the flat's nearer end, and the flat's length. Far flat: read from the far tip to the far flat's end nearer the far tip, and its length; its station from the datum tip is the Op 310 length less those two readings."
+instruction = "Datum flat: read with the calipers from the datum tip to the flat's nearer end, and the flat's length. Far flat: read from the far tip to the far flat's end nearer the far tip, and its length; its station from the datum tip is the Op 300 length less those two readings."
 inspection = "Datum flat from the datum tip {{cad.flat_datum_station_min_in:.2dot}}–{{cad.flat_datum_station_max_in:.2dot}}, far flat from the datum tip {{cad.flat_far_station_min_in:.2dot}}–{{cad.flat_far_station_max_in:.2dot}}; each {{cad.flat_datum_length_min_in:.2dot}}–{{cad.flat_datum_length_max_in:.2dot}} long."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.flat_datum_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.flat_datum_length_band_mm}}" }]
 
