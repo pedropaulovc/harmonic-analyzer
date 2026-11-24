@@ -21,7 +21,7 @@ from __future__ import annotations
 
 DRAWING_NUMBER = "MHA-MG-00"
 
-DRUM_PRESSED_KEY = "drum-pressed"
+DRUM_BONDED_KEY = "drum-bonded"
 DRUM_HELD_KEY = "drum-held"
 PRESS_SLEEVE_MADE_KEY = "press-sleeve-made"
 SPACER_FITTED_KEY = "spacer-fitted"
@@ -45,15 +45,18 @@ WIRE_TIED_KEY = "lever-wire-tied"
 
 # One tuple per numbered step: its action, then its lettered sub-steps.
 STEPS: tuple[tuple[str, ...], ...] = (
-    # Wheel group. Each press is accepted at the bench before anything else
-    # goes on it (rule 23): it does not turn or slide by hand, and a slip fit
-    # has its own single-action remedies.
+    # Wheel group. Each fixed joint is accepted at the bench before anything
+    # else goes on it (rule 23): it does not turn or slide by hand.
+    # Owner ruling 2026-11-24, fit audit question 17: the drum is always
+    # bonded on a spigot turned to slide in its drilled bore, centred on an
+    # indicator while wet; a drum that turns once cured is stripped and
+    # bonded again.
     (
-        DRUM_PRESSED_KEY,
-        DRUM_HELD_KEY,
-        "drum-pulled-off",
-        "drum-bonded",
+        DRUM_BONDED_KEY,
+        "drum-centred",
         "drum-bond-cured",
+        DRUM_HELD_KEY,
+        "drum-stripped",
     ),
     # The press's sleeve, the spacer it gauges from and the oil are their own
     # steps (rule 22).

@@ -6,4 +6,4 @@ mg-magnifying-wheel:
   tolerance_class: machined_block
   drawing_unit: in
   fit_class: shaft_in_bushing
-  process: "gray-iron casting: face and turn the boss and drum spigot, ream the bore, turn the rim and its wire groove, drill the two tie holes"
+  process: "gray-iron casting: face and turn the boss, ream the bore, turn the drum spigot to slide in the drilled MHA-MG-10 bore, turn the rim and its wire groove, drill the two tie holes"

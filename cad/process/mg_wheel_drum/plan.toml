@@ -3,33 +3,27 @@
 # NC). Route chosen for speed: two chuckings of the 7/8 in C36000 bar on hand
 # (cad/config/shop-equipment/stock-bought.toml c360-round-7-8, a 7 in piece).
 # Setup 1, the bar: face the end (Z0), turn the outside to its .76-.78 band
-# back past the parting line, spot, drill V (.377) then 31/64 (.484) through
-# and past the parting line, ream .4990 through in the same chucking (the
-# bore runs true to the outside it was turned with), part off .02 long.
+# back past the parting line, spot, drill V (.377) then 1/2 through and past
+# the parting line in the same chucking (the bore runs true to the outside it
+# was turned with), part off .02 long.
 # Setup 2: the drum turned round, .20 of its outside in the 3-jaw over a shim
 # wrap, the parted end out; nothing seats it axially, so the length is set
 # from the micrometer, not a stop (the MHA-MG-11 spacer's regrip): mike the
 # length, touch the AR on the parted end, preset the DRO to the miked length
-# less the .344 nominal, face to Z0. Bench: deburr, check the bore with the
-# .4990 GO / .4995 NO-GO Class ZZ pins (the band's ends).
+# less the .344 nominal, face to Z0. Bench: deburr.
 #
-# Not on hand (cad/config/shop-equipment/, to order): the .4990 reamer
-# (tools-reamers-taps.toml reamer-4990) and two Class ZZ single pins, .4990
-# plus (GO) and .4995 minus (NO-GO), shop gauges.zz-pins-4990-4995: the band
-# is .0005, under the pin-gauge sets' .001 step. Owner ruling 2026-11-23 (tool
-# audit Q1, re-answered), verbatim: "ZZ singles per the record: 29 pins (17
-# plus GO, 12 minus NO-GO), about $130. Accept that good holes near a limit
-# may be refused; the traveler mikes each pin so the real window is known per
-# pin." It replaces the Class X .4990/.4995 pair. Setup 1 mikes both pins and
-# the reamer before reaming; the bore is gauged right after the ream, still
-# chucked (one more reamer pass is the only remedy, and only there), and again
-# on the bench.
+# Owner ruling 2026-11-24, fit audit question 17 (approved as recommended):
+# the bore is a 1/2 drill at the DRILLED HOLES row (the owned 115-piece
+# index's 1/2, cad/config/shop-equipment/tools-drills.toml drill-1-2) and
+# MHA-MG-05's spigot is turned to slide in it and bonded at MHA-MG-00, so
+# the bore is accepted by that spigot, not gauged: the .4990 reamer and the
+# .4990/.4995 Class ZZ pins leave this traveler.
 title = "Magnifying Wheel Drum"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 7/8 in"
 stock = "Lot: {{process.quantity:d}} drum. Ø{{process.stock_dia_in:.3dot}} bar, on hand (a {{process.bar_length_in:g}} in piece); the drum takes {{cad.pitch_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .4990 chucking reamer and the .4990 plus (GO) / .4995 minus (NO-GO) Class ZZ pins for the bore check."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Every tool is on hand."
 shop = "../shop"
 stock_refs = ["c360-round-7-8"]
 material_key = "lathe-c360"
@@ -69,19 +63,6 @@ rough_radial_doc_mm = 0.5
 finish_radial_doc_mm = 0.05
 turn_feed_mm_rev = 0.1016
 turn_start_z_mm = 0.5
-# The bore's Class ZZ pins (owner ruling 2026-11-23, tool audit Q1; shop
-# gauges.zz-pins-4990-4995): each pin is made within .0002 in = 0.00508 mm
-# of its size, on one side. GO, the .4990 plus pin, is .4990-.4992 in:
-# the band's low end 12.6746 plus 0.00508 mm. NO-GO, the .4995 minus pin, is
-# .4993-.4995 in: the band's high end 12.6873 less 0.00508 mm. A pin miking
-# outside its own range is not used.
-# go_pin_min_mm and nogo_pin_max_mm are the band's own ends (cad bore dia,
-# 12.6746-12.6873 mm), repeated in mm for the micrometer checks
-# (test_zz_pin_windows binds all four).
-go_pin_min_mm = 12.6746
-go_pin_max_mm = 12.6797
-nogo_pin_min_mm = 12.6822
-nogo_pin_max_mm = 12.6873
 
 [[tools]]
 id = "ar"
@@ -99,26 +80,14 @@ name = "V drill"
 ref = "drill-v"
 
 [[tools]]
-id = "drill-31-64"
-name = "31/64 drill"
-ref = "drill-31-64"
-
-[[tools]]
-id = "reamer"
-name = ".4990 chucking reamer"
-ref = "reamer-4990"
-status = "to_order"
+id = "drill-1-2"
+name = "1/2 drill"
+ref = "drill-1-2"
 
 [[tools]]
 id = "cutoff"
 name = "P1 HSS cutoff blade"
 ref = "cutoff-blade-p1"
-
-[[tools]]
-id = "zz-pins"
-name = "Class ZZ pins: .4990 plus (GO) and .4995 minus (NO-GO)"
-ref = "zz-pins-4990-4995"
-status = "to_order"
 
 [[tools]]
 id = "file"
@@ -127,27 +96,15 @@ ref = "jig-files"
 
 [[setups]]
 machine_kind = "lathe"
-title = "Bar: face, turn the outside, drill and ream the bore, part off long"
+title = "Bar: face, turn the outside, drill the bore, part off long"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
-datum = "Z0 (carriage DRO) the bar end faced in Op 30."
-diagram = { file = "diagrams/bar.svg", alt = "The 7/8 in bar in the 3-jaw: the end faced, the outside turned, the bore spotted, drilled and reamed through past the parting line; the drum parted off .02 long." }
+datum = "Z0 (carriage DRO) the bar end faced in Op 10."
+diagram = { file = "diagrams/bar.svg", alt = "The 7/8 in bar in the 3-jaw: the end faced, the outside turned, the bore spotted and drilled through past the parting line; the drum parted off .02 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Before chucking the bar, on the bench: with the .0001 micrometer (it reads to about ±.00005), mike the GO pin, the NO-GO pin, and the reamer across two opposite margins at its front end. Write the three readings here, and each pin's reading on its tag."
-inspection = "GO pin {{cad.bore_dia_min_in:.4dot}}–{{process.go_pin_max_mm:in.4dot}}; NO-GO pin {{process.nogo_pin_min_mm:in.4dot}}–{{cad.bore_dia_max_in:.4dot}}. A pin outside its range is not used: get another before Op 90."
-gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.go_pin_min_mm}}", "{{process.go_pin_max_mm}}"] }, { gauge = "micrometers", band_mm = ["{{process.nogo_pin_min_mm}}", "{{process.nogo_pin_max_mm}}"] }]
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Only if the reamer read under the GO pin's reading (otherwise skip): chuck a brass offcut first, face it, spot, drill V and 31/64 .50 deep, and ream it .40 deep as Op 90 does. Gauge that trial hole with both pins: GO refused, stop and tell the owner (this reamer's holes would be refused)."
-feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -177,7 +134,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Outside over {{cad.outer_dia_max_in:.3dot}} in Op 40: take another finish pass and mike again. Under {{cad.outer_dia_min_in:.3dot}}: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 30."
+instruction = "Outside over {{cad.outer_dia_max_in:.3dot}} in Op 20: take another finish pass and mike again. Under {{cad.outer_dia_min_in:.3dot}}: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10."
 feed = "hand"
 
 [[setups.operations]]
@@ -206,41 +163,14 @@ peck_reason = "a .38 drill through about .44 of brass from a hand-fed quill: bac
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "drill-31-64"
+tool = "drill-1-2"
 drilling = "twist_drill"
-sizing = "other"
-instruction = "Open the hole with the 31/64 drill: lips on the pilot's edge, zero the quill scale, drill until it reads {{cad.run_in:.2dot}}, blind into the bar past the parting line. It leaves the reamer about .007 a side."
-settings = "lathe-drill-31-64-c360"
-cut_diameter_mm = 12.3031
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Open the hole with the 1/2 drill: lips on the pilot's edge, zero the quill scale, drill until it reads {{cad.run_in:.2dot}}, blind into the bar past the parting line (the DRILLED HOLES row, Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}; MHA-MG-05's spigot is turned to this bore)."
+settings = "lathe-drill-1-2-c360"
+cut_diameter_mm = 12.7
 hole_depth_mm = "{{cad.run_mm}}"
 peck = "none"
-
-[[setups.operations]]
-cut_kind = "other"
-speed_kind = "spindle"
-tool = "reamer"
-drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Ream .4990 from the tailstock, spindle running: feed the reamer in until its lead chamfer meets the hole's mouth and zero the quill scale there; feed slowly until it reads {{cad.run_in:.2dot}} (past the parting line), and withdraw with the spindle still running."
-settings = "lathe-ream-4990-c360"
-cut_diameter_mm = "{{cad.bore_dia_mm}}"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Spindle stopped, still chucked: blow the chips out of the bore and try the pins from the open end. The sheet accepts a bore from the GO pin's reading up to, not including, the NO-GO pin's reading (Op 10)."
-inspection = "GO enters, NO-GO does not. With both pins at their limits only {{process.go_pin_max_mm:in.4dot}}–{{process.nogo_pin_min_mm:in.4dot}} is sure to pass: a good bore within .0002 of either end of {{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} may be refused."
-gauge_checks = [{ gauge = "zz-pins-4990-4995", band_mm = "{{cad.bore_dia_band_mm}}" }]
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "GO refused in Op 100: clear the chips, ream once more with the same reamer as Op 90, and gauge again. Still refused: part the turned length off as scrap and stop; tell the owner. The pins cannot show the bore at or over {{cad.bore_dia_min_in:.4dot}}, and this reamer cuts no larger: a new reamer is proved on an offcut, as Op 20, before Op 30 again."
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "NO-GO enters in Op 100: no cut remedies it (nothing on the sheet shows the bore at or under {{cad.bore_dia_max_in:.4dot}}). Part the turned length off as scrap and stop; tell the owner: this reamer cuts over the NO-GO pin, and a new one is proved on an offcut, as Op 20, before Op 30 again."
-feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -259,7 +189,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a shim wrap of brass shim, {{process.regrip_grip_in:.2dot}} in of the outside in the jaws from the Setup 1 faced end (a pencil line that far from it at the jaw fronts), closed lightly (the wall is about .13); the parted end {{cad.outer_stickout_far_mm:in.2dot}} in out. Nothing seats the drum axially: the jaw tips may stand proud of the chuck face."
-datum = "Z0: the parted face, {{cad.length_nominal_in:.3dot}} from the Setup 1 faced end, preset from the length miked in Op 140; the setting error, about .0005 either way, plus a touch mark of at most .001, which only shortens it, stays well inside the {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} band."
+datum = "Z0: the parted face, {{cad.length_nominal_in:.3dot}} from the Setup 1 faced end, preset from the length miked in Op 80; the setting error, about .0005 either way, plus a touch mark of at most .001, which only shortens it, stays well inside the {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} band."
 diagram = { file = "diagrams/regrip.svg", alt = "The drum turned round, its faced end in the jaws over a shim wrap with nothing behind it; the parted end faced to length from the miked length." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
@@ -277,16 +207,16 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Over {{cad.length_max_in:.3dot}} in Op 140: chuck it again and repeat Op 140 from that reading (re-touch, preset, face to Z0). Under {{cad.length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1."
+instruction = "Over {{cad.length_max_in:.3dot}} in Op 80: chuck it again and repeat Op 80 from that reading (re-touch, preset, face to Z0). Under {{cad.length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Bench: deburr and check the bore"
+title = "Bench: deburr"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished drum: its {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} length, the turned outside and the reamed bore through." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished drum: its {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} length, the turned outside and the drilled bore through." }
 vise_hold = "other"
 beam = "other"
 
@@ -299,15 +229,5 @@ instruction = "Deburr: break the outside edges and both ends of the bore, R{{cad
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Try the GO pin in the bore from both ends, then the NO-GO pin from both ends: the sheet accepts a bore from the GO pin's reading up to, not including, the NO-GO pin's reading (Op 10)."
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}: GO enters from both ends, NO-GO enters from neither."
-gauge_checks = [{ gauge = "zz-pins-4990-4995", band_mm = "{{cad.bore_dia_band_mm}}" }]
-feed = "hand"
-
-[[setups.operations]]
-instruction = "A drum failing the bore check in Op 170 is scrapped, not reworked (out of the chucking it was reamed in, it cannot be reamed again true): make another from Setup 1."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Finish (drawing: bright machined, oiled): wipe the drum clean and give it a light coat of light machine oil, then wipe the bore dry for the press on MHA-MG-05."
+instruction = "Finish (drawing: bright machined, oiled): wipe the drum clean and give it a light coat of light machine oil, then wipe the bore dry: MHA-MG-00 degreases it for the bond on MHA-MG-05."
 feed = "hand"

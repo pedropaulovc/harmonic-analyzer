@@ -7,4 +7,4 @@ mg-wheel-drum:
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "turned from bar (brass): bore reamed for a press fit on the wheel spigot, both ends faced"
+  process: "turned from bar (brass): bore drilled 1/2 through, both ends faced; MHA-MG-05's spigot is turned to slide in the bore and the drum bonded on it (LOCTITE 638) at MHA-MG-00"

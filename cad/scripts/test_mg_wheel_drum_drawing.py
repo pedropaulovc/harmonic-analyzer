@@ -52,21 +52,30 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 def test_every_size_carries_its_band_on_the_model() -> None:
     # The O.D. and the length have no fit band: they take the title block's
-    # .XX and .XXX rows.
-    assert model_toleranced_dimensions(part) == {
-        ("RingProfile", "DrumBore"): "*deviations(DRUM_BORE_BAND)",
-    }
+    # .XX and .XXX rows; the 1/2 drilled bore takes the DRILLED HOLES row
+    # (owner ruling 2026-11-24, fit audit question 17).
+    assert model_toleranced_dimensions(part) == {}
     # drawing-guidelines.md rule 17 (walls and webs) at the worst printed
-    # corner: the O.D. printed .77 -.01 over the .4990 +.0005 reamed bore.
-    assert mg_wheel_drum_geom.WALL_WORST == pytest.approx((0.76 - 0.4995) * 25.4 / 2.0)
+    # corner: the O.D. printed .77 -.01 over the 1/2 drill's .504.
+    assert mg_wheel_drum_geom.DRUM_BORE_BAND == pytest.approx((0.004 * 25.4, 0.0))
+    assert mg_wheel_drum_geom.WALL_WORST == pytest.approx((0.76 - 0.504) * 25.4 / 2.0)
     assert mg_wheel_drum_geom.WALL_WORST >= mg_wheel_drum_geom.MIN_WALL
 
 
-def test_drum_presses_on_the_wheel_spigot_never_proud() -> None:
-    # Reamed bore, made first; the spigot is turned to the stated interference in it.
-    assert spec.DRUM_BORE == pytest.approx(0.499 * 25.4)
+def test_drum_bonds_on_the_wheel_spigot_never_proud() -> None:
+    # Drilled bore, made first; the spigot is turned to slide in it with the
+    # bond's clearance, inside LOCTITE 638's gap.
+    assert spec.DRUM_BORE == pytest.approx(0.500 * 25.4)
+    assert spec.DRUM_BORE_DRILL == "1/2"
     assert spec.DRUM_BORE == wheel_geom.SPIGOT_DIA
-    assert wheel_geom.DRUM_PRESS == pytest.approx((0.0002 * 25.4, 0.0013 * 25.4))
+    assert wheel_geom.DRUM_BOND_CLEARANCE == pytest.approx(
+        (0.0005 * 25.4, 0.0025 * 25.4)
+    )
+    assert wheel_geom.DRUM_BOND_CLEARANCE[1] <= wheel_geom.LOCTITE_638_GAP_MAX
+    assert wheel_geom.SPIGOT_DIA_MIN == pytest.approx(0.4975 * 25.4)
+    assert drawing.DIMENSION_CALLOUTS["DrumBore"] == (
+        "1/2 DRILL THRU\nMHA-MG-05 SPIGOT IS TURNED TO THIS BORE"
+    )
     # Both lengths on the title block's .XXX row, each model inside its
     # printed limits: the longest drum still keeps its face under the
     # shortest spigot's, so it is never proud.
@@ -88,6 +97,6 @@ def test_registry_row() -> None:
     assert part.MATERIAL == "Brass"
 
 
-def test_pressed_bore_carries_no_finish_and_no_gdt() -> None:
-    # drawing-guidelines.md rule 6: a pressed bore neither runs nor slides.
+def test_bonded_bore_carries_no_finish_and_no_gdt() -> None:
+    # drawing-guidelines.md rule 6: a bonded bore neither runs nor slides.
     assert spec.SURFACE_FINISHES == ()

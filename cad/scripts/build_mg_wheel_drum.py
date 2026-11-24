@@ -1,7 +1,7 @@
 r"""Reproduction script: magnifying-wheel drum (MHA-MG-10; 1 used).
 
 The brass ring the lever wire wraps (book ch. 21, p.53 shows the wheel's brass
-hub drum): pressed on the wheel's Ø.499 spigot up to the boss, its front face
+hub drum): bonded on the wheel's Ø.500 spigot up to the boss, its front face
 never proud of the spigot's (``mg_magnifying_wheel_geom.DRUM_RECESS``). Its
 wire-centre radius sets the wheel's magnification (``mg_wheel_drum_geom``).
 
@@ -38,18 +38,14 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
-from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from mg_wheel_drum_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     DRUM_BORE,
-    DRUM_BORE_BAND,
     DRUM_LEN,
     DRUM_OD,
     SURFACE_FINISHES,
-    UNIT,
 )
 
 PART_NAME = "mg-wheel-drum"
@@ -129,15 +125,9 @@ def build(adapter) -> dict[str, str]:
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
     # The O.D. and the length take the title block's .XX and .XXX rows
-    # (DRAWING_PRECISION); the reamed bore carries its band (millimetres,
-    # printed in UNIT).
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "RingProfile",
-        "DrumBore",
-        *deviations(DRUM_BORE_BAND),
-        display_unit=UNIT,
-    )
+    # (DRAWING_PRECISION); the 1/2 drilled bore carries no band of its own:
+    # its DRILL THRU callout takes the title block's DRILLED HOLES row
+    # (mg_wheel_drum_geom.DRUM_BORE_BAND, an analysis band).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

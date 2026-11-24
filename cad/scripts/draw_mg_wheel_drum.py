@@ -31,20 +31,18 @@ from _drawing_dimensions import (
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
-from _title_block_units import MM_PER_INCH, render_number
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_registry import DRAWINGS_BY_NAME
 from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
-from _printed_limits import limits
-from mg_magnifying_wheel_geom import DRUM_PRESS
+from _printed_limits import drilled_limits, limits
 from mg_wheel_drum_geom import WALL_WORST
 from mg_wheel_drum_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     DRUM_BORE,
-    DRUM_BORE_BAND,
+    DRUM_BORE_DRILL,
     DRUM_LEN,
     DRUM_OD,
     UNIT,
@@ -86,7 +84,7 @@ DRAWING_PRECISION_BY_NAME = {
 # Both diameters import on the face view, where every diameter line runs
 # through the centre: two would cross there. The bore keeps the face view;
 # the O.D. is a donor there and moves onto the side view, right of the ring.
-# The bore's three-line callout stands up and right of the face view; the
+# The bore's two-line callout stands up and right of the face view; the
 # length's one-line callout hangs under the side view, above the title
 # block, so the two text blocks never share a row.  The length's block is
 # wider than the ring (about 76 mm), so it stands LEFT of the side view's
@@ -105,22 +103,16 @@ RIGHT_KEEP = {
 OD_ON_SIDE = (RIGHT_CENTER[0] + DRUM_LEN / 2.0 * _S + 0.030, RIGHT_CENTER[1])
 
 
-def _inch(value_mm: float, digits: int) -> str:
-    return render_number(abs(value_mm) / MM_PER_INCH, "in", digits)
-
-
-# Each tight size names its mate once, on its own callout (rules 4 and 7):
-# the reamed bore's standard fit on the wheel spigot, which is turned to it,
-# with the interference as REF; the length's third place (the title block's
-# .XXX) sets the drum's stack on that spigot. Seating against the boss and
-# the front-face recess are the assembly's drum-pressed step, not part-sheet
-# text.
+# Each size names its mate once, on its own callout (rules 4 and 7): the
+# drilled bore (owner ruling 2026-11-24, fit audit question 17) is made
+# first, and the wheel spigot is turned to slide in it and bonded, so this
+# sheet names the spigot as made to the bore and prints no acceptance (the
+# spigot's sheet, MHA-MG-05 note 2, carries the bonded fit's clearance);
+# the length's third place (the title block's .XXX) sets the drum's stack
+# on that spigot. Seating against the boss and the front-face recess are
+# the assembly's drum-bonded step, not part-sheet text.
 DIMENSION_CALLOUTS = {
-    "DrumBore": (
-        "REAM THRU\n"
-        "PRESS FIT ON MHA-MG-05 WHEEL SPIGOT\n"
-        f"(INTERFERENCE {_inch(DRUM_PRESS[0], 4)}-{_inch(DRUM_PRESS[1], 4)})"
-    ),
+    "DrumBore": f"{DRUM_BORE_DRILL} DRILL THRU\nMHA-MG-05 SPIGOT IS TURNED TO THIS BORE",
     "DrumLen": "SETS STACK ON MHA-MG-05 SPIGOT",
 }
 
@@ -129,9 +121,9 @@ DIMENSION_CALLOUTS = {
 # (build_mg_wheel_drum: the Front-plane annulus extruded mid-plane, axis +Z
 # through the origin; the -Z face is the datum end the length runs from).
 # The length takes the title block's .XXX row, the O.D. its .XX row (on the
-# printed .77, round the exact wire-seat model value), the bore its reamed
-# +.0005/.0000 band. Each ``span`` is a diameter's model-Z extent. The
-# declarations print nothing.
+# printed .77, round the exact wire-seat model value), the bore its 1/2
+# drill under the DRILLED HOLES row. Each ``span`` is a diameter's model-Z
+# extent. The declarations print nothing.
 # The sheet prints no manufacturing note: every requirement is a dimension,
 # its band or its native callout, so the feature manifest's notes are empty.
 DRAWING_NOTES = ""
@@ -207,7 +199,7 @@ requirement(
         "at": ([0.0, 0.0, 0.0], ((_GEOM, "DRUM_BORE"),)),
         "span": ([-_HALF, _HALF], ((_GEOM, "DRUM_LEN"),)),
         "dia": (
-            limits(DRUM_BORE, _P["DrumBore"], DRUM_BORE_BAND, unit=UNIT),
+            drilled_limits(DRUM_BORE, _P["DrumBore"], unit=UNIT),
             (
                 (_GEOM, "DRUM_BORE"),
                 (_GEOM, "DRUM_BORE_BAND"),
@@ -217,11 +209,12 @@ requirement(
         ),
         "nominal_dia": (DRUM_BORE, ((_GEOM, "DRUM_BORE"),)),
         "thru": (True, ((_SELF, "DIMENSION_CALLOUTS"),)),
-        "process": ("ream", ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "process": ("drill", ((_SELF, "DIMENSION_CALLOUTS"),)),
         "wall_min": (WALL_WORST, ((_GEOM, "WALL_WORST"),)),
+        "mate": ("MHA-MG-05", ((_SELF, "DIMENSION_CALLOUTS"),)),
         "callout": (
             DIMENSION_CALLOUTS["DrumBore"],
-            ((_SELF, "DIMENSION_CALLOUTS"), ("mg_magnifying_wheel_geom", "DRUM_PRESS")),
+            ((_SELF, "DIMENSION_CALLOUTS"),),
         ),
     },
     precision={"dia": _P["DrumBore"]},
@@ -300,9 +293,9 @@ def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # The template centre-marks the bore as the view is placed, so an
-    # explicit AutoInsertCenterMarks2 would print a duplicate mark.  The pressed bore takes
+    # explicit AutoInsertCenterMarks2 would print a duplicate mark.  The bonded bore takes
     # no roughness symbol (drawing-guidelines.md rule 6): it neither runs nor
-    # slides, and the ream and the stated interference control the fit.
+    # slides, and the spigot is turned to it.
 
     return finalize_drawing(
         adapter,
