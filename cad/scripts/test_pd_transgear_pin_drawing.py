@@ -141,7 +141,7 @@ def test_the_arm_rear_mouth_clears_the_seat_root_at_every_limit() -> None:
     # minimum, so the arm models and prints one.
     low, high = arm.PIN_MOUTH_CHAMFER_LIMITS
     assert low >= spec.SEAT_FILLET_R
-    assert low < arm.PIN_MOUTH_CHAMFER < high
+    assert low == arm.PIN_MOUTH_CHAMFER < high
     assert high == pytest.approx(edge_break_chamfer_mm(unit=spec.UNIT))
 
 
@@ -288,7 +288,7 @@ def test_notes_fit_the_sheet_limits() -> None:
 
 
 def test_the_one_diameter_shank_is_bonded_in_the_arm_and_runs_in_its_mates() -> None:
-    """Fit audit 2026-11-23 (pending owner confirmation): the pin has one
+    """Owner ruling 2026-11-24, fit audit question 4: the pin has one
     diameter under its head, a slip fit bonded in the arm's ream with the
     retaining compound the note names; nothing presses.  The gap sits inside
     the compound's fill, the bond's derated capacity covers the ring's rated
@@ -310,21 +310,44 @@ def test_the_one_diameter_shank_is_bonded_in_the_arm_and_runs_in_its_mates() -> 
         - arm.PIN_MOUTH_CHAMFER_LIMITS[1]
         - edge_break_chamfer_mm(unit=spec.UNIT)
     )
-    assert spec.LOCTITE_638_SHEAR_MPA == arbor.LOCTITE_638_SHEAR_MPA == gooseneck.LOCTITE_638_SHEAR_MPA
-    assert spec.BOND_TORQUE_MARGIN_MIN == arbor.BOND_TORQUE_MARGIN_MIN == gooseneck.BOND_TORQUE_MARGIN_MIN
+    assert (
+        spec.LOCTITE_638_SHEAR_MPA
+        == arbor.LOCTITE_638_SHEAR_MPA
+        == gooseneck.LOCTITE_638_SHEAR_MPA
+    )
+    assert (
+        spec.BOND_TORQUE_MARGIN_MIN
+        == arbor.BOND_TORQUE_MARGIN_MIN
+        == gooseneck.BOND_TORQUE_MARGIN_MIN
+    )
     # The gooseneck's steel and clearance factors, with a long land's 0.5.
     assert spec.BOND_FACTOR == pytest.approx(gooseneck.BOND_FACTOR * 0.5)
     assert spec.BOND_AXIAL_CAPACITY_N == pytest.approx(
-        spec.LOCTITE_638_SHEAR_MPA * spec.BOND_FACTOR * math.pi * spec.DIA_MIN * spec.BOND_LENGTH_MIN
+        spec.LOCTITE_638_SHEAR_MPA
+        * spec.BOND_FACTOR
+        * math.pi
+        * spec.DIA_MIN
+        * spec.BOND_LENGTH_MIN
     )
     assert spec.BOND_AXIAL_CAPACITY_N > spec.BOND_AXIAL_DEMAND_N
-    assert spec.BOND_TORQUE_CAPACITY_NMM >= spec.BOND_TORQUE_MARGIN_MIN * spec.BOND_TORQUE_DEMAND_NMM
-    assert _below("ShankDia") == callouts.SHANK_CALLOUT == f"SEE NOTE {callouts.SHANK_FIT_NOTE}"
+    assert (
+        spec.BOND_TORQUE_CAPACITY_NMM
+        >= spec.BOND_TORQUE_MARGIN_MIN * spec.BOND_TORQUE_DEMAND_NMM
+    )
+    assert (
+        _below("ShankDia")
+        == callouts.SHANK_CALLOUT
+        == f"SEE NOTE {callouts.SHANK_FIT_NOTE}"
+    )
     assert callouts.DRAWING_NOTES.startswith(f"{callouts.SHANK_FIT_NOTE}. ")
     notes = " ".join(line.strip() for line in callouts.DRAWING_NOTES.splitlines())
+    # Rule 23, on the member made last (fit batch review r2): the bond's
+    # diametral clearance, inside the compound's gap, with the trial.
     assert (
-        f"BONDED SLIP FIT IN {spec.ARM_NUMBER}, {spec.RETAINING_COMPOUND}: SLIDES IN BY HAND."
+        f"BONDED IN {spec.ARM_NUMBER}, {spec.RETAINING_COMPOUND}, CLEARANCE .0010-.0022: "
+        "SLIDES IN BY HAND."
     ) in notes
+    assert 0.0022 * 25.4 < spec.LOCTITE_638_GAP_MAX
     assert all(number in callouts.DRAWING_NOTES for number in spec.RUNNING_MATES)
     assert "PRESS" not in callouts.DRAWING_NOTES
     assert "GROUND" not in callouts.DRAWING_NOTES
@@ -340,7 +363,7 @@ def test_the_shank_is_made_to_fit_and_prints_no_limits() -> None:
     import pd_transgear_feed_pinion_spec as sleeve
 
     notes = " ".join(line.strip() for line in callouts.DRAWING_NOTES.splitlines())
-    shank = notes[notes.index("SHANK:") : notes.index(" BONDED SLIP FIT")]
+    shank = notes[notes.index("SHANK:") : notes.index(" BONDED IN")]
     assert shank == (
         "SHANK: TURN LAST TO BORES OF MHA-PD-10, MHA-PD-24, MHA-PD-25: "
         "EACH TURNS FREE, NO SHAKE; SHIM MHA-PD-VN-68 SLIDES ON."

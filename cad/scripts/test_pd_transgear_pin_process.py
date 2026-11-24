@@ -51,13 +51,14 @@ def _cap(radius_in: float, dia_in: float) -> float:
 def test_the_pin_is_enrolled_on_turned_shaft(plan: dict) -> None:
     assert STEM in _process_plans.TRAVELER_STEMS
     assert plan["cad"]["adapter"] == "turned_shaft"
-    assert plan["stock_refs"] == ["1018-round-1-4"]
+    # The 1018 bar is the pin's; the brass is the split bush's (#3500).
+    assert plan["stock_refs"] == ["1018-round-1-4", "c360-round-1-2"]
 
 
 def test_the_arm_is_tried_on_the_shank_and_nothing_is_turned_to_a_reading(
     plan: dict, parameters: dict, features: dict
 ) -> None:
-    """Fit audit 2026-11-23 (pending owner confirmation): the pin is one
+    """Owner ruling 2026-11-24, fit audit question 4: the pin is one
     diameter, bonded in the arm. No land, no ream reading, no Class X plugs:
     the arm's one limit is its .127 set pin, and the arm slides on by hand."""
     assert "step_land" not in features
@@ -70,7 +71,11 @@ def test_the_arm_is_tried_on_the_shank_and_nothing_is_turned_to_a_reading(
     text = " ".join(op["instruction"] + " " + op.get("inspection", "") for op in ops)
     assert "step_land" not in text and "plug" not in text.lower()
     assert "the .127 pin does not enter" in ops[1]["inspection"]
-    trials = [op for op in ops if "the arm slides on by hand up to the seat" in op.get("inspection", "")]
+    trials = [
+        op
+        for op in ops
+        if "the arm slides on by hand up to the seat" in op.get("inspection", "")
+    ]
     assert len(trials) == 2
 
 
@@ -162,15 +167,42 @@ def test_each_regrip_stands_within_the_shops_stickout(
     radius = parameters["dome_datum_leaf_radius_min_in"]
     assert "step_land" not in features
     shank_dia = features["outer"]["dia"]
-    # Head out: the jaw fronts on the shank under the head, past the faced
+    # Head out: the bush's front on the shank under the head, past the faced
     # head.
     out = parameters["regrip_stickout_datum_in"]
     assert parameters["head_face_max_in"] < out
     assert out <= ratio * shank_dia[0] / IN
     assert _cap(radius, head_dia) < parameters["head_face_max_in"]
-    # Tip out: the jaw fronts on the journal past the groove.
+    # Tip out: the bush's front on the journal past the groove.
     groove = features["groove"]
     tip = features["far_end"]["station"][1] - groove["station"][0]
     out = parameters["regrip_stickout_far_in"]
     assert out * IN > tip + groove["width"][1]
     assert out <= ratio * groove["dia"][0] / IN
+
+
+def test_the_jaws_never_grip_the_shank(plan: dict, parameters: dict) -> None:
+    """#3500: the 3-jaw closes no smaller than Ø.175 (owner's measurement
+    2026-11-24, #3489), over the pin's Ø.125 shank. The jaws grip the 1/4 in
+    bar, then a split bush of 1/2 in brass that closes on the shank."""
+    least_grip_in = 0.175
+    grips = [setup["lathe_hold"]["grip_diameter_mm"] for setup in plan["setups"][:4]]
+    assert grips == [
+        "{{cad.stock_dia_mm}}",
+        "{{process.bush_dia_mm}}",
+        "{{process.bush_dia_mm}}",
+        "{{process.bush_dia_mm}}",
+    ]
+    assert "lathe_hold" not in plan["setups"][4]
+    assert parameters["stock_dia_in"] > least_grip_in
+    assert parameters["bush_dia_in"] > least_grip_in
+    assert parameters["bush_dia_mm"] == pytest.approx(parameters["bush_dia_in"] * IN)
+    assert parameters["bush_length_mm"] == pytest.approx(
+        parameters["bush_length_in"] * IN
+    )
+    # Held on bush_grip_in, the rest out of the jaws.
+    assert parameters["bush_stickout_mm"] == pytest.approx(
+        (parameters["bush_length_in"] - parameters["bush_grip_in"]) * IN
+    )
+    text = _process_plans.plan_path(STEM).read_text(encoding="utf-8")
+    assert "shim wrap" not in text

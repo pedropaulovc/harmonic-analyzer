@@ -106,7 +106,7 @@ def test_latch_bracket_screw_rows_follow_the_screw_and_bar_taps() -> None:
 
 def test_disc_cluster_rows_follow_the_pin_hub_and_disc() -> None:
     allowed = _allowed()
-    # Fit audit 2026-11-23 (pending owner confirmation): the one-diameter
+    # Owner ruling 2026-11-24, fit audit question 4: the one-diameter
     # pin is bonded in the arm's reamed bore with clearance, no overlap row.
     assert _pair("pd-transgear-pin-1", "pd-transgear-arm-1") not in allowed
     assert pin.DIA < arm.PIN_BORE_DIA

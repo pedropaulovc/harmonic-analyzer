@@ -37,7 +37,7 @@
 # locating holes are match-drilled #32 with MHA-PD-18 and reamed at assembly
 # (steps 13A and 13E) with the set's .1260 reamer, the arm's with its .1240;
 # the MHA-PD-28 bush is pressed into
-# K (step 11H) and its bore reamed after the press (step 11N). The plate
+# K (step 11K) and its bore reamed after the press (step 11Q). The plate
 # leaves with K reamed and chamfered for the press.
 #
 # Workholding: bonded, blue painter's tape on both faces and CA glue between
@@ -732,5 +732,5 @@ inspection = "No sharp edge or burr anywhere."
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "The plate leaves without the two Ø.1260 locating holes: MHA-PD-00 step 13A match-drills them with MHA-PD-18 and step 13E reams them; step 11H presses the MHA-PD-28 bush into K and step 11N reams its bore. Wipe on ISO VG 32 oil all over and into K ({{cad.finish}}); bag the plate."
+instruction = "The plate leaves without the two Ø.1260 locating holes: MHA-PD-00 step 13A match-drills them with MHA-PD-18 and step 13E reams them; step 11K presses the MHA-PD-28 bush into K and step 11Q reams its bore. Wipe on ISO VG 32 oil all over and into K ({{cad.finish}}); bag the plate."
 feed = "hand"

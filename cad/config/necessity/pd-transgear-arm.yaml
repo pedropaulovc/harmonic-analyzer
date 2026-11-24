@@ -5,10 +5,10 @@
 # 2026-11-23, pending owner confirmation.
 necessity:
   - id: N-01
-    feature: "sheet 1, front view, Ø.126 REAM THRU pin bore (datum C), MHA-PD-23 IS TURNED TO THIS BORE"
+    feature: "sheet 1, front view, Ø.126 REAM THRU pin bore (datum C), MHA-PD-23 BONDED, TURNED TO THIS BORE"
     kind: mesh
     reason: "keeps bonded pin MHA-PD-23 square to MHA-PD-26 rack mesh"
-    source: "paper_drive_arm_registration.S_AXIS_TILT_MAX_RAD; test_pd_feed_rack_drawing opposite-flank budget"
+    source: "owner ruling 2026-11-24, fit audit question 4 (MHA-PD-23 bonded, no lean check); paper_drive_arm_registration.S_AXIS_TILT_MAX_RAD"
   - id: N-02
     feature: "sheet 1, front view, 2X Ø.1240 REAM THRU dowel holes (note 2)"
     kind: joint
@@ -24,8 +24,3 @@ necessity:
     kind: bought_seat
     reason: "sets installed height of bought spring MHA-PD-VN-63"
     source: "transgear_hanger_joints.SPRING_ROOM_MIN: .0003 over the working height at ±.002, .0027 under it at ±.005"
-  - id: N-05
-    feature: "sheet 2, section D-D, pin bore mouth chamfer .008 ±.002 X 45°"
-    kind: gap
-    reason: "clears MHA-PD-23 seat fillet; leaves its head a seat"
-    source: "pd_transgear_pin_spec (R.005 MAX root against the .006 least leg); pd_transgear_arm_geometry.PIN_MOUTH_CHAMFER_LIMITS"

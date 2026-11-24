@@ -55,7 +55,9 @@ def test_the_contract_dimensions_are_the_ruled_variant() -> None:
     assert BUSH.HUB_DIA == pytest.approx(_in(0.52))
     assert BUSH.HUB_LENGTH == pytest.approx(_in(0.809))
     assert BUSH.HUB_LENGTH_BAND == FIT_LENGTH_BAND_IN
-    assert BUSH.SHOULDER_SEAT_GAP_MAX == pytest.approx(_in(0.0005))
+    # .002: the coarsest feeler leaf that still closes the collar-to-disc
+    # air (machinist review 20261124T013305458Z; fit audit 2026-11-23).
+    assert BUSH.SHOULDER_SEAT_GAP_MAX == pytest.approx(_in(0.002))
     assert BUSH.LENGTH == pytest.approx(_in(1.143))
     assert BUSH.LENGTH_BAND == pytest.approx(_in(0.002))
     assert BUSH.STUB_LENGTH == pytest.approx(_in(0.334))
@@ -671,7 +673,7 @@ def test_registry_row_is_the_turned_steel_mha_pd_28() -> None:
     assert row["tolerance_class"] == "machined_block"
     assert row["drawing_unit"] == "in"
     process = " ".join(row["process"].split())
-    for phrase in (".238 (letter B)", ".0005 feeler", "ream the bore .249 through"):
+    for phrase in (".238 (letter B)", ".002 feeler", "ream the bore .249 through"):
         assert phrase in process, phrase
 
 
