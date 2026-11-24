@@ -48,17 +48,14 @@ OD_PLACES = 2
 BORE_DIA = FIT.BORE_DIA  # .1260
 BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower) ANALYSIS deviations
 BORE_PLACES = 3
-# The callout: size and process, the running fit accepted by the mate (the
-# MHA-PD-23 pin is turned last to this bore), and rule 4's necessity answer:
-# play here cocks the bushing and the ring on the pin and tilts the disc
-# into the drive collar (pd_cluster_air, "front bushing and ring cocking on
-# the pin").
-BORE_CALLOUT = (
-    "REAM THRU, RUNNING FIT\n"
-    f"{PIN.PIN_NUMBER} PIN ENTERS, NO SHAKE\n"
-    f"KEEPS {_config.parts('pd-rack-pinion')['number']} CLEAR OF "
-    f"{_config.parts('pd-transgear-drive-collar')['number']}"
-)
+# The callout: size and process, then the mate and that it is turned to
+# this bore (a bare fit name is not enough).  The pair's one acceptance
+# prints on the sheet of the member made last, the pin's (MHA-PD-23 note 1;
+# machinist review r1 of the fit batch: three rows of words, and an
+# acceptance on both members).  Why the bore is reamed is in the part's
+# necessity file (owner ruling 2026-11-24: "In the part's registry file,
+# not on the sheet"; cad/config/necessity/pd-transgear-front-bushing.yaml).
+BORE_CALLOUT = f"REAM THRU\n{PIN.PIN_NUMBER} IS TURNED TO THIS BORE"
 # 45 deg, on the ring face's O.D. edge: a single MAX limit (the MHA-160
 # precedent).  Only its largest size matters: it must leave the MHA-PD-VN-61
 # ring a full bearing flat (checked below).  The part authors " MAX" as the
