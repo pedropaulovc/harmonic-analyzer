@@ -261,9 +261,6 @@ diameter_mm = 6.7564
 [tools.reamer-0775]  # B-reamer-.0775
 description = ".0775 in HSS chucking reamer"
 diameter_mm = 1.9685
-[tools.reamer-2560]  # B-reamer-.2560 (not the 6.5 mm B-reamer-.2559: #3083 row 4)
-description = ".2560 in HSS chucking reamer"
-diameter_mm = 6.5024
 [tools.tap-1-72-plug]  # Tap coverage #1-72 UNF
 description = "#1-72 UNF plug hand tap (OSG 1010700)"
 tap_drill_mm = 1.5875  # 1/16 (.0625 in, tools.drill-1-16), ~58% thread: MHA-CH-07's Ø.060 +.004/0 crown hole excludes the usual #53 (.0595).
@@ -287,22 +284,6 @@ chip_load_mm_per_tooth = 0.0254  # .001 in; 2800 × 3 × .001 = 8.4 in/min
 flutes = 3
 feed_unit = "in/min"
 
-# The MHA-CH-07 keeper bore's Class ZZ pins, its band .2560-.2570 (owner
-# ruling 2026-11-23, tool audit Q7: "Re-band to dia .2560 +.0010/0, cut with
-# the .2560 reamer"). Owner ruling 2026-11-23, tool audit Q1, verbatim: "ZZ
-# singles per the record: 29 pins (17 plus GO, 12 minus NO-GO), about $130.
-# Accept that good holes near a limit may be refused; the traveler mikes
-# each pin so the real window is known per pin." GO a plus .2560 single,
-# NO-GO the .257 minus pin of the .061-.500 box (the zz-pins-<low>-<high>
-# keys of the tool/travelers branches; ownership is the inventory's record
-# under the same key, cad/config/shop-equipment/, PR #3442); the
-# resolution is one pin's ZZ tolerance, .0002 in.
-[gauges.zz-pins-2560-2570]
-range_mm = [6.5024, 6.5278]
-resolution_mm = 0.00508
-[tools.zz-pins-2560-2570]
-description = "Class ZZ pins for .2560-.2570: GO .2560 plus (single), NO-GO .257 minus (the .061-.500 box)"
-
 # --- MHA-CH-01/-03 notches and slot (cad/process/ch_amplitude_bar, ch_connecting_rod) ---
 # The owned HSS slitting saw (cad/config/shop-equipment/
 # tools.slitting-saw-2-75-064, McMaster 3062A21, 1 in hole): ROOTS R.015 MAX
@@ -313,22 +294,6 @@ description = "Class ZZ pins for .2560-.2570: GO .2560 plus (single), NO-GO .257
 [tools.slitting-saw-2-75-064]
 description = "HSS slitting saw, 2-3/4 in diameter, .064 in thick, 72 teeth (McMaster 3062A21)"
 diameter_mm = 69.85
-
-# --- MHA-CH-08 pivot bracket bore (cad/process/ch_pivot_bracket) ---
-# Class ZZ pins for the Ø.2560 +.0040/.0000 bore (owner ruling 2026-11-23,
-# tool audit Q1, re-answered, verbatim: "ZZ singles per the record: 29 pins
-# (17 plus GO, 12 minus NO-GO), about $130. Accept that good holes near a
-# limit may be refused; the traveler mikes each pin so the real window is
-# known per pin."). GO a .2560 plus single (.2560-.2562), as the #3075
-# record asks (cad/config/shop-equipment/gauges.toml gauges.pin-gauges);
-# NO-GO the .260 minus pin of the .061-.500 box (.2598-.2600). Range: the
-# band, 6.5024-6.604 mm; resolution: one pin's Class ZZ tolerance, .0002 in
-# = 0.00508 mm.
-[gauges.zz-pins-2560-2600]
-range_mm = [6.5024, 6.604]
-resolution_mm = 0.00508
-[tools.zz-pins-2560-2600]
-description = "Class ZZ pins for .2560-.2600: GO .2560 plus (single), NO-GO .260 minus (the .061-.500 box)"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
