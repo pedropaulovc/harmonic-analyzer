@@ -11,7 +11,7 @@ part marks and drawing keeps in lockstep (``test_dt_pinion_lever_drawing.py``).
 
 from __future__ import annotations
 
-from _fit_ream_slide import REAM_SLIDE
+from _fit_deviations import deviations
 from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_deviations
 from dt_pinion_lever_geometry import (
@@ -39,10 +39,11 @@ from dt_pinion_lever_geometry import (
 LIFT_ROD_NUMBER = "MHA-DT-17"
 
 # U36: the pin carries the torque, so the hub only has to slide onto the h-band
-# 1/4 in lift rod.  Codex P2 (#844): the former band's minimum met the rod's
-# maximum line-to-line; REAM_SLIDE (+.0015/+.0010, the fit MHA-DT-14 and
-# MHA-DT-18 hold on the same shafts) guarantees .0010 of clearance.
-BORE_BAND = REAM_SLIDE
+# 1/4 in lift rod.  Fit audit F23 (owner ruling 2026-11-24): the owned .2510
+# reamer cuts it and the sheet prints its size with no band, the MHA-DT-17
+# rod entering by hand its acceptance.  BORE_BAND is the reamer's ANALYSIS
+# band (.2510-.2515: .0010-.0023 on the rod), not a printed limit.
+BORE_BAND = (0.0127, 0.0)  # ANALYSIS (upper, lower) deviations
 # drawing-guidelines.md rule 17 (walls .080 target / .060 floor at the worst
 # printed bands): the end wall behind the blind bore is what the two .XX
 # baselines from face B leave -- the overall length to the crown apex less
@@ -55,7 +56,7 @@ END_WALL_ON_AXIS_WORST = (
 # Off the axis the dome falls away: at the floor's corner (the largest bore)
 # it drops most on the smallest printed SR.
 _CAP_R_MIN = CAP_RADIUS + printed_deviations(CAP_RADIUS, 2, unit=UNIT)[0]
-_FLOOR_CORNER_R = BORE / 2.0 + BORE_BAND[0]
+_FLOOR_CORNER_R = BORE / 2.0 + deviations(BORE_BAND)[1]
 END_WALL_AT_FLOOR_CORNER_WORST = END_WALL_ON_AXIS_WORST - (
     _CAP_R_MIN - (_CAP_R_MIN**2 - _FLOOR_CORNER_R**2) ** 0.5
 )
@@ -91,8 +92,8 @@ REFERENCE_SKETCHES = (
 )
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the part authors
-# them and the drawing reads them back.  Four on the banded bore (fit F10,
-# .2500 +.0015/+.0010); three on the drilled pin hole, which takes the title
+# them and the drawing reads them back.  Four on the reamed bore (the .2510
+# reamer's size, fit audit F23); three on the drilled pin hole, which takes the title
 # block's DRILLED HOLES row (Ø.064, +.004/0); two, the inch .XX row,
 # everywhere else: the rig's stacks read the grip stations, and no feature on
 # the lever is routine enough for .X.
