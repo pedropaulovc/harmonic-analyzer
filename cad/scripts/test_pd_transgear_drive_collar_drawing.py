@@ -524,7 +524,9 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     assert spec.PIN_OFFSET_TOL < spec.PIN_CENTRE_SHIFT_MAX
     import pd_transgear_removable_spec as wheel
 
-    assert wheel.PIN_CENTRE_SHIFT_MAX == pytest.approx(0.005 * 25.4)
+    # The wheels' holes keep their printed band (the trial bounds only the
+    # spacing, and their shift floats the chain toward MHA-DT-11's spigot).
+    assert wheel.PIN_LOCATION_TOL == pytest.approx(0.0009 * 25.4)
     # No wall reads the spacing analysis: each moves by the whole shift.
     hole_r = (spec.PIN_HOLE_DIA + max(spec.PIN_HOLE_BAND)) / 2.0
     inner = spec.PIN_CIRCLE_RADIUS - spec.PIN_CENTRE_SHIFT_MAX - hole_r

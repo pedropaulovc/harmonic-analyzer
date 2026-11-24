@@ -22,13 +22,10 @@ CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 CRANKSHAFT_NUMBER = "MHA-DT-11"
 KNOB_COLLAR_NUMBER = "MHA-PD-22"
 
-# Rule 4, a location made to its mates: both pin centres print as REF targets
-# (TARGET_TEXT below) and the holes' own 2X callout gives the trial on the
-# named pins, their acceptance (rule 7: at the feature, so no note is needed
-# to link it).  Rows stay inside the gear teeth to the callout's right.
+# Rule 7: the drive-pin pattern names its mates once, on its 2X callout, in a
+# standard fit name; each location carries only its value and band.
 PIN_HOLE_CALLOUT = (
-    f"{PIN_HOLE_DRILL[0]} DRILL THRU\n"
-    "DROPS FREELY ON PINS OF\n"
+    f"{PIN_HOLE_DRILL[0]} DRILL THRU\nSLIDING FIT ON PINS OF\n"
     f"{CRANKSHAFT_NUMBER} AND {KNOB_COLLAR_NUMBER}"
 )
 # The supplied plate is never cut: its thickness prints as the stock's REF
@@ -58,13 +55,6 @@ REFERENCE_TEXT: dict[tuple[str, str], dict[int, str]] = {
     ("BlankProfile", "BlankDia"): {TEXT_PREFIX: "(<MOD-DIAM>", TEXT_SUFFIX: ")"},
     ("BlankProfile", "BlankWidth"): {TEXT_PREFIX: "(", TEXT_SUFFIX: ")"},
 }
-# Each pin centre prints as a REF target for the drilling set-up, "(.276)",
-# with no band: the wheel is accepted by dropping on both seats' pins (the
-# holes' 2X callout; fit audit 2026-11-23, pending owner confirmation).
-TARGET_TEXT: dict[tuple[str, str], dict[int, str]] = {
-    ("BorePinsProfile", name): {TEXT_PREFIX: "(", TEXT_SUFFIX: ")"}
-    for name in ("PinPosY", "PinNegY")
-}
 
 
 def authored_text() -> dict[str, dict[str, dict[int, str]]]:
@@ -73,7 +63,7 @@ def authored_text() -> dict[str, dict[str, dict[int, str]]]:
     for lane, rows in CALLOUTS.items():
         for (feature, name), text in rows.items():
             authored.setdefault(feature, {}).setdefault(name, {})[lane] = text
-    for (feature, name), lanes in (*REFERENCE_TEXT.items(), *TARGET_TEXT.items()):
+    for (feature, name), lanes in REFERENCE_TEXT.items():
         authored.setdefault(feature, {}).setdefault(name, {}).update(lanes)
     return authored
 

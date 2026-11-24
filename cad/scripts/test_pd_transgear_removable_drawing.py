@@ -65,24 +65,22 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_pin_locations_print_inside_the_shared_band() -> None:
-    """Each hole's offset prints as a REF target (fit audit 2026-11-23); its
-    analysis scatter stays inside the band the shafts' pins share, so the
+    """Each hole is located inside the band the shafts' pins share, so the
     slip clearance absorbs both parts' spacing error; the drilled sizes print
-    their 3-place drill."""
-    assert callouts.TARGET_TEXT == {
-        ("BorePinsProfile", name): {callouts.TEXT_PREFIX: "(", callouts.TEXT_SUFFIX: ")"}
-        for name in ("PinPosY", "PinNegY")
-    }
-    authored = callouts.authored_text()["BorePinsProfile"]
-    assert authored["PinPosY"] == authored["PinNegY"] == {
-        callouts.TEXT_PREFIX: "(", callouts.TEXT_SUFFIX: ")"
-    }
-    # No dimension carries a native band: the supplied plate prints REF.
-    assert not hasattr(part, "family_bands")
-    assert spec.DRAWING_PRECISION_BY_NAME["PinPosY"] == 3
-    assert spec.DRAWING_PRECISION_BY_NAME["PinNegY"] == 3
+    their 3-place drill.  The offsets carry a native band, never REF: a
+    trial of the wheels on the pins bounds only their spacing (fit audit
+    question 8 is applied to MHA-PD-22's pins only)."""
+    assert spec.DRAWING_PRECISION_BY_NAME["PinPosY"] == 4
+    assert spec.DRAWING_PRECISION_BY_NAME["PinNegY"] == 4
     assert spec.DRAWING_PRECISION_BY_NAME["BoreDiaDim"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["PinPosDia"] == 3
+    band = (4, -spec.PIN_LOCATION_TOL, spec.PIN_LOCATION_TOL)  # swTolSYMMETRIC
+    assert part.family_bands() == {
+        ("BorePinsProfile", "PinPosY"): band,
+        ("BorePinsProfile", "PinNegY"): band,
+    }
+    assert not {"PinPosY", "PinNegY"} & spec.DRAWING_REFERENCE_DIMENSIONS
+    assert "PinPosY" not in callouts.authored_text()["BorePinsProfile"]
     assert spec.PIN_LOCATION_TOL <= seat_geometry.DRIVE_PIN_OFFSET_TOL
     assert spec.PIN_SLIP_CLEARANCE_MIN >= 2.0 * (
         seat_geometry.DRIVE_PIN_OFFSET_TOL + spec.PIN_LOCATION_TOL
@@ -94,6 +92,18 @@ def test_pin_locations_print_inside_the_shared_band() -> None:
         dt_crankshaft_spec.DRIVE_PIN_SPACING_ERROR_MAX / 2.0
         <= seat_geometry.DRIVE_PIN_OFFSET_TOL + 1e-12
     )
+    # The band has its register entry (rule 4).
+    import yaml
+
+    registry = yaml.safe_load(
+        (_config.CONFIG_DIR / "necessity" / "pd-transgear-removable.yaml").read_text(
+            encoding="utf-8"
+        )
+    )["necessity"]
+    assert [(row["id"], row["kind"]) for row in registry] == [("N-01", "gap")]
+    assert ".2756 ±.0009" in registry[0]["feature"]
+    assert "MHA-DT-11" in registry[0]["reason"]
+    assert "pd_transgear_removable_spec.PIN_LOCATION_TOL" in registry[0]["source"]
 
 
 def test_the_supplied_plate_prints_as_reference_stock() -> None:
@@ -110,35 +120,28 @@ def test_the_supplied_plate_prints_as_reference_stock() -> None:
 
 
 def test_web_worst_case_is_the_printed_limits() -> None:
-    """Both holes at the DRILLED HOLES maximum and the pin centre at the
-    shop's drilled-hole location row toward the bore (the trial on the pins
-    bounds the spacing, not that shift); floored so the sheet never states
-    more web."""
+    """Both holes at the DRILLED HOLES maximum and the pin centre moved its
+    full band toward the bore; floored so the sheet never states more web."""
     from _printed_tolerance import drilled_oversize_mm, drilled_undersize_mm
 
     assert drilled_undersize_mm(unit=spec.UNIT) == 0.0
     oversize = drilled_oversize_mm(unit=spec.UNIT)
     web = (
         seat_geometry.PIN_CIRCLE_DIA / 2.0
-        - spec.PIN_CENTRE_SHIFT_MAX
+        - spec.PIN_LOCATION_TOL
         - (spec.PIN_HOLE_DIA + oversize) / 2.0
         - (spec.BORE_DIA + oversize) / 2.0
     ) / 25.4
     assert notes.BORE_PIN_WEB_WORST_IN <= web < notes.BORE_PIN_WEB_WORST_IN + 0.001
     assert 0.0 < notes.BORE_PIN_WEB_WORST_IN * 25.4 < seat_geometry.BORE_PIN_WEB
     assert notes.BORE_PIN_WEB_NOTE in notes.DRAWING_NOTES.splitlines()
-    assert notes.BORE_PIN_WEB_NOTE == "BORE TO DRIVE-PIN HOLE WEB .014 MIN."
-    assert spec.PIN_CENTRE_SHIFT_MAX == pytest.approx(0.005 * 25.4)
-    assert spec.PIN_LOCATION_TOL < spec.PIN_CENTRE_SHIFT_MAX
+    assert notes.BORE_PIN_WEB_NOTE == "BORE TO DRIVE-PIN HOLE WEB .018 MIN."
     # No easing drill prints.
     assert "#39" not in notes.DRAWING_NOTES
     assert len(notes.DRAWING_NOTES.splitlines()) == 4
-    # The acceptance is the trial on the pins, never a reading of the
-    # offsets: it prints on the holes' own callout, one line of words and
-    # the mates' line (rule 7).
+    # The holes' callout names the mates' pins by number (rule 7).
     rows = callouts.PIN_HOLE_CALLOUT.splitlines()
-    assert rows == ["#40 DRILL THRU", "DROPS FREELY ON PINS OF", "MHA-DT-11 AND MHA-PD-22"]
-    assert max(len(row) for row in rows) <= 24
+    assert rows == ["#40 DRILL THRU", "SLIDING FIT ON PINS OF", "MHA-DT-11 AND MHA-PD-22"]
 
 
 def test_sprocket_data_lists_every_configuration() -> None:
@@ -254,8 +257,6 @@ def test_notes_specify_every_blank_and_the_operations_not_on_the_views() -> None
 
 
 def test_notes_stay_within_four_lines_and_never_restate_the_title_block() -> None:
-    # Rule 7's four short lines: the wheels' trial on the pins prints on the
-    # holes' own 2X callout, not in the notes.
     lines = notes.DRAWING_NOTES.splitlines()
     assert len(lines) <= 4
     text = notes.DRAWING_NOTES.upper()

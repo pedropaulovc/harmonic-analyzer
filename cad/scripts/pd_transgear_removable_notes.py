@@ -19,35 +19,18 @@ _IN = spec.MM_PER_IN
 # A drilled hole may open by the title block's DRILLED HOLES row; it never
 # closes (minus 0).
 _DRILL_OVERSIZE = drilled_oversize_mm(unit=spec.UNIT)
-# The pin centres print as REF targets (owner ruling 2026-11-24, fit audit
-# question 8): a wheel is accepted by dropping on both seats' pins.  That
-# trial bounds the holes' spacing, not how far both lie toward the bore, so
-# the web is charged spec.PIN_CENTRE_SHIFT_MAX, the shop's drilled-hole
-# location row, never the spacing analysis spec.PIN_LOCATION_TOL (Codjiflo
-# P1 on #3485).  The sheet names no easing drill: a wheel that binds is
-# renewed (MHA-PD-00).
-
-
-def _web_worst(pin_hole_dia: float) -> float:
-    """Thinnest bore/pin-hole web: both holes at their drilled maximum, the
-    pin centre at the shop's drilled-hole location row toward the bore."""
-    return (
-        seat_geometry.PIN_CIRCLE_RADIUS
-        - spec.PIN_CENTRE_SHIFT_MAX
-        - (pin_hole_dia + _DRILL_OVERSIZE) / 2.0
-        - (spec.BORE_DIA + _DRILL_OVERSIZE) / 2.0
-    )
-
-
-def _floor_in(value_mm: float) -> float:
-    """Rounded DOWN to .001 in, so the sheet never states more web than the
-    limits give."""
-    return math.floor(value_mm / _IN * 1000.0 + 1e-9) / 1000.0
-
-
-_WEB_WORST = _web_worst(spec.PIN_HOLE_DIA)  # 0.3706 (.0146)
-BORE_PIN_WEB_WORST_IN = _floor_in(_WEB_WORST)
-if not 0.0 < BORE_PIN_WEB_WORST_IN:
+# Thinnest bore/pin-hole web the printed limits allow: both holes at their
+# drilled maximum, the pin centre moved its full location band toward the bore.
+_WEB_WORST = (
+    seat_geometry.PIN_CIRCLE_RADIUS
+    - spec.PIN_LOCATION_TOL
+    - (spec.PIN_HOLE_DIA + _DRILL_OVERSIZE) / 2.0
+    - (spec.BORE_DIA + _DRILL_OVERSIZE) / 2.0
+)  # 0.4849
+# Rounded DOWN to .001 in, so the sheet never states more web than the
+# limits give.
+BORE_PIN_WEB_WORST_IN = math.floor(_WEB_WORST / _IN * 1000.0 + 1e-9) / 1000.0
+if BORE_PIN_WEB_WORST_IN <= 0.0:
     raise AssertionError("the drive-pin holes break into the bore at print-worst")
 
 
@@ -57,16 +40,11 @@ def _inch(value_mm: float, places: int) -> str:
 
 
 # The shortfall prints as a plain fact; its governance is RV-01 in
-# pd-transgear-removable.yaml (the owner's 2026-11-01 minor exception at
-# .018, restated at this value by a delegated ruling 2026-11-24; revisit in
-# #2141), never the sheet.
+# pd-transgear-removable.yaml (owner ruling 2026-11-01: a permanent minor
+# exception, revisit in #2141), never the sheet.
 BORE_PIN_WEB_NOTE = (
     f"BORE TO DRIVE-PIN HOLE WEB {_inch(BORE_PIN_WEB_WORST_IN * _IN, 3)} MIN."
 )
-# The pin holes' location is made to its mates (rule 4): the offsets print as
-# REF and the trial on the named pins, their acceptance, prints on the holes'
-# own 2X callout (pd_transgear_removable_callouts.PIN_HOLE_CALLOUT), so no
-# note line carries it.
 
 
 def _per_configuration(render: Callable[[int], str]) -> str:

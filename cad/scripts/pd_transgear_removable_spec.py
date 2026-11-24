@@ -179,24 +179,26 @@ if type(CHAIN_LINK_COUNT) is not int or CHAIN_LINK_COUNT <= 0 or CHAIN_LINK_COUN
 # band every chain-float and drive-pin stack reads; the pilot is faced to
 # the measured plate at assembly.
 PLATE_PLACES = 3
-# Each pin centre prints .276 (the shared 7.0 at three places, on the inch
-# grid) as a REF target (pd_transgear_removable_callouts.TARGET_TEXT),
-# accepted by the wheel's trial on both seats' pins (owner ruling
-# 2026-11-24, fit audit question 8).  Two errors of the centres are charged
-# apart (Codjiflo P1 on #3485):
-# - PIN_LOCATION_TOL, the shared +/-DRIVE_PIN_OFFSET_TOL: the holes' SPACING
-#   error against the pins, which the trial accepts; the slip budget below
-#   alone reads it.
-# - PIN_CENTRE_SHIFT_MAX: how far either centre may lie from its target
-#   toward the bore.  The trial does not bound it (both holes and both pins
-#   shifted the same way still drop on, and the bore has .003 to .015 radial
-#   air round the seats' pilots), so it is the shop's declared capability
-#   for the process (drawing-guidelines.md, What the shop holds: "location
-#   of a drilled hole from a datum edge or bore ±.005").  The web is charged
-#   it (pd_transgear_removable_notes).
-PIN_LOCATION_PLACES = 3
+# Each pin centre prints .2756 (the shared 7.0 at four places) +/-.0009, the
+# shared +/-DRIVE_PIN_OFFSET_TOL the crank seat's pins also carry.
+# The wheel rides its seat on the two pins (its bore has .015-.018 radial air
+# on the crank shaft), so each centre's error floats the wheel, and the #25
+# chain wrapping it, toward MHA-DT-11's seat spigot: dt_crankshaft_spec.
+# WHEEL_SEAT_FLOAT charges this band, and the drive train's ANSI chain-plate
+# air to the spigot is +0.029 mm with it, -0.075 mm at the shop's drilled-hole
+# row (+/-.005), against its 0.010 mm floor.  A trial of the wheel on the pins
+# bounds only the holes' spacing, never a shift of the whole pattern, so fit
+# audit question 8's REF-by-trial is applied to MHA-PD-22's pins only
+# (cad/config/necessity/pd-transgear-removable.yaml N-01).  The datum is the
+# bore axis: the bore and both holes are drilled in one CNC set-up whose
+# centre is swept true to the supplied teeth, so the pattern is true to the
+# pitch circle the chain rides on.  +/-.0009 is inside no row of "What the
+# shop holds" (the narrowest hole location there is +/-.002, reamed or bored;
+# drilled +/-.005): RV-02 accepts it, and the traveler (placeholder
+# cad/process/pd_transgear_removable/plan.toml) must state how it is reached
+# and read.
+PIN_LOCATION_PLACES = seat.DRIVE_PIN_OFFSET_PLACES
 PIN_LOCATION_TOL = seat.DRIVE_PIN_OFFSET_TOL
-PIN_CENTRE_SHIFT_MAX = 0.127  # ±.005, the shop's drilled-hole location row
 # The drills the bore and the pin holes are cut with, and their diameters (in).
 BORE_DRILL = ("13/32", 13.0 / 32.0)
 PIN_HOLE_DRILL = ("#40", 0.098)

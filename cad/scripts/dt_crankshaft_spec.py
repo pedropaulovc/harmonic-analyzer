@@ -32,6 +32,7 @@ import dt_cone_pivot_post_spec
 import dt_crank_pinion_spec
 from dt_crank_drive_gear_spec import inch_text
 import dt_vn_crank_seat_drive_pin_spec
+import pd_transgear_removable_spec
 import _sprocket_seat_geometry as seat_geometry
 from dt_crank_hub_geometry import (
     FIDUCIAL_MODEL_DEPTH,  # noqa: F401 -- re-exported to the drawing contract
@@ -492,11 +493,15 @@ if (
 _DRILL_OVERSIZE = drilled_oversize_mm(
     unit=drawing_unit("parts/pd-transgear-removable", _config.parts("pd-transgear-removable"))
 )
-# A pin centre (this sheet's location band) and its hole centre (the wheel's)
-# each at their limit, opposite ways along the pins' line.
+# A pin centre and its hole centre each at their limit, opposite ways along
+# the pins' line.  Each term is what its sheet prints for that centre: this
+# sheet's DrivePinOffset band and MHA-PD-09's PinPosY/PinNegY band
+# (test_pd_transgear_removable_seat checks both against the declarations).
+WHEEL_SEAT_PIN_CENTRE_TOL = DRIVE_PIN_OFFSET_TOL
+WHEEL_SEAT_HOLE_CENTRE_TOL = pd_transgear_removable_spec.PIN_LOCATION_TOL
 _WHEEL_PIN_FLOAT = (
     seat_geometry.PIN_HOLE_DIA + _DRILL_OVERSIZE - _DOWEL_OD[0]
-) / 2.0 + DRIVE_PIN_OFFSET_TOL + seat_geometry.DRIVE_PIN_OFFSET_TOL
+) / 2.0 + WHEEL_SEAT_PIN_CENTRE_TOL + WHEEL_SEAT_HOLE_CENTRE_TOL
 _WHEEL_BORE_FLOAT = (
     seat_geometry.BORE_DIA
     + _DRILL_OVERSIZE
