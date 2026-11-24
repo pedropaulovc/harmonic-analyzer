@@ -1,0 +1,839 @@
+# Purchased hardware the owner already holds, one record per packing-list
+# line, keyed by the part's stem (cad/config/hardware.yaml key where the stem
+# is one today).
+#
+# McMaster-Carr PO 1103PCAMPOS (McMaster-Carr number 8227120-01, 11/03/2026):
+# 82 lines, every line shipped as ordered. Owner (Pedro) 2026-11-23: "add
+# 1103PCAMPOS to inventory as all on hand". Each line prints "Your Part
+# Number: <MHA number> <stem>", cut at about 40 characters; a stem the
+# packing list cuts short is completed from cad/config/current-identity-map.json
+# by its MHA number. Names, pack sizes and quantities are the packing list's;
+# nothing it does not state is recorded. `pieces` counts packs or pieces as
+# shipped (`unit`). hardware.yaml carries no ownership and no build leaf
+# reads this file. Its raw stock lines (73-80, 82) are stock rows
+# (stock-bought.toml); its two plug gauges (line 72) are a gauges record below.
+
+[hardware.ch-rocker-arm-tl-vn-oblique-bracket-screw]
+name = "Black-Oxide Alloy Steel Socket Head Screw, US Origin, 8-32 Thread Size, 5/8\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-CH-06-TL-VN-62"
+make = "McMaster-Carr"
+sku = "91251A196"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Oblique rocker-arm jig hardware (parent ch-rocker-arm-tl-oblique-jig); not a hardware.yaml key."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 1: \"Black-Oxide Alloy Steel Socket Head Screw, US Origin, 8-32 Thread Size, 5/8\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-CH-06-TL-VN-62", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-rocker-arm-tl-vn-oblique-carriage-screw]
+name = "Black-Oxide Alloy Steel Socket Head Screw, US Origin, M4 x 0.7 mm Thread Size, 20 mm Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-CH-06-TL-VN-64"
+make = "McMaster-Carr"
+sku = "91290A168"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Oblique rocker-arm jig hardware (parent ch-rocker-arm-tl-oblique-jig); not a hardware.yaml key."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 2: \"Black-Oxide Alloy Steel Socket Head Screw, US Origin, M4 x 0.7 mm Thread Size, 20 mm Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-CH-06-TL-VN-64", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-rocker-arm-tl-vn-oblique-cl-dowel]
+name = "Dowel Pin, Alloy Steel, 1/4\" Diameter, 1\" Long, Packs of 25"
+kind = "purchased_hardware"
+number = "MHA-CH-06-TL-VN-53"
+make = "McMaster-Carr"
+sku = "98381A542"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Oblique rocker-arm jig hardware (parent ch-rocker-arm-tl-oblique-jig); a retired identity in current-identity-map.json."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 3: \"Dowel Pin, Alloy Steel, 1/4\" Diameter, 1\" Long, Packs of 25\", 1 pack shipped; Your Part Number MHA-CH-06-TL-VN-53", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-rocker-arm-tl-vn-oblique-clamp-screw]
+name = "Black-Oxide Alloy Steel Socket Head Screw, US Origin, 1/4\"-20 Thread Size, 7/8\" Long, Packs of 50"
+kind = "purchased_hardware"
+number = "MHA-CH-06-TL-VN-68"
+make = "McMaster-Carr"
+sku = "91251A541"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Oblique rocker-arm jig hardware (parent ch-rocker-arm-tl-oblique-jig); a retired identity in current-identity-map.json."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 4: \"Black-Oxide Alloy Steel Socket Head Screw, US Origin, 1/4\"-20 Thread Size, 7/8\" Long, Packs of 50\", 1 pack shipped; Your Part Number MHA-CH-06-TL-VN-68", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-rocker-arm-tl-vn-oblique-kp08-screw]
+name = "Black-Oxide Alloy Steel Socket Head Screw, US Origin, 6-32 Thread Size, 5/8\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-CH-06-TL-VN-65"
+make = "McMaster-Carr"
+sku = "91251A150"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Oblique rocker-arm jig hardware (parent ch-rocker-arm-tl-oblique-jig); a retired identity in current-identity-map.json."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 5: \"Black-Oxide Alloy Steel Socket Head Screw, US Origin, 6-32 Thread Size, 5/8\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-CH-06-TL-VN-65", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-rocker-arm-tl-vn-oblique-lever-screw]
+name = "Black-Oxide Alloy Steel Socket Head Screw, US Origin, 5/16\"-18 Thread Size, 1\" Long, Packs of 50"
+kind = "purchased_hardware"
+number = "MHA-CH-06-TL-VN-69"
+make = "McMaster-Carr"
+sku = "91251A583"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Oblique rocker-arm jig hardware (parent ch-rocker-arm-tl-oblique-jig); not a hardware.yaml key."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 6: \"Black-Oxide Alloy Steel Socket Head Screw, US Origin, 5/16\"-18 Thread Size, 1\" Long, Packs of 50\", 1 pack shipped; Your Part Number MHA-CH-06-TL-VN-69", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-rocker-arm-tl-vn-oblique-lever-washer]
+name = "Extreme-Vibration-Resistant Wedge Lock Washer, 316 Stainless Steel, for M8 and 5/16\" Screws, 0.530\" OD, Packs of 5"
+kind = "purchased_hardware"
+number = "MHA-CH-06-TL-VN-71"
+make = "McMaster-Carr"
+sku = "91812A230"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Oblique rocker-arm jig hardware (parent ch-rocker-arm-tl-oblique-jig); not a hardware.yaml key."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 7: \"Extreme-Vibration-Resistant Wedge Lock Washer, 316 Stainless Steel, for M8 and 5/16\" Screws, 0.530\" OD, Packs of 5\", 1 pack shipped; Your Part Number MHA-CH-06-TL-VN-71", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-rocker-arm-tl-vn-oblique-nut-dowel]
+name = "Dowel Pin, Alloy Steel, 3/32\" Diameter, 1/2\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-CH-06-TL-VN-81"
+make = "McMaster-Carr"
+sku = "98381A438"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Oblique rocker-arm jig hardware (parent ch-rocker-arm-tl-oblique-jig); a retired identity in current-identity-map.json."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 8: \"Dowel Pin, Alloy Steel, 3/32\" Diameter, 1/2\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-CH-06-TL-VN-81", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-rocker-arm-tl-vn-oblique-nut-screw]
+name = "Black-Oxide Flanged Button Head Hex-Drive Screw, Alloy Steel, 4-40 Thread Size, 3/4\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-CH-06-TL-VN-66"
+make = "McMaster-Carr"
+sku = "91355A581"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Oblique rocker-arm jig hardware (parent ch-rocker-arm-tl-oblique-jig); a retired identity in current-identity-map.json."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 9: \"Black-Oxide Flanged Button Head Hex-Drive Screw, Alloy Steel, 4-40 Thread Size, 3/4\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-CH-06-TL-VN-66", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-rocker-arm-tl-vn-oblique-rail-screw]
+name = "Black-Oxide Alloy Steel Socket Head Screw, US Origin, 8-32 Thread Size, 3/4\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-CH-06-TL-VN-61"
+make = "McMaster-Carr"
+sku = "91251A197"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Oblique rocker-arm jig hardware (parent ch-rocker-arm-tl-oblique-jig); not a hardware.yaml key."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 10: \"Black-Oxide Alloy Steel Socket Head Screw, US Origin, 8-32 Thread Size, 3/4\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-CH-06-TL-VN-61", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-rocker-arm-tl-vn-oblique-riser-screw]
+name = "18-8 Stainless Steel Phillips Flat Head Screw, 82 Degree Countersink, 4-40 Thread Size, 5/8\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-CH-06-TL-VN-67"
+make = "McMaster-Carr"
+sku = "91771A112"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Oblique rocker-arm jig hardware (parent ch-rocker-arm-tl-oblique-jig); not a hardware.yaml key."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 11: \"18-8 Stainless Steel Phillips Flat Head Screw, 82 Degree Countersink, 4-40 Thread Size, 5/8\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-CH-06-TL-VN-67", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-vn-bracket-hold-down-screw]
+name = "Steel Fillister Head Slotted Screws, Zinc-Plated, 8-32 Thread Size, 5/8\" Long, Packs of 1"
+kind = "purchased_hardware"
+number = "MHA-CH-VN-57"
+make = "McMaster-Carr"
+sku = "90280A196"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 12: \"Steel Fillister Head Slotted Screws, Zinc-Plated, 8-32 Thread Size, 5/8\" Long, Packs of 1\", 1 pack shipped; Your Part Number MHA-CH-VN-57", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-vn-channel-spring-installed]
+name = "Music-Wire Steel Extension Springs with Hook Ends, Zinc-Plated 1.948\" Long 0.25\" OD, Packs of 6"
+kind = "purchased_hardware"
+number = "MHA-CH-VN-50"
+make = "McMaster-Carr"
+sku = "9432K31"
+status = "on_hand"
+pieces = 4
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 13: \"Music-Wire Steel Extension Springs with Hook Ends, Zinc-Plated 1.948\" Long 0.25\" OD, Packs of 6\", 4 pack shipped; Your Part Number MHA-CH-VN-50", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-vn-frame-side-screw]
+name = "18-8 Stainless Steel Fillister Head Slotted Screw, 2-56 Thread Size, 7/16\" Long, Packs of 1"
+kind = "purchased_hardware"
+number = "MHA-CH-VN-52"
+make = "McMaster-Carr"
+sku = "91794A080"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 14: \"18-8 Stainless Steel Fillister Head Slotted Screw, 2-56 Thread Size, 7/16\" Long, Packs of 1\", 1 pack shipped; Your Part Number MHA-CH-VN-52", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-vn-fulcrum-set-screw]
+name = "Alloy Steel Cup-Tip Set Screw, Black-Oxide, 1-72 Thread, 5/32\" Long, Packs of 10"
+kind = "purchased_hardware"
+number = "MHA-CH-VN-55"
+make = "McMaster-Carr"
+sku = "91375A942"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 15: \"Alloy Steel Cup-Tip Set Screw, Black-Oxide, 1-72 Thread, 5/32\" Long, Packs of 10\", 1 pack shipped; Your Part Number MHA-CH-VN-55", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-vn-rocker-bank-spring]
+name = "Wave Disc Spring, High-Carbon Steel, 0.265\" ID, 0.367\" OD, 0.006\" Thick, Packs of 25"
+kind = "purchased_hardware"
+number = "MHA-CH-VN-54"
+make = "McMaster-Carr"
+sku = "9714K24"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Not a hardware.yaml key today: a retired identity in current-identity-map.json."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 16: \"Wave Disc Spring, High-Carbon Steel, 0.265\" ID, 0.367\" OD, 0.006\" Thick, Packs of 25\", 1 pack shipped; Your Part Number MHA-CH-VN-54", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-vn-rocker-thrust-washer]
+name = "Carbon Steel Shim, 0.0310\" Thick, 1/4\" ID, Packs of 10"
+kind = "purchased_hardware"
+number = "MHA-CH-VN-56"
+make = "McMaster-Carr"
+sku = "3088A429"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Not a hardware.yaml key today: a retired identity in current-identity-map.json."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 17: \"Carbon Steel Shim, 0.0310\" Thick, 1/4\" ID, Packs of 10\", 1 pack shipped; Your Part Number MHA-CH-VN-56", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ch-vn-spring-hook]
+name = "Routing Eyebolt with Nut - Not for Lifting, Black-Oxide with Bent-Closed Eye, 6-32 Thread, 3/4\" Shank, Packs of 10"
+kind = "purchased_hardware"
+number = "MHA-CH-VN-51"
+make = "McMaster-Carr"
+sku = "9489T111"
+status = "on_hand"
+pieces = 3
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 18: \"Routing Eyebolt with Nut - Not for Lifting, Black-Oxide with Bent-Closed Eye, 6-32 Thread, 3/4\" Shank, Packs of 10\", 3 pack shipped; Your Part Number MHA-CH-VN-51", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.dt-vn-cone-lock-knob]
+name = "Stainless Steel High-Profile Knurled-Head Thumb Screw, 1/4\"-20 Thread Size, 3/4\" Long"
+kind = "purchased_hardware"
+number = "MHA-DT-VN-51"
+make = "McMaster-Carr"
+sku = "93585A190"
+status = "on_hand"
+pieces = 2
+unit = "each"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 19: \"Stainless Steel High-Profile Knurled-Head Thumb Screw, 1/4\"-20 Thread Size, 3/4\" Long\", 2 each shipped; Your Part Number MHA-DT-VN-51", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.dt-vn-cone-pivot-screw]
+name = "Slotted 18-8 Stainless Steel Precision Shoulder Screw, 1/4\" Shoulder Diameter, 1/4\" Shoulder Length, 10-24 Thread"
+kind = "purchased_hardware"
+number = "MHA-DT-VN-52"
+make = "McMaster-Carr"
+sku = "91829A560"
+status = "on_hand"
+pieces = 2
+unit = "each"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 20: \"Slotted 18-8 Stainless Steel Precision Shoulder Screw, 1/4\" Shoulder Diameter, 1/4\" Shoulder Length, 10-24 Thread\", 2 each shipped; Your Part Number MHA-DT-VN-52", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.dt-vn-cone-tip-adjuster]
+name = "Slotted 18-8 Stainless Steel Cup-Tip Set Screws, 10-32 Thread, 3/8\" Long, Packs of 25"
+kind = "purchased_hardware"
+number = "MHA-DT-VN-55"
+make = "McMaster-Carr"
+sku = "94025A164"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Not a hardware.yaml key today: a retired identity in current-identity-map.json."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 21: \"Slotted 18-8 Stainless Steel Cup-Tip Set Screws, 10-32 Thread, 3/8\" Long, Packs of 25\", 1 pack shipped; Your Part Number MHA-DT-VN-55", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.dt-vn-cone-tip-block-screw]
+name = "Black-Oxide Alloy Steel Socket Head Screw, US Origin, 4-40 Thread Size, 3/8\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-DT-VN-60"
+make = "McMaster-Carr"
+sku = "91251A108"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 22: \"Black-Oxide Alloy Steel Socket Head Screw, US Origin, 4-40 Thread Size, 3/8\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-DT-VN-60", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.dt-vn-cone-tip-pinch-screw]
+name = "18-8 Stainless Steel Fillister Head Slotted Screw, 4-40 Thread Size, 5/8\" Long, Packs of 1"
+kind = "purchased_hardware"
+number = "MHA-DT-VN-56"
+make = "McMaster-Carr"
+sku = "91794A112"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 23: \"18-8 Stainless Steel Fillister Head Slotted Screw, 4-40 Thread Size, 5/8\" Long, Packs of 1\", 1 pack shipped; Your Part Number MHA-DT-VN-56", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.dt-vn-crank-hub-pin]
+name = "Dowel Pin, Alloy Steel, 5/32\" Diameter, 1/2\" Long, Packs of 10"
+kind = "purchased_hardware"
+number = "MHA-DT-VN-59"
+make = "McMaster-Carr"
+sku = "98381A487"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 24: \"Dowel Pin, Alloy Steel, 5/32\" Diameter, 1/2\" Long, Packs of 10\", 1 pack shipped; Your Part Number MHA-DT-VN-59", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.dt-vn-crank-seat-drive-pin]
+name = "Dowel Pin, Alloy Steel, 3/32\" Diameter, 1/4\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-DT-VN-67"
+make = "McMaster-Carr"
+sku = "98381A434"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 25: \"Dowel Pin, Alloy Steel, 3/32\" Diameter, 1/4\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-DT-VN-67", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.dt-vn-cylinder-bank-spring]
+name = "Wave Disc Spring, Steel, 0.385\" ID, 0.5\" OD, 0.005\" Thick, Packs of 10"
+kind = "purchased_hardware"
+number = "MHA-DT-VN-68"
+make = "McMaster-Carr"
+sku = "9714K392"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 26: \"Wave Disc Spring, Steel, 0.385\" ID, 0.5\" OD, 0.005\" Thick, Packs of 10\", 1 pack shipped; Your Part Number MHA-DT-VN-68", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.dt-vn-keeper-chain]
+name = "Bead Chain-Not for Lifting Unfinished Brass, 3 Trade Size, 50 ft.  Length"
+kind = "purchased_hardware"
+number = "MHA-DT-VN-65"
+make = "McMaster-Carr"
+sku = "3606T118"
+status = "on_hand"
+pieces = 1
+unit = "each"
+note = "hardware.yaml describes dt-vn-keeper-chain as jack chain; the packing list line is bead chain. Recorded as shipped, not reconciled."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 27: \"Bead Chain-Not for Lifting Unfinished Brass, 3 Trade Size, 50 ft.  Length\", 1 each shipped; Your Part Number MHA-DT-VN-65", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.dt-vn-keeper-chain-link]
+name = "Loop Links, for Unfinished Brass Trade Size 3 Bead Chain-Not for Lifting, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-DT-VN-66"
+make = "McMaster-Carr"
+sku = "3606T811"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Not a hardware.yaml key today: a retired identity in current-identity-map.json."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 28: \"Loop Links, for Unfinished Brass Trade Size 3 Bead Chain-Not for Lifting, Packs of 100\", 1 pack shipped; Your Part Number MHA-DT-VN-66", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.dt-vn-pedestal-hold-down-screw]
+name = "Steel Fillister Head Slotted Screws, Zinc-Plated, 8-32 Thread Size, 3/4\" Long, Packs of 1"
+kind = "purchased_hardware"
+number = "MHA-DT-VN-62"
+make = "McMaster-Carr"
+sku = "90280A197"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 29: \"Steel Fillister Head Slotted Screws, Zinc-Plated, 8-32 Thread Size, 3/4\" Long, Packs of 1\", 1 pack shipped; Your Part Number MHA-DT-VN-62", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.dt-vn-pinion-strap-pin]
+name = "1050-1095 Spring Steel Slotted Spring Pin, 1/16\" Diameter, 1/2\" Long, Packs of 250"
+kind = "purchased_hardware"
+number = "MHA-DT-VN-63"
+make = "McMaster-Carr"
+sku = "98296A027"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 30: \"1050-1095 Spring Steel Slotted Spring Pin, 1/16\" Diameter, 1/2\" Long, Packs of 250\", 1 pack shipped; Your Part Number MHA-DT-VN-63", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.dt-vn-slotted-screw]
+name = "Steel Fillister Head Slotted Screws, Zinc-Plated, 8-32 Thread Size, 1-1/2\" Long, Packs of 1"
+kind = "purchased_hardware"
+number = "MHA-DT-VN-57"
+make = "McMaster-Carr"
+sku = "90280A203"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 31: \"Steel Fillister Head Slotted Screws, Zinc-Plated, 8-32 Thread Size, 1-1/2\" Long, Packs of 1\", 1 pack shipped; Your Part Number MHA-DT-VN-57", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.fr-vn-frame-cross-screw]
+name = "Steel Fillister Head Slotted Screws, Zinc-Plated, 10-32 Thread Size, 1-3/4\" Long, Packs of 1"
+kind = "purchased_hardware"
+number = "MHA-FR-VN-53"
+make = "McMaster-Carr"
+sku = "90280A837"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 32: \"Steel Fillister Head Slotted Screws, Zinc-Plated, 10-32 Thread Size, 1-3/4\" Long, Packs of 1\", 1 pack shipped; Your Part Number MHA-FR-VN-53", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.fr-vn-gooseneck-set-screw]
+name = "External-Square-Drive Steel Cup-Tip Set Screw, 1/4\"-20 Thread, 3/4\" Long, Packs of 50"
+kind = "purchased_hardware"
+number = "MHA-FR-VN-52"
+make = "McMaster-Carr"
+sku = "91410A540"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 33: \"External-Square-Drive Steel Cup-Tip Set Screw, 1/4\"-20 Thread, 3/4\" Long, Packs of 50\", 1 pack shipped; Your Part Number MHA-FR-VN-52", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.fr-vn-lag-screw]
+name = "18-8 Stainless Steel Hex Head Screw, 1/4\"-20 Thread Size, 3/4\" Long, Fully Threaded, Packs of 50"
+kind = "purchased_hardware"
+number = "MHA-FR-VN-51"
+make = "McMaster-Carr"
+sku = "92240A540"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 34: \"18-8 Stainless Steel Hex Head Screw, 1/4\"-20 Thread Size, 3/4\" Long, Fully Threaded, Packs of 50\", 1 pack shipped; Your Part Number MHA-FR-VN-51", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.fr-vn-tube-frame-cap]
+name = "Metal Round Cap for 1\" OD, Steel"
+kind = "purchased_hardware"
+number = "MHA-FR-VN-54"
+make = "McMaster-Carr"
+sku = "9275K141"
+status = "on_hand"
+pieces = 5
+unit = "each"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 35: \"Metal Round Cap for 1\" OD, Steel\", 5 each shipped; Your Part Number MHA-FR-VN-54", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.mg-vn-magnifying-bracket-screw]
+name = "18-8 Stainless Steel Fillister Head Slotted Screw, 2-56 Thread Size, 5/16\" Long, Packs of 1"
+kind = "purchased_hardware"
+number = "MHA-MG-VN-53"
+make = "McMaster-Carr"
+sku = "91794A078"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 36: \"18-8 Stainless Steel Fillister Head Slotted Screw, 2-56 Thread Size, 5/16\" Long, Packs of 1\", 1 pack shipped; Your Part Number MHA-MG-VN-53", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.mg-vn-wheel-axle-back-washer]
+name = "Brass Washer for Number 10 Screw Size, 0.200\" ID, 0.438\" OD, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-MG-VN-54"
+make = "McMaster-Carr"
+sku = "92916A480"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 37: \"Brass Washer for Number 10 Screw Size, 0.200\" ID, 0.438\" OD, Packs of 100\", 1 pack shipped; Your Part Number MHA-MG-VN-54", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.mg-vn-wheel-axle-front-washer]
+name = "Brass Washer for Number 4 Screw Size, 0.120\" ID, 0.281\" OD, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-MG-VN-55"
+make = "McMaster-Carr"
+sku = "92916A250"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 38: \"Brass Washer for Number 4 Screw Size, 0.120\" ID, 0.281\" OD, Packs of 100\", 1 pack shipped; Your Part Number MHA-MG-VN-55", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.mg-vn-wheel-axle-nut]
+name = "Brass Hex Nut, 4-40 Thread Size, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-MG-VN-52"
+make = "McMaster-Carr"
+sku = "92671A005"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 39: \"Brass Hex Nut, 4-40 Thread Size, Packs of 100\", 1 pack shipped; Your Part Number MHA-MG-VN-52", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.ms-vn-stop-plate-screw]
+name = "Brass Fillister Head Slotted Screws, 2-56 Thread Size, 1/4\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-MS-VN-51"
+make = "McMaster-Carr"
+sku = "90114A124"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 40: \"Brass Fillister Head Slotted Screws, 2-56 Thread Size, 1/4\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-MS-VN-51", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pd-vn-chain-connecting-link]
+name = "Connecting Link for ANSI Number 25 Single Strand Roller Chain"
+kind = "purchased_hardware"
+number = "MHA-PD-VN-66"
+make = "McMaster-Carr"
+sku = "6261K108"
+status = "on_hand"
+pieces = 2
+unit = "each"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 41: \"Connecting Link for ANSI Number 25 Single Strand Roller Chain\", 2 each shipped; Your Part Number MHA-PD-VN-66", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pd-vn-guide-lock-screw]
+name = "18-8 Stainless Steel Pan Head Slotted Screws, 4-40 Thread Size, 3/8\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-PD-VN-60"
+make = "McMaster-Carr"
+sku = "91792A108"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 42: \"18-8 Stainless Steel Pan Head Slotted Screws, 4-40 Thread Size, 3/8\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-PD-VN-60", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pd-vn-platen-clip-screw]
+name = "Brass Pan Head Slotted Screws, 2-56 Thread Size, 1/4\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-PD-VN-65"
+make = "McMaster-Carr"
+sku = "92446A077"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 43: \"Brass Pan Head Slotted Screws, 2-56 Thread Size, 1/4\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-PD-VN-65", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pd-vn-transgear-arm-plate-locating-pin]
+name = "Dowel Pin, Alloy Steel, 3/32\" Diameter, 5/16\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-PD-VN-64"
+make = "McMaster-Carr"
+sku = "98381A435"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 44: \"Dowel Pin, Alloy Steel, 3/32\" Diameter, 5/16\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-PD-VN-64", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pd-vn-transgear-arm-plate-screw]
+name = "18-8 Stainless Steel Slotted Oval Head Screws, 8-32 Thread Size, 1\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-PD-VN-56"
+make = "McMaster-Carr"
+sku = "91790A199"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 45: \"18-8 Stainless Steel Slotted Oval Head Screws, 8-32 Thread Size, 1\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-PD-VN-56", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pd-vn-transgear-cluster-shim]
+name = "18-8 Stainless Steel Shims for Shortening 1/8\" Diameter Screw Shoulder, 0.005\" Thick, Packs of 10"
+kind = "purchased_hardware"
+number = "MHA-PD-VN-68"
+make = "McMaster-Carr"
+sku = "94773A606"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 46: \"18-8 Stainless Steel Shims for Shortening 1/8\" Diameter Screw Shoulder, 0.005\" Thick, Packs of 10\", 1 pack shipped; Your Part Number MHA-PD-VN-68", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pd-vn-transgear-disc-screw]
+name = "18-8 Stainless Steel Fillister Head Slotted Screw, 0-80 Thread Size, 1/4\" Long, Packs of 1"
+kind = "purchased_hardware"
+number = "MHA-PD-VN-55"
+make = "McMaster-Carr"
+sku = "91794A055"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Not a hardware.yaml key today: a retired identity in current-identity-map.json. Same McMaster-Carr SKU as hardware.yaml sh-vn-fillister-screw-91794a055."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 47: \"18-8 Stainless Steel Fillister Head Slotted Screw, 0-80 Thread Size, 1/4\" Long, Packs of 1\", 1 pack shipped; Your Part Number MHA-PD-VN-55", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pd-vn-transgear-knob-cup-pin]
+name = "1050-1095 Spring Steel Slotted Spring Pin, 1/16\" Diameter, 5/8\" Long, Packs of 250"
+kind = "purchased_hardware"
+number = "MHA-PD-VN-62"
+make = "McMaster-Carr"
+sku = "98296A031"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Not a hardware.yaml key today: a retired identity in current-identity-map.json."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 48: \"1050-1095 Spring Steel Slotted Spring Pin, 1/16\" Diameter, 5/8\" Long, Packs of 250\", 1 pack shipped; Your Part Number MHA-PD-VN-62", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pd-vn-transgear-knob-drive-pin]
+name = "Dowel Pin, Alloy Steel, 3/32\" Diameter, 3/16\" Long, Packs of 50"
+kind = "purchased_hardware"
+number = "MHA-PD-VN-54"
+make = "McMaster-Carr"
+sku = "98381A433"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 49: \"Dowel Pin, Alloy Steel, 3/32\" Diameter, 3/16\" Long, Packs of 50\", 1 pack shipped; Your Part Number MHA-PD-VN-54", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pd-vn-transgear-latch-pin]
+name = "Dowel Pin, Alloy Steel, 1/8\" Diameter, 7/8\" Long, Packs of 50"
+kind = "purchased_hardware"
+number = "MHA-PD-VN-58"
+make = "McMaster-Carr"
+sku = "98381A474"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 50: \"Dowel Pin, Alloy Steel, 1/8\" Diameter, 7/8\" Long, Packs of 50\", 1 pack shipped; Your Part Number MHA-PD-VN-58", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pd-vn-transgear-pivot-screw]
+name = "18-8 Stainless Steel Precision Shoulder Screw, 3/16\" Shoulder Diameter, 1/2\" Shoulder Length, 8-32 Size, 3/8\" Thread Length"
+kind = "purchased_hardware"
+number = "MHA-PD-VN-57"
+make = "McMaster-Carr"
+sku = "90325A174"
+status = "on_hand"
+pieces = 2
+unit = "each"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 51: \"18-8 Stainless Steel Precision Shoulder Screw, 3/16\" Shoulder Diameter, 1/2\" Shoulder Length, 8-32 Size, 3/8\" Thread Length\", 2 each shipped; Your Part Number MHA-PD-VN-57", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pd-vn-transgear-pivot-spring]
+name = "Curved Disc Springs for 0.190\" Shaft Diameter, 0.200\" ID, 0.423\" OD, 0.0113\" Thick, Packs of 10"
+kind = "purchased_hardware"
+number = "MHA-PD-VN-63"
+make = "McMaster-Carr"
+sku = "9715K43"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 52: \"Curved Disc Springs for 0.190\" Shaft Diameter, 0.200\" ID, 0.423\" OD, 0.0113\" Thick, Packs of 10\", 1 pack shipped; Your Part Number MHA-PD-VN-63", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pd-vn-transgear-retaining-ring]
+name = "Side-Mount External Retaining Rings for 1/8\" OD, Black Phosphate-Coated Carbon Steel, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-PD-VN-61"
+make = "McMaster-Carr"
+sku = "97431A240"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 53: \"Side-Mount External Retaining Rings for 1/8\" OD, Black Phosphate-Coated Carbon Steel, Packs of 100\", 1 pack shipped; Your Part Number MHA-PD-VN-61", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pn-vn-hanger-screw]
+name = "Low-Strength Zinc-Plated Steel Hex Head Screws, 8-32 Thread Size, 1\" Long, Packs of 1"
+kind = "purchased_hardware"
+number = "MHA-PN-VN-50"
+make = "McMaster-Carr"
+sku = "93075A199"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 54: \"Low-Strength Zinc-Plated Steel Hex Head Screws, 8-32 Thread Size, 1\" Long, Packs of 1\", 1 pack shipped; Your Part Number MHA-PN-VN-50", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pn-vn-pen-adjust-nut]
+name = "Brass Hex Nut, 0-80 Thread Size, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-PN-VN-53"
+make = "McMaster-Carr"
+sku = "92671A115"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 55: \"Brass Hex Nut, 0-80 Thread Size, Packs of 100\", 1 pack shipped; Your Part Number MHA-PN-VN-53", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pn-vn-pen-hanger-jam-nut]
+name = "Steel Narrow-Profile Hex Nuts, Zinc-Plated, 8-32 Thread Size, 1/4\" Wide, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-PN-VN-55"
+make = "McMaster-Carr"
+sku = "90760A009"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 56: \"Steel Narrow-Profile Hex Nuts, Zinc-Plated, 8-32 Thread Size, 1/4\" Wide, Packs of 100\", 1 pack shipped; Your Part Number MHA-PN-VN-55", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pn-vn-pen-hanger-nut]
+name = "Zinc-Plated Low-Strength Steel Hex Nuts, 8-32 Thread Size, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-PN-VN-54"
+make = "McMaster-Carr"
+sku = "90480A009"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "This pack also supplies the one nut of fixtures.dt-cone-gear-round-arbor-nut (same McMaster-Carr SKU)."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 57: \"Zinc-Plated Low-Strength Steel Hex Nuts, 8-32 Thread Size, Packs of 100\", 1 pack shipped; Your Part Number MHA-PN-VN-54", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.pn-vn-pen-set-screw]
+name = "Stainless Steel Flared-Collar Knurled-Head Thumb Screw, 4-40 Thread Size, 5/8\" Long, Packs of 5"
+kind = "purchased_hardware"
+number = "MHA-PN-VN-51"
+make = "McMaster-Carr"
+sku = "99607A213"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 58: \"Stainless Steel Flared-Collar Knurled-Head Thumb Screw, 4-40 Thread Size, 5/8\" Long, Packs of 5\", 1 pack shipped; Your Part Number MHA-PN-VN-51", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.sh-vn-arbor-set-screw]
+name = "Alloy Steel Cup-Tip Set Screw, Black Oxide, 4-40 Thread, 1/4\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-SH-VN-54"
+make = "McMaster-Carr"
+sku = "91375A106"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 59: \"Alloy Steel Cup-Tip Set Screw, Black Oxide, 4-40 Thread, 1/4\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-SH-VN-54", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.sh-vn-brass-fillister-screw]
+name = "Brass Fillister Head Slotted Screws, 4-40 Thread Size, 1/4\" Long, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-SH-VN-51"
+make = "McMaster-Carr"
+sku = "90114A511"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 60: \"Brass Fillister Head Slotted Screws, 4-40 Thread Size, 1/4\" Long, Packs of 100\", 1 pack shipped; Your Part Number MHA-SH-VN-51", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.sh-vn-chain-link]
+name = "Roller Chain, Single Strand, ANSI Number 25, 1/4\" Pitch, 2 Feet Long"
+kind = "purchased_hardware"
+number = "MHA-SH-VN-50"
+make = "McMaster-Carr"
+sku = "6261K171"
+status = "on_hand"
+pieces = 1
+unit = "each"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 61: \"Roller Chain, Single Strand, ANSI Number 25, 1/4\" Pitch, 2 Feet Long\", 1 each shipped; Your Part Number MHA-SH-VN-50", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.sh-vn-clamp-screw]
+name = "Steel Fillister Head Slotted Screws, Zinc-Plated, 8-32 Thread Size, 1-1/4\" Long, Packs of 1"
+kind = "purchased_hardware"
+number = "MHA-SH-VN-53"
+make = "McMaster-Carr"
+sku = "90280A201"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 62: \"Steel Fillister Head Slotted Screws, Zinc-Plated, 8-32 Thread Size, 1-1/4\" Long, Packs of 1\", 1 pack shipped; Your Part Number MHA-SH-VN-53", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.sh-vn-fillister-screw-90280a108]
+name = "Steel Fillister Head Slotted Screws, Zinc-Plated, 4-40 Thread Size, 3/8\" Long, Packs of 1"
+kind = "purchased_hardware"
+number = "MHA-SH-VN-52"
+make = "McMaster-Carr"
+sku = "90280A108"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 63: \"Steel Fillister Head Slotted Screws, Zinc-Plated, 4-40 Thread Size, 3/8\" Long, Packs of 1\", 1 pack shipped; Your Part Number MHA-SH-VN-52", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.sh-vn-music-wire]
+name = "Lubricated 1080 Spring Steel Wire, 1/4 lb. Coil, 0.031\" Diameter, 110 Feet Long"
+kind = "purchased_hardware"
+number = "MHA-SH-VN-56"
+make = "McMaster-Carr"
+sku = "9666K56"
+status = "on_hand"
+pieces = 1
+unit = "each"
+note = "Not the wire the part now calls for: cad/config/hardware.yaml sh-vn-music-wire is Ø.008 music wire (ASTM A228, McMaster 9666K142 envelope); this owned coil is the Ø.031 size the PO bought under the same part number. No inventory record shows the Ø.008 wire owned."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 64: \"Lubricated 1080 Spring Steel Wire, 1/4 lb. Coil, 0.031\" Diameter, 110 Feet Long\", 1 each shipped; Your Part Number MHA-SH-VN-56", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.sh-vn-thumb-screw]
+name = "Steel Raised Knurled-Head Thumb Screw, 4-40 Thread Size, 7/16\" Long, 3/8\" Diameter Head"
+kind = "purchased_hardware"
+number = "MHA-SH-VN-55"
+make = "McMaster-Carr"
+sku = "91882A221"
+status = "on_hand"
+pieces = 4
+unit = "each"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 65: \"Steel Raised Knurled-Head Thumb Screw, 4-40 Thread Size, 7/16\" Long, 3/8\" Diameter Head\", 4 each shipped; Your Part Number MHA-SH-VN-55", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.sm-vn-boss-hook]
+name = "Zinc-Plated Steel Routing Eyebolt-Not for Lifting, 10-24 Thread Size, 2-5/16\" Thread Length, Packs of 20"
+kind = "purchased_hardware"
+number = "MHA-SM-VN-50"
+make = "McMaster-Carr"
+sku = "9490T1"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 66: \"Zinc-Plated Steel Routing Eyebolt-Not for Lifting, 10-24 Thread Size, 2-5/16\" Thread Length, Packs of 20\", 1 pack shipped; Your Part Number MHA-SM-VN-50", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.sm-vn-boss-hook-jam-nut]
+name = "Steel Narrow-Profile Hex Nuts, Zinc-Plated, 10-24 Thread Size, 5/16\" Wide, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-SM-VN-55"
+make = "McMaster-Carr"
+sku = "90760A140"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Not a hardware.yaml key today: a retired identity in current-identity-map.json."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 67: \"Steel Narrow-Profile Hex Nuts, Zinc-Plated, 10-24 Thread Size, 5/16\" Wide, Packs of 100\", 1 pack shipped; Your Part Number MHA-SM-VN-55", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.sm-vn-counter-spring]
+name = "Extension Spring, Double Loop Ends, 10\" Long, 0.5\" OD, Music-Wire Steel, Packs of 2"
+kind = "purchased_hardware"
+number = "MHA-SM-VN-51"
+make = "McMaster-Carr"
+sku = "1330K524"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 68: \"Extension Spring, Double Loop Ends, 10\" Long, 0.5\" OD, Music-Wire Steel, Packs of 2\", 1 pack shipped; Your Part Number MHA-SM-VN-51", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.sm-vn-knife-hanger-stud]
+name = "18-8 Stainless Steel Hex Head Screw, 10-24 Thread Size, 2\" Long, Fully Threaded, Packs of 25"
+kind = "purchased_hardware"
+number = "MHA-SM-VN-52"
+make = "McMaster-Carr"
+sku = "92314A253"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 69: \"18-8 Stainless Steel Hex Head Screw, 10-24 Thread Size, 2\" Long, Fully Threaded, Packs of 25\", 1 pack shipped; Your Part Number MHA-SM-VN-52", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.sm-vn-knife-hanger-washer]
+name = "18-8 Stainless Steel SAE Washer for Number 10 Screw Size, 0.219\" ID, 0.500\" OD, Packs of 100"
+kind = "purchased_hardware"
+number = "MHA-SM-VN-54"
+make = "McMaster-Carr"
+sku = "96659A104"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Shared pack: the rocker strap fixture hub clamp takes one washer selected from this pack by measurement and kept with the fixture (owner ruling 2026-11-23: \"Pick one washer from the pack of 100 by measurement and keep it with the fixture\")."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 70: \"18-8 Stainless Steel SAE Washer for Number 10 Screw Size, 0.219\" ID, 0.500\" OD, Packs of 100\", 1 pack shipped; Your Part Number MHA-SM-VN-54", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.sm-vn-knife-mount-dowel]
+name = "Dowel Pin, Alloy Steel, 1/8\" Diameter, 3/4\" Long, Packs of 50"
+kind = "purchased_hardware"
+number = "MHA-SM-VN-53"
+make = "McMaster-Carr"
+sku = "98381A473"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 71: \"Dowel Pin, Alloy Steel, 1/8\" Diameter, 3/4\" Long, Packs of 50\", 1 pack shipped; Your Part Number MHA-SM-VN-53", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[hardware.dt-vn-cone-tip-collar]
+name = "18-8 Stainless Steel Flat-Tip Set Screw, 2-56 Thread Size, 5/16\" Long, Packs of 50"
+kind = "purchased_hardware"
+number = "MHA-DT-VN-54"
+make = "McMaster-Carr"
+sku = "94355A213"
+status = "on_hand"
+pieces = 1
+unit = "pack"
+note = "Not a hardware.yaml key today: a retired identity in current-identity-map.json."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 81: \"18-8 Stainless Steel Flat-Tip Set Screw, 2-56 Thread Size, 5/16\" Long, Packs of 50\", 1 pack shipped; Your Part Number MHA-DT-VN-54", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
+
+[gauges.plug-gauge-4000-class-z-nogo]
+name = "Class Z plug gauge, tool steel, NO-GO member, .4000 in"
+kind = "gauge_pin"
+make = "McMaster-Carr"
+sku = "23065A855"
+status = "on_hand"
+pieces = 2
+note = "Bought for the oblique rocker-arm jig hub pin (MHA-CH-06-TL-VN-80 ch-rocker-arm-tl-vn-oblique-hub-pin, a retired identity). Class and member are the packing list's; the size limits are not on it and the pins are not measured."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 72: \"Class Z Plug Gauge, Tool Steel, NO-Go Gauge, 0.4000\" Size\", 2 each shipped; Your Part Number MHA-CH-06-TL-VN-80", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
