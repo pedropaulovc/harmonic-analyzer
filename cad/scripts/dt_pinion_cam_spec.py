@@ -55,10 +55,14 @@ UNIT = drawing_unit("parts/dt-pinion-cam", _config.parts("dt-pinion-cam"))
 # the bore only has to slip over it: 0.02-0.10 diametral clearance against the
 # rod's h band is enough to slide on at assembly, small enough that the set
 # screw's shift is noise under the feeler-set rig location.  #290 (owner
-# ruling): the owned .2510 reamer cuts it .2510 +.0005/.0000, at four places.
+# ruling): the owned .2510 reamer cuts it; fit audit F19: it prints .2510
+# (four places) with no band, the MHA-DT-17 rod sliding in by hand its
+# acceptance.  BORE_BAND is the ANALYSIS band (what the reamer is modelled
+# to cut, .2510-.2515), not a printed limit: the slip clearance and the
+# thin wall read it.
 LIFT_ROD_NUMBER = "MHA-DT-17"
 BORE_PLACES = 4
-BORE_BAND = (0.0127, 0.0)  # (upper, lower) about BORE: +.0005/.0000 in
+BORE_BAND = (0.0127, 0.0)  # ANALYSIS (upper, lower) deviations
 _BORE_LOWER, _BORE_UPPER = deviations(BORE_BAND)
 SLIP_CLEARANCE_MIN = round(
     BORE + _BORE_LOWER - (LIFT_ROD_DIA + LIFT_ROD_DIA_BAND[0]), 6
@@ -204,20 +208,12 @@ SET_SCREW_SUBFLUSH_MIN_MM = (
 if SET_SCREW_SUBFLUSH_MIN_MM <= 0.0:
     raise AssertionError("the longest supplied screw can stand proud of the cam OD")
 
-# The reamed bore's fit, by its standard name, with the clearance its printed
-# limits give on the rod's (rule 4; fan-out screen 20261107T081227004Z:
-# SLIP FIT is not a standard fit name).
-_SLIP_CLEARANCE_IN = tuple(
-    f"{value / 25.4:.4f}".removeprefix("0")
-    for value in (SLIP_CLEARANCE_MIN, SLIP_CLEARANCE_MAX)
-)
-BORE_CALLOUT = "\n".join(
-    (
-        "REAM THRU",
-        f"SLIDING FIT ON LIFT ROD {LIFT_ROD_NUMBER}",
-        f"(CLEARANCE {_SLIP_CLEARANCE_IN[0]}-{_SLIP_CLEARANCE_IN[1]})",
-    )
-)
+# Fit audit F19 (owner ruling 2026-11-24, its recommended form ".2510 REAM
+# THRU; MHA-DT-17 ROD SLIDES IN BY HAND"): the reamed bore prints the
+# reamer's size, no band and no clearance row; the rod is its gauge.  Two
+# rows (rule 7).  Keeping the reamer rather than an F drill is the
+# necessity register's N-01 (the thin wall).
+BORE_CALLOUT = f"REAM THRU; {LIFT_ROD_NUMBER} ROD\nSLIDES IN BY HAND"
 # The OD and its .079 offset from the bore together set the follower pin's
 # lift, so the one reason sits once, in numbered note 1, and both dimensions
 # flag it (rules 4 and 7; fan-out r1 57234c1d71: the reason on the OD's

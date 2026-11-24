@@ -58,11 +58,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
-from _fit_deviations import deviations
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
@@ -77,7 +73,6 @@ from dt_pinion_cam_geometry import (
 )
 from _named_views import name_octant_views
 from dt_pinion_cam_spec import (
-    BORE_BAND,
     COLLAR_AXIS_TOLERANCE_MM,
     COLLAR_OD_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
@@ -338,10 +333,8 @@ def build(adapter) -> dict[str, str]:
     # model dimensions (drawing-simplicity-policy.md `How the repository implements the guidelines` -- the places are the tolerance, so the
     # sheet reads them back instead of rewriting them); mark exactly the
     # print's dimensions and stamp the make-critical title-block properties.
-    # The bands are millimetres; UNIT prints them in inches.
-    set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *deviations(BORE_BAND), display_unit=UNIT
-    )
+    # The bands are millimetres; UNIT prints them in inches.  The reamed
+    # bore prints the .2510 reamer's size and no band (fit audit F19).
     set_dimension_symmetric_tolerance(
         adapter,
         "CollarProfile",

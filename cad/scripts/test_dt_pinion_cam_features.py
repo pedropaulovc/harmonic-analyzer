@@ -110,7 +110,8 @@ def test_cam_feature_bands_are_the_printed_ones() -> None:
     assert od["finish_ra"] == 1.6 and od["mates"] == "MHA-DT-25"
     assert od["callout"] == drawing.DIMENSION_CALLOUTS["CollarOd"] == "SEE NOTE 1"
     bore = features["bore"]
-    # Ø.2510 +.0005/.0000 REAM THRU, sliding fit on the MHA-DT-17 rod.
+    # Ø.2510 REAM THRU, the MHA-DT-17 rod slides in by hand (fit audit F19);
+    # dia and clearance are the reamer's ANALYSIS band.
     assert bore["dia"] == pytest.approx([_in(0.2510), _in(0.2515)])
     assert bore["process"] == "ream" and bore["thru"] is True
     assert bore["callout"] == drawing.DIMENSION_CALLOUTS["BoreDia"]
