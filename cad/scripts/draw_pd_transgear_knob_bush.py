@@ -82,8 +82,6 @@ from pd_transgear_knob_bush_spec import (
     FINISH_CAPTIONS,
     GEOMETRIC_CONTROLS,
     GEOMETRIC_TOLERANCES_MM,
-    HUB_LENGTH_CALLOUT,
-    LENGTH_CALLOUT,
     PART_DATUMS,
     PLATE_NUMBER,
     PRESS_CALLOUT,
@@ -313,7 +311,6 @@ requirement(
         ),
         "length_nominal": (LENGTH, ((_GEOM, "LENGTH"),)),
         "length_from": ("datum_end", ((_SELF, "SECTION_KEEP"),)),
-        "callout": (LENGTH_CALLOUT, ("LENGTH_CALLOUT",)),
     },
     precision={"length": _P["BushLength"]},
 )
@@ -348,7 +345,6 @@ requirement(
             ((_GEOM, "SHOULDER_ROOT_R_MAX_MM"), "SHOULDER_ROOT_SUFFIX"),
         ),
         "datum": ("A", ("PART_DATUMS", (_SELF, "DATUM_A_XY"))),
-        "callout": (HUB_LENGTH_CALLOUT, ("HUB_LENGTH_CALLOUT",)),
     },
     precision={"station": _P["HubLength"], "root_radius_max": _P["ShoulderR"]},
 )

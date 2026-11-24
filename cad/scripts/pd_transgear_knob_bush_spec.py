@@ -129,20 +129,20 @@ FINISH_CAPTIONS = {
 # callout carries at most two lines of words (rule 7), so the fit statement
 # stands in the note: the knob shaft is turned to this bore (guidelines v2:
 # the acceptance prints once, on the sheet of the member made last,
-# MHA-PD-08's note 1; a bare fit name here was r1's blocker) and what the
-# fit protects (rule 4's necessity answer: the journal's shake is the
-# reducer mesh's backlash).  No line of the callout is longer than its process
-# line: at 59 characters the block ran out through the left border and its
-# leader through the bore finish's text (r1).  The B pre-drill is the
-# process's, not the sheet's.
+# MHA-PD-08's note 1; a bare fit name here was r1's blocker).  What the fit
+# protects is in the necessity register
+# (cad/config/necessity/pd-transgear-knob-bush.yaml N-01; owner ruling
+# 2026-11-24: the sheet prints no reason).  No line of the callout is longer
+# than its process line: at 59 characters the block ran out through the left
+# border and its leader through the bore finish's text (r1).  The B
+# pre-drill is the process's, not the sheet's.
 WALL_TEXT = f"WALL {_inch(BUSH.WALL_STATED_MIN, 3, math.floor)} MIN"
-BORE_NECESSITY = "KEEPS REDUCER BACKLASH"
 BORE_NOTE_NUMBER = 1
 BORE_NOTE_WIDTH = 40
 BORE_NOTE = "\n".join(
     textwrap.wrap(
         f"{BORE_NOTE_NUMBER}. KNOB SHAFT {KNOB_SHAFT_NUMBER} IS TURNED TO THIS "
-        f"BORE. {BORE_NECESSITY}.",
+        "BORE.",
         width=BORE_NOTE_WIDTH,
         subsequent_indent="   ",
         break_on_hyphens=False,
@@ -155,15 +155,13 @@ BORE_CALLOUT = (
 )
 # Made to fit (rule 4, form 2): the press step is turned last to MHA-PD-19's
 # hole as measured, so its size prints REF and the interference range
-# (.0011 wide) is the requirement, with what the press protects, rule 4's
-# fixed-joint answer in full: it alone holds knob axis K in the plate, with
-# no fastener (the MHA-CH-12 press land's form,
-# ch_rocker_hub_notes.LAND_CALLOUT).  The press itself, where rule 4 would
-# take a bonded slip fit, is the owner's #2425 choice (the registry row's
-# RV-04).  Neither line is longer than the 48 characters the block's place
-# was set for.
+# (.0011 wide) is the requirement (the MHA-CH-12 press land's form,
+# ch_rocker_hub_notes.LAND_CALLOUT).  What the press protects is in the
+# necessity register (N-04).  The press itself, where rule 4 would take a
+# bonded slip fit, is the registry row's RV-04.  Neither line is longer than
+# the 48 characters the block's place was set for.
 PRESS_CALLOUT = (
-    f"PRESS IN {PLATE_NUMBER}, HOLDS KNOB AXIS, NO FASTENER\n"
+    f"PRESS FIT IN {PLATE_NUMBER}\n"
     "TURN TO MEASURED HOLE (INTERFERENCE "
     f"{_inch(BUSH.PRESS_INTERFERENCE[0], 4, math.floor)}-"
     f"{_inch(BUSH.PRESS_INTERFERENCE[1], 4, math.ceil)})"
@@ -176,20 +174,16 @@ PRESS_DIA_TEXT_SUFFIX = ")"
 # the disc cluster's stack (F, transgear_cluster_fit), and the stack's air
 # between the MHA-PD-22 drive collar and the MHA-PD-06 disc is what closes
 # when it is loose: at the title block's ±.005 the statistical air falls to
-# 0.0599 mm under its 0.1016 floor (pd_cluster_air.require_air).  The
-# callout names that gap (rule 4's necessity answer, a running gap that
-# closes; machinist review r1: the mates alone were no answer).  At most 16
-# characters a line, inside the station's own extension lines.
-HUB_LENGTH_CALLOUT = f"KEEPS GAP AT\nCOLLAR {DRIVE_COLLAR_NUMBER}"
+# 0.0599 mm under its 0.1016 floor (pd_cluster_air.require_air).
 # The hub-to-rear-face length places the bush's rear face on the knob shaft,
 # so its ±.002 is a term of the journal's stand-out behind it
 # (pd_transgear_knob_shaft_spec.JOURNAL_STANDOUT_BAND), which the
 # MHA-PD-16 cup's supplied pilot must cover for the knob's end float to be
 # set by facing the cup (pd_transgear_knob_cup_spec.FACING_REMOVAL, never
 # negative: .001 is left at ±.002, none at ±.003, and at the title block's
-# ±.005 the float cannot be set).  The callout names that float (rule 4's
-# necessity answer; r1: "facing range" named no gap or stack).
-LENGTH_CALLOUT = f"SETS KNOB END FLOAT\nAT CUP {KNOB_CUP_NUMBER}"
+# ±.005 the float cannot be set).  Neither band has a mate to try, so
+# neither prints a label (rule 4: a band with no mate to try names none);
+# the necessity register says what each protects (N-02, N-03).
 # Below-text the part build authors on its source dimensions; the drawing
 # imports and reads it back (text set from the drawing writes through to the
 # built part, fleet issue #1942).
@@ -197,8 +191,6 @@ DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "BoreSketch": {"BoreDia": BORE_CALLOUT},
     "BushProfile": {
         "PressDia": PRESS_CALLOUT,
-        "HubLength": HUB_LENGTH_CALLOUT,
-        "BushLength": LENGTH_CALLOUT,
     },
 }
 # The shoulder root, a sketch arc in the turned profile so its radius imports
