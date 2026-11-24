@@ -113,9 +113,6 @@ diameter_mm = 2.1844
 [tools.drill-40]  # Drills #40
 description = "#40 (.0980 in) drill, 115-piece index"
 diameter_mm = 2.4892
-[tools.drill-39]  # 115-piece index #39; MHA-PD-09: one drive-pin hole re-drilled on a wheel that binds on the pins (fit audit 2026-11-23)
-description = "#39 (.0995 in) drill, 115-piece index"
-diameter_mm = 2.5273
 [tools.drill-11]  # 115-piece index #11; MHA-PD-22 #11 DRILL THRU (fit audit 2026-11-23)
 description = "#11 (.1910 in) drill, 115-piece index"
 diameter_mm = 4.8514

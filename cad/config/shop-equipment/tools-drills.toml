@@ -81,11 +81,6 @@ kind = "drill"
 status = "on_hand"
 note = "quotes-2026-11-17-rev3.xlsx Drills #40: owned in 115-pc index (quality unverified); not on the buy list."
 
-[tools.drill-39]
-kind = "drill"
-status = "on_hand"
-note = "Fit audit 2026-11-23 (MHA-PD-09 easing drill): #39 is a member of the owned 115-pc index (number drills #1-#60; quality unverified); the quote workbook's Drills sheet was not re-read for this record; not on the buy list."
-
 [tools.drill-37]
 kind = "drill"
 status = "on_hand"
