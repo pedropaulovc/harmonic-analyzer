@@ -14,8 +14,8 @@
   <rect class="part-removed" x="183.2" y="154.7" width="33.5" height="9.9"/>
   <line class="active-face" x1="183.2" y1="164.6" x2="216.8" y2="164.6"/>
   <rect class="holes" x="196.6" y="164.6" width="6.8" height="51.1"/>
-  <rect class="holes" x="195.1" y="164.6" width="9.8" height="25.5"/>
-  <line class="hidden" x1="183.2" y1="189.1" x2="216.8" y2="189.1"/>
+  <rect class="holes" x="195.1" y="164.6" width="9.8" height="25.1"/>
+  <line class="hidden" x1="183.2" y1="189.7" x2="216.8" y2="189.7"/>
   <line class="centre-line" x1="200.0" y1="154.6" x2="200.0" y2="227.7"/>
   <rect class="cutter" x="195.1" y="36.7" width="9.8" height="107.1"/>
   <polygon class="cutter" points="195.1,143.8 204.9,143.8 200.0,146.7"/>
@@ -25,7 +25,7 @@
   <text class="label" x="440.0" y="110.0">W faced to .670</text>
   <line class="leader" x1="436.0" y1="106.0" x2="184.0" y2="164.6"/>
   <circle class="leader-dot" cx="184.0" cy="164.6" r="2.5"/>
-  <text class="label" x="440.0" y="150.0">#30 to .335 (the slot's place)</text>
+  <text class="label" x="440.0" y="150.0">#30 to .330 (the slot's place)</text>
   <line class="leader" x1="436.0" y1="146.0" x2="204.0" y2="182.6"/>
   <circle class="leader-dot" cx="204.0" cy="182.6" r="2.5"/>
   <text class="label" x="440.0" y="190.0">#43 through both halves, exits E between the stacks</text>

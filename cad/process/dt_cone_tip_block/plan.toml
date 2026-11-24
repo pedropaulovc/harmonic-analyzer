@@ -216,7 +216,7 @@ adjuster_tap_reach_mm = 16.51
 # The slit: the owned 2-3/4 in x .064 HSS slitting saw (shop
 # slitting-saw-2-75-064; inventory tools.slitting-saw-2-75-064: dia_in 2.75,
 # thickness_in .064, teeth 72, bore_in 1.0; test_dt_cone_tip_block_process.py
-# holds the three numbers below to that record) at 100 rpm, the mill's
+# holds the four numbers below to that record) at 100 rpm, the mill's
 # slowest by the shop record (100-2800) and inside the L range on the
 # mill's plate (50-1500): 72 ft/min at its rim (LittleMachineShop "Cutting
 # Speeds", Milling, Plain carbon steels 1006-1026, HSS: 80-110 ft/min; the
@@ -232,6 +232,7 @@ adjuster_tap_reach_mm = 16.51
 saw_dia_mm = 69.85
 saw_thickness_mm = 1.6256
 saw_teeth = 72
+saw_bore_mm = 25.4
 saw_rpm = 100
 saw_feed_per_min_mm = 182.88
 slit_depth_mm = 15.128
@@ -269,6 +270,19 @@ saw_arbor_cap_dia_mm = 31.75
 saw_arbor_cap_thickness_mm = 12.7
 saw_arbor_screw_head_dia_mm = 15.8242
 saw_arbor_nose_to_cap_mm = 35.56
+# The drive (record keyed = false): the cap's screw, M8 x 1.25, 5 mm key, at
+# saw_clamp_torque_nm (the record's clamp_torque_nm) clamps the saw between
+# the shoulder and the cap with about 11 kN (the record's cited table: 13.2
+# kN at 23 N·m, friction .14). One face's friction on the ring between the
+# 1 in pilot and the 1.25 cap (mean radius 14.35 mm) carries .14 × 11 kN ×
+# 14.35 mm = 22.1 N·m (saw_drive_torque_max_nm); the other face and the
+# screw are the reserve. The heaviest pass here, .170 into TOP at the kerf's
+# .068 ceiling, takes 8.1 N·m by the handbook's milling power, and the light
+# first pass 4.1 N·m (cam.py checks the heaviest against the drive).
+saw_clamp_torque_nm = 20.0
+saw_clamp_preload_kn = 11.0
+saw_drive_friction = 0.14
+saw_drive_torque_max_nm = 22.1
 # Two sizes that record does not carry (screw_head_past_cap_in is
 # "to_measure"; the nose's height above the saw follows from the 1.4 only
 # if the cap seats on the shoulder with no saw, unverified). Each is a
@@ -1088,7 +1102,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.blade_min_mm}}", 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "At the bench, the arbor's shank upright in the soft-jawed vise, pilot step up: wipe the shoulder, both faces of the saw and the cap clean and dry. The saw onto the 1 in pilot step, flat on the shoulder, its teeth leaning clockwise seen from the shank end (they cut with M3). The cap on it; its screw to 20 N·m with the 5 mm key."
+instruction = "At the bench, the arbor's shank upright in the soft-jawed vise, pilot step up: wipe the shoulder, both faces of the saw and the cap clean and dry. The saw onto the 1 in pilot step, flat on the shoulder, its teeth leaning clockwise seen from the shank end (they cut with M3). The cap on it; its screw to {{process.saw_clamp_torque_nm:g}} N·m with the 5 mm key."
 inspection = "The saw flat on the shoulder and the cap flat on the saw, no gap. A straightedge across the cap's face: the screw's head under it or flush; proud, at most {{process.saw_screw_stand_max_mm:in.2dot}} by the calipers' depth rod. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.saw_screw_stand_max_mm}}"] }]
 feed = "hand"

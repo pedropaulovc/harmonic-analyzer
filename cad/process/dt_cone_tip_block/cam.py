@@ -173,6 +173,20 @@ TOUCH_IN_MM = 3.0
 # The slit's printed ceiling less this is the most the miked blade and its
 # axial runout may add up to.
 KERF_ALLOWANCE_MM = 0.002 * IN
+# The saw's side runout is read this far in from its teeth; the rim swings
+# wider by the saw's radius over the radius less this.
+RUNOUT_INSET_MM = IN / 8
+# Machinery's Handbook milling power for the saw's passes, the figures
+# prechips' milling screen takes for milling_material steel_1018: unit power
+# (hp per in³/min, plain carbon steel 160-180 HB), the feed factor at .001
+# in/tooth and the tool-wear factor (as the CH-01 and CH-03 recipes).
+SAW_UNIT_POWER_HP = 0.78
+SAW_FEED_FACTOR = 1.60
+SAW_FEED_FACTOR_AT_MM = 0.0254
+SAW_WEAR_FACTOR = 1.10
+WATTS_PER_HP = 745.7
+# The friction drive's torque is recomputed to this (N·m).
+DRIVE_TOL_NM = 0.05
 # The arbor's length from the spindle nose is rounded up to this (.1 in).
 ARBOR_LENGTH_STEP_MM = 0.1 * IN
 # A plan number the recipe recomputes must agree to this (its rounding).
@@ -421,6 +435,21 @@ def _saw_depths(depth: float, max_step: float) -> list[float]:
     n = math.ceil(depth / max_step + 0.5 - 1e-9)
     step = depth / (n - 0.5)
     return [step * (k + 0.5) for k in range(n - 1)] + [depth]
+
+
+def _saw_torque_nm(step: float, width: float, feed: float, rpm: float) -> float:
+    """Mean spindle torque of a saw pass ``step`` into the work and ``width``
+    wide at ``feed`` mm/min: the handbook's power (unit power × feed factor ×
+    wear × removal rate) over the spindle's speed."""
+    removal = step * width * feed / IN**3
+    watts = WATTS_PER_HP * SAW_UNIT_POWER_HP * SAW_FEED_FACTOR * SAW_WEAR_FACTOR
+    return watts * removal / (2 * math.pi * rpm / 60)
+
+
+def _ring_radius(inner: float, outer: float) -> float:
+    """The friction radius of a clamp ring ``inner`` to ``outer`` under even
+    pressure."""
+    return 2 * (outer**3 - inner**3) / (3 * (outer**2 - inner**2))
 
 
 def _thread(designation: str) -> tuple[str, float, float]:
@@ -802,6 +831,17 @@ def context(
             "process.saw_thickness_mm: the blade leaves no runout inside the slit's width"
         )
     _agree(plan, "saw_side_tir_nominal_mm", p["kerf_max_mm"] - thick)
+    # The reading is taken RUNOUT_INSET_MM in from the teeth, where the saw
+    # swings less than at its rim: with the thinnest accepted blade and the
+    # reading at its limit, the rim still sweeps inside the slit's ceiling.
+    rim = radius / (radius - RUNOUT_INSET_MM)
+    if (
+        p["blade_min_mm"] + (p["kerf_max_mm"] - p["blade_min_mm"]) * rim
+        > slit["width"][1]
+    ):
+        raise ValueError(
+            "process.kerf_max_mm: the saw's rim sweeps over the slit's width"
+        )
     # The slit's depth: X0 is the top end and the saw's centre its recorded
     # radius less the depth past it, so the tips' radial runout (at most
     # saw_tip_tir_max_mm, read at the mounting) deepens the floor. With it
@@ -900,6 +940,33 @@ def context(
     if p["saw_arbor_nose_to_cap_mm"] - cap_t < nose_above:
         raise ValueError(
             "process.saw_nose_above_min_mm is over what the arbor's record gives"
+        )
+    # The friction drive (the arbor is not keyed): one face's friction torque
+    # on the clamp ring between the pilot (the saw's hole) and the narrower
+    # of the body and the cap, at the plan's preload and friction; the other
+    # face and the screw are its reserve. The heaviest pass (the deepest
+    # step, at the kerf's ceiling) takes less spindle torque, by the
+    # handbook's power at this feed per tooth, than that.
+    ring = _ring_radius(p["saw_bore_mm"] / 2, min(body_r, cap_r))
+    drive = p["saw_drive_friction"] * p["saw_clamp_preload_kn"] * ring
+    if not math.isclose(p["saw_drive_torque_max_nm"], drive, abs_tol=DRIVE_TOL_NM):
+        raise ValueError(
+            f"process.saw_drive_torque_max_nm {p['saw_drive_torque_max_nm']:g}, "
+            f"the recipe computes {drive:.2f}"
+        )
+    if not math.isclose(
+        saw_feed / (saw_rpm * teeth), SAW_FEED_FACTOR_AT_MM, abs_tol=1e-6
+    ):
+        raise ValueError(
+            "the saw's feed is not the .001 in/tooth the handbook's feed factor "
+            "is taken at"
+        )
+    bite = max(b - a for a, b in zip([0.0, *saw_steps], saw_steps, strict=False))
+    torque = _saw_torque_nm(bite, p["kerf_max_mm"], saw_feed, saw_rpm)
+    if torque > drive:
+        raise ValueError(
+            f"the saw's heaviest pass takes {torque:.1f} N·m, over the arbor's "
+            f"friction drive, process.saw_drive_torque_max_nm {drive:.1f}"
         )
     # The reach past the arbor, on both sides of the saw (the body above, the
     # cap below): (the saw - the wider of them) / 2 less ARBOR_CLEAR_MM. The

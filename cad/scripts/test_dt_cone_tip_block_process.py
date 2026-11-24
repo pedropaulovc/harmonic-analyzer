@@ -146,6 +146,7 @@ def test_the_saw_and_arbor_sizes_are_their_inventory_records() -> None:
     for key, value in (
         ("saw_dia_mm", saw["dia_in"]),
         ("saw_thickness_mm", saw["thickness_in"]),
+        ("saw_bore_mm", saw["bore_in"]),
         ("saw_arbor_body_dia_mm", arbor["body_dia_above_saw_in"]),
         ("saw_arbor_cap_dia_mm", arbor["cap_dia_in"]),
         ("saw_arbor_cap_thickness_mm", arbor["cap_thickness_in"]),
@@ -155,14 +156,28 @@ def test_the_saw_and_arbor_sizes_are_their_inventory_records() -> None:
         assert p[key] == pytest.approx(value * 25.4, abs=1e-4), key
     assert p["saw_teeth"] == saw["teeth"]
     assert arbor["screw_head_past_cap_in"] == "to_measure"
-    assert (arbor["clamp_torque_nm"], arbor["screw_key_mm"]) == (20.0, 5)
+    # The drive is the cap's friction alone, at the record's clamp torque.
+    assert arbor["keyed"] is False
+    assert p["saw_clamp_torque_nm"] == arbor["clamp_torque_nm"]
+    assert arbor["screw_key_mm"] == 5
     mount = next(
         op["instruction"]
         for setup in PLAN["setups"]
         for op in setup["operations"]
         if "pilot step" in op["instruction"]
     )
-    assert "20 N·m with the 5 mm key" in mount
+    assert "{{process.saw_clamp_torque_nm:g}} N·m with the 5 mm key" in mount
+
+
+def test_a_pass_over_the_friction_drive_is_refused() -> None:
+    """The arbor is not keyed. One face of the clamp carries the drive (the
+    other face and the screw are reserve): a clamp whose one face carries
+    less torque than the heaviest pass takes is refused."""
+    plan = copy.deepcopy(PLAN)
+    plan["parameters"]["saw_clamp_preload_kn"] = 3.0
+    plan["parameters"]["saw_drive_torque_max_nm"] = 6.03
+    with pytest.raises(ValueError, match="friction drive"):
+        _context(plan)
 
 
 def test_the_slit_saw_steps_in_to_the_slits_depth(context) -> None:
@@ -237,6 +252,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -
         ("saw_screw_stand_max_mm", 12.7, "saw_below_max_mm"),
         ("saw_nose_above_min_mm", 5.0, "saw_nose_above_min_mm"),
         ("saw_arbor_body_dia_mm", 44.45, "saw_reach_max_mm"),
+        ("saw_drive_torque_max_nm", 44.2, "saw_drive_torque_max_nm"),
         ("lying_grip_mm", 8.0, "lying_grip_mm"),
         ("east_grip_mm", 6.8453, "east_grip_mm"),
         ("tap_stack_max_mm", 261.62, "tap_stack_max_mm"),
