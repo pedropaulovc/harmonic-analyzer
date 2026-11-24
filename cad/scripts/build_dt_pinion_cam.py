@@ -58,7 +58,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
@@ -73,8 +72,6 @@ from dt_pinion_cam_geometry import (
 )
 from _named_views import name_octant_views
 from dt_pinion_cam_spec import (
-    COLLAR_AXIS_TOLERANCE_MM,
-    COLLAR_OD_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -83,7 +80,6 @@ from dt_pinion_cam_spec import (
     THIN_WALL_MIN_BAND,
     THIN_WALL_MIN_MM,
     THIN_WALL_MIN_TOL_TYPE,
-    UNIT,
 )
 
 PART_NAME = "dt-pinion-cam"
@@ -334,21 +330,9 @@ def build(adapter) -> dict[str, str]:
     # sheet reads them back instead of rewriting them); mark exactly the
     # print's dimensions and stamp the make-critical title-block properties.
     # The bands are millimetres; UNIT prints them in inches.  The reamed
-    # bore prints the .2510 reamer's size and no band (fit audit F19).
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "CollarProfile",
-        "CollarOd",
-        COLLAR_OD_TOLERANCE_MM,
-        display_unit=UNIT,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "CollarProfile",
-        "CollarCy",
-        COLLAR_AXIS_TOLERANCE_MM,
-        display_unit=UNIT,
-    )
+    # bore prints the .2510 reamer's size and no band (fit audit F19); the
+    # OD and eccentricity ride the title block's +/-.005 (fit audit S3), so
+    # only the RV-01 wall's single limit is set here.
     set_single_limit(
         adapter,
         "ThinWallReference",

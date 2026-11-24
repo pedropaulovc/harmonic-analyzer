@@ -61,15 +61,11 @@ from dt_pinion_cam_spec import (
     BORE_CALLOUT,
     CAM_LEN,
     CAM_OD,
-    COLLAR_AXIS_TOLERANCE_MM,
-    COLLAR_OD_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION_BY_NAME,
     ECC,
     FOLLOWER_PIN_NUMBER,
-    LIFT_NOTE_CALLOUT,
-    LIFT_NOTE_NUMBER,
     LIFT_ROD_NUMBER,
     SCREW_NOTE_NUMBER,
     SET_SCREW_Z,
@@ -159,12 +155,10 @@ BOTTOM_KEEP = {
     "TapDrillDia": (0.215, 0.100),
     "TapCz": (BOTTOM_CENTER[0] + 0.036, BOTTOM_CENTER[1] + 0.007),
 }
-# The eccentricity is a location: value and band, plus the flag to the note
-# naming the lift it sets with the OD (rules 4 and 7; fan-out r1).
+# The eccentricity is a location at the title block's +/-.005 (fit audit S3):
+# value only, no flag.
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
-    "CollarOd": LIFT_NOTE_CALLOUT,
-    "CollarCy": LIFT_NOTE_CALLOUT,
     "TapDrillDia": TAP_DRILL_CALLOUT,
     "ThinWallMin": THIN_WALL_CALLOUT,
 }
@@ -231,9 +225,9 @@ requirement(
     requirements=("plane",),
     fields={"plane": (_plane(CAM_LEN), (_FRAME, (_GEOM, "CAM_LEN")))},
 )
-# The turned OD the MHA-DT-25 follower pin rides: Ø.575 +/-.002 flagged to
-# note 1 (SIDE_KEEP "CollarOd"), its length .35 (SIDE_KEEP "Depth") and the
-# sheet's one roughness symbol (SURFACE_FINISHES "cam_od").
+# The turned OD the MHA-DT-25 follower pin rides: Ø.575 at the title block's
+# +/-.005 (SIDE_KEEP "CollarOd", fit audit S3), its length .35 (SIDE_KEEP
+# "Depth") and the sheet's one roughness symbol (SURFACE_FINISHES "cam_od").
 requirement(
     "cam_od",
     kind="outside_cylinder",
@@ -243,18 +237,8 @@ requirement(
         "at": ([0.0, -ECC, 0.0], (_FRAME, (_GEOM, "ECC"))),
         "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
         "dia": (
-            limits(
-                CAM_OD,
-                _P["CollarOd"],
-                (COLLAR_OD_TOLERANCE_MM, -COLLAR_OD_TOLERANCE_MM),
-                unit=UNIT,
-            ),
-            (
-                (_GEOM, "CAM_OD"),
-                "COLLAR_OD_TOLERANCE_MM",
-                "UNIT",
-                (_SELF, "SIDE_KEEP"),
-            ),
+            limits(CAM_OD, _P["CollarOd"], unit=UNIT),
+            ((_GEOM, "CAM_OD"), "UNIT", (_SELF, "SIDE_KEEP")),
         ),
         "nominal_dia": (CAM_OD, ((_GEOM, "CAM_OD"),)),
         "length": (
@@ -263,15 +247,7 @@ requirement(
         ),
         "length_nominal": (CAM_LEN, ((_GEOM, "CAM_LEN"),)),
         "finish_ra": (_CAM_OD_FINISH.roughness_um, ("SURFACE_FINISHES",)),
-        "callout": (
-            LIFT_NOTE_CALLOUT,
-            ("LIFT_NOTE_CALLOUT", (_SELF, "DIMENSION_CALLOUTS")),
-        ),
         "mates": (FOLLOWER_PIN_NUMBER, ("FOLLOWER_PIN_NUMBER",)),
-        "note": (
-            _NOTES[LIFT_NOTE_NUMBER - 1],
-            ("DRAWING_NOTES", "LIFT_NOTE_NUMBER"),
-        ),
     },
     precision={"dia": _P["CollarOd"], "length": _P["Depth"], "finish_ra": 1},
 )
@@ -279,10 +255,11 @@ requirement(
 # (FRONT_KEEP "BoreDia" with BORE_CALLOUT: the .2510 reamer's size, no band,
 # the MHA-DT-17 rod sliding in by hand its acceptance, fit audit F19; ``dia``
 # and the slip clearance are the reamer's ANALYSIS band). The eccentricity
-# .079 +/-.002 (FRONT_KEEP "CollarCy", flagged to note 1) locates it from the
-# OD's axis along Y; the thin-side wall over it prints as the single limit
-# .0797 MIN (FRONT_KEEP "ThinWallMin", owner minor RV-01): the least wall
-# the OD, bore and eccentricity bands leave, not a band of its own.
+# .079 (FRONT_KEEP "CollarCy", the title block's +/-.005, fit audit S3)
+# locates it from the OD's axis along Y; the thin-side wall over it prints as
+# the single limit .0752 MIN (FRONT_KEEP "ThinWallMin", owner minor RV-01):
+# the least wall the OD, bore and eccentricity limits leave, not a band of
+# its own.
 requirement(
     "bore",
     kind="hole",
@@ -305,26 +282,12 @@ requirement(
             ("SLIP_CLEARANCE_MIN", "SLIP_CLEARANCE_MAX"),
         ),
         "eccentricity": (
-            limits(
-                ECC,
-                _P["CollarCy"],
-                (COLLAR_AXIS_TOLERANCE_MM, -COLLAR_AXIS_TOLERANCE_MM),
-                unit=UNIT,
-            ),
-            (
-                (_GEOM, "ECC"),
-                "COLLAR_AXIS_TOLERANCE_MM",
-                "UNIT",
-                (_SELF, "FRONT_KEEP"),
-            ),
+            limits(ECC, _P["CollarCy"], unit=UNIT),
+            ((_GEOM, "ECC"), "UNIT", (_SELF, "FRONT_KEEP")),
         ),
         "eccentricity_nominal": (ECC, ((_GEOM, "ECC"),)),
         "eccentricity_from": ("cam_od", ((_SELF, "FRONT_KEEP"),)),
         "eccentricity_axis": ("y", (_FRAME,)),
-        "eccentricity_callout": (
-            LIFT_NOTE_CALLOUT,
-            ("LIFT_NOTE_CALLOUT", (_SELF, "DIMENSION_CALLOUTS")),
-        ),
         "thin_wall_min": (
             THIN_WALL_MIN_MM,
             ("THIN_WALL_MIN_MM", "THIN_WALL_MIN_TOL_TYPE", (_SELF, "FRONT_KEEP")),

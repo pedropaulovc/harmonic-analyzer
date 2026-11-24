@@ -57,25 +57,25 @@ def test_drive_train_recipe_depends_on_geometry_not_drawing_notes() -> None:
     assert "dt_pinion_cam_spec.py" not in dependency_names
 
 
-def test_eccentricity_is_dimensioned_as_a_flagged_location() -> None:
+def test_eccentricity_is_dimensioned_as_a_location() -> None:
     # The whole point of the cam: bore and OD are NOT concentric, so the offset
     # must be an explicit dimension, not implied by graphical alignment.  It is
-    # a location, so it carries its value, band and the flag to the note that
-    # names what it sets (rules 4 and 7; fan-out r1).
+    # a location at the title block's +/-.005 (fit audit S3): value only.
     assert "CollarCy" in drawing.FRONT_KEEP
-    assert drawing.DIMENSION_CALLOUTS["CollarCy"] == "SEE NOTE 1"
+    assert "CollarCy" not in drawing.DIMENSION_CALLOUTS
     assert dt_pinion_cam_geometry.CAM_OD == 14.6
 
 
 def test_thin_side_wall_is_owner_minor_rv_01_at_the_printed_limits() -> None:
     # Rule 17 on the inch sheet: .080 target, .060 floor.  At the printed
-    # limits (OD .575 -.002, bore .2510 +.0005, eccentricity .079 +.002) the
-    # thin side keeps .07975: owner minor RV-01, printed as .0797 MIN.
+    # limits (OD .575 -.005, bore .2510 +.0005, eccentricity .079 +.005) the
+    # thin side keeps .07525, between the floor and the target: owner minor
+    # RV-01 as restated for fit audit S3, printed as .0752 MIN.
     import _config
 
     spec = dt_pinion_cam_spec
-    worst_in = (0.575 - 0.002) / 2.0 - (0.2510 + 0.0005) / 2.0 - (0.079 + 0.002)
-    assert worst_in == pytest.approx(0.07975)
+    worst_in = (0.575 - 0.005) / 2.0 - (0.2510 + 0.0005) / 2.0 - (0.079 + 0.005)
+    assert worst_in == pytest.approx(0.07525)
     assert spec.THIN_SIDE_WALL_MIN_MM == pytest.approx(worst_in * 25.4)
     assert 0.060 < worst_in < 0.080
     assert dt_pinion_cam_geometry.THIN_SIDE_WALL >= 0.080 * 25.4
@@ -85,9 +85,10 @@ def test_thin_side_wall_is_owner_minor_rv_01_at_the_printed_limits() -> None:
         if entry["id"] == "RV-01"
     ]
     assert rv_01["kind"] == "minor"
+    assert ".0752 MIN" in rv_01["where"] and "fit audit S3" in rv_01["reason"]
     # The sheet states the wall on its own native single-limit dimension,
     # floored so it never claims more than the worst case leaves.
-    assert spec.THIN_WALL_MIN_MM == pytest.approx(0.0797 * 25.4)
+    assert spec.THIN_WALL_MIN_MM == pytest.approx(0.0752 * 25.4)
     assert spec.THIN_WALL_MIN_MM <= spec.THIN_SIDE_WALL_MIN_MM
     assert spec.THIN_WALL_MIN_TOL_TYPE == 5  # swTolType_e.swTolMIN
     assert "ThinWallMin" in drawing.FRONT_KEEP
@@ -103,13 +104,10 @@ def test_sheet_runs_at_3_to_1_with_a_set_screw_showing_2_to_1_pictorial() -> Non
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = dt_pinion_cam_spec.DRAWING_NOTES
     assert "SLIDING FIT" not in notes
-    # Only the cam OD / eccentricity carry bands; the reamed bore prints the
-    # .2510 reamer's size with no band (fit audit F19).  Routine controlling
-    # dimensions take the title-block grade.
-    assert model_toleranced_dimensions(cam) == {
-        ("CollarProfile", "CollarOd"): "COLLAR_OD_TOLERANCE_MM",
-        ("CollarProfile", "CollarCy"): "COLLAR_AXIS_TOLERANCE_MM",
-    }
+    # Nothing carries a band of its own: the reamed bore prints the .2510
+    # reamer's size (fit audit F19); the cam OD / eccentricity and routine
+    # controlling dimensions take the title-block grade (fit audit S3).
+    assert model_toleranced_dimensions(cam) == {}
     # U27 (Main, 2026-09-23): a set-screwed cam only slips over the rod, with
     # 0.02-0.10 diametral clearance on the MHA-DT-17 rod's h band.  #290: the
     # owned .2510 reamer; BORE_BAND is its ANALYSIS band (.2510-.2515).
@@ -139,10 +137,10 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     notes = dt_pinion_cam_spec.DRAWING_NOTES
     assert "RELEASE HOLD" not in notes
     lines = notes.splitlines()
-    assert lines[1] == (
-        "2. SUPPLY ASME B18.3 #2-56 UNC X 3/16 FLAT-POINT SOCKET SET SCREW LOOSE."
-    )
-    assert len(lines) == 2
+    # Fit audit S3 deleted the lift note: the set-screw note is note 1.
+    assert lines == [
+        "1. SUPPLY ASME B18.3 #2-56 UNC X 3/16 FLAT-POINT SOCKET SET SCREW LOOSE."
+    ]
     tap = drawing.DIMENSION_CALLOUTS["TapDrillDia"]
     assert "#2-56 UNC" in tap
     assert "2B" not in tap  # Title block owns the default unified thread class.
@@ -151,20 +149,18 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     assert "OPTIONAL" not in tap
 
 
-def test_the_od_and_offset_flag_the_follower_pin_note_once() -> None:
-    # Rule 4: the OD and eccentricity bands exist for the MHA-DT-25 follower
-    # pin that rides the OD (ENFORCE r1 blockers); the one reason sits in
-    # numbered note 1, which both dimensions flag (fan-out r1: on the OD's
-    # callout alone, the .079 named no mate).
+def test_the_od_and_offset_carry_no_note() -> None:
+    # Fit audit S3: the OD and eccentricity ride the title block's +/-.005,
+    # so the note naming the follower lift they set (old note 1) and the
+    # dimensions' SEE NOTE 1 flags are gone (the sheet prints no reason).
     import _config
 
     pin = _config.parts("dt-pinion-cam-pin")["number"]
     assert dt_pinion_cam_spec.FOLLOWER_PIN_NUMBER == pin
     for name in ("CollarOd", "CollarCy"):
-        assert drawing.DIMENSION_CALLOUTS[name] == "SEE NOTE 1"
-    assert dt_pinion_cam_spec.DRAWING_NOTES.splitlines()[0] == (
-        f"1. \N{LATIN CAPITAL LETTER O WITH STROKE}.575 AND .079 SET THE LIFT OF FOLLOWER PIN {pin}."
-    )
+        assert name not in drawing.DIMENSION_CALLOUTS
+    assert "LIFT" not in dt_pinion_cam_spec.DRAWING_NOTES
+    assert "SEE NOTE" not in "".join(drawing.DIMENSION_CALLOUTS.values())
 
 
 def test_tap_callout_gives_the_tap_only() -> None:
@@ -260,26 +256,25 @@ def test_set_screw_sits_below_the_od_in_the_heavy_side() -> None:
     geometry = dt_pinion_cam_geometry
     spec = dt_pinion_cam_spec
     assert "3/16" in spec.DRAWING_NOTES
-    # Preserve the functional OD/bore/eccentricity bands; do not tighten any
-    # of them to rescue screw seating. The rim sees the OD's sag, not just
-    # its centre tangent. Rod clearance can only deepen the seated screw.
-    assert spec.COLLAR_OD_TOLERANCE_MM == pytest.approx(0.002 * 25.4)
-    assert spec.COLLAR_AXIS_TOLERANCE_MM == pytest.approx(0.002 * 25.4)
+    # The OD/bore/eccentricity limits are not tightened to rescue screw
+    # seating. The rim sees the OD's sag, not just its centre tangent. Rod
+    # clearance can only deepen the seated screw.  Fit audit S3: the OD and
+    # eccentricity at the title block's +/-.005.
     clearances = []
     for od, bore, eccentricity in itertools.product(
-        (0.573 * 25.4, 0.577 * 25.4),
+        (0.570 * 25.4, 0.580 * 25.4),
         (0.2510 * 25.4, 0.2515 * 25.4),
-        (0.077 * 25.4, 0.081 * 25.4),
+        (0.074 * 25.4, 0.084 * 25.4),
     ):
         rim_radius = spec.SET_SCREW_MAJOR_MAX_MM / 2.0
         outer_y = eccentricity + math.sqrt((od / 2.0) ** 2 - rim_radius**2)
         clearances.append(outer_y - bore / 2.0 - spec.SET_SCREW_LENGTH_MAX_MM)
     worst = min(clearances)
     assert spec.THICK_SIDE_WALL_MIN_MM == pytest.approx(
-        (0.573 / 2.0 - 0.2515 / 2.0 + 0.077) * 25.4
+        (0.570 / 2.0 - 0.2515 / 2.0 + 0.074) * 25.4
     )
     assert spec.SET_SCREW_SUBFLUSH_MIN_MM == pytest.approx(worst)
-    assert worst > 0.87  # about 0.876 mm, including the curved OD at the rim
+    assert worst > 0.76  # about 0.762 mm, including the curved OD at the rim
     # The next longer stock length would fail even before the OD sag.
     assert (0.25 + 0.01) * 25.4 > spec.THICK_SIDE_WALL_MIN_MM
     assert not hasattr(geometry, "BOSS_DIA")
@@ -297,18 +292,18 @@ def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
     assert "BoreDia" in drawing.FRONT_KEEP
     assert "CollarOd" not in drawing.FRONT_KEEP
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].startswith("REAM THRU")
-    assert drawing.DIMENSION_CALLOUTS["CollarCy"] == "SEE NOTE 1"
+    assert "CollarCy" not in drawing.DIMENSION_CALLOUTS
     assert "TapCz" not in drawing.DIMENSION_CALLOUTS
 
 
 def test_the_part_owns_every_printed_decimal_place() -> None:
     """drawing-simplicity-policy.md `How the repository implements the guidelines`: the .SLDPRT owns places for every imported nominal.
 
-    Inch places (#290): four on the reamed bore (its +.0005/.0000 band) and
-    the .0797 MIN wall, three on the +/-.002 cam OD and eccentricity and on the
-    #2-56 tap drill, two (.XX) on the length and tap station.
+    Inch places (#290): four on the reamed bore (the reamer's .2510) and the
+    .0752 MIN wall, three on the cam OD and eccentricity (the title block's
+    +/-.005, fit audit S3) and on the #2-56 tap drill, two (.XX) on the length
+    and tap station.
     """
-    from _drawing_tolerances import _tolerance_places
 
     spec = dt_pinion_cam_spec
     by_name = spec.DRAWING_PRECISION_BY_NAME
@@ -338,9 +333,9 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
         "Depth": 0.35,
         "TapCz": 0.16,
     }
-    # Each band prints at its nominal's places (the bore prints none, F19).
-    for band in (spec.COLLAR_OD_TOLERANCE_MM, spec.COLLAR_AXIS_TOLERANCE_MM):
-        assert _tolerance_places(-band, band, display_unit="in") == 3
+    # No band of its own prints: the bore is the reamer's size (F19), the OD
+    # and eccentricity ride the title block's +/-.005 (S3).
+    assert model_toleranced_dimensions(cam) == {}
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
