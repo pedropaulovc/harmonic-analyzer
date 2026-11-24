@@ -424,8 +424,7 @@ Gear seats, pinned or pressed bores, clamp faces, register faces that do not
 locate, and every other face carry no symbol. A banded or reamed bore is not a
 running bore by itself: a gear's D-bore or seat bore does not run. Nor is a
 pivot that only rocks a few degrees against one side of its clearance under
-a spring or a weight (a lever on its fulcrum shaft): it is drilled (rule 4)
-and carries no symbol. A symbol on
+a spring or a weight: it carries no symbol. A symbol on
 a face that neither runs nor locates is over-specification. Judge function
 from the whole package: a thrust washer face, a thrust shoulder, or a face a
 note says slides or bears does run.
