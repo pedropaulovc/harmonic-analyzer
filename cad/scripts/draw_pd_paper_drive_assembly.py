@@ -2057,15 +2057,13 @@ def sub_step(key: str, index: int) -> str:
 # the locks are struck; and (rule 23, #2425) the retaining compounds, one
 # row group per grade naming every sub-step that uses it, with its cure:
 # LOCTITE 638 bonds the MHA-PD-23 pin and the pivot spacer and, by DETAIL
-# H's bond note, a latch or plate dowel that slides in by hand (a collar
-# dowel or pin that slides in renews the collar, step 20);
+# H's bond note, a plate dowel that slides in by hand (a latch dowel that
+# slides in renews the arm, step 10; a collar dowel or pin, the collar,
+# step 20);
 # LOCTITE 641 bonds the knob cup.
 LOCK_TRANSFER_SCREWS = 4 * 2
 # The sub-steps that send a hand-slid dowel or pin to DETAIL H's bond note.
-BOND_NOTE_SUB_STEPS = (
-    ("latch-pin-pressed", 1),
-    ("arm-plate-fitted", 6),
-)
+BOND_NOTE_SUB_STEPS = (("arm-plate-fitted", 6),)
 LOCTITE_638_SUB_STEPS = tuple(
     sorted(
         (
@@ -2084,8 +2082,8 @@ BOM_EXPENDABLES_NOTE = (
     f"SCREWS, AND 1 MORE {BOM_PART_NUMBERS['pd-vn-chain-connecting-link']} TO\n"
     f"CLOSE THE SPARE'S LOOP. {sub_step('platen-hung', 0)} USES {LOCK_TRANSFER_SCREWS}\n"
     "#4-40 TRANSFER SCREWS, A SHOP TOOL.\n"
-    f"LOCTITE 638 AT {', '.join(_LOCTITE_638_HEADS[:3])},\n"
-    f"{', '.join(_LOCTITE_638_HEADS[3:])}; CURE {PIN_BOND_CURE_H} H.\n"
+    f"LOCTITE 638 AT {', '.join(_LOCTITE_638_HEADS)};\n"
+    f"CURE {PIN_BOND_CURE_H} H.\n"
     f"LOCTITE 641 AT {sub_step('knob-stack-fitted', KNOB_CUP_BOND_SUB_STEP)}; "
     f"CURE {KNOB_CUP_BOND_CURE_H} H."
 )
@@ -2544,18 +2542,20 @@ def _step_text(
         # point, so the proud is set as the dowel goes in, not by a floor;
         # the press is permanent (MHA-PD-18 RV-03), so an over-pressed dowel
         # stays in the arm it costs, and both are remade (Codjiflo #3127).
-        # A dowel that slides into the .1240 ream by hand is bonded, not
-        # scrapped with the arm (fit audit 2026-11-23, pending owner
-        # confirmation; machinist exception PD-00-latch-dowel-bond): the hole
-        # is reamed with the set reamer and the dowel is its gauge.
+        # A dowel that slides into the .1240 ream by hand is a slip fit (rule
+        # 23): the hole is reamed with the set reamer and the dowel is its
+        # gauge, so its size is unknown and no bonded clearance can be
+        # printed for it, and the arm does not yet carry DETAIL K's
+        # jig-boring, the one place owner ruling 2026-11-20 (#2497) allows
+        # compound; arm and dowel are remade, as the arm's traveler rejects
+        # the arm when the dowel enters by hand (MHA-PD-18 note 3; Codjiflo
+        # r2 on #3486: the bond salvage had no valid ruling).
         "latch-pin-pressed": (
             f"PRESS THE {n['pd-vn-transgear-latch-pin']} DOWEL, CHAMFERED END FIRST, "
             f"INTO THE {n['pd-transgear-arm']} ARM'S REAMED HOLE, {pin_window} PROUD, "
             f"CALIPER DEPTH ROD {detail_cite('latch-pin-pressed')}.",
-            "IF THE DOWEL SLIDES IN BY HAND, BOND IT PER THE BOND NOTE AT "
-            f"{detail_cite('arm-plate-fitted')[1:-1]}.",
-            f"IF IT READS UNDER {pin_window.split(' TO ')[0]}, OR A BONDED DOWEL "
-            f"MOVES WHEN PUSHED, MAKE A NEW {n['pd-transgear-arm']} ARM AND "
+            "IF THE DOWEL SLIDES IN BY HAND OR READS UNDER "
+            f"{pin_window.split(' TO ')[0]}, MAKE A NEW {n['pd-transgear-arm']} ARM AND "
             f"{n['pd-vn-transgear-latch-pin']} DOWEL AND REPEAT FROM STEP "
             f"{steps.step_number('latch-pin-pressed')}.",
         ),
@@ -2755,9 +2755,9 @@ def _step_text(
             # slides in is bonded, not scrapped with the arm (owner ruling
             # 2026-11-20 (Pedro), #2497; machinist exception
             # PD-00-press-salvage). The scrap rule stays at the bush's press
-            # (11) and the hub pin's (16); the latch dowel (10B) and the
-            # collar's pins (20) are bonded under their own exceptions; the
-            # MHA-PD-23 pin and the MHA-PD-20 spacer are bonded slip fits.
+            # (11), the latch dowel's (10B), the hub pin's (16) and the
+            # collar's pins (20); the MHA-PD-23 pin and the MHA-PD-20 spacer
+            # are bonded slip fits.
             # The cured dowel is read again before the plate goes on;
             # a bond that fails renews the arm's set as 13Y does. The plate
             # refit and its match mark share a sub-step (24-letter budget).
@@ -4126,8 +4126,8 @@ def _steps_label(keys: tuple[str, ...]) -> str:
 SETTING_CAPTION_WIDTH = 26
 # DETAIL H carries the bond 13G points to (owner ruling 2026-11-20 (Pedro),
 # #2497: retaining compound only on the arm, which already carries DETAIL K's
-# jig-boring) and, under the fit audit of 2026-11-23 (pending owner
-# confirmation), the latch dowel's at 10B. Its prep and where the compound
+# jig-boring); a latch dowel that slides in at 10B, before that jig-boring,
+# renews the arm (Codjiflo r2 on #3486). Its prep and where the compound
 # goes are the machinist review's (592b20079f); as a note, 13G stays one
 # action (review of 70917f0316). The column under H's caption is empty down
 # to the title block, clear of DETAIL L left and DETAIL J right.

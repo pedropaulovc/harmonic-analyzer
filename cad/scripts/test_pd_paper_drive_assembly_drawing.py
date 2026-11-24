@@ -505,12 +505,9 @@ def test_a_dowel_that_slides_into_the_arm_is_bonded() -> None:
         drawing.detail_cite("arm-plate-fitted") == f"(DETAIL H, SHEET {detail_sheet})"
     )
     note = " ".join(drawing.SETTING_DETAIL_CAPTIONS["H"].split())
-    # A collar dowel or pin that slides in renews the collar (step 20), so
-    # the note serves the latch dowel and the plate dowels only.
-    assert (
-        f"BOND NOTE ({drawing.sub_step('latch-pin-pressed', 1)}, "
-        f"{drawing.sub_step('arm-plate-fitted', 6)}):"
-    ) in note
+    # A collar dowel or pin that slides in renews the collar (step 20) and a
+    # latch dowel the arm (step 10), so the note serves the plate dowels only.
+    assert f"BOND NOTE ({drawing.sub_step('arm-plate-fitted', 6)}):" in note
     for words in (
         "PULL THE DOWEL.",
         "DEGREASE IT AND ITS HOLE.",
@@ -2070,27 +2067,30 @@ def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
         assert f"{steps.inch_window(band, 3, ' TO ')} PROUD" in _step_body(key)
 
 
-def test_an_over_pressed_latch_dowel_is_remade_with_its_arm() -> None:
+def test_an_over_pressed_or_slipping_latch_dowel_is_remade_with_its_arm() -> None:
     """#3124 / Codjiflo #3127: the dowel is pressed to height and the press
     is permanent (MHA-PD-18 RV-03), so a dowel set under the window stays in
     the arm it scraps; the remedy remakes both, as the later restarts do.
-    Fit audit 2026-11-23 (pending owner confirmation): a dowel that slides
-    into the reamed hole by hand is bonded per DETAIL H's note, not scrapped
-    with the arm; a bond that does not hold remakes both."""
+    A dowel that slides into the reamed hole by hand is a slip fit of
+    unknown clearance in an arm that does not yet carry DETAIL K's
+    jig-boring (#2497 allows compound only after it), so it remakes both
+    too, as the arm's traveler rejects the arm (Codjiflo r2 on #3486).  The
+    facts are asserted, not the wording (AGENTS.md, assembly data)."""
     texts = drawing._step_text(operating_domain=_unit_operating_domain())
-    rows = [" ".join(row.split()) for row in texts["latch-pin-pressed"]]
+    press, *remedies = (" ".join(row.split()) for row in texts["latch-pin-pressed"])
     low = steps.inch_text(drawing.setting_details.LATCH_PROUD_BAND[0], 3)
-    assert rows[1] == (
-        "IF THE DOWEL SLIDES IN BY HAND, BOND IT PER THE BOND NOTE AT "
-        f"{drawing.detail_cite('arm-plate-fitted')[1:-1]}."
-    )
-    assert rows[2] == (
-        f"IF IT READS UNDER {low}, OR A BONDED DOWEL MOVES WHEN PUSHED, MAKE A NEW "
-        f"{_number('pd-transgear-arm')} ARM AND "
-        f"{_number('pd-vn-transgear-latch-pin')} DOWEL AND REPEAT FROM STEP "
-        f"{steps.step_number('latch-pin-pressed')}."
-    )
-    assert len(rows) == 3
+    assert drawing.detail_cite("latch-pin-pressed") in press
+    remedy = " ".join(remedies)
+    for fact in (
+        "SLIDES IN BY HAND",
+        f"UNDER {low}",
+        f"NEW {_number('pd-transgear-arm')} ARM",
+        f"{_number('pd-vn-transgear-latch-pin')} DOWEL",
+        f"REPEAT FROM STEP {steps.step_number('latch-pin-pressed')}",
+    ):
+        assert fact in remedy, fact
+    assert "BOND" not in remedy and "LOCTITE" not in remedy
+    assert ("latch-pin-pressed", 1) not in drawing.BOND_NOTE_SUB_STEPS
 
 
 def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:

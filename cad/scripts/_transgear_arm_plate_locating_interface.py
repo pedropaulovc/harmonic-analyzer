@@ -4,7 +4,7 @@ The arm's reamed holes run through: the dowel presses in from the rear to
 its proud set and punches out from the front; the plate slips over its
 proud end. Catalogue stock and whole-joint checks stay in the pin spec.
 
-Fit audit 2026-11-23 (pending owner confirmation): the dowel is 1/8, so the
+Owner ruling 2026-11-24, fit audit question 9: the dowel is 1/8, so the
 two holes are cut by the .1240 and .1260 members of the over/under reamer
 set (cad/config/shop-equipment/tools-reamers-taps.toml), each printed as its
 reamer's size with no band and accepted with the dowel itself: it does not
