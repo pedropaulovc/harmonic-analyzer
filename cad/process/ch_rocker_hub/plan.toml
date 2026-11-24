@@ -28,13 +28,9 @@
 # (owner ruling 2026-11-21), its four Class X reading pins (tool audit Q2,
 # 2026-11-23) and the .4000/.4005 pair stay retired. The hubs part .02 long
 # over the .32 MIN supply length: the drawing's note 1 finishes bore and
-# length after joining, on MHA-CH-06. Bench: deburr, check length. Setup 4
-# bonds each hub into its own
-# finished strap with LOCTITE 638 (consumables.loctite-638, on hand) on the
-# owned surface plate, the strap held parallel to it on two gauge blocks from
-# the owned Mitutoyo set so the hub stands square at the strap's middle; no
-# fixture is made. The joint cures 24 h before MHA-CH-06's F drill and facing
-# load it.
+# length after joining, on MHA-CH-06. Bench: deburr, check length. The bond
+# of each hub into its own strap (LOCTITE 638) is the rocker arm traveler's
+# first setup (cad/process/ch_rocker_arm): hub n travels with strap n there.
 title = "Rocker Hub"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -127,11 +123,6 @@ ref = "cutoff-blade-p1"
 id = "file"
 name = "Smooth file"
 ref = "jig-files"
-
-[[tools]]
-id = "gauge-blocks"
-name = "Gauge blocks"
-ref = "gauge-blocks-mitutoyo"
 
 [[tools]]
 id = "telescoping"
@@ -307,66 +298,4 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "A hub under the length in Op 150 is scrapped, not reworked: turn another for its strap on a later pull (if the piece runs short, saw another, Setup 1)."
-feed = "hand"
-
-# Setup 4: the bond (owner ruling 2026-11-24, fit audit question 2). Held
-# with owned equipment only, no fixture made: the hub stands on its faced end
-# on the surface plate (gauges.surface-plate), so its axis is square to the
-# plate, and the strap lies on two gauge blocks of the owned Mitutoyo set
-# (gauges.gauge-blocks-mitutoyo, the .101-.149 by .001 series), so it is
-# parallel to the plate at the hub's middle: square hub to strap within the
-# blocks' .001 difference over their spacing. The offset of the strap from
-# the hub's middle (blocks within .005 of the half-difference, plus the paper)
-# is taken by the .020 face stock each end (ch_rocker_hub_spec.FACE_STOCK).
-# LOCTITE 638 (consumables.loctite-638, on hand): fixture about 4 min on
-# steel, full cure 24 h (Henkel, LOCTITE 638 product page, read 2026-11-24:
-# https://next.henkel-adhesives.com/us/en/products/industrial-adhesives/central-pdp.html/loctite-638/BP000000450822.html);
-# 30 min on the blocks is the shop's margin for the .0030 widest gap, which
-# cures slower. The joint is loaded first by MHA-CH-06's F drill and facing,
-# after the 24 h. Degrease with isopropyl alcohol, as the strap traveler's
-# bond does. No running joint lies beside this one: the F pivot bore is
-# drilled through the hub after the cure, so the compound is kept off the
-# hub's ends and out of its bore, which that drill and facing would meet.
-[[setups]]
-machine_kind = "other"
-title = "MHA-CH-06 joining (drawing note 1): bond each hub into its own strap, LOCTITE 638, 24 h cure"
-machine = "Surface plate (bench)"
-indexing = "none"
-holding = "On the surface plate, one joint at a time per pair of blocks: a square of plain paper under the hub's place (it keeps the 638 off the plate); the strap lying flat across two gauge blocks, one under each arm about 1 in either side of the hub hole; the hub through the strap's hub hole, standing on its faced end on the paper."
-datum = "None. The plate squares the hub (it stands on its faced end); the two blocks hold the strap parallel to the plate at the hub's middle."
-diagram = { file = "diagrams/bond.svg", alt = "Section through the hub: the surface plate, a paper square under the hub, the hub standing on its end through the strap's hub hole, the strap resting on a gauge block under each arm, the 638 film in the land's middle." }
-envelope = "other"
-vise_hold = "other"
-beam = "other"
-
-[[setups.operations]]
-speed_kind = "other"
-tool = "gauge-blocks"
-drilling = "none"
-sizing = "other"
-instruction = "For each hub: its length L across the faces, calipers; half the difference H = (L − .098)/2, the strap's thickness taken off. Pick two blocks of the .101–.149 series within .005 of H and within .001 of each other (for example .120 and .121 when H is .121); up to five joints go at once on different pairs."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Dry fit as in Holding, no compound: the hub slides through its own strap's hole by hand and stands on its end on the paper, the strap on both blocks."
-inspection = "Dry fit: the strap rests on both blocks (no light under either), the hub stands upright on the paper without being held."
-gauge_checks = "other"
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Lift the strap and hub off. Degrease the land and the strap's hub hole with isopropyl alcohol on a clean rag and let them dry; from here on touch neither."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Put a thin ring of LOCTITE 638 round the middle of the land, no more than covers it once the hub is in; none on the hub's ends or in its bore. Slide the hub into its strap's hole with a quarter turn to spread the compound and set both back as in the dry fit: the hub on its end on the paper, the strap on its two blocks."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "At once wipe any squeeze-out off both strap faces and the hub's outside with a dry rag; none may run down onto the paper."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Leave the joint untouched on its blocks for 30 min. Then lift it off by the strap, peel the paper off the hub's end and set it aside untouched until 24 h from the bond. Wipe the blocks with isopropyl alcohol and oil them. Nothing loads the joint (MHA-CH-06's F drill and facing) before the 24 h."
-inspection = "At 24 h: the hub does not turn or shift in the strap when twisted hard by hand; no 638 on the hub's ends or in its bore. The hub moves: stop and tell the owner (do not re-bond over cured 638)."
-gauge_checks = "other"
 feed = "hand"
