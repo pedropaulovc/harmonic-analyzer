@@ -39,15 +39,16 @@
   <rect class="part-removed" x="340" y="302.9" width="80" height="9.1"/>
   <line class="hidden" x1="355.4" y1="302.9" x2="355.4" y2="376.7"/>
   <line class="hidden" x1="404.6" y1="302.9" x2="404.6" y2="376.7"/>
-  <!-- The 1/2 in end mill at the end's height. -->
-  <rect class="cutter" x="330" y="236" width="100" height="76"/>
-  <text class="label-on-clamp" x="345" y="278">1/2 in EM</text>
+  <!-- The 1/2 in end mill at the end's height, coming in along X. -->
+  <rect class="cutter" x="440" y="236" width="100" height="76"/>
+  <text class="label-on-clamp" x="455" y="278">1/2 in EM</text>
+  <line class="arrow" x1="436" y1="300" x2="426" y2="300"/>
   <!-- .090 from the strap's top (Z0) to the faced end. -->
-  <line class="dims" x1="455" y1="312" x2="455" y2="330"/>
-  <line class="leader" x1="420" y1="312" x2="470" y2="312"/>
-  <text class="label" x="475" y="316">.090 over the strap (Z0 its top)</text>
-  <text class="label" x="475" y="300">removed: .0115–.0455</text>
-  <text class="label" x="20" y="300">strap MHA-CH-13</text>
+  <line class="dims" x1="310" y1="312" x2="310" y2="330"/>
+  <line class="leader" x1="300" y1="312" x2="340" y2="312"/>
+  <text class="label" x="120" y="292">removed: .0115–.0455</text>
+  <text class="label" x="120" y="308">.090 over the strap (Z0 its top)</text>
+  <text class="label" x="20" y="325">strap MHA-CH-13</text>
   <text class="label" x="20" y="386">hub MHA-CH-12 (D bore hidden)</text>
   <line class="leader" x1="200" y1="382" x2="340" y2="360"/>
 </svg>
