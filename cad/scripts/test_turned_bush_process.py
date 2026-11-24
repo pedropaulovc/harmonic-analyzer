@@ -176,8 +176,9 @@ def test_the_pivot_spacer_plan_mikes_the_length_round_the_rim_and_tries_the_mate
     """MHA-PD-20 (fit audit 2026-11-23, pending owner confirmation): the
     sheet carries no frame between the faces, so the plan authors no zone:
     the length's limits read at four places round the rim bound the taper;
-    the #12 hole is accepted by the screw's shoulder, with no reamer and no
-    plug pair."""
+    the #12 hole is accepted by the screw's shoulder and, for the drawing's
+    bonded clearance, by the .001-step pin set against the miked shoulder
+    (traveler review 2026-11-24), with no reamer and no plug pair."""
     plan = _plan("pd_transgear_pivot_spacer")
     far = export_features.requirement_manifest("pd_transgear_pivot_spacer")[
         "features"
@@ -186,7 +187,11 @@ def test_the_pivot_spacer_plan_mikes_the_length_round_the_rim_and_tries_the_mate
     assert "face_parallelism_in" not in plan["parameters"]
     assert _drills(plan) == ["drill-12"]
     refs = {tool["ref"] for tool in plan["tools"]}
-    assert not {ref for ref in refs if "reamer" in ref or "plug" in ref or "pin" in ref}
+    assert not {ref for ref in refs if "reamer" in ref or "plug" in ref}
+    import pd_transgear_pivot_spacer_callouts as callouts
+
+    low, high = (plan["parameters"][f"bond_clearance_{end}_in"] for end in ("min", "max"))
+    assert f"(CLEARANCE {low:.4f}-{high:.4f})".replace("0.", ".") in callouts.BOND_CALLOUT
     text = _process_plans.plan_path("pd_transgear_pivot_spacer").read_text(
         encoding="utf-8"
     )
