@@ -25,15 +25,20 @@
 # the dowels (20E), the pilot faced to fit (21A), the rear faced to fit (29D)
 # and the rear bore mouth's .008 X 45° break through the pin (29E).
 #
-# Fit audit 2026-11-23 (pending owner confirmation; owner, 2026-11-23: "can
-# the holes not be reamed in the first place"):
+# Owner ruling 2026-11-24, fit audit questions 7 (the bore drilled, the
+# D-core turned to it) and 8 (the dowel centres by trial); the reams to the
+# bought pins rest on drawing-guidelines rule 4 (owner, 2026-11-23: "can the
+# holes not be reamed in the first place"):
 # - The bore is the #11 drill's (the title block's DRILLED HOLES row);
 #   MHA-PD-08's D-core is turned to slide in it. No .1920 reamer, no pins
 #   for a .0005 bore band.
 # - The dowel holes and the flat pin's hole are reamed to the bought pins,
 #   which are their gauges: none enters by hand. No band is gauged, no pin
-#   or reamer is miked, no trial hole is reamed; a pin that does enter by
-#   hand is bonded at MHA-PD-00 (20B, 20D), not a scrapped collar.
+#   or reamer is miked, no trial hole is reamed. A pin that does enter by
+#   hand is in a hole of unknown size (the pins' least sizes lie over the
+#   whole of what the reamers are taken to cut), so no bonded clearance can
+#   be stated for it: the collar is scrap (the sheet's note 3; Codjiflo P2
+#   on #3485 removed the bond salvage).
 # - The dowel centres are the program's targets: their acceptance is the
 #   three MHA-PD-09 wheels dropping on at MHA-PD-00 (20E), never a reading
 #   over pins here. The flat pin's centre keeps its printed ±.002 and is
@@ -399,7 +404,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "A dowel entering a hole by hand in Op 170: not scrap. Mark that hole on this sheet and go on: MHA-PD-00 bonds that dowel (step 20B)."
+instruction = "A dowel entering a hole by hand in Op 170 (the hole is oversize; no cut remedies it): stop the file at its M6 T4 stop. The collar is scrap; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
@@ -429,7 +434,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "The pin entering by hand in Op 200: not scrap. Mark it on this sheet and go on: MHA-PD-00 bonds the pin (step 20D)."
+instruction = "The pin entering by hand in Op 200 (the hole is oversize; no cut remedies it): the collar is scrap; make another from Setup 1."
 feed = "hand"
 
 [[setups]]
@@ -489,5 +494,5 @@ instruction = "Finish (drawing: bright machined, oiled): wipe the collar clean a
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Left to MHA-PD-00, not done here: the two MHA-PD-VN-54 dowels pressed (step 20A) and the MHA-PD-VN-70 pin pressed to the floor (20C), either one bonded if it enters by hand (20B, 20D); the three MHA-PD-09 wheels tried on the dowels (20E); the pilot faced to fit (21A, note 5); the rear face faced to fit (29D, note 6) and the rear bore mouth broken .008 X 45° (29E)."
+instruction = "Left to MHA-PD-00, not done here: the two MHA-PD-VN-54 dowels pressed (step 20A) and the MHA-PD-VN-70 pin pressed to the floor (20C); the three MHA-PD-09 wheels tried on the dowels (20E); the pilot faced to fit (21A, note 5); the rear face faced to fit (29D, note 6) and the rear bore mouth broken .008 X 45° (29E)."
 feed = "hand"
