@@ -334,20 +334,19 @@ def test_the_one_diameter_shank_is_bonded_in_the_arm_and_runs_in_its_mates() -> 
         spec.BOND_TORQUE_CAPACITY_NMM
         >= spec.BOND_TORQUE_MARGIN_MIN * spec.BOND_TORQUE_DEMAND_NMM
     )
+    assert _below("ShankDia") == callouts.SHANK_CALLOUT
     assert (
-        _below("ShankDia")
-        == callouts.SHANK_CALLOUT
-        == f"SEE NOTE {callouts.SHANK_FIT_NOTE}"
+        callouts.SHANK_CALLOUT.split("\n")[0] == f"SEE NOTE {callouts.SHANK_FIT_NOTE}"
     )
     assert callouts.DRAWING_NOTES.startswith(f"{callouts.SHANK_FIT_NOTE}. ")
     notes = " ".join(line.strip() for line in callouts.DRAWING_NOTES.splitlines())
     # Rule 23, on the member made last (fit batch review r2): the bond's
     # diametral clearance, inside the compound's gap, with the trial.
     assert (
-        f"BONDED IN {spec.ARM_NUMBER}, {spec.RETAINING_COMPOUND}, CLEARANCE .0010-.0022: "
+        f"BONDED IN {spec.ARM_NUMBER}, {spec.RETAINING_COMPOUND}, CLEARANCE .0010-.0025: "
         "SLIDES IN BY HAND."
     ) in notes
-    assert 0.0022 * 25.4 < spec.LOCTITE_638_GAP_MAX
+    assert 0.0025 * 25.4 < spec.LOCTITE_638_GAP_MAX
     assert all(number in callouts.DRAWING_NOTES for number in spec.RUNNING_MATES)
     assert "PRESS" not in callouts.DRAWING_NOTES
     assert "GROUND" not in callouts.DRAWING_NOTES
@@ -359,7 +358,9 @@ def test_the_shank_is_made_to_fit_and_prints_no_limits() -> None:
     size and no reason (machinist review r1 of the fit batch, rule 7: the
     reference size has no band to answer for; the bores' REAM callouts
     carry the necessity answers); the modelled clearance is an analysis
-    result the stacks read, not a printed limit."""
+    result the stacks read, printed once as a reference range under the
+    note's link (owner ruling 2026-11-24, fit audit question 5), never as
+    limits of size."""
     import pd_transgear_feed_pinion_spec as sleeve
 
     notes = " ".join(line.strip() for line in callouts.DRAWING_NOTES.splitlines())
@@ -371,11 +372,37 @@ def test_the_shank_is_made_to_fit_and_prints_no_limits() -> None:
     assert not re.search(r"\d*\.\d", shank)
     assert "KEEPS" not in callouts.DRAWING_NOTES
     assert not hasattr(callouts, "SHANK_NECESSITY")
-    assert not hasattr(callouts, "RUNNING_CLEARANCE")
-    # The analysis result: the modelled shank in the reamer's modelled bore.
-    assert sleeve.BORE_DIAMETRAL_CLEARANCE == pytest.approx(
-        (0.0010 * 25.4, 0.0017 * 25.4)
+    # Owner ruling 2026-11-24, fit audit question 5: the modelled shank in the
+    # reamer's modelled bore, a range .0015 wide, which the shank's callout
+    # prints once as a reference under the note's link (rule 4: a made-to-fit
+    # mate may print a clearance range at least .001 wide; rule 7: two lines
+    # of words).
+    least, greatest = sleeve.BORE_DIAMETRAL_CLEARANCE
+    assert (least, greatest) == spec.RUNNING_CLEARANCE
+    assert (least, greatest) == pytest.approx((0.0010 * 25.4, 0.0025 * 25.4))
+    assert greatest - least >= 0.001 * 25.4 - 1e-9
+    assert callouts.SHANK_CALLOUT.split("\n") == [
+        "SEE NOTE 1",
+        "(RUNNING CLEARANCE .0010-.0025 REF)",
+    ]
+    assert callouts.RUNNING_CLEARANCE_TEXT == callouts.SHANK_CALLOUT.split("\n")[1]
+    # Codjiflo on #3506: the callout's module imports no mate's spec, so a
+    # sleeve edit does not re-key this part.
+    assert not hasattr(callouts, "SLEEVE")
+    assert "pd_transgear_feed_pinion_spec" not in Path(callouts.__file__).read_text(
+        encoding="utf-8"
     )
+    # Printed on the pin only: none of the three bores repeats the range.
+    import pd_transgear_feed_pinion_callouts as sleeve_callouts
+    import pd_transgear_front_bushing_spec as front_bushing
+    import pd_transgear_rear_bushing_spec as rear_bushing
+
+    for text in (
+        front_bushing.BORE_CALLOUT,
+        rear_bushing.BORE_CALLOUT,
+        *(value for value in vars(sleeve_callouts).values() if isinstance(value, str)),
+    ):
+        assert "CLEARANCE" not in text, text
     # Its top is the bought shims' smallest bore.
     assert spec.DIA_MAX == pytest.approx(0.1250 * 25.4)
 

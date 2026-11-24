@@ -59,14 +59,12 @@ if WALL_WORST < WALL_TARGET_MM:
 # What the fit protects.  With the cluster forward the bushing is loose in
 # the sleeve's end float and can cock on the pin as far as its bore lets it;
 # cocked, it takes up its largest O.D. times that angle of the float.  At
-# the modelled fit (clearance to .0017) that is .0032 of the .008 least
+# the modelled fit (clearance to .0025) that is .0049 of the .008 least
 # float, so it never wedges between the arm's shims and the turning sleeve.
-# Rule 4's own test does not fail it: .002 looser (.0037) takes up .0070,
-# .0010 short of the float (Codjiflo r1 on #3492); the float goes whole at
-# .0042.  The REAM stays by the exception RV-01 in this part's registry
-# row: the one pin is turned to this bore and three others, all cut by the
-# one reamer, and the next form down, a drilled #30 (.1285 +.004/0,
-# clearance to .0077 on this pin), takes up .0147, more than the float.
+# Rule 4's own test: .002 looser (.0045) takes up .0088, more than the
+# float (it goes whole at .0041), so the REAM answers the test itself and
+# needs no exception; the next form down, a drilled #30 (.1285 +.004/0,
+# clearance to .0080 on this pin), would take up .0157.
 BORE_COCK_SPAN_MIN = (
     FIT.REAR_BUSHING_LENGTH
     - FIT.REAR_BUSHING_LENGTH_BAND
@@ -89,7 +87,7 @@ if BORE_COCK_TAKE_UP >= FIT.RING_FLOAT_RANGE[0]:
 # --- Length: title block (owner ruling 2026-11-01, #2124) -----------------------
 # The shims under it set the disc's end float, so its .XXX band only moves
 # the shim count (transgear_cluster_fit.SHIM_COUNT_RANGE).
-LENGTH = FIT.REAR_BUSHING_LENGTH  # .214
+LENGTH = FIT.REAR_BUSHING_LENGTH  # .209
 LENGTH_PLACES = FIT.LENGTH_PLACES
 # Rule 4: the length names the stack it serves and where it is shimmed.
 LENGTH_CALLOUT = f"{STACK_NAME},\nSHIMMED AT {STACK_SHEET}"

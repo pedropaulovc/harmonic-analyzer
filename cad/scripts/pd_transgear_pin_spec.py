@@ -71,12 +71,36 @@ HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -114
 # (pd_cluster_air.COLLAR_AIR; build_pd_paper_drive_assembly gates it).  Its
 # top stops at .1250, the MHA-PD-VN-68 shims' smallest bore, so no shim
 # interferes (line-on-line at the worst case; transgear_cluster_fit,
-# codjiflo P2 on #2124).
+# codjiflo P2 on #2124).  Its bottom is .1245 (owner ruling 2026-11-24, fit
+# audit question 5: "pin +0/-.0005"; it was .1248): with the disc
+# cluster .005 further back (transgear_cluster_fit) the collar air carries
+# a running clearance to .0025, the range the shank's callout prints as a
+# reference (pd_transgear_pin_callouts.RUNNING_CLEARANCE_TEXT).
 DIA = 3.175  # .125
-DIA_BAND = (0.0, -0.00508)  # (upper, lower) ANALYSIS deviations, +.0000/-.0002 in
+DIA_BAND = (0.0, -0.0127)  # (upper, lower) ANALYSIS deviations, +.0000/-.0005 in
 DIA_MIN = round(DIA + DIA_BAND[1], 6)
 DIA_MAX = round(DIA + DIA_BAND[0], 6)
 DIA_PLACES = 3  # prints (Ø.125), a reference
+
+# --- The running fit: the shank in its three mates' reamed bores ---------------
+# The sleeve (MHA-PD-10) and both bushings (MHA-PD-24, MHA-PD-25) are reamed
+# with the set's one .1260 reamer and print that size with no band.
+# RUNNING_BORE_DIA_BAND is the ANALYSIS band that reamer is modelled to cut,
+# on size to .0010 over (owner ruling 2026-11-24, fit audit question 5:
+# "bores +.001"; it was .0005 over, the band those holes printed before
+# the fit audit).  It is not a printed limit and no gauge is charged with
+# it: nothing on a sheet bounds these bores from above, the shank is
+# turned last to them.  Owned here,
+# with the shank made to those bores, so the three bore specs and this
+# part's callout read one number and the callout's module imports no mate's
+# spec (Codjiflo on #3506).  RUNNING_CLEARANCE is the modelled result of the
+# fit, which every stack reads: .0010-.0025.
+RUNNING_BORE_DIA = 3.2004  # .1260, the reamer's size
+RUNNING_BORE_DIA_BAND = (0.0254, 0.0)  # (upper, lower) ANALYSIS deviations: +.0010/0
+RUNNING_CLEARANCE = (
+    round(RUNNING_BORE_DIA + RUNNING_BORE_DIA_BAND[1] - DIA_MAX, 6),
+    round(RUNNING_BORE_DIA + RUNNING_BORE_DIA_BAND[0] - DIA_MIN, 6),
+)  # (least, greatest) diametral
 
 # --- Bond: the shank's slip fit in the arm (fit audit 2026-11-23) --------------
 # The shank slides through the arm's .1260 reamed bore and is bonded over the
@@ -92,15 +116,15 @@ LOCTITE_638_GAP_MAX = 0.25
 BOND_GAP = (
     round(ARM.PIN_BORE_DIA_MIN - DIA_MAX, 6),
     round(ARM.PIN_BORE_DIA_MAX - DIA_MIN, 6),
-)  # (least, greatest) diametral: .0010, .0017
+)  # (least, greatest) diametral: .0010, .0020
 # Rule 23: the bond's clearance as note 1 prints it (the pin is made last),
 # the least the reamer and the shank model to the most the arm traveler's
 # .127 set pin accepts: a bore that just refuses that pin, on the smallest
 # modelled shank.  Here, not in pd_transgear_arm_spec, so the pin's sheet
 # reads no arm module but the geometry above (Codjiflo r1 on #3492).
 BOND_NO_GO_PIN_DIA = 3.2258  # .127, one pin of the .001-step set
-BOND_GAP_ACCEPTED_MAX = round(BOND_NO_GO_PIN_DIA - DIA_MIN, 6)  # .0022
-BOND_CLEARANCE_PRINTED = (BOND_GAP[0], BOND_GAP_ACCEPTED_MAX)  # .0010-.0022
+BOND_GAP_ACCEPTED_MAX = round(BOND_NO_GO_PIN_DIA - DIA_MIN, 6)  # .0025
+BOND_CLEARANCE_PRINTED = (BOND_GAP[0], BOND_GAP_ACCEPTED_MAX)  # .0010-.0025
 # The bonded length: the thinnest arm less the rear mouth's largest chamfer
 # and the front face's largest edge break.
 BOND_LENGTH_MIN = round(
@@ -113,15 +137,15 @@ BOND_LENGTH_MIN = round(
 # Capacity: ISO 10123 shear 25 N/mm^2 minimum (TDS), derated with the Henkel
 # Retaining Compound Design Guide's factors as the repository books them,
 # each taken low: 0.9 for steel on steel (sm_gooseneck_spring_joint), 0.3
-# for the clearance (booked there at the 0.25 mm limit; this gap is under a
-# fifth of it) and 0.5 for a long land (dt_pinion_arbor_geometry; .354 on
-# Ø.125 is L/D 2.8).
+# for the clearance (booked there at the 0.25 mm limit; the widest gap the
+# arm's NO-GO accepts, .0025, is a quarter of it) and 0.5 for a long land
+# (dt_pinion_arbor_geometry; .354 on Ø.125 is L/D 2.8).
 LOCTITE_638_SHEAR_MPA = 25.0
 BOND_FACTOR = 0.9 * 0.3 * 0.5
 BOND_AXIAL_CAPACITY_N = (
     LOCTITE_638_SHEAR_MPA * BOND_FACTOR * math.pi * DIA_MIN * BOND_LENGTH_MIN
-)  # 302 N (68 lbf)
-BOND_TORQUE_CAPACITY_NMM = BOND_AXIAL_CAPACITY_N * DIA_MIN / 2.0  # 479 N mm
+)  # 301 N (68 lbf)
+BOND_TORQUE_CAPACITY_NMM = BOND_AXIAL_CAPACITY_N * DIA_MIN / 2.0  # 477 N mm
 # Demand.  No working load crosses the bond axially: the ring's forward
 # thrust pulls the head onto the arm's rear face, and rearward thrust goes
 # through the rear bushing and the shims to the arm's front face.  The bond

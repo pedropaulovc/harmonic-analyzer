@@ -3,7 +3,7 @@
 # diameter under its head (owner ruling 2026-11-24, fit audit question 4;
 # it replaces the #2415 press land and its six Class X plugs): a slip fit
 # bonded in the MHA-PD-18 arm's reamed bore with LOCTITE 638 at assembly
-# (MHA-PD-00), drawing note 1: CLEARANCE .0010-.0022, SLIDES IN BY HAND.
+# (MHA-PD-00), drawing note 1: CLEARANCE .0010-.0025, SLIDES IN BY HAND.
 # Nothing is turned to a reading. Op 20 tries the pin-gauge set's .127 pin
 # in the arm's bore (the clearance's upper end on the smallest shank: it
 # must not enter); Op 190 tries the arm on the shank with the three running
@@ -286,7 +286,7 @@ instruction = "Before turning, have at the lathe the reamed MHA-PD-18 arm, the r
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Try the pin-gauge set's .126 pin, then its .127 pin, in the MHA-PD-18 pin bore from each face, by hand and clean, never forced."
-inspection = "Drawing note 1, the bond's clearance in MHA-PD-18 (.0010-.0022) on a journal polished to .1250 or just under (Op 130): the .126 pin enters and the .127 pin does not enter the pin bore."
+inspection = "Drawing note 1, the bond's clearance in MHA-PD-18 (.0010-.0025) on a journal polished to .1250 or just under (Op 130): the .126 pin enters and the .127 pin does not enter the pin bore."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -377,18 +377,18 @@ sizing = "other"
 instruction = "Finish the journal from Z+{{process.turn_start_z_mm:in.3dot}} in the stub to the seat, leaving stock for polishing: stop at Ø{{process.polish_dia_max_in:.4dot}} or just under, miking at both ends and the middle between passes (spindle stopped), in passes of {{process.finish_radial_doc_mm:in.4dot}} or less on the radius, the last no deeper than half of what the mike reads over {{process.polish_dia_min_in:.4dot}}; spring passes allowed."
 settings = "lathe-sharp-nose-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Stock left for polishing, not an acceptance. A station over {{process.polish_dia_max_in:.4dot}}: one more light pass. Every station {{process.polish_stop_in:.4dot}} to {{process.polish_dia_max_in:.4dot}}: go on to Op 130. A station already .1248 to {{process.polish_stop_in:.4dot}}: do not polish there in Op 130. A station under .1248: scrap, start again from Op 40."
+inspection = "Stock left for polishing, not an acceptance. A station over {{process.polish_dia_max_in:.4dot}}: one more light pass. Every station {{process.polish_stop_in:.4dot}} to {{process.polish_dia_max_in:.4dot}}: go on to Op 130. A station already .1245 to {{process.polish_stop_in:.4dot}}: do not polish there in Op 130. A station under .1245: scrap, start again from Op 40."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Polish the journal (Ra 63 or finer): spindle about 600 rpm, 400-grit abrasive cloth backed by a flat file, stroked steadily along the journal from the seat to the stub, never wrapped round the work; keep it off the seat's face. Every few strokes stop the spindle and mike it at three stations: by the seat, the middle and by the tip. Stop when every station first reads {{process.polish_stop_in:.4dot}} or just under: the mates are tried in Op 190."
-inspection = "No station reads over {{process.polish_stop_in:.4dot}} (the MHA-PD-VN-68 shims' bore) or under .1248 (drawing note 1: the bond's clearance in MHA-PD-18 stays at or under .0022 in a bore the .127 pin does not enter); the three stations read alike, no taper you can mike. The running fit itself is accepted in Op 190, on the mates."
+inspection = "No station reads over {{process.polish_stop_in:.4dot}} (the MHA-PD-VN-68 shims' bore) or under .1245 (drawing note 1: the bond's clearance in MHA-PD-18 stays at or under .0025 in a bore the .127 pin does not enter); the three stations read alike, no taper you can mike. The running fit itself is accepted in Op 190, on the mates."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A station still over {{process.polish_stop_in:.4dot}}: polish there alone. Do not polish on past the first reading at or under it. A station under .1248: the journal is scrap; start again from Op 40, the blank rechucked as in Setup 1's Holding."
+instruction = "A station still over {{process.polish_stop_in:.4dot}}: polish there alone. Do not polish on past the first reading at or under it. A station under .1245: the journal is scrap; start again from Op 40, the blank rechucked as in Setup 1's Holding."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -439,7 +439,7 @@ instruction = "Only if a mate, the shim or MHA-PD-18 will not enter, or binds al
 [[setups.operations]]
 cut_kind = "other"
 instruction = "After any strokes in Op 200: spindle stopped, mike the journal at both ends and the middle, then turn the chuck by hand and watch the tip against the tool's point."
-inspection = "No station reads under .1248, the three read within .0003 of each other, and the tip does not wobble to the eye: repeat Op 190. Otherwise Op 220."
+inspection = "No station reads under .1245, the three read within .0003 of each other, and the tip does not wobble to the eye: repeat Op 190. Otherwise Op 220."
 gauge_checks = "other"
 
 [[setups.operations]]

@@ -34,7 +34,7 @@ pd-transgear-feed-pinion:
       kind: "minor"
       where: "the boss wall between the (Ø.313) boss, turned to the MHA-PD-17 bore, and the Ø.126 bore at the nose face"
       finding: "boss wall below the .080 in target (rule 17)"
-      reason: "owner ruling 2026-10-27 (#1378): accept as is. Re-sized for #290 (boss .313 +.0005/.0000): .3130/2 less .1265/2 is .0933; less the .010 OD and bore edge breaks the worst wall is .0733, between the .060 floor and the .080 target (first ruled at 1.638 mm, .0645)"
+      reason: "owner ruling 2026-10-27 (#1378): accept as is. Re-sized for #290 (boss .313 +.0005/.0000); restated by owner ruling 2026-11-24 (Pedro), fit audit question 5: \"Yes: restate RV-04 to .0730 and build the full form.\" .3130/2 less .1270/2 (the largest bore the .1260 reamer is modelled to cut) is .0930; less the .010 OD and bore edge breaks the worst wall is .0730, between the .060 floor and the .080 target (it was .0733 at a bore of .1265; first ruled at 1.638 mm, .0645)"
     - id: "RV-06"
       kind: "accept"
       where: "the end view's SPAN 2 TEETH .1523/.1515 limits, MATCHED FIT, SEE GEAR DATA"

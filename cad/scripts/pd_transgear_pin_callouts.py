@@ -20,6 +20,7 @@ from pd_transgear_pin_spec import (
     FRONT_BUSHING_NUMBER,
     RETAINING_COMPOUND,
     RING_NUMBER,
+    RUNNING_CLEARANCE,
     RUNNING_MATES,
     SEAT_FILLET_SUFFIX,
 )
@@ -76,7 +77,23 @@ CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 GROOVE_CALLOUT = f"SEE NOTE {RING_GROOVE_NOTE}"
 # The shank's reference Ø links its fits in numbered note 1 (rule 7: a
 # callout carries at most two lines of words; the fit route is the note's).
-SHANK_CALLOUT = f"SEE NOTE {SHANK_FIT_NOTE}"
+# Under the link, the running fit's clearance as a reference (owner ruling
+# 2026-11-24, fit audit question 5): with the disc
+# cluster .005 back the range is .0015 wide, so rule 4 lets a made-to-fit
+# mate print it beside the acceptance by feel.  It is the modelled result
+# the stacks read (pd_transgear_pin_spec.RUNNING_CLEARANCE: the one
+# reamer's analysis band on the shank's), rounded outward; it prints on
+# this sheet only, never on the three bores (limits are not printed on
+# both members of a pair).  It is a reference, not an acceptance: the
+# acceptance is note 1's, by feel.
+RUNNING_CLEARANCE_PLACES = 4
+RUNNING_CLEARANCE_TEXT = (
+    "(RUNNING CLEARANCE "
+    f"{inch_text(inch_floor_mm(min(RUNNING_CLEARANCE), RUNNING_CLEARANCE_PLACES), RUNNING_CLEARANCE_PLACES)}-"
+    f"{inch_text(inch_ceil_mm(max(RUNNING_CLEARANCE), RUNNING_CLEARANCE_PLACES), RUNNING_CLEARANCE_PLACES)}"
+    " REF)"
+)
+SHANK_CALLOUT = f"SEE NOTE {SHANK_FIT_NOTE}\n{RUNNING_CLEARANCE_TEXT}"
 # The +/-.001 station names the stack it sets once, by drawing number (rule
 # 4): the groove's load wall holds the ring that stops the front bushing and
 # the sleeve (``transgear_cluster_fit.SLEEVE_REAR_FORWARD_CHAIN``); the end
