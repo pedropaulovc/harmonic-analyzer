@@ -75,17 +75,14 @@ demoted:
   pd_transgear_arm: fit-batch-pd
   pd_transgear_arm_plate: fit-batch-pd
   pd_transgear_disc_hub: fit-batch-pd
-  pd_transgear_drive_collar: fit-batch-pd
   pd_transgear_feed_pinion: fit-batch-pd
   pd_transgear_front_bushing: fit-batch-pd
   pd_transgear_knob_bush: fit-batch-pd
   pd_transgear_knob_cup: fit-batch-pd
-  pd_transgear_knob_shaft: fit-batch-pd
   pd_transgear_knob_thrust_ring: fit-batch-pd
   pd_transgear_pin: fit-batch-pd
   pd_transgear_pivot_spacer: fit-batch-pd
   pd_transgear_rear_bushing: fit-batch-pd
-  pd_transgear_removable: fit-batch-pd
   pn_pen_assembly: fit-batch-pn
   pn_pen_hanger: fit-batch-pn
   pn_pen_rod: fit-batch-pn

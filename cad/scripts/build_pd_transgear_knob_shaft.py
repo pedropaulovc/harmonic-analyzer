@@ -70,16 +70,12 @@ from paper_drive_stock_native import (
 )
 from pd_transgear_knob_shaft_spec import (
     CORE_DIA,
-    CORE_DIA_BAND,
-    CORE_FLAT_BAND,
     CORE_FLAT_FROM_AXIS,
     CORE_FRONT_FROM_F,
     CORE_ACTIVE_LENGTH,
     CORE_FLAT_CUT_END_Z,
     CORE_FLAT_TOOL_END_RADIUS,
-    CORE_FLAT_TOOL_END_RADIUS_BAND,
     CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE,
-    CORE_FLAT_CUT_END_BAND,
     CORE_FLAT_CUT_END_TOL_TYPE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -90,7 +86,6 @@ from pd_transgear_knob_shaft_spec import (
     FRONT_RELIEF_DIA_TOL_TYPE,
     FRONT_RELIEF_WIDTH,
     FRONT_CORNER_RADIUS,
-    FRONT_CORNER_RADIUS_BAND,
     FRONT_CORNER_RADIUS_TOL_TYPE,
     GEOMETRIC_CONTROLS,
     JOURNAL_DIA,
@@ -682,21 +677,29 @@ def _root_profile(adapter: Any) -> list[tuple[str, str]]:
     return jobs
 
 
-def _apply_root_min(adapter: Any) -> None:
-    """Print RootDia as its MIN: swTolMIN prints the model value then the
-    limit word, so the circle IS the limit and no deviation is authored."""
-    _, dimension = _named_dimension(adapter, "RootProfile", "RootDia")
-    if not math.isclose(float(dimension.SystemValue) * 1000.0, ROOT_DIA_MIN, abs_tol=1e-6):
-        raise RuntimeError("RootDia: the root circle is not the printed MIN")
+def _apply_single_limit(
+    adapter: Any, feature: str, name: str, limit: float, tolerance_type: int
+) -> None:
+    """Leave a dimension that prints as a single MAX or MIN with no native
+    tolerance: the modelled value IS the limit and the sheet sets the limit
+    word as its suffix (swTolMAX / swTolMIN print a lowercase "max." /
+    "min."; build_pd_transgear_knob_bush._shoulder_root_max_limit)."""
+    _, dimension = _named_dimension(adapter, feature, name)
+    if not math.isclose(float(dimension.SystemValue) * 1000.0, limit, abs_tol=1e-6):
+        raise RuntimeError(f"{name}: the modelled value is not the printed limit")
     raw_tolerance = dimension.Tolerance
     if raw_tolerance is None:
-        raise RuntimeError("RootDia: no native tolerance")
+        raise RuntimeError(f"{name}: no native tolerance")
     tolerance = _early_bound(raw_tolerance, "IDimensionTolerance")
-    tolerance.Type = ROOT_DIA_TOL_TYPE
-    if tolerance.SetValues(0.0, 0.0) is not True:
-        raise RuntimeError("RootDia: SetValues rejected the MIN's zero deviations")
-    if int(tolerance.Type) != ROOT_DIA_TOL_TYPE:
-        raise RuntimeError("RootDia: native MIN readback changed")
+    tolerance.Type = tolerance_type
+    if int(tolerance.Type) != tolerance_type:
+        raise RuntimeError(f"{name}: single-limit tolerance type readback changed")
+
+
+def _apply_root_min(adapter: Any) -> None:
+    """RootDia is its MIN: the circle IS the limit and no deviation is
+    authored."""
+    _apply_single_limit(adapter, "RootProfile", "RootDia", ROOT_DIA_MIN, ROOT_DIA_TOL_TYPE)
 
 
 def _apply_native_limits(
@@ -730,17 +733,17 @@ def _apply_neck_and_flat_limits(adapter: Any) -> None:
         FRONT_RELIEF_DIA_BAND,
         FRONT_RELIEF_DIA_TOL_TYPE,
     )
-    _apply_native_limits(
+    _apply_single_limit(
         adapter, "StudProfile", "FrontCornerRadius", FRONT_CORNER_RADIUS,
-        FRONT_CORNER_RADIUS_BAND, FRONT_CORNER_RADIUS_TOL_TYPE,
+        FRONT_CORNER_RADIUS_TOL_TYPE,
     )
-    _apply_native_limits(
+    _apply_single_limit(
         adapter, "CoreFlatProfile", "FlatEnd", -CORE_FLAT_CUT_END_Z,
-        CORE_FLAT_CUT_END_BAND, CORE_FLAT_CUT_END_TOL_TYPE,
+        CORE_FLAT_CUT_END_TOL_TYPE,
     )
-    _apply_native_limits(
+    _apply_single_limit(
         adapter, "CoreFlatProfile", "FlatToolRadius", CORE_FLAT_TOOL_END_RADIUS,
-        CORE_FLAT_TOOL_END_RADIUS_BAND, CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE,
+        CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE,
     )
 
 
@@ -940,19 +943,15 @@ def build(adapter: Any) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "GearBlank", "FaceWidth", FACE_WIDTH_BAND, display_unit=UNIT
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "StudProfile", "CoreDia", *deviations(CORE_DIA_BAND), display_unit=UNIT
-    )
+    # The D-core and its flat are made to fit MHA-PD-22 (sheet note 2): both
+    # print as REF, so neither carries a native band (the spec's
+    # CORE_DIA_BAND and CORE_FLAT_BAND are analysis numbers).
     set_dimension_bilateral_tolerance(
         adapter, "JournalProfile", "JournalDia", *deviations(JOURNAL_DIA_BAND),
         display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter, "StudProfile", "OutsideDia", *deviations(OUTSIDE_DIA_BAND), display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "CoreFlatReference", "FlatToAxis", *deviations(CORE_FLAT_BAND),
-        display_unit=UNIT,
     )
     _apply_neck_and_flat_limits(adapter)
     apply_span_limits(

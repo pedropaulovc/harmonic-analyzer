@@ -335,7 +335,8 @@ note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-10 .002 TIR TO
 # 2026-11-23. The 29 were counted over 17 bands; three of those bands were
 # re-cut the same day (Q8 .1570-.1575, Q11 .4500-.4505, Q13 .4720-.4735), so
 # their six pins are not bought and the re-cut bands have their own records at
-# the end of this file. That leaves 23 of the 29 below.
+# the end of this file. That leaves 23 of the 29; the fit audit of 2026-11-23
+# retired the .1920-.1925 band's two (MHA-PD-22 drilled), so 21 are below.
 # Each zz-pins record takes over from its Class X pair (plug-gauges-<low>-<high>
 # above) when the part's plan names it; until then the plan and the BOM still
 # show the Class X pair. Buy the ZZ pins, not the pair, for these bands.
@@ -347,7 +348,7 @@ make = "Vermont Gage"
 status = "to_order"
 source = "https://www.mscdirect.com/product/details/88906151"
 purchase = "MSC 88906151 (.0615 plus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
-note = "MHA-PD-17, MHA-PD-22. GO: ZZ .0615 plus single. NO-GO: the .062 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
+note = "MHA-PD-17. GO: ZZ .0615 plus single. NO-GO: the .062 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
 
 [gauges.zz-pins-0625-0630]
 name = "Class ZZ pins for the .0625-.0630 band"
@@ -374,7 +375,7 @@ make = "Vermont Gage"
 status = "to_order"
 source = "https://www.mscdirect.com/product/details/88909304"
 purchase = "MSC 88909304 (.0930 plus, $4.48); MSC 89009351 (.0935 minus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
-note = "MHA-DT-11, MHA-PD-22. GO: ZZ .0930 plus single. NO-GO: ZZ .0935 minus single. Each pin is miked before first use and its size written on its tag."
+note = "MHA-DT-11. GO: ZZ .0930 plus single. NO-GO: ZZ .0935 minus single. Each pin is miked before first use and its size written on its tag."
 
 [gauges.zz-pins-1240-1245]
 name = "Class ZZ pins for the .1240-.1245 band"
@@ -402,15 +403,6 @@ status = "to_order"
 source = "https://www.mscdirect.com/product/details/88918651"
 purchase = "MSC 88918651 (.1865 plus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
 note = "MHA-MG-08. GO: ZZ .1865 plus single. NO-GO: the .187 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
-
-[gauges.zz-pins-1920-1925]
-name = "Class ZZ pins for the .1920-.1925 band"
-kind = "plug_gauge_pair"
-make = "Vermont Gage"
-status = "to_order"
-source = "https://www.mscdirect.com/product/details/88919204"
-purchase = "MSC 88919204 (.1920 plus, $4.48); MSC 89019251 (.1925 minus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
-note = "MHA-PD-22. GO: ZZ .1920 plus single. NO-GO: ZZ .1925 minus single. Each pin is miked before first use and its size written on its tag."
 
 [gauges.zz-pins-2500-2505]
 name = "Class ZZ pins for the .2500-.2505 band"

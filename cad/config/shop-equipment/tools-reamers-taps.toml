@@ -406,7 +406,7 @@ source = "https://www.mcmaster.com/8803A139/"
 purchase = "McMaster-Carr 8803A139, .0615 in HSS straight-flute chucking reamer (Alvord-Polk), $22.05 (read live 2026-11-22); stated diameter tolerance 0 to +.0002, 1/2 in flute, 2-1/2 in overall."
 kind = "reamer"
 status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 +.0005/.0000 REAM (.163). MHA-DT-38 moved to the .0625 reamer (owner ruling 2026-11-20, #2469)."
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 REAM (.163), no band, its MHA-PD-VN-70 pin the gauge (fit audit 2026-11-23). MHA-DT-38 moved to the .0625 reamer (owner ruling 2026-11-20, #2469)."
 
 [tools.reamer-0625]
 make = "Alvord-Polk"
@@ -424,7 +424,7 @@ source = "https://www.mcmaster.com/8803A197/"
 purchase = "McMaster-Carr 8803A197, .0930 in HSS straight-flute chucking reamer (Alvord-Polk), $22.68 (read live 2026-11-22); stated diameter tolerance 0 to +.0002, 3/4 in flute, 3 in overall."
 kind = "reamer"
 status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-11 2X .0930 +.0005/.0000 REAM .1555; MHA-PD-18 Ø.0930 +.0005/.0000 2X REAM THRU; MHA-PD-22 Ø.0930 +.0005/.0000 2X REAM THRU."
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-11 2X .0930 +.0005/.0000 REAM .1555; MHA-PD-18 Ø.0930 +.0005/.0000 2X REAM THRU; MHA-PD-22 Ø.0930 2X REAM THRU, no band, its MHA-PD-VN-54 dowels the gauges (fit audit 2026-11-23)."
 
 [tools.reamer-0945]
 kind = "reamer"
@@ -462,15 +462,6 @@ purchase = "McMaster-Carr 2995A212, .1855 in HSS straight-flute chucking reamer 
 kind = "reamer"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-20 Ø.1850 +.0010/+.0005 REAM THRU."
-
-[tools.reamer-1920]
-make = "Alvord-Polk"
-sku = "8803A371"
-source = "https://www.mcmaster.com/8803A371/"
-purchase = "McMaster-Carr 8803A371, .1920 in HSS straight-flute chucking reamer (Alvord-Polk), $25.76 (read live 2026-11-22); stated diameter tolerance 0 to +.0002, 1-1/4 in flute, 5 in overall."
-kind = "reamer"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-22 Ø.1920 +.0005/.0000 REAM THRU."
 
 [tools.reamer-1940]
 make = "Alvord-Polk"

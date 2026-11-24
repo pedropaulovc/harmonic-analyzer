@@ -2935,23 +2935,60 @@ def _step_text(
             f"{n['pd-vn-transgear-knob-drive-pin']} DOWELS INTO THE "
             f"{n['pd-transgear-drive-collar']} COLLAR TO A STOP, {drive_window} "
             f"PROUD OF ITS FRONT {detail_cite('collar-pins-pressed')}.",
-            _press_remedy(
-                "DOWEL", f"{n['pd-transgear-drive-collar']} COLLAR", "collar-pins-pressed"
-            ),
-            f"PRESS THE {n['pd-vn-transgear-collar-flat-pin']} PIN INTO THE COLLAR'S "
-            "REAR BLIND HOLE TO THE BOTTOM; COLLAR AND PIN ARE ONE PERMANENT UNIT.",
-            _press_remedy(
-                "PIN", f"{n['pd-transgear-drive-collar']} COLLAR", "collar-pins-pressed"
-            ),
+            # The collar's pin holes are reamed to the bought dowels, which
+            # are their gauges and print no band, so a dowel or pin that
+            # slides in by hand is in a hole of unknown size: no bonded
+            # clearance can be printed for it (rule 23), and the looseness
+            # is what the reams exist to prevent (MHA-PD-22's necessity
+            # register, N-01 and N-02).  The collar is renewed, rule 23's
+            # press remedy (Codjiflo P2 on #3485: the bond salvage printed
+            # no clearance).  The drive-pin offsets are REF targets on
+            # MHA-PD-22 and MHA-PD-09: their acceptance is this trial of the
+            # three wheels (owner ruling 2026-11-24, fit audit question 8).
+            # No easing drill is printed; a wheel that binds is renewed.
+            # A new collar has a fresh #11 bore and a fresh pin crest, and
+            # MHA-PD-08's core and D-flat were made to the old ones, so every
+            # collar renewal (here, the pilot's and the rear face's) runs
+            # through this step's last five sub-steps: the new collar is
+            # tried on the shaft, a shaft that binds is cut to it and one
+            # that shakes is renewed to it (Codjiflo P2 on #3485: the
+            # remedies broke the made-to-fit pair).  One action each.
+            "IF A DOWEL SLIDES IN BY HAND, RENEW THE COLLAR PER "
+            f"{s('collar-pins-pressed', 7)}-{s('collar-pins-pressed', 11)}.",
+            # The flat pin is pressed on the collar's own traveler, so the
+            # collar arrives with it and MHA-PD-08's D-flat, milled to that
+            # pin (its note 2), is finished before the shaft is first used
+            # at the arm-plate-located step (Codjiflo P2 on #3485: the flat
+            # needed a pin pressed at this later step).  This step checks
+            # the joint (rule 23: a bench acceptance).
+            f"CHECK: THE {n['pd-vn-transgear-collar-flat-pin']} PIN STANDS ON THE "
+            "BOTTOM OF THE COLLAR'S REAR BLIND HOLE AND DOES NOT MOVE BY HAND; "
+            "COLLAR AND PIN ARE ONE PERMANENT UNIT.",
+            "IF THE PIN MOVES, RENEW THE COLLAR PER "
+            f"{s('collar-pins-pressed', 7)}-{s('collar-pins-pressed', 11)}.",
+            f"CHECK: EACH OF THE {len(sprocket.CONFIGS)} "
+            f"{n['pd-transgear-removable']} WHEELS DROPS ON THE COLLAR'S DOWELS "
+            "FREELY AND LIFTS OFF.",
+            "IF ONE WHEEL BINDS, RENEW IT.",
+            "IF NO WHEEL BINDS, GO TO STEP "
+            f"{steps.step_number('collar-pins-pressed') + 1}.",
+            "ALL WHEELS BINDING, OR A COLLAR SENT HERE FOR RENEWAL: MAKE A NEW "
+            f"{n['pd-transgear-drive-collar']} COLLAR.",
+            f"CHECK: THE NEW COLLAR SLIDES ON THE {n['pd-transgear-knob-shaft']} "
+            "SHAFT'S CORE BY HAND WITH NO SHAKE, ITS PIN ON THE D-FLAT.",
+            "IF IT BINDS, CUT THE SHAFT'S CORE AND D-FLAT TO THE NEW COLLAR PER "
+            f"{n['pd-transgear-knob-shaft']}.",
+            f"IF IT SHAKES, MAKE A NEW {n['pd-transgear-knob-shaft']} SHAFT TO THE "
+            "NEW COLLAR.",
+            f"REPEAT FROM {s('collar-pins-pressed', 0)} WITH THE NEW COLLAR.",
         ),
         "pilot-faced-to-fit": (
             f"FACE THE {n['pd-transgear-drive-collar']} COLLAR'S FRONT PILOT "
             f"{collar.PILOT_PROUD_TEXT} PROUD OF EACH "
             f"{n['pd-transgear-removable']} WHEEL LAID FLAT ON THE PINS, READ WITH "
             f"A STRAIGHTEDGE AND FEELERS {row_cite('collar-pilot')}.",
-            "IF THE PILOT FACES BELOW THE WINDOW, MAKE A NEW "
-            f"{n['pd-transgear-drive-collar']} COLLAR AND REPEAT FROM STEP "
-            f"{steps.step_number('collar-pins-pressed')}.",
+            "IF THE PILOT FACES BELOW THE WINDOW, RENEW THE COLLAR PER "
+            f"{s('collar-pins-pressed', 7)}-{s('collar-pins-pressed', 11)}.",
         ),
         # #2425 (owner ruling 2026-11-20): the end float is set at fit-up. The
         # shaft stands rearward (pinion on the ring, ring on the bush's hub
@@ -3252,10 +3289,22 @@ def _step_text(
             f"{n['pd-vn-transgear-collar-flat-pin']} PIN'S CREST WITH IT.",
             f"CHECK: THE COLLAR BODY IS IN "
             f"{n['pd-transgear-drive-collar']}'S FITTED LIMITS.",
+            # The shaft is in its bush here, its cup bonded on: a new collar
+            # that does not fit it takes the cup off and the shaft out
+            # before the shaft is cut or renewed to it (step 20's block).
             f"IF NOT, OR IF THE {s('collar-rear-faced-to-fit', 1)} READING WAS "
             f"ALREADY BEHIND {s('collar-rear-faced-to-fit', 3)}'S WINDOW, MAKE A NEW "
-            f"{n['pd-transgear-drive-collar']} COLLAR AND REPEAT "
-            f"FROM STEP {steps.step_number('collar-pins-pressed')}.",
+            f"{n['pd-transgear-drive-collar']} COLLAR.",
+            "CHECK THE NEW COLLAR ON THE SHAFT AS "
+            f"{s('collar-pins-pressed', 8)}.",
+            f"IF IT BINDS OR SHAKES, {knob_cup_off_cited}",
+            f"IF IT BINDS OR SHAKES, {knob_shaft_out}",
+            f"IF IT BINDS OR SHAKES, DO {s('collar-pins-pressed', 9)}-"
+            f"{s('collar-pins-pressed', 10)}.",
+            f"REPEAT FROM STEP {steps.step_number('collar-pins-pressed')} WITH THE "
+            f"NEW COLLAR, STEP {steps.step_number('knob-stack-fitted')} WITH A NEW "
+            f"{n['pd-transgear-knob-cup']} CUP AND "
+            f"{n['pd-vn-transgear-knob-cup-screw']} SCREW IF THE CUP CAME OFF.",
         ),
         "collar-shoulder-seated": (
             f"SEAT THE {n['pd-transgear-drive-collar']} COLLAR ON THE SHAFT, ITS PIN ON "

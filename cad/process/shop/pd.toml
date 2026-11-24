@@ -35,8 +35,7 @@ description = "Plug gauge pair, .2500 GO (plus) and .2510 NO-GO (minus), Vermont
 # band is the odd one: its NO-GO is a
 # .4380 plus pin, .4380-.4382, at or under the .4382 limit. Bands only pd
 # plans gauge: .1240-.1245 (MHA-PD-18), .4375-.4382 (MHA-PD-19, and MHA-PD-28
-# re-gauging PD-19's hole with the same pins), .0615-.0620 (MHA-PD-17,
-# MHA-PD-22), .1920-.1925 (MHA-PD-22).
+# re-gauging PD-19's hole with the same pins), .0615-.0620 (MHA-PD-17).
 [gauges.zz-pins-1240-1245]
 range_mm = [3.1496, 3.1623]
 resolution_mm = 0.00508
@@ -52,11 +51,6 @@ range_mm = [1.5621, 1.5748]
 resolution_mm = 0.00508
 [tools.zz-pins-0615-0620]
 description = "Class ZZ pins for .0615-.0620: GO .0615 plus (single), NO-GO .062 minus (the .061-.500 box)"
-[gauges.zz-pins-1920-1925]
-range_mm = [4.8768, 4.8895]
-resolution_mm = 0.00508
-[tools.zz-pins-1920-1925]
-description = "Class ZZ pins for .1920-.1925: GO .1920 plus (single), NO-GO .1925 minus (single)"
 
 # --- MHA-PD-15 ring, MHA-PD-20 spacer, MHA-PD-28 bush, MHA-PD-16 cup ---------
 # (cad/process/pd_transgear_knob_thrust_ring, pd_transgear_pivot_spacer,
@@ -133,6 +127,9 @@ diameter_mm = 2.1844
 [tools.drill-40]  # Drills #40
 description = "#40 (.0980 in) drill, 115-piece index"
 diameter_mm = 2.4892
+[tools.drill-11]  # 115-piece index #11; MHA-PD-22 #11 DRILL THRU (fit audit 2026-11-23)
+description = "#11 (.1910 in) drill, 115-piece index"
+diameter_mm = 4.8514
 [tools.drill-33]  # Drills #33
 description = "#33 (.1130 in) drill, 115-piece index"
 diameter_mm = 2.8702
@@ -181,7 +178,7 @@ description = "Shop-made latch-hook former: R3.13 roll and R.38 tab form"
 description = "Platen-clip bow former: four laminations of the .032 strip, each split into a male and a female die half (cut by PC01_sheet)"
 [tools.pd-rack-pinion-cutting-arbor]  # inventory fixtures.pd-rack-pinion-cutting-arbor
 description = "Shop-made work arbor with two backing discs for cutting the MHA-PD-06 teeth"
-[tools.reamer-0615]  # MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 +.0005/.0000 REAM (.163)
+[tools.reamer-0615]  # MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 REAM (.163), no band
 description = ".0615 in HSS chucking reamer"
 diameter_mm = 1.5621
 [tools.reamer-0945]  # MHA-PD-19 2X Ø.0945 +.0005/.0000 REAM THRU
@@ -190,9 +187,6 @@ diameter_mm = 2.4003
 [tools.reamer-1855]  # MHA-PD-20 Ø.1850 +.0010/+.0005 REAM THRU
 description = ".1855 in HSS chucking reamer"
 diameter_mm = 4.7117
-[tools.reamer-1920]  # MHA-PD-22 Ø.1920 +.0005/.0000 REAM THRU
-description = ".1920 in HSS chucking reamer"
-diameter_mm = 4.8768
 [tools.reamer-1940]  # MHA-PD-18 Ø.1940 +.001/.000 REAM THRU
 description = ".1940 in HSS chucking reamer"
 diameter_mm = 4.9276
@@ -300,19 +294,14 @@ feed = "cross slide by hand, one firm plunge, then the carriage along by hand; o
 # --- MHA-PD-22 drive collar (cad/process/pd_transgear_drive_collar/plan.toml) -
 # Lathe: facing, turning, the centre drill and parting take shop/lathe.toml's
 # C360 rows. LittleMachineShop "Cutting Speeds" (read live 2026-11-22,
-# lathe.toml header), Drilling & Reaming, Brass (C36000): drilling and
-# reaming both 160-175 ft/min; the low end asks over 3000 rpm of the #14 and
-# the .1920 reamer, so both clamp to the lathe's 2000 rpm top speed.
-[settings.lathe-drill-14-c360]
-tool = "drill-14"
+# lathe.toml header), Drilling & Reaming, Brass (C36000): drilling
+# 160-175 ft/min; the low end asks 3200 rpm of the #11, so it clamps to the
+# lathe's 2000 rpm top speed.
+[settings.lathe-drill-11-c360]
+tool = "drill-11"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, pecking, dry; back fully out to clear chips"
-[settings.lathe-ream-1920-c360]
-tool = "reamer-1920"
-material = "lathe-c360"
-sfm = 160
-feed = "tailstock quill by hand, slow and steady, dry; withdraw with the spindle running"
 # Mill (PM-30MV low belt, 100-2800 rpm), the same LittleMachineShop row and
 # AutoDrill "Suggested drilling feed rates" (read 2026-11-20, as shop/pn.toml),
 # row Brass: 1/16 in .001, 1/8 in .003 in/rev, a size between two columns
