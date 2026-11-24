@@ -41,17 +41,12 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
-from _fit_deviations import deviations
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from pd_transgear_front_bushing_spec import (
     BORE_DIA,
-    BORE_DIA_BAND,
     CHAMFER_SUFFIX,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -201,16 +196,10 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The bore runs on the pin: its reamed band lives on the model dimension.
-    # The length is printed to the disc cluster stack's band.  The chamfer
-    # prints its MAX.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "RingProfile",
-        "BoreDia",
-        *deviations(BORE_DIA_BAND),
-        display_unit=UNIT,
-    )
+    # The bore prints the reamer's size with no band (fit audit 2026-11-23):
+    # the MHA-PD-23 pin is turned to it, and its callout carries the
+    # acceptance.  The length is printed to the disc cluster stack's band.
+    # The chamfer prints its MAX.
     set_dimension_symmetric_tolerance(
         adapter, "Ring", "RingLength", LENGTH_BAND, display_unit=UNIT
     )
