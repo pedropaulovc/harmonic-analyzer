@@ -8,7 +8,7 @@
   <circle class="holes" cx="475" cy="147.8" r="9.2"/>
   <line class="centre-line" x1="330" y1="200" x2="600" y2="200"/>
   <line class="leader" x1="380" y1="125.3" x2="300" y2="90"/>
-  <text class="label" x="60" y="86">spigot Ø{{cad.spigot_dia_min_in:.4dot}}–{{cad.spigot_dia_max_in:.4dot}}</text>
+  <text class="label" x="60" y="86">spigot Ø{{cad.spigot_dia_ref_mm:in.3dot}} REF, to MHA-PD-06</text>
   <line class="leader" x1="420" y1="91" x2="560" y2="60"/>
   <text class="label" x="564" y="56">#51 thru, 3X on Ø.75</text>
   <line class="leader" x1="475" y1="147.8" x2="560" y2="110"/>
