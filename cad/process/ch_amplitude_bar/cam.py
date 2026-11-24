@@ -561,11 +561,18 @@ def context(
                 "less process.holder_grip_min_mm"
             )
 
-    # Notches: each band's middle, and the saw's reach.
+    # Notches: each band's middle, and the saw's reach. The top notch's band
+    # (.124 +.010/0, the .XXX row's width) is wider than two passes of the
+    # .064 saw reach: its target is the band's middle or two saw widths, the
+    # less, still inside the band.
     foot, top = g["foot"], g["top"]
     _agree(plan, "foot_notch_width_mm", _mid(foot["width"]))
     _agree(plan, "foot_notch_depth_mm", _mid(foot["depth"]))
-    _agree(plan, "top_notch_width_mm", _mid(top["width"]))
+    _agree(
+        plan,
+        "top_notch_width_mm",
+        min(_mid(top["width"]), 2 * p["saw_thickness_mm"]),
+    )
     _agree(plan, "top_notch_depth_mm", _mid(top["depth"]))
     # The P2-P4 bars' ledges are cut from the P1 bar's saw Z0: each is off by
     # the touch-off's error, by its down face's height against P1's where the
