@@ -3,8 +3,8 @@ r"""MHA-PD-17 transgear-disc-hub: the brass hub and flange in front of the reduc
 The turned Ø.540 hub has a plain round bore reamed through with the .3135
 over reamer, no band printed; the pinion sleeve's (MHA-PD-10) boss is turned
 last to it, a sliding fit by feel, with a Ø1.05 × .094 flange and
-a Ø.498 +.000/-.002 rear spigot.  The spigot passes the reducer disc's
-(MHA-PD-06) bore, which it clears (the disc is centred at assembly), and its
+a Ø.498 REF rear spigot.  The spigot is turned to the reducer disc's
+(MHA-PD-06) reamed bore, a stated clearance in it (the disc is centred at assembly), and its
 end seats on the sleeve's step face (the 12T's tooth ends); the flange's rear
 face clamps the disc's front face, the spigot's length ahead of the step.
 Three #0-80 fillister screws (MHA-SH-VN-59 DiscScrew) pass the flange's #51 holes on the
@@ -70,7 +70,6 @@ import pd_rack_pinion_spec as DISC
 import transgear_cluster_fit as FIT
 import pd_transgear_feed_pinion_spec as SLEEVE
 import pd_vn_transgear_hub_key_pin_spec as KEY_PIN
-from _fit_deviations import deviations
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import (
     drilled_oversize_mm,
@@ -87,6 +86,7 @@ from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_POSITION_TOL,
     SCREW_COUNT,
     SCREW_HOLE_DIA,
+    SPIGOT_CLEARANCE,
     SPIGOT_DIA,
     SPIGOT_DIA_BAND,
     SPIGOT_DIA_PLACES,
@@ -132,9 +132,9 @@ FLANGE_THICK = 2.3876  # .094
 FLANGE_THICK_PLACES = 3  # the screw-tip-to-platen stack reads it (R9-5)
 HUB_DIA = 13.716  # .540: the wall over the key pin's chord hole holds the floor
 HUB_DIA_PLACES = 3
-# The spigot (``pd_transgear_disc_hub_geometry``): its turned-row band is the
-# model's, its length the cluster's printed band.
-SPIGOT_DIA_DEVIATIONS = deviations(SPIGOT_DIA_BAND)
+# The spigot (``pd_transgear_disc_hub_geometry``): made to the disc's bore,
+# its size REF and its clearance the requirement; the band is the analysis
+# band of that fit, its length the cluster's printed band.
 SPIGOT_DIA_MIN = SPIGOT_DIA + SPIGOT_DIA_BAND[1]
 SPIGOT_LENGTH_MIN = SPIGOT_LENGTH - SPIGOT_LENGTH_BAND
 SPIGOT_LENGTH_MAX = SPIGOT_LENGTH + SPIGOT_LENGTH_BAND
@@ -351,17 +351,18 @@ _BAND = {places: printed_band_mm(places, unit=UNIT) for places in (1, 2, 3)}
 # slides off forward with the pin riding along the open-ended flat.  The
 # hole sits at a printed .XX station behind the hub front face, the body's
 # centre to the .01 grid (machinist review: a location given only as
-# "centred" is missing), and .174 from the hub axis at the reamed-hole
-# location band, as is its stop.
+# "centred" is missing), .174 +/-.002 from the hub axis, and stops .160
+# past it at the title block's row.
 KEY_PIN_NUMBER = _config.parts("pd-vn-transgear-hub-key-pin")["number"]
 # The ream prints the reamer's size and no band (fit audit 2026-11-23,
 # pending owner confirmation; drawing-guidelines.md rule 4, reamed to the
 # bought mate): the MHA-PD-VN-69 dowel is the gauge (it does not enter by
 # hand, it presses in).  KEY_PIN_HOLE_BAND is the ANALYSIS band, what the
 # reamer is taken to cut, never a printed limit.  What fails if the hole is
-# .002 looser, or drilled: the wall over it to the hub's O.D.
-# (KEY_PIN_WALL_WORST below, .0005 over the floor) falls under the floor,
-# and the dowel's press, which holds it with no bond, is lost.
+# .002 looser, or drilled: the dowel, held by its press alone, is loose in
+# the hub and no longer keeps its air to the sleeve's flat
+# (KEY_PIN_FLAT_AIR below), and the wall over it to the hub's O.D.
+# (KEY_PIN_WALL_WORST below, .0005 over the floor) falls under the floor.
 KEY_PIN_HOLE_DIA = KEY_PIN.PRESS_HOLE_DIA  # .0615
 KEY_PIN_HOLE_BAND = KEY_PIN.PRESS_HOLE_BAND  # analysis: REAM_H7, +.0005/.0000
 KEY_PIN_HOLE_PLACES = 4
@@ -373,20 +374,26 @@ _KEY_PIN_R_MIN = min(KEY_PIN.DIA_LIMITS_MM) / 2.0
 _KEY_PIN_R_MAX = max(KEY_PIN.DIA_LIMITS_MM) / 2.0
 if not KEY_PIN_DRILL_DIA + DRILL_OVERSIZE < KEY_PIN_HOLE_DIA:
     raise AssertionError("the #56 knockout leaves no step for the key pin to stop on")
-# The chord's offset from the hub axis along local -Y, and the stop's from
-# the axis along local -X, each at the reamed-hole location band.
+# The chord's offset from the hub axis along local -Y keeps a band under
+# the title block's (KEY_PIN_CHORD_BAND): .002 looser and the pin's side
+# closes on the sleeve's flat at one end (KEY_PIN_FLAT_AIR's least is
+# .0006) and the wall over the ream falls under the floor at the other.
+# The stop's from the axis along local -X takes the title block's row (fit
+# audit 2026-11-23, pending owner confirmation; it printed +/-.002): the
+# pin's ends stay under the O.D. and held in the wall at +/-.005
+# (KEY_PIN_END_RECESS_WORST, KEY_PIN_SUPPORT_WORST below).
 KEY_PIN_CHORD_OFFSET = 4.4196  # .174
 KEY_PIN_STOP = 4.064  # .160
 KEY_PIN_STOP_X = -KEY_PIN_STOP
 KEY_PIN_LOCATION_PLACES = 3
-KEY_PIN_LOCATION_BAND = 0.0508  # +/-.002
+KEY_PIN_CHORD_BAND = 0.0508  # +/-.002
 KEY_PIN_CHORD_RANGE = (
-    KEY_PIN_CHORD_OFFSET - KEY_PIN_LOCATION_BAND,
-    KEY_PIN_CHORD_OFFSET + KEY_PIN_LOCATION_BAND,
+    KEY_PIN_CHORD_OFFSET - KEY_PIN_CHORD_BAND,
+    KEY_PIN_CHORD_OFFSET + KEY_PIN_CHORD_BAND,
 )
 KEY_PIN_STOP_RANGE = (
-    KEY_PIN_STOP - KEY_PIN_LOCATION_BAND,
-    KEY_PIN_STOP + KEY_PIN_LOCATION_BAND,
+    KEY_PIN_STOP - _BAND[KEY_PIN_LOCATION_PLACES],
+    KEY_PIN_STOP + _BAND[KEY_PIN_LOCATION_PLACES],
 )
 KEY_PIN_STATION = 3.81  # .15, behind the hub front face
 KEY_PIN_STATION_PLACES = 2
@@ -624,9 +631,14 @@ if KEY_PIN_WALL_WORST < WALL_FLOOR_MM - 1e-9:
 
 # --- sheet --------------------------------------------------------------------
 # Each requirement is flagged at its feature (rule 7): a callout carries at
-# most two lines of words, and the requirements several dimensions share are
-# numbered notes their callouts link, each stated once.
+# most two lines of words, and each fit is one numbered note its callout
+# links (mate, acceptance and the one reason), as is the requirement
+# several dimensions share.
 COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
+STACK_NOTE = 1
+BORE_NOTE = 2
+KEY_PIN_NOTE = 3
+SPIGOT_NOTE = 4
 # The hub O.D.'s third place is held for the wall over the key pin's chord
 # ream (rule 3: a size finer than the turned row states its function): the
 # least wall, floored at three places (rule 20), under the size.
@@ -637,40 +649,39 @@ HUB_DIA_CALLOUT_BELOW = "\n".join(
     )
 )
 # The bore is reamed through and the sleeve's boss turned to it: the
-# process, the fit by its standard name and its mate (rules 4 and 12), what
-# the fit protects (rule 4's necessity answer: the hub's rock closes the
-# collar's gap to the disc), then the least finished wall over it (rule 20).
-BORE_NECESSITY = f"KEEPS {COLLAR_NUMBER} GAP"
+# process, the link to its fit note, then the least finished wall over it
+# (rule 20).  The note names the mate made to this bore (rule 4, made to
+# fit; the acceptance prints once, on the sleeve's sheet).  Why the bore is
+# reamed is the registry's (cad/config/necessity/pd-transgear-disc-hub.yaml,
+# owner ruling 2026-11-24: the reason is not printed on the sheet).
 BORE_CALLOUT_BELOW = "\n".join(
     (
         "REAM THRU",
-        f"SLIDING FIT ON {SLEEVE_NUMBER}, {BORE_NECESSITY}",
+        f"SEE NOTE {BORE_NOTE}",
         BORE_WALL_TEXT,
     )
 )
+BORE_NOTE_TEXT = f"{SLEEVE_NUMBER} IS TURNED TO THIS BORE."
 # The overall and the spigot's length both print the disc cluster's band and
 # serve one stack (rule 4): one note, named once, linked from both.
-STACK_NOTE = 1
 STACK_TEXT = f"{STACK_NAME}: SETS {COLLAR_NUMBER} TO {DISC_NUMBER} CLEARANCE."
 HUB_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
 SPIGOT_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
 # The flange's .XXX thickness sets the disc screws' reach (the cut window
 # in pd_transgear_disc_screw_spec reads it).
 FLANGE_THICK_CALLOUT = f"SETS {SCREW_NAME}\n{SCREW_NUMBER} REACH"
-# The spigot enters the disc's bore at assembly (the disc is then centred
-# and its taps transferred); its turned-row band keeps it clear of the
-# reamed bore and bounds the disc's float, which the disc's tap-to-bore web
-# pays (pd_rack_pinion_spec.TAP_TO_BORE_WALL_FINISHED).  The callout names
-# the mate it clears, what the band protects (rule 4's necessity answer)
-# and the sharp root the disc's face seats past.
-SPIGOT_NECESSITY = "KEEPS DISC TAP WALL"
+# The spigot is made to the disc's reamed bore (rule 4, made to fit): its
+# size prints REF and its callout says what it is turned to; its note gives
+# the requirement, the diametral clearance in that bore.  Its sharp root is
+# a single limit on the edge view, on a leader to the corner (rule 16;
+# machinist review 2026-11-24, three runs: in the note it was linked to the
+# fit, not to the corner).  The reasons are the registry's.
 SPIGOT_CALLOUT_BELOW = "\n".join(
-    (
-        f"CLEARS {DISC_NUMBER} BORE",
-        SPIGOT_NECESSITY,
-        f"SPIGOT ROOT R{inch_text(CORNER_RADIUS_MAX, 3)} MAX",
-    )
+    (f"TURN TO {DISC_NUMBER} BORE", f"SEE NOTE {SPIGOT_NOTE}")
 )
+SPIGOT_CLEARANCE_TEXT = "-".join(inch_text(value, 3) for value in SPIGOT_CLEARANCE)
+SPIGOT_NOTE_TEXT = f"CLEARANCE {SPIGOT_CLEARANCE_TEXT} IN {DISC_NUMBER} BORE."
+SPIGOT_ROOT_CALLOUT = f"R{inch_text(CORNER_RADIUS_MAX, 3)} MAX"
 
 # Callouts the sheet hangs on the native dimensions.  The holes are drilled
 # (the title block's DRILLED HOLES row governs their sizes); the three screw
@@ -687,16 +698,32 @@ OIL_HOLE_CALLOUT_BELOW = "\n".join(
 )
 # The chord hole prints in section A-A, cut through its station: the
 # reamer's size with no band and REAM beside it (the value's own row: the
-# air left of the ring holds two rows of sixteen characters under it), then
-# the press fit's pin (rules 4 and 12) and what the ream is for (rule 4's
-# necessity answer: the dowel holds by its press alone, with no bond; the
-# wall the ream also keeps is stated at the hub's O.D.); the #56 knockout
-# drilled through; the chord's offset and the ream's stop from the hub axis
-# at the reamed-hole location band, locations that carry their value and
+# air left of the ring holds rows of sixteen characters under it), then
+# the ream's depth, its stop past the hub axis, at the title block's
+# three-place band (rule 26: a hole reads size, process, depth, and the
+# depth is never left to a view; reviews 2026-11-24: a .160 dimension on
+# the view was gated bare for stating no function, then for the depth
+# missing from the callout, and faulted for the function words beside it),
+# then the pin and the link to its fit note: the press fit and its
+# acceptance by the pin (why the hole is reamed and its offset held to
+# +/-.002 is the registry's); the #56 knockout drilled through; the
+# chord's offset from the hub axis, a location that carries its value and
 # band only (rule 7).
 KEY_PIN_SUFFIX = " REAM"
-KEY_PIN_NECESSITY = "PRESS, NO BOND"
-KEY_PIN_CALLOUT_BELOW = "\n".join((f"PIN {KEY_PIN_NUMBER}", KEY_PIN_NECESSITY))
+KEY_PIN_DEPTH_TEXT = (
+    f"TO {inch_text(KEY_PIN_STOP, KEY_PIN_LOCATION_PLACES)} PAST AXIS"
+)
+KEY_PIN_CALLOUT_BELOW = "\n".join(
+    (KEY_PIN_DEPTH_TEXT, f"PIN {KEY_PIN_NUMBER}", f"SEE NOTE {KEY_PIN_NOTE}")
+)
+KEY_PIN_NOTE_TEXT = f"PRESS FIT ON {KEY_PIN_NUMBER}: THE PIN PRESSES IN."
+# The numbered notes, in order.
+NOTE_TEXTS = {
+    STACK_NOTE: STACK_TEXT,
+    BORE_NOTE: BORE_NOTE_TEXT,
+    KEY_PIN_NOTE: KEY_PIN_NOTE_TEXT,
+    SPIGOT_NOTE: SPIGOT_NOTE_TEXT,
+}
 KEY_PIN_DRILL_CALLOUT_BELOW = "#56 DRILL THRU"
 
 # The key-pin hole's station lives on a hidden reference sketch: one
@@ -725,7 +752,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
     "ScrewHoleProfile": {"BoltCircleDia", "ScrewHoleDia"},
     "OilHoleProfile": {"OilHoleDia"},
-    "KeyPinProfile": {"KeyPinDia", "KeyPinDrillDia", "KeyPinChord", "KeyPinStop"},
+    "KeyPinProfile": {"KeyPinDia", "KeyPinDrillDia", "KeyPinChord"},
     "KeyPinReference": {"KeyPinStation"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -747,7 +774,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "KeyPinDia": KEY_PIN_HOLE_PLACES,
         "KeyPinDrillDia": KEY_PIN_DRILL_PLACES,
         "KeyPinChord": KEY_PIN_LOCATION_PLACES,
-        "KeyPinStop": KEY_PIN_LOCATION_PLACES,
     },
     "KeyPinReference": {"KeyPinStation": KEY_PIN_STATION_PLACES},
 }
@@ -760,4 +786,6 @@ if {f: set(n) for f, n in DRAWING_PRECISION.items()} != DRAWING_DIMENSIONS:
     raise AssertionError("every marked MHA-PD-17 dimension needs its printed places")
 if not set(REFERENCE_SKETCHES) <= set(DRAWING_DIMENSIONS):
     raise AssertionError("a hidden MHA-PD-17 reference sketch prints nothing")
-REFERENCE_DIMENSIONS: frozenset[str] = frozenset()
+# Printed in parentheses: the spigot is made to the disc's bore, so its
+# size is a reference and the note's clearance the requirement.
+REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"SpigotDia"})

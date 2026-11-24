@@ -216,11 +216,6 @@ def _mate_name(part: dict) -> str:
     return f"{title} {part['number']}"
 
 
-def _fit_range_text(low_mm: float, high_mm: float) -> str:
-    """A clearance range from both parts' printed limits, to .0001 in."""
-    return f"{inch_text(low_mm, 4)}-{inch_text(high_mm, 4)}"
-
-
 # The journal is made to fit (rule 4; fit audit 2026-11-23, pending owner
 # confirmation): turned last to the MHA-PD-28 bush's reamed bore and tried
 # in it, so it prints REF and no limits.  JOURNAL_DIA_BAND stays the
@@ -252,8 +247,7 @@ NOTE_TEXTS = (
     (
         JOURNAL_FIT_NOTE,
         f"RUNNING FIT IN {_mate_name(_config.parts('pd-transgear-knob-bush'))}: "
-        "TURN TO ITS REAMED BORE, TURNS FREE WITH NO SHAKE. "
-        "KEEPS REDUCER BACKLASH.",
+        "TURN TO ITS REAMED BORE, TURNS FREE WITH NO SHAKE.",
     ),
     # Made to fit (fit audit 2026-11-23, pending owner confirmation): the
     # collar's bore is drilled and its pin pressed first; the core's Ø and

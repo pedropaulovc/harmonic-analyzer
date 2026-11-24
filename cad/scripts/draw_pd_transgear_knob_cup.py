@@ -41,7 +41,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimensions,
+)
 from _drawing_finish import add_surface_finish
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -59,12 +63,14 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _printed_limits import drilled_limits, limits
 from pd_paper_drive_assembly_steps import step_ref
-from pd_transgear_knob_cup_notes import CBORE_DEPTH_CALLOUT
+from pd_transgear_knob_cup_notes import (
+    CBORE_DEPTH_CALLOUT,
+    PILOT_CORNER_CALLOUT,
+    POCKET_CORNER_CALLOUT,
+)
 from pd_transgear_knob_cup_spec import (
-    BORE_BAND,
     BORE_DIA,
     BORE_CLEARANCE_TEXT,
-    BORE_JOURNAL_CLEARANCE,
     CBORE_DEPTH,
     CBORE_DIA,
     CLEAR_HOLE_DIA,
@@ -73,9 +79,11 @@ from pd_transgear_knob_cup_spec import (
     LENGTH,
     OD,
     PILOT_DEPTH,
+    PILOT_CLEARANCE,
     PILOT_DEPTH_FITTED_TEXT,
     PILOT_FLOOR_R_MAX,
     POCKET_FLOOR_R_MAX,
+    REFERENCE_DIMENSIONS,
     SURFACE_FINISHES,
     UNIT,
     WEB_MIN,
@@ -136,35 +144,42 @@ CAPTION_XY = (SECTION_CENTER[0], SECTION_BOTTOM - 0.026)
 
 SHAFT_NUMBER = _config.parts("pd-transgear-knob-shaft")["number"]
 BUSH_NUMBER = _config.parts("pd-transgear-knob-bush")["number"]
-# drawing-guidelines.md rule 23: a bonded fit is a fit -- the pilot's band
-# names its mate and the diametral clearance, inside LOCTITE 641's gap fill
-# (the spec asserts it); the grade and method are the assembly step's.  No
+# drawing-guidelines.md rule 23: a bonded fit is a fit -- the pilot
+# is made to fit its mate (rule 4, form 2): its size prints REF, the callout
+# says what it is bored to and links note 2, which names the fit and its
+# clearance (inside LOCTITE 641's gap fill; the spec asserts it); the method
+# is the assembly step's.  A made-to-fit seat is no tight band, so the
+# sheet has no necessity register (owner ruling 2026-11-24: no reason is
+# printed on the sheet either).  No
 # process row: the section draws the pilot's flat floor and R.005 MAX limits
 # its corner, so "FLAT BOTTOM END MILL" named a tool, not a requirement
 # (rule 7; machinist review r10, three runs).  Two lines of words, each
 # within the 24 characters that fit between the front face and the isometric.
-BORE_CALLOUT = (
-    f"BONDED FIT ON {SHAFT_NUMBER}\n"
-    f"(CLEARANCE {BORE_CLEARANCE_TEXT})"
+FIT_NOTE = 2
+BORE_CALLOUT = f"BORE TO {SHAFT_NUMBER}\nSEE NOTE {FIT_NOTE}"
+FIT_NOTE_TEXT = (
+    f"{FIT_NOTE}. BONDED FIT ON {SHAFT_NUMBER}: CLEARANCE {BORE_CLEARANCE_TEXT}."
 )
 # The block hangs right of its own vertical dimension line, which drops to
 # the shelf under the block's last row: the line struck the first row's text
-# and the shelf both parentheses' tails (machinist review r1-r3, text on lines).
+# (machinist review r1-r3, text on lines).
 # A leading space on every row holds the ink off the line
 # (draw_ch_fulcrum_shaft's across-flat block), and a closing no-break-space
-# row drops the shelf a row below the parentheses.
+# row drops the shelf a row below the last.
 BORE_CALLOUT_ROWS = "\n".join(f" {row}" for row in BORE_CALLOUT.splitlines()) + "\n\u00a0"
 # The supply sizes refer to NOTE 1 (rule 19); the web drill prints its
 # process where it shows round.
 SUPPLY_CALLOUT = "SEE NOTE 1"
 HOLE_CALLOUT = "#33 DRILL THRU"
 # The pocket depth's function row is pd_transgear_knob_cup_notes' (the web
-# its third place holds).
+# its third place holds), as are the mates the two floor corners seat.
 SECTION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT_ROWS,
     "CupLength": SUPPLY_CALLOUT,
     "PilotDepth": SUPPLY_CALLOUT,
     "CboreDepth": CBORE_DEPTH_CALLOUT,
+    "PilotFloorR": PILOT_CORNER_CALLOUT,
+    "PocketFloorR": POCKET_CORNER_CALLOUT,
 }
 FACE_CALLOUTS = {"HoleDia": HOLE_CALLOUT}
 
@@ -189,7 +204,16 @@ BORE_BLOCK_HALF_HEIGHT = 0.0130
 # over 15 mm) right of the front face, where the length's extension line
 # no longer strikes its NOTE row and the pocket depth's arrow no longer
 # runs into its "S" (r5 render).  Below the section, the two floor corners'
-# R.xxx MAX on one row, each under its own corner, the caption beneath.
+# R.xxx MAX on one row, each over the mate it seats, the caption beneath.
+# Each block's near end stands under its own corner, where the r1 render of
+# 2026-11-23 began the leader (the pocket's corner 11 mm right of the rear
+# face, the pilot's 15 mm left of the front face), so the pocket's block
+# runs left from its corner and the pilot's right from its own, 12 mm
+# apart, the pilot's ending 20 mm left of the pilot Ø's dimension line.
+CORNER_TEXT_ADVANCE = 0.00277  # the callouts' width a character
+POCKET_CORNER_HALF_WIDTH = len(POCKET_CORNER_CALLOUT) * CORNER_TEXT_ADVANCE / 2.0
+PILOT_CORNER_HALF_WIDTH = len(PILOT_CORNER_CALLOUT) * CORNER_TEXT_ADVANCE / 2.0
+CORNER_ROW_Y = SECTION_BOTTOM - 0.013
 DEPTH_TEXT_HALF_WIDTH = 0.012  # "SEE NOTE 1", 23.9 mm on the r5 render
 # The pocket depth's block: its function row at the callouts' 2.77 mm a
 # character (".108" alone was 8.5 mm on the r6 render).
@@ -208,8 +232,8 @@ SECTION_KEEP = {
         FRONT_FACE_X + 0.060,
         SECTION_CENTER[1] - HALF_BORE - BORE_BLOCK_HALF_HEIGHT - 0.010,
     ),
-    "PocketFloorR": (REAR_FACE_X - 0.002, SECTION_BOTTOM - 0.010),
-    "PilotFloorR": (FRONT_FACE_X - 0.004, SECTION_BOTTOM - 0.010),
+    "PocketFloorR": (REAR_FACE_X + 0.011 - POCKET_CORNER_HALF_WIDTH, CORNER_ROW_Y),
+    "PilotFloorR": (FRONT_FACE_X - 0.014 + PILOT_CORNER_HALF_WIDTH, CORNER_ROW_Y),
 }
 # The web drill's Ø on the face view, up and left of it on a leader.
 FACE_KEEP = {"HoleDia": (FACE_CENTER[0] - 0.040, FACE_CENTER[1] + 0.037)}
@@ -230,7 +254,8 @@ FRONT_FINISH = (_FRONT_PICK, (_FRONT_PICK[0] + 0.037, _FRONT_PICK[1]))
 NOTES = (
     "NOTES:\n"
     "1. LENGTH AND PILOT DEPTH ARE SUPPLY SIZES. FITTED\n"
-    f"   PILOT DEPTH {PILOT_DEPTH_FITTED_TEXT} AT {step_ref('knob-stack-fitted')}."
+    f"   PILOT DEPTH {PILOT_DEPTH_FITTED_TEXT} AT {step_ref('knob-stack-fitted')}.\n"
+    f"{FIT_NOTE_TEXT}"
 )
 NOTES_XY = (0.020, 0.112)
 # The front face's finish caption names the face's function and its mate
@@ -252,8 +277,8 @@ FRONT_FINISH_CAPTION_XY = (FRONT_FINISH[1][0] + 0.016, FRONT_FINISH[1][1] + 0.01
 # (pd_transgear_knob_cup_spec: axis +Y; the front face, the running face
 # on MHA-PD-28, at y = 0; the pilot's floor at y = PILOT_DEPTH; the pocket's
 # floor at y = LENGTH - CBORE_DEPTH; the rear face at y = LENGTH). The O.D.
-# and the length take the title block's .XX row, the pilot the DRILLED HOLES
-# +.004/0 band, bonded on the MHA-PD-08 journal, its depth and the pocket's
+# and the length take the title block's .XX row, the pilot prints REF and is
+# bored to the MHA-PD-08 journal at note 2's clearance, bonded, its depth and the pocket's
 # depth the .XXX row, the pocket's Ø the .XX row, the web's #33 the DRILLED
 # HOLES row, each floor corner its R MAX. The length and the pilot depth are
 # supply sizes: MHA-PD-00 faces the front face to the fitted pilot depth
@@ -325,15 +350,14 @@ requirement(
     "pilot",
     kind="counterbore",
     faces=(CylinderFace(BORE_DIA), PlanarFace((0.0, -1.0, 0.0), -PILOT_DEPTH)),
-    requirements=("dia", "depth", "corner_radius_max", "diametral_clearance"),
+    requirements=("dia_ref", "depth", "corner_radius_max", "diametral_clearance"),
     fields={
         "at": ([0.0, PILOT_DEPTH, 0.0], ("PILOT_DEPTH",)),
         "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
-        "dia": (
-            limits(BORE_DIA, _P["BoreDia"], BORE_BAND, unit=UNIT),
-            ("BORE_DIA", "BORE_BAND", "UNIT", (_SELF, "SECTION_KEEP")),
+        "dia_ref": (
+            BORE_DIA,
+            ("BORE_DIA", "REFERENCE_DIMENSIONS", (_SELF, "SECTION_KEEP")),
         ),
-        "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
         "depth": (
             limits(PILOT_DEPTH, _P["PilotDepth"], unit=UNIT),
             ("PILOT_DEPTH", "UNIT", (_SELF, "SECTION_KEEP")),
@@ -346,14 +370,15 @@ requirement(
             ("PILOT_FLOOR_R_MAX", "CORNER_SUFFIX"),
         ),
         "diametral_clearance": (
-            list(BORE_JOURNAL_CLEARANCE),
-            ("BORE_JOURNAL_CLEARANCE", "BORE_CLEARANCE_TEXT"),
+            list(PILOT_CLEARANCE),
+            ("PILOT_CLEARANCE", "BORE_CLEARANCE_TEXT", (_SELF, "FIT_NOTE_TEXT")),
         ),
         "mate": (SHAFT_NUMBER, ((_SELF, "SHAFT_NUMBER"), (_SELF, "BORE_CALLOUT"))),
-        "bonded": (True, ((_SELF, "BORE_CALLOUT"),)),
+        "bonded": (True, ((_SELF, "FIT_NOTE_TEXT"),)),
         "callout": (BORE_CALLOUT, ((_SELF, "BORE_CALLOUT"),)),
+        "note": (FIT_NOTE_TEXT, ((_SELF, "FIT_NOTE_TEXT"),)),
     },
-    precision={"dia": _P["BoreDia"], "depth": _P["PilotDepth"]},
+    precision={"dia_ref": _P["BoreDia"], "depth": _P["PilotDepth"]},
 )
 requirement(
     "web_hole",
@@ -581,6 +606,7 @@ def build(adapter: Any) -> dict[str, str]:
         adapter, section_annotations + face_annotations, DRAWING_PRECISION_BY_NAME
     )
     set_dimension_callouts(adapter, section_annotations, SECTION_CALLOUTS)
+    set_reference_dimensions(adapter, section_annotations, REFERENCE_DIMENSIONS)
     set_dimension_callouts(adapter, face_annotations, FACE_CALLOUTS)
     create_section_axis_centerline(
         adapter, section, length_mm=LENGTH, label="knob cup axis"

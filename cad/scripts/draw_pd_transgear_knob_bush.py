@@ -67,7 +67,6 @@ from pd_transgear_knob_bush_geometry import (
     LENGTH,
     LENGTH_BAND,
     PRESS_DIA,
-    PRESS_DIA_BAND,
     PRESS_INTERFERENCE,
     SHOULDER_ROOT_R_MAX_MM,
     UNIT,
@@ -76,14 +75,13 @@ from pd_transgear_knob_bush_geometry import (
 from pd_transgear_knob_bush_spec import (
     BORE_BAND,
     BORE_CALLOUT,
+    BORE_NOTE,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FINISH_CAPTIONS,
     GEOMETRIC_CONTROLS,
     GEOMETRIC_TOLERANCES_MM,
-    HUB_LENGTH_CALLOUT,
-    LENGTH_CALLOUT,
     PART_DATUMS,
     PLATE_NUMBER,
     PRESS_CALLOUT,
@@ -177,8 +175,16 @@ FACE_KEEP = {
     "BoreDia": (FACE_CENTER[0] + 0.015, FACE_CENTER[1] + HALF_HUB + 0.0265),
 }
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
-# The bore's block, read off r6's A-A: 96 mm wide, 25 mm from shelf to top.
+# The bore's block, read off r6's A-A: 96 mm wide (its 37-character process
+# line, the longest the callout may carry), 25 mm from shelf to top.
 BORE_BLOCK_SIZE_M = (0.096, 0.025)
+BORE_BLOCK_LINE_MAX = 37
+# The bore's numbered note (its top-left corner): in the open sheet right of
+# the SECTION caption and above the title block (its top at 0.066), under
+# the press Ø's lower arrow (r1: its tail ends at 0.148).  At most
+# BORE_NOTE_WIDTH characters a line, about 2.85 mm each, ends left of the
+# right border.
+BORE_NOTE_XY = (0.290, 0.110)
 
 # A surface finish's ink, read off r6 relative to its symbol point: the
 # leader leaves 6.3 mm right of it, the symbol stands up to 7.2 mm above it,
@@ -255,14 +261,16 @@ SECTION_POSITION_TOL_M = 1e-4
 # ring's thrust face, at y = 0 is the datum end the lengths run from; the
 # shoulder (datum A) at y = HUB_LENGTH; the rear face, the MHA-PD-16 cup's
 # thrust face, at y = LENGTH). The hub takes the title block's .XX row; the
-# press prints (Ø.4385) REF, turned to the measured MHA-PD-19 hole (its
-# callout; its "dia" field carries the spec's ANALYSIS envelope);
+# press prints (Ø.4385) REF, turned to the measured MHA-PD-19 hole for the
+# stated interference (its callout; declared as that reference and the
+# interference, the MHA-CH-12 land's form, so the traveler's pictures print
+# the fit to the measured mate and no analysis band: traveler review r2);
 # the shoulder's station its ±.001 and its root the printed R.005 MAX; the
 # length its ±.002; the bore its H7 band, reamed through after pressing in
 # MHA-PD-19 (MHA-PD-00), square to A, under the stated wall. Each ``span``
-# is a diameter's model-Y extent. The sheet prints no manufacturing note.
-# The declarations print nothing.
-DRAWING_NOTES = ""
+# is a diameter's model-Y extent. The sheet's one numbered note is the
+# bore's fit statement.  The declarations print nothing.
+DRAWING_NOTES = BORE_NOTE
 _P = DRAWING_PRECISION_BY_NAME
 _SELF = "draw_pd_transgear_knob_bush"
 _GEOM = "pd_transgear_knob_bush_geometry"
@@ -303,7 +311,6 @@ requirement(
         ),
         "length_nominal": (LENGTH, ((_GEOM, "LENGTH"),)),
         "length_from": ("datum_end", ((_SELF, "SECTION_KEEP"),)),
-        "callout": (LENGTH_CALLOUT, ("LENGTH_CALLOUT",)),
     },
     precision={"length": _P["BushLength"]},
 )
@@ -338,7 +345,6 @@ requirement(
             ((_GEOM, "SHOULDER_ROOT_R_MAX_MM"), "SHOULDER_ROOT_SUFFIX"),
         ),
         "datum": ("A", ("PART_DATUMS", (_SELF, "DATUM_A_XY"))),
-        "callout": (HUB_LENGTH_CALLOUT, ("HUB_LENGTH_CALLOUT",)),
     },
     precision={"station": _P["HubLength"], "root_radius_max": _P["ShoulderR"]},
 )
@@ -363,25 +369,25 @@ requirement(
     "step",
     kind="diameter",
     faces=(CylinderFace(PRESS_DIA),),
-    requirements=("dia", "diametral_interference"),
+    requirements=("diametral_interference",),
     fields={
         "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
         "span": ([HUB_LENGTH, LENGTH], ((_GEOM, "HUB_LENGTH"), (_GEOM, "LENGTH"))),
-        "dia": (
-            limits(PRESS_DIA, _P["PressDia"], PRESS_DIA_BAND, unit=UNIT),
-            ((_GEOM, "PRESS_DIA"), (_GEOM, "PRESS_DIA_BAND"), (_SELF, "SECTION_KEEP")),
+        "dia_ref": (
+            PRESS_DIA,
+            ((_GEOM, "PRESS_DIA"), "PRESS_DIA_TEXT_PREFIX", (_SELF, "SECTION_KEEP")),
         ),
-        "dia_nominal": (PRESS_DIA, ((_GEOM, "PRESS_DIA"),)),
         "diametral_interference": (
             list(PRESS_INTERFERENCE),
             ((_GEOM, "PRESS_INTERFERENCE"), "PRESS_CALLOUT"),
         ),
         "mate": (f"{PLATE_NUMBER} HOLE", ("PLATE_NUMBER", "PRESS_CALLOUT")),
+        "mate_nominal_dia": (PRESS_DIA, ((_GEOM, "PRESS_DIA"),)),
         "turn_to_measured_mate": (True, ("PRESS_CALLOUT",)),
         "callout": (PRESS_CALLOUT, ("PRESS_CALLOUT",)),
     },
-    precision={"dia": _P["PressDia"]},
+    precision={"dia_ref": _P["PressDia"]},
 )
 requirement(
     "bore",
@@ -770,6 +776,7 @@ def build(adapter: Any) -> dict[str, str]:
             char_height=FINISH_CHAR_HEIGHT,
         )
         _add_placed_note(adapter, FINISH_CAPTIONS[key], caption, f"{label} caption")
+    _add_placed_note(adapter, BORE_NOTE, BORE_NOTE_XY, "bore fit note")
 
     return finalize_drawing(
         adapter,

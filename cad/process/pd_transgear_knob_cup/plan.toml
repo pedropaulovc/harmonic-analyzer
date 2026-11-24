@@ -8,7 +8,8 @@
 # the web and past the pocket floor, drill B short of the pilot floor, then
 # plunge the 1/4 end mill from the tailstock to the pilot depth (owner route,
 # #2425: the 1/4 end mill's square corner is the floor's R.005 MAX; the
-# pilot is a bonded seat at the DRILLED HOLES row, .250 +.004/0, fit audit
+# pilot is a bonded seat made to fit the MHA-PD-08 journal, its size REF
+# and its clearance on the journal the requirement, sheet note 2, fit audit
 # 2026-11-23, pending owner confirmation), part off .02 long. Setup 2, the cup turned
 # round on its outside over a shim wrap: face the rear to length from the
 # miked length, plunge the 3/16 end mill for the head pocket. Bench: deburr,
@@ -21,18 +22,21 @@
 #
 # Not on hand (cad/config/shop-equipment/gauges.toml pin-gauges, to order;
 # owner 2026-11-21: "ill buy pin gauges"): the .113 and .117 pins for the web
-# hole and the .250 and .254 pins for the pilot. The pilot is accepted with
-# its mate (traveler-guidelines T0): the MHA-PD-08 journal's end enters to
-# the floor (the .250 set pin stands in until the shaft is made), and the
-# set's .254 pin, one pin as a single limit, does not enter: over .254 the
-# bond gap passes LOCTITE 641's fill (pd_transgear_knob_cup_spec
-# LOCTITE_641_GAP_MAX). No plug gauge pair.
+# hole and the .250-.254 pins for the pilot. The pilot is accepted on its
+# mate (traveler-guidelines T0; traveler review 2026-11-24, three runs: two
+# fixed pins pass and reject pilots the sheet's clearance does not): the
+# finished MHA-PD-08 journal's end is miked as J and enters to the floor,
+# P is the largest .001-step pin that enters, and P less J is .0005-.004.
+# The pilot lies between P and P + .001, so its clearance on the journal is
+# inside the sheet's .0005-.005 and LOCTITE 641's fill
+# (pd_transgear_knob_cup_spec PILOT_CLEARANCE, LOCTITE_641_GAP_MAX). No
+# plug gauge pair.
 title = "Transgear Knob Cup"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 7/8 in (drawing: {{cad.material_name}})"
 stock = "Lot: {{process.quantity:d}} cup. Ø{{process.bar_dia_in:.3dot}} bar, on hand; the cup takes about {{process.bar_use_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Left for MHA-PD-00 step 22, not made here: facing the front face to the fitted pilot depth and the pilot's bond on MHA-PD-08. To order (not on hand): the .113, .117, .250 and .254 pins (pin-gauge sets)."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Make MHA-PD-08 first: Op 70 accepts the pilot on its finished journal. Left for MHA-PD-00 step 22, not made here: facing the front face to the fitted pilot depth and the pilot's bond on MHA-PD-08. To order (not on hand): the .113, .117 and .250–.254 pins (pin-gauge sets)."
 shop = "../shop"
 stock_refs = ["c360-round-7-8"]
 material_key = "lathe-c360"
@@ -75,6 +79,13 @@ web_drill_depth_in = 0.3
 # long) then ends inside the #33 hole, above the pilot floor, so the end mill
 # cuts the floor flat across its whole face.
 pilot_drill_depth_in = 0.08
+# The 1/4 end mill's size, the pilot's REF size on the sheet.
+pilot_cutter_dia_mm = 6.35
+# The smallest pin tried in the pilot, the 1/4 end mill's size, and the
+# most the largest entering pin may stand over the miked journal: the
+# sheet's clearance maximum less the set's .001 step (the header above).
+pilot_go_pin_in = 0.25
+pilot_pin_over_journal_max_in = 0.004
 # Setup 2: how much of the outside the jaws take, from the front face.
 regrip_grip_in = 0.18
 # The feeler leaf the AR's tip is touched through in Setup 2 (the shop's
@@ -103,7 +114,7 @@ ref = "drill-b"
 
 [[tools]]
 id = "endmill-1-4"
-name = "1/4 two-flute end mill (both pieces on hand)"
+name = "1/4 two-flute end mill"
 ref = "endmill-hss-2fl-1-4"
 
 [[tools]]
@@ -123,7 +134,7 @@ ref = "feeler-gauges"
 
 [[tools]]
 id = "pins"
-name = "Pin gauges .113, .117, .250 and .254"
+name = "Pin gauges .113, .117 and .250–.254"
 ref = "pin-gauges"
 status = "to_order"
 
@@ -134,7 +145,7 @@ ref = "jig-files"
 
 [[tools]]
 id = "deburr"
-name = "Deburring countersink"
+name = "Deburring scraper"
 ref = "deburring-set"
 
 [[setups]]
@@ -214,16 +225,16 @@ cut_kind = "other"
 speed_kind = "spindle"
 tool = "endmill-1-4"
 drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.pilot_dia_band_mm}}" }
+sizing = "other"
 instruction = "The pilot: the end mill in the tailstock drill chuck, short. Feed it until its end just touches the faced end and zero the quill scale there. Plunge slowly to {{cad.pilot_depth_in:.3dot}}, backing out to clear chips every .03: its square corner leaves the floor's R{{cad.pilot_corner_radius_max_mm:in.3dot}} MAX and its end the flat floor."
 settings = "lathe-plunge-1-4-c360"
-cut_diameter_mm = "{{cad.pilot_dia_mm}}"
-inspection = "Pilot Ø{{cad.pilot_dia_min_in:.3dot}}–{{cad.pilot_dia_max_in:.3dot}}: the {{cad.pilot_mate}} journal's end enters to the floor (the {{cad.pilot_dia_min_in:.3dot}} pin if the shaft is not made yet); the {{cad.pilot_dia_max_in:.3dot}} pin does not enter. Depth {{cad.pilot_depth_min_in:.3dot}}–{{cad.pilot_depth_max_in:.3dot}} from the faced end, calipers' depth rod beside the #33 hole (a supply size); write it down."
-gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.pilot_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.pilot_depth_band_mm}}" }]
+cut_diameter_mm = "{{process.pilot_cutter_dia_mm}}"
+inspection = "The pilot is accepted on its mate (drawing note 2: clearance {{cad.pilot_diametral_clearance_min_in:.4dot}}–{{cad.pilot_diametral_clearance_max_in:.3dot}} on the {{cad.pilot_mate}} journal). Mike the finished {{cad.pilot_mate}} journal's end: J. The journal's end enters to the floor. Try the pins from {{process.pilot_go_pin_in:.3dot}} up: P is the largest that enters. P less J is {{cad.pilot_diametral_clearance_min_in:.4dot}}–{{process.pilot_pin_over_journal_max_in:.3dot}} (the pilot is under P plus .001); write J and P down. Depth {{cad.pilot_depth_min_in:.3dot}}–{{cad.pilot_depth_max_in:.3dot}} from the faced end, calipers' depth rod beside the #33 hole (a supply size); write it down."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = [6.35, 6.4516] }, { gauge = "micrometers", band_mm = [0.0127, 0.1016] }, { gauge = "calipers", band_mm = "{{cad.pilot_depth_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Pilot short of {{cad.pilot_depth_min_in:.3dot}} in Op 70: plunge on. Over {{cad.pilot_depth_max_in:.3dot}}, the journal (or the {{cad.pilot_dia_min_in:.3dot}} pin) not entering, or the {{cad.pilot_dia_max_in:.3dot}} pin entering: part the turned length off as scrap and start again at Op 10."
+instruction = "Pilot short of {{cad.pilot_depth_min_in:.3dot}} in Op 70: plunge on. Over {{cad.pilot_depth_max_in:.3dot}}, the journal not entering, or P less J outside {{cad.pilot_diametral_clearance_min_in:.4dot}}–{{process.pilot_pin_over_journal_max_in:.3dot}}: part the turned length off as scrap and start again at Op 10."
 feed = "hand"
 
 [[setups.operations]]
@@ -304,7 +315,7 @@ speed_kind = "other"
 tool = "deburr"
 drilling = "none"
 sizing = "other"
-instruction = "Break both ends of the #33 hole with a light twist of the countersink by hand, no burr standing on either floor."
+instruction = "Break both ends of the #33 hole with the deburring set's scraper blade, reached down the pilot and the pocket without touching their mouths: no burr standing on either floor."
 feed = "hand"
 
 [[setups.operations]]
@@ -314,9 +325,9 @@ gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.web_hole_dia_band_mm}}"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Pilot again, after Setup 2's jaws held it: the {{cad.pilot_mate}} journal's end (or the {{cad.pilot_dia_min_in:.3dot}} pin) still enters to the floor, tried at three places round the mouth (a jaw-pressed wall closes the pilot)."
-inspection = "Pilot Ø{{cad.pilot_dia_min_in:.3dot}} MIN (the bond gap on {{cad.pilot_mate}})."
-gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.pilot_dia_band_mm}}" }]
+instruction = "Pilot again, after Setup 2's jaws held it: the {{cad.pilot_mate}} journal's end still enters to the floor, tried at three places round the mouth (a jaw-pressed wall closes the pilot)."
+inspection = "The journal's end enters to the floor at all three places and pin P of Op 70 still enters."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = [6.35, 6.4516] }]
 feed = "hand"
 
 [[setups.operations]]

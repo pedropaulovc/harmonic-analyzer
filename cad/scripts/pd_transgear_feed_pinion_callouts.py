@@ -48,30 +48,22 @@ TEXT_SUFFIX = 2  # swDimensionTextSuffix
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
 
-def _clearance(limits_mm: tuple[float, float]) -> str:
-    """A fit's (least, greatest) clearance as REF in the sheet's inches.
-
-    Literal text: the document converts dimension values, never text
-    (codjiflo P2 on 65a022125)."""
-    return f"(CLEARANCE {inch_text(limits_mm[0], 4)}-{inch_text(limits_mm[1], 4)} REF)"
-
-
 # The reamed bore runs on the MHA-PD-23 pin's 1/8 shank.  It prints the
 # reamer's size and no band (fit audit 2026-11-23, pending owner
 # confirmation): the pin is turned to it, and the pin's sheet carries the
 # pair's one acceptance (MHA-PD-23 note 1: each bore turns free with no
 # shake; machinist review r1 of the fit batch: an acceptance printed on
 # both members, and three rows of words under the size).  The callout is
-# the process row and two rows of words (rule 7): the mate and that it is
-# turned to this bore (a bare fit name is not enough), and rule 4's
-# necessity answer (play cocks the sleeve and tilts the MHA-PD-06 disc into
-# the drive collar: pd_cluster_air.COLLAR_AIR).  The block stays clear of
-# the gear data (test_section_values_and_bands_print_clear_of_each_other).
-COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
+# the process row and the mate, with that it is turned to this bore (a
+# bare fit name is not enough).  Why it is reamed (play cocks the sleeve
+# and tilts the MHA-PD-06 disc into the drive collar:
+# pd_cluster_air.COLLAR_AIR) is in the part's necessity file (owner ruling
+# 2026-11-24: "In the part's registry file, not on the sheet";
+# cad/config/necessity/pd-transgear-feed-pinion.yaml).  The block stays
+# clear of the gear data
+# (test_section_values_and_bands_print_clear_of_each_other).
 BORE_PROCESS_CALLOUT = "REAM THRU"
-BORE_NECESSITY = f"KEEPS DISC OFF {COLLAR_NUMBER}"
-BORE_MATE_CALLOUT = f"{PIN_NUMBER} IS TURNED TO THIS BORE"
-BORE_FIT_CALLOUT = "\n".join((BORE_MATE_CALLOUT, BORE_NECESSITY))
+BORE_FIT_CALLOUT = f"{PIN_NUMBER} IS TURNED TO THIS BORE"
 BORE_CALLOUT = f"{BORE_PROCESS_CALLOUT}\n{BORE_FIT_CALLOUT}"
 # The tip serves the rack mesh, named once in the gear data block.  The
 # two-tooth span's .0008 band is under the milled row and still controls (it
@@ -86,31 +78,28 @@ HUB_NAME = "DISC HUB"
 # The boss is made to fit (rule 4): turned last to the hub's reamed bore,
 # accepted by feel, so its size prints REF (parenthesised by the prefix and
 # suffix lanes, _drawing_dimensions.set_reference_dimension's texts) and
-# the callout names the mate by name and number, the acceptance and what
-# the fit protects (the necessity answer: the hub's rock on a loose boss
-# closes the MHA-PD-22 collar's gap to the disc).
-COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
+# the callout names the mate by name and number and the acceptance.
 BOSS_REF_PREFIX = "(<MOD-DIAM>"
 BOSS_REF_SUFFIX = ")"
-BOSS_NECESSITY = f"KEEPS {COLLAR_NUMBER} GAP"
-BOSS_CALLOUT = "\n".join(
-    (
-        f"TURN TO {HUB_NAME} {HUB_NUMBER}: SLIDES ON, NO ROCK",
-        BOSS_NECESSITY,
-    )
-)
+BOSS_CALLOUT = f"TURN TO {HUB_NAME} {HUB_NUMBER}: SLIDES ON, NO ROCK"
 # #2409: the flat takes the side of the hub's MHA-PD-VN-69 chord key pin,
 # which keys hub and disc to the sleeve; the hub's plain bore fits the boss
 # only.  The pin bears across the flat, so the pin is the mate it names.
-# Its ±.002 is under the title block's row for what it keeps (rule 4's
-# necessity answer): the pin's air to the flat
-# (pd_transgear_disc_hub_spec.KEY_PIN_FLAT_AIR, .0006 least), which closes
-# at a looser band, so the hub would not slide on.
-FLAT_NECESSITY = "KEEPS PIN GAP"
-FLAT_CALLOUT = "\n".join((f"KEYS {HUB.KEY_PIN_NUMBER}", FLAT_NECESSITY))
+# Its ±.002 is under the title block's row for the pin's gap to the flat
+# (pd_transgear_disc_hub_spec.KEY_PIN_FLAT_AIR, .0006 least); the reason is
+# in the part's necessity file, not on the sheet (owner ruling 2026-11-24).
+# Two rows no wider than the pin's number: VIEW E prints the text right of
+# its dimension line on a shelf as long as its widest row, and the boss's
+# dimension line stands 40 mm right of it.  "KEYS MHA-PD-VN-69", five
+# characters wider, ran that shelf across the boss's line (leaf
+# 20261124T014755Z, layout audit shoulder-crosses-line: the drawing leaf
+# failed).
+FLAT_CALLOUT = "\n".join(("KEYS PIN", HUB.KEY_PIN_NUMBER))
 # The step seats the hub's spigot: the tooth length places hub and disc.  Its
-# ±band is a term of the disc cluster's printed stack (transgear_cluster_fit.TL),
-# named once, on the overall (r8 machinist review, rule 7: a second reason).
+# ±band is a term of the disc cluster's printed stack (transgear_cluster_fit.TL):
+# it keeps the hub's front face .000-.006 behind the sleeve's nose
+# (RECESS_RANGE; .004 proud at the title block's ±.005), the reason its
+# necessity file gives.  The row names the mate the step seats.
 FACE_WIDTH_CALLOUT = f"SEATS {HUB_NUMBER} SPIGOT"
 # The overall sets the hub's recess behind the nose and carries the front
 # bushing's thrust: a term of the disc cluster's printed stack

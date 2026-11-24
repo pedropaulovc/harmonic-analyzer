@@ -47,7 +47,9 @@ def test_stack_lengths_print_their_bands():
         assert spec.LENGTH_PLACES == 3
         assert not spec.REFERENCE_DIMENSIONS
     assert HUB.HUB_LENGTH_PLACES == 3
-    assert not HUB.REFERENCE_DIMENSIONS
+    # The hub's one REF is its spigot diameter, turned to the MHA-PD-06 disc's
+    # reamed bore (made to fit); its overall length prints its band.
+    assert HUB.REFERENCE_DIMENSIONS == frozenset({"SpigotDia"})
 
 
 def test_unshimmed_ring_gap_never_closes_under_the_floor():
