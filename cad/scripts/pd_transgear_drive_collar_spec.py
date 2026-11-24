@@ -184,8 +184,8 @@ if not PILOT_LENGTH_FITTED_MIN <= PILOT_LENGTH <= PILOT_LENGTH_FITTED_MAX:
     raise AssertionError("MHA-PD-22's modelled pilot lies outside its fitted band")
 
 # --- Round bore over the D-core (#2409) --------------------------------------
-# Drilled, and its mate made to it (fit audit 2026-11-23, pending owner
-# confirmation; owner, 2026-11-23: "can the holes not be reamed in the first
+# Drilled, and its mate made to it (owner ruling 2026-11-24, fit audit
+# question 7; owner, 2026-11-23: "can the holes not be reamed in the first
 # place").  #11 DRILL THRU at the title block's DRILLED HOLES row; the knob
 # shaft's D-core is then turned to slide in THIS bore by hand with no shake
 # (MHA-PD-08 note 2), so no reamer and no gauge is bought for it.  No flat is

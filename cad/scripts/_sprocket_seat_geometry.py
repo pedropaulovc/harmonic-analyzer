@@ -52,9 +52,10 @@ PIN_CIRCLE_RADIUS = PIN_CIRCLE_DIA / 2.0
 PIN_HOLE_ANGLES_DEG = (90.0, 270.0)
 # Each drive pin and wheel hole is located .2756 from the axis, +/-.0009.
 # Their 0.100 diametral slip clearance absorbs both parts' spacing error.
-# MHA-DT-11 prints the band; MHA-PD-22 and MHA-PD-09 print the offset as a REF
-# target accepted by trying the wheels on (fit audit 2026-11-23, pending
-# owner confirmation) and charge it as an analysis scatter only.
+# MHA-DT-11 and MHA-PD-09 print the band; MHA-PD-22 prints the offset as a
+# REF target accepted by trying the wheels on (owner ruling 2026-11-24, fit
+# audit question 8, applied to MHA-PD-22 only), its pins charged the shop's
+# reamed-hole location row (+/-.002) in its walls and in the wheel-seat float.
 DRIVE_PIN_OFFSET_PLACES = 4
 DRIVE_PIN_OFFSET_TOL = 0.02286  # .0009
 

@@ -387,7 +387,10 @@ def test_neck_diameter_prints_limits_and_one_reason() -> None:
     assert spec.FRONT_RELIEF_DIA + lo == pytest.approx(spec.FRONT_RELIEF_DIA_MIN)
     assert spec.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.81**2 / 4.0)
     neck = dict(drawing.NOTE_TEXTS)[drawing.NECK_NOTE]
-    assert neck == f"NECK AND D-FLAT END UNDER DRIVE COLLAR {spec.DRIVE_COLLAR_NUMBER}."
+    assert neck == (
+        f"NECK AND D-FLAT END UNDER DRIVE COLLAR {spec.DRIVE_COLLAR_NUMBER}; "
+        "GEAR FACE UNCUT."
+    )
     assert drawing.DIMENSION_SUFFIXES["FrontReliefDia"] == f" {drawing.NECK_LINK}"
     assert drawing.NECK_LINK == f"SEE NOTE {drawing.NECK_NOTE}"
     # Rounds 4-5: the nominal flat end coincides with the neck corner's

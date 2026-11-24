@@ -3084,8 +3084,9 @@ def _step_text(
             # register, N-01 and N-02).  The collar is renewed, rule 23's
             # press remedy (Codjiflo P2 on #3485: the bond salvage printed
             # no clearance).  The drive-pin offsets are REF targets on
-            # MHA-PD-22 and MHA-PD-09: their acceptance is this trial of the
-            # three wheels (owner ruling 2026-11-24, fit audit question 8).
+            # MHA-PD-22 (MHA-PD-09 keeps its printed band): their acceptance
+            # is this trial of the three wheels (owner ruling 2026-11-24, fit
+            # audit question 8, applied to MHA-PD-22 only).
             # No easing drill is printed; a wheel that binds is renewed.
             # A new collar has a fresh #11 bore and a fresh pin crest, and
             # MHA-PD-08's core and D-flat were made to the old ones, so every
