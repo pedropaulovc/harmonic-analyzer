@@ -276,8 +276,9 @@ requirement(
     precision={"dia": _P["CollarOd"], "length": _P["Depth"], "finish_ra": 1},
 )
 # The eccentric bore on the origin, reamed through from the front face
-# (FRONT_KEEP "BoreDia" with BORE_CALLOUT: its sliding fit on the MHA-DT-17
-# lift rod and the diametral clearance its limits give). The eccentricity
+# (FRONT_KEEP "BoreDia" with BORE_CALLOUT: the .2510 reamer's size, no band,
+# the MHA-DT-17 rod sliding in by hand its acceptance, fit audit F19; ``dia``
+# and the slip clearance are the reamer's ANALYSIS band). The eccentricity
 # .079 +/-.002 (FRONT_KEEP "CollarCy", flagged to note 1) locates it from the
 # OD's axis along Y; the thin-side wall over it prints as the single limit
 # .0797 MIN (FRONT_KEEP "ThinWallMin", owner minor RV-01): the least wall
@@ -286,7 +287,7 @@ requirement(
     "bore",
     kind="hole",
     faces=(CylinderFace(BORE),),
-    requirements=("dia", "thru", "eccentricity", "thin_wall_min"),
+    requirements=("dia", "thru", "process", "mates", "eccentricity", "thin_wall_min"),
     fields={
         "at": ([0.0, 0.0, 0.0], (_FRAME,)),
         "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
@@ -301,7 +302,7 @@ requirement(
         "mates": (LIFT_ROD_NUMBER, ("LIFT_ROD_NUMBER",)),
         "diametral_clearance": (
             [SLIP_CLEARANCE_MIN, SLIP_CLEARANCE_MAX],
-            ("SLIP_CLEARANCE_MIN", "SLIP_CLEARANCE_MAX", "BORE_CALLOUT"),
+            ("SLIP_CLEARANCE_MIN", "SLIP_CLEARANCE_MAX"),
         ),
         "eccentricity": (
             limits(

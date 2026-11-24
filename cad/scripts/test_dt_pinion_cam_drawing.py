@@ -103,17 +103,16 @@ def test_sheet_runs_at_3_to_1_with_a_set_screw_showing_2_to_1_pictorial() -> Non
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = dt_pinion_cam_spec.DRAWING_NOTES
     assert "SLIDING FIT" not in notes
-    # Only the critical features carry bands: the reamed RUNNING bore and the
-    # cam OD / eccentricity that sets the follower lift.  Routine controlling
+    # Only the cam OD / eccentricity carry bands; the reamed bore prints the
+    # .2510 reamer's size with no band (fit audit F19).  Routine controlling
     # dimensions take the title-block grade.
     assert model_toleranced_dimensions(cam) == {
-        ("BoreProfile", "BoreDia"): "*deviations(BORE_BAND)",
         ("CollarProfile", "CollarOd"): "COLLAR_OD_TOLERANCE_MM",
         ("CollarProfile", "CollarCy"): "COLLAR_AXIS_TOLERANCE_MM",
     }
     # U27 (Main, 2026-09-23): a set-screwed cam only slips over the rod, with
     # 0.02-0.10 diametral clearance on the MHA-DT-17 rod's h band.  #290: the
-    # owned .2510 reamer, .2510 +.0005/.0000.
+    # owned .2510 reamer; BORE_BAND is its ANALYSIS band (.2510-.2515).
     assert dt_pinion_cam_spec.BORE / 25.4 == pytest.approx(0.2510)
     assert dt_pinion_cam_spec.BORE_BAND == (0.0127, 0.0)
     rod_max = dt_pinion_lift_rod_spec.ROD_DIA + dt_pinion_lift_rod_spec.ROD_DIA_BAND[0]
@@ -124,11 +123,11 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert round(bore_max - rod_min, 6) == 0.05842
     assert dt_pinion_cam_spec.LIFT_ROD_NUMBER in drawing.DIMENSION_CALLOUTS["BoreDia"]
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    # A standard fit name with its REF clearance (rule 4), not SLIP FIT.
+    # Fit audit F19's recommended form (rule 4 v2): the reamer, the mate as
+    # the gauge, no clearance row.
     assert bore.splitlines() == [
-        "REAM THRU",
-        "SLIDING FIT ON LIFT ROD MHA-DT-17",
-        "(CLEARANCE .0010-.0023)",
+        "REAM THRU; MHA-DT-17 ROD",
+        "SLIDES IN BY HAND",
     ]
     assert "LOCK AFTER POSITIONING" not in bore
     assert "LINEAR +/-" not in notes
@@ -310,7 +309,6 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
     #2-56 tap drill, two (.XX) on the length and tap station.
     """
     from _drawing_tolerances import _tolerance_places
-    from _fit_deviations import deviations
 
     spec = dt_pinion_cam_spec
     by_name = spec.DRAWING_PRECISION_BY_NAME
@@ -340,8 +338,7 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
         "Depth": 0.35,
         "TapCz": 0.16,
     }
-    # Each band prints at its nominal's places.
-    assert _tolerance_places(*deviations(spec.BORE_BAND), display_unit="in") == 4
+    # Each band prints at its nominal's places (the bore prints none, F19).
     for band in (spec.COLLAR_OD_TOLERANCE_MM, spec.COLLAR_AXIS_TOLERANCE_MM):
         assert _tolerance_places(-band, band, display_unit="in") == 3
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
