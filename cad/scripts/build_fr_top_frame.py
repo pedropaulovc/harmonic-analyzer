@@ -1125,7 +1125,9 @@ HANGER_WASHER_OUTER_END_WALL = min(
 # side, so the washer no longer bears on the frame all round the hole and
 # the bolt's clamp loses its seat there.  Pure contact geometry, not a
 # preload/material strength claim.  Owner ruling 2026-11-24 (fit audit
-# part 2, C12, option A per Main): this is the washer's criterion; the
+# part 2, C12): "A. The ring is not needed: the rule becomes the washer's
+# bearing width (1.47 mm, 1.64 today) and question 19 stands."  So this is
+# the washer's criterion; the
 # former unbroken ring inside the knockouts is not one (the knockout mouths
 # under the washer are pin holes in its land, not a lost seat).
 HANGER_WASHER_BEARING_MIN = (
