@@ -106,7 +106,8 @@ def test_stack_stays_inside_the_strap_programs_hub_keep_out(plan: dict) -> None:
     assert stack <= plan["bushing_stack_height_mm"]
     text = " ".join(spec.ASSEMBLY_STEPS.split())
     assert "MIKES .505 OR UNDER ON ITS OUTSIDE DIAMETER" in text
-    assert "A .221 PIN GAUGE DOES NOT ENTER ITS BORE" in text
+    assert "A .220 PIN GAUGE DOES NOT ENTER ITS BORE" in text
+    assert spec.WASHER_BORE_NO_GO == washer.SELECT_BORE_MAX
     assert "IT STAYS WITH THE FIXTURE" in text
     blank = " ".join(spec.BLANK_STEPS.split())
     assert "CENTRED OVER ITS HUB HOLE" in blank

@@ -140,7 +140,7 @@ ream_tip_z_mm = -4.0
 # measurement and keep it with the fixture: OD .505 or under and bore .220 or
 # under ... The traveler says to mike it once and centre it by eye."
 # washer_od_max_mm and washer_bore_no_go_mm print that selection (the bore by
-# the pin gauge .001 over its limit, which must not enter).
+# the pin gauge of its limit, which must not enter).
 # bushing_flange_dia_mm (.540) is the diameter the washer stays inside when
 # centred: half of .505, plus ASME B18.21.1's .013 bore-to-rim run-out all
 # one way, plus the tapped hole's .003 position, is .268 from the hub centre
@@ -154,8 +154,11 @@ ream_tip_z_mm = -4.0
 # thickest washer B18.21.1 allows, .065, plus the head's .101 above the
 # strap's top (.166); cam.py keeps the holder and every link move clear of
 # it. All three stand as they were for the made washer, so RS04 is unchanged.
+# Owner ruling 2026-11-24 (Pedro), on the pushed-aside 0.22 mm: "Accept as
+# is: centre the washer by eye, 0.5 mm centred, 0.22 mm worst case; the
+# traveler says to centre it and to watch the first level."
 washer_od_max_mm = 12.827
-washer_bore_no_go_mm = 5.6134
+washer_bore_no_go_mm = 5.588
 bushing_flange_dia_mm = 13.716
 bushing_clearance_mm = 0.5
 bushing_stack_height_mm = 5.1308

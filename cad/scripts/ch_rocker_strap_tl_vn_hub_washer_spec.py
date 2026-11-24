@@ -27,16 +27,20 @@ OD-to-ID runout .013, taken as a full radial offset). The recipe is the
 shared ``diagnostics/diag_build_96659A104.py`` (catalog-only), modelled at
 the nominal diameters and the thickness range's mid value.
 
-The selection limits, confirmed here. The washer lies loose on the screw, so
-its rim can reach, from the strap programs' hub centre, half its OD plus its
-bore's play on the smallest screw (the class 3A major's minimum) plus its
+The selection limits and what they hold. The washer lies loose on the screw,
+so its rim can reach, from the strap programs' hub centre, half its OD plus
+its bore's play on the smallest screw (the class 3A major's minimum) plus its
 OD-to-ID runout plus the tapped hole's own position error. At OD .505 and
-bore .220 that reach stays inside the radius the outline program guards
-(the strap plan's bushing_flange_dia_mm / 2 + bushing_clearance_mm, which
-cam.py refuses a cutter edge inside), with the runout at the standard's
-whole .013: no third measurement. Centred by eye it keeps the plan's 0.5 mm
-from the cutter; pushed fully to one side it still clears the cutter and
-still covers the hub hole all round.
+bore .220, with the runout at the standard's whole .013 (no third
+measurement): centred it keeps the plan's 0.5 mm from the cutter; pushed
+fully to one side it reaches 7.273 mm, inside the radius the outline program
+guards (bushing_flange_dia_mm / 2 + bushing_clearance_mm, which cam.py
+refuses a cutter edge inside) but only 0.22 mm from the cutter's nearest
+edge (7.49 mm), not 0.5: no washer in the standard's band keeps 0.5 mm
+pushed aside (it would need OD .472; the minimum is .495). Owner ruling
+2026-11-24 (Pedro), on that shortfall: "Accept as is: centre the washer by
+eye, 0.5 mm centred, 0.22 mm worst case; the traveler says to centre it and
+to watch the first level." It still covers the hub hole all round.
 
 Part frame: the recipe's +Y axis turned onto +Z; z = 0 the face on the
 strap, the face under the screw head at z = THICKNESS; the axis published
@@ -116,6 +120,20 @@ if not REACH_MAX <= KEEP_RADIUS:
     raise AssertionError(
         f"the selected washer can reach {REACH_MAX:.3f} mm from the hub centre, "
         f"past the {KEEP_RADIUS:.3f} mm the outline program keeps its cutter out of"
+    )
+# Owner ruling 2026-11-24 (Pedro): "Accept as is: centre the washer by eye,
+# 0.5 mm centred, 0.22 mm worst case; the traveler says to centre it and to
+# watch the first level." The worst case is the washer pushed fully aside
+# against the outline cutter's nearest edge to the hub centre (the strap's
+# bottom edge, 7.49 mm: the strap plan's bushing_* comment).
+# The plan's 0.5 mm is held centred (below), not pushed aside.
+CUTTER_EDGE_MIN = 7.49
+ACCEPTED_WORST_CLEARANCE = 0.22
+WORST_CLEARANCE = CUTTER_EDGE_MIN - REACH_MAX  # 0.217
+if not WORST_CLEARANCE >= ACCEPTED_WORST_CLEARANCE - 0.005:
+    raise AssertionError(
+        f"pushed fully aside the washer is {WORST_CLEARANCE:.3f} mm from the "
+        f"cutter, under the {ACCEPTED_WORST_CLEARANCE} mm the owner accepted"
     )
 # Centred by eye (its bore's play taken up evenly) its rim stays inside the
 # plan's flange diameter, so the cutter passes the plan's whole clearance off.

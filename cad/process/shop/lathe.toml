@@ -112,12 +112,6 @@ material = "lathe-1018-cold-finished"
 sfm = 60
 feed = "tailstock quill by hand, pecking, cutting oil"
 
-[settings.lathe-drill-h-1018]
-tool = "drill-h"
-material = "lathe-1018-cold-finished"
-sfm = 60
-feed = "tailstock quill by hand, steady, cutting oil"
-
 [settings.lathe-drill-l-1018]
 tool = "drill-l"
 material = "lathe-1018-cold-finished"

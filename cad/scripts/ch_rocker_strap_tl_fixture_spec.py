@@ -152,8 +152,12 @@ if WASHER_SKU != washer.SKU:
     raise AssertionError("the washer's registry row and its catalogue disagree")
 # The washer's selection (owner ruling 2026-11-23: "OD .505 or under and
 # bore .220 or under"), checked once on sheet 1: the OD by micrometer, the
-# bore by the pin gauge one thousandth over its limit, which must not enter.
-WASHER_BORE_NO_GO = washer.SELECT_BORE_MAX + 0.001 * INCH
+# bore by the pin gauge of its limit, which must not enter (so the bore is
+# under the .220 the reach is worked at). The two limits are typed into the
+# step, as the clamp torque and the fence reading are: they select a bought
+# part at fitting, and no model dimension can carry a selection limit (the
+# washer is modelled at its catalogue nominal).
+WASHER_BORE_NO_GO = washer.SELECT_BORE_MAX
 WASHER_OD_TEXT = washer.SELECT_OD_TEXT
 WASHER_BORE_NO_GO_TEXT = washer.inch_text(WASHER_BORE_NO_GO, 3)
 BOM_DESCRIPTIONS: dict[str, str] = {

@@ -23,10 +23,14 @@ import math
 import sys
 
 from _fastener_catalog import fastener
+from _mcmaster_96659a104 import DIMS
 from _session import run_build
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
-from ch_rocker_strap_tl_vn_hub_washer_spec import SKU
 from diagnostics.diag_build_96659A104 import build_96659A104
+
+# The catalogue module, not the washer spec: the spec imports the hub
+# screw's catalogue for its reach checks, which would re-key this build.
+SKU = DIMS.part_no
 
 PART_NAME = "ch-rocker-strap-tl-vn-hub-washer"
 SPEC = fastener(PART_NAME)

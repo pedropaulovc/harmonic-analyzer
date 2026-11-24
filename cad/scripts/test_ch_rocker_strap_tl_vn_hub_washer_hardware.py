@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 import _config
+import _shop_equipment
 import _mcmaster_91255a267 as screw
 import build_ch_rocker_strap_tl_vn_hub_washer as part
 import ch_rocker_hub_fit
@@ -39,6 +40,10 @@ PLAN = ROOT / "cad" / "process" / "ch_rocker_strap" / "plan.toml"
 
 def _plan() -> dict:
     return tomllib.loads(PLAN.read_text(encoding="utf-8"))["parameters"]
+
+
+def _shop_record() -> dict:
+    return _shop_equipment.load()["fixtures"]["strap-hub-washer"]
 
 
 def test_catalogue_row_is_the_registered_mcmaster_washer() -> None:
@@ -105,6 +110,15 @@ def test_mirrors_agree_with_their_authorities() -> None:
     assert spec.HUB_LOCATION_TOL == plate.HUB_LOCATION_TOL
     assert spec.PLUG_LOCATING_ERROR_MAX == pytest.approx(plug.HUB_LOCATING_ERROR_MAX)
     assert plug.WASHER_NUMBER == spec.PART_NUMBER
+    assert part.SKU == spec.SKU
+    # The selection limits' copies: the strap traveler and the fixture record.
+    assert plan["washer_od_max_mm"] == pytest.approx(spec.SELECT_OD_MAX)
+    assert plan["washer_bore_no_go_mm"] == pytest.approx(spec.SELECT_BORE_MAX)
+    record = _shop_record()
+    assert record["select_od_max_mm"] == pytest.approx(spec.SELECT_OD_MAX)
+    assert record["select_bore_max_mm"] == pytest.approx(spec.SELECT_BORE_MAX)
+    for text in (spec.SELECT_OD_TEXT, spec.SELECT_BORE_TEXT):
+        assert text in record["purchase"]
 
 
 def test_pushed_to_one_side_the_selected_washer_stays_inside_the_guarded_radius() -> (
@@ -121,9 +135,19 @@ def test_pushed_to_one_side_the_selected_washer_stays_inside_the_guarded_radius(
     assert spec.REACH_MAX == pytest.approx(reach)
     assert spec.KEEP_RADIUS == pytest.approx(7.358)
     assert spec.REACH_MAX <= spec.KEEP_RADIUS
+    # Owner ruling 2026-11-24: "Accept as is: centre the washer by eye, 0.5 mm
+    # centred, 0.22 mm worst case; the traveler says to centre it and to
+    # watch the first level." Pushed fully aside it is 0.22 mm (to the
+    # hundredth) from the cutter's nearest edge, not the plan's 0.5.
+    assert spec.WORST_CLEARANCE == pytest.approx(7.49 - reach)
+    assert round(spec.WORST_CLEARANCE, 2) == spec.ACCEPTED_WORST_CLEARANCE == 0.22
+    assert spec.WORST_CLEARANCE < spec.PLAN_CLEARANCE
     # Centred by eye the rim stays inside the plan's flange diameter, so the
     # cutter passes its whole 0.5 mm off.
     assert spec.REACH_CENTRED_MAX <= spec.PLAN_FLANGE_DIA / 2.0
+    text = PLAN.read_text(encoding="utf-8")
+    assert "centred on the hub hole by eye" in text
+    assert "watch the first level pass outside the washer" in text
     # An unselected washer (the standard's largest OD and bore) would not.
     worst = DIMS.od_max / 2.0 + (DIMS.id_max - screw.MAJOR_DIA_MIN) / 2.0
     assert worst + spec.RUNOUT_MAX + spec.SCREW_AXIS_ERROR_MAX > spec.KEEP_RADIUS

@@ -357,8 +357,11 @@ note = "Not made: shop-made on the lathe. MHA-CH-13 Setup 5: the pilot locates t
 # fixture: OD .505 or under and bore .220 or under (limits to be confirmed by
 # the agent so the 0.5 mm clearance holds even pushed to one side). The
 # traveler says to mike it once and centre it by eye. Nothing to buy but the
-# #10-32 screw." The limits are confirmed in
-# cad/scripts/ch_rocker_strap_tl_vn_hub_washer_spec.py.
+# #10-32 screw." Worked in cad/scripts/ch_rocker_strap_tl_vn_hub_washer_spec.py:
+# 0.5 mm from the cutter centred, 0.22 mm pushed fully aside. Owner ruling
+# 2026-11-24 on that: "Accept as is: centre the washer by eye, 0.5 mm
+# centred, 0.22 mm worst case; the traveler says to centre it and to watch
+# the first level."
 [fixtures.strap-hub-washer]
 name = "MHA-CH-13-TL-VN-52 rocker-strap hub washer: one #10 SAE flat washer, 18-8, selected by measurement"
 kind = "washer"
@@ -366,7 +369,7 @@ status = "on_hand"
 sku = "McMaster 96659A104"
 select_od_max_mm = 12.827
 select_bore_max_mm = 5.588
-purchase = "Nothing to buy: one washer from the owned pack of 100 (PO 1103PCAMPOS). Pick it by measurement: outside diameter .505 or under (micrometer) and bore .220 or under (the .221 pin gauge does not enter). Mark it; it stays with the fixture. The catalogue's .219 x .500 x .036-.065 is ASME B18.21.1 Table 11 No. 10: bore .214-.227, outside diameter .495-.515, the bore up to .013 off the rim's centre. On the smallest class 3A #10-32 screw (major .1840) the selected washer pushed fully to one side reaches 7.27 mm from the hub centre: inside the 7.358 mm the outline program keeps its cutter out of, 0.22 mm short of the cutter's nearest edge (7.49 mm). Centred it reaches 6.82 mm, the plan's full 0.5 mm from the keep-out. Pushed fully aside it still bears on .011 of steel round the .4005 hub hole (.047 centred)."
+purchase = "Nothing to buy: one washer from the owned pack of 100 (PO 1103PCAMPOS). Pick it by measurement: outside diameter .505 or under (micrometer) and bore .220 or under (the .220 pin gauge does not enter). Mark it; it stays with the fixture. The catalogue's .219 x .500 x .036-.065 is ASME B18.21.1 Table 11 No. 10: bore .214-.227, outside diameter .495-.515, the bore up to .013 off the rim's centre. On the smallest class 3A #10-32 screw (major .1840) the selected washer pushed fully to one side reaches 7.27 mm from the hub centre: inside the 7.358 mm the outline program keeps its cutter out of, 0.22 mm short of the cutter's nearest edge (7.49 mm). Centred it reaches 6.82 mm, the plan's full 0.5 mm from the keep-out. Pushed fully aside it still bears on .011 of steel round the .4005 hub hole (.047 centred)."
 note = "Owned (PO 1103PCAMPOS). MHA-CH-13 Setup 2 picks and marks it once; Setup 5: under the hub screw's head, on the strap round the hub hole, centred by eye at each load."
 
 [fixtures.strap-hub-screw]
