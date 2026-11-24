@@ -294,8 +294,7 @@ def _knob_collar_and_drive_pins(paper) -> None:
 def _platen_rack_and_chain_air(paper) -> None:
     assert (
         abs(
-            paper.PLATEN_AIR.terms["MHA-PD-20 spacer rear face perpendicularity"]
-            + paper.PLATEN_AIR.terms["MHA-PD-20 spacer front face perpendicularity"]
+            paper.PLATEN_AIR.terms["MHA-PD-20 spacer rear face parallelism"]
             - paper.HANGER_TILT_AT_DISC_RIM
         )
         <= 1e-9

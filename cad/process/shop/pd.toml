@@ -4,20 +4,11 @@
 # names are in common.toml, with the conventions every file follows; prechips
 # merges the directory's files by section and refuses a key defined twice.
 
-# The MHA-PD-20 spacer bore's go/no-go pair (cad/config/shop-equipment/
-# gauges.plug-gauges-1855-1860, to buy): GO .1855 and NO-GO .1860 in =
-# 4.7117 and 4.7244 mm. A fixed-limit pair reads no scale; its resolution is
-# each member's Class X tolerance, .000040 in = 0.001016 mm. The tools record
-# lets a plan list the pair.
-[gauges.plug-gauges-1855-1860]
-range_mm = [4.7117, 4.7244]
-resolution_mm = 0.001016
-[tools.plug-gauges-1855-1860]
-description = "Plug gauge pair, .1855 GO (plus) and .1860 NO-GO (minus), Vermont Gage Class X"
-
 # The MHA-PD-16 cup pilot's go/no-go pair (cad/config/shop-equipment/
 # gauges.plug-gauges-2500-2510, to buy): GO .2500 and NO-GO .2510 in =
-# 6.35 and 6.3754 mm, Class X as the pair above.
+# 6.35 and 6.3754 mm. A fixed-limit pair reads no scale; its resolution is
+# each member's Class X tolerance, .000040 in = 0.001016 mm. The tools record
+# lets a plan list the pair.
 [gauges.plug-gauges-2500-2510]
 range_mm = [6.35, 6.3754]
 resolution_mm = 0.001016
@@ -61,16 +52,11 @@ tool = "jig-drill-f"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, steady, dry"
-[settings.lathe-drill-15-c360]
-tool = "block-drill-15"
+[settings.lathe-drill-12-c360]
+tool = "drill-12"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, steady, dry"
-[settings.lathe-ream-1855-c360]
-tool = "reamer-1855"
-material = "lathe-c360"
-sfm = 160
-feed = "tailstock quill by hand, slow and steady, dry; withdraw with the spindle running"
 [settings.lathe-drill-b-1018]
 tool = "drill-b"
 material = "lathe-1018-cold-finished"
@@ -171,12 +157,12 @@ description = "Shop-made work arbor with two backing discs for cutting the MHA-P
 [tools.reamer-0615]  # MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 REAM (.163), no band
 description = ".0615 in HSS chucking reamer"
 diameter_mm = 1.5621
-[tools.reamer-1855]  # MHA-PD-20 Ø.1850 +.0010/+.0005 REAM THRU
-description = ".1855 in HSS chucking reamer"
-diameter_mm = 4.7117
-[tools.reamer-1940]  # MHA-PD-18 Ø.1940 +.001/.000 REAM THRU
-description = ".1940 in HSS chucking reamer"
-diameter_mm = 4.9276
+# MHA-PD-20's #12 DRILL THRU (a LOCTITE 638 bonded slip fit on MHA-PD-VN-57,
+# fit audit 2026-11-23): the 115-piece index's #12, nominal × 25.4
+# (cad/config/shop-equipment/tools-drills.toml drill-12).
+[tools.drill-12]
+description = "#12 (.189 in) drill, 115-piece index"
+diameter_mm = 4.8006
 [tools.endmill-hss-tin-2fl-3-16]  # MHA-PD-16 flat floor for the Ø.19 head counterbore, plunged from the tailstock
 description = "3/16 in TiN-coated HSS 2-flute square end mill, centre cutting (McMaster 8949A16)"
 diameter_mm = 4.7625

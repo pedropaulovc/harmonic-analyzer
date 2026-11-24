@@ -476,11 +476,13 @@ def test_lock_sweep_judges_the_flat_plate_and_the_knob_bush(
             printed_deviations(assembly.GUIDE_DEPTH, 1, unit=assembly.GUIDE_UNIT),
             "lock plates .* into the arm as",
         ),
-        # So does a lock plate whose thickness prints .X, not its sheet band...
+        # So does a lock plate whose thickness prints .X, not its sheet band
+        # (its heads reach the arm's plate-screw tip, the section the
+        # hanger's tilt carries furthest, before the arm's own face)...
         (
             "_LOCK_THICK_DEV",
             printed_deviations(assembly.LOCK_THICK, 1),
-            "heads .* into the arm as",
+            "heads .* into the arm (as|plate-screw tip)",
         ),
         # A rail that may run 0.9 shallow rubs its plates on the bar.
         ("_GUIDE_DEPTH_DEV", (-0.9, 0.0), "bar's back face"),

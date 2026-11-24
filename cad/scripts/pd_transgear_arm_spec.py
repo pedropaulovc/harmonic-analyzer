@@ -44,8 +44,8 @@ from pd_transgear_arm_geometry import (
 # their mm models (``pd_transgear_arm_geometry.OUTLINE_PLACES``); the tip
 # station is .XX (R9-23, ``pd_transgear_arm_geometry.TIP_STATION``); the
 # thickness is the ground stock's, a reference (the stock band governs it,
-# ``STOCK_TEXT_PREFIX``); the pivot bore prints the .1940 reamer's size under
-# its +.0010/0 band (#2413); the latch-pin hole and pin bore print
+# ``STOCK_TEXT_PREFIX``); the pivot bore prints its #9 drill's size under
+# the DRILLED HOLES row; the latch-pin hole and pin bore print
 # under their explicit ream bands; the pin station and the locating sites
 # are BASIC under circular position controls; the plate-tap stations print
 # as references, the taps being spotted through MHA-PD-19's screw holes at
@@ -58,7 +58,7 @@ from pd_transgear_arm_geometry import (
 OUTLINE_PLACES = ARM.OUTLINE_PLACES
 TIP_STATION_PLACES = ARM.TIP_STATION_PLACES
 THICKNESS_PLACES = 4
-PIVOT_BORE_PLACES = 4
+PIVOT_BORE_PLACES = 3
 SPOT_FACE_DIA_PLACES = 3
 SPOT_FACE_FLOOR_PLACES = ARM.SPOT_FACE_FLOOR_PLACES
 STATION_PLACES = 4

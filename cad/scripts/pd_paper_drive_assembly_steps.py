@@ -349,7 +349,7 @@ OFFSET_ACCEPT_TOL = 0.2286  # .009
 # accepted band, the mid-planes a half plate band either way (both chain
 # wheels are MHA-PD-09 plates); then the crank's end play, the knob's end
 # float and the knob wheel's own float under the nut forward. Nothing moves the
-# crank wheel rearward: MHA-PD-VN-63 holds the arm on a spacer pressed on the
+# crank wheel rearward: MHA-PD-VN-63 holds the arm on a spacer bonded on the
 # MHA-PD-VN-57 shoulder, so its tilt is fixed in the bar and read here as made
 # (pd_transgear_drive_collar_spec's in-service terms, one helper for the
 # setting and this re-check):

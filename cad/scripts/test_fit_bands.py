@@ -395,6 +395,11 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "native band); upper limit indexed for the ring's worst wall and the "
         "knob shaft's rear tooth-end bearing (RING_TRANSVERSE_FLOAT_MAX)"
     ),
+    ("pd_transgear_pivot_spacer_spec", "BORE_DIA_BAND"): (
+        "title-block drilled-hole deviations (the #12 DRILL THRU callout's row, "
+        "no native band); indexed for the bond gap on MHA-PD-VN-57's shoulder "
+        "(BOND_GAP) and the ring's worst wall"
+    ),
     ("pd_vn_transgear_latch_pin_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the arm's blind hole"

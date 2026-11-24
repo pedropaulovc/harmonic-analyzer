@@ -83,11 +83,12 @@ def test_hanger_screw_rows_follow_the_arm_plate_and_bar() -> None:
             pivot_screw.FITTED_THREAD_LEN - NECK_FLAT_END,
         )
     )
-    # R9-71: the spacer's reamed bore pressed on the shoulder, whole length.
-    assert allowed[
+    # The spacer's #12 drilled bore clears the shoulder (a bonded slip fit,
+    # fit audit 2026-11-23): no allowed-interference row.
+    assert spacer.BOND_GAP[0] > 0.0
+    assert (
         _pair("pd-transgear-pivot-spacer-1", "pd-vn-transgear-pivot-screw-1")
-    ] == pytest.approx(
-        _annulus(pivot_screw.SHOULDER_DIA, spacer.BORE_DIA, spacer.LENGTH)
+        not in allowed
     )
 
 

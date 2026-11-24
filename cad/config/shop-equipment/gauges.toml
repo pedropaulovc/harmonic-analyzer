@@ -286,24 +286,6 @@ purchase = "Four Vermont Gage standard Class X steel pin/plug gages, .1261, .126
 note = "Not owned: to buy. MHA-PD-23 Setup 1 Op 10: the largest of the six pins .1260-.1265 that enters the MHA-PD-18 Ø.1260-.1265 ream is its reading R; the pin's press land is turned from it."
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages"]
 
-# --- Reamed bores of lathe parts (MHA-MG-10, MHA-DT-38, MHA-DT-39) -----------
-# Fixed-limit pairs as gauges.plug-gauges-2510-2515: each band is .0005 in,
-# under the pin-gauge sets' .001 in step. Range and tolerance:
-# cad/process/shop/ gauges, same keys.
-# Acceptance of the MHA-PD-20 pivot spacer's Ø.1850 +.0010/+.0005 REAM THRU
-# bore (.1855-.1860 in): a fixed-limit pair as the hub pair above, .1855 GO
-# (plus tolerance) and .1860 NO-GO (minus tolerance), Vermont Gage standard
-# Class X, each .000040 in; the band is .0005, under the pin-gauge sets' .001
-# in step. Range and tolerance: cad/process/shop/ gauges, same key.
-[gauges.plug-gauges-1855-1860]
-name = "Plug gauge pair, .1855 GO and .1860 NO-GO, Class X"
-kind = "plug_gauge_pair"
-make = "Vermont Gage"
-status = "to_order"
-purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .1855 in GO (plus tolerance) and .1860 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
-note = "Not owned: to buy. MHA-PD-20 pivot spacer bore, after the ream and after the mandrel: GO enters, NO-GO does not."
-cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
-
 # Acceptance of the MHA-PD-16 knob cup's Ø.250 +.001/.000 flat-bottom pilot
 # (.2500-.2510 in): a fixed-limit pair as the hub pair above, .2500 GO (plus
 # tolerance) and .2510 NO-GO (minus tolerance), Vermont Gage standard Class

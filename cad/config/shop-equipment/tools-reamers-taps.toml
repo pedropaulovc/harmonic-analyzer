@@ -433,24 +433,6 @@ kind = "reamer"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-03-TL-01 132X .1570 +.0005/.0000 REAM THRU; MHA-DT-14 .1570 +.0005/.0000 FLAT-BOTTOM REAM."
 
-[tools.reamer-1855]
-make = "Alvord-Polk"
-sku = "2995A212"
-source = "https://www.mcmaster.com/2995A212/"
-purchase = "McMaster-Carr 2995A212, .1855 in HSS straight-flute chucking reamer (Alvord-Polk), $32.00 (read live 2026-11-22); stated diameter tolerance 0 to +.0002 (.1855-.1857), 1-1/8 in flute, 4-1/2 in overall. Not the dowel-pin reamer 3002A23, whose .1855 carries -.0002 to 0 and can cut under the bore's .1855 floor. Import alternative: Shars 416-2092 (dowel-pin reamer, band not stated), $18.65 (read 2026-11-22, workbook rev4)."
-kind = "reamer"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-20 Ø.1850 +.0010/+.0005 REAM THRU."
-
-[tools.reamer-1940]
-make = "Alvord-Polk"
-sku = "8803A374"
-source = "https://www.mcmaster.com/8803A374/"
-purchase = "McMaster-Carr 8803A374, .1940 in HSS straight-flute chucking reamer (Alvord-Polk), $25.76 (read live 2026-11-22); stated diameter tolerance 0 to +.0002, 1-1/4 in flute, 5 in overall."
-kind = "reamer"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-18 Ø.1940 +.001/.000 REAM THRU."
-
 [tools.reamer-2500]
 make = "Alvord-Polk"
 sku = "89485A45"

@@ -1865,6 +1865,13 @@ KNOB_END_FLOAT_RANGE = (
 # (Henkel's LOCTITE 641 TDS states its strength at 24 h, 22 °C).
 KNOB_CUP_BOND_SUB_STEP = 6
 KNOB_CUP_BOND_CURE_H = 24
+# Rule 23's bond bullet for the MHA-PD-20 spacer on the MHA-PD-VN-57
+# shoulder (fit audit 2026-11-23, pending owner confirmation; LOCTITE 638,
+# the grade pd_transgear_pivot_spacer_spec holds the gap to): the sub-step
+# that coats the spacer's bore, which the BOM sheet's consumables lines cite,
+# and the cure before the screw is seated (the spring then loads the bond).
+PIVOT_SPACER_BOND_SUB_STEP = 6
+PIVOT_SPACER_BOND_CURE_H = 24
 # The reducer's backlash as an indicator reads it (#2417: a feeler leaf
 # cannot be laid between 48DP flanks). The knob shaft and the disc are
 # pressed lightly together, the shaft held and the disc rocked, with a test
@@ -2024,8 +2031,9 @@ def sub_step(key: str, index: int) -> str:
 # up beyond the BOM rows: four more MHA-SH-VN-59, cut into the rack's transfer
 # screws, the spare sprocket's connecting link (#2429), and the #4-40
 # transfer screws, a bought shop tool, four in each guide's lock taps when
-# the locks are struck; and (rule 23, #2425) the retaining compound that
-# bonds the knob cup, by grade, with its cure.
+# the locks are struck; and (rule 23, #2425) the retaining compounds that
+# bond the pivot spacer and the knob cup, each by grade at its sub-step,
+# with their cure (one row: the caption stands on the border's last pitch).
 LOCK_TRANSFER_SCREWS = 4 * 2
 BOM_EXPENDABLES_NOTE = (
     f"ALSO ORDER {RACK_SCREWS} MORE {BOM_PART_NUMBERS[explode.RACK_SCREW]}\n"
@@ -2036,7 +2044,8 @@ BOM_EXPENDABLES_NOTE = (
     "TO CLOSE THE SPARE'S LOOP.\n"
     f"{sub_step('platen-hung', 0)} USES {LOCK_TRANSFER_SCREWS} #4-40 TRANSFER\n"
     "SCREWS, A SHOP TOOL.\n"
-    f"{sub_step('knob-stack-fitted', KNOB_CUP_BOND_SUB_STEP)} USES LOCTITE 641; "
+    f"LOCTITE 638 {sub_step('hanger-pivoted', PIVOT_SPACER_BOND_SUB_STEP)}, "
+    f"641 {sub_step('knob-stack-fitted', KNOB_CUP_BOND_SUB_STEP)}; "
     f"CURE {KNOB_CUP_BOND_CURE_H} H."
 )
 BOM_SHEET_CAPTION = (
@@ -2264,7 +2273,7 @@ def _step_text(
     # renew, 31E's cluster re-faced without renewal. The knob cup's LOCTITE
     # 641 bond is the removable grade and its screw comes out (#2425).
     # The pivot screw is unlocked (owner ruling U-MHA-PD-VN-57-no-lock,
-    # #1194); it comes out with the spacer pressed on its shoulder, and a
+    # #1194); it comes out with the spacer bonded on its shoulder, and a
     # rebuild renews both.
     knob_stack_off = (
         f"REMOVE THE {n['pd-transgear-thumbnut']} THUMBNUT, {knob_short} AND "
@@ -2289,11 +2298,11 @@ def _step_text(
         f"UNSCREW THE {n['pd-vn-transgear-pivot-screw']} SCREW.",
         "LIFT THE ARM OFF.",
     )
-    # The pivot's reseat (15L-15Q: unscrew, clean, reseat, re-check) is
+    # The pivot's reseat (15P-15T: unscrew, clean, reseat, re-check) is
     # written once and done from 33 (the step-line budget); a repeat
     # failure there rebuilds the arm as 28R-28V, whose step 15 carries the
-    # full renewal and inspection. 28's rebuild takes only 15L-15M.
-    pivot_remedied = f"{s('hanger-pivoted', 10)}-{s('hanger-pivoted', 14)}"
+    # full renewal and inspection. 28's rebuild takes only 15P-15Q.
+    pivot_remedied = f"{s('hanger-pivoted', 13)}-{s('hanger-pivoted', 17)}"
     # #2409: the hub is keyed to the sleeve's flat by its MHA-PD-VN-69 pin,
     # pressed along a chord of the hub to its ream's stop before the hub is
     # fitted, its side lying over the flat. The flat runs out at the nose, so
@@ -2697,7 +2706,7 @@ def _step_text(
             "NO SHAKE ON THE DOWELS AND NO DAYLIGHT UNDER IT.",
             "IF IT SHAKES OR SHOWS DAYLIGHT, CLEAN AND DEBURR THE FACES AND "
             f"DOWELS AND REPEAT {s('arm-plate-fitted', 14)}-{s('arm-plate-fitted', 17)}.",
-            # The doweled plate is read before the pivot spacer is pressed, the cup
+            # The doweled plate is read before the pivot spacer is bonded, the cup
             # bonded or the hook drilled, so a setting the dowels lost
             # costs only the arm's own parts. The uncut plate screws stand
             # under the disc with room to spare
@@ -2736,15 +2745,18 @@ def _step_text(
             f"IF IT SHAKES OR SHOWS DAYLIGHT, DO {s('arm-plate-fitted', 18)} AND "
             f"REPEAT {s('arm-plate-screws-cut', 4)}.",
         ),
-        # R9-71: the spacer is pressed on the shoulder, so its faces' tilt is
-        # fixed in the bar; the MHA-PD-VN-63 spring holds the arm on it. The
+        # The spacer is bonded on the shoulder (LOCTITE 638; fit audit
+        # 2026-11-23, pending owner confirmation), its front face and the
+        # shoulder's end clamped down on one flat plate while it cures, so
+        # its faces' tilt is fixed in the bar; the MHA-PD-VN-63 spring holds
+        # the arm on it. The
         # screw's tip is faced below the bar's front face, where the platen
         # slides; the screw is unlocked, held by its shoulder seated on the
         # bar's back face (owner ruling U-MHA-PD-VN-57-no-lock, #1194). The
         # spot-face floor sets the spring room (transgear_hanger_joints).
         "hanger-pivoted": (
             # #2430: the tip is faced on the bare screw, before the spring,
-            # the arm and the pressed spacer make it captive; it seats the
+            # the arm and the bonded spacer make it captive; it seats the
             # same bare as finished (the spacer stands flush with the
             # shoulder's end, both on the bar's back face).
             f"FACE THE {n['pd-vn-transgear-pivot-screw']} SCREW'S TIP UNTIL, SEATED "
@@ -2753,14 +2765,27 @@ def _step_text(
             f"FRONT FACE, CALIPER DEPTH ROD {row_cite('pivot-tip')}.",
             f"FIT THE {n['pd-vn-transgear-pivot-spring']} SPRING ON ITS SHOULDER, FROM "
             "THE REAR.",
-            "FIT THE ARM, BORE REAMED TO THIS SCREW, ON IT FROM THE REAR.",
-            f"PRESS THE {n['pd-transgear-pivot-spacer']} SPACER, AS MADE, ON THE "
-            "SHOULDER, FLUSH WITH ITS END, BOTH ON A FLAT PLATE WHOSE HOLE CLEARS "
+            # Wax keeps the compound out of the running fit and off the
+            # face the arm bears on (rule 23).
+            "FIT THE ARM, ITS BORE AND FRONT FACE WAXED, ON IT FROM THE REAR.",
+            # The dry trial is what holds one bought screw's shoulder end
+            # inside the squareness the drilled pivot bore tolerates
+            # (pd_transgear_arm_geometry.PIVOT_SHOULDER_END_SQUARENESS_ALLOWED):
+            # no catalogue row states it.
+            f"CHECK, DRY: THE {n['pd-transgear-pivot-spacer']} SPACER, AS MADE, ON "
+            "THE SHOULDER, SCREW HELD DOWN ON A WAXED FLAT PLATE WHOSE HOLE CLEARS "
             f"THE {pivot_screw.THREAD} THREAD, NOT THE "
-            f"\u00d8{steps.inch_text(pivot_screw.SHOULDER_DIA, 4)} SHOULDER.",
-            "IF THE SPACER SLIDES ON BY HAND, MAKE A NEW "
-            f"{n['pd-transgear-pivot-spacer']} SPACER AND REPEAT "
-            f"{s('hanger-pivoted', 3)}.",
+            f"\u00d8{steps.inch_text(pivot_screw.SHOULDER_DIA, 4)} SHOULDER, THE ARM "
+            "SWINGS FREELY.",
+            f"IF IT BINDS, REPEAT FROM {s('hanger-pivoted', 0)} WITH A NEW "
+            f"{n['pd-vn-transgear-pivot-screw']} SCREW.",
+            "DEGREASE THE SPACER'S BORE AND THE SHOULDER BELOW THE ARM.",
+            "COAT THE SPACER'S BORE WITH LOCTITE 638, NOT THE SHOULDER, PUSH IT ON "
+            "CLEAR OF THE ARM AND WIPE ITS FRONT FACE.",
+            "AT ONCE, CLAMP THE SCREW DOWN, THE SHOULDER'S END AND THE SPACER BOTH "
+            f"ON THE PLATE OF {s('hanger-pivoted', 3)}, AND LET THE BOND CURE "
+            f"{PIVOT_SPACER_BOND_CURE_H} H BEFORE THE SCREW IS SEATED OR THE ARM "
+            "OILED.",
             "SEAT THE SCREW, ITS SHOULDER TIGHT ON THE BAR'S BACK FACE "
             f"({PIVOT_VIEW_REF}).",
             "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE.",
@@ -2768,23 +2793,23 @@ def _step_text(
             # on 93879abc87): a hand-torque acceptance that locks nothing.
             "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW.",
             "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY.",
-            f"IF ALL THREE CHECKS PASS, SKIP {s('hanger-pivoted', 10)}-"
-            f"{s('hanger-pivoted', 20)}.",
+            f"IF ALL THREE CHECKS PASS, SKIP {s('hanger-pivoted', 13)}-"
+            f"{s('hanger-pivoted', 23)}.",
             # The arm is captured on the shoulder between the head and the
-            # pressed spacer, so the remedy takes the screw out first
+            # bonded spacer, so the remedy takes the screw out first
             # (Codjiflo P3 on 93879abc87).
             pivot_unscrewed[0],
             pivot_unscrewed[1],
             "FLUSH OIL INTO THE ARM'S BORE, WORKING THE ARM ON THE SHOULDER.",
             "CLEAN AND DEBURR THE SPACER END, BAR BACK FACE AND TAP MOUTH.",
-            f"REPEAT {s('hanger-pivoted', 5)}-{s('hanger-pivoted', 8)}.",
-            f"IF ALL THREE CHECKS NOW PASS, SKIP {s('hanger-pivoted', 16)}-"
-            f"{s('hanger-pivoted', 20)}.",
+            f"REPEAT {s('hanger-pivoted', 8)}-{s('hanger-pivoted', 11)}.",
+            f"IF ALL THREE CHECKS NOW PASS, SKIP {s('hanger-pivoted', 19)}-"
+            f"{s('hanger-pivoted', 23)}.",
             # #3107 (Codjiflo P3 on 3e6318a026, P2s on f92995b8e6): the
             # renewal runs once; a second failure sends the bar and the arm
             # to their sheets and closes every outcome, one action a step
             # (machinist review of 17c29c2192, rule 22).
-            f"DO {s('hanger-pivoted', 10)}-{s('hanger-pivoted', 11)}.",
+            f"DO {s('hanger-pivoted', 13)}-{s('hanger-pivoted', 14)}.",
             "IF NOT YET RENEWED, REPEAT FROM "
             f"{s('hanger-pivoted', 0)} WITH A NEW {n['pd-vn-transgear-pivot-screw']} "
             f"SCREW AND {n['pd-transgear-pivot-spacer']} SPACER.",
@@ -2796,7 +2821,7 @@ def _step_text(
             # an arm found outside with it is renewed in that rebuild.
             f"FOR A BAR FOUND OUTSIDE, MAKE A NEW {n['pd-support-bar']} BAR AND "
             f"REBUILD FROM STEP {steps.step_number('bar-clamped')}, WITH "
-            f"{s('hanger-pivoted', 20)}'S PARTS IF THE ARM IS ALSO OUTSIDE.",
+            f"{s('hanger-pivoted', 23)}'S PARTS IF THE ARM IS ALSO OUTSIDE.",
             "FOR AN ARM FOUND OUTSIDE, OR IF ALL ARE INSIDE, REPEAT FROM STEP "
             f"{steps.step_number('latch-pin-pressed')} WITH A NEW "
             f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-arm-plate']} PLATE, {bush} BUSH, "
@@ -3257,8 +3282,8 @@ def _step_text(
             "HOOK.",
             f"FOR THE ARM SETTING, STRIP THE CLUSTER ({s('disc-cluster-hung', 4)} "
             f"BACK TO {s('disc-cluster-hung', 1)}), KEEPING ITS SHIMS.",
-            f"FOR THE ARM SETTING, DO {s('hanger-pivoted', 10)}-"
-            f"{s('hanger-pivoted', 11)}.",
+            f"FOR THE ARM SETTING, DO {s('hanger-pivoted', 13)}-"
+            f"{s('hanger-pivoted', 14)}.",
             "FOR THE ARM SETTING, REBUILD FROM STEP "
             f"{steps.step_number('latch-pin-pressed')} WITH A NEW "
             f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-arm-plate']} PLATE, {bush} BUSH, "
@@ -3437,7 +3462,7 @@ def _step_text(
             f"IF {s('fitup-accepted', 2)} FAILS, REPEAT FROM STEP "
             f"{steps.step_number('collar-shoulder-seated')}.",
             f"IF {s('fitup-accepted', 5)} FAILS, ARM UNLATCHED, DO {pivot_remedied}.",
-            f"IF A {s('hanger-pivoted', 6)}-{s('hanger-pivoted', 8)} CHECK THEN FAILS, DO "
+            f"IF A {s('hanger-pivoted', 9)}-{s('hanger-pivoted', 11)} CHECK THEN FAILS, DO "
             f"{s('fitup-mesh-remedied', 6)} AND {s('fitup-mesh-remedied', 15)}-"
             f"{s('fitup-mesh-remedied', 19)}.",
             f"FOR {s('fitup-accepted', 5)}, REPEAT {s('hook-pin-hole-match-drilled', 8)}-"

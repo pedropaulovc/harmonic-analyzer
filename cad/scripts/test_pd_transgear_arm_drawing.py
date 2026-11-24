@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import itertools
 import math
+import re
 import runpy
 from fractions import Fraction
 from pathlib import Path
@@ -30,7 +31,7 @@ import _mcmaster_90325a174 as pivot_screw
 from _drawing_types import DRAWING_TEMPLATES
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 
 def _band(places: int) -> float:
@@ -228,17 +229,18 @@ def _floor_pressed_proud_range(pin_length: float, hole_depth: float) -> tuple[fl
 # to .XX inch (reach 0.376), the hook its formed .XX ±.02 (FORMED_BAND .024
 # with the rounding, MHA-PD-14).  The hook's screw holes take the title
 # block's ±.005 (delegated ruling 2026-11-07, the bar's taps spotted through
-# them), so the hook's screw drift grew; MHA-PD-20 faces at ⊥ .001
-# (delegated ruling 2026-11-07) open the pivot fit; #2413's .1940 +.0010/0
-# ream floats the pivot .0085 at most (was .0072).  #3124: the 7/8 pin is set
+# them), so the hook's screw drift grew; the MHA-PD-20 rear face parallel
+# .001 to its front (fit audit 2026-11-23, pending owner confirmation)
+# seats the pivot; the #9 drilled pivot bore floats the pivot .0135 at most
+# (#2413's ream floated it .0085).  #3124: the 7/8 pin is set
 # .516-.565 proud at assembly (owner decision 2026-11-19).  #2019: on the 3/8
 # arm (latch height .188, hook hole on the moved axis) each margin is about
 # 0.011 smaller.  #2422: the bar's pivot tap prints the title block's ±.005
 # (it was ±.002; owner ruling 2026-11-20), which the pin's reach spends.
 _SET_PROUD_WINDOW = (0.516 * 25.4, 0.565 * 25.4)
-_PINNED_FAR_FACE_MARGIN = 0.285
-_PINNED_OLD_PIN_MARGIN = -0.597
-_PINNED_DEEPER_OLD_PIN_MARGIN = -0.647
+_PINNED_FAR_FACE_MARGIN = 0.221
+_PINNED_OLD_PIN_MARGIN = -0.661
+_PINNED_DEEPER_OLD_PIN_MARGIN = -0.711
 
 
 def _worst_far_face_margin(
@@ -363,7 +365,6 @@ def test_the_explicit_bands_are_the_spot_face_and_the_reams() -> None:
     assert model_toleranced_dimensions(part) == {
         ("SpotFaceProfile", "SpotFaceDia"): "*deviations(SPOT_FACE_DIA_BAND)",
         ("SpotFaceProfile", "FloorDepth"): "SPOT_FACE_FLOOR_TOLERANCE",
-        ("PivotBoreProfile", "PivotBoreDia"): "*deviations(PIVOT_BORE_DIA_BAND)",
         ("PinBoreProfile", "PinBoreDia"): "*deviations(PIN_BORE_DIA_BAND)",
         ("PinBoreRearMouthProfile", "PinMouthChamfer"): "PIN_MOUTH_CHAMFER_TOLERANCE",
     }
@@ -630,28 +631,47 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
     assert "PIN HOLE TO FACES" not in note
 
 
-def test_the_pivot_bore_is_one_reamer_running_fit_on_any_shoulder() -> None:
-    """#2413: a standard reamer's size under a pin-gauge band, not a window
-    matched to a measured shoulder; every as-supplied shoulder runs free."""
+def test_the_pivot_bore_is_one_drill_running_clear_on_any_shoulder() -> None:
+    """Fit audit 2026-11-23 (pending owner confirmation): the rocking pivot
+    takes a named drill under the DRILLED HOLES row, not a ream under a
+    pin-gauge band; every as-supplied shoulder runs free in every hole the
+    drill cuts."""
     lower, upper = geometry.PIVOT_BORE_DIAMETRAL_CLEARANCE
     bore_min, bore_max = geometry.PIVOT_BORE_FULL_LIMITS
     shoulder_min = pivot_screw.SHOULDER_DIA + min(pivot_screw.SHOULDER_DIA_LIMITS)
     shoulder_max = pivot_screw.SHOULDER_DIA + max(pivot_screw.SHOULDER_DIA_LIMITS)
     assert (lower, upper) == pytest.approx((bore_min - shoulder_max, bore_max - shoulder_min))
-    assert min(geometry.PIVOT_BORE_DIA_BAND) == 0.0
-    # The band spans one .001 pin-gauge step: GO at the reamer, NO-GO a step up.
-    assert max(geometry.PIVOT_BORE_DIA_BAND) == pytest.approx(0.001 * 25.4)
+    assert (lower, upper) == pytest.approx((0.0085 * 25.4, 0.0135 * 25.4))
+    assert geometry.PIVOT_BORE_DRILL == "#9"
+    assert geometry.PIVOT_BORE_DIA == pytest.approx(0.196 * 25.4)
+    # The analysis band is the drill's growth: the title block's row.
+    assert geometry.PIVOT_BORE_DIA_BAND == pytest.approx(
+        (drilled_oversize_mm(unit=geometry.UNIT), 0.0)
+    )
     # The tightest pair still clears the bore's sweep at the angular row.
     assert lower >= geometry.PIVOT_RUNNING_CLEARANCE_MIN > geometry.PIVOT_AXIS_BINDING_SWEEP_MAX
+    # What the tightest pair leaves for the bought screw's shoulder end,
+    # which no drawing here controls: about .0015 out of square over the
+    # shoulder's diameter (the MHA-PD-20 spacer's taper, its length band's
+    # spread, is charged first).  MHA-PD-00 proves the arm swings free
+    # before the spacer is bonded.
+    allowed = geometry.PIVOT_SHOULDER_END_SQUARENESS_ALLOWED
+    assert allowed == pytest.approx(0.00149 * 25.4, abs=0.0005)
+    assert geometry.PIVOT_SHOULDER_END_ANGLE_ALLOWED == pytest.approx(0.00798, abs=1e-5)
+    assert allowed == pytest.approx(
+        shoulder_min * math.tan(geometry.PIVOT_SHOULDER_END_ANGLE_ALLOWED)
+    )
     assert joints.SHOULDER_RADIAL_CLEARANCE == pytest.approx(lower / 2.0)
     assert joints.PIVOT_RADIAL_FLOAT_MAX == pytest.approx(upper / 2.0)
     screw = _config.parts("pd-vn-transgear-pivot-screw")["number"]
-    # The fit's facts, not its wording: the clearance band and the named
-    # screw, in the note the bore's callout links; no measured-shoulder route.
+    # The fit's facts, not its wording: the named drill on the callout and
+    # the named screw in the note it links; no number in the note.
+    assert arm_notes.PIVOT_BORE_CALLOUT.startswith("#9 DRILL THRU")
+    assert "REAM" not in arm_notes.PIVOT_BORE_CALLOUT
     assert f"SEE NOTE {arm_notes.PIVOT_NOTE}" in arm_notes.PIVOT_BORE_CALLOUT
     flat = " ".join(arm_notes.NOTES[arm_notes.PIVOT_NOTE - 1].split())
-    for fact in (".0065-.0085", screw):
-        assert fact in flat, fact
+    assert screw in flat and "RUNNING CLEARANCE" in flat
+    assert not re.search(r"\d", flat.removeprefix(f"{arm_notes.PIVOT_NOTE}.").replace(screw, ""))
     assert "MEASURED" not in flat
     assert screw == "MHA-PD-VN-57"
     assert not hasattr(spec, "PIVOT_FIT_INSPECTION_NOTE")
@@ -1246,8 +1266,8 @@ def test_arm_feature_bands_are_the_printed_ones() -> None:
     assert features["rear_face"]["thickness_stock"] == pytest.approx([_in(0.374), _in(0.376)])
     assert features["rear_face"]["callout"] == "3/8 (.3750) GROUND STOCK REF"
     pivot = features["pivot_bore"]
-    assert pivot["dia"] == pytest.approx([_in(0.1940), _in(0.1950)])
-    assert pivot["process"] == "ream" and pivot["thru"] is True and pivot["datum"] == "B"
+    assert pivot["dia"] == pytest.approx([_in(0.196), _in(0.200)])
+    assert pivot["process"] == "drill" and pivot["thru"] is True and pivot["datum"] == "B"
     spot = features["spot_face"]
     assert spot["dia"] == pytest.approx([_in(0.500), _in(0.504)])
     # The native ±.002 qualifies the 6.9 model floor (.2717 printed).
