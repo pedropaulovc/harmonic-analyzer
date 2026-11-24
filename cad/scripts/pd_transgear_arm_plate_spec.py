@@ -70,9 +70,9 @@ for _label, _places, _band in (
             f" not the ±{_band} its walls assume"
         )
 
-# Explicit model bands, (upper, lower) deviations where one-sided.
-# The FN2 hole for the MHA-PD-28 bush's press diameter (ANSI B4.1 hole
-# limits, pd_transgear_knob_bush_geometry).
+# ANALYSIS band, (upper, lower) deviations, not a printed limit: what the
+# .4385 set reamer is modelled to cut for the MHA-PD-28 bush's press
+# (pd_transgear_knob_bush_geometry); the sheet prints the size and no band.
 PRESS_HOLE_BAND = PLATE.BUSH.PRESS_HOLE_BAND
 BASIC_REDUCER_DIMENSIONS = (
     ("ScrewHoleProfile", "ScrewHoleX1"),
@@ -148,8 +148,8 @@ DOWEL_NUMBER = "MHA-PD-VN-64"
 # press hole is a pressed bore, face A a clamp face, and the knob's running
 # bore and thrust faces are the MHA-PD-28 bush's.
 # The press hole is a fit: REAM is the requirement (drawing-guidelines.md
-# rule 12 (hole and slot callouts say what to do)), and its FN2 band names
-# the bush (rule 4).  The screw holes are clearance, drilled; both
+# rule 12 (hole and slot callouts say what to do)), and its callout names
+# the bush and what the press protects (rule 4).  The screw holes are clearance, drilled; both
 # countersinks take the oval heads, each coaxial with its drilled hole: the
 # seat and wall budgets bound both axes inside the plate by the hole's zone
 # and the drill's run-off

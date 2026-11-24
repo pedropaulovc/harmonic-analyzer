@@ -255,7 +255,8 @@ SECTION_POSITION_TOL_M = 1e-4
 # ring's thrust face, at y = 0 is the datum end the lengths run from; the
 # shoulder (datum A) at y = HUB_LENGTH; the rear face, the MHA-PD-16 cup's
 # thrust face, at y = LENGTH). The hub takes the title block's .XX row; the
-# press its FN2 band, turned to the measured MHA-PD-19 hole (its callout);
+# press prints (Ø.4385) REF, turned to the measured MHA-PD-19 hole (its
+# callout; its "dia" field carries the spec's ANALYSIS envelope);
 # the shoulder's station its ±.001 and its root the printed R.005 MAX; the
 # length its ±.002; the bore its H7 band, reamed through after pressing in
 # MHA-PD-19 (MHA-PD-00), square to A, under the stated wall. Each ``span``

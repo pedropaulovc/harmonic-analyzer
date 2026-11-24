@@ -3,13 +3,15 @@ pd-vn-transgear-arm-plate-locating-pin:
   number: MHA-PD-VN-64
   stock_name: Alloy Steel Dowel Pin
   supplier: McMaster-Carr
-  supplier_skus: [98381A435]
+  supplier_skus: [98381A216]
   material: Alloy Steel
-  material_specification: "Alloy steel dowel pin, 3/32 x 5/16, Round x Chamfer ends; McMaster-Carr 98381A435"
+  material_specification: "Alloy steel dowel pin, 1/8 x 5/16, Round x Chamfer ends; McMaster-Carr 98381A216"
   finish: plain; no coating
-  # https://www.mcmaster.com/products/dowel-pins/system-of-measurement~inch/diameter~3-32/length~5-16/
-  # Family table read live 2026-11-02 (product page needs login): 3/32 dia,
-  # 5/16 long, dia +.0001/+.0003, 1,400 lbf double shear, RC47, ASME B18.8.2.
+  # https://www.mcmaster.com/products/dowel-pins/system-of-measurement~inch/diameter~1-8/length~5-16/
+  # Family table read live 2026-11-23 (product page needs login): 1/8 dia,
+  # 5/16 long, dia +.0001/+.0003, 2,600 lbf double shear, RC47, ASME B18.8.2,
+  # package of 100. 1/8 (was 3/32, 98381A435): fit audit 2026-11-23, pending
+  # owner confirmation; its holes take the over/under set's .1240/.1260 reamers.
   quantity: 2
   tolerance_class: machined_block
   process: purchased

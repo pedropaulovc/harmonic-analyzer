@@ -31,21 +31,11 @@ description = "Plug gauge pair, .2500 GO (plus) and .2510 NO-GO (minus), Vermont
 # known per pin."). Conventions as common.toml's zz-pins records: GO a plus
 # pin at the low limit, NO-GO a minus pin at the high limit (from the
 # .061-.500 minus box where that limit is a whole thousandth), resolution one
-# pin's Class ZZ tolerance, .0002 in = 0.00508 mm. The K bore's .4375-.4382
-# band is the odd one: its NO-GO is a
-# .4380 plus pin, .4380-.4382, at or under the .4382 limit. Bands only pd
-# plans gauge: .1240-.1245 (MHA-PD-18), .4375-.4382 (MHA-PD-19, and MHA-PD-28
-# re-gauging PD-19's hole with the same pins), .0615-.0620 (MHA-PD-17).
-[gauges.zz-pins-1240-1245]
-range_mm = [3.1496, 3.1623]
-resolution_mm = 0.00508
-[tools.zz-pins-1240-1245]
-description = "Class ZZ pins for .1240-.1245: GO .1240 plus (single), NO-GO .1245 minus (single)"
-[gauges.zz-pins-4375-4382]
-range_mm = [11.1125, 11.13028]
-resolution_mm = 0.00508
-[tools.zz-pins-4375-4382]
-description = "Class ZZ pins for .4375-.4382: GO .4375 plus (single), NO-GO .4380 plus (single)"
+# pin's Class ZZ tolerance, .0002 in = 0.00508 mm. Bands only pd
+# plans gauge: .0615-.0620 (MHA-PD-17). The .1240-.1245 (MHA-PD-18) and
+# .4375-.4382 (MHA-PD-19) pins are retired: fit audit 2026-11-23 (pending
+# owner confirmation), those holes are cut by the over/under set's reamers
+# and accepted with their own mates.
 [gauges.zz-pins-0615-0620]
 range_mm = [1.5621, 1.5748]
 resolution_mm = 0.00508
@@ -181,23 +171,12 @@ description = "Shop-made work arbor with two backing discs for cutting the MHA-P
 [tools.reamer-0615]  # MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 REAM (.163), no band
 description = ".0615 in HSS chucking reamer"
 diameter_mm = 1.5621
-[tools.reamer-0945]  # MHA-PD-19 2X Ø.0945 +.0005/.0000 REAM THRU
-description = ".0945 in HSS chucking reamer"
-diameter_mm = 2.4003
 [tools.reamer-1855]  # MHA-PD-20 Ø.1850 +.0010/+.0005 REAM THRU
 description = ".1855 in HSS chucking reamer"
 diameter_mm = 4.7117
 [tools.reamer-1940]  # MHA-PD-18 Ø.1940 +.001/.000 REAM THRU
 description = ".1940 in HSS chucking reamer"
 diameter_mm = 4.9276
-# MHA-PD-19 press hole Ø.4375 +.0007/0 REAM THRU for the MHA-PD-28 bush (FN2,
-# #2425). The 27/64 (.4219 in) drill is the 115-piece index's, nominal × 25.4;
-# it leaves .0156 in on the diameter for the reamer. The .4375 reamer is not
-# owned (cad/config/shop-equipment/ tools.reamer-4375, to buy); diameter_mm is
-# its nominal size.
-[tools.reamer-4375]
-description = ".4375 in (7/16) HSS straight-flute chucking reamer"
-diameter_mm = 11.1125
 [tools.endmill-hss-tin-2fl-3-16]  # MHA-PD-16 flat floor for the Ø.19 head counterbore, plunged from the tailstock
 description = "3/16 in TiN-coated HSS 2-flute square end mill, centre cutting (McMaster 8949A16)"
 diameter_mm = 4.7625

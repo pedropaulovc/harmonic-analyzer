@@ -261,7 +261,10 @@ def test_the_paper_drive_bushes_print_the_sheets_bands() -> None:
 
     bush = manifest("pd_transgear_knob_bush")["features"]
     assert _inch(bush["outer"]["dia"]) == [0.51, 0.53]
-    assert _inch(bush["step"]["dia"]) == [0.4387, 0.4391]
+    # Made to the plate's measured hole: the export's limits are the
+    # analysis envelope (the .4385 reamer's modelled hole plus the range),
+    # not a printed band; the sheet prints (Ø.4385) and the range.
+    assert _inch(bush["step"]["dia"]) == [0.439, 0.4406]
     assert _inch(bush["step"]["diametral_interference"]) == [0.0005, 0.0016]
     assert _inch(bush["shoulder"]["station"]) == [0.808, 0.81]
     assert _inch([bush["shoulder"]["root_radius_max"]]) == [0.005]

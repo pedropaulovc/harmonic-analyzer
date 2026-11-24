@@ -287,17 +287,28 @@ def test_locating_dowels_press_into_the_arm_and_slip_in_the_plate() -> None:
         assert _pair(pin, "pd-transgear-arm-plate-1") not in allowed
 
 
+def test_the_latch_pin_presses_into_the_arms_blind_ream() -> None:
+    """MHA-PD-VN-58 in the arm's .1240 ream over its modelled insertion: the
+    hole is modelled at its set reamer's size (fit audit 2026-11-23), so the
+    press is a modelled overlap and takes a row."""
+    assert latch_pin.DIA > arm.PIN_HOLE_DIA
+    assert latch_pin.PRESS_DEPTH < arm.PIN_HOLE_DEPTH
+    pair = _pair("pd-vn-transgear-latch-pin-1", "pd-transgear-arm-1")
+    assert _allowed()[pair] == pytest.approx(
+        _annulus(latch_pin.DIA, arm.PIN_HOLE_DIA, latch_pin.PRESS_DEPTH)
+    )
+
+
 def test_pressed_and_slip_joints_without_a_row_do_not_overlap() -> None:
     """A row-less joint is modelled line to line or clear; a spec that turns
     one into a press needs a row here."""
     assert shaft.CORE_DIA <= _collar().BORE_DIA
-    assert latch_pin.DIA <= arm.PIN_HOLE_DIA
     # The modelled pin stands on the hook hole's axis offset by the bearing lift.
     assert hook.PIN_BEARING_LIFT + latch_pin.DIA / 2.0 <= hook.PIN_HOLE_DIA / 2.0
     assert drive_pin.DIA <= removable.PIN_HOLE_DIA
-    # #2425: the MHA-PD-28 bush's FN2 press in the plate is modelled line to
-    # line (its printed limits come from the bands), and the journal runs in
-    # its reamed bore.
+    # #2425: the MHA-PD-28 bush's press in the plate is modelled line to
+    # line (the step is turned to the measured hole), and the journal runs
+    # in its reamed bore.
     assert bush.PRESS_DIA == plate.PRESS_HOLE_DIA
     assert shaft.JOURNAL_DIA <= bush.BORE_DIA
     allowed = _allowed()

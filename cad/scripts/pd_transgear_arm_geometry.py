@@ -34,7 +34,6 @@ import pd_rack_pinion_spec as DISC
 import pd_support_bar_spec as BAR
 import _mcmaster_90325a174 as PIVOT
 from _fit_close_running import measured_close_running_clearance_mm
-from _fit_deviations import deviations
 from _gear_quality import reducer_position_diameter_mm
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
@@ -258,38 +257,28 @@ PLATE_TAP_STATIONS = (
 )
 
 # Matched locating dowels, independent of the mounting screws' clearance.
-# 13.1 (was 13.7): owner ruling 2026-10-27 (#1379) confirmed option W1 under
-# the full-budget wall rule (sketch and per-term arithmetic in
-# issuecomment-6443060097). At 13.7 the full
-# worst-case wall to the arm's edge, with the outline's edge break and the
-# drill's run-off, fell to 1.76 (WALLS below). 13.2 met 2.0 by 0.014, too
-# thin for the reducer centre's ±0.5 source-mutation control; 13.1 keeps 2.06.
-LOCATOR_PAIR_BASELINE_MM = 13.1
+# 12.8 (was 13.1, and 13.7 before): owner ruling 2026-11-24, fit audit
+# question 9 ("Arm-to-plate dowels: 1/8 dowels on two reamers of the set,
+# holes .504 apart", approved as recommended; it reverses the 3/32 dowel of
+# #290).  The dowels go from 3/32 to 1/8 so their holes are cut by
+# the over/under reamer set's .1240 and .1260 members; at 13.1 the larger
+# plate hole's full worst-case wall to the plate's edge falls to 1.91 under
+# the 2.03 target (pd_transgear_arm_plate_geometry.WALLS), at 12.8 it keeps
+# 2.06 and the arm's own edge wall 2.35 (WALLS below).  13.1 was owner
+# ruling 2026-10-27 (#1379), option W1 under the full-budget wall rule
+# (issuecomment-6443060097), for the 3/32 dowel.
+LOCATOR_PAIR_BASELINE_MM = 12.8
 LOCATOR_SITES_MM = (
     (PLATE_SCREW_MID_STATION, LOCATOR_PAIR_BASELINE_MM / 2.0),
     (PLATE_SCREW_MID_STATION, -LOCATOR_PAIR_BASELINE_MM / 2.0),
 )
-# The interface's .093 REAM_H7 press, printed as the reamer's band
-# (upper, lower), as the named fit bands are written.
-LOCATOR_HOLE_DIA_MM = min(LOCATING_PIN.PRESS_HOLE_LIMITS_MM)  # .0930
+# The interface's .1240 set reamer.  The sheet prints the reamer's size and
+# no band (the dowel that does not enter by hand is the gauge); the reamed
+# limits are the ANALYSIS limits the walls and the press are judged at, what
+# the reamer is modelled to cut.
+LOCATOR_HOLE_DIA_MM = min(LOCATING_PIN.PRESS_HOLE_LIMITS_MM)  # .1240
 LOCATOR_HOLE_PLACES = 4
-LOCATOR_HOLE_DIA_BAND = tuple(
-    limit - LOCATOR_HOLE_DIA_MM for limit in reversed(LOCATING_PIN.PRESS_HOLE_LIMITS_MM)
-)
-_LOCATOR_PRINTED = tuple(
-    LOCATOR_HOLE_DIA_MM + deviation
-    for deviation in printed_deviations(
-        LOCATOR_HOLE_DIA_MM, LOCATOR_HOLE_PLACES, deviations(LOCATOR_HOLE_DIA_BAND), unit=UNIT,
-    )
-)
-if not (
-    LOCATING_PIN.PRESS_HOLE_LIMITS_MM[0] - 1e-9
-    <= min(_LOCATOR_PRINTED)
-    < max(_LOCATOR_PRINTED)
-    <= LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] + 1e-9
-):
-    raise AssertionError("the printed locating ream leaves the interface's press limits")
-LOCATOR_HOLE_PRINTED_LIMITS_MM = (min(_LOCATOR_PRINTED), max(_LOCATOR_PRINTED))
+LOCATOR_HOLE_REAMED_LIMITS_MM = tuple(LOCATING_PIN.PRESS_HOLE_LIMITS_MM)
 PLATE_TAP_SPEC = HoleSpec("tapped", "#8-32")
 # The tap mouths take the title block's ordinary edge break (.010 chamfer):
 # no band is tightened to protect the thread (fan-out screen, gating); the
@@ -312,10 +301,15 @@ PLATE_TAP_EXIT_LOSS_MAX_MM = PLATE_TAP_EXIT_BREAK_MAX_MM / math.tan(
 PLATE_TAP_PITCH_DIA_LIMITS_MM = tuple(value * 25.4 for value in (0.1437, 0.1475))
 
 # --- Latch pin: reamed press hole along -X into the square end, drill point -
-PIN_HOLE_DIA = 3.175  # .125, the 1/8 dowel's nominal
-# REAM .125 -.0005/-.0010 (#290, owned .1240 reamer): the blind press for the
-# 98381A474 dowel (+.0001/+.0003 over nominal) holds at both limits (R9-12).
-PIN_HOLE_DIA_BAND = (-0.0127, -0.0254)
+# REAM .1240 (the over/under set's reamer), printed as the reamer's size
+# with no band: the 98381A474 dowel (+.0001/+.0003 over 1/8) is the gauge,
+# it does not enter by hand.  Permanent stop pin with no other fastener
+# (owner 2026-10-27, #1379: "should never come out").  The band is the
+# ANALYSIS band, what the reamer is modelled to cut (REAM_H7), for the walls
+# and the press range (fit audit 2026-11-23, pending owner confirmation;
+# was the same hole printed .1250 -.0005/-.0010).
+PIN_HOLE_DIA = 3.1496  # .1240
+PIN_HOLE_DIA_BAND = (0.0127, 0.0)
 # Owner decision 2026-11-19 (#3124 item 3): drilled and reamed to a drill
 # point, the full-diameter depth printed as a MIN; the dowel is pressed to
 # its proud height at assembly (MHA-PD-00 DETAIL L), not onto a floor.  The

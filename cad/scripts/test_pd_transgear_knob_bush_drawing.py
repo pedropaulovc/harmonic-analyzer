@@ -49,8 +49,9 @@ def test_required_drawing_paths() -> None:
 
 
 def test_the_contract_dimensions_are_the_ruled_variant() -> None:
-    """#2425: hub Ø.52 x .809 to the shoulder, press Ø.4375 on to the rear
-    face, 1.143 overall, bore .249 reamed after a .238 (B) drill."""
+    """#2425: hub Ø.52 x .809 to the shoulder, press Ø.4385 REF (the plate's
+    set reamer; fit audit 2026-11-23) on to the rear face, 1.143 overall,
+    bore .249 reamed after a .238 (B) drill."""
     assert BUSH.HUB_DIA == pytest.approx(_in(0.52))
     assert BUSH.HUB_LENGTH == pytest.approx(_in(0.809))
     assert BUSH.HUB_LENGTH_BAND == FIT_LENGTH_BAND_IN
@@ -58,7 +59,7 @@ def test_the_contract_dimensions_are_the_ruled_variant() -> None:
     assert BUSH.LENGTH == pytest.approx(_in(1.143))
     assert BUSH.LENGTH_BAND == pytest.approx(_in(0.002))
     assert BUSH.STUB_LENGTH == pytest.approx(_in(0.334))
-    assert BUSH.PRESS_DIA == pytest.approx(_in(0.4375))
+    assert BUSH.PRESS_DIA == pytest.approx(_in(0.4385))
     assert BUSH.BORE_DIA == pytest.approx(_in(0.249))
     assert BUSH.BORE_DIA_LIMITS == pytest.approx((0.0, _in(0.0005)))
     assert BUSH.PRE_REAM_DRILL_DIA == pytest.approx(_in(0.238))
@@ -75,16 +76,20 @@ def test_the_contract_dimensions_are_the_ruled_variant() -> None:
     assert BUSH.UNIT == "in"
 
 
-def test_the_fn2_press_limits_and_interference() -> None:
-    """ANSI B4.1 FN2, 0.40-0.56 in: hole +.0007/0, shaft +.0016/+.0012,
-    interference .0005-.0016; the bush prints .4387/.4391."""
-    press = tuple(BUSH.PRESS_DIA + deviation for deviation in BUSH.PRESS_DIA_BAND)
-    assert press == pytest.approx((_in(0.4391), _in(0.4387)))
+def test_the_press_is_turned_to_the_measured_hole() -> None:
+    """Fit audit 2026-11-23 (rule 4, made to fit): the plate's hole is cut
+    by the .4385 set reamer (modelled +.0005/0) and the step is turned
+    .0005-.0016 over that hole as measured, a range over .001 wide.  The
+    step's own band is the analysis envelope, not a printed limit."""
     hole = tuple(BUSH.PRESS_DIA + deviation for deviation in BUSH.PRESS_HOLE_BAND)
-    assert hole == pytest.approx((_in(0.4382), _in(0.4375)))
+    assert hole == pytest.approx((_in(0.4390), _in(0.4385)))
     assert BUSH.PRESS_INTERFERENCE == pytest.approx((_in(0.0005), _in(0.0016)))
-    assert min(press) - max(hole) == pytest.approx(BUSH.PRESS_INTERFERENCE[0])
-    assert max(press) - min(hole) == pytest.approx(BUSH.PRESS_INTERFERENCE[1])
+    assert max(BUSH.PRESS_INTERFERENCE) - min(BUSH.PRESS_INTERFERENCE) >= _in(0.001)
+    press = tuple(BUSH.PRESS_DIA + deviation for deviation in BUSH.PRESS_DIA_BAND)
+    assert min(press) == pytest.approx(min(hole) + BUSH.PRESS_INTERFERENCE[0])
+    assert max(press) == pytest.approx(max(hole) + BUSH.PRESS_INTERFERENCE[1])
+    assert spec.PRESS_DIA_TEXT_PREFIX == "(<MOD-DIAM>"
+    assert spec.PRESS_DIA_TEXT_SUFFIX == ")"
 
 
 def test_the_plate_hole_is_the_bush_press_band() -> None:
@@ -97,10 +102,12 @@ def test_the_plate_hole_is_the_bush_press_band() -> None:
 def test_the_bands_live_on_the_model_from_named_constants() -> None:
     assert model_toleranced_dimensions(part) == {
         ("BoreSketch", "BoreDia"): "*deviations(BORE_BAND)",
-        ("BushProfile", "PressDia"): "*deviations(PRESS_DIA_BAND)",
         ("BushProfile", "HubLength"): "HUB_LENGTH_BAND",
         ("BushProfile", "BushLength"): "LENGTH_BAND",
     }
+    assert "_press_dia_reference(adapter)" in Path(part.__file__).read_text(
+        encoding="utf-8"
+    )
     assert spec.BORE_BAND == (max(BUSH.BORE_DIA_LIMITS), min(BUSH.BORE_DIA_LIMITS))
     # Every band is narrower than the title-block row its places claim.
     for band, places in (
@@ -184,7 +191,7 @@ def test_each_tight_callout_names_its_mate_by_drawing_number() -> None:
     assert bore[2] == spec.WALL_TEXT
     press = spec.PRESS_CALLOUT.splitlines()
     assert len(press) == 2
-    assert press[0] == f"PRESS FIT IN {plate}"
+    assert press[0] == f"PRESS FIT IN {plate}, HOLDS KNOB AXIS"
     assert press[1] == "TURN TO MEASURED HOLE (INTERFERENCE .0005-.0016)"
     assert spec.HUB_LENGTH_CALLOUT == (
         f"SETS {shaft}\nAND {_number('pd-transgear-removable')}"
@@ -212,7 +219,7 @@ def _worst_walls_in() -> dict[str, float]:
     run_off = (1.143 + 0.002) * math.tan(math.radians(0.3))
     breaks = 2.0 * 0.010
     return {
-        "press section over the bore": (0.4375 + 0.0012) / 2.0
+        "press section over the bore": (0.4385 - 0.0005) / 2.0
         - bore_r
         - run_off
         - breaks,
@@ -221,16 +228,17 @@ def _worst_walls_in() -> dict[str, float]:
 
 
 def test_walls_hold_at_the_printed_worst_case() -> None:
-    """Rule 17: the smallest press (FN2 lower limit) and hub (.XX) over the
+    """Rule 17: the smallest press section (the traveler's slip pilot, at
+    most .0005 under the smallest reamed hole) and hub (.XX) over the
     largest reamed bore, less 0.3 deg run-off over the longest bore and the
-    title-block break on both rims: press .0686 (between the floor and the
+    title-block break on both rims: press .0682 (between the floor and the
     target, stated on the sheet), hub .1043."""
     expected = _worst_walls_in()
     assert set(BUSH.WALLS) == set(expected)
     for name, worst_in in expected.items():
         assert BUSH.WALLS[name][1] == pytest.approx(_in(worst_in), abs=1e-6), name
     assert BUSH.WALLS["press section over the bore"][1] / 25.4 == pytest.approx(
-        0.0686, abs=5e-5
+        0.06825, abs=5e-5
     )
     assert BUSH.WALLS["hub over the bore"][1] >= WALL_TARGET_MM
     assert WALL_FLOOR_MM <= BUSH.WALL_WORST < WALL_TARGET_MM
@@ -263,7 +271,7 @@ def test_the_stated_wall_is_an_owner_minor_exception() -> None:
         " .080 target, with no geometry escape, are accepted as package-specific"
         " minor exceptions."
     )
-    press_min = f"{(BUSH.PRESS_DIA + BUSH.PRESS_DIA_BAND[1]) / 25.4:.4f}"
+    press_min = f"{BUSH.PILOT_DIA_MIN / 25.4:.4f}"
     bore_max = f"{(BUSH.BORE_DIA + max(BUSH.BORE_DIA_LIMITS)) / 25.4:.4f}"
     longest = f"{(BUSH.LENGTH + BUSH.LENGTH_BAND) / 25.4:.3f}"
     for fact in (press_min, bore_max, longest):
@@ -297,7 +305,7 @@ def test_the_shoulder_seats_past_the_plate_hole_mouth() -> None:
     assert BUSH.PRESS_HOLE_MOUTH_CHAMFER_MIN == pytest.approx(_in(0.010))
     assert BUSH.PRESS_HOLE_MOUTH_CHAMFER_MAX == pytest.approx(_in(0.020))
     assert BUSH.PRESS_HOLE_MOUTH_CHAMFER_MIN >= BUSH.SHOULDER_ROOT_R_MAX_MM
-    land_in = (0.51 - 0.4382) / 2.0 - 0.020 - 0.010
+    land_in = (0.51 - 0.4390) / 2.0 - 0.020 - 0.010
     assert BUSH.SHOULDER_LAND_WORST == pytest.approx(_in(land_in), abs=1e-6)
     assert BUSH.SHOULDER_LAND_WORST > 0.0
     assert spec.SHOULDER_ROOT_SUFFIX == " MAX"
