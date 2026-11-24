@@ -1402,6 +1402,13 @@ def context(
     ):
         if not (-across + t_par + half < xy[1] < -t_par - half):
             raise ValueError(f"{what} reaches a stack")
+    # The least gap each leaves a stack, the block at its least size across
+    # the jaws: the Holding texts of those two setups print it.
+    for key, xy, half, least in (
+        ("pinch_stack_clear_min_mm", pinch_xy, t_major / 2, f["south_face"]["depth"][0]),
+        ("adjuster_stack_clear_min_mm", adj_xy, a_major / 2, f["west_face"]["width"][0]),
+    ):
+        _agree(plan, key, min(-xy[1], least + xy[1]) - half - t_par)
     # DT11: the jaws inward of the overhang, the stacks inside them, the
     # spacer strip standing on the vise bed at the jaws' left end, and the
     # block itself (the arbor's parts must miss it at every Z).

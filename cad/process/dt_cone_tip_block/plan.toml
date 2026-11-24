@@ -327,6 +327,12 @@ riser_height_mm = 38.1
 east_riser_height_mm = 28.575
 parallel_height_mm = 12.7
 parallel_thickness_mm = 3.175
+# The least gap between a through hole's edge (its tap's basic major) and a
+# stack's inner face, the block at its least size across the jaws: the pinch
+# hole in Setup 6 (.029), the adjuster in Setup 8 (.070). cam.py recomputes
+# both; the two Holding texts print them.
+pinch_stack_clear_min_mm = 0.7366
+adjuster_stack_clear_min_mm = 1.778
 vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
 vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
 vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
@@ -755,7 +761,7 @@ title = "W to the width; the pinch hole"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The 1 in and 1/2 in parallels stacked against each jaw (1.5 in). The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; SEAT to the LEFT, centred along the jaws. Tap it down onto both stacks while closing the vise: the pinch hole exits E between them."
+holding = "The 1 in and 1/2 in parallels stacked against each jaw (1.5 in), each stack hard against its jaw. The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; SEAT to the LEFT, centred along the jaws. Tap it down onto both stacks while closing the vise. The parallels are {{process.parallel_thickness_mm:in.3dot}} thick: the pinch hole exits E in the gap between the two stacks, {{process.pinch_stack_clear_min_mm:in.3dot}} or more clear of each."
 datum = "Program DT06_west. G54: X0 SEAT (left), Y0 the fixed jaw's face (N), Z0 the stacks' top (E), set from the miked width. The pinch hole at X {{cad.pinch_tap_height_in:.3f}}, Y −{{cad.pinch_tap_depth_center_in:.3f}} in."
 diagram = { file = "diagrams/west.svg", alt = "The block on edge on stacked parallels, E down, gripped on N and S; the 1/2 in end mill faces W down to the width; the #43 drills the pinch hole through both halves and the #30 opens the W half to the slot." }
 envelope = { x_span_mm = ["{{process.length_target_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.depth_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.west_raw_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.pinch_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_30_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
@@ -915,7 +921,7 @@ title = "The adjuster: drill, countersink N, tap"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The same stacks. The block lying N up, S down on them, gripped on E and W: E against the FIXED jaw; SEAT to the LEFT, centred. Tap it down onto both stacks while closing the vise: the adjuster exits S between them."
+holding = "The same stacks, each hard against its jaw. The block lying N up, S down on them, gripped on E and W: E against the FIXED jaw; SEAT to the LEFT, centred. Tap it down onto both stacks while closing the vise. The adjuster, drilled and tapped through, exits S in the gap between the two {{process.parallel_thickness_mm:in.3dot}} thick stacks, {{process.adjuster_stack_clear_min_mm:in.3dot}} or more clear of each."
 datum = "Programs DT08_adjuster and DT09_adjuster_tap. G54: X0 SEAT (left) shifted by H − 1.500 (below), Y0 the fixed jaw's face (E), Z0 .4400 below N (touched off on N: the countersink is cut from N whatever the block's depth). The adjuster at X 1.500 (that is, H from SEAT), Y −{{cad.adjuster_lateral_in:.3f}} in."
 diagram = { file = "diagrams/adjuster.svg", alt = "The block lying N up on stacked parallels, gripped on E and W; the centre drill spots, the #3 drills the adjuster through and the chamfer mill circles its countersink at N; then the 1/4-28 tap is turned by hand under the tap guide." }
 envelope = { x_span_mm = ["{{process.length_target_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{process.width_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_target_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.adjuster_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
@@ -1088,7 +1094,7 @@ title = "Saw the slit"
 machine = "PM-30MV CNC (FluidNC, CNCjs) / vise, swivel off; the 2-3/4 × .064 slitting saw on the R8 stepped saw arbor"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The 1 in and 1/2 in parallels stacked against each jaw, their right ends at or left of the right jaw side. The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; TOP to the RIGHT, standing {{process.slit_overhang_mm:in.2dot}} in past the right jaw side. The spacer strip (Setup 2) standing on end on the vise bed at the jaws' left end (its 2-1/4 length upright, a .44 × .80 end down), the stacks ending to its right, gripped by the bare jaws on its two .44 faces. Tap the block down onto both stacks while closing the vise. The saw works right of TOP: the arbor's body above the saw and its cap and screw below pass beside the TOP end, right of the jaws."
+holding = "The 1 in and 1/2 in parallels stacked against each jaw, their right ends at or left of the right jaw side. The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; TOP to the RIGHT, standing {{process.slit_overhang_mm:in.2dot}} in past the right jaw side. The spacer strip (Setup 2) standing on end on the vise bed at the jaws' left end (its 2-1/4 length upright, a .44 × .80 end down), the stacks ending to its right: the bare jaws grip it on its two wide faces (the bar's faces, which Setup 2 left {{cad.south_face_depth_min_in:.2dot}}–{{cad.south_face_depth_max_in:.2dot}} apart: the block's depth), its .80 width along the jaws. Tap the block down onto both stacks while closing the vise. The saw works right of TOP: the arbor's body above the saw and its cap and screw below pass beside the TOP end, right of the jaws."
 datum = "Program DT11_slit. G54: X0 TOP (right, the block to −X), Y0 the fixed jaw's face (N), Z0 the stacks' top (E), set from the miked width with the saw's lower face touched off on W. The file's Z is the saw's lower face; it loads no tool."
 diagram = { file = "diagrams/slit.svg", alt = "The block on edge on stacked parallels, E down, gripped on N and S, TOP .75 in past the right jaw side; the slitting saw, horizontal on the stepped arbor, saws the slit in from TOP across the block's depth, the arbor's body above the saw and its cap and screw below it, both past the end." }
 envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.slit_depth_mm}}", 5.08], y_span_mm = ["{{process.saw_dia_mm}}", "{{process.depth_target_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.width_target_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.saw_cut_z_mm}}"], longest_tool_mm = "{{process.saw_arbor_length_mm}}", shortest_tool_mm = "{{process.saw_arbor_length_mm}}" }
@@ -1155,7 +1161,7 @@ speed_kind = "spindle"
 tool = "slit-saw"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT11_slit (the saw; set 100, low range): one light pass along +Y across the block's depth (conventional: the saw turns clockwise right of TOP), {{process.slit_first_pass_mm:in.3dot}} into TOP. The file then lifts the saw clear and stops the spindle (M0). Cutting oil on the saw."
+instruction = "Run DT11_slit (the saw; set 100, in the L range): one light pass along +Y across the block's depth (conventional: the saw turns clockwise right of TOP), {{process.slit_first_pass_mm:in.3dot}} into TOP. The file then lifts the saw clear and stops the spindle (M0). Cutting oil on the saw."
 rpm = 100
 feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
