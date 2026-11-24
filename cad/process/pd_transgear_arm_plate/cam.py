@@ -615,8 +615,9 @@ def context(
     )
     # The check: a pin between K's top limit and the smallest rim stands in
     # the chamfer; its end sits half the rim-less-pin below face A. The band
-    # holds for any K in its band: the shallowest end from K's top limit and
-    # the shortest leg, the deepest from K's low limit and the longest.
+    # is the sheet's leg band on the printed K, no tighter (rule T15): a K
+    # at the reamer's modelled top limit moves a reading by a quarter thou,
+    # under what the calipers' depth rod resolves.
     pin = p["chamfer_pin_dia_mm"]
     if not g["k_band"][1] < pin < g["k_dia"] + 2 * g["chamfer_band"][0]:
         raise ValueError("the chamfer pin does not seat on the chamfer")
@@ -624,8 +625,8 @@ def context(
         plan,
         "chamfer_pin_depth",
         (
-            (g["k_band"][1] + 2 * g["chamfer_band"][0] - pin) / 2,
-            (g["k_band"][0] + 2 * g["chamfer_band"][1] - pin) / 2,
+            (g["k_dia"] + 2 * g["chamfer_band"][0] - pin) / 2,
+            (g["k_dia"] + 2 * g["chamfer_band"][1] - pin) / 2,
         ),
     )
 

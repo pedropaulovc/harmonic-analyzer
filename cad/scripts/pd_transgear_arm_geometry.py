@@ -257,8 +257,10 @@ PLATE_TAP_STATIONS = (
 )
 
 # Matched locating dowels, independent of the mounting screws' clearance.
-# 12.8 (was 13.1, and 13.7 before): fit audit 2026-11-23 (pending owner
-# confirmation).  The dowels go from 3/32 to 1/8 so their holes are cut by
+# 12.8 (was 13.1, and 13.7 before): owner ruling 2026-11-24, fit audit
+# question 9 ("Arm-to-plate dowels: 1/8 dowels on two reamers of the set,
+# holes .504 apart", approved as recommended; it reverses the 3/32 dowel of
+# #290).  The dowels go from 3/32 to 1/8 so their holes are cut by
 # the over/under reamer set's .1240 and .1260 members; at 13.1 the larger
 # plate hole's full worst-case wall to the plate's edge falls to 1.91 under
 # the 2.03 target (pd_transgear_arm_plate_geometry.WALLS), at 12.8 it keeps

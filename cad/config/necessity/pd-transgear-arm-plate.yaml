@@ -1,0 +1,11 @@
+necessity:
+  - id: N-01
+    feature: "sheet 1, rear view, Ø.4385 REAM THRU press hole for MHA-PD-28 (datum B)"
+    kind: joint
+    reason: "press, alone holds knob axis K; no bond, pin, screw"
+    source: "pd_transgear_knob_bush_geometry.PRESS_INTERFERENCE; owner ruling 2026-11-20, #2425 (registry RV-02)"
+  - id: N-02
+    feature: "sheet 1, rear view, 2X Ø.1260 REAM THRU locating holes for the MHA-PD-VN-64 dowels"
+    kind: mesh
+    reason: "dowel shake here moves K: reducer mesh centre distance"
+    source: "pd_transgear_arm_plate_geometry.REDUCER_POSITION_DIAMETER; _gear_quality.reducer_k_setting_diameter_mm; owner ruling 2026-11-24, fit audit question 9"
