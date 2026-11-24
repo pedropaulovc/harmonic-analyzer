@@ -697,15 +697,38 @@ def test_view_k_carries_the_set_coordinates_as_assembly_model_dimensions() -> No
     # (owner ruling 2026-11-24, audit part 2 question C1).
     assert knob_setting.CENTRE_TOLERANCE_MM[0] == pytest.approx(-0.001 * 25.4)
     assert high - low - 0.00254 < knob_setting.CENTRE_TOLERANCE_MM[1] <= high - low
-    # One trial move each way keeps the table setting inside those limits;
-    # a second would pass one.
+    # C1 ("Yes, the trial may move the plate within those limits."): every
+    # setting the step reaches keeps N, indicated TRUE, inside the limits
+    # and clear of a bind with both running fits pressed shut (Codjiflo r2 on
+    # #3539: the old .001 away move let N reach about +.0027).
     lower = disc.CENTRE_DISTANCE + knob_setting.CENTRE_TOLERANCE_MM[0]
     upper = disc.CENTRE_DISTANCE + knob_setting.CENTRE_TOLERANCE_MM[1]
-    for moves in (-1, 0, 1):
-        assert lower <= math.hypot(*knob_setting.trial_setting(moves)) <= upper
-    for moves in (-2, 2):
-        assert not lower <= math.hypot(*knob_setting.trial_setting(moves)) <= upper
-    assert drawing.KNOB_TRIAL_MOVE_TEXT == ".0008 ALONG AND .0006 ACROSS"
+    error = knob_setting.TRUE_RADIAL_ERROR_MM
+    assert error == pytest.approx(0.0199, abs=1e-4)
+    aim = knob_setting.setting_radius(1, (0.0, 0.0))
+    # From the mid-band aim the limit leaves .00028 away from S: under the
+    # .0005 a hobby mill sets, so no away move prints.
+    assert knob_setting.TRIAL_AWAY_ROOM_MM == pytest.approx(upper - error - aim)
+    assert knob_setting.TRIAL_AWAY_ROOM_MM == pytest.approx(0.00028 * 25.4, abs=0.000005 * 25.4)
+    assert knob_setting.TRIAL_AWAY_ROOM_MM < knob_setting.TRIAL_MOVE_MIN_IN * 25.4
+    assert knob_setting.TRIAL_MOVE_AWAY_MM is None
+    assert drawing.KNOB_TRIAL_AWAY_MOVE_TEXT is None
+    # Toward S the limit leaves .00116, but the pressed-shut mesh binds with
+    # N under -.00079: the derived move is .0006 each way (.00085 along S-K).
+    toward = knob_setting.TRIAL_MOVE_TOWARD_MM
+    assert toward == pytest.approx((0.0006 * 25.4, 0.0006 * 25.4))
+    assert drawing.KNOB_TRIAL_MOVE_TEXT == ".0006 ALONG AND .0006 ACROSS"
+    lowest = knob_setting.setting_radius(-1, toward) - error
+    assert lowest == pytest.approx(knob_setting.TRIAL_LOWEST_CENTRE_MM)
+    assert lower < lowest and not knob_setting.binds(lowest)
+    # The .0008/.0006 pair the old rule printed would bind there.
+    old = (0.0008 * 25.4, 0.0006 * 25.4)
+    assert knob_setting.binds(knob_setting.setting_radius(-1, old) - error)
+    highest = aim + error
+    assert highest == pytest.approx(knob_setting.TRIAL_HIGHEST_CENTRE_MM) and highest < upper
+    # C3's gate at the top, every gate at the bottom.
+    assert round(knob_setting.TRIAL_HIGHEST_MESH.runout_contact_ratio_min, 3) >= 1.1
+    assert not knob_setting.TRIAL_LOWEST_MESH.failures()
     # The view marks the band and the two settings, at the places the model
     # owns; only the settings are references.
     assert knob_setting.DRAWING_DIMENSIONS == {
@@ -913,6 +936,11 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     tangential_err = dro + 2.0 * centring + 2.0 * centring * lever
     assert centring == pytest.approx(0.0005 * 25.4 / 2.0)
     assert radial_err == pytest.approx(0.0199, abs=1e-4)
+    # The spec charges the same budget against DETAIL K's limits for every
+    # setting the trial reaches (C1; Codjiflo r2 on #3539).
+    assert knob_setting.DRO_ACCURACY_MM == pytest.approx(accuracy)
+    assert knob_setting.TRUE_SWEEP_IN == drawing.KNOB_SETTING_SWEEP_IN
+    assert knob_setting.TRUE_RADIAL_ERROR_MM == pytest.approx(radial_err)
     # The printed values are the display's own counts: the operator dials
     # exactly what DETAIL K prints.
     # The 5 um scale's inch-mode count, .0002.
@@ -2921,17 +2949,16 @@ def test_every_failure_branch_has_a_pass_exit() -> None:
         f"IF {s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)} PASSED, GO TO STEP "
         f"{steps.step_number('arm-plate-fitted')}."
     )
-    # Owner ruling 2026-11-24, audit part 2 question C1: one trial move of
-    # the table before a part is inspected.  With C2's floor gone the dial
-    # check also fails with no shake, which moves away from S as a tight
-    # spot does (Codjiflo r2 on #3539).
+    # Owner ruling 2026-11-24, audit part 2 question C1: the trial's move
+    # before a part is inspected, toward S only (no away move is left inside
+    # the limits once TRUE's error is charged); a tight spot or no shake
+    # takes the inspection (Codjiflo r2 on #3539).
     assert located[17] == (
-        f"IF {s('arm-plate-located', 11)} OR {s('arm-plate-located', 12)} ALONE "
-        f"FAILED AT {drawing.KNOB_SETTING_VIEW_NAME}'S SETTING, "
-        f"MOVE THE TABLE {drawing.KNOB_TRIAL_MOVE_TEXT}, AWAY FROM "
-        "S FOR A TIGHT SPOT OR NO SHAKE, TOWARD S FOR SHAKE OVER .008, THEN FROM "
-        f"{s('arm-plate-located', 5)}."
+        f"IF ONLY {s('arm-plate-located', 12)} FAILED, ON SHAKE OVER .008, AT "
+        f"{drawing.KNOB_SETTING_VIEW_NAME}'S SETTING, MOVE THE TABLE "
+        f"{drawing.KNOB_TRIAL_MOVE_TEXT} TOWARD S, THEN FROM {s('arm-plate-located', 5)}."
     )
+    assert "AWAY FROM S" not in located[17]
     # The re-indication reads N at the table's setting, DETAIL K's or as
     # moved, so a moved plate reaches the pass exit (Codjiflo r2 on #3539).
     assert located[14].endswith(

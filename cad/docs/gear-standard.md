@@ -203,13 +203,19 @@ ruling 2026-11-24, audit part 2 question C2; no floor prints), has for its ceili
 runout and the two running fits can give (`draw_pd_paper_drive_assembly.REDUCER_SHAKE_MAX_MM`; #2510):
 the band's backlash at the loosest centre the two running fits allow, read
 at the tip and rounded up to the indicator's division. The 1 um lever indicator's 0.14 mm range is too
-short for it (#2888). The trial may move the plate once before a part is
-blamed (owner ruling 2026-11-24, audit part 2 question C1: "Yes, the trial
-may move the plate within those limits."): .001 away from S for a tight
-spot or no shake, .001 toward S for a shake over .008, never above +.002 nor
-below -.001 of DETAIL K (`CENTRE_DISTANCE_TRIAL_WINDOW`, 43.769 to 43.845;
-`paper_drive_mesh_check.reducer_trial_low_mesh` holds CR 1.331 and 1.238 at
-the low end). A part replaced after a move is tried again from DETAIL K's
+short for it (#2888). The trial may move the plate before a part is blamed
+(owner ruling 2026-11-24, audit part 2 question C1: "Yes, the trial may move
+the plate within those limits.", the owner's .001 each way, never above
++.002 nor below -.001 of DETAIL K, `CENTRE_DISTANCE_TRIAL_WINDOW`, 43.769 to
+43.845). "Within" holds for N itself: every setting is indicated TRUE again,
+whose radial error (.00078: DRO .00028, sweep .0005) is charged against the
+limits (`pd_paper_drive_knob_setting_spec.TRUE_RADIAL_ERROR_MM`). From the
+mid-band aim (+.00094) that leaves .00028 away from S, under what the mill
+sets, so no away move prints and a tight pair takes the inspection; toward
+S the pressed-shut running fits bind with N below -.00079, so the move for a
+shake over .008 is .0006 along and .0006 across (N no lower than -.00069,
+CR 1.316 and 1.223 there; the top, aim plus error at +.00172, gives 1.204 and
+1.112). A part replaced after a move is tried again from DETAIL K's
 setting. The pilots are drilled after the trial passes, and the doweled plate
 is read the same way again before anything on the arm is made permanent.
 The limits and the coordinates are the assembly's own model dimensions

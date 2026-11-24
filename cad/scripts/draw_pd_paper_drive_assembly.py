@@ -608,14 +608,15 @@ KNOB_SETTING_INSTANCES = frozenset(
 # The radial part of that worst case (.0008) keeps N inside the S to N set
 # band, which governs along S-N; the .004 circle bounds the rest. TRUE names
 # both, so it no longer reads as wider than DETAIL K's S to N limits (#2417).
-# The trial mesh may move the table once, by KNOB_TRIAL_MOVE_TEXT, and only
-# within those limits (owner ruling 2026-11-24, audit part 2 question C1).
+# The trial mesh may move the table only so far that N, indicated TRUE with
+# that radial error, stays within those limits (owner ruling 2026-11-24, audit
+# part 2 question C1; pd_paper_drive_knob_setting_spec derives the moves).
 # The knob-bore point's label inside DETAIL K. DETAIL K keeps its letter
 # (other sheets cite "MHA-PD-00 DETAIL K"), so the point takes a letter used
 # nowhere else on the package (machinist review round 7, rules 9 and 26: K
 # meant both the view and the bore).
 KNOB_BORE_LETTER = "N"
-KNOB_SETTING_SWEEP_IN = 0.0005
+KNOB_SETTING_SWEEP_IN = knob_setting.TRUE_SWEEP_IN
 _KNOB_SETTING_SWEEP_TEXT = f"{KNOB_SETTING_SWEEP_IN:g}".lstrip("0")
 KNOB_SETTING_CIRCLE_TEXT = (
     f"WITHIN {steps.inch_text(registration.REDUCER_AXIS_SETUP_RADIUS_MM, 3)} OF ITS "
@@ -626,14 +627,23 @@ KNOB_SETTING_TRUE = (
     f"{KNOB_BORE_LETTER} LANDS INSIDE "
     f"THE S TO {KNOB_BORE_LETTER} BAND, {KNOB_SETTING_CIRCLE_TEXT}"
 )
-# One trial move of the table, in DRO counts on DETAIL K's two axes; one each
-# way is all the S to N limits hold (pd_paper_drive_knob_setting_spec).
-if not knob_setting.TRIAL_MOVES_AWAY == knob_setting.TRIAL_MOVES_TOWARD == 1:
-    raise AssertionError("the located step allows one trial move each way")
-KNOB_TRIAL_MOVE_TEXT = (
-    f"{steps.inch_text(knob_setting.TRIAL_MOVE_ALONG_MM, 4)} ALONG AND "
-    f"{steps.inch_text(knob_setting.TRIAL_MOVE_ACROSS_MM, 4)} ACROSS"
+# The trial moves of the table, in DRO counts on DETAIL K's two axes
+# (pd_paper_drive_knob_setting_spec): one toward S for a shake over the
+# ceiling; away from S only where the limit leaves the mill a settable move
+# after TRUE's error (from the mid-band aim it leaves .00028, so none prints
+# and a pair that runs tight takes the inspection exit).
+def _knob_move_text(move: tuple[float, float]) -> str:
+    return f"{steps.inch_text(move[0], 4)} ALONG AND {steps.inch_text(move[1], 4)} ACROSS"
+
+
+KNOB_TRIAL_MOVE_TEXT = _knob_move_text(knob_setting.TRIAL_MOVE_TOWARD_MM)
+KNOB_TRIAL_AWAY_MOVE_TEXT = (
+    None
+    if knob_setting.TRIAL_MOVE_AWAY_MM is None
+    else _knob_move_text(knob_setting.TRIAL_MOVE_AWAY_MM)
 )
+if KNOB_TRIAL_AWAY_MOVE_TEXT not in (None, KNOB_TRIAL_MOVE_TEXT):
+    raise AssertionError("the located step words one move both ways or the toward move alone")
 # The second column's steps end above this on DETAIL K's sheet.
 KNOB_SETTING_FIELD_TOP = 0.144
 # The plate-screw tap inside the crop, in the machine frame (mm): the arm's
@@ -1902,7 +1912,7 @@ PIN_BOND_CURE_H = 24
 # bore and the sleeve on the N side of the pin, so neither gives way along
 # the rock and the mesh stands at the tightest centre the two running fits
 # allow: closer than the axes by half of both diametral clearances
-# (_PRESSED_CLOSURE_MM). The tooth beside the mesh moves only as far as the
+# (knob_setting.PRESSED_CLOSURE_MM). The tooth beside the mesh moves only as far as the
 # flanks let it, so the cluster's shift on the pin and the pin's own bending
 # are not read as shake.
 #
@@ -1928,27 +1938,17 @@ PIN_BOND_CURE_H = 24
 # NEEDLE MOVES), .008 MAX; it retires the half-division floor of the
 # delegated ruling of 2026-11-10, review finding #2960). What stays coded is
 # that the tightest mesh the fits allow does not bind: a positive shake at
-# the closest table setting the trial's one move toward S reaches (owner
-# ruling 2026-11-24, audit part 2 question C1;
-# knob_setting.TRIAL_LOWEST_CENTRE_MM, -.00005) closed by the largest
-# clearances. At DETAIL K's printed -.001, which no step reaches, it would
-# bind; a tight spot at any setting is still caught by the re-run trial.
-_KNOB_JOURNAL_CLEARANCE_MM = (
-    min(knob_bush.BORE_DIA_LIMITS) - max(knob_shaft.JOURNAL_DIA_BAND),
-    max(knob_bush.BORE_DIA_LIMITS) - min(knob_shaft.JOURNAL_DIA_BAND),
-)
-_PRESSED_CLOSURE_MM = tuple(
-    (journal + sleeve) / 2.0
-    for journal, sleeve in zip(
-        _KNOB_JOURNAL_CLEARANCE_MM, cluster_fit.BORE_DIAMETRAL_CLEARANCE, strict=True
-    )
-)
+# the closest N may stand after the trial's move toward S, TRUE's error
+# included (owner ruling 2026-11-24, audit part 2 question C1;
+# knob_setting.TRIAL_LOWEST_CENTRE_MM, -.00069) closed by the largest
+# clearances; the spec picks that move so it does not. A tight spot at any
+# setting is still caught by the re-run trial.
 _REDUCER_CIRCULAR_BACKLASH_MM = (
     mesh_check.reducer_mesh(
-        knob_setting.TRIAL_LOWEST_CENTRE_MM - _PRESSED_CLOSURE_MM[1]
+        knob_setting.TRIAL_LOWEST_CENTRE_MM - knob_setting.PRESSED_CLOSURE_MM[1]
     ).backlash_mm[0],
     mesh_check.reducer_mesh(
-        disc.CENTRE_DISTANCE_WINDOW[1] - _PRESSED_CLOSURE_MM[0]
+        disc.CENTRE_DISTANCE_WINDOW[1] - knob_setting.PRESSED_CLOSURE_MM[0]
     ).backlash_mm[1],
 )
 _DISC_TIP_RADII_MM = [profile.blank_radius_mm for profile in disc.manufactured_profiles()]
@@ -2681,36 +2681,44 @@ def _step_text(
             "PIN BORE S READS TRUE AT THE DRO'S ZERO AND "
             f"KNOB BORE {KNOB_BORE_LETTER} AT THE TABLE'S SETTING.",
             f"IF NOT, REPEAT FROM {s('arm-plate-located', 2)}.",
-            # The trial may move the plate once, within DETAIL K's S to N
-            # limits, before a part is blamed: owner ruling 2026-11-24, audit
-            # part 2 question C1, "Yes, the trial may move the plate within
-            # those limits." (.001 away from S for a tight spot, .001 toward
-            # S if the shake reads over .008; never above +.002 nor below
-            # -.001 of DETAIL K). It retires the delegated ruling of
-            # 2026-11-10 that the plate is not moved to chase a reading. The
-            # move is whole DRO counts on both axes
-            # (pd_paper_drive_knob_setting_spec.TRIAL_MOVE_ALONG_MM); one
-            # move each way keeps the table inside the limits. A mesh that
-            # still reads outside the window with N true is a part off its
-            # drawing: a gear or one of the two running fits the window
-            # charges; only when all are inside is the arm renewed (codjiflo
-            # P2 on 176fad0). The restart follows the part (codjiflo P2 on
-            # ab2fdaf): a new plate is set to DETAIL K again, a new disc or
-            # sleeve is centred again; one sub-step per part (machinist
-            # review on 36242bf: one action per step).  A new disc, sleeve or
-            # shaft is tried with the table back at DETAIL K's setting, not
-            # at a move made for the part it replaces (codjiflo r2 on
-            # #3539), so each repeats from the table's setting (the tap
-            # sub-step slackens the clamps first).  With the dial check's
-            # floor gone (C2), "no shake" fails it low and moves away from S,
-            # as a tight spot does.
+            # The trial may move the plate before a part is blamed: owner
+            # ruling 2026-11-24, audit part 2 question C1, "Yes, the trial
+            # may move the plate within those limits." (.001 away from S for
+            # a tight spot, .001 toward S if the shake reads over .008; never
+            # above +.002 nor below -.001 of DETAIL K). It retires the
+            # delegated ruling of 2026-11-10 that the plate is not moved to
+            # chase a reading. Each move is whole DRO counts on both axes,
+            # derived so N, indicated TRUE, stays inside the limits
+            # (pd_paper_drive_knob_setting_spec.TRIAL_MOVE_TOWARD_MM,
+            # TRIAL_MOVE_AWAY_MM): from the mid-band aim no away move is
+            # left, so a tight spot or no shake goes straight to the
+            # inspection. A mesh that still reads outside the window with N
+            # true is a part off its drawing: a gear or one of the two
+            # running fits the window charges; only when all are inside is
+            # the arm renewed (codjiflo P2 on 176fad0). The restart follows
+            # the part (codjiflo P2 on ab2fdaf): a new plate is set to DETAIL
+            # K again, a new disc or sleeve is centred again; one sub-step
+            # per part (machinist review on 36242bf: one action per step).
+            # A new disc, sleeve or shaft is tried with the table back at
+            # DETAIL K's setting, not at a move made for the part it replaces
+            # (codjiflo r2 on #3539), so each repeats from the table's
+            # setting (the tap sub-step slackens the clamps first).
             f"IF {s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)} "
             f"PASSED, GO TO STEP {steps.step_number('arm-plate-fitted')}.",
-            f"IF {s('arm-plate-located', 11)} OR {s('arm-plate-located', 12)} ALONE "
-            f"FAILED AT {KNOB_SETTING_VIEW_NAME}'S SETTING, MOVE THE TABLE "
-            f"{KNOB_TRIAL_MOVE_TEXT}, AWAY FROM S FOR A TIGHT SPOT OR NO SHAKE, "
-            f"TOWARD S FOR SHAKE OVER {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}, "
-            f"THEN FROM {s('arm-plate-located', 5)}.",
+            (
+                f"IF ONLY {s('arm-plate-located', 12)} FAILED, ON SHAKE OVER "
+                f"{steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}, AT {KNOB_SETTING_VIEW_NAME}'S "
+                f"SETTING, MOVE THE TABLE {KNOB_TRIAL_MOVE_TEXT} TOWARD S, THEN FROM "
+                f"{s('arm-plate-located', 5)}."
+                if KNOB_TRIAL_AWAY_MOVE_TEXT is None
+                # With the C2 floor gone, "no shake" fails the dial check
+                # low and moves away from S, as a tight spot does.
+                else f"IF {s('arm-plate-located', 11)} OR {s('arm-plate-located', 12)} "
+                f"ALONE FAILED AT {KNOB_SETTING_VIEW_NAME}'S SETTING, MOVE THE TABLE "
+                f"{KNOB_TRIAL_MOVE_TEXT}, AWAY FROM S FOR A TIGHT SPOT OR NO SHAKE, "
+                f"TOWARD S FOR SHAKE OVER {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}, "
+                f"THEN FROM {s('arm-plate-located', 5)}."
+            ),
             f"IF NOT, INSPECT THE {n['pd-transgear-knob-shaft']} PINION, "
             f"{n['pd-rack-pinion']} DISC, {n['pd-transgear-knob-shaft']} JOURNAL AND "
             f"{bush} AND {n['pd-transgear-feed-pinion']} "
