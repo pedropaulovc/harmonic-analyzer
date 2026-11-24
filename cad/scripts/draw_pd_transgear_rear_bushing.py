@@ -111,9 +111,11 @@ _PROFILE_BOTTOM = PROFILE_CENTER[1] - OD * _S / 2.0
 # The bore stays on the end view, where it is a circle: a reamed through
 # hole, fully defined by its callout (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)), it needs no section, and the
 # profile is hidden-lines-removed (a dimension never lands on a hidden line).
-# The O.D. arrives there too and is moved onto the profile below.
+# The O.D. arrives there too and is moved onto the profile below.  The bore's
+# callout is centred 6 mm right of where its 30-character block stood: its
+# mate row is 32 characters.
 END_KEEP = {
-    "BoreDia": (0.060, 0.225),
+    "BoreDia": (0.066, 0.225),
     "RingOd": (0.045, 0.120),  # donor: moved onto the profile
 }
 DIMENSION_CALLOUTS = {
@@ -214,7 +216,11 @@ requirement(
     "bore",
     kind="hole",
     faces=(CylinderFace(BORE_DIA),),
-    requirements=("thru", "mate"),
+    # ``dia`` stays a traveler requirement, as MHA-PD-18's pin bore keeps
+    # it: prechips' turned-bush adapter refuses a bore without one
+    # ("bore.dia: missing drawing requirement"; the fit stack had dropped
+    # it with the printed band, so the traveler no longer rendered).
+    requirements=("dia", "thru", "mate"),
     fields={
         "axis": ([0.0, 0.0, 1.0], ("BORE_DIA",)),
         "at": ([0.0, 0.0, 0.0], ("BORE_DIA",)),

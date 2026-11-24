@@ -42,14 +42,13 @@ OD_PLACES = 2
 BORE_DIA = FIT.BORE_DIA  # .1260
 BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower) ANALYSIS deviations
 BORE_PLACES = 3
-# The callout: size and process, the running fit accepted by the mate (the
-# MHA-PD-23 pin is turned last to this bore), and rule 4's necessity answer
-# (BORE_COCK_TAKE_UP below).
-BORE_CALLOUT = (
-    "REAM THRU, RUNNING FIT\n"
-    f"{PIN.PIN_NUMBER} PIN ENTERS, NO SHAKE\n"
-    f"KEEPS {_config.parts('pd-transgear-feed-pinion')['number']} END FLOAT OPEN"
-)
+# The callout: size and process, then the mate and that it is turned to
+# this bore (a bare fit name is not enough).  The pair's one acceptance
+# prints on the sheet of the member made last, the pin's (MHA-PD-23 note
+# 1).  Why the bore is reamed (BORE_COCK_TAKE_UP below) is in the part's
+# necessity file (owner ruling 2026-11-24: "In the part's registry file,
+# not on the sheet"; cad/config/necessity/pd-transgear-rear-bushing.yaml).
+BORE_CALLOUT = f"REAM THRU\n{PIN.PIN_NUMBER} IS TURNED TO THIS BORE"
 
 WALL_NOMINAL = (OD - BORE_DIA) / 2.0
 WALL_WORST = (
@@ -60,22 +59,27 @@ if WALL_WORST < WALL_TARGET_MM:
 # What the fit protects.  With the cluster forward the bushing is loose in
 # the sleeve's end float and can cock on the pin as far as its bore lets it;
 # cocked, it takes up its largest O.D. times that angle of the float.  At
-# the modelled fit that is .0032 of the .008 least float, so it never wedges
-# between the arm's shims and the turning sleeve.  A drilled #30
-# (.1285 +.004/0, clearance to .0077 on this pin) would take up .0147, more
-# than the float: that is why the bore is reamed.  (The float is taken up
-# whole at a clearance of .0042; .002 looser than the modelled fit takes up
-# .0070.)
+# the modelled fit (clearance to .0017) that is .0032 of the .008 least
+# float, so it never wedges between the arm's shims and the turning sleeve.
+# Rule 4's own test does not fail it: .002 looser (.0037) takes up .0070,
+# .0010 short of the float (Codjiflo r1 on #3492); the float goes whole at
+# .0042.  The REAM stays by the exception RV-01 in this part's registry
+# row: the one pin is turned to this bore and three others, all cut by the
+# one reamer, and the next form down, a drilled #30 (.1285 +.004/0,
+# clearance to .0077 on this pin), takes up .0147, more than the float.
 BORE_COCK_SPAN_MIN = (
     FIT.REAR_BUSHING_LENGTH
     - FIT.REAR_BUSHING_LENGTH_BAND
     - 2.0 * edge_break_chamfer_mm(unit=UNIT)
 )
-BORE_COCK_TAKE_UP = (
-    (OD + printed_band_mm(OD_PLACES, unit=UNIT))
-    * FIT.BORE_DIAMETRAL_CLEARANCE[1]
-    / BORE_COCK_SPAN_MIN
-)
+
+
+def bore_cock_take_up(clearance: float) -> float:
+    """The end float the bushing takes up cocked at a diametral clearance."""
+    return (OD + printed_band_mm(OD_PLACES, unit=UNIT)) * clearance / BORE_COCK_SPAN_MIN
+
+
+BORE_COCK_TAKE_UP = bore_cock_take_up(FIT.BORE_DIAMETRAL_CLEARANCE[1])
 if BORE_COCK_TAKE_UP >= FIT.RING_FLOAT_RANGE[0]:
     raise AssertionError(
         f"MHA-PD-24 cocked on the pin takes up {BORE_COCK_TAKE_UP:.4f} of the "
