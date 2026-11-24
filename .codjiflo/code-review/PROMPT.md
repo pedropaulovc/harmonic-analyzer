@@ -94,6 +94,10 @@ claim the saved model or final sheet was inspected. Check at least:
   they produce the required fit; interchangeable parts keep their essential
   limits. A matched pair needs the mate's name and number plus the required
   clearance or interference; "MATCH FIT" alone is incomplete.
+  A REAM or tight band needs an entry in `cad/config/necessity/<drawing>.yaml`
+  (rule 4); a new or changed entry is a claim about the machine: check its
+  kind and reason against the spec module or ruling it cites, and flag one
+  that only restates a fit name or a mate.
 - **GD&T allowlist (rule 5).** A feature-control frame or datum appears only
   where the package's own `machinist_exceptions` `accept` entry allows it.
   New frames, datums or boxed basics without one are findings.

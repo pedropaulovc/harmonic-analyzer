@@ -50,7 +50,8 @@ credibility rests on:
    built once: every size starts at the title block and every hole drilled.
    A REAM, a band tighter than the title block, a printed interference or a
    gauge bought for one size must pass guidelines rule 4's necessity test
-   (the sheet prints what fails if it is `.002 in` loose) and take the least
+   (the package's necessity register, `cad/config/necessity/<drawing>.yaml`,
+   says what fails if it is `.002 in` loose; the sheet does not) and take the least
    demanding form (drilled, made to fit, reamed to the bought mate, and only
    last a printed band); no reamer or gauge is bought for one feature
    without an owner ruling. Drawing review is
@@ -1131,7 +1132,10 @@ a `cache.refresh` span event, and a `refresh` record with reason in `cache.jsonl
 `check:machinist_review:<stem>` also uses the shared cache probe/store path, but
 executes entirely on the submitter under either executor. Its key includes the
 drawing PDF's ink, the package's existing `cad/config/parts/<dashed>.yaml` (or assembly
-contract with the `-assembly` suffix removed), the review/exception/sheet-server
+contract with the `-assembly` suffix removed), its necessity register
+`cad/config/necessity/<dashed-drawing-stem>.yaml` when it has one (rule 4; read
+by the review alone, so an entry re-keys that one review and no SolidWorks
+leaf), the review/exception/necessity/sheet-server
 code and its pinned local-import closure, the selected kind's reviewer template
 and shared reviewer/judge severity contract, shared judge instructions/schemas,
 and the integer `major_version` in `cad/docs/drawing-guidelines.md`'s YAML

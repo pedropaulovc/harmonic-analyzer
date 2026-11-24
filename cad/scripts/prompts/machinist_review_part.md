@@ -72,7 +72,8 @@ JUDGING THE PART AS DRAWN
   experienced eye forgives most easily. Do not forgive it. You are not asked
   whether the shop could hold the band or whether the fit is well chosen for
   a production part; you are asked whether this one machine needs it and
-  whether the sheet says why. A named mate and a fit name do not answer that.
+  whether the package's necessity register says why. A named mate and a fit
+  name do not answer that, and neither does a reason printed on the sheet.
 - The thread-engagement and wall minimums and the "What the shop holds" table
   are design rules for a first-time machinist. Apply them as printed; use no
   other numeric cutoff for capability.

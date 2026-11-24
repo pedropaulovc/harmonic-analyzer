@@ -195,36 +195,47 @@ Tolerances exist to make parts work at the least cost, and this machine is
 built once. Every size starts at the title block and every hole at DRILLED
 HOLES. A REAM, a band narrower than the title-block row for its places, a
 printed interference and a gauge bought for one size are exceptions, and the
-sheet has to earn each one. That a feature runs, slides, locates or is
+package has to earn each one. That a feature runs, slides, locates or is
 pressed does not earn it: most such features on this machine work drilled, or
 made to their mate.
 
 - **The necessity test.** For every REAM and every tight band ask: *what
   fails on this one machine if it is `.002 in` loose?* The feature passes
-  only when the answer is one of the kinds below and its callout, or a flag
-  note linked to it, prints that answer in a few words (rule 7):
-  - play, out-of-roundness or run-out, or an error in a lever arm, throw or
-    ratio, that reaches the pen trace or a reading (`PLAY SHOWS AT PEN`,
-    `WHEEL TURNS ON THIS BORE`, `SETS READING ZERO`, `THROW SETS CHANNEL
-    GAIN`);
-  - a gear mesh's centre distance or run-out (`SETS MESH BACKLASH`);
-  - a running gap or stack that closes, or a wall that falls under rule 17,
-    at the looser size (`KEEPS GAP TO MHA-XX-nn`, `SETS THE GEAR STACK`,
-    or the wall in rule 20's form, `WALL .080 MIN`);
-  - a fixed joint that must hold with no bond, pin, key or screw
-    (`PRESS, HOLDS CRANK TORQUE`);
-  - a groove or seat cut to the installation size its maker gives for a
-    bought part (a retaining-ring groove): the callout names the bought part
-    by its drawing number, and that is the answer.
+  only when the answer is one of the kinds below and the package's necessity
+  register carries an entry for it: the feature it covers, the kind, and the
+  reason in a few words (`cad/config/necessity/<drawing>.yaml`). The sheet
+  prints none of it (owner ruling 2026-11-24: "In the part's registry file,
+  not on the sheet. The sheet stays clean; the reviewer fails a tight feature
+  that has no registry reason."). The kinds, with reasons as an entry gives
+  them:
+  - `trace`: play, out-of-roundness or run-out, or an error in a lever arm,
+    throw or ratio, that reaches the pen trace or a reading ("play shows at
+    the pen", "wheel turns on this bore", "sets the reading zero", "throw
+    sets channel gain");
+  - `mesh`: a gear mesh's centre distance or run-out ("sets mesh backlash");
+  - `gap`: a running gap or stack that closes, or a wall that falls under
+    rule 17, at the looser size ("keeps the gap to MHA-XX-nn", "sets the
+    gear stack"; a wall short of the title block still prints rule 20's
+    `WALL .080 MIN` on the sheet);
+  - `joint`: a fixed joint that must hold with no bond, pin, key or screw
+    ("press, holds crank torque");
+  - `bought_seat`: a groove or seat cut to the installation size its maker
+    gives for a bought part (a retaining-ring groove); the entry names the
+    bought part by its drawing number.
 
-  A fit name alone (`RUNNING FIT ON MHA-XX-nn`), a named mate alone, "it
-  runs", "it locates" or "a reamer leaves a better hole" is not an answer. A
+  A fit name alone ("running fit on MHA-XX-nn"), a named mate alone, "it
+  runs", "it locates" or "a reamer leaves a better hole" is not an answer,
+  in the register or anywhere else. A
   spring, a weight or a screw that keeps a pivot or slide that only rocks or
   shifts against one side of its clearance takes the play out: such a joint
   fails the test. A feature
   that fails takes the title-block band, and a hole a named drill. The test
-  is applied to what is printed: a tight band or REAM with no printed answer
-  is over-specification, whatever reason may lie behind it.
+  is applied to the register: a REAM or tight band that no entry supplied
+  with the package covers is over-specification, whatever reason may lie
+  behind it or be printed beside it, and so is one whose entry gives a
+  reason that is not of its kind. A reason on the sheet is never required.
+  A short functional label that rule 7 allows may stay beside the feature;
+  a justification printed on the sheet is narration (rule 7).
 - **Then the least demanding form.** A feature that passes the test takes
   the first form in this order that does the job. A later form where an
   earlier one serves is over-specification.
@@ -248,7 +259,7 @@ made to their mate.
      inside its grade's gap. This is the default wherever the mate is made
      in this shop. A
      hole match-drilled or reamed in place through its mate at assembly, for
-     the pin that joins them, is this form and needs no further answer.
+     the pin that joins them, is this form and needs no register entry.
      The acceptance prints once, on the sheet of the member made last; the
      other member's sheet names that mate and says it is made to this
      feature (`MHA-XX-nn IS TURNED TO THIS BORE`) and prints no acceptance
@@ -267,15 +278,16 @@ made to their mate.
      never narrower than its "What the shop holds" row. Gear tooth data
      (span, tooth thickness, run-out, a gear's outside and root diameters)
      keep the gear data block's own rules (rule 7) and take neither the
-     necessity test nor this order. A diameter that is bought to size and
-     never cut prints the
+     necessity test nor this order; a band on one is still never narrower
+     than its "What the shop holds" row. A diameter that is bought to size
+     and never cut prints the
      stock (`1/4 GROUND ROD, AS SUPPLIED`), not limits of size.
 - **What is over-specification on a one-off.** Limits of size printed on
   both members of a mating pair; a band on a reamed hole (`+.0005 / 0`); a
   clearance or interference range narrower than `.001` wide; a press with a
   printed interference where a bonded slip fit or a pin would hold (rule
-  23); a REAM for a bolt, a bonded pin or a spring-loaded pivot that prints
-  no answer to the necessity test; and any feature whose acceptance needs a
+  23); a REAM for a bolt, a bonded pin or a spring-loaded pivot that has
+  no register entry; and any feature whose acceptance needs a
   plug gauge, a pin pair, a gauge block stack or another gauge bought or set
   up for that one size. One pin of the `.001`-step set used as a single
   limit (`.127 PIN DOES NOT ENTER`) is not such a gauge. Name the feature,
@@ -284,7 +296,7 @@ made to their mate.
   fails the test or the form order stands when an owner exception supplied
   to the review (rule 20) covers that feature and value. The sheet still
   prints no argument for it.
-- **Every tight band names its mate and what it protects.** A tight band is
+- **Every fit names its mate; the register says what a band protects.** A tight band is
   an explicit band narrower than the title-block band for its decimal places,
   or any REAM callout (REAM marks a fit bore even when it prints no band). A
   three-place size given a function, printed at its title-block band, names
@@ -292,22 +304,20 @@ made to their mate.
   apply to it; nor is a single-limit corner radius or edge break (`R.03
   MAX`, rule 16), a thread designation or class, gear tooth data, a
   purchased part's catalogue designation or one of the title block's own
-  rows. The callout of a tight band, or a flagged note attached
-  to it (rule 7), names the mate, the fit it needs (running, sliding, press,
-  bonded or locating) and the answer to the necessity test. The fit is made
+  rows. The callout of a fit, or a flagged note attached
+  to it (rule 7), names the mate and the fit it needs (running, sliding, press,
+  bonded or locating); the answer to the necessity test is in the
+  register, not here. The fit is made
   to the mate, not to printed limits: the stated acceptance or the clearance
   or interference range is the requirement, and a size beside it prints as
   REF. A size printed at title-block places whose linked note states the
   fitted range is the same case: the printed size is the supply size, and
   the range is the fit. Where a band survives as form 4, it is the
   requirement and a range beside it is REF (`(CLEARANCE .004-.012)`).
-  A gear centre distance names the mesh; a width that sets a stack names the
-  stack. Where
-  the mate alone does not show why the band is tight, the few words of
-  reason are the necessity answer (`SETS MESH BACKLASH`, `SETS LEVER ARM
-  RATIO`); see rule 7. The shop can
+  A band with no mate to try (a stack, a gap set by two faces, a wall) names
+  none: its register entry says what it protects. The shop can
   then make the hole to the shaft instead of chasing a number. A tight band
-  that names no mate and prints no answer to the necessity test is
+  with no register entry is
   over-specification: it takes the title-block band. Do not ask for a mate
   to be named on a band that nothing shows is needed. A mate named
   somewhere in the package (a general
@@ -358,8 +368,8 @@ made to their mate.
   fit; equal widths are not equal fits.
 - **Necessity first, then the shop table.** Being printed does not make
   precision necessary, and being easy does not either. A reviewer decides
-  necessity from the sheet: a REAM or tight band with no printed answer to
-  the necessity test, or in a later form than its mate allows, is
+  necessity from the register supplied with the package: a REAM or tight
+  band that no entry covers, or in a later form than its mate allows, is
   over-specification. Say so, quote the callout and name the form it should
   take. Do not excuse it because a mate is named, a fit route is named or the
   band sits inside its shop-table row. Precision that passes the test is
@@ -466,8 +476,10 @@ are gear data, not narration.
   where the views leave a feature's purpose unclear (`WHEEL BEARING
   SURFACE`). A reason is one line of at most six
   words, beyond the mate's drawing number, on the callout it explains, once
-  per feature or pattern. The answer to rule 4's necessity test is that one
-  reason. A fit statement (rule 4: mate, fit name, acceptance) and a stated
+  per feature or pattern. The answer to rule 4's necessity test is in the
+  package's register and is never required on the sheet; a label of this
+  kind beside a tight band is optional and is not that answer.
+  A fit statement (rule 4: mate, fit name, acceptance) and a stated
   shortfall (rule 20) have their own forms and are not counted. Anything
   beyond that is narration and is over-specification: a method or procedure
   (below), design rationale that answers no builder question (`HOLDS …
@@ -789,7 +801,8 @@ sub-assembly, never on part fabrication.
   A retention or fit acceptance that is a measurable value (a check with a
   number) is such a setting and prints here. A gap, endshake, travel, press
   depth or alignment set finer than `.XXX`, or banded tighter than its
-  title-block row, passes rule 4's necessity test and names the indicator
+  title-block row, has its entry in the assembly drawing's necessity
+  register (rule 4) and names the indicator
   or feeler that reads it; it never needs a gauge bought for that one
   setting. A fit acceptance given as a clearance or interference range or
   by feel is not such a setting (rule 4). A fit made

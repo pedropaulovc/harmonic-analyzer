@@ -230,10 +230,24 @@ their sheet re-keys for another reason or the review leaf is force-refreshed.
   fit. A shaft turned to its hole, a pin bonded in a drilled hole and a hole
   reamed to the bought shaft are how this machine's fits are made (owner
   direction 2026-11-23: "can the holes not be reamed in the first place").
+- **The necessity answer lives in a register, not on the sheet.** Rule 4's
+  answer for a REAM or tight band is an entry in
+  `cad/config/necessity/<dashed-drawing-stem>.yaml` (`id`, `feature`, `kind`,
+  `reason`, optional `source`; `cad/scripts/machinist_necessity.py`). Owner
+  ruling 2026-11-24: "In the part's registry file, not on the sheet. The
+  sheet stays clean; the reviewer fails a tight feature that has no registry
+  reason." The register is a sibling of `cad/config/parts/<dashed>.yaml` and
+  of the assembly contract rather than a key inside them, because both are
+  content-hashed inputs of the package's SolidWorks leaves: a reason written
+  there would rebuild the part and its drawing. Only the review reads the
+  register, so adding or editing an entry re-reviews that one package and
+  rebuilds nothing. An entry is a claim about the machine: code review
+  checks it against the spec module or ruling it cites.
 - **A spec constant that bands a fit carries its necessity.** A `*_BAND`,
   `*_LIMITS` or fit class narrower than the title block states, in the
   comment above it, what fails if it is `.002 in` loose and which module
-  computes it (a stack, a mesh check, `error_budget`). "Running fit", "the
+  computes it (a stack, a mesh check, `error_budget`); the drawing's
+  register entry cites it as its `source`. "Running fit", "the
   reamer's band" and a fit-table row are not reasons. `error_budget.yaml`
   already says it: a limit tighter than its allowable "is a fit, process or
   capability choice, not a benchmark requirement".
@@ -245,6 +259,15 @@ their sheet re-keys for another reason or the review leaf is force-refreshed.
   ruling**, the owner's or a delegated one, declared as a
   `machinist_exceptions` entry (kind `accept`) under the package's own key
   in the form "Named exceptions" gives. The sheet prints no argument for it.
+- **Sheets held at warn-only during the conversion.** A drawing listed in
+  `cad/config/machinist-review/demoted.yaml` runs its review at `LEARN`
+  though its script declares `ENFORCE` (owner ruling 2026-11-24: "Merge the
+  policy now and demote the failing sheets to warn-only ... restoring
+  enforcement per batch"; "better to be able to cut releases with known
+  issues than to hold unreleased code"). The list is read by the review task
+  alone, so adding or deleting a line rebuilds and re-reviews nothing. The
+  batch that converts a sheet deletes its line; the list is empty when the
+  conversion is done (tracking issue #3511).
 - **Thread engagement (rule 18)** is owned by the CAD: the build's seat-fit
   and stack asserts enforce it. Through-tapped receivers use actual retained
   material and external full-form overlap, not blind drilling depths or raw
