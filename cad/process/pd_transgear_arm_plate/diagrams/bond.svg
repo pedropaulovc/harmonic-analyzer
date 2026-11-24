@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 600" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="600"/>
-  <text class="title" x="20" y="20">Setup 3 (plan view, rear face up): the blank bonded on the spoil block in the vise</text>
+  <text class="title" x="20" y="20">Setup 2 (plan view, rear face up): the blank bonded on the spoil block in the vise</text>
   <rect class="clamp" x="96" y="68" width="634" height="26"/>
   <text class="label-on-clamp" x="110" y="86">fixed jaw</text>
   <rect class="clamp" x="96" y="399" width="634" height="26"/>
@@ -27,7 +27,7 @@
   <line class="leader" x1="300" y1="318" x2="357" y2="225"/>
   <text class="label" x="200" y="332">screw holes: #1 through, 82° countersinks</text>
   <line class="leader" x1="600" y1="270" x2="490" y2="190"/>
-  <text class="label" x="560" y="286">K: #1, 27/64, ream .4375</text>
+  <text class="label" x="560" y="286">K: #1, 27/64, ream .4385</text>
   <line class="leader" x1="620" y1="220" x2="572" y2="200"/>
   <text class="label" x="624" y="224">corner clearing R.965</text>
   <line class="leader" x1="538" y1="356" x2="553" y2="236"/>
