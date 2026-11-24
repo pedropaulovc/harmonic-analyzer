@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 320" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="320"/>
+  <text class="title" x="20" y="20">Setup 1: a pilot on the bar's end, fitted to MHA-PD-19's hole (not to scale)</text>
+  <rect class="fixture-vise" x="40" y="70" width="140" height="200"/>
+  <rect class="part-rest" x="180" y="125" width="300" height="90"/>
+  <rect class="part-waste" x="480" y="135" width="40" height="70"/>
+  <rect class="part-removed" x="480" y="125" width="40" height="10"/>
+  <rect class="part-removed" x="480" y="205" width="40" height="10"/>
+  <line class="centre-line" x1="160" y1="170" x2="720" y2="170"/>
+  <rect class="cutter" x="486" y="216" width="28" height="54"/>
+  <rect class="part-arriving" x="600" y="75" width="26" height="60"/>
+  <rect class="part-arriving" x="600" y="205" width="26" height="60"/>
+  <text class="label" x="75" y="60">3-jaw</text>
+  <text class="label" x="250" y="160">Ø{{process.stock_dia_in:.3dot}} bar</text>
+  <text class="label" x="262" y="100">pilot: the first {{process.pilot_length_in:.2dot}} in of the end</text>
+  <line class="leader" x1="472" y1="104" x2="498" y2="135"/>
+  <text class="label" x="330" y="50">MHA-PD-19: its hole offered by hand, chamfered side first</text>
+  <line class="leader" x1="612" y1="55" x2="613" y2="75"/>
+  <text class="label" x="560" y="300">Mike the pilot: PILOT = ______</text>
+  <line class="leader" x1="552" y1="292" x2="521" y2="200"/>
+  <text class="label" x="215" y="255">Op 40 faces the pilot off to here</text>
+  <line class="leader" x1="425" y1="243" x2="480" y2="214"/>
+  <text class="label" x="296" y="292">AR, then the strip on the file</text>
+  <line class="leader" x1="478" y1="286" x2="490" y2="270"/>
+</svg>
