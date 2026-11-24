@@ -276,10 +276,10 @@ def test_the_set_screws_bite_flats_clear_of_the_hubs() -> None:
     assert bank.SOUTH_EAR_SET_RANGE == pytest.approx(
         (-bank.EAR_SPAN_BAND, bank.EAR_SPAN_BAND)
     )
-    # .010 tip set + .004 north-ear thickness + .004 span set + the south
-    # end's inset.
+    # .010 tip set + .005 north-ear thickness (the title block's .XXX, fit
+    # audit census) + .004 span set + the south end's inset.
     assert bank.FLAT_OFFSET_MAX == pytest.approx(
-        (0.254 + 0.1016 + 0.1016 + abs(bank.SOUTH_END_INSET), 0.254), abs=5e-4
+        (0.254 + 0.127 + 0.1016 + abs(bank.SOUTH_END_INSET), 0.254), abs=5e-4
     )
     station_error = (
         shaft.FLAT_STATION_BAND + shaft.LENGTH_BAND,
@@ -302,7 +302,9 @@ def test_the_set_screws_bite_flats_clear_of_the_hubs() -> None:
         bracket.SET_SCREW_STATION_BAND + bracket.EAR_T_BAND,
     )
     assert bank.FLAT_RUN_MAX == pytest.approx(hub_free)
-    assert bank.FLAT_RUN_MAX == pytest.approx((4.599, 4.2434), abs=5e-4)
+    # The ear thickness at the title block's +/-.005 (fit audit census;
+    # (4.599, 4.2434) at +/-.004).
+    assert bank.FLAT_RUN_MAX == pytest.approx((4.5863, 4.2180), abs=5e-4)
     for offset, error, run_max, band in zip(
         bank.FLAT_OFFSET_MAX, station_error, hub_free, tap_band, strict=True
     ):
@@ -334,7 +336,7 @@ def test_south_apex_stays_on_the_support_at_the_worst_case() -> None:
         abs=5e-4,
     )
     apex_z = bank.SOUTH_EAR_OUTER_Z - bank.SOUTH_APEX_REACH_MAX
-    assert apex_z == pytest.approx(-88.464, abs=5e-4)
+    assert apex_z == pytest.approx(-88.515, abs=5e-4)  # -88.464 at +/-.004
     support_end = support.SUPPORT_WORLD_Z - support.SUPPORT_HALF_MACHINE_Z
     assert apex_z - support_end >= 2.0
 
