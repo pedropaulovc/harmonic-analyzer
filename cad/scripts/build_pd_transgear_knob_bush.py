@@ -76,7 +76,6 @@ from pd_transgear_knob_bush_geometry import (
     SHOULDER_ROOT_R_MAX_MM,
 )
 from pd_transgear_knob_bush_spec import (
-    BORE_BAND,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -315,16 +314,10 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The H7 running bore and the FN2 press carry their fit bands; the hub
-    # station and the overall length their stack bands.  The hub Ø is
-    # governed by its places (the spec's DRAWING_PRECISION): no model band.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "BoreSketch",
-        "BoreDia",
-        *deviations(BORE_BAND),
-        display_unit=UNIT,
-    )
+    # The FN2 press carries its fit band; the hub station and the overall
+    # length their stack bands.  The reamed running bore prints the reamer's
+    # size and no band (rule 4); the hub Ø is governed by its places (the
+    # spec's DRAWING_PRECISION): no model band.
     set_dimension_bilateral_tolerance(
         adapter,
         "BushProfile",

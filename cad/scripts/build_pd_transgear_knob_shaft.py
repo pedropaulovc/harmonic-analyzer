@@ -94,7 +94,6 @@ from pd_transgear_knob_shaft_spec import (
     FRONT_CORNER_RADIUS_TOL_TYPE,
     GEOMETRIC_CONTROLS,
     JOURNAL_DIA,
-    JOURNAL_DIA_BAND,
     JOURNAL_LENGTH,
     OUTSIDE_DIA_BAND,
     OUTSIDE_DIA,
@@ -942,10 +941,6 @@ def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "StudProfile", "CoreDia", *deviations(CORE_DIA_BAND), display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "JournalProfile", "JournalDia", *deviations(JOURNAL_DIA_BAND),
-        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter, "StudProfile", "OutsideDia", *deviations(OUTSIDE_DIA_BAND), display_unit=UNIT
