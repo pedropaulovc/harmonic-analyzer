@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" font-family="sans-serif" font-size="13">
   <!-- The finished collar, section through the axis and the holes, 400 px to the inch: the seat face at x 300, the rear face at the left (x 180), the pilot to the right. Styles: prechips.palette. -->
   <rect class="paper" x="0" y="0" width="760" height="360"/>
-  <text class="title" x="20" y="22">The finished collar: rear face left, pilot right; the dowel centres measured over pins</text>
+  <text class="title" x="20" y="22">The finished collar: rear face left, pilot right; the flat pin's centre measured over pins</text>
   <polygon class="part-kept" points="180,43 300,43 300,102 356,102 356,258 300,258 300,317 180,317"/>
   <rect class="holes" x="180" y="142" width="176" height="76"/>
   <rect class="holes" x="180" y="71" width="120" height="38"/>
@@ -11,12 +11,12 @@
   <line class="datum" x1="300" y1="30" x2="300" y2="330"/>
   <text class="datum-label" x="290" y="348">seat face</text>
   <line class="leader" x1="240" y1="71" x2="420" y2="60"/>
-  <text class="label" x="424" y="64">2X dowel Ø{{cad.dowel_a_dia_min_in:.4dot}}–{{cad.dowel_a_dia_max_in:.4dot}} through,</text>
-  <text class="label" x="424" y="80">centres {{cad.dowel_a_offset_min_in:.4dot}}–{{cad.dowel_a_offset_max_in:.4dot}} from the bore's axis</text>
+  <text class="label" x="424" y="64">2X dowel holes .0930 reamed through,</text>
+  <text class="label" x="424" y="80">no dowel enters by hand; centres by wheel trial</text>
   <line class="leader" x1="330" y1="175" x2="420" y2="130"/>
-  <text class="label" x="424" y="134">bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} through</text>
+  <text class="label" x="424" y="134">bore #11 drilled, Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}} through</text>
   <line class="leader" x1="250" y1="228" x2="420" y2="214"/>
-  <text class="label" x="424" y="210">flat pin Ø{{cad.flat_pin_hole_dia_min_in:.4dot}}–{{cad.flat_pin_hole_dia_max_in:.4dot}} blind,</text>
+  <text class="label" x="424" y="210">flat pin's hole .0615 reamed blind,</text>
   <text class="label" x="424" y="226">floor {{cad.flat_pin_floor_station_min_in:.2dot}}–{{cad.flat_pin_floor_station_max_in:.2dot}} from the seat face</text>
   <line class="leader" x1="356" y1="250" x2="420" y2="280"/>
   <text class="label" x="424" y="284">pilot, supplied long: faced at MHA-PD-00</text>
