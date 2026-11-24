@@ -56,7 +56,6 @@ from dt_cylinder_gear_shaft_spec import (
     LENGTH_CALLOUT,
     SHAFT_DIA,
     SHAFT_RADIUS,
-    SHAFT_DIA_BAND,
     SURFACE_FINISHES,
     UNIT,
 )
@@ -155,19 +154,14 @@ requirement(
     "outer",
     kind="diameter",
     faces=(CylinderFace(SHAFT_DIA),),
-    requirements=("dia",),
+    requirements=("stock",),
     fields={
         "axis": ([0.0, 1.0, 0.0], ("SHAFT_DIA",)),
         "at": ([0.0, 0.0, 0.0], ("SHAFT_DIA",)),
         "span": ([0.0, ARBOR_LENGTH], ((_LAYOUT, "ARBOR_LENGTH"),)),
-        "dia": (
-            limits(SHAFT_DIA, _P["ShaftDia"], SHAFT_DIA_BAND, unit=UNIT),
-            ("SHAFT_DIA", "SHAFT_DIA_BAND", "UNIT"),
-        ),
-        "dia_nominal": (SHAFT_DIA, ("SHAFT_DIA",)),
-        "callout": (SHAFT_DIA_CALLOUT, ((_NOTES, "SHAFT_DIA_CALLOUT"),)),
+        "dia_ref": (SHAFT_DIA, ("SHAFT_DIA",)),
+        "stock": (SHAFT_DIA_CALLOUT, ((_NOTES, "SHAFT_DIA_CALLOUT"),)),
     },
-    precision={"dia": _P["ShaftDia"]},
 )
 
 

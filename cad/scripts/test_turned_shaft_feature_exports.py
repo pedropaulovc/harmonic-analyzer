@@ -232,7 +232,8 @@ def test_printed_bands_are_the_sheets() -> None:
     )
 
     cylinder = manifest("dt_cylinder_gear_shaft")["features"]
-    assert _inch(cylinder["outer"]["dia"]) == [0.3742, 0.375]
+    assert cylinder["outer"]["dia_ref"] == pytest.approx(arbor.SHAFT_DIA)
+    assert cylinder["outer"]["stock"].startswith("3/8 GROUND STOCK, AS SUPPLIED")
     assert _inch(cylinder["far_end"]["height"]) == [0.05, 0.07]
     assert _inch(cylinder["far_end"]["supply_length"]) == [7.4, 7.6]
     assert (
