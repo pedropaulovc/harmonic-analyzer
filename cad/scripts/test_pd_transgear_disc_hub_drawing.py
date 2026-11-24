@@ -1122,7 +1122,7 @@ def test_the_chord_hole_dimensions_print_left_of_the_ring() -> None:
     # what it does beside its value.
     assert drawing.SECTION_SUFFIXES == {
         "KeyPinDia": " REAM",
-        "KeyPinStop": " SEATS PIN",
+        "KeyPinStop": " PIN END",
     }
     assert callout.splitlines() == [
         f"PIN {spec.KEY_PIN_NUMBER}",

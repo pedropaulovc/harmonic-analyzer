@@ -376,7 +376,7 @@ def section_letter_box(tail: tuple[float, float]) -> Box:
 # Seen along +Z with model +X up, model +Y runs right: the oil hole on the
 # right, the key pin's chord hole on the left, the ream entering from the
 # top -- the face view's frame.  _orient_section reads that frame back.
-SECTION_CENTER = (0.370, 0.105)  # where the hub axis lands
+SECTION_CENTER = (0.3735, 0.105)  # where the hub axis lands
 SECTION_POSITION_TOL_M = 1e-4
 # A projected 1 mm step reads off the sheet's axes by less than this.
 _SECTION_FRAME_TOL_M = 1e-8
@@ -399,9 +399,10 @@ _SECTION_REACH_MM = _HUB_R_MM + SECTION_CENTERLINE_OVERRUN_MM
 # print left of the section, in the air between the flange thickness's
 # block and the ring: the stop's text inline on its dimension line between
 # the hub axis's and the stop's extension lines, its function beside the
-# value on one row (38 mm wide, ending 2 mm short of the ring and starting
-# right of the knockout's size, in the 11 mm between the ream's shelf and
-# the knockout's row); the ream's size and fit
+# value on one row (ending 2 mm short of the ring, its dimension line right
+# of the ream's callout: r4 review, a line 6 mm further left struck the
+# pin's number; the section stands 3.5 mm further right for it); the
+# ream's size and fit
 # beside the ream, under the Ø1.05's lower extension line (y .125), the
 # knockout's beside the knockout, both left of the stop's line so their
 # dimension lines run straight across the hole; the chord offset above the
@@ -412,7 +413,7 @@ SECTION_KEEP = {
         SECTION_CENTER[0] + 0.019,
         _section_xy(_SECTION_REACH_MM, 0.0)[1] + 0.004,
     ),
-    "KeyPinStop": (0.3285, _section_xy(-KEY_PIN_STOP / 2.0, 0.0)[1]),
+    "KeyPinStop": (0.335, _section_xy(-KEY_PIN_STOP / 2.0, 0.0)[1]),
     "KeyPinDia": (0.3125, SECTION_CENTER[1] + 0.0065),
     "KeyPinDrillDia": (
         0.315,

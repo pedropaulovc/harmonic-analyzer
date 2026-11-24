@@ -706,9 +706,11 @@ OIL_HOLE_CALLOUT_BELOW = "\n".join(
 # and the ream's stop from the hub axis, a three-place size at the title
 # block's band that says what it does beside its value (rule 3; machinist
 # review 2026-11-24, three runs: a bare .160 stated no function): the pin
-# seats on it, its end inside the hub's O.D.
+# ends on it, inside the hub's O.D. (PIN END is as wide as the air takes
+# with the dimension line clear of the ream's callout: r4 review, the line
+# of a longer text struck it).
 KEY_PIN_SUFFIX = " REAM"
-KEY_PIN_STOP_SUFFIX = " SEATS PIN"
+KEY_PIN_STOP_SUFFIX = " PIN END"
 KEY_PIN_CALLOUT_BELOW = "\n".join(
     (f"PIN {KEY_PIN_NUMBER}", f"SEE NOTE {KEY_PIN_NOTE}")
 )

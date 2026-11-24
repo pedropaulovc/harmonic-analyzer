@@ -130,13 +130,16 @@ spigot_rough_length_in = 0.14
 # is its diametral clearance in the MHA-PD-06 disc's reamed bore (note 4),
 # so the disc's bore is reamed before this operation and the acceptance is
 # the trial of that disc on the spigot, its shake read on the DTI; no size
-# band is gauged. The micrometer (it reads the two-point size across the
-# crests, which is what enters the disc) only steers the cuts to the aim:
-# the middle of the clearance under the .501 reamer's hole. The
-# last cut is set from the measured diameter, then a spring pass at the same
-# setting. The flange's rear face takes the .001 in/rev cross feed: its cusp
-# .00004.
-spigot_aim_in = 0.497
+# band is gauged. The cuts are steered by the mate too (traveler review
+# 2026-11-24, three runs: a fixed aim scrapped spigots under a large bore):
+# the micrometer (it reads the two-point size across the crests, which is
+# what enters the disc) takes the spigot to a first size the .501 reamer's
+# hole accepts with shake still under the clearance, the disc is tried and
+# its shake S read, and the last cut takes half of (the aimed shake, the
+# middle of the clearance, less S), then a spring pass at the same setting.
+# The flange's rear face takes the .001 in/rev cross feed: its cusp .00004.
+spigot_first_dia_in = 0.5
+spigot_aim_shake_in = 0.004
 # Setup 2 drills and reams through from the spigot end: the quill readings
 # past the hub front face (inside the chuck's bore).
 drill_run_in = 0.75
@@ -386,7 +389,7 @@ speed_kind = "spindle"
 tool = "sharp"
 drilling = "none"
 sizing = "other"
-instruction = "Sharp-nose tool (nose R.003–.004; to buy), on centre: turn the spigot from Z0 to Z-{{cad.spigot_length_mm:in.3dot}} at the .0025 in/rev power feed, miking after each pass, toward Ø{{process.spigot_aim_in:.3dot}} (the middle of its clearance in the MHA-PD-06 disc's bore, reamed .501 before this operation). Within .003 of it, feed the cross slide in by half of (the reading less Ø{{process.spigot_aim_in:.3dot}}) for the last cut, then a spring pass with no infeed. Then face the flange's rear face out to the rim at Z-{{cad.spigot_length_mm:in.3dot}} on the .001 in/rev cross feed, leaving the root sharp (R{{cad.spigot_root_radius_max_mm:in.3dot}} MAX)."
+instruction = "Sharp-nose tool, on centre: turn the spigot from Z0 to Z-{{cad.spigot_length_mm:in.3dot}} at the .0025 in/rev power feed to Ø{{process.spigot_first_dia_in:.3dot}}, miked. Spindle stopped, try the reamed MHA-PD-06 disc on it and read its shake S as in the Check. Take the last cut at half of ({{process.spigot_aim_shake_in:.3dot}} less S), then a spring pass. Then face the flange's rear face out to the rim at Z-{{cad.spigot_length_mm:in.3dot}} on the .001 in/rev cross feed, the root left sharp (R{{cad.spigot_root_radius_max_mm:in.3dot}} MAX)."
 settings = "lathe-sharp-nose-c360"
 cut_diameter_mm = "{{cad.spigot_dia_ref_mm}}"
 inspection = "The spigot is accepted by its mate: spindle stopped, slip the reamed MHA-PD-06 disc over the spigot up to the flange, the DTI on the carriage with its tip on the top of one of the disc's teeth; push the disc toward the DTI and pull it away, the hub not moving: the reading changes by {{cad.spigot_diametral_clearance_min_in:.3dot}}–{{cad.spigot_diametral_clearance_max_in:.3dot}}. The flange's face at Z-{{cad.spigot_length_min_in:.3dot}} to Z-{{cad.spigot_length_max_in:.3dot}}, the tool's point touched on it; the flange {{cad.flange_front_face_thickness_min_in:.3dot}}–{{cad.flange_front_face_thickness_max_in:.3dot}} thick at the rim, micrometer."
@@ -631,7 +634,7 @@ instruction = "Clear the chord hole's breakthrough slivers inside the bore: grip
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The chord ream after deburring: try the .061 pin in it, then offer the MHA-PD-VN-69 dowel to its mouth by hand (it is pressed at MHA-PD-00, step 8A). The dowel entering by hand: scrapped, not reworked; make another from Setup 1."
+instruction = "The chord ream after deburring: try the .061 pin in it, then offer the MHA-PD-VN-69 dowel to its mouth by hand (it is pressed at MHA-PD-00, step 8A)."
 inspection = "The .061 pin enters to the stop; the MHA-PD-VN-69 dowel does not enter by hand."
 gauge_checks = "other"
 feed = "hand"
@@ -643,7 +646,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pin_ream_station_band_mm}
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Station outside its band in Op 380: scrapped (the hole is reamed and cannot move); make another from Setup 1."
+instruction = "Station outside its band in Op 380, or the dowel entering by hand in Op 370: scrapped (the hole is reamed and cannot move or close); make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
