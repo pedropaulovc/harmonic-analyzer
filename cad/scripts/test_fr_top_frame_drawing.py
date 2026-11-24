@@ -1429,23 +1429,25 @@ def test_transferred_keeper_receiver_keeps_real_normal_wall_at_printed_bands() -
     # leaning at least the 2° an added family may print.
     assert part.KEEPER_TAP_X == part.COLUMN_X + keeper.KEEPER_FITUP_X_FROM_WEB_MM
     assert part.KEEPER_MAX_TRANSVERSE_OFFSET == pytest.approx(0.254)
-    assert part.KEEPER_MAX_WEB_CENTRE_OFFSET == pytest.approx(3.9116)
+    # The lug centre at MHA-CH-00's printed .114 ±.004 (rulings.md D15).
+    assert part.KEEPER_MAX_WEB_CENTRE_OFFSET == pytest.approx(4.0132)
     assert part.KEEPER_MIN_WEB_HALF_WIDTH == pytest.approx(6.962586831553313)
     assert part.KEEPER_MIN_ROOT_RADIUS == pytest.approx(2.286)
     assert part.KEEPER_MIN_FLANGE_THICKNESS == pytest.approx(7.366)
     assert part.KEEPER_MAX_FULL_THREAD_DEPTH == pytest.approx(7.874)
     assert part.KEEPER_TAP_THREAD_WALL_MARGIN_NO_WANDER == pytest.approx(
-        2.357056473671888
+        2.263367373611047
     )
     assert part.KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER == pytest.approx(
-        2.1111868315533138
+        2.009586831553314
     )
-    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(2.2958786336548878)
-    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(2.0500089915363136)
-    assert (
-        min(part.KEEPER_TAP_THREAD_WALL_MARGIN, part.KEEPER_TAP_DRILL_WALL_MARGIN)
-        >= WALL_TARGET_MM
-    )
+    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(2.202189533594047)
+    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.9484089915363136)
+    # Main, by the owner's delegation of 2026-11-24 (rulings.md D15): .0767
+    # accepted under the .080 target at .076 (RV-14), over the .060 floor.
+    held = min(part.KEEPER_TAP_THREAD_WALL_MARGIN, part.KEEPER_TAP_DRILL_WALL_MARGIN)
+    assert spec.KEEPER_TAP_WALL_ACCEPTED_MM <= held < WALL_TARGET_MM
+    assert spec.KEEPER_TAP_WALL_ACCEPTED_MM > part.WALL_FLOOR_MM
     # Independently sample the actual quarter-circle surface. The threaded
     # cylinder's deepest/outboard corner, not its horizontal section, is
     # nearest this concave surface. All other thread points are farther in.
@@ -1616,10 +1618,11 @@ def test_printed_typ_top_flange_minimum_keeps_the_receiver_wall() -> None:
     pilot_wall = half_width - (axis_offset + displacement + pilot_radius)
     assert thread_wall == pytest.approx(part.KEEPER_TAP_THREAD_WALL_MARGIN, abs=1e-6)
     assert pilot_wall == pytest.approx(part.KEEPER_TAP_DRILL_WALL_MARGIN)
-    # The pilot wall holds the .080 target with MHA-CH-07's inch fit-up band
-    # at the 2° minimum added draft (.0807 MIN).
-    assert pilot_wall == pytest.approx(2.0500, abs=5e-5)
-    assert min(thread_wall, pilot_wall) >= WALL_TARGET_MM
+    # With the lug centre at MHA-CH-00's printed .114 ±.004, the pilot wall
+    # at the 2° minimum added draft is .0767, under the .080 target and held
+    # at D15's accepted .076 (RV-14).
+    assert pilot_wall == pytest.approx(1.9484, abs=5e-5)
+    assert min(thread_wall, pilot_wall) >= spec.KEEPER_TAP_WALL_ACCEPTED_MM
 
 
 # --- #946 leader-over-part: RD4 -------------------------------------------
@@ -3077,17 +3080,19 @@ def test_one_draft_angle_prints_for_each_band_on_sheet_sevens_elevation() -> Non
     # rule 3 gives the form: the wall, with its value.  Rule 7 allows a
     # callout two lines of words, so the faces share the first (machinist
     # reviews of 518e3d01e1 and 7dfc6b6c5f).  The taken-out band is the title
-    # block's own and gives no reason.  The wall's text is the package's
-    # thin-wall target, composed in a module only the drawing imports (the
-    # drawing itself owns no stated limit, test_drawing_specification_purity;
-    # a library module reads no builder, test_buildgraph), and the builder
+    # block's own and gives no reason.  The wall's text is the wall accepted
+    # under the package's thin-wall target (Main, by the owner's delegation
+    # of 2026-11-24, rulings.md D15; RV-14), composed in a module only the
+    # drawing imports (the drawing itself owns no stated limit,
+    # test_drawing_specification_purity; a library module reads no builder,
+    # test_buildgraph), and the builder
     # proves both of the tap's walls hold it.
     import fr_top_frame_callouts as stated_walls
 
-    assert stated_walls.ADDED_DRAFT_WALL_CALLOUT == "HOLDS 2-56 TAP WALL .080 MIN"
+    assert stated_walls.ADDED_DRAFT_WALL_CALLOUT == "HOLDS 2-56 TAP WALL .076 MIN"
     held = min(part.KEEPER_TAP_DRILL_WALL_MARGIN, part.KEEPER_TAP_THREAD_WALL_MARGIN)
     assert math.floor(round(held / spec.IN * 1000.0, 6)) / 1000.0 == pytest.approx(
-        WALL_TARGET_MM / spec.IN
+        spec.KEEPER_TAP_WALL_ACCEPTED_MM / spec.IN
     )
     reason = {
         "WebRingDraft": [stated_walls.ADDED_DRAFT_WALL_CALLOUT],
@@ -3107,16 +3112,23 @@ def test_one_draft_angle_prints_for_each_band_on_sheet_sevens_elevation() -> Non
     )
     (stated,) = reason["WebRingDraft"]
     assert keeper_screw.THREAD.lstrip("#") in stated
-    # The stated wall is the rule 17 target, which the keeper drill's wall
-    # holds at the 2° minimum (.0807) and loses a degree lower (.0636).
-    assert f"{WALL_TARGET_MM / 25.4:.3f}".lstrip("0") in stated.split()
+    # The stated wall is D15's accepted .076, which the keeper drill's wall
+    # holds at the 2° minimum (.0767) and loses a degree lower (.0596, under
+    # the .060 floor).
+    assert f"{spec.KEEPER_TAP_WALL_ACCEPTED_MM / 25.4:.3f}".lstrip("0") in stated.split()
     drill_rise = part._KEEPER_DRILL_BOTTOM_Y + part.HALF_H
     thinner = part.KEEPER_TAP_DRILL_WALL_MARGIN - drill_rise * (
         part.DRAFT_T_ADDED_MIN - math.tan(math.radians(spec.DRAFT_DEG - 1.0))
     )
-    assert part.KEEPER_TAP_DRILL_WALL_MARGIN >= WALL_TARGET_MM > thinner
+    assert (
+        WALL_TARGET_MM
+        > part.KEEPER_TAP_DRILL_WALL_MARGIN
+        >= spec.KEEPER_TAP_WALL_ACCEPTED_MM
+        > part.WALL_FLOOR_MM
+        > thinner
+    )
     assert part.KEEPER_TAP_THREAD_WALL_MARGIN >= part.KEEPER_TAP_DRILL_WALL_MARGIN
-    assert thinner / 25.4 == pytest.approx(0.0636, abs=5e-5)
+    assert thinner / 25.4 == pytest.approx(0.0596, abs=5e-5)
     # One band covers every added-draft face by owner ruling D4, though the
     # wall it holds stands in the rail web alone: RV-12 records the ruling
     # for a reviewer who would loosen the other faces (machinist review of
@@ -5541,8 +5553,8 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     assert (part.HALF_H, part.FLANGE, part.FLANGE_BOT_Y) == pytest.approx(
         (18.2499, 8.128, 10.1219)
     )
-    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(2.2958786336548878)
-    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(2.0500089915363136)
+    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(2.202189533594047)
+    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.9484089915363136)
     assert min(part.KEEPER_FOOT_BOSS_MARGINS) >= 1.016
     # Along the rail the faced top runs boss to boss, so the fitted foot
     # stays on it exactly when it clears the bosses at the printed bands.
@@ -5571,13 +5583,14 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     )
     half_foot = part._keeper_printed(keeper.KEEPER_WIDTH, foot_places, 1.0) / 2.0
     max_chamfer = spec.printed_limit(part.EDGE_CHAMFER, chamfer_places, 1.0)
+    # The lug centre at MHA-CH-00's printed .114 ±.004 (rulings.md D15).
     assert (half_flange, median, offset, half_foot, max_chamfer) == pytest.approx(
-        (16.764, 1.143, 2.8956, 7.112, 1.778)
+        (16.764, 1.143, 2.9972, 7.112, 1.778)
     )
     assert max_chamfer == pytest.approx(part.EDGE_BREAK_PRINTED_MAX)
     margin = half_flange - median - offset - half_foot - max_chamfer
     assert part.KEEPER_FOOT_PRINTED_FLAT_TOP_SIDE_MARGIN == pytest.approx(margin)
-    assert margin == pytest.approx(3.8354)
+    assert margin == pytest.approx(3.7338)
     # Faced in place: the rail-top plane stays put.
     assert part.HALF_H - part.FLANGE_BOT_Y == pytest.approx(spec.FLANGE_THICKNESS_MM)
     # Native finishes: the four sockets, and the four boss tops (owner
@@ -5595,19 +5608,31 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     assert not hasattr(spec, "HANGER_SPOTFACE_TARGET")
 
 
-def test_keeper_tap_drill_wall_holds_the_target_without_an_exception() -> None:
+def test_keeper_tap_drill_wall_is_accepted_under_the_target_as_rv14() -> None:
     # Owner rulings D3/D4 (#2333): with the web's median ±.03 to the socket
-    # axes and its faces at the 2° minimum an added family may print, the
-    # keeper taps' drill wall holds .0807 MIN, over the .080 target, so no
-    # exception or sheet note returns (RV-08 stays retired).
-    assert 0.080 * spec.IN <= part.KEEPER_TAP_DRILL_WALL_MARGIN < 0.081 * spec.IN
-    assert part.KEEPER_TAP_DRILL_WALL_MARGIN >= WALL_TARGET_MM
+    # axes and its faces at the 2° minimum an added family may print, and the
+    # lug centre at MHA-CH-00's printed .114 ±.004, the keeper taps' drill
+    # wall is .0767, under the .080 target. Main, by the owner's delegation
+    # of 2026-11-24 (rulings.md D15), accepts it at .076 as the minor entry
+    # RV-14; RV-08 stays retired and no sheet note returns.
+    assert 0.076 * spec.IN <= part.KEEPER_TAP_DRILL_WALL_MARGIN < 0.077 * spec.IN
+    assert spec.KEEPER_TAP_WALL_ACCEPTED_MM == pytest.approx(0.076 * spec.IN)
+    assert (
+        part.WALL_FLOOR_MM
+        < spec.KEEPER_TAP_WALL_ACCEPTED_MM
+        <= part.KEEPER_TAP_DRILL_WALL_MARGIN
+        < WALL_TARGET_MM
+    )
     assert not hasattr(part, "KEEPER_WALL_NOTE")
     entries = {
-        entry.id
+        entry.id: entry
         for entry in load_exceptions(CAD_ROOT / "config", "fr_top_frame", "part")
     }
     assert "RV-08" not in entries
+    rv14 = entries["RV-14"]
+    assert rv14.kind == "minor"
+    assert "rulings.md D15" in rv14.reason
+    assert ".0767" in rv14.finding and ".076 MIN" in rv14.where
 
 
 def test_top_frame_drawing_is_seven_sheets() -> None:

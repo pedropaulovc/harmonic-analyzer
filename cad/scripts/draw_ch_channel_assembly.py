@@ -1254,7 +1254,8 @@ def _fitup_text() -> dict[str, str]:
         ),
         "keepers-unclamped": "REMOVE THE CLAMPS.",
         "keepers-held": f"CHECK EACH {keeper} DOES NOT TURN BY HAND.",
-        # #2338: each keeper is reamed alone to its print; the bore's band
+        # #2338: each keeper is drilled letter F alone to its print (owner
+        # ruling 2026-11-24, fit audit Q1); the bore's band
         # covers both bore heights and the rail seats, so the shaft slides
         # with both screwed down (ch_fulcrum_shaft_spec ALIGNED_MIN_CLEARANCE_MM).
         "keeper-bores-checked": (

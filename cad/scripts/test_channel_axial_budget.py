@@ -199,7 +199,7 @@ def test_the_bar_lean_books_the_lever_bank_and_closes_no_cheek() -> None:
     closures = [_cheek_closure(j) for j in range(bank.COUNT)]
     worst = max(range(bank.COUNT), key=closures.__getitem__)
     assert worst == 12
-    assert closures[worst] == pytest.approx(0.0336, abs=1e-4)
+    assert closures[worst] == pytest.approx(0.0330, abs=1e-4)
     assert closures[worst] < CHEEK_CLOSURE_LIMIT
 
 

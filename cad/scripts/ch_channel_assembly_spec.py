@@ -225,8 +225,9 @@ TOLERANCE_PRECISION = {
 }
 # (lower, upper) deviations.
 # The ear span and the lug centre carry their fit-up bands on their own
-# dimensions (owner rulings X1+B1 and X-A, 2026-10-18; necessity register
-# ch-channel-assembly); the front lug inner face the title block's band and
+# dimensions (owner rulings X1+B1 and X-A, 2026-10-18). The lug centre's
+# is in necessity register ch-channel-assembly N-01; the ear span's has no
+# entry: its end hubs still clear at the title block (#3563); the front lug inner face the title block's band and
 # the rear inner face is a reference (C10, ch_keeper_fitup: the rear keeper
 # is set to the bare lever stack over a leaf).
 DIMENSION_TOLERANCES = {

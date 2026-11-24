@@ -377,7 +377,15 @@ def test_fitup_exports_for_the_top_frame() -> None:
     from frame_column_stations import COLUMN_X
 
     spec = ch_fulcrum_keeper_spec
-    assert spec.KEEPER_FITUP_PLACES == 2
+    # MHA-CH-00 prints the lug centre (.114 ±.004) at these places, and the
+    # frame's stacks charge that printed value (rulings.md D15).
+    import ch_channel_assembly_spec as asm
+
+    assert spec.KEEPER_FITUP_PLACES == 3
+    assert (
+        asm.DRAWING_PRECISION[asm.KEEPER_PLAN_FEATURE][asm.KEEPER_X_DIMENSION]
+        == spec.KEEPER_FITUP_PLACES
+    )
     # The lug centres stand on the fulcrum line, off the column (web) line.
     assert COLUMN_X + spec.KEEPER_FITUP_X_FROM_WEB_MM == pytest.approx(
         LEVER_FULCRUM_XY[0]

@@ -142,9 +142,11 @@ KEEPER_SEAT_LENGTH_MM = LUG_HALF_T + FOOT_TIP_X  # 16.5: seat along the shaft
 # feeler leaf (owner ruling 2026-11-24, fit audit part 2, C10;
 # ch_keeper_fitup). The frame's keeper taps are then transferred from the
 # foot holes, so no frame-tap or foot-hole station reaches the keeper's
-# place. The step prints the X distance to KEEPER_FITUP_PLACES;
-# build_fr_top_frame reads the same names for the foot-to-boss stack. ---
-KEEPER_FITUP_PLACES = 2
+# place. MHA-CH-00 prints the lug-centre X distance (KeeperLugX, .114
+# ±.004) at KEEPER_FITUP_PLACES (ch_channel_assembly_spec.DRAWING_PRECISION),
+# and build_fr_top_frame charges that printed value in its foot-to-boss
+# stacks (Main, by the owner's delegation of 2026-11-24, rulings.md D15). ---
+KEEPER_FITUP_PLACES = 3
 # Each lug centre stands this far west (+x) of the centre of the top-frame
 # rail web under it, its column's socket axis (Main's ruling: a local X
 # datum on the receiving web): the kinematic fulcrum line off the frame's

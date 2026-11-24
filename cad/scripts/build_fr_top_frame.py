@@ -291,6 +291,7 @@ from fr_top_frame_spec import (
     STUD_Z_REAR,
     KEEPER_TAP_CALLOUT_PRECISION,
     KEEPER_TAP_DRILL_WANDER_DEG,
+    KEEPER_TAP_WALL_ACCEPTED_MM,
     DRILL_DRIFT_PER_MM,
     PRINTED_DRILLED_HOLE_PLUS_MM,
     PRINTED_LINEAR_BAND_MM,
@@ -1793,10 +1794,19 @@ KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER = (
 KEEPER_TAP_DRILL_WALL_MARGIN = (
     KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER - KEEPER_TAP_AXIS_WANDER_MM
 )
-# Owner rulings D3/D4 (#2333): the drill wall holds the .080 target at the 2°
-# minimum added draft (.0807 MIN); the owner's floor is .060.
-if min(KEEPER_TAP_THREAD_WALL_MARGIN, KEEPER_TAP_DRILL_WALL_MARGIN) < WALL_TARGET_MM:
-    raise AssertionError("keeper receiver leaves less than .080 with drill wander")
+# Owner rulings D3/D4 (#2333) leave the drill wall its least at the 2°
+# minimum added draft; with the lug centre charged at MHA-CH-00's printed
+# .114 ±.004 it is .0767, under the .080 target. Main, by the owner's
+# delegation of 2026-11-24 (rulings.md D15): "tap wall .0767 accepted
+# against the .080 target (floor .060) as an exception entry" (RV-14), held
+# at KEEPER_TAP_WALL_ACCEPTED_MM (.076); the floor still binds.
+_KEEPER_TAP_WALL = min(KEEPER_TAP_THREAD_WALL_MARGIN, KEEPER_TAP_DRILL_WALL_MARGIN)
+if _KEEPER_TAP_WALL < WALL_FLOOR_MM:
+    raise AssertionError("keeper receiver leaves less than .060 with drill wander")
+if _KEEPER_TAP_WALL < KEEPER_TAP_WALL_ACCEPTED_MM:
+    raise AssertionError(
+        "keeper receiver leaves less than D15's accepted .076 with drill wander"
+    )
 KEEPER_MAX_STOCK_ENTRY = FOOT_SCREW_LENGTH_MM - (
     _keeper_printed(FOOT_H, KEEPER_DRAWING_PRECISION["FootProfile"]["FootRise"], -1.0)
     - _keeper_printed(CBORE_DEPTH_MM, FOOT_COUNTERBORE_DEPTH_PLACES, 1.0)

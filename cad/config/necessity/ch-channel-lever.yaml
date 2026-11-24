@@ -2,15 +2,15 @@ necessity:
   - id: N-01
     feature: "hub length .300 +.001/.000, SETS PITCH OF 20X STACK ON MHA-CH-04"
     kind: gap
-    reason: "twenty long hubs close the keeper end play"
-    source: "ch_channel_lever_spec.HUB_LENGTH_BAND; ch_fulcrum_keeper_spec.KEEPER_Z_OFF (20 x .303 = 6.060 over the 6.038 lug span)"
+    reason: "the hub stack sets the rear keeper over shaft flats"
+    source: "ch_fulcrum_shaft_spec.FLAT_STATION_WINDOW_MM: .474 mm at this band, -2.066 at the title block's ±.005 (no shaft station seats both set-screw cups; -1.041 at +.005/.000), the rear keeper set to the stack over a .020 leaf (owner ruling 2026-11-24, fit audit part 2, C10; ch_keeper_fitup.LEVER_HUB_LENGTH_MM); build_fr_top_frame.KEEPER_FOOT_PRINTED_BOSS_MARGINS also goes to -.660 mm at +.005 (1.372 at this band). Main, by the owner's delegation of 2026-11-24 (rulings.md D16)"
   - id: N-02
     feature: "plate thickness .118 +/-.002, in the MHA-CH-01 top notch"
     kind: gap
     reason: "thick plate closes the running gap in the notch"
-    source: "ch_channel_lever_spec.LEVER_THICKNESS_TOLERANCE; ch_amplitude_bar_spec.TOP_NOTCH_WIDTH (plate max plus the running floor)"
+    source: "ch_amplitude_bar_spec.TOP_NOTCH_WIDTH (plate max plus the running floor); ch_channel_lever_spec.LEVER_THICKNESS_TOLERANCE"
   - id: N-03
     feature: "plate near face .091 +/-.002 from the hub face"
     kind: gap
     reason: "at the title block, bowed bars close mid-span"
-    source: "ch_channel_lever_spec.PLATE_OFFSET_TOLERANCE; ch_channel_assembly_spec.bar_gap_budget mid_span_bowed (fails at +/-.005)"
+    source: "ch_channel_assembly_spec.BAR_GAP mid_span_bowed (fails at +/-.005); ch_channel_lever_spec.PLATE_OFFSET_TOLERANCE"
