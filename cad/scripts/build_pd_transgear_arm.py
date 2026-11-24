@@ -13,8 +13,8 @@ face, +X to the square end, +Z to the rear face):
   tangent to it, cut square at the tip station by the 14-wide end face;
   extruded ``THICKNESS`` toward +Z as ``Arm``.
 * ``PivotBore``: the Ø4.9 running bore through at P.
-* ``PinBore``: the Ø3.874 reamed press bore through at S for the MHA-PD-23
-  pin, cut normal to the faces (the pin's head seats on the rear face).
+* ``PinBore``: the Ø.126 reamed bore through at S the MHA-PD-23 pin is bonded
+  in, cut normal to the faces (the pin's head seats on the rear face).
 * ``PinBoreRearMouth``: the bore's 45-degree rear mouth, clearing the pin's
   seat root: a revolved cut whose profile ``PinBoreRearMouthProfile`` lies on
   ``PinBoreSectionPlane`` (x = PIN_STATION, section D-D's cutting plane), so
@@ -103,7 +103,6 @@ from pd_transgear_arm_geometry import (
     EDGE_LEAN,
     END_HALF_WIDTH,
     PIN_BORE_DIA,
-    PIN_BORE_DIA_BAND,
     PIN_MOUTH_CHAMFER,
     PIN_MOUTH_CHAMFER_TOLERANCE,
     PIN_HOLE_DEPTH,
@@ -1079,10 +1078,9 @@ def build(adapter: Any) -> dict[str, str]:
     )
     # The pivot bore carries no band of its own: its DRILL THRU callout takes
     # the title block's DRILLED HOLES row (geometry PIVOT_BORE_DIA_BAND).
-    set_dimension_bilateral_tolerance(
-        adapter, "PinBoreProfile", "PinBoreDia", *deviations(PIN_BORE_DIA_BAND),
-        display_unit=UNIT,
-    )
+    # The pin bore prints the reamer's size with no band (fit audit
+    # 2026-11-23): MHA-PD-23 is bonded in it, and its callout carries the
+    # acceptance.
     # The rear mouth's leg: its minimum clears the MHA-PD-23 seat fillet
     # (pd_transgear_pin_spec), its maximum is the title block's break.
     set_dimension_symmetric_tolerance(
