@@ -126,15 +126,18 @@ SCREW_STATION_TERMS: dict[str, dict[str, float]] = {
     },
 }
 SCREW_HALF_RANGE = {key: sum(terms.values()) for key, terms in SCREW_STATION_TERMS.items()}
-# Each flat covers its whole range plus the screw's major, up to the .XX grid.
-# Its rim-side edge, the printed station, is the .XX grid point closest to
-# centring the flat on the nominal tap station, among those that keep the
-# screw's point on the flat at both bands' worst case (R8 review #2).  Round
-# to nearest gave the back flat .58, and its far end then let the point run
-# off by .0014.  Centres follow from the edge and the length.
+# Owner ruling C7 (fit audit part 2, 2026-11-24: "Yes: ranges, longer flats,
+# no leaf miking."): both flats are .30 long.  The least length that covers
+# a flat's whole range plus the screw's major, up to the .XX grid, stays as
+# the guard: .30 must hold it.  Each flat's rim-side edge, the printed
+# station, is the .XX grid point closest to centring the flat on the nominal
+# tap station, among those that keep the screw's point on the flat at both
+# bands' worst case (R8 review #2: rounding to nearest once let the back
+# point run off).  Centres follow from the edge and the length.
 _LENGTH_GRID = _IN / 10**FLAT_LENGTH_PLACES
 _STATION_GRID = _IN / 10**FLAT_STATION_PLACES
-FLAT_LEN = {
+FLAT_LEN_RULED = 0.30 * _IN
+FLAT_LEN_NEEDED = {
     key: round(
         math.ceil((2.0 * half + CAM_SET_SCREW_MAJOR_MAX) / _LENGTH_GRID - 1e-9)
         * _LENGTH_GRID,
@@ -142,6 +145,11 @@ FLAT_LEN = {
     )
     for key, half in SCREW_HALF_RANGE.items()
 }
+if max(FLAT_LEN_NEEDED.values()) > FLAT_LEN_RULED + 1e-9:
+    raise AssertionError(
+        f"a set-screw range outgrows the ruled .30 flat: {FLAT_LEN_NEEDED}"
+    )
+FLAT_LEN = dict.fromkeys(SCREW_HALF_RANGE, FLAT_LEN_RULED)
 # Worst case of the printed bands (inch title block) and the rig's set
 # errors together: the screw's point lies wholly on its flat.
 _LENGTH_BAND = printed_band_mm(FLAT_LENGTH_PLACES, unit=UNIT)
@@ -166,12 +174,12 @@ def _flat_edge_from_rim(key: str) -> float:
 
 FLAT_EDGE_FROM_RIM = {key: _flat_edge_from_rim(key) for key in FLAT_LEN}
 FLAT_FROM_RIM = {key: FLAT_EDGE_FROM_RIM[key] + FLAT_LEN[key] / 2.0 for key in FLAT_LEN}
-FRONT_FLAT_LEN = FLAT_LEN["front"]  # 6.604 (.26)
-BACK_FLAT_LEN = FLAT_LEN["back"]  # 4.826 (.19)
-FRONT_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["front"]  # 176.53 (6.95), printed
-BACK_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["back"]  # 14.732 (.58), printed
+FRONT_FLAT_LEN = FLAT_LEN["front"]  # 7.62 (.30)
+BACK_FLAT_LEN = FLAT_LEN["back"]  # 7.62 (.30)
+FRONT_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["front"]  # 176.022 (6.93), printed
+BACK_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["back"]  # 13.208 (.52), printed
 FRONT_FLAT_FROM_RIM = FLAT_FROM_RIM["front"]  # 179.832 (7.080), centre
-BACK_FLAT_FROM_RIM = FLAT_FROM_RIM["back"]  # 17.145 (.675), centre
+BACK_FLAT_FROM_RIM = FLAT_FROM_RIM["back"]  # 17.018 (.670), centre
 
 SCREW_POINT_ON_FLAT_MARGIN_MM = min(
     min(
@@ -337,13 +345,15 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
-# the h band rides the diameter because the rod turns in the two MHA-DT-18
-# blocks' reamed lift bores (+.0015/+.0010 slide band); ground 1/4 in shafting
-# already holds it, so the stock is good enough as supplied (machinist review
-# r1: the band and Ra named no mate).
+# the rod turns freely in the two MHA-DT-18 lift bores (fit audit F26: the F
+# drill, "MHA-DT-17 TURNS FREELY").  The h band stays for the two MHA-DT-23
+# cams' and the MHA-DT-16 hub's .2510 reamed bores the rod slides into by
+# hand (fit audit F19, F23); the reason is in cad/config/necessity/
+# dt-pinion-lift-rod.yaml.  Ground 1/4 in shafting already holds it, so the
+# stock is good enough as supplied.
 ROD_DIA_CALLOUT = "\n".join(
     (
-        f"RUNNING FIT IN {PIVOT_BLOCK_NUMBER} LIFT BORES,",
+        f"TURNS FREELY IN {PIVOT_BLOCK_NUMBER} LIFT BORES,",
         "1/4 IN GROUND STOCK OK",
     )
 )

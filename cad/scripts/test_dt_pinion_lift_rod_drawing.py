@@ -102,11 +102,13 @@ def test_the_body_length_exception_names_the_rig_stacks() -> None:
 
 def test_the_bearing_band_names_its_mate() -> None:
     # drawing-guidelines.md rule 4 (tighten only for function, and name the
-    # mate): the h band and Ra ride the bore the rod runs in.
+    # mate): the rod turns freely in the lift bores (fit audit F26); the h
+    # band's reason, the .2510 cam and hub bores, is in its necessity entry.
     block = _config.parts("dt-pinion-pivot-block")
     assert dt_pinion_lift_rod_spec.PIVOT_BLOCK_NUMBER == block["number"]
     callout = dt_pinion_lift_rod_spec.ROD_DIA_CALLOUT
-    assert f"RUNNING FIT IN {block['number']} LIFT BORES" in callout
+    assert f"TURNS FREELY IN {block['number']} LIFT BORES" in callout
+    assert "RUNNING FIT" not in callout
     assert "GROUND STOCK OK" in callout
     assert drawing.DIMENSION_CALLOUTS["RodDia"] == callout
     assert "\n" in callout  # multi-line: below the value, where it prints
@@ -130,9 +132,10 @@ spec = dt_pinion_lift_rod_spec
 
 def test_each_flat_covers_its_cams_feeler_set_range() -> None:
     # Rule-23 retention, owner ruling 2026-11-07 (owner question 2, option
-    # A): each flat is twice its screw's half range plus the #2-56 major, up
-    # to .01, and sits on the nominal tap station (owner_q2_rule23_sketch.py,
-    # panel 2).
+    # A): each flat covers twice its screw's half range plus the #2-56 major
+    # and sits on the nominal tap station (owner_q2_rule23_sketch.py, panel
+    # 2).  Owner ruling C7 (2026-11-24, "Yes: ranges, longer flats, no leaf
+    # miking."): both flats are .30; the least .01 step is the guard.
     # #1038 re-pitch: the 6.06 drum moves the front cam .42 in (10.668) aft.
     # #3042: the inch leaves (.010, .019, .035, D .053) restation both cams a
     # thousandth or so.  Owner ruling C7 (2026-11-24): each feeler term is its
@@ -162,18 +165,20 @@ def test_each_flat_covers_its_cams_feeler_set_range() -> None:
     assert spec.SCREW_HALF_RANGE["back"] == pytest.approx(0.04944 * _IN, abs=1e-3)
     for key, length in (("front", spec.FRONT_FLAT_LEN), ("back", spec.BACK_FLAT_LEN)):
         need = 2.0 * spec.SCREW_HALF_RANGE[key] + spec.CAM_SET_SCREW_MAJOR_MAX
-        assert need <= length < need + 0.01 * _IN
-    # The owner's ranges take the flats to .26 and .19 (.23 / .17 before C7).
-    assert spec.FRONT_FLAT_LEN == pytest.approx(0.26 * _IN)
-    assert spec.BACK_FLAT_LEN == pytest.approx(0.19 * _IN)
+        assert need <= spec.FLAT_LEN_NEEDED[key] < need + 0.01 * _IN
+        assert spec.FLAT_LEN_NEEDED[key] <= length
+    # The ranges alone need .26 and .19; the owner's flats are .30.
+    assert spec.FLAT_LEN_NEEDED == pytest.approx(
+        {"front": 0.26 * _IN, "back": 0.19 * _IN}
+    )
+    assert spec.FRONT_FLAT_LEN == spec.BACK_FLAT_LEN == pytest.approx(0.30 * _IN)
     # R8 review #2: the printed rim-side edges sit on the .XX grid.  Each is
     # the grid point nearest centring its flat on the tap station that still
-    # holds the screw point on the flat at both bands' worst case (the .17
-    # back flat needed .59; the .19 one sits at .58).
-    assert spec.FRONT_FLAT_EDGE_FROM_RIM == pytest.approx(6.95 * _IN)
-    assert spec.BACK_FLAT_EDGE_FROM_RIM == pytest.approx(0.58 * _IN)
+    # holds the screw point on the flat at both bands' worst case.
+    assert spec.FRONT_FLAT_EDGE_FROM_RIM == pytest.approx(6.93 * _IN)
+    assert spec.BACK_FLAT_EDGE_FROM_RIM == pytest.approx(0.52 * _IN)
     assert spec.FRONT_FLAT_FROM_RIM == pytest.approx(7.08 * _IN)
-    assert spec.BACK_FLAT_FROM_RIM == pytest.approx(0.675 * _IN)
+    assert spec.BACK_FLAT_FROM_RIM == pytest.approx(0.67 * _IN)
     band = 0.01 * _IN
     point_r = spec.SET_SCREW_POINT_DIA / 2.0
     for key in ("front", "back"):
@@ -183,10 +188,6 @@ def test_each_flat_covers_its_cams_feeler_set_range() -> None:
         assert edge + band <= screw - half - point_r
         assert edge - band + length - band >= screw + half + point_r
         assert abs(spec.FLAT_FROM_RIM[key] - screw) <= 0.01 * _IN
-    nearest = round((spec.SCREW_FROM_RIM["back"] - spec.BACK_FLAT_LEN / 2.0) / band) * band
-    assert nearest + spec.BACK_FLAT_LEN - 2.0 * band < (
-        spec.SCREW_FROM_RIM["back"] + spec.SCREW_HALF_RANGE["back"] + point_r
-    )
 
 
 def test_the_screw_point_lands_on_its_flat_at_the_worst_case() -> None:
@@ -196,20 +197,25 @@ def test_the_screw_point_lands_on_its_flat_at_the_worst_case() -> None:
     assert spec.SET_SCREW_POINT_DIA == pytest.approx(
         spec.CAM_SET_SCREW_MAJOR_MAX - 2.0 * spec.CAM_SET_SCREW_PITCH
     )
-    # The flat is the shortest .01 in step that keeps the screw point on it at
-    # the worst stack: .0028 in spare before the inch leaves' tolerance was
-    # booked, under .0001 in after (#3042), .0028 in again on the owner's
-    # ranges (C7).
-    assert 0.0 <= spec.SCREW_POINT_ON_FLAT_MARGIN_MM < 0.01 * _IN
-    assert spec.SCREW_POINT_ON_FLAT_MARGIN_MM == pytest.approx(0.0721, abs=0.0005)
+    # .0028 in spare on the shortest .01 step before the inch leaves'
+    # tolerance was booked, under .0001 in after (#3042); the owner's .30
+    # flats (C7) leave .0228 in on the ranges.
+    assert spec.SCREW_POINT_ON_FLAT_MARGIN_MM > 0.0
+    assert spec.SCREW_POINT_ON_FLAT_MARGIN_MM == pytest.approx(0.5801, abs=0.0005)
     assert spec.FLAT_CHORD_MIN > spec.SET_SCREW_POINT_DIA
     # For the record (owner sketch: the front flat can show past its hub;
     # owner ruling C7 accepts more showing): with the flats' own .XX bands the
-    # front shows .065 and reaches .045 under the front block's bore mouth;
-    # the back flat shows .0001 and stays clear of its block.
-    assert spec.FLAT_HUB_COVER_MM["front"] == pytest.approx(-0.0654 * _IN, abs=0.0002 * _IN)
-    assert spec.FLAT_HUB_COVER_MM["back"] == pytest.approx(-0.0001 * _IN, abs=0.0002 * _IN)
-    assert spec.FLAT_TO_BLOCK_MM["front"] == pytest.approx(-0.0449 * _IN, abs=0.0002 * _IN)
+    # front shows .085 and reaches .065 under the front block's bore mouth;
+    # the back flat shows .050 and stays clear of its block.
+    assert spec.FLAT_HUB_COVER_MM["front"] == pytest.approx(
+        -0.0854 * _IN, abs=0.0002 * _IN
+    )
+    assert spec.FLAT_HUB_COVER_MM["back"] == pytest.approx(
+        -0.0501 * _IN, abs=0.0002 * _IN
+    )
+    assert spec.FLAT_TO_BLOCK_MM["front"] == pytest.approx(
+        -0.0649 * _IN, abs=0.0002 * _IN
+    )
     assert spec.FLAT_TO_BLOCK_MM["back"] > 0.0
 
 

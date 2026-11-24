@@ -24,7 +24,6 @@ demoted:
   dt_cylinder_gear: fit-batch-dt
   dt_cylinder_gear_tl_cam_fixture: fit-batch-dt
   dt_drive_train_assembly: fit-batch-dt
-  dt_pinion_lift_rod: fit-batch-dt
   fr_frame_assembly: fit-batch-fr
   fr_top_frame: fit-batch-fr
   ha_harmonic_analyzer_assembly: fit-batch-ha
