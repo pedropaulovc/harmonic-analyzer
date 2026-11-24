@@ -21,7 +21,7 @@ SEQUENCE_BLOCKS = (
     drawing.BANK_STEPS,
     drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4),
 )
-TIP_GAP_FEELER = f"{tip_gap.TIP_GAP_SETTING_TEXT} FEELER"
+TIP_GAP_ROD = f"A {tip_gap.TIP_GAP_ROD_TEXT} IS SNUG"
 STEP_HEAD = re.compile(r"^\s*(\d+)\. ", re.MULTILINE)
 
 
@@ -59,7 +59,7 @@ def test_a_key_resolves_to_its_position_and_prints_a_pointer() -> None:
 
 @pytest.mark.parametrize(
     ("text", "key", "phrase"),
-    ((drawing.CHECKS, "rig-located", TIP_GAP_FEELER),),
+    ((drawing.CHECKS, "rig-located", TIP_GAP_ROD),),
 )
 def test_each_typed_step_cite_names_the_step_that_does_it(
     text: str, key: str, phrase: str
@@ -370,7 +370,7 @@ def test_step_four_holds_the_collar_before_the_feeler_and_the_pin() -> None:
 
 def test_a_cite_to_the_wrong_step_is_caught() -> None:
     """Positive control: RIG SET sets the rig along the bank, not its tip gap."""
-    assert TIP_GAP_FEELER not in _step_body("rig-set")
+    assert TIP_GAP_ROD not in _step_body("rig-set")
 
 
 

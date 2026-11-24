@@ -30,7 +30,6 @@ from dt_cone_gear_stack import STACK_L20_ACCEPT
 import dt_crank_handle_pivot_screw_spec as handle_screw
 from dt_crank_pin_ring_spec import BUTT_GAP_BAND as RING_BUTT_GAP_BAND
 from dt_drive_train_assembly_sheet import (
-    FEELER_PLACES,
     inch_floor_mm,
     inch_max_text,
     inch_text,
@@ -169,8 +168,9 @@ ACCEPTANCES = (
         "tip-gap",
         f"{_step_ref('rig-located', 'E')}, CHECK 7",
         "PARKED TIP GAP AT GEAR 0 AND AT GEAR 19",
-        inch_window(TIP_GAP.TIP_GAP_ACCEPT, FEELER_PLACES),
-        f"{TIP_GAP.TIP_GAP_FEELER_TEXT} SNUG",
+        "SNUG TIP TO TIP",
+        # Owner ruling 2026-11-24, audit part 2 C8: "Yes, a 3/32 rod."
+        TIP_GAP.TIP_GAP_ROD_TEXT,
     ),
     (
         "lift-rod-rear-flush",
