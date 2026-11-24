@@ -19,13 +19,14 @@
   <circle class="cutter" cx="163.3" cy="93" r="5.5"/>
   <circle class="cutter" cx="596.7" cy="93" r="5.5"/>
   <line class="leader" x1="163.3" y1="87.5" x2="120" y2="60"/>
-  <text class="label" x="20" y="56">edge finder, X −3.94</text>
+  <text class="label" x="20" y="56">edge finder, X −100.08 (−3.94 in)</text>
   <line class="leader" x1="596.7" y1="87.5" x2="620" y2="40"/>
-  <text class="label" x="540" y="36">X +3.94: Y within .002 of X −3.94's</text>
+  <text class="label" x="470" y="36">X +100.08: Y within 0.05 of X −100.08's</text>
   <line class="leader" x1="668.1" y1="111.7" x2="640" y2="170"/>
   <circle class="leader-dot" cx="668.1" cy="111.7" r="1.5"/>
   <text class="label" x="520" y="184">#47 at X 5.2389, Y .3329</text>
-  <text class="label" x="632" y="148">tip block</text>
+  <line class="leader" x1="714" y1="138" x2="712" y2="128"/>
+  <text class="label" x="690" y="150">tip block</text>
   <line class="leader" x1="380" y1="130" x2="340" y2="180"/>
   <text class="label" x="250" y="194">F through the hub at X0 Y0</text>
   <text class="label" x="20" y="214">The #47 lies between the right gap block and the tip block, .135 from the tip block's end.</text>
