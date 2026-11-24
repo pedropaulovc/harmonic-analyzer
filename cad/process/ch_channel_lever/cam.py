@@ -984,9 +984,7 @@ def context(
             [
                 ln
                 for xy in bore_xy
-                for ln in _pecked(
-                    xy, hub_t, tips["drill-f"], pecks["bore_open"], clear
-                )
+                for ln in _pecked(xy, hub_t, tips["drill-f"], pecks["bore_open"], clear)
             ],
             tip=DRILL_POINT_DEG,
         ),

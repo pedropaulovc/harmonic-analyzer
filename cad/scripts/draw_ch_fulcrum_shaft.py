@@ -340,9 +340,7 @@ def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     # Rule 4: the three-place across-flat size names what it sets.
-    set_dimension_callouts(
-        adapter, curated, {"AcrossFlat": ACROSS_FLAT_CALLOUT_ROWS}
-    )
+    set_dimension_callouts(adapter, curated, {"AcrossFlat": ACROSS_FLAT_CALLOUT_ROWS})
     _set_dome_reference(adapter, curated)
     # The bought rod's diameter: an untoleranced fraction reference with its
     # stock line (rule 4), as draw_dt_crank_pinion_pin prints its rod.
