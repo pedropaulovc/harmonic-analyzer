@@ -168,12 +168,16 @@ def test_every_tight_band_names_its_mate_and_fit_route():
     assert "CLEARANCE" in journal
     # The journal's text hangs right of its line only off the faced end
     # (round 3: dragged onto the journal its box hung left onto section A's
-    # letter); its widest row, in the proof's 2.17 mm a character, ends at
-    # least 3 mm short of section A-A's box (0.3141).
+    # letter).  Its widest row inks 2.48 mm a character, not the proof's 2.17:
+    # farm run 20261124T125542720Z measured "RUNNING FIT TO MHA-DT-05" at
+    # 0.2579..0.3175, into section A-A's S value (machinist review r2).  That
+    # row ends CLEAR_GAP_M short of S's block (0.0131 left of S's position).
     x, _y = drawing.SIDE_DIAMETERS["Sec0Dia"]
     assert x > drawing.BIG_END_X
     widest = max(map(len, drawing.DIMENSION_CALLOUTS["Sec0Dia"].split("\n")))
-    assert x + widest * 0.00217 <= 0.3141 - 0.003
+    (a_section,) = drawing.D_SECTIONS
+    s_block_left = a_section.centre[0] - drawing.KEYSEAT_S_SHIFT - 0.0131
+    assert x + widest * 0.00248 <= s_block_left - CLEAR_GAP_M
     # Land 2 flags the bond note; the stack's lengths flag the stack note, at
     # every callout it serves (round 4).
     assert set(drawing.DIMENSION_SUFFIXES) == {"Sec2Dia"} | set(drawing.STACK_LENGTHS)
@@ -699,14 +703,15 @@ def test_the_keyseat_section_cuts_land_one_clear_of_its_neighbours() -> None:
     # The width's line rises at the keyseat's edge.  The S text (PR 1
     # 5a4e41cb5f r3 layout audit: 0.3227..0.3501 about its 0.3371 position,
     # 14.4 mm left and 13.0 mm right) steps away from it, ending CLEAR_GAP_M
-    # plus 1 mm short of that line, its left end clear of the Ø.4825 block
-    # (<= 0.3111, test_every_tight_band_names_its_mate_and_fit_route); with
-    # its arrows inside, its dimension line ends at the floor's extension line,
-    # inside the land's edge.
+    # plus 1 mm short of that line, its left end clear of the journal's
+    # callout (its "MHA-DT-05" row inked to 0.3175, farm run
+    # 20261124T125542720Z); with its arrows inside, its dimension line ends at
+    # the floor's extension line, inside the land's edge.
+    journal_ink_right = 0.3175
     keyseat_x = x + half
     s_x = x - drawing.KEYSEAT_S_SHIFT
     assert s_x + 0.0130 <= keyseat_x - CLEAR_GAP_M - 0.001
-    assert s_x - 0.0144 >= 0.3111 + CLEAR_GAP_M
+    assert s_x - 0.0144 >= journal_ink_right + CLEAR_GAP_M
     # With its NOTE flag above, S's block is centred on its position, the
     # value pushed down by the flag's row: PR 1 r9 (9b8efb7876) and PR 2 r6
     # measured 0.3170..0.3424 x 0.1747..0.1872 about (0.3301, 0.182), its
@@ -716,7 +721,7 @@ def test_the_keyseat_section_cuts_land_one_clear_of_its_neighbours() -> None:
     s_y = y + 0.017 + drawing.KEYSEAT_S_FLAG_LIFT
     block = (s_x - 0.0131, s_y - 0.0073, s_x + 0.0123, s_y + 0.0052)
     assert block[1] - (y + half) >= CLEAR_GAP_M + 0.001
-    assert block[0] >= 0.3144 + CLEAR_GAP_M
+    assert block[0] >= journal_ink_right + CLEAR_GAP_M
     assert block[2] <= keyseat_x - CLEAR_GAP_M
     assert block[3] <= iso_bottom - CLEAR_GAP_M
     floor_x = x + cone_land_key.KEYSEAT_FLOOR_OFFSET_MM / 1000.0 * section.scale[0] / section.scale[1]

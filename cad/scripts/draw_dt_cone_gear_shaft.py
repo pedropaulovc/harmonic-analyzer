@@ -362,8 +362,16 @@ class DSection(NamedTuple):
 # 25 mm) move to 0.1345..0.1409, and Sec1End's text (SIDE_KEEP) moves 6 mm
 # right with them.
 A_CUT_FROM_STEP_MM = 31.0
+# A-A's centre x: the journal's running-fit callout (Sec0Dia, its mate and
+# clearance on two rows since round 1 of the fit audit) prints wider than the
+# proof's estimate.  Machinist review r2 (farm run 20261124T125542720Z,
+# clarity, gating) read its "MHA-DT-05" row running into the S value: the row
+# inked 0.2579..0.3175 and S's block started ~0.317, hiding S's decimal
+# point.  At 0.3451 (8 mm right of 0.3371) S's block starts 0.3250, 7.5 mm
+# clear of that row; the width's text ends ~0.387, inside the frame.
+A_SECTION_CENTRE_X = 0.3451
 D_SECTIONS = (
-    DSection(1, "A", SECTION_ENDS[1] - A_CUT_FROM_STEP_MM, 0.0150, (0.3371, 0.165), (2, 1)),
+    DSection(1, "A", SECTION_ENDS[1] - A_CUT_FROM_STEP_MM, 0.0150, (A_SECTION_CENTRE_X, 0.165), (2, 1)),
 )
 # The dimensions each section prints; the first is centred over its section
 # (A-A's S shifted at build time, below).
