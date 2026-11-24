@@ -734,12 +734,13 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     assert press is notes.PRESS_HOLE_CALLOUT
     assert press.splitlines()[0] == "REAM THRU"
     # Reamed with the set reamer: no band, no interference range; the two
-    # lines of words name the mate with its acceptance by feel and say what
-    # the press protects (rule 4).
+    # lines of words say the mate is turned to this hole (its acceptance
+    # prints once, on MHA-PD-28) and what the press protects (rule 4).
     assert press.splitlines()[2:] == [
-        f"{numbers['BUSH_NUMBER']} PRESSES IN, DOES NOT",
-        "TURN BY HAND. HOLDS KNOB AXIS.",
+        f"{numbers['BUSH_NUMBER']} TURNED TO PRESS IN HERE",
+        "HOLDS KNOB AXIS, NO FASTENER",
     ]
+    assert max(map(len, press.splitlines())) <= 33
     assert "INTERFERENCE" not in press and not re.search(r"\.\d{4}", press)
     locator = flat(drawing.LOCATOR_CALLOUT)
     assert drawing.CALLOUTS_ABOVE["LocatorDia1"] == f"{len(geometry.LOCATOR_SITES_MM)}X"
@@ -754,8 +755,15 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     assert "CLEARANCE" not in flat(locator + " " + note)
     assert not re.search(r"\.\d{4}", locator + note)
     assert "KEEPS PLATE AT REDUCER MESH SETTING" in note
-    # The order of work: both parts drilled through together, clamped.
-    assert "DRILL THROUGH ARM" in note and "AND PLATE CLAMPED AT" in note
+    # One scheme: sheet 2's frame says where the holes stand, the note only
+    # when they are made; no order of work, no "match-drill".
+    assert "DRILL AND REAM AT ASSEMBLY ON ARM" in note
+    for word in ("MATCH", "THROUGH", "CLAMPED", "FIRST", "THEN"):
+        assert word not in note, word
+    locator_frames = [
+        c for c in spec.GEOMETRIC_CONTROLS if c.key.startswith("plate_locator_")
+    ]
+    assert len(locator_frames) == len(geometry.LOCATOR_SITES_MM)
     assert numbers["DOWEL_NUMBER"] not in note
     assert min(dowel.SLIP_DIAMETRAL_CLEARANCE_MM) > 0.0
     assert note.startswith(f"{notes.LOCATOR_NOTE_NUMBER}. ")
