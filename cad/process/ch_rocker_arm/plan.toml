@@ -465,7 +465,7 @@ machine_kind = "other"
 title = "Bench: deburr and inspect"
 machine = "Bench"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished arm: the hub length across both ends, each end's height over its strap face, the F bore through the hub, the #47 at its distance from the bore." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished arm: the hub length across both ends, end G's height over its strap face (the strap's mid-plane), the F bore through the hub, the #47 at its distance from the bore." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -491,14 +491,14 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First arm only: the strap's thickness t beside the hub, micrometer. Then strap face 2 down on two .150 gauge blocks on the surface plate, the hub between them, end G up; dial height gauge zeroed on face 1 beside the hub, read end G's height h. Turn the arm over and read the other end's height over face 2 the same way."
-inspection = "h + t/2, the strap's mid-plane from end G, {{process.strap_mid_min_in:.3dot}}–{{process.strap_mid_max_in:.3dot}}: the drawing's .004 position of the strap to G. The other end {{cad.hub_end_height_in:.3dot}} ±.002 over face 2."
+instruction = "First arm only: the strap's thickness t beside the hub, micrometer. Then strap face 2 down on two .150 gauge blocks on the surface plate, the hub between them, end G up; dial height gauge zeroed on face 1 beside the hub, read end G's height h."
+inspection = "h + t/2, the strap's mid-plane from end G, {{process.strap_mid_min_in:.3dot}}–{{process.strap_mid_max_in:.3dot}}: the drawing's .004 position of the strap to G. The other end needs no reading: Op 270's hub length and this mid-plane hold it."
 gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First arm only: the offcut in the bore and the #47 drill's shank in the rod-pin hole; calipers over both. Not gauged to its frame: the program's coordinates from the hub's axis place the hole; this reading proves its radius from the bore (X0, Y0 and the program). The tram readings (Op 180) hold its angle."
-inspection = "The caliper reading less .164 (half of .250 plus .0785): {{cad.rod_hole_from_bore_in:.3dot}} within .010, the pins' slack in their holes."
+instruction = "First arm only: the offcut in the bore and the #47 drill's shank in the rod-pin hole; calipers over both, once with the two pressed apart in their holes and once pressed together; the mean of the two readings takes out their slack. Not gauged to its frame: the program's coordinates from the hub's axis place the hole; this reading proves its radius from the bore (X0, Y0 and the program). The tram readings (Op 180) hold its angle."
+inspection = "The mean less .164 (half of .250 plus .0785): {{cad.rod_hole_from_bore_in:.4dot}} within .007, the drawing's Ø.014 position along the radius."
 gauge_checks = "other"
 feed = "hand"
 
