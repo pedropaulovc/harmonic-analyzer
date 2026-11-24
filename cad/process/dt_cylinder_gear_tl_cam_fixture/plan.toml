@@ -393,7 +393,7 @@ feed = "{{process.ream_0365_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
   { name = "pin ream", kind = "drill", phase = "finish", cutter_dia_mm = 0.9271, flutes = 4, rpm = 1400, feed_mm_min = "{{process.ream_0365_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
 ]
-inspection = "Pin hole, before unclamping: the clock pin MHA-DT-12-TL-VN-51, offered to the hole's mouth by hand, does not enter (it is pressed in at MHA-DT-12-TL-00). Depth {{cad.pin_hole_depth_min_in:.3dot}}–{{cad.pin_hole_depth_max_in:.3dot}}: a #65 drill stood shank down in the hole, its miked length less its stand-out above face F (calipers' depth rod)."
+inspection = "Pin hole, before unclamping: the clock pin MHA-DT-12-TL-VN-51, offered to the hole's mouth by hand, does not enter (it is pressed in at MHA-DT-12-TL-00). Reamed depth {{cad.pin_hole_depth_min_in:.3dot}}–{{cad.pin_hole_depth_max_in:.3dot}}: take the .0365 reamer out of its holder, mike its length, stand it flutes down in the hole by finger until it stops on the end of its own bore (the #65 hole below is too small for it), and caliper its stand-out above face F; the length less the stand-out is the depth."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pin_hole_depth_band_mm}}" }]
 
 [[setups.operations]]

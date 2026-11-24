@@ -23,7 +23,7 @@
 #   own (over-pins, tooth runout to its bore).
 # - Setup 9, lathe 4-jaw on the cam fixture MHA-DT-12-TL-01 (its kit sheet
 #   MHA-DT-12-TL-00): the cam turned on each gear, located by the notch.
-# - Setup 10, bench: the cam checked, its edge broken, the final check.
+# - Setup 10, bench: the cam checked, its edge broken, cosmetic faces polished, the final check.
 # The CNC cuts only the teeth and the notch (AGENTS.md: CNC for milled work,
 # the manual lathe for turning); the index is the BS-0's crank, by hand at
 # each M0.
@@ -176,6 +176,9 @@ cutter_teeth_min = 10
 # (the AR insert's R0.4 nose would leave a fillet past the blank's .010 bore
 # break, and blank 1 would not seat).
 relief_depth_in = 0.010
+# The P1 cutoff blade's width (tools.cutoff-blade-p1, width_in). The blade
+# only plunges the arbor's thread relief here; nothing is parted with it.
+blade_width_in = 0.0625
 # The BS-0's 3-jaw grips the body .75; its jaw fronts stand this far from
 # the shoulder: the cutter's and the saw's reach toward the jaws stays
 # short of it (cam.py).
@@ -632,7 +635,7 @@ speed_kind = "spindle"
 tool = "parting"
 drilling = "none"
 sizing = "other"
-instruction = "Thread relief: plunge the P1 blade (1/16 wide) against the pilot's shoulder on the thread side to Ø{{process.relief_dia_mm:in.3dot}} (calipers), so the thread runs out into it and the nut reaches the collar."
+instruction = "Thread relief: plunge the P1 blade ({{process.blade_width_in:.4dot}} wide) against the pilot's shoulder on the thread side to Ø{{process.relief_dia_mm:in.3dot}} (calipers), so the thread runs out into it and the nut reaches the collar."
 rpm = 150
 feed = "cross slide by hand, slow"
 cut_diameter_mm = "{{process.thread_major_mm}}"
@@ -892,7 +895,7 @@ feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Bench: cam check, edges"
+title = "Bench: cam check, edges, polish"
 machine = "Bench"
 indexing = "none"
 diagram = { file = "diagrams/final.svg", alt = "The finished gear on the setting mandrel in the V-blocks, the dial indicator on the cam." }
@@ -925,7 +928,11 @@ instruction = "Break the cam's O.D. edge at the cam face R{{cad.edge_break_in:.3
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Final check, each gear: mike it on the boss and across the rim; write the final thickness on the tally card. Out of band: set the gear aside and tell the owner (a replacement's aim is in Setup 3)."
+instruction = "Polish the cosmetic faces (the back face, and the rim face outside the teeth on the cam side): a few light strokes flat on the stone's fine face, oiled, only until the turning marks dull evenly. Never the bore, the cam's O.D. or the teeth."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Final check after the polishing, each gear: mike it on the boss and across the rim; write the final thickness on the tally card. Out of band: set the gear aside and tell the owner (a replacement's aim is in Setup 3)."
 inspection = "Thickness {{cad.cam_face_thickness_min_in:.4dot}}-{{cad.cam_face_thickness_max_in:.4dot}}; rim {{cad.rim_face_face_width_min_in:.3dot}}-{{cad.rim_face_face_width_max_in:.3dot}}."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.cam_face_thickness_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.rim_face_face_width_band_mm}}" }]
 feed = "hand"
