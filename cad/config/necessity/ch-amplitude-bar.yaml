@@ -7,20 +7,25 @@ necessity:
   - id: N-01
     feature: "sheet 1, view C, Ø.0775 REAM THRU pivot-pin hole (note 1: press fit on MHA-SH-VN-58)"
     kind: joint
-    reason: "press alone holds pivot pin MHA-SH-VN-58, no fastener"
+    reason: "press, or bond if loose, alone holds pin MHA-SH-VN-58"
     source: "owner ruling 2026-11-24, fit audit question 3 (reamed, no band, the pin is the gauge; a pin that enters by hand is bonded at MHA-CH-00); sh_vn_pivot_pin_bar_spec.BUDGET interference_min/max"
   - id: N-02
     feature: "sheet 1, detail A, foot notch width .104 +.006/0"
     kind: gap
     reason: "wider foot notch closes the bar-to-bar running gap"
-    source: "ch_channel_assembly_spec.bar_gap_budget foot: .005 at +.006, under the .0039 floor at +.008"
+    source: "ch_channel_assembly_spec.BAR_GAP foot: .005 at +.006, under the .0039 floor at +.008"
   - id: N-03
     feature: "sheet 1, detail A, foot notch ledge .073 ±.002"
     kind: gap
     reason: "ledge float closes the bar-to-bar running gap"
-    source: "ch_channel_assembly_spec.bar_gap_budget foot: both ledges' bands, under the .0039 floor at ±.003 (ch_amplitude_bar_spec.NOTCH_OFFSET_TOLERANCE_MM)"
+    source: "ch_channel_assembly_spec.BAR_GAP foot: both ledges' bands, under the .0039 floor at ±.003 (ch_amplitude_bar_spec.NOTCH_OFFSET_TOLERANCE_MM)"
   - id: N-04
     feature: "sheet 1, detail B, top notch ledge .063 ±.002"
     kind: gap
     reason: "near cheek reaches the .060 wall floor"
     source: "ch_amplitude_bar_notes.LEDGE_CHEEK_MIN: .061 at ±.002, .060 at ±.003, .058 at the row's ±.005; one NOTCH_OFFSET_TOLERANCE_MM serves both ledges (N-03)"
+  - id: N-05
+    feature: "sheet 1, detail B, top notch width .124 +.007/0"
+    kind: gap
+    reason: "wider top notch closes bowed bars' mid-span running gap"
+    source: "ch_channel_assembly_spec.BAR_GAP mid_span_bowed: .006 at +.007, .0021 over the .0039 running floor; .0045 at the row's +.010, .0006 over it, under the .001 the shop reads (Main, by the owner's delegation of 2026-11-24, rulings.md D14)"

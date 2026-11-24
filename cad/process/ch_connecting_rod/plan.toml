@@ -1061,6 +1061,11 @@ inspection = "Each rod: the edges, the bore's, the slot's and the pin hole's mou
 gauge_checks = "other"
 
 [[setups.operations]]
+instruction = "Each rod, after the reamer: try an MHA-SH-VN-58 pin by hand in its pin hole again, chamfered end first, and take it out again."
+inspection = "The reamer by hand may have opened the hole: the same try as on the mill. The pin does not enter past its chamfer by hand. It enters: try the set's .079 pin in that hole. The .079 does not enter: do not scrap the rod; write SLIP on its tag, if not already there (MHA-CH-00 bonds its pin). The .079 enters: stop and tell the owner."
+gauge_checks = "other"
+
+[[setups.operations]]
 instruction = "Inspect each rod; the first rod of the batch in full."
 inspection = "Each rod: ring {{cad.ring_far_face_thickness_min_in:.4dot}}–{{cad.ring_far_face_thickness_max_in:.4dot}} thick (the micrometers; its near face and the bore were checked on the mill for every load); no tab stub standing proud. The first rod also: ring Ø{{cad.ring_dia_min_in:.2f}}–{{cad.ring_dia_max_in:.2f}}; shank {{cad.shank_far_face_thickness_min_in:.3dot}}–{{cad.shank_far_face_thickness_max_in:.3dot}} thick and {{cad.shank_right_flank_width_min_in:.2dot}}–{{cad.shank_right_flank_width_max_in:.2dot}} wide; the fork {{cad.fork_width_min_in:.2dot}}–{{cad.fork_width_max_in:.2dot}} wide and its step {{cad.fork_boss_length_min_in:.2dot}}–{{cad.fork_boss_length_max_in:.2dot}} from the crown (the micrometers, the calipers); later rods hold these on the program's path. The shank's four corners at the ring and the fork's step, R{{cad.shank_right_flank_corner_r_min_in:.3dot}}–{{cad.shank_right_flank_corner_r_max_in:.3dot}}: process-held by the 1/8 in end mill's R.0625 in Setup 6. Outside: set it aside and tell the owner."
 gauge_checks = [

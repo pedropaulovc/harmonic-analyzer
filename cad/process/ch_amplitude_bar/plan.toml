@@ -25,8 +25,9 @@
 # 1 in hole) runs horizontally on the vertical spindle: its periphery cuts
 # the root straight across the bar's depth with the saw's sharp corners, its
 # faces cut the notch walls, two passes per width (kerf: the .064 saw twice,
-# the second level .043 above the first for the foot's .104-.110, .064 for
-# the top's .124-.134: two saw widths, .128, the most two passes reach).
+# the second level .043 above the first for the foot's .104-.110, .062 for
+# the top's .124-.131: half its least width, so the two kerfs overlap at
+# every saw Setup 3 accepts and leave no fin).
 #
 # The saw's arbor is the owned R8 stepped saw arbor (cad/config/shop-
 # equipment/ tools.saw-arbor-r8-stepped, owner 2026-11-24; shop key
@@ -42,7 +43,7 @@
 # foot's), never over the jaws nor under the bars. NOT MEASURED, each a
 # bounded assumption a STOP measures before the spindle starts: the screw
 # head's stand past the cap's face (saw_screw_head_stand_max_mm) and the
-# saw's runout (the *_saw_swept_* and *_saw_radial_tir_max_mm limits). The
+# saw's runout (the saw_swept_* and *_saw_radial_tir_max_mm limits). The
 # drive is friction alone (not keyed): the screw at 20 N·m, witness lines,
 # a light first pass and a stop to look at them.
 #
@@ -323,12 +324,15 @@ saw_drive_torque_max_nm = 22.1
 # foot_notch_rise_mm, top_notch_rise_mm) plus the saw's swept thickness, its
 # miked thickness t plus its axial runout at the rim. Swept from the width's
 # least less the rise to its most less the rise and saw_swept_margin_mm
-# (.0005): foot .0610-.0665, top .0600-.0695; the foot's window lies inside
-# the top's, so both setups read to the foot's limit and Setup 3's t serves
-# both (cam.py checks them). The lever indicator reads the saw's lower face 1/8
+# (.0005), and never under the rise, or the two kerfs leave a fin between
+# them. One saw cuts both notches, so Setup 3 accepts the window both allow,
+# .0620-.0665 (saw_swept_min_mm, the top's .124 less its .062 rise;
+# saw_swept_max_mm, the foot's .110 less .043 and the margin): every saw it
+# accepts overlaps both notches' kerfs and keeps the top notch .124-.1285
+# (cam.py checks them). The lever indicator reads the saw's lower face 1/8
 # in in from the teeth, where the rim's runout shows 1/1.10 of itself:
 # saw_axial_reading_per_in_mm is its reading, in mm, per inch at the rim;
-# foot_saw_axial_nominal_mm the reading a saw miking .0640 may show. Z0 is
+# saw_axial_nominal_mm the reading a saw miking .0640 may show. Z0 is
 # touched under the tooth where that face stands lowest, so the ledge keeps
 # its budget and the far wall takes the runout. Radial: the files are posted
 # for the saw's catalogue diameter (saw_dia_mm, the packing list's, not
@@ -341,12 +345,10 @@ saw_swept_margin_mm = 0.0127
 saw_depth_margin_mm = 0.0508
 saw_axial_reading_per_in_mm = 23.091
 foot_notch_rise_mm = 1.0922
-top_notch_rise_mm = 1.6256
-foot_saw_swept_min_mm = 1.5494
-foot_saw_swept_max_mm = 1.6891
-foot_saw_axial_nominal_mm = 0.0577
-top_saw_swept_min_mm = 1.524
-top_saw_swept_max_mm = 1.7653
+top_notch_rise_mm = 1.5748
+saw_swept_min_mm = 1.5748
+saw_swept_max_mm = 1.6891
+saw_axial_nominal_mm = 0.0577
 foot_saw_radial_tir_max_mm = 0.4063
 top_saw_radial_tir_max_mm = 0.4064
 # The saw's touch-off station: over the middle of the bar against the fixed
@@ -367,10 +369,12 @@ saw_park_z_mm = 11.35
 # reset other than one after a Feed Hold, an alarm, a stall or an E-stop
 # needs one), the saw goes back over the station by MDI from the homed Z
 # (its top), X and Y only, then down in Z.
-# Notch targets: each band's middle, from the export (cam.py checks them).
+# Notch targets: the depths each band's middle; the foot's width its band's
+# middle, the top's .126, the .064 saw plus a .062 rise, half its .124 least
+# width, so the two kerfs overlap at every accepted saw (cam.py checks them).
 foot_notch_width_mm = 2.7178
 foot_notch_depth_mm = 2.1273
-top_notch_width_mm = 3.2512
+top_notch_width_mm = 3.2004
 top_notch_depth_mm = 13.97
 # The top notch is cut in equal steps into the end no deeper than .118 (3.0
 # mm) at each of its two levels: in one 13.97 mm bite the saw's push would
@@ -730,8 +734,8 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "First load, and again whenever the cap's screw has been loosened: mic the slitting saw's thickness at its rim, just inside the teeth, at four places a quarter turn apart, to .0001. Write the largest on this sheet: t. First load only: also the calipers across the tips of two opposite teeth, at three places round the saw. Write the largest: D."
-inspection = "t {{process.foot_saw_swept_min_mm:in.4dot}}–{{process.foot_saw_swept_max_mm:in.4dot}}: two passes of it, the second {{process.foot_notch_rise_mm:in.3dot}} higher, make the foot notch's {{cad.foot_notch_width_min_in:.3dot}}–{{cad.foot_notch_width_max_in:.3dot}} width. Outside: stop and tell the owner."
-gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.foot_saw_swept_min_mm}}", "{{process.foot_saw_swept_max_mm}}"] }]
+inspection = "t {{process.saw_swept_min_mm:in.4dot}}–{{process.saw_swept_max_mm:in.4dot}}: two passes of it make each notch, the second {{process.foot_notch_rise_mm:in.3dot}} higher for the foot notch's {{cad.foot_notch_width_min_in:.3dot}}–{{cad.foot_notch_width_max_in:.3dot}} width and {{process.top_notch_rise_mm:in.3dot}} higher for the top notch's {{cad.top_notch_width_min_in:.3dot}}–{{cad.top_notch_width_max_in:.3dot}}, the two kerfs overlapping (no fin between them). Outside: stop and tell the owner."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.saw_swept_min_mm}}", "{{process.saw_swept_max_mm}}"] }]
 
 [[setups.operations]]
 speed_kind = "other"
@@ -765,7 +769,7 @@ drilling = "none"
 sizing = "other"
 feed = "hand"
 instruction = "Every load (the taper never seats the arbor quite the same twice): the lever indicator on its magnetic base on the vise, its tip up against the saw's lower face 1/8 in in from the teeth. Turn the spindle one turn by hand: the needle's total swing, in mm, is A. Wipe off any old LOW mark; mark LOW on the tooth that is over the tip where that face stands lowest."
-inspection = "A ≤ ({{process.foot_saw_swept_max_mm:in.4dot}} − t) × {{process.saw_axial_reading_per_in_mm:.1f}} mm (t .0640: {{process.foot_saw_axial_nominal_mm:.3f}} mm): the saw's wobble then keeps the foot notch's width in its band. Over: take the arbor out, wipe its shank and the taper, mount it and read again. Still over: loosen the screw, wipe, turn the saw a quarter turn on the pilot, clamp to {{process.saw_clamp_torque_nm:.0f}} N·m, draw new witness lines and read again, then the tips' swing. Over after two such tries: stop and tell the owner."
+inspection = "A ≤ ({{process.saw_swept_max_mm:in.4dot}} − t) × {{process.saw_axial_reading_per_in_mm:.1f}} mm (t .0640: {{process.saw_axial_nominal_mm:.3f}} mm): the saw's wobble then keeps both notches' widths in their bands. Over: take the arbor out, wipe its shank and the taper, mount it and read again. Still over: loosen the screw, wipe, turn the saw a quarter turn on the pilot, clamp to {{process.saw_clamp_torque_nm:.0f}} N·m, draw new witness lines and read again, then the tips' swing. Over after two such tries: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -948,7 +952,7 @@ drilling = "none"
 sizing = "other"
 feed = "hand"
 instruction = "Spindle stopped (M5), the head where CA03_top_end parked it: do not jog X or Y. Jog Z only, up, until the arbor can go up into the spindle with its saw clear above the bars. Take out the collet and end mill. Wipe the saw arbor's shank and the spindle's taper clean and mount the arbor (drawbar tight), the saw still clamped on it as checked in Setup 3, teeth cutting with M3. Do not move the bars."
-inspection = "Both witness lines unbroken and the screw untouched since Setup 3: its t, its D and its tips' swing R stand for the top notch too (its {{cad.top_notch_width_min_in:.3dot}}–{{cad.top_notch_width_max_in:.3dot}} width and {{cad.top_notch_depth_min_in:.2f}}–{{cad.top_notch_depth_max_in:.2f}} depth allow at least as much). Otherwise: do Setup 3's first-load saw ops again here, from the miking, to the same limits."
+inspection = "Both witness lines unbroken and the screw untouched since Setup 3: its t, its D and its tips' swing R stand for the top notch too (Setup 3's t limits are set for both notches' widths, and the top notch's {{cad.top_notch_depth_min_in:.2f}}–{{cad.top_notch_depth_max_in:.2f}} depth allows at least the foot's swing). Otherwise: do Setup 3's first-load saw ops again here, from the miking, to the same limits."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -958,7 +962,7 @@ drilling = "none"
 sizing = "other"
 feed = "hand"
 instruction = "Every load (the arbor is seated afresh): read the saw's swing A again as in Setup 3, the lever indicator's tip up against the saw's lower face 1/8 in in from the teeth, one turn by hand. Wipe off the old LOW mark; mark LOW on the tooth that is over the tip where that face stands lowest."
-inspection = "A ≤ ({{process.foot_saw_swept_max_mm:in.4dot}} − t) × {{process.saw_axial_reading_per_in_mm:.1f}} mm, Setup 3's limit (t .0640: {{process.foot_saw_axial_nominal_mm:.3f}} mm). Over: take the arbor out, wipe its shank and the taper, mount it and read again. Still over: loosen the screw, wipe, turn the saw a quarter turn on the pilot, clamp to {{process.saw_clamp_torque_nm:.0f}} N·m, draw new witness lines and read again, then the tips' swing as in Setup 3. Over after two such tries: stop and tell the owner."
+inspection = "A ≤ ({{process.saw_swept_max_mm:in.4dot}} − t) × {{process.saw_axial_reading_per_in_mm:.1f}} mm, Setup 3's limit (t .0640: {{process.saw_axial_nominal_mm:.3f}} mm). Over: take the arbor out, wipe its shank and the taper, mount it and read again. Still over: loosen the screw, wipe, turn the saw a quarter turn on the pilot, clamp to {{process.saw_clamp_torque_nm:.0f}} N·m, draw new witness lines and read again, then the tips' swing as in Setup 3. Over after two such tries: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]

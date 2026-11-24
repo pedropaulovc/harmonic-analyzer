@@ -111,14 +111,15 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
         "CA05_pin_hole",
     }
     # The saw's two levels per notch: the ledge, then the far wall less the
-    # saw's thickness, so the notch is the band's middle wide.
+    # saw's thickness: the foot notch the band's middle wide, the top notch
+    # .126 (a .062 rise, half its least width, so its kerfs overlap).
     levels = {
         key: sorted({line for line in _lines(ctx, key) if line.startswith("G1 Z")})
         for key in ("foot_notch", "top_notch")
     }
     assert levels == {
         "foot_notch": ["G1 Z1.854 F{feed}", "G1 Z2.946 F{feed}"],
-        "top_notch": ["G1 Z1.600 F{feed}", "G1 Z3.226 F{feed}"],
+        "top_notch": ["G1 Z1.600 F{feed}", "G1 Z3.175 F{feed}"],
     }
     # Four pin holes .25 in from the top end, one per bar, a pitch apart.
     holes = next(
@@ -258,6 +259,9 @@ def test_a_pass_past_the_arbors_reach_is_caught_at_the_bars_ends(ctx, tmp_path) 
         ({"riser_chamfer_mm": 1.6}, "quarter of the first bar"),
         ({"riser_length_max_mm": 80.0}, "longer than the jaws"),
         ({"foot_notch_width_mm": 2.6416}, "foot_notch_width_mm"),
+        # The old .128 target: two .064 saw widths, a .064 rise the least
+        # accepted saw does not cover.
+        ({"top_notch_width_mm": 3.2512}, "leaves a fin"),
         ({"top_notch_depth_mm": 14.224}, "top_notch_depth_mm"),
         ({"top_notch_step_mm": 3.4925}, "top_notch_step_mm"),
         ({"end_protrusion_mm": 14.0}, "top notch's depth"),
@@ -307,11 +311,11 @@ def test_a_pass_past_the_arbors_reach_is_caught_at_the_bars_ends(ctx, tmp_path) 
             "over the arbor's friction drive",
         ),
         ({"saw_feed_per_min_mm": 365.76}, "not the .001 in/tooth"),
-        ({"saw_swept_margin_mm": 0.0508}, "foot_saw_swept_max_mm"),
+        ({"saw_swept_margin_mm": 0.0508}, "saw_swept_max_mm"),
         ({"foot_notch_rise_mm": 1.0}, "foot_notch_rise_mm"),
         ({"top_saw_radial_tir_max_mm": 0.6}, "top_saw_radial_tir_max_mm"),
         ({"saw_axial_reading_per_in_mm": 25.4}, "saw_axial_reading_per_in_mm"),
-        ({"foot_saw_axial_nominal_mm": 0.07}, "foot_saw_axial_nominal_mm"),
+        ({"saw_axial_nominal_mm": 0.07}, "saw_axial_nominal_mm"),
         ({"foot_notch_light_mm": 2.1273}, "foot_notch_light_mm"),
     ],
 )

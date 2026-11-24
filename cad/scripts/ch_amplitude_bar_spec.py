@@ -65,12 +65,8 @@ BAR_STOCK_UNDERSIZE = 0.002 * MM_PER_IN  # 0.051
 # so a notch is never narrower than its plate. The 0.25 novice spare
 # (rocker_bank_layout.MARGIN_SPARE) is deliberately left out.
 # The top notch (owner ruling 2026-10-15, #1038 option 2): the lever plate
-# prints .118 +/-.002, so the notch is .124 at its least; its band is the
-# .XXX row's width all on the plus side, +.010/.000 (drawing-guidelines
-# rule 4: a band as wide as its title-block row is not tight; nothing
-# checked fails at the widest notch, and the MHA-CH-00 bar-gap leaf,
-# ch_channel_assembly_spec.BAR_GAP, still reads .004).
-# The foot notch is
+# prints .118 +/-.002, so the notch is .124 +.007/.000 (necessity register
+# ch-amplitude-bar: +.010 leaves the bar-gap budget under a thousandth). The foot notch is
 # .104 +.006/.000 on the .098 +/-.001 strap (#3114): the rocker arms float
 # on their shaft, each following its own rod, so two neighbouring arms can
 # close to their hubs' least length (ch_rocker_arm_spec.HUB_LENGTH_MIN), and
@@ -84,7 +80,7 @@ BOTTOM_NOTCH_WIDTH = _straddle_minimum(
 BOTTOM_NOTCH_HEIGHT = 0.09375 * MM_PER_IN  # 2.381 (.094), the foot's contact height
 BOTTOM_NOTCH_WIDTH_BAND = (0.1524, 0.0)  # +.006/.000 (upper, lower) deviations, native
 TOP_NOTCH_WIDTH = _straddle_minimum(LEVER_THICKNESS, LEVER_THICKNESS_TOLERANCE)  # .124
-TOP_NOTCH_WIDTH_BAND = (0.254, 0.0)  # +.010/.000 (upper, lower) deviations, native
+TOP_NOTCH_WIDTH_BAND = (0.1778, 0.0)  # +.007/.000 (upper, lower) deviations, native
 # The top notch's depth only clears the lever: its roof must stay below the
 # lever's lower edge with the lever turned on the pin relative to the bar
 # (sh_vn_pivot_pin_bar_spec.joint_budget notch_roof_clearance_min). The legacy

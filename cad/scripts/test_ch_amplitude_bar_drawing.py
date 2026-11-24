@@ -253,10 +253,10 @@ def test_cheek_walls_state_their_worst_case_at_each_width() -> None:
         assert printed < WALL_TARGET_MM
         text = notes.inch_text(printed, notes.WALL_PLACES)
         assert f"CHEEK WALL {text} MIN" in notes.DIMENSION_CALLOUTS[name].splitlines()
-    # In .250 -.002 stock: the top's .124 +.010 notch beside its .063 +/-.002
-    # ledge leaves .049, the foot's .104 +.006 beside its .073 +/-.002 .063.
+    # In .250 -.002 stock: the top's .124 +.007 notch beside its .063 +/-.002
+    # ledge leaves .052, the foot's .104 +.006 beside its .073 +/-.002 .063.
     assert (notes.TOP_CHEEK_WALL_MIN, notes.BOTTOM_CHEEK_WALL_MIN) == pytest.approx(
-        (0.049 * 25.4, 0.063 * 25.4)
+        (0.052 * 25.4, 0.063 * 25.4)
     )
     assert notes.TOP_CHEEK_WALL_MIN < WALL_FLOOR_MM
     assert notes.BOTTOM_CHEEK_WALL_MIN >= WALL_FLOOR_MM - 1e-9
@@ -265,8 +265,8 @@ def test_cheek_walls_state_their_worst_case_at_each_width() -> None:
     assert notes.CHEEK_WALL_APPROVED_MIN == {"top": 1.17}
     assert notes.TOP_CHEEK_WALL_MIN >= notes.CHEEK_WALL_APPROVED_MIN["top"]
     row = _exception("RV-04")
-    assert "1.17 mm (.046)" in row["reason"] and ".049" in row["reason"]
-    assert "CHEEK WALL .049 MIN" in row["where"] and "foot" not in row["where"]
+    assert "1.17 mm (.046)" in row["reason"] and ".052" in row["reason"]
+    assert "CHEEK WALL .052 MIN" in row["where"] and "foot" not in row["where"]
     assert "CHEEK WALL .063 MIN" in _exception("RV-05")["where"]
 
 
@@ -687,12 +687,11 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     ) == rocker.ARM_THICKNESS_BAND
     assert spec.STRADDLE_RUNNING_FLOOR == bank.RUNNING_FLOOR
 
-    # #1038 option 2 (owner ruling 2026-10-15): the top notch .124 at its
-    # least, its band the .XXX row's width, +.010/.000 (rule 4: as wide as
-    # its row, not tight; nothing fails at +.009). The foot +.006/.000
-    # (#3114): the float left to the bars once two floating arms close hub on
-    # hub.
-    assert spec.TOP_NOTCH_WIDTH_BAND == pytest.approx((0.010 * 25.4, 0.0))
+    # #1038 option 2 (owner ruling 2026-10-15): the top notch +.007/.000
+    # (necessity N-05: +.010 leaves the mid-span bar gap under a thousandth,
+    # rulings.md D14). The foot +.006/.000 (#3114): the float left to the
+    # bars once two floating arms close hub on hub.
+    assert spec.TOP_NOTCH_WIDTH_BAND == pytest.approx((0.007 * 25.4, 0.0))
     assert spec.BOTTOM_NOTCH_WIDTH_BAND == pytest.approx((0.006 * 25.4, 0.0))
     for width, (_upper, lower), plate, tolerance in (
         (
@@ -795,21 +794,20 @@ def test_the_bow_ch00_accepts_keeps_the_mid_span_gap() -> None:
 
     top = pin.BUDGET["neighbour_clearance_min"]
     foot = _foot_gap(rocker.HUB_LENGTH_MIN)
-    assert top == pytest.approx(0.6096, abs=1e-9)
+    assert top == pytest.approx(0.6858, abs=1e-9)
     mid = (top + foot) / 2.0
-    assert mid == pytest.approx(0.3683, abs=1e-9)
+    assert mid == pytest.approx(0.4064, abs=1e-9)
     assert asm.BAR_BOW_MAX_IN == 0.005
     bowed = mid - 2.0 * asm.BAR_BOW_MAX_MM
     assert bowed >= bank.RUNNING_FLOOR
     assert bowed == pytest.approx(asm.BAR_GAP["mid_span_bowed"])
     leaf = asm.BAR_GAP["leaf"]
     assert bank.RUNNING_FLOOR <= leaf <= min(top, foot, bowed)
-    assert leaf / 25.4 == pytest.approx(0.004)
-    # With the top notch at the .XXX row's width (+.010/0, rule 4's row
-    # width) .005 is the widest bow on the .001 grid that still holds
-    # the floor; .006 closes.
-    assert mid - 2.0 * 0.005 * 25.4 >= bank.RUNNING_FLOOR
-    assert mid - 2.0 * 0.006 * 25.4 < bank.RUNNING_FLOOR
+    assert leaf / 25.4 == pytest.approx(0.005)
+    # .006 is the widest bow on the .001 grid that still closes; .005 keeps a
+    # thousandth in hand.
+    assert mid - 2.0 * 0.006 * 25.4 >= bank.RUNNING_FLOOR
+    assert mid - 2.0 * 0.007 * 25.4 < bank.RUNNING_FLOOR
 
 
 def test_cropped_views_are_model_views_dimensioned_before_the_crop() -> None:
@@ -884,7 +882,7 @@ def test_every_band_is_inch_native() -> None:
     spec = ch_amplitude_bar_spec
     tol = spec.NOTCH_OFFSET_TOLERANCE_MM
     for band, inch in (
-        (spec.TOP_NOTCH_WIDTH_BAND, (0.010, 0.0)),
+        (spec.TOP_NOTCH_WIDTH_BAND, (0.007, 0.0)),
         (spec.BOTTOM_NOTCH_WIDTH_BAND, (0.006, 0.0)),
         (spec.BOTTOM_NOTCH_DEPTH_BAND, (0.0, -0.020)),
         ((tol, -tol), (0.002, -0.002)),
@@ -973,7 +971,7 @@ def test_bar_feature_bands_are_the_printed_ones() -> None:
         assert features[name][field] == pytest.approx([_in(0.248), _in(0.25)])
         assert features[name]["callout"] == "1/4 SQ STOCK"
     top, foot = features["top_notch"], features["foot_notch"]
-    assert top["width"] == pytest.approx([_in(0.124), _in(0.134)])
+    assert top["width"] == pytest.approx([_in(0.124), _in(0.131)])
     assert top["ledge"] == pytest.approx([_in(0.061), _in(0.065)])
     assert top["ledge_from"] == "right_face"
     assert top["depth"] == pytest.approx([_in(0.54), _in(0.56)])

@@ -7,7 +7,7 @@ necessity:
   - id: N-01
     feature: "sheet 1, fork detail, Ø.0775 REAM THRU pivot-pin hole through both tines (note 1: press fit on MHA-SH-VN-58)"
     kind: joint
-    reason: "press alone holds pivot pin MHA-SH-VN-58, no fastener"
+    reason: "press, or bond if loose, alone holds pin MHA-SH-VN-58"
     source: "owner ruling 2026-11-24, fit audit question 3 (reamed, no band, the pin is the gauge; a pin that enters by hand is bonded at MHA-CH-00); sh_vn_pivot_pin_rod_spec.BUDGET interference_min/max"
   - id: N-02
     feature: "sheet 1, fork detail, fork slot .106 ±.002 (note 2)"

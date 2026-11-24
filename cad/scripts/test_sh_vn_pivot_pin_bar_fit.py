@@ -77,8 +77,8 @@ def test_worst_case_joint_budget() -> None:
     assert b["running_clearance_min"] == pytest.approx(0.004545, abs=1e-6)
     assert b["running_clearance_max"] == pytest.approx(0.111225, abs=1e-6)
     # Flush ends leave the #1038 top-notch gap untouched: at the .300 pitch
-    # 7.62 - 6.35 - (3.4036 - 2.9464) - 0.1016 - 0.1016.
-    assert b["neighbour_clearance_min"] == pytest.approx(0.6096, abs=1e-6)
+    # 7.62 - 6.35 - (3.3274 - 2.9464) - 0.1016 - 0.1016.
+    assert b["neighbour_clearance_min"] == pytest.approx(0.6858, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.RUNNING_FLOOR
     # The .55 roof under the .37 lever (#3113; full depth at the pin) turned
     # the full relative swing.
@@ -112,7 +112,7 @@ def test_the_cheeks_the_pin_presses_into_hold_the_approved_exception() -> None:
     b = pin.BUDGET
     assert b["tine_min_printed"] == pytest.approx(1.5494, abs=1e-6)
     assert b["tine_min_printed"] >= pin.RULE12_WALL_FLOOR
-    assert b["tine_min_derived"] == pytest.approx(1.2446, abs=1e-6)
+    assert b["tine_min_derived"] == pytest.approx(1.3208, abs=1e-6)
     assert b["tine_min_derived"] < pin.RULE12_WALL_FLOOR  # #1038, not this pin
     assert b["tine_min_derived"] >= bar_notes.CHEEK_WALL_APPROVED_MIN["top"]
 
@@ -131,8 +131,8 @@ def test_neighbour_stack_closes_the_inter_bar_gap_exactly() -> None:
         + 2.0 * lever.PLATE_OFFSET_TOLERANCE
         + 2.0 * pin.PIN_END_PROUD_MAX
     ) == pytest.approx(b["neighbour_clearance_min"])
-    # 7.62 - 6.35 - (3.4036 - 2.9464) - 0.1016 - 0.1016 = 0.6096.
-    assert (notch_max, lever_min) == pytest.approx((3.4036, 2.9464))
+    # 7.62 - 6.35 - (3.3274 - 2.9464) - 0.1016 - 0.1016 = 0.6858.
+    assert (notch_max, lever_min) == pytest.approx((3.3274, 2.9464))
 
 
 def _lever_bar_swing_deg() -> float:
@@ -179,6 +179,12 @@ def _lever_bar_swing_deg() -> float:
 def test_restated_lever_bar_swing_brackets_the_solved_loop() -> None:
     worst = _lever_bar_swing_deg()
     assert worst <= pin.LEVER_BAR_SWING_DEG <= worst + 0.05
+
+
+def test_the_bar_notes_bonded_hole_literal_is_the_pin_specs() -> None:
+    import ch_amplitude_bar_notes as notes
+
+    assert notes.BOND_HOLE_MAX == pytest.approx(pin_family.BOND_HOLE_MAX, abs=1e-9)
 
 
 def test_the_assembly_press_allowance_is_this_joint() -> None:
