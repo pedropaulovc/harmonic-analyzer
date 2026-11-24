@@ -331,7 +331,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "pd-vn-transgear-arm-plate-locating-pin": _stock(
         "pd-vn-transgear-arm-plate-locating-pin",
         "Alloy Steel Dowel Pin",
-        "98381A435",
+        "98381A216",
         material="Alloy Steel",
     ),
     "pd-vn-transgear-pivot-screw": _stock(

@@ -258,7 +258,7 @@ from build_pd_guide_lock import (  # noqa: E402
 # the same spec constants the guide and lock builds author on their model
 # dimensions, so the sheets and the sweep read one source.
 from _fit_deviations import deviations  # noqa: E402
-from _printed_tolerance import printed_band_mm, printed_deviations  # noqa: E402
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations  # noqa: E402
 from pd_guide_lock_spec import (  # noqa: E402
     DRAWING_PRECISION_BY_NAME as LOCK_PRECISION,
     HOLE_PATTERN_X as LOCK_HOLE_PATTERN_X,
@@ -453,7 +453,7 @@ KNOB_SHAFT_XY = PAPER_PLACEMENT.KNOB_SHAFT_XY
 # z stack of the hanger (front -Z -> back). It stands behind the bar's back
 # face on the pivot spacer, so the arm clears the sliding guide-lock stations
 # (_assert_lock_station_sweep).
-SPACER_Z0 = BAR_BACK_Z  # -129.4: spacer pressed flush on the shoulder's end
+SPACER_Z0 = BAR_BACK_Z  # -129.4: spacer bonded flush on the shoulder's end
 ARM_Z0 = ARM.FRONT_FACE_MACHINE_Z  # -124.4: arm front face on the spacer
 # Shoulder screw MHA-PD-VN-57 (Rx+90: shank to -Z): the shoulder bottoms on the
 # bar's back face; under its head the MHA-PD-VN-63 spring (identity: its O.D.
@@ -626,7 +626,7 @@ KNOB_CUP_SCREW_ENGAGED = KNOB_SHAFT_REAR_Z - KNOB_CUP_SCREW_TIP_Z
 # platen's thickness, the thickest disc, the shimmed step's sources and the
 # spigot length (the disc's chain from the arm's front face: the shims close
 # the float off the ring's load wall, transgear_cluster_fit.SHIMMED_STEP_TERMS),
-# the spacer's two faces' squareness tilting the hanger about P (Codex P1 on
+# the spacer's rear face's parallelism tilting the hanger about P (Codex P1 on
 # 6c385465d) at the rim's farthest point from P, the step, spigot-end and
 # flange squareness and the disc's rear-face parallelism at the rim, and the
 # pin's S projected axis zone at the rim.
@@ -652,7 +652,7 @@ CLUSTER_TILT_AT_DISC_RIM = (
     * CLUSTER.BORE_DIAMETRAL_CLEARANCE[1]
     / (FEED.OVERALL_LENGTH - FEED.OVERALL_LENGTH_BAND)
 )  # 0.0317
-# The hanger tilts about P by the spacer's face squareness
+# The hanger tilts about P by the spacer's face parallelism
 # (transgear_hanger_joints.HANGER_TILT): a point r from P moves r times it.
 _P_TO_S = math.dist(PIVOT_XY, STUD_XY)  # 68.81
 _P_TO_DISC_RIM = _P_TO_S + DISC_SPEC.OUTSIDE_DIA / 2.0
@@ -711,11 +711,8 @@ PLATEN_AIR = CLUSTER_AIR.AirStack(
         "MHA-PD-06 disc thickness": DISC_SPEC.FACE_WIDTH_MAX - DISC_SPEC.FACE_WIDTH,
         **dict(CLUSTER.SHIMMED_STEP_TERMS),
         CLUSTER.SP[0]: CLUSTER.SP[2],
-        "MHA-PD-20 spacer rear face perpendicularity": SPACER.REAR_FACE_PERPENDICULARITY
-        / SPACER.FACE_PERPENDICULARITY_ZONE_DIA
-        * _P_TO_DISC_RIM,
-        "MHA-PD-20 spacer front face perpendicularity": SPACER.FRONT_FACE_PERPENDICULARITY
-        / SPACER.FACE_PERPENDICULARITY_ZONE_DIA
+        "MHA-PD-20 spacer rear face parallelism": SPACER.REAR_FACE_PARALLELISM
+        / SPACER.FACE_PARALLELISM_ZONE_DIA
         * _P_TO_DISC_RIM,
         "sleeve step face perpendicularity": _STEP_AT_RIM,
         "hub spigot end perpendicularity": _SPIGOT_END_AT_RIM,
@@ -771,13 +768,32 @@ CHAIN_REACH_REAR_WORST = seat_geometry.CHAIN_REACH_REAR_WORST  # 3.587
 # Radially, the only knob-stack feature between the seat face and the disc is
 # the drive collar (the pins sit inside it); at its print-worst (largest)
 # radius it must stand inside the knob-wheel plates' inner edge, CAD link and ANSI,
-# with the wheel floated off-centre on its pins (the crank's same pins, holes
-# and bands: dt_crankshaft_spec.WHEEL_SEAT_FLOAT).
+# with the wheel floated off-centre on its pins by KNOB_WHEEL_SEAT_FLOAT.
 KNOB_CHAIN_INNER_R = min(
     REMOVABLE.chain_plate_inner_radius(REMOVABLE.KNOB_TEETH, h)
     for h in (2.0 * CHAIN_PLATE_HALF_H, REMOVABLE.ANSI_PLATE_HEIGHT)
 )
 KNOB_COLLAR_R_WORST = (COLLAR.OD + max(COLLAR.OD_BAND)) / 2.0  # 8.75
+# The knob wheel on MHA-PD-22's pins, as dt_crankshaft_spec.WHEEL_SEAT_FLOAT
+# on the crank's: one hole's slip (drilled to its largest over the smallest
+# MHA-PD-VN-54 dowel) plus a pin centre and its hole centre at their limits,
+# opposite ways along the pins' line, capped by the bore's loosest air round
+# the collar's pilot.  Each centre term is what its sheet prints: MHA-PD-22's
+# offsets are REF targets (fit audit question 8), so its pins are charged the
+# shop's reamed-hole location row COLLAR.PIN_CENTRE_SHIFT_MAX (+/-.002), and
+# MHA-PD-09's holes their printed band REMOVABLE.PIN_LOCATION_TOL (+/-.0009).
+KNOB_SEAT_PIN_CENTRE_TOL = COLLAR.PIN_CENTRE_SHIFT_MAX
+KNOB_SEAT_HOLE_CENTRE_TOL = REMOVABLE.PIN_LOCATION_TOL
+KNOB_WHEEL_SEAT_FLOAT = min(
+    (
+        seat_geometry.PIN_HOLE_DIA
+        + drilled_oversize_mm(unit=REMOVABLE.UNIT)
+        - (KNOB_PIN.DIA + KNOB_PIN.DIA_BAND_IN[0] * KNOB_PIN.MM_PER_IN)
+    ) / 2.0
+    + KNOB_SEAT_PIN_CENTRE_TOL
+    + KNOB_SEAT_HOLE_CENTRE_TOL,
+    max(COLLAR.PILOT_BORE_CLEARANCE),
+)  # 0.177
 
 # Thumbnut MHA-PD-13 (ch23 p.58/59 + video 4/4 "unscrew the nut that holds the
 # other gear in place"): the knurled brass nut OUTERMOST on the knob shaft,
@@ -1516,11 +1532,16 @@ def _assert_lock_station_sweep() -> None:
     ky = KNOB_SHAFT_XY[1]
     # R9-61: the hanger hangs on the pivot screw, whose #8-32 tap the bar
     # prints at its ±HOLE_POSITION_BAND, so every hung section stands off its
-    # model by that band in y. The spacer is pressed on the shoulder, so its
-    # bore is on the screw axis; its largest O.D. stands off that axis by the
+    # model by that band in y. The spacer is bonded on the shoulder, so its
+    # bore may cure off the screw axis by half the bond's greatest gap
+    # (SPACER.SEAT_OFFSET_MAX); its largest O.D. stands off the bore by the
     # offset its printed runout to A allows (SPACER.BORE_ECCENTRICITY).
     pivot_tap = BAR.HOLE_POSITION_BAND
-    spacer_r = (SPACER.OD + SPACER.OD_BAND) / 2.0 + SPACER.BORE_ECCENTRICITY
+    spacer_r = (
+        (SPACER.OD + SPACER.OD_BAND) / 2.0
+        + SPACER.BORE_ECCENTRICITY
+        + SPACER.SEAT_OFFSET_MAX
+    )
     # The arm's front face on the shortest spacer; the flat plate's face A on
     # the thinnest arm stock. The bush's hub face stands its longest hub, and
     # the shoulder's largest seat gap, forward of face A.
@@ -1836,8 +1857,11 @@ def _assert_gear_mesh() -> None:
     ext = centre_distance - c2c_nominal
     # CR at the minimum tips, positive backlash at the tight runout extreme,
     # AGMA root clearance and the interference points, at both ends of the
-    # set band (the nominal end is the model's centre).
+    # set band (the nominal end is the model's centre) and at the lowest
+    # centre the trial mesh may move the plate to (owner ruling 2026-11-24,
+    # audit part 2 question C1).
     reducer, reducer_top = (check.require() for check in mesh_check.reducer_band_meshes())
+    reducer_trial_low = mesh_check.reducer_trial_low_mesh().require()
     if DISC_SPEC.CENTRE_DISTANCE_WINDOW[0] != centre_distance:
         raise RuntimeError("the model's reducer centre is not the set band's nominal end")
     # The disc's teeth repeat every 360/DISC_TEETH deg, so a tooth must point
@@ -1868,6 +1892,7 @@ def _assert_gear_mesh() -> None:
     log(
         f"gear mesh {THIRD_TEETH}:{DISC_TEETH} {DISC_DP:g}DP PA{DISC_SPEC.PRESSURE_ANGLE_DEG:g}:"
         f" c2c {centre_distance} (ext {ext:.3f}); {reducer.summary}; {reducer_top.summary};"
+        f" {reducer_trial_low.summary};"
         f" {THIRD_TEETH}T phased {THIRD_PHASE_DEG:+.1f} deg,"
         f" tip/floor margin {min(root_margin, reciprocal_margin):.3f}"
     )
@@ -2290,8 +2315,9 @@ def _author_knob_setting_reference(adapter) -> None:
     name_last_feature(adapter, spec.FEATURE)
     for name, expression in dims.apply(adapter, spec.FEATURE):
         drive_dimension(adapter, name, expression)
-    # The set band itself, +x/-0, on S to N: an assembly setting is an
-    # associative model dimension, never a note (#1388).
+    # DETAIL K's limits on S to N, the set band's +x and the trial mesh's
+    # -.001: an assembly setting is an associative model dimension, never a
+    # note (#1388).
     set_dimension_bilateral_tolerance(
         adapter, spec.FEATURE, spec.CENTRE_DIMENSION, *KNOB_SETTING.CENTRE_TOLERANCE_MM,
         places=spec.TOLERANCE_PLACES, display_unit=assembly_contract(ASM_NAME).drawing_unit,

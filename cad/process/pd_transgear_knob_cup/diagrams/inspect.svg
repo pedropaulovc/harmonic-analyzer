@@ -10,7 +10,7 @@
   <line class="datum" x1="200" y1="80" x2="200" y2="280"/>
   <text class="datum-label" x="40" y="300">front face: faced at MHA-PD-00 step 22</text>
   <line class="leader" x1="240" y1="135" x2="420" y2="60"/>
-  <text class="label" x="424" y="56">pilot Ø{{cad.pilot_dia_min_in:.3dot}}–{{cad.pilot_dia_max_in:.3dot}}, {{cad.pilot_depth_min_in:.3dot}}–{{cad.pilot_depth_max_in:.3dot}} deep (supply)</text>
+  <text class="label" x="424" y="56">pilot Ø{{process.pilot_cutter_dia_mm:in.3dot}} REF, {{cad.pilot_depth_min_in:.3dot}}–{{cad.pilot_depth_max_in:.3dot}} deep (supply)</text>
   <line class="leader" x1="280" y1="180" x2="420" y2="176"/>
   <text class="label" x="424" y="180">web hole Ø{{cad.web_hole_dia_min_in:.3dot}}–{{cad.web_hole_dia_max_in:.3dot}}</text>
   <line class="leader" x1="330" y1="150" x2="420" y2="112"/>

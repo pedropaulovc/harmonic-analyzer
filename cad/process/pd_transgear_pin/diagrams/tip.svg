@@ -1,3 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Turned round again, the journal in the jaws over a shim wrap, the tip out and the head inside the chuck: its R.07 dome stepped from the table and filed on the faced end. Shell: prechips.shaft_diagrams; styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" data-cad-template="turned-shaft" data-hold="regrip" data-out="far" data-grip="outer" data-work="dome steps" data-done="turn groove dome-datum"/>
+<!-- Turned round again, the journal in the split bush in the 3-jaw, the tip out and the head behind the bush: the tip faced, its R.07 dome stepped from the table and filed. Hand-drawn, not to scale (#3500). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="540" height="290" viewBox="0 0 540 290" font-family="sans-serif" font-size="12">
+<rect width="540" height="290" fill="#fff"/>
+<rect x="20" y="30" width="40" height="230" fill="#ccc" stroke="#000"/>
+<rect x="60" y="30" width="150" height="40" fill="#ccc" stroke="#000"/>
+<rect x="60" y="220" width="150" height="40" fill="#ccc" stroke="#000"/>
+<rect x="60" y="70" width="225" height="150" fill="#ec9" stroke="#000"/>
+<rect x="24" y="115" width="26" height="60" fill="#cde" stroke="#000"/>
+<rect x="50" y="126" width="310" height="38" fill="#cde" stroke="#000"/>
+<rect x="307" y="126" width="6" height="5" fill="#fff" stroke="#000"/>
+<rect x="307" y="159" width="6" height="5" fill="#fff" stroke="#000"/>
+<path d="M285 70 l-8 0 l4 8 z" fill="#000"/>
+<line x1="10" y1="145" x2="530" y2="145" stroke="#000" stroke-dasharray="12 3 2 3" stroke-width="0.6"/>
+<line x1="285" y1="225" x2="285" y2="262" stroke="#000" stroke-width="0.6"/>
+<line x1="360" y1="170" x2="360" y2="262" stroke="#000" stroke-width="0.6"/>
+<line x1="285" y1="256" x2="360" y2="256" stroke="#000" stroke-width="0.6"/>
+<text x="322" y="274" text-anchor="middle">.25 out of the bush</text>
+<text x="375" y="120" text-anchor="start">tip: face to its station,</text>
+<text x="375" y="135" text-anchor="start">step and file the R.07 dome</text>
+<line x1="373" y1="125" x2="361" y2="135" stroke="#000" stroke-width="0.6"/>
+<text x="318" y="104" text-anchor="start">ring groove, clear of the bush</text>
+<line x1="316" y1="106" x2="310" y2="124" stroke="#000" stroke-width="0.6"/>
+<text x="300" y="66" text-anchor="start">nick at jaw 1</text>
+<line x1="298" y1="62" x2="283" y2="72" stroke="#000" stroke-width="0.6"/>
+<text x="135" y="22" text-anchor="middle">3-jaw on the bush, never on the pin</text>
+<text x="172" y="205" text-anchor="middle">split bush</text>
+<text x="24" y="282" text-anchor="start">head behind the bush, inside the chuck</text>
+</svg>

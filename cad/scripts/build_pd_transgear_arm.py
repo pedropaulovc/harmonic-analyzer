@@ -13,8 +13,8 @@ face, +X to the square end, +Z to the rear face):
   tangent to it, cut square at the tip station by the 14-wide end face;
   extruded ``THICKNESS`` toward +Z as ``Arm``.
 * ``PivotBore``: the Ø4.9 running bore through at P.
-* ``PinBore``: the Ø3.874 reamed press bore through at S for the MHA-PD-23
-  pin, cut normal to the faces (the pin's head seats on the rear face).
+* ``PinBore``: the Ø.126 reamed bore through at S the MHA-PD-23 pin is bonded
+  in, cut normal to the faces (the pin's head seats on the rear face).
 * ``PinBoreRearMouth``: the bore's 45-degree rear mouth, clearing the pin's
   seat root: a revolved cut whose profile ``PinBoreRearMouthProfile`` lies on
   ``PinBoreSectionPlane`` (x = PIN_STATION, section D-D's cutting plane), so
@@ -77,7 +77,7 @@ from _drawing_dimension_insert import (
     add_angular_reference_dimension,
     add_diametric_linear_dimension,
 )
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -85,36 +85,28 @@ from _drawing_marks import (
 )
 from _drawing_tolerances import (
     set_dimension_basic_tolerance,
-    set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
 from _document_units import apply_package_model_units
-from _fit_deviations import deviations
 from _hole_spec import DRILL_POINT_H, blind_cut_dia_mm
 from _holes import find_planar_face, wizard_holes
 from _part_pmi import author_part_pmi
-from _single_limit_tolerance import SW_TOL_MIN, set_single_limit
 from _part_properties import part_drawing_unit
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
-    LOCATOR_HOLE_DIA_BAND,
     EDGE_LEAN,
     END_HALF_WIDTH,
     PIN_BORE_DIA,
-    PIN_BORE_DIA_BAND,
     PIN_MOUTH_CHAMFER,
-    PIN_MOUTH_CHAMFER_TOLERANCE,
     PIN_HOLE_DEPTH,
     PIN_HOLE_POINT_LENGTH,
     PIN_HOLE_DIA,
-    PIN_HOLE_DIA_BAND,
     PIN_HOLE_Z,
     PIN_STATION,
     PIVOT_BORE_DIA,
-    PIVOT_BORE_DIA_BAND,
     PIVOT_END_R,
     PIVOT_TANGENT_X,
     PIVOT_TANGENT_Y,
@@ -131,13 +123,13 @@ from pd_transgear_arm_geometry import (
 )
 from pd_transgear_arm_spec import (
     BASIC_REDUCER_DIMENSIONS,
+    COUNTERBORE_PREFIX,
     GEOMETRIC_CONTROLS,
+    MIN_SUFFIX,
     PART_DATUMS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
-    PIN_HOLE_DEPTH_BAND,
-    SPOT_FACE_DIA_BAND,
     SPOT_FACE_FLOOR_TOLERANCE,
 )
 
@@ -334,6 +326,43 @@ def _pin_section_sketch(
         return (0.0 if abs(u) < 1e-9 else u, 0.0 if abs(v) < 1e-9 else v)
 
     return to_sketch, axial == 0
+
+
+@_telemetry.traced("part.transgear_arm.dimension_text", label_param="dimension_name")
+def _author_dimension_text(
+    adapter: Any,
+    feature_name: str,
+    dimension_name: str,
+    *,
+    lane: int,
+    text: str,
+    limit: float | None = None,
+) -> None:
+    """Author ``text`` on one lane of ``dimension_name@feature_name``, a
+    dimension with no native tolerance (build_pd_transgear_front_bushing's
+    " MAX" suffix): a single limit's " MIN" suffix (lane 2,
+    swDimensionTextSuffix: swTolMIN prints a lowercase "min."), whose model
+    value must be the printed ``limit`` mm, or the counterbore symbol as the
+    prefix (lane 1, swDimensionTextPrefix).  The drawing imports the text
+    with the dimension.
+    """
+    label = f"{dimension_name}@{feature_name}"
+    display, dimension = _named_dimension(adapter, feature_name, dimension_name)
+    if limit is not None and not math.isclose(
+        float(dimension.SystemValue), limit / 1000.0, abs_tol=1e-9
+    ):
+        raise RuntimeError(
+            f"{label}: nominal {float(dimension.SystemValue) * 1000.0:.7f} "
+            f"is not the limit {limit:g}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(tolerance.Type) != 0:  # swTolType_e.swTolNONE
+        raise RuntimeError(f"{label}: carries native tolerance type {int(tolerance.Type)}")
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(lane, text)
+    if str(display.GetText(lane) or "") != text:
+        raise RuntimeError(f"{label}: text lane {lane} did not persist {text!r}")
+    _telemetry.success(f"{label}: lane {lane} {text!r}")
 
 
 def build(adapter: Any) -> dict[str, str]:
@@ -1058,48 +1087,39 @@ def build(adapter: Any) -> dict[str, str]:
     apply_color(adapter, POLISHED_STEEL)
     report_mass_properties(adapter)
     # Explicit bands (contract §3.1 / §12); every other printed dimension is
-    # governed by its places (the spec's DRAWING_PRECISION).
-    set_dimension_bilateral_tolerance(
-        adapter, "SpotFaceProfile", "SpotFaceDia", *deviations(SPOT_FACE_DIA_BAND),
-        display_unit=UNIT,
+    # governed by its places (the spec's DRAWING_PRECISION).  The counterbore's
+    # Ø is one of those, at the title block's .XX, under its symbol.
+    _author_dimension_text(
+        adapter, "SpotFaceProfile", "SpotFaceDia", lane=1, text=COUNTERBORE_PREFIX,
     )
     set_dimension_symmetric_tolerance(
         adapter, "SpotFaceProfile", "FloorDepth", SPOT_FACE_FLOOR_TOLERANCE,
         display_unit=UNIT,
     )
-    # The locating ream prints the .0930 reamer's own band.
-    for index in (1, 2):
-        set_dimension_bilateral_tolerance(
-            adapter, "LocatorProfile", f"LocatorDia{index}",
-            *deviations(LOCATOR_HOLE_DIA_BAND), display_unit=UNIT,
-        )
+    # The locating reams and the latch-pin ream print their set reamer's
+    # size and no band (fit audit 2026-11-23): each is accepted with its
+    # dowel (pd_transgear_arm_notes, notes 2 and 3).
     for feature_name, dimension_name in BASIC_REDUCER_DIMENSIONS:
         set_dimension_basic_tolerance(adapter, feature_name, dimension_name)
     # PinHoleZ carries no explicit band: its .XXX title-block row governs
     # (coordinator ruling (a), #2019).
-    set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND),
-        display_unit=UNIT,
-    )
     # The full-diameter depth is a MIN over the drill point (#3124 item 3):
-    # the model value is the printed limit, read back.
-    set_single_limit(
-        adapter, "PinHole", "PinHoleDepth", limit=PIN_HOLE_DEPTH,
-        band=PIN_HOLE_DEPTH_BAND, tol_type=SW_TOL_MIN,
+    # the model value is the printed limit, " MIN" its suffix.
+    _author_dimension_text(
+        adapter, "PinHole", "PinHoleDepth", lane=2, text=MIN_SUFFIX,
+        limit=PIN_HOLE_DEPTH,
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "PivotBoreProfile", "PivotBoreDia", *deviations(PIVOT_BORE_DIA_BAND),
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "PinBoreProfile", "PinBoreDia", *deviations(PIN_BORE_DIA_BAND),
-        display_unit=UNIT,
-    )
-    # The rear mouth's leg: its minimum clears the MHA-PD-23 seat fillet
-    # (pd_transgear_pin_spec), its maximum is the title block's break.
-    set_dimension_symmetric_tolerance(
-        adapter, "PinBoreRearMouthProfile", "PinMouthChamfer",
-        PIN_MOUTH_CHAMFER_TOLERANCE, display_unit=UNIT,
+    # The pivot bore carries no band of its own: its DRILL THRU callout takes
+    # the title block's DRILLED HOLES row (geometry PIVOT_BORE_DIA_BAND).
+    # The pin bore prints the reamer's size with no band (fit audit
+    # 2026-11-23): MHA-PD-23 is bonded in it, and its callout carries the
+    # fit.
+    # The rear mouth's leg prints its one limit, the minimum that clears the
+    # MHA-PD-23 seat fillet (pd_transgear_pin_spec): the model value with a
+    # " MIN" suffix.  Its maximum is the title block's break.
+    _author_dimension_text(
+        adapter, "PinBoreRearMouthProfile", "PinMouthChamfer", lane=2,
+        text=MIN_SUFFIX, limit=PIN_MOUTH_CHAMFER,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)

@@ -705,24 +705,24 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.261,
                 8.7122,
             ),
-            frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): _annulus_limit(
-                3.21564, 3.2004, 7.366
-            ),
-            # MHA-PD-VN-64 3/32 (Ø2.38125) dowels pressed into the arm's Ø2.3622
+            # Owner ruling 2026-11-24, fit audit question 4: MHA-PD-23 is
+            # a bonded slip fit in the arm's ream, modelled with clearance,
+            # so the pair needs no interference allowance.
+            # MHA-PD-VN-64 1/8 (Ø3.175) dowels pressed into the arm's Ø3.1496
             # through reams, the 5/16 stock less the 1.7018 proud set.
             **_expected_numbered_pairs(
                 "pd-vn-transgear-arm-plate-locating-pin",
                 range(1, 3),
                 "pd-transgear-arm",
-                2.38125,
-                2.3622,
+                3.175,
+                3.1496,
                 7.9375 - 1.7018,
             ),
-            # R9-71: MHA-PD-20's Ø.1850 ream pressed on MHA-PD-VN-57's Ø4.7625
-            # shoulder over its 5.0 length.
-            frozenset(("pd-transgear-pivot-spacer-1", "pd-vn-transgear-pivot-screw-1")): (
-                _annulus_limit(4.7625, 4.699, 5.0)
-            ),
+            # MHA-PD-VN-58 1/8 (Ø3.175) latch pin pressed 8.5 into the arm's
+            # Ø3.1496 blind ream.
+            frozenset(
+                ("pd-vn-transgear-latch-pin-1", "pd-transgear-arm-1")
+            ): _annulus_limit(3.175, 3.1496, 8.5),
             # MHA-PD-VN-61's three prong arcs, atan(3/4) of the turn each, at the
             # Ø2.3876 free diameter inside the MHA-PD-23 Ø2.413 groove floor.
             frozenset(("pd-vn-transgear-retaining-ring-1", "pd-transgear-pin-1")): (

@@ -65,12 +65,8 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_basic_tolerance,
-    set_dimension_bilateral_tolerance,
-)
+from _drawing_tolerances import set_dimension_basic_tolerance
 from _document_units import apply_package_model_units
-from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _part_properties import part_drawing_unit
 from _saved_part_guard import require_saved_drawing_properties
@@ -78,7 +74,6 @@ from _visibility import blank_reference_geometry
 from pd_transgear_arm_plate_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
-    LOCATOR_HOLE_BAND_MM,
     CSK_ANGLE_DEG,
     CSK_DEPTH,
     CSK_DIA,
@@ -98,7 +93,6 @@ from pd_transgear_arm_plate_geometry import (
     TOP_RIGHT,
     WIDTH,
     section_area_moments,
-    UNIT,
 )
 from pd_transgear_arm_plate_spec import (
     BASIC_REDUCER_DIMENSIONS,
@@ -107,7 +101,6 @@ from pd_transgear_arm_plate_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
-    PRESS_HOLE_BAND,
 )
 
 PART_NAME = "pd-transgear-arm-plate"
@@ -715,17 +708,10 @@ def build(adapter: Any) -> dict[str, str]:
     )
     bbox_extent_check(adapter, "bar width", "x", WIDTH)
 
-    # Size/axial fit bands are separate from the locating-hole circular
-    # position controls. Their coordinates are BASIC, never +/- substitutes.
-    set_dimension_bilateral_tolerance(
-        adapter, "PressHoleProfile", "PressHoleDia", *deviations(PRESS_HOLE_BAND),
-        display_unit=UNIT,
-    )
-    for index in (1, 2):
-        set_dimension_bilateral_tolerance(
-            adapter, "LocatorProfile", f"LocatorDia{index}", *deviations(LOCATOR_HOLE_BAND_MM),
-            display_unit=UNIT,
-        )
+    # The press hole and the locating holes print their set reamer's size
+    # and no band (fit audit 2026-11-23): each is accepted with its mate
+    # (pd_transgear_arm_plate_notes).  The locating holes' coordinates are
+    # BASIC under circular position controls, never +/- substitutes.
     for feature_name, dimension_name in BASIC_REDUCER_DIMENSIONS:
         set_dimension_basic_tolerance(adapter, feature_name, dimension_name)
     apply_drawing_precision(adapter, DRAWING_PRECISION)

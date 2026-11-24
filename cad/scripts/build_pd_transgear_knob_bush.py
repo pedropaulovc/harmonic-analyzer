@@ -2,7 +2,8 @@ r"""Reproduction script: transgear knob bush (MHA-PD-28; ch. 23; 1 used).
 
 The turned steel bush pressed into the MHA-PD-19 arm plate (owner ruling
 2026-11-20 (Pedro), #2425): its hub stands in front of face A as the
-shoulder, the MHA-PD-15 thrust ring's seat; its FN2 press runs through the
+shoulder, the MHA-PD-15 thrust ring's seat; its press, turned to the
+plate's measured hole, runs through the
 plate and on to the rear face, the MHA-PD-16 cup's thrust face; its bore is
 reamed through after pressing for the MHA-PD-08 knob shaft's journal
 (``pd_transgear_knob_bush_geometry``).
@@ -56,12 +57,8 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _document_units import apply_package_model_units
-from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _part_properties import part_drawing_unit
 from pd_transgear_knob_bush_geometry import (
@@ -72,16 +69,16 @@ from pd_transgear_knob_bush_geometry import (
     LENGTH,
     LENGTH_BAND,
     PRESS_DIA,
-    PRESS_DIA_BAND,
     SHOULDER_ROOT_R_MAX_MM,
 )
 from pd_transgear_knob_bush_spec import (
-    BORE_BAND,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
+    PRESS_DIA_TEXT_PREFIX,
+    PRESS_DIA_TEXT_SUFFIX,
     SHOULDER_ROOT_SUFFIX,
     SHOULDER_ROOT_TOL_TYPE,
     SURFACE_FINISHES,
@@ -143,6 +140,25 @@ def _shoulder_root_max_limit(adapter) -> None:
         or str(display.GetText(2) or "") != SHOULDER_ROOT_SUFFIX
     ):
         raise RuntimeError("ShoulderR: the MAX single limit did not persist")
+
+
+@_telemetry.traced("part.knob_bush.press_dia_reference")
+def _press_dia_reference(adapter) -> None:
+    """PressDia as the reference "(Ø.4385)": the step is turned to the
+    plate's measured hole, so it carries no native tolerance and prints in
+    parentheses (build_pd_transgear_pin's press land)."""
+    display, dimension = _named_dimension(adapter, "BushProfile", "PressDia")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 0  # swTolType_e.swTolNONE
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(1, PRESS_DIA_TEXT_PREFIX)  # swDimensionTextPrefix
+    display.SetText(2, PRESS_DIA_TEXT_SUFFIX)  # swDimensionTextSuffix
+    if (
+        int(tolerance.Type) != 0
+        or str(display.GetText(1) or "") != PRESS_DIA_TEXT_PREFIX
+        or str(display.GetText(2) or "") != PRESS_DIA_TEXT_SUFFIX
+    ):
+        raise RuntimeError("PressDia: the reference form did not persist")
 
 
 def build(adapter) -> dict[str, str]:
@@ -315,23 +331,12 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The H7 running bore and the FN2 press carry their fit bands; the hub
-    # station and the overall length their stack bands.  The hub Ø is
-    # governed by its places (the spec's DRAWING_PRECISION): no model band.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "BoreSketch",
-        "BoreDia",
-        *deviations(BORE_BAND),
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "BushProfile",
-        "PressDia",
-        *deviations(PRESS_DIA_BAND),
-        display_unit=UNIT,
-    )
+    # The hub station and the overall length carry their stack bands.  The
+    # press Ø is made to the plate's measured hole: a reference, no model
+    # band.  The reamed running bore prints the reamer's size and no band
+    # (rule 4); the hub Ø is governed by its places (the spec's
+    # DRAWING_PRECISION): no model band.
+    _press_dia_reference(adapter)
     set_dimension_symmetric_tolerance(
         adapter, "BushProfile", "HubLength", HUB_LENGTH_BAND, display_unit=UNIT
     )

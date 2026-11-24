@@ -89,7 +89,7 @@ from _printed_limits import drilled_limits, limits
 from pd_transgear_arm_geometry import (
     EDGE_LEAN,
     END_HALF_WIDTH,
-    LOCATOR_HOLE_PRINTED_LIMITS_MM,
+    LOCATOR_HOLE_REAMED_LIMITS_MM,
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
     PIN_BORE_DIA,
@@ -99,6 +99,7 @@ from pd_transgear_arm_geometry import (
     PIN_HOLE_DIA_BAND,
     PIN_HOLE_Z,
     PIN_MOUTH_CHAMFER,
+    PIN_MOUTH_CHAMFER_AIM,
     PIN_MOUTH_CHAMFER_LIMITS,
     PIN_STATION,
     PIVOT_BORE_DIA,
@@ -121,7 +122,7 @@ from pd_transgear_arm_spec import (
     GEOMETRIC_CONTROLS,
     GEOMETRIC_TOLERANCES_MM,
     LATCH_PIN_NUMBER,
-    LATCH_PIN_PRESS_PRINTED,
+    LATCH_PIN_PRESS_INTERFERENCE,
     LOCATOR_PRESS_INTERFERENCE,
     PART_DATUMS,
     DRAWING_DIMENSIONS,
@@ -130,13 +131,13 @@ from pd_transgear_arm_spec import (
     ISO_VIEW_SCALE,
     OVERALL_LENGTH,
     PIN_HOLE_DEPTH_BAND,
-    PIN_PRESS_INTERFERENCE,
     SPOT_FACE_DIA_BAND,
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
 )
 from pd_transgear_arm_notes import (
     DIMENSION_CALLOUTS,
+    FLOOR_CALLOUT,
     LOCATOR_CALLOUT_TEXT,
     NOTES,
     NOTES_TEXT,
@@ -145,7 +146,6 @@ from pd_transgear_arm_notes import (
     PIN_MOUTH_CALLOUT,
     PIVOT_BORE_CALLOUT,
     PLATE_TAP_QUALIFIER,
-    SPRING_CALLOUT,
 )
 
 
@@ -250,8 +250,14 @@ FRONT_KEEP = {
     "PivotBoreDia": (0.060, _front_y(PIVOT_END_R) + 0.021),
     # The pin bore's Ø and its callout lines stand below right of the arm,
     # right of the station stack; the upper band holds the tap and locator
-    # callouts.
-    "PinBoreDia": (_front_x(PIN_STATION) + 0.056, _UNDER_FRONT - 0.024),
+    # callouts.  SOLIDWORKS centres the block on this point, midway between
+    # the pin station's extension line, which drops through this band to
+    # the 2.7093 row, and the 5.07 row's at the square end, 120 mm apart:
+    # its widest row, the mate's 32 characters (~84 mm at the 2.61 mm a
+    # character run 20261124T030945233Z printed), stands 18 mm off each
+    # (fit batch reviews: r1's 47-character row struck the first line,
+    # r2's 46-character row, moved right, the second).
+    "PinBoreDia": (_front_x(PIN_STATION) + 0.060, _UNDER_FRONT - 0.024),
     "EndWidth": (_front_x(TIP_STATION) + 0.0115, FRONT_CENTER[1]),
     # Mid-line, or further left: it keeps 12 mm between its centre and the
     # lower 6.850's box, which hangs left of tap 1 (since #2034 moved K, tap 1
@@ -312,10 +318,11 @@ SECTION_KEEP = {
         SECTION_CENTER[1] - 0.016,
     ),
 }
-# Its left edge stands ~12 mm right of the line.  SOLIDWORKS centres its two
-# lines (the value, and the link to note 4 on sheet 2) on this point; 6 mm
-# right of 0.075 since the link names the notes' sheet (round 4).
-FLOOR_TEXT_XY = (0.081, 0.059)
+# Its left edge stands ~12 mm right of the line.  SOLIDWORKS centres its
+# two lines (the value and the spring the floor seats) on this point;
+# 8 mm right of 0.081 since the 25-character mate row replaced the
+# 19-character link to a note.
+FLOOR_TEXT_XY = (0.089, 0.059)
 # Section A-A's column right of the stud bore, where both its frames stand.
 _STUD_FRAME_X = _front_x(PIN_STATION) + 0.012
 END_KEEP = {
@@ -467,7 +474,7 @@ TAP_CALLOUTS = (
 # on the FRONT face, datum A; +X toward the square end; +Y across; +Z through
 # the thickness to the rear face).  Bands are the title block's rows at the
 # places the part authors (DRAWING_PRECISION), the reams their own bands.
-# The traveler makes the outline, the pivot ream (B) and its rear spot face,
+# The traveler makes the outline, the pivot drill (B) and its rear spot face,
 # the pin ream (C) and its rear mouth, and the latch-pin ream; the 2X dowel
 # reams and the 2X 8-32 taps are made at assembly with MHA-PD-19 on
 # (``made_at``), declared so the traveler can name what it leaves.  The
@@ -615,9 +622,10 @@ requirement(
     },
     precision={"angle_ref_deg": _P["FlankAngle"]},
 )
-# Datum B: the pivot bore, Ø.1940 +.0010/.0000 REAM THRU (FRONT_KEEP
-# "PivotBoreDia"), a running fit on the MHA-PD-VN-57 shoulder (note 1).
-_PIVOT_REAM = ((_NOTES, "PIVOT_BORE_CALLOUT"), (_SELF, "FRONT_KEEP"))
+# Datum B: the pivot bore, Ø.196 #9 DRILL THRU (FRONT_KEEP "PivotBoreDia"),
+# a running clearance on the MHA-PD-VN-57 shoulder (note 1); the clearance
+# is the geometry's analysis range, exported for the traveler, not printed.
+_PIVOT_DRILL = ((_NOTES, "PIVOT_BORE_CALLOUT"), (_SELF, "FRONT_KEEP"))
 requirement(
     "pivot_bore",
     kind="hole",
@@ -628,24 +636,25 @@ requirement(
         "axis": ([0.0, 0.0, -1.0], (_FRAME,)),
         "dia": (
             limits(PIVOT_BORE_DIA, _P["PivotBoreDia"], PIVOT_BORE_DIA_BAND, unit=UNIT),
-            ((_GEOM, "PIVOT_BORE_DIA"), (_GEOM, "PIVOT_BORE_DIA_BAND"), *_PIVOT_REAM),
+            ((_GEOM, "PIVOT_BORE_DIA"), (_GEOM, "PIVOT_BORE_DIA_BAND"), *_PIVOT_DRILL),
         ),
         "nominal_dia": (PIVOT_BORE_DIA, ((_GEOM, "PIVOT_BORE_DIA"),)),
-        "process": ("ream", _PIVOT_REAM),
-        "thru": (True, _PIVOT_REAM),
+        "process": ("drill", _PIVOT_DRILL),
+        "thru": (True, _PIVOT_DRILL),
         "datum": ("B", ("PART_DATUMS",)),
         "diametral_clearance": (
             list(PIVOT_BORE_DIAMETRAL_CLEARANCE),
-            ((_GEOM, "PIVOT_BORE_DIAMETRAL_CLEARANCE"), (_NOTES, "NOTES")),
+            ((_GEOM, "PIVOT_BORE_DIAMETRAL_CLEARANCE"),),
         ),
         "mate": ("MHA-PD-VN-57", ((_NOTES, "NOTES"),)),
         "callout": (PIVOT_BORE_CALLOUT, ((_NOTES, "PIVOT_BORE_CALLOUT"),)),
     },
     precision={"dia": _P["PivotBoreDia"]},
 )
-# The rear spot face on the pivot: Ø.500 +.004/.000, its floor .2717 ±.002
-# from the FRONT face (SECTION_KEEP "SpotFaceDia", "FloorDepth"; note 4: it
-# seats and preloads the MHA-PD-VN-63 spring).
+# The rear counterbore on the pivot: ⌴ Ø.50 at the title block's row, its
+# floor .2717 ±.002 from the FRONT face (SECTION_KEEP "SpotFaceDia",
+# "FloorDepth"; the floor's callout: it seats the MHA-PD-VN-63 spring and
+# sets its working height).
 requirement(
     "spot_face",
     kind="counterbore",
@@ -683,13 +692,16 @@ requirement(
             THICKNESS - SPOT_FACE_FLOOR_FROM_FRONT,
             ((_GEOM, "THICKNESS"), (_GEOM, "SPOT_FACE_FLOOR_FROM_FRONT")),
         ),
-        "callout": (SPRING_CALLOUT, ((_NOTES, "SPRING_CALLOUT"),)),
+        "callout": (FLOOR_CALLOUT, ((_NOTES, "FLOOR_CALLOUT"),)),
     },
     precision={"dia": _P["SpotFaceDia"], "floor": _P["FloorDepth"]},
 )
-# Datum C: the pin bore, Ø.1260 +.0005/.0000 REAM THRU (FRONT_KEEP
+# Datum C: the pin bore, Ø.126 REAM THRU with no band (FRONT_KEEP
 # "PinBoreDia"), 2.7093 BASIC from B, ⌖ Ø.004 A|B and ⊥ Ø.001 A (section
-# A-A); note 5: the MHA-PD-23 pin's land is turned to the measured ream.
+# A-A); its callout: the MHA-PD-23 pin is a bonded fit at the printed
+# clearance.  ``dia`` carries the geometry's ANALYSIS band (what the reamer
+# is modelled to cut) because the traveler's adapter and cam.py bind a
+# band; no step quotes it as an acceptance.
 _PIN_REAM = ((_NOTES, "PIN_BORE_CALLOUT"), (_SELF, "FRONT_KEEP"))
 requirement(
     "pin_bore",
@@ -716,15 +728,12 @@ requirement(
             GEOMETRIC_TOLERANCES_MM["perpendicularity"], ("GEOMETRIC_CONTROLS",)
         ),
         "perpendicularity_datums": ("A", ("GEOMETRIC_CONTROLS",)),
-        "diametral_interference": (
-            list(PIN_PRESS_INTERFERENCE), ("PIN_PRESS_INTERFERENCE", (_NOTES, "NOTES"))
-        ),
-        "mate": ("MHA-PD-23", ((_NOTES, "NOTES"),)),
+        "mate": ("MHA-PD-23", ((_NOTES, "PIN_BORE_CALLOUT"),)),
         "callout": (PIN_BORE_CALLOUT, ((_NOTES, "PIN_BORE_CALLOUT"),)),
     },
     precision={"dia": _P["PinBoreDia"], "station_basic": _P["PinStation"]},
 )
-# The pin bore's rear mouth (opposite datum A): .008 ±.002 X 45° (section
+# The pin bore's rear mouth (opposite datum A): .006 MIN X 45° (section
 # D-D PIN_SECTION_KEEP "PinMouthChamfer"), clearing the MHA-PD-23 seat fillet.
 requirement(
     "pin_mouth",
@@ -736,7 +745,7 @@ requirement(
             list(PIN_MOUTH_CHAMFER_LIMITS),
             ((_GEOM, "PIN_MOUTH_CHAMFER_LIMITS"), (_SELF, "PIN_SECTION_KEEP")),
         ),
-        "leg_nominal": (PIN_MOUTH_CHAMFER, ((_GEOM, "PIN_MOUTH_CHAMFER"),)),
+        "leg_nominal": (PIN_MOUTH_CHAMFER_AIM, ((_GEOM, "PIN_MOUTH_CHAMFER_AIM"),)),
         "angle_deg": (45.0, ((_NOTES, "PIN_MOUTH_CALLOUT"),)),
         "edge_of": ("pin_bore", ((_NOTES, "PIN_MOUTH_CALLOUT"),)),
         "at_face": ("rear_face", ((_NOTES, "PIN_MOUTH_CALLOUT"),)),
@@ -744,10 +753,12 @@ requirement(
     },
     precision={"leg": _P["PinMouthChamfer"]},
 )
-# The latch-pin hole, reamed blind along -X into the square end: Ø.1250
-# -.0005/-.0010 REAM, full diameter (.38) MIN deep over a drill point
+# The latch-pin hole, reamed blind along -X into the square end: Ø.1240
+# REAM, no printed band, full diameter (.38) MIN deep over a drill point
 # (END_KEEP "PinHoleDia", SECTION_KEEP "PinHoleDepth"), .188 from face A
-# (END_KEEP "PinHoleZ"); note 3: the MHA-PD-VN-58 press.
+# (END_KEEP "PinHoleZ"); note 3: the MHA-PD-VN-58 dowel does not enter by
+# hand.  "dia" and the interference are the spec's ANALYSIS numbers (what
+# the set reamer is modelled to cut), not printed limits.
 _LATCH_REAM = ((_NOTES, "PIN_HOLE_CALLOUT"), (_SELF, "END_KEEP"))
 requirement(
     "latch_pin_hole",
@@ -776,17 +787,18 @@ requirement(
         "height_nominal": (PIN_HOLE_Z, ((_GEOM, "PIN_HOLE_Z"),)),
         "height_from": ("front_face", ((_SELF, "END_KEEP"),)),
         "diametral_interference": (
-            list(LATCH_PIN_PRESS_PRINTED), ("LATCH_PIN_PRESS_PRINTED", (_NOTES, "NOTES"))
+            list(LATCH_PIN_PRESS_INTERFERENCE), ("LATCH_PIN_PRESS_INTERFERENCE",)
         ),
         "mate": (LATCH_PIN_NUMBER, ("LATCH_PIN_NUMBER",)),
         "callout": (PIN_HOLE_CALLOUT, ((_NOTES, "PIN_HOLE_CALLOUT"),)),
     },
     precision={"dia": _P["PinHoleDia"], "depth": _P["PinHoleDepth"], "height": _P["PinHoleZ"]},
 )
-# The 2X dowel holes: Ø.0930 +.0005/.0000 2X REAM THRU (FRONT_KEEP
+# The 2X dowel holes: Ø.1240 2X REAM THRU, no printed band (FRONT_KEEP
 # "LocatorDia1"), BASIC sites (LocatorX1, LocatorY1, LocatorY2) under ⌖ Ø.004
 # A|B|C.  Note 2: match-drilled with MHA-PD-19 and reamed at assembly
-# (MHA-PD-00); this traveler does not make them.
+# (MHA-PD-00); this traveler does not make them.  "dia" and the
+# interference are the spec's ANALYSIS numbers, not printed limits.
 _LOCATOR_SOURCES = ((_GEOM, "LOCATOR_SITES_MM"), "BASIC_REDUCER_DIMENSIONS")
 requirement(
     "dowel_holes",
@@ -802,15 +814,15 @@ requirement(
         "station_basic": (LOCATOR_SITES_MM[0][0], _LOCATOR_SOURCES),
         "offset_basic": (abs(LOCATOR_SITES_MM[0][1]), _LOCATOR_SOURCES),
         "dia": (
-            list(LOCATOR_HOLE_PRINTED_LIMITS_MM),
-            ((_GEOM, "LOCATOR_HOLE_PRINTED_LIMITS_MM"), (_SELF, "FRONT_KEEP")),
+            list(LOCATOR_HOLE_REAMED_LIMITS_MM),
+            ((_GEOM, "LOCATOR_HOLE_REAMED_LIMITS_MM"), (_SELF, "FRONT_KEEP")),
         ),
         "dia_ref": (LOCATOR_HOLE_DIA_MM, ((_GEOM, "LOCATOR_HOLE_DIA_MM"),)),
         "thru": (True, ((_NOTES, "LOCATOR_CALLOUT_TEXT"),)),
         "position_dia_max": (GEOMETRIC_TOLERANCES_MM["position"], ("GEOMETRIC_CONTROLS",)),
         "position_datums": ("A|B|C", ("GEOMETRIC_CONTROLS",)),
         "diametral_interference": (
-            list(LOCATOR_PRESS_INTERFERENCE), ("LOCATOR_PRESS_INTERFERENCE", (_NOTES, "NOTES"))
+            list(LOCATOR_PRESS_INTERFERENCE), ("LOCATOR_PRESS_INTERFERENCE",)
         ),
         "made_at": ("assembly", ((_NOTES, "NOTES"),)),
         "made_with": ("MHA-PD-19", ((_NOTES, "NOTES"),)),

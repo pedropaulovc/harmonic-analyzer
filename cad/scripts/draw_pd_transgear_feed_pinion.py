@@ -238,7 +238,9 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
     # the bore dimension's lower extension line (r1, r3).
     "OutsideDia": (_REAR_X - 0.044, RIGHT_CENTER[1]),
     "BossDia": (_NOSE_X + BOSS_TEXT_OFFSET, RIGHT_CENTER[1]),
-    "BoreDia": (_REAR_X - 0.010, _SIDE_TOP + 0.040),
+    # 4 mm right of its r1 place: the 32-character mate row stands off the
+    # gear data block on its left.
+    "BoreDia": (_REAR_X - 0.006, _SIDE_TOP + 0.040),
     # The tooth length's band and its mate's row make a two-row text,
     # centred on its point.
     "FaceWidth": (_left_of(_REAR_X, _FACE_WIDTH_TEXT_WIDTH), _SIDE_BOTTOM - 0.0099),

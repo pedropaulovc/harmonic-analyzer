@@ -1,0 +1,85 @@
+# Necessity register for MHA-PD-00 (drawing-guidelines.md rules 4 and 22):
+# the assembly settings banded tighter than their title-block row. Read by
+# the machinist review only. Owner ruling 2026-11-24: "In the part's registry
+# file, not on the sheet."
+necessity:
+  - id: N-01
+    feature: "sheet 13 DETAIL J and step 3B, rack crests .100 ±.002 below the platen's bottom edge"
+    kind: mesh
+    reason: "sets the feed rack's mesh depth on the feed pinion"
+    source: "pd_paper_drive_assembly_steps.RACK_CREST_TOL (pd_platen_bottom_guide_spec.CREST_SET_BAND); the feed mesh's datum pitch-line distance sets the crest drop"
+  - id: N-02
+    feature: "step 26P and setting table row 16, rack crests at the two ends WITHIN .001 of each other"
+    kind: mesh
+    reason: "crest drift takes the feed mesh's contact ratio under one"
+    source: "pd_paper_drive_assembly_steps.LEVEL_RACK_CREST_DRIFT, FEED_WORST_CASE_MESH: the one term the fitter controls when the steady-advance check fails with every part inside its sheet"
+  - id: N-03
+    feature: "step 27G and setting table row 17, disc tooth CENTRED WITHIN .002 in a knob pinion gap"
+    kind: mesh
+    reason: "off centre, the reducer mesh's shake reading is false"
+    source: "_gear_quality.reducer_setup_clock_deviation_mm; exception PD-00-knob-setting-true"
+  - id: N-04
+    feature: "sheet 7 DETAIL K, S to N 1.7242 +.002/-.001"
+    kind: mesh
+    reason: "sets the reducer mesh's centre distance"
+    source: "pd_rack_pinion_spec.CENTRE_DISTANCE_SET_BAND_IN, CENTRE_DISTANCE_TRIAL_BAND_IN; owner ruling 2026-11-08, #2144 item 5.3; owner ruling 2026-11-24, fit audit part 2 C1 (the trial may move the plate within +.002/-.001)"
+  - id: N-05
+    feature: "setting table row 9 (12N, 13W, 27K), disc shake (THE NEEDLE MOVES), .008 MAX at the tooth in mesh"
+    kind: mesh
+    reason: "sets the reducer mesh's backlash"
+    source: "draw_pd_paper_drive_assembly.REDUCER_SHAKE_MAX_MM; owner ruling 2026-11-24, fit audit part 2 C2 (the .0005 floor retired)"
+  - id: N-06
+    feature: "setting table row 22 (22M, 33B), knob end float .006 TO .010"
+    kind: gap
+    reason: "keeps the knob shaft's end float open"
+    source: "pd_transgear_knob_shaft_spec.END_FLOAT, END_FLOAT_SET_TOL"
+  - id: N-07
+    feature: "steps 9C, 9N and setting table row 6, MHA-PD-06 O.D. then tooth spaces .002 TIR MAX on the mandrel"
+    kind: mesh
+    reason: "disc run-out swings the reducer mesh's backlash once a turn"
+    source: "pd_rack_pinion_spec.TOOTH_SPACE_RUNOUT_TIR_MM; exception PD-00-disc-tir-sample covers only the sampling"
+  - id: N-08
+    feature: "sheet 6 DETAIL E and steps 19C, 33H, ring to front bushing .008 +.006/.000"
+    kind: gap
+    reason: "sets the sleeve cluster's end float on the shims"
+    source: "#2124 (owner ruling 2026-11-01): the ring gap read on a feeler, cluster rearward, and shimmed"
+  - id: N-09
+    feature: "steps 7A-7D and setting table row 5, lock front face to bar back face .002 TO .009"
+    kind: gap
+    reason: "bounds the platen's float forward toward the disc"
+    source: "pd_platen_guide_spec.LOCK_GAP_FIT (R9-47)"
+  - id: N-10
+    feature: "step 21A and setting table row 13, collar pilot .002 TO .006 proud of each MHA-PD-09 wheel"
+    kind: gap
+    reason: "leaves the wheel free under the thumbnut's seat"
+    source: "pd_transgear_drive_collar_spec.PILOT_PROUD_RANGE (R9-70)"
+  - id: N-11
+    feature: "steps 5D, 5E and setting table rows 2-4, MHA-PD-12 hole marks .151 TO .159, .153 TO .161, .705 TO .713"
+    kind: gap
+    reason: "keeps the lock's hole walls inside their judged band"
+    source: "draw_pd_paper_drive_assembly.GUIDE_LOCK_MARK_BAND_MM: the holes' printed .XXX location band less the transfer's own .001 (delegated per-joint ruling, owner review #2144)"
+  - id: N-12
+    feature: "step 14B and setting table row 10, MHA-PD-VN-56 tips FLUSH TO .008 proud of the arm front"
+    kind: gap
+    reason: "a prouder tip closes the latched hanger's sweep clearance"
+    source: "transgear_hanger_joints.PLATE_SCREW_CUT_PROUD_MAX; build_pd_paper_drive_assembly lock sweep, plate-screw tip"
+  - id: N-13
+    feature: "step 16 and setting table row 12, MHA-SH-VN-59 (item 34) tips .000 TO .008 below the disc rear face"
+    kind: gap
+    reason: "a proud tip strikes the platen behind the disc"
+    source: "pd_transgear_disc_screw_spec.TIP_BELOW_REAR_FACE (R9-47)"
+  - id: N-14
+    feature: "step 20A and sheet 13 DETAIL F, MHA-PD-VN-54 dowels .091 TO .098 proud of the collar front"
+    kind: gap
+    reason: "pins drive the wheel's full plate under the thumbnut"
+    source: "pd_vn_transgear_knob_drive_pin_spec.PROUD_RANGE, PROUD_SET_TOL; reason read from the spec by the spacer fix agent, for the collar family to confirm"
+  - id: N-15
+    feature: "step 11Q and setting table row 8, MHA-PD-28 bore REAM Ø.2490 THRU, running fit on the MHA-PD-08 journal"
+    kind: mesh
+    reason: "journal play opens the reducer mesh's centre distance"
+    source: "pd_transgear_knob_bush_geometry.BORE_DIA; the journal is turned to the reamed bore (rule 4 form 2)"
+  - id: N-16
+    feature: "step 11M and setting table row 7, MHA-PD-28 shoulder on MHA-PD-19: .002 FEELER DOES NOT ENTER"
+    kind: gap
+    reason: "an open seat closes the collar-to-disc air"
+    source: "no longer required after fit audit question 5; loosening tracked in issue (pending). pd_transgear_knob_bush_geometry.SHOULDER_SEAT_GAP_MAX: at .004 (.002 looser) the MHA-PD-22 to MHA-PD-06 statistical air is 0.1601 mm against its 0.1016 floor (0.1880 at .002); loosening moves no gate, only paper_drive_arm_registration.S_/K_PROJECTED_HEIGHT_MM (printed on MHA-PD-18/19) by .002"

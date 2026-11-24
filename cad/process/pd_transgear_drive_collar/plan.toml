@@ -1,42 +1,62 @@
 # Transgear drive collar MHA-PD-22, one off, from the 7/8 in C36000 bar on
 # hand (cad/config/shop-equipment/stock-bought.toml c360-round-7-8, a 7 in
 # piece shared with other parts). Turned on the manual PM-1127VF-LB (owner
-# ruling 2026-11-21: turned parts get lathe travelers, no NC); the three
-# axial holes drilled and reamed on the PM-30MV CNC (CM01).
+# ruling 2026-11-21: turned parts get lathe travelers, no NC), the
+# bore drilled #11 on the lathe; the three small axial holes drilled and
+# reamed on the PM-30MV CNC (CM01).
 # Route, chosen for speed (owner ruling 2026-11-21: the agent picks):
 # - Setup 1, lathe, the bar in the 3-jaw, Z0 the faced pilot end: turn the
 #   outside Ø.687 back past the parting line, the pilot Ø.390 to its .140
-#   supply length (the shoulder faced square: the seat face), spot, drill #14
-#   and ream .1920 through past the parting line in the same chucking, part
-#   the body off at its .300 supply length. The body (.292 MIN) and the
-#   pilot (.134 MIN) are supplied long: MHA-PD-00 faces both to fit (sheet
-#   notes 3 and 4), so the parted rear face is not faced again.
+#   supply length (the shoulder faced square: the seat face), spot and drill
+#   #11 through past the parting line in the same chucking, part the body
+#   off at its .300 supply length. The body (.292 MIN) and the pilot
+#   (.134 MIN) are supplied long: MHA-PD-00 faces both to fit (sheet notes 5
+#   and 6), so the parted rear face is not faced again.
 # - Setup 2, PM-30MV, vise: the collar seat face down on two stacked
 #   parallels against each jaw, the pilot hanging between them, gripped on
-#   the outside; G54 X0 Y0 swept true to the bore with the DTI (the dowel
-#   centres are held ±.0009 from the bore's axis), Z0 the rear face. CM01
-#   spots, drills #43 and reams the 2X .0930 dowel holes through, then
-#   drills #53 and reams the .0615 flat-pin hole blind to its floor, all on
-#   one line through the axis.
+#   the outside; G54 X0 Y0 swept true to the drilled bore with the DTI, Z0
+#   the rear face. CM01 spots, drills #43 and reams the 2X .0930 dowel holes
+#   through, then drills #53 and reams the .0615 flat-pin hole blind to its
+#   floor, all on one line through the axis.
 # - Setup 3, bench: deburr, clear the flat-pin breakthrough from the bore,
-#   check every hole and the dowel centres over pins, oil.
+#   check the flat pin's centre over pins and its floor, press the
+#   MHA-PD-VN-70 flat pin to the floor, oil. The pin is pressed here, not at
+#   MHA-PD-00: MHA-PD-08's D-flat is milled to this collar with its pin
+#   pressed (MHA-PD-08 note 2), and that shaft is needed finished before the
+#   collar's own assembly step (Codjiflo P2 on #3485). Collar and pin leave
+#   this traveler as one permanent pair.
 # Left to MHA-PD-00 (final op): the MHA-PD-VN-54 dowel presses (step 20A),
-# the MHA-PD-VN-70 flat-pin press (20C), the pilot faced to fit (21A), the
-# rear faced to fit (29D) and the rear bore mouth's .008 X 45° break through
-# the pin (29E).
+# the pressed flat pin checked (20C), the three MHA-PD-09 wheels tried on
+# the dowels (20E), the pilot faced to fit (21A), the rear faced to fit (29D)
+# and the rear bore mouth's .008 X 45° break through the pin (29E).
 #
-# Not on hand (to order): the .1920, .0930 and .0615 chucking reamers
-# (cad/config/shop-equipment/tools-reamers-taps.toml reamer-1920,
-# reamer-0930, reamer-0615) and the Class ZZ pins for the three .0005 bands:
-# .1920 plus / .1925 minus (zz-pins-1920-1925), .0930 plus / .0935 minus
-# (zz-pins-0930-0935) and .0615 plus / .062 minus (zz-pins-0615-0620).
+# Owner ruling 2026-11-24, fit audit questions 7 (the bore drilled, the
+# D-core turned to it) and 8 (the dowel centres by trial); the reams to the
+# bought pins rest on drawing-guidelines rule 4 (owner, 2026-11-23: "can the
+# holes not be reamed in the first place"):
+# - The bore is the #11 drill's (the title block's DRILLED HOLES row);
+#   MHA-PD-08's D-core is turned to slide in it. No .1920 reamer, no pins
+#   for a .0005 bore band.
+# - The dowel holes and the flat pin's hole are reamed to the bought pins,
+#   which are their gauges: none enters by hand. No band is gauged, no pin
+#   or reamer is miked, no trial hole is reamed. A pin that does enter by
+#   hand is in a hole of unknown size (the pins' least sizes lie over the
+#   whole of what the reamers are taken to cut), so no bonded clearance can
+#   be stated for it: the collar is scrap (the sheet's note 3; Codjiflo P2
+#   on #3485 removed the bond salvage).
+# - The dowel centres are the program's targets: their acceptance is the
+#   three MHA-PD-09 wheels dropping on at MHA-PD-00 (20E), never a reading
+#   over pins here. The flat pin's centre keeps its printed ±.002: it is
+#   read over set pins (Setup 3) and accepted inside that band less the
+#   reading's .0012 bias each side.
+# - The feature export still binds limits for the reamed sizes and the dowel
+#   centres (the adapter requires them): they are the spec's ANALYSIS bands
+#   and no step here accepts by them.
 #
-# Owner ruling 2026-11-23 (tool audit Q1, re-answered), verbatim: "ZZ singles
-# per the record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept
-# that good holes near a limit may be refused; the traveler mikes each pin so
-# the real window is known per pin." Setup 1 mikes every pin and reamer
-# first; Setup 3's over-pins readings take off the GO pins' written
-# readings, not their nominal sizes.
+# Not on hand (to order): the .0930 and .0615 chucking reamers
+# (cad/config/shop-equipment/tools-reamers-taps.toml reamer-0930,
+# reamer-0615) and the .001-step pin gauge set (gauges.toml pin-gauges; the
+# bore's .191 and .195, the .093 and .061 for the flat pin's centre).
 #
 # NC (cad/process/pd_transgear_drive_collar/cam.py): CM01_holes. Program
 # names, the [parameters] and the milling_cuts names are a contract with that
@@ -48,7 +68,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass, 7/8 in round (drawing: {{cad.material_name}})"
 stock = "Lot: {{process.quantity:d}} collar. Ø{{process.bar_dia_in:.3dot}} bar, on hand; Setup 1 takes about {{process.bar_use_in:.2dot}} in of it: saw a 3 in piece off it for the lathe, never the whole bar (it would run out past the spindle's rear end)."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); mill PM-30MV low belt (100–2800 rpm). Brass cut dry. The body and the pilot leave this traveler long (supply {{cad.rear_face_supply_length_min_mm:in.3dot}} and {{cad.pilot_face_supply_length_min_mm:in.3dot}} MIN): MHA-PD-00 faces both to fit. Home the mill ($H) and touch off G54 at the start of the mill setup; prove CM01 in air before it cuts. To order (not on hand): the .1920, .0930 and .0615 reamers and the Class ZZ pins .1920 plus/.1925 minus, .0930 plus/.0935 minus and .0615 plus/.062 minus (GO/NO-GO)."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); mill PM-30MV low belt (100–2800 rpm). Brass cut dry. The body and the pilot leave this traveler long (supply {{cad.rear_face_supply_length_min_mm:in.3dot}} and {{cad.pilot_face_supply_length_min_mm:in.3dot}} MIN): MHA-PD-00 faces both to fit. Home the mill ($H) and touch off G54 at the start of the mill setup; prove CM01 in air before it cuts. The reamed holes' gauges are their own pins (2 MHA-PD-VN-54 dowels, 1 MHA-PD-VN-70 pin): have them at the mill. To order (not on hand): the .0930 and .0615 reamers and the .001-step pin gauge set."
 shop = "../shop"
 stock_refs = ["c360-round-7-8"]
 material_key = "lathe-c360"
@@ -88,10 +108,10 @@ body_min_in = 0.297
 body_max_in = 0.303
 # Setup 1 turns the outside this far back from Z0, past the parting line.
 outer_run_in = 0.55
-# The #14 runs its full diameter, the reamer its end, past the parting line.
+# The #11 runs its full diameter past the parting line, in pecks under its
+# own diameter.
 drill_run_in = 0.58
-ream_run_in = 0.56
-peck_14_in = 0.18
+peck_11_in = 0.18
 # The P1 cutoff blade's width: its record (cad/config/shop-equipment/
 # tools-cutting.toml tools.cutoff-blade-p1 width_in, the makers' 1/16 in).
 blade_width_in = 0.0625
@@ -112,10 +132,11 @@ parallel_stack_mm = 38.1
 parallel_thickness_mm = 3.175
 parallel_gap_mm = 11.0992
 rear_over_jaws_mm = 0.7747
-# Spots with the #2 centre drill, one size for all three holes: Ø.040 on
+# Spots with the #2 centre drill, one size for all three holes: Ø.030 on
 # its pilot's point, under both the #53 (.0595) and the #43 (.089), and
-# clear of the bore's edge beside the flat pin (cam.py checks both).
-spot_dia_mm = 1.016
+# .0055 clear of the largest drilled bore's edge (.195) beside the flat pin
+# (Ø.040 left .0005 there); cam.py checks both.
+spot_dia_mm = 0.762
 # Dowels: the #43's full diameter 1.0 mm past the seat face, the reamer's end
 # 1.5 mm past it (its full diameter past the face with the 45° bevel lead),
 # both into the gap between the stacks. Pecks under each drill's diameter.
@@ -139,38 +160,26 @@ flat_ream_tip_mm = -5.715
 # Each tool at least this far out of the chuck: the deepest tip below Z0
 # plus 5 mm of clearance over the rear face (cam.py checks it).
 tool_out_min_in = 0.6
-# The dowel centres over pins (Setup 3): the bore's .1920 GO pin and a dowel
-# hole's .0930 GO pin, half the sum of their written readings; the flat
-# pin's centre from a dowel's over the .0930 and the .0615 GO pins, half the
-# sum of theirs. The two constants are those sums at the nominal sizes
-# (.07725 printed to 4 places), printed as a cross-check on the arithmetic.
-over_pins_half_sum_in = 0.1425
-over_flat_half_sum_in = 0.0773
-# An accepted hole is under its NO-GO pin's reading (at most the band's top)
-# and over its GO pin's (at least the band's bottom), so each GO pin stands
-# less than .0005 under its hole (.1920 in .1920-.1925, .0930 in .0930-.0935,
-# .0615 in .0615-.0620), as with the Class X plugs, and the anvils push both
-# pins toward each other: an over-pins reading is low by up to the two
-# half-clearances, .00025 + .00025 = over_plugs_clearance_max_in. The dowel
-# acceptance is the sheet's .2747-.2765 with that taken off its top (the
-# reading can only be low): .2747-.2760. The flat pin's centre, D + .0773 -
-# R, is biased either way by up to the same .0005 (D low, R low), so its
-# acceptance is the sheet's .116-.120 with .0005 off each end: .1165-.1195.
-over_plugs_clearance_max_in = 0.0005
-# The Class ZZ pins (header): each GO a plus pin, true size its band's low
-# limit to .0002 over; each NO-GO a minus pin, .0002 under its high limit to
-# it. The most a usable GO pin reads and the least a usable NO-GO does
-# (.1922/.1923, .0932/.0933, .0617/.0618): with both there, only that .0001
-# is sure to pass.
-bore_go_pin_max_mm = 4.88188
-bore_nogo_pin_min_mm = 4.88442
-dowel_go_pin_max_mm = 2.36728
-dowel_nogo_pin_min_mm = 2.36982
-flat_go_pin_max_mm = 1.56718
-flat_nogo_pin_min_mm = 1.56972
-dowel_accept_max_in = 0.276
-flat_accept_min_in = 0.1165
-flat_accept_max_in = 0.1195
+# The flat pin's centre over pins (Setup 3), with the .001-step set's pins
+# at their marked sizes: D, a dowel hole's centre from the bore's axis, is
+# the reading over the bore's pin (the largest that enters) and the .093
+# pin less half the sum of those two sizes; R is the reading over the .093
+# and the .061 pins; the centre is D + over_flat_half_sum_in - R, the
+# constant half of .093 + .061.
+over_flat_half_sum_in = 0.077
+# The pins stand loose in their holes and up to .0002 under their marked
+# sizes, so a reading can sit up to over_pins_bias_in off the true centre,
+# and re-seating the pins does not remove it (the anvils push both pins
+# toward each other). So the reading is accepted only inside the sheet's
+# .116-.120 less that bias each side (Codjiflo round 2 on #3485): a reading
+# there proves the true centre inside the print, which N-03 and RV-03 rest
+# on. test_pd_transgear_drive_collar_process derives the window from the
+# spec's FLAT_PIN_CENTRE and FLAT_PIN_CENTRE_TOL.
+over_pins_bias_in = 0.0012
+flat_centre_accept_min_in = 0.1172
+flat_centre_accept_max_in = 0.1188
+flat_centre_accept_min_mm = 2.97688
+flat_centre_accept_max_mm = 3.01752
 # Speeds and feeds: the shop settings (cad/process/shop/pd.toml, the
 # MHA-PD-22 block, sourced there): spot, #43 and #53 2800 rpm × .001 in/rev
 # = 2.8 in/min; the reamers 1400 × .001 = 1.4 in/min. cam.py refuses a feed
@@ -190,15 +199,9 @@ name = "No. 3 centre drill"
 ref = "centre-drills-carbide-60"
 
 [[tools]]
-id = "drill-14"
-name = "#14 drill"
-ref = "drill-14"
-
-[[tools]]
-id = "reamer-1920"
-name = ".1920 chucking reamer"
-ref = "reamer-1920"
-status = "to_order"
+id = "drill-11"
+name = "#11 drill"
+ref = "drill-11"
 
 [[tools]]
 id = "cutoff"
@@ -233,21 +236,9 @@ ref = "reamer-0615"
 status = "to_order"
 
 [[tools]]
-id = "zz-1920"
-name = "Class ZZ pins: .1920 plus (GO) and .1925 minus (NO-GO)"
-ref = "zz-pins-1920-1925"
-status = "to_order"
-
-[[tools]]
-id = "zz-0930"
-name = "Class ZZ pins: .0930 plus (GO) and .0935 minus (NO-GO)"
-ref = "zz-pins-0930-0935"
-status = "to_order"
-
-[[tools]]
-id = "zz-0615"
-name = "Class ZZ pins: .0615 plus (GO) and .062 minus (NO-GO)"
-ref = "zz-pins-0615-0620"
+id = "pin-gauges"
+name = "Pin gauges, .001 steps: the bore's .191 and .195, the .093 and the .061"
+ref = "pin-gauges"
 status = "to_order"
 
 [[tools]]
@@ -255,44 +246,21 @@ id = "files"
 name = "Files"
 ref = "jig-files"
 
+[[tools]]
+id = "arbor-press"
+name = "Arbor press, 1 ton"
+ref = "arbor-press"
+
 [[setups]]
 machine_kind = "lathe"
-title = "Bar: turn the outside and the pilot, drill and ream the bore, part off"
+title = "Bar: turn the outside and the pilot, drill the bore, part off"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.bar_dia_in:.3dot}} bar, {{process.stickout_mm:in.2dot}} in out of the jaw fronts (rule)."
-datum = "Z0 (carriage DRO): the bar end faced in Op 50, the pilot's front face."
-diagram = { file = "diagrams/bar.svg", alt = "The 7/8 in bar in the 3-jaw: the end faced (Z0, the pilot's front face), the outside turned Ø.687 back past the parting line, the pilot Ø.390 turned .140 long, the bore drilled and reamed through past the parting line; the collar parted off .44 from Z0." }
+datum = "Z0 (carriage DRO): the bar end faced in Op 10, the pilot's front face."
+diagram = { file = "diagrams/bar.svg", alt = "The 7/8 in bar in the 3-jaw: the end faced (Z0, the pilot's front face), the outside turned Ø.687 back past the parting line, the pilot Ø.390 turned .140 long, the bore drilled #11 through past the parting line; the collar parted off .44 from Z0." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = 22.225, stock_diameter_mm = 22.225, stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{cad.pilot_dia_least_mm}}", support = "none" }
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Before any ream: on the .0001 micrometer, mike the .1920 plus GO pin, the .1925 minus NO-GO pin and the .1920 reamer (across two opposite margins at its front); each reading is good to ±.00005. Write the three on this sheet and each pin's on its tag."
-inspection = "GO pin {{cad.bore_dia_min_in:.4dot}}–{{process.bore_go_pin_max_mm:in.4dot}}, NO-GO pin {{process.bore_nogo_pin_min_mm:in.4dot}}–{{cad.bore_dia_max_in:.4dot}}; a pin outside that is not used: stop and tell the owner. Accept a bore from the GO pin's reading to under the NO-GO's. Owner ruling 2026-11-23: 'Accept that good holes near a limit may be refused' (sure to pass: {{process.bore_go_pin_max_mm:in.4dot}}–{{process.bore_nogo_pin_min_mm:in.4dot}} only)."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.bore_dia_band_mm}}" }]
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "The same for the dowel holes: mike the .0930 plus GO pin, the .0935 minus NO-GO pin and the .0930 reamer; write the three here and each pin's on its tag."
-inspection = "GO pin {{cad.dowel_a_dia_min_in:.4dot}}–{{process.dowel_go_pin_max_mm:in.4dot}}, NO-GO pin {{process.dowel_nogo_pin_min_mm:in.4dot}}–{{cad.dowel_a_dia_max_in:.4dot}}; a pin outside that is not used: stop and tell the owner. Only {{process.dowel_go_pin_max_mm:in.4dot}}–{{process.dowel_nogo_pin_min_mm:in.4dot}} is sure to pass."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.dowel_a_dia_band_mm}}" }]
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "The same for the flat pin's hole: mike the .0615 plus GO pin, the .062 minus NO-GO pin and the .0615 reamer; write the three here and each pin's on its tag."
-inspection = "GO pin {{cad.flat_pin_hole_dia_min_in:.4dot}}–{{process.flat_go_pin_max_mm:in.4dot}}, NO-GO pin {{process.flat_nogo_pin_min_mm:in.4dot}}–{{cad.flat_pin_hole_dia_max_in:.4dot}}; a pin outside that is not used: stop and tell the owner. Only {{process.flat_go_pin_max_mm:in.4dot}}–{{process.flat_nogo_pin_min_mm:in.4dot}} is sure to pass."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.flat_pin_hole_dia_band_mm}}" }]
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Only if a reamer read under its GO pin: before Op 50, in the bar's end from the tailstock, spot the centre; then for each such reamer, smallest first, drill .30 deep (#53 for the .0615, #43 for the .0930, #14 for the .1920) and ream .25 deep (the small two at 1400 rpm, the .1920 as Op 110). Gauge each trial hole with its pins, then part .40 off the bar's end and set it out again as Holding says."
-inspection = "Each trial hole: GO enters, NO-GO does not: go on. GO refused: that reamer's holes will be refused: stop and tell the owner."
-gauge_checks = [{ gauge = "zz-pins-0615-0620", band_mm = "{{cad.flat_pin_hole_dia_band_mm}}" }, { gauge = "zz-pins-0930-0935", band_mm = "{{cad.dowel_a_dia_band_mm}}" }, { gauge = "zz-pins-1920-1925", band_mm = "{{cad.bore_dia_band_mm}}" }]
-feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -330,7 +298,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.pilot_dia_band_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Outside or pilot over its band in Op 60 or Op 70: another finish pass, mike again. The seat face under {{process.pilot_supply_min_in:.3dot}} from Z0: face the step again, a little deeper, and re-measure. Outside or pilot under its band, or the seat face over {{process.pilot_supply_max_in:.3dot}}: part the turned length off as scrap and start again at Op 50."
+instruction = "Outside or pilot over its band in Op 20 or Op 30: another finish pass, mike again. The seat face under {{process.pilot_supply_min_in:.3dot}} from Z0: face the step again, a little deeper, and re-measure. Outside or pilot under its band, or the seat face over {{process.pilot_supply_max_in:.3dot}}: part the turned length off as scrap and start again at Op 10."
 feed = "hand"
 
 [[setups.operations]]
@@ -339,42 +307,32 @@ speed_kind = "spindle"
 tool = "centre"
 drilling = "none"
 sizing = "other"
-instruction = "Spot the centre from the tailstock with the No. 3 centre drill, about Ø.16 across: under the #14, so the drill removes it."
+instruction = "Spot the centre from the tailstock with the No. 3 centre drill, about Ø.16 across: under the #11, so the drill removes it."
 settings = "lathe-centre-c360"
 cut_diameter_mm = 4.064
 
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "drill-14"
+tool = "drill-11"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Feed the #14 in until its lips touch the spot's rim; zero the tailstock quill scale. Drill until it reads {{process.drill_run_in:.2dot}}, backing fully out to clear chips every {{process.peck_14_in:.2dot}}: blind into the bar past the parting line. It leaves the reamer about .005 a side."
-settings = "lathe-drill-14-c360"
-cut_diameter_mm = 4.6228
+instruction = "Feed the #11 in until its lips touch the spot's rim; zero the tailstock quill scale. Drill until it reads {{process.drill_run_in:.2dot}}, backing fully out to clear chips every {{process.peck_11_in:.2dot}}: blind into the bar past the parting line. This is the finished bore (the sheet's #11 DRILL THRU): a sharp drill, a light steady feed, no dwell."
+settings = "lathe-drill-11-c360"
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
 hole_depth_mm = 14.732
 peck = { step_mm = 4.572, retract = "full" }
 
 [[setups.operations]]
 cut_kind = "other"
-speed_kind = "spindle"
-tool = "reamer-1920"
-drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Ream .1920 from the tailstock, spindle running: feed the reamer in until its lead chamfer meets the hole's mouth, zero the quill scale, feed slowly until it reads {{process.ream_run_in:.2dot}} (past the parting line), and withdraw with the spindle still running."
-settings = "lathe-ream-1920-c360"
-cut_diameter_mm = "{{cad.bore_dia_mm}}"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Still chucked, the bore blown out and wiped: GO enters the full .44, NO-GO does not enter (both ends are checked again at the bench, Op 290)."
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "zz-pins-1920-1925", band_mm = "{{cad.bore_dia_band_mm}}" }]
+instruction = "Still chucked, the bore blown out and wiped: the set's .191 pin enters the full .44; the .195 pin does not enter. MHA-PD-08's D-core is turned to slide in this bore, so no closer size is read."
+inspection = "Bore Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}} (the title block's DRILLED HOLES row)."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "GO refused in Op 120: blow out the chips, oil the reamer, run it through once more and gauge again. Still refused (the pins cannot show the bore at or over {{cad.bore_dia_min_in:.4dot}}, and a reamer cannot be made to cut larger), or NO-GO entering (no cut remedies it): part the turned length off as scrap and start again at Op 50."
+instruction = "The .191 pin refused in Op 70: clear the chips and run the #11 through once more by hand feed; gauge again. The .195 pin entering (no cut remedies it): part the turned length off as scrap and start again at Op 10 with another #11 or the same one resharpened."
 feed = "hand"
 
 [[setups.operations]]
@@ -396,7 +354,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "B outside {{process.body_min_in:.3dot}}–{{process.body_max_in:.3dot}} in Op 150: scrapped, not reworked (the flat pin's floor is drilled from the rear face); chuck the bar again {{process.stickout_mm:in.2dot}} out and start again at Op 50."
+instruction = "B outside {{process.body_min_in:.3dot}}–{{process.body_max_in:.3dot}} in Op 100: scrapped, not reworked (the flat pin's floor is drilled from the rear face); chuck the bar again {{process.stickout_mm:in.2dot}} out and start again at Op 10."
 feed = "hand"
 
 [[setups]]
@@ -406,15 +364,15 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat). Against each jaw a stack of the 1 in and the 1/2 in parallels, 1/8 thick ({{process.parallel_stack_mm:in.3f}} tall). The collar seat face down on both stacks' tops, rear face up, the pilot hanging in the gap between them (about {{process.parallel_gap_mm:in.3dot}}); gripped on the outside, centred along the jaws. Tap it down onto both stacks while closing the vise: the rear face then stands {{process.rear_over_jaws_mm:in.3dot}} above the jaw tops."
-datum = "Program CM01_holes (cam:pd_transgear_drive_collar). G54: X0 Y0 the bore's axis, swept with the DTI; Z0 the rear face. The holes lie on the X axis: dowels at X ±{{cad.dowel_a_offset_in:.4f}}, the flat pin's at X −{{cad.flat_pin_hole_centre_in:.3f}}. Tool lengths from the tool setter at each M6. After any reset, alarm, stall or E-stop, or if the collar is disturbed in the vise: home ($H) and repeat Ops 170–190 before Cycle Start. At each M6 the program has stopped the spindle (M5) and shows the tool and speed: wait for the spindle to stop, change the tool, set the speed, then Cycle Start."
+datum = "Program CM01_holes (cam:pd_transgear_drive_collar). G54: X0 Y0 the drilled bore's axis, swept with the DTI; Z0 the rear face. The holes lie on the X axis: dowels at X ±{{cad.dowel_a_offset_in:.4f}}, the flat pin's at X −{{cad.flat_pin_hole_centre_in:.3f}}. Tool lengths from the tool setter at each M6. After any reset, alarm, stall or E-stop, or if the collar is disturbed in the vise: home ($H) and repeat Ops 120–140 before Cycle Start. At each M6 the program has stopped the spindle (M5) and shows the tool and speed: wait for the spindle to stop, change the tool, set the speed, then Cycle Start."
 diagram = { file = "diagrams/mill.svg", alt = "The collar seat face down on two stacked parallels in the vise, rear face up, the pilot hanging between the stacks; the dowel holes reamed through at X ±.2756 and the flat pin's hole reamed blind at X −.118, all on the X axis through the bore." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.outer_dia_mm}}", along_jaws_mm = "{{cad.outer_dia_mm}}", part_height_mm = 7.62, parallel_height_mm = "{{process.parallel_stack_mm}}", overhang_mm = [-70.5869, -70.5869], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "rod" }
 beam = { axis = "x", hold = "solid", extent_mm = [0, "{{cad.outer_dia_mm}}"], seat = "gripped across the outside in the vise jaws, the seat face on the stacked parallels", seat_mm = [0, "{{cad.outer_dia_mm}}"] }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). G54 X0 Y0: the bore's axis, swept with the DTI in the bore."
-instruction_detailed = "Home the mill ($H). Spindle stopped, the DTI in the collet, its ball in the bore about .05 below the rear face, preloaded to mid-range. Turn the spindle by hand and read at +X, −X, +Y and −Y; jog X and Y by half of each pair's difference and repeat until all four read within .005 mm (.0002). Then G10 L20 P1 X0 Y0. Raise the DTI clear and remove it."
+instruction = "Home the mill ($H). G54 X0 Y0: the drilled bore's axis, swept with the DTI in the bore."
+instruction_detailed = "Home the mill ($H). Spindle stopped, the DTI in the collet, its ball in the bore about .05 below the rear face, preloaded to mid-range. Turn the spindle by hand and read at +X, −X, +Y and −Y; jog X and Y by half of each pair's difference and repeat until all four read within .013 mm (.0005): a drilled bore reads no closer, and the flat pin's centre has ±.002 from it. Then G10 L20 P1 X0 Y0. Raise the DTI clear and remove it."
 feed = "hand"
 
 [[setups.operations]]
@@ -455,17 +413,17 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "reamer-0930"
 drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.dowel_a_dia_band_mm}}" }
-instruction = "Same file, M6 T3 (the .0930 reamer, to buy): ream both dowel holes through, its end {{process.ream_past_mm:in.3dot}} past the seat face, fed in and fed out, no peck; set 1400."
+sizing = "other"
+instruction = "Same file, M6 T3 (the .0930 reamer, to buy): ream both dowel holes through, its end {{process.ream_past_mm:in.3dot}} past the seat face, fed in and fed out, no peck; set 1400. At the M6 T4 stop (spindle stopped by the file's M5, the reamer raised clear: confirm both before reaching in), still clamped, offer a MHA-PD-VN-54 dowel to each hole's mouth by hand."
 settings = "pd-collar-ream-0930-c360"
-inspection = "Dowel holes Ø{{cad.dowel_a_dia_min_in:.4dot}}–{{cad.dowel_a_dia_max_in:.4dot}}, still clamped, at the M6 T4 stop (spindle stopped by the file's M5, the reamer raised clear: confirm both before reaching in): GO passes through each, held by its end; NO-GO enters neither."
-gauge_checks = [{ gauge = "zz-pins-0930-0935", band_mm = "{{cad.dowel_a_dia_band_mm}}" }]
+inspection = "Dowel holes: the MHA-PD-VN-54 dowel is the gauge. It does not enter either hole by hand past its lead."
+gauge_checks = "other"
 milling_cuts = [
   { name = "dowel ream", kind = "drill", phase = "finish", cutter_dia_mm = 2.3622, flutes = 4, rpm = 1400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = ["{{cad.dowel_a_offset_mm}}"] },
 ]
 
 [[setups.operations]]
-instruction = "GO refused in a dowel hole in Op 220: let the file run to its end (Ops 240, 250), blow out the holes, oil the reamers and run CM01_holes again from its start, G54 unchanged (cuts in air, the reamers pass again); gauge again. Still refused (the pins cannot show it at or over {{cad.dowel_a_dia_min_in:.4dot}}), or NO-GO entering (no cut remedies it): the collar is scrap; make another from Setup 1."
+instruction = "A dowel entering a hole by hand in Op 170 (the hole is oversize; no cut remedies it): stop the file at its M6 T4 stop. The collar is scrap; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
@@ -485,26 +443,26 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "reamer-0615"
 drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.flat_pin_hole_dia_band_mm}}" }
-instruction = "Same file, M6 T5 (the .0615 reamer, to buy): ream the flat pin's hole blind, the reamer's end {{process.flat_ream_station_in:.3dot}} from the seat face (Z{{process.flat_ream_tip_mm:.3f}} mm in the file), fed in and fed out; set 1400. The file ends with the spindle stopped and the reamer raised clear."
+sizing = "other"
+instruction = "Same file, M6 T5 (the .0615 reamer, to buy): ream the flat pin's hole blind, the reamer's end {{process.flat_ream_station_in:.3dot}} from the seat face (Z{{process.flat_ream_tip_mm:.3f}} mm in the file), fed in and fed out; set 1400. The file ends with the spindle stopped and the reamer raised clear. Still clamped, offer the MHA-PD-VN-70 pin to the hole's mouth by hand."
 settings = "pd-collar-ream-0615-c360"
-inspection = "Flat pin's hole Ø{{cad.flat_pin_hole_dia_min_in:.4dot}}–{{cad.flat_pin_hole_dia_max_in:.4dot}}, still clamped: GO enters to the floor, NO-GO does not enter."
-gauge_checks = [{ gauge = "zz-pins-0615-0620", band_mm = "{{cad.flat_pin_hole_dia_band_mm}}" }]
+inspection = "Flat pin's hole: the MHA-PD-VN-70 pin is the gauge. It does not enter by hand past its lead."
+gauge_checks = "other"
 milling_cuts = [
   { name = "flat ream", kind = "drill", phase = "finish", cutter_dia_mm = 1.5621, flutes = 4, rpm = 1400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = ["{{cad.flat_pin_hole_centre_mm}}"] },
 ]
 
 [[setups.operations]]
-instruction = "GO not entering the flat pin's hole to the floor in Op 250: blow out the holes, oil the reamers and run CM01_holes again from its start, G54 unchanged (cuts in air, the reamers pass again); gauge again. Still refused (the pins cannot show it at or over {{cad.flat_pin_hole_dia_min_in:.4dot}}), or NO-GO entering (no cut remedies it): the collar is scrap; make another from Setup 1."
+instruction = "The pin entering by hand in Op 200 (the hole is oversize; no cut remedies it): the collar is scrap; make another from Setup 1."
 feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Bench: deburr, clear the bore, check the holes, oil"
+title = "Bench: deburr, clear the bore, check the flat pin's centre and floor, press the flat pin, oil"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished collar: the reamed bore through, the 2X dowel holes through at .2756 from the bore's axis, the flat pin's blind hole at .118 with its floor .08 from the seat face; the dowel centres measured over pins." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished collar: the drilled bore through, the 2X dowel holes reamed through at their (.276) targets from the bore's axis, the flat pin's blind hole at .118 with its floor .08 from the seat face; the flat pin's centre measured over pins." }
 vise_hold = "other"
 beam = "other"
 
@@ -518,44 +476,52 @@ feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
-tool = "reamer-1920"
+tool = "drill-11"
 drilling = "none"
 sizing = "other"
-instruction = "Clear the flat pin hole's breakthrough slivers inside the bore: grip the .1920 reamer's shank upright in the bench vise between soft jaws and turn the collar down over it by hand, always in the reamer's cutting direction, through the full length; lift it off turning the same way. Blow out the bore and the holes."
+instruction = "Clear the flat pin hole's breakthrough slivers inside the bore: grip the #11 drill's shank upright in the bench vise between soft jaws and turn the collar down over it by hand, always in the drill's cutting direction, through the full length; lift it off turning the same way. Blow out the bore and the holes."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "GO passes the full length of the bore, past the flat pin's hole; NO-GO enters from neither end."
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} through."
-gauge_checks = [{ gauge = "zz-pins-1920-1925", band_mm = "{{cad.bore_dia_band_mm}}" }]
+instruction = "The set's .191 pin passes the full length of the bore, past the flat pin's hole; the .195 pin enters from neither end. Keep the largest pin that enters as the bore's pin for Op 250 and write its marked size here as Pb."
+inspection = "Bore Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}} through (the title block's DRILLED HOLES row)."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Push the .1920 GO pin through the bore and the .0930 GO pin through one dowel hole, each standing about .3 out of the rear face. Mike over the two pins; the reading less half the sum of the two GO pins' written readings (about {{process.over_pins_half_sum_in:.4dot}}) is that hole's centre from the bore's axis. Repeat for the other dowel hole; write the one beside the flat pin's hole as D."
-inspection = "Each dowel centre {{cad.dowel_a_offset_min_in:.4dot}}–{{cad.dowel_a_offset_max_in:.4dot}} from the bore's axis: accept a reading {{cad.dowel_a_offset_min_in:.4dot}}–{{process.dowel_accept_max_in:.4dot}} (each pin's centre may sit up to .00025 off its hole's, so the reading is up to {{process.over_plugs_clearance_max_in:.4dot}} low)."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.dowel_a_offset_band_mm}}" }]
+instruction = "The bore's pin through the bore and the set's .093 pin through the dowel hole beside the flat pin's hole, each standing about .3 out of the rear face. Mike over the two pins as M. That hole's centre from the bore's axis is D = M − (Pb + .093)/2: write D here. D feeds Op 260; it is not an acceptance."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The bore's pin out. The .0930 GO pin in dowel hole D, the .0615 GO pin in the flat pin's hole, both standing out of the rear face. Mike over the two pins as R. The flat pin's centre from the bore's axis is D + half the sum of those two GO pins' written readings (about {{process.over_flat_half_sum_in:.4dot}}) − R."
-inspection = "Flat pin's centre {{cad.flat_pin_hole_centre_min_in:.3dot}}–{{cad.flat_pin_hole_centre_max_in:.3dot}} from the bore's axis: accept {{process.flat_accept_min_in:.4dot}}–{{process.flat_accept_max_in:.4dot}} (the pins' clearances bias it up to {{process.over_plugs_clearance_max_in:.4dot}} either way)."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.flat_pin_hole_centre_band_mm}}" }]
+instruction = "The bore's pin out. The .093 pin in the same dowel hole, the set's .061 pin in the flat pin's hole, both standing out of the rear face. Mike over the two pins as R. The flat pin's centre from the bore's axis is D + {{process.over_flat_half_sum_in:.3dot}} − R."
+inspection = "Flat pin's centre {{process.flat_centre_accept_min_in:.4dot}}–{{process.flat_centre_accept_max_in:.4dot}} from the bore's axis: the sheet's {{cad.flat_pin_hole_centre_min_in:.3dot}}–{{cad.flat_pin_hole_centre_max_in:.3dot}} less the {{process.over_pins_bias_in:.4dot}} the loose pins can read off, each side. Outside it: re-seat both pins and mike once more."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.flat_centre_accept_min_mm}}", "{{process.flat_centre_accept_max_mm}}"] }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mike the .0615 GO pin's length as P. Drop it into the flat pin's hole to the floor and read how far its end stands out of the rear face, calipers' depth rod, as S. The floor's station from the seat face is B − P + S (B from Op 150)."
+instruction = "Measure the .061 pin's length with the calipers as P. Drop it into the flat pin's hole to the floor and read how far its end stands out of the rear face, calipers' depth rod, as S. The floor's station from the seat face is B − P + S (B from Op 100)."
 inspection = "Flat pin floor {{cad.flat_pin_floor_station_min_in:.2dot}}–{{cad.flat_pin_floor_station_max_in:.2dot}} from the seat face."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.flat_pin_floor_station_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "GO refused in the bore in Op 290: repeat Op 280 once and gauge again. Still refused, or NO-GO entering; a dowel reading outside {{cad.dowel_a_offset_min_in:.4dot}}–{{process.dowel_accept_max_in:.4dot}} (Op 300); the flat pin's centre outside {{process.flat_accept_min_in:.4dot}}–{{process.flat_accept_max_in:.4dot}} (Op 310); or its floor outside {{cad.flat_pin_floor_station_min_in:.2dot}}–{{cad.flat_pin_floor_station_max_in:.2dot}} (Op 320): scrapped, not reworked; make another from Setup 1."
+instruction = "The .191 pin refused in the bore in Op 240: repeat Op 230 once and gauge again. Still refused, or the .195 pin entering; the flat pin's centre still outside {{process.flat_centre_accept_min_in:.4dot}}–{{process.flat_centre_accept_max_in:.4dot}} after the re-seat (Op 260); or its floor outside {{cad.flat_pin_floor_station_min_in:.2dot}}–{{cad.flat_pin_floor_station_max_in:.2dot}} (Op 270): scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Finish (drawing: bright machined, oiled): wipe the collar clean and give it a light coat of light machine oil; wipe the dowel holes and the flat pin's hole dry for their presses."
+speed_kind = "other"
+tool = "arbor-press"
+drilling = "none"
+sizing = "other"
+instruction = "Press the MHA-PD-VN-70 pin into the flat pin's hole: the collar on the arbor press's plate on its pilot's front face, rear face up; start the pin's lead in the hole's mouth and press it flush with the ram, then on to the floor with a 3/64 pin punch under the ram, until it stops solid. Collar and pin are one permanent pair from here: MHA-PD-08's D-flat is milled to this pin."
+feed = "hand"
+inspection = "The pin's end lies below the rear face and does not move under the punch pushed by hand. It moves: the collar is scrap; make another from Setup 1."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Finish (drawing: bright machined, oiled): wipe the collar clean and give it a light coat of light machine oil; wipe the dowel holes dry for their presses."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Left to MHA-PD-00, not done here: the two MHA-PD-VN-54 dowels pressed (step 20A) and the MHA-PD-VN-70 pin pressed to the floor (20C); the pilot faced to fit (21A, note 3); the rear face faced to fit (29D, note 4) and the rear bore mouth broken .008 X 45° through the pin's crest (29E). The collar leaves this traveler with the body and pilot long."
+instruction = "Left to MHA-PD-00, not done here: the two MHA-PD-VN-54 dowels pressed (step 20A); the three MHA-PD-09 wheels tried on the dowels (20E); the pilot faced to fit (21A, note 5); the rear face faced to fit (29D, note 6) and the rear bore mouth broken .008 X 45° (29E)."
 feed = "hand"
