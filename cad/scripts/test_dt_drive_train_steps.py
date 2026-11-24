@@ -200,7 +200,7 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
         "THREAD MHA-DT-39 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING",
         "BACK MHA-DT-39 OFF 1/8 TURN",
         "TIGHTEN MHA-DT-VN-56",
-        "IF IT READ OVER, REDO 3B-3C WITH MHA-DT-39 IN MORE, IF UNDER LESS",
+        "IF IT WAS LOOSE, REDO 3B-3C WITH MHA-DT-39 IN MORE, IF TIGHT LESS",
         # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
         # acceptance comes once the end play is final.
         "CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND",
@@ -225,15 +225,25 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
 def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
     """The end screw's embed and the bushing air book
     cone_stack_end_play.SHAFT_END_PLAY; the sheet prints that band, rounded
-    inward to the thousandth, as step 3C's sheet 16 row."""
+    inward to the thousandth, as step 3C's sheet 16 row.  Fit audit part 2,
+    B10: the play is felt by hand once the pinch screw is tight, the dial
+    indicator only breaking a doubt, because step 3A's 1/8 turn of the 1/4-28
+    end screw leaves a play inside that band."""
     body = _step_body("end-play-set")
-    assert "INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END (" in body
+    assert "FEEL THE MHA-DT-04 END PLAY AT THE SHAFT END (" in body
+    number = str(drawing.ACCEPTANCE_ROW_NUMBERS["shaft-end-play"])
+    (row,) = (row for row in drawing.ACCEPTANCE_TABLE_ROWS if row[0] == number)
+    assert row[drawing.ACCEPTANCE_TABLE_HEADER.index("SETTING")].endswith(", BY FEEL")
+    assert row[drawing.ACCEPTANCE_TABLE_HEADER.index("CHECK WITH")] == "DIAL IF IN DOUBT"
     match = re.fullmatch(r"(\.\d{3})-(\.\d{3})", _accept("shaft-end-play", cites=body))
     assert match is not None
     low, high = (float(value) * 25.4 for value in match.groups())
     least, most = cone_stack_end_play.SHAFT_END_PLAY
     assert least <= low < least + 0.0254 and most - 0.0254 < high <= most
     assert 0.0 < low < high
+    eighth_turn = 25.4 / 28 / 8
+    assert "BACK MHA-DT-39 OFF 1/8 TURN" in body
+    assert low < eighth_turn < high
 
 
 def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:

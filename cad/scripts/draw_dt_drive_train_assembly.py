@@ -1573,13 +1573,19 @@ CONE_CRANK_STEPS = _note_text(
         # the step states no engagement shortfall (DT-07 retired).
         "3A. BACK MHA-DT-39 OFF 1/8 TURN.",
         "3B. TIGHTEN MHA-DT-VN-56 ACROSS THE SLIT.",
-        "3C. INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END "
+        # Fit audit 2026-11-23 part 2, B10 (drawing-guidelines rule 4, form 2:
+        # an acceptance by feel; no owner ruling touched): C1's turn-set (3,
+        # 3A) leaves 1/8 turn, .0045, inside the .002-.009 band, so the end
+        # play is felt once the pinch screw is tight, and the sheet 16 row's
+        # dial indicator (owner ruling P2: .002 total on the .001 dial; the
+        # band is .007) only breaks a doubt.
+        "3C. FEEL THE MHA-DT-04 END PLAY AT THE SHAFT END "
         f"({acceptance_ref('shaft-end-play')}).",
         "3D. IF THE END PLAY IS OUT, LOOSEN MHA-DT-VN-56.",
         # Attempt 1 review (clarity, rule 22): the redo says which way
         # MHA-DT-39 moves; Codjiflo on #3023: it redoes 3B-3C only, not 3A's
         # fixed 1/8 turn (the embed books SHAFT_END_PLAY[1] either way).
-        "3E. IF IT READ OVER, REDO 3B-3C WITH MHA-DT-39 IN MORE, IF UNDER LESS.",
+        "3E. IF IT WAS LOOSE, REDO 3B-3C WITH MHA-DT-39 IN MORE, IF TIGHT LESS.",
         # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
         # acceptance, worded as 2Z's, once the end play is final.
         "3F. CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND.",

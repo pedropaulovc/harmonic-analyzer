@@ -825,10 +825,10 @@ def test_a_loosened_post_screw_re_sets_the_post_before_the_checks() -> None:
     assert "TURN MHA-DT-05 ON ITS SCREWS" in re_set
     assert "TIGHTEN BOTH MHA-DT-VN-61" in re_set
     # The post can shift along the shaft on the screws' float: the end play
-    # is indicated again, with its remedy and the pinch lock's check.
+    # is felt again, with its remedy and the pinch lock's check.
     assert step.group(4) == f"{end_play}C" and step.group(5) == f"{end_play}F"
     end_play_redo = redone(step.group(4), step.group(5))
-    assert "INDICATE THE MHA-DT-04 END PLAY" in end_play_redo
+    assert "FEEL THE MHA-DT-04 END PLAY AT THE SHAFT END" in end_play_redo
     assert "DOES NOT TURN IN MHA-DT-21" in end_play_redo
 
 
