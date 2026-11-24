@@ -754,22 +754,15 @@ def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> No
     import dt_swing_stop_screw_spec as stop_screw
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    # Attempt 1 review (rule 22): the minimum prints as check 4Y's sheet 16 row.
-    printed = re.fullmatch(r"(\.\d{3}) MIN", _accept_cell("stop-screw-engagement"))
-    assert printed is not None
-    # The inch minimum is the 1.5D rule rounded up, never over the guarantee.
-    minimum = float(printed.group(1)) * 25.4
-    assert 1.5 * stop_screw.SHANK_DIA - 1e-9 <= minimum
-    assert minimum <= stop_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
+    # Owner ruling S1 (audit part 2): turns from first bite, the count less
+    # two lead pitches holding the 1.5D full-form floor.
+    turns = _assert_engagement_cites_its_count(
+        check, "MHA-SH-VN-52", "stop-screw-engagement"
+    )
+    assert (turns - 2) * stop_screw.THREAD_PITCH >= stop_screw.MIN_USEFUL_ENGAGEMENT_MM
+    assert (turns - 3) * stop_screw.THREAD_PITCH < stop_screw.MIN_USEFUL_ENGAGEMENT_MM
     assert "CHECK THAT ITS HEAD IS FULLY SEATED" in check
     assert "CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED" in check
-    _assert_engagement_cites_its_records(
-        check,
-        "SWING STOP FULL-FORM",
-        "THE STOP SEAT'S",
-        "MHA-SH-VN-52'S THREAD LENGTH",
-        "stop-screw-engagement",
-    )
 
 
 def test_a_loosened_post_screw_re_sets_the_post_before_the_checks() -> None:
@@ -818,55 +811,49 @@ def test_a_loosened_post_screw_re_sets_the_post_before_the_checks() -> None:
     assert "DOES NOT TURN IN MHA-DT-21" in end_play_redo
 
 
-def _assert_engagement_cites_its_records(
-    check: str, joint: str, seat: str, screw: str, row: str
-) -> None:
-    """PR 2 machinist review round 6: a seated screw's engagement cannot be
-    read, so the check takes the lesser of the seat's full-thread depth and
-    the screw's thread length, both recorded in step 23 before it goes in;
-    its sheet 16 row names the same two records."""
+def _assert_engagement_cites_its_count(check: str, screw: str, row: str) -> int:
+    """A seated screw's engagement cannot be read: step 23 records its turns
+    from first bite as it goes in, the check verifies that record, and its
+    sheet 16 row prints the minimum and names the same record (owner ruling
+    S1, audit part 2).  Returns the printed minimum."""
     import dt_drive_train_steps as steps
 
     cited = re.search(
-        rf"{joint} THREAD ENGAGEMENT, THE LESSER READING OF STEPS (\d+\w)-(\d+\w) "
-        rf"\({re.escape(drawing.acceptance_ref(row))}\)\.",
+        rf"VERIFY {screw}'S STEP (\d+\w) TURNS \({re.escape(drawing.acceptance_ref(row))}\)\.",
         check,
     )
-    assert cited is not None
+    assert cited is not None, check
+    (ref,) = cited.groups()
     number = steps.step_number("other-base-mounting")
-    assert all(ref.startswith(str(number)) for ref in cited.groups())
+    assert ref.startswith(str(number))
     number_text = str(drawing.ACCEPTANCE_ROW_NUMBERS[row])
     (printed,) = (cells for cells in drawing.ACCEPTANCE_TABLE_ROWS if cells[0] == number_text)
-    assert printed[-1] == "LESSER OF {}, {}".format(*cited.groups())
+    assert printed[-1] == f"COUNTED AT {ref}"
     body = _rig_step_body("other-base-mounting")
-    seat_line, screw_line = (
-        re.search(rf"\b{ref}\. (.*?)(?= {number}[A-HJ-NP-Z]\. |$)", body).group(1)
-        for ref in cited.groups()
-    )
-    assert seat_line == f"RECORD {seat} FULL-THREAD DEPTH WITH A DEPTH GAUGE."
-    assert screw_line == f"RECORD {screw} WITH CALIPERS."
+    record = re.search(rf"\b{ref}\. (.*?)(?= {number}[A-HJ-NP-Z]\. |$)", body).group(1)
+    assert record == f"RECORD {screw}'S TURNS FROM FIRST BITE TO SEATED."
+    # Nothing is read off a depth gauge or calipers for the engagement now.
+    assert "FULL-THREAD DEPTH" not in body and "THREAD LENGTH WITH CALIPERS" not in body
+    minimum = re.fullmatch(r"(\d+) MIN", _accept_cell(row))
+    assert minimum is not None
+    return int(minimum.group(1))
 
 
 def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
     """The seated shoulder does not establish actual full-form thread engagement."""
+    from _mcmaster_91829a560 import PITCH
     import dt_vn_cone_pivot_screw_spec as pivot_screw
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    # Attempt 1 review (rule 22): the minimum prints as check 4W's sheet 16 row.
-    printed = re.fullmatch(r"(\.\d{3}) MIN", _accept_cell("pivot-screw-engagement"))
-    assert printed is not None
-    # The inch minimum is the 1D floor rounded up, never over the guarantee.
-    minimum = float(printed.group(1)) * 25.4
-    assert pivot_screw.THREAD_SOLID_DIA - 1e-9 <= minimum
-    assert minimum <= pivot_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
-    assert "MHA-DT-VN-52 SHOULDER STAY SEATED" in check
-    _assert_engagement_cites_its_records(
-        check,
-        "MHA-DT-VN-52 FULL-FORM",
-        "THE TAPPED HOLE'S",
-        "MHA-DT-VN-52'S THREAD LENGTH",
-        "pivot-screw-engagement",
+    turns = _assert_engagement_cites_its_count(
+        check, "MHA-DT-VN-52", "pivot-screw-engagement"
     )
+    # The count less two lead pitches holds DT-04's 1D floor, and the
+    # screw's thread (9 turns) can give it before the shoulder seats.
+    assert (turns - 2) * PITCH >= pivot_screw.MIN_USEFUL_ENGAGEMENT_MM
+    assert (turns - 3) * PITCH < pivot_screw.MIN_USEFUL_ENGAGEMENT_MM
+    assert turns * PITCH <= pivot_screw.THREAD_TAIL_LEN + 1e-9
+    assert "MHA-DT-VN-52 SHOULDER STAY SEATED" in check
     # Owner ruling DT-04's location follows the minimum to its sheet 16 row
     # (Codjiflo on #3023), as DT-07's is pinned to its fact.
     from machinist_exceptions import load_exceptions
@@ -877,7 +864,7 @@ def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
         if entry.id == "DT-04"
     )
     row = drawing.acceptance_ref("pivot-screw-engagement")
-    assert f"({row}: {pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT})" in dt04.where
+    assert f"({row}: {turns} MIN)" in dt04.where
 
 
 def _flat(text: str) -> str:
