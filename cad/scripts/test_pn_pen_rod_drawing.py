@@ -449,7 +449,9 @@ def test_pivot_fit_route_is_note_1_linked_from_the_diameter() -> None:
 
     bore = (PIVOT_BORE_DIA + PIVOT_BORE_BAND[1], PIVOT_BORE_DIA + PIVOT_BORE_BAND[0])
     pin = (spec.PIVOT_DIA + spec.PIVOT_BAND[1], spec.PIVOT_DIA + spec.PIVOT_BAND[0])
-    assert spec.PIVOT_CLEARANCE_MM == pytest.approx((bore[0] - pin[1], bore[1] - pin[0]))
+    assert spec.PIVOT_CLEARANCE_MM == pytest.approx(
+        (bore[0] - pin[1], bore[1] - pin[0])
+    )
     assert spec.PIVOT_CLEARANCE_MM == pytest.approx((0.0030 * 25.4, 0.0085 * 25.4))
     clearance = "-".join(spec._inch_text(mm) for mm in spec.PIVOT_CLEARANCE_MM)
     assert f"(CLEARANCE {clearance})" in spec.DRAWING_NOTES
