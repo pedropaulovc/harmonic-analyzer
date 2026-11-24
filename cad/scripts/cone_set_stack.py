@@ -86,7 +86,9 @@ share of the journal-to-pivot span. The terms of one gear's eccentricity
 turn together and are taken at the same phase. T006 has no reading (#971):
 it books its printed runout and MHA-DT-37's tilt in the socket. Not booked,
 because MHA-DT-04 prints no runout of land 1 to its journal: that runout,
-under the keyed gears.
+under the keyed gears. Owner ruling 2026-11-24 on #3402: "Route note only
+(rough the journal in the same chucking as the land, dial it true in the
+4-jaw before finishing); no reading." The route rides MHA-DT-04's traveler.
 
 The CAD places the cone line ``SET_ABOVE_STANDARD_MM`` above standard at
 every cone; the feel set runs T120 tighter than that, by
