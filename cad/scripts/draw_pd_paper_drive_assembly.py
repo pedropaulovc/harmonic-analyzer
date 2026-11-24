@@ -2973,9 +2973,12 @@ def _step_text(
             f"\u00d8{steps.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN "
             f"IN {DISC_TIR_SAMPLE_SPACES} SPACES, EVERY {DISC_TIR_SAMPLE_STRIDES[0]}TH "
             f"OR {DISC_TIR_SAMPLE_STRIDES[1]}TH, READS {tir} TIR MAX.",
-            # The O.D. already read true, so the disc is set on the pins.
+            # The O.D. already read true, so the disc is set by the gauge
+            # pin's readings (machinist review 20261124T035641048Z: "the
+            # pins" named nothing the builder had met).
             "IF NOT, SLACKEN THE SCREWS.",
-            f"TAP THE DISC CENTRAL ON THE PINS AND REPEAT {s('disc-taps-transferred', 9)} AND "
+            f"TAP THE DISC CENTRAL BY {s('disc-taps-transferred', 12)}'S GAUGE-PIN READINGS "
+            f"AND REPEAT {s('disc-taps-transferred', 9)} AND "
             f"{s('disc-taps-transferred', 12)}.",
             # Rule 23 bench acceptance for the disc screws: they carry the
             # drive torque as shear on the flange's bolt circle

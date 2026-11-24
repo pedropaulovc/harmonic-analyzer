@@ -1,0 +1,35 @@
+# Necessity register for MHA-PD-00 (drawing-guidelines.md rules 4 and 22):
+# the assembly settings banded tighter than their title-block row. Read by
+# the machinist review only. Owner ruling 2026-11-24: "In the part's registry
+# file, not on the sheet."
+necessity:
+  - id: N-01
+    feature: "sheet 13 DETAIL J and step 3B, rack crests .100 ±.002 below the platen's bottom edge"
+    kind: mesh
+    reason: "sets the feed rack's mesh depth on the feed pinion"
+    source: "pd_paper_drive_assembly_steps.RACK_CREST_TOL (pd_platen_bottom_guide_spec.CREST_SET_BAND); the feed mesh's datum pitch-line distance sets the crest drop"
+  - id: N-02
+    feature: "step 26P and setting table row 16, rack crests at the two ends WITHIN .001 of each other"
+    kind: mesh
+    reason: "crest drift takes the feed mesh's contact ratio under one"
+    source: "pd_paper_drive_assembly_steps.LEVEL_RACK_CREST_DRIFT, FEED_WORST_CASE_MESH: the one term the fitter controls when the steady-advance check fails with every part inside its sheet"
+  - id: N-03
+    feature: "step 27G and setting table row 17, disc tooth CENTRED WITHIN .002 in a knob pinion gap"
+    kind: mesh
+    reason: "off centre, the reducer mesh's shake reading is false"
+    source: "_gear_quality.reducer_setup_clock_deviation_mm; exception PD-00-knob-setting-true"
+  - id: N-04
+    feature: "sheet 7 DETAIL K, S to N 1.7242 +.002/.000"
+    kind: mesh
+    reason: "sets the reducer mesh's centre distance"
+    source: "pd_rack_pinion_spec.CENTRE_DISTANCE_SET_BAND_IN; owner ruling 2026-11-08, #2144 item 5.3"
+  - id: N-05
+    feature: "setting table row 9 (12N, 13W, 27K), disc shake .0005 TO .008 at the tooth in mesh"
+    kind: mesh
+    reason: "sets the reducer mesh's backlash"
+    source: "draw_pd_paper_drive_assembly.REDUCER_SHAKE_MAX_MM, REDUCER_DIAL_STEP_MM"
+  - id: N-06
+    feature: "setting table row 22 (22M, 33B), knob end float .006 TO .010"
+    kind: gap
+    reason: "keeps the knob shaft's end float open"
+    source: "pd_transgear_knob_shaft_spec.END_FLOAT, END_FLOAT_SET_TOL"
