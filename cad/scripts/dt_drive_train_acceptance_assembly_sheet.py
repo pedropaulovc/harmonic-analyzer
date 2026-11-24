@@ -26,10 +26,8 @@ import dt_cone_gear_spec as cone_gear
 from dt_cone_gear_stack import STACK_L20_ACCEPT
 import dt_crank_handle_pivot_screw_spec as handle_screw
 from dt_crank_pin_ring_spec import BUTT_GAP_BAND as RING_BUTT_GAP_BAND
-from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
 from dt_drive_train_assembly_sheet import (
     FEELER_PLACES,
-    inch_ceil_mm,
     inch_floor_mm,
     inch_max_text,
     inch_text,
@@ -52,15 +50,6 @@ import pinion_rig_tip_gap as TIP_GAP
 
 def _step_ref(key: str, letter: str = "") -> str:
     return f"{steps.step_number(key)}{letter}"
-
-
-def inch_envelope(limits_mm: tuple[float, float], places: int) -> str:
-    """A predicted (min, max) stack result the fitter cannot adjust, rounded
-    outward so every accepted part set lands inside the printed range."""
-    return (
-        f"{inch_text(inch_floor_mm(limits_mm[0], places), places)}-"
-        f"{inch_text(inch_ceil_mm(limits_mm[1], places), places)}"
-    )
 
 
 # The fit-up modules' own wordings of three limits, which the drawing also
@@ -101,16 +90,6 @@ ACCEPTANCES = (
         "MHA-DT-04 END PLAY AT THE SHAFT END",
         inch_window(SHAFT_END_PLAY, 3),
         "DIAL INDICATOR",
-    ),
-    (
-        "crank-end-proud",
-        _step_ref("crank-mesh-checked", "Y"),
-        "MHA-DT-11 END PROUD OF MHA-DT-10",
-        # A stack result, not a set window: rounded outward (Codjiflo, #2194).
-        inch_envelope(
-            (max(CRANK_END_PROUD_RANGE[0], 0.0), CRANK_END_PROUD_RANGE[1]), 3
-        ),
-        "CALIPER DEPTH ROD",
     ),
     (
         "ring-butt-gap",
