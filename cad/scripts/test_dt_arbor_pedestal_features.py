@@ -14,7 +14,7 @@ import dt_arbor_pedestal_spec as spec
 import export_features
 from _gtol_face import FaceGeometry
 from _hole_spec import blind_cut_dia_mm
-from _surface_finish import MACHINED_UM, SEAT_UM
+from _surface_finish import SEAT_UM
 
 _STEM = "dt_arbor_pedestal"
 
@@ -193,13 +193,14 @@ def test_pedestal_feature_bands_are_the_printed_ones() -> None:
     assert crown["overall_height_ref"] == pytest.approx(_in(2.18), abs=_in(0.005))
 
     bore = features["arbor_bore"]
-    # Ø.3750 +.0015/+.0010 REAM THRU, SLIDING FIT ON ARBOR MHA-DT-13.
-    assert bore["dia"] == pytest.approx([_in(0.3760), _in(0.3765)])
-    assert bore["precision"]["dia"] == 4
-    assert bore["process"] == "ream" and bore["thru"] is True
+    # Ø.377 V DRILL THRU, ARBOR MHA-DT-13 ENTERS BY HAND (fit audit F01).
+    assert bore["dia"] == pytest.approx([_in(0.377), _in(0.381)])
+    assert bore["precision"]["dia"] == 3
+    assert bore["process"] == "drill" and bore["drill"] == "V"
+    assert bore["thru"] is True
     assert bore["callout"] == drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert bore["mates"] == drawing.ARBOR_NUMBER
-    assert bore["finish_ra"] == MACHINED_UM
+    assert bore["finish_ra"] == SEAT_UM
     assert bore["height"] == pytest.approx([_in(1.74), _in(1.76)])
     assert bore["lateral"] == pytest.approx([_in(0.46), _in(0.48)])
 

@@ -38,7 +38,7 @@ def test_only_the_running_fit_carries_a_size_band() -> None:
     }
 
 
-def test_shaft_band_closes_the_configured_running_fit() -> None:
+def test_arbor_enters_the_drilled_pedestal_bores_by_hand() -> None:
     lower, upper = _fit_deviations.deviations(spec.SHAFT_DIA_BAND)
     shaft_limits = (spec.SHAFT_DIA + lower, spec.SHAFT_DIA + upper)
     bore_lower, bore_upper = _fit_deviations.deviations(dt_arbor_pedestal_spec.BORE_DIA_BAND)
@@ -46,11 +46,15 @@ def test_shaft_band_closes_the_configured_running_fit() -> None:
         dt_arbor_pedestal_spec.BORE_DIA + bore_lower,
         dt_arbor_pedestal_spec.BORE_DIA + bore_upper,
     )
+    # Fit audit F01: the pedestal bore is V-drilled, the arbor enters by hand
+    # and the apex set screw clamps it (no running fit): .0020 least
+    # clearance, .0068 most (the screw's cup point spans it,
+    # cylinder_bank_layout.SET_SCREW_POINT_MARGIN).
     clearances = [
         round(bore_limits[0] - shaft_limits[1], 5),
         round(bore_limits[1] - shaft_limits[0], 5),
     ]
-    assert clearances == list(_config.fit("shaft_in_bushing", "diametral_clearance_mm"))
+    assert clearances == [0.0508, 0.17272]
 
 
 def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None:

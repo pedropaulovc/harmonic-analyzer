@@ -57,7 +57,7 @@ from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_arbor_pedestal_spec import (
     BORE_DIA,
-    BORE_DIA_BAND,
+    BORE_DIA_BAND as BORE_DIA_BAND,
     BORE_HEIGHT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -201,14 +201,20 @@ TOP_KEEP = {
 # dimensioned from the foot's west side face, so the two views share one
 # origin the shop can touch off.
 
-# The arbor (MHA-DT-13) is what the reamed bore fits: the front pedestal's
-# apex screw locks it, and the back pedestal slides along it while its strap
-# is set off the bank's north spring blade (cylinder_bank_layout), so the bore is a
-# sliding fit and the Ra 63 says so (rule 4 (tighten only for function, and
-# name the mate); 2026-10-18 ENFORCE r1 blocker).
+# The arbor (MHA-DT-13) is what the drilled bore takes: it enters by hand,
+# the front pedestal's apex screw locks it, and the back pedestal slides
+# along it while its strap is set off the bank's north spring blade
+# (cylinder_bank_layout), then its own screw clamps it.  Nothing turns in
+# the bore, so it is drilled V (.377), no band (fit audit F01, its
+# recommended callout; rule 4 (tighten only for function, and name the
+# mate)).
 ARBOR_NUMBER = str(_config.parts("dt-cylinder-gear-shaft")["number"])
+SET_SCREW_NUMBER = str(_config.parts("sh-vn-arbor-set-screw")["number"])
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"REAM THRU\nSLIDING FIT ON\nARBOR {ARBOR_NUMBER}",
+    "BoreDia": (
+        f"V DRILL THRU\nARBOR {ARBOR_NUMBER} ENTERS BY HAND,\n"
+        f"CLAMPED BY {SET_SCREW_NUMBER}"
+    ),
 }
 CROWN_CALLOUT = "SIDES TANGENT"
 # The flanks run straight from the .20 foot top, at the foot's full width, up
@@ -317,9 +323,9 @@ PLAN_HOLE_CENTRELINE_MM = (
 # FOOT_NEAR_Z). The arbor bore and the crown run along Z at BORE_HEIGHT; the
 # hold-down hole and the apex tap run along Y on the X = 0 centreline. A band
 # is the title block's row for the places the sheet prints
-# (DRAWING_PRECISION_BY_NAME) on the printed nominal, or the bore's own
-# REAM_SLIDE band on its exact nominal; the hold-down drill and the tap drill
-# take the DRILLED HOLES row (HOLE_CALLOUT_PRECISION). Every Z location runs
+# (DRAWING_PRECISION_BY_NAME) on the printed nominal; the arbor bore's V
+# drill, the hold-down drill and the tap drill take the DRILLED HOLES row
+# (the bore at its .377 nominal, the others at HOLE_CALLOUT_PRECISION). Every Z location runs
 # off the far face and every X location off the west side face, as the plan
 # and elevation print them. The declarations print nothing.
 _P = DRAWING_PRECISION_BY_NAME
@@ -535,31 +541,28 @@ requirement(
         "overall_height_ref": DRAWING_REFERENCE_PRECISION["overall height"],
     },
 )
-# The reamed arbor bore through the strap: Ø.3750 +.0015/+.0010 REAM THRU,
-# SLIDING FIT ON ARBOR MHA-DT-13 (FRONT_KEEP "BoreDia", DIMENSION_CALLOUTS),
-# Ra 63; its axis 1.75 off the seat (FRONT_KEEP "BoreHeight") and .47 off the
-# west side (BoreLateral, under the elevation).
+# The drilled arbor bore through the strap: Ø.377 V DRILL THRU, ARBOR
+# MHA-DT-13 ENTERS BY HAND, CLAMPED BY MHA-SH-VN-54 (fit audit F01, whose
+# MHA-DT-VN-64 is that screw's prior number; FRONT_KEEP "BoreDia",
+# DIMENSION_CALLOUTS), Ra 125; its axis 1.75 off the
+# seat (FRONT_KEEP "BoreHeight") and .47 off the west side (BoreLateral,
+# under the elevation).
 requirement(
     "arbor_bore",
     kind="hole",
     faces=(_BORE_FINISH.face,),
-    requirements=("dia", "thru", "finish_ra", "height", "lateral"),
+    requirements=("dia", "thru", "process", "mates", "finish_ra", "height", "lateral"),
     fields={
         "at": ([0.0, BORE_HEIGHT, STRAP_INNER_Z], ("BORE_HEIGHT", "STRAP_INNER_Z")),
         "axis": ((0.0, 0.0, -1.0), ("__frame__", "STRAP_T")),
         "dia": (
-            limits(BORE_DIA, _P["BoreDia"], BORE_DIA_BAND, unit=UNIT),
-            (
-                "BORE_DIA",
-                "BORE_DIA_BAND",
-                ("_fit_ream_slide", "REAM_SLIDE"),
-                "UNIT",
-                *_FRONT_KEEP,
-            ),
+            drilled_limits(BORE_DIA, _P["BoreDia"], unit=UNIT),
+            ("BORE_DIA", "BORE_DIA_BAND", "UNIT", *_FRONT_KEEP),
         ),
         "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
         "thru": (True, ((_SELF, "DIMENSION_CALLOUTS"),)),
-        "process": ("ream", ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "process": ("drill", ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "drill": ("V", ((_SELF, "DIMENSION_CALLOUTS"),)),
         "callout": (DIMENSION_CALLOUTS["BoreDia"], ((_SELF, "DIMENSION_CALLOUTS"),)),
         "mates": (ARBOR_NUMBER, ((_SELF, "ARBOR_NUMBER"),)),
         "finish_ra": (_BORE_FINISH.roughness_um, ("SURFACE_FINISHES",)),

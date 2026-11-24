@@ -26,7 +26,6 @@ PLANS = {
     "dt_cone_tip_bushing": ("zz-pins-0625-0630", "go_pin_max_in", "nogo_pin_min_in"),
     "dt_crank_hub": ("zz-pins-3760-3765", "go_pin_max_in", "nogo_pin_min_in"),
     "dt_pinion_cam": ("zz-pins-2510-2515", "go_pin_max_in", "nogo_pin_min_in"),
-    "dt_arbor_pedestal": ("zz-pins-3760-3765", "go_pin_max_in", "nogo_pin_min_in"),
 }
 
 
