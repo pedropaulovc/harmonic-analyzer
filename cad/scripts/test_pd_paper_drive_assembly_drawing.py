@@ -2862,10 +2862,12 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     # #3107: the screw and spacer are renewed once; a second failure sends
     # the bar and the arm to their sheets, and every outcome has a route: a
     # bar outside (with the arm if it is outside too), an arm outside or all
-    # inside, one action a step (rule 22).
+    # inside, one action a step (rule 22). The renewal frees the captive arm
+    # on the arbor press (D10, owner question Q7a, option B).
     bar = _number("pd-support-bar")
     assert pivot[20:23] == (
-        f"IF NOT YET RENEWED, REPEAT FROM 14G WITH A NEW "
+        "IF NOT YET RENEWED, PUSH THE SCREW OUT OF THE SPACER, ARM REAR FACE "
+        "DOWN ON THE ARBOR PRESS, AND REPEAT FROM 14G WITH A NEW "
         f"{_number('pd-vn-transgear-pivot-screw')} SCREW AND "
         f"{_number('pd-transgear-pivot-spacer')} SPACER.",
         f"IF ALREADY RENEWED, INSPECT THE {bar} BAR'S TAP AND BACK FACE AND THE "
