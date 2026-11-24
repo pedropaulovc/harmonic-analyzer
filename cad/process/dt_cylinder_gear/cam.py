@@ -431,12 +431,22 @@ def context(
             f"depth spread {p['depth_spread_in']:.4f} in does not fit the window "
             f"{window[0]:.4f}-{window[1]:.4f}"
         )
-    _agree(
-        plan,
-        "depth_aim_in",
-        round(((window[0] + window[1]) / 2 + p["depth_spread_in"] / 2) * 1e4) / 1e4,
-        IN_TOL,
-    )
+    # A shallow cut is corrected by the two readings' mean to mid-window;
+    # readings no further apart than the stop then both land inside it, a
+    # reading's resolution to spare at each end.
+    mid = (window[0] + window[1]) / 2
+    _agree(plan, "depth_aim_in", math.floor(mid * 1e4 + 0.5 + 1e-6) / 1e4, IN_TOL)
+    stop = p["depth_spread_stop_in"]
+    aim = p["depth_aim_in"]
+    if not (
+        2 * p["depth_spread_in"] <= stop
+        and aim - stop / 2 >= window[0] + resolution_in
+        and aim + stop / 2 <= window[1] - resolution_in
+    ):
+        raise ValueError(
+            f"depth_spread_stop_in {stop:.4f} is not between twice the expected spread "
+            f"{p['depth_spread_in']:.4f} and what the window {window[0]:.4f}-{window[1]:.4f} holds about {aim:.4f}"
+        )
     depth_spread = p["depth_spread_in"] * IN
     # The space-1/space-61 index: 60 spaces is whole turns of the circle.
     half_turns = Fraction(shop["machines"]["bs-0"]["worm_ratio"], 2)

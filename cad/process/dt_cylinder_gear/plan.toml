@@ -235,15 +235,18 @@ first_run_shallow_mm = 0.0762
 # cancels. It moves 2:1 with the depth. Read on the deepest blank (the least
 # arbor deflection, blank 1) and the shallowest (the most, blank 9; cam.py
 # finds both): every blank lies between them. The window is the acceptance
-# band less a micrometer reading's resolution at each end, two readings; the
-# aim puts the expected blank 1 to blank 9 spread (cam.py) mid-window.
+# band less a micrometer reading's resolution at each end, two readings. A
+# shallow cut is corrected by the two readings' mean to the aim, mid-window,
+# so both blanks land inside whatever their spread up to the stop; a wider
+# spread than the stop (over twice the expected one, cam.py) is not cut on.
 pin_dia_in = 0.040
 depth_deep_blank = 1
 depth_shallow_blank = 9
 depth_window_min_in = 0.0254
 depth_window_max_in = 0.0289
 depth_spread_in = 0.0013
-depth_aim_in = 0.0278
+depth_aim_in = 0.0272
+depth_spread_stop_in = 0.0030
 # The crank turns from space 1 to space 61 (half the worm's 40).
 opposite_turns = 20
 # Acceptance over two Ø.040 pins in opposite spaces less the gear's own
@@ -782,7 +785,15 @@ gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Blank {{process.depth_shallow_blank:d}} over {{process.depth_window_max_in:.4dot}} and blank {{process.depth_deep_blank:d}} not under {{process.depth_window_min_in:.4dot}} (too shallow: expected on the first run, set .003 shallow; blank {{process.depth_deep_blank:d}} may be over too): send $#, G10 L2 P1 Y(the G54 line's Y + 25.4 × (blank {{process.depth_shallow_blank:d}}'s reading - {{process.depth_aim_in:.4f}}) / 2); run GP01_first_space, index {{process.opposite_turns:d}} turns, run it again (both spaces deeper), and check again. Any other reading outside the window (either blank under {{process.depth_window_min_in:.4dot}}, or blank {{process.depth_deep_blank:d}} over {{process.depth_window_max_in:.4dot}} with blank {{process.depth_shallow_blank:d}} inside): stop and tell the owner; never cut deeper."
+instruction = "Either reading under {{process.depth_window_min_in:.4dot}}, or the two readings more than {{process.depth_spread_stop_in:.4dot}} apart: stop and tell the owner; never cut deeper."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Otherwise a reading over {{process.depth_window_max_in:.4dot}} is a cut too shallow (expected on the first run, set .003 shallow): send $#, then G10 L2 P1 Y(the G54 line's Y + 25.4 × (the mean of the two readings - {{process.depth_aim_in:.4f}}) / 2)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "After that correction: run GP01_first_space, index {{process.opposite_turns:d}} turns, run it again (both spaces deeper), and make the depth check again."
 feed = "hand"
 
 [[setups.operations]]
