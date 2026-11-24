@@ -1,8 +1,8 @@
 """MHA-PD-VN-64: McMaster 98381A216 arm/plate locating dowel.
 
 Alloy steel, 1/8 x 5/16, Round x Chamfer ends, ASME B18.8.2; the supplier
-specifies diameter +.0001/+.0003 over nominal.  Fit audit 2026-11-23
-(pending owner confirmation; owner, 2026-11-23: "can the holes not be
+specifies diameter +.0001/+.0003 over nominal.  Owner ruling 2026-11-24,
+fit audit question 9 (owner, 2026-11-23: "can the holes not be
 reamed in the first place"): the pair is 1/8, so the arm's press and the
 plate's slip are the .1240 and .1260 members of the over/under reamer set
 and no reamer is bought for these two holes.  It replaces the 3/32 x 5/16

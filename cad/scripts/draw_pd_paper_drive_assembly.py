@@ -608,14 +608,15 @@ KNOB_SETTING_INSTANCES = frozenset(
 # The radial part of that worst case (.0008) keeps N inside the S to N set
 # band, which governs along S-N; the .004 circle bounds the rest. TRUE names
 # both, so it no longer reads as wider than DETAIL K's S to N limits (#2417).
-# The trial mesh may move the table once, by KNOB_TRIAL_MOVE_TEXT, and only
-# within those limits (owner ruling 2026-11-24, audit part 2 question C1).
+# The trial mesh may move the table only so far that N, indicated TRUE with
+# that radial error, stays within those limits (owner ruling 2026-11-24, audit
+# part 2 question C1; pd_paper_drive_knob_setting_spec derives the moves).
 # The knob-bore point's label inside DETAIL K. DETAIL K keeps its letter
 # (other sheets cite "MHA-PD-00 DETAIL K"), so the point takes a letter used
 # nowhere else on the package (machinist review round 7, rules 9 and 26: K
 # meant both the view and the bore).
 KNOB_BORE_LETTER = "N"
-KNOB_SETTING_SWEEP_IN = 0.0005
+KNOB_SETTING_SWEEP_IN = knob_setting.TRUE_SWEEP_IN
 _KNOB_SETTING_SWEEP_TEXT = f"{KNOB_SETTING_SWEEP_IN:g}".lstrip("0")
 KNOB_SETTING_CIRCLE_TEXT = (
     f"WITHIN {steps.inch_text(registration.REDUCER_AXIS_SETUP_RADIUS_MM, 3)} OF ITS "
@@ -626,14 +627,23 @@ KNOB_SETTING_TRUE = (
     f"{KNOB_BORE_LETTER} LANDS INSIDE "
     f"THE S TO {KNOB_BORE_LETTER} BAND, {KNOB_SETTING_CIRCLE_TEXT}"
 )
-# One trial move of the table, in DRO counts on DETAIL K's two axes; one each
-# way is all the S to N limits hold (pd_paper_drive_knob_setting_spec).
-if not knob_setting.TRIAL_MOVES_AWAY == knob_setting.TRIAL_MOVES_TOWARD == 1:
-    raise AssertionError("the located step allows one trial move each way")
-KNOB_TRIAL_MOVE_TEXT = (
-    f"{steps.inch_text(knob_setting.TRIAL_MOVE_ALONG_MM, 4)} ALONG AND "
-    f"{steps.inch_text(knob_setting.TRIAL_MOVE_ACROSS_MM, 4)} ACROSS"
+# The trial moves of the table, in DRO counts on DETAIL K's two axes
+# (pd_paper_drive_knob_setting_spec): one toward S for a shake over the
+# ceiling; away from S only where the limit leaves the mill a settable move
+# after TRUE's error (from the mid-band aim it leaves .00028, so none prints
+# and a pair that runs tight takes the inspection exit).
+def _knob_move_text(move: tuple[float, float]) -> str:
+    return f"{steps.inch_text(move[0], 4)} ALONG AND {steps.inch_text(move[1], 4)} ACROSS"
+
+
+KNOB_TRIAL_MOVE_TEXT = _knob_move_text(knob_setting.TRIAL_MOVE_TOWARD_MM)
+KNOB_TRIAL_AWAY_MOVE_TEXT = (
+    None
+    if knob_setting.TRIAL_MOVE_AWAY_MM is None
+    else _knob_move_text(knob_setting.TRIAL_MOVE_AWAY_MM)
 )
+if KNOB_TRIAL_AWAY_MOVE_TEXT not in (None, KNOB_TRIAL_MOVE_TEXT):
+    raise AssertionError("the located step words one move both ways or the toward move alone")
 # The second column's steps end above this on DETAIL K's sheet.
 KNOB_SETTING_FIELD_TOP = 0.144
 # The plate-screw tap inside the crop, in the machine frame (mm): the arm's
@@ -1902,7 +1912,7 @@ PIN_BOND_CURE_H = 24
 # bore and the sleeve on the N side of the pin, so neither gives way along
 # the rock and the mesh stands at the tightest centre the two running fits
 # allow: closer than the axes by half of both diametral clearances
-# (_PRESSED_CLOSURE_MM). The tooth beside the mesh moves only as far as the
+# (knob_setting.PRESSED_CLOSURE_MM). The tooth beside the mesh moves only as far as the
 # flanks let it, so the cluster's shift on the pin and the pin's own bending
 # are not read as shake.
 #
@@ -1928,27 +1938,17 @@ PIN_BOND_CURE_H = 24
 # NEEDLE MOVES), .008 MAX; it retires the half-division floor of the
 # delegated ruling of 2026-11-10, review finding #2960). What stays coded is
 # that the tightest mesh the fits allow does not bind: a positive shake at
-# the closest table setting the trial's one move toward S reaches (owner
-# ruling 2026-11-24, audit part 2 question C1;
-# knob_setting.TRIAL_LOWEST_CENTRE_MM, -.00005) closed by the largest
-# clearances. At DETAIL K's printed -.001, which no step reaches, it would
-# bind; a tight spot at any setting is still caught by the re-run trial.
-_KNOB_JOURNAL_CLEARANCE_MM = (
-    min(knob_bush.BORE_DIA_LIMITS) - max(knob_shaft.JOURNAL_DIA_BAND),
-    max(knob_bush.BORE_DIA_LIMITS) - min(knob_shaft.JOURNAL_DIA_BAND),
-)
-_PRESSED_CLOSURE_MM = tuple(
-    (journal + sleeve) / 2.0
-    for journal, sleeve in zip(
-        _KNOB_JOURNAL_CLEARANCE_MM, cluster_fit.BORE_DIAMETRAL_CLEARANCE, strict=True
-    )
-)
+# the closest N may stand after the trial's move toward S, TRUE's error
+# included (owner ruling 2026-11-24, audit part 2 question C1;
+# knob_setting.TRIAL_LOWEST_CENTRE_MM, -.00069) closed by the largest
+# clearances; the spec picks that move so it does not. A tight spot at any
+# setting is still caught by the re-run trial.
 _REDUCER_CIRCULAR_BACKLASH_MM = (
     mesh_check.reducer_mesh(
-        knob_setting.TRIAL_LOWEST_CENTRE_MM - _PRESSED_CLOSURE_MM[1]
+        knob_setting.TRIAL_LOWEST_CENTRE_MM - knob_setting.PRESSED_CLOSURE_MM[1]
     ).backlash_mm[0],
     mesh_check.reducer_mesh(
-        disc.CENTRE_DISTANCE_WINDOW[1] - _PRESSED_CLOSURE_MM[0]
+        disc.CENTRE_DISTANCE_WINDOW[1] - knob_setting.PRESSED_CLOSURE_MM[0]
     ).backlash_mm[1],
 )
 _DISC_TIP_RADII_MM = [profile.blank_radius_mm for profile in disc.manufactured_profiles()]
@@ -2057,15 +2057,13 @@ def sub_step(key: str, index: int) -> str:
 # the locks are struck; and (rule 23, #2425) the retaining compounds, one
 # row group per grade naming every sub-step that uses it, with its cure:
 # LOCTITE 638 bonds the MHA-PD-23 pin and the pivot spacer and, by DETAIL
-# H's bond note, a latch or plate dowel that slides in by hand (a collar
-# dowel or pin that slides in renews the collar, step 20);
+# H's bond note, a plate dowel that slides in by hand (a latch dowel that
+# slides in renews the arm, step 10; a collar dowel or pin, the collar,
+# step 20);
 # LOCTITE 641 bonds the knob cup.
 LOCK_TRANSFER_SCREWS = 4 * 2
 # The sub-steps that send a hand-slid dowel or pin to DETAIL H's bond note.
-BOND_NOTE_SUB_STEPS = (
-    ("latch-pin-pressed", 1),
-    ("arm-plate-fitted", 6),
-)
+BOND_NOTE_SUB_STEPS = (("arm-plate-fitted", 6),)
 LOCTITE_638_SUB_STEPS = tuple(
     sorted(
         (
@@ -2084,8 +2082,8 @@ BOM_EXPENDABLES_NOTE = (
     f"SCREWS, AND 1 MORE {BOM_PART_NUMBERS['pd-vn-chain-connecting-link']} TO\n"
     f"CLOSE THE SPARE'S LOOP. {sub_step('platen-hung', 0)} USES {LOCK_TRANSFER_SCREWS}\n"
     "#4-40 TRANSFER SCREWS, A SHOP TOOL.\n"
-    f"LOCTITE 638 AT {', '.join(_LOCTITE_638_HEADS[:3])},\n"
-    f"{', '.join(_LOCTITE_638_HEADS[3:])}; CURE {PIN_BOND_CURE_H} H.\n"
+    f"LOCTITE 638 AT {', '.join(_LOCTITE_638_HEADS)};\n"
+    f"CURE {PIN_BOND_CURE_H} H.\n"
     f"LOCTITE 641 AT {sub_step('knob-stack-fitted', KNOB_CUP_BOND_SUB_STEP)}; "
     f"CURE {KNOB_CUP_BOND_CURE_H} H."
 )
@@ -2337,9 +2335,12 @@ def _step_text(
         f"{s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 15)}."
     )
     knob_shaft_out = f"DRAW THE {n['pd-transgear-knob-shaft']} SHAFT OUT FORWARD."
+    # The bonded spacer holds the arm captive on the shoulder, so the arm
+    # comes off the bar with the screw, not off the screw (Codjiflo r2 on
+    # #3487).
     pivot_unscrewed = (
         f"UNSCREW THE {n['pd-vn-transgear-pivot-screw']} SCREW.",
-        "LIFT THE ARM OFF.",
+        "LIFT IT OUT, THE ARM AND THE SPACER ON IT.",
     )
     # The pivot's reseat (15R-15U: unscrew, lift off, flush, clean; then
     # 15L-15P: reseat, re-check) is written once and done from 33 (the
@@ -2544,18 +2545,20 @@ def _step_text(
         # point, so the proud is set as the dowel goes in, not by a floor;
         # the press is permanent (MHA-PD-18 RV-03), so an over-pressed dowel
         # stays in the arm it costs, and both are remade (Codjiflo #3127).
-        # A dowel that slides into the .1240 ream by hand is bonded, not
-        # scrapped with the arm (fit audit 2026-11-23, pending owner
-        # confirmation; machinist exception PD-00-latch-dowel-bond): the hole
-        # is reamed with the set reamer and the dowel is its gauge.
+        # A dowel that slides into the .1240 ream by hand is a slip fit (rule
+        # 23): the hole is reamed with the set reamer and the dowel is its
+        # gauge, so its size is unknown and no bonded clearance can be
+        # printed for it, and the arm does not yet carry DETAIL K's
+        # jig-boring, the one place owner ruling 2026-11-20 (#2497) allows
+        # compound; arm and dowel are remade, as the arm's traveler rejects
+        # the arm when the dowel enters by hand (MHA-PD-18 note 3; Codjiflo
+        # r2 on #3486: the bond salvage had no valid ruling).
         "latch-pin-pressed": (
             f"PRESS THE {n['pd-vn-transgear-latch-pin']} DOWEL, CHAMFERED END FIRST, "
             f"INTO THE {n['pd-transgear-arm']} ARM'S REAMED HOLE, {pin_window} PROUD, "
             f"CALIPER DEPTH ROD {detail_cite('latch-pin-pressed')}.",
-            "IF THE DOWEL SLIDES IN BY HAND, BOND IT PER THE BOND NOTE AT "
-            f"{detail_cite('arm-plate-fitted')[1:-1]}.",
-            f"IF IT READS UNDER {pin_window.split(' TO ')[0]}, OR A BONDED DOWEL "
-            f"MOVES WHEN PUSHED, MAKE A NEW {n['pd-transgear-arm']} ARM AND "
+            "IF THE DOWEL SLIDES IN BY HAND OR READS UNDER "
+            f"{pin_window.split(' TO ')[0]}, MAKE A NEW {n['pd-transgear-arm']} ARM AND "
             f"{n['pd-vn-transgear-latch-pin']} DOWEL AND REPEAT FROM STEP "
             f"{steps.step_number('latch-pin-pressed')}.",
         ),
@@ -2639,8 +2642,11 @@ def _step_text(
             f"SET THE TABLE TO {KNOB_SETTING_VIEW_NAME}'S "
             f"(SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}) ALONG AND ACROSS "
             "FROM S.",
-            f"TAP THE PLATE UNTIL KNOB BORE {KNOB_BORE_LETTER} READS TRUE PER "
-            f"{s('arm-plate-located', 2)} (SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}).",
+            # The clamps are slackened here, so every return to 12F (12H's
+            # re-tap, the trial move, a part's retrial) frees the plate first.
+            f"SLACKEN THE CLAMPS AND TAP THE PLATE UNTIL KNOB BORE {KNOB_BORE_LETTER} "
+            f"READS TRUE PER {s('arm-plate-located', 2)} "
+            f"(SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}).",
             "TIGHTEN THE CLAMPS.",
             # Named in full: the continued column on the next sheet has no
             # DETAIL K key (integration review, run 20261109T062834910Z).
@@ -2662,42 +2668,57 @@ def _step_text(
             reducer_dial_check("SHAFT"),
             "LIFT OFF THE SHAFT, THE RING, THE CLUSTER AND THE BUSHING.",
             # The trial counts only if nothing moved under it: S still at the
-            # DRO's zero and N still true at its settings.  Pointed back like
-            # 12H, with both bores named: the step can pack onto a sheet without
-            # the DETAIL K key (machinist review on 0a4408f590). The arm's
-            # number is left to 12C so the steps fit their sheets (C1 restack).
+            # DRO's zero and N still true at the table's setting, DETAIL K's
+            # or as the trial move left it (codjiflo r2 on #3539: read
+            # against DETAIL K alone, a moved plate failed here and undid the
+            # move).  Pointed
+            # back like 12H, with both bores named: the step can pack onto a
+            # sheet without the DETAIL K key (machinist review on 0a4408f590).
+            # The arm's number is left to 12C so the steps fit their sheets
+            # (C1 restack).
             f"CHECK: RE-INDICATED PER {s('arm-plate-located', 2)} "
             f"(SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}), "
             "PIN BORE S READS TRUE AT THE DRO'S ZERO AND "
-            f"{bush} KNOB BORE {KNOB_BORE_LETTER} AT ITS "
-            "SETTINGS.",
+            f"KNOB BORE {KNOB_BORE_LETTER} AT THE TABLE'S SETTING.",
             f"IF NOT, REPEAT FROM {s('arm-plate-located', 2)}.",
-            # The trial may move the plate once, within DETAIL K's S to N
-            # limits, before a part is blamed: owner ruling 2026-11-24, audit
-            # part 2 question C1, "Yes, the trial may move the plate within
-            # those limits." (.001 away from S for a tight spot, .001 toward
-            # S if the shake reads over .008; never above +.002 nor below
-            # -.001 of DETAIL K). It retires the delegated ruling of
-            # 2026-11-10 that the plate is not moved to chase a reading. The
-            # move is whole DRO counts on both axes
-            # (pd_paper_drive_knob_setting_spec.TRIAL_MOVE_ALONG_MM); one
-            # move each way keeps the table inside the limits. A mesh that
-            # still reads outside the window with N true is a part off its
-            # drawing: a gear or one of the two running fits the window
-            # charges; only when all are inside is the arm renewed (codjiflo
-            # P2 on 176fad0). The restart follows the part (codjiflo P2 on
-            # ab2fdaf): a new plate is set to DETAIL K again, a new disc or
-            # sleeve is centred again, a new shaft only re-meshes; one
-            # sub-step per part (machinist review on 36242bf: one action per
-            # step).
+            # The trial may move the plate before a part is blamed: owner
+            # ruling 2026-11-24, audit part 2 question C1, "Yes, the trial
+            # may move the plate within those limits." (.001 away from S for
+            # a tight spot, .001 toward S if the shake reads over .008; never
+            # above +.002 nor below -.001 of DETAIL K). It retires the
+            # delegated ruling of 2026-11-10 that the plate is not moved to
+            # chase a reading. Each move is whole DRO counts on both axes,
+            # derived so N, indicated TRUE, stays inside the limits
+            # (pd_paper_drive_knob_setting_spec.TRIAL_MOVE_TOWARD_MM,
+            # TRIAL_MOVE_AWAY_MM): from the mid-band aim no away move is
+            # left, so a tight spot or no shake goes straight to the
+            # inspection. A mesh that still reads outside the window with N
+            # true is a part off its drawing: a gear or one of the two
+            # running fits the window charges; only when all are inside is
+            # the arm renewed (codjiflo P2 on 176fad0). The restart follows
+            # the part (codjiflo P2 on ab2fdaf): a new plate is set to DETAIL
+            # K again, a new disc or sleeve is centred again; one sub-step
+            # per part (machinist review on 36242bf: one action per step).
+            # A new disc, sleeve or shaft is tried with the table back at
+            # DETAIL K's setting, not at a move made for the part it replaces
+            # (codjiflo r2 on #3539), so each repeats from the table's
+            # setting (the tap sub-step slackens the clamps first).
             f"IF {s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)} "
             f"PASSED, GO TO STEP {steps.step_number('arm-plate-fitted')}.",
-            f"IF ONLY {s('arm-plate-located', 11)} OR ONLY "
-            f"{s('arm-plate-located', 12)} FAILED AND THE TABLE IS STILL AT "
-            f"{KNOB_SETTING_VIEW_NAME}'S SETTING, SLACKEN THE CLAMPS, MOVE THE TABLE "
-            f"{KNOB_TRIAL_MOVE_TEXT}, AWAY FROM S FOR A TIGHT SPOT, TOWARD S FOR "
-            f"SHAKE OVER {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}, AND REPEAT FROM "
-            f"{s('arm-plate-located', 5)}.",
+            (
+                f"IF ONLY {s('arm-plate-located', 12)} FAILED, ON SHAKE OVER "
+                f"{steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}, AT {KNOB_SETTING_VIEW_NAME}'S "
+                f"SETTING, MOVE THE TABLE {KNOB_TRIAL_MOVE_TEXT} TOWARD S, THEN FROM "
+                f"{s('arm-plate-located', 5)}."
+                if KNOB_TRIAL_AWAY_MOVE_TEXT is None
+                # With the C2 floor gone, "no shake" fails the dial check
+                # low and moves away from S, as a tight spot does.
+                else f"IF {s('arm-plate-located', 11)} OR {s('arm-plate-located', 12)} "
+                f"ALONE FAILED AT {KNOB_SETTING_VIEW_NAME}'S SETTING, MOVE THE TABLE "
+                f"{KNOB_TRIAL_MOVE_TEXT}, AWAY FROM S FOR A TIGHT SPOT OR NO SHAKE, "
+                f"TOWARD S FOR SHAKE OVER {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}, "
+                f"THEN FROM {s('arm-plate-located', 5)}."
+            ),
             f"IF NOT, INSPECT THE {n['pd-transgear-knob-shaft']} PINION, "
             f"{n['pd-rack-pinion']} DISC, {n['pd-transgear-knob-shaft']} JOURNAL AND "
             f"{bush} AND {n['pd-transgear-feed-pinion']} "
@@ -2712,7 +2733,7 @@ def _step_text(
             "REPLACE A DISC FOUND OUTSIDE THROUGH "
             f"{s('disc-cluster-assembled', 2)}-{s('disc-taps-transferred', 17)} ON THE "
             f"SAME HUB, ITS {hub_pin} PIN RIDING THE FLAT, AND REPEAT FROM "
-            f"{s('arm-plate-located', 9)}.",
+            f"{s('arm-plate-located', 4)}.",
             # The disc is screwed to the hub by then, so it is slackened before
             # it is centred again (codjiflo P3 on 593f4ee). One sub-step, as
             # the disc's (C1's move took the letter the slide-off had).
@@ -2724,9 +2745,9 @@ def _step_text(
             f"{s('disc-taps-transferred', 2)}, {s('disc-taps-transferred', 9)} AND "
             f"{s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 17)} ON A NEW "
             "ONE, THEN FROM "
-            f"{s('arm-plate-located', 9)}.",
+            f"{s('arm-plate-located', 4)}.",
             f"REPLACE A {n['pd-transgear-knob-shaft']} FOUND OUTSIDE AND REPEAT FROM "
-            f"{s('arm-plate-located', 9)}.",
+            f"{s('arm-plate-located', 4)}.",
             "IF ALL ARE INSIDE, UNCLAMP AND REPEAT FROM STEP "
             f"{steps.step_number('latch-pin-pressed')} WITH A NEW "
             f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-pin']} PIN AND "
@@ -2755,9 +2776,9 @@ def _step_text(
             # slides in is bonded, not scrapped with the arm (owner ruling
             # 2026-11-20 (Pedro), #2497; machinist exception
             # PD-00-press-salvage). The scrap rule stays at the bush's press
-            # (11) and the hub pin's (16); the latch dowel (10B) and the
-            # collar's pins (20) are bonded under their own exceptions; the
-            # MHA-PD-23 pin and the MHA-PD-20 spacer are bonded slip fits.
+            # (11), the latch dowel's (10B), the hub pin's (16) and the
+            # collar's pins (20); the MHA-PD-23 pin and the MHA-PD-20 spacer
+            # are bonded slip fits.
             # The cured dowel is read again before the plate goes on;
             # a bond that fails renews the arm's set as 13Y does. The plate
             # refit and its match mark share a sub-step (24-letter budget).
@@ -3084,8 +3105,9 @@ def _step_text(
             # register, N-01 and N-02).  The collar is renewed, rule 23's
             # press remedy (Codjiflo P2 on #3485: the bond salvage printed
             # no clearance).  The drive-pin offsets are REF targets on
-            # MHA-PD-22 and MHA-PD-09: their acceptance is this trial of the
-            # three wheels (owner ruling 2026-11-24, fit audit question 8).
+            # MHA-PD-22 (MHA-PD-09 keeps its printed band): their acceptance
+            # is this trial of the three wheels (owner ruling 2026-11-24, fit
+            # audit question 8, applied to MHA-PD-22 only).
             # No easing drill is printed; a wheel that binds is renewed.
             # A new collar has a fresh #11 bore and a fresh pin crest, and
             # MHA-PD-08's core and D-flat were made to the old ones, so every
@@ -4125,8 +4147,8 @@ def _steps_label(keys: tuple[str, ...]) -> str:
 SETTING_CAPTION_WIDTH = 26
 # DETAIL H carries the bond 13G points to (owner ruling 2026-11-20 (Pedro),
 # #2497: retaining compound only on the arm, which already carries DETAIL K's
-# jig-boring) and, under the fit audit of 2026-11-23 (pending owner
-# confirmation), the latch dowel's at 10B. Its prep and where the compound
+# jig-boring); a latch dowel that slides in at 10B, before that jig-boring,
+# renews the arm (Codjiflo r2 on #3486). Its prep and where the compound
 # goes are the machinist review's (592b20079f); as a note, 13G stays one
 # action (review of 70917f0316). The column under H's caption is empty down
 # to the title block, clear of DETAIL L left and DETAIL J right.

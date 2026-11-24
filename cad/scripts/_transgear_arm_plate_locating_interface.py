@@ -4,15 +4,17 @@ The arm's reamed holes run through: the dowel presses in from the rear to
 its proud set and punches out from the front; the plate slips over its
 proud end. Catalogue stock and whole-joint checks stay in the pin spec.
 
-Fit audit 2026-11-23 (pending owner confirmation): the dowel is 1/8, so the
+Owner ruling 2026-11-24, fit audit question 9: the dowel is 1/8, so the
 two holes are cut by the .1240 and .1260 members of the over/under reamer
 set (cad/config/shop-equipment/tools-reamers-taps.toml), each printed as its
 reamer's size with no band and accepted with the dowel itself: it does not
 enter the arm's hole by hand and slides into the plate's with no shake.
 What fails if either is .002 loose: the plate no longer returns to the
 knob-axis setting of MHA-PD-00 step 12, which sets the reducer mesh's
-centre distance (pd_rack_pinion_spec.CENTRE_DISTANCE_SET_BAND; the yaw of
-the two-hole registration carries the slip to K about 2.4 times over).
+centre distance inside DETAIL K's limits
+(pd_rack_pinion_spec.CENTRE_DISTANCE_TRIAL_BAND, the set band and the trial
+move's -.001; the yaw of the two-hole registration carries the slip to K
+about 2.4 times over).
 """
 
 from __future__ import annotations

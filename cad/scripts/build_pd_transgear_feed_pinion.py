@@ -854,7 +854,9 @@ def build(adapter) -> dict[str, str]:
     )
     # The bore and the boss print no band (fit audit 2026-11-23): the bore is
     # the reamer's size and MHA-PD-23 is turned to it; the boss is turned to
-    # the MHA-PD-17 hub's bore. Their callouts carry the acceptance.
+    # the MHA-PD-17 hub's bore. The boss's callout carries its acceptance;
+    # the bore's carries none, its pair's one acceptance is MHA-PD-23's
+    # note 1 (rule 4, form 2; Codjiflo r2 on #3492).
     set_dimension_symmetric_tolerance(
         adapter,
         "FlatReference",

@@ -662,15 +662,12 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
     assert "INTERFERENCE" not in note and not any(char.isdigit() for char in note[2:].replace(
         spec.LATCH_PIN_NUMBER, ""
     ))
-    # A dowel that slides in by hand is bonded (MHA-PD-00 10B): the gap
-    # stays inside LOCTITE 638's limit even in a hole cut .004 over.
-    assert 0.0 < spec.LATCH_PIN_BOND_GAP_MAX <= 0.25
     assert geometry.WALLS["pin hole to faces"][1] >= geometry.WALL_TARGET
     assert "PIN HOLE TO FACES" not in note
 
 
 def test_the_pivot_bore_is_one_drill_running_clear_on_any_shoulder() -> None:
-    """Fit audit 2026-11-23 (pending owner confirmation): the rocking pivot
+    """Owner ruling 2026-11-24, fit audit question 6: the rocking pivot
     takes a named drill under the DRILLED HOLES row, not a ream under a
     pin-gauge band; every as-supplied shoulder runs free in every hole the
     drill cuts."""

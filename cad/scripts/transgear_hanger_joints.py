@@ -109,7 +109,7 @@ if not BAR.PIVOT_TAP_CSK_DIA < PIVOT.SHOULDER_DIA + PIVOT.SHOULDER_DIA_LIMITS[0]
     raise AssertionError("the bar tap's countersink swallows the shoulder end")
 
 # --- MHA-PD-20 spacer bonded on the MHA-PD-VN-57 shoulder --------------------------
-# Bonded at the bench (fit audit 2026-11-23, pending owner confirmation; it
+# Bonded at the bench (owner ruling 2026-11-24, fit audit question 6; it
 # was R9-71's press): a #12 drilled hole, LOCTITE 638, cured with its front
 # face and the shoulder's end down together on a flat plate, so the screw
 # seats both on the bar as one body: the spacer turns with the screw while
@@ -129,13 +129,13 @@ SPRING_ROOM_MIN = (
     + PIVOT.SHOULDER_LEN_LIMITS[0]
     - (SPACER.LENGTH + SPACER.LENGTH_BAND)
     - (ARM.SPOT_FACE_FLOOR_FROM_FRONT + ARM.SPOT_FACE_FLOOR_BAND)
-)  # 0.693
+)  # 0.719
 SPRING_ROOM_MAX = (
     PIVOT.SHOULDER_LEN
     + PIVOT.SHOULDER_LEN_LIMITS[1]
     - (SPACER.LENGTH - SPACER.LENGTH_BAND)
     - (ARM.SPOT_FACE_FLOOR_FROM_FRONT - ARM.SPOT_FACE_FLOOR_BAND)
-)  # 0.957
+)  # 0.932
 if not SPRING.WORKING_HEIGHT <= SPRING_ROOM_MIN < SPRING_ROOM_MAX < SPRING.FREE_HEIGHT:
     raise AssertionError(
         f"MHA-PD-VN-63 room {SPRING_ROOM_MIN:.4f}..{SPRING_ROOM_MAX:.4f} leaves the "
@@ -147,7 +147,7 @@ if abs(SPRING.MODEL_HEIGHT - SPRING_ROOM_NOMINAL) > 1e-9:
 SPRING_PRELOAD_N = (
     SPRING.RATE_N_PER_MM * (SPRING.FREE_HEIGHT - SPRING_ROOM_MAX),
     SPRING.RATE_N_PER_MM * (SPRING.FREE_HEIGHT - SPRING_ROOM_MIN),
-)  # 18.6 .. 39.4
+)  # 20.6 .. 37.4
 
 # --- MHA-PD-20 bond: what it must hold ---------------------------------------
 # LOCTITE 638's ISO 10123 shear, 25 N/mm^2 minimum (TDS), derated by the
@@ -161,8 +161,8 @@ if SPACER.BOND_LAND_MIN > _SHOULDER_MIN:
     raise AssertionError("the spacer's bond land is longer than its diameter")
 SPACER_BOND_SHEAR_N = (
     LOCTITE_638_SHEAR_MPA * SPACER_BOND_FACTOR * math.pi * _SHOULDER_MIN * SPACER.BOND_LAND_MIN
-)  # 198
-SPACER_BOND_TORQUE_NMM = SPACER_BOND_SHEAR_N * _SHOULDER_MIN / 2.0  # 469
+)  # 199
+SPACER_BOND_TORQUE_NMM = SPACER_BOND_SHEAR_N * _SHOULDER_MIN / 2.0  # 472
 # The swinging arm, pressed on the rear face by the spring, tries to turn
 # the ring: the greatest preload at the rim of the largest O.D.
 # [INFERENCE: mu 0.5, the top of the textbook range for dry brass on steel;
@@ -170,13 +170,13 @@ SPACER_BOND_TORQUE_NMM = SPACER_BOND_SHEAR_N * _SHOULDER_MIN / 2.0  # 469
 SPACER_FACE_FRICTION = 0.5
 SPACER_DRAG_TORQUE_NMM = (
     SPACER_FACE_FRICTION * SPRING_PRELOAD_N[1] * (SPACER.OD + SPACER.OD_BAND) / 2.0
-)  # 113
+)  # 107
 # Between the cure and the screw's seating on the bar the spring pushes the
 # ring toward the shoulder's end with its whole preload; seated, the bar
 # carries it.
 SPACER_BOND_MARGIN_MIN = 2.0
-SPACER_BOND_TORQUE_MARGIN = SPACER_BOND_TORQUE_NMM / SPACER_DRAG_TORQUE_NMM  # 4.2
-SPACER_BOND_PUSH_MARGIN = SPACER_BOND_SHEAR_N / SPRING_PRELOAD_N[1]  # 5.0
+SPACER_BOND_TORQUE_MARGIN = SPACER_BOND_TORQUE_NMM / SPACER_DRAG_TORQUE_NMM  # 4.4
+SPACER_BOND_PUSH_MARGIN = SPACER_BOND_SHEAR_N / SPRING_PRELOAD_N[1]  # 5.3
 if min(SPACER_BOND_TORQUE_MARGIN, SPACER_BOND_PUSH_MARGIN) < SPACER_BOND_MARGIN_MIN:
     raise AssertionError(
         "the MHA-PD-20 LOCTITE 638 bond does not hold the spring's drag or push:"

@@ -505,12 +505,9 @@ def test_a_dowel_that_slides_into_the_arm_is_bonded() -> None:
         drawing.detail_cite("arm-plate-fitted") == f"(DETAIL H, SHEET {detail_sheet})"
     )
     note = " ".join(drawing.SETTING_DETAIL_CAPTIONS["H"].split())
-    # A collar dowel or pin that slides in renews the collar (step 20), so
-    # the note serves the latch dowel and the plate dowels only.
-    assert (
-        f"BOND NOTE ({drawing.sub_step('latch-pin-pressed', 1)}, "
-        f"{drawing.sub_step('arm-plate-fitted', 6)}):"
-    ) in note
+    # A collar dowel or pin that slides in renews the collar (step 20) and a
+    # latch dowel the arm (step 10), so the note serves the plate dowels only.
+    assert f"BOND NOTE ({drawing.sub_step('arm-plate-fitted', 6)}):" in note
     for words in (
         "PULL THE DOWEL.",
         "DEGREASE IT AND ITS HOLE.",
@@ -700,15 +697,38 @@ def test_view_k_carries_the_set_coordinates_as_assembly_model_dimensions() -> No
     # (owner ruling 2026-11-24, audit part 2 question C1).
     assert knob_setting.CENTRE_TOLERANCE_MM[0] == pytest.approx(-0.001 * 25.4)
     assert high - low - 0.00254 < knob_setting.CENTRE_TOLERANCE_MM[1] <= high - low
-    # One trial move each way keeps the table setting inside those limits;
-    # a second would pass one.
+    # C1 ("Yes, the trial may move the plate within those limits."): every
+    # setting the step reaches keeps N, indicated TRUE, inside the limits
+    # and clear of a bind with both running fits pressed shut (Codjiflo r2 on
+    # #3539: the old .001 away move let N reach about +.0027).
     lower = disc.CENTRE_DISTANCE + knob_setting.CENTRE_TOLERANCE_MM[0]
     upper = disc.CENTRE_DISTANCE + knob_setting.CENTRE_TOLERANCE_MM[1]
-    for moves in (-1, 0, 1):
-        assert lower <= math.hypot(*knob_setting.trial_setting(moves)) <= upper
-    for moves in (-2, 2):
-        assert not lower <= math.hypot(*knob_setting.trial_setting(moves)) <= upper
-    assert drawing.KNOB_TRIAL_MOVE_TEXT == ".0008 ALONG AND .0006 ACROSS"
+    error = knob_setting.TRUE_RADIAL_ERROR_MM
+    assert error == pytest.approx(0.0199, abs=1e-4)
+    aim = knob_setting.setting_radius(1, (0.0, 0.0))
+    # From the mid-band aim the limit leaves .00028 away from S: under the
+    # .0005 a hobby mill sets, so no away move prints.
+    assert knob_setting.TRIAL_AWAY_ROOM_MM == pytest.approx(upper - error - aim)
+    assert knob_setting.TRIAL_AWAY_ROOM_MM == pytest.approx(0.00028 * 25.4, abs=0.000005 * 25.4)
+    assert knob_setting.TRIAL_AWAY_ROOM_MM < knob_setting.TRIAL_MOVE_MIN_IN * 25.4
+    assert knob_setting.TRIAL_MOVE_AWAY_MM is None
+    assert drawing.KNOB_TRIAL_AWAY_MOVE_TEXT is None
+    # Toward S the limit leaves .00116, but the pressed-shut mesh binds with
+    # N under -.00079: the derived move is .0006 each way (.00085 along S-K).
+    toward = knob_setting.TRIAL_MOVE_TOWARD_MM
+    assert toward == pytest.approx((0.0006 * 25.4, 0.0006 * 25.4))
+    assert drawing.KNOB_TRIAL_MOVE_TEXT == ".0006 ALONG AND .0006 ACROSS"
+    lowest = knob_setting.setting_radius(-1, toward) - error
+    assert lowest == pytest.approx(knob_setting.TRIAL_LOWEST_CENTRE_MM)
+    assert lower < lowest and not knob_setting.binds(lowest)
+    # The .0008/.0006 pair the old rule printed would bind there.
+    old = (0.0008 * 25.4, 0.0006 * 25.4)
+    assert knob_setting.binds(knob_setting.setting_radius(-1, old) - error)
+    highest = aim + error
+    assert highest == pytest.approx(knob_setting.TRIAL_HIGHEST_CENTRE_MM) and highest < upper
+    # C3's gate at the top, every gate at the bottom.
+    assert round(knob_setting.TRIAL_HIGHEST_MESH.runout_contact_ratio_min, 3) >= 1.1
+    assert not knob_setting.TRIAL_LOWEST_MESH.failures()
     # The view marks the band and the two settings, at the places the model
     # owns; only the settings are references.
     assert knob_setting.DRAWING_DIMENSIONS == {
@@ -916,6 +936,11 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     tangential_err = dro + 2.0 * centring + 2.0 * centring * lever
     assert centring == pytest.approx(0.0005 * 25.4 / 2.0)
     assert radial_err == pytest.approx(0.0199, abs=1e-4)
+    # The spec charges the same budget against DETAIL K's limits for every
+    # setting the trial reaches (C1; Codjiflo r2 on #3539).
+    assert knob_setting.DRO_ACCURACY_MM == pytest.approx(accuracy)
+    assert knob_setting.TRUE_SWEEP_IN == drawing.KNOB_SETTING_SWEEP_IN
+    assert knob_setting.TRUE_RADIAL_ERROR_MM == pytest.approx(radial_err)
     # The printed values are the display's own counts: the operator dials
     # exactly what DETAIL K prints.
     # The 5 um scale's inch-mode count, .0002.
@@ -1506,7 +1531,7 @@ def test_the_pivot_screw_is_unlocked_and_the_spacer_bonded_as_made() -> None:
     """MHA-PD-VN-57 runs through the bar, its tip faced below the front face,
     and carries no lock (owner ruling U-MHA-PD-VN-57-no-lock, #1194): no
     stake, no threadlocker. The seat is shown in the pivot view. R9-6 never
-    faces MHA-PD-20.  Fit audit 2026-11-23 (pending owner confirmation): the
+    faces MHA-PD-20.  Owner ruling 2026-11-24, fit audit question 6: the
     spacer is bonded on the shoulder flush with its end (rule 23: the grade,
     the degrease, how it is held square while it cures, the compound kept
     off the running fit, and the cure before load), and the MHA-PD-VN-63
@@ -2070,27 +2095,30 @@ def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
         assert f"{steps.inch_window(band, 3, ' TO ')} PROUD" in _step_body(key)
 
 
-def test_an_over_pressed_latch_dowel_is_remade_with_its_arm() -> None:
+def test_an_over_pressed_or_slipping_latch_dowel_is_remade_with_its_arm() -> None:
     """#3124 / Codjiflo #3127: the dowel is pressed to height and the press
     is permanent (MHA-PD-18 RV-03), so a dowel set under the window stays in
     the arm it scraps; the remedy remakes both, as the later restarts do.
-    Fit audit 2026-11-23 (pending owner confirmation): a dowel that slides
-    into the reamed hole by hand is bonded per DETAIL H's note, not scrapped
-    with the arm; a bond that does not hold remakes both."""
+    A dowel that slides into the reamed hole by hand is a slip fit of
+    unknown clearance in an arm that does not yet carry DETAIL K's
+    jig-boring (#2497 allows compound only after it), so it remakes both
+    too, as the arm's traveler rejects the arm (Codjiflo r2 on #3486).  The
+    facts are asserted, not the wording (AGENTS.md, assembly data)."""
     texts = drawing._step_text(operating_domain=_unit_operating_domain())
-    rows = [" ".join(row.split()) for row in texts["latch-pin-pressed"]]
+    press, *remedies = (" ".join(row.split()) for row in texts["latch-pin-pressed"])
     low = steps.inch_text(drawing.setting_details.LATCH_PROUD_BAND[0], 3)
-    assert rows[1] == (
-        "IF THE DOWEL SLIDES IN BY HAND, BOND IT PER THE BOND NOTE AT "
-        f"{drawing.detail_cite('arm-plate-fitted')[1:-1]}."
-    )
-    assert rows[2] == (
-        f"IF IT READS UNDER {low}, OR A BONDED DOWEL MOVES WHEN PUSHED, MAKE A NEW "
-        f"{_number('pd-transgear-arm')} ARM AND "
-        f"{_number('pd-vn-transgear-latch-pin')} DOWEL AND REPEAT FROM STEP "
-        f"{steps.step_number('latch-pin-pressed')}."
-    )
-    assert len(rows) == 3
+    assert drawing.detail_cite("latch-pin-pressed") in press
+    remedy = " ".join(remedies)
+    for fact in (
+        "SLIDES IN BY HAND",
+        f"UNDER {low}",
+        f"NEW {_number('pd-transgear-arm')} ARM",
+        f"{_number('pd-vn-transgear-latch-pin')} DOWEL",
+        f"REPEAT FROM STEP {steps.step_number('latch-pin-pressed')}",
+    ):
+        assert fact in remedy, fact
+    assert "BOND" not in remedy and "LOCTITE" not in remedy
+    assert ("latch-pin-pressed", 1) not in drawing.BOND_NOTE_SUB_STEPS
 
 
 def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
@@ -2822,8 +2850,10 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     assert pivot[12] == "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW."
     assert pivot[13] == "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY."
     assert pivot[14] == "IF ALL THREE CHECKS PASS, SKIP 15R-15Z."
-    # The remedy takes the captured arm off before anything is cleaned.
-    assert pivot[15].startswith("UNSCREW ") and pivot[16] == "LIFT THE ARM OFF."
+    # The remedy takes the screw out with the arm captive on it (the bonded
+    # spacer keeps the arm on the shoulder) before anything is cleaned.
+    assert pivot[15].startswith("UNSCREW ")
+    assert pivot[16] == "LIFT IT OUT, THE ARM AND THE SPACER ON IT."
     assert pivot[17].startswith("FLUSH OIL INTO THE ARM'S BORE")
     assert "BAR BACK FACE" in pivot[18]
     # One repeat of the reseat, its checks, their skip and the strip: checks
@@ -2919,16 +2949,24 @@ def test_every_failure_branch_has_a_pass_exit() -> None:
         f"IF {s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)} PASSED, GO TO STEP "
         f"{steps.step_number('arm-plate-fitted')}."
     )
-    # Owner ruling 2026-11-24, audit part 2 question C1: one trial move of
-    # the table before a part is inspected.
+    # Owner ruling 2026-11-24, audit part 2 question C1: the trial's move
+    # before a part is inspected, toward S only (no away move is left inside
+    # the limits once TRUE's error is charged); a tight spot or no shake
+    # takes the inspection (Codjiflo r2 on #3539).
     assert located[17] == (
-        f"IF ONLY {s('arm-plate-located', 11)} OR ONLY {s('arm-plate-located', 12)} "
-        f"FAILED AND THE TABLE IS STILL AT {drawing.KNOB_SETTING_VIEW_NAME}'S SETTING, "
-        f"SLACKEN THE CLAMPS, MOVE THE TABLE {drawing.KNOB_TRIAL_MOVE_TEXT}, AWAY FROM "
-        "S FOR A TIGHT SPOT, TOWARD S FOR SHAKE OVER .008, AND REPEAT FROM "
-        f"{s('arm-plate-located', 5)}."
+        f"IF ONLY {s('arm-plate-located', 12)} FAILED, ON SHAKE OVER .008, AT "
+        f"{drawing.KNOB_SETTING_VIEW_NAME}'S SETTING, MOVE THE TABLE "
+        f"{drawing.KNOB_TRIAL_MOVE_TEXT} TOWARD S, THEN FROM {s('arm-plate-located', 5)}."
     )
-    assert located[5].startswith("TAP THE PLATE UNTIL KNOB BORE")
+    assert "AWAY FROM S" not in located[17]
+    # The re-indication reads N at the table's setting, DETAIL K's or as
+    # moved, so a moved plate reaches the pass exit (Codjiflo r2 on #3539).
+    assert located[14].endswith(
+        f"KNOB BORE {drawing.KNOB_BORE_LETTER} AT THE TABLE'S SETTING."
+    )
+    # Every return to the tap (12H's re-tap, the move, a part's retrial)
+    # frees the plate first.
+    assert located[5].startswith("SLACKEN THE CLAMPS AND TAP THE PLATE UNTIL KNOB BORE")
     assert located[18].startswith("IF NOT, INSPECT THE ")
 
 
@@ -3382,7 +3420,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     assert located.rindex("TAP THE PLATE") < trial
     recheck = located[lifted:]
     assert "S READS TRUE AT THE DRO'S ZERO" in recheck
-    assert f"KNOB BORE {drawing.KNOB_BORE_LETTER} AT ITS SETTINGS" in recheck
+    assert f"KNOB BORE {drawing.KNOB_BORE_LETTER} AT THE TABLE'S SETTING" in recheck
     assert "CLAMP THE ARM FRONT UP ON PARALLELS ON THE MILL TABLE" in located
     # The setting is made where the mesh is: S is indicated at the disc's height.
     assert "PIN BORE S, AT THE HEIGHT THE DISC WILL RUN" in located
@@ -3404,9 +3442,16 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"MOVE THE TABLE {drawing.KNOB_TRIAL_MOVE_TEXT}"
     ) < located.index("IF NOT, INSPECT")
     # The restart follows the part, one sub-step each: a new plate is set
-    # again from 12A, a new disc or sleeve is centred again before the trial
-    # is repeated, a new shaft only re-meshes.
-    trial = drawing.sub_step("arm-plate-located", 9)
+    # again from 12A, a new disc or sleeve is centred again; a new disc,
+    # sleeve or shaft is tried with the table back at DETAIL K's setting,
+    # never at a move made for the part it replaced (Codjiflo r2 on #3539).
+    retrial = f"REPEAT FROM {drawing.sub_step('arm-plate-located', 4)}."
+    located_texts = drawing._step_text(operating_domain=_unit_operating_domain())[
+        "arm-plate-located"
+    ]
+    assert located_texts[4].startswith(
+        f"SET THE TABLE TO {drawing.KNOB_SETTING_VIEW_NAME}'S "
+    )
     for remedy in (
         f"REPLACE A {_number('pd-transgear-knob-bush')} BUSH FOUND OUTSIDE WITH A NEW BUSH AND "
         f"{_number('pd-transgear-arm-plate')} PLATE PER {drawing.sub_step('pin-pressed', 9)}-"
@@ -3415,8 +3460,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         "REPLACE A DISC FOUND OUTSIDE THROUGH "
         f"{drawing.sub_step('disc-cluster-assembled', 2)}-"
         f"{drawing.sub_step('disc-taps-transferred', 17)} ON THE SAME HUB, ITS "
-        f"{_number('pd-vn-transgear-hub-key-pin')} PIN RIDING THE FLAT, "
-        f"AND REPEAT FROM {trial}.",
+        f"{_number('pd-vn-transgear-hub-key-pin')} PIN RIDING THE FLAT, AND {retrial}",
         f"REPLACE A {_number('pd-transgear-feed-pinion')} FOUND OUTSIDE: SLIDE THE HUB "
         "AND DISC OFF IT AS ONE, THE PIN RIDING THE FLAT, THE DISC SCREWS "
         "SLACKENED, REPEAT "
@@ -3426,8 +3470,9 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"{drawing.sub_step('disc-taps-transferred', 2)}, "
         f"{drawing.sub_step('disc-taps-transferred', 9)} AND "
         f"{drawing.sub_step('disc-taps-transferred', 12)}-"
-        f"{drawing.sub_step('disc-taps-transferred', 17)} ON A NEW ONE, THEN FROM {trial}.",
-        f"REPLACE A {_number('pd-transgear-knob-shaft')} FOUND OUTSIDE AND REPEAT FROM {trial}.",
+        f"{drawing.sub_step('disc-taps-transferred', 17)} ON A NEW ONE, THEN FROM "
+        f"{drawing.sub_step('arm-plate-located', 4)}.",
+        f"REPLACE A {_number('pd-transgear-knob-shaft')} FOUND OUTSIDE AND {retrial}",
     ):
         assert remedy in located
     assert f"IF ALL ARE INSIDE, UNCLAMP AND REPEAT FROM STEP {steps.step_number('latch-pin-pressed')}" in located

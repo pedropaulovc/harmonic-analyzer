@@ -1365,11 +1365,11 @@ Catalog specifications checked on September 10, 2026:
   package of 100, $16.11. It is not in the sequential 1/8 series
   (98381A469 is 1/8 x 1/4 per two reseller listings; 98381A473 and
   98381A474 are 3/4 and 7/8). It replaces the 3/32 x 5/16 98381A435 (read
-  November 2, 2026; #290) under the fit audit of 2026-11-23, pending owner
-  confirmation: at 1/8 the arm's press and the plate's slip are cut by the
-  .1240 and .1260 reamers of the over/under set, so no .0945 reamer is
+  November 2, 2026; #290) under the owner's ruling of 2026-11-24 on fit
+  audit question 9: at 1/8 the arm's press and the plate's slip are cut by
+  the .1240 and .1260 reamers of the over/under set, so no .0945 reamer is
   bought for two holes. `_transgear_arm_plate_locating_interface.py` owns
-  the two reamer sizes, the proud set and the mouth breaks;
+  the two reamer sizes and the proud set;
   `pd_vn_transgear_arm_plate_locating_pin_spec.py` keeps the purchased-pin
   data and the fit and insertion arithmetic. `diag_build_98381A216.py`
   models the plain nominal cylinder; catalogue-only, no vendor model, no

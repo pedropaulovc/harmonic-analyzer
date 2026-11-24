@@ -270,7 +270,7 @@ if _STUD_STATION_BAND > printed_band_mm(TIP_STATION_PLACES, unit=UNIT):
     raise AssertionError("MHA-PD-08 prints F from the tip looser than its stacks charge")
 
 # --- Solid D-core; no gear bore and no transverse torque hole ---------------
-# Made to fit (fit audit 2026-11-23, pending owner confirmation; owner,
+# Made to fit (owner ruling 2026-11-24, fit audit question 7; owner,
 # 2026-11-23: "can the holes not be reamed in the first place").  The drive
 # collar's bore is drilled #11 and this core is turned to slide in it by hand
 # with no shake; the D-flat is then milled last, a little at a time, until the
@@ -411,8 +411,11 @@ CORE_ACTIVE_LENGTH_MIN = (
 # It prints as the single limit .007 MAX from F (machinist review r1 of the
 # fit batch: the former limits .007/.002 were a band .005 wide with no
 # necessity answer): the modelled end IS the farthest the tool may stop, and
-# the nearest is F itself, which the tool never cuts.  Between the two the
-# end lies in air over the neck, so the solid is the same wherever it stops.
+# the nearest is F itself, which the tool never cuts: the neck note prints
+# GEAR FACE UNCUT (Codjiflo r2 on #3485), so a tool end at or past F, which
+# would nick the face MHA-PD-22's rear face bears on and the collar's stack
+# datum, is outside the sheet.  Between the two the end lies in air over
+# the neck, so the solid is the same wherever it stops.
 CORE_FLAT_CUT_END_FROM_F = 0.1778  # .007 MAX
 CORE_FLAT_CUT_END_LIMITS = (0.0, CORE_FLAT_CUT_END_FROM_F)  # F .. .007
 CORE_FLAT_CUT_END_TOL_TYPE = SINGLE_LIMIT_TOL_TYPE

@@ -245,20 +245,25 @@ NOTE_TEXTS = (
         f"RUNNING FIT IN {_mate_name(_config.parts('pd-transgear-knob-bush'))}: "
         "TURN TO ITS REAMED BORE, TURNS FREE WITH NO SHAKE.",
     ),
-    # Made to fit (fit audit 2026-11-23, pending owner confirmation): the
+    # Made to fit (owner ruling 2026-11-24, fit audit question 7): the
     # collar's bore is drilled and its pin pressed first; the core's Ø and
     # the flat's distance print as REF and link this note, whose two fits by
     # feel are the requirement.  No reason prints (owner ruling 2026-11-24:
     # a justification on the sheet is narration).  The acceptance prints
     # here once, on the member made last; MHA-PD-22's bore callout names
-    # this core.
+    # this core.  The pressed pin's crest stands inside the bore from the
+    # rear face to its floor, so the round core is tried from the pilot end,
+    # where the bore is clear of it (Codjiflo r2 on #3485).
     (
         D_SECTION_FIT_NOTE,
-        f"MADE TO FIT {_COLLAR}: CORE SLIDES IN ITS BORE BY HAND, NO SHAKE; "
-        "D-FLAT: COLLAR WITH PIN PRESSED SLIDES ON BY HAND.",
+        f"MADE TO FIT {_COLLAR}: CORE ENTERS ITS BORE FROM THE PILOT END UP TO "
+        "THE PIN BY HAND, NO SHAKE; D-FLAT: COLLAR WITH PIN PRESSED SLIDES ON BY "
+        "HAND.",
     ),
     (STATIONS_NOTE, f"D-FLAT SEAT UNDER {_COLLAR}."),
-    (NECK_NOTE, f"NECK AND D-FLAT END UNDER {_COLLAR}."),
+    # The flat's end prints .007 MAX from F with no lower limit, so the note
+    # says the tool stops short of F (Codjiflo r2 on #3485).
+    (NECK_NOTE, f"NECK AND D-FLAT END UNDER {_COLLAR}; GEAR FACE UNCUT."),
     (THREAD_NOTE, f"FULL THREAD FOR {_mate_name(_config.parts('pd-transgear-thumbnut'))}."),
 )
 # Rule 7: a note runs to four short lines at most.

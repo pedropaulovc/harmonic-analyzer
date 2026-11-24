@@ -70,8 +70,12 @@ demoted:
   pd_paper_drive_assembly: fit-batch-pd
   pd_platen_bottom_guide: fit-batch-pd
   pd_platen_guide: fit-batch-pd
+  # Final farm run on 237cdfc514 read FIX (gear data MATCHED while the span
+  # limits print live; issue #3525). Owner ruling 2026-11-24, main during fit
+  # conversion: "better to be able to cut releases with known issues than to
+  # hold unreleased code".
+  pd_rack_pinion: fit-batch-pd
   pd_support_bar: fit-batch-pd
-  pd_transgear_arm: fit-batch-pd
   pd_transgear_disc_hub: fit-batch-pd
   pd_transgear_feed_pinion: fit-batch-pd
   pd_transgear_front_bushing: fit-batch-pd

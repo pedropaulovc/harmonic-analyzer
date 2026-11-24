@@ -230,15 +230,23 @@ def test_the_functional_station_runs_from_the_head_seat_to_the_load_wall() -> No
     assert drawing.LOAD_WALL_X < drawing.GROOVE_REAR_X < drawing.SEAT_X
 
 
-def test_the_station_names_the_stack_it_sets() -> None:
-    """Rule 4: the station's ±band names the stack it serves by drawing number."""
+def test_the_station_prints_value_and_band_and_the_register_names_its_stack() -> None:
+    """Rule 7 (final farm run on 237cdfc514, the machinist's one gating
+    finding): the groove's ±.001 location prints value and band only; the
+    stack it sets is necessity N-03's reason, by drawing number."""
+    import machinist_necessity
     import transgear_cluster_fit as fit
 
-    callout = _below("GrooveStation")
-    assert callout == callouts.GROOVE_STATION_CALLOUT
-    assert "\n" not in callout and spec.FRONT_BUSHING_NUMBER in callout
+    assert "GrooveStation" not in callouts.callouts_by_lane(callouts.CALLOUT_BELOW)
+    assert not hasattr(callouts, "GROOVE_STATION_CALLOUT")
     assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 3
     assert fit.GS[1:] == (spec.GROOVE_STATION, spec.GROOVE_STATION_BAND)
+    entries = machinist_necessity.load_necessity(
+        Path(_config.__file__).resolve().parents[1] / "config", "pd_transgear_pin"
+    )
+    (station,) = [entry for entry in entries if "1.923 ±.001" in entry.feature]
+    assert station.kind == "gap"
+    assert "MHA-PD-10" in station.reason and spec.FRONT_BUSHING_NUMBER in station.reason
 
 
 def test_the_dome_heights_and_the_overall_print_as_references() -> None:
@@ -386,12 +394,15 @@ def test_the_shank_is_made_to_fit_and_prints_no_limits() -> None:
         "(RUNNING CLEARANCE .0010-.0025 REF)",
     ]
     assert callouts.RUNNING_CLEARANCE_TEXT == callouts.SHANK_CALLOUT.split("\n")[1]
-    # Codjiflo on #3506: the callout's module imports no mate's spec, so a
-    # sleeve edit does not re-key this part.
+    # Codjiflo on #3506 and its round 2: neither the callout's module nor
+    # the drawing script imports a mate's spec, so a sleeve edit does not
+    # re-key this part; the requirement reads the pin's own clearance.
     assert not hasattr(callouts, "SLEEVE")
-    assert "pd_transgear_feed_pinion_spec" not in Path(callouts.__file__).read_text(
-        encoding="utf-8"
-    )
+    assert not hasattr(drawing, "SLEEVE")
+    for module in (callouts, drawing):
+        assert "pd_transgear_feed_pinion_spec" not in Path(module.__file__).read_text(
+            encoding="utf-8"
+        )
     # Printed on the pin only: none of the three bores repeats the range.
     import pd_transgear_feed_pinion_callouts as sleeve_callouts
     import pd_transgear_front_bushing_spec as front_bushing

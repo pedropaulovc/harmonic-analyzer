@@ -80,8 +80,8 @@ def test_the_bore_is_a_bonded_slip_fit_on_the_shoulder_at_every_limit() -> None:
     so screw and spacer seat on the bar as one body: the largest shoulder
     still slips into the smallest drilled hole, and the smallest in the
     largest stays inside LOCTITE 638's gap limit, the one the repo's other
-    638 joints are held to (fit audit 2026-11-23, pending owner
-    confirmation)."""
+    638 joints are held to (owner ruling 2026-11-24, fit audit question
+    6)."""
     import cone_tip_cluster
     import dt_pinion_arbor_geometry
     import sm_gooseneck_spring_joint
@@ -102,6 +102,24 @@ def test_the_bore_is_a_bonded_slip_fit_on_the_shoulder_at_every_limit() -> None:
     # The ring may cure off the screw's axis by half the widest gap.
     assert spec.SEAT_OFFSET_MAX == pytest.approx(loosest / 2.0)
     assert not hasattr(spec, "PRESS_INTERFERENCE")
+
+
+def test_the_tightest_bond_gap_absorbs_the_drilled_bore_squareness() -> None:
+    """Codjiflo r2 on #3487: the front face cures in one plane with the
+    shoulder's end only if the ring can tilt on the shoulder, inside its
+    tightest gap over its shortest land, as far as its bore is off square to
+    that face.  The sheet holds the drilled bore at the angular row alone,
+    so MHA-PD-00's dry trial (the spacer as made shows no daylight on the
+    plate, the screw held down on it) accepts each ring; the tailstock
+    drill's run-off the repo charges elsewhere (the arm's 0.3 degrees) sits
+    inside that tilt, so the trial is not expected to reject a sound ring."""
+    import pd_transgear_arm_geometry as arm
+
+    tilt = spec.BOND_GAP[0] / spec.BOND_LAND_MIN
+    assert tilt == pytest.approx(0.0381 / (5.0 - 0.0254 - 2 * 0.254), rel=1e-3)
+    run_off = math.tan(math.radians(arm.DRILL_RUN_OFF_DEG))
+    assert run_off < tilt
+    assert tilt - run_off > 0.003  # rad: 0.0085 against 0.0052
 
 
 def test_wall_holds_the_target_at_the_full_worst_case() -> None:

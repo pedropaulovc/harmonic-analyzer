@@ -66,7 +66,6 @@ from _printed_limits import limits
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-import pd_transgear_feed_pinion_spec as SLEEVE
 import pd_transgear_pin_callouts as callouts
 from pd_transgear_pin_spec import (
     ARM_NUMBER,
@@ -91,6 +90,7 @@ from pd_transgear_pin_spec import (
     LENGTH,
     OVERALL_LENGTH,
     RING_NUMBER,
+    RUNNING_CLEARANCE,
     RUNNING_MATES,
     SEAT_FILLET_R,
     SURFACE_FINISHES,
@@ -242,7 +242,6 @@ _P = DRAWING_PRECISION_BY_NAME
 _SELF = "draw_pd_transgear_pin"
 _KEEP = (_SELF, "SIDE_KEEP")
 _NOTES = ("pd_transgear_pin_callouts", "DRAWING_NOTES")
-_SLEEVE = "pd_transgear_feed_pinion_spec"
 _TIP_ROOT = LENGTH - TIP_DOME_SAG
 part_metadata(
     model_sources=(
@@ -371,8 +370,8 @@ requirement(
         ),
         "dia_nominal": (DIA, ("DIA",)),
         "diametral_clearance": (
-            list(SLEEVE.BORE_DIAMETRAL_CLEARANCE),
-            ((_SLEEVE, "BORE_DIAMETRAL_CLEARANCE"), "DIA_BAND"),
+            list(RUNNING_CLEARANCE),
+            ("RUNNING_CLEARANCE", "RUNNING_BORE_DIA_BAND", "DIA_BAND"),
         ),
         "mates": (list(RUNNING_MATES), ("RUNNING_MATES", _NOTES)),
         "bonded_in": (ARM_NUMBER, ("ARM_NUMBER", _NOTES)),

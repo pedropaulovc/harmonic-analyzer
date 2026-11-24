@@ -177,9 +177,10 @@ polish_dia_min_mm = 3.18008
 polish_dia_max_mm = 3.18516
 polish_stop_in = 0.125
 # Passes in turning_deflection's screens (0.10 mm rough, 0.005 mm finish) on
-# the journal between chuck and centre: .004 in a side at .002 in/rev, and
-# .0003 in a side at .001 in/rev.
-rough_radial_doc_mm = 0.1
+# the journal between chuck and centre: .0038 in a side at .002 in/rev, and
+# .0003 in a side at .001 in/rev. (.004 bent the one-diameter shank roughed
+# to Ø.1285, its Q5 band's floor plus allowance, 0.1007 mm: over the screen.)
+rough_radial_doc_mm = 0.09652
 finish_radial_doc_mm = 0.0076
 turn_feed_mm_rev = 0.0508
 finish_feed_mm_rev = 0.0254
@@ -326,7 +327,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Rough in passes of .004 in on the radius, the tool clear of the centre at the start of each, each pass starting at Z+{{process.turn_start_z_mm:in.3dot}} in the stub (the journal runs on into it, so the tip cut in Op 180 leaves no collar): from there to Z{{process.seat_rough_z_mm:in.3dot}} (.005 short of the seat) to Ø{{cad.outer_rough_dia_mm:in.4dot}}."
+instruction = "Rough in passes of .0038 in on the radius, the tool clear of the centre at the start of each, each pass starting at Z+{{process.turn_start_z_mm:in.3dot}} in the stub (the journal runs on into it, so the tip cut in Op 180 leaves no collar): from there to Z{{process.seat_rough_z_mm:in.3dot}} (.005 short of the seat) to Ø{{cad.outer_rough_dia_mm:in.4dot}}."
 settings = "lathe-ar-light-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 

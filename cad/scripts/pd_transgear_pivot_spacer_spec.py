@@ -52,9 +52,9 @@ UNIT = drawing_unit(
 OD = 11.176  # .44
 OD_PLACES = 2
 OD_BAND = printed_band_mm(OD_PLACES, unit=UNIT)
-# The bore is a bonded slip fit on the .1875 -.0010/0 shoulder (fit audit
-# 2026-11-23, pending owner confirmation; owner: "can the holes not be reamed
-# in the first place"): a #12 drill at the title block's DRILLED HOLES row,
+# The bore is a bonded slip fit on the .1875 -.0010/0 shoulder (owner ruling
+# 2026-11-24, fit audit question 6, which reverses R9-71's press and #2144
+# item 4.4's mandrel facing): a #12 drill at the title block's DRILLED HOLES row,
 # LOCTITE 638 in the gap.  Nothing reads its size but the bond's gap and the
 # wall, so it prints the drill and no band; BORE_DIA_BAND is the ANALYSIS
 # band of what the drill cuts (the DRILLED HOLES row), not a printed limit.
@@ -77,7 +77,8 @@ BORE_CALLOUT = f"{BORE_DRILL} DRILL THRU"
 # the MHA-PD-06 disc's statistical air to the platen under its floor
 # (build_pd_paper_drive_assembly PLATEN_AIR; test_pd_transgear_pivot_spacer_drawing
 # computes both).  ±.001 is the shop's row for a turned length.
-# Fit audit 2026-11-23, pending owner confirmation.
+# It follows owner ruling 2026-11-24, fit audit question 6 (the spacer
+# drilled and bonded, so no mandrel facing holds a parallelism frame).
 LENGTH = 5.0
 LENGTH_PLACES = 3
 LENGTH_TOLERANCE = 0.0254  # ±.001
@@ -110,11 +111,19 @@ SEAT_OFFSET_MAX = BOND_GAP[1] / 2.0
 # The ring is bonded on the shoulder with its front face and the shoulder's
 # end down together on a flat plate (MHA-PD-00), so the front face lies in
 # the plane that seats on the bar and the bore plays no part in the arm's
-# attitude: the arm, seated on the rear face, tilts to the bar by the rear
+# attitude.  That needs the bore square enough to the front face for the
+# ring to tilt that much inside its tightest bond gap (BOND_GAP[0] over
+# BOND_LAND_MIN): the sheet holds the drilled bore only at the angular
+# row, so MHA-PD-00's dry trial (15C: the spacer, as made, shows no
+# daylight on the plate with the screw held down on it) is its acceptance,
+# and test_pd_transgear_pivot_spacer_drawing ties the tailstock drill's
+# run-off to that tilt (Codjiflo r2 on #3487).  The arm, seated on the rear
+# face, tilts to the bar by the rear
 # face's parallelism to the front over the smallest flat it seats on
 # (FACE_PARALLELISM_ZONE_DIA).  No frame prints it (machinist review
 # 20261124T013305458Z, rule 5: a face-to-face frame on a spacer is
-# over-specification; it replaced #2144 item 4.4's mandrel facing): the
+# over-specification; with owner ruling 2026-11-24, fit audit question 6,
+# it replaced #2144 item 4.4's mandrel facing): the
 # length's printed limits hold at every place round the rim, so the faces
 # cannot be out of parallel by more than the band's whole spread
 # (REAR_FACE_PARALLELISM below), and every hanger-tilt stack is judged at

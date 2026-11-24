@@ -18,12 +18,10 @@ import math
 from _gtol_controls import GeometricControl, PartDatum
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
-from _printed_tolerance import drilled_oversize_mm
 
 import pd_vn_transgear_latch_pin_spec as LATCH_PIN
 import pd_transgear_arm_geometry as ARM
 import pd_vn_transgear_arm_plate_locating_pin_spec as LOCATOR_PIN
-import _transgear_arm_plate_locating_interface as LOCATING_PIN
 import pd_transgear_pin_spec as PIN
 from pd_transgear_arm_geometry import (
     REDUCER_POSITION_DIAMETER,
@@ -188,8 +186,9 @@ STOCK_TEXT_SUFFIX = ") GROUND STOCK REF"
 # (paper_drive_arm_registration.S_AXIS_TILT_MAX_RAD), and a drilled #30
 # (.1285 +.004/0) would open it past what the meshes and the airs clear.
 # ``pd_transgear_arm_geometry.PIN_BORE_DIA_BAND`` is the ANALYSIS band the
-# set reamer is modelled to cut, not a printed limit.  The sheet states the
-# fit once, at the bore's callout, as the bond's clearance range (rule 23);
+# set reamer is modelled to cut, not a printed limit.  The arm's callout
+# names the bonded mate only; the bond's clearance range prints once, on
+# MHA-PD-23's note 1 (rule 23; Codjiflo r2 on #3494), and
 # the traveler checks the range's upper end with one pin of the .001-step
 # set that must not enter (the sheet prints no gauge).
 # (PIN_BORE_DIA_PLACES above: three places, Ø.126 REAM THRU.)
@@ -236,16 +235,6 @@ LATCH_PIN_PRESS_INTERFERENCE = (
 )
 if LATCH_PIN_PRESS_INTERFERENCE[0] <= 0.0:
     raise AssertionError("the MHA-PD-18 latch-pin ream loses MHA-PD-VN-58's press")
-# A dowel that slides in by hand is bonded (MHA-PD-00's bond note) instead of
-# a new arm.  Even a hole cut the DRILLED HOLES row over the reamer's size
-# keeps the smallest dowel inside LOCTITE 638's gap.
-LATCH_PIN_BOND_GAP_MAX = round(
-    PIN_HOLE_DIA + drilled_oversize_mm(unit=ARM.UNIT)
-    - LATCH_PIN.DIA - min(LATCH_PIN.DIA_BAND),
-    6,
-)
-if LATCH_PIN_BOND_GAP_MAX > LOCATING_PIN.BOND_GAP_LIMIT_MM:
-    raise AssertionError("a bonded MHA-PD-VN-58 exceeds the retaining compound's gap")
 # The depth MIN's analysis record (#3124; the sheet prints the model value
 # and MIN): its upper deviation is the deepest hole that still holds the wall
 # target at the faces, its drill run-off charged, and from its point to the

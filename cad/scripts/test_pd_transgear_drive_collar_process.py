@@ -22,6 +22,7 @@ import _cam_programs
 import _process_plans
 import cam_nc
 import export_features
+import pd_transgear_drive_collar_spec as SPEC
 
 STEM = "pd_transgear_drive_collar"
 PLAN = tomllib.loads(_process_plans.plan_path(STEM).read_text(encoding="utf-8"))
@@ -206,3 +207,17 @@ def test_a_seeded_fault_in_the_program_is_caught(
     seeded = _seed(ctx, key, old, new)
     _post(seeded, tmp_path)
     assert {finding.check for finding in _findings(seeded, tmp_path)} >= {check}
+
+
+def test_the_flat_pin_centre_is_accepted_inside_the_band_less_the_reading_bias() -> None:
+    # Codjiflo round 2 on #3485: the loose pins read up to the bias off the
+    # true centre, so a reading inside the printed band less the bias each
+    # side is what proves the centre inside the print.
+    p = PLAN["parameters"]
+    bias_mm = p["over_pins_bias_in"] * 25.4
+    lo = SPEC.FLAT_PIN_CENTRE - SPEC.FLAT_PIN_CENTRE_TOL + bias_mm
+    hi = SPEC.FLAT_PIN_CENTRE + SPEC.FLAT_PIN_CENTRE_TOL - bias_mm
+    assert p["flat_centre_accept_min_in"] * 25.4 == pytest.approx(lo, abs=1e-6)
+    assert p["flat_centre_accept_max_in"] * 25.4 == pytest.approx(hi, abs=1e-6)
+    assert p["flat_centre_accept_min_mm"] == pytest.approx(lo, abs=1e-6)
+    assert p["flat_centre_accept_max_mm"] == pytest.approx(hi, abs=1e-6)
