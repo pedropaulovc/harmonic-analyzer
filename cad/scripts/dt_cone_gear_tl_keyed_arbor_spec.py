@@ -120,8 +120,11 @@ KEYED_GEARS: tuple[Blank, ...] = (
 )
 if len(KEYED_GEARS) != 17:
     raise AssertionError("the arbor serves the sixteen keyed cones and the 64T")
-if any(cone.bore_dia_mm(t) != cone_land_key.LAND_DIA_MM for t in cone.KEYED_TEETH):
-    raise AssertionError("a keyed cone gear is no longer bored for land 1")
+if any(
+    cone.bore_dia_mm(t) != cone.land_seat_reamer_mm(cone_land_key.LAND_DIA_MM)
+    for t in cone.KEYED_TEETH
+):
+    raise AssertionError("a keyed cone gear is no longer reamed for land 1")
 BORE_MIN_MM = min(blank.bore[0] for blank in KEYED_GEARS)
 BORE_MAX_MM = max(blank.bore[1] for blank in KEYED_GEARS)
 FACE_MIN_MM = min(blank.face[0] for blank in KEYED_GEARS)

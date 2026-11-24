@@ -1,0 +1,23 @@
+# Why each REAM and each band under the title block stays on MHA-DT-04
+# (drawing-guidelines rule 4; owner ruling 2026-11-24: "In the part's
+# registry file, not on the sheet. The sheet stays clean; the reviewer fails
+# a tight feature that has no registry reason."). Read by the machinist review
+# only. The journal and both lands are turned last to their mates and print
+# as references with their acceptance (form 2): no entry. Fit batch DT,
+# 2026-11-24.
+necessity:
+  - id: N-01
+    feature: "sheet 1, tip end view, Ø.0625 REAM .20 socket (SEE NOTE 2)"
+    kind: mesh
+    reason: "spigot float tilts T012 and T018 off the running axis"
+    source: "cone_running_axis (MHA-DT-37 cures off-centre and tilted in the socket); the MHA-DT-37 spigot is turned to this socket"
+  - id: N-02
+    feature: "sheet 1, section A-A, keyseat width .0625 +.0020/-.0000 (NOTE 1)"
+    kind: trace
+    reason: "key side play turns land 1's gears off their phase"
+    source: "error_budget cone_key_play; cut by one pass of a 1/16 end mill, key MHA-DT-VN-71 slides in"
+  - id: N-03
+    feature: "sheet 1, section A-A, keyseat S .3355 +.0000/-.0040 (NOTE 1)"
+    kind: gap
+    reason: "keeps the key's top clear of the gears' keyways"
+    source: "cone_land_key KEY_TOP_RADIAL_CLEARANCE_FLOOR_MM (.0015) and its key-edge depth"
