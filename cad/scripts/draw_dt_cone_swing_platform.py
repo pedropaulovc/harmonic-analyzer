@@ -6,7 +6,7 @@ defines the reamed pivot bore; section A-A exposes the shallow pivot-head
 relief and plate thickness in solid lines.  Display precision comes from the
 model.
 
-The platform is an asymmetric steel wedge with a 1/4-in reamed H7 pivot
+The platform is an asymmetric steel wedge with a .2510 reamed pivot
 bore on the stock screw shoulder, paired 1/4-20 post-mount taps, an open
 west-edge lock notch, three rounded plan corners, the chamfered south-east
 corner and the counterbored #4
@@ -68,7 +68,6 @@ from _drawing_hole_callout import (
     add_native_hole_callout,
     set_hole_callout_precision,
 )
-from _drawing_tolerances import _tolerance_places
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -108,7 +107,9 @@ from dt_cone_swing_platform_drawing_spec import (
     HOLDDOWN_CALLOUT_BELOW,
     HOLDDOWN_PROCESS,
     PIVOT_BORE_CALLOUT_BELOW,
+    PIVOT_CALLOUT_PLACES,
     PIVOT_PROCESS,
+    PIVOT_SHOULDER_NUMBER,
     POST_MOUNT_LOCATING_CALLOUT,
     TOP_FACE_LABEL,
     UNDERSIDE_LABEL,
@@ -1565,34 +1566,32 @@ def _rewrite_hole_callout(
     print(f"{label} callout: definitions={persisted!r} resolved={resolved!r}")
 
 
-@_telemetry.traced("drawing.cone_swing_platform.pivot_band_places")
-def _print_pivot_band_exactly(display: Any) -> None:
-    """Print the pivot ream's size and band at the places they need, natively.
+@_telemetry.traced("drawing.cone_swing_platform.pivot_size_places")
+def _print_pivot_reamer_size(display: Any) -> None:
+    """Print the pivot ream's size at the reamer's own places, natively.
 
-    The callout's ``<hw-diam>`` shows the Hole Wizard feature's band at the
-    template's tolerance places, so the H7 band read "+.00/.00".
-    ``SetPrecision3`` cannot set a hole callout's places;
-    ``ICalloutLengthVariable`` can: the reamed .2500 and its band print the
-    band's four places.
+    The bore carries no band (owner ruling 2026-11-24, fit audit question
+    10: the .2510 reamer, the shoulder as the gauge), so the callout's
+    ``<hw-diam>`` prints only the reamer's size, .251.  ``SetPrecision3``
+    cannot set a hole callout's places; ``ICalloutLengthVariable`` can.
 
     This render-time precision write is the declared exception RV-01 in
     ``cad/config/parts/dt-cone-swing-platform.yaml`` (Owner ruling
     2026-11-08 (Pedro), #2144 item 1.2): a hole callout does not inherit the
-    part's places.  With the Hole Wizard diameter's tolerance precision
-    authored as 4 on the part (read back 4), the callout's ``<hw-diam>``
-    still reported -1, the document default (farm run 20261102T230110877Z).
-    The places come from the part's band, never a literal.
+    part's places.  With the Hole Wizard diameter's precision authored on
+    the part (read back), the callout's ``<hw-diam>`` still reported -1, the
+    document default (farm run 20261102T230110877Z).  The places come from
+    the drawing spec's PIVOT_CALLOUT_PLACES, never a literal.
     """
     from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
 
-    places = _tolerance_places(*_part.PIVOT_HOLE_BAND, display_unit=UNIT)
+    places = PIVOT_CALLOUT_PLACES
     for raw in display.GetHoleCalloutVariables() or ():
         if str(dynamic_dispatch(raw._oleobj_).VariableName) != "hw-diam":
             continue
         length = _early_bound(raw, "ICalloutLengthVariable")
         length.Precision = places
-        length.TolerancePrecision = places
-        if (int(length.Precision), int(length.TolerancePrecision)) != (places, places):
+        if int(length.Precision) != places:
             raise RuntimeError("pivot reamed bore: places did not persist")
         return
     raise RuntimeError("pivot reamed bore: callout has no <hw-diam> variable")
@@ -2466,7 +2465,7 @@ def _place_holes_sheet(adapter: Any) -> list[Any]:
         pivot_callout_definitions,
         label="pivot reamed bore",
     )
-    _print_pivot_band_exactly(pivot_callout)
+    _print_pivot_reamer_size(pivot_callout)
     post_mount_callout = add_native_hole_callout(
         adapter,
         plan,
@@ -2619,29 +2618,31 @@ requirement(
     },
     precision={"finish_ra": 1},
 )
-# The pivot bore, the layout origin: a native 1/4 Hole Wizard hole reamed
-# .2500 +.0005/.0000 THRU (PIVOT_HOLE_BAND, four places), a running fit on
-# the MHA-DT-VN-52 shoulder.
+# The pivot bore, the layout origin: a native 1/4 Hole Wizard hole at the
+# .2510 reamer's size, REAM THRU, no band; the MHA-DT-VN-52 shoulder is the
+# gauge (owner ruling 2026-11-24, fit audit question 10).  ``dia`` is the
+# spec's ANALYSIS band (what the reamer is modelled to cut), carried for the
+# traveler's reamer check only; it is not a requirement.
 requirement(
     "pivot_bore",
     kind="hole",
     faces=(CylinderFace(PIVOT_HOLE_DIA),),
-    requirements=("dia", "thru", "process"),
+    requirements=("thru", "process", "mate"),
     fields={
         "at": ([0.0, _T, 0.0], (_FRAME, "PLATE_THICKNESS")),
         "axis": (_DOWN, (_FRAME,)),
         "dia": (
             limits(PIVOT_HOLE_DIA, 4, _pv.PIVOT_HOLE_BAND),
-            (
-                (_PIVOT, "PIVOT_HOLE_DIA"),
-                (_PIVOT, "PIVOT_HOLE_BAND"),
-                (_SELF, "_print_pivot_band_exactly"),
-            ),
+            ((_PIVOT, "PIVOT_HOLE_DIA"), (_PIVOT, "PIVOT_HOLE_BAND")),
         ),
         "dia_nominal": (PIVOT_HOLE_DIA, ((_PIVOT, "PIVOT_HOLE_DIA"),)),
         "thru": (True, ((_PIVOT, "PIVOT_HOLE_SPEC"),)),
         "process": (PIVOT_PROCESS.lower(), ((_DSPEC, "PIVOT_PROCESS"),)),
-        "fit": (PIVOT_BORE_CALLOUT_BELOW[0], ((_DSPEC, "PIVOT_BORE_CALLOUT_BELOW"),)),
+        "mate": (PIVOT_SHOULDER_NUMBER, ((_DSPEC, "PIVOT_SHOULDER_NUMBER"),)),
+        "acceptance": (
+            " ".join(PIVOT_BORE_CALLOUT_BELOW),
+            ((_DSPEC, "PIVOT_BORE_CALLOUT_BELOW"),),
+        ),
     },
     precision={"dia": 4},
 )

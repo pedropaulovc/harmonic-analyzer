@@ -34,7 +34,6 @@ PLANS = {
     ),
     "dt_pinion_cam": ("zz-pins-2510-2515", None, "go_pin_max_in", "nogo_pin_min_in"),
     "dt_pinion_pivot_block": ("zz-pins-2510-2515", None, "go_pin_max_in", "nogo_pin_min_in"),
-    "dt_cone_swing_platform": ("zz-pins-2500-2505", None, "go_pin_max_in", "nogo_pin_min_in"),
     "dt_arbor_pedestal": ("zz-pins-3760-3765", None, "go_pin_max_in", "nogo_pin_min_in"),
 }
 

@@ -136,7 +136,15 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
 # Feature-callout wording is specification data; the drawing owns placement.
 # Name features, not compass directions: the plan maps model north downward.
 RELIEF_WIDTH_CALLOUT = "TOP RELIEF\nCTR ON PIVOT\nOPEN THRU\nPIVOT END"
-PIVOT_BORE_CALLOUT_BELOW = ("RUNNING FIT ON MHA-DT-VN-52 SHOULDER",)
+# The pivot bore: the .2510 reamer's size, REAM and the bought shoulder as the
+# gauge (drawing-guidelines rule 4, form 3; owner ruling 2026-11-24, fit audit
+# question 10).  No band, no fit name: the shoulder entering and the plate
+# swinging free is the acceptance, one row like the running-fit row it
+# replaces (the callout's height and clearances stay as laid out).  The size
+# prints at the reamer's three places (.251).
+PIVOT_SHOULDER_NUMBER = "MHA-DT-VN-52"
+PIVOT_BORE_CALLOUT_BELOW = (f"{PIVOT_SHOULDER_NUMBER} SHOULDER ENTERS, SWINGS FREE",)
+PIVOT_CALLOUT_PLACES = 3
 POST_MOUNT_LOCATING_CALLOUT = "LOCATES MHA-DT-05 CONE PIVOT POST"
 # A drawing number identifies the hold-down's mate without lengthening its
 # leader shelf into the title block.  Its stations print at the shop's

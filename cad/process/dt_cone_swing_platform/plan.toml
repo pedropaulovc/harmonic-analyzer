@@ -18,7 +18,7 @@
 # 1-2-3 blocks, step-clamped: PL04 drills its two clearance holes for the
 # post screws. Setup 4, the blank top up on the plate, screwed from below
 # into its post taps and trammed on E; G54 on the pivot hole: PL05 runs the
-# B drill on into the plate and reams the pivot .2500 (the bar flat on the
+# B drill on into the plate and reams the pivot .2510 (the bar flat on the
 # plate: a reamer's thrust on Setup 2's overhang bent it past the finish
 # limit), then drills the plate through the hold-down and wedge holes;
 # PL06-PL07 bring the tap guide over each (4-40, 10-24); the hold-down and
@@ -34,8 +34,8 @@
 # blackening: the drawing's finish leaves it bare, oiled. The placeholder
 # plan's tools placed elsewhere: tools.drill-53, tools.reamer-0630 and
 # tools.pin-gauges go with that assembly step; tools.reamers-adjustable-lms-
-# 5948 is replaced by a fixed .2500 reamer (owner ruling 2026-11-20, #3073:
-# a fixed reamer for each running/press fit); tools.endmill-7-32 is not
+# 5948 is replaced by the fixed .2510 reamer (owner ruling 2026-11-24, fit
+# audit question 10; #3073: a fixed reamer); tools.endmill-7-32 is not
 # needed (the owned 1/8 in end mill interpolates the counterbore);
 # tools.depth-micrometer is not needed (the calipers' depth rod holds the
 # counterbore's .010 band).
@@ -59,16 +59,10 @@
 # branch): the floor .010 below the top; no swing test here, the shims go
 # under the head at assembly (MHA-DT-00, #3363).
 #
-# FLAGGED: to buy before Setup 4: the .2500 reamer (tools.reamer-2500,
-# to_order), the pivot bore's two Class ZZ pins, .2500 plus (GO) and .2505
-# minus (NO-GO) (shop dt.toml zz-pins-2500-2505, to_order; owner ruling
-# 2026-11-23, tool audit Q1, re-answered on the corrected facts, verbatim:
-# "ZZ singles per the record: 29 pins (17 plus GO, 12 minus NO-GO), about
-# $130. Accept that good holes near a limit may be refused; the traveler
-# mikes each pin so the real window is known per pin."; Setup 4 opens by
-# miking both pins and the reamer, with a trial hole in an offcut of the
-# flat if the reamer reads under the GO pin, and accepts the bore between
-# the two pins' readings), the hold-down screws (fixtures.dt-
+# FLAGGED: to buy before Setup 4: the .2510 reamer (tools.reamer-2510,
+# to_order; owner ruling 2026-11-24, fit audit question 10: the bore prints
+# no band and the MHA-DT-VN-52 shoulder is its gauge, so the pivot's Class
+# ZZ pins and the .2500 reamer are no longer needed), the hold-down screws (fixtures.dt-
 # platform-hold-down-screws, to_order: two 1/4-20 x 3/4 SHCS, one #4-40 x
 # 1/2 SHCS, one #10-24 x 1/2 SHCS) and the MHA-DT-VN-52 shoulder screw that
 # will be assembled with this platform (McMaster 91829A560, the assembly's
@@ -98,7 +92,7 @@
 # PL08_outline, PL09_relief. Program names, the [parameters]
 # and the milling_cuts names are a contract with that recipe. Tool numbers
 # are the places in the tools list among the mill's tools: T1 1/4 in end
-# mill, T2 1/8 in end mill, T3 #1 centre drill, T4 #31, T5 B, T6 .2500
+# mill, T2 1/8 in end mill, T3 #1 centre drill, T4 #31, T5 B, T6 .2510
 # reamer, T7 #7, T8 L, T9 #25, T10 #43, T11 tap guide.
 title = "Cone swing platform"
 part = "{{cad.drawing_number}}"
@@ -195,27 +189,20 @@ drill_past_mm = 0.5
 drill_31_tip_mm = -7.8927
 drill_b_tip_mm = -8.7932
 drill_7_tip_mm = -8.5108
-# The .2500 reamer, Setup 4 (the bar flat on the spoil plate, its thrust
+# The .2510 reamer, Setup 4 (the bar flat on the spoil plate, its thrust
 # into the plate): 600 rpm, .004 in/rev (2.4 in/min) in and out at feed,
 # its full diameter ream_past_mm into the plate (ream_tip_mm below Z0); the
 # B drill re-enters its hole first, its full diameter drill_past_mm deeper
 # (pivot_redrill_tip_mm), and leaves the reamer ream_allowance_mm on the
-# diameter (the channel lever's reamer speeds).
+# diameter (the channel lever's reamer speeds).  The bore prints no band:
+# the MHA-DT-VN-52 shoulder entering by hand accepts it (owner ruling
+# 2026-11-24, fit audit question 10), so no pins.
 ream_rpm = 600
 ream_feed_per_min_mm = 60.96
 ream_past_mm = 1.5
 ream_tip_mm = -1.5
 pivot_redrill_tip_mm = -3.8162
-ream_allowance_mm = 0.3048
-# The Class ZZ pins (shop dt.toml zz-pins-2500-2505; owner ruling 2026-11-23,
-# tool audit Q1): GO a plus pin at the pivot bore's low limit, true size
-# .2500 to .2502; NO-GO a minus pin at the high limit, .2503 to .2505 (one
-# pin's ZZ tolerance, .0002, is the record's resolution_mm 0.00508). The
-# largest GO pin and the smallest NO-GO pin the sheet may use: with both
-# pins there, a bore is sure to pass only between them, the middle .0001 of
-# the .0005 band.
-go_pin_max_in = 0.2502
-nogo_pin_min_in = 0.2503
+ream_allowance_mm = 0.3302
 # Drills and the reamer stand at least 1.00 in out of the chuck, the 1/4 in
 # end mill 1.375 in (of its 3 in) and the 1/8 in end mill .75 in out of
 # their collets: each nose clears the jaw tops at its tool's deepest point
@@ -305,7 +292,7 @@ relief_stock_top_mm = 0.25
 north_station_min_mm = 6.858
 north_station_max_mm = 7.366
 # Holders: HA holders.r8-collets-lms-4860.gauge_len_mm; archive
-# holders.drill-chuck-r8.gauge_len_mm. Longest tool: the .2500 chucking
+# holders.drill-chuck-r8.gauge_len_mm. Longest tool: the .2510 chucking
 # reamer, 6 in overall (ASME B94.2).
 r8_collet_gauge_mm = 6.3
 drill_chuck_gauge_mm = 95.0
@@ -344,8 +331,8 @@ name = "B drill"
 ref = "drill-b"
 [[tools]]
 id = "reamer"
-name = ".2500 reamer, TO BUY"
-ref = "reamer-2500"
+name = ".2510 reamer, TO BUY"
+ref = "reamer-2510"
 status = "to_order"
 [[tools]]
 id = "drill-7"
@@ -391,11 +378,6 @@ ref = "jig-files"
 id = "deburr"
 name = "Deburring tool"
 ref = "deburring-set"
-[[tools]]
-id = "pins"
-name = "Class ZZ pins: .2500 plus (GO) and .2505 minus (NO-GO), TO BUY"
-ref = "zz-pins-2500-2505"
-status = "to_order"
 [[tools]]
 id = "gauge-blocks"
 name = "Gauge blocks, 81-piece inch set"
@@ -641,23 +623,6 @@ vise_hold = "other"
 beam = { axis = "x", hold = "plate", extent_mm = [-235.997, 8.642], seat = "the 1/2 x 6 in 6061 spoil plate", seat_mm = [-342.28, 114.92], clamps_mm = [-213.887, -207.669, -16.635], section_mm = { y = "{{process.platform_narrowest_mm}}", z = "{{process.blank_thickness_min_mm}}" } }
 
 [[setups.operations]]
-instruction = "Before seating: on the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the {{cad.pivot_bore_dia_min_in:.4dot}} GO pin, the {{cad.pivot_bore_dia_max_in:.4dot}} NO-GO pin, and the .2500 reamer across two opposite margins at its front end. Write the three readings on the job card, and each pin's on its tag."
-inspection = "GO pin reads {{cad.pivot_bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}: a pin outside its range is not used. The reamer reads under the NO-GO pin's reading, else it is not used: stop and tell the owner."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }]
-
-[[setups.operations]]
-instruction = "This sheet accepts a bore the GO pin enters and the NO-GO pin does not: GO reading ≤ bore < NO-GO reading. With both pins at their size limits only {{process.go_pin_max_in:.4dot}}–{{process.nogo_pin_min_in:.4dot}} is sure to pass; a good bore within .0002 of either band limit may be refused (owner ruling 2026-11-23)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Only if the reamer read under the GO pin, before seating the blank: a 2 in offcut of the 1/4 in flat on the plate's top beside the L holes, held by a step clamp as Setup 3's, clear of every hole. Home the mill ($H). Console M6 T5 (B drill); jog over the offcut's middle; spindle stopped, its point on a .002 leaf on the offcut: G10 L20 P1 X0 Y0 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Trial hole, MDI: M3 S1200, G0 Z2, G1 Z-9 F{{process.drill_b_feed_per_min_mm:.1f}}, G0 Z15, M5. Console M6 T6 (the reamer): M3 S600, G0 Z2, G1 Z-9 F{{process.ream_feed_per_min_mm:.1f}}, G1 Z15, M5. Cutting oil. Gauge it with the pins: the GO pin enters: unclamp the offcut and go on. Refused: stop and tell the owner (the pins refuse this reamer's holes)."
-feed = "hand"
-
-[[setups.operations]]
 instruction = "Before seating: mic the blank's thickness beside the pivot hole, 1/4 in in from each long edge: t, the thinner reading, to .0001 on the job card (it picks the relief's branch below)."
 inspection = "t {{process.blank_thickness_min_mm:in.3dot}}–{{process.blank_thickness_max_mm:in.3dot}}, as Setup 1. Outside: set the blank aside and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.blank_thickness_min_mm}}", "{{process.blank_thickness_max_mm}}"] }]
@@ -700,11 +665,11 @@ speed_kind = "spindle"
 tool = "reamer"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }
-instruction = "Same file, M6 T6 (.2500 reamer, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 600, cutting oil): ream the pivot through, in and out at feed (no rapid leaves the bore), its full diameter {{process.ream_past_mm:in.3dot}} into the plate."
+instruction = "Same file, M6 T6 (.2510 reamer, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 600, cutting oil): ream the pivot through, in and out at feed (no rapid leaves the bore), its full diameter {{process.ream_past_mm:in.3dot}} into the plate."
 rpm = 600
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [
-  { name = "pivot ream", kind = "drill", phase = "finish", cutter_dia_mm = 6.35, flutes = 6, rpm = 600, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = 0.0 },
+  { name = "pivot ream", kind = "drill", phase = "finish", cutter_dia_mm = 6.3754, flutes = 6, rpm = 600, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = 0.0 },
 ]
 
 [[setups.operations]]
@@ -738,16 +703,12 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Blow out the chips. Try the pivot bore with the GO pin and the NO-GO pin from the top."
-inspection = "GO enters, NO-GO does not: bore Ø{{cad.pivot_bore_dia_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}, the GO pin the full depth."
-gauge_checks = [{ gauge = "zz-pins-2500-2505", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }]
+instruction = "Blow out the chips. Try the MHA-DT-VN-52 shoulder screw that goes with this platform down the pivot bore from the top, by hand."
+inspection = "The shoulder enters the full depth by hand (drawing: MHA-DT-VN-52 SHOULDER ENTERS, SWINGS FREE; the swing is tried at assembly)."
+gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "GO pin refused: blow out the chips and oil the bore; Console M6 T6 (the same reamer). MDI: G53 G0 Z0, G0 X0 Y0, M3 S600, G0 Z15, G1 Z{{process.ream_tip_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}, G1 Z15, G53 G0 Z0, M5. Gauge again."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "GO pin still refused (the pins cannot show the bore at or over {{cad.pivot_bore_dia_min_in:.4dot}}, and a reamer cannot be made to cut larger), or the NO-GO pin entering (no cut remedies it): the platform is scrap; stop and tell the owner."
+instruction = "Shoulder refused: blow out the chips and oil the bore; Console M6 T6 (the same reamer). MDI: G53 G0 Z0, G0 X0 Y0, M3 S600, G0 Z15, G1 Z{{process.ream_tip_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}, G1 Z15, G53 G0 Z0, M5. Try it again. Still refused: stop and tell the owner."
 feed = "hand"
 
 [[setups.operations]]
@@ -829,7 +790,7 @@ inspection = "Swings free with no tight spot and no axial shake felt (drawing no
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "FIT branch, tight only: VN-52 out; the platform back on its post screws, E trammed as above, hold-down screw in. GO pin in the bore: pick up G54 X/Y on it as above; pin and edge finder out. Send $#, note G54 Z; G10 L2 P1 Z(noted Z − 0.013) (.0005 lower; no touch-off). Run PL09_relief again (its M6 T1 measures T1); repeat the swing test."
+instruction = "FIT branch, tight only: VN-52 out; the platform back on its post screws, E trammed as above, hold-down screw in. T1 out of its collet, its 1/4 in shank stood down in the bore: pick up G54 X/Y on it as above; shank and edge finder out, T1 back. Send $#, note G54 Z; G10 L2 P1 Z(noted Z − 0.013) (.0005 lower; no touch-off). Run PL09_relief again (its M6 T1 measures T1); repeat the swing test."
 feed = "hand"
 
 [[setups.operations]]
@@ -911,5 +872,5 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Seal: wipe on the stone lubricant (a light oil; the maker: clear coat, wax or oil), leave it a few minutes, wipe off the excess; oil the tapped holes."
 feed = "hand"
-inspection = "Even black all over, no bare spot and no wiping-off coating. Fit after blackening: the GO pin still enters the bore. Tight: stop and tell the owner; do not re-ream."
-gauge_checks = [{ gauge = "zz-pins-2500-2505", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }]
+inspection = "Even black all over, no bare spot and no wiping-off coating. Fit after blackening: the MHA-DT-VN-52 shoulder still enters the bore by hand. Tight: stop and tell the owner; do not re-ream."
+gauge_checks = "other"
