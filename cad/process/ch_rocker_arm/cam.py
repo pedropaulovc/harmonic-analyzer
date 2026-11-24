@@ -245,6 +245,7 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         "hub_nominal": hub["dia_nominal"],
         "length": faces["length_nominal"],
         "thick": strap["thickness_nominal"],
+        "thick_min": strap["thickness"][0],
         "rod": (rod["at"][0], rod["at"][1]),
         "rod_band": tuple(rod["dia"]),
         "centre": tuple(top["arc_centre"][:2]),
@@ -290,13 +291,29 @@ def context(
     dia = _cut(plan, "first end", "cutter_dia_mm")
     radius = dia / 2
     woc = _cut(plan, "first end", "radial_woc_mm")
+    depth = _cut(plan, "first end", "axial_doc_mm")
     for name in ("first end", "second end"):
-        for key, value in (("cutter_dia_mm", dia), ("radial_woc_mm", woc)):
+        for key, value in (
+            ("cutter_dia_mm", dia),
+            ("radial_woc_mm", woc),
+            ("axial_doc_mm", depth),
+        ):
             if _cut(plan, name, key) != value:
                 raise ValueError(f"'{name}' {key} is not 'first end''s")
     _agree(plan, "face_cutter_dia_mm", dia)
     _agree(plan, "face_pass_y_mm", g["hub_nominal"] / 2)
     _agree(plan, "face_woc_mm", radius)
+    # The deepest an end is faced: the longest hub, the most off-centre bond
+    # and the thinnest strap, down to the nominal end height.
+    _agree(
+        plan,
+        "face_depth_max_mm",
+        (p["hub_supply_length_max_in"] * IN - g["thick_min"]) / 2
+        + p["bond_offset_max_in"] * IN
+        - height,
+    )
+    if not math.isclose(depth, p["face_depth_max_mm"], abs_tol=1e-6):
+        raise ValueError("'first end' axial_doc_mm is not process.face_depth_max_mm")
     y = p["face_pass_y_mm"]
     # The first pass takes the cutter's radius less the hub's far side's
     # part, at most the plan's width.
