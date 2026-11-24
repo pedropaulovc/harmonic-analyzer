@@ -26,7 +26,8 @@ KNOB_COLLAR_NUMBER = "MHA-PD-22"
 CHAIN_NUMBER = _config.parts("sh-vn-chain-link")["number"]
 
 # Rule 7: the drive-pin pattern names its mates once, on its 2X callout, in a
-# standard fit name; each location carries only its value and band.
+# standard fit name; each location carries only its value, a REF target
+# (TARGET_TEXT below).
 PIN_HOLE_CALLOUT = (
     f"{PIN_HOLE_DRILL[0]} DRILL THRU\nSLIDING FIT ON PINS OF\n"
     f"{CRANKSHAFT_NUMBER} AND {KNOB_COLLAR_NUMBER}"
@@ -55,6 +56,13 @@ CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
 REFERENCE_TEXT: dict[tuple[str, str], dict[int, str]] = {
     ("BlankProfile", "BlankDia"): {TEXT_PREFIX: "(<MOD-DIAM>", TEXT_SUFFIX: ")"},
 }
+# Each pin centre prints as a REF target for the drilling set-up, "(.2756)",
+# with no band: the wheel is accepted by dropping on both seats' pins (the
+# sheet's notes; fit audit 2026-11-23, pending owner confirmation).
+TARGET_TEXT: dict[tuple[str, str], dict[int, str]] = {
+    ("BorePinsProfile", name): {TEXT_PREFIX: "(", TEXT_SUFFIX: ")"}
+    for name in ("PinPosY", "PinNegY")
+}
 
 
 def authored_text() -> dict[str, dict[str, dict[int, str]]]:
@@ -63,7 +71,7 @@ def authored_text() -> dict[str, dict[str, dict[int, str]]]:
     for lane, rows in CALLOUTS.items():
         for (feature, name), text in rows.items():
             authored.setdefault(feature, {}).setdefault(name, {})[lane] = text
-    for (feature, name), lanes in REFERENCE_TEXT.items():
+    for (feature, name), lanes in (*REFERENCE_TEXT.items(), *TARGET_TEXT.items()):
         authored.setdefault(feature, {}).setdefault(name, {}).update(lanes)
     return authored
 
