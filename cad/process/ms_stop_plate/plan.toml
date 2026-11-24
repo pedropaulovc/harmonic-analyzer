@@ -30,7 +30,7 @@
 #
 # Flagged: the .040 brass sheet is not on record (no stock record in
 # cad/config/shop-equipment/stock-*.toml: to buy, any brass sheet or strip
-# .036-.044 thick as rolled, at least .62 x .90). Birchwood Casey Brass Black,
+# .035-.045 thick as rolled, at least .62 x .90). Birchwood Casey Brass Black,
 # its Cleaner-Degreaser and Barricade oil and the chemical gloves and glasses
 # are recorded consumables, to_order: the traveler ends bare, tagged, until
 # they arrive, as MHA-MG-02's does.
@@ -97,10 +97,11 @@ spot_dia_mm = 1.651
 # checks the tip: −(1.016 + 7.62 + the #49's 118° point 0.557).
 pilot_peck_mm = 1.27
 pilot_tip_height_mm = -9.193
-# #41 opening: its full Ø .4 mm past the thickest plate (.044) into the
-# block's window; cam.py checks the tip: −(1.1176 + 0.4 + its point 0.733).
+# #41 opening: its full Ø .4 mm past the thickest plate (.045, the title
+# block's .040 ±.005) into the block's window; cam.py checks the tip:
+# −(1.143 + 0.4 + its point 0.733).
 open_past_mm = 0.4
-open_tip_height_mm = -2.250
+open_tip_height_mm = -2.276
 # Speeds and feeds of the holes, authored in the operations (no settings
 # record: the plate's alloy is not on record). LittleMachineShop "Cutting
 # Speeds", Drilling & Reaming, Brass: 160–175 ft/min (read 2026-11-17, the
@@ -156,7 +157,7 @@ beam = "other"
 
 [[setups.operations]]
 instruction = "Mike the sheet's thickness at three places along the edge you will use."
-inspection = "Sheet {{cad.outer_face_thickness_min_in:.3dot}}–{{cad.outer_face_thickness_max_in:.3dot}} thick everywhere (drawing .040 ±.004, SEE NOTE 1: it sets the MHA-MS-VN-51 screws' reach). Outside: use another sheet; this one is not machined to thickness."
+inspection = "Sheet {{cad.outer_face_thickness_min_in:.3dot}}–{{cad.outer_face_thickness_max_in:.3dot}} thick everywhere (drawing .040, the title block's ±.005). Outside: use another sheet; this one is not machined to thickness."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_face_thickness_band_mm}}" }]
 
 [[setups.operations]]

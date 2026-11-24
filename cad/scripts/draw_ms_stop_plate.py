@@ -33,7 +33,6 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import set_dimension_callouts
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
@@ -78,12 +77,10 @@ FRONT_KEEP = {
 }
 # Text left of the thin edge view, so neither witness line strikes it.
 RIGHT_KEEP = {"PlateThickness": (0.327, 0.225)}
-# Rule 4: the thickness and the hole callout link note 1
-# (ms_stop_plate_notes.MATCHED_PAIR_NOTE), which names the matched pair, its
-# screws and the thickness that sets their reach once; the three hole
-# locations carry only their value (title block .XXX).
+# Rule 4: the hole callout links note 1 (ms_stop_plate_notes.MATCHED_PAIR_NOTE),
+# which names the matched pair and its screws once; the three hole locations
+# and the sheet's thickness carry only their value (title block .XXX).
 NOTE_LINK = f"SEE NOTE {NOTE_NUMBER}"
-DIMENSION_CALLOUTS = {"PlateThickness": NOTE_LINK}
 # Upper-left corner of the note: the open top-left field, as on MHA-MS-02.
 MATCHED_PAIR_NOTE_XY = (0.020, 0.262)
 # The size rows are wider than the room between the .56 witnesses, so the
@@ -104,8 +101,8 @@ LOCATING_EDGE_X_MM = 7.0
 # LOCATING END, Y = 0 the LOCATING EDGE, Z = 0 the face that seats on the
 # MHA-MS-02 mating face, the sheet's .040 thickness toward -Z). A band is the
 # title block's row for the places the sheet prints
-# (PLATE_DRAWING_PRECISION_BY_NAME) on the printed nominal, the thickness its
-# own +/-.004, the clearance holes the DRILLED HOLES row
+# (PLATE_DRAWING_PRECISION_BY_NAME) on the printed nominal, the thickness
+# included, the clearance holes the DRILLED HOLES row
 # (HOLE_CALLOUT_PRECISION). The plate is the match-drill master: its holes
 # are opened from the #49 pilot the pair drill puts through it and into the
 # block (MHA-MS-02's 2X Ø.073 to .300 from its mating face), carried here as
@@ -213,8 +210,8 @@ for _name, _normal, _axis, _value, _key, _dim, _source, _from in (
         },
         precision={_key: _P[_dim]},
     )
-# The seating face (Z = 0) and the outer face: the sheet's .040 +/-.004
-# (RIGHT_KEEP PlateThickness, SEE NOTE 1), the stock's as bought.
+# The seating face (Z = 0) and the outer face: the sheet's .040 at the title
+# block's .XXX (RIGHT_KEEP PlateThickness), the stock's as bought.
 requirement(
     "seating_face",
     kind="face",
@@ -229,22 +226,15 @@ requirement(
     requirements=("thickness",),
     fields={
         "plane": (_plane("z", part.PLATE_Z_MIN), ((_SPEC, "PLATE_Z_MIN"),)),
-        "thickness": (
-            limits(
-                part.PLATE_THICKNESS,
-                _P["PlateThickness"],
-                (part.PLATE_THICKNESS_TOLERANCE_MM, -part.PLATE_THICKNESS_TOLERANCE_MM),
-                unit=part.UNIT,
-            ),
-            (
-                (_SPEC, "PLATE_THICKNESS"),
-                (_SPEC, "PLATE_THICKNESS_TOLERANCE_MM"),
-                (_SELF, "RIGHT_KEEP"),
-            ),
+        "thickness": _printed(
+            "PlateThickness",
+            part.PLATE_THICKNESS,
+            (_SPEC, "PLATE_THICKNESS"),
+            (_SPEC, "PLATE_THICKNESS_TOLERANCE_MM"),
+            (_SELF, "RIGHT_KEEP"),
         ),
         "thickness_nominal": (part.PLATE_THICKNESS, ((_SPEC, "PLATE_THICKNESS"),)),
         "thickness_from": ("seating_face", ((_SELF, "RIGHT_KEEP"),)),
-        "callout": (NOTE_LINK, ((_SELF, "DIMENSION_CALLOUTS"),)),
     },
     precision={"thickness": _P["PlateThickness"]},
 )
@@ -449,7 +439,6 @@ def build(adapter: Any) -> dict[str, str]:
         annotations += curate_view_dimensions(adapter, view, keep=keep, view_label=label,
                                                dimensions_by_feature=part.PLATE_DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter, iso)
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _style_plate_chamfer(adapter, annotations)
     # The rim's lower outboard point, off the .160 witness through the centre,
     # so the leader from the callout below crosses no station line.
@@ -472,9 +461,6 @@ def build(adapter: Any) -> dict[str, str]:
     assert_manufacturing_dimensions(
         adapter, annotations, part.PLATE_DRAWING_VALUES_BY_NAME,
         part.PLATE_DRAWING_PRECISION_BY_NAME,
-        bands={
-            "PlateThickness": (-part.PLATE_THICKNESS_TOLERANCE_MM, part.PLATE_THICKNESS_TOLERANCE_MM),
-        },
         angular=frozenset({"RoofChamferAngle"}),
     )
     for view in (front, right):

@@ -1,0 +1,14 @@
+# MHA-MS-00 measuring stick assembly: why each check tighter than the title
+# block stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the
+# reason lives here, not on the sheet). Read by the machinist review only.
+# Step 10A fits the stop block's end face nearer the 10 square to the stick
+# at assembly (delegated ruling 2026-11-18 for #2434, owner precedents #2365
+# and #2416): that face reads the stick and bears on the rocker arm's tip land
+# 8.94 mm below the reading edge, so its lean is a station offset along the
+# stick (error_budget.yaml stop_face_square books the checked .002).
+necessity:
+  - id: N-01
+    feature: "sheet 1 and step 10A, .002 FEELER DOES NOT ENTER UNDER A SQUARE ON THE TOP FACE OF ITEM 3"
+    kind: trace
+    reason: "the stop face's lean offsets every station it sets"
+    source: "error_budget.yaml stop_face_square; ms_measuring_stick_assembly_sheet.STOP_FACE_FEELER"
