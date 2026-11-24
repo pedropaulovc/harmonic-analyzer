@@ -428,13 +428,13 @@ cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped, the pin still on the bar: wipe the journal and the bores of {{cad.outer_mates}} and the MHA-PD-18 arm clean, a drop of oil on the journal. Slide each of {{cad.outer_mates}} in turn onto the journal by hand, up to the seat, never forced, and turn it; rock it across the pin at both ends of the journal. Then slide one MHA-PD-VN-68 shim on to the seat. Then slide the arm's pin bore over the journal up to the seat. Wipe the oil off the pin and out of the arm's bore afterwards: it is bonded there."
+instruction = "Spindle stopped, the pin still on the bar: wipe the journal and the bores of {{cad.outer_mates}} and the MHA-PD-18 arm clean, a drop of oil on the journal. Slide each of {{cad.outer_mates}} in turn onto the journal by hand, up to the seat, never forced, and turn it; rock it across the pin at both ends of the journal. Then slide one MHA-PD-VN-68 shim along the journal up to the seat. Then slide the arm's pin bore over the journal up to the seat. Wipe the oil off the pin and out of the arm's bore afterwards: it is bonded there."
 inspection = "Drawing note 1: each mate enters by hand, turns free along the whole journal, and has no shake you can feel when rocked; the shim slides on; the arm slides on by hand up to the seat. No reading accepts the journal: the mates do."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A mate, the shim or the arm that will not enter, or binds along the journal: spindle at 600 rpm, a few light strokes of the 400-grit cloth on the file where it binds, the lightest pressure (the centre is gone), and try all of them again. A mate that shakes: cut the piece off, scrap it, and start again from Op 40, the blank rechucked as in Setup 1's Holding."
+instruction = "A mate, the shim or the arm that will not enter, or binds along the journal: spindle at 600 rpm, a few light strokes of the 400-grit cloth on the file where it binds, the lightest pressure (the centre is gone), and try all of them again. After any such strokes, spindle stopped, mike the journal again at both ends and the middle and turn the chuck by hand watching the tip against the tool's point: a station that now reads more than .0003 under the other two, or a tip that wobbles more than you can just see, is a tapered or bent journal; scrap it as below. One mate alone shaking while the others turn free: its bore is the odd one; set that mate aside, tell the owner, and go on. Every mate shaking: the journal is small; cut the piece off, scrap it, and start again from Op 40, the blank rechucked as in Setup 1's Holding."
 
 [[setups.operations]]
 cut_kind = "other"

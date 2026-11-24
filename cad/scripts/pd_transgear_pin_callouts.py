@@ -14,9 +14,9 @@ from __future__ import annotations
 import _config
 import pd_vn_transgear_retaining_ring_spec as RING
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
-from pd_transgear_arm_spec import PIN_BOND_CLEARANCE_PRINTED
 from pd_transgear_pin_spec import (
     ARM_NUMBER,
+    BOND_CLEARANCE_PRINTED,
     FRONT_BUSHING_NUMBER,
     RETAINING_COMPOUND,
     RING_NUMBER,
@@ -42,7 +42,7 @@ from pd_transgear_pin_spec import (
 # here and nowhere else (rule 23; fit batch review r2: the arm's sheet
 # carried it, so the member made last printed no range): the least the
 # reamer and the shank model to the most the arm traveler's .127 set pin
-# accepts (pd_transgear_arm_spec.PIN_BOND_CLEARANCE_PRINTED), inside the
+# accepts (pd_transgear_pin_spec.BOND_CLEARANCE_PRINTED), inside the
 # compound's gap.  The ring groove's Ø and width
 # name their ring once, in note 2 (rule 4).  Kept here, not in the widely
 # imported spec, so the wording re-keys only this part.
@@ -52,8 +52,8 @@ SHIM_NUMBER = _config.parts("pd-vn-transgear-cluster-shim")["number"]
 SHANK_ACCEPTANCE = "EACH TURNS FREE, NO SHAKE"
 BOND_ACCEPTANCE = "SLIDES IN BY HAND"
 BOND_CLEARANCE_TEXT = (
-    f"{inch_text(inch_floor_mm(min(PIN_BOND_CLEARANCE_PRINTED), 4), 4)}-"
-    f"{inch_text(inch_ceil_mm(max(PIN_BOND_CLEARANCE_PRINTED), 4), 4)}"
+    f"{inch_text(inch_floor_mm(min(BOND_CLEARANCE_PRINTED), 4), 4)}-"
+    f"{inch_text(inch_ceil_mm(max(BOND_CLEARANCE_PRINTED), 4), 4)}"
 )
 DRAWING_NOTES = "\n".join((
     f"{SHANK_FIT_NOTE}. SHANK: TURN LAST TO BORES OF {', '.join(RUNNING_MATES)}:",

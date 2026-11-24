@@ -68,9 +68,9 @@ def test_only_the_printed_length_carries_a_model_band() -> None:
 
 def test_the_bore_runs_on_the_pin_and_names_it() -> None:
     """drawing-guidelines.md rule 4 (fit audit 2026-11-23): a reamed bore
-    prints size, REAM, the fit on its mate and one line saying what the fit
-    protects; no band, no clearance.  The acceptance prints once, on the
-    pin's sheet (rule 7: at most two rows of words under size and process).
+    prints size, REAM and that its mate is turned to it; no band, no
+    clearance.  The acceptance prints once, on the pin's sheet; the reason
+    for the REAM is in the part's necessity file (owner ruling 2026-11-24).
     drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the fit bore's process is REAM."""
     low, high = fit.BORE_DIAMETRAL_CLEARANCE
     assert 0.0 < low < high
@@ -80,7 +80,6 @@ def test_the_bore_runs_on_the_pin_and_names_it() -> None:
     assert callout.splitlines() == [
         "REAM THRU",
         f"{pin.PIN_NUMBER} IS TURNED TO THIS BORE",
-        "KEEPS MHA-PD-06 CLEAR OF MHA-PD-22",
     ]
     assert not re.search(r"\d*\.\d", callout)
     assert "NO SHAKE" not in callout

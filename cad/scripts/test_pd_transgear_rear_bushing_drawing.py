@@ -50,9 +50,9 @@ def test_the_bore_prints_no_band_and_the_length_the_title_block() -> None:
 
 def test_the_bore_runs_on_the_pin_and_names_it() -> None:
     """drawing-guidelines.md rule 4 (fit audit 2026-11-23): a reamed bore
-    prints size, REAM, the fit on its mate and one line saying what the fit
-    protects; no band, no clearance.  The acceptance prints once, on the
-    pin's sheet (rule 7: at most two rows of words under size and process).
+    prints size, REAM and that its mate is turned to it; no band, no
+    clearance.  The acceptance prints once, on the pin's sheet; the reason
+    for the REAM is in the part's necessity file (owner ruling 2026-11-24).
     drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the fit bore's process is REAM."""
     low, high = fit.BORE_DIAMETRAL_CLEARANCE
     assert 0.0 < low < high
@@ -62,19 +62,29 @@ def test_the_bore_runs_on_the_pin_and_names_it() -> None:
     assert callout.splitlines() == [
         "REAM THRU",
         f"{pin.PIN_NUMBER} IS TURNED TO THIS BORE",
-        "KEEPS MHA-PD-10 END FLOAT OPEN",
     ]
     assert not re.search(r"\d*\.\d", callout)
-    assert len(re.sub(r"MHA-\S+", "", callout.splitlines()[-1]).split()) <= 6
     assert "NO SHAKE" not in callout
     assert _config.parts("pd-transgear-rear-bushing")["number"] in pin.RUNNING_MATES
     assert "NO SHAKE" in pin_callouts.SHANK_ACCEPTANCE
-    # What the necessity answer states: cocked on the pin at the modelled
-    # fit, the bushing takes up less than the sleeve's least end float; a
-    # drilled #30's clearance (.1285 +.004/0 on the smallest pin) would not.
-    assert spec.BORE_COCK_TAKE_UP < fit.RING_FLOAT_RANGE[0]
-    drilled = (0.1285 + 0.004) * 25.4 - pin.DIA_MIN
-    assert spec.BORE_COCK_TAKE_UP * drilled / high > fit.RING_FLOAT_RANGE[0]
+    # Codjiflo r1 on #3492: rule 4's own criterion, .002 in looser than the
+    # modelled fit, does NOT take the float up (.0070 of .0080), so the
+    # REAM stays by the delegated exception RV-01, whose reason is that the
+    # next form down, a drilled #30 (.1285 +.004/0 on the smallest pin),
+    # does (.0147).
+    least_float = fit.RING_FLOAT_RANGE[0]
+    assert spec.BORE_COCK_TAKE_UP == spec.bore_cock_take_up(high) < least_float
+    loose = spec.bore_cock_take_up(high + 0.002 * 25.4)
+    assert loose / 25.4 == pytest.approx(0.0070, abs=5e-5)
+    assert loose < least_float
+    drilled = spec.bore_cock_take_up((0.1285 + 0.004) * 25.4 - pin.DIA_MIN)
+    assert drilled / 25.4 == pytest.approx(0.0147, abs=5e-5)
+    assert drilled > least_float
+    (ruling,) = _config.parts("pd-transgear-rear-bushing")["machinist_exceptions"]
+    assert ruling["kind"] == "accept" and "REAM" in ruling["where"]
+    assert "delegated ruling 2026-11-24, no precedent" in ruling["reason"]
+    assert "issues/2144" in ruling["reason"]
+    assert ".0070" in ruling["finding"] and ".0147" in ruling["reason"]
 
 
 def test_wall_holds_the_target_at_the_printed_worst_case() -> None:

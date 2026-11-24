@@ -194,15 +194,14 @@ STOCK_TEXT_SUFFIX = ") GROUND STOCK REF"
 # set that must not enter (the sheet prints no gauge).
 # (PIN_BORE_DIA_PLACES above: three places, Ø.126 REAM THRU.)
 PIN_BOND_GAP = PIN.BOND_GAP  # modelled (least, greatest) diametral
-PIN_BORE_NO_GO_PIN_DIA = 3.2258  # .127, one pin of the .001-step set
+PIN_BORE_NO_GO_PIN_DIA = PIN.BOND_NO_GO_PIN_DIA  # .127, one pin of the .001-step set
 PIN_BORE_NO_GO_PLACES = 3
 _SET_PIN_UNDER_SIZE_MAX = 0.00508  # .0002, a Class ZZ minus pin
-# The widest gap the sheet accepts: a bore that just refuses the .127 pin,
-# on the pin's smallest modelled shank.
-PIN_BOND_GAP_ACCEPTED_MAX = round(PIN_BORE_NO_GO_PIN_DIA - PIN.DIA_MIN, 6)  # .0022
-# Rule 23: the bond's clearance as the bore's callout prints it, the least
-# the reamer and the pin model to the most the .127 set pin accepts.
-PIN_BOND_CLEARANCE_PRINTED = (PIN_BOND_GAP[0], PIN_BOND_GAP_ACCEPTED_MAX)  # .0010-.0022
+# The widest gap the pin's sheet accepts: a bore that just refuses the .127
+# pin, on the pin's smallest modelled shank.
+PIN_BOND_GAP_ACCEPTED_MAX = PIN.BOND_GAP_ACCEPTED_MAX  # .0022
+# Rule 23: the bond's clearance as the pin's note 1 prints it.
+PIN_BOND_CLEARANCE_PRINTED = PIN.BOND_CLEARANCE_PRINTED  # .0010-.0022
 if not 0.0 < PIN_BOND_GAP[0] <= PIN_BOND_GAP[1] <= PIN_BOND_GAP_ACCEPTED_MAX:
     raise AssertionError(
         f"MHA-PD-18 pin bore bond gap on MHA-PD-23 is {PIN_BOND_GAP}, outside "
