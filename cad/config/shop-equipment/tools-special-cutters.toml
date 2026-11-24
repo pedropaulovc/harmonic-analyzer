@@ -12,11 +12,6 @@ kind = "end_mill"
 status = "to_order"
 note = "quotes-2026-11-17-rev3.xlsx C-endmill-7-32: recommended Shars 404-6071."
 
-[tools.form-tool-r160]
-kind = "form_tool"
-status = "to_order"
-note = "quotes-2026-11-17-rev3.xlsx D-form-tool-R160 (not in the recommended total): no in-spec offer found (the workbook's Not priced sheet); nearest standard radii 5/32 (.1563) or 4 mm (.1575)."
-
 [tools.threading-bits-lms-6685]
 kind = "threading_tool_bit"
 status = "on_hand"
@@ -33,24 +28,10 @@ status = "to_order"
 note = "Not owned: to buy. Variable Helix End Mills for Aluminum Alloys - Square - Downcut: 3 left-hand spiral, right-hand cut flutes, centre cutting, uncoated; the family page states it prevents lifting of the workpiece and performs in brass. Cuts the MHA-PD-03 platen clip out of .032 brass strip bonded on tape (PC01_sheet): its .031 fits the clip's .04 slits (drawing cross-check 2026-11-19, 2X .04 SLIT, FULL R END; it replaces the 3/64 end mill that list named, too wide to cut the slit's two sides), and a downcut pushes the narrow finger onto the tape instead of lifting it."
 flutes = 3
 
-[tools.endmill-carbide-3-64]
-make = "Titan USA"
-sku = "TC10203"
-source = "https://www.dixie-tool.com/end-mill-3-64-2fl-se-stub-carb-130392/"
-purchase = "Dixie Tool TITUS1-TC10203, 3/64 in 2-flute single-end stub-length solid carbide square end mill, uncoated, $13.37 (read live 2026-11-22)."
-kind = "end_mill"
-status = "to_order"
-note = "Not owned: to buy. MHA-PD-17 disc hub: plunges the flat floor at the pin hole's mouth (CM02_pin_hole). No longer for MHA-PD-03, which the 1/32 downcut cuts."
-
 [tools.endmill-carbide-3-32]
 kind = "end_mill"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-27 flat floor for the Ø.110 counterbore; MHA-CH-03 .106 ±.002 fork slot."
-
-[tools.endmill-5-64-long]
-kind = "end_mill"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PN-01 window corners R.040 max."
 
 [tools.endmill-carbide-3fl-1-16-reach-1-2]
 kind = "end_mill"
@@ -73,40 +54,22 @@ note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-13 STRAIGHT KN
 [tools.lathe-tool-sharp-nose]
 sku = "1965"
 source = "https://littlemachineshop.com/products/tool-bits-1-4-presharpened-individual-tool-bits"
-purchase = "LittleMachineShop 1965, Tool Bit 1/4 in Right Hand Presharpened (HSS), $7.95, available (read live 2026-11-22); its nose is stoned to R.004 or less in the shop. No stock insert for the owned TCMT-21.51 holders reads R.004: LittleMachineShop's TCMT-21.50 (3416) states R.008."
+purchase = "LittleMachineShop 1965, Tool Bit 1/4 in Right Hand Presharpened (HSS), $7.95, available (read live 2026-11-22); two in the cart: one whose nose is stoned to R.004 or less in the shop, one ground into the .020 groover (tools.grooving-tool-020; owner 2026-11-24: \"also buy the $7.95 pre-sharpened HSS bit\"). No stock insert for the owned TCMT-21.51 holders reads R.004: LittleMachineShop's TCMT-21.50 (3416) states R.008."
 kind = "turning_tool"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-08 R.004 max. corners, .016 neck; MHA-PD-17 SPIGOT ROOT R.004 MAX; MHA-PD-23 R.005 MAX land-to-head corner; MHA-PN-04 R.008 max. shoulder."
 
 [tools.grooving-tool-020]
 kind = "grooving_tool"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-23 .020 +.002/.000 ring groove; MHA-MG-04 thread relief, corners R.008 max.; MHA-MG-07 thread relief, corners R.008 max.."
+status = "to_make"
+supply = "shop_made"
+note = "Not owned: to make. Owner ruling 2026-11-24: \"Grind it\", from the pre-sharpened HSS bit he also asked for (tools.lathe-tool-sharp-nose, LittleMachineShop 1965), on the owned bench grinder (tools.bench-grinder-duracraft-60650). No insert or holder is bought. drawing cross-check 2026-11-19: MHA-PD-23 .020 +.002/.000 ring groove; MHA-MG-04 thread relief, corners R.008 max.; MHA-MG-07 thread relief, corners R.008 max.."
 
 [tools.form-tool-r024]
 kind = "form_tool"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-MG-05 R.024 rim wire groove."
-
-[tools.form-tool-r047]
-kind = "form_tool"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-MG-06 R .047/.020 FULL R groove."
-
-[tools.form-tool-r070]
-kind = "form_tool"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-23 R.07 shank-end dome; MHA-MG-07 R.07 tip."
-
-[tools.form-tool-r125]
-kind = "form_tool"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-CH-04 2X (SR.125) ends; MHA-MG-03 SR.13 tip; MHA-MG-04 R.13 TANGENT HEMISPHERE (1/4 bar, #2404)."
-
-[tools.form-tool-r180]
-kind = "form_tool"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-23 R.18 head dome."
+status = "to_make"
+supply = "shop_made"
+note = "Not owned: to make. Owner ruling 2026-11-24: \"Grind it by hand from an HSS blank.\" An R.024 full-radius groover, about .048 in wide, ground from an owned HSS blank (tools.hss-tool-bit-blanks) on the owned bench grinder (tools.bench-grinder-duracraft-60650): the MHA-MG-05 R.024 rim wire groove and the MHA-MG-06 groove (mg_output_fixture plan: \"the one groover MHA-MG-05's rim groove names\"; that plan's header still says to order). Check of the ground form (the coordinator's delegated method, 2026-11-24; not an owner ruling): mike the tool's width, .040-.058 in with a full radius, which is R.020-.029: the overlap of MHA-MG-05's R.019-.029 and MHA-MG-06's R.020 minimum (gauges.micrometers, owned), and sight the nose against the shank of the owned 3/64 in drill (tools.drill-3-64, .0469) held behind it against the light. No radius gauge on record reaches R.024 (gauges.radius-gauges starts at 1/32 in)."
 
 [tools.needle-files-swiss]
 make = "TTC"
@@ -125,17 +88,6 @@ purchase = "Travers 99-006-013, C.H. Hanson 20541 steel number stamp set, 1/8 in
 kind = "stamp_set"
 status = "to_order"
 note = "Not owned: to buy. MHA-FR-01 STAMP \"2\", 1/8 FIGURE STAMP (owner decision 2026-11-19, #3124 item 1)."
-
-[tools.endmill-carbide-3fl-1-16-downcut]
-name = "Harvey Tool 896262 carbide downcut square end mill, 1/16 in (.0620), .186 length of cut, 3 flutes, 1/8 shank, 1-1/2 in overall"
-kind = "endmill"
-make = "Harvey Tool"
-sku = "896262"
-source = "https://www.harveytool.com/products/tool-details-896262"
-purchase = "Harvey Tool 896262, $51.40 each (listing read live 2026-11-22); buy one"
-status = "to_order"
-note = "Not owned: to buy. Variable Helix End Mills for Aluminum Alloys - Square - Downcut: 3 left-hand spiral, right-hand cut flutes, centre cutting, uncoated; the family page states it prevents lifting of the workpiece and performs in brass. Cuts the MHA-DT-03-TL-02 phasing comb's outline out of .020 brass sheet bonded on tape (CB01_outline): a downcut pushes the narrow arms onto the tape instead of lifting them."
-flutes = 3
 
 # Owner ruling 2026-11-23 (tool audit Q5): the dome ends are turned with a
 # bought ball and radius turning tool; step-and-file is the fallback for any

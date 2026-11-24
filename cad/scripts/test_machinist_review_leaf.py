@@ -65,9 +65,27 @@ def dodo(loaded_dodo, monkeypatch):
     monkeypatch.setattr(
         loaded_dodo, "_MACHINIST_REVIEW_PROFILE", registered_review_profile({})
     )
+    # The tests below review synthetic drawings; the repository's demotion
+    # list names real ones.
+    monkeypatch.setattr(
+        loaded_dodo, "_MACHINIST_REVIEW_DEMOTIONS", Path("no-demotions.yaml")
+    )
     loaded_dodo._reviewed_drawings.cache_clear()
     yield loaded_dodo
     loaded_dodo._reviewed_drawings.cache_clear()
+
+
+def test_repository_demotion_list_names_only_enforced_drawings(loaded_dodo):
+    """The list is temporary (tracking issue #3511): while the file exists it
+    is non-empty (the loader rejects an empty one) and every line names a
+    drawing whose script declares ENFORCE (the graph load rejects any other)."""
+    loaded_dodo._reviewed_drawings.cache_clear()
+    modes = dict(loaded_dodo._reviewed_drawings())
+    loaded_dodo._reviewed_drawings.cache_clear()
+    demoted = loaded_dodo._demoted_reviews()
+    assert bool(demoted) == loaded_dodo._MACHINIST_REVIEW_DEMOTIONS.is_file()
+    for stem in demoted:
+        assert modes[stem] is loaded_dodo.MachinistReviewMode.LEARN
 
 
 # OFF never reaches the action: it yields no task.
@@ -541,6 +559,48 @@ def test_assembly_exception_uses_bare_dashed_config_stem(inputs):
     path = dodo.CONFIG_DIR / "assemblies" / "probe.yaml"
     path.write_text("machinist_exceptions: []\n")
     assert str(path.resolve()) in dodo._machinist_review_file_deps("probe_assembly")
+
+
+def test_necessity_register_keys_its_own_review_only(inputs):
+    dodo = inputs.module
+    before = _review_key(dodo)
+    other = dodo.CONFIG_DIR / "necessity" / "other-part.yaml"
+    other.parent.mkdir(parents=True)
+    other.write_text("necessity: []\n")
+    assert _review_key(dodo) == before
+    own = dodo.CONFIG_DIR / "necessity" / "probe.yaml"
+    own.write_text("necessity: []\n")
+    assert str(own.resolve()) in dodo._machinist_review_file_deps("probe")
+    assert _review_key(dodo) != before
+
+
+def test_demotion_list_runs_an_enforced_drawing_at_learn(inputs, monkeypatch, tmp_path):
+    dodo = inputs.module
+    monkeypatch.setattr(dodo, "_drawing_order", lambda: ["probe"])
+    demotions = tmp_path / "demoted.yaml"
+    monkeypatch.setattr(dodo, "_MACHINIST_REVIEW_DEMOTIONS", demotions)
+    inputs.draw.write_text("MACHINIST_REVIEW = MachinistReviewMode.ENFORCE\n")
+
+    def modes():
+        dodo._reviewed_drawings.cache_clear()
+        return dict(dodo._reviewed_drawings())
+
+    assert modes() == {"probe": dodo.MachinistReviewMode.ENFORCE}
+    key = _review_key(dodo)
+    demotions.write_text("demoted:\n  probe: fit-batch-probe\n")
+    assert modes() == {"probe": dodo.MachinistReviewMode.LEARN}
+    # Neither the verdict key nor any file dependency sees the list.
+    assert _review_key(dodo) == key
+    assert str(demotions) not in dodo._machinist_review_file_deps("probe")
+    # A line for a drawing that does not declare ENFORCE is stale.
+    inputs.draw.write_text("MACHINIST_REVIEW = MachinistReviewMode.LEARN\n")
+    with pytest.raises(ValueError, match="not a drawing declared ENFORCE"):
+        modes()
+    # An empty list means the conversion is done: the file has to go.
+    for text in ("demoted: {}\n", "demoted:\n  - probe\n", "demoted:\n  probe:\n"):
+        demotions.write_text(text)
+        with pytest.raises(ValueError, match="delete the file when no sheet is left"):
+            modes()
 
 
 def test_mode_and_input_set_changes_invalidate_doit_but_not_the_verdict_key(

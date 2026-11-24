@@ -61,7 +61,7 @@ def build(adapter) -> dict[str, str]:
     )
     place_component(
         adapter,
-        "ch-rocker-strap-tl-hub-washer",
+        "ch-rocker-strap-tl-vn-hub-washer",
         list(spec.WASHER_POSITION),
         euler,
         rows,

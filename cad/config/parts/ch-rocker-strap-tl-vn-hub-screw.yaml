@@ -1,17 +1,18 @@
 ch-rocker-strap-tl-vn-hub-screw:
   title: Rocker Strap Hub Screw
   # Shop tooling: the parent MHA-CH-13 Number plus -TL-VN-nn (subsystem-identities.md).
-  # 2026-11-17 (owner ruling, replacing 5/16-18): 1/4-20 x 5/8 button head
-  # socket cap screw through the hub washer and the strap blank's hub hole
-  # into MHA-CH-13-TL-01's tapped hole.
+  # Owner ruling 2026-11-23 ("change the screw to #10-32", reversing
+  # 2026-11-17's "Use a 1/4-20 hub screw"): #10-32 x 5/8 button head socket
+  # cap screw through the hub washer MHA-CH-13-TL-VN-52 and the strap blank's
+  # hub hole into MHA-CH-13-TL-01's tapped hole.
   number: MHA-CH-13-TL-VN-51
   stock_name: Black-Oxide Button Head Hex-Drive Screw
   supplier: McMaster-Carr
-  supplier_skus: ["91255A539"]
+  supplier_skus: ["91255A267"]
   material: Alloy Steel
-  material_specification: "Black-oxide alloy steel button head hex drive screw, ASME B18.3, ASTM F835, 1/4-20 UNC-3A x 5/8, head .437 dia x .132, 5/32 hex; McMaster-Carr 91255A539"
+  material_specification: "Black-oxide alloy steel button head hex drive screw, ASME B18.3, ASTM F835, #10-32 UNF-3A x 5/8, head .361 dia x .101, 1/8 hex; McMaster-Carr 91255A267"
   finish: black oxide
-  # https://www.mcmaster.com/91255A539/ read live 2026-11-17: $11.55 per pack of 50.
+  # https://www.mcmaster.com/91255A267/ read live 2026-11-23: $13.21 per pack of 50.
   quantity: 1
   tolerance_class: machined_block
   process: purchased

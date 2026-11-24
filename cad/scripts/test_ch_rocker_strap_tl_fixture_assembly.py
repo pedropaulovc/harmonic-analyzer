@@ -75,8 +75,14 @@ def test_interference_literals_match_the_parts() -> None:
     assert interference.HUB_SCREW_THREAD[2] == pytest.approx(
         under_counterbore, abs=1e-4
     )
-    assert interference.HUB_SCREW_THREAD[0] == pytest.approx(0.25 * INCH)
-    assert interference.HUB_SCREW_THREAD[1] == pytest.approx(0.201 * INCH)
+    assert interference.HUB_SCREW_THREAD[0] == pytest.approx(0.190 * INCH)
+    assert interference.HUB_SCREW_THREAD[1] == pytest.approx(0.159 * INCH)
+    assert interference.HUB_SCREW_THREAD[:2] == pytest.approx(
+        (plate.HUB_THREAD_MAJOR, plate.HUB_TAP_DRILL)
+    )
+    assert spec.hub_screw.MAJOR_DIA == pytest.approx(plate.HUB_THREAD_MAJOR)
+    assert spec.plug.BORE_DIA > spec.hub_screw.MAJOR_DIA
+    assert spec.washer.BORE_DIA > spec.hub_screw.MAJOR_DIA
     assert interference.CLAMP_SCREW_THREAD[1] == pytest.approx(0.089 * INCH)
     # Each screw reaches through the plate's underside, so its engaged length
     # is the plate's whole thickness there.
@@ -87,9 +93,27 @@ def test_interference_literals_match_the_parts() -> None:
 
 
 def test_stack_stays_inside_the_strap_programs_hub_keep_out(plan: dict) -> None:
-    assert spec.washer.OUTER_DIA + 0.01 * INCH <= plan["bushing_flange_dia_mm"]
-    stack = spec.washer.THICKNESS + spec.HUB_SCREW_HEAD_HEIGHT
+    """Owner ruling 2026-11-23: one washer picked by measurement ("OD .505 or
+    under and bore .220 or under"); pushed fully to one side on the smallest
+    screw it stays inside the radius the outline program keeps its cutter
+    out of, and the thickest washer under the head inside the stack."""
+    washer = spec.washer
+    keep = plan["bushing_flange_dia_mm"] / 2.0 + plan["bushing_clearance_mm"]
+    assert washer.REACH_MAX <= keep
+    assert washer.SELECT_OD_MAX <= plan["bushing_flange_dia_mm"]
+    stack = washer.THICKNESS_MAX + spec.HUB_SCREW_HEAD_HEIGHT
+    assert stack == pytest.approx(washer.STACK_HEIGHT_MAX)
     assert stack <= plan["bushing_stack_height_mm"]
+    text = " ".join(spec.ASSEMBLY_STEPS.split())
+    assert "MIKES .505 OR UNDER ON ITS OUTSIDE DIAMETER" in text
+    assert "A .220 PIN GAUGE DOES NOT ENTER ITS BORE" in text
+    assert spec.WASHER_BORE_NO_GO == washer.SELECT_BORE_MAX
+    assert "IT STAYS WITH THE FIXTURE" in text
+    blank = " ".join(spec.BLANK_STEPS.split())
+    assert "CENTRED OVER ITS HUB HOLE" in blank
+    # Rule 26 bans the private phrase; the traveler carries the owner's
+    # "centre it by eye".
+    assert "BY EYE" not in blank
 
 
 def test_sheet_words_cite_real_items() -> None:

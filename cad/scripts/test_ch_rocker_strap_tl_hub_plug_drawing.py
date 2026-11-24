@@ -113,8 +113,8 @@ def test_sizes_are_the_contract_and_its_ruled_changes() -> None:
     # LEARN machinist review r5: widened from .3990-.3995 to the turned row.
     assert spec.PILOT_LIMITS == pytest.approx((0.3985 * INCH, 0.3995 * INCH))
     assert spec.BORE_DIA == pytest.approx(
-        0.266 * INCH
-    )  # owner ruling 2: 1/4-20, H drill
+        0.201 * INCH
+    )  # owner ruling 2026-11-23: #10-32, #7 drill
     assert spec.CHAMFER == pytest.approx(0.02 * INCH)
     assert spec.PILOT_LIMITS[0] < spec.PILOT_DIA < spec.PILOT_LIMITS[1]
 
@@ -143,8 +143,8 @@ def test_the_pilot_band_is_one_the_lathe_holds_and_its_play_fits_the_outline() -
     assert shift == pytest.approx(spec.HUB_LOCATING_ERROR_MAX)
     assert shift == pytest.approx(0.00175 * INCH)
     assert shift <= 0.2 * arm._PROFILE_HALF
-    # The wider band keeps the wall over the floor and its stated value.
-    assert spec.WALL_TEXT == "WALL .064 MIN"
+    # The wider band keeps the wall over rule 17's target.
+    assert spec.WALL_TEXT == "WALL .096 MIN"
 
 
 def test_seated_on_the_floor_the_plug_stays_inside_the_strap_at_the_worst_case() -> (
@@ -171,13 +171,17 @@ def test_seated_on_the_floor_the_plug_stays_inside_the_strap_at_the_worst_case()
     assert pilot_top[0] - (spec.CHAMFER + XX) > plan["tape_stack_max_mm"]
 
 
-def test_the_bore_clears_the_quarter_inch_screw_and_states_its_wall() -> None:
-    assert spec.BORE_DIA > spec.SCREW_MAJOR_DIA == pytest.approx(0.25 * INCH)
+def test_the_bore_clears_the_number_ten_screw_and_its_wall_meets_the_target() -> None:
+    """Owner ruling 2026-11-23: "change the screw to #10-32. The sub-plate's
+    tapped hole becomes #10-32 and the plug's bore .201 (#7 drill)."
+    (2026-11-17's "Use a 1/4-20 hub screw." left .064 under the pilot.)"""
+    assert spec.BORE_DIA > spec.SCREW_MAJOR_DIA == pytest.approx(0.190 * INCH)
     wall = (spec.PILOT_LIMITS[0] - spec.BORE_DIA - drilled_oversize_mm(unit="in")) / 2.0
     assert wall == pytest.approx(spec.WALL_MIN)
-    assert WALL_FLOOR_MM <= wall < WALL_TARGET_MM
-    assert spec.WALL_TEXT == "WALL .064 MIN"
-    assert spec.DIMENSION_CALLOUTS_BY_NAME["BoreDia"] == "DRILL THRU\nWALL .064 MIN"
+    assert WALL_FLOOR_MM < WALL_TARGET_MM <= wall
+    assert spec.WALL_TEXT == "WALL .096 MIN"
+    assert not spec.WALL_STATED
+    assert spec.DIMENSION_CALLOUTS_BY_NAME["BoreDia"] == "DRILL THRU"
     row = _config.parts(spec.PART_NAME)
     assert "machinist_exceptions" not in row
 
@@ -308,7 +312,7 @@ def _sheet_boxes() -> dict[str, Box]:
             drawing.ISO_NOTE_XY[1],
             drawing.ISO_NOTE_XY[1] + 0.005,
         ),
-        # WALL .064 MIN, ~25 mm wide, centred on its keep.
+        # The bore's block, ~25 mm wide, centred on its keep.
         "bore": _block(
             keep["BoreDia"], keep["BoreDia"][0] - 0.013, keep["BoreDia"][0] + 0.013
         ),

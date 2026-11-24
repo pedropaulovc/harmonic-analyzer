@@ -1,7 +1,7 @@
 ---
 # Bump major_version when an edit should change machinist-review verdicts;
 # other edits do not re-run cached reviews.
-major_version: 1
+major_version: 2
 ---
 # Drawing guidelines
 
@@ -18,14 +18,22 @@ One builder, a first-time hobby machinist, making one of each part. Milled
 features are cut on a CNC mill, turned ones on a manual lathe with a DRO; the
 parts are assembled at a bench with
 hand tools. Inspection and setting use what a well-equipped hobby shop owns:
-rule, calipers, micrometers, pin, feeler and thread gauges, a square, a granite
+rule, calipers, micrometers, a pin-gauge set in `.001 in` steps, feeler and
+thread gauges, a square, a granite
 surface plate with a height gauge and dial or test indicators, V-blocks, a sine
 bar and gauge blocks, a between-centres or bench-centre setup, and a torque
 screwdriver. There is no CMM, no optical comparator, no production line and no
 jig the package does not tell the builder to make.
 
-The machine is a hobby-scale scientific instrument, not aerospace hardware.
-Parts that work with loose tolerances are the mark of a good design.
+The machine is a hobby-scale scientific instrument, not aerospace hardware. One
+machine is built, once, by its owner; it is turned by hand and read by eye
+against a pen line about `.006 in` wide. Nothing in it is interchangeable, so
+no pair of mating parts needs limits printed on both. It is meant to be made
+with drills, the few standard reamers a hobby shop keeps, a micrometer,
+calipers and files, without working to tenths of a thousandth. Parts that
+work with loose tolerances are the mark of a good design. A package that needs
+a special reamer, a plug gauge or a band narrower than `.001 in` is presumed
+wrong until its necessity register says what fails otherwise (rule 4).
 
 The builder learned to read prints from a textbook and a shop handbook and
 reads each callout once, at the machine. They know standard ASME symbols and
@@ -46,22 +54,23 @@ the only capability figure a review may use.
 | location of a reamed or bored hole or a milled step, up to 6 in from its datum | ±.002 | as above, then ream or bore; surface plate, pin, indicator |
 | the same, more than 6 in from its datum, measured along the toleranced direction | ±.004 | DRO over long travel in a shop without temperature control |
 | milled width, thickness or slot | ±.001 | micrometer, gauge blocks |
-| turned diameter | ±.0005 | micrometer, made to the measured mate |
+| turned diameter | ±.001 | micrometer |
 | turned length or shoulder | ±.001 | DRO, depth micrometer |
-| reamed hole size | the reamer's size, banded no tighter than `+.0005 / 0` | pin gauges |
+| reamed hole size | the reamer's size; a reamed hole prints no band | its mate, tried in the hole |
 | angle | ±0.25° | sine bar and gauge blocks |
 | flatness, parallelism, perpendicularity, runout | .001 per inch of feature, never under .001 total | surface plate, indicator, V-blocks |
 | position of a reamed pattern | Ø.004 | surface plate, pins, height gauge |
-| assembly gap, alignment or end play | ±.0005 | dial or test indicator, feeler gauges |
+| assembly gap, alignment or end play | as fine as the named instrument reads: one owned feeler leaf (`.0015` to `.035`) as a single limit, or a go and a no-go leaf two leaves apart; `.002` total on a `.001` dial indicator; `.0005` total on the lever test indicator | the feeler leaf or the indicator the step names; a face set on the DRO follows the located-step rows above |
 
 Unconverted millimetre sheets use the same rows at ±0.12, ±0.05, ±0.10,
-±0.025, ±0.012, ±0.025 mm and Ø0.1 mm position.
+±0.025, ±0.025, ±0.025 mm and Ø0.1 mm position.
 
 A band narrower than its row cannot be reached by cutting to a number. It is
 reached only by a **fit route** the sheet names at the feature:
 
-- a matched fit to a named mate with its stated clearance, interference or
-  acceptance (rule 4);
+- a fit made to its mate: the mate turned, filed or selected to the finished
+  hole, with a stated acceptance (rule 4). This is the ordinary route for
+  every fit closer than its row, not an exception;
 - match-drilling, reaming in place or transferring through the mate;
 - a set-at-assembly feature (slot, shim, adjusting screw, feeler-set gap)
   whose setting and acceptance the assembly step gives (rule 19); or
@@ -180,36 +189,142 @@ HOLES row.
 - A tighter band goes on the dimension itself, never in a note and never as a
   geometric frame.
 
-### Rule 4 — Tighten only for function, and name the mate
+### Rule 4 — Loose unless something fails; fit the pair, not the number
 
-Tolerances exist to make parts work at the least cost. Tight is right only
-where a feature runs, slides, seals, locates or is pressed: a bearing journal
-and its bore, a press or sweat fit, a slide, a knife edge and its seat, a gear
-centre distance. A pass-through hole, a clearance bore, an outside profile or
-a chamfer gets the loosest title-block band that serves it.
+Tolerances exist to make parts work at the least cost, and this machine is
+built once. Every size starts at the title block and every hole at DRILLED
+HOLES. A REAM, a band narrower than the title-block row for its places, a
+printed interference and a gauge bought for one size are exceptions, and the
+package has to earn each one. That a feature runs, slides, locates or is
+pressed does not earn it: most such features on this machine work drilled, or
+made to their mate.
 
-- **Every tight band names its mate.** A tight band is an explicit band
-  narrower than the title-block band for its decimal places, a three-place
-  size given a function, or any REAM callout (REAM marks a fit bore even when
-  its band matches DRILLED HOLES). The reason for it is the mating part, so
-  the callout, or a flagged note attached to it (rule 7), names the mate and
-  the fit it needs: running, sliding, press, bonded or locating. The fit is
-  set by the printed limits of size; the callout names it with one of those
-  standard fit names (`RUNNING FIT ON MHA-CH-06-TL-VN-77`), and the resulting
-  clearance or interference range may follow as REF (`(CLEARANCE
-  .0010-.0025)`). Beside printed limits of size, `DIAMETRAL CLEARANCE` or
-  `DIAMETRAL INTERFERENCE` as the stated requirement repeats the limits in
-  private words. A matched pair whose nominal is REF has no limits to repeat;
-  there the stated clearance or interference range is the requirement (below).
-  So is a size printed at title-block places whose linked note states the
-  fitted range: the printed size is the supply size, and the range is the fit.
-  A gear centre distance names the mesh; a width that sets a stack names the
-  stack. Where
-  the mate alone does not show why the band is tight, add a few words of
-  reason (`SETS MESH BACKLASH`, `KNIFE-EDGE SEAT`); see rule 7. The shop can
+- **The necessity test.** For every REAM and every tight band ask: *what
+  fails on this one machine if it is `.002 in` loose?* The feature passes
+  only when the answer is one of the kinds below and the package's necessity
+  register carries an entry for it: the feature it covers, the kind, and the
+  reason in a few words. The register belongs to the part's registry record
+  and is supplied with the package; the sheet prints none of it. The kinds,
+  with reasons as an entry gives
+  them:
+  - `trace`: play, out-of-roundness or run-out, or an error in a lever arm,
+    throw or ratio, that reaches the pen trace or a reading ("play shows at
+    the pen", "wheel turns on this bore", "sets the reading zero", "throw
+    sets channel gain");
+  - `mesh`: a gear mesh's centre distance or run-out ("sets mesh backlash");
+  - `gap`: a running gap or stack that closes, or a wall that falls under
+    rule 17, at the looser size ("keeps the gap to MHA-XX-nn", "sets the
+    gear stack"; a wall short of the title block still prints rule 20's
+    `WALL .080 MIN` on the sheet);
+  - `joint`: a fixed joint that must hold with no bond, pin, key or screw
+    ("press, holds crank torque");
+  - `bought_seat`: a groove or seat cut to the installation size its maker
+    gives for a bought part (a retaining-ring groove); the entry names the
+    bought part by its drawing number.
+
+  A fit name alone ("running fit on MHA-XX-nn"), a named mate alone, "it
+  runs", "it locates" or "a reamer leaves a better hole" is not an answer,
+  in the register or anywhere else. A
+  spring, a weight or a screw that keeps a pivot or slide that only rocks or
+  shifts against one side of its clearance takes the play out: such a joint
+  fails the test. A feature
+  that fails takes the title-block band, and a hole a named drill. The test
+  is applied to the register: a REAM or tight band that no entry supplied
+  with the package covers is over-specification, whatever reason may lie
+  behind it or be printed beside it, and so is one whose entry gives a
+  reason that is not of its kind. A reason on the sheet is never required.
+  A short functional label that rule 7 allows may stay beside the feature;
+  a justification printed on the sheet is narration (rule 7).
+- **Then the least demanding form.** A feature that passes the test takes
+  the first form in this order that does the job. A later form where an
+  earlier one serves is over-specification.
+  1. **Drilled.** A named drill at DRILLED HOLES. It serves every
+     pass-through, every bonded seat whose drilled clearance stays inside
+     its grade's gap (it prints that clearance, rule 23; one that would not
+     is made to fit in form 2), every joint match-drilled, pinned or
+     adjusted at assembly, and
+     every pivot or slide held against one side that only rocks or shifts.
+     It does not serve a bore that a journal turns in through whole turns
+     where the bore's roundness reaches the trace: that bore is reamed for
+     roundness and finish, in form 2 or 3, and still prints no band. A
+     bonded seat says how the part is held square while the compound cures
+     and keeps the compound off any running land beside it (rule 23).
+  2. **Made to fit.** The hole is drilled, or reamed with whatever reamer is
+     on hand, and prints no band; its mate is turned, filed or selected last
+     to that hole. The mate's size prints as REF and the fit is the
+     requirement: an acceptance by feel (`TURN TO MHA-XX-nn BORE: TURNS FREE,
+     NO SHAKE`) or a clearance or interference range no narrower than `.001`
+     wide. A bonded fit states the clearance range, which rule 23 wants
+     inside its grade's gap. This is the default wherever the mate is made
+     in this shop. A
+     hole match-drilled or reamed in place through its mate at assembly, for
+     the pin that joins them, is this form and needs no register entry.
+     The acceptance prints once, on the sheet of the member made last; the
+     other member's sheet names that mate and says it is made to this
+     feature (`MHA-XX-nn IS TURNED TO THIS BORE`) and prints no acceptance
+     of its own. A location is made to its mate the same way: it prints as
+     REF, and a note linked to the feature gives the trial on the named
+     mate (`ALL MHA-XX-nn WHEELS DROP ON FREELY`).
+  3. **Reamed to the bought mate.** Where the mate is bought to size (drill
+     rod, ground shaft, dowel pin, shoulder screw), or one mate passes
+     through several parts (a row of gears on one shaft), the hole takes a
+     standard reamer (a 64th size, or `.001` over or under it), prints no
+     band, and the mate is the gauge (`Ø.376 REAM THRU; MHA-XX-nn ENTERS,
+     NO SHAKE`). A hole that is short of the title block's wall or web by
+     rule 17 still prints its wall.
+  4. **A printed band.** Only where no mate can be tried in the feature: a
+     wall, a stack, a gap set by two faces, a gear's size over pins. It is
+     never narrower than its "What the shop holds" row. Gear tooth data
+     (span, tooth thickness, run-out, a gear's outside and root diameters)
+     keep the gear data block's own rules (rule 7) and take neither the
+     necessity test nor this order; a band on one is still never narrower
+     than its "What the shop holds" row. A diameter that is bought to size
+     and never cut prints the
+     stock (`1/4 GROUND ROD, AS SUPPLIED`), not limits of size.
+- **What is over-specification on a one-off.** Limits of size printed on
+  both members of a mating pair; a band on a reamed hole (`+.0005 / 0`); a
+  clearance or interference range narrower than `.001` wide; a press with a
+  printed interference where a bonded slip fit or a pin would hold (rule
+  23); a REAM for a bolt, a bonded pin or a spring-loaded pivot that has
+  no register entry; and any feature whose acceptance needs a
+  plug gauge, a pin pair, a gauge block stack or another gauge bought or set
+  up for that one size. One pin of the `.001`-step set used as a single
+  limit (`.127 PIN DOES NOT ENTER`) is not such a gauge. Name the feature,
+  quote its callout and give the form it should take.
+- **An owner exception keeps what it names.** A REAM, band or gauge that
+  fails the test or the form order stands when an owner exception supplied
+  to the review (rule 20) covers that feature and value. The sheet still
+  prints no argument for it.
+- **Every fit names its mate; the register says what a band protects.** A tight band is
+  an explicit band narrower than the title-block band for its decimal places,
+  compared by total width (rule 4, "Read a band as its total width"):
+  `+.000 / -.004` is `.004` wide against the `.XXX` row's `.010`, `+.000 /
+  -.016` is `.016` against the `.XX` row's `.020`, and `±.5°` is `1°`
+  against the angle row's `2°`. A band as wide as its row or wider is not a
+  tight band and is never filed as one, however its limits are split;
+  or any REAM callout (REAM marks a fit bore even when it prints no band). A
+  three-place size given a function, printed at its title-block band, names
+  its mate as below but is not a tight band, and the necessity test does not
+  apply to it; nor is a single-limit corner radius or edge break (`R.03
+  MAX`, rule 16), a thread designation or class, gear tooth data, a
+  purchased part's catalogue designation or one of the title block's own
+  rows. The callout of a fit, or a flagged note attached
+  to it (rule 7), names the mate and the fit it needs (running, sliding, press,
+  bonded or locating); the answer to the necessity test is in the
+  register, not here. The fit is made
+  to the mate, not to printed limits: the stated acceptance or the clearance
+  or interference range is the requirement, and a size beside it prints as
+  REF. A size printed at title-block places whose linked note states the
+  fitted range is the same case: the printed size is the supply size, and
+  the range is the fit. Where a band survives as form 4, it is the
+  requirement and a range beside it is REF (`(CLEARANCE .004-.012)`).
+  A band with no mate to try (a stack, a gap set by two faces, a wall) names
+  none: its register entry says what it protects. The shop can
   then make the hole to the shaft instead of chasing a number. A tight band
-  whose mate appears nowhere in the package is a blocker: either name the
-  mate or loosen the band. A mate named somewhere in the package (a general
+  with no register entry is
+  over-specification: it takes the title-block band. Do not ask for a mate
+  to be named on a band that nothing shows is needed. A mate named
+  somewhere in the package (a general
   note, a gear data block, another sheet) but not at the callout it serves is
   a clarity defect, not a blocker. One feature with several tight dimensions
   (a groove's diameter and radius, a bore's size and depth) names its mate
@@ -239,38 +354,41 @@ a chamfer gets the loosest title-block band that serves it.
   subsystems number differently (`MHA-PD-07`, `MHA-PD-VN-57`,
   `MHA-CH-06-TL-21`), so never demand a sub-group code a number does not
   have.
-- **Matched or selectively fitted pairs.** For a one-off pair, the callout
-  identifies the mate by name and full drawing number, and states
-  the required clearance, interference or an unambiguous functional
-  acceptance. A clearance or interference range is diametral unless it says
-  `RADIAL`; `DIAMETRAL CLEARANCE .004-.012 ON MHA-SH-VN-53` is a complete
-  statement here. "MATCH FIT" alone is incomplete. When the nominal is
-  reference-only, the finished mate
-  and the stated acceptance define the fit, and a reference nominal does not
-  mean purchased stock. Where both parts carry controlled limits, those limits
-  still apply and must produce the required fit; matching does not waive them.
-  Interchangeable parts need their essential limits.
+- **Fitted pairs are the default.** For a pair made to fit, the callout
+  identifies the mate by name and full drawing number and states the
+  acceptance: a functional acceptance in ordinary words (`SLIDES IN, NO
+  ROCK`, `TURNS FREE, NO SHAKE`, `PRESSES IN, DOES NOT TURN BY HAND`), or a
+  clearance or interference range, diametral unless it says `RADIAL`. "MATCH
+  FIT" alone is incomplete. A reference nominal does not mean purchased
+  stock. The pair stays together: where several like pairs exist (a row of
+  hubs in their straps) the sheet or its assembly says they are kept as
+  fitted, or says that one size serves them all. Printed limits on both
+  members are for interchangeable parts, and this machine has none.
 - **Stock that is good enough stays stock.** Where bar stock already meets the
   need, say so (`n STOCK OK`, `.nn (STOCK)`) or give a minimum cleanup size
   rather than a turned band.
 - **Read a band as its total width.** `+.001 / 0 in` is `.001 in` wide,
   the same as `±.0005 in`. Keep the nominal and asymmetric limits when checking a
   fit; equal widths are not equal fits.
-- **Necessity, then the shop table.** Being printed does not make precision
-  necessary. Unneeded precision is over-specification even when it is easy.
-  Needed precision is then checked against "What the shop holds":
+- **Necessity first, then the shop table.** Being printed does not make
+  precision necessary, and being easy does not either. A reviewer decides
+  necessity from the register supplied with the package: a REAM or tight
+  band that no entry covers, or in a later form than its mate allows, is
+  over-specification. Say so, quote the callout and name the form it should
+  take. Do not excuse it because a mate is named, a fit route is named or the
+  band sits inside its shop-table row. Precision that passes the test is
+  then checked against "What the shop holds":
   - A band narrower than its row, with no fit route named at the feature, is
     unbuildable as a cut-to-number dimension. Quote the band, the row and the
-    missing route. Do not decide whether the function could live with less;
-    the designer either names the route or changes the design.
+    missing route.
   - A band inside its row but narrower than `.002` total on a location,
     length or setting needs the same named fit route or a stated check at the
     feature (what it is checked against and with which listed tool). Missing
     that support is a clarity defect, not a claim that the band is impossible.
   - Use no figure the table does not give. DRO or micrometer resolution is not
     accuracy, and "the DRO reads to .0002" never excuses a band. Do not
-    assume grinding, lapping, temperature-controlled metrology or an ideal
-    reamed hole.
+    assume grinding, lapping, temperature-controlled metrology, an ideal
+    reamed hole, or a gauge the shop list does not name.
 - **A clearance hole is never located tighter than its clearance.** With hole
   Ø H and fastener Ø F, its position tolerance is at least Ø(H−F) when both
   parts have clearance holes and Ø(H−F)/2 when the mate is tapped or pinned
@@ -281,11 +399,11 @@ a chamfer gets the loosest title-block band that serves it.
   inch step (`±.0005`, `±.001`, `±.002`, `±.005`, `+.001 / 0`), not a
   converted millimetre value (`±.0008`, `±.0009`, `Ø.0039`). A converted band
   is a clarity defect: it reads as a deliberate precision no one chose.
-- **Never loosen a functional fit just to ease manufacture,** and never
-  tighten a band to rescue a thin wall, a short thread or a stack (rules
-  17–19). A proposed replacement band faces the same scrutiny: wider is not
-  automatically better. If the right limits depend on a mate the sheet does not
-  show, say so rather than inventing numbers.
+- **Never tighten to rescue, and never invent the replacement.** A band is
+  never tightened to rescue a thin wall, a short thread or a stack (rules
+  17–19). When asking for a looser form, give the form (drilled, made to
+  fit, reamed to the bought mate), not a new set of numbers: if the right
+  size depends on a mate the sheet does not show, say so.
 
 ### Rule 5 — Avoid excessive GD&T
 
@@ -330,7 +448,9 @@ deliberately:
 
 Gear seats, pinned or pressed bores, clamp faces, register faces that do not
 locate, and every other face carry no symbol. A banded or reamed bore is not a
-running bore by itself: a gear's D-bore or seat bore does not run. A symbol on
+running bore by itself: a gear's D-bore or seat bore does not run. Nor is a
+pivot that only rocks a few degrees against one side of its clearance under
+a spring or a weight: it carries no symbol. A symbol on
 a face that neither runs nor locates is over-specification. Judge function
 from the whole package: a thrust washer face, a thrust shoulder, or a face a
 note says slides or bears does run.
@@ -356,11 +476,14 @@ are gear data, not narration.
   that answers a question the builder would foreseeably ask at the machine
   is not over-specification. It is welcome where a tight band, a roughness
   symbol or a hardness would otherwise look arbitrary (`BEARING SURFACE`,
-  `KNIFE-EDGE SEAT`, `SETS MESH BACKLASH`, `SLIDING FIT ON MHA-CH-05`) and
+  `KNIFE-EDGE SEAT`, `SETS MESH BACKLASH`, `PLAY SHOWS AT PEN`) and
   where the views leave a feature's purpose unclear (`WHEEL BEARING
   SURFACE`). A reason is one line of at most six
   words, beyond the mate's drawing number, on the callout it explains, once
-  per feature or pattern. A matched-fit statement (rule 4) and a stated
+  per feature or pattern. The answer to rule 4's necessity test is in the
+  package's register and is never required on the sheet; a label of this
+  kind beside a tight band is optional and is not that answer.
+  A fit statement (rule 4: mate, fit name, acceptance) and a stated
   shortfall (rule 20) have their own forms and are not counted. Anything
   beyond that is narration and is over-specification: a method or procedure
   (below), design rationale that answers no builder question (`HOLDS …
@@ -389,7 +512,8 @@ are gear data, not narration.
   reads the same as a note on that sheet.
 - **Geometry, not method** (ASME Y14.5 §1.4(e)). `MACHINE BOTH POCKETS`,
   `CAST`, `MILL FROM SOLID` are not requirements; the dimensioned feature is. A
-  process word appears only where it is the requirement: REAM for a fit bore, a
+  process word appears only where it is the requirement: REAM for a fit bore
+  that has passed rule 4's necessity test, a
   tap-drill depth that matters, matched fitting to an identified mate,
   match-drill at assembly. Setups, workholding, CNC offsets, speeds, feeds and
   in-process checks live in the part's traveler, reviewed against
@@ -602,7 +726,9 @@ cross-hole. Judge it at the worst case of the printed bands (the title-block
 band for its decimal places, DRILLED HOLES, or the explicit band) plus
 realistic drill wander on a deep hole, never at nominal and never by
 root-sum-square. Fix a thin wall with geometry so the bands can stay loose,
-never with a tighter band.
+never with a tighter band. This is the basis for a wall, a web and a
+ligament. It is not, by itself, the basis for a joint the assembly sets:
+rule 19 says how that is judged.
 
 ### Rule 18 — Thread engagement: 1.5D of full thread
 
@@ -623,6 +749,18 @@ on tight part bands is a defect; the fix is an adjustment, not a tighter part.
 A part that states a supply size and a set-at-assembly size for the same
 feature (`SUPPLY n.nn MIN`, `n.nn SET AT ASSEMBLY n.nn–n.nn`) is describing
 this adjustment, not contradicting itself.
+
+Making one part to its mate (rule 4) is not this rule's adjustment and is
+not a last resort: it is how a one-off fit is made. This rule is about
+stacks of several parts.
+
+A joint that has such an adjustment, or that the assembly step sets by
+feel, is judged after its setting: the setting is not summed again as a
+term, and only what the setting cannot see is checked. A stack that
+closes only when a part band is tightened, an inspection is added or a
+limit is moved by less than the shop reads (`.001 in` on a size, one step
+of the instrument on a setting) has not closed: give it room with geometry,
+name the setting that already absorbs it, or ask the owner.
 
 ### Rule 20 — State a known shortfall as a plain fact
 
@@ -675,8 +813,21 @@ sub-assembly, never on part fabrication.
   its native dimension, with a setting diagram or setting table (reference,
   target, range and check in columns) where a view alone cannot carry it.
   A retention or fit acceptance that is a measurable value (a check with a
-  number) is such a setting and prints here. A setting finer than `.XXX`
-  names the indicator or gauge that reads it. A fit made at assembly
+  number) is such a setting and prints here. A gap, endshake, travel, press
+  depth or alignment set finer than `.XXX`, or banded tighter than its
+  title-block row, has its entry in the assembly drawing's necessity
+  register (rule 4) and names the indicator
+  or feeler that reads it; it never needs a gauge bought for that one
+  setting. A fit acceptance given as a clearance or interference range or
+  by feel is not such a setting (rule 4). A mesh, a play or a free-running
+  check that the step itself sets by feel or to a first bind prints no
+  backlash, shake or gap number for that quantity: the step says what is
+  felt and what must not happen (no bind through a full turn, no skipped
+  tooth). This does not remove a clearance or interference range that rule
+  4 or rule 23 requires on a made-to-fit, bonded or pressed joint. A window
+  read on an instrument is no narrower than the assembly row of "What the
+  shop holds", and wider wherever the function allows. A fit made
+  at assembly
   (match-drill, ream in place, shim, adjust) names the mating parts as rule 4
   requires; an item reference is enough when the BOM supplies the item's name
   and number unambiguously.
@@ -819,7 +970,8 @@ beside them. Every symbol, abbreviation and phrase is one they can look up.
   standard view names (front, top, right side), never a compass (`NORTH`,
   `EAST`), a clock reading or a private convention.
 - **Holes.** Size first, then process, then depth, with the Y14.5 symbols:
-  `Ø.257 THRU`, `Ø.3750 +.0015/+.0010 REAM THRU`, `⌴ Ø.31 ↧ .19`,
+  `Ø.257 THRU`, `Ø.376 REAM THRU` (its rule 4 fit lines follow),
+  `⌴ Ø.31 ↧ .19`,
   `⌵ Ø.312 X 82°`, `1/4-20 UNC ↧ .45`. A counterbore or countersink is
   written with its symbol, not in words; a depth is never deferred to a view.
   A depth printed as REF in the callout is complete when a controlling

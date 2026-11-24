@@ -8,7 +8,7 @@ places the marked dimensions and proves the import kept them.
 At 4:1 (the arbor collar's recipe, ``draw_dt_cone_gear_tl_arbor_collar``):
 
 * the END VIEW (``*Front``, looking down on the pilot's top) keeps the bore
-  with its DRILL THRU callout and stated wall;
+  with its DRILL THRU callout;
 * the SIDE VIEW (``*Right``, model +Z to the left, so the pilot stands left
   of the body as on the lathe; rule 11) carries both diameters, moved from
   the end view where every diameter crosses the centre: the pilot's limits

@@ -1,7 +1,7 @@
 ---
 # Bump major_version when an edit should change traveler machinist-review
 # verdicts; other edits do not re-run cached reviews.
-major_version: 1
+major_version: 2
 ---
 # Traveler guidelines (machinist review v2)
 
@@ -38,11 +38,19 @@ drawings"), plus the shop's process equipment:
   most ordinary hand tools (files, stones, abrasive rolls, scrapers, blades,
   squares, clamps, hex keys, wrenches, torque wrenches / torque screwdriver,
   soft-jaw bench vise, miter saw or bandsaw, spring-loaded spindle tap guide,
-  feeler leaves) are available even when not itemized on the Tools table. Bores
-  are checked as "What the shop holds" says: pin gauges, or a GO / NO-GO plug
-  gauge pair the traveler names for a band the pin-gauge steps cannot resolve.
-  The shop also owns telescoping gauges read on the `.0001 in` outside
-  micrometers (see rule T11 for what they cannot accept). A CMM, optical
+  feeler leaves) are available even when not itemized on the Tools table. A
+  fit bore is accepted with its mate, as "What the shop holds" says: the
+  bought shaft or pin tried in it, or the made mate turned to it. A pin-gauge
+  set in `.001 in` steps and telescoping gauges read on the `.0001 in` outside
+  micrometers serve to read a hole for the mate's first cut (see rule T11
+  for what they cannot accept). No traveler adds a plug gauge, a GO / NO-GO
+  pin pair or a reamer bought for one band on its own account: a band that
+  seems to need one is a drawing defect (drawing rule 4), raised against the
+  drawing, not answered with a purchase. Where the part drawing still prints
+  such a band, the traveler checks it as printed, with pin gauges where
+  their step resolves the band and otherwise a named GO / NO-GO pair (rule
+  T11), and the review summary reports the band as a
+  drawing defect. A CMM, optical
   comparator, air gauge, bore micrometer, small-hole gauge or production
   metrology lab is not in the shop.
 
@@ -333,8 +341,12 @@ defect** (`over_specification`, rule T15) just as a broken check is:
   `gauge_capability` owns it, EXCEPT when the prose names a transfer tool that
   contradicts how the check is physically read. A telescoping gauge read on a
   micrometer repeats to about `.0005 in`, so it does not accept a bore band of
-  `.0005 in` or similar; that bore needs pin gauges or a named GO / NO-GO plug
-  gauge pair. Calipers on a `.001 in` band are the same defect.
+  `.0005 in` or similar. Where the drawing prints no band on the bore, it is
+  accepted with its mate (T0). Where the drawing still prints such a band,
+  the traveler checks it with pin gauges where their `.001 in` step resolves
+  the band, and otherwise with a named GO / NO-GO plug gauge pair, and the
+  review summary reports the band as a drawing defect.
+  Calipers on a `.001 in` band are the same defect.
 
 ### Rule T12 — Operations read cleanly at the machine
 

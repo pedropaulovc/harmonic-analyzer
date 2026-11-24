@@ -256,11 +256,6 @@ kind = "drill"
 status = "on_hand"
 note = "The 27/64 of the owned 115-piece index (1/16-1/2 by 64ths, as the 13/32 and 7/16 above); its shank is the winding mandrel of MHA-DT-27 dt-crank-pin-ring (cad/process/dt_crank_pin_ring/plan.toml), never cut with."
 
-[tools.drill-11-8mm]
-kind = "drill"
-status = "to_order"
-note = "quotes-2026-11-17-rev3.xlsx G-drill-11.8mm: not owned; recommended Travers 01-041-180."
-
 [tools.drill-15-32]
 kind = "drill"
 status = "on_hand"
@@ -270,11 +265,6 @@ note = "quotes-2026-11-17-rev3.xlsx Drills 15/32: owned in 115-pc index (quality
 kind = "drill"
 status = "on_hand"
 note = "quotes-2026-11-17-rev3.xlsx Drills 31/64: owned in 115-pc index (quality unverified); not on the buy list."
-
-[tools.drill-13mm]
-kind = "drill"
-status = "to_order"
-note = "quotes-2026-11-17-rev3.xlsx G-drill-13mm (optional tier, not in the recommended total): not owned; recommended McMaster-Carr 6154N11."
 
 [tools.drill-33-64]
 kind = "drill"
@@ -294,15 +284,6 @@ purchase = "MSC 63725519, Cleveland C08618 #51 (.0670) HSS 118 deg taper-length 
 kind = "drill"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-FR-02 #51 DRILL 2X Ø.067 THRU FROM REAM POINT. fr_top_frame_spec.py: a jobber #51 falls short; Cleveland HSS taper length, MSC 63725519."
-
-[tools.drill-30-cobalt]
-make = "Precision Twist Drill"
-sku = "01-304-130"
-source = "https://www.travers.com/product/precision-twist-drill-018330-jobbers-drill-01-304-130"
-purchase = "Travers 01-304-130, Precision Twist Drill 018330 #30 cobalt 135 deg split-point jobber drill, 2-3/4 in overall, $4.53, in stock (read live 2026-11-22). Import alternative: Travers 01-021-030, $2.90."
-kind = "drill"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-24 #30 DRILL .129 THRU in 17-7 PH Cond C. The 115-piece index is HSS; the cobalt drill is for the hard 17-7 PH (not verified)."
 
 [tools.drill-65]
 make = "Chicago-Latrobe"

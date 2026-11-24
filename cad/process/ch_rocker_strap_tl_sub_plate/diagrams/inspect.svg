@@ -23,7 +23,7 @@
   <line class="leader" x1="720" y1="48" x2="720" y2="85.4"/>
   <text class="label" x="752" y="44" text-anchor="end">Y0 to the pockets' far walls 1.875 ±.002</text>
   <line class="leader" x1="370.2" y1="148.9" x2="370.2" y2="234"/>
-  <text class="label" x="330" y="248">hub 6.000, 1.000 ±.002 from X0, Y0; Ø.500 × .185, 1/4-20 thru</text>
+  <text class="label" x="330" y="248">hub 6.000, 1.000 ±.002 from X0, Y0; Ø.500 × .185, 10-32 thru</text>
   <text class="label" x="40" y="280">notches .17 deep back from Y0; fence and stop .074 ±.005 above Z0</text>
   <!-- Section: overall thickness over the fence. -->
   <polygon class="section" points="240,343.8 240,322.67 367,322.67 367,318.91 392.4,318.91 392.4,343.8"/>
@@ -31,5 +31,5 @@
   <line class="dims" x1="395" y1="318.91" x2="418" y2="318.91"/>
   <line class="dims" x1="395" y1="343.8" x2="418" y2="343.8"/>
   <text class="label" x="424" y="336">.49 ±.01 overall, over the fence</text>
-  <text class="label" x="40" y="380">Threads: a 4-40 and a 1/4-20 screw run in by hand through each tapped hole.</text>
+  <text class="label" x="40" y="380">Threads: a 4-40 and a 10-32 screw run in by hand through each tapped hole.</text>
 </svg>

@@ -19,6 +19,7 @@ import pytest
 
 import _cam_programs
 import _process_plans
+import _shop_equipment
 import cam_nc
 import export_features
 
@@ -40,9 +41,10 @@ def ctx() -> dict:
 
 def _post(ctx: dict, out: Path) -> None:
     """Each program as the runtime posts it: the grbl preamble, then per
-    section an M6 block (M5, the operator's %msg, M6, M3) and its lines, the
-    feeds in mm/min; a program that does not load its first tool starts on
-    its M3."""
+    section its lines, the feeds in mm/min, after an M6 block (M5, the
+    operator's %msg, M6) where the tool changes or the program loads its
+    first tool; a manual section (the saw's witness-line stop) is its own
+    lines, and the section after it restarts the spindle on its M3."""
     sections = {op[0]: job for job in ctx["jobs"] for op in job["ops"]}
     lines_of = {op[0]: op[2] for job in ctx["jobs"] for op in job["ops"]}
     for name, groups in RECIPE.PROGRAMS:
@@ -55,10 +57,18 @@ def _post(ctx: dict, out: Path) -> None:
             "G54",
         ]
         keys = [group[0] if isinstance(group, tuple) else group for group in groups]
-        for index, key in enumerate(keys):
+        previous = None
+        for key in keys:
+            if key in ctx["manual"]:
+                manual = ctx["manual"][key]
+                assert manual["tool"] == previous, "a stop on the tool running"
+                text += manual["gcode"]
+                continue
             job = sections[key]
             number = ctx["numbers"][job["tool"]]
-            if index or name in RECIPE.LOAD_FIRST_TOOL:
+            if number != previous and (
+                previous is not None or name in RECIPE.LOAD_FIRST_TOOL
+            ):
                 text += [
                     "M5",
                     f"%msg TOOL CHANGE: T{number} {ctx['names'][job['tool']]}, SET SPINDLE TO {job['rpm']:g} RPM",
@@ -73,6 +83,7 @@ def _post(ctx: dict, out: Path) -> None:
                     for line in lines_of[key]
                 ),
             ]
+            previous = number
         text += ["M5", "G17 G90", "M2"]
         (out / f"{name}.nc").write_text("\n".join(text) + "\n", encoding="utf-8")
 
@@ -143,7 +154,7 @@ def test_the_saw_is_mounted_and_moved_only_where_its_arbor_clears(ctx) -> None:
     # The saw rises straight up from the touch-off before any X or Y move,
     # and moves between passes at that height (down to the pass only beside
     # the load, 1 mm over the bars' top).
-    for key in ("foot_notch", "top_notch"):
+    for key in ("foot_light", "foot_notch", "top_light", "top_notch"):
         lines = _lines(ctx, key)
         assert lines[0] == f"G0 Z{p['saw_clear_z_mm']:.3f}"
         assert {line for line in lines if line.startswith("G0 Z")} == {
@@ -152,16 +163,83 @@ def test_the_saw_is_mounted_and_moved_only_where_its_arbor_clears(ctx) -> None:
         }
 
 
-def test_a_nut_too_close_under_the_saw_is_caught_over_the_top_ends(tmp_path) -> None:
-    # The rod's .125 in of spacers under the saw: at the top notch's second
-    # level the nut, wider than the spacers, reaches over the bars' ends.
-    plan = copy.deepcopy(PLAN)
-    plan["parameters"]["saw_spacer_below_min_mm"] = 3.175
-    ctx = _context(plan)
+def test_the_saw_runs_on_the_owned_arbor_as_its_record_gives_it() -> None:
+    # The arbor's sizes in the plan are the inventory record's (inches there),
+    # the saw's hole its own record's; nothing of the arbor that was to buy
+    # (its spacers, its nut) is left in the plan.
+    inventory = _shop_equipment.load()["tools"]
+    record = inventory["saw-arbor-r8-stepped"]
+    p = PLAN["parameters"]
+    assert record["status"] == "on_hand" and record["keyed"] is False
+    for key, field in (
+        ("saw_arbor_body_dia_mm", "body_dia_above_saw_in"),
+        ("saw_arbor_cap_dia_mm", "cap_dia_in"),
+        ("saw_arbor_cap_thickness_mm", "cap_thickness_in"),
+        ("saw_arbor_screw_head_dia_mm", "screw_head_dia_in"),
+        ("saw_arbor_nose_to_cap_mm", "below_spindle_nose_in"),
+    ):
+        assert p[key] == pytest.approx(record[field] * 25.4, abs=1e-4), key
+    # The thread, its engagement and the clamp torque are the record's.
+    assert p["saw_clamp_torque_nm"] == record["clamp_torque_nm"]
+    assert record["screw_thread"].startswith(f"M{p['saw_screw_dia_mm']:g} x ")
+    assert (
+        p["saw_screw_engagement_no_saw_mm"] == record["screw_engagement_no_saw_mm"]
+    )
+    assert p["saw_bore_mm"] == pytest.approx(
+        inventory["slitting-saw-2-75-064"]["bore_in"] * 25.4
+    )
+    arbor = next(tool for tool in PLAN["tools"] if tool["id"] == "saw-arbor")
+    assert arbor["ref"] == "saw-arbor-r8-stepped"
+    # The arbor that was to buy is no tool of the plan, and its limits are no
+    # parameters of it.
+    assert "gear-cutter-arbor-1" not in {tool["ref"] for tool in PLAN["tools"]}
+    for gone in (
+        "saw_collar_dia_max_mm",
+        "saw_spacer_below_min_mm",
+        "saw_nut_dia_max_mm",
+    ):
+        assert gone not in p, gone
+
+
+def test_each_saw_program_stops_after_a_light_pass_for_the_witness_lines(
+    ctx, tmp_path
+) -> None:
+    p = PLAN["parameters"]
+    # The light pass: one level, half a step into the ends, at the ledge.
+    for key, x, z in (
+        ("foot_light", p["foot_notch_light_mm"] - p["saw_dia_mm"] / 2, "1.854"),
+        ("top_light", p["saw_dia_mm"] / 2 - p["top_notch_light_mm"], "1.600"),
+    ):
+        lines = _lines(ctx, key)
+        assert [line for line in lines if line.startswith("G1 Z")] == [
+            f"G1 Z{z} F{{feed}}"
+        ]
+        assert sum(line.startswith(f"G0 X{x:.3f} Y") for line in lines) == 1
+    # Then M5, the operator's %msg and M0; the rest restarts on its own M3.
     _post(ctx, tmp_path)
-    found = [f.detail for f in _findings(ctx, tmp_path) if f.check == "keep_out"]
-    assert found and all("the arbor's nut" in detail for detail in found)
-    assert any("the bars' ends" in detail for detail in found)
+    for name in ("CA02_foot_notch", "CA04_top_notch"):
+        text = (tmp_path / f"{name}.nc").read_text(encoding="utf-8").splitlines()
+        stop = text.index("M0")
+        assert text.count("M0") == 1 and "M6" not in " ".join(text)
+        assert text[stop - 2] == "M5" and "WITNESS LINES" in text[stop - 1]
+        assert text[stop + 1] == "M3 S100"
+        assert sum(line.startswith("G1 Y") for line in text[:stop]) == 1
+
+
+def test_a_pass_past_the_arbors_reach_is_caught_at_the_bars_ends(ctx, tmp_path) -> None:
+    # The top notch's deepest pass stationed 7 mm further in than its depth:
+    # the cap below the saw and the body above it meet the bars' ends.
+    seeded = _seed(
+        ctx,
+        "top_notch",
+        lambda line: line.startswith("G0 X20.955 Y"),
+        lambda line: line.replace("X20.955", "X14.000"),
+    )
+    _post(seeded, tmp_path)
+    found = [f.detail for f in _findings(seeded, tmp_path) if f.check == "keep_out"]
+    for part in ("the arbor's cap below the saw", "the arbor's body above the saw"):
+        assert any(f"the bars' ends ({part})" in detail for detail in found), part
+    assert not any("the cap's screw head" in detail for detail in found)
 
 
 @pytest.mark.parametrize(
@@ -183,7 +261,12 @@ def test_a_nut_too_close_under_the_saw_is_caught_over_the_top_ends(tmp_path) -> 
         ({"top_notch_depth_mm": 14.224}, "top_notch_depth_mm"),
         ({"top_notch_step_mm": 3.4925}, "top_notch_step_mm"),
         ({"end_protrusion_mm": 14.0}, "top notch's depth"),
-        ({"saw_collar_dia_max_mm": 45.0}, "saw_collar_dia_max_mm"),
+        ({"saw_arbor_cap_dia_mm": 44.45}, "saw_depth_past_arbor_max_mm"),
+        (
+            {"saw_arbor_body_dia_mm": 44.45, "saw_depth_past_arbor_max_mm": 11.7},
+            "top notch's deepest limit 14.224 passes the arbor's reach",
+        ),
+        ({"saw_arbor_screw_head_dia_mm": 31.75}, "not inside the cap"),
         ({"drill_tip_height_mm": -0.5}, "drill_tip_height_mm"),
         ({"spot_dia_mm": 1.9}, "under the #49"),
         ({"top_clamp_end_mm": 19.05}, "top_clamp_end_mm"),
@@ -201,13 +284,35 @@ def test_a_nut_too_close_under_the_saw_is_caught_over_the_top_ends(tmp_path) -> 
         ({"riser_face_overhang_mm": -50.0}, "riser_face_overhang_mm"),
         ({"riser_parallel_height_mm": 38.1}, "to grip"),
         ({"riser_parallel_height_mm": 12.7}, "over the jaw tops"),
-        ({"saw_spacer_below_min_mm": 25.4}, "inside its stack's depth"),
+        ({"saw_below_max_mm": 12.7}, "saw_below_max_mm"),
         ({"saw_clear_z_mm": 11.35}, "saw_clear_z_mm"),
-        ({"saw_proof_raise_mm": 25.4}, "air proof"),
+        ({"saw_proof_raise_mm": 20.0}, "air proof"),
+        (
+            {
+                "saw_screw_head_stand_max_mm": 1.27,
+                "saw_below_max_mm": 13.97,
+                "saw_clear_z_mm": 25.32,
+            },
+            "not the largest the air proof tolerates",
+        ),
+        ({"saw_arbor_below_nose_mm": 36.0}, "nose-to-cap distance plus the saw"),
+        ({"saw_arbor_length_mm": 38.1}, "saw_arbor_length_mm"),
         ({"saw_touch_x_mm": 31.9}, "saw_touch_x_mm"),
         ({"saw_touch_y_mm": -3.0}, "saw_touch_y_mm"),
-        ({"saw_park_z_mm": 11.35}, "saw_park_z_mm"),
-        ({"saw_nut_dia_max_mm": 64.0}, "bar ends at the saw's touch-off"),
+        ({"saw_park_z_mm": 17.75}, "saw_park_z_mm"),
+        ({"saw_clamp_preload_kn": 2.0}, "saw_drive_torque_max_nm"),
+        ({"saw_screw_engagement_no_saw_mm": 9.0}, "under one screw diameter"),
+        (
+            {"saw_clamp_preload_kn": 2.0, "saw_drive_torque_max_nm": 4.02},
+            "over the arbor's friction drive",
+        ),
+        ({"saw_feed_per_min_mm": 365.76}, "not the .001 in/tooth"),
+        ({"saw_swept_margin_mm": 0.0508}, "foot_saw_swept_max_mm"),
+        ({"foot_notch_rise_mm": 1.0}, "foot_notch_rise_mm"),
+        ({"top_saw_radial_tir_max_mm": 0.6}, "top_saw_radial_tir_max_mm"),
+        ({"saw_axial_reading_per_in_mm": 25.4}, "saw_axial_reading_per_in_mm"),
+        ({"foot_saw_axial_nominal_mm": 0.07}, "foot_saw_axial_nominal_mm"),
+        ({"foot_notch_light_mm": 2.1273}, "foot_notch_light_mm"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(changes, detail) -> None:
@@ -245,7 +350,7 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             "passes",
         ),
         # The deepest pass started over the load instead of beside it: the
-        # nut, under the saw coming down there, meets the bars' ends.
+        # saw comes down flat onto the bars' tops.
         (
             "top_notch",
             lambda line: line.startswith("G0 X20.955 Y"),

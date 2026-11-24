@@ -2939,6 +2939,74 @@ def test_review_prompt_injects_declared_exceptions(
     assert "OWNER-DECLARED MACHINIST EXCEPTIONS" not in mr._review_prompt(bare, 1)
 
 
+def _write_necessity(config_root: Path, name: str, entries: object) -> Path:
+    import yaml
+
+    path = config_root / "necessity" / f"{name}.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump({"necessity": entries}), encoding="utf-8")
+    return path
+
+
+_NECESSITY_ENTRY = {
+    "id": "N-01",
+    "feature": "sheet 1, front view, .159 ±.002 ridge height",
+    "kind": "trace",
+    "reason": "sets the lever arm ratio",
+}
+
+
+def test_necessity_register_loads_by_dashed_drawing_stem(tmp_path: Path) -> None:
+    import machinist_necessity
+
+    _write_necessity(
+        tmp_path, "pn-pen-assembly", [{**_NECESSITY_ENTRY, "source": "pn_pen_spec.GAP"}]
+    )
+    (entry,) = machinist_necessity.load_necessity(tmp_path, "pn_pen_assembly")
+    assert (entry.id, entry.kind, entry.source) == ("N-01", "trace", "pn_pen_spec.GAP")
+    assert machinist_necessity.load_necessity(tmp_path, "ms_stick") == ()
+
+
+@pytest.mark.parametrize(
+    "entries",
+    [
+        [],
+        [{**_NECESSITY_ENTRY, "kind": "running fit"}],
+        [{**_NECESSITY_ENTRY, "reason": " ".join(["word"] * 11)}],
+        [{key: value for key, value in _NECESSITY_ENTRY.items() if key != "feature"}],
+        [{**_NECESSITY_ENTRY, "note": "extra"}],
+        [_NECESSITY_ENTRY, _NECESSITY_ENTRY],
+    ],
+)
+def test_necessity_register_rejects_malformed_entries(
+    tmp_path: Path, entries: object
+) -> None:
+    import machinist_necessity
+
+    _write_necessity(tmp_path, "crank-arm", entries)
+    with pytest.raises(ValueError):
+        machinist_necessity.load_necessity(tmp_path, "crank_arm")
+
+
+def test_review_prompt_states_the_necessity_register(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _text_pdf(tmp_path / "sheet.pdf", [(100, 400, "FRONT 5:1")])
+    monkeypatch.setattr(mr, "CAD_ROOT", tmp_path)
+    package = mr.ReviewPackage("crank_arm", "part", (source,))
+    # No register is itself what rule 4 turns on, so the prompt says so.
+    assert "This package registers no entry." in mr._review_prompt(package, 1)
+    _write_necessity(tmp_path / "config", "crank-arm", [_NECESSITY_ENTRY])
+    prompt = mr._review_prompt(package, 1)
+    assert "This package registers no entry." not in prompt
+    assert "- N-01 [trace: play, out-of-roundness" in prompt
+    assert "ridge height: sets the lever arm ratio\n" in prompt
+    # The judge reads the same package input.
+    assert "- N-01 [trace" in mr._review_prompt(package, 1, prompt_text="JUDGE")
+    traveler = mr.ReviewPackage("crank_arm", "traveler", (source,))
+    assert "NECESSITY REGISTER" not in mr._review_prompt(traveler, 1)
+
+
 # --- blind evidence ----------------------------------------------------------
 
 

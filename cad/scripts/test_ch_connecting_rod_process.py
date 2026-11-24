@@ -19,6 +19,7 @@ import pytest
 
 import _cam_programs
 import _process_plans
+import _shop_equipment
 import cam_nc
 import export_features
 
@@ -40,8 +41,10 @@ def ctx() -> dict:
 
 def _post(ctx: dict, out: Path) -> None:
     """Each program as the runtime posts it: the grbl preamble, then per
-    section an M6 block (M5, the operator's %msg, M6, M3) and its lines, the
-    feeds in mm/min."""
+    section its lines, the feeds in mm/min, after an M6 block (M5, the
+    operator's %msg, M6) where the tool changes or the program loads its
+    first tool; a manual section (the saw's witness-line stop) is its own
+    lines, and the section after it restarts the spindle on its M3."""
     sections = {op[0]: job for job in ctx["jobs"] for op in job["ops"]}
     lines_of = {op[0]: op[2] for job in ctx["jobs"] for op in job["ops"]}
     for name, groups in RECIPE.PROGRAMS:
@@ -54,10 +57,18 @@ def _post(ctx: dict, out: Path) -> None:
             "G54",
         ]
         keys = [group[0] if isinstance(group, tuple) else group for group in groups]
-        for index, key in enumerate(keys):
+        previous = None
+        for key in keys:
+            if key in ctx["manual"]:
+                manual = ctx["manual"][key]
+                assert manual["tool"] == previous, "a stop on the tool running"
+                text += manual["gcode"]
+                continue
             job = sections[key]
             number = ctx["numbers"][job["tool"]]
-            if index or name in RECIPE.LOAD_FIRST_TOOL:
+            if number != previous and (
+                previous is not None or name in RECIPE.LOAD_FIRST_TOOL
+            ):
                 text += [
                     "M5",
                     f"%msg TOOL CHANGE: T{number} {ctx['names'][job['tool']]}, SET SPINDLE TO {job['rpm']:g} RPM",
@@ -72,6 +83,7 @@ def _post(ctx: dict, out: Path) -> None:
                     for line in lines_of[key]
                 ),
             ]
+            previous = number
         text += ["M5", "G17 G90", "M2"]
         (out / f"{name}.nc").write_text("\n".join(text) + "\n", encoding="utf-8")
 
@@ -112,11 +124,13 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
         (2.794, 1.27, 1.524)
     }
     assert outline["passes"] == [{"offset": 1.5875, "levels": [3.387, 2.201, 1.016]}]
-    # The saw's two heights, each one step into the crowns.
+    # The saw's two heights, each three steps into the crowns: a step is what
+    # the arbor's friction drive carries with its reserve.
     saw = next(
         kw for p, c, kw in ctx["expect"] if p == "CR06_slot" and c == "side_passes"
     )
-    assert (saw["final"], saw["raw"], saw["max_step"]) == (207.012, 221.744, 14.732)
+    assert (saw["final"], saw["raw"]) == (207.012, 221.744)
+    assert saw["max_step"] == pytest.approx(14.732 / 3)
     # The end trim: two passes of 1/16 in from the longest blank's end to the
     # crowns, each 6.6 mm deep, on the measured deep setting.
     trim = next(
@@ -146,8 +160,101 @@ def test_the_saw_is_mounted_and_moved_only_where_its_arbor_clears(ctx) -> None:
         f"G0 X{p['saw_touch_x_mm']:.3f}",
         "G0 Y-25.400",
     ]
-    # CR06 rises straight up from the touch-off before any X or Y move.
-    assert _lines(ctx, "slot")[0] == f"G0 Z{p['saw_clear_z_mm']:.3f}"
+    # CR06 rises straight up from the touch-off before any X or Y move, and
+    # moves between passes at that height (down to a pass only beside the
+    # load, 1 mm over the stock top).
+    for key in ("slot_light", "slot"):
+        lines = _lines(ctx, key)
+        assert lines[0] == f"G0 Z{p['saw_clear_z_mm']:.3f}"
+        assert {line for line in lines if line.startswith("G0 Z")} == {
+            lines[0],
+            "G0 Z7.350",
+        }
+
+
+def test_the_saw_runs_on_the_owned_arbor_as_its_record_gives_it() -> None:
+    # The arbor's sizes in the plan are the inventory record's (inches there),
+    # the saw's hole its own record's; nothing of the arbor that was to buy
+    # (its spacers, its nut) is left in the plan.
+    inventory = _shop_equipment.load()["tools"]
+    record = inventory["saw-arbor-r8-stepped"]
+    p = PLAN["parameters"]
+    assert record["status"] == "on_hand" and record["keyed"] is False
+    for key, field in (
+        ("saw_arbor_body_dia_mm", "body_dia_above_saw_in"),
+        ("saw_arbor_cap_dia_mm", "cap_dia_in"),
+        ("saw_arbor_cap_thickness_mm", "cap_thickness_in"),
+        ("saw_arbor_screw_head_dia_mm", "screw_head_dia_in"),
+        ("saw_arbor_nose_to_cap_mm", "below_spindle_nose_in"),
+    ):
+        assert p[key] == pytest.approx(record[field] * 25.4, abs=1e-4), key
+    # The thread, its engagement and the clamp torque are the record's.
+    assert p["saw_clamp_torque_nm"] == record["clamp_torque_nm"]
+    assert record["screw_thread"].startswith(f"M{p['saw_screw_dia_mm']:g} x ")
+    assert (
+        p["saw_screw_engagement_no_saw_mm"] == record["screw_engagement_no_saw_mm"]
+    )
+    assert p["saw_bore_mm"] == pytest.approx(
+        inventory["slitting-saw-2-75-064"]["bore_in"] * 25.4
+    )
+    arbor = next(tool for tool in PLAN["tools"] if tool["id"] == "saw-arbor")
+    assert arbor["ref"] == "saw-arbor-r8-stepped"
+    # The arbor that was to buy is no tool of the plan, and its limits are no
+    # parameters of it.
+    assert "gear-cutter-arbor-1" not in {tool["ref"] for tool in PLAN["tools"]}
+    for gone in (
+        "saw_collar_dia_max_mm",
+        "saw_spacer_below_min_mm",
+        "saw_nut_dia_max_mm",
+    ):
+        assert gone not in p, gone
+
+
+def test_the_slot_program_stops_after_a_light_pass_for_the_witness_lines(
+    ctx, tmp_path
+) -> None:
+    p = PLAN["parameters"]
+    # The light pass: half a step into the crowns at the near tine's wall;
+    # then three steps at each level, none over the step the drive carries.
+    crown = p["crown_x_mm"] + p["saw_dia_mm"] / 2
+    light = _lines(ctx, "slot_light")
+    assert [line for line in light if line.startswith("G1 Z")] == ["G1 Z1.702 F{feed}"]
+    assert sum(
+        line.startswith(f"G0 X{crown - p['slot_light_mm']:.3f} Y") for line in light
+    ) == 1
+    stations = [
+        float(line.split()[1][1:])
+        for line in _lines(ctx, "slot")
+        if line.startswith("G0 X")
+    ]
+    assert stations == pytest.approx(
+        [crown - k * p["slot_step_mm"] for k in (1, 2, 3)] * 2, abs=1e-3
+    )
+    # Then M5, the operator's %msg and M0; the rest restarts on its own M3.
+    _post(ctx, tmp_path)
+    text = (tmp_path / "CR06_slot.nc").read_text(encoding="utf-8").splitlines()
+    stop = text.index("M0")
+    assert text.count("M0") == 1 and "M6" not in " ".join(text)
+    assert text[stop - 2] == "M5" and "WITNESS LINES" in text[stop - 1]
+    assert text[stop + 1] == "M3 S100"
+    assert sum(line.startswith("G1 Y") for line in text[:stop]) == 1
+
+
+def test_a_pass_past_the_arbors_reach_is_caught_at_the_forks(ctx, tmp_path) -> None:
+    # The slot's deepest pass stationed 7 mm further in than its depth: the
+    # cap below the saw and the body above it meet the blanks' ends.
+    seeded = _seed(
+        ctx,
+        "slot",
+        lambda line: line.startswith("G0 X207.012 Y"),
+        lambda line: line.replace("X207.012", "X200.000"),
+    )
+    _post(seeded, tmp_path)
+    found = [f.detail for f in _findings(seeded, tmp_path) if f.check == "keep_out"]
+    for part in ("the arbor's cap below the saw", "the arbor's body above the saw"):
+        assert any(
+            f"the blanks past the plate ({part})" in detail for detail in found
+        ), part
 
 
 def test_the_eighth_cutter_leaves_the_shank_corners_inside_their_limits() -> None:
@@ -171,7 +278,12 @@ def test_the_eighth_cutter_leaves_the_shank_corners_inside_their_limits() -> Non
         ({"fork_thickness_mm": 6.2}, "fork_thickness_mm"),
         ({"crown_x_mm": 186.0}, "crown_x_mm"),
         ({"slot_floor_x_mm": 171.0}, "slot_floor_x_mm"),
-        ({"saw_collar_dia_max_mm": 40.0}, "saw_collar_dia_max_mm"),
+        ({"saw_arbor_cap_dia_mm": 44.45}, "saw_depth_past_arbor_max_mm"),
+        (
+            {"saw_arbor_body_dia_mm": 44.45, "saw_depth_past_arbor_max_mm": 11.7},
+            "fork slot's deepest limit 14.986 passes the arbor's reach",
+        ),
+        ({"saw_arbor_screw_head_dia_mm": 31.75}, "not inside the cap"),
         ({"saw_touch_y_mm": -25.0}, "saw_touch_y_mm"),
         ({"fork_touch_z_mm": 6.096}, "fork_touch_z_mm"),
         ({"tab_top_mm": 2.54}, "tab_top_mm"),
@@ -187,9 +299,46 @@ def test_the_eighth_cutter_leaves_the_shank_corners_inside_their_limits() -> Non
             {"blank_length_in": 7.36, "blank_length_min_mm": 186.944},
             "right end by its margin",
         ),
-        ({"saw_below_max_mm": 25.4}, "saw_clear_z_mm"),
-        ({"saw_nut_dia_max_mm": 64.0}, "nut reaches the crown"),
-        ({"saw_arbor_length_mm": 76.2}, "saw_park_z_mm"),
+        ({"saw_below_max_mm": 25.4}, "saw_below_max_mm"),
+        ({"saw_clear_z_mm": 11.35}, "saw_clear_z_mm"),
+        ({"saw_below_plate_top_mm": 12.7}, "saw_below_plate_top_mm"),
+        (
+            {
+                "saw_screw_head_stand_max_mm": 5.08,
+                "saw_below_max_mm": 17.78,
+                "saw_clear_z_mm": 29.13,
+            },
+            "under the stock top in CR06's air proof",
+        ),
+        (
+            {
+                "saw_screw_head_stand_max_mm": 1.27,
+                "saw_below_max_mm": 13.97,
+                "saw_clear_z_mm": 25.32,
+            },
+            "not the largest the air proof tolerates",
+        ),
+        ({"saw_arbor_below_nose_mm": 36.0}, "nose-to-cap distance plus the saw"),
+        ({"saw_arbor_length_mm": 76.2}, "saw_arbor_length_mm"),
+        ({"saw_park_z_mm": 40.61}, "saw_park_z_mm"),
+        ({"saw_clamp_preload_kn": 2.0}, "saw_drive_torque_max_nm"),
+        ({"saw_screw_engagement_no_saw_mm": 9.0}, "under one screw diameter"),
+        # The slot in two steps a level: a step over the drive's reserve.
+        (
+            {"slot_step_max_mm": 7.5, "slot_step_mm": 7.366, "slot_light_mm": 3.683},
+            "takes 13.1 N·m, over the arbor's friction drive",
+        ),
+        ({"saw_feed_per_min_mm": 365.76}, "not the .001 in/tooth"),
+        ({"saw_swept_margin_mm": 0.0508}, "slot_saw_swept_max_mm"),
+        (
+            {"saw_swept_margin_mm": -0.0127, "slot_saw_swept_max_mm": 1.6891},
+            "far tine under its band",
+        ),
+        ({"slot_rise_mm": 1.0}, "slot_rise_mm"),
+        ({"slot_saw_radial_tir_max_mm": 0.6}, "slot_saw_radial_tir_max_mm"),
+        ({"saw_axial_reading_per_in_mm": 25.4}, "saw_axial_reading_per_in_mm"),
+        ({"slot_saw_axial_nominal_mm": 0.07}, "slot_saw_axial_nominal_mm"),
+        ({"slot_light_mm": 7.366}, "slot_light_mm"),
         ({"end_trim_run_past_mm": 0.254}, "thickest blank plus its run-past"),
         ({"end_trim_step_mm": 2.0}, "even step"),
     ],
@@ -209,19 +358,6 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
     index = next(i for i, line in enumerate(lines) if pick(line))
     lines[index] = change(lines[index])
     return seeded
-
-
-def _nth(text: str, n: int):
-    """A ``pick`` accepting the ``n``-th line equal to ``text``."""
-    seen: list[str] = []
-
-    def pick(line: str) -> bool:
-        if line == text:
-            seen.append(line)
-            return len(seen) == n
-        return False
-
-    return pick
 
 
 @pytest.mark.parametrize(
@@ -269,13 +405,12 @@ def _nth(text: str, n: int):
             lambda line: "G1 Z1.400 F{feed}",
             "depth",
         ),
-        # The saw's return after its first pass at the old clearance, the
-        # stock top plus 5 mm: the nut hanging under it sweeps through the
-        # blanks' ends.
+        # The saw's deepest pass started over the load instead of beside it:
+        # the saw comes down flat onto the blanks.
         (
             "slot",
-            _nth("G0 Z30.400", 2),
-            lambda line: "G0 Z11.350",
+            lambda line: line.startswith("G0 X207.012 Y"),
+            lambda line: "G0 X207.012 Y-30.000",
             "keep_out",
         ),
         # The end trim's first pass skipped: the crown pass takes the whole

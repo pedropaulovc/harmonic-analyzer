@@ -140,13 +140,6 @@ description = "Adjustable reamer set, .250-.375 in, 4 pieces (LMS 5948)"
 [tools.slitting-saw-1-032]  # inventory tools.slitting-saw-1-032
 description = "Malco smooth-finish slitting saw, 1 in diameter, .032 in thick, .315 in hole (McMaster 3044A23; hole measured by the owner)"
 diameter_mm = 25.4
-# MHA-DT-21's slit (cad/process/dt_cone_tip_block): the 3 in × .051 jeweler's
-# slotting saw, to buy (cad/config/shop-equipment/ tools.slitting-saw-3-051,
-# Penn Tool 10-200-445), on the R8 1 in arbor (tools.gear-cutter-arbor-1, to
-# buy). diameter_mm: its 3 in × 25.4.
-[tools.slitting-saw-3-051]
-description = "Precise HSS jeweler's slotting saw, 3 in diameter, .051 in thick, 168 teeth (Penn Tool 10-200-445)"
-diameter_mm = 76.2
 [tools.steady-rest-pm-1127]  # inventory fixtures.steady-rest-pm-1127
 description = "PM-1127VF-LB steady rest"
 

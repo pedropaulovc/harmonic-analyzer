@@ -107,18 +107,19 @@ face_step_max_mm = 1.27
 width_level_mm = 1.009
 # Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2). F
 # (MB01) and the seat (MB02) in equal passes no wider than
-# skim_stepover_max_mm, 3.4 mm (.134 in), and levels no deeper than .050:
-# the measured face envelope, shop settings.em-half-carbide-1018-v5-face
-# (dechatter v5, 2370 rpm stable at 1.27 mm deep and 3.0-3.4 mm wide,
-# conventional; the zigzag's return passes climb, and that half is not
-# measured); each level starts with the cutter over the edge, so no pass
-# takes more than the stepover. H, L and the neck (MB03-MB05) keep passes no
+# skim_stepover_max_mm, 6.4 mm (.252 in), and levels no deeper than .050:
+# the measured face envelope, shop settings.em-half-carbide-1018-3439-face
+# (dechatter session of 2026-11-23, #3439: stable at 1.27 mm deep to 6.4 mm
+# wide, 2420-2490 rpm in the cut, conventional; the zigzag's return passes
+# climb, and that half is not measured); three passes of 4.44 mm across the
+# 1/2 in bar (two would need 6.66, over the limit), and each level starts
+# with the cutter over the edge, so no pass takes more than the stepover. H, L and the neck (MB03-MB05) keep passes no
 # wider than .200 in, under half the cutter, on the chart setting
 # (settings.endmill-carbide-3fl-1-2-1018-cf): those programs also cut the
 # notch, whose stepovers run full width, and MB05 runs at a longer stick-out.
 face_cutter_dia_mm = 12.7
 face_stepover_max_mm = 5.08
-skim_stepover_max_mm = 3.4
+skim_stepover_max_mm = 6.4
 # The notch: half its depth from H (MB03, L down: down to notch_split_mm
 # above the stacks), the other half from L once L is faced (MB04, H down:
 # down to notch_through_mm, notch_past_mm through MB03's floor), so no thin
@@ -241,12 +242,13 @@ rod_dia_mm = 6.35
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # 1/2 in end mill, 3 in overall (tools.endmill-carbide-3fl-1-2's
-# description): set 1.10 in out of the collet, the stick-out its measured
-# settings were cut at (cad/config/shop-equipment/measured-cuts.toml; owner,
-# Pedro, 2026-11-22: "stickout is recorded as 30mm but is actually 27.94").
+# description): set 1.12 in (28.45 mm) out of the collet (owner, Pedro,
+# 2026-11-24: "28.45"), the longer end of the stick-out the measured face
+# setting allows (cad/config/shop-equipment/measured-cuts.toml: 27.94 to
+# 28.45 mm).
 # cam.py checks the collet's nose clears the part and the jaws at each
 # program's deepest end-mill cut. MB05 sets it longer (below).
-half_mill_projection_mm = 27.94
+half_mill_projection_mm = 28.45
 half_mill_oal_mm = 76.2
 # MB05: at the neck's last level the end mill stands beside the foot, which
 # rises the part's width above O. Set it at least 1.85 in out, so the collet
@@ -379,8 +381,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run MB01_width (M6 T1, 1/2 in end mill; set 2370): face the top edge down to Z {{cad.outer_face_length_mm:in.4dot}} in equal levels of {{process.width_level_mm:in.3dot}}, in passes along the blank no wider than {{process.skim_stepover_max_mm:in.3dot}}. Unclamp; calipers across it. Mark this edge F."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run MB01_width (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): face the top edge down to Z {{cad.outer_face_length_mm:in.4dot}} in equal levels of {{process.width_level_mm:in.3dot}}, in passes along the blank no wider than {{process.skim_stepover_max_mm:in.3dot}}. Unclamp; calipers across it. Mark this edge F."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Length {{cad.outer_face_length_min_in:.3dot}}–{{cad.outer_face_length_max_in:.3dot}}, O to F, calipers at both ends."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.outer_face_length_band_mm}}" }]
 milling_cuts = [
@@ -424,10 +426,10 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run MB02_seat (M6 T1, 1/2 in end mill; set 2370): face the seat at Z0, {{process.seat_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.skim_stepover_max_mm:in.3dot}}; the file then stops at its M6 T2."
+instruction = "Run MB02_seat (M6 T1, 1/2 in end mill; 2450, display near 2485): face the seat at Z0, {{process.seat_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.skim_stepover_max_mm:in.3dot}}; the file then stops at its M6 T2."
 inspection = "At the M6 T2 stop: the whole end faced, Ra {{cad.seat_finish_ra:.1f}} µm (125 µin) or finer: an even end-mill finish, no tears, no sawn patch left."
 gauge_checks = "other"
-settings = "em-half-carbide-1018-v5-face"
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "seat", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.seat_skim_mm}}", radial_woc_mm = "{{process.skim_stepover_max_mm}}", stations_mm = "{{process.blank_length_max_mm}}" },
 ]
@@ -564,7 +566,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Over {{cad.high_side_width_max_in:.3dot}}: reclamp as before; send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.high_side_width_in:.3dot}}) × 25.4); run MB04_low again. Under {{cad.high_side_width_min_in:.3dot}}: the part is scrap."
+instruction = "Over {{cad.high_side_width_max_in:.3dot}}: reclamp as before. Pick up X0 again, edge finder (900 rpm) on O (the RIGHT side) from the right, its tip .10 below the blank's top: G10 L20 P1 X2.540. Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.high_side_width_in:.3dot}}) × 25.4); run MB04_low again. Under {{cad.high_side_width_min_in:.3dot}}: the part is scrap."
 feed = "hand"
 
 [[setups]]
@@ -620,8 +622,8 @@ instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 
 feed = "hand"
 
 # Not chatter-tested (#3428): .151 wide at .135 deep is wider than tested at
-# that depth, and the end mill stands 1.85-2.00 out, longer than the 1.10 it
-# was tested at. Owner, Pedro, 2026-11-22: "same log new dechatter issues to
+# that depth, and the end mill stands 1.85-2.00 out, longer than the 1.10-1.12
+# it was tested at. Owner, Pedro, 2026-11-22: "same log new dechatter issues to
 # try full radial depth but shallow axial".
 [[setups.operations]]
 instruction = "First part only: this cut at 2650 rpm, the end mill {{process.neck_mill_projection_min_mm:in.2dot}}–2.00 out, has not been chatter-tested on this end mill (owner's test list #3428): the neck {{process.neck_level_mm:in.3dot}} deep x .151 wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
@@ -641,7 +643,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Over {{cad.neck_inner_face_thickness_max_in:.3dot}}: reclamp as before; send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.neck_inner_face_thickness_in:.3dot}}) × 25.4); run MB05_neck again. Under {{cad.neck_inner_face_thickness_min_in:.3dot}}: the part is scrap."
+instruction = "Over {{cad.neck_inner_face_thickness_max_in:.3dot}}: reclamp as before. Pick up X0 again, edge finder (900 rpm) on the seat (the LEFT end) from the left, its tip .50 below the foot's top: G10 L20 P1 X-2.540. Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.neck_inner_face_thickness_in:.3dot}}) × 25.4); run MB05_neck again. Under {{cad.neck_inner_face_thickness_min_in:.3dot}}: the part is scrap."
 feed = "hand"
 
 [[setups]]

@@ -23,7 +23,7 @@ back edge's finish, at two hand-set speeds (M0 stops). SP02 cuts the top in
 one vise clamping: fence and stop tops faced, the plate top (Z0) milled round
 them, the stop and fence walls finished, the hub counterbore plunged (1/2 in
 end mill); the fence notches, clamp pockets and the hub tap's spot (1/8 in
-end mill); spot, #43 and #7 drills. Then one short file per hole to tap,
+end mill); spot, #43 and #21 drills. Then one short file per hole to tap,
 SP03_tap_*: the tap guide loaded (M6), Z to the machine's top, over the
 hole, M30; the operator taps by hand with the wrench under the tap guide.
 
@@ -71,7 +71,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
             ("notches", "pockets", "hub_spot"),
             ("spot",),
             ("drill_43",),
-            ("drill_7",),
+            ("drill_21",),
         ),
     ),
     # A literal (``_cam_programs.program_names`` reads it by AST): one per
@@ -98,7 +98,7 @@ CAM_TOOLS = (
     "em-eighth",
     "spot",
     "drill-43",
-    "drill-7",
+    "drill-21",
     "tap-guide",
 )
 IN = 25.4
@@ -374,11 +374,11 @@ def context(
     d1 = _shop_tool(plan, shop, "em-half")["diameter_mm"]
     d8 = _shop_tool(plan, shop, "em-eighth")["diameter_mm"]
     d43 = _shop_tool(plan, shop, "drill-43")["diameter_mm"]
-    d7 = _shop_tool(plan, shop, "drill-7")["diameter_mm"]
+    d21 = _shop_tool(plan, shop, "drill-21")["diameter_mm"]
     agree("half_cutter_dia_mm", d1)
     agree("eighth_cutter_dia_mm", d8)
     r1, r8 = d1 / 2, _up(d8 / 2)
-    for name, hole, dia in (("clamp taps", taps[0], d43), ("hub tap", hub_tap, d7)):
+    for name, hole, dia in (("clamp taps", taps[0], d43), ("hub tap", hub_tap, d21)):
         if not math.isclose(hole["drill_dia"], dia, abs_tol=1e-3):
             raise ValueError(
                 f"{name}: drawn drill Ø{hole['drill_dia']}, the plan's drill Ø{dia}"
@@ -433,7 +433,7 @@ def context(
     plunge_8 = plunges["pocket plunges"][1]
     rpm_sp, feed_sp = _cut_feed(plan, "clamp spots")
     rpm_43, feed_43 = _cut_feed(plan, "clamp holes")
-    rpm_7, feed_7 = _cut_feed(plan, "hub hole")
+    rpm_21, feed_21 = _cut_feed(plan, "hub hole")
 
     # Blank and bar.
     b_max = p["blank_thickness_max_in"] * IN
@@ -821,10 +821,10 @@ def context(
     spot_z = _r(tap_top - spot_depth)
     point = math.tan(math.radians(DRILL_POINT_DEG / 2))
     tip43 = _r(z_under - p["drill_breakthrough_mm"] - d43 / 2 / point)
-    tip7 = _r(z_under - p["drill_breakthrough_mm"] - d7 / 2 / point)
-    if not math.isclose(tip7 - z_under, p["drill_tip_below_mm"], abs_tol=1e-3):
+    tip21 = _r(z_under - p["drill_breakthrough_mm"] - d21 / 2 / point)
+    if not math.isclose(tip21 - z_under, p["drill_tip_below_mm"], abs_tol=1e-3):
         raise ValueError(
-            f"the #7 tip is {tip7 - z_under:.3f} from the underside, process.drill_tip_below_mm {p['drill_tip_below_mm']}"
+            f"the #21 tip is {tip21 - z_under:.3f} from the underside, process.drill_tip_below_mm {p['drill_tip_below_mm']}"
         )
 
     def spot_holes():
@@ -860,11 +860,11 @@ def context(
             drill_43.append(f"G1 Z{z:.3f} F{{feed}}")
             previous = z
         drill_43 += [f"G0 Z{r_plane:.3f}", f"G0 Z{clear_h:.3f}"]
-    drill_7 = [
+    drill_21 = [
         f"G0 Z{clear_h:.3f}",
         f"G0 X{hub[0]:.3f} Y{hub[1]:.3f}",
         f"G0 Z{r_plane:.3f}",
-        f"G1 Z{tip7:.3f} F{{feed}}",
+        f"G1 Z{tip21:.3f} F{{feed}}",
         f"G0 Z{r_plane:.3f}",
         f"G0 Z{clear_h:.3f}",
     ]
@@ -879,7 +879,7 @@ def context(
             f"clamp_{k}": ("4-40", f"CLAMP HOLE {k}", xy)
             for k, xy in enumerate(tap_xy, 1)
         },
-        "hub": ("1/4-20", "THE HUB HOLE", hub),
+        "hub": ("10-32", "THE HUB HOLE", hub),
     }
     if tuple(tap_holes) != TAP_HOLES:
         raise ValueError(f"holes to tap {tuple(tap_holes)}, programs {TAP_HOLES}")
@@ -966,16 +966,16 @@ def context(
             "ops": [["drill_43", "drill clamp holes", drill_43]],
         },
         {
-            "tool": "drill-7",
-            "dia": d7,
+            "tool": "drill-21",
+            "dia": d21,
             "shape": "drill",
             "tip_angle": DRILL_POINT_DEG,
-            "label": "drill #7",
-            "rpm": rpm_7,
-            "feed": feed_7,
-            "plunge": feed_7,
+            "label": "drill #21",
+            "rpm": rpm_21,
+            "feed": feed_21,
+            "plunge": feed_21,
             "stock": stock_b,
-            "ops": [["drill_7", "drill hub hole", drill_7]],
+            "ops": [["drill_21", "drill hub hole", drill_21]],
         },
     ]
 
@@ -1104,17 +1104,17 @@ def context(
         ],
         hole_checks(tap_xy, spot_z, body / 2),
         hole_checks(tap_xy, tip43, d43 / 2),
-        hole_checks([hub], tip7, d7 / 2),
+        hole_checks([hub], tip21, d21 / 2),
     ]
     expect += [
         [sp2, "tool_changes", {"z_top": bar_top, "tools": tools2, "loads_first": True}],
         [
             sp2,
             "spindle",
-            {"rpm": [[rpm_1], [rpm_8], [rpm_sp], [rpm_43], [rpm_7]]},
+            {"rpm": [[rpm_1], [rpm_8], [rpm_sp], [rpm_43], [rpm_21]]},
         ],
         [sp2, "pauses", {"z_top": z0, "count": 0}],
-        [sp2, "depth", {"z_min": tip7}],
+        [sp2, "depth", {"z_min": tip21}],
     ]
     for key, section in tap_files.items():
         name = f"SP03_{key}"

@@ -6,7 +6,7 @@ stub at the cam throw and a blind press ream for the clock pin. One sheet:
 the face view carries both reams and their stations from the register axis
 (centre-marked), every value outside the disc; the edge view the register's
 diameter beside the thickness (rule 11); a small shaded isometric. No
-numbered note: each REAM callout names its pin and what its stations set.
+numbered note: each REAM callout names its pressed pin and the press fit.
 
 Run only through the supervised farm launcher:
 ``drawing:dt_cylinder_gear_tl_cam_fixture``.
@@ -123,8 +123,11 @@ HOLE_ARM_OVERRUN_MM = 1.0
 # is on it and its axis runs -Z into the body. The register's diameter and the
 # thickness take the title block's .XX row on their printed nominal; each
 # hole station its printed +/-.0020 (spec POSITION_BAND) from the register
-# axis, unsigned (the side is the hole's `at`); each ream its +.0005/.0000
-# (REAM_H7); the pin hole's depth the .XX row. The sheet prints no numbered
+# axis, unsigned (the side is the hole's `at`); each ream prints its reamer's
+# size and no band (fit audit 2026-11-23, rule 4 form 3: the pressed pin is
+# the gauge), so its "dia" is the spec's analysis band (REAM_H7, what the
+# reamer cuts) and its callout the acceptance; the pin hole's depth the .XX
+# row. The sheet prints no numbered
 # note and no roughness symbol (finish "as machined"); edge breaks are the
 # title block's general row. The declarations print nothing.
 _P = part.DRAWING_PRECISION_BY_NAME

@@ -1,0 +1,39 @@
+# MHA-DT-12 cylinder gear: why each REAM and each band tighter than the title
+# block stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the
+# reason lives here, not on the sheet). Read by the machinist review only.
+# Fit audit 2026-11-23 (owner ruling 2026-11-24 approved its questions; these
+# rows are its "keep" rows, MHA-DT-12.bore with the second pass's correction).
+# The outside diameter's band, the cutter plunge and the tooth runout are gear
+# data (rule 7), exempt from the test; the kerf's .016 MAX is a single limit;
+# the pattern locator is BASIC.
+necessity:
+  - id: N-01
+    feature: "sheet 1, front view, Ø.3760 REAM THRU bore (MHA-DT-13 ENTERS, NO SHAKE)"
+    kind: gap
+    reason: "drilled, the drum cocks into the cone tip's air"
+    source: "dt_cone_tip_air (running cock from dt_cylinder_gear_spec.BORE_DIAMETRAL_CLEARANCE_MM: air 0.134 mm reamed, -0.401 mm at a V drill, fit audit 2026-11-23 second pass)"
+  - id: N-02
+    feature: "sheet 1, side view, stacking thickness .3000 ±.0010"
+    kind: gap
+    reason: "twenty gears stack solid; this sets every channel station"
+    source: "dt_cylinder_gear_spec.OVERALL_THICKNESS_BAND; cylinder_bank_layout.STACK_L20_ACCEPT; #743, user ruling L20 d'"
+  - id: N-03
+    feature: "sheet 1, side view, face width .118 ±.002"
+    kind: gap
+    reason: "leaves the MHA-CH-03 ring its cam slot length"
+    source: "dt_cylinder_gear_spec.FACE_WIDTH_TOLERANCE_MM; cylinder_bank_layout.SLOT_MIN"
+  - id: N-04
+    feature: "sheet 1, front view, cam Ø1.205 +.000/-.002 (running fit in MHA-CH-03)"
+    kind: trace
+    reason: "ring play on the cam shows at the pen"
+    source: "dt_cylinder_gear_spec.CAM_DIA_BAND; ch_connecting_rod_spec.STRAP_DIAMETRAL_CLEARANCE"
+  - id: N-05
+    feature: "sheet 1, front view, cam throw .3402 ±.0020"
+    kind: trace
+    reason: "throw sets channel gain"
+    source: "dt_cylinder_gear_spec.ECCENTRICITY_TOLERANCE_MM; owner ruling 2026-11-08, #2144 item 8.2"
+  - id: N-06
+    feature: "sheet 1, front view, notch phase 3.0° ±.7° from the cam lobe"
+    kind: trace
+    reason: "notch to lobe angle is the channel's phase"
+    source: "dt_cylinder_gear_phase_band.NOTCH_PHASE_TOLERANCE_DEG; delegated ruling 2026-11-17, #2361"

@@ -55,7 +55,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel flat bar (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_x_in:fraction}} x {{process.blank_z_in:fraction}} in flat bar; {{process.quantity:d}} × {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in blanks."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.east_side_width_min_in:.3dot}}–{{cad.east_side_width_max_in:.3dot}} wide at the foot (W to E), {{cad.near_end_depth_min_in:.3dot}}–{{cad.near_end_depth_max_in:.3dot}} deep (the far face to the near end), the strap {{cad.strap_outer_face_depth_min_in:.3dot}}–{{cad.strap_outer_face_depth_max_in:.3dot}} thick; the bore {{cad.arbor_bore_height_min_in:.3dot}}–{{cad.arbor_bore_height_max_in:.3dot}} above the seat. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Both blanks go through each mill setup in turn before the next setup: after the first, unclamp it, clamp the second as the Holding says and pick up again every zero taken on the part itself (each setup's X0; Setup 4's Z0 on the sawn top; Setup 7's X0, Y0 and Z0); the fixed jaw's Y0 and a stack or parallel Z0 stand. Then run the file and its checks on it. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home (logbook 2026-11-06). After any controller reset, stall or E-stop, home again and re-touch the setup's zeros before re-running its file from the top."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.east_side_width_min_in:.3dot}}–{{cad.east_side_width_max_in:.3dot}} wide at the foot (W to E), {{cad.near_end_depth_min_in:.3dot}}–{{cad.near_end_depth_max_in:.3dot}} deep (the far face to the near end), the strap {{cad.strap_outer_face_depth_min_in:.3dot}}–{{cad.strap_outer_face_depth_max_in:.3dot}} thick; the bore {{cad.arbor_bore_height_min_in:.3dot}}–{{cad.arbor_bore_height_max_in:.3dot}} above the seat. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Both blanks go through each mill setup in turn before the next setup: after the first, unclamp it, clamp the second as the Holding says and pick up again every zero taken on the part itself (each setup's X0; Setup 4's Z0 on the sawn top; Setup 7's X0, Y0 and Z0); the fixed jaw's Y0 and a stack or parallel Z0 stand. Then run the file and its checks on it. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then, before Cycle Start, touch one of the setup's zeros again with the edge finder: it must read what its step set, within .001 in. It does not, or the part may have moved: take the setup again from its first step, the part out. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; console M6 for the tool in the spindle, then Cycle Start."
 shop = "../shop"
 stock_refs = ["1018-flat-1x1-1-4"]
 material_key = "rocker-1018-cold-finished"
@@ -112,16 +112,16 @@ depth_top_min_mm = 29.337
 depth_top_max_mm = 29.591
 # Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2). The
 # faces of PA01-PA03 and PA05 at the measured setting
-# em-half-carbide-1018-v5-face (shop common.toml; cad/config/shop-equipment/
-# measured-cuts.toml: stable to 1.27 mm deep and 3.4 mm wide, conventional,
-# at half_mill_projection_mm out of the collet): equal passes no wider than
-# its 3.4 mm, the first engaging one stepover and the last overhanging the
-# far edge; the zigzag climbs on every other pass, which the report did not
-# measure. The far face (PA07) shares its Job and speed with the outline,
+# em-half-carbide-1018-3439-face (shop common.toml; cad/config/
+# shop-equipment/measured-cuts.toml, #3439: stable to 1.27 mm deep and 6.4 mm
+# wide, conventional, 2420-2490 rpm in the cut): equal passes no wider than
+# .250 in, half the cutter and inside its 6.4 mm, the first engaging one
+# stepover and the last overhanging the far edge; the zigzag climbs on every
+# other pass, which the session did not measure. The far face (PA07) shares its Job and speed with the outline,
 # which no measured setting covers (below): it stays on the chart setting
 # settings.endmill-carbide-3fl-1-2-1018-cf, in passes no wider than .200 in.
 face_cutter_dia_mm = 12.7
-face_stepover_max_mm = 3.4
+face_stepover_max_mm = 6.35
 far_face_stepover_max_mm = 5.08
 # The step (PA04): equal levels from the near end down to the strap's outer
 # face (7 × .100), each a row of passes across the width along +Y, E toward
@@ -131,7 +131,7 @@ far_face_stepover_max_mm = 5.08
 # beside the open end to the foot top's station (the cutter's edge on the
 # foot top). At the measured setting em-half-carbide-1018-v6-deep (stable
 # to 6.6 mm deep and 2.2 mm wide): its .100 levels at 2.2 mm stations run
-# shorter than the face setting's 1.27 mm levels at 3.4 mm. step_floor_mm:
+# shorter than the face setting's 1.27 mm levels at 6.35 mm. step_floor_mm:
 # the floor above the stacks (the strap plus the far face's stock); cam.py
 # computes and checks the floor and the stations.
 step_level_mm = 2.54
@@ -258,11 +258,12 @@ step_prove_raise_mm = 40.64
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set 1.100 in out of the collet, the stick-out
-# its measured settings hold at (cad/config/shop-equipment/measured-cuts.toml;
-# owner, Pedro, 2026-11-22: "stickout is recorded as 30mm but is actually
-# 27.94").
-half_mill_projection_mm = 27.94
+# 1/2 in end mill, 3 in overall: set 1.12 in (28.45 mm) out of the collet
+# (owner, Pedro, 2026-11-24: "28.45"), the longer end of the stick-out its
+# measured settings allow (cad/config/shop-equipment/measured-cuts.toml:
+# 27.94 to 28.45 mm). The deep one was measured at 27.94 only: 28.45 is the
+# owner's ruling for it, not a cut, and a longer tool is the less stiff case.
+half_mill_projection_mm = 28.45
 # Overall lengths: jobber #15 3-1/2 in, 23/64 4-7/8 in (ASME B94.11M); the
 # #2 combined drill and countersink 1-7/8 in. Bounded by their whole length
 # below the chuck.
@@ -404,13 +405,13 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_z_mm}}", alo
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.blank_length_max_mm}}"], section_mm = { y = "{{process.blank_z_mm}}", z = "{{process.blank_x_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the blank's left end, Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's LEFT end from the left, G10 L20 P1 X-2.540."
+instruction = "Before the first blank goes in, G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack, the jaws open."
+instruction_detailed = "Before the first blank goes in, the stacks in place and the jaws open: console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Jog it over the fixed-jaw stack, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank before the tip reached the stack."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack left of the blank."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). MDI G0 X-12.700 Y-6.850: the cutter left of the blank, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
+instruction = "The blank clamped as Holding says: G54 X0 the blank's left end, Y0 the fixed jaw's face: edge finder (900 rpm)."
+instruction_detailed = "The blank clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's LEFT end from the left, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -423,8 +424,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PA01_width (M6 T1, 1/2 in end mill; set 2370): face the top down to Z {{cad.east_side_width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. Unclamp; mic the width. Mark this face E."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run PA01_width (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): face the top down to Z {{cad.east_side_width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. Unclamp; mic the width. Mark this face E."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Width {{cad.east_side_width_min_in:.3dot}}–{{cad.east_side_width_max_in:.3dot}}, W to E, miked at both ends."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.east_side_width_band_mm}}" }]
 milling_cuts = [
@@ -453,13 +454,13 @@ instruction = "Before clamping: file the burr off E's four edges (milled in Setu
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the blank's RIGHT end, Y0 the fixed jaw's face (W): edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's RIGHT end from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
+instruction = "Before the first blank goes in, G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack, the jaws open."
+instruction_detailed = "Before the first blank goes in, the stacks in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw stack, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank before the tip reached the stack."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack right of the blank."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X12.700 Y-6.850: the cutter right of the blank, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
+instruction = "The blank clamped as Holding says: G54 X0 the blank's RIGHT end, Y0 the fixed jaw's face (W): edge finder (900 rpm)."
+instruction_detailed = "The blank clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's RIGHT end from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
 feed = "hand"
 
 [[setups.operations]]
@@ -472,8 +473,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PA02_depth (M6 T1; set 2370): face the top down to Z {{process.depth_top_mm:in.4dot}} ({{cad.near_end_depth_mm:in.3dot}} plus the far face's {{process.far_face_stock_mm:in.3dot}}, faced off in Setup 7) in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. Unclamp; mic F to the near end. Mark this face N."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run PA02_depth (M6 T1; 2450, display near 2485): face the top down to Z {{process.depth_top_mm:in.4dot}} ({{cad.near_end_depth_mm:in.3dot}} plus the far face's {{process.far_face_stock_mm:in.3dot}}, faced off in Setup 7) in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. Unclamp; mic F to the near end. Mark this face N."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "F to N {{process.depth_top_min_mm:in.4dot}}–{{process.depth_top_max_mm:in.4dot}}, miked at both ends: the step's floor in Setup 5 is cut from F, the far face in Setup 7 from N, so this sets the strap."
 gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.depth_top_min_mm}}", "{{process.depth_top_max_mm}}"] }]
 milling_cuts = [
@@ -502,8 +503,8 @@ instruction = "Before clamping: file the burr off N's four edges (milled in Setu
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the near end N, Y0 the fixed jaw's face (W): edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm), its tip .10 below the sawn top: on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on N (the blank's LEFT side) from the left, G10 L20 P1 X-2.540."
+instruction = "G54 X0 the near end N, Y0 the fixed jaw's face (W): edge finder (900 rpm)."
+instruction_detailed = "Edge finder (900 rpm), its tip .10 below the sawn top: on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on N (the blank's LEFT side) from the left, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -521,8 +522,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PA03_seat (M6 T1, 1/2 in end mill; set 2370): face the seat at Z0, {{process.seat_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. At the M6 T2 stop look at the seat."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run PA03_seat (M6 T1, 1/2 in end mill; 2450, display near 2485): face the seat at Z0, {{process.seat_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. At the M6 T2 stop look at the seat."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "At the M6 T2 stop: the whole end faced, Ra {{cad.foot_seat_finish_ra}} µm or finer: an even end-mill finish, no tears, no sawn patch."
 gauge_checks = "other"
 milling_cuts = [
@@ -605,7 +606,7 @@ instruction = "This sheet accepts a bore the GO pin enters and the NO-GO pin doe
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Only if the reamer read under the GO pin, before the first part: home the mill ($H). Grip a 2 in offcut of the 1 x 1-1/4 flat on the stacks as Holding says, lying on a 1-1/4 in face (1.00 thick). Console M6 T4 (23/64; the tool setter measures it). Jog it over the offcut's middle, above the gap between the stacks; spindle stopped, its point on a .002 leaf on the top: G10 L20 P1 X0 Y0 Z0.051."
+instruction = "Only if the reamer read under the GO pin, before the first part: grip a 2 in offcut of the 1 x 1-1/4 flat on the stacks as Holding says, lying on a 1-1/4 in face (1.00 thick). Console M6 T4 (23/64; the tool setter measures it). Jog it over the offcut's middle, above the gap between the stacks; spindle stopped, its point on a .002 leaf on the top: G10 L20 P1 X0 Y0 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -613,13 +614,13 @@ instruction = "Trial hole, MDI: M3 S650, G0 Z2, G1 Z-29 F{{process.bore_drill_fe
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the seat (the RIGHT end), Y0 the fixed jaw's face (W): edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the seat (the part's RIGHT end) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
+instruction = "Before the first part goes in, G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack, the jaws open."
+instruction_detailed = "Before the first part goes in, the stacks in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw stack, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the part in: the collet would meet the part before the tip reached the stack."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack right of the part."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X12.700 Y-6.850: the cutter right of the seat, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
+instruction = "The part clamped as Holding says: G54 X0 the seat (the RIGHT end), Y0 the fixed jaw's face (W): edge finder (900 rpm)."
+instruction_detailed = "The part clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the seat (the part's RIGHT end) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
 feed = "hand"
 
 [[setups.operations]]
@@ -743,13 +744,13 @@ instruction = "Before clamping: file the burr off the step's edges, the foot top
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the near end N (the RIGHT side), Y0 the fixed jaw's face (W): edge finder (900 rpm), its tip on the foot above the parallels."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; its tip about .10 in above the seat, on the foot (below the jaw tops is fine: the jaws stand back from N), on N from the right, G10 L20 P1 X2.540."
+instruction = "Before the first part goes in, G54 Z0: the parallels' top (the seat), touched with the end mill on the fixed-jaw parallel, the jaws open."
+instruction_detailed = "Before the first part goes in, the parallels in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the part in: the collet would meet the part before the tip reached the parallel."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the parallels' top (the seat), touched with the end mill on the fixed-jaw parallel right of the part."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X12.700 Y-6.850: the cutter right of N, its edge .02 off the fixed jaw, over that jaw's parallel. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051."
+instruction = "The part clamped as Holding says: G54 X0 the near end N (the RIGHT side), Y0 the fixed jaw's face (W): edge finder (900 rpm), its tip on the foot above the parallels."
+instruction_detailed = "The part clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; its tip about .10 in above the seat, on the foot (below the jaw tops is fine: the jaws stand back from N), on N from the right, G10 L20 P1 X2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -762,8 +763,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PA05_top_apex (M6 T1; set 2370): face the strap's top end down to Z {{cad.envelope_y_mm:in.4dot}} (the crown's apex height) in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run PA05_top_apex (M6 T1; 2450, display near 2485): face the strap's top end down to Z {{cad.envelope_y_mm:in.4dot}} (the crown's apex height) in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}."
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "top", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", stations_mm = "{{process.upright_top_max_mm}}" },
 ]
@@ -846,8 +847,8 @@ instruction = "Before clamping: file the burr off the top end's edges and the ap
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 and Y from the bore: edge finder (900 rpm) on its walls; the seat is Y0, {{cad.arbor_bore_height_in:.3dot}} from the bore's centre (the jaws close on the foot: nothing else is reachable)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm) in the bore, its tip .10 below F. X: on the bore's left wall G10 L20 P1 X0; on its right wall read the DRO X; MDI G0 X(half that reading); G10 L20 P1 X0. Y: on the bore's wall toward the moving jaw G10 L20 P1 Y0; on the wall toward the fixed jaw read the DRO Y; MDI G0 Y(half that reading); G10 L20 P1 Y-{{cad.arbor_bore_height_mm:.3f}}."
+instruction = "G54 X0 and Y from the bore: edge finder (900 rpm) on its walls; the seat is Y0, {{cad.arbor_bore_height_in:.3dot}} from the bore's centre (the jaws close on the foot: nothing else is reachable)."
+instruction_detailed = "Edge finder (900 rpm) in the bore, its tip .10 below F. X: on the bore's left wall G10 L20 P1 X0; on its right wall read the DRO X; MDI G0 X(half that reading); G10 L20 P1 X0. Y: on the bore's wall toward the moving jaw G10 L20 P1 Y0; on the wall toward the fixed jaw read the DRO Y; MDI G0 Y(half that reading); G10 L20 P1 Y-{{cad.arbor_bore_height_mm:.3f}}."
 feed = "hand"
 
 [[setups.operations]]

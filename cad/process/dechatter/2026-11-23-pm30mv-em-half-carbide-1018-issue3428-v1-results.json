@@ -1,0 +1,128 @@
+{
+ "session": "issue-3428-v1",
+ "rounds": [
+  {
+   "round": 1,
+   "recording": "recording.wav",
+   "thresholds": {
+    "prominence_db": 27.0,
+    "excess_db": 10.0
+   },
+   "passes": [
+    {
+     "id": 0,
+     "kind": "truing",
+     "rpm": 2300,
+     "width_mm": 0.2,
+     "status": "no cut heard",
+     "verdict": null,
+     "chatter_hz": 2055.2,
+     "spindle_hz": 39.667,
+     "prominence_db": 16.3,
+     "excess_db": 10.6,
+     "start_s": 24.41,
+     "end_s": 31.91,
+     "detected": null,
+     "over_air_db": 0.9
+    },
+    {
+     "id": 1,
+     "kind": "test",
+     "rpm": 2300,
+     "width_mm": 1.3,
+     "status": "analysed",
+     "verdict": "stable",
+     "chatter_hz": 2072.8,
+     "spindle_hz": 39.69,
+     "prominence_db": 18.6,
+     "excess_db": 10.3,
+     "start_s": 42.95,
+     "end_s": 50.95,
+     "detected": "stable",
+     "over_air_db": 4.1
+    },
+    {
+     "id": 2,
+     "kind": "test",
+     "rpm": 2300,
+     "width_mm": 2.5,
+     "status": "analysed",
+     "verdict": "stable",
+     "chatter_hz": 479.0,
+     "spindle_hz": 39.552,
+     "prominence_db": 20.1,
+     "excess_db": 34.2,
+     "start_s": 62.34,
+     "end_s": 70.1,
+     "detected": "stable",
+     "over_air_db": 9.6
+    },
+    {
+     "id": 3,
+     "kind": "test",
+     "rpm": 2420,
+     "width_mm": 1.3,
+     "status": "analysed",
+     "verdict": "stable",
+     "chatter_hz": 716.3,
+     "spindle_hz": 39.583,
+     "prominence_db": 18.5,
+     "excess_db": 26.8,
+     "start_s": 114.54,
+     "end_s": 121.81,
+     "detected": "stable",
+     "over_air_db": 7.1
+    },
+    {
+     "id": 4,
+     "kind": "test",
+     "rpm": 2550,
+     "width_mm": 1.3,
+     "status": "analysed",
+     "verdict": "stable",
+     "chatter_hz": 2053.7,
+     "spindle_hz": 43.35,
+     "prominence_db": 17.3,
+     "excess_db": 26.7,
+     "start_s": 144.25,
+     "end_s": 151.08,
+     "detected": "stable",
+     "over_air_db": 4.2
+    },
+    {
+     "id": 5,
+     "kind": "test",
+     "rpm": 2680,
+     "width_mm": 1.3,
+     "status": "analysed",
+     "verdict": "stable",
+     "chatter_hz": 2052.2,
+     "spindle_hz": 44.872,
+     "prominence_db": 18.3,
+     "excess_db": 24.1,
+     "start_s": 174.39,
+     "end_s": 181.03,
+     "detected": "stable",
+     "over_air_db": 3.7
+    },
+    {
+     "id": 6,
+     "kind": "test",
+     "rpm": 2800,
+     "width_mm": 1.3,
+     "status": "analysed",
+     "verdict": "stable",
+     "chatter_hz": 843.8,
+     "spindle_hz": 46.657,
+     "prominence_db": 17.9,
+     "excess_db": 21.0,
+     "start_s": 201.78,
+     "end_s": 207.96,
+     "detected": "stable",
+     "over_air_db": 4.0
+    }
+   ],
+   "schema": 2
+  }
+ ]
+}

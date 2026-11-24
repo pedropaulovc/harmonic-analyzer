@@ -1,14 +1,14 @@
-r"""McMaster 91255A539 -- black-oxide alloy steel button head hex drive screw, 1/4-20 x 5/8.
+r"""McMaster 91255A267 -- black-oxide alloy steel button head hex drive screw, 10-32 x 5/8.
 
 Used as ch-rocker-strap-tl-vn-hub-screw (MHA-CH-13-TL-VN-51), the screw that
 snugs the strap blank's hub on the sub-plate through the hub washer (owner
-ruling 2026-11-17).  The catalogue facts and the head form are
-``_mcmaster_91255a539``'s.
+ruling 2026-11-23).  The catalogue facts and the head form are
+``_mcmaster_91255a267``'s.
 
 The model is one Front-plane half profile revolved about the sketch Y axis:
 the flat head top, the spherical dome down to the catalogue head diameter,
-the head's side to the bearing face at y = 0, the shank at the 1/4-20 basic
-major to the 45 deg tip chamfer; then the 5/32 hex socket cut mid-plane
+the head's side to the bearing face at y = 0, the shank at the 10-32 basic
+major to the 45 deg tip chamfer; then the 1/8 hex socket cut mid-plane
 about a plane at the head top (the half above it is air).  The thread is not
 modelled.  The production build turns the body so the recipe's +Y is the
 part frame's +Z.
@@ -19,7 +19,7 @@ solid and saving it under cad/out/reference.
 
 Run standalone (SolidWorks open)::
 
-    uv run python cad\scripts\diagnostics\diag_build_91255A539.py
+    uv run python cad\scripts\diagnostics\diag_build_91255A267.py
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ else:
     import _script_paths  # noqa: F401
 from _check import check  # noqa: E402
 from _feature_tree import name_last_feature  # noqa: E402
-from _mcmaster_91255a539 import (  # noqa: E402
+from _mcmaster_91255a267 import (  # noqa: E402
     DOME_CENTER_Y,
     HEAD_DIA,
     HEAD_HEIGHT,
@@ -88,8 +88,8 @@ def socket_hexagon_mm() -> list[tuple[float, float]]:
     ]
 
 
-@stock_recipe("91255A539", threaded=False)
-def build_91255A539(adapter, truth=None):
+@stock_recipe("91255A267", threaded=False)
+def build_91255A267(adapter, truth=None):
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     check("create_sketch screw profile", adapter.create_sketch("Front"))
@@ -146,7 +146,7 @@ def build_catalog(adapter) -> dict[str, str]:
     with _telemetry.span("catalog.build", label=PART_NO):
         check(f"create_part {PART_NO}", adapter.create_part())
         assert_seat_sketch_baseline(adapter, PART_NO)
-        build_91255A539(adapter)
+        build_91255A267(adapter)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
             raise RuntimeError(f"{PART_NO} catalog build has no solid volume")

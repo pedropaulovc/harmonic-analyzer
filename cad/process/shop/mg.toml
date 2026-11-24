@@ -227,3 +227,5 @@ description = "C36000 free-machining brass (360-H02, extruded), hex bar, 1/2 in 
 description = "C36000 free-machining brass (360-H02, extruded), hex bar, 7/16 in across flats"
 [stock.c360-round-7-16]
 description = "C36000 free-machining brass, round bar, 7/16 in"
+[stock.o1-drill-rod-3-16]
+description = "AISI O1 drill rod, precision ground, round bar, 3/16 in"

@@ -43,7 +43,11 @@ X, model x → Y, model −z → Z).
 Toolpath rules (owner rulings 2026-11-16): plunges beside the stock at the
 cutting feed, plunges into metal at the plan's slow feed, real G0 above the
 stock. The slitting saw has no tool-setter length: CR06 loads no tool, its
-Z0 is touched off from the saw's lower face.
+Z0 is touched off from the saw's lower face. It runs on the owned R8 stepped
+saw arbor (the body's shoulder above it, the cap and its screw below it),
+driven by the clamp's friction alone: CR06's first pass is half a step,
+then an M0 stop with the spindle off for a look at the saw's witness lines,
+and one step's handbook torque is held under the clamp's friction torque.
 """
 
 from __future__ import annotations
@@ -55,8 +59,9 @@ from typing import Any
 STEM = "ch_connecting_rod"
 COMMENT = "MHA-CH-03 connecting rod, two per load"
 # Programs in order, each listing its operation keys. A program whose keys
-# are grouped in tuples is one section per group (a FreeCAD Job), joined at
-# M6 tool changes.
+# are grouped in tuples is one section per group (a FreeCAD Job, or a manual
+# section: the saw's witness-line stop), joined at M6 tool changes and M0
+# stops.
 PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("CR01_rough_2", (("rough_2",), ("band_rough_2",))),
     ("CR02_rough_1", (("rough_1",), ("band_rough_1",))),
@@ -64,7 +69,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("CR04a_end_trim", ("end_trim",)),
     ("CR04_finish_2", (("finish_2",), ("band_2",))),
     ("CR05_bore", ("bore",)),
-    ("CR06_slot", ("slot",)),
+    ("CR06_slot", (("slot_light",), ("slot_line",), ("slot",))),
     ("CR07_pin", (("pin_spot",), ("pin_drill",), ("pin_ream",))),
     ("CR08_outline", ("outline",)),
 )
@@ -109,8 +114,23 @@ OUTLINE_TOL_MM = 0.05
 # The 1/8 in outline and the 1/2 in fork contour overlap this far along the
 # fork's sides past the slot's floor.
 FORK_OVERLAP_MM = 1.0
-# The arbor spacer by the saw clears the fork's crown by this much.
-COLLAR_CLEAR_MM = 1.0
+# CR06's first pass takes this share of a step, then stops (M0, spindle off)
+# for the witness lines: a light proof of the friction drive.
+LIGHT_PASS_SHARE = 0.5
+# A saw pass may take this share of the friction drive's torque at most: the
+# drive's friction and preload are a table's, not measured, and the saw runs
+# oiled (friction .10 under a preload a quarter low leaves about half).
+DRIVE_RESERVE = 2.0
+# The plan's saw arbor: its tool id, and the shop record it names, the owned
+# R8 stepped saw arbor.
+ARBOR_TOOL = "saw-arbor"
+ARBOR_REF = "saw-arbor-r8-stepped"
+# The screw head's stand bound is the largest the plan tolerates, to this
+# (.005 in).
+STAND_STEP_MM = 0.127
+# The saw's axial runout is read on its side face this far in from the tooth
+# tips (1/8 in).
+RUNOUT_INSET_MM = 3.175
 # The saw is touched off over the fork against the fixed jaw, its rim this
 # far in over the crown.
 TOUCH_IN_MM = 3.0
@@ -118,8 +138,19 @@ TOUCH_IN_MM = 3.0
 LEAF_MM = 0.0508
 # The plan's air proofs raise Z0 1.000 in.
 AIR_PROOF_RAISE_MM = 25.4
-# A plan number the recipe recomputes must agree to this (its rounding).
+# A plan number the recipe recomputes must agree to this (its rounding); a
+# runout limit to this.
 PLAN_TOL_MM = 0.01
+RUNOUT_TOL_MM = 0.0005
+# Machinery's Handbook milling power for the saw's passes, the figures
+# prechips' milling screen takes for milling_material steel_1018: unit power
+# (hp per in³/min, plain carbon steel 160-180 HB), the feed factor at .001
+# in/tooth and the tool-wear factor.
+SAW_UNIT_POWER_HP = 0.78
+SAW_FEED_FACTOR = 1.60
+SAW_FEED_FACTOR_AT_MM = 0.0254
+SAW_WEAR_FACTOR = 1.10
+WATTS_PER_HP = 745.7
 
 
 def _plan_operations(plan: dict[str, Any]):
@@ -199,11 +230,38 @@ def _box(
     return {"name": name, "x": [x[0], x[1]], "y": [y[0], y[1]], "z_top": z_top}
 
 
-def _agree(plan: dict[str, Any], key: str, value: float) -> None:
+def _agree(
+    plan: dict[str, Any], key: str, value: float, tol: float = PLAN_TOL_MM
+) -> None:
     """A plan parameter the recipe recomputes from the export and the shop."""
     stated = plan["parameters"][key]
-    if not math.isclose(stated, value, abs_tol=PLAN_TOL_MM):
+    if not math.isclose(stated, value, abs_tol=tol):
         raise ValueError(f"process.{key} {stated:g}, the recipe computes {value:.4f}")
+
+
+def _saw_torque_nm(step: float, width: float, feed: float, rpm: float) -> float:
+    """Mean spindle torque of a saw pass ``step`` into the work and ``width``
+    wide at ``feed`` mm/min: the handbook's power (unit power × feed factor ×
+    wear × removal rate) over the spindle's speed."""
+    removal = step * width * feed / IN**3
+    watts = WATTS_PER_HP * SAW_UNIT_POWER_HP * SAW_FEED_FACTOR * SAW_WEAR_FACTOR
+    return watts * removal / (2 * math.pi * rpm / 60)
+
+
+def _ring_radius(inner: float, outer: float) -> float:
+    """The friction radius of a clamp ring ``inner`` to ``outer`` under even
+    pressure."""
+    return 2 * (outer**3 - inner**3) / (3 * (outer**2 - inner**2))
+
+
+def _heaviest(levels: list[list[float]]) -> float:
+    """The deepest single bite of passes run to each depth in turn, level by
+    level, each level from the raw face."""
+    return max(
+        depth - previous
+        for depths in levels
+        for previous, depth in zip([0.0, *depths], depths)
+    )
 
 
 def _mid(band: list[float]) -> float:
@@ -379,9 +437,12 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         "fork_base": fork["extent_y"][0],
         "crown": crown[1],
         "slot_width": _mid(slot["width"]),
+        "slot_width_band": slot["width"],
         "near_tine": _mid(slot["near_tine"]),
         "far_tine": _mid(slot["far_tine"]),
+        "far_tine_band": slot["far_tine"],
         "slot_depth": _mid(slot["depth"]),
+        "slot_depth_band": slot["depth"],
         "shank_corner_r": f["shank_right_flank"]["corner_r"],
         "pin": pin["dia"],
     }
@@ -596,11 +657,6 @@ def context(
     saw_t = p["saw_thickness_mm"]
     if not saw_t < g["slot_width"] <= 2 * saw_t:
         raise ValueError("the fork slot is not two saw passes wide")
-    _agree(
-        plan,
-        "saw_collar_dia_max_mm",
-        2 * (saw_r - g["slot_depth"] - COLLAR_CLEAR_MM),
-    )
     near_wall = g["near_tine"]
     far_wall = fork_t - g["far_tine"]
     if not math.isclose(far_wall - near_wall, g["slot_width"], abs_tol=1e-3):
@@ -611,50 +667,198 @@ def context(
     n_steps = math.ceil(g["slot_depth"] / p["slot_step_max_mm"] - 1e-9)
     slot_steps = [g["slot_depth"] * (k + 1) / n_steps for k in range(n_steps)]
     _agree(plan, "slot_step_mm", slot_steps[0])
+    # CR06's first pass, at the near wall's level: a share of a step.
+    slot_light = LIGHT_PASS_SHARE * slot_steps[0]
+    _agree(plan, "slot_light_mm", slot_light, RUNOUT_TOL_MM)
     saw_rpm, saw_feed = _setting(plan, shop, "fork slot")
+    if _setting(plan, shop, "fork slot light") != (saw_rpm, saw_feed):
+        raise ValueError("'fork slot light' runs at another setting than 'fork slot'")
     if (saw_rpm, saw_feed) != (p["saw_rpm"], p["saw_feed_per_min_mm"]):
         raise ValueError("the saw's cut is not process.saw_rpm and saw_feed_per_min_mm")
     if not math.isclose(
         _cut(plan, "fork slot", "radial_woc_mm"), slot_steps[0], abs_tol=1e-6
     ):
         raise ValueError("'fork slot' radial_woc_mm is not process.slot_step_mm")
+    if not math.isclose(
+        _cut(plan, "fork slot light", "radial_woc_mm"), p["slot_light_mm"], abs_tol=1e-6
+    ):
+        raise ValueError(
+            "'fork slot light' radial_woc_mm is not process.slot_light_mm"
+        )
     saw_xs = [crown_x + saw_r - d for d in slot_steps]
 
-    # The arbor round the saw (tools.gear-cutter-arbor-1, to buy: its sizes
-    # are the plan's assumed limits, checked when it is mounted): above the
-    # saw, spacers no wider than the collar limit; below it, spacers at least
-    # saw_spacer_below_min_mm deep, then the nut, all within saw_below_max_mm
-    # of the saw's lower face and the nut no wider than saw_nut_dia_max_mm.
-    collar_r = p["saw_collar_dia_max_mm"] / 2
-    nut_r = p["saw_nut_dia_max_mm"] / 2
-    below = p["saw_below_max_mm"]
-    spacer_below = p["saw_spacer_below_min_mm"]
-    if not 0 < spacer_below < below:
-        raise ValueError("the spacers under the saw are not inside its stack's depth")
+    # The saw's arbor is the owned R8 stepped saw arbor (the plan's tool names
+    # its shop record; its sizes are the plan's, held to the inventory record
+    # by the process test): the body's shoulder above the saw, the cap and
+    # its countersunk screw below it.
+    arbor_ref = next(
+        (t["ref"] for t in plan["tools"] if t["id"] == ARBOR_TOOL), None
+    )
+    if arbor_ref != ARBOR_REF or ARBOR_REF not in shop["tools"]:
+        raise ValueError(
+            f"the plan's saw arbor is not the owned one, shop tools.{ARBOR_REF}"
+        )
+    body_r = p["saw_arbor_body_dia_mm"] / 2
+    cap_r = p["saw_arbor_cap_dia_mm"] / 2
+    cap_t = p["saw_arbor_cap_thickness_mm"]
+    head_r = p["saw_arbor_screw_head_dia_mm"] / 2
+    if not 0 < head_r < cap_r:
+        raise ValueError("the cap's screw head is not inside the cap")
+    # The saw cuts past the arbor by its radius less the arbor's, less the
+    # clearance, on both sides of it (the body above, the cap below): the
+    # slot's deepest limit does not pass that, so the body and the cap stay
+    # beyond the forks' crowns at every cut, and at the touch-off, where the
+    # saw's rim is in over the crown by less than the slot's depth.
+    arbor_reach = saw_r - max(body_r, cap_r) - p["saw_arbor_clear_mm"]
+    _agree(plan, "saw_depth_past_arbor_max_mm", arbor_reach)
+    slot_deepest = g["slot_depth_band"][1]
+    if slot_deepest > arbor_reach + 1e-9:
+        raise ValueError(
+            f"the fork slot's deepest limit {slot_deepest:.3f} passes the arbor's "
+            f"reach {arbor_reach:.3f}: its body or cap would meet the forks' crowns"
+        )
+    # NOT MEASURED: the screw head's stand past the cap's lower face, a
+    # bounded assumption a first-load stop measures. The stack below the
+    # saw's lower face is the cap plus it.
+    stand = p["saw_screw_head_stand_max_mm"]
+    below = cap_t + stand
+    _agree(plan, "saw_below_max_mm", below)
     # CR06 moves between passes with the stack's lowest point CLEAR_MM over
     # the stock top.
     saw_clear = t_max + CLEAR_MM + below
     _agree(plan, "saw_clear_z_mm", saw_clear)
+    # CR06's air proof raises Z0 by AIR_PROOF_RAISE_MM, lifting the whole
+    # stack CLEAR_MM over the stock top at the lower level: the stand's bound
+    # is the largest that proof tolerates, to STAND_STEP_MM.
+    stand_limit = AIR_PROOF_RAISE_MM + saw_zs[0] - cap_t - t_max - CLEAR_MM
+    if stand > stand_limit + 1e-6:
+        raise ValueError(
+            "process.saw_screw_head_stand_max_mm leaves the arbor's stack under "
+            "the stock top in CR06's air proof"
+        )
+    if stand <= stand_limit - STAND_STEP_MM:
+        raise ValueError(
+            f"process.saw_screw_head_stand_max_mm {stand:g} is not the largest the "
+            f"air proof tolerates ({stand_limit:.3f}, to {STAND_STEP_MM} mm)"
+        )
+    # At the cut the stack passes this far below Z0 (the plate's top), which
+    # is lower than the parallels' top under the plate: the traveler has the
+    # builder check, every load, that no parallel stands past the jaws' right
+    # side, which is as far as the keep-outs below model the vise.
+    _agree(plan, "saw_below_plate_top_mm", below - saw_zs[0], RUNOUT_TOL_MM)
+    # The arbor's lowest point from the spindle nose: the record's distance
+    # to the cap's lower face with no saw on, plus the saw, inside the
+    # plan's round figure; plus the stand's bound.
+    if p["saw_arbor_nose_to_cap_mm"] + saw_t > p["saw_arbor_below_nose_mm"]:
+        raise ValueError(
+            "process.saw_arbor_below_nose_mm is under the record's nose-to-cap "
+            "distance plus the saw"
+        )
+    _agree(plan, "saw_arbor_length_mm", p["saw_arbor_below_nose_mm"] + stand)
+    # The friction drive (not keyed): one face's friction torque on the clamp
+    # ring between the pilot (the saw's hole) and the cap, at the plan's
+    # preload and friction.
+    ring = _ring_radius(p["saw_bore_mm"] / 2, min(body_r, cap_r))
+    drive = p["saw_drive_friction"] * p["saw_clamp_preload_kn"] * ring
+    _agree(plan, "saw_drive_torque_max_nm", drive, 0.05)
+    # The screw holds that preload on its thread in the arbor: the record's
+    # engagement with no saw fitted (measured), less this saw between the
+    # shoulder and the cap, is at least one screw diameter.
+    if p["saw_screw_engagement_no_saw_mm"] - saw_t < p["saw_screw_dia_mm"]:
+        raise ValueError(
+            "the clamp screw's thread behind this saw, "
+            "process.saw_screw_engagement_no_saw_mm less the saw's thickness, is "
+            "under one screw diameter"
+        )
+    # The heaviest saw pass (the deepest bite, at the saw's full width) takes
+    # no more spindle torque, by the handbook's power at this feed per tooth,
+    # than the friction drive carries with DRIVE_RESERVE in hand: what
+    # slot_step_max_mm is for.
+    teeth = _cut(plan, "fork slot", "flutes")
+    if teeth != p["saw_teeth"] or not math.isclose(
+        saw_feed / (saw_rpm * teeth), SAW_FEED_FACTOR_AT_MM, abs_tol=1e-6
+    ):
+        raise ValueError(
+            "the saw's feed is not the .001 in/tooth the handbook's feed factor "
+            "is taken at"
+        )
+    bite = _heaviest([[slot_light, *slot_steps], slot_steps])
+    torque = _saw_torque_nm(bite, saw_t, saw_feed, saw_rpm)
+    if torque * DRIVE_RESERVE > drive:
+        raise ValueError(
+            f"the saw's heaviest pass takes {torque:.1f} N·m, over the arbor's "
+            f"friction drive with its reserve: {drive / DRIVE_RESERVE:.1f} of "
+            f"process.saw_drive_torque_max_nm {drive:.1f}"
+        )
+    # Runout (not measured: stops read the axial at every mounting of the
+    # arbor, the radial at every clamping of the saw). Axial: the
+    # slot's width is the second level's rise above the first plus the saw's
+    # swept thickness (its miked thickness plus its axial runout at the rim),
+    # which may run from the width's least less the rise to its most less the
+    # rise and the margin; the far tine, which takes the runout (Z0 is
+    # touched under the saw's lowest tooth), stays in its band at the widest
+    # sweep. Radial: the passes are laid out on the saw's catalogue diameter,
+    # so the deepest tooth cuts the floor deeper than the depth's target (its
+    # band's middle) by half the tips' total swing plus half the saw's excess
+    # over that diameter (the calipers read it on the first load): their sum
+    # within twice the depth's most less its target less the margin, either
+    # way.
+    _agree(
+        plan, "saw_axial_reading_per_in_mm", IN * (saw_r - RUNOUT_INSET_MM) / saw_r
+    )
+    rise = saw_zs[1] - saw_zs[0]
+    _agree(plan, "slot_rise_mm", rise, RUNOUT_TOL_MM)
+    swept = (
+        g["slot_width_band"][0] - rise,
+        g["slot_width_band"][1] - rise - p["saw_swept_margin_mm"],
+    )
+    _agree(plan, "slot_saw_swept_min_mm", swept[0], RUNOUT_TOL_MM)
+    _agree(plan, "slot_saw_swept_max_mm", swept[1], RUNOUT_TOL_MM)
+    if not swept[0] <= saw_t < swept[1]:
+        raise ValueError(
+            "the fork slot's width leaves the saw's nominal thickness no axial runout"
+        )
+    if fork_t - saw_zs[1] - swept[1] < g["far_tine_band"][0] - 1e-9:
+        raise ValueError("the saw's widest sweep leaves the far tine under its band")
+    _agree(
+        plan,
+        "slot_saw_axial_nominal_mm",
+        (swept[1] - saw_t) / IN * p["saw_axial_reading_per_in_mm"],
+        RUNOUT_TOL_MM,
+    )
+    _agree(
+        plan,
+        "slot_saw_radial_tir_max_mm",
+        2 * (slot_deepest - g["slot_depth"] - p["saw_depth_margin_mm"]),
+        RUNOUT_TOL_MM,
+    )
     # The touch-off station: over the fork against the fixed jaw, the saw's
-    # rim TOUCH_IN_MM in over its crown; the spacers and the nut, hanging
-    # below the saw as it comes down onto the fork, stay past the crown.
+    # rim TOUCH_IN_MM in over its crown: inside the arbor's reach, so the cap
+    # and its screw, hanging below the saw as it comes down onto the fork,
+    # are beyond the crown.
+    if TOUCH_IN_MM > arbor_reach:
+        raise ValueError(
+            "the saw's touch-off puts its rim farther in over the crown than the "
+            "arbor reaches: the cap would come down on the fork"
+        )
     touch = (crown_x + saw_r - TOUCH_IN_MM, centres[0])
     _agree(plan, "saw_touch_x_mm", touch[0])
     _agree(plan, "saw_touch_y_mm", touch[1])
     # The saw's and T3's Z0 on the fork's F face, over the .002 leaf.
     _agree(plan, "fork_touch_z_mm", fork_t + LEAF_MM)
-    if touch[0] - max(nut_r, collar_r) < crown_x + COLLAR_CLEAR_MM:
-        raise ValueError("the arbor's nut reaches the crown at the saw's touch-off")
-    # CR05 leaves T1 parked over that station, high enough that the arbor
-    # mounted in its place (its lowest point no more than saw_arbor_length_mm
-    # from the nose; T1's tip its collet and its set projection out) hangs
-    # CLEAR_MM over the stock top: the saw never moves in X or Y on a
-    # height the controller does not know.
+    # CR05 leaves T1 parked over that station, its tip CLEAR_MM over the
+    # stock top, and higher by as much as the arbor mounted in its place (its
+    # lowest point no more than saw_arbor_length_mm from the nose; T1's tip
+    # its collet and its set projection out) hangs lower than T1: the saw
+    # never moves in X or Y on a height the controller does not know.
     park_z = (
         t_max
         + CLEAR_MM
-        + p["saw_arbor_length_mm"]
-        - (p["r8_collet_gauge_mm"] + p["half_mill_projection_mm"])
+        + max(
+            0.0,
+            p["saw_arbor_length_mm"]
+            - (p["r8_collet_gauge_mm"] + p["half_mill_projection_mm"]),
+        )
     )
     _agree(plan, "saw_park_z_mm", park_z)
 
@@ -1059,15 +1263,33 @@ def context(
     # The slot: the saw's passes along +Y, each Z level in steps into the
     # crown: with an M3 saw right of the forks a pass along +Y is
     # conventional (along -Y it would climb, and a slitting saw climbing
-    # grabs and feeds itself in). Between passes the saw rises to
-    # saw_clear, its stack's lowest point clear over the stock.
-    slot = _side(
-        saw_xs,
-        saw_zs,
-        (-load - saw_r - APPROACH_MM, saw_r + APPROACH_MM),
-        t_max,
-        saw_clear,
+    # grabs and turns on its friction-driven arbor). Between passes the saw
+    # rises to saw_clear, its stack's lowest point clear over the stock. The
+    # first, light pass is a section of its own, before the witness-line
+    # stop.
+    saw_y = (-load - saw_r - APPROACH_MM, saw_r + APPROACH_MM)
+    slot_light_lines = _side(
+        [crown_x + saw_r - slot_light], saw_zs[:1], saw_y, t_max, saw_clear
     )
+    slot = _side(saw_xs, saw_zs, saw_y, t_max, saw_clear)
+    # The witness-line stop after the light pass: the saw is at its clear
+    # height beyond the load (the pass's last line), the spindle is stopped,
+    # and the operator looks at the marker lines across the body, the saw and
+    # the cap. The instruction is a CNCjs %msg line, which CNCjs shows when
+    # the M0 pauses it; the next section restarts the spindle.
+    manual = {
+        "slot_line": {
+            "tool": numbers["saw"],
+            "label": names["saw"],
+            "setting": "SPINDLE STAYS OFF",
+            "gcode": [
+                "M5",
+                "%msg PAUSE: SPINDLE STOPPED. BOTH WITNESS LINES ON THE SAW UNBROKEN:"
+                " CYCLE START. A LINE BROKEN: THE SAW SLIPPED, DO NOT RESTART",
+                "M0",
+            ],
+        }
+    }
 
     # The pin holes.
     pins = [(rx + g["crown"], yc) for yc in centres]
@@ -1367,6 +1589,19 @@ def context(
             stock_two,
             bore,
             3,
+        ),
+        job(
+            "slot_light",
+            "saw the fork slots, light pass",
+            "saw",
+            saw,
+            "slittingsaw",
+            saw_rpm,
+            saw_feed,
+            saw_feed,
+            "two",
+            stock_two,
+            slot_light_lines,
         ),
         job(
             "slot",
@@ -1781,8 +2016,8 @@ def context(
     # face (the programmed Z) down (lo) and up (hi), and its radius. No move,
     # rapid or feed, brings a part into the stock, the plate or the vise:
     # the blanks over the support plate and the jaws stand on the vise; the
-    # blanks' ends past the plate overhang air from Z0 to their top, which
-    # the nut may pass under while the saw cuts.
+    # blanks' ends past the plate overhang air from Z0 to their top, beside
+    # which the cap and its screw pass while the saw cuts.
     plate_end = p["support_plate_length_mm"]
     solids = jaws2 + [
         _box("the blanks over the plate", (0.0, plate_end), (-load, 0.0), t_max),
@@ -1813,7 +2048,8 @@ def context(
     expect += [
         [name, "tool_changes", {"z_top": t_max, "tools": [], "loads_first": False}],
         [name, "spindle", {"rpm": [[saw_rpm]]}],
-        [name, "pauses", {"z_top": t_max, "count": 0}],
+        # One stop, spindle off: the witness-line look after the light pass.
+        [name, "pauses", {"z_top": t_max, "count": 1, "spindle_off": True}],
         [name, "depth", {"z_min": _r(min(saw_zs))}],
         [name, "rapids_clear", {"z_top": t_max}],
         [name, "air_feed", {"z_top": t_max}],
@@ -1831,15 +2067,35 @@ def context(
             },
         ],
         [name, "keep_out", {"radius": saw_r, "boxes": jaws2}],
+        # The saw comes down to a pass only beside the load: its lower face
+        # never crosses the height between its higher level and the stock
+        # top within its radius of the blanks.
+        [
+            name,
+            "keep_out",
+            {
+                "radius": saw_r,
+                "boxes": [
+                    {
+                        **_box(
+                            "the blanks' top (the saw coming down over the load)",
+                            (0.0, crown_x),
+                            (-load, 0.0),
+                            t_max,
+                        ),
+                        "z_bottom": _r(max(saw_zs)),
+                    }
+                ],
+            },
+        ],
     ]
     # Each arbor part as cut, and as proved in air (Z0 raised
-    # AIR_PROOF_RAISE_MM: every part that much higher over the same shapes,
-    # where the nut that passes under the crowns must not rise into them).
+    # AIR_PROOF_RAISE_MM: every part that much higher over the same shapes).
     for lift, when in ((0.0, ""), (AIR_PROOF_RAISE_MM, ", proved in air")):
         for part, radius_of, lo, hi in (
-            ("spacers above the saw", collar_r, saw_t, None),
-            ("spacers below the saw", collar_r, -below, 0.0),
-            ("the arbor's nut", nut_r, -below, -spacer_below),
+            ("the arbor's body above the saw", body_r, saw_t, None),
+            ("the arbor's cap below the saw", cap_r, -cap_t, 0.0),
+            ("the cap's screw head", head_r, -below, -cap_t),
         ):
             expect.append(
                 [
@@ -1914,7 +2170,7 @@ def context(
         "names": names,
         "numbers": numbers,
         "jobs": jobs,
-        "manual": {},
+        "manual": manual,
         "expect": expect,
         "levels": {
             "band_rough_2": band_rough2_levels,

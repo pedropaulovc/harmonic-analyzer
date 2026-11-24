@@ -45,7 +45,10 @@
 # underside. Program names, the [parameters] and the milling_cuts names are a
 # contract with that recipe. Tool numbers are the places in the tools list
 # among the mill's tools: T1 1/2 in end mill, T2 1/8 in end mill, T3 centre
-# drill, T4 #43, T5 #7, T6 the tap guide (the taps are turned by hand).
+# drill, T4 #43, T5 #21, T6 the tap guide (the taps are turned by hand). The
+# hub hole is #10-32 (owner ruling 2026-11-23: "change the screw to #10-32.
+# The sub-plate's tapped hole becomes #10-32", reversing 2026-11-17's "Use a
+# 1/4-20 hub screw"): #21 drill, the owned #10-32 UNF plug tap.
 title = "Rocker-strap sub-plate"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -149,12 +152,12 @@ cbore_plunge_feed_per_min_mm = 114.3
 # Holes: LittleMachineShop "Cutting Speeds", Drilling & Reaming, Wrought
 # aluminum 6061-T6 (read 2026-11-17): 350-400 ft/min, over 2800 rpm on every
 # drill here, so all run at the spindle's 2800. Feeds per rev, the author's
-# choice: centre drill .001 (2.8 in/min), #43 .0015 (4.2), #7 .003 (8.4).
+# choice: centre drill .001 (2.8 in/min), #43 .0015 (4.2), #21 .0025 (7.0).
 # The #2 centre drill spots the 4-40 holes Ø.094 on the pocket floors.
 spot_dia_mm = 2.4
 spot_feed_per_min_mm = 71.12
 drill_43_feed_per_min_mm = 106.68
-drill_7_feed_per_min_mm = 213.36
+drill_21_feed_per_min_mm = 177.8
 # Full-retract pecks of one #43 diameter (L/D 3.1 through the pocket floor);
 # drill tips drill_breakthrough_mm past full diameter under the underside.
 peck_43_mm = 2.2606
@@ -176,7 +179,7 @@ parallel_height_mm = 38.1
 plate_overhang_mm = 85.7631      # (plate length − jaw width)/2, centred.
 jaw_right_x_mm = 244.4369        # plate_overhang_mm + vise_jaw_width_mm.
 bar_top_max_mm = 12.827          # The thickest bar, .505 in.
-drill_tip_below_mm = -2.034     # #7 tip under the underside (deepest cut).
+drill_tip_below_mm = -1.713     # #21 tip under the underside (deepest cut).
 r8_collet_gauge_mm = 6.3         # As the strap plan (archived LMS 4860).
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 drill_projection_max_mm = 112.8  # Archive 13/32 jobber, bounds the drills.
@@ -202,9 +205,9 @@ id = "drill-43"
 name = "#43 drill"
 ref = "jig-drill-43"
 [[tools]]
-id = "drill-7"
-name = "#7 drill"
-ref = "jig-drill-7"
+id = "drill-21"
+name = "#21 drill"
+ref = "drill-21"
 [[tools]]
 id = "tap-guide"
 name = "Fisher spring tap guide"
@@ -214,9 +217,9 @@ id = "tap-4-40"
 name = "4-40 tap"
 ref = "jig-tap-4-40-plug"
 [[tools]]
-id = "tap-1-4-20"
-name = "1/4-20 tap"
-ref = "jig-tap-1-4-20-plug"
+id = "tap-10-32"
+name = "#10-32 tap"
+ref = "tap-10-32-plug"
 [[tools]]
 id = "saw"
 name = "Evolution miter saw"
@@ -322,7 +325,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Vise indicated <.001 along X. The 1 in and 1/2 in parallels of the owned set stacked under each jaw (1.5 in), against the jaws, clear of the holes (the nearest is .85 in in from an edge). The plate on them, underside down, FRONT edge at the moving jaw, gripped on its two milled long edges (.27 in the jaws), centred on the jaws (LEFT end at the left); its top (Z0) stands .146 above the jaw tops. Nothing to the right of or in front of the plate stands above the jaws: the end mill runs out past the right end and the front edge."
 datum = "Program SP02_top, the plate's frame (the G54 of the MHA-CH-13 programs): X0 the end-stop face it cuts, {{cad.stop_width_mm:in.3dot}} in in from the LEFT end; Y0 the fence face it cuts, {{cad.fence_width_in:.3dot}} in in front of the back edge (fixed jaw), +Y toward the fixed jaw; Z0 the plate top it cuts, {{cad.plate_top_height_mm:in.3dot}} above the underside. Tool lengths from the tool setter at each M6; at each M6 the file has stopped the spindle (M5) and lifted the tool clear. After a controller reset, a stall or an E-stop: home ($H), then check G54 before Cycle Start: the edge finder on the LEFT end reads X {{process.sp02_x_set_mm:.3f}}; once the fence face is cut, the finder on it from the front reads Y -2.540; once the tops are faced, T1's tip on a .002 leaf on the fence top reads Z {{process.sp02_z_check_mm:.3f}}. Off by more than 0.025 mm: G10 L20 P1 that axis to the value given here. Before the fence face is cut: unclamp and run the first operation again."
-diagram = { file = "diagrams/top.svg", alt = "Plan of the plate in the vise: fence along the back edge at the fixed jaw, end stop at the left end, the plate top milled down round them; the fence notched at both ends, four clamp pockets with 4-40 holes along the front, the hub counterbore with its 1/4-20 hole; section showing the stacked parallels and the plate top above the jaws." }
+diagram = { file = "diagrams/top.svg", alt = "Plan of the plate in the vise: fence along the back edge at the fixed jaw, end stop at the left end, the plate top milled down round them; the fence notched at both ends, four clamp pockets with 4-40 holes along the front, the hub counterbore with its #10-32 hole; section showing the stacked parallels and the plate top above the jaws." }
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.width_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.bar_top_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_tip_below_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.width_mm}}", along_jaws_mm = "{{cad.length_mm}}", part_height_mm = "{{process.bar_top_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{process.plate_overhang_mm}}", "{{process.jaw_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.plate_top_height_mm}}" }, vise_left = "start" }
@@ -463,16 +466,16 @@ milling_cuts = [
 
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "drill-7"
+tool = "drill-21"
 drilling = "twist_drill"
-sizing = { kind = "tap_drill", tap = "tap-1-4-20" }
-instruction = "Same file, M6 T5 (#7 drill; set 2800): the hub hole through from the counterbore floor, in the 1/8 in end mill's spot, no peck. Cutting oil."
+sizing = { kind = "tap_drill", tap = "tap-10-32" }
+instruction = "Same file, M6 T5 (#21 drill; set 2800): the hub hole through from the counterbore floor, in the 1/8 in end mill's spot, no peck. Cutting oil."
 rpm = 2800
-feed = "{{process.drill_7_feed_per_min_mm:in.1f}} in/min"
+feed = "{{process.drill_21_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.hub_hole_depth_mm}}"
 peck = "none"
 milling_cuts = [
-  { name = "hub hole", kind = "drill", phase = "finish", cutter_dia_mm = 5.1054, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_7_feed_per_min_mm}}", stations_mm = "{{cad.hub_beam_x_mm}}" },
+  { name = "hub hole", kind = "drill", phase = "finish", cutter_dia_mm = 4.0386, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_21_feed_per_min_mm}}", stations_mm = "{{cad.hub_beam_x_mm}}" },
 ]
 
 # The holes are tapped in this clamping (their XY are the drills'), one file
@@ -484,7 +487,7 @@ tool = "tap-guide"
 drilling = "none"
 sizing = "other"
 instruction = "Stop check before SP03_tap_clamp_1: measure each tap in the T-handle wrench from its point to the wrench's centre hole (calipers or rule). Each must be at most {{process.tap_wrench_reach_max_mm:in.2f}} in. Over: stop; do not tap on this setup."
-instruction_detailed = "Stop check before SP03_tap_clamp_1: measure the 4-40 and the 1/4-20 tap, each in the T-handle wrench, from its point to the wrench's centre hole (calipers or rule). Each must be at most {{process.tap_wrench_reach_max_mm:in.2f}} in: the mill's 17 in opening less the vise, the parallels, the plate up to the pocket floors, the collet, the tap guide's 3 1/8 in, and 1 in to bring the point down onto the wrench. Over: stop; do not tap on this setup."
+instruction_detailed = "Stop check before SP03_tap_clamp_1: measure the 4-40 and the #10-32 tap, each in the T-handle wrench, from its point to the wrench's centre hole (calipers or rule). Each must be at most {{process.tap_wrench_reach_max_mm:in.2f}} in: the mill's 17 in opening less the vise, the parallels, the plate up to the pocket floors, the collet, the tap guide's 3 1/8 in, and 1 in to bring the point down onto the wrench. Over: stop; do not tap on this setup."
 feed = "hand"
 
 [[setups.operations]]
@@ -509,10 +512,10 @@ feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
-tool = "tap-1-4-20"
+tool = "tap-10-32"
 drilling = "none"
 sizing = "other"
-instruction = "Load and run SP03_tap_hub: the same, the 1/4-20 tap in the hub hole from the counterbore floor, under the tap guide, its point pushed fully home in the wrench. Jog Z up clear of the wrench at the end."
+instruction = "Load and run SP03_tap_hub: the same, the #10-32 tap in the hub hole from the counterbore floor, under the tap guide, its point pushed fully home in the wrench. Jog Z up clear of the wrench at the end."
 feed = "hand"
 
 [[setups.operations]]

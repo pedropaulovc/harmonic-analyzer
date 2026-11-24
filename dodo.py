@@ -93,6 +93,7 @@ from doit.tools import config_changed
 from doit.loader import generate_tasks
 from doit.task import Task, dict_to_task
 from filelock import FileLock, Timeout  # noqa: E402
+import yaml
 
 # Every build/verify/export task routes its subprocess through ``_run``, which
 # streams the child's stdout through this doit parent process -- and tees it to
@@ -3036,6 +3037,7 @@ _MACHINIST_REVIEW_MODULES = (
     "machinist_review_credentials.py",
     "machinist_review_sheets_mcp.py",
     "machinist_exceptions.py",
+    "machinist_necessity.py",
     "_paths.py",
 )
 
@@ -3141,6 +3143,7 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
         exceptions = (
             CONFIG_DIR / "assemblies" / f"{dashed.removesuffix('-assembly')}.yaml"
         )
+    necessity = CONFIG_DIR / "necessity" / f"{dashed}.yaml"
     # Selecting this kind's reviewer and severity contract also keys --kind
     # without hashing the registry. Judge instructions and schemas are shared.
     prompts = _machinist_review_prompts(spec.source_kind)
@@ -3161,6 +3164,9 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
             # The rubric is keyed by its major version, not its bytes.
             Path(_drawing_guidelines_version_dep()),
             *([exceptions] if exceptions.is_file() else []),
+            # The necessity register (rule 4) is read by the review alone;
+            # no SolidWorks leaf depends on it.
+            *([necessity] if necessity.is_file() else []),
             *([fitup] if fitup else []),
         )
     })
@@ -3498,19 +3504,72 @@ def _machinist_review_leaf(
     return key, aggregate
 
 
+_MACHINIST_REVIEW_DEMOTIONS = CONFIG_DIR / "machinist-review" / "demoted.yaml"
+
+
+def _demoted_reviews() -> frozenset[str]:
+    """Drawings declared ``ENFORCE`` that run at ``LEARN`` until a batch
+    converts their fits (``cad/config/machinist-review/demoted.yaml``, a
+    mapping of drawing stem to the batch that removes the line; owner ruling
+    2026-11-24: "Merge the policy now and demote the failing sheets to
+    warn-only ... restoring enforcement per batch").
+
+    Temporary (tracking issue #3511): an empty list fails the graph load, so
+    the batch that deletes the last line deletes the file.
+
+    The list lives here and not in the draw scripts because a draw script is
+    its drawing's recipe input: editing the declaration rebuilds the sheet in
+    SolidWorks. The mode feeds no review key and no recipe, so listing a
+    sheet rebuilds and re-reviews nothing, and deleting its line restores
+    enforcement the same way.
+    """
+    if not _MACHINIST_REVIEW_DEMOTIONS.is_file():
+        return frozenset()
+    doc = yaml.safe_load(_MACHINIST_REVIEW_DEMOTIONS.read_text(encoding="utf-8"))
+    demoted = doc.get("demoted") if isinstance(doc, dict) and set(doc) == {"demoted"} else None
+    if (
+        not isinstance(demoted, dict)
+        or not demoted
+        or not all(
+            isinstance(item, str) and item.strip()
+            for pair in demoted.items()
+            for item in pair
+        )
+    ):
+        raise ValueError(
+            f"{_MACHINIST_REVIEW_DEMOTIONS}: must hold one key 'demoted', a "
+            "non-empty mapping of drawing stem to the batch that removes it; "
+            "delete the file when no sheet is left"
+        )
+    return frozenset(demoted)
+
+
 @functools.cache
 def _reviewed_drawings() -> tuple[tuple[str, MachinistReviewMode], ...]:
     """Drawings opted in to machinist review, in build order.
 
     An undeclared (``OFF``) drawing gets no task: until its sheet stabilizes,
-    reviewing it would spend model tokens on findings nobody acts on.
+    reviewing it would spend model tokens on findings nobody acts on. A
+    drawing on the demotion list runs at ``LEARN``; a listed stem that does
+    not declare ``ENFORCE`` is a stale line and fails the graph load.
     """
-    modes = (
-        (stem, mode_for_drawing(DRAWINGS_BY_NAME[stem].script))
+    declared = {
+        stem: mode_for_drawing(DRAWINGS_BY_NAME[stem].script)
         for stem in _drawing_order()
+    }
+    demoted = _demoted_reviews()
+    stale = sorted(
+        stem for stem in demoted
+        if declared.get(stem) is not MachinistReviewMode.ENFORCE
     )
+    if stale:
+        raise ValueError(
+            f"{_MACHINIST_REVIEW_DEMOTIONS}: not a drawing declared ENFORCE: {stale}"
+        )
     return tuple(
-        (stem, mode) for stem, mode in modes if mode is not MachinistReviewMode.OFF
+        (stem, MachinistReviewMode.LEARN if stem in demoted else mode)
+        for stem, mode in declared.items()
+        if mode is not MachinistReviewMode.OFF
     )
 
 
@@ -3937,10 +3996,12 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             # Shop-equipment contracts read the tracked shop records at runtime.
             *(str(path.resolve()) for path in _process_plans.shop_files()),
             *(str(path.resolve()) for path in _shop_equipment.files()),
-            # test_measured_cuts reads the dechatter reports measured-cuts.toml names.
+            # test_measured_cuts reads the dechatter reports and results files
+            # measured-cuts.toml names.
             *(
                 str(path.resolve())
-                for path in sorted((_process_plans.PROCESS_ROOT / "dechatter").glob("*.html"))
+                for pattern in ("*.html", "*.json")
+                for path in sorted((_process_plans.PROCESS_ROOT / "dechatter").glob(pattern))
             ),
             # test_cam_nc loads each CAM recipe by path (importlib, outside
             # cad/scripts); process tests read every plan at runtime, and a
@@ -3974,6 +4035,12 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             ),
             str(
                 (REPO_ROOT / "cad" / "config" / "current-identity-map.json").resolve()
+            ),
+            # test_check_register reads every check and necessity register.
+            *(
+                str(path.resolve())
+                for family in ("checks", "necessity")
+                for path in sorted((REPO_ROOT / "cad" / "config" / family).glob("*.yaml"))
             ),
             *captured_fixtures,
         }

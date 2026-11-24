@@ -1,0 +1,41 @@
+# The cam turning fixture's guards (tolerance-policy.md, "Checks in spec
+# modules and tests"; cad/scripts/check_register.py). Fit batch DT,
+# 2026-11-24: entered because the fixture's necessity register
+# (cad/config/necessity/dt-cylinder-gear-tl-cam-fixture.yaml) cites them.
+checks:
+  - id: C-01
+    check: "STUB_PRESS_INTERFERENCE"
+    kind: joint
+    reason: "the stub dowel turns or slides in its hole"
+    source: "McMaster 97175A344 catalogue diameter band; the .3740 reamer's cut (_fit_ream_h7.REAM_H7)"
+    basis: worst_case
+  - id: C-02
+    check: "STUB_RETENTION_MARGIN"
+    kind: joint
+    reason: "the clamp screw pulls the stub out of the body"
+    source: "the module computes the press's hold against the 10-32 clamp preload; the 1.5 factor is the author's, no published source"
+    basis: worst_case
+  - id: C-03
+    check: "PIN_PRESS_INTERFERENCE"
+    kind: joint
+    reason: "the clock pin turns or falls out of its hole"
+    source: "McMaster 23065A503 class Z minus pin band; KBC 5-018-0365 reamer band (tools.reamer-0365)"
+    basis: worst_case
+  - id: C-04
+    check: "THROW_ERROR_MAX_MM"
+    kind: trace
+    reason: "a gear's throw leaves its printed band; channel gain errs"
+    source: "MHA-DT-12 throw .3402 ±.0020, owner ruling 2026-11-08, #2144 item 8.2"
+    basis: after_setting
+  - id: C-05
+    check: "PHASE_TOTAL_WORST_DEG"
+    kind: trace
+    reason: "a gear's cam phase leaves its printed ±.7°"
+    source: "dt_cylinder_gear_phase_band.NOTCH_PHASE_TOLERANCE_DEG, delegated ruling 2026-11-17, #2361"
+    basis: worst_case
+  - id: C-06
+    check: "PHASE_PER_PART_WORST_DEG"
+    kind: trace
+    reason: "gear-to-gear phase scatter exceeds the channel phase budget"
+    source: "config/error_budget.yaml cam_phase (dt_cylinder_gear_spec.CAM_PHASE_TOLERANCE_DEG)"
+    basis: worst_case

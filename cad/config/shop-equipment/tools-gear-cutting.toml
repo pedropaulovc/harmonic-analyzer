@@ -98,9 +98,12 @@ status = "to_order"
 note = "Not owned: to buy (route A, owner ruling 2026-11-14, #2356). The eight 48DP cutters."
 bore_in = 0.875
 
-# The archived inventory's R8 one-inch-pilot saw arbor was a #1413 trial
-# placeholder, not a shop fact (tools.cylinder-notch-saw above); if one is on
-# the shelf and takes a cutter this thick, this arbor is not bought.
+# Held with the gear routes. The slitting saws go on the owned stepped saw
+# arbors (tools.saw-arbor-r8-stepped, owner 2026-11-24), so the saw plans
+# (MHA-CH-01, MHA-CH-03, MHA-DT-21) no longer need this one; the four gear
+# plans still name it (24DP/32DP cutters). Whether the owned R8 stepped arbor
+# (not keyed, friction drive by a 1.25 in cap) can carry those cutters is
+# the gear route's call; until then this arbor is bought only with them.
 [tools.gear-cutter-arbor-1]
 name = "TTC 67-600-016 R8 stub milling arbor, 1 in, spacer type, 2 in shoulder to nut"
 kind = "cutter_arbor"
@@ -109,7 +112,7 @@ sku = "67-600-016"
 source = "https://www.travers.com/product/ttc-67-600-016-spacer-type-milling-machine-arbor-67-600-016"
 purchase = "Travers 67-600-016, $76.05, 18 in stock (listing read live 2026-11-12)"
 status = "to_order"
-note = "Not owned: to buy (route A, owner ruling 2026-11-14, #2356). The 24DP and 32DP cutters."
+note = "Not owned: held with the gear routes (route A, owner ruling 2026-11-14, #2356): the 24DP and 32DP cutters. Not needed for the slitting saws (owned stepped arbors, 2026-11-24); buy only with the gear cutters."
 bore_in = 1.0
 
 # Hub keyways of the 16 keyed cone gears T030-T120 and the 64T (#2465;

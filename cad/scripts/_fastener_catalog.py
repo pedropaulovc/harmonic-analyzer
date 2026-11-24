@@ -425,13 +425,24 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         material="Alloy Steel",
         supplier="Mitee-Bite Products",
     ),
-    # MHA-CH-13-TL-VN-51 (owner ruling 2026-11-17): the 1/4-20 x 5/8 button
-    # head that snugs the strap blank's hub on MHA-CH-13-TL-01.
+    # MHA-CH-13-TL-VN-51 (owner ruling 2026-11-23, reversing 2026-11-17's
+    # 1/4-20): the #10-32 x 5/8 button head that snugs the strap blank's hub
+    # on MHA-CH-13-TL-01.
     "ch-rocker-strap-tl-vn-hub-screw": _stock(
         "ch-rocker-strap-tl-vn-hub-screw",
         "Black-Oxide Button Head Hex-Drive Screw",
-        "91255A539",
+        "91255A267",
         material="Alloy Steel",
+    ),
+    # MHA-CH-13-TL-VN-52 (owner ruling 2026-11-23): the #10 SAE washer under
+    # that screw's head, one picked from the pack the machine's MHA-SM-VN-54
+    # washers came in; the fixture's own identity (a kit holds only fixture
+    # parts), sharing that SKU's recipe.
+    "ch-rocker-strap-tl-vn-hub-washer": _stock(
+        "ch-rocker-strap-tl-vn-hub-washer",
+        "18-8 Stainless Steel SAE No. 10 Flat Washer",
+        "96659A104",
+        material="AISI 304",
     ),
     # MHA-DT-12-TL-VN-50, -52, -53: the cylinder gears' cam turning fixture
     # kit's bought hardware (MHA-DT-12-TL-00, #2361). Its clock pin (-VN-51)

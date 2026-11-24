@@ -373,7 +373,7 @@ note = "MHA-CH-06-TL-21 carrier and TL-20 base bar table setups"
 # the PM vise, the blank against its fence under four low-profile edge clamps.
 # The fixture is drawn as MHA-CH-13-TL-00 (drawing
 # ch_rocker_strap_tl_fixture_assembly; parts TL-01 sub-plate, TL-02 hub plug,
-# TL-03 hub washer, TL-VN-50 edge clamp, TL-VN-51 hub screw). The plan's
+# TL-VN-52 hub washer, TL-VN-50 edge clamp, TL-VN-51 hub screw). The plan's
 # [parameters] carry the sizes prechips reads (plate_*, fence_*,
 # clamp_height_mm, hub_relief_dia_mm, bushing_*); they are not repeated here.
 [fixtures.strap-sub-plate]
@@ -381,7 +381,7 @@ name = "MHA-CH-13-TL-01 rocker-strap sub-plate, 6061, 13 x 3 x .49 in, integral 
 kind = "fixture_plate"
 status = "to_make"
 supply = "shop_made"
-purchase = "Make to drawing MHA-CH-13-TL-01 (ch_rocker_strap_tl_sub_plate) from the owned 1/2 x 6 in 6061-T6511 flat (OnlineMetals 1173, bought for the oblique trammel jig and freed, owner 2026-11-17): saw one 13 in length and mill a 3.00 in wide strip off it (the rest, about 2.8 x 13 in, stays as fixture stock). The drawing holds the interfaces the strap's setups use: .490 overall; the top (the plan's Z0) with the fence along the back edge and the end stop at the blank's left end standing .074 +/-.005 above it, so .416 of plate under Z0; under the hub hole, at X 6.000 from the stop face and Y 1.000 in front of the fence face, a counterbore .500 dia x .185 deep with a 1/4-20 tapped hole through its floor, .231 of thread (owner ruling 2026-11-17: \"Use a 1/4-20 hub screw. The .23 in of thread in the 6061 plate is accepted: the screw only snugs the strap during the outline.\"); the fence notched .17 deep at both ends (X 0-.92 and 11.08 on), where the outline cutter mills away the strip of blank under the strap's tips; four Pitbull clamp pockets with 4-40 holes along the front at the plan's clamp stations (fixtures.edge-clamps-low-profile)."
+purchase = "Make to drawing MHA-CH-13-TL-01 (ch_rocker_strap_tl_sub_plate) from the owned 1/2 x 6 in 6061-T6511 flat (OnlineMetals 1173, bought for the oblique trammel jig and freed, owner 2026-11-17): saw one 13 in length and mill a 3.00 in wide strip off it (the rest, about 2.8 x 13 in, stays as fixture stock). The drawing holds the interfaces the strap's setups use: .490 overall; the top (the plan's Z0) with the fence along the back edge and the end stop at the blank's left end standing .074 +/-.005 above it, so .416 of plate under Z0; under the hub hole, at X 6.000 from the stop face and Y 1.000 in front of the fence face, a counterbore .500 dia x .185 deep with a #10-32 tapped hole through its floor, .231 of thread (owner ruling 2026-11-23: \"change the screw to #10-32. The sub-plate's tapped hole becomes #10-32 and the plug's bore .201 (#7 drill).\", reversing 2026-11-17's \"Use a 1/4-20 hub screw. The .23 in of thread in the 6061 plate is accepted: the screw only snugs the strap during the outline.\", whose thread acceptance stands); the fence notched .17 deep at both ends (X 0-.92 and 11.08 on), where the outline cutter mills away the strip of blank under the strap's tips; four Pitbull clamp pockets with 4-40 holes along the front at the plan's clamp stations (fixtures.edge-clamps-low-profile)."
 note = "Not made: shop-made from owned stock. MHA-CH-13 Setups 2-5: seats the 1/8 x 1-1/2 in blank for facing and the hub hole (edge clamps), and for the outline (bonded with consumables.hold-painters-tape-ca, screwed down at the hub)."
 
 # Model picked from Mitee-Bite's Pitbull table (read 2026-11-17): the 4-40 size
@@ -415,24 +415,39 @@ name = "MHA-CH-13-TL-02 rocker-strap hub plug, shop-made"
 kind = "locating_plug"
 status = "to_make"
 supply = "shop_made"
-purchase = "Turn to drawing MHA-CH-13-TL-02 (ch_rocker_strap_tl_hub_plug) from 6061 aluminium round bar on hand, 9/16 in or over (no stock is allocated here). Body .499 REF dia x .170 long, a .0005-.0015 diametral slip fit in the sub-plate's .500 counterbore; pilot .3985-.3995 dia x .102 (.0005-.0020 clearance in the strap's .4000-.4005 hub hole), standing .087 above the plate top when seated, under the strap's .098 plus tape; .272 overall; bore .266 through for the screw."
+purchase = "Turn to drawing MHA-CH-13-TL-02 (ch_rocker_strap_tl_hub_plug) from 6061 aluminium round bar on hand, 9/16 in or over (no stock is allocated here). Body .499 REF dia x .170 long, a .0005-.0015 diametral slip fit in the sub-plate's .500 counterbore; pilot .3985-.3995 dia x .102 (.0005-.0020 clearance in the strap's .4000-.4005 hub hole), standing .087 above the plate top when seated, under the strap's .098 plus tape; .272 overall; bore .201 (#7 drill) through for the #10-32 screw (owner ruling 2026-11-23: \"the plug's bore .201 (#7 drill)\"; was .266, the H drill, for 2026-11-17's \"Use a 1/4-20 hub screw\")."
 note = "Not made: shop-made on the lathe. MHA-CH-13 Setup 5: the pilot locates the reamed hub hole over the counterbore. Out of the plate for Setup 4, where the drill and reamer run into the counterbore."
 
+# Owner ruling 2026-11-23: "The washer is then a #10 SAE washer you already
+# own (McMaster 96659A104, .219 x .500, pack of 100 from PO 1103PCAMPOS),
+# used as supplied. The made washer, its drawing and its lathe traveler are
+# deleted." (MHA-CH-13-TL-03, retired.) Owner ruling 2026-11-23, its reach:
+# "Pick one washer from the pack of 100 by measurement and keep it with the
+# fixture: OD .505 or under and bore .220 or under (limits to be confirmed by
+# the agent so the 0.5 mm clearance holds even pushed to one side). The
+# traveler says to mike it once and centre it by eye. Nothing to buy but the
+# #10-32 screw." Worked in cad/scripts/ch_rocker_strap_tl_vn_hub_washer_spec.py:
+# 0.5 mm from the cutter centred, 0.22 mm pushed fully aside. Owner ruling
+# 2026-11-24 on that: "Accept as is: centre the washer by eye, 0.5 mm
+# centred, 0.22 mm worst case; the traveler says to centre it and to watch
+# the first level."
 [fixtures.strap-hub-washer]
-name = "MHA-CH-13-TL-03 rocker-strap hub washer, shop-made"
+name = "MHA-CH-13-TL-VN-52 rocker-strap hub washer: one #10 SAE flat washer, 18-8, selected by measurement"
 kind = "washer"
-status = "to_make"
-supply = "shop_made"
-purchase = "Make to drawing MHA-CH-13-TL-03 (ch_rocker_strap_tl_hub_washer) from low-carbon steel: .53 dia x .06 thick, bore .266 (H drill). At its largest (.54 dia, title-block .XX band) the outline cutter passes .025 in from it."
-note = "Not made: shop-made. MHA-CH-13 Setup 5: under the hub screw's head, on the strap round the hub hole."
+status = "on_hand"
+sku = "McMaster 96659A104"
+select_od_max_mm = 12.827
+select_bore_max_mm = 5.588
+purchase = "Nothing to buy: one washer from the owned pack of 100 (PO 1103PCAMPOS). Pick it by measurement: outside diameter .505 or under (micrometer) and bore .220 or under (the .220 pin gauge does not enter). Mark it; it stays with the fixture. The catalogue's .219 x .500 x .036-.065 is ASME B18.21.1 Table 11 No. 10: bore .214-.227, outside diameter .495-.515, the bore up to .013 off the rim's centre. On the smallest class 3A #10-32 screw (major .1840) the selected washer pushed fully to one side reaches 7.27 mm from the hub centre: inside the 7.358 mm the outline program keeps its cutter out of, 0.22 mm short of the cutter's nearest edge (7.49 mm). Centred it reaches 6.82 mm, the plan's full 0.5 mm from the keep-out. Pushed fully aside it still bears on .011 of steel round the .4005 hub hole (.047 centred)."
+note = "Owned (PO 1103PCAMPOS). MHA-CH-13 Setup 2 picks and marks it once; Setup 5: under the hub screw's head, on the strap round the hub hole, centred by eye at each load."
 
 [fixtures.strap-hub-screw]
-name = "MHA-CH-13-TL-VN-51 1/4-20 x 5/8 in alloy steel button-head socket cap screw"
+name = "MHA-CH-13-TL-VN-51 #10-32 x 5/8 in alloy steel button-head socket cap screw"
 kind = "fastener"
 status = "to_order"
-sku = "McMaster 91255A539"
-purchase = "One (a box is the usual pack). Button head .437 in dia x .132 in high. 5/8 long: through the .06 washer, the strap and tape and the .185 counterbore it engages the sub-plate's whole .231 of 1/4-20 thread and stands about .045 out under the plate, between the parallels. Owner ruling 2026-11-17: \"Use a 1/4-20 hub screw. The .23 in of thread in the 6061 plate is accepted: the screw only snugs the strap during the outline.\""
-note = "Not owned: to buy. MHA-CH-13 Setup 5: hub hold-down through fixtures.strap-hub-washer and fixtures.strap-hub-plug."
+sku = "McMaster 91255A267"
+purchase = "One (pack of 50, $13.21, read live 2026-11-23). Black-oxide alloy steel, #10-32 UNF class 3A, button head .361 in dia x .101 in high (ASME B18.3), 1/8 hex. 5/8 long: through the washer (.036-.065), the strap and tape and the .185 counterbore it engages the sub-plate's whole .231 of #10-32 thread (1.01 diameters at the .19 minimum) and stands about .025-.051 out under the plate, between the parallels. Owner ruling 2026-11-23: \"change the screw to #10-32. The sub-plate's tapped hole becomes #10-32 and the plug's bore .201 (#7 drill).\" It reverses 2026-11-17's \"Use a 1/4-20 hub screw. The .23 in of thread in the 6061 plate is accepted: the screw only snugs the strap during the outline.\" (McMaster 91255A539, head .437 x .132); the thread acceptance stands."
+note = "Not owned: to buy (the only purchase the #10-32 hub clamp needs). MHA-CH-13 Setup 5: hub hold-down through fixtures.strap-hub-washer and fixtures.strap-hub-plug."
 
 [fixtures.dt-cone-gear-cutting-arbor]
 kind = "fixture"
@@ -449,10 +464,12 @@ note = "Not made: shop-made. Owner ruling 2026-11-20 (#2356, Option 2): T024 (MH
 [fixtures.dt-cone-gear-round-arbor-nut]
 name = "#8-32 UNC zinc-plated steel hex machine screw nut (round cutting arbor kit)"
 kind = "fastener"
-status = "to_order"
+status = "on_hand"
+pieces = 1
 sku = "McMaster 90480A009"
-purchase = "One (a pack is the usual unit). 11/32 across flats, 1/8 thick (ASME B18.6.3). Owner ruling 2026-11-20 (#2356, Option 2): \"purchased #8-32 nut under the root\"."
-note = "Not owned: to buy. Clamps TL-08 and T024 on the round arbor MHA-DT-03-TL-07 (fixtures.dt-cone-gear-round-arbor); no stem or Number (bought fixture hardware outside a kit assembly)."
+purchase = "Owned: one pack on McMaster-Carr PO 1103PCAMPOS, line 57, bought as MHA-PN-VN-54 pn-vn-pen-hanger-nut (hardware.pn-vn-pen-hanger-nut); the arbor takes one nut from that pack. 11/32 across flats, 1/8 thick (ASME B18.6.3). Owner ruling 2026-11-20 (#2356, Option 2): \"purchased #8-32 nut under the root\"."
+note = "Clamps TL-08 and T024 on the round arbor MHA-DT-03-TL-07 (fixtures.dt-cone-gear-round-arbor); no stem or Number (bought fixture hardware outside a kit assembly)."
+cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), line 57: \"Zinc-Plated Low-Strength Steel Hex Nuts, 8-32 Thread Size, ...\" (description cut short here), 1 pack shipped; Your Part Number MHA-PN-VN-54 pn-vn-pen-hanger-nut", "Owner (Pedro) 2026-11-23: \"add 1103PCAMPOS to inventory as all on hand\""]
 
 [fixtures.dt-cone-gear-index-plate]
 kind = "fixture"
@@ -492,7 +509,12 @@ note = "Not made: shop-made from the clip's own strip in the clip's traveler (ca
 
 # MHA-DT-20 cone swing platform (cad/process/dt_cone_swing_platform), Setup
 # 4: the blank screwed to the 1/2 in spoil plate while its outline is cut.
-# To buy: not owned, no vendor or SKU asserted.
+# Owner ruling 2026-11-24 (form), fixture screws: "Yes." to the proposal that
+# owned screws stand in where they serve and the three missing singles are
+# bought at a hardware store, not as McMaster packs. For this fixture: the
+# owned 1/4-20 x 7/8 socket head screws (hardware 91251A541, PO 1103PCAMPOS
+# line 4) serve the 3/4 pair with 1/8 in of washers under each head; the
+# #4-40 x 1/2 and the #10-24 x 1/2 are two of the three singles to buy.
 [fixtures.dt-platform-hold-down-screws]
 name = "Alloy steel socket head cap screws: two 1/4-20 x 3/4, one #4-40 x 1/2, one #10-24 x 1/2"
 kind = "fastener"
@@ -531,6 +553,10 @@ supply = "shop_made"
 purchase = "Make from the 1 in 1018 CF bar on hand (stock.1018-round-1), 4.75 in long: turn 2.00 in of one end to Ø.750 for the AXA No. 4 heavy-duty boring holder (tools.qctp-axa-lms-2280), face both ends square, and drill 3/8 from the shank's end 1.90 deep (the pinion seat's clearance). On the mill: drill #21 and tap 10-32 radially into the Ø1.0 head 1.25 in from its front face, .50 deep. Its .4385 bore is not made here: the dt_crankshaft traveler bores it in place on the lathe, the jig in the No. 4 holder on the tool post, each cutter in the 3-jaw and the carriage feeding the jig (centre drill, 27/64 drill, the .4385 reamer 2.95 deep into the 3/8 hole), so the bore lies on the spindle axis and along the carriage travel by construction. The holder stays on the tool post until the crankshaft's holes are done."
 note = "Workholding for the MHA-DT-11 drive-pin holes (dt_crankshaft plan). The crankshaft goes in far end first: its two Ø.4375 journals (.4367-.4375) and the Ø.375 inboard neck in the .4385 bore (owner ruling 2026-11-23, tool audit Q11), the Ø.3125 pinion seat in the 3/8 hole; a 10-32 set screw on a brass pad bears down on the Ø.41 relief and seats both journals on the bore's bottom; a 1/8 in spacer between the spigot's rear face and the jig face while clamping, then withdrawn, leaves the gap the #54 knockouts break into."
 
+# Owner ruling 2026-11-24 (form), fixture screws: "Yes." The owned #4-40 x 5/8
+# stainless fillister slotted screw (hardware 91794A112, PO 1103PCAMPOS line
+# 23) stands in for the #4-40 x 5/8 socket head; the #10-32 x 5/8 is the third
+# single bought at a hardware store. No McMaster pack is bought.
 [fixtures.pd-arm-sub-plate-screws]
 name = "Socket head cap screws, #10-32 x 5/8 and #4-40 x 5/8, alloy steel black oxide, one each"
 kind = "fixture"

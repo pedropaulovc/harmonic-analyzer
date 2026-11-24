@@ -1,7 +1,7 @@
 """Offline part, recipe and schedule contracts for ch-rocker-strap-tl-vn-hub-screw.
 
-MHA-CH-13-TL-VN-51 is tier-1 hardware (owner ruling 2026-11-17: 1/4-20 x 5/8
-button head, McMaster 91255A539): a HARDWARE.md row, never a drawing. These
+MHA-CH-13-TL-VN-51 is tier-1 hardware (owner ruling 2026-11-23: #10-32 x 5/8
+button head, McMaster 91255A267): a HARDWARE.md row, never a drawing. These
 checks pin the part the fixture assembly builds.
 """
 
@@ -16,13 +16,13 @@ from pathlib import Path
 import pytest
 
 import _config
-import _mcmaster_91255a539 as screw
+import _mcmaster_91255a267 as screw
 import build_ch_rocker_strap_tl_vn_hub_screw as part
 import hardware_schedule
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _test_stock_recipes import discovered_recipes
-from diagnostics import diag_build_91255A539 as recipe
+from diagnostics import diag_build_91255A267 as recipe
 
 STEM = "ch-rocker-strap-tl-vn-hub-screw"
 NUMBER = "MHA-CH-13-TL-VN-51"
@@ -36,19 +36,19 @@ def test_catalogue_row_is_the_registered_mcmaster_part() -> None:
     row = _config.parts(STEM)
     stock = FASTENERS[STEM]
     assert part.SPEC is stock
-    assert stock.skus == tuple(row["supplier_skus"]) == (screw.SKU,) == ("91255A539",)
+    assert stock.skus == tuple(row["supplier_skus"]) == (screw.SKU,) == ("91255A267",)
     assert stock.supplier == row["supplier"] == "McMaster-Carr"
     assert stock.stock_name == row["stock_name"] == STOCK_NAME
     assert stock.material == row["material"] == part.MATERIAL == "Alloy Steel"
     assert row["finish"] == "black oxide"
     assert "ASME B18.3" in row["material_specification"]
-    assert "1/4-20" in row["material_specification"]
+    assert "10-32" in row["material_specification"]
     assert row["number"] == NUMBER
     assert row["process"] == "purchased"
     assert int(row["quantity"]) == 1
     metadata = discovered_recipes()[screw.SKU]
     assert metadata.module == recipe.__name__
-    assert getattr(recipe, metadata.callable_name) is recipe.build_91255A539
+    assert getattr(recipe, metadata.callable_name) is recipe.build_91255A267
     assert metadata.threaded is False
     for other, entry in FASTENERS.items():
         if other != STEM:
@@ -56,16 +56,21 @@ def test_catalogue_row_is_the_registered_mcmaster_part() -> None:
 
 
 def test_provider_carries_the_live_catalogue_facts() -> None:
-    """McMaster 91255A539 product page, read live 2026-11-17."""
-    assert screw.THREAD == "1/4-20"
-    assert screw.HEAD_DIA == pytest.approx(0.437 * IN)
-    assert screw.HEAD_HEIGHT == pytest.approx(0.132 * IN)
+    """McMaster 91255A267 product page, read live 2026-11-23; the head's
+    sizes are ASME B18.3's maxima for a No. 10 button head, the major's
+    minimum ASME B1.1's for class 3A."""
+    assert screw.THREAD == "#10-32"
+    assert screw.HEAD_DIA == pytest.approx(0.361 * IN)
+    assert screw.HEAD_DIA_MIN == pytest.approx(0.347 * IN)
+    assert screw.HEAD_HEIGHT == pytest.approx(0.101 * IN)
     assert screw.LENGTH == pytest.approx(0.625 * IN)
-    assert screw.MAJOR_DIA == pytest.approx(0.250 * IN)
-    assert screw.SOCKET_AF == pytest.approx(5.0 / 32.0 * IN)
-    # The vendor model's dome: its top flat (FreeCAD: r 2.7781 at the hex's
-    # flat) follows from the sphere and the catalogue head height.
-    assert screw.TOP_FLAT_R == pytest.approx(2.7781, abs=1e-3)
+    assert screw.MAJOR_DIA == pytest.approx(0.190 * IN)
+    assert screw.MAJOR_DIA_MIN == pytest.approx(0.184 * IN)
+    assert screw.SOCKET_AF == pytest.approx(1.0 / 8.0 * IN)
+    # The vendor model's dome: its top flat (FreeCAD: the sphere R 5.26903
+    # cut at the head height, r 2.2225) follows from the sphere and the
+    # catalogue head height.
+    assert screw.TOP_FLAT_R == pytest.approx(2.2225, abs=1e-3)
     # The model omits the thread, so it may only exceed the vendor solid.
     assert 0.0 < screw.screw_volume() - screw.STEP_VOLUME < 0.2 * screw.STEP_VOLUME
 
@@ -73,7 +78,7 @@ def test_provider_carries_the_live_catalogue_facts() -> None:
 def test_tier_one_schedule_row_and_no_sheet() -> None:
     row = hardware_schedule.SCHEDULE[STEM]
     assert row["standard"] == "ASME B18.3"
-    assert row["designation"].startswith("1/4-20 UNC-3A x 5/8")
+    assert row["designation"].startswith("#10-32 UNF-3A x 5/8")
     assert hardware_schedule.envelope_mm(row["envelope"]["head Ø"]) == pytest.approx(
         screw.HEAD_DIA
     )
@@ -88,10 +93,11 @@ def test_tier_one_schedule_row_and_no_sheet() -> None:
 
 def test_screw_head_fits_the_plans_hold_down_stack() -> None:
     """cad/process/ch_rocker_strap/plan.toml's hold-down stack keep-out
-    covers this head, .437 dia, .132 high over the washer's .06 +.01. The
-    plan's exact quote of this stack is the strap traveler's PR's change."""
+    covers this head, .361 dia, .101 high over the washer's .065 maximum."""
     parameters = tomllib.loads(PLAN.read_text(encoding="utf-8"))["parameters"]
-    assert 0.07 * IN + screw.HEAD_HEIGHT <= parameters["bushing_stack_height_mm"] + 1e-9
+    assert (
+        0.065 * IN + screw.HEAD_HEIGHT <= parameters["bushing_stack_height_mm"] + 1e-9
+    )
     assert screw.HEAD_DIA < parameters["bushing_flange_dia_mm"]
 
 
@@ -153,7 +159,7 @@ def _record(monkeypatch) -> list[tuple]:
         "offset_plane",
         lambda _a, name, y: adapter.events.append(("plane", (name, y))),
     )
-    recipe.build_91255A539(adapter)
+    recipe.build_91255A267(adapter)
     return adapter.events
 
 
@@ -197,7 +203,7 @@ def test_stock_build_turns_the_recipe_axis_onto_part_z(monkeypatch) -> None:
     part.build(None)
     (component,) = seen["components"]
     assert component.sku == screw.SKU
-    assert component.author is recipe.build_91255A539
+    assert component.author is recipe.build_91255A267
     assert component.transform.rotation_radians == pytest.approx(
         (math.pi / 2.0, 0.0, 0.0)
     )
@@ -214,7 +220,7 @@ def test_no_vendor_model_is_tracked() -> None:
 
 @pytest.mark.parametrize(
     "module",
-    ["diagnostics/diag_build_91255A539.py", "build_ch_rocker_strap_tl_vn_hub_screw.py"],
+    ["diagnostics/diag_build_91255A267.py", "build_ch_rocker_strap_tl_vn_hub_screw.py"],
 )
 def test_every_direct_adapter_call_exists_and_binds(module: str) -> None:
     from test_pd_transgear_adapter_contract import (

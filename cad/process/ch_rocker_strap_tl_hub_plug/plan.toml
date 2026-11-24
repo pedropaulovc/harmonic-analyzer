@@ -6,7 +6,9 @@
 # Setup 1, the bar pilot end out: measure the MHA-CH-13-TL-01 counterbore
 # (the body is turned to it), face the end (Z0), turn the body to the
 # measured counterbore less its clearance back past the parting line, turn
-# the pilot to the shoulder, chamfer the pilot end, spot, drill H through,
+# the pilot to the shoulder, chamfer the pilot end, spot, drill #7 through
+# (owner ruling 2026-11-23: "the plug's bore .201 (#7 drill)", for the #10-32
+# hub screw; it reverses 2026-11-17's "Use a 1/4-20 hub screw" and its H drill),
 # part off .02 long. Setup 2, the plug turned round on its pilot over a shim
 # wrap, the shoulder seated on the jaw fronts: face the body end to length
 # with the shoulder in its band. Bench: deburr and check.
@@ -69,9 +71,9 @@ name = "No. 3 centre drill"
 ref = "centre-drills-carbide-60"
 
 [[tools]]
-id = "drill-h"
-name = "H drill"
-ref = "drill-h"
+id = "drill-7"
+name = "#7 drill"
+ref = "jig-drill-7"
 
 [[tools]]
 id = "cutoff"
@@ -90,13 +92,13 @@ ref = "jig-files"
 
 [[setups]]
 machine_kind = "lathe"
-title = "Bar, pilot end out: turn the body and pilot, drill H, part off long"
+title = "Bar, pilot end out: turn the body and pilot, drill #7, part off long"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.4dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
 datum = "Z0 (carriage DRO) the bar end, faced in this setup: the pilot end. The body end is faced in Setup 2."
-diagram = { file = "diagrams/bar.svg", alt = "The 9/16 in bar in the 3-jaw, pilot end out: the end faced, the body and pilot turned, the pilot end chamfered, drilled H through, the plug parted off .02 long." }
+diagram = { file = "diagrams/bar.svg", alt = "The 9/16 in bar in the 3-jaw, pilot end out: the end faced, the body and pilot turned, the pilot end chamfered, drilled #7 through, the plug parted off .02 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
 
@@ -196,18 +198,18 @@ speed_kind = "spindle"
 tool = "centre"
 drilling = "none"
 sizing = "other"
-instruction = "Spot the centre from the tailstock, about Ø.20 across the countersink: under the H drill, so the drill removes it."
+instruction = "Spot the centre from the tailstock, about Ø.15 across the countersink: under the #7 drill, so the drill removes it."
 settings = "lathe-centre-6061"
 cut_diameter_mm = 2.778
 
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "drill-h"
+tool = "drill-7"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Feed the H drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{cad.run_in:.2dot}}, in one steady feed with cutting oil: the drill's full diameter then runs through the plug and past the parting line."
-settings = "lathe-drill-h-6061"
+instruction = "Feed the #7 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{cad.run_in:.2dot}}, in one steady feed with cutting oil: the drill's full diameter then runs through the plug and past the parting line."
+settings = "lathe-drill-7-6061"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 hole_depth_mm = "{{cad.run_mm}}"
 peck = "none"
@@ -229,7 +231,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the pilot over one wrap of printer paper trimmed .08 wide, so it stays below the jaw fronts; the shoulder seated on the jaw fronts; the body end {{cad.step_stickout_datum_mm:in.2dot}} in out."
-datum = "Z0 (carriage DRO) the body end once faced. Before facing, check the shoulder sits on all three jaw fronts with no gap (reseat if light shows); then touch the AR on a jaw front and set Z-{{cad.shoulder_in:.3dot}} there, and face the body end to Z0."
+datum = "Z0 (carriage DRO) the body end once faced. Before facing, check the shoulder sits on all three jaw fronts with no gap (reseat if light shows); then, spindle stopped, bring the AR's tip up to a jaw front until it just touches (rock the chuck by hand: the tip drags) and set Z-{{cad.shoulder_in:.3dot}} there; back off, start the spindle and face the body end to Z0."
 diagram = { file = "diagrams/regrip.svg", alt = "The plug turned round, its pilot in the jaws over a paper wrap with the shoulder on the jaw fronts: the body end faced to length." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.step_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.step_stickout_datum_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
@@ -251,7 +253,7 @@ title = "Bench: deburr and check"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished plug: the body to the measured counterbore, the pilot, the shoulder and the H hole through." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished plug: the body to the measured counterbore, the pilot, the shoulder and the #7 hole through." }
 vise_hold = "other"
 beam = "other"
 

@@ -3,7 +3,7 @@
 # 1/8 x 1-1/2 in 1018 CF flat (OnlineMetals 4807), 20 off; a shop-made 6061
 # sub-plate gripped in the PM vise carries a fixed fence (Y0), an end stop (X0)
 # and four Mitee-Bite Pitbull 26000 edge clamps (to buy). The sub-plate, hub
-# plug, washer, clamps and hub screw are the fixture MHA-CH-13-TL-00, made
+# plug, bought washer, clamps and hub screw are the fixture MHA-CH-13-TL-00, made
 # beforehand to its drawings (cad/config/shop-equipment/
 # fixtures.strap-*); this traveler cuts only the strap. Per the part
 # registry's process text (cad/config/parts/ch-rocker-strap.yaml): rough both
@@ -66,11 +66,14 @@ face_finish_stock_mm = 0.127
 face_rough_doc_mm = 0.2413
 face_finish_doc_mm = 0.127
 # Face stepover of the 1/2 in end mill, the measured face setting
-# (settings.em-half-carbide-1018-v5-face, dechatter v5, 2026-11-22: stable to
-# 3.4 mm wide at up to 1.27 mm deep; cad/config/shop-equipment/
-# measured-cuts.toml): twelve passes over the 1-1/2 in width plus the
-# recipe's overhang, a width cam.py posts exactly (26 % of the cutter).
-face_stepover_mm = 3.302
+# (settings.em-half-carbide-1018-3439-face, dechatter session of 2026-11-23,
+# #3439: stable to 6.4 mm wide at up to 1.27 mm deep, 2420-2490 rpm in the
+# cut; cad/config/shop-equipment/measured-cuts.toml): seven passes over the
+# 1-1/2 in width plus the recipe's overhang, a width cam.py posts exactly
+# (44 % of the cutter; six passes would need 6.43 mm, over the limit). Every
+# measured pass was conventional and the faces zigzag (owner ruling
+# 2026-11-16, kept 2026-11-22), so every other pass climbs, not measured.
+face_stepover_mm = 5.588
 # The strap in the blank, setup frame: X from the end stop, Y from the fence
 # into the blank (machine −Y), top arc toward the fence, bottom arc toward
 # the front edge. The hub is centred along the blank and 1.000 in from the
@@ -112,7 +115,7 @@ fence_height_mm = 2.0066
 end_stop_height_mm = 2.0066
 clamp_height_mm = 1.905
 # Under the hub the plate has a Ø1/2 in counterbore .185 in deep with a
-# 1/4-20 tapped hole through its floor. In RS03 it is the relief the drill
+# #10-32 tapped hole through its floor. In RS03 it is the relief the drill
 # and reamer run into: their tips stop relief_floor_clearance_mm above its
 # floor (25/64 drill: 118° point 2.98 mm long, so its full diameter is 1.0 mm
 # through the strap; the reamer's lead likewise). In RS04 the hub plug sits in
@@ -127,17 +130,38 @@ drill_tip_z_mm = -4.0
 ream_tip_z_mm = -4.0
 # Outline hold-down (fixture assembly MHA-CH-13-TL-00): the hub plug TL-02 in
 # the counterbore, its pilot slipping into the reamed hub hole, the washer
-# TL-03 over the hole and the 1/4-20 × 5/8 button-head screw TL-VN-51
-# (McMaster 91255A539) through both into the plate (owner ruling 2026-11-17:
-# "Use a 1/4-20 hub screw. The .23 in of thread in the 6061 plate is
-# accepted: the screw only snugs the strap during the outline.").
-# bushing_flange_dia_mm is the largest diameter above the strap, the washer's
-# .53 at its .XX maximum, .54 (the head is .437); the outline cutter's edge
-# must pass bushing_clearance_mm from it (prechips refuses otherwise: the
-# strap's bottom edge is at least 7.49 mm from the hub centre, so 0.63 mm).
-# bushing_stack_height_mm is the washer's .06 at its .XX maximum, .07, plus
-# the head's .132 above the strap's top; cam.py keeps the holder and every
-# link move clear of it.
+# TL-VN-52 over the hole and the #10-32 × 5/8 button-head screw TL-VN-51
+# (McMaster 91255A267) through both into the plate. Owner ruling 2026-11-23:
+# "change the screw to #10-32. The sub-plate's tapped hole becomes #10-32 and
+# the plug's bore .201 (#7 drill). The washer is then a #10 SAE washer you
+# already own (McMaster 96659A104, .219 x .500, pack of 100 from PO
+# 1103PCAMPOS), used as supplied. The made washer, its drawing and its lathe
+# traveler are deleted." It reverses 2026-11-17's "Use a 1/4-20 hub screw.
+# The .23 in of thread in the 6061 plate is accepted: the screw only snugs
+# the strap during the outline." (the thread acceptance stands). Owner ruling
+# 2026-11-23, the washer: "Pick one washer from the pack of 100 by
+# measurement and keep it with the fixture: OD .505 or under and bore .220 or
+# under ... The traveler says to mike it once and centre it by eye."
+# washer_od_max_mm and washer_bore_no_go_mm print that selection (the bore by
+# the pin gauge of its limit, which must not enter).
+# bushing_flange_dia_mm (.540) is the diameter the washer stays inside when
+# centred: half of .505, plus ASME B18.21.1's .013 bore-to-rim run-out all
+# one way, plus the tapped hole's .003 position, is .268 from the hub centre
+# (.537 across). The outline cutter's edge must pass
+# bushing_clearance_mm from it (prechips refuses otherwise: the strap's
+# bottom edge is at least 7.49 mm from the hub centre, so 0.63 mm). Pushed
+# fully to one side the washer reaches 7.27 mm from the hub centre
+# (ch_rocker_strap_tl_vn_hub_washer_spec.REACH_MAX), inside the 7.358 the
+# program keeps out of and 0.22 mm short of the cutter's edge: hence centre
+# it, and watch the first level. bushing_stack_height_mm (.202) covers the
+# thickest washer B18.21.1 allows, .065, plus the head's .101 above the
+# strap's top (.166); cam.py keeps the holder and every link move clear of
+# it. All three stand as they were for the made washer, so RS04 is unchanged.
+# Owner ruling 2026-11-24 (Pedro), on the pushed-aside 0.22 mm: "Accept as
+# is: centre the washer by eye, 0.5 mm centred, 0.22 mm worst case; the
+# traveler says to centre it and to watch the first level."
+washer_od_max_mm = 12.827
+washer_bore_no_go_mm = 5.588
 bushing_flange_dia_mm = 13.716
 bushing_clearance_mm = 0.5
 bushing_stack_height_mm = 5.1308
@@ -251,13 +275,14 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # whole length below the chuck.
 reamer_oal_mm = 177.8
 # 1/2 in carbide end mill, 3 in overall (shop-equipment
-# tools.endmill-carbide-3fl-1-2): set 1.10 in out of the collet, the tool
-# assembly the dechatter cuts were measured with (cad/config/shop-equipment/
-# measured-cuts.toml; owner, Pedro, 2026-11-22: "stickout is recorded as 30mm
-# but is actually 27.94"). The collet's lower end then stands about 30 mm over
+# tools.endmill-carbide-3fl-1-2): set 1.12 in (28.45 mm) out of the collet
+# (owner, Pedro, 2026-11-24: "28.45"), the longer end of the stick-out the
+# measured face setting allows (cad/config/shop-equipment/
+# measured-cuts.toml: 27.94 to 28.45 mm). The collet's lower end then stands
+# about 31 mm over
 # the plate top while the faces are cut: the jaws' top is 9 mm over it, the
 # fence, end stop and clamp noses at most 2 mm.
-half_mill_projection_mm = 27.94
+half_mill_projection_mm = 28.45
 # 1/8 in end mill, 1-1/2 in overall, 1/2 in of flute: between this much out
 # of the collet and its flute length (4 diameters).
 eighth_mill_projection_min_mm = 12.0
@@ -295,7 +320,7 @@ ref = "jig-files"
 id = "fixture"
 name = "Fixture MHA-CH-13-TL-00"
 ref = "strap-sub-plate"
-description = "Fixture MHA-CH-13-TL-00, made beforehand to its drawings: sub-plate TL-01, hub plug TL-02, hub washer TL-03 (Ø.53 × .06), 4 Mitee-Bite Pitbull 26000 4-40 edge clamps TL-VN-50, 1/4-20 × 5/8 button-head screw TL-VN-51 (McMaster 91255A539)"
+description = "Fixture MHA-CH-13-TL-00, made beforehand to its drawings: sub-plate TL-01, hub plug TL-02, hub washer TL-VN-52 (a #10 SAE washer, McMaster 96659A104, picked by measurement in Setup 2), 4 Mitee-Bite Pitbull 26000 4-40 edge clamps TL-VN-50, #10-32 × 5/8 button-head screw TL-VN-51 (McMaster 91255A267)"
 [[tools]]
 id = "tape"
 name = "Blue painter's tape"
@@ -363,7 +388,18 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Console M6 T1 (the 1/2 in end mill, 1.10 in out of the collet, measured on the tool setter). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z5.080. The .200 edge finder at 900 rpm on the fence face: G10 L20 P1 Y-2.540; on the end stop's face: G10 L20 P1 X2.540 (its 2.540 mm radius)."
+instruction = "Console M6 T1 (the 1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet, measured on the tool setter). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z5.080. The .200 edge finder at 900 rpm on the fence face: G10 L20 P1 Y-2.540; on the end stop's face: G10 L20 P1 X2.540 (its 2.540 mm radius)."
+feed = "hand"
+
+# Owner ruling 2026-11-23: "Pick one washer from the pack of 100 by
+# measurement and keep it with the fixture ... The traveler says to mike it
+# once and centre it by eye." The limits: [parameters] washer_*.
+[[setups.operations]]
+steps = [
+  { kind = "check", text = "Once, for the fixture: pick the hub washer TL-VN-52 from the #10 SAE washer pack (McMaster 96659A104). Its outside diameter mikes {{process.washer_od_max_mm:in.3dot}} or under, and the {{process.washer_bore_no_go_mm:in.3dot}} pin gauge does not enter its bore." },
+  { kind = "stop", text = "Over on either: take another washer from the pack and measure it the same way." },
+  { kind = "action", text = "Mark the washer with a paint pen and keep it with the fixture: no other washer goes on the hub." },
+]
 feed = "hand"
 
 # Prove-out: the clamps, fence and end stop stand about .02 under the finish
@@ -394,8 +430,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS01_rough_faces (M6 T1, 1/2 in end mill; set 2370): face 1 at Z {{cad.rough_face_1_z_in:.4dot}}. At its M0 (spindle off, cutter retracted): unclamp, turn the blank over end for end (face 2 up, the same long edge on the fence, the other end on the end stop), reclamp, Cycle Start: face 2 at Z {{cad.rough_face_2_z_in:.4dot}}."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run RS01_rough_faces (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): face 1 at Z {{cad.rough_face_1_z_in:.4dot}}. At its M0 (spindle off, cutter retracted): unclamp, turn the blank over end for end (face 2 up, the same long edge on the fence, the other end on the end stop), reclamp, Cycle Start: face 2 at Z {{cad.rough_face_2_z_in:.4dot}}."
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "face rough", kind = "end", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_rough_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
@@ -418,8 +454,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS02_finish_face_1 (M6 T1 at its start, the 1/2 in end mill: set it on the tool setter again; 2370): the face at Z {{cad.finish_face_1_z_in:.4dot}}."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run RS02_finish_face_1 (M6 T1 at its start, the 1/2 in end mill: set it on the tool setter again; 2450, display near 2485): the face at Z {{cad.finish_face_1_z_in:.4dot}}."
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "face finish", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_finish_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
@@ -447,10 +483,10 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS03_finish_face_2_hub (M6 T1 at its start, the 1/2 in end mill; 2370): the face at Z {{cad.thickness_in:.4dot}}. It stops at its M6 T3 (spindle off, cutter retracted), before the centre drill goes in: unclamp the blank and lift it off for the check, since the micrometer cannot reach under it on the plate."
+instruction = "Run RS03_finish_face_2_hub (M6 T1 at its start, the 1/2 in end mill; 2450, display near 2485): the face at Z {{cad.thickness_in:.4dot}}. It stops at its M6 T3 (spindle off, cutter retracted), before the centre drill goes in: unclamp the blank and lift it off for the check, since the micrometer cannot reach under it on the plate."
 inspection = "Every blank's thickness acceptance: {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}, micrometer at both ends and mid-length."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.thickness_band_mm}}" }]
-settings = "em-half-carbide-1018-v5-face"
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "face finish", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_finish_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
@@ -537,7 +573,7 @@ title = "Bond to the plate; outline"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Blank bonded to the plate under its whole face: blue painter's tape on the plate and on the blank's face 1, GH1200 thick CA glue between (the stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}, miked). Face 1 down, the reamed hub hole over the hub plug TL-02's pilot in the plate's counterbore (tape cut away there), one long edge against the fence, the left end on the end stop; screwed down at the hub: the 1/4-20 × 5/8 button-head screw TL-VN-51 through the washer TL-03 into the plate. Edge clamps backed off clear of the blank."
+holding = "Blank bonded to the plate under its whole face: blue painter's tape on the plate and on the blank's face 1, GH1200 thick CA glue between (the stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}, miked). Face 1 down, the reamed hub hole over the hub plug TL-02's pilot in the plate's counterbore (tape cut away there), one long edge against the fence, the left end on the end stop; screwed down at the hub: the #10-32 × 5/8 button-head screw TL-VN-51 through the marked washer TL-VN-52, centred by eye, into the plate. Edge clamps backed off clear of the blank."
 datum = "Program RS04_outline. G54 unchanged: Y0 fence, X0 end stop; Z0 the plate top; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack (blue tape, CA glue, blue tape). The plug puts the hub hole at X {{cad.hub_x_in:.3f}}, Y −{{cad.hub_y_in:.3f}}; the fence sets the blank square."
 diagram = { file = "diagrams/outline.svg", alt = "Plan of the sub-plate: blank bonded to the plate (blue tape, CA glue, blue tape) against the fence, no edge clamps; screw and washer at the hub hole; the fence notched under both tips of the strap; the 1/8 in end mill's slot runs round the whole outline, top arc toward the fence." }
 # Top: the strap on the thickest stack; deepest: the through cut stops in
@@ -629,7 +665,7 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Washer TL-03 on the blank over the hub hole; the button-head screw TL-VN-51 through it into the plate, snug."
+instruction = "The marked washer TL-VN-52 on the blank, centred on the hub hole by eye; the button-head screw TL-VN-51 through it into the plate, snug. Look again after snugging: the washer's rim even all round the hole."
 feed = "hand"
 
 # Cut cautions for the bond, real for CA and paper tape (brief step 8).

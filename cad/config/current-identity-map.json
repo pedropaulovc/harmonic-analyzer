@@ -2215,13 +2215,14 @@
       ]
     },
     {
-      "old_stem": "ch-rocker-strap-tl-hub-washer",
+      "old_stem": "ch-rocker-strap-tl-vn-hub-washer",
       "old_number": null,
-      "introduced": "2026-11-17",
+      "introduced": "2026-11-23",
       "new_identities": [
         {
-          "stem": "ch-rocker-strap-tl-hub-washer",
-          "number": "MHA-CH-13-TL-03"
+          "parent": "ch-rocker-strap-tl-fixture",
+          "stem": "ch-rocker-strap-tl-vn-hub-washer",
+          "number": "MHA-CH-13-TL-VN-52"
         }
       ]
     },
@@ -2613,6 +2614,18 @@
     }
   ],
   "retired_identities": [
+    {
+      "old_stem": "ch-rocker-strap-tl-hub-washer",
+      "old_number": null,
+      "introduced": "2026-11-17",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-strap-tl-hub-washer",
+          "number": "MHA-CH-13-TL-03"
+        }
+      ],
+      "status": "retired"
+    },
     {
       "old_stem": "ch-rocker-arm-tl-filing-button",
       "old_number": "MHA-CH-006-TL-04",

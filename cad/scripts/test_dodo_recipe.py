@@ -681,6 +681,30 @@ def test_supplier_row_reader_requires_unmodified_source_binding(
             test_drawing_closures_read_no_foreign_dynamic_part_row()
 
 
+def test_no_com_leaf_closure_reads_the_review_only_config():
+    """The necessity register, the review demotion list and the check
+    register are read by review alone (owner ruling 2026-11-24: the reason
+    lives in the part's registry without rebuilding the part). A recipe that
+    read one, by name or through a whole-config read, would turn every
+    reason into a SolidWorks rebuild."""
+    import _buildgraph as bg
+
+    scripts = [
+        *bg.part_scripts(),
+        *(bg.script_for(stem) for stem in bg.ASSEMBLY_ORDER),
+        *bg.SCRIPTS_DIR.glob("draw_*.py"),
+        bg.SCRIPTS_DIR / "export_features.py",
+    ]
+    review_only = ("necessity/", "machinist-review/", "checks/")
+    loaders = {"machinist_necessity.py", "check_register.py"}
+    for script in scripts:
+        tokens = bg.config_files_of(script)
+        assert "**" not in tokens, script.name
+        assert not [tok for tok in tokens if tok.startswith(review_only)], script.name
+        modules = {Path(path).name for path in bg.module_deps_of(script)}
+        assert not loaders & modules, script.name
+
+
 def test_drawing_closures_read_no_foreign_dynamic_part_row():
     import _buildgraph as bg
 

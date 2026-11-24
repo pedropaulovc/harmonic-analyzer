@@ -32,25 +32,6 @@ sku = "S10R-SCLCR3"
 status = "on_hand"
 note = "Owner inventory 2026-11-13; lathe boring bar."
 
-# To buy (route B for the MHA-DT-35 butt cup's pocket, 2026-11-21): the first
-# boring tool under 3/8 in. The pocket is bored to the measured MHA-DT-32 head
-# + .008-.016 (any head in the drawn .231-.241) with its floor corner inside
-# R.004 MAX, which no owned tool reaches. Micro 100 BB-180500S, listings read
-# 2026-11-21 (micro100.com tool details BB-180500; Kaufman Co. and Raptor
-# Supplies BB-180500S, about $48-53): solid carbide, sharp corner, right hand,
-# min bore .196 (5 mm), max bore depth .500, 1/4 in shank with a lockdown
-# flat, 2-1/2 in OAL, centreline offset .055. It needs a 1/4 in shank holder
-# (a Micro 100 Micro-Quik holder, or a 1/4 in ID sleeve in the tool post's
-# boring-bar holder): none is on record.
-[tools.boring-bar-micro100-bb-180500s]
-source = "https://www.dixie-tool.com/right-hand-0-1800-min-bore-dia-x-0-500-1-2-max-bore-depth-x-0-1500-tooth-width-x-0-0450-projection-x-2-50-2-1-2-overall-length-bb-180500s/"
-purchase = "Dixie Tool MIC100-BB-180500S, $48.25 (read live 2026-11-22; the listing states .1800 in minimum bore, .500 in maximum bore depth, 2-1/2 in overall). Travers 20-471-272, $48.24. The 1/4 in shank holder is still not chosen."
-name = "Micro 100 BB-180500S solid carbide boring bar, sharp corner, .196 min bore x .500 deep, 1/4 in shank"
-kind = "boring_bar"
-sku = "BB-180500S"
-status = "to_order"
-note = "To buy, with a 1/4 in shank holder or sleeve (not on record). Supplier for the order not chosen; price about $48-53 (listings read 2026-11-21)."
-
 # To buy with it: the floor-side chamfer of the butt cup's #20 hole sits
 # inside the bored pocket (Ø.239-.257), where the owned 1/4 in chamfer mill
 # does not fit. Harvey Tool 902345-C3 (Turner Supply listing read
@@ -138,21 +119,6 @@ status = "to_order"
 note = "Not owned: to buy. MHA-MS-01 graduations (101 ticks) and numerals 0-10."
 included_angle_deg = 30.0
 tip_width_in = 0.005
-
-# MHA-FR-01 and MHA-FR-02 cross-screw paths (#2387, cad/docs/machining-dfm.md
-# "Cross-screw setup"). The Ø.35 spotface and counterbore print .34-.36; the
-# owned LMS 6784 set jumps from 5/16 to 3/8, so an 11/32 (.3438) end mill is
-# bought. Held in a 3/8 R8 collet it stands far less proud than a drill chuck,
-# which keeps the base on edge (11.06 in face height) under the 17 in limit.
-[tools.frame-spotface-endmill]
-name = "HTC DC-11, 11/32 in 2-flute HSS double-end end mill, 3/8 in shank, 9/16 in LOC, 3-1/8 in OAL, centre cutting"
-kind = "end_mill"
-make = "HTC"
-sku = "DC-11"
-source = "https://fmcarbide.com/products/htc-dc-11"
-purchase = "FM Carbide DC-11 (EDP 17537), $13.11 each (listing read live 2026-11-12)"
-status = "to_order"
-note = "Not owned: to buy. MHA-FR-01 4X Ø.35 spotfaces and MHA-FR-02 4X Ø.35 counterbores."
 
 # The near-wall Ø.206 #10 close clearance on the same paths: a jobber #5 from
 # the owned 115-piece index stands too proud in the chuck with the base on
@@ -261,20 +227,6 @@ kind = "countersink"
 status = "to_order"
 note = "Not owned: to buy. The 3/8 in 82° countersink: MHA-DT-03-TL-01 index plate (.35 x 82°) and MHA-PD-19 arm plate (Ø.312 x 82°) plans."
 
-# MHA-PD-19 K's face-A chamfer, cut by hand (delegated ruling 2026-11-22,
-# Main, owner review #2144: option C). The owned deburring set (tools-hand
-# deburring-set, McMaster 4289A78) has a countersink blade, but its angle is
-# not on record, so a 90° one is to buy.
-[tools.hand-countersink-90]
-make = "Noga"
-sku = "99-000-151"
-source = "https://www.travers.com/product/noga-rc2000-deburring-blade-99-000-151"
-purchase = "Travers 99-000-151, Noga RC2000 reversible hand countersink (handle with the 90 deg HSS countersink blade), $27.06, in stock (read live 2026-11-22). The blade's diameter is not stated on the listing read: confirm it is over K's .4775 rim on receipt."
-kind = "countersink"
-status = "to_order"
-cite = ["McMaster-Carr, Hole Deburring Tools (read 2026-11-23): hand countersinks with handles, 90° variants: https://www.mcmaster.com/products/hole-deburring-tools/"]
-note = "Not owned: to buy. A 90° hand countersink with a handle, body 1/2 in or larger (over K's .4775 largest rim): MHA-PD-19 arm plate, K's .010-.020 x 45° chamfer at face A, checked with the .450 pin."
-
 # --- McMaster-Carr PO 0803PCAMPOS (owned) ------------------------------------
 
 # Every tool, gauge, cutter, insert, holder, saw and shop fluid on the owner's
@@ -360,7 +312,7 @@ pieces = 1
 flutes = 3
 oal_in = 3.0
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 13: \"Uncoated Carbide Square 3-Flute End Mill, 1/2\" Mill Diameter, 3\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
-note = "Measured on the owner's PM-30MV, dechatter 0.4.0 reports v5 and v6, 2026-11-22, R8 collet, 27.94 mm (1.100 in) stick-out as the owner measured it (the reports' setup field reads 30.0), side-milling 1018 (cad/process/dechatter/2026-11-22-pm30mv-em-half-carbide-1018-v5.html, -v6.html; cad/process/shop/ settings.em-half-carbide-1018-v5-face and -v6-deep; limits in measured-cuts.toml)."
+note = "Measured on the owner's PM-30MV, dechatter 0.4.0 reports v5 and v6, 2026-11-22, R8 collet, 27.94 mm (1.100 in) stick-out as the owner measured it (the reports' setup field reads 30.0), side-milling 1018 (cad/process/dechatter/2026-11-22-pm30mv-em-half-carbide-1018-v5.html, -v6.html; cad/process/shop/ settings.em-half-carbide-1018-v5-face and -v6-deep; limits in measured-cuts.toml). Wider faces: session 1018-3.4mm-3fl-issue3439-v1, dechatter 0.5.0, 2026-11-23, setup stick-out 28.448 mm (cad/process/dechatter/2026-11-23-pm30mv-em-half-carbide-1018-issue3439-v1.html; settings.em-half-carbide-1018-3439-face)."
 
 [tools.roughing-endmill-carbide-4fl-3-8]
 name = "Roughing carbide square end mill, TiN coated, 4-flute, 3/8 in, 1/2 in length of cut"
@@ -638,29 +590,6 @@ body_dia_above_saw_in = "to_measure"
 cite = ["Owner (Pedro) 2026-11-24 photo research/shop-evidence/2026-11-24/saws-arbors.jpg", "Owner (Pedro) 2026-11-24, verbatim: \"the bottom arbor has 0.5 in shank and both are designed for saws with bores of 1 7/8 3/4 5/8 1/2 ; they are not keyed\"; \"caps are 1/2 in each ; both arbors steps are spring loaded so they fit 1 in bores\"; \"1/2 thickness 1.25 dia\""]
 note = "On hand (owner, 2026-11-24). Held in the 1/2 in R8 collet."
 
-# MHA-DT-21 cone tip block's pinch slit (.040-.060 wide, depth_ref .596 from
-# the top into the 1/4-28 adjuster hole, through the .44 depth). Neither owned
-# saw cuts it: the 1 in x .032 reaches about 4.7 mm past a 3/8 arbor's nut
-# (and no 3/8 arbor is owned), and the 2-3/4 x .064 is over the .060 MAX.
-# This one goes on the R8 1 in arbor (tools.gear-cutter-arbor-1, to_order),
-# which DT-21 shares with the gear work and the amplitude bar. Its reach past
-# the arbor's spacers and nut, and the blade thickness the slit accepts, are
-# the DT-21 plan's limits, checked by its recipe
-# (cad/process/dt_cone_tip_block/plan.toml and cam.py) and miked at mounting.
-# Read live on penntoolco.com 2026-11-22: Precise 10-200-445, $34.95, in
-# stock, 168 teeth, straight peripheral teeth, no side teeth, HSS 58-60 RC.
-[tools.slitting-saw-3-051]
-name = "Precise HSS jewelers slotting saw, 3 in diameter, .051 in thick, 1 in arbor hole, 168 teeth"
-kind = "slitting_saw"
-make = "Precise"
-sku = "10-200-445"
-source = "https://www.penntoolco.com/precise-3-size-hss-jewelers-slotting-saw-051-thickness-1-hole-size/"
-status = "to_order"
-dia_in = 3.0
-thickness_in = 0.051
-teeth = 168
-purchase = "One Precise 10-200-445 (Penn Tool Co.), $34.95."
-note = "Saws MHA-DT-21's .040-.060 pinch slit into the adjuster hole on the R8 1 in arbor (gear-cutter-arbor-1). The DT-21 recipe must check reach and width against the miked spacer OD and blade thickness."
 
 # Lathe inserts, insert code CCMT-32.51, one each. No holder for them is on
 # the packing list; their fit to tools.boring-bar-s10r-sclcr3 is not asserted.
@@ -738,31 +667,6 @@ height_in = 0.5
 length_in = 4.5
 holder = "qctp-axa-lms-2280"
 cite = ["Owner (Pedro) 2026-11-21: \"p1 hss and 0.252\\\"\"", "Somma Tool, T-Type Cut-Off Blades H.S.S. (https://www.sommatool.com/catalog/cutting.tools/ttype_cutoff_blades.asp, read 2026-11-21): P-1, W 1/16, H 1/2 nominal, L 4-1/2", "LittleMachineShop, Cut-Off Blade P1 (https://littlemachineshop.com/products/cut-off-blade-p1, read 2026-11-21): M2 HSS, 1/16 x 1/2 x 4-1/2, T-shaped"]
-
-# To buy (owner 2026-11-21, via Main: add a better parting blade to the shop
-# records): the premium P1 for the AXA No. 7 holder (Aloris AXA-7 and its
-# clones take 1/2 in high T-type blades). Same 1/16 in kerf as the on-hand
-# P1, so no plan's numbers change when it arrives, only the tool refs (#3326);
-# the travelers mike whichever blade is mounted. T15 HSS over the on-hand M2
-# for edge life in 1018 and O1;
-# chosen over the P1 carbide-tipped (LMS 3415, $139.95: brittle under a hand
-# feed) and the P2 indexable (LMS 5020, $47.95: GTN-2 inserts, not included,
-# and a wider kerf). The deepest part-off is the 1-3/4 in 1018 arbor collar:
-# about .95 in of blade out of the holder (radius .875 plus clearance), about
-# 15 times its width. That is a 1/16 blade's working range when the groove is
-# widened as the collar's op says, so no wider blade is recorded.
-[tools.cutoff-blade-p1-t15]
-name = "P1 T15 HSS T-type cutoff blade, 1/16 in wide x 1/2 in high x 4-1/2 in long (A R Warner)"
-kind = "cutoff_blade"
-make = "A R Warner"
-sku = "1728"
-status = "to_order"
-width_in = 0.0625
-height_in = 0.5
-length_in = 4.5
-holder = "qctp-axa-lms-2280"
-cite = ["LittleMachineShop, Cut-Off Blade, P1, T15 HSS, SKU 1728, $34.95 (https://littlemachineshop.com/products/cut-off-blade-p1-m2-hss, read 2026-11-21): size P1, T15 high speed steel, 1/16 x 1/2 x 4-1/2, T-shaped, made in USA by the Arthur R. Warner Co.", "Aloris, Universal Parting Blade Holder AXA-7 (https://aloris.com/product/universal-parting-blade-holder-axa-7/, read 2026-11-21): blade height 1/2 in, T-type or bevel blades"]
-note = "To buy from LittleMachineShop (SKU 1728). Until it is on hand the travelers part with cutoff-blade-p1."
 
 # The PM-1127VF-LB's tool post: the AXA (series 100) wedge-type quick-change
 # set. Its No. 7 holds the P1 cutoff blade.

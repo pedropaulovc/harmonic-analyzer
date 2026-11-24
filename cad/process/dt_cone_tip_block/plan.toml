@@ -31,17 +31,42 @@
 # tagged, until H is measured. The programs are posted for H = 1.500; the
 # traveler shifts G54 X by (H - 1.500) at the SEAT touch-off.
 #
-# The slit (.040-.060 wide, 15.13 mm REF into the adjuster): the Precise
-# 3 in x .051 HSS jeweler's slotting saw (Penn Tool 10-200-445, TO BUY,
-# shop-equipment tools.slitting-saw-3-051) on the R8 1 in spacer-type arbor
-# (TTC 67-600-016, TO BUY, tools.gear-cutter-arbor-1), horizontal on the
-# vertical spindle; the owned saws do not reach (1 in x .032) or are too
-# thick (2-3/4 x .064). The saw cuts the slit's width in one pass; its
-# thickness is miked before it is mounted (accepted .040-.057, the slit's
-# .060 less .003 of runout). Its reach past the spacers by it (2 x (1.500 -
-# .596 - .039), at most 1.73 in across) and the nut's are ASSUMED until the
-# arbor is bought, and miked when it is mounted; cam.py checks every part of
-# the arbor against the block, the jaws and the stacks.
+# The slit (.050-.070 wide: owner tool-audit ruling Q10, 2026-11-23, "Print
+# .06 (.050-.070) and use the owned 2-3/4 x .064 saw on the 1 in arbor, IF
+# the owned saw's hole is 1 in", the condition met 2026-11-24; 15.13 mm REF
+# into the adjuster): the owned 2-3/4 in x .064 HSS slitting saw (McMaster
+# 3062A21, inventory tools.slitting-saw-2-75-064, 1 in hole) on the owned R8
+# stepped saw arbor (inventory tools.saw-arbor-r8-stepped, owner facts
+# 2026-11-24), horizontal on the vertical spindle. The saw centres on the
+# arbor's spring-loaded 1 in pilot step, seats against the arbor body's
+# shoulder on its upper (spindle) side and is clamped from below by the cap
+# and its M8 x 1.25 countersunk hex socket screw (record screw_thread: the
+# owner gauged the pitch; 5 mm key, screw_key_mm_inferred), torqued to the
+# record's clamp_torque_nm, 20 N·m. The owner counted 8 turns from first bite
+# to seated with no saw fitted (screw_engagement_no_saw_mm, 10 mm); the saw
+# takes its own thickness off that. The arbor is not keyed: the cap's
+# friction drives the saw. So the passes run conventional (a climb cut would
+# let the teeth grab and slip it), a marker line is drawn across cap, saw and
+# shoulder before the first pass, and that pass is a light one (half a step)
+# with a stop after it to read the line.
+#
+# Where everything stands in Setup 10: the block lies E down, gripped on N
+# and S, TOP .75 in past the right jaw side; the saw's axis is right of TOP.
+# The arbor's body (1.25 across) passes above the saw and its cap (1.25
+# across, .50 thick) with the screw below it, both beside the TOP end and
+# right of the jaw sides: 3.92 mm clear of TOP at the slit's full depth. The
+# reach past the arbor is (2.750 - 1.250)/2 less 1.0 mm = 18.05 mm (.711 in)
+# on both sides of the saw, against the slit's 15.128. The jaws' tops are
+# under the saw and left of it by the overhang. The saw cuts the slit's
+# width in one pass: its thickness is miked and its side runout read at
+# every mounting (the pilot is a sliding fit), the two together at most
+# .068, the slit's .070 less .002. Two sizes the arbor's record does not
+# carry are bounds of this plan, which cam.py checks every clearance at and
+# Setup 10 measures before the spindle starts: the screw head's stand past
+# the cap's face (at most .25 in) and the spindle nose's height above the
+# saw (at least .43 in; the record's 1.4 in less the .50 cap gives about
+# .90). The saw's Z is set by touching the saw itself off on W, never from
+# the arbor's recorded length.
 #
 # Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
 # guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner, Pedro,
@@ -58,11 +83,15 @@
 # (logbook 2026-11-04, tools.edge-finder) and every Z zero a cutter on a
 # .002 feeler leaf, as the column clamp and platen guide plans do.
 #
-# Flagged, not owned: the slotting saw and the R8 1 in arbor (above); the
-# #4-40 bottoming tap (tools.tap-4-40-bottoming, to order); the PC9 and its
-# gloves and glasses (consumables.presto-black-steel-pc9 and
-# chemical-gloves-eye-protection, to order). The .062 dowel ream (drawing
-# NOTE 1) is match-drilled at MHA-DT-00 step 2, not here.
+# Flagged, not owned: the #4-40 bottoming tap (tools.tap-4-40-bottoming, to
+# order); the PC9 and its gloves and glasses
+# (consumables.presto-black-steel-pc9 and chemical-gloves-eye-protection, to
+# order). The .062 dowel ream (drawing NOTE 1) is match-drilled at MHA-DT-00
+# step 2, not here. For Setup 10: the owner's torque wrench covering 15 ft·lb
+# (tools.torque-wrench, to be identified: "tbd tomorrow", owner 2026-11-24)
+# with a 5 mm hex bit or socket (tools.hex-bit-5mm, to be confirmed), and the
+# owned 12 in combination square whose blade is the setup's rule and
+# straightedge. Without the wrench and bit the setup stops before the saw runs.
 #
 # NC (cam:dt_cone_tip_block, cad/process/dt_cone_tip_block/cam.py):
 # DT01_depth, DT02_east, DT03_top, DT04_seat, DT05_foot_tap, DT06_west,
@@ -71,13 +100,13 @@
 # contract with that recipe. Tool numbers are the places in the tools list
 # among the mill's tools: T1 1/2 in end mill, T2 centre drill, T3 #43, T4
 # #30, T5 #3, T6 chamfer mill, T7 the tap guide (the taps are turned by
-# hand), T8 the slotting saw (no tool-setter length; DT11 loads no tool).
+# hand), T8 the slitting saw (no tool-setter length; DT11 loads no tool).
 title = "Cone tip block"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1/2 × 2-1/4 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.bar_thickness_in:fraction}} × {{process.blank_y_in:fraction}} in flat bar; two strips {{process.strip_min_mm:in.2dot}}–{{process.strip_max_mm:in.2dot}} in wide sawn off its end: {{process.quantity:d}} part and the Setup 10 vise spacer."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.top_face_height_min_in:.2dot}}–{{cad.top_face_height_max_in:.2dot}} high (SEAT to TOP), {{cad.west_face_width_min_in:.2dot}}–{{cad.west_face_width_max_in:.2dot}} wide (E to W), {{cad.south_face_depth_min_in:.2dot}}–{{cad.south_face_depth_max_in:.2dot}} deep (N to S). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every cutting file is proved in air first. At every M6 stop the file has stopped the spindle and lifted the tool clear. The slit (Setup 10) splits the TOP end into the E half and the W half; the pinch hole runs through both. The Ø.0620 dowel ream (drawing NOTE 1) is done at assembly (MHA-DT-00), not here. Setup 8 waits for H, the measured MHA-DT-05 axis height. To buy: the slotting saw and its arbor, the 4-40 bottoming tap, the PC9."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.top_face_height_min_in:.2dot}}–{{cad.top_face_height_max_in:.2dot}} high (SEAT to TOP), {{cad.west_face_width_min_in:.2dot}}–{{cad.west_face_width_max_in:.2dot}} wide (E to W), {{cad.south_face_depth_min_in:.2dot}}–{{cad.south_face_depth_max_in:.2dot}} deep (N to S). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once a session, not at every setup; each mill setup touches off its own G54. A Reset after a Feed Hold keeps G54: no homing, no new zero. After any other controller reset (it restarted by itself in a pass once, and lost home: logbook 2026-11-06), an alarm, a stall or an E-stop: home and touch off again before Cycle Start. Every cutting file is proved in air first. At every M6 stop the file has stopped the spindle and lifted the tool clear. The slit (Setup 10) splits the TOP end into the E half and the W half; the pinch hole runs through both. The Ø.0620 dowel ream (drawing NOTE 1) is done at assembly (MHA-DT-00), not here. Setup 8 waits for H, the measured MHA-DT-05 axis height. To buy: the 4-40 bottoming tap, the PC9."
 shop = "../shop"
 stock_refs = ["1018-flat-1-2x2-1-4"]
 material_key = "rocker-1018-cold-finished"
@@ -124,15 +153,15 @@ seat_raw_min_mm = 54.737
 seat_raw_max_mm = 54.991
 face_cut_min_mm = 0.254
 # Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2) at the
-# measured setting em-half-carbide-1018-v5-face (shop common.toml; cad/config/
-# shop-equipment/measured-cuts.toml: stable to 1.27 mm deep and 3.4 mm wide,
-# conventional, at half_mill_projection_mm out of the collet), passes no
-# wider than its 3.4 mm, equally spaced, the first engaging one stepover and
-# the last overhanging the far edge; the zigzag climbs on every other pass,
-# which the report did not measure. Equal levels no deeper than .030 (the
+# measured setting em-half-carbide-1018-3439-face (shop common.toml; cad/
+# config/shop-equipment/measured-cuts.toml, #3439: stable to 1.27 mm deep and
+# 6.4 mm wide, conventional, 2420-2490 rpm in the cut), passes no wider than
+# .250 in (half the cutter, inside its 6.4 mm), equally spaced, the first
+# engaging one stepover and the last overhanging the far edge; the zigzag
+# climbs on every other pass, which the session did not measure. Equal levels no deeper than .030 (the
 # author's choice for a 1/2 in end mill in 1018).
 face_cutter_dia_mm = 12.7
-face_stepover_max_mm = 3.4
+face_stepover_max_mm = 6.35
 face_step_max_mm = 0.762
 # Holes: spot Ø.080 with the #2 centre drill, under the #43 (no chamfer at a
 # tap's mouth), then the drills pecked with full retracts: the #43 .080
@@ -140,7 +169,7 @@ face_step_max_mm = 0.762
 # their full diameter drill_past_mm past the far face, into the air between
 # the stacks. Heights (each program's Z) cam.py recomputes: the foot hole's
 # #43 point (.440 full diameter below SEAT, from the parallels' top), the
-# pinch hole's #43 point below E, the #30's depth from W (.335, the band's
+# pinch hole's #43 point below E, the #30's depth from W (.330, the band's
 # middle, full diameter: its shoulder inside the slit) and its point, the
 # #3's point below S.
 spot_dia_mm = 2.032
@@ -149,8 +178,8 @@ peck_mm = 2.54
 drill_past_mm = 1.0
 foot_tip_height_mm = 40.7228
 pinch_tip_height_mm = -1.6792
-clearance_depth_mm = 8.507
-clearance_tip_height_mm = 7.5304
+clearance_depth_mm = 8.38
+clearance_tip_height_mm = 7.6574
 adjuster_tip_height_mm = -2.6254
 # Speeds and feeds of the holes, authored in the operations: LittleMachineShop
 # "Cutting Speeds", Drilling & Reaming, Plain carbon steels 1006-1026 (read
@@ -191,50 +220,140 @@ foot_plug_reach_mm = 10.414
 foot_bottoming_reach_mm = 9.398
 pinch_tap_reach_mm = 11.43
 adjuster_tap_reach_mm = 16.51
-# The slit: the 3 in x .051 slotting saw (shop slitting-saw-3-051, 168 teeth)
-# at 100 rpm, the mill's slowest, 79 ft/min at its rim (LittleMachineShop
-# "Cutting Speeds", Milling, Plain carbon steels 1006-1026, HSS: 80-110
-# ft/min; the bottom of the mill's range is the nearest it runs); .001
-# in/tooth × 168 × 100 = 16.8 in/min (as the CH-01 notch saw's .001, the
-# bottom of prechips' feed table). Three equal steps into the TOP end, each no deeper than
-# .200, to the slit's 15.128 mm REF depth (into the adjuster bore at any H in
-# the band; cam.py checks it). The saw's lower face at saw_cut_z_mm above E:
-# the slit's middle at the adjuster's .340 from E, for the catalogue .051.
-saw_dia_mm = 76.2
-saw_thickness_mm = 1.2954
-saw_teeth = 168
+# The slit: the owned 2-3/4 in x .064 HSS slitting saw (shop
+# slitting-saw-2-75-064; inventory tools.slitting-saw-2-75-064: dia_in 2.75,
+# thickness_in .064, teeth 72, bore_in 1.0; test_dt_cone_tip_block_process.py
+# holds the four numbers below to that record) at 100 rpm, the mill's
+# slowest by the shop record (100-2800) and inside the L range on the
+# mill's plate (50-1500): 72 ft/min at its rim. LittleMachineShop "Cutting
+# Speeds", Milling, Plain carbon steels 1006-1026, HSS, gives 80-110 ft/min,
+# which is 111-153 rpm for this saw. 100 is kept under that on purpose, as
+# the CH-01 and CH-03 plans run this saw: slower is the safe side for an HSS
+# saw deep in a slit, and at a fixed feed per tooth the pass's torque, which
+# the friction drive is checked against, does not change with the speed.
+# .001 in/tooth (the bottom of prechips' feed table) × 72 × 100 = 7.2 in/min
+# (182.88 mm/min). Into the TOP end in four passes:
+# the first slit_first_pass_mm (.085, half a step: the light cut that proves
+# the arbor's friction drive), then three of slit_step_mm (.170), each no
+# deeper than slit_step_max_mm (.200), to the slit's 15.128 mm REF depth
+# (cam.py recomputes the two steps). The saw's lower face at saw_cut_z_mm
+# above E: the slit's middle at the adjuster's .340 from E, for the
+# catalogue .064.
+saw_dia_mm = 69.85
+saw_thickness_mm = 1.6256
+saw_teeth = 72
+saw_bore_mm = 25.4
 saw_rpm = 100
-saw_feed_per_min_mm = 426.72
+saw_feed_per_min_mm = 182.88
 slit_depth_mm = 15.128
 slit_step_max_mm = 5.08
-saw_cut_z_mm = 7.9883
-# The blade accepted when miked before mounting: at least the slit's .040,
-# at most its .060 less .003 of runout (cam.py checks both).
-blade_min_mm = 1.016
-blade_max_mm = 1.4478
-# The arbor round the saw, ASSUMED until it is bought (tools.gear-cutter-
-# arbor-1, the TTC 67-600-016; Setup 10 checks the real one at mounting):
-# the spacers by the saw no wider than saw_collar_dia_max_mm (2 × (the saw's
-# radius − the slit's depth − 1.0 mm clear of the TOP end)), at least .375 of
-# them above the saw (its shoulder then clears W) and below it, then the
-# nut, all within 1.00 in of the saw's lower face; the nut no wider than
-# 1.75 in across its corners.
-saw_collar_dia_max_mm = 43.944
-saw_spacer_above_min_mm = 9.525
-saw_spacer_below_min_mm = 9.525
-saw_below_max_mm = 25.4
-saw_nut_dia_max_mm = 44.45
-# The saw moves between passes with the stack's lowest point 5 mm over W's
+slit_first_pass_mm = 2.1611
+slit_step_mm = 4.3223
+saw_cut_z_mm = 7.8232
+# The kerf, read at every mounting (the pilot is a sliding fit): the blade
+# miked at least the slit's .050 (blade_min_mm); miked plus its side runout
+# (the lever indicator on the saw's side face 1/8 in in from the teeth, one
+# hand revolution) at most kerf_max_mm, the slit's .070 less .002: .004 of
+# runout for a blade that mikes .064 (saw_side_tir_nominal_mm; cam.py checks
+# all three).
+blade_min_mm = 1.27
+kerf_max_mm = 1.7272
+saw_side_tir_nominal_mm = 0.1016
+# The slit's depth is cut from X0 on TOP with the saw's centre its recorded
+# radius less the depth past it, so the tips' radial runout deepens the
+# floor, and a saw off its recorded diameter moves it by half the error.
+# Both are read: the diameter over two opposite tips by calipers before the
+# saw is clamped, within saw_dia_tol_mm (.050) of the record
+# (saw_dia_min_mm to saw_dia_max_mm); the runout at every clamping (the dial
+# indicator on the tips, the saw turned backward by hand), at most .020 in.
+# At both limits together the floor stays inside the adjuster's tap drill at
+# both ends of the height band and of H's band (cam.py: .016 in of room
+# left), and no tooth takes more than twice its .001 feed (cam.py).
+saw_tip_tir_max_mm = 0.508
+saw_dia_tol_mm = 1.27
+saw_dia_min_mm = 68.58
+saw_dia_max_mm = 71.12
+# The owned R8 stepped saw arbor, its sizes repeated from its record
+# (cad/config/shop-equipment/ tools.saw-arbor-r8-stepped, measured by the
+# owner 2026-11-24; test_dt_cone_tip_block_process.py holds these to the
+# record): the body above the saw 1.25 in across (body_dia_above_saw_in);
+# the cap below it 1.25 across and .50 thick (cap_dia_in, cap_thickness_in);
+# its countersunk screw's head .623 across (screw_head_dia_in); the spindle
+# nose to the cap's lower face 1.4 in with no saw fitted
+# (below_spindle_nose_in).
+saw_arbor_body_dia_mm = 31.75
+saw_arbor_cap_dia_mm = 31.75
+saw_arbor_cap_thickness_mm = 12.7
+saw_arbor_screw_head_dia_mm = 15.8242
+saw_arbor_nose_to_cap_mm = 35.56
+# The drive (record keyed = false): the cap's screw at saw_clamp_torque_nm
+# (the record's clamp_torque_nm) clamps the saw between the shoulder and the
+# cap with about 11 kN (the record's cited table: 13.2 kN at 23 N·m,
+# friction .14). One face's friction on the ring between the 1 in pilot and
+# the 1.25 cap (mean radius 14.35 mm) carries .14 × 11 kN × 14.35 mm = 22.1
+# N·m (saw_drive_torque_max_nm); the other face and the screw are the
+# reserve. The heaviest pass here, .170 into TOP at the kerf's .068 ceiling,
+# takes 8.1 N·m by the handbook's milling power, and the light first pass 4.1
+# N·m (cam.py checks the heaviest against the drive). The thread carries that
+# torque: the record's engagement with no saw fitted
+# (saw_screw_engagement_no_saw_mm, 10 mm, the owner's 8 turns) less the
+# thickest blade the plan accepts (kerf_max_mm) is 8.27 mm, over one
+# saw_screw_dia_mm (cam.py); with the .064 saw, 8.4 mm, 1.05 D.
+saw_clamp_torque_nm = 20.0
+saw_screw_dia_mm = 8.0
+saw_screw_engagement_no_saw_mm = 10.0
+saw_clamp_preload_kn = 11.0
+saw_drive_friction = 0.14
+saw_drive_torque_max_nm = 22.1
+# Two sizes that record does not carry (screw_head_past_cap_in is
+# "to_measure"; the nose's height above the saw follows from the 1.4 only
+# if the cap seats on the shoulder with no saw, unverified). Each is a
+# bound of this plan, not a measurement: cam.py checks every clearance at
+# the bound, and Setup 10 measures the real size before the spindle starts
+# and stops outside it. The screw head stands at most .25 in past the cap's
+# face (a countersunk head sits flush or under; no cut or move of this setup
+# brings the cap over the block, the jaws or the stacks, so the bound only
+# sets the clear height and the length below). The spindle nose, or anything
+# wider than the body, stands at least .43 in above the saw's upper face:
+# then it passes 1 mm or more over the spacer strip's top and over W at the
+# cut. The record gives about .90 (1.4 less the .50 cap).
+saw_screw_stand_max_mm = 6.35
+saw_nose_above_min_mm = 10.922
+# From those (cam.py recomputes all three): the reach past the arbor, (saw −
+# body or cap)/2 − 1.0 mm clear of the TOP end, 18.05 mm on both sides of
+# the saw (the slit is 15.128 deep: body and cap pass 3.92 mm right of TOP
+# at full depth); the stack below the saw's lower face, the cap plus the
+# screw head's bound. The arbor's lowest point from the spindle nose
+# (saw_arbor_length_mm, with the machine-capacity inputs below): the
+# record's 1.4 in plus the saw, rounded up to 1.5 in, plus the screw head's
+# bound.
+saw_reach_max_mm = 18.05
+saw_below_max_mm = 19.05
+# At the cut that stack hangs saw_below_stack_top_mm (.44) below the stacks'
+# top (saw_below_max_mm less saw_cut_z_mm), right of TOP. cam.py's keep-outs
+# end the stacks at the jaws' right side, so Setup 10 checks at every
+# clamping that no parallel stands past it.
+saw_below_stack_top_mm = 11.2268
+# The saw moves between passes with the arbor's lowest point 5 mm over W's
 # highest (cam.py checks it). It is touched off with its rim 3 mm in over
-# the TOP end, over the block's middle; the spacers and the nut then hang
-# past the end. Its air proof raises Z0 1.000 in, as every other file's.
-saw_clear_z_mm = 47.672
-saw_touch_x_mm = 35.1
+# the TOP end, over the block's middle; the cap then hangs past the end.
+# Its air proof raises Z0 1.000 in, as every other file's.
+saw_clear_z_mm = 41.322
+saw_touch_x_mm = 31.925
 saw_touch_y_mm = -5.588
 saw_proof_raise_mm = 25.4
 # The TOP end stands .75 in past the right jaw side in Setup 10, past the
 # slit's depth: the saw never reaches the jaws (cam.py checks it).
 slit_overhang_mm = 19.05
+# The Setup 10 vise spacer (the second strip) against the block, N to S:
+# never thicker (the jaws would close on it and leave the block loose under
+# the saw); at most spacer_under_max_mm (.002) thinner: the moving jaw then
+# tilts .002 over the 5 in between the two, a quarter of it, .0005, across
+# the block's 1.3 in grip. Setup 2 takes the thicker strip as the block; a
+# larger difference is made up in Setup 10 with feeler leaves (cam.py: the
+# allowance is no finer than the set's thinnest leaf, shop
+# gauges.feeler-gauges, so leaves can always land inside it).
+spacer_under_max_mm = 0.0508
 # Holding (shop workholding.vise-pm-6 and fixtures.parallels-lms-6745, 1/8 in
 # thick, 4 in long, 1/2-1 in by 1/16): lying, the set's 1 in and 1/2 in
 # parallels stacked against each jaw (1.5 in); the strip on edge for E's skim
@@ -244,6 +363,13 @@ riser_height_mm = 38.1
 east_riser_height_mm = 28.575
 parallel_height_mm = 12.7
 parallel_thickness_mm = 3.175
+# The least gap between a through hole's edge (its tap's basic major) and a
+# stack's inner face, the hole anywhere in its drawing band and the block at
+# its least size across the jaws: the pinch hole in Setup 6 (.019), the
+# adjuster in Setup 8 (.060). cam.py recomputes both; the two Holding texts
+# print them.
+pinch_stack_clear_min_mm = 0.4826
+adjuster_stack_clear_min_mm = 1.524
 vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
 vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
 vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
@@ -265,19 +391,20 @@ vise_slit_inset_mm = -125.1458
 # the spindle nose to the tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set 1.100 in out of the collet, the stick-out
-# its measured setting holds at (cad/config/shop-equipment/measured-cuts.toml;
-# owner, Pedro, 2026-11-22: "stickout is recorded as 30mm but is actually
-# 27.94").
-half_mill_projection_mm = 27.94
+# 1/2 in end mill, 3 in overall: set 1.12 in (28.45 mm) out of the collet
+# (owner, Pedro, 2026-11-24: "28.45"), the longer end of the stick-out its
+# measured setting allows (cad/config/shop-equipment/measured-cuts.toml:
+# 27.94 to 28.45 mm).
+half_mill_projection_mm = 28.45
 chamfer_projection_min_mm = 12.7
 # Overall lengths: the #2 combined drill and countersink 1-7/8 in; the #30
 # jobber drill 2-3/4 in (ASME B94.11M), the longest drill under the chuck.
 centre_drill_oal_mm = 47.625
 drill_30_oal_mm = 69.85
-# The arbor and saw from the spindle nose, at most 2.5 in (ASSUMED, the arbor
-# to buy: 2 in shoulder to nut on record).
-saw_arbor_length_mm = 63.5
+# The saw arbor's lowest point from the spindle nose, 1.75 in: the record's
+# 1.4 in to the cap's face plus the saw, taken as 1.5 in, plus the screw
+# head's .25 bound (the slit's parameters above; cam.py recomputes it).
+saw_arbor_length_mm = 44.45
 # Tapping under the spring tap guide (tools.tap-guide-fisher): the guide and
 # the tap in its wrench together reach at most tap_stack_max_mm below the
 # collet face, the spindle-to-table maximum (shop machines.pm-30mv, 431.8)
@@ -323,12 +450,12 @@ name = "Fisher spring tap guide"
 ref = "tap-guide-fisher"
 [[tools]]
 id = "slit-saw"
-name = "3 in × .051 HSS slotting saw on the R8 1 in arbor, both TO BUY"
-ref = "slitting-saw-3-051"
+name = "2-3/4 in × .064 HSS slitting saw, 72 teeth, 1 in hole"
+ref = "slitting-saw-2-75-064"
 [[tools]]
 id = "arbor"
-name = "R8 1 in spacer-type arbor (TTC 67-600-016), TO BUY"
-ref = "gear-cutter-arbor-1"
+name = "R8 stepped saw arbor, owned (shop key saw-arbor-r8-stepped): 1 in pilot step, Ø1.25 × .50 cap, M8 × 1.25 countersunk hex socket screw, 5 mm key"
+ref = "saw-arbor-r8-stepped"
 [[tools]]
 id = "tap-4-40"
 name = "4-40 plug tap"
@@ -357,6 +484,26 @@ ref = "reamer-0620"
 id = "deburring-set"
 name = "Deburring scraper set"
 ref = "deburring-set"
+[[tools]]
+id = "torque-wrench"
+name = "Torque wrench covering 20 N·m (15 ft·lb)"
+ref = "torque-wrench"
+[[tools]]
+id = "hex-bit-5mm"
+name = "5 mm hex bit or socket for the torque wrench (owner to confirm)"
+ref = "hex-bit-5mm"
+[[tools]]
+id = "square"
+name = "12 in combination square: its blade as rule and straightedge"
+ref = "combination-square-starrett-c11h-12"
+[[tools]]
+id = "dti"
+name = "Lever indicator, 0.001 mm, on the magnetic base"
+ref = "dti"
+[[tools]]
+id = "dial-indicator"
+name = ".001 in dial indicator on the magnetic base"
+ref = "dial-indicators"
 
 [[setups]]
 machine_kind = "other"
@@ -379,7 +526,7 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Saw two strips, each marked .80 wide, off the end of the 1/2 × 2-1/4 in 1018 bar, the bar lying on a wide face in the saw's vise, each cut across its full 2-1/4 width. One is the part; the other the spacer for Setup 10. The rest of the bar stays for MHA-DT-18, MHA-DT-16 and MHA-MG-01."
+instruction = "Saw two strips, each marked .80 wide, off the end of the 1/2 × 2-1/4 in 1018 bar, the bar lying on a wide face in the saw's vise, each cut across its full 2-1/4 width. One becomes the part, the other the vise spacer for Setup 10 (Setup 2 decides which). The rest of the bar stays for MHA-DT-18, MHA-DT-16 and MHA-MG-01."
 feed = "hand"
 inspection = "Each strip {{process.strip_min_mm:in.2dot}}–{{process.strip_max_mm:in.2dot}} wide at both ends, calipers. Narrower: scrap it and saw another. Wider: file the sawn face until it is, then recheck."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.strip_min_mm}}", "{{process.strip_max_mm}}"] }]
@@ -389,7 +536,7 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "File the burr off both sawn faces and the edges so the strip seats flat on the parallels. With marking fluid: one bar face N, one sawn face E, one bar edge SEAT (the drawing names none; this traveler does, and the marks go back on after each cut)."
+instruction = "File the burr off both sawn faces and the edges of each strip so it seats flat on the parallels. With marking fluid, on each: one bar face N, one sawn face E, one bar edge SEAT (the drawing names none; this traveler does, and the marks go back on after each cut)."
 feed = "hand"
 
 [[setups]]
@@ -406,7 +553,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_width_max_mm}}
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.strip_max_mm}}"], clamp_mm = [0, "{{process.strip_max_mm}}"], section_mm = { y = "{{process.bar_width_max_mm}}", z = "{{process.bar_thickness_max_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Before clamping: mic N to the face up at the strip's middle and write it down (mm = in × 25.4). Clamp it as Holding says. Home the mill ($H)."
+instruction = "Before clamping: mic N to the face up at the strip's middle and write it down (mm = in × 25.4). Clamp it as Holding says. Home the mill ($H) if it has not been homed this session."
 feed = "hand"
 
 [[setups.operations]]
@@ -429,8 +576,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT01_depth (M6 T1, 1/2 in end mill; set 2370): face the face up down to Z {{process.depth_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.bar_thickness_max_mm:in.3dot}} (the thickest bar: a thinner one cuts air first). Unclamp; mark this face S; mic N to S."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run DT01_depth (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): face the face up down to Z {{process.depth_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.bar_thickness_max_mm:in.3dot}} (the thickest bar: a thinner one cuts air first). Unclamp; file the burr off the cut face's edges; mark this face S; mic N to S."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Depth {{cad.south_face_depth_min_in:.3dot}}–{{cad.south_face_depth_max_in:.3dot}}, N to S, miked at all four corners."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.south_face_depth_band_mm}}" }]
 milling_cuts = [
@@ -442,7 +589,13 @@ instruction = "Over {{cad.south_face_depth_max_in:.3dot}}: wipe N and the stacks
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The spacer strip: this setup's ops again, from the first (mic, clamp, edge finder, Z0, DT01_depth). Its depth .43–.45 as well, so it holds Setup 10's jaws parallel; nothing else is done to it."
+instruction = "The second strip: this setup's ops again, from the first (mic, clamp, edge finder, Z0, DT01_depth), to the same depth check."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mic both strips N to S at the middle and write both down. The thicker one is the block from here on; the other is Setup 10's vise spacer, and nothing else is done to it. (A spacer thicker than the block would take the jaws' grip off the block under the saw.)"
+inspection = "The spacer no thicker than the block and at most {{process.spacer_under_max_mm:in.3dot}} thinner. Thinner by more: write the difference on it; Setup 10 makes it up with feeler leaves."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups]]
@@ -459,8 +612,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.depth_target_mm}}"
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.bar_width_max_mm}}"], clamp_mm = [0, "{{process.bar_width_max_mm}}"], section_mm = { y = "{{process.depth_target_mm}}", z = "{{process.strip_max_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the unmarked bar edge (left), Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the strip, G10 L20 P1 Y-2.540; on the unmarked bar edge from the left, G10 L20 P1 X-2.540."
+instruction = "Home the mill ($H) if it has not been homed this session. G54 X0 the unmarked bar edge (left), Y0 the fixed jaw's face: edge finder (900 rpm)."
+instruction_detailed = "Home the mill ($H) if it has not been homed this session. Edge finder (900 rpm): on the fixed jaw's face beside the strip, G10 L20 P1 Y-2.540; on the unmarked bar edge from the left, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -477,8 +630,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT02_east (M6 T1; set 2370): skim the face up at Z0. A sawn patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; mark this face E again."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run DT02_east (M6 T1; 2450, display near 2485): skim the face up at Z0. A sawn patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; file the burr off the skimmed face's edges; mark this face E again."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "E cut clean end to end, no sawn patch left, by eye."
 gauge_checks = "other"
 milling_cuts = [
@@ -499,8 +652,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.depth_target_mm}}"
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.bar_width_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{process.west_raw_max_mm}}", y = "{{process.depth_target_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 face W (left), Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the strip, G10 L20 P1 Y-2.540; on face W from the left, its tip .10 below the end up, G10 L20 P1 X-2.540."
+instruction = "Home the mill ($H) if it has not been homed this session. G54 X0 face W (left), Y0 the fixed jaw's face: edge finder (900 rpm)."
+instruction_detailed = "Home the mill ($H) if it has not been homed this session. Edge finder (900 rpm): on the fixed jaw's face beside the strip, G10 L20 P1 Y-2.540; on face W from the left, its tip .10 below the end up, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -517,8 +670,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT03_top (M6 T1; set 2370): skim TOP down to Z0 in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. An edge patch left: Z0 .010 lower as in Setup 3 and run it again. Unclamp; mark this end TOP."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run DT03_top (M6 T1; 2450, display near 2485): skim TOP down to Z0 in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. An edge patch left: Z0 .010 lower as in Setup 3 and run it again. Unclamp; file the burr off the skimmed end's edges; mark this end TOP."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "TOP cut clean across, no bar-edge patch left, by eye."
 gauge_checks = "other"
 milling_cuts = [
@@ -539,7 +692,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.depth_target_mm}}"
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.seat_raw_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{process.west_raw_max_mm}}", y = "{{process.depth_target_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Before clamping: mic TOP to the bar edge up at the strip's middle and write it down (mm = in × 25.4). Clamp it as Holding says. Home the mill ($H)."
+instruction = "Before clamping: mic TOP to the bar edge up at the strip's middle and write it down (mm = in × 25.4). Clamp it as Holding says. Home the mill ($H) if it has not been homed this session."
 feed = "hand"
 
 [[setups.operations]]
@@ -561,8 +714,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT04_seat (M6 T1; set 2370): face the end up down to Z {{process.length_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.seat_raw_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first). The file stops at its M6 T2, the spindle stopped and the end mill lifted clear."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run DT04_seat (M6 T1; 2450, display near 2485): face the end up down to Z {{process.length_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.seat_raw_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first). The file stops at its M6 T2, the spindle stopped and the end mill lifted clear."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "At the M6 T2 stop: SEAT, the face just cut, Ra {{cad.seat_finish_callout}} µin or finer: one even end-mill finish, no tear or chatter, by eye and fingernail. Torn: stop and tell the owner."
 gauge_checks = "other"
 milling_cuts = [
@@ -572,7 +725,7 @@ milling_cuts = [
 [[setups.operations]]
 instruction = "Still at the M6 T2 stop: the height, before the hole."
 instruction_detailed = "Still at the M6 T2 stop, before the hole: the calipers' depth rod from SEAT down to the fixed-jaw parallel's top beside the block, at both sides of the block."
-inspection = "Height {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}}. Over: stop the file; home, repeat this setup's touch-offs with a new reading and run DT04_seat again from its start. Under: the block is scrap."
+inspection = "Height {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}}. Over: stop the file; repeat this setup's touch-offs, the Z one on SEAT as cut with the depth-rod height just read as its reading; run DT04_seat again from its start. Under: the block is scrap."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.top_face_height_band_mm}}" }]
 feed = "hand"
 
@@ -610,7 +763,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.foot_tap_station_band_mm}
 feed = "hand"
 
 [[setups.operations]]
-instruction = "No 4-40 bottoming tap in hand (it is to buy): do the stop check, the tap file, the plug tap's depth reference, the plug tap and the scrape now; skip the bottoming tap's depth reference, the bottoming tap and the thread-depth check. Tag the block AWAITING 4-40 BOTTOMING TAP and go on to Setup 6. When the tap comes: clamp, home, the touch-offs above, the stop check on the bottoming tap, DT05_foot_tap, then those three ops."
+instruction = "No 4-40 bottoming tap in hand (it is to buy): do the stop check, the tap file, the plug tap's depth reference, the plug tap and the scrape now; skip the bottoming tap's depth reference, the bottoming tap and the thread-depth check. Tag the block AWAITING 4-40 BOTTOMING TAP and go on to Setup 6. This setup's last op is the way back."
 feed = "hand"
 
 [[setups.operations]]
@@ -662,7 +815,11 @@ speed_kind = "other"
 tool = "deburring-set"
 drilling = "none"
 sizing = "other"
-instruction = "Unclamp; scrape the foot hole's mouth flush with SEAT (no countersink). Mark the end SEAT."
+instruction = "Unclamp; file the burr off SEAT's edges (never across the face); scrape the foot hole's mouth flush with SEAT (no countersink). Mark the end SEAT."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A block tagged AWAITING 4-40 BOTTOMING TAP, when the tap comes: clamp as Holding says (a new session: home the mill first), this setup's edge-finder touch-off (X and Y only: the tap file moves Z only to the machine top), the stop check on the bottoming tap, DT05_foot_tap, then the three skipped ops. Unclamp and scrape as in the op before this one."
 feed = "hand"
 
 [[setups]]
@@ -671,7 +828,7 @@ title = "W to the width; the pinch hole"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The 1 in and 1/2 in parallels stacked against each jaw (1.5 in). The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; SEAT to the LEFT, centred along the jaws. Tap it down onto both stacks while closing the vise: the pinch hole exits E between them."
+holding = "The 1 in and 1/2 in parallels stacked against each jaw (1.5 in), each stack hard against its jaw. The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; SEAT to the LEFT, centred along the jaws. Tap it down onto both stacks while closing the vise. The parallels are {{process.parallel_thickness_mm:in.3dot}} thick: the pinch hole exits E in the gap between the two stacks, {{process.pinch_stack_clear_min_mm:in.3dot}} or more clear of each."
 datum = "Program DT06_west. G54: X0 SEAT (left), Y0 the fixed jaw's face (N), Z0 the stacks' top (E), set from the miked width. The pinch hole at X {{cad.pinch_tap_height_in:.3f}}, Y −{{cad.pinch_tap_depth_center_in:.3f}} in."
 diagram = { file = "diagrams/west.svg", alt = "The block on edge on stacked parallels, E down, gripped on N and S; the 1/2 in end mill faces W down to the width; the #43 drills the pinch hole through both halves and the #30 opens the W half to the slot." }
 envelope = { x_span_mm = ["{{process.length_target_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.depth_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.west_raw_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.pinch_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_30_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
@@ -679,7 +836,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.depth_target_mm}}"
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.length_target_mm}}"], clamp_mm = [0, "{{process.length_target_mm}}"], section_mm = { y = "{{process.depth_target_mm}}", z = "{{process.width_target_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Before clamping: mic E to the sawn face at the block's middle and write it down (mm = in × 25.4). Clamp it as Holding says. Home the mill ($H)."
+instruction = "Before clamping: mic E to the sawn face at the block's middle and write it down (mm = in × 25.4). Clamp it as Holding says. Home the mill ($H) if it has not been homed this session."
 feed = "hand"
 
 [[setups.operations]]
@@ -701,8 +858,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT06_west (M6 T1; set 2370): face the face up down to Z {{process.width_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.west_raw_max_mm:in.3dot}} (the widest strip). The file stops at its M6 T2, the spindle stopped and the end mill lifted clear."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run DT06_west (M6 T1; 2450, display near 2485): face the face up down to Z {{process.width_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.west_raw_max_mm:in.3dot}} (the widest strip). The file stops at its M6 T2, the spindle stopped and the end mill lifted clear."
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "west face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.length_target_mm}}"] },
 ]
@@ -710,7 +867,7 @@ milling_cuts = [
 [[setups.operations]]
 instruction = "Still at the M6 T2 stop: the width, before the holes."
 instruction_detailed = "Still at the M6 T2 stop, before the holes: the calipers' depth rod from W, the face just cut, down to the fixed-jaw stack's top beside the block, at both ends."
-inspection = "Width {{cad.west_face_width_min_in:.3dot}}–{{cad.west_face_width_max_in:.3dot}} (it stays within the MHA-DT-20 edge). Over: stop the file; home, repeat this setup's touch-offs with a new reading and run DT06_west again from its start. Under: the block is scrap."
+inspection = "Width {{cad.west_face_width_min_in:.3dot}}–{{cad.west_face_width_max_in:.3dot}} (it stays within the MHA-DT-20 edge). Over: stop the file; repeat this setup's touch-offs, the Z one on W as cut with the depth-rod width just read as its reading; run DT06_west again from its start. Under: the block is scrap."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.west_face_width_band_mm}}" }]
 feed = "hand"
 
@@ -770,7 +927,7 @@ speed_kind = "other"
 tool = "deburring-set"
 drilling = "none"
 sizing = "other"
-instruction = "Unclamp; scrape the pinch hole's exit on E and its mouth on W flush (E seats against the fixed jaw in Setup 8). Mark the face W."
+instruction = "Unclamp; file the burr off W's edges; scrape the pinch hole's exit on E and its mouth on W flush (E seats against the fixed jaw in Setup 8). Mark the face W."
 feed = "hand"
 
 [[setups]]
@@ -787,8 +944,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.depth_target_mm}}"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 SEAT (right), Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on SEAT from the right, G10 L20 P1 X2.540."
+instruction = "Home the mill ($H) if it has not been homed this session. G54 X0 SEAT (right), Y0 the fixed jaw's face: edge finder (900 rpm)."
+instruction_detailed = "Home the mill ($H) if it has not been homed this session. Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on SEAT from the right, G10 L20 P1 X2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -831,7 +988,7 @@ title = "The adjuster: drill, countersink N, tap"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The same stacks. The block lying N up, S down on them, gripped on E and W: E against the FIXED jaw; SEAT to the LEFT, centred. Tap it down onto both stacks while closing the vise: the adjuster exits S between them."
+holding = "The same stacks, each hard against its jaw. The block lying N up, S down on them, gripped on E and W: E against the FIXED jaw; SEAT to the LEFT, centred. Tap it down onto both stacks while closing the vise. The adjuster, drilled and tapped through, exits S in the gap between the two {{process.parallel_thickness_mm:in.3dot}} thick stacks, {{process.adjuster_stack_clear_min_mm:in.3dot}} or more clear of each."
 datum = "Programs DT08_adjuster and DT09_adjuster_tap. G54: X0 SEAT (left) shifted by H − 1.500 (below), Y0 the fixed jaw's face (E), Z0 .4400 below N (touched off on N: the countersink is cut from N whatever the block's depth). The adjuster at X 1.500 (that is, H from SEAT), Y −{{cad.adjuster_lateral_in:.3f}} in."
 diagram = { file = "diagrams/adjuster.svg", alt = "The block lying N up on stacked parallels, gripped on E and W; the centre drill spots, the #3 drills the adjuster through and the chamfer mill circles its countersink at N; then the 1/4-28 tap is turned by hand under the tap guide." }
 envelope = { x_span_mm = ["{{process.length_target_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{process.width_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_target_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.adjuster_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
@@ -849,7 +1006,7 @@ instruction = "Write down the shift D = (H − 1.5000) × 25.4, in mm, with its 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Clamp the block as Holding says. Home the mill ($H)."
+instruction = "Clamp the block as Holding says. Home the mill ($H) if it has not been homed this session."
 feed = "hand"
 
 [[setups.operations]]
@@ -967,7 +1124,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.width_target_mm}}"
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.length_target_mm}}"], clamp_mm = [0, "{{process.length_target_mm}}"], section_mm = { y = "{{process.width_target_mm}}", z = "{{process.depth_target_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Clamp the block as Holding says. Home the mill ($H)."
+instruction = "Clamp the block as Holding says. Home the mill ($H) if it has not been homed this session."
 feed = "hand"
 
 [[setups.operations]]
@@ -1001,53 +1158,97 @@ milling_cuts = [
 [[setups]]
 machine_kind = "other"
 title = "Saw the slit"
-machine = "PM-30MV CNC (FluidNC, CNCjs) / vise, swivel off; the slotting saw on the R8 1 in arbor"
+machine = "PM-30MV CNC (FluidNC, CNCjs) / vise, swivel off; the 2-3/4 × .064 slitting saw on the R8 stepped saw arbor"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The 1 in and 1/2 in parallels stacked against each jaw, their right ends at or left of the right jaw side. The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; TOP to the RIGHT, standing {{process.slit_overhang_mm:in.2dot}} in past the right jaw side. The spacer strip (Setup 2) standing on end on the vise bed at the jaws' left end (its 2-1/4 length upright, a .44 × .80 end down), the stacks ending to its right, gripped by the bare jaws on its two .44 faces. Tap the block down onto both stacks while closing the vise."
-datum = "Program DT11_slit. G54: X0 TOP (right, the block to −X), Y0 the fixed jaw's face (N), Z0 the stacks' top (E), set from the miked width with the saw's lower face. The file's Z is the saw's lower face; it loads no tool."
-diagram = { file = "diagrams/slit.svg", alt = "The block on edge on stacked parallels, E down, gripped on N and S, TOP .75 in past the right jaw side; the slotting saw, horizontal on its arbor, saws the slit in from TOP across the block's depth, its spacers and nut past the end." }
+holding = "The 1 in and 1/2 in parallels stacked against each jaw, their right ends at or left of the right jaw side. The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; TOP to the RIGHT, standing {{process.slit_overhang_mm:in.2dot}} in past the right jaw side. The spacer strip (Setup 2) standing on end on the vise bed at the jaws' left end (its 2-1/4 length upright, a .44 × .80 end down), the stacks ending to its right: the bare jaws grip it on its two wide faces (the bar's faces: Setup 2 left it no thicker than the block and at most {{process.spacer_under_max_mm:in.3dot}} thinner), its .80 width along the jaws. If Setup 2 wrote a larger difference on it, feeler leaves between it and the moving jaw bring it to within {{process.spacer_under_max_mm:in.3dot}} under the block, never over. Tap the block down onto both stacks while closing the vise. The saw works right of TOP: the arbor's body above the saw and its cap and screw below pass beside the TOP end, right of the jaws."
+datum = "Program DT11_slit. G54: X0 TOP (right, the block to −X), Y0 the fixed jaw's face (N), Z0 the stacks' top (E), set from the miked width with the saw's lower face touched off on W. The file's Z is the saw's lower face; it loads no tool."
+diagram = { file = "diagrams/slit.svg", alt = "The block on edge on stacked parallels, E down, gripped on N and S, TOP .75 in past the right jaw side; the slitting saw, horizontal on the stepped arbor, saws the slit in from TOP across the block's depth, the arbor's body above the saw and its cap and screw below it, both past the end." }
 envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.slit_depth_mm}}", 5.08], y_span_mm = ["{{process.saw_dia_mm}}", "{{process.depth_target_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.width_target_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.saw_cut_z_mm}}"], longest_tool_mm = "{{process.saw_arbor_length_mm}}", shortest_tool_mm = "{{process.saw_arbor_length_mm}}" }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.depth_target_mm}}", along_jaws_mm = "{{process.length_target_mm}}", part_height_mm = "{{process.width_target_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_slit_inset_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "as_bought", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.length_target_mm}}"], clamp_mm = [0, 33.528], section_mm = { y = "{{process.depth_target_mm}}", z = "{{process.width_target_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Mic the slotting saw's thickness at three places round its rim (Penn Tool 10-200-445, TO BUY; not in hand: tag the block AWAITING SLOTTING SAW and stop here)."
-inspection = "Every reading {{process.blade_min_mm:in.3dot}}–{{process.blade_max_mm:in.3dot}}: the slit is the blade plus at most .003 of runout, inside {{cad.slit_width_min_in:.3dot}}–{{cad.slit_width_max_in:.3dot}}. Outside: stop and tell the owner."
-gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.blade_min_mm}}", "{{process.blade_max_mm}}"] }]
+instruction = "Mic the slitting saw's thickness at three places round its rim; write the largest down. Calipers over two opposite tooth tips: its diameter."
+inspection = "Every thickness reading {{process.blade_min_mm:in.3dot}} or more and under {{process.kerf_max_mm:in.3dot}} (the saw is a .064). The diameter {{process.saw_dia_min_mm:in.2dot}}–{{process.saw_dia_max_mm:in.2dot}} (the slit's depth is laid out on a 2.750 saw). Outside: stop and tell the owner."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.blade_min_mm}}", "{{process.kerf_max_mm}}"] }, { gauge = "calipers", band_mm = ["{{process.saw_dia_min_mm}}", "{{process.saw_dia_max_mm}}"] }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mic every spacer of the TTC 67-600-016 R8 1 in arbor (TO BUY) that will sit within .375 above or below the saw, and the nut across its corners."
-inspection = "Each spacer under {{process.saw_collar_dia_max_mm:in.2dot}} in (else it meets TOP at the slit's full depth), the nut under {{process.saw_nut_dia_max_mm:in.2dot}} in. DT11 assumes these sizes. Over: stop and tell the owner."
+instruction = "At the bench, the arbor's shank upright in the soft-jawed vise, pilot step up: wipe the shoulder, both faces of the saw and the cap clean and dry. The saw onto the 1 in pilot step, flat on the shoulder, its teeth leaning clockwise seen from the shank end (they cut with M3). The cap on it."
+inspection = "The saw flat on the shoulder and the cap flat on the saw, no gap."
 gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Before clamping: mic E to W at the TOP end and write it down (mm = in × 25.4); the saw's Z0 is set from it. Clamp the block as Holding says. Home the mill ($H)."
+speed_kind = "other"
+tool = "torque-wrench"
+drilling = "none"
+sizing = "other"
+instruction = "Tighten the cap's screw (M8 × 1.25 countersunk hex socket) to {{process.saw_clamp_torque_nm:g}} N·m (15 ft·lb): the 5 mm hex bit on the torque wrench. No torque wrench covering 15 ft·lb with a 5 mm hex bit to hand: stop: run no saw program; tell the owner."
+inspection = "The combination square's blade on edge across the cap's face: the screw's head under it or flush; proud, at most {{process.saw_screw_stand_max_mm:in.2dot}} by the calipers' depth rod. Outside: stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.saw_screw_stand_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Before clamping: mic E to W at the TOP end and write it down (mm = in × 25.4); the saw's Z0 is set from it. Clamp the block as Holding says. Home the mill ($H) if it has not been homed this session."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Every time the block is clamped, before the arbor goes in: hold the combination square's blade flat against the jaws' right side, across the right ends of both stacks of parallels, under the block's overhanging end."
+inspection = "The blade touches no parallel: both stacks end at or inside the jaws' right side. Right of TOP the arbor's cap and its screw pass down to {{process.saw_below_stack_top_mm:in.2dot}} below the stacks' top. A parallel out: unclamp, slide it in and clamp again as Holding says."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 X0 TOP (right), Y0 the fixed jaw's face: edge finder (900 rpm); then Z fully up."
-instruction_detailed = "Edge finder (900 rpm), in the collet: on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on TOP from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of TOP). Then $H: Z goes to the machine top, G54 stays."
+instruction_detailed = "Edge finder (900 rpm), in the collet: on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on TOP from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of TOP). Then MDI G53 G0 Z0: Z goes to the machine top."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Spindle stopped (M5). Take out the collet; mount the arbor (drawbar tight), the saw between the spacers just checked, at least {{process.saw_spacer_above_min_mm:in.3dot}} of them above it and {{process.saw_spacer_below_min_mm:in.3dot}} below, then the nut; teeth cutting with M3 (clockwise seen from above)."
-inspection = "The nut's upper face at least {{process.saw_spacer_below_min_mm:in.3dot}} and the arbor's lowest point at most {{process.saw_below_max_mm:in.2dot}} below the saw's lower face (the calipers' depth rod). Outside: change the spacers, or stop and tell the owner."
-gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.saw_spacer_below_min_mm}}", "{{process.saw_below_max_mm}}"] }]
+instruction = "Spindle stopped (M5). Take out the collet. Wipe the arbor's shank and the spindle's taper clean; the arbor with its saw into the spindle, cap down, drawbar tight. Calipers' depth rod: the arbor's body from the saw's upper face up to the first thing wider than it (the arbor's flange or the spindle nose)."
+inspection = "{{process.saw_nose_above_min_mm:in.2dot}} or more (about .90 expected). Less: stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.saw_nose_above_min_mm}}", "{{process.saw_arbor_nose_to_cap_mm}}"] }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Confirm Z is at the machine top (no move since the $H), then MDI G0 X{{process.saw_touch_x_mm:.3f}} Y{{process.saw_touch_y_mm:.3f}} (X and Y only): the saw's rim 3 mm in over TOP, its spacers and nut past the end."
+speed_kind = "other"
+tool = "dti"
+drilling = "none"
+sizing = "other"
+instruction = "Side runout, at every mounting of the arbor in the spindle (the taper never seats it quite the same twice), spindle stopped: the lever indicator's magnetic base on the mill's head, its stylus on the saw's upper face 1/8 in in from the teeth. One full turn by hand, backward (anticlockwise seen from above)."
+inspection = "The needle's swing plus the saw's thickness written down: at most {{process.kerf_max_mm:in.3dot}} ({{process.saw_side_tir_nominal_mm:in.3dot}}, 0.10 mm, of swing for a .064 saw). Over: take the arbor out, wipe its shank and the taper, mount it and read again. Still over: at the bench, loosen the screw, wipe, turn the saw a quarter turn round on the pilot and tighten to {{process.saw_clamp_torque_nm:g}} N·m; then both runouts again. Over after two such tries: stop and tell the owner."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: spindle stopped, jog Z only, down in CNCjs (0.01 mm steps near the leaf), until a .002 leaf just drags under the saw on W; G10 L20 P1 Z(the E-to-W reading taken before clamping, in mm, + 0.051). DT11 loads no tool."
+instruction = "The lever indicator still on the saw's face: wipe off any old LOW mark, then mark LOW on the tooth under the stylus where the face stands lowest. The Z0 touch-off is made under that tooth."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Prove DT11_slit in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})): it rises straight to its clear height before any X or Y move; the saw, spacers and nut clear the block, the jaws and the stacks. Then Z0 back."
+speed_kind = "other"
+tool = "dial-indicator"
+drilling = "none"
+sizing = "other"
+instruction = "Tip runout, every time the saw has been clamped on the arbor, spindle stopped: the .001 dial indicator on the same base, its plunger square on the saw's rim. One full turn by hand, backward: read the needle's peak at each tooth (the plunger drops into the gullets between) and take the highest and the lowest. Then the indicator and its base off the mill."
+inspection = "Highest to lowest at most {{process.saw_tip_tir_max_mm:in.3dot}}. Over: at the bench, loosen the screw, wipe, turn the saw a quarter turn round on the pilot and tighten to {{process.saw_clamp_torque_nm:g}} N·m; then both runouts again. Over after two such tries: stop and tell the owner."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Both runouts accepted: wipe off any old marker lines, then with a marker draw one line down the cap's rim and out across the saw's lower face; a second, in line with it, down the arbor's body and out across the saw's upper face. The cap's friction alone drives the saw: the lines show if it slips."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Confirm Z is at the machine top (no move since the G53 G0 Z0), then MDI G0 X{{process.saw_touch_x_mm:.3f}} Y{{process.saw_touch_y_mm:.3f}} (X and Y only): the saw's rim 3 mm in over TOP, the arbor's cap past the end."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: spindle stopped, turn the saw by hand until the tooth marked LOW is the one over W. Jog Z only, down in CNCjs (0.01 mm steps near the leaf), until a .002 leaf just drags under that tooth on W; G10 L20 P1 Z(the E-to-W reading taken before clamping, in mm, + 0.051). DT11 loads no tool."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove DT11_slit in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})): it rises straight to its clear height before any X or Y move; the saw, the arbor's body, its cap and the screw clear the block, the jaws and the stacks; it stops once after its first pass, spindle stopped (Cycle Start). Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -1055,21 +1256,39 @@ speed_kind = "spindle"
 tool = "slit-saw"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT11_slit (the saw; set 100): three passes along +Y across the block's depth (conventional: the saw turns clockwise right of TOP), each {{process.slit_step_max_mm:in.3dot}} or less deeper into TOP, to {{process.slit_depth_mm:in.3dot}} REF: into the adjuster. Cutting oil on the saw."
+instruction = "Run DT11_slit (the saw; set 100, in the L range): one light pass along +Y across the block's depth, {{process.slit_first_pass_mm:in.3dot}} into TOP. Conventional: the saw turns clockwise right of TOP, so at the block its teeth run +Y, the way it is fed, and the cut pushes back against the feed (fed −Y it would grab and turn on the arbor). The file then lifts the saw clear and stops the spindle (M0). Cutting oil on the saw."
 rpm = 100
 feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
-  { name = "slit", kind = "side", phase = "finish", cutter_dia_mm = "{{process.saw_dia_mm}}", flutes = 168, rpm = 100, feed_mm_min = "{{process.saw_feed_per_min_mm}}", axial_doc_mm = "{{process.saw_thickness_mm}}", radial_woc_mm = "{{process.slit_step_max_mm}}", stations_mm = 0 },
+  { name = "slit first", kind = "side", phase = "rough", cutter_dia_mm = "{{process.saw_dia_mm}}", flutes = 72, rpm = 100, feed_mm_min = "{{process.saw_feed_per_min_mm}}", axial_doc_mm = "{{process.saw_thickness_mm}}", radial_woc_mm = "{{process.slit_first_pass_mm}}", stations_mm = 0 },
 ]
 
 [[setups.operations]]
-instruction = "DT11 has ended with the spindle stopped (M5) and the saw raised clear past TOP; confirm it has stopped. Still clamped: the slit's width with the feeler leaves, at TOP and at the adjuster."
-inspection = "The {{cad.slit_width_min_in:.3dot}} leaf enters the slit to the adjuster; the {{cad.slit_width_max_in:.3dot}} leaf does not. The slit opens into the adjuster's thread, and W's #30 opens full round into the slit. Outside: stop and tell the owner."
+instruction = "At the M0, the spindle stopped and the saw clear of the block: look at the two marker lines."
+inspection = "Both lines unbroken across the cap, the saw and the arbor's body: Cycle Start. A line broken (the saw has slipped on the arbor): stop the file and tell the owner."
 gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Unclamp; take the arbor off and put the collet back."
+speed_kind = "spindle"
+tool = "slit-saw"
+drilling = "none"
+sizing = "other"
+instruction = "Same file after Cycle Start (the saw; still 100): three more passes along +Y, each {{process.slit_step_mm:in.3dot}} deeper into TOP, to {{process.slit_depth_mm:in.3dot}} REF: into the adjuster. Cutting oil on the saw."
+rpm = 100
+feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "slit", kind = "side", phase = "finish", cutter_dia_mm = "{{process.saw_dia_mm}}", flutes = 72, rpm = 100, feed_mm_min = "{{process.saw_feed_per_min_mm}}", axial_doc_mm = "{{process.saw_thickness_mm}}", radial_woc_mm = "{{process.slit_step_max_mm}}", stations_mm = 0 },
+]
+
+[[setups.operations]]
+instruction = "DT11 has ended with the spindle stopped (M5) and the saw raised clear past TOP; confirm it has stopped. Still clamped: the slit's width with the feeler leaves, at TOP and at the adjuster."
+inspection = "Leaves stacked to {{cad.slit_width_min_in:.3dot}} enter the slit to the adjuster; leaves stacked to {{cad.slit_width_max_in:.3dot}} do not. The slit opens into the adjuster's thread, and W's #30 opens full round into the slit. Outside: stop and tell the owner."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "MDI G53 G0 Z0: Z only, to the machine top; X and Y stay. The arbor's shank drops out downward, and it has that room only up there, the saw and its cap clear above the vise. Then unclamp, take the arbor out of the spindle and the saw off it at the bench; put the collet back."
 feed = "hand"
 
 [[setups]]
@@ -1083,7 +1302,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Hold: a block tagged AWAITING 4-40 BOTTOMING TAP goes back to Setup 5 for the bottoming tap and the thread-depth check before anything here."
+instruction = "Hold: a block tagged AWAITING 4-40 BOTTOMING TAP goes back to Setup 5 (its last op) for the bottoming tap and the thread-depth check before anything here."
 feed = "hand"
 
 [[setups.operations]]
@@ -1111,7 +1330,7 @@ gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.adjuster_height_band_
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Fits: a 4-40 screw runs from E across the slit into W's #30 and draws the two halves together; a 1/4-28 screw runs through the adjuster; the foot hole takes its 4-40 screw to the Setup 5 depth."
+instruction = "Fits: a 4-40 screw runs in from W through the #30, across the slit into the E half's thread, and draws the two halves together; a 1/4-28 screw runs through the adjuster; the foot hole takes its 4-40 screw to the Setup 5 depth."
 inspection = "Each runs in by hand and seats. Any failure: stop and tell the owner."
 gauge_checks = "other"
 feed = "hand"

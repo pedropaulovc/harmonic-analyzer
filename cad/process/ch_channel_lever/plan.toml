@@ -121,11 +121,14 @@ pocket_b_floor_mm = 5.3213
 pocket_a_floor_mm = 5.3086
 face_removal_max_mm = 0.3048
 # Face B's widest bite: the measured face setting
-# (settings.em-half-carbide-1018-v5-face, dechatter v5, 2026-11-22: stable to
-# 3.4 mm wide at up to 1.27 mm deep; cad/config/shop-equipment/
-# measured-cuts.toml). CL01's first row takes exactly this much, every later
-# row its even share of the rest (cam.py checks every pass).
-face_stepover_max_mm = 3.4
+# (settings.em-half-carbide-1018-3439-face, dechatter session of 2026-11-23,
+# #3439: stable to 6.4 mm wide at up to 1.27 mm deep, 2420-2490 rpm in the
+# cut; cad/config/shop-equipment/measured-cuts.toml). CL01's first row takes
+# exactly this much, every later row its even share of the rest, 6.38 mm:
+# 16 rows across the load (15 would need 6.81 mm, over the limit; cam.py
+# checks every pass). Every measured pass was conventional and the face
+# zigzags, so every other row climbs, not measured.
+face_stepover_max_mm = 6.4
 # Holding (shop workholding.vise-pm-6): the spoil plate (1/2 in 6061, 3.9 x
 # 6 in, its top faced) on two 1 in parallels (fixtures.parallels-lms-6745),
 # one against each jaw; the blanks on the plate, gripped by their edges.
@@ -231,12 +234,12 @@ lever_end_mm = 191.1028
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set 1.10 in out of the collet, the tool
-# assembly the dechatter cuts were measured with (cad/config/shop-equipment/
-# measured-cuts.toml; owner, Pedro, 2026-11-22: "stickout is recorded as 30mm
-# but is actually 27.94"); 1/8 in end mill, 1-1/2 in overall: at least .75 in
-# out.
-half_mill_projection_mm = 27.94
+# 1/2 in end mill, 3 in overall: set 1.12 in (28.45 mm) out of the collet
+# (owner, Pedro, 2026-11-24: "28.45"), the longer end of the stick-out the
+# measured face setting allows (cad/config/shop-equipment/
+# measured-cuts.toml: 27.94 to 28.45 mm); 1/8 in end mill, 1-1/2 in overall:
+# at least .75 in out.
+half_mill_projection_mm = 28.45
 eighth_mill_projection_min_mm = 19.05
 # ASME B94.11M jobber, D: 4 in overall; the reamer bounded by 6 in.
 drill_d_oal_mm = 101.6
@@ -336,7 +339,7 @@ beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.blank_length_m
 
 [[setups.operations]]
 instruction = "Every lot, before the first load: Home ($H); console M6 T1. Clamp the new spoil plate alone on the parallels and face its top .005, once."
-instruction_detailed = "Home the mill ($H). Console M6 T1 (1/2 in end mill, 1.10 in out of the collet; the tool setter measures it). Clamp the new spoil plate alone across the jaws on the parallels, its LEFT edge to the left. Set 2650 and face its top .005 by hand jog in overlapping passes, once: a second facing could lift the jaws' top over the band below."
+instruction_detailed = "Home the mill ($H). Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Clamp the new spoil plate alone across the jaws on the parallels, its LEFT edge to the left. Set 2650 and face its top .005 by hand jog in overlapping passes, once: a second facing could lift the jaws' top over the band below."
 feed = "hand"
 
 [[setups.operations]]
@@ -378,8 +381,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CL01_face_b (M6 T1; set 2370): face B of all four blanks to {{process.hub_thickness_mm:in.4dot}} above the spoil plate in one level, zigzag rows along X at most {{process.face_stepover_max_mm:in.3dot}} apart, at most {{process.face_removal_max_mm:in.3dot}} deep."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run CL01_face_b (M6 T1; set 2450: the display rests near 2485, not 2380): face B of all four blanks to {{process.hub_thickness_mm:in.4dot}} above the spoil plate in one level, zigzag rows along X at most {{process.face_stepover_max_mm:in.3dot}} apart, at most {{process.face_removal_max_mm:in.3dot}} deep."
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "face b", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_removal_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.blank_length_min_mm}}"] },
 ]

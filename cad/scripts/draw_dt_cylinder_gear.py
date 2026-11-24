@@ -60,7 +60,6 @@ import _telemetry
 from dt_cylinder_gear_notes import (
     BORE_FIT_CALLOUT,
     CAM_WALL_NOTE,
-    STACK_FIT_CALLOUT,
     TOOTH_RUNOUT_TIR_MM,
 )
 from dt_cylinder_gear_phase_band import (
@@ -206,16 +205,16 @@ FACE_WIDTH_TEXT = (0.240, 0.207)
 # the stacking text, outside the (90°) arc).
 CAM_REFERENCE_TEXT = (0.180, 0.336)
 CAM_FINISH_SYMBOL = (0.152, 0.303)
+# Rule 4 (guidelines major_version 2): a callout names the mate and the fit,
+# never the reason; why each band stays is in the necessity register
+# (cad/config/necessity/dt-cylinder-gear.yaml). The face width and the
+# stacking thickness have no mate to try, so they carry no words.
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_FIT_CALLOUT,
     "OutsideDia": "MESHES WITH CONE\nGEARS MHA-DT-03",
-    # Within the .300 stack, the rim width leaves the cam its length, the
-    # axial room MHA-CH-03 runs in (machinist review of #2712: "ROD-RING
-    # SLOT" was a private phrase, rule 26). Rows <= 18 characters.
-    "FaceWidth": "SETS CAM LENGTH\nFOR MHA-CH-03",
-    "CamDia": "RUNNING FIT IN MHA-CH-03;\nTHROW SETS CHANNEL GAIN",
-    # "CAM PHASE" was a private phrase too (same review, rule 26).
-    "NotchWidth": "ALIGNMENT NOTCH\nSETS CAM ANGLE TO MHA-DT-03",
+    "CamDia": "RUNNING FIT IN MHA-CH-03",
+    # "CAM PHASE" was a private phrase (machinist review of #2712, rule 26).
+    "NotchWidth": "ALIGNMENT NOTCH",
 }
 # The crescent wall's stated minimum (rule 20) lands on the cam OD at the
 # thin side, 10 degrees off the -Y axis so the pick misses the bore's centre
@@ -315,10 +314,6 @@ requirement(
         ),
         "face_width_nominal": (FACE_WIDTH, ("FACE_WIDTH",)),
         "face_width_from": ("back_face", ((_SELF, "RIGHT_KEEP"),)),
-        "face_width_callout": (
-            DIMENSION_CALLOUTS["FaceWidth"],
-            ((_SELF, "DIMENSION_CALLOUTS"),),
-        ),
     },
     precision={"face_width": _P["FaceWidth"]},
 )
@@ -347,10 +342,6 @@ requirement(
         ),
         "thickness_nominal": (OVERALL_THICKNESS, ("OVERALL_THICKNESS",)),
         "thickness_from": ("back_face", ((_SELF, "RIGHT_KEEP"),)),
-        "thickness_callout": (
-            STACK_FIT_CALLOUT,
-            ((_NOTES, "STACK_FIT_CALLOUT"),),
-        ),
     },
     precision={"thickness": _P["OverallThickness"]},
 )
@@ -450,9 +441,12 @@ requirement(
     },
     precision={"dia": _P["CamDia"], "throw": _P["CamCy"], "finish_ra": 1},
 )
-# The bore on the origin, Ø.3760 +.0005/.0000 REAM THRU (FRONT_KEEP
-# "BoreDia" with BORE_FIT_CALLOUT): its running fit on the MHA-DT-13 shaft,
-# Ra 63.
+# The bore on the origin, Ø.3760 REAM THRU, MHA-DT-13 ENTERS, NO SHAKE
+# (FRONT_KEEP "BoreDia" with BORE_FIT_CALLOUT), Ra 63. The sheet prints the
+# reamer's size and no band (fit audit 2026-11-23, rule 4 form 3): "dia" is
+# the spec's analysis band, what the .3760 reamer is expected to cut, which
+# the route sizes its reaming and its fit and runout arithmetic to; the
+# callout is the acceptance.
 requirement(
     "bore",
     kind="hole",
@@ -967,22 +961,6 @@ def build(adapter: Any) -> dict[str, str]:
         {"FaceWidth": FACE_WIDTH_TEXT},
     )
     _leader_outside_arrow(adapter, front_annotations, "CamDia")
-    overall_annotations = [
-        annotation
-        for annotation in right_annotations
-        if dimension_name(adapter, annotation) == "OverallThickness"
-    ]
-    if len(overall_annotations) != 1:
-        raise RuntimeError("expected one overall (stacking) thickness dimension")
-    overall_display = _early_bound(
-        overall_annotations[0].GetSpecificAnnotation(), "IDisplayDimension"
-    )
-    # Keep the stacking requirement with the toleranced nominal in the linear
-    # dimension's primary text.  Its callout-above slot did not render in the
-    # native export (the former cam-thickness fit callout).
-    overall_prefix = f"{STACK_FIT_CALLOUT}\n"
-    overall_display.SetText(1, overall_prefix)
-
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to cam-side front view")
 
@@ -1072,11 +1050,9 @@ def build(adapter: Any) -> dict[str, str]:
     # before the finalizer shades it (PR #1436).
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
-    # Check the complete native requirement after all annotation formatting.
+    # Rebuild once after all annotation formatting.
     drawing_model.EditRebuild3()
     drawing_model.GraphicsRedraw2()
-    if str(overall_display.GetText(1) or "") != overall_prefix:
-        raise RuntimeError("overall thickness stacking text did not persist")
     return finalize_drawing(
         adapter,
         OUTPUTS,

@@ -138,8 +138,8 @@ cite = ["OnlineMetals 1018 cold-finish round, read live 2026-11-12", "https://gi
 
 # MHA-SM-02 knife mounts (owner ruling 2026-11-10 (Pedro), #2334 option B1).
 # Length 6 in (was 4 in): the traveler (cad/process/sm_knife_mount) saws two
-# blanks and a trial coupon for the 12 mm reamer (the reamer record's "trial-cut
-# a scrap of the same bar"), each 1.05-1.15 in, with a 1/8 in kerf each and a
+# blanks and a trial coupon for the .4990 reamer (tools.reamer-4990; the
+# traveler trial-cuts a scrap of the same bar), each 1.05-1.15 in, with a 1/8 in kerf each and a
 # squaring cut off the supplier's end: 3.95 in at worst, too close to 4.
 # Supplier: no 5/8 x 1-1/4 pre-hardened bar is listed at Online Metals (its
 # 4140 heat-treated rectangle list stops at 5/8 x 2) or Key Metals (5/8 x 1,
@@ -150,7 +150,7 @@ cite = ["OnlineMetals 1018 cold-finish round, read live 2026-11-12", "https://gi
 [stock.4140-ht-flat-5-8x1-1-4]
 form = "flat_bar"
 material = "4140/4142 HT alloy steel, pre-hardened 28-32 HRC as supplied"
-note = "To order: 5/8 x 1-1/4 in 4140/4142 HT (pre-hardened, 28-32 HRC) flat bar, 6 in, with the mill certificate (the traveler checks grade and hardness on it). Allocation: the two MHA-SM-02 knife mounts (each 1.00 x 1.17 x .55 finished, cut from the bar with facing stock) and one trial coupon for the 12 mm reamer. No heat treatment in the shop; both fits and the tap are cut in the supplied condition. Not owned."
+note = "To order: 5/8 x 1-1/4 in 4140/4142 HT (pre-hardened, 28-32 HRC) flat bar, 6 in, with the mill certificate (the traveler checks grade and hardness on it). Allocation: the two MHA-SM-02 knife mounts (each 1.00 x 1.17 x .55 finished, cut from the bar with facing stock) and one trial coupon for the .4990 reamer (tools.reamer-4990). No heat treatment in the shop; both fits and the tap are cut in the supplied condition. Not owned."
 section_mm = [31.75, 15.875]
 length_mm = 152.4
 status = "to_order"
@@ -195,6 +195,11 @@ cite = ["https://github.com/pedropaulovc/harmonic-analyzer/issues/2359", "cad/co
 # treatment for now; pd-latch-hook should be changed to not require heat
 # treatment", then the half-hard brass strip below) and MHA-PD-03 platen
 # clip (cad/process/pd_platen_clip/plan.toml).
+# Owner ruling 2026-11-24 (form): "Use the sheet; buy strip only if the hook
+# takes a set." The on-hand .032 x 6 x 6 in sheet (stock-bought.toml
+# c260-sheet-032-6x6) is used first, the latch hook cut first as the temper
+# trial; this strip is NOT bought unless that hook takes a set. The row stays
+# because the platen-clip plan's stock line still names it.
 [stock.c260-h02-strip-032x2]
 form = "strip"
 material = "C26000 cartridge brass, H02 half hard, ASTM B36"
@@ -284,24 +289,6 @@ length_in = [3.0]
 status = "to_order"
 cite = ["cad/config/parts/ch-rocker-strap-tl-hub-plug.yaml material_specification"]
 
-[stock.drill-rod-1-8]
-form = "round_bar"
-material = "drill rod (O1 or W1 tool steel, annealed, ground)"
-note = "To order: 1/8 in drill rod, at least 3 in (one .56 in pin, dt_crank_pinion_pin_spec.PIN_LEN 14.224 mm, plus facing, parting and a chucking end). Source: the dt-crank-pinion-pin (MHA-DT-29) registry row, AISI 1018 CF rod or stock 1/8 in drill rod, diameter as supplied; no 1/8 in round of either is owned. Supplier, length and price not read. Not owned."
-dia_in = [0.125]
-length_in = [3.0]
-status = "to_order"
-cite = ["cad/config/parts/dt-crank-pinion-pin.yaml material_specification, process", "cad/scripts/dt_crank_pinion_pin_spec.py PIN_LEN"]
-
-[stock.o1-drill-rod-5-32]
-form = "round_bar"
-material = "AISI O1 drill rod, precision ground"
-note = "To order: McMaster-Carr 8893K162, 5/32 in O1 drill rod, .1563 +/-.0005 in, at least 4 in (two .86 in sawn blanks for the .79 in cam-follower pins with their crowns, dt_pinion_cam_pin_geometry.PIN_LEN 20.066 mm, one more for a remake, the saw kerfs and about 1 in held in the saw vise for the last cut). Source: the dt-pinion-cam-pin (MHA-DT-25) registry row (owner ruling #290, 2026-10-30), diameter as supplied. Catalogue length and price not read. Not owned."
-dia_in = [0.15625]
-length_in = [4.0]
-status = "to_order"
-cite = ["cad/config/parts/dt-pinion-cam-pin.yaml material_specification", "cad/scripts/dt_pinion_cam_pin_geometry.py PIN_DIA, PIN_LEN"]
-
 [stock.taper-pin-no3-1-3-4]
 form = "taper_pin"
 material = "12L14 carbon steel, ASME B18.8.2 No. 3 taper pin"
@@ -311,15 +298,6 @@ length_in = [1.75]
 pieces = 25
 status = "to_order"
 cite = ["cad/config/parts/dt-crank-pin.yaml material_specification", "cad/scripts/dt_crank_pin_spec.py SKU, DESIGNATION, PIN_LENGTH, BIG_END_DIA"]
-
-[stock.drill-rod-1-16]
-form = "round_bar"
-material = "AISI O1 drill rod, turned, ground and polished"
-note = "To order: Abrams Industries SKU 106183, 1/16 in O1 drill rod, .0625 +/-.0003 in, 36 in (+.125/-0), $5.75. Allocation: dt-pinion-lever-pin (MHA-DT-30), one .65 in piece hand-sawn off a filed end and filed to the .63 cut length (dt_pinion_lever_pin_geometry.PIN_LEN 16.002 mm), diameter as supplied (the sheet's .0625 +/-.0003, 1/16 DRILL ROD, STOCK OK); the rest is spare for remakes. Source: the dt-pinion-lever-pin registry row, AISI O1 or W1 drill rod, 1/16 in. Not owned."
-dia_in = [0.0625]
-length_in = [36.0]
-status = "to_order"
-cite = ["Abrams Industries O1-DR 1/16 x 36 https://us.abrams-industries.com/steel/tool-steel/o1/dr-36/o1-dr-1-16-x-36 read live 2026-11-21: SKU 106183, turned, ground and polished, diameter +/-0.0003 in, length saw cut +0.125/-0.000 in, $5.75", "cad/config/parts/dt-pinion-lever-pin.yaml material_specification", "cad/scripts/dt_pinion_lever_pin_geometry.py PIN_DIA, PIN_LEN"]
 
 [stock.key-stock-1-16-undersized]
 form = "square_bar"

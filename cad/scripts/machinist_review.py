@@ -110,6 +110,7 @@ import _telemetry  # noqa: E402
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME  # noqa: E402
 from _paths import CAD_ROOT  # noqa: E402
 from machinist_exceptions import load_exceptions as _load_exceptions  # noqa: E402
+import machinist_necessity as _necessity  # noqa: E402
 import machinist_review_config as review_config  # noqa: E402
 import machinist_review_transport as _claude_transport  # noqa: E402
 from machinist_review_transport import TransportError as _ClaudeTransportError  # noqa: E402
@@ -401,6 +402,36 @@ def _package_exceptions(package: ReviewPackage) -> tuple[Any, ...]:
     return _load_exceptions(CAD_ROOT / "config", package.name, package.kind)
 
 
+def _package_necessity(package: ReviewPackage) -> tuple[Any, ...]:
+    """The package's necessity register (rule 4); a traveler has none."""
+    if package.kind == "traveler":
+        return ()
+    return _necessity.load_necessity(CAD_ROOT / "config", package.name)
+
+
+def _necessity_section(package: ReviewPackage) -> str:
+    """The register as the reviewers and the judge read it. Printed for every
+    drawing package, entries or none: an absent register is itself the fact
+    rule 4 turns on."""
+    text = (
+        "\nNECESSITY REGISTER\n"
+        "Rule 4's necessity answers for this package. They are registered "
+        "here, not printed on the sheet. An entry covers the REAM or tight "
+        "band its feature text identifies; one that no entry covers has no "
+        "answer. Each entry gives its kind and its reason.\n"
+    )
+    entries = _package_necessity(package)
+    if not entries:
+        return text + "This package registers no entry.\n"
+    for entry in entries:
+        source = f" (source: {entry.source})" if entry.source else ""
+        text += (
+            f"- {entry.id} [{entry.kind}: {_necessity.KINDS[entry.kind]}] at "
+            f"{entry.feature}: {entry.reason}{source}\n"
+        )
+    return text
+
+
 def _review_prompt(
     package: ReviewPackage,
     sheet_count: int,
@@ -463,6 +494,8 @@ def _review_prompt(
             f"{fitup}\n"
         )
     if package.sources:
+        if package.kind != "traveler":
+            prompt += _necessity_section(package)
         exceptions = _package_exceptions(package)
         if exceptions:
             prompt += (
@@ -2090,6 +2123,7 @@ def _review_session(
             }
             for exception in _package_exceptions(package)
         ],
+        "necessity": [asdict(entry) for entry in _package_necessity(package)],
         "context_errors": context_errors,
         "session_id": next(
             (record["session_id"] for record in attempt_records if record["outcome"] == "succeeded"),

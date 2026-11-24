@@ -10,9 +10,31 @@
 # _buildgraph.all_config_files() and would re-key every whole-config consumer.
 # No COM build closure reads it: it is in no leaf's cache key.
 
+# Spindle speed stops (#3439). The spindle rests only on steps of 2800/26 =
+# 107.7 rpm: turning the knob, it ramps from one stop to the next and stays
+# on none between. Resting speeds observed in the four dechatter sessions of
+# 2026-11-22 and 2026-11-23, heard (the results files' spindle_hz x 60) or
+# read off the display (spindle_rest_observed_rpm, each 0-18 rpm over a
+# multiple of the step): 1511-1515, 1837-1841, 1947-1953, 2269-2282,
+# 2373-2387, 2477-2488, 2582-2601, 2692, 2787-2800. Values between appear
+# only while the spindle ramps. The head's display is a live tachometer, not
+# the setpoint: with the spindle free it reads 3-8 rpm above the heard speed
+# (spindle_display_over_heard_rpm), and in a cut it follows the spindle down.
+# NOT known: the cause (the knob or the drive), and what the display reads
+# at the 2477-2488 stop, which was used only on 2026-11-23 and not filmed.
+# Sources: owner (Pedro) 2026-11-24, "check D:\HarmonicAnalyzer videos for
+# actual speeds; 28.45"; his videos DJI_20261122173617_0018_D (v5) and
+# DJI_20261122181554_0019_D (v6), read frame by frame against the sessions'
+# timelines in https://github.com/pedropaulovc/harmonic-analyzer/issues/3439#issuecomment-7120803633 ;
+# cad/process/dechatter/*-results.json. prechips has no field for these;
+# test_measured_cuts.py checks the step against the results files.
 [machines.pm-30mv]
 kind = "mill"
 status = "on_hand"
+spindle_speed_step_rpm = 107.7
+spindle_speed_steps = 26
+spindle_rest_observed_rpm = [[1511, 1515], [1837, 1841], [1947, 1953], [2269, 2282], [2373, 2387], [2477, 2488], [2582, 2601], [2692, 2692], [2787, 2800]]
+spindle_display_over_heard_rpm = [3, 8]
 note = "Ownership only; its facts are cad/process/shop/, same key. Explicit on_hand preserves the pre-split ASSEMBLY.md OWNED, which read a shop.toml record with no present key as owned."
 
 # The BS-0 semi-universal dividing head (installed on the PM-30MV, #465; its

@@ -31,9 +31,12 @@
 # fixture's stub and clock-pin holes are presses, and the press is the
 # check"; policy PR #3513, tracking issue #3511): no plug gauge pair is
 # bought. Each hole is reamed with its reamer and tried with its own pin,
-# which must not enter by hand. The sheet still prints both .0005 bands
-# until the fit batch (fit-batch-dt) redraws it; this plan follows the
-# approved policy ahead of the sheet.
+# which must not enter by hand. The sheet prints the same, each reamer's
+# size and no band (#3524): PRESS FIT ON TL-VN-50, DOES NOT TURN BY HAND and
+# PRESS FIT ON TL-VN-51, PERMANENT PAIR. Those are read after the press, at
+# MHA-DT-12-TL-00; here each hole is proved a press before the disc leaves
+# the vise. cad.stub_hole_dia_* and cad.pin_hole_dia_* are the spec's
+# analysis bands (what each reamer cuts).
 # Mill speeds are the spindle's stops, 107.7 rpm apart (#3439): 1831, 646,
 # 323, 2800, 1400 and, for the edge finder, 969.
 #
@@ -48,7 +51,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 4 in round (drawing: {{cad.material_name}})"
 stock = "{{process.bar_dia_in:.2f}} in round 1018 CF, the {{process.bar_length_in:.2f}} in piece on hand: one disc ({{process.quantity:d}} off) from one chucking; the rest is kept for a remake."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished Ø{{cad.register_dia_min_in:.3dot}}–{{cad.register_dia_max_in:.3dot}} × {{cad.register_length_min_in:.3dot}}–{{cad.register_length_max_in:.3dot}} thick; the stub hole Ø{{cad.stub_hole_dia_min_in:.4dot}}–{{cad.stub_hole_dia_max_in:.4dot}} through, the clock-pin hole Ø{{cad.pin_hole_dia_min_in:.4dot}}–{{cad.pin_hole_dia_max_in:.4dot}} × {{cad.pin_hole_depth_min_in:.3dot}}–{{cad.pin_hole_depth_max_in:.3dot}} deep, both from face F. Lathe on its low range (70–380 rpm); mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) and touch off G54 at the start of the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every file is proved in air first. Cutting oil on the steel. Edges: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished Ø{{cad.register_dia_min_in:.3dot}}–{{cad.register_dia_max_in:.3dot}} × {{cad.register_length_min_in:.3dot}}–{{cad.register_length_max_in:.3dot}} thick; the stub hole Ø{{cad.stub_hole_dia_min_in:.4dot}} reamed through (press fit on the stub dowel), the clock-pin hole Ø{{cad.pin_hole_dia_min_in:.4dot}} reamed (press fit on the clock pin) × {{cad.pin_hole_depth_min_in:.3dot}}–{{cad.pin_hole_depth_max_in:.3dot}} deep, both from face F. Lathe on its low range (70–380 rpm); mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) and touch off G54 at the start of the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every file is proved in air first. Cutting oil on the steel. Edges: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max."
 shop = "../shop"
 stock_refs = ["1018-round-4"]
 material_key = "rocker-1018-cold-finished"
@@ -349,7 +352,7 @@ feed = "{{process.ream_3740_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
   { name = "stub ream", kind = "drill", phase = "finish", cutter_dia_mm = 9.4996, flutes = 6, rpm = 323, feed_mm_min = "{{process.ream_3740_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
 ]
-inspection = "Stub hole, before unclamping: reamed clean through (visual), and the stub dowel MHA-DT-12-TL-VN-50, offered to the hole's mouth by hand, does not enter (it is pressed in at MHA-DT-12-TL-00)."
+inspection = "Stub hole, before unclamping: reamed clean through (visual), and the stub dowel MHA-DT-12-TL-VN-50, offered to the hole's mouth by hand, does not enter (it is pressed in at MHA-DT-12-TL-00; pressed home there, it does not turn by hand)."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -393,7 +396,7 @@ feed = "{{process.ream_0365_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
   { name = "pin ream", kind = "drill", phase = "finish", cutter_dia_mm = 0.9271, flutes = 4, rpm = 1400, feed_mm_min = "{{process.ream_0365_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
 ]
-inspection = "Pin hole, before unclamping: the clock pin MHA-DT-12-TL-VN-51, offered to the hole's mouth by hand, does not enter (it is pressed in at MHA-DT-12-TL-00). Reamed depth {{cad.pin_hole_depth_min_in:.3dot}}–{{cad.pin_hole_depth_max_in:.3dot}}: take the .0365 reamer out of its holder, mike its length, stand it flutes down in the hole by finger until it stops on the end of its own bore (the #65 hole below is too small for it), and caliper its stand-out above face F; the length less the stand-out is the depth."
+inspection = "Pin hole, before unclamping: the clock pin MHA-DT-12-TL-VN-51, offered to the hole's mouth by hand, does not enter (it is pressed in for good at MHA-DT-12-TL-00). Reamed depth {{cad.pin_hole_depth_min_in:.3dot}}–{{cad.pin_hole_depth_max_in:.3dot}}: take the .0365 reamer out of its holder, mike its length, stand it flutes down in the hole by finger until it stops on the end of its own bore (the #65 hole below is too small for it), and caliper its stand-out above face F; the length less the stand-out is the depth."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pin_hole_depth_band_mm}}" }]
 
 [[setups.operations]]

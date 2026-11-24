@@ -337,7 +337,7 @@ def hub_hole_definitions(definitions: dict[int, str]) -> dict[int, str]:
     (draw_ch_fulcrum_keeper.foot_hole_callout_definitions): its through row
     (part 7, printed first) the drill's Ø, DRILL and the native extent, then
     the thread on the same extent (spec.HUB_THREAD_ROW: the drill is the
-    1/4-20's, its thread cosmetic); the counterbore row (part 5, Ø and depth
+    #10-32's, its thread cosmetic); the counterbore row (part 5, Ø and depth
     as native variables) closing with the plug it locates; the thread's
     stated shortfall below (part 8, rule 20). Four rows, the audit's limit."""
     if set(definitions) != {5, 6, 7, 8}:
@@ -872,7 +872,7 @@ def _set_section_label_text(adapter: Any) -> None:
         raise RuntimeError("native section-label scale text did not persist")
 
 
-# Section B-B cuts the hub's 1/4-20 on its axis: SolidWorks printed its
+# Section B-B cuts the hub's #10-32 on its axis: SolidWorks printed its
 # cosmetic thread's major Ø dashed inside the hatching (machinist review
 # r23; rule 9: a section never carries hidden lines). It moves onto a
 # visible thin continuous layer, the section's own thread line

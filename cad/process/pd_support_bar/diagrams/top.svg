@@ -12,8 +12,8 @@
   <!-- The blank on edge, 3/8 across, T up; the skim drawn thick. -->
   <rect class="part-kept" x="240" y="140.56" width="30" height="79.44"/>
   <rect class="part-removed" x="240" y="137.5" width="30" height="3.06"/>
-  <!-- The 1/2 in end mill on its first pass, .132 in onto the edge. -->
-  <rect class="cutter" x="259.5" y="60" width="40" height="80.56"/>
+  <!-- The 1/2 in end mill on its first pass, .197 in onto the edge. -->
+  <rect class="cutter" x="254.2" y="60" width="40" height="80.56"/>
   <text class="label-halo" x="247" y="160">T</text>
   <line class="datum" x1="60" y1="220" x2="532" y2="220"/>
   <text class="datum-label" x="20" y="214">Z0: the parallels' top</text>
@@ -22,8 +22,8 @@
   <line class="leader" x1="246" y1="138.5" x2="170" y2="112"/>
   <text class="label" x="165" y="106" text-anchor="end">skim .003–.009</text>
   <text class="label" x="165" y="122" text-anchor="end">(drawn thick)</text>
-  <line class="leader" x1="299.5" y1="90" x2="340" y2="80"/>
-  <text class="label" x="344" y="84">1/2 in end mill, pass 1 of 3; the passes run along the bar</text>
+  <line class="leader" x1="294.2" y1="90" x2="340" y2="80"/>
+  <text class="label" x="344" y="84">1/2 in end mill, pass 1 of 2; the passes run along the bar</text>
   <line class="dims" x1="335" y1="140.56" x2="335" y2="158.4"/>
   <line class="dims" x1="301" y1="140.56" x2="525" y2="140.56"/>
   <line class="dims" x1="322" y1="158.4" x2="340" y2="158.4"/>
@@ -38,9 +38,9 @@
   <text class="label-on-clamp" x="360" y="430">fixed jaw</text>
   <text class="label-on-clamp" x="360" y="475">moving jaw</text>
   <rect class="part-kept" x="32" y="440" width="715.4" height="15"/>
-  <circle class="cutter" cx="16.6" cy="435.3" r="10"/>
+  <circle class="cutter" cx="16.6" cy="437.9" r="10"/>
   <line class="arrow" x1="34" y1="424" x2="130" y2="424"/>
-  <text class="label" x="34" y="414">pass 1 +X, pass 2 back, pass 3 +X</text>
+  <text class="label" x="34" y="414">pass 1 +X, pass 2 back</text>
   <line class="datum" x1="745" y1="424" x2="745" y2="470"/>
   <text class="datum-label" x="776" y="418" text-anchor="end">X0, {{process.end_a_skim_mm:in.3dot}} inside the sawn END A</text>
   <text class="label" x="738" y="474" text-anchor="end">END A</text>

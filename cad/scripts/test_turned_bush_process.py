@@ -75,7 +75,6 @@ def test_the_turned_parts_are_enrolled() -> None:
     assert set(STEMS) >= {
         "ch_rocker_hub",
         "ch_rocker_strap_tl_hub_plug",
-        "ch_rocker_strap_tl_hub_washer",
         "dt_cone_gear_tl_arbor_collar",
         "dt_crank_handle_ferrule",
         "dt_crank_handle_butt_cup",

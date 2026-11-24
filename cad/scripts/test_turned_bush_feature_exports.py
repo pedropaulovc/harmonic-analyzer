@@ -13,7 +13,6 @@ import pytest
 
 import ch_rocker_hub_spec as hub
 import ch_rocker_strap_tl_hub_plug_spec as plug
-import ch_rocker_strap_tl_hub_washer_spec as washer
 import dt_cone_gear_tl_arbor_collar_spec as collar
 import dt_crank_handle_butt_cup_seat_spec as cup_seat
 import dt_crank_handle_butt_cup_spec as cup
@@ -93,9 +92,6 @@ _FACES: dict[tuple[str, str | None], dict[str, FaceGeometry]] = {
         "bore": _cylinder(plug.BORE_DIA, _Z),
         "chamfer_far": _cone(plug.OVERALL_LENGTH - plug.CHAMFER, plug.OVERALL_LENGTH),
     },
-    ("ch_rocker_strap_tl_hub_washer", None): _annulus(
-        washer.THICKNESS, washer.OUTER_DIA, washer.BORE_DIA
-    ),
     ("dt_cone_gear_tl_arbor_collar", None): _annulus(
         collar.LENGTH, collar.OD_BY_CONFIGURATION["C175"], collar.BORE
     ),
@@ -216,9 +212,6 @@ def test_printed_bands_are_the_sheets() -> None:
     assert _inch(plug_features["far_end"]["length"]) == [0.267, 0.277]
     assert _inch(plug_features["chamfer_far"]["leg"]) == [0.01, 0.03]
 
-    assert _inch(
-        manifest("ch_rocker_strap_tl_hub_washer")["features"]["outer"]["dia"]
-    ) == [0.52, 0.54]
     collar_features = manifest("dt_cone_gear_tl_arbor_collar")["features"]
     assert [
         collar_features[name]["dia_ref"]
@@ -295,7 +288,6 @@ def test_manifest_notes_are_the_printed_notes() -> None:
     )
     for stem in (
         "ch_rocker_strap_tl_hub_plug",
-        "ch_rocker_strap_tl_hub_washer",
         "dt_cone_gear_tl_arbor_collar",
         "dt_cylinder_end_disc",
         "mg_wheel_axle_spacer",

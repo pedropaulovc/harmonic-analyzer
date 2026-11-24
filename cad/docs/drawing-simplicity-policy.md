@@ -223,11 +223,75 @@ their sheet re-keys for another reason or the review leaf is force-refreshed.
   scale changes. The fixture's Material `LineLength` write
   was observed to persist without widening its wrapped text, so that ineffective
   write is removed for Material only; actual native bounds still decide fit.
-- **Fit-up at assembly (rule 19) is a last resort.** Slots, shims, cut-to-fit
-  and match-drilling open space for sloppy work, so avoid them as much as
-  possible: prefer geometry whose loose bands hold the stack at the worst
-  case. A stated fit-up adjustment is the escape hatch when the stack cannot
-  be held otherwise — never the design default.
+- **Fit-up of a stack at assembly (rule 19) is a last resort; fitting a pair
+  is the default (rule 4).** Slots, shims and cut-to-fit lengths that absorb
+  a multi-part stack open space for sloppy work: prefer geometry whose loose
+  bands hold the stack at the worst case. That does not apply to a single
+  fit. A shaft turned to its hole, a pin bonded in a drilled hole and a hole
+  reamed to the bought shaft are how this machine's fits are made (owner
+  direction 2026-11-23: "can the holes not be reamed in the first place").
+  Where the owner has already accepted a setting at a joint (a shim, a
+  feeler-set gap, a mesh set by feel), the checks of that joint are written
+  after the setting; keeping a worst-case sum beside it double-pays.
+- **The necessity answer lives in a register, not on the sheet.** Rule 4's
+  answer for a REAM or tight band is an entry in
+  `cad/config/necessity/<dashed-drawing-stem>.yaml` (`id`, `feature`, `kind`,
+  `reason`, optional `source`; `cad/scripts/machinist_necessity.py`). Owner
+  ruling 2026-11-24: "In the part's registry file, not on the sheet. The
+  sheet stays clean; the reviewer fails a tight feature that has no registry
+  reason." The register is part of the part's registry, kept as a sibling of
+  `cad/config/parts/<dashed>.yaml` and
+  of the assembly contract rather than a key inside them, because both are
+  content-hashed inputs of the package's SolidWorks leaves: a reason written
+  there would rebuild the part and its drawing. Only the review reads the
+  register, so adding or editing an entry re-reviews that one package and
+  rebuilds nothing; no recipe may read it, and `check:recipe` fails if a COM
+  leaf closure does. An entry is a claim about the machine: code review
+  checks it against the spec module or ruling it cites.
+- **A spec constant that bands a fit carries its necessity.** A `*_BAND`,
+  `*_LIMITS` or fit class narrower than the title block states, in the
+  comment above it, what fails if it is `.002 in` loose and which module
+  computes it (a stack, a mesh check, `error_budget`); the drawing's
+  register entry cites it as its `source`. "Running fit", "the
+  reamer's band" and a fit-table row are not reasons. `error_budget.yaml`
+  already says it: a limit tighter than its allowable "is a fit, process or
+  capability choice, not a benchmark requirement".
+- **A check carries its necessity too.** A floor, budget or guard in a
+  spec module or a test has an entry in `cad/config/checks/<module>.yaml`
+  that says what fails past it, what sets its number and on which basis it
+  is summed (`tolerance-policy.md`, "Checks in spec modules and tests").
+  Like the necessity register it is read by review alone and rebuilds
+  nothing. A joint set or fitted at assembly is checked after its setting,
+  not at the worst case of every band (owner ruling 2026-11-24). A check
+  that closes by less than the shop reads goes to the owner; it is never
+  closed with a tighter part, another inspection or a limit moved by a
+  digit.
+- **No tool or gauge is bought for one feature without an owner ruling.** A
+  plan that names a reamer outside the standard set, a plug gauge or a pin
+  pair for one band is a signal that the drawing is wrong: change the
+  feature's form (rule 4) before adding the inventory record.
+- **A REAM or tight band that fails rule 4's necessity test stays only by a
+  ruling**, the owner's or a delegated one, declared as a
+  `machinist_exceptions` entry (kind `accept`) under the package's own key
+  in the form "Named exceptions" gives. The sheet prints no argument for it.
+- **Sheets held at warn-only during the conversion (temporary).** A drawing
+  listed in `cad/config/machinist-review/demoted.yaml` (stem: the batch that
+  removes the line) runs its review at `LEARN`
+  though its script declares `ENFORCE` (owner ruling 2026-11-24: "Merge the
+  policy now and demote the failing sheets to warn-only ... restoring
+  enforcement per batch"; "better to be able to cut releases with known
+  issues than to hold unreleased code"). The list is read by the review task
+  alone, so adding or deleting a line rebuilds and re-reviews nothing;
+  flipping the declaration in the draw script would rebuild the drawing. The
+  batch that brings a sheet to SHIP deletes its line, and the batch that
+  deletes the last line deletes the file: an empty list fails the graph
+  load, as does a line for a drawing that does not declare `ENFORCE`
+  (tracking issue #3511). No sheet is added without an owner ruling. This
+  is the one adjustment kept in a central file rather than under each
+  package's own key, by the owner's ruling of 2026-11-24 ("Approve." on
+  "92 sheets go on a temporary warn-only list (no rebuilds); each batch
+  removes its lines"): it is temporary, and one file is deleted when the
+  conversion ends.
 - **Thread engagement (rule 18)** is owned by the CAD: the build's seat-fit
   and stack asserts enforce it. Through-tapped receivers use actual retained
   material and external full-form overlap, not blind drilling depths or raw
@@ -274,10 +338,14 @@ frames and no datums. A new entry needs a user ruling or a delegated ruling
 
 ## Named exceptions
 
-A shortfall against rules 17–19 (or another numeric rule) is acceptable only
+A shortfall against rules 17–19 is acceptable only
 by a ruling declared as a `machinist_exceptions` entry (kind `minor`) under
-the package's own key in its config YAML. The thresholds are never loosened to
-admit a shortfall. Each entry is specific to the part it names.
+the package's own key in its config YAML. The wall floor, the 1.5D
+engagement and rule 19's stack are never loosened to admit a shortfall. A
+check an author wrote into a spec module or a test is not such a threshold:
+when its basis is wrong it is re-derived, and the PR says why
+(`tolerance-policy.md`, "Checks in spec modules and tests"). Each entry is
+specific to the part it names.
 
 A ruling is either the owner's own or delegated. A delegated ruling is made by
 the agent coordinating the work when the owner is unavailable, and it must

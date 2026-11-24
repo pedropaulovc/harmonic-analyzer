@@ -151,8 +151,10 @@ def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
     # edge breaks.  #290: the inch grades (.XX +/-.01, .XXX +/-.005) are
     # tighter than the mm ones they replace, so every web grows.  C1 keyed's
     # 1/4-28 end screw (owner decision 2026-11-09, PR #1992) opens the tap
-    # drill to 5.41, thinning the slit mouth and side webs.
-    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(2.934, abs=1e-3)
+    # drill to 5.41, thinning the slit mouth and side webs.  Tool-audit Q10
+    # (.06 slit): the wider slit meets the thread root lower, so its mouth
+    # web grows from 2.934.
+    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(2.956, abs=1e-3)
     assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.889, abs=1e-3)
     assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(4.577, abs=1e-3)
     for web in (
@@ -1122,7 +1124,7 @@ def test_block_feature_bands_are_the_printed_ones() -> None:
     assert adjuster["height_match"] == pytest.approx([_in(-0.003), _in(0.003)])
     assert adjuster["lateral"] == pytest.approx([_in(0.33), _in(0.35)])
     assert adjuster["csk_dia"] == pytest.approx([_in(0.252), _in(0.262)], abs=1e-3)
-    assert features["slit"]["width"] == pytest.approx([_in(0.04), _in(0.06)])
+    assert features["slit"]["width"] == pytest.approx([_in(0.05), _in(0.07)])
     assert features["slit"]["extent"] == "SLOT INTO BORE"
     pinch = features["pinch_tap"]
     assert pinch["thread"] == "#4-40 UNC-2B"

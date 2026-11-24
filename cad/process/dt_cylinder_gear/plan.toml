@@ -65,10 +65,11 @@
 # stays reamed"; policy PR #3513, tracking issue #3511): the bore is reamed
 # with the owned .3760 reamer and accepted by its mate, the 3/8 ground
 # setting mandrel (the MHA-DT-13 shaft's own bar) entering with no shake; no
-# plug gauge pair is bought. The sheet still prints the bore's .0005 band
-# until the fit batch (fit-batch-dt) redraws it; this plan follows the
-# approved policy ahead of the sheet. The gang arbor's journal is made to fit
-# the reamed blanks the same way.
+# plug gauge pair is bought. The sheet prints the same: Ø.3760 REAM THRU,
+# MHA-DT-13 ENTERS, NO SHAKE, with no band (#3524). cad.bore_dia_* is the
+# spec's analysis band, what the reamer is expected to cut, used to size the
+# reaming, the arbor fit and the runout budget. The gang arbor's journal is
+# made to fit the reamed blanks the same way.
 #
 # To order before the first load (records cited): the #2 48DP cutter TTC
 # 10-289-482 (tools.gear-cutters-48dp-20pa), the 7/8 stub arbor HHIP
@@ -96,7 +97,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass, 2-5/8 in round (drawing: {{cad.material_name}})"
 stock = "2-5/8 in round C360 bar (to order, 12 in, shared with the cone gears MHA-DT-03): 20 slices {{process.slice_in:.2dot}} thick. Arbor, once: 7 in of the 5/8 in 1018 CF bar on hand."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Brass cut dry. Lathe PM-1127VF-LB (70-380 and 380-2000 rpm). Teeth: 120, 48DP 20°, cutter #2 (55-134 teeth). Finished O.D. Ø{{cad.teeth_dia_min_in:.3dot}}-{{cad.teeth_dia_max_in:.3dot}}, thickness {{cad.cam_face_thickness_min_in:.3dot}}-{{cad.cam_face_thickness_max_in:.3dot}}, bore Ø{{cad.bore_dia_min_in:.4dot}}-{{cad.bore_dia_max_in:.4dot}}. Twenty gears in two loads of ten: load 1 is gears 0-9. Load 2 (gears 10-19): Setups 5 to 8 again, every op except those marked first load only (the zeros and the depth check are taken again). Setup 9 after both loads."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Brass cut dry. Lathe PM-1127VF-LB (70-380 and 380-2000 rpm). Teeth: 120, 48DP 20°, cutter #2 (55-134 teeth). Finished O.D. Ø{{cad.teeth_dia_min_in:.3dot}}-{{cad.teeth_dia_max_in:.3dot}}, thickness {{cad.cam_face_thickness_min_in:.3dot}}-{{cad.cam_face_thickness_max_in:.3dot}}, bore Ø{{cad.bore_dia_min_in:.4dot}} reamed (the MHA-DT-13 bar enters, no shake). Twenty gears in two loads of ten: load 1 is gears 0-9. Load 2 (gears 10-19): Setups 5 to 8 again, every op except those marked first load only (the zeros and the depth check are taken again). Setup 9 after both loads."
 shop = "../shop"
 stock_refs = ["c360-round-gear-blanks", "1018-round-5-8"]
 material_key = "lathe-c360"

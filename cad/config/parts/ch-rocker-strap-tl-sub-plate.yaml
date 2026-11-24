@@ -14,10 +14,10 @@ ch-rocker-strap-tl-sub-plate:
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "saw one 13 in length from the owned 1/2 x 6 in 6061-T6511 flat and mill a 3.00 in strip off it; CNC: mill both long edges for the vise jaws, face the top, then in one vise setup mill the plate top (Z0) down around the integral fence and end stop, their faces (Y0, X0), the fence notches, the clamp pockets and the hub counterbore; spot, drill and hand-tap the 4-40 and 1/4-20 holes; break edges"
+  process: "saw one 13 in length from the owned 1/2 x 6 in 6061-T6511 flat and mill a 3.00 in strip off it; CNC: mill both long edges for the vise jaws, face the top, then in one vise setup mill the plate top (Z0) down around the integral fence and end stop, their faces (Y0, X0), the fence notches, the clamp pockets and the hub counterbore; spot, drill and hand-tap the 4-40 and 10-32 holes; break edges"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the 1/4-20 UNC-2B THRU hole below the hub counterbore"
-      finding: "thread engagement in the .23 in of plate under the counterbore: .21 in of full thread nominal (.84D) and .19 in at the worst case of the printed bands (.76D), after the title block's .010 edge break at both tap mouths, short of 1.5D (.38 in) in aluminum (rule 18)"
-      reason: "Owner ruling 2026-11-17 (Pedro): \"Use a 1/4-20 hub screw. The .23 in of thread in the 6061 plate is accepted: the screw only snugs the strap during the outline.\""
+      where: "the 10-32 UNF-2B THRU hole below the hub counterbore"
+      finding: "thread engagement in the .23 in of plate under the counterbore: .21 in of full thread nominal (1.11D) and .19 in at the worst case of the printed bands (1.01D), after the title block's .010 edge break at both tap mouths, short of 1.5D (.29 in) in aluminum (rule 18)"
+      reason: "Owner ruling 2026-11-23 (Pedro): \"change the screw to #10-32. The sub-plate's tapped hole becomes #10-32 and the plug's bore .201 (#7 drill).\" It reverses his 2026-11-17 ruling \"Use a 1/4-20 hub screw. The .23 in of thread in the 6061 plate is accepted: the screw only snugs the strap during the outline.\", whose acceptance of the .23 in of thread stands: the same plate thickness now gives the smaller screw 1.01D at the worst case (was .76D)."

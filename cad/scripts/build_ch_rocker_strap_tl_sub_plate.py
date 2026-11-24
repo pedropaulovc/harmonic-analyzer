@@ -20,8 +20,8 @@ model dimension located from X0, Y0 or Z0:
 * ``PocketProfile`` / ``ClampPockets`` / ``PocketCorners``: the four clamp
   pockets cut PocketDepth down from Z0, their corners R MAX.
 * ``HubHole``: one native Hole Wizard counterbore down from Z0 (Ø.500 x
-  .185 over the 1/4-20's #7 drill THRU), placed by HubX and HubY;
-  ``HubThread``: the 1/4-20 cosmetic thread on its drill, THRU.
+  .185 over the #10-32's #21 drill THRU), placed by HubX and HubY;
+  ``HubThread``: the #10-32 cosmetic thread on its drill, THRU.
 * ``ClampTaps``: one native #4-40 THRU wizard feature, four instances on the
   pocket floors.
 * ``SectionAPlane`` / ``SectionAReference`` and ``SectionBPlane`` /
@@ -521,7 +521,7 @@ def _pockets(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> 
 def _hub(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> float:
     """The hub hole down from Z0, one native Hole Wizard counterbore located
     from X0 and Y0 (HubX, HubY), its Ø.500 x .185 counterbore over the tap's
-    #7 drill through (spec.HUB_HOLE_SPEC), then the 1/4-20 cosmetic thread on
+    #21 drill through (spec.HUB_HOLE_SPEC), then the #10-32 cosmetic thread on
     the drill (HubThread). Its callout prints drill, counterbore and depth
     together (draw_ch_fulcrum_keeper's foot hole)."""
     from solidworks_mcp.adapters.base import AddThreadParameters
@@ -531,7 +531,7 @@ def _hub(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> floa
         spec.HUB_HOLE_SPEC,
         [[spec.HUB_X, spec.HUB_Y, spec.PLATE_TOP_Z]],
         (0.0, 0.0, 1.0),
-        "hub hole (Ø.500 counterbore over #7 thru)",
+        "hub hole (Ø.500 counterbore over #21 thru)",
         name="HubHole",
         expect_dia_mm=spec.HUB_TAP_DRILL,
         placement_dims=[(("HubX", '"HubX"'), ("HubY", '"HubY"'))],
@@ -548,7 +548,7 @@ def _hub(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> floa
 
     major = THREAD_MAJOR_MM[spec.HUB_TAP_THREAD]
     created = check(
-        "hub thread (1/4-20 thru)",
+        "hub thread (#10-32 thru)",
         adapter.add_thread(
             AddThreadParameters(
                 edge_point=[
@@ -580,7 +580,7 @@ def _hub(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> floa
     definition = _early_bound(thread.GetDefinition(), "ICosmeticThreadFeatureData")
     # swCosmeticEndConditions_e.swEndConditionThrough = 2. Size reads back
     # empty on a seat (farm run r20), so the thread's identity is gated where
-    # it prints: the drawing checks the hub callout's resolved 1/4-20 row.
+    # it prints: the drawing checks the hub callout's resolved 10-32 row.
     if int(definition.EndCondition) != 2:
         raise RuntimeError(
             "hub thread did not read back THRU: "

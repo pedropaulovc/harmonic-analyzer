@@ -45,7 +45,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "Brass hex, 1/2 in across flats (alloy not on record; a piece at least 1.25 in long is on hand, owner 2026-11-17)"
 stock = "{{process.blank_af_in:.3dot}} in hex bar; {{process.quantity:d}} × {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in length."
-note = "Inches unless mm; G-code and console entries in mm. Finished {{cad.block_height_min_in:.3dot}}–{{cad.block_height_max_in:.3dot}} long. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home (logbook 2026-11-06), so no offset from an earlier session is trusted. After any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every cutting file (MC01, MC03, MC04) is proved in air on its first run; the tap files (MC02, MC05) move only at the machine top and over the hole, spindle off. Finish: brass black, the last setup, once the Brass Black is bought (owner 2026-11-17): machined now, blackened later; until then the clamp is tagged AWAITING BRASS BLACK."
+note = "Inches unless mm; G-code and console entries in mm. Finished {{cad.block_height_min_in:.3dot}}–{{cad.block_height_max_in:.3dot}} long. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then, before Cycle Start, touch one of the setup's zeros again with the edge finder: it must read what its step set, within .001 in. It does not, or the part may have moved: take the setup again from its first step, the part out. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; console M6 for the tool in the spindle, then Cycle Start. Every cutting file (MC01, MC03, MC04) is proved in air on its first run; the tap files (MC02, MC05) move only at the machine top and over the hole, spindle off. Finish: brass black, the last setup, once the Brass Black is bought (owner 2026-11-17): machined now, blackened later; until then the clamp is tagged AWAITING BRASS BLACK."
 shop = "../shop"
 stock_refs = ["c360-hex-1-2"]
 material_key = "clamp-brass-hex"
@@ -223,8 +223,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.af_mm}}", along_jaws_m
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { diameter = "{{cad.af_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 midway between the two corners; Y0 the hex axis, half the miked across flats from the fixed jaw."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm) on the fixed jaw's face beside the blank: G10 L20 P1 Y(half your across-flats reading in mm − 2.540); for .500, Y3.810. On the LEFT corner from the left: G10 L20 P1 X0. On the RIGHT corner from the right: G10 L20 P1 X(half the DRO X reading)."
+instruction = "G54 X0 midway between the two corners; Y0 the hex axis, half the miked across flats from the fixed jaw."
+instruction_detailed = "Edge finder (900 rpm) on the fixed jaw's face beside the blank: G10 L20 P1 Y(half your across-flats reading in mm − 2.540); for .500, Y3.810. On the LEFT corner from the left: G10 L20 P1 X0. On the RIGHT corner from the right: G10 L20 P1 X(half the DRO X reading)."
 feed = "hand"
 
 [[setups.operations]]
@@ -329,8 +329,8 @@ instruction = "Bore gauges, before the setup: mic the F drill's shank, .2570–.
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the faced bottom end; Y0 the hex axis, half the miked across flats from the fixed jaw."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y(half your across-flats reading in mm − 2.540); for .500, Y3.810. On the clamp's faced bottom end from the left: G10 L20 P1 X-2.540 (minus: the edge finder's centre is left of the end)."
+instruction = "G54 X0 the faced bottom end; Y0 the hex axis, half the miked across flats from the fixed jaw."
+instruction_detailed = "Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y(half your across-flats reading in mm − 2.540); for .500, Y3.810. On the clamp's faced bottom end from the left: G10 L20 P1 X-2.540 (minus: the edge finder's centre is left of the end)."
 feed = "hand"
 
 [[setups.operations]]
@@ -391,13 +391,13 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.af_mm}}", along_jaws_m
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.upright_top_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { diameter = "{{cad.af_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 midway between the two corners, touched above the cross bore (the bore has cut the corners below .93); Y0 the hex axis, half the miked across flats from the fixed jaw."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y(half your across-flats reading in mm − 2.540). The edge finder's tip .10 below the top end, above the bore: on the LEFT corner from the left: G10 L20 P1 X0. On the RIGHT corner from the right: G10 L20 P1 X(half the DRO X reading)."
+instruction = "Before the clamp goes in, G54 Z0: the parallels' top (the faced bottom end), touched with the 1/2 in end mill on the fixed-jaw parallel, the jaws open."
+instruction_detailed = "Before the clamp goes in, the parallels in place and the jaws open: console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the clamp in: no tool reaches the parallel beside it before its holder meets the clamp."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the parallels' top (the faced bottom end), touched with the #43 drill between the jaws, on the fixed-jaw parallel left of the clamp."
-instruction_detailed = "Console M6 T3 (#43 drill, at least .90 out of its collet or chuck: it reaches .77 down between the jaws; the tool setter measures it). MDI G0 X-12.700 Y4.763: over the fixed-jaw parallel's top, left of the clamp (the 1/2 in end mill is too wide to go between the jaws). Spindle stopped, its point just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051."
+instruction = "The clamp in as Holding says: G54 X0 midway between the two corners, touched above the cross bore (the bore has cut the corners below .93); Y0 the hex axis, half the miked across flats from the fixed jaw."
+instruction_detailed = "The clamp in as Holding says. Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y(half your across-flats reading in mm − 2.540). The edge finder's tip .10 below the top end, above the bore: on the LEFT corner from the left: G10 L20 P1 X0. On the RIGHT corner from the right: G10 L20 P1 X(half the DRO X reading)."
 feed = "hand"
 
 [[setups.operations]]

@@ -46,7 +46,26 @@ credibility rests on:
    [`cad/docs/drawing-guidelines.md`](cad/docs/drawing-guidelines.md) and its
    repository governance in
    [`cad/docs/drawing-simplicity-policy.md`](cad/docs/drawing-simplicity-policy.md)
-   before changing CAD geometry or manufacturing drawings. Drawing review is
+   before changing CAD geometry or manufacturing drawings. One machine is
+   built once: every size starts at the title block and every hole drilled.
+   A REAM, a band tighter than the title block, a printed interference or a
+   gauge bought for one size must pass guidelines rule 4's necessity test
+   (the package's necessity register says what fails if it is `.002 in`
+   loose; the sheet does not. The register is part of the part's registry,
+   in its own file `cad/config/necessity/<drawing>.yaml` beside
+   `cad/config/parts/<part>.yaml`: the parts row is a cache-key input of the
+   part and drawing COM leaves, the register is read by the machinist review
+   alone, so a reason never rebuilds a part. No recipe may read it;
+   `check:recipe` fails if a COM leaf closure does) and take the least
+   demanding form (drilled, made to fit, reamed to the bought mate, and only
+   last a printed band); no reamer or gauge is bought for one feature
+   without an owner ruling. A check in a spec module or a test is held to
+   the same test: its entry in `cad/config/checks/<module>.yaml` names what
+   fails, what sets its number and its basis
+   (`cad/docs/tolerance-policy.md`, "Checks in spec modules and tests"); a
+   joint set at assembly is checked after its setting; a check is never
+   closed by tightening a part or by a margin smaller than the shop reads.
+   Drawing review is
    the last DFM backstop: a finding that exposes a plausible model omission,
    contradiction, or unmanufacturable feature must be reconciled against the
    source CAD and primary evidence, not papered over on the sheet. Escalate a
@@ -221,6 +240,15 @@ individual PR or stack does not need a successful full `build` before merging.
    explicit `MachinistReviewMode.OFF`) creates no review task, so no model
    tokens are spent until a drawing stabilizes and opts in. The declaration is read by AST,
    never by importing the drawing, and mode changes reuse the same cached verdict.
+   **Temporary, for the fit conversion (tracking issue #3511):** a drawing
+   listed in `cad/config/machinist-review/demoted.yaml` (stem: the batch that
+   removes the line) runs at `LEARN` though its script declares `ENFORCE`.
+   Only dodo's review task reads the list, so a line rebuilds and re-reviews
+   nothing; flipping the declaration instead would rebuild the drawing,
+   because the draw script is its recipe input. The batch that brings a sheet
+   to `SHIP` deletes its line, and the last one deletes the file: an empty
+   list, or a line for a drawing that does not declare `ENFORCE`, fails the
+   graph load. Do not add a sheet to it without an owner ruling.
    `FIX` is cached before enforcement, so a rerun cannot roll the reviewers again;
    provider errors are not cached. An explicitly forced refresh that produces no
    cacheable verdict fails even in LEARN mode: it could not publish the requested
@@ -1124,7 +1152,10 @@ a `cache.refresh` span event, and a `refresh` record with reason in `cache.jsonl
 `check:machinist_review:<stem>` also uses the shared cache probe/store path, but
 executes entirely on the submitter under either executor. Its key includes the
 drawing PDF's ink, the package's existing `cad/config/parts/<dashed>.yaml` (or assembly
-contract with the `-assembly` suffix removed), the review/exception/sheet-server
+contract with the `-assembly` suffix removed), its necessity register
+`cad/config/necessity/<dashed-drawing-stem>.yaml` when it has one (rule 4; read
+by the review alone, so an entry re-keys that one review and no SolidWorks
+leaf), the review/exception/necessity/sheet-server
 code and its pinned local-import closure, the selected kind's reviewer template
 and shared reviewer/judge severity contract, shared judge instructions/schemas,
 and the integer `major_version` in `cad/docs/drawing-guidelines.md`'s YAML
@@ -1257,8 +1288,10 @@ Assembly data splits by consumer: `<stem>_assembly_spec.py` (reaches the .SLDASM
 Keep fit-up wording in the assembly sheet too: for example,
 `dt_drive_train_assembly_sheet.py` derives its lever-pin drill fraction from
 `dt_pinion_lever_geometry.PIN_HOLE_DIA` with `_inch_fraction.inch_fraction`.
-Test fit-up behavior through physical clearance floors, worst-service readings,
-feature-specific cut decisions and limits, sequence, and available sheet space.
+Test fit-up behavior through what the fit-up must do: the adjustment covers
+the stack that feeds it, the function holds after the setting, the
+sequence is possible and the sheet has the space. Do not add a floor for a
+quantity the fitter sets.
 Do not pin the narration or exact note wording.
 Identity changes can make a 70-character line wider in the drawing font.
 Use receiver-headed, indented paragraphs for meaningful native-field clearance;

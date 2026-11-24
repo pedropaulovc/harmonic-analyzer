@@ -33,6 +33,7 @@ diameter_mm = 13.096875
 description = "#10-32 UNF bottoming hand tap (OSG 1025308)"
 [tools.tap-10-32-plug]  # Tap coverage #10-32 UNF
 description = "#10-32 UNF plug hand tap (OSG 1025200)"
+tap_drill_mm = 4.0386  # #21 (.159), the drill the 10-32 UNF tap is sized on (drill-21).
 [tools.angle-plate-4]  # F-angle-plate-LMS-5386
 description = "Angle plate 4x4x4 webbed end (LMS 5386)"
 

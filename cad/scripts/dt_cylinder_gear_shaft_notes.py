@@ -7,6 +7,9 @@ here: editing them re-keys only this part and its drawing.
 
 from __future__ import annotations
 
+from _inch_fraction import inch_fraction
+from dt_cylinder_gear_shaft_spec import SHAFT_DIA
+
 # The cup-point set screws that make the spots, and the pedestal whose taps
 # they are drilled through, by drawing number (rule 4; fan-out screen
 # 20261107T081227004Z: "SET-SCREW SPOTS" named no mate).  Hard-coded, not
@@ -15,15 +18,18 @@ from __future__ import annotations
 SET_SCREW_NUMBER = "MHA-SH-VN-54"
 PEDESTAL_NUMBER = "MHA-DT-02"
 
-# drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
-# the O.D. band exists for the 20 MHA-DT-12 gears that run on it and the two
-# MHA-DT-02 strap bores it fills, so the callout names both.  Its band is
-# narrower than the shop's turned-diameter row, so the callout also names the
-# fit route, purchased ground stock, at the feature (fan-out screen: the route
-# sat in an unlinked general note).  One row: SOLIDWORKS stores a multi-line
-# ABOVE callout but prints none of it (fan-out r1 57234c1d71 printed a bare
-# Ø; draw_dt_pinion_lift_rod), and the below lane sits on the .06 dome.
-SHAFT_DIA_CALLOUT = "RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES; 3/8 GROUND STOCK OK"
+# drawing-guidelines.md rule 4: the O.D. is bought to size and never cut, so
+# it prints REF beside the stock it is, not limits of size; the 20 MHA-DT-12
+# gear bores are reamed to it (form 3: the bought rod is their gauge), so the
+# callout names them and says so (the MHA-DT-02 strap bores' fit is printed
+# on MHA-DT-02).  The stock's fraction comes from the spec's diameter.  One
+# row: SOLIDWORKS stores a multi-line ABOVE callout but prints none of it
+# (fan-out r1 57234c1d71 printed a bare Ø; draw_dt_pinion_lift_rod), and the
+# below lane sits on the .06 dome.
+SHAFT_DIA_CALLOUT = (
+    f"{inch_fraction(SHAFT_DIA, what='arbor stock')} GROUND STOCK, AS SUPPLIED; "
+    "MHA-DT-12 BORES ARE REAMED TO IT"
+)
 
 # Part-specific facts a machinist cannot read off the views (rule 7).  A
 # 7:.375 slender bar is turned between centres, which may stay.  The length
