@@ -1,0 +1,16 @@
+necessity:
+  - id: N-01
+    feature: "hub length .300 +.001/.000, SETS PITCH OF 20X STACK ON MHA-CH-04"
+    kind: gap
+    reason: "twenty long hubs close the keeper end play"
+    source: "ch_channel_lever_spec.HUB_LENGTH_BAND; ch_fulcrum_keeper_spec.KEEPER_Z_OFF (20 x .303 = 6.060 over the 6.038 lug span)"
+  - id: N-02
+    feature: "plate thickness .118 +/-.002, in the MHA-CH-01 top notch"
+    kind: gap
+    reason: "thick plate closes the running gap in the notch"
+    source: "ch_channel_lever_spec.LEVER_THICKNESS_TOLERANCE; ch_amplitude_bar_spec.TOP_NOTCH_WIDTH (plate max plus the running floor)"
+  - id: N-03
+    feature: "plate near face .091 +/-.002 from the hub face"
+    kind: gap
+    reason: "at the title block, bowed bars close mid-span"
+    source: "ch_channel_lever_spec.PLATE_OFFSET_TOLERANCE; ch_channel_assembly_spec.bar_gap_budget mid_span_bowed (fails at +/-.005)"
