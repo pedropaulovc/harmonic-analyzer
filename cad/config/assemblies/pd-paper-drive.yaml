@@ -90,7 +90,7 @@ machinist_exceptions:
   - id: "PD-00-knob-setting-true"
     kind: "accept"
     where: "sheet 7, step 12C (and 12F/12H/12Q, which reuse it): a snug gauge pin standing in the pivot bore, the pin's shank in pin bore S and knob bore N indicated TRUE: SWEEP UNDER .0005 ON THE TEST INDICATOR, SO N LANDS INSIDE THE S TO N BAND, WITHIN .004 OF ITS DETAIL K SETTING"
-    finding: "TRUE sweep finer than the .002 S-N band (1.7242 +.002/.000) or the .0005 assembly row needs (rule 4, over_specification)"
+    finding: "TRUE sweep finer than the .002 S-N band (1.7242 +.002/-.001) or the .0005 assembly row needs (rule 4, over_specification)"
     reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 5.3: DETAIL K's setting circle opens to Ø.008 (stock_form_quality.reducer_k_setting_diameter_mm 0.2032; paper_drive_arm_registration.REDUCER_AXIS_SETUP_RADIUS_MM .1016 mm), decoupled from the S-K set band, which stays 43.794 +.002/-0 (pd_rack_pinion_spec.CENTRE_DISTANCE_SET_BAND_IN) because the reducer mesh needs it. The knob bore N (the model's K) must end inside that circle about its DETAIL K nominal, not only inside the S-N band. The pivot-and-pin tram turns N about S with a 0.64 lever (K_SET_CENTRE_DISTANCE_MM / PIN_STATION), which amplifies the across error: with the DRO's stated accuracy and one full .0005 division of sweep the worst-case N lands .0563 mm (.0022) off, inside the .1016 mm circle, and the radial error (about .0199 mm) keeps margin at both ends of the set band (test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends). One division is the coarsest acceptance the shop's .0005 test indicator reads"
   - id: "PD-00-disc-hub-shear-clamp"
     kind: "accept"

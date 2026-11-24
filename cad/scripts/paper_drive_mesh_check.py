@@ -30,6 +30,9 @@ The reducer's centre takes the ordinary fine-pitch set band, nominal
 both tiers: the far end, 43.844, a stock 15T:150T pair at the stock 0.05
 TIR, gives CR 1.214 at the set centre and 1.123 at the runout extreme
 (owner ruling on #2034 x #2011: 43.794 +0.050/-0 at the full floors).
+MHA-PD-00's trial mesh may move the plate .001 in below the nominal
+(pd_rack_pinion_spec.CENTRE_DISTANCE_TRIAL_WINDOW; owner ruling 2026-11-24,
+audit part 2 question C1): reducer_trial_low_mesh holds every gate there.
 
 Finite-profile bound (not a gate). These formulas take the ideal involutes.
 Over the active profile at the printed corners, the disc cut by the stock
@@ -329,3 +332,11 @@ def reducer_band_meshes() -> tuple[MeshCheck, MeshCheck]:
     low, high = disc.CENTRE_DISTANCE_WINDOW
     top = reducer_mesh(high)
     return reducer_mesh(low), replace(top, label=f"{top.label} at +{high - low:.3f}")
+
+
+def reducer_trial_low_mesh() -> MeshCheck:
+    """The reducer at the lowest centre the trial mesh may move the plate to
+    (the top of that window is the set band's own)."""
+    low = disc.CENTRE_DISTANCE_TRIAL_WINDOW[0]
+    mesh = reducer_mesh(low)
+    return replace(mesh, label=f"{mesh.label} at {low - disc.CENTRE_DISTANCE:+.3f}")
