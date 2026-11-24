@@ -69,6 +69,7 @@ from pd_platen_guide_spec import (
     GUIDE_DEPTH_BAND,
     GUIDE_DEPTH_PLACES,
     GUIDE_HEIGHT,
+    GUIDE_HEIGHT_PLACES,
     LOCK_GAP_FIT,
     LOCK_TAP_SPEC,
     SURFACE_FINISHES,
@@ -87,11 +88,10 @@ MATERIAL = "Plain Carbon Steel"
 # platen's guide holes: both are the platen's (pd_platen_spec; the width is
 # _recording_geometry's, so it keeps its millimetres and prints 10.62).
 GUIDE_LENGTH = PLATE_WIDTH
-# .40 deep, past the bar's back face so the lock plates clear it: the 9.5 bar
-# grew rearward under the fixed hanger (user ruling 2026-10-15), so the rail's
-# relief shrank to keep the lock-screw heads off the arm plate
-# (pd_platen_guide_spec.GUIDE_DEPTH_BAND).
-GUIDE_DEPTH = 10.16  # .40
+# .387 deep, past the bar's back face by the lock gap MHA-PD-00 step 7 checks
+# (owner ruling 2026-11-24, audit part 2 question C4;
+# pd_platen_guide_spec.GUIDE_DEPTH_BAND).
+GUIDE_DEPTH = 9.8298  # .387
 # The fastening screws' stations (the platen's guide holes); the two lock
 # stations, 30% and 70% across, are the second and fourth, inboard of the
 # east column clamp.
@@ -124,12 +124,10 @@ _MIN_OPPOSED_RECEIVER_C2C = min(
 _GUIDE_DEPTH_DEV = printed_deviations(
     GUIDE_DEPTH, GUIDE_DEPTH_PLACES, deviations(GUIDE_DEPTH_BAND), unit=UNIT
 )
-# The lock seats' shallowest depth: the printed band's floor, or a seat faced
-# to the fitted lock gap (R9-47) on the thinnest bar. The front taps at the
-# lock stations exit under the seats.
-LOCK_SEAT_DEPTH_MIN = min(
-    GUIDE_DEPTH + _GUIDE_DEPTH_DEV[0], BAR_DEPTH_MIN + LOCK_GAP_FIT[0]
-)
+# The rail's shallowest back, under the locks too: no seat is milled (owner
+# ruling 2026-11-24, audit part 2 question C4). The front taps at the lock
+# stations exit there.
+LOCK_SEAT_DEPTH_MIN = GUIDE_DEPTH + _GUIDE_DEPTH_DEV[0]
 # R9-48: the longest lock screw under the thinnest plate stops this far inside
 # the rail's platen-mating face at the shallowest seat.
 LOCK_SCREW_TIP_INSIDE_MIN = LOCK_SEAT_DEPTH_MIN - TIP_REACH_MAX
@@ -160,7 +158,7 @@ RECEIVER_WALL_FLOOR = WALL_FLOOR_MM
 # accepts .059: Delegated ruling 2026-11-09 (Main), pending owner
 # confirmation; owner review #2144 item 2.3. The sheet states it
 # (TAP_EDGE_WALL_TEXT, rule 20). The floor stays WALL_FLOOR_MM everywhere else.
-_HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES, unit=UNIT)
+_HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_HEIGHT_PLACES, unit=UNIT)
 _TAP_REACH = THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size] / 2.0 + TAP_Y_BAND
 _EDGE_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
 TAP_EDGE_WALL_MIN = (
@@ -200,12 +198,19 @@ if LOCK_TAP_EXIT_WALL_MIN < RECEIVER_WALL_FLOOR:
         "MHA-PD-11 platen guide through tap beside the other row's tap: wall "
         f"{LOCK_TAP_EXIT_WALL_MIN:.3f} < {RECEIVER_WALL_FLOOR}"
     )
-# R9-47: the as-made lock gap (shallowest rail on the deepest bar) never
-# falls under the fitted window's max, so facing the seats always cuts.
-if GUIDE_DEPTH + _GUIDE_DEPTH_DEV[0] - BAR_DEPTH_MAX < LOCK_GAP_FIT[1]:
+# Owner ruling 2026-11-24, audit part 2 question C4: the as-made lock gap, the
+# rail's depth less the bar's, lies inside step 7's leaf check on every rail
+# and bar the two sheets allow (.005 to .016 against .004 and .017), so no seat
+# is ever milled.
+_AS_MADE_LOCK_GAP = (
+    GUIDE_DEPTH + _GUIDE_DEPTH_DEV[0] - BAR_DEPTH_MAX,
+    GUIDE_DEPTH + _GUIDE_DEPTH_DEV[1] - BAR_DEPTH_MIN,
+)
+if not LOCK_GAP_FIT[0] < _AS_MADE_LOCK_GAP[0] <= _AS_MADE_LOCK_GAP[1] < LOCK_GAP_FIT[1]:
     raise AssertionError(
-        "MHA-PD-11 platen guide on the support bar: as-made lock gap under the "
-        f"fitted max {LOCK_GAP_FIT[1]:.2f}"
+        "MHA-PD-11 platen guide on the support bar: as-made lock gap "
+        f"{_AS_MADE_LOCK_GAP[0]:.3f}..{_AS_MADE_LOCK_GAP[1]:.3f} outside the leaf "
+        f"check {LOCK_GAP_FIT[0]:.3f}..{LOCK_GAP_FIT[1]:.3f}"
     )
 
 # 1:2 (machinist review round 4: at 1:4 the black-oxide bar read as a dark

@@ -1,0 +1,9 @@
+# Why each band tighter than the title block stays on MHA-PD-11
+# (drawing-guidelines rule 4; owner ruling 2026-11-24: "In the part's registry
+# file, not on the sheet.").
+necessity:
+  - id: N-01
+    feature: "rail depth .387 +.000/-.007 (Depth@Guide, one-sided LIMITS)"
+    kind: gap
+    reason: "deeper floats the platen into reducer disc MHA-PD-06"
+    source: "pd_platen_guide_spec.GUIDE_DEPTH_BAND, LOCK_GAP_FIT; owner ruling 2026-11-24, audit part 2 question C4: \"(b) Rails .387 +.000/-.007; check \"A .004 LEAF ENTERS AND A .017 LEAF DOES NOT\". Air 0.067 mm at the widest gap; no seat is ever milled.\" The shallow limit keeps the .004 leaf entering on the thickest MHA-PD-07 bar (build_pd_platen_guide asserts both ends)"

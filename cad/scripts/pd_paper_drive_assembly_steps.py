@@ -57,10 +57,11 @@ SEQUENCE: tuple[str, ...] = (
     "guides-screwed",
     "clips-fitted",
     "platen-hung",
-    # Platen on the bar (R9-49: the locks set clear of the hanger; R9-47: the
-    # seats faced to the platen's float, pd_platen_guide_spec.LOCK_GAP_FIT).
+    # Platen on the bar (R9-49: the locks set clear of the hanger; owner ruling
+    # 2026-11-24, audit part 2 question C4: the platen's float checked by
+    # leaves, pd_platen_guide_spec.LOCK_GAP_FIT, no seat milled).
     "guide-locks-set",
-    "lock-seats-faced",
+    "lock-gaps-checked",
     # Disc cluster, on the bench, before anything is fixed on the arm, so the
     # reducer's trial mesh can run on it (R9-68: the disc on the sleeve's seat
     # shoulder, the hub's bore on its boss, its key pin over the flat (#2409);

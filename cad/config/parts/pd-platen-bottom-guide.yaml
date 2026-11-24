@@ -2,7 +2,7 @@ pd-platen-bottom-guide:
   title: Platen Bottom Guide
   number: MHA-PD-27
   # Owner rulings 2026-11-13 (#2410): the platen's bottom guide rail, MHA-PD-11's
-  # .40-deep section grown downward so the MHA-PD-26 feed rack screws to its
+  # section (.387 deep since owner ruling 2026-11-24, C4) grown downward so the MHA-PD-26 feed rack screws to its
   # underside; MHA-PD-11 is now the top rail only.
   material: Plain Carbon Steel
   material_specification: AISI 1018 cold-rolled steel

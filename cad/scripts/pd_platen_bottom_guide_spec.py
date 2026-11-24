@@ -58,7 +58,7 @@ BAND = printed_band_mm(PLACES, unit=UNIT)  # +/-.005
 EDGE_BREAK = max(edge_break_chamfer_mm(unit=UNIT), edge_break_radius_mm(unit=UNIT))
 
 GUIDE_LENGTH = PLATE_WIDTH
-GUIDE_DEPTH = 10.16  # .40, MHA-PD-11's section
+GUIDE_DEPTH = 9.8298  # .387, MHA-PD-11's section (owner ruling 2026-11-24, C4)
 GUIDE_DEPTH_BAND = top_rail.GUIDE_DEPTH_BAND
 GUIDE_DEPTH_PLACES = top_rail.GUIDE_DEPTH_PLACES
 GUIDE_DEPTH_CALLOUT = top_rail.GUIDE_DEPTH_CALLOUT

@@ -18,7 +18,7 @@ UNIT = drawing_unit("parts/pd-platen-guide", _config.parts("pd-platen-guide"))
 # R9-64: the guide screws' front receivers are #4-40 tapped THROUGH the rail,
 # as R9-48 made the rear row. A blind tap cannot hold full thread to the
 # screw's 5.42 reach and keep a bottoming tap's lead above the drill bottom
-# without the drill point breaking through a faced lock seat, so the hole has
+# without the drill point breaking through the rail's back under a lock, so the hole has
 # no thread or drill depth to stack. The tips stop inside the rail
 # (build_pd_platen_guide asserts the reach).
 TAPPED_HOLE_SPEC = HoleSpec("tapped", "#4-40")
@@ -60,28 +60,28 @@ TAP_POSITION_RADIAL = math.hypot(TAP_STATION_BAND, TAP_Y_BAND)
 TAP_Y_BAND_TEXT = f"{TAP_Y / 25.4:.3f} ±{TAP_Y_BAND / 25.4:.3f}".replace("0.", ".")
 
 # The rail's depth (``build_pd_platen_guide.GUIDE_DEPTH``) sets how far behind the
-# bar's back face the lock plates ride and how close their slotted pan heads
-# come to the hanger arm and its plate. Both sit inside the paper-drive
-# lock-station sweep, so the depth carries an explicit one-sided band, native
-# on Depth@Guide: never deeper than the .40 nominal (the heads keep their
-# room to the arm plate), and on the shallow side no shallower than the
-# deepest bar plus the fitted lock gap's max (R9-47: so the seat facing
-# always cuts; build_pd_platen_guide asserts it). It prints .XX.
-GUIDE_DEPTH_BAND = (0.0, -0.254)  # (upper, lower): +.00/-.01
-GUIDE_DEPTH_PLACES = 2
-# The one-sided band's function, printed at the depth (rule 4): a deeper rail
-# stands the lock-screw heads closer to the hanger's arm plate. The .39 floor
-# is R9-47's (build_pd_platen_guide: the as-made lock gap stays over the
-# fitted max; LOCK_SEAT_DEPTH_MIN); naming it as a seat fit-up on the sheet
-# read as a fit with no acceptance (machinist review round 7).
+# bar's back face the lock plates ride: the lock gap, which is the platen's
+# float toward the 150T disc. The depth carries an explicit one-sided band,
+# native on Depth@Guide, that holds the gap inside MHA-PD-00 step 7's leaf
+# check on every bar MHA-PD-07 allows, so no seat is ever milled (owner ruling
+# 2026-11-24, audit part 2 question C4: "(b) Rails .387 +.000/-.007; check
+# "A .004 LEAF ENTERS AND A .017 LEAF DOES NOT". Air 0.067 mm at the widest
+# gap; no seat is ever milled."; build_pd_platen_guide asserts it). It retires
+# R9-47's faced seats and the .40 +.00/-.01 rail. It prints .XXX.
+GUIDE_DEPTH_BAND = (0.0, -0.1778)  # (upper, lower): +.000/-.007
+GUIDE_DEPTH_PLACES = 3
+# The height keeps .XX (the lock-station sweep reads it so).
+GUIDE_HEIGHT_PLACES = 2
+# The one-sided band's function, printed at the depth (rule 7's short label):
+# both limits are the lock gap's on the support bar.
 GUIDE_DEPTH_CALLOUT = (
-    f"LOCK-SCREW HEADS\nCLEAR {_config.parts('pd-transgear-arm-plate')['number']}"
+    f"SETS LOCK GAP\nON {_config.parts('pd-support-bar')['number']}"
 )
 
 # The print's dimensions, by owning feature (the build marks exactly these and
 # the sheet imports only these), and the places each carries, authored on the
-# model (drawing-simplicity-policy.md `How the repository implements the guidelines`). The height prints at the depth's places (the
-# lock-station sweep reads it so). The length prints .XX: the rail ends meet
+# model (drawing-simplicity-policy.md `How the repository implements the guidelines`). The height prints .XX
+# (the lock-station sweep reads it so). The length prints .XX: the rail ends meet
 # the platen's edges, which the platen sheet prints at .XX; the holes locate
 # from the left end at basic stations, so no stack reads its band.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -89,7 +89,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Guide": {"Depth"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "GuideProfile": {"Length": 2, "Height": GUIDE_DEPTH_PLACES},
+    "GuideProfile": {"Length": 2, "Height": GUIDE_HEIGHT_PLACES},
     "Guide": {"Depth": GUIDE_DEPTH_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -100,13 +100,14 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if {f: set(d) for f, d in DRAWING_PRECISION.items()} != DRAWING_DIMENSIONS:
     raise AssertionError("every marked platen-guide dimension needs native precision")
 
-# R9-47 (Main-approved fit-up): the lock gap, lock-plate front face to the
-# bar's back face, as fitted by facing the rail backs under the lock plates
-# (the lock seats; pd_paper_drive_assembly_steps "lock-seats-faced"). It is the
-# platen's float: (min, max), on .002 and .009 feelers. Its max bounds how far
-# the platen can come forward toward the 120T disc. The as-made gap is never
-# under the max (build_pd_platen_guide asserts it), so the facing always cuts.
-LOCK_GAP_FIT = (0.0508, 0.2286)  # .002, .009
+# The lock gap, lock-plate front face to the bar's back face, as MHA-PD-00
+# step 7 accepts it (owner ruling 2026-11-24, audit part 2 question C4): a
+# .004 leaf enters and a .017 leaf does not. It is the platen's float: (min,
+# max). Its max bounds how far the platen can come forward toward the disc
+# (build_pd_paper_drive_assembly.PLATEN_AIR). The as-made gap, the rail's
+# depth less the bar's, always lies inside it (build_pd_platen_guide asserts
+# it), so nothing is faced.
+LOCK_GAP_FIT = (0.1016, 0.4318)  # the .004 and .017 leaves
 
 # The one running surface (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): the platen HANGS by the top rail's
 # bottom face (local y 0) on the support bar's top edge and slides

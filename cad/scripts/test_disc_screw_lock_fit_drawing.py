@@ -101,33 +101,31 @@ def test_a_stock_screw_stopping_short_of_the_window_is_refused(monkeypatch) -> N
         _exec_fresh(screw)
 
 
-def test_platen_float_fitted_to_keep_the_disc_clear_of_the_platen() -> None:
-    """The platen yaws about the bar end, so its float reaches the disc
-    multiplied by k = 226/(226 - 80.892); the disc rear stands 2.2 - 1.0262
-    off the platen front before it (R9-47 design stack). At the old 0.31 max
-    the stack behind the disc (m 0.20, cluster float 0.40, tilt 0.081,
-    squareness 0.05) runs negative; at the fitted .009 (0.2286) it clears."""
-    k = 226.0 / (226.0 - 80.892)
-    behind = 0.20 + 0.40 + (40.7735 - 4.1) * 0.050 / 22.55 + 0.05
+def test_platen_float_checked_by_leaves_keeps_the_disc_clear_of_the_platen() -> None:
+    """Owner ruling 2026-11-24, audit part 2 question C4: "(b) Rails .387
+    +.000/-.007; check "A .004 LEAF ENTERS AND A .017 LEAF DOES NOT". Air 0.067
+    mm at the widest gap; no seat is ever milled." The air is the assembly's
+    statistical disc-to-platen stack with the float at the .017 leaf (0.0508
+    at Q5's form (c), where his 0.067 was read at form (b))."""
+    import build_pd_paper_drive_assembly as assembly
 
-    def air(fit_max: float) -> float:
-        return 2.2 - 1.0262 - fit_max * k - behind
-
-    assert k == pytest.approx(1.5575, abs=1e-4)
-    assert air(0.31) < 0.0
-    assert guide.LOCK_GAP_FIT == pytest.approx((0.002 * IN, 0.009 * IN))
-    assert air(guide.LOCK_GAP_FIT[1]) == pytest.approx(0.087, abs=1e-3)
-    # As made, the shallowest rail on the deepest bar (.375, the 3/8 CF
-    # flat's as-supplied maximum, #1563 option C) floats .015: every rail's
-    # seats are faced down into the window, none is short of it.
-    as_made_min = (0.40 - 0.010) * IN - 0.375 * IN
-    assert as_made_min == pytest.approx(0.381)
-    assert as_made_min >= guide.LOCK_GAP_FIT[1]
+    assert guide.LOCK_GAP_FIT == pytest.approx((0.004 * IN, 0.017 * IN))
+    platen = assembly.PLATEN_AIR
+    assert platen.terms["platen float at the near lock"] == pytest.approx(
+        guide.LOCK_GAP_FIT[1] * assembly.PLATEN_YAW_LEVER
+    )
+    assert assembly.DISC_PLATEN_AIR >= assembly.DISC_PLATEN_AIR_MIN
+    assert assembly.DISC_PLATEN_AIR == pytest.approx(0.0508, abs=5e-4)
+    # As made, rail .380-.387 on bar .371-.375 (#1563 option C): .005 to
+    # .016, inside the two leaves on every part the sheets allow.
+    as_made = ((0.387 - 0.007) * IN - 0.375 * IN, 0.387 * IN - 0.371 * IN)
+    assert as_made == pytest.approx((0.005 * IN, 0.016 * IN))
+    assert guide.LOCK_GAP_FIT[0] < as_made[0] <= as_made[1] < guide.LOCK_GAP_FIT[1]
 
 
-def test_a_float_window_the_rails_cannot_reach_is_refused(monkeypatch) -> None:
+def test_a_leaf_check_the_rails_cannot_meet_is_refused(monkeypatch) -> None:
     import build_pd_platen_guide
 
     monkeypatch.setattr(guide, "LOCK_GAP_FIT", (0.05, 0.40))
-    with pytest.raises(AssertionError, match="as-made lock gap under the fitted"):
+    with pytest.raises(AssertionError, match="as-made lock gap .* outside the leaf"):
         _exec_fresh(build_pd_platen_guide)
