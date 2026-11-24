@@ -24,9 +24,18 @@
 #   MHA-DT-12-TL-00, not here.
 # To order before Setup 2 runs: the .3740 reamer (tools.reamer-3740,
 # McMaster 3087A55), the #65 drill (tools.drill-65), the .0365 reamer
-# (tools.reamer-0365, KBC 5-018-0365), the .3740/.3745 and .0365/.0370 plug
-# gauge pairs (gauges.plug-gauges-3740-3745, gauges.plug-gauges-0365-0370,
-# Vermont Gage Class X).
+# (tools.reamer-0365, KBC 5-018-0365), and the two pressed parts tried at
+# the holes: the stub dowel MHA-DT-12-TL-VN-50 and the clock pin
+# MHA-DT-12-TL-VN-51.
+# Fits (owner 2026-11-23/24; fit audit fit-audit-2026-11-23 README, "the
+# fixture's stub and clock-pin holes are presses, and the press is the
+# check"; policy PR #3513, tracking issue #3511): no plug gauge pair is
+# bought. Each hole is reamed with its reamer and tried with its own pin,
+# which must not enter by hand. The sheet still prints both .0005 bands
+# until the fit batch (fit-batch-dt) redraws it; this plan follows the
+# approved policy ahead of the sheet.
+# Mill speeds are the spindle's stops, 107.7 rpm apart (#3439): 1831, 646,
+# 323, 2800, 1400 and, for the edge finder, 969.
 #
 # NC (cam:dt_cylinder_gear_tl_cam_fixture, cad/process/
 # dt_cylinder_gear_tl_cam_fixture/cam.py): CF01_stub_hole, CF02_pin_hole.
@@ -118,9 +127,9 @@ pin_ream_tip_mm = -5.207
 # Speeds", Drilling & Reaming, Plain carbon steels 1006-1026 (read
 # 2026-11-20): drilling 60-100 ft/min; AutoDrill "Suggested drilling feed
 # rates" (read 2026-11-20), row Stl, Carbon: 1/16 in .001, 3/8 in .006 in/rev.
-# Centre drill 1800 rpm × .001 = 1.8 in/min (the pinion cam's spot); 23/64 at
-# 700 rpm (66 ft/min) × .004 = 2.8 in/min; the .3740 reamer at 300 rpm
-# (29 ft/min, under half the drilling speed) × .006 = 1.8 in/min. The #65
+# Centre drill 1831 rpm × .001 = 1.8 in/min (the pinion cam's spot); 23/64 at
+# 646 rpm (61 ft/min) × .0043 = 2.8 in/min; the .3740 reamer at 323 rpm
+# (32 ft/min, half the drilling speed) × .0056 = 1.8 in/min. The #65
 # (.035) at the spindle's 2800 (26 ft/min, the most the mill turns) × .0005
 # = 1.4 in/min, under the 1/16 column; the pilot spot the same; the .0365
 # reamer at 1400 rpm × .0005 = .7 in/min.
@@ -169,16 +178,6 @@ status = "to_order"
 id = "reamer-0365"
 name = ".0365 reamer"
 ref = "reamer-0365"
-status = "to_order"
-[[tools]]
-id = "plugs-3740"
-name = "Plug gauges .3740 GO, .3745 NO-GO"
-ref = "plug-gauges-3740-3745"
-status = "to_order"
-[[tools]]
-id = "plugs-0365"
-name = "Plug gauges .0365 GO, .0370 NO-GO"
-ref = "plug-gauges-0365-0370"
 status = "to_order"
 [[tools]]
 id = "files"
@@ -280,12 +279,12 @@ instruction = "Before loading, at the bench vise (soft jaws): file the parting p
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Start only with the .3740 and .0365 reamers, the #65 drill and both plug gauge pairs in hand (all to order). Caliper the register across three diameters and write the mean on a tag."
+instruction = "Start only with the .3740 and .0365 reamers, the #65 drill, the stub dowel MHA-DT-12-TL-VN-50 and the clock pin MHA-DT-12-TL-VN-51 in hand (all to order). Caliper the register across three diameters and write the mean on a tag."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill ($H). G54 Y0: the register axis, half the tagged register from the fixed jaw."
-instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face beside the disc: G10 L20 P1 Y(half the tagged register in mm − 2.540); for 3.250, Y38.735. MDI G0 Y0."
+instruction = "Home the mill ($H) if it has not been homed this session. G54 Y0: the register axis, half the tagged register from the fixed jaw."
+instruction_detailed = "Home the mill ($H) if it has not been homed this session. Edge finder (set 969) on the fixed jaw's face beside the disc: G10 L20 P1 Y(half the tagged register in mm − 2.540); for 3.250, Y38.735. MDI G0 Y0."
 feed = "hand"
 
 [[setups.operations]]
@@ -318,11 +317,11 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Run CF01_stub_hole (M6 T1, centre drill; set 1800): spot Ø{{process.stub_spot_dia_mm:in.3dot}} at X-{{cad.stub_hole_station_y_mm:.3f}} Y0, under the 23/64 drill."
-rpm = 1800
+instruction = "Run CF01_stub_hole (M6 T1, centre drill; set 1831): spot Ø{{process.stub_spot_dia_mm:in.3dot}} at X-{{cad.stub_hole_station_y_mm:.3f}} Y0, under the 23/64 drill."
+rpm = 1831
 feed = "{{process.stub_spot_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
-  { name = "stub spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.stub_spot_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = "{{process.stub_spot_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
+  { name = "stub spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.stub_spot_dia_mm}}", flutes = 2, rpm = 1831, feed_mm_min = "{{process.stub_spot_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
 ]
 
 [[setups.operations]]
@@ -330,13 +329,13 @@ speed_kind = "spindle"
 tool = "drill-23-64"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T2 (set 700): 23/64 drill through in one feed (L/D 2.8), its full diameter {{process.drill_past_mm:in.3dot}} past the back face into the gap. Cutting oil."
-rpm = 700
+instruction = "Same file, M6 T2 (set 646): 23/64 drill through in one feed (L/D 2.8), its full diameter {{process.drill_past_mm:in.3dot}} past the back face into the gap. Cutting oil."
+rpm = 646
 feed = "{{process.drill_23_64_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.envelope_z_mm}}"
 peck = "none"
 milling_cuts = [
-  { name = "stub drill", kind = "drill", phase = "rough", cutter_dia_mm = 9.128125, flutes = 2, rpm = 700, feed_mm_min = "{{process.drill_23_64_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
+  { name = "stub drill", kind = "drill", phase = "rough", cutter_dia_mm = 9.128125, flutes = 2, rpm = 646, feed_mm_min = "{{process.drill_23_64_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
 ]
 
 [[setups.operations]]
@@ -344,17 +343,17 @@ speed_kind = "spindle"
 tool = "reamer-3740"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.stub_hole_dia_band_mm}}" }
-instruction = "Same file, M6 T3 (set 300): .3740 reamer through, {{process.ream_past_mm:in.3dot}} past the back face, fed in and fed back out with the spindle running: no rapid leaves the hole. Plenty of cutting oil."
-rpm = 300
+instruction = "Same file, M6 T3 (set 323): .3740 reamer through, {{process.ream_past_mm:in.3dot}} past the back face, fed in and fed back out with the spindle running: no rapid leaves the hole. Plenty of cutting oil."
+rpm = 323
 feed = "{{process.ream_3740_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
-  { name = "stub ream", kind = "drill", phase = "finish", cutter_dia_mm = 9.4996, flutes = 6, rpm = 300, feed_mm_min = "{{process.ream_3740_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
+  { name = "stub ream", kind = "drill", phase = "finish", cutter_dia_mm = 9.4996, flutes = 6, rpm = 323, feed_mm_min = "{{process.ream_3740_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
 ]
-inspection = "Stub hole Ø{{cad.stub_hole_dia_min_in:.4dot}}–{{cad.stub_hole_dia_max_in:.4dot}} before unclamping: the .3740 GO plug enters, the .3745 NO-GO does not."
-gauge_checks = [{ gauge = "plug-gauges-3740-3745", band_mm = "{{cad.stub_hole_dia_band_mm}}" }]
+inspection = "Stub hole, before unclamping: reamed clean through (visual), and the stub dowel MHA-DT-12-TL-VN-50, offered to the hole's mouth by hand, does not enter (it is pressed in at MHA-DT-12-TL-00)."
+gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "The GO does not enter: T3 still in, MDI G0 X-{{cad.stub_hole_station_y_mm:.3f}} Y0 Z1, M3 S300, G1 Z{{process.stub_ream_tip_mm:.3f}} F{{process.ream_3740_feed_per_min_mm:.1f}}, G1 Z1, G0 Z5, M5; gauge again. Still tight, or the NO-GO enters: the disc is scrap; make another from Setup 1."
+instruction = "The stub dowel enters by hand: the hole is oversize and the disc is scrap; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
@@ -394,11 +393,11 @@ feed = "{{process.ream_0365_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
   { name = "pin ream", kind = "drill", phase = "finish", cutter_dia_mm = 0.9271, flutes = 4, rpm = 1400, feed_mm_min = "{{process.ream_0365_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
 ]
-inspection = "Pin hole Ø{{cad.pin_hole_dia_min_in:.4dot}}–{{cad.pin_hole_dia_max_in:.4dot}} before unclamping: the .0365 GO plug enters, the .0370 NO-GO does not. Depth {{cad.pin_hole_depth_min_in:.3dot}}–{{cad.pin_hole_depth_max_in:.3dot}}: the GO's miked length less its stand-out above face F (calipers' depth rod)."
-gauge_checks = [{ gauge = "plug-gauges-0365-0370", band_mm = "{{cad.pin_hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.pin_hole_depth_band_mm}}" }]
+inspection = "Pin hole, before unclamping: the clock pin MHA-DT-12-TL-VN-51, offered to the hole's mouth by hand, does not enter (it is pressed in at MHA-DT-12-TL-00). Depth {{cad.pin_hole_depth_min_in:.3dot}}–{{cad.pin_hole_depth_max_in:.3dot}}: a #65 drill stood shank down in the hole, its miked length less its stand-out above face F (calipers' depth rod)."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pin_hole_depth_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "The GO does not enter: T5 still in, MDI G0 X{{cad.pin_hole_station_y_mm:.3f}} Y{{cad.pin_hole_station_x_mm:.3f}} Z1, M3 S1400, G1 Z{{process.pin_ream_tip_mm:.3f}} F{{process.ream_0365_feed_per_min_mm:.1f}}, G1 Z1, G0 Z5, M5; gauge again. Still tight, the NO-GO enters, or the depth is out: the disc is scrap; make another from Setup 1."
+instruction = "The clock pin enters by hand, or the depth is out: the disc is scrap; make another from Setup 1."
 feed = "hand"
 
 [[setups]]

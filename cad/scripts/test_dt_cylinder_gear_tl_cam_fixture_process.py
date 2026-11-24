@@ -97,9 +97,11 @@ def test_the_plan_is_an_enrolled_traveler_and_cam_stem() -> None:
     assert PLAN["revision"] != "placeholder"
     assert STEM in _process_plans.enrolled_stems()
     assert STEM in _cam_programs.CAM_STEMS
-    assert {"reamer-3740", "drill-65", "reamer-0365", "plugs-3740", "plugs-0365"} <= {
+    assert {"reamer-3740", "drill-65", "reamer-0365"} <= {
         t["id"] for t in PLAN["tools"] if t.get("status") == "to_order"
     }
+    # Fit policy (#3513): the presses are the check; no plug gauge pair.
+    assert not any("plug-gauges" in t.get("ref", "") for t in PLAN["tools"])
 
 
 def test_the_recipes_programs_pass_every_check_it_declares(ctx, tmp_path) -> None:

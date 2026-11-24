@@ -111,26 +111,6 @@ description = "Shop-made dividing-head index plate MHA-DT-03-TL-01 for the cone 
 description = "Shop-made fly cutter bar MHA-DT-37-TL-02 for the cone tip gear form cutter"
 [tools.dt-cone-tip-form-cutter]  # MHA-DT-37 GEAR DATA CUTTER: MHA-DT-37-TL-01
 description = "Shop-made form cutter MHA-DT-37-TL-01 for the MHA-DT-37 tooth space"
-# --- MHA-DT-12-TL-01 cam fixture (cnc/gear-pilot) ---
-# Go/no-go pairs for its two press reams (cad/process/
-# dt_cylinder_gear_tl_cam_fixture/plan.toml): the stub hole Ø.3740
-# +.0005/.0000 (.3740-.3745) and the clock-pin hole Ø.0365 +.0005/.0000
-# (.0365-.0370), as the .2510-.2515 pair: Vermont Gage standard Class X
-# steel pin/plug gages, GO at the low limit (plus tolerance) and NO-GO at the
-# high limit (minus tolerance), each ± .000040 in (= 0.001016 mm, the
-# resolution). Not owned: to buy (cad/config/shop-equipment/ gauges, same
-# keys). The tools records let the plan list each pair in its tooling.
-[tools.plug-gauges-3740-3745]
-description = "Plug gauge pair, .3740 GO (plus) and .3745 NO-GO (minus), Vermont Gage Class X"
-[tools.plug-gauges-0365-0370]
-description = "Plug gauge pair, .0365 GO (plus) and .0370 NO-GO (minus), Vermont Gage Class X"
-[gauges.plug-gauges-3740-3745]
-range_mm = [9.4996, 9.5123]
-resolution_mm = 0.001016
-[gauges.plug-gauges-0365-0370]
-range_mm = [0.9271, 0.9398]
-resolution_mm = 0.001016
-
 [tools.dt-cylinder-gear-cam-fixture]  # MHA-DT-12 cam throw .3402 ±.0020
 description = "Shop-made cam turning fixture MHA-DT-12-TL-01 (stub, clamp, clock pin) for the MHA-DT-12 cams"
 [tools.follow-rest-pm-1127]  # inventory fixtures.follow-rest-pm-1127
@@ -310,16 +290,18 @@ flutes = 12
 feed_unit = "in/min"
 
 # Notch saw, TTC 10-215-014 (2-3/4 x .014, 72 teeth, HSS; tools.cylinder-
-# notch-saw) on the 1 in R8 arbor: the amplitude bar's slitting-saw row
-# (shop/ch.toml, MHA-CH-01's 2-3/4 in 72-tooth saw): 100 rpm, the mill's
-# slowest (machines.pm-30mv), and .001 in a tooth, the lowest chip load
-# prechips' force table holds: 7.2 in/min. 100 rpm is 72 ft/min at the rim,
-# under the Maxwell row's 30 m/min (98 ft/min) for HSS in brass: slow for a
-# .014 blade.
+# notch-saw) on the owned R8 stepped saw arbor (common.toml
+# tools.saw-arbor-r8-stepped): the amplitude bar's slitting-saw row
+# (shop/ch.toml, MHA-CH-01's 2-3/4 in 72-tooth saw), at the spindle's first
+# speed stop over the mill's 100 rpm floor, 107.7 rpm (#3439: the spindle
+# rests only on stops 107.7 rpm apart; machines.pm-30mv), and .001 in a
+# tooth, the lowest chip load prechips' force table holds: 7.8 in/min. 108
+# rpm is 78 ft/min at the rim, under the Maxwell row's 30 m/min (98 ft/min)
+# for HSS in brass: slow for a .014 blade.
 [settings.cylinder-notch-saw-c360]
 tool = "cylinder-notch-saw"
 material = "lathe-c360"
-rpm = 100
+rpm = 108
 chip_load_mm_per_tooth = 0.0254
 flutes = 72
 feed_unit = "in/min"
@@ -341,10 +323,9 @@ feed = "tailstock quill by hand, steady, in and out, dry"
 
 # Shop-made: the gang arbor the gear plan's Setup 4 makes (cad/config/shop-
 # equipment/ fixtures.dt-cylinder-gear-gang-arbor); the BS-0's tailstock
-# (fixtures.bs-0-tailstock, possession from the archived inventory, to
-# confirm).
+# (fixtures.bs-0-tailstock, on hand: owner 2026-11-24).
 [tools.dt-cylinder-gear-gang-arbor]
-description = "Shop-made gang cutting arbor for ten MHA-DT-12 blanks: Ø.600 body, Ø.3758-.3760 journal, 1/4-28 tail, 60° tail centre"
+description = "Shop-made gang cutting arbor for ten MHA-DT-12 blanks: Ø.600 body, journal turned to fit the reamed blanks, 1/4-28 tail, 60° tail centre"
 [tools.bs-0-tailstock]
 description = "BS-0 dividing head tailstock, adjustable centre"
 # --- MHA-DT-09 crank pin (cad/process/dt_crank_pin/plan.toml) ---------------

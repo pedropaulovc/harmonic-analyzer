@@ -152,20 +152,20 @@ def _index(teeth: int, head: dict[str, Any]) -> dict[str, Any]:
     raise ValueError(f"no plate circle divides {turn} turn exactly")
 
 
-def _deflection(
+def _beam(
     sections: list[tuple[float, float, float]],
     fixed: float,
     pinned: float,
-    load_at: float,
-    force: float,
     modulus: float,
     steps: int = 2000,
-) -> float:
-    """Deflection (mm) under ``force`` (N) at ``load_at`` of a stepped round
-    beam fixed at ``fixed`` (the BS-0 jaws) and pinned at ``pinned`` (the
-    tailstock centre): each section (start, end, diameter) in mm, ``modulus``
-    in MPa. The cantilever's bending under the load and under the tail's
-    reaction, integrated twice; the reaction makes the tail's deflection zero."""
+) -> Any:
+    """A stepped round beam fixed at ``fixed`` (the BS-0 jaws) and pinned at
+    ``pinned`` (the tailstock centre): each section (start, end, diameter) in
+    mm, ``modulus`` in MPa. Returns ``deflection(load_at, force)`` in mm under
+    ``force`` (N) at ``load_at``: the cantilever's bending under the load and
+    under the tail's reaction, integrated twice; the reaction makes the tail's
+    deflection zero. The section stiffness and the tail's unit bending are
+    computed once for every load station."""
     xs = [fixed + (pinned - fixed) * k / steps for k in range(steps + 1)]
 
     def inertia(x: float) -> float:
@@ -185,11 +185,15 @@ def _deflection(
             deflection.append(deflection[-1] + (slope[i] + slope[i - 1]) / 2 * h)
         return deflection
 
-    under_load, under_tail = cantilever(load_at), cantilever(pinned)
-    reaction = force * under_load[-1] / under_tail[-1]
-    net = [force * a - reaction * b for a, b in zip(under_load, under_tail)]
-    k = min(range(len(xs)), key=lambda i: abs(xs[i] - load_at))
-    return net[k]
+    under_tail = cantilever(pinned)
+
+    def deflection(load_at: float, force: float) -> float:
+        under_load = cantilever(load_at)
+        reaction = force * under_load[-1] / under_tail[-1]
+        k = min(range(len(xs)), key=lambda i: abs(xs[i] - load_at))
+        return force * under_load[k] - reaction * under_tail[k]
+
+    return deflection
 
 
 def context(
@@ -381,19 +385,12 @@ def context(
     # The arbor's deflection under the cut at each blank's rim: the same for
     # every space of a blank (the same cut), so it moves each blank's mean
     # depth, not the depth around it.
+    bend = _beam(sections, -p["standoff_mm"], tail, modulus)
+
     def rim_deflection(blank: int) -> list[float]:
         x0 = (blank - 1) * pitch
         return [
-            abs(
-                _deflection(
-                    sections,
-                    -p["standoff_mm"],
-                    tail,
-                    x0 + face * k / RIM_STATIONS,
-                    force,
-                    modulus,
-                )
-            )
+            abs(bend(x0 + face * k / RIM_STATIONS, force))
             for k in range(RIM_STATIONS + 1)
         ]
 
@@ -448,6 +445,8 @@ def context(
     # left by Setup 5: the body's lathe-jaw TIR tapering to nothing at the
     # tail centre, its share at blank 10's near face). Between the two its
     # offset is at most the larger; then the arbor's fit in the largest bore.
+    # The journal is turned to the reamed blanks (Setup 4), .3758 at least by
+    # the micrometer; the bore is the reamer's, taken at the sheet's largest.
     fit = f["bore"]["dia"][1] - p["journal_dia_min_mm"]
     share = (tail - (stack_end - pitch)) / (tail + p["standoff_mm"])
     journal = max(p["mount_tir_max_mm"], p["mount_tir_max_mm"] * (1 + share))
@@ -456,8 +455,8 @@ def context(
         raise ValueError(
             f"runout budget {runout:.4f} mm exceeds {teeth['tooth_runout_tir_max']}"
         )
-    if p["journal_dia_max_mm"] > f["bore"]["dia"][0]:
-        raise ValueError("the journal is larger than the least bore")
+    if p["journal_dia_min_mm"] >= f["bore"]["dia"][0]:
+        raise ValueError("the journal's least size does not enter the least bore")
 
     names = {t["id"]: t["name"] for t in plan["tools"]}
     numbers = {
@@ -677,7 +676,7 @@ def context(
             [],
             (_r(saw_start), _r(saw_end)),
             saw_r,
-            p["saw_arbor_nut_dia_mm"] / 2,
+            p["saw_arbor_cap_dia_mm"] / 2,
             notch[1],
         ),
     ):

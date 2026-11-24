@@ -109,9 +109,11 @@ def test_the_budgets_fit_the_teeth_bands(ctx) -> None:
 def test_the_plan_is_an_enrolled_traveler() -> None:
     assert PLAN["revision"] != "placeholder"
     assert STEM in _process_plans.enrolled_stems()
-    assert {"cutter", "cutter-arbor", "saw", "saw-arbor", "plugs"} <= {
-        t["id"] for t in PLAN["tools"] if t.get("status") == "to_order"
-    }
+    ordered = {t["id"] for t in PLAN["tools"] if t.get("status") == "to_order"}
+    assert {"cutter", "cutter-arbor", "saw"} <= ordered
+    # Fit policy (#3513): no plug gauge pair; the owned saw arbor is not bought.
+    assert not {"plugs", "saw-arbor"} & ordered
+    assert not any("plug-gauges" in t.get("ref", "") for t in PLAN["tools"])
     assert {"gang-arbor", "fixture"} <= {
         t["id"] for t in PLAN["tools"] if t.get("status") == "to_make"
     }
@@ -180,6 +182,10 @@ def test_the_plans_cutter_and_saw_records_are_the_inventorys() -> None:
     assert SHOP["tools"]["cylinder-notch-saw"]["diameter_mm"] == pytest.approx(
         saw["dia_in"] * IN
     )
+    arbor = tools["saw-arbor-r8-stepped"]
+    assert arbor["status"] == "on_hand" and saw["bore_in"] in arbor["pilot_bores_in"]
+    assert P["saw_arbor_cap_dia_mm"] == pytest.approx(arbor["cap_dia_in"] * IN)
+    assert arbor["body_dia_above_saw_in"] <= arbor["cap_dia_in"]
 
 
 @pytest.mark.parametrize(
@@ -228,6 +234,18 @@ def test_a_loose_arbor_fit_breaks_the_runout_budget() -> None:
         9.50 * (p["arbor_modulus_gpa"] / p["brass_modulus_gpa"]) ** 0.25
     )
     with pytest.raises(ValueError, match="runout budget"):
+        _context(plan)
+
+
+def test_a_journal_that_cannot_enter_the_least_bore_is_refused() -> None:
+    plan = copy.deepcopy(PLAN)
+    p = plan["parameters"]
+    p["journal_dia_min_mm"] = FEATURES["features"]["bore"]["dia"][0]
+    p["beam_brass_equiv_dia_mm"] = (
+        p["journal_dia_min_mm"]
+        * (p["arbor_modulus_gpa"] / p["brass_modulus_gpa"]) ** 0.25
+    )
+    with pytest.raises(ValueError, match="does not enter the least bore"):
         _context(plan)
 
 

@@ -190,7 +190,7 @@ class Program:
                 tuple(n for n in self.machine_moves if first <= n < last),
                 tuple(p for p in self.probes if first <= p.line < last),
                 index,
-                starts=tuple((line, moves - start) for line, moves in self.starts if first <= line < last),
+                starts=tuple(s for s in self.starts if first <= s[0] < last),
             ))
         return sections
 
