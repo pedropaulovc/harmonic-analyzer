@@ -269,6 +269,7 @@ from pd_guide_lock_spec import (  # noqa: E402
 from pd_platen_guide_spec import (  # noqa: E402
     GUIDE_DEPTH_BAND,
     GUIDE_DEPTH_PLACES,
+    GUIDE_HEIGHT_PLACES,
     LOCK_GAP_FIT,
     TAP_Y as GUIDE_TAP_Y,
     UNIT as GUIDE_UNIT,
@@ -1403,8 +1404,8 @@ _BAR_DEPTH_DEV = BAR.BAR_DEPTH_LIMITS
 _GUIDE_DEPTH_DEV = printed_deviations(
     GUIDE_DEPTH, GUIDE_DEPTH_PLACES, deviations(GUIDE_DEPTH_BAND), unit=GUIDE_UNIT
 )
-# The rail's sheet prints its other sizes at the same document places.
-_GUIDE_HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES, unit=GUIDE_UNIT)
+# The rail's sheet prints its height at .XX.
+_GUIDE_HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_HEIGHT_PLACES, unit=GUIDE_UNIT)
 # MHA-PD-27 prints its height at .XXX.
 _BOTTOM_GUIDE_HEIGHT_DEV = printed_deviations(
     BOTTOM_GUIDE.GUIDE_HEIGHT, BOTTOM_GUIDE.PLACES, unit=BOTTOM_GUIDE.UNIT

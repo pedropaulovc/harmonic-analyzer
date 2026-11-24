@@ -286,7 +286,7 @@ def test_rail_feature_bands_are_the_printed_ones() -> None:
     ]
     assert features["right_end"]["length"] == pytest.approx([_in(10.61), _in(10.63)])
     assert features["top_face"]["height"] == pytest.approx([_in(0.619), _in(0.629)])
-    assert features["rear_face"]["depth"] == pytest.approx([_in(0.39), _in(0.40)])
+    assert features["rear_face"]["depth"] == pytest.approx([_in(0.380), _in(0.387)])
     stations = (2.909, 3.461, 7.155, 7.707)
     for index, station in enumerate(stations, 1):
         tap = features[f"lock_tap_{index}"]

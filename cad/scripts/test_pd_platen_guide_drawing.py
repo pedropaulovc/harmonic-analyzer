@@ -156,7 +156,7 @@ def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
 # R9-64: the guide screws' front receivers are tapped THROUGH, so no thread
 # or drill depth exists to stack (a blind tap could not hold full thread to
 # the screw's reach and keep a bottoming tap's lead without its drill point
-# breaking through a faced lock seat). Recomputed from the catalogue screw
+# breaking through the rail's back under a lock). Recomputed from the catalogue screw
 # and the platen's counterbore, not from the build's derived constants.
 _GUIDE_SCREW_LEN_MAX = 0.25 * 25.4  # 90114A511; B18.6.3 band +0/-0.03 in
 _PLATEN_PASSAGE = PLATE_THICKNESS - CBORE_DEPTH  # plate less the stock-head counterbore
@@ -168,9 +168,10 @@ def test_front_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
     assert spec.depth_mm == 0.0 and not spec.overrides_mm
     reach = _GUIDE_SCREW_LEN_MAX - _PLATEN_PASSAGE
     assert guide.GUIDE_SCREW_THREAD_ENGAGEMENT == pytest.approx(reach)
-    # The tip against the shallowest seat (the faced lock seats over A2/A4).
-    seat_min = min(_GUIDE_DEPTH_MIN, _BAR_DEPTH_MIN + _LOCK_GAP_FIT_MIN)
-    assert seat_min - reach == pytest.approx(4.0532, abs=1e-3)
+    # The tip against the rail's shallowest back (no seat is milled: owner
+    # ruling 2026-11-24, audit part 2 question C4).
+    seat_min = _GUIDE_DEPTH_MIN
+    assert seat_min - reach == pytest.approx(4.2310, abs=1e-3)
     assert guide.GUIDE_SCREW_TIP_INSIDE_MIN == pytest.approx(seat_min - reach)
     # The assembly's blind-bottom check reads the same tip clearance.
     assert guide.GUIDE_SCREW_BOTTOM_CLEARANCE == guide.GUIDE_SCREW_TIP_INSIDE_MIN
@@ -185,18 +186,16 @@ def test_front_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
 _IN = 25.4
 _LOCK_SCREW_LEN_MAX = 0.375 * _IN  # 91792A108; B18.6.3 band +0/-0.03 in
 _LOCK_THICK_MIN = (1.0 / 16.0 - 0.005) * _IN  # 1/16 sheet as supplied, +/-0.005 in
-_GUIDE_DEPTH_MIN = 10.16 - 0.254  # .40 +0/-.01 on the guide sheet
-_BAR_DEPTH_MIN = (0.374 - 0.003) * _IN  # MHA-PD-07 .374 +.001/-.003 (#1563)
-_LOCK_GAP_FIT_MIN = 0.002 * _IN  # the faced lock seats (R9-47)
+_GUIDE_DEPTH_MIN = (0.387 - 0.007) * _IN  # .387 +.000/-.007 on the guide sheet (C4)
 
 
 def test_lock_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
     spec = guide.LOCK_TAP_SPEC
     assert (spec.kind, spec.size, spec.end) == ("tapped", "#4-40", "through_all")
     assert spec.depth_mm == 0.0 and not spec.overrides_mm
-    seat_min = min(_GUIDE_DEPTH_MIN, _BAR_DEPTH_MIN + _LOCK_GAP_FIT_MIN)
+    seat_min = _GUIDE_DEPTH_MIN
     tip_reach_max = _LOCK_SCREW_LEN_MAX - _LOCK_THICK_MIN
-    assert seat_min - tip_reach_max == pytest.approx(1.4097, abs=1e-3)
+    assert seat_min - tip_reach_max == pytest.approx(1.5875, abs=1e-3)
     assert guide.LOCK_SCREW_TIP_INSIDE_MIN == pytest.approx(seat_min - tip_reach_max)
 
 
@@ -350,6 +349,7 @@ def test_part_authors_the_printed_dimensions_and_places() -> None:
         DRAWING_PRECISION,
         DRAWING_PRECISION_BY_NAME,
         GUIDE_DEPTH_PLACES,
+        GUIDE_HEIGHT_PLACES,
     )
 
     assert DRAWING_DIMENSIONS == {
@@ -359,14 +359,16 @@ def test_part_authors_the_printed_dimensions_and_places() -> None:
     # The length only meets the platen's edges and the holes locate from the
     # left end at basic stations: .XX (the inch .X's ±.1 would print a band
     # coarser than the platen it matches). The height prints at the places
-    # the paper-drive lock-station sweep judges it at.
+    # the paper-drive lock-station sweep judges it at, .XX; the depth .XXX
+    # (.387 +.000/-.007, owner ruling 2026-11-24, audit part 2 question C4).
+    assert (GUIDE_HEIGHT_PLACES, GUIDE_DEPTH_PLACES) == (2, 3)
     assert DRAWING_PRECISION == {
-        "GuideProfile": {"Length": 2, "Height": GUIDE_DEPTH_PLACES},
+        "GuideProfile": {"Length": 2, "Height": GUIDE_HEIGHT_PLACES},
         "Guide": {"Depth": GUIDE_DEPTH_PLACES},
     }
     assert DRAWING_PRECISION_BY_NAME == {
         "Length": 2,
-        "Height": GUIDE_DEPTH_PLACES,
+        "Height": GUIDE_HEIGHT_PLACES,
         "Depth": GUIDE_DEPTH_PLACES,
     }
 
@@ -636,7 +638,7 @@ def test_rail_feature_bands_are_the_printed_ones() -> None:
     features = export_features.requirement_manifest("pd_platen_guide")["features"]
     assert features["right_end"]["length"] == pytest.approx([_in(10.61), _in(10.63)])
     assert features["top_face"]["height"] == pytest.approx([_in(0.28), _in(0.30)])
-    assert features["rear_face"]["depth"] == pytest.approx([_in(0.39), _in(0.40)])
+    assert features["rear_face"]["depth"] == pytest.approx([_in(0.380), _in(0.387)])
     assert features["bottom_face"]["finish_callout"] == "63"
     stations = (1.062, 2.909, 3.185, 3.461, 5.308, 7.155, 7.431, 7.707, 9.554)
     for index, station in enumerate(stations, 1):

@@ -58,8 +58,8 @@ SHANK_LEN_BAND = (0.0, 0.03 * IN)
 # engagement: one pitch, as the contract's §7 counts it.
 FIRST_THREAD_LOSS = PITCH
 ENGAGEMENT_FLOOR_D = 1.5
-# The guide's rear tap mouth carries the title block's edge break (the
-# lock seat may be faced at fit-up and re-broken to the same row).
+# The guide's rear tap mouth carries the title block's edge break (no lock
+# seat is faced since owner ruling 2026-11-24, audit part 2 question C4).
 TAP_MOUTH_BREAK = max(
     edge_break_radius_mm(unit=guide.UNIT), edge_break_chamfer_mm(unit=guide.UNIT)
 )

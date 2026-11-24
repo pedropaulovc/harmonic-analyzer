@@ -197,7 +197,7 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # A peck's re-entry rapided past the depth already drilled.
         (
             "lock_drill",
-            lambda line: line == "G0 Z8.501",
+            lambda line: line == "G0 Z8.209",
             lambda line: "G0 Z6.000",
             "rapid",
         ),

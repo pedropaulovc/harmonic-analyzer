@@ -2705,8 +2705,14 @@ def test_the_explode_refuses_a_model_missing_the_knob_wheel() -> None:
 def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:
     """Codex B2: the steps started with the locks already on."""
     order = ["bar-clamped", "rack-screwed", "guides-screwed", "clips-fitted"]
-    order += ["platen-hung", "guide-locks-set", "lock-seats-faced"]
+    order += ["platen-hung", "guide-locks-set", "lock-gaps-checked"]
     assert list(steps.SEQUENCE[: len(order)]) == order
+    # Owner ruling 2026-11-24, audit part 2 question C4: step 7 is the leaf
+    # check in his words, and no seat is ever milled.
+    gaps = _step_body("lock-gaps-checked")
+    assert "A .004 LEAF ENTERS AND A .017 LEAF DOES NOT" in " ".join(gaps.split())
+    assert "FACE" not in gaps.replace("FRONT FACE", "").replace("BACK FACE", "")
+    assert "LIFT THE PLATEN" not in gaps
     assert f"{steps.BAR_TOP_ABOVE_DECK_TEXT} ABOVE THE " in _step_body("bar-clamped")
     # The round pair locates the bar before the slotted pair is tightened;
     # the step names it by its holes, as no package sheet defines END A.
@@ -2782,7 +2788,7 @@ def test_the_rack_is_screwed_to_its_guide_before_the_guide_is_set_by_its_crests(
     )
     assert any(
         _number("pd-platen-bottom-guide") in text and rack_step in text
-        for text in texts["lock-seats-faced"]
+        for text in texts["lock-gaps-checked"]
     )
 
 

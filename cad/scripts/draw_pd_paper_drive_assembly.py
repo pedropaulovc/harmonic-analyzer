@@ -2190,7 +2190,16 @@ def _mark_window(location_mm: float) -> str:
 
 
 # --- rule 22: the values the setting table and the steps share ---------------
-LOCK_GAP_WINDOW = steps.inch_window(platen_guide.LOCK_GAP_FIT, 3, " TO ")
+# Owner ruling 2026-11-24, audit part 2 question C4, his words for step 7; the
+# setting table's row reads the same two leaves in its narrow column.
+LOCK_GAP_CHECK = (
+    f"A {steps.inch_text(platen_guide.LOCK_GAP_FIT[0], 3)} LEAF ENTERS AND A "
+    f"{steps.inch_text(platen_guide.LOCK_GAP_FIT[1], 3)} LEAF DOES NOT"
+)
+LOCK_GAP_ROW = (
+    f"{steps.inch_text(platen_guide.LOCK_GAP_FIT[0], 3)} ENTERS, "
+    f"{steps.inch_text(platen_guide.LOCK_GAP_FIT[1], 3)} DOES NOT"
+)
 KNOB_END_FLOAT_WINDOW = steps.inch_window(KNOB_END_FLOAT_RANGE, 3, " TO ")
 REDUCER_CLOCK_TEXT = steps.inch_text(
     steps.inch_floor_mm(quality.reducer_setup_clock_deviation_mm(), 3), 3
@@ -2270,15 +2279,11 @@ def _step_text(
     # to it (fit audit 2026-11-23, pending owner confirmation).
     bush_ream = steps.inch_text(knob_bush.BORE_DIA, 4)
     bush_made = f"{sub_step('pin-pressed', 9)}-{sub_step('pin-pressed', 14)}"
-    lock_gap = LOCK_GAP_WINDOW
-    lock_gap_min, lock_gap_max = lock_gap.split(" TO ")
-    # R9-47: the gap is the rail's depth less the bar's, so facing the rail's
-    # back under a lock closes it. As made it is always over the window
-    # (build_pd_platen_guide asserts it): each over lock is faced by its
-    # reading less the window's middle, and only an over-faced rail (under
-    # the window) is replaced.
-    lock_gap_target = steps.inch_text(sum(platen_guide.LOCK_GAP_FIT) / 2.0, 3)
-    after_lock_seats = steps.SEQUENCE[steps.SEQUENCE.index("lock-seats-faced") + 1]
+    # Owner ruling 2026-11-24, audit part 2 question C4: the gap is the
+    # rail's depth less the bar's, and the two sheets hold it inside the leaf
+    # check (build_pd_platen_guide asserts it), so no seat is milled; a lock
+    # that fails has a part off its sheet.
+    after_lock_gaps = steps.SEQUENCE[steps.SEQUENCE.index("lock-gaps-checked") + 1]
     teeth = KNOB_PINION
     knob = sprocket_name(sprocket.KNOB_CONFIG)
     crank = sprocket_name(sprocket.CRANK_CONFIG)
@@ -2520,25 +2525,22 @@ def _step_text(
             f"IF ONE MOVES, FIT NEW {n['pd-vn-guide-lock-screw']} SCREWS AND REPEAT "
             f"{s('guide-locks-set', 0)}-{s('guide-locks-set', 3)}.",
         ),
-        # The read branches three ways (machinist review of 492f8b4a70: the
-        # in-window case had no exit and the platen lift read as
-        # unconditional); a faced rail goes back to the read.
-        "lock-seats-faced": (
-            "WITH THE LOCK SCREWS TIGHT, READ THE GAP BETWEEN EACH LOCK'S FRONT "
-            "FACE AND THE BAR'S BACK FACE WITH FEELERS.",
-            f"IF EVERY GAP IS {lock_gap} {row_cite('lock-gap')}, GO TO STEP "
-            f"{steps.step_number(after_lock_seats)}.",
-            f"IF A GAP IS UNDER {lock_gap_min}, REPLACE THAT GUIDE AND REPEAT FROM "
+        # A check, its pass exit, then the part found off its sheet (owner
+        # ruling 2026-11-24, audit part 2 question C4: "no seat is ever
+        # milled").
+        "lock-gaps-checked": (
+            "CHECK: WITH THE LOCK SCREWS TIGHT, BETWEEN EACH LOCK'S FRONT FACE AND "
+            f"THE BAR'S BACK FACE, {LOCK_GAP_CHECK} {row_cite('lock-gap')}.",
+            f"IF EVERY LOCK PASSES, GO TO STEP {steps.step_number(after_lock_gaps)}.",
+            "IF A LOCK FAILS, MEASURE ITS GUIDE'S DEPTH AND THE "
+            f"{n['pd-support-bar']} BAR'S THICKNESS AT IT AGAINST THEIR SHEETS.",
+            "REPLACE A GUIDE FOUND OUTSIDE AND REPEAT FROM "
             f"STEP {steps.step_number('guides-screwed')} FOR THE "
             f"{n['pd-platen-guide']} GUIDE, FROM STEP "
             f"{steps.step_number('rack-screwed')} FOR THE "
             f"{n['pd-platen-bottom-guide']} GUIDE.",
-            f"IF A GAP IS OVER {lock_gap_max}, REMOVE THE LOCKS.",
-            "WITH THE LOCKS REMOVED, LIFT THE PLATEN OFF THE BAR.",
-            "FACE THE GUIDE'S BACK FACE UNDER EACH LOCK THAT READ OVER "
-            f"{lock_gap_max} BY ITS GAP LESS {lock_gap_target}.",
-            f"REFIT PER {s('platen-hung', 9)}-{s('guide-locks-set', 3)}.",
-            f"REPEAT FROM STEP {steps.step_number('lock-seats-faced')}.",
+            "REPLACE A BAR FOUND OUTSIDE AND REPEAT FROM STEP "
+            f"{steps.step_number('bar-clamped')}.",
         ),
         # #3124: the arm's hole runs past the deepest insertion to a drill
         # point, so the proud is set as the dowel goes in, not by a floor;
@@ -3277,8 +3279,8 @@ def _step_text(
             # drift, by setting the bottom guide again with the rack level
             # (its screws float in the platen's holes); that the loop then
             # ends is steps.FEED_LEVEL_RACK_WORST_CASE_MESH's gate. The platen
-            # comes off for the rework as in lock-seats-faced (codjiflo P3 on
-            # 6c847adb0).
+            # comes off for the rework as the retired faced-seat rework of step
+            # 7 took it (codjiflo P3 on 6c847adb0).
             # Machinist review r8 (59eb13ee2): a pass exit first, so a builder
             # whose checks all passed does not read on into the rework.
             "IF EVERY CHECK PASSES, GO TO STEP "
@@ -3678,9 +3680,9 @@ def setting_table_rows(
             "CALIPERS",
         ),
         "lock-gap": (
-            s("lock-seats-faced", 1),
+            s("lock-gaps-checked", 0),
             "EACH LOCK'S FRONT FACE TO THE BAR'S BACK FACE",
-            LOCK_GAP_WINDOW,
+            LOCK_GAP_ROW,
             "FEELERS",
         ),
         "disc-tir": (

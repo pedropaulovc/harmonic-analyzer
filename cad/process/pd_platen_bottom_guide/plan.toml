@@ -3,7 +3,7 @@
 # afterwards). One sawn blank of 3/4 in square 1018 cold-finished bar about
 # 10.8 long, every face milled lying along the vise jaws on the 1 in + 1/2 in
 # parallel stacks (1.5 in), centred, both ends 2.3 in out past the jaws: the
-# .624 height, the .390-.400 depth, the 10.62 length and the four #4-40
+# .624 height, the .380-.387 depth, the 10.62 length and the four #4-40
 # lock-tap holes through from the rear face, all from one zero, then tapped
 # by hand under the spring tap guide.
 #
@@ -106,13 +106,14 @@ blank_length_min_mm = 273.05
 blank_length_max_mm = 275.59
 kerf_in = 0.125
 # Targets, the middle of each band (cam.py checks them against the export):
-# length 10.62 (10.61-10.63), height .624 (.619-.629), depth .395
-# (.390-.400 LIMIT; the model sits on its .400 limit).
+# length 10.62 (10.61-10.63), height .624 (.619-.629), depth .3835
+# (.380-.387 LIMIT, owner ruling 2026-11-24, audit part 2 question C4; the
+# model sits on its .387 limit).
 length_target_mm = 269.748
 height_target_mm = 15.8496
-depth_target_mm = 10.033
+depth_target_mm = 9.7409
 # Skims (author's choice): the underside .050 (one level), the front face
-# .175 (about half of the .355 the depth removes, so both sides lose skin),
+# .175 (about half of the .367 the depth removes, so both sides lose skin),
 # the left end .060 (a sawn end's lean and burr). The top, the rear face and
 # the right end are faced to size from them; the right end's raw station
 # (the longest blank) to the length in equal steps.
@@ -151,10 +152,10 @@ face_step_max_mm = 1.27
 # the front face (end_axial_doc_mm, cam.py checks it), in equal radial steps
 # no deeper than .030, one-way conventional passes across the rail. They
 # stay on the chart setting (shop settings.endmill-carbide-3fl-1-2-1018-cf):
-# 10.541 deep is past the deepest measured cut, 6.6 (measured-cuts.toml).
+# 10.249 deep is past the deepest measured cut, 6.6 (measured-cuts.toml).
 end_step_max_mm = 0.762
 end_past_mm = 0.508
-end_axial_doc_mm = 10.541
+end_axial_doc_mm = 10.2489
 # Lock-tap holes: spot Ø.080 with the #2 centre drill, under the #43 (no
 # chamfer at the mouth; the tap's start is the drill's), then the #43
 # through, pecked .080 (under one diameter) with full retracts (L/D 4.4),
@@ -178,8 +179,8 @@ spot_feed_per_min_mm = 45.72
 drill_feed_per_min_mm = 71.12
 # Tapping #4-40 through: the tap's point stops this far below the rear face
 # (.550): with a spiral-point (plug) chamfer of at most .125 the full thread
-# runs through the .400 deepest rail, and a standard #4 hand tap's 9/16
-# thread keeps its shank out of the hole. The point then stands .150 under
+# runs through the .387 deepest rail, and a standard #4 hand tap's 9/16
+# thread keeps its shank out of the hole. The point then stands .163 under
 # the front face, in the air beside the stacks.
 tap_point_depth_mm = 13.97
 # Holding (shop workholding.vise-pm-6 and fixtures.parallels-lms-6745, 1/8
@@ -210,16 +211,16 @@ half_mill_projection_mm = 28.45
 # the tap in its wrench together reach at most tap_stack_max_mm below the
 # collet face, the spindle-to-table maximum (shop machines.pm-30mv, 431.8)
 # less 25.0 to bring the point down onto the wrench (the shop's tool-change
-# clearance), the vise bed, the stacks, the deepest rail (.400) and the
+# clearance), the vise bed, the stacks, the deepest rail (.387) and the
 # collet gauge, rounded down to .01 in; cam.py checks it. It is also the
 # guide-and-tap stack's declared reach in the capacity check. The guide is
 # 3 1/8 in (79.375) overall, its sellers' size and the most it can stand
 # below the collet face; the tap's reach in its wrench is not on record, so
 # the traveler stops before the first tap file unless the tap, point to the
-# wrench's centre hole, is at most tap_wrench_reach_max_mm: 278.892 less
-# 79.375, 199.517, rounded down to .01 in (cam.py checks it).
-tap_stack_max_mm = 278.892
-tap_wrench_reach_max_mm = 199.39
+# wrench's centre hole, is at most tap_wrench_reach_max_mm: 279.146 less
+# 79.375, 199.771, rounded down to .01 in (cam.py checks it).
+tap_stack_max_mm = 279.146
+tap_wrench_reach_max_mm = 199.644
 
 [[tools]]
 id = "em-half"
@@ -472,7 +473,7 @@ feed = "hand"
 instruction = "Prove PB05_ends_drill in air, Z0 raised 1.000 in; every move clears the jaws, through every M6. Then Z0 back."
 feed = "hand"
 
-# The ends are not measured: 10.541 deep is past the deepest measured cut
+# The ends are not measured: 10.249 deep is past the deepest measured cut
 # (cad/config/shop-equipment/measured-cuts.toml). Owner (Pedro), 2026-11-22,
 # for deep walls: "log new dechatter issues to try deep axial cuts but with
 # shallow radial depth" (#3427). Until then they keep the chart cut and
