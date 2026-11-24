@@ -45,7 +45,6 @@ from pd_transgear_knob_shaft_spec import (
     END_FLOAT_SET_TOL,
     JOURNAL_DIA,
     JOURNAL_DIA_BAND,
-    JOURNAL_DIA_MIN,
     JOURNAL_STANDOUT,
     JOURNAL_STANDOUT_BAND,
     REAR_CHAMFER_MIN as SHAFT_REAR_CHAMFER_MIN,
@@ -81,7 +80,7 @@ LENGTH = 9.144  # .36 as turned (SUPPLY)
 # the ring round the pilot keeps the wall target (PILOT_WALL_WORST).
 BORE_DIA = 6.35  # .250 REF
 BORE_BAND = (0.0762, 0.0)  # analysis (upper, lower) deviations: +.003/0
-PILOT_CLEARANCE = (0.0254, 0.127)  # printed (least, greatest) diametral: .001-.005
+PILOT_CLEARANCE = (0.0127, 0.127)  # printed (least, greatest) diametral: .0005-.005
 PILOT_DEPTH = 3.8608  # .152 as turned (SUPPLY)
 # The web's #33 drill and the rear pocket the screw head sinks in, cut flat
 # with a 3/16 end mill after the drill.  The pocket only clears the head, so
@@ -138,10 +137,14 @@ BORE_MAX = BORE_DIA + max(BORE_BAND)
 # --- The bonded pilot: the journal end, LOCTITE 641 -----------------------------
 # drawing-guidelines.md rule 23: a bonded fit is a fit; the sheet prints the
 # pilot's size REF, names MHA-PD-08 and states the diametral clearance,
-# PILOT_CLEARANCE, which must lie inside the grade's gap fill.  The journal's
-# limits here are the modelled result of its fit by feel in the MHA-PD-28
-# bush (pd_transgear_knob_shaft_spec.JOURNAL_DIA_BAND), not printed limits:
-# the traveler accepts the pilot with the journal itself and two pins of the
+# PILOT_CLEARANCE, which must lie inside the grade's gap fill.  The journal
+# is itself made to fit: turned to the MHA-PD-28 bush's reamed bore, REF on
+# its own sheet, so its size follows that bore.  The journal this pilot can
+# meet is therefore the bush bore's analysis band less the running
+# clearance the shaft's model gives the pair (Codjiflo on #3493: the range
+# rested on the journal's own g6 band, which a journal fitted to a bore at
+# the top of its band leaves, .2492 in a .2495 bore).  The traveler accepts
+# the pilot with the journal itself and two pins of the
 # .001-step set.  Henkel's LOCTITE 641 product page
 # (https://next.henkel-adhesives.com/us/en/products/industrial-adhesives/central-pdp.html/loctite-641/BP000000153498.html,
 # read 2026-11-20) gives "Gap fill: 0.15 mm"; its TDS (May 2004,
@@ -149,22 +152,32 @@ BORE_MAX = BORE_DIA + max(BORE_BAND)
 # on steel pins and collars at 0.05-0.2 mm gaps.  641 is the removable grade
 # (rule 23: "641 where the part must come out").
 LOCTITE_641_GAP_MAX = 0.15
+_JOURNAL_RUNNING_CLEARANCE = (
+    min(BUSH.BORE_DIA_LIMITS) - max(JOURNAL_DIA_BAND),
+    max(BUSH.BORE_DIA_LIMITS) - min(JOURNAL_DIA_BAND),
+)
+# (least, greatest) journal as fitted to the bush's bore: .2480-.2493.
+JOURNAL_FITTED = (
+    BUSH.BORE_DIA + min(BUSH.BORE_DIA_LIMITS) - max(_JOURNAL_RUNNING_CLEARANCE),
+    BUSH.BORE_DIA + max(BUSH.BORE_DIA_LIMITS) - min(_JOURNAL_RUNNING_CLEARANCE),
+)
 BORE_JOURNAL_CLEARANCE = (
-    BORE_DIA + min(BORE_BAND) - (JOURNAL_DIA + max(JOURNAL_DIA_BAND)),
-    BORE_MAX - JOURNAL_DIA_MIN,
+    BORE_DIA + min(BORE_BAND) - max(JOURNAL_FITTED),
+    BORE_MAX - min(JOURNAL_FITTED),
 )
 if min(BORE_JOURNAL_CLEARANCE) <= 0.0:
     raise AssertionError("MHA-PD-16's pilot bore binds on the journal")
 if max(PILOT_CLEARANCE) > LOCTITE_641_GAP_MAX:
     raise AssertionError("MHA-PD-16's pilot clearance passes LOCTITE 641's gap fill")
 if not (
-    min(PILOT_CLEARANCE) <= min(BORE_JOURNAL_CLEARANCE)
-    and max(BORE_JOURNAL_CLEARANCE) <= max(PILOT_CLEARANCE)
+    min(PILOT_CLEARANCE) <= min(BORE_JOURNAL_CLEARANCE) + 1e-9
+    and max(BORE_JOURNAL_CLEARANCE) <= max(PILOT_CLEARANCE) + 1e-9
 ):
     raise AssertionError("MHA-PD-16's modelled pilot leaves its printed clearance")
-# The pilot note's diametral clearance, the printed requirement.
+# The pilot note's diametral clearance, the printed requirement: its least
+# at four places (half a thousandth), its greatest at three.
 BORE_CLEARANCE_TEXT = (
-    f"{inch_text(min(PILOT_CLEARANCE), 3)}-{inch_text(max(PILOT_CLEARANCE), 3)}"
+    f"{inch_text(min(PILOT_CLEARANCE), 4)}-{inch_text(max(PILOT_CLEARANCE), 3)}"
 )
 # The pilot's Ø prints in parentheses (REF): the fit is the requirement.
 REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"BoreDia"})

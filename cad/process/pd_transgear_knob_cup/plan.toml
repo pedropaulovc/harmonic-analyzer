@@ -226,7 +226,7 @@ sizing = "other"
 instruction = "The pilot: the end mill in the tailstock drill chuck, short. Feed it until its end just touches the faced end and zero the quill scale there. Plunge slowly to {{cad.pilot_depth_in:.3dot}}, backing out to clear chips every .03: its square corner leaves the floor's R{{cad.pilot_corner_radius_max_mm:in.3dot}} MAX and its end the flat floor."
 settings = "lathe-plunge-1-4-c360"
 cut_diameter_mm = "{{process.pilot_cutter_dia_mm}}"
-inspection = "The pilot is accepted by its mate (clearance {{cad.pilot_diametral_clearance_min_in:.3dot}}–{{cad.pilot_diametral_clearance_max_in:.3dot}} on the {{cad.pilot_mate}} journal): the journal's end enters to the floor and so does the {{process.pilot_go_pin_in:.3dot}} pin (the pin alone if the shaft is not made yet); the {{process.pilot_nogo_pin_in:.3dot}} pin does not enter. Depth {{cad.pilot_depth_min_in:.3dot}}–{{cad.pilot_depth_max_in:.3dot}} from the faced end, calipers' depth rod beside the #33 hole (a supply size); write it down."
+inspection = "The pilot is accepted by its mate (clearance {{cad.pilot_diametral_clearance_min_in:.4dot}}–{{cad.pilot_diametral_clearance_max_in:.3dot}} on the {{cad.pilot_mate}} journal): the journal's end enters to the floor and so does the {{process.pilot_go_pin_in:.3dot}} pin (the pin alone if the shaft is not made yet); the {{process.pilot_nogo_pin_in:.3dot}} pin does not enter. Depth {{cad.pilot_depth_min_in:.3dot}}–{{cad.pilot_depth_max_in:.3dot}} from the faced end, calipers' depth rod beside the #33 hole (a supply size); write it down."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = [6.35, 6.4262] }, { gauge = "calipers", band_mm = "{{cad.pilot_depth_band_mm}}" }]
 
 [[setups.operations]]

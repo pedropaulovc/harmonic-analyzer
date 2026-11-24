@@ -127,8 +127,8 @@ def test_pilot_callout_names_its_bonded_mate_and_stands_clear_below_the_pilot() 
         f"{spec.BORE_CLEARANCE_TEXT}."
     )
     assert drawing.FIT_NOTE_TEXT in drawing.NOTES
-    assert spec.BORE_CLEARANCE_TEXT == ".001-.005"
-    assert spec.PILOT_CLEARANCE == pytest.approx((0.001 * IN, 0.005 * IN))
+    assert spec.BORE_CLEARANCE_TEXT == ".0005-.005"
+    assert spec.PILOT_CLEARANCE == pytest.approx((0.0005 * IN, 0.005 * IN))
     # Every printed row stands a space off the dimension line, and a closing
     # no-break-space row keeps the shelf off the parentheses' tails.
     printed = drawing.SECTION_CALLOUTS["BoreDia"]
@@ -391,21 +391,35 @@ def test_a_looser_length_row_refuses_the_thin_web(monkeypatch) -> None:
 
 
 def test_the_bonded_pilot_clears_the_journal_inside_641_gap_fill() -> None:
-    tightest = (spec.BORE_DIA + min(spec.BORE_BAND)) - (
-        knob_shaft.JOURNAL_DIA + max(knob_shaft.JOURNAL_DIA_BAND)
+    """Codjiflo on #3493: the journal is itself turned to the bush's reamed
+    bore, so the journal this pilot meets is that bore's analysis band less
+    the pair's modelled running clearance, .2480-.2493, not the journal's own
+    g6 band."""
+    bush_bore = (
+        bush.BORE_DIA + min(bush.BORE_DIA_LIMITS),
+        bush.BORE_DIA + max(bush.BORE_DIA_LIMITS),
     )
-    loosest = (spec.BORE_DIA + max(spec.BORE_BAND)) - knob_shaft.JOURNAL_DIA_MIN
+    running = (
+        bush_bore[0] - (knob_shaft.JOURNAL_DIA + max(knob_shaft.JOURNAL_DIA_BAND)),
+        bush_bore[1] - (knob_shaft.JOURNAL_DIA + min(knob_shaft.JOURNAL_DIA_BAND)),
+    )
+    assert running == pytest.approx((0.0002 * IN, 0.0010 * IN))
+    fitted = (bush_bore[0] - running[1], bush_bore[1] - running[0])
+    assert spec.JOURNAL_FITTED == pytest.approx(fitted)
+    assert fitted == pytest.approx((0.2480 * IN, 0.2493 * IN))
+    tightest = (spec.BORE_DIA + min(spec.BORE_BAND)) - fitted[1]
+    loosest = (spec.BORE_DIA + max(spec.BORE_BAND)) - fitted[0]
     assert 0.0 < tightest <= loosest <= spec.LOCTITE_641_GAP_MAX == 0.15
     assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((tightest, loosest))
 
 
 def test_cup_bore_refuses_binding_on_the_actual_journal(monkeypatch) -> None:
-    assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((0.03048, 0.1143))
-    # The modelled pilot (.0012-.0045 on the journal) lies inside the
+    assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((0.01778, 0.127))
+    # The modelled pilot (.0007-.0050 on the fitted journal) lies inside the
     # printed clearance, and that inside LOCTITE 641's fill: one more
     # thousandth on the printed range passes it.
     assert min(spec.PILOT_CLEARANCE) <= min(spec.BORE_JOURNAL_CLEARANCE)
-    assert max(spec.BORE_JOURNAL_CLEARANCE) <= max(spec.PILOT_CLEARANCE)
+    assert max(spec.BORE_JOURNAL_CLEARANCE) <= max(spec.PILOT_CLEARANCE) + 1e-9
     assert max(spec.PILOT_CLEARANCE) <= spec.LOCTITE_641_GAP_MAX
     assert max(spec.PILOT_CLEARANCE) + 0.0254 > spec.LOCTITE_641_GAP_MAX
     monkeypatch.setattr(knob_shaft, "JOURNAL_DIA_BAND", (0.030, 0.0))
@@ -566,7 +580,7 @@ def test_declarations_print_the_sheets_bands_and_supply_sizes() -> None:
     assert round(features["pilot"]["dia_ref"] / IN, 4) == 0.25
     assert "dia" not in features["pilot"]
     assert inch(features["pilot"]["depth"]) == [0.147, 0.157]
-    assert inch(features["pilot"]["diametral_clearance"]) == [0.001, 0.005]
+    assert inch(features["pilot"]["diametral_clearance"]) == [0.0005, 0.005]
     assert inch([features["pilot"]["corner_radius_max"]]) == [0.005]
     assert inch(features["web_hole"]["dia"]) == [0.113, 0.117]
     assert inch(features["pocket"]["dia"]) == [0.18, 0.2]
