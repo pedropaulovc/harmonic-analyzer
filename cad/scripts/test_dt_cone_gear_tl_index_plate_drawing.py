@@ -69,12 +69,42 @@ def test_registry_row_is_tooling_in_inch() -> None:
     assert entry.source_kind == "part"
 
 
-def test_only_the_bore_and_the_reamed_index_holes_carry_a_model_band() -> None:
+def test_only_the_bore_carries_a_model_band() -> None:
     bands = model_toleranced_dimensions(part)
-    assert set(bands) == {("PlateProfile", "BoreDia"), ("Ring57Profile", "PRINTED_HOLE")}
+    assert set(bands) == {("PlateProfile", "BoreDia")}
     assert spec.BORE_DEVIATIONS == (0.0, 0.003 * INCH)
-    assert spec.INDEX_HOLE_DEVIATIONS == (0.0, 0.0005 * INCH)
-    assert spec.DRAWING_PRECISION_BY_NAME[spec.PRINTED_HOLE] == 4
+    assert spec.DRAWING_PRECISION_BY_NAME[spec.PRINTED_HOLE] == 3
+
+
+def test_the_index_holes_are_the_owned_drill_just_over_the_measured_pin() -> None:
+    # Owner fact 2026-11-24: "0.117 in dia dividing head pin"; owner ruling
+    # 2026-11-23, tool audit Q15: drilled just over the pin, no reamer.
+    assert math.isclose(spec.INDEX_PIN_DIA, 0.117 * INCH)
+    assert spec.INDEX_HOLE_DRILL == "#31"
+    assert math.isclose(spec.INDEX_HOLE_DIA, 0.1200 * INCH)
+    # #32 (.1160), the next owned size down, does not pass the pin.
+    assert 0.1160 * INCH < spec.INDEX_PIN_DIA < spec.INDEX_HOLE_DIA
+    low, high = spec.INDEX_HOLE_DEVIATIONS
+    assert low == 0.0
+    assert math.isclose(high, 0.004 * INCH)
+    least, most = spec.INDEX_PIN_CLEARANCE
+    assert math.isclose(least, 0.003 * INCH)
+    assert math.isclose(most, 0.007 * INCH)
+    callout = spec.CALLOUTS_BELOW[spec.PRINTED_HOLE].split("\n")
+    assert callout[:2] == ["#31 DRILL THRU", "BS-0 HEAD INDEX PIN ENTERS"]
+    assert "REAM" not in spec.CALLOUTS_BELOW[spec.PRINTED_HOLE]
+
+
+def test_pin_play_and_position_zone_stay_under_a_quarter_percent_of_pitch() -> None:
+    # Half the worst play (.007) plus half the zone (.004) along the circle.
+    assert math.isclose(spec.INDEX_ERROR_TANGENTIAL_MM, 0.0055 * INCH)
+    for circle, teeth in spec.RING_TEETH.items():
+        crank = math.degrees(0.0055 / (spec.RING_PCDS[circle] / INCH / 2.0))
+        assert math.isclose(spec.INDEX_ERROR_GEAR_DEG[teeth], crank / 40.0)
+    # The 24-hole circle is the smallest radius: the worst of the three.
+    assert max(spec.INDEX_ERROR_GEAR_DEG, key=spec.INDEX_ERROR_GEAR_DEG.get) == 96
+    assert math.isclose(spec.INDEX_ERROR_GEAR_DEG[96], 0.005836, abs_tol=1e-6)
+    assert max(spec.INDEX_ERROR_TOOTH_FRACTION.values()) < 0.0025
 
 
 def test_the_sheet_states_the_web_shortfall_it_carries() -> None:
@@ -82,7 +112,9 @@ def test_the_sheet_states_the_web_shortfall_it_carries() -> None:
     shortest = min(spec.WEBS_MM[name] for name in spec.SHORT_WEBS)
     assert shortest == spec.WEB_MIN_MM
     assert spec.WEB_MIN_PRINTED * INCH <= spec.WEB_MIN_MM
-    assert spec.WEB_CALLOUT == "WEB .03 MIN"
+    # Above rule 17's .060 floor, under its .080 target (RV-01).
+    assert 0.060 * INCH <= spec.WEB_MIN_MM < 0.080 * INCH
+    assert spec.WEB_CALLOUT == "WEB .06 MIN"
     assert spec.CALLOUTS_BELOW[spec.PRINTED_HOLE].endswith(spec.WEB_CALLOUT)
 
 

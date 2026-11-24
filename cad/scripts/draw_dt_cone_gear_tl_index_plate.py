@@ -70,7 +70,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A Ø3.94 plate: 3:2 keeps the .157 holes and their .03 webs legible while the
+# A Ø3.94 plate: 3:2 keeps the .120 holes and their .07 webs legible while the
 # face view leaves room for callouts on both sides.
 SHEET_SCALE = (3.0, 2.0)
 VIEW_SCALE = (3, 2)

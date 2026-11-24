@@ -1234,8 +1234,11 @@ plates have not been checked against this list; check yours before cutting.
 
 T096, T102 and T114 need 5/12, 20/51 and 20/57 of a crank turn, which no stock plate gives. The
 shop-made index plate MHA-DT-03-TL-01 (`dt-cone-gear-tl-index-plate`) carries 24-, 51- and
-57-hole circles for them (10, 20 and 20 hole spaces a tooth); its sizes are
-best guesses until the BS-0 plate is measured
+57-hole circles for them (10, 20 and 20 hole spaces a tooth). Its 132 pin holes are drilled #31
+(.120), just over the head's measured index pin (owner fact 2026-11-24: "0.117 in dia dividing head
+pin"; owner ruling 2026-11-23, tool audit Q15: drilled, no reamer). The pin's .003-.007 play in a
+hole and the Ø.004 position zone together misplace a tooth by at most .0058° at the gear, 0.16 %
+of a 96-tooth pitch. Its other sizes are best guesses until the BS-0 plate is measured
 ([#2157](https://github.com/pedropaulovc/harmonic-analyzer/issues/2157)). Differential indexing on a
 universal head with change gears is the alternative. Those tooth counts did not change with the
 pitch, so this was already true of the old train.

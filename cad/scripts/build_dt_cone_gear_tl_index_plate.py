@@ -65,9 +65,7 @@ from dt_cone_gear_tl_index_plate_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     GLOBALS,
-    INDEX_HOLE_DEVIATIONS,
     INDEX_HOLE_DIA,
-    INDEX_HOLE_PLACES,
     ISOMETRIC_VIEW_NOTE,
     MOUNT_COUNT,
     MOUNT_HOLE_DIA,
@@ -76,7 +74,6 @@ from dt_cone_gear_tl_index_plate_spec import (
     MOUNT_X_FACTOR,
     MOUNT_Y_FACTOR,
     PLATE_DIA,
-    PRINTED_HOLE,
     RING_COUNTS,
     RING_PCDS,
     THICKNESS,
@@ -595,15 +592,8 @@ def build(adapter: Any) -> dict[str, str]:
         places=3,
         display_unit=UNIT,
     )
-    # The reamed index holes: a sliding fit on the head's index pin.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "Ring57Profile",
-        PRINTED_HOLE,
-        *INDEX_HOLE_DEVIATIONS,
-        places=INDEX_HOLE_PLACES,
-        display_unit=UNIT,
-    )
+    # The drilled index holes take the title block's DRILLED HOLES band: the
+    # model dimension carries none (owner ruling 2026-11-23, tool audit Q15).
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)

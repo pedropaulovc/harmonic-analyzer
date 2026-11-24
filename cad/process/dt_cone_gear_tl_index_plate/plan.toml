@@ -10,9 +10,9 @@ shop = "../shop"
 stock_refs = ["6061-flat-1-4x5"]
 
 [[tools]]
-id = "drill-26"
-name = "#26 drill"
-ref = "drill-26"  # Drills #26
+id = "drill-31"
+name = "#31 drill"
+ref = "drill-31"  # owner ruling 2026-11-23, tool audit Q15: 132X .120 #31 DRILL THRU, just over the .117 index pin (owner fact 2026-11-24)
 
 [[tools]]
 id = "riser-drill-9"
@@ -23,11 +23,6 @@ ref = "riser-drill-9"  # Drills #9
 id = "pin-gauges"
 name = "Pin gauges .011-.500"
 ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
-
-[[tools]]
-id = "reamer-1570"
-name = ".1570 reamer"
-ref = "reamer-1570"  # drawing cross-check 2026-11-19: 132X .1570 +.0005/.0000 REAM THRU
 
 [[tools]]
 id = "riser-countersink"

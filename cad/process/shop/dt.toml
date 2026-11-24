@@ -124,9 +124,6 @@ diameter_mm = 1.5875
 [tools.reamer-1562]  # MHA-DT-31 (Ø.156) REAM .17 at assembly with MHA-DT-06; MHA-DT-06 (Ø.156) REAM .17 for dowel MHA-DT-VN-59
 description = "5/32 (.1562 in) HSS chucking reamer"
 diameter_mm = 3.96875
-[tools.reamer-1570]  # MHA-DT-03-TL-01 132X .1570 +.0005/.0000 REAM THRU
-description = ".1570 in HSS chucking reamer"
-diameter_mm = 3.9878
 [tools.chamfer-mill-3-16-90]  # MHA-DT-35 #20 hole's floor-side chamfer inside the pocket (inventory: to order)
 description = "3/16 in 90° pointed 2-flute carbide chamfer cutter (Harvey Tool 902345-C3)"
 diameter_mm = 4.7625

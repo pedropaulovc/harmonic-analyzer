@@ -10,14 +10,15 @@ cuts the MHA-DT-03 cone gears. The stock BS-0 plates (A: 15-20; B: 21 23 27
 * 102T: 40/102 = 20/51, twenty holes on the 51-hole circle;
 * 114T: 40/114 = 20/57, twenty holes on the 57-hole circle.
 
-BEST GUESSES, every one (#2157 tracks the measurement of the owner's BS-0
-plate and head): the plate envelope comes from a Hobby-Machinist member's
-measurement of a BS-0 plate, 3.938 OD x .829 ID x .218 thick with three
-mounting holes (post #8, https://www.hobby-machinist.com/threads/
+BEST GUESSES, all but the index pin (#2157 tracks the measurement of the
+owner's BS-0 plate and head): the plate envelope comes from a Hobby-Machinist
+member's measurement of a BS-0 plate, 3.938 OD x .829 ID x .218 thick with
+three mounting holes (post #8, https://www.hobby-machinist.com/threads/
 index-plate-size-used-on-bs-0-or-bs-1-import-dividing-head.46769/). The
-mounting screw, its countersink and bolt circle, the index-pin hole size and
-the three hole-circle diameters are guesses within that envelope. Replace
-each ``# GUESS (#2157)`` value with the measured one.
+mounting screw, its countersink and bolt circle and the three hole-circle
+diameters are guesses within that envelope. Replace each ``# GUESS (#2157)``
+value with the measured one. The index pin is measured (owner fact
+2026-11-24, verbatim: "0.117 in dia dividing head pin").
 
 Frame (the SolidWorks model): the plate's axis is model Z through the
 origin. The back face (Z0) seats on the head; the front face (Z = THICKNESS)
@@ -29,19 +30,22 @@ Precision: the three hole circles are BASIC and every index hole carries a
 position frame to the bore, datum A (``INDEX_POSITION``), so neither the
 title block's ±1° angle nor its three-place band governs the spacing; a DRO
 bolt-circle drill holds the zone, and the 40:1 worm divides what is left.
-The pin holes are reamed to a sliding fit on the head's index pin (delegated
-ruling 2026-11-07, owner review #2144, pending owner confirmation): a drilled
-hole holds only the drilled-hole row, not the Ø.004 zone. The bore pilots the
-plate on the head's hub (+.003/0 over the measured stock bore) so the hole
-circles stay concentric with the crank.
+The pin holes are drilled just over the head's index pin with the owned #31
+drill and take the title block's DRILLED HOLES band (owner ruling 2026-11-23,
+tool audit Q15, verbatim: "Wait for #2157 (pin measurement), then drill just
+over the pin (+.004/0) with an owned drill, no reamer (revises the 2026-11-08
+reamed-fit ruling)."). The pin is the gauge: it enters every hole. The play
+of the pin in its hole and the position zone are an indexing error at the
+crank, divided by the 40:1 worm at the gear (``INDEX_ERROR_*`` below). The
+bore pilots the plate on the head's hub (+.003/0 over the measured stock
+bore) so the hole circles stay concentric with the crank.
 
 Rule 17 shortfall (stated on the sheet; owner ruling 2026-11-02, RV-01 in the
-part's machinist_exceptions, provisional until #2157): Ø.1570
-holes on the 57- and 51-hole circles leave about .035 in between neighbouring
-holes and between those two circles, at the worst case of the ream band and
-the position zone, below the .060 floor. The plate's
-3.94 OD leaves no larger radius at the .080 edge target; a smaller measured
-pin is the likely cure. The 24-hole circle stands at Ø2.700, not the brief's
+part's machinist_exceptions): #31 holes on the 57- and 51-hole circles leave
+about .07 in between neighbouring holes and between those two circles, at the
+worst case of the drilled-hole band and the position zone: above the .060
+floor, below the .080 target. The plate's 3.94 OD leaves no larger radius at
+the .080 edge target. The 24-hole circle stands at Ø2.700, not the brief's
 Ø2.800, so its web to the 51-hole circle meets the .080 target.
 
 The head is shop equipment with no drawing number; the sheet names it once
@@ -56,7 +60,11 @@ import _config
 from _hole_spec import CLEARANCE_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    drilled_undersize_mm,
+    printed_band_mm,
+)
 
 PART_NAME = "dt-cone-gear-tl-index-plate"
 UNIT = drawing_unit(
@@ -84,10 +92,27 @@ def holes_per_tooth(teeth: int, circle: int) -> float:
 
 
 # --- Index-hole circles: hole count -> bolt-circle diameter -------------------
-INDEX_HOLE_DIA = 0.157 * INCH  # GUESS (#2157): Ø4 mm index-pin class
-# Reamed to a sliding fit on the head's index pin (Owner ruling 2026-11-08 (Pedro), #2144 item 9.4).
-INDEX_HOLE_DEVIATIONS = (0.0, 0.0005 * INCH)
-INDEX_HOLE_PLACES = 4
+# The BS-0 head's index pin (owner fact 2026-11-24, verbatim: "0.117 in dia
+# dividing head pin"; #2157).
+INDEX_PIN_DIA = 0.117 * INCH
+# The owned drill just over the pin (owner ruling 2026-11-23, tool audit Q15):
+# #32 (.1160) is under the pin; #31 (.1200) is the next size of the owned
+# 115-piece index (shop-equipment tools.drill-31). No reamer.
+INDEX_HOLE_DRILL = "#31"
+INDEX_HOLE_DIA = 0.120 * INCH
+# The title block's DRILLED HOLES row: the model dimension carries no band.
+INDEX_HOLE_DEVIATIONS = (
+    -drilled_undersize_mm(unit=UNIT),
+    drilled_oversize_mm(unit=UNIT),
+)
+INDEX_HOLE_PLACES = 3
+# Diametral play of the pin in a hole, least and most; the pin always enters.
+INDEX_PIN_CLEARANCE = (
+    INDEX_HOLE_DIA + INDEX_HOLE_DEVIATIONS[0] - INDEX_PIN_DIA,
+    INDEX_HOLE_DIA + INDEX_HOLE_DEVIATIONS[1] - INDEX_PIN_DIA,
+)
+if INDEX_PIN_CLEARANCE[0] <= 0.0:
+    raise AssertionError("the BS-0 index pin does not enter a least-size hole")
 RING_COUNTS = (57, 51, 24)
 RING_PCDS = {
     57: 3.600 * INCH,  # GUESS (#2157): outermost at the .080 edge target
@@ -125,8 +150,7 @@ MOUNT_SEED = (
 # --- Printed precision --------------------------------------------------------
 # Places: OD, thickness and the countersink at .XX; the bore (banded, the
 # hub pilot), the bolt circles (index arm reach, head taps) and the drill
-# size at .XXX (rule 3: drill diameters print three places); the reamed index
-# holes at .XXXX with their band.
+# sizes at .XXX (rule 3: drill diameters print three places).
 _XX = printed_band_mm(2, unit=UNIT)
 _XXX = printed_band_mm(3, unit=UNIT)
 
@@ -185,8 +209,8 @@ WEBS_MM: dict[str, float] = {
     - _CSK_R_MAX
     - (BORE_DIA + BORE_DEVIATIONS[1]) / 2.0,
 }
-# The two fine circles fall short of rule 17's floor (owner ruling RV-01);
-# every other wall meets the .080 target.
+# The two fine circles stand between rule 17's .060 floor and its .080 target
+# (owner ruling RV-01); every other wall meets the target.
 SHORT_WEBS = frozenset(
     {
         "57-hole circle, between holes",
@@ -196,7 +220,7 @@ SHORT_WEBS = frozenset(
 )
 for _wall, _mm in WEBS_MM.items():
     if _wall in SHORT_WEBS:
-        if not 0.0 < _mm < WALL_FLOOR_MM:
+        if not WALL_FLOOR_MM <= _mm < WALL_TARGET_MM:
             raise AssertionError(
                 f"index plate {_wall} web {_mm:.3f} is not the stated shortfall"
             )
@@ -210,6 +234,28 @@ if WEB_MIN_PRINTED <= 0.0:
 RULED_WEB_MIN_MM = 0.02 * INCH
 if WEB_MIN_MM < RULED_WEB_MIN_MM:
     raise AssertionError("index plate web is thinner than owner ruling RV-01 accepts")
+
+# --- Indexing error of a drilled pin hole -------------------------------------
+# The pin may stand anywhere in its hole, half the diametral play either way
+# along the circle, and the hole anywhere in its position zone, half the zone
+# either way: a crank angle error of that sum over the circle's radius, which
+# the worm divides at the gear. Worst case of both, per gear, in degrees at
+# the gear and as a fraction of that gear's tooth pitch.
+INDEX_ERROR_TANGENTIAL_MM = (INDEX_PIN_CLEARANCE[1] + INDEX_POSITION) / 2.0
+INDEX_ERROR_GEAR_DEG: dict[int, float] = {
+    teeth: math.degrees(INDEX_ERROR_TANGENTIAL_MM / (RING_PCDS[circle] / 2.0))
+    / WORM_RATIO
+    for circle, teeth in RING_TEETH.items()
+}
+INDEX_ERROR_TOOTH_FRACTION: dict[int, float] = {
+    teeth: error / (360.0 / teeth) for teeth, error in INDEX_ERROR_GEAR_DEG.items()
+}
+# Either way of true position, each tooth space stands within a quarter of
+# one percent of its pitch; a reamed sliding fit bought nothing a cone gear
+# needs.
+INDEX_ERROR_TOOTH_FRACTION_MAX = 0.0025
+if max(INDEX_ERROR_TOOTH_FRACTION.values()) > INDEX_ERROR_TOOTH_FRACTION_MAX:
+    raise AssertionError("drilled index holes misplace a tooth by over 0.25 % of pitch")
 
 # --- Model globals: name -> value (mm); the build sets each and drives from it --
 GLOBALS: dict[str, float] = {
@@ -313,7 +359,9 @@ CALLOUTS_ABOVE: dict[str, str] = {
 # degrees, as for the index circles.
 WEB_CALLOUT = f"WEB {inch_text(WEB_MIN_PRINTED * INCH, 2)} MIN"
 CALLOUTS_BELOW: dict[str, str] = {
-    PRINTED_HOLE: f"REAM THRU\nSLIDING FIT ON {HEAD} INDEX PIN\n{WEB_CALLOUT}",
+    PRINTED_HOLE: (
+        f"{INDEX_HOLE_DRILL} DRILL THRU\n{HEAD} INDEX PIN ENTERS\n{WEB_CALLOUT}"
+    ),
     "BoreDia": f"BORE THRU\nLOCATING FIT ON\n{HEAD} PLATE HUB",
     "MountHoleDia": f"DRILL THRU\n{CSK_CALLOUT}\nFOR {HEAD}\nPLATE SCREWS",
 }
