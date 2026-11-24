@@ -290,7 +290,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Pilot depth in the block: drop the #49 drill into each pilot shank end first, so it bottoms where the point begins; the calipers' depth rod from the block face to the drill's end, subtracted from the drill's miked length."
-inspection = "Each pilot {{cad.clearance_hole_1_pair_pilot_depth_in_mate_min_in:.2dot}}–{{cad.clearance_hole_1_pair_pilot_depth_in_mate_max_in:.2dot}} below the block face (MHA-MS-02 Ø.073 ↧ .30). Short: the next op. Deep: stop and tell the owner (the block's back wall)."
+inspection = "Each pilot {{cad.clearance_hole_1_pair_pilot_depth_in_mate_mm:in.2dot}} ±.01 below the block face (MHA-MS-02 Ø.073 ↧ .30, the title block's .XX row). Short: the next op. Deep: stop and tell the owner (the block's back wall)."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.clearance_hole_1_pair_pilot_depth_in_mate_band_mm}}" }]
 
 [[setups.operations]]

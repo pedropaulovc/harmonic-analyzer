@@ -644,7 +644,10 @@ drilling = "none"
 sizing = "other"
 instruction = "Drawing note 2 and the slots' clearance, on the pen rod MHA-PN-04: hold the hanger upright by the strap's edges, its top end up and the plates' slots facing you, and lower the rod into the upper plate's slot from above. Then lay the {{cad.slots_fit_feeler_in:.3dot}} feeler leaf flat on one side of the rod and try rod and leaf together into each slot, at its mouth and at its floor."
 inspection = "The rod slides down through both slots under its own weight; with the {{cad.slots_fit_feeler_in:.3dot}} leaf beside it, it enters neither slot (the drawing's CLEARANCE {{cad.slots_fit_feeler_in:.3dot}} MAX). Tight, or rod and leaf enter a slot: stop and tell the owner."
-gauge_checks = [{ gauge = "feeler-gauges", band_mm = [0, "{{cad.slots_fit_feeler_mm}}"] }]
+# A fit-up, not a measured band: the rod's free slide is the GO, the single
+# leaf the NO-GO. A [0, .007] band would start below the feeler set's .0015
+# thinnest leaf, so prechips' gauge_capability could not hold it.
+gauge_checks = "other"
 
 [[setups]]
 machine_kind = "other"
