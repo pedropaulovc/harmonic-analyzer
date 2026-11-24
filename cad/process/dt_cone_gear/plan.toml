@@ -42,7 +42,7 @@ ref = "feeler-gauges"  # F-feeler-66MA; repointed from the Starrett 66MA (owner 
 [[tools]]
 id = "pin-gauges"
 name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-011-060
+ref = "pin-gauges"  # A1-pin-set-011-060; the over-pins pair (.040); the bores print their reamer's size, no pin read (fit audit 2026-11-23)
 
 [[tools]]
 id = "arbor-press"
@@ -57,7 +57,7 @@ ref = "jig-drill-23-64"  # drawing cross-check 2026-11-19: pre-drill for the .37
 [[tools]]
 id = "reamer-0376"
 name = ".3760 reamer"
-ref = "reamer-0376"  # drawing cross-check 2026-11-19: .3750/.3760 class REAM THRU
+ref = "reamer-0376"  # .3760 REAM THRU (T030-T120), no band: MHA-DT-04 land 1 is turned to the bores (fit audit 2026-11-23)
 
 [[tools]]
 id = "drill-53"
@@ -67,7 +67,7 @@ ref = "drill-53"  # drawing cross-check 2026-11-19: pre-drill for the .0625 ream
 [[tools]]
 id = "reamer-0625"
 name = ".0625 reamer"
-ref = "reamer-0625"  # drawing cross-check 2026-11-19: .0625 +.0005/.0000 REAM THRU (T012, T018)
+ref = "reamer-0625"  # .0625 REAM THRU (T012, T018), no band: MHA-DT-37's spigot is turned to it (fit audit 2026-11-23)
 
 [[tools]]
 id = "drill-c"

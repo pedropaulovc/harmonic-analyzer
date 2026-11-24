@@ -141,10 +141,11 @@ def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
     assert spec.BLANK_DIA_BAND == (0.0, -0.0508)
     assert all(spec.blank_dia_band(t) is spec.BLANK_DIA_BAND for t in spec.CONFIGURATION_TEETH)
     assert spec.BLANK_DIA_BAND[0] < spec.MODULE_MM / 2.0
+    # The bores print their reamer's size with no band (fit audit
+    # 2026-11-23): no configuration band rides them.
     assert readback._BANDED_DIMENSIONS == (
         (notes.BLANK_DIA_REFERENCE_SKETCH, "BlankDia", spec.blank_dia_band),
         (spec.TOOTH_REFERENCE_SKETCH, "ToothThickness", spec.tooth_thickness_band),
-        (spec.BORE_SKETCH, "BoreCutDia", spec.bore_dia_band),
     )
 
 
@@ -180,11 +181,19 @@ def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
         (spec.BORE_BAND_FIT_UPPER, spec.BORE_BAND_LOWER)
     )
     assert spec.BORE_DIA_BAND[0] - spec.BORE_DIA_BAND[1] >= 0.02 - 1e-9
+    # Each land seat is reamed with the owned over reamer, the land's
+    # nominal plus the seat class's lower deviation (.2510, .3760), and its
+    # analysis band is the class's spread about that size: the absolute
+    # limits are the seat class's on the land.
     for teeth in (24, *spec.KEYED_TEETH):
         land = 2 if teeth == 24 else spec.KEYED_LAND
-        assert spec.bore_dia_mm(teeth) == pytest.approx(
-            dt_cone_gear_shaft_spec.SECTION_DIAS[land]
-        )
+        land_dia = dt_cone_gear_shaft_spec.SECTION_DIAS[land]
+        assert spec.bore_dia_mm(teeth) == pytest.approx(land_dia + spec.BORE_DIA_BAND[1])
+        upper, lower = spec.bore_dia_band(teeth)
+        assert spec.bore_dia_mm(teeth) + lower == pytest.approx(land_dia + spec.BORE_DIA_BAND[1])
+        assert spec.bore_dia_mm(teeth) + upper == pytest.approx(land_dia + spec.BORE_DIA_BAND[0])
+    assert spec.bore_dia_mm(24) == pytest.approx(0.2510 * 25.4)
+    assert spec.bore_dia_mm(30) == pytest.approx(0.3760 * 25.4)
     # The keyway takes cone_land_key's bands: the milled-width row's
     # +.0020/-.0000 width and +/-.003 on T (the one-pass broach's reach, no
     # tighter than the milled-step row), plain inch steps.
@@ -373,11 +382,12 @@ def test_tight_bands_name_their_mates_once_in_flagged_notes() -> None:
 
 
 def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
-    """Note 1 is the bore's fit: a keyed bore's matched sliding fit on its
-    MHA-DT-04 land and the MHA-DT-VN-71 key, with the clearances the parts'
-    printed limits give (REF); a round bore's bonded slip fit on its mate
-    with its diametral clearance (rule 23), no compound and no method. Note 2
-    names the mesh and the over-pins and backlash acceptances."""
+    """Note 1 is the bore's fit (rule 4, form 2): every bore is reamed, and
+    the note names its mate, which is turned to it last (MHA-DT-04's land,
+    by its diameter, or MHA-DT-37's spigot); the keyed bore's key slides in
+    its keyway. The acceptance and the bond's clearance print on the mate's
+    sheet: no clearance, no compound and no method here. Note 2 names the
+    mesh and the over-pins and backlash acceptances."""
     import cone_shaft_land_bands as lands
 
     shaft = str(_config.parts("dt-cone-gear-shaft")["title"]).upper()
@@ -388,38 +398,32 @@ def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
         if spec.keyed(teeth):
             land = lands.SECTION_DIA_BANDS[spec.KEYED_LAND]
             (round_min, round_max), (second_min, second_max) = drawing.bore_clearances_mm(teeth)
+            # The analysis clearance is the seat class's, unchanged.
             assert round_min == pytest.approx(spec.BORE_DIA_BAND[1] - land[0])
             assert round_max == pytest.approx(spec.BORE_DIA_BAND[0] - land[1])
             assert 0.0 < round_min < round_max
-            dia = f"\u00d8{spec.inch_text(spec.bore_dia_mm(teeth), 4)} LAND"
-            # The key slides in the keyway at every printed limit.
+            dia = f"\u00d8{spec.inch_text(spec.BORE_DIA, 4)} LAND"
             assert (second_min, second_max) == cone_land_key.KEYWAY_SIDE_CLEARANCE_MM
-            assert 0.0 <= second_min < second_max
             assert lines[0] == (
-                f"1. SLIDING FIT ON {shaft} MHA-DT-04, {dia}, AND KEY {drawing.KEY_MATE}:"
+                f"1. SLIDING FIT: {shaft} MHA-DT-04 {dia} IS TURNED TO THIS BORE;"
             )
-            clearance = (
-                f"(CLEARANCE {spec.inch_text(round_min, 4)}-{spec.inch_text(round_max, 4)} ON \u00d8, "
-                f"{spec.inch_text(second_min, 4)}-{spec.inch_text(second_max, 4)} KEYWAY TO KEY)"
-            )
-            assert clearance in text
+            assert lines[1] == f"   KEY {drawing.KEY_MATE} SLIDES IN THE KEYWAY."
+            assert "CLEARANCE" not in text
+            assert "MEASURED" not in text
             notes_from = 2
         else:
             if teeth in spec.SPIGOT_TEETH:
                 mate = f"{str(tip_gear['title']).upper()} {tip_gear['number']} SPIGOT"
             else:
-                land_name = f"\u00d8{spec.inch_text(spec.bore_dia_mm(teeth), 4)} LAND"
-                mate = f"{shaft} MHA-DT-04, {land_name}"
+                land_name = f"\u00d8{spec.inch_text(spec.LAND_2_DIA, 4)} LAND"
+                mate = f"{shaft} MHA-DT-04 {land_name}"
             low, high = spec.bond_clearance_mm(teeth)
             # A bond: never interference, never past the compound's largest gap.
             assert 0.0 <= low < high <= cone_tip_cluster.RETAINING_COMPOUND_MAX_GAP_MM
-            clearance = f"{spec.inch_text(low, 4)}-{spec.inch_text(high, 4)}"
-            assert lines[0] == (
-                f"1. BONDED SLIP FIT ON {mate} (CLEARANCE {clearance} ON \u00d8)."
-            )
+            assert lines[0] == f"1. BONDED SLIP FIT: {mate} IS TURNED TO THIS BORE."
             assert drawing.KEY_MATE not in text
-            # Rule 23: the part sheet gives the bond's clearance; the grade and
-            # method are MHA-DT-00's bonding step's.
+            # Rule 23: the mate's sheet gives the bond's clearance; the grade
+            # and method are MHA-DT-00's bonding step's.
             assert "LOCTITE" not in text
             notes_from = 1
         assert "ACROSS FLAT" not in text
