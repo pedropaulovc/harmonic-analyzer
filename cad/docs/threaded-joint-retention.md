@@ -210,7 +210,7 @@ Why each row is classified so, and how it is held axially:
 | `pinion-block-hold-down` | MHA-DT-VN-57 `dt-vn-slotted-screw` → MHA-FR-01 `fr-harmonic-base` | #8-32 UNC | 4 | static clamp | none | MHA-DT-00 STEP 20 |
 | `north-pivot-bracket-hold-down` | MHA-CH-VN-57 `ch-vn-bracket-hold-down-screw` → MHA-FR-05 `fr-rocker-arm-support` | #8-32 | 1 | static clamp | none | MHA-DT-00 STEP 10 |
 | `south-pivot-bracket-hold-down` | MHA-CH-VN-57 `ch-vn-bracket-hold-down-screw` → MHA-FR-05 `fr-rocker-arm-support` | #8-32 | 1 | static clamp | none | MHA-CH-00 STEP 30 |
-| `fulcrum-keeper-screw-in-top-frame` | MHA-CH-VN-52 `ch-vn-frame-side-screw` → MHA-FR-02 `fr-top-frame` | #2-56 | 2 | static clamp | none | MHA-CH-00 STEP 45 |
+| `fulcrum-keeper-screw-in-top-frame` | MHA-CH-VN-52 `ch-vn-frame-side-screw` → MHA-FR-02 `fr-top-frame` | #2-56 | 2 | static clamp | none | MHA-CH-00 STEP 48 |
 | `channel-anchor-in-summing-plate` | MHA-CH-VN-51 `ch-vn-spring-hook` → MHA-SM-03 `sm-summing-lever` | #6-32 UNC | 1 per channel | adjuster | none; ruling `U-MHA-CH-VN-51-no-lock` | MHA-HA-00 STEP 5 |
 | `magnifying-bracket-screws` | MHA-MG-VN-53 `mg-vn-magnifying-bracket-screw` → MHA-SM-03 `sm-summing-lever` | #2-56 UNC | 2 | static clamp | none | MHA-HA-00 STEP 9 |
 
