@@ -688,7 +688,7 @@ description = "Bottoming hand tap #4-40 UNC, HSS"
 [tools.gear-cutter-arbor-1]  # F-arbor-1in-R8
 description = "1 in R8 stub arbor"
 [tools.saw-arbor-r8-stepped]  # inventory tools.saw-arbor-r8-stepped
-description = "R8 stepped slitting-saw arbor, spring-loaded pilot (1 in step), 1.25 x .50 cap, M8 countersunk clamp screw, not keyed"
+description = "R8 stepped slitting-saw arbor (owned; no maker mark recorded), spring-loaded pilot steps 1, 7/8, 3/4, 5/8, 1/2 in, not keyed; 1.25 x .50 cap; M8 x 1.25 countersunk hex-socket clamp screw, 5 mm key"
 [tools.gear-cutter-arbor-7-8]  # F-arbor-7-8
 description = "7/8 stub arbor, 3/4 straight shank"
 [tools.gear-cutters-48dp-20pa]  # F-gear-cutter-10-289-481 to -488
