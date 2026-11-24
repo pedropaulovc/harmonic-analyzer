@@ -55,7 +55,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel flat bar (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_x_in:fraction}} x {{process.blank_z_in:fraction}} in flat bar; {{process.quantity:d}} × {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in blanks."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.east_side_width_min_in:.3dot}}–{{cad.east_side_width_max_in:.3dot}} wide at the foot (W to E), {{cad.near_end_depth_min_in:.3dot}}–{{cad.near_end_depth_max_in:.3dot}} deep (the far face to the near end), the strap {{cad.strap_outer_face_depth_min_in:.3dot}}–{{cad.strap_outer_face_depth_max_in:.3dot}} thick; the bore {{cad.arbor_bore_height_min_in:.3dot}}–{{cad.arbor_bore_height_max_in:.3dot}} above the seat. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Both blanks go through each mill setup in turn before the next setup: after the first, unclamp it, clamp the second as the Holding says and pick up again every zero taken on the part itself (each setup's X0; Setup 4's Z0 on the sawn top; Setup 7's X0, Y0 and Z0); the fixed jaw's Y0 and a stack or parallel Z0 stand. Then run the file and its checks on it. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home (logbook 2026-11-06). After any controller reset, stall or E-stop, home again and re-touch the setup's zeros before re-running its file from the top."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.east_side_width_min_in:.3dot}}–{{cad.east_side_width_max_in:.3dot}} wide at the foot (W to E), {{cad.near_end_depth_min_in:.3dot}}–{{cad.near_end_depth_max_in:.3dot}} deep (the far face to the near end), the strap {{cad.strap_outer_face_depth_min_in:.3dot}}–{{cad.strap_outer_face_depth_max_in:.3dot}} thick; the bore {{cad.arbor_bore_height_min_in:.3dot}}–{{cad.arbor_bore_height_max_in:.3dot}} above the seat. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Both blanks go through each mill setup in turn before the next setup: after the first, unclamp it, clamp the second as the Holding says and pick up again every zero taken on the part itself (each setup's X0; Setup 4's Z0 on the sawn top; Setup 7's X0, Y0 and Z0); the fixed jaw's Y0 and a stack or parallel Z0 stand. Then run the file and its checks on it. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then, before Cycle Start, touch one of the setup's zeros again with the edge finder: it must read what its step set, within .001 in. It does not, or the part may have moved: take the setup again from its first step, the part out. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; console M6 for the tool in the spindle, then Cycle Start."
 shop = "../shop"
 stock_refs = ["1018-flat-1x1-1-4"]
 material_key = "rocker-1018-cold-finished"
@@ -405,8 +405,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_z_mm}}", alo
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.blank_length_max_mm}}"], section_mm = { y = "{{process.blank_z_mm}}", z = "{{process.blank_x_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). Before each blank goes in, G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack, the jaws open."
-instruction_detailed = "Home the mill first ($H). Before each blank goes in, the stacks in place and the jaws open: console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Jog it over the fixed-jaw stack, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank before the tip reached the stack."
+instruction = "Before the first blank goes in, G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack, the jaws open."
+instruction_detailed = "Before the first blank goes in, the stacks in place and the jaws open: console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Jog it over the fixed-jaw stack, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank before the tip reached the stack."
 feed = "hand"
 
 [[setups.operations]]
@@ -454,8 +454,8 @@ instruction = "Before clamping: file the burr off E's four edges (milled in Setu
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). Before each blank goes in, G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack, the jaws open."
-instruction_detailed = "Home the mill first ($H). Before each blank goes in, the stacks in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw stack, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank before the tip reached the stack."
+instruction = "Before the first blank goes in, G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack, the jaws open."
+instruction_detailed = "Before the first blank goes in, the stacks in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw stack, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank before the tip reached the stack."
 feed = "hand"
 
 [[setups.operations]]
@@ -503,8 +503,8 @@ instruction = "Before clamping: file the burr off N's four edges (milled in Setu
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the near end N, Y0 the fixed jaw's face (W): edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm), its tip .10 below the sawn top: on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on N (the blank's LEFT side) from the left, G10 L20 P1 X-2.540."
+instruction = "G54 X0 the near end N, Y0 the fixed jaw's face (W): edge finder (900 rpm)."
+instruction_detailed = "Edge finder (900 rpm), its tip .10 below the sawn top: on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on N (the blank's LEFT side) from the left, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -606,7 +606,7 @@ instruction = "This sheet accepts a bore the GO pin enters and the NO-GO pin doe
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Only if the reamer read under the GO pin, before the first part: home the mill ($H). Grip a 2 in offcut of the 1 x 1-1/4 flat on the stacks as Holding says, lying on a 1-1/4 in face (1.00 thick). Console M6 T4 (23/64; the tool setter measures it). Jog it over the offcut's middle, above the gap between the stacks; spindle stopped, its point on a .002 leaf on the top: G10 L20 P1 X0 Y0 Z0.051."
+instruction = "Only if the reamer read under the GO pin, before the first part: grip a 2 in offcut of the 1 x 1-1/4 flat on the stacks as Holding says, lying on a 1-1/4 in face (1.00 thick). Console M6 T4 (23/64; the tool setter measures it). Jog it over the offcut's middle, above the gap between the stacks; spindle stopped, its point on a .002 leaf on the top: G10 L20 P1 X0 Y0 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -614,8 +614,8 @@ instruction = "Trial hole, MDI: M3 S650, G0 Z2, G1 Z-29 F{{process.bore_drill_fe
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). Before each part goes in, G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack, the jaws open."
-instruction_detailed = "Home the mill first ($H). Before each part goes in, the stacks in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw stack, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the part in: the collet would meet the part before the tip reached the stack."
+instruction = "Before the first part goes in, G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack, the jaws open."
+instruction_detailed = "Before the first part goes in, the stacks in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw stack, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the part in: the collet would meet the part before the tip reached the stack."
 feed = "hand"
 
 [[setups.operations]]
@@ -744,8 +744,8 @@ instruction = "Before clamping: file the burr off the step's edges, the foot top
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). Before each part goes in, G54 Z0: the parallels' top (the seat), touched with the end mill on the fixed-jaw parallel, the jaws open."
-instruction_detailed = "Home the mill first ($H). Before each part goes in, the parallels in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the part in: the collet would meet the part before the tip reached the parallel."
+instruction = "Before the first part goes in, G54 Z0: the parallels' top (the seat), touched with the end mill on the fixed-jaw parallel, the jaws open."
+instruction_detailed = "Before the first part goes in, the parallels in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the part in: the collet would meet the part before the tip reached the parallel."
 feed = "hand"
 
 [[setups.operations]]
@@ -847,8 +847,8 @@ instruction = "Before clamping: file the burr off the top end's edges and the ap
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 and Y from the bore: edge finder (900 rpm) on its walls; the seat is Y0, {{cad.arbor_bore_height_in:.3dot}} from the bore's centre (the jaws close on the foot: nothing else is reachable)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm) in the bore, its tip .10 below F. X: on the bore's left wall G10 L20 P1 X0; on its right wall read the DRO X; MDI G0 X(half that reading); G10 L20 P1 X0. Y: on the bore's wall toward the moving jaw G10 L20 P1 Y0; on the wall toward the fixed jaw read the DRO Y; MDI G0 Y(half that reading); G10 L20 P1 Y-{{cad.arbor_bore_height_mm:.3f}}."
+instruction = "G54 X0 and Y from the bore: edge finder (900 rpm) on its walls; the seat is Y0, {{cad.arbor_bore_height_in:.3dot}} from the bore's centre (the jaws close on the foot: nothing else is reachable)."
+instruction_detailed = "Edge finder (900 rpm) in the bore, its tip .10 below F. X: on the bore's left wall G10 L20 P1 X0; on its right wall read the DRO X; MDI G0 X(half that reading); G10 L20 P1 X0. Y: on the bore's wall toward the moving jaw G10 L20 P1 Y0; on the wall toward the fixed jaw read the DRO Y; MDI G0 Y(half that reading); G10 L20 P1 Y-{{cad.arbor_bore_height_mm:.3f}}."
 feed = "hand"
 
 [[setups.operations]]
