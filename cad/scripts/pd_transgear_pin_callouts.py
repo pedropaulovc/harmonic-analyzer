@@ -32,24 +32,22 @@ from pd_transgear_pin_spec import (
 # interference as REF; #2415); the shank is made to fit (fit audit
 # 2026-11-23, pending owner confirmation; rule 4): turned last to its three
 # mates' reamed bores and accepted by feel, a bought shim sliding on (the
-# shims' smallest bore is the shank's ceiling), with rule 4's necessity
-# answer as its own sentence (play in those bores tilts the disc into the
-# drive collar: pd_cluster_air.COLLAR_AIR).  The shank's sentence carries no
-# size.  The note prints the arm's ream limits, so the route and the land's
+# shims' smallest bore is the shank's ceiling).  This is the running pairs'
+# one acceptance: the three bores print their REAM, the fit and what it
+# protects, and no acceptance of their own.  The shank's sentence gives no
+# reason (machinist review r1 of the fit batch read "KEEPS DISC OFF
+# MHA-PD-22" here as design rationale, rule 7) and no size.  The note
+# prints the arm's ream limits, so the route and the land's
 # reference agree on the sheet.  The ring groove's Ø and width name their
 # ring once, in note 2 (rule 4).  Kept here, not in the widely imported
 # spec, so the wording re-keys only this part.
 SHANK_FIT_NOTE = 1
 RING_GROOVE_NOTE = 2
 SHIM_NUMBER = _config.parts("pd-vn-transgear-cluster-shim")["number"]
-COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
 SHANK_ACCEPTANCE = "EACH TURNS FREE, NO SHAKE"
-# "DISC" is the MHA-PD-06 rack pinion disc the cluster carries (the wording
-# MHA-PD-10's bore callout prints).
-SHANK_NECESSITY = f"KEEPS DISC OFF {COLLAR_NUMBER}"
 _SHANK_WORDS = (
     f"SHANK: TURN LAST TO BORES OF {', '.join(RUNNING_MATES)}: {SHANK_ACCEPTANCE}; "
-    f"SHIM {SHIM_NUMBER} SLIDES ON. {SHANK_NECESSITY}."
+    f"SHIM {SHIM_NUMBER} SLIDES ON."
 ).split()
 
 

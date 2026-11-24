@@ -121,17 +121,15 @@ def test_fits_take_standard_names_and_name_their_mates() -> None:
         return f"{_inch(limits[0], 4)}-{_inch(limits[1], 4)} REF"
 
     standard = ("RUNNING FIT", "SLIDING FIT", "LOCATIONAL CLEARANCE FIT")
-    for text, mate, clearance in (
-        # Fit audit 2026-11-23: the reamed bore prints no band and no
-        # clearance; its acceptance is the pin entering with no shake.
-        (callouts.BORE_CALLOUT, spec.PIN_NUMBER, None),
-        (callouts.BOSS_CALLOUT, spec.HUB_NUMBER, hub.BOSS_CLEARANCE_LIMITS),
-    ):
-        assert any(name in text for name in standard), text
-        assert mate in text, text
-        if clearance is not None:
-            assert window(clearance) in text, text
-    assert f"{spec.PIN_NUMBER} ENTERS, NO SHAKE" in callouts.BORE_FIT_CALLOUT
+    # Fit audit 2026-11-23: the reamed bore prints no band and no
+    # clearance; the pair's acceptance prints once, on the pin's sheet
+    # (review-fix r1: not on both members).
+    text = callouts.BORE_CALLOUT
+    assert not any(name in text for name in standard), text
+    assert spec.PIN_NUMBER in text, text
+    assert callouts.BORE_PROCESS_CALLOUT == "REAM THRU"
+    assert callouts.BORE_FIT_CALLOUT.split("\n")[0] == f"{spec.PIN_NUMBER} IS TURNED TO THIS BORE"
+    assert "NO SHAKE" not in text
     assert not re.search(r"\d*\.\d", callouts.BORE_CALLOUT)
     # Rule 4's necessity answer: one line, at most six words beyond the
     # mate's number, no size.
@@ -518,7 +516,7 @@ def test_sheet_text_names_the_right_parts() -> None:
     # #2409: the oil hole shares the key-pin hole's printed station.
     assert hub.OIL_HOLE_SLEEVE_Z == hub.KEY_PIN_SLEEVE_Z
     assert "KeyPinStation" in hub.DRAWING_PRECISION_BY_NAME
-    assert f"{spec.PIN_NUMBER} ENTERS" in callouts.BORE_FIT_CALLOUT
+    assert f"{spec.PIN_NUMBER} IS TURNED TO THIS BORE" in callouts.BORE_FIT_CALLOUT
     assert _config.parts("pd-transgear-front-bushing")["number"] == "MHA-PD-25"
 
 

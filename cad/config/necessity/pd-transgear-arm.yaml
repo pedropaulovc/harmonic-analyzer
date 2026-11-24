@@ -1,0 +1,31 @@
+# Why each REAM and each band under the title block stays on MHA-PD-18
+# (owner ruling 2026-11-24: "In the part's registry file, not on the sheet.
+# The sheet stays clean; the reviewer fails a tight feature that has no
+# registry reason."). Read by the machinist review only. Fit audit
+# 2026-11-23, pending owner confirmation.
+necessity:
+  - id: N-01
+    feature: "sheet 1, front view, Ø.126 REAM THRU pin bore (datum C), MHA-PD-23 IS TURNED TO THIS BORE"
+    kind: mesh
+    reason: "keeps bonded pin MHA-PD-23 square to MHA-PD-26 rack mesh"
+    source: "paper_drive_arm_registration.S_AXIS_TILT_MAX_RAD; test_pd_feed_rack_drawing opposite-flank budget"
+  - id: N-02
+    feature: "sheet 1, front view, 2X Ø.1240 REAM THRU dowel holes (note 2)"
+    kind: joint
+    reason: "dowel press holds plate MHA-PD-19 at reducer mesh setting"
+    source: "pd_transgear_arm_spec.LOCATOR_PRESS_INTERFERENCE"
+  - id: N-03
+    feature: "sheet 1, end view, Ø.1240 REAM latch-pin hole (note 3)"
+    kind: joint
+    reason: "press alone holds latch pin MHA-PD-VN-58, no fastener"
+    source: "pd_vn_transgear_latch_pin_spec; owner ruling 2026-10-27 (#1379)"
+  - id: N-04
+    feature: "sheet 1, section A-A, counterbore floor .2717 ±.002 from the front face"
+    kind: bought_seat
+    reason: "sets installed height of bought spring MHA-PD-VN-63"
+    source: "transgear_hanger_joints.SPRING_ROOM_MIN: .0003 over the working height at ±.002, .0027 under it at ±.005"
+  - id: N-05
+    feature: "sheet 2, section D-D, pin bore mouth chamfer .008 ±.002 X 45°"
+    kind: gap
+    reason: "clears MHA-PD-23 seat fillet; leaves its head a seat"
+    source: "pd_transgear_pin_spec (R.005 MAX root against the .006 least leg); pd_transgear_arm_geometry.PIN_MOUTH_CHAMFER_LIMITS"

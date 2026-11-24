@@ -15,6 +15,7 @@ import transgear_cluster_fit as fit
 from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
 import pd_transgear_disc_hub_spec as hub
 import pd_transgear_front_bushing_spec as spec
+import pd_transgear_pin_callouts as pin_callouts
 import pd_transgear_pin_spec as pin
 import pd_vn_transgear_retaining_ring_spec as ring
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
@@ -67,8 +68,9 @@ def test_only_the_printed_length_carries_a_model_band() -> None:
 
 def test_the_bore_runs_on_the_pin_and_names_it() -> None:
     """drawing-guidelines.md rule 4 (fit audit 2026-11-23): a reamed bore
-    prints size, REAM, the mate, the acceptance by the mate and one line
-    saying what the fit protects; no band, no clearance.
+    prints size, REAM and that its mate is turned to it; no band, no
+    clearance.  The acceptance prints once, on the pin's sheet; the reason
+    for the REAM is in the part's necessity file (owner ruling 2026-11-24).
     drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the fit bore's process is REAM."""
     low, high = fit.BORE_DIAMETRAL_CLEARANCE
     assert 0.0 < low < high
@@ -76,11 +78,13 @@ def test_the_bore_runs_on_the_pin_and_names_it() -> None:
     assert spec.BORE_DIA_BAND == fit.BORE_DIA_BAND
     callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert callout.splitlines() == [
-        "REAM THRU, RUNNING FIT",
-        f"{pin.PIN_NUMBER} PIN ENTERS, NO SHAKE",
-        "KEEPS MHA-PD-06 CLEAR OF MHA-PD-22",
+        "REAM THRU",
+        f"{pin.PIN_NUMBER} IS TURNED TO THIS BORE",
     ]
     assert not re.search(r"\d*\.\d", callout)
+    assert "NO SHAKE" not in callout
+    assert _config.parts("pd-transgear-front-bushing")["number"] in pin.RUNNING_MATES
+    assert "NO SHAKE" in pin_callouts.SHANK_ACCEPTANCE
 
 
 def test_wall_holds_the_target_at_the_printed_worst_case() -> None:
