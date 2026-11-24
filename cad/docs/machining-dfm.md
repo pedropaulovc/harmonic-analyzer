@@ -1203,7 +1203,9 @@ Indexing assumes a 40:1 head, the ratio of the shop's Precision Matthews BS-0, s
 40/N crank turns. The hole circles are the standard Brown & Sharpe plates (15, 16, 17, 18, 19,
 20, 21, 23, 27, 29, 31, 33, 37, 39, 41, 43, 47, 49), from
 `references/machinerys-handbook/` (printed p. 2008, which also covers differential indexing). The BS-0's own
-plates have not been checked against this list; check yours before cutting.
+plates A, B and C carry exactly these circles (its manual, read 2026-11-24;
+`cad/config/shop-equipment/machines.toml`, `machines.bs-0`), so every row below indexes on a stock
+plate except the three on the made plate. The BS-0 has no differential indexing (only the BS-2 does).
 
 ### Cone and cylinder train, 48DP PA20
 
