@@ -282,7 +282,7 @@ def _seed(ctx: dict, key: str, changes: dict[str, str]) -> dict:
     ("key", "changes", "check"),
     [
         # The first face pass moved onto the edge's middle: a full-width cut.
-        ("top_face", {"G0 X-462.534 Y3.008": "G0 X-462.534 Y-4.763"}, "face"),
+        ("top_face", {"G0 X-462.534 Y1.338": "G0 X-462.534 Y-4.763"}, "face"),
         # END A's first pass dropped: the second takes both steps.
         ("end_a", {"G0 X7.112 Y-34.112": "G0 X6.350 Y-34.112"}, "passes"),
         # END A's first pass run the other way: climb, not conventional.

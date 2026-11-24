@@ -161,7 +161,7 @@ def _seed(ctx: dict, key: str, changes: dict[str, str]) -> dict:
     ("key", "changes", "check"),
     [
         # The first face pass moved onto the bar's middle: a full-width slot.
-        ("top_face", {"G0 X-10.414 Y3.008": "G0 X-10.414 Y-4.763"}, "face"),
+        ("top_face", {"G0 X-10.414 Y1.338": "G0 X-10.414 Y-4.763"}, "face"),
         # The left end's first pass dropped: the second takes both steps.
         ("left_end", {"G0 X-7.112 Y8.890": "G0 X-6.350 Y8.890"}, "passes"),
         # The right end's first pass run the other way: climb, not conventional.
