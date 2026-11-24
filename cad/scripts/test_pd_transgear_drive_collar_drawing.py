@@ -264,7 +264,8 @@ def test_fits_refuse_round_and_crest_binding_independently(monkeypatch) -> None:
 
 
 def test_round_stud_must_pass_the_flat_pin_crest(monkeypatch) -> None:
-    assert spec.STUD_FLAT_PIN_AIR == pytest.approx(0.0031 * 25.4)
+    # D6: the crest charged the .0012 over-pins reading bias (.0031 before).
+    assert spec.STUD_FLAT_PIN_AIR == pytest.approx(0.0019 * 25.4)
     monkeypatch.setattr(shaft, "THREAD_BLANK_LIMITS", (4.30, 4.40))
     with pytest.raises(AssertionError, match="stud cannot pass"):
         _fresh_collar_spec()
@@ -272,17 +273,17 @@ def test_round_stud_must_pass_the_flat_pin_crest(monkeypatch) -> None:
 
 def test_the_flat_pin_crest_drives_the_core_flat_with_bounded_play() -> None:
     inch = 25.4
-    assert spec.FLAT_PIN_CREST_LIMITS == pytest.approx((0.08465 * inch, 0.08875 * inch))
+    assert spec.FLAT_PIN_CREST_LIMITS == pytest.approx((0.08345 * inch, 0.08995 * inch))
     # The flat is milled last until the collar slides on: the air is what
     # that trial leaves (two .001 cuts), not a stack of printed bands.
     assert spec.FLAT_PIN_CREST_CLEARANCE == pytest.approx((0.0, 0.002 * inch))
     assert spec.FLAT_PIN_CREST_CLEARANCE == shaft.CORE_FLAT_FIT_AIR
     # Over half the pin lies in its ream at the drilled bore's largest radius.
-    assert spec.FLAT_PIN_RETAINED_MARGIN == pytest.approx(0.0185 * inch)
+    assert spec.FLAT_PIN_RETAINED_MARGIN == pytest.approx(0.0173 * inch)
     # The pin's front end stands on the core's flat over a real length at
     # every corner of the fitted body, floor, pin and core-front bands, behind
     # the rear break's relief of its crest.
-    assert spec.FLAT_PIN_CORE_ENGAGEMENT_MIN == pytest.approx(0.03623 * inch, abs=1e-4)
+    assert spec.FLAT_PIN_CORE_ENGAGEMENT_MIN == pytest.approx(0.03499 * inch, abs=1e-4)
     nominal = spec.flat_pin_core_engagement(
         spec.LENGTH, spec.FLAT_PIN_FLOOR, spec.FLAT_PIN_LENGTH, shaft.CORE_FRONT_FROM_F
     )
@@ -295,10 +296,10 @@ def test_the_flat_pin_crest_drives_the_core_flat_with_bounded_play() -> None:
     flat = shaft.CORE_FLAT_FROM_AXIS
     pin_r = flat_pin.DIA / 2.0
     assert spec.flat_pin_play_deg(flat + pin_r, pin_r, flat) == pytest.approx(0.0)
-    assert spec.FLAT_PIN_PLAY_DEG == pytest.approx((0.0, 10.65), abs=0.01)
+    assert spec.FLAT_PIN_PLAY_DEG == pytest.approx((0.0, 10.71), abs=0.01)
     # Never more than RV-04 accepted when the flat carried a printed band.
     assert max(spec.FLAT_PIN_PLAY_DEG) < spec.FLAT_PIN_PLAY_ACCEPTED_DEG == 17.2
-    assert spec.FLAT_PIN_CONTACT_EDGE_MARGIN == pytest.approx(0.2497, abs=1e-4)  # .0098
+    assert spec.FLAT_PIN_CONTACT_EDGE_MARGIN == pytest.approx(0.1512, abs=1e-4)  # .0060
 
 
 def test_the_flat_pin_centre_takes_the_shop_row_for_a_reamed_location() -> None:
@@ -314,7 +315,8 @@ def test_the_rear_break_lifts_the_pin_crest_off_the_root_corner() -> None:
     """Within the shaft's largest root corner of F, its corner reaches the
     neck's largest radius plus that corner, both runouts and the whole float;
     the rear break's cone, at its smallest leg and steepest angle, stands the
-    crest clear of it.  Without the break the crest meets it exactly."""
+    crest clear of it.  Without the break the crest falls the reading bias
+    inside it."""
     reach = (
         shaft.FRONT_RELIEF_DIA_MAX / 2.0 + shaft.FRONT_CORNER_RADIUS_MAX
         + (shaft.CORE_TOTAL_RUNOUT + shaft.FRONT_RELIEF_TOTAL_RUNOUT) / 2.0
@@ -342,14 +344,14 @@ def test_the_rear_break_ends_inside_the_neck() -> None:
     assert spec.REAR_BREAK_DEPTH_MAX == pytest.approx(0.3419, abs=1e-4)  # .0135
     assert spec.REAR_BREAK_DEPTH_MAX <= shaft.FRONT_RELIEF_WIDTH_MAX
     # The widest, shallowest cone from the largest drilled bore reaches down
-    # to the lowest crest .0268 in from F; the pin bears on the flat only
+    # to the lowest crest .0280 in from F; the pin bears on the flat only
     # behind it, past the neck's widest .021.
     bore_r_max = spec.BORE_DIA / 2.0 + max(spec.BORE_DIA_BAND) / 2.0
     assert spec.rear_break_radius(
         spec.FLAT_PIN_CREST_RELIEF_MAX, bore_r_max, max(spec.REAR_BREAK_LIMITS),
         min(spec.REAR_BREAK_ANGLE_LIMITS),
     ) == pytest.approx(min(spec.FLAT_PIN_CREST_LIMITS))
-    assert spec.FLAT_PIN_CREST_RELIEF_MAX == pytest.approx(0.02677 * 25.4, abs=1e-4)
+    assert spec.FLAT_PIN_CREST_RELIEF_MAX == pytest.approx(0.02801 * 25.4, abs=1e-4)
     assert spec.FLAT_PIN_CREST_RELIEF_MAX > shaft.FRONT_RELIEF_WIDTH_MAX
 
 
@@ -360,7 +362,7 @@ def test_the_knob_reversal_play_costs_a_fraction_of_a_millimetre_of_paper() -> N
     assert knob == pytest.approx(2.0 * max(spec.FLAT_PIN_PLAY_DEG))
     sleeve = knob * paper_drive_geom.GEAR_RATIO
     paper = math.pi * paper_drive_geom.FEED_PITCH_DIA * sleeve / 360.0
-    assert (knob, sleeve, paper) == pytest.approx((21.31, 2.13, 0.18), abs=0.01)
+    assert (knob, sleeve, paper) == pytest.approx((21.42, 2.14, 0.18), abs=0.01)
     ruling = next(
         r for r in _config.parts(part.PART_NAME)["machinist_exceptions"] if r["id"] == "RV-04"
     )
@@ -376,13 +378,22 @@ def test_the_knob_reversal_play_costs_a_fraction_of_a_millimetre_of_paper() -> N
 
 
 def test_the_flat_pin_ream_keeps_its_walls_and_stays_in_the_body() -> None:
-    # The web to the -Y drive-pin hole is the one shortfall: over the floor,
-    # printed as a MIN note; the O.D. and pilot-shoulder walls meet target.
-    assert spec.FLAT_PIN_WEB_WORST == pytest.approx(0.075 * 25.4)
+    # The web to the -Y drive-pin hole and the floor's wall to the pilot
+    # shoulder fall short of the target, over the floor, each printed as a
+    # MIN note (the shoulder wall accepted at .079 by D6); the O.D. wall
+    # meets the target.
+    assert spec.FLAT_PIN_WEB_WORST == pytest.approx(0.074 * 25.4)
     assert spec.WALL_FLOOR <= spec.FLAT_PIN_WEB_WORST < spec.WALL_TARGET_MM
     assert f"{_in(spec.FLAT_PIN_WEB_WORST)} MIN" in spec.DRAWING_NOTES
     assert spec.FLAT_PIN_OD_WALL_WORST >= spec.WALL_TARGET_MM
-    assert spec.FLAT_PIN_SHOULDER_WALL_WORST >= spec.WALL_TARGET_MM
+    assert round(spec.FLAT_PIN_SHOULDER_WALL_WORST / 25.4, 4) == 0.0796
+    assert spec.WALL_FLOOR <= spec.FLAT_PIN_SHOULDER_WALL_WORST < spec.WALL_TARGET_MM
+    assert spec.FLAT_PIN_SHOULDER_WALL_PRINTED == pytest.approx(0.079 * 25.4)
+    assert spec.FLAT_PIN_SHOULDER_WALL_ACCEPTED == pytest.approx(0.079 * 25.4)
+    shoulder = spec.DRAWING_NOTES.splitlines()[spec.SHOULDER_NOTE - 1]
+    assert shoulder == (
+        f"{spec.SHOULDER_NOTE}. PIN {spec.FLAT_PIN_NUMBER} HOLE FLOOR TO PILOT SHOULDER .079 MIN."
+    )
     # The drill point stays behind the front face and the pressed pin's rear
     # end inside the supplied body.
     assert spec.FLAT_PIN_DRILL_TIP_MIN > 0.0
@@ -419,7 +430,7 @@ def test_fits_carry_named_bands_and_the_lengths_print_their_places() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["FlatPinFloor"] == 2
     assert spec.FLAT_PIN_FLOOR_LIMITS == pytest.approx((0.07 * 25.4, 0.09 * 25.4))
     assert spec.FLAT_PIN_DRILL_TIP_MIN > 0.0
-    assert spec.FLAT_PIN_SHOULDER_WALL_WORST >= spec.WALL_TARGET_MM
+    assert spec.FLAT_PIN_SHOULDER_WALL_PRINTED >= spec.FLAT_PIN_SHOULDER_WALL_ACCEPTED - 1e-9
     assert spec.FLAT_PIN_CORE_ENGAGEMENT_MIN > 0.0
     assert spec.FLAT_PIN_BLANK_INSET_MIN >= 0.0
     assert spec.DRAWING_PRECISION_BY_NAME["RearBreak"] == 3
@@ -692,7 +703,7 @@ def test_notes_and_recipe_have_no_obsolete_front_pin_or_slot() -> None:
     # the part's notes, then the drawing's numbered fit notes, each linked
     # from its feature by SEE NOTE n.
     assert [line[:3] for line in notes.splitlines() if not line.startswith(" ")] == [
-        "1. ", "2. ", "3. ", "4. ", "5. ", "6. "
+        "1. ", "2. ", "3. ", "4. ", "5. ", "6. ", "7. "
     ]
     assert "BROACH" not in notes and "EDM" not in notes
     assert drawing.NOTES_TEXT.startswith(

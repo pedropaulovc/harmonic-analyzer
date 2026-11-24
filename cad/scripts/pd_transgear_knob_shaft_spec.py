@@ -294,7 +294,8 @@ if _STUD_STATION_BAND > printed_band_mm(TIP_STATION_PLACES, unit=UNIT):
 #   (pd-transgear-drive-collar RV-04); tighter, the crest binds on the flat.
 # - CORE_FLAT_BAND: the flat as fitted, for the stacks that read it alone:
 #   the collar's lowest crest less the widest air to its highest crest less
-#   none (pd_transgear_drive_collar_spec asserts it against its own crest
+#   none, the crest charged the collar's .0012 centre-reading bias (D6)
+#   (pd_transgear_drive_collar_spec asserts it against its own crest
 #   limits, which this module cannot import).
 CORE_DIA = 4.8514  # .191 REF: the collar's #11 drill
 CORE_DIA_PLACES = 3
@@ -307,7 +308,7 @@ CORE_FLAT_FROM_AXIS = 2.1336  # .084 REF
 CORE_FLAT_PLACES = 3
 CORE_FLAT_FIT_STEP = 0.0254  # .001: the most one fitting cut takes off
 CORE_FLAT_FIT_AIR = (0.0, 2.0 * CORE_FLAT_FIT_STEP)  # 0 .. .002 radial
-CORE_FLAT_BAND = (0.12065, -0.03429)  # +.00475/-.00135, analysis only
+CORE_FLAT_BAND = (0.15113, -0.06477)  # +.00595/-.00255, analysis only
 # The drawing's frames print GEOMETRIC_TOLERANCES_IN; readers take the
 # derived mm.  The turned-shaft grade is the shared shaft_turned_runout_mm()
 # on the .001 in grid (asserted below).

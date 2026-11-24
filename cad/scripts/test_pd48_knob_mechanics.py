@@ -180,11 +180,14 @@ def test_round_bore_and_flat_pin_clear_the_neck_without_float_credit():
     crest_min = min(collar.FLAT_PIN_CREST_LIMITS)
     assert crest_min - neck_crown - float_max > 0.0
     # Within the root corner's radius of F the corner reaches further; the
-    # crest alone gives it no air, so the collar's rear bore-mouth break,
-    # cut through the crest after facing (its least leg at its steepest
-    # angle, one corner radius in), lifts the crest corner off it.
+    # crest alone gives it no air (with the centre's .0012 reading bias
+    # charged, D6, it falls that much inside), so the collar's rear
+    # bore-mouth break, cut through the crest after facing (its least leg at
+    # its steepest angle, one corner radius in), lifts the crest corner off it.
     corner_reach = neck_crown + shaft.FRONT_CORNER_RADIUS_MAX + float_max
-    assert crest_min - corner_reach == pytest.approx(0.0, abs=1e-6)
+    assert crest_min - corner_reach == pytest.approx(
+        -collar.FLAT_PIN_CENTRE_READ_BIAS, abs=1e-6
+    )
     assert collar.REAR_BREAK_LIMITS == pytest.approx((0.0762, 0.3302))
     assert collar.REAR_BREAK_ANGLE_LIMITS == pytest.approx((44.0, 46.0))
     break_r = (
@@ -207,7 +210,7 @@ def test_shortened_drive_face_is_real_not_old_full_core_length():
     # #2409: the pressed pin's least length on the D-core over every fitted
     # body length, floor and core-front corner, behind the crest relief the
     # rear break cuts from F.
-    assert collar.FLAT_PIN_CORE_ENGAGEMENT_MIN == pytest.approx(0.92028, abs=1e-5)
+    assert collar.FLAT_PIN_CORE_ENGAGEMENT_MIN == pytest.approx(0.88872, abs=1e-5)
     assert shaft.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.81**2 / 4.0)
     assert collar.FLAT_PIN_CORE_ENGAGEMENT_MIN > 0.0
     assert collar.LENGTH == collar.SET_NOMINAL == 6.1722
