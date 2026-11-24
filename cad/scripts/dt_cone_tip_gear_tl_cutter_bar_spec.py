@@ -48,6 +48,9 @@ BAR_LENGTH_PLACES = 2
 
 # --- The cross hole: reamed slip fit on the 1/8 drill rod bit ----------------
 # A .1260 reamer over the drill rod's .1245-.1255 leaves .0005-.0020 of slip.
+# The hole prints the reamer's size with no band: the bought bit is its gauge
+# (rule 4 form 3; fit audit 2026-11-23 part 2 batch plan 3b: it stays reamed
+# with the set's .1260). CROSS_HOLE_BAND is the reamer's analysis spread.
 CROSS_HOLE_DIA = 3.2004  # .1260
 CROSS_HOLE_PLACES = 4
 CROSS_HOLE_BAND = REAM_H7  # (upper, lower): +.0005/.0000

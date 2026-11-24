@@ -29,9 +29,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import name_last_feature
-from _fit_deviations import deviations
 from _holes import DIAMETER_TOLERANCE_MM, cross_hole_volume_mm3, wizard_holes
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_pmi import author_part_pmi
@@ -52,15 +50,12 @@ from dt_cone_tip_gear_tl_cutter_bar_spec import (
     BAR_DIA,
     BAR_LENGTH,
     BAR_RADIUS,
-    CROSS_HOLE_BAND,
     CROSS_HOLE_DIA,
-    CROSS_HOLE_PLACES,
     CROSS_HOLE_STATION,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     SET_SCREW_HOLE_SPEC,
     TAP_DRILL_DIA,
-    UNIT,
     tap_drill_volume_mm3,
 )
 
@@ -198,16 +193,6 @@ def build(adapter: Any) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The reamed hole carries the reamer's row; every other size takes the
-    # title block's.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "CrossHoleProfile",
-        "CrossHoleDia",
-        *deviations(CROSS_HOLE_BAND),
-        places=CROSS_HOLE_PLACES,
-        display_unit=UNIT,
-    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

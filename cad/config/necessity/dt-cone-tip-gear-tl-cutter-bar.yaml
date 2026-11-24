@@ -1,0 +1,11 @@
+# Why the REAM on MHA-DT-37-TL-02 stays (drawing-guidelines rule 4; owner
+# ruling 2026-11-24: "In the part's registry file, not on the sheet."). Read
+# by the machinist review only. The cross hole prints the reamer's size with
+# no band; the bought 1/8 drill rod bit MHA-DT-37-TL-01 is its gauge (form 3).
+# Fit batch DT, 2026-11-24.
+necessity:
+  - id: N-01
+    feature: "top view, Ø.1260 REAM THRU cross hole, SLIDING FIT ON MHA-DT-37-TL-01"
+    kind: mesh
+    reason: "bit slip over .003 shifts T006's cut form"
+    source: "fit audit 2026-11-23 part 2 batch plan 3b: the fly-cutter bar's cross hole stays reamed with the set's .1260, with no band; a #30 drill frees nothing (the reamer is a member of the set) and breaks the bar's .003 slip limit (test_dt_cone_tip_gear_tl_cutter_bar_drawing: slip <= .003)"
