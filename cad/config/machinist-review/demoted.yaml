@@ -83,10 +83,6 @@ demoted:
   - pd_transgear_knob_thrust_ring
   - sh_column_clamp_front
   - sm_gooseneck
-  # converted, one gating finding left after four farm rounds (fit batch r4,
-  # run 20261124T042524454Z): the bare .XXX overall 2.722 states no function
-  # (rule 3); its register entries are in cad/config/necessity/.
-  - pd_transgear_knob_shaft
   # assemblies (settings not audited): 12
   - ch_channel_assembly
   - dt_cone_gear_tl_arbor_assembly
