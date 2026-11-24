@@ -1,0 +1,17 @@
+# MHA-DT-12-TL-00 cam turning kit: why each setting tighter than the title
+# block stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the
+# reason lives here, not on the sheet). Read by the machinist review only.
+# Both settings are made once, in the 4-jaw, for all 20 MHA-DT-12 gears; each
+# is read on the shop's own indicators (owner ruling 2026-11-24, audit part 2
+# P2: ".0005 total on the lever test indicator").
+necessity:
+  - id: N-01
+    feature: "sheet 1 steps 9-14 and sheet 2 setting table: item 2 throw .3402, gap .6804 within .001 on the dial test indicator"
+    kind: trace
+    reason: "throw sets channel gain on all twenty gears"
+    source: "dt_cylinder_gear_tl_cam_fixture_spec.THROW_ERROR_MAX_MM inside MHA-DT-12's .3402 ±.0020 (owner ruling 2026-11-08, #2144 item 8.2)"
+  - id: N-02
+    feature: "sheet 1 step 8: item 1's Ø3.25 register indicated to .001 TIR"
+    kind: trace
+    reason: "register runout is a cam phase error on every gear"
+    source: "dt_cylinder_gear_tl_cam_fixture_spec.REGISTER_OFFSET in PHASE_FIXED_WORST_DEG (.47° of the ±.7° print)"
