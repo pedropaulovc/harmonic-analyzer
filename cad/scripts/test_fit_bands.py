@@ -432,6 +432,21 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "MHA-PD-17 bore by feel: indexed for the hub's clearance, rock and "
         "the boss wall"
     ),
+    ("pd_transgear_disc_hub_geometry", "SPIGOT_DIA_BAND"): (
+        "analysis band of the spigot, which prints REF and is turned to the "
+        "reamed MHA-PD-06 bore at the printed clearance: indexed for the "
+        "spigot wall and the disc's float"
+    ),
+    ("pd_transgear_knob_cup_spec", "BORE_BAND"): (
+        "analysis band of the pilot, which prints REF and is bored to the "
+        "MHA-PD-08 journal at the printed clearance: indexed for the bond "
+        "gap and the pilot wall"
+    ),
+    ("pd_transgear_knob_bush_geometry", "PRESS_DIA_BAND"): (
+        "analysis band of the press diameter, which prints its interference "
+        "to the measured MHA-PD-19 hole and no band: indexed for the plate "
+        "stub's envelope and the press-to-bore wall"
+    ),
 }
 
 KNOWN_BAD: dict[str, pytest.MarkDecorator] = {}

@@ -891,7 +891,7 @@ def test_tight_bands_name_their_mates_once_by_name_and_number() -> None:
     assert sum("MHA-PD-22" in text for _number, text in drawing.NOTE_TEXTS) == 3
     assert all(len(line) <= drawing.NOTES_LINE_CHARS_MAX for line in drawing.NOTES.splitlines())
     # The journal is made to fit: its note says how it is accepted (by feel
-    # in the bush's reamed bore) and what the fit protects, with no number;
+    # in the bush's reamed bore), with no number and no reason;
     # the clearance the analysis bands give is consumed by the stacks only.
     low, high = drawing.JOURNAL_CLEARANCE_MM
     assert low == pytest.approx(
@@ -899,9 +899,7 @@ def test_tight_bands_name_their_mates_once_by_name_and_number() -> None:
     )
     assert 0.0 < low < high
     journal_note = notes[drawing.JOURNAL_FIT_NOTE]
-    assert journal_note.endswith(
-        ": TURN TO ITS REAMED BORE, TURNS FREE WITH NO SHAKE. KEEPS REDUCER BACKLASH."
-    )
+    assert journal_note.endswith(": TURN TO ITS REAMED BORE, TURNS FREE WITH NO SHAKE.")
     assert not any(ch.isdigit() for ch in journal_note.split(":", 1)[1])
     assert "CLEARANCE" not in printed.split("2. ")[0]
     # The relief's plain clearance names its mate by number.

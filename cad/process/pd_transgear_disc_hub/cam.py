@@ -301,7 +301,7 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         "spigot_end": spigot_end,
         "flange_dia": f["flange"]["nominal_dia"],
         "flange_least": f["flange"]["dia"][0],
-        "spigot_dia": f["spigot"]["nominal_dia"],
+        "spigot_dia": f["spigot"]["dia_ref"],
         "body_dia": f["hub_body"]["nominal_dia"],
         "body_band": f["hub_body"]["dia"],
         "body_length": f["hub_body"]["length_nominal"],

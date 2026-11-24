@@ -54,6 +54,7 @@ from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_POSITION_TOL,
     SCREW_COUNT,
     SCREW_THREAD,
+    SPIGOT_CLEARANCE,
     SPIGOT_DIA,
     SPIGOT_DIA_BAND,
     screw_centres,
@@ -298,13 +299,16 @@ FACE_WIDTH_PLACES = 3
 # .501 to .498 (#2412).
 # The sheet prints the reamer's size and no band (fit audit 2026-11-23,
 # pending owner confirmation; drawing-guidelines.md rule 4): the hub's
-# spigot entering is the acceptance.  BORE_BAND is the ANALYSIS band, what
+# spigot is turned to it (MHA-PD-17 note 4 prints the clearance, the
+# acceptance, once).  BORE_BAND is the ANALYSIS band, what
 # the reamer is taken to cut in the .118 sheet, never a printed limit; it
 # was a printed +.0005/0.  What fails if the hole is .002 looser: the #0-80
 # taps' finished web to the bore (TAP_TO_BORE_WALL_FINISHED below, already
-# under the .080 target) falls under the .063 the owner confirmed (RV-03).
-# A 1/2 drilled hole (+.004/0) does the same, .0625: the reamer stays until
-# the owner rules on that web (fit-audit-2026-11-23/batch-pd/misc).
+# under the .080 target) loses .001 and falls under the wall the taps' note
+# states (RV-03).  A 1/2 drilled hole (+.004/0) takes the web to .0635 and,
+# the spigot being made to the hole, the MHA-PD-17 spigot's own wall to
+# .0705, under the .071 the owner confirmed there: the reamer stays until
+# the owner rules on those walls (fit-audit-2026-11-23/batch-pd/misc).
 BORE_DIA = 12.7254  # .501
 BORE_BAND = (0.0508, 0.0)  # analysis (upper, lower) deviations: +.002/0
 BORE_PLACES = 3
@@ -315,20 +319,27 @@ FACE_WIDTH_MAX = FACE_WIDTH + _BAND[FACE_WIDTH_PLACES]
 BORE_DIA_MIN = BORE_DIA + BORE_BAND[1]
 BORE_DIA_MAX = BORE_DIA + BORE_BAND[0]
 
-# The hub's spigot, turned to the band the hub's model carries (the turned
-# diameter's shop row).  Its limits and the bore's analysis band give the
-# clearance the disc is centred in at assembly and bound how far the disc
-# can sit off the hub's axis while the taps are spotted through the flange.
-SPIGOT_DIA_MIN = SPIGOT_DIA + SPIGOT_DIA_BAND[1]
-SPIGOT_DIA_MAX = SPIGOT_DIA + SPIGOT_DIA_BAND[0]
-# (least, greatest) diametral clearance: .0030 .. .0070.
-SPIGOT_DIAMETRAL_CLEARANCE = (
-    round(BORE_DIA_MIN - SPIGOT_DIA_MAX, 6),
-    round(BORE_DIA_MAX - SPIGOT_DIA_MIN, 6),
-)
-if SPIGOT_DIAMETRAL_CLEARANCE[0] < 0.0:
+# The hub's spigot is made to this bore (fit audit 2026-11-23, pending owner
+# confirmation; rule 4, made to fit): MHA-PD-17 prints its size REF and the
+# diametral clearance in this bore, the (least, greatest) the disc is
+# centred in at assembly and that bounds how far the disc can sit off the
+# hub's axis while the taps are spotted through the flange.  The spigot's
+# analysis band in the hub's stacks is that clearance under this bore's.
+SPIGOT_DIAMETRAL_CLEARANCE = SPIGOT_CLEARANCE  # .0030 .. .0050
+if not 0.0 < SPIGOT_DIAMETRAL_CLEARANCE[0] < SPIGOT_DIAMETRAL_CLEARANCE[1]:
     raise AssertionError(
         f"MHA-PD-06 bore binds on the MHA-PD-17 spigot: {SPIGOT_DIAMETRAL_CLEARANCE}"
+    )
+if not (
+    math.isclose(
+        SPIGOT_DIA + SPIGOT_DIA_BAND[1], BORE_DIA_MIN - SPIGOT_DIAMETRAL_CLEARANCE[1]
+    )
+    and math.isclose(
+        SPIGOT_DIA + SPIGOT_DIA_BAND[0], BORE_DIA_MAX - SPIGOT_DIAMETRAL_CLEARANCE[0]
+    )
+):
+    raise AssertionError(
+        "the MHA-PD-17 spigot's analysis band is not its clearance under this bore"
     )
 DISC_OFFSET_MAX = SPIGOT_DIAMETRAL_CLEARANCE[1] / 2.0
 # The part's own tooth-space runout to its bore (datum A), at the shop row

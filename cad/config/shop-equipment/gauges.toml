@@ -270,20 +270,6 @@ purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .1260 in GO 
 note = "Not owned: to buy. MHA-PN-05 Ø.1260-.1265 REAM THRU pivot bore (after the ream, and again after the bench clean-up): GO enters, NO-GO does not."
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages"]
 
-# Acceptance of the MHA-PD-16 knob cup's Ø.250 +.001/.000 flat-bottom pilot
-# (.2500-.2510 in): a fixed-limit pair as the hub pair above, .2500 GO (plus
-# tolerance) and .2510 NO-GO (minus tolerance), Vermont Gage standard Class
-# X, each .000040 in; a minus pin used as GO would pass the pilot under its
-# low limit. Range and tolerance: cad/process/shop/ gauges, same key.
-[gauges.plug-gauges-2500-2510]
-name = "Plug gauge pair, .2500 GO and .2510 NO-GO, Class X"
-kind = "plug_gauge_pair"
-make = "Vermont Gage"
-status = "to_order"
-purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .2500 in GO (plus tolerance) and .2510 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
-note = "Not owned: to buy. MHA-PD-16 knob cup pilot, after the 1/4 end mill's plunge: GO enters to the floor, NO-GO does not."
-cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
-
 [gauges.gauge-pin-0625]
 make = "Vermont Gage"
 sku = "88906250"
@@ -303,19 +289,11 @@ note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-10 .002 TIR TO
 # their six pins are not bought and the re-cut bands have their own records at
 # the end of this file. That leaves 23 of the 29; the fit audit of 2026-11-23
 # retired the .1920-.1925 (MHA-PD-22 drilled), .1240-.1245 (MHA-PD-18) and
-# .4375-.4382 (MHA-PD-19) bands' two each, so 17 are below.
+# .4375-.4382 (MHA-PD-19) bands' two each and the .0615-.0620 band's one
+# (MHA-PD-17 and MHA-PD-22), so 16 are below.
 # Each zz-pins record takes over from its Class X pair (plug-gauges-<low>-<high>
 # above) when the part's plan names it; until then the plan and the BOM still
 # show the Class X pair. Buy the ZZ pins, not the pair, for these bands.
-
-[gauges.zz-pins-0615-0620]
-name = "Class ZZ pins for the .0615-.0620 band"
-kind = "gauge_pin"
-make = "Vermont Gage"
-status = "to_order"
-source = "https://www.mscdirect.com/product/details/88906151"
-purchase = "MSC 88906151 (.0615 plus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
-note = "MHA-PD-17. GO: ZZ .0615 plus single. NO-GO: the .062 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
 
 [gauges.zz-pins-0625-0630]
 name = "Class ZZ pins for the .0625-.0630 band"
@@ -387,7 +365,7 @@ make = "Vermont Gage"
 status = "to_order"
 source = "https://www.mscdirect.com/product/details/88931357"
 purchase = "MSC 88931357 (.3135 plus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
-note = "MHA-DT-14, MHA-PD-17. GO: ZZ .3135 plus single. NO-GO: the .314 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
+note = "MHA-DT-14. GO: ZZ .3135 plus single. NO-GO: the .314 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
 
 [gauges.zz-pins-3760-3765]
 name = "Class ZZ pins for the .3760-.3765 band"

@@ -76,12 +76,14 @@ STUB_LENGTH = LENGTH - HUB_LENGTH  # 8.4836, .334
 # the holes not be reamed in the first place"): MHA-PD-19's hole K is cut by
 # the over/under set's .4385 reamer and prints that size with no band; this
 # press step is turned LAST to the hole as measured, by the pilot-first
-# method (a short pilot on the step's rear end turned until the plate's
-# hole just slides on it without shake, and miked; the step then turned to
-# that reading plus the interference), so no reamer, plug gauge or pin pair
-# is bought for the hole.  The pilot stays on the bush: it lies on the stub
-# that stands behind the plate, outside the hole once the shoulder seats,
-# and leads the press in.  The requirement is the interference, a range
+# method (a short pilot turned on the bar's end until the plate's hole just
+# slides on it without shake, and miked; the pilot is then faced off and
+# the step turned to that reading plus the interference), so no reamer,
+# plug gauge or pin pair is bought for the hole.  The pilot only reads the
+# hole: it is gone before the press diameter is cut, so the finished step
+# is one diameter from the shoulder to the rear face, as the sheet draws it
+# (traveler review r2: a pilot left on the bush was a land the drawing does
+# not show).  The requirement is the interference, a range
 # .0011 wide; the size prints REF.  What fails if it is loose: the press is
 # the only thing that holds the knob axis K in the plate (no screw, pin or
 # bond), and K sets the reducer mesh.
@@ -108,12 +110,9 @@ PRESS_DIA_BAND = (
 )  # +.0021/+.0005, .4390/.4406
 if PRESS_INTERFERENCE[1] - PRESS_INTERFERENCE[0] < 0.0254 - 1e-9:
     raise AssertionError("MHA-PD-28's interference range is narrower than .001")
-# The traveler's pilot (ANALYSIS): at most PILOT_LENGTH_MAX_MM of the rear
-# end, a slip in the hole it measures, charged PILOT_SLIP_MAX_MM under the
-# smallest hole for the walls.  It must lie behind the plate.
-PILOT_LENGTH_MAX_MM = 1.524  # .060
-PILOT_SLIP_MAX_MM = 0.0127  # .0005
-PILOT_DIA_MIN = PRESS_DIA + min(PRESS_HOLE_BAND) - PILOT_SLIP_MAX_MM  # .4380
+# The smallest finished press diameter (ANALYSIS): the least interference
+# over the smallest hole the reamer is modelled to cut.
+PRESS_DIA_MIN = PRESS_DIA + min(PRESS_DIA_BAND)  # .4390
 
 # --- Bore: reamed through after pressing --------------------------------------
 # The .2490 chucking reamer's size (#290 fit D8; reamer-2490, to order: not
@@ -176,8 +175,7 @@ DRILL_RUN_OFF_DEG = 0.3
 BORE_RUN_OFF_MM = (LENGTH + LENGTH_BAND) * math.tan(math.radians(DRILL_RUN_OFF_DEG))
 _BORE_R_MAX = (BORE_DIA + max(BORE_DIA_LIMITS)) / 2.0
 _HUB_DIA_MIN = HUB_DIA - printed_band_mm(HUB_DIA_PLACES, unit=UNIT)
-# The thinnest press section is the pilot's.
-_PRESS_DIA_MIN = PILOT_DIA_MIN
+_PRESS_DIA_MIN = PRESS_DIA_MIN
 _PRESS_HOLE_MAX = PRESS_DIA + PRESS_HOLE_BAND[0]
 WALLS: dict[str, tuple[float, float]] = {  # (nominal, worst)
     "press section over the bore": (
@@ -197,7 +195,7 @@ for _name, (_nominal, _worst) in WALLS.items():
             f"MHA-PD-28 {_name} wall {_worst:.4f} at the printed worst case is "
             f"under the {WALL_FLOOR} floor"
         )
-WALL_WORST = min(worst for _nominal, worst in WALLS.values())  # the pilot, .0682
+WALL_WORST = min(worst for _nominal, worst in WALLS.values())  # the press, .0688
 # Rule 20: under the target, the sheet states the wall as a plain fact,
 # floored to three places so it never claims more than is left.
 WALL_STATED_MIN = math.floor(WALL_WORST / 25.4 * 1000.0 + 1e-9) / 1000.0 * 25.4

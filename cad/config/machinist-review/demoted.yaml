@@ -71,10 +71,7 @@ demoted:
   ms_stop_plate: fit-batch-ms
   pd_platen_bottom_guide: fit-batch-pd
   pd_platen_guide: fit-batch-pd
-  pd_rack_pinion: fit-batch-pd
   pd_support_bar: fit-batch-pd
-  pd_transgear_disc_hub: fit-batch-pd
-  pd_transgear_knob_cup: fit-batch-pd
   pd_transgear_knob_thrust_ring: fit-batch-pd
   pn_pen_assembly: fit-batch-pn
   pn_pen_hanger: fit-batch-pn

@@ -154,7 +154,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("pilot_tip_mm", -4.0, "pilot_tip_mm"),
         ("ream_tip_mm", -4.2, "ream_tip_mm"),
         ("stop_shallow_mm", -4.064, "stop_shallow_mm"),
-        ("stop_deep_mm", -4.2, "stop_deep_mm"),
+        ("stop_deep_mm", -4.3, "stop_deep_mm"),
         ("peck_56_mm", 2.0, "peck"),
         ("pin_tool_out_min_in", 0.8, "pin_tool_out_min_in"),
     ],

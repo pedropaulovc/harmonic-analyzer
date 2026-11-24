@@ -72,10 +72,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _visibility import blank_reference_geometry
 from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_DIA,
@@ -97,7 +94,7 @@ from pd_transgear_disc_hub_spec import (
     KEY_PIN_CHORD_OFFSET,
     KEY_PIN_DRILL_DIA,
     KEY_PIN_HOLE_DIA,
-    KEY_PIN_LOCATION_BAND,
+    KEY_PIN_CHORD_BAND,
     KEY_PIN_STATION,
     KEY_PIN_STOP,
     KEY_PIN_Z,
@@ -105,7 +102,6 @@ from pd_transgear_disc_hub_spec import (
     REFERENCE_SKETCHES,
     SCREW_HOLE_DIA,
     SPIGOT_DIA,
-    SPIGOT_DIA_DEVIATIONS,
     SPIGOT_LENGTH,
     SPIGOT_LENGTH_BAND,
     UNIT,
@@ -782,8 +778,9 @@ def build(adapter) -> dict[str, str]:
     report_mass_properties(adapter)
     # The bore and the key-pin ream print their reamers' sizes and no band
     # (drawing-guidelines.md rule 4: the mate is the gauge); the key pin's
-    # chord and stop carry the reamed hole's location band; the spigot carries
-    # its turned-row band, clear of the disc's bore.  The overall and spigot
+    # chord carries its own band (it keeps the pin's air to the sleeve's
+    # flat) and its stop the title block's row; the spigot is made to the
+    # disc's bore and prints REF with no band.  The overall and spigot
     # lengths carry the disc cluster stack's printed band.  Every other size
     # is governed by its places, the holes by the title block's DRILLED HOLES
     # row (the spec's DRAWING_PRECISION).  All print in inches.
@@ -791,18 +788,8 @@ def build(adapter) -> dict[str, str]:
         adapter,
         "KeyPinProfile",
         "KeyPinChord",
-        KEY_PIN_LOCATION_BAND,
+        KEY_PIN_CHORD_BAND,
         display_unit=UNIT,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "KeyPinProfile",
-        "KeyPinStop",
-        KEY_PIN_LOCATION_BAND,
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "HubProfile", "SpigotDia", *SPIGOT_DIA_DEVIATIONS, display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
         adapter, "HubProfile", "HubLength", HUB_LENGTH_BAND, display_unit=UNIT

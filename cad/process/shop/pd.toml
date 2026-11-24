@@ -4,35 +4,6 @@
 # names are in common.toml, with the conventions every file follows; prechips
 # merges the directory's files by section and refuses a key defined twice.
 
-# The MHA-PD-16 cup pilot's go/no-go pair (cad/config/shop-equipment/
-# gauges.plug-gauges-2500-2510, to buy): GO .2500 and NO-GO .2510 in =
-# 6.35 and 6.3754 mm. A fixed-limit pair reads no scale; its resolution is
-# each member's Class X tolerance, .000040 in = 0.001016 mm. The tools record
-# lets a plan list the pair.
-[gauges.plug-gauges-2500-2510]
-range_mm = [6.35, 6.3754]
-resolution_mm = 0.001016
-[tools.plug-gauges-2500-2510]
-description = "Plug gauge pair, .2500 GO (plus) and .2510 NO-GO (minus), Vermont Gage Class X"
-
-# Class ZZ go/no-go pins for the paper-drive reamed bands (owner ruling
-# 2026-11-23, tool audit Q1, verbatim: "ZZ singles per the record: 29 pins
-# (17 plus GO, 12 minus NO-GO), about $130. Accept that good holes near a
-# limit may be refused; the traveler mikes each pin so the real window is
-# known per pin."). Conventions as common.toml's zz-pins records: GO a plus
-# pin at the low limit, NO-GO a minus pin at the high limit (from the
-# .061-.500 minus box where that limit is a whole thousandth), resolution one
-# pin's Class ZZ tolerance, .0002 in = 0.00508 mm. Bands only pd
-# plans gauge: .0615-.0620 (MHA-PD-17). The .1240-.1245 (MHA-PD-18) and
-# .4375-.4382 (MHA-PD-19) pins are retired: fit audit 2026-11-23 (pending
-# owner confirmation), those holes are cut by the over/under set's reamers
-# and accepted with their own mates.
-[gauges.zz-pins-0615-0620]
-range_mm = [1.5621, 1.5748]
-resolution_mm = 0.00508
-[tools.zz-pins-0615-0620]
-description = "Class ZZ pins for .0615-.0620: GO .0615 plus (single), NO-GO .062 minus (the .061-.500 box)"
-
 # --- MHA-PD-15 ring, MHA-PD-20 spacer, MHA-PD-28 bush, MHA-PD-16 cup ---------
 # (cad/process/pd_transgear_knob_thrust_ring, pd_transgear_pivot_spacer,
 # pd_transgear_knob_bush, pd_transgear_knob_cup). Facing, turning and parting

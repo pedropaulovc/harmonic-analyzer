@@ -96,12 +96,11 @@ def test_the_sheet_prints_the_overall_and_the_flange_never_the_hub_body() -> Non
         "SpigotLength",
         "KeyPinStation",
         "KeyPinChord",
-        "KeyPinStop",
     }
     assert _places("KeyPinStation") == 2
     assert _places("KeyPinDia") == _places("KeyPinDrillDia") == 4
-    assert _places("KeyPinChord") == _places("KeyPinStop") == 3
-    assert spec.REFERENCE_DIMENSIONS == frozenset()
+    assert _places("KeyPinChord") == spec.KEY_PIN_LOCATION_PLACES == 3
+    assert spec.REFERENCE_DIMENSIONS == frozenset({"SpigotDia"})
     assert {"HubLength", "SpigotLength", "KeyPinStation"} < set(drawing.SIDE_KEEP)
     assert set(drawing.SECTION_KEEP) == spec.DRAWING_DIMENSIONS["KeyPinProfile"]
     assert spec.HUB_LENGTH == cluster_fit.HUB_LENGTH == pytest.approx(0.539 * IN)
@@ -141,18 +140,20 @@ def test_the_overall_and_the_spigot_are_terms_of_the_disc_cluster_stack() -> Non
     assert STACK_NAME in spec.STACK_TEXT
 
 
-def test_the_spigot_and_the_stack_lengths_carry_model_bands() -> None:
+def test_the_stack_lengths_and_the_chord_carry_model_bands() -> None:
     """Every other size is governed by its printed places and the holes by
     the title block's DRILLED HOLES row.  The two reamed holes (the bore and
     the key pin's) print their reamers' sizes and no band (rule 4, fit audit
-    2026-11-23): their mates are their gauges."""
+    2026-11-23): their mates are their gauges.  The spigot, made to the
+    disc's bore, prints REF with no band, and the ream's stop takes the
+    title block's row."""
     assert model_toleranced_dimensions(part) == {
-        ("HubProfile", "SpigotDia"): "*SPIGOT_DIA_DEVIATIONS",
         ("HubProfile", "HubLength"): "HUB_LENGTH_BAND",
         ("HubProfile", "SpigotLength"): "SPIGOT_LENGTH_BAND",
-        ("KeyPinProfile", "KeyPinChord"): "KEY_PIN_LOCATION_BAND",
-        ("KeyPinProfile", "KeyPinStop"): "KEY_PIN_LOCATION_BAND",
+        ("KeyPinProfile", "KeyPinChord"): "KEY_PIN_CHORD_BAND",
     }
+    assert not hasattr(spec, "SPIGOT_DIA_DEVIATIONS")
+    assert not hasattr(spec, "KEY_PIN_LOCATION_BAND")
     for name in ("BORE_DEVIATIONS", "KEY_PIN_HOLE_DEVIATIONS"):
         assert not hasattr(spec, name) and not hasattr(part, name)
 
@@ -174,9 +175,10 @@ def test_the_round_bore_is_reamed_and_the_sleeve_boss_made_to_it() -> None:
     no band, and the sleeve's boss prints REF and is turned last to it, so
     neither sheet prints limits; the specs keep analysis bands whose
     clearance (never a bind, .0010 at most) the stacks consume.  The callout
-    names the mate it slides on and what the fit protects (the necessity
-    answer, no dimension in it) and ends on the least finished wall over it
-    (rule 20)."""
+    links the fit's note and ends on the least finished wall over it (rule
+    20); the note names the mate, the acceptance by that mate and what the
+    fit protects (the necessity answer, six words at most, no dimension in
+    it)."""
     import build_pd_transgear_feed_pinion as sleeve_part
     import pd_transgear_feed_pinion_spec as sleeve
 
@@ -186,7 +188,7 @@ def test_the_round_bore_is_reamed_and_the_sleeve_boss_made_to_it() -> None:
     assert part.BORE_R == pytest.approx(0.3135 * IN / 2.0)
     # One round cut through the whole part: no flat, no second bore.
     assert part.V_BORE == pytest.approx(math.pi * part.BORE_R**2 * spec.HUB_LENGTH)
-    for name in ("FLAT_TO_AXIS", "FLAT_CLEARANCE", "BORE_FIT_TEXT"):
+    for name in ("FLAT_TO_AXIS", "FLAT_CLEARANCE"):
         assert not hasattr(spec, name)
 
     # Neither build applies a band to the pair.
@@ -204,13 +206,11 @@ def test_the_round_bore_is_reamed_and_the_sleeve_boss_made_to_it() -> None:
     assert round_fit == pytest.approx((0.0, 0.0010 * IN), abs=1e-6)
     assert spec.BOSS_CLEARANCE == spec.BOSS_CLEARANCE_LIMITS[1]
     callout = drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].splitlines()
-    assert callout == [
-        "REAM THRU",
-        f"SLIDING FIT ON {spec.SLEEVE_NUMBER}, KEEPS {spec.COLLAR_NUMBER} GAP",
-        spec.BORE_WALL_TEXT,
-    ]
-    assert spec.BORE_NECESSITY == f"KEEPS {spec.COLLAR_NUMBER} GAP"
-    assert not re.search(r"\.\d", callout[1])
+    assert callout == ["REAM THRU", f"SEE NOTE {spec.BORE_NOTE}", spec.BORE_WALL_TEXT]
+    # Owner ruling 2026-11-24: the reason is the registry's, not the sheet's.
+    assert spec.BORE_NOTE_TEXT == f"{spec.SLEEVE_NUMBER} IS TURNED TO THIS BORE."
+    assert not re.search(r"\.\d", spec.BORE_NOTE_TEXT)
+    assert f"{spec.BORE_NOTE}. {spec.BORE_NOTE_TEXT}" in drawing.NOTES_TEXT
 
 
 def test_a_looser_boss_fit_closes_the_collar_air() -> None:
@@ -295,13 +295,15 @@ def test_the_key_pin_keys_the_hub_on_the_sleeve_flat() -> None:
     assert clearance > 0.0
     assert spec.KEY_PIN_SLEEVE_Z == pytest.approx(0.924 * IN)
     assert spec.KEY_PIN_SLEEVE_Z < sleeve.OVERALL_LENGTH
-    # The chord and the stop at the reamed-hole location band.
+    # The chord keeps its own band; the stop takes the title block's row
+    # (fit audit 2026-11-23: it printed the chord's +/-.002).
     band = 0.002 * IN
-    assert spec.KEY_PIN_LOCATION_BAND == pytest.approx(band)
+    assert spec.KEY_PIN_CHORD_BAND == pytest.approx(band)
     chord = (spec.KEY_PIN_CHORD_OFFSET - band, spec.KEY_PIN_CHORD_OFFSET + band)
-    stop = (spec.KEY_PIN_STOP - band, spec.KEY_PIN_STOP + band)
+    stop = (spec.KEY_PIN_STOP - _row(3), spec.KEY_PIN_STOP + _row(3))
+    assert spec.KEY_PIN_LOCATION_PLACES == 3
     assert chord == pytest.approx((0.172 * IN, 0.176 * IN))
-    assert stop == pytest.approx((0.158 * IN, 0.162 * IN))
+    assert stop == pytest.approx((0.155 * IN, 0.165 * IN))
     assert spec.KEY_PIN_CHORD_RANGE == pytest.approx(chord)
     assert spec.KEY_PIN_STOP_RANGE == pytest.approx(stop)
     assert spec.KEY_PIN_STOP_X == -spec.KEY_PIN_STOP
@@ -388,20 +390,47 @@ def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
     """R9-68: the spigot clears the disc's bore and seats on the 12T's step.
     Its end and the flange's rear face are square to the bore (datum A) on
     the sheet; the disc's tilt reads both, the step's and the hub's rock on
-    the boss, and its rear face stays in air ahead of the step."""
+    the boss, and its rear face stays in air ahead of the step.  Fit audit
+    2026-11-23 (rule 4, made to fit): the spigot is turned to the disc's
+    reamed bore, its size REF, and its note prints the clearance, .003-.005,
+    with the one reason and the root's limit."""
     import pd_rack_pinion_spec as disc
     import pd_transgear_feed_pinion_spec as sleeve
 
-    # The spigot clears the disc's bore: the two printed bands never bind.
+    # The printed clearance is the requirement; the spigot's analysis band
+    # is that clearance under the disc bore's analysis band.
+    assert joint.SPIGOT_CLEARANCE == pytest.approx((0.003 * IN, 0.005 * IN))
+    assert disc.SPIGOT_DIAMETRAL_CLEARANCE == joint.SPIGOT_CLEARANCE
     spigot = (
         spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[1],
         spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[0],
     )
     disc_bore = (disc.BORE_DIA + disc.BORE_BAND[1], disc.BORE_DIA + disc.BORE_BAND[0])
-    fit = (disc_bore[0] - spigot[1], disc_bore[1] - spigot[0])
-    assert fit == pytest.approx(disc.SPIGOT_DIAMETRAL_CLEARANCE)
-    assert fit[0] >= 0.0
-    assert spec.DISC_NUMBER in drawing.DIMENSION_CALLOUTS_BELOW["SpigotDia"].splitlines()[0]
+    assert spigot == pytest.approx(
+        (
+            disc_bore[0] - joint.SPIGOT_CLEARANCE[1],
+            disc_bore[1] - joint.SPIGOT_CLEARANCE[0],
+        )
+    )
+    assert spigot == pytest.approx((0.496 * IN, 0.500 * IN))
+    assert ("HubProfile", "SpigotDia") not in model_toleranced_dimensions(part)
+    assert drawing.DIMENSION_CALLOUTS_BELOW["SpigotDia"].splitlines() == [
+        f"TURN TO {spec.DISC_NUMBER} BORE",
+        f"SEE NOTE {spec.SPIGOT_NOTE}",
+    ]
+    assert spec.SPIGOT_NOTE_TEXT == f"CLEARANCE .003-.005 IN {spec.DISC_NUMBER} BORE."
+    # Rule 16: the root's single limit on a leader to the corner itself, in
+    # the air under the spigot and over the flange face's frame.
+    assert spec.SPIGOT_ROOT_CALLOUT == "R.004 MAX"
+    assert "ROOT" not in drawing.NOTES_TEXT
+    corner = drawing.SPIGOT_ROOT_XY
+    assert corner == pytest.approx(
+        (drawing._side_x(0.0), drawing.AXIS_Y - spec.SPIGOT_DIA / 2.0 * drawing._S)
+    )
+    text = drawing.SPIGOT_ROOT_TEXT_XY
+    assert text[0] > corner[0] + 0.010
+    assert corner[1] - 0.009 < text[1] < corner[1] - 0.003
+    assert f"{spec.SPIGOT_NOTE}. {spec.SPIGOT_NOTE_TEXT}" in drawing.NOTES_TEXT
     # The common seat annulus at the actual partial-depth cutter end, with
     # every printed radial/tip/step/full-depth corner bounded by its owner.
     assert spec.SEAT_CONTACT_R == pytest.approx(
@@ -875,20 +904,16 @@ _NOMINAL = {
     "KeyPinDia": spec.KEY_PIN_HOLE_DIA,
     "KeyPinDrillDia": spec.KEY_PIN_DRILL_DIA,
     "KeyPinChord": spec.KEY_PIN_CHORD_OFFSET,
-    "KeyPinStop": spec.KEY_PIN_STOP,
 }
-# The spigot's native band prints beside its value; the reamed bore and
-# key-pin hole print their reamers' sizes and no band.
-_BANDS = {
-    "SpigotDia": spec.SPIGOT_DIA_BAND,
-}
-# The disc cluster stack's printed lengths and the chord hole's locations
+# The reamed bore and key-pin hole print their reamers' sizes and no band;
+# the spigot prints in parentheses with none.
+_REFERENCE = spec.REFERENCE_DIMENSIONS
+# The disc cluster stack's printed lengths and the chord hole's offset
 # carry their symmetric band.
 _SYMMETRIC = {
     "HubLength": spec.HUB_LENGTH_BAND,
     "SpigotLength": spec.SPIGOT_LENGTH_BAND,
-    "KeyPinChord": spec.KEY_PIN_LOCATION_BAND,
-    "KeyPinStop": spec.KEY_PIN_LOCATION_BAND,
+    "KeyPinChord": spec.KEY_PIN_CHORD_BAND,
 }
 
 
@@ -898,8 +923,8 @@ def _printed_box(name: str, anchor: tuple[float, float]) -> Box:
     value = f"{_NOMINAL[name] / IN:.{_places(name)}f}".lstrip("0")
     if name.endswith("Dia"):
         value = f"\u00d8{value}"
-    if name in _BANDS:
-        value += f" +{_BANDS[name][0] / IN:.4f}".replace("0.", ".", 1)
+    if name in _REFERENCE:
+        value = f"({value})"
     if name in _SYMMETRIC:
         value += f"\u00b1{_SYMMETRIC[name] / IN:.{_places(name)}f}".replace("0.", ".", 1)
     value += drawing.SECTION_SUFFIXES.get(name, "")
@@ -1081,17 +1106,30 @@ def test_section_letters_stand_clear_of_the_flange_and_its_dimensions() -> None:
 
 
 def test_the_chord_hole_dimensions_print_left_of_the_ring() -> None:
-    """The ream's size and fit (two lines of words naming the pin, rules 4
-    and 7) and the knockout's stand left of the ring, each dimension line at
-    its text's height crossing its own run of the hole; the stop's text
-    stands inline between the hub axis's and the stop's extension lines, the
-    chord's above the ring right of the axis's extension line."""
+    """The ream's size, depth and fit (the stop as the hole's depth, rule
+    26, then the pin and the link to its fit note, rules 4 and 7) and the
+    knockout's stand left of the ring, each dimension line at its text's
+    height crossing its own run of the hole; the chord's above the ring
+    right of the axis's extension line."""
     callout = drawing.SECTION_CALLOUTS_BELOW["KeyPinDia"]
     # Fit audit 2026-11-23 (rule 4): the reamed hole prints the reamer's
-    # size with REAM beside it and no band, its pin (the gauge) and what the
-    # ream is for, with no dimension in the answer.
+    # size with REAM beside it and no band, its pin (the gauge) and the link
+    # to its note: the press fit, the acceptance by the pin and what the
+    # ream and its offset protect, with no dimension in the answer.
+    # Rule 26: the ream's stop prints as the depth in its callout, never as
+    # a dimension left to the view.
     assert drawing.SECTION_SUFFIXES == {"KeyPinDia": " REAM"}
-    assert callout.splitlines() == [f"PIN {spec.KEY_PIN_NUMBER}", "PRESS, NO BOND"]
+    assert "KeyPinStop" not in drawing.SECTION_KEEP
+    assert callout.splitlines() == [
+        "TO .160 PAST AXIS",
+        f"PIN {spec.KEY_PIN_NUMBER}",
+        f"SEE NOTE {spec.KEY_PIN_NOTE}",
+    ]
+    assert spec.KEY_PIN_NOTE_TEXT == (
+        f"PRESS FIT ON {spec.KEY_PIN_NUMBER}: THE PIN PRESSES IN."
+    )
+    assert not re.search(r"\.\d", spec.KEY_PIN_NOTE_TEXT)
+    assert f"{spec.KEY_PIN_NOTE}. {spec.KEY_PIN_NOTE_TEXT}" in drawing.NOTES_TEXT
     assert spec.KEY_PIN_HOLE_BAND == pytest.approx((0.0005 * IN, 0.0))  # analysis
     assert len(drawing.SECTION_CALLOUTS_BELOW["KeyPinDrillDia"].splitlines()) <= 2
     assert set(drawing.SECTION_CALLOUTS_BELOW) == {"KeyPinDia", "KeyPinDrillDia"}
@@ -1107,9 +1145,6 @@ def test_the_chord_hole_dimensions_print_left_of_the_ring() -> None:
     # The ream's line crosses the ream, the knockout's the knockout.
     assert stop_y < keep["KeyPinDia"][1] < xy(reach, 0.0)[1]
     assert xy(-reach, 0.0)[1] < keep["KeyPinDrillDia"][1] < stop_y
-    # The stop's text between its extension lines, left of the ring.
-    assert stop_y < keep["KeyPinStop"][1] < centre[1]
-    assert boxes["KeyPinStop"].xmax <= ring_left - 0.002
     # Both sizes left of the ring, clear of it.
     for name in ("KeyPinDia", "KeyPinDrillDia"):
         assert boxes[name].xmax <= ring_left - 0.010, name
@@ -1433,13 +1468,20 @@ def test_hub_feature_bands_are_the_printed_ones() -> None:
     assert features["flange_rear_face"]["perpendicularity_datum"] == "A"
     assert features["flange_front_face"]["thickness"] == band(0.089, 0.099)
     assert features["flange"]["dia"] == band(1.04, 1.06)
-    assert features["spigot"]["dia"] == band(0.496, 0.498)
+    assert "dia" not in features["spigot"]
+    assert features["spigot"]["dia_ref"] == pytest.approx(0.498 * IN)
+    assert features["spigot"]["diametral_clearance"] == pytest.approx(
+        [0.003 * IN, 0.005 * IN]
+    )
+    assert features["spigot"]["fit"] == "clearance"
     assert features["spigot"]["length"] == band(0.143, 0.145)
     assert features["spigot"]["root_radius_max"] == pytest.approx(0.004 * IN)
     assert features["hub_body"]["dia"] == band(0.535, 0.545)
     assert features["hub_body"]["pin_ream_wall_min"] == pytest.approx(0.060 * IN)
     bore = features["bore"]
+    # The reamed holes print no band: their bands are marked analysis-only.
     assert bore["dia"] == band(0.3135, 0.3140)
+    assert bore["dia_basis"] == features["pin_ream"]["dia_basis"] == "analysis"
     assert (bore["process"], bore["thru"], bore["mate"], bore["datum"]) == (
         "ream",
         True,
@@ -1457,7 +1499,7 @@ def test_hub_feature_bands_are_the_printed_ones() -> None:
     ream = features["pin_ream"]
     assert ream["dia"] == band(0.0615, 0.0620)
     assert ream["chord"] == band(0.172, 0.176)
-    assert ream["stop"] == band(0.158, 0.162)
+    assert ream["stop"] == band(0.155, 0.165)
     assert ream["station"] == band(0.14, 0.16)
     assert (ream["process"], ream["mate"], ream["fit"]) == (
         "ream",
@@ -1468,7 +1510,7 @@ def test_hub_feature_bands_are_the_printed_ones() -> None:
     assert ream["at"] == pytest.approx(
         [entry, -spec.KEY_PIN_CHORD_OFFSET, spec.KEY_PIN_Z]
     )
-    assert ream["depth"] == pytest.approx([entry + 0.158 * IN, entry + 0.162 * IN])
+    assert ream["depth"] == pytest.approx([entry + 0.155 * IN, entry + 0.165 * IN])
     knockout = features["pin_knockout"]
     assert knockout["dia"] == band(0.0465, 0.0505)
     assert (knockout["drill"], knockout["thru"]) == ("#56", True)
@@ -1482,9 +1524,22 @@ def test_hub_feature_bands_are_the_printed_ones() -> None:
     assert "process" not in oil
 
 
-def test_hub_drawing_notes_are_the_printed_stack_note() -> None:
+def test_hub_drawing_notes_are_the_four_numbered_notes() -> None:
+    """Rule 7: at most four lines of notes, each one line, numbered as the
+    callouts link them: the stack, then the bore's, the key pin's and the
+    spigot's fit."""
     import export_features
 
     manifest = export_features.requirement_manifest("pd_transgear_disc_hub")
-    assert manifest["notes"]["manufacturing"] == drawing.NOTES_TEXT.splitlines()
+    lines = drawing.NOTES_TEXT.splitlines()
+    assert manifest["notes"]["manufacturing"] == lines
     assert drawing.DRAWING_NOTES == drawing.NOTES_TEXT
+    assert lines == [f"{n}. {text}" for n, text in spec.NOTE_TEXTS.items()]
+    assert list(spec.NOTE_TEXTS) == [1, 2, 3, 4]
+    for name, note in (
+        ("BoreDia", spec.BORE_NOTE),
+        ("SpigotDia", spec.SPIGOT_NOTE),
+        ("HubLength", spec.STACK_NOTE),
+        ("SpigotLength", spec.STACK_NOTE),
+    ):
+        assert f"SEE NOTE {note}" in drawing.DIMENSION_CALLOUTS_BELOW[name]
