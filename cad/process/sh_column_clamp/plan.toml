@@ -420,7 +420,7 @@ beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_ma
 
 [[setups.operations]]
 instruction = "Work stop unlocked, its rod drawn back clear of the vise. G54 X0 Y0 the bar's axis: edge finder (900 rpm) on the left and right faces and on the fixed jaw."
-instruction_detailed = "Mic the first blank across the two faces the jaws grip. Edge finder (900 rpm). Y: its tip .10 below the jaw top, on the fixed jaw's face beside the blank, G10 L20 P1 Y(half that mic reading in mm − 2.540); for .750, Y6.985. X: its tip .10 below the sawn top, on the blank's LEFT face from the left, G10 L20 P1 X0; on its RIGHT face from the right, G10 L20 P1 X(half the DRO X reading)."
+instruction_detailed = "Work stop's rod drawn back clear of the vise. Mic the first blank across the gripped faces. Edge finder, 900 rpm. Y: tip .10 below the jaw top, on the fixed jaw's face beside the blank, G10 L20 P1 Y(half that mic reading in mm − 2.540); for .750, Y6.985. X: tip .10 below the sawn top, on the LEFT face from the left, G10 L20 P1 X0; on the RIGHT face from the right, G10 L20 P1 X(half the DRO X reading)."
 feed = "hand"
 
 [[setups.operations]]
@@ -470,7 +470,7 @@ beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.upright_top
 
 [[setups.operations]]
 instruction = "Work stop unlocked, its rod drawn back clear of the vise. Before the first blank goes in: G54 Z0 on the parallels' top, touched with the end mill on the fixed-jaw parallel. The vise holds no blank yet: beside a standing blank the spindle nose would meet its top before the tip reached the parallel."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). Jog the cutter over the fixed-jaw parallel near its middle, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z to the top of its travel before loading the blank."
+instruction_detailed = "Work stop unlocked, its rod drawn back clear of the vise. Before the first blank goes in, the vise holding only the parallels: console M6 T1 (the tool setter measures it). Jog the cutter over the fixed-jaw parallel near its middle, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z to the top of its travel before loading the blank."
 feed = "hand"
 
 [[setups.operations]]
@@ -525,7 +525,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], c
 
 [[setups.operations]]
 instruction = "Work stop unlocked, its rod drawn back clear of the vise. G54 X0 the blank's left end, Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's LEFT end from the left, G10 L20 P1 X-2.540."
+instruction_detailed = "Work stop unlocked, its rod drawn back clear of the vise. Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's LEFT end from the left, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -629,7 +629,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], c
 
 [[setups.operations]]
 instruction = "Work stop unlocked, its rod drawn back clear of the vise. G54 X0 the N end, Y0 the fixed jaw's face (B): edge finder (900 rpm), by the table's row for the half in the vise."
-instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; then on the blank's N end, from the side and with the entry in the table's row for the half in the vise."
+instruction_detailed = "Work stop unlocked, its rod drawn back clear of the vise. Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; then on the blank's N end, from the side and with the entry in the table's row for the half in the vise."
 feed = "hand"
 diagram = { file = "diagrams/mating.svg", part = "back", alt = "A back held the same way, the near side N at the right: its X0 is the right end." }
 table = { columns = ["Half", "Program", "N end (X0)", "Edge finder on the N end", "Z0 touch: MDI, then the feeler"], rows = [
@@ -684,7 +684,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], c
 
 [[setups.operations]]
 instruction = "Work stop unlocked, its rod drawn back clear of the vise. G54 X0 the RIGHT end (N, marked in Setup 4), Y0 the fixed jaw's face (B): edge finder (900 rpm). N, marked in Setup 4, is that end here."
-instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the part's RIGHT end (N) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end). N, scribed in Setup 4, is the right end here: it is the near side the stations and the bore count from, here and in the pair (Setup 9)."
+instruction_detailed = "Work stop unlocked, its rod drawn back clear of the vise. Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the part's RIGHT end (N) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end). N, scribed in Setup 4, is the right end here: it is the near side the stations and the bore count from, here and in the pair (Setup 9)."
 feed = "hand"
 
 [[setups.operations]]
@@ -779,7 +779,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], c
 
 [[setups.operations]]
 instruction = "Work stop unlocked, its rod drawn back clear of the vise. G54 X0 the LEFT end (N), Y0 the fixed jaw's face (B): edge finder (900 rpm)."
-instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the part's LEFT end from the left, G10 L20 P1 X-2.540. N, scribed in Setup 4, is the left end here and in the pair."
+instruction_detailed = "Work stop unlocked, its rod drawn back clear of the vise. Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the part's LEFT end from the left, G10 L20 P1 X-2.540. N, scribed in Setup 4, is the left end here and in the pair."
 feed = "hand"
 
 [[setups.operations]]
@@ -961,7 +961,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "No work stop in this setup: its rod drawn back clear of the vise. G54 X0 the N ends, Y0 the split line: edge finder (900 rpm) on the N ends and on the fixed jaw, less this back's recorded pre-face depth."
-instruction_detailed = "Edge finder (900 rpm), its tip .10 below the pair's top: on the N ends from the left, G10 L20 P1 X-2.540. On the fixed jaw's face beside the pair (right of it), G10 L20 P1 Y(the mean of this back's two recorded pre-face depths, in mm, − 2.540). The split line is that depth from the jaw."
+instruction_detailed = "No work stop in this setup: its rod drawn back clear of the vise. Edge finder (900 rpm), its tip .10 below the pair's top: on the N ends from the left, G10 L20 P1 X-2.540. On the fixed jaw's face beside the pair (right of it), G10 L20 P1 Y(the mean of this back's two recorded pre-face depths, in mm, − 2.540). The split line is that depth from the jaw."
 feed = "hand"
 
 [[setups.operations]]
@@ -1044,7 +1044,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], c
 
 [[setups.operations]]
 instruction = "Work stop unlocked, its rod drawn back clear of the vise. G54 X0 the RIGHT end (N), Y0 the fixed jaw's face (B): edge finder (900 rpm)."
-instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the part's RIGHT end (N) from the right, G10 L20 P1 X2.540."
+instruction_detailed = "Work stop unlocked, its rod drawn back clear of the vise. Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the part's RIGHT end (N) from the right, G10 L20 P1 X2.540."
 feed = "hand"
 
 [[setups.operations]]

@@ -192,6 +192,10 @@ def test_no_touch_off_is_taken_with_the_work_stop_between_the_jaws() -> None:
     drawn_back = "rod drawn back clear of the vise"
     mill = [setup for setup in PLAN["setups"] if setup.get("programs")]
     assert len(mill) == 9
+    first_blank = "Before the first blank goes in"
+    setup_3 = next(s for s in mill if s["title"] == "Other end to the width")
+    for key in ("instruction", "instruction_detailed"):
+        assert first_blank in setup_3["operations"][0][key], key
     for setup in mill:
         operations = setup["operations"]
         touches = [
@@ -201,14 +205,19 @@ def test_no_touch_off_is_taken_with_the_work_stop_between_the_jaws() -> None:
             or "touch-off" in operation["instruction"]
         ]
         first = operations[touches[0]]
-        assert drawn_back in first["instruction"], setup["title"]
+        # Both texts: the hobby sheet prints the detailed one where an op has
+        # it, the pro sheet the short one.
+        for key in ("instruction", "instruction_detailed"):
+            assert drawn_back in first.get(key, drawn_back), (setup["title"], key)
         stops = [
             index
             for index, operation in enumerate(operations)
             if operation.get("tool") == "work-stop"
         ]
         if setup["title"].startswith("Deburr, then the pair bore"):
-            assert not stops and "No work stop" in first["instruction"]
+            assert not stops
+            for key in ("instruction", "instruction_detailed"):
+                assert "No work stop" in first.get(key, "No work stop")
             continue
         (stop,) = stops
         # Every zero of the setup is taken before the stop goes in.
