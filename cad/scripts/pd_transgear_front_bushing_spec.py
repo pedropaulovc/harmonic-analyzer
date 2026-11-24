@@ -40,18 +40,22 @@ UNIT = drawing_unit(
 
 OD = 11.938  # .47
 OD_PLACES = 2
-BORE_DIA = PIN.DIA
-BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower), the sleeve's running band
-BORE_PLACES = 4
-# The running fit on the pin, named on the bore callout by its standard fit
-# name with the clearance the printed limits give as REF
-# (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)).
-BORE_CALLOUT = (
-    "REAM THRU\n"
-    f"RUNNING FIT ON {PIN.PIN_NUMBER} PIN\n"
-    f"(CLEARANCE {PIN.inch_text(FIT.BORE_DIAMETRAL_CLEARANCE[0], 4)}-"
-    f"{PIN.inch_text(FIT.BORE_DIAMETRAL_CLEARANCE[1], 4)} REF)"
-)
+# The bore: reamed with the set's .1260 reamer, the sleeve's (one reamer,
+# one size), and printed at that size with NO band (fit audit 2026-11-23,
+# pending owner confirmation).  BORE_DIA_BAND is the ANALYSIS band the
+# reamer is modelled to cut, never printed; the walls and the air stacks
+# read it.
+BORE_DIA = FIT.BORE_DIA  # .1260
+BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower) ANALYSIS deviations
+BORE_PLACES = 3
+# The callout: size and process, then the mate and that it is turned to
+# this bore (a bare fit name is not enough).  The pair's one acceptance
+# prints on the sheet of the member made last, the pin's (MHA-PD-23 note 1;
+# machinist review r1 of the fit batch: three rows of words, and an
+# acceptance on both members).  Why the bore is reamed is in the part's
+# necessity file (owner ruling 2026-11-24: "In the part's registry file,
+# not on the sheet"; cad/config/necessity/pd-transgear-front-bushing.yaml).
+BORE_CALLOUT = f"REAM THRU\n{PIN.PIN_NUMBER} IS TURNED TO THIS BORE"
 # 45 deg, on the ring face's O.D. edge: a single MAX limit (the MHA-160
 # precedent).  Only its largest size matters: it must leave the MHA-PD-VN-61
 # ring a full bearing flat (checked below).  The part authors " MAX" as the
@@ -85,16 +89,18 @@ if HUB_FACE_OVERLAP_WORST < HUB_FACE_OVERLAP_MIN:
     )
 
 # --- Length: +/-.001 (owner ruling 2026-11-01, #2124) ----------------------------
-# With the cluster forward it sets F to the disc's front face (m), so the
-# drive collar's air to the disc: a term of the disc cluster's stack.
-LENGTH = FIT.FRONT_BUSHING_LENGTH  # .222
+# It is a term of the sleeve's float at the MHA-PD-VN-61 ring
+# (transgear_cluster_fit.RING_FLOAT_CHAIN): looser, the unshimmed ring gap
+# closes under END_FLOAT_MIN.  Since fit audit question 5 (owner ruling
+# 2026-11-24) the collar air no longer needs it (necessity N-02).
+LENGTH = FIT.FRONT_BUSHING_LENGTH  # .227
 LENGTH_BAND = FIT.LENGTH_BAND
 LENGTH_PLACES = FIT.LENGTH_PLACES
-# Rule 4: the band names the stack it serves, by the drawing numbers of the
-# drive collar and the disc whose clearance it sets.
-COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
-DISC_NUMBER = _config.parts("pd-rack-pinion")["number"]
-LENGTH_CALLOUT = f"{STACK_NAME}:\n{COLLAR_NUMBER} TO {DISC_NUMBER} CLEARANCE"
+# Rule 4: the band names the stack it serves, the gap at the ring (rule 25:
+# the sheet and N-02 say the same; Codjiflo r2 on #3506).  Its second line
+# is shorter than the clearance line it replaces, so it fits where that
+# stood.
+LENGTH_CALLOUT = f"{STACK_NAME}:\n{PIN.RING_NUMBER} RING GAP"
 
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore runs on the pin and both faces bear, so all three carry
 # the machined grade, the bore as the sleeve's bore on the same pin does.

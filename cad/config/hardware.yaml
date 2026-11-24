@@ -226,7 +226,7 @@ pd-vn-platen-clip-screw:
 pd-vn-transgear-arm-plate-locating-pin:
   tier: 1
   why: "ASME B18.8.2 hardened dowel pin, used as supplied"
-  designation: "Ø3/32 x 5/16 hardened dowel pin, alloy steel"
+  designation: "Ø1/8 x 5/16 hardened dowel pin, alloy steel"
   standard: "ASME B18.8.2"
 pd-vn-transgear-arm-plate-screw:
   tier: 1

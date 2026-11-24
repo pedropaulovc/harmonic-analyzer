@@ -61,7 +61,6 @@ from _holes import wizard_holes
 from _visibility import blank_reference_geometry
 from paper_drive_stock_native import apply_span_limits, author_span
 from pd_rack_pinion_spec import (
-    BORE_DEVIATIONS,
     BORE_DIA,
     BORE_FRONT_CHAMFER,
     DIAMETRAL_PITCH,
@@ -263,11 +262,9 @@ def build(adapter) -> dict[str, str]:
         f" tap to bore wall {TAP_TO_BORE_WALL_WORST:.2f} worst"
     )
 
-    # Functional bore, supported blank and controlling span bands live on
-    # native model dimensions; the drawing only imports their authored ink.
-    set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *BORE_DEVIATIONS, display_unit=UNIT
-    )
+    # The supported blank and controlling span bands live on native model
+    # dimensions; the drawing only imports their authored ink.  The reamed
+    # bore prints the reamer's size and no band (drawing-guidelines.md rule 4).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     set_dimension_bilateral_tolerance(
         adapter,

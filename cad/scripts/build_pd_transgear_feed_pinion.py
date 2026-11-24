@@ -85,10 +85,8 @@ from paper_drive_stock_native import (
     suppress_dimension_input,
 )
 from pd_transgear_feed_pinion_spec import (
-    BORE_DEVIATIONS,
     BORE_DIA,
     BOSS_DIA,
-    BOSS_DIA_DEVIATIONS,
     CUTTER_DIA_MAX,
     CUTTER_RUNOUT_DEVIATIONS,
     CUTTER_RUNOUT_MAX,
@@ -854,12 +852,11 @@ def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "GearBlank", "FaceWidth", FACE_WIDTH_BAND, display_unit=UNIT
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "SleeveProfile", "BoreDia", *BORE_DEVIATIONS, display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "SleeveProfile", "BossDia", *BOSS_DIA_DEVIATIONS, display_unit=UNIT
-    )
+    # The bore and the boss print no band (fit audit 2026-11-23): the bore is
+    # the reamer's size and MHA-PD-23 is turned to it; the boss is turned to
+    # the MHA-PD-17 hub's bore. The boss's callout carries its acceptance;
+    # the bore's carries none, its pair's one acceptance is MHA-PD-23's
+    # note 1 (rule 4, form 2; Codjiflo r2 on #3492).
     set_dimension_symmetric_tolerance(
         adapter,
         "FlatReference",

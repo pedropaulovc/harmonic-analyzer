@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 import _config
 import build_pd_transgear_rear_bushing as part
 import draw_pd_transgear_rear_bushing as drawing
 import transgear_cluster_fit as fit
+import pd_transgear_pin_callouts as pin_callouts
 import pd_transgear_pin_spec as pin
 import pd_transgear_rear_bushing_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
@@ -38,25 +41,55 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(drawing.PROFILE_KEEP) == {"RingLength"}
 
 
-def test_the_bore_carries_its_model_band_and_the_length_the_title_block() -> None:
-    """The bore runs on the pin, so its reamed band lives on the model
-    dimension; the length only feeds the shimmed end float (#2124)."""
-    assert model_toleranced_dimensions(part) == {
-        ("RingProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
-    }
+def test_the_bore_prints_no_band_and_the_length_the_title_block() -> None:
+    """Fit audit 2026-11-23: the reamed bore prints the reamer's size with
+    no band (the pin is turned last to it); the length only feeds the
+    shimmed end float (#2124)."""
+    assert model_toleranced_dimensions(part) == {}
+    assert spec.BORE_PLACES == 3
 
 
 def test_the_bore_runs_on_the_pin_and_names_it() -> None:
-    """drawing-guidelines.md rule 4 (tighten only for function, and name the mate): the running-fit callout names the mate and its clearance;
+    """drawing-guidelines.md rule 4 (fit audit 2026-11-23): a reamed bore
+    prints size, REAM and that its mate is turned to it; no band, no
+    clearance.  The acceptance prints once, on the pin's sheet; the reason
+    for the REAM is in the part's necessity file (owner ruling 2026-11-24).
     drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the fit bore's process is REAM."""
     low, high = fit.BORE_DIAMETRAL_CLEARANCE
     assert 0.0 < low < high
-    assert spec.BORE_DIA == pin.DIA
+    assert spec.BORE_DIA == fit.BORE_DIA == pytest.approx(0.1260 * 25.4)
     assert spec.BORE_DIA_BAND == fit.BORE_DIA_BAND
     callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert callout.splitlines()[0] == "REAM THRU"
-    assert pin.PIN_NUMBER in callout
-    assert f"{pin.inch_text(low, 4)}-{pin.inch_text(high, 4)}" in callout
+    assert callout.splitlines() == [
+        "REAM THRU",
+        f"{pin.PIN_NUMBER} IS TURNED TO THIS BORE",
+    ]
+    assert not re.search(r"\d*\.\d", callout)
+    assert "NO SHAKE" not in callout
+    assert _config.parts("pd-transgear-rear-bushing")["number"] in pin.RUNNING_MATES
+    assert "NO SHAKE" in pin_callouts.SHANK_ACCEPTANCE
+    # Rule 4's own criterion, .002 in looser than the modelled fit: with the
+    # running clearance to .0025 (owner ruling 2026-11-24, fit audit
+    # question 5) the cocked bushing takes the whole float up (.0088 of
+    # .0080), so the REAM answers the necessity test itself and the
+    # delegated exception RV-01 (Codjiflo r1 on #3492, .0070 at .0017) is
+    # gone; the next form down, a drilled #30 (.1285 +.004/0 on the smallest
+    # pin), takes up .0157.
+    least_float = fit.RING_FLOAT_RANGE[0]
+    assert spec.BORE_COCK_TAKE_UP == spec.bore_cock_take_up(high) < least_float
+    assert spec.BORE_COCK_TAKE_UP / 25.4 == pytest.approx(0.0049, abs=5e-5)
+    loose = spec.bore_cock_take_up(high + 0.002 * 25.4)
+    assert loose / 25.4 == pytest.approx(0.0088, abs=5e-5)
+    assert loose > least_float
+    drilled = spec.bore_cock_take_up((0.1285 + 0.004) * 25.4 - pin.DIA_MIN)
+    assert drilled / 25.4 == pytest.approx(0.0157, abs=5e-5)
+    assert "machinist_exceptions" not in _config.parts("pd-transgear-rear-bushing")
+    (entry,) = yaml.safe_load(
+        (_config.CONFIG_DIR / "necessity" / "pd-transgear-rear-bushing.yaml").read_text(
+            encoding="utf-8"
+        )
+    )["necessity"]
+    assert ".0088" in entry["source"] and ".0157" in entry["source"]
 
 
 def test_wall_holds_the_target_at_the_printed_worst_case() -> None:
