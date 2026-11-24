@@ -119,8 +119,8 @@ def test_bracket_feature_bands_are_the_printed_ones() -> None:
     assert features["foot_top"]["height"] == pytest.approx([_in(0.23), _in(0.25)])
     assert features["east_side"]["width"] == pytest.approx([_in(0.63), _in(0.65)])
     ear = features["outboard_face"]
-    assert ear["thickness"] == pytest.approx([_in(0.316), _in(0.324)])
-    assert ear["callout"] == drawing.DIMENSION_CALLOUTS["EarThick"]
+    assert ear["thickness"] == pytest.approx([_in(0.315), _in(0.325)])
+    assert "callout" not in ear
     assert features["foot_end"]["length"] == pytest.approx([_in(0.69), _in(0.71)])
     arch = features["arch"]
     assert arch["radius"] == pytest.approx([_in(0.31), _in(0.33)])

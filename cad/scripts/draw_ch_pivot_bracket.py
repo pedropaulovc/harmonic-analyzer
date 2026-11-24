@@ -77,7 +77,6 @@ from ch_pivot_bracket_spec import (
     BORE_H,
     EAR_ARCH_R,
     EAR_T,
-    EAR_T_BAND,
     EAR_TOP_Y,
     FOOT_H,
     FOOT_W,
@@ -250,10 +249,11 @@ EAR_THICK_TEXT_OFFSET = (0.042, 0.010)
 # The F-drilled cross-bore names its drill and the shaft it slides on, no
 # number (owner ruling 2026-11-24, fit audit question 1; drawing-guidelines.md
 # rule 4); the drilled hold-down hole says drill and
-# through. The ear thickness carries its own band and says what it holds:
-# fit-up sets the pivot shaft's tip off the ear's outboard face and the apex
-# tap stands off the inboard one, so the thickness locates the shaft's flat
-# under the tap (rocker_bank_layout.SET_SCREW_TO_FLAT_BAND; #3114: nothing
+# through. The ear thickness rides the title block's .XXX with no words (fit
+# audit census, MHA-CH-08 ear thickness: a reason on a size with no band of
+# its own is narration, drawing-guidelines.md rule 7); fit-up sets the pivot
+# shaft's tip off the ear's outboard face and the apex tap stands off the
+# inboard one (rocker_bank_layout.SET_SCREW_TO_FLAT_BAND; #3114: nothing
 # bears on an ear's face). The tap's station from the inboard
 # face is a location, so it carries its value and band only (rule 7); the
 # set screw it places on the pivot shaft's flat rides the tap's own callout
@@ -265,7 +265,6 @@ EAR_THICK_TEXT_OFFSET = (0.042, 0.010)
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": f"{drill_process(BORE_HOLE_SPEC)} THRU\nSLIDING CLEARANCE ON {PIVOT_SHAFT_NUMBER}",
     "HoleDia": "DRILL THRU",
-    "EarThick": f"LOCATES FLAT OF {PIVOT_SHAFT_NUMBER}",
     "CornerRadius": f"CLEARS HEAD OF\n{HOLD_DOWN_SCREW_NUMBER}",
 }
 # The right view prints the corner radius and the ear thickness.
@@ -402,8 +401,8 @@ requirement(
     requirements=("plane",),
     fields={"plane": (_plane("z", FOOT_Z0), ("__frame__", "FOOT_Z0"))},
 )
-# The ear's outboard face: the thickness .320 +/-.004 from the inboard face
-# (RIGHT_KEEP_NAMES "EarThick"), the part's own band, with its callout.
+# The ear's outboard face: the thickness .320 at the title block's .XXX from
+# the inboard face (RIGHT_KEEP_NAMES "EarThick").
 requirement(
     "outboard_face",
     kind="face",
@@ -412,12 +411,11 @@ requirement(
     fields={
         "plane": (_plane("z", EAR_T / 2.0), ("__frame__", "EAR_T")),
         "thickness": (
-            limits(EAR_T, _P["EarThick"], (EAR_T_BAND, -EAR_T_BAND), unit=UNIT),
-            ("EAR_T", "EAR_T_BAND", (_SELF, "RIGHT_KEEP_NAMES")),
+            limits(EAR_T, _P["EarThick"], unit=UNIT),
+            ("EAR_T", (_SELF, "RIGHT_KEEP_NAMES"), "UNIT"),
         ),
         "thickness_nominal": (EAR_T, ("EAR_T",)),
         "thickness_from": ("inboard_face", ((_SELF, "RIGHT_KEEP_NAMES"),)),
-        "callout": (DIMENSION_CALLOUTS["EarThick"], ((_SELF, "DIMENSION_CALLOUTS"),)),
     },
     precision={"thickness": _P["EarThick"]},
 )
