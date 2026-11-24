@@ -3,7 +3,7 @@
        +Y up the page (the back). Section (bottom): through the hub's axis,
        seen from the front, 1 in = 200 px, Z0 the strap's top at y 330. -->
   <rect class="paper" x="0" y="0" width="760" height="470"/>
-  <text class="title" x="20" y="18">Setup 2: face A up; face the hub's top end (datum G's) to .090 over the strap</text>
+  <text class="title" x="20" y="18">Setup 2: strap face 1 up; face the hub's top end (datum G's) to .090 over the strap</text>
   <text class="label" x="20" y="38">Plan</text>
   <!-- Gap blocks (2 in up, 3 in along X, inner ends .500 apart) and the tip block. -->
   <rect class="fixture-support" x="201.3" y="102.5" width="164.95" height="55"/>
@@ -49,6 +49,6 @@
   <text class="label" x="120" y="292">removed: .0115–.0455</text>
   <text class="label" x="120" y="308">.090 over the strap (Z0 its top)</text>
   <text class="label" x="20" y="325">strap MHA-CH-13</text>
-  <text class="label" x="20" y="386">hub MHA-CH-12 (D bore hidden)</text>
+  <text class="label" x="20" y="386">hub MHA-CH-12 (Ø.246 pilot bore hidden)</text>
   <line class="leader" x1="200" y1="382" x2="340" y2="360"/>
 </svg>
