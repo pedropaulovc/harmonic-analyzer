@@ -67,7 +67,6 @@ from pd_transgear_knob_bush_geometry import (
     LENGTH,
     LENGTH_BAND,
     PRESS_DIA,
-    PRESS_DIA_BAND,
     PRESS_INTERFERENCE,
     SHOULDER_ROOT_R_MAX_MM,
     UNIT,
@@ -264,8 +263,10 @@ SECTION_POSITION_TOL_M = 1e-4
 # ring's thrust face, at y = 0 is the datum end the lengths run from; the
 # shoulder (datum A) at y = HUB_LENGTH; the rear face, the MHA-PD-16 cup's
 # thrust face, at y = LENGTH). The hub takes the title block's .XX row; the
-# press prints (Ø.4385) REF, turned to the measured MHA-PD-19 hole (its
-# callout; its "dia" field carries the spec's ANALYSIS envelope);
+# press prints (Ø.4385) REF, turned to the measured MHA-PD-19 hole for the
+# stated interference (its callout; declared as that reference and the
+# interference, the MHA-CH-12 land's form, so the traveler's pictures print
+# the fit to the measured mate and no analysis band: traveler review r2);
 # the shoulder's station its ±.001 and its root the printed R.005 MAX; the
 # length its ±.002; the bore its H7 band, reamed through after pressing in
 # MHA-PD-19 (MHA-PD-00), square to A, under the stated wall. Each ``span``
@@ -372,25 +373,25 @@ requirement(
     "step",
     kind="diameter",
     faces=(CylinderFace(PRESS_DIA),),
-    requirements=("dia", "diametral_interference"),
+    requirements=("diametral_interference",),
     fields={
         "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
         "span": ([HUB_LENGTH, LENGTH], ((_GEOM, "HUB_LENGTH"), (_GEOM, "LENGTH"))),
-        "dia": (
-            limits(PRESS_DIA, _P["PressDia"], PRESS_DIA_BAND, unit=UNIT),
-            ((_GEOM, "PRESS_DIA"), (_GEOM, "PRESS_DIA_BAND"), (_SELF, "SECTION_KEEP")),
+        "dia_ref": (
+            PRESS_DIA,
+            ((_GEOM, "PRESS_DIA"), "PRESS_DIA_TEXT_PREFIX", (_SELF, "SECTION_KEEP")),
         ),
-        "dia_nominal": (PRESS_DIA, ((_GEOM, "PRESS_DIA"),)),
         "diametral_interference": (
             list(PRESS_INTERFERENCE),
             ((_GEOM, "PRESS_INTERFERENCE"), "PRESS_CALLOUT"),
         ),
         "mate": (f"{PLATE_NUMBER} HOLE", ("PLATE_NUMBER", "PRESS_CALLOUT")),
+        "mate_nominal_dia": (PRESS_DIA, ((_GEOM, "PRESS_DIA"),)),
         "turn_to_measured_mate": (True, ("PRESS_CALLOUT",)),
         "callout": (PRESS_CALLOUT, ("PRESS_CALLOUT",)),
     },
-    precision={"dia": _P["PressDia"]},
+    precision={"dia_ref": _P["PressDia"]},
 )
 requirement(
     "bore",

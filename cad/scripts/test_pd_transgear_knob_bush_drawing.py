@@ -88,6 +88,11 @@ def test_the_press_is_turned_to_the_measured_hole() -> None:
     press = tuple(BUSH.PRESS_DIA + deviation for deviation in BUSH.PRESS_DIA_BAND)
     assert min(press) == pytest.approx(min(hole) + BUSH.PRESS_INTERFERENCE[0])
     assert max(press) == pytest.approx(max(hole) + BUSH.PRESS_INTERFERENCE[1])
+    assert BUSH.PRESS_DIA_MIN == pytest.approx(min(press))
+    # The traveler's pilot only reads the hole and is faced off before the
+    # press diameter is cut: the geometry carries no pilot.
+    assert not [name for name in vars(BUSH) if name.startswith("PILOT_")]
+    assert not hasattr(PLATE, "_STUB_BEHIND_PLATE_MIN_MM")
     assert spec.PRESS_DIA_TEXT_PREFIX == "(<MOD-DIAM>"
     assert spec.PRESS_DIA_TEXT_SUFFIX == ")"
 
@@ -268,7 +273,7 @@ def _worst_walls_in() -> dict[str, float]:
     run_off = (1.143 + 0.002) * math.tan(math.radians(0.3))
     breaks = 2.0 * 0.010
     return {
-        "press section over the bore": (0.4385 - 0.0005) / 2.0
+        "press section over the bore": (0.4385 + 0.0005) / 2.0
         - bore_r
         - run_off
         - breaks,
@@ -277,17 +282,17 @@ def _worst_walls_in() -> dict[str, float]:
 
 
 def test_walls_hold_at_the_printed_worst_case() -> None:
-    """Rule 17: the smallest press section (the traveler's slip pilot, at
-    most .0005 under the smallest reamed hole) and hub (.XX) over the
+    """Rule 17: the smallest press section (the least interference over the
+    smallest reamed hole) and hub (.XX) over the
     largest reamed bore, less 0.3 deg run-off over the longest bore and the
-    title-block break on both rims: press .0682 (between the floor and the
+    title-block break on both rims: press .0688 (between the floor and the
     target, stated on the sheet), hub .1043."""
     expected = _worst_walls_in()
     assert set(BUSH.WALLS) == set(expected)
     for name, worst_in in expected.items():
         assert BUSH.WALLS[name][1] == pytest.approx(_in(worst_in), abs=1e-6), name
     assert BUSH.WALLS["press section over the bore"][1] / 25.4 == pytest.approx(
-        0.06825, abs=5e-5
+        0.06875, abs=5e-5
     )
     assert BUSH.WALLS["hub over the bore"][1] >= WALL_TARGET_MM
     assert WALL_FLOOR_MM <= BUSH.WALL_WORST < WALL_TARGET_MM
@@ -320,7 +325,7 @@ def test_the_stated_wall_is_an_owner_minor_exception() -> None:
         " .080 target, with no geometry escape, are accepted as package-specific"
         " minor exceptions."
     )
-    press_min = f"{BUSH.PILOT_DIA_MIN / 25.4:.4f}"
+    press_min = f"{BUSH.PRESS_DIA_MIN / 25.4:.4f}"
     bore_max = f"{(BUSH.BORE_DIA + max(BUSH.BORE_DIA_LIMITS)) / 25.4:.4f}"
     longest = f"{(BUSH.LENGTH + BUSH.LENGTH_BAND) / 25.4:.3f}"
     for fact in (press_min, bore_max, longest):
