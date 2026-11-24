@@ -150,6 +150,11 @@ face_cutter_dia_mm = 12.7
 face_woc_mm = 6.35
 face_pass_y_mm = 5.08
 face_pass_x_mm = 14.0
+# Each end's deepest cut, the cuts' axial_doc_mm: the hub supplied at its
+# longest on the thinnest strap (.097, the drawing's .098 ±.001), the bond
+# its most off-centre, faced to the nominal end height; .0455 in, under the
+# setting's 1.27 mm (cam.py recomputes it from the export).
+face_depth_max_mm = 1.1557
 # --- Holes, Setup 3. Speeds: LittleMachineShop "Cutting Speeds", plain
 # carbon steels 1006-1026, drilling 60-100 ft/min; feeds: AutoDrill
 # "Suggested drilling feed rates", Stl, Carbon, 1/16 in .001, 1/4 in .003
@@ -346,7 +351,7 @@ sizing = "other"
 instruction = "Run RA01_first_end (M6 T1, the 1/2 in end mill; set 2450: the display rests near 2485, not 2380). Dry. Two passes along X at Z {{cad.hub_end_height_in:.3dot}}, the cutter's centre at Y +{{process.face_pass_y_mm:in.3dot}} then Y −{{process.face_pass_y_mm:in.3dot}}: each end takes {{cad.face_depth_min_in:.3dot}}–{{cad.face_depth_max_in:.3dot}}."
 settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
-  { name = "first end", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{cad.face_depth_max_mm}}", radial_woc_mm = "{{process.face_woc_mm}}", traverse_mm = [-14.0, 14.0] },
+  { name = "first end", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_depth_max_mm}}", radial_woc_mm = "{{process.face_woc_mm}}", traverse_mm = [-14.0, 14.0] },
 ]
 inspection = "The whole end is faced: no unfaced patch on it."
 gauge_checks = "other"
@@ -401,7 +406,7 @@ sizing = "other"
 instruction = "Run RA02_second_end_holes (M6 T1, the 1/2 in end mill; set 2450, display near 2485). Dry. The second end at Z {{cad.hub_end_height_in:.3dot}}, the same two passes as RA01."
 settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
-  { name = "second end", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{cad.face_depth_max_mm}}", radial_woc_mm = "{{process.face_woc_mm}}", traverse_mm = [-14.0, 14.0] },
+  { name = "second end", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_depth_max_mm}}", radial_woc_mm = "{{process.face_woc_mm}}", traverse_mm = [-14.0, 14.0] },
 ]
 
 [[setups.operations]]
