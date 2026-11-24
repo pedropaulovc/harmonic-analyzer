@@ -403,7 +403,7 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "Still clamped, blow out the chips: the pivot bore."
-inspection = "Pivot bore: the .194 minus pin enters (GO). GO fails: stop and tell the owner."
+inspection = "Pivot bore: the .194 minus pin enters (GO) and the pin-gauge set's .200 pin does not enter, by hand, never forced. Either fails: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
