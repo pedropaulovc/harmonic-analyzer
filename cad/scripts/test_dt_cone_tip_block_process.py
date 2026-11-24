@@ -162,12 +162,10 @@ def test_the_saw_and_arbor_sizes_are_their_inventory_records() -> None:
     # screw diameter or more at the inferred pitch, before the screw is torqued.
     assert arbor["keyed"] is False
     assert p["saw_clamp_torque_nm"] == arbor["clamp_torque_nm_inferred"]
-    dia, pitch = (
-        float(size)
-        for size in arbor["screw_thread_inferred"].removeprefix("M").split(" x ")
+    assert (
+        f"M{p['saw_screw_dia_mm']:g} x {p['saw_screw_pitch_mm']:g}"
+        == arbor["screw_thread_inferred"]
     )
-    assert p["saw_screw_pitch_mm"] == pitch
-    assert p["saw_screw_engagement_min_mm"] == dia
     assert arbor["screw_engagement_in"] == "to_measure"
     # The saw and the arbor that were to buy are no tools of the plan, and the
     # limits laid out on them (that blade's upper bound, the spacer-type
@@ -266,7 +264,8 @@ def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -
         ("saw_screw_stand_max_mm", 12.7, "saw_below_max_mm"),
         ("saw_below_stack_top_mm", 9.0, "saw_below_stack_top_mm"),
         ("spacer_under_max_mm", 0.02, "spacer_under_max_mm"),
-        ("saw_screw_turns_min", 5.0, "saw_screw_turns_min"),
+        ("saw_screw_turns_min", 6.0, "saw_screw_turns_min"),
+        ("saw_screw_engagement_min_mm", 4.0, "under one screw diameter"),
         ("saw_nose_above_min_mm", 5.0, "saw_nose_above_min_mm"),
         ("saw_arbor_body_dia_mm", 44.45, "saw_reach_max_mm"),
         ("saw_drive_torque_max_nm", 44.2, "saw_drive_torque_max_nm"),

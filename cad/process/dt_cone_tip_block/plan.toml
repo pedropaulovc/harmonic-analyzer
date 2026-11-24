@@ -287,13 +287,15 @@ saw_arbor_nose_to_cap_mm = 35.56
 # "to_measure": a .635 screw through the .50 cap may hold by as little as
 # .135 in, .43 D, and strip near the 11 kN). So Setup 10 counts the
 # engagement before the screw is torqued: turns from the thread's first bite
-# to seated × saw_screw_pitch_mm, at least saw_screw_engagement_min_mm (1 D
-# of the inferred M8), which is saw_screw_turns_min turns (cam.py). Under
-# it, or the 5 mm key not fitting: no torque, and the owner is told.
+# to seated × saw_screw_pitch_mm, at least saw_screw_engagement_min_mm (one
+# saw_screw_dia_mm of the inferred M8), which is saw_screw_turns_min turns,
+# to the half turn (cam.py). Under it, or the 5 mm key not fitting: no
+# torque, and the owner is told. The same four parameters as #3505's plans.
 saw_clamp_torque_nm = 20.0
+saw_screw_dia_mm = 8.0
 saw_screw_pitch_mm = 1.25
 saw_screw_engagement_min_mm = 8.0
-saw_screw_turns_min = 6.4
+saw_screw_turns_min = 6.5
 saw_clamp_preload_kn = 11.0
 saw_drive_friction = 0.14
 saw_drive_torque_max_nm = 22.1
@@ -1152,8 +1154,8 @@ gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Before any torque: run the cap's screw in by hand with the 5 mm hex key, counting the turns from the thread's first bite until its head seats. Snug, no more."
-inspection = "The 5 mm key fits the socket, and the count is {{process.saw_screw_turns_min:g}} turns or more ({{process.saw_screw_engagement_min_mm:g}} mm of thread at {{process.saw_screw_pitch_mm:g}} mm a turn: the screw's full diameter engaged). The screw's thread, key and torque are assumed, not read off the arbor: with fewer turns, or another key fitting, the torque below may strip it. Then leave it snug, stop and tell the owner."
+instruction = "Before any torque: run the cap's screw in by hand with the 5 mm hex key until its head seats, counting its turns from the first bite of the thread: N. Snug, no more."
+inspection = "N {{process.saw_screw_turns_min:.1f}} or more: N × {{process.saw_screw_pitch_mm:.2f}} mm of thread holds the cap, {{process.saw_screw_engagement_min_mm:.0f}} mm (one screw diameter) or more. Fewer, or the 5 mm key does not fit (the screw's thread, key and torque are assumed, not read off the arbor): so few threads may strip at the torque below. Leave the screw snug, do not torque it, do not start the spindle; stop and tell the owner."
 gauge_checks = "other"
 feed = "hand"
 

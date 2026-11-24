@@ -591,7 +591,6 @@ cite = ["Owner (Pedro) 2026-11-24 photo research/shop-evidence/2026-11-24/saws-a
 note = "On hand (owner, 2026-11-24). Held in the 1/2 in R8 collet."
 
 
-
 # Lathe inserts, insert code CCMT-32.51, one each. No holder for them is on
 # the packing list; their fit to tools.boring-bar-s10r-sclcr3 is not asserted.
 [tools.lathe-inserts-ccmt-32-51]
