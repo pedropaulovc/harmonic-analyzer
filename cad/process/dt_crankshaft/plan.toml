@@ -34,36 +34,39 @@
 # scale accuracy and the drills' walk (proven on the slug; the scale's
 # accuracy is not recorded: gauges.lathe-x-dro), the shaft not moving while
 # cut (the stub swept again before unclamping); heat is assumed negligible.
-# The slug's and the shaft's offsets are read with the .0930 GO pin in the
-# hole and the micrometer over pin and stub; that reading is good to about
-# ±.0003 (±8 um: the hole's size taken at mid band, ±.000125, the micrometer
-# and the stub's half). The slug's targets are corrected only for an error
-# the reading resolves (over .0003), and the slug passes inside the drawing's
-# band less that uncertainty (±.0006); the shaft is accepted to the drawing's
-# band and never re-cut.
+# The slug's and the shaft's offsets are read with the .0930 plus pin (a
+# measuring rod here, not a gauge of the hole) in the hole and the
+# micrometer over pin and stub; that reading is good to about ±.0003 (±8 um:
+# the hole's size taken at mid band, ±.000125, the micrometer and the stub's
+# half). The slug's targets are corrected only for an error the reading
+# resolves (over .0003), and the slug passes inside the drawing's band less
+# that uncertainty (±.0006); the shaft is accepted to the drawing's band and
+# never re-cut.
 #
-# Note 3, the matched fits: Setup 3 gauges the three mate bores with Class ZZ
-# pins before finishing (MHA-DT-31's hub bore .3760-.3765, MHA-DT-05's crank
-# bore .4385-.4390, MHA-DT-10's bore .3135-.3140); a bore in its band and the
-# diameter in the drawing's band give the .0010-.0023 clearance. Owner ruling
-# 2026-11-23, tool audit Q11: "Both bores dia .4385 +.0005/0 (7/16 over
-# reamer of the Shars set), both journals .4375 0/-.0008" (they were .4500
-# and .4490 0/-.0008).
+# Note 3, the matched fits: the crankshaft is made last. The three mates'
+# bores are their reamers' cuts with no band (MHA-DT-31 .3760, MHA-DT-05
+# .4385, MHA-DT-10 .3135; fit audit 2026-11-23, MHA-DT-31.bore__MHA-DT-11
+# .hub_shaft, MHA-DT-11.journals, MHA-DT-10.bore__MHA-DT-11.pinion_seat), so
+# no pin gauges the bores: each diameter is turned to its reamer's bore less
+# .0010-.0023 on the micrometer, and the 16T and the post are tried on their
+# diameters from F before the centre goes back in; the hub is tried on the
+# shank at the bench. Owner ruling 2026-11-23, tool audit Q11: "Both bores dia
+# .4385 +.0005/0 (7/16 over reamer of the Shars set), both journals .4375
+# 0/-.0008" (the journals now print as REF under note 3).
 #
-# Owner ruling 2026-11-23 (tool audit Q1), verbatim: "ZZ singles per the
-# record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept that good
-# holes near a limit may be refused; the traveler mikes each pin so the real
-# window is known per pin." Each band's GO is a plus pin at its low limit,
-# its NO-GO a minus pin at its high limit; Setup 3 mikes every pin and the
-# .0930 reamer before any of them is used.
+# The drive-pin holes are the .0930 reamer's, no band (fit audit 2026-11-23,
+# MHA-DT-11.drive_pin_holes): MHA-DT-VN-67 pressing in at MHA-DT-00 step 4 is
+# their acceptance, so no NO-GO is used; the .0930 plus pin stays as the
+# reading rod for the offsets, the depth and the pins' line (owner ruling
+# 2026-11-23, tool audit Q1: "the traveler mikes each pin"; its .0935 minus
+# partner, zz-pins-0930-0935, still serves MHA-PD-22).
 #
 # To order before Setup 7: the drill chuck on its straight arbor
 # (holders.drill-chuck-jt33-straight-1-2), the 1/8 carbide spot drill
 # (tools.spot-drill-carbide-1-8), the #54 taper-length drill
 # (tools.drill-54-taper-length), the .0930 and .4385 reamers
-# (tools.reamer-0930, tools.reamer-4385), the Class ZZ pins
-# (zz-pins-0930-0935, zz-pins-3760-3765, zz-pins-4385-4390,
-# zz-pins-3135-3140); to make: the jig (fixtures.dt-crankshaft-drive-pin-jig).
+# (tools.reamer-0930, tools.reamer-4385), the .0930 plus pin
+# (zz-pins-0930-0935); to make: the jig (fixtures.dt-crankshaft-drive-pin-jig).
 #
 # NC (cam:dt_crankshaft, cad/process/dt_crankshaft/cam.py): PK01_cross_hole.
 # The program name, the [parameters] and the milling_cuts names are a
@@ -193,7 +196,7 @@ drill_43_tip_in = 0.202
 knockout_tip_in = 0.32
 # The .0930 reamer's chamfer length is not measurable with the shop's
 # gauges: the slug is reamed with the tip .010 past the .1555 full-diameter
-# depth, its full-diameter depth read with the GO pin, and the difference
+# depth, its full-diameter depth read with the .0930 plus pin, and the difference
 # (the chamfer allowance c) written and used for the shaft.
 ream_tip_in = 0.1655
 # The DTI's X0 sweep: its front and back readings agree within .010 mm
@@ -206,7 +209,7 @@ dti_x0_mm = 0.01
 # outside the drawing's band the job stops for a check of the jig and slide.
 pin_uncertainty_in = 0.0003
 pin_guard_in = 0.0006
-# The .0930 GO pin and the hole's mid size, for the offset from the
+# The .0930 plus pin and the hole's mid size, for the offset from the
 # micrometer reading over pin and stub: offset = reading − stub/2 + .09325/2
 # − .0930 (the pin pushed onto the hole's inner wall by the anvil).
 pin_go_in = 0.093
@@ -259,7 +262,7 @@ cross_projection_min_mm = 27.0
 spot_feed_per_min_mm = 45.72
 drill_9_feed_per_min_mm = 76.2
 # The pins' line level within 1° before the cross hole (the drawing's ±1°):
-# the DTI on the two .0930 GO pins, 14.0 mm apart, read within 0.10 mm
+# the DTI on the .0930 plus pin in each hole, 14.0 mm apart, read within 0.10 mm
 # (.10 / 14.0 = 0.4°).
 pin_level_dti_mm = 0.1
 # Bench: the cross hole's .196 GO and .200 NO-GO (gauges.pin-gauges, class ZZ
@@ -346,26 +349,8 @@ status = "to_order"
 
 [[tools]]
 id = "pin-plugs"
-name = "Class ZZ pins: .0930 plus (GO) and .0935 minus (NO-GO)"
+name = "Class ZZ pin .0930 plus: the offset and depth reading rod (the pair's .0935 minus is not used here)"
 ref = "zz-pins-0930-0935"
-status = "to_order"
-
-[[tools]]
-id = "hub-plugs"
-name = "Class ZZ pins: .3760 plus (GO) and .3765 minus (NO-GO)"
-ref = "zz-pins-3760-3765"
-status = "to_order"
-
-[[tools]]
-id = "post-plugs"
-name = "Class ZZ pins: .4385 plus (GO) and .439 minus (NO-GO)"
-ref = "zz-pins-4385-4390"
-status = "to_order"
-
-[[tools]]
-id = "pinion-plugs"
-name = "Class ZZ pins: .3135 plus (GO) and .314 minus (NO-GO)"
-ref = "zz-pins-3135-3140"
 status = "to_order"
 
 [[tools]]
@@ -466,23 +451,13 @@ cut_diameter_mm = "{{process.bar_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Note 3, before any finishing pass: on the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the eight Class ZZ pins: .3760 plus and .3765 minus, .4385 plus and .439 minus, .3135 plus and .314 minus, .0930 plus and .0935 minus; and the .0930 reamer across two opposite margins at its front end. Write the nine readings here, and each pin's reading on its tag."
-inspection = "Each plus (GO) pin reads its low limit to .0002 over; each minus (NO-GO) pin its high limit to .0002 under: a pin outside that is not used. The .0930 reamer reads under the .0935 pin's reading, else it is not used: stop and tell the owner."
-gauge_checks = [{ gauge = "micrometers", band_mm = [9.5504, 9.5631] }, { gauge = "micrometers", band_mm = [11.1379, 11.1506] }, { gauge = "micrometers", band_mm = [7.9629, 7.9756] }, { gauge = "micrometers", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }]
+instruction = "Before any finishing pass: on the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the .0930 plus pin and write the reading here and on its tag: Setup 7 reads the drive-pin offsets, the depth and the pins' line over it."
+inspection = "The pin reads .0930 to .0932; outside that it is not used: stop and tell the owner."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Accept a hole its GO pin enters and its NO-GO pin does not. With the pins at their size limits only .3762–.3763, .4387–.4388, .3137–.3138 and .0932–.0933 are sure to pass; a good bore within .0002 of a band limit may be refused."
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Gauge the mates' bores. MHA-DT-31's hub bore (the stub's mate): the .3760 GO pin enters, the .3765 NO-GO does not. MHA-DT-05's crank bore (the journals' mate): the .4385 GO enters, the .439 NO-GO does not. MHA-DT-10's bore (the pinion seat's mate): the .3135 GO enters, the .314 NO-GO does not. Write the results here."
-inspection = "GO enters, NO-GO does not: hub bore Ø.3760–.3765, crank bore Ø.4385–.4390, pinion bore Ø.3135–.3140: then each diameter below, in its band, gives note 3's .0010–.0023 clearance."
-gauge_checks = [{ gauge = "zz-pins-3760-3765", band_mm = [9.5504, 9.5631] }, { gauge = "zz-pins-4385-4390", band_mm = [11.1379, 11.1506] }, { gauge = "zz-pins-3135-3140", band_mm = [7.9629, 7.9756] }]
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "A mate's bore outside its band: stop; that part goes back to its own traveler, and the matching diameter here is not finished until its mate gauges in band."
+instruction = "Note 3: the 16T MHA-DT-10 (bore reamed .3135) and the cone pivot post MHA-DT-05 (crank bore reamed .4385) at the lathe, clean and dry, for the trials after the finishing passes; the hub MHA-DT-31 (bore reamed .3760) at the bench for Setup 9."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -513,6 +488,17 @@ sizing = "other"
 instruction = "The pinion seat from F to Z-{{cad.seat_step_station_in:.2dot}} in .010 cuts per side to Ø{{cad.pinion_seat_dia_min_in:.4dot}}–{{cad.pinion_seat_dia_max_in:.4dot}}, aiming {{cad.pinion_seat_dia_in:.4dot}}, the last pass light; stop .005 short of the step."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.pinion_seat_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Note 3 trials, spindle stopped: back the dead centre out of F and the tailstock clear. Slide MHA-DT-10 onto the pinion seat from F, then MHA-DT-05's crank bore over F onto the journal diameter; take each off. Bring the centre back into F, a dab of grease, the quill snug and locked."
+inspection = "Each slides on by hand, no force (the drawing's note 3: each diameter turned to its mate's bore less .0010–.0023)."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "A mate that will not go on: another .0002 a side on that diameter, the centre back in, and try again; never below the diameter's low limit above. Still refused at that limit: the mate's bore is small; stop and tell the owner (that part goes back to its own traveler)."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -947,29 +933,27 @@ peck = { step_mm = 0.508, retract = "full" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The slug out (the jig, the cross slide and the drill chuck untouched). Each hole: the .0930 GO enters, the .0935 NO-GO does not."
-inspection = "GO enters, NO-GO does not: holes Ø{{cad.drive_pin_1_dia_min_in:.4dot}}–{{cad.drive_pin_1_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "zz-pins-0930-0935", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }]
+instruction = "The slug out (the jig, the cross slide and the drill chuck untouched). Each hole: the .0930 plus pin goes in (the hole is the reamer's, drawing: no band; it is the reading rod for what follows)."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The NO-GO entering: stop and tell the owner (these are the .0930 reamer's trial holes). The GO refused: the re-ream ops at the end of this setup."
+instruction = "The pin refused: the re-ream ops at the end of this setup."
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "With the GO pin in each hole in turn, mike over the pin and the stub's far side beside the spigot face; offset = reading − stub/2 + .09325/2 − the GO's written reading (the anvil pushes the pin onto the hole's inner wall). Write both offsets."
+instruction = "With the .0930 plus pin in each hole in turn, mike over the pin and the stub's far side beside the spigot face; offset = reading − stub/2 + .09325/2 − the pin's written reading (the anvil pushes the pin onto the hole's inner wall). Write both offsets."
 inspection = "Each offset {{cad.drive_pin_1_offset_min_in:.4dot}}–{{cad.drive_pin_1_offset_max_in:.4dot}} (the drawing's band); the slug passes within {{process.pin_guard_in:.4dot}} of {{cad.drive_pin_1_offset_in:.4dot}} (the band less the reading's ±{{process.pin_uncertainty_in:.4dot}})."
-gauge_checks = [{ gauge = "zz-pins-0930-0935", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }, { gauge = "micrometers", band_mm = [6.9848, 7.0152] }]
+gauge_checks = [{ gauge = "micrometers", band_mm = [6.9848, 7.0152] }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Slug hole depth: mike the GO pin's length; stand it in a hole, where it stops at the reamer's chamfer; the calipers' depth rod from the spigot face to the pin's top reads its protrusion. Depth = the pin's length − the protrusion. Write c = {{process.ream_tip_in:.4dot}} − that depth: the reamer's chamfer allowance for the shaft."
+instruction = "Slug hole depth: mike the .0930 plus pin's length; stand it in a hole, where it stops at the reamer's chamfer; the calipers' depth rod from the spigot face to the pin's top reads its protrusion. Depth = the pin's length − the protrusion. Write c = {{process.ream_tip_in:.4dot}} − that depth: the reamer's chamfer allowance for the shaft."
 inspection = "c between .000 and .020 (a .0930 chucking reamer's chamfer); outside it, read again."
 gauge_checks = [{ gauge = "calipers", band_mm = [3.6957, 4.2037] }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "c still outside .000–.020 on a second reading: stop, do not ream the shaft, and tell the owner (check the GO pin's seating and the reamer's chamfer)."
+instruction = "c still outside .000–.020 on a second reading: stop, do not ream the shaft, and tell the owner (check the pin's seating and the reamer's chamfer)."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -989,7 +973,7 @@ instruction = "An offset outside {{cad.drive_pin_1_offset_min_in:.4dot}}–{{cad
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A slug hole the GO does not enter: ream it again by the re-ream ops at the end of this setup, its tip to Z-{{process.ream_tip_in:.4dot}} as at first (not the shaft's .1555 + c), then read it as above."
+instruction = "A slug hole the .0930 plus pin does not enter: ream it again by the re-ream ops at the end of this setup, its tip to Z-{{process.ream_tip_in:.4dot}} as at first (not the shaft's .1555 + c), then read it as above."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -1057,13 +1041,13 @@ instruction = "Moved by more than {{process.dti_x0_mm:.3f}} mm: the next op's re
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The shaft out. Each hole: the .0930 GO enters, the .0935 NO-GO does not; offset as for the slug. Depth: mike the GO pin's length; stand it in the hole, where it stops on the step to the Ø.089 drilled hole below the ream; the calipers' depth rod from the spigot face to the pin's top reads its protrusion. Depth = the pin's length − the protrusion."
-inspection = "Holes Ø{{cad.drive_pin_1_dia_min_in:.4dot}}–{{cad.drive_pin_1_dia_max_in:.4dot}}; offsets {{cad.drive_pin_1_offset_min_in:.4dot}}–{{cad.drive_pin_1_offset_max_in:.4dot}}; depth {{cad.drive_pin_1_depth_min_in:.4dot}}–{{cad.drive_pin_1_depth_max_in:.4dot}}."
-gauge_checks = [{ gauge = "zz-pins-0930-0935", band_mm = "{{cad.drive_pin_1_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.drive_pin_1_offset_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.drive_pin_1_depth_band_mm}}" }]
+instruction = "The shaft out. Each hole: the .0930 plus pin goes in; offset as for the slug. Depth: mike the pin's length; stand it in the hole, where it stops on the step to the Ø.089 drilled hole below the ream; the calipers' depth rod from the spigot face to the pin's top reads its protrusion. Depth = the pin's length − the protrusion."
+inspection = "Offsets {{cad.drive_pin_1_offset_min_in:.4dot}}–{{cad.drive_pin_1_offset_max_in:.4dot}}; depth {{cad.drive_pin_1_depth_min_in:.4dot}}–{{cad.drive_pin_1_depth_max_in:.4dot}}. The holes' size is the reamer's: MHA-DT-VN-67 pressing in at MHA-DT-00 accepts them."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.drive_pin_1_offset_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.drive_pin_1_depth_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A hole the GO does not enter: the work back in the jig as Holding says, set screw snug only. The .0930 reamer in the drill chuck, {{process.ream_stickout_in:.2f}} in out; the cross slide to that hole's proved target, the move ending in −X, gib locked."
+instruction = "A hole the .0930 plus pin does not enter: the work back in the jig as Holding says, set screw snug only. The .0930 reamer in the drill chuck, {{process.ream_stickout_in:.2f}} in out; the cross slide to that hole's proved target, the move ending in −X, gib locked."
 feed = "hand"
 
 [[setups.operations]]
@@ -1093,7 +1077,7 @@ feed = "carriage handwheel, steady, cutting oil"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "An offset outside {{cad.drive_pin_1_offset_min_in:.4dot}}–{{cad.drive_pin_1_offset_max_in:.4dot}}, a depth outside its band, or a hole the NO-GO enters: the shaft is scrap (a reamed hole cannot be moved). Make a new shaft and a new slug (Setups 1–6); in Setup 7 the jig is not bored again: start at the slug's sweep, from the last written targets."
+instruction = "An offset or a depth outside its band: the shaft is scrap (a reamed hole cannot be moved). Make a new shaft and a new slug (Setups 1–6); in Setup 7 the jig is not bored again: start at the slug's sweep, from the last written targets."
 
 [[setups]]
 machine_kind = "other"
@@ -1109,7 +1093,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.outboard_journal_dia_m
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.part_length_mm}}"], clamp_mm = ["{{process.left_overhang_mm}}", "{{process.part_length_mm}}"], section_mm = { diameter = "{{cad.hub_shaft_dia_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Before tightening: the pins' line level. The .0930 GO pin in one drive-pin hole, the DTI in the spindle on its top beside the stub; read. Move the pin to the other hole and read there. Roll the shaft and read both again until the two readings agree. Write them."
+instruction = "Before tightening: the pins' line level. The .0930 plus pin in one drive-pin hole, the DTI in the spindle on its top beside the stub; read. Move the pin to the other hole and read there. Roll the shaft and read both again until the two readings agree. Write them."
 inspection = "The pin's top in the two holes within {{process.pin_level_dti_mm:.2f}} mm of each other (the line within 0.4°; the drawing's ±1°)."
 gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{process.pin_level_dti_mm}}"] }]
 feed = "hand"
@@ -1129,7 +1113,7 @@ instruction = "Over {{process.pin_level_dti_mm:.2f}} mm after tightening: open t
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Take the GO pin out of the drive-pin hole."
+instruction = "Take the .0930 plus pin out of the drive-pin hole."
 feed = "hand"
 
 [[setups.operations]]
@@ -1226,6 +1210,16 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "A raised burr on the stub: stone it off and mike again. The hole out of its band or station: the shaft is scrap; start again from Setup 1."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Note 3: slide the hub MHA-DT-31 (bore reamed .3760), clean and dry, onto the shank over the dome to the spigot face; take it off."
+inspection = "It slides on by hand, no force (the drawing's note 3)."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The hub refused with the shank in its band: the hub's bore is small; stop and tell the owner (the hub goes back to its own traveler)."
 feed = "hand"
 
 [[setups.operations]]

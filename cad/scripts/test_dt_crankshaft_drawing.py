@@ -609,3 +609,27 @@ def test_centres_note_field_clears_front_witnesses_title_block_and_caption() -> 
     match_floor = drawing.PINION_PIN_NOTE_FIELD[1]
     assert max(y1, drawing.FAR_END_FRONT_RIM_WINDOW[3]) < match_floor
     assert drawing.CENTRES_NOTE_XY[0] > drawing.FAR_END_FRONT_RIM_PICK[0]
+
+
+def test_turned_fits_print_ref_and_the_holes_print_the_reamer() -> None:
+    # Fit audit 2026-11-23 (MHA-DT-31.bore__MHA-DT-11.hub_shaft,
+    # MHA-DT-11.journals, MHA-DT-10.bore__MHA-DT-11.pinion_seat,
+    # MHA-DT-11.drive_pin_holes): the crankshaft is made last, so each fit
+    # diameter is a REF turned to its mate's reamed bore (note 3, the one
+    # acceptance), and the drive-pin holes print the .0930 reamer with no
+    # band, the pressed dowel their acceptance.
+    fits = {"ShaftDiaDim", "JournalDiaDim", "PinionSeatDiaDim"}
+    assert fits <= spec.REFERENCE_DIMENSIONS
+    assert fits <= spec.DIAMETER_REFERENCES
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    toleranced = set(
+        re.findall(
+            r"set_dimension_\w+_tolerance\(\s*adapter,\s*\"\w+\",\s*f?\"([A-Za-z]+)", source
+        )
+    )
+    assert "SpigotDiaDim" in toleranced
+    assert not toleranced & (fits | {"DrivePinHoleDia"})
+    assert notes.FIT_NOTE.startswith("3. TURN EACH FIT TO ITS MATE'S BORE LESS .0010-.0023:")
+    assert notes.DRIVE_PIN_CALLOUT.splitlines()[0] == (
+        "MHA-DT-VN-67 PRESSES IN, NOT BY HAND; DRIVES MHA-PD-09"
+    )
