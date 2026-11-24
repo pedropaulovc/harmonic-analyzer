@@ -488,6 +488,18 @@ id = "saw-arbor"
 name = "R8 stepped saw arbor (owned): 1 in pilot step, body and cap 1.25 across, cap .50 thick, M8 x 1.25 countersunk screw (5 mm hex key), not keyed"
 ref = "saw-arbor-r8-stepped"
 [[tools]]
+id = "torque-wrench"
+name = "Torque wrench covering 20 N·m (15 ft·lb)"
+ref = "torque-wrench"
+[[tools]]
+id = "hex-bit-5mm"
+name = "5 mm hex bit or socket for the torque wrench (owner to confirm)"
+ref = "hex-bit-5mm"
+[[tools]]
+id = "square"
+name = "12 in combination square: its blade as straightedge"
+ref = "combination-square-starrett-c11h-12"
+[[tools]]
 id = "dti"
 name = "Lever indicator, 0.001 mm, on the magnetic base"
 ref = "dti"
@@ -734,11 +746,13 @@ inspection = "Loads after the first: both witness lines on the saw (drawn below)
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "First load, and whenever the screw has been loosened: wipe the arbor's shoulder, the saw's faces round its hole and the cap's face clean and dry (friction alone drives the saw). Saw on the pilot's 1 in step, up against the shoulder, teeth cutting with M3 (clockwise from above); cap under it; its M8 screw from below, 5 mm hex key on the torque wrench: {{process.saw_clamp_torque_nm:.0f}} N·m (15 ft·lb), spindle held as for the drawbar."
+instruction = "First load, and whenever the screw has been loosened: wipe the arbor's shoulder, the saw's faces round its hole and the cap's face clean and dry (friction alone drives the saw). Saw on the pilot's 1 in step, up against the shoulder, teeth cutting with M3 (clockwise from above); cap under it; its M8 screw from below, the 5 mm hex bit on the torque wrench: {{process.saw_clamp_torque_nm:.0f}} N·m (15 ft·lb), spindle held as for the drawbar."
+inspection = "No torque wrench covering 15 ft·lb with a 5 mm hex bit to hand, or the screw not torqued with it: stop: run no saw program; tell the owner."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First load only, before the spindle starts: lay a 6 in rule's edge across the cap's lower face, over the screw's head. If the head stands past the face, measure how far: the calipers' beam end on the head, the depth rod run up to the cap's face."
+instruction = "First load only, before the spindle starts: lay the combination square's blade on edge across the cap's lower face, over the screw's head. If the head stands past the face, measure how far: the calipers' beam end on the head, the depth rod run up to the cap's face."
 inspection = "The head flush with the cap's face or under it, or standing {{process.saw_screw_head_stand_max_mm:in.3dot}} or less: CA02, CA04 and their air proofs carry the cap and that much head clear over the bars. More: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.saw_screw_head_stand_max_mm}}"] }]
 
