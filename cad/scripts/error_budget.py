@@ -1639,7 +1639,10 @@ def closed_form_terms(
     }
     # Lost motion on load reversal: the strap's diametral clearance shifts the
     # rod by c when the ordinate changes sign -- DC for a fixed-sign station.
-    strap_c = ch_connecting_rod_spec.RING_BORE_DIA - dt_cylinder_gear_spec.CAM_DIA
+    # Booked at the most the printed bands allow (MHA-CH-03 bore 1.213
+    # +.005/0 on the MHA-DT-12 cam 1.205 0/-.002: .015), not the nominals'
+    # .008.
+    strap_c = ch_connecting_rod_spec.STRAP_DIAMETRAL_CLEARANCE[1]
     lost_motion = {
         "strap_clearance_mm": strap_c,
         "dc_step_pct_of_channel_amplitude": 100.0 * strap_c / nom.ecc,
