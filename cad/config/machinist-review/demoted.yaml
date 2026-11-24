@@ -83,8 +83,6 @@ demoted:
   pd_transgear_removable: fit-batch-pd
   pn_pen_assembly: fit-batch-pn
   pn_pen_hanger: fit-batch-pn
-  pn_pen_rod: fit-batch-pn
-  pn_pen_v_block: fit-batch-pn
   sh_column_clamp_back: fit-batch-sh
   sh_column_clamp_front: fit-batch-sh
   sm_gooseneck: fit-batch-sm

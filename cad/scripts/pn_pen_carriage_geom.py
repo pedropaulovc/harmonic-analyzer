@@ -558,11 +558,12 @@ def groove_landing_spare() -> tuple[float, float]:
     SetScrewY below the shoulder (both .XX on the v-block sheet); the walls
     are .XXX from the shoulder on the rod sheet.  The point is the vendor's
     45 deg x one-pitch cup-end chamfer, taken where it crosses the pivot-bore
-    wall, .010 above the cup on the floor: wider than the cup's rim, so that
-    is what must pass between the walls.  The deepest printed floor in the
-    largest reamed bore lifts that crossing to .01275 and costs about .0027
-    a side; test_pn_pen_carriage_geom proves the spare at that full worst
-    case too."""
+    wall, .011 above the cup on the floor in the nominal #30 bore (owner
+    ruling 2026-11-24, fit audit question 20): wider than the cup's rim, so
+    that is what must pass between the walls.  The deepest printed floor in
+    the largest drilled bore lifts that crossing to .01575 and costs about
+    .0045 a side; test_pn_pen_carriage_geom proves the spare at that full
+    worst case too."""
     height = _printed_limits(vb, "Height", vb.BLOCK_HEIGHT)
     screw_y = _printed_limits(vb, "SetScrewY", vb.SET_SCREW_Y)
     axis_min, axis_max = height[0] - screw_y[1], height[1] - screw_y[0]

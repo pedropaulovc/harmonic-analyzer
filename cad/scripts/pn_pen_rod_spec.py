@@ -23,11 +23,10 @@ import math
 
 import _config
 from _fit_deviations import deviations
-from _fit_ream_h7 import REAM_H7
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 # #290: the sheet prints decimal inch (``drawing_unit: in``).  Lengths stay
 # millimetres, each the exact decimal of its printed inch value, except the
@@ -69,16 +68,19 @@ if not (
 # (pn_pen_carriage_geom asserts the engagement).
 SQUARE_LENGTH = 112.0  # closure (module docstring); prints 4.41
 
-# Turned pivot end: a sliding fit in the v-block's .126 reamed pivot bore
-# (pn_pen_v_block_spec.PIVOT_BORE_DIA, #290 owner ruling: 4 mm -> .126),
-# turned concentric with the square.  The pivot only has to drop into the
-# bore by hand and turn while the pen's yaw is set: the block's cup-point set
-# screw then clamps it (MHA-PN-00 steps 4A-4B), so nothing runs in the bore
-# and any clearance is taken up by the clamp (#2437).  -.0005/-.0020 is a
-# .0015 band, inside the shop's turned-diameter row (+/-.0005 holds .001), so
-# it is turned to number with a micrometer, not to a measured bore.
+# Turned pivot end (#290 owner ruling: 4 mm -> .126), turned concentric with
+# the square, in the v-block's #30 drilled pivot bore (owner ruling
+# 2026-11-24, fit audit question 20, option A: the rod left as it is).  The
+# pivot only has to drop into the bore by hand and turn while the pen's yaw
+# is set: the block's cup-point set screw then clamps it (MHA-PN-00 steps
+# 4A-4B), so nothing runs in the bore and any clearance is taken up by the
+# clamp (#2437).  -.0005/-.0020 is a .0015 band, inside the shop's
+# turned-diameter row (+/-.0005 holds .001), so it is turned to number with a
+# micrometer, not to a measured bore; it keeps the set screw's cup on the
+# relief groove's floor (pn_pen_carriage_geom; the reason is in
+# cad/config/necessity/pn-pen-rod.yaml).
 PIVOT_DIA = 3.2004  # .126
-PIVOT_BAND = (-0.0127, -0.0508)  # -.0005/-.0020: .0005-.0025 in the reamed bore
+PIVOT_BAND = (-0.0127, -0.0508)  # -.0005/-.0020: .0030-.0085 in the #30 bore
 PIVOT_LENGTH = 10.414  # .41, shoulder to end: stops clear above the v-block relief roof
 
 # Adjuster stud tap in the top face. #0-80 is the largest thread whose tap
@@ -237,10 +239,14 @@ if DRAWING_BANDS[("RodProfile", "Section")] != DRAWING_BANDS[("Rod", "Depth")]:
 # two lines of words would overrun the border from the diameter's
 # left-hanging block).
 PIVOT_FIT_NOTE = 1
-# The pivot in the v-block's REAM_H7 bore (pn_pen_v_block_spec.PIVOT_BORE_BAND,
-# which imports this module): .0005-.0025 diametral, printed as REF.
-_BORE_LOW, _BORE_HIGH = deviations(REAM_H7)
-_PIN_LOW, _PIN_HIGH = deviations(PIVOT_BAND)
+# The pivot in the v-block's #30 drilled bore (owner ruling 2026-11-24, fit
+# audit question 20; pn_pen_v_block_spec.PIVOT_BORE_DIA and PIVOT_BORE_BAND,
+# a module that imports this one, so the drill's size and the DRILLED HOLES
+# row are restated here and test_pn_pen_rod_drawing pins them equal):
+# .0030-.0085 diametral before the set screw clamps it, printed as REF.
+PIVOT_BORE_DIA = 3.2639  # .1285, a #30 drill
+_BORE_LOW, _BORE_HIGH = PIVOT_BORE_DIA, PIVOT_BORE_DIA + drilled_oversize_mm(unit=UNIT)
+_PIN_LOW, _PIN_HIGH = (PIVOT_DIA + deviation for deviation in deviations(PIVOT_BAND))
 PIVOT_CLEARANCE_MM = (_BORE_LOW - _PIN_HIGH, _BORE_HIGH - _PIN_LOW)
 
 
@@ -260,7 +266,7 @@ DIMENSION_CALLOUTS: dict[str, str] = {
 # and the SQ size above still states the band the stock must hold.
 DRAWING_NOTES = "\n".join(
     (
-        f"{PIVOT_FIT_NOTE}. PIVOT: SLIDING FIT IN {PEN_V_BLOCK_NUMBER} PIVOT BORE",
+        f"{PIVOT_FIT_NOTE}. PIVOT: CLAMPED IN {PEN_V_BLOCK_NUMBER} PIVOT BORE",
         "   (CLEARANCE "
         f"{_inch_text(PIVOT_CLEARANCE_MM[0])}-{_inch_text(PIVOT_CLEARANCE_MM[1])}).",
     )

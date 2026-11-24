@@ -254,20 +254,22 @@ purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .4000 in GO 
 note = "Not owned: to buy. MHA-CH-13 Setup 4 (RS03, after the ream): the first hole gauged before the lot, then every hole; GO enters, NO-GO does not."
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
 
-# --- MHA-PN-05 pen V block (cad/process/pn_pen_v_block) ----------------------
+# --- .1260 reams (cad/process/pd_transgear_*) --------------------------------
 
-# Pivot-bore acceptance for MHA-PN-05, Ø.1260-.1265 REAM THRU: the same
-# fixed-limit pattern as gauges.plug-gauges-4000-4005 (Vermont Gage standard
-# Class X, .000040 in, GO plus and NO-GO minus). The pin-gauge sets to buy
-# (gauges.pin-gauges) step by .001 in and hold no .1265. Range and
-# tolerance: cad/process/shop/ gauges.plug-gauges-1260-1265.
+# Acceptance for the Ø.1260-.1265 reamed bores of the transgear arm and
+# bushings: the same fixed-limit pattern as gauges.plug-gauges-4000-4005
+# (Vermont Gage standard Class X, .000040 in, GO plus and NO-GO minus). The
+# pin-gauge sets to buy (gauges.pin-gauges) step by .001 in and hold no .1265.
+# MHA-PN-05's pivot bore no longer uses it: drilled #30 (owner ruling
+# 2026-11-24, fit audit question 20). Range and tolerance:
+# cad/process/shop/ gauges.plug-gauges-1260-1265.
 [gauges.plug-gauges-1260-1265]
 name = "Plug gauge pair, .1260 GO and .1265 NO-GO, Class X"
 kind = "plug_gauge_pair"
 make = "Vermont Gage"
 status = "to_order"
 purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .1260 in GO (plus tolerance) and .1265 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
-note = "Not owned: to buy. MHA-PN-05 Ø.1260-.1265 REAM THRU pivot bore (after the ream, and again after the bench clean-up): GO enters, NO-GO does not."
+note = "Not owned: to buy. MHA-PD transgear arm and bushings Ø.1260-.1265 reamed bores (after the ream): GO enters, NO-GO does not."
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages"]
 
 # MHA-PD-23's press land is turned to the measured MHA-PD-18 ream (drawing
