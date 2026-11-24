@@ -980,7 +980,7 @@ def test_keeper_feature_bands_are_the_printed_ones() -> None:
     assert features["far_side"]["width"] == pytest.approx([_in(0.54), _in(0.56)])
     bore = features["bore"]
     assert bore["dia"] == pytest.approx([6.528, 6.6296])  # F, +.004/0
-    assert bore["process"] == "F DRILL" and bore["drill"] == "F" and bore["thru"] is True
+    assert bore["process"] == "drill" and bore["drill"] == "F" and bore["thru"] is True
     assert bore["height"] == pytest.approx([_in(0.98), _in(1.00)])
     assert bore["off_centre"] == pytest.approx([_in(-0.012), _in(0.012)])
     tap = features["crown_tap"]
