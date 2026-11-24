@@ -556,7 +556,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the back face, light skims, to gear k's aim, back face to cam face. Between skims take the blank out and mike it on the boss; rechuck with the rim face home on the jaw fronts. Write the miked thickness on the card. No mark on the part: gear k goes in envelope k and lives there between setups; on the arbor the gears go on in number order (blank 1 the lowest) and come off in the same order."
+instruction = "Face the back face, light skims, to gear k's aim, back face to cam face. Between skims take the blank out and mike it on the boss; rechuck with the rim face home on the jaw fronts. Write the miked thickness on the card. No mark on the part: gear k goes in envelope k and lives there between setups."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{process.slice_dia_mm}}"
 inspection = "Thickness {{cad.cam_face_thickness_min_in:.4dot}}-{{cad.cam_face_thickness_max_in:.4dot}} (micrometer, on the boss); rim {{cad.rim_face_face_width_min_in:.3dot}}-{{cad.rim_face_face_width_max_in:.3dot}} (micrometer across the rim)."
@@ -674,7 +674,7 @@ title = "Load ten blanks; turn the stack's O.D."
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "Ten blanks on the journal, back faces toward the shoulder (blank 1 on it), the MHA-DT-03-TL-04 Ø1.75 collar on the pilot against blank 10's boss, the arbor nut wrench-tight. The arbor in the 3-jaw on the body's last {{process.body_grip_in:.2f}} (the jaw fronts {{process.standoff_mm:in.2f}} from the shoulder, the .50 raw stub behind the jaws); the MT3 dead centre in the tail centre, oiled."
+holding = "Ten blanks on the journal in gear-number order, back faces toward the shoulder: blank 1, on the shoulder, is the load's lowest gear (blank n is gear n-1 in load 1, gear n+9 in load 2). The MHA-DT-03-TL-04 Ø1.75 collar on the pilot against blank 10's boss, the arbor nut wrench-tight. The arbor in the 3-jaw on the body's last {{process.body_grip_in:.2f}} (the jaw fronts {{process.standoff_mm:in.2f}} from the shoulder, the .50 raw stub behind the jaws); the MT3 dead centre in the tail centre, oiled."
 datum = "The arbor's axis: the body indicated at the jaws, the tail on its own centre."
 diagram = { file = "diagrams/stack.svg", alt = "Ten blanks on the arbor between the 3-jaw and the dead centre, their rims spaced by the cam bosses; the O.D. turned across all ten in one setting." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.body_dia_mm}}", stock_diameter_mm = "{{process.slice_dia_mm}}", stickout_mm = "{{process.stack_stickout_mm}}", minimum_diameter_mm = "{{process.journal_dia_min_mm}}", support = "tailstock" }
@@ -863,7 +863,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Take the stack off: nut, collar, then the ten gears off the journal."
+instruction = "Take the stack off: nut, collar, then the ten gears off the journal one at a time, blank 10 first, each straight into its own envelope (blank n is gear n-1 in load 1, gear n+9 in load 2)."
 feed = "hand"
 
 [[setups.operations]]
