@@ -45,8 +45,9 @@ from pd_transgear_arm_geometry import (
 # station is .XX (R9-23, ``pd_transgear_arm_geometry.TIP_STATION``); the
 # thickness is the ground stock's, a reference (the stock band governs it,
 # ``STOCK_TEXT_PREFIX``); the pivot bore prints its #9 drill's size under
-# the DRILLED HOLES row; the latch-pin hole and pin bore print
-# under their explicit ream bands; the pin station and the locating sites
+# the DRILLED HOLES row; the latch-pin hole prints under its explicit ream
+# band; the pin bore prints the .1260 reamer's size at three places
+# with no band (fit audit 2026-11-23); the pin station and the locating sites
 # are BASIC under circular position controls; the plate-tap stations print
 # as references, the taps being spotted through MHA-PD-19's screw holes at
 # assembly (``pd_transgear_arm_geometry.PLATE_TAP_LOCATION_RADIUS_MM``); the
@@ -63,7 +64,7 @@ SPOT_FACE_DIA_PLACES = 3
 SPOT_FACE_FLOOR_PLACES = ARM.SPOT_FACE_FLOOR_PLACES
 STATION_PLACES = 4
 PIN_HOLE_DIA_PLACES = 4
-PIN_BORE_DIA_PLACES = 4
+PIN_BORE_DIA_PLACES = 3
 PIN_HOLE_DEPTH_PLACES = ARM.PIN_HOLE_DEPTH_PLACES
 # The flank's lean to the P-T centreline prints as a reference to one place
 # of a degree, 2.4 (owner ruling 2026-11-20 (Pedro), #2424 option B): the
@@ -92,8 +93,8 @@ PART_DATUMS = (
 # precedent; owner review #2144): no projected zone anywhere on MHA-PD-18
 # (rule 26 bars the modifier). The pin bore S (datum C) takes ⌖ Ø.004 to
 # A|B and a plain ⊥ Ø.001 to A over the bore, the reamed-hole row (owner
-# ruling 2026-11-08 (Pedro), #2144 item 4.1). The axis it allows, gripped by
-# the pin's press land and run on to the chain plane in front of face A, is
+# ruling 2026-11-08 (Pedro), #2144 item 4.1). The axis it allows, the bonded
+# pin leaning in the bore's gap and run on to the chain plane in front of face A, is
 # paper_drive_arm_registration.S_AXIS_ZONE_DIAMETER_MM: the meshes and the
 # platen air charge it, and MHA-PD-00's collar feeler accepts the collar air
 # it closes (pd_cluster_air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES).
@@ -170,18 +171,39 @@ STOCK_TEXT_PREFIX = f"{STOCK_THICKNESS_IN} ("
 # REF: an as-bought size with the supplier's tolerance (units guidance).
 STOCK_TEXT_SUFFIX = ") GROUND STOCK REF"
 
-# --- The MHA-PD-23 pin's press in the reamed bore at S (R9-68) -----------------
-# The pin spec owns the press (it imports the arm geometry, so the geometry
-# cannot import it back); the arm prints it under the bore.  #2415: only the
-# pin's short land presses, turned to the measured ream.
-PIN_PRESS_INTERFERENCE = PIN.PRESS_INTERFERENCE
-if not all(
-    math.isclose(value, expected, abs_tol=1e-9)
-    for value, expected in zip(PIN_PRESS_INTERFERENCE, (0.00508, 0.0127), strict=True)
-):
+# --- The MHA-PD-23 pin's bonded slip fit in the reamed bore at S (R9-68) -------
+# Fit audit 2026-11-23 (pending owner confirmation): the pin is one diameter
+# and is bonded in the bore with LOCTITE 638; nothing presses.  The pin spec
+# owns the bond (it imports the arm geometry, so the geometry cannot import
+# it back).  The bore stays REAMED and prints the reamer's size with no
+# band: its gap is the lean the pin's axis is allowed
+# (paper_drive_arm_registration.S_AXIS_TILT_MAX_RAD), and a drilled #30
+# (.1285 +.004/0) would open it past what the meshes and the airs clear.
+# ``pd_transgear_arm_geometry.PIN_BORE_DIA_BAND`` is the ANALYSIS band the
+# set reamer is modelled to cut, not a printed limit.  The acceptance is the
+# pin entering with no shake and, as the gap's single upper limit, one pin
+# of the .001-step set that must not enter.
+# (PIN_BORE_DIA_PLACES above: three places, Ø.126 REAM THRU.)
+PIN_BOND_GAP = PIN.BOND_GAP  # modelled (least, greatest) diametral
+PIN_BORE_NO_GO_PIN_DIA = 3.2258  # .127, one pin of the .001-step set
+PIN_BORE_NO_GO_PLACES = 3
+_SET_PIN_UNDER_SIZE_MAX = 0.00508  # .0002, a Class ZZ minus pin
+# The widest gap the sheets accept: a bore that just refuses the .127 pin,
+# on the pin's smallest modelled shank.
+PIN_BOND_GAP_ACCEPTED_MAX = round(PIN_BORE_NO_GO_PIN_DIA - PIN.DIA_MIN, 6)  # .0022
+# Rule 23: the bond's clearance as the bore's callout prints it, the least
+# the reamer and the pin model to the most the .127 NO-GO accepts.
+PIN_BOND_CLEARANCE_PRINTED = (PIN_BOND_GAP[0], PIN_BOND_GAP_ACCEPTED_MAX)  # .0010-.0022
+if not 0.0 < PIN_BOND_GAP[0] <= PIN_BOND_GAP[1] <= PIN_BOND_GAP_ACCEPTED_MAX:
     raise AssertionError(
-        f"MHA-PD-18 pin bore press on MHA-PD-23 is {PIN_PRESS_INTERFERENCE}, "
-        "not .0002..0005"
+        f"MHA-PD-18 pin bore bond gap on MHA-PD-23 is {PIN_BOND_GAP}, outside "
+        f"0..{PIN_BOND_GAP_ACCEPTED_MAX}"
+    )
+if PIN_BOND_GAP_ACCEPTED_MAX > PIN.LOCTITE_638_GAP_MAX:
+    raise AssertionError("the .127 NO-GO accepts a gap over LOCTITE 638's gap fill")
+if ARM.PIN_BORE_DIA_MAX >= PIN_BORE_NO_GO_PIN_DIA - _SET_PIN_UNDER_SIZE_MAX:
+    raise AssertionError(
+        "the smallest .127 set pin enters a pin bore inside the reamer's modelled band"
     )
 # The true overall, pivot-end extreme to the square end, prints as a
 # reference; a derived reference has no part-side places, so the spec owns

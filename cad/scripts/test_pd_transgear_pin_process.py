@@ -1,12 +1,12 @@
 """The MHA-PD-23 transgear pin's lathe traveler agrees with its model.
 
 ``pd_transgear_pin`` is turned from 1/4 in bar on ``turned_shaft``: the tip end
-out on a tailstock centre in a stub beyond the tip plane, the press land
-turned to the measured MHA-PD-18 ream, the journal finish-turned and polished
-into its band, then turned round twice to face and dome each end. The adapter
-binds the drawing's bands; these tests hold the plan's own numbers to them:
-the land's window over the ream's reading, the head's facing window, the
-stub and the stub cut, the polish allowance and the regrip stickouts.
+out on a tailstock centre in a stub beyond the tip plane, the one-diameter
+journal finish-turned, polished and tried in its mates and in the MHA-PD-18
+arm it is bonded in, then turned round twice to face and dome each end. The
+adapter binds the drawing module's bands; these tests hold the plan's own
+numbers to them: the head's facing window, the stub and the stub cut, the
+polish allowance and the regrip stickouts.
 """
 
 from __future__ import annotations
@@ -54,30 +54,24 @@ def test_the_pin_is_enrolled_on_turned_shaft(plan: dict) -> None:
     assert plan["stock_refs"] == ["1018-round-1-4"]
 
 
-def test_the_land_window_takes_the_drawings_interference_over_the_reading(
-    parameters: dict, features: dict, shop: dict
+def test_the_arm_is_tried_on_the_shank_and_nothing_is_turned_to_a_reading(
+    plan: dict, parameters: dict, features: dict
 ) -> None:
-    land = features["step_land"]
-    # The ream lies in R - tol to R + step + tol (each Class X pin +/- tol):
-    # the least excess over R is the least interference over the ream's top,
-    # the most the most interference over its bottom.
-    step_in = shop["gauges"]["plug-gauges-1261-1264"]["resolution_mm"] / IN
-    tol_in = shop["gauges"]["plug-gauges-1260-1265"]["resolution_mm"] / IN
-    least = land["diametral_interference"][0] / IN + step_in + tol_in
-    most = land["diametral_interference"][1] / IN - tol_in
-    assert parameters["land_over_reading_min_in"] == pytest.approx(least, abs=1e-6)
-    assert parameters["land_over_reading_max_in"] == pytest.approx(most, abs=1e-6)
-    # The window stays open and holds the micrometer's R + .0004 reading.
-    assert least < 0.0004 < most
-
-
-def test_the_six_pins_step_the_reams_band(shop: dict, features: dict) -> None:
-    band = features["step_land"]["mate_dia"]
-    pair = shop["gauges"]["plug-gauges-1260-1265"]["range_mm"]
-    steps = shop["gauges"]["plug-gauges-1261-1264"]["range_mm"]
-    assert pair == pytest.approx(band)
-    step = shop["gauges"]["plug-gauges-1261-1264"]["resolution_mm"]
-    assert steps == pytest.approx([band[0] + step, band[1] - step])
+    """Fit audit 2026-11-23 (pending owner confirmation): the pin is one
+    diameter, bonded in the arm. No land, no ream reading, no Class X plugs:
+    the arm's one limit is its .127 set pin, and the arm slides on by hand."""
+    assert "step_land" not in features
+    assert not [name for name in parameters if name.startswith("land_")]
+    assert {tool["ref"] for tool in plan["tools"]} & {
+        "plug-gauges-1260-1265",
+        "plug-gauges-1261-1264",
+    } == set()
+    ops = [op for setup in plan["setups"] for op in setup["operations"]]
+    text = " ".join(op["instruction"] + " " + op.get("inspection", "") for op in ops)
+    assert "step_land" not in text and "plug" not in text.lower()
+    assert "the .127 pin does not enter" in ops[1]["inspection"]
+    trials = [op for op in ops if "the arm slides on by hand up to the seat" in op.get("inspection", "")]
+    assert len(trials) == 2
 
 
 def test_the_head_window_holds_the_head_land_for_any_head_dia(
@@ -166,13 +160,13 @@ def test_each_regrip_stands_within_the_shops_stickout(
     ratio = shop["limits"]["stickout_ld_max"]
     head_dia = features["step_head"]["dia"][1] / IN
     radius = parameters["dome_datum_leaf_radius_min_in"]
-    land = features["step_land"]
-    land_length = [s / IN for s in land["length"]]
-    # Head out: the jaw fronts on the press land, past the faced head.
+    assert "step_land" not in features
+    shank_dia = features["outer"]["dia"]
+    # Head out: the jaw fronts on the shank under the head, past the faced
+    # head.
     out = parameters["regrip_stickout_datum_in"]
     assert parameters["head_face_max_in"] < out
-    assert out < parameters["head_face_min_in"] + land_length[0]
-    assert out <= ratio * land["dia_ref"] / IN
+    assert out <= ratio * shank_dia[0] / IN
     assert _cap(radius, head_dia) < parameters["head_face_max_in"]
     # Tip out: the jaw fronts on the journal past the groove.
     groove = features["groove"]

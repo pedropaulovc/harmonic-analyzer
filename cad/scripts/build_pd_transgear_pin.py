@@ -1,13 +1,14 @@
 r"""Build MHA-PD-23, the transgear pin (R9-68).
 
-The plain steel pin the disc cluster runs on, pressed into the MHA-PD-18 arm
-from the rear.  Dimensions and the derived fit facts live in
+The plain steel pin the disc cluster runs on, one diameter from head to tip,
+bonded into the MHA-PD-18 arm from the rear (fit audit 2026-11-23, pending
+owner confirmation).  Dimensions and the derived fit facts live in
 ``pd_transgear_pin_spec``.
 
 Layout: one stepped revolve about local +Z on the Right plane, origin at the
 head's underside (the seat on the arm's rear face, the Front Plane).  From
-the rear: the Ø.20 head land, the short press land the arm grips, the Ø.125
-turned shank, the MHA-PD-VN-61 ring groove (its FRONT wall, the load wall, at
+the rear: the Ø.20 head land, the Ø.125 turned shank (its length in the arm
+bonded, the rest the journal), the MHA-PD-VN-61 ring groove (its FRONT wall, the load wall, at
 ``GROOVE_STATION`` from the seat) and the plain land in front of it.  The two
 spherical ends are separate revolves on the same plane.  The named plane
 ``GrooveLoadWall`` and
@@ -77,8 +78,6 @@ from pd_transgear_pin_spec import (
     HEAD_LAND,
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
-    PRESS_LAND_DIA,
-    PRESS_LAND_LENGTH,
     SEAT_FILLET_R,
     SURFACE_FINISHES,
     TIP_DOME_R,
@@ -91,14 +90,12 @@ MATERIAL = "Plain Carbon Steel"  # 12L14/1215 (the registry row names it)
 
 R_HEAD = HEAD_DIA / 2.0
 R_SHANK = DIA / 2.0
-R_LAND = PRESS_LAND_DIA / 2.0
 R_GROOVE = GROOVE_DIA / 2.0
 FRONT_END_STATION = GROOVE_STATION + FRONT_LAND
 
 V_PROFILE = math.pi * (
     R_HEAD**2 * HEAD_LAND
-    + R_LAND**2 * PRESS_LAND_LENGTH
-    + R_SHANK**2 * (FRONT_END_STATION - GROOVE_WIDTH - PRESS_LAND_LENGTH)
+    + R_SHANK**2 * (FRONT_END_STATION - GROOVE_WIDTH)
     + R_GROOVE**2 * GROOVE_WIDTH
 )
 
@@ -111,11 +108,11 @@ def _cap_volume(sag: float, sphere_r: float) -> float:
 V_HEAD_DOME = _cap_volume(HEAD_DOME_SAG, HEAD_DOME_R)
 V_TIP_DOME = _cap_volume(TIP_DOME_SAG, TIP_DOME_R)
 # Pappus: the seat root's spandrel r^2 (1 - pi/4), its centroid
-# r (10 - 3 pi) / (3 (4 - pi)) out from the press land, revolved about the axis.
+# r (10 - 3 pi) / (3 (4 - pi)) out from the shank, revolved about the axis.
 V_SEAT_FILLET = (
     2.0
     * math.pi
-    * (R_LAND + SEAT_FILLET_R * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi)))
+    * (R_SHANK + SEAT_FILLET_R * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi)))
     * SEAT_FILLET_R**2
     * (1.0 - math.pi / 4.0)
 )
@@ -252,8 +249,6 @@ def build(adapter) -> dict[str, str]:
         ("HeadDia", HEAD_DIA),
         ("HeadLand", HEAD_LAND),
         ("ShankDia", DIA),
-        ("LandDia", PRESS_LAND_DIA),
-        ("LandLength", PRESS_LAND_LENGTH),
         ("GrooveStation", GROOVE_STATION),
         ("GrooveDia", GROOVE_DIA),
         ("GrooveWidth", GROOVE_WIDTH),
@@ -270,8 +265,7 @@ def build(adapter) -> dict[str, str]:
     # Right sketch (u, v) maps to model (-Z, Y): negative u runs from the
     # seat (origin) toward the front end; the head land lies at u > 0.  Every
     # axial station dimensions from the seat face, the groove's load wall
-    # first; the groove width and the front land hang off that wall, the
-    # press land's length off the seat.
+    # first; the groove width and the front land hang off that wall.
     u_rear = HEAD_LAND
     u_front = -FRONT_END_STATION
     profile = SketchDims()
@@ -284,9 +278,7 @@ def build(adapter) -> dict[str, str]:
         (u_rear, 0.0),
         (u_rear, R_HEAD),
         (0.0, R_HEAD),
-        (0.0, R_LAND),
-        (-PRESS_LAND_LENGTH, R_LAND),
-        (-PRESS_LAND_LENGTH, R_SHANK),
+        (0.0, R_SHANK),
         (-GROOVE_REAR_STATION, R_SHANK),
         (-GROOVE_REAR_STATION, R_GROOVE),
         (-GROOVE_STATION, R_GROOVE),
@@ -299,7 +291,7 @@ def build(adapter) -> dict[str, str]:
     # The land in front of the groove is the same Ø3.900 cylinder as the
     # shank: collinear with it (one turned diameter, one dimension), not a
     # second horizontal with its own Ø.
-    front_land_index = 9
+    front_land_index = 7
     for index, line in enumerate(lines):
         if index == front_land_index:
             continue
@@ -313,8 +305,6 @@ def build(adapter) -> dict[str, str]:
         _head_back,
         head_rim,
         seat_face,
-        press_land,
-        _land_step,
         shank,
         _groove_rear_wall,
         groove_floor,
@@ -341,7 +331,6 @@ def build(adapter) -> dict[str, str]:
     )
     for name, start, end, value in (
         ("HeadLand", f"{head_rim}.start", f"{head_rim}.end", HEAD_LAND),
-        ("LandLength", f"{press_land}.start", f"{press_land}.end", PRESS_LAND_LENGTH),
         ("GrooveStation", f"{seat_face}.end", f"{load_wall}.end", GROOVE_STATION),
         ("GrooveWidth", f"{groove_floor}.start", f"{groove_floor}.end", GROOVE_WIDTH),
         ("FrontLand", f"{front_land}.start", f"{front_land}.end", FRONT_LAND),
@@ -352,7 +341,6 @@ def build(adapter) -> dict[str, str]:
         profile.record(name, f'"{name}"')
     for name, line, u_mid, radius in (
         ("HeadDia", head_rim, u_rear / 2.0, R_HEAD),
-        ("LandDia", press_land, -PRESS_LAND_LENGTH / 2.0, R_LAND),
         ("ShankDia", shank, -GROOVE_REAR_STATION / 2.0, R_SHANK),
         (
             "GrooveDia",
@@ -376,11 +364,11 @@ def build(adapter) -> dict[str, str]:
     )
 
     # --- Seat root: the tool-nose radius the print allows (R MAX) ---------------
-    # Picked on the circular edge where the press land meets the seat face at
+    # Picked on the circular edge where the shank meets the seat face at
     # z = 0: the only edge through that point.
     check(
         "fillet seat root",
-        adapter.add_fillet(SEAT_FILLET_R, [[R_LAND, 0.0, 0.0]]),
+        adapter.add_fillet(SEAT_FILLET_R, [[R_SHANK, 0.0, 0.0]]),
     )
     name_last_feature(adapter, "SeatFillet")
     fillet_dim = name_dimensions(adapter, "SeatFillet", ["SeatRadius"])
@@ -485,9 +473,8 @@ def build(adapter) -> dict[str, str]:
     # ring groove's catalogue Ø and width, and the groove station, a
     # disc-cluster stack term at the cluster's band.  The shank's Ø carries
     # none: it is a reference, made to fit its mates' reamed bores (note 1;
-    # fit audit 2026-11-23).  The press land's Ø is a
-    # reference made to the measured arm ream; its length and the front land
-    # print .XX and the title block governs them.
+    # fit audit 2026-11-23).  The front land prints .XX and the title block
+    # governs it.
     set_dimension_bilateral_tolerance(
         adapter,
         "PinProfile",

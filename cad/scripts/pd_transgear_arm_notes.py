@@ -19,7 +19,12 @@ from pd_transgear_arm_geometry import (
     PIVOT_BORE_DRILL,
 )
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
-from pd_transgear_arm_spec import LATCH_PIN_NUMBER, PIN_PRESS_INTERFERENCE
+from pd_transgear_arm_spec import (
+    LATCH_PIN_NUMBER,
+    PIN_BOND_CLEARANCE_PRINTED,
+    PIN_BORE_NO_GO_PIN_DIA,
+    PIN_BORE_NO_GO_PLACES,
+)
 
 
 def _inch_range(limits: tuple[float, float], places: int = 4) -> str:
@@ -52,6 +57,17 @@ def see_note(number: int) -> str:
     return f"SEE NOTE {number}, SHEET {NOTES_SHEET}"
 
 
+# Rule 4's necessity answer for the reamed pin bore, one line and no size.
+# A looser bore lets the bonded pin lean (paper_drive_arm_registration.
+# S_AXIS_TILT_MAX_RAD); the lean is charged to the platen air, the reducer
+# and rack meshes and the collar air, and the first to close as the gap
+# opens is the MHA-PD-10 12T's full-depth teeth stopping inside the
+# MHA-PD-26 rack's reach (build_pd_paper_drive_assembly's platen, rack and
+# chain check; fit audit 2026-11-23 batch sweep).
+_RACK = _config.parts("pd-feed-rack")
+PIN_BORE_NECESSITY = f"KEEPS PIN SQUARE TO {_RACK['number']} RACK MESH"
+
+
 NOTES = (
     # A drilled hole at the DRILLED HOLES row: the note names its mate and
     # prints no numbers (fit audit 2026-11-23, pending owner confirmation).
@@ -73,12 +89,14 @@ NOTES = (
     "   DOES NOT ENTER BY HAND. HOLDS LATCH STOP, NO OTHER FASTENER.",
     f"{SPRING_NOTE}. COUNTERBORE Ø AND FLOOR: SEAT AND PRELOAD\n"
     f"   PIVOT SPRING {_SPRING['number']}.",
-    # The arm is reamed first; the pin's land is turned to the measured ream
-    # (MHA-PD-23 note 1), so the interference band is the matched fit's, not
-    # the two parts' printed limits (machinist review, run
-    # 20261111T201934013Z).
-    f"{PIN_NOTE}. PIN BORE: PRESS FIT ON PIN {PIN.PIN_NUMBER}, ITS LAND TURNED TO\n"
-    f"   THE MEASURED REAM (INTERFERENCE {_inch_range(PIN_PRESS_INTERFERENCE)}).",
+    # Fit audit 2026-11-23 (pending owner confirmation): the one-diameter pin
+    # is a slip fit bonded in the bore.  The note names the mate, the grade
+    # and the acceptance by the mate, then rule 4's necessity answer
+    # (PIN_BORE_NECESSITY).  A note carries no size: rule 23's bond
+    # clearance and its upper limit, one set pin, stand in the callout.
+    f"{PIN_NOTE}. PIN BORE: PIN {PIN.PIN_NUMBER} BONDED WITH "
+    f"{PIN.RETAINING_COMPOUND}: PIN ENTERS, NO SHAKE.\n"
+    f"   {PIN_BORE_NECESSITY}.",
 )
 NOTES_TEXT = "\n".join(NOTES)
 # The sheet's numbered notes as export_features reads a declared part's
@@ -86,7 +104,21 @@ NOTES_TEXT = "\n".join(NOTES)
 DRAWING_NOTES = NOTES_TEXT
 
 PIVOT_BORE_CALLOUT = f"{PIVOT_BORE_DRILL} DRILL THRU, {see_note(PIVOT_NOTE)}"
-PIN_BORE_CALLOUT = f"REAM THRU, {see_note(PIN_NOTE)}"
+# The pin bore's callout: size and process with the note's link, rule 23's
+# bond clearance (the least the reamer and the pin model, the most the
+# NO-GO below accepts: pd_transgear_arm_spec.PIN_BOND_CLEARANCE_PRINTED),
+# then that upper limit's check, one pin of the .001-step set (rule 4: not
+# a gauge bought for the size).  The numbers stand here, on the native
+# dimension's callout, never in the note.
+PIN_BORE_BOND_TEXT = (
+    f"BONDED FIT ON {PIN.PIN_NUMBER} (CLEARANCE {_inch_range(PIN_BOND_CLEARANCE_PRINTED)})"
+)
+PIN_BORE_NO_GO_TEXT = (
+    f"{inch_text(PIN_BORE_NO_GO_PIN_DIA, PIN_BORE_NO_GO_PLACES)} PIN DOES NOT ENTER"
+)
+PIN_BORE_CALLOUT = (
+    f"REAM THRU, {see_note(PIN_NOTE)}\n{PIN_BORE_BOND_TEXT}\n{PIN_BORE_NO_GO_TEXT}"
+)
 # Note 2 names the dowel and its press; the callout links it (round 2: the
 # dowel named on both was named twice for one pattern).
 LOCATOR_CALLOUT_TEXT = f"2X REAM THRU, {see_note(LOCATOR_NOTE)}"
