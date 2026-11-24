@@ -11,5 +11,5 @@ checks:
     check: "keeper receiver leaves less than D15's accepted .076 with drill wander"
     kind: wall
     reason: "keeper's 2-56 tap breaks into the rail web's side"
-    source: "Main, by the owner's delegation of 2026-11-24 (rulings.md D15): .0767 at the printed lug centre .114, accepted under the .080 target (MHA-FR-02 RV-14); computed in build_fr_top_frame"
+    source: "delegated ruling 2026-11-24 (Main), precedent: owner ruling 2026-11-01, #2144 (rulings.md D15): .0767 at the printed lug centre .114, accepted under the .080 target (MHA-FR-02 RV-14); computed in build_fr_top_frame"
     basis: worst_case
