@@ -76,9 +76,9 @@ stock_dia_in = 0.25
 # An 8 in blank sawn off the 72 in bar on hand (authored; fleet rule, Main
 # 2026-11-22: no bar past the rear of the spindle). Chucked 2.61 out, 5.39 in
 # of it lies behind the jaw fronts, grip included, inside the working limit
-# (CncBarWhip's record, harmonic-analyzer #3426) cad/config/shop-equipment/machines.toml machines.pm-1127vf-lb
-# bar_behind_jaw_fronts_max_in (the spindle's length from the jaw fronts,
-# jaw_fronts_to_spindle_rear, is still to be measured by the owner). Yield:
+# (harmonic-analyzer #3426) cad/config/shop-equipment/machines.toml machines.pm-1127vf-lb
+# bar_behind_jaw_fronts_max_in (the owner's measured 17 in jaw fronts to
+# spindle rear, less its margin; test_lathe_bar_length). Yield:
 # the pin and one restart from Op 40 (each takes about 2.4 in).
 bar_length_in = 8.0
 chuck_grip_in = 0.75
