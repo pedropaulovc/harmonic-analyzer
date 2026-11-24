@@ -116,10 +116,17 @@ PILOT_SLIP_MAX_MM = 0.0127  # .0005
 PILOT_DIA_MIN = PRESS_DIA + min(PRESS_HOLE_BAND) - PILOT_SLIP_MAX_MM  # .4380
 
 # --- Bore: reamed through after pressing --------------------------------------
-# .249 REAM_H7 (#290 fit D8, the owned .2490 reamer) over the knob shaft's
-# .249 g6 journal: the plate's former running bore, the same limits.
+# The .2490 chucking reamer's size (#290 fit D8; reamer-2490, to order: not
+# on hand) under the knob shaft's journal, which is turned to this bore: the
+# plate's former running bore.  The sheet prints the reamer's size and no
+# band (drawing-guidelines rule 4; fit audit 2026-11-23, pending owner
+# confirmation).  BORE_DIA_LIMITS is the ANALYSIS band, what the reamer is
+# taken to cut, for the wall and the tilt stacks: the modelled result, not
+# printed limits.  A fit .002 looser trebles the journal's shake in the
+# bore, which the reducer mesh's backlash and the collar air's tilt term
+# (pd_cluster_air) both pay.
 BORE_DIA = 6.3246  # .249
-BORE_DIA_LIMITS = (min(REAM_H7), max(REAM_H7))  # +.0000/+.0005
+BORE_DIA_LIMITS = (min(REAM_H7), max(REAM_H7))  # analysis: +.0000/+.0005
 BORE_PLACES = 4
 # Letter B, drilled with the turning: the reamer's stock after the press has
 # closed the hole in.  The drill never cuts to the reamed size.
