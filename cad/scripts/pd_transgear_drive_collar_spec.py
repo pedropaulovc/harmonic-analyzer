@@ -494,6 +494,9 @@ if min(FLAT_PIN_CREST_CLEARANCE) < 0.0 or (
     )
 # Lost motion, stated not gated: the knob is chain-driven and the paper feeds
 # one way while the crank turns.  Delegated accept RV-04 in the registry row.
+# The flat's loose side carries no limit (D10, owner question Q4: MHA-PD-08
+# RV-07): a flat cut deeper than the fit only adds play, and the 17.2° cap
+# below is reached at about .0051 of air.
 # With the flat fitted to the crest the play follows the fitted air alone:
 # cos(theta) = 1 - air / centre, widest at the nearest centre.
 FLAT_PIN_PLAY_DEG = (
