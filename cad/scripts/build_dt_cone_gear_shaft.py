@@ -94,7 +94,6 @@ from dt_cone_gear_shaft_spec import (
     FILLET_RADIUS,
     FILLET_R_BAND,
     FILLET_R_TOL_TYPE,
-    SECTION_DIA_BANDS,
     SECTION_DIAS,
     SECTION_ENDS,
     SECTION_KNOBS,
@@ -102,7 +101,6 @@ from dt_cone_gear_shaft_spec import (
     SECTIONS,
     SOCKET_DEPTH,
     SOCKET_DIA,
-    SOCKET_DIA_BAND,
     SURFACE_FINISHES,
     UNIT,
     validate_gear_loading_clearances,
@@ -353,19 +351,11 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The three turned diameters, the keyseat and the socket carry their fit
-    # on the MODEL dimension, so SolidWorks renders the limits and
-    # re-renders them on a unit change.  The bands are millimetres; UNIT
-    # prints them in decimal inch at the nominal's places.
-    for section, band in enumerate(SECTION_DIA_BANDS):
-        set_dimension_bilateral_tolerance(
-            adapter,
-            f"Sec{section}Profile",
-            f"Sec{section}Dia",
-            *deviations(band),
-            places=DRAWING_PRECISION[f"Sec{section}Profile"][f"Sec{section}Dia"],
-            display_unit=UNIT,
-        )
+    # The keyseat carries its band on the MODEL dimension, so SolidWorks
+    # renders the limits and re-renders them on a unit change.  The three
+    # turned diameters are made last to their mates and print as references,
+    # and the socket prints its reamer's size: none carries a band (fit
+    # audit 2026-11-23; SECTION_DIA_BANDS stay the stacks' analysis bands).
     for name, band in (
         ("Sec1KeyseatWidth", cone_land_key.KEYSEAT_WIDTH_BAND),
         ("Sec1KeyseatS", cone_land_key.KEYSEAT_S_BAND),
@@ -378,14 +368,6 @@ def build(adapter) -> dict[str, str]:
             places=DRAWING_PRECISION["Sec1KeyseatProfile"][name],
             display_unit=UNIT,
         )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "SocketProfile",
-        "SocketDia",
-        *deviations(SOCKET_DIA_BAND),
-        places=DRAWING_PRECISION["SocketProfile"]["SocketDia"],
-        display_unit=UNIT,
-    )
     # The step roots' single limit R.004 MAX: the band (0/-R) stays on the
     # native tolerance as the model's record; swTolMAX prints the model value
     # then MAX, so the setback books the printed maximum

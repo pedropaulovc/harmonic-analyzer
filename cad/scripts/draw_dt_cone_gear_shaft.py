@@ -99,6 +99,7 @@ from dt_cone_gear_shaft_spec import (
     KEYSEAT_MATE_SUFFIXES,
     LAND_NOTE,
     JOURNAL_DIA,
+    MADE_TO_FIT_DIAMETERS,
     SEAT_MATE_CALLOUTS,
     SEAT_MATE_SUFFIXES,
     STACK_NOTE,
@@ -1384,6 +1385,15 @@ def build(adapter: Any) -> dict[str, str]:
     if collar is None:
         raise RuntimeError("the donor view gave no CollarDia dimension")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    # The journal and both lands are turned last to their mates: their sizes
+    # print as references (rule 4, form 2); a suffix written after this
+    # (land 2's flag) closes the parenthesis itself.
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name in MADE_TO_FIT_DIAMETERS:
+            set_reference_dimension(
+                adapter, annotation, label=f"{name} made-to-fit reference", diameter=True
+            )
     _set_dimension_suffixes(adapter, annotations, DIMENSION_SUFFIXES)
     sign = _axis_sign(adapter, side)
     sections = _add_d_sections(adapter, side, sign)

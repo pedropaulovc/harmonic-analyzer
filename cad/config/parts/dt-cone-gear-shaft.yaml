@@ -16,11 +16,7 @@ dt-cone-gear-shaft:
   # CORNERS .001 MAX) and RV-02 (the tailstock note). The rulings they rested
   # on are superseded by C1 keyed: U40 2026-09-23 (integral .031 tip land
   # turned with tailstock support) and 2026-09-28 ("one flat per gear land;
-  # no keys, no solder, no retaining compound; no gear bonded"). RV-03 keeps
-  # the journal only: no across-flat band remains.
-  machinist_exceptions:
-    - id: "RV-03"
-      kind: "accept"
-      where: "sheet 1, the journal Ø.4375 +.0000/-.0008 (RUNNING FIT, MATCHED TO MHA-DT-05 BORE); land 1's keyed section A-A and the socket's reamed Ø.0625 +.0005/-.0000 are out of scope (owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): plain inch-step bands)"
-      finding: "-.0008 is a converted millimetre band (0.02 mm), not a plain inch step, and narrower than the turned-diameter row (rule 4)"
-      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (F1, F2, F5): the band comes from the fleet-shared constant _fit_shaft_h.SHAFT_H, kept as is with the matched-fit route printed at the feature; the shared constant is restated at the next re-key of the cone shaft family. Re-scoped by owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): the tip land and the across-flats it also covered are gone. Owner ruling 2026-11-23, tool audit Q11 (\"both journals .4375 0/-.0008\") moves the journal from Ø.4825 to Ø.4375 and names the same 0/-.0008 band"
+  # no keys, no solder, no retaining compound; no gear bonded"). RV-03 (the
+  # journal's converted 0/-.0008 band) retired with fit audit 2026-11-23 F02:
+  # the journal is turned last to MHA-DT-05's reamed bore and prints as a
+  # reference with its running clearance; no band remains to accept.

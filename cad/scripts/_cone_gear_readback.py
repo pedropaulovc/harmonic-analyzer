@@ -74,15 +74,13 @@ def foreign_bore_features(configuration: str) -> tuple[str, ...]:
 
 
 # The configuration-specific bilateral bands, each written into (and read
-# back from) every configuration: the round bore's reamer band on T012/T018
-# and seat band on T024..T120 (bore_dia_band; the bore is live in every
-# configuration since the T120 marking fix), and the shared blank and
-# tooth-thickness bands. The tip diameter's band rides the side view's
-# witness, the printed dimension (dt_cone_gear_notes).
+# back from) every configuration: the shared blank and tooth-thickness
+# bands.  The bores print their reamer's size with no band (fit audit
+# 2026-11-23). The tip diameter's band rides the side view's witness, the
+# printed dimension (dt_cone_gear_notes).
 _BANDED_DIMENSIONS = (
     (BLANK_DIA_REFERENCE_SKETCH, "BlankDia", blank_dia_band),
     (TOOTH_REFERENCE_SKETCH, "ToothThickness", tooth_thickness_band),
-    (BORE_SKETCH, "BoreCutDia", bore_dia_band),
 )
 
 
@@ -131,8 +129,8 @@ def _assert_configuration_bands(adapter: Any, configuration: str, teeth: int) ->
                 f"expected bilateral {expected} mm"
             )
     _telemetry.success(
-        f"{configuration}: blank {blank_dia_band(teeth)}, tooth-thickness "
-        f"{tooth_thickness_band(teeth)} and bore {bore_dia_band(teeth)} bands"
+        f"{configuration}: blank {blank_dia_band(teeth)} and tooth-thickness "
+        f"{tooth_thickness_band(teeth)} bands"
     )
 
 
