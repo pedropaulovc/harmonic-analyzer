@@ -48,6 +48,6 @@
   <line class="dims" x1="461.5" y1="250" x2="521.5" y2="250"/>
   <line class="dims" x1="521.5" y1="165" x2="521.5" y2="255"/>
   <text class="label" x="470" y="268">axle {{cad.axle_bore_station_mm:in.4f}}</text>
-  <text class="label" x="430" y="320">hanger #15 at {{cad.hanger_hole_station_in:.3f}}; axle #17, ream .1865 at {{cad.axle_bore_station_mm:in.4f}},</text>
+  <text class="label" x="430" y="320">hanger #15 at {{cad.hanger_hole_station_in:.3f}}; axle 3/16 at {{cad.axle_bore_station_mm:in.4f}},</text>
   <text class="label" x="430" y="338">both from the left end, inside the jaws' reach</text>
 </svg>

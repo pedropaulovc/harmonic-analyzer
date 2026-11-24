@@ -88,10 +88,9 @@ CLAMP_POSITION_BAND = printed_band_mm(CLAMP_POSITION_PLACES, unit=UNIT)
 # drawing-guidelines.md rule 17 (walls and webs), at the FULL worst case:
 # - the locating bands: each row at its band from the top face, the stations
 #   at theirs from the left end, the bar at its title-block least height;
-# - each bore at its largest (DRILLED HOLES +.004, the reamer's +.0005);
+# - each bore at its largest (DRILLED HOLES +.004);
 # - 0.3 deg drill run-off over the deepest bar (its printed depth's maximum):
-#   every hole is drilled or reamed on the mill into faces cut in an earlier
-#   setup;
+#   every hole is drilled on the mill into faces cut in an earlier setup;
 # - the title block's edge break on both exposed edges of each wall, the
 #   hole's rim and the bar's edge at the face.
 # The row and the stations keep millimetre nominals other parts read, so each
@@ -141,7 +140,7 @@ BORE_ROW_WALLS = {
     - PEN_HANGER_STATION_TOL
     - BORE_BANDS["hanger hole"][0]
     - _WALL_LOSSES,
-}  # top .0745 / .0760 / .0680, bottom all over .080, hanger hole end .0760 in
+}  # top .0743 / .0780 / .0700, bottom .1003 / .1040 / .0960, hanger hole end .0760 in
 for _wall, _value in BORE_ROW_WALLS.items():
     if _value < WALL_FLOOR_MM:
         raise AssertionError(
@@ -166,13 +165,14 @@ WALL_CALLOUT_MIN_IN = {
     )
     / 1000
     for bore in BORE_BANDS
-}  # axle bore .079, hanger hole .076, clamp holes .070
+}  # axle bore .074, hanger hole .076, clamp holes .070
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The bar depth is the extrude's named depth, at the title
 # block's .XXX, naming the axle-end stack it sets (mg_wheel_axle_spec).
-# The reamed axle bore is a sketch-cut whose diameter (with its reamer band)
-# and station from the left end are model dimensions.  The three screw bores
+# The 3/16 drilled axle bore is a sketch-cut whose diameter (no band of its
+# own: the DRILLED HOLES row) and station from the left end are model
+# dimensions.  The three screw bores
 # are native Hole Wizard clearance holes (sizes on their native callouts);
 # their stations from the left end and the row's drop from the top face ride
 # the hidden BoreRowReference sketch, driven by the same equations as the
@@ -192,7 +192,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 # The length prints .X (no stack reads it); the height and the bore and hanger
 # stations .XX; the depth, the row and the clamp stations .XXX for their
-# stacks; the reamed bore .XXXX for its +.0005.
+# stacks; the drilled bore .XXXX, the 3/16 drill's .1875.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BarProfile": {"Length": 1, "Side": BAR_SIDE_PLACES},
     "Bar": {"BarDepth": BAR_DEPTH_PLACES},

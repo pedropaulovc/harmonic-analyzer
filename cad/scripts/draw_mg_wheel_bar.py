@@ -3,7 +3,7 @@ r"""Create the curated machinist drawing for the magnifying-wheel bar.
 A .43 x .374 steel bar, 9.2 long (decimal-inch sheet), carrying the wheel axle
 and the pen-hanger strap.
 Four bores run along the depth (front-back), so the FRONT view (looking down the
-bore axis) shows them as circles: the reamed axle bore, 2x #8 clamp-screw
+bore axis) shows them as circles: the drilled axle bore, 2x #8 clamp-screw
 clearance holes flanking the column and 1x #8 pen-hanger hole at the free end.
 The bar length + section, the axle bore's Ø + station from the left end, the
 screw holes' stations from the left end and the bore row's distance from the
@@ -59,7 +59,6 @@ import _telemetry
 from _column_clamp_interface import BAR_DEPTH
 import mg_wheel_bar_callouts as callouts
 from mg_wheel_bar_spec import (
-    AXLE_BORE_BAND,
     AXLE_BORE_DIA,
     AXLE_BORE_STATION,
     AXLE_BORE_X,
@@ -144,7 +143,7 @@ FRONT_KEEP = {
     # hole, locates all four holes on their shared centreline.
     "Side": (RIGHT_END + 0.040, _BAR_BOTTOM - 0.014),
     "ClampRowFromTop": (RIGHT_END + 0.021, _BAR_TOP + 0.015),
-    # The reamed Ø up and right of the bore, the press lines standing clear
+    # The drilled Ø up and right of the bore, the bond lines standing clear
     # of the bar.
     "AxleBoreDia": (AXLE_BORE_SHEET_X + 0.035, FRONT_CENTER[1] + 0.042),
 }
@@ -158,7 +157,7 @@ RIGHT_KEEP = {
     ),
 }
 # The native Hole Wizard callouts stand above the bar, the hanger's left of
-# the reamed bore's Ø, the clamps' between that and the row's text.
+# the drilled bore's Ø, the clamps' between that and the row's text.
 HANGER_CALLOUT_XY = (_sheet_x(SCREW_HOLE_X) + 0.025, FRONT_CENTER[1] + 0.035)
 CLAMP_CALLOUT_XY = (_sheet_x(CLAMP_HOLE_X[0]) + 0.010, FRONT_CENTER[1] + 0.035)
 # Each clearance hole's native drill size prints .XXX.
@@ -309,9 +308,10 @@ _ROW_FIELDS: dict[str, Any] = {
     "height_nominal": (BORE_ROW_FROM_TOP, ("BORE_ROW_FROM_TOP",)),
     "height_from": ("top_face", ((_SELF, "FRONT_KEEP"),)),
 }
-# The reamed axle bore: .1865 +.0005/0 (FRONT_KEEP "AxleBoreDia"), REAM
-# THRU, press fit on the MHA-MG-07 axle, its least wall; 2.40 from the left
-# end (FRONT_KEEP "AxleBoreStation").
+# The drilled axle bore: 3/16 DRILL THRU under the DRILLED HOLES row (owner
+# ruling 2026-11-24, fit audit question 18; FRONT_KEEP "AxleBoreDia"), the
+# MHA-MG-07 axle bonded in it, its least wall; 2.40 from the left end
+# (FRONT_KEEP "AxleBoreStation").
 requirement(
     "axle_bore",
     kind="hole",
@@ -321,12 +321,12 @@ requirement(
         "at": ([AXLE_BORE_X, 0.0, _FRONT_Z], ((_GEOM, "AXLE_BORE_X"), *_FRAME)),
         "axis": (_INTO_FRONT, _FRAME),
         "dia": (
-            limits(AXLE_BORE_DIA, _P["AxleBoreDia"], AXLE_BORE_BAND),
+            drilled_limits(AXLE_BORE_DIA, _P["AxleBoreDia"], unit=UNIT),
             ((_GEOM, "AXLE_BORE_DIA"), (_GEOM, "AXLE_BORE_BAND"), (_SELF, "FRONT_KEEP")),
         ),
         "nominal_dia": (AXLE_BORE_DIA, ((_GEOM, "AXLE_BORE_DIA"),)),
         "thru": (True, (("mg_wheel_bar_callouts", "AXLE_BORE_CALLOUT"),)),
-        "process": ("ream", (("mg_wheel_bar_callouts", "AXLE_BORE_CALLOUT"),)),
+        "process": ("drill", (("mg_wheel_bar_callouts", "AXLE_BORE_CALLOUT"),)),
         "callout": (
             callouts.AXLE_BORE_CALLOUT,
             (("mg_wheel_bar_callouts", "AXLE_BORE_CALLOUT"),),
@@ -580,7 +580,7 @@ def build(adapter: Any) -> dict[str, str]:
             0: "Wheel Bar Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "wheel bar; steel support bar; reamed axle bore; clearance holes",
+            3: "wheel bar; steel support bar; drilled axle bore; clearance holes",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

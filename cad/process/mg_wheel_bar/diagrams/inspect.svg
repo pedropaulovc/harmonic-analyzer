@@ -18,7 +18,7 @@
   <line class="leader" x1="580" y1="108" x2="540" y2="80"/>
   <text class="label" x="420" y="75">row {{cad.clamp_hole_1_height_min_in:.3dot}}–{{cad.clamp_hole_1_height_max_in:.3dot}} from T</text>
   <line class="leader" x1="217.2" y1="108" x2="200" y2="70"/>
-  <text class="label" x="120" y="62">Ø.1865 REAM, GO/NO-GO</text>
+  <text class="label" x="120" y="62">3/16 DRILL, PIN NO-GO</text>
   <line class="leader" x1="45.6" y1="108" x2="40" y2="70"/>
   <text class="label" x="20" y="45">hanger Ø.180</text>
   <line class="leader" x1="713.3" y1="108" x2="700" y2="70"/>

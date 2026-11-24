@@ -120,19 +120,24 @@ if THREAD_PAST_LOCKNUT_MAX > _pin.THREAD_PAST_LOCKNUT_LIMIT:
 
 # --- fits on the pin ------------------------------------------------------------------
 _PIN = (_pin.PIN_DIA - _pin.PIN_DIA_TOL, _pin.PIN_DIA + _pin.PIN_DIA_TOL)
-# Press in the bar's reamed bore (interference, both corners > 0).
-BAR_PRESS = (
-    _PIN[0] - (_bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[0]),
-    _PIN[1] - (_bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[1]),
-)  # .0003 .. .0012
+# Bonded in the bar's 3/16 drilled bore (owner ruling 2026-11-24, fit audit
+# question 18): the drill's DRILLED HOLES row over the drill rod's supplier
+# band leaves a diametral gap inside LOCTITE 638's. Its tight corner is a
+# light press (.0002 at most), which the compound takes as well; the step
+# pushes the axle in on its shoulder through the sleeve.
+BAR_BOND_GAP = (
+    (_bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[1]) - _PIN[1],
+    (_bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[0]) - _PIN[0],
+)  # -.0002 .. .0042
 # Running fit (drawing-guidelines.md rule 4 (tighten only for function, and
-# name the mate)): the wheel's owned-reamer .1885 bore (+.0005/0) on the
+# name the mate)): the wheel's .1885 reamed bore (+.0005/0; the reamer is to
+# order, shop-equipment tools.reamer-1885) on the
 # drill rod's supplier band.
 HUB_RUNNING = (0.02032, 0.04318)  # (.0008, .0017)
 # The largest finished bore: the loosest clearance on the largest pin.
 WHEEL_BORE_MAX = _PIN[1] + HUB_RUNNING[1]  # .1894
-if min(BAR_PRESS) <= 0.0:
-    raise AssertionError(f"pin is not a press fit in the bar: {BAR_PRESS}")
+if BAR_BOND_GAP[1] > _wheel.LOCTITE_638_GAP_MAX:
+    raise AssertionError(f"axle gap in the bar exceeds LOCTITE 638's: {BAR_BOND_GAP}")
 if min(HUB_RUNNING) <= 0.0:
     raise AssertionError(f"wheel does not run free on the pin: {HUB_RUNNING}")
 if not (

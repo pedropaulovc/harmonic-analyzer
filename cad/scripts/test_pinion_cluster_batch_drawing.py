@@ -565,11 +565,6 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(
                 ("mg-magnifying-vertical-rod-1", "mg-magnifying-clamp-1")
             ): _annulus_limit(2.845, 2.261, 5.976),
-            # MHA-MG-07 3/16 drill-rod pin pressed through the wheel bar's
-            # reamed .1865 bore, the bar's 9.0 depth.
-            frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): _annulus_limit(
-                4.7625, 4.7371, 9.0
-            ),
             frozenset(("sh-vn-thumb-screw-2", "mg-output-fixture-1")): _annulus_limit(
                 2.8448, 2.261, 9.1821
             ),

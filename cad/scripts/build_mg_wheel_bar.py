@@ -21,8 +21,8 @@ build_mg_magnifier_assembly at centre x +109 (machine = local + 109): span
 margin.
 
 Holes (all along local Z, the machine front-back axis):
-* 1x reamed axle bore at local (AXLE_BORE_X, 0) = machine x WHEEL_X, the
-  mg-wheel-axle pressed in to a gauge from the front face (mg_wheel_axle_spec).
+* 1x 3/16 drilled axle bore at local (AXLE_BORE_X, 0) = machine x WHEEL_X, the
+  mg-wheel-axle bonded in it (mg_wheel_axle_spec).
 * 2x #8 clearance clamp-screw through-holes flanking the column at local
   x 70.5 / 105.5 (the column line crosses the bar at local +88 =
   column +197 - centre +109; ears at +-17.5,
@@ -75,13 +75,8 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimensions, apply_drawing_precision
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-)
-from _fit_deviations import deviations
 from _column_clamp_interface import BAR_DEPTH
 from mg_wheel_bar_geom import (
-    AXLE_BORE_BAND,
     AXLE_BORE_DIA,
     AXLE_BORE_X,
     BAR_LENGTH,
@@ -97,7 +92,6 @@ from mg_wheel_bar_geom import (
     PEN_HANGER_HOLE_DIA,
     PEN_HANGER_HOLE_SPEC,
     SCREW_HOLE_X,
-    UNIT,
     require_hanger_end_wall,
 )
 import mg_wheel_bar_callouts as callouts
@@ -491,20 +485,13 @@ def build(adapter) -> dict[str, str]:
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
 
-    # Manufacturing drawing support: the native band, then mark exactly the
-    # print's dimensions and stamp the make-critical title-block properties.
-    # Only the reamed bore carries a band of its own; the depth (naming the
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties. No size carries a band
+    # of its own: the 3/16 drilled bore takes the DRILLED HOLES row (owner
+    # ruling 2026-11-24, fit audit question 18); the depth (naming the
     # axle-end stack it sets, mg_wheel_bar_callouts), height, row and
     # stations are the title block's (the depth, row and clamp stations at
     # .XXX: mg_wheel_bar_geom.BAR_DEPTH_BAND, mg_wheel_bar_spec.CLAMP_POSITION_BAND).
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "AxleBoreProfile",
-        "AxleBoreDia",
-        *deviations(AXLE_BORE_BAND),
-        places=DRAWING_PRECISION["AxleBoreProfile"]["AxleBoreDia"],
-        display_unit=UNIT,
-    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

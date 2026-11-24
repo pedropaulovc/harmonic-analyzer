@@ -54,13 +54,6 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset(
         ("mg-magnifying-vertical-rod-1", "mg-magnifying-clamp-1")
     ): _MG_ROD_THREAD_LIMIT,
-    # MHA-MG-07 drill-rod pin (Ø4.7625, mg_wheel_axle_spec.PIN_DIA) pressed in
-    # the wheel bar's Ø4.7371 reamed bore (mg_wheel_bar_geom.AXLE_BORE_DIA)
-    # over at most 9.0 of the bar's 9.5 depth (its back end 0.60 sunk at
-    # nominal, mg_wheel_axle_spec.BACK_Y): the press.
-    frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): smooth_annulus_limit_mm3(
-        4.7625, 4.7371, 9.0
-    ),
     frozenset(("sh-vn-thumb-screw-2", "mg-output-fixture-1")): _MG_FIXTURE_THREAD_LIMIT,
     frozenset(
         ("mg-magnifying-lever-1", "mg-magnifying-bracket-1")

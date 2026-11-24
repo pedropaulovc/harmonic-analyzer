@@ -6,9 +6,9 @@ part's exported ``features.toml`` and the plan/shop TOML, then runs
 checks the posted G-code against :func:`expectations`. The bar's sizes come
 from the feature export (its length, height and depth bands, the four
 holes' sizes, stations and row); the blank, the top face's cut, face levels,
-end passes, spots, drill and reamer depths, the two holds and the stacks
+end passes, spots and drill depths, the two holds and the stacks
 from ``plan.toml`` ``[parameters]`` and ``milling_cuts``; cutter diameters
-and end-mill speeds from the shop (``shop/``), the drills' and the reamer's
+and end-mill speeds from the shop (``shop/``), the drills'
 speeds from the plan's operations. Every path is written here
 (``rt.custom``): straight lines a recipe can state exactly. Typed here,
 because neither record carries them: the #2 centre drill's catalogue
@@ -24,8 +24,8 @@ flat about 9.35 long; the 3/8 thickness is the drawing's depth as supplied.
   faced down to the top face T, .840 above B.
 - WB03 (lying, F down, T at the fixed jaw, the sawn left end just out past
   the jaws): the left end milled with the cutter's side to X0; the hanger
-  hole and the axle bore spotted, drilled #15 and #17, the axle bore reamed
-  .1865.
+  hole and the axle bore spotted, drilled #15 and 3/16 (owner ruling
+  2026-11-24, fit audit question 18: the axle is bonded, no reamer).
 - WB04 (the same hold slid along the jaws, the right end just out past
   them; X0 picked up again on the milled left end): the right end milled to
   the length; both clamp holes spotted and drilled #9.
@@ -49,7 +49,6 @@ Work frames (G54); X0 the finished left end in every one, +X along the bar:
 Toolpath rules (owner rulings 2026-11-16): faces zigzag (ball screws),
 plunges beside the stock at the cutting feed, real G0 above the stock. The
 ends are milled with the cutter's side in one-way conventional passes.
-Reamers feed in and out (a rapid retract can score the bore).
 """
 
 from __future__ import annotations
@@ -72,7 +71,6 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
             ("left_spot",),
             ("axle_drill",),
             ("hanger_drill",),
-            ("axle_ream",),
         ),
     ),
     ("WB04_right", (("right_end",), ("right_spot",), ("clamp_drill",))),
@@ -83,7 +81,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
 LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these (the saw, the files and the gauges are not).
-CAM_TOOLS = ("em-half", "spot", "drill-17", "drill-15", "drill-9", "reamer-1865")
+CAM_TOOLS = ("em-half", "spot", "drill-3-16", "drill-15", "drill-9")
 IN = 25.4
 # ANSI #2 combined drill and countersink, 60° included: the shop record names
 # the tool, not its geometry.
@@ -279,20 +277,6 @@ def _drilled(xy: list[float], top: float, tip: float, clear: float) -> list[str]
     ]
 
 
-def _reamed(xy: list[float], top: float, tip: float, clear: float) -> list[str]:
-    """Feed the reamer in to ``tip`` and back out to the R plane, spindle
-    running: no rapid leaves the bore."""
-    clear, r_plane = _r(clear), _r(top + SAFE_MM)
-    return [
-        f"G0 Z{clear:.3f}",
-        f"G0 X{xy[0]:.3f} Y{xy[1]:.3f}",
-        f"G0 Z{r_plane:.3f}",
-        f"G1 Z{_r(tip):.3f} F{{feed}}",
-        f"G1 Z{r_plane:.3f} F{{feed}}",
-        f"G0 Z{clear:.3f}",
-    ]
-
-
 def _stations(y: tuple[float, float], radius: float, max_step: float) -> list[float]:
     """Zigzag pass stations across the face ``y`` (low, high), from its high
     side: each pass takes the same width, at most ``max_step``, and together
@@ -412,8 +396,8 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         if not math.isclose(top_y - y, hole["height_nominal"], abs_tol=1e-3):
             raise ValueError(f"{name}: its Y is not its height below the top face")
         holes[name] = {"x": x, "y": y, "dia": hole["dia"], "station": hole["station"]}
-    if f["axle_bore"].get("process") != "ream":
-        raise ValueError("axle_bore: expected a reamed bore")
+    if f["axle_bore"].get("process") != "drill":
+        raise ValueError("axle_bore: expected a drilled bore")
     return {
         "frame": (left_x, top_y, front_z),
         "back_z": back["plane"]["value"],
@@ -524,29 +508,27 @@ def context(
     left_faces = _end_stations(-left_skim, 0.0, end_step)
     right_faces = _end_stations(right_raw, length, end_step)
 
-    # Holes: the spot under every drill; each drill and the reamer against
-    # its hole's printed band; the tips through F into the air.
+    # Holes: the spot under every drill; each drill against its hole's
+    # printed band; the tips through F into the air.
     holes = g["holes"]
 
     def tool_dia(tool: str) -> float:
         return _shop_tool(plan, shop, tool)["diameter_mm"]
 
-    d17, d15, d9, d_ream = (
-        tool_dia(t) for t in ("drill-17", "drill-15", "drill-9", "reamer-1865")
-    )
-    for name, dia in (("hanger_hole", d15), ("clamp_hole_1", d9), ("clamp_hole_2", d9)):
+    d316, d15, d9 = (tool_dia(t) for t in ("drill-3-16", "drill-15", "drill-9"))
+    for name, dia in (
+        ("axle_bore", d316),
+        ("hanger_hole", d15),
+        ("clamp_hole_1", d9),
+        ("clamp_hole_2", d9),
+    ):
         low, high = holes[name]["dia"]
         if not low - SIZE_TOL_MM <= dia <= high:
             raise ValueError(
                 f"the drill Ø{dia} is outside {name}'s band {holes[name]['dia']}"
             )
-    low, high = holes["axle_bore"]["dia"]
-    if not low - SIZE_TOL_MM <= d_ream <= high:
-        raise ValueError(f"reamer-1865 Ø{d_ream} is outside the axle bore's band")
-    if not 0 < d_ream - d17 <= p["ream_stock_max_mm"]:
-        raise ValueError("the #17 leaves the .1865 reamer no stock or too much")
     spot = p["spot_dia_mm"]
-    if spot >= min(d17, d15, d9):
+    if spot >= min(d316, d15, d9):
         raise ValueError("the spot is not under every drill: it would chamfer a hole")
     spot_depth = _spot_depth(spot)
     # The thinnest bar's top stands depth_hi − depth_lo under the programs'
@@ -556,26 +538,23 @@ def context(
     )
     if thin_spot <= CENTRE_DRILL["pilot_mm"]:
         raise ValueError("on the thinnest bar the spot does not reach past the pilot")
-    for key, dia in (("drill_17", d17), ("drill_15", d15), ("drill_9", d9)):
+    for key, dia in (("drill_3_16", d316), ("drill_15", d15), ("drill_9", d9)):
         _agree(plan, f"{key}_tip_mm", -(p["drill_past_mm"] + _point(dia)))
     for cut, dia in (
         ("left spot", spot),
         ("right spot", spot),
-        ("axle drill", d17),
+        ("axle drill", d316),
         ("hanger drill", d15),
         ("clamp drill", d9),
-        ("axle ream", d_ream),
     ):
         if not math.isclose(_cut(plan, cut, "cutter_dia_mm"), dia, abs_tol=1e-4):
             raise ValueError(f"'{cut}' cutter_dia_mm is not its tool's Ø{dia}")
-    ream_tip = -p["ream_past_mm"]
-    _agree(plan, "ream_tip_mm", ream_tip)
     spot_rpm, spot_feed = _setting(plan, shop, "left spot")
     if _setting(plan, shop, "right spot") != (spot_rpm, spot_feed):
         raise ValueError("'right spot' runs at another speed than 'left spot'")
     speeds = {
         cut: _setting(plan, shop, cut)
-        for cut in ("axle drill", "hanger drill", "clamp drill", "axle ream")
+        for cut in ("axle drill", "hanger drill", "clamp drill")
     }
 
     # Vise: the jaws, the stacks and each hold's reach.
@@ -683,7 +662,7 @@ def context(
         xy[name] = [_r(x), _r(y)]
     # Both stacks against the moving jaw, under edge B: every hole and the
     # largest tool through it exit clear of them.
-    largest = max(d17, d15, d9, d_ream, CENTRE_DRILL["body_mm"])
+    largest = max(d316, d15, d9, CENTRE_DRILL["body_mm"])
     for name, (_x, y) in xy.items():
         if not (-top_w + 2 * t < y - largest / 2 and y + largest / 2 < 0.0):
             raise ValueError(
@@ -725,22 +704,13 @@ def context(
     spot_tool = point_tool(
         "spot", CENTRE_DRILL["body_mm"], spot_rpm, spot_feed, CENTRE_DRILL["point_deg"]
     )
-    reamer_tool = {
-        "tool": "reamer-1865",
-        "dia": d_ream,
-        "shape": "endmill",
-        "flutes": 6,
-        "rpm": speeds["axle ream"][0],
-        "feed": speeds["axle ream"][1],
-        "plunge": speeds["axle ream"][1],
-    }
     drill_rows = {
         "axle_drill": (
-            "drill-17",
-            d17,
+            "drill-3-16",
+            d316,
             "axle drill",
             ["axle_bore"],
-            "drill the axle bore #17 through",
+            "drill the axle bore 3/16 through",
         ),
         "hanger_drill": (
             "drill-15",
@@ -840,19 +810,6 @@ def context(
         },
         drill_job("axle_drill", "left"),
         drill_job("hanger_drill", "left"),
-        {
-            **reamer_tool,
-            "frame": "left",
-            "label": "axle ream",
-            "stock": stocks["left"],
-            "ops": [
-                [
-                    "axle_ream",
-                    "ream the axle bore .1865",
-                    _reamed(xy["axle_bore"], depth_hi, ream_tip, clear),
-                ]
-            ],
-        },
         {
             **end_tool,
             "frame": "right",
@@ -970,11 +927,7 @@ def context(
         ]
 
     def hole_checks(
-        names_: list[str],
-        bottom: float,
-        radius: float,
-        frame: str,
-        feed_out: bool = False,
+        names_: list[str], bottom: float, radius: float, frame: str
     ) -> list[list[Any]]:
         centres = [xy[n] for n in names_]
         return [
@@ -983,7 +936,6 @@ def context(
             ["vertical_below_top", {"z_top": depth_hi}],
             ["air_feed", {"z_top": depth_hi}],
             ["keep_out", {"radius": radius, "boxes": keep[frame]}],
-            *([["feed_out", {"z_top": depth_hi}]] if feed_out else []),
         ]
 
     def end_checks(
@@ -1028,9 +980,8 @@ def context(
             [
                 tn["em-half"],
                 tn["spot"],
-                tn["drill-17"],
+                tn["drill-3-16"],
                 tn["drill-15"],
-                tn["reamer-1865"],
             ],
             [
                 ([end_rpm], end_checks(-r, -left_skim - r, -1.0, "left")),
@@ -1045,18 +996,14 @@ def context(
                 ),
                 (
                     [speeds["axle drill"][0]],
-                    hole_checks(["axle_bore"], tips["axle_drill"], d17 / 2, "left"),
+                    hole_checks(["axle_bore"], tips["axle_drill"], d316 / 2, "left"),
                 ),
                 (
                     [speeds["hanger drill"][0]],
                     hole_checks(["hanger_hole"], tips["hanger_drill"], d15 / 2, "left"),
                 ),
-                (
-                    [speeds["axle ream"][0]],
-                    hole_checks(["axle_bore"], ream_tip, d_ream / 2, "left", True),
-                ),
             ],
-            min(end_z, tips["axle_drill"], tips["hanger_drill"], ream_tip),
+            min(end_z, tips["axle_drill"], tips["hanger_drill"]),
         ),
         "WB04_right": (
             [tn["em-half"], tn["spot"], tn["drill-9"]],
