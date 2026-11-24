@@ -467,7 +467,7 @@ name = "2-3/4 x .064 HSS slitting saw, 1 in hole, on the R8 stepped saw arbor"
 ref = "slitting-saw-2-75-064"
 [[tools]]
 id = "saw-arbor"
-name = "R8 stepped saw arbor (owned): 1 in pilot step, 1.25 x .50 cap, M8 flat-head screw (5 mm hex key), not keyed"
+name = "R8 stepped saw arbor (owned): 1 in pilot step, body and cap 1.25 across, cap .50 thick, M8 flat-head screw (5 mm hex key), not keyed"
 ref = "saw-arbor-r8-stepped"
 [[tools]]
 id = "dti"
@@ -757,7 +757,7 @@ instruction = "G54 Z0 again, from the saw's lower face: spindle stopped, turn th
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First load only: prove CA02_foot_notch in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})); it rises straight to its clear height before any X or Y move, and the saw, the cap and the screw clear the jaws and the four bars' ends; Cycle Start again at its M0 stop. Then Z0 back."
+instruction = "First load only: prove CA02_foot_notch in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})); it rises straight to its clear height before any X or Y move, and the saw, the arbor's body, the cap and the screw clear the jaws and the four bars' ends; Cycle Start again at its M0 stop. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -765,7 +765,7 @@ speed_kind = "spindle"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Run CA02_foot_notch (the saw; set 100, in the L range): first one light pass along −Y across the four foot ends, {{process.foot_notch_light_mm:in.3dot}} deep, the saw's lower face at the ledge (conventional: the saw turns clockwise left of the ends; fed the other way it would grab and turn on the arbor). Cutting oil on the saw. The file then stops (M0): spindle off, the saw raised clear beyond the moving jaw's side."
+instruction = "Run CA02_foot_notch (the saw; set 100): first one light pass along −Y across the four foot ends, {{process.foot_notch_light_mm:in.3dot}} deep, the saw's lower face at the ledge (conventional: the saw turns clockwise left of the ends; fed the other way it would grab and turn on the arbor). Cutting oil on the saw. The file then stops (M0): spindle off, the saw raised clear beyond the moving jaw's side."
 rpm = 100
 feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -931,7 +931,7 @@ instruction = "G54 Z0 again, from the saw's lower face: spindle stopped, turn th
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First load only: prove CA04_top_notch in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})); it rises straight to its clear height before any X or Y move, and the saw, the cap and the screw clear the jaws and the four bars' ends; Cycle Start again at its M0 stop. Then Z0 back."
+instruction = "First load only: prove CA04_top_notch in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})); it rises straight to its clear height before any X or Y move, and the saw, the arbor's body, the cap and the screw clear the jaws and the four bars' ends; Cycle Start again at its M0 stop. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -939,7 +939,7 @@ speed_kind = "spindle"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Run CA04_top_notch (the saw; set 100, in the L range): first one light pass along +Y across the four top ends, {{process.top_notch_light_mm:in.3dot}} into the ends, the saw's lower face at the ledge (conventional: the saw turns clockwise right of the ends; fed the other way it would grab and turn on the arbor). Cutting oil on the saw. The file then stops (M0): spindle off, the saw raised clear beyond the fixed jaw's side."
+instruction = "Run CA04_top_notch (the saw; set 100): first one light pass along +Y across the four top ends, {{process.top_notch_light_mm:in.3dot}} into the ends, the saw's lower face at the ledge (conventional: the saw turns clockwise right of the ends; fed the other way it would grab and turn on the arbor). Cutting oil on the saw. The file then stops (M0): spindle off, the saw raised clear beyond the fixed jaw's side."
 rpm = 100
 feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [

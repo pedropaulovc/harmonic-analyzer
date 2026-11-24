@@ -460,7 +460,7 @@ name = "2-3/4 x .064 HSS slitting saw, 1 in hole, on the R8 stepped saw arbor"
 ref = "slitting-saw-2-75-064"
 [[tools]]
 id = "saw-arbor"
-name = "R8 stepped saw arbor (owned): 1 in pilot step, 1.25 x .50 cap, M8 flat-head screw (5 mm hex key), not keyed"
+name = "R8 stepped saw arbor (owned): 1 in pilot step, body and cap 1.25 across, cap .50 thick, M8 flat-head screw (5 mm hex key), not keyed"
 ref = "saw-arbor-r8-stepped"
 [[tools]]
 id = "dti"
@@ -877,7 +877,7 @@ instruction = "G54 Z0 again, from the saw's lower face: spindle stopped, turn th
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First load only: prove CR06_slot in air, Z0 raised 1.000 in: it rises straight to its clear height before any X or Y move and between its passes; the saw, the cap and the screw clear the jaws, the frames' ends and both crowns; Cycle Start again at its M0 stop. Then Z0 back."
+instruction = "First load only: prove CR06_slot in air, Z0 raised 1.000 in: it rises straight to its clear height before any X or Y move and between its passes; the saw, the arbor's body, the cap and the screw clear the jaws, the frames' ends and both crowns; Cycle Start again at its M0 stop. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
