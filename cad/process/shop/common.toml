@@ -834,7 +834,7 @@ description = "Mitutoyo 81-piece inch gauge block set, shop grade"
 description = "HSS lathe grooving bit, .020 in wide or less, corners R.008 max."
 [tools.lathe-tool-sharp-nose]  # MHA-PD-08 R.004 max. corners, .016 neck; MHA-PD-17 SPIGOT ROOT R.004 MAX; MHA-PD-23 R.005 MAX land-to-head corner; MHA-PN-04 R.008 max. shoulder
 description = "Lathe turning tool, nose radius .004 in or less, tip under .016 wide"
-[tools.reamer-0930]  # MHA-DT-11 2X .0930 +.0005/.0000 REAM .1555; MHA-PD-18 Ø.0930 +.0005/.0000 2X REAM THRU; MHA-PD-22 Ø.0930 +.0005/.0000 2X REAM THRU
+[tools.reamer-0930]  # MHA-DT-11 2X .0930 +.0005/.0000 REAM .1555; MHA-PD-18 Ø.0930 +.0005/.0000 2X REAM THRU; MHA-PD-22 Ø.0930 2X REAM THRU, no band
 description = ".0930 in HSS chucking reamer"
 diameter_mm = 2.3622
 [tools.radius-gauges]  # inventory gauges.radius-gauges (to buy); MHA-PD-12 4X R.07 filed corners

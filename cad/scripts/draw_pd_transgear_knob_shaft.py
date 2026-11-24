@@ -118,6 +118,8 @@ from pd_transgear_knob_shaft_spec import (
     STOCK_PROFILE,
     GAP_AZIMUTH_DEG,
     SPAN_TEETH,
+    SINGLE_MAX_SUFFIX,
+    SINGLE_MIN_SUFFIX,
     TOOTH_SPACE_GAUGE_PIN_DIA_MM,
     TOOTH_SPACE_CALLOUT,
     TOOTH_SPACE_CALLOUT_PROPERTY,
@@ -232,8 +234,8 @@ JOURNAL_CLEARANCE_MM = (
 # function), one reason each with no values in the text (machinist review
 # r1 of #2019, rule 7); and the neck's mate, which its Ø limits and the
 # flat's end limits link (round 2: the flat end's .005 band named no mate).
-# The overall prints .XXX plain: the title block's ±.005 keeps the knob
-# cup's fit-up facing positive.  They stand in the open field right of the
+# The journal's length is the controlled one at .XX and the overall a .XX
+# reference.  They stand in the open field right of the
 # overall's tip witness line, over the title block; at 2.2 mm a line runs
 # ~1.5 mm a character, so no line runs past 70 characters (~105 mm).
 JOURNAL_FIT_NOTE = 1
@@ -253,13 +255,14 @@ NOTE_TEXTS = (
     # Made to fit (fit audit 2026-11-23, pending owner confirmation): the
     # collar's bore is drilled and its pin pressed first; the core's Ø and
     # the flat's distance print as REF and link this note, whose two fits by
-    # feel are the requirement, each with what it protects (rule 4).
+    # feel are the requirement.  No reason prints (owner ruling 2026-11-24:
+    # a justification on the sheet is narration).  The acceptance prints
+    # here once, on the member made last; MHA-PD-22's bore callout names
+    # this core.
     (
         D_SECTION_FIT_NOTE,
-        f"MADE TO FIT {_COLLAR}: TURN THE CORE TO SLIDE IN ITS BORE BY HAND, "
-        f"NO SHAKE (CENTRES CHAIN WHEEL {_config.parts('pd-transgear-removable')['number']}); "
-        "THEN MILL THE D-FLAT LAST UNTIL THE COLLAR, ITS PIN PRESSED, SLIDES ON "
-        "BY HAND (KEEPS PIN CREST CLEAR, LEAST PLAY).",
+        f"MADE TO FIT {_COLLAR}: CORE SLIDES IN ITS BORE BY HAND, NO SHAKE; "
+        "D-FLAT: COLLAR WITH PIN PRESSED SLIDES ON BY HAND.",
     ),
     (STATIONS_NOTE, f"D-FLAT SEAT UNDER {_COLLAR}."),
     (NECK_NOTE, f"NECK AND D-FLAT END UNDER {_COLLAR}."),
@@ -382,14 +385,14 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     "ThreadEndFromTip": ((THREAD_END_X + TIP_X) / 2.0, _ROW_Y[0]),
     "CoreFromTip": ((CORE_END_X + TIP_X) / 2.0, _ROW_Y[1]),
     "TipStation": ((F_X + TIP_X) / 2.0, _ROW_Y[2]),
-    # The journal, the rest of the overall, as a reference.
+    # The journal, pinion rear face to rear end: controlled, .XX.
     "JournalLength": ((PINION_REAR_X + REAR_X) / 2.0, _ROW_Y[0]),
-    # The controlled overall, tip face to rear face, on the last row, its
-    # rear witness line right of the gear data block.  Its text, with its
-    # function on the value's line, centres between the rear witness line
-    # and the pinion's rear witness line (round 3: "2.792 SEE NOTE 3" left
-    # of F ran into the face width's left witness line and arrow, which drop
-    # to the overall text's height); OVERALL_TEXT_* below check both ends.
+    # The reference overall, tip face to rear face, on the last row, its
+    # rear witness line right of the gear data block.  Its text centres
+    # between the rear witness line and the pinion's rear witness line
+    # (round 3: text left of F ran into the face width's left witness line
+    # and arrow, which drop to the overall text's height); OVERALL_TEXT_*
+    # below check both ends.
     "OverallLength": ((REAR_X + PINION_REAR_X) / 2.0, _ROW_Y[5] + _OVERALL_LIFT),
     # #2425: the rear chamfer's leg, under the rear end (REAR_CHAMFER_FUNCTION).
     "RearChamferSize": (REAR_X + 0.030, _sheet_y(-JOURNAL_DIA / 2.0) - 0.0065),
@@ -454,42 +457,44 @@ DIMENSION_CALLOUTS_BELOW = {
     "FlatToAxis": D_SECTION_FIT_LINK,
     "ToothSpan": SPAN_CALLOUT,
     "RearChamferSize": REAR_CHAMFER_FUNCTION,
+    "FlatEnd": NECK_LINK,
 }
 # The two D-flat stations link the seat note and the thread's end the thread
 # note, each on its value's line; detail
-# B's neck Ø (LIMITS) and the D-flat end's limits link the neck note, which
-# names both features and MHA-PD-22 once.  At nominal the flat's end stands
-# on the neck corner's R.004 tangent, so the note names the D-flat end in
-# words (round-4 repeat read a bare link as locating that tangent; round 5
+# B's neck Ø (LIMITS) links the neck note on its value's line and the D-flat
+# end's single MAX on the row under it (".007 MAX SEE NOTE 4" on one line
+# would run from F's witness line out over the end view), which
+# names both features and MHA-PD-22 once.  The note names the D-flat end in
+# words (round-4 repeat read a bare link as locating the neck corner's
+# tangent; round 5
 # read a bare `FLAT END` label as coined and unlinked).  (A row under the
 # neck Ø would top out past the border, and the side rows stand 10 mm apart.)
+# The four single limits carry no native tolerance: SolidWorks prints its
+# own as "max." and "min." (rule 26), so the limit word is the suffix.
 DIMENSION_SUFFIXES = {
     "RearChamferSize": REAR_CHAMFER_SUFFIX,
     "ThreadEndFromTip": f" {THREAD_LINK}",
     "CoreFromTip": f" {STATIONS_LINK}",
     "TipStation": f" {STATIONS_LINK}",
     "FrontReliefDia": f" {NECK_LINK}",
-    "FlatEnd": f" {NECK_LINK}",
+    "FlatEnd": SINGLE_MAX_SUFFIX,
+    "FlatToolRadius": SINGLE_MAX_SUFFIX,
+    "FrontCornerRadius": SINGLE_MAX_SUFFIX,
+    "RootDia": SINGLE_MIN_SUFFIX,
     # Round 7: the neck width keeps .XXX (at .XX its least, .006, falls
     # under the flat end's .007) and links the neck note like its neighbours.
     "FrontReliefWidth": f" {NECK_LINK}",
-    # Round 6: the overall keeps .XXX (at .XX the journal's stand-out can
-    # outrun the knob cup's supplied pilot, pd_transgear_knob_cup_spec
-    # FACING_REMOVAL) and states that function once, at the dimension, not
-    # in a note (r3).
-    "OverallLength": (
-        f" SETS {_config.parts('pd-transgear-knob-cup')['number']} FIT-UP"
-    ),
 }
+# The overall prints as a .XX reference: the journal's length is the
+# controlled dimension (pd_transgear_knob_shaft_spec.JOURNAL_LENGTH_PLACES),
+# so no three-place overall needs a function the sheet may not state.
 # The overall's one-line text (~2.75 mm a character, centred on its keep;
 # the round-6 render's digits ran 2.32 mm) ends 5 mm short of the face
 # width's left witness line (the pinion's rear face, which drops to the
 # text's height with its arrow) and starts 5 mm right of the rear witness
 # line.  It sits over the overall's line; SPAN 2 TEETH and the GEAR DATA
 # block stand under that line and left of the rear witness line.
-OVERALL_TEXT_CHARS = len(inch_text(REAR_END_Z - TIP_Z, 3)) + len(
-    DIMENSION_SUFFIXES["OverallLength"]
-)
+OVERALL_TEXT_CHARS = len(f"({inch_text(REAR_END_Z - TIP_Z, 2)})")
 _OVERALL_HALF = OVERALL_TEXT_CHARS * 0.00275 / 2.0
 OVERALL_TEXT_LEFT = SIDE_KEEP["OverallLength"][0] - _OVERALL_HALF
 OVERALL_TEXT_RIGHT = SIDE_KEEP["OverallLength"][0] + _OVERALL_HALF
@@ -497,12 +502,12 @@ if OVERALL_TEXT_RIGHT > PINION_REAR_X - 0.005:
     raise AssertionError("the overall's text runs into the face width's witness line")
 if OVERALL_TEXT_LEFT < REAR_X + 0.005:
     raise AssertionError("the overall's text runs over the rear witness line")
-# Reference sizes (parenthesized): the journal (the rest of the controlled
-# overall), the thread blank the #8-32 UNC-2A class governs, and the D-core's
-# Ø and its flat's distance from the axis, both made to fit MHA-PD-22
-# (note 2).  Name -> diameter glyph.
+# Reference sizes (parenthesized): the overall (the journal's length
+# controls the rear end), the thread blank the #8-32 UNC-2A class
+# governs, and the D-core's Ø and its flat's distance from the axis, both
+# made to fit MHA-PD-22 (note 2).  Name -> diameter glyph.
 REFERENCE_DIMENSIONS = {
-    "JournalLength": False,
+    "OverallLength": False,
     "ThreadBlankDia": True,
     "CoreDia": True,
     "FlatToAxis": False,
@@ -565,7 +570,14 @@ if GEAR_DATA_RIGHT > REAR_X - 0.003:
 NOTES_XY = (0.300, 0.100)
 TITLE_BLOCK_TOP = 0.0663
 NOTES_CHAR_HEIGHT = GEAR_DATA_CHAR_HEIGHT
-DATUM_A_SYMBOL = (END_CENTER[0] - 0.017, END_CENTER[1] - 0.018)
+# Datum A stands on the journal's own upper outline in the side view, where
+# only the journal can be meant: on the rear view's journal circle its
+# triangle read as resting on the tooth-root circle .005 outside it
+# (machinist review r2 of the fit batch).  A turned flank is a drawing
+# SILHOUETTE.  The tag stands between detail B's kept texts (right ends
+# ~0.100) and the journal Ø's line (0.1348), under the detail's crop.
+DATUM_A_PICK = (REAR_X + 0.041, _sheet_y(JOURNAL_DIA / 2.0))
+DATUM_A_SYMBOL = (DATUM_A_PICK[0], DATUM_A_PICK[1] + 0.011)
 # The rear #2-56 tap's native callout, from the rear view's hole to the open
 # field under the journal.  Its leader lands on the lower corner of the
 # rows' underline, so rows that straddle the hole's x are struck by it
@@ -703,12 +715,12 @@ DETAIL_KEEP: dict[str, tuple[float, float]] = {
     # on the keep, ends 2.5 mm short of the crop circle (at 32.5 mm in, run
     # 20261031T233549214Z, the circle crossed its last letter).
     "FrontCornerRadius": (_CORNER_CENTER[0] - 0.0365, _CORNER_CENTER[1] - 0.006),
-    # The D-flat tool's end from F, under the crop: its limits and the neck
-    # note's link on the value's line, left of F's witness line, on its own
-    # dimension line 9 mm under the neck width's (round 1: at 2.3 mm the two
-    # read as one line carrying .007/.002 and .016).  The line (~174) stays
+    # The D-flat tool's end from F, under the crop: its single MAX on the
+    # value's line and the neck note's link on the row under it, left of F's
+    # witness line, on its own dimension line 9 mm under the neck width's
+    # (round 1: at 2.3 mm the two read as one line).  The line (~174) stays
     # over the end view's teeth (top 0.1735) and the journal's outline
-    # (0.169); the ~39 mm text, centred on the keep, ends 5.5 mm left of F
+    # (0.169); the ~26 mm block, centred on the keep, ends 12 mm left of F
     # and right of the end view's tooth tips (x ~0.0585).
     "FlatEnd": (_F_DETAIL_X - 0.025, _DETAIL_BOTTOM - 0.0160),
     # Left of the crop, just over the tool's end arc (centre ~0.105, 0.2003):
@@ -1399,8 +1411,9 @@ def build(adapter: Any) -> dict[str, str]:
     journal_datum = PART_DATUMS[0]
     add_datum_feature(
         adapter,
-        end,
-        entity=visible_circle_edge(adapter, end, JOURNAL_DIA),
+        side,
+        edge_xy=DATUM_A_PICK,
+        entity_type="SILHOUETTE",
         symbol_xy=DATUM_A_SYMBOL,
         datum=journal_datum.letter,
         label="knob running journal datum",

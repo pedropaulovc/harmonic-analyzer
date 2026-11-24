@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import ast
+import inspect
 import math
+import re
 
 import pytest
 
 import _config
+from _feature_requirements import requirements_for
 from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm
 import build_dt_drive_train_assembly as bdt
@@ -138,7 +142,7 @@ def _wheel_float(hole_dia: float) -> float:
     return (
         (hole_max - dowel_min) / 2.0
         + crank.DRIVE_PIN_OFFSET_TOL
-        + seat_geometry.DRIVE_PIN_OFFSET_TOL
+        + spec.PIN_LOCATION_TOL
     )
 
 
@@ -187,6 +191,107 @@ def test_chain_on_the_floated_crank_wheel_keeps_its_radial_air() -> None:
     assert corner < bdt.CHAIN_RADIAL_AIR_WORST_MIN
     with pytest.raises(AssertionError, match="radial air"):
         bdt.chain_radial_air("spigot", spec.ANSI_PLATE_HEIGHT, spigot_max, loose)
+
+
+def _shop_location_row(process: str) -> float:
+    """drawing-guidelines "What the shop holds": the narrowest location band
+    (mm, +/-) of a hole cut by ``process``, read from the table itself."""
+    feature = {
+        "drill": "location of a drilled hole from a datum edge or bore",
+        "ream": "location of a reamed or bored hole or a milled step, up to 6 in from its datum",
+    }[process]
+    text = (_config.CONFIG_DIR.parent / "docs" / "drawing-guidelines.md").read_text(
+        encoding="utf-8"
+    )
+    match = re.search(rf"^\| {re.escape(feature)} \| ±(\.\d+) \|", text, re.MULTILINE)
+    assert match, feature
+    return float(match.group(1)) * 25.4
+
+
+def _module_calls(module, function: str) -> list[ast.Call]:
+    tree = ast.parse(inspect.getsource(module))
+    return [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == function
+    ]
+
+
+def _requirement_half_band(drawing, name: str) -> tuple[str, float]:
+    """A drawing requirement's offset process and its +/- band (mm)."""
+    fields = requirements_for(drawing)[name].fields
+    low, high = fields["offset"][0]
+    return fields["process"][0], (high - low) / 2.0
+
+
+def test_wheel_seat_floats_charge_what_each_sheet_prints() -> None:
+    """Each centre term of both seats' wheel floats is what that centre's
+    sheet prints: its native band, or, where the sheet prints it REF, the
+    shop's location row for the hole's process.  A sheet that changes a band
+    or its REF status without the float following fails here (fit audit
+    question 8 applied to MHA-PD-22 only: the wheels' and MHA-DT-11's
+    centres print a band, MHA-PD-22's are REF targets)."""
+    import build_dt_crankshaft as crank_part
+    import build_pd_paper_drive_assembly as paper
+    import build_pd_transgear_drive_collar as collar_part
+    import build_pd_transgear_removable as wheel_part
+    import draw_dt_crankshaft as crank_drawing
+    import draw_pd_transgear_drive_collar as collar_drawing
+    import pd_transgear_removable_callouts as wheel_callouts
+
+    # MHA-DT-11: a native symmetric band on both DrivePinOffset dimensions.
+    crank_bands = {
+        eval(ast.unparse(call.args[3]), vars(crank_part))  # noqa: S307 -- module constant
+        for call in _module_calls(crank_part, "set_dimension_symmetric_tolerance")
+        if "DrivePinOffset" in ast.unparse(call.args[2])
+    }
+    _process, declared = _requirement_half_band(crank_drawing, "drive_pin_1")
+    assert len(crank_bands) == 1
+    assert crank_bands.pop() == pytest.approx(declared)
+    assert crank.WHEEL_SEAT_PIN_CENTRE_TOL == pytest.approx(declared)
+    # MHA-PD-09: a native symmetric band on both offsets, neither REF.
+    bands = wheel_part.family_bands()
+    wheel_bands = {
+        bands[("BorePinsProfile", name)] for name in ("PinPosY", "PinNegY")
+    }
+    assert len(wheel_bands) == 1
+    kind, lower, upper = wheel_bands.pop()
+    assert kind == 4 and lower == -upper  # swTolSYMMETRIC
+    assert not {"PinPosY", "PinNegY"} & spec.DRAWING_REFERENCE_DIMENSIONS
+    assert "PinPosY" not in wheel_callouts.authored_text()["BorePinsProfile"]
+    assert crank.WHEEL_SEAT_HOLE_CENTRE_TOL == pytest.approx(upper)
+    assert paper.KNOB_SEAT_HOLE_CENTRE_TOL == pytest.approx(upper)
+    # MHA-PD-22: both offsets REF (no native band), so the shop's row for
+    # their process, which the drawing's requirement declares.
+    referenced = {
+        call.args[2].value
+        for call in _module_calls(collar_part, "_reference")
+        if getattr(call.args[1], "value", None) == "PinHoleProfile"
+    }
+    assert referenced == {"PinPosY", "PinNegY"}
+    assert not any(
+        "PinHoleProfile" == getattr(call.args[1], "value", None)
+        for call in _module_calls(collar_part, "set_dimension_symmetric_tolerance")
+    )
+    process, declared = _requirement_half_band(collar_drawing, "dowel_a")
+    assert declared == pytest.approx(_shop_location_row(process))
+    assert paper.KNOB_SEAT_PIN_CENTRE_TOL == pytest.approx(declared)
+    # Both floats are built from those terms.
+    assert crank.WHEEL_SEAT_FLOAT == pytest.approx(
+        min(_wheel_float(seat_geometry.PIN_HOLE_DIA), crank._WHEEL_BORE_FLOAT)
+    )
+    slip = _wheel_float(seat_geometry.PIN_HOLE_DIA) - (
+        crank.WHEEL_SEAT_PIN_CENTRE_TOL + crank.WHEEL_SEAT_HOLE_CENTRE_TOL
+    )
+    assert knob_pin.DIA_BAND_IN[0] == dowel_spec.DIA_BAND_IN[0]
+    assert paper.KNOB_WHEEL_SEAT_FLOAT == pytest.approx(
+        min(
+            slip + paper.KNOB_SEAT_PIN_CENTRE_TOL + paper.KNOB_SEAT_HOLE_CENTRE_TOL,
+            max(collar.PILOT_BORE_CLEARANCE),
+        )
+    )
 
 
 def test_bought_chain_reach_about_the_seat_face() -> None:

@@ -98,7 +98,6 @@ from pd_transgear_drive_collar_spec import (
     PIN_HOLE_DIA,
     PIN_REAR_INSET_WORST,
     REAR_BREAK,
-    REAR_BREAK_TOL,
     UNIT,
     circle_overlap_area,
     cone_cylinder_volume,
@@ -550,17 +549,15 @@ def build(adapter) -> dict[str, str]:
     # and remain REF on part and drawing; the flat pin's floor station takes
     # the title block's row.  The bore is a named drill at the title block's
     # DRILLED HOLES row and the three reamed pin holes print their reamers'
-    # sizes with no band (their bought dowels are their gauges, sheet note 3):
-    # none carries a native band.  The two drive-pin offsets are REF targets
-    # (below), accepted by the wheels' trial (sheet note 4).
+    # sizes with no band (their bought dowels are their gauges, sheet note
+    # REAM_NOTE): none carries a native band.  The two drive-pin offsets are
+    # REF targets (below), accepted by the wheels' trial (sheet note
+    # TRIAL_NOTE).  The rear break takes the title block's row.
     set_dimension_bilateral_tolerance(
         adapter, "BodyProfile", "CollarDia", *deviations(OD_BAND), display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
         adapter, "FlatPinProfile", "FlatPinCentre", FLAT_PIN_CENTRE_TOL, display_unit=UNIT
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "RearBreakProfile", "RearBreak", REAR_BREAK_TOL, display_unit=UNIT
     )
 
     apply_material(adapter, MATERIAL)

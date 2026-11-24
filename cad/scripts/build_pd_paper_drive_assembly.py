@@ -258,7 +258,7 @@ from build_pd_guide_lock import (  # noqa: E402
 # the same spec constants the guide and lock builds author on their model
 # dimensions, so the sheets and the sweep read one source.
 from _fit_deviations import deviations  # noqa: E402
-from _printed_tolerance import printed_band_mm, printed_deviations  # noqa: E402
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations  # noqa: E402
 from pd_guide_lock_spec import (  # noqa: E402
     DRAWING_PRECISION_BY_NAME as LOCK_PRECISION,
     HOLE_PATTERN_X as LOCK_HOLE_PATTERN_X,
@@ -771,13 +771,32 @@ CHAIN_REACH_REAR_WORST = seat_geometry.CHAIN_REACH_REAR_WORST  # 3.587
 # Radially, the only knob-stack feature between the seat face and the disc is
 # the drive collar (the pins sit inside it); at its print-worst (largest)
 # radius it must stand inside the knob-wheel plates' inner edge, CAD link and ANSI,
-# with the wheel floated off-centre on its pins (the crank's same pins, holes
-# and bands: dt_crankshaft_spec.WHEEL_SEAT_FLOAT).
+# with the wheel floated off-centre on its pins by KNOB_WHEEL_SEAT_FLOAT.
 KNOB_CHAIN_INNER_R = min(
     REMOVABLE.chain_plate_inner_radius(REMOVABLE.KNOB_TEETH, h)
     for h in (2.0 * CHAIN_PLATE_HALF_H, REMOVABLE.ANSI_PLATE_HEIGHT)
 )
 KNOB_COLLAR_R_WORST = (COLLAR.OD + max(COLLAR.OD_BAND)) / 2.0  # 8.75
+# The knob wheel on MHA-PD-22's pins, as dt_crankshaft_spec.WHEEL_SEAT_FLOAT
+# on the crank's: one hole's slip (drilled to its largest over the smallest
+# MHA-PD-VN-54 dowel) plus a pin centre and its hole centre at their limits,
+# opposite ways along the pins' line, capped by the bore's loosest air round
+# the collar's pilot.  Each centre term is what its sheet prints: MHA-PD-22's
+# offsets are REF targets (fit audit question 8), so its pins are charged the
+# shop's reamed-hole location row COLLAR.PIN_CENTRE_SHIFT_MAX (+/-.002), and
+# MHA-PD-09's holes their printed band REMOVABLE.PIN_LOCATION_TOL (+/-.0009).
+KNOB_SEAT_PIN_CENTRE_TOL = COLLAR.PIN_CENTRE_SHIFT_MAX
+KNOB_SEAT_HOLE_CENTRE_TOL = REMOVABLE.PIN_LOCATION_TOL
+KNOB_WHEEL_SEAT_FLOAT = min(
+    (
+        seat_geometry.PIN_HOLE_DIA
+        + drilled_oversize_mm(unit=REMOVABLE.UNIT)
+        - (KNOB_PIN.DIA + KNOB_PIN.DIA_BAND_IN[0] * KNOB_PIN.MM_PER_IN)
+    ) / 2.0
+    + KNOB_SEAT_PIN_CENTRE_TOL
+    + KNOB_SEAT_HOLE_CENTRE_TOL,
+    max(COLLAR.PILOT_BORE_CLEARANCE),
+)  # 0.177
 
 # Thumbnut MHA-PD-13 (ch23 p.58/59 + video 4/4 "unscrew the nut that holds the
 # other gear in place"): the knurled brass nut OUTERMOST on the knob shaft,

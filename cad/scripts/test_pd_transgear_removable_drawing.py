@@ -65,24 +65,22 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_pin_locations_print_inside_the_shared_band() -> None:
-    """Each hole's offset prints as a REF target (fit audit 2026-11-23); its
-    analysis scatter stays inside the band the shafts' pins share, so the
+    """Each hole is located inside the band the shafts' pins share, so the
     slip clearance absorbs both parts' spacing error; the drilled sizes print
-    their 3-place drill."""
-    assert callouts.TARGET_TEXT == {
-        ("BorePinsProfile", name): {callouts.TEXT_PREFIX: "(", callouts.TEXT_SUFFIX: ")"}
-        for name in ("PinPosY", "PinNegY")
-    }
-    authored = callouts.authored_text()["BorePinsProfile"]
-    assert authored["PinPosY"] == authored["PinNegY"] == {
-        callouts.TEXT_PREFIX: "(", callouts.TEXT_SUFFIX: ")"
-    }
-    # No native band on the offsets: the plate's is the only one.
-    assert set(part.family_bands()) == {("BlankProfile", "BlankWidth")}
+    their 3-place drill.  The offsets carry a native band, never REF: a
+    trial of the wheels on the pins bounds only their spacing (fit audit
+    question 8 is applied to MHA-PD-22's pins only)."""
     assert spec.DRAWING_PRECISION_BY_NAME["PinPosY"] == 4
     assert spec.DRAWING_PRECISION_BY_NAME["PinNegY"] == 4
     assert spec.DRAWING_PRECISION_BY_NAME["BoreDiaDim"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["PinPosDia"] == 3
+    band = (4, -spec.PIN_LOCATION_TOL, spec.PIN_LOCATION_TOL)  # swTolSYMMETRIC
+    assert part.family_bands() == {
+        ("BorePinsProfile", "PinPosY"): band,
+        ("BorePinsProfile", "PinNegY"): band,
+    }
+    assert not {"PinPosY", "PinNegY"} & spec.DRAWING_REFERENCE_DIMENSIONS
+    assert "PinPosY" not in callouts.authored_text()["BorePinsProfile"]
     assert spec.PIN_LOCATION_TOL <= seat_geometry.DRIVE_PIN_OFFSET_TOL
     assert spec.PIN_SLIP_CLEARANCE_MIN >= 2.0 * (
         seat_geometry.DRIVE_PIN_OFFSET_TOL + spec.PIN_LOCATION_TOL
@@ -94,14 +92,31 @@ def test_pin_locations_print_inside_the_shared_band() -> None:
         dt_crankshaft_spec.DRIVE_PIN_SPACING_ERROR_MAX / 2.0
         <= seat_geometry.DRIVE_PIN_OFFSET_TOL + 1e-12
     )
+    # The band has its register entry (rule 4).
+    import yaml
+
+    registry = yaml.safe_load(
+        (_config.CONFIG_DIR / "necessity" / "pd-transgear-removable.yaml").read_text(
+            encoding="utf-8"
+        )
+    )["necessity"]
+    assert [(row["id"], row["kind"]) for row in registry] == [("N-01", "gap")]
+    assert ".2756 ±.0009" in registry[0]["feature"]
+    assert "MHA-DT-11" in registry[0]["reason"]
+    assert "pd_transgear_removable_spec.PIN_LOCATION_TOL" in registry[0]["source"]
 
 
-def test_printed_plate_band_stays_inside_the_stacked_plate_band() -> None:
-    # Incoming plate inspection, not a facing-to-thickness operation.
+def test_the_supplied_plate_prints_as_reference_stock() -> None:
+    # Bought stock, never cut: "(.110)" AS SUPPLIED, no limits of size.  The
+    # shared stack keeps its analysis band about the same nominal.
     assert max(seat_geometry.PLATE_BAND) == 0.0 > min(seat_geometry.PLATE_BAND)
-    low, high = spec._PLATE_PRINTED
-    assert seat_geometry.PLATE + min(seat_geometry.PLATE_BAND) <= low < high
-    assert high <= seat_geometry.PLATE + max(seat_geometry.PLATE_BAND)
+    assert not hasattr(spec, "PLATE_PRINTED_BAND")
+    assert callouts.REFERENCE_TEXT[("BlankProfile", "BlankWidth")] == {
+        callouts.TEXT_PREFIX: "(", callouts.TEXT_SUFFIX: ")"
+    }
+    below = callouts.callouts_by_name(callouts.CALLOUT_BELOW)
+    assert below["BlankWidth"].strip() == "AS SUPPLIED"
+    assert f"{seat_geometry.PLATE / 25.4:.{spec.PLATE_PLACES}f}" == "0.110"
 
 
 def test_web_worst_case_is_the_printed_limits() -> None:
@@ -120,19 +135,13 @@ def test_web_worst_case_is_the_printed_limits() -> None:
     assert notes.BORE_PIN_WEB_WORST_IN <= web < notes.BORE_PIN_WEB_WORST_IN + 0.001
     assert 0.0 < notes.BORE_PIN_WEB_WORST_IN * 25.4 < seat_geometry.BORE_PIN_WEB
     assert notes.BORE_PIN_WEB_NOTE in notes.DRAWING_NOTES.splitlines()
-    # A wheel that binds on the pins has one hole drilled #39, the next
-    # number size: its web, re-derived the same way, prints beside the #40's.
-    assert notes.EASED_HOLE_DRILL == ("#39", 0.0995)
-    eased = web - (notes.EASED_HOLE_DRILL[1] - spec.PIN_HOLE_DIA / 25.4) / 2.0
-    assert eased == pytest.approx(0.01794, abs=1e-5)
-    assert notes.EASED_WEB_WORST_IN <= eased < notes.EASED_WEB_WORST_IN + 0.001
-    assert notes.BORE_PIN_WEB_NOTE == (
-        "BORE TO DRIVE-PIN HOLE WEB .018 MIN; .017 MIN AT A HOLE DRILLED #39."
-    )
-    # The acceptance is the trial on the pins, never a reading of the offsets.
-    assert notes.TRIAL_NOTE in notes.DRAWING_NOTES.splitlines()
-    assert "DROPS ON BOTH SEATS' PINS FREELY" in notes.TRIAL_NOTE
-    assert notes.EASED_HOLE_DRILL[0] in notes.TRIAL_NOTE
+    assert notes.BORE_PIN_WEB_NOTE == "BORE TO DRIVE-PIN HOLE WEB .018 MIN."
+    # No easing drill prints.
+    assert "#39" not in notes.DRAWING_NOTES
+    assert len(notes.DRAWING_NOTES.splitlines()) == 4
+    # The holes' callout names the mates' pins by number (rule 7).
+    rows = callouts.PIN_HOLE_CALLOUT.splitlines()
+    assert rows == ["#40 DRILL THRU", "SLIDING FIT ON PINS OF", "MHA-DT-11 AND MHA-PD-22"]
 
 
 def test_sprocket_data_lists_every_configuration() -> None:
@@ -154,7 +163,7 @@ def test_the_outside_diameter_is_a_model_dimension_not_sheet_text() -> None:
     """The supplied OD remains a part-owned model dimension, but claims no
     turning tolerance or manufacturing operation on any configuration."""
     assert "BlankDia" in spec.DRAWING_DIMENSIONS["BlankProfile"]
-    assert spec.DRAWING_REFERENCE_DIMENSIONS == {"BlankDia"}
+    assert "BlankDia" in spec.DRAWING_REFERENCE_DIMENSIONS
     assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
     # p (0.6 + cot(180/N)): T12 .250 (0.6 + 3.732) = 1.083 in.
     assert [
@@ -247,11 +256,9 @@ def test_notes_specify_every_blank_and_the_operations_not_on_the_views() -> None
     assert "HUB REMOVED FLUSH" in notes.DRAWING_NOTES
 
 
-def test_notes_stay_within_five_lines_and_never_restate_the_title_block() -> None:
-    # Five since the fit audit of 2026-11-23: the wheels' trial on the pins
-    # replaces the offsets' printed band and needs its one line.
+def test_notes_stay_within_four_lines_and_never_restate_the_title_block() -> None:
     lines = notes.DRAWING_NOTES.splitlines()
-    assert len(lines) <= 5
+    assert len(lines) <= 4
     text = notes.DRAWING_NOTES.upper()
     assert "DEBUR" not in text and "+0.10" not in text
     assert "DEBUR" not in str(_config.parts("pd-transgear-removable")["finish"]).upper()
@@ -286,9 +293,9 @@ def test_the_pin_locations_name_exactly_the_parts_the_drive_pins_press_into() ->
     assert not number.findall(notes.DRAWING_NOTES)
 
 
-def test_the_plate_band_names_the_chain_it_serves() -> None:
+def test_the_supplied_plate_names_no_mate() -> None:
     callout = callouts.callouts_by_name(callouts.CALLOUT_BELOW)["BlankWidth"]
-    assert _config.parts("sh-vn-chain-link")["number"] in callout
+    assert "MHA-" not in callout
 
 
 def test_the_sheet_names_t24_and_covers_what_every_configuration_shares() -> None:
@@ -305,7 +312,7 @@ def test_the_sheet_names_t24_and_covers_what_every_configuration_shares() -> Non
     assert len(shared) == 1
     for configuration in drawing.CONFIGURATION_VIEW_CENTERS:
         assert set(drawing.configuration_keep(configuration)) == {"BlankDia"}
-    assert spec.DRAWING_REFERENCE_DIMENSIONS == {"BlankDia"}
+    assert spec.DRAWING_REFERENCE_DIMENSIONS == {"BlankDia", "BlankWidth"}
 
 
 def test_the_part_authors_the_reference_mark_of_every_reference_dimension() -> None:

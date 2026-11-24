@@ -13,14 +13,6 @@ id = "drill-40"
 name = "#40 drill"
 ref = "drill-40"  # Drills #40
 
-# Fit audit 2026-11-23 (pending owner confirmation): the pin-hole offsets are
-# REF targets, each wheel accepted by dropping on both seats' pins; a wheel
-# that binds has one drive-pin hole drilled #39 (115-piece index).
-[[tools]]
-id = "drill-39"
-name = "#39 drill"
-ref = "drill-39"
-
 [[tools]]
 id = "drill-13-32"
 name = "13/32 drill"
@@ -33,6 +25,16 @@ id = "straightedge"
 name = "Straightedge: the 12 in combination square's blade"
 ref = "combination-square-starrett-c11h-12"
 
+# Requirement for the traveler that replaces this placeholder (fit audit
+# question 8 applied to MHA-PD-22 only; pd_transgear_removable_spec, near
+# PIN_LOCATION_TOL): the sheet prints each drive-pin hole .2756 +/-.0009 from
+# the bore axis, a band inside no row of drawing-guidelines "What the shop
+# holds" (narrowest hole location +/-.002, reamed or bored; drilled +/-.005;
+# RV-02 accepts it).  The plan must drill the 13/32 bore and both #40 holes in
+# one CNC mill set-up whose centre is swept true to the supplied teeth, say
+# how the +/-.0009 is reached (spot before each drill), and name how each
+# offset is read and the tool that reads it.  Trying the wheels on the pins
+# (MHA-PD-00) checks the assembly; it is not this sheet's acceptance.
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

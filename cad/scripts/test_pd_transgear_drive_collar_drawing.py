@@ -9,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 import _config
 import build_pd_transgear_drive_collar as part
@@ -94,7 +95,7 @@ def test_turned_diameters_and_lengths_print_on_the_side_view() -> None:
     )
     rows = [size_row, *drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines()]
     # Its widest rows, measured on run 20261117T123054105Z: the size row
-    # 63.9 mm (Ø to ")"), "PRESS FIT, PIN MHA-PD-VN-70" 63.6 mm.  Longer rows
+    # 63.9 mm (Ø to ")"), a 27-character mate row 63.6 mm.  Longer rows
     # need a new measurement.  The two spaces of ink air ending every row
     # print 1.3 mm each, and the block's widest row ends at the line.
     assert max(len(r.rstrip()) for r in rows) <= 27
@@ -281,7 +282,7 @@ def test_the_flat_pin_crest_drives_the_core_flat_with_bounded_play() -> None:
     # The pin's front end stands on the core's flat over a real length at
     # every corner of the fitted body, floor, pin and core-front bands, behind
     # the rear break's relief of its crest.
-    assert spec.FLAT_PIN_CORE_ENGAGEMENT_MIN == pytest.approx(0.03934 * inch, abs=1e-4)
+    assert spec.FLAT_PIN_CORE_ENGAGEMENT_MIN == pytest.approx(0.03623 * inch, abs=1e-4)
     nominal = spec.flat_pin_core_engagement(
         spec.LENGTH, spec.FLAT_PIN_FLOOR, spec.FLAT_PIN_LENGTH, shaft.CORE_FRONT_FROM_F
     )
@@ -326,27 +327,29 @@ def test_the_rear_break_lifts_the_pin_crest_off_the_root_corner() -> None:
     )
     assert cone_r > min(spec.FLAT_PIN_CREST_LIMITS)
     assert spec.FLAT_PIN_CREST_CORNER_AIR_MIN == pytest.approx(cone_r - reach)
-    assert spec.FLAT_PIN_CREST_CORNER_AIR_MIN == pytest.approx(0.3228, abs=1e-4)  # .0127
+    assert spec.FLAT_PIN_CREST_CORNER_AIR_MIN == pytest.approx(0.2466, abs=1e-4)  # .0097
     # Negative control: the bare crest, no break cone, has no air there.
     assert min(spec.FLAT_PIN_CREST_LIMITS) - reach <= 1e-9
 
 
 def test_the_rear_break_ends_inside_the_neck() -> None:
-    # The .010 leg at 44°, the widest and shallowest, ends .0104 in: inside the
-    # neck's .011, so the bore keeps its whole support on the core.
+    # The break takes the title block's ±.005 (fit audit 2026-11-23, pending
+    # owner confirmation).  Its .013 leg at 44°, the widest and shallowest,
+    # ends .0135 in: inside the neck's widest .021, so the bore's support on
+    # the core, counted from that width, is whole.
     assert spec.REAR_BREAK == pytest.approx(0.008 * 25.4)
-    assert spec.REAR_BREAK_TOL == pytest.approx(0.002 * 25.4)
-    assert spec.REAR_BREAK_DEPTH_MAX == pytest.approx(0.2630, abs=1e-4)  # .0104
-    assert spec.REAR_BREAK_DEPTH_MAX <= shaft.FRONT_RELIEF_WIDTH_MIN
+    assert spec.REAR_BREAK_TOL == pytest.approx(printed_band_mm(3, unit=spec.UNIT))
+    assert spec.REAR_BREAK_DEPTH_MAX == pytest.approx(0.3419, abs=1e-4)  # .0135
+    assert spec.REAR_BREAK_DEPTH_MAX <= shaft.FRONT_RELIEF_WIDTH_MAX
     # The widest, shallowest cone from the largest drilled bore reaches down
-    # to the lowest crest .0237 in from F; the pin bears on the flat only
+    # to the lowest crest .0268 in from F; the pin bears on the flat only
     # behind it, past the neck's widest .021.
     bore_r_max = spec.BORE_DIA / 2.0 + max(spec.BORE_DIA_BAND) / 2.0
     assert spec.rear_break_radius(
         spec.FLAT_PIN_CREST_RELIEF_MAX, bore_r_max, max(spec.REAR_BREAK_LIMITS),
         min(spec.REAR_BREAK_ANGLE_LIMITS),
     ) == pytest.approx(min(spec.FLAT_PIN_CREST_LIMITS))
-    assert spec.FLAT_PIN_CREST_RELIEF_MAX == pytest.approx(0.02366 * 25.4, abs=1e-4)
+    assert spec.FLAT_PIN_CREST_RELIEF_MAX == pytest.approx(0.02677 * 25.4, abs=1e-4)
     assert spec.FLAT_PIN_CREST_RELIEF_MAX > shaft.FRONT_RELIEF_WIDTH_MAX
 
 
@@ -375,7 +378,7 @@ def test_the_knob_reversal_play_costs_a_fraction_of_a_millimetre_of_paper() -> N
 def test_the_flat_pin_ream_keeps_its_walls_and_stays_in_the_body() -> None:
     # The web to the -Y drive-pin hole is the one shortfall: over the floor,
     # printed as a MIN note; the O.D. and pilot-shoulder walls meet target.
-    assert spec.FLAT_PIN_WEB_WORST == pytest.approx(0.076 * 25.4)
+    assert spec.FLAT_PIN_WEB_WORST == pytest.approx(0.075 * 25.4)
     assert spec.WALL_FLOOR <= spec.FLAT_PIN_WEB_WORST < spec.WALL_TARGET_MM
     assert f"{_in(spec.FLAT_PIN_WEB_WORST)} MIN" in spec.DRAWING_NOTES
     assert spec.FLAT_PIN_OD_WALL_WORST >= spec.WALL_TARGET_MM
@@ -400,7 +403,6 @@ def test_fits_carry_named_bands_and_the_lengths_print_their_places() -> None:
     assert model_toleranced_dimensions(part) == {
         ("BodyProfile", "CollarDia"): "*deviations(OD_BAND)",
         ("FlatPinProfile", "FlatPinCentre"): "FLAT_PIN_CENTRE_TOL",
-        ("RearBreakProfile", "RearBreak"): "REAR_BREAK_TOL",
     }
     # The seat O.D. and the drive-pin layout are the crank spigot's, so the
     # removable wheels fit either shaft.
@@ -408,7 +410,7 @@ def test_fits_carry_named_bands_and_the_lengths_print_their_places() -> None:
     assert spec.PIN_CIRCLE_RADIUS == removable.PIN_CIRCLE_RADIUS
     assert spec.PIN_HOLE_DIA == removable.DRIVE_PIN_HOLE_DIA
     assert spec.DRAWING_PRECISION_BY_NAME["CollarLength"] == 3
-    assert spec.DRAWING_PRECISION_BY_NAME["PinPosY"] == 4
+    assert spec.DRAWING_PRECISION_BY_NAME["PinPosY"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["FlatPinDia"] == 4
     assert spec.DRAWING_PRECISION_BY_NAME["FlatPinCentre"] == 3
     # The floor station takes the title block's .XX row: over .07-.09 the
@@ -438,18 +440,15 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     for name, stem in mates.items():
         callout = " ".join(drawing.DIMENSION_CALLOUTS_BELOW[name].split())
         assert _config.parts(stem)["number"] in callout, name
-    assert _config.parts("pd-transgear-removable")["number"] in (
-        drawing.DIMENSION_CALLOUTS_BELOW["PinPosDia"]
-    )
-    # The pressed pin is the collar's for good; its location is tight because
-    # its crest drives the shaft (named there): two lines of words (rule 7).
-    pin_rows = drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines()
-    assert len(pin_rows) == 2
-    assert "PRESS FIT" in pin_rows[0] and spec.FLAT_PIN_NUMBER in pin_rows[0]
+    # The pressed pin is the collar's for good: its pin and fit, then the
+    # linked gauge note (rule 7).  Why it is tight is the registry's.
+    pin_rows = [row.rstrip() for row in drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines()]
+    assert pin_rows == [
+        f"PRESS FIT, PIN {spec.FLAT_PIN_NUMBER}", f"SEE NOTE {spec.REAM_NOTE}"
+    ]
     # rule 16: the package declares the pin permanent, in the part notes.
     assert f"PERMANENT PIN {spec.FLAT_PIN_NUMBER}" in spec.DRAWING_NOTES
     shaft_number = _config.parts("pd-transgear-knob-shaft")["number"]
-    assert pin_rows[1] == f"CREST DRIVES {shaft_number}  "
     # Rule 26: size, process, depth.  The ream's process follows the value on
     # its line, as the sheet's other reams read, then its depth: a REF from the
     # section's nominal fitted rear face, the .XX floor controlling.  The depth
@@ -461,7 +460,10 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     # The block hangs left of its own dimension line, whose arrowhead the
     # widest row's last glyph met (run 20261117T123054105Z): every printed row
     # ends in two spaces of ink air.
-    printed = (*pin_rows, drawing.DIMENSION_SUFFIXES["FlatPinDia"])
+    printed = (
+        *drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines(),
+        drawing.DIMENSION_SUFFIXES["FlatPinDia"],
+    )
     assert all(row.endswith("  ") for row in printed)
     # The drilled bore names its drill, then the mate made to fit it: no
     # range prints on either sheet.
@@ -469,32 +471,73 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     assert bore_rows[0] == f"{spec.BORE_DRILL} DRILL THRU"
     assert shaft_number in bore_rows[1] and "TO FIT" in bore_rows[-1]
     assert not re.search(r"\.\d", drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"])
-    # The reamed dowel holes: process, mate, then the necessity answer, one
-    # line of at most six words beyond the mate's number, no dimension.
+    # The reamed dowel holes: process and the linked gauge note, then the
+    # mate and fit.  No reason line prints (owner ruling 2026-11-24): each
+    # ream and tight band has its row in the necessity registry.
     dowel_rows = drawing.DIMENSION_CALLOUTS_BELOW["PinPosDia"].splitlines()
-    assert dowel_rows[0] == "2X REAM THRU" and "PRESS FIT" in dowel_rows[1]
-    for answer in (dowel_rows[2], pin_rows[1]):
-        words = [w for w in answer.split() if not w.startswith("MHA-")]
-        assert 0 < len(words) <= 6 and not re.search(r"\d", " ".join(words)), answer
+    assert dowel_rows == [
+        f"2X REAM THRU, SEE NOTE {spec.REAM_NOTE}",
+        f"PRESS FIT, DOWEL {spec.DOWEL_NUMBER}",
+    ]
+    registry = yaml.safe_load(
+        (_config.CONFIG_DIR / "necessity" / "pd-transgear-drive-collar.yaml").read_text(
+            encoding="utf-8"
+        )
+    )["necessity"]
+    assert [row["id"] for row in registry] == ["N-01", "N-02", "N-03", "N-04"]
+    for row in registry:
+        assert row["kind"] in {"trace", "mesh", "gap", "joint", "bought_seat"}
+        assert len(row["reason"].split()) <= 10, row["id"]
+    for needle in ("Ø.0930", "Ø.0615", ".118 ±.002", "Ø.689"):
+        assert sum(needle in row["feature"] for row in registry) == 1, needle
     # Their acceptance is the pins themselves and the wheels' trial (notes).
-    assert "THEIR PINS ARE THE GAUGES" in spec.DRAWING_NOTES
-    assert "WHEELS DROP ON FREELY" in spec.DRAWING_NOTES
+    ream_note = spec.DRAWING_NOTES.splitlines()[spec.REAM_NOTE - 1]
+    assert ream_note == "3. PRESS FIT: THE PIN IS THE GAUGE; NONE ENTERS ITS HOLE BY HAND."
+    assert f"ALL 3 {spec.SPROCKET_NUMBER} WHEELS DROP ON FREELY" in spec.DRAWING_NOTES
     # The rear break's leg and angle share one line; its mate rows name the
     # shaft corner it clears, short enough to hang left of its dimension line.
     assert drawing.DIMENSION_SUFFIXES["RearBreak"] == " X 45°"
     assert drawing.DIMENSION_SUFFIXES.keys() == {"RearBreak", "FlatPinDia"}
     assert "ROOT CORNER" in drawing.DIMENSION_CALLOUTS_BELOW["RearBreak"]
     assert all(len(r) <= 21 for r in drawing.DIMENSION_CALLOUTS_BELOW["RearBreak"].splitlines())
-    for location in ("PinPosY", "PinNegY", "FlatPinCentre", "FlatPinFloor"):
+    for location in ("FlatPinCentre", "FlatPinFloor"):
         assert location not in drawing.DIMENSION_CALLOUTS_BELOW
+    # Each REF offset links the flag note that gives its trial (rule 4).
+    link = f"SEE NOTE {spec.TRIAL_NOTE}"
+    assert drawing.DIMENSION_CALLOUTS_BELOW["PinPosY"] == link
+    assert drawing.DIMENSION_CALLOUTS_BELOW["PinNegY"] == link
+    assert spec.DRAWING_NOTES.splitlines()[spec.TRIAL_NOTE - 1].startswith(
+        f"{spec.TRIAL_NOTE}. LOCATE BY TRIAL: "
+    )
     # Rule 7: size and process lines plus at most two lines of words.
     assert all(
         len(text.splitlines()) <= 3 for text in drawing.DIMENSION_CALLOUTS_BELOW.values()
     )
-    # The offsets print as REF targets; PIN_OFFSET_TOL is the analysis scatter
-    # the walls and the wheels' slip are charged, the sprocket's own.
+    # The offsets print as REF targets.  PIN_OFFSET_TOL is the spacing
+    # analysis the wheels' slip is charged (what the trial accepts), the
+    # sprocket's own; the walls are charged PIN_CENTRE_SHIFT_MAX, the shop's
+    # reamed-hole location row, which the trial does not bound (Codjiflo P1
+    # on #3485).
     assert spec.PIN_OFFSET_TOL <= removable.DRIVE_PIN_OFFSET_TOL
     assert spec.PIN_OFFSET_TOL < printed_band_mm(3, unit=spec.UNIT)
+    assert spec.PIN_CENTRE_SHIFT_MAX == pytest.approx(0.002 * 25.4)
+    assert spec.PIN_OFFSET_TOL < spec.PIN_CENTRE_SHIFT_MAX
+    import pd_transgear_removable_spec as wheel
+
+    # The wheels' holes keep their printed band (the trial bounds only the
+    # spacing, and their shift floats the chain toward MHA-DT-11's spigot).
+    assert wheel.PIN_LOCATION_TOL == pytest.approx(0.0009 * 25.4)
+    # No wall reads the spacing analysis: each moves by the whole shift.
+    hole_r = (spec.PIN_HOLE_DIA + max(spec.PIN_HOLE_BAND)) / 2.0
+    inner = spec.PIN_CIRCLE_RADIUS - spec.PIN_CENTRE_SHIFT_MAX - hole_r
+    assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(inner)
+    assert spec.BORE_PIN_WALL_WORST == pytest.approx(
+        inner - (spec.BORE_DIA + max(spec.BORE_DIA_BAND)) / 2.0
+    )
+    rim = (spec.OD + min(spec.OD_BAND)) / 2.0 - (
+        spec.PIN_CIRCLE_RADIUS + spec.PIN_CENTRE_SHIFT_MAX + hole_r
+    )
+    assert spec.DRIVE_PIN_COLLAR_RIM_WORST <= rim < spec.DRIVE_PIN_COLLAR_RIM_WORST + 0.0254
 
 
 def test_drive_pin_rim_is_the_seat_shortfall() -> None:
@@ -503,7 +546,7 @@ def test_drive_pin_rim_is_the_seat_shortfall() -> None:
     # The O.D. keeps only the spigot's maximum; its minimum is held to -.004
     # to keep the rim (owner ruling 2026-11-01).
     assert spec.OD_BAND == pytest.approx((max(removable.SPIGOT_DIA_BAND), -0.1016))
-    assert spec.DRIVE_PIN_COLLAR_RIM_WORST == pytest.approx(0.4826)  # .019
+    assert spec.DRIVE_PIN_COLLAR_RIM_WORST == pytest.approx(0.4572)  # .018
     assert spec.DRIVE_PIN_COLLAR_RIM_WORST > 0.0
 
 
@@ -518,14 +561,14 @@ def test_pilot_wall_worst_and_the_one_decimal_control() -> None:
 
 def test_drive_pin_holes_clear_the_bore_and_the_pilot() -> None:
     # The unchanged dowel circle clears the bore and pilot.
-    assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.31319)  # .1304
+    assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.28525)  # .1293
     assert spec.BORE_PIN_WALL_WORST >= spec.WALL_FLOOR
-    assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(5.78969)
+    assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(5.76175)
     assert spec.PIN_HOLE_INNER_R_MIN > spec.PILOT_R_MAX
     # Negative controls: holes on a 6.0 radius break into the pilot; on the
     # pilot's own 5.0 radius they leave 0.605 to the bore.
-    assert 6.0 - 0.025 - 1.19 < spec.PILOT_R_MAX
-    assert 4.0 - 0.025 - 1.19 - (spec.BORE_DIA + max(spec.BORE_DIA_BAND)) / 2.0 < spec.WALL_FLOOR
+    assert 6.0 - 0.051 - 1.19 < spec.PILOT_R_MAX
+    assert 4.0 - 0.051 - 1.19 - (spec.BORE_DIA + max(spec.BORE_DIA_BAND)) / 2.0 < spec.WALL_FLOOR
 
 
 def test_bore_slides_on_the_core_and_the_pilot_in_the_wheel() -> None:
@@ -747,20 +790,20 @@ def test_the_round_bore_clears_the_root_corner_and_bears_on_the_whole_core(monke
     inch = 25.4
     # The rear mouth's 45° break, not an entry chamfer, meets the neck; it
     # ends inside the neck so the bore bears on the core's length.
-    assert spec.REAR_BREAK_DEPTH_MAX <= shaft.FRONT_RELIEF_WIDTH_MIN
+    assert spec.REAR_BREAK_DEPTH_MAX <= shaft.FRONT_RELIEF_WIDTH_MAX
     assert spec.ROUND_FIT_FLOAT_MAX == pytest.approx(0.00115 * inch)
     assert spec.ROOT_CORNER_BORE_AIR_MIN == pytest.approx(0.01085 * inch)
     assert spec.BORE_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.06742, abs=1e-5)  # .0027
     # The rear face's bearing annulus on the gear starts outside the mouth,
     # its break, the bore's tilt at F and the gear's runout.
     assert spec.FRONT_BEARING_INNER_RADIUS_MAX > spec.BORE_DIA / 2.0 + max(spec.REAR_BREAK_LIMITS)
-    # The largest drilled bore (.195) starts the annulus further out than the
-    # former .1925 ream did: 22.92 then.
-    assert spec.FRONT_BEARING_AREA_MIN == pytest.approx(22.36, abs=0.01)
+    # The largest drilled bore (.195) and the .013 break start the annulus
+    # further out than the former .1925 ream and .010 break did.
+    assert spec.FRONT_BEARING_AREA_MIN == pytest.approx(20.99, abs=0.01)
     # Negative control: a neck narrower than the mouth's break would leave
     # the break on the core, shortening the bore's support.
-    monkeypatch.setattr(shaft, "FRONT_RELIEF_WIDTH_MIN", spec.REAR_BREAK_DEPTH_MAX / 2.0)
-    with pytest.raises(AssertionError, match="shortens the bore's support"):
+    monkeypatch.setattr(shaft, "FRONT_RELIEF_WIDTH_MAX", spec.REAR_BREAK_DEPTH_MAX / 2.0)
+    with pytest.raises(AssertionError, match="recompute the bore's support"):
         _fresh_collar_spec()
 
 
@@ -848,9 +891,10 @@ def test_collar_feature_bands_are_the_printed_ones() -> None:
         dowel = features[name]
         # ANALYSIS bands, bound only because the adapter requires limits: the
         # sheet prints neither (the dowel is the gauge, the offset a REF
-        # target tried with the wheels).
+        # target tried with the wheels).  The offset's is the shop's
+        # reamed-hole location row, what the walls are charged.
         assert dowel["dia"] == pytest.approx([_in(0.0930), _in(0.0935)])
-        offset = [_in(0.2756 - 0.0009), _in(0.2756 + 0.0009)]
+        offset = [_in(0.2756 - 0.002), _in(0.2756 + 0.002)]
         assert dowel["offset"] == pytest.approx(offset, abs=2e-3)
         assert dowel["at"] == pytest.approx([0.0, sign * spec.PIN_CIRCLE_RADIUS, 0.0])
         assert dowel["thru"] is True and dowel["process"] == "ream"
@@ -872,4 +916,4 @@ def test_collar_feature_bands_are_the_printed_ones() -> None:
     assert pilot["faced_at"] == rear["faced_at"] == "assembly"
     # The rear mouth's break is cut at assembly (MHA-PD-00 step 29).
     assert features["rear_break"]["made_at"] == "assembly"
-    assert features["rear_break"]["leg"] == pytest.approx([_in(0.006), _in(0.010)])
+    assert features["rear_break"]["leg"] == pytest.approx([_in(0.003), _in(0.013)])
