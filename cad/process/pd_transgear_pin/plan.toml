@@ -285,13 +285,13 @@ instruction = "Before turning, have at the lathe the reamed MHA-PD-18 arm, the r
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Try the pin-gauge set's .127 pin in the arm's pin bore from each face, by hand and clean, never forced."
-inspection = "Drawing note 1, the bond's clearance in MHA-PD-18 (.0010-.0022), its upper end: the .127 pin does not enter the pin bore."
+instruction = "Try the pin-gauge set's .126 pin, then its .127 pin, in the MHA-PD-18 pin bore from each face, by hand and clean, never forced."
+inspection = "Drawing note 1, the bond's clearance in MHA-PD-18 (.0010-.0022) on a journal polished to .1250 or just under (Op 130): the .126 pin enters and the .127 pin does not enter the pin bore."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The .127 pin enters the arm's pin bore: that bore is over the bond's clearance and the bonded pin would lean in it. Stop: make no pin for that arm and tell the owner."
+instruction = "The .126 pin does not enter the MHA-PD-18 pin bore, or the .127 pin does: the bore is outside the bond's clearance. Stop: make no pin for that arm and tell the owner."
 
 [[setups.operations]]
 cut_kind = "other"
