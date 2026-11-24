@@ -94,7 +94,7 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
         "spot": 2,
         "drill-15": 3,
         "drill-d": 4,
-        "reamer": 5,
+        "drill-f": 5,
         "drill-43": 6,
         "tap-guide": 7,
     }
@@ -128,7 +128,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("blank_length_min_in", 1.38, "blank_length_min_mm"),
         ("hold_tip_height_mm", 28.5, "hold_tip_height_mm"),
         ("bore_drill_past_mm", 1.0, "bore_tip_height_mm"),
-        ("reamer_lead_mm", 1.5, "ream_tip_height_mm"),
+        ("bore_open_tip_height_mm", 7.5, "bore_open_tip_height_mm"),
         ("apex_drill_past_mm", 0.0, "apex_tip_height_mm"),
         ("arch_rough_woc_mm", 4.5, "arch_rough_woc_mm"),
         ("arch_past_mm", 0.5, "arch_depth_mm"),
@@ -202,17 +202,17 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: "G1 Y10.795 F{feed}",
             "passes",
         ),
-        # The reamer rapided out of the bore.
+        # The F drill stopped short of the bore's far side.
         (
-            "bore_ream",
-            lambda line: line == "G1 Z20.050 F{feed}",
-            lambda line: "G0 Z20.050",
-            "feed_out",
+            "bore_open",
+            lambda line: line.startswith("G1 Z6.961"),
+            lambda line: "G1 Z9.000 F{feed}",
+            "holes",
         ),
         # The #43 stopped short of the bore.
         (
             "apex_drill",
-            lambda line: line.startswith("G1 Z27.069"),
+            lambda line: line.startswith("G1 Z27.083"),
             lambda line: "G1 Z29.000 F{feed}",
             "holes",
         ),

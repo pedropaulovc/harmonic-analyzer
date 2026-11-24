@@ -53,7 +53,8 @@ def test_apex_tap_keeps_its_walls_to_both_ear_faces() -> None:
 
 
 def test_web_over_the_bore_keeps_the_floor() -> None:
-    assert bracket.BORE_LIGAMENT == pytest.approx(6.6008)
+    # .2594 over the F-drilled bore (fit audit question 1; .2599 at .256).
+    assert bracket.BORE_LIGAMENT == pytest.approx(6.588)
     assert bracket.BORE_LIGAMENT >= bracket.LIGAMENT_FLOOR
     assert bracket.LIGAMENT_FLOOR == pytest.approx(1.524)  # .060 in
 
@@ -73,8 +74,9 @@ def test_set_screw_keeps_one_and_a_half_diameters_of_full_thread() -> None:
     assert bracket.SET_SCREW_WALL_TERMS["apex over the bore at its minimum"] == (
         pytest.approx(bracket.EAR_TOP_Y - bracket.HEIGHT_BAND - (0.99 + 0.01) * 25.4)
     )
-    assert bracket.SET_SCREW_FULL_THREAD_MIN == pytest.approx(5.009, abs=1e-3)
-    assert bracket.SET_SCREW_ENGAGEMENT_D == pytest.approx(1.761, abs=1e-3)
+    # The F-drilled bore (fit audit question 1): 5.009 / 1.761D at the old .256.
+    assert bracket.SET_SCREW_FULL_THREAD_MIN == pytest.approx(4.998, abs=1e-3)
+    assert bracket.SET_SCREW_ENGAGEMENT_D == pytest.approx(1.757, abs=1e-3)
     assert bracket.SET_SCREW_ENGAGEMENT_D >= bracket.SET_SCREW_MIN_ENGAGEMENT_D == 1.5
 
 
