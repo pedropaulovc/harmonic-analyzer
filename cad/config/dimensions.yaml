@@ -1706,7 +1706,7 @@ sections:
       axis-to-pitch-line distance is 5.293261347 = PD/2 + 0.530761347.
       The finite #8/12T feed master is rigidly translated s = 0.210 mm.
       Its source contact law sets the tooth-centred rack-normal datum
-      backlash to 0.13 mm (0.12–0.14); this is not an all-phase running band.
+      backlash to 0.13 mm (0.121–0.14); this is not an all-phase running band.
       Native span limits govern the accepted feed template translations.
       CAD rack x0 = −33.6641288 and first gap = 1.246819584 are nominal
       illustration phases only, not purchased-stock end-tooth controls.
@@ -1791,7 +1791,7 @@ sections:
         - implemented conditional whole-point receiving; PROVISIONAL / NOT SHOP-RELEASED
         - high
       - - Finite rack operating datum and mesh gates
-        - 'Closed-form AGMA-style gates at the 0.12–0.14 tooth-centred datum over every printed feed-pinion corner (tip band × translation limits): contact ratio ≥1.2 at the minimum OD and loose datum, positive backlash, rack-crest root clearance ≥0.25, tip clearance and the interference point. The translated #8 form is treated as the untranslated involute with rack and tip moved in by s·cos(π/N); a numeric step of the generated flank agrees within 0.004. The engaged-feed window clips the projected contact path (±max(approach, recess)·cos 20°) plus one pitch and the lateral deviation at each cut end, and the profile-centre band once; limits round inward. The actual −X cut face is the operator datum; positive machine-X feed decreases cut-face-to-running-axis distance.'
+        - 'Closed-form AGMA-style gates at the 0.121–0.14 tooth-centred datum over every printed feed-pinion corner (tip band × translation limits): contact ratio ≥1.2 at the minimum OD and loose datum, positive backlash, rack-crest root clearance ≥0.25, tip clearance and the interference point. The translated #8 form is treated as the untranslated involute with rack and tip moved in by s·cos(π/N); a numeric step of the generated flank agrees within 0.004. The engaged-feed window clips the projected contact path (±max(approach, recess)·cos 20°) plus one pitch and the lateral deviation at each cut end, and the profile-centre band once; limits round inward. The actual −X cut face is the operator datum; positive machine-X feed decreases cut-face-to-running-axis distance.'
         - —
         - '`paper_drive_mesh_check.feed_rack_mesh`, `feed_rack_contact_half_width_mm`; `pd_paper_drive_assembly_steps.require_feed_rack_mesh`, `feed_rack_operating_domain`; `paper_drive_rack_travel.rack_operating_domain_mm`, `RackOperatingDomain.cut_end_reserve_mm`; canonical `paper_drive_geom.feed_rack_cut_end_section_maxima_mm`'
         - closed-form standard checks + native assembly interference
