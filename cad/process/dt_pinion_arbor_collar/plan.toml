@@ -20,11 +20,11 @@
 # - Setup 5, bench: deburr, check, oil, bag.
 #
 # Checks: the O.D. on the lathe (micrometers); length, bore (telescoping
-# gauge and micrometers), pin hole (pin gauges, class ZZ minus, to order:
-# cad/config/shop-equipment/ gauges.pin-gauges) and the hole's station at
-# the bench. The bore is a plain drilled hole (DRILL THRU, +.004/0) that
-# slides on the MHA-DT-22 arbor, not a matched fit; the pin hole presses the
-# MHA-DT-VN-63 spring pin at assembly.
+# gauge and micrometers), pin hole (an MHA-DT-VN-63 pin does not enter by
+# hand, fit audit F15) and the hole's station at the bench. The bore is a
+# plain drilled hole (DRILL THRU, +.004/0) that slides on the MHA-DT-22
+# arbor, not a matched fit; the MHA-DT-VN-63 spring pin is driven into the
+# pin hole at assembly.
 #
 # NC (cam:dt_pinion_arbor_collar, cad/process/dt_pinion_arbor_collar/cam.py):
 # PC01_pin_hole. The program name, the [parameters] and the milling_cuts
@@ -133,14 +133,11 @@ centre_drill_oal_mm = 31.75
 # depth with the chuck above the jaw tops; cam.py checks it.
 spot_projection_min_mm = 20.0
 drill_projection_min_mm = 26.0
-# Bench: the pin hole's GO is the .0625 class ZZ gauge pin (tools.gauge-pin-
-# 0625, the band's bottom); the NO-GO the .065 pin of the class ZZ minus set
-# (gauges.pin-gauges: at most .0650): a hole it does not enter is under the
-# band's top.
-go_pin_in = 0.0625
-nogo_pin_in = 0.065
-# The station read over the GO pin: the faced end to the pin's far side is
-# the station plus half the pin (.03125).
+# Bench: the pin hole has no gauge pin: an MHA-DT-VN-63 must drive, not
+# enter by hand (owner ruling 2026-11-24, fit audit F15). The station is
+# read over the 1/16 drill's shank: the faced end to the shank's far side is
+# the station plus half the shank (.03125).
+shank_in = 0.0625
 station_far_side_min_in = 0.3513
 station_far_side_max_in = 0.3713
 # The bore as the sheet prints it: Ø.313 DRILL THRU under the title block's
@@ -195,12 +192,6 @@ ref = "jig-files"
 id = "lathe-file"
 name = "Smooth file"
 ref = "jig-files"
-
-[[tools]]
-id = "gauge-pin"
-name = "Gauge pin .0625, class ZZ"
-ref = "gauge-pin-0625"
-status = "to_order"
 
 [[setups]]
 machine_kind = "other"
@@ -383,7 +374,7 @@ indexing = "none"
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished collar: Ø.59 × .66 long, the 5/16 bore through, the 1/16 pin hole through both walls .33 from face F; the GO pin in the pin hole, the calipers from face F to its far side." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished collar: Ø.59 × .66 long, the 5/16 bore through, the 1/16 pin hole through both walls .33 from face F; the 1/16 drill's shank in the pin hole, the calipers from face F to its far side." }
 
 [[setups.operations]]
 speed_kind = "other"
@@ -394,9 +385,9 @@ instruction = "File the parting burr off the parted face flat on the smooth file
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Length: calipers across face F and the parted face. Bore: the telescoping gauge at both ends, read on the micrometers. Pin hole: the {{process.go_pin_in:.4dot}} gauge pin (GO) passes through both walls, the {{process.nogo_pin_in:.3dot}} pin (NO-GO) enters neither. Station: the GO pin through the hole, calipers from face F to the pin's far side, {{process.station_far_side_min_in:.4dot}}–{{process.station_far_side_max_in:.4dot}} (the station plus half the pin)."
-inspection = "Length {{cad.far_end_length_min_in:.2dot}}–{{cad.far_end_length_max_in:.2dot}}; bore Ø{{process.bore_print_min_in:.3dot}}–{{process.bore_print_max_in:.3dot}}; pin hole Ø{{cad.pin_hole_dia_min_in:.4dot}}–{{cad.pin_hole_dia_max_in:.4dot}}, {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from face F."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.far_end_length_band_mm}}" }, { gauge = "telescoping-gauges-starrett-s579gz", band_mm = ["{{process.bore_print_min_mm}}", "{{process.bore_print_max_mm}}"] }, { gauge = "pin-gauges", band_mm = "{{cad.pin_hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.pin_hole_station_band_mm}}" }]
+instruction = "Length: calipers across face F and the parted face. Bore: the telescoping gauge at both ends, read on the micrometers. Pin hole: an MHA-DT-VN-63 pin, tried by hand at each end, does not enter (it must be driven at assembly; fit audit F15). Station: the 1/16 drill's shank through the hole, calipers from face F to the shank's far side, {{process.station_far_side_min_in:.4dot}}–{{process.station_far_side_max_in:.4dot}} for a {{process.shank_in:.4dot}} shank (the station plus half the shank; a smaller shank reads half its shortfall less)."
+inspection = "Length {{cad.far_end_length_min_in:.2dot}}–{{cad.far_end_length_max_in:.2dot}}; bore Ø{{process.bore_print_min_in:.3dot}}–{{process.bore_print_max_in:.3dot}}; MHA-DT-VN-63 does not enter the pin hole by hand; pin hole {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from face F."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.far_end_length_band_mm}}" }, { gauge = "telescoping-gauges-starrett-s579gz", band_mm = ["{{process.bore_print_min_mm}}", "{{process.bore_print_max_mm}}"] }, { gauge = "calipers", band_mm = "{{cad.pin_hole_station_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]

@@ -40,7 +40,8 @@
 # band.
 #
 # To order before Setup 4 runs: the .2510 reamer (tools.reamer-2510, owner
-# ruling #3073); pin gauges (gauges.pin-gauges).
+# ruling #3073). No gauge pins: the MHA-DT-15 rod and the MHA-DT-VN-63 pin
+# gauge their holes (fit audit F14, F15).
 #
 # NC (cam:dt_pinion_arbor, cad/process/dt_pinion_arbor/cam.py):
 # PA01_cross_hole, PA02_pin_hole. The program names, the [parameters] and the
@@ -198,13 +199,12 @@ rest_joint_in = 3.2
 # its 6.80 end (.028 + .016); the sharp-nose tool turns off what is left.
 neck_rough_start_z_in = 0.7672
 relief_rough_start_z_in = 6.75
-# Bench: the pins over which the pin hole's station is read: its GO the .0625
-# class ZZ gauge pin (tools.gauge-pin-0625, the band's bottom), its NO-GO the
-# set's .065. The pin hole lies in the shaft: the station plus half the pin.
-# The cross hole's station is read over the MHA-DT-15 rod itself, miked (fit
-# audit F14: the rod is its gauge).
-pin_go_pin_in = 0.0625
-pin_nogo_pin_in = 0.065
+# Bench: the pin hole's station is read over the 1/16 drill's shank (miked),
+# the hole in the shaft: the station plus half the shank. The hole has no
+# gauge pin: an MHA-DT-VN-63 must drive, not enter by hand (owner ruling
+# 2026-11-24, fit audit F15). The cross hole's station is read over the
+# MHA-DT-15 rod itself, miked (fit audit F14: the rod is its gauge).
+pin_shank_in = 0.0625
 pin_far_side_min_in = 1.5213
 pin_far_side_max_in = 1.5413
 # Setup 5: a 1/4 rod (MHA-DT-15 or an offcut of its bar) set upright in the
@@ -282,12 +282,6 @@ ref = "drill-1-16"
 id = "telescoping-gauges"
 name = "Telescoping gauges (Starrett S579GZ)"
 ref = "telescoping-gauges-starrett-s579gz"
-
-[[tools]]
-id = "gauge-pin"
-name = "Gauge pin .0625, class ZZ"
-ref = "gauge-pin-0625"
-status = "to_order"
 
 [[tools]]
 id = "file"
@@ -527,9 +521,9 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "PA02_pin_hole has ended: its last lines lift T4 to Z8.670 (.34 in over the bar's top) and stop the spindle (M5). Confirm the spindle is stopped; jog Z up clear, X and Y untouched. Before unclamping: the {{process.pin_go_pin_in:.4dot}} gauge pin (GO) passes through the pin hole, the {{process.pin_nogo_pin_in:.3dot}} pin (NO-GO) does not enter."
-inspection = "Pin hole Ø{{cad.pin_hole_dia_min_in:.4dot}}–{{cad.pin_hole_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.pin_hole_dia_band_mm}}" }]
+instruction = "PA02_pin_hole has ended: its last lines lift T4 to Z8.670 (.34 in over the bar's top) and stop the spindle (M5). Confirm the spindle is stopped; jog Z up clear, X and Y untouched. Before unclamping: an MHA-DT-VN-63 pin, tried by hand, does not enter the pin hole."
+inspection = "MHA-DT-VN-63 must drive, not enter by hand (fit audit F15); the 1/16 drill cuts the hole."
+gauge_checks = "other"
 
 [[setups.operations]]
 instruction = "Still before unclamping: the 1/4 rod back in the cross hole, read it with the DTI over .200 of Z as in this setup's first op: the bar has not rolled while drilling."
@@ -919,9 +913,9 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.cross_hole_station_band_m
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Pin hole: the {{process.pin_go_pin_in:.4dot}} GO gauge pin passes, the {{process.pin_nogo_pin_in:.3dot}} NO-GO enters neither end; with the GO in it, the calipers' step faces (both faces point to the back end): the beam's end on the head's rear face, the slider's step on the pin's far side, {{process.pin_far_side_min_in:.4dot}}–{{process.pin_far_side_max_in:.4dot}}."
-inspection = "Pin hole Ø{{cad.pin_hole_dia_min_in:.4dot}}–{{cad.pin_hole_dia_max_in:.4dot}}, {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from the head's rear face."
-gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.pin_hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.pin_hole_station_band_mm}}" }]
+instruction = "Pin hole: an MHA-DT-VN-63 pin, tried by hand at each end, does not enter (it must be driven at assembly; fit audit F15). Mike the 1/16 drill's shank; with the shank in the hole, the calipers' step faces (both faces point to the back end): the beam's end on the head's rear face, the slider's step on the shank's far side, {{process.pin_far_side_min_in:.4dot}}–{{process.pin_far_side_max_in:.4dot}} for a {{process.pin_shank_in:.4dot}} shank (a smaller shank reads half its shortfall less)."
+inspection = "MHA-DT-VN-63 does not enter the pin hole by hand; the pin hole {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from the head's rear face."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pin_hole_station_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]

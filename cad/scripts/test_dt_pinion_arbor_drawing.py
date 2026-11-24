@@ -1433,21 +1433,17 @@ def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> 
     assert min(station_y, dia_y) > axis_y
 
 
-def test_collar_pin_hole_callout_names_the_press_fit_and_its_interference() -> None:
-    """R5 machinist review (blocker, rule 4): '.0625 +.0025/.0000 ... PRESS FIT
-    ON MHA-DT-VN-63' read as a clearance fit on a 1/16 pin.  The slotted pin
-    is .066-.069 before it is driven (ASME B18.8.2), so the callout prints
-    the interference the hole band gives it as a reference."""
+def test_collar_pin_hole_callout_makes_the_pin_its_own_gauge() -> None:
+    """R5 machinist review (blocker, rule 4) read '.0625 +.0025/.0000' as a
+    clearance fit on a 1/16 pin.  Fit audit F15 (owner ruling 2026-11-24):
+    the pin must drive, never enter by hand, so the callout says so and the
+    pin is the gauge (no gauge pin, no printed interference)."""
     assert drawing.DIMENSION_CALLOUTS["PinHoleDia"].splitlines() == [
-        "1/16 DRILL THRU",
-        "PRESS FIT ON MHA-DT-VN-63",
-        "(INTERFERENCE .0010-.0065)",
+        "1/16 DRILL THRU;",
+        "MHA-DT-VN-63 MUST DRIVE,",
+        "NOT ENTER BY HAND",
     ]
-    low, high = drawing.PIN_HOLE_INTERFERENCE
-    assert low > 0.0
-    assert (low, high) == pytest.approx(
-        ((0.066 - 0.065) * 25.4, (0.069 - 0.0625) * 25.4)
-    )
+    assert not hasattr(drawing, "PIN_HOLE_INTERFERENCE")
 
 
 # pc-r10 (37495ac47) layout audit, sheet mm: the three-line collar-pin

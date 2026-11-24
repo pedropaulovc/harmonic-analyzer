@@ -126,16 +126,18 @@ SHAFT_FIT_CALLOUT = (
     f"RUNS IN {_BLOCK['number']} "
     f"{str(_BLOCK['title']).upper().removeprefix('PINION ')} BORES"
 )
-# The spring pin's +.0025/0 band is the pin's hole: the callout names the pin
-# and its fit, and the match-drill with its strap, in two lines of words
-# (rule 7).  The drilling set-up is MHA-DT-00's step, which names the hole,
-# so the part sheet carries no pointer to it.
+# The spring pin's +.0025/0 band is the pin's hole (ASME B18.8.2's
+# recommended hole): the callout names the pin as its own gauge (fit audit
+# F15; delegated ruling 2026-11-24 (FitLaneDT): "MUST DRIVE" on a
+# match-drilled hole) and the match-drill with its strap, in two lines of
+# words (rule 7).  The drilling set-up is MHA-DT-00's step, which names the
+# hole, so the part sheet carries no pointer to it.
 STRAP_NUMBER = _config.parts("dt-pinion-bracket")["number"]
 STRAP_PIN_NUMBER = _config.parts("dt-vn-pinion-strap-pin")["number"]
 PIN_HOLE_CALLOUT = "\n".join(
     (
         f"MATCH-DRILL THRU AT ASSEMBLY IN {STRAP_NUMBER}, 2 PL",
-        f"PRESS FIT ON {STRAP_PIN_NUMBER} SPRING PIN",
+        f"{STRAP_PIN_NUMBER} MUST DRIVE",
     )
 )
 DIMENSION_CALLOUTS = {

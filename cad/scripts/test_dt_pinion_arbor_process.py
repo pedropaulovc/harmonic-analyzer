@@ -107,21 +107,17 @@ def test_the_journal_aim_gives_the_drawings_clearance_on_the_strap():
 
 
 def test_the_bench_gauges_read_inside_the_drawings_bands():
-    p = _plan()["parameters"]
+    plan = _plan()
+    p = plan["parameters"]
     f = _features()["features"]
-    for hole, go, nogo, side_min, side_max, sign in (
-        (
-            "pin_hole",
-            "pin_go_pin_in",
-            "pin_nogo_pin_in",
-            "pin_far_side_min_in",
-            "pin_far_side_max_in",
-            1,
-        ),
-    ):
-        low, high = (v / IN for v in f[hole]["dia"])
-        assert p[go] == pytest.approx(low, abs=1e-4) and p[nogo] <= high + 1e-9
-        station = [v / IN for v in f[hole]["station"]]
-        half = sign * p[go] / 2
-        assert p[side_min] == pytest.approx(station[0] + half, abs=1e-4)
-        assert p[side_max] == pytest.approx(station[1] + half, abs=1e-4)
+    # Fit audit F15: the MHA-DT-VN-63 pin is the pin hole's gauge (it must
+    # drive, not enter by hand); no gauge pin is bought for it.
+    refs = {t["ref"] for t in plan["tools"]}
+    assert not refs & {"gauge-pin-0625", "pin-gauges"}
+    # The station reads over the 1/16 drill's shank.
+    low, _high = (v / IN for v in f["pin_hole"]["dia"])
+    assert p["pin_shank_in"] == pytest.approx(low, abs=1e-4)
+    station = [v / IN for v in f["pin_hole"]["station"]]
+    half = p["pin_shank_in"] / 2
+    assert p["pin_far_side_min_in"] == pytest.approx(station[0] + half, abs=1e-4)
+    assert p["pin_far_side_max_in"] == pytest.approx(station[1] + half, abs=1e-4)

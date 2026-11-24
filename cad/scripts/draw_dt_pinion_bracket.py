@@ -357,12 +357,14 @@ ARBOR_FINISH_XY = (0.155, 0.205)
 # SHAFT DRILL SET names the drill.  The pin is its own BOM line
 # (MHA-DT-VN-63), so the callout names it instead of supplying one loose with
 # each strap; test_dt_pinion_bracket_drawing keeps both numbers in step with
-# the parts registry.  The band is tighter than DRILLED HOLES, so the callout
-# also names the fit (rule 4; r2 review): a slotted spring pin grips its hole
-# by compression.  Rule 7 allows the process line and two lines of words
-# (machinist review, farm run 20261121T170909507Z: four lines gated), as
-# MHA-DT-19's own pin-hole callout words it.
-CROSS_HOLE_CALLOUT = "MATCH-DRILL THRU\nWITH MHA-DT-19 AT ASSEMBLY\nPRESS FIT ON MHA-DT-VN-63"
+# the parts registry.  The band is tighter than DRILLED HOLES: it is ASME
+# B18.8.2's recommended hole, which the slotted pin grips by compression, so
+# the pin is its own gauge (fit audit F15: "MHA-DT-VN-63 MUST DRIVE, NOT
+# ENTER BY HAND"; delegated ruling 2026-11-24 (FitLaneDT): on a match-drilled
+# hole the row reads "MHA-DT-VN-63 MUST DRIVE", keeping rule 7's process line
+# and two lines of words (machinist review, farm run 20261121T170909507Z:
+# four lines gated), as MHA-DT-19's own pin-hole callout words it.
+CROSS_HOLE_CALLOUT = "MATCH-DRILL THRU\nWITH MHA-DT-19 AT ASSEMBLY\nMHA-DT-VN-63 MUST DRIVE"
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU\nMHA-DT-19 ENTERS,\nTURNS BY HAND",
     "ArborBoreDia": "5/16 DRILL THRU\nMHA-DT-22 IS TURNED\nTO THIS BORE",
