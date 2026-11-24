@@ -357,20 +357,20 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Mike the hub's length across the rims, from the hub front face to the parted end, clear of the parting pip; write it as L0 (about {{process.part_off_in:.3dot}}). Chuck it; spindle running, touch the AR lightly on the parted end's rim and set DRO Z to L0 less {{process.length_target_in:.3dot}}. Face in light skims to Z0: the spigot's end."
+instruction = "Mike the hub's length across the rims, from the hub front face to the parted end, clear of the parting pip: L0 (about {{process.part_off_in:.3dot}}). Mike the flange end at its rim, from the flange's front face to the parted end: T0. Write both down. Chuck it; spindle running, touch the AR lightly on the parted end's rim and set DRO Z to L0 less {{process.length_target_in:.3dot}}. Face in light skims to Z0: the spigot's end."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.flange_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: mike the overall from the hub front face to the spigot's end, the anvils on the faces' rims."
-inspection = "Overall {{cad.spigot_end_length_min_in:.3dot}}–{{cad.spigot_end_length_max_in:.3dot}}, micrometer."
+instruction = "Spindle stopped: between two jaws, mike the flange end at its rim again, from the flange's front face to the faced end: T. The overall is T plus (L0 less T0); the hub front face is inside the chuck."
+inspection = "Overall (T plus L0 less T0) {{cad.spigot_end_length_min_in:.3dot}}–{{cad.spigot_end_length_max_in:.3dot}}, micrometer."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.spigot_end_length_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Overall over {{cad.spigot_end_length_max_in:.3dot}} in Op 70: spindle running, touch the AR lightly on the spigot end's rim; set DRO Z to the excess (the Op 70 reading less {{process.length_target_in:.3dot}}); face in light skims to Z0; mike again. Under {{cad.spigot_end_length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1 (the bar holds a second)."
+instruction = "Overall over {{cad.spigot_end_length_max_in:.3dot}} in Op 70: spindle running, touch the AR lightly on the spigot end's rim; set DRO Z to the excess (the Op 70 overall less {{process.length_target_in:.3dot}}); face in light skims to Z0; mike T again. Under {{cad.spigot_end_length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1 (the bar holds a second)."
 feed = "hand"
 
 [[setups.operations]]
