@@ -1,0 +1,11 @@
+# The disc cluster's air-stack floors (tolerance-policy.md, "Checks in spec
+# modules and tests"; cad/scripts/check_register.py). Fit batch PD,
+# 2026-11-24: entered when D10 confirmed the platen-air floor (owner
+# question Q10).
+checks:
+  - id: C-01
+    check: "PLATEN_AIR_MIN"
+    kind: gap
+    reason: "the MHA-PD-06 disc grazes the MHA-PD-02 platen"
+    source: "Main, by the owner's delegation of 2026-11-24, D10 (fit-batch owner question Q10, option A: 0.03 mm confirmed); first set in 198518aabe (2026-10-02)"
+    basis: after_setting

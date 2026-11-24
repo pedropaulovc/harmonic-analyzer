@@ -696,7 +696,8 @@ DISC_MOUNT_WOBBLE = (
 # The pin's axis in its S projected zone tilts the whole cluster; at the rim
 # it levers from the step contact's edge, as the hub's rock does.
 PIN_ZONE_TILT_AT_DISC_RIM = CLUSTER_AIR.S_ZONE_TILT * (_DISC_RIM_R - DISC_HUB.SEAT_CONTACT_R)
-# The least air the disc's rear face keeps to the platen's front (R9-68).
+# The least air the disc's rear face keeps to the platen's front (D10,
+# pd_cluster_air.PLATEN_AIR_MIN).
 DISC_PLATEN_AIR_MIN = CLUSTER_AIR.PLATEN_AIR_MIN
 PLATEN_AIR = CLUSTER_AIR.AirStack(
     "MHA-PD-06 disc to MHA-PD-02 platen air",
