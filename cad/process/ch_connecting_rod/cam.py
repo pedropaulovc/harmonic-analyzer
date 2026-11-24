@@ -737,6 +737,11 @@ def context(
             f"process.saw_screw_head_stand_max_mm {stand:g} is not the largest the "
             f"air proof tolerates ({stand_limit:.3f}, to {STAND_STEP_MM} mm)"
         )
+    # At the cut the stack passes this far below Z0 (the plate's top), which
+    # is lower than the parallels' top under the plate: the traveler has the
+    # builder check, every load, that no parallel stands past the jaws' right
+    # side, which is as far as the keep-outs below model the vise.
+    _agree(plan, "saw_below_plate_top_mm", below - saw_zs[0], RUNOUT_TOL_MM)
     # The arbor's lowest point from the spindle nose: the record's distance
     # to the cap's lower face with no saw on, plus the saw, inside the
     # plan's round figure; plus the stand's bound.

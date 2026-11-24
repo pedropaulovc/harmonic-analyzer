@@ -290,6 +290,7 @@ def test_the_eighth_cutter_leaves_the_shank_corners_inside_their_limits() -> Non
         ),
         ({"saw_below_max_mm": 25.4}, "saw_below_max_mm"),
         ({"saw_clear_z_mm": 11.35}, "saw_clear_z_mm"),
+        ({"saw_below_plate_top_mm": 12.7}, "saw_below_plate_top_mm"),
         (
             {
                 "saw_screw_head_stand_max_mm": 5.08,

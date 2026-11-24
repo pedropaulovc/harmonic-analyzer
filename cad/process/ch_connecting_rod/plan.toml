@@ -292,6 +292,13 @@ saw_depth_past_arbor_max_mm = 18.05
 saw_screw_head_stand_max_mm = 3.048
 saw_below_max_mm = 15.748
 saw_clear_z_mm = 27.098
+# At the cut that stack passes saw_below_plate_top_mm (.55) below Z0, the
+# plate's top: the stack's depth less saw_low_mm, lower than the parallels'
+# top (the plate's thickness below Z0). It passes beyond the crowns, .80 or
+# more past the jaws' right side (cam.py checks it against the vise as far
+# as that side); Setup 5 checks, every load, that no parallel stands past
+# that side.
+saw_below_plate_top_mm = 14.0462
 # The drive (record keyed = false): the cap's screw, M8 x 1.25, 5 mm hex
 # key, at saw_clamp_torque_nm (record clamp_torque_nm) clamps the saw
 # between the shoulder and the cap with about 11 kN (the record's cited
@@ -821,6 +828,11 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = 101.6, along_jaws_mm = "{{pro
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.crown_x_mm}}"], clamp_mm = ["{{process.jaw_start_mm}}", "{{process.jaw_end_mm}}"], section_mm = { y = "{{cad.fork_width_mm}}", z = "{{process.fork_thickness_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
+instruction = "Every load, before the saw goes in: hold a 6 in rule flat against the jaws' right side, across the right ends of both parallels."
+inspection = "The rule touches neither parallel: both end inside the jaws' right side. Past the forks the saw's cap and its screw pass up to {{process.saw_below_plate_top_mm:in.2dot}} below the plate's top, lower than the parallels' top. A parallel out: tap it in along its jaw until the rule clears it, the load still clamped."
+gauge_checks = "other"
+
+[[setups.operations]]
 instruction = "First load, and again whenever the cap's screw has been loosened: mic the slitting saw's thickness at its rim, just inside the teeth, at four places a quarter turn apart, to .0001. Write the largest on this sheet: t."
 inspection = "t {{process.slot_saw_swept_min_mm:in.4dot}}–{{process.slot_saw_swept_max_mm:in.4dot}}: two levels of it, the second {{process.slot_rise_mm:in.3dot}} higher, make the fork slot's {{cad.fork_slot_width_min_in:.4dot}}–{{cad.fork_slot_width_max_in:.4dot}} width. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.slot_saw_swept_min_mm}}", "{{process.slot_saw_swept_max_mm}}"] }]
@@ -841,7 +853,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "First load only, before the spindle starts: lay a 6 in rule's edge across the cap's lower face, over the screw's head. If the head stands past the face, measure how far: the calipers' beam end on the head, the depth rod run up to the cap's face."
-inspection = "The head flush with the cap's face or under it, or standing {{process.saw_screw_head_stand_max_mm:in.3dot}} or less: CR06 and its air proof carry the cap and that much head clear over the stock. More: stop and tell the owner."
+inspection = "The head flush with the cap's face or under it, or standing {{process.saw_screw_head_stand_max_mm:in.3dot}} or less: CR06 moves between its passes, and its air proof runs, with the cap and that much head clear over the stock. More: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.saw_screw_head_stand_max_mm}}"] }]
 
 [[setups.operations]]
