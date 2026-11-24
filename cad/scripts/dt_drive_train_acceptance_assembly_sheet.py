@@ -185,16 +185,16 @@ ACCEPTANCES = (
         "CHECK 4W",
         "MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT",
         PIVOT_SCREW_ENGAGEMENT,
-        f"LESSER OF {_step_ref('other-base-mounting', 'H')}, "
-        f"{_step_ref('other-base-mounting', 'J')}",
+        f"LESSER OF {_step_ref('other-base-mounting', 'J')}, "
+        f"{_step_ref('other-base-mounting', 'K')}",
     ),
     (
         "stop-screw-engagement",
         "CHECK 4Y",
         "MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT",
         STOP_SCREW_ENGAGEMENT,
-        f"LESSER OF {_step_ref('other-base-mounting', 'M')}, "
-        f"{_step_ref('other-base-mounting', 'N')}",
+        f"LESSER OF {_step_ref('other-base-mounting', 'N')}, "
+        f"{_step_ref('other-base-mounting', 'P')}",
     ),
     # #3292 (owner ruling 2026-11-21, options 2 + 4): T024 is centred while
     # its bond is wet (1S) and accepted after cure (1X) on its tooth runout
