@@ -156,17 +156,12 @@ def test_the_saw_and_arbor_sizes_are_their_inventory_records() -> None:
         assert p[key] == pytest.approx(value * 25.4, abs=1e-4), key
     assert p["saw_teeth"] == saw["teeth"]
     assert arbor["screw_head_past_cap_in"] == "to_measure"
-    # The drive is the cap's friction alone, at the record's clamp torque.
-    # That torque, the screw's thread and its key are inferred on the record,
-    # and the thread's engagement is to measure: the plan counts it, one
-    # screw diameter or more at the inferred pitch, before the screw is torqued.
+    # The drive is the cap's friction alone, at the record's clamp torque, on
+    # the record's thread and its engagement as the owner counted it.
     assert arbor["keyed"] is False
-    assert p["saw_clamp_torque_nm"] == arbor["clamp_torque_nm_inferred"]
-    assert (
-        f"M{p['saw_screw_dia_mm']:g} x {p['saw_screw_pitch_mm']:g}"
-        == arbor["screw_thread_inferred"]
-    )
-    assert arbor["screw_engagement_in"] == "to_measure"
+    assert p["saw_clamp_torque_nm"] == arbor["clamp_torque_nm"]
+    assert arbor["screw_thread"].split(" x ")[0] == f"M{p['saw_screw_dia_mm']:g}"
+    assert p["saw_screw_engagement_no_saw_mm"] == arbor["screw_engagement_no_saw_mm"]
     # The saw and the arbor that were to buy are no tools of the plan, and the
     # limits laid out on them (that blade's upper bound, the spacer-type
     # arbor's collars, spacers and nut) are no parameters of it.
@@ -264,8 +259,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -
         ("saw_screw_stand_max_mm", 12.7, "saw_below_max_mm"),
         ("saw_below_stack_top_mm", 9.0, "saw_below_stack_top_mm"),
         ("spacer_under_max_mm", 0.02, "spacer_under_max_mm"),
-        ("saw_screw_turns_min", 6.0, "saw_screw_turns_min"),
-        ("saw_screw_engagement_min_mm", 4.0, "under one screw diameter"),
+        ("saw_screw_engagement_no_saw_mm", 9.0, "under one diameter of thread"),
         ("saw_nose_above_min_mm", 5.0, "saw_nose_above_min_mm"),
         ("saw_arbor_body_dia_mm", 44.45, "saw_reach_max_mm"),
         ("saw_drive_torque_max_nm", 44.2, "saw_drive_torque_max_nm"),
