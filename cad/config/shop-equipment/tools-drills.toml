@@ -166,6 +166,11 @@ kind = "drill"
 status = "on_hand"
 note = "quotes-2026-11-17-rev3.xlsx Drills #14: owned in 115-pc index (quality unverified); not on the buy list."
 
+[tools.drill-12]
+kind = "drill"
+status = "on_hand"
+note = "115-pc index member (#1-#60 number sizes; owned, quality unverified); no quotes-2026-11-17-rev3.xlsx Drills row read for it. Added 2026-11-23 for MHA-PD-20's #12 DRILL THRU (fit audit 2026-11-23, pending owner confirmation); not on the buy list."
+
 [tools.drill-11]
 kind = "drill"
 status = "on_hand"

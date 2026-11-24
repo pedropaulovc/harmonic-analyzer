@@ -4,7 +4,7 @@
 # Route, chosen for speed (one part, quantity 1): one blank of 3/8 x 1
 # precision-ground 1018 is sawn to 5.70-5.75 in; Setup 2 (PM-30MV CNC, the
 # blank flat on parallels, AR01_holes) makes every hole through the faces from
-# the rear face: the pivot bore (B) and the pin bore (C) drilled and reamed,
+# the rear face: the pivot bore (B) drilled #9 and the pin bore (C) drilled and reamed,
 # the pivot's Ø.500 spot face plunged to its floor with the 1/2 in end mill, the
 # pin bore's rear mouth broken with the chamfer mill. Setup 3 makes a 1/2 in
 # 6061 sub-plate (AR02_plate drills it, AR03/AR04 stop for the hand taps), the
@@ -29,8 +29,10 @@
 # To order (not owned): the 12095 bar (stock.1018-ground-flat-3-8x1, one
 # 12 in length), the .1260/.1265 Class X pair
 # (plug-gauges-1260-1265, already on the to-buy list; Class X stays for that
-# band), the .1940 reamer (reamer-1940, already on the to-buy list), and the
+# band), and the
 # two fixture screws (#10-32 x 5/8 and #4-40 x 5/8 socket head cap screws).
+# The pivot bore is the #9 drill's hole (fit audit 2026-11-23, pending owner
+# confirmation): no reamer; the .194 set pin entering is its one check.
 #
 # The latch-pin hole (fit audit 2026-11-23, pending owner confirmation; the
 # owner on the audit: "can the holes not be reamed in the first place"):
@@ -88,6 +90,7 @@ holes_jaw_top_mm = 19.5453
 spot_dia_mm = 2.5
 drill_past_mm = 1.0
 drill_14_tip_mm = -2.389
+drill_9_tip_mm = -2.496
 drill_32_tip_mm = -1.885
 ream_past_mm = 1.5
 drill_peck_mm = 2.54
@@ -181,9 +184,9 @@ id = "em-half"
 name = "1/2 in carbide end mill"
 ref = "endmill-carbide-3fl-1-2"
 [[tools]]
-id = "reamer-1940"
-name = ".1940 reamer, TO BUY"
-ref = "reamer-1940"
+id = "drill-9"
+name = "#9 drill"
+ref = "riser-drill-9"
 [[tools]]
 id = "reamer-1260"
 name = ".1260 reamer"
@@ -238,7 +241,7 @@ name = "Two-grit sharpening stone (320 face)"
 ref = "sharpening-stone-two-grit"
 [[tools]]
 id = "pin-gauges"
-name = "Pin gauges .194 minus, .195 minus"
+name = "Pin gauges: the .194 minus (GO) and the pins beside it"
 ref = "pin-gauges"
 [[tools]]
 id = "plug-1260"
@@ -362,14 +365,16 @@ milling_cuts = [
 
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "reamer-1940"
-drilling = "none"
+tool = "drill-9"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }
-instruction = "Same file, M6 T5: the .1940 reamer through the pivot from the spot face's floor, {{process.ream_past_mm:in.3dot}} past face A, in and out at feed; set 800. Cutting oil."
-rpm = 800
+instruction = "Same file, M6 T5: the #9 drill through the pivot from the spot face's floor, following the #14 hole, its full diameter {{process.drill_past_mm:in.3dot}} past face A, in and out at feed; set 1600. Cutting oil. The #9 drill is the bore (drawing: #9 DRILL THRU)."
+rpm = 1600
 feed = "3.2 in/min"
+hole_depth_mm = "{{cad.rear_face_thickness_stock_mm}}"
+peck = "none"
 milling_cuts = [
-  { name = "pivot ream", kind = "drill", phase = "finish", cutter_dia_mm = 4.9276, flutes = 6, rpm = 800, feed_mm_min = 81.28, stations_mm = "{{process.pivot_from_end_mm}}" },
+  { name = "pivot drill 9", kind = "drill", phase = "finish", cutter_dia_mm = 4.9784, flutes = 2, rpm = 1600, feed_mm_min = 81.28, stations_mm = "{{process.pivot_from_end_mm}}" },
 ]
 
 [[setups.operations]]
@@ -398,8 +403,8 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "Still clamped, blow out the chips: the pivot bore."
-inspection = "Pivot bore Ø{{cad.pivot_bore_dia_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}: the .194 minus pin enters (GO); the .195 minus pin does not (NO-GO). GO fails or NO-GO enters: stop and tell the owner."
-gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }]
+inspection = "Pivot bore: the .194 minus pin enters (GO). GO fails: stop and tell the owner."
+gauge_checks = "other"
 
 [[setups.operations]]
 instruction = "The pin bore."
@@ -535,8 +540,8 @@ inspection = "Square end {{cad.end_face_width_min_in:.2f}}–{{cad.end_face_widt
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.end_face_width_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Undo both screws and lift the arm off. The sub-plate is not reused. Then the square end's station: the .194 pin gauge in the pivot bore."
-inspection = "Station {{cad.end_face_station_min_in:.2f}}–{{cad.end_face_station_max_in:.2f}}: the calipers from the square end to the pin's far side, less half the pin (.097). Outside: stop and tell the owner."
+instruction = "Undo both screws and lift the arm off. The sub-plate is not reused. Then the square end's station: the largest pin of the set that enters the pivot bore, left in it."
+inspection = "Station {{cad.end_face_station_min_in:.2f}}–{{cad.end_face_station_max_in:.2f}}: the calipers from the square end to the pin's far side, less half that pin's size. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.end_face_station_band_mm}}" }]
 
 # --- Setup 4 ------------------------------------------------------------------
@@ -601,7 +606,7 @@ machine_kind = "other"
 title = "Deburr and inspect"
 machine = "Bench"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished arm: the pivot round with its reamed bore and rear spot face, the tapering flanks, the pin bore with its rear break, the square end with the latch-pin hole." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished arm: the pivot round with its drilled bore and rear spot face, the tapering flanks, the pin bore with its rear break, the square end with the latch-pin hole." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -624,9 +629,8 @@ gauge_checks = [
 
 [[setups.operations]]
 instruction = "Re-gauge both bores after deburring, then their spacing. Not gauged, held by AR01's one clamping from one G54 with face A on the parallels: C's Y position and its squareness to A."
-inspection = "The pivot pins and the pin-bore plugs as in Setup 2; spacing B to C: the .194 pin in B and the .1260 plug in C, the calipers over both less .160, {{cad.pin_bore_x_mm:in.4dot}} ±.002. Outside: set it aside and tell the owner."
+inspection = "The pivot's GO pin and the pin-bore plugs as in Setup 2; spacing B to C: the largest set pin that enters B and the .1260 plug in C, the calipers over both less half of each, {{cad.pin_bore_x_mm:in.4dot}} ±.002. Outside: set it aside and tell the owner."
 gauge_checks = [
-  { gauge = "pin-gauges", band_mm = "{{cad.pivot_bore_dia_band_mm}}" },
   { gauge = "plug-gauges-1260-1265", band_mm = "{{cad.pin_bore_dia_band_mm}}" },
 ]
 

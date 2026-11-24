@@ -169,3 +169,25 @@ def test_every_squared_blank_is_sawn_from_a_flat_of_its_thickness(stem: str) -> 
         width, thickness = stock["section_mm"]
         assert abs(thickness - axial) < 1e-6, ref
         assert width >= side - 1e-6, ref
+
+
+def test_the_pivot_spacer_plan_holds_the_sheets_parallelism_and_tries_the_mate() -> None:
+    """MHA-PD-20 (fit audit 2026-11-23, pending owner confirmation): the
+    turned_bush adapter binds no parallelism, so the plan authors the
+    sheet's zone and this holds it to the drawing's manifest; the #12 hole
+    is accepted by the screw's shoulder, with no reamer and no plug pair."""
+    plan = _plan("pd_transgear_pivot_spacer")
+    far = export_features.requirement_manifest("pd_transgear_pivot_spacer")[
+        "features"
+    ]["far_end"]
+    assert plan["parameters"]["face_parallelism_in"] * 25.4 == pytest.approx(
+        far["parallelism"]
+    )
+    assert _drills(plan) == ["drill-12"]
+    refs = {tool["ref"] for tool in plan["tools"]}
+    assert not {ref for ref in refs if "reamer" in ref or "plug" in ref or "pin" in ref}
+    text = _process_plans.plan_path("pd_transgear_pivot_spacer").read_text(
+        encoding="utf-8"
+    )
+    assert "bore_dia_min_in" not in text and "bore_dia_max_in" not in text
+    assert "shoulder enters the hole by hand" in text

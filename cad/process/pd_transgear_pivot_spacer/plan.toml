@@ -1,38 +1,39 @@
 # Transgear pivot spacer MHA-PD-20, one off, turned on the manual
 # PM-1127VF-LB (owner ruling 2026-11-21: turned parts get lathe travelers, no
-# NC). Route chosen for speed and for the faces' .001 perpendicularity to the
-# bore, which the sheet takes from the shop row "faced on a mandrel after
-# reaming" (owner ruling 2026-11-08, #2144 item 4.4; pd_transgear_pivot_spacer_spec
-# GEOMETRIC_TOLERANCES_IN). The 1/2 in C36000 bar on hand
-# (cad/config/shop-equipment/stock-bought.toml c360-round-1-2; the 7/16 bar is
-# only to order).
-# Setup 1, the bar: face the end, turn the outside to its .43-.45 band back
-# past the parting line, spot, drill #15, ream .1855 through and past the
-# parting line in the same chucking (the bore runs true to the outside, the
-# printed .016 runout), gauge the bore, part off .025 long.
+# NC). The bore is a #12 drilled hole, a LOCTITE 638 bonded slip fit on the
+# MHA-PD-VN-57 shoulder (fit audit 2026-11-23, pending owner confirmation):
+# no reamer, no plug gauges; the hole is accepted by trying the screw's
+# shoulder in it. The sheet holds the rear face parallel to the front face
+# (pd_transgear_pivot_spacer_spec GEOMETRIC_TOLERANCES_IN). The 1/2 in C36000
+# bar on hand (cad/config/shop-equipment/stock-bought.toml c360-round-1-2;
+# the 7/16 bar is only to order).
+# Setup 1, the bar: face the end (the spacer's front face), turn the outside
+# to its .43-.45 band back past the parting line, spot, drill #12 through and
+# past the parting line in the same chucking (the hole runs true to the
+# outside, the printed .016 runout), try the screw's shoulder in the hole,
+# part off .02 long.
 # Setup 2, a stub mandrel turned on the bar left in the chuck (the jaws not
 # opened, so it runs true to the spindle): its end faced square, a pilot
-# turned a light press in the gauged bore and relieved at its root, its body
-# stepped down behind the shoulder so the spacer's rim overhangs it. The
-# spacer pushed on, parted face to the shoulder, by a flat pusher in the
-# tailstock drill chuck (a dead centre's point would land on the pilot's
-# solid tip, which stands below the spacer's face, before the spacer seats):
-# its front face skimmed clean; pushed off by the parting blade on the
-# overhang, turned round, pushed on front face to the shoulder, the rear
-# face faced to length from the shoulder's DRO station. Each face is faced
-# square to the pilot, i.e. to the bore, and indicated there. Bench: deburr,
-# gauge the bore again, oil.
-#
-# Not on hand (cad/config/shop-equipment/, to order): the .1855 chucking
-# reamer (tools-reamers-taps.toml reamer-1855) and the .1855 GO / .1860
-# NO-GO Class X plug gauge pair (gauges.toml plug-gauges-1855-1860): the band
-# is .0005, under the pin-gauge sets' .001 step.
+# fitted a light press in this spacer's drilled hole and relieved at its
+# root, its body stepped down behind the shoulder so the spacer's rim
+# overhangs it. The spacer pushed on once, its front face (faced in Setup 1)
+# to the shoulder, by a flat pusher in the tailstock drill chuck (a dead
+# centre's point would land on the pilot's solid tip, which stands below the
+# spacer's face, before the spacer seats); the rear face faced to length
+# from the shoulder's DRO station, so it is cut parallel to the face seated
+# on the shoulder. Route chosen over rubbing the parted face flat on the
+# surface plate (no mandrel): one mounting on a shoulder faced in place cuts
+# the rear face parallel by construction and to length on the DRO, where
+# hand rubbing a Ø.44 ring rocks it and is slow to a ±.002 length. The
+# micrometer at four places round the rim then reads the length and, by
+# their spread, the faces' parallelism. Bench: deburr, try the shoulder
+# again, wipe dry.
 title = "Transgear Pivot Spacer"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 1/2 in"
-stock = "Lot: {{process.quantity:d}} spacer. Ø{{process.stock_dia_in:.3dot}} bar, on hand (the bar, shared with MHA-PD-24, MHA-PD-25 and MHA-MG-11): hacksaw a {{process.bar_length_in:g}} in working piece and a 1 in piece for the pusher of Op 140 off it before Setup 1. The spacer takes {{cad.pitch_in:.2dot}} in of the working piece, and the stub mandrel of Setup 2 is turned on the end left in the chuck: the piece stays in the jaws from Setup 1 to the end of Setup 2."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .1855 chucking reamer and the .1855 GO / .1860 NO-GO plug gauge pair for the bore."
+stock = "Lot: {{process.quantity:d}} spacer. Ø{{process.stock_dia_in:.3dot}} bar, on hand (the bar, shared with MHA-PD-24, MHA-PD-25 and MHA-MG-11): hacksaw a {{process.bar_length_in:g}} in working piece and a 1 in piece for the pusher of Op 120 off it before Setup 1. The spacer takes {{cad.pitch_in:.2dot}} in of the working piece, and the stub mandrel of Setup 2 is turned on the end left in the chuck: the piece stays in the jaws from Setup 1 to the end of Setup 2."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Have the {{cad.bore_mate}} screw this spacer is bonded on at the lathe: its shoulder is the hole's gauge."
 shop = "../shop"
 stock_refs = ["c360-round-1-2"]
 material_key = "lathe-c360"
@@ -54,9 +55,8 @@ bar_length_in = 4.0
 chuck_grip_in = 0.75
 # Facing allowance: squares a sawn bar end.
 face_allowance_in = 0.02
-# Left on the parted end for Setup 2: about .005 for the front face's skim
-# on the mandrel and .02 for the rear face's facing to length.
-regrip_allowance_in = 0.025
+# Left on the parted end for Setup 2's facing of the rear face to length.
+regrip_allowance_in = 0.02
 # Parting kerf: the P1 blade's width plus .0125 (authored), for wander or a
 # .010 step toward the chuck that widens a deep groove.
 part_kerf_in = 0.075
@@ -77,17 +77,15 @@ rough_radial_doc_mm = 0.5
 finish_radial_doc_mm = 0.05
 turn_feed_mm_rev = 0.1016
 turn_start_z_mm = 0.5
-# Setup 2's stub mandrel (authored). The pilot is fitted to the spacer (a
-# light press: it starts by hand and the flat pusher pushes it home); its
-# aim, .0002-.0005 over the gauged bore's top limit, is printed as an aim
-# only. Enough to hold a light facing skim, pushed off at the carriage; .15 long, under the spacer's
+# Setup 2's stub mandrel (authored). The pilot is fitted to this spacer's
+# drilled hole (a light press: it starts by hand and the flat pusher pushes
+# it home), not turned to a size. Enough to hold a light facing skim, pushed
+# off at the carriage; .15 long, under the spacer's
 # length so the facing tool never meets it. Its root relieved by the P1
 # blade to Ø.17 (under the pilot), taking out the AR's R0.4 mm nose radius
 # so the spacer seats flat on the shoulder. The body behind the shoulder
 # turned to Ø.38, .10 long: the spacer's rim overhangs it all round for the
 # blade to push on and the feeler to read the seat.
-pilot_dia_min_in = 0.1862
-pilot_dia_max_in = 0.1865
 pilot_length_in = 0.15
 relief_dia_in = 0.17
 mandrel_body_dia_in = 0.38
@@ -95,6 +93,11 @@ mandrel_body_length_in = 0.1
 # The feeler leaf that must not enter under a seated face (the shop's feeler
 # gauges, cad/config/shop-equipment/gauges.toml feeler-gauges).
 seat_leaf_in = 0.002
+# The sheet's rear-face parallelism to the front face (datum B), .001
+# (pd_transgear_pivot_spacer_spec GEOMETRIC_TOLERANCES_IN): the turned_bush
+# adapter binds no parallelism, so it is authored here and
+# test_turned_bush_process holds it to the drawing's manifest.
+face_parallelism_in = 0.001
 
 [[tools]]
 id = "ar"
@@ -107,15 +110,9 @@ name = "No. 1 centre drill"
 ref = "centre-drills-carbide-60"
 
 [[tools]]
-id = "drill-15"
-name = "#15 drill"
-ref = "block-drill-15"
-
-[[tools]]
-id = "reamer"
-name = ".1855 chucking reamer"
-ref = "reamer-1855"
-status = "to_order"
+id = "drill-12"
+name = "#12 drill"
+ref = "drill-12"
 
 [[tools]]
 id = "cutoff"
@@ -123,20 +120,9 @@ name = "P1 HSS cutoff blade"
 ref = "cutoff-blade-p1"
 
 [[tools]]
-id = "plugs"
-name = "Plug gauges .1855 GO, .1860 NO-GO"
-ref = "plug-gauges-1855-1860"
-status = "to_order"
-
-[[tools]]
 id = "feelers"
 name = "Feeler gauges"
 ref = "feeler-gauges"
-
-[[tools]]
-id = "dti"
-name = "Lever test indicator on its magnetic base"
-ref = "dti"
 
 [[tools]]
 id = "file"
@@ -150,13 +136,13 @@ ref = "deburring-set"
 
 [[setups]]
 machine_kind = "lathe"
-title = "Bar: face, turn the outside, drill and ream the bore, part off long"
+title = "Bar: face, turn the outside, drill #12 through, part off long"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts. Leave the bar in the jaws after Op 90: Setup 2 turns its mandrel on it."
+holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts. Leave the bar in the jaws after Op 70: Setup 2 turns its mandrel on it."
 datum = "Z0 (carriage DRO) the bar end faced in Op 10."
-diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw: the end faced, the outside turned, the bore spotted, drilled and reamed through past the parting line; the spacer parted off .025 long." }
+diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw: the end faced, the outside turned, the hole spotted and drilled #12 through past the parting line; the spacer parted off .02 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
 
@@ -166,7 +152,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off; set DRO Z0 on it."
+instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off, the last skim no more than .001 deep at the settings' feed, fed from the outside in to the centre: the spacer's front face (the face that seats on the bar, Ra 125; the AR's R0.4 mm nose at that feed leaves about Ra 32). Set DRO Z0 on it."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -197,42 +183,27 @@ speed_kind = "spindle"
 tool = "centre"
 drilling = "none"
 sizing = "other"
-instruction = "Spot the centre from the tailstock with the No. 1 centre drill, about Ø.10 across the countersink: under the #15 drill, so the drill removes it."
+instruction = "Spot the centre from the tailstock with the No. 1 centre drill, about Ø.10 across the countersink: under the #12 drill, so the drill removes it."
 settings = "lathe-centre-c360"
 cut_diameter_mm = 1.191
 
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "drill-15"
+tool = "drill-12"
 drilling = "twist_drill"
-sizing = "other"
-instruction = "Feed the #15 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill in one steady feed until the scale reads {{cad.run_in:.2dot}}: the drill's full diameter runs through the spacer and past the parting line. It leaves the reamer about .003 a side."
-settings = "lathe-drill-15-c360"
-cut_diameter_mm = 4.572
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Feed the #12 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill in one steady feed until the scale reads {{cad.run_in:.2dot}}: the drill's full diameter then runs through the spacer and past the parting line. The #12 drill is the bore (drawing: #12 DRILL THRU). The outside, turned in Op 20, and this hole are made in one chucking: that holds the drawing's .016 runout of the outside to the bore (not gauged)."
+settings = "lathe-drill-12-c360"
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
 hole_depth_mm = "{{cad.run_mm}}"
 peck = "none"
 
 [[setups.operations]]
 cut_kind = "other"
-speed_kind = "spindle"
-tool = "reamer"
-drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Ream .1855 from the tailstock, spindle running: feed the reamer in until its lead chamfer meets the hole's mouth and zero the quill scale there; feed slowly until it reads {{cad.run_in:.2dot}} (past the parting line), and withdraw with the spindle still running. The outside, turned in Op 20, and this bore are made in one chucking: that holds the drawing's .016 runout of the outside to the bore (not gauged)."
-settings = "lathe-ream-1855-c360"
-cut_diameter_mm = "{{cad.bore_dia_mm}}"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Spindle stopped: the {{cad.bore_dia_min_in:.4dot}} GO plug enters the bore from the faced end; the {{cad.bore_dia_max_in:.4dot}} NO-GO plug does not. The pilot of Setup 2 is turned over the NO-GO's size, so a bore passing here takes it as a press (drawing: Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}, a press on {{cad.bore_mate}} of {{cad.bore_interference_min_in:.4dot}}–{{cad.bore_interference_max_in:.4dot}})."
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}, GO/NO-GO plugs."
-gauge_checks = [{ gauge = "plug-gauges-1855-1860", band_mm = "{{cad.bore_dia_band_mm}}" }]
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "GO tight or NO-GO entering in Op 70: the hole is wrong whatever is done to it; part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10 (a NO-GO entering twice: the reamer cuts oversize, stop and check it)."
+instruction = "Spindle stopped, the hole blown clear: try the {{cad.bore_mate}} screw in it, thread first. Its shoulder slides in by hand (the drawing's bonded fit; the compound fills the clearance at assembly). A shoulder that will not enter: break the burr at the hole's mouth and clear the chips, then try again."
+inspection = "The {{cad.bore_mate}} shoulder enters the hole by hand."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
@@ -247,13 +218,13 @@ cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
 [[setups]]
 machine_kind = "lathe"
-title = "Stub mandrel on the bar: face both ends of the spacer square to its bore"
+title = "Stub mandrel on the bar: face the rear face to length, parallel to the front"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "The bar left in the 3-jaw from Setup 1, the jaws not opened: a stub mandrel turned on its end runs true to the spindle. The spacer pushed onto the mandrel's pilot by a flat pusher in the tailstock drill chuck, spindle stopped, until the face toward the chuck seats on the mandrel's shoulder; its rim overhangs the shoulder all round."
-datum = "Z0 (carriage DRO): the spacer's rear face as finished in Op 190, {{cad.length_in:.3dot}} out from the mandrel's shoulder: set by touching the AR on the shoulder, faced in Op 110, and setting DRO Z-{{cad.length_in:.3dot}} there. The P1 blade (Ops 120, 180) works from its own holder: the AR's holder comes off and goes back on the toolpost dovetail with its height nut untouched, and the AXA post returns it within about .0005 in Z, inside the ±.002 length band."
-diagram = { file = "diagrams/mandrel.svg", alt = "The bar stub in the 3-jaw turned into a stub mandrel: shoulder faced, body stepped down behind it, pilot with a root relief; the spacer pushed on, front face to the shoulder, its rear face faced to Z0, a lever indicator on it." }
+holding = "The bar left in the 3-jaw from Setup 1, the jaws not opened: a stub mandrel turned on its end runs true to the spindle. The spacer pushed onto the mandrel's pilot by a flat pusher in the tailstock drill chuck, spindle stopped, until its front face (faced in Setup 1) seats on the mandrel's shoulder; its rim overhangs the shoulder all round."
+datum = "Z0 (carriage DRO): the spacer's rear face as finished in Op 130, {{cad.length_in:.3dot}} out from the mandrel's shoulder: set by touching the AR on the shoulder, faced in Op 90, and setting DRO Z-{{cad.length_in:.3dot}} there. The P1 blade (Ops 100, 130) works from its own holder: the AR's holder comes off and goes back on the toolpost dovetail with its height nut untouched, and the AXA post returns it within about .0005 in Z, inside the ±.002 length band."
+diagram = { file = "diagrams/mandrel.svg", alt = "The bar stub in the 3-jaw turned into a stub mandrel: shoulder faced, body stepped down behind it, pilot with a root relief; the spacer pushed on, front face to the shoulder, its rear face faced to Z0." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = 8.38, minimum_diameter_mm = 4.318, support = "none" }
 
 [[setups.operations]]
@@ -262,7 +233,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the bar's parted end square, .07 off in all: the drill's point and the reamer ran about .06 into it past the parting line, so the pilot's tip is then solid brass with no hole in it. Set DRO Z0 on it for Op 110."
+instruction = "Face the bar's parted end square, .07 off in all: the drill's point ran about .06 into it past the parting line, so the pilot's tip is then solid brass with no hole in it. Set DRO Z0 on it for Op 90."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -272,10 +243,10 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Turn the pilot from the tip back to Z-{{process.pilot_length_in:.2dot}}, to about Ø.188; feed the AR out along Z-{{process.pilot_length_in:.2dot}} on the last pass: the shoulder's face. Turn the body behind it to Ø{{process.mandrel_body_dia_in:.2dot}}, {{process.mandrel_body_length_in:.2dot}} long. Then fit the pilot: passes of .0002 a side, trying the spacer between, until it starts by hand about .05 and goes no further. Touch the AR on the shoulder and set DRO Z-{{cad.length_in:.3dot}} there."
+instruction = "Turn the pilot from the tip back to Z-{{process.pilot_length_in:.2dot}}, until the spacer's hole will not quite start on it; feed the AR out along Z-{{process.pilot_length_in:.2dot}} on the last pass: the shoulder's face. Turn the body behind it to Ø{{process.mandrel_body_dia_in:.2dot}}, {{process.mandrel_body_length_in:.2dot}} long. Then fit the pilot: passes of .0002 a side, trying the spacer between, until it starts by hand about .05 and goes no further. Touch the AR on the shoulder and set DRO Z-{{cad.length_in:.3dot}} there."
 settings = "lathe-ar-c360"
-cut_diameter_mm = 4.737
-inspection = "Pilot: the spacer starts by hand and stops, with no shake (a light press; Ø{{process.pilot_dia_min_in:.4dot}}–{{process.pilot_dia_max_in:.4dot}} the aim, not a gauge)."
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
+inspection = "Pilot: the spacer starts by hand and stops, with no shake (a light press, fitted to this spacer's hole)."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -286,7 +257,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Relieve the pilot's root: the blade's chuck-side face on the shoulder (touch it, then back off .0005), plunge to Ø{{process.relief_dia_in:.2dot}}, under the pilot. It takes out the AR's nose radius in the corner, so the spacer's face can seat on the shoulder."
 settings = "lathe-part-c360"
-cut_diameter_mm = 4.737
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -294,12 +265,12 @@ speed_kind = "other"
 tool = "deburr"
 drilling = "none"
 sizing = "other"
-instruction = "Spacer off the lathe: deburr both ends of its bore with a light twist of the deburring set's countersink by hand, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, and file any parting burr off the parted face's rim, so neither stands proud of a face."
+instruction = "Spacer off the lathe: deburr both ends of its hole with a light twist of the deburring set's countersink by hand, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, and file any parting burr off the parted face's rim, so neither stands proud of a face."
 feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The pusher: the 1 in piece sawn off the bar before Setup 1 (stock line), its sawn end filed flat and its edges broken, the other end in the tailstock drill chuck. Spindle stopped: start the spacer on the pilot parted face first, bring the pusher's flat end onto the spacer's face (the pilot's tip stands about .07 below that face, so only the spacer is pushed) and wind the quill until the spacer seats on the shoulder; withdraw the tailstock."
+instruction = "The pusher: the 1 in piece sawn off the bar before Setup 1 (stock line), its sawn end filed flat and its edges broken, the other end in the tailstock drill chuck. Spindle stopped: start the spacer on the pilot front face first (the face faced in Setup 1), bring the pusher's flat end onto the spacer's parted face (the pilot's tip stands about .07 below that face, so only the spacer is pushed) and wind the quill until the spacer seats on the shoulder; withdraw the tailstock."
 inspection = "Seated: a {{process.seat_leaf_in:.3dot}} leaf does not enter between the spacer and the shoulder."
 gauge_checks = "other"
 feed = "hand"
@@ -310,52 +281,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Skim the spacer's front face (the Setup 1 faced end, now out; the face that seats on the bar, Ra 125) clean all over in light passes, about .005 off in all, the last no more than .001 deep at the settings' feed, fed from the outside in to the bore: the AR's R0.4 mm nose at that feed leaves about Ra 32, inside the face's Ra."
+instruction = "Face the rear face (the parted end; the arm's bearing face, Ra 63) to Z0 in light skims, the last no more than .001 deep at the settings' feed, fed from the outside in to the hole: about Ra 32 from the R0.4 mm nose. Spindle stopped: push the spacer off with the P1 blade's tailstock-side face on the rim where it overhangs the shoulder, a strip of paper between, winding the carriage toward the tailstock. Mike the length at four places round the rim, a quarter turn apart."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} at every place, micrometer; the four readings within {{process.face_parallelism_in:.3dot}} of each other (the rear face parallel to the front face)."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-speed_kind = "other"
-tool = "dti"
-drilling = "none"
-sizing = "other"
-instruction = "Lever indicator on the carriage, its tip on the front face just inside the rim; turn the chuck by hand one full turn and read the movement."
-inspection = "Front face perpendicularity to the bore {{cad.datum_end_perpendicularity_in:.3dot}} ({{cad.datum_end_perpendicularity_mm:.3f}} mm: {{cad.datum_end_perpendicularity_mm:.3f}} on the 0.001 mm indicator): it moves no more than that over the turn."
-gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{cad.datum_end_perpendicularity_mm}}"] }]
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Front face reading over {{cad.datum_end_perpendicularity_in:.3dot}} in Op 160: push the spacer off as Op 180, wipe the pilot and the shoulder clean, push it on again parted face to the shoulder as Op 140, skim the front face .001 more as Op 150 and indicate it again as Op 160; then go on at Op 180."
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-speed_kind = "other"
-tool = "cutoff"
-drilling = "none"
-sizing = "other"
-instruction = "Spindle stopped: push the spacer off. Put the blade's tailstock-side face on the spacer's rim where it overhangs the shoulder, a strip of paper between, and wind the carriage toward the tailstock until the spacer comes off the pilot. Turn it round and push it on as Op 140, front face to the shoulder."
-inspection = "Seated: a {{process.seat_leaf_in:.3dot}} leaf does not enter between the spacer and the shoulder."
-gauge_checks = "other"
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-speed_kind = "spindle"
-tool = "ar"
-drilling = "none"
-sizing = "other"
-instruction = "Face the rear face (the arm's bearing face, Ra 63) to Z0 in light skims, the last no more than .001 deep at the settings' feed, fed from the outside in to the bore: about Ra 32 from the R0.4 mm nose. Spindle stopped, the indicator's tip on the rear face just inside the rim, one turn of the chuck by hand; then push it off as Op 180, a strip of paper on the rim, and mike the length at three places round the rim."
-settings = "lathe-ar-c360"
-cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Rear face perpendicularity to the bore {{cad.far_end_perpendicularity_in:.3dot}} ({{cad.far_end_perpendicularity_mm:.3f}} mm on the 0.001 mm indicator); length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} at every place, micrometer."
-gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{cad.far_end_perpendicularity_mm}}"] }, { gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Rear face reading over {{cad.far_end_perpendicularity_in:.3dot}} in Op 190: push it off, wipe the pilot and the shoulder, push it on again front face to the shoulder, face the rear .001 past Z0 (Z-.001) and repeat Op 190's checks. Length over {{cad.length_max_in:.3dot}}: push it on again the same way and face the rear to Z0 again. Under {{cad.length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1."
+instruction = "Readings spread over {{process.face_parallelism_in:.3dot}} in Op 130: wipe the pilot, the shoulder and the front face clean, push the spacer on again as Op 120, face the rear .001 past Z0 (Z-.001) and mike again. Length over {{cad.length_max_in:.3dot}}: push it on again the same way and face the rear to Z0 again. Under {{cad.length_min_in:.3dot}}: make another from Setup 1."
 feed = "hand"
 
 [[setups]]
@@ -364,7 +298,7 @@ title = "Bench: deburr and check the spacer"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished spacer: its {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} length between faces square to the bore, the turned outside and the reamed bore through." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished spacer: its {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} length between parallel faces, the turned outside and the #12 drilled hole through." }
 vise_hold = "other"
 beam = "other"
 
@@ -373,19 +307,15 @@ speed_kind = "other"
 tool = "file"
 drilling = "none"
 sizing = "other"
-instruction = "Deburr the outside edges with the smooth file: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, without touching either face's flat. Break both ends of the bore again only if a burr stands, with a light twist of the countersink."
+instruction = "Deburr the outside edges with the smooth file: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, without touching either face's flat. Break both ends of the hole again only if a burr stands, with a light twist of the countersink."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The {{cad.bore_dia_min_in:.4dot}} GO plug enters the bore from both ends and the {{cad.bore_dia_max_in:.4dot}} NO-GO plug enters from neither."
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "plug-gauges-1855-1860", band_mm = "{{cad.bore_dia_band_mm}}" }]
+instruction = "Try the {{cad.bore_mate}} screw's shoulder in the hole from both ends: it slides through by hand."
+inspection = "The {{cad.bore_mate}} shoulder passes through the hole by hand."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A spacer failing Op 220 is scrapped, not reworked: make another from Setup 1."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Finish: wipe the spacer clean and give its outside a light coat of light machine oil; keep the bore dry for the press on {{cad.bore_mate}}."
+instruction = "Finish: wipe the spacer clean and dry, the hole free of oil: it is bonded on {{cad.bore_mate}} at assembly (MHA-PD-00), which degreases it again."
 feed = "hand"
