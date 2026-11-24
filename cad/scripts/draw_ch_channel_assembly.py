@@ -935,10 +935,6 @@ ROCKER_COLUMNS = (
     StepColumn(SHEET_NAMES[2], (STEPS_RIGHT_X, STEPS_TOP_Y), _RIGHT_FOOT),
     StepColumn(SHEET_NAMES[3], (STEPS_LEFT_X, STEPS_TOP_Y), _BORDER_FOOT),
 )
-LEVER_COLUMNS = (
-    StepColumn(SHEET_NAMES[4], (STEPS_RIGHT_X, STEPS_TOP_Y), _RIGHT_FOOT),
-    StepColumn(SHEET_NAMES[5], (STEPS_LEFT_X, STEPS_TOP_Y), _BORDER_FOOT),
-)
 
 
 # A reference word and its number or letter (ITEM 10, STEP 5, VIEW D) print
@@ -1027,6 +1023,14 @@ if _planned[2] > _TEMPLATE.width_m - BORDER - 0.003:
     raise AssertionError("the setting table runs past the right border")
 if _planned[1] < _TEMPLATE.title_block_top_m + 0.003:
     raise AssertionError("the setting table runs into the title block")
+# C10 (the rear keeper set to the bare stack) adds a step and threads the
+# levers at the keepers' fit-up: the lever steps run on under the setting
+# table, down to the title block.
+LEVER_COLUMNS = (
+    StepColumn(SHEET_NAMES[4], (STEPS_RIGHT_X, STEPS_TOP_Y), _RIGHT_FOOT),
+    StepColumn(SHEET_NAMES[5], (STEPS_LEFT_X, STEPS_TOP_Y), _BORDER_FOOT),
+    StepColumn(SHEET_NAMES[5], (STEPS_RIGHT_X, _planned[1] - 0.006), _RIGHT_FOOT),
+)
 
 
 def _fitup_text() -> dict[str, str]:
@@ -1223,15 +1227,22 @@ def _fitup_text() -> dict[str, str]:
             f"WITH {top_frame} ON THE MILL, STAND BOTH {keeper} ON ITS RAIL AS "
             f"{plan_view} SHOWS, FEET OUTWARD."
         ),
+        # C10 (ch_channel_assembly_spec REAR_KEEPER_LEAF_MM): the rear keeper
+        # is set to the bare levers, so they go on with the shaft.
         "fulcrum-shaft-through-keepers": (
-            f"PUSH {fulcrum_shaft} THROUGH BOTH {keeper} BORES."
+            f"PUSH {fulcrum_shaft} THROUGH BOTH {keeper} AND {COUNT} BARE {lever} "
+            "LEVERS."
         ),
         steps.KEEPERS_SET_KEY: (
             f"BY DRO, SET EACH LUG CENTRE OFF THE RAIL WEB CENTRE, TO {plan_view}."
         ),
         "keeper-faces-set": (
-            "BY DRO, SET THE LUG INNER FACES OFF THE LINE OF THE UPPER SOCKET "
-            f"CENTRES, TO {plan_view}."
+            "BY DRO, SET THE RIGHT LUG INNER FACE OFF THE LINE OF THE UPPER "
+            f"SOCKET CENTRES, TO {plan_view}."
+        ),
+        "rear-keeper-to-stack": (
+            f"HOLDING THE RIGHT {keeper}, PUSH THE LEFT ONE UP TO THE {lever} "
+            f"HUBS ON THE FEELER LEAF OF {notes.setting_row('rear-keeper-to-stack')}."
         ),
         "keepers-clamped-on-frame": f"CLAMP BOTH {keeper} TO THE RAIL.",
         "keeper-feet-transferred": (
@@ -1248,6 +1259,9 @@ def _fitup_text() -> dict[str, str]:
         # with both screwed down (ch_fulcrum_shaft_spec ALIGNED_MIN_CLEARANCE_MM).
         "keeper-bores-checked": (
             f"CHECK {fulcrum_shaft} SLIDES FREELY THROUGH BOTH {keeper} BORES."
+        ),
+        "fulcrum-shaft-withdrawn": (
+            f"DRAW {fulcrum_shaft} OUT OF BOTH {keeper} TO THE LEFT ({lever_view})."
         ),
         "bars-straight": (
             f"LAY EACH {bar} BAR ON THE SURFACE PLATE ON EACH SIDE FACE IN TURN: "
@@ -1284,9 +1298,6 @@ def _fitup_text() -> dict[str, str]:
         ),
         "bar-pin-return": (
             f"RETURN TO STEP {n('bar-pin-bonded')} IF {bar_pin} SLIDES OR {bar} BINDS."
-        ),
-        "fulcrum-shaft-withdrawn": (
-            f"DRAW {fulcrum_shaft} OUT OF BOTH {keeper} TO THE LEFT ({lever_view})."
         ),
         steps.LEVER_BANK_THREADED_KEY: (
             f"PUSH {fulcrum_shaft} BACK THROUGH THE LEFT {keeper}, THEN THROUGH "
