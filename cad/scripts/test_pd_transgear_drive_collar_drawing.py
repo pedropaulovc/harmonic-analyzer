@@ -94,7 +94,7 @@ def test_turned_diameters_and_lengths_print_on_the_side_view() -> None:
     )
     rows = [size_row, *drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines()]
     # Its widest rows, measured on run 20261117T123054105Z: the size row
-    # 63.9 mm (Ø to ")"), "PRESS FIT, PIN MHA-PD-VN-70" 63.6 mm.  Longer rows
+    # 63.9 mm (Ø to ")"), a 27-character mate row 63.6 mm.  Longer rows
     # need a new measurement.  The two spaces of ink air ending every row
     # print 1.3 mm each, and the block's widest row ends at the line.
     assert max(len(r.rstrip()) for r in rows) <= 27
@@ -446,7 +446,8 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     # the stud's gap under its crest (rule 4): two lines of words (rule 7).
     pin_rows = drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines()
     assert len(pin_rows) == 2
-    assert "PRESS FIT" in pin_rows[0] and spec.FLAT_PIN_NUMBER in pin_rows[0]
+    # The pin's row names it and links the note giving its press fit and gauge.
+    assert pin_rows[0].rstrip() == f"PIN {spec.FLAT_PIN_NUMBER} SEE NOTE {spec.REAM_NOTE}"
     # rule 16: the package declares the pin permanent, in the part notes.
     assert f"PERMANENT PIN {spec.FLAT_PIN_NUMBER}" in spec.DRAWING_NOTES
     shaft_number = _config.parts("pd-transgear-knob-shaft")["number"]
@@ -473,13 +474,15 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     # The reamed dowel holes: process, mate, then the necessity answer, one
     # line of at most six words beyond the mate's number, no dimension.
     dowel_rows = drawing.DIMENSION_CALLOUTS_BELOW["PinPosDia"].splitlines()
-    assert dowel_rows[0] == "2X REAM THRU" and "PRESS FIT" in dowel_rows[1]
+    assert dowel_rows[0] == f"2X REAM THRU, SEE NOTE {spec.REAM_NOTE}"
+    assert "PRESS FIT" in dowel_rows[1]
     for answer in (dowel_rows[2], pin_rows[1]):
         words = [w for w in answer.split() if not w.startswith("MHA-")]
         assert 0 < len(words) <= 6 and not re.search(r"\d", " ".join(words)), answer
     # Their acceptance is the pins themselves and the wheels' trial (notes).
-    assert "THEIR PINS ARE THE GAUGES" in spec.DRAWING_NOTES
-    assert "WHEELS DROP ON FREELY" in spec.DRAWING_NOTES
+    ream_note = spec.DRAWING_NOTES.splitlines()[spec.REAM_NOTE - 1]
+    assert ream_note == "3. PRESS FIT: THE PIN IS THE GAUGE; NONE ENTERS ITS HOLE BY HAND."
+    assert f"ALL 3 {spec.SPROCKET_NUMBER} WHEELS DROP ON FREELY" in spec.DRAWING_NOTES
     # The rear break's leg and angle share one line; its mate rows name the
     # shaft corner it clears, short enough to hang left of its dimension line.
     assert drawing.DIMENSION_SUFFIXES["RearBreak"] == " X 45°"
@@ -493,7 +496,7 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     assert drawing.DIMENSION_CALLOUTS_BELOW["PinPosY"] == link
     assert drawing.DIMENSION_CALLOUTS_BELOW["PinNegY"] == link
     assert spec.DRAWING_NOTES.splitlines()[spec.TRIAL_NOTE - 1].startswith(
-        f"{spec.TRIAL_NOTE}. LOCATE TO "
+        f"{spec.TRIAL_NOTE}. LOCATE BY TRIAL: "
     )
     # Rule 7: size and process lines plus at most two lines of words.
     assert all(

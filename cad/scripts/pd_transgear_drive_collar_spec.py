@@ -723,15 +723,17 @@ for _ok, _what in (
 # drawing-guidelines.md rule 4 (loose unless something fails; fit the pair):
 # the bore is a named drill at DRILLED HOLES and names the mate that is made
 # to it; the acceptance prints once, on MHA-PD-08 (the member made last, its
-# note 2).  The reamed pin holes print the reamer's size and no band, their
-# bought pins are their gauges (general note REAM_NOTE) and each callout
-# prints its one reason.
+# note 2).  The reamed pin holes print the reamer's size and no band; their
+# bought pins are their gauges (note REAM_NOTE, which both ream callouts
+# link: machinist review r2 of the fit batch read it as unlinked) and each
+# callout prints its one reason.
 RIM_NOTE, WEB_NOTE, REAM_NOTE, TRIAL_NOTE = 1, 2, 3, 4
 BORE_CALLOUT = f"{BORE_DRILL} DRILL THRU\n{SHAFT_NUMBER} D-CORE\nIS TURNED TO FIT"
-# The dowels' reams: the dowel and its fit, then what the press protects (a
-# floating pin would spend the wheels' slip in their holes).
+# The dowels' reams: the linked gauge note, the dowel and its fit, then what
+# the press protects (a floating pin would spend the wheels' slip in their
+# holes).
 PIN_HOLE_CALLOUT = (
-    f"2X REAM THRU\nPRESS FIT, DOWEL {DOWEL_NUMBER}\n"
+    f"2X REAM THRU, SEE NOTE {REAM_NOTE}\nPRESS FIT, DOWEL {DOWEL_NUMBER}\n"
     f"KEEPS SLIP IN {SPROCKET_NUMBER} HOLES"
 )
 # The flat pin's press ream.  Rule 26 orders a hole callout size, process,
@@ -740,15 +742,17 @@ PIN_HOLE_CALLOUT = (
 # (rule 26: a depth is never left to the view; REF because the rear is faced to
 # fit after reaming).  The depth symbol marks it blind, to the floor the .XX
 # station dimension places, which controls.  Under the size, two lines of
-# words (rule 7): its pin and fit, then the one reason its ream and its
-# centre's ±.002 share (rule 4: a gap that closes at the looser size): the
-# crest must pass the shaft's #8-32 stud (STUD_FLAT_PIN_AIR).  The pin is the
-# hole's gauge (general note REAM_NOTE).  That the pin is pressed for good,
-# collar and pin one permanent pair (rule 16), is part note WEB_NOTE, beside
-# its web.
+# words (rule 7): its pin and the linked note that gives its press fit and
+# gauge (27 characters, the widest row the block's lane holds), then the one
+# reason its ream and its centre's ±.002 share (rule 4: a gap that closes at
+# the looser size): the crest must pass the shaft's #8-32 stud
+# (STUD_FLAT_PIN_AIR).  That the pin is pressed for good, collar and pin one
+# permanent pair (rule 16), is part note WEB_NOTE, beside its web.
 FLAT_PIN_HOLE_DEPTH_REF = LENGTH - FLAT_PIN_FLOOR
 FLAT_PIN_HOLE_SUFFIX = f" REAM <HOLE-DEPTH> ({inch_text(FLAT_PIN_HOLE_DEPTH_REF, 3)})"
-FLAT_PIN_HOLE_CALLOUT = f"PRESS FIT, PIN {FLAT_PIN_NUMBER}\nKEEPS GAP TO {SHAFT_NUMBER} STUD"
+FLAT_PIN_HOLE_CALLOUT = (
+    f"PIN {FLAT_PIN_NUMBER} SEE NOTE {REAM_NOTE}\nKEEPS GAP TO {SHAFT_NUMBER} STUD"
+)
 # The rear break prints its leg and angle on one line, then the mate it
 # clears (rule 4) on two short rows under it; the clearance is the spec's
 # assertion (FLAT_PIN_CREST_CORNER_AIR_MIN).
@@ -956,8 +960,8 @@ DRAWING_NOTES = (
     f"{inch_text(DRIVE_PIN_COLLAR_RIM_WORST, 3)} MIN.\n"
     f"{WEB_NOTE}. PERMANENT PIN {FLAT_PIN_NUMBER}: HOLE TO DRIVE-PIN HOLE "
     f"{inch_text(FLAT_PIN_WEB_WORST, 3)} MIN.\n"
-    f"{REAM_NOTE}. REAMED HOLES: THEIR PINS ARE THE GAUGES; NONE ENTERS BY HAND.\n"
-    f"{TRIAL_NOTE}. LOCATE TO {SPROCKET_NUMBER} HOLES: ALL 3 WHEELS DROP ON FREELY."
+    f"{REAM_NOTE}. PRESS FIT: THE PIN IS THE GAUGE; NONE ENTERS ITS HOLE BY HAND.\n"
+    f"{TRIAL_NOTE}. LOCATE BY TRIAL: ALL 3 {SPROCKET_NUMBER} WHEELS DROP ON FREELY."
 )
 if max(map(len, DRAWING_NOTES.splitlines())) > FIT_UP_NOTE_WIDTH:
     raise AssertionError("a MHA-PD-22 sheet note runs past the notes block")
