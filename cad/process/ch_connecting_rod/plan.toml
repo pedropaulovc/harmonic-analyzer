@@ -72,12 +72,13 @@
 # Also to buy: the .0775 reamer (tools.reamer-0775). The shank's four
 # corners take the 1/8 in end mill's R.0625 inside their printed R.065
 # (.060-.070; owner ruling 2026-11-23, tool audit Q9): no 5/64 in end mill.
-# The pin hole's size is gauged by a special
-# Class ZZ pin-gauge pair, GO .0775 plus and NO-GO .0779 minus, TO BUY (as
-# CH-01's; owner ruling 2026-11-21, "ill buy pin gauges", superseding the
-# 2026-11-19 decision of #3124 item 5): a reamed hole is the reamer's size
-# +.0005/0, wider than the drawing's .0004 band, so the reamer alone does
-# not hold it; the pin-gauge sets on order (gauges.pin-gauges) step .001.
+# Owner ruling 2026-11-24, fit audit question 3: the pin hole prints the
+# reamer's size with no band and the MHA-SH-VN-58 pin itself is its gauge
+# (it does not enter by hand); no special Class ZZ pins and no miking of the
+# pin or the reamer. A hole the pin enters by hand is not a scrapped rod:
+# tagged SLIP, MHA-CH-00 bonds its pin, if the .079 pin of the .061-.500 set
+# (gauges.pin-gauges, on order) does not enter it (the largest hole bonded;
+# delegated ruling 2026-11-24, no precedent).
 # The drawing's finish, matte black oxide (owner ruling 2026-11-20, #2348;
 # all over, no masking), is done in the shop. The sheet prints it per
 # MIL-DTL-13924 Class 1 until #3318 lands: that PR makes the callout a
@@ -109,7 +110,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1/4 x 2 in flat (the drawing's MATERIAL: Plain Carbon Steel; 1018 CF chosen)"
 stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:.0f}} in flat bar: two 72 in lengths and one 36 in; {{process.quantity:d}} × {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blanks. Support plate: one 3.9 x 6 in piece of the 1/2 x 6 in 6061 flat."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Faces: D, the datum face (the fork's near face), stays as bought; F, the fork's far face, is skimmed in Setup 2. Mark D on each blank in Setup 1 and keep it readable. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once a session, not at every setup. A Reset after a Feed Hold keeps G54: no homing, no new zero. Pick up G54 X and Y once, in Setup 2, and again after any other controller reset, an alarm, a stall or an E-stop (FluidNC loses home: home first), except with the saw mounted (Setup 5): there $H brings the stored G54 back, the edge finder not fitting with the arbor in; the vise, the parallels and the plate stay put, so X and Y carry through Setups 2 to 6. Z0 is touched where each setup's Datum says. Setups 2 and 3 each run for all the loads in turn before the next; Setups 4, 5 and 6 are one clamping, run through on each load before the next load is clamped. To buy before Setup 5: the .0775 reamer and the Class ZZ pin-gauge pair (.0775 plus, .0779 minus). The slitting saw and its R8 stepped saw arbor are owned."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Faces: D, the datum face (the fork's near face), stays as bought; F, the fork's far face, is skimmed in Setup 2. Mark D on each blank in Setup 1 and keep it readable. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once a session, not at every setup. A Reset after a Feed Hold keeps G54: no homing, no new zero. Pick up G54 X and Y once, in Setup 2, and again after any other controller reset, an alarm, a stall or an E-stop (FluidNC loses home: home first), except with the saw mounted (Setup 5): there $H brings the stored G54 back, the edge finder not fitting with the arbor in; the vise, the parallels and the plate stay put, so X and Y carry through Setups 2 to 6. Z0 is touched where each setup's Datum says. Setups 2 and 3 each run for all the loads in turn before the next; Setups 4, 5 and 6 are one clamping, run through on each load before the next load is clamped. To buy before Setup 5: the .0775 reamer and the .061-.500 pin-gauge set (its .079 pin). The slitting saw and its R8 stepped saw arbor are owned."
 shop = "../shop"
 stock_refs = ["1018-flat-1-4x2-72in", "1018-flat-1-4x2-36in", "6061-flat-1-2x6-54in"]
 material_key = "rocker-1018-cold-finished"
@@ -387,11 +388,6 @@ ream_past_mm = 1.0
 # The #49's tip below Z0: its full diameter drill_past_mm past face D plus
 # its 118° point (the Setup 5 envelope's deepest cut).
 drill_tip_mm = -1.057
-# The pin MHA-SH-VN-58, McMaster 90145A299: 5/64 in, 0/+.0002 (.0781-.0783,
-# cad/config/parts/sh-vn-pivot-pin.yaml): the .0775 reamer is .0004-.0008
-# under it, inside the drawing's .0002-.0008 (sheet note 1).
-pin_dia_min_mm = 1.98374
-pin_dia_max_mm = 1.98882
 # Speeds, authored in the operations: LittleMachineShop "Cutting Speeds",
 # Drilling & Reaming, Plain carbon steels 1006-1026 (read 2026-11-20):
 # drilling 60-100 ft/min, reaming 40-65. The #49 (.073) at 2800 rpm, the
@@ -517,9 +513,9 @@ name = "Files"
 ref = "jig-files"
 [[tools]]
 id = "pin-gauges"
-name = "Pin gauges .0775 plus, .0779 minus"
+name = "Pin gauge .079 from the .061-.500 set"
 ref = "pin-gauges"
-description = "Special Class ZZ pin gauges: .0775 plus pin (GO, .0775-.0777) and .0779 minus pin (NO-GO, .0777-.0779); not in the .001-step sets on order"
+description = "One pin of the .001-step minus set on order, tried only in a hole the MHA-SH-VN-58 pin entered by hand"
 status = "to_order"
 
 [[setups]]
@@ -554,14 +550,6 @@ drilling = "none"
 sizing = "other"
 instruction = "Once per batch: saw a {{process.support_plate_width_mm:in.1f}} in piece off the end of the 1/2 x 6 in 6061 flat (the support plate, {{process.support_plate_width_mm:in.1f}} x 6 in), file its burrs, and mark one {{process.support_plate_width_mm:in.1f}} in edge LEFT: its 6 in length runs along X under the blanks, its 3.9 in across the jaws, narrower than the pair. It is faced in Setup 2 and kept for every load."
 feed = "hand"
-
-[[setups.operations]]
-instruction = "Mic one MHA-SH-VN-58 pin from the lot the rods will be assembled with (sheet note 1 fits the hole to it), and mic the .0775 reamer across its flutes."
-inspection = "The pin {{process.pin_dia_min_mm:in.4dot}}–{{process.pin_dia_max_mm:in.4dot}} (McMaster 90145A299, 5/64 in 0/+.0002) and the reamer .0775–.0777. A hole the Setup 5 gauges pass (.0775–.0779) is then .0002–.0008 under the pin, note 1's fit. Outside: stop and tell the owner before reaming any rod."
-gauge_checks = [
-  { gauge = "micrometers", band_mm = ["{{process.pin_dia_min_mm}}", "{{process.pin_dia_max_mm}}"] },
-  { gauge = "micrometers", band_mm = [1.9685, 1.97358] },
-]
 
 [[setups]]
 machine_kind = "other"
@@ -1010,8 +998,8 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "First load and the first load after any reamer change, before the next load: gauge each hole with the Class ZZ pin-gauge pair (GO .0775 plus, NO-GO .0779 minus; TO BUY), then try the miked MHA-SH-VN-58 pin by hand in each hole, chamfered end first."
-inspection = "Size Ø.0775–.0779: the GO enters through by hand, the NO-GO does not enter. Then the pin does not enter past its chamfer (note 1's press fit). Either fails: stop and tell the owner. The pin is pressed in only at assembly."
+instruction = "Every load, before the next: try an MHA-SH-VN-58 pin by hand in each hole, chamfered end first, and take it out again."
+inspection = "The pin does not enter past its chamfer by hand (note 1: press fit; the pin is pressed in only at assembly, MHA-CH-00). It enters: try the set's .079 pin in that hole. The .079 does not enter: do not scrap the rod; write SLIP on its tag (MHA-CH-00 bonds its pin). The .079 enters: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -1068,7 +1056,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Break each rod out of its frame: bend the frame at each tab until it snaps, or cut the tab with a hacksaw. File each tab's stub flush with the edge. Deburr the edges, the bore's, the slot's and the pin hole's mouths: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, smooth file and a scraper; clear the slot's burrs inside the pin hole with the reamer by hand. Wash off the oil."
 feed = "hand"
-inspection = "Each rod, after the reamer: the NO-GO .0779 pin does not enter the pin hole. Enters: set the rod aside and tell the owner."
+inspection = "Each rod: the edges, the bore's, the slot's and the pin hole's mouths broken, no burr left in the slot or the pin hole."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -1121,5 +1109,5 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Seal: wipe on the stone lubricant (a light oil; the maker: clear coat, wax or oil), leave it a few minutes, wipe off the excess."
 feed = "hand"
-inspection = "Even black all over each rod, no bare spot and no wiping-off coating. Fit after blackening: the GO .0775 pin still enters the pin hole. Tight: stop and tell the owner; do not re-ream."
+inspection = "Even black all over each rod, no bare spot and no wiping-off coating."
 gauge_checks = "other"

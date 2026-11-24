@@ -46,11 +46,14 @@
 # drive is friction alone (not keyed): the screw at 20 N·m, witness lines,
 # a light first pass and a stop to look at them.
 #
-# FLAGGED: the .0775 reamer is to buy (tools.reamer-0775). The hole's size
-# is gauged by a special Class ZZ pin-gauge pair, GO .0775 plus and NO-GO
-# .0779 minus, TO BUY: the pin-gauge sets on order (gauges.pin-gauges) step
-# .001 and hold no .0775 or .0779. A first-article hand try of the miked pin
-# backs it up.
+# FLAGGED: the .0775 reamer is to buy (tools.reamer-0775). Owner ruling
+# 2026-11-24, fit audit question 3: the hole prints the reamer's size with
+# no band and the MHA-SH-VN-58 pin itself is its gauge (it does not enter by
+# hand); no special Class ZZ pins. A hole the pin enters by hand is not a
+# scrapped bar: tagged SLIP, MHA-CH-00 bonds its pin, if the .079 pin of the
+# .061-.500 set (gauges.pin-gauges, on order) does not enter it (the largest
+# hole bonded; delegated ruling 2026-11-24, no precedent). The set's .077 pin
+# stands in the hole for the drop and place readings.
 #
 # Length: owner ruling 2026-11-23 (tool audit Q3), verbatim: "B. Buy only the
 # Insize rule; make the 20 bars equal by comparison (stop on the surface
@@ -387,12 +390,6 @@ drill_past_mm = 0.5
 # The #49's point (118°) under that: cam.py checks it.
 drill_tip_height_mm = -1.057
 ream_past_mm = 1.0
-# The pin MHA-SH-VN-58, McMaster 90145A299: 5/64 in, 0/+.0002 (.0781-.0783,
-# cad/config/parts/sh-vn-pivot-pin.yaml): the .0775 reamer is .0006-.0008
-# under it; the reamed band .0775-.0779 is .0002-.0008 under it, the
-# drawing's .0002-.0008 (sheet note 1).
-pin_dia_min_mm = 1.98374
-pin_dia_max_mm = 1.98882
 # Speeds, authored in the operations: LittleMachineShop "Cutting Speeds",
 # Drilling & Reaming, Plain carbon steels 1006-1026 (read 2026-11-20):
 # drilling 60-100 ft/min, reaming 40-65. The #49 (.073) at 2800 rpm, the
@@ -537,9 +534,9 @@ name = "Files"
 ref = "jig-files"
 [[tools]]
 id = "pin-gauges"
-name = "Pin gauges .0775 plus, .0779 minus"
+name = "Pin gauges .077 and .079 from the .061-.500 set"
 ref = "pin-gauges"
-description = "Special Class ZZ pin gauges: .0775 plus pin (GO, .0775-.0777) and .0779 minus pin (NO-GO, .0777-.0779); not in the .001-step sets on order"
+description = "Two pins of the .001-step minus set on order: the .077 stands in the reamed hole for the drop and place readings; the .079 is tried only in a hole the MHA-SH-VN-58 pin entered by hand"
 status = "to_order"
 
 [[setups]]
@@ -880,11 +877,6 @@ gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.top_excess_max_mm
 instruction = "Write each bar's x near its top end and sort the bars into 5 loads of four of near equal x."
 feed = "hand"
 
-[[setups.operations]]
-instruction = "Mic one MHA-SH-VN-58 pin from the lot the bars will be assembled with (sheet note 1 fits the hole to it)."
-inspection = "The pin {{process.pin_dia_min_mm:in.4dot}}–{{process.pin_dia_max_mm:in.4dot}} (McMaster 90145A299, 5/64 in 0/+.0002): the reamed hole ({{cad.top_pin_hole_dia_min_in:.4dot}}–{{cad.top_pin_hole_dia_max_in:.4dot}}) is then .0002–.0008 under it, as the note asks. Outside: stop and tell the owner before reaming any bar."
-gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.pin_dia_min_mm}}", "{{process.pin_dia_max_mm}}"] }]
-
 [[setups]]
 machine_kind = "other"
 title = "Top ends to length, top notches, pin holes"
@@ -1078,20 +1070,20 @@ instruction = "Every load: CA05 has ended with the spindle stopped (M5), the rea
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First load and the first load after any reamer change, before the next load: gauge each hole with the Class ZZ pin-gauge pair (GO .0775 plus, NO-GO .0779 minus; TO BUY, not in the .001-step sets on order), then try a miked MHA-SH-VN-58 pin by hand in each hole, chamfered end first."
-inspection = "Size Ø{{cad.top_pin_hole_dia_min_in:.4dot}}–{{cad.top_pin_hole_dia_max_in:.4dot}}: the GO .0775 enters through both cheeks by hand, the NO-GO .0779 does not enter. Then the miked pin does not enter past its chamfer by hand (the hole is under it, the press fit of sheet note 1). Either fails: stop and tell the owner. The pin is pressed in only at assembly (MHA-CH-00)."
+instruction = "Every load, before the next: try an MHA-SH-VN-58 pin by hand in each hole, chamfered end first, and take it out again."
+inspection = "The pin does not enter past its chamfer by hand (sheet note 1: press fit; the pin is pressed in only at assembly, MHA-CH-00). It enters: try the set's .079 pin in that hole. The .079 does not enter: do not scrap the bar; write SLIP on its tag (MHA-CH-00 bonds its pin). The .079 enters: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Still clamped, first load only and after any X0 remedy or change to CA05: each hole's drop, the GO .0775 pin gauge pushed into it (a snug fit; the #49 shank is .004 loose and would shift the reading)."
-inspection = "Drop {{cad.top_pin_hole_drop_min_in:.2f}}–{{cad.top_pin_hole_drop_max_in:.2f}} from the top end: the calipers from the end over the gauge pin, less half its .0775. Outside: stop and tell the owner."
+instruction = "Still clamped, first load only and after any X0 remedy or change to CA05: each hole's drop, the set's .077 pin pushed into it (.0005-.0011 loose; the #49 shank is .004 loose and would shift the reading)."
+inspection = "Drop {{cad.top_pin_hole_drop_min_in:.2f}}–{{cad.top_pin_hole_drop_max_in:.2f}} from the top end: the calipers from the end over the .077 pin, less half its .077. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.top_pin_hole_drop_band_mm}}" },
 ]
 
 [[setups.operations]]
-instruction = "Unclamp the load. Every load: the P4 bar's hole place from its B face (CA05 places the holes on a {{process.bar_pitch_mm:in.4dot}} pitch from Y0, so the P4 hole carries the P1–P3 bars' widths, within .003 of them). First load (write its G54 Y, from $#, on this sheet), and any later load whose G54 Y differs from it by more than 0.05 mm (.002): every bar's. The GO .0775 pin gauge in the hole."
-inspection = "From B {{cad.top_pin_hole_location_from_back_min_in:.3dot}}–{{cad.top_pin_hole_location_from_back_max_in:.3dot}}: the calipers from the B face over the gauge pin, less half its .0775. Outside: stop and tell the owner."
+instruction = "Unclamp the load. Every load: the P4 bar's hole place from its B face (CA05 places the holes on a {{process.bar_pitch_mm:in.4dot}} pitch from Y0, so the P4 hole carries the P1–P3 bars' widths, within .003 of them). First load (write its G54 Y, from $#, on this sheet), and any later load whose G54 Y differs from it by more than 0.05 mm (.002): every bar's. The set's .077 pin in the hole."
+inspection = "From B {{cad.top_pin_hole_location_from_back_min_in:.3dot}}–{{cad.top_pin_hole_location_from_back_max_in:.3dot}}: the calipers from the B face over the .077 pin, less half its .077. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.top_pin_hole_location_from_back_band_mm}}" },
 ]
@@ -1112,7 +1104,7 @@ beam = "other"
 
 [[setups.operations]]
 instruction = "Inspect first, the edges still sharp."
-inspection = "Pin hole: gauged GO/NO-GO and tried with the miked pin in Setup 5 (first load and after any reamer change); nothing more here. Foot notch's floor finish: Ra {{cad.foot_notch_finish_ra_uin:d}} µin, a smooth saw cut with no torn marks; torn: tell the owner."
+inspection = "Pin hole: tried with the MHA-SH-VN-58 pin in Setup 5 (every load); a bar tagged SLIP goes on as it is (MHA-CH-00 bonds its pin). Foot notch's floor finish: Ra {{cad.foot_notch_finish_ra_uin:d}} µin, a smooth saw cut with no torn marks; torn: tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
