@@ -1810,15 +1810,15 @@ def test_the_knob_bush_is_pressed_and_reamed_before_the_plate_is_set() -> None:
         f"IF IT STILL ENTERS, REPEAT FROM {drawing.sub_step('pin-pressed', 2)} WITH A "
         f"NEW {plate} PLATE AND {bush} BUSH."
     )
-    # The in-place ream names its mate, fit and gauge (rules 4 and 22).
+    # The in-place ream names its mate and fit; it prints the reamer's size
+    # and no band, and the journal is turned to the bore (rule 4, fit audit
+    # 2026-11-23).
     assert texts[7].endswith(
         f"THRU, A RUNNING FIT ON THE {_number('pd-transgear-knob-shaft')} JOURNAL, "
-        f"CHECKED WITH PIN GAUGES {drawing.row_cite('bush-reamed')}."
+        f"WHICH IS TURNED TO IT {drawing.row_cite('bush-reamed')}."
     )
-    ream = steps.inch_window(
-        tuple(knob_bush.BORE_DIA + limit for limit in knob_bush.BORE_DIA_LIMITS), 4
-    )
-    assert ream == ".2490-.2495"
+    ream = steps.inch_text(knob_bush.BORE_DIA, 4)
+    assert ream == ".2490"
     assert texts[7].startswith(f"REAM THE BUSH'S BORE \u00d8{ream} THRU, ")
     assert len(texts) == 8
     assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
