@@ -249,14 +249,14 @@ def test_the_paper_drive_bushes_print_the_sheets_bands() -> None:
     assert ring["bore"]["process"] == "drill"
 
     pivot = manifest("pd_transgear_pivot_spacer")["features"]
-    # The sheet prints .197 ±.002 about the exact 5.0 mm model.
-    assert _inch(pivot["far_end"]["length"]) == [0.195, 0.199]
+    # The sheet prints .197 ±.001 about the exact 5.0 mm model.
+    assert _inch(pivot["far_end"]["length"]) == [0.196, 0.198]
     assert _inch(pivot["outer"]["dia"]) == [0.43, 0.45]
     assert _inch(pivot["bore"]["dia"]) == [0.189, 0.193]
     assert pivot["bore"]["process"] == "drill"
     assert _inch(pivot["bore"]["diametral_clearance_ref"]) == [0.0015, 0.0065]
-    assert _inch([pivot["far_end"]["parallelism"]]) == [0.001]
-    assert pivot["far_end"]["parallelism_datum"] == "datum_end"
+    assert "parallelism" not in pivot["far_end"]
+    assert "datum_feature" not in pivot["datum_end"]
     assert "perpendicularity" not in pivot["datum_end"]
     assert _inch([pivot["outer"]["runout"]]) == [0.016]
 

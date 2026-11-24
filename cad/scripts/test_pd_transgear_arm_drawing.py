@@ -651,12 +651,13 @@ def test_the_pivot_bore_is_one_drill_running_clear_on_any_shoulder() -> None:
     # The tightest pair still clears the bore's sweep at the angular row.
     assert lower >= geometry.PIVOT_RUNNING_CLEARANCE_MIN > geometry.PIVOT_AXIS_BINDING_SWEEP_MAX
     # What the tightest pair leaves for the bought screw's shoulder end,
-    # which no drawing here controls: about .0019 out of square over the
-    # shoulder's diameter.  MHA-PD-00 proves the arm swings free before the
-    # spacer is bonded.
+    # which no drawing here controls: about .0015 out of square over the
+    # shoulder's diameter (the MHA-PD-20 spacer's taper, its length band's
+    # spread, is charged first).  MHA-PD-00 proves the arm swings free
+    # before the spacer is bonded.
     allowed = geometry.PIVOT_SHOULDER_END_SQUARENESS_ALLOWED
-    assert allowed == pytest.approx(0.00194 * 25.4, abs=0.0005)
-    assert geometry.PIVOT_SHOULDER_END_ANGLE_ALLOWED == pytest.approx(0.01042, abs=1e-5)
+    assert allowed == pytest.approx(0.00149 * 25.4, abs=0.0005)
+    assert geometry.PIVOT_SHOULDER_END_ANGLE_ALLOWED == pytest.approx(0.00798, abs=1e-5)
     assert allowed == pytest.approx(
         shoulder_min * math.tan(geometry.PIVOT_SHOULDER_END_ANGLE_ALLOWED)
     )

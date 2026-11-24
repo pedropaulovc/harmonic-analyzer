@@ -5,14 +5,14 @@ LOCTITE 638, on the MHA-PD-VN-57 shoulder), .197 long under its explicit
 band.  The profile lies as it sits in the lathe (axis horizontal): the
 ``*Top`` view turned a quarter turn, so model +Z runs LEFT and the bar-side
 front face (z 0) is the profile's right end, the rear face (on the arm) its
-left end.  Each end face carries its finish (the arm's bearing face and the
-bar seat); the front face is datum B and the rear face holds parallel to
-it; the length sits under the profile and the O.D. moves onto the profile
+left end.  The rear face carries its finish (the arm's bearing face); no
+frame relates the faces, the length's band bounds their taper (rule 5);
+the length sits under the profile and the O.D. moves onto the profile
 (drawing-guidelines.md rule 11 (turned parts read like the lathe): diameters on the side view).  The end view to its left (third
 angle, looking along -Z from the +Z end) keeps the bore, a solid circle only
 end-on, and its axis is datum A (the O.D.'s runout).  The bore names the
 bonded seat it makes on the screw's shoulder (rule 23), the length the
-spring room it sets (rule 4).
+disc-to-platen air its band keeps (rule 4).
 
 Run with SolidWorks open::
 
@@ -22,7 +22,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import math
 import sys
 from typing import Any
@@ -47,7 +46,6 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, offset_dimension_text
-from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_notes import add_property_linked_note
@@ -57,7 +55,6 @@ from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
-from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
 from _drawing_layout_audit import annotation_display
 from _layout_audit import (
@@ -91,8 +88,6 @@ from pd_transgear_pivot_spacer_spec import (
     LENGTH_TOLERANCE,
     OD,
     OD_RUNOUT,
-    REAR_FACE_PARALLELISM,
-    SEAT_DATUM,
     SURFACE_FINISHES,
     UNIT,
     WALL_WORST,
@@ -140,40 +135,31 @@ END_KEEP = {
     "BoreDia": (0.050, 0.222),
     "RingOd": (0.045, 0.120),  # donor: moved onto the profile
 }
-# Rule 23 / rule 4: the bonded seat and the banded length name their mates
-# (pd_transgear_pivot_spacer_callouts).  The part authors both
-# below-callouts on its source dimensions; the sheet imports them and only
-# reads them back (#1942).
+# Rule 23: the bonded seat names its mate
+# (pd_transgear_pivot_spacer_callouts).  The part authors the
+# below-callout on its source dimension; the sheet imports it and only
+# reads it back (#1942).
 DIMENSION_CALLOUTS = {
     name: lanes[callouts.CALLOUT_BELOW]
     for name, lanes in callouts.authored_by_name().items()
 }
-# The length under the profile; the O.D. right of the part, its dimension line
-# far enough out that the front face's finish symbol sits between them.
+# The length under the profile; the O.D. right of the part.
 PROFILE_KEEP = {
     "RingLength": (PROFILE_CENTER[0], _PROFILE_BOTTOM - 0.022),
 }
-# The length's text and its callout are wider than the 25 between its
-# extension lines, so they stand offset right of the front face's extension
+# The length's text stands offset right of the front face's extension
 # line, level with the dimension line and under the O.D.'s lower extension
 # line (clarity, review 2026-10-23: text struck by both extension lines).
 LENGTH_TEXT_XY = (_PROFILE_FRONT_X + 0.032, PROFILE_KEEP["RingLength"][1])
 OD_ON_PROFILE = (_PROFILE_FRONT_X + 0.040, PROFILE_CENTER[1])
 
-# Each face's pick lies on its edge line between the bore and O.D. radii.  The
-# rear face's symbol stands above-left, clear of every dimension; the front
-# face's stands right of the part inside the O.D.'s extension-line band,
-# below the axis, short of the O.D. dimension line.
+# The rear face's pick lies on its edge line between the bore and O.D. radii;
+# its symbol stands above-left, clear of every dimension.
 _FACE_PICK_UP = PROFILE_CENTER[1] + (BORE_DIA + OD) / 4.0 * _S
-_FACE_PICK_DOWN = PROFILE_CENTER[1] - (BORE_DIA + OD) / 4.0 * _S
 FACE_FINISHES = {
     "rear_face": (
         (_PROFILE_REAR_X, _FACE_PICK_UP),
         (_PROFILE_REAR_X - 0.022, _PROFILE_TOP + 0.014),
-    ),
-    "front_face": (
-        (_PROFILE_FRONT_X, _FACE_PICK_DOWN),
-        (_PROFILE_FRONT_X + 0.014, PROFILE_CENTER[1] - 0.008),
     ),
 }
 ISO_NOTE_XY = (0.315, 0.140)
@@ -202,33 +188,12 @@ _JOIN_TOL_M = 1e-5
 
 # Datum A is the bore's axis, put on the end view's bore circle by
 # SolidWorks' native placement, as the disc hub's is; only the O.D.'s runout
-# reads it.  Datum B is the front face, the bar seat the ring is bonded
-# flush on: its tag hangs on the face's O.D. rim, which the profile shows
-# edge-on as the face's line (draw_ch_rocker_arm's hub-face datum G), its
-# triangle landed above the axis at r 3.0 and its box straight out right,
-# inside the O.D.'s extension-line band, under the upper extension line and
-# short of the O.D. dimension line; the front face's finish holds that band
-# below the axis.  The rear face's parallelism frame attaches by entity to
-# the FACE on the profile, as the hub's frames do
-# (draw_transgear_disc_hub.py): a sheet pick on an edge-on face's line can
-# find no edge there, and a symbol left on the rim the face shares with the
-# O.D. reads as controlling the cylinder.  It finds its face's O.D. rim by
-# model geometry and takes, of the rim's two faces, the plane its finish row
-# names (SURFACE_FINISHES: the rear at z LENGTH facing +Z).  Its leader
-# lands on the face's projected line at a model x, placed between the rim's
-# projected ends at run time (model +X runs DOWN the profile), below the
-# axis at the annulus' mid radius, and the frame stands left of the face,
-# level with the landing, so the leader runs square onto the line: the free
-# lane between the end view and the length's left extension line, under the
-# axis centreline.  The rear face's finish stands above-left, the length
-# below.
+# reads it.  The end faces carry no datum and no frame.
 # A frame's box as the hub's farm run drew its ⊥ 0.03 A (20261002T180658288Z):
 # 7.03 tall and 26.75 wide on the sheet, its position its top-left corner,
 # the leader leaving its side at mid-height.
 FRAME_HEIGHT = 0.00703
 FRAME_WIDTH = 0.02675
-# Sheet run from a frame to its face's line.
-FRAME_RUN = 0.008
 # The O.D.'s circular runout to A (coordinator ruling, #2014: it bounds the
 # offset the wall charges) lands on the profile's upper O.D. line at z 0.7 L,
 # its frame above the profile: right of the rear face's BEARING FACE symbol,
@@ -238,75 +203,11 @@ OD_RUNOUT_FRAME = (_PROFILE_REAR_X + 0.0125, _PROFILE_TOP + 0.020)
 OD_RUNOUT_LABEL = "spacer O.D. circular runout to bore"
 # A projected landing may sit this far from its laid-out point.
 _LANDING_TOL_M = 0.0005
-_SPACER_AXIS = (0.0, 0.0, 1.0)
-# A rim matches within this of its modelled centre and radius, its axis
-# along the spacer's.
-_RIM_TOL_MM = 1e-4
-# Seen edge-on, a rim's +Y point projects onto its line's midpoint; the
-# projection is exact to ~1e-9 m.
-_EDGE_ON_TOL_M = 1e-6
 
 
 def _profile_x(z_mm: float) -> float:
     """Sheet X of a model-Z station on the profile (+Z runs LEFT)."""
     return PROFILE_CENTER[0] - (z_mm - LENGTH / 2.0) * _S
-
-
-@dataclass(frozen=True)
-class EndFaceMark:
-    """A native feature-control frame on one end face, which the profile
-    shows edge-on: the face's finish row (the exact plane), and the model x
-    its leader lands at on the face's line."""
-
-    key: str
-    label: str
-    landing_x_mm: float
-
-    @property
-    def face(self) -> PlanarFace:
-        face = surface_finish_by_key(SURFACE_FINISHES, self.key).face
-        if not isinstance(face, PlanarFace):
-            raise TypeError(f"{self.label}: {self.key} is not a planar face")
-        return face
-
-    @property
-    def face_z_mm(self) -> float:
-        """The face's station on the spacer axis."""
-        return self.face.offset_mm * self.face.normal[2]
-
-    @property
-    def outboard(self) -> float:
-        """Sheet X sense the face looks out along: model +Z runs LEFT."""
-        return -self.face.normal[2]
-
-    @property
-    def nominal_landing(self) -> tuple[float, float]:
-        """Where the leader lands on the laid-out profile (sheet metres)."""
-        return (
-            _profile_x(self.face_z_mm),
-            PROFILE_CENTER[1] - self.landing_x_mm * _S,
-        )
-
-
-REAR_FACE_FRAME = EndFaceMark(
-    key="rear_face",
-    label="spacer rear face parallelism to front face",
-    landing_x_mm=(BORE_DIA + OD) / 4.0,
-)
-FRONT_FACE_DATUM = EndFaceMark(
-    key="front_face",
-    label="spacer front face datum B",
-    landing_x_mm=-3.0,
-)
-# Datum B's box stands this far straight out of its face's line
-# (draw_ch_rocker_arm.HUB_FACE_DATUM_STANDOFF_M).
-DATUM_B_STANDOFF = 0.0075
-
-
-def datum_b_symbol(landing: tuple[float, float]) -> tuple[float, float]:
-    """Datum B's tag for a triangle landing at ``landing``: outboard of the
-    front face (the profile's right end), level with the landing."""
-    return landing[0] + FRONT_FACE_DATUM.outboard * DATUM_B_STANDOFF, landing[1]
 
 
 # Feature-export declarations (export_features; cad/docs/pipeline/
@@ -315,11 +216,10 @@ def datum_b_symbol(landing: tuple[float, float]) -> tuple[float, float]:
 # z = 0 is the datum end the length runs from; the rear face, the arm's
 # bearing face, at z = LENGTH). The O.D. takes the title block's .XX row
 # and its circular runout to the bore (datum A); the length its printed
-# .197 ±.002 (the native band about the exact 5.0 mm model, read back as the
+# .197 ±.001 (the native band about the exact 5.0 mm model, read back as the
 # printed limits); the bore its #12 drill under the DRILLED HOLES row, a
 # bonded slip fit on MHA-PD-VN-57's shoulder (the clearance is the spec's
-# analysis range, printed as REF); the front face is datum B and the rear
-# face holds parallel to it. Each ``span`` is a diameter's model-Z extent.
+# analysis range, printed as REF). Each ``span`` is a diameter's model-Z extent.
 # The sheet prints no manufacturing note. The declarations print nothing.
 DRAWING_NOTES = ""
 _P = DRAWING_PRECISION_BY_NAME
@@ -340,14 +240,13 @@ requirement(
     fields={
         "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
         "outward": ([0.0, 0.0, -1.0], ("__frame__",)),
-        "datum_feature": (SEAT_DATUM, ("SEAT_DATUM", (_SELF, "FRONT_FACE_DATUM"))),
     },
 )
 requirement(
     "far_end",
     kind="face",
     faces=(PlanarFace((0.0, 0.0, 1.0), LENGTH),),
-    requirements=("length", "parallelism"),
+    requirements=("length",),
     fields={
         "plane": ({"frame": "model", "axis": "z", "value": LENGTH}, ("LENGTH",)),
         "outward": ([0.0, 0.0, 1.0], ("LENGTH",)),
@@ -357,12 +256,6 @@ requirement(
         ),
         "length_nominal": (LENGTH, ("LENGTH",)),
         "length_from": ("datum_end", ((_SELF, "PROFILE_KEEP"),)),
-        "callout": (callouts.LENGTH_CALLOUT, ((_CALLOUTS, "LENGTH_CALLOUT"),)),
-        "parallelism": (
-            REAR_FACE_PARALLELISM,
-            ("GEOMETRIC_TOLERANCES_IN", (_SELF, "REAR_FACE_FRAME")),
-        ),
-        "parallelism_datum": ("datum_end", ("SEAT_DATUM",)),
     },
     precision={"length": _P["RingLength"]},
 )
@@ -417,118 +310,6 @@ requirement(
     },
     precision={"dia": _P["BoreDia"]},
 )
-
-
-def frame_position(
-    mark: EndFaceMark, landing: tuple[float, float]
-) -> tuple[float, float]:
-    """The frame's top-left corner for a leader landing at ``landing``:
-    outboard of ``mark``'s face, its middle level with the landing."""
-    if mark.outboard < 0.0:
-        x = landing[0] - FRAME_RUN - FRAME_WIDTH
-    else:
-        x = landing[0] + FRAME_RUN
-    return x, landing[1] + FRAME_HEIGHT / 2.0
-
-
-def face_rim(edges: ViewEdges, mark: EndFaceMark) -> ViewEdge:
-    """The one visible O.D. circle on the spacer axis at ``mark``'s face
-    station; none or several raise, listing every circle the scan holds."""
-    centre = (0.0, 0.0, mark.face_z_mm)
-
-    def is_rim(circle: tuple[float, ...]) -> bool:
-        offset = sum(abs(a - b) for a, b in zip(circle[:3], centre))
-        tilt = 1.0 - abs(sum(a * b for a, b in zip(circle[3:6], _SPACER_AXIS)))
-        return (
-            offset <= _RIM_TOL_MM
-            and abs(circle[6] - OD / 2.0) <= _RIM_TOL_MM
-            and tilt <= 1e-6
-        )
-
-    matches = [item for item in edges.circles if is_rim(item.circle)]
-    if len(matches) != 1:
-        candidates = "; ".join(
-            "r {6:.4f} at ({0:.4f}, {1:.4f}, {2:.4f})".format(*item.circle)
-            for item in edges.circles
-        )
-        raise RuntimeError(
-            f"{mark.label}: expected one visible O.D. rim at z {mark.face_z_mm:g} "
-            f"mm in the {edges.label!r} scan, matched {len(matches)} of "
-            f"{len(edges.circles)} circles: {candidates or 'none'}"
-        )
-    return matches[0]
-
-
-def controlled_face(rim: ViewEdge, mark: EndFaceMark) -> Any:
-    """Of the two faces ``rim`` joins (the end face and the O.D.), the one
-    plane matching ``mark.face``; anything else raises naming each face."""
-    faces = tuple(
-        face for face in (rim.edge.GetTwoAdjacentFaces2() or ()) if face is not None
-    )
-    geometries = [face_geometry(face) for face in faces]
-    matches = [
-        face
-        for face, geometry in zip(faces, geometries)
-        if geometry is not None and mark.face.matches(geometry)
-    ]
-    if len(faces) != 2 or len(matches) != 1:
-        described = "; ".join(
-            "unreadable"
-            if geometry is None
-            else f"surface {geometry.identity} normal {geometry.outward_normal}"
-            for geometry in geometries
-        )
-        raise RuntimeError(
-            f"{mark.label}: expected the rim's two faces to hold one plane "
-            f"{mark.face!r}, matched {len(matches)} of {len(faces)} faces: "
-            f"{described or 'none'}"
-        )
-    return matches[0]
-
-
-def face_landing(
-    mark: EndFaceMark,
-    minus_end: tuple[float, float],
-    plus_end: tuple[float, float],
-) -> tuple[float, float]:
-    """Where ``mark``'s leader lands: its model x along the face's projected
-    line, from the rim's -X end to its +X end (sheet metres)."""
-    t = (mark.landing_x_mm + OD / 2.0) / OD
-    return (
-        minus_end[0] + t * (plus_end[0] - minus_end[0]),
-        minus_end[1] + t * (plus_end[1] - minus_end[1]),
-    )
-
-
-def _face_attachment(
-    adapter: Any, view: Any, edges: ViewEdges, mark: EndFaceMark
-) -> tuple[Any, tuple[float, float]]:
-    """``mark``'s face and its leader's landing, projected from the face's
-    rim at run time; logs where the layout expected the landing."""
-    face = controlled_face(face_rim(edges, mark), mark)
-    r_m, z_m = OD / 2000.0, mark.face_z_mm / 1000.0
-    minus_end, plus_end, side_point = model_points_in_view(
-        adapter,
-        view,
-        ((-r_m, 0.0, z_m), (r_m, 0.0, z_m), (0.0, r_m, z_m)),
-        label=f"{mark.label} rim",
-        names=("-X end", "+X end", "+Y point"),
-    )
-    middle = ((minus_end[0] + plus_end[0]) / 2.0, (minus_end[1] + plus_end[1]) / 2.0)
-    if math.dist(side_point, middle) > _EDGE_ON_TOL_M:
-        raise RuntimeError(
-            f"{mark.label}: the face is not edge-on in the profile: its rim's "
-            f"+Y point projects to {side_point}, its line's midpoint is {middle}"
-        )
-    landing = face_landing(mark, minus_end, plus_end)
-    expected = mark.nominal_landing
-    _telemetry.info(
-        f"{mark.label} face projects from ({minus_end[0]:.5f}, {minus_end[1]:.5f}) "
-        f"at -X to ({plus_end[0]:.5f}, {plus_end[1]:.5f}) at +X; leader lands at "
-        f"({landing[0]:.5f}, {landing[1]:.5f}); the layout expects "
-        f"({expected[0]:.5f}, {expected[1]:.5f})"
-    )
-    return face, landing
 
 
 @_telemetry.traced("pivot_spacer.od_runout_landing")
@@ -919,20 +700,16 @@ def build(adapter: Any) -> dict[str, str]:
         face_xy=(PROFILE_CENTER[0], PROFILE_CENTER[1] + OD * _S / 4.0),
         label="pivot spacer axis centerline",
     )
-    for key, label in (
-        ("rear_face", "spacer rear (arm) face finish"),
-        ("front_face", "spacer front (bar) face finish"),
-    ):
-        pick, symbol = FACE_FINISHES[key]
-        add_surface_finish(
-            adapter,
-            profile,
-            edge_xy=pick,
-            symbol_xy=symbol,
-            control=surface_finish_by_key(SURFACE_FINISHES, key),
-            label=label,
-            char_height=0.0025,
-        )
+    pick, symbol = FACE_FINISHES["rear_face"]
+    add_surface_finish(
+        adapter,
+        profile,
+        edge_xy=pick,
+        symbol_xy=symbol,
+        control=surface_finish_by_key(SURFACE_FINISHES, "rear_face"),
+        label="spacer rear (arm) face finish",
+        char_height=0.0025,
+    )
     # Datum A, the bore, on the end view where it shows round.  The edge is
     # first proved to be the source part's one bore cylinder at the spec's
     # radius (the native helper's validation), then the tag is placed.
@@ -946,38 +723,6 @@ def build(adapter: Any) -> dict[str, str]:
         label="spacer bore axis",
     )
     datum_a, datum_a_xy = _place_datum_a(adapter, end, bore_edge)
-    # Datum B, the front face (the bar seat), on its line in the profile:
-    # the tag hangs on the face's O.D. rim, proved first to join the face's
-    # own plane.
-    profile_edges = scan_view_edges(profile, label="spacer profile rims")
-    _seat_face, seat_landing = _face_attachment(
-        adapter, profile, profile_edges, FRONT_FACE_DATUM
-    )
-    add_datum_feature(
-        adapter,
-        profile,
-        edge_entity=face_rim(profile_edges, FRONT_FACE_DATUM).edge,
-        leader_attach_xy=seat_landing,
-        symbol_xy=datum_b_symbol(seat_landing),
-        datum=SEAT_DATUM,
-        label=FRONT_FACE_DATUM.label,
-    )
-    # The rear face parallel to B.
-    rear_face, rear_landing = _face_attachment(
-        adapter, profile, profile_edges, REAR_FACE_FRAME
-    )
-    add_feature_control_frame(
-        adapter,
-        profile,
-        entity=rear_face,
-        entity_type="FACE",
-        leader_attach_xy=rear_landing,
-        frame_xy=frame_position(REAR_FACE_FRAME, rear_landing),
-        characteristic="parallelism",
-        tolerance=GEOMETRIC_TOLERANCES_IN["rear face parallelism to front face"],
-        datums=(SEAT_DATUM,),
-        label=REAR_FACE_FRAME.label,
-    )
     # The O.D. runs true to A.
     od_face = resolve_faces(
         _early_bound(_early_bound(profile, "IView").ReferencedDocument, "IModelDoc2"),

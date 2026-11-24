@@ -17,11 +17,10 @@ from _printed_tolerance import (
     printed_band_mm,
 )
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-import _drawing_edges
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _layout_geometry import Box, estimate_text_box
-from _surface_finish import MACHINED_UM, SEAT_UM
+from _surface_finish import MACHINED_UM
 import build_pd_transgear_pivot_spacer as part
 import draw_pd_transgear_pivot_spacer as drawing
 import pd_transgear_pivot_spacer_spec as spec
@@ -58,9 +57,8 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_the_length_carries_its_band_on_the_model_and_the_bore_none() -> None:
-    """The MHA-PD-VN-63 spring's room rides the length, so its band is a native
-    model tolerance from the spec (policy
-    drawing-simplicity-policy.md `How the repository implements the guidelines`).  The O.D. prints at .XX and the title block's row governs it;
+    """The length's band is a native model tolerance from the spec (policy
+    drawing-simplicity-policy.md `How the repository implements the guidelines`): ±.001, the shop's row for a turned length.  The O.D. prints at .XX and the title block's row governs it;
     the bore is a #12 drill under the DRILLED HOLES row: restating either row
     on the dimension is what drawing-guidelines.md rule 2 (the title block is the general specification) forbids."""
     assert model_toleranced_dimensions(part) == {
@@ -68,6 +66,7 @@ def test_the_length_carries_its_band_on_the_model_and_the_bore_none() -> None:
     }
     row = printed_band_mm(3, unit=spec.UNIT)
     assert 0.0 < spec.LENGTH_TOLERANCE <= spec.LENGTH_BAND < row
+    assert spec.LENGTH_TOLERANCE == pytest.approx(0.001 * 25.4)
     # The analysis band is what the drill cuts: never under size, up to the
     # DRILLED HOLES row's growth.
     drilled_growth = drilled_oversize_mm(unit=spec.UNIT)
@@ -159,20 +158,18 @@ def test_the_sheet_states_no_shortfall_and_no_facing_step() -> None:
     assert "Manufacturing Notes" not in part._SAVED_DRAWING_PROPERTIES
 
 
-def test_the_arm_runs_on_the_rear_face_and_the_front_face_seats_on_the_bar() -> None:
+def test_the_arm_runs_on_the_rear_face_and_the_front_face_carries_no_symbol() -> None:
     """Rule 6: the arm swings on the shoulder against the rear face, which
-    runs (Ra 1.6, labelled BEARING FACE); the front face is the one static
-    seat on the bar (Ra 3.2).  The bonded bore carries no symbol."""
+    runs (Ra 1.6, labelled BEARING FACE).  The front face, clamped on the bar,
+    and the bonded bore carry no symbol (machinist review
+    20261124T013305458Z)."""
     controls = {control.key: control for control in spec.SURFACE_FINISHES}
-    assert set(controls) == {"front_face", "rear_face"}
-    front, rear = controls["front_face"].face, controls["rear_face"].face
-    assert controls["front_face"].roughness_um == SEAT_UM
-    assert controls["front_face"].production_method == ""
+    assert set(controls) == {"rear_face"} == set(drawing.FACE_FINISHES)
+    rear = controls["rear_face"].face
     assert controls["rear_face"].roughness_um == MACHINED_UM
     assert controls["rear_face"].production_method == "BEARING FACE"
     # Part frame: axis +Z, the bar-side face at z 0, the arm-side face at
     # z LENGTH (the RearFace plane).
-    assert (tuple(front.normal), front.offset_mm) == ((0.0, 0.0, -1.0), 0.0)
     assert (tuple(rear.normal), rear.offset_mm) == ((0.0, 0.0, 1.0), spec.LENGTH)
 
 
@@ -198,18 +195,19 @@ def test_face_symbols_attach_to_their_own_end_of_the_lathe_profile() -> None:
     assert drawing.END_CENTER[1] == drawing.PROFILE_CENTER[1]
 
 
-def test_the_rear_face_holds_parallel_to_the_front_face_datum() -> None:
-    """Bonded with its front face (datum B) and the shoulder's end down on a
-    flat plate, the ring seats on the bar by B; the arm seats on the rear
-    face, so it tilts by that face's parallelism to B over the smallest face
-    it seats on.  One frame; the bore (datum A) serves the O.D.'s runout
-    alone."""
-    assert (spec.BORE_DATUM, spec.SEAT_DATUM) == ("A", "B")
-    assert spec.GEOMETRIC_TOLERANCES_IN == {
-        "rear face parallelism to front face": ".001",
-        "o.d. circular runout to bore": ".016",
-    }
-    assert spec.REAR_FACE_PARALLELISM == pytest.approx(0.001 * 25.4)
+def test_no_frame_relates_the_faces_and_the_length_band_bounds_their_taper() -> None:
+    """Rule 5 (machinist review 20261124T013305458Z): a plain spacer carries
+    no face-to-face frame and no datum on a face.  Bonded with its front face
+    and the shoulder's end down on a flat plate, the ring seats on the bar by
+    its front face and the arm seats on the rear face, so the hanger tilts by
+    the faces' taper over the smallest flat the arm seats on; with no frame
+    that taper is the printed length's whole spread, high limit at one place
+    of the rim and low limit opposite.  The bore (datum A) serves the O.D.'s
+    runout alone."""
+    assert spec.BORE_DATUM == "A" and not hasattr(spec, "SEAT_DATUM")
+    assert spec.GEOMETRIC_TOLERANCES_IN == {"o.d. circular runout to bore": ".016"}
+    assert spec.REAR_FACE_PARALLELISM == pytest.approx(2.0 * spec.LENGTH_TOLERANCE)
+    assert spec.REAR_FACE_PARALLELISM == pytest.approx(0.002 * 25.4)
     # The arm seats on the face's flat inside the O.D. rim's break.
     assert spec.FACE_PARALLELISM_ZONE_DIA == pytest.approx(
         spec.OD - spec.OD_BAND - 2.0 * spec.EDGE_BREAK
@@ -217,23 +215,44 @@ def test_the_rear_face_holds_parallel_to_the_front_face_datum() -> None:
     assert spec.SEATED_FACE_TILT == pytest.approx(
         math.atan(spec.REAR_FACE_PARALLELISM / spec.FACE_PARALLELISM_ZONE_DIA)
     )
-    # The frame and the datum tag each sit on the exact plane its finish row
-    # names: the rear face at z LENGTH, the front at z 0.
-    faces = {control.key: control.face for control in spec.SURFACE_FINISHES}
-    marks = {mark.key: mark for mark in _MARKS}
-    assert set(marks) == {"rear_face", "front_face"}
-    for key, z in (("rear_face", spec.LENGTH), ("front_face", 0.0)):
-        assert marks[key].face == faces[key]
-        assert marks[key].face_z_mm == pytest.approx(z)
+    for gone in ("REAR_FACE_FRAME", "FRONT_FACE_DATUM", "frame_position", "face_rim"):
+        assert not hasattr(drawing, gone)
 
 
-_FRAMES = (drawing.REAR_FACE_FRAME,)
-_MARKS = (drawing.REAR_FACE_FRAME, drawing.FRONT_FACE_DATUM)
+def test_the_looser_length_band_would_close_the_disc_to_platen_air() -> None:
+    """The necessity answer the length's register entry gives: at the ±.002 the sheet carried
+    under its parallelism frame, the taper alone (the band's spread over the
+    seat flat, levered to the disc's rim) takes the MHA-PD-06 disc's
+    statistical air to the MHA-PD-02 platen under its floor; at ±.001 the
+    stack holds it."""
+    import build_pd_paper_drive_assembly as assembly
+    from _printed_tolerance import printed_deviations
+
+    air = assembly.PLATEN_AIR
+    length, taper = "MHA-PD-20 spacer length", "MHA-PD-20 spacer rear face parallelism"
+    assert air.terms[length] == spec.LENGTH_BAND
+    assert air.statistical_mm >= air.minimum_mm
+    # The old ±.002 through the spec's own rules: the printed length's reach,
+    # and the taper as the band's whole spread (it scales with the band).
+    old = 2.0 * spec.LENGTH_TOLERANCE
+    old_band = max(
+        abs(deviation)
+        for deviation in printed_deviations(
+            spec.LENGTH, spec.LENGTH_PLACES, (-old, old), unit=spec.UNIT
+        )
+    )
+    looser = dict(air.terms)
+    looser[length] = old_band
+    looser[taper] = air.terms[taper] * 2.0 * old / spec.REAR_FACE_PARALLELISM
+    closed = type(air)(air.name, air.nominal_mm, looser, air.minimum_mm)
+    assert closed.statistical_mm < air.minimum_mm
+    # Only the spacer's two terms grow: the air drops by their share of the RSS.
+    rest = air.tolerance_rss_mm**2 - air.terms[length] ** 2 - air.terms[taper] ** 2
+    growth = math.sqrt(rest + old_band**2 + looser[taper] ** 2) - air.tolerance_rss_mm
+    assert closed.statistical_mm == pytest.approx(air.statistical_mm - growth)
 
 
 _S = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
-# A leader's arrowhead as the hub's farm run drew it (20261002T180658288Z).
-_ARROWHEAD = 0.00313
 # A finish symbol's ink from its insertion point at 2.5 mm text, measured on
 # the feed pinion's run 20261001T110844152Z: left of the root by 2.1, right to
 # the "Ra" text's corner at 14.7, up 7.2.
@@ -251,39 +270,6 @@ def _sheet_point(x_mm: float, z_mm: float) -> tuple[float, float]:
         drawing.PROFILE_CENTER[0] - (z_mm - spec.LENGTH / 2.0) * _S,
         drawing.PROFILE_CENTER[1] - x_mm * _S,
     )
-
-
-def _frame_box(mark) -> Box:
-    x, top = drawing.frame_position(mark, mark.nominal_landing)
-    return Box(x, top - drawing.FRAME_HEIGHT, x + drawing.FRAME_WIDTH, top)
-
-
-def test_each_mark_lands_square_on_its_own_face() -> None:
-    """The rear face's leader lands on the profile's left end and datum B's
-    triangle on its right end.  Each lands on its face's annulus an arrowhead
-    and a millimetre or more from the corner the face shares with the O.D.,
-    runs level from its symbol (square to the face) and stands outboard of
-    its face, on the side of the axis that face's finish leaves free."""
-    finish_picks = {key: pick for key, (pick, _symbol) in drawing.FACE_FINISHES.items()}
-    for mark in _MARKS:
-        landing = mark.nominal_landing
-        assert landing == pytest.approx(_sheet_point(mark.landing_x_mm, mark.face_z_mm))
-        radius = abs(mark.landing_x_mm)
-        assert spec.BORE_DIA_MAX / 2.0 < radius < spec.OD / 2.0
-        assert (spec.OD / 2.0 - radius) * _S >= _ARROWHEAD + 0.001
-        finish_side = finish_picks[mark.key][1] - drawing.PROFILE_CENTER[1]
-        assert (landing[1] - drawing.PROFILE_CENTER[1]) * finish_side < 0.0
-        # Outboard: left of the rear (left) end, right of the front (right) end.
-        if mark.key == "rear_face":
-            frame = _frame_box(mark)
-            assert (frame.ymin + frame.ymax) / 2.0 == pytest.approx(landing[1])
-            assert landing[0] == pytest.approx(_sheet_point(0.0, spec.LENGTH)[0])
-            assert landing[0] - frame.xmax >= _ARROWHEAD + 0.003
-        else:
-            symbol = drawing.datum_b_symbol(landing)
-            assert symbol[1] == pytest.approx(landing[1])
-            assert landing[0] == pytest.approx(_sheet_point(0.0, 0.0)[0])
-            assert symbol[0] - landing[0] == pytest.approx(drawing.DATUM_B_STANDOFF)
 
 
 def _text_box(text: str, anchor: tuple[float, float], reference: int) -> Box:
@@ -327,8 +313,7 @@ def _callout_block(text: str, anchor: tuple[float, float]) -> Box:
 
 def _length_text_box() -> Box:
     return _callout_block(
-        f"{spec.LENGTH:.3f} ±{spec.LENGTH_BAND:.2f}\n"
-        f"{drawing.DIMENSION_CALLOUTS['RingLength']}",
+        f"{spec.LENGTH:.3f} ±{spec.LENGTH_BAND:.2f}",
         drawing.LENGTH_TEXT_XY,
     )
 
@@ -341,19 +326,12 @@ def _bore_text_box() -> Box:
     )
 
 
-def _datum_b_box() -> Box:
-    """Datum B's tag: its box stands outboard of the point its stem meets,
-    at either height SolidWorks may anchor it there."""
-    x, y = drawing.datum_b_symbol(drawing.FRONT_FACE_DATUM.nominal_landing)
-    return Box(x, y - _DATUM_TAG, x + _DATUM_TAG, y + _DATUM_TAG)
-
-
-def test_the_frames_and_datum_b_stand_inside_the_sheet_clear_of_every_annotation() -> None:
-    """Both frames, datum B and their leaders keep 2 mm of air from every
+def test_the_runout_frame_stands_inside_the_sheet_clear_of_every_annotation() -> None:
+    """The O.D.'s runout frame and its leader keep 2 mm of air from every
     other annotation's box and line on the sheet (the dimensions' text and
-    extension lines, both finishes, the notes, the axis centreline and both
-    views) and from each other, and stand inside the inner border, off the
-    title block."""
+    extension lines, the rear face's finish, the notes, the axis centreline
+    and both views), and stand inside the inner border, off the title
+    block."""
     s = _S
     centre_x, axis_y = drawing.PROFILE_CENTER
     rear_x, front_x = _sheet_point(0.0, spec.LENGTH)[0], _sheet_point(0.0, 0.0)[0]
@@ -392,18 +370,6 @@ def test_the_frames_and_datum_b_stand_inside_the_sheet_clear_of_every_annotation
             min(pick[0], sx), min(pick[1], sy), max(pick[0], sx), max(pick[1], sy)
         )
     symbols: dict[str, Box] = {}
-    for mark in _FRAMES:
-        frame, (landing_x, landing_y) = _frame_box(mark), mark.nominal_landing
-        near_x = frame.xmax if mark.outboard < 0.0 else frame.xmin
-        symbols[f"{mark.key} frame"] = frame
-        symbols[f"{mark.key} frame leader"] = Box(
-            min(near_x, landing_x), landing_y, max(near_x, landing_x), landing_y
-        )
-    datum_b_landing = drawing.FRONT_FACE_DATUM.nominal_landing
-    symbols["front_face datum tag"] = _datum_b_box()
-    symbols["front_face datum leader"] = Box(
-        datum_b_landing[0], datum_b_landing[1], _datum_b_box().xmin, datum_b_landing[1]
-    )
     # The O.D.'s runout frame above the profile, its leader down to the upper
     # O.D. line (the leader leaves the frame's left side at mid-height).
     rx, ry = drawing.OD_RUNOUT_FRAME
@@ -433,67 +399,10 @@ def test_the_frames_and_datum_b_stand_inside_the_sheet_clear_of_every_annotation
         template.width_m,
         template.title_block_top_m,
     )
-    for key, box in (
-        *((mark.key, _frame_box(mark)) for mark in _FRAMES),
-        ("datum B", _datum_b_box()),
-        ("runout", runout),
-    ):
+    for key, box in (("runout", runout),):
         assert left <= box.xmin and box.xmax <= right, key
         assert bottom_edge <= box.ymin and box.ymax <= top_edge, key
         assert box.gap(title_block) >= _AIR, key
-
-
-def _circle(radius: float, z: float, *, axis_z: float = 1.0):
-    return _drawing_edges.ViewEdge(
-        edge=object(),
-        line=None,
-        circle=(0.0, 0.0, z, 0.0, 0.0, axis_z, radius),
-        vertices=None,
-    )
-
-
-def test_each_mark_finds_the_od_rim_of_its_own_face() -> None:
-    """The rim is the one O.D. circle at the face's station on the spacer's
-    axis, either normal sign; the other end's rim and the bore's circle at the
-    same station never stand in for it, and none or two fail listing every
-    circle."""
-    od_r, bore_r = spec.OD / 2.0, spec.BORE_DIA / 2.0
-    for mark, z, other_z in (
-        (drawing.FRONT_FACE_DATUM, 0.0, spec.LENGTH),
-        (drawing.REAR_FACE_FRAME, spec.LENGTH, 0.0),
-    ):
-        rim = _circle(od_r, z, axis_z=-1.0)
-        neighbours = (
-            _circle(od_r, other_z),
-            _circle(bore_r, z),
-            _circle(bore_r, other_z),
-        )
-        edges = _drawing_edges.ViewEdges(label="profile", edges=(*neighbours, rim))
-        assert drawing.face_rim(edges, mark) is rim
-        lone = _drawing_edges.ViewEdges(label="profile", edges=neighbours)
-        with pytest.raises(RuntimeError, match=rf"matched 0 of 3 circles: r {re.escape(f'{od_r:.4f}')}"):
-            drawing.face_rim(lone, mark)
-        split = _drawing_edges.ViewEdges(
-            label="profile", edges=(rim, _circle(od_r, z))
-        )
-        with pytest.raises(RuntimeError, match="matched 2 of 2"):
-            drawing.face_rim(split, mark)
-
-
-@pytest.mark.parametrize("turn", [1.0, -1.0])
-def test_face_landing_puts_the_leader_at_its_model_x_on_the_projected_line(
-    turn: float,
-) -> None:
-    """The landing sits at the mark's model x between the rim's projected -X
-    and +X ends, whichever way the view turns them."""
-    axis_y = drawing.PROFILE_CENTER[1]
-    r = spec.OD / 2.0 * _S
-    for mark in _MARKS:
-        minus_end = (0.19, axis_y - turn * r)
-        plus_end = (0.19, axis_y + turn * r)
-        assert drawing.face_landing(mark, minus_end, plus_end) == pytest.approx(
-            (0.19, axis_y + turn * mark.landing_x_mm * _S)
-        )
 
 
 def test_turned_part_diameters_follow_the_machinist() -> None:
@@ -515,7 +424,7 @@ def test_the_bore_callout_names_the_drill_and_the_bonded_seat() -> None:
     rides the end-view diameter, the hole's defining view, names the bonded
     seat on the screw, and gives the clearance both limits produce (rule
     23), in two lines of words (rule 7)."""
-    assert set(drawing.DIMENSION_CALLOUTS) == {"BoreDia", "RingLength"}
+    assert set(drawing.DIMENSION_CALLOUTS) == {"BoreDia"}
     assert "BoreDia" in drawing.END_KEEP and "RingLength" in drawing.PROFILE_KEEP
     text = drawing.DIMENSION_CALLOUTS["BoreDia"]
     rows = text.split("\n")
@@ -533,12 +442,19 @@ def test_the_bore_callout_names_the_drill_and_the_bonded_seat() -> None:
     assert high - low >= 0.001 * 25.4
 
 
-def test_the_length_band_names_the_spring_room_it_sets() -> None:
-    """Rule 4: a width that sets a stack names the stack.  The ±0.05 length
-    sets the MHA-PD-VN-63 spring's room (transgear_hanger_joints)."""
-    callout = " ".join(drawing.DIMENSION_CALLOUTS["RingLength"].split())
-    assert _config.parts("pd-vn-transgear-pivot-spring")["number"] in callout
-    assert "SPRING ROOM" in callout
+def test_the_length_band_answers_necessity_in_the_register_not_on_the_sheet() -> None:
+    """Rule 4 (owner ruling 2026-11-24: "In the part's registry file, not on
+    the sheet."): the ±.001 length prints no reason; the package's necessity
+    register carries its one entry, a gap."""
+    import machinist_necessity
+
+    assert "RingLength" not in drawing.DIMENSION_CALLOUTS
+    (entry,) = machinist_necessity.load_necessity(
+        Path(_config.__file__).resolve().parents[1] / "config",
+        "pd_transgear_pivot_spacer",
+    )
+    assert entry.kind == "gap"
+    assert "±.001" in entry.feature
 
 
 # The rows run 20261027T121009040Z-eda67c82 printed (layout audit: each
@@ -571,22 +487,19 @@ def test_callout_block_model_encloses_the_rows_the_farm_printed() -> None:
 def test_offset_length_text_clears_every_extension_line() -> None:
     """Review 2026-10-23 (clarity): the length's text filled the 25 between
     its extension lines.  Offset right of the front face's extension line, it
-    keeps 2 mm of air from both length extension lines, the O.D.'s lower
-    extension line and dimension line, and the front face's finish."""
+    keeps 2 mm of air from both length extension lines and the O.D.'s lower
+    extension line and dimension line."""
     rear_x, front_x = _sheet_point(0.0, spec.LENGTH)[0], _sheet_point(0.0, 0.0)[0]
     bottom = drawing.PROFILE_CENTER[1] - spec.OD / 2.0 * _S
     top = drawing.PROFILE_CENTER[1] + spec.OD / 2.0 * _S
     length_y = drawing.PROFILE_KEEP["RingLength"][1]
     od_x = drawing.OD_ON_PROFILE[0]
     text = _length_text_box()
-    sx, sy = drawing.FACE_FINISHES["front_face"][1]
-    dx0, dy0, dx1, dy1 = _FINISH_INK
     for name, line in {
         "rear extension": Box(rear_x, length_y, rear_x, bottom),
         "front extension": Box(front_x, length_y, front_x, bottom),
         "O.D. lower extension": Box(front_x, bottom, od_x, bottom),
         "O.D. dimension line": Box(od_x, bottom, od_x, top),
-        "front finish": Box(sx + dx0, sy + dy0, sx + dx1, sy + dy1),
     }.items():
         assert text.gap(line) >= _AIR, name
     assert text.xmin > front_x
