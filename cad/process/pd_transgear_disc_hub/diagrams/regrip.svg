@@ -18,7 +18,7 @@
   <line class="leader" x1="297.6" y1="160" x2="420" y2="120"/>
   <text class="datum-label" x="424" y="116">Z0: the spigot's end, faced to {{process.length_target_in:.3dot}} overall</text>
   <line class="leader" x1="284" y1="150.2" x2="420" y2="84"/>
-  <text class="label" x="424" y="80">spigot Ø{{cad.spigot_dia_min_in:.4dot}}–{{cad.spigot_dia_max_in:.4dot}}, root R{{cad.spigot_root_radius_max_mm:in.3dot}} MAX</text>
+  <text class="label" x="424" y="80">spigot Ø{{cad.spigot_dia_ref_mm:in.3dot}} REF, to MHA-PD-06, root R{{cad.spigot_root_radius_max_mm:in.3dot}} MAX</text>
   <line class="leader" x1="268.8" y1="280" x2="420" y2="300"/>
   <text class="label" x="424" y="304">the flange's rear face, square to the bore</text>
   <line class="leader" x1="285" y1="222" x2="480" y2="250"/>
