@@ -497,7 +497,10 @@ feed_unit = "in/min"
 # and -v6.html. Stick-out 27.94 mm (1.100 in), the owner's measurement; both
 # reports' setup field reads 30.0, the value entered before the cut (owner,
 # Pedro, 2026-11-22: "stickout is recorded as 30mm but is actually 27.94").
-# The reports are his recorded data and stay as written. The work: a
+# The reports are his recorded data and stay as written. The travelers set
+# 28.45 mm (1.12 in), which the session of 2026-11-23 cut at (owner, Pedro,
+# 2026-11-24: "28.45"); each record's band, and what was and was not cut at
+# 28.45, is in measured-cuts.toml. The work: a
 # 126 x 13 x 73 mm 1018 plate upright in the vise, about 30 mm above the jaws
 # (the reports' setup text). Valid only for that tool assembly, and only inside
 # each record's depth and width; those limits and the stick-out are data in
@@ -567,6 +570,12 @@ feed_unit = "in/min"
 # most, and across four sessions the dial landed up to 80 rpm from the speed
 # asked. Up to 4.6 mm wide a spindle found near 2380 is also measured stable;
 # wider, bring it up to 2450-2490 first. 2450 × 3 × .0028 = 20.6 in/min.
+# The spindle rests only on stops 107.7 rpm apart (cad/config/shop-equipment/
+# machines.toml, machines.pm-30mv) and the head's display is a tachometer: the
+# travelers say "set 2450: the display rests near 2485, not 2380"
+# (measured_cuts' display_rest_rpm; 2380 is one stop low, 2590 one stop high,
+# where 3.4 mm chattered). rpm stays 2450: it is the speed in the cut, which
+# the feed is computed for.
 [settings.em-half-carbide-1018-3439-face]
 tool = "endmill-carbide-3fl-1-2"
 material = "rocker-1018-cold-finished"
