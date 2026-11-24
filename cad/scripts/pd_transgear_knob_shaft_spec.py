@@ -182,13 +182,18 @@ ROOT_DIA = 2.0 * STOCK_PROFILE.root_radius_min_mm
 ROOT_DIA_PLACES = 3
 ROOT_DIA_EXACT_MIN = min(2.0 * p.root_radius_min_mm for p in _PROFILE_CORNERS)
 ROOT_DIA_MIN = inch_floor_mm(ROOT_DIA_EXACT_MIN, ROOT_DIA_PLACES)
-# The root prints as a native MIN on a hidden Front-plane construction circle
-# (RootProfile), the feed pinion's way: swTolType_e.swTolMIN prints the model
-# value then "min.", so the modelled circle IS the printed limit.  The prefix
+# The root prints as a single MIN on a hidden Front-plane construction circle
+# (RootProfile), the feed pinion's way: the modelled circle IS the printed
+# limit.  It carries no native tolerance and the sheet sets " MIN" as its
+# suffix (SINGLE_MIN_SUFFIX), since swTolMIN prints a lowercase "min."
+# (build_pd_transgear_knob_bush's shoulder root).  The prefix
 # lane replaces SolidWorks' own diameter symbol, so it carries it; the
 # translated cutter's root arcs are not concentric, so the MIN bounds every
 # root point and names itself an envelope.
-ROOT_DIA_TOL_TYPE = 5  # swTolType_e.swTolMIN
+SINGLE_LIMIT_TOL_TYPE = 0  # swTolType_e.swTolNONE: the suffix is the limit word
+SINGLE_MIN_SUFFIX = " MIN"
+SINGLE_MAX_SUFFIX = " MAX"
+ROOT_DIA_TOL_TYPE = SINGLE_LIMIT_TOL_TYPE
 ROOT_PREFIX = "ROOT ENVELOPE <MOD-DIAM>"
 ROOT_DEPTH_X_MIN = min(
     p.root_point(p.root_half_angle_rad)[0] for p in _PROFILE_CORNERS
@@ -252,7 +257,7 @@ TIP_CHAMFER = (THREAD_BLANK_DIA - THREAD_BASIC_MINOR) / 2.0
 # full thread runs to the relief, whose front shoulder is the PlainCore
 # station (machinist review r8: the callout gave no thread length).
 THREAD_CALLOUT = f"{THREAD} UNC\nTHREAD TO RELIEF"
-TIP_CHAMFER_CALLOUT = "CHAMFER 45 DEG TO MINOR"
+TIP_CHAMFER_CALLOUT = "CHAMFER 45\u00b0 TO MINOR"
 # The tip face is the stud chucking's faced end (rule 11): F prints as its
 # station from the tip at the .XXX row (STUD_STATION_PLACES).  The thumbnut
 # stack (the collar spec) still charges it the .XX row's ±.010
@@ -383,13 +388,12 @@ FRONT_RELIEF_DIA_TOL_TYPE = 3  # native LIMIT
 FRONT_RELIEF_AREA_MIN = math.pi * FRONT_RELIEF_DIA_MIN**2 / 4.0
 FRONT_RELIEF_WIDTH = 0.4064  # .016
 FRONT_RELIEF_WIDTH_PLACES = 3
-# The neck corners print R.004 MAX (rule 16): native swTolMAX prints the
-# model value, so the modelled corner IS the largest acceptable radius.
+# The neck corners print R.004 MAX (rule 16): the modelled corner IS the
+# largest acceptable radius, " MAX" its suffix with no native tolerance.
 FRONT_CORNER_RADIUS_MAX = 0.1016  # .004
 FRONT_CORNER_RADIUS = FRONT_CORNER_RADIUS_MAX
 FRONT_CORNER_RADIUS_PLACES = 3
-FRONT_CORNER_RADIUS_BAND = (0.0, -FRONT_CORNER_RADIUS_MAX)
-FRONT_CORNER_RADIUS_TOL_TYPE = 6  # swTolMAX: sharp up to R.004
+FRONT_CORNER_RADIUS_TOL_TYPE = SINGLE_LIMIT_TOL_TYPE  # sharp up to R.004
 FRONT_RELIEF_TOTAL_RUNOUT = GEOMETRIC_TOLERANCES_MM["front_neck_total_runout"]
 FRONT_RELIEF_WIDTH_MIN = FRONT_RELIEF_WIDTH - printed_band_mm(
     FRONT_RELIEF_WIDTH_PLACES, unit=UNIT
@@ -404,33 +408,32 @@ CORE_ACTIVE_LENGTH_MIN = (
 )
 # Native cut-profile foremost point IS the actual physical rounded tool
 # terminal, not an independently toleranced sketch centre plus a hidden R.
-CORE_FLAT_CUT_END_FROM_F = 0.1016  # .004
-CORE_FLAT_CUT_END_LIMITS = (0.0508, 0.1778)  # .002 .. .007
-CORE_FLAT_CUT_END_BAND = (
-    CORE_FLAT_CUT_END_LIMITS[1] - CORE_FLAT_CUT_END_FROM_F,
-    CORE_FLAT_CUT_END_LIMITS[0] - CORE_FLAT_CUT_END_FROM_F,
-)
-CORE_FLAT_CUT_END_TOL_TYPE = 3
+# It prints as the single limit .007 MAX from F (machinist review r1 of the
+# fit batch: the former limits .007/.002 were a band .005 wide with no
+# necessity answer): the modelled end IS the farthest the tool may stop, and
+# the nearest is F itself, which the tool never cuts.  Between the two the
+# end lies in air over the neck, so the solid is the same wherever it stops.
+CORE_FLAT_CUT_END_FROM_F = 0.1778  # .007 MAX
+CORE_FLAT_CUT_END_LIMITS = (0.0, CORE_FLAT_CUT_END_FROM_F)  # F .. .007
+CORE_FLAT_CUT_END_TOL_TYPE = SINGLE_LIMIT_TOL_TYPE
 CORE_FLAT_CUT_END_PLACES = 3
 CORE_FLAT_TOOL_END_RADIUS = 0.1016  # .004
 CORE_FLAT_TOOL_END_RADIUS_MAX = 0.1016
-CORE_FLAT_TOOL_END_RADIUS_BAND = (0.0, -CORE_FLAT_TOOL_END_RADIUS)
-CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE = 6
+CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE = SINGLE_LIMIT_TOL_TYPE
 CORE_FLAT_TOOL_END_RADIUS_PLACES = 3
 CORE_FLAT_GEAR_AIR_MIN = min(CORE_FLAT_CUT_END_LIMITS)
 CORE_FLAT_REACH_PAST_SHOULDER_MIN = (
     FRONT_RELIEF_WIDTH_MIN - max(CORE_FLAT_CUT_END_LIMITS)
 )
 # The tool's rounded end lies in air under the neck floor.  Detail B prints
-# both of its limits as the part's native FlatEnd (LIMIT, from F) and
-# FlatToolRadius (MAX) dimensions, their values alone (a location prints its
-# value and band).  Its reach past the core shoulder is the neck width's
-# function (three places, the drawing's callout): the narrowest printed neck
-# (FRONT_RELIEF_WIDTH_MIN) less the farthest allowed tool end is
+# both of its limits as the part's native FlatEnd (MAX, from F) and
+# FlatToolRadius (MAX) dimensions.  Its reach past the core shoulder is the
+# neck width's function (three places, the drawing's callout): the narrowest
+# printed neck (FRONT_RELIEF_WIDTH_MIN) less the farthest allowed tool end is
 # CORE_FLAT_REACH_PAST_SHOULDER_MIN, asserted below; the .XX row would leave
-# none.
+# none.  The tool's end never passes F into the gear.
 if (
-    CORE_FLAT_GEAR_AIR_MIN < 0.050 - 1e-9
+    CORE_FLAT_GEAR_AIR_MIN < 0.0
     or CORE_FLAT_REACH_PAST_SHOULDER_MIN < 0.100 - 1e-9
 ):
     raise AssertionError("the D-flat tool terminal violates its actual two-end reach limits")
@@ -512,25 +515,30 @@ CUP_FACE_STATION = RING_LENGTH + BUSH.LENGTH + END_FLOAT  # 1.418
 CUP_FACE_STATION_BAND = RING_LENGTH_TOL + BUSH.LENGTH_BAND + END_FLOAT_SET_TOL
 # The journal ends JOURNAL_STANDOUT behind the bush's rear face at the stack
 # pose: the cup's fitted pilot (.132, which centres the cup on the journal
-# end) plus the float.  The rear chucking faces the rear end to the
-# controlled overall length from the tip face (OVERALL_LENGTH, .XXX) and the
-# pinion's rear face to the face width from F, so the journal (pinion rear
-# face to rear end, REF) carries the overall's, F's (from the tip) and the
-# face width's bands (#2169, Main delegated ruling 2026-11-04 under #989).
+# end) plus the float.  The journal's length, pinion rear face to rear end,
+# is the controlled dimension at .XX (the model's own driving dimension):
+# it alone sets the stand-out, so the stack reads one two-place band, and
+# the overall from the tip face prints as a .XX reference.  Until fit batch
+# r5 the overall was the controlled one at .XXX and the journal the REF
+# (#2169, Main delegated ruling 2026-11-04 under #989), which made the
+# stand-out carry three bands (.011) and left a three-place overall whose
+# function no rule lets the sheet state: bare it read as over-specified
+# (rule 3), labelled as narration (rule 7), in four review rounds.
 JOURNAL_STANDOUT = 3.556  # .140
-JOURNAL_LENGTH = RING_LENGTH + BUSH.LENGTH + JOURNAL_STANDOUT  # 1.550 REF
-JOURNAL_LENGTH_PLACES = 2
-OVERALL_LENGTH_PLACES = 3  # controlled, tip face to rear face
+JOURNAL_LENGTH = RING_LENGTH + BUSH.LENGTH + JOURNAL_STANDOUT  # 1.550
+JOURNAL_LENGTH_PLACES = 2  # controlled, pinion rear face to rear face
+OVERALL_LENGTH_PLACES = 2  # reference, tip face to rear face
+# The journal's own ±.01, and the face width's .001 the former chain also
+# charged: kept as an allowance so the stand-out's band, and with it
+# MHA-PD-16's printed fitted pilot range, stays what it was (.011, never
+# under the printed band).
 _JOURNAL_LENGTH_BAND = (
-    printed_band_mm(OVERALL_LENGTH_PLACES, unit=UNIT)
-    + _STUD_STATION_BAND
-    + FACE_WIDTH_BAND
+    printed_band_mm(JOURNAL_LENGTH_PLACES, unit=UNIT) + FACE_WIDTH_BAND
 )
 # The stand-out on a real stack, the pinion pushed forward onto the ring and
 # the ring onto the bush's hub face: the journal's, the ring's and the bush's
 # bands.  The cup's facing at fit-up takes it up
-# (pd_transgear_knob_cup_spec.FACING_REMOVAL, never negative only while the
-# overall holds .XXX).
+# (pd_transgear_knob_cup_spec.FACING_REMOVAL, never negative).
 JOURNAL_STANDOUT_BAND = _JOURNAL_LENGTH_BAND + RING_LENGTH_TOL + BUSH.LENGTH_BAND
 JOURNAL_DIA_MIN = JOURNAL_DIA + min(JOURNAL_DIA_BAND)
 
@@ -872,9 +880,9 @@ GEOMETRIC_CONTROLS = (
 # dimensions from its faced tip: F (TipStation), the core's front
 # (CoreFromTip) and the thread's end (ThreadEndFromTip) are stations from
 # the tip face.  It also carries two construction-only witnesses, the
-# tooth-tip blank across the face (OutsideDia) and the controlled overall
-# length from the tip face to the rear face (OverallLength) that the rear
-# chucking faces to, drawing-simplicity-policy.md `How the repository
+# tooth-tip blank across the face (OutsideDia) and the reference overall
+# length from the tip face to the rear face (OverallLength),
+# drawing-simplicity-policy.md `How the repository
 # implements the guidelines`'s reference-sketch allowance, so every turned
 # size imports natively beside its axial extent.  ``CoreFlatProfile``
 # carries the D-flat's in-air tool end (FlatEnd, FlatToolRadius).  The

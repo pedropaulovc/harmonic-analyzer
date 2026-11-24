@@ -1,0 +1,26 @@
+# Why each ream and each band tighter than the title block stays on MHA-PD-22
+# (drawing-guidelines rule 4; owner ruling 2026-11-24: the reason lives here,
+# not on the sheet).  The #11 drilled bore and the drive-pin offsets by trial
+# are owner ruling 2026-11-24, fit audit questions 7 and 8.  The flat-pin
+# centre's ±.002 (N-03) is not ruled: an owner question of the fit batch.
+necessity:
+  - id: N-01
+    feature: "sheet 1, end view, Ø.0930 2X REAM THRU drive-pin holes"
+    kind: gap
+    reason: "a loose dowel spends the MHA-PD-09 wheels' hole slip"
+    source: "pd_transgear_drive_collar_spec.PIN_HOLE_DIA, _sprocket_seat_geometry slip budget (.0039 min); bought dowel MHA-PD-VN-54; a 3/32 drill leaves the rim .016, under RV-01's .018"
+  - id: N-02
+    feature: "sheet 1, section A-A, Ø.0615 REAM blind flat-pin hole"
+    kind: gap
+    reason: "a loose pin's crest closes the gap to MHA-PD-08's stud"
+    source: "pd_transgear_drive_collar_spec.STUD_FLAT_PIN_AIR (.0031); bought pin MHA-PD-VN-70"
+  - id: N-03
+    feature: "sheet 1, section A-A, .118 ±.002 flat-pin hole centre from the bore axis"
+    kind: gap
+    reason: "keeps the pin crest's gap to MHA-PD-08's stud"
+    source: "pd_transgear_drive_collar_spec.STUD_FLAT_PIN_AIR (.0031 at ±.002, .0001 at ±.005); FLAT_PIN_CONTACT_EDGE_MARGIN; FLAT_PIN_SHOULDER_WALL_WORST"
+  - id: N-04
+    feature: "sheet 1, section A-A, Ø.689 +.000/-.004 collar seat diameter"
+    kind: gap
+    reason: "keeps the gap to chain MHA-SH-VN-50 on the 12-tooth wheel"
+    source: "pd_transgear_drive_collar_spec.OD_BAND (_sprocket_seat_geometry.SPIGOT_DIA_BAND)"

@@ -3,7 +3,7 @@
 # Read only by dodo's review task: a line here rebuilds and re-reviews nothing.
 # The batch that converts a sheet deletes its line. Tracking issue: #3511.
 demoted:
-  # parts that print a REAM: 45
+  # parts that print a REAM: 44
   - ch_amplitude_bar
   - ch_channel_lever
   - ch_connecting_rod
@@ -41,7 +41,6 @@ demoted:
   - pd_transgear_arm
   - pd_transgear_arm_plate
   - pd_transgear_disc_hub
-  - pd_transgear_drive_collar
   - pd_transgear_feed_pinion
   - pd_transgear_front_bushing
   - pd_transgear_knob_bush
@@ -49,7 +48,7 @@ demoted:
   - pd_transgear_rear_bushing
   - pn_pen_v_block
   - sm_knife_mount
-  # parts with an explicit band tighter than the title block: 30
+  # parts with an explicit band tighter than the title block: 29
   - ch_fulcrum_shaft
   - ch_pivot_shaft
   - dt_cone_gear_tl_arbor_key
@@ -75,14 +74,12 @@ demoted:
   - pd_support_bar
   - pd_transgear_knob_cup
   - pd_transgear_pin
-  - pd_transgear_removable
   - pn_pen_hanger
   - pn_pen_rod
   - sh_column_clamp_back
   - sm_summing_lever
-  # parts whose tight bands print a reason but have no register entry: 5
+  # parts whose tight bands print a reason but have no register entry: 4
   - mg_magnifying_bracket
-  - pd_transgear_knob_shaft
   - pd_transgear_knob_thrust_ring
   - sh_column_clamp_front
   - sm_gooseneck

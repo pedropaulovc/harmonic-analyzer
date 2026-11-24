@@ -172,18 +172,31 @@ if type(CHAIN_LINK_COUNT) is not int or CHAIN_LINK_COUNT <= 0 or CHAIN_LINK_COUN
 # outside diameter, configuration-driven ("2 * Ra"), printed once per
 # configuration at .XX as a REFERENCE only: it is not a turning operation.
 #
-# The supplied .110 plate (seat.PLATE 2.8 is the shared stack's value) prints
-# as the limits .110/.107: 2.718..2.794, inside the 2.7..2.8 every chain-float
-# and drive-pin stack reads (seat.PLATE_BAND).
+# The supplied .110 plate (seat.PLATE 2.8 is the shared stack's value) is
+# never cut, so it prints as the stock's REF size "(.110) AS SUPPLIED" (rule
+# 4; machinist review r1 of the fit batch read the former limits .110/.107
+# as limits of size on bought stock).  seat.PLATE_BAND stays the ANALYSIS
+# band every chain-float and drive-pin stack reads; the pilot is faced to
+# the measured plate at assembly.
 PLATE_PLACES = 3
-PLATE_PRINTED_BAND = (0.0, -0.0762)  # (upper, lower): +.000/-.003
-# Each pin centre prints .2756 (the shared 7.0 at four places) as a REF target
-# (pd_transgear_removable_callouts.TARGET_TEXT), accepted by the wheel's
-# trial on both seats' pins.  PIN_LOCATION_TOL, the shared
-# +/-DRIVE_PIN_OFFSET_TOL, is the ANALYSIS scatter about that target which
-# the web and the slip budget below are charged; this sheet does not print it.
-PIN_LOCATION_PLACES = seat.DRIVE_PIN_OFFSET_PLACES
+# Each pin centre prints .276 (the shared 7.0 at three places, on the inch
+# grid) as a REF target (pd_transgear_removable_callouts.TARGET_TEXT),
+# accepted by the wheel's trial on both seats' pins (owner ruling
+# 2026-11-24, fit audit question 8).  Two errors of the centres are charged
+# apart (Codjiflo P1 on #3485):
+# - PIN_LOCATION_TOL, the shared +/-DRIVE_PIN_OFFSET_TOL: the holes' SPACING
+#   error against the pins, which the trial accepts; the slip budget below
+#   alone reads it.
+# - PIN_CENTRE_SHIFT_MAX: how far either centre may lie from its target
+#   toward the bore.  The trial does not bound it (both holes and both pins
+#   shifted the same way still drop on, and the bore has .003 to .015 radial
+#   air round the seats' pilots), so it is the shop's declared capability
+#   for the process (drawing-guidelines.md, What the shop holds: "location
+#   of a drilled hole from a datum edge or bore ±.005").  The web is charged
+#   it (pd_transgear_removable_notes).
+PIN_LOCATION_PLACES = 3
 PIN_LOCATION_TOL = seat.DRIVE_PIN_OFFSET_TOL
+PIN_CENTRE_SHIFT_MAX = 0.127  # ±.005, the shop's drilled-hole location row
 # The drills the bore and the pin holes are cut with, and their diameters (in).
 BORE_DRILL = ("13/32", 13.0 / 32.0)
 PIN_HOLE_DRILL = ("#40", 0.098)
@@ -211,7 +224,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for names in DRAWING_PRECISION.values()
     for name, places in names.items()
 }
-DRAWING_REFERENCE_DIMENSIONS = frozenset({"BlankDia"})
+DRAWING_REFERENCE_DIMENSIONS = frozenset({"BlankDia", "BlankWidth"})
 
 
 if not seat.BAND_FRONT_Z < seat.DRIVE_PIN_TIP_Z < seat.SEAT_FACE_Z:
@@ -230,15 +243,6 @@ def _printed_limits(model: float, places: int, band: tuple[float, float]) -> tup
     return printed + band[1], printed + band[0]
 
 
-# The printed plate limits stay inside the shared band the stacks read.
-_PLATE_PRINTED = _printed_limits(seat.PLATE, PLATE_PLACES, PLATE_PRINTED_BAND)
-if not (
-    seat.PLATE + min(seat.PLATE_BAND) - 1e-9
-    <= _PLATE_PRINTED[0]
-    < _PLATE_PRINTED[1]
-    <= seat.PLATE + max(seat.PLATE_BAND) + 1e-9
-):
-    raise AssertionError("the printed plate band leaves the chain-float stack's band")
 # Each drill is a size the printed hole accepts: printed nominal to +.004.
 for _what, _model, (_drill, _drill_in) in (
     ("bore", BORE_DIA, BORE_DRILL),
