@@ -12,3 +12,9 @@ dt-cylinder-gear-tl-cam-fixture:
   tolerance_class: machined_block
   drawing_unit: in
   process: "turn the register and both faces in one chucking; locate, drill and ream the stub and clock-pin holes on the mill DRO from the register axis; break edges"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "sheet 1, face view, clock-pin hole callout Ø.0365 REAM ↧ .20 / PRESS FIT ON TL-VN-51, PERMANENT PAIR"
+      finding: "the Ø.0365 reamer is not a standard size (not a 64th, nor .001 over or under one), so the hole takes a later form than rule 4's form 3 allows; a named drill with TL-VN-51 made to fit (form 2) is asked instead"
+      reason: "Main, by the owner's delegation of 2026-11-24 (D1): \"MHA-DT-12-TL-01 clock pin: keep the special .0365 reamer (status quo; KBC 5-018-0365). No redesign.\" The delegation, verbatim: \"i expect some level of autonomy from you to to delegate some rulings on my behalf; what i care about are visual changes to geometry, tight tolerances\"; keeping the hole as drawn changes no geometry and adds no tolerance. The bought .0375 minus pin TL-VN-51 presses into the .0365 reamed hole and keeps its tooth-space station (necessity N-02): worst cam phase 0.684° inside MHA-DT-12's ±.7°. A 1/32 pin on a standard .0303 reamer needs new stations (a fixture redesign); a #63 drill with the pin bonded lets it float to 0.763°, over ±.7° (sketch fit-audit-2026-11-23/batch-dt/cyl/Q-DT12TL01-clock-pin-reamer.png). Accepts this hole's .0365 reamer only, with no band; no other callout."
