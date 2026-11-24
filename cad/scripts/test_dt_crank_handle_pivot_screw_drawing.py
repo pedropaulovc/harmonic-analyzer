@@ -86,7 +86,7 @@ def test_model_owns_places_and_bands() -> None:
     assert seat.SCREW_DRAWING_PRECISION_BY_NAME == {
         "HeadDia": 3,
         "HeadLength": 3,
-        "ShoulderDia": 3,
+        "ShoulderDia": 4,
         "ShoulderLength": 2,
         "ThreadLength": 2,
         "ReliefDia": 3,
@@ -108,9 +108,11 @@ def test_model_owns_places_and_bands() -> None:
     assert model_toleranced_dimensions(part) == {
         ("ScrewProfile", "ShoulderDia"): "*deviations(SHOULDER_DIA_BAND)",
     }
-    # The F12 running fit (#290): .156 0/-.0020 in a .161 +.0005/0 ream.
+    # The F12 running fit (#290): the shoulder turned to MHA-DT-08's #20
+    # drilled bore less .0050-.0075, inside .1535-.1585 (owner ruling
+    # 2026-11-24, fit audit question 14).
     assert spec.SHOULDER_DIA == pytest.approx(0.156 * 25.4)
-    assert spec.SHOULDER_DIA_BAND == pytest.approx((0.0, -0.002 * 25.4))
+    assert spec.SHOULDER_DIA_BAND == pytest.approx((0.0025 * 25.4, -0.0025 * 25.4))
     assert spec.SHOULDER_LENGTH == pytest.approx(
         spec.HANDLE_STACK_NOMINAL + spec.END_PLAY_NOMINAL
     )
@@ -153,19 +155,23 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
     # Handle numbers come from its own spec, the arm thickness from the shared
     # crank interface geometry.
     assert handle.PIVOT_BORE_DIA + handle.PIVOT_BORE_BAND[1] == pytest.approx(0.161 * 25.4)
-    assert handle.PIVOT_BORE_DIA + handle.PIVOT_BORE_BAND[0] == pytest.approx(0.1615 * 25.4)
+    assert handle.PIVOT_BORE_DIA + handle.PIVOT_BORE_BAND[0] == pytest.approx(0.1635 * 25.4)
 
     # The fitted shoulder: the cup face on the handle's basic length less the
     # pocket is the bonded handle, plus the modelled end play.
     assert spec.HANDLE_STACK_NOMINAL == pytest.approx(handle.HANDLE_LENGTH - cup.POCKET_DEPTH)
     low, high = spec.END_PLAY_RANGE
     assert low < spec.END_PLAY_NOMINAL < high
-    # The ream over the shoulder, on diameter.
-    assert spec.DIAMETRAL_CLEARANCE_MIN == pytest.approx(
-        spec.HANDLE_BORE_MIN - spec.SHOULDER_DIA_MAX
+    # The shoulder turned to the read bore less .0050-.0075: the clearance is
+    # the fit's, and the shoulder's limits hold it for every accepted bore.
+    assert (spec.DIAMETRAL_CLEARANCE_MIN, spec.DIAMETRAL_CLEARANCE_MAX) == pytest.approx(
+        (0.0050 * 25.4, 0.0075 * 25.4)
     )
-    assert spec.DIAMETRAL_CLEARANCE_MAX == pytest.approx(
-        spec.HANDLE_BORE_MAX - spec.SHOULDER_DIA_MIN
+    assert spec.SHOULDER_DIA_MIN == pytest.approx(
+        spec.HANDLE_BORE_MIN - spec.DIAMETRAL_CLEARANCE_MAX
+    )
+    assert spec.SHOULDER_DIA_MAX == pytest.approx(
+        spec.HANDLE_BORE_MAX - spec.DIAMETRAL_CLEARANCE_MIN
     )
     assert spec.DIAMETRAL_CLEARANCE_MIN > 0.0
     # The shortest threaded section always spans the stock arm.
@@ -519,9 +525,7 @@ def test_fitted_shoulder_length_is_one_flagged_numbered_note() -> None:
     x, _ = drawing.NOTES_XY
     assert x + max(map(len, lines)) * 0.0027 < 0.4191
     # Standard fit name and forms on the other callouts (rules 3, 4, 7).
-    assert notes.SHOULDER_FIT_CALLOUT == (
-        "RUNNING FIT, TURN TO\nMHA-DT-08 BORE LESS\n.0050-.0075"
-    )
+    assert notes.SHOULDER_FIT_CALLOUT == "TURN TO MHA-DT-08\nBORE LESS .0050-.0075"
     assert max(map(len, notes.SHOULDER_FIT_CALLOUT.splitlines())) <= 21
     assert notes.HEAD_LENGTH_CALLOUT == "CLEARS\nMHA-DT-35 FACE"
     assert notes.HEAD_DIA_CALLOUT == "CLEARS POCKET\nOF MHA-DT-35"

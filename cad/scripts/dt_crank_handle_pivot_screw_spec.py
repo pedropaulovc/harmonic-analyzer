@@ -45,6 +45,7 @@ from dt_crank_handle_butt_cup_spec import (
     BODY_DIA_TOL as CUP_BODY_DIA_TOL,
     FLOOR_HOLE_DIA as CUP_FLOOR_HOLE_DIA,
     POCKET_CLEARANCE as CUP_POCKET_CLEARANCE,
+    POCKET_DIA_LIMITS as CUP_POCKET_DIA_LIMITS,
     POCKET_DEPTH as CUP_POCKET_DEPTH,
     POCKET_DEPTH_TOL as CUP_POCKET_DEPTH_TOL,
     POCKET_WALL_FLOOR_MM as CUP_POCKET_WALL_FLOOR_MM,
@@ -82,7 +83,8 @@ _GENERAL_3PL = printed_band_mm(3, unit=UNIT)
 STOCK_DIA = 0.25 * MM_PER_IN
 
 # User ruling 2026-09-29 (ch11 p.14): the head sits recessed in the MHA-DT-35
-# butt cup's pocket, which is bored to suit it, and bears on the cup floor.
+# butt cup's pocket, which it clears unmatched (owner ruling 2026-11-24, fit
+# audit question 15), and bears on the cup floor.
 # Its .XXX band keeps a bearing annulus outside the drilled floor hole at the
 # worst case, after an edge break on each.  User ruling 2026-09-30 (ch30
 # eight-views-4): the photographed head, which lets the cup and the butt
@@ -100,13 +102,17 @@ SLOT_WIDTH = 1.016  # .04
 SLOT_DEPTH = 1.016  # .04
 SLOT_DEPTH_TOL = _GENERAL_2PL
 
-# The running surface under the oak bore (#290 fit F12): .156 +.000/-.002,
-# a loose wood-on-steel running fit in the .1610 reamed bore.  (upper, lower)
-# deviations; the model carries the band natively (drawing-simplicity-policy.md
-# `How the repository implements the guidelines`).  The tenon keeps the rule-17
-# floor of oak over its bore.
+# The running surface in the oak bore (#290 fit F12).  MHA-DT-08's bore is
+# drilled #20 and capped .1635 MAX; the shoulder is turned last to that bore
+# less .0050-.0075, its own trial steps reading the bore (owner ruling
+# 2026-11-24, fit audit question 14: "handle stays DRILL #20; DT-32 shoulder
+# by trial, limits .1535-.1585").  The limits are that fit's envelope over
+# every accepted bore (.1610 less .0075 to .1635 less .0050); the old
+# +.000/-.002 left a bore of .162 or more no window.  (upper, lower)
+# deviations; the model carries the band natively.  The tenon keeps the
+# rule-17 floor of oak over its bore.
 SHOULDER_DIA = 3.9624  # .1560
-SHOULDER_DIA_BAND = (0.0, -0.0508)  # +.0000/-.0020
+SHOULDER_DIA_BAND = (0.0635, -0.0635)  # .1535-.1585
 # The shoulder's thread-end face is the seat on the arm face.  Under the
 # title block's edge break on it and on the tapped mouth, a #6-32 left no
 # seat (local review of 1f3067ef2); a larger collar cannot pass the oak bore
@@ -266,8 +272,8 @@ def _limits(nominal: float, band: tuple[float, float]) -> tuple[float, float]:
 SHOULDER_DIA_MIN, SHOULDER_DIA_MAX = _limits(SHOULDER_DIA, SHOULDER_DIA_BAND)
 THREAD_LENGTH_MIN = round(THREAD_LENGTH - _GENERAL_2PL, 6)
 THREAD_LENGTH_MAX = round(THREAD_LENGTH + _GENERAL_2PL, 6)
-# The handle's printed bore is a reference over this running clearance
-# (MHA-DT-08), so the reamer's band reaches the checks only here.
+# The handle's #20 drilled bore as accepted (MHA-DT-08: .1610 up to its
+# .1635 MAX cap), an analysis band read only here and by the head checks.
 _BORE_LOWER, _BORE_UPPER = deviations(PIVOT_BORE_BAND)
 HANDLE_BORE_MIN = round(PIVOT_BORE_DIA + _BORE_LOWER, 6)
 HANDLE_BORE_MAX = round(PIVOT_BORE_DIA + _BORE_UPPER, 6)
@@ -285,11 +291,12 @@ HEAD_RECESS_WORST = round(
     - END_PLAY_RANGE[1],
     6,
 )
-# The pocket is bored to suit the actual head, so its wall is judged at the
-# largest head plus the widest clearance, inside the smallest cup body, at the
-# cup's outer face, where the pocket mouth and the body's face edge each take
-# the cup sheet's edge break (#2170).
-POCKET_MAX = HEAD_DIA + HEAD_DIA_TOL + CUP_POCKET_CLEARANCE[1]
+# The pocket is end-milled to its own limits, not matched to the head (owner
+# ruling 2026-11-24, fit audit question 15), so its wall is judged at the
+# pocket's own upper limit, inside the smallest cup body, at the cup's outer
+# face, where the pocket mouth and the body's face edge each take the cup
+# sheet's edge break (#2170).
+POCKET_MAX = CUP_POCKET_DIA_LIMITS[1]
 CUP_POCKET_WALL_MIN = round(
     ((CUP_BODY_DIA - CUP_BODY_DIA_TOL) - POCKET_MAX) / 2.0
     - 2.0 * edge_break_chamfer_mm(unit=CUP_UNIT),
@@ -315,9 +322,11 @@ HEAD_RUNNING_OFFSET_MAX = round(
     6,
 )
 HEAD_BEARING_RADIAL_MIN = round(HEAD_BEARING_RADIAL_CONCENTRIC_MIN - HEAD_RUNNING_OFFSET_MAX, 6)
-# Wood-on-steel running clearance, on diameter.
-DIAMETRAL_CLEARANCE_MIN = round(HANDLE_BORE_MIN - SHOULDER_DIA_MAX, 6)
-DIAMETRAL_CLEARANCE_MAX = round(HANDLE_BORE_MAX - SHOULDER_DIA_MIN, 6)
+# Wood-on-steel running clearance, on diameter: the modelled result of the
+# fit, the shoulder turned to the read bore less .0050-.0075 (this sheet's
+# acceptance), not a difference of two printed bands.
+SHOULDER_FIT_CLEARANCE = (0.127, 0.1905)  # .0050-.0075
+DIAMETRAL_CLEARANCE_MIN, DIAMETRAL_CLEARANCE_MAX = SHOULDER_FIT_CLEARANCE
 # Engagement in the MHA-DT-06 tapped through hole.  The relief sits in the arm's
 # first RELIEF_WIDTH below the seat face, so only the full thread beyond it
 # engages, and never deeper than the arm is thick.  The drawing-simplicity
@@ -405,8 +414,6 @@ SHOULDER_LENGTH_CALLOUT = (
 # outside the floor hole, its length keeps it below the cup's face.
 HEAD_DIA_CALLOUT = "BEARS ON\nMHA-DT-35\nFLOOR"
 HEAD_LENGTH_CALLOUT = "KEEPS HEAD BELOW\nMHA-DT-35 FACE"
-# The shoulder's running mate, at its band (rule 4).
-SHOULDER_FIT_CALLOUT = "RUNS IN MHA-DT-08\nREAMED BORE"
 # The seat edge's break, on a leader to that edge, names what seats there.
 SEAT_EDGE_NOTE = (
     f"SEAT EDGE BREAK {inch_text(SEAT_EDGE_BREAK_MAX, 3)} MAX;\n"
@@ -442,8 +449,13 @@ for _ok, _what in (
     ),
     (DIAMETRAL_CLEARANCE_MIN > 0.0, "shoulder can bind in the oak bore"),
     (
-        abs(PIVOT_BORE_FIT_MAX - (SHOULDER_DIA_MAX + DIAMETRAL_CLEARANCE_MAX)) < 1e-6,
-        "MHA-DT-08's tenon walls read a bore other than the printed fit's largest",
+        abs(PIVOT_BORE_FIT_MAX - HANDLE_BORE_MAX) < 1e-6,
+        "MHA-DT-08's tenon walls read a bore other than its largest accepted",
+    ),
+    (
+        SHOULDER_DIA_MIN <= HANDLE_BORE_MIN - DIAMETRAL_CLEARANCE_MAX + 1e-6
+        and SHOULDER_DIA_MAX >= HANDLE_BORE_MAX - DIAMETRAL_CLEARANCE_MIN - 1e-6,
+        "the shoulder's limits leave an accepted MHA-DT-08 bore no fit",
     ),
     (
         RELIEF_DIA_MAX <= min(THREAD_MINOR_BASIC_ROOT, THREAD_MINOR_UNR_2A_MAX),
@@ -493,10 +505,22 @@ for _ok, _what in (
     (HEAD_DIA > HANDLE_BORE_MAX, "head passes through the handle bore"),
     (HEAD_DIA + HEAD_DIA_TOL < STOCK_DIA, "head is not turnable from 1/4-in rod"),
     (
-        # Owner ruling B on #1375: the cup body grows; the head and fit stay unchanged.
+        # Owner ruling B on #1375: the cup body grows; the head stays unchanged.
         CUP_POCKET_WALL_MIN >= CUP_POCKET_WALL_FLOOR_MM,
-        "the MHA-DT-35 pocket bored to suit the largest head leaves under its .060 "
+        "the MHA-DT-35 pocket at its .257 limit leaves under its .060 "
         "wall at the cup's broken face",
+    ),
+    (
+        # Fit audit question 15: the head at its own band clears any pocket
+        # inside the pocket's limits, and the cup books that clearance.
+        abs(CUP_POCKET_CLEARANCE[0] - (CUP_POCKET_DIA_LIMITS[0] - (HEAD_DIA + HEAD_DIA_TOL)))
+        < 1e-6
+        and abs(
+            CUP_POCKET_CLEARANCE[1] - (CUP_POCKET_DIA_LIMITS[1] - (HEAD_DIA - HEAD_DIA_TOL))
+        )
+        < 1e-6
+        and CUP_POCKET_CLEARANCE[0] > 0.0,
+        "the MHA-DT-35 pocket clearance is not the head's band in the pocket's limits",
     ),
     (HEAD_BEARING_RADIAL_MIN >= 0.1, "under 0.1 mm of under-head bearing on the cup floor"),
     (
@@ -544,8 +568,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 # Decimal places ARE the tolerance (drawing-guidelines.md rule 3 (decimal
 # places carry the tolerance)): the head diameter and length (the cup-floor
-# bearing and recess), the shoulder's running band, the relief diameter, the
-# relief lead and the tip chamfer's single limit at three; every other
+# bearing and recess), the relief diameter, the relief lead and the tip
+# chamfer's single limit at three; the shoulder's limits .1535-.1585 at four
+# (owner ruling 2026-11-24, fit audit question 14); every other
 # size at two, the relief width for the 1.5D engagement rule and the thread
 # length at the title block's .XX band; the fitted shoulder length and the
 # overall are references.
@@ -553,7 +578,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewProfile": {
         "HeadDia": 3,
         "HeadLength": 3,
-        "ShoulderDia": 3,
+        "ShoulderDia": 4,
         "ShoulderLength": 2,
         "ThreadLength": 2,
         "ReliefDia": 3,

@@ -59,6 +59,7 @@ from dt_crank_handle_butt_cup_spec import (
     OVERALL_LENGTH,
     POCKET_DEPTH,
     POCKET_DIA,
+    POCKET_DIA_LIMITS,
     POCKET_FLOOR_CORNER_R_BAND,
     POCKET_FLOOR_CORNER_R_MAX,
     POCKET_FLOOR_CORNER_R_TOL_TYPE,
@@ -335,6 +336,16 @@ def build(adapter) -> dict[str, str]:
         "FloorHoleChamfer",
         limits=FLOOR_HOLE_CHAMFER_LIMITS,
         places=DRAWING_PRECISION["CupProfile"]["FloorHoleChamfer"],
+        display_unit=UNIT,
+    )
+    # The pocket's own limits .248-.257, the end mill's .250 modelled
+    # (owner ruling 2026-11-24, fit audit question 15).
+    set_limits(
+        adapter,
+        "CupProfile",
+        "PocketDia",
+        limits=POCKET_DIA_LIMITS,
+        places=DRAWING_PRECISION["CupProfile"]["PocketDia"],
         display_unit=UNIT,
     )
     apply_drawing_properties(

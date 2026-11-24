@@ -19,24 +19,18 @@ name = "Pin gauges .011-.500"
 ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 
 [[tools]]
-# Owner ruling 2026-11-23, tool audit Q14: "DRILL #20, read with pins, turn
-# the MHA-DT-32 shoulder last to the bore less .0050-.0075, trial hole in an
-# oak offcut first" (it was a .1610 reamer). For the traveler to come: a
-# trial #20 hole through an offcut of the same oak first; the .1635 minus
-# NO-GO must not enter it (it entering: stop and ask the owner, who may rule
-# a #21); then the handle's bore, read with the zz-pins-1610-1635 pins, the
-# .1635 NO-GO entering a reject (the handle's walls are sized at .1635,
-# dt_crank_handle_spec.PIVOT_BORE_FIT_MAX). MHA-DT-32's traveler turns its
-# shoulder to the reading.
+# Owner ruling 2026-11-23, tool audit Q14: "DRILL #20 ... turn the MHA-DT-32
+# shoulder last to the bore less .0050-.0075, trial hole in an oak offcut
+# first" (it was a .1610 reamer); owner ruling 2026-11-24, fit audit
+# question 14: no pins, "handle stays DRILL #20; DT-32 shoulder by trial".
+# For the traveler to come: a trial #20 hole through an offcut of the same
+# oak first, then the handle's bore. Nothing reads the bore here: MHA-DT-32's
+# traveler turns its shoulder to a Ø.1635 trial size the bonded handle must
+# not go on (the sheet's .1635 MAX, the walls' basis,
+# dt_crank_handle_spec.PIVOT_BORE_FIT_MAX), then to the bore by trial.
 id = "drill-20"
 name = "#20 drill"
-ref = "drill-20"  # Drills #20: (Ø.161) DRILL THRU, running fit on MHA-DT-32
-
-[[tools]]
-id = "bore-pins"
-name = "Class ZZ pins: .161, .162 and .163 minus (reading) and .1635 minus (NO-GO)"
-ref = "zz-pins-1610-1635"
-status = "to_order"
+ref = "drill-20"  # Drills #20: #20 DRILL THRU, .1635 MAX; MHA-DT-32 is turned to it
 
 [[tools]]
 id = "boring-bars-meda-6045000"

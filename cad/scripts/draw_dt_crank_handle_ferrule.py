@@ -142,8 +142,8 @@ CUT_END = (END_CENTER[0], END_CENTER[1] + OUTER_R + 0.006)
 # (build_dt_crank_handle_ferrule: one revolve about model +X; the arm-bearing
 # face at x = 0, the datum end the length runs from; the seat face at x =
 # LENGTH). The O.D. is the 9/16 rod as supplied (a REF, skimmed at
-# MHA-DT-08, note 1); the bore takes the title block's .XXX row (BORE names
-# the process, not DRILLED HOLES) and names its bonded tenon; the length the
+# MHA-DT-08, note 1); the hole is the N drill's at the title block's .XXX row
+# (fit audit question 15) and names its bonded tenon; the length the
 # .XX row. Each ``span`` is a diameter's model-X extent. The declarations
 # print nothing.
 _P = DRAWING_PRECISION_BY_NAME
@@ -214,7 +214,7 @@ requirement(
         ),
         "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
         "thru": (True, ((_NOTES, "BORE_FIT_CALLOUT"),)),
-        "process": ("bore", ((_NOTES, "BORE_FIT_CALLOUT"),)),
+        "process": ("drill", ((_NOTES, "BORE_FIT_CALLOUT"),)),
         "diametral_clearance_ref": (
             list(TENON_GLUE_LINE),
             ("TENON_GLUE_LINE", (_NOTES, "BORE_FIT_CALLOUT")),

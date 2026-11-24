@@ -577,8 +577,8 @@ requirement(
     },
     precision={"width": _P["SlotWidth"], "depth": _P["SlotDepth"]},
 )
-# The running shoulder: Ø.156 +.000/-.002, a running fit in MHA-DT-08's
-# reamed bore (SIDE_KEEP "ShoulderDia"), Ra 63 (SURFACE_FINISHES
+# The running shoulder: Ø.1535-.1585, turned to MHA-DT-08's #20 drilled bore
+# less .0050-.0075 (SIDE_KEEP "ShoulderDia"), Ra 63 (SURFACE_FINISHES
 # "pivot_shoulder"); its under-head corner R.004 MAX (DETAIL_B_KEEP
 # "UnderHeadRadius").  Its length is the fitted reference above.
 requirement(

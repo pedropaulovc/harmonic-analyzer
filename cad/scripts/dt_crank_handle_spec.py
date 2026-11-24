@@ -92,18 +92,18 @@ HANDLE_MAX_DIA = 21.082  # .83 at the swell
 # review of 2026-10-18: a tighter contour allowance had no mate to justify it).
 _GENERAL_2PL = printed_band_mm(2, unit=UNIT)
 # Drilled running bore on the MHA-DT-32 shoulder (#290 fit F12).  Owner ruling
-# 2026-11-23, tool audit Q14: "DRILL #20, read with pins, turn the MHA-DT-32
-# shoulder last to the bore less .0050-.0075, trial hole in an oak offcut
-# first" (it was reamed .1610).  A #20 cuts .1610 and up (DRILLED HOLES
-# +.004/0); the travelers accept a bore only to .1635 (PIVOT_BORE_FIT_MAX:
-# the largest the .1540-.1560 shoulder fits at .0075, and the walls' basis)
-# and turn the shoulder to the read bore, so the fit is matched.  The band
-# below is the fit's bookkeeping: .1610-.1615 on the .154-.156 shoulder spans
-# exactly the printed .0050-.0075.  The sheet prints the bore as a reference
-# over that clearance (MHA-DT-08 review of 29af6f44d: a .0005 band in oak
-# was over-specification), the fleet's matched-fit form.
+# 2026-11-23, tool audit Q14: "DRILL #20 ... turn the MHA-DT-32 shoulder last
+# to the bore less .0050-.0075, trial hole in an oak offcut first" (it was
+# reamed .1610); owner ruling 2026-11-24, fit audit question 14: the
+# shoulder's own trial steps read the bore, no pins, and "handle stays DRILL
+# #20; DT-32 shoulder by trial, limits .1535-.1585".  A #20 cuts .1610 and up
+# (DRILLED HOLES +.004/0); the sheet caps the bore at .1635 MAX
+# (PIVOT_BORE_FIT_MAX, the walls' basis: a bore the shoulder's .1635 trial
+# step enters is rejected).  The band below is that accepted drilled range, an
+# analysis band for the walls and the shoulder's limits, not a printed one:
+# the sheet prints the drill and the cap, and MHA-DT-32 prints the fit.
 PIVOT_BORE_DIA = 4.0894  # .1610
-PIVOT_BORE_BAND = (0.0127, 0.0)  # +.0005/.0000
+PIVOT_BORE_BAND = (0.0635, 0.0)  # #20 drilled, accepted .1610-.1635
 
 # The tenon shoulder is where the ferrule seats, FERRULE_LENGTH from the arm
 # face.  The oak leaves it flush with the ferrule's OD (user, handle2.png).
@@ -359,11 +359,10 @@ FERRULE_ARM_FACE_WALL_ACCEPTED_MM = 1.25
 TENON_END_GAP_MIN = round(
     (FERRULE_LENGTH - _GENERAL_2PL) - (TENON_LENGTH + _GENERAL_2PL), 6
 )
-# The largest bore the printed matched fit allows: the sheet prints the bore
-# as a reference over .0050-.0075 diametral clearance on the shoulder, so the
-# shoulder's .156 max plus .0075 governs, not the reamer's .1615 (local
-# Codex review of 049cf9829).  MHA-DT-32's spec checks this equals its
-# SHOULDER_DIA_MAX + DIAMETRAL_CLEARANCE_MAX.
+# The largest bore the sheet accepts: its .1635 MAX cap on the #20 drilled
+# bore (owner ruling 2026-11-24, fit audit question 14: the shoulder's .1635
+# trial step must not enter), not the drill's .165.  MHA-DT-32's spec checks
+# this equals the top of the accepted drilled range.
 PIVOT_BORE_FIT_MAX = 4.1529  # .1635
 # Oak between the smallest tenon and the largest fitted pivot bore.
 TENON_STRAIGHT_WALL_MIN = (TENON_DIA_MIN - PIVOT_BORE_FIT_MAX) / 2.0 - BORE_ECCENTRICITY

@@ -11,12 +11,13 @@ concept v4): the cup is a plain cup, no flange, seated flush with the oak's
 end; after the epoxy cures the handle's end round is turned on the oak, clear of the
 cup, whose face stays flat (local review of fbf82ad96).  Formerly: turned across the oak and
 the cup together, so wood and steel read as one rounded butt.  The smaller
-MHA-DT-32 head sets the pocket's matched fit.  Owner ruling B on #1375
+MHA-DT-32 head clears the pocket.  Owner ruling B on #1375
 enlarges the body to retain the rule-17 floor as the pocket wall at the
 smallest body and largest pocket; Owner ruling 2026-11-08 (Pedro), #2144
 item 7.1 holds it at the outer face, after both of that face's edge breaks.
 
-The pocket is bored to suit the MHA-DT-32 head; the handle's end play is fitted
+The pocket is end-milled to its own limits, the head clearing it unmatched
+(owner ruling 2026-11-24, fit audit question 15); the handle's end play is fitted
 on the screw shoulder at assembly, so no length here is a stack term.  The
 body diameter prints at .XXX because it sets the pocket wall and the
 MHA-DT-08 counterbore bored to suit it (that handle's butt wall); the pocket
@@ -61,21 +62,32 @@ OVERALL_LENGTH = 8.636  # .34
 # play, still sits below the face (Codex P2 on #1139).  User ruling 2026-09-30.
 POCKET_DEPTH = 5.5118  # .217
 POCKET_DEPTH_TOL = printed_band_mm(3, unit=UNIT)
-# Bored to suit the MHA-DT-32 head (reference size); POCKET_CLEARANCE is the
-# diametral clearance the note asks for, and POCKET_DIA_MAX its hard limit
-# (the largest head plus the widest clearance).
-POCKET_DIA = 6.2992  # .248
-POCKET_CLEARANCE = (0.2032, 0.4064)  # .008-.016
-POCKET_DIA_MAX = 6.5278  # .257
+# Plunged with the owned 1/4 carbide end mill (owner ruling 2026-11-23, tool
+# audit Q6) and printed at its own limits .248-.257, not derived from the
+# head (owner ruling 2026-11-24, fit audit question 15: no matching; the
+# head is turned to its own band and clears any pocket inside these limits).
+# Modelled at the end mill's .250.  POCKET_CLEARANCE is the clearance those
+# limits leave on the head's .231-.241, the modelled result, not a printed
+# one; POCKET_DIA_MAX is the pocket's own upper limit, which the wall reads.
+POCKET_DIA = 6.35  # .250
+POCKET_DIA_LIMITS = (6.2992, 6.5278)  # .248-.257
+POCKET_DIA_BAND = (
+    round(POCKET_DIA_LIMITS[1] - POCKET_DIA, 6),
+    round(POCKET_DIA_LIMITS[0] - POCKET_DIA, 6),
+)  # (upper, lower): +.007/-.002
+POCKET_DIA_MAX = POCKET_DIA_LIMITS[1]
+POCKET_CLEARANCE = (0.1778, 0.6604)  # .007-.026, unmatched
 # Owner ruling B on #1375: the cup grows around the unchanged head and pocket,
 # rather than retaining a sub-floor wall or tightening the body band.  Owner ruling 2026-11-08 (Pedro), #2144 item 7.1 (#2170, option B) grows it again so that the
 # floor holds at the outer face, where both of the wall's edges are broken.
 POCKET_WALL_FLOOR_MM = WALL_FLOOR_MM
 BODY_DIA = 10.7188  # .422: the largest pocket, two .060 face walls, their breaks and the band
 # The head bears on the floor: the floor-to-wall corner may round no more than
-# the tightest radial clearance, so a sharp-edged, centred head still seats on
-# the flat (rule 16: the largest radius acceptable; MHA-DT-35 r1 finding 5).
-POCKET_FLOOR_CORNER_R_MAX = POCKET_CLEARANCE[0] / 2.0
+# half the tightest radial clearance, so a sharp-edged, centred head still
+# seats on the flat (rule 16: the largest radius acceptable; MHA-DT-35 r1
+# finding 5).  Half of .007 is .0035; the sheet prints the three-place limit
+# under it, R.003 MAX (owner ruling 2026-11-24, fit audit question 15).
+POCKET_FLOOR_CORNER_R_MAX = 0.0762  # .003
 POCKET_FLOOR_CORNER_R_BAND = (0.0, -POCKET_FLOOR_CORNER_R_MAX)  # (upper, lower)
 POCKET_FLOOR_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: nominal is the limit
 # The floor hole passes the MHA-DT-32 shoulder: a #20 drill (.161) under the
@@ -133,6 +145,14 @@ for _ok, _what in (
         "pocket wall is under .060 at the broken face (#2170, option B)",
     ),
     (FLOOR_HOLE_DIA < POCKET_DIA, "floor hole leaves no floor"),
+    (
+        POCKET_DIA_LIMITS[0] < POCKET_DIA < POCKET_DIA_LIMITS[1],
+        "the modelled pocket is outside its printed limits",
+    ),
+    (
+        POCKET_FLOOR_CORNER_R_MAX <= POCKET_CLEARANCE[0] / 2.0,
+        "the pocket's floor corner rounds past half the tightest head clearance",
+    ),
     (BODY_DIA + BODY_DIA_TOL < STOCK_DIA - 0.2, "body is not turnable from 1/2-in rod"),
 ):
     if not _ok:
@@ -171,4 +191,4 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-DT-35 dimension needs authored places")
-REFERENCE_DIMENSIONS = frozenset({"PocketDia"})
+REFERENCE_DIMENSIONS: frozenset[str] = frozenset()
