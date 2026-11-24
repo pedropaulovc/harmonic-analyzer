@@ -38,7 +38,10 @@ def test_outboard_proportions_follow_the_u29_enlargement() -> None:
 
 def test_u27_walls_hold_the_inch_wall_target_at_the_printed_bands() -> None:
     assert geometry.WALL_TARGET_MM == pytest.approx(0.080 * 25.4)
-    assert geometry.SEAM_WEB_WORST_MM == pytest.approx(2.247, abs=1e-3)
+    # The seam hole is the 5/32 drill at its DRILLED HOLES maximum and the
+    # seat may sit .003 under the arm bore's minimum (fit audit 2026-11-23,
+    # MHA-DT-06_DT-31.seam_pin; fit audit question 21).
+    assert geometry.SEAM_WEB_WORST_MM == pytest.approx(2.162, abs=1e-3)
     assert geometry.ARM_CHEEK_WORST_MM == pytest.approx(2.362, abs=1e-3)
     assert min(geometry.SEAM_WEB_WORST_MM, geometry.ARM_CHEEK_WORST_MM) >= (
         geometry.WALL_TARGET_MM
@@ -46,16 +49,18 @@ def test_u27_walls_hold_the_inch_wall_target_at_the_printed_bands() -> None:
 
 
 def test_arm_shoulder_keeps_its_land_over_the_largest_matched_seat() -> None:
-    """Codex P2 on 16146c26f: the arm is pressed to the barrel's front face,
-    and the seat is turned to whatever MHA-DT-06 bore it meets.  At the printed
-    limits the largest bore (.XX) plus the tightest press stands inside the
-    smallest barrel the sheet allows; after the arm bore's and the barrel
-    corner's edge breaks a land at least one edge break wide must be left."""
+    """Codex P2 on 16146c26f: the arm bears on the barrel's front face, and
+    the seat is turned to whatever MHA-DT-06 bore it meets.  At the printed
+    limits the largest bore (.XX) less the tightest slip (owner ruling
+    2026-11-24, fit audit question 21: a bonded slip fit, not a press) stands
+    inside the smallest barrel the sheet allows; after the arm bore's and the
+    barrel corner's edge breaks a land at least one edge break wide must be
+    left."""
     two_place = 0.01 * 25.4
     edge_break = geometry.EDGE_BREAK_MAX_MM
     assert dt_crank_hub_spec.DRAWING_PRECISION_BY_NAME["SeatDia"] == 2
     assert dt_crank_hub_spec.DRAWING_PRECISION_BY_NAME["BarrelDia"] == 2
-    seat_max = geometry.HUB_SEAT_DIA + two_place + 0.0012 * 25.4
+    seat_max = geometry.HUB_SEAT_DIA + two_place - 0.0005 * 25.4
     assert geometry.HUB_SEAT_DIA_MAX_MATCHED == pytest.approx(seat_max)
     barrel_min = geometry.HUB_BARREL_DIA - two_place
     land = (barrel_min - seat_max) / 2.0 - 2.0 * edge_break
@@ -223,23 +228,20 @@ def test_named_shaft_fit_class_bounds_the_through_bore() -> None:
     )
 
 
-def test_seat_press_sits_inside_the_iso_locational_interference_fit() -> None:
-    # ISO 286-2, 18-30 mm: H7 hole 0/+0.021; p6 shaft +0.022/+0.035.
-    assert 18.0 < geometry.HUB_SEAT_DIA <= 30.0
-    h7_upper, p6_lower, p6_upper = 0.021, 0.022, 0.035
-    iso = (p6_lower - h7_upper, p6_upper)  # 0.001-0.035 diametral
-    low, high = dt_crank_hub_notes.SEAT_PRESS_INTERFERENCE
-    assert iso[0] < low < high <= iso[1]
-    # A real press at the loose end: the match-turned seat never goes
-    # line-to-line.
-    assert low >= 0.010
+def test_seat_slip_fit_is_a_bondable_gap() -> None:
+    # Owner ruling 2026-11-24, fit audit question 21: a slip fit bonded with
+    # LOCTITE 638, .0005-.003 diametral, inside the compound's 0.25 mm gap.
+    low, high = geometry.SEAT_SLIP_CLEARANCE
+    assert (low, high) == pytest.approx((0.0005 * 25.4, 0.003 * 25.4))
+    assert 0.0 < low < high <= 0.25
+    assert not hasattr(geometry, "SEAT_PRESS_INTERFERENCE")
 
 
 def test_hub_shoulder_and_pin_stations_preserve_removal_topology() -> None:
     assert geometry.HUB_SEAT_LENGTH == geometry.ARM_THICKNESS
     assert geometry.HUB_SHOULDER_STATION < geometry.SERVICE_PIN_STATION
     assert geometry.SERVICE_PIN_STATION < geometry.HUB_LENGTH
-    # The cut pin seats flush before it can bottom in the match-reamed seam.
+    # The cut pin seats flush before it can bottom in the drilled seam.
     assert geometry.SEAM_DEPTH > geometry.AXIAL_PIN_LENGTH
 
 
@@ -276,27 +278,35 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     # numbered note its callout flags.
     assert not hasattr(dt_crank_hub_spec, "DRAWING_NOTES")
     seat = dt_crank_hub_notes.SEAT_CALLOUT
-    # B1 (Main 2026-09-25): a light press in arm MHA-DT-06, with the F10
-    # interference printed in inch.  Two lines of words (rule 7), no assembly
-    # instruction (END FLUSH lives on the MHA-DT-00 press step) and no
-    # private phrase (rule 26: TO SUIT).
+    # Owner ruling 2026-11-24, fit audit question 21: the seat is turned to
+    # arm MHA-DT-06's bore, the acceptance by feel, and bonded.  Two lines of
+    # words (rule 7), no assembly instruction (END FLUSH lives on the
+    # MHA-DT-00 bond step) and no private phrase (rule 26: TO SUIT).
     assert seat.splitlines() == [
-        "LIGHT PRESS IN CRANK ARM MHA-DT-06:",
-        ".0004-.0012 DIAMETRAL INTERFERENCE",
+        "TURN TO CRANK ARM MHA-DT-06 BORE:",
+        "ARM SLIDES ON BY HAND; BONDED",
     ]
     assert "FLUSH" not in seat and "TO SUIT" not in seat
     # The arm bore is made first; the hub seat is turned to it, so its
     # nominal prints as a reference.
     assert dt_crank_hub_spec.REFERENCE_DIMENSIONS == {"SeatDia"}
     seam = dt_crank_hub_notes.SEAM_CALLOUT
-    # Size, the final process (REAM, not DRILL/REAM) and the depth first
-    # (rule 26), then two lines naming the mate and the pin by name and
-    # number; no private phrase (ON SEAM) and no assembly instruction
-    # (PERMANENT PAIR; DISASSEMBLE AT MHA-DT-09).
+    # Size, the named drill (fit audit 2026-11-23, MHA-DT-06_DT-31.seam_pin:
+    # 5/32 drilled and the pin bonded) and the depth first (rule 26), then two
+    # lines naming the mate and the pin by name and number; no private phrase
+    # (ON SEAM) and no assembly instruction (PERMANENT PAIR; DISASSEMBLE AT
+    # MHA-DT-09).
     assert seam.splitlines() == [
-        "(<MOD-DIAM>.156) REAM <HOLE-DEPTH> .17 AT ASSEMBLY",
+        "(<MOD-DIAM>.156) 5/32 DRILL <HOLE-DEPTH> .17 AT ASSEMBLY",
         "WITH CRANK ARM MHA-DT-06 FOR",
-        "DOWEL PIN MHA-DT-VN-59, LIGHT DRIVE FIT",
+        "DOWEL PIN MHA-DT-VN-59, BONDED",
+    ]
+    assert "REAM" not in seam
+    # The bore is the .3760 reamer's, no band; the shank is turned to it.
+    assert dt_crank_hub_notes.BORE_CALLOUT.splitlines() == [
+        "REAM THRU",
+        "MHA-DT-11 IS TURNED",
+        "TO THIS BORE",
     ]
     for phrase in ("ON SEAM", "DRILL/REAM", "PERMANENT", "DISASSEMBLE", "O'CLOCK"):
         assert phrase not in seam
@@ -319,10 +329,11 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
         "HubLength": "SETS CLEARANCE TO\nSPROCKET MHA-PD-09",
     }
     assert geometry.HUB_LENGTH_BAND[0] < geometry.GENERAL_2PL_TOL_MM / 2.0
-    # Note 2's acceptance is one-sided, +.000/-.002 to the arm's measured
-    # thickness: the hub end is never proud (owner ruling 2026-11-06).
+    # Note 2's acceptance is one-sided, +.000/-.010 to the arm's measured
+    # thickness: the hub end is never proud (owner ruling 2026-11-06; fit
+    # audit 2026-11-23, MHA-DT-31.seat_length).
     assert dt_crank_hub_notes.SEAT_LENGTH_NOTE == (
-        "2. SEAT LENGTH (.31): MEASURED THICKNESS OF CRANK ARM MHA-DT-06 +.000/-.002."
+        "2. SEAT LENGTH (.31): MEASURED THICKNESS OF CRANK ARM MHA-DT-06 +.000/-.010."
     )
     assert f"{geometry.HUB_SEAT_LENGTH / 25.4:.2f}" == "0.31"
     # Rule 7: the sheet's notes are at most four lines.
@@ -350,13 +361,6 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert re.search(r"\d\.\d", note.split("1:48", 1)[1]) is None
     assert "PinProudReference" not in dt_crank_hub_spec.DRAWING_DIMENSIONS
     assert "PinProud" not in drawing.END_KEEP
-    # The bore band governs; the callout names the standard fit, the one
-    # MHA-DT-11's sheet gives the joint, and the clearance follows as REF.
-    import dt_crankshaft_notes
-
-    bore = dt_crank_hub_notes.BORE_CALLOUT.splitlines()
-    assert bore[1] == f"{dt_crankshaft_notes.SLIDING_FIT} ON MHA-DT-11"
-    assert bore[2].startswith("(CLEARANCE ") and "DIAMETRAL" not in dt_crank_hub_notes.BORE_CALLOUT
     assert drawing.ISO_NOTE == "ISOMETRIC VIEW" and drawing.SHEET_SCALE == (2.0, 1.0)
 
 
@@ -579,7 +583,6 @@ CALLOUT_LINE_CAP = 4
         ("SEAM_CALLOUT", dt_crank_hub_notes.SEAM_CALLOUT),
         ("BORE_CALLOUT", dt_crank_hub_notes.BORE_CALLOUT),
         ("CROSS_HOLE_CALLOUT", dt_crank_hub_notes.CROSS_HOLE_CALLOUT),
-        ("seat_bore_callout", dt_crank_hub_notes.seat_bore_callout("MHA-DT-31")),
     ],
 )
 def test_every_generated_callout_stays_within_four_lines(name: str, text: str) -> None:
@@ -590,7 +593,9 @@ def test_u29_walls_hold_at_the_seat_bores_printed_limits() -> None:
     # Main 2026-09-25: the arm is 1-in CF flat, held to 0.004 in on width
     # (OnlineMetals, Speedy Metals), not 0.003; and the cheek must come from
     # the seat bore's REAL limits. MHA-DT-06 bores the seat first at .XX; the
-    # MHA-DT-31 seat is turned to suit it for a press, so it is never smaller.
+    # MHA-DT-31 seat is turned to it less the slip (fit audit question 21), so
+    # it may be the bore's minimum less .003, and the seam hole is the 5/32
+    # drill at its DRILLED HOLES maximum.
     mm = 25.4
     assert geometry.ARM_WIDTH_STOCK_MINUS == pytest.approx(0.004 * mm)
     bore_max = geometry.HUB_SEAT_DIA + 0.01 * mm
@@ -598,8 +603,9 @@ def test_u29_walls_hold_at_the_seat_bores_printed_limits() -> None:
     cheek = geometry.wall_after_edge_break(
         geometry.ARM_WIDTH - geometry.ARM_WIDTH_STOCK_MINUS, bore_max
     )
+    assert geometry.SEAM_HOLE_DIA_MAX == pytest.approx((5 / 32 + 0.004) * mm)
     web = geometry.wall_after_edge_break(
-        bore_min - geometry.AXIAL_PIN_DIA_STOCK_MAX, geometry.HUB_BORE_DIA_MAX
+        bore_min - 0.003 * mm - geometry.SEAM_HOLE_DIA_MAX, geometry.HUB_BORE_DIA_MAX
     )
     assert cheek >= geometry.WALL_TARGET_MM
     assert web >= geometry.WALL_TARGET_MM

@@ -19,11 +19,11 @@
   <text class="label" x="424" y="80">Z0: the front face, faced to</text>
   <text class="label" x="424" y="96">{{process.length_target_in:.3dot}} from the rear face</text>
   <line class="leader" x1="316" y1="124" x2="300" y2="56"/>
-  <text class="label" x="200" y="40">seat Ø B+.0006 to B+.0012, back to the</text>
-  <text class="label" x="200" y="54">shoulder at Z−S (S = T − .001)</text>
+  <text class="label" x="200" y="40">seat turned until the arm slides on, back to the</text>
+  <text class="label" x="200" y="54">shoulder at Z−S (S = T − .005)</text>
   <text class="label" x="590" y="190">reamer</text>
   <line class="leader" x1="250" y1="238" x2="330" y2="340"/>
-  <text class="label" x="334" y="344">bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} through</text>
+  <text class="label" x="334" y="344">bore reamed .3760 through</text>
   <line class="leader" x1="190" y1="291" x2="150" y2="364"/>
   <text class="label" x="40" y="378">brass shim; .40 of the hub in the jaws, from the rear face</text>
 </svg>

@@ -275,27 +275,27 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
 # tolerance.  The fiducial and the pivot tap's mouth limit are flagged at
 # their features (dt_crank_arm_notes).
 STOCK_NOTE = "1. WIDTH AND THICKNESS: CF FLAT BAR AS SUPPLIED."
-# The hub-seat press fit's acceptance, flagged from the seat callout (SEE NOTE
-# 2): the callout's two word rows name the fit and its mate, and its width is
-# bounded by the border and the seam leader.
-_PRESS_LOW_IN, _PRESS_HIGH_IN = (
-    f"{value / 25.4:.4f}".lstrip("0")
-    for value in dt_crank_hub_geometry.SEAT_PRESS_INTERFERENCE
-)
+# The hub seat's bonded slip fit, flagged from the seat callout (SEE NOTE 2):
+# the callout's two word rows name the fit and its mate, and its width is
+# bounded by the border and the seam leader.  Owner ruling 2026-11-24, fit
+# audit question 21: the bore is made first and MHA-DT-31's seat is turned
+# to it, the joint bonded with LOCTITE 638 (no press); the acceptance (the
+# arm slides on by hand) prints once, on the hub, the member made last.
 SEAT_PRESS_NOTE = (
-    f"2. HUB SEAT: {_PRESS_LOW_IN}-{_PRESS_HIGH_IN} DIAMETRAL INTERFERENCE"
-    " ON MHA-DT-31."
+    "2. HUB SEAT: MHA-DT-31 IS TURNED TO THIS BORE;"
+    " BONDED WITH LOCTITE 638."
 )
-# The MHA-DT-VN-59 pin hole across the bore/hub joint, flagged from its ream
+# The MHA-DT-VN-59 pin hole across the bore/hub joint, flagged from its drill
 # callout (SEE NOTE 3): the callout keeps size, process and depth; the
-# assembly-made ream, its pin and fit, and the owner's permanent pair
+# assembly-made hole, its pin and bond, and the owner's permanent pair
 # (rulings 2026-11-01, as the hub's sheet prints it) are two rows too many
-# for the callout (rule 7).  Plain words, not the private "seam" (rule 26,
-# fan-out round 3).  The rows stay short of the title block (x 0.216 at the
-# render's 2.67 mm per character).
+# for the callout (rule 7).  Drilled 5/32 and the pin bonded (fit audit
+# 2026-11-23, MHA-DT-06_DT-31.seam_pin; the .1562 reamer is retired).  Plain
+# words, not the private "seam" (rule 26, fan-out round 3).  The rows stay
+# short of the title block (x 0.216 at the render's 2.67 mm per character).
 SEAM_NOTE = (
-    "3. REAM ACROSS THE BORE/HUB JOINT WITH CRANK HUB MHA-DT-31 AT ASSEMBLY;\n"
-    "   PIN MHA-DT-VN-59, LIGHT DRIVE FIT; PERMANENT PAIR."
+    "3. DRILL ACROSS THE BORE/HUB JOINT WITH CRANK HUB MHA-DT-31 AT ASSEMBLY;\n"
+    "   PIN MHA-DT-VN-59 BONDED (LOCTITE 638); PERMANENT PAIR."
 )
 DRAWING_NOTES = "\n".join((STOCK_NOTE, SEAT_PRESS_NOTE, SEAM_NOTE))
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

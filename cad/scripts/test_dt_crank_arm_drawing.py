@@ -32,9 +32,13 @@ def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
     assert spec.ARM_THICKNESS == geometry.ARM_THICKNESS == pytest.approx(7.9375)
     assert spec.HUB_SEAT_DIA == geometry.HUB_SEAT_DIA == pytest.approx(0.76 * 25.4)
     assert spec.HALF_WIDTH == pytest.approx(12.7)
-    # The arm bore is made first; the hub is turned to suit it for the F10
-    # light press, .0004-.0012 in diametral.
-    assert geometry.SEAT_PRESS_INTERFERENCE == pytest.approx((0.01016, 0.03048))
+    # The arm bore is made first; the hub is turned to it for a slip fit
+    # bonded with LOCTITE 638 (owner ruling 2026-11-24, fit audit question
+    # 21), .0005-.003 in diametral; the arm's note names the bond.
+    assert geometry.SEAT_SLIP_CLEARANCE == pytest.approx((0.0127, 0.0762))
+    assert "LOCTITE 638" in spec.SEAT_PRESS_NOTE and "INTERFERENCE" not in spec.SEAT_PRESS_NOTE
+    assert notes.HUB_SEAT_CALLOUT.startswith("BONDED ON CRANK HUB")
+    assert "5/32 DRILL" in notes.SEAM_CALLOUT and "REAM" not in notes.SEAM_CALLOUT
     assert not hasattr(spec, "SHAFT_BORE_DIA")
     assert not hasattr(spec, "PIN_HOLE_SPEC")
 

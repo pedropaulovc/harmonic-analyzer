@@ -16,7 +16,9 @@ from _drawing_registry import DRAWINGS_BY_NAME
 def test_pin_is_the_98381a487_dowel_cut_shorter_than_the_seam() -> None:
     # McMaster-Carr 98381A487: 5/32 x 1/2 alloy-steel dowel, +.0001/+.0003.
     assert pin_spec.PIN_DIA == pytest.approx(5 / 32 * 25.4)
-    assert geometry.AXIAL_PIN_DIA_STOCK_MAX == pytest.approx((5 / 32 + 0.0003) * 25.4, abs=1e-4)
+    # Bonded in the 5/32 drilled seam (fit audit 2026-11-23,
+    # MHA-DT-06_DT-31.seam_pin): the widest gap stays inside LOCTITE 638's.
+    assert 0.0 < geometry.SEAM_HOLE_DIA_MAX - pin_spec.PIN_DIA <= 0.25
     assert pin_spec.PIN_LEN < 0.5 * 25.4
     assert pin_spec.PIN_LEN < geometry.SEAM_DEPTH
     assert _config.parts("dt-vn-crank-hub-pin")["supplier_skus"] == [pin_spec.SKU]

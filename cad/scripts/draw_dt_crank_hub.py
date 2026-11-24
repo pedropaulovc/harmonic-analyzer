@@ -54,7 +54,7 @@ from dt_crank_hub_geometry import (
     HUB_SEAT_DIA,
     RELIEF_DIA,
     RELIEF_LENGTH,
-    SEAT_PRESS_INTERFERENCE,
+    SEAT_SLIP_CLEARANCE,
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
     UNIT,
@@ -354,7 +354,7 @@ requirement(
     "seat",
     kind="outside_cylinder",
     faces=(CylinderFace(HUB_SEAT_DIA),),
-    requirements=("dia_ref", "diametral_interference"),
+    requirements=("dia_ref", "diametral_clearance"),
     fields={
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
         "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
@@ -362,9 +362,11 @@ requirement(
             HUB_SEAT_DIA,
             ((_GEOM, "HUB_SEAT_DIA"), "REFERENCE_DIMENSIONS", (_SELF, "SIDE_KEEP")),
         ),
-        "diametral_interference": (
-            list(SEAT_PRESS_INTERFERENCE),
-            ((_GEOM, "SEAT_PRESS_INTERFERENCE"), (_NOTES, "SEAT_CALLOUT")),
+        # The bonded slip fit's design clearance (fit audit question 21): the
+        # traveler turns the seat until the arm slides on by hand.
+        "diametral_clearance": (
+            list(SEAT_SLIP_CLEARANCE),
+            ((_GEOM, "SEAT_SLIP_CLEARANCE"), (_NOTES, "SEAT_CALLOUT")),
         ),
         "mate": ("MHA-DT-06 CRANK ARM BORE", ((_NOTES, "SEAT_CALLOUT"),)),
         "length_nominal": (HUB_SEAT_LENGTH, ((_GEOM, "HUB_SEAT_LENGTH"),)),
@@ -419,6 +421,9 @@ requirement(
     fields={
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
         "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        # The sheet prints the .3760 reamer's size with no band (fit audit
+        # 2026-11-23, MHA-DT-31.bore); HUB_BORE_BAND is the analysis band,
+        # what the reamer cuts, declared here for the traveler.
         "dia": (
             limits(HUB_BORE_DIA, _P["BoreDia"], HUB_BORE_BAND, unit=UNIT),
             ((_GEOM, "HUB_BORE_DIA"), (_GEOM, "HUB_BORE_BAND"), (_SELF, "END_KEEP")),

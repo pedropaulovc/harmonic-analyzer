@@ -9,7 +9,7 @@
   <line class="datum" x1="200" y1="60" x2="200" y2="300"/>
   <text class="datum-label" x="120" y="316">front face</text>
   <line class="leader" x1="240" y1="85" x2="150" y2="50"/>
-  <text class="label" x="20" y="46">seat Ø B+.0006 to B+.0012, S long</text>
+  <text class="label" x="20" y="46">seat: the arm slides on, S long</text>
   <line class="leader" x1="385" y1="70" x2="360" y2="44"/>
   <text class="label" x="300" y="40">barrel Ø{{cad.barrel_dia_min_in:.3dot}}–{{cad.barrel_dia_max_in:.3dot}}</text>
   <line class="leader" x1="428" y1="99" x2="500" y2="70"/>
