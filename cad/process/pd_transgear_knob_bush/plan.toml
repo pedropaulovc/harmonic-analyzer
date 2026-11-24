@@ -4,10 +4,14 @@
 # 1018-round-5-8, allocated to MHA-PD-28 by owner ruling 2026-11-20, #2425).
 # Setup 1, the bar, rear end out: face the rear face (Z0), turn the hub to
 # its .51-.53 band back past the parting line, then the press diameter and
-# the shoulder (datum A) to MHA-PD-19's gauged hole: the sheet's .4387-.4391
-# is .0005-.0016 over any hole that passes the plate's .4375 GO / .4382 NO-GO
-# pair, so gauging the hole with that pair and turning to the band makes the
-# matched press. The shoulder's root is formed by the P1 blade's corner
+# the shoulder (datum A) to MHA-PD-19's hole as measured, by a pilot: Op 40
+# turns the first .06 of the end down until the plate's reamed hole just
+# slides on it without shake, and mikes it (that reading is the hole);
+# Op 60 finishes the press diameter to that reading plus .0005-.0016, the
+# sheet's interference. The pilot stays on the bush: it is on the stub that
+# stands behind the plate once the shoulder seats, and it leads the press in
+# (pd_transgear_knob_bush_geometry PILOT_LENGTH_MAX_MM; the wall stack is
+# judged at it). The shoulder's root is formed by the P1 blade's corner
 # (R.005 MAX; the AR's R0.4 mm nose cannot form it). Then spot and drill B
 # (.238) through past the parting line in the same chucking, and part off
 # .02 long. That is the route pd_transgear_knob_bush_geometry's wall stack
@@ -30,13 +34,17 @@
 # parted end (the hub face) out: faced to .809 from the shoulder, read over a
 # .350 gauge block standing on the shoulder.
 #
-# Not on hand: the Class ZZ pins zz-pins-4375-4382 (.4375 plus GO, .4380 plus
-# NO-GO), the same pins MHA-PD-19 buys, mikes and accepts its hole with. Owner
-# ruling 2026-11-23 (tool audit Q1, re-answered), verbatim: "ZZ singles per
-# the record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept that
-# good holes near a limit may be refused; the traveler mikes each pin so the
-# real window is known per pin." Re-gauging with PD-19's own pins cannot refuse
-# a hole PD-19 accepted. The minus pin gauges (gauges.toml pin-gauges, to
+# No gauge is bought for the plate's hole (fit audit 2026-11-23, pending
+# owner confirmation; the owner on the audit: "why do we need single micron
+# level tolerance x class plug gauges for a hobby machining project"; "can
+# the holes not be reamed in the first place"): MHA-PD-19 reams it with the
+# over/under set's .4385 reamer and this traveler fits the bush to it, the
+# plate itself the gauge and the .0001 micrometer the only instrument. The
+# sheet prints the press diameter (Ø.4385) REF and the interference
+# .0005-.0016. The feature export's press-diameter limits are the spec's
+# ANALYSIS envelope (the reamer's modelled hole plus the interference): this
+# plan binds them where the adapter needs a band and never as acceptance.
+# The minus pin gauges (gauges.toml pin-gauges, to
 # order) are for Op 130's pin in the B hole. The .2490 reamer (reamer-2490, to order) is
 # MHA-PD-00's, not this traveler's.
 title = "Transgear Knob Bush"
@@ -44,7 +52,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished steel round bar, 5/8 in"
 stock = "Lot: {{process.quantity:d}} bush. Ø{{process.stock_dia_in:.3dot}} bar, on hand (saw a {{process.bar_length_in:g}} in working piece off the bar); the bush takes {{cad.pitch_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); steel cut with cutting oil. MHA-PD-19, the plate this bush is pressed into, is made first: Op 40 gauges its hole. Left for MHA-PD-00 step 11 (not made here): the ream to Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} after pressing, which follows the B hole this traveler drills in the chucking that turns the press diameter and the shoulder (Ops 130–150 check the hole's squareness to the shoulder before part-off). To order (not on hand): the Class ZZ pins .4375 plus (GO) and .4380 plus (NO-GO) that MHA-PD-19 gauges its hole with (one set for both), and the minus pin gauges for the B hole (Op 130)."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); steel cut with cutting oil. MHA-PD-19, the plate this bush is pressed into, is made first and is at the lathe: Op 40 fits a pilot to its hole and Op 60 turns the press diameter from the pilot's reading. Left for MHA-PD-00 step 11 (not made here): the ream to Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} after pressing, which follows the B hole this traveler drills in the chucking that turns the press diameter and the shoulder (Ops 130–150 check the hole's squareness to the shoulder before part-off). To order (not on hand): the minus pin gauges for the B hole (Op 130)."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
 material_key = "lathe-1018-cold-finished"
@@ -107,6 +115,11 @@ pin_tilt_reading_max_mm = 0.015
 # The feeler leaf the tools are touched through (the shop's feeler gauges,
 # cad/config/shop-equipment/gauges.toml feeler-gauges).
 touch_leaf_in = 0.002
+# Op 40's pilot: the length of the rear end turned to a slip in MHA-PD-19's
+# hole (pd_transgear_knob_bush_geometry.PILOT_LENGTH_MAX_MM), and the
+# diameter the AR roughs it to before the fitting passes.
+pilot_length_in = 0.06
+pilot_rough_dia_in = 0.445
 
 [[tools]]
 id = "ar"
@@ -132,12 +145,6 @@ ref = "cutoff-blade-p1"
 id = "feelers"
 name = "Feeler gauges"
 ref = "feeler-gauges"
-
-[[tools]]
-id = "plugs"
-name = "Class ZZ pins: .4375 plus (GO) and .4380 plus (NO-GO), MHA-PD-19's"
-ref = "zz-pins-4375-4382"
-status = "to_order"
 
 [[tools]]
 id = "pins"
@@ -210,10 +217,15 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "MHA-PD-19, the plate this bush is pressed into, made first: gauge its knob-bush hole with PD-19's ZZ pins (their readings on their tags). The GO pin enters it from face A; the NO-GO does not. A hole passing this is Ø.4375–.4382, so the {{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}} press diameter is a {{cad.step_interference_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}} press in it. A hole failing it goes back to MHA-PD-19's traveler; do not turn the press diameter to it."
-inspection = "{{cad.step_mate}} Ø.4375–.4382, GO/NO-GO ZZ pins."
-gauge_checks = [{ gauge = "zz-pins-4375-4382", band_mm = [11.1125, 11.13028] }]
-feed = "hand"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "The pilot, for MHA-PD-19's hole (the plate at the lathe, its hole wiped clean). Turn the first {{process.pilot_length_in:.2dot}} of the end to Ø{{process.pilot_rough_dia_in:.3dot}}, cutting oil, then in passes of .0005 a side or less: after each, spindle stopped and the pilot wiped, offer the plate's hole to it, face A toward the chuck, by hand. Stop at the first pass after which the plate slides on without shake. Mike the pilot and write the reading here: PILOT = ______. The pilot stays on the bush. A pass too many (the plate shakes on it): face the pilot off, {{process.pilot_length_in:.2dot}} and no more, set DRO Z0 on the new end and turn the pilot again."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.step_dia_mm}}"
+inspection = "The plate slides onto the pilot by hand and does not shake on it; the pilot miked to .0001 and written down."
+gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "longitudinal_turning"
@@ -237,10 +249,10 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish it to the same shoulder Z in passes of .0005 a side or less, miking between them, to Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}, aiming at its middle. The AR's nose leaves its R0.4 mm in the root (Ops 70–90 take it out). Write down the cross-slide DRO X (diameter) at the finished diameter."
+instruction = "Finish it to the same shoulder Z in passes of .0005 a side or less, miking between them (behind the pilot), to PILOT plus .0005–.0016, aiming at PILOT plus .0010. The AR's nose leaves its R0.4 mm in the root (Ops 70–90 take it out). Write down the cross-slide DRO X (diameter) at the finished diameter."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
-inspection = "Press diameter Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}} along its length, micrometer (a press of {{cad.step_interference_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}} in the hole gauged in Op 40)."
+inspection = "Press diameter {{cad.step_interference_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}} over the written PILOT reading, along its length behind the pilot, micrometer."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.step_dia_band_mm}}" }]
 
 [[setups.operations]]
@@ -270,12 +282,12 @@ sizing = "other"
 instruction = "Spindle running, cutting oil: plunge until DRO X reads the Op 60 reading, no further. The blade cuts only the AR's fillet out of the root, leaving its own corner: the sheet's R{{cad.shoulder_root_r_max_in:.3dot}} MAX, which the AR's nose cannot form."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
-inspection = "Root: square to the eye, no fillet, step or groove at the press diameter's end; the press diameter by micrometer next to the root as Op 60."
+inspection = "Root: square to the eye, no fillet, step or groove at the press diameter's end; the press diameter by micrometer next to the root as Op 60 (PILOT plus .0005–.0016)."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.step_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Press diameter over {{cad.step_dia_max_in:.4dot}} in Op 60: another AR finish pass of .0005 a side or less to the same shoulder Z, checked again as Op 60, before Op 70. Over in Op 90: the same AR pass, write down its new DRO X, then repeat Ops 70–90 with that reading. Under {{cad.step_dia_min_in:.4dot}} (too light a press in that hole), or a groove at the root: part the turned length off as scrap and start again at Op 10."
+instruction = "Press diameter over PILOT plus .0016 in Op 60: another AR finish pass of .0005 a side or less to the same shoulder Z, checked again as Op 60, before Op 70. Over in Op 90: the same AR pass, write down its new DRO X, then repeat Ops 70–90 with that reading. Under PILOT plus .0005 (too light a press in that hole), or a groove at the root: part the turned length off as scrap and start again at Op 10."
 feed = "hand"
 
 [[setups.operations]]
