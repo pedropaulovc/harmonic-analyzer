@@ -47,13 +47,6 @@ description = "A R Warner AR carbide turning holder, TCMT insert, R0.4 nose (LMS
 [tools.cutoff-blade-p1]
 description = "P1 HSS T-type cutoff blade, 1/16 in wide x 1/2 in high, in the AXA No. 7 parting blade holder"
 
-# To order (owner 2026-11-21: a better parting blade): the premium P1, same
-# 1/16 in kerf, for the same No. 7 holder. Ownership and the choice's reasons:
-# cad/config/shop-equipment/tools-cutting.toml, same key (status to_order).
-# The plans keep cutoff-blade-p1 until it is on hand.
-[tools.cutoff-blade-p1-t15]
-description = "P1 T15 HSS T-type cutoff blade, 1/16 in wide x 1/2 in high (A R Warner, LittleMachineShop 1728), in the AXA No. 7 parting blade holder"
-
 # The lathe's tool post (owner 2026-11-21: LittleMachineShop 2280). Ownership:
 # cad/config/shop-equipment/tools-cutting.toml, same key, with its five
 # holders as members.

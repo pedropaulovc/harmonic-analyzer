@@ -67,7 +67,7 @@ note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-23 .020 +.002/
 [tools.form-tool-r024]
 kind = "form_tool"
 status = "to_order"
-note = "Not owned: to buy. An R.024 full-radius groover, about .048 in wide: the MHA-MG-05 R.024 rim wire groove and the MHA-MG-06 groove (mg_output_fixture plan: \"the one groover MHA-MG-05's rim groove names\"). No source chosen."
+note = "Not owned: to make. Owner ruling 2026-11-24: \"Grind it by hand from an HSS blank.\" An R.024 full-radius groover, about .048 in wide, ground on the owned bench grinder (tools.bench-grinder-duracraft-60650) and checked on the radius gauge: the MHA-MG-05 R.024 rim wire groove and the MHA-MG-06 groove (mg_output_fixture plan: \"the one groover MHA-MG-05's rim groove names\")."
 
 [tools.needle-files-swiss]
 make = "TTC"

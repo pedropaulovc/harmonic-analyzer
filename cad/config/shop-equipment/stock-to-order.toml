@@ -149,13 +149,15 @@ cite = ["OnlineMetals 1018 cold-finish round, read live 2026-11-12", "https://gi
 # mikes the bar against its own blank bands before sawing.
 [stock.4140-ht-flat-5-8x1-1-4]
 form = "flat_bar"
-material = "4140/4142 HT alloy steel, pre-hardened 28-32 HRC as supplied"
-note = "To order: 5/8 x 1-1/4 in 4140/4142 HT (pre-hardened, 28-32 HRC) flat bar, 6 in, with the mill certificate (the traveler checks grade and hardness on it). Allocation: the two MHA-SM-02 knife mounts (each 1.00 x 1.17 x .55 finished, cut from the bar with facing stock) and one trial coupon for the .4990 reamer (tools.reamer-4990). No heat treatment in the shop; both fits and the tap are cut in the supplied condition. Not owned."
+material = "4140/4142 HT alloy steel, pre-hardened 27-32 HRC as supplied"
+note = "To order: McMaster-Carr 8892K683, 5/8 x 1-1/4 in hardened 4140/4142 bar, 1 ft (the shortest length sold; 6 in are needed), $64.98, with its digital material certificate (the traveler checks grade and hardness on it). The page lists Rockwell C27; owner ruling 2026-11-24: \"Accept C27; widen the record to C27-32.\" Allocation: the two MHA-SM-02 knife mounts (each 1.00 x 1.17 x .55 finished, cut from the bar with facing stock) and one trial coupon for the .4990 reamer (tools.reamer-4990). No heat treatment in the shop; both fits and the tap are cut in the supplied condition. Not owned."
 section_mm = [31.75, 15.875]
 length_mm = 152.4
 status = "to_order"
 cite = [
   "Owner ruling 2026-11-10 (Pedro), https://github.com/pedropaulovc/harmonic-analyzer/issues/2334",
+  "Owner ruling 2026-11-24 (Pedro): \"Accept C27; widen the record to C27-32.\"",
+  "McMaster-Carr 8892K683 (read live 2026-11-23): 4140 or 4142, hot rolled and hardened, precision ground, Rockwell C27, thickness -0.002/+0.002 in, width 0/+0.005 in, ASTM A829, 1 ft $64.98, material certificate with traceable lot number: https://www.mcmaster.com/8892K683/",
   "McMaster-Carr, Made-to-Order Hardened 4140 Alloy Steel Bars (read 2026-11-22): 4140 or 4142, hardened, decarb-free, cut to the ordered thickness and width, material certificate with traceable lot number: https://www.mcmaster.com/products/made-to-order-hardened-4140-alloy-steel-bars/",
   "Key Metals, 4140 Prehard Alloy Flat (read 2026-11-22): heat treated, typical 26-32 Rockwell C, decarb free ground/milled, typical tolerances +.020/.045 in thickness, +.060/.120 in width; stock sizes 5/8 x 1 and 5/8 x 2, no 5/8 x 1-1/4: https://www.keymetals.com/alloy_steel/4140_Prehard_Flat.html",
   "Online Metals, Alloy Steel Rectangle Bar 4140 (read 2026-11-22): 0.625 in thick heat-treated (decarb free, ASTM A829) listed at 2 in wide (mp-00002577), no 1.25 in width: https://www.onlinemetals.com/en/buy/alloy-steel-rectangle-bar-4140",
