@@ -98,7 +98,7 @@ MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 # FACE_WIDTH (the whole tooth length), SHOULDER_LENGTH, TURNED_DIA and
 # BOSS_LENGTH are in dt_crank_pinion_spec. build_dt_drive_train_assembly checks the
 # installed south face, the T120 clearances and the 64T row overlap.
-# The bore at the owned .3135 reamer's size, the lower end of the spec's
+# The bore at the .3135 reamer's size (to order: reamer-3135), the lower end of the spec's
 # analysis band over the crankshaft's Ø.3125 seat; it prints that size with
 # no band (fit audit 2026-11-23, MHA-DT-10.bore).
 BORE_DIAMETER = BORE_DIA + min(BORE_DIA_BAND)
@@ -666,7 +666,7 @@ def build(adapter) -> dict[str, str]:
     force_rebuild(adapter)
     assert_boss_present(adapter, "driven crank pinion")
     # The bands are millimetres; UNIT prints them in inches.  The bore
-    # carries none: it is the owned .3135 reamer's size and MHA-DT-11's seat
+    # carries none: it is the .3135 reamer's size and MHA-DT-11's seat
     # is turned to it (fit audit 2026-11-23, MHA-DT-10.bore); the tip
     # diameter and the turned band take the title block's .XXX row (fit
     # audit 2026-11-23, MHA-DT-10.outside_dia and .turned_band).  None on the

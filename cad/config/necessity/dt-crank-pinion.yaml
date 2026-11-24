@@ -9,7 +9,7 @@ necessity:
     feature: "sheet 1, section A-A, Ø.3135 REAM THRU bore"
     kind: trace
     reason: "bore shake is pinion run-out in the 64T mesh"
-    source: "shaft_in_bushing clearance .0010-.0023 (BORE_DIAMETRAL_CLEARANCE); the owned .3135 reamer"
+    source: "shaft_in_bushing clearance .0010-.0023 (BORE_DIAMETRAL_CLEARANCE); the .3135 reamer (to order: reamer-3135)"
   - id: N-02
     feature: "sheet 1, section A-A, (Ø.125) match drill and ream for pin MHA-DT-29"
     kind: gap
