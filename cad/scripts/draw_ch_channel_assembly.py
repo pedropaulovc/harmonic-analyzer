@@ -1368,8 +1368,8 @@ def _pin_bond_note() -> str:
         "TINE OR CHEEK IT STOPS IN; NONE ON THE MIDDLE.",
         "4. AT ONCE PUSH IT BACK, COATED END LAST, FLUSH WITH BOTH FACES: "
         f"THE COMPOUND STAYS OFF THE {arm} OR {lever} BETWEEN THEM.",
-        "5. WIPE THAT FACE. CURE 24 H, COATED END DOWN, THE FAR HOLE "
-        "HOLDING THE PIN SQUARE.",
+        "5. WIPE THAT FACE.",
+        "6. CURE 24 H, COATED END DOWN, THE FAR HOLE HOLDING THE PIN SQUARE.",
     )
     wrapped: list[str] = []
     for line in lines:
