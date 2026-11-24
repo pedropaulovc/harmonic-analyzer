@@ -88,7 +88,8 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 def test_every_band_is_native_and_names_its_mate() -> None:
     assert model_toleranced_dimensions(part) == {
         ("Strap", "StrapThickness"): "strap_upper",
-        ("StrapProfile", "HoleDia"): "*deviations(STRAP_HOLE_BAND)",
+        # The hub hole prints REAM with no band (owner ruling 2026-11-24, fit
+        # audit question 2): MHA-CH-12 is turned to it.
         ("StrapProfile", "TopAbovePivot"): "*deviations(TOP_EDGE_BAND)",
         ("StrapProfile", "BottomBelowPivot"): "*deviations(BOTTOM_EDGE_BAND)",
     }
@@ -97,6 +98,11 @@ def test_every_band_is_native_and_names_its_mate() -> None:
     # The bottom edge's band is the arm's: the lower profile zone's halves.
     assert spec.BOTTOM_EDGE_BAND == rocker.BOTTOM_EDGE_BAND == pytest.approx((0.254, -0.254))
     assert notes.DIMENSION_CALLOUTS["HoleDia"] == notes.HOLE_CALLOUT
+    assert notes.HOLE_CALLOUT.splitlines() == [
+        "REAM THRU",
+        "MHA-CH-12 IS TURNED TO THIS HOLE",
+        "BOTH EDGES SHARP, NO BURR",
+    ]
     assert notes.DIMENSION_CALLOUTS["StrapThickness"] == rocker_notes.STRAP_FIT_CALLOUT
 
 

@@ -11,14 +11,14 @@ from __future__ import annotations
 
 import math
 
-from ch_rocker_hub_fit import PRESS_INTERFERENCE
+from ch_rocker_hub_fit import BOND_CLEARANCE
 from ch_rocker_hub_spec import NUMBER, ROCKER_NUMBER, STRAP_NUMBER, SUPPLY_WALL_MIN
 
 # --- Drawing contract (drawing-simplicity-policy.md `How the repository
 # implements the guidelines`: the PART owns places and bands). The land and the
 # supply bore live on the Front-plane annulus (``HubProfile``); the supply
 # length is the extrude's depth (``Hub``). The land prints its Ø.400 as a
-# reference at three places (the stated interference governs), the bore at
+# reference at three places (the stated bond clearance governs), the bore at
 # three (a drill size; the title block's DRILLED HOLES row), the supply
 # length as a single MIN limit at two.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -41,10 +41,11 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 
 # Below-text rows (SOLIDWORKS stores an ABOVE-compartment line break but never
 # prints it, draw_pd_transgear_pin._printable_above_callouts).
-# drawing-guidelines.md rule 4, matched pairs: the land is turned to the
-# measured strap hole, so its Ø is a reference nominal and the stated
-# diametral interference on the named mate is the requirement (owner ruling
-# 2026-11-21, "matched fit only"; the plug MHA-CH-13-TL-02's pattern).
+# drawing-guidelines.md rule 4, made to fit: the land is turned to slide into
+# the strap hole, so its Ø is a reference nominal and the stated diametral
+# clearance in the named mate is the requirement, printed once, here, on the
+# member made last (owner ruling 2026-11-24, fit audit question 2: "hub
+# turned until it slides in (clearance .0005-.0030); bond").
 REFERENCE_DIMENSIONS: dict[str, frozenset[str]] = {
     "HubProfile": frozenset({"LandDia"}),
 }
@@ -53,21 +54,19 @@ REFERENCE_SUFFIX = ")"
 
 
 def _inch_text(value_mm: float) -> str:
-    """``value_mm`` as four-place decimal-inch print text: ``.0004``."""
+    """``value_mm`` as four-place decimal-inch print text: ``.0005``."""
     return f"{value_mm / 25.4:.4f}".removeprefix("0")
 
 
-INTERFERENCE_TEXT = (
-    f"{_inch_text(PRESS_INTERFERENCE[0])}-{_inch_text(PRESS_INTERFERENCE[1])}"
-)
+CLEARANCE_TEXT = f"{_inch_text(BOND_CLEARANCE[0])}-{_inch_text(BOND_CLEARANCE[1])}"
 LAND_CALLOUT = (
-    "TURN TO MEASURED STRAP HOLE\n"
-    f"{INTERFERENCE_TEXT} DIAMETRAL INTERFERENCE ON {STRAP_NUMBER}"
+    f"TURN TO SLIDE INTO {STRAP_NUMBER} HOLE\n"
+    f"{CLEARANCE_TEXT} CLEARANCE, LOCTITE 638"
 )
 # rule 19: the bore and the length are supply sizes; the numbered note says
 # where the finished ones are, and each supply size links it (rule 7). Rule
 # 20: the supply wall is under the .080 target (owner ruling 2026-11-01,
-# RV-01), so the bore states it, rounded down.
+# RV-01, restated for the bond's .0735), so the bore states it, rounded down.
 SUPPLY_NOTE_NUMBER = 1
 SUPPLY_NOTE_LINK = f"SEE NOTE {SUPPLY_NOTE_NUMBER}"
 _SUPPLY_WALL_IN = math.floor(SUPPLY_WALL_MIN / 25.4 * 1000.0) / 1000.0

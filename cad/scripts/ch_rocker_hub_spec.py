@@ -1,13 +1,14 @@
 r"""Rocker hub (MHA-CH-12): the turned hub of the built-up rocker arm, as supplied.
 
 PURE DATA, no SolidWorks/COM imports. MHA-CH-06 may be built up
-(``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): this hub is pressed into
-the strap MHA-CH-13 (``ch_rocker_hub_fit``), then the joined part's bore is
-drilled F and its hub length faced to the MHA-CH-06 print. So this detail is
-the hub as SUPPLIED to the joint: the land at its finished Ø, turned to the
-measured strap hole for the press, the bore and the length left with stock
-(drawing-guidelines.md rule 19: a supply size, finished later). The finished
-bore and length print on MHA-CH-06 only; this sheet never repeats them.
+(``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): this hub slides into the
+strap MHA-CH-13 and is bonded there with LOCTITE 638 (``ch_rocker_hub_fit``),
+then the joined part's bore is drilled F and its hub length faced to the
+MHA-CH-06 print. So this detail is the hub as SUPPLIED to the joint: the land
+at its finished Ø, turned to slide into the strap hole, the bore and the
+length left with stock (drawing-guidelines.md rule 19: a supply size,
+finished later). The finished bore and length print on MHA-CH-06 only; this
+sheet never repeats them.
 
 Every size derives from ``ch_rocker_arm_spec``; the two stock allowances below
 are the only new numbers.
@@ -37,7 +38,7 @@ ROCKER_NUMBER = "MHA-CH-06"
 # #290: the registry row's drawing_unit (in) is this sheet's unit.
 UNIT = drawing_unit("parts/ch-rocker-hub", _config.parts("ch-rocker-hub"))
 
-# The land: the finished hub O.D., pressed in the strap's reamed hole.
+# The land: the finished hub O.D., bonded in the strap's reamed hole.
 LAND_DIA = HUB_DIA
 
 # Supply bore: a letter-D drill under the joined part's F pivot bore (owner
@@ -50,10 +51,11 @@ if not SUPPLY_BORE_DIA + DRILLED_PLUS < PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]:
     raise AssertionError("the largest supply bore leaves no stock for the F drill")
 
 # Supply length: the finished length's top limit plus FACE_STOCK at each end.
-# Each end is faced after the press, so this stock also takes up how far off
-# centre the press leaves the hub in the strap (.020 per end: a clean-up cut
-# plus that offset). Printed as a single MIN limit (swTolMIN prints the
-# nominal, so the nominal is the limit), rounded UP on its two-place inch grid.
+# Each end is faced after the bond has cured, so this stock also takes up how
+# far off centre the bond leaves the hub in the strap (.020 per end: a
+# clean-up cut plus that offset). Printed as a single MIN limit (swTolMIN
+# prints the nominal, so the nominal is the limit), rounded UP on its
+# two-place inch grid.
 FACE_STOCK = 0.508  # .020
 SUPPLY_LENGTH_PLACES = 2
 _STEP = 25.4 * 10.0**-SUPPLY_LENGTH_PLACES
@@ -64,8 +66,8 @@ SUPPLY_LENGTH_MIN = round(
 )  # 8.128, .32
 SUPPLY_LENGTH_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints ".32 MIN"
 
-# Wall between the smallest land (the smallest hole plus the least
-# interference) and the largest supply bore: .0752 against the .060 floor
+# Wall between the smallest land (the smallest hole less the greatest bond
+# clearance) and the largest supply bore: .0735 against the .060 floor
 # (under the .080 target; the joined part's F drill thins it).
 SUPPLY_WALL_MIN = (LAND_DIA + LAND_RANGE[0] - (SUPPLY_BORE_DIA + DRILLED_PLUS)) / 2.0
 if SUPPLY_WALL_MIN < WALL_FLOOR_MM:
