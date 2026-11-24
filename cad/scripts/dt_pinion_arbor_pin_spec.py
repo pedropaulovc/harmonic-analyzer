@@ -33,7 +33,7 @@ PIN_HOLE_DIA_MAX = _pin.HOLE_MAX
 # The hole's function is the pin it takes: the stock MHA-DT-VN-63 (McMaster
 # 98296A027), the third of its BOM line.  Both sheets that drill for it,
 # MHA-DT-22 and the MHA-DT-33 collar, print this one callout.  Fit audit F15
-# (owner ruling 2026-11-24, its recommended form "1/16 DRILL THRU;
+# (necessity entries on both sheets, kind bought_seat; its recommended form "1/16 DRILL THRU;
 # MHA-DT-VN-63 MUST DRIVE, NOT ENTER BY HAND"): the pin itself is the gauge,
 # so no gauge pin is needed.  The +.0025/.0000 band stays: it is ASME
 # B18.8.2's recommended hole for the pin (necessity register, bought_seat).

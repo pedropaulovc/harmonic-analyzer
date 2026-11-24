@@ -1138,7 +1138,10 @@ def test_block_feature_bands_are_the_printed_ones() -> None:
     assert features["south_face"]["depth"] == pytest.approx([_in(0.43), _in(0.45)])
     adjuster = features["adjuster"]
     assert adjuster["thread"] == "1/4-28 UNF-2B" and adjuster["thru"] is True
-    assert adjuster["height"] == pytest.approx([_in(1.49), _in(1.51)])
+    # The axis height is a reference; note 2's match is its requirement
+    # (machinist review r1, farm run 20261124T110807008Z).
+    assert "height" not in adjuster
+    assert adjuster["height_ref"] == pytest.approx(_in(1.50))
     assert adjuster["height_match"] == pytest.approx([_in(-0.003), _in(0.003)])
     assert adjuster["lateral"] == pytest.approx([_in(0.33), _in(0.35)])
     assert adjuster["csk_dia"] == pytest.approx([_in(0.252), _in(0.262)], abs=1e-3)

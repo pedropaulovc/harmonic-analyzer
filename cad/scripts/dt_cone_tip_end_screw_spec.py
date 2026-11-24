@@ -163,16 +163,20 @@ def inch_text(value_mm: float, places: int) -> str:
 # prints its drill), rules 12 and 26: the drill and the depth (PR 2 r7
 # machinist review: the depth belongs in the callout; the depth the
 # model's at its drawing places).  Then rule 7's two lines of words: the
-# mate by drawing number, turned to this hole (FitLaneDT 2026-11-24: "RUNS
-# FREE" stated a fit the hole does not set; the reamed MHA-DT-38 bushing
-# sizes the pivot) and the wall shortfall as a plain fact in rule 20's own
-# form (RV-01; the hole's one wall is to the thread root).
+# flag to note END_HOLE_NOTE, which names the mate by drawing number, turned
+# to this hole (drawing-guidelines rule 4, form 2: "RUNS FREE" stated a fit
+# the hole does not set; the reamed MHA-DT-38 bushing sizes the pivot), and the wall
+# shortfall as a plain fact in rule 20's own form (RV-01; the hole's one
+# wall is to the thread root).  The fit is a flag note because on one row,
+# 38 characters at ~2.48 mm, it is 94 mm wide, past the 72 mm between the
+# frame and the head's outline (machinist review r1, farm run
+# 20261124T110807008Z: three rows of words broke rule 7).
+END_HOLE_NOTE = 3
 END_HOLE_DEPTH_TEXT = inch_text(END_HOLE_DEPTH, END_HOLE_DEPTH_PLACES)
 END_HOLE_CALLOUT = "\n".join(
     (
         f"{END_HOLE_DRILL} DRILL <HOLE-DEPTH> {END_HOLE_DEPTH_TEXT}",
-        f"{PIVOT_NUMBER} PIVOT IS",
-        "TURNED TO THIS HOLE",
+        f"SEE NOTE {END_HOLE_NOTE}",
         f"WALL {inch_text(END_HOLE_WALL_PRINTED_IN * MM_PER_IN, 3)} MIN",
     )
 )
@@ -183,6 +187,7 @@ STOCK_NOTE = "\n".join(
         f"1. MAKE FROM McMASTER-CARR {SKU}, {THREAD} X 3/4 SLOTTED FILLISTER",
         "   HEAD SCREW; ADD THE DRILLED HOLE ONLY.",
         "2. UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE.",
+        f"{END_HOLE_NOTE}. {PIVOT_NUMBER} PIVOT IS TURNED TO THE DRILLED HOLE.",
     )
 )
 

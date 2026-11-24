@@ -27,8 +27,12 @@ SPAN_WITNESS_LEN = 4.0
 # witness still starts ~2.1 past the land and ends ~1.8 short of the rim.
 BACK_STUB_DIA_FROM_HEAD_REAR = 231.7
 BACK_STUB_DIA_Z = spec.HEAD_REAR_Z + BACK_STUB_DIA_FROM_HEAD_REAR
-# One size for both spans outside the journals; note 2 names the two.
-BACK_STUB_DIA_PREFIX = "2X <MOD-DIAM>"
+# One size for both spans outside the journals; note 2 names the two.  The
+# size is a REFERENCE, "2X (Ø.3125)": the spans are made to fit the MHA-DT-33
+# collar's drilled bore, note 2 the acceptance (machinist review r1, farm run
+# 20261124T110807008Z; drawing-guidelines rule 4, form 2).
+BACK_STUB_DIA_PREFIX = "2X (<MOD-DIAM>"
+BACK_STUB_DIA_SUFFIX = ")"
 # The back bond land's witness starts 2.28 past the relief's back shoulder,
 # where its block, hung left of its line under the shaft, sits between the
 # 6.80 and 8.25 station witnesses (draw_dt_pinion_arbor).
@@ -50,7 +54,7 @@ JOURNAL_DIA_PREFIX = "2X (<MOD-DIAM>"
 JOURNAL_DIA_SUFFIX = ")"
 # Each bond land's size is a REFERENCE too, "(Ø.3125)": the lands are turned
 # last to the 5/16 drilled MHA-DT-01 bore (owner ruling 2026-11-24, fit audit
-# question 13; made to fit: delegated ruling 2026-11-24 (FitLaneDT)); note 3
+# question 13; made to fit: drawing-guidelines rule 4, form 2); note 3
 # prints the acceptance.
 BOND_LAND_DIA_PREFIX = "(<MOD-DIAM>"
 BOND_LAND_DIA_SUFFIX = ")"
@@ -72,8 +76,7 @@ SPAN_REFERENCES = (
     ),
     *_NEW_SPANS,
 )
-# Four places, as the bond lands' .3125: the spans' -.0004/-.0038 band prints
-# exactly.
+# Four places, as the bond lands' (.3125).
 _SPAN_PLACES = spec.DRAWING_PRECISION["BondZoneReference"]["BondZoneDia"]
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

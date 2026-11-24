@@ -198,7 +198,7 @@ requirement(
         "depth_nominal": (END_HOLE_DEPTH, ("END_HOLE_DEPTH",)),
         "process": ("drill", ("END_HOLE_CALLOUT",)),
         "drill": (END_HOLE_DRILL, ("END_HOLE_CALLOUT",)),
-        "mate": (PIVOT_NUMBER, ("END_HOLE_CALLOUT",)),
+        "mate": (PIVOT_NUMBER, ("END_HOLE_CALLOUT", "STOCK_NOTE")),
         "wall_min": (
             END_HOLE_WALL_PRINTED_IN * 25.4,
             ("END_HOLE_WALL_PRINTED_IN", "END_HOLE_CALLOUT"),

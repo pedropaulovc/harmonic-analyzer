@@ -132,10 +132,15 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     assert spec.NECK_LEN == pytest.approx(spec.NECK_END_Z - spec.HEAD_REAR_Z)
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is drawing.CROSS_HOLE_CALLOUT
-    # Fit audit F14 (owner ruling 2026-11-24, recommended form): the reamed
+    # Fit audit F14 (drawing-guidelines rule 4, form 3, recommended form): the reamed
     # hole prints no band; the rod entering by hand is its acceptance and
-    # the compound is named (rule 4 v2), in two rows (rule 7).
-    assert callout == "REAM THRU; MHA-DT-15 ROD ENTERS\nBY HAND; BOND LOCTITE 638"
+    # the compound is named (rule 4 v2), in two rows (rule 7).  Rule 23: the
+    # bond's diametral clearance prints too (machinist review r1, farm run
+    # 20261124T110807008Z, blocker).
+    assert callout == (
+        "REAM THRU; MHA-DT-15 ROD ENTERS BY HAND;\n"
+        "BOND LOCTITE 638, CLEARANCE .0010-.0035"
+    )
     # Machinist review r1 of #1685 (blocker): the band names its mate, and
     # every mate a callout names is the registry's part number.
     import _config
@@ -172,8 +177,12 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
     assert loosest == pytest.approx(0.0889)  # .0035 in
     assert loosest <= spec.RETAINING_COMPOUND_MAX_GAP_MM
     assert "INTO MHA-DT-22 HEAD WITH LOCTITE 638" in crossrod.ASSEMBLY_STEP
-    for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP", "CLEARANCE"):
+    for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP"):
         assert retired not in drawing.CROSS_HOLE_CALLOUT
+    # The printed clearance is the analysis pair, at least .001 wide and
+    # inside the compound's gap.
+    assert drawing.CROSSROD_CLEARANCE == (tightest, loosest)
+    assert loosest - tightest >= 0.0254
     for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP"):
         assert retired not in spec.DRAWING_NOTES
 
@@ -187,7 +196,6 @@ def test_only_the_two_journal_lands_carry_the_finish_and_no_band() -> None:
     assert geometry.BOND_LAND_DIA_BAND == (-0.01016, -0.1016)
     assert spec.SHAFT_DIA_BAND == (-0.01016, -0.09652)
     assert model_toleranced_dimensions(part) == {
-        ("BackStubReference", "BackStubDia"): "*deviations(SHAFT_DIA_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
     }
     lands = {
@@ -527,7 +535,7 @@ def test_back_bond_land_carries_its_own_diameter_under_the_shaft() -> None:
     # LOCTITE grade through note 3; farm run 20261117T130901535Z r2 (rule
     # 23): with the clearance.  Owner ruling 2026-11-24, fit audit question
     # 13: the lands are turned to the drilled drum bore, size REF, so note 3
-    # prints the made-to-fit acceptance (delegated ruling 2026-11-24).
+    # prints the made-to-fit acceptance (drawing-guidelines rule 4, form 2).
     assert drawing.DIMENSION_CALLOUTS["BackBondDia"] == drawing.BOND_CALLOUT
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] == drawing.BOND_CALLOUT
     assert drawing.BOND_CALLOUT == "SEE NOTE 3"
@@ -849,26 +857,27 @@ def test_spans_outside_the_journals_share_one_2x_diameter_and_mate() -> None:
     }
     stub = stations["BackStubReference"]
     assert back_land_end < stub and stub + lengths["BackStubReference"] < rim
-    assert sheet.BACK_STUB_DIA_PREFIX == "2X <MOD-DIAM>"
+    assert (sheet.BACK_STUB_DIA_PREFIX, sheet.BACK_STUB_DIA_SUFFIX) == ("2X (<MOD-DIAM>", ")")
     assert drawing.DIMENSION_CALLOUTS["BackStubDia"] == "SEE NOTE 2"
     assert sheet.DRAWING_PRECISION_BY_NAME["BackStubDia"] == 4
     assert not any("CollarSpan" in name for name in drawing.PRINCIPAL_KEEP)
     note_2 = drawing.SHEET_NOTES.split("\n2. ")[1].split("\n")[0]
     # #1038 r9 machinist review (rules 1 and 26): a leadered tag, not the
-    # note's words, reaches the second span (SPAN_TAGS).  One row: the mate
-    # by number (rule 7), so note 3 fits in the four rows.
-    assert note_2 == "SPANS (2X): SLIDING FIT IN MHA-DT-33 (CLEARANCE .0004-.0078)."
-    # The clearance from both parts' printed limits; its minimum is the
-    # collar spec's own slide-on clearance.
+    # note's words, reaches the second span (SPAN_TAGS).  Machinist review r1
+    # (farm run 20261124T110807008Z): the spans are made to fit MHA-DT-33
+    # (drawing-guidelines rule 4, form 2), size REF, one acceptance and
+    # no printed clearance beside it.
+    assert note_2 == "SPANS (2X): TURN TO MHA-DT-33 COLLAR BORE: SLIDES ON BY HAND."
+    assert "CLEARANCE" not in note_2
+    # The analysis clearance's minimum is the collar spec's own slide-on
+    # clearance.
     assert drawing.COLLAR_CLEARANCE[0] == pytest.approx(collar.SLIDE_CLEARANCE_MIN)
-    # The title block's .XX or .XXX on the back stub would stop the collar
-    # and the drum passing over it, so it keeps the band (L2 not met).
+    # The traveler's aim (the analysis band's top) stays under the smaller of
+    # the collar's and the drum's drilled bores, so both pass the spans.
     smallest_bore = min(
         collar.BORE + collar.BORE_BAND[1], drum.BORE_DIA + drum.ARBOR_BORE_BAND[1]
     )
     assert spec.SHAFT_DIA + spec.SHAFT_DIA_BAND[0] < smallest_bore
-    for title_block_max_in in (0.31 + 0.01, 0.312 + 0.005):
-        assert title_block_max_in * 25.4 > smallest_bore
     # Placement: the stub's line inside the back land's crown end, and its
     # 2X block, which SolidWorks runs right of its line (rounds 4-6), clear
     # of every known line.
@@ -1435,7 +1444,7 @@ def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> 
 
 def test_collar_pin_hole_callout_makes_the_pin_its_own_gauge() -> None:
     """R5 machinist review (blocker, rule 4) read '.0625 +.0025/.0000' as a
-    clearance fit on a 1/16 pin.  Fit audit F15 (owner ruling 2026-11-24):
+    clearance fit on a 1/16 pin.  Fit audit F15 (necessity N-02, kind bought_seat):
     the pin must drive, never enter by hand, so the callout says so and the
     pin is the gauge (no gauge pin, no printed interference)."""
     assert drawing.DIMENSION_CALLOUTS["PinHoleDia"].splitlines() == [

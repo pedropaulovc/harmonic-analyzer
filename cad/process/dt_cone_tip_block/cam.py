@@ -867,7 +867,13 @@ def context(
     _agree(plan, "saw_dia_min_mm", p["saw_dia_mm"] - dia_tol)
     _agree(plan, "saw_dia_max_mm", p["saw_dia_mm"] + dia_tol)
     bore_r = adj["dia"][0] / 2
-    for h in adj["height"]:
+    # The adjuster's axis prints (1.50) REF and is made to the measured
+    # MHA-DT-05 journal height (note 2, machinist review r1, farm run
+    # 20261124T110807008Z); the floor is still proved over the title
+    # block's .XX band (±.01 in) around that REF, the envelope the matched
+    # height was proved in before it went REF.
+    xx_band = 0.01 * 25.4
+    for h in (adj["height_ref"] - xx_band, adj["height_ref"] + xx_band):
         for top in f["top_face"]["height"]:
             if not (
                 h - bore_r < top - slit_depth - tip_tir - dia_tol / 2

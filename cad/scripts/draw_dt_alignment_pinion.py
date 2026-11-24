@@ -37,27 +37,21 @@ from _drawing_common import (
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_finish import add_surface_finish
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note, property_link
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
-from _gear_drawing_entities import visible_circle_edge
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_alignment_pinion_spec import (
     ARBOR_BORE_CALLOUT,
-    BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     OUTSIDE_DIA,
-    OUTSIDE_DIA_CALLOUT,
-    SURFACE_FINISHES,
     TEETH,
 )
 
@@ -111,10 +105,9 @@ FRONT_KEEP = {
 }
 # Diameters on the side view beside the length (rule 11): the tip diameter's
 # dimension line stands just right of the back face with its text below the
-# part, clear of the face-width baseline under the view.  The callout reads
-# left-to-right off its shelf from the dimension line, so the line stands close
-# enough that the mate number ends well inside the border (machinist review
-# r4: at +45 mm it printed cut off as "MHA-DT-0").
+# part, clear of the face-width baseline under the view.  The tip band prints
+# no mate: the gear data block names the cylinder gears once (rule 4;
+# machinist review r1, farm run 20261124T110807008Z, 3 of 3 runs).
 RIGHT_KEEP = {
     "FaceWidth": (RIGHT_CENTER[0], 0.122),
     "OutsideDia": (_SIDE_RIGHT_X + 0.015, 0.118),
@@ -122,7 +115,6 @@ RIGHT_KEEP = {
 DIMENSION_CALLOUTS = {
     "ArborBoreDia": ARBOR_BORE_CALLOUT,
     "FaceWidth": "TEETH FULL LENGTH",
-    "OutsideDia": OUTSIDE_DIA_CALLOUT,
 }
 
 
@@ -419,22 +411,6 @@ def build(adapter: Any) -> dict[str, str]:
     _prefix_diameter_symbol(adapter, right_annotations, "OutsideDia")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to drum bore")
-    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
-
-    add_surface_finish(
-        adapter,
-        front,
-        symbol_xy=(FRONT_CENTER[0] + 0.045, FRONT_CENTER[1] - 0.030),
-        control=surface_finish_by_key(SURFACE_FINISHES, "drum_bore"),
-        label="drum bore finish",
-        entity=bore_edge,
-        leader_attach_xy=(
-            FRONT_CENTER[0],
-            FRONT_CENTER[1] - BORE_DIA * FRONT_SCALE[0] / FRONT_SCALE[1] / 2000.0,
-        ),
-        char_height=0.0025,
-    )
-
     add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025)
     add_property_linked_note(
         adapter,

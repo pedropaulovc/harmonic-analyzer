@@ -2,13 +2,17 @@
 # block stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the
 # reason lives here, not on the sheet). Read by the machinist review only.
 # The crossrod hole is reamed with the owned .2510 reamer and prints no band;
-# the MHA-DT-15 rod entering by hand is its acceptance (fit audit F14, owner
-# ruling 2026-11-24). A 1/4 drill can cut under the largest 1/4 rod (.250),
+# the MHA-DT-15 rod entering by hand is its acceptance (drawing-guidelines
+# rule 4, form 3; fit audit F14). A 1/4 drill can cut under the largest 1/4 rod (.250),
 # so the rod may refuse it; an F drill (.257-.261) leaves up to .013 of gap on
-# the smallest rod (.248), past Loctite 638's 0.25 mm (.0098) gap limit.
+# the smallest rod (.248), past Loctite 638's 0.25 mm (.0098) gap limit. The
+# two Ø5/16 spans outside the journals carry no band: they are made to fit
+# the MHA-DT-33 collar's drilled bore (note 2; machinist review r1, farm run
+# 20261124T110807008Z; drawing-guidelines rule 4, form 2), so the
+# former N-03 is gone.
 necessity:
   - id: N-01
-    feature: "Ø.2510 REAM THRU crossrod hole (MHA-DT-15 ROD ENTERS BY HAND)"
+    feature: "Ø.2510 REAM THRU crossrod hole (MHA-DT-15 ROD ENTERS BY HAND; BOND LOCTITE 638, CLEARANCE .0010-.0035)"
     kind: gap
     reason: "F drill's gap exceeds Loctite 638's limit; 1/4 refuses rod"
     source: "fit audit F14; dt_pinion_arbor_geometry.CROSSROD_MAX_CLEARANCE"
@@ -17,8 +21,3 @@ necessity:
     kind: bought_seat
     reason: "B18.8.2's recommended hole for the MHA-DT-VN-63 spring pin"
     source: "ASME B18.8.2 (.062-.065 for 1/16); fit audit F15 (keep the band, the pin is the gauge)"
-  - id: N-03
-    feature: "Ø5/16 -.0004/-.0038 spans (collar span, back stub)"
-    kind: gap
-    reason: "past .3121 the MHA-DT-33 collar no longer slides on"
-    source: "fit audit F12 (keep as is); dt_pinion_arbor_collar_spec.SLIDE_CLEARANCE_MIN"

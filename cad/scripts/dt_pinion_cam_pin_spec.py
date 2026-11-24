@@ -55,8 +55,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CapProfile": {"CapR"},
 }
 # Decimal places ARE the tolerance statement (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the drill
-# rod's +/-.0005 band needs four, and the length and crown radius take the
-# .XX band.
+# rod's REF size prints its catalogue .1563 at four, and the length and crown
+# radius take the .XX band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {"PinDia": 4, "Depth": 2},
     "CapProfile": {"CapR": 2},
@@ -69,14 +69,23 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-# The stock is stated once, in the title block's Material cell (the registry
-# row): repeating it on the diameter callout was over-specification (machinist
-# review of 7f7fc1717), and a callout that names no bar cannot disagree with
-# the title block (Codex P2 on #814).  The bonded slip fit above assumes drill rod.
+# The shank is the drill rod as bought and never cut, so it prints the stock,
+# not limits of size (drawing-guidelines.md rule 4: "a diameter that is
+# bought to size and never cut prints the stock"): the size REF, "(Ø.1563)",
+# and "5/32 DRILL ROD, AS SUPPLIED" under it, with the bonded fit by its
+# standard name and LOCTITE grade.  Machinist review r1 (farm run
+# 20261124T110807008Z, over-specification): the ±.0005 banded a bought
+# diameter.  Fit audit F22's "keep" carries no owner ruling, so the stock
+# form stands (drawing-guidelines rule 4, form 4's bought-to-size clause).  PIN_DIA_BAND stays
+# the supplier's catalogue band, the input to BOND_CLEARANCE_MIN/MAX; it
+# prints nowhere.  The fraction is the registry row's (its Material cell).
 STOCK = _config.parts("dt-pinion-cam-pin")["material"]
-if "drill rod" not in STOCK.lower():
-    raise AssertionError(f"the bonded slip fit assumes drill rod, not {STOCK!r}")
-PIN_DIA_CALLOUT = f"SLIP FIT IN {SEAT_NUMBER} FOLLOWER SEAT"
+if "drill rod, 5/32 in" not in STOCK.lower():
+    raise AssertionError(f"the bonded slip fit assumes 5/32 drill rod, not {STOCK!r}")
+PIN_DIA_CALLOUT = (
+    "5/32 DRILL ROD, AS SUPPLIED; BONDED FIT IN\n"
+    f"{SEAT_NUMBER} FOLLOWER SEAT, {RETAINING_COMPOUND}"
+)
 DEPTH_CALLOUT = "SEATED FLAT END\nTO CROWN ROOT"
 CAP_RADIUS_CALLOUT = "OUTER CROWN"
 

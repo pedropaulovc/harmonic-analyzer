@@ -548,8 +548,8 @@ def build(adapter) -> dict[str, str]:
         0.01 * V_ROD,
     )
 
-    # Manufacturing drawing support: nothing carries a band (the reamed bore
-    # prints the .2510 reamer's size, fit audit F23); everything rides the
+    # Manufacturing drawing support: nothing carries a band (the bore is F
+    # DRILL, .257, fit audit F23: drawing-guidelines rule 4, form 1); everything rides the
     # title block at the part-authored decimal places.
     set_dimension_prefix(adapter, "CapProfile", "CapR", "SR")
     clear_dimensions_for_drawing(adapter)

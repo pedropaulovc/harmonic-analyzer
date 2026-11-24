@@ -159,8 +159,12 @@ FRONT_KEEP = {
     ),
     "BoreHeight": (FRONT_CENTER[0] - 0.046, _front_y(BORE_HEIGHT / 2.0)),
     # Right of the elevation, far enough out that the three-line callout's
-    # widest row ("ARBOR MHA-DT-13", ~42 mm) clears the tapered flank.
-    "BoreDia": (FRONT_CENTER[0] + 0.050, _front_y(BORE_HEIGHT) - 0.010),
+    # widest row ("ARBOR MHA-DT-13 ENTERS BY HAND,", ~81 mm, centred on this
+    # x) clears the tapered flank.  Machinist review r1 (farm run
+    # 20261124T110807008Z, measured on r1's crop 560-720 x 660-725): at +0.050
+    # the row started 13.1 mm west of the flank's outer ink and the flank
+    # struck ARBOR and CLAMPED; +0.067 leaves 3.9 mm of air.
+    "BoreDia": (FRONT_CENTER[0] + 0.067, _front_y(BORE_HEIGHT) - 0.010),
     "BoreLateral": BORE_LATERAL_XY,
     # Crown: the model's radius (_show_crown_radius), up and right of the dome.
     "DomeRadius": (0.178, _front_y(BORE_HEIGHT + TOP_RADIUS) + 0.008),
@@ -336,7 +340,6 @@ _SET_SCREW_STATION = STRAP_INNER_Z - SET_SCREW_Z
 _TAP_DRILL_DIA = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC)
 _TOP_KEEP = ((_SELF, "TOP_KEEP"),)
 _FRONT_KEEP = ((_SELF, "FRONT_KEEP"),)
-_BORE_FINISH = surface_finish_by_key(SURFACE_FINISHES, "arbor_bore")
 _SEAT_FINISH = surface_finish_by_key(SURFACE_FINISHES, "foot_seat")
 
 
@@ -544,14 +547,14 @@ requirement(
 # The drilled arbor bore through the strap: Ø.377 V DRILL THRU, ARBOR
 # MHA-DT-13 ENTERS BY HAND, CLAMPED BY MHA-SH-VN-54 (fit audit F01, whose
 # MHA-DT-VN-64 is that screw's prior number; FRONT_KEEP "BoreDia",
-# DIMENSION_CALLOUTS), Ra 125; its axis 1.75 off the
-# seat (FRONT_KEEP "BoreHeight") and .47 off the west side (BoreLateral,
-# under the elevation).
+# DIMENSION_CALLOUTS), no roughness symbol (a clamp seat, rule 6); its axis
+# 1.75 off the seat (FRONT_KEEP "BoreHeight") and .47 off the west side
+# (BoreLateral, under the elevation).
 requirement(
     "arbor_bore",
     kind="hole",
-    faces=(_BORE_FINISH.face,),
-    requirements=("dia", "thru", "process", "mates", "finish_ra", "height", "lateral"),
+    faces=(CylinderFace(BORE_DIA, contains_y_mm=BORE_HEIGHT),),
+    requirements=("dia", "thru", "process", "mates", "height", "lateral"),
     fields={
         "at": ([0.0, BORE_HEIGHT, STRAP_INNER_Z], ("BORE_HEIGHT", "STRAP_INNER_Z")),
         "axis": ((0.0, 0.0, -1.0), ("__frame__", "STRAP_T")),
@@ -565,7 +568,6 @@ requirement(
         "drill": ("V", ((_SELF, "DIMENSION_CALLOUTS"),)),
         "callout": (DIMENSION_CALLOUTS["BoreDia"], ((_SELF, "DIMENSION_CALLOUTS"),)),
         "mates": (ARBOR_NUMBER, ((_SELF, "ARBOR_NUMBER"),)),
-        "finish_ra": (_BORE_FINISH.roughness_um, ("SURFACE_FINISHES",)),
         "height": (
             limits(BORE_HEIGHT, _P["BoreHeight"], unit=UNIT),
             ("BORE_HEIGHT", "UNIT", *_FRONT_KEEP),
@@ -581,7 +583,6 @@ requirement(
     },
     precision={
         "dia": _P["BoreDia"],
-        "finish_ra": 1,
         "height": _P["BoreHeight"],
         "lateral": _P["BoreLateral"],
     },
@@ -767,10 +768,10 @@ def _set_reference_precision(display: Any, label: str) -> None:
 
 
 @_telemetry.traced("drawing.arbor.front_entity_scan")
-def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
-    """Return the foot-seat, arbor-bore, crown and east-flank entities."""
+def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
+    """Return the foot-seat, crown and east-flank entities."""
     foot_candidates: list[tuple[float, Any]] = []
-    bore_candidates: list[tuple[float, float, Any]] = []
+    circle_candidates: list[tuple[float, float, Any]] = []
     flank_ends = (
         (FOOT_WIDTH / 2.0, FOOT_HEIGHT),
         (TAPER_TANGENT_X, TAPER_TANGENT_Y),
@@ -787,7 +788,7 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
             curve = _early_bound(curve, "ICurve")
             if curve.IsCircle():
                 params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
-                bore_candidates.append((params[6], params[1], edge))
+                circle_candidates.append((params[6], params[1], edge))
         start = edge.GetStartVertex()
         end = edge.GetEndVertex()
         if start is None or end is None:
@@ -808,25 +809,17 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
     foot_span, foot_edge = max(foot_candidates, key=lambda item: item[0])
     if foot_span < FOOT_WIDTH - 0.1:
         raise RuntimeError(f"foot-seat edge span is only {foot_span:.3f} mm")
-    if not bore_candidates:
+    if not circle_candidates:
         raise RuntimeError("front view has no circular model edges")
-    radius, height, bore_edge = min(
-        bore_candidates,
-        key=lambda item: abs(item[0] - BORE_DIA / 2.0) + abs(item[1] - BORE_HEIGHT),
-    )
-    if abs(radius - BORE_DIA / 2.0) > 0.01 or abs(height - BORE_HEIGHT) > 0.01:
-        raise RuntimeError(
-            f"no circular edge matches arbor bore at {BORE_HEIGHT:.3f} mm"
-        )
     dome_radius, dome_height, dome_edge = min(
-        bore_candidates,
+        circle_candidates,
         key=lambda item: abs(item[0] - TOP_RADIUS) + abs(item[1] - BORE_HEIGHT),
     )
     if abs(dome_radius - TOP_RADIUS) > 0.01 or abs(dome_height - BORE_HEIGHT) > 0.01:
         raise RuntimeError("front view has no circular dome edge")
     if not flank_edges:
         raise RuntimeError("front view has no east flank edge")
-    return foot_edge, bore_edge, dome_edge, flank_edges[0]
+    return foot_edge, dome_edge, flank_edges[0]
 
 
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
@@ -1229,25 +1222,7 @@ def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
-    foot_entity, bore_entity, dome_entity, flank_entity = _front_entities(
-        adapter, front
-    )
-    # Attach on the bore's 3 o'clock point and keep the symbol above that
-    # height: left to itself the leader reached into the circle and crossed
-    # the diameter dimension's line, which leaves the bore at 315 deg.
-    add_surface_finish(
-        adapter,
-        front,
-        symbol_xy=(FRONT_CENTER[0] + 0.037, _front_y(BORE_HEIGHT) + 0.010),
-        control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
-        label="arbor bore finish",
-        char_height=0.0025,
-        entity=bore_entity,
-        leader_attach_xy=(
-            FRONT_CENTER[0] + BORE_DIA / 2.0 * _S,
-            _front_y(BORE_HEIGHT),
-        ),
-    )
+    foot_entity, dome_entity, flank_entity = _front_entities(adapter, front)
     # Under the seat's east half, between the bore lateral's witness at the
     # centreline and the foot-height lane east of the elevation: the leader
     # drops from the seat's right quarter and the roughness text hangs right

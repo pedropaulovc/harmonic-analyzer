@@ -5,9 +5,9 @@
 # The two strap-pin holes, match-drilled with the MHA-DT-14 straps at
 # assembly, keep their +.0025/.0000 band: it is ASME B18.8.2's recommended
 # hole for the 1/16 slotted spring pin, which grips by compressing into it.
-# The pin itself is the gauge: it must drive (owner ruling 2026-11-24, fit
-# audit F15; delegated ruling 2026-11-24 (FitLaneDT) for the match-drilled
-# wording "MHA-DT-VN-63 MUST DRIVE").
+# The pin itself is the gauge: it must drive (necessity N-01, kind
+# bought_seat; fit audit F15; the match-drilled wording "MHA-DT-VN-63 MUST
+# DRIVE" is drawing-guidelines rule 4, form 2, and rule 7).
 necessity:
   - id: N-01
     feature: "Ø.0625 +.0025/.0000 pin holes, 2 PL (MATCH-DRILL ... MHA-DT-VN-63 MUST DRIVE)"

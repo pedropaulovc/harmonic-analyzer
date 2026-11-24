@@ -393,12 +393,14 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "indexed by pinion_arbor_spec for the cross-rod fit limits"
     ),
     ("dt_pinion_cam_pin_spec", "PIN_DIA_BAND"): (
-        "the 5/32 drill rod's supplied +/-.0005 in: indexed as the symmetric "
-        "tolerance and for the bonded slip fit's BOND_CLEARANCE_MIN/MAX"
+        "the 5/32 drill rod's supplied +/-.0005 in (no native band; the size "
+        "prints REF, AS SUPPLIED): indexed for the bonded slip fit's "
+        "BOND_CLEARANCE_MIN/MAX and the traveler's rod check"
     ),
     ("dt_pinion_lever_pin_spec", "PIN_DIA_BAND"): (
-        "the 1/16 drill rod's supplied +/-.0003 in: indexed as the symmetric "
-        "tolerance (the pin slips into the #51 match-drilled hole)"
+        "the 1/16 drill rod's supplied +/-.0003 in (no native band; the size "
+        "prints REF, AS SUPPLIED): indexed for the pin's clearance in the #51 "
+        "match-drilled hole and the traveler's rod check"
     ),
     ("dt_cone_swing_platform_pivot_spec", "PIVOT_HOLE_BAND"): (
         "the .2510 reamed pivot bore's ANALYSIS band (no native band; fit "

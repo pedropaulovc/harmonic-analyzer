@@ -83,7 +83,6 @@ from dt_pinion_arbor_spec import (
     PIN_STATION_FROM_HEAD_REAR,
     PIN_Z,
     SHAFT_DIA,
-    SHAFT_DIA_BAND,
     SHAFT_LEN,
     SURFACE_FINISHES,
     UNIT,
@@ -92,6 +91,7 @@ from dt_pinion_arbor_spec import (
 # (dt_pinion_arbor_notes), so dt_pinion_arbor_spec's other readers keep theirs.
 from dt_pinion_arbor_notes import (
     BACK_STUB_DIA_PREFIX,
+    BACK_STUB_DIA_SUFFIX,
     BOND_LAND_DIA_PREFIX,
     BOND_LAND_DIA_SUFFIX,
     DRAWING_DIMENSIONS,
@@ -1163,12 +1163,11 @@ def build(adapter) -> dict[str, str]:
     # Spelled out per span: _drawing_contract reads each call's literal names.
     # The two MHA-DT-01 bond lands carry no band: they are made to fit the
     # drilled drum bore (owner ruling 2026-11-24, fit audit question 13;
-    # delegated ruling 2026-11-24 (FitLaneDT)), REF sizes below.  The
-    # crossrod hole prints the .2510 reamer's size and no band (fit audit
-    # F14).
-    set_dimension_bilateral_tolerance(
-        adapter, "BackStubReference", "BackStubDia", *deviations(SHAFT_DIA_BAND), display_unit=UNIT
-    )
+    # drawing-guidelines rule 4, form 2), REF sizes below.  Nor do the
+    # two spans outside the journals: they are made to fit the MHA-DT-33
+    # collar's drilled bore (machinist review r1, farm run 20261124T110807008Z;
+    # drawing-guidelines rule 4, form 2), REF size below.  The crossrod
+    # hole prints the .2510 reamer's size and no band (fit audit F14).
     set_dimension_bilateral_tolerance(
         adapter,
         "PinHoleProfile",
@@ -1199,8 +1198,12 @@ def build(adapter) -> dict[str, str]:
         adapter, "BackBondReference", "BackBondDia", BOND_LAND_DIA_SUFFIX
     )
     set_dimension_prefix(adapter, "BondReliefProfile", "BondReliefDia", "<MOD-DIAM>")
-    # One size for both spans outside the journals (dt_pinion_arbor_notes).
+    # One size for both spans outside the journals (dt_pinion_arbor_notes),
+    # a REFERENCE: they are turned to the MHA-DT-33 collar's bore (note 2).
     set_dimension_prefix(adapter, "BackStubReference", "BackStubDia", BACK_STUB_DIA_PREFIX)
+    _set_dimension_suffix(
+        adapter, "BackStubReference", "BackStubDia", BACK_STUB_DIA_SUFFIX
+    )
     set_dimension_prefix(adapter, "FrontCapProfile", "HeadCapR", "SR")
     set_dimension_prefix(adapter, "BackCapProfile", "BackCapR", "SR")
     clear_dimensions_for_drawing(adapter)

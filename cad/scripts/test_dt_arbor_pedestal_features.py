@@ -200,7 +200,7 @@ def test_pedestal_feature_bands_are_the_printed_ones() -> None:
     assert bore["thru"] is True
     assert bore["callout"] == drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert bore["mates"] == drawing.ARBOR_NUMBER
-    assert bore["finish_ra"] == SEAT_UM
+    assert "finish_ra" not in bore  # a clamp seat carries no symbol (rule 6)
     assert bore["height"] == pytest.approx([_in(1.74), _in(1.76)])
     assert bore["lateral"] == pytest.approx([_in(0.46), _in(0.48)])
 

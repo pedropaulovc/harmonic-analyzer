@@ -202,7 +202,7 @@ def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
 def test_arbor_bore_is_drilled_v_and_names_its_arbor_and_clamp() -> None:
     import _config
 
-    # Fit audit F01 (owner ruling 2026-11-24): V DRILL (.377) THRU; the arbor
+    # Fit audit F01 (drawing-guidelines rule 4, form 1): V DRILL (.377) THRU; the arbor
     # enters by hand and the apex set screw clamps it (rule 4 v2 form 1).
     assert dt_arbor_pedestal_spec.BORE_DIA == 9.5758
     assert dt_arbor_pedestal_spec.BORE_DIA_BAND == (0.1016, 0.0)
@@ -285,12 +285,11 @@ def test_pedestal_has_no_gdt_or_basic_dimensions() -> None:
     assert not hasattr(dt_arbor_pedestal_spec, "GEOMETRIC_TOLERANCES_MM")
 
 
-def test_bore_and_mating_foot_seat_carry_surface_finish_controls() -> None:
+def test_only_the_mating_foot_seat_carries_a_surface_finish_control() -> None:
     by_key = {c.key: c for c in dt_arbor_pedestal_spec.SURFACE_FINISHES}
-    assert set(by_key) == {"arbor_bore", "foot_seat"}
-    # A drilled bore (fit audit F01), static and clamped: Ra 3.2 (125 µin).
-    assert by_key["arbor_bore"].roughness_um == 3.2
-    assert by_key["arbor_bore"].face.contains_y_mm == dt_arbor_pedestal_spec.BORE_HEIGHT
+    # The drilled bore (fit audit F01) is a clamp seat: no symbol (rule 6;
+    # machinist review r1, farm run 20261124T110807008Z).
+    assert set(by_key) == {"foot_seat"}
     # The seat is the only face that MUST be cut on a part the title block
     # otherwise leaves CAST/MACHINED; it is the y=0 plane facing -Y.
     assert by_key["foot_seat"].roughness_um == 3.2

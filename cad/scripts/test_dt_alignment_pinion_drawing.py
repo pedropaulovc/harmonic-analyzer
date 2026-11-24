@@ -45,17 +45,16 @@ def test_gear_data_block_preserves_the_actual_finite_stock_profile() -> None:
     assert "X.XX" not in data
 
 
-def test_only_the_bore_carries_a_finish_symbol() -> None:
+def test_no_face_carries_a_finish_symbol() -> None:
     """Machinist review of the pc-r7 sheet: Ra 1.6 on both end faces was
     over-specified.  The ends bear on the MHA-DT-14 straps at the float's two
     stops, but no friction or end-play budget asks for a grade, so they take
-    the title-block finish.  "End faces polished" stays retired too."""
+    the title-block finish.  The bore is a bonded seat on MHA-DT-22, so its
+    Ra 63 went too (rule 6; machinist review r1, farm run
+    20261124T110807008Z).  "End faces polished" stays retired too."""
     import draw_dt_alignment_pinion as drawing
 
-    (bore,) = spec.SURFACE_FINISHES
-    assert bore.key == "drum_bore"
-    assert bore.face.diameter_mm == spec.BORE_DIA
-    assert bore.roughness_um == 1.6
+    assert spec.SURFACE_FINISHES == ()
     assert "polish" not in _config.parts("dt-alignment-pinion")["finish"].lower()
     for retired in ("_end_face_tip_arc", "BACK_END_FACE_XY", "FRONT_END_FACE_XY"):
         assert not hasattr(drawing, retired), retired
@@ -64,7 +63,7 @@ def test_only_the_bore_carries_a_finish_symbol() -> None:
 def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None:
     # Owner ruling 2026-11-24, fit audit question 13: the bore is drilled
     # 5/16 (the DRILLED HOLES row is its analysis band) and MHA-DT-22's bond
-    # lands are turned to it (made to fit: delegated ruling 2026-11-24).
+    # lands are turned to it (made to fit: drawing-guidelines rule 4, form 2).
     bore_limits = (
         spec.BORE_DIA + spec.ARBOR_BORE_BAND[1],
         spec.BORE_DIA + spec.ARBOR_BORE_BAND[0],
@@ -169,9 +168,19 @@ def test_fit_bore_callout_names_its_process() -> None:
 
     assert draw.DIMENSION_CALLOUTS["ArborBoreDia"].splitlines() == [
         "5/16 DRILL THRU",
-        "MHA-DT-22 IS TURNED",
-        "TO THIS BORE",
+        "MHA-DT-22 PINION ARBOR IS TURNED",
+        "TO THIS BORE, BONDED FIT",
     ]
+
+
+def test_tip_band_does_not_repeat_the_gear_data_mate() -> None:
+    """Rule 4: a mate serving several features is named once; the gear data
+    block's MATES WITH row names the cylinder gears (machinist review r1,
+    farm run 20261124T110807008Z)."""
+    import draw_dt_alignment_pinion as draw
+
+    assert "OutsideDia" not in draw.DIMENSION_CALLOUTS
+    assert "MATES WITH:  EACH OF 20 CYLINDER GEARS MHA-DT-12" in spec.GEAR_DATA
 
 
 def test_diagnostic_home_clocking_uses_engaged_pose_and_native_row_handedness() -> None:

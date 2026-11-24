@@ -64,7 +64,7 @@ SHAFT_DIA_BAND = (-0.01016, -0.09652)
 # bore drilled, the bond taking the size): at least .002 under the smaller
 # of its two measured ends, so the drum slides on by hand, and never more
 # than .008 under its larger end, inside LOCTITE 638's gap (made to fit,
-# form 2: delegated ruling 2026-11-24 (FitLaneDT), in place of question 13's
+# form 2: drawing-guidelines rule 4's form order, in place of question 13's
 # printed -.0014/-.0048).  The shaft is finished whole length to the
 # journals' aim first; the lands are skimmed only where that aim leaves the
 # drum less than .002.  The sheet prints the size REF and the acceptance
@@ -300,7 +300,7 @@ NECK_END_Z = HEAD_REAR_Z + NECK_LEN
 EXPOSED_SHAFT_LEN = SHAFT_LEN - NECK_END_Z
 # R1 (U27 precedent, Main 2026-09-24): as-received bar cannot make a press, so
 # MHA-DT-15 is bonded in with Loctite 638.  #290 (owner ruling): the crossrod
-# is 1/4 bar.  Fit audit F14 (owner ruling 2026-11-24): the hole is reamed
+# is 1/4 bar.  Fit audit F14 (drawing-guidelines rule 4, form 3): the hole is reamed
 # with the owned .2510 reamer (inventory tools.reamers "0.2510in") and prints
 # no band, the rod entering by hand its acceptance (".2510 REAM THRU; MHA-DT-15
 # ROD ENTERS BY HAND; BOND LOCTITE 638").  The model nominal is the reamer's

@@ -134,7 +134,7 @@ centre_drill_oal_mm = 31.75
 spot_projection_min_mm = 20.0
 drill_projection_min_mm = 26.0
 # Bench: the pin hole has no gauge pin: an MHA-DT-VN-63 must drive, not
-# enter by hand (owner ruling 2026-11-24, fit audit F15). The station is
+# enter by hand (necessity N-01, kind bought_seat; fit audit F15). The station is
 # read over the 1/16 drill's shank: the faced end to the shank's far side is
 # the station plus half the shank (.03125).
 shank_in = 0.0625

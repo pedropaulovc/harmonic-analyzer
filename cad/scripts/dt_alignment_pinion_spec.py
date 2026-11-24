@@ -16,8 +16,6 @@ from _fit_deviations import deviations
 from _gear_fit_limits import gear_tip_band_mm
 from _package_units import drawing_unit
 from _printed_tolerance import printed_deviations
-from _gtol_cylinder import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from stock_form_cutter import TOOTH_FORM_NOTE, CutterTemplate, StockFormProfile
 
 
@@ -113,7 +111,7 @@ BORE_DIA = 7.9375  # 5/16 drill, through (build_dt_pinion_arbor.py)
 # bore is a seizing risk for a novice (U27, U6 precedent).  The bore is
 # drilled 5/16 from both ends (owner ruling 2026-11-24, fit audit question
 # 13), and MHA-DT-22's two bond lands are turned last to it, so the drum
-# slides on by hand (delegated ruling 2026-11-24 (FitLaneDT): the lands are
+# slides on by hand (drawing-guidelines rule 4: the lands are
 # made to fit, form 2; MHA-DT-22's note 3 prints the acceptance and the
 # clearance, this sheet names the arbor as turned to the bore).
 # ARBOR_BORE_BAND is NOT a printed limit: it is the ANALYSIS band, what the
@@ -130,17 +128,19 @@ FACE_WIDTH = 153.924  # 6.06 in; located from the back end (drawing note)
 # stock-form support, coverage/no-gap, backlash, air and TE must pay both
 # printed tip corners and the retained tangent-span/fit bands independently.
 
-# Only the bore carries a roughness symbol.  The two end faces bear on
-# the MHA-DT-14 straps' inner faces when the drum floats hard forward or hard
-# aft, but no friction or end-play budget derives a grade from that slow,
-# hand-cranked contact.  So they take the title-block finish, the loosest
-# band (novice rule), rather than a 1.6 no function asks for (machinist
-# review of the pc-r7 sheet: over-specification; Main ruling (a), 2026-09-26).
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "drum_bore", MACHINED_UM, CylinderFace(BORE_DIA), display_unit=UNIT
-    ),
-)
+# No face carries a roughness symbol (drawing-guidelines.md rule 6).  The
+# bore is a bonded seat: MHA-DT-22 is bonded in it with Loctite 638 (its
+# ASSEMBLY_STEP), so nothing turns or slides in it; the arbor's journals run
+# in the MHA-DT-14 straps.  Machinist review r1 (farm run
+# 20261124T110807008Z, r1 and r3): the Ra 63 on a drilled bonded seat was
+# over-specification (drawing-guidelines rule 6).  The two end
+# faces bear on the MHA-DT-14 straps' inner faces when the drum floats hard
+# forward or hard aft, but no friction or end-play budget derives a grade
+# from that slow, hand-cranked contact.  So they take the title-block finish,
+# the loosest band (novice rule), rather than a 1.6 no function asks for
+# (machinist review of the pc-r7 sheet: over-specification; Main ruling (a),
+# 2026-09-26).
+SURFACE_FINISHES = ()
 
 # The tip diameter prints on the side view beside the length it runs
 # (drawing-guidelines.md rule 11 (turned parts read like the lathe)).  The gear
@@ -252,9 +252,10 @@ def _inch(value_mm: float, places: int) -> str:
 # The tight tip and tooth-thickness bands exist for the mesh with the 20
 # cylinder gears, so the block names that mate and why the span is tight
 # (drawing-guidelines.md rule 4 (tighten only for function, and name the mate);
-# machinist review r1 of 680e8eea5).
+# machinist review r1 of 680e8eea5).  It names the mate once: the tip band's
+# callout no longer repeats it (rule 4, a mate serving several features is
+# named once; machinist review r1, farm run 20261124T110807008Z).
 _CYLINDER_GEAR = _config.parts("dt-cylinder-gear")
-MESH_MATE = f"CYLINDER GEAR {_CYLINDER_GEAR['number']}"
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
@@ -293,18 +294,22 @@ GEAR_DATA = gear_data_note(
         ),
     ]
 )
-# The tip band's mate rides its callout (rule 4).
-OUTSIDE_DIA_CALLOUT = f"MESHES WITH\n{MESH_MATE}"
 
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): notes never carry a dimension.  The drilled
-# bore names its drill and its mate by number (rule 4, form 2): MHA-DT-22's
-# bond lands are turned last to this bore, so the acceptance (the drum slides
-# on by hand) and the bond clearance print once, on MHA-DT-22's sheet (its
-# note 3), and this sheet only says the arbor is turned to the bore (owner
-# ruling 2026-11-24, fit audit question 13; the made-to-fit lands are a
-# delegated ruling 2026-11-24 (FitLaneDT)).
+# bore names its drill, its mate by number and name, and the fit (rule 4,
+# form 2): MHA-DT-22's bond lands are turned last to this bore, so the
+# acceptance (the drum slides on by hand) and the bond clearance print once,
+# on MHA-DT-22's sheet (its note 3), and this sheet only says the arbor is
+# turned to the bore (owner ruling 2026-11-24, fit audit question 13; the
+# made-to-fit lands are drawing-guidelines rule 4, form 2).  The mate's
+# name and the fit kind (bonded) were added for machinist review r1 (farm run
+# 20261124T110807008Z, r1 and r2): drawing-guidelines rule 4, "Every fit
+# names its mate".
 _ARBOR = _config.parts("dt-pinion-arbor")
-ARBOR_BORE_CALLOUT = f"5/16 DRILL THRU\n{_ARBOR['number']} IS TURNED\nTO THIS BORE"
+ARBOR_BORE_CALLOUT = (
+    f"5/16 DRILL THRU\n{_ARBOR['number']} PINION ARBOR IS TURNED\n"
+    "TO THIS BORE, BONDED FIT"
+)
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the bond to MHA-DT-22 is an assembly step (dt_pinion_arbor_spec
 # ASSEMBLY_STEP owns the drum joint), not a part note.  The one note is a
 # do-not-cut requirement, so it is leadered to the teeth on the side view and

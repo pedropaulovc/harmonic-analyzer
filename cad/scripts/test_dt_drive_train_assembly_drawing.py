@@ -987,7 +987,12 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
 
     assert pin.PIN_DIA == 25.4 / 16.0
     step = _rig_step_body(pin.LEVER_PIN_SET_STEP_KEY)
-    assert step.startswith(f"{pin.LEVER_PIN_SET_NAME}, GRIP PARKED: MATCH-DRILL #51 THRU")
+    # Fit audit F23 (rule 4 form 1, F drilled hub): the lead holds the lever
+    # square to the rod while the pin hole is match-drilled.
+    assert step.startswith(
+        f"{pin.LEVER_PIN_SET_NAME}, GRIP PARKED, {pin.LEVER_NUMBER} HELD SQUARE TO "
+        f"{pin.LIFT_ROD_NUMBER} WITH A SQUARE: MATCH-DRILL #51 THRU"
+    )
     assert f"{pin.LEVER_NUMBER}'S HUB AT ITS PRINTED STATION AND {pin.LIFT_ROD_NUMBER} TOGETHER" in step
     assert f"INSERT {pin.PIN_NUMBER}, A SLIDING FIT." in step
     assert "TRIM BOTH ENDS." in step

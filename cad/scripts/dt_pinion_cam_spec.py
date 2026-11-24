@@ -197,7 +197,7 @@ SET_SCREW_SUBFLUSH_MIN_MM = (
 if SET_SCREW_SUBFLUSH_MIN_MM <= 0.0:
     raise AssertionError("the longest supplied screw can stand proud of the cam OD")
 
-# Fit audit F19 (owner ruling 2026-11-24, its recommended form ".2510 REAM
+# Fit audit F19 (drawing-guidelines rule 4, form 3; necessity N-01; its recommended form ".2510 REAM
 # THRU; MHA-DT-17 ROD SLIDES IN BY HAND"): the reamed bore prints the
 # reamer's size, no band and no clearance row; the rod is its gauge.  Two
 # rows (rule 7).  Keeping the reamer rather than an F drill is the

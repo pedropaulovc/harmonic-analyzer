@@ -2109,7 +2109,11 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             # Rubric sample round 6 (rule 22): the hole's drill and station
             # fold into the match-drill action; insert, trim and peen are
             # one thing each.  Round 9 (rule 23): the cross pin's bench check.
-            f"{LEVER_PIN_SET_NAME}, GRIP PARKED: MATCH-DRILL {LEVER_PIN_HOLE_DRILL} THRU "
+            # Fit audit F23 (batch-dt/rig/derive_f23.py): the F drilled hub can tilt
+            # 2.1 deg on the rod before it is pinned, so the lead holds it
+            # square to the rod while the hole is drilled.
+            f"{LEVER_PIN_SET_NAME}, GRIP PARKED, {LEVER_NUMBER} HELD SQUARE TO "
+            f"{LIFT_ROD_NUMBER} WITH A SQUARE: MATCH-DRILL {LEVER_PIN_HOLE_DRILL} THRU "
             f"{LEVER_NUMBER}'S HUB AT ITS PRINTED STATION AND {LIFT_ROD_NUMBER} TOGETHER.\n"
             f"INSERT {LEVER_PIN_NUMBER}, A SLIDING FIT.\n"
             "TRIM BOTH ENDS.\n"

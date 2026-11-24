@@ -15,7 +15,7 @@ ROD_LEN = 86.106  # 3.39
 ROD_Y0 = 3.5
 HUB_OD = 12.954  # .51
 HUB_LEN = 10.16  # .40
-BORE = 6.3754  # .2510 reamer (fit audit F23); dt_pinion_lever_spec.BORE_BAND analyses it
+BORE = 6.5278  # F drill, .257 (fit audit F23: drawing-guidelines rule 4, form 1); dt_pinion_lever_spec.BORE_BAND analyses it
 WALL_T = 2.032  # .08
 # ENFORCE r1 of MHA-DT-16 (#1011): the end wall behind the blind bore now
 # reads from two baselines on face B -- the bore depth and the overall

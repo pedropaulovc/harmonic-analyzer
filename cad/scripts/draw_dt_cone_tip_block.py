@@ -2004,7 +2004,7 @@ requirement(
     "adjuster",
     kind="threaded_hole",
     faces=(CylinderFace(ADJUSTER_BORE_DIA),),
-    requirements=("thread", "dia", "thru", "csk_dia", "height", "lateral", "height_match"),
+    requirements=("thread", "dia", "thru", "csk_dia", "lateral", "height_match"),
     fields={
         "at": ([0.0, ADJUSTER_AXIS_HEIGHT, _HALF_Z], ("ADJUSTER_AXIS_HEIGHT", "BLOCK_Z")),
         "axis": ((0.0, 0.0, -1.0), (_FRAME, "ADJUSTER_BORE_SPEC")),
@@ -2028,12 +2028,14 @@ requirement(
         ),
         "csk_angle_deg": (90.0, ((_SELF, "ADJUSTER_CSK_QUALIFIER"),)),
         "csk_ends": ("both", ((_SELF, "ADJUSTER_CSK_QUALIFIER"),)),
-        "height": (
-            limits(ADJUSTER_AXIS_HEIGHT, _P["AxisHeight"], unit=UNIT),
-            ("ADJUSTER_AXIS_HEIGHT", "UNIT", (_SELF, "_adjuster_axis_keep")),
+        # The axis height prints (1.50) REF: note 2's match to the measured
+        # MHA-DT-05 journal height is its one requirement (machinist review
+        # r1, farm run 20261124T110807008Z).
+        "height_ref": (
+            ADJUSTER_AXIS_HEIGHT,
+            ("ADJUSTER_AXIS_HEIGHT", (_SELF, "_adjuster_axis_keep")),
         ),
-        "height_nominal": (ADJUSTER_AXIS_HEIGHT, ("ADJUSTER_AXIS_HEIGHT",)),
-        "height_from": ("seat", ((_SELF, "_adjuster_axis_keep"),)),
+        "height_ref_from": ("seat", ((_SELF, "_adjuster_axis_keep"),)),
         "height_match": (
             [-AXIS_HEIGHT_MATCH_RESIDUAL_MM, AXIS_HEIGHT_MATCH_RESIDUAL_MM],
             ("AXIS_HEIGHT_MATCH_RESIDUAL_MM", (_SELF, "AXIS_MATCH_NOTE")),
@@ -2053,7 +2055,7 @@ requirement(
     precision={
         "dia": HOLE_CALLOUT_PLACES,
         "csk_dia": HOLE_CALLOUT_PLACES,
-        "height": _P["AxisHeight"],
+        "height_ref": _P["AxisHeight"],
         "height_match": HOLE_CALLOUT_PLACES,
         "lateral": _P["PassageCenter"],
     },
@@ -2463,6 +2465,18 @@ def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("expected one locating dowel station on the bottom view")
     set_reference_dimension(
         adapter, dowel_station[0], label="locating dowel reference station"
+    )
+    # The adjuster axis height is made to the measured MHA-DT-05 journal
+    # height within ±.003 (note 2, register N-01), so its 1.50 prints as a
+    # reference (machinist review r1, farm run 20261124T110807008Z: a plain
+    # 1.50 was a second controlling value).
+    axis_height = [
+        item for item in annotations if dimension_name(adapter, item) == "AxisHeight"
+    ]
+    if len(axis_height) != 1:
+        raise RuntimeError("expected one adjuster axis height")
+    set_reference_dimension(
+        adapter, axis_height[0], label="adjuster axis height reference"
     )
     _set_arrow_sides(
         adapter,

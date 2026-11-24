@@ -360,7 +360,7 @@ ARBOR_FINISH_XY = (0.155, 0.205)
 # the parts registry.  The band is tighter than DRILLED HOLES: it is ASME
 # B18.8.2's recommended hole, which the slotted pin grips by compression, so
 # the pin is its own gauge (fit audit F15: "MHA-DT-VN-63 MUST DRIVE, NOT
-# ENTER BY HAND"; delegated ruling 2026-11-24 (FitLaneDT): on a match-drilled
+# ENTER BY HAND"; drawing-guidelines rule 4, form 2: on a match-drilled
 # hole the row reads "MHA-DT-VN-63 MUST DRIVE", keeping rule 7's process line
 # and two lines of words (machinist review, farm run 20261121T170909507Z:
 # four lines gated), as MHA-DT-19's own pin-hole callout words it.

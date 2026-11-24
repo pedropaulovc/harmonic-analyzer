@@ -128,7 +128,7 @@ SHAFT_FIT_CALLOUT = (
 )
 # The spring pin's +.0025/0 band is the pin's hole (ASME B18.8.2's
 # recommended hole): the callout names the pin as its own gauge (fit audit
-# F15; delegated ruling 2026-11-24 (FitLaneDT): "MUST DRIVE" on a
+# F15; drawing-guidelines rule 4, form 2: "MUST DRIVE" on a
 # match-drilled hole) and the match-drill with its strap, in two lines of
 # words (rule 7).  The drilling set-up is MHA-DT-00's step, which names the
 # hole, so the part sheet carries no pointer to it.

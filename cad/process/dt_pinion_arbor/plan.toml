@@ -36,8 +36,10 @@
 # journals. The bond lands are made to the MHA-DT-01 drum's 5/16 drilled
 # bore too (note 3; owner ruling 2026-11-24, fit audit question 13): Setup 7
 # measures its two ends and skims the lands only where the aim leaves the
-# drum less than .002 clear. The spans' sliding fit in MHA-DT-33 is a fixed
-# band.
+# drum less than .002 clear. The spans are made to the MHA-DT-33 collar's
+# 5/16 drilled bore too (note 2; drawing-guidelines rule 4, form 2):
+# Setup 7's aim keeps them under its .3125 minimum, and Setup 8 slides the
+# collar over them by hand.
 #
 # To order before Setup 4 runs: the .2510 reamer (tools.reamer-2510, owner
 # ruling #3073). No gauge pins: the MHA-DT-15 rod and the MHA-DT-VN-63 pin
@@ -201,8 +203,8 @@ neck_rough_start_z_in = 0.7672
 relief_rough_start_z_in = 6.75
 # Bench: the pin hole's station is read over the 1/16 drill's shank (miked),
 # the hole in the shaft: the station plus half the shank. The hole has no
-# gauge pin: an MHA-DT-VN-63 must drive, not enter by hand (owner ruling
-# 2026-11-24, fit audit F15). The cross hole's station is read over the
+# gauge pin: an MHA-DT-VN-63 must drive, not enter by hand (necessity N-02,
+# kind bought_seat; fit audit F15). The cross hole's station is read over the
 # MHA-DT-15 rod itself, miked (fit audit F14: the rod is its gauge).
 pin_shank_in = 0.0625
 pin_far_side_min_in = 1.5213
@@ -919,13 +921,18 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pin_hole_station_band_mm}
 feed = "hand"
 
 [[setups.operations]]
+instruction = "Spans: slide the MHA-DT-33 collar (made before this arbor) on from the back crown, by hand, over the back stub and on to the pin hole; slide it off again."
+inspection = "MHA-DT-33 slides on by hand over both spans (note 2: turned to the collar's bore). A tight spot: chuck the arbor again as in Setup 7 and skim that span only to A."
+feed = "hand"
+
+[[setups.operations]]
 instruction = "Neck length: the calipers' depth rod, the beam's end on the neck's step to the shaft, the rod along the neck onto the head's rear face (both faces point to the back end)."
 inspection = "Neck {{cad.neck_length_min_in:.2dot}}–{{cad.neck_length_max_in:.2dot}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.neck_length_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Out of any limit in the three checks above: the arbor is scrap; make another from Setup 1."
+instruction = "Out of any limit in the station and length checks above: the arbor is scrap; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]

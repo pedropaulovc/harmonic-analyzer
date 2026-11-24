@@ -520,10 +520,14 @@ TIP_DOWEL_NOTE_ROW_HEIGHT = 0.0044
 TIP_DOWEL_NOTE_XY = (0.222, 0.0745)
 # The callout's block: three rows under the drill's untoleranced size (one
 # row; the r6 ream's stacked band took 8.4 mm), at the r6 render's 5.45 mm a
-# row and its 1.7 mm underline and 3.6 mm top margin, 21.65 mm tall.
+# row and its 1.7 mm underline and 3.6 mm top margin, 21.65 mm tall.  Its
+# bottom stands 2.3 mm over TipDowelPivotX's text: run
+# 20261124T110807008Z printed the drilled block's Ø.0635 row 1.08 mm over
+# the (.188) at a 1.5 mm offset (layout audit text-clearance, 1.78 mm
+# needed).
 TIP_DOWEL_CALLOUT_SIZE = (0.0475, 0.0217)
 _TIP_DOWEL_CALLOUT_BOTTOM = (
-    TIP_DOWEL_PIVOT_X_LINE_Y + TIP_DOWEL_PIVOT_X_TEXT_SIZE[1] + 0.0015
+    TIP_DOWEL_PIVOT_X_LINE_Y + TIP_DOWEL_PIVOT_X_TEXT_SIZE[1] + 0.0023
 )
 TIP_DOWEL_CALLOUT_LOWER_LEFT = (
     DETAIL_CENTER[0]

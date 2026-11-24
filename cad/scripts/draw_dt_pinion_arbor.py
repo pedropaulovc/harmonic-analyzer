@@ -123,7 +123,12 @@ from dt_pinion_arbor_collar_spec import (
     BORE_BAND as COLLAR_BORE_BAND,
     COLLAR_NUMBER,
 )
-from dt_pinion_arbor_geometry import BOND_FIT_CLEARANCE, JOURNAL_FIT_CLEARANCE
+from dt_pinion_arbor_geometry import (
+    BOND_FIT_CLEARANCE,
+    CROSSROD_MAX_CLEARANCE,
+    CROSSROD_MIN_CLEARANCE,
+    JOURNAL_FIT_CLEARANCE,
+)
 
 
 def _inch(value_mm: float) -> str:
@@ -145,17 +150,20 @@ JOURNAL_CALLOUT = "SEE NOTE 1"
 # from the head rear face, rests on both journals' inner ends:
 # dt_pinion_arbor_spec.DRUM_*_END_ON_JOURNAL_MIN) are made to fit the 5/16
 # drilled MHA-DT-01 bore (owner ruling 2026-11-24, fit audit question 13;
-# made to fit: delegated ruling 2026-11-24 (FitLaneDT)): each prints its size
+# made to fit: drawing-guidelines rule 4, form 2): each prints its size
 # REF and note 3 the acceptance.  The two spans outside the journals (the
-# collar's, by the head, with its pin hole; the back stub) take -.0004/-.0038:
-# MHA-DT-33 slides over both from the back crown to its pin station, the
-# band's upper limit its slide-on clearance
-# (dt_pinion_arbor_collar_spec.SLIDE_CLEARANCE_MIN).  One 2X diameter on the
-# back stub sizes both and flags note 2, which names them and that sliding
-# fit (round 5: the collar span's own block had no open space between the
-# front land's and the neck's witnesses, whichever side SolidWorks put it).
-# The title block's .XX or .XXX on the back stub (Ø.32 or Ø.317 max) would
-# stop the collar (bore .3125 min) passing it, so it keeps the band.
+# collar's, by the head, with its pin hole; the back stub) are made to fit
+# the MHA-DT-33 collar's 5/16 drilled bore: MHA-DT-33 slides over both from
+# the back crown to its pin station, so the size prints REF and note 2 the
+# acceptance by feel (machinist review r1, farm run 20261124T110807008Z: the
+# -.0004/-.0038 band was a form-4 band where the collar can be tried, and
+# note 2's clearance a second controlling value; drawing-guidelines
+# rule 4, form 2).  One 2X diameter on the back stub sizes both and
+# flags note 2 (round 5: the collar span's own block had no open space
+# between the front land's and the neck's witnesses, whichever side
+# SolidWorks put it).  COLLAR_CLEARANCE is ANALYSIS data, what the spans'
+# modelled band (SHAFT_DIA_BAND, the aim the traveler turns to) leaves in the
+# drilled collar bore; it prints nowhere.
 COLLAR_CLEARANCE = (
     COLLAR_BORE + COLLAR_BORE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
     COLLAR_BORE + COLLAR_BORE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
@@ -172,26 +180,28 @@ SPAN_CALLOUT = "SEE NOTE 2"
 # the lands' in the drilled MHA-DT-01 bore on note 3, the fit's own range
 # (BOND_FIT_CLEARANCE: the lands are turned to the measured bore, not limits
 # on both members).  The head cross bore is reamed .2510 with no band, the
-# MHA-DT-15 rod entering by hand its acceptance (owner ruling 2026-11-24,
-# fit audit F14, its recommended form): the reamer and the bought rod hold
-# the bond gap (dt_pinion_arbor_geometry.CROSSROD_MAX_CLEARANCE under
-# Loctite 638's limit), so the callout names the rod and the compound only.
+# MHA-DT-15 rod entering by hand its acceptance (drawing-guidelines rule 4,
+# form 3; fit audit F14, its recommended form): the reamer and the bought rod hold
+# the bond gap, and the callout prints that gap (CROSSROD_MIN/MAX_CLEARANCE,
+# .0010-.0035, under Loctite 638's limit) as rule 23 asks (machinist review
+# r1, farm run 20261124T110807008Z, blocker in 2 of 3 runs).
 BOND_CLEARANCE = BOND_FIT_CLEARANCE
+CROSSROD_CLEARANCE = (CROSSROD_MIN_CLEARANCE, CROSSROD_MAX_CLEARANCE)
 CROSS_HOLE_CALLOUT = (
-    f"REAM THRU; {CROSSROD_NUMBER} ROD ENTERS\nBY HAND; BOND {RETAINING_COMPOUND}"
+    f"REAM THRU; {CROSSROD_NUMBER} ROD ENTERS BY HAND;\n"
+    f"BOND {RETAINING_COMPOUND}, CLEARANCE "
+    f"{_inch(CROSSROD_CLEARANCE[0])}-{_inch(CROSSROD_CLEARANCE[1])}"
 )
 # Rule 7: the notes block stays at four short rows; the widest (66
 # characters, ~172 mm) ends ~24 mm left of the title block (x 0.216).
 # Each 2X's second span carries a leadered SEE NOTE tag (SPAN_TAGS), so the
 # note says what the spans are, not where (#1038 r9 machinist review, rules
 # 1 and 26: "PIN-HOLE SPAN AND BACK-END SPAN" named them in words only).
-# Note 2 names its mate by number only, to keep it to one row.
 SHEET_NOTES = (
     f"1. JOURNALS (2X): TURN LAST TO THE MEASURED BORES OF {STRAP_NUMBER},\n"
     f"   CLEARANCE {_inch(JOURNAL_CLEARANCE[0])}-{_inch(JOURNAL_CLEARANCE[1])}; "
     f"{DRUM_NUMBER} SLIDES OVER THE BACK ONE.\n"
-    f"2. SPANS (2X): SLIDING FIT IN {COLLAR_NUMBER} (CLEARANCE "
-    f"{_inch(COLLAR_CLEARANCE[0])}-{_inch(COLLAR_CLEARANCE[1])}).\n"
+    f"2. SPANS (2X): TURN TO {COLLAR_NUMBER} COLLAR BORE: SLIDES ON BY HAND.\n"
     f"3. LANDS: TURN TO {DRUM_NUMBER}, {RETAINING_COMPOUND} (CLEARANCE "
     f"{_inch(BOND_CLEARANCE[0])}-{_inch(BOND_CLEARANCE[1])})."
 )
@@ -290,14 +300,18 @@ requirement(
     precision={"dia": _P["NeckDia"], "length": _P["NeckLen"]},
 )
 # Every Ø5/16 span but the two journals and the two bond lands: the collar's
-# span and the back stub (note 2, sliding fit in MHA-DT-33).  The bond lands'
-# made-to-fit clearance in MHA-DT-01 (note 3) rides here as data; their
-# sizes print REF.  It runs from the neck shoulder to the back crown's root.
+# span and the back stub (note 2, made to fit MHA-DT-33: size REF, the
+# collar sliding on by hand the acceptance).  ``dia`` is the ANALYSIS band
+# (SHAFT_DIA_BAND, the aim the traveler turns to), kept as a traveler
+# requirement as the cross hole keeps its reamer's; COLLAR_CLEARANCE is its
+# analysis result.  The bond lands' made-to-fit clearance in MHA-DT-01
+# (note 3) rides here as data; their sizes print REF.  It runs from the neck
+# shoulder to the back crown's root.
 requirement(
     "shaft",
     kind="outside_cylinder",
     faces=(CylinderFace(SHAFT_DIA, contains_z_mm=BACK_STUB_DIA_Z),),
-    requirements=("dia",),
+    requirements=("dia", "collar_acceptance"),
     fields={
         "at": ([0.0, 0.0, NECK_END_Z], ((_GEOM, "NECK_END_Z"),)),
         "axis": ([0.0, 0.0, 1.0], (_FRAME,)),
@@ -312,6 +326,10 @@ requirement(
         ),
         "collar_clearance": (list(COLLAR_CLEARANCE), ((_SELF, "COLLAR_CLEARANCE"),)),
         "collar_mates": (COLLAR_NUMBER, (("dt_pinion_arbor_collar_spec", "COLLAR_NUMBER"),)),
+        "collar_acceptance": (
+            SHEET_NOTES.split("\n2. ")[1].split("\n")[0],
+            ((_SELF, "SHEET_NOTES"),),
+        ),
         "bond_clearance": (list(BOND_CLEARANCE), ((_SELF, "BOND_CLEARANCE"),)),
         "bond_mates": (DRUM_NUMBER, (("dt_pinion_arbor_spec", "DRUM_NUMBER"),)),
     },
@@ -467,13 +485,14 @@ requirement(
 )
 # The head's reamed crossrod hole along model Y, a .XX station from the head
 # rear face, bonded on MHA-DT-15: the .2510 reamer's size and no band (fit
-# audit F14).  ``dia`` (the reamer's ANALYSIS band) stays a traveler
-# requirement, as MHA-DT-14's pivot bore keeps it.
+# audit F14), the bond's diametral clearance on the callout (rule 23).
+# ``dia`` (the reamer's ANALYSIS band) stays a traveler requirement, as
+# MHA-DT-14's pivot bore keeps it.
 requirement(
     "cross_hole",
     kind="hole",
     faces=(CylinderFace(CROSS_HOLE_DIA),),
-    requirements=("dia", "thru", "process", "mates", "station"),
+    requirements=("dia", "thru", "process", "mates", "bond_clearance", "station"),
     fields={
         "at": (
             [0.0, -HEAD_DIA / 2.0, HEAD_CENTER_Z],
@@ -489,6 +508,10 @@ requirement(
         "process": ("ream", ((_SELF, "CROSS_HOLE_CALLOUT"),)),
         "callout": (CROSS_HOLE_CALLOUT, ((_SELF, "CROSS_HOLE_CALLOUT"),)),
         "mates": (CROSSROD_NUMBER, (("dt_pinion_arbor_spec", "CROSSROD_NUMBER"),)),
+        "bond_clearance": (
+            list(CROSSROD_CLEARANCE),
+            ((_SELF, "CROSSROD_CLEARANCE"), (_SELF, "CROSS_HOLE_CALLOUT")),
+        ),
         "station": (
             _xx(CROSS_HOLE_STATION, "CrossHoleFromHeadRear"),
             ((_GEOM, "CROSS_HOLE_STATION"), *_PRINT),
@@ -844,8 +867,8 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 # detail A's view box (x 0.1928).
 # The band is ASME B18.8.2's recommended hole for the 1/16 slotted spring
 # pin (.062-.065; the title block's DRILLED HOLES row would open it to
-# .0665), which the pin grips by compressing into.  Fit audit F15 (owner
-# ruling 2026-11-24): the callout is the shared one
+# .0665), which the pin grips by compressing into.  Fit audit F15 (necessity
+# N-02, kind bought_seat): the callout is the shared one
 # (dt_pinion_arbor_pin_spec.PIN_HOLE_CALLOUT, "1/16 DRILL THRU; /
 # MHA-DT-VN-63 MUST DRIVE, / NOT ENTER BY HAND"): the pin is its own gauge,
 # and the drive it must take answers R5's reading of the band as a clearance
@@ -998,12 +1021,14 @@ DETAIL_KEEP = {
     "HeadCapSagDim": (0.205, 0.210),
     # Above the hole's centre line, so the leader drops onto the hole edge.
     # Two callout lines (r3 of #1685) under the value.  Since the second
-    # carries the bonded clearance (rule 23) the rows run ~89 mm, so the
-    # block centres 14 mm right of the R5 spot (0.245, 0.2525) to start right
-    # of SR.43's text (x 212.1), and 0.8 mm higher: its top ~263.4, 3.2 mm
-    # under the border (266.6), its shoulder ~243.3, 2.8 mm over the pin
-    # hole's callout.
-    "CrossHoleDia": (0.259, 0.2533),
+    # carries the bonded clearance again (rule 23; machinist review r1, farm
+    # run 20261124T110807008Z) the first row runs 41 characters, ~107 mm at
+    # the 2.61 mm a character r1's render measured (31 characters, 80.9 mm),
+    # so the block centres at 0.269: its left end ~0.2155, 5 mm right of
+    # SR.43's text (ends x 0.2105), its right end ~0.3225, 12 mm short of the
+    # isometric note (starts x 0.3349).  Height unchanged: its top 3.2 mm
+    # under the border, its shoulder 2.8 mm over the pin hole's callout.
+    "CrossHoleDia": (0.269, 0.2533),
     # The hole's station rides under the head, its text left of the
     # rear-face witness and clear of the neck above and the head length below.
     "CrossHoleFromHeadRear": CROSS_HOLE_STATION_TEXT_XY,

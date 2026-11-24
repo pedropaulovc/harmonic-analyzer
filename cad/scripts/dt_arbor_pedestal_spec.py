@@ -12,7 +12,6 @@ from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _hole_spec import HoleSpec, THREAD_MAJOR_MM, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
-from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from sh_vn_arbor_set_screw_spec import THREAD as SET_SCREW_THREAD
@@ -155,15 +154,11 @@ if SET_SCREW_WEB_MM < WALL_TARGET_MM:
     raise AssertionError(f"apex tap web {SET_SCREW_WEB_MM:.3f} mm < .080 in target")
 
 SURFACE_FINISHES = (
-    # The V-drilled bore is static, clamped by the apex set screw (fit audit
-    # F01): the commercial machine finish a drill leaves is enough, called
-    # out only because the title block names no grade on this casting.
-    SurfaceFinishControl(
-        "arbor_bore",
-        SEAT_UM,
-        CylinderFace(BORE_DIA, contains_y_mm=BORE_HEIGHT),
-        display_unit=UNIT,
-    ),
+    # The V-drilled bore carries no symbol: it is a clamp seat (fit audit F01),
+    # MHA-DT-13 enters by hand and the apex set screw clamps it, so nothing
+    # runs or slides in it (drawing-guidelines.md rule 6).  Machinist review r1
+    # (farm run 20261124T110807008Z, 3 of 3 runs): its Ra 125 was
+    # over-specification beside the foot's one locating-seat Ra 125.
     # The foot seat mates the pedestal to harmonic-base: on a part that may be
     # left as-cast elsewhere, the one face that MUST be cut says so.
     SurfaceFinishControl(
