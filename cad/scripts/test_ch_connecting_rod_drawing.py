@@ -381,8 +381,10 @@ def test_every_tight_band_names_its_mate() -> None:
     on their own callout, with the clearance or interference they hold."""
     spec = ch_connecting_rod_spec
     least, most = spec.STRAP_DIAMETRAL_CLEARANCE
-    # The running bore's clearance on the cam stays in the 0.20-0.35 intent.
-    assert 0.20 - 1e-9 <= least < most <= 0.35 + 1e-9
+    # The running bore's clearance on the cam: .008-.015 (owner ruling
+    # 2026-11-21, the bore +.003 -> +.005 with the next MHA-CH-03 change).
+    assert least == pytest.approx(_in(0.008)) and most == pytest.approx(_in(0.015))
+    assert "(CLEARANCE .008-.015)" in drawing.FRONT_CALLOUTS["StrapBoreDia"]
     bore = drawing.FRONT_CALLOUTS["StrapBoreDia"]
     assert bore.startswith("BORE")
     assert drawing.CAM_NUMBER in bore
@@ -1025,7 +1027,7 @@ def test_rod_feature_bands_are_the_printed_ones() -> None:
     assert flank["corner_count"] == 4
     assert flank["corner_callout"] == drawing.FRONT_CALLOUTS["ShankCornerR"]
     bore, pin = features["strap_bore"], features["pin_hole"]
-    assert bore["dia"] == pytest.approx([_in(1.213), _in(1.216)])
+    assert bore["dia"] == pytest.approx([_in(1.213), _in(1.218)])
     assert bore["datum"] == "A" and bore["finish_ra"] == pytest.approx(1.6)
     assert pin["dia"] == pytest.approx([_in(0.0775), _in(0.0779)])
     assert pin["position_dia"] == pytest.approx(_in(0.014))

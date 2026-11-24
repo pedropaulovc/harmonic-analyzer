@@ -105,7 +105,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # place there over-specified) and take the title block's .XX: that band
 # keeps both shank faces inside the ring's
 # (ch_connecting_rod_spec.SHANK_INSIDE_RING_MIN). The strap bore prints 1.213
-# at three with its +.003/.000; the reamed press hole at four; the shank's
+# at three with its +.005/.000; the reamed press hole at four; the shank's
 # four corners R.065 at three (the title block's .XXX is their .060-.070).
 # The ring OD, shank width, fork width, slot depth and boss length take the
 # title block's .XX too.

@@ -646,7 +646,7 @@ requirement(
         "depth": _P["SlotDepth"],
     },
 )
-# The strap bore (datum A): 1.213 +.003/.000, Ra, running on the cam
+# The strap bore (datum A): 1.213 +.005/.000, Ra, running on the cam
 # (FRONT_KEEP "StrapBoreDia").
 requirement(
     "strap_bore",
