@@ -37,11 +37,16 @@ sku = "6745"
 status = "on_hand"
 note = "Possession: photo and LittleMachineShop package (archived inventory source.by)."
 
+# Owner (Pedro) 2026-11-24, verbatim: "add to inventory 2 v blocks 1.5 x 2 in
+# with 2 clamps". Brand, accuracy, whether the two are a matched pair, and
+# which faces the 1.5 and 2 in are: not stated, not recorded.
 [fixtures.v-blocks]
-name = "Matched V-block pair with clamps"
+name = "V-blocks, 1.5 x 2 in, two, with two clamps"
 kind = "v_blocks"
-status = "to_order"
-note = "The archived inventory recorded the pair only as a trial ownership assumption (#1413), not as owned."
+status = "on_hand"
+pieces = 2
+cite = ["Owner (Pedro) 2026-11-24, verbatim: \"add to inventory 2 v blocks 1.5 x 2 in with 2 clamps\""]
+note = "On hand (owner, 2026-11-24): two V-blocks, 1.5 x 2 in as he stated it, and two clamps. Replaces the archived #1413 trial assumption (to_order)."
 
 # MHA-FR-00 holds the top frame at its set cross-hole height on these until the
 # cross screws do (owner ruling 2026-11-20 (Pedro), #2324: "Shaft collars under
@@ -95,23 +100,46 @@ kind = "follow_rest"
 status = "on_hand"
 cite = ["Owner (Pedro) 2026-11-17: \"already have follow and steady rests for the lathe\""]
 
+# The lathe's 6 in 3-jaw, supplied with it (PM-1127VF-LB Operator's Manual
+# 2015, "Chuck": "comes equiped with a 6" 3-jaw chuck"). Its least grip,
+# owner 2026-11-24, verbatim: "3 jaw min 0.1750" (.1750 in = 4.445 mm), is
+# its prechips record's grip_range_mm (cad/process/shop/common.toml
+# workholding.chuck-3jaw-6); this record holds ownership and the citations.
+# Its maximum opening and body sizes are not measured.
+[fixtures.chuck-3jaw-6]
+name = "6 in 3-jaw chuck for the PM-1127VF-LB lathe (supplied with it)"
+kind = "chuck"
+status = "on_hand"
+cite = [
+  "PM-1127VF-LB Operator's Manual (2015), \"Chuck\", read 2026-11-21 (https://archive.org/download/pm-1440-gs-v-3-2020-10/Precision%20Matthews/PM-1127VF-LB-Manual-2015.pdf): \"PM-1127VF-LB comes equiped with a 6\" 3-jaw chuck, a 6\" 4-jaw chuck and a 9\" faceplate\"",
+  "Owner (Pedro) 2026-11-24, relayed by Main, verbatim: \"3 jaw min 0.1750\"",
+]
+
 # The lathe's 6 in 4-jaw independent chuck. Owner (Pedro), answered in person
 # 2026-11-21 (cnc rulings record): "Lathe 6 in 4-jaw independent chuck: on
 # hand." Owner (Pedro) 2026-11-22, measured: "i measured the 4 jaw chuck;
 # 160mm diameter ; max jaw opening 140mm". Its prechips record is
-# cad/process/shop/common.toml workholding.chuck-4jaw-6 (kind and the body
-# diameter). The maximum jaw opening stays here: prechips' grip_range_mm
-# needs a minimum too, not measured. The through-bore is not measured.
+# cad/process/shop/common.toml workholding.chuck-4jaw-6 (kind, body diameter
+# and grip range). Least grip measured by the owner 2026-11-24, verbatim:
+# "0.2865 in min dia for 4 jaw" (.2865 in = 7.2771 mm, the smallest
+# diameter the jaws close on): that and the 140 mm opening are its
+# grip_range_mm. A setup gripping less in the 4-jaw (shims included) cannot
+# be held. Through-bore, owner 2026-11-24,
+# verbatim: "through-bore 1 3/4" (1.75 in = 44.45 mm). It is NOT the bar
+# limit: the lathe's spindle bore behind it is 1-1/2 in (machines.toml
+# machines.pm-1127vf-lb spindle_bore_in, the maker's figure), so the
+# spindle, not the chuck, limits bar through the headstock to 1.5 in.
 [fixtures.chuck-4jaw-6]
 name = "6 in 4-jaw independent chuck for the PM-1127VF-LB lathe"
 kind = "chuck"
 status = "on_hand"
-max_jaw_opening_mm = 140.0
-through_bore_mm = "to_measure"
-note = "Body Ø160 mm and maximum jaw opening 140 mm, measured by the owner 2026-11-22. Not recorded: the through-bore (to measure), the least grip, the body length, and the jaw width and height (neither the lathe's manual nor Precision Matthews' 6 in 4-jaw page states them, read 2026-11-21)."
+through_bore_mm = 44.45
+note = "Body Ø160 mm and maximum jaw opening 140 mm, measured by the owner 2026-11-22; least grip Ø.2865 in and through-bore 1-3/4 in, owner 2026-11-24 (bar through the headstock is limited by the 1-1/2 in spindle bore, not this). Not recorded: the body length, and the jaw width and height (neither the lathe's manual nor Precision Matthews' 6 in 4-jaw page states them, read 2026-11-21)."
 cite = [
   "Owner (Pedro) 2026-11-21, answered in person: \"Lathe 6 in 4-jaw independent chuck: on hand.\"",
   "Owner (Pedro) 2026-11-22, relayed by Main: \"i measured the 4 jaw chuck; 160mm diameter ; max jaw opening 140mm\"",
+  "Owner (Pedro) 2026-11-24, relayed by Main, verbatim: \"0.2865 in min dia for 4 jaw\"",
+  "Owner (Pedro) 2026-11-24, relayed by Main, verbatim: \"through-bore 1 3/4\"",
   "PM-1127VF-LB Operator's Manual (2015), \"Chuck\", read 2026-11-21 (https://archive.org/download/pm-1440-gs-v-3-2020-10/Precision%20Matthews/PM-1127VF-LB-Manual-2015.pdf): \"PM-1127VF-LB comes equiped with a 6\" 3-jaw chuck, a 6\" 4-jaw chuck and a 9\" faceplate\"; \"the 4-jaw chuck features four independent jaws. The 4-jaw chuck is used to clamp square or unevenly-shaped work-pieces.\"",
 ]
 

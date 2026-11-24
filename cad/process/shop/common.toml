@@ -376,12 +376,16 @@ plate_holes = { A = [15, 16, 17, 18, 19, 20], B = [21, 23, 27, 29, 31, 33], C = 
 [workholding.chuck-3jaw-5-bs0]
 kind = "chuck"
 
-# HA: fixtures.chuck-3jaw-6-d1-4, the PM-1127's standard 6 in 3-jaw (45952b66bc
-# inventory: body Ø158 x 72, #1413 placeholders). Grip range: prechips v0.10
-# examples/shop.toml workholding.chuck-3jaw-6.
+# HA: fixtures.chuck-3jaw-6, the PM-1127's standard 6 in 3-jaw (45952b66bc
+# inventory: body Ø158 x 72, #1413 placeholders). Grip range: least grip
+# measured by the owner 2026-11-24, verbatim "3 jaw min 0.1750" (4.445 mm);
+# the 140 mm top is still the prechips v0.10 example shop's (not measured).
+# Holds under 4.445 mm opt out with lathe_hold = "other" until rewritten:
+# dt_crank_pinion_pin (#3498), dt_pinion_cam_pin (#3499), pd_transgear_pin's
+# regrips (#3500).
 [workholding.chuck-3jaw-6]
 kind = "chuck"
-grip_range_mm = [3.0, 140.0]
+grip_range_mm = [4.445, 140.0]
 body_diameter_mm = 158.0
 body_length_mm = 72.0
 
@@ -396,12 +400,15 @@ body_length_mm = 72.0
 # 2026-11-21: "Removable / Reversible Jaws for ID and OD Work", shipping box
 # 8 x 8 x 8 in only) give no sizes. The owner measured it 2026-11-22: "i
 # measured the 4 jaw chuck; 160mm diameter ; max jaw opening 140mm":
-# body_diameter_mm below. No grip range is declared (prechips needs its
-# minimum too, not measured; the 140 mm maximum opening is
-# cad/config/shop-equipment/fixtures.toml, same key), so a plan holding work
-# in it sets lathe_hold = "other".
+# body_diameter_mm below. Grip range: the owner's least grip 2026-11-24,
+# verbatim "0.2865 in min dia for 4 jaw" (7.2771 mm), to the 140 mm maximum
+# opening (cad/config/shop-equipment/fixtures.toml, same key, cites both).
+# Plans holding work in it still set lathe_hold = "other" (independent jaws
+# dialled in by hand); pn_pen_rod and dt_cone_tip_end_screw grip under the
+# least grip (#3495, #3496).
 [workholding.chuck-4jaw-6]
 kind = "chuck"
+grip_range_mm = [7.2771, 140.0]
 body_diameter_mm = 160.0
 
 # --- 3-flute uncoated carbide square end mills (McMaster 88815) ---
@@ -680,6 +687,8 @@ description = "#2-56 UNC plug hand tap (OSG 1011008)"
 description = "Bottoming hand tap #4-40 UNC, HSS"
 [tools.gear-cutter-arbor-1]  # F-arbor-1in-R8
 description = "1 in R8 stub arbor"
+[tools.saw-arbor-r8-stepped]  # inventory tools.saw-arbor-r8-stepped
+description = "R8 stepped slitting-saw arbor (no maker marking), spring-loaded pilot steps 1, 7/8, 3/4, 5/8, 1/2 in, not keyed; 1.25 x .50 cap; M8 x 1.25 countersunk hex-socket clamp screw, 5 mm key"
 [tools.gear-cutter-arbor-7-8]  # F-arbor-7-8
 description = "7/8 stub arbor, 3/4 straight shank"
 [tools.gear-cutters-48dp-20pa]  # F-gear-cutter-10-289-481 to -488
@@ -712,7 +721,7 @@ description = "Steel rule, 48 in, finest graduation 1/64 in (Insize 7110-1200)"
 [tools.transfer-punches]  # F-transfer-punches-fractional
 description = "Transfer punch set, fractional 3/32-1/2 by 64ths"
 [tools.v-blocks]  # F-v-blocks
-description = "Matched V-block pair with clamps"
+description = "V-blocks, two, 1.5 x 2 in, with two clamps (owner 2026-11-24; matched or not: not stated)"
 
 # --- Drawing cross-check additions (2026-11-19) -------------------------------
 # Tools the v50 drawings call for that the quote workbook left out, from the
