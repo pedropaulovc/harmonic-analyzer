@@ -195,15 +195,20 @@ if MOUNT_HEAD_WEB_WORST < WALL_TARGET_MM:
 
 # The cone shaft MHA-DT-04's collar bears on the NORTH cone-boss end face, so
 # the print locates that face from the post axis (rule 10) instead of calling
-# the boss symmetric in a note.  The drive-train stacks book that face half the
-# face-to-face band off the post axis (dt_cone_gear_shaft_spec,
-# crank_boss_rim, build_dt_drive_train_assembly); the station's own band is the
-# largest .001 in band inside that half, so no stack moves.
+# the boss symmetric in a note.  Owner ruling 2026-11-24, audit part 2 C9
+# ("Yes: add the look and relax the rest."): the face takes the title
+# block's .XXX band (it was +/-.002, the largest .001 band inside half the
+# face-to-face band).  Step 23's look at the bushing erases it from the tip
+# air; the drive-train stacks that place the collar, the 64T and T120 from
+# it book the station's printed limits (CONE_BOSS_NORTH_STATION_DEVIATIONS_MM:
+# build_dt_drive_train_assembly, crank_boss_rim, dt_cone_tip_air).
 CONE_BOSS_NORTH_STATION = CONE_BOSS_LENGTH / 2.0
-_CONE_BOSS_HALF_BAND = printed_band_mm(3, unit=UNIT) / 2.0  # ConeBossLen .XXX
-CONE_BOSS_NORTH_STATION_TOLERANCE_MM = (
-    math.floor(_CONE_BOSS_HALF_BAND / MM_PER_IN * 1000.0 + 1e-9) / 1000.0 * MM_PER_IN
-)  # +/-.002
+CONE_BOSS_NORTH_STATION_DEVIATIONS_MM = printed_deviations(
+    CONE_BOSS_NORTH_STATION, 3, unit=UNIT
+)
+CONE_BOSS_NORTH_STATION_TOLERANCE_MM = max(
+    abs(deviation) for deviation in CONE_BOSS_NORTH_STATION_DEVIATIONS_MM
+)
 # Both cone bosses stand clear of the body at every printed limit (#2756):
 # the north face at its station's least, the far face at the face-to-face's
 # least less the north station's greatest, each against the body's largest
@@ -212,12 +217,7 @@ CONE_BOSS_NORTH_STATION_TOLERANCE_MM = (
 _BODY_RADIUS_MAX = _printed_limits(BODY_DIA, 2)[1] / 2.0
 _NORTH_STATION_LIMITS = tuple(
     CONE_BOSS_NORTH_STATION + deviation
-    for deviation in printed_deviations(
-        CONE_BOSS_NORTH_STATION,
-        3,
-        (-CONE_BOSS_NORTH_STATION_TOLERANCE_MM, CONE_BOSS_NORTH_STATION_TOLERANCE_MM),
-        unit=UNIT,
-    )
+    for deviation in CONE_BOSS_NORTH_STATION_DEVIATIONS_MM
 )
 CONE_BOSS_STANDOFF_WORST_MM = {
     "north": _NORTH_STATION_LIMITS[0] - _BODY_RADIUS_MAX,
@@ -234,10 +234,6 @@ for _name, _standoff in CONE_BOSS_STANDOFF_WORST_MM.items():
             f"the {_name} cone boss stands {_standoff:.3f} mm off the body at the "
             f"printed limits, under the {CONE_BOSS_STANDOFF_FLOOR_MM:.3f} mm edge break"
         )
-if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _CONE_BOSS_HALF_BAND:
-    raise AssertionError(
-        "north cone-boss face station band exceeds the stacks' half band"
-    )
 
 # Final solid volume, the sum of the per-feature analytic terms the build
 # checks natively one feature at a time (build_dt_cone_pivot_post.py asserts

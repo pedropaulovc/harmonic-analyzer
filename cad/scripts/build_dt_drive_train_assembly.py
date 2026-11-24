@@ -985,6 +985,7 @@ from build_dt_cone_pivot_post import (  # noqa: E402
 )
 from dt_cone_pivot_post_spec import (  # noqa: E402
     ATTACHMENT_THRU_DIA as POST_ATTACHMENT_THRU_DIA,
+    CONE_BOSS_NORTH_STATION_DEVIATIONS_MM as POST_CONE_BOSS_NORTH_DEVIATIONS,
     CRANK_BOSS_DIA as POST_CRANK_BOSS_DIA,
     DRAWING_PRECISION_BY_NAME as POST_DRAWING_PRECISION,
     UNIT as POST_UNIT,
@@ -1408,10 +1409,9 @@ _PINION_TURNED_RADIUS_UP = _PINION_TURNED_DIA_BAND[1] / 2.0
 _BOSS_NORTH_BAND = printed_deviations(
     POST_CRANK_BOSS_NORTH_FACE, POST_DRAWING_PRECISION["CrankBossStartZ"], unit=POST_UNIT
 )
-_CONE_BOSS_NORTH_BAND = tuple(
-    d / 2.0
-    for d in printed_deviations(POST_CONE_BOSS_LENGTH, POST_DRAWING_PRECISION["ConeBossLen"], unit=POST_UNIT)
-)
+# The collar face's station prints at the title block (owner ruling
+# 2026-11-24, audit part 2 C9): its own limits, not half the face-to-face.
+_CONE_BOSS_NORTH_BAND = POST_CONE_BOSS_NORTH_DEVIATIONS
 _COLLAR_WIDTH_BAND = printed_deviations(
     SHAFT_COLLAR_THICKNESS, SHAFT_DRAWING_PRECISION["CollarWidth"], unit=SHAFT_UNIT
 )
@@ -1995,7 +1995,8 @@ PIVOT_BASE_THREAD_FIT = require_through_seat_fit(
 # plate's post-mount taps (explicit +/-0.10 stations).  Its journal runs at the
 # incline to its mount-hole line, so the mount holes' .XX stations move it
 # along the cone axis by sin(I); the shaft collar bears on the boss's north
-# face, half the ConeBossLen band off the post centre.
+# face, its station's title-block band off the post centre (owner ruling
+# 2026-11-24, audit part 2 C9).
 _SIN_INCLINE = math.sin(math.radians(INCLINE_DEG))
 _COS_INCLINE = math.cos(math.radians(INCLINE_DEG))
 POST_SCREW_FLOAT_MM = (
@@ -2006,7 +2007,7 @@ POST_BOSS_FACE_AXIAL_BAND_MM = (
     PLAT_POST_MOUNT_STATION_TOL_MM
     + POST_SCREW_FLOAT_MM
     + _POST_MOUNT_X_BAND * _SIN_INCLINE
-    + tip_printed_band_mm(POST_DRAWING_PRECISION["ConeBossLen"]) / 2.0
+    + max(abs(deviation) for deviation in POST_CONE_BOSS_NORTH_DEVIATIONS)
 )
 # Pivot-screw head vs the block's plain north face: the head stands on its
 # shoulder at PIVOT_STATION and floats in the plate's reamed pivot bore by

@@ -43,7 +43,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _surface_finish
 import dt_cone_gear_shaft_spec as cone_shaft
 import dt_cone_pivot_post_spec as cone
-import dt_crankshaft_spec as crankshaft
 from _feature_requirements import part_metadata, requirement
 from _printed_limits import drilled_limits as _drilled_band
 from _printed_limits import limits as _band
@@ -577,12 +576,6 @@ CONE_BORE_NOTE = 2
 MESH_NOTE = 3
 
 
-def fit_clearance_text(clearance_mm: tuple[float, float]) -> str:
-    """A diametral clearance range as inch REF text: ``.0010-.0023``."""
-    low, high = clearance_mm
-    return f"{cone_shaft.inch_text(low, 4)}-{cone_shaft.inch_text(high, 4)}"
-
-
 def _printed(value_mm: float, name: str) -> str:
     """A dimension's value as the sheet prints it (its part-owned places)."""
     return cone_shaft.inch_text(value_mm, _P[name])
@@ -590,13 +583,13 @@ def _printed(value_mm: float, name: str) -> str:
 
 # The sheet's numbered notes, one block (rule 7: at most four lines).  The
 # collar on the .827 face is named by its drawing number, not by "ITS" or a
-# bare COLLAR (R5 fix attempt 1, blocker).
+# bare COLLAR (R5 fix attempt 1, blocker).  Fit audit 2026-11-23 F02 (rule
+# 4, form 2): both bores print the reamer's size with no band; each names
+# the journal turned last to it, whose sheet prints the clearance.
 SHEET_NOTES = "\n".join(
     (
-        f"{CRANK_BORE_NOTE}. RUNNING FIT ON CRANKSHAFT MHA-DT-11 (CLEARANCE "
-        f"{fit_clearance_text(crankshaft.JOURNAL_DIAMETRAL_CLEARANCE_MM)}).",
-        f"{CONE_BORE_NOTE}. RUNNING FIT ON CONE SHAFT MHA-DT-04 (CLEARANCE "
-        f"{fit_clearance_text(cone_shaft.JOURNAL_DIAMETRAL_CLEARANCE_MM)});",
+        f"{CRANK_BORE_NOTE}. RUNNING FIT: CRANKSHAFT MHA-DT-11 JOURNAL IS TURNED TO THIS BORE.",
+        f"{CONE_BORE_NOTE}. RUNNING FIT: CONE SHAFT MHA-DT-04 JOURNAL IS TURNED TO THIS BORE;",
         f"   MHA-DT-04 COLLAR RUNS ON "
         f"{_printed(cone.CONE_BOSS_NORTH_STATION, 'ConeBossNorthZ')} FACE.",
         f"{MESH_NOTE}. {_printed(cone.CRANK_ABOVE_CONE, 'CrankAboveCone')} AND "

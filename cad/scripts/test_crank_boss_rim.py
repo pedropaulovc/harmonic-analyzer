@@ -42,13 +42,12 @@ def test_the_floor_is_the_ruled_quarter_millimetre() -> None:
 def test_the_64t_station_is_the_collar_stack() -> None:
     """#916 (Main's ruling (b), 2026-09-27): the 64T is set against MHA-DT-04's
     thrust collar, which bears on the cone boss's north end; toward the post it
-    moves by the boss end long (ConeBossLen's .XX row, half per end) and the
-    collar thin (CollarWidth's printed short limit).  The two butts are closed
+    moves by the boss end's station band (ConeBossNorthZ at the title block's
+    .XXX, owner ruling 2026-11-24, audit part 2 C9) and the collar thin
+    (CollarWidth's printed short limit).  The two butts are closed
     nominally."""
-    boss_end = (
-        rim.printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"], unit=rim.POST_UNIT)
-        / 2.0
-    )
+    boss_end = post.CONE_BOSS_NORTH_STATION_TOLERANCE_MM
+    assert boss_end == pytest.approx(0.005 * 25.4, abs=1e-3)
     collar = -shaft.printed_length_deviations("CollarWidth")[0]
     assert rim.GEAR64_STATION_TOWARD_POST == pytest.approx(boss_end + collar)
     assert rim.collar_contacts(SEATED) == pytest.approx(0.0, abs=1e-9)

@@ -51,7 +51,7 @@ from _single_limit_tolerance import SW_TOL_MAX, set_single_limit
 from _sketch_circle import define_circle
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _holes import HoleSpec, wizard_holes
 from _named_views import octant_rotation
@@ -71,7 +71,6 @@ from dt_cone_pivot_post_spec import (
     CONE_BOSS_DIA,
     CONE_BOSS_LENGTH,
     CONE_BOSS_NORTH_STATION,
-    CONE_BOSS_NORTH_STATION_TOLERANCE_MM,
     CRANK_ABOVE_CONE,
     CRANK_ABOVE_CONE_BAND,
     CRANK_BORE_DIA,
@@ -94,10 +93,8 @@ from dt_cone_pivot_post_spec import (
     JOURNAL_REFERENCE_X,
     JOURNAL_REFERENCE_Z,
     PART_DATUMS,
-    JOURNAL_BORE_BAND,
     JOURNAL_RIM_BREAK,
     JOURNAL_RIM_BREAK_BAND,
-    RUNNING_BORE_BAND,
     SURFACE_FINISHES,
     UNIT,
 )
@@ -1021,27 +1018,15 @@ def build(adapter: Any) -> dict[str, str]:
         HARVESTED_VOLUME_MM3,
         0.001 * HARVESTED_VOLUME_MM3,
     )
-    # Four accuracy features on this casting: both running bores carry the
-    # band that closes the `shaft_in_bushing` fit class against their turned
-    # shafts (cad/docs/tolerance-policy.md), the spacing between them the
-    # 16T:64T mesh band, and the cone axis above the foot the band that keeps
-    # the tip's stub inside the adjuster's cup.  Everything else -- cast body
-    # and head diameters, boss diameters, boss extents, mounting-hole
-    # stations -- runs at the title block's general grade.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "CrankBoreProfile",
-        "CrankBoreDia",
-        *deviations(RUNNING_BORE_BAND),
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "JournalBoreProfile",
-        "JournalBoreDia",
-        *deviations(JOURNAL_BORE_BAND),
-        display_unit=UNIT,
-    )
+    # Two accuracy features on this casting: the spacing between the running
+    # bores carries the 16T:64T mesh band, and the cone axis above the foot
+    # the band that keeps the tip's stub inside the adjuster's cup.  Both
+    # bores print the .4385 reamer's size with no band: the journals of
+    # MHA-DT-11 and MHA-DT-04 are turned last to them (fit audit 2026-11-23
+    # F02).  The collar face's station takes the title block (owner ruling
+    # 2026-11-24, audit part 2 C9).  Everything else -- cast body and head
+    # diameters, boss diameters, boss extents, mounting-hole stations -- runs
+    # at the title block's general grade.
     # The mesh band on the bore-to-bore spacing (derivation in
     # dt_cone_pivot_post_spec.CRANK_ABOVE_CONE_BAND).
     set_dimension_bilateral_tolerance(
@@ -1049,16 +1034,6 @@ def build(adapter: Any) -> dict[str, str]:
         "BoreSpacingReference",
         "CrankAboveCone",
         *deviations(CRANK_ABOVE_CONE_BAND),
-        display_unit=UNIT,
-    )
-    # The collar thrust face's station from the post axis: the half
-    # face-to-face band the drive-train stacks book (derivation in
-    # dt_cone_pivot_post_spec.CONE_BOSS_NORTH_STATION_TOLERANCE_MM).
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "ConeBossStationReference",
-        "ConeBossNorthZ",
-        CONE_BOSS_NORTH_STATION_TOLERANCE_MM,
         display_unit=UNIT,
     )
     # The journal rims' break prints as its single MAX limit: the leg is

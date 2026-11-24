@@ -265,9 +265,13 @@ def test_cone_boss_length_lives_in_the_bore_plane_section() -> None:
 
 def test_cone_boss_north_station_shares_the_face_to_face_global() -> None:
     """The printed collar-face station and the boss extrusion cannot drift
-    apart, and its band is the half face-to-face band the stacks book."""
+    apart, and its band is the title block's .XXX (owner ruling 2026-11-24,
+    audit part 2 C9), which the stacks book from the station's limits."""
     assert spec.CONE_BOSS_NORTH_STATION == spec.CONE_BOSS_LENGTH / 2.0
-    assert spec.CONE_BOSS_NORTH_STATION_TOLERANCE_MM <= spec.printed_band_mm(2) / 2.0
+    assert spec.CONE_BOSS_NORTH_STATION_DEVIATIONS_MM == spec.printed_deviations(
+        spec.CONE_BOSS_NORTH_STATION, 3, unit=spec.UNIT
+    )
+    assert spec.CONE_BOSS_NORTH_STATION_TOLERANCE_MM == pytest.approx(0.005 * 25.4, abs=1e-3)
 
 
 def test_part_owns_every_printed_decimal_place() -> None:
@@ -679,14 +683,15 @@ def test_body_diameter_takes_the_title_block_band() -> None:
 
 
 def test_both_cone_bosses_stand_proud_of_the_body_at_every_limit() -> None:
-    """#2756: the north face's least station (.827 - .002) and the far face's
+    """#2756: the north face's least station (.827 - .005, the title block
+    since owner ruling 2026-11-24, audit part 2 C9) and the far face's
     (1.654's least less the north face's greatest) each clear the body's
     largest radius by at least the title block's edge break, so the pads are
     real cast bosses a shop can face, never flush with or inside the round."""
     inch = 25.4
     body_r_max = (round(spec.BODY_DIA / inch, 2) + 0.01) / 2.0
-    north_min = 0.827 - 0.002
-    far_min = (1.654 - 0.005) - (0.827 + 0.002)
+    north_min = 0.827 - 0.005
+    far_min = (1.654 - 0.005) - (0.827 + 0.005)
     assert spec.CONE_BOSS_STANDOFF_WORST_MM["north"] == pytest.approx(
         (north_min - body_r_max) * inch
     )
@@ -788,8 +793,9 @@ def test_both_bores_read_size_then_ream_thru_and_flag_their_fit_note() -> None:
         assert name not in drawing.DIMENSION_SUFFIXES
         rows = drawing.DIMENSION_CALLOUTS[name].splitlines()
         assert rows[0] == f"REAM THRU, SEE NOTE {note}"
-    assert _note(1).startswith("1. RUNNING FIT ON CRANKSHAFT MHA-DT-11 (CLEARANCE ")
-    assert _note(2).startswith("2. RUNNING FIT ON CONE SHAFT MHA-DT-04 (CLEARANCE ")
+    # Fit audit 2026-11-23 F02: each note names the journal turned to it.
+    assert _note(1).startswith("1. RUNNING FIT: CRANKSHAFT MHA-DT-11 JOURNAL IS TURNED")
+    assert _note(2).startswith("2. RUNNING FIT: CONE SHAFT MHA-DT-04 JOURNAL IS TURNED")
 
 
 def test_crank_bore_mate_line_stands_clear_of_the_head_height_extension() -> None:
@@ -1020,37 +1026,27 @@ def test_numbered_notes_state_each_bores_fit_and_its_locations_mates() -> None:
     """Novice-rubric screen (rules 4, 7 and 26): the four location dimensions
     carried their mates in words, the 1.694 named its mesh only by tooth
     count, and the bores said RUNS ON with no fit.  Each bore's numbered note
-    states the standard running fit on its shaft by drawing number with the
-    clearance its printed limits give as REF, and the mates its locations
-    serve: the bore spacing and the crank boss's north-face station set the
-    16T crank pinion against the 64T crank drive gear (rule 4: a gear centre
-    distance names the mesh), and the MHA-DT-04 collar runs on the cone
-    boss's north face.  The cone-axis height takes the title block's .XX band,
-    so rule 4 asks no mate of it.  Four lines in all (rule 7)."""
-    import dt_cone_gear_shaft_spec as shaft
+    names the running fit and the journal turned last to it by drawing
+    number (fit audit 2026-11-23 F02, rule 4 form 2: the clearance prints on
+    the journal's sheet), and the mates its locations serve: the bore
+    spacing and the crank boss's north-face station set the 16T crank pinion
+    against the 64T crank drive gear (rule 4: a gear centre distance names
+    the mesh), and the MHA-DT-04 collar runs on the cone boss's north face.
+    The cone-axis height takes the title block's .XX band, so rule 4 asks no
+    mate of it.  Four lines in all (rule 7)."""
     import dt_crank_drive_gear_spec as gear64
     import dt_crank_pinion_spec as pinion
-    import dt_crankshaft_spec as crankshaft
 
     assert drawing.SHEET_NOTES == "\n".join(
         (
-            "1. RUNNING FIT ON CRANKSHAFT MHA-DT-11 (CLEARANCE .0010-.0023).",
-            "2. RUNNING FIT ON CONE SHAFT MHA-DT-04 (CLEARANCE .0010-.0023);",
+            "1. RUNNING FIT: CRANKSHAFT MHA-DT-11 JOURNAL IS TURNED TO THIS BORE.",
+            "2. RUNNING FIT: CONE SHAFT MHA-DT-04 JOURNAL IS TURNED TO THIS BORE;",
             "   MHA-DT-04 COLLAR RUNS ON .827 FACE.",
             "3. 1.694 AND .842 SET MESH OF PINION MHA-DT-10 WITH GEAR MHA-DT-07.",
         )
     )
     assert len(drawing.SHEET_NOTES.splitlines()) <= 4
-    # Each REF range is the bore's printed limits against its shaft's.
-    for note, bore, (upper, lower), shaft_dia, (shaft_upper, shaft_lower) in (
-        (1, spec.CRANK_BORE_DIA, spec.RUNNING_BORE_BAND, crankshaft.JOURNAL_DIA, crankshaft.JOURNAL_DIA_BAND),
-        (2, spec.BORE_DIA, spec.JOURNAL_BORE_BAND, shaft.JOURNAL_DIA, shaft.SECTION_DIA_BANDS[0]),
-    ):
-        clearance = (
-            bore + lower - (shaft_dia + shaft_upper),
-            bore + upper - (shaft_dia + shaft_lower),
-        )
-        assert f"(CLEARANCE {drawing.fit_clearance_text(clearance)})" in _note(note)
+    assert "CLEARANCE" not in drawing.SHEET_NOTES
     # The cited values are the ones the locations print.
     for value, name in (
         (spec.CRANK_ABOVE_CONE, "CrankAboveCone"),
