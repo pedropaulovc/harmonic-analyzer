@@ -20,7 +20,6 @@ from _fit_deviations import deviations
 from _fit_ream_h7 import REAM_H7
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from _package_units import drawing_unit
-from dt_cone_tip_gear_spec import inch_range
 from dt_cone_tip_gear_tl_form_cutter_spec import (
     BIT_DIA_LIMITS,
     BIT_RADIUS,
@@ -151,10 +150,8 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 # The tap callout's drill prints at the title block's three places.
 HOLE_CALLOUT_PRECISION = 3
+# Rule 4 form 3: the reamer's size, REAM, and the bought bit as the gauge.
 DIMENSION_CALLOUTS: dict[str, str] = {
     "BarDia": "STOCK OK",
-    "CrossHoleDia": (
-        f"REAM THRU\nSLIDING FIT ON {BIT_NUMBER}\n"
-        f"(CLEARANCE {inch_range(SLIP_CLEARANCE)} REF)"
-    ),
+    "CrossHoleDia": f"REAM THRU\n{BIT_NUMBER} ENTERS,\nNO SHAKE",
 }

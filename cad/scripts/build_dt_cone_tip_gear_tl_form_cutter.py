@@ -47,7 +47,6 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _feature_tree import name_last_feature
 from _gear import equation_curve
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
@@ -70,8 +69,6 @@ from _straight_gash_gear import _affine_expression, _literal, _plane_through
 from _visibility import blank_reference_geometry
 from dt_cone_tip_gear_tl_form_cutter_spec import (
     BIT_DIA,
-    BIT_DIA_PLACES,
-    BIT_DIA_TOL,
     BIT_LENGTH,
     BIT_RADIUS,
     DRAWING_DIMENSIONS,
@@ -98,7 +95,6 @@ from dt_cone_tip_gear_tl_form_cutter_spec import (
     TIP_DEPTH,
     TIP_STOCK,
     TIP_WIDTH,
-    UNIT,
     VOLUME_TOL_MM3,
     bit_volume_mm3,
     clearance_direction,
@@ -668,17 +664,8 @@ def build(adapter: Any) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The rod's ground diameter carries the supplier's band (the slip fit in
-    # the bar); every other size takes the title block's rows.
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "BitProfile",
-        "BitDia",
-        BIT_DIA_TOL,
-        places=BIT_DIA_PLACES,
-        display_unit=UNIT,
-    )
-    # The flat's depth takes the title block's .XXX row, like every other size.
+    # The rod's ground diameter is bought to size and prints as stock with no
+    # band; every size takes the title block's rows, the flat's depth its .XXX.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

@@ -5,7 +5,7 @@
 # Fit batch DT, 2026-11-24.
 necessity:
   - id: N-01
-    feature: "top view, Ø.1260 REAM THRU cross hole, SLIDING FIT ON MHA-DT-37-TL-01"
+    feature: "top view, Ø.1260 REAM THRU cross hole, MHA-DT-37-TL-01 ENTERS, NO SHAKE"
     kind: mesh
     reason: "bit slip over .003 shifts T006's cut form"
     source: "fit audit 2026-11-23 part 2 batch plan 3b: the fly-cutter bar's cross hole stays reamed with the set's .1260, with no band; a #30 drill frees nothing (the reamer is a member of the set) and breaks the bar's .003 slip limit (test_dt_cone_tip_gear_tl_cutter_bar_drawing: slip <= .003)"
