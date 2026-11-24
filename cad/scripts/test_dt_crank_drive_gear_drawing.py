@@ -519,17 +519,16 @@ def test_bore_and_keyway_dimensions_link_one_matched_fit_note() -> None:
     assert f"THE KEYED LAND OF CONE GEAR SHAFT {notes.SHAFT_MATE_NUMBER}" in note
     assert "LAND 1" not in note
     assert notes.KEY_MATE_NUMBER in note
-    # The clearances print as REF in the keyed cone gears' form, off the
-    # same limits (draw_dt_cone_gear.sheet_notes on the same land).
+    # The clearances print as REF off the keyed cone gears' limits
+    # (draw_dt_cone_gear.bore_clearances_mm on the same land); the cone
+    # gears' own sheets now say the land is turned to them (fit batch DT,
+    # 2026-11-24: rule 4 form 2, the acceptance on MHA-DT-04).
     import draw_dt_cone_gear as cone_drawing
 
     (round_lo, round_hi), (key_lo, key_hi) = cone_drawing.bore_clearances_mm(30)
     reference = (
         f"(CLEARANCE {spec.inch_text(round_lo, 4)}-{spec.inch_text(round_hi, 4)} "
         f"ON \u00d8, {spec.inch_text(key_lo, 4)}-{spec.inch_text(key_hi, 4)} KEYWAY TO KEY)"
-    )
-    assert reference in " ".join(
-        line.strip() for line in cone_drawing.sheet_notes(30).splitlines()
     )
     assert reference in note
     assert note.endswith("SLIDES ON, NO ROCK.")
