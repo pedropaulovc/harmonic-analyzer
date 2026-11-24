@@ -1,0 +1,37 @@
+# Why each ream and each band tighter than the title block stays on MHA-DT-11
+# (drawing-guidelines rule 4; owner ruling 2026-11-24: the reason lives here,
+# not on the sheet).  The fit audit's rows for MHA-DT-11 (2026-11-23,
+# approved as recommended 2026-11-24): the drive-pin holes reamed with no
+# band, the offsets, spigot and overall kept as drawn; the three turned fits
+# became REF under note 3 and are not tight bands.
+necessity:
+  - id: N-01
+    feature: "sheet 1, END view, 2X Ø.0930 REAM .1555 drive-pin holes"
+    kind: bought_seat
+    reason: "pins MHA-DT-VN-67 press in, not by hand"
+    source: "fit audit 2026-11-23, MHA-DT-11.drive_pin_holes; dt_crankshaft_spec DRIVE_PIN_PRESS_INTERFERENCE"
+  - id: N-02
+    feature: "sheet 1, END view, 2X drive-pin offset .2756 ±.0009"
+    kind: gap
+    reason: "spacing error must stay inside the wheel's slip"
+    source: "fit audit 2026-11-23, MHA-DT-11.drive_pin_offset (kept); owner ruling C2 2026-11-22"
+  - id: N-03
+    feature: "sheet 1, FRONT view, Ø.689 +.000/-.004 seat spigot, note 2"
+    kind: gap
+    reason: "the chain wrapping MHA-PD-09 passes over it"
+    source: "fit audit 2026-11-23, MHA-DT-11.spigot (kept); dt_crankshaft_spec SPIGOT_DIA_BAND"
+  - id: N-04
+    feature: "sheet 1, FRONT view, far end to dome root 5.06 +.000/-.016"
+    kind: gap
+    reason: "long closes MHA-DT-31's air to MHA-PD-09"
+    source: "fit audit 2026-11-23, MHA-DT-11.overall_length (kept); dt_crankshaft_spec SHAFT_LENGTH_BAND"
+  - id: N-05
+    feature: "sheet 1, note 1, taper-ream 1:48 with MHA-DT-31 for MHA-DT-09"
+    kind: joint
+    reason: "the taper pin alone drives the crank"
+    source: "fit audit 2026-11-23, MHA-DT-31_DT-11.taper_pin: kept as drawn (README, Kept as drawn)"
+  - id: N-06
+    feature: "sheet 1, (Ø.125) match-ream thru MHA-DT-10 pin hole for MHA-DT-29"
+    kind: gap
+    reason: "a loose drive pin walks out of the boss"
+    source: "fit audit 2026-11-23, MHA-DT-10_DT-11.pin_hole_MHA-DT-29 (unchanged); dt_crank_pinion_spec PIN_FIT_LINES"
