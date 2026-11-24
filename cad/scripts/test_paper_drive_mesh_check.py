@@ -60,6 +60,18 @@ def test_reducer_band_ends_both_pass_the_design_floors() -> None:
     assert top.label.endswith("at +0.051")
 
 
+def test_reducer_holds_every_gate_where_the_trial_may_move_the_plate() -> None:
+    """Owner ruling 2026-11-24, audit part 2 question C1: the trial may move
+    the plate .001 toward S, never below -.001 of DETAIL K, nor above +.002."""
+    low, high = disc.CENTRE_DISTANCE_TRIAL_WINDOW
+    assert high == disc.CENTRE_DISTANCE_WINDOW[1]
+    assert low == pytest.approx(disc.CENTRE_DISTANCE - 0.001 * 25.4)
+    trial_low = mesh.reducer_trial_low_mesh()
+    assert trial_low.failures() == []
+    assert 0.0 < trial_low.backlash_mm[0] < mesh.reducer_band_meshes()[0].backlash_mm[0]
+    assert trial_low.label.endswith("at -0.025")
+
+
 def _min_tips() -> tuple[float, float]:
     return (
         min(p.blank_radius_mm for p in knob.manufactured_profiles()),

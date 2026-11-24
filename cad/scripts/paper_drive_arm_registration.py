@@ -35,9 +35,11 @@ LOCATOR_PAIR_BASELINE_MM = ARM.LOCATOR_PAIR_BASELINE_MM
 # included; along S-K the set band below is tighter, and both are checked.
 REDUCER_AXIS_SETUP_RADIUS_MM = reducer_k_setting_diameter_mm() / 2.0
 # The drawn matched setting: K held this band (upper, lower) from
-# CENTRE_DISTANCE along S-K (the reducer's set band,
-# pd_rack_pinion_spec.CENTRE_DISTANCE_SET_BAND_IN, which the mesh sets).
-REDUCER_CENTRE_DISTANCE_SET_BAND_MM = ARM.DISC.CENTRE_DISTANCE_SET_BAND
+# CENTRE_DISTANCE along S-K: the reducer's set band opened below by what the
+# trial mesh may move the plate toward S
+# (pd_rack_pinion_spec.CENTRE_DISTANCE_TRIAL_BAND; owner ruling 2026-11-24,
+# audit part 2 question C1), DETAIL K's printed limits.
+REDUCER_CENTRE_DISTANCE_SET_BAND_MM = ARM.DISC.CENTRE_DISTANCE_TRIAL_BAND
 # Unit vector S -> K in the arm frame (x along the arm, y across), the
 # frame of every K reading below.
 _S_TO_K = (ARM.KNOB_BORE_STATION - ARM.PIN_STATION, ARM.KNOB_BORE_OFFSET)
