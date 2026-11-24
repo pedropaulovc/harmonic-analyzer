@@ -3,9 +3,12 @@
 # in 1018 bar on hand (cad/config/shop-equipment/stock-bought.toml
 # 1018-round-5-8, allocated to MHA-PD-28 by owner ruling 2026-11-20, #2425).
 # Setup 1, the bar's end, about 1 in out: MHA-PD-19's hole is read first,
-# by a pilot. Op 10 squares the sawn end and turns the first .06 of it down
-# until the plate's reamed hole just slides on it without shake, and mikes
-# it (that reading is the hole); Op 30 faces the pilot off. The pilot only
+# by a pilot. Op 10 squares the sawn end and turns the first .06 of it to
+# Ø.4400; Op 20 brings it down with an abrasive strip on a file, a few
+# strokes between readings (the MHA-PD-23 journal's polishing route: an
+# insert does not take a dependable tenth, traveler review r3), until the
+# plate's reamed hole just slides on it without shake, and mikes
+# it (that reading is the hole); Op 40 faces the pilot off. The pilot only
 # reads the hole and is gone before anything of the bush is cut, so the
 # finished press diameter is one diameter from the shoulder to the rear
 # face, as the sheet draws it (traveler review r2: a pilot left on the bush
@@ -14,10 +17,10 @@
 # bar past three times the press diameter (prechips lathe_holding).
 # Setup 2, the bar pulled out, rear end out: face the rear face (Z0), turn
 # the hub to its .51-.53 band back past the parting line, then the press
-# diameter and the shoulder (datum A): Op 80 finishes the press diameter to
+# diameter and the shoulder (datum A): Op 90 finishes the press diameter to
 # the PILOT reading plus .0007-.0016. That is the sheet's .0005-.0016 over
 # the hole (Codjiflo #3486: the pilot stands in for the hole, so its slip
-# comes off the interference): Op 10 mikes the pilot after every pass and
+# comes off the interference): Op 20 mikes the pilot after every few strokes and
 # writes the last two readings, the one the plate would not go on (BEFORE)
 # and the one it slides on (PILOT); the hole lies between them, so with
 # BEFORE at most .0002 over PILOT (pilot_step_max_in) a press diameter of
@@ -35,7 +38,7 @@
 # hole and makes only the size, so the bore's axis is this drilled hole's.
 # The wall stack budgets the drill's run-off (DRILL_RUN_OFF_DEG) for the WALL
 # .068 MIN, but that run-off is wider than the bore's .002 perpendicularity to
-# A, so the drill does not hold the .002: Ops 150–170 check the drilled hole over
+# A, so the drill does not hold the .002: Ops 160–180 check the drilled hole over
 # a gauge pin before part-off, still in the chucking that turned the
 # shoulder, and a bush whose hole has run off is scrapped there. No boring
 # bar on hand trues a Ø.24 hole 1.14 deep (cad/config/shop-equipment/
@@ -58,14 +61,14 @@
 # measured mate; the checks on the press diameter are against the written
 # PILOT reading.
 # The minus pin gauges (gauges.toml pin-gauges, to
-# order) are for Op 150's pin in the B hole. The .2490 reamer (reamer-2490, to order) is
+# order) are for Op 160's pin in the B hole. The .2490 reamer (reamer-2490, to order) is
 # MHA-PD-00's, not this traveler's.
 title = "Transgear Knob Bush"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished steel round bar, 5/8 in"
 stock = "Lot: {{process.quantity:d}} bush. Ø{{process.stock_dia_in:.3dot}} bar, on hand (saw a {{process.bar_length_in:g}} in working piece off the bar); the bush takes {{cad.pitch_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); steel cut with cutting oil. MHA-PD-19, the plate this bush is pressed into, is made first and is at the lathe: Setup 1 fits a pilot to its hole and writes its reading, and Op 80 turns the press diameter from that reading. Left for MHA-PD-00 step 11 (not made here): the Ø{{cad.bore_dia_min_in:.4dot}} ream after pressing (the MHA-PD-08 journal is turned to that bore), which follows the B hole this traveler drills in the chucking that turns the press diameter and the shoulder (Ops 150–170 check the hole's squareness to the shoulder before part-off). To order (not on hand): the minus pin gauges for the B hole (Op 150)."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); steel cut with cutting oil. MHA-PD-19, the plate this bush is pressed into, is made first and is at the lathe: Setup 1 fits a pilot to its hole and writes its reading, and Op 90 turns the press diameter from that reading. Left for MHA-PD-00 step 11 (not made here): the Ø{{cad.bore_dia_min_in:.4dot}} ream after pressing (the MHA-PD-08 journal is turned to that bore), which follows the B hole this traveler drills in the chucking that turns the press diameter and the shoulder (Ops 160–180 check the hole's squareness to the shoulder before part-off). To order (not on hand): the minus pin gauges for the B hole (Op 160)."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
 material_key = "lathe-1018-cold-finished"
@@ -105,7 +108,7 @@ rough_radial_doc_mm = 0.5
 finish_radial_doc_mm = 0.05
 turn_feed_mm_rev = 0.0762
 turn_start_z_mm = 0.5
-# Ops 150-170, the B hole's squareness to the shoulder over a gauge pin. The pin
+# Ops 160-180, the B hole's squareness to the shoulder over a gauge pin. The pin
 # is the largest minus pin of the set (gauges.toml pin-gauges, Class ZZ, .001
 # steps) that enters by hand, pushed in pin_depth_in; the indicator reads it
 # at pin_near_in and pin_far_in out of the rear face, with a chuck mark at
@@ -191,6 +194,11 @@ name = "Smooth file"
 ref = "jig-files"
 
 [[tools]]
+id = "strip"
+name = "220-grit sanding roll, a strip backed by the smooth file"
+ref = "sanding-roll-220"
+
+[[tools]]
 id = "deburr"
 name = "Deburring countersink"
 ref = "deburring-set"
@@ -202,7 +210,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; about {{process.pilot_stickout_in:g}} in out of the jaw fronts."
-datum = "None kept: the pilot is cut on the bar's end and Op 30 faces it off."
+datum = "None kept: the pilot is cut on the bar's end and Op 40 faces it off."
 diagram = { file = "diagrams/pilot.svg", alt = "The 5/8 in bar in the 3-jaw, about 1 in out: a short pilot turned on its end, MHA-PD-19's hole offered to it by hand; the pilot is miked and then faced off." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{process.pilot_stickout_mm}}", minimum_diameter_mm = "{{process.pilot_min_dia_mm}}", support = "none" }
 
@@ -212,15 +220,24 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the sawn end square. Turn the first {{process.pilot_length_in:.2dot}} in of the end to Ø{{process.pilot_rough_dia_in:.4dot}}, then in passes of .0001 a side or less, miking the pilot after each. After each, spindle stopped, offer MHA-PD-19's hole to the pilot by hand, both wiped clean, chamfered side first. Stop when the plate first slides on without shake. Write the last two readings: BEFORE = ______, PILOT = ______."
+instruction = "Face the sawn end square. Turn the first {{process.pilot_length_in:.2dot}} in of the end to Ø{{process.pilot_rough_dia_in:.4dot}} and mike it: the pilot, left over MHA-PD-19's hole for Op 20 to fit."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
-inspection = "The plate slides onto the pilot by hand and does not shake on it; PILOT no more than {{process.pilot_step_max_in:.4dot}} under BEFORE (the hole lies between the two), micrometer."
-gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The plate shakes on the pilot, or PILOT is more than {{process.pilot_step_max_in:.4dot}} under BEFORE: face the pilot off and turn it again as Op 10. The plate slides on at the first trial: stop, its hole is over {{process.pilot_rough_dia_in:.4dot}}."
+speed_kind = "other"
+tool = "strip"
+drilling = "none"
+sizing = "other"
+instruction = "Bring the pilot down with a strip of the 220-grit roll on the smooth file, never wrapped round the work: about 600 rpm, a few strokes. Then, spindle stopped, mike the pilot and offer MHA-PD-19's wiped hole to it, chamfered side first. Repeat until the plate first slides on without shake. Write the last two readings: BEFORE = ______, PILOT = ______."
+inspection = "The plate slides onto the pilot by hand and does not shake on it; PILOT no more than {{process.pilot_step_max_in:.4dot}} under BEFORE (the hole lies between the two), micrometer."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The plate shakes on the pilot, or PILOT is more than {{process.pilot_step_max_in:.4dot}} under BEFORE: face the pilot off and repeat Ops 10–20, with fewer strokes between readings. The plate slides on at Ø{{process.pilot_rough_dia_in:.4dot}}, before any stroke: stop, its hole is over size."
 feed = "hand"
 
 [[setups.operations]]
@@ -229,7 +246,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the pilot off, leaving the end one flat face. The PILOT reading stays written for Op 80."
+instruction = "Face the pilot off, leaving the end one flat face. The PILOT reading stays written for Op 90."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -239,8 +256,8 @@ title = "Bar, rear end out: turn the hub, the press diameter and the shoulder, d
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "The bar pulled out: 3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts. The bar stays in the jaws from Op 40 to Op 190: the press diameter, the shoulder and the B hole share this chucking."
-datum = "Z0 (carriage DRO): the bar end faced in Op 40, the bush's rear face. The shoulder (datum A) is at Z{{cad.step_far_out_far_z_mm:in.3dot}}, the hub face {{cad.length_in:.3dot}} in."
+holding = "The bar pulled out: 3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts. The bar stays in the jaws from Op 50 to Op 200: the press diameter, the shoulder and the B hole share this chucking."
+datum = "Z0 (carriage DRO): the bar end faced in Op 50, the bush's rear face. The shoulder (datum A) is at Z{{cad.step_far_out_far_z_mm:in.3dot}}, the hub face {{cad.length_in:.3dot}} in."
 diagram = { file = "diagrams/bar.svg", alt = "The 5/8 in bar in the 3-jaw, rear end out: the rear face faced, the hub turned back past the parting line, the press diameter turned back to the shoulder, the B hole drilled through past the parting line; the bush parted off .02 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
@@ -265,7 +282,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Turn the hub's diameter from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}, cutting oil: rough to Ø{{cad.outer_rough_dia_mm:in.3dot}}, then one finish pass to Ø{{cad.outer_dia_mm:in.3dot}}; mike it once. Ops 70–80 turn the press diameter out of its end, back to the shoulder."
+instruction = "Turn the hub's diameter from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}, cutting oil: rough to Ø{{cad.outer_rough_dia_mm:in.3dot}}, then one finish pass to Ø{{cad.outer_dia_mm:in.3dot}}; mike it once. Ops 80–90 turn the press diameter out of its end, back to the shoulder."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 inspection = "Hub Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}, micrometer."
@@ -273,7 +290,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Hub over {{cad.outer_dia_max_in:.3dot}} in Op 50: another finish pass. Under {{cad.outer_dia_min_in:.3dot}}: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 40."
+instruction = "Hub over {{cad.outer_dia_max_in:.3dot}} in Op 60: another finish pass. Under {{cad.outer_dia_min_in:.3dot}}: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 50."
 feed = "hand"
 
 [[setups.operations]]
@@ -298,7 +315,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish it to the same shoulder Z in passes of .0005 a side or less, miking between them, to PILOT plus {{process.press_over_pilot_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}}, aiming at PILOT plus .0011. The AR's nose leaves its R0.4 mm in the root (Ops 90–110 take it out). Write down the cross-slide DRO X (diameter) at the finished diameter."
+instruction = "Finish it to the same shoulder Z in passes of .0005 a side or less, miking between them, to PILOT plus {{process.press_over_pilot_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}}, aiming at PILOT plus .0011. The AR's nose leaves its R0.4 mm in the root (Ops 100–120 take it out). Write down the cross-slide DRO X (diameter) at the finished diameter."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
 inspection = "Press diameter {{process.press_over_pilot_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}} over the written PILOT reading, along its length, micrometer: {{cad.step_interference_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}} over the hole, which is PILOT to PILOT plus {{process.pilot_step_max_in:.4dot}}."
@@ -310,7 +327,7 @@ speed_kind = "other"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle stopped, P1 blade in the post, its chuck-side face about .10 from the shoulder (clear of the root's fillet). Bring its tip onto the press diameter through the {{process.touch_leaf_in:.3dot}} leaf until it drags; set DRO X to the Op 80 reading plus .004 (the leaf, on the diameter). Leaf out."
+instruction = "Spindle stopped, P1 blade in the post, its chuck-side face about .10 from the shoulder (clear of the root's fillet). Bring its tip onto the press diameter through the {{process.touch_leaf_in:.3dot}} leaf until it drags; set DRO X to the Op 90 reading plus .004 (the leaf, on the diameter). Leaf out."
 feed = "hand"
 
 [[setups.operations]]
@@ -319,7 +336,7 @@ speed_kind = "other"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Back X out to DRO X the Op 80 reading plus .04 (on the diameter, .02 a side): above the root's fillet, still below the hub. Z: bring the blade's chuck-side face onto the shoulder's face through the leaf until it drags. Leaf out; move the carriage {{process.touch_leaf_in:.3dot}} toward the chuck by its handwheel dial and lock it."
+instruction = "Back X out to DRO X the Op 90 reading plus .04 (on the diameter, .02 a side): above the root's fillet, still below the hub. Z: bring the blade's chuck-side face onto the shoulder's face through the leaf until it drags. Leaf out; move the carriage {{process.touch_leaf_in:.3dot}} toward the chuck by its handwheel dial and lock it."
 feed = "hand"
 
 [[setups.operations]]
@@ -328,15 +345,15 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle running, cutting oil: plunge until DRO X reads the Op 80 reading, no further. The blade cuts only the AR's fillet out of the root, leaving its own corner: the sheet's R{{cad.shoulder_root_r_max_in:.3dot}} MAX, which the AR's nose cannot form."
+instruction = "Spindle running, cutting oil: plunge until DRO X reads the Op 90 reading, no further. The blade cuts only the AR's fillet out of the root, leaving its own corner: the sheet's R{{cad.shoulder_root_r_max_in:.3dot}} MAX, which the AR's nose cannot form."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
-inspection = "Root: square to the eye, no fillet, step or groove at the press diameter's end; the press diameter by micrometer next to the root as Op 80 (PILOT plus {{process.press_over_pilot_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}})."
+inspection = "Root: square to the eye, no fillet, step or groove at the press diameter's end; the press diameter by micrometer next to the root as Op 90 (PILOT plus {{process.press_over_pilot_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}})."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Press diameter over PILOT plus {{cad.step_interference_max_in:.4dot}} in Op 80: another AR finish pass of .0005 a side or less to the same shoulder Z, checked again as Op 80, before Op 90. Over in Op 110: the same AR pass, write down its new DRO X, then repeat Ops 90–110 with that reading. Under PILOT plus {{process.press_over_pilot_min_in:.4dot}} (too light a press in that hole), or a groove at the root: part the turned length off as scrap and start again at Op 40."
+instruction = "Press diameter over PILOT plus {{cad.step_interference_max_in:.4dot}} in Op 90: another AR finish pass of .0005 a side or less to the same shoulder Z, checked again as Op 90, before Op 100. Over in Op 120: the same AR pass, write down its new DRO X, then repeat Ops 100–120 with that reading. Under PILOT plus {{process.press_over_pilot_min_in:.4dot}} (too light a press in that hole), or a groove at the root: part the turned length off as scrap and start again at Op 50."
 feed = "hand"
 
 [[setups.operations]]
@@ -386,13 +403,13 @@ tool = "dti"
 drilling = "none"
 sizing = "other"
 instruction = "The same four readings at {{process.pin_far_in:.2dot}} out, and the same two differences. Pull the pin."
-inspection = "Each difference here less its Op 160 difference, either sign: at most {{process.pin_tilt_reading_max_mm:.3f}} mm on the 0.001 mm indicator (holds ⊥ Ø{{cad.bore_perpendicularity_in:.3dot}} to A with the pin's fit charged; a full-swing difference reads twice the tilt)."
+inspection = "Each difference here less its Op 170 difference, either sign: at most {{process.pin_tilt_reading_max_mm:.3f}} mm on the 0.001 mm indicator (holds ⊥ Ø{{cad.bore_perpendicularity_in:.3dot}} to A with both planes at this limit together and the pin's fit charged; a full-swing difference reads twice the tilt)."
 gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{process.pin_tilt_reading_max_mm}}"] }]
 feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Over {{process.pin_tilt_reading_max_mm:.3f}} mm in Op 170: the B hole has run off; part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 40."
+instruction = "Over {{process.pin_tilt_reading_max_mm:.3f}} mm in Op 180: the B hole has run off; part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 50."
 feed = "hand"
 
 [[setups.operations]]
@@ -412,7 +429,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a shim wrap of brass shim, {{process.regrip_grip_in:.2dot}} in of the hub in the jaws from the shoulder (a pencil line that far from it at the jaw fronts), the wrap cut no wider than that, the press diameter clear of the jaws behind it; the parted end (the hub face) out. Nothing seats the bush axially."
-datum = "Z0 (carriage DRO): the hub face as faced in Op 210, {{cad.shoulder_in:.3dot}} from the shoulder, preset in Op 200 from the shoulder's reading over the .350 gauge block through a {{process.touch_leaf_in:.3dot}} feeler leaf."
+datum = "Z0 (carriage DRO): the hub face as faced in Op 220, {{cad.shoulder_in:.3dot}} from the shoulder, preset in Op 210 from the shoulder's reading over the .350 gauge block through a {{process.touch_leaf_in:.3dot}} feeler leaf."
 diagram = { file = "diagrams/regrip.svg", alt = "The bush turned round, its hub in the jaws over a shim wrap with nothing behind it: the parted end faced to the shoulder station." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_datum_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
@@ -439,7 +456,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.shoulder_band_mm}}" },
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Shoulder over {{cad.shoulder_max_in:.3dot}} in Op 210: chuck it again as Op 200 and repeat Ops 200–210 from that reading. Under {{cad.shoulder_min_in:.3dot}}, or the length outside its band with the shoulder in: scrapped, not reworked; make another from Setup 2."
+instruction = "Shoulder over {{cad.shoulder_max_in:.3dot}} in Op 220: chuck it again as Op 210 and repeat Ops 210–220 from that reading. Under {{cad.shoulder_min_in:.3dot}}, or the length outside its band with the shoulder in: scrapped, not reworked; make another from Setup 2."
 feed = "hand"
 
 [[setups]]

@@ -2,7 +2,7 @@
   <rect class="paper" x="0" y="0" width="760" height="320"/>
   <text class="title" x="20" y="20">Setup 1: a pilot on the bar's end, fitted to MHA-PD-19's hole (not to scale)</text>
   <rect class="fixture-vise" x="40" y="70" width="140" height="200"/>
-  <rect class="part-waste" x="180" y="125" width="300" height="90"/>
+  <rect class="part-rest" x="180" y="125" width="300" height="90"/>
   <rect class="part-waste" x="480" y="135" width="40" height="70"/>
   <rect class="part-removed" x="480" y="125" width="40" height="10"/>
   <rect class="part-removed" x="480" y="205" width="40" height="10"/>
@@ -18,7 +18,8 @@
   <line class="leader" x1="612" y1="55" x2="613" y2="75"/>
   <text class="label" x="560" y="300">Mike the pilot: PILOT = ______</text>
   <line class="leader" x1="552" y1="292" x2="521" y2="200"/>
-  <text class="label" x="215" y="255">Op 30 faces the pilot off to here</text>
+  <text class="label" x="215" y="255">Op 40 faces the pilot off to here</text>
   <line class="leader" x1="425" y1="243" x2="480" y2="214"/>
-  <text class="label" x="505" y="285">AR</text>
+  <text class="label" x="296" y="292">AR, then the strip on the file</text>
+  <line class="leader" x1="478" y1="286" x2="490" y2="270"/>
 </svg>
