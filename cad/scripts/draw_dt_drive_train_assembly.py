@@ -1456,8 +1456,8 @@ CONE_CRANK_STEPS = _note_text(
         f"1R. BOND T024 ON THE LAND, {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER ON T030, PER THE SHEET 1 NOTE.",
         # #3292 (owner ruling 2026-11-21, options 2 + 4): a bonded slip fit
         # cures wherever it sits in its clearance, so T024 is centred while
-        # the 638 is wet and accepted after cure on its tooth runout about
-        # MHA-DT-04 (1X), the value cone_set_stack books.  Both read in the
+        # the 638 is wet and recorded after cure on its tooth runout about
+        # MHA-DT-04 (1W), the value cone_set_stack books.  Both read in the
         # sheet 16 row's setup: MHA-DT-04 on end, its journal in a V-block,
         # so it turns on its own axis, and 1T clips the comb in that same
         # setup without moving it (Codjiflo review of #3324).
@@ -1484,11 +1484,16 @@ CONE_CRANK_STEPS = _note_text(
         # joints wait on the comb (Codjiflo review of PR #2531); a bonded slip
         # fit has nothing to adjust, so the remedy parts it (drawing-
         # guidelines: about 250 C releases 638) and cleans the cured film out.
-        # Both T024 checks share that remedy; step 1 has one letter left for
-        # the clean, which names the redo it prepares.
-        f"1W. CHECK THAT {PHASING_COMB} CLIPS OVER T030 AND T024, BOTH ARMS ON T036.",
-        f"1X. CHECK T024'S TOOTH RUNOUT ABOUT MHA-DT-04 ({acceptance_ref('t024-runout')}).",
-        "1Y. IF EITHER CHECK FAILS, TAKE T024 OFF AT 250 DEG C.",
+        # Owner ruling 2026-11-24, audit part 2 C5: "B. Keep the wet tap-true
+        # steps; the after-cure readings become a record only; strip and
+        # re-bond only if a gear hesitates in the 80-turn running check."  So
+        # 1W records, before the comb check, so the remedy follows that check
+        # alone (rule 22); a gear that hesitates in check 4R is stripped by
+        # 2G.  Step 1 has one letter left for the clean, which names the redo
+        # it prepares.
+        f"1W. RECORD T024'S TOOTH RUNOUT ABOUT MHA-DT-04 ({acceptance_ref('t024-runout')}).",
+        f"1X. CHECK THAT {PHASING_COMB} CLIPS OVER T030 AND T024, BOTH ARMS ON T036.",
+        "1Y. IF IT FAILS, TAKE T024 OFF AT 250 DEG C.",
         "1Z. CLEAN THE CURED 638 OFF ITS BORE AND LAND FOR A REDO FROM 1P.",
         # Step 1 has no letter left for the spigot's round, so it opens step 2,
         # before the post goes on.
@@ -1496,7 +1501,7 @@ CONE_CRANK_STEPS = _note_text(
         "2A. BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024, PER THE SHEET 1 NOTE.",
         # #2473 (owner ruling 2026-11-22, option G): MHA-DT-37 cures in the
         # socket wherever its float and tilt leave it, so its pivot is tapped
-        # true while the 638 is wet and accepted after cure (2F) on its
+        # true while the 638 is wet and recorded after cure (2E) on its
         # runout about MHA-DT-04's journal, the value cone_set_stack books.
         # Both read in the sheet 16 row's setup, the one 1S left standing:
         # MHA-DT-04 on end, its journal in a V-block.  The comb is a flat U
@@ -1519,21 +1524,23 @@ CONE_CRANK_STEPS = _note_text(
         # and 2F), so the hold is the condition 2B starts and this step ends:
         # the comb comes off once the bonds grab, as 1U takes it off.
         f"2D. REMOVE {PHASING_COMB} ONCE THE BONDS GRAB, MHA-DT-37 HELD HOME ON T024 UNTIL THEN.",
-        # The cured tip is accepted on the comb and on its pivot's runout,
-        # before the post is assembled, so a failure costs no more than the
-        # tip: the one remedy parts every tip bond, cleans the film off the
-        # coated spigot and the pivot too, and redoes the tip from 1L:
-        # cleaning the pivot takes MHA-DT-38 off, so it is bonded back on at
-        # 1L (Codjiflo reviews of PR #2531; machinist review of PR #2557
-        # named the parts and the restart).  The clean names the redo it
-        # prepares, as 1Z does.
-        f"2E. ONCE CURED, CHECK THAT {PHASING_COMB} CLIPS OVER ALL FIVE GEARS, BOTH ARMS ON T036.",
-        # 2F reads the pivot and, in the same setup, T012's and T018's teeth
+        # 2E records the pivot and, in the same setup, T012's and T018's teeth
         # (#2473, owner ruling 2026-11-22: the pivot's reading does not see
-        # MHA-DT-04's socket standing off its journal).
-        f"2F. CHECK THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT ({acceptance_ref('pivot-runout')})"
+        # MHA-DT-04's socket standing off its journal).  Owner ruling
+        # 2026-11-24, audit part 2 C5: the readings are a record only; the
+        # tip is stripped and re-bonded only if a gear hesitates in check
+        # 4R's run, so 2G names that run beside the comb check it follows.
+        f"2E. ONCE CURED, RECORD THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT ({acceptance_ref('pivot-runout')})"
         f" AND OF T012'S AND T018'S TEETH ({acceptance_ref('spigot-gear-runout')}).",
-        "2G. IF ANY CHECK FAILS, AT 250 DEG C TAKE MHA-DT-37, T018, T012, T024 AND MHA-DT-38 OFF.",
+        # The cured tip is accepted on the comb before the post is assembled,
+        # so a failure costs no more than the tip: the one remedy parts every
+        # tip bond, cleans the film off the coated spigot and the pivot too,
+        # and redoes the tip from 1L: cleaning the pivot takes MHA-DT-38 off,
+        # so it is bonded back on at 1L (Codjiflo reviews of PR #2531;
+        # machinist review of PR #2557 named the parts and the restart).  The
+        # clean names the redo it prepares, as 1Z does.
+        f"2F. CHECK THAT {PHASING_COMB} CLIPS OVER ALL FIVE GEARS, BOTH ARMS ON T036.",
+        "2G. IF IT FAILS, OR A GEAR HESITATES IN CHECK 4R, AT 250 DEG C TAKE MHA-DT-37, T018, T012, T024 AND MHA-DT-38 OFF.",
         "2H. CLEAN THE CURED 638 OFF EVERY PARTED FACE: SPIGOT, PIVOT, LAND, BORES, SOCKET, FOR A REDO FROM 1L.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
@@ -2268,11 +2275,16 @@ CHECKS = _note_text(
         "4P. TIGHTEN MHA-DT-VN-51 WITH THE CONE SET HELD THERE.",
         # Rule 23 (rubric sample round 5): the adjustable clamp's acceptance.
         "4Q. PUSH THE CONE SET BY HAND: IT DOES NOT SWING.",
+        # Owner ruling 2026-11-24, audit part 2 C5: the bonded gears'
+        # after-cure readings are a record; a gear that hesitates in this run
+        # is what strips and re-bonds the tip (step 2G, which 4S names in the
+        # one line the field has: 69 of 70 characters).
         f"4R. TURN THE CRANK {CHECK_RUN_CRANK_TURNS} TURNS: THE GEARS MUST NEVER BIND "
-        "(A GEAR OUTSIDE THE TWO 4E BINDS MAY SHAKE).",
+        "OR HESITATE (A GEAR OUTSIDE THE TWO 4E BINDS MAY SHAKE).",
         # Rubric sample round 9 (rule 22): the check, its remedy, the hold and
         # the redo are one step each.
-        "4S. IF ONE BINDS, LOOSEN MHA-DT-VN-51 THERE.",
+        "4S. IF ONE BINDS, LOOSEN MHA-DT-VN-51 THERE "
+        f"(ONE HESITATES: STEP {_step_ref('post-and-tip-block', 'G')}).",
         "4T. REDO 4N-4R.",
         # Owner ruling 2026-11-20 (Pedro, #1177: no blind plate hole, so no
         # post dowel; #3085 option B): only the two MHA-DT-VN-61 screws'
