@@ -242,7 +242,9 @@ made to their mate.
      to that hole. The mate's size prints as REF and the fit is the
      requirement: an acceptance by feel (`TURN TO MHA-XX-nn BORE: TURNS FREE,
      NO SHAKE`) or a clearance or interference range no narrower than `.001`
-     wide. This is the default wherever the mate is made in this shop. A
+     wide. A bonded fit states the clearance range, which rule 23 wants
+     inside its grade's gap. This is the default wherever the mate is made
+     in this shop. A
      hole match-drilled or reamed in place through its mate at assembly, for
      the pin that joins them, is this form and needs no further answer.
   3. **Reamed to the bought mate.** Where the mate is bought to size (drill
