@@ -5,5 +5,11 @@ checks:
     check: "washer bearing width round the hole"
     kind: gap
     reason: "washer rim meets the hole edge; clamp loses its seat"
-    source: "owner ruling 2026-11-24, fit audit part 2 C12 (A, per Main); computed in build_fr_top_frame"
+    source: "owner ruling 2026-11-24, fit audit part 2 C12: \"A. The ring is not needed: the rule becomes the washer's bearing width (1.47 mm, 1.64 today) and question 19 stands.\"; computed in build_fr_top_frame"
+    basis: worst_case
+  - id: C-02
+    check: "keeper receiver leaves less than D15's accepted .076 with drill wander"
+    kind: wall
+    reason: "keeper's 2-56 tap breaks into the rail web's side"
+    source: "Main, by the owner's delegation of 2026-11-24 (rulings.md D15): .0767 at the printed lug centre .114, accepted under the .080 target (MHA-FR-02 RV-14); computed in build_fr_top_frame"
     basis: worst_case
