@@ -94,10 +94,13 @@ def test_receiver_engagement_and_separation_are_real_geometry() -> None:
 
 
 def test_print_worst_joint_stack_preserves_bottoming_tap_and_ligaments() -> None:
-    assert spec.PLATE_THICKNESS_MIN == pytest.approx(0.9144)
-    assert spec.PLATE_THICKNESS_MAX == pytest.approx(1.1176)
+    # The sheet at the title block's .040 ±.005 (fit audit 2026-11-23,
+    # MHA-MS-03.plate_thickness): reach .195-.225 against 1.5 D .129 and
+    # the .245 full thread.
+    assert spec.PLATE_THICKNESS_MIN == pytest.approx(0.889)
+    assert spec.PLATE_THICKNESS_MAX == pytest.approx(1.143)
     assert spec.PLATE_FULL_THREAD_MIN == pytest.approx(6.223)
-    assert spec.PLATE_SCREW_PENETRATION_MAX == pytest.approx(5.6896)
+    assert spec.PLATE_SCREW_PENETRATION_MAX == pytest.approx(5.715)
     assert spec.PLATE_SCREW_PENETRATION_MIN >= 1.5 * screw.MAJOR_DIA
     assert spec.PLATE_SCREW_PENETRATION_MAX < spec.PLATE_FULL_THREAD_MIN
     assert spec.PLATE_TAP_LEAD_MIN == pytest.approx(1.016)
@@ -161,7 +164,7 @@ def test_hole_wizard_callouts_print_three_places_by_native_variable() -> None:
 def test_matched_pair_uses_functional_positions_and_a_real_shop_sequence() -> None:
     # Plain clearance stations ride the title block's .XXX (L2 ruling).
     assert spec.PLATE_HOLE_POSITION_TOLERANCE_MM == pytest.approx(_inch(0.005))
-    assert spec.PLATE_THICKNESS_TOLERANCE_MM == pytest.approx(_inch(0.004))
+    assert spec.PLATE_THICKNESS_TOLERANCE_MM == pytest.approx(_inch(0.005))
     assert all(block_point[:2] == plate_point[:2] for block_point, plate_point
                in zip(spec.BLOCK_PLATE_HOLE_POINTS, spec.PLATE_HOLE_POINTS, strict=True))
 
@@ -357,7 +360,9 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         "set_hidden_lines_removed", "set_dimension_callouts",
         "add_property_linked_note",
     ):
-        monkeypatch.setattr(drawing, name, lambda *a, **kw: None)
+        # The plate prints no dimension callout (its thickness links no note).
+        if hasattr(drawing, name):
+            monkeypatch.setattr(drawing, name, lambda *a, **kw: None)
     notes = []
     monkeypatch.setattr(drawing, "add_note",
                         lambda adapter, text, x, y: notes.append((text, (x, y))) or object())
@@ -624,7 +629,8 @@ def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
     assert len(block_drawing.COVER_HOLE_MATCH_DRILL.splitlines()) == 2
     assert plate_drawing.NOTE_LINK == f"SEE NOTE {plate_drawing.NOTE_NUMBER}"
     assert plate_drawing.MATCHED_PAIR_NOTE.startswith(f"{plate_drawing.NOTE_NUMBER}. ")
-    assert plate_drawing.DIMENSION_CALLOUTS == {"PlateThickness": plate_drawing.NOTE_LINK}
+    # The thickness takes the title block and links no note.
+    assert not hasattr(plate_drawing, "DIMENSION_CALLOUTS")
 
 
 def test_stock_precision_and_worst_case_walls_use_each_printed_band() -> None:
@@ -833,5 +839,5 @@ def test_tight_bands_name_their_mates_and_no_wall_states_a_shortfall() -> None:
     assert block_drawing.REBATE_NOTE.endswith(f"{stick_number} MEASURING STICK")
     # Every wall meets the .080 target, so no callout states a MIN.
     assert not any("MIN" in text for text in callouts.values())
-    assert "THICKNESS SETS THEIR REACH" in plate_drawing.MATCHED_PAIR_NOTE.replace("\n", " ")
+    assert "THICKNESS" not in plate_drawing.MATCHED_PAIR_NOTE
     assert spec.MATCH_DRILL_DATUM_ALIGNMENT in block_drawing.COVER_HOLE_MATCH_DRILL.replace("\n", " ")

@@ -95,8 +95,9 @@ def test_plate_feature_bands_are_the_printed_ones() -> None:
     features = export_features.requirement_manifest("ms_stop_plate")["features"]
     assert features["far_end"]["length"] == pytest.approx([_in(0.83), _in(0.85)])
     assert features["roof_edge"]["height"] == pytest.approx([_in(0.55), _in(0.57)])
+    # The sheet's .040 at the title block's .XXX.
     assert features["outer_face"]["thickness"] == pytest.approx(
-        [_in(0.036), _in(0.044)]
+        [_in(0.035), _in(0.045)]
     )
     chamfers = features["roof_chamfers"]
     assert chamfers["size"] == pytest.approx([_in(0.03), _in(0.05)])
@@ -123,6 +124,5 @@ def test_the_matched_pair_note_is_the_one_the_sheet_prints() -> None:
     assert notes.DRAWING_NOTES == notes.MATCHED_PAIR_NOTE
     assert notes.MATCHED_PAIR_NOTE.splitlines() == [
         "1. MATCHED PAIR WITH MHA-MS-02 STOP BLOCK: LOCATING ENDS AND EDGES FLUSH.",
-        "    2X MHA-MS-VN-51 SCREWS ENTER FREELY; THICKNESS SETS THEIR REACH IN",
-        "    MHA-MS-02 TAPS.",
+        "    2X MHA-MS-VN-51 SCREWS ENTER FREELY INTO MHA-MS-02 TAPS.",
     ]

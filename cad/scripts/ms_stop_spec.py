@@ -145,7 +145,12 @@ PLATE_DRAWING_DIMENSIONS = {
 LOCATING_END_NOTE = "LOCATING END"
 LOCATING_EDGE_NOTE = "LOCATING EDGE"
 MATCH_DRILL_DATUM_ALIGNMENT = "LOCATING ENDS AND EDGES FLUSH"
-PLATE_THICKNESS_TOLERANCE_MM = 0.1016  # .004
+# The plate is the .040 brass sheet as supplied: its thickness prints at the
+# title block's .XXX (fit audit 2026-11-23, MHA-MS-03.plate_thickness, was
+# +-.004): at +-.005 the screws still reach 1.5 D into the block's taps and
+# stay short of their full thread (asserted below). The analysis band is
+# that printed row, not a native tolerance.
+PLATE_THICKNESS_TOLERANCE_MM = printed_band_mm(3, unit=UNIT)
 # Plain THRU clearance holes: the match-drill, not a band, aligns the pair, so
 # the stations take the title block's .XXX (rule 4; delegated ruling L2,
 # 2026-11-07: every web below still clears the .080 target).

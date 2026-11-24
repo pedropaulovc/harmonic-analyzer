@@ -59,9 +59,6 @@ demoted:
   fr_frame_assembly: fit-batch-fr
   fr_top_frame: fit-batch-fr
   ha_harmonic_analyzer_assembly: fit-batch-ha
-  ms_measuring_stick_assembly: fit-batch-ms
-  ms_stick: fit-batch-ms
-  ms_stop_plate: fit-batch-ms
   pd_paper_drive_assembly: fit-batch-pd
   pd_platen_bottom_guide: fit-batch-pd
   pd_platen_guide: fit-batch-pd
