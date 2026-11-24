@@ -1503,7 +1503,7 @@ def test_the_pivot_screw_is_unlocked_and_the_spacer_bonded_as_made() -> None:
     """MHA-PD-VN-57 runs through the bar, its tip faced below the front face,
     and carries no lock (owner ruling U-MHA-PD-VN-57-no-lock, #1194): no
     stake, no threadlocker. The seat is shown in the pivot view. R9-6 never
-    faces MHA-PD-20.  Fit audit 2026-11-23 (pending owner confirmation): the
+    faces MHA-PD-20.  Owner ruling 2026-11-24, fit audit question 6: the
     spacer is bonded on the shoulder flush with its end (rule 23: the grade,
     the degrease, how it is held square while it cures, the compound kept
     off the running fit, and the cure before load), and the MHA-PD-VN-63
@@ -2822,8 +2822,10 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     assert pivot[12] == "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW."
     assert pivot[13] == "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY."
     assert pivot[14] == "IF ALL THREE CHECKS PASS, SKIP 15R-15Z."
-    # The remedy takes the captured arm off before anything is cleaned.
-    assert pivot[15].startswith("UNSCREW ") and pivot[16] == "LIFT THE ARM OFF."
+    # The remedy takes the screw out with the arm captive on it (the bonded
+    # spacer keeps the arm on the shoulder) before anything is cleaned.
+    assert pivot[15].startswith("UNSCREW ")
+    assert pivot[16] == "LIFT IT OUT, THE ARM AND THE SPACER ON IT."
     assert pivot[17].startswith("FLUSH OIL INTO THE ARM'S BORE")
     assert "BAR BACK FACE" in pivot[18]
     # One repeat of the reseat, its checks, their skip and the strip: checks

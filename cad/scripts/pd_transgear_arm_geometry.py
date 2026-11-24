@@ -132,8 +132,9 @@ END_HALF_WIDTH_BAND = printed_reach_mm(2.0 * END_HALF_WIDTH, OUTLINE_PLACES) / 2
 OUTLINE_BAND = max(PIVOT_END_R_BAND, END_HALF_WIDTH_BAND)
 
 # --- Pivot at P: a drilled running clearance on the as-supplied shoulder ---
-# Fit audit 2026-11-23 (pending owner confirmation; owner: "can the holes not
-# be reamed in the first place"): a #9 drill at the title block's DRILLED
+# Owner ruling 2026-11-24, fit audit question 6 ("Pivot spacer MHA-PD-20
+# drilled #12 and bonded, with the arm pivot drilled #9", approved as
+# recommended; it reverses #2413): a #9 drill at the title block's DRILLED
 # HOLES row, where #2413's .1940 reamer and its GO / NO-GO pair stood.  The
 # arm only swings a few degrees to throw the feed in and is held on the
 # spacer by its spring; nothing reads a clearance window: the latch sets the
@@ -224,7 +225,7 @@ PIVOT_SHOULDER_END_ANGLE_ALLOWED = (
 )
 PIVOT_SHOULDER_END_SQUARENESS_ALLOWED = (
     PIVOT.SHOULDER_DIA + min(PIVOT.SHOULDER_DIA_LIMITS)
-) * math.tan(PIVOT_SHOULDER_END_ANGLE_ALLOWED)  # .0019
+) * math.tan(PIVOT_SHOULDER_END_ANGLE_ALLOWED)  # .0015
 
 
 # --- Pin at S: REAM THROUGH, the bore the MHA-PD-23 pin is bonded in ---------

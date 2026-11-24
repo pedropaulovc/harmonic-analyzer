@@ -2335,9 +2335,12 @@ def _step_text(
         f"{s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 15)}."
     )
     knob_shaft_out = f"DRAW THE {n['pd-transgear-knob-shaft']} SHAFT OUT FORWARD."
+    # The bonded spacer holds the arm captive on the shoulder, so the arm
+    # comes off the bar with the screw, not off the screw (Codjiflo r2 on
+    # #3487).
     pivot_unscrewed = (
         f"UNSCREW THE {n['pd-vn-transgear-pivot-screw']} SCREW.",
-        "LIFT THE ARM OFF.",
+        "LIFT IT OUT, THE ARM AND THE SPACER ON IT.",
     )
     # The pivot's reseat (15R-15U: unscrew, lift off, flush, clean; then
     # 15L-15P: reseat, re-check) is written once and done from 33 (the

@@ -667,7 +667,7 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
 
 
 def test_the_pivot_bore_is_one_drill_running_clear_on_any_shoulder() -> None:
-    """Fit audit 2026-11-23 (pending owner confirmation): the rocking pivot
+    """Owner ruling 2026-11-24, fit audit question 6: the rocking pivot
     takes a named drill under the DRILLED HOLES row, not a ream under a
     pin-gauge band; every as-supplied shoulder runs free in every hole the
     drill cuts."""
