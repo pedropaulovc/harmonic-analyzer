@@ -66,8 +66,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " (drilled_oversize_mm(unit='in'), -drilled_undersize_mm(unit='in')))",
         "each",
     ),
-    # Builders apply the same bands their specs publish on the sheet.
-    ("build_pn_pen_rod", "band"): ("DRAWING_BANDS", "values"),
     # for (feature, name), band in spec.MODEL_BANDS_MM.items(): deviations(band)
     ("build_dt_cone_gear_tl_keyed_arbor", "band"): ("spec.MODEL_BANDS_MM", "values"),
     ("build_dt_cylinder_gear_tl_cam_fixture", "deviations"): ("MODEL_BANDS_MM", "values"),
@@ -580,7 +578,7 @@ def _resolve(use: BandUse) -> list[tuple[str, Any]]:
 @pytest.mark.parametrize(
     ("module_name", "expected"),
     [
-        ("build_pn_pen_rod", "DRAWING_BANDS"),
+        ("build_dt_cone_gear_tl_keyed_arbor", "spec.MODEL_BANDS_MM"),
     ],
 )
 def test_local_sources_cover_every_band(module_name: str, expected: str) -> None:
