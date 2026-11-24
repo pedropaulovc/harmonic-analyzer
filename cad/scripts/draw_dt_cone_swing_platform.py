@@ -88,7 +88,6 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _part_properties import part_drawing_unit
 from _surface_finish import surface_finish_by_key
-from _title_block_units import render_number
 import _config
 import _telemetry
 import build_dt_cone_swing_platform as _part
@@ -477,9 +476,7 @@ _TIP_DOWEL_X_TEXT_X = (
 # MHA-DT-00 step 2's, not this sheet's).
 TIP_DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
 TIP_DOWEL_NOTE_NUMBER = 3
-TIP_DOWEL_WALL_TEXT = (
-    f"WALL {render_number(_chk.TIP_DOWEL_WEB_PRINTED_IN, _sp.UNIT, 3)} MIN"
-)
+TIP_DOWEL_WALL_TEXT = _chk.TIP_DOWEL_WALL_TEXT
 TIP_DOWEL_CALLOUT = "\n".join(
     (
         f"{_sp.TIP_DOWEL_HOLE_DRILL} DRILL THRU",
