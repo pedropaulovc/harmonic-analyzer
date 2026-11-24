@@ -43,8 +43,9 @@ _RING_PRONG_SHARE = 3.0 * math.atan(0.75) / (2.0 * math.pi)
 # bushings on the MHA-PD-23 pin (Ø3.9), the disc bore on the boss (Ø9), the
 # knob journal in the MHA-PD-28 bush's bore (Ø6.3246), the bush pressed in
 # the plate's ream (FN2, both modelled line to line at Ø11.1125; owner ruling
-# 2026-11-20, #2425), the drive collar's round bore on
-# the core (Ø4.8768), the MHA-PD-VN-70 pin's crest clear of the core's flat
+# 2026-11-20, #2425), the drive collar's drilled round bore on the core made
+# to fit it (both modelled line to line at Ø4.8514, the #11 drill; fit audit
+# 2026-11-23), the MHA-PD-VN-70 pin's crest clear of the core's flat
 # and its faced rear end flush on F, the MHA-PD-VN-54 dowels in the T24's Ø2.5
 # holes, every screw in its clearance hole (the MHA-PD-VN-71 shank in the
 # MHA-PD-16 cup web's #33 hole among them), and the MHA-PD-14 latch hook: its

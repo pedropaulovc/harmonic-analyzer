@@ -85,13 +85,18 @@ def test_round_bore_and_flat_pin_clear_the_core_and_round_stud_at_printed_limits
         (0.118 - 0.002) * INCH - (0.0627 * INCH) / 2.0,
         (0.118 + 0.002) * INCH - (0.0625 * INCH) / 2.0,
     )
-    curved_air = (bore[0] - core[1], bore[1] - core[0])
-    crest_air = (crest[0] - core_flat[1], crest[1] - core_flat[0])
-    assert core == pytest.approx((4.83108, 4.8514))
-    assert curved_air == pytest.approx((0.0254, 0.05842))
+    # Both fits are made on MHA-PD-08 by feel (fit audit 2026-11-23): the
+    # shaft's analysis bands are the collar's sizes less the fitted air.
+    curved_air = shaft.CORE_FIT_CLEARANCE
+    crest_air = shaft.CORE_FLAT_FIT_AIR
+    assert bore == pytest.approx((0.191 * INCH, 0.195 * INCH))
+    # The loosest core in the smallest bore to the tightest in the largest.
+    assert core == pytest.approx((bore[0] - curved_air[1], bore[1] - curved_air[0]))
+    assert curved_air == pytest.approx((0.0127, 0.05842))
     assert collar.BORE_CORE_CLEARANCE == pytest.approx(curved_air)
     assert collar.FLAT_PIN_CREST_LIMITS == pytest.approx(crest)
-    assert crest_air == pytest.approx((0.01651, 0.13589))
+    assert core_flat == pytest.approx((crest[0] - crest_air[1], crest[1] - crest_air[0]))
+    assert crest_air == pytest.approx((0.0, 0.0508))
     assert collar.FLAT_PIN_CREST_CLEARANCE == pytest.approx(crest_air)
     # The #8-32 UNC-2A class governs the blank: its largest major.
     stud_max = max(shaft.THREAD_BLANK_LIMITS)
@@ -99,10 +104,10 @@ def test_round_bore_and_flat_pin_clear_the_core_and_round_stud_at_printed_limits
     assert stud_air == pytest.approx(0.07874)
     assert collar.STUD_FLAT_PIN_AIR == pytest.approx(stud_air)
     with monkeypatch.context() as patch:
-        with pytest.raises(AssertionError, match="the flat pin's crest binds"):
+        with pytest.raises(AssertionError, match="flat analysis band is not"):
             _reloaded_collar(patch, shaft, "CORE_FLAT_BAND", (0.060, -0.015))
     with monkeypatch.context() as patch:
-        with pytest.raises(AssertionError, match="the bore binds"):
+        with pytest.raises(AssertionError, match="core analysis band is not"):
             _reloaded_collar(patch, shaft, "CORE_DIA_BAND", (0.030, -0.008))
     with pytest.raises(AssertionError, match="round stud cannot pass the flat pin"):
         _reloaded_collar(monkeypatch, shaft, "THREAD_BLANK_LIMITS", (4.50, 4.60))
@@ -111,9 +116,8 @@ def test_round_bore_and_flat_pin_clear_the_core_and_round_stud_at_printed_limits
 def test_fitted_rear_face_reacts_on_actual_f_at_every_printed_corner(
     monkeypatch,
 ) -> None:
-    core_r = (shaft.CORE_DIA + min(shaft.CORE_DIA_BAND)) / 2.0
     bore_r = (collar.BORE_DIA + max(collar.BORE_DIA_BAND)) / 2.0
-    float_max = bore_r - core_r
+    float_max = max(shaft.CORE_FIT_CLEARANCE) / 2.0
     # The bore's axis is bounded at both support sections of the core and
     # extrapolated to F; its rear mouth takes the title block's edge break.
     lever = 1.0 + 2.0 * shaft.FRONT_RELIEF_WIDTH_MAX / shaft.CORE_ACTIVE_LENGTH_MIN
@@ -124,7 +128,7 @@ def test_fitted_rear_face_reacts_on_actual_f_at_every_printed_corner(
         + shaft.TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
     )
     assert collar.ROUND_FIT_FLOAT_MAX == pytest.approx(float_max)
-    assert inner == pytest.approx(2.791574, abs=1e-6)
+    assert inner == pytest.approx(2.823324, abs=1e-6)
     assert collar.FRONT_BEARING_INNER_RADIUS_MAX == pytest.approx(inner)
     areas = [
         shaft.gear_bearing_area_lower(profile, inner)

@@ -55,7 +55,6 @@ import _config
 
 from _fit_close_running import SHAFT_G6_3_TO_6_MM
 from _fit_deviations import deviations
-from _fit_shaft_h import SHAFT_H
 from _gear_fit_limits import gear_tip_band_mm
 from _gear_quality import (
     shaft_turned_runout_mm,
@@ -67,7 +66,7 @@ from _gtol_cylinder import CylinderFace
 from _hole_spec import DRILL_POINT_H, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, edge_break_chamfer_mm, printed_band_mm
 from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -266,15 +265,44 @@ if _STUD_STATION_BAND > printed_band_mm(TIP_STATION_PLACES, unit=UNIT):
     raise AssertionError("MHA-PD-08 prints F from the tip looser than its stacks charge")
 
 # --- Solid D-core; no gear bore and no transverse torque hole ---------------
-# .191 SHAFT_H (#290 fit F10; 4.850 before): under the drive collar's .192
-# reamed round bore.  The current form root lifts FRONT_CORE_AIR_MIN well over
-# its 0.035 floor.
-CORE_DIA = 4.8514  # .191
-CORE_DIA_BAND = SHAFT_H  # .0000/-.0008
-CORE_DIA_PLACES = 4
-CORE_FLAT_FROM_AXIS = 2.1336  # .084 (#290 fit F11)
-CORE_FLAT_BAND = (0.0, -0.01524)  # .0000/-.0006
-CORE_FLAT_PLACES = 4
+# Made to fit (fit audit 2026-11-23, pending owner confirmation; owner,
+# 2026-11-23: "can the holes not be reamed in the first place").  The drive
+# collar's bore is drilled #11 and this core is turned to slide in it by hand
+# with no shake; the D-flat is then milled last, a little at a time, until the
+# collar with its MHA-PD-VN-70 pin pressed slides on by hand.  Both sizes
+# print as REF (.191, .084); the fit is the requirement (sheet note 2).  The
+# nominals are the #11 drill's size and the flat the model is cut at.
+#
+# ANALYSIS numbers, never printed: what the stacks charge the two fits.
+# - CORE_FIT_CLEARANCE: the diametral clearance a by-hand, no-shake slide
+#   leaves in the actual bore, taken as wide as the reamed fit it replaces
+#   allowed at its loosest (.0023).  What fails if it is .002 looser: the
+#   collar, which seats the chain wheel, floats that much more on the core
+#   (pd_transgear_drive_collar_spec.ROUND_FIT_FLOAT_MAX, charged to the root
+#   corner air and the collar's bearing on F).
+# - CORE_DIA_BAND: the core's size alone, for the stacks that read it without
+#   the collar: the bore anywhere in the title block's DRILLED HOLES row
+#   over the drill, less that clearance.  (upper, lower) about CORE_DIA.
+# - CORE_FLAT_FIT_AIR: the radial air the flat's trial fit leaves under the
+#   pin's crest, the collar centred: none to two cuts of the fitting step.
+#   What fails if it is .002 looser: only the knob's lost motion grows
+#   (pd-transgear-drive-collar RV-04); tighter, the crest binds on the flat.
+# - CORE_FLAT_BAND: the flat as fitted, for the stacks that read it alone:
+#   the collar's lowest crest less the widest air to its highest crest less
+#   none (pd_transgear_drive_collar_spec asserts it against its own crest
+#   limits, which this module cannot import).
+CORE_DIA = 4.8514  # .191 REF: the collar's #11 drill
+CORE_DIA_PLACES = 3
+CORE_FIT_CLEARANCE = (0.0127, 0.05842)  # .0005 .. .0023 diametral, by feel
+CORE_DIA_BAND = (
+    drilled_oversize_mm(unit=UNIT) - min(CORE_FIT_CLEARANCE),
+    -max(CORE_FIT_CLEARANCE),
+)  # +.0035/-.0023, analysis only
+CORE_FLAT_FROM_AXIS = 2.1336  # .084 REF
+CORE_FLAT_PLACES = 3
+CORE_FLAT_FIT_STEP = 0.0254  # .001: the most one fitting cut takes off
+CORE_FLAT_FIT_AIR = (0.0, 2.0 * CORE_FLAT_FIT_STEP)  # 0 .. .002 radial
+CORE_FLAT_BAND = (0.12065, -0.03429)  # +.00475/-.00135, analysis only
 # The drawing's frames print GEOMETRIC_TOLERANCES_IN; readers take the
 # derived mm.  The turned-shaft grade is the shared shaft_turned_runout_mm()
 # on the .001 in grid (asserted below).

@@ -5,11 +5,12 @@ closure.  ``build_pd_transgear_drive_collar`` marks and tolerances exactly
 ``DRAWING_DIMENSIONS`` / ``DRAWING_PRECISION`` on the model and
 ``draw_pd_transgear_drive_collar`` keeps exactly the same names.
 
-The plain round reamed bore slides over the knob shaft's .191 solid D-core
-(#2409: no internal D, no broach).  The drive flat is the crest of the
+The plain round bore is drilled #11 and the knob shaft's .191 REF solid
+D-core is turned to slide in it by hand (#2409: no internal D, no broach;
+fit audit 2026-11-23: no reamer).  The drive flat is the crest of the
 MHA-PD-VN-70 dowel pressed parallel to the axis into a blind ream on local
--Y; that crest bears on the core's D-flat and carries the torque.  There is
-no rear slot or front spring pin.
+-Y; that crest bears on the core's D-flat, which is milled last to fit it,
+and carries the torque.  There is no rear slot or front spring pin.
 The existing seat-diameter body is supplied long and its REAR FACE is faced
 at assembly until the removable T24 meets the unchanged chain-plane setting,
 with that rear face seated directly on the integral gear front F.
@@ -48,7 +49,6 @@ import math
 import textwrap
 
 import _config
-from _fit_ream_h7 import REAM_H7
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
@@ -73,7 +73,9 @@ from pd_vn_transgear_collar_flat_pin_spec import PRESS_HOLE_DIA as FLAT_PIN_HOLE
 from pd_transgear_knob_shaft_spec import (
     CORE_DIA,
     CORE_DIA_BAND,
+    CORE_FIT_CLEARANCE,
     CORE_FLAT_BAND,
+    CORE_FLAT_FIT_AIR,
     CORE_FLAT_FROM_AXIS,
     CORE_TOTAL_RUNOUT,
     CORE_FRONT_FROM_F,
@@ -184,12 +186,24 @@ if not PILOT_LENGTH_FITTED_MIN <= PILOT_LENGTH <= PILOT_LENGTH_FITTED_MAX:
     raise AssertionError("MHA-PD-22's modelled pilot lies outside its fitted band")
 
 # --- Round bore over the D-core (#2409) --------------------------------------
-# #290 fit D10: the .192 REAM_H7 bore (.1920-.1925, the .192 reamer) slides
-# over the core's .191 SHAFT_H.  No flat is cut in the bore: the MHA-PD-VN-70
-# pin's crest (below) is the drive flat.
-BORE_DIA = 4.8768  # .192
-BORE_DIA_BAND = REAM_H7
-BORE_DIA_PLACES = 4
+# Drilled, and its mate made to it (fit audit 2026-11-23, pending owner
+# confirmation; owner, 2026-11-23: "can the holes not be reamed in the first
+# place").  #11 DRILL THRU at the title block's DRILLED HOLES row; the knob
+# shaft's D-core is then turned to slide in THIS bore by hand with no shake
+# (MHA-PD-08 note 2), so no reamer and no gauge is bought for it.  No flat is
+# cut in the bore: the MHA-PD-VN-70 pin's crest (below) is the drive flat.
+# BORE_DIA_BAND is an ANALYSIS band, never printed as limits: what the drill
+# is expected to cut, the row's plus allowance over the drill's size.
+BORE_DRILL = "#11"
+BORE_DIA = 4.8514  # .191, the #11 drill
+BORE_DIA_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # +.004/-.000
+BORE_DIA_PLACES = 3
+if not math.isclose(BORE_DIA, CORE_DIA, abs_tol=1e-9) or not math.isclose(
+    max(CORE_DIA_BAND) + min(CORE_FIT_CLEARANCE), max(BORE_DIA_BAND), abs_tol=1e-9
+):
+    raise AssertionError(
+        "MHA-PD-08's core analysis band is not this drilled bore's less its fit"
+    )
 _CORE_R_MIN = (CORE_DIA + min(CORE_DIA_BAND)) / 2.0
 _BORE_R_MIN = (BORE_DIA + min(BORE_DIA_BAND)) / 2.0
 _BORE_R_MAX = (BORE_DIA + max(BORE_DIA_BAND)) / 2.0
@@ -257,8 +271,10 @@ def cone_cylinder_volume(
     )
 
 
-# The largest radial float of the round bore on the plain core.
-ROUND_FIT_FLOAT_MAX = _BORE_R_MAX - _CORE_R_MIN
+# The largest radial float of the round bore on the plain core: half the
+# widest clearance the core's by-hand fit leaves in the actual bore (the core
+# follows the bore, so the two analysis bands are never stacked).
+ROUND_FIT_FLOAT_MAX = max(CORE_FIT_CLEARANCE) / 2.0
 # The rear mouth seats on F over the shaft's neck and its root corner (the
 # neck's largest radius plus its largest corner, .0815): spend both turned
 # surfaces' runout and the whole float, no common-axis credit.
@@ -289,18 +305,27 @@ FRONT_BEARING_AREA_MIN = min(
 # --- Drive-pin holes: reamed THROUGH for the MHA-PD-VN-54 press (the crank's twin) -
 PIN_CIRCLE_RADIUS = _WHEEL_PIN_CIRCLE_RADIUS  # ±Y
 PIN_HOLE_DIA = DRIVE_PIN_HOLE_DIA  # the shared 3/32 press hole
-# The shared .0930 REAM_H7 hole and each centre's .2756 +/-.0009, at the
-# four places the crank's sheet prints them too.
-PIN_HOLE_BAND = DRIVE_PIN_HOLE_BAND  # +.0005/-.0000
+# Reamed to the bought dowel, which is its gauge (it does not enter by
+# hand): the hole prints the shared .0930 reamer's size and no band (sheet
+# note 3).  PIN_HOLE_BAND is the ANALYSIS band the walls charge, what that
+# reamer is taken to cut.  Each centre's .2756 prints as a REF target for the
+# CNC; the acceptance is all three MHA-PD-09 wheels dropping on the pressed
+# pins freely (sheet note 4; fit audit 2026-11-23, pending owner
+# confirmation).  PIN_OFFSET_TOL is likewise ANALYSIS only: the scatter about
+# the targets that the walls and the wheels' slip budget are charged (the
+# shared seat's DRIVE_PIN_OFFSET_TOL, which MHA-DT-11 still prints).
+PIN_HOLE_BAND = DRIVE_PIN_HOLE_BAND  # +.0005/-.0000, analysis only
 PIN_HOLE_PLACES = 4
-PIN_OFFSET_TOL = DRIVE_PIN_OFFSET_TOL  # ±.0009 each centre
+PIN_OFFSET_TOL = DRIVE_PIN_OFFSET_TOL  # ±.0009 each centre, analysis only
 PIN_OFFSET_PLACES = DRIVE_PIN_OFFSET_PLACES
 PIN_HOLE_DEPTH = LENGTH  # through the body
 
 # --- The drive flat: the MHA-PD-VN-70 dowel's crest (#2409) ------------------
 # A 1/16 x 3/16 unhardened stainless dowel pressed parallel to the axis into a
-# blind .0615 REAM_H7 hole on local -Y (the former D-flat side, so the
-# assembly's clocking is unchanged).  The hole is reamed blind from the rear
+# blind .0615 reamed hole on local -Y (the former D-flat side, so the
+# assembly's clocking is unchanged).  The dowel is the hole's gauge (it does
+# not enter by hand), so the hole prints no band; FLAT_PIN_HOLE_BAND is the
+# ANALYSIS band the walls charge.  The hole is reamed blind from the rear
 # face into the supplied body to a full-diameter floor FLAT_PIN_FLOOR behind
 # the front (seat) face; the floor prints at two places (.XX, ±.01): over its
 # band the drill point stays in the body, the pilot-shoulder wall holds the
@@ -313,8 +338,9 @@ PIN_HOLE_DEPTH = LENGTH  # through the body
 # (rule 16), named so at the pin hole's callout.
 FLAT_PIN_NUMBER = "MHA-PD-VN-70"
 FLAT_PIN_HOLE_PLACES = 4
-# The shop row for a reamed hole's location, no fit route: the crest's
-# clearance to the core's flat holds over the whole band (asserted below).
+# The shop row for a reamed hole's location, no fit route: the shaft's flat is
+# milled last to this collar's own crest (MHA-PD-08 note 2), wherever in the
+# band the centre lands.
 FLAT_PIN_CENTRE = 2.9972  # .118 from the bore axis, along local -Y
 FLAT_PIN_CENTRE_TOL = 0.0508  # ±.002
 FLAT_PIN_CENTRE_PLACES = 3
@@ -336,11 +362,26 @@ FLAT_PIN_CREST_LIMITS = (
     min(_FLAT_PIN_CENTRE_LIMITS) - max(_FLAT_PIN_R_LIMITS),
     max(_FLAT_PIN_CENTRE_LIMITS) - min(_FLAT_PIN_R_LIMITS),
 )  # .0847 .. .0888
-# Radial air from the crest to the core's flat, the core centred in the bore.
-FLAT_PIN_CREST_CLEARANCE = (
-    min(FLAT_PIN_CREST_LIMITS) - _CORE_FLAT_MAX,
-    max(FLAT_PIN_CREST_LIMITS) - _CORE_FLAT_MIN,
-)
+# Radial air from the crest to the core's flat, the core centred in the bore:
+# what the flat's trial fit leaves (the collar with its pin pressed slides on
+# by hand), not a stack of two printed bands.  MHA-PD-08's flat analysis band
+# is this collar's crest less that air.
+FLAT_PIN_CREST_CLEARANCE = CORE_FLAT_FIT_AIR
+if not (
+    math.isclose(
+        _CORE_FLAT_MIN,
+        min(FLAT_PIN_CREST_LIMITS) - max(CORE_FLAT_FIT_AIR),
+        abs_tol=1e-9,
+    )
+    and math.isclose(
+        _CORE_FLAT_MAX,
+        max(FLAT_PIN_CREST_LIMITS) - min(CORE_FLAT_FIT_AIR),
+        abs_tol=1e-9,
+    )
+):
+    raise AssertionError(
+        "MHA-PD-08's flat analysis band is not this crest's less its fitted air"
+    )
 # The #8-32 stud's largest blank passes the lowest crest.
 STUD_FLAT_PIN_AIR = min(FLAT_PIN_CREST_LIMITS) - max(THREAD_BLANK_LIMITS) / 2.0
 # More than half the pin lies in the hole: the bore cannot release it.
@@ -407,15 +448,37 @@ def flat_pin_play_deg(centre: float, pin_r: float, core_flat: float) -> float:
     return math.degrees(math.acos((core_flat + pin_r) / centre))
 
 
-# A binding crest leaves no play (the acos below has no root): refuse it here.
-if min(FLAT_PIN_CREST_CLEARANCE) <= 0.0:
-    raise AssertionError("MHA-PD-22: the flat pin's crest binds on the core's flat")
+# The fit by feel needs room to land in (rule 4: no fit range under .001),
+# and never leaves the crest in the flat.
+if min(FLAT_PIN_CREST_CLEARANCE) < 0.0 or (
+    max(FLAT_PIN_CREST_CLEARANCE) - min(FLAT_PIN_CREST_CLEARANCE) < 0.0254 - 1e-9
+):
+    raise AssertionError(
+        "MHA-PD-22: the flat's fitted crest air is negative or under .001 wide"
+    )
 # Lost motion, stated not gated: the knob is chain-driven and the paper feeds
 # one way while the crank turns.  Delegated accept RV-04 in the registry row.
+# With the flat fitted to the crest the play follows the fitted air alone:
+# cos(theta) = 1 - air / centre, widest at the nearest centre.
 FLAT_PIN_PLAY_DEG = (
-    flat_pin_play_deg(min(_FLAT_PIN_CENTRE_LIMITS), max(_FLAT_PIN_R_LIMITS), _CORE_FLAT_MAX),
-    flat_pin_play_deg(max(_FLAT_PIN_CENTRE_LIMITS), min(_FLAT_PIN_R_LIMITS), _CORE_FLAT_MIN),
+    flat_pin_play_deg(
+        max(_FLAT_PIN_CENTRE_LIMITS),
+        0.0,
+        max(_FLAT_PIN_CENTRE_LIMITS) - min(FLAT_PIN_CREST_CLEARANCE),
+    ),
+    flat_pin_play_deg(
+        min(_FLAT_PIN_CENTRE_LIMITS),
+        0.0,
+        min(_FLAT_PIN_CENTRE_LIMITS) - max(FLAT_PIN_CREST_CLEARANCE),
+    ),
 )
+# RV-04 accepted ±17° when the flat carried a printed band; the fitted flat
+# must never give more.
+FLAT_PIN_PLAY_ACCEPTED_DEG = 17.2
+if max(FLAT_PIN_PLAY_DEG) > FLAT_PIN_PLAY_ACCEPTED_DEG:
+    raise AssertionError(
+        "MHA-PD-22: the fitted flat gives more lost motion than RV-04 accepted"
+    )
 # At the widest play the contact still lands on the flat, short of its edge.
 FLAT_PIN_CONTACT_EDGE_MARGIN = math.sqrt(_CORE_R_MIN**2 - _CORE_FLAT_MAX**2) - (
     max(_FLAT_PIN_CENTRE_LIMITS) * math.sin(math.radians(max(FLAT_PIN_PLAY_DEG)))
@@ -517,11 +580,10 @@ PIN_HOLE_INNER_R_MIN = PIN_CIRCLE_RADIUS - PIN_OFFSET_TOL - _PIN_HOLE_R_MAX
 PILOT_R_MAX = (PILOT_DIA + max(PILOT_DIA_BAND)) / 2.0
 
 # --- Fits ------------------------------------------------------------------------
-# Diametral sliding clearance of the round bore on the core.
-BORE_CORE_CLEARANCE = (
-    BORE_DIA + min(BORE_DIA_BAND) - (CORE_DIA + max(CORE_DIA_BAND)),
-    BORE_DIA + max(BORE_DIA_BAND) - (CORE_DIA + min(CORE_DIA_BAND)),
-)
+# Diametral sliding clearance of the round bore on the core: the core is
+# turned to this bore (MHA-PD-08 note 2), so it is the fit's own modelled
+# result, never the difference of two printed bands.
+BORE_CORE_CLEARANCE = CORE_FIT_CLEARANCE
 # Radial air round the pilot in the wheel's drilled bore.
 PILOT_BORE_CLEARANCE = (
     (WHEEL_BORE_DIA - (PILOT_DIA + max(PILOT_DIA_BAND))) / 2.0,
@@ -617,7 +679,15 @@ for _ok, _what in (
     ),
     (BORE_PIN_WALL_WORST >= WALL_FLOOR, "bore to drive-pin hole under the floor"),
     (PIN_HOLE_INNER_R_MIN > PILOT_R_MAX, "the drive-pin holes break into the pilot"),
-    (min(BORE_CORE_CLEARANCE) > 0.0, "the bore binds on the plain core"),
+    (
+        min(BORE_CORE_CLEARANCE) > 0.0
+        and max(BORE_CORE_CLEARANCE) - min(BORE_CORE_CLEARANCE) >= 0.0254 - 1e-9,
+        "the core's fit by feel has no .001 to land in",
+    ),
+    (
+        max(THREAD_BLANK_LIMITS) < BORE_DIA + min(BORE_DIA_BAND),
+        "the #8-32 stud does not pass the drilled bore",
+    ),
     (min(PILOT_BORE_CLEARANCE) > 0.0, "the pilot binds in the wheel bore"),
     (NUT_PILOT_BEARING_WORST > 0.0, "the thumbnut's countersink swallows the pilot"),
     (
@@ -635,24 +705,23 @@ for _ok, _what in (
     if not _ok:
         raise AssertionError(f"MHA-PD-22: {_what}")
 
-# drawing-guidelines.md rule 4 (name the mate): every tight band names its
-# mate and fit at its own callout; the native bands print the limits and the
-# fit's range follows as REF.  The bore's rows: the process and its mate,
-# then its clearance.
-BORE_CALLOUT = (
-    f"REAM THRU, SLIDING FIT\nON {SHAFT_NUMBER} D-CORE\n"
-    f"(CLEARANCE {inch_text(inch_floor_mm(BORE_CORE_CLEARANCE[0], 4), 4)}-"
-    f"{inch_text(inch_ceil_mm(BORE_CORE_CLEARANCE[1], 4), 4)})"
-)
+# drawing-guidelines.md rule 4 (loose unless something fails; fit the pair):
+# the bore is a named drill at DRILLED HOLES and names the mate that is made
+# to it; the reamed pin holes print the reamer's size and no band, their
+# bought pins are their gauges (general note REAM_NOTE) and each callout
+# prints, in one line, what the press protects.
+RIM_NOTE, WEB_NOTE, REAM_NOTE, TRIAL_NOTE = 1, 2, 3, 4
+BORE_CALLOUT = f"{BORE_DRILL} DRILL THRU\n{SHAFT_NUMBER} D-CORE\nIS TURNED TO FIT"
 # The flat pin's press ream.  Rule 26 orders a hole callout size, process,
 # depth, as the sheet's other two reams read: the process follows the size on
 # its line, then the depth, a REF from the section's (nominal fitted) rear face
 # (rule 26: a depth is never left to the view; REF because the rear is faced to
 # fit after reaming).  The depth symbol marks it blind, to the floor the .XX
 # station dimension places, which controls.  Under the size, two lines of
-# words (rule 7): its pin and fit, and why its location is tight (rule 4): the
-# crest drives the shaft.  That the pin is pressed for good, collar and pin one
-# permanent pair (rule 16), is part note 2, beside its web.
+# words (rule 7): its pin and fit, then what the press protects (rule 4): it
+# holds with no bond and its crest drives the shaft.  The pin is the hole's
+# gauge (general note 3).  That the pin is pressed for good, collar and pin
+# one permanent pair (rule 16), is part note 2, beside its web.
 FLAT_PIN_HOLE_DEPTH_REF = LENGTH - FLAT_PIN_FLOOR
 FLAT_PIN_HOLE_SUFFIX = f" REAM <HOLE-DEPTH> ({inch_text(FLAT_PIN_HOLE_DEPTH_REF, 3)})"
 FLAT_PIN_HOLE_CALLOUT = f"PRESS FIT, PIN {FLAT_PIN_NUMBER}\nCREST DRIVES {SHAFT_NUMBER}"
@@ -851,12 +920,19 @@ FIT_UP_NOTE = "\n".join(
 # The external drive-pin rim shortfall, note 1: owner-ruled permanent minor
 # exception RV-01 in cad/config/parts/pd-transgear-drive-collar.yaml (shared
 # #25 sprocket-seat geometry, #2141).  The flat-pin hole to drive-pin hole
-# web, note 2: delegated minor exception RV-03 there (#2409).  The bore's fit
-# prints at its own callout (BORE_CALLOUT).  The drawing appends the two
-# fitted lengths as notes 3 and 4 with their assembly steps
-# (draw_pd_transgear_drive_collar.FIT_NOTES).
+# web, note 2: delegated minor exception RV-03 there (#2409).  Note 3: the
+# three reamed holes print no band, their bought dowels are their gauges.
+# Note 4: the drive-pin offsets are REF targets, accepted by the three wheels
+# (MHA-PD-00 tries them on).  The bore's fit prints at its own callout
+# (BORE_CALLOUT).  The drawing appends the two fitted lengths as the next two
+# notes with their assembly steps (draw_pd_transgear_drive_collar.FIT_NOTES).
 DRAWING_NOTES = (
-    f"1. DRIVE-PIN HOLE TO COLLAR RIM {inch_text(DRIVE_PIN_COLLAR_RIM_WORST, 3)} MIN.\n"
-    f"2. PERMANENT PIN {FLAT_PIN_NUMBER}: HOLE TO DRIVE-PIN HOLE "
-    f"{inch_text(FLAT_PIN_WEB_WORST, 3)} MIN."
+    f"{RIM_NOTE}. DRIVE-PIN HOLE TO COLLAR RIM "
+    f"{inch_text(DRIVE_PIN_COLLAR_RIM_WORST, 3)} MIN.\n"
+    f"{WEB_NOTE}. PERMANENT PIN {FLAT_PIN_NUMBER}: HOLE TO DRIVE-PIN HOLE "
+    f"{inch_text(FLAT_PIN_WEB_WORST, 3)} MIN.\n"
+    f"{REAM_NOTE}. REAMED HOLES: THEIR PINS ARE THE GAUGES; NONE ENTERS BY HAND.\n"
+    f"{TRIAL_NOTE}. PIN OFFSETS: TARGETS; ALL 3 {SPROCKET_NUMBER} WHEELS DROP ON FREELY."
 )
+if max(map(len, DRAWING_NOTES.splitlines())) > FIT_UP_NOTE_WIDTH:
+    raise AssertionError("a MHA-PD-22 sheet note runs past the notes block")

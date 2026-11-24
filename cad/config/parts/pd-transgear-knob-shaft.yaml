@@ -16,7 +16,7 @@ pd-transgear-knob-shaft:
   # accuracy are unpublished. Main's 2.25-module depth is a model premise,
   # provisional for physical admission, not published vendor ground geometry.
   # Pedro's owner ruling, 2026-11-05 (coordinator session): single-point, not die-cut.
-  process: "turned from bar, including the front neck and limited corner radius; integral 15T 48DP PA20 teeth cut straight at full depth through the face with stock #7 form cutter (14T master), with radial setting, tooth-span and all-space angular-index acceptance from the part specification; mill the front D-core flat to its specified physical rounded-tool-end limits; #8-32 UNC-2A thread single-pointed on the lathe before the teeth are cut, the tip carried on a tailstock centre in sacrificial length parted off after threading, finished with spring passes; rear end chamfered .015 X 45 deg, drilled #50 and tapped #2-56 blind on the axis with a bottoming tap in the rear chucking, for the MHA-PD-VN-71 cup screw"
+  process: "turned from bar, including the front neck and limited corner radius; the front D-core turned to slide by hand, with no shake, in the drilled bore of the finished MHA-PD-22 drive collar; integral 15T 48DP PA20 teeth cut straight at full depth through the face with stock #7 form cutter (14T master), with radial setting, tooth-span and all-space angular-index acceptance from the part specification; mill the front D-core flat last, to its specified physical rounded-tool-end limits, coming down .001 at a time until the MHA-PD-22 collar with its MHA-PD-VN-70 pin pressed slides on by hand; #8-32 UNC-2A thread single-pointed on the lathe before the teeth are cut, the tip carried on a tailstock centre in sacrificial length parted off after threading, finished with spring passes; rear end chamfered .015 X 45 deg, drilled #50 and tapped #2-56 blind on the axis with a bottoming tap in the rear chucking, for the MHA-PD-VN-71 cup screw"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
@@ -28,21 +28,11 @@ pd-transgear-knob-shaft:
       where: "the core and front-relief runout frames to the running journal"
       finding: "runout frames over-specified (rule 5)"
       reason: "finite stock-cutter clearance requires runout control of the core and front relief to the running journal (owner-accepted gear class)"
-    - id: "RV-03"
-      kind: "accept"
-      where: "front view, D-core collar seat Ø.1910 +.0000/-.0008, linked SEE NOTE 2 (SLIDING FIT ON DRIVE COLLAR MHA-PD-22: SLIDES IN BY HAND.)"
-      finding: "band narrower than the turned-diameter row, or -.0008 a converted-millimetre deviation (rules 4, 26)"
-      reason: "fleet-shared shaft h fit class kept, restated at the next re-key of that family; the matched sliding fit to MHA-PD-22 is printed at the callout. Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144"
     - id: "RV-04"
       kind: "accept"
       where: "front view, gear tip Ø.3533 +.0000/-.0008, linked SEE GEAR DATA (MATES WITH: REDUCER DISC MHA-PD-06; SPAN MATCHED FIT: BACKLASH WITH MATE .002-.007, FEELER)"
       finding: "band narrower than the turned-diameter row, or -.0008 a converted-millimetre deviation (rules 4, 26)"
       reason: "fleet-shared contact-critical gear-tip class kept, restated at the next re-key of that family; the mesh route is the gear data backlash acceptance at the callout. Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144"
-    - id: "RV-05"
-      kind: "accept"
-      where: "front end view, D-flat .0840 +.0000/-.0006 from the axis, linked SEE NOTE 2 (SLIDING FIT ON DRIVE COLLAR MHA-PD-22: SLIDES IN BY HAND.)"
-      finding: "band narrower than the milled row, or -.0006 a converted-millimetre deviation (rules 4, 26)"
-      reason: "loosening it re-sets the clearance (.0006-.0054) to the crest of the MHA-PD-VN-70 pin that forms the MHA-PD-22 drive flat, which its sheet and tests carry (#2409), so the band is kept with the matched sliding fit printed at the callout (L3); the drive's rotational play from that clearance is ruled at MHA-PD-22 RV-04. Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144"
     - id: "RV-06"
       kind: "accept"
       where: "detail B, front neck Ø.155/.150 LIMITS, linked SEE NOTE 4 (NECK AND D-FLAT END UNDER DRIVE COLLAR MHA-PD-22.)"

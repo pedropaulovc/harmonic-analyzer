@@ -70,8 +70,6 @@ from paper_drive_stock_native import (
 )
 from pd_transgear_knob_shaft_spec import (
     CORE_DIA,
-    CORE_DIA_BAND,
-    CORE_FLAT_BAND,
     CORE_FLAT_FROM_AXIS,
     CORE_FRONT_FROM_F,
     CORE_ACTIVE_LENGTH,
@@ -940,19 +938,15 @@ def build(adapter: Any) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "GearBlank", "FaceWidth", FACE_WIDTH_BAND, display_unit=UNIT
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "StudProfile", "CoreDia", *deviations(CORE_DIA_BAND), display_unit=UNIT
-    )
+    # The D-core and its flat are made to fit MHA-PD-22 (sheet note 2): both
+    # print as REF, so neither carries a native band (the spec's
+    # CORE_DIA_BAND and CORE_FLAT_BAND are analysis numbers).
     set_dimension_bilateral_tolerance(
         adapter, "JournalProfile", "JournalDia", *deviations(JOURNAL_DIA_BAND),
         display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter, "StudProfile", "OutsideDia", *deviations(OUTSIDE_DIA_BAND), display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "CoreFlatReference", "FlatToAxis", *deviations(CORE_FLAT_BAND),
-        display_unit=UNIT,
     )
     _apply_neck_and_flat_limits(adapter)
     apply_span_limits(

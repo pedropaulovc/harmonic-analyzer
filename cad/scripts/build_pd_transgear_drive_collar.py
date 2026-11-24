@@ -13,7 +13,7 @@ face, the Front Plane; the body runs z 0..LENGTH, the pilot in front of it.
 * ``Axis1``: the bore axis (Top Plane x Right Plane), made first so the
   assembly mates always find it by that name.
 * ``Body``: the turned Ø17.5 body and Ø10 pilot.
-* ``Bore``: the round reamed bore through both.
+* ``Bore``: the round drilled bore through both.
 * ``PinHoles``: the two drive-pin holes on local ±Y, cut from ``RearFace``
   through the body.
 * ``FlatPinHole``: the flat pin's blind ream on local -Y, a revolve cut
@@ -75,7 +75,6 @@ from _gtol_face_resolve import resolve_faces
 from _visibility import blank_reference_geometry
 from pd_transgear_drive_collar_spec import (
     BORE_DIA,
-    BORE_DIA_BAND,
     BORE_PIN_WALL_WORST,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -84,7 +83,6 @@ from pd_transgear_drive_collar_spec import (
     FLAT_PIN_CENTRE,
     FLAT_PIN_CENTRE_TOL,
     FLAT_PIN_FLOOR,
-    FLAT_PIN_HOLE_BAND,
     FLAT_PIN_HOLE_DIA,
     FLAT_PIN_SHOULDER_WALL_WORST,
     FLAT_PIN_WEB_WORST,
@@ -96,10 +94,8 @@ from pd_transgear_drive_collar_spec import (
     PILOT_LENGTH,
     PILOT_WALL_WORST,
     PIN_CIRCLE_RADIUS,
-    PIN_HOLE_BAND,
     PIN_HOLE_DEPTH,
     PIN_HOLE_DIA,
-    PIN_OFFSET_TOL,
     PIN_REAR_INSET_WORST,
     REAR_BREAK,
     REAR_BREAK_TOL,
@@ -287,11 +283,13 @@ def _rear_break(adapter) -> list[tuple[str, str]]:
     return mouth.apply(adapter, "RearBreakProfile")
 
 
-def _fitted_length_reference(adapter, name: str, nominal: float) -> None:
-    """Save a fitted nominal as REF, never an independent size acceptance."""
-    display, dimension = _named_dimension(adapter, "BodyProfile", name)
+def _reference(adapter, feature: str, name: str, nominal: float, what: str) -> None:
+    """Save a nominal as REF (parenthesized), never an independent size
+    acceptance: a length fitted at assembly, or a CNC target accepted by the
+    mate's trial."""
+    display, dimension = _named_dimension(adapter, feature, name)
     if abs(float(dimension.SystemValue) * 1000.0 - nominal) > 1e-6:
-        raise RuntimeError(f"collar {name} reference does not match the fitted nominal")
+        raise RuntimeError(f"collar {name} reference does not match the {what}")
     tolerance = dimension.Tolerance
     if tolerance is None or int(tolerance.Type) != 0:
         raise RuntimeError(f"collar {name} has an independent size band")
@@ -299,6 +297,11 @@ def _fitted_length_reference(adapter, name: str, nominal: float) -> None:
     display.SetText(2, ")")
     if (display.GetText(1), display.GetText(2)) != ("(", ")"):
         raise RuntimeError(f"collar {name} reference text did not persist")
+
+
+def _fitted_length_reference(adapter, name: str, nominal: float) -> None:
+    """Save a fitted nominal as REF, never an independent size acceptance."""
+    _reference(adapter, "BodyProfile", name, nominal, "fitted nominal")
 
 
 def build(adapter) -> dict[str, str]:
@@ -543,27 +546,15 @@ def build(adapter) -> dict[str, str]:
         f"{PIN_REAR_INSET_WORST:.4f} min inside the rear face"
     )
 
-    # The bore and both hole patterns carry their source-owned controls.
-    # Body and pilot lengths are fitted at assembly and remain REF on part
-    # and drawing; the flat pin's floor station takes the title block's row.
+    # Source-owned controls.  Body and pilot lengths are fitted at assembly
+    # and remain REF on part and drawing; the flat pin's floor station takes
+    # the title block's row.  The bore is a named drill at the title block's
+    # DRILLED HOLES row and the three reamed pin holes print their reamers'
+    # sizes with no band (their bought dowels are their gauges, sheet note 3):
+    # none carries a native band.  The two drive-pin offsets are REF targets
+    # (below), accepted by the wheels' trial (sheet note 4).
     set_dimension_bilateral_tolerance(
         adapter, "BodyProfile", "CollarDia", *deviations(OD_BAND), display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND), display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinPosDia", *deviations(PIN_HOLE_BAND), display_unit=UNIT
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "PinHoleProfile", "PinPosY", PIN_OFFSET_TOL, display_unit=UNIT
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "PinHoleProfile", "PinNegY", PIN_OFFSET_TOL, display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "FlatPinProfile", "FlatPinDia", *deviations(FLAT_PIN_HOLE_BAND),
-        display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
         adapter, "FlatPinProfile", "FlatPinCentre", FLAT_PIN_CENTRE_TOL, display_unit=UNIT
@@ -580,6 +571,8 @@ def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _fitted_length_reference(adapter, "CollarLength", LENGTH)
     _fitted_length_reference(adapter, "PilotLength", PILOT_LENGTH)
+    _reference(adapter, "PinHoleProfile", "PinPosY", PIN_CIRCLE_RADIUS, "target")
+    _reference(adapter, "PinHoleProfile", "PinNegY", PIN_CIRCLE_RADIUS, "target")
     resolve_faces(
         adapter.currentModel,
         {

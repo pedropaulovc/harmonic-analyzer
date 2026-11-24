@@ -53,7 +53,7 @@ from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
-from _printed_limits import limits
+from _printed_limits import drilled_limits, limits
 from _section_axis import position_section_caption
 from _session import run_build
 import _config
@@ -65,7 +65,6 @@ from pd_transgear_drive_collar_spec import (
     BORE_CALLOUT,
     BORE_CORE_CLEARANCE,
     BORE_DIA,
-    BORE_DIA_BAND,
     DOWEL_NUMBER,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -270,15 +269,20 @@ _FLAT_PIN_ROWS = "\n".join(
     f"{row}{_INK_AIR}" for row in FLAT_PIN_HOLE_CALLOUT.splitlines()
 )
 # Rule 7: a callout carries its size and process lines plus at most two lines
-# of words, and a location dimension carries only its value and band.  The
-# dowel pattern names the dowel and the sprocket its pins locate once, on its
-# 2X callout; each mate is named by drawing number (rule 4): the bore's
-# sliding fit on the shaft's D-core, the flat pin pressed in its ream for
-# good, the two one permanent pair, and the rear break clearing the shaft's
-# root corner.
+# of words, and a location dimension carries only its value.  The dowel
+# pattern names the dowel, the fit and, in one line, what the press protects
+# (rule 4: a floating pin would spend the wheels' slip in their holes) once,
+# on its 2X callout; general notes 3 and 4 make the dowels the reamed holes'
+# gauges and the wheels the REF offsets' acceptance.  Each mate is named by
+# drawing number: the drilled bore's shaft, whose D-core is turned to it, the
+# flat pin pressed in its ream for good, the two one permanent pair, and the
+# rear break clearing the shaft's root corner.
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
-    "PinPosDia": f"2X REAM THRU\nPRESS FIT, DOWEL {DOWEL_NUMBER}\nPINS LOCATE {SPROCKET_NUMBER}",
+    "PinPosDia": (
+        f"2X REAM THRU\nPRESS FIT, DOWEL {DOWEL_NUMBER}\n"
+        f"KEEPS SLIP IN {SPROCKET_NUMBER} HOLES"
+    ),
     "PilotDia": f"CLEARS BORE\nOF {SPROCKET_NUMBER}",
     "CollarDia": f"CLEARS CHAIN {CHAIN_NUMBER}\nON 12-TOOTH {SPROCKET_NUMBER}",
     "PilotLength": f"SEE NOTE {PILOT_NOTE}",
@@ -302,8 +306,13 @@ NOTES_TEXT = f"{property_link('Manufacturing Notes')}\n{FIT_NOTES}"
 # (build_pd_transgear_drive_collar: axis +Z through the origin, rearward; the
 # seat face at z = 0, the body to the fitted rear face at z = LENGTH, the
 # pilot to z = -PILOT_LENGTH).  The body and the pilot are supplied long and
-# faced to fit at assembly (notes 3 and 4): each end face carries its supply
-# minimum, the fitted band its note prints and the note.  The 2X dowel reams
+# faced to fit at assembly (the two fitted-length notes): each end face
+# carries its supply minimum, the fitted band its note prints and the note.
+# The bore's and the three reamed holes' "dia" and the dowels' "offset" are
+# the spec's ANALYSIS bands (what the drill and the reamers are taken to cut
+# and the scatter about the REF targets), bound for the traveler adapter
+# only: the sheet prints none of them, and the acceptances are the mates
+# (notes 3 and 4, MHA-PD-08 note 2).  The 2X dowel reams
 # run through the body beside the pilot, entered here from the seat face;
 # the flat pin's ream is blind from the rear face, its floor stationed from
 # the seat face (.08, the controlling dimension; the (.163) depth is its
@@ -439,12 +448,12 @@ requirement(
         "at": ([0.0, 0.0, -PILOT_LENGTH], ("PILOT_LENGTH",)),
         "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
         "dia": (
-            limits(BORE_DIA, _P["BoreDia"], BORE_DIA_BAND, unit=UNIT),
+            drilled_limits(BORE_DIA, _P["BoreDia"], unit=UNIT),
             ("BORE_DIA", "BORE_DIA_BAND", "UNIT", (_SELF, "END_KEEP")),
         ),
         "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
         "thru": (True, ("BORE_CALLOUT",)),
-        "process": ("ream", ("BORE_CALLOUT",)),
+        "process": ("drill", ("BORE_CALLOUT",)),
         "mate": (SHAFT_NUMBER, ("SHAFT_NUMBER", "BORE_CALLOUT")),
         "diametral_clearance": (list(BORE_CORE_CLEARANCE), ("BORE_CORE_CLEARANCE",)),
         "callout": (BORE_CALLOUT, ("BORE_CALLOUT",)),
