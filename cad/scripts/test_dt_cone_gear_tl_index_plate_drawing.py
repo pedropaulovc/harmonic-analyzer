@@ -140,7 +140,7 @@ def test_callouts_name_counts_and_the_counterbore() -> None:
     assert spec.CALLOUTS_BELOW["MountHoleDia"].split("\n") == [
         "DRILL THRU",
         "<HOLE-SPOT><MOD-DIAM>.346 <HOLE-DEPTH> .145",
-        "FOR PLATE SCREWS",
+        "BS-0 HEAD SCREWS",
         "WALL .03 MIN",
     ]
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
@@ -173,8 +173,11 @@ def test_the_measured_stock_plate_sets_the_envelope_and_the_screw_seat() -> None
     assert math.isclose(spec.CBORE_SEAT, 0.095 * INCH)
     assert abs(spec.CBORE_SEAT - (0.2770 - 0.1830) * INCH) <= 0.0015 * INCH
     assert spec.CBORE_SEAT_MIN >= 0.080 * INCH - 1e-9
-    # The pin cannot pass through: it reaches no deeper than a stock blind hole.
-    assert 0.1 * INCH < spec.PIN_ENGAGEMENT_MAX < spec.THICKNESS
+    # Owner fact 2026-11-24: "pin goes 0.1555 into blind holes": .037 less in
+    # this thinner plate, and never through it.
+    assert math.isclose(spec.PIN_ENGAGEMENT, 0.1185 * INCH)
+    assert math.isclose(spec.PIN_ENGAGEMENT_MIN, 0.1085 * INCH)
+    assert spec.PIN_ENGAGEMENT < spec.THICKNESS - 0.01 * INCH
 
 
 def test_the_bolt_circle_is_inferred_from_the_owners_two_readings() -> None:

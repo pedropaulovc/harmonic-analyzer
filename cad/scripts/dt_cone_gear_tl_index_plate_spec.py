@@ -27,15 +27,15 @@ within the stock plates' circle band (owner facts 2026-11-24, verbatim: "rim
 to outermost hole edge 0.1030" and "innermost hole edge to hto bore 0.5545"),
 which the index arm is known to reach. No size is a guess any longer. The
 screw pattern's clocking to a hole row is free: indexing counts holes from
-wherever the pin stands, and the sector arms turn about the hub. One look is
-left for first fitting (#2157): how far the pin enters, the plate being .037
-thinner than stock. The maker's manual (owner photographs 2026-11-24) gives
-the 1:40 worm and the stock circles and no plate dimension.
+wherever the pin stands, and the sector arms turn about the hub. The maker's
+manual (owner photographs 2026-11-24) gives the 1:40 worm and the stock
+circles and no plate dimension.
 
 Thickness: the stock plate is .2770; this one is cut from the owned 1/4 in
-plate, skimmed to .24, so it sits .037 lower under the pin. The stock pin
-holes are blind, .1635 deep, so the pin reaches no deeper than that into a
-plate; these holes are through.
+plate, skimmed to .24, so it sits .037 lower under the pin. The pin enters a
+stock plate's blind hole .1555 (owner fact 2026-11-24, verbatim: "pin goes
+0.1555 into blind holes"), so it enters this plate .1185, about one pin
+diameter, and stops inside the through hole.
 
 Frame (the SolidWorks model): the plate's axis is model Z through the
 origin. The back face (Z0) seats on the head; the front face (Z = THICKNESS)
@@ -110,12 +110,15 @@ THICKNESS = 0.24 * INCH
 # enters a plate no deeper than the blind depth.
 STOCK_PIN_HOLE_DIA = 0.120 * INCH
 STOCK_PIN_HOLE_DEPTH = 0.1635 * INCH
-# A pin that reached the full blind depth of a stock plate still stops
-# inside this thinner, lower plate's through hole, and keeps most of a pin
-# diameter of engagement.
-PIN_ENGAGEMENT_MAX = STOCK_PIN_HOLE_DEPTH - (STOCK_PLATE_THICKNESS - THICKNESS)
-if not 0.0 < PIN_ENGAGEMENT_MAX < THICKNESS:
-    raise AssertionError("the index pin leaves or passes through the plate")
+# Owner fact 2026-11-24: "pin goes 0.1555 into blind holes". The pin's reach
+# is its own, so in this thinner, lower plate it enters that much less: .1185
+# nominal, and at the thin end of the thickness band still nine tenths of a
+# pin diameter, stopping inside the through hole.
+STOCK_PIN_ENTRY = 0.1555 * INCH
+PIN_ENGAGEMENT = STOCK_PIN_ENTRY - (STOCK_PLATE_THICKNESS - THICKNESS)
+PIN_ENGAGEMENT_MIN = PIN_ENGAGEMENT - 0.01 * INCH  # thickness at -.01
+if not 0.1 * INCH <= PIN_ENGAGEMENT_MIN < PIN_ENGAGEMENT < THICKNESS - 0.01 * INCH:
+    raise AssertionError("the index pin's engagement in the plate is not held")
 
 # --- Worm and the gears this plate indexes ------------------------------------
 WORM_RATIO = 40  # BS-0 dividing head
@@ -487,7 +490,7 @@ CALLOUTS_BELOW: dict[str, str] = {
     ),
     "BoreDia": f"BORE THRU\nLOCATING FIT ON\n{HEAD} PLATE HUB",
     "MountHoleDia": (
-        f"DRILL THRU\n{CBORE_CALLOUT}\nFOR PLATE SCREWS\n{CBORE_WALL_CALLOUT}"
+        f"DRILL THRU\n{CBORE_CALLOUT}\n{HEAD} SCREWS\n{CBORE_WALL_CALLOUT}"
     ),
 }
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
