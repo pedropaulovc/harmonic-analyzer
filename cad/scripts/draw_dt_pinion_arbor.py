@@ -62,10 +62,8 @@ from dt_pinion_arbor_pin_spec import (
     PIN_HOLE_CALLOUT as _PIN_HOLE_CALLOUT,
     PIN_HOLE_DIA as _PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND as _PIN_HOLE_DIA_BAND,
-    PIN_HOLE_DIA_MAX as _PIN_HOLE_DIA_MAX,
     PIN_NUMBER as _PIN_NUMBER,
 )
-from dt_vn_pinion_strap_pin_spec import DRILL_THRU_CALLOUT as _PIN_DRILL_THRU_CALLOUT
 from dt_pinion_arbor_geometry import (
     BACK_CAP_R,
     BACK_CAP_SAG,
@@ -846,38 +844,21 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 # detail A's view box (x 0.1928).
 # The band is ASME B18.8.2's recommended hole for the 1/16 slotted spring
 # pin (.062-.065; the title block's DRILLED HOLES row would open it to
-# .0665), which the pin grips by compressing into: the press fit the
-# MHA-DT-33 collar and MHA-DT-19 sheets name for the same pin.  The second
-# row names that fit and the mate (rule 4; integration proof
-# 20261109T105251629Z, 3 of 3 runs: the pin's number alone named no fit),
-# dropping "SPRING PIN" (the number names the pin) to stay 25 characters.
-# The third row prints the interference the band gives as a reference, the
-# MHA-DT-38 bushing's and MHA-PD-20 spacer's pattern: R5 machinist review
-# (run 20261117T111407559Z) read the .0625-.0650 hole as a clearance fit on
-# a 1/16 pin, as no row said the pin is driven oversize.
-# B18.8.2 makes the 1/16 pin .066-.069 across before it is driven.  The
-# fact stays on this sheet: the shared pin spec keys the strap, shaft,
-# collar and drive-train leaves, and the collar sheet names the pin a
-# SPRING PIN (its own review SHIPs on that).
-PIN_FREE_DIA = (0.066 * 25.4, 0.069 * 25.4)
-PIN_HOLE_INTERFERENCE = (
-    PIN_FREE_DIA[0] - _PIN_HOLE_DIA_MAX,
-    PIN_FREE_DIA[1] - _PIN_HOLE_DIA,
-)
-PIN_HOLE_FIT_ROW = f"PRESS FIT ON {_PIN_NUMBER}"
-PIN_HOLE_CALLOUT = (
-    f"{_PIN_DRILL_THRU_CALLOUT}\n{PIN_HOLE_FIT_ROW}\n(INTERFERENCE "
-    f"{_inch(PIN_HOLE_INTERFERENCE[0])}-{_inch(PIN_HOLE_INTERFERENCE[1])})"
-)
+# .0665), which the pin grips by compressing into.  Fit audit F15 (owner
+# ruling 2026-11-24): the callout is the shared one
+# (dt_pinion_arbor_pin_spec.PIN_HOLE_CALLOUT, "1/16 DRILL THRU; /
+# MHA-DT-VN-63 MUST DRIVE, / NOT ENTER BY HAND"): the pin is its own gauge,
+# and the drive it must take answers R5's reading of the band as a clearance
+# fit (run 20261117T111407559Z) without a printed interference.
+PIN_HOLE_CALLOUT = _PIN_HOLE_CALLOUT
 PIN_HOLE_CALLOUT_ADVANCE = 0.00267
 PIN_HOLE_CALLOUT_CENTRE_DX = 0.00075
 PIN_HOLE_LEADER_ARROW_DX = -0.0004
 PIN_HOLE_LEADER_RUN = 0.0085
-# The fit row sets the underline: the interference row has one character
-# more, but its stops, digits and parentheses print narrower (Century
-# Gothic advances 13121 against the fit row's 13366 units), so measuring it
-# by characters would move the underline left onto detail A's view box.
-PIN_HOLE_CALLOUT_WIDTH = PIN_HOLE_CALLOUT_ADVANCE * len(PIN_HOLE_FIT_ROW)
+# The widest row sets the underline.
+PIN_HOLE_CALLOUT_WIDTH = PIN_HOLE_CALLOUT_ADVANCE * max(
+    len(row) for row in PIN_HOLE_CALLOUT.splitlines()
+)
 PIN_HOLE_CALLOUT_X = (
     _sheet_x(PIN_Z)
     + PIN_HOLE_LEADER_ARROW_DX
