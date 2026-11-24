@@ -19,8 +19,9 @@ ref = "drill-m"  # Drills M
 # (7/16 over reamer of the Shars set), both journals .4375 0/-.0008" (the
 # bores were .4500 and .4830 +.0010/+.0005). Both bores: the 27/64 drill
 # leaves the reamer .0166 (a 7/16 drill cuts about the reamer's size), then
-# the .4385 reamer; GO .4385 plus, NO-GO .439 minus, each miked with the
-# reamer first (owner ruling 2026-11-23, tool audit Q1).
+# the .4385 reamer. Fit audit 2026-11-23 F02: the bores print the reamer's
+# size with no band and the journals of MHA-DT-11 and MHA-DT-04 are turned
+# last to them, so no GO/NO-GO pin reads them here (zz-pins-4385-4390 freed).
 id = "drill-27-64"
 name = "27/64 drill"
 ref = "drill-27-64"
@@ -29,12 +30,6 @@ ref = "drill-27-64"
 id = "reamer-4385"
 name = ".4385 reamer (7/16 over)"
 ref = "reamer-4385"
-status = "to_order"
-
-[[tools]]
-id = "bore-pins"
-name = "Class ZZ pins: .4385 plus (GO) and .439 minus (NO-GO)"
-ref = "zz-pins-4385-4390"
 status = "to_order"
 
 [[tools]]

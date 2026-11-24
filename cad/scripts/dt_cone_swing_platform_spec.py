@@ -113,9 +113,11 @@ def crank_gear_platform_budget() -> dict[str, float]:
     def upper(nominal: float, places: int, unit: str) -> float:
         return nominal + printed_deviations(nominal, places, unit=unit)[1]
 
-    boss_half_max = upper(
-        post.CONE_BOSS_LENGTH, post.DRAWING_PRECISION_BY_NAME["ConeBossLen"], post.UNIT
-    ) / 2.0
+    # The collar face's station prints at the title block (owner ruling
+    # 2026-11-24, audit part 2 C9): its own upper limit.
+    boss_half_max = (
+        post.CONE_BOSS_NORTH_STATION + post.CONE_BOSS_NORTH_STATION_DEVIATIONS_MM[1]
+    )
     overhang = (
         upper(
             cone_shaft.COLLAR_THICKNESS,
