@@ -66,7 +66,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder, wizard_holes
@@ -77,7 +76,6 @@ from ch_vn_frame_side_screw_spec import THREAD as FRAME_SIDE_THREAD
 from ch_fulcrum_keeper_notes import DRAWING_NOTES
 from ch_fulcrum_keeper_spec import (
     BORE_DIA,
-    BORE_DIA_BAND,
     BORE_FROM_SIDE,
     CBORE_DEPTH_BAND,
     CBORE_DEPTH_MM,
@@ -104,7 +102,6 @@ from ch_fulcrum_keeper_spec import (
     SCREW_HOLE_SPEC,
     SET_SCREW_HOLE_SPEC,
     SHAFT_AXIS_H,
-    UNIT,
 )
 
 PART_NAME = "ch-fulcrum-keeper"
@@ -483,7 +480,7 @@ def build(adapter) -> dict[str, str]:
     v_crown = 0.5 * math.pi * r_c * r_c * LUG_T
     volume = volume_check(adapter, "lug crown", volume + v_crown, 0.01 * v_crown)
 
-    # --- Shaft bore: plain reamed Ø.2560 through the lug on the axis ------
+    # --- Shaft bore: plain F-drilled Ø.257 through the lug on the axis ------
     bore = SketchDims()
     check("create_sketch bore", adapter.create_sketch("Right"))
     define_circle(
@@ -574,18 +571,11 @@ def build(adapter) -> dict[str, str]:
     )
     _hide_reference_sketches(adapter)
     # Decimal places are the tolerance statement, so the PART carries them;
-    # the reamed bore's band (BORE_DIA_BAND) is a native model tolerance.
+    # the F-drilled bore takes the DRILLED HOLES row (owner ruling
+    # 2026-11-24, fit audit question 1): no native band.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     # The crown is a full round tangent to both sides: no band of its own
     # (the width's governs it); the sheet prints it as a radial reference.
-    # The bands are millimetres; UNIT prints them in inches.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "ShaftBoreProfile",
-        "BoreDia",
-        *deviations(BORE_DIA_BAND),
-        display_unit=UNIT,
-    )
     _band_foot_counterbore(adapter)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and

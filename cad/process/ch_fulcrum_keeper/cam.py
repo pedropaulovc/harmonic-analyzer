@@ -30,7 +30,7 @@ height. Lying on the 1 in + 1/2 in parallel stacks: FK01 skims the far side
 F, FK02 (F down) faces the near side N to the width. Upright on the 1 in
 parallels: FK03 faces the seat, spots and drills the #41 foot hole from it
 into the waste above the foot. Lying, the inner face I up: FK04 profiles the
-crown through the lug and spots, drills and reams the bore through it, both
+crown through the lug and spots, drills D and opens F the bore through it, both
 into the waste the step removes; the jaws grip only that waste. Lying, I
 down: FK05 faces the foot tip to the length and mills the step to the lug,
 opening the bore and the foot hole. Upright on the seat: FK06 spots and
@@ -49,7 +49,7 @@ Work frames (G54), each set in its setup:
 Toolpath rules (owner rulings 2026-11-16): faces zigzag (ball screws),
 plunges beside the stock at the cutting feed, real G0 above the stock; the
 crown is profiled climb (G2 round the outside), the counterbore climb (G3
-inside it). The reamer is fed out. The crown hole is tapped by hand (FluidNC
+inside it). The crown hole is tapped by hand (FluidNC
 cannot rigid-tap; owner, Pedro, 2026-11-17), the T-handle wrench's centre
 hole on the spring point of the Fisher tap guide in the 1/2 in R8 collet
 (owner, Pedro, 2026-11-21: "use
@@ -77,7 +77,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("FK03_seat", (("seat",), ("foot_spot",), ("foot_drill",))),
     (
         "FK04_crown_bore",
-        (("crown",), ("bore_spot",), ("bore_drill",), ("bore_ream",)),
+        (("crown",), ("bore_spot",), ("bore_drill",), ("bore_open",)),
     ),
     ("FK05_step", ("step",)),
     ("FK06_crown_cbore", (("crown_spot",), ("crown_drill",), ("cbore",))),
@@ -91,13 +91,13 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
 # (the tap guide).
 LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
-# list among these (the tap, the pins, the saw and the files are not).
+# list among these (the tap, the saw and the files are not).
 CAM_TOOLS = (
     "em-half",
     "spot",
     "drill-41",
     "drill-d",
-    "reamer",
+    "drill-f",
     "drill-1-16",
     "em-eighth",
     "tap-guide",
@@ -336,19 +336,6 @@ def _pecked(
     return lines + [f"G0 Z{r_plane:.3f}", f"G0 Z{clear:.3f}"]
 
 
-def _reamed(xy: tuple[float, float], top: float, tip: float, clear: float) -> list[str]:
-    """Feed the reamer from the R plane to ``tip`` and back out at feed."""
-    clear, r_plane = _r(clear), _r(top + SAFE_MM)
-    return [
-        f"G0 Z{clear:.3f}",
-        f"G0 X{xy[0]:.3f} Y{xy[1]:.3f}",
-        f"G0 Z{r_plane:.3f}",
-        f"G1 Z{_r(tip):.3f} F{{feed}}",
-        f"G1 Z{r_plane:.3f} F{{feed}}",
-        f"G0 Z{clear:.3f}",
-    ]
-
-
 def _stepover(y: tuple[float, float], max_step: float) -> tuple[int, float]:
     """(passes, stepover) of a zigzag face across ``y`` (low, high): equal
     widths, each at most ``max_step``, reaching ``FACE_OVERHANG_MM`` past
@@ -535,7 +522,7 @@ def context(
     em = _shop_tool(plan, shop, "em-half")["diameter_mm"]
     d41 = _shop_tool(plan, shop, "drill-41")["diameter_mm"]
     dd = _shop_tool(plan, shop, "drill-d")["diameter_mm"]
-    reamer = _shop_tool(plan, shop, "reamer")["diameter_mm"]
+    df = _shop_tool(plan, shop, "drill-f")["diameter_mm"]
     d16 = _shop_tool(plan, shop, "drill-1-16")["diameter_mm"]
     em8 = _shop_tool(plan, shop, "em-eighth")["diameter_mm"]
     tap_drill = _shop_tool(plan, shop, "tap-1-72")["tap_drill_mm"]
@@ -543,10 +530,10 @@ def context(
     hold_band, tap_band = g["hold"]["dia"], g["tap"]["dia"]
     if not _inside(d41, hold_band):
         raise ValueError(f"#41 Ø{d41} is outside the foot hole's band {hold_band}")
-    if not _inside(reamer, bore_dia):
-        raise ValueError(f"reamer Ø{reamer} is outside the bore's band {bore_dia}")
-    if not dd < reamer:
-        raise ValueError(f"D Ø{dd} is not under the reamer Ø{reamer}")
+    if not _inside(df, bore_dia):
+        raise ValueError(f"F Ø{df} is outside the bore's band {bore_dia}")
+    if not dd < df:
+        raise ValueError(f"D Ø{dd} is not under the F Ø{df}")
     if not _inside(d16, tap_band) or not _close(d16, tap_drill):
         raise ValueError(
             f"1/16 Ø{d16} is not the #1-72 tap's drill in the band {tap_band}"
@@ -657,7 +644,7 @@ def context(
     for name, dia in (
         ("hold drill", d41),
         ("bore drill", dd),
-        ("bore ream", reamer),
+        ("bore open", df),
         ("apex drill", d16),
         ("cbore", em8),
     ):
@@ -665,7 +652,7 @@ def context(
             raise ValueError(f"'{name}' cutter_dia_mm is not its tool's Ø{dia}")
     hold_rpm, hold_feed = _setting(plan, shop, "hold drill")
     drill_rpm, drill_feed = _setting(plan, shop, "bore drill")
-    ream_rpm, ream_feed = _setting(plan, shop, "bore ream")
+    open_rpm, open_feed = _setting(plan, shop, "bore open")
     apex_rpm, apex_feed = _setting(plan, shop, "apex drill")
     # The counterbore's feed: the setting's chip load holds at the cutter's
     # edge, which runs (path radius + r)/path radius faster than its centre on
@@ -692,18 +679,14 @@ def context(
     hold_full = -(foot_top + p["hold_drill_past_mm"])
     hold_tip = hold_full - _point(d41)
     _agree(plan, "hold_tip_height_mm", blank_min - seat_skim + hold_tip)
-    # Bore: from I down through the lug; the drill's and the reamer's full
-    # diameters past the outer face's plane, the reamer's tip no deeper than
-    # the drill's full diameter.
+    # Bore: from I down through the lug; the D's and then the F's full
+    # diameters bore_drill_past_mm past the outer face's plane.
     out_z = section - ear
     bore_full = out_z - p["bore_drill_past_mm"]
     bore_tip = bore_full - _point(dd)
-    ream_full = out_z - p["bore_ream_past_mm"]
-    ream_tip = ream_full - p["reamer_lead_mm"]
+    open_tip = bore_full - _point(df)
     _agree(plan, "bore_tip_height_mm", bore_tip)
-    _agree(plan, "ream_tip_height_mm", ream_tip)
-    if ream_tip < bore_full - 1e-6 or p["bore_ream_past_mm"] <= 0:
-        raise ValueError("the reamer's tip runs below the drill's full diameter")
+    _agree(plan, "bore_open_tip_height_mm", open_tip)
     arch_bottom = section - arch_depth
     # Crown: the 1/16 full diameter apex_drill_past_mm past the bore's wall
     # where the drill's edge meets it; the tap's lead past the wall at the
@@ -1097,15 +1080,15 @@ def context(
             ],
         },
         {
-            **drill_tool("reamer", reamer, ream_rpm, ream_feed),
+            **drill_tool("drill-f", df, open_rpm, open_feed),
             "frame": "arch",
-            "label": "bore ream",
+            "label": "bore open",
             "stock": stocks["arch"],
             "ops": [
                 [
-                    "bore_ream",
-                    "ream the bore",
-                    _reamed(bore_xy, section, ream_tip, section + CLEAR_MM),
+                    "bore_open",
+                    "open the bore F",
+                    _pecked(bore_xy, section, open_tip, math.inf, section + CLEAR_MM),
                 ]
             ],
         },
@@ -1247,14 +1230,13 @@ def context(
             ["keep_out", {"radius": r, "boxes": keep[frame]}],
         ]
 
-    def hole_checks(key, frame, top, bottom, radius, feed_out=False) -> list[list[Any]]:
+    def hole_checks(key, frame, top, bottom, radius) -> list[list[Any]]:
         return [
             ["holes", {"centres": holes[key], "z_bottom": _r(bottom)}],
             ["rapids_clear", {"z_top": top, "open_holes": holes[key]}],
             ["vertical_below_top", {"z_top": top}],
             ["air_feed", {"z_top": top}],
             ["keep_out", {"radius": radius, "boxes": keep[frame]}],
-            *([["feed_out", {"z_top": top}]] if feed_out else []),
         ]
 
     for name, levels, top in (
@@ -1323,13 +1305,13 @@ def context(
             "tool_changes",
             {
                 "z_top": section,
-                "tools": [tn["em-half"], tn["spot"], tn["drill-d"], tn["reamer"]],
+                "tools": [tn["em-half"], tn["spot"], tn["drill-d"], tn["drill-f"]],
                 "loads_first": True,
             },
         ],
-        [name, "spindle", {"rpm": [[em_rpm], [spot_rpm], [drill_rpm], [ream_rpm]]}],
+        [name, "spindle", {"rpm": [[em_rpm], [spot_rpm], [drill_rpm], [open_rpm]]}],
         [name, "pauses", {"z_top": section, "count": 0}],
-        [name, "depth", {"z_min": _r(bore_tip)}],
+        [name, "depth", {"z_min": _r(open_tip)}],
     ]
     for k, checks in enumerate(
         (
@@ -1348,7 +1330,7 @@ def context(
                 CENTRE_DRILL["body_mm"] / 2,
             ),
             hole_checks("bore", "arch", section, bore_tip, dd / 2),
-            hole_checks("bore", "arch", section, ream_tip, reamer / 2, feed_out=True),
+            hole_checks("bore", "arch", section, open_tip, df / 2),
         )
     ):
         expect += [[f"{name}@{k}", check, kwargs] for check, kwargs in checks]

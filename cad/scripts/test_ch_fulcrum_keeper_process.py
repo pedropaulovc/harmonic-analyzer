@@ -94,7 +94,7 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
         "spot": 2,
         "drill-41": 3,
         "drill-d": 4,
-        "reamer": 5,
+        "drill-f": 5,
         "drill-1-16": 6,
         "em-eighth": 7,
         "tap-guide": 8,
@@ -138,7 +138,6 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("blank_length_min_in", 1.27, "blank_length_min_mm"),
         ("hold_tip_height_mm", 24.0, "hold_tip_height_mm"),
         ("bore_drill_past_mm", 1.0, "bore_tip_height_mm"),
-        ("reamer_lead_mm", 1.5, "ream_tip_height_mm"),
         ("apex_drill_past_mm", 0.0, "apex_tip_height_mm"),
         ("arch_rough_woc_mm", 4.5, "arch_rough_woc_mm"),
         ("arch_past_mm", 0.5, "arch_depth_mm"),
@@ -219,17 +218,18 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: "G1 Y8.890 F{feed}",
             "passes",
         ),
-        # The reamer rapided out of the bore.
+        # The F drill stopped short of the lug's outer face (fit audit
+        # question 1: the bore is F-drilled, no reamer).
         (
-            "bore_ream",
-            lambda line: line == "G1 Z20.050 F{feed}",
-            lambda line: "G0 Z20.050",
-            "feed_out",
+            "bore_open",
+            lambda line: line.startswith("G1 Z"),
+            lambda line: "G1 Z15.000 F{feed}",
+            "holes",
         ),
         # The 1/16 stopped short of the bore.
         (
             "crown_drill",
-            lambda line: line.startswith("G1 Z27.376"),
+            lambda line: line.startswith("G1 Z27.389"),
             lambda line: "G1 Z29.000 F{feed}",
             "holes",
         ),

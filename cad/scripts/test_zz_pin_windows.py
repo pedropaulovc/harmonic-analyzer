@@ -20,8 +20,6 @@ BORES = [
     ("ch_pivot_bracket", "bore", "zz-pins-2560-2600"),
     ("mg_wheel_bar", "axle_bore", "zz-pins-1865-1870"),
     ("mg_wheel_drum", "bore", "zz-pins-4990-4995"),
-    # Owner ruling 2026-11-23, tool audit Q7 and Q13.
-    ("ch_fulcrum_keeper", "bore", "zz-pins-2560-2570"),
     ("sm_knife_mount", "knife_bore", "zz-pins-4985-5000"),
 ]
 

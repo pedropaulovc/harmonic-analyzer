@@ -15,7 +15,7 @@
 # Setup 4 upright on the 1 in parallels, gripped on F and N: face the seat
 # and drill the #41 foot hole from it, into the waste above the foot (FK03);
 # Setup 5 lying, I up, the raw opposite face down: profile the full R.275
-# crown through the lug and spot, drill (D) and ream (.2560) the bore
+# crown through the lug and spot, drill (D) and open (F) the bore
 # through the lug, both 1 mm into the waste the step removes; the jaws grip
 # only that waste, below the cuts (FK04); Setup 6 I down: face the foot tip
 # to the .65 length and mill the L step to the .32 lug, which opens the bore
@@ -23,7 +23,7 @@
 # through the crown into the bore, mill the foot hole's Ø.150 counterbore
 # from the foot top with the long-reach 1/8 in end mill (FK06), tap #1-72 by
 # hand under the spring tap guide in the spindle (FK07); bench deburr (the
-# reamer by hand through the bore) and inspect. Finish: black oxide, in the
+# F drill by hand through the bore) and inspect. Finish: black oxide, in the
 # shop. Owner (Pedro), answered in person 2026-11-21: "Black oxide: cold
 # blackening in the shop with Presto Black PC9 is acceptable as the
 # drawing's black oxide." The last setup blackens the keeper with Birchwood
@@ -64,7 +64,7 @@
 # are a contract with that recipe (the recipe keeps the bracket's names for
 # them: west = F, hold = the foot hole, arch = the crown, apex = the crown
 # hole). Tool numbers are the places in the tools list among the mill's
-# tools: T1 1/2 in end mill, T2 centre drill, T3 #41, T4 D, T5 .2560 reamer,
+# tools: T1 1/2 in end mill, T2 centre drill, T3 #41, T4 D, T5 F drill,
 # T6 1/16 drill, T7 long-reach 1/8 in end mill, T8 the tap guide (the tap is turned
 # by hand).
 title = "Fulcrum keeper"
@@ -85,26 +85,12 @@ part = "ch-fulcrum-keeper"
 
 [parameters]
 quantity = 2
-# The bore: owner ruling 2026-11-23, tool audit Q7: "Re-band to dia .2560
-# +.0010/0, cut with the .2560 reamer" (was .2550 +.0010/0, its own .2550
-# reamer). Its GO / NO-GO pins: owner ruling 2026-11-23, tool audit Q1,
-# verbatim: "ZZ singles per the record: 29 pins (17 plus GO, 12 minus
-# NO-GO), about $130. Accept that good holes near a limit may be refused;
-# the traveler mikes each pin so the real window is known per pin."
-# (tools.zz-pins-2560-2570). GO: a plus .2560 single, .2560-.2562; NO-GO:
-# the .257 minus pin of the .061-.500 box, .2568-.2570. The hole is
-# accepted between the two pins' miked readings; with both pins at their
-# tolerance limits only .2562-.2568, the middle .0006 of the .0010 band, is
-# sure to pass.
-go_pin_in = 0.2560
-nogo_pin_in = 0.2570
-# Each pin's acceptable reading, one Class ZZ tolerance (.0002) wide: GO
-# from the band's low end up, NO-GO from its high end down (the
-# ToolTravelers pattern, test_zz_pin_windows).
-go_pin_min_mm = 6.5024
-go_pin_max_mm = 6.5075
-nogo_pin_min_mm = 6.5227
-nogo_pin_max_mm = 6.5278
+# The bore: owner ruling 2026-11-24, fit audit question 1 (approved as
+# recommended): drilled F, .257 at the title block's DRILLED HOLES row, with
+# the other bores on the two 1/4 in shafts; it reverses tool audit Q7's
+# .2560 reamer and its Class ZZ pins (tools.zz-pins-2560-2570). Acceptance:
+# a 1/4 in ground-bar offcut (stock 1018-ground-round-1-4, the MHA-CH-04
+# shaft's bar) slides through the bore by hand.
 # The bar (stock.1018-square-3-4) and the blank the programs are posted for:
 # sawn about 1.35. At least 1.32: the seat skim (.020) and the 1.267 height
 # leave .033 above the crown's apex. At most 1.38: FK04's rough crown pass
@@ -192,19 +178,16 @@ hold_tip_height_mm = 23.413
 foot_hole_station_from_i_mm = 11.938
 width_middle_mm = 6.985
 # The bore's ±.012 off the width's centre, read by calipers from F over the
-# GO pin: the width's middle ± .012 (6.985 ± 0.3048), on the nominal width.
+# F drill's shank: the width's middle ± .012 (6.985 ± 0.3048), on the nominal width.
 bore_from_f_min_mm = 6.6802
 bore_from_f_max_mm = 7.2898
-# Bore (FK04): the D drill (.246, .010 under the reamer) one plunge (L/D
-# 1.6), full diameter bore_drill_past_mm past the lug's outer face's plane;
-# the reamer's full diameter bore_ream_past_mm past it, its tip (a chucking
-# reamer's 45° bevel, under reamer_lead_mm long) no deeper than the drill's
-# full diameter. Tip heights above the stacks; cam.py checks them.
+# Bore (FK04): the D drill (.246, .011 under the F) one plunge (L/D 1.6),
+# full diameter bore_drill_past_mm past the lug's outer face's plane; the F
+# drill opens it the same way, its full diameter as far past. Tip heights
+# above the stacks; cam.py checks them.
 bore_drill_past_mm = 2.0
-bore_ream_past_mm = 1.0
-reamer_lead_mm = 1.0
 bore_tip_height_mm = 7.045
-ream_tip_height_mm = 8.922
+bore_open_tip_height_mm = 6.960
 # Crown hole (FK06): the 1/16 drill (.0625), not the #1-72's usual #53
 # (.0595): the drawing's Ø.060 with the title block's DRILLED HOLES +.004/0
 # is .060-.064, and the #53 is under it; the 1/16 leaves about 58% thread
@@ -214,13 +197,13 @@ ream_tip_height_mm = 8.922
 # parallels.
 apex_peck_mm = 1.016
 apex_drill_past_mm = 0.5
-apex_tip_height_mm = 27.376
+apex_tip_height_mm = 27.389
 # Hand tap (FK07): the plug tap's 5-thread lead (5 × 1/72) past the bore's
 # wall at the thread's major diameter, and 1.0 short of the bore's far wall:
 # the tap's point to go tap_reach_min_mm–tap_reach_max_mm below the apex.
 plug_tap_lead_mm = 1.764
-tap_reach_min_mm = 5.633
-tap_reach_max_mm = 9.236
+tap_reach_min_mm = 5.619
+tap_reach_max_mm = 9.249
 # Counterbore (FK06): the long-reach 1/8 in end mill's centre on a circle
 # cbore_path_radius_mm round the foot hole's axis (Ø.152, the middle of the
 # drawing's .150-.154 band, less the cutter), 17 helical turns of .0049 down
@@ -250,19 +233,19 @@ cbore_edge_feed_per_min_mm = 213.36
 long_reach_mm = 31.75
 # Speeds and feeds of the holes, authored in the operations: LittleMachineShop
 # "Cutting Speeds", Drilling & Reaming, Plain carbon steels 1006-1026 (read
-# 2026-11-20): drilling 60-100 ft/min, reaming 40-65; AutoDrill "Suggested
+# 2026-11-20): drilling 60-100 ft/min; AutoDrill "Suggested
 # drilling feed rates" (read 2026-11-20), row Stl, Carbon: 1/16 in .001,
 # 1/8 in .003 in/rev, a size between two columns taking the lower one's
 # feed. Centre drill 1800 rpm × .001 = 1.8 in/min (the column clamp's). #41
 # (.096): 2600 rpm (65 ft/min) × .001 = 2.6 in/min. D (.246): 1000 rpm (64
 # ft/min) × .003 = 3.0 in/min. 1/16 (.0625): 2800 rpm (the spindle's top, 46
-# ft/min) × .001 = 2.8 in/min. Reamer .2560: 450 rpm (30 ft/min, under the
-# band: the finish matters more) × .004 = 1.8 in/min, in and out. cam.py
+# ft/min) × .001 = 2.8 in/min. F (.257): 969 rpm, the spindle's 9th stop
+# (9 x 107.7, machines.pm-30mv; 65 ft/min) × .003 = 2.9 in/min. cam.py
 # posts these.
 spot_feed_per_min_mm = 45.72
 hold_drill_feed_per_min_mm = 66.04
 bore_drill_feed_per_min_mm = 76.2
-ream_feed_per_min_mm = 45.72
+bore_open_feed_per_min_mm = 73.66
 apex_drill_feed_per_min_mm = 71.12
 # Holding (shop workholding.vise-pm-6 and fixtures.parallels-lms-6745, 1/8
 # in thick): upright, a 1 in parallel against each jaw; lying, the set's 1 in
@@ -297,15 +280,15 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # cam.py checks its
 # collet nose clears the stock at every program's deepest cut.
 half_mill_projection_mm = 28.45
-# Overall lengths: jobber #41 2-1/8 in, D 4 in, 1/16 1-7/8 in (ASME B94.11M);
-# the #2 combined drill and countersink 1-7/8 in; a 1/4 in class chucking
-# reamer 6 in; the long-reach 1/8 in end mill 2-1/2 in. Bounded by their
-# whole length below the chuck or collet.
+# Overall lengths: jobber #41 2-1/8 in, D 4 in, F 4-1/8 in, 1/16 1-7/8 in
+# (ASME B94.11M); the #2 combined drill and countersink 1-7/8 in; the
+# long-reach 1/8 in end mill 2-1/2 in. Bounded by their whole length below
+# the chuck or collet.
 drill_41_oal_mm = 53.975
 drill_d_oal_mm = 101.6
 drill_1_16_oal_mm = 47.625
 centre_drill_oal_mm = 47.625
-reamer_oal_mm = 152.4
+drill_f_oal_mm = 104.775
 long_reach_oal_mm = 63.5
 # Tapping under the spring tap guide (tools.tap-guide-fisher): the guide and
 # the tap in its wrench together reach at most tap_stack_max_mm below the
@@ -339,9 +322,9 @@ id = "drill-d"
 name = "D drill"
 ref = "drill-d"
 [[tools]]
-id = "reamer"
-name = ".2560 reamer, TO ORDER"
-ref = "reamer-2560"
+id = "drill-f"
+name = "F drill"
+ref = "jig-drill-f"
 [[tools]]
 id = "drill-1-16"
 name = "1/16 drill"
@@ -358,11 +341,6 @@ ref = "tap-guide-fisher"
 id = "tap-1-72"
 name = "#1-72 plug tap"
 ref = "tap-1-72-plug"
-[[tools]]
-id = "pins"
-name = "Class ZZ pins: .2560 plus (GO) and .2570 minus (NO-GO)"
-ref = "zz-pins-2560-2570"
-status = "to_order"
 [[tools]]
 id = "saw"
 name = "Evolution miter saw"
@@ -564,24 +542,10 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in + 1/2 in stacks against each jaw (1/8 in thick: the bore falls between them). The part lying along the jaws, I UP, the opposite (still the bar's face) down on both stacks; gripped on F (against the FIXED jaw) and N; the seat to the RIGHT; centred on the jaws. The jaws grip only the lower {{process.lying_grip_mm:in.3dot}}, the waste under the lug that Setup 6 cuts away: the crown and the bore are cut above the jaw tops."
 datum = "Program FK04_crown_bore. G54: X0 the seat (the part's RIGHT end), the part to −X; Y0 the fixed jaw's face (F), +Y toward it; Z0 the stacks' top. The crown's centre and the bore at X −{{cad.bore_height_mm:.3f}}, Y −{{cad.bore_lateral_ref:.3f}} mm (the width's middle). Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
-diagram = { file = "diagrams/arch.svg", alt = "The part lying along the jaws on stacked parallels, I up, the seat to the right; the 1/2 in end mill profiles the full R.275 crown at the left end through the lug, then the centre drill, the D drill and the .2560 reamer make the bore through the lug on the crown's centre, all above the jaw tops." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.far_side_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 2.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bore_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
+diagram = { file = "diagrams/arch.svg", alt = "The part lying along the jaws on stacked parallels, I up, the seat to the right; the 1/2 in end mill profiles the full R.275 crown at the left end through the lug, then the centre drill, the D drill and the F drill make the bore through the lug on the crown's centre, all above the jaw tops." }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.far_side_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 2.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bore_open_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_f_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.far_side_width_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.blank_length_max_mm}}"], section_mm = { y = "{{cad.far_side_width_mm}}", z = "{{process.blank_section_mm}}" }, vise_left = "end" }
-
-[[setups.operations]]
-speed_kind = "other"
-tool = "pins"
-drilling = "none"
-sizing = "other"
-instruction = "Before the first part's file, at the bench: mike the GO pin, the NO-GO pin and the .2560 reamer (across two opposite margins at its front) on the .0001 micrometer, each to ±.00005. Write the three readings on this sheet and each pin's reading on its tag. A pin outside its range is not used."
-feed = "hand"
-inspection = "GO reads {{cad.bore_dia_min_in:.4dot}}–{{process.go_pin_max_mm:in.4dot}}, NO-GO {{process.nogo_pin_min_mm:in.4dot}}–{{cad.bore_dia_max_in:.4dot}}. The bore is accepted between the two readings (GO reading ≤ bore < NO-GO reading): with both pins at their limits only {{process.go_pin_max_mm:in.4dot}}–{{process.nogo_pin_min_mm:in.4dot}} is sure to pass, so a good bore within .0002 of a limit may be refused."
-gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.go_pin_min_mm}}", "{{process.go_pin_max_mm}}"] }, { gauge = "micrometers", band_mm = ["{{process.nogo_pin_min_mm}}", "{{process.nogo_pin_max_mm}}"] }]
-
-[[setups.operations]]
-instruction = "If the reamer reads under the GO pin's reading, its holes would be refused: stop and tell the owner before reaming any keeper."
-feed = "hand"
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 the seat (the RIGHT end), Y0 the fixed jaw's face (F): edge finder (900 rpm)."
@@ -625,7 +589,7 @@ milling_cuts = [
 
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "A step where the crown meets a side: do not go on (no spot, drill or ream); stop the file and tell the owner with the blank's number." },
+  { kind = "stop", text = "A step where the crown meets a side: do not go on (no spot or drill); stop the file and tell the owner with the blank's number." },
 ]
 feed = "hand"
 
@@ -646,7 +610,7 @@ speed_kind = "spindle"
 tool = "drill-d"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T4: D drill (.246, the reamer's pilot) down through the lug, one plunge, its full diameter {{process.bore_drill_past_mm:in.3dot}} past the lug's outer face's plane into the waste; set 1000. Cutting oil."
+instruction = "Same file, M6 T4: D drill (.246, the F drill's pilot) down through the lug, one plunge, its full diameter {{process.bore_drill_past_mm:in.3dot}} past the lug's outer face's plane into the waste; set 1000. Cutting oil."
 rpm = 1000
 feed = "{{process.bore_drill_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = 10.128
@@ -657,38 +621,19 @@ milling_cuts = [
 
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "reamer"
-drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Same file, M6 T5 (spindle off, retracted): ream the bore, .2560 reamer in the drill chuck, its full diameter {{process.bore_ream_past_mm:in.3dot}} past the lug's outer face's plane; set 450. Cutting oil. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Leave the part clamped for the check."
-rpm = 450
-feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
+tool = "drill-f"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T5: F drill (.257) down through the D hole, one plunge, its full diameter {{process.bore_drill_past_mm:in.3dot}} past the lug's outer face's plane into the waste; set 969. Cutting oil. Leave the part clamped for the check."
+rpm = 969
+feed = "{{process.bore_open_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = 10.128
+peck = "none"
 milling_cuts = [
-  { name = "bore ream", kind = "drill", phase = "finish", cutter_dia_mm = 6.5024, flutes = 2, rpm = 450, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = "{{cad.bore_height_mm}}" },
+  { name = "bore open", kind = "drill", phase = "finish", cutter_dia_mm = 6.5278, flutes = 2, rpm = 969, feed_mm_min = "{{process.bore_open_feed_per_min_mm}}", stations_mm = "{{cad.bore_height_mm}}" },
 ]
-inspection = "Still clamped, the first part before the second is reamed: bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}: the {{process.go_pin_in:.4dot}} plus pin (GO) enters the full depth, the {{process.nogo_pin_in:.4dot}} minus pin (NO-GO) does not."
-gauge_checks = [{ gauge = "zz-pins-2560-2570", band_mm = "{{cad.bore_dia_band_mm}}" }]
-
-# The ream's remedy follows its check: prechips prints an op's Check after
-# its work, so it is the next op; the remedy, its stop and the in-band path
-# are one op each (rule T12).
-[[setups.operations]]
-steps = [
-  { kind = "action", text = "GO refused (the bore is under the GO pin's reading): clear the chips, oil the bore, give it one more pass with the same .2560 reamer by hand in the tap wrench, forward only, and draw it out still turning forward; gauge again." },
-]
-feed = "hand"
-
-[[setups.operations]]
-steps = [
-  { kind = "stop", text = "GO still refused, or NO-GO enters (no cut remedies an oversize bore): reject the keeper. Set it aside with its number and tell the owner; the reamer or its runout is out." },
-]
-feed = "hand"
-
-[[setups.operations]]
-steps = [
-  { kind = "action", text = "In band: the next part is reamed without the check; unclamp." },
-]
-feed = "hand"
+inspection = "Still clamped, the first part before the second is drilled: the 1/4 in ground bar offcut (stock 1018-ground-round-1-4, the MHA-CH-04 bar) slides through the bore by hand. Tight: stop and tell the owner."
+gauge_checks = "other"
 
 [[setups]]
 machine_kind = "other"
@@ -899,17 +844,17 @@ machine_kind = "other"
 title = "Deburr and inspect"
 machine = "Bench"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished keeper from the side and from above: the seat, the foot top with the counterbored foot hole, the crown with its tapped hole, the reamed bore, and where each is measured from." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished keeper from the side and from above: the seat, the foot top with the counterbored foot hole, the crown with its tapped hole, the F-drilled bore, and where each is measured from." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
 speed_kind = "other"
-tool = "reamer"
+tool = "drill-f"
 drilling = "none"
 sizing = "other"
-instruction = "The crown hole's and the step's burrs inside the bore: turn the .2560 reamer through the bore by hand in a tap wrench, forward only, Tapmatic Gold, and draw it out still turning forward. Blow the bore out."
+instruction = "The crown hole's and the step's burrs inside the bore: turn the F drill through the bore by hand in a tap wrench, forward only, Tapmatic Gold, and draw it out still turning forward. Blow the bore out."
 feed = "hand"
 
 [[setups.operations]]
@@ -923,15 +868,15 @@ inspection = "I down on the surface plate: it does not rock. The combination squ
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Inspect each keeper, recording every reading with its number. Bore size, after the hand ream: the Class ZZ pins miked in Setup 5."
+instruction = "Inspect each keeper, recording every reading with its number. Bore: the 1/4 in ground bar offcut."
 feed = "hand"
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}: the {{process.go_pin_in:.4dot}} plus pin (GO) enters, the {{process.nogo_pin_in:.4dot}} minus pin (NO-GO) does not. GO refused or NO-GO enters: reject the keeper (the stop below)."
-gauge_checks = [{ gauge = "zz-pins-2560-2570", band_mm = "{{cad.bore_dia_band_mm}}" }]
+inspection = "The offcut slides through the bore by hand. Tight: reject the keeper (the stop below)."
+gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Bore height and centring: the keeper on its seat on the surface plate, the GO pin in the bore."
+instruction = "Bore height and centring: the keeper on its seat on the surface plate, the F drill's shank in the bore, its Ø miked."
 feed = "hand"
-inspection = "Bore height {{cad.bore_height_min_in:.3dot}}–{{cad.bore_height_max_in:.3dot}}: the height gauge over the pin less half the GO pin's written reading. Bore on the width's centre within ±{{cad.bore_off_centre_max_in:.3dot}}: calipers from F and from N over the pin, each less half that reading; half their difference is the offset."
+inspection = "Bore height {{cad.bore_height_min_in:.3dot}}–{{cad.bore_height_max_in:.3dot}}: the height gauge over the shank less half its Ø. Bore on the width's centre within ±{{cad.bore_off_centre_max_in:.3dot}}: calipers from F and from N over the shank, each less half its Ø; half their difference is the offset."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = "{{cad.bore_height_band_mm}}" },
   { gauge = "calipers", band_mm = ["{{process.bore_from_f_min_mm}}", "{{process.bore_from_f_max_mm}}"] },
@@ -995,11 +940,11 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Seal: wipe on the stone lubricant (a light oil; the maker: clear coat, wax or oil), leave it a few minutes, wipe off the excess."
 feed = "hand"
-inspection = "Even black all over, no bare spot and no wiping-off coating. Fits after blackening: the {{process.go_pin_in:.4dot}} pin still enters the bore and a #1-72 screw still runs into the crown hole by hand."
+inspection = "Even black all over, no bare spot and no wiping-off coating. Fits after blackening: the 1/4 in ground bar offcut still slides through the bore and a #1-72 screw still runs into the crown hole by hand."
 gauge_checks = "other"
 
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "The pin or the screw tight after blackening: stop and tell the owner; do not re-ream or re-tap." },
+  { kind = "stop", text = "The offcut or the screw tight after blackening: stop and tell the owner; do not open the bore or re-tap." },
 ]
 feed = "hand"

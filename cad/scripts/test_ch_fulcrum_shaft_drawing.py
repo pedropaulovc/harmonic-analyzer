@@ -34,9 +34,9 @@ def test_shaft_carries_no_frames_or_datums() -> None:
 def test_plain_shaft_domed_proud_of_each_keeper() -> None:
     spec = ch_fulcrum_shaft_spec
     keeper = ch_fulcrum_keeper_spec
-    # #2338: the keeper bore is a .2560 reamer's size over the .2500 shaft
-    # (owner ruling 2026-11-23, tool audit Q7; was .2550).
-    assert round((keeper.BORE_DIA - spec.SHAFT_DIA) / 25.4, 4) == 0.0060
+    # #2338: the keeper bore is the F drill's .257 over the .2500 shaft
+    # (owner ruling 2026-11-24, fit audit question 1; was the .2560 reamer).
+    assert round((keeper.BORE_DIA - spec.SHAFT_DIA) / 25.4, 4) == 0.0070
     assert math.isclose(
         spec.CYLINDER_HALF, keeper.KEEPER_Z_OFF + keeper.LUG_HALF_T + 1.016
     )
@@ -213,16 +213,16 @@ def test_every_orthographic_view_is_at_sheet_scale() -> None:
     assert drawing.ISO_SCALE == (1, 1)
 
 
-def test_keeper_bores_reamed_apart_still_pass_the_shaft() -> None:
-    # #2338: each keeper is reamed alone, so the two bores stand up to both
+def test_keeper_bores_drilled_apart_still_pass_the_shaft() -> None:
+    # #2338: each keeper is drilled alone, so the two bores stand up to both
     # .XX LugRise bands (.020) plus the rail seats' 0.04 zone apart in height
     # (a roll across the width only moves a lug sideways, which the fit-up
     # takes with the shaft through both); each seat may also pitch its zone
     # over its .65 length. The shaft runs through both lug centres 6.360
     # apart and each lug, at its thickest printed .33, spends its thickness x
-    # (pitch + slope); each bore, reamed in its own setup, may run off 0.3 deg
-    # from its seat (the drill it follows). The .2560 bore keeps the slip
-    # minimum after all of that.
+    # (pitch + slope); each bore, drilled in its own setup, may run off 0.3 deg
+    # from its seat. The F-drilled .257 bore (owner ruling 2026-11-24, fit
+    # audit question 1) keeps the slip minimum after all of that.
     keeper = ch_fulcrum_keeper_spec
     spec = ch_fulcrum_shaft_spec
     flatness = keeper.KEEPER_SEAT_FLATNESS_BUDGET_MM
@@ -237,9 +237,9 @@ def test_keeper_bores_reamed_apart_still_pass_the_shaft() -> None:
     assert math.isclose(keeper.BORE_ALIGNMENT_ALLOWANCE_MM, allowance)
     assert round(allowance, 4) == 0.0926
     least = keeper.BORE_DIA + keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA - spec.SHAFT_DIA_BAND[0]
-    assert round(least / 25.4, 4) == 0.0060
+    assert round(least / 25.4, 4) == 0.0070
     assert math.isclose(spec.ALIGNED_MIN_CLEARANCE_MM, least - allowance)
-    assert round(spec.ALIGNED_MIN_CLEARANCE_MM, 4) == 0.0598
+    assert round(spec.ALIGNED_MIN_CLEARANCE_MM, 4) == 0.0854
     assert spec.ALIGNED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM == 0.010
     # Neither the owned .2510 reamer nor a .2540 one would do it: each one's
     # least clearance is under the slip minimum plus the allowance.

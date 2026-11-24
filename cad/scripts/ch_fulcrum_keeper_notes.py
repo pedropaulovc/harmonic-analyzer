@@ -13,12 +13,14 @@ Each callout keeps its size first and at most two rows of words
 
 from __future__ import annotations
 
-from ch_fulcrum_keeper_spec import FOOT_TIP_WALL_TEXT
+from _hole_spec import drill_process
+from ch_fulcrum_keeper_spec import BORE_HOLE_SPEC, FOOT_TIP_WALL_TEXT
 
 # Each keeper is finished alone to this print (#2338: no at-assembly pair
-# ream): the process word marks the fit bore (rule 7) and the band its fit
-# on the shaft (rule 4).
-BORE_CALLOUT = "REAM THRU\nSLIDING FIT ON MHA-CH-04"
+# ream). The bore is drilled F at the DRILLED HOLES row (owner ruling
+# 2026-11-24, fit audit question 1): the callout names the drill (rule 7)
+# and the shaft it slides on (rule 4), and prints no number of its own.
+BORE_CALLOUT = f"{drill_process(BORE_HOLE_SPEC)} THRU\nSLIDING CLEARANCE ON MHA-CH-04"
 # The crown is a full round tangent to both side faces (owner ruling Q10-B),
 # centred on the bore (ch_fulcrum_keeper_spec).
 CROWN_CALLOUT = "FULL R"

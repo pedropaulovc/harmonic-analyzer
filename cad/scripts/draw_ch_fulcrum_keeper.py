@@ -57,7 +57,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
-from _hole_spec import blind_cut_dia_mm
+from _hole_spec import blind_cut_dia_mm, drill_process
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _printed_limits import drilled_limits, limits
@@ -74,6 +74,7 @@ from ch_fulcrum_keeper_spec import (
     BORE_CENTRE_CALLOUT,
     BORE_DIA,
     BORE_DIA_BAND,
+    BORE_HOLE_SPEC,
     BORE_FROM_SIDE,
     CBORE_DEPTH_BAND,
     CBORE_DEPTH_MM,
@@ -226,7 +227,7 @@ DIMENSION_CALLOUTS = {
 # 2026-10-28, review exception RV-03) and off the -Z side face, the latter's
 # text and function under its extension lines right of the foot tip, clear
 # of the foot-hole callout.  The end view carries the width plus the
-# shaft-axis / crown stack, the reamed bore and the bore's reference place
+# shaft-axis / crown stack, the F-drilled bore and the bore's reference place
 # off a side face with its centre-plane band above it.
 FRONT_KEEP = {
     "LugThickness": (0.080, 0.086),
@@ -300,7 +301,7 @@ REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the lines are fully defined sketch lengt
 # code that prints it, in the part frame (ch_fulcrum_keeper_spec: +X along the
 # shaft, outboard, x 0 the lug mid-plane; +Y up from the seat; +Z across the
 # width, z 0 its centre plane). Bands are the title block's rows at the places
-# the part authors (DRAWING_PRECISION), the reamed bore its own BORE_DIA_BAND,
+# the part authors (DRAWING_PRECISION), the F-drilled bore the DRILLED HOLES row,
 # the drilled holes and the tap drill the DRILLED HOLES row at their callouts'
 # three places. The (1.27) height, the (R.275) crown and the (.275) bore
 # station are references: the crown follows the width's .XX band and the bore
@@ -457,12 +458,13 @@ requirement(
         "overall_height_ref": _P["OverallHeight"],
     },
 )
-# The shaft bore, reamed through the lug from its outer face: Ø.2560
-# +.0010/.0000 REAM THRU, SLIDING FIT ON MHA-CH-04 (RIGHT_KEEP "BoreDia"); its
-# axis .99 off the seat (RIGHT_KEEP "LugRise") and on the width's centre
-# plane within ±.012 (RIGHT_KEEP "BoreFromSide": the (.275) reference off the
-# -Z side face with BORE_CENTRE_CALLOUT).
-_REAM = ((_SELF, "DIMENSION_CALLOUTS"),)
+# The shaft bore, F-drilled through the lug from its outer face: Ø.257
+# F DRILL THRU, SLIDING CLEARANCE ON MHA-CH-04 (RIGHT_KEEP "BoreDia"; owner
+# ruling 2026-11-24, fit audit question 1); its axis .99 off the seat
+# (RIGHT_KEEP "LugRise") and on the width's centre plane within ±.012
+# (RIGHT_KEEP "BoreFromSide": the (.275) reference off the -Z side face with
+# BORE_CENTRE_CALLOUT).
+_BORE_CALLOUT = ((_SELF, "DIMENSION_CALLOUTS"),)
 requirement(
     "bore",
     kind="hole",
@@ -476,9 +478,10 @@ requirement(
             ("BORE_DIA", "BORE_DIA_BAND", (_SELF, "RIGHT_KEEP")),
         ),
         "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
-        "process": ("ream", _REAM),
-        "thru": (True, _REAM),
-        "callout": (BORE_CALLOUT, ((_NOTES, "BORE_CALLOUT"), *_REAM)),
+        "drill": (BORE_HOLE_SPEC.size, ("BORE_HOLE_SPEC",)),
+        "process": (drill_process(BORE_HOLE_SPEC), _BORE_CALLOUT),
+        "thru": (True, _BORE_CALLOUT),
+        "callout": (BORE_CALLOUT, ((_NOTES, "BORE_CALLOUT"), *_BORE_CALLOUT)),
         "height": (
             limits(SHAFT_AXIS_H, _P["LugRise"], unit=UNIT),
             ("SHAFT_AXIS_H", "UNIT", (_SELF, "RIGHT_KEEP")),
