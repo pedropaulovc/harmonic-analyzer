@@ -84,7 +84,7 @@ def test_flat_pair_is_baselined_from_one_end() -> None:
     assert spec.DRAWING_PRECISION["FlatProfile"]["FlatFromEnd"] == 2
     assert spec.DRAWING_PRECISION["FlatProfile"]["FlatBaseline"] == 2
     assert spec.DRAWING_PRECISION["FlatProfile"]["FlatLength"] == 2
-    assert round(spec.FLAT_STATION_WINDOW_MM, 3) == 1.219
+    assert round(spec.FLAT_STATION_WINDOW_MM, 3) == 0.474  # C10 (ch_keeper_fitup)
 
 
 def _station_window(spec) -> float:
@@ -106,7 +106,7 @@ def test_the_flat_length_cannot_drop_a_place(monkeypatch) -> None:
     with monkeypatch.context() as patch:
         for key in ("front_flat", "rear_flat"):
             patch.setitem(spec._STATION_BANDS, key, spec._BAND_BY_PLACES[1])
-        assert round(_station_window(spec), 3) == -2.337
+        assert round(_station_window(spec), 3) == -3.082
 
 
 def test_both_flats_print_one_length_and_one_across_flat() -> None:

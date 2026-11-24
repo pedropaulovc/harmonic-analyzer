@@ -399,7 +399,7 @@ def test_keeper_relief_is_a_chord_step_that_leaves_the_cap_recess_its_wall() -> 
     assert part.KEEPER_FOOT_RELIEF_ROOT_MARGIN == pytest.approx(
         min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS) - root
     )
-    assert part.KEEPER_FOOT_RELIEF_ROOT_MARGIN == pytest.approx(0.2286, abs=5e-4)
+    assert part.KEEPER_FOOT_RELIEF_ROOT_MARGIN == pytest.approx(0.127, abs=5e-4)
     assert part.KEEPER_FOOT_RELIEF_ROOT_MARGIN > 0.0
     title_block_inside_corner = 0.040 * spec.IN
     assert title_block_inside_corner > min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS)
@@ -499,19 +499,15 @@ def test_complete_keeper_foot_clears_boss_at_every_printed_fitup_corner(
     socket_pitch = (
         part.REAR_COLUMN_Z - part.FRONT_COLUMN_Z
     ) + pitch_direction * spec.SOCKET_PATTERN_REFINEMENT_ZONE
-    front_inner = (
-        part._keeper_printed(
-            keeper.KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[0],
-            keeper.KEEPER_FITUP_PLACES,
-        )
-        + front_station_direction * keeper.KEEPER_FITUP_LOCATION_BAND_MM
+    # C10 (ch_keeper_fitup): the front face by DRO, the rear pushed up to the
+    # lever stack over a leaf; each face's deviation from the model.
+    from ch_keeper_fitup import FACE_DEVIATIONS_MM
+
+    front_inner = keeper.KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[0] + (
+        FACE_DEVIATIONS_MM["front"][(front_station_direction + 1) // 2]
     )
-    rear_inner = (
-        part._keeper_printed(
-            keeper.KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[1],
-            keeper.KEEPER_FITUP_PLACES,
-        )
-        + rear_station_direction * keeper.KEEPER_FITUP_LOCATION_BAND_MM
+    rear_inner = keeper.KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[1] + (
+        FACE_DEVIATIONS_MM["rear"][(rear_station_direction + 1) // 2]
     )
     margins = (
         front_inner - overall_length - boss_radius,
@@ -526,7 +522,7 @@ def test_complete_keeper_foot_clears_boss_at_every_printed_fitup_corner(
         boss_direction,
     ) == (-1, 1, -1, 1, 1):
         assert margins == pytest.approx(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS)
-        assert margins == pytest.approx((0.7366, 1.4986), abs=5e-4)
+        assert margins == pytest.approx((0.6350, 1.3716), abs=5e-4)
 
 
 def _in_corner_crop(dx: float, dz: float, triangle=part.CORNER_CROP_TRIANGLE) -> bool:

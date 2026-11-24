@@ -560,7 +560,10 @@ def test_the_package_sheets_and_settings_contract() -> None:
         asm.KEEPER_PLAN_FEATURE
     }
     assert set(drawing.notes.DIMENSION_CALLOUTS) == set(kept)
-    assert drawing.notes.REFERENCE_DIMENSIONS == {asm.LUG_SPAN_DIMENSION}
+    assert drawing.notes.REFERENCE_DIMENSIONS == {
+        asm.LUG_SPAN_DIMENSION,
+        asm.KEEPER_REAR_Z_DIMENSION,
+    }
     assert set(asm.DIMENSION_TOLERANCES) == set(kept) - drawing.notes.REFERENCE_DIMENSIONS
     # Every kept dimension text lands on view D, E or F, inside the border,
     # left of the right column.
@@ -1031,11 +1034,15 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_screwed() -> None:
         "keepers-on-frame",
         "fulcrum-shaft-through-keepers",
         steps.KEEPERS_SET_KEY,
+        "keeper-faces-set",
+        "rear-keeper-to-stack",
         "keepers-clamped-on-frame",
         "keeper-feet-transferred",
         steps.KEEPERS_SCREWED_KEY,
         "keepers-held",
         "keeper-bores-checked",
+        "fulcrum-shaft-withdrawn",
+        "bars-straight",
         steps.BARS_PINNED_KEY,
         steps.LEVER_BANK_THREADED_KEY,
         "lever-bank-slides",
@@ -1062,15 +1069,27 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_screwed() -> None:
     import ch_fulcrum_shaft_spec as shaft
 
     assert shaft.ALIGNED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM
-    # #1660 r2 (rule 19): the lever bank has no stack fit-up because it
-    # needs none: twenty hubs at the top of their band leave end play at the
-    # shortest lug span, which the slide check gauges.
-    from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB, HUB_LENGTH_BAND
+    # C10 (owner ruling 2026-11-24, fit audit part 2, C10): the bare levers
+    # go on with the shaft, the front lug is set by DRO at the title block's
+    # band and the rear keeper is pushed up to the hubs over the leaf; the
+    # levers come off again before the bars are pinned at the bench.
+    lever = drawing.item(drawing.explode.LEVER)
+    assert f"{drawing.COUNT} BARE {lever}" in _step_body("fulcrum-shaft-through-keepers")
+    assert "RIGHT LUG INNER FACE" in _step_body("keeper-faces-set")
+    pushed = _step_body("rear-keeper-to-stack")
+    assert drawing.notes.setting_row("rear-keeper-to-stack") in pushed
+    assert ".020" not in pushed
+    # The bank's end play is the leaf less or plus the push's settle; a
+    # cocked hub (.012 longer, c10_close_solid.py) never closes it solid,
+    # and the slide check's leaf enters at the least play.
+    import ch_keeper_fitup as fitup
 
-    span_min = (
-        keeper.KEEPER_INNER_FACE_SPAN_MM - 2 * keeper.KEEPER_FITUP_LOCATION_BAND_MM
-    )
-    assert span_min - drawing.COUNT * (LEVER_HUB + HUB_LENGTH_BAND[0]) > 0.2
+    assert fitup.REAR_KEEPER_LEAF_MM == pytest.approx(0.020 * 25.4)
+    assert [p / 25.4 for p in fitup.END_PLAY_MM] == pytest.approx([0.019, 0.021])
+    assert drawing.notes.END_PLAY_LEAF_MM <= fitup.END_PLAY_MM[0]
+    deviations = {k: [d / 25.4 for d in v] for k, v in fitup.FACE_DEVIATIONS_MM.items()}
+    assert deviations["front"] == pytest.approx([-0.0052, 0.0048], abs=1e-4)
+    assert deviations["rear"] == pytest.approx([-0.0262, 0.0058], abs=1e-4)
     assert keeper.SET_SCREW_ENGAGEMENT_D >= keeper.SET_SCREW_MIN_ENGAGEMENT_D
     # Main's ruling: X off the receiving web, Z off the upper socket line; the
     # owner's (X1+B1, b9ae review): the settings are view F's own banded
@@ -1080,14 +1099,17 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_screwed() -> None:
     )
     assert drawing.KEEPER_PLAN.title in _step_body(steps.KEEPERS_SET_KEY)
     asm = drawing.asm
-    # Owner ruling X-A: the lug centre carries its own looser band, the
-    # inner faces the location band.
-    for name, band in (
-        (asm.KEEPER_X_DIMENSION, keeper.KEEPER_FITUP_X_BAND_MM),
-        (asm.KEEPER_FRONT_Z_DIMENSION, keeper.KEEPER_FITUP_LOCATION_BAND_MM),
-        (asm.KEEPER_REAR_Z_DIMENSION, keeper.KEEPER_FITUP_LOCATION_BAND_MM),
-    ):
-        assert asm.DIMENSION_TOLERANCES[name] == (-band, band)
+    # Owner ruling X-A: the lug centre carries its own looser band; C10: the
+    # front inner face the title block's, the rear a reference.
+    assert asm.DIMENSION_TOLERANCES[asm.KEEPER_X_DIMENSION] == (
+        -keeper.KEEPER_FITUP_X_BAND_MM,
+        keeper.KEEPER_FITUP_X_BAND_MM,
+    )
+    assert asm.DIMENSION_TOLERANCES[asm.KEEPER_FRONT_Z_DIMENSION] == pytest.approx(
+        (-0.127, 0.127)
+    )
+    assert asm.KEEPER_REAR_Z_DIMENSION not in asm.DIMENSION_TOLERANCES
+    assert asm.KEEPER_REAR_Z_DIMENSION in drawing.notes.REFERENCE_DIMENSIONS
     assert asm.KEEPER_LUG_X - asm.KEEPER_SOCKET_XZ[0] == pytest.approx(
         keeper.KEEPER_FITUP_X_FROM_WEB_MM
     )
@@ -1096,19 +1118,15 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_screwed() -> None:
     )
     # The bands' functions (Main's ruling, 2026-10-16): the lug centre's band
     # is charged in the transferred foot tap's wall to the rail web (#1660
-    # r6), and the inner faces' band is the shaft flats' (ch_fulcrum_shaft_spec).
-    # At the .300 pitch the south foot stands over the K5 relief machined on
-    # the front socket boss (#1038, fr_top_frame_spec KEEPER_BOSS_RELIEF_*),
-    # so it clears the relief step at the printed worst case even at the
-    # title block's band: the boss no longer sets the location band.
+    # r6), and the inner faces' fit-up is the shaft flats'
+    # (ch_fulcrum_shaft_spec). At the .300 pitch the south foot stands over
+    # the K5 relief machined on the front socket boss (#1038, fr_top_frame_spec
+    # KEEPER_BOSS_RELIEF_*), so it clears the relief step with the front face
+    # at the title block's band.
     import build_fr_top_frame as top
 
     south_margin, north_margin = top.KEEPER_FOOT_PRINTED_BOSS_MARGINS
-    band = keeper.KEEPER_FITUP_LOCATION_BAND_MM
-    title_block_band = top.PRINTED_LINEAR_BAND_MM[keeper.KEEPER_FITUP_PLACES]
-    assert south_margin == pytest.approx(0.737, abs=5e-4)
-    assert south_margin + band - title_block_band > 0.0
-    assert north_margin > 10 * band
+    assert (south_margin, north_margin) == pytest.approx((0.635, 1.3716), abs=5e-4)
     assert top.KEEPER_TAP_DRILL_WALL_MARGIN >= top.WALL_FLOOR_MM
 
 
@@ -1288,11 +1306,13 @@ def test_the_set_screws_go_in_after_the_shaft_is_set() -> None:
 def test_the_set_screw_engagement_needs_no_declaration() -> None:
     """The owner's 2026-10-15 shortfall ruling (#1371) covered the R8 arch's
     1.08D; the lifted arch holds 1.5D, so the engagement is no shortfall and
-    the channel contract declares no exception for it. RV-01 covers the
-    keeper inner-face bands of owner ruling X-A."""
+    the channel contract declares no exception for it. RV-01 (the keeper
+    inner faces at ±.001) retired with C10; the lug centre's ±.004 band
+    (owner ruling X-A) is in the necessity register."""
     import ch_pivot_bracket_spec as bracket_spec
     from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
+    from machinist_necessity import load_necessity
 
     name = "ch_channel_assembly"
     assert DRAWINGS_BY_NAME[name].source_kind == "assembly"
@@ -1300,11 +1320,12 @@ def test_the_set_screw_engagement_needs_no_declaration() -> None:
         entry.id: entry
         for entry in load_exceptions(CAD_ROOT / "config", name, "assembly")
     }
-    keeper_bands = entries["RV-01"]
+    assert "RV-01" not in entries
     assert not [id_ for id_ in entries if "1667" in id_]
-    assert (keeper_bands.id, keeper_bands.kind) == ("RV-01", "accept")
-    assert "KeeperFrontFaceZ, KeeperRearFaceZ" in keeper_bands.where
-    assert "ENGAGEMENT" not in keeper_bands.where.upper()
+    assert not [e for e in entries.values() if "ENGAGEMENT" in e.where.upper()]
+    register = load_necessity(CAD_ROOT / "config", name)
+    assert [entry.id for entry in register] == ["N-01"]
+    assert "KeeperLugX" in register[0].feature
     assert bracket_spec.SET_SCREW_ENGAGEMENT_PRINTED >= 1.5
     assert assembly_contract("ch-channel").number == "MHA-CH-00"
 
@@ -1404,10 +1425,8 @@ def _setting_table_row(key: str) -> tuple[str, ...]:
 def test_the_feeler_acceptances_are_setting_table_rows_their_steps_cite() -> None:
     """R5 machinist review (rule 22): the feeler acceptances printed only in
     their steps. Each is a setting table row on sheet 6, cited by its step,
-    which carries no number; the end-play leaf is the worst case floored to
-    .01 in."""
-    import ch_fulcrum_keeper_spec as keeper
-    from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB, HUB_LENGTH_BAND
+    which carries no number; the end-play leaf is the rear keeper's leaf
+    less the push's settle, floored to .01 in (C10)."""
 
     assert drawing.notes.SETTING_TABLE_HEADER == (
         "ROW",
@@ -1417,20 +1436,30 @@ def test_the_feeler_acceptances_are_setting_table_rows_their_steps_cite() -> Non
         "SET TO / ACCEPT",
         "CHECK WITH",
     )
-    keys = ("end-hubs-clear", "bars-straight", "bars-gapped", "lever-bank-slides")
-    assert [row[0] for row in drawing.SETTING_TABLE_ROWS] == ["1", "2", "3", "4"]
+    # C10's rear-keeper row comes last so rows 1-4 keep their numbers.
+    keys = (
+        "end-hubs-clear",
+        "bars-straight",
+        "bars-gapped",
+        "lever-bank-slides",
+        "rear-keeper-to-stack",
+    )
+    assert [row[0] for row in drawing.SETTING_TABLE_ROWS] == ["1", "2", "3", "4", "5"]
     assert [row[1] for row in drawing.SETTING_TABLE_ROWS] == [
         str(steps.step_number(key)) for key in keys
     ]
     for key in keys:
         assert drawing.notes.setting_row(key) in _step_body(key)
         assert "SHEET 6" in drawing.notes.setting_row(key)
-    span_min = (
-        keeper.KEEPER_INNER_FACE_SPAN_MM - 2 * keeper.KEEPER_FITUP_LOCATION_BAND_MM
+    assert _setting_table_row("rear-keeper-to-stack")[2:] == (
+        "REAR LUG TO LAST HUB",
+        "-",
+        ".020",
+        "FEELER LEAF",
     )
-    play_min_in = (span_min - drawing.COUNT * (LEVER_HUB + HUB_LENGTH_BAND[0])) / 25.4
+    play_min_in = 0.020 - 0.001
     leaf_in = math.floor(play_min_in * 100.0) / 100.0
-    assert 0.0 < leaf_in <= play_min_in
+    assert leaf_in == pytest.approx(0.01)
     assert _setting_table_row("lever-bank-slides")[2:] == (
         "LEVER END PLAY",
         "-",
