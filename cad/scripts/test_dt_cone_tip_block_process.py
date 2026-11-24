@@ -176,16 +176,15 @@ def test_the_saw_and_arbor_sizes_are_their_inventory_records() -> None:
         assert gone not in p, gone
 
 
-def test_the_clamp_torque_is_set_with_tools_on_record() -> None:
+def test_the_clamp_torque_is_set_with_owned_tools_on_record() -> None:
     """The friction drive is checked against the clamp torque, so the
-    operation that sets it names a torque wrench, and the wrench and its 5 mm
-    bit are inventory records (to buy until the owner records them owned).
+    operation that sets it names a torque wrench, and the wrench and the 5 mm
+    hex key are inventory records the owner has (2026-11-24: "I own both").
     Setup 10's rule and straightedge are the owned combination square."""
     refs = {tool["id"]: tool["ref"] for tool in PLAN["tools"]}
     tools = _shop_equipment.load()["tools"]
-    for tool_id in ("torque-wrench", "hex-bit-5mm", "square"):
-        assert refs[tool_id] in tools, tool_id
-    assert tools[refs["square"]]["status"] == "on_hand"
+    for tool_id in ("torque-wrench", "hex-key-5mm", "square"):
+        assert tools[refs[tool_id]]["status"] == "on_hand", tool_id
     assert any(
         op.get("tool") == "torque-wrench"
         for setup in PLAN["setups"]

@@ -193,11 +193,14 @@ DRIVE_TOL_NM = 0.05
 DRIVE_RESERVE = 2.0
 # The arbor's length from the spindle nose is rounded up to this (.1 in).
 ARBOR_LENGTH_STEP_MM = 0.1 * IN
-# How far the arbor drops before its R8 shank is free of the spindle. The
-# shank's length is not on the arbor's record: 4.5 in is an assumed upper
-# bound (an R8 shank is about 4 in long), not a measured size. With it the
-# check below asks for 184 mm of the 303 mm under the nose.
-R8_SHANK_MM = 4.5 * IN
+# How far the arbor drops before its R8 shank is free of the spindle: an R8
+# collet's overall length, 4.000 in (Logan Actuator Co., "Collet
+# Specifications", R8 row, Overall Length B 4.000,
+# https://www.loganact.com/tips/collet.htm, read 2026-11-24). The arbor's own
+# shank length is not on its record: with this figure the check below asks
+# for 171 mm of the 303 mm under the nose, so a shank up to 5 in longer than
+# the collet's still passes.
+R8_SHANK_MM = 4.0 * IN
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
 # The #43 drill against the tap drill's printed band: the shop records the
