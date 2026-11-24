@@ -733,10 +733,13 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     press = drawing.PLAN_CALLOUTS["PressHoleDia"]
     assert press is notes.PRESS_HOLE_CALLOUT
     assert press.splitlines()[0] == "REAM THRU"
-    assert f"PRESS FIT FOR {numbers['BUSH_NUMBER']}" in press.splitlines()
-    # Reamed with the set reamer: no band, no interference range; the last
-    # line says what the press protects (rule 4).
-    assert press.splitlines()[-1] == "HOLDS KNOB AXIS, NO FASTENER"
+    # Reamed with the set reamer: no band, no interference range; the two
+    # lines of words name the mate with its acceptance by feel and say what
+    # the press protects (rule 4).
+    assert press.splitlines()[2:] == [
+        f"{numbers['BUSH_NUMBER']} PRESSES IN, DOES NOT",
+        "TURN BY HAND. HOLDS KNOB AXIS.",
+    ]
     assert "INTERFERENCE" not in press and not re.search(r"\.\d{4}", press)
     locator = flat(drawing.LOCATOR_CALLOUT)
     assert drawing.CALLOUTS_ABOVE["LocatorDia1"] == f"{len(geometry.LOCATOR_SITES_MM)}X"
@@ -751,6 +754,8 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     assert "CLEARANCE" not in flat(locator + " " + note)
     assert not re.search(r"\.\d{4}", locator + note)
     assert "KEEPS PLATE AT REDUCER MESH SETTING" in note
+    # The order of work: both parts drilled through together, clamped.
+    assert "DRILL THROUGH ARM" in note and "AND PLATE CLAMPED AT" in note
     assert numbers["DOWEL_NUMBER"] not in note
     assert min(dowel.SLIP_DIAMETRAL_CLEARANCE_MM) > 0.0
     assert note.startswith(f"{notes.LOCATOR_NOTE_NUMBER}. ")

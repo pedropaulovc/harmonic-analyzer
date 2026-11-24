@@ -33,34 +33,38 @@ from pd_transgear_arm_plate_spec import (
 # MHA-PD-28 bush's press step is turned to this hole as measured, so the
 # interference is the bush sheet's requirement, not this one's.  REAM, the
 # face-A mouth's lead-in chamfer in the hole callout's size form (as the
-# screw holes carry their countersink), the fit and the bush by drawing
-# number, then what the press protects (rule 4's necessity test: the press
-# alone holds knob axis K in the plate).  Two lines of words under the size
-# and process (rule 7).
+# screw holes carry their countersink), then the bush by drawing number
+# with this sheet's acceptance by feel (it presses in and does not turn by
+# hand: machinist review r0b, blocker: the callout stated no acceptance)
+# and what the press protects (rule 4's necessity test: the press alone
+# holds knob axis K in the plate).  Two lines of words under the size and
+# process (rule 7), each at most 33 characters, inside the left border.
 _PRESS_CHAMFER_TEXT = (
     f"{PRESS_HOLE_CHAMFER / 25.4:.{PRESS_HOLE_CHAMFER_PLACES}f}".removeprefix("0")
 )
 PRESS_HOLE_CALLOUT = "\n".join((
     "REAM THRU",
     f"{_PRESS_CHAMFER_TEXT} X 45\u00b0 AT FACE A",
-    f"PRESS FIT FOR {BUSH_NUMBER}",
-    "HOLDS KNOB AXIS, NO FASTENER",
+    f"{BUSH_NUMBER} PRESSES IN, DOES NOT",
+    "TURN BY HAND. HOLDS KNOB AXIS.",
 ))
 
 # The locating holes: reamed with the .1260 set reamer, the size printed
 # with no band; the callout names the dowel and the acceptance by the dowel
 # itself, and one numbered note, which the callout points at, carries what
-# the slip protects and the match-drilling (rule 7: under the size and
+# the slip protects and the order of work (rule 7: under the size and
 # process a callout carries at most two lines of words; a note at most four
-# lines).  The match-drill pointer names the MHA-PD-00 view whose native S-K
-# dimension sets the pair (#1388 policy: the setting's value lives on the
-# assembly sheet, not here).  The mouths take the title block's edge break
+# lines): the plate is clamped on the arm at the MHA-PD-00 view whose native
+# S-K dimension sets the pair and both are drilled through together
+# (machinist review r0b, clarity: "match-drill" did not say which part is
+# drilled first; #1388 policy: the setting's value lives on the assembly
+# sheet, not here).  The mouths take the title block's edge break
 # (pd_transgear_arm_plate_geometry.LOCATOR_MOUTH_BREAK_MAX_MM).
 LOCATOR_NOTE_NUMBER = 1
 LOCATOR_NOTE_WIDTH = 30
 LOCATOR_NOTE = "\n".join(textwrap.wrap(
     f"{LOCATOR_NOTE_NUMBER}. KEEPS PLATE AT REDUCER MESH SETTING. "
-    f"MATCH-DRILL WITH ARM {ARM_NUMBER}, SET PER {knob_setting_ref()}.",
+    f"DRILL THROUGH ARM {ARM_NUMBER} AND PLATE CLAMPED AT {knob_setting_ref()}.",
     width=LOCATOR_NOTE_WIDTH,
     subsequent_indent="   ",
     break_on_hyphens=False,
