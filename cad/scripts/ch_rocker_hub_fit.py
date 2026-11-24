@@ -47,8 +47,7 @@ def land_range(
     least, greatest = clearance
     if not 0.0 < least < greatest:
         raise AssertionError(
-            f"the hub land can go in the strap hole line-to-line or tight: "
-            f"{clearance}"
+            f"the hub land can go in the strap hole line-to-line or tight: {clearance}"
         )
     if greatest > LOCTITE_638_GAP_MAX:
         raise AssertionError(
