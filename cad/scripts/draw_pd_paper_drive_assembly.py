@@ -3003,10 +3003,10 @@ def _step_text(
             # are wiped clean of compound (rule 23).  The reamed hole still
             # holds the loose dowel square.  The drive-pin offsets are REF
             # targets on MHA-PD-22 and MHA-PD-09: their acceptance is this
-            # trial of the three wheels, and the easing drill is the one
-            # MHA-PD-09's sheet names (pd_transgear_removable_notes
-            # .EASED_HOLE_DRILL, a literal here so the wheel's drawing-only
-            # notes stay out of this recipe; the assembly's tests pin it).
+            # trial of the three wheels.  No easing drill is printed (a hole
+            # re-drilled #39 would leave MHA-PD-09 a web its RV-01 does not
+            # cover: an open owner question of the fit audit); a wheel that
+            # binds is renewed.
             "IF A DOWEL SLIDES IN BY HAND, BOND IT PER THE BOND NOTE AT "
             f"{detail_cite('arm-plate-fitted')[1:-1]}, BUT TO "
             f"{s('collar-pins-pressed', 0)}'S PROUD; WIPE ITS PROUD END CLEAN.",
@@ -3017,9 +3017,7 @@ def _step_text(
             f"CHECK, ANY BOND CURED: EACH OF THE {len(sprocket.CONFIGS)} "
             f"{n['pd-transgear-removable']} WHEELS DROPS ON THE COLLAR'S DOWELS "
             "FREELY AND LIFTS OFF.",
-            "IF A WHEEL BINDS, RE-DRILL ONE OF ITS DRIVE-PIN HOLES #39 AND TRY IT "
-            "AGAIN.",
-            "IF ONE WHEEL STILL BINDS, RENEW IT; IF ALL DO, MAKE A NEW "
+            "IF ONE WHEEL BINDS, RENEW IT; IF ALL DO, MAKE A NEW "
             f"{n['pd-transgear-drive-collar']} COLLAR AND REPEAT FROM STEP "
             f"{steps.step_number('collar-pins-pressed')}.",
         ),

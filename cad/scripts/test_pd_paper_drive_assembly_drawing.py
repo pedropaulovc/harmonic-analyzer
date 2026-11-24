@@ -3479,9 +3479,8 @@ def test_the_hub_key_pin_and_collar_flat_pin_are_fitted_and_kept() -> None:
     assert len(pressed) <= len(drawing.SUB_STEP_LETTERS)
     # Fit audit 2026-11-23: a dowel or the pin that slides in by hand is
     # bonded per the sheet's bond note, never a new collar; the three wheels
-    # are then tried on the dowels, the drive-pin offsets' acceptance, and
-    # the easing drill is the one MHA-PD-09's sheet names.
-    import pd_transgear_removable_notes as wheel_notes
+    # are then tried on the dowels, the drive-pin offsets' acceptance; a
+    # wheel that binds is renewed, no easing drill printed.
 
     loose = [row for row in pressed if "SLIDES IN BY HAND" in row]
     assert len(loose) == 2
@@ -3493,7 +3492,8 @@ def test_the_hub_key_pin_and_collar_flat_pin_are_fitted_and_kept() -> None:
     trial = next(row for row in pressed if row.startswith("CHECK, ANY BOND CURED"))
     assert f"EACH OF THE 3 {wheel} WHEELS DROPS ON" in trial
     remedy = pressed[pressed.index(trial) + 1]
-    assert f"RE-DRILL ONE OF ITS DRIVE-PIN HOLES {wheel_notes.EASED_HOLE_DRILL[0]} " in remedy
+    assert remedy.startswith("IF ONE WHEEL BINDS, RENEW IT; IF ALL DO, MAKE A NEW ")
+    assert all("RE-DRILL" not in row for row in pressed)
     # The pin rides the collar off the shaft, then (drawn apart only) leaves
     # its blind ream the way it went in, rearward out of the open end, before
     # any other move, so sheet 3's isometric can show it.
