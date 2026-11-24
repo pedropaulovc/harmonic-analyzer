@@ -75,11 +75,9 @@ demoted:
   pd_rack_pinion: fit-batch-pd
   pd_support_bar: fit-batch-pd
   pd_transgear_arm: fit-batch-pd
-  pd_transgear_arm_plate: fit-batch-pd
   pd_transgear_disc_hub: fit-batch-pd
   pd_transgear_feed_pinion: fit-batch-pd
   pd_transgear_front_bushing: fit-batch-pd
-  pd_transgear_knob_bush: fit-batch-pd
   pd_transgear_knob_cup: fit-batch-pd
   pd_transgear_knob_thrust_ring: fit-batch-pd
   pd_transgear_pin: fit-batch-pd

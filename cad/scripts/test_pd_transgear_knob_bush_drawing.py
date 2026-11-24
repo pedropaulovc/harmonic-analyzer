@@ -105,7 +105,9 @@ def test_the_bands_live_on_the_model_from_named_constants() -> None:
         ("BushProfile", "HubLength"): "HUB_LENGTH_BAND",
         ("BushProfile", "BushLength"): "LENGTH_BAND",
     }
-    assert "_press_dia_reference(adapter)" in Path(part.__file__).read_text(encoding="utf-8")
+    assert "_press_dia_reference(adapter)" in Path(part.__file__).read_text(
+        encoding="utf-8"
+    )
     assert spec.BORE_BAND == (max(BUSH.BORE_DIA_LIMITS), min(BUSH.BORE_DIA_LIMITS))
     # Every band is narrower than the title-block row its places claim.
     for band, places in (

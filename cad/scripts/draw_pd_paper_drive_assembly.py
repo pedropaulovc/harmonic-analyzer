@@ -2490,7 +2490,7 @@ def _step_text(
         # stays in the arm it costs, and both are remade (Codjiflo #3127).
         # A dowel that slides into the .1240 ream by hand is bonded, not
         # scrapped with the arm (fit audit 2026-11-23, pending owner
-        # confirmation; machinist exception PD-00-press-salvage): the hole
+        # confirmation; machinist exception PD-00-latch-dowel-bond): the hole
         # is reamed with the set reamer and the dowel is its gauge.
         "latch-pin-pressed": (
             f"PRESS THE {n['pd-vn-transgear-latch-pin']} DOWEL, CHAMFERED END FIRST, "

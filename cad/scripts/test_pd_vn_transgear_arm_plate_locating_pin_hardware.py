@@ -66,7 +66,9 @@ def test_standard_press_slip_and_length_family_fit_the_custom_arm_and_plate() ->
     # What the two set reamers are modelled to cut (+.0005/0) against the
     # catalogue dowel (+.0001/+.0003): analysis, not printed limits.
     assert spec.PRESS_INTERFERENCE_MM == pytest.approx((0.0006 * inch, 0.0013 * inch))
-    assert spec.SLIP_DIAMETRAL_CLEARANCE_MM == pytest.approx((0.0007 * inch, 0.0014 * inch))
+    assert spec.SLIP_DIAMETRAL_CLEARANCE_MM == pytest.approx(
+        (0.0007 * inch, 0.0014 * inch)
+    )
     # A dowel that slides into the arm by hand is bonded (MHA-PD-00 13G):
     # even an arm hole cut as large as the plate's stays inside LOCTITE 638's
     # gap.
