@@ -1,0 +1,13 @@
+# MHA-MG-00 magnifier assembly: why each band tighter than the title block
+# stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the reason
+# lives here, not on the sheet). Read by the machinist review only.
+# The wheel's endshake is set at assembly with the go and no-go feelers
+# (steps 12-13); the thread end past the second nut prints as a window the
+# trial reads (owner ruling 2026-11-24, fit audit part 2, C11) and DETAIL A's
+# station and plain end and DETAIL B's drum face are references.
+necessity:
+  - id: N-01
+    feature: "sheet 1, DETAIL B, endshake .004 ±.002 (WHEEL FREE, NO RATTLE)"
+    kind: trace
+    reason: "axial wheel shake moves the rim wire and the pen"
+    source: "mg_wheel_group.ENDSHAKE_MIN / ENDSHAKE_MAX"

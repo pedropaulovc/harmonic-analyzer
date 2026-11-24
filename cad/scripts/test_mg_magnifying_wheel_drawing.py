@@ -90,7 +90,6 @@ def test_tight_bands_sit_on_the_model_dimensions() -> None:
     # The boss Ø and TIE 1's two coordinates ride the title block's .XX: the
     # boss is sized for TIE 1's wall, so none carries a band of its own.
     assert model_toleranced_dimensions(part) == {
-        ("HubProfile", "HubLength"): "HUB_LEN_BAND[0]",
         ("feature_name", "dimension_name"): "CAST_TOL",
     }
     # The as-cast sizes carry the explicit +/-.03 casting band.
@@ -399,7 +398,7 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     # interference as REF (rule 4).  The groove's two tight bands serve one
     # mate, named once in a note both link (rule 4).
     assert lines == [
-        "1. RUNNING FIT ON AXLE MHA-MG-07 (CLEARANCE .0008-.0017).",
+        "1. RUNNING FIT ON AXLE MHA-MG-07: AXLE TURNS FREE, NO SHAKE.",
         "2. BONDED FIT IN DRUM MHA-MG-10: TURN TO ITS BORE (CLEARANCE .0005-.0025).",
         "3. GROOVE SEATS PEN WIRE OF MHA-SH-VN-56.",
     ]

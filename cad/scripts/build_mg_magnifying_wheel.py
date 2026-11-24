@@ -83,7 +83,6 @@ from mg_magnifying_wheel_geom import (
     HUB_FILLET_R,
     HUB_FRONT_Z,
     HUB_LEN,
-    HUB_LEN_BAND,
     HUB_STEP_Z,
     RIM_FILLET_R,
     SPIGOT_DIA,
@@ -1349,16 +1348,9 @@ def build(adapter) -> dict[str, str]:
     # the places on every marked one.  The spigot and the bore are matched
     # fits (mg_magnifying_wheel_spec.REFERENCE_DIMENSIONS): no band.  The
     # boss Ø rides the title block (mg_magnifying_wheel_geom.HUB_DIA), and so
-    # do the spigot length and the groove's R and bottom Ø at .XXX.  The
-    # bands are millimetres; UNIT prints them in inches.
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "HubProfile",
-        "HubLength",
-        HUB_LEN_BAND[0],
-        places=DRAWING_PRECISION["HubProfile"]["HubLength"],
-        display_unit=UNIT,
-    )
+    # do the hub's overall (fit audit MHA-MG-05.hub_length), the spigot
+    # length and the groove's R and bottom Ø at .XXX.  The bands are
+    # millimetres; UNIT prints them in inches.
     # The as-cast sizes carry the casting band (mg_magnifying_wheel_spec).
     for feature_name, dimension_names in CAST_DIMENSIONS.items():
         for dimension_name in sorted(dimension_names):

@@ -33,15 +33,14 @@ WHEEL = "MHA-MG-05 MAGNIFYING WHEEL"
 # clearance prints once, on the bar's own sheet, and the wheel that runs on
 # it, which is what the journal's Ra 63 uin marks (rule 6). The bond's gap
 # (the stock over the bore's drilled limits) is mg_wheel_group.BAR_BOND_GAP,
-# inside LOCTITE 638's. The running clearance is
-# mg_wheel_group.HUB_RUNNING, a literal so the wheel stays out of this part's
-# recipe (test_mg_wheel_axle_drawing pins it).
+# inside LOCTITE 638's. The wheel's bore is reamed with no band and accepted
+# on this axle once, on the wheel's sheet (MHA-MG-05 note 1, rule 4 form 3),
+# so no clearance prints here.
 PIN_LIMITS = (PIN_DIA - PIN_DIA_TOL, PIN_DIA + PIN_DIA_TOL)
-RUNNING_CLEARANCE_TEXT = ".0008-.0017"
 PIN_DIA_CALLOUT = "\n".join(
     (
         f"BONDED IN {BAR}",
-        f"RUNNING FIT IN {WHEEL} (CLEARANCE {RUNNING_CLEARANCE_TEXT})",
+        f"RUNNING FIT IN {WHEEL}",
     )
 )
 # The lengths carry their values and bands only (rule 7): the extension lines
