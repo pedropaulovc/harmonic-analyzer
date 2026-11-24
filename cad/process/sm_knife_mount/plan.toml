@@ -646,6 +646,7 @@ instruction = "Same file, M6 T3: #30 drill datum B, pecks of {{process.dowel_pec
 settings = "riser-drill-30-4140-ht"
 hole_depth_mm = "{{cad.dowel_hole_depth_mm}}"
 peck = { step_mm = 3.048, retract = "full" }
+peck_reason = "blind in 28-32 HRC steel and B's finished size (no reamer follows), L/D 2.9: backing out every diameter keeps the #30's chips from packing at the bottom and scoring the drilled wall that locates the hanger"
 milling_cuts = [
   { name = "dowel drill", kind = "drill", phase = "finish", cutter_dia_mm = 3.2639, flutes = 2, stations_mm = "{{cad.bottom_face_height_mm}}" },
 ]
