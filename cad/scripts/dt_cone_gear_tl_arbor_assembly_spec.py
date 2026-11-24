@@ -147,7 +147,7 @@ if key.END_Z_MM + key.LENGTH >= BLANK_FACE_Z:
 # Nothing in the machine reads the 64T's tooth-to-key clock (fit audit part 2,
 # B13; drawing-guidelines rule 4: a setting nothing needs takes no
 # requirement). The 16T it meshes is match-drilled to MHA-DT-11 wherever it
-# meshes (MHA-DT-00 step 4S; dt_crank_pinion_spec's retention pin), so any
+# meshes (MHA-DT-00 step 4M; dt_crank_pinion_spec's retention pin), so any
 # 64T phase on the key is taken up there, and error_budget's crank index
 # (timebase.crank_index_deg) is the crank arm's stop repeatability, not this
 # clock. So the 64T row prints its index as REF and says any index serves;

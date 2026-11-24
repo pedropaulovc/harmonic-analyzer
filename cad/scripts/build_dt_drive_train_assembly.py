@@ -1372,10 +1372,7 @@ from dt_crank_pinion_spec import (  # noqa: E402
     OUTSIDE_DIA_TOLERANCE_MM as PINION_OUTSIDE_DIA_TOLERANCE,
     SHOULDER_LENGTH as PINION_SHOULDER_LENGTH,
     SHOULDER_LENGTH_LIMITS as PINION_SHOULDER_LIMITS,
-    T120_FITUP_FEELER_MM as PINION_T120_FITUP_FEELER,
-    T120_FITUP_PUSHED as PINION_T120_FITUP_PUSHED,
     TURNED_DIA as PINION_TURNED_DIA,
-    TURNED_DIA_FITUP_MIN as PINION_TURNED_DIA_FITUP_MIN,
     TURNED_DIA_TOLERANCE_MM as PINION_TURNED_DIA_TOLERANCE,
 )
 from gear_seat_fit import GEAR_SEAT_CLEARANCE  # noqa: E402
@@ -1840,90 +1837,11 @@ CRANK_SHAFT_END_NORTH_AIR_WORST = (
     _END_T120_NEAREST - T120_POSE_RADIAL - CRANK_SHAFT_END_RADIUS_MAX
 )
 # This envelope follows the configured cone family. The nominal floors above
-# and the fit-up/service and engagement guards below remain independent of
-# the worst-clearance facts stated on the manufacturing sheets.
-
-# The fit-up check (dt_crank_pinion_spec.T120_FITUP_ASSEMBLY_CHECK) reads the
-# pair with the 16T on its seat feeler (its end play's north end) and the
-# stack resting at its model pose, MHA-DT-10 and T120 pushed toward each other.
-# Each running play that can still move after the check is taken up by one of
-# those pushes: MHA-DT-10 takes up its own bore and MHA-DT-11's journal, T120 the
-# cone shaft in the post boss.  The rest of T120_POSE_TERMS are fixed once
-# assembled, and the check's full turn sweeps them.  Codex P2 on #1154: a
-# check that pushed only MHA-DT-11 passed a Ø16.043 band that then closed to
-# 0.018 when the cone shaft moved.
-T120_RUNNING_PLAY = {
-    "crank journal float": "MHA-DT-10",
-    "16T bore on the crankshaft": "MHA-DT-10",
-    "cone shaft float in the post boss": "T120",
-}
-
-
-def t120_fitup_reading(
-    *, pushed: tuple[str, ...] = PINION_T120_FITUP_PUSHED, **geometry
-) -> dict[str, float]:
-    """The least the fit-up feeler can read at the check's pose: every fixed
-    offset and pose at its worst, the running play of each part in
-    ``pushed`` taken up toward T120 and the rest left centred."""
-    left = [
-        T120_POSE_TERMS[name]
-        for name, part in T120_RUNNING_PLAY.items()
-        if part not in pushed
-    ]
-    return pinion_t120_clearances(
-        pose_radial=T120_POSE_RADIAL - sum(radial for radial, _ in left),
-        pose_axial=T120_POSE_AXIAL - sum(axial for _, axial in left),
-        end_plays=(max(PINION_END_PLAY),),
-        cone_floats=(0.0,),
-        **geometry,
-    )
-
-
-# ... and a band turned down must still mesh.  Codex P1 on #1154: at Ø15.48
-# and the open centre distance the band's contact path is -0.63, no contact.
-# Each cut is called for by its own reading alone (t120_fitup_cuts): the band
-# is turned down only where the feeler stops between it and the T120 tips,
-# and the check reads the pair's worst, so only a crank no higher than
-# T120_BAND_CHECK_CRANK_HEIGHT above its model height is ever turned down
-# (every other term taken at its closing worst there: a superset).  A
-# shoulder faced back leaves the band reading as it was: the band's window
-# already starts at the shoulder's short limit, the facing's floor.  A lower
-# crank also closes the 16T:64T centres, so the floor need keep contact only
-# up to that height, every other open-corner term open (worst to worst only
-# on the terms the two checks do not share).  Codex P1 on #1154 (review 3):
-# a check that let either failure turn the band down would turn it at crank
-# +0.300, where only the shoulder stops the feeler, and lose contact there.
-
-
-def t120_fitup_cuts(reading: dict[str, float]) -> frozenset[str]:
-    """The clearances whose own fit-up cut the check calls for at
-    ``reading`` (dt_crank_pinion_spec.T120_FITUP_ASSEMBLY_CHECK): the band is
-    turned down only for ``turned band radial``, the shoulder faced back only
-    for ``shoulder air``, each where its own reading stops the feeler."""
-    return frozenset(
-        name for name, value in reading.items() if value < PINION_T120_FITUP_FEELER
-    )
-
-
-def _band_check_crank_height() -> float:
-    """Highest crank height at which the fit-up check can call for the band
-    to be turned down: its own reading, the band at its printed upper limit,
-    stops the feeler (the reading grows as the crank rises)."""
-
-    def turns_band(height: float) -> bool:
-        reading = t120_fitup_reading(crank_heights=(height,))
-        return "turned band radial" in t120_fitup_cuts(reading)
-
-    low, high = _CRANK_HEIGHT_BAND
-    if turns_band(high):
-        return high
-    for _ in range(50):
-        middle = (low + high) / 2.0
-        low, high = (middle, high) if turns_band(middle) else (low, middle)
-    return high
-
-
-T120_BAND_CHECK_CRANK_HEIGHT = _band_check_crank_height()
+# and the service and engagement guards below remain independent of the
+# worst-clearance facts stated on the manufacturing sheets.  MHA-DT-00 checks
+# the 16T against T120 by a look for daylight (fit audit 2026-11-23 part 2,
+# B9): the worst clearances (T120_TURNED_BAND_RADIAL, T120_SHOULDER_AIR) leave
+# no fit-up feeler or cut to model.
 
 
 # Retain this pitch-cylinder frame construction for independent dimensional
@@ -3922,10 +3840,7 @@ def build(adapter) -> dict[str, str]:
         f"{PINION_T120_CONCENTRIC['turned band radial']:.4f} >= "
         f"{T120_TURNED_BAND_RADIAL_FLOOR:.2f} mm on the nominal axes; at the worst fit "
         f"offsets and poses {T120_SHOULDER_AIR:.4f} "
-        f"and {T120_TURNED_BAND_RADIAL:.4f} mm, "
-        f"checked at fit-up on a {PINION_T120_FITUP_FEELER:.2f} feeler; band turned down to "
-        f"{PINION_TURNED_DIA_FITUP_MIN:.2f} only at crank height <= "
-        f"{T120_BAND_CHECK_CRANK_HEIGHT:.4f}"
+        f"and {T120_TURNED_BAND_RADIAL:.4f} mm, checked at fit-up by a look for daylight"
     )
     _telemetry.info(
         f"16T covers {CRANK_ROW_ENGAGEMENT_FRACTION_WORST:.2%} of the 64T tooth row at worst "

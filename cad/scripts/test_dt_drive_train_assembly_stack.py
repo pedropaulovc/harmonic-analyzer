@@ -808,38 +808,12 @@ def _pinion_under_t120(drive) -> None:
         f"{drive.CRANK_SHAFT_END_NORTH_AIR_WORST:.3f} mm from the {drive.CRANK_SHAFT_END_NORTH_NEIGHBOUR} "
         f"at print-worst, below the {drive.T120_TURNED_BAND_RADIAL_FLOOR:.2f}-mm radial floor"
     )
-    assert set(drive.T120_RUNNING_PLAY.values()) <= set(
-        drive.PINION_T120_FITUP_PUSHED
-    ), "the T120 fit-up check leaves running play unpushed"
-    # So what the check reads is the pair's worst in service: a band or shoulder
-    # that passes the feeler keeps that clearance however the plays then move.
-    T120_FITUP_READING = drive.t120_fitup_reading()
-    for _name, _reading in T120_FITUP_READING.items():
-        assert _reading <= drive.PINION_T120_CLEARANCES[_name] + 1e-9, (
-            f"the T120 fit-up check reads {_name} {_reading:.4f}, more than its service "
-            f"worst {drive.PINION_T120_CLEARANCES[_name]:.4f}: its pose is not the closing one"
-        )
-    # The fit-up can always close: a band turned down to its fit-up minimum, or a
-    # shoulder faced back to its short limit, passes the fit-up feeler at every
-    # corner of the same stack.  The minimum is an actual size, not a toleranced one.
-    T120_FITUP_LIMIT_CLEARANCES = {
-        "turned band radial": drive.t120_fitup_reading(
-            turned_dia=drive.PINION_TURNED_DIA_FITUP_MIN
-            - 2.0 * drive._PINION_TURNED_RADIUS_UP
-        )["turned band radial"],
-        "shoulder air": drive.t120_fitup_reading(
-            shoulder_length=dt_crank_pinion_spec.SHOULDER_LENGTH_FITUP_MIN
-        )["shoulder air"],
-    }
-    for _name, _clearance in T120_FITUP_LIMIT_CLEARANCES.items():
-        assert _clearance >= drive.PINION_T120_FITUP_FEELER, (
-            f"16T {_name} to T120 at its fit-up limit is {_clearance:.3f} mm, under the "
-            f"{drive.PINION_T120_FITUP_FEELER:.2f} fit-up feeler"
-        )
-    # T120's distance from the crank axis never falls as the crank rises, so the
-    # band-turn heights run from the bottom of the printed band to one height.
-    assert drive.Y_CRANK + min(drive._CRANK_HEIGHT_BAND) > drive.Y_DRIVE, (
-        "the T120 band reading is not monotonic over the crank height band"
+    # Fit audit 2026-11-23 part 2, B9: MHA-DT-00 looks for daylight between
+    # the 16T and T120 instead of reading a feeler, because the service worst
+    # clearances stay well over a look's resolution (no fit-up cut remains).
+    assert min(drive.PINION_T120_CLEARANCES.values()) >= 1.0, (
+        f"16T to T120 worst clearances {drive.PINION_T120_CLEARANCES} fall under the "
+        "1 mm a look for daylight is held to"
     )
     assert math.isclose(
         drive.gear64_contact_z(0.0), drive._GEAR64_CONTACT_Z, abs_tol=1e-9

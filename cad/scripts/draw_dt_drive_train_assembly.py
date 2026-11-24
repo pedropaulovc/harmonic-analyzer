@@ -128,11 +128,8 @@ from dt_pinion_lever_pin_spec import (
 from dt_drive_train_assembly_sheet import (
     FEELER_PLACES,
     LEVER_PIN_HOLE_DRILL,
-    T120_FITUP_BAND_CHECK,
-    T120_FITUP_BAND_REMEDY,
-    T120_FITUP_PUSH,
-    T120_FITUP_SHOULDER_CHECK,
-    T120_FITUP_SHOULDER_REMEDY,
+    T120_DAYLIGHT_CHECK,
+    T120_DAYLIGHT_REMEDY,
     inch_ceil_mm,
     inch_floor_mm,
     inch_text,
@@ -1114,13 +1111,9 @@ def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
         (STACK_FEELER, _step_ref("cone-gears-stacked", "R")),
         (PINION_SEAT_FEELER, _step_ref("crank-mesh-checked", "F")),
         (bank.BANK_SPRING_SET, _step_ref("cylinder-bank-located", "D")),
-        # Rubric sample round 16 (#0, 3/3 runs): the crank fit-up feeler.  The
-        # cone swing is set by feel (owner direction 2026-11-11, #2365): it
-        # takes no leaves.
-        (
-            pinion.T120_FITUP_FEELER_MM,
-            f"{_step_ref('crank-mesh-checked', 'H')}, {_step_ref('crank-mesh-checked', 'J')}",
-        ),
+        # The cone swing is set by feel (owner direction 2026-11-11, #2365)
+        # and the crank pinion's T120 air by a look (fit audit part 2, B9):
+        # neither takes leaves.
     )
     ranged = (
         (
@@ -1339,13 +1332,13 @@ def acceptance_ref(key: str) -> str:
 
 # Rule 23 (rubric sample round 13, #3): a press whose part slides in by hand
 # is a slip fit, so each pressed pin's check is followed by this one remedy,
-# the sheet 1 LOCTITE 638 note's bond (4V-4W, 4A-4B); steps 6 and 6D
+# the sheet 1 LOCTITE 638 note's bond (4Q-4R, 4A-4B); steps 6 and 6D
 # bond the crank hub and its seam pin outright (fit audit question 21).
 SLIP_FIT_BOND = "BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE."
 # MHA-DT-29's acceptance and flush condition, as both part sheets print them.
 PIN_FIT_ACCEPTANCE, PIN_FIT_FLUSH = pinion.PIN_FIT_LINES[1].split(", ")
 # #2481 option B (delegated ruling 2026-11-17, owner review on #2144): a crank
-# pair that binds in its teeth at step 4N has the still-unpinned MHA-DT-10
+# pair that binds in its teeth at step 4J has the still-unpinned MHA-DT-10
 # recut, every tooth gap this much wider (.004), the cutter moved sideways at
 # the same depth: the spec refuses a deeper cut on the same blank, because the
 # cutter's form runs out before the tip.  The ruling's owner pack computed the
@@ -1567,7 +1560,7 @@ CONE_CRANK_STEPS = _note_text(
         # Owner decision C1 keyed (2026-11-09, PR #1992): the end screw sets
         # MHA-DT-04's end play against MHA-DT-38 (cone_stack_end_play
         # SHAFT_END_PLAY: 1/8 turn of 1/4-28 is 0.113) and the pinch screw
-        # locks it; 4N's full turn checks the shaft runs free after.  U32
+        # locks it; 4J's full turn checks the shaft runs free after.  U32
         # (user, 2026-09-23): option 1A turn-set.
         "3. THREAD MHA-DT-39 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING.",
         # #2726: the 3/4 end screw keeps 1.5 D over the whole embed stack, so
@@ -1599,16 +1592,22 @@ CONE_CRANK_STEPS = _note_text(
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         # Delegated ruling 2026-11-17 on #2481 (option B; precedent #2365 and
-        # #2416; owner reviews it after the fact on #2144): 4N's full turn by
-        # hand is the mesh's acceptance, and 4Q-4R its tooth remedy.
+        # #2416; owner reviews it after the fact on #2144): 4J's full turn by
+        # hand is the mesh's acceptance, and 4K-4L its tooth remedy.
         # CONTRACT-crank: MHA-DT-VN-67 press to the blind-hole floor.  Owner
         # ruling D1 (2026-10-15): no crank-seat washer -- the collar is held
         # hard on the boss's front face, the 16T set on its feeler off the
-        # back face, and only then is its pin match-drilled (4E-4U).
+        # back face, and only then is its pin match-drilled (4E-4P).
         # User ruling 2026-09-30 (#1154): the 16T's shoulder and turned band
-        # are feeler-checked against T120 before the pin is drilled, turning
-        # by hand, and the free-running revolution after them (Codex P2 on
-        # #1154, review 3).
+        # are checked against T120 before the pin is drilled, turning by hand,
+        # and the free-running revolution after them (Codex P2 on #1154,
+        # review 3).  Fit audit 2026-11-23 part 2, B9 (drawing-guidelines
+        # rule 4: no gauge where nothing fails; no owner ruling touched): with
+        # every part at its print worst the band keeps
+        # dt_crank_pinion_spec.T120_TURNED_BAND_RADIAL_WORST (1.67 mm) to the
+        # T120 tips and the shoulder never overlaps T120 axially, so a look for
+        # daylight through one turn replaces the .004 feeler and its two
+        # fit-up cuts (band turned down, shoulder faced back).
         "4. PRESS 2X MHA-DT-VN-67 TO THE FLOORS OF THE MHA-DT-11 COLLAR HOLES.",
         # Rule 23 (rubric sample round 5): the press fit's bench acceptance
         # and its slip-fit remedy, the sheet 1 LOCTITE 638 note.
@@ -1622,43 +1621,35 @@ CONE_CRANK_STEPS = _note_text(
         # every accepted part set; it is left as it comes, not faced.  These
         # print in step 4 itself (rubric sample round 4: the separate crank end
         # fit block repeated the step and crowded sheet 10).  Owner ruling
-        # 2026-11-24, audit part 2 S5: 4Y checks only that the end is not
+        # 2026-11-24, audit part 2 S5: 4T checks only that the end is not
         # below the 16T's face, by straightedge (no depth-rod window).
         "4E. HOLD MHA-DT-11'S COLLAR HARD ON THE MHA-DT-05 BOSS, NO WASHER.",
         f"4F. SET MHA-DT-10 {inch_text(PINION_SEAT_FEELER, FEELER_PLACES)} OFF THE BOSS BACK FACE "
         "WITH A FEELER.",
-        "4G. " + T120_FITUP_PUSH,
-        "4H. " + T120_FITUP_BAND_CHECK,
-        "4J. " + T120_FITUP_SHOULDER_CHECK,
-        "4K. " + T120_FITUP_BAND_REMEDY,
-        # Attempt 1 review (clarity, rule 26): the limit names its dimension.
-        "4L. " + T120_FITUP_SHOULDER_REMEDY,
-        "4M. REPEAT 4E-4J UNTIL THE FEELER PASSES BOTH.",
-        "4N. TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND.",
+        "4G. " + T120_DAYLIGHT_CHECK,
+        "4H. " + T120_DAYLIGHT_REMEDY,
+        "4J. TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND.",
         # Rubric sample round 4: the bind remedy names what to check and how;
-        # round 10 (rule 22): one action, the correction.  Codjiflo r1 on
-        # #3090: each 4N remedy names the bind it answers, the band or
-        # shoulder on T120 (4P) or the teeth (4Q).
-        "4P. IF THE BAND OR SHOULDER RUBS T120, CORRECT AS 4K-4M WHERE THE 4H-4J FEELER "
-        "STOPS.",
-        # The ruling's wording; its "THEN REPEAT FROM 4D" is 4R, one action a
+        # round 10 (rule 22): one action, the correction.  The band and
+        # shoulder are 4G's; 4J's remedy is the teeth's (Codjiflo r1 on #3090).
+        # The ruling's wording; its "THEN REPEAT FROM 4D" is 4L, one action a
         # step (rule 22), conditioned on the recut so a free pair goes on.
-        f"4Q. IF THE TEETH BIND, RECUT MHA-DT-10: EVERY TOOTH GAP "
+        f"4K. IF THE TEETH BIND, RECUT MHA-DT-10: EVERY TOOTH GAP "
         f"{inch_text(PINION_RECUT_GAP_WIDENING_MM, 3)} WIDER, CUTTER MOVED SIDEWAYS, SAME DEPTH.",
-        "4R. AFTER A RECUT, REPEAT FROM 4D.",
-        "4S. MATCH-DRILL THE MHA-DT-10 BOSS AT MID-LENGTH INTO MHA-DT-11.",
+        "4L. AFTER A RECUT, REPEAT FROM 4D.",
+        "4M. MATCH-DRILL THE MHA-DT-10 BOSS AT MID-LENGTH INTO MHA-DT-11.",
         # Rule 4 (8a1a516): a standard fit name; the part sheets' shared
         # "LIGHT HAMMER FIT" (pinion.PIN_FIT_LINES) is a drive fit.
-        f"4T. REAM TO FIT PIN {pinion.PIN_NUMBER}, A DRIVE FIT.",
+        f"4N. REAM TO FIT PIN {pinion.PIN_NUMBER}, A DRIVE FIT.",
         # Rule 23 (machinist review r8 of PR #2640): the drive fit's bench
         # check and slip-fit remedy, as every other pressed pin's, worded from
         # the part sheets' shared fit line (PIN_FIT_LINES).
-        f"4U. TAP {pinion.PIN_NUMBER} IN {PIN_FIT_FLUSH}.",
-        f"4V. CHECK THAT {pinion.PIN_NUMBER} IS {PIN_FIT_ACCEPTANCE}.",
-        f"4W. IF IT IS, {SLIP_FIT_BOND}",
-        "4X. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING.",
-        "4Y. CHECK MHA-DT-11'S END IS NOT BELOW MHA-DT-10 (STRAIGHTEDGE).",
-        "4Z. DO NOT FACE THAT END.",
+        f"4P. TAP {pinion.PIN_NUMBER} IN {PIN_FIT_FLUSH}.",
+        f"4Q. CHECK THAT {pinion.PIN_NUMBER} IS {PIN_FIT_ACCEPTANCE}.",
+        f"4R. IF IT IS, {SLIP_FIT_BOND}",
+        "4S. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING.",
+        "4T. CHECK MHA-DT-11'S END IS NOT BELOW MHA-DT-10 (STRAIGHTEDGE).",
+        "4U. DO NOT FACE THAT END.",
         f"5. SLIDE {CRANK_CHAIN_WHEEL} ON MHA-DT-11, HOLES OVER THE 2X MHA-DT-VN-67.",
         # U33 (user, 2026-09-23): crank hub MHA-DT-31 in the arm and
         # seam-pinned by MHA-DT-VN-59; the MHA-DT-09 cross-hole runs behind
@@ -2361,7 +2352,7 @@ CONSUMABLES_NOTES = _note_text(
         "UNLESS ITS STEP GIVES ANOTHER SETTING.",
         # Rule 23 (rubric d9f8b0c): one package note may carry the bond's
         # degrease, apply and cure rules; the bonds are part-spec steps.
-        # Round 13: every bond cites the note (1N, 1R, 2-2A, 2X, 4B, 4U, 6, 6D, 12-14), so the
+        # Round 13: every bond cites the note (1N, 1R, 2-2A, 2X, 4B, 4R, 6, 6D, 12-14), so the
         # note names no step range; the station it sets at once is 12A's.
         "LOCTITE 638 BONDS: DEGREASE BOTH PARTS; COAT THE "
         "INSERTED PART, NEVER A BLIND SEAT; KEEP IT OFF RUNNING LANDS; SET STEP "

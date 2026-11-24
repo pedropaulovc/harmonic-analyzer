@@ -290,31 +290,32 @@ def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
     assert drawing.POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT in declared["DT-02"].where
 
 
-def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> None:
+def test_crank_fit_looks_at_t120_before_the_full_turn_and_retention_drilling() -> None:
     import dt_crank_pinion_spec as pinion
 
     fitup = _step_body("crank-mesh-checked")
+    # Fit audit 2026-11-23 part 2, B9: a look for daylight replaces the .004
+    # feeler, the push and both fit-up cuts.
     order = (
         "SLIDE MHA-DT-10 ON WITHOUT ITS PIN",
         f"SET MHA-DT-10 {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} OFF",
-        "PUSH MHA-DT-10 AND T120 TOWARD EACH OTHER",
-        f"A {sheet.T120_FITUP_FEELER_TEXT} FEELER PASSES ALL ROUND",
-        "BETWEEN THE MHA-DT-10 BAND AND THE T120 TIPS",
-        "BETWEEN THE MHA-DT-10 SHOULDER AND THE T120 FRONT FACE",
-        "IF IT STOPS AT THE BAND, TURN MHA-DT-10'S BAND DOWN",
-        f"Ø{sheet.inch_min_text(pinion.TURNED_DIA_FITUP_MIN, 3)} MIN",
-        "IF IT STOPS AT THE SHOULDER, FACE THE SHOULDER BACK",
-        f"{sheet.inch_min_text(pinion.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN",
-        "REPEAT 4E-4J",
-        "TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND",
-        "MATCH-DRILL THE MHA-DT-10",
-        "TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING",
+        "4G. TURN MHA-DT-07 SLOWLY ONE FULL TURN: DAYLIGHT MUST SHOW ALL ROUND BETWEEN MHA-DT-10",
+        "4H. IF IT DOES NOT, MEASURE MHA-DT-10 AND T120 AGAINST THEIR PRINTS",
+        "4J. TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND",
+        "4K. IF THE TEETH BIND, RECUT MHA-DT-10",
+        "4L. AFTER A RECUT, REPEAT FROM 4D",
+        "4M. MATCH-DRILL THE MHA-DT-10",
+        "4S. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING",
+        "4T. CHECK MHA-DT-11'S END IS NOT BELOW MHA-DT-10",
+        "4U. DO NOT FACE THAT END",
     )
     positions = [fitup.index(phrase) for phrase in order]
     assert positions == sorted(positions)
     assert "FLUSH BOTH SIDES" in fitup
     assert "BACKLASH" not in fitup
     assert "WORST-CASE" not in fitup
+    assert "FEELER PASSES" not in fitup and "PUSH MHA-DT-10" not in fitup
+    assert "4V." not in fitup
 
 
 def test_full_turn_checks_use_the_spec_ratio_and_clear_the_unrelieved_platform() -> None:
