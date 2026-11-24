@@ -121,9 +121,6 @@ def test_fits_take_standard_names_and_name_their_mates() -> None:
     prints where its function is stated."""
     import pd_transgear_disc_hub_spec as hub
 
-    def window(limits: tuple[float, float]) -> str:
-        return f"{_inch(limits[0], 4)}-{_inch(limits[1], 4)} REF"
-
     standard = ("RUNNING FIT", "SLIDING FIT", "LOCATIONAL CLEARANCE FIT")
     # Fit audit 2026-11-23: the reamed bore prints no band and no
     # clearance; its acceptance is the pin entering with no shake.

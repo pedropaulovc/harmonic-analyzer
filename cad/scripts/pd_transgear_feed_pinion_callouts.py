@@ -48,14 +48,6 @@ TEXT_SUFFIX = 2  # swDimensionTextSuffix
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
 
-def _clearance(limits_mm: tuple[float, float]) -> str:
-    """A fit's (least, greatest) clearance as REF in the sheet's inches.
-
-    Literal text: the document converts dimension values, never text
-    (codjiflo P2 on 65a022125)."""
-    return f"(CLEARANCE {inch_text(limits_mm[0], 4)}-{inch_text(limits_mm[1], 4)} REF)"
-
-
 # The reamed bore runs on the MHA-PD-23 pin's 1/8 shank.  It prints the
 # reamer's size and no band (fit audit 2026-11-23, pending owner
 # confirmation): the pin is turned to it, the acceptance is the pin itself,
