@@ -8,7 +8,7 @@ necessity:
     feature: "sheet 1, section A-A, .809 ±.001 hub face station from the shoulder"
     kind: gap
     reason: "keeps collar MHA-PD-22 clear of disc MHA-PD-06"
-    source: "pd_cluster_air.require_air: statistical air 0.0599 mm under the 0.1016 mm floor at ±.005; passes at ±.002"
+    source: "no longer required after fit audit question 5; loosening tracked in issue (pending). With the disc cluster .005 back (owner ruling 2026-11-24) pd_cluster_air.COLLAR_AIR statistical is 0.1880 mm at ±.001, 0.1688 at ±.003, 0.1366 at ±.005 against its 0.1016 floor; loosening moves no gate, only paper_drive_arm_registration.S_/K_PROJECTED_HEIGHT_MM (printed on MHA-PD-18/19) by .002"
   - id: N-03
     feature: "sheet 1, section A-A, 1.143 ±.002 overall length"
     kind: gap

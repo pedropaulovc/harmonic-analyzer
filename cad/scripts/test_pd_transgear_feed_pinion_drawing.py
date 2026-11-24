@@ -474,7 +474,13 @@ def test_bore_runs_on_the_pin() -> None:
     b_upper, b_lower = spec.BORE_DIA_BAND
     clearance = (spec.BORE_DIA + b_lower - pin.DIA_MAX, spec.BORE_DIA + b_upper - pin.DIA_MIN)
     assert clearance == pytest.approx(spec.BORE_DIAMETRAL_CLEARANCE)
-    assert clearance == pytest.approx((0.0010 * 25.4, 0.0017 * 25.4))
+    # Owner ruling 2026-11-24, fit audit question 5: pin +0/-.0005 in the
+    # reamer's +.0010/0, the one band the three running bores share
+    # (pd_transgear_pin_spec owns it).
+    assert (b_upper, b_lower) == pytest.approx((0.0010 * 25.4, 0.0))
+    assert spec.BORE_DIA_BAND is pin.RUNNING_BORE_DIA_BAND
+    assert spec.BORE_DIAMETRAL_CLEARANCE is pin.RUNNING_CLEARANCE
+    assert clearance == pytest.approx((0.0010 * 25.4, 0.0025 * 25.4))
 
 
 def test_oil_hole_lands_on_a_tooth_centre() -> None:
@@ -494,8 +500,19 @@ def test_walls_meet_the_target_worst_case() -> None:
     # and the sheet prints its worst case floored on the .001 in grid.
     assert spec.WALL_FLOOR <= spec.FLAT_WALL_WORST < spec.WALL_TARGET
     assert spec.FLAT_WALL_WORST <= spec.FLAT_WALL
-    # .138 -.002 flat over the Ø.1265 bore's radius: .07275, printed .072 MIN.
-    assert spec.FLAT_WALL_WORST == pytest.approx((0.136 - 0.1265 / 2.0) * 25.4)
+    # .138 -.002 flat over the modelled Ø.1270 bore's radius: .0725, still
+    # over the printed .072 MIN, which does not move (RV-03 as ruled).
+    assert spec.FLAT_WALL_WORST == pytest.approx((0.136 - 0.1270 / 2.0) * 25.4)
+    # RV-04 (owner ruling 2026-11-24: "Yes: restate RV-04 to .0730 and build
+    # the full form."): the boss wall at the nose between the two .010 breaks.
+    boss_wall = dict((name, worst) for name, _nominal, worst in spec.WALLS)["boss"]
+    assert boss_wall - 2 * 0.010 * 25.4 == pytest.approx(0.0730 * 25.4)
+    reason = next(
+        entry["reason"]
+        for entry in _config.parts("pd-transgear-feed-pinion")["machinist_exceptions"]
+        if entry["id"] == "RV-04"
+    )
+    assert "the worst wall is .0730" in reason
     assert "D-FLAT WALL TO BORE .072 MIN." in spec.DRAWING_NOTES.splitlines()
     assert spec.FLAT_WALL_PRINTED <= spec.FLAT_WALL_WORST
     assert spec.FLAT_WALL_WORST - spec.FLAT_WALL_PRINTED < 0.001 * 25.4

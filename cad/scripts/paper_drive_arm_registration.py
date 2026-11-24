@@ -171,7 +171,7 @@ K_PROJECTED_HEIGHT_MM = (
 # pd_transgear_pin_spec and pd_transgear_arm_spec, so pin edits do not
 # re-key every importer of this module.
 S_PIN_BOND_LENGTH_MIN_MM = 8.9916  # .354
-S_PIN_BOND_GAP_MAX_MM = 0.05588  # .0022: the .127 NO-GO less the .1248 shank
+S_PIN_BOND_GAP_MAX_MM = 0.0635  # .0025: the .127 NO-GO less the .1245 shank
 S_ARM_FRONT_EDGE_BREAK_MAX_MM = 0.254  # .010, the title block's
 S_AXIS_TILT_MAX_RAD = (
     ARM.PIN_BORE_PERPENDICULARITY_MM + S_PIN_BOND_GAP_MAX_MM

@@ -37,8 +37,8 @@ def test_stack_lengths_print_their_bands():
     assert FIT.LRB[2] == printed_band_mm(3, unit=REAR_BUSHING.UNIT)
     assert (FIT.HUB_LENGTH, FIT.FRONT_BUSHING_LENGTH, FIT.REAR_BUSHING_LENGTH) == (
         pytest.approx(13.6906),  # .539
-        pytest.approx(5.6388),  # .222
-        pytest.approx(5.4356),  # .214
+        pytest.approx(5.7658),  # .227 (fit audit owner question 5: .005 back)
+        pytest.approx(5.3086),  # .209
     )
     assert HUB.HUB_LENGTH == FIT.HUB_LENGTH
     assert FRONT_BUSHING.LENGTH == FIT.FRONT_BUSHING_LENGTH

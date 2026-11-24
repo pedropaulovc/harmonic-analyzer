@@ -70,8 +70,18 @@ LENGTH_BAND = FIT_LENGTH_BAND_IN  # the hub and the front bushing
 LENGTH_PLACES = 3
 REAR_BUSHING_LENGTH_BAND = printed_band_mm(LENGTH_PLACES, unit=PIN.UNIT)
 HUB_LENGTH = 13.6906  # .539
-FRONT_BUSHING_LENGTH = 5.6388  # .222
-REAR_BUSHING_LENGTH = 5.4356  # .214
+# Owner ruling 2026-11-24, fit audit question 5 ("disc .005 back"): the
+# cluster sits .005 further back than #2124 put it (front bushing .222 to
+# .227, rear .214 to .209), moving spare platen-side air to the collar side
+# so the pin's running fit may be a range .0015 wide, .0010-.0025 (pin
+# +0/-.0005, reamed bores on size to .0010 over).  Collar air statistical
+# .0045 to .0078 against .004; platen air .0212 to .0145 against .0012.
+# The looser pin widens the feed pinion's lateral offset band, so MHA-PD-00
+# step 24C's engaged feed (and its settings row) moves from .165 TO 10.445
+# to .166 TO 10.444 (4.19-265.31 to 4.20-265.30 mm, derived by
+# paper_drive_rack_travel.RackOperatingDomain).
+FRONT_BUSHING_LENGTH = 5.7658  # .227
+REAR_BUSHING_LENGTH = 5.3086  # .209
 
 # --- the stack's terms: (label, nominal, band) ------------------------------------
 # The MHA-PD-28 bush's hub face, HUB_LENGTH forward of its shoulder on face A
@@ -289,7 +299,7 @@ for _ok, _what in (
     (
         # Codjiflo P2 on #2124: the smallest shim bore never binds on the
         # largest pin (line-on-line at worst; the running fits and the
-        # collar air keep the pin's floor at .1248).
+        # collar air keep the pin's floor at .1245).
         SHIM.ID_MIN >= PIN.DIA_MAX - 1e-9,
         f"the MHA-PD-VN-68 shim's smallest bore {SHIM.ID_MIN} binds on the "
         f"pin's largest shank {PIN.DIA_MAX}",

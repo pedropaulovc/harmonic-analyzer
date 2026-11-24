@@ -199,9 +199,9 @@ PIN_BORE_NO_GO_PLACES = 3
 _SET_PIN_UNDER_SIZE_MAX = 0.00508  # .0002, a Class ZZ minus pin
 # The widest gap the pin's sheet accepts: a bore that just refuses the .127
 # pin, on the pin's smallest modelled shank.
-PIN_BOND_GAP_ACCEPTED_MAX = PIN.BOND_GAP_ACCEPTED_MAX  # .0022
+PIN_BOND_GAP_ACCEPTED_MAX = PIN.BOND_GAP_ACCEPTED_MAX  # .0025
 # Rule 23: the bond's clearance as the pin's note 1 prints it.
-PIN_BOND_CLEARANCE_PRINTED = PIN.BOND_CLEARANCE_PRINTED  # .0010-.0022
+PIN_BOND_CLEARANCE_PRINTED = PIN.BOND_CLEARANCE_PRINTED  # .0010-.0025
 if not 0.0 < PIN_BOND_GAP[0] <= PIN_BOND_GAP[1] <= PIN_BOND_GAP_ACCEPTED_MAX:
     raise AssertionError(
         f"MHA-PD-18 pin bore bond gap on MHA-PD-23 is {PIN_BOND_GAP}, outside "

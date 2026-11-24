@@ -9,7 +9,7 @@ necessity:
     feature: "sheet 1, section B-B, Ø.126 REAM THRU bore, MHA-PD-23 IS TURNED TO THIS BORE"
     kind: gap
     reason: "cocked on the pin, MHA-PD-06 closes its air to MHA-PD-22"
-    source: "pd_cluster_air.COLLAR_AIR"
+    source: "no longer required after fit audit question 5; loosening tracked in issue (pending). With this bore alone .002 looser, pd_cluster_air.COLLAR_AIR statistical 0.1189 mm against its 0.1016 floor (0.1880 as modelled), PLATEN_AIR 0.1428 against 0.03; no gate trips; MHA-PD-00 step 24C's engaged feed would print .167 TO 10.443 (.166 TO 10.444)"
   - id: N-02
     feature: "sheet 1, section B-B, tooth length .535 ±.001 to the step (SEATS MHA-PD-17 SPIGOT)"
     kind: gap

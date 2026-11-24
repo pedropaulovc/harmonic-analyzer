@@ -175,7 +175,8 @@ SIDE_KEEP = {
     # At the shank's middle: its dimension line, and the arrow below the
     # shank, stand clear right of the groove width's text and ring callout
     # (34 mm left of here the lower arrow struck the +0.0762, run
-    # 20261024T030409384Z).  The callout under the value runs right from
+    # 20261024T030409384Z).  The callout under the value, two rows (the
+    # note's link and the running clearance's reference), runs right from
     # the line, high enough that it clears the Ra symbol and the head Ø.
     "ShankDia": (SHANK_MID_X, SHANK_TOP_Y + 0.046),
     # Above the shank Ø's whole block, with a text gap past the audit's

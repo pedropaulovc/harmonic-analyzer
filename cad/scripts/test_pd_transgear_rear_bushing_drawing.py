@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 import _config
 import build_pd_transgear_rear_bushing as part
@@ -67,24 +68,28 @@ def test_the_bore_runs_on_the_pin_and_names_it() -> None:
     assert "NO SHAKE" not in callout
     assert _config.parts("pd-transgear-rear-bushing")["number"] in pin.RUNNING_MATES
     assert "NO SHAKE" in pin_callouts.SHANK_ACCEPTANCE
-    # Codjiflo r1 on #3492: rule 4's own criterion, .002 in looser than the
-    # modelled fit, does NOT take the float up (.0070 of .0080), so the
-    # REAM stays by the delegated exception RV-01, whose reason is that the
-    # next form down, a drilled #30 (.1285 +.004/0 on the smallest pin),
-    # does (.0147).
+    # Rule 4's own criterion, .002 in looser than the modelled fit: with the
+    # running clearance to .0025 (owner ruling 2026-11-24, fit audit
+    # question 5) the cocked bushing takes the whole float up (.0088 of
+    # .0080), so the REAM answers the necessity test itself and the
+    # delegated exception RV-01 (Codjiflo r1 on #3492, .0070 at .0017) is
+    # gone; the next form down, a drilled #30 (.1285 +.004/0 on the smallest
+    # pin), takes up .0157.
     least_float = fit.RING_FLOAT_RANGE[0]
     assert spec.BORE_COCK_TAKE_UP == spec.bore_cock_take_up(high) < least_float
+    assert spec.BORE_COCK_TAKE_UP / 25.4 == pytest.approx(0.0049, abs=5e-5)
     loose = spec.bore_cock_take_up(high + 0.002 * 25.4)
-    assert loose / 25.4 == pytest.approx(0.0070, abs=5e-5)
-    assert loose < least_float
+    assert loose / 25.4 == pytest.approx(0.0088, abs=5e-5)
+    assert loose > least_float
     drilled = spec.bore_cock_take_up((0.1285 + 0.004) * 25.4 - pin.DIA_MIN)
-    assert drilled / 25.4 == pytest.approx(0.0147, abs=5e-5)
-    assert drilled > least_float
-    (ruling,) = _config.parts("pd-transgear-rear-bushing")["machinist_exceptions"]
-    assert ruling["kind"] == "accept" and "REAM" in ruling["where"]
-    assert "delegated ruling 2026-11-24, no precedent" in ruling["reason"]
-    assert "issues/2144" in ruling["reason"]
-    assert ".0070" in ruling["finding"] and ".0147" in ruling["reason"]
+    assert drilled / 25.4 == pytest.approx(0.0157, abs=5e-5)
+    assert "machinist_exceptions" not in _config.parts("pd-transgear-rear-bushing")
+    (entry,) = yaml.safe_load(
+        (_config.CONFIG_DIR / "necessity" / "pd-transgear-rear-bushing.yaml").read_text(
+            encoding="utf-8"
+        )
+    )["necessity"]
+    assert ".0088" in entry["source"] and ".0157" in entry["source"]
 
 
 def test_wall_holds_the_target_at_the_printed_worst_case() -> None:

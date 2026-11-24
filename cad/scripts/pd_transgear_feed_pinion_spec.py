@@ -346,17 +346,22 @@ for _limit in (FLAT_END_MIN, FLAT_END_STATION):
 # the MHA-PD-22 collar (pd_cluster_air.COLLAR_AIR, "sleeve cocking on the
 # pin"; the gate is build_pd_paper_drive_assembly's).
 # BORE_DIA_BAND is NOT a printed limit: it is the ANALYSIS band, what the
-# set reamer is modelled to cut (on size to .0005 over, the band the hole
-# printed before), and BORE_DIAMETRAL_CLEARANCE the modelled result of the
-# fit on the pin's analysis band, .0010...0017.  Every stack reads these.
+# set reamer is modelled to cut (on size to .0010 over), and
+# BORE_DIAMETRAL_CLEARANCE the modelled result of the fit on the pin's
+# analysis band, .0010...0025 (owner ruling 2026-11-24, fit audit question
+# 5: "disc .005 back, pin +0/-.0005, bores +.001").  With the bore to
+# .1270 the D-flat wall's worst case is .0725, still over its printed
+# .072 MIN: the analysis worst case moving inside the printed MIN is not
+# a re-ruling, and RV-03 and the note are unchanged.  The boss wall at the
+# nose prints no MIN; RV-04 is restated from .0733 to .0730 (owner ruling
+# 2026-11-24: "Yes: restate RV-04 to .0730 and build the full form.").
+# pd_transgear_pin_spec owns both, for the three bores the one reamer
+# cuts.  Every stack reads these.
 # The true finite root at every radial-setting corner retains the .080 wall.
-BORE_DIA = 3.2004  # .1260, the reamer's size
-BORE_DIA_BAND = (0.0127, 0.0)  # (upper, lower) ANALYSIS deviations: +.0005/0
+BORE_DIA = pd_transgear_pin_spec.RUNNING_BORE_DIA  # .1260, the reamer's size
+BORE_DIA_BAND = pd_transgear_pin_spec.RUNNING_BORE_DIA_BAND  # ANALYSIS: +.0010/0
 BORE_PLACES = 3  # prints Ø.126 REAM THRU
-BORE_DIAMETRAL_CLEARANCE = (
-    round(BORE_DIA + BORE_DIA_BAND[1] - pd_transgear_pin_spec.DIA_MAX, 6),
-    round(BORE_DIA + BORE_DIA_BAND[0] - pd_transgear_pin_spec.DIA_MIN, 6),
-)
+BORE_DIAMETRAL_CLEARANCE = pd_transgear_pin_spec.RUNNING_CLEARANCE
 if BORE_DIAMETRAL_CLEARANCE[0] <= 0.0:
     raise AssertionError(f"sleeve bore binds on the pin: {BORE_DIAMETRAL_CLEARANCE}")
 
