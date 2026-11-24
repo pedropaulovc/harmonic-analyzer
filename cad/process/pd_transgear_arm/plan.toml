@@ -18,7 +18,7 @@
 # Left to the assembly (MHA-PD-00, not made here; the last op names them):
 # 2X Ø.0930 dowel holes (PD-00 13A pilots through arm and plate, 13D reams the
 # arm's two), the 2X 8-32 tapped holes' match work (13L spot through the
-# plate, 13N #29 drill, 13P tap) and the MHA-PD-23 pin press (11A).
+# plate, 13N #29 drill, 13P tap) and the MHA-PD-23 pin's bond (11A-11G).
 #
 # PENDING OWNER CORRECTION (#3184): two assumptions this plan rests on.
 # (1) Stock: 3/8 x 1 precision-ground 1018, Online Metals 12095 (±.001
@@ -27,9 +27,13 @@
 #     ground thickness is the drawing's 3/8 (.3750) GROUND STOCK REF.
 #
 # To order (not owned): the 12095 bar (stock.1018-ground-flat-3-8x1, one
-# 12 in length), the .1260/.1265 Class X pair
-# (plug-gauges-1260-1265, already on the to-buy list; Class X stays for that
-# band), and the
+# 12 in length), the pin-gauge set for the pin
+# bore's one check (pin-gauges: its .127 pin must not enter; fit audit
+# 2026-11-23, pending owner confirmation: the bore prints the .1260 reamer's
+# size with no band and the MHA-PD-23 pin is bonded in it, so the Class X
+# .1260/.1265 pair is gone from this plan; cad.pin_bore_dia_band_mm is the
+# drawing module's ANALYSIS band, which sizes the reaming op and is no
+# acceptance), and the
 # two fixture screws (#10-32 x 5/8 and #4-40 x 5/8 socket head cap screws).
 # The pivot bore is the #9 drill's hole (fit audit 2026-11-23, pending owner
 # confirmation): no reamer; the .194 set pin entering is its one check.
@@ -241,12 +245,8 @@ name = "Two-grit sharpening stone (320 face)"
 ref = "sharpening-stone-two-grit"
 [[tools]]
 id = "pin-gauges"
-name = "Pin gauges: the .194 minus (GO) and the pins beside it"
+name = "Pin gauges: the .194 minus (GO) and the pins beside it; .126 and .127 for the pin bore"
 ref = "pin-gauges"
-[[tools]]
-id = "plug-1260"
-name = "Plug gauges .1260 GO / .1265 NO-GO, TO BUY"
-ref = "plug-gauges-1260-1265"
 
 # --- Setup 1 ------------------------------------------------------------------
 [[setups]]
@@ -408,8 +408,8 @@ gauge_checks = "other"
 
 [[setups.operations]]
 instruction = "The pin bore."
-inspection = "Pin bore Ø{{cad.pin_bore_dia_min_in:.4dot}}–{{cad.pin_bore_dia_max_in:.4dot}}: the .1260 plug enters (GO); the .1265 does not (NO-GO). Its rear mouth shows an even ring of break all round; the break's .008 ±.002 size is not gauged: held by T7's programmed depth in op 130. GO fails or NO-GO enters: stop and tell the owner."
-gauge_checks = [{ gauge = "plug-gauges-1260-1265", band_mm = "{{cad.pin_bore_dia_band_mm}}" }]
+inspection = "Pin bore (drawing: Ø.126 REAM THRU, .127 PIN DOES NOT ENTER): the pin-gauge set's .127 pin does not enter from either face, by hand, never forced. The MHA-PD-23 pin is fitted to this bore on its own traveler. Its rear mouth shows an even ring of break all round; the break's .008 ±.002 size is not gauged: held by T7's programmed depth in op 130. The .127 pin enters: stop and tell the owner."
+gauge_checks = "other"
 
 [[setups.operations]]
 instruction = "The spot face: its depth below the rear face (the calipers' depth rod), subtracted from T, the middle thickness written on face A."
@@ -629,10 +629,8 @@ gauge_checks = [
 
 [[setups.operations]]
 instruction = "Re-gauge both bores after deburring, then their spacing. Not gauged, held by AR01's one clamping from one G54 with face A on the parallels: C's Y position and its squareness to A."
-inspection = "The pivot's GO pin and the pin-bore plugs as in Setup 2; spacing B to C: the largest set pin that enters B and the .1260 plug in C, the calipers over both less half of each, {{cad.pin_bore_x_mm:in.4dot}} ±.002. Outside: set it aside and tell the owner."
-gauge_checks = [
-  { gauge = "plug-gauges-1260-1265", band_mm = "{{cad.pin_bore_dia_band_mm}}" },
-]
+inspection = "The pivot's GO pin and the pin bore's .127 pin as in Setup 2; spacing B to C: the largest set pin that enters B and the set's .126 pin in C, the calipers over both less half of each, {{cad.pin_bore_x_mm:in.4dot}} ±.002. Outside: set it aside and tell the owner."
+gauge_checks = "other"
 
 # --- Setup 6 ------------------------------------------------------------------
 [[setups]]
@@ -650,5 +648,5 @@ instruction = "The drawing's finish: {{cad.finish}}. Wash off the cutting oil an
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Not made here, left to the assembly (MHA-PD-00): the 2X Ø.0930 dowel holes (PD-00 step 13A drills #44 pilots through the arm and the arm plate MHA-PD-19 together; 13D reams the arm's two, press fit), the 2X 8-32 tapped holes' match work (13L spots through the plate; 13N drills #29; 13P taps) and the MHA-PD-23 pin pressed into the pin bore (11A). Send the arm to assembly with the plate."
+instruction = "Not made here, left to the assembly (MHA-PD-00): the 2X Ø.0930 dowel holes (PD-00 step 13A drills #44 pilots through the arm and the arm plate MHA-PD-19 together; 13D reams the arm's two, press fit), the 2X 8-32 tapped holes' match work (13L spots through the plate; 13N drills #29; 13P taps) and the MHA-PD-23 pin bonded into the pin bore (11A-11G). Send the arm to assembly with the plate."
 feed = "hand"
