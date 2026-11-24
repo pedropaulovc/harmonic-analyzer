@@ -112,17 +112,17 @@ def test_plate_outline_and_holes_follow_the_physical_bore_source(
 
 
 def test_the_explicit_bands_are_the_press_hole_and_the_hole_positions() -> None:
-    assert model_toleranced_dimensions(part) == {
-        ("LocatorProfile", "f'LocatorDia{index}'"): "*deviations(LOCATOR_HOLE_BAND_MM)",
-        ("PressHoleProfile", "PressHoleDia"): "*deviations(PRESS_HOLE_BAND)",
-    }
-    # The FN2 hole prints the bush's ANSI B4.1 hole limits, +.0007/0
-    # (pd_transgear_knob_bush_geometry); zero lower deviation is intentional.
+    """Fit audit 2026-11-23: the press hole and the locating holes print
+    their set reamer's size and no band; each is accepted with its mate."""
+    assert model_toleranced_dimensions(part) == {}
+    # ANALYSIS: what the .4385 set reamer is modelled to cut, +.0005/0
+    # (pd_transgear_knob_bush_geometry); the walls are judged at it.
     lower, upper = deviations(spec.PRESS_HOLE_BAND)
     assert (lower, upper) == geometry.PRESS_HOLE_LIMITS
     assert (upper, lower) == bush.PRESS_HOLE_BAND
-    assert (lower, upper) == pytest.approx((0.0, 0.0007 * 25.4))
-    assert geometry.PRESS_HOLE_DIA == bush.PRESS_DIA == pytest.approx(0.4375 * 25.4)
+    assert (lower, upper) == pytest.approx((0.0, 0.0005 * 25.4))
+    assert geometry.PRESS_HOLE_DIA == bush.PRESS_DIA == pytest.approx(0.4385 * 25.4)
+    assert geometry.LOCATOR_HOLE_DIA_MM == pytest.approx(0.1260 * 25.4)
 
 
 def test_every_printed_band_is_no_wider_than_the_arithmetic_assumed() -> None:
@@ -732,29 +732,54 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
 
     press = drawing.PLAN_CALLOUTS["PressHoleDia"]
     assert press is notes.PRESS_HOLE_CALLOUT
-    assert press.splitlines()[0] == "REAM THRU"
-    assert f"PRESS FIT FOR {numbers['BUSH_NUMBER']}" in press.splitlines()
-    # The REF interference is the FN2 range the printed limits give.
-    match = re.search(r"\(INTERFERENCE (\.\d{4})-(\.\d{4}) REF\)", press)
-    assert match, press
-    assert tuple(map(float, match.groups())) == (0.0005, 0.0016)
+    assert press.splitlines()[0] == "REAM THRU, PRESS FIT"
+    # Reamed with the set reamer: no band, no interference range; the fit
+    # rides on the process line and the two lines of words give the
+    # three-place chamfer its function (rule 3) and say the mate is turned
+    # to this bore, in rule 4's words (its acceptance prints once, on
+    # MHA-PD-28).  No necessity reason is printed: it is in the register.
+    assert press.splitlines()[2:] == [
+        f"CLEARS {numbers['BUSH_NUMBER']} SHOULDER ROOT",
+        f"{numbers['BUSH_NUMBER']} IS TURNED TO THIS BORE",
+    ]
+    for word in ("HOLDS", "KEEPS", "SETS", "FASTENER"):
+        assert word not in press, word
+    # The chamfer's window: over the bush's root radius, under the leg that
+    # still leaves a shoulder land; no two-place value fits inside it.
+    low = bush.SHOULDER_ROOT_R_MAX_MM / 25.4
+    high = (
+        (bush.HUB_DIA / 25.4 - 0.01) - (bush.PRESS_DIA + max(bush.PRESS_HOLE_BAND)) / 25.4
+    ) / 2.0 - 0.010
+    assert low == pytest.approx(0.005) and high == pytest.approx(0.0255, abs=1e-4)
+    for nominal in (0.01, 0.02):
+        assert not (low <= nominal - 0.01 and nominal + 0.01 <= high), nominal
+    assert low <= 0.015 - 0.005 and 0.015 + 0.005 <= high
+    assert max(map(len, press.splitlines())) <= 33
+    assert "INTERFERENCE" not in press and not re.search(r"\.\d{4}", press)
     locator = flat(drawing.LOCATOR_CALLOUT)
     assert drawing.CALLOUTS_ABOVE["LocatorDia1"] == f"{len(geometry.LOCATOR_SITES_MM)}X"
     assert locator.startswith(f"REAM THRU, SEE NOTE {notes.LOCATOR_NOTE_NUMBER}")
     # Rule 7: under the size and process, at most two lines of words.
     assert len(drawing.LOCATOR_CALLOUT.splitlines()) == 3
-    assert "LOCATIONAL CLEARANCE FIT ON" in locator
-    assert numbers["DOWEL_NUMBER"] in locator
+    assert f"SLIP ON {numbers['DOWEL_NUMBER']}" in locator
+    assert "SLIDES IN, NO SHAKE" in locator
     note = flat(drawing.LOCATOR_NOTE)
-    # The REF clearance (in the note) encloses the dowel's limits in the
-    # reamed hole; the dowel is named once, on the callout.
-    match = re.search(r"\(CLEARANCE (\.\d{4})-(\.\d{4})\)", note)
-    assert match, note
+    # No clearance range is printed: the dowel is the gauge, named once, on
+    # the callout.  The note prints no reason (necessity register N-02).
+    assert "CLEARANCE" not in flat(locator + " " + note)
+    assert not re.search(r"\.\d{4}", locator + note)
+    assert "KEEPS" not in note and "MESH" not in note
+    # One scheme: sheet 2's frame says where the holes stand, the note only
+    # when they are made; no order of work, no "match-drill".
+    assert "DRILL AND REAM AT ASSEMBLY ON ARM" in note
+    for word in ("MATCH", "THROUGH", "CLAMPED", "FIRST", "THEN"):
+        assert word not in note, word
+    locator_frames = [
+        c for c in spec.GEOMETRIC_CONTROLS if c.key.startswith("plate_locator_")
+    ]
+    assert len(locator_frames) == len(geometry.LOCATOR_SITES_MM)
     assert numbers["DOWEL_NUMBER"] not in note
-    low, high = map(float, match.groups())
-    clearance_in = [value / 25.4 for value in dowel.SLIP_DIAMETRAL_CLEARANCE_MM]
-    assert 0.0 < low <= clearance_in[0] < low + 1e-4
-    assert high - 1e-4 < clearance_in[1] <= high
+    assert min(dowel.SLIP_DIAMETRAL_CLEARANCE_MM) > 0.0
     assert note.startswith(f"{notes.LOCATOR_NOTE_NUMBER}. ")
     for required in (numbers["ARM_NUMBER"], steps.knob_setting_ref()):
         assert required in note, required
@@ -940,7 +965,7 @@ def test_the_plate_feature_bands_are_the_printed_ones() -> None:
 
     f = export_features.requirement_manifest("pd_transgear_arm_plate")["features"]
     assert f["rear_face"]["thickness"] == pytest.approx([_in(0.192), _in(0.202)], abs=1e-3)
-    assert f["press_hole"]["dia"] == pytest.approx([_in(0.4375), _in(0.4382)], abs=1e-4)
+    assert f["press_hole"]["dia"] == pytest.approx([_in(0.4385), _in(0.4390)], abs=1e-4)
     assert f["press_hole"]["chamfer_leg"] == pytest.approx([_in(0.010), _in(0.020)])
     assert f["press_hole"]["chamfer_at"] == "face_a" and f["press_hole"]["thru"] is True
     assert f["outline"]["end_r"] == pytest.approx([_in(0.48), _in(0.50)], abs=1e-3)
@@ -956,5 +981,5 @@ def test_the_plate_feature_bands_are_the_printed_ones() -> None:
         assert hole["position_dia"] == pytest.approx(_in(0.014))
         locator = f[f"locator_{index}"]
         assert locator["made_at"] == "assembly"
-        assert locator["dia"] == pytest.approx([_in(0.0945), _in(0.0950)], abs=1e-4)
+        assert locator["dia"] == pytest.approx([_in(0.1260), _in(0.1265)], abs=1e-4)
         assert locator["position_dia"] == pytest.approx(_in(0.004))

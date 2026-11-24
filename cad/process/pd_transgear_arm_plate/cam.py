@@ -21,14 +21,14 @@ Route (plan text in ``plan.toml``): the 1/4 x 1-1/2 in bar's long edges are
 the plate's side edges, as supplied. The sawn blank is bonded face A down on
 a 6061 spoil block held in the vise, its C edge flush with the block's edge
 at the fixed jaw. AP01 faces the rear face to the thickness, spots, drills
-#1 through K and both screw holes, opens K 27/64 and reams it .4375; AP02
+#1 through K and both screw holes, opens K 27/64 and reams it .4385; AP02
 countersinks the screw holes; AP03 clears the end's corners with a half
 circle, then mills the end round, the tapers and the top edge with the
 cutter's side, through into the spoil block. K's face-A chamfer is cut by
 hand at the bench after the plate is freed (delegated ruling 2026-11-22,
 owner review #2144): no NC.
 
-Work frame (G54), set in Setup 3:
+Work frame (G54), set in Setup 2:
 - AP01-AP03 (``bond``): X0 Y0 K's axis, the plate's length along -X (the
   end round at +X), +Y toward the fixed jaw (the C edge, model +X); Z0 face
   A (model Z0), the rear face up. Work (X, Y, Z) = (-y, x, z).
@@ -348,8 +348,9 @@ def context(
     rc = dem / 2
     if not g["screw_band"][0] - 1e-6 <= d1 <= g["screw_band"][1]:
         raise ValueError(f"#1 Ø{d1} outside the screw holes' band {g['screw_band']}")
-    if not g["k_band"][0] - 1e-6 <= dream <= g["k_band"][1]:
-        raise ValueError(f"the reamer Ø{dream} is outside K's band {g['k_band']}")
+    # K prints the set reamer's size and no band: the reamer is that size.
+    if not math.isclose(dream, g["k_dia"], abs_tol=1e-6):
+        raise ValueError(f"the reamer Ø{dream} is not K's Ø{g['k_dia']}")
     if not d1 < d2764 < dream:
         raise ValueError("the 27/64 does not lie between the #1 and the reamer")
     if not math.isclose(g["sink_angle"], SINK_DEG):
@@ -614,8 +615,9 @@ def context(
     )
     # The check: a pin between K's top limit and the smallest rim stands in
     # the chamfer; its end sits half the rim-less-pin below face A. The band
-    # holds for any K in its band: the shallowest end from K's top limit and
-    # the shortest leg, the deepest from K's low limit and the longest.
+    # is the sheet's leg band on the printed K, no tighter (rule T15): a K
+    # at the reamer's modelled top limit moves a reading by a quarter thou,
+    # under what the calipers' depth rod resolves.
     pin = p["chamfer_pin_dia_mm"]
     if not g["k_band"][1] < pin < g["k_dia"] + 2 * g["chamfer_band"][0]:
         raise ValueError("the chamfer pin does not seat on the chamfer")
@@ -623,8 +625,8 @@ def context(
         plan,
         "chamfer_pin_depth",
         (
-            (g["k_band"][1] + 2 * g["chamfer_band"][0] - pin) / 2,
-            (g["k_band"][0] + 2 * g["chamfer_band"][1] - pin) / 2,
+            (g["k_dia"] + 2 * g["chamfer_band"][0] - pin) / 2,
+            (g["k_dia"] + 2 * g["chamfer_band"][1] - pin) / 2,
         ),
     )
 
@@ -644,9 +646,11 @@ def context(
     holes_area = math.pi / 4 * (g["k_dia"] ** 2 + 2 * d1**2)
     _agree(plan, "bond_area_mm2", _area(g) - holes_area)
 
-    # Inspection bands from K, over the GO plug (K's low limit).
-    plug_r = g["k_band"][0] / 2
-    _agree(plan, "plug_radius_mm", plug_r)
+    # Inspection bands from K, over the plug: the pin gauge one .001 step
+    # under K (a plug to measure from; K itself is not gauged).
+    plug_r = p["plug_radius_mm"]
+    if not 0.0 < g["k_dia"] - 2 * plug_r <= 0.0254 + 1e-9:
+        raise ValueError("the plug is not the pin gauge next under K")
     for key, band in (
         ("side_over_plug", g["side_band"]),
         ("round_over_plug", g["radius_band"]),
@@ -797,7 +801,7 @@ def context(
             [
                 [
                     "press_ream",
-                    "ream K .4375",
+                    "ream K .4385",
                     _plunge(k, t, -p["ream_past_mm"], clear, out="G1"),
                 ]
             ],
@@ -836,7 +840,7 @@ def context(
         ),
     ]
 
-    # Keep-outs. Setup 3: the jaws, their tops spoil_over below the spoil
+    # Keep-outs. Setup 2: the jaws, their tops spoil_over below the spoil
     # block's top (under the tape stack: at its thinnest the jaws stand
     # highest), the fixed jaw's face at the C edge, the moving jaw's at the
     # block's other edge, along the block centred on the jaws.

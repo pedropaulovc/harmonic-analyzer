@@ -11,22 +11,26 @@
 # shim wrap, the parted end out; nothing seats it axially, so the length's
 # +/-.001 band is set from the micrometer, not a stop (the MHA-DT-38 bushing's
 # regrip): mike the length, touch the AR on the parted end, preset the DRO to
-# the miked length less the .222 nominal, face to Z0. Both faces bear (the
+# the miked length less the .227 nominal, face to Z0. Both faces bear (the
 # MHA-PD-10 sleeve's nose and the MHA-PD-VN-61 ring), and both are faced.
-# Bench: break the edges and the bore's ends, check the bore with the .1260 GO
-# / .1265 NO-GO plug gauge pair (the band's ends).
+# Bench: break the edges and the bore's ends. The drawing prints the bore as
+# the reamer's size with no band (fit audit 2026-11-23, pending owner
+# confirmation): its fit is accepted on the MHA-PD-23 pin, which is turned
+# last to this bore and tried in it on the pin's own traveler. Here the bore
+# gets no size check (traveler review t2: a .127 must-not-enter pin was an
+# acceptance the drawing does not print), only a look at its finish.
+# cad.bore_dia_band_mm is the drawing module's ANALYSIS band (what the reamer
+# is modelled to cut); it sizes the reaming op and is no acceptance.
 #
 # Not on hand (cad/config/shop-equipment/, to order): the .1260 chucking
-# reamer (tools-reamers-taps.toml reamer-1260) and the .1260 GO / .1265 NO-GO
-# Class X plug gauge pair (gauges.toml plug-gauges-1260-1265): the band is
-# .0005, under the pin-gauge sets' .001 step. Both serve MHA-PD-24 and
-# MHA-PN-05 too.
+# reamer (tools-reamers-taps.toml reamer-1260; it serves MHA-PD-24 and
+# MHA-PN-05 too).
 title = "Transgear Front Bushing"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 1/2 in"
 stock = "Lot: {{process.quantity:d}} bushing. Ø{{process.stock_dia_in:.3dot}} bar, on hand: saw a {{process.bar_length_in:g}} in piece off it for the lathe, never the whole bar (it would run out past the spindle's rear end); the bushing takes {{cad.pitch_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .1260 chucking reamer and the .1260 GO / .1265 NO-GO plug gauge pair for the bore check."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .1260 chucking reamer. The bore's fit is accepted on the MHA-PD-23 pin, which is turned last to this bushing: keep the bushing with MHA-PD-18, MHA-PD-10 and MHA-PD-24."
 shop = "../shop"
 stock_refs = ["c360-round-1-2"]
 material_key = "lathe-c360"
@@ -96,12 +100,6 @@ id = "deburr"
 name = "Deburring countersink"
 ref = "deburring-set"
 
-[[tools]]
-id = "plugs"
-name = "Plug gauges .1260 GO, .1265 NO-GO"
-ref = "plug-gauges-1260-1265"
-status = "to_order"
-
 [[setups]]
 machine_kind = "lathe"
 title = "Bar: face, turn, chamfer, drill and ream the bore, part off long"
@@ -135,7 +133,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Turn the outside from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}, to Ø{{cad.outer_dia_mm:in.3dot}} (the band's middle), miking between passes and taking the last one light."
+instruction = "Turn the outside from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}, to Ø{{cad.outer_dia_mm:in.3dot}} (the band's middle), miking between passes (spindle stopped, the tool backed off) and taking the last one light."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 inspection = "Outside Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}, micrometer."
@@ -252,13 +250,13 @@ instruction = "Deburr: break both ends of the bore and the nose face's outside e
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The {{cad.bore_dia_min_in:.4dot}} GO plug enters the bore from both ends and the {{cad.bore_dia_max_in:.4dot}} NO-GO plug enters from neither."
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}; its wall bright and smooth, no chatter rings or tears, by eye under a light (Ra 63, held by the reamer)."
-gauge_checks = [{ gauge = "plug-gauges-1260-1265", band_mm = "{{cad.bore_dia_band_mm}}" }]
+instruction = "Look down the bore from each end against a light."
+inspection = "The bore's wall bright and smooth, no chatter rings or tears, by eye (Ra 63, held by the reamer). The bore's size is the .1260 reamer's; the running fit is accepted on the MHA-PD-23 pin (its traveler: the pin enters and turns free, no shake)."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A bushing failing the bore check in Op 130 is scrapped, not reworked: make another from Setup 1."
+instruction = "A bore with chatter rings or tears in Op 130: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]

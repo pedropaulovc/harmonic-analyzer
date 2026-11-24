@@ -21,7 +21,7 @@
   <line class="leader" x1="300" y1="134" x2="330" y2="96"/>
   <text class="label" x="334" y="92">outside Ø{{cad.outside_dia_min_in:.3dot}}–{{cad.outside_dia_max_in:.3dot}}, past the parting line</text>
   <line class="leader" x1="304" y1="230" x2="420" y2="250"/>
-  <text class="label" x="424" y="246">pilot Ø{{cad.pilot_dia_min_in:.3dot}}–{{cad.pilot_dia_max_in:.3dot}}, 1/4 end mill,</text>
+  <text class="label" x="424" y="246">pilot Ø{{process.pilot_cutter_dia_mm:in.3dot}} REF, 1/4 end mill,</text>
   <text class="label" x="424" y="262">{{cad.pilot_depth_min_in:.3dot}}–{{cad.pilot_depth_max_in:.3dot}} deep, flat floor</text>
   <line class="leader" x1="250" y1="210" x2="420" y2="300"/>
   <text class="label" x="424" y="304">#33 hole through the web, on past</text>

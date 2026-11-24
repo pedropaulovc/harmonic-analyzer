@@ -96,14 +96,21 @@ def test_the_plan_is_an_enrolled_traveler_and_cam_stem() -> None:
     assert PLAN["revision"] != "placeholder"
     assert STEM in _process_plans.enrolled_stems()
     assert STEM in _cam_programs.CAM_STEMS
+    tools = {t["id"] for t in PLAN["tools"]}
     assert {
         "sharp",
         "reamer-3135",
         "endmill",
         "reamer-0615",
-        "zz-3135",
-        "zz-0615",
     } <= {t["id"] for t in PLAN["tools"] if t.get("status") == "to_order"}
+    # Fit audit 2026-11-23: the reamed holes print no band, so no Class ZZ
+    # pin gauges them; the ream's mate (the MHA-PD-VN-69 dowel) accepts it.
+    assert not {"zz-3135", "zz-0615"} & tools
+    assert not any("zz-pins" in t.get("ref", "") for t in PLAN["tools"])
+    text = _process_plans.plan_path(STEM).read_text(encoding="utf-8")
+    body = "\n".join(line for line in text.splitlines() if not line.startswith("#"))
+    for word in ("zz-pins", "GO pin", "NO-GO"):
+        assert word not in body
 
 
 def test_the_traveler_leaves_the_assembly_work_to_pd_00() -> None:
@@ -147,7 +154,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("pilot_tip_mm", -4.0, "pilot_tip_mm"),
         ("ream_tip_mm", -4.2, "ream_tip_mm"),
         ("stop_shallow_mm", -4.064, "stop_shallow_mm"),
-        ("stop_deep_mm", -4.2, "stop_deep_mm"),
+        ("stop_deep_mm", -4.3, "stop_deep_mm"),
         ("peck_56_mm", 2.0, "peck"),
         ("pin_tool_out_min_in", 0.8, "pin_tool_out_min_in"),
     ],

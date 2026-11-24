@@ -37,8 +37,8 @@ def test_stack_lengths_print_their_bands():
     assert FIT.LRB[2] == printed_band_mm(3, unit=REAR_BUSHING.UNIT)
     assert (FIT.HUB_LENGTH, FIT.FRONT_BUSHING_LENGTH, FIT.REAR_BUSHING_LENGTH) == (
         pytest.approx(13.6906),  # .539
-        pytest.approx(5.6388),  # .222
-        pytest.approx(5.4356),  # .214
+        pytest.approx(5.7658),  # .227 (fit audit owner question 5: .005 back)
+        pytest.approx(5.3086),  # .209
     )
     assert HUB.HUB_LENGTH == FIT.HUB_LENGTH
     assert FRONT_BUSHING.LENGTH == FIT.FRONT_BUSHING_LENGTH
@@ -47,7 +47,9 @@ def test_stack_lengths_print_their_bands():
         assert spec.LENGTH_PLACES == 3
         assert not spec.REFERENCE_DIMENSIONS
     assert HUB.HUB_LENGTH_PLACES == 3
-    assert not HUB.REFERENCE_DIMENSIONS
+    # The hub's one REF is its spigot diameter, turned to the MHA-PD-06 disc's
+    # reamed bore (made to fit); its overall length prints its band.
+    assert HUB.REFERENCE_DIMENSIONS == frozenset({"SpigotDia"})
 
 
 def test_unshimmed_ring_gap_never_closes_under_the_floor():

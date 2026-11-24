@@ -75,9 +75,10 @@ SEQUENCE: tuple[str, ...] = (
     "disc-taps-transferred",
     # Hanger, on the bench, then hung (R9-6: the spacer is fitted as made).
     "latch-pin-pressed",
-    # R9-68: the plain pin pressed into the arm's reamed hole, head on the
-    # arm's rear face (pd_transgear_pin_spec), before the plate is set: the
-    # pressed shank is the cluster's running axis, so the setting indicates
+    # R9-68: the plain one-diameter pin bonded in the arm's reamed hole, head
+    # on the arm's rear face (pd_transgear_pin_spec; a slip fit with LOCTITE
+    # 638, fit audit 2026-11-23), before the plate is set: the
+    # bonded shank is the cluster's running axis, so the setting indicates
     # it (not the head, which no drawing control holds to the shank: codjiflo
     # P2 on 8e8d5d5) and the trial mesh runs the cluster on it (#2417).
     "pin-pressed",
@@ -85,8 +86,8 @@ SEQUENCE: tuple[str, ...] = (
     # shank S at MHA-PD-00 DETAIL K's model dimensions, the arm front up, and
     # held by clamps while the reducer is trial-meshed on its real seats (the
     # cluster on the pin, the knob shaft in the plate bore) and read with the
-    # indicator; the trial only reads the setting (the S to N band stays its
-    # limit, so the plate is not moved to chase a reading), and
+    # indicator; the trial may move the plate once, within DETAIL K's S to N
+    # limits (owner ruling 2026-11-24, audit part 2 question C1), and
     # only then are the two locating holes drilled and given their separate
     # final press/slip reams (#2417: doweled before any trial, a bad mesh was
     # found only at the chain fit-up and rebuilt twelve parts). The doweled
@@ -349,7 +350,7 @@ OFFSET_ACCEPT_TOL = 0.2286  # .009
 # accepted band, the mid-planes a half plate band either way (both chain
 # wheels are MHA-PD-09 plates); then the crank's end play, the knob's end
 # float and the knob wheel's own float under the nut forward. Nothing moves the
-# crank wheel rearward: MHA-PD-VN-63 holds the arm on a spacer pressed on the
+# crank wheel rearward: MHA-PD-VN-63 holds the arm on a spacer bonded on the
 # MHA-PD-VN-57 shoulder, so its tilt is fixed in the bar and read here as made
 # (pd_transgear_drive_collar_spec's in-service terms, one helper for the
 # setting and this re-check):

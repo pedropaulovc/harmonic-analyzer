@@ -11,7 +11,6 @@ assemblies import.
 
 from __future__ import annotations
 
-import _config
 from pd_transgear_removable_spec import BORE_DRILL, PIN_HOLE_DRILL
 
 TEXT_PREFIX = 1  # swDimensionTextPrefix
@@ -22,8 +21,6 @@ CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 # The pins the drive-pin holes slip over are pressed into these two parts.
 CRANKSHAFT_NUMBER = "MHA-DT-11"
 KNOB_COLLAR_NUMBER = "MHA-PD-22"
-# The #25 chain the plate band serves, by its drawing number (rule 4).
-CHAIN_NUMBER = _config.parts("sh-vn-chain-link")["number"]
 
 # Rule 7: the drive-pin pattern names its mates once, on its 2X callout, in a
 # standard fit name; each location carries only its value and band.
@@ -31,9 +28,10 @@ PIN_HOLE_CALLOUT = (
     f"{PIN_HOLE_DRILL[0]} DRILL THRU\nSLIDING FIT ON PINS OF\n"
     f"{CRANKSHAFT_NUMBER} AND {KNOB_COLLAR_NUMBER}"
 )
-# The plate band serves the chain's axial float on the supplied plate; the
-# rows stand off the thickness dimension's lower arrow by leading spaces.
-PLATE_CALLOUT = f"   SUPPLIED PLATE; SETS\n   FLOAT OF CHAIN {CHAIN_NUMBER}"
+# The supplied plate is never cut: its thickness prints as the stock's REF
+# size (rule 4), the row standing off the dimension's lower arrow by leading
+# spaces.
+PLATE_CALLOUT = "   AS SUPPLIED"
 
 # lane -> (feature, dimension) -> text.  The two pin holes share one size:
 # the +Y hole's diameter prints for both, as "2X".  Both holes and the bore
@@ -51,9 +49,11 @@ CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
 # The supplied outside diameter prints once per configuration's view as a
 # REFERENCE: "(Ø2.05)".  A custom prefix replaces the automatic diameter
 # glyph, so it carries SOLIDWORKS' own <MOD-DIAM> token.  Each view proves
-# it (the drawing's ``_assert_outside_diameter``).
+# it (the drawing's ``_assert_outside_diameter``).  The supplied plate's
+# thickness is a REFERENCE too: "(.110)".
 REFERENCE_TEXT: dict[tuple[str, str], dict[int, str]] = {
     ("BlankProfile", "BlankDia"): {TEXT_PREFIX: "(<MOD-DIAM>", TEXT_SUFFIX: ")"},
+    ("BlankProfile", "BlankWidth"): {TEXT_PREFIX: "(", TEXT_SUFFIX: ")"},
 }
 
 

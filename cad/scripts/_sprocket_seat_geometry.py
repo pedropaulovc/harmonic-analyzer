@@ -50,8 +50,12 @@ PIN_CIRCLE_DIA = 14.0
 PIN_CIRCLE_RADIUS = PIN_CIRCLE_DIA / 2.0
 # Two holes at 180 deg on the part's (and the shafts') +/-Y: 12 and 6 o'clock.
 PIN_HOLE_ANGLES_DEG = (90.0, 270.0)
-# Each drive pin and wheel hole is located .2756 +/-.0009 from the axis.
+# Each drive pin and wheel hole is located .2756 from the axis, +/-.0009.
 # Their 0.100 diametral slip clearance absorbs both parts' spacing error.
+# MHA-DT-11 and MHA-PD-09 print the band; MHA-PD-22 prints the offset as a
+# REF target accepted by trying the wheels on (owner ruling 2026-11-24, fit
+# audit question 8, applied to MHA-PD-22 only), its pins charged the shop's
+# reamed-hole location row (+/-.002) in its walls and in the wheel-seat float.
 DRIVE_PIN_OFFSET_PLACES = 4
 DRIVE_PIN_OFFSET_TOL = 0.02286  # .0009
 
@@ -73,8 +77,10 @@ DRIVE_PIN_DIA = 3.0 / 32.0 * _MM_PER_IN  # 2.38125
 DRIVE_PIN_PROUD = 2.4
 DRIVE_PIN_TIP_Z = SEAT_FACE_Z - DRIVE_PIN_PROUD  # -156.7
 # Reamed for a light press of the hardened 3/32 dowel: .0930 REAM_H7
-# (.0930/.0935, #290 fit row D14, the .0930 reamer), one hole for the crank
-# seat and the drive collar.  The crankshaft spec checks the press window.
+# (.0930/.0935, #290 fit row D14, the .0930 reamer, to order), one hole for
+# the crank seat and the drive collar.  The crankshaft spec checks the press
+# window; MHA-PD-22 prints no band (its dowel is the gauge) and charges this
+# one as an analysis band.
 DRIVE_PIN_HOLE_DIA = 2.3622  # .0930
 DRIVE_PIN_HOLE_BAND = REAM_H7  # +.0005/-.0000
 # The shared 98381A stock dowel family's +/-0.010 in length grade.

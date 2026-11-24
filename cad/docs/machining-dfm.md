@@ -1422,7 +1422,7 @@ allows for it is in `cad/config/tolerances/stock_form_quality.yaml` (`rack_pitch
 The chain is 66 links of ANSI #25, 12:24 from the crank sprocket to the knob sprocket (#2034
 moved the knob 6.64 mm nearer the crank; the former 68 links no longer close). The
 sprockets are made from McMaster 6793K blanks. The transgear arm and its plate are located by two
-MHA-PD-VN-64 dowels (McMaster 98381A435, 3/32 × 5/16); the screws only clamp.
+MHA-PD-VN-64 dowels (McMaster 98381A216, 1/8 × 5/16); the screws only clamp.
 
 The knob-shaft journal length is **1.62 in**, under the title block's
 two-place **±.01 in** row (#2169, Main delegated ruling 2026-11-04 under

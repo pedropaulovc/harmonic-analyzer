@@ -121,7 +121,8 @@ recipes:
 | 98381A417 | `dt-vn-locating-pin` (MHA-DT-VN-69; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A433 | `pd-vn-transgear-knob-drive-pin` (catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A434 | `dt-vn-crank-seat-drive-pin` (crank only; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
-| 98381A435 | `pd-vn-transgear-arm-plate-locating-pin` (MHA-PD-VN-64; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
+| 98381A435 | — (retired 2026-11-23, fit audit: MHA-PD-VN-64 takes the 1/8 x 5/16 98381A216; recipe renamed) | Alloy Steel Dowel Pin |
+| 98381A216 | `pd-vn-transgear-arm-plate-locating-pin` (MHA-PD-VN-64; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A473 | `sm-vn-knife-mount-dowel` | Alloy Steel Dowel Pin |
 | 98381A474 | `pd-vn-transgear-latch-pin` (catalogue-only; no vendor model; SKU not yet read live) | Alloy Steel Dowel Pin |
 | 98390A254 | `dt-crank-pin` (MHA-DT-09, shop-reworked blank: one cross-drilled #45 ring hole; owner ruling 2026-11-20, #2368; catalogue-only, modelled from ASME B18.8.2 No. 3; read live 2026-11-20: 12L14, pack of 25) | Taper Pin, No. 3, 1-3/4" Long, 0.183" Small End Diameter |
@@ -1354,20 +1355,25 @@ Catalog specifications checked on September 10, 2026:
   2 x 6 mm dowel, read live on October 9, 2026. Retired 2026-11-02: the
   metric dowel went to inch (owner ruling 2026-10-30) and its recipe and
   dimension module were removed.
-- [98381A435](https://www.mcmaster.com/98381A435/) (`pd-vn-transgear-arm-plate-locating-pin`,
-  MHA-PD-VN-64, quantity two) was read live on November 2, 2026 from the
+- [98381A216](https://www.mcmaster.com/98381A216/) (`pd-vn-transgear-arm-plate-locating-pin`,
+  MHA-PD-VN-64, quantity two) was read live on November 23, 2026 from the
   family table (the product page asks for a login),
-  https://www.mcmaster.com/products/dowel-pins/system-of-measurement~inch/diameter~3-32/length~5-16/:
-  High-Strength Alloy Steel, 3/32 in diameter (+0.0001 to +0.0003 in), 5/16
-  in long, 1,400 lbf double shear, Rockwell C47 minimum, ASME B18.8.2,
-  package of 100. The #290 ruling named 98381A434, but that is the crank's
-  MHA-DT-VN-67, so the PD pair takes the next free length rather than a
-  Shared identity. `_transgear_arm_plate_locating_interface.py` owns the
-  arm's .093 press and the plate's .0945 slip ream, the proud set and the
-  mouth breaks; `pd_vn_transgear_arm_plate_locating_pin_spec.py` keeps the
-  purchased-pin data and the fit and insertion arithmetic.
-  `diag_build_98381A435.py` models the plain nominal cylinder; catalogue-only,
-  no vendor model, no replica gate.
+  https://www.mcmaster.com/products/dowel-pins/system-of-measurement~inch/diameter~1-8/length~5-16/
+  (the filter resolves to the 5/16 in length table; the 1/8 in diameter row):
+  High-Strength Alloy Steel, 1/8 in diameter (+0.0001 to +0.0003 in), 5/16
+  in long, 2,600 lbf double shear, Rockwell C47 minimum, ASME B18.8.2,
+  package of 100, $16.11. It is not in the sequential 1/8 series
+  (98381A469 is 1/8 x 1/4 per two reseller listings; 98381A473 and
+  98381A474 are 3/4 and 7/8). It replaces the 3/32 x 5/16 98381A435 (read
+  November 2, 2026; #290) under the owner's ruling of 2026-11-24 on fit
+  audit question 9: at 1/8 the arm's press and the plate's slip are cut by
+  the .1240 and .1260 reamers of the over/under set, so no .0945 reamer is
+  bought for two holes. `_transgear_arm_plate_locating_interface.py` owns
+  the two reamer sizes and the proud set;
+  `pd_vn_transgear_arm_plate_locating_pin_spec.py` keeps the purchased-pin
+  data and the fit and insertion arithmetic. `diag_build_98381A216.py`
+  models the plain nominal cylinder; catalogue-only, no vendor model, no
+  replica gate.
 - [98381A473](https://www.mcmaster.com/98381A473/) (`sm-vn-knife-mount-dowel`,
   MHA-SM-VN-53, two; formerly `pd-vn-transgear-latch-pin`) was read live on
   September 30, 2026:

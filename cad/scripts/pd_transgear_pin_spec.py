@@ -1,12 +1,14 @@
 r"""Pure-data contract for MHA-PD-23, the transgear pin (R9-68).
 
-The plain steel pin the disc cluster runs on.  Its short press land under
-the head is pressed into the MHA-PD-18 arm's reamed hole at S from the rear
-until the domed head seats on the arm's rear face; the shank passes the
-ream clear and, forward of the arm, carries, rear to front, the
-MHA-PD-24 rear bushing, the MHA-PD-10 sleeve (with the disc, hub and screws on
-it), the MHA-PD-25 front bushing and, in the groove near its front end, the
-MHA-PD-VN-61 retaining ring (McMaster 97431A240).  Nothing on it is threaded.
+The plain steel pin the disc cluster runs on: one diameter from head to tip.
+Its shank slides through the MHA-PD-18 arm's reamed hole at S from the rear
+until the domed head seats on the arm's rear face, and is bonded there with
+LOCTITE 638 (owner ruling 2026-11-24, fit audit question 4; it replaces
+the #2415 press land).  Forward of the arm the same shank carries, rear to
+front, the MHA-PD-24 rear bushing, the MHA-PD-10 sleeve (with the disc, hub
+and screws on it), the MHA-PD-25 front bushing and, in the groove near its
+front end, the MHA-PD-VN-61 retaining ring (McMaster 97431A240).  Nothing on
+it is threaded.
 
 #290: the sheet prints decimal inch (the row's ``drawing_unit: in``); every
 length below is the exact millimetre value of its printed inch nominal.  The
@@ -15,8 +17,7 @@ owner ruling of 2026-10-30 took the shank from 3.9 mm to 1/8 in.
 Frame: one revolve about local +Z.  Local z = 0 is the head's underside
 (the face that seats on the arm's rear face, machine z -114.888) and local
 +Z runs toward the machine front, so machine z = ``HEAD_SEAT_MACHINE_Z`` -
-local z.  The head runs z -HEAD_HEIGHT..0, the press land z
-0..PRESS_LAND_LENGTH and the shank on from there to LENGTH.
+local z.  The head runs z -HEAD_HEIGHT..0 and the shank z 0..LENGTH.
 
 PURE DATA: the build and the drawing both import it; neither imports the
 other.  ``transgear_cluster_fit`` holds the chain the groove station sets.
@@ -55,52 +56,115 @@ RUNNING_MATES = ("MHA-PD-10", "MHA-PD-24", FRONT_BUSHING_NUMBER)
 # The head seats on the arm's rear face.
 HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -114.888
 
-# --- Shank: the running journal ------------------------------------------------
-# The sleeve and both bushings run on it (their bores .125 REAM_SLIDE, cut by
-# the owned .1260 reamer, .0010..0017 diametral); its top stops at .1250, the
-# MHA-PD-VN-68 shims' smallest bore, so no shim interferes (line-on-line at
-# the worst case; transgear_cluster_fit, codjiflo P2 on #2124).  #2415: it
-# passes the arm's .1260 ream clear, so pressing never drags it through an
-# interference; the press land below holds the pin.
+# --- Shank: the bonded length and the running journal, one diameter -----------
+# Made to fit (fit audit 2026-11-23, pending owner confirmation; owner
+# 2026-11-23: "why do we need single micron level tolerance x class plug
+# gauges for a hobby machining project"): the sheet prints the size as a
+# reference and the acceptance by feel, the shank turned last to the three
+# reamed running bores (the sleeve's and both bushings', the set's .1260
+# reamer) until each turns free with no shake.  It prints no limits.
+#
+# DIA_BAND is NOT a printed limit: it is the ANALYSIS band, the shank that
+# fit is modelled to produce.  What fails if it is .002 looser: play in the
+# running bores cocks the sleeve and the front bushing, which tilts the disc
+# toward the MHA-PD-22 collar and closes the collar-to-disc air
+# (pd_cluster_air.COLLAR_AIR; build_pd_paper_drive_assembly gates it).  Its
+# top stops at .1250, the MHA-PD-VN-68 shims' smallest bore, so no shim
+# interferes (line-on-line at the worst case; transgear_cluster_fit,
+# codjiflo P2 on #2124).  Its bottom is .1245 (owner ruling 2026-11-24, fit
+# audit question 5: "pin +0/-.0005"; it was .1248): with the disc
+# cluster .005 further back (transgear_cluster_fit) the collar air carries
+# a running clearance to .0025, the range the shank's callout prints as a
+# reference (pd_transgear_pin_callouts.RUNNING_CLEARANCE_TEXT).
 DIA = 3.175  # .125
-DIA_BAND = (0.0, -0.00508)  # (upper, lower) deviations, +.0000/-.0002 in
+DIA_BAND = (0.0, -0.0127)  # (upper, lower) ANALYSIS deviations, +.0000/-.0005 in
 DIA_MIN = round(DIA + DIA_BAND[1], 6)
 DIA_MAX = round(DIA + DIA_BAND[0], 6)
-DIA_PLACES = 4
-JOURNAL_ARM_CLEARANCE_MIN = round(ARM.PIN_BORE_DIA_MIN - DIA_MAX, 6)  # .0010
+DIA_PLACES = 3  # prints (Ø.125), a reference
 
-# --- Press land: the only length pressed into the arm (#2415) -----------------
-# A short land under the head, turned in the stiff length beside the chuck to
-# the measured arm ream for a light drive fit, .0002-.0005 diametral (FN1's
-# range at 1/8): pressed oiled (μ ≈ .10) over its .29 grip that is about
-# 270-680 lbf [INFERENCE: thick-hub estimate], under the 12L14 land's
-# ~750 lbf squash; no slender length carries it.
-# The model is the ream's mid band plus the mid interference, a reference.
-PRESS_INTERFERENCE = (0.00508, 0.0127)  # (loosest, tightest) diametral: .0002, .0005
-PRESS_LAND_DIA = round(
-    ARM.PIN_BORE_DIA + sum(ARM.PIN_BORE_DIA_BAND) / 2.0 + sum(PRESS_INTERFERENCE) / 2.0,
+# --- The running fit: the shank in its three mates' reamed bores ---------------
+# The sleeve (MHA-PD-10) and both bushings (MHA-PD-24, MHA-PD-25) are reamed
+# with the set's one .1260 reamer and print that size with no band.
+# RUNNING_BORE_DIA_BAND is the ANALYSIS band that reamer is modelled to cut,
+# on size to .0010 over (owner ruling 2026-11-24, fit audit question 5:
+# "bores +.001"; it was .0005 over, the band those holes printed before
+# the fit audit).  It is not a printed limit and no gauge is charged with
+# it: nothing on a sheet bounds these bores from above, the shank is
+# turned last to them.  Owned here,
+# with the shank made to those bores, so the three bore specs and this
+# part's callout read one number and the callout's module imports no mate's
+# spec (Codjiflo on #3506).  RUNNING_CLEARANCE is the modelled result of the
+# fit, which every stack reads: .0010-.0025.
+RUNNING_BORE_DIA = 3.2004  # .1260, the reamer's size
+RUNNING_BORE_DIA_BAND = (0.0254, 0.0)  # (upper, lower) ANALYSIS deviations: +.0010/0
+RUNNING_CLEARANCE = (
+    round(RUNNING_BORE_DIA + RUNNING_BORE_DIA_BAND[1] - DIA_MAX, 6),
+    round(RUNNING_BORE_DIA + RUNNING_BORE_DIA_BAND[0] - DIA_MIN, 6),
+)  # (least, greatest) diametral
+
+# --- Bond: the shank's slip fit in the arm (fit audit 2026-11-23) --------------
+# The shank slides through the arm's .1260 reamed bore and is bonded over the
+# bore's full-diameter length; the head, seated on the arm's rear face, is
+# clamped there while the compound cures (MHA-PD-00's pin step).  The gap is
+# the arm bore's modelled band against the shank's, inside LOCTITE 638's
+# gap fill (TDS: 0.25 mm; dt_pinion_arbor_geometry, sm_gooseneck_spring_joint
+# and cone_tip_cluster book the same limit; test_pd_transgear_pin_drawing
+# pins these literals to them, so this spec does not import a drive-train
+# module).
+RETAINING_COMPOUND = "LOCTITE 638"
+LOCTITE_638_GAP_MAX = 0.25
+BOND_GAP = (
+    round(ARM.PIN_BORE_DIA_MIN - DIA_MAX, 6),
+    round(ARM.PIN_BORE_DIA_MAX - DIA_MIN, 6),
+)  # (least, greatest) diametral: .0010, .0020
+# Rule 23: the bond's clearance as note 1 prints it (the pin is made last),
+# the least the reamer and the shank model to the most the arm traveler's
+# .127 set pin accepts: a bore that just refuses that pin, on the smallest
+# modelled shank.  Here, not in pd_transgear_arm_spec, so the pin's sheet
+# reads no arm module but the geometry above (Codjiflo r1 on #3492).
+BOND_NO_GO_PIN_DIA = 3.2258  # .127, one pin of the .001-step set
+BOND_GAP_ACCEPTED_MAX = round(BOND_NO_GO_PIN_DIA - DIA_MIN, 6)  # .0025
+BOND_CLEARANCE_PRINTED = (BOND_GAP[0], BOND_GAP_ACCEPTED_MAX)  # .0010-.0025
+# The bonded length: the thinnest arm less the rear mouth's largest chamfer
+# and the front face's largest edge break.
+BOND_LENGTH_MIN = round(
+    ARM.THICKNESS
+    - ARM.THICKNESS_BAND
+    - ARM.PIN_MOUTH_CHAMFER_LIMITS[1]
+    - edge_break_chamfer_mm(unit=UNIT),
     6,
-)  # .1266 REF
-PRESS_LAND_DIA_PLACES = 4
-PRESS_LAND_DIA_MAX = round(ARM.PIN_BORE_DIA_MAX + PRESS_INTERFERENCE[1], 6)
-# The land ends short of the arm's front face on the thinnest stock, so the
-# MHA-PD-VN-68 shims seat on the face around the journal; .XX.
-PRESS_LAND_LENGTH = 7.366  # .29
-PRESS_LAND_LENGTH_PLACES = 2
-PRESS_LAND_LENGTH_MAX = round(
-    PRESS_LAND_LENGTH + printed_band_mm(PRESS_LAND_LENGTH_PLACES, unit=UNIT), 6
-)
-# The land's grip in the full ream: past the rear mouth's largest chamfer.
-PRESS_LAND_GRIP_MIN = round(
-    PRESS_LAND_LENGTH
-    - printed_band_mm(PRESS_LAND_LENGTH_PLACES, unit=UNIT)
-    - ARM.PIN_MOUTH_CHAMFER_LIMITS[1],
-    6,
-)  # .27
+)  # .354
+# Capacity: ISO 10123 shear 25 N/mm^2 minimum (TDS), derated with the Henkel
+# Retaining Compound Design Guide's factors as the repository books them,
+# each taken low: 0.9 for steel on steel (sm_gooseneck_spring_joint), 0.3
+# for the clearance (booked there at the 0.25 mm limit; the widest gap the
+# arm's NO-GO accepts, .0025, is a quarter of it) and 0.5 for a long land
+# (dt_pinion_arbor_geometry; .354 on Ø.125 is L/D 2.8).
+LOCTITE_638_SHEAR_MPA = 25.0
+BOND_FACTOR = 0.9 * 0.3 * 0.5
+BOND_AXIAL_CAPACITY_N = (
+    LOCTITE_638_SHEAR_MPA * BOND_FACTOR * math.pi * DIA_MIN * BOND_LENGTH_MIN
+)  # 301 N (68 lbf)
+BOND_TORQUE_CAPACITY_NMM = BOND_AXIAL_CAPACITY_N * DIA_MIN / 2.0  # 477 N mm
+# Demand.  No working load crosses the bond axially: the ring's forward
+# thrust pulls the head onto the arm's rear face, and rearward thrust goes
+# through the rear bushing and the shims to the arm's front face.  The bond
+# only keeps the pin from turning, rocking or backing out.  It is judged
+# against the most the MHA-PD-VN-61 ring can pass, its catalogue thrust
+# rating: pushed straight back on the pin (handling), and as the drag the
+# turning front bushing puts on the ring's face at the ring's O.D., which
+# twists the pin (ASSUMPTION: dry brass on steel, friction 0.2; the head's
+# own friction on the arm is given no credit).
+_N_PER_LBF = 4.4482216
+BOND_AXIAL_DEMAND_N = RING.THRUST_LBF * _N_PER_LBF  # 267 N
+BOND_FACE_FRICTION = 0.2
+BOND_TORQUE_DEMAND_NMM = BOND_FACE_FRICTION * BOND_AXIAL_DEMAND_N * RING.OD / 2.0  # 156
+BOND_TORQUE_MARGIN_MIN = 2.0  # the repository's bonded-joint margin
 
 # --- Head: Ø.20, a .09 land then a spherical dome R.18 ------------------------
-# The head stops the press and, pulled forward by the ring's thrust on the
-# load wall, holds the pin in the arm; nothing bears on its dome.  The land
+# The head seats on the arm's rear face and, pulled forward by the ring's
+# thrust on the load wall, holds the pin in the arm (the bond only keeps it
+# from turning or backing out); nothing bears on its dome.  The land
 # is a wall held to the .080 target at its printed lower limit: .09 at .XX
 # leaves exactly .080.  The R.18 dome rises .030 on top, so the apex stands
 # .120 proud of the arm's rear face, under the MHA-PD-VN-57 head's 5/32.
@@ -129,7 +193,7 @@ SEAT_CONTACT_WIDTH_MIN = round(
     - edge_break_chamfer_mm(unit=UNIT)
     - max(
         ARM.PIN_BORE_DIA_MAX / 2.0 + ARM.PIN_MOUTH_CHAMFER_LIMITS[1],
-        PRESS_LAND_DIA_MAX / 2.0 + SEAT_FILLET_R,
+        DIA_MAX / 2.0 + SEAT_FILLET_R,
     ),
     6,
 )
@@ -202,13 +266,11 @@ SURFACE_FINISHES = (
 # Each dome prints its radius and, as a reference, its height off the land's
 # end face, so the blank and the dome read without deriving the cap.  The tip
 # apex prints from the head seat; the land ahead of the groove, ending at the
-# tip dome's junction, prints as a reference.  The press land prints its
-# reference Ø (made to the measured ream, note 1) and its .XX length.
+# tip dome's junction, prints as a reference.  The shank prints its Ø as a
+# reference (made to fit its three running bores, note 1).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {
         "ShankDia",
-        "LandDia",
-        "LandLength",
         "HeadDia",
         "HeadLand",
         "GrooveStation",
@@ -223,8 +285,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {
         "ShankDia": DIA_PLACES,
-        "LandDia": PRESS_LAND_DIA_PLACES,
-        "LandLength": PRESS_LAND_LENGTH_PLACES,
         "HeadDia": 2,
         "HeadLand": HEAD_LAND_PLACES,
         "GrooveStation": GROOVE_STATION_PLACES,
@@ -281,22 +341,26 @@ for _ok, _what in (
         f"{inch_text(HEAD_LAND_FLOOR, 3)} wall target",
     ),
     (
-        PRESS_INTERFERENCE[0] > 0.0,
-        f"the press land loses its press in the {ARM_NUMBER} ream: {PRESS_INTERFERENCE}",
+        0.0 < BOND_GAP[0] <= BOND_GAP[1] <= LOCTITE_638_GAP_MAX,
+        f"the shank's gap {BOND_GAP} in the {ARM_NUMBER} ream is outside "
+        f"{RETAINING_COMPOUND}'s 0-{LOCTITE_638_GAP_MAX} window",
     ),
     (
-        JOURNAL_ARM_CLEARANCE_MIN > 0.0,
-        f"the journal is dragged through the {ARM_NUMBER} ream when pressed",
+        BOND_AXIAL_CAPACITY_N >= BOND_AXIAL_DEMAND_N,
+        f"the {RETAINING_COMPOUND} bond holds {BOND_AXIAL_CAPACITY_N:.0f} N, under "
+        f"the {RING_NUMBER} ring's {BOND_AXIAL_DEMAND_N:.0f} N rating",
     ),
     (
-        PRESS_LAND_LENGTH_MAX < ARM.THICKNESS - ARM.THICKNESS_BAND,
-        f"the press land stands past the thinnest {ARM_NUMBER}'s front face",
+        BOND_TORQUE_CAPACITY_NMM >= BOND_TORQUE_MARGIN_MIN * BOND_TORQUE_DEMAND_NMM,
+        f"the {RETAINING_COMPOUND} bond holds {BOND_TORQUE_CAPACITY_NMM:.0f} N mm, "
+        f"under {BOND_TORQUE_MARGIN_MIN} x the {BOND_TORQUE_DEMAND_NMM:.0f} N mm the "
+        "front bushing's drag on the ring can put on the pin",
     ),
 ):
     if not _ok:
         raise AssertionError(f"MHA-PD-23: {_what}")
 
-# The press into the arm is the MHA-PD-00 assembly's pin-pressed step, not a
-# part-sheet note (rule 24).
+# The bond into the arm is the MHA-PD-00 assembly's pin step, not a
+# part-sheet note (rule 24); the sheet gives the fit (rule 23).
 DRAWING_NOTES = "1/4 IN BAR STOCK OK."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"

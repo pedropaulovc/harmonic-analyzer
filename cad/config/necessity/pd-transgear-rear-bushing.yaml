@@ -1,0 +1,10 @@
+# Why the REAM stays on MHA-PD-24 (owner ruling 2026-11-24: "In the part's
+# registry file, not on the sheet. The sheet stays clean; the reviewer fails
+# a tight feature that has no registry reason."). Read by the machinist
+# review only. Fit audit 2026-11-23, pending owner confirmation.
+necessity:
+  - id: N-01
+    feature: "sheet 1, end view, Ø.126 REAM THRU bore, MHA-PD-23 IS TURNED TO THIS BORE"
+    kind: gap
+    reason: "drilled, it cocks and wedges MHA-PD-10 endwise in its float"
+    source: "pd_transgear_rear_bushing_spec.bore_cock_take_up: .0049 of the .0080 least float reamed (running clearance to .0025, owner ruling 2026-11-24, fit audit question 5), .0088 at .002 looser (the float goes whole at .0041), .0157 drilled #30"

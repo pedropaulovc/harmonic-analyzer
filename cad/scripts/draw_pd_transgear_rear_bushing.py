@@ -1,6 +1,6 @@
 r"""Create the manufacturing drawing for the transgear rear bushing (MHA-PD-24).
 
-A turned brass ring: Ø.35 O.D. over a reamed Ø.1250 bore, its length printed
+A turned brass ring: Ø.35 O.D. over a reamed Ø.126 bore, its length printed
 to the band that holds the shim count, under the stack callout.  The profile
 lies as it sits in the lathe (axis horizontal): the ``*Top`` view turned a
 quarter turn, so model +Z runs LEFT and the arm face (z 0) is the profile's
@@ -73,7 +73,6 @@ from pd_transgear_rear_bushing_spec import (
     UNIT,
     WALL_WORST,
 )
-from transgear_cluster_fit import BORE_DIAMETRAL_CLEARANCE
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -112,9 +111,11 @@ _PROFILE_BOTTOM = PROFILE_CENTER[1] - OD * _S / 2.0
 # The bore stays on the end view, where it is a circle: a reamed through
 # hole, fully defined by its callout (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)), it needs no section, and the
 # profile is hidden-lines-removed (a dimension never lands on a hidden line).
-# The O.D. arrives there too and is moved onto the profile below.
+# The O.D. arrives there too and is moved onto the profile below.  The bore's
+# callout is centred 6 mm right of where its 30-character block stood: its
+# mate row is 32 characters.
 END_KEEP = {
-    "BoreDia": (0.060, 0.225),
+    "BoreDia": (0.066, 0.225),
     "RingOd": (0.045, 0.120),  # donor: moved onto the profile
 }
 DIMENSION_CALLOUTS = {
@@ -150,8 +151,12 @@ ISO_NOTE_XY = (0.315, 0.145)
 # (build_pd_transgear_rear_bushing: one extrusion along model +Z).  The
 # sleeve's thrust face at z = LENGTH is the datum end the length runs from,
 # so the bar's faced end takes the finish; the arm face at z = 0 is the far
-# end.  The O.D. takes the title block's .XX row, the length its .XXX row,
-# the bore its reamed band.  Each ``span`` is a diameter's model-Z extent.
+# end.  The O.D. takes the title block's .XX row and the length its .XXX
+# row.  The bore prints the reamer's size, REAM and its acceptance by the
+# MHA-PD-23 pin, no band: its ``dia`` field is the spec's ANALYSIS band
+# (what the reamer is modelled to cut), carried only because the traveler's
+# adapter needs a band to bind; it is not a requirement and no step quotes
+# it as an acceptance.  Each ``span`` is a diameter's model-Z extent.
 # The declarations print nothing.
 # The sheet prints no manufacturing note: every requirement is a dimension,
 # its band or its native callout, so the feature manifest's notes are empty.
@@ -211,7 +216,11 @@ requirement(
     "bore",
     kind="hole",
     faces=(CylinderFace(BORE_DIA),),
-    requirements=("dia", "thru"),
+    # ``dia`` stays a traveler requirement, as MHA-PD-18's pin bore keeps
+    # it: prechips' turned-bush adapter refuses a bore without one
+    # ("bore.dia: missing drawing requirement"; the fit stack had dropped
+    # it with the printed band, so the traveler no longer rendered).
+    requirements=("dia", "thru", "mate"),
     fields={
         "axis": ([0.0, 0.0, 1.0], ("BORE_DIA",)),
         "at": ([0.0, 0.0, 0.0], ("BORE_DIA",)),
@@ -224,10 +233,6 @@ requirement(
         "thru": (True, ("BORE_CALLOUT",)),
         "process": ("ream", ("BORE_CALLOUT",)),
         "wall_min": (WALL_WORST, ("WALL_WORST",)),
-        "diametral_clearance_ref": (
-            list(BORE_DIAMETRAL_CLEARANCE),
-            (("transgear_cluster_fit", "BORE_DIAMETRAL_CLEARANCE"), "BORE_CALLOUT"),
-        ),
         "mate": (PIN_NUMBER, (("pd_transgear_pin_spec", "PIN_NUMBER"), "BORE_CALLOUT")),
         "callout": (BORE_CALLOUT, ("BORE_CALLOUT",)),
     },

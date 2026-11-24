@@ -256,7 +256,9 @@ SIDE_KEEP: dict[str, tuple[float, float, float]] = {
 # it, in the part frame (pd_transgear_arm_plate_geometry: origin on K on face
 # A, +Z to the rear face, the long axis along -Y from the screws to the end
 # round). Bands are the title block's rows at the places the part authors
-# (DRAWING_PRECISION_BY_NAME), the press hole its explicit FN2 band, the
+# (DRAWING_PRECISION_BY_NAME), the press hole and the locating holes their
+# set reamer's size with no printed band (their "dia" fields carry the
+# spec's ANALYSIS bands, what each reamer is modelled to cut), the
 # screw holes the DRILLED HOLES row, the hole positions BASIC with their
 # frames' zones (GEOMETRIC_TOLERANCES_MM). The locating holes are reamed at
 # assembly (note 1, MHA-PD-00 13A/13E: match-drilled with MHA-PD-18):
@@ -394,8 +396,9 @@ requirement(
         "kink_right_y": _P["KinkRightY"],
     },
 )
-# Datum B, the press hole on K: REAM THRU Ø.4375 +.0007/.0000, the FN2 press
-# for the MHA-PD-28 bush, its face-A mouth .015 X 45° (the bush's lead-in).
+# Datum B, the press hole on K: REAM THRU Ø.4385, no printed band, the press
+# for the MHA-PD-28 bush (turned to this hole as measured), its face-A mouth
+# .015 X 45° (the bush's lead-in).
 requirement(
     "press_hole",
     kind="hole",
@@ -472,10 +475,10 @@ for _index, (_x, _y) in enumerate(SCREW_HOLES, 1):
         },
         precision={"dia": _P["ScrewHoleDia"], "csk_dia": _P["CskDia"]},
     )
-# The two locating holes Ø.0945 +.0005/.0000 REAM THRU, a locational
-# clearance on the MHA-PD-VN-64 dowels, BASIC from K in a Ø.004 zone:
-# match-drilled with MHA-PD-18 and reamed at assembly (note 1; MHA-PD-00
-# 13A pilots, 13E ream). No part traveler makes them.
+# The two locating holes Ø.1260 REAM THRU, no printed band, a slip on the
+# MHA-PD-VN-64 dowels (the dowel slides in, no shake), BASIC from K in a
+# Ø.004 zone: match-drilled with MHA-PD-18 and reamed at assembly (note 1;
+# MHA-PD-00 13A pilots, 13E ream). No part traveler makes them.
 for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
     requirement(
         f"locator_{_index}",

@@ -1,0 +1,11 @@
+# MHA-PD-18's guards (tolerance-policy.md, "Checks in spec modules and
+# tests"; cad/scripts/check_register.py). Fit batch PD, 2026-11-24: entered
+# because the arm's necessity register (cad/config/necessity/
+# pd-transgear-arm.yaml, N-02) cites it.
+checks:
+  - id: C-01
+    check: "LOCATOR_PRESS_INTERFERENCE"
+    kind: joint
+    reason: "dowel loosens; plate MHA-PD-19 leaves the reducer mesh setting"
+    source: "McMaster 98381A216 catalogue diameter +.0001/+.0003 over 1/8 (_mcmaster_98381a216, _dowel_dimensions.DIA_BAND_IN); the .1240 set reamer's modelled cut +.0005/0 (_fit_ream_h7.REAM_H7 in _transgear_arm_plate_locating_interface.PRESS_HOLE_LIMITS_MM)"
+    basis: worst_case
