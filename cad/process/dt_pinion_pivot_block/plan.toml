@@ -468,7 +468,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.top_face_height_mm}}",
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.upright_top_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{process.blank_thickness_max_mm}}", y = "{{cad.top_face_height_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). Before each block goes in: mike a 1-2-3 block's 1 in thickness and write it down. The jaws open about 2-1/2 in, a parallel against each: lay the 1-2-3 block flat across both parallels (1 in up)."
+instruction = "Home the mill first ($H). Once a lot: mike a 1-2-3 block's 1 in thickness and write it down. Before each block goes in, a parallel against each jaw: close the jaws to about 2-1/8 in and lay the 1-2-3 block flat between them, 1 in up, its 2 in width resting 1/16 in on each parallel. It rocks or drops between them: reset the jaws."
 feed = "hand"
 
 [[setups.operations]]
