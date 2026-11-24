@@ -270,13 +270,13 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     assert "D-FLAT SEAT" in notes[drawing.STATIONS_NOTE]
     assert "FULL THREAD" in notes[drawing.THREAD_NOTE]
     cup = _config.parts("pd-transgear-knob-cup")["number"]
-    assert drawing.DIMENSION_SUFFIXES["OverallLength"] == f" SETS {cup} FIT-UP"
+    assert "OverallLength" not in drawing.DIMENSION_SUFFIXES
     assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_BELOW
     assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_ABOVE
     assert spec.inch_text(spec.OVERALL_LENGTH, 3) == "2.722"
     assert "2.722" not in drawing.NOTES and cup not in drawing.NOTES
     # At .XX the stand-out's band outruns the cup's supplied pilot: the
-    # least facing goes negative, so the third place is the suffix's function.
+    # least facing goes negative, so the overall keeps its third place.
     import pd_transgear_knob_cup_spec as cup_spec
 
     xx_band = printed_band_mm(2, unit=spec.UNIT) + printed_band_mm(3, unit=spec.UNIT) + spec.FACE_WIDTH_BAND
@@ -294,7 +294,7 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     # width's left witness line (the pinion's rear face, which drops with its
     # arrow to the text's height) and of the rear witness line.
     x, _y = drawing.SIDE_KEEP["OverallLength"]
-    chars = len("2.722 SETS MHA-PD-16 FIT-UP")
+    chars = len("2.722")
     assert drawing.OVERALL_TEXT_CHARS == chars
     half = chars * 0.00275 / 2
     assert x + half <= drawing.PINION_REAR_X - 0.005

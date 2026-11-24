@@ -272,14 +272,14 @@ _FLAT_PIN_ROWS = "\n".join(
 )
 # Rule 7: a callout carries its size and process lines plus at most two lines
 # of words, and a location dimension carries only its value and its note
-# link.  The dowel pattern names the dowel, the fit and, in one line, what
-# the press protects once, on
-# its 2X callout; general note REAM_NOTE makes the dowels the reamed holes'
-# gauges and note TRIAL_NOTE, which both REF offsets link, the wheels their
-# acceptance.  Each mate is named by
-# drawing number: the drilled bore's shaft, whose D-core is turned to it, the
-# flat pin pressed in its ream for good, the two one permanent pair, and the
-# rear break clearing the shaft's root corner.
+# link.  The dowel pattern names the dowel and the fit once, on its 2X
+# callout; general note REAM_NOTE, which both ream callouts link, makes the
+# pins the reamed holes' gauges and note TRIAL_NOTE, which both REF offsets
+# link, the wheels their acceptance.  Each mate is named by drawing number:
+# the drilled bore's shaft, whose D-core is turned to it, the flat pin
+# pressed in its ream for good, and the rear break clearing the shaft's root
+# corner.  No callout prints why its size is tight: that is the necessity
+# registry's (cad/config/necessity/pd-transgear-drive-collar.yaml).
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
     "PinPosDia": PIN_HOLE_CALLOUT,

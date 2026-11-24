@@ -9,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 import _config
 import build_pd_transgear_drive_collar as part
@@ -439,19 +440,15 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     for name, stem in mates.items():
         callout = " ".join(drawing.DIMENSION_CALLOUTS_BELOW[name].split())
         assert _config.parts(stem)["number"] in callout, name
-    assert _config.parts("pd-transgear-removable")["number"] in (
-        drawing.DIMENSION_CALLOUTS_BELOW["PinPosDia"]
-    )
-    # The pressed pin is the collar's for good; its location is tight to keep
-    # the stud's gap under its crest (rule 4): two lines of words (rule 7).
-    pin_rows = drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines()
-    assert len(pin_rows) == 2
-    # The pin's row names it and links the note giving its press fit and gauge.
-    assert pin_rows[0].rstrip() == f"PIN {spec.FLAT_PIN_NUMBER} SEE NOTE {spec.REAM_NOTE}"
+    # The pressed pin is the collar's for good: its pin and fit, then the
+    # linked gauge note (rule 7).  Why it is tight is the registry's.
+    pin_rows = [row.rstrip() for row in drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines()]
+    assert pin_rows == [
+        f"PRESS FIT, PIN {spec.FLAT_PIN_NUMBER}", f"SEE NOTE {spec.REAM_NOTE}"
+    ]
     # rule 16: the package declares the pin permanent, in the part notes.
     assert f"PERMANENT PIN {spec.FLAT_PIN_NUMBER}" in spec.DRAWING_NOTES
     shaft_number = _config.parts("pd-transgear-knob-shaft")["number"]
-    assert pin_rows[1] == f"KEEPS GAP TO {shaft_number} STUD  "
     # Rule 26: size, process, depth.  The ream's process follows the value on
     # its line, as the sheet's other reams read, then its depth: a REF from the
     # section's nominal fitted rear face, the .XX floor controlling.  The depth
@@ -463,7 +460,10 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     # The block hangs left of its own dimension line, whose arrowhead the
     # widest row's last glyph met (run 20261117T123054105Z): every printed row
     # ends in two spaces of ink air.
-    printed = (*pin_rows, drawing.DIMENSION_SUFFIXES["FlatPinDia"])
+    printed = (
+        *drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines(),
+        drawing.DIMENSION_SUFFIXES["FlatPinDia"],
+    )
     assert all(row.endswith("  ") for row in printed)
     # The drilled bore names its drill, then the mate made to fit it: no
     # range prints on either sheet.
@@ -471,14 +471,25 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     assert bore_rows[0] == f"{spec.BORE_DRILL} DRILL THRU"
     assert shaft_number in bore_rows[1] and "TO FIT" in bore_rows[-1]
     assert not re.search(r"\.\d", drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"])
-    # The reamed dowel holes: process, mate, then the necessity answer, one
-    # line of at most six words beyond the mate's number, no dimension.
+    # The reamed dowel holes: process and the linked gauge note, then the
+    # mate and fit.  No reason line prints (owner ruling 2026-11-24): each
+    # ream and tight band has its row in the necessity registry.
     dowel_rows = drawing.DIMENSION_CALLOUTS_BELOW["PinPosDia"].splitlines()
-    assert dowel_rows[0] == f"2X REAM THRU, SEE NOTE {spec.REAM_NOTE}"
-    assert "PRESS FIT" in dowel_rows[1]
-    for answer in (dowel_rows[2], pin_rows[1]):
-        words = [w for w in answer.split() if not w.startswith("MHA-")]
-        assert 0 < len(words) <= 6 and not re.search(r"\d", " ".join(words)), answer
+    assert dowel_rows == [
+        f"2X REAM THRU, SEE NOTE {spec.REAM_NOTE}",
+        f"PRESS FIT, DOWEL {spec.DOWEL_NUMBER}",
+    ]
+    registry = yaml.safe_load(
+        (_config.CONFIG_DIR / "necessity" / "pd-transgear-drive-collar.yaml").read_text(
+            encoding="utf-8"
+        )
+    )["necessity"]
+    assert [row["id"] for row in registry] == ["N-01", "N-02", "N-03", "N-04"]
+    for row in registry:
+        assert row["kind"] in {"trace", "mesh", "gap", "joint", "bought_seat"}
+        assert len(row["reason"].split()) <= 10, row["id"]
+    for needle in ("Ø.0930", "Ø.0615", ".118 ±.002", "Ø.689"):
+        assert sum(needle in row["feature"] for row in registry) == 1, needle
     # Their acceptance is the pins themselves and the wheels' trial (notes).
     ream_note = spec.DRAWING_NOTES.splitlines()[spec.REAM_NOTE - 1]
     assert ream_note == "3. PRESS FIT: THE PIN IS THE GAUGE; NONE ENTERS ITS HOLE BY HAND."

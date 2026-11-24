@@ -488,23 +488,19 @@ DIMENSION_SUFFIXES = {
     # Round 7: the neck width keeps .XXX (at .XX its least, .006, falls
     # under the flat end's .007) and links the neck note like its neighbours.
     "FrontReliefWidth": f" {NECK_LINK}",
-    # Round 6: the overall keeps .XXX (at .XX the journal's stand-out can
-    # outrun the knob cup's supplied pilot, pd_transgear_knob_cup_spec
-    # FACING_REMOVAL) and states that function once, at the dimension, not
-    # in a note (r3).
-    "OverallLength": (
-        f" SETS {_config.parts('pd-transgear-knob-cup')['number']} FIT-UP"
-    ),
 }
+# The overall prints its value alone at .XXX, the title block's row (at .XX
+# the journal's stand-out can outrun the knob cup's supplied pilot,
+# pd_transgear_knob_cup_spec FACING_REMOVAL).  No reason prints on it
+# (machinist review r3 of the fit batch; owner ruling 2026-11-24: reasons
+# are not the sheet's).
 # The overall's one-line text (~2.75 mm a character, centred on its keep;
 # the round-6 render's digits ran 2.32 mm) ends 5 mm short of the face
 # width's left witness line (the pinion's rear face, which drops to the
 # text's height with its arrow) and starts 5 mm right of the rear witness
 # line.  It sits over the overall's line; SPAN 2 TEETH and the GEAR DATA
 # block stand under that line and left of the rear witness line.
-OVERALL_TEXT_CHARS = len(inch_text(REAR_END_Z - TIP_Z, 3)) + len(
-    DIMENSION_SUFFIXES["OverallLength"]
-)
+OVERALL_TEXT_CHARS = len(inch_text(REAR_END_Z - TIP_Z, 3))
 _OVERALL_HALF = OVERALL_TEXT_CHARS * 0.00275 / 2.0
 OVERALL_TEXT_LEFT = SIDE_KEEP["OverallLength"][0] - _OVERALL_HALF
 OVERALL_TEXT_RIGHT = SIDE_KEEP["OverallLength"][0] + _OVERALL_HALF
