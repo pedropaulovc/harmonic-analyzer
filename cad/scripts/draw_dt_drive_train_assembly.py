@@ -1030,9 +1030,10 @@ STACK_WINDOW = inch_window(
 # the model leg's own places (dt_cylinder_bank_setting_spec.PLACES; Codjiflo
 # review of #2532).
 STACK_GAUGE_BLOCKS = inch_text(_STACK_LENGTH, bank_settings.PLACES)
-# Step 9D's spring gap is set on a stack of the inch feeler gauge's leaves
-# (v47 machinist review: the blade was never identified); the steps print the
-# setting and the feeler-stack table the leaves that make it up.
+# Step 9D's spring gap is set on one .035 leaf of the inch feeler gauge (v47
+# machinist review: the blade was never identified; fit audit part 2, B11:
+# one leaf, was .037 on two); the steps print the setting and the
+# feeler-stack table the leaf.
 BANK_SPRING_FEELER = inch_text(bank.BANK_SPRING_SET, FEELER_PLACES)
 
 # --- sheet 15: the setting tables ----------------------------------------------

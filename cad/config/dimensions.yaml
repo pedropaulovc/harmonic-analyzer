@@ -512,9 +512,9 @@ sections:
         - derived from matched fit
         - med
       - - Cylinder arbor length
-        - 176.454 mm cylindrical strap-to-strap span; 179.502 mm including two domes
+        - 176.403 mm cylindrical strap-to-strap span; 179.451 mm including two domes
         - —
-        - 'Current cylinder_bank_layout.ARBOR_LENGTH / ARBOR_OVERALL_LENGTH: accepted gear stack plus one 2.794 mm (.11 in) south disc and the 0.940 mm (.037 in) north spring gap, with full depth of both 10.16 mm (.40 in) pedestal straps; each dome 1.524 mm (.06 in) proud. User ruling 2026-10-20 removes the north disc and relocates both pedestal origins from this stack. The #1038 re-pitch adds 20 × 0.5635 mm; the 7-1/2 in supply still covers it. The earlier ~200 mm estimate, the 165.08 mm cylinder and the 164.88 / 167.88, 164.874 / 167.922 and 165.194 / 168.242 mm lengths are historical, not current cut lengths; final length is measured at fit-up.'
+        - 'Current cylinder_bank_layout.ARBOR_LENGTH / ARBOR_OVERALL_LENGTH: accepted gear stack plus one 2.794 mm (.11 in) south disc and the 0.889 mm (.035 in) north spring gap, with full depth of both 10.16 mm (.40 in) pedestal straps; each dome 1.524 mm (.06 in) proud. User ruling 2026-10-20 removes the north disc and relocates both pedestal origins from this stack. The #1038 re-pitch adds 20 × 0.5635 mm; the 7-1/2 in supply still covers it. The earlier ~200 mm estimate, the 165.08 mm cylinder and the 164.88 / 167.88, 164.874 / 167.922 and 165.194 / 168.242 mm lengths are historical, not current cut lengths; final length is measured at fit-up.'
         - derived from current bank layout
         - med
       - - Cylinder bank south end disc ×1 (user ruling 2026-10-20)
@@ -530,7 +530,7 @@ sections:
         - derived
         - med
       - - Cylinder bank preload spring (#948 ruling R, PR #1292)
-        - McMaster 9714K392 wave disc spring Ø9.78 × Ø12.7 × 0.127, free 1.27; set on a .037 in (0.940 mm) feeler stack directly between gear 19's north planar face and the north pedestal strap, 2.1–4.6 N over the ±0.10 set band and the stack's leaf tolerance (MHA-DT-VN-68; inch leaves, owner ruling 2026-11-23, #3042)
+        - McMaster 9714K392 wave disc spring Ø9.78 × Ø12.7 × 0.127, free 1.27; set on one .035 in (0.889 mm) feeler leaf directly between gear 19's north planar face and the north pedestal strap, 2.7–5.0 N over the ±0.10 set band and the leaf's tolerance (MHA-DT-VN-68; inch leaves, owner ruling 2026-11-23, #3042; one leaf, fit audit part 2 B11)
         - —
         - 'User ruling 2026-10-20 reverses preload south onto the single brass disc and south hard datum, retaining the existing installed-gap and inferred linear-rate contracts. The north pedestal follows the accepted stack, not a nominal gear-19 hard datum (`cylinder_bank_layout.BANK_PRELOAD`, `test_channel_axial_budget.py`).'
         - derived
@@ -671,7 +671,7 @@ sections:
         - 'cone_line exact tracking retains sin i = 1.5875/7.62 and tan(cone half-angle) = 1.5875/7.452801067384 = tan i, making the drum-side generator parallel to the drum axis (#1038, the .300 in channel grid; 7.0565 and 6.875611681880 before). GEAR_AXIS_SHIFT = −33.114642580298 mm; dt_cone_gear_shaft_spec.gear_faces owns touching solid faces. Earlier y = 90.518 was the lower-axis layout.'
         - low
       - - Cylinder arbor (stationary)
-        - 'x = −60.393602135, y = 95.25; cylindrical span z −88.159312220..+88.294487780 (176.45 mm), domes 1.524 mm (.06 in) proud of each end. Stationary plain-bore support stations follow cylinder_bank_layout; earlier y = 90.518 belonged to the lower-axis design.'
+        - 'x = −60.393602135, y = 95.25; cylindrical span z −88.159312220..+88.243687780 (176.40 mm), domes 1.524 mm (.06 in) proud of each end. Stationary plain-bore support stations follow cylinder_bank_layout; earlier y = 90.518 belonged to the lower-axis design.'
         - ch30 GT supplies historical topology; cone_line and cylinder_bank_layout own current placement and strap-to-strap cut length
         - med (derived current layout)
       - - Cylinder gear j
